@@ -87,8 +87,8 @@ def test_coherence_spans_multiple_files_in_chronological_order(tmp_path: Path) -
     [
         pytest.param(
             lambda bugs: _write_log(bugs, "20260701T13Z-00.jsonl", [_resolved("orphan")]),
-            "no prior 'reported'",
-            id="terminal-without-prior-reported",
+            "no 'reported' event anywhere",
+            id="terminal-without-any-reported",
         ),
         pytest.param(
             lambda bugs: _write_log(
@@ -252,3 +252,34 @@ def test_a_terminal_with_no_reported_is_still_an_error(tmp_path: Path) -> None:
     errors = [i for i in _doc033(specs) if i.severity is Severity.ERROR]
 
     assert errors, "fechar um bug que ninguém abriu continua a ser um erro"
+
+
+def test_a_reconstructed_opening_appended_late_warns_but_does_not_error(tmp_path: Path) -> None:
+    """Um log append-only não consegue inserir a abertura ANTES de um terminal já escrito.
+
+    Doze bugs foram fechados por um agente que só acrescentou o terminal, antes de o guard
+    r19 existir; verificado em 163 revisões de git, o `reported` nunca existiu. A reparação
+    honesta num ledger append-only é um lançamento compensatório, que por construção fica
+    depois. O invariante que importa é «nenhum bug foi fechado sem nunca ter sido aberto» —
+    uma abertura tardia é a reparação, não o defeito.
+    """
+    specs = tmp_path / "specs"
+    bugs = _bugs_dir(specs)
+    _write_log(
+        bugs,
+        "20260701T13Z-00.jsonl",
+        [
+            _resolved("bug-a", ts="2026-07-01T15:00:00Z"),
+            _reported("bug-a", ts="2026-07-01T15:00:00Z"),
+        ],
+    )
+
+    issues = _doc033(specs)
+
+    assert not [i for i in issues if i.severity is Severity.ERROR], (
+        f"uma abertura reconstruída não pode reprovar a árvore: {issues}"
+    )
+    late = [i for i in issues if "precedes its 'reported'" in i.description]
+    assert late and all(i.severity is Severity.WARNING for i in late), (
+        "a reparação tem de continuar visível, nunca silenciosa"
+    )

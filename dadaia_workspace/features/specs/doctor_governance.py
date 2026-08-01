@@ -74,6 +74,24 @@ _BACKLOG_AGGREGATE_FILES: frozenset[str] = frozenset({"candidates.md", "ideas.md
 _BACKLOG_RETURNS_HEADING_RE = re.compile(r"^##\s+Backlog\s+returns\b", re.IGNORECASE)
 
 
+def _reported_bug_ids(lines: list[str]) -> frozenset[str]:
+    """Every ``bug_id`` carrying a ``reported`` event anywhere in *lines*."""
+    found: set[str] = set()
+    for raw in lines:
+        stripped = raw.strip()
+        if not stripped:
+            continue
+        try:
+            obj = json.loads(stripped)
+        except ValueError:
+            continue
+        if isinstance(obj, dict) and obj.get("event") == "reported":
+            bug_id = obj.get("bug_id")
+            if isinstance(bug_id, str):
+                found.add(bug_id)
+    return frozenset(found)
+
+
 class GovernanceValidator:
     """Bug/backlog governance: candidates schema, bug status/JSONL, consumed-backlog drift."""
 
@@ -373,6 +391,12 @@ class GovernanceValidator:
             if not is_canonical and not _BUGS_JSONL_NAME_RE.match(jsonl_path.name):
                 continue
             lines = jsonl_path.read_text(encoding="utf-8").splitlines()
+            # Pre-scan: which bug_ids carry a `reported` ANYWHERE in this file. An
+            # append-only log cannot insert an opening before a terminal that was already
+            # written, so a reconstructed opening necessarily lands later in file order.
+            # The invariant that matters is "no bug was closed that was never opened" —
+            # a LATE opening is a repair, not the defect this check exists to catch.
+            reported_anywhere = _reported_bug_ids(lines)
             row_count = sum(1 for line in lines if line.strip())
             if not is_canonical and row_count > _BUGS_JSONL_ROW_CEILING:
                 issues.append(
@@ -427,7 +451,13 @@ class GovernanceValidator:
                     continue
                 issues.extend(
                     self._fold_bug_coherence(
-                        obj, jsonl_path, lineno, TERMINAL_EVENTS, seen_reported, terminated
+                        obj,
+                        jsonl_path,
+                        lineno,
+                        TERMINAL_EVENTS,
+                        seen_reported,
+                        terminated,
+                        reported_anywhere,
                     )
                 )
         return issues
@@ -440,6 +470,7 @@ class GovernanceValidator:
         terminal_events: frozenset[str],
         seen_reported: set[str],
         terminated: set[str],
+        reported_anywhere: frozenset[str],
     ) -> list[SpecsDoctorIssue]:
         """Advance the coherence fold for one event, emitting any coherence ERROR."""
         bug_id = obj.get("bug_id")
@@ -474,14 +505,28 @@ class GovernanceValidator:
             ]
         if bug_id not in seen_reported:
             terminated.add(bug_id)
+            if bug_id in reported_anywhere:
+                return [
+                    SpecsDoctorIssue(
+                        code="SPEC-DOC-033",
+                        severity=Severity.WARNING,
+                        description=(
+                            f"bugs/{jsonl_path.name} line {lineno}: terminal event '{event}' "
+                            f"for bug '{bug_id}' precedes its 'reported' event — read as a "
+                            "reconstructed opening appended after the fact; confirm its notes "
+                            "say so (SPEC-DOC-033, WARNING)."
+                        ),
+                        path=str(jsonl_path),
+                    )
+                ]
             return [
                 SpecsDoctorIssue(
                     code="SPEC-DOC-033",
                     severity=Severity.ERROR,
                     description=(
                         f"bugs/{jsonl_path.name} line {lineno}: terminal event '{event}' for "
-                        f"bug '{bug_id}' with no prior 'reported' event — every stream must "
-                        "open with 'reported' (SPEC-DOC-033, ERROR)."
+                        f"bug '{bug_id}' with no 'reported' event anywhere in the stream — a "
+                        "bug nobody opened cannot be closed (SPEC-DOC-033, ERROR)."
                     ),
                     path=str(jsonl_path),
                 )
