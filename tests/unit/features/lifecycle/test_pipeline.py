@@ -630,3 +630,82 @@ def test_pipeline_review_retry_is_observable_in_the_run_record(tmp_path: Path) -
     assert run.revision_note is not None
     assert "bounded review retry" in run.revision_note
     assert "implement" in run.revision_note
+
+
+# ── the implementation ladder must terminate under a reviewer that never approves ────
+#
+# `test_a_rejecting_review_terminates.py` proves this for the fragment-gate engine
+# (release-definition / audit). The implementation ladder runs on a DIFFERENT engine, this
+# one, and it is the path the operator uses most — so the property was unproven exactly
+# where it matters most. The nearest existing test, `test_pipeline_keeps_tasks_reserved_
+# when_review_blocks`, sets `max_review_retries=0` and therefore never enters the retry loop
+# at all.
+#
+# Round 25's live R-01 evidence shows the loop running for real: implement accepted, review
+# blocked, implement accepted, review blocked, implement started — three implement runs for
+# a default budget of two retries. This pins that the count is bounded rather than merely
+# observed to be small once, which is the operator's requirement in their own words: no
+# infinite tasks.
+
+
+def test_the_implementation_ladder_stops_when_the_review_never_approves(tmp_path: Path) -> None:
+    specs = _task_specs(tmp_path)
+    seen: dict[str, int] = {}
+
+    class _NeverApproves:
+        def runtime_kind(self) -> AgentRuntimeKind:
+            return AgentRuntimeKind.FAKE
+
+        def run(self, request: AgentRunRequest) -> AgentRunResult:
+            # The pipeline's task_id ends in `attempt-N`, not the step label — an earlier
+            # draft of this test split on ":" and took the last segment, so nothing ever
+            # matched "review", every step was approved, and the run sailed to CLOSURE. The
+            # test reported a product defect that did not exist. Match the whole id.
+            task_id = request.task_id or ""
+            label = "review" if "review" in task_id else "implement"
+            seen[label] = seen.get(label, 0) + 1
+            if seen[label] > 12:
+                raise AssertionError(
+                    f"step {label!r} ran {seen[label]} times — the review budget is not "
+                    "bounding the loop; this is the infinite task the operator asked never "
+                    "to be possible"
+                )
+            if label == "review":
+                return AgentRunResult(
+                    status=AgentRunStatus.SUCCEEDED,
+                    summary="withholding approval forever",
+                    artifact_refs=(".dadaia/tmp/lifecycle-worker/demo/rejected.step-output.json",),
+                    structured_output={"verdict": "REJECTED", "verdict_reason": "never"},
+                )
+            return _approved_for("demo")
+
+    from dadaia_workspace.features.lifecycle.workflow_handoffs import WorkflowHandoffResolver
+    from dadaia_workspace.infrastructure.json_lifecycle_run_store import JsonLifecycleRunStore
+    from dadaia_workspace.infrastructure.runtime_files import FilesystemRuntimeFileAdapter
+
+    pipe = LifecyclePipeline(
+        context="demo",
+        release_id="task-release",
+        run_store=_MemoryRunStore(),
+        runtime_factory=lambda kind: _NeverApproves(),  # type: ignore[arg-type,return-value]
+        specs_dir=specs,
+        # Wired as production wires it: a bounded retry resolves the rejecting review's
+        # payload, so a pipeline without a resolver cannot exercise this path at all.
+        handoff_resolver=WorkflowHandoffResolver(
+            run_store=JsonLifecycleRunStore(tmp_path),
+            payload_writer=FilesystemRuntimeFileAdapter(tmp_path),
+            clock=lambda: "2026-08-01T00:00:00Z",
+        ),
+        max_review_retries=2,
+    )
+
+    result = pipe.run("never-approves-impl", implementation_ladder(AgentRuntimeKind.FAKE))
+
+    # Reaching this line at all is the first assertion: _NeverApproves raises above 12.
+    assert result.completed is False, "a run whose review never approved must not complete"
+    assert seen.get("implement", 0) == 3, (
+        "a budget of 2 retries means the create step runs at most three times; it ran "
+        f"{seen.get('implement', 0)} — matching the live round-25 R-01 trace"
+    )
+    assert result.blocked is not None
+    assert result.blocked.operator_command, "a blocked run must still hand back a command"
