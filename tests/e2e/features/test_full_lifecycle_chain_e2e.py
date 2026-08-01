@@ -233,3 +233,61 @@ def test_the_workspace_survives_being_used_more_than_once(workspace: Path) -> No
     )
     backlog_doctor = _cli("backlog", "doctor", "--specs-dir", str(_specs(workspace)))
     assert backlog_doctor.exit_code == 0, backlog_doctor.output
+
+
+def _doctors_clean(workspace: Path, stage: str) -> None:
+    specs = _cli("specs", "doctor", "--context", _CTX)
+    assert specs.exit_code == 0, f"specs doctor fails {stage}:\n{specs.output}"
+    backlog = _cli("backlog", "doctor", "--specs-dir", str(_specs(workspace)))
+    assert backlog.exit_code == 0, f"backlog doctor fails {stage}:\n{backlog.output}"
+
+
+def test_the_tree_is_valid_at_every_stage_not_just_the_end(workspace: Path) -> None:
+    """The workspace must never fail its own validators mid-chain.
+
+    Bug ``r25-release-definition-leaves-consumed-backlog-stale`` was found by the
+    consumer-side validator precisely because it stopped after ``release-definition`` and
+    ran the doctor there: ``backlog doctor`` reported BL-STALE on a tree the workflow had
+    just produced correctly. Every chain test in this file ran straight through to closure
+    and inspected only the end state, so the intermediate one was covered by nothing — the
+    same blind-spot shape the mutation measurements exposed in the E2E layer generally.
+
+    An operator does not run the chain atomically. They author a backlog item and stop.
+    They define a release and go to bed. Whatever the doctors say at those points is what
+    they will believe about their workspace, so those points are the contract.
+    """
+    _doctors_clean(workspace, "on a fresh context")
+
+    backlog = _cli(
+        "lifecycle", "backlog-definition",
+        "--context", _CTX, "--release-id", _RELEASE, "--run-id", "sbd",
+        "--harness", "fake", "--demand", "add an example verb",
+    )  # fmt: skip
+    assert backlog.exit_code == 0, backlog.output
+    _doctors_clean(workspace, "after backlog-definition")
+
+    define = _cli(
+        "lifecycle", "release-definition",
+        "--context", _CTX, "--release-id", _RELEASE, "--run-id", "srd",
+        "--harness", "fake", "--backlog-run-id", "sbd",
+    )  # fmt: skip
+    assert define.exit_code == 0, define.output
+    _doctors_clean(workspace, "after release-definition (the state r25 reported)")
+
+    assert (
+        _cli("context", "bind", _CTX, "--mode", "implementation", "--release", _RELEASE).exit_code
+        == 0
+    )
+    implement = _cli(
+        "lifecycle", "implementation-reviews",
+        "--context", _CTX, "--release-id", _RELEASE, "--run-id", "sir", "--harness", "fake",
+    )  # fmt: skip
+    assert implement.exit_code == 0, implement.output
+    _doctors_clean(workspace, "after implementation reached closure")
+
+    audit = _cli(
+        "lifecycle", "audit",
+        "--context", _CTX, "--release-id", _RELEASE, "--run-id", "sau", "--harness", "fake",
+    )  # fmt: skip
+    assert audit.exit_code == 0, audit.output
+    _doctors_clean(workspace, "after audit")
