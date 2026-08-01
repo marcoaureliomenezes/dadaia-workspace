@@ -6,9 +6,9 @@ applyTo: "specs/releases/*/CLOSURE.md"
 
 # dadaia-release-closure
 
-> **Not the lifecycle enforcement mechanism.** Ordered lifecycle execution (the closure
-> sequence and its gates) is owned by the dadaia-workflows (`dadaia lifecycle`). This
-> skill is reference / manual-operator guidance only.
+> **This skill is the procedure.** `product-engineer` executes the closure sequence
+> itself; no engine advances it. `dadaia specs doctor` is the check that the closed
+> release is coherent, and the commit gate is what makes closure real on disk.
 
 ## When to invoke
 

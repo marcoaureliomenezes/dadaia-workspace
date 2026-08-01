@@ -344,14 +344,14 @@ done — exactly the SDD shape. Map Codex workflow expectations onto dadaia's ga
 | Closure | `product-engineer` | triple evidence | CLOSURE + memory update + archived release |
 
 **No `.codex/workflows/` projection.** The retired `*.workflow.md` reference layer
-duplicated executable lifecycle behavior without providing an executor. The four
-Python-backed `dadaia lifecycle` commands are the sole workflow authority; their
-fragments live under `public/lifecycle_fragments/` and their operative role mandates
-under `public/personas/`. The installer removes legacy projected workflow files and
+duplicated executable lifecycle behavior without providing an executor. There is no
+workflow executor at all: ordered lifecycle work is a persona following its skill, and
+the persona definitions live in the core memory atom `personas`. The installer removes
+legacy projected workflow files and
 the doctor reports any residue. `.codex/config.toml` carries no inert workflow keys.
 
 Authoring consequences:
-- Hooks and Python lifecycle workflows enforce *mechanics* of these gates; they must never decide
+- Hooks and git chokepoints enforce *mechanics* of these gates; they must never decide
   product scope, rewrite the SPEC to justify code, or hide human approval.
 - For difficult tasks, plan before implementing (reduces rework). For bugs,
   reproduction + verification matter more than a vague description.

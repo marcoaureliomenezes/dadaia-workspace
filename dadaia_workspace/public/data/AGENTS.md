@@ -245,34 +245,28 @@ deterministic gate constrains **what** may be written (path-class, presence, pha
 mode) — not **how** the change was produced. (`Aprovado`, `Em revisão`, and `Draft` are
 the canonical SDD status tokens — do not translate or change them.)
 
-**Ordered lifecycle is owned by the dadaia-workflows, not by this file.** The ordered
-ritual — reading SPEC/PLAN/TASKS, reserving a task, the per-phase definition →
-implementation → review → closure sequence — is executed by the **dadaia-workflows**
-(the four `dadaia lifecycle` commands: `backlog-definition`, `release-definition`,
-`implementation-reviews`, and `audit`). Each is a Python workflow body that assembles
-fragment-scoped per-step prompts,
-selects dynamic context, calls worker agents, and advances **Python-validated gates**.
-Each model-driven worker step prompt is assembled from its **fragment**
-(`public/lifecycle_fragments/<workflow>/<step>.md` — the step-specific instruction:
-inputs, the exact task, output schema) **plus** its **persona**. A persona
-(`public/personas/<role>.md`) is the Layer-2 (codex/pi) equivalent of a Claude
-sub-agent: the role's behavioral mandate, injected into the step prompt alongside the
-fragment as an operative directive, resolved from the step's `role`. The persona roster
-is the **8 non-PM core roles** (`ai-engineer`, `code-reviewer`, `product-engineer`,
-`project-auditor`, `qa-engineer`, `security-reviewer`, `software-architect`,
-`software-engineer`); `project-manager` is the Layer-1 orchestrator, not a Layer-2
-persona, so it has no persona atom.
-**Harness preference (convention):** in a Codex or PI entry session, dadaia-workflows
-are the preferred execution path, and the Layer-2 worker harness defaults to the entry
-harness (enter `codex` ⇒ prefer `--harness codex`; enter `pi` ⇒ prefer `--harness pi`);
-an explicit `--harness`/`--step-harness` always wins. Claude Code is Layer-1-only —
-never a Layer-2 worker.
-Layer-1 agents are **oriented toward** those workflows; the disk/commit boundary is
+**Ordered lifecycle is a persona following a skill, not an engine.** The ordered ritual —
+reading SPEC/PLAN/TASKS, reserving a task, the per-phase definition → implementation →
+review → closure sequence — is executed by the owning **persona**, which follows the
+matching skill: `dadaia-grill-me` before a SPEC, `dadaia-release-definition` to author it,
+`dadaia-task-manager` for marker discipline, `dadaia-release-closure` to close it. There is
+no workflow executor and no Markdown workflow catalog.
+
+**Personas are core definitions; harness entities are projections** (constitution §14).
+The core defines each capability abstractly — a persona (a role's question, authority,
+refusals, output), a deterministic behaviour, a rule, a skill — and each entry harness
+derives its own entity from that definition: a Claude Code sub-agent, a Codex agent, a
+Kimi CLI agent. **No entity exists without a definition behind it**, and a projection may
+add harness mechanics (tools, model tier, effort) but may never contradict the definition.
+The roster is the nine core personas plus three install-gated plugin personas; the
+definitions live in the core memory atom `personas`. **Only the harness you are running in
+may edit that harness's own entities** — harnesses know nothing about each other. Core
+definitions, skills, and scoped `AGENTS.md` are harness-universal.
+
+Agents are **oriented toward** those skills; the disk/commit boundary is
 **safety-gate-enforced** by the deterministic gate and git chokepoints described above
-(write-scope, presence, and phase) — there is no procedural check that a given
-workflow verb was actually run. For the full per-workflow description — purpose,
-ordered steps, per-step harness/model, flow diagram, and availability — open the
-**`dadaia panel` → 2º Agentic Layer**.
+(write-scope, presence, and phase) — there is no procedural check that a given skill was
+actually followed.
 
 ## Memory
 

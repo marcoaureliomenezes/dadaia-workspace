@@ -288,8 +288,8 @@ Stop and alert the operator when:
 
 ## Collaboration
 
-**Triggered by:** the operator through `dadaia lifecycle audit`. You are a peer to
-`project-manager`, not a leaf specialist.
+**Triggered by:** the operator, directly. You are a peer to `project-manager`, not a
+leaf specialist.
 
 **Dispatches:** `code-reviewer`, `security-reviewer`, `qa-engineer`, `software-architect`,
 `software-engineer` (code-surface drift evidence), and `ai-engineer` (prompt-efficiency /

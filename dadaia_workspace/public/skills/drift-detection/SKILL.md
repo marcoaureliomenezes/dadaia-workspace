@@ -9,9 +9,10 @@ applyTo: ".dadaia/reports/**"
 
 # drift-detection — Memory ↔ Implementation Drift Audit
 
-> **Not the lifecycle enforcement mechanism.** Ordered lifecycle execution (the audit
-> workflow and its gates) is owned by the dadaia-workflows (`dadaia lifecycle`). This
-> skill is reference / manual-operator guidance only.
+> **This skill is the procedure.** `project-auditor` runs it directly; there is no
+> engine that runs it for you. The audit's product is evidence, and the
+> `audit-without-disposition` doctor invariant is what keeps that evidence from being
+> filed and forgotten.
 
 ## Memory Atom Inventory
 

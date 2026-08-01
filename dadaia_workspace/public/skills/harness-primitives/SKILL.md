@@ -19,14 +19,12 @@ every agent a working mental model of the primitives that harness exposes, so yo
 read your own configuration intelligently and know when a question is beyond your
 remit.
 
-**Two agentic layers** (constitution §0 "The two agentic layers"). dadaia runs agents at
-**Layer 1** — the entry harness a human launches in a terminal (`claude`, `codex`,
-`pi`) — and **Layer 2** — a bounded worker driven inside a Python
-`dadaia lifecycle` workflow behind the `AgentRuntimePort` seam, selectable per step as
-Codex headless or PI headless. FAKE is an internal test adapter; Claude Code is
-Layer-1-only. This literacy
-skill describes the Layer-1 entry-harness primitives; the Layer-2 worker-runtime model is
-deep harness depth — defer to `ai-engineer`.
+**Core definitions, harness projections** (constitution §14). dadaia defines each
+capability abstractly — a persona, a deterministic behaviour, a rule, a skill — and each
+entry harness a human launches in a terminal (`claude`, `codex`, `kimi`) derives its own
+entity from that definition. No entity exists without a definition behind it. This literacy
+skill describes those entry-harness primitives; the derivation rules per harness are deep
+harness depth — defer to `ai-engineer`.
 
 This is **literacy, not mastery.** For deep reasoning about *why* a primitive
 behaves a certain way — or to author/diagnose one — defer to `ai-engineer`
@@ -130,7 +128,7 @@ the question to ai-engineer rather than guessing.
 | You need to reason about *why* a primitive behaves a certain way (e.g. why a rule loaded but did not block) | Defer to ai-engineer. |
 | You are diagnosing a hook/skill/rule interaction or a projection drift you do not understand | Defer to ai-engineer (drift *repair* via `--force` is operator/devops-only). |
 | You want to design, author, or modify any AI-entity file (persona, skill, rule, hook) | Defer to ai-engineer — product-engineer specs it, ai-engineer implements it. |
-| You want the deep decision protocol for any Layer-1 harness (Claude Code, Codex, PI), the Layer-2 worker-runtime model, or context engineering | Defer to ai-engineer. Those deep skills (`ai-harness-claude-code`, `ai-harness-codex`, `ai-context-engineering`) are restricted to ai-engineer by the `harness-skill-scope` rule — do not attempt to invoke them. |
+| You want the deep decision protocol for any entry harness (Claude Code, Codex, Kimi Code) or for context engineering | Defer to ai-engineer. Those deep skills (`ai-harness-claude-code`, `ai-harness-codex`, `ai-context-engineering`) are restricted to ai-engineer by the `harness-skill-scope` rule — do not attempt to invoke them. |
 | You just need to *read* your own persona/rule/skill to do your task | No deferral — that is normal literacy, which is what this skill is for. |
 
 In one sentence: know the primitives well enough to read your own configuration

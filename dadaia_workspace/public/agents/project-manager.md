@@ -142,12 +142,13 @@ existing spec or source files.
 
 ## Playbook routers
 
-#### Tier-1 (dadaia-workflows)
+#### Ordered lifecycle work
 
-Use the four Python workflows listed by `dadaia lifecycle --help`. Do not load or
-invent Markdown workflow files.
+Dispatch the owning persona and have it follow the matching skill —
+`dadaia-grill-me` before a SPEC, `dadaia-release-definition` to author it,
+`dadaia-release-closure` to close it. Do not invent Markdown workflow files.
 
-#### Tier-2 (playbook routers — entry agent in the demand cell)
+#### Playbook routers (entry agent in the demand cell)
 
 | Demand pattern → entry agent | Playbook |
 |---|---|

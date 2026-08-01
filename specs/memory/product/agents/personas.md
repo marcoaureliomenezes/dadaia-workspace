@@ -36,7 +36,7 @@ Five fields, and nothing else:
 | **Authority** | What it may create or modify. Everything else is out of contract. |
 | **Refusals** | What it must decline even when asked, because another persona owns it. |
 | **Output** | The artifact it hands back — always evidence, never an assertion. |
-| **Class** | ADDITIVE (only adds evidence) or MUTATING (changes the repo). |
+| **Class** | MUTATING (writes repository files) or ADDITIVE (adds only evidence — reports and handoffs). Not to be confused with the SDD gate's *path* classes, which grade the destination, not the role. |
 
 A persona carries **no model, no reasoning effort, and no harness name.** Those are
 projection concerns, resolved when a harness scaffolds its own entity.
@@ -47,7 +47,7 @@ Nine core personas. Every one owns a distinct question.
 
 | Persona | Question it answers | Class |
 |---|---|---|
-| `project-manager` | *What should we do next, and who does it?* | ADDITIVE — coordinates |
+| `project-manager` | *What should we do next, and who does it?* | MUTATING — backlog |
 | `product-engineer` | *What exactly are we building, and how do we know it is done?* | MUTATING — specs + memory |
 | `software-architect` | *Does this design fit the system we already have?* | ADDITIVE |
 | `software-engineer` | *Does the code exist, work, and stay inside its scope?* | MUTATING — code + tests |
@@ -70,8 +70,8 @@ auditable at all.
 ## Detail per persona
 
 **project-manager** — Entry point for every non-trivial demand. Classifies, dispatches,
-synthesizes. Sole curator of `specs/backlog/**`: what enters, matures, and leaves it.
-Refuses to write code, specs, memory, tests, or CI.
+synthesizes. Sole curator of `specs/backlog/**`: what enters, matures, and leaves it — the
+only repository files it writes. Refuses to write code, release specs, memory, tests, or CI.
 
 **product-engineer** — Authors SPEC, PLAN, TASKS and CLOSURE, and owns atomic product
 memory. Each artifact is atomic: the SPEC describes only this release's delta; memory

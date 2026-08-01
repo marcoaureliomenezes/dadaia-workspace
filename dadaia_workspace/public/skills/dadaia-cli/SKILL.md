@@ -14,7 +14,7 @@ The `dadaia` CLI is the single control surface for the workspace. It is **self-d
 ## Discover
 
 - `dadaia --help` — all command groups.
-- `dadaia <group> --help` — a group's subcommands (e.g. `dadaia context --help`, `dadaia lifecycle --help`).
+- `dadaia <group> --help` — a group's subcommands (e.g. `dadaia context --help`, `dadaia backlog --help`).
 - Always call the binary in the workspace venv: `.dadaia/.venv/bin/dadaia`. Never system Python/pip.
 - Add `--json` to most read commands for machine-readable output.
 - Start every new or upgraded runtime with `dadaia capabilities --json`; this versioned
@@ -53,22 +53,19 @@ dadaia context baseline <ctx> --yes --push                       # explicit unbo
 
 Bind binds the **context** (persists mode + session id in the session record, self-scoped); no shell `eval` needed. ADDITIVE work (bugs/backlog/audits/reports) needs no bind.
 
-## Workflows (`dadaia lifecycle <verb>`)
+## Backlog consumption (`dadaia backlog <verb>`)
 
-Deterministic, Python-gated. Pass `--context <ctx> --release-id <id>` on every workflow command; add `--harness pi|codex|fake` + `--step-model` to select the Layer-2 worker.
+Removal-on-release, driven from the SPEC's `**Consumes:**` line.
 
 | Verb | Purpose |
 |---|---|
-| `backlog-definition` | Research/grill a demand or bug and author one consistent backlog item |
-| `release-definition` | Author and review SPEC, PLAN, and TASKS |
-| `implementation-reviews` | Implement, self-verify, run QA/security/code review, correct, and close |
-| `audit` | Scope, inspect, disposition findings, and verify handoff coherence |
+| `consume --release-id <id>` | Bind the declared slugs to shipped anchors, write `specs/_archive/<id>/consumed_backlog.json` |
+| `remove-consumed --release-id <id>` | Drop fully-consumed items from the live SET (archiving a copy first) |
+| `doctor` | Report BL-STALE and other backlog invariants |
 
-These are the only workflow commands. Status, cleanup, report validation, model policy,
-and handoff doctors are diagnostics under their owning top-level command groups; they are
-not workflows.
-
-Full per-verb detail (steps, harness/model, diagrams): the panel **Workflows** tab.
+There is no workflow engine: ordered lifecycle work is a persona following its skill
+(`dadaia-grill-me`, `dadaia-release-definition`, `dadaia-task-manager`,
+`dadaia-release-closure`).
 
 ## Runtime convergence and certification
 
