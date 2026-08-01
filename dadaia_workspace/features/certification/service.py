@@ -343,6 +343,27 @@ def certify(
 
     check("workflow-audit", audit_chain)
 
+    def tree_stays_doctor_clean() -> str:
+        """The tree the workflows just produced must still pass its OWN validators.
+
+        Bug r25-release-definition-leaves-consumed-backlog-stale: between
+        release-definition and closure, `backlog doctor` reported BL-STALE on a tree the
+        workflow had just produced correctly — and certify was green through all of it,
+        because every workflow check asserted its own artifacts and none asked the doctors
+        what they thought afterwards.
+
+        That is the shape the operator has called out repeatedly: an internal gate that
+        reads green while the consumer-side validator finds real defects is itself a defect.
+        certify now ends where an operator would actually look.
+        """
+        specs_verdict = doctor_clean("specs", "doctor", "--context", "certified-consumer", "--json")
+        # `backlog doctor` reports through its exit code, not JSON — `cli` raises on a
+        # non-zero exit, so a rejected tree surfaces here carrying the doctor's own output.
+        cli("backlog", "doctor", "--specs-dir", str(consumer_specs))
+        return f"specs {specs_verdict}; backlog doctor clean after the full workflow chain"
+
+    check("workflow-tree-stays-doctor-clean", tree_stays_doctor_clean)
+
     # Honest-failure canaries (F-22 class): wrong invocations refuse cleanly — non-zero
     # exit, no raw traceback, no side effects.
     def audit_missing_release_refused() -> str:
