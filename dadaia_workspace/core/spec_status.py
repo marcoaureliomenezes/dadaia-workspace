@@ -89,6 +89,34 @@ def extract_status(text: str) -> str | None:
     return None
 
 
+def contradicting_status_lines(text: str) -> list[tuple[int, str]]:
+    """Every status declaration that disagrees with an otherwise-approved document.
+
+    Returns ``(line number, token)`` pairs, 1-indexed, empty when the document is
+    consistent or plainly not approved.
+
+    Recipe R-27: a refusal must name the defect it FOUND. The terminal gate used to say
+    ``PLAN.md (not Aprovado)`` about a file whose line 3 reads ``> **Status:** Aprovado``,
+    so the author saw the refusal contradicted by the very line they were pointed at, and
+    the actual cause — a second declaration further down — went unmentioned. That is the
+    same shape as the round-24 plan lint reporting empty cells about a fully populated row:
+    a correct refusal the author cannot act on, which turns each retry into a rewrite of
+    the part that was already right.
+
+    Only reported for a document that declares APPROVED somewhere; one that plainly reads
+    Draft is refused for an obvious reason and needs no extra explanation.
+    """
+    if extract_status(text) != APPROVED:
+        return []
+    return [
+        # Anchored on the TOKEN, not the match: the pattern's leading `^\s*` absorbs
+        # the preceding newline, so match.start() reports the line above.
+        (text[: match.start("token")].count("\n") + 1, match.group("token"))
+        for match in _DECORATED_STATUS_LINE.finditer(text)
+        if match.group("token") != APPROVED
+    ]
+
+
 def is_approved(text: str) -> bool:
     """Whether the document carries a canonical ``**Status:** Aprovado``.
 

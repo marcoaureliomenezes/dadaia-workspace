@@ -38,6 +38,7 @@ from dadaia_workspace.core.models.workflow_execution import ResolvedModelConfig
 from dadaia_workspace.core.spec_status import (
     ANY_STATUS_LINE,
     APPROVED_LINE,
+    contradicting_status_lines,
     is_approved,
 )
 from dadaia_workspace.features.lifecycle.workflows._fragment_gate import (
@@ -586,8 +587,22 @@ class ReleaseDefinitionWorkflow(FragmentGateWorkflow[ReleaseStep, ReleaseDefinit
             if not path.is_file():
                 missing.append(f"{name} (absent)")
                 continue
-            if not is_approved(path.read_text(encoding="utf-8")):
-                missing.append(f"{name} (not Aprovado)")
+            body = path.read_text(encoding="utf-8")
+            if not is_approved(body):
+                # Name the defect the artifact ACTUALLY has (recipe R-27). A file whose
+                # line 3 reads `> **Status:** Aprovado` was refused with a bare
+                # "(not Aprovado)", so the author was pointed at a line that contradicted
+                # the refusal while the real cause — a second, contradictory declaration
+                # further down — went unmentioned. Same shape as the round-24 plan lint
+                # reporting empty cells about a fully populated row.
+                contradictions = contradicting_status_lines(body)
+                if contradictions:
+                    where = ", ".join(f"line {n} says {token}" for n, token in contradictions)
+                    missing.append(
+                        f"{name} (declares Aprovado AND a contradictory status: {where})"
+                    )
+                else:
+                    missing.append(f"{name} (not Aprovado)")
                 # Bug release-definition-approved-plan-not-persisted-041: a Draft
                 # artifact with an APPROVED ledger (resumed/rewritten mid-run) recovers
                 # by re-running ONLY its review — the flip is re-asserted on acceptance.
