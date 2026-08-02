@@ -76,5 +76,5 @@ source; no external CDN is required.
 
 ## Dependencies
 
-[[dadaia-workflows]], [[agent-orchestration]], [[agent-monitoring]],
+[[agent-orchestration]], [[agent-monitoring]],
 [[server-registry]], [[brand-identity]].

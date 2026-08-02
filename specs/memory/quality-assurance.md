@@ -43,8 +43,10 @@ workspace. The suite is ~2,700 collected tests, green-serial in 5–10 minutes.
 
 ## Workflow Validation
 
-Each of the four dadaia-workflows has deterministic fake-worker coverage and real
-phantom journeys through Codex and PI. Tests assert step order, fragment/persona
+The SDD lifecycle has deterministic coverage through `dadaia certify`, which drives the
+real verbs end to end (backlog item → release opened → artifacts approved → task markers
+→ audit disposition) and then asks BOTH doctors what they think of the tree it produced.
+Tests assert artifact contracts, refusal
 injection, provider/model resolution, immutable attempt payloads, exact dependency
 consumption, rejection/retry behavior, task-marker closure gating, diagnostics, and
 terminal state. The v0.2.3 simplification adds: bounded in-run revision (a REJECTED
@@ -89,4 +91,4 @@ and Playwright outputs are redirected. Forbidden repo-local artifacts include
 
 ## Dependencies
 
-[[tech-stack]], [[architecture]], [[dadaia-workflows]], [[panel]].
+[[tech-stack]], [[architecture]], [[panel]].

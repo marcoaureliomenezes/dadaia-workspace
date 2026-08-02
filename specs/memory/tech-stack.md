@@ -16,8 +16,8 @@ The session bootstrap injects only the top of this file — these bullets ARE th
 
 - Python `^3.12` · Poetry Core build · console entrypoint `dadaia` · version lives in `pyproject.toml` only.
 - Deps: Typer + Rich (CLI), PyYAML, Jinja2, jsonschema, Mistune, openpyxl; optional `claude-sdk` extra. Everything else is stdlib; SQLite backs local telemetry. PI/Codex/Kimi Code are external operator-installed CLIs, never Python deps.
-- Runtimes: **Claude Code = Layer-1 only** (a `claude-*` id is never a Layer-2 worker); **Kimi Code = Layer-1 only** (`.kimi-code/` projection; hooks registered via a managed block in the user-level `$KIMI_CODE_HOME/config.toml` since Kimi has no project-level config); **Codex** and **PI** are Layer-1 entries AND Layer-2 workers (`codex exec`, `pi --mode json`); `fake` is the deterministic test adapter. This list is set-equal to `AgentRuntimeKind` (`core/models/lifecycle.py`).
-- Layer-2 models: Codex profiles `gpt-5.3-codex-spark` (medium/high reasoning); PI profiles provider-qualified `openai-codex/gpt-5.3-codex-spark` (low/medium/high) plus the explicit opt-in OpenRouter `moonshotai/kimi-k2.5:high`. A `light` purpose tier routes mechanical steps to the lowest-effort profile per harness. Provider qualification is part of the model contract. Containerized hosts without landlock need `DADAIA_CODEX_SANDBOX=danger-full-access` for Codex workers.
+- Entry harnesses: **Claude Code** (`.claude/` projection), **Kimi Code** (`.kimi-code/` projection; hooks registered via a managed block in the user-level `$KIMI_CODE_HOME/config.toml` since Kimi has no project-level config), **Codex** (`.codex/`), and **PI** (`.pi/`). Each derives its own entities from the core definitions; there is no worker layer behind them. `fake` is the deterministic test adapter. This list is set-equal to `AgentRuntimeKind` (`core/models/lifecycle.py`).
+- Per-persona model governance: resolved at projection time from the selected template plus the operator overlay (low/medium/high) plus the explicit opt-in OpenRouter `moonshotai/kimi-k2.5:high`. A `light` purpose tier routes mechanical steps to the lowest-effort profile per harness. Provider qualification is part of the model contract. Containerized hosts without landlock need `DADAIA_CODEX_SANDBOX=danger-full-access` for Codex workers.
 - Quality: pytest (markers unit/contract/integration/e2e/slow/tmp, `-p no:cacheprovider` in addopts), Ruff format/lint, mypy `--strict` (incremental disabled), import-linter, Hypothesis, Playwright (panel), gitleaks. Contract coverage ≥80% in CI; caches/artifacts always live outside repos.
 - Prohibitions: no system Python for workspace commands; no repo-local venv/`.dadaia`/cache/coverage trees; secrets only in the operator-managed root `.env` (or a runtime's external OAuth store); features reach infrastructure via ports + `container.py`, never directly.
 
@@ -29,7 +29,7 @@ PYTHONDONTWRITEBYTECODE=1 .dadaia/.venv/bin/python -m pytest -p no:cacheprovider
 .dadaia/.venv/bin/dadaia doctor
 .dadaia/.venv/bin/dadaia specs doctor
 .dadaia/.venv/bin/dadaia public doctor
-.dadaia/.venv/bin/dadaia lifecycle --help
+.dadaia/.venv/bin/dadaia backlog --help
 .dadaia/.venv/bin/dadaia panel --no-open
 ```
 
@@ -40,10 +40,10 @@ dev dependency set is installed.
 
 - Wheels/sdists exclude bytecode (`**/__pycache__`, `*.pyc`, `*.pyo`); the canonical
   `public/` asset tree ships via the package include (`dadaia_workspace` package), so
-  every consumer install carries agents, skills, rules, fragments, personas, schemas,
+  every consumer install carries agents, skills, rules, schemas,
   plugin packs, and the consumer validation recipe.
 - Layer-1 agent model/effort comes from the selected agent-policy template plus operator
-  overrides; Layer-2 model/effort comes from workflow profiles and per-run policy.
+  overrides; model/effort is resolved at projection time from the agent-model policy.
 - The v0.2.5 live contract was certified with `codex-cli 0.144.4`; both headless exec
   and TUI fired all four projected hook events.
 

@@ -2,17 +2,15 @@
 slug: harness-pi
 title: Harness - PI (pi-coding-agent)
 category: product
-tldr: Dual-layer PI runtime with a trusted TypeScript entry extension and a governed headless worker supporting Codex-subscription and explicit OpenRouter profiles.
+tldr: Entry harness whose TypeScript SDD-gate extension loads only after the operator explicitly trusts the workspace.
 summary: >-
-  PI can enter the workspace interactively after explicit trust and can execute bounded
-  Layer-2 workflow steps through `pi --mode json`. GPT profiles use provider-qualified
-  Codex-subscription ids; optional OpenRouter profiles remain explicit; headless attempts
-  preserve bytecode-suppression env and report content-delta changed paths.
+  PI enters the workspace interactively after explicit trust. Its `.pi/**` projection is
+  post-trust EXECUTABLE TypeScript, unlike every other projection, which makes trusting it
+  a deliberate privilege grant rather than inert configuration.
 tags:
 - harness
 - pi
 - layer-1
-- layer-2
 - projection
 token_estimate: 380
 last_updated: '2026-07-14'
@@ -21,40 +19,15 @@ release_origin: v0.2.5
 
 ## Purpose
 
-PI is both a Layer-1 entry harness and a Layer-2 workflow worker. It is an operator-
-installed external CLI, not a Python package dependency.
+PI is an entry harness. It is an operator-installed external CLI, not a Python package
+dependency.
 
-## Layer 1
+## Projection
 
 `.pi/` is a generated projection. PI loads its TypeScript SDD gate extension only after
 the operator trusts the workspace. The extension maps PI tool events to the same Python
-gate policies and sets `DADAIA_ENTRY_HARNESS=pi` so `--harness auto` can prefer PI.
+gate policies and sets `DADAIA_ENTRY_HARNESS=pi` to identify the entry session.
 Generated `.pi/**` files contain no secrets and must not be hand-edited.
-
-## Layer 2
-
-`PiHeadlessAdapter` invokes `pi --mode json` with the exact governed model id and
-`--thinking` effort. It preserves the non-secret `PYTHONDONTWRITEBYTECODE` control in
-its subprocess environment allowlist, parses the event stream, validates
-`agent-run-result-v1`, retains redacted diagnostics for malformed/non-zero attempts, and
-returns artifact references plus Git-derived content-delta `changed_paths` to the
-lifecycle engine.
-
-The built-in PI catalog includes:
-
-- `openai-codex/gpt-5.5` at high, medium, and low reasoning;
-- `moonshotai/kimi-k2.5` at high reasoning through the explicit OpenRouter profile.
-
-Provider qualification is mandatory. A Codex-subscription profile cannot resolve to
-OpenRouter, and an OpenRouter profile cannot masquerade as subscription-backed. OAuth
-and API-key storage are operator/runtime concerns outside generated workspace assets;
-the workspace never copies credential material.
-
-## Workflow Use
-
-All four dadaia-workflows accept PI globally or per step. The workflow policy freezes the
-selected profile for each run. PI receives fragment plus persona, scoped context, allowed
-paths, exact dependencies, and a required output schema just like Codex.
 
 ## Telemetry
 
@@ -64,5 +37,5 @@ known pricing row.
 
 ## Dependencies
 
-[[dadaia-workflows]], [[lifecycle-foundation]], [[multi-platform-parity]],
+[[multi-platform-parity]],
 [[agent-monitoring]], [[sdd-gate-v3]].

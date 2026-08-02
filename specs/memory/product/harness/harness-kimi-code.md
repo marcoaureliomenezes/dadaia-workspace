@@ -7,7 +7,7 @@ summary: >-
   Kimi Code enters the workspace as a first-class Layer-1 harness. The projection
   tree is inert Markdown; the live wiring is four POSIX shims registered via a
   marker-delimited managed block of TOML hook rules in `$KIMI_CODE_HOME/config.toml`,
-  delegating to the shared Python hook modules. Layer-2 workers remain codex/pi only.
+  delegating to the shared Python hook modules.
 tags:
 - harness
 - kimi-code
@@ -20,7 +20,7 @@ release_origin: v0.2.8
 
 ## Purpose
 
-Kimi Code is a Layer-1 entry harness (never a Layer-2 worker). It is an
+Kimi Code is an entry harness. It is an
 operator-installed external CLI (`kimi`), not a Python package dependency.
 
 ## Layer 1
@@ -48,9 +48,11 @@ workspace-absolute paths, and are the only dadaia assets installed outside the
 workspace tree. `dadaia public doctor` verifies the projection, the shims, and the
 managed block. Generated `.kimi-code/**` files must not be hand-edited.
 
-## Layer 2
+## Sub-agents
 
-None. Layer-2 workflow workers stay `codex`/`pi`. Kimi built-in sub-agents
+Kimi Code has no project-level surface for custom agents, so dadaia projects none: a
+persona cannot be derived here, and that is a platform limitation, not a projection
+defect. Kimi built-in sub-agents
 (`coder`/`explore`/`plan`) are a harness-native surface, not dadaia personas.
 
 ## Dependencies

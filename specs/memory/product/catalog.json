@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-22T02:17:38Z",
+  "generated_at": "2026-08-02T14:07:28Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -18,7 +18,6 @@
       ],
       "token_estimate": 1560,
       "depends_on": [
-        "lifecycle-foundation",
         "public-asset-distribution"
       ]
     },
@@ -49,27 +48,44 @@
       "title": "agent-orchestration",
       "category": "product",
       "area": "agents",
-      "tldr": "Nine core Layer-1 roles, eight Layer-2 personas, two dispatchers, four workflows, and advisory-only concurrency.",
-      "summary": "Defines role ownership, dispatch purity, memory bootstrap, task discipline, review checkpoints, model governance, and the relationship between Layer-1 agents and Layer-2 workflow personas. No role acquires or coordinates a concurrency lock.",
+      "tldr": "Twelve personas, two dispatchers, leaf workers everywhere else, and advisory-only concurrency — no role ever holds a lock.",
+      "summary": "How the persona roster operates: who dispatches, what every worker does before starting, how tasks are reserved and released, and where review evidence gates a commit or a push. The persona definitions themselves live in the personas atom.",
       "path": "specs/memory/product/agents/agent-orchestration.md",
       "tags": [
         "orchestration",
         "agents",
-        "workflows",
         "dispatch"
       ],
-      "token_estimate": 526,
+      "token_estimate": 0,
       "depends_on": [
-        "dadaia-workflows",
-        "lifecycle-foundation",
-        "sdd-gate-v3",
+        "personas",
         "agent-comms",
-        "harness-codex",
-        "harness-pi"
+        "sdd-gate-v3"
       ]
     },
     {
       "rank": 4,
+      "slug": "personas",
+      "title": "personas",
+      "category": "product",
+      "area": "agents",
+      "tldr": "dadaia-workspace defines twelve abstract personas; each harness derives its own agent entity from them and owns nothing of its own.",
+      "summary": "A persona is the functional definition of a role — its question, its authority, its refusals, its output. It is harness-agnostic on purpose: Claude Code sub-agents, Codex agents, and Kimi CLI agents are all derived projections of the same persona. No harness may invent an agent that has no persona behind it.",
+      "path": "specs/memory/product/agents/personas.md",
+      "tags": [
+        "personas",
+        "agents",
+        "core"
+      ],
+      "token_estimate": 0,
+      "depends_on": [
+        "agent-orchestration",
+        "agent-comms",
+        "sdd-gate-v3"
+      ]
+    },
+    {
+      "rank": 5,
       "slug": "academy",
       "title": "academy",
       "category": "product",
@@ -89,7 +105,7 @@
       ]
     },
     {
-      "rank": 5,
+      "rank": 6,
       "slug": "plugin-packs",
       "title": "plugin-packs",
       "category": "product",
@@ -112,7 +128,7 @@
       ]
     },
     {
-      "rank": 6,
+      "rank": 7,
       "slug": "public-asset-distribution",
       "title": "public-asset-distribution",
       "category": "product",
@@ -135,7 +151,7 @@
       ]
     },
     {
-      "rank": 7,
+      "rank": 8,
       "slug": "pypi-distribution",
       "title": "pypi-distribution",
       "category": "product",
@@ -158,7 +174,7 @@
       ]
     },
     {
-      "rank": 8,
+      "rank": 9,
       "slug": "harness-claude-code",
       "title": "Harness — Claude Code",
       "category": "product",
@@ -182,38 +198,36 @@
       ]
     },
     {
-      "rank": 9,
+      "rank": 10,
       "slug": "harness-codex",
       "title": "Harness — Codex",
       "category": "product",
       "area": "harness",
-      "tldr": "Dual-layer harness: Layer-1 TUI (deterministic hooks) vs headless exec (chokepoints only); Layer-2 CODEX_EXEC worker; scaffold = .codex/ projection.",
+      "tldr": "Entry harness: the interactive TUI gets the deterministic hooks, headless exec is governed by the git chokepoints; scaffold = .codex/ projection.",
       "summary": "Capability and scaffold truth for the Codex harness at both agentic layers — interactive vs headless enforcement asymmetry, the CODEX_EXEC worker transport, content-delta changed-path attribution, bytecode-suppression environment preservation, model catalog, and what a Codex-only workspace installation contains.",
       "path": "specs/memory/product/harness/harness-codex.md",
       "tags": [
         "harness",
         "codex",
         "layer-1",
-        "layer-2",
         "projection"
       ],
       "token_estimate": 980,
       "depends_on": [
         "workspace-init",
         "tech-stack",
-        "lifecycle-foundation",
         "sdd-gate-v3",
         "public-asset-distribution"
       ]
     },
     {
-      "rank": 10,
+      "rank": 11,
       "slug": "harness-kimi-code",
       "title": "Harness — Kimi Code",
       "category": "product",
       "area": "harness",
       "tldr": "Layer-1-only harness: `.kimi-code/` projection + hooks via a managed block in the user-level `config.toml`; first with post-compact re-injection.",
-      "summary": "Kimi Code enters the workspace as a first-class Layer-1 harness. The projection tree is inert Markdown; the live wiring is four POSIX shims registered via a marker-delimited managed block of TOML hook rules in `$KIMI_CODE_HOME/config.toml`, delegating to the shared Python hook modules. Layer-2 workers remain codex/pi only.",
+      "summary": "Kimi Code enters the workspace as a first-class Layer-1 harness. The projection tree is inert Markdown; the live wiring is four POSIX shims registered via a marker-delimited managed block of TOML hook rules in `$KIMI_CODE_HOME/config.toml`, delegating to the shared Python hook modules.",
       "path": "specs/memory/product/harness/harness-kimi-code.md",
       "tags": [
         "harness",
@@ -231,32 +245,29 @@
       ]
     },
     {
-      "rank": 11,
+      "rank": 12,
       "slug": "harness-pi",
       "title": "Harness - PI (pi-coding-agent)",
       "category": "product",
       "area": "harness",
-      "tldr": "Dual-layer PI runtime with a trusted TypeScript entry extension and a governed headless worker supporting Codex-subscription and explicit OpenRouter profiles.",
-      "summary": "PI can enter the workspace interactively after explicit trust and can execute bounded Layer-2 workflow steps through `pi --mode json`. GPT profiles use provider-qualified Codex-subscription ids; optional OpenRouter profiles remain explicit; headless attempts preserve bytecode-suppression env and report content-delta changed paths.",
+      "tldr": "Entry harness whose TypeScript SDD-gate extension loads only after the operator explicitly trusts the workspace.",
+      "summary": "PI enters the workspace interactively after explicit trust. Its `.pi/**` projection is post-trust EXECUTABLE TypeScript, unlike every other projection, which makes trusting it a deliberate privilege grant rather than inert configuration.",
       "path": "specs/memory/product/harness/harness-pi.md",
       "tags": [
         "harness",
         "pi",
         "layer-1",
-        "layer-2",
         "projection"
       ],
       "token_estimate": 380,
       "depends_on": [
-        "dadaia-workflows",
-        "lifecycle-foundation",
         "multi-platform-parity",
         "agent-monitoring",
         "sdd-gate-v3"
       ]
     },
     {
-      "rank": 12,
+      "rank": 13,
       "slug": "brand-identity",
       "title": "brand-identity",
       "category": "product",
@@ -276,7 +287,7 @@
       ]
     },
     {
-      "rank": 13,
+      "rank": 14,
       "slug": "panel",
       "title": "panel",
       "category": "product",
@@ -293,7 +304,6 @@
       ],
       "token_estimate": 481,
       "depends_on": [
-        "dadaia-workflows",
         "agent-orchestration",
         "agent-monitoring",
         "server-registry",
@@ -301,7 +311,7 @@
       ]
     },
     {
-      "rank": 14,
+      "rank": 15,
       "slug": "product-vision",
       "title": "product-vision",
       "category": "product",
@@ -319,14 +329,13 @@
       "token_estimate": 358,
       "depends_on": [
         "spec-context-project",
-        "dadaia-workflows",
         "sdd-gate-v3",
         "architecture",
         "public-asset-distribution"
       ]
     },
     {
-      "rank": 15,
+      "rank": 16,
       "slug": "spec-context-project",
       "title": "spec-context-project",
       "category": "product",
@@ -344,12 +353,11 @@
       "depends_on": [
         "context-management",
         "sdd-gate-v3",
-        "dadaia-workflows",
         "architecture"
       ]
     },
     {
-      "rank": 16,
+      "rank": 17,
       "slug": "context-management",
       "title": "context-management",
       "category": "product",
@@ -372,7 +380,7 @@
       ]
     },
     {
-      "rank": 17,
+      "rank": 18,
       "slug": "cross-platform-portability",
       "title": "cross-platform-portability",
       "category": "product",
@@ -397,7 +405,7 @@
       ]
     },
     {
-      "rank": 18,
+      "rank": 19,
       "slug": "hermes-agent-support",
       "title": "Hermes agent — supported consumer environment",
       "category": "product",
@@ -421,13 +429,13 @@
       ]
     },
     {
-      "rank": 19,
+      "rank": 20,
       "slug": "multi-platform-parity",
       "title": "multi-platform-parity",
       "category": "product",
       "area": "platform",
       "tldr": "Claude Code, Codex, and PI receive truthful runtime-specific projections from one canonical public source.",
-      "summary": "Defines Layer-1 projection parity without pretending the harnesses have identical primitives. Codex and PI also provide Layer-2 workflow workers; Claude remains Layer-1-only. Git chokepoints protect commit/push independently of harness hooks.",
+      "summary": "Defines Layer-1 projection parity without pretending the harnesses have identical primitives. Each harness derives its own entities from the core definitions; Claude remains Layer-1-only. Git chokepoints protect commit/push independently of harness hooks.",
       "path": "specs/memory/product/platform/multi-platform-parity.md",
       "tags": [
         "codex",
@@ -446,7 +454,7 @@
       ]
     },
     {
-      "rank": 20,
+      "rank": 21,
       "slug": "repos-catalog",
       "title": "repos-catalog",
       "category": "product",
@@ -466,7 +474,7 @@
       ]
     },
     {
-      "rank": 21,
+      "rank": 22,
       "slug": "server-registry",
       "title": "server-registry",
       "category": "product",
@@ -487,7 +495,7 @@
       ]
     },
     {
-      "rank": 22,
+      "rank": 23,
       "slug": "workspace-doctor",
       "title": "workspace-doctor",
       "category": "product",
@@ -509,7 +517,7 @@
       ]
     },
     {
-      "rank": 23,
+      "rank": 24,
       "slug": "workspace-init",
       "title": "workspace-init",
       "category": "product",
@@ -531,7 +539,7 @@
       ]
     },
     {
-      "rank": 24,
+      "rank": 25,
       "slug": "workspace-portability",
       "title": "workspace-portability",
       "category": "product",
@@ -552,57 +560,7 @@
       ]
     },
     {
-      "rank": 25,
-      "slug": "dadaia-workflows",
-      "title": "dadaia-workflows",
-      "category": "product",
-      "area": "sdd",
-      "tldr": "Exactly four executable Layer-2 workflows: backlog definition, release definition, implementation plus reviews, and audit.",
-      "summary": "The complete executable workflow surface. Each workflow has one CLI command, a Python-owned ordered body, fragment-plus-persona worker prompts, semantic gates, immutable per-attempt payloads, and an auditable handoff graph. Codex and PI are the supported real Layer-2 workers; fake is the deterministic test adapter.",
-      "path": "specs/memory/product/sdd/dadaia-workflows.md",
-      "tags": [
-        "sdd",
-        "workflows",
-        "lifecycle",
-        "layer-2"
-      ],
-      "token_estimate": 649,
-      "depends_on": [
-        "lifecycle-foundation",
-        "agent-comms",
-        "sdd-gate-v3",
-        "harness-codex",
-        "harness-pi",
-        "agent-orchestration"
-      ]
-    },
-    {
       "rank": 26,
-      "slug": "lifecycle-foundation",
-      "title": "lifecycle-foundation",
-      "category": "product",
-      "area": "sdd",
-      "tldr": "Deterministic Python workflow engine with fragment-scoped workers, semantic gates, bounded retries, and immutable handoff evidence.",
-      "summary": "The runtime foundation beneath the four dadaia-workflows. Python owns sequencing, context selection, policy resolution, task-marker and artifact gates, advisory Git preflight warnings, run state, retries, diagnostics, and retention. Codex and PI workers run behind AgentRuntimePort with content-delta changed-path attribution.",
-      "path": "specs/memory/product/sdd/lifecycle-foundation.md",
-      "tags": [
-        "sdd",
-        "lifecycle",
-        "multi-harness",
-        "hygiene",
-        "gates"
-      ],
-      "token_estimate": 655,
-      "depends_on": [
-        "dadaia-workflows",
-        "agent-comms",
-        "sdd-gate-v3",
-        "harness-codex",
-        "harness-pi"
-      ]
-    },
-    {
-      "rank": 27,
       "slug": "sdd-bug-backlog-governance",
       "title": "sdd-bug-backlog-governance",
       "category": "product",
@@ -619,14 +577,13 @@
       ],
       "token_estimate": 380,
       "depends_on": [
-        "dadaia-workflows",
         "specs-doctor",
         "sdd-gate-v3",
         "agent-comms"
       ]
     },
     {
-      "rank": 28,
+      "rank": 27,
       "slug": "sdd-gate-v3",
       "title": "sdd-gate-v3",
       "category": "product",
@@ -644,13 +601,12 @@
       "token_estimate": 552,
       "depends_on": [
         "context-management",
-        "dadaia-workflows",
         "workspace-doctor",
         "architecture"
       ]
     },
     {
-      "rank": 29,
+      "rank": 28,
       "slug": "specs-doctor",
       "title": "specs-doctor",
       "category": "product",
@@ -666,7 +622,6 @@
       ],
       "token_estimate": 212,
       "depends_on": [
-        "dadaia-workflows",
         "sdd-bug-backlog-governance",
         "workspace-doctor"
       ]

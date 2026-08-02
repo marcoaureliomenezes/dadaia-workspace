@@ -27,7 +27,7 @@ handoffs.
 
 1. **Bind** - the caller selects a context and mode; only its own session record changes.
 2. **Inject** - the bind-epoch marker triggers current memory and release-context loading.
-3. **Enforce** - deterministic path/phase/mode gates and the four workflows constrain
+3. **Enforce** - deterministic path/phase/mode gates and the git chokepoints constrain
    unsafe changes.
 4. **Work concurrently** - other sessions may use the same or different contexts;
    presence warnings expose overlap but never block progress.
@@ -45,4 +45,4 @@ the workspace root under `.dadaia/`; a repo-local `.dadaia/` is always invalid.
 
 ## Dependencies
 
-[[context-management]], [[sdd-gate-v3]], [[dadaia-workflows]], [[architecture]].
+[[context-management]], [[sdd-gate-v3]], [[architecture]].

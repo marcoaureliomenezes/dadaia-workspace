@@ -62,4 +62,4 @@ commit SHA. This is a quality boundary, not a concurrency mechanism.
 
 ## Dependencies
 
-[[dadaia-workflows]], [[specs-doctor]], [[sdd-gate-v3]], [[agent-comms]].
+[[specs-doctor]], [[sdd-gate-v3]], [[agent-comms]].

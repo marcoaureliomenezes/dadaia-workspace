@@ -72,7 +72,7 @@ is assembled in `features/lifecycle/governed_catalog.py` and exposed through
 `features/workflows/dadaia_catalog.py`; `features/workflows/dag.py` renders offline SVG
 diagrams.
 
-The supported Layer-2 real runtimes are Codex and PI behind `AgentRuntimePort`. Claude
+The supported entry harnesses are Claude Code, Codex, and Kimi Code. Claude
 Code and Kimi Code are Layer-1-only. `fake` is the deterministic test adapter.
 
 ### Handoffs and reports
@@ -137,7 +137,7 @@ else); this table mirrors it:
 | `states/bind_epoch/` | context injection markers |
 | `states/presence/` | advisory live-session records |
 | `states/server_registry.json` | development server registry |
-| `states/*model*policy*.json` | Layer-1/Layer-2 governance overlays |
+| `states/*model*policy*.json` | Per-persona model governance overlays |
 | `states/root_exceptions.txt` | operator-approved root-whitelist exceptions |
 | `states/import-manifest.json` | provenance of the last `dadaia import` |
 | `runs/lifecycle/` | workflow run state (durable step payloads live in the Spec Context: `specs/releases/<id>/handoffs/`, backlog runs in `specs/backlog/handoffs/`) |
@@ -177,7 +177,7 @@ import without a forbidden sibling edge).
 ## Agentic Layers
 
 
-Layer 1 is the interactive agent surface: nine core roles with two dispatchers. Layer 2
+The agent surface is nine core personas with two dispatchers. Each entry harness
 is a bounded Codex/PI workflow worker governed by one of eight non-PM personas. Personas
 carry role behavior only; workflow policy carries harness/model/effort.
 
@@ -187,5 +187,5 @@ Hooks enforce mechanical file/Git boundaries only.
 ## Dependencies
 
 [[spec-context-project]], [[context-management]], [[sdd-gate-v3]],
-[[dadaia-workflows]], [[lifecycle-foundation]], [[agent-orchestration]], [[panel]],
+[[agent-orchestration]], [[panel]],
 [[public-asset-distribution]], [[tech-stack]].

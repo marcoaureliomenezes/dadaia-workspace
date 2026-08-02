@@ -78,7 +78,7 @@ history and break tag/PR continuity for zero information gain. When reading any
 **Wheel content contract:** the wheel ships the complete runtime product —
 `dadaia_workspace/` with the full `public/` asset tree (agents, skills, rules,
 workflows, scripts, schemas, templates, data, scaffold, runtime, personas,
-lifecycle_fragments, pi) **including the in-package plugin packs**
+pi) **including the in-package plugin packs**
 (`public/plugins/{frontend-design,devops}/` — verified at the v0.1.60 audit), so
 `dadaia init` and `dadaia plugin install` work offline from a bare pip install
 with no network fetch of assets. The wheel also ships

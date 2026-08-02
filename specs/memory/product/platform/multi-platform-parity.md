@@ -5,7 +5,7 @@ category: product
 tldr: Claude Code, Codex, and PI receive truthful runtime-specific projections from one canonical public source.
 summary: >-
   Defines Layer-1 projection parity without pretending the harnesses have identical
-  primitives. Codex and PI also provide Layer-2 workflow workers; Claude remains
+  primitives. Each harness derives its own entities from the core definitions; Claude remains
   Layer-1-only. Git chokepoints protect commit/push independently of harness hooks.
 tags:
 - codex
@@ -35,10 +35,10 @@ honest.
 `.pi/**` is executable after trust and therefore contains no secrets or operator-local
 paths. Generated projection files are never edited in place.
 
-## Layer 2
+## Harness derivation
 
-Codex and PI are selectable workflow workers behind `AgentRuntimePort`; `fake` is the
-test adapter. Claude is rejected as a Layer-2 workflow harness. Personas are shared,
+Every entry harness derives its own entities from the same core definitions; `fake` is
+the deterministic test adapter. Personas are shared,
 while model/profile selection remains harness-specific.
 
 ## Independent Boundaries

@@ -20,11 +20,11 @@ release_origin: v0.1.58
 
 Claude Code is a **Layer-1-only** harness: the operator's interactive coding agent, and
 the only harness with native sub-agent dispatch (the Agent tool). By law it is **never a
-Layer-2 workflow worker** — running Claude workers would spend credits outside the
+dispatch target for another harness** — each harness runs its own personas, so Claude
 operator's subscription, so `claude` is rejected as a `--harness` value (the
 `ClaudeSdkAdapter` remains importable and unit-tested for Layer-1 SDK use only). When
 the operator works Claude-only, the 9-agent roster runs entirely inside Claude Code via
-sub-agents; dadaia-workflows remain available but drive pi/codex workers.
+sub-agents, derived from the core persona definitions.
 
 ## Usage flow
 
@@ -58,7 +58,7 @@ fan-out without the lifecycle engine.
 ## Differentiator
 
 Strongest Layer-1 posture: deterministic hooks + chokepoints, native sub-agents,
-first-message context injection. The trade-off is the Layer-2 exclusion — heavy
+first-message context injection. The trade-off is that heavy
 batch/workflow execution is delegated to pi/codex workers.
 
 ## Runtime state touched

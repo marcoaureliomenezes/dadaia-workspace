@@ -12,7 +12,8 @@
 |------|-------|------|
 | `agent-comms` | agent-comms — Handoff Contract v1 | handoff-v1.2 separates HTML reports from JSON handoffs and carries the self_pull Layer-1 read-proof line. |
 | `agent-monitoring` | agent-monitoring | stdlib-only local telemetry (Claude/Codex/PI sessions) → panel Sessions tab + /api/agents; allowlist gate preserves privacy. |
-| `agent-orchestration` | agent-orchestration | Nine core Layer-1 roles, eight Layer-2 personas, two dispatchers, four workflows, and advisory-only concurrency. |
+| `agent-orchestration` | agent-orchestration | Twelve personas, two dispatchers, leaf workers everywhere else, and advisory-only concurrency — no role ever holds a lock. |
+| `personas` | personas | dadaia-workspace defines twelve abstract personas; each harness derives its own agent entity from them and owns nothing of its own. |
 
 ### distribution
 
@@ -28,9 +29,9 @@
 | slug | title | tldr |
 |------|-------|------|
 | `harness-claude-code` | Harness — Claude Code | Layer-1-only entry harness; richest deterministic enforcement; scaffold = CLAUDE.md bridge + .claude/ projection (agents, skills, rules, hooks). |
-| `harness-codex` | Harness — Codex | Dual-layer harness: Layer-1 TUI (deterministic hooks) vs headless exec (chokepoints only); Layer-2 CODEX_EXEC worker; scaffold = .codex/ projection. |
+| `harness-codex` | Harness — Codex | Entry harness: the interactive TUI gets the deterministic hooks, headless exec is governed by the git chokepoints; scaffold = .codex/ projection. |
 | `harness-kimi-code` | Harness — Kimi Code | Layer-1-only harness: `.kimi-code/` projection + hooks via a managed block in the user-level `config.toml`; first with post-compact re-injection. |
-| `harness-pi` | Harness - PI (pi-coding-agent) | Dual-layer PI runtime with a trusted TypeScript entry extension and a governed headless worker supporting Codex-subscription and explicit OpenRouter profiles. |
+| `harness-pi` | Harness - PI (pi-coding-agent) | Entry harness whose TypeScript SDD-gate extension loads only after the operator explicitly trusts the workspace. |
 
 ### panel
 
@@ -52,7 +53,7 @@
 |------|-------|------|
 | `context-management` | context-management | ALIVE/DEAD context registry, caller-owned session binding, bind-driven memory injection, and advisory presence with no concurrency locks. |
 | `cross-platform-portability` | cross-platform-portability | Linux, macOS, and Windows support through a single platform capability seam, injected adapters, Python hooks, and hard-gated cross-OS tests. |
-| `hermes-agent-support` | Hermes agent — supported consumer environment | Hermes agent is a first-class supported consumer of dadaia-workspace: certified end-to-end via the consumer recipe plus the Real-use matrix (R-01..R-08), converged to zero real-use failures in v0.2.9. |
+| `hermes-agent-support` | Hermes agent — supported consumer environment | Hermes agent is a supported consumer: certified end-to-end via the consumer recipe Real-use matrix, converged to zero failures in v0.2.9. |
 | `multi-platform-parity` | multi-platform-parity | Claude Code, Codex, and PI receive truthful runtime-specific projections from one canonical public source. |
 | `repos-catalog` | repos-catalog | repos.xlsx lookup for fast discovery of known repos with slug + URL. |
 | `server-registry` | server-registry | internal port registry with TTL+PID to avoid conflicts between parallel agents' dev servers; the 3000-3999 range applies only to next_port allocation. |
@@ -64,8 +65,6 @@
 
 | slug | title | tldr |
 |------|-------|------|
-| `dadaia-workflows` | dadaia-workflows | Exactly four executable Layer-2 workflows: backlog definition, release definition, implementation plus reviews, and audit. |
-| `lifecycle-foundation` | lifecycle-foundation | Deterministic Python workflow engine with fragment-scoped workers, semantic gates, bounded retries, and immutable handoff evidence. |
 | `sdd-bug-backlog-governance` | sdd-bug-backlog-governance | Event-sourced JSONL bugs, duplicate-safe backlog definition, release consumption, audit dispositions, and exact-commit security-gated push. |
 | `sdd-gate-v3` | sdd-gate-v3 | No-lock SDD enforcement: deterministic path/mode gates, advisory presence, warn-only concurrent commits, and a security-gated push boundary. |
 | `specs-doctor` | specs-doctor | Validates canonical specs structure, memory/catalog integrity, release markers, closure evidence, dispositions, bug ledgers, and audit coherence. |

@@ -51,4 +51,4 @@ operator decisions.
 
 ## Dependencies
 
-[[dadaia-workflows]], [[sdd-bug-backlog-governance]], [[workspace-doctor]].
+[[sdd-bug-backlog-governance]], [[workspace-doctor]].

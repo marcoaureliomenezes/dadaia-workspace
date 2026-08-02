@@ -30,7 +30,7 @@ specs tree, current memory, and auditable lifecycle evidence.
 
 1. **Current context** - agents bind explicitly and receive only the relevant project,
    memory, release, and task state.
-2. **Simple lifecycle** - exactly four workflows cover backlog definition, release
+2. **Simple lifecycle** - a persona following a skill covers backlog definition, release
    definition, implementation plus reviews, and audit.
 3. **Deterministic boundaries** - path, phase, caller mode, root hygiene, and Git push
    gates are mechanical; procedural sequencing lives in Python workflows.
@@ -41,8 +41,8 @@ specs tree, current memory, and auditable lifecycle evidence.
 
 ## Harness Model
 
-Claude Code, Codex, and PI can be Layer-1 entry harnesses. Codex and PI can also be
-Layer-2 workers. Public assets originate once under `dadaia_workspace/public/`, stage
+Claude Code, Codex, Kimi Code, and PI are entry harnesses; each derives its own entities
+from the core definitions. Public assets originate once under `dadaia_workspace/public/`, stage
 under `.dadaia/agentic/`, and project to the runtime-specific roots.
 
 ## Evidence Model
@@ -59,5 +59,5 @@ generated configuration must not contain secrets.
 
 ## Dependencies
 
-[[spec-context-project]], [[dadaia-workflows]], [[sdd-gate-v3]], [[architecture]],
+[[spec-context-project]], [[sdd-gate-v3]], [[architecture]],
 [[public-asset-distribution]].

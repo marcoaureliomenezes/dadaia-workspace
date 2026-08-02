@@ -79,7 +79,7 @@ preflight only. A foreign session's bind cannot alter this session's context or 
 ## Non-Goals
 
 The hook does not read approval status, task markers, personas, or task write sets.
-Those ordered checks belong to the four dadaia-workflows. It also does not parse
+Those ordered checks belong to the persona following its skill. It also does not parse
 arbitrary shell strings; git chokepoints provide the independent commit/push boundary.
 
 ## Runtime State
@@ -95,4 +95,4 @@ doctor reports and removes them.
 
 ## Dependencies
 
-[[context-management]], [[dadaia-workflows]], [[workspace-doctor]], [[architecture]].
+[[context-management]], [[workspace-doctor]], [[architecture]].
