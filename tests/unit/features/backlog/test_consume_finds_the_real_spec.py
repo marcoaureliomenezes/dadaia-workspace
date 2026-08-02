@@ -94,3 +94,32 @@ def test_a_declared_slug_with_no_intents_refuses_as_a_clean_error() -> None:
     from dadaia_workspace.features.backlog.consumes import ConsumesBindError
 
     assert issubclass(ConsumesBindError, DadaiaError)
+
+
+def test_a_release_id_may_not_escape_the_releases_tree(tmp_path: Path) -> None:
+    """`--release-id` is joined into a path; an id like `..` walked out of the tree.
+
+    Found in the pre-push security review of this branch. `build_release_spec_path`
+    joined the caller's release id straight onto `releases/`, so `--release-id ..`
+    resolved to `releases/../SPEC.md` and `--release-id /etc` hijacked the root
+    entirely. The file read is then parsed for a `**Consumes:**` line, so an id that
+    escapes turns an unrelated document into release input.
+    """
+    specs = _specs(tmp_path)
+    (specs / "SPEC.md").write_text("**Consumes:** planted\n", encoding="utf-8")
+
+    for escaping in ("..", "../..", "/etc", "v0.1.0/../..", "a/b"):
+        with pytest.raises(DadaiaError) as excinfo:
+            build_release_spec_path(tmp_path, context="demo", release_id=escaping)
+        assert "release id" in str(excinfo.value).lower(), escaping
+
+
+def test_the_canonical_release_id_forms_still_resolve(tmp_path: Path) -> None:
+    """The guard must not reject what `release new` and `specs release open` produce."""
+    specs = _specs(tmp_path)
+    for release_id in ("v0.1.0", "hotfix-auth"):
+        target = specs / "releases" / release_id
+        target.mkdir(parents=True)
+        (target / "SPEC.md").write_text(f"{release_id}\n", encoding="utf-8")
+        resolved = build_release_spec_path(tmp_path, context="demo", release_id=release_id)
+        assert resolved.read_text(encoding="utf-8") == f"{release_id}\n"

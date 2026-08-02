@@ -895,6 +895,9 @@ def _backlog_context_roots(workspace_root: Path, context: str) -> tuple[Path, Pa
     return specs_dir, source_root
 
 
+from dadaia_workspace.features.spec_artifacts.new_artifacts import is_valid_release_id
+
+
 def _segment_sort_key(name: str) -> tuple[int, int, str]:
     """Order release segments the way they mature: alpha-1 < alpha-2 < rc-1 < rc-2.
 
@@ -934,6 +937,18 @@ def build_release_spec_path(
     consumed nothing — a silent no-op indistinguishable from the real thing
     (bug r6-backlog-consume-spec-path-ignores-segment-nesting).
     """
+    # The caller's release id is joined into a filesystem path, so it must be ONE safe
+    # path segment. Without this, `--release-id ..` resolved to `releases/../SPEC.md` and
+    # `--release-id /etc` hijacked the root outright — and the file that lands there is
+    # then parsed for a `**Consumes:**` line, turning an unrelated document into release
+    # input. Validated against the same canon `release new` enforces, so the guard can
+    # never reject an id the product itself produces.
+    if not is_valid_release_id(release_id):
+        raise DadaiaError(
+            f"Invalid release id {release_id!r}: a release id must be the SemVer canon "
+            "(vX.Y.Z) or a lowercase-kebab slug, and must never contain a path separator "
+            "or '..'."
+        )
     specs_dir, _source_root = _backlog_context_roots(workspace_root, context)
     release_dir = specs_dir / "releases" / release_id
 
