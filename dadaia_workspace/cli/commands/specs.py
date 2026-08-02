@@ -449,6 +449,24 @@ def hotfix_open(
     )
 
 
+def _next_segment(release_dir: Path) -> str:
+    """The segment `specs segment open` should be given next, from what is on disk.
+
+    A release matures ``alpha-1 -> alpha-2 -> ... -> rc-1 -> rc-2``. The next segment is
+    one past the highest existing segment of the current kind; a release still in alpha
+    advances its alpha, and one that has reached rc advances its rc.
+    """
+    highest = {"alpha": 0, "rc": 0}
+    for child in release_dir.iterdir():
+        if not child.is_dir():
+            continue
+        kind, _, number = child.name.partition("-")
+        if kind in highest and number.isdigit():
+            highest[kind] = max(highest[kind], int(number))
+    kind = "rc" if highest["rc"] else "alpha"
+    return f"{kind}-{highest[kind] + 1}"
+
+
 @release_app.command("open")
 def release_open(
     version_id: str = typer.Argument(..., help="SemVer release id, e.g. v0.1.6."),
@@ -464,13 +482,26 @@ def release_open(
     # `open` creates. Re-running it on a release that already exists used to rewind
     # ACTIVE.md's phase back to SPEC while reporting `[ok]` — a silent state regression
     # on a live release. Refuse, and name the verb that actually advances one.
-    if not force and (target / "releases" / version_id).exists():
+    release_dir = target / "releases" / version_id
+    if not force and release_dir.exists():
+        # R-23: the remedy must be a command the operator can paste, not a template with
+        # a placeholder they have to fill in from knowledge they may not have
+        # (bug r6-release-open-guard-remedy-placeholder-not-pasteable). Name the real
+        # next segment, computed from what is already on disk.
         typer.echo(
-            f"[error] release {version_id} already exists at "
-            f"{target / 'releases' / version_id}. `release open` creates a release; it "
-            "does not re-open one, and re-running it would rewind ACTIVE.md's phase. "
-            "To open the next segment: dadaia specs segment open <alpha-N|rc-N>. "
-            "To deliberately re-scaffold this release: --force.",
+            f"[error] release {version_id} already exists at {release_dir}. "
+            "`release open` creates a release; it does not re-open one, and re-running "
+            "it would rewind ACTIVE.md's phase.",
+            err=True,
+        )
+        typer.echo(
+            f"[error] To open the next segment: dadaia specs segment open "
+            f"{_next_segment(release_dir)}",
+            err=True,
+        )
+        typer.echo(
+            "[error] To deliberately re-scaffold this release: "
+            f"dadaia specs release open {version_id} --force",
             err=True,
         )
         raise typer.Exit(2)

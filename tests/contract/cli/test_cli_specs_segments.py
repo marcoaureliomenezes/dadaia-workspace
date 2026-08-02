@@ -87,3 +87,31 @@ def test_force_still_reopens_deliberately(tmp_path: Path) -> None:
 
     assert res.exit_code == 0, res.output
     assert "phase: SPEC" in (specs / "releases" / "ACTIVE.md").read_text()
+
+
+def test_the_reopen_refusal_prescribes_a_pasteable_command(tmp_path: Path) -> None:
+    """R-23: a remedy is a command you paste, not advice about one.
+
+    The first version of this guard printed `dadaia specs segment open <alpha-N|rc-N>`;
+    pasted verbatim the literal placeholder fails validation, so the operator burns a
+    cycle proving the tool wrong (bug r6-release-open-guard-remedy-placeholder-not-pasteable).
+    """
+    specs = _specs(tmp_path)
+    _runner.invoke(app, ["specs", "release", "open", "v0.1.6", "--specs-dir", str(specs)])
+
+    res = _runner.invoke(app, ["specs", "release", "open", "v0.1.6", "--specs-dir", str(specs)])
+
+    prescribed = [
+        line.strip()
+        for line in res.output.splitlines()
+        if "segment open" in line and "dadaia" in line
+    ]
+    assert prescribed, res.output
+    assert not any("<" in line or ">" in line for line in prescribed), prescribed
+
+    # And it actually runs: take the real command out of the message and execute it.
+    command = prescribed[0][prescribed[0].index("dadaia") :].split("#")[0].strip()
+    argv = command.split()[1:] + ["--specs-dir", str(specs)]
+    follow_up = _runner.invoke(app, argv)
+    assert follow_up.exit_code == 0, follow_up.output
+    assert (specs / "releases" / "v0.1.6" / "alpha-2" / "TASKS.md").is_file()

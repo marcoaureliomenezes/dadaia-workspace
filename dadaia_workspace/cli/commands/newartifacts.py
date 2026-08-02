@@ -326,12 +326,21 @@ def backlog_consume_cmd(
     from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
     from dadaia_workspace.features.backlog.consumes import parse_consumes_line, shipped_anchors_for
 
+    from dadaia_workspace.core.exceptions import DadaiaError
+
     workspace_root = resolve_workspace_root()
     ctx = resolve_context_for_cli(context)
-    spec_path = container.build_release_spec_path(
-        workspace_root, context=ctx, release_id=release_id
-    )
-    slugs = parse_consumes_line(spec_path.read_text(encoding="utf-8") if spec_path.exists() else "")
+    try:
+        spec_path = container.build_release_spec_path(
+            workspace_root, context=ctx, release_id=release_id
+        )
+    except DadaiaError as exc:
+        # A missing SPEC is NOT "consumes nothing" — reading an absent file as an empty
+        # string made a real release look like a clean no-op (exit 0), which is exactly
+        # the silence this verb exists to prevent.
+        typer.echo(f"[error] {exc}", err=True)
+        raise typer.Exit(2) from None
+    slugs = parse_consumes_line(spec_path.read_text(encoding="utf-8"))
     if not slugs:
         typer.echo("no `**Consumes:**` line — nothing to consume.")
         return

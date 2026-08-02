@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from dadaia_workspace.features.certification import CertificationResult
 
 from dadaia_workspace.core.exceptions import (
+    DadaiaError,
     NoActiveReleaseError,
     WorkspaceNotInitializedError,
 )
@@ -894,22 +895,64 @@ def _backlog_context_roots(workspace_root: Path, context: str) -> tuple[Path, Pa
     return specs_dir, source_root
 
 
+def _segment_sort_key(name: str) -> tuple[int, int, str]:
+    """Order release segments the way they mature: alpha-1 < alpha-2 < rc-1 < rc-2.
+
+    Numeric ordering matters — plain lexicographic sorting puts ``alpha-10`` before
+    ``alpha-2``, which would resolve a matured release to a stale SPEC.
+    """
+    kind, _, number = name.partition("-")
+    rank = {"alpha": 0, "rc": 1}.get(kind, 2)
+    try:
+        return (rank, int(number), name)
+    except ValueError:
+        return (rank, 0, name)
+
+
 def build_release_spec_path(
     workspace_root: Path,
     *,
     context: str,
     release_id: str,
 ) -> Path:
-    """Resolve ``<specs_dir>/releases/<release_id>/SPEC.md`` for a context's release.
+    """Resolve the SPEC.md of a context's release, flat or segment-nested.
 
     Uses the same root resolution as :func:`build_backlog_removal_lifecycle`
     (:func:`_backlog_context_roots`): a consumer context resolves to ``repos/<ctx>/specs``;
     the self-hosting library repo falls back to the workspace-root ``specs``. All roots are
-    derived from ``workspace_root`` — never cwd. The producer post-step reads the
-    ``**Consumes:**`` line from this path (SPEC §3.2).
+    derived from ``workspace_root`` — never cwd. The consumer of this path reads the
+    ``**Consumes:**`` line from it (SPEC §3.2).
+
+    Two shapes exist on disk and both are legitimate: ``release new`` writes a flat
+    ``releases/<id>/SPEC.md``, while ``specs release open`` — the scaffolder a real release
+    uses — writes ``releases/<id>/<segment>/SPEC.md`` and matures alpha-1 → alpha-2 → rc-N.
+    The flat file wins when present; otherwise the LATEST segment does, because that is the
+    release's current SPEC.
+
+    Raises ``DadaiaError`` when no SPEC exists under the release. Returning a
+    non-existent path let the caller read an empty string and conclude the release
+    consumed nothing — a silent no-op indistinguishable from the real thing
+    (bug r6-backlog-consume-spec-path-ignores-segment-nesting).
     """
     specs_dir, _source_root = _backlog_context_roots(workspace_root, context)
-    return specs_dir / "releases" / release_id / "SPEC.md"
+    release_dir = specs_dir / "releases" / release_id
+
+    flat = release_dir / "SPEC.md"
+    if flat.is_file():
+        return flat
+
+    segments = sorted(
+        (child for child in release_dir.glob("*/SPEC.md") if child.is_file()),
+        key=lambda path: _segment_sort_key(path.parent.name),
+    )
+    if segments:
+        return segments[-1]
+
+    raise DadaiaError(
+        f"Release '{release_id}' has no SPEC.md under '{release_dir}' — neither "
+        f"'{release_id}/SPEC.md' nor '{release_id}/<segment>/SPEC.md'. Open the release "
+        f"with `dadaia specs release open {release_id}` and author its SPEC first."
+    )
 
 
 def build_backlog_removal_lifecycle(

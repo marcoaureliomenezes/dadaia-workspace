@@ -942,3 +942,50 @@ def test_cat1_sync_matrix(tmp_path: Path) -> None:
     _make_catalog_json(product_dir_g, ["feature-a", "product-vision"])
     cat1_g = [i for i in SpecsDoctor(specs_g).check() if i.code == "CAT-1"]
     assert cat1_g == []
+
+
+def test_a_contradicting_status_declaration_is_reported(tmp_path: Path) -> None:
+    """An artifact may not say two different things about its own status.
+
+    `contradicting_status_lines()` was written for exactly this — its docstring describes
+    the scenario — and then never called from anywhere. The doctor read the canonical line,
+    saw `Aprovado`, and passed a SPEC whose heading told the human `Draft`. The gate saw
+    approved, the reader saw Draft, and the release moved into IMPLEMENTATION.
+
+    Reported as `r6-spec-doctor-silent-on-contradicting-status-declaration` (HIGH, R-25).
+    """
+    specs = _make_clean_specs_tree(tmp_path, "v0.1.0")
+    spec = specs / "releases" / "v0.1.0" / "SPEC.md"
+    spec.write_text(
+        "# SPEC\n\n**Status:** Aprovado\n\n## Status: Draft\n\nbody\n", encoding="utf-8"
+    )
+
+    issues = SpecsDoctor(specs).check()
+
+    contradiction = [i for i in issues if i.code == "SPEC-DOC-040"]
+    assert contradiction, [i.to_dict() for i in issues if i.code.startswith("SPEC-DOC-0")]
+    assert contradiction[0].severity == Severity.ERROR
+    assert "Draft" in contradiction[0].description
+    assert "5" in contradiction[0].description, "the refusal must name the offending line"
+
+
+def test_a_single_canonical_declaration_is_not_reported(tmp_path: Path) -> None:
+    """The escape hatch has to stay open: a consistent artifact must pass untouched."""
+    specs = _make_clean_specs_tree(tmp_path, "v0.1.0")
+    spec = specs / "releases" / "v0.1.0" / "SPEC.md"
+    spec.write_text("# SPEC\n\n**Status:** Aprovado\n\n## Escopo\n\nbody\n", encoding="utf-8")
+
+    issues = SpecsDoctor(specs).check()
+
+    assert [i for i in issues if i.code == "SPEC-DOC-040"] == []
+
+
+def test_a_plain_draft_artifact_is_not_accused_of_contradicting_itself(tmp_path: Path) -> None:
+    """A Draft document is refused elsewhere for an obvious reason; not this check's job."""
+    specs = _make_clean_specs_tree(tmp_path, "v0.1.0")
+    spec = specs / "releases" / "v0.1.0" / "SPEC.md"
+    spec.write_text("# SPEC\n\n**Status:** Draft\n\n## Status: Draft\n\nbody\n", encoding="utf-8")
+
+    issues = SpecsDoctor(specs).check()
+
+    assert [i for i in issues if i.code == "SPEC-DOC-040"] == []
