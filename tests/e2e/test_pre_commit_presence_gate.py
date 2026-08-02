@@ -35,8 +35,18 @@ from tests.e2e.rendezvous import wait_for_file
 pytestmark = pytest.mark.e2e
 
 _SLUG = "demo-ctx"
-_READY_DEADLINE = 30.0
-_EXIT_DEADLINE = 30.0
+# These bound a REAL subprocess that spawns git, which spawns the pre-commit hook, which
+# spawns a Python interpreter. Under a full-suite run that chain competes with everything
+# else on the box, and a 30s ceiling turned a slow machine into a FAILING assertion — the
+# test reported a product defect when the only thing that happened was load
+# (bug e2e-presence-gate-ancestry-test-is-timing-flaky).
+#
+# A deadline here exists to stop a genuine HANG from wedging the suite forever, not to
+# measure speed. So it is set far above any plausible slow-but-working run: a real hang
+# still fails in bounded time, and a loaded machine no longer produces a false failure.
+# Raising it costs nothing when the code is correct — the wait ends when the file appears.
+_READY_DEADLINE = 180.0
+_EXIT_DEADLINE = 180.0
 
 #: A long-lived "foreign holder": just stay alive (pid genuinely running) until told to stop.
 _HOLDER = textwrap.dedent(

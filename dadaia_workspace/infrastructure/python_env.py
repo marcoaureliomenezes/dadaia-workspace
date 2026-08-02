@@ -7,10 +7,12 @@ Executable paths are constructed using ``PLATFORM.venv_scripts_dir`` and
 
 import base64
 import hashlib
+import logging
 import os
 import subprocess
 import venv
 import zipfile
+from collections.abc import Callable
 from importlib import metadata
 from pathlib import Path
 
@@ -99,6 +101,35 @@ def repack_installed_wheel(
 
 
 class VenvPythonEnvironmentManager:
+    def _upgrade_pip(
+        self, pip_executable: Path | str, *, runner: Callable[..., object] | None = None
+    ) -> None:
+        """Best-effort upgrade of the venv's bundled pip. NEVER a gate.
+
+        ``venv.create(with_pip=True)`` leaves whatever pip the host interpreter bundles,
+        and an old one carries real advisories — path traversal when extracting a wheel,
+        symlink escape when extracting a tar, mishandling of concatenated archives. A
+        consumer workspace's venv goes on to install other packages with that pip, so the
+        exposure is not theoretical (bug ``workspace-venv-ships-vulnerable-pip``).
+
+        It is deliberately best-effort: the offline-first bootstrap is a documented
+        property, so an unreachable index, a proxy, or any other failure is a SILENT
+        no-op. An air-gapped ``init`` keeps working exactly as before — it just keeps the
+        pip it had.
+        """
+        import subprocess as _sp
+
+        run: Callable[..., object] = runner if runner is not None else _sp.check_call
+        try:
+            run(
+                [str(pip_executable), "install", "--quiet", "--upgrade", "pip"],
+                timeout=120,
+            )
+        except Exception:  # noqa: BLE001 — best-effort by design; never fail the bootstrap
+            logging.getLogger(__name__).debug(
+                "pip upgrade skipped (no index reachable or upgrade refused)"
+            )
+
     def _venv_path(self, workspace_root: str) -> Path:
         return Path(workspace_root) / ".dadaia" / ".venv"
 
@@ -158,6 +189,7 @@ class VenvPythonEnvironmentManager:
         if not self._dadaia_entrypoint(workspace_root).exists():
             spec = self._install_spec()
             pip = self.pip_executable(workspace_root)
+            self._upgrade_pip(pip)
             install_cmd = [pip, "install", "--quiet"]
             editable = Path(spec).is_dir()
             if editable:
