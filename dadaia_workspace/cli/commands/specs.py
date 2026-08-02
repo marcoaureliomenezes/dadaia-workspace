@@ -11,6 +11,7 @@ import typer
 
 from dadaia_workspace import container
 from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
+from dadaia_workspace.core.release_layout import next_segment_name
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.specs import Severity, SpecsDoctor
 from dadaia_workspace.features.specs.doctor_common import read_active_md
@@ -449,24 +450,6 @@ def hotfix_open(
     )
 
 
-def _next_segment(release_dir: Path) -> str:
-    """The segment `specs segment open` should be given next, from what is on disk.
-
-    A release matures ``alpha-1 -> alpha-2 -> ... -> rc-1 -> rc-2``. The next segment is
-    one past the highest existing segment of the current kind; a release still in alpha
-    advances its alpha, and one that has reached rc advances its rc.
-    """
-    highest = {"alpha": 0, "rc": 0}
-    for child in release_dir.iterdir():
-        if not child.is_dir():
-            continue
-        kind, _, number = child.name.partition("-")
-        if kind in highest and number.isdigit():
-            highest[kind] = max(highest[kind], int(number))
-    kind = "rc" if highest["rc"] else "alpha"
-    return f"{kind}-{highest[kind] + 1}"
-
-
 @release_app.command("open")
 def release_open(
     version_id: str = typer.Argument(..., help="SemVer release id, e.g. v0.1.6."),
@@ -500,7 +483,7 @@ def release_open(
         where = f" --specs-dir {specs_dir}" if specs_dir else ""
         typer.echo(
             f"[error] To open the next segment: dadaia specs segment open "
-            f"{_next_segment(release_dir)}{where}",
+            f"{next_segment_name(child.name for child in release_dir.iterdir() if child.is_dir())}{where}",
             err=True,
         )
         typer.echo(

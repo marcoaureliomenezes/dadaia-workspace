@@ -26,7 +26,11 @@ from pathlib import Path
 
 import yaml
 
-from dadaia_workspace.core.models.backlog import Intent, serialize_intents
+from dadaia_workspace.core.models.backlog import (
+    Intent,
+    declared_new_anchor,
+    serialize_intents,
+)
 from dadaia_workspace.features.backlog.preview import BacklogItem, load_backlog_items
 from dadaia_workspace.features.backlog.subject_registry import BindStatus, Registry
 
@@ -79,7 +83,7 @@ def _residual_intents(
             # item never left the live backlog
             # (bug backlog-remove-consumed-never-clears-surface-new). Both halves must
             # derive the anchor the SAME way — this is that one way.
-            declared = f"new:{intent.subject.kind.value}:{intent.subject.ref}"
+            declared = declared_new_anchor(intent.subject)
             if declared in shipped_anchors:
                 any_shipped = True
                 continue

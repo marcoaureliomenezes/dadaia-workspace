@@ -24,6 +24,7 @@ from dadaia_workspace.core.exceptions import (
 )
 from dadaia_workspace.core.models.hygiene import SlopPolicy
 from dadaia_workspace.core.protocols.process_ancestry import ProcessAncestry
+from dadaia_workspace.core.release_layout import ordered_segments
 from dadaia_workspace.core.specs_resolver import repo_slug_for_context, resolve_bound_context_name
 from dadaia_workspace.features.academy.service import AcademyService
 from dadaia_workspace.features.agents.reader import FileSystemAgentsProvider
@@ -896,20 +897,6 @@ def _backlog_context_roots(workspace_root: Path, context: str) -> tuple[Path, Pa
     return specs_dir, source_root
 
 
-def _segment_sort_key(name: str) -> tuple[int, int, str]:
-    """Order release segments the way they mature: alpha-1 < alpha-2 < rc-1 < rc-2.
-
-    Numeric ordering matters — plain lexicographic sorting puts ``alpha-10`` before
-    ``alpha-2``, which would resolve a matured release to a stale SPEC.
-    """
-    kind, _, number = name.partition("-")
-    rank = {"alpha": 0, "rc": 1}.get(kind, 2)
-    try:
-        return (rank, int(number), name)
-    except ValueError:
-        return (rank, 0, name)
-
-
 def build_release_spec_path(
     workspace_root: Path,
     *,
@@ -953,13 +940,15 @@ def build_release_spec_path(
     flat = release_dir / "SPEC.md"
     if flat.is_file():
         return flat
-
-    segments = sorted(
-        (child for child in release_dir.glob("*/SPEC.md") if child.is_file()),
-        key=lambda path: _segment_sort_key(path.parent.name),
+    segments = (
+        ordered_segments(child.name for child in release_dir.iterdir() if child.is_dir())
+        if release_dir.is_dir()
+        else []
     )
-    if segments:
-        return segments[-1]
+    for name in reversed(segments):
+        candidate = release_dir / name / "SPEC.md"
+        if candidate.is_file():
+            return candidate
 
     raise DadaiaError(
         f"Release '{release_id}' has no SPEC.md under '{release_dir}' — neither "

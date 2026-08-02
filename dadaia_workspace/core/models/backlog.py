@@ -25,6 +25,7 @@ __all__ = [
     "Intent",
     "Subject",
     "SubjectKind",
+    "declared_new_anchor",
     "is_intents_exempt",
     "parse_intents",
     "serialize_intents",
@@ -32,6 +33,19 @@ __all__ = [
 
 #: The one backlog stage exempt from the resolvable-typed-intents requirement.
 INTENTS_EXEMPT_STATUS = "idea"
+
+
+def declared_new_anchor(subject: Subject) -> str:
+    """The anchor id a ``surface: new`` subject binds to, by its own declared identity.
+
+    A surface the item INTRODUCES cannot resolve through the registry — it does not exist
+    yet — so it binds to ``new:<kind>:<ref>``. Both halves of removal-on-release must
+    derive it the SAME way: `consume` records it and `remove-consumed` looks it up. They
+    each had their own copy, the strings could never match, and a shipped `surface: new`
+    item stayed in the live backlog forever (bug
+    ``backlog-remove-consumed-never-clears-surface-new``). One derivation, one answer.
+    """
+    return f"new:{subject.kind.value}:{subject.ref}"
 
 
 def is_intents_exempt(status: str | None) -> bool:

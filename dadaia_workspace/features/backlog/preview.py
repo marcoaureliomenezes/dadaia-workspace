@@ -21,7 +21,12 @@ from pathlib import Path
 
 import yaml
 
-from dadaia_workspace.core.models.backlog import Intent, SubjectKind, parse_intents
+from dadaia_workspace.core.models.backlog import (
+    Intent,
+    SubjectKind,
+    declared_new_anchor,
+    parse_intents,
+)
 from dadaia_workspace.features.backlog.subject_registry import (
     Anchor,
     BindStatus,
@@ -257,7 +262,7 @@ def bound_anchor_changes(item: BacklogItem, registry: Registry) -> tuple[dict[st
                     "it as existing (drop 'surface: new') or choose a new name."
                 )
                 continue
-            declared = f"new:{intent.subject.kind.value}:{intent.subject.ref}"
+            declared = declared_new_anchor(intent.subject)
             anchor_changes.setdefault(declared, intent.change)
             continue
         result = registry.bind(intent.subject.ref, intent.subject.kind)

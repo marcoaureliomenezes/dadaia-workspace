@@ -27,6 +27,8 @@ from collections.abc import Mapping, Sequence
 from collections.abc import Set as AbstractSet
 from pathlib import Path
 
+from dadaia_workspace.core.release_layout import CLOSURE_ARTIFACT
+
 __all__ = ["LEDGER_FILENAME", "read_consumed"]
 
 #: The fixed sidecar filename (ADR-C); one per archived release directory.
@@ -56,9 +58,11 @@ def _release_still_in_flight(specs_dir: Path | None, release_id: str) -> bool:
     # looking only at the flat path answered "still in flight" forever — read_consumed
     # returned {} always and BL-STALE could never fire on any real release
     # (bug backlog-doctor-bl-stale-noop-on-segmented-release).
-    if (release_dir / "CLOSURE.md").is_file():
+    if (release_dir / CLOSURE_ARTIFACT).is_file():
         return False
-    return not any(release_dir.glob("*/CLOSURE.md"))
+    return not any(
+        (child / CLOSURE_ARTIFACT).is_file() for child in release_dir.iterdir() if child.is_dir()
+    )
 
 
 def recorded_consumed_slugs(archive_root: Path, release_id: str) -> dict[str, set[str]]:
