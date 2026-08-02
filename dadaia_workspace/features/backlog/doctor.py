@@ -24,7 +24,13 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
 
-from dadaia_workspace.core.models.backlog import INTENTS_EXEMPT_STATUS, is_intents_exempt
+from dadaia_workspace.core.models.backlog import (
+    BACKLOG_STATUSES,
+    BACKLOG_TERMINAL_STATUSES,
+    INTENTS_EXEMPT_STATUS,
+    is_intents_exempt,
+    normalize_backlog_status,
+)
 from dadaia_workspace.features.backlog.classifier import BoundItem, Verdict, classify
 from dadaia_workspace.features.backlog.ledger import read_consumed
 from dadaia_workspace.features.backlog.preview import (
@@ -42,7 +48,10 @@ __all__ = [
 ]
 
 #: Backlog statuses that are terminal — a stale check only flags non-terminal survivors.
-_TERMINAL_STATUSES = frozenset({"delivered", "rejected", "done", "closed"})
+# Derived, never redeclared: this module used to carry its own set with `done`/`closed`
+# (unknown to the rest of the product) and WITHOUT `consumed`/`superseded`/`resolved`
+# (which the governance doctor treats as terminal and demands be archived).
+_TERMINAL_STATUSES = BACKLOG_TERMINAL_STATUSES
 
 #: The one status EXEMPT from the resolvable-typed-intents requirement (v0.1.55 FR5, bug
 #: ``backlog-new-stub-readme-lag-intents-schema``). An ``idea`` is an unbound brainstorm: it
@@ -54,20 +63,7 @@ _INTENTS_EXEMPT_STATUS = INTENTS_EXEMPT_STATUS
 
 #: Statuses accepted as valid in BL-SCHEMA (kept permissive; the backlog status vocabulary is
 #: informal — see ``release-governance``). ``None``/empty is the only invalid case here.
-_KNOWN_STATUSES = frozenset(
-    {
-        "idea",
-        "candidate",
-        "picked",
-        "in-progress",
-        "delivered",
-        "rejected",
-        "deferred",
-        "done",
-        "closed",
-        "open",
-    }
-)
+_KNOWN_STATUSES = BACKLOG_STATUSES
 
 
 class BacklogDoctorCode(StrEnum):
@@ -162,7 +158,8 @@ def _check_schema(ctx: DoctorContext) -> list[Finding]:
                 )
             )
         # An invalid status token is always BL-SCHEMA, at ANY status.
-        if item.status is not None and item.status.lower() not in _KNOWN_STATUSES:
+        normalized = normalize_backlog_status(item.status)
+        if normalized is not None and normalized not in _KNOWN_STATUSES:
             findings.append(
                 Finding(
                     BacklogDoctorCode.BL_SCHEMA,

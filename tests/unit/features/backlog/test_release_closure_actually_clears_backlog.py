@@ -143,3 +143,42 @@ def test_a_terminal_backlog_item_needs_no_resolvable_intents() -> None:
         assert is_intents_exempt(terminal) is True, terminal
     for live in ("open", "picked", "candidate", None):
         assert is_intents_exempt(live) is False, live
+
+
+def test_one_vocabulary_answers_for_the_whole_product() -> None:
+    """Three modules each carried their own idea of what a backlog status IS.
+
+    core knew six terminal tokens, `features/backlog/doctor` knew four — two of which
+    (`done`, `closed`) nobody else had ever heard of — and `doctor_governance` knew a
+    third four. Worse than drift: `consumed` is TERMINAL to the governance doctor, which
+    demands such an item be moved into `_archive/`, while the backlog doctor rejected the
+    very same token as an unknown status. Two laws of the same product contradicting each
+    other, so no operator could satisfy both.
+    """
+    from dadaia_workspace.core.models.backlog import (
+        BACKLOG_STATUSES,
+        BACKLOG_TERMINAL_STATUSES,
+    )
+    from dadaia_workspace.features.backlog.doctor import _KNOWN_STATUSES, _TERMINAL_STATUSES
+    from dadaia_workspace.features.specs.doctor_governance import _BACKLOG_TERMINAL_PREFIXES
+
+    assert BACKLOG_TERMINAL_STATUSES <= BACKLOG_STATUSES
+    assert _KNOWN_STATUSES == BACKLOG_STATUSES, "the backlog doctor must not keep its own copy"
+    assert _TERMINAL_STATUSES == BACKLOG_TERMINAL_STATUSES
+    assert set(_BACKLOG_TERMINAL_PREFIXES) <= BACKLOG_TERMINAL_STATUSES
+
+
+def test_a_status_may_carry_the_release_suffix_the_skill_documents() -> None:
+    """`DELIVERED — v0.4.2` is the documented disposition; it must parse to `delivered`.
+
+    Bug closure-skill-delivered-suffix-rejected-by-bl-schema: the skill documented the
+    format, the doctor exact-matched, and following our own instructions produced an error.
+    """
+    from dadaia_workspace.core.models.backlog import normalize_backlog_status
+
+    assert normalize_backlog_status("DELIVERED — v0.4.2") == "delivered"
+    assert normalize_backlog_status("delivered - v0.4.2") == "delivered"
+    assert normalize_backlog_status("  Superseded — by other-slug ") == "superseded"
+    assert normalize_backlog_status("candidate") == "candidate"
+    assert normalize_backlog_status(None) is None
+    assert normalize_backlog_status("") is None

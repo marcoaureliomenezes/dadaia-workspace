@@ -25,7 +25,10 @@ __all__ = [
     "Intent",
     "Subject",
     "SubjectKind",
+    "BACKLOG_LIVE_STATUSES",
+    "BACKLOG_STATUSES",
     "BACKLOG_TERMINAL_STATUSES",
+    "normalize_backlog_status",
     "declared_new_anchor",
     "is_intents_exempt",
     "parse_intents",
@@ -48,6 +51,42 @@ INTENTS_EXEMPT_STATUS = "idea"
 BACKLOG_TERMINAL_STATUSES: frozenset[str] = frozenset(
     {"delivered", "consumed", "superseded", "resolved", "deferred", "rejected"}
 )
+
+#: Every status a backlog item may carry. Live tokens first, then the terminal set.
+#:
+#: Three modules each kept their own copy of this and they DISAGREED. The backlog doctor
+#: knew ``done``/``closed``, which nothing else had ever heard of, and did NOT know
+#: ``consumed``/``superseded``/``resolved`` — the very tokens the governance doctor treats
+#: as terminal and demands be archived. So one doctor required a state the other rejected
+#: outright, and no operator could satisfy both. One vocabulary, one answer.
+BACKLOG_LIVE_STATUSES: frozenset[str] = frozenset(
+    {"idea", "open", "candidate", "picked", "in-progress"}
+)
+BACKLOG_STATUSES: frozenset[str] = BACKLOG_LIVE_STATUSES | BACKLOG_TERMINAL_STATUSES
+
+#: Separators a status line may use before a free-text suffix (``DELIVERED — v0.4.2``).
+_STATUS_SUFFIX_SEPARATORS = ("—", "–", " - ", ":", "(")
+
+
+def normalize_backlog_status(raw: str | None) -> str | None:
+    """The bare status token from a status line, or ``None`` when there is none.
+
+    The closure skill documents the disposition format as ``DELIVERED — vX.Y.Z``: a token
+    plus a free suffix naming the release. The backlog doctor exact-matched the whole
+    string and rejected exactly that format, so following our own documented instruction
+    produced a ``BL-SCHEMA`` error (bug
+    ``closure-skill-delivered-suffix-rejected-by-bl-schema``). Parsing the suffix off is
+    the rule; it lives here so a doctor and a skill can never again mean different things
+    by the same line.
+    """
+    if raw is None:
+        return None
+    token = raw.strip()
+    for separator in _STATUS_SUFFIX_SEPARATORS:
+        head, found, _ = token.partition(separator)
+        if found:
+            token = head.strip()
+    return token.lower() or None
 
 
 def declared_new_anchor(subject: Subject) -> str:
@@ -82,9 +121,9 @@ def is_intents_exempt(status: str | None) -> bool:
     contract forbids ``features.lifecycle`` importing ``features.backlog``, so the one
     shared home has to be here.
     """
-    if status is None:
+    token = normalize_backlog_status(status)
+    if token is None:
         return False
-    token = status.strip().lower()
     return token == INTENTS_EXEMPT_STATUS or token in BACKLOG_TERMINAL_STATUSES
 
 
