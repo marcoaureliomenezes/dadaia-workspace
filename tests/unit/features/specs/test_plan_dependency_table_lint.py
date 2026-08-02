@@ -62,7 +62,7 @@ def test_an_unfilled_scaffold_row_is_reported() -> None:
     """The stub the scaffolder writes is a placeholder, not an answer."""
     rows = "| WS-1 | (deliverable of this segment) | (how it is validated in isolation) | none | none |\n"
 
-    issues = dependency_table_issues(_plan(rows))
+    issues = dependency_table_issues(_plan(rows), phase="IMPLEMENTATION")
 
     assert issues, "an untouched scaffold placeholder must not read as a filled table"
     assert "placeholder" in issues[0].lower()
@@ -75,8 +75,32 @@ def test_a_plan_without_the_section_is_not_accused() -> None:
 
 def test_a_section_with_no_rows_at_all_is_reported() -> None:
     issues = dependency_table_issues(
-        f"# PLAN\n\n## Validation Dependency Table\n\n{_HEADER}\n## Next\n"
+        f"# PLAN\n\n## Validation Dependency Table\n\n{_HEADER}\n## Next\n",
+        phase="IMPLEMENTATION",
     )
 
     assert issues
     assert "no rows" in issues[0].lower()
+
+
+def test_an_untouched_scaffold_does_not_warn_in_an_authoring_phase() -> None:
+    """Bug fresh-release-scaffold-emits-spec-doctor-warnings-042, restated.
+
+    A freshly opened release MUST be doctor-clean: the scaffolder and the doctor have to
+    agree on the fresh state. The placeholder is the legitimate authoring state, so it is
+    only worth reporting once the release is implementation-bound — exactly the rule
+    SPEC-DOC-004 already applies to a Draft status. Structural damage (a row with the
+    wrong cell count, or a genuinely empty cell) is reported in every phase, because no
+    phase makes a broken table correct.
+    """
+    rows = "| WS-1 | (deliverable of this segment) | (how it is validated in isolation) | none | none |\n"
+
+    assert dependency_table_issues(_plan(rows), phase="SPEC") == []
+    assert dependency_table_issues(_plan(rows), phase="IMPLEMENTATION")
+
+
+def test_structural_damage_is_reported_in_every_phase() -> None:
+    broken = "| WS-1 | the parser |\n"
+
+    assert dependency_table_issues(_plan(broken), phase="SPEC")
+    assert dependency_table_issues(_plan(broken), phase="IMPLEMENTATION")

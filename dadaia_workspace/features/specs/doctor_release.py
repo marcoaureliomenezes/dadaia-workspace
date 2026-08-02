@@ -182,7 +182,7 @@ class ReleaseValidator:
             # PLAN legitimately carries the untouched scaffold.
             if fname == "PLAN.md":
                 for problem in dependency_table_issues(
-                    fpath.read_text(encoding="utf-8", errors="replace")
+                    fpath.read_text(encoding="utf-8", errors="replace"), phase=phase
                 ):
                     issues.append(
                         SpecsDoctorIssue(

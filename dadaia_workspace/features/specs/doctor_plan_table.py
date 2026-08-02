@@ -44,12 +44,20 @@ def _placeholder(cell: str) -> bool:
     return text.startswith("(") and text.endswith(")")
 
 
-def dependency_table_issues(plan_text: str) -> list[str]:
+def dependency_table_issues(plan_text: str, *, phase: str | None = None) -> list[str]:
     """Human-readable problems with the PLAN's dependency table; empty when sound.
 
     Each message names the offending row and column so a second attempt written only
     from the message would pass (recipe R-27).
+
+    ``phase`` gates the PLACEHOLDER finding only. A freshly opened release must be
+    doctor-clean — the scaffolder and the doctor have to agree on the fresh state (bug
+    ``fresh-release-scaffold-emits-spec-doctor-warnings-042``) — so an untouched stub is
+    the legitimate authoring state and is reported only once the release is
+    implementation-bound, exactly as SPEC-DOC-004 already treats a Draft status.
+    Structural damage is reported in every phase: no phase makes a broken table correct.
     """
+    implementation_bound = (phase or "").upper() in ("IMPLEMENTATION", "CLOSURE")
     if SECTION not in plan_text:
         return []
 
@@ -79,12 +87,12 @@ def dependency_table_issues(plan_text: str) -> list[str]:
         for column, cell in zip(COLUMNS, cells, strict=True):
             if not cell.strip():
                 issues.append(f"row {label!r} leaves the {column!r} column empty.")
-            elif _placeholder(cell):
+            elif _placeholder(cell) and implementation_bound:
                 issues.append(
                     f"row {label!r} still carries the scaffold placeholder "
                     f"{cell.strip()!r} in the {column!r} column."
                 )
 
-    if data_rows == 0:
+    if data_rows == 0 and implementation_bound:
         issues.append(f"{SECTION} has no rows: the section was scaffolded and never filled in.")
     return issues
