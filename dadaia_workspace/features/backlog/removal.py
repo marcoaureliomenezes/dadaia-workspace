@@ -26,7 +26,11 @@ from pathlib import Path
 
 import yaml
 
-from dadaia_workspace.core.models.backlog import Intent, serialize_intents
+from dadaia_workspace.core.models.backlog import (
+    Intent,
+    declared_new_anchor,
+    serialize_intents,
+)
 from dadaia_workspace.features.backlog.preview import BacklogItem, load_backlog_items
 from dadaia_workspace.features.backlog.subject_registry import BindStatus, Registry
 
@@ -71,6 +75,20 @@ def _residual_intents(
     residual: list[Intent] = []
     any_shipped = False
     for intent in item.intents:
+        if intent.subject.surface == "new":
+            # A declared NEW surface is recorded by `consume` under its own identity
+            # (`new:<kind>:<ref>`) because the registry cannot resolve something that does
+            # not exist yet. Binding it through the registry here searched for an anchor
+            # that could never match the one recorded, so a fully shipped `surface: new`
+            # item never left the live backlog
+            # (bug backlog-remove-consumed-never-clears-surface-new). Both halves must
+            # derive the anchor the SAME way — this is that one way.
+            declared = declared_new_anchor(intent.subject)
+            if declared in shipped_anchors:
+                any_shipped = True
+                continue
+            residual.append(intent)
+            continue
         bind = registry.bind(intent.subject.ref, intent.subject.kind)
         if (
             bind.status is BindStatus.RESOLVED

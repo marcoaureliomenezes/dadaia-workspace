@@ -1,6 +1,6 @@
 ---
 name: bugfix-workflow-tdd
-status: OPEN
+status: rejected
 created: 2026-07-15
 origin: operator demand 2026-07-15 (same session as the bug-hotfix doctrine decree)
 owner: project-manager (curates)
@@ -10,6 +10,19 @@ intents:
   - subject: { kind: code, ref: "dadaia_workspace/features/lifecycle/prompt_builder.py#FragmentBundle" }
     change: "new bugfix/ fragment set (7 one-job fragments + bugfix-*-v1 output schemas) reusing shared/anti-slop, shared/write-scope, shared/output-handoff"
 ---
+
+> **REJECTED 2026-08-02.** This item asked for a `bugfix` workflow body and a fragment
+> set inside `features/lifecycle/` — a subsystem that was demolished. Both of its
+> `intents[]` point at files that no longer exist, which is why `backlog doctor` reports
+> BL-SCHEMA on it: the refs resolve to no anchor because the anchors were deleted.
+>
+> The NEED it carried is not rejected and is not lost — it was superseded by the
+> always-on `bug-hotfix-doctrine` rule, which says a bug is registered, root-caused,
+> reproduced with a failing test, fixed, proven green, closed with evidence and
+> committed, WITHOUT any release ceremony. That doctrine is the strict-TDD bug handling
+> this item wanted, expressed as law an agent follows rather than as an engine to build.
+>
+> Kept, never deleted (release-governance: never delete a backlog file).
 
 # Backlog — `bugfix` dadaia-workflow: strict-TDD bug handling
 

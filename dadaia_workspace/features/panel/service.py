@@ -32,7 +32,6 @@ from dadaia_workspace.core.models.spec_context import ContextState, SpecContextP
 from dadaia_workspace.core.protocols.agents_provider import AgentsProvider
 from dadaia_workspace.core.protocols.context_project_provider import ContextProjectProvider
 from dadaia_workspace.core.protocols.server_registry_provider import ServerRegistryProvider
-from dadaia_workspace.core.protocols.workflow_provider import WorkflowProvider
 
 
 @dataclass
@@ -108,7 +107,6 @@ class PanelService:
         workspace_root: Path,
         telemetry: Any = None,
         academy: Any = None,
-        workflows_service: WorkflowProvider | None = None,
         report_retention: Any = None,
         adapter_registry: dict[str, Any] | None = None,
         agents_provider: AgentsProvider | None = None,
@@ -133,11 +131,6 @@ class PanelService:
         academy:
             Optional AcademyService instance (injected).  When None,
             the Academy tab returns an empty course list.
-        workflows_service:
-            WorkflowProvider instance (injected via DI, T-017-06/07).
-            When None, a WorkflowsService is constructed lazily from
-            workspace_root on first use (backward-compatible for callers
-            that do not pass this parameter).
         report_retention:
             ReportRetentionService instance (injected, T-017-08).
             When None, calling get_report_retention() raises RuntimeError.
@@ -152,7 +145,6 @@ class PanelService:
         self.academy = academy
         # workflows_service is injected; fallback to lazy construction preserves
         # backward compatibility (T-017-06: no self-construction in __init__).
-        self._workflows_service: WorkflowProvider | None = workflows_service
         # AR-03: injected dependencies for report retention and adapter registry.
         self._report_retention = report_retention
         self._adapter_registry: dict[str, Any] = (
@@ -244,10 +236,6 @@ class PanelService:
             for ctx in self._active_contexts()
         ]
 
-    def list_dadaia_workflows(self) -> list[Any]:
-        """Return the authoritative Python-governed workflow catalog."""
-        return list(self._workflows_svc().list_dadaia_workflows())
-
     def _agents(self) -> AgentsProvider:
         """Return the injected AgentsProvider.
 
@@ -322,22 +310,6 @@ class PanelService:
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
-
-    def _workflows_svc(self) -> WorkflowProvider:
-        """Return the injected WorkflowProvider.
-
-        T-017-06: WorkflowsService is injected through the constructor.
-        T-017-07: the concrete class is no longer imported here; the composition root
-        (container.py) always injects a concrete WorkflowsService.  Callers that do not
-        inject a WorkflowProvider receive a clear error rather than a hidden construction.
-        """
-        if self._workflows_service is None:
-            raise RuntimeError(
-                "PanelService requires a WorkflowProvider to be injected via "
-                "'workflows_service'. The composition root (container.py) always "
-                "provides one; pass a fake for tests."
-            )
-        return self._workflows_service
 
     def _active_contexts(self) -> list[SpecContextProject]:
         """Return contexts with state == alive."""

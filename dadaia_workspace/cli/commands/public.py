@@ -148,14 +148,6 @@ def doctor() -> None:
     # import-linter `features-no-subprocess`/layering contract.
     public_dir = Path(dadaia_workspace.__file__).parent / "public"
     reports.extend(check_ai_surface_ritual(public_dir))
-    # Workflow-policy Layer-2 residue check (v0.1.28 T-28-D-02): no claude/opencode leaks
-    # into the public docs as a selectable Layer-2 worker harness (LAW 1). Wired at the CLI
-    # for the same import-layering reason as the AI-surface check above.
-    from dadaia_workspace.features.lifecycle.policy_public_doctor import (
-        check_workflow_policy_layer2_residue,
-    )
-
-    reports.extend(check_workflow_policy_layer2_residue(public_dir))
     has_issues = False
     for item in reports:
         if item.startswith("[ok]"):

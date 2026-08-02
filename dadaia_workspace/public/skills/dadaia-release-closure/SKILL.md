@@ -6,9 +6,9 @@ applyTo: "specs/releases/*/CLOSURE.md"
 
 # dadaia-release-closure
 
-> **Not the lifecycle enforcement mechanism.** Ordered lifecycle execution (the closure
-> sequence and its gates) is owned by the dadaia-workflows (`dadaia lifecycle`). This
-> skill is reference / manual-operator guidance only.
+> **This skill is the procedure.** `product-engineer` executes the closure sequence
+> itself; no engine advances it. `dadaia specs doctor` is the check that the closed
+> release is coherent, and the commit gate is what makes closure real on disk.
 
 ## When to invoke
 
@@ -76,6 +76,36 @@ touch dependencies").
 - `specs/memory/product/<slug>.md` — <one-liner per feature page updated>
 - `specs/memory/architecture.md` — <one-liner>
 - `specs/memory/tech-stack.md` — <one-liner or "no change: reason">
+
+### Writing a new memory atom
+
+A shipped feature is recorded as an **atom** at `specs/memory/product/<area>/<slug>.md`.
+**Prefer the generator** — `dadaia memory product add <slug> --specs-dir <specs-dir>` — then
+edit the generated body. A malformed atom is rejected by `dadaia specs doctor` (frontmatter,
+allowlisted headings, and the mandatory markdown heading are all validated), so if you write
+the file by hand, copy this template verbatim and fill it:
+
+```markdown
+---
+slug: <kebab-case-slug>
+title: <Feature Title>
+category: product
+tldr: <one-line summary under 160 chars>
+summary: <2-3 sentence description of the shipped capability>
+tags:
+  - <tag>
+token_estimate: 0
+last_updated: "<YYYY-MM-DD>"
+release_origin: <release-id>
+---
+
+## Visão atômica
+
+<what this feature does, grounded in the shipped behaviour>
+```
+
+An atom states what the product **is now** — never a changelog. History lives in
+`_archive/` and `git log`.
 
 ## Dispositions
 

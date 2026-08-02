@@ -65,6 +65,16 @@ _CODEX_HOOK_WRAPPERS: dict[str, tuple[str, dict[str, str]]] = {
         "dadaia_workspace.hooks.ctx_inject",
         {"DADAIA_HOOK_OUTPUT": "codex-json", "DADAIA_HOOK_EVENT": "SessionStart"},
     ),
+    # A compaction DISCARDS the injected bootstrap, so the session keeps working with the
+    # context silently gone. Claude Code recovers via SessionStart matcher `compact` and
+    # Kimi via its PostCompact shim; Codex wired neither, which was the one harness-parity
+    # divergence the certifying gate found (bug
+    # codex-ctx-inject-no-compaction-reinjection). Not a platform limit — `PostCompact` is
+    # in Codex's own event surface, recorded in ai-harness-codex/SKILL.md §9.
+    "codex-ctx-inject-post-compact": (
+        "dadaia_workspace.hooks.ctx_inject",
+        {"DADAIA_HOOK_OUTPUT": "codex-json", "DADAIA_HOOK_EVENT": "PostCompact"},
+    ),
 }
 
 
@@ -120,15 +130,25 @@ _CLAUDE_MATCH_ALL = "*"
 _DADAIA_HOOK_MARKER = "dadaia_workspace.hooks."
 
 
+#: Retired dadaia hook shapes. They carry no ``dadaia_workspace.hooks.`` marker, so
+#: ownership detection would read them as the operator's and PRESERVE them — leaving a
+#: superseded hook wired alongside its replacement. They are ours; they get replaced.
+_RETIRED_DADAIA_HOOK_MARKERS = ("ctx-inject.sh",)
+
+
 def _is_dadaia_hook_entry(entry: object) -> bool:
-    """True iff *entry* is a hook entry this module generated."""
+    """True iff *entry* is a hook entry this module generated, now or in a past version."""
     if not isinstance(entry, dict):
         return False
     hooks = entry.get("hooks")
-    if not isinstance(hooks, list):
-        return False
+    candidates = hooks if isinstance(hooks, list) else [entry]
     return any(
-        isinstance(h, dict) and _DADAIA_HOOK_MARKER in str(h.get("command", "")) for h in hooks
+        isinstance(h, dict)
+        and (
+            _DADAIA_HOOK_MARKER in str(h.get("command", ""))
+            or any(marker in str(h.get("command", "")) for marker in _RETIRED_DADAIA_HOOK_MARKERS)
+        )
+        for h in candidates
     )
 
 
@@ -378,6 +398,20 @@ def codex_hooks(workspace_root: Path) -> dict[str, object]:
                                 "codex-ctx-inject-session-start"
                             ),
                             "statusMessage": "Loading dadaia context",
+                        }
+                    ],
+                }
+            ],
+            # PostCompact: the compaction just dropped the injected context, so re-inject
+            # it once. ctx_inject stamps a compact marker and the next prompt's
+            # UserPromptSubmit path stays silent afterwards, so this never double-injects.
+            "PostCompact": [
+                {
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": _codex_hook_wrapper_command("codex-ctx-inject-post-compact"),
+                            "statusMessage": "Restoring dadaia context after compaction",
                         }
                     ],
                 }

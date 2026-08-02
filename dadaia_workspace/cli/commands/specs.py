@@ -11,6 +11,7 @@ import typer
 
 from dadaia_workspace import container
 from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
+from dadaia_workspace.core.release_layout import next_segment_name
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.specs import Severity, SpecsDoctor
 from dadaia_workspace.features.specs.doctor_common import read_active_md
@@ -461,6 +462,36 @@ def release_open(
     phase: SPEC`` (schema v2, ADR-1/ADR-5).
     """
     target = _resolve_specs_dir(specs_dir)
+    # `open` creates. Re-running it on a release that already exists used to rewind
+    # ACTIVE.md's phase back to SPEC while reporting `[ok]` — a silent state regression
+    # on a live release. Refuse, and name the verb that actually advances one.
+    release_dir = target / "releases" / version_id
+    if not force and release_dir.exists():
+        # R-23: the remedy must be a command the operator can paste, not a template with
+        # a placeholder they have to fill in from knowledge they may not have
+        # (bug r6-release-open-guard-remedy-placeholder-not-pasteable). Name the real
+        # next segment, computed from what is already on disk.
+        typer.echo(
+            f"[error] release {version_id} already exists at {release_dir}. "
+            "`release open` creates a release; it does not re-open one, and re-running "
+            "it would rewind ACTIVE.md's phase.",
+            err=True,
+        )
+        # Carry the caller's own --specs-dir into the remedy. Dropping it made the
+        # prescribed line unrunnable from the same shell that just failed
+        # (bug specs-release-open-collision-remedy-omits-specs-dir).
+        where = f" --specs-dir {specs_dir}" if specs_dir else ""
+        typer.echo(
+            f"[error] To open the next segment: dadaia specs segment open "
+            f"{next_segment_name(child.name for child in release_dir.iterdir() if child.is_dir())}{where}",
+            err=True,
+        )
+        typer.echo(
+            "[error] To deliberately re-scaffold this release: "
+            f"dadaia specs release open {version_id}{where} --force",
+            err=True,
+        )
+        raise typer.Exit(2)
     try:
         result = scaffold_release_segment(target, version_id, "alpha-1", force=force)
     except ValueError as exc:

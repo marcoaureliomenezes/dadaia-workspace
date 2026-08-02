@@ -14,6 +14,7 @@ import re
 from datetime import UTC, datetime
 from pathlib import Path
 
+from dadaia_workspace.core.models.backlog import BACKLOG_TERMINAL_STATUSES
 from dadaia_workspace.features.specs.doctor_common import iter_archive_release_dirs
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
 
@@ -52,11 +53,13 @@ _BUGS_JSONL_NAME_RE = re.compile(r"^\d{8}T\d{2}Z-\d+\.jsonl$")
 # SPEC-DOC-035 (v0.1.46 AC-4): terminal backlog status prefixes. A backlog entry whose
 # Status is terminal but still loose in ``specs/backlog/`` (not under ``_archive/``) WARNs —
 # a consumed/shipped item must be moved into ``specs/backlog/_archive/``.
-_BACKLOG_TERMINAL_PREFIXES: tuple[str, ...] = (
-    "delivered",
-    "consumed",
-    "superseded",
-    "resolved",
+# Deliberately NARROWER than ``BACKLOG_TERMINAL_STATUSES``: this rule is about SHIPPED
+# work that must be moved into ``_archive/``. Deferring or rejecting an item settles it
+# but does not ship it, so those two stay loose in ``specs/backlog/`` where the operator
+# can still see them. Derived from the single vocabulary so the two can never drift into
+# disagreeing about what a token MEANS — only about which subset this rule asks for.
+_BACKLOG_TERMINAL_PREFIXES: tuple[str, ...] = tuple(
+    sorted(BACKLOG_TERMINAL_STATUSES - {"deferred", "rejected"})
 )
 
 # Match a Status line in a backlog entry: ``Status: ...`` or ``**Status:** ...``.
@@ -72,6 +75,24 @@ _BACKLOG_AGGREGATE_FILES: frozenset[str] = frozenset({"candidates.md", "ideas.md
 # legitimate return (the slug is being ADDED for a future release, not consumed) and are
 # the documented false-positive class. SPEC-DOC-031 stays WARN (never ERR) for this reason.
 _BACKLOG_RETURNS_HEADING_RE = re.compile(r"^##\s+Backlog\s+returns\b", re.IGNORECASE)
+
+
+def _reported_bug_ids(lines: list[str]) -> frozenset[str]:
+    """Every ``bug_id`` carrying a ``reported`` event anywhere in *lines*."""
+    found: set[str] = set()
+    for raw in lines:
+        stripped = raw.strip()
+        if not stripped:
+            continue
+        try:
+            obj = json.loads(stripped)
+        except ValueError:
+            continue
+        if isinstance(obj, dict) and obj.get("event") == "reported":
+            bug_id = obj.get("bug_id")
+            if isinstance(bug_id, str):
+                found.add(bug_id)
+    return frozenset(found)
 
 
 class GovernanceValidator:
@@ -373,6 +394,12 @@ class GovernanceValidator:
             if not is_canonical and not _BUGS_JSONL_NAME_RE.match(jsonl_path.name):
                 continue
             lines = jsonl_path.read_text(encoding="utf-8").splitlines()
+            # Pre-scan: which bug_ids carry a `reported` ANYWHERE in this file. An
+            # append-only log cannot insert an opening before a terminal that was already
+            # written, so a reconstructed opening necessarily lands later in file order.
+            # The invariant that matters is "no bug was closed that was never opened" —
+            # a LATE opening is a repair, not the defect this check exists to catch.
+            reported_anywhere = _reported_bug_ids(lines)
             row_count = sum(1 for line in lines if line.strip())
             if not is_canonical and row_count > _BUGS_JSONL_ROW_CEILING:
                 issues.append(
@@ -427,7 +454,13 @@ class GovernanceValidator:
                     continue
                 issues.extend(
                     self._fold_bug_coherence(
-                        obj, jsonl_path, lineno, TERMINAL_EVENTS, seen_reported, terminated
+                        obj,
+                        jsonl_path,
+                        lineno,
+                        TERMINAL_EVENTS,
+                        seen_reported,
+                        terminated,
+                        reported_anywhere,
                     )
                 )
         return issues
@@ -440,6 +473,7 @@ class GovernanceValidator:
         terminal_events: frozenset[str],
         seen_reported: set[str],
         terminated: set[str],
+        reported_anywhere: frozenset[str],
     ) -> list[SpecsDoctorIssue]:
         """Advance the coherence fold for one event, emitting any coherence ERROR."""
         bug_id = obj.get("bug_id")
@@ -454,28 +488,48 @@ class GovernanceValidator:
             # ARCHIVED and any non-terminal annotation are ignored by the coherence rule.
             return []
         if bug_id in terminated:
+            # A later terminal SUPERSEDES the earlier one; the fold takes the latest.
+            # The ledger is append-only, so the only way to correct a disposition made in
+            # error is to append the right one and say so in its reason. Forbidding that
+            # would push the correction outside the evidence trail — the one place it must
+            # not happen (see the `bug-registration-guardrail` rule).
             return [
                 SpecsDoctorIssue(
                     code="SPEC-DOC-033",
-                    severity=Severity.ERROR,
+                    severity=Severity.WARNING,
                     description=(
-                        f"bugs/{jsonl_path.name} line {lineno}: bug '{bug_id}' has a second "
-                        f"terminal event '{event}' after an existing terminal — a bug_id may "
-                        "carry at most one terminal (SPEC-DOC-033, ERROR)."
+                        f"bugs/{jsonl_path.name} line {lineno}: bug '{bug_id}' carries a "
+                        f"second terminal event '{event}'. Read as a correction superseding "
+                        "the earlier disposition; confirm its reason says so "
+                        "(SPEC-DOC-033, WARNING)."
                     ),
                     path=str(jsonl_path),
                 )
             ]
         if bug_id not in seen_reported:
             terminated.add(bug_id)
+            if bug_id in reported_anywhere:
+                return [
+                    SpecsDoctorIssue(
+                        code="SPEC-DOC-033",
+                        severity=Severity.WARNING,
+                        description=(
+                            f"bugs/{jsonl_path.name} line {lineno}: terminal event '{event}' "
+                            f"for bug '{bug_id}' precedes its 'reported' event — read as a "
+                            "reconstructed opening appended after the fact; confirm its notes "
+                            "say so (SPEC-DOC-033, WARNING)."
+                        ),
+                        path=str(jsonl_path),
+                    )
+                ]
             return [
                 SpecsDoctorIssue(
                     code="SPEC-DOC-033",
                     severity=Severity.ERROR,
                     description=(
                         f"bugs/{jsonl_path.name} line {lineno}: terminal event '{event}' for "
-                        f"bug '{bug_id}' with no prior 'reported' event — every stream must "
-                        "open with 'reported' (SPEC-DOC-033, ERROR)."
+                        f"bug '{bug_id}' with no 'reported' event anywhere in the stream — a "
+                        "bug nobody opened cannot be closed (SPEC-DOC-033, ERROR)."
                     ),
                     path=str(jsonl_path),
                 )

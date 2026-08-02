@@ -98,7 +98,7 @@
     },
     {
       "code": "SPECS-VERSION",
-      "description": "specs_pattern_version is 0, below the canonical 4. Run: dadaia specs upgrade",
+      "description": "specs_pattern_version is 0, below the canonical 4. Run: dadaia specs upgrade --specs-dir <SPECS>",
       "path": "<SPECS>/constitution.md",
       "severity": "warning"
     },

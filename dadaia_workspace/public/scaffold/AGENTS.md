@@ -22,8 +22,9 @@ releases/<release-id>/TASKS.md
 Use `_archive/` only for history. Use `backlog/` and `bugs/` for intake and
 triage; they are not approval gates.
 
-Run ordered work through exactly one of the four `dadaia lifecycle` workflows:
-`backlog-definition`, `release-definition`, `implementation-reviews`, or `audit`.
+Run ordered work by dispatching the owning persona and having it follow the matching
+skill: `dadaia-grill-me`, `dadaia-release-definition`, `dadaia-task-manager`,
+`dadaia-release-closure`.
 Concurrent sessions are allowed and surfaced through advisory presence; never wait for
 or create a workspace concurrency lock.
 

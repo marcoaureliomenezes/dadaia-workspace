@@ -7,7 +7,7 @@
     "provider",
     "specs",
     "contexts",
-    "workflows",
+    "sdd_lifecycle",
     "harnesses",
     "surfaces",
     "consumer_requirements",
@@ -46,17 +46,16 @@
         "selection_contract": {"const": "explicit-or-caller-owned-bind"}
       }
     },
-    "workflows": {
+    "sdd_lifecycle": {
       "type": "array",
-      "minItems": 4,
-      "maxItems": 4,
+      "minItems": 1,
       "items": {
         "type": "object",
         "required": ["id", "command"],
         "additionalProperties": false,
         "properties": {
           "id": {"type": "string"},
-          "command": {"type": "string", "pattern": "^dadaia lifecycle "}
+          "command": {"type": "string", "pattern": "^dadaia [a-z]"}
         }
       }
     },
@@ -65,12 +64,12 @@
     "consumer_requirements": {"type": "object"},
     "certification": {
       "type": "object",
-      "required": ["command", "schema_version", "deterministic_fake_workflows", "live_harness_canaries_required_for_release"],
+      "required": ["command", "schema_version", "deterministic_sdd_chain", "live_harness_canaries_required_for_release"],
       "additionalProperties": false,
       "properties": {
         "command": {"const": "dadaia certify --json"},
         "schema_version": {"const": "dadaia-certification-v1"},
-        "deterministic_fake_workflows": {"const": true},
+        "deterministic_sdd_chain": {"const": true},
         "live_harness_canaries_required_for_release": {"const": true}
       }
     }

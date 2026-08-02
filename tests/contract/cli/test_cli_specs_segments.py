@@ -57,3 +57,69 @@ def test_specs_segment_error_matrix(tmp_path: Path, setup_and_invoke: str) -> No
             app, ["specs", "segment", "open", "alpha-2", "--specs-dir", str(specs)]
         )
     assert res.exit_code == 2
+
+
+def test_reopening_an_existing_release_is_refused(tmp_path: Path) -> None:
+    """`open` creates. Re-running it on a live release silently rewound ACTIVE.md's
+    phase (IMPLEMENTATION -> SPEC) while reporting `[ok]` — a state regression with no
+    trace. The verb must refuse and name the verb that advances a release instead."""
+    specs = _specs(tmp_path)
+    assert (
+        _runner.invoke(
+            app, ["specs", "release", "open", "v0.1.6", "--specs-dir", str(specs)]
+        ).exit_code
+        == 0
+    )
+    active = specs / "releases" / "ACTIVE.md"
+    active.write_text(active.read_text().replace("phase: SPEC", "phase: IMPLEMENTATION"))
+
+    res = _runner.invoke(app, ["specs", "release", "open", "v0.1.6", "--specs-dir", str(specs)])
+
+    assert res.exit_code != 0, res.output
+    assert "phase: IMPLEMENTATION" in active.read_text(), "a refusal must not rewind the phase"
+    assert "segment open" in res.output, "the refusal must name the verb that advances a release"
+    assert "Traceback" not in res.output
+
+
+def test_force_still_reopens_deliberately(tmp_path: Path) -> None:
+    """`--force` is the documented escape hatch and must keep working."""
+    specs = _specs(tmp_path)
+    _runner.invoke(app, ["specs", "release", "open", "v0.1.6", "--specs-dir", str(specs)])
+
+    res = _runner.invoke(
+        app, ["specs", "release", "open", "v0.1.6", "--specs-dir", str(specs), "--force"]
+    )
+
+    assert res.exit_code == 0, res.output
+    assert "phase: SPEC" in (specs / "releases" / "ACTIVE.md").read_text()
+
+
+def test_the_reopen_refusal_prescribes_a_pasteable_command(tmp_path: Path) -> None:
+    """R-23: a remedy is a command you paste, not advice about one.
+
+    The first version of this guard printed `dadaia specs segment open <alpha-N|rc-N>`;
+    pasted verbatim the literal placeholder fails validation, so the operator burns a
+    cycle proving the tool wrong (bug r6-release-open-guard-remedy-placeholder-not-pasteable).
+    """
+    specs = _specs(tmp_path)
+    _runner.invoke(app, ["specs", "release", "open", "v0.1.6", "--specs-dir", str(specs)])
+
+    res = _runner.invoke(app, ["specs", "release", "open", "v0.1.6", "--specs-dir", str(specs)])
+
+    prescribed = [
+        line.strip()
+        for line in res.output.splitlines()
+        if "segment open" in line and "dadaia" in line
+    ]
+    assert prescribed, res.output
+    assert not any("<" in line or ">" in line for line in prescribed), prescribed
+
+    # And it actually runs — pasted VERBATIM, adding nothing. Appending --specs-dir here
+    # is what hid the defect the first time: the remedy dropped the flag the failing
+    # invocation itself carried, so the operator's paste could not resolve a specs tree
+    # (bug specs-release-open-collision-remedy-omits-specs-dir).
+    command = prescribed[0][prescribed[0].index("dadaia") :].split("#")[0].strip()
+    assert "--specs-dir" in command, f"the remedy dropped the caller's --specs-dir: {command}"
+    follow_up = _runner.invoke(app, command.split()[1:])
+    assert follow_up.exit_code == 0, follow_up.output
+    assert (specs / "releases" / "v0.1.6" / "alpha-2" / "TASKS.md").is_file()

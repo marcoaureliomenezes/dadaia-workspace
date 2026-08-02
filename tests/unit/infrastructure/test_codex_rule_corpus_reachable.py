@@ -16,7 +16,7 @@ import pathlib
 import pytest
 
 from dadaia_workspace.infrastructure.codex_doctor import (
-    check_codex_rule_corpus_reachable,
+    check_rule_corpus_reachable,
     codex_trust_boundary_info,
 )
 
@@ -42,7 +42,7 @@ def _make_rule(workspace: pathlib.Path, name: str) -> None:
         "all-reachable-ok",
         "unreachable-reports-error",
         "no-citations-silent",
-        "no-codex-dir-silent",
+        "no-rules-dir-silent",
         "unreachable-name-deduped",
     ],
 )
@@ -56,8 +56,8 @@ def test_rule_corpus_reachable(tmp_path: pathlib.Path, case: str) -> None:
         _make_rule(tmp_path, "workspace-protocol")
         _make_rule(tmp_path, "release-governance")
 
-        out = check_codex_rule_corpus_reachable(tmp_path)
-        assert out == ["[ok] codex:rule-corpus-reachable (WS-CDX-PROTOCOL)"]
+        out = check_rule_corpus_reachable(tmp_path)
+        assert out == ["[ok] rule-corpus-reachable (WS-CDX-PROTOCOL)"]
 
     elif case == "unreachable-reports-error":
         _make_codex_agent(
@@ -68,24 +68,25 @@ def test_rule_corpus_reachable(tmp_path: pathlib.Path, case: str) -> None:
         _make_rule(tmp_path, "workspace-protocol")
         # nonexistent-rule.md deliberately absent.
 
-        out = check_codex_rule_corpus_reachable(tmp_path)
+        out = check_rule_corpus_reachable(tmp_path)
         assert len(out) == 1
         assert "nonexistent-rule" in out[0]
-        assert out[0].startswith("[error] codex:rule-corpus")
+        assert out[0].startswith("[error] rule-corpus")
         assert "WS-CDX-PROTOCOL" in out[0]
 
     elif case == "no-citations-silent":
         _make_codex_agent(tmp_path, "lonely", "No rules referenced here.")
-        assert check_codex_rule_corpus_reachable(tmp_path) == []
+        _make_rule(tmp_path, "unused-but-present")
+        assert check_rule_corpus_reachable(tmp_path) == []
 
-    elif case == "no-codex-dir-silent":
-        assert check_codex_rule_corpus_reachable(tmp_path) == []
+    elif case == "no-rules-dir-silent":
+        assert check_rule_corpus_reachable(tmp_path) == []
 
     else:  # unreachable-name-deduped
         _make_codex_agent(tmp_path, "a", "Use the `missing-rule` rule.")
         _make_codex_agent(tmp_path, "b", "Also the `missing-rule` rule.")
 
-        out = check_codex_rule_corpus_reachable(tmp_path)
+        out = check_rule_corpus_reachable(tmp_path)
         assert len(out) == 1
         assert "missing-rule" in out[0]
 

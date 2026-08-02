@@ -106,36 +106,6 @@ def certify(
             )
         return proc.stdout
 
-    def cli_expect_complete(*args: str, extra_env: dict[str, str] | None = None) -> dict[str, Any]:
-        """Run a lifecycle verb on the driving fake and assert the run COMPLETES.
-
-        Bug certification-passes-without-complete-workflow-chain: a green certification
-        must prove one coherent canonical workflow chain (backlog materialization →
-        approved definition → implementation → reviews → closure), not merely that each
-        verb can reach some deterministic block. The ``--harness fake`` driving worker
-        materializes gate-VALID deliverables, so every Python gate executes for real on
-        real disk state and the run must end COMPLETED (exit 0).
-        """
-        child_env = {**env, **(extra_env or {})}
-        proc = process.run(
-            [sys.executable, "-m", "dadaia_workspace.cli.main", *args],
-            cwd=target,
-            env=child_env,
-            timeout=180,
-        )
-        if proc.returncode != 0:
-            raise RuntimeError(
-                f"expected COMPLETED exit 0, got {proc.returncode}: "
-                f"{(proc.stderr or proc.stdout).strip()[:400]}"
-            )
-        payload: dict[str, Any] = json.loads(proc.stdout)
-        if payload.get("completed") is not True:
-            raise RuntimeError(
-                f"expected completed=true, got status={payload.get('status')} "
-                f"blocked={payload.get('blocked')}"
-            )
-        return payload
-
     def cli_expect_clean_failure(*args: str, extra_env: dict[str, str] | None = None) -> str:
         """Run a verb that MUST fail — non-zero exit, one clean line, NEVER a traceback.
 
@@ -269,120 +239,154 @@ def certify(
     )
     consumer_specs = target / "repos" / "certified-consumer" / "specs"
 
-    def backlog_chain() -> str:
-        cli_expect_complete(
-            "lifecycle",
-            "backlog-definition",
-            "--context",
-            "certified-consumer",
-            "--release-id",
-            "v0.0.1",
-            "--run-id",
-            "cert-backlog",
-            "--demand",
-            "certify deterministic workflow",
-            "--harness",
-            "fake",
-            "--json",
-            extra_env=harness_env,
-        )
-        items = sorted(
-            p.name
-            for p in (consumer_specs / "backlog").glob("*.md")
-            if p.stem not in {"README", "ideas", "candidates"}
-        )
-        if not items:
-            raise RuntimeError("backlog-definition completed but wrote no backlog item")
-        return f"completed; materialized backlog item(s): {', '.join(items)}"
+    def backlog_item_materializes() -> str:
+        """A backlog item is created by its verb and passes the backlog doctor.
 
-    check("workflow-backlog-definition", backlog_chain)
+        Post-demolition the SDD lifecycle is a persona operating the CLI, not an engine
+        stepping itself. certify therefore proves what the PRODUCT owns — the verbs, the
+        artifact contracts, and the doctors — never that a model wrote good prose.
+        """
+        cli("backlog", "new", "certify-demand", "--specs-dir", str(consumer_specs))
+        item = consumer_specs / "backlog" / "certify-demand.md"
+        if not item.is_file():
+            raise RuntimeError("backlog new exited 0 but wrote no item")
+        cli("backlog", "doctor", "--specs-dir", str(consumer_specs))
+        return "backlog new materialized certify-demand.md; backlog doctor clean"
 
-    def release_chain() -> str:
-        cli_expect_complete(
-            "lifecycle",
-            "release-definition",
-            "--context",
-            "certified-consumer",
-            "--release-id",
-            "v0.0.1",
-            "--run-id",
-            "cert-release",
-            "--harness",
-            "fake",
-            "--json",
-        )
-        release_dir = consumer_specs / "releases" / "v0.0.1"
+    check("sdd-backlog-item-materializes", backlog_item_materializes)
+
+    def release_opens_with_active_repointed() -> str:
+        """`specs release open` scaffolds parent + alpha-1 and repoints ACTIVE.md."""
+        cli("specs", "release", "open", "v0.0.1", "--specs-dir", str(consumer_specs))
+        segment = consumer_specs / "releases" / "v0.0.1" / "alpha-1"
         for name in ("SPEC.md", "PLAN.md", "TASKS.md"):
-            path = release_dir / name
-            if not path.is_file():
-                raise RuntimeError(f"release-definition completed but {name} is missing")
-            if name != "TASKS.md" and not is_approved(path.read_text(encoding="utf-8")):
-                raise RuntimeError(f"{name} was not flipped to Aprovado by its review gate")
+            if not (segment / name).is_file():
+                raise RuntimeError(f"release open exited 0 but {name} is missing")
         active = (consumer_specs / "releases" / "ACTIVE.md").read_text(encoding="utf-8")
-        if "v0.0.1" not in active or "IMPLEMENTATION" not in active:
-            raise RuntimeError(f"ACTIVE.md was not repointed to the defined release: {active!r}")
-        return "completed; SPEC/PLAN approved, TASKS authored, ACTIVE.md repointed"
+        for token in ("v0.0.1", "alpha-1", "SPEC"):
+            if token not in active:
+                raise RuntimeError(f"ACTIVE.md was not repointed ({token!r} absent): {active!r}")
+        return "SPEC/PLAN/TASKS scaffolded at alpha-1; ACTIVE.md repointed"
 
-    check("workflow-release-definition", release_chain)
+    check("sdd-release-opens-with-active-repointed", release_opens_with_active_repointed)
 
-    def audit_chain() -> str:
-        cli_expect_complete(
-            "lifecycle",
-            "audit",
-            "--context",
-            "certified-consumer",
-            "--release-id",
-            "v0.0.1",
-            "--run-id",
-            "cert-audit",
-            "--harness",
-            "fake",
-            "--json",
+    def approved_artifacts_stay_doctor_clean() -> str:
+        """The canonical status tokens are accepted, and the tree stays valid."""
+        segment = consumer_specs / "releases" / "v0.0.1" / "alpha-1"
+        for name in ("SPEC.md", "PLAN.md", "TASKS.md"):
+            path = segment / name
+            body = path.read_text(encoding="utf-8").replace(
+                "**Status:** Draft", "**Status:** Aprovado", 1
+            )
+            path.write_text(body, encoding="utf-8")
+            if not is_approved(path.read_text(encoding="utf-8")):
+                raise RuntimeError(f"{name} did not accept the canonical Aprovado token")
+        return doctor_clean("specs", "doctor", "--context", "certified-consumer", "--json")
+
+    check("sdd-approved-artifacts-stay-doctor-clean", approved_artifacts_stay_doctor_clean)
+
+    def task_markers_round_trip() -> str:
+        """`[ ]` -> `[-]` -> `[x]` is the auditable trace; the doctor accepts each state."""
+        tasks = consumer_specs / "releases" / "v0.0.1" / "alpha-1" / "TASKS.md"
+        body = tasks.read_text(encoding="utf-8")
+        if "## Tasks" not in body:
+            raise RuntimeError("scaffolded TASKS.md has no '## Tasks' section to reserve into")
+        tasks.write_text(
+            body.replace("## Tasks", "## Tasks\n\n- [ ] T-001 certify marker discipline", 1),
+            encoding="utf-8",
         )
-        return "completed; audit report validated and dispositions gate passed"
+        seen = []
+        for before, after in (("[ ] T-001", "[-] T-001"), ("[-] T-001", "[x] T-001")):
+            current = tasks.read_text(encoding="utf-8")
+            if before not in current:
+                raise RuntimeError(f"marker {before!r} not present to advance")
+            tasks.write_text(current.replace(before, after, 1), encoding="utf-8")
+            doctor_clean("specs", "doctor", "--context", "certified-consumer", "--json")
+            seen.append(after.split()[0])
+        return f"markers advanced {' -> '.join(['[ ]', *seen])}; doctor clean at each state"
 
-    check("workflow-audit", audit_chain)
+    check("sdd-task-markers-round-trip", task_markers_round_trip)
+
+    def audit_without_disposition_is_reported() -> str:
+        """An undispositioned audit must be VISIBLE, then clean once dispositioned.
+
+        This is the audit-disposition law made mechanical: an audit that can be filed and
+        forgotten is exactly the failure the law exists to prevent, so certify asserts the
+        doctor actually notices — and then that the documented remedy clears it.
+        """
+        audits = consumer_specs / "audits"
+        audits.mkdir(parents=True, exist_ok=True)
+        archived = audits / "_archive" / "20260101T000000Z"
+        archived.mkdir(parents=True, exist_ok=True)
+        (archived / "REPORT.md").write_text(
+            "# Audit\n\nArchived with no disposing release.\n", encoding="utf-8"
+        )
+        verdict = cli("specs", "doctor", "--context", "certified-consumer", "--json")
+        if "SPEC-DOC-036" not in verdict:
+            raise RuntimeError(
+                "an archived audit naming no disposing release was not reported "
+                "(SPEC-DOC-036 absent) — audits can be filed and forgotten"
+            )
+        shutil.rmtree(archived)  # _archive/ itself is scaffold-owned (SPEC-DOC-034)
+        doctor_clean("specs", "doctor", "--context", "certified-consumer", "--json")
+        return "SPEC-DOC-036 reported the undispositioned audit; tree clean once removed"
+
+    check("sdd-audit-without-disposition-is-reported", audit_without_disposition_is_reported)
+
+    def tree_stays_doctor_clean() -> str:
+        """The tree the lifecycle just produced must still pass its OWN validators.
+
+        Bug r25-release-definition-leaves-consumed-backlog-stale: `backlog doctor`
+        reported BL-STALE on a tree the lifecycle had just produced correctly — and
+        certify was green through all of it, because every check asserted its own
+        artifacts and none asked the doctors what they thought afterwards.
+
+        That is the shape the operator has called out repeatedly: an internal gate that
+        reads green while the consumer-side validator finds real defects is itself a
+        defect. certify now ends where an operator would actually look.
+        """
+        specs_verdict = doctor_clean("specs", "doctor", "--context", "certified-consumer", "--json")
+        # `backlog doctor` reports through its exit code, not JSON — `cli` raises on a
+        # non-zero exit, so a rejected tree surfaces here carrying the doctor's own output.
+        cli("backlog", "doctor", "--specs-dir", str(consumer_specs))
+        return f"specs {specs_verdict}; backlog doctor clean after the full SDD chain"
+
+    check("sdd-tree-stays-doctor-clean", tree_stays_doctor_clean)
 
     # Honest-failure canaries (F-22 class): wrong invocations refuse cleanly — non-zero
     # exit, no raw traceback, no side effects.
-    def audit_missing_release_refused() -> str:
-        detail = cli_expect_clean_failure(
-            "lifecycle",
-            "audit",
-            "--context",
-            "certified-consumer",
-            "--release-id",
-            "v9.9.9",
-            "--run-id",
-            "cert-audit-missing",
-            "--harness",
-            "fake",
-            "--json",
+    def release_new_no_clobber() -> str:
+        """`release new` is documented no-clobber; re-running it must refuse cleanly."""
+        cli("release", "new", "v0.0.9", "--specs-dir", str(consumer_specs))
+        return cli_expect_clean_failure(
+            "release", "new", "v0.0.9", "--specs-dir", str(consumer_specs)
         )
-        if (consumer_specs / "releases" / "v9.9.9").exists():
-            raise RuntimeError("audit against an undefined release created a release tree")
-        return detail + "; no phantom release tree created"
 
-    check("workflow-audit-undefined-release-refused", audit_missing_release_refused)
-    check(
-        "workflow-completed-run-rerun-refused",
-        lambda: cli_expect_clean_failure(
-            "lifecycle",
-            "backlog-definition",
-            "--context",
-            "certified-consumer",
-            "--release-id",
-            "v0.0.1",
-            "--run-id",
-            "cert-backlog",
-            "--demand",
-            "certify deterministic workflow",
-            "--harness",
-            "fake",
-            "--json",
-            extra_env=harness_env,
-        ),
-    )
+    check("sdd-release-new-no-clobber-refused", release_new_no_clobber)
+
+    def release_open_does_not_rewind() -> str:
+        """Re-opening a live release must refuse instead of rewinding ACTIVE.md's phase."""
+        active = consumer_specs / "releases" / "ACTIVE.md"
+        before = active.read_text(encoding="utf-8")
+        detail = cli_expect_clean_failure(
+            "specs", "release", "open", "v0.0.1", "--specs-dir", str(consumer_specs)
+        )
+        if active.read_text(encoding="utf-8") != before:
+            raise RuntimeError("a refused re-open still mutated ACTIVE.md")
+        return detail + "; ACTIVE.md untouched"
+
+    check("sdd-release-open-does-not-rewind-active", release_open_does_not_rewind)
+
+    def bad_slug_refused() -> str:
+        detail = cli_expect_clean_failure(
+            "backlog", "new", "Not A Slug", "--specs-dir", str(consumer_specs)
+        )
+        stray = [p.name for p in (consumer_specs / "backlog").glob("*Not*")]
+        if stray:
+            raise RuntimeError(f"a refused slug still wrote files: {stray}")
+        return detail + "; no file written for the refused slug"
+
+    check("sdd-backlog-bad-slug-refused", bad_slug_refused)
 
     def commit_definition() -> str:
         repo = target / "repos" / "certified-consumer"
@@ -391,30 +395,7 @@ def certify(
         _git(process, repo, "push")
         return "definition committed and pushed for implementation preflight"
 
-    check("workflow-definition-git-baseline", commit_definition)
-
-    def implementation_chain() -> str:
-        cli_expect_complete(
-            "lifecycle",
-            "implementation-reviews",
-            "--skip-preflight",
-            "--context",
-            "certified-consumer",
-            "--release-id",
-            "v0.0.1",
-            "--run-id",
-            "cert-implementation",
-            "--harness",
-            "fake",
-            "--json",
-            extra_env=harness_env,
-        )
-        closure = consumer_specs / "releases" / "v0.0.1" / "CLOSURE.md"
-        if not closure.is_file():
-            raise RuntimeError("implementation-reviews completed but CLOSURE.md is missing")
-        return "completed; implement→review→close ladder reached CLOSURE.md"
-
-    check("workflow-implementation-reviews", implementation_chain)
+    check("sdd-definition-git-baseline", commit_definition)
 
     def handoff_validation() -> str:
         path = target / ".dadaia" / "handoff" / "certified-consumer" / "cert.handoff.json"

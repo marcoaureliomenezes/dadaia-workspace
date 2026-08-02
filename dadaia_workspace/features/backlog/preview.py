@@ -21,7 +21,12 @@ from pathlib import Path
 
 import yaml
 
-from dadaia_workspace.core.models.backlog import Intent, SubjectKind, parse_intents
+from dadaia_workspace.core.models.backlog import (
+    Intent,
+    SubjectKind,
+    declared_new_anchor,
+    parse_intents,
+)
 from dadaia_workspace.features.backlog.subject_registry import (
     Anchor,
     BindStatus,
@@ -120,6 +125,30 @@ def _format_yaml_error(exc: yaml.YAMLError, *, line_offset: int = 0) -> str:
     return message
 
 
+#: A YAML mapping key at the very start of a line (``name:``, ``status:``, ``intents:``).
+_YAML_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_.-]*:(?:\s|$)")
+
+
+def _closes_a_block_it_never_opened(content: str) -> bool:
+    """Whether *content* is frontmatter that forgot its opening ``---``.
+
+    Deliberately narrow, because a false positive blocks a file the operator cannot fix
+    by changing anything: the FIRST line must already be a YAML key, and everything up to
+    the first ``---`` must be keys, continuation lines, or blanks. A Markdown horizontal
+    rule always has prose or a heading above it, so it can never match.
+    """
+    lines = content.splitlines()
+    if not lines or not _YAML_KEY_RE.match(lines[0]):
+        return False
+    for line in lines:
+        stripped = line.rstrip()
+        if stripped == "---":
+            return True
+        if stripped.startswith("#") or stripped.startswith("```"):
+            return False
+    return False
+
+
 def _parse_frontmatter(content: str) -> tuple[dict[str, object] | None, str | None]:
     """Parse the frontmatter block; return ``(data, frontmatter_error)``.
 
@@ -130,6 +159,29 @@ def _parse_frontmatter(content: str) -> tuple[dict[str, object] | None, str | No
     """
     match = _FRONTMATTER_RE.match(content)
     if match is None:
+        # Bug r9-f26-author-accepts-unterminated-frontmatter: the regex needs BOTH
+        # delimiters, so a block that opens and never closes used to be indistinguishable
+        # from a file with no frontmatter — both returned (None, None). The item was then
+        # promoted with status=None and the failure resurfaced far downstream as
+        # "status missing", a diagnosis that names the wrong thing and never mentions the
+        # truncation a live worker actually produced. A file that OPENS a block has
+        # declared frontmatter; failing to close it is malformed, not absent.
+        if content.startswith("---\n") or content.startswith("---\r\n"):
+            return None, (
+                "unterminated frontmatter block: the file opens with '---' but never "
+                "closes it — add the closing '---' line"
+            )
+        # Bug r22-live-backlog-author-accepts-unterminated-frontmatter: the mirror image.
+        # The R9 fix above was written for the shape that was reported — a block that
+        # opens and never closes — so when a live worker produced the other half (keys and
+        # a CLOSING delimiter, no opening one) the same conflation came straight back. The
+        # thing that is actually wrong in both is a file that DECLARES frontmatter and
+        # gets the delimiters wrong, so both are named here.
+        if _closes_a_block_it_never_opened(content):
+            return None, (
+                "frontmatter block missing its opening delimiter: the file begins with "
+                "YAML keys and later closes with '---' — add the opening '---' line"
+            )
         return None, None
     try:
         data = yaml.safe_load(match.group(1))
@@ -210,7 +262,7 @@ def bound_anchor_changes(item: BacklogItem, registry: Registry) -> tuple[dict[st
                     "it as existing (drop 'surface: new') or choose a new name."
                 )
                 continue
-            declared = f"new:{intent.subject.kind.value}:{intent.subject.ref}"
+            declared = declared_new_anchor(intent.subject)
             anchor_changes.setdefault(declared, intent.change)
             continue
         result = registry.bind(intent.subject.ref, intent.subject.kind)

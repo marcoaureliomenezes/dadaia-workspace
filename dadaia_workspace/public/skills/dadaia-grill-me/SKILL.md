@@ -94,6 +94,15 @@ Resolve the "ANSWERABLE" ones internally. Only bring "UNANSWERABLE" ones to the 
 
 ### Phase 1 — Focused Interview on Real Problems
 
+> **When you run headless** (`-p`, a dispatched subagent, or any turn with no operator on the
+> other end), an interview posture is a dead end: nobody will answer, and waiting produces
+> nothing. Run Phase 1 as a *checklist against the evidence* instead. Resolve every row the
+> evidence can settle and record HOW it was settled — never surface it as a question. Whatever
+> the evidence cannot settle becomes one entry in `open_questions`: a precise,
+> evidence-anchored statement of what is unknown, why the evidence does not settle it, and
+> your recommended resolution. Never a vague "it depends" — state the actual fork and pick a
+> side. Then go straight to Phase 2.
+
 **One question per turn. Always anchored in real specs and files.**
 
 Required format for each turn:

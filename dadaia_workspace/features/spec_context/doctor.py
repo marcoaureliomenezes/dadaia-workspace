@@ -15,6 +15,7 @@ from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.core.protocols.context_store import ContextStore
 from dadaia_workspace.core.protocols.git_client import GitClient
 from dadaia_workspace.core.record_liveness import is_stale
+from dadaia_workspace.core.rule_corpus import CITER_GLOBS, RULES_DIR, scan_rule_corpus
 from dadaia_workspace.features.spec_context import presence, session_identity
 
 # Note: INV-1, INV-2, INV-3, INV-6 have been removed in v2. INV-4 and INV-5
@@ -438,6 +439,43 @@ class DoctorService:
             )
         ]
 
+    def _check_rule_corpus(self) -> list[DoctorIssue]:
+        """RULE-1: a by-name law citation that resolves to no rule file.
+
+        Bug ``r9-doctor-omits-rule-corpus-reachable``: this check existed only in
+        ``dadaia public doctor``, so the workspace-state doctor reported "All invariants
+        OK" for a tree whose agent cited a rule that does not exist. An agent following
+        that citation gets no law and no error.
+
+        Not fixable: dadaia cannot invent the missing rule. Either the citation is a typo
+        or the rule was never written — both are the author's call. Dead-law (uncited
+        rules) stays a ``public doctor`` ``[warn]``; it is hygiene, not a broken
+        invariant, and must not turn ``dadaia doctor`` red.
+        """
+        root = self._workspace_root
+        rules_dir = root / RULES_DIR
+        available = {p.stem for p in rules_dir.glob("*.md")} if rules_dir.is_dir() else set()
+        texts: list[str] = []
+        for pattern in CITER_GLOBS:
+            for artifact in sorted(root.glob(pattern)):
+                try:
+                    texts.append(artifact.read_text(encoding="utf-8"))
+                except OSError:
+                    continue
+        scan = scan_rule_corpus(texts, available)
+        return [
+            DoctorIssue(
+                code="RULE-1",
+                description=(
+                    f"by-name rule '{name}' is cited by an agent, skill or rule but has "
+                    f"no reachable surface at .claude/rules/{name}.md — an agent that "
+                    "follows the citation gets no law"
+                ),
+                fixable=False,
+            )
+            for name in scan.unreachable
+        ]
+
     def check(self) -> list[DoctorIssue]:
         issues: list[DoctorIssue] = []
         contexts = self._store.list_all()
@@ -506,6 +544,9 @@ class DoctorService:
 
         # ---- Efficiency-audit staleness (EFF-1, v0.1.60 FR7) ----
         issues.extend(self._check_efficiency_audit())
+
+        # ---- By-name rule-law reachability (RULE-1) ----
+        issues.extend(self._check_rule_corpus())
 
         return issues
 

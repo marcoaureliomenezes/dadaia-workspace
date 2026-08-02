@@ -315,11 +315,10 @@ def _real_worker_guard(request: pytest.FixtureRequest, monkeypatch: pytest.Monke
             "runner= at construction to keep the test hermetic."
         )
 
-    from dadaia_workspace.infrastructure.codex_runtime import CodexExecAdapter
-    from dadaia_workspace.infrastructure.pi_runtime import PiHeadlessAdapter
-
-    monkeypatch.setattr(PiHeadlessAdapter, "_resolve_runner", _guarded_resolve_runner, raising=True)
-    monkeypatch.setattr(CodexExecAdapter, "_resolve_runner", _guarded_resolve_runner, raising=True)
+    # No-op desde a demolição dos dadaia-workflows: os adaptadores de worker Layer-2
+    # (pi/codex/claude-sdk) eram do motor e foram removidos, portanto não há binário real
+    # que um teste possa invocar por engano. A fixture fica para não partir quem a pede.
+    _ = _guarded_resolve_runner
 
 
 @pytest.fixture

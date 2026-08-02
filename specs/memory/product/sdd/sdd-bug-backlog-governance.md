@@ -43,12 +43,18 @@ item is allowed only when every existing item is unrelated.
 
 ## Release And Audit
 
-Release definition records exactly which backlog/bug inputs are consumed. Closure gives
-each consumed item a terminal disposition and evidence. Audit triage must dispose every
+Release definition records exactly which backlog/bug inputs are consumed, via the SPEC's
+`**Consumes:**` line bound by `dadaia backlog consume`. Closure gives each consumed item a
+terminal disposition and evidence, and `dadaia backlog remove-consumed` takes it out of the
+live set (archiving a copy first). A backlog status is ONE vocabulary for the whole
+product — live (`idea`, `open`, `candidate`, `picked`, `in-progress`) or terminal
+(`delivered`, `consumed`, `superseded`, `resolved`, `deferred`, `rejected`), and a terminal
+token may carry a free suffix naming the release (`DELIVERED — v0.4.2`). A terminal item
+needs no resolvable `intents[]`: it is settled and will never be consumed again. Audit triage must dispose every
 finding as bug, backlog, accepted risk, or resolved; it cannot silently drop findings.
 
 Bug, backlog, and audit paths are additive and writable without a bind or concurrency
-lock. Production release artifacts and code follow the ordinary workflow and phase rules.
+lock. Production release artifacts and code follow the ordinary path-class and phase rules.
 
 Push is blocked until an APPROVED security-reviewer handoff names each exact pushed
 commit SHA. This is a quality boundary, not a concurrency mechanism.
@@ -57,9 +63,10 @@ commit SHA. This is a quality boundary, not a concurrency mechanism.
 
 - `specs/bugs/*.jsonl`
 - `specs/backlog/*.md`
-- `specs/releases/<id>/consumed_backlog.json` or its archived equivalent
+- `specs/_archive/<release-id>/consumed_backlog.json` — the consumed ledger `backlog
+  consume` writes and `backlog remove-consumed` reads
 - `specs/audits/<timestamp>-<session>/`
 
 ## Dependencies
 
-[[dadaia-workflows]], [[specs-doctor]], [[sdd-gate-v3]], [[agent-comms]].
+[[specs-doctor]], [[sdd-gate-v3]], [[agent-comms]].

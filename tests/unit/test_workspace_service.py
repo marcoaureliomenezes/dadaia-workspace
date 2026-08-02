@@ -69,16 +69,22 @@ def _user_prompt_submit(settings_path: Path) -> list:  # type: ignore[type-arg]
     return data["hooks"]["UserPromptSubmit"]
 
 
-def test_configure_hook_writes_canonical_schema_and_supersedes_stale_sh(
+def test_settings_writer_uses_canonical_schema_and_supersedes_stale_sh(
     service: WorkspaceService, workspace_root: Path
 ) -> None:
-    """_configure_hook must write the canonical nested Claude Code hook schema (a
-    matcher entry with a nested `hooks` array), never the legacy flat entry — and
-    given a stale ctx-inject.sh entry it must REPLACE it with the Python module
-    command, not append a duplicate (bug pin: T-018-17, hooks.UserPromptSubmit.1.hooks
-    Expected array)."""
+    """The settings writer must emit the canonical nested Claude Code hook schema (a
+    matcher entry with a nested `hooks` array), never the legacy flat entry — and given a
+    stale ctx-inject.sh entry it must REPLACE it with the Python module command, not
+    append a duplicate (bug pin: T-018-17, hooks.UserPromptSubmit.1.hooks Expected array).
+
+    Retargeted from the retired init-side ``_configure_hook`` to the single canonical
+    writer both paths now share (bug init-skip-assets-writes-gateless-claude-settings).
+    Supersession of a retired dadaia hook shape is what keeps this green: ownership
+    detection has to claim the old ``.sh`` command as ours, or the merge would preserve
+    it as "the operator's" and wire the replacement alongside it.
+    """
     ws = Workspace.from_root(workspace_root)
-    service._configure_hook(ws)
+    service._public_assets.install_claude_settings(ws.root)
 
     entries = _user_prompt_submit(ws.claude_dir / "settings.json")
     assert len(entries) == 1
@@ -115,7 +121,7 @@ def test_configure_hook_writes_canonical_schema_and_supersedes_stale_sh(
         encoding="utf-8",
     )
 
-    service._configure_hook(stale_ws)
+    service._public_assets.install_claude_settings(stale_ws.root)
 
     superseded_entries = _user_prompt_submit(settings_path)
     # SUPERSEDE: exactly one entry — the .sh was replaced, not duplicated.

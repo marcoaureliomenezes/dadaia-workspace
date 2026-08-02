@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import contextlib
 import json
 import os
 import shutil
@@ -25,8 +24,8 @@ from dadaia_workspace.core.protocols.plugin_store import PluginStore
 from dadaia_workspace.infrastructure.codex_doctor import (
     check_agent_skill_refs,
     check_codex_drift,
-    check_codex_rule_corpus_reachable,
     check_memory_phase_single_source,
+    check_rule_corpus_reachable,
     codex_trust_boundary_info,
     dcx1_missing_toml,
     dcx2_config_toml_entries,
@@ -47,10 +46,12 @@ from dadaia_workspace.infrastructure.install_helpers import (
     install_handoff_agents_md,
     install_reports_agents_md,
     install_universal_skills,
+    load_projection_ledger,
     remove_legacy_workflow_projections,
     render_claude_agent,
     resolve_codex_agent_model,
     runtime_expectations,
+    save_projection_ledger,
     write_generated,
 )
 from dadaia_workspace.infrastructure.json_agent_model_policy_store import (
@@ -145,6 +146,31 @@ from dadaia_workspace.infrastructure.workspace_guardrail import (  # noqa: F401
 _OUT_OF_PROFILE_WARN = "[warn] {harness}: out-of-profile runtime present (drift unchecked)"
 
 
+def _restore_execute_bit(dst: Path) -> str | None:
+    """Make *dst* executable; return a report line when it could not be made so.
+
+    Bug r24-public-install-does-not-repair-kimi-shim-mode: this chmod used to sit inside a
+    bare ``contextlib.suppress(OSError)``. Doctor diagnosed ``(not executable)`` and
+    prescribed ``dadaia public install --target kimi-code``; the install exited 0, the bit
+    was never restored, and the very next doctor reported the identical drift. The
+    operator was told the remedy ran.
+
+    An installer must not die over one mode bit, so the suppression itself was not the
+    mistake — erasing the outcome was. The mode is read back rather than inferred from
+    chmod returning cleanly, because a filesystem may accept the call and ignore it.
+    """
+    try:
+        dst.chmod(0o755)
+    except OSError as exc:
+        return f"[error] {dst} not executable — chmod failed: {exc.strerror or exc}"
+    try:
+        if not dst.stat().st_mode & stat.S_IXUSR:
+            return f"[error] {dst} not executable — the filesystem did not accept mode 755"
+    except OSError as exc:
+        return f"[error] {dst} not executable — mode unreadable: {exc.strerror or exc}"
+    return None
+
+
 class FileSystemPublicAssetManager:
     def __init__(self, plugin_store: PluginStore = JsonPluginStore()) -> None:
         # Injectable installed-plugins ledger seam (T-61-20 / FR4). The same-layer
@@ -163,8 +189,15 @@ class FileSystemPublicAssetManager:
     def _copy_file(self, src: Path, dst: Path, force: bool, installed: list[str]) -> None:
         copy_file(src, dst, force, installed)
 
-    def _copy_tree(self, src: Path, dst: Path, force: bool, installed: list[str]) -> None:
-        copy_tree(src, dst, force, installed, self._iter_files)
+    def _copy_tree(
+        self,
+        src: Path,
+        dst: Path,
+        force: bool,
+        installed: list[str],
+        owned: Iterable[str] | None = None,
+    ) -> set[str]:
+        return copy_tree(src, dst, force, installed, self._iter_files, owned=owned)
 
     def _write_generated(self, dst: Path, content: str, force: bool, installed: list[str]) -> None:
         write_generated(dst, content, force, installed)
@@ -783,6 +816,28 @@ class FileSystemPublicAssetManager:
         # that skipped them left single-harness workspaces permanently red).
         if target in {"all", *L1_ENTRY_HARNESSES}:
             self._install_scripts(agentic_dir, workspace_root, force, installed)
+            # The by-name rule-law corpus is harness-independent for the same reason:
+            # the projected root AGENTS.md — which EVERY harness reads — cites rules by
+            # name and sends the agent to `.claude/rules/<name>.md`. A codex-only, pi-only
+            # or kimi-only workspace used to get those citations with no corpus behind
+            # them: the agent follows the pointer, finds nothing, and is told nothing
+            # (bug r11-codex-only-reconcile-rule-corpus-missing). `.claude/` here is the
+            # canonical HOME of the corpus, not a Claude-runtime projection.
+            # `--only <dir>` narrows what a projection writes; it must narrow this too.
+            if only is None or only == "rules":
+                key = (workspace_root / ".claude" / "rules").relative_to(workspace_root).as_posix()
+                ledger = load_projection_ledger(workspace_root)
+                ledger[key] = sorted(
+                    copy_tree(
+                        agentic_dir / "rules",
+                        workspace_root / ".claude" / "rules",
+                        force,
+                        installed,
+                        self._iter_files,
+                        owned=ledger.get(key),
+                    )
+                )
+                save_projection_ledger(workspace_root, ledger)
 
         # Projection precedence (FR3, AC-4): after the core projection, overlay any installed
         # pack's real body over its stub — scoped to the harnesses actually being projected —
@@ -928,6 +983,7 @@ class FileSystemPublicAssetManager:
         # Claude generated-config projection — scoped to `claude in profile`.
         if "claude" in active:
             reports.extend(self._doctor_claude_settings(workspace_root))
+            reports.extend(self._doctor_unmanaged_claude_files(agentic_dir, workspace_root))
         elif (workspace_root / ".claude").exists():
             reports.append(_OUT_OF_PROFILE_WARN.format(harness="claude"))
 
@@ -988,6 +1044,8 @@ class FileSystemPublicAssetManager:
         elif kimi_projected.exists():
             reports.append(_OUT_OF_PROFILE_WARN.format(harness="kimi-code"))
 
+        reports.extend(self._check_managed_script_modes(workspace_root))
+
         # Harness-independent checks stay unconditional. The rule-corpus check
         # early-returns on an absent .codex/agents; skill/memory/privacy checks read the
         # package public dir, not a runtime projection.
@@ -997,7 +1055,10 @@ class FileSystemPublicAssetManager:
         # which would make a claude-only/pi-only `public doctor` exit 1 (AC-5 unachievable).
         if "codex" in active:
             reports.extend(check_codex_drift(agentic_dir, workspace_root, self._public_dir))
-        reports.extend(check_codex_rule_corpus_reachable(workspace_root))
+        # Harness-independent: the corpus lives in .claude/rules and is cited from every
+        # harness's artifacts, so this must NOT gate on codex (bug
+        # rule-corpus-reachability-unchecked-on-claude-path).
+        reports.extend(check_rule_corpus_reachable(workspace_root))
         if "codex" in active:
             reports.extend(codex_trust_boundary_info())
         reports.extend(check_agent_skill_refs(self._public_dir))
@@ -1065,17 +1126,89 @@ class FileSystemPublicAssetManager:
                 self._load_agent_policy(workspace_root, agentic_dir)
             )
         dirs = _CLAUDE_DIRS if only is None else tuple(d for d in _CLAUDE_DIRS if d == only)
+        # Pruning is scoped to what a previous projection recorded as ours, so an
+        # operator-authored rule/agent/skill is never deleted (bug
+        # claude-install-prunes-operator-authored-files).
+        ledger = load_projection_ledger(workspace_root)
         for name in dirs:
+            key = (claude_dir / name).relative_to(workspace_root).as_posix()
             if name == "agents":
                 # v0.1.65 FR5: core agents are RENDERED (staged generic body +
                 # resolved policy) through the D-6 seam; stubs copy verbatim.
-                install_claude_agents(
-                    agentic_dir, claude_dir, force, installed, self._iter_files, resolved_models
+                ledger[key] = sorted(
+                    install_claude_agents(
+                        agentic_dir,
+                        claude_dir,
+                        force,
+                        installed,
+                        self._iter_files,
+                        resolved_models,
+                        owned=ledger.get(key),
+                    )
                 )
                 continue
-            copy_tree(agentic_dir / name, claude_dir / name, force, installed, self._iter_files)
+            ledger[key] = sorted(
+                copy_tree(
+                    agentic_dir / name,
+                    claude_dir / name,
+                    force,
+                    installed,
+                    self._iter_files,
+                    owned=ledger.get(key),
+                )
+            )
+        save_projection_ledger(workspace_root, ledger)
         if only is None:
             self._install_claude_settings(claude_dir, workspace_root, force, installed)
+
+    def install_claude_settings(self, workspace_root: Path) -> list[str]:
+        """Public seam for the one canonical ``settings.json`` writer (port method).
+
+        ``init`` used to hand-roll its own writer that registered ctx-inject and nothing
+        else, so ``init --skip-assets`` produced a settings.json with no PreToolUse gate
+        at all and exited 0 (bug ``init-skip-assets-writes-gateless-claude-settings``).
+        Both paths now go through here, so "the two writers agree" is structural instead
+        of a claim in a comment.
+        """
+        installed: list[str] = []
+        claude_dir = workspace_root / ".claude"
+        claude_dir.mkdir(parents=True, exist_ok=True)
+        self._install_claude_settings(claude_dir, workspace_root, force=False, installed=installed)
+        return installed
+
+    def _doctor_unmanaged_claude_files(self, agentic_dir: Path, workspace_root: Path) -> list[str]:
+        """Name every ``.claude/`` file that is present but not lib-originated.
+
+        Bug ``claude-doctor-blind-to-unmanaged-projection-files``: doctor only ever walked
+        staging→projection, so a file the library does not ship produced no line at all
+        and doctor exited 0. ``.claude/rules`` is loaded into every session's context, so
+        an unmanaged file there is an instruction-injection surface; after the ownership
+        fix it also survives every install. It must be seen.
+
+        These are ``[warn]`` (visible, exit-0) rather than errors on purpose: the
+        Workspace Root Law's operator exception makes an operator-authored rule/agent/
+        skill legitimate, and a check that turns doctor red on a sanctioned file would
+        just teach the operator to stop reading doctor.
+        """
+        claude_dir = workspace_root / ".claude"
+        lines: list[str] = []
+        for name in _CLAUDE_DIRS:
+            src_dir, dst_dir = agentic_dir / name, claude_dir / name
+            if not dst_dir.exists():
+                continue
+            staged = (
+                {src.relative_to(src_dir).as_posix() for src in self._iter_files(src_dir)}
+                if src_dir.exists()
+                else set()
+            )
+            for dst in sorted(self._iter_files(dst_dir)):
+                rel = dst.relative_to(dst_dir).as_posix()
+                if rel not in staged:
+                    lines.append(
+                        f"[warn] claude:{name}/{rel} unmanaged (not lib-originated; "
+                        "it is loaded into session context and install will not remove it)"
+                    )
+        return lines
 
     def _install_claude_settings(
         self, claude_dir: Path, workspace_root: Path, force: bool, installed: list[str]
@@ -1170,8 +1303,13 @@ class FileSystemPublicAssetManager:
             for name, content in _build_codex_hook_wrapper_contents().items():
                 dst = hooks_dir / name
                 write_generated(dst, content, force, installed)
-                with contextlib.suppress(OSError):
-                    dst.chmod(0o755)
+                # These wrappers ARE the PreToolUse gate. A silent chmod failure here is a
+                # gate that stops firing while install reports success — the same shape as
+                # r24-public-install-does-not-repair-kimi-shim-mode, found by sweeping the
+                # class rather than waiting for the next report.
+                failure = _restore_execute_bit(dst)
+                if failure is not None:
+                    installed.append(failure)
             write_generated(
                 codex_dir / "hooks.json",
                 _json_dump(_build_codex_hooks(workspace_root)),
@@ -1245,8 +1383,9 @@ class FileSystemPublicAssetManager:
         for name, content in kimi_hook_shims().items():
             dst = home / "hooks" / name
             write_generated(dst, content, force, installed)
-            with contextlib.suppress(OSError):
-                dst.chmod(0o755)
+            failure = _restore_execute_bit(dst)
+            if failure is not None:
+                installed.append(failure)
         config_path = home / "config.toml"
         existing = config_path.read_text(encoding="utf-8") if config_path.exists() else ""
         updated = upsert_kimi_hooks_block(existing, kimi_hooks_block(home))
@@ -1268,8 +1407,13 @@ class FileSystemPublicAssetManager:
         )
         scripts_dir = workspace_root / ".dadaia" / "scripts"
         if scripts_dir.exists():
-            for script in scripts_dir.glob("*.sh"):
-                script.chmod(0o755)
+            for script in sorted(scripts_dir.glob("*.sh")):
+                # The git chokepoints, including the pre-push security-verdict gate. This
+                # chmod was unguarded, so one unwritable file aborted the entire install
+                # with a traceback instead of naming the file (F-22 class).
+                failure = _restore_execute_bit(script)
+                if failure is not None:
+                    installed.append(failure)
 
     def _iter_files(self, root: Path) -> Iterable[Path]:
         if not root.exists():
@@ -1298,6 +1442,36 @@ class FileSystemPublicAssetManager:
         if dst.read_text(encoding="utf-8") != expected:
             return f"[drift] {label}"
         return f"[ok] {label}"
+
+    def _check_managed_script_modes(self, workspace_root: Path) -> list[str]:
+        """Report a git-chokepoint script that git could not execute.
+
+        The ``dadaia:scripts/*`` doctor lines compare CONTENT, so a script stripped of its
+        execute bit read ``[ok]`` while git silently could not run it. These are the git
+        chokepoints — ``pre-push-ci-gate.sh`` carries the pre-push security-verdict gate and
+        the CI preflight — so a mode-only corruption disables an enforcing gate and the
+        command whose whole job is to report workspace soundness said nothing.
+
+        The sibling surface has been checked all along: ``codex_doctor`` reports a Codex
+        hook wrapper that is not executable. One instance checked and the sibling left out
+        is the shape this repository keeps rediscovering; this closes it for the chokepoints.
+        """
+        scripts_dir = workspace_root / ".dadaia" / "scripts"
+        if not scripts_dir.is_dir():
+            return []
+        reports: list[str] = []
+        for script in sorted(scripts_dir.glob("*.sh")):
+            try:
+                executable = bool(script.stat().st_mode & stat.S_IXUSR)
+            except OSError as exc:
+                reports.append(f"[error] dadaia:scripts/{script.name} mode unreadable: {exc}")
+                continue
+            if not executable:
+                reports.append(
+                    f"[drift] dadaia:scripts/{script.name} (not executable) — git cannot "
+                    "run this chokepoint; repair with `dadaia public install --target all`"
+                )
+        return reports
 
     def _check_kimi_user_hooks(self) -> list[str]:
         """Doctor the user-level kimi wiring: shim currency + managed config block.

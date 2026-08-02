@@ -64,6 +64,14 @@ def test_harness_scopes_scaffold(
     for harness in expect_present:
         assert (tmp_path / f".{harness}").is_dir()
     for harness in expect_absent:
+        if harness == "claude":
+            # `.claude/rules/` is the shared by-name law corpus every harness's AGENTS.md
+            # points at, not a Claude-runtime projection (bug
+            # r11-codex-only-reconcile-rule-corpus-missing). Scoping means "no foreign
+            # runtime", not "no law".
+            assert not (tmp_path / ".claude" / "agents").exists()
+            assert not (tmp_path / ".claude" / "settings.json").exists()
+            continue
         assert not (tmp_path / f".{harness}").exists()
 
     if "claude" in expect_present:

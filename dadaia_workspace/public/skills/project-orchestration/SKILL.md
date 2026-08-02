@@ -9,9 +9,9 @@ applyTo: ".dadaia/handoff/**"
 
 # project-orchestration
 
-> **Not the lifecycle enforcement mechanism.** Ordered lifecycle execution and dispatch
-> sequencing are owned by the dadaia-workflows (`dadaia lifecycle`), whose Python
-> orchestrator owns the sequence. This skill is reference / manual-operator guidance only.
+> **Not an enforcement mechanism.** What is actually enforced is the deterministic gate
+> (path class, presence, phase, mode) and the git chokepoints. This skill is the routing
+> map an operator or dispatcher reads; nothing here blocks a write.
 
 This is the public default orchestration skill. It must stay generic: no
 operator-private project names, hostnames, IPs, customer names, private repo
@@ -47,18 +47,20 @@ Plugins (not in core roster, constitution §14): `frontend-engineer`, `design-sp
 `devops-engineer`. They may be dispatched within a release when their surface is in scope,
 but they do not appear in the default core topology above.
 
-## Workflow Inventory
+## Ordered work
 
-Python owns exactly four executable workflows. Run them only through `dadaia lifecycle`:
+Ordered lifecycle work is a dispatch, not a command: the dispatcher routes the demand to
+the owning persona, which follows the matching skill.
 
-| Workflow | Command |
-|---|---|
-| `backlog_definition` | `dadaia lifecycle backlog-definition` |
-| `release_definition` | `dadaia lifecycle release-definition` |
-| `implementation_reviews` | `dadaia lifecycle implementation-reviews` |
-| `audit` | `dadaia lifecycle audit` |
+| Ordered work | Persona | Skill |
+|---|---|---|
+| Author one backlog item from a demand | `project-manager` | — |
+| Pressure-test a picked set before the SPEC | `project-manager` | `dadaia-grill-me` |
+| Author SPEC / PLAN / TASKS | `product-engineer` | `dadaia-release-definition` |
+| Implement a reserved task, then review it | `software-engineer` → reviewers | `dadaia-task-manager` |
+| Close an approved release | `product-engineer` | `dadaia-release-closure` |
 
-There is no parallel Markdown workflow catalog and no manual workflow executor.
+There is no executable workflow engine and no Markdown workflow catalog.
 
 ## Dispatch Protocol
 
@@ -103,20 +105,21 @@ Every HTML report that feeds another agent must have a handoff JSON file under:
 .dadaia/handoff/<context-name>/<UTC>-<agent-name>-<task-slug>.handoff.json
 ```
 
-## Mechanics moved to the engine (D12)
+## What enforces what
 
-The **ordered review/QA sequence** — the per-task → end-of-alpha → rc-ship transition
-ladder and its gate ordering — is the engine's TRANSITIONS made executable:
-`features/lifecycle/state_machine.py` owns the legal phase transitions and gate ordering
-(`is_legal_transition`, `TransitionDecision`), `features/lifecycle/gates.py` owns the
-typed handoff gate (the APPROVED-verdict requirement), and
-`features/lifecycle/pipeline.py` + `phase_workflow.py` own run sequencing and the
-per-step **Layer-2 worker harness** — the bounded Codex or PI headless worker each step
-drives behind `AgentRuntimePort`; FAKE is the deterministic test adapter. Claude Code is
-Layer-1-only. See constitution §0 "The two agentic layers". This skill no longer narrates
-that ordered procedure step by step.
+Nothing in this skill blocks a write. Three surfaces enforce, and they are the only ones:
 
-What it keeps is the **orchestration judgment** the engine cannot make: who may dispatch
+| Surface | What it enforces |
+|---|---|
+| The deterministic gate (`pre_gate`) | Path class × presence × phase × mode on every file-write tool call |
+| Git chokepoints | pre-commit advisory warning; pre-push security verdict + CI preflight |
+| Doctors (`specs`, `backlog`, `public`) | Artifact coherence, after the fact |
+
+The **review ladder** — which review gates which transition, and the per-push security
+verdict — is law, not code: it lives in the `release-governance` rule. The ordered
+sequence itself is a persona following its skill.
+
+What this skill owns is the **orchestration judgment** no gate can make: who may dispatch
 (dispatcher purity), the persona inventory and routing, decision authority, mediation,
 escalation, and the forbidden actions. The gate cadence below is the human-readable
 contract the engine's transitions correspond to — kept as a pointer, not a procedure.
@@ -235,9 +238,9 @@ Use when the operator wants a new release built from reported bugs + backlog.
 `project-manager` dispatches `product-engineer` with the
 `dadaia-release-definition` skill. Steps: (1) sanitize stale bugs/backlog
 (`deferred`/`rejected` + reason, never delete); (2) pick the bug + backlog set;
-(3) apply bug-always-solved — every picked bug is fixed in the release unless a
-picked backlog item supersedes it (`superseded_by: <slug>` on the bug + SPEC
-note); (4) a **MANDATORY** `dadaia-grill-me` session before the SPEC; (5) author
+(3) apply the `bug-hotfix-doctrine` rule — bugs are hotfixed, never released; the
+only release-side disposition is a picked backlog item superseding an open bug
+(`superseded_by: <slug>` on the bug + SPEC note); (4) a **MANDATORY** `dadaia-grill-me` session before the SPEC; (5) author
 the SPEC. `project-manager` owns the gate: a release-from-backlog must not reach
 SPEC without the grill report. See the `release-governance` rule.
 

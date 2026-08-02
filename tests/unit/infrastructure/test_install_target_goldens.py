@@ -173,7 +173,6 @@ def _build_panel_service(tmp_path: Path) -> PanelService:
         spec_context=_FakeSpecContext(),  # type: ignore[arg-type]
         workspace_root=tmp_path,
         telemetry=_FakeTelemetry(),
-        workflows_service=_FakeWorkflows(),
     )
     svc._canonical_agents_override = _canonical_agents()  # type: ignore[attr-defined]
     return svc

@@ -86,20 +86,21 @@ _DISPATCHER_PREFLIGHT = """=== dispatcher preflight (SDD routing) ===
 Before acting on a request in this workspace:
 1. Resolve the active context (above) and the OWNING role for the
    artifact class you are about to touch: backlog -> project-manager;
-   SPEC/PLAN/TASKS -> product-engineer; hooks/agents/skills/rules/
-   workflows (the AI surface) -> ai-engineer audit; production code ->
+   SPEC/PLAN/TASKS -> product-engineer; agents/skills/rules/hooks
+   (the AI surface) -> ai-engineer audit; production code ->
    software-engineer; reviews -> code/security/qa reviewers.
-2. Ordered lifecycle work uses exactly four Python workflows:
-   backlog-definition, release-definition, implementation-reviews,
-   and audit. Ownership is a coordination convention; concurrent
-   sessions are surfaced through advisory presence and never blocked.
+2. Ordered lifecycle work is driven by dispatching the owning persona
+   and having it follow the matching skill (grill-me before a SPEC,
+   release-definition to author it, release-closure to close it).
+   Ownership is a coordination convention; concurrent sessions are
+   surfaced through advisory presence and never blocked.
 3. If the operator asks for multi-agent / deep / AI-surface work and a
    subagent or dispatch tool is not in your active tool set, DISCOVER it
    first (e.g. tool_search for the agent/dispatch tool) BEFORE starting
    the main task -- do not silently proceed as a generic single agent.
 4. Limitation (truthful): this harness does NOT auto-spawn subagents
-   from static .codex/.claude workflow files. Workflow files are
-   reference docs; explicit dispatcher/operator fan-out is required.
+   from static instruction files. Those files are reference docs;
+   explicit dispatcher/operator fan-out is required.
 === end dispatcher preflight ==="""
 
 
@@ -444,10 +445,20 @@ def main() -> int:
         context = _resolve_context(workspace, session_id, sentinel_mtime, harness_pid)
         if not context:
             context = recorded_slug
+        # Whether to restamp depends on what the HARNESS does with the emission, and the
+        # two differ: Kimi discards PostCompact stdout, so the sentinel stays unstamped and
+        # the next prompt performs the real re-injection; Codex ADDS it back to context, so
+        # leaving it unstamped injected a SECOND time on the next prompt. Exactly-once is
+        # the contract in every harness — the mechanism just has to match the harness.
+        consumes_stdout = os.environ.get("DADAIA_HOOK_OUTPUT") == "codex-json"
         if context and (workspace / "repos" / context / "specs").is_dir():
             _emit_bootstrap(workspace, context)
+            if consumes_stdout:
+                _stamp_sentinel(tmp_dir, sentinel, context)
         else:
             _emit(_generic_preflight(workspace))
+            if consumes_stdout:
+                _stamp_sentinel(tmp_dir, sentinel, "")
         return 0
 
     # Claude Code SessionStart re-injection (bug claude-compact-reinjection-missing):

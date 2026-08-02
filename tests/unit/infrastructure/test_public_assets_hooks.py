@@ -221,6 +221,7 @@ def test_wrapper_contents_and_inert_config_keys_omitted(tmp_path: Path) -> None:
         "codex-post-gate",
         "codex-ctx-inject",
         "codex-ctx-inject-session-start",
+        "codex-ctx-inject-post-compact",
     }
     assert "dadaia_workspace.hooks.pre_gate" in wrappers["codex-pre-gate"]
     assert "dadaia_workspace.hooks.sdd_post_gate" in wrappers["codex-post-gate"]
@@ -273,3 +274,52 @@ def test_codex_pre_gate_wrapper_never_creates_repo_bytecode(tmp_path: Path) -> N
 
     assert list(repo.rglob("__pycache__")) == []
     assert list(repo.rglob("*.pyc")) == []
+
+
+def test_codex_reinjects_context_after_a_compaction(tmp_path: Path) -> None:
+    """A compacted Codex session must recover the context it just dropped.
+
+    Only `SessionStart` (matcher `startup|resume`) was wired, so a compaction — which
+    discards the injected bootstrap — left the session working blind, silently. The other
+    two harnesses both recover: Claude Code via `SessionStart` matcher `compact`, Kimi via
+    its `PostCompact` shim. This was the ONE harness-parity divergence in the certifying
+    gate (bug codex-ctx-inject-no-compaction-reinjection).
+
+    It is not a platform limitation: `ai-harness-codex/SKILL.md` records `PreCompact` and
+    `PostCompact` in Codex's own event surface. Wired here with the operator's explicit
+    authorization, since only the harness you run in normally edits its own entities.
+    """
+    from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+    from dadaia_workspace.infrastructure.runtime_config import codex_hook_wrapper_contents
+
+    hooks = FileSystemPublicAssetManager()._codex_hooks(tmp_path)["hooks"]
+    assert isinstance(hooks, dict)
+
+    assert "PostCompact" in hooks, f"no compaction recovery wired: {sorted(hooks)}"
+    entries = hooks["PostCompact"]
+    assert isinstance(entries, list) and entries
+    command = entries[0]["hooks"][0]["command"]
+    assert "post-compact" in command, command
+
+    wrappers = codex_hook_wrapper_contents()
+    name = next(n for n in wrappers if "post-compact" in n)
+    body = wrappers[name]
+    assert "ctx_inject" in body, "the compaction wrapper must drive the injection hook"
+    assert "PostCompact" in body, "the wrapper must tell ctx_inject which event fired"
+
+
+def test_the_codex_doctor_derives_the_wrapper_set_it_checks() -> None:
+    """D-CX-9 must not keep its own copy of the wrapper inventory.
+
+    The doctor hardcoded the four wrapper commands it expected, so wiring a FIFTH hook
+    made the doctor reject the projection the generator had just produced — the product
+    refusing its own output. Same dispersed-knowledge class as the release layout and the
+    backlog status vocabulary: the generator knows the set, so the checker must ask it.
+    """
+    from dadaia_workspace.infrastructure.codex_doctor import expected_codex_hook_commands
+    from dadaia_workspace.infrastructure.runtime_config import codex_hook_wrapper_contents
+
+    assert expected_codex_hook_commands() == {
+        f".dadaia/hooks/{name}" for name in codex_hook_wrapper_contents()
+    }
+    assert ".dadaia/hooks/codex-ctx-inject-post-compact" in expected_codex_hook_commands()

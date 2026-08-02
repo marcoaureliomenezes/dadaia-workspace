@@ -27,7 +27,7 @@ CLI surface: `dadaia reports validate [PATHS...] [--all] [--release <id>] [--str
 
 **handoff-v1** is the structured JSON contract family every specialist agent emits for agent-to-agent coordination; the current version token is **`handoff-v1.2`**. HTML reports stay in `.dadaia/reports/<context>/<agent>/`; JSON handoffs live in `.dadaia/handoff/<context>/<UTC>-<agent>-<slug>.handoff.json`. The document references the delivered report or artifact via `artifact.path` and `artifact.content_hash`.
 
-A v1.2 handoff carries the **`self_pull` audit line** — `self_pull.refs` records the Layer-1 memory atoms the emitting session **actually self-pulled/read** (step0 atoms + any deep atom read during the task), as `specs/`-prefixed context-relative paths (e.g. `specs/memory/architecture.md`). This is the Layer-1 mirror of the Layer-2 mechanical proof (the role→atom map recording refs in `InjectedContext.refs`, checked by FRAG-COH-4 — [[lifecycle-foundation]]): it turns the step0 self-pull discipline into a validator-checkable contract. An agent must never list an atom it did not read; the contract is honest-by-construction where mechanical (existence + coverage checks below) and discipline beyond that.
+A v1.2 handoff carries the **`self_pull` audit line** — `self_pull.refs` records the memory atoms the emitting session **actually self-pulled/read** (step0 atoms + any deep atom read during the task), as `specs/`-prefixed context-relative paths (e.g. `specs/memory/architecture.md`). The role→atom map is what makes this checkable: a handoff whose refs do not include its role's atom is rejected by the validator. An agent must never list an atom it did not read; the contract is honest-by-construction where mechanical (existence + coverage checks below) and discipline beyond that.
 
 It materializes the symbolic referent `schema_ref: handoff-schema-v1` declared by the topology's agents; the schema lives on disk (`public/schemas/` → staging) and is consumed by CLI + skill.
 
@@ -85,10 +85,9 @@ file-enumerated contract test (`tests/contract/test_handoff_instruction_adoption
 surfaces): the 12 agent bodies (9 core `public/agents/*.md` + 3 plugin
 `public/plugins/*/agents/*.md`), the `dadaia-handoff-emitter` skill's two examples,
 `public/data/handoff-AGENTS.md`, and the shared
-`public/lifecycle_fragments/shared/output-handoff.md` fragment. The 9 core public agents
+shared handoff contract. The 9 core public agents
 declare `dadaia-handoff-emitter` when they produce reports/handoffs that need a
-machine-readable sidecar. The two Layer-2 code emitters emit v1.2 as well
-([[lifecycle-foundation]]).
+machine-readable sidecar.
 
 ```mermaid
 flowchart LR

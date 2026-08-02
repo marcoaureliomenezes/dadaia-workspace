@@ -314,8 +314,11 @@ class Registry:
         return BindResult(
             status=BindStatus.UNRESOLVED,
             message=(
-                f"subject ref {raw_ref!r} (kind={kind.value}) resolves to no known anchor; "
-                f"add it as an alias in the operator alias map, or correct the ref."
+                f"subject ref {raw_ref!r} (kind={kind.value}) resolves to no known anchor. "
+                "Two recoveries, both real: if the surface ALREADY exists, list the "
+                "anchors and use one verbatim — dadaia backlog subjects — or add an "
+                "alias for it in the operator alias map; if this item INTRODUCES the "
+                "surface, declare it as new by adding 'surface: new' to the subject."
             ),
         )
 

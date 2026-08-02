@@ -21,6 +21,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.features.backlog.preview import bound_anchor_changes, load_backlog_items
 from dadaia_workspace.features.backlog.subject_registry import Registry
 
@@ -34,7 +35,7 @@ __all__ = [
 _CONSUMES_RE = re.compile(r"^\s*\*\*Consumes:\*\*\s*(?P<slugs>.*?)\s*$", re.MULTILINE)
 
 
-class ConsumesBindError(Exception):
+class ConsumesBindError(DadaiaError):
     """Raised when a declared ``**Consumes:**`` slug cannot be bound to a shipped anchor set.
 
     Surfaces the offending slug (and the unresolved ref when applicable) so the producer

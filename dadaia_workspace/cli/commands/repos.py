@@ -19,7 +19,13 @@ def list_repos() -> None:
     rows = svc.list_known(workspace_root)
 
     if not rows:
-        console.print("[dim]No repos found. Add repos.xlsx to your workspace root.[/dim]")
+        # The old text told the operator to put repos.xlsx at the workspace ROOT, which
+        # the Workspace Root Law forbids — a remedy that cannot be followed.
+        console.print(
+            "[dim]No repos catalogued. Fill in "
+            ".dadaia/agentic/data/repos.xlsx — the shipped file is a template, and its "
+            "example rows are ignored until you replace their your-org URLs.[/dim]"
+        )
         return
 
     if rows:

@@ -481,7 +481,18 @@ class TestPerProfileInit:
         codex_wrappers = sorted((ws / ".dadaia" / "hooks").glob("codex-*"))
         assert codex_wrappers, "expected .dadaia/hooks/codex-* wrappers for a codex profile"
         # un-chosen harnesses get no projection.
-        assert not (ws / ".claude").exists(), "claude must NOT be scaffolded for a codex profile"
+        # The Claude RUNTIME is not scaffolded — but `.claude/rules/` is the shared
+        # by-name law corpus, which the projected root AGENTS.md tells EVERY harness to
+        # read (bug r11-codex-only-reconcile-rule-corpus-missing: without it those
+        # citations pointed at nothing). Scoping means "no foreign runtime", not
+        # "no law".
+        assert not (ws / ".claude" / "agents").exists(), (
+            "claude runtime must NOT be scaffolded for a codex profile"
+        )
+        assert not (ws / ".claude" / "settings.json").exists(), (
+            "no claude settings for a codex profile"
+        )
+        assert (ws / ".claude" / "rules").is_dir(), "the shared law corpus must be present"
         assert not (ws / ".pi").exists(), "pi must NOT be scaffolded for a codex profile"
 
         assert _persisted_profile(ws) == ["codex"]
@@ -508,7 +519,18 @@ class TestPerProfileInit:
             f"  Extra:   {sorted(projected_pi - _staged_pi_files)}"
         )
         # un-chosen harnesses get no projection.
-        assert not (ws / ".claude").exists(), "claude must NOT be scaffolded for a pi profile"
+        # The Claude RUNTIME is not scaffolded — but `.claude/rules/` is the shared
+        # by-name law corpus, which the projected root AGENTS.md tells EVERY harness to
+        # read (bug r11-codex-only-reconcile-rule-corpus-missing: without it those
+        # citations pointed at nothing). Scoping means "no foreign runtime", not
+        # "no law".
+        assert not (ws / ".claude" / "agents").exists(), (
+            "claude runtime must NOT be scaffolded for a pi profile"
+        )
+        assert not (ws / ".claude" / "settings.json").exists(), (
+            "no claude settings for a pi profile"
+        )
+        assert (ws / ".claude" / "rules").is_dir(), "the shared law corpus must be present"
         assert not (ws / ".codex").exists(), "codex must NOT be scaffolded for a pi profile"
 
         assert _persisted_profile(ws) == ["pi"]
@@ -529,10 +551,14 @@ class TestPerProfileInit:
 
         # EXACT structure — the `.kimi-code/` projection carries the staged AGENTS.md.
         assert (ws / ".kimi-code" / "AGENTS.md").is_file(), ".kimi-code/AGENTS.md missing"
-        # un-chosen harnesses get no projection.
-        assert not (ws / ".claude").exists(), (
-            "claude must NOT be scaffolded for a kimi-code profile"
+        # un-chosen harnesses get no RUNTIME projection — but `.claude/rules/` is the
+        # shared by-name law corpus every harness's AGENTS.md points at (bug
+        # r11-codex-only-reconcile-rule-corpus-missing).
+        assert not (ws / ".claude" / "agents").exists(), (
+            "claude runtime must NOT be scaffolded for a kimi-code profile"
         )
+        assert not (ws / ".claude" / "settings.json").exists()
+        assert (ws / ".claude" / "rules").is_dir(), "the shared law corpus must be present"
         assert not (ws / ".codex").exists(), "codex must NOT be scaffolded for a kimi-code profile"
         assert not (ws / ".pi").exists(), "pi must NOT be scaffolded for a kimi-code profile"
 

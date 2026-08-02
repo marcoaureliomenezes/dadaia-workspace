@@ -31,7 +31,7 @@ _SLUG_RE = re.compile(r"^[a-z][a-z0-9-]+$")
 # validator rejected the very `vX.Y.Z` form the doctor mandates.
 
 
-def _is_valid_release_id(release_id: str) -> bool:
+def is_valid_release_id(release_id: str) -> bool:
     """A release id is valid if it is the SemVer canon (``vX.Y.Z``) or the legacy slug."""
     return bool(RELEASE_SEMVER_RE.match(release_id) or _SLUG_RE.match(release_id))
 
@@ -144,8 +144,11 @@ intents:
     change: what changes about this subject
   - subject:
       kind: cli
-      ref: dadaia some-command
+      ref: backlog consume
     change: what changes about this command
+  # A cli ref is the bare verb path, WITHOUT the `dadaia` prefix — list the real
+  # anchors with `dadaia backlog subjects` and copy one verbatim. For a surface this
+  # item INTRODUCES, add `surface: new` to the subject instead.
 -->
 """
 
@@ -168,7 +171,7 @@ def release_new(specs_dir: Path, release_id: str) -> NewArtifactResult:
         ValueError:    If ``release_id`` is neither the SemVer canon nor the legacy slug.
         FileExistsError: If the release directory already exists (no-clobber).
     """
-    if not _is_valid_release_id(release_id):
+    if not is_valid_release_id(release_id):
         raise ValueError(
             f"Invalid release ID {release_id!r}. "
             "Must be SemVer ^v\\d+\\.\\d+\\.\\d+$ (e.g. v0.1.23 — preferred, matches the "

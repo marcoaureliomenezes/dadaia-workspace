@@ -20,7 +20,7 @@ release_origin: v0.1.65
 `dadaia public {stage|install|doctor}` distributes the public agentic surface of
 `dadaia-workspace`. The 14 live asset types under `dadaia_workspace/public/` are:
 `agents`, `skills`, `rules`, `workflows`, `scripts`, `schemas`, `templates`, `data`,
-`scaffold`, `runtime`, `personas`, `lifecycle_fragments`, `pi`, and `plugins`
+`scaffold`, `runtime`, `pi`, and `plugins`
 (in-package plugin packs, v0.1.60 — [[plugin-packs]]; there is no `public/commands/`
 or `public/hooks/` — governance hooks are the Python package
 `dadaia_workspace/hooks/`, not a projected asset type).

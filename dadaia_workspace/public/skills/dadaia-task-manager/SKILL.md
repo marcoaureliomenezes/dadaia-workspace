@@ -11,10 +11,15 @@ applyTo: "specs/**/TASKS.md"
 
 # dadaia-task-manager — Task State Protocol
 
-> **Not the lifecycle enforcement mechanism.** Ordered task reservation and the
-> per-phase lifecycle sequence are owned by the dadaia-workflows (`dadaia lifecycle`),
-> whose Python gates own task-state transitions. This skill is reference / manual-operator
-> guidance for the human-auditable marker discipline only.
+**Advancing the segment.** When an `alpha-N` closes, open the next one with
+`dadaia specs segment open <alpha-N+1|rc-N>` — it scaffolds the segment and advances
+`ACTIVE.md`. Never re-run `specs release open` to do this: that verb creates a release and
+refuses on one that already exists.
+
+> **This skill is the procedure.** Marker discipline is upheld by the agent that holds
+> the task — no engine advances it for you. What is *enforced* is narrower: the
+> deterministic gate grades the destination path, and the git chokepoints gate commit and
+> push. A marker never flipped is invisible to both.
 
 ## The 3-marker contract
 

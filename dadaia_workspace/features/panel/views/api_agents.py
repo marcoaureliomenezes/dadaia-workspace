@@ -111,21 +111,9 @@ def _workflow_membership(service: PanelService) -> dict[str, list[str]]:
     Derived at request time from the governed Python workflow catalog. Best-effort:
     a catalog-read failure yields an empty map rather than failing /api/agents.
     """
-    membership: dict[str, list[str]] = {}
-    try:
-        workflows = service.list_dadaia_workflows()
-    except Exception:  # noqa: BLE001
-        logger.warning(
-            "_workflow_membership: list_dadaia_workflows() failed; "
-            "continuing with empty workflow membership"
-        )
-        return membership
-    for wf in workflows:
-        for agent_id in dict.fromkeys(step.role for step in wf.steps):
-            bucket = membership.setdefault(agent_id, [])
-            if wf.display_name not in bucket:
-                bucket.append(wf.display_name)
-    return membership
+    # O catálogo de workflows foi demolido; a associação agente→workflow
+    # deixou de existir. Mapa vazio mantém /api/agents a responder.
+    return {}
 
 
 def render_api_agents_canonical(

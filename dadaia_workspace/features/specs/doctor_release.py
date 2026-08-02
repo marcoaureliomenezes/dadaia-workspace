@@ -14,7 +14,7 @@ import re
 from datetime import date
 from pathlib import Path
 
-from dadaia_workspace.core.spec_status import APPROVED, extract_status
+from dadaia_workspace.core.spec_status import APPROVED, contradicting_status_lines, extract_status
 from dadaia_workspace.core.spec_status import CANONICAL_STATUS as _CANONICAL_STATUS
 from dadaia_workspace.core.specs_version import RELEASE_SEMVER_RE
 from dadaia_workspace.features.specs.doctor_common import (
@@ -22,6 +22,7 @@ from dadaia_workspace.features.specs.doctor_common import (
     iter_all_release_dirs,
     read_active_md,
 )
+from dadaia_workspace.features.specs.doctor_plan_table import dependency_table_issues
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
 
 # Vocabulary + parser live in core.spec_status (single definition); re-exported here
@@ -175,6 +176,43 @@ class ReleaseValidator:
                     )
                 )
                 continue
+            # SPEC-DOC-041: the PLAN's Validation Dependency Table is scaffolded into
+            # every release and was validated by nothing after the engine was demolished
+            # (bug plan-dependency-lint-unwired). WARNING, not ERROR: an authoring-phase
+            # PLAN legitimately carries the untouched scaffold.
+            if fname == "PLAN.md":
+                for problem in dependency_table_issues(
+                    fpath.read_text(encoding="utf-8", errors="replace"), phase=phase
+                ):
+                    issues.append(
+                        SpecsDoctorIssue(
+                            code="SPEC-DOC-041",
+                            severity=Severity.WARNING,
+                            description=f"PLAN.md Validation Dependency Table: {problem}",
+                            path=str(fpath),
+                        )
+                    )
+
+            # SPEC-DOC-040: an artifact may not say two different things about its own
+            # status. `_extract_status` reads only the canonical line, so a decorated
+            # second declaration ("## Status: Draft") stayed invisible: the gate saw
+            # Aprovado while the human reading the file saw Draft
+            # (bug r6-spec-doctor-silent-on-contradicting-status-declaration).
+            for line_no, token in contradicting_status_lines(
+                fpath.read_text(encoding="utf-8", errors="replace")
+            ):
+                issues.append(
+                    SpecsDoctorIssue(
+                        code="SPEC-DOC-040",
+                        severity=Severity.ERROR,
+                        description=(
+                            f"{fname} declares `**Status:** Aprovado` and also '{token}' "
+                            f"on line {line_no}. One artifact, one status: delete the "
+                            f"second declaration so the gate and the reader agree."
+                        ),
+                        path=str(fpath),
+                    )
+                )
             status = _extract_status(fpath)
             if status is None:
                 issues.append(

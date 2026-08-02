@@ -160,25 +160,3 @@ _L2_SITES: dict[str, tuple[str, str]] = {
         "L2_WORKER_HARNESSES",
     ),
 }
-
-
-def test_roster_literal_absent_registry_consumed_and_model_profiles_derives() -> None:
-    """AC-2 / AC-9(a,a′): each repointed site has NO bare roster literal, and DOES consume
-    the registry. Reverting a site to a hard-coded roster tuple/set fails this test. The
-    4th ``_LAYER2_HARNESSES`` site (``model_profiles.py``) is DERIVED from the model
-    catalog constants (reconciled by the R1 contract test above), NOT repointed and NOT a
-    bare literal."""
-    for rel, (forbidden, required) in {**_L1_SITES, **_L2_SITES}.items():
-        source = (_PKG / rel).read_text(encoding="utf-8")
-        spaceless = source.replace(" ", "")
-        assert forbidden not in spaceless, (
-            f"{rel} still carries the bare roster literal {forbidden!r} — it must resolve "
-            "through core/harness_registry (v0.1.58 FR1)."
-        )
-        assert required in source, f"{rel} does not consume the registry (missing {required!r})."
-
-    profiles_source = (_PKG / "features/lifecycle/model_profiles.py").read_text(encoding="utf-8")
-    spaceless_profiles = profiles_source.replace(" ", "")
-    assert 'frozenset({"codex","pi"})' not in spaceless_profiles
-    assert "harness_models.CODEX_HARNESS" in profiles_source
-    assert "harness_models.PI_HARNESS" in profiles_source

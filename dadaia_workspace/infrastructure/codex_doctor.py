@@ -15,6 +15,12 @@ import subprocess
 import tomllib
 from pathlib import Path
 
+from dadaia_workspace.core.rule_corpus import (
+    CITER_GLOBS,
+    RULES_DIR,
+    RuleCorpusScan,
+    scan_rule_corpus,
+)
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
     _CODEX_SKILL_REF_PREFIXES,
     _parse_agent_frontmatter,
@@ -268,6 +274,18 @@ def dcx8_codex_rules_shape(codex_dir: Path) -> list[str]:
     return out
 
 
+def expected_codex_hook_commands() -> set[str]:
+    """The wrapper commands the generated hooks.json must invoke — derived, never listed.
+
+    This set used to be written out by hand here, so wiring a FIFTH wrapper made the
+    doctor reject the very projection the generator had just produced: the product
+    refusing its own output. The generator owns the inventory; the checker asks it.
+    """
+    from dadaia_workspace.infrastructure.runtime_config import codex_hook_wrapper_contents
+
+    return {f".dadaia/hooks/{name}" for name in codex_hook_wrapper_contents()}
+
+
 def dcx9_codex_hook_shape(workspace_root: Path) -> list[str]:
     """D-CX-9: generated Codex hooks must invoke executable wrapper commands."""
     hooks_path = workspace_root / ".codex" / "hooks.json"
@@ -277,12 +295,7 @@ def dcx9_codex_hook_shape(workspace_root: Path) -> list[str]:
     except (OSError, json.JSONDecodeError):
         return ["[error] codex:hooks.json missing or invalid (D-CX-9)"]
 
-    expected = {
-        ".dadaia/hooks/codex-pre-gate",
-        ".dadaia/hooks/codex-post-gate",
-        ".dadaia/hooks/codex-ctx-inject",
-        ".dadaia/hooks/codex-ctx-inject-session-start",
-    }
+    expected = expected_codex_hook_commands()
     commands = set(_codex_hook_commands(hooks))
     missing = expected - commands
     for command in sorted(missing):
@@ -507,47 +520,51 @@ def check_memory_phase_single_source(public_dir: Path) -> list[str]:
 _CODEX_RULE_CITATION_RE: re.Pattern[str] = re.compile(r"`([a-z][a-z0-9-]+)`\s+rule\b")
 
 
-def check_codex_rule_corpus_reachable(workspace_root: Path) -> list[str]:
-    """WS-CDX-PROTOCOL (A6): every by-name rule cited by a Codex artifact is reachable.
+def _corpus_scan(workspace_root: Path) -> RuleCorpusScan:
+    """Read the citing artifacts and the rule names, then delegate to the core semantics.
 
-    A Codex session reaches the load-bearing rule-law corpus through the on-disk
-    surface ``.claude/rules/<rule-name>.md`` (documented in the projected root
-    ``AGENTS.md`` "Rule-Law Corpus" section). This check proves the contract: for
-    every ``\\`<name>\\` rule`` citation in any ``.codex/agents/*.toml`` artifact, the
-    file ``.claude/rules/<name>.md`` must exist. A missing file means a Codex artifact
-    cites a law surface Codex cannot reach.
-
-    Returns ``[ok] codex:rule-corpus-reachable`` when every citation resolves, or one
-    ``[error]`` line per unreachable citation.
+    The traversal is here (and mirrored in the workspace-state doctor) because ``core`` is
+    I/O-pure by ratchet; the shared ``CITER_GLOBS``/``RULES_DIR`` constants are what keep
+    the two from drifting on WHICH artifacts count as citers.
     """
-    codex_agents = workspace_root / ".codex" / "agents"
-    rules_dir = workspace_root / ".claude" / "rules"
-    out: list[str] = []
-    if not codex_agents.exists():
-        return out
+    rules_dir = workspace_root / RULES_DIR
+    available = {path.stem for path in rules_dir.glob("*.md")} if rules_dir.is_dir() else set()
+    texts: list[str] = []
+    for pattern in CITER_GLOBS:
+        for artifact in sorted(workspace_root.glob(pattern)):
+            try:
+                texts.append(artifact.read_text(encoding="utf-8"))
+            except OSError:
+                continue
+    return scan_rule_corpus(texts, available)
 
-    unreachable: set[str] = set()
-    cited_any = False
-    for toml_file in sorted(codex_agents.glob("*.toml")):
-        try:
-            text = toml_file.read_text(encoding="utf-8")
-        except OSError:
-            continue
-        for match in _CODEX_RULE_CITATION_RE.finditer(text):
-            name = match.group(1)
-            cited_any = True
-            if not (rules_dir / f"{name}.md").is_file():
-                unreachable.add(name)
 
-    if unreachable:
-        for name in sorted(unreachable):
-            out.append(
-                f"[error] codex:rule-corpus: by-name rule '{name}' cited in a Codex "
-                f"artifact has no reachable surface .claude/rules/{name}.md "
-                "(WS-CDX-PROTOCOL)"
-            )
-    elif cited_any:
-        out.append("[ok] codex:rule-corpus-reachable (WS-CDX-PROTOCOL)")
+def check_rule_corpus_reachable(workspace_root: Path) -> list[str]:
+    """Every by-name rule cited by ANY harness artifact must resolve to a rule file.
+
+    The scan lives in ``core.rule_corpus`` so ``dadaia public doctor`` (here) and
+    ``dadaia doctor`` (features) give the same answer; fixing the blindness in one verb
+    and not the other is bug ``r9-doctor-omits-rule-corpus-reachable``.
+
+    Emits one ``[error]`` per citation with no rule file — an agent that follows it gets
+    no law and no warning — and one ``[warn]`` per rule nothing cites, which is dead law
+    that still costs every session's context window.
+    """
+    scan = _corpus_scan(workspace_root)
+    if not scan.cited:
+        return []
+    out = [
+        f"[error] rule-corpus: by-name rule '{name}' is cited but has no reachable "
+        f"surface .claude/rules/{name}.md (WS-CDX-PROTOCOL)"
+        for name in scan.unreachable
+    ]
+    if not out:
+        out.append("[ok] rule-corpus-reachable (WS-CDX-PROTOCOL)")
+    out.extend(
+        f"[warn] rule-corpus: rule '{name}' is cited by no agent or skill "
+        "(dead law — it still costs context in every session)"
+        for name in scan.uncited
+    )
     return out
 
 

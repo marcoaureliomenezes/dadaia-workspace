@@ -25,7 +25,7 @@ from dadaia_workspace.cli._specs_resolution import (
     resolve_context_for_cli,
     resolve_specs_dir_for_cli,
 )
-from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
+from dadaia_workspace.core.exceptions import DadaiaError, WorkspaceNotInitializedError
 from dadaia_workspace.core.models.bugs import BugEvent, BugEventKind
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.bugs.service import BugService
@@ -188,7 +188,16 @@ def bugs_append_cmd(
         typer.echo(f"[error] bug event invalid: {exc.message}", err=True)
         raise typer.Exit(code=1) from exc
 
-    path = JsonlBugStore(target / "bugs").append_event(model)
+    # Through the SERVICE, not the store. Writing straight to the store bypassed the
+    # lifecycle rule and let a terminal event land for a bug_id no `reported` ever opened
+    # (bug r19-bugs-resolved-event-accepted-without-prior-reported) — the same two-writers
+    # shape already fixed for settings.json. One writer, one place the rule can live.
+    store = JsonlBugStore(target / "bugs")
+    try:
+        path = BugService(store).append_event(model)
+    except DadaiaError as exc:
+        typer.echo(f"[error] {exc}", err=True)
+        raise typer.Exit(code=1) from exc
     typer.echo(f"[ok] appended {event.value} for {bug_id} -> {path}")
 
 

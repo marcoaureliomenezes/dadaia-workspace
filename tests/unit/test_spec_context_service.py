@@ -134,11 +134,12 @@ def test_dead_removes_repo_syncs_dirty_pushes_and_state_error(
 
 
 def test_dead_ignores_residual_legacy_lock_record(
-    service: SpecContextService, workspace_root: Path
+    service: SpecContextService, workspace_root: Path, git: FakeGitClient
 ) -> None:
     """A pre-doctrine lock file can never block a context transition."""
     service.create("proj", "my-repo", "https://github.com/org/my-repo")
     service.alive("proj")
+    git._has_remote.add(workspace_root / "repos" / "my-repo")  # DEAD pushes before removal
 
     lock_dir = workspace_root / ".dadaia" / "states" / "ctx_locks"
     lock_dir.mkdir(parents=True, exist_ok=True)

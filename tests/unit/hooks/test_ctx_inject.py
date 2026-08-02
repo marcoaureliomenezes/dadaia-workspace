@@ -423,3 +423,48 @@ def test_output_contract_envelopes(
     assert env["hookSpecificOutput"]["hookEventName"] == expect_event
     if name == "codex_json_envelope":
         assert "[no bound context]" in env["hookSpecificOutput"]["additionalContext"]
+
+
+def test_post_compact_restamps_when_the_harness_consumes_stdout(tmp_path, monkeypatch) -> None:
+    """Codex ADDS hook stdout back to context; Kimi discards it. The branch must differ.
+
+    The PostCompact path was written for Kimi, whose harness throws the emission away —
+    so it deliberately does NOT restamp the sentinel, letting the next prompt do the real
+    re-injection. Codex consumes the emission, so leaving the sentinel unstamped made the
+    NEXT prompt inject a second time: the context arrived twice, once from PostCompact and
+    once from UserPromptSubmit. Exactly-once is the contract, in every harness.
+    """
+    import subprocess
+    import sys
+
+    ws = tmp_path
+    (ws / ".dadaia" / "tmp").mkdir(parents=True)
+    (ws / "repos" / "ctx" / "specs").mkdir(parents=True)
+    (ws / "repos" / "ctx" / "specs" / "memory").mkdir()
+
+    def run(event: str, output: str, prompt: bool = True) -> str:
+        env = {
+            "PATH": "/usr/bin:/bin",
+            "WORKSPACE_ROOT": str(ws),
+            "DADAIA_CONTEXT": "ctx",
+            "DADAIA_SESSION_ID": "sid-1",
+            "PYTHONPATH": str(Path(__file__).resolve().parents[3]),
+        }
+        if event:
+            env["DADAIA_HOOK_EVENT"] = event
+        if output:
+            env["DADAIA_HOOK_OUTPUT"] = output
+        extra = ',"prompt":"x"' if prompt else ""
+        payload = f'{{"session_id":"sid-1","cwd":"{ws}"{extra}}}'
+        return subprocess.run(
+            [sys.executable, "-B", "-m", "dadaia_workspace.hooks.ctx_inject"],
+            input=payload,
+            capture_output=True,
+            text=True,
+            env=env,
+        ).stdout
+
+    assert run("", "codex-json")  # first injection
+    assert run("PostCompact", "codex-json", prompt=False), "compaction must re-inject"
+    after = run("", "codex-json")
+    assert not after.strip(), f"the next prompt duplicated the context: {after[:120]!r}"

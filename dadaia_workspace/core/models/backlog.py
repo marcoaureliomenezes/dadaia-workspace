@@ -25,21 +25,94 @@ __all__ = [
     "Intent",
     "Subject",
     "SubjectKind",
+    "BACKLOG_LIVE_STATUSES",
+    "BACKLOG_STATUSES",
+    "BACKLOG_TERMINAL_STATUSES",
+    "normalize_backlog_status",
+    "declared_new_anchor",
     "is_intents_exempt",
     "parse_intents",
     "serialize_intents",
 ]
 
-#: The one backlog stage exempt from the resolvable-typed-intents requirement.
+#: The pre-binding stage exempt from the resolvable-typed-intents requirement.
 INTENTS_EXEMPT_STATUS = "idea"
+
+#: The backlog statuses that END an item's life (ADR-11 vocabulary). Kept here, in the
+#: one module both the doctor and the gate already share, because the vocabulary was
+#: dispersed: a comment in the governance doctor listed six tokens while the tuple beside
+#: it carried four, and this module knew only ``idea``.
+#:
+#: Two DIFFERENT questions are asked of this vocabulary and must not be collapsed:
+#:   * "is this item settled, so its intents need not still resolve?" — every token here;
+#:   * "must this item be moved into ``_archive/``?" — a NARROWER set (shipped work only),
+#:     which the governance doctor names for itself, because deferring or rejecting an
+#:     item is not the same as shipping it.
+BACKLOG_TERMINAL_STATUSES: frozenset[str] = frozenset(
+    {"delivered", "consumed", "superseded", "resolved", "deferred", "rejected"}
+)
+
+#: Every status a backlog item may carry. Live tokens first, then the terminal set.
+#:
+#: Three modules each kept their own copy of this and they DISAGREED. The backlog doctor
+#: knew ``done``/``closed``, which nothing else had ever heard of, and did NOT know
+#: ``consumed``/``superseded``/``resolved`` — the very tokens the governance doctor treats
+#: as terminal and demands be archived. So one doctor required a state the other rejected
+#: outright, and no operator could satisfy both. One vocabulary, one answer.
+BACKLOG_LIVE_STATUSES: frozenset[str] = frozenset(
+    {"idea", "open", "candidate", "picked", "in-progress"}
+)
+BACKLOG_STATUSES: frozenset[str] = BACKLOG_LIVE_STATUSES | BACKLOG_TERMINAL_STATUSES
+
+#: Separators a status line may use before a free-text suffix (``DELIVERED — v0.4.2``).
+_STATUS_SUFFIX_SEPARATORS = ("—", "–", " - ", ":", "(")
+
+
+def normalize_backlog_status(raw: str | None) -> str | None:
+    """The bare status token from a status line, or ``None`` when there is none.
+
+    The closure skill documents the disposition format as ``DELIVERED — vX.Y.Z``: a token
+    plus a free suffix naming the release. The backlog doctor exact-matched the whole
+    string and rejected exactly that format, so following our own documented instruction
+    produced a ``BL-SCHEMA`` error (bug
+    ``closure-skill-delivered-suffix-rejected-by-bl-schema``). Parsing the suffix off is
+    the rule; it lives here so a doctor and a skill can never again mean different things
+    by the same line.
+    """
+    if raw is None:
+        return None
+    token = raw.strip()
+    for separator in _STATUS_SUFFIX_SEPARATORS:
+        head, found, _ = token.partition(separator)
+        if found:
+            token = head.strip()
+    return token.lower() or None
+
+
+def declared_new_anchor(subject: Subject) -> str:
+    """The anchor id a ``surface: new`` subject binds to, by its own declared identity.
+
+    A surface the item INTRODUCES cannot resolve through the registry — it does not exist
+    yet — so it binds to ``new:<kind>:<ref>``. Both halves of removal-on-release must
+    derive it the SAME way: `consume` records it and `remove-consumed` looks it up. They
+    each had their own copy, the strings could never match, and a shipped `surface: new`
+    item stayed in the live backlog forever (bug
+    ``backlog-remove-consumed-never-clears-surface-new``). One derivation, one answer.
+    """
+    return f"new:{subject.kind.value}:{subject.ref}"
 
 
 def is_intents_exempt(status: str | None) -> bool:
-    """True iff ``status`` is the intents-exempt ``idea`` stage (v0.1.55 FR5).
+    """True iff ``status`` never needs bindable intents — pre-binding or settled.
 
-    An ``idea`` is an unbound brainstorm — exempt from the resolvable-typed-intents
-    requirement. Every other status (candidate and beyond, or a missing status) must
-    carry bound, resolvable intents.
+    An ``idea`` is an unbound brainstorm, exempt because it has not been bound yet. A
+    TERMINAL item is exempt for the mirror reason: it is settled and will never be
+    consumed, so requiring its refs to still resolve is requiring the world to stand
+    still. When ``features/lifecycle/`` was demolished, an item that had asked for a
+    workflow body there reported ``BL-SCHEMA`` forever — its refs pointed at deleted
+    files — and the only escapes were to DELETE the item (forbidden: never delete a
+    backlog file) or to falsify its refs. A live item (open/picked/candidate, or a
+    missing status) must still carry bound, resolvable intents.
 
     Lives in ``core`` so the backlog doctor and the backlog-definition gate share ONE
     predicate. They previously diverged — the gate accepted a pre-existing ``candidate``
@@ -48,7 +121,10 @@ def is_intents_exempt(status: str | None) -> bool:
     contract forbids ``features.lifecycle`` importing ``features.backlog``, so the one
     shared home has to be here.
     """
-    return status is not None and status.strip().lower() == INTENTS_EXEMPT_STATUS
+    token = normalize_backlog_status(status)
+    if token is None:
+        return False
+    return token == INTENTS_EXEMPT_STATUS or token in BACKLOG_TERMINAL_STATUSES
 
 
 class SubjectKind(StrEnum):

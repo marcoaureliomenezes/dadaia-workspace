@@ -143,6 +143,7 @@ class FakePublicAssetManager:
         self.staged: list[Path] = []
         self.installed: list[tuple[Path, str, bool]] = []
         self.doctored: list[Path] = []
+        self.claude_settings_written: list[Path] = []
 
     def stage(self, workspace_root: Path) -> list[str]:
         self.staged.append(workspace_root)
@@ -159,6 +160,18 @@ class FakePublicAssetManager:
     ) -> list[str]:
         self.installed.append((workspace_root, target, force))
         return [str(workspace_root / ".agents" / "skills" / "fake-skill" / "SKILL.md")]
+
+    def install_claude_settings(self, workspace_root: Path) -> list[str]:
+        """Delegate to the real writer — settings.json wiring is the behaviour under test.
+
+        Faking this one would hide exactly the bug the port method exists for
+        (``init-skip-assets-writes-gateless-claude-settings``): a fake that writes a
+        plausible-looking file would let an ungated settings.json pass every test.
+        """
+        from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+
+        self.claude_settings_written.append(workspace_root)
+        return FileSystemPublicAssetManager().install_claude_settings(workspace_root)
 
     def list_all(self) -> dict[str, list[str]]:
         return {"agents": ["fake-agent"], "skills": ["fake-skill"]}
