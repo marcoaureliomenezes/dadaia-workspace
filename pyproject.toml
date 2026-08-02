@@ -95,6 +95,12 @@ build-backend = "poetry.core.masonry.api"
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+# ruff >= 0.16 formats Python code blocks inside Markdown. This repo's specs carry code
+# samples that document what the code looked like AT THE TIME, and `specs/_archive/` is
+# the FROZEN class the SDD gate refuses writes to — so `ruff format .` was rewriting
+# archived history, and `dadaia ci preflight` (the push gate) could not pass without that
+# rewrite. We lint Python; prose is out of scope.
+extend-exclude = ["*.md"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
