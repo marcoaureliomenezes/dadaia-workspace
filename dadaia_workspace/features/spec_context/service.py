@@ -48,6 +48,18 @@ class DeadSecretFoundError(DadaiaError):
     """
 
 
+class DeadRemoteRequiredError(DadaiaError):
+    """Raised when dead() would remove a git repository that has no remote.
+
+    DEAD promises commit → push → remove. Without a remote the push cannot happen,
+    so removing the directory destroys the only copy of the work — including the
+    auto-sync commit, which lives in the ``.git`` being deleted. The transition
+    refuses instead of silently degrading the promise; the repo is left untouched.
+    ``no_remote_ok=True`` (CLI ``--no-remote``) is explicit consent to accept the
+    loss, mirroring the ``--commit`` consent on the untracked-file review gate.
+    """
+
+
 def _rmtree_chmod_retry(func: object, path: str, _exc: BaseException) -> None:
     """`shutil.rmtree` onexc handler: chmod-and-retry (v0.1.50 FR3).
 
@@ -565,7 +577,9 @@ class SpecContextService:
                 "Remove or redact the flagged content, then re-run. Nothing was pushed."
             )
 
-    def dead(self, name: str, *, commit: bool = False) -> SpecContextProject:
+    def dead(
+        self, name: str, *, commit: bool = False, no_remote_ok: bool = False
+    ) -> SpecContextProject:
         """Transition a context from ALIVE to DEAD; sets dead_since, removes repo.
 
         Review gate (F-5 / AC-R7-01): if the repo has untracked non-gitignored
@@ -577,6 +591,12 @@ class SpecContextService:
         ``DeadSecretFoundError`` (push blocked, repo untouched). Tracked-but-dirty
         modifications keep the existing auto-sync behaviour (FR-R7: only untracked
         content is gated). A clean tree behaves exactly as before.
+
+        Remote gate: DEAD promises commit → push → remove. A git repo with no remote
+        has nowhere to push, so removing it destroys the only copy of the work — the
+        auto-sync commit included, since it lives in the ``.git`` being deleted. Such a
+        transition raises ``DeadRemoteRequiredError`` and leaves the repo untouched;
+        ``no_remote_ok=True`` is explicit consent to accept the loss.
 
         Concurrent races are accepted and surfaced by advisory presence; this operation
         never waits for or refuses another session.
@@ -598,6 +618,14 @@ class SpecContextService:
         # push, or rmtree, so a refusal leaves the repo entirely untouched on disk.
         if repo_path.exists() and self._git.is_git_root(repo_path):
             self._enforce_dead_review_gate(name, repo_path, commit=commit)
+            if not no_remote_ok and not self._git.has_remote(repo_path):
+                raise DeadRemoteRequiredError(
+                    f"Context '{name}': the repository at '{repo_path}' has no git "
+                    "remote, so DEAD cannot push before removing it from disk — the "
+                    "removal would destroy the only copy of the work. Add a remote and "
+                    "push, or re-run with --no-remote to accept the loss explicitly. "
+                    "Nothing was committed, pushed, or removed."
+                )
 
         # Git sync + rmtree. Races are accepted by the NO-LOCKS doctrine.
         if repo_path.exists():

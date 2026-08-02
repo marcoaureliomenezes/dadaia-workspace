@@ -79,6 +79,7 @@ def test_dead_succeeds_on_non_writable_files(
     locked_file.write_text("content")
     locked_file.chmod(stat.S_IRUSR | stat.S_IRGRP)  # read-only, like a loose object
 
+    git._has_remote.add(repo)  # DEAD pushes before it removes
     result = service.dead("proj")
     assert result.state is ContextState.DEAD
     assert not repo.exists()
@@ -148,6 +149,7 @@ def test_dead_writable_alive_safe_preserve_and_merge_not_skipped(
     svc.alive("proj")
     repo = workspace_root / "repos" / "my-repo"
     (repo / "writable.txt").write_text("data")
+    git._has_remote.add(repo)  # DEAD pushes before it removes
     svc.dead("proj")
     assert not repo.exists()
 

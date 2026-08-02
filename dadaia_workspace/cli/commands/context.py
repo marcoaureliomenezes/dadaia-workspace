@@ -29,6 +29,7 @@ from dadaia_workspace.core.session_env import harness_session_id, sanitize_sessi
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.spec_context import presence, session_identity
 from dadaia_workspace.features.spec_context.service import (
+    DeadRemoteRequiredError,
     DeadReviewRequiredError,
     DeadSecretFoundError,
     SpecContextService,
@@ -405,15 +406,27 @@ def dead(
             "secret scan runs over the files before push and blocks on any finding."
         ),
     ),
+    no_remote: bool = typer.Option(
+        False,
+        "--no-remote",
+        help=(
+            "Explicit consent to remove a repository that has NO git remote. DEAD "
+            "promises commit+push+remove; without a remote the push cannot happen and "
+            "the removal destroys the only copy. Without this flag, dead() refuses."
+        ),
+    ),
 ) -> None:
     """Transition a context to DEAD; git sync + remove repo from disk."""
     try:
-        ctx = _ctx_service().dead(name, commit=commit)
+        ctx = _ctx_service().dead(name, commit=commit, no_remote_ok=no_remote)
         console.print(f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' is now DEAD")
     except DeadReviewRequiredError as e:
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
     except DeadSecretFoundError as e:
+        err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+    except DeadRemoteRequiredError as e:
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
     except GitSyncError as e:
