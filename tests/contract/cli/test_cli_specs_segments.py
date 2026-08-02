@@ -57,3 +57,33 @@ def test_specs_segment_error_matrix(tmp_path: Path, setup_and_invoke: str) -> No
             app, ["specs", "segment", "open", "alpha-2", "--specs-dir", str(specs)]
         )
     assert res.exit_code == 2
+
+
+def test_reopening_an_existing_release_is_refused(tmp_path: Path) -> None:
+    """`open` creates. Re-running it on a live release silently rewound ACTIVE.md's
+    phase (IMPLEMENTATION -> SPEC) while reporting `[ok]` — a state regression with no
+    trace. The verb must refuse and name the verb that advances a release instead."""
+    specs = _specs(tmp_path)
+    assert _runner.invoke(app, ["specs", "release", "open", "v0.1.6", "--specs-dir", str(specs)]).exit_code == 0
+    active = specs / "releases" / "ACTIVE.md"
+    active.write_text(active.read_text().replace("phase: SPEC", "phase: IMPLEMENTATION"))
+
+    res = _runner.invoke(app, ["specs", "release", "open", "v0.1.6", "--specs-dir", str(specs)])
+
+    assert res.exit_code != 0, res.output
+    assert "phase: IMPLEMENTATION" in active.read_text(), "a refusal must not rewind the phase"
+    assert "segment open" in res.output, "the refusal must name the verb that advances a release"
+    assert "Traceback" not in res.output
+
+
+def test_force_still_reopens_deliberately(tmp_path: Path) -> None:
+    """`--force` is the documented escape hatch and must keep working."""
+    specs = _specs(tmp_path)
+    _runner.invoke(app, ["specs", "release", "open", "v0.1.6", "--specs-dir", str(specs)])
+
+    res = _runner.invoke(
+        app, ["specs", "release", "open", "v0.1.6", "--specs-dir", str(specs), "--force"]
+    )
+
+    assert res.exit_code == 0, res.output
+    assert "phase: SPEC" in (specs / "releases" / "ACTIVE.md").read_text()

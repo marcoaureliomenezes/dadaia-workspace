@@ -461,6 +461,19 @@ def release_open(
     phase: SPEC`` (schema v2, ADR-1/ADR-5).
     """
     target = _resolve_specs_dir(specs_dir)
+    # `open` creates. Re-running it on a release that already exists used to rewind
+    # ACTIVE.md's phase back to SPEC while reporting `[ok]` — a silent state regression
+    # on a live release. Refuse, and name the verb that actually advances one.
+    if not force and (target / "releases" / version_id).exists():
+        typer.echo(
+            f"[error] release {version_id} already exists at "
+            f"{target / 'releases' / version_id}. `release open` creates a release; it "
+            "does not re-open one, and re-running it would rewind ACTIVE.md's phase. "
+            "To open the next segment: dadaia specs segment open <alpha-N|rc-N>. "
+            "To deliberately re-scaffold this release: --force.",
+            err=True,
+        )
+        raise typer.Exit(2)
     try:
         result = scaffold_release_segment(target, version_id, "alpha-1", force=force)
     except ValueError as exc:
