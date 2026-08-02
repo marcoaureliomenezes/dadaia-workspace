@@ -124,3 +124,22 @@ def test_an_unshipped_intent_is_still_kept() -> None:
 
     assert any_shipped is False
     assert len(residual) == 1
+
+
+def test_a_terminal_backlog_item_needs_no_resolvable_intents() -> None:
+    """A rejected/deferred item is never consumed, so its refs need not still resolve.
+
+    The demolition deleted `features/lifecycle/`, and a backlog item that had asked for a
+    workflow body there still pointed at those files. `backlog doctor` reported BL-SCHEMA
+    on it forever: the refs resolve to no anchor because the anchors were deleted. The
+    only ways out were to DELETE the file (forbidden — never delete a backlog file) or to
+    falsify its refs. Neither is right: an item that will never be consumed does not need
+    bindable intents, exactly as an `idea` does not.
+    """
+    from dadaia_workspace.core.models.backlog import is_intents_exempt
+
+    assert is_intents_exempt("idea") is True
+    for terminal in ("rejected", "deferred", "delivered", "consumed", "superseded", "resolved"):
+        assert is_intents_exempt(terminal) is True, terminal
+    for live in ("open", "picked", "candidate", None):
+        assert is_intents_exempt(live) is False, live

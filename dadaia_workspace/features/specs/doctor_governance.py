@@ -14,6 +14,7 @@ import re
 from datetime import UTC, datetime
 from pathlib import Path
 
+from dadaia_workspace.core.models.backlog import BACKLOG_TERMINAL_STATUSES
 from dadaia_workspace.features.specs.doctor_common import iter_archive_release_dirs
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
 
@@ -52,11 +53,13 @@ _BUGS_JSONL_NAME_RE = re.compile(r"^\d{8}T\d{2}Z-\d+\.jsonl$")
 # SPEC-DOC-035 (v0.1.46 AC-4): terminal backlog status prefixes. A backlog entry whose
 # Status is terminal but still loose in ``specs/backlog/`` (not under ``_archive/``) WARNs —
 # a consumed/shipped item must be moved into ``specs/backlog/_archive/``.
-_BACKLOG_TERMINAL_PREFIXES: tuple[str, ...] = (
-    "delivered",
-    "consumed",
-    "superseded",
-    "resolved",
+# Deliberately NARROWER than ``BACKLOG_TERMINAL_STATUSES``: this rule is about SHIPPED
+# work that must be moved into ``_archive/``. Deferring or rejecting an item settles it
+# but does not ship it, so those two stay loose in ``specs/backlog/`` where the operator
+# can still see them. Derived from the single vocabulary so the two can never drift into
+# disagreeing about what a token MEANS — only about which subset this rule asks for.
+_BACKLOG_TERMINAL_PREFIXES: tuple[str, ...] = tuple(
+    sorted(BACKLOG_TERMINAL_STATUSES - {"deferred", "rejected"})
 )
 
 # Match a Status line in a backlog entry: ``Status: ...`` or ``**Status:** ...``.
