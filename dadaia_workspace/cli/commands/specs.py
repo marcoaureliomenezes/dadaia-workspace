@@ -494,14 +494,18 @@ def release_open(
             "it would rewind ACTIVE.md's phase.",
             err=True,
         )
+        # Carry the caller's own --specs-dir into the remedy. Dropping it made the
+        # prescribed line unrunnable from the same shell that just failed
+        # (bug specs-release-open-collision-remedy-omits-specs-dir).
+        where = f" --specs-dir {specs_dir}" if specs_dir else ""
         typer.echo(
             f"[error] To open the next segment: dadaia specs segment open "
-            f"{_next_segment(release_dir)}",
+            f"{_next_segment(release_dir)}{where}",
             err=True,
         )
         typer.echo(
             "[error] To deliberately re-scaffold this release: "
-            f"dadaia specs release open {version_id} --force",
+            f"dadaia specs release open {version_id}{where} --force",
             err=True,
         )
         raise typer.Exit(2)

@@ -114,9 +114,12 @@ def test_the_reopen_refusal_prescribes_a_pasteable_command(tmp_path: Path) -> No
     assert prescribed, res.output
     assert not any("<" in line or ">" in line for line in prescribed), prescribed
 
-    # And it actually runs: take the real command out of the message and execute it.
+    # And it actually runs — pasted VERBATIM, adding nothing. Appending --specs-dir here
+    # is what hid the defect the first time: the remedy dropped the flag the failing
+    # invocation itself carried, so the operator's paste could not resolve a specs tree
+    # (bug specs-release-open-collision-remedy-omits-specs-dir).
     command = prescribed[0][prescribed[0].index("dadaia") :].split("#")[0].strip()
-    argv = command.split()[1:] + ["--specs-dir", str(specs)]
-    follow_up = _runner.invoke(app, argv)
+    assert "--specs-dir" in command, f"the remedy dropped the caller's --specs-dir: {command}"
+    follow_up = _runner.invoke(app, command.split()[1:])
     assert follow_up.exit_code == 0, follow_up.output
     assert (specs / "releases" / "v0.1.6" / "alpha-2" / "TASKS.md").is_file()
