@@ -123,3 +123,26 @@ def test_the_canonical_release_id_forms_still_resolve(tmp_path: Path) -> None:
         (target / "SPEC.md").write_text(f"{release_id}\n", encoding="utf-8")
         resolved = build_release_spec_path(tmp_path, context="demo", release_id=release_id)
         assert resolved.read_text(encoding="utf-8") == f"{release_id}\n"
+
+
+def test_consume_refuses_to_silently_drop_a_previously_recorded_slug(tmp_path: Path) -> None:
+    """Re-consuming a SHRUNK `**Consumes:**` line must refuse, naming what was lost.
+
+    `backlog consume` rewrote `consumed_backlog.json` from the SPEC alone, comparing
+    against nothing. Editing a slug out of the line and re-running silently produced a
+    smaller ledger — so an item recorded as consumed by this release stopped being
+    tracked, and nothing would ever remove it from the live backlog. The recipe's own
+    R-19 step 4 exists to catch exactly this: a verification that cannot fail is not a
+    verification (bug backlog-consume-shrink-not-refused).
+    """
+    from dadaia_workspace.features.backlog.ledger import shrunk_consumed_slugs
+
+    previous = {"slug-a": {"anchor:a"}, "slug-b": {"anchor:b"}, "slug-c": {"anchor:c"}}
+
+    assert shrunk_consumed_slugs(previous, ("slug-a", "slug-b", "slug-c")) == ()
+    assert shrunk_consumed_slugs(previous, ("slug-a", "slug-b")) == ("slug-c",)
+    assert shrunk_consumed_slugs(previous, ("slug-a",)) == ("slug-b", "slug-c")
+    # Growing the set is normal maturation, never a refusal.
+    assert shrunk_consumed_slugs(previous, ("slug-a", "slug-b", "slug-c", "slug-d")) == ()
+    # No prior ledger — the first consume of a release has nothing to lose.
+    assert shrunk_consumed_slugs({}, ("slug-a",)) == ()

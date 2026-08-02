@@ -71,6 +71,20 @@ def _residual_intents(
     residual: list[Intent] = []
     any_shipped = False
     for intent in item.intents:
+        if intent.subject.surface == "new":
+            # A declared NEW surface is recorded by `consume` under its own identity
+            # (`new:<kind>:<ref>`) because the registry cannot resolve something that does
+            # not exist yet. Binding it through the registry here searched for an anchor
+            # that could never match the one recorded, so a fully shipped `surface: new`
+            # item never left the live backlog
+            # (bug backlog-remove-consumed-never-clears-surface-new). Both halves must
+            # derive the anchor the SAME way — this is that one way.
+            declared = f"new:{intent.subject.kind.value}:{intent.subject.ref}"
+            if declared in shipped_anchors:
+                any_shipped = True
+                continue
+            residual.append(intent)
+            continue
         bind = registry.bind(intent.subject.ref, intent.subject.kind)
         if (
             bind.status is BindStatus.RESOLVED

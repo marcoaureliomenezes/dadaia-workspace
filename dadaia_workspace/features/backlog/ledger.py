@@ -23,6 +23,8 @@ Sidecar JSON shape::
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping, Sequence
+from collections.abc import Set as AbstractSet
 from pathlib import Path
 
 __all__ = ["LEDGER_FILENAME", "read_consumed"]
@@ -49,7 +51,53 @@ def _release_still_in_flight(specs_dir: Path | None, release_id: str) -> bool:
     release_dir = specs_dir / "releases" / release_id
     if not release_dir.is_dir():
         return False
-    return not (release_dir / "CLOSURE.md").is_file()
+    # CLOSURE.md lands flat only on the legacy layout; every release the canonical
+    # scaffolder opens is SEGMENTED (releases/<id>/<segment>/CLOSURE.md, ADR-1), so
+    # looking only at the flat path answered "still in flight" forever — read_consumed
+    # returned {} always and BL-STALE could never fire on any real release
+    # (bug backlog-doctor-bl-stale-noop-on-segmented-release).
+    if (release_dir / "CLOSURE.md").is_file():
+        return False
+    return not any(release_dir.glob("*/CLOSURE.md"))
+
+
+def recorded_consumed_slugs(archive_root: Path, release_id: str) -> dict[str, set[str]]:
+    """The consumed ledger of ONE release, ``{slug: shipped_anchors}``.
+
+    :func:`read_consumed` unions every release's ledger, which is what BL-STALE needs but
+    NOT what a re-consume must compare against — a release may only be measured against
+    its own prior record. Absent or malformed ledgers read as ``{}``.
+    """
+    path = archive_root / release_id / "consumed_backlog.json"
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    entries = payload.get("consumed") if isinstance(payload, dict) else None
+    if not isinstance(entries, list):
+        return {}
+    out: dict[str, set[str]] = {}
+    for entry in entries:
+        if isinstance(entry, dict) and isinstance(entry.get("slug"), str):
+            anchors = entry.get("shipped_anchors")
+            out[entry["slug"]] = set(anchors) if isinstance(anchors, list) else set()
+    return out
+
+
+def shrunk_consumed_slugs(
+    previous: Mapping[str, AbstractSet[str]], declared: Sequence[str]
+) -> tuple[str, ...]:
+    """Slugs a prior ledger recorded that the newly declared set drops, sorted.
+
+    ``backlog consume`` rewrote the ledger from the SPEC alone, comparing against nothing.
+    Editing a slug out of ``**Consumes:**`` and re-running silently produced a SMALLER
+    ledger, so an item this release had already consumed stopped being tracked and would
+    never be removed from the live backlog (bug backlog-consume-shrink-not-refused).
+
+    Growing the declared set is normal maturation and returns ``()``. A release with no
+    prior ledger has nothing to lose and also returns ``()``.
+    """
+    return tuple(sorted(set(previous) - set(declared)))
 
 
 def read_consumed(archive_root: Path, *, specs_dir: Path | None = None) -> dict[str, set[str]]:

@@ -326,6 +326,10 @@ def backlog_consume_cmd(
     from dadaia_workspace.core.exceptions import DadaiaError
     from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
     from dadaia_workspace.features.backlog.consumes import parse_consumes_line, shipped_anchors_for
+    from dadaia_workspace.features.backlog.ledger import (
+        recorded_consumed_slugs,
+        shrunk_consumed_slugs,
+    )
 
     workspace_root = resolve_workspace_root()
     ctx = resolve_context_for_cli(context)
@@ -344,6 +348,23 @@ def backlog_consume_cmd(
         typer.echo("no `**Consumes:**` line — nothing to consume.")
         return
     lifecycle = container.build_backlog_removal_lifecycle(workspace_root, context=ctx)
+
+    # A re-consume that DROPS a slug the ledger already recorded is a silent regression:
+    # the item stops being tracked and nothing will ever remove it from the live backlog.
+    # Refuse and name what would be lost (bug backlog-consume-shrink-not-refused).
+    previously = recorded_consumed_slugs(lifecycle.archive_root, release_id)
+    lost = shrunk_consumed_slugs(previously, slugs)
+    if lost:
+        typer.echo(
+            f"[error] release {release_id!r} already consumed {', '.join(lost)}, and the "
+            "SPEC's `**Consumes:**` line no longer declares them. Re-consuming would drop "
+            "them from the ledger, so nothing would ever remove them from the live "
+            "backlog. Restore the slug(s) in the SPEC, or archive the release's ledger "
+            "deliberately before re-consuming. Nothing was written.",
+            err=True,
+        )
+        raise typer.Exit(2)
+
     shipped = shipped_anchors_for(
         slugs, backlog_dir=lifecycle.backlog_dir, registry=lifecycle.registry
     )
