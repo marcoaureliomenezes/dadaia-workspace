@@ -1,5 +1,6 @@
 [
   "[error] codex hook wrapper probe failed .dadaia/hooks/codex-ctx-inject (D-CX-9)",
+  "[error] codex hook wrapper probe failed .dadaia/hooks/codex-ctx-inject-post-compact (D-CX-9)",
   "[error] codex hook wrapper probe failed .dadaia/hooks/codex-ctx-inject-session-start (D-CX-9)",
   "[error] codex hook wrapper probe failed .dadaia/hooks/codex-post-gate (D-CX-9)",
   "[error] codex hook wrapper probe failed .dadaia/hooks/codex-pre-gate (D-CX-9)",
@@ -70,6 +71,7 @@
   "[ok] codex:rules/dadaia-command-policy.rules",
   "[ok] dadaia:AGENTS.md",
   "[ok] dadaia:hooks/codex-ctx-inject",
+  "[ok] dadaia:hooks/codex-ctx-inject-post-compact",
   "[ok] dadaia:hooks/codex-ctx-inject-session-start",
   "[ok] dadaia:hooks/codex-post-gate",
   "[ok] dadaia:hooks/codex-pre-gate",

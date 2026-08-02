@@ -274,6 +274,18 @@ def dcx8_codex_rules_shape(codex_dir: Path) -> list[str]:
     return out
 
 
+def expected_codex_hook_commands() -> set[str]:
+    """The wrapper commands the generated hooks.json must invoke — derived, never listed.
+
+    This set used to be written out by hand here, so wiring a FIFTH wrapper made the
+    doctor reject the very projection the generator had just produced: the product
+    refusing its own output. The generator owns the inventory; the checker asks it.
+    """
+    from dadaia_workspace.infrastructure.runtime_config import codex_hook_wrapper_contents
+
+    return {f".dadaia/hooks/{name}" for name in codex_hook_wrapper_contents()}
+
+
 def dcx9_codex_hook_shape(workspace_root: Path) -> list[str]:
     """D-CX-9: generated Codex hooks must invoke executable wrapper commands."""
     hooks_path = workspace_root / ".codex" / "hooks.json"
@@ -283,12 +295,7 @@ def dcx9_codex_hook_shape(workspace_root: Path) -> list[str]:
     except (OSError, json.JSONDecodeError):
         return ["[error] codex:hooks.json missing or invalid (D-CX-9)"]
 
-    expected = {
-        ".dadaia/hooks/codex-pre-gate",
-        ".dadaia/hooks/codex-post-gate",
-        ".dadaia/hooks/codex-ctx-inject",
-        ".dadaia/hooks/codex-ctx-inject-session-start",
-    }
+    expected = expected_codex_hook_commands()
     commands = set(_codex_hook_commands(hooks))
     missing = expected - commands
     for command in sorted(missing):

@@ -445,10 +445,20 @@ def main() -> int:
         context = _resolve_context(workspace, session_id, sentinel_mtime, harness_pid)
         if not context:
             context = recorded_slug
+        # Whether to restamp depends on what the HARNESS does with the emission, and the
+        # two differ: Kimi discards PostCompact stdout, so the sentinel stays unstamped and
+        # the next prompt performs the real re-injection; Codex ADDS it back to context, so
+        # leaving it unstamped injected a SECOND time on the next prompt. Exactly-once is
+        # the contract in every harness — the mechanism just has to match the harness.
+        consumes_stdout = os.environ.get("DADAIA_HOOK_OUTPUT") == "codex-json"
         if context and (workspace / "repos" / context / "specs").is_dir():
             _emit_bootstrap(workspace, context)
+            if consumes_stdout:
+                _stamp_sentinel(tmp_dir, sentinel, context)
         else:
             _emit(_generic_preflight(workspace))
+            if consumes_stdout:
+                _stamp_sentinel(tmp_dir, sentinel, "")
         return 0
 
     # Claude Code SessionStart re-injection (bug claude-compact-reinjection-missing):
