@@ -21,9 +21,9 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.features.backlog.preview import bound_anchor_changes, load_backlog_items
 from dadaia_workspace.features.backlog.subject_registry import Registry
-from dadaia_workspace.core.exceptions import DadaiaError
 
 __all__ = [
     "ConsumesBindError",

@@ -64,7 +64,12 @@ def test_reopening_an_existing_release_is_refused(tmp_path: Path) -> None:
     phase (IMPLEMENTATION -> SPEC) while reporting `[ok]` — a state regression with no
     trace. The verb must refuse and name the verb that advances a release instead."""
     specs = _specs(tmp_path)
-    assert _runner.invoke(app, ["specs", "release", "open", "v0.1.6", "--specs-dir", str(specs)]).exit_code == 0
+    assert (
+        _runner.invoke(
+            app, ["specs", "release", "open", "v0.1.6", "--specs-dir", str(specs)]
+        ).exit_code
+        == 0
+    )
     active = specs / "releases" / "ACTIVE.md"
     active.write_text(active.read_text().replace("phase: SPEC", "phase: IMPLEMENTATION"))
 

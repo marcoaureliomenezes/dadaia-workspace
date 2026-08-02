@@ -68,9 +68,9 @@ The documented unit is `prefix_rule(...)`:
 
 ```python
 prefix_rule(
-    pattern = ["git", "push"],
-    decision = "prompt",
-    justification = "Publishing requires an explicit operator decision.",
+    pattern=["git", "push"],
+    decision="prompt",
+    justification="Publishing requires an explicit operator decision.",
 )
 ```
 

@@ -63,6 +63,7 @@ from dadaia_workspace.features.reports.retention import ReportRetentionService
 from dadaia_workspace.features.reports.validation import ReportsValidationService
 from dadaia_workspace.features.repos.service import ReposService
 from dadaia_workspace.features.server_registry.service import ServerRegistryService
+from dadaia_workspace.features.spec_artifacts.new_artifacts import is_valid_release_id
 from dadaia_workspace.features.spec_context.doctor import DoctorService
 from dadaia_workspace.features.spec_context.service import SpecContextService
 from dadaia_workspace.features.telemetry.aggregator.runtimes import ADAPTER_REGISTRY
@@ -893,9 +894,6 @@ def _backlog_context_roots(workspace_root: Path, context: str) -> tuple[Path, Pa
         specs_dir = workspace_root / "specs"
         source_root = workspace_root
     return specs_dir, source_root
-
-
-from dadaia_workspace.features.spec_artifacts.new_artifacts import is_valid_release_id
 
 
 def _segment_sort_key(name: str) -> tuple[int, int, str]:

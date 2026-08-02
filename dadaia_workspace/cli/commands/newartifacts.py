@@ -323,10 +323,9 @@ def backlog_consume_cmd(
 
     from dadaia_workspace import container
     from dadaia_workspace.cli._specs_resolution import resolve_context_for_cli
+    from dadaia_workspace.core.exceptions import DadaiaError
     from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
     from dadaia_workspace.features.backlog.consumes import parse_consumes_line, shipped_anchors_for
-
-    from dadaia_workspace.core.exceptions import DadaiaError
 
     workspace_root = resolve_workspace_root()
     ctx = resolve_context_for_cli(context)
