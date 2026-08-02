@@ -182,3 +182,39 @@ def test_a_status_may_carry_the_release_suffix_the_skill_documents() -> None:
     assert normalize_backlog_status("candidate") == "candidate"
     assert normalize_backlog_status(None) is None
     assert normalize_backlog_status("") is None
+
+
+def test_an_unresolved_ref_refusal_names_both_recoveries_and_a_pasteable_command() -> None:
+    """A refusal that names no way out is a dead end (R-16/R-23).
+
+    The UNRESOLVED message said only "add it as an alias in the operator alias map, or
+    correct the ref" — it never mentioned `dadaia backlog subjects` (how you SEE the
+    anchors that exist) nor `surface: new` (what you declare when the surface does not
+    exist yet), and gave no command to paste. Both recoveries already existed; the message
+    just never said so (bug backlog-unresolved-ref-remedy-incomplete).
+    """
+    from dadaia_workspace.core.models.backlog import SubjectKind
+    from dadaia_workspace.features.backlog.subject_registry import Registry
+
+    result = Registry(anchors={}, aliases={}).bind("nao-existe", SubjectKind.CLI)
+
+    message = result.message or ""
+    assert "backlog subjects" in message, message
+    assert "surface: new" in message, message
+    assert "dadaia backlog subjects" in message, "the remedy must be pasteable, not described"
+    assert "<" not in message and ">" not in message, f"no placeholders: {message}"
+
+
+def test_the_backlog_template_shows_a_ref_shape_that_can_resolve() -> None:
+    """The scaffold taught a prefix no real anchor carries.
+
+    `backlog new` wrote `ref: dadaia some-command` while every cli anchor is the bare verb
+    path (`academy list`, `backlog consume`). An author following the template produced a
+    ref that could never bind (bug backlog-new-cli-intent-template-wrong-prefix).
+    """
+    from dadaia_workspace.features.spec_artifacts.new_artifacts import _BACKLOG_STUB
+
+    assert "ref: dadaia " not in _BACKLOG_STUB, "the template must not teach the dadaia prefix"
+    assert "backlog subjects" in _BACKLOG_STUB, (
+        "point the author at the registry that lists anchors"
+    )

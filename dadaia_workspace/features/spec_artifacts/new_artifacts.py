@@ -144,8 +144,11 @@ intents:
     change: what changes about this subject
   - subject:
       kind: cli
-      ref: dadaia some-command
+      ref: backlog consume
     change: what changes about this command
+  # A cli ref is the bare verb path, WITHOUT the `dadaia` prefix — list the real
+  # anchors with `dadaia backlog subjects` and copy one verbatim. For a surface this
+  # item INTRODUCES, add `surface: new` to the subject instead.
 -->
 """
 
