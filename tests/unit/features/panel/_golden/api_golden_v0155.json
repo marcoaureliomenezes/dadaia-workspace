@@ -42,7 +42,7 @@
     "status": 200
   },
   "api_reports": {
-    "body": "{\"reports\": [{\"title\": \"report\", \"agent\": \"qa-engineer\", \"context\": \"ctx\", \"created_at\": \"<TS>\", \"path\": \"ctx/qa-engineer/report.html\", \"findings_summary\": {\"CRITICAL\": 0, \"HIGH\": 0, \"MEDIUM\": 0, \"LOW\": 0}, \"important\": false, \"expires_at\": \"<TS>\", \"is_expired\": false, \"retention_status\": \"expires\", \"retention_reason\": \"Expires after 48h\"}]}",
+    "body": "{\"reports\": [{\"title\": \"report\", \"agent\": \"qa-engineer\", \"context\": \"ctx\", \"created_at\": \"<TS>\", \"path\": \"ctx/qa-engineer/report.html\", \"findings_summary\": {\"CRITICAL\": 0, \"HIGH\": 0, \"MEDIUM\": 0, \"LOW\": 0}, \"kind\": \"report\", \"important\": false, \"expires_at\": \"<TS>\", \"is_expired\": false, \"retention_status\": \"expires\", \"retention_reason\": \"Expires after 48h\"}]}",
     "content_type": "application/json; charset=utf-8",
     "domain": "reports",
     "status": 200

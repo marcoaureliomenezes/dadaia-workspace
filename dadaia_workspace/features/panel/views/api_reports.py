@@ -85,6 +85,24 @@ def render_api_reports(
                 handoffs.extend(root.rglob("*.handoff.json"))
         return handoffs
 
+    def _index_handoff_only(
+        rows: dict[str, dict[str, object]], handoff: Path, data: dict[str, object]
+    ) -> None:
+        """Add a row for a handoff that carries no HTML artifact of its own."""
+        route = handoff.relative_to(service.workspace_root).as_posix()
+        rows.setdefault(
+            route,
+            {
+                "title": handoff.name.removesuffix(".handoff.json"),
+                "agent": str(data.get("agent") or ""),
+                "context": str(data.get("context") or ""),
+                "created_at": str(data.get("produced_at") or _created_at_from_file(handoff)),
+                "path": route,
+                "kind": "handoff",
+                "findings_summary": _severity_counts(data.get("findings", [])),
+            },
+        )
+
     def _view(**_kwargs: object) -> tuple[int, str, bytes]:
         reports_root = (service.workspace_root / ".dadaia" / "reports").resolve()
         retention = service.get_report_retention()
@@ -97,39 +115,56 @@ def render_api_reports(
             for record in retention.list_reports()
         }
         results_by_path: dict[str, dict[str, object]] = {}
+        # Handoff discovery is NOT gated on the reports root existing. Handoff-first is the
+        # default emission, so a workspace can legitimately have handoffs and no
+        # `.dadaia/reports/` directory at all — and this whole block used to be skipped,
+        # returning an empty index for a workspace that had produced real evidence.
         if reports_root.exists():
             for report in reports_root.rglob("*.html"):
                 if report.is_file():
                     row = _row_from_report(report, reports_root)
                     results_by_path[str(row["path"])] = row
+                    row["kind"] = "report"
 
-            for handoff in _iter_handoffs(reports_root):
+        for handoff in _iter_handoffs(reports_root):
+            try:
+                data = json.loads(handoff.read_text(encoding="utf-8"))
+                artifact = data.get("artifact", {})
+                if not isinstance(artifact, dict):
+                    artifact = {}
+                artifact_path = str(artifact.get("path", ""))
+                if not artifact_path:
+                    # Handoff-first is the DEFAULT emission (workspace-protocol §4):
+                    # the JSON alone, with an HTML report only when a human is the next
+                    # target. Skipping it made the product's default output invisible in
+                    # its own panel (bug
+                    # panel-reports-index-excludes-handoff-first-emissions).
+                    _index_handoff_only(results_by_path, handoff, data)
+                    continue
+                if not artifact_path.startswith(".dadaia/reports/"):
+                    # A handoff that NAMES an artifact outside the reports root is not a
+                    # handoff-first emission — it is a claim about a file it has no
+                    # business pointing at. Still skipped, deliberately.
+                    continue
+                report_path = _report_route_path(artifact_path)
+                report_file = (reports_root / report_path).resolve()
                 try:
-                    data = json.loads(handoff.read_text(encoding="utf-8"))
-                    artifact = data.get("artifact", {})
-                    if not isinstance(artifact, dict):
-                        continue
-                    artifact_path = str(artifact.get("path", ""))
-                    if not artifact_path.startswith(".dadaia/reports/"):
-                        continue
-                    report_path = _report_route_path(artifact_path)
-                    report_file = (reports_root / report_path).resolve()
-                    try:
-                        report_file.relative_to(reports_root)
-                    except ValueError:
-                        continue
-                    if not report_file.is_file() or report_file.suffix.lower() != ".html":
-                        continue
-                    row = results_by_path.setdefault(
-                        report_path,
-                        _row_from_report(report_file, reports_root),
-                    )
-                    row["agent"] = data.get("agent") or row["agent"]
-                    row["context"] = data.get("context") or row["context"]
-                    row["created_at"] = data.get("produced_at") or row["created_at"]
-                    row["findings_summary"] = _severity_counts(data.get("findings", []))
-                except Exception as exc:  # noqa: BLE001
-                    _log.warning("Skipping malformed handoff %s: %s", handoff, exc)
+                    report_file.relative_to(reports_root)
+                except ValueError:
+                    continue
+                if not report_file.is_file() or report_file.suffix.lower() != ".html":
+                    continue
+                row = results_by_path.setdefault(
+                    report_path,
+                    _row_from_report(report_file, reports_root),
+                )
+                row["kind"] = "report"
+                row["agent"] = data.get("agent") or row["agent"]
+                row["context"] = data.get("context") or row["context"]
+                row["created_at"] = data.get("produced_at") or row["created_at"]
+                row["findings_summary"] = _severity_counts(data.get("findings", []))
+            except Exception as exc:  # noqa: BLE001
+                _log.warning("Skipping malformed handoff %s: %s", handoff, exc)
 
         results = list(results_by_path.values())
         now = datetime.datetime.now(tz=datetime.UTC)

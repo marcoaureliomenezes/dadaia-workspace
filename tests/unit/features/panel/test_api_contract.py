@@ -213,6 +213,7 @@ def test_discovery_skips_bogus_handoffs_and_lists_sidecar_less_reports(tmp_path:
             "created_at": created.strftime("%Y-%m-%dT%H:%M:%SZ"),
             "path": f"ctx/project-auditor/{title}.html",
             "findings_summary": {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0},
+            "kind": "report",
             "important": False,
             "expires_at": expires.strftime("%Y-%m-%dT%H:%M:%SZ"),
             "is_expired": False,
@@ -283,3 +284,79 @@ def test_delete_removes_report_and_handoff(tmp_path: Path, handoff_kind: str) ->
     assert status == 200
     assert not report_path.exists()
     assert not handoff_path.exists()
+
+
+# ---------------------------------------------------------------------------
+# Handoff-first emissions are the DEFAULT and must be visible in the panel
+# ---------------------------------------------------------------------------
+
+
+def test_a_handoff_with_no_html_is_indexed(tmp_path: Path) -> None:
+    """The panel's own default emission was invisible in the panel.
+
+    `workspace-protocol §4` makes handoff-first the DEFAULT: an agent emits the JSON
+    handoff alone, and an HTML report only when a human is the next target. But the index
+    was built by `rglob("*.html")` and handoffs were used ONLY to enrich a row that an
+    HTML file had already created — a handoff with no `artifact.path` pointing at an
+    existing `.html` was skipped outright. So the product's default output could never
+    appear in its own UI, and an agent reading `/api/reports` to see what was produced
+    saw nothing (bug panel-reports-index-excludes-handoff-first-emissions).
+    """
+    handoff = (
+        tmp_path / ".dadaia" / "handoff" / "ctx" / "20260802T120000Z-qa-engineer-run.handoff.json"
+    )
+    handoff.parent.mkdir(parents=True, exist_ok=True)
+    handoff.write_text(
+        json.dumps(
+            {
+                "schema_version": "handoff-v1.2",
+                "agent": "qa-engineer",
+                "context": "ctx",
+                "produced_at": _now_iso(),
+                "verdict": "APPROVED",
+                "artifact": {"type": "other"},
+                "findings": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    status, _, body = render_api_reports(_build_service(tmp_path))()
+
+    assert status == 200
+    rows = json.loads(body)["reports"]
+    mine = [r for r in rows if r.get("agent") == "qa-engineer"]
+    assert mine, f"the handoff-first emission is missing from the index: {rows}"
+    row = mine[0]
+    assert row["context"] == "ctx"
+    assert row["path"].endswith(".handoff.json"), row["path"]
+    assert row.get("kind") == "handoff", (
+        "an agent must be able to tell it apart from an HTML report"
+    )
+
+
+def test_an_html_report_still_wins_its_own_row(tmp_path: Path) -> None:
+    """Enrichment must not regress: a handoff that names its HTML stays ONE row."""
+    _write_report(tmp_path, "ctx/qa-engineer/qa.html")
+    handoff = tmp_path / ".dadaia" / "handoff" / "ctx" / "h.handoff.json"
+    handoff.parent.mkdir(parents=True, exist_ok=True)
+    handoff.write_text(
+        json.dumps(
+            {
+                "schema_version": "handoff-v1.2",
+                "agent": "qa-engineer",
+                "context": "ctx",
+                "produced_at": _now_iso(),
+                "artifact": {"type": "html", "path": ".dadaia/reports/ctx/qa-engineer/qa.html"},
+                "findings": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    status, _, body = render_api_reports(_build_service(tmp_path))()
+
+    rows = json.loads(body)["reports"]
+    assert status == 200
+    assert len([r for r in rows if r.get("agent") == "qa-engineer"]) == 1, rows
+    assert rows[0]["path"].endswith(".html")

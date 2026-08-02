@@ -28,7 +28,7 @@ artifact, however green it reads. If you resume or reuse earlier evidence, re-ve
 identity first and say which statements came from the earlier run.
 
 **Cover the whole surface, not the statements you happen to like.** The product is the
-16 CLI groups — `init export import capabilities certify reconcile clean context ci repos
+23 CLI groups — `init export import capabilities certify reconcile clean context ci repos
 public doctor academy plugin reports specs server migrate panel memory release backlog
 bugs`. Before you write the verdict, list every group and say which statement exercised
 it. A group no statement touched is reported under `COBERTURA` as untested — silence is
