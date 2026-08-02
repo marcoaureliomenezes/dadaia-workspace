@@ -22,6 +22,7 @@ from dadaia_workspace.features.specs.doctor_common import (
     iter_all_release_dirs,
     read_active_md,
 )
+from dadaia_workspace.features.specs.doctor_plan_table import dependency_table_issues
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
 
 # Vocabulary + parser live in core.spec_status (single definition); re-exported here
@@ -175,6 +176,23 @@ class ReleaseValidator:
                     )
                 )
                 continue
+            # SPEC-DOC-041: the PLAN's Validation Dependency Table is scaffolded into
+            # every release and was validated by nothing after the engine was demolished
+            # (bug plan-dependency-lint-unwired). WARNING, not ERROR: an authoring-phase
+            # PLAN legitimately carries the untouched scaffold.
+            if fname == "PLAN.md":
+                for problem in dependency_table_issues(
+                    fpath.read_text(encoding="utf-8", errors="replace")
+                ):
+                    issues.append(
+                        SpecsDoctorIssue(
+                            code="SPEC-DOC-041",
+                            severity=Severity.WARNING,
+                            description=f"PLAN.md Validation Dependency Table: {problem}",
+                            path=str(fpath),
+                        )
+                    )
+
             # SPEC-DOC-040: an artifact may not say two different things about its own
             # status. `_extract_status` reads only the canonical line, so a decorated
             # second declaration ("## Status: Draft") stayed invisible: the gate saw
