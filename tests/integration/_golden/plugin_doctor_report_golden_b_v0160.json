@@ -211,6 +211,5 @@
   "[ok] stage:templates/memory-feature.md",
   "[ok] stage:templates/release_hotfix.md.j2",
   "[ok] stage:templates/repo-AGENTS.md",
-  "[ok] stage:templates/specs-AGENTS.md",
-  "[warn] rule-corpus: rule 'grounded-work' is cited by no agent or skill (dead law — it still costs context in every session)"
+  "[ok] stage:templates/specs-AGENTS.md"
 ]
