@@ -2,7 +2,7 @@
 name: dadaia-cli
 description: >
   Use this skill whenever you need to operate the dadaia-workspace CLI — open the
-  panel, bind a Spec Context, run a lifecycle workflow, check state, register a bug,
+  panel, bind a Spec Context, materialize an SDD artifact, check state, register a bug,
   or discover any command. The CLI is self-documenting; this is the map plus the few
   non-obvious idioms. All agents may use it.
 ---
@@ -22,14 +22,13 @@ The `dadaia` CLI is the single control surface for the workspace. It is **self-d
 
 ## Panel — see everything
 
-`dadaia panel` starts the local UI (default port 4999). Tabs: Contexts (ALIVE/DEAD + advisory presence), Workflows (verbs, diagrams, model pickers), Servers, Reports/Handoffs, Sub-agents, projection health. Use it to inspect state instead of reading files.
+`dadaia panel` starts the local UI (default port 4999). Tabs: Contexts (ALIVE/DEAD + advisory presence), Servers, Reports/Handoffs, Sub-agents, projection health. Every read it renders is also reachable as JSON under `/api/…`, which is how an agent uses it. Use it to inspect state instead of reading files.
 
 ## Command groups (`dadaia <group> --help` for detail)
 
 | Group | What |
 |---|---|
 | `context` | Spec Context Projects: `list show create alive dead bind release heartbeat delete` |
-| `lifecycle` | Deterministic workflow verbs (see below) |
 | `specs` | SDD structure: `doctor upgrade init hotfix release segment` |
 | `capabilities` / `certify` / `reconcile` | Discover, prove, and converge the installed provider |
 | `bugs` | Event-sourced bug telemetry: `append status stats` |
@@ -53,19 +52,28 @@ dadaia context baseline <ctx> --yes --push                       # explicit unbo
 
 Bind binds the **context** (persists mode + session id in the session record, self-scoped); no shell `eval` needed. ADDITIVE work (bugs/backlog/audits/reports) needs no bind.
 
-## Backlog consumption (`dadaia backlog <verb>`)
+## The verbs that materialize SDD artifacts
 
-Removal-on-release, driven from the SPEC's `**Consumes:**` line.
+There is no workflow engine — a persona runs these itself. Every ordered step below is a
+command you type, not a step an engine advances.
+
+| Verb | What it materializes |
+|---|---|
+| `backlog new <slug>` | `specs/backlog/<slug>.md` with canonical frontmatter |
+| `backlog subjects` | The canonical-subject registry an item's `intents[].ref` must resolve through |
+| `specs release open <version>` | The release parent + its first segment (`alpha-1/` SPEC+PLAN+TASKS) and repoints `ACTIVE.md`. **Creation only** — on an existing release it refuses; use `specs segment open` to advance |
+| `specs segment open <alpha-N\|rc-N>` | The next segment of the ACTIVE release, advancing `ACTIVE.md` |
+| `release new <id>` | A bare `SPEC.md` (Draft) when you want only the parent artifact; documented no-clobber |
+
+### Backlog consumption (removal-on-release)
+
+Driven from the SPEC's `**Consumes:**` line.
 
 | Verb | Purpose |
 |---|---|
-| `consume --release-id <id>` | Bind the declared slugs to shipped anchors, write `specs/_archive/<id>/consumed_backlog.json` |
-| `remove-consumed --release-id <id>` | Drop fully-consumed items from the live SET (archiving a copy first) |
-| `doctor` | Report BL-STALE and other backlog invariants |
-
-There is no workflow engine: ordered lifecycle work is a persona following its skill
-(`dadaia-grill-me`, `dadaia-release-definition`, `dadaia-task-manager`,
-`dadaia-release-closure`).
+| `backlog consume --release-id <id>` | Bind the declared slugs to shipped anchors, write `specs/_archive/<id>/consumed_backlog.json` |
+| `backlog remove-consumed --release-id <id>` | Drop fully-consumed items from the live SET (archiving a copy first) |
+| `backlog doctor` | Report BL-STALE and other backlog invariants |
 
 ## Runtime convergence and certification
 
@@ -82,19 +90,22 @@ ${DADAIA_BIN:-.dadaia/.venv/bin/dadaia} certify --json
 `reconcile` validates the exact provider version, migrates state, reinstalls projections,
 runs public/workspace doctors, and executes a capability canary. `certify` creates a
 disposable workspace and proves init, projections, clean specs scaffolds, empty Git remote
-baseline, caller-owned bind/heartbeat, all four fake workflows through closure, strict
-handoff validation, panel HTTP/server registry, and ALIVE/DEAD/delete teardown. Any failed
-check is a release blocker. Real Codex and PI canaries remain required before publishing a
-provider release; `fake` is only the deterministic workflow contract harness.
+baseline, caller-owned bind/heartbeat, the full SDD chain (backlog item -> release opened
+-> artifacts approved -> task markers -> audit disposition -> both doctors still clean),
+strict handoff validation, panel HTTP/server registry, and ALIVE/DEAD/delete teardown. Any
+failed check is a release blocker. A live-harness canary remains required before publishing
+a provider release; certify proves the deterministic contract, never that a model wrote
+good prose.
 
 ## Agent operating sequence
 
 1. Read `dadaia capabilities --json`; never infer features from an older conversation.
 2. Select the target with `context list/show --json`, then bind this session explicitly.
 3. Run `specs doctor --context <ctx> --json`; do not implement against errors or warnings.
-4. Use exactly one current lifecycle verb with explicit `--context` and `--release-id`.
-5. Preserve the complete JSON result and worker diagnostic when blocked; never reduce it
-   to “workflow failed”.
+4. Materialize artifacts with the verbs above, always with an explicit `--context` or
+   `--specs-dir`; reserve your task in TASKS.md before writing production files.
+5. Preserve the complete JSON result and the tool's own diagnostic when a command refuses;
+   never reduce it to “it failed”.
 6. Use `dadaia panel` for the human view and the server registry for ports.
 7. Emit/validate the final handoff and register genuine provider bugs before workarounds.
 

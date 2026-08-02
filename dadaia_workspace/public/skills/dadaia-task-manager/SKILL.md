@@ -11,6 +11,11 @@ applyTo: "specs/**/TASKS.md"
 
 # dadaia-task-manager — Task State Protocol
 
+**Advancing the segment.** When an `alpha-N` closes, open the next one with
+`dadaia specs segment open <alpha-N+1|rc-N>` — it scaffolds the segment and advances
+`ACTIVE.md`. Never re-run `specs release open` to do this: that verb creates a release and
+refuses on one that already exists.
+
 > **This skill is the procedure.** Marker discipline is upheld by the agent that holds
 > the task — no engine advances it for you. What is *enforced* is narrower: the
 > deterministic gate grades the destination path, and the git chokepoints gate commit and

@@ -6,6 +6,14 @@ applyTo: "specs/backlog/**"
 
 # dadaia-release-definition
 
+**Materialize the tree before you author it.** Open the release with
+`dadaia specs release open <version>` — it scaffolds the parent plus `alpha-1/`
+(SPEC.md, PLAN.md, TASKS.md) and repoints `ACTIVE.md` to release/segment/phase. It is a
+CREATION verb: on a release that already exists it refuses rather than rewinding
+`ACTIVE.md`'s phase, and the next segment is opened with `dadaia specs segment open
+<alpha-N|rc-N>`. Every `intents[].ref` you write must resolve through
+`dadaia backlog subjects`, or declare `surface: new` for a surface that does not exist yet.
+
 > **This skill is the procedure.** `product-engineer` runs the definition sequence itself
 > — scope, SPEC, review, PLAN, TASKS — and commits the artifacts at the end. No engine
 > advances it. What is enforced is narrower: the deterministic gate grades the destination
