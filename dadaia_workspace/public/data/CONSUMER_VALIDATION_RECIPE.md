@@ -20,6 +20,13 @@ Do NOT mark FAIL for "not fully demonstrated": every statement here has a crisp
 assertion — if the commands ran and the assertion holds, it is PASS. If a command uses
 a flag/subcommand that does not exist, THAT is a real FAIL (contract/CLI mismatch).
 
+**State the identity you verified, by hash, or the run is void.** Before the first
+statement, hash the candidate wheel and at least one installed `.py` file, and print those
+hashes in the report. Never copy an identity from a previous run's evidence files: a run
+that reports a sha which does not match the artifact under test proves nothing about that
+artifact, however green it reads. If you resume or reuse earlier evidence, re-verify the
+identity first and say which statements came from the earlier run.
+
 **Cover the whole surface, not the statements you happen to like.** The product is the
 16 CLI groups — `init export import capabilities certify reconcile clean context ci repos
 public doctor academy plugin reports specs server migrate panel memory release backlog
@@ -889,13 +896,25 @@ one FAIL", and only the last one means the abstraction leaked.
 - **PASS if:** the context's memory is injected exactly ONCE per bind epoch, an unbound
   session receives generic preflight and NO context memory, and a re-bind re-injects.
   Injection that never fires, or fires on every prompt, are both FAILs.
+- **Compaction is a legitimate second trigger, not a double-injection.** A harness that
+  compacts its context has DROPPED the memory, so re-injecting exactly once on the next
+  prompt is the contract, not a defect — check each harness's own documented compaction
+  behaviour before calling it a FAIL. The bug shape is re-injecting *more than once* for
+  a single compaction, or never re-injecting after one.
 
 ### H-04 — Sub-agents exist and are dispatchable
 - List the harness's agent entities and compare them to the persona roster (the nine core
   personas plus the three install-gated plugin stubs).
-- **PASS if:** every entity maps to a persona and every persona has an entity — no orphan
-  entity, no persona without a projection. Then DISPATCH one leaf specialist in that
-  harness with a trivial bounded task and confirm it runs and returns.
+- **First establish whether the harness can express a custom agent at all.** Some entry
+  harnesses have no project-level agent surface; for those, "zero persona entities" is a
+  documented platform limitation, NOT a projection defect. Report it under `PARIDADE` as a
+  **capability gap** with the evidence (the harness CLI has no such command, and dadaia's
+  own scoped `AGENTS.md` for that harness says so) — never as a FAIL. A FAIL here means a
+  harness that CAN express agents and still has none, or has one with no persona behind it.
+- **PASS if:** for every harness that supports custom agents, each entity maps to a persona
+  and each persona has an entity — no orphan entity, no persona without a projection. Then
+  DISPATCH one leaf specialist in that harness with a trivial bounded task and confirm it
+  runs and returns.
 - A stub plugin persona must answer with the `[PLUGIN REQUIRED]` line, not attempt the
   work. An entity whose declared authority contradicts its persona's is a FAIL — report
   the contradiction, do not fix it.
