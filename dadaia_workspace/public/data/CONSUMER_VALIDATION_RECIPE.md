@@ -38,9 +38,8 @@ not a pass, and "the matrix didn't ask" is exactly how a feature ships broken.
 run EVERY statement every time, never stop at the first FAIL, and report ALL failures
 of the run in one batch (one bug event each, full evidence). When a defect is found,
 immediately probe the SAME defect class across every sibling surface in the SAME run —
-e.g. a worker-step defect in `backlog-definition` means you also probe
-`release-definition`, `audit`, and `implementation-reviews` for that class before
-reporting — so the operator fixes a CLASS, not an instance, and the next candidate does
+e.g. a path-resolution defect in `backlog consume` means you also probe `specs release
+open`, `specs doctor`, and `backlog remove-consumed` for that class before reporting — so the operator fixes a CLASS, not an instance, and the next candidate does
 not fail on the sibling you never tried. A run that reports one bug and stops is an
 incomplete validation, not a verdict.
 
@@ -485,8 +484,9 @@ never exercised the live backlog path was false confidence).
 
 ### R-02 — Real-demand backlog is canonical and consumable
 
-- Run a B3/CVM-style real capture demand through backlog-definition on a real or
-  disposable context, then validate with `dadaia backlog doctor --specs-dir <ctx>/specs`.
+- Author a backlog item from a real capture demand (`dadaia backlog new`, then fill its
+  frontmatter and acceptance) on a real or disposable context, then validate with
+  `dadaia backlog doctor --specs-dir <ctx>/specs`.
 - **The authority is `backlog doctor`, NOT eyeballing `backlog subjects`.** `backlog
   subjects` lists the canonical registry (the anchors that exist) and always exits 0; it
   never reports an item's unresolved refs. Reading a ref's absence from that list as
@@ -497,9 +497,9 @@ never exercised the live backlog path was false confidence).
   (`new:<kind>:<ref>`) instead of registry resolution. Demanding that *every* ref resolve
   contradicts the mechanism shipped for bugs `backlog-independent-cli-items-false-conflict-044`
   and `backlog-cli-intent-hallucinated-anchor-045`.
-- **PASS if:** `backlog doctor` reports clean AND release-definition's authoritative pick
-  consumes the item (the promoted payload carries the canonical
-  `specs/backlog/<slug>.md` path — never a bare "codex exec completed" summary).
+- **PASS if:** `backlog doctor` reports clean AND `dadaia backlog consume` binds the item
+  from a SPEC that declares it (the ledger names the canonical `specs/backlog/<slug>.md`
+  path — never a bare "done" summary).
 - **Both error directions must still be caught — prove them, do not assume:**
   - an intent WITHOUT `surface: new` whose ref resolves to nothing ⇒ doctor MUST fail with
     `BL-SCHEMA … resolves to no known anchor`;
@@ -554,40 +554,24 @@ never exercised the live backlog path was false confidence).
   `dadaia public doctor` is green (incl. `dadaia:scripts/*` on a kimi-only profile);
   `dadaia public doctor` flags a tampered shim/block and `install` heals it.
 
-### R-10 — Dedupe EDIT path is gate-visible (disk truth, not anchors only)
+### R-10 — A refined backlog item is visible on disk, not just claimed
 
-- Run backlog-definition twice over the same demand: the second run's worker refines
-  the existing item's BODY/acceptance without touching `intents[]`.
-- **PASS if:** the run COMPLETES (the review gate detects the content-hash change);
-  and a worker that claims 'updated' while writing NOTHING blocks at the author step
-  with the worker diagnostic — never an accepted-then-unexplained gate block (bug
-  backlog-dedupe-updated-payload-not-gate-visible-043).
-
-### R-11 — Resume never collides with its own leftovers (ledger-owned immutability)
-
-- **Do NOT try to reach a "spent-review-budget block" — it does not exist by design.**
-  An earlier version of this item required driving a review to REJECT twice and then
-  resuming from a block. The product deliberately makes a post-budget REJECTED review
-  **advisory**: the step proceeds carrying the rejection as a warning, precisely so a
-  model verdict can never deadlock a release (`_fragment_gate`, "a model verdict is
-  advisory, never terminal"). The shipped CLI also has no deterministic rejection
-  injector, so the scenario is unreachable AND contradicts the intended semantics.
-  Requiring it produced a FAIL against correct behaviour on R17.
-- Instead: interrupt a run between payload write and state save (or plant a stray
-  `<step>-attempt-0.step-payload.json` with no ledger record) and resume from the
-  prescribed step on the SAME run-id.
-- **PASS if:** every prescribed resume executes — no `already recorded step ...
-  (immutable payload ...)` error ever surfaces on a path the error text itself
-  prescribed (bug release-definition-retry-collides-with-immutable-tasks-payload).
+- Author a backlog item, then refine the SAME item's body/acceptance without touching
+  its `intents[]`.
+- **PASS if:** the refinement is present in the file on disk and `backlog doctor` still
+  passes. An agent that reports "updated" while writing NOTHING is a FAIL — the
+  deliverable is the file, never the final message
+  (bug backlog-dedupe-updated-payload-not-gate-visible-043).
 
 ### R-12 — New-surface backlog intents classify by their own identity
 
 - Author two independent NEW CLI-command items (e.g. `hello`, then `version`) using
   `subject: { kind: cli, ref: <name>, surface: new }`.
-- **PASS if ALL of:** both runs complete (no DIVERGENT_CONFLICT over a shared coarse
-  anchor — bug backlog-independent-cli-items-false-conflict-044); a `surface: new`
-  ref that ALREADY resolves blocks with the exact remedy; an unresolved EXISTING ref
-  blocks with a reason naming both recoveries (`dadaia backlog subjects` /
+- **PASS if ALL of:** both items materialize with DISTINCT anchors (two independent new
+  CLI surfaces must not collapse onto one shared coarse anchor — bug
+  backlog-independent-cli-items-false-conflict-044); a `surface: new` ref that ALREADY
+  resolves through `dadaia backlog subjects` is refused with the exact remedy; and an
+  unresolved EXISTING ref is refused naming both recoveries (`dadaia backlog subjects` /
   `surface: new`) AND a pasteable command that performs the fix
   (bug backlog-cli-intent-hallucinated-anchor-045 — no refusal is a dead end).
 
@@ -652,9 +636,10 @@ gates cannot catch, because they never call the model.
 ### R-16 — Every prescribed remedy actually WORKS (no contradiction loops)
 
 A block that names a command which cannot run is worse than a block with no advice:
-the operator burns a cycle proving the tool wrong. This class has now appeared twice
-(bug release-definition-retry-collides-with-immutable-tasks-payload, bug
-r4d-resume-preflight-invalid-step-traceback), so it gets its own sweep.
+the operator burns a cycle proving the tool wrong. This class keeps recurring — most
+recently `r6-release-open-guard-remedy-placeholder-not-pasteable`, where a refusal
+prescribed `segment open <alpha-N|rc-N>` and the literal placeholder failed — so it gets
+its own sweep.
 
 - For every refusal you can reach in this run — a doctor, a gate, a guard, a chokepoint —
   take the command its message prescribes and **execute it verbatim**.
@@ -787,13 +772,13 @@ that survives.
 
 ### R-24 — A malformed artifact is diagnosed where it is WRITTEN
 
-Have the author step of `backlog-definition` produce a broken item, one variant per run:
-frontmatter that opens and never closes; frontmatter with keys and a closing `---` but no
-opening one; and unparseable YAML inside a well-formed block. **PASS if** each blocks at
-`backlog_author` naming the actual defect ("unterminated", "missing its opening
-delimiter", the YAML error with line/column). **FAIL if** any is allowed through and
-surfaces later at `backlog_review_gate` as a missing status or absent intents — a
-diagnosis that names the wrong thing, at the wrong step, about a file the operator will
+Hand-write a broken backlog item, one variant per run: frontmatter that opens and never
+closes; frontmatter with keys and a closing `---` but no opening one; and unparseable YAML
+inside a well-formed block. Then run `dadaia backlog doctor`. **PASS if** each is refused
+naming the actual defect ("unterminated", "missing its opening delimiter", the YAML error
+with line/column). **FAIL if** any is allowed through and surfaces later as a missing
+status or absent intents — a diagnosis that names the wrong thing, about a file the
+operator will
 then inspect looking for the wrong problem.
 
 Guard the other way too: a normal item containing a Markdown horizontal rule (`---` after
@@ -821,11 +806,11 @@ normalizer written as a list of known shapes is one live worker behind.
 
 ### R-27 — A gate must name the defect it actually found
 
-The lesson of round 24. `release-definition` blocked a live PLAN twice with *"every
-validation dependency row must contain all five non-empty cells"* — while not one cell was
-empty. The real defect was a `|` inside an `rg` command in the "Direct validation" column,
-which the lint split into extra cells. The worker, told nothing true, rewrote the same
-correct table and the release deadlocked at `definition_draft`.
+The lesson of round 24. A PLAN lint refused a live artifact twice with *"every validation
+dependency row must contain all five non-empty cells"* — while not one cell was empty. The
+real defect was a `|` inside an `rg` command in the "Direct validation" column, which the
+lint split into extra cells. The author, told nothing true, rewrote the same correct table
+and the definition went nowhere.
 
 A wrong diagnosis is worse than a strict gate, because a retry loop can only converge on
 what it is told. Drive each deterministic gate — the plan dependency lint, the frontmatter
