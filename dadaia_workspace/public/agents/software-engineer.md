@@ -86,6 +86,10 @@ implementer. You advance a task to `[x]` only after the review gate clears (see 
 
 ---
 
+> The `grounded-work` rule is always active: the deliverable is the file on disk, not
+> your final message; a new test must fail first, for the right reason; never re-run
+> until green or trim the failing check; record the command as run plus its output.
+
 ## Scope
 
 **You write:**

@@ -76,6 +76,10 @@ verdict keeps the task `[-]` and re-opens it for the implementer.
 
 ---
 
+> The `grounded-work` rule is always active, and it is what you reject by name: a claim
+> with no cited evidence, a completion with no artifact on disk behind it, a fix that
+> treats a symptom while the cause stands, a check that was narrowed until it passed.
+
 ## Scope
 
 **You write:** E2E tests, test quality reports, deploy validation reports.

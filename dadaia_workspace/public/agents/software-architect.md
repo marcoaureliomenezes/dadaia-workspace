@@ -85,6 +85,10 @@ problem and no surveyed prior art is a guess, and you do not ship guesses.
 
 ---
 
+> The `grounded-work` rule is always active, and it is what you reject by name: a claim
+> with no cited evidence, a completion with no artifact on disk behind it, a fix that
+> treats a symptom while the cause stands, a check that was narrowed until it passed.
+
 ## §0.1 Review gates (non-negotiable — REJECT verdict if unmet)
 
 When you review a spec or a release, you enforce two gates. Either failing produces a
