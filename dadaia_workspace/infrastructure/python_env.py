@@ -100,6 +100,43 @@ def repack_installed_wheel(
     return wheel_path
 
 
+def bootstrap_failure_message(
+    *, spec: str, repack: str | None, pip_tail: str, spec_from_operator: bool
+) -> str:
+    """Describe a venv bootstrap failure by what actually happened.
+
+    Two facts vary independently and the operator needs both: whether re-packing the
+    running distribution produced a wheel (``repack``), and whether the spec being
+    installed already came from the ``DADAIA_BOOTSTRAP_PACKAGE`` escape hatch
+    (``spec_from_operator``). Asserting one fixed story for every combination sent the
+    consumer validator chasing a re-pack that had in fact succeeded, and prescribed the
+    very env var that was already set.
+    """
+    if repack is None:
+        cause = "and the running distribution could not be re-packed as a local wheel"
+    else:
+        cause = f"and the re-packed running distribution ('{repack}') failed to install too"
+    if spec_from_operator:
+        # The wheel itself is already local; what is left unresolvable is its
+        # dependencies, so name the way to make THOSE reachable.
+        remedy = (
+            "DADAIA_BOOTSTRAP_PACKAGE already points at a local wheel, so the wheel is "
+            "not what is missing — its dependencies are. Make them reachable: either "
+            "restore access to a package index, or pre-download them once and install "
+            "from that directory, e.g. `pip download dadaia-workspace -d <dir>` on a "
+            "connected host, then re-run with PIP_FIND_LINKS=<dir> (pip's --find-links)."
+        )
+    else:
+        remedy = (
+            "If this version is not published on the index (e.g. a candidate wheel under "
+            "validation) or the index is unreachable, point DADAIA_BOOTSTRAP_PACKAGE at "
+            "the local wheel file and retry, e.g. "
+            "DADAIA_BOOTSTRAP_PACKAGE=/path/to/dadaia_workspace-X.Y.Z-py3-none-any.whl "
+            "dadaia init."
+        )
+    return f"workspace venv bootstrap failed installing '{spec}' ({cause}). {remedy} Installer output: {pip_tail}"
+
+
 class VenvPythonEnvironmentManager:
     def _upgrade_pip(
         self, pip_executable: Path | str, *, runner: Callable[..., object] | None = None
@@ -228,17 +265,19 @@ class VenvPythonEnvironmentManager:
                         return str(venv_dir)
                     except subprocess.CalledProcessError:
                         pass
-                # Name the escape hatch that exists for exactly this case (a raw
-                # CalledProcessError traceback pointed nowhere — validation-028 cascade).
+                # Report the outcome that actually happened, and never prescribe the
+                # remedy the operator already applied (validation-028 cascade; bug
+                # init-offline-bootstrap-repack-misdiagnosed-as-repack-failure).
                 pip_tail = ((exc.stderr or exc.output or "") if exc else "").strip()[-400:]
                 raise WorkspaceVenvBootstrapError(
-                    f"workspace venv bootstrap failed installing '{spec}' (and the "
-                    "running distribution could not be re-packed as a local wheel). If "
-                    "this version is not published on the index (e.g. a candidate wheel "
-                    "under validation) or the index is unreachable, point "
-                    "DADAIA_BOOTSTRAP_PACKAGE at the local wheel file and retry, e.g. "
-                    "DADAIA_BOOTSTRAP_PACKAGE=/path/to/dadaia_workspace-X.Y.Z-py3-none-any.whl "
-                    f"dadaia init. Installer output: {pip_tail}"
+                    bootstrap_failure_message(
+                        spec=spec,
+                        repack=repacked.name if repacked is not None else None,
+                        pip_tail=pip_tail,
+                        spec_from_operator=bool(
+                            os.environ.get("DADAIA_BOOTSTRAP_PACKAGE", "").strip()
+                        ),
+                    )
                 ) from exc
             self._ensure_ci_toolchain(pip)
             # Success is only reported after the venv provider VERIFIES independently
