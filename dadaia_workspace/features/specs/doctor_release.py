@@ -104,6 +104,21 @@ def _extract_created_date(md_path: Path) -> date | None:
     return None
 
 
+def _active_md_body(release: str, segment: str | None, phase: str) -> str:
+    """The COMPLETE ACTIVE.md body — schema v2 keeps the segment line when there is one.
+
+    A remedy that writes a partial ACTIVE.md is worse than no remedy: pasted verbatim, an
+    earlier version of the SPEC-DOC-024 message dropped `segment:` and turned a clean tree
+    into seven errors, because the doctor could no longer find the release's artifacts
+    (bug r23-doc024-remedy-drops-segment-line).
+    """
+    lines = [f"release: {release}"]
+    if segment:
+        lines.append(f"segment: {segment}")
+    lines.append(f"phase: {phase}")
+    return "\n".join(lines) + "\n"
+
+
 class ReleaseValidator:
     """Active-release lifecycle, SemVer naming, and release-ledger invariants."""
 
@@ -397,8 +412,12 @@ class ReleaseValidator:
                                 f"({done}/{len(markers)} done). The phase field was "
                                 "never advanced through IMPLEMENTATION. Either the phase "
                                 "is stale or the markers are (constitution §7). To advance "
-                                "the phase, write it:  printf 'release: "
-                                f"{release}\\nphase: IMPLEMENTATION\\n' > {active_path}"
+                                "the phase, write the WHOLE file — dropping the segment "
+                                "line orphans the release's artifacts:  printf '"
+                                + _active_md_body(release, segment, "IMPLEMENTATION").replace(
+                                    "\n", "\\n"
+                                )
+                                + f"' > {active_path}"
                             ),
                             path=str(active_path),
                         )
