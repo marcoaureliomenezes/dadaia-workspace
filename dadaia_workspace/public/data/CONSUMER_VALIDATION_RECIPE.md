@@ -454,10 +454,23 @@ The whole flow with no model in the loop, so it can run anywhere, every time, fo
 - Mark **EXCEPTION** only if NO harness CLI is installed at all. A sandbox-namespace
   failure is a FAIL, not an EXCEPTION: `danger-bypass` fixes it.
 
+### F-27 — The groups nobody remembers: `clean` and `repos`
+Written because the coverage law above caught these two with no statement at all — which
+is precisely how a group ships broken while a 50-statement matrix reports APROVADA.
+- Run: `$D clean --help` and every subcommand's `--help`; then exercise a reclaim on a
+  disposable workspace after seeding a stale file under a `.dadaia/` ephemeral zone
+  (`.dadaia/tmp/…`).
+- **PASS if:** the seeded stale file is gone afterwards, and nothing outside the ephemeral
+  zones was touched — assert a canary file under `.dadaia/states/` still exists. A clean
+  that reclaims live state is a CRITICAL FAIL.
+- Run: `$D repos list` in a workspace with no catalog present.
+- **PASS if:** it refuses or reports empty as ONE clean line naming what it expected —
+  never a traceback, never a silent empty success that looks like "no repos exist".
+
 ## Real-use matrix — the hermes day-to-day contract (v0.2.9)
 
 **This section is the release gate's second half.** The deterministic matrix above
-(F-01…F-26 + the structural certification) proves components in isolation; it is
+(F-01…F-27 + the structural certification) proves components in isolation; it is
 **never sufficient to approve a release alone**. A candidate is green only when the
 real-use statements below — built from the hermes agent's actual day-to-day
 inventory — ALL pass with artifact-level evidence (bug
@@ -826,19 +839,6 @@ naturally write — a validation column holding a real shell command with a pipe
 backlog item containing a Markdown horizontal rule, a localized heading — and confirm it
 is accepted. A gate that rejects the honest answer to its own question has no correct
 input, and no operator can escape it.
-
-### F-27 — The groups nobody remembers: `clean` and `repos`
-Written because the coverage law above caught these two with no statement at all — which
-is precisely how a group ships broken while a 50-statement matrix reports APROVADA.
-- Run: `$D clean --help` and every subcommand's `--help`; then exercise a reclaim on a
-  disposable workspace after seeding a stale file under a `.dadaia/` ephemeral zone
-  (`.dadaia/tmp/…`).
-- **PASS if:** the seeded stale file is gone afterwards, and nothing outside the ephemeral
-  zones was touched — assert a canary file under `.dadaia/states/` still exists. A clean
-  that reclaims live state is a CRITICAL FAIL.
-- Run: `$D repos list` in a workspace with no catalog present.
-- **PASS if:** it refuses or reports empty as ONE clean line naming what it expected —
-  never a traceback, never a silent empty success that looks like "no repos exist".
 
 ---
 
