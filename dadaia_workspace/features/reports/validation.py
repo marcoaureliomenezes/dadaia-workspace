@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -66,10 +67,21 @@ class ReportsValidationService:
             kept for API compatibility.
     """
 
-    def __init__(self, validator: ValidatorPort, reports_root: Path) -> None:
+    def __init__(
+        self,
+        validator: ValidatorPort,
+        reports_root: Path,
+        slug_resolver: Callable[[Path, str], str] | None = None,
+    ) -> None:
         self._validator = validator
         self._reports_root = reports_root
         self._workspace_root = self._infer_workspace_root(reports_root)
+        # A context has TWO identities: `name` (what a handoff's `context` field carries)
+        # and `repo_slug` (the directory under repos/). Translating between them needs the
+        # registry, which is I/O — so it arrives by injection, as the layering contract
+        # requires, rather than by importing the resolver into a feature. The identity
+        # fallback keeps a bare construction working for the common name == slug case.
+        self._slug_resolver = slug_resolver or (lambda _root, name: name)
 
     # ------------------------------------------------------------------
     # Public API
@@ -242,7 +254,17 @@ class ReportsValidationService:
         assert self._workspace_root is not None
         candidates: list[Path] = []
         if isinstance(context, str) and context:
-            candidates.append(self._workspace_root / "repos" / context / ref)
+            # A context has TWO identities and they are not the same string: `name` is what
+            # the handoff's `context` field carries, `repo_slug` is the directory under
+            # repos/. Joining the name literally rejected a compliant handoff whenever
+            # `context create <name> --repo <slug>` used name != slug — ordinary usage, with
+            # its own test. `repo_slug_for_context` already owns this translation; the
+            # validator was re-deriving it wrongly
+            # (bug b1-r01-self-pull-context-name-vs-repo-slug).
+            slug = self._slug_resolver(self._workspace_root, context)
+            candidates.append(self._workspace_root / "repos" / slug / ref)
+            if slug != context:
+                candidates.append(self._workspace_root / "repos" / context / ref)
         candidates.append(self._workspace_root / ref)
         for candidate in candidates:
             resolved = self._within_workspace(candidate)

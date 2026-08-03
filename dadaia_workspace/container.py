@@ -363,7 +363,11 @@ def build_reports_validation_service(workspace_root: Path) -> ReportsValidationS
     schema_path = workspace_root / ".dadaia" / "agentic" / "schemas" / "handoff-v1.schema.json"
     reports_root = workspace_root / ".dadaia" / "handoff"
     validator = StdlibHandoffValidator(schema_path)
-    return ReportsValidationService(validator=validator, reports_root=reports_root)
+    return ReportsValidationService(
+        validator=validator,
+        reports_root=reports_root,
+        slug_resolver=repo_slug_for_context,
+    )
 
 
 def build_reports_next_service(
