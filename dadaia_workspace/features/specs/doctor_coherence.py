@@ -116,8 +116,9 @@ class CoherenceValidator:
                     severity=Severity.WARNING,
                     description=(
                         f"constitution.md references '{ref}' but it does not resolve "
-                        f"against the repo root ({self.repo_root}). Fix the path or "
-                        "remove the stale reference (SPEC-DOC-028)."
+                        f"against the repo root ({self.repo_root}). Point it at a real "
+                        f"path or delete the line — find it with:  grep -n {ref!r} "
+                        f"{constitution}   (SPEC-DOC-028)."
                     ),
                     path=str(constitution),
                 )

@@ -395,8 +395,10 @@ class ReleaseValidator:
                                 f"ACTIVE.md phase='{phase}' but the active release "
                                 f"'{release}' has an [x]-majority TASKS.md "
                                 f"({done}/{len(markers)} done). The phase field was "
-                                "never advanced through IMPLEMENTATION — advance ACTIVE.md "
-                                "or correct the markers (constitution §7)."
+                                "never advanced through IMPLEMENTATION. Either the phase "
+                                "is stale or the markers are (constitution §7). To advance "
+                                "the phase, write it:  printf 'release: "
+                                f"{release}\\nphase: IMPLEMENTATION\\n' > {active_path}"
                             ),
                             path=str(active_path),
                         )
@@ -524,7 +526,8 @@ class ReleaseValidator:
                         f"Release dir '{d.relative_to(self.specs_dir).as_posix()}' does "
                         "not follow the naming canon ^v<MAJOR>.<MINOR>.<PATCH>$ "
                         + (
-                            "— rename it (SPEC-DOC-027)."
+                            f"— rename it with:  git mv {root / d} {root}/v0.0.0   "
+                            "(substituting the real version) (SPEC-DOC-027)."
                             if severity == Severity.ERROR
                             else "— legacy name (WARNING, preserved until renamed)."
                         )

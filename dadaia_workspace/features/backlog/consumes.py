@@ -90,8 +90,10 @@ def shipped_anchors_for(
         item = by_slug.get(slug)
         if item is None:
             raise ConsumesBindError(
-                f"**Consumes:** slug {slug!r} is not a live backlog item under {backlog_dir}; "
-                f"correct the SPEC line or restore the item."
+                f"**Consumes:** slug {slug!r} is not a live backlog item under "
+                f"{backlog_dir}. List what IS there with:  ls {backlog_dir}/*.md   "
+                f"— then either fix the slug in the SPEC's `**Consumes:**` line, or "
+                f"restore the item with:  git checkout -- {backlog_dir}/{slug}.md"
             )
         anchor_changes, unresolved = bound_anchor_changes(item, registry)
         if unresolved:

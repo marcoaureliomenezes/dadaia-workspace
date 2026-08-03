@@ -104,13 +104,13 @@
     },
     {
       "code": "SPEC-DOC-027",
-      "description": "Release dir 'releases/badname-release' does not follow the naming canon ^v<MAJOR>.<MINOR>.<PATCH>$ — rename it (SPEC-DOC-027).",
+      "description": "Release dir 'releases/badname-release' does not follow the naming canon ^v<MAJOR>.<MINOR>.<PATCH>$ — rename it with:  git mv <SPECS>/releases/badname-release <SPECS>/releases/v0.0.0   (substituting the real version) (SPEC-DOC-027).",
       "path": "<SPECS>/releases/badname-release",
       "severity": "error"
     },
     {
       "code": "SPEC-DOC-030",
-      "description": "Audit dir 'audits/bad-audit-name' does not follow the collision-safe naming law <YYYYMMDDTHHMMSSZ>-<session_id_8chars> (constitution §8) — rename it (SPEC-DOC-030, WARNING).",
+      "description": "Audit dir 'audits/bad-audit-name' does not follow the collision-safe naming law <YYYYMMDDTHHMMSSZ>-<session_id_8chars> (constitution §8). Rename it with a timestamp and this session's id, e.g.:  git mv <SPECS>/audits/bad-audit-name <SPECS>/audits/$(date -u +%Y%m%dT%H%M%SZ)-$(echo $DADAIA_SESSION_ID | cut -c1-8)",
       "path": "<SPECS>/audits/bad-audit-name",
       "severity": "warning"
     },
@@ -128,7 +128,7 @@
     },
     {
       "code": "SPEC-DOC-038",
-      "description": "audits/bad-audit-name is loose in specs/audits/ — a dispositioned audit must be archived to specs/audits/_archive/ (one remediation release dispositions every finding, then archives; audit-disposition law). SPEC-DOC-038, WARNING.",
+      "description": "audits/bad-audit-name is loose in specs/audits/ — a dispositioned audit must be archived (one remediation release dispositions every finding, then archives; audit-disposition law). Archive it with:  git mv <SPECS>/audits/bad-audit-name <SPECS>/audits/_archive/bad-audit-name   SPEC-DOC-038, WARNING.",
       "path": "<SPECS>/audits/bad-audit-name",
       "severity": "warning"
     }

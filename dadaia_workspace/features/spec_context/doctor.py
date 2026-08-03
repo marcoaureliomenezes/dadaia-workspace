@@ -376,7 +376,7 @@ class DoctorService:
                     code="VENV-1",
                     description=(
                         f"Workspace venv entrypoint not executable: '{entry}'. "
-                        "Restore the exec bit (chmod +x) or re-bootstrap the venv."
+                        f"Restore the exec bit with:  chmod +x {entry}"
                     ),
                     fixable=False,
                 )

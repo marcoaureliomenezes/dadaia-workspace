@@ -565,8 +565,9 @@ class GovernanceValidator:
                     severity=Severity.WARNING,
                     description=(
                         f"backlog/{entry.name} has terminal status '{status}' but is still "
-                        "loose in specs/backlog/ — move it into specs/backlog/_archive/ "
-                        "(SPEC-DOC-035, WARNING)."
+                        "loose in specs/backlog/. Archive it with:  "
+                        f"git mv {entry} {entry.parent}/_archive/{entry.name}"
+                        "   (SPEC-DOC-035, WARNING)."
                     ),
                     path=str(entry),
                 )

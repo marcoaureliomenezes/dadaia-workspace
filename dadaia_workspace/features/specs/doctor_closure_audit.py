@@ -185,8 +185,10 @@ class ClosureAuditValidator:
                     severity=Severity.WARNING,
                     description=(
                         f"Audit dir 'audits/{name}' does not follow the collision-safe "
-                        "naming law <YYYYMMDDTHHMMSSZ>-<session_id_8chars> (constitution §8) "
-                        "— rename it (SPEC-DOC-030, WARNING)."
+                        "naming law <YYYYMMDDTHHMMSSZ>-<session_id_8chars> (constitution §8). "
+                        "Rename it with a timestamp and this session's id, e.g.:  "
+                        f"git mv {child} {child.parent}/"
+                        "$(date -u +%Y%m%dT%H%M%SZ)-$(echo $DADAIA_SESSION_ID | cut -c1-8)"
                     ),
                     path=str(child),
                 )
@@ -302,9 +304,10 @@ class ClosureAuditValidator:
                     severity=Severity.WARNING,
                     description=(
                         f"audits/{child.name} is loose in specs/audits/ — a dispositioned "
-                        "audit must be archived to specs/audits/_archive/ (one remediation "
-                        "release dispositions every finding, then archives; audit-disposition "
-                        "law). SPEC-DOC-038, WARNING."
+                        "audit must be archived (one remediation release dispositions every "
+                        "finding, then archives; audit-disposition law). Archive it with:  "
+                        f"git mv {child} {child.parent}/_archive/{child.name}"
+                        "   SPEC-DOC-038, WARNING."
                     ),
                     path=str(child),
                 )
