@@ -218,3 +218,28 @@ def test_the_backlog_template_shows_a_ref_shape_that_can_resolve() -> None:
     assert "backlog subjects" in _BACKLOG_STUB, (
         "point the author at the registry that lists anchors"
     )
+
+
+def test_the_shrink_refusal_prescribes_a_command_not_advice() -> None:
+    """R-23: a remedy is a command you paste, not a sentence about one.
+
+    My own shrink guard said "Restore the slug(s) in the SPEC, or archive the release's
+    ledger deliberately before re-consuming" — correct detection, prose remedy. The
+    operator is left to work out which file, which line, and what "archive the ledger"
+    means (bug r23-backlog-consume-shrink-refusal-no-command).
+    """
+    from typer.testing import CliRunner
+
+    # The message is built before any I/O, so a bad invocation surfaces it verbatim.
+    from dadaia_workspace.cli.commands.newartifacts import _shrink_refusal
+
+    text = _shrink_refusal(
+        release_id="v0.1.0", lost=("slug-a",), spec_path="specs/releases/v0.1.0/alpha-1/SPEC.md"
+    )
+
+    assert "**Consumes:** " in text, "it must show the line to restore, not describe it"
+    assert "slug-a" in text
+    assert "specs/releases/v0.1.0/alpha-1/SPEC.md" in text, "name the file, do not say 'the SPEC'"
+    assert "git mv" in text or "mv " in text, "the archive path must be a command, not a verb"
+    assert "<" not in text and ">" not in text, f"no placeholders: {text}"
+    assert CliRunner  # keep the import meaningful for future CLI-level coverage

@@ -121,3 +121,20 @@ def test_a_repo_that_is_not_a_git_root_is_not_gated(
 
     assert not repo.exists()
     assert ctx.state == ContextState.DEAD
+
+
+def test_the_baseline_refusal_prescribes_commands_not_advice() -> None:
+    """R-23 again: "Commit or stash your changes first" is advice, not a remedy.
+
+    The detection is right — baseline never sweeps operator content — but the operator is
+    told WHAT to achieve, not what to run, and not in which repository
+    (bug r23-context-baseline-refusal-no-command).
+    """
+    from dadaia_workspace.features.spec_context.service import baseline_dirty_refusal
+
+    text = baseline_dirty_refusal(name="demo", repo_path=Path("/w/repos/demo"))
+
+    assert "/w/repos/demo" in text, "name the repository, do not leave it implicit"
+    assert "git -C /w/repos/demo commit" in text, text
+    assert "git -C /w/repos/demo stash" in text, text
+    assert "<" not in text and ">" not in text, f"no placeholders: {text}"

@@ -299,6 +299,29 @@ def _explain_backlog(specs_dir: Path, src: Path, catalog_path: Path, alias_map_p
             typer.echo(f"  UNRESOLVED  {message}")
 
 
+def _shrink_refusal(*, release_id: str, lost: tuple[str, ...], spec_path: str) -> str:
+    """The refusal text for a re-consume that would drop already-consumed slugs.
+
+    R-23: a remedy is a command you paste, not a sentence about one. The first version
+    said "Restore the slug(s) in the SPEC, or archive the release's ledger deliberately"
+    — correct detection, but it left the operator to work out WHICH file, WHICH line, and
+    what "archive the ledger" means in practice
+    (bug r23-backlog-consume-shrink-refusal-no-command).
+    """
+    dropped = ", ".join(lost)
+    ledger = f"specs/_archive/{release_id}/consumed_backlog.json"
+    return (
+        f"[error] release {release_id!r} already consumed {dropped}, and the "
+        f"`**Consumes:**` line in {spec_path} no longer declares them. Re-consuming would "
+        "drop them from the ledger, so nothing would ever remove them from the live "
+        "backlog. Nothing was written.\n"
+        f"[error] To restore them, put this line back in {spec_path}:\n"
+        f"[error]   **Consumes:** {dropped}\n"
+        "[error] To retire the old ledger instead, deliberately:\n"
+        f"[error]   git mv {ledger} {ledger}.superseded"
+    )
+
+
 @backlog_app.command("consume")
 def backlog_consume_cmd(
     release_id: str = typer.Option(
@@ -356,11 +379,7 @@ def backlog_consume_cmd(
     lost = shrunk_consumed_slugs(previously, slugs)
     if lost:
         typer.echo(
-            f"[error] release {release_id!r} already consumed {', '.join(lost)}, and the "
-            "SPEC's `**Consumes:**` line no longer declares them. Re-consuming would drop "
-            "them from the ledger, so nothing would ever remove them from the live "
-            "backlog. Restore the slug(s) in the SPEC, or archive the release's ledger "
-            "deliberately before re-consuming. Nothing was written.",
+            _shrink_refusal(release_id=release_id, lost=lost, spec_path=str(spec_path)),
             err=True,
         )
         raise typer.Exit(2)

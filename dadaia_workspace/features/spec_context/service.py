@@ -48,6 +48,25 @@ class DeadSecretFoundError(DadaiaError):
     """
 
 
+def baseline_dirty_refusal(*, name: str, repo_path: Path) -> str:
+    """The refusal text when baseline finds operator content it must not sweep.
+
+    R-23: a remedy is a command you paste. "Commit or stash your changes first" told the
+    operator WHAT to achieve and left them to work out the invocation and the repository
+    (bug r23-context-baseline-refusal-no-command). The detection is unchanged — baseline
+    still never touches operator content.
+    """
+    where = str(repo_path)
+    return (
+        f"Context {name!r} already has Git history with uncommitted changes outside the "
+        "scaffold envelope (specs/**, AGENTS.md); baseline never sweeps operator content. "
+        "Nothing was written.\n"
+        f"  See what is dirty:  git -C {where} status --short\n"
+        f"  Keep the changes:   git -C {where} commit -am 'wip before baseline'\n"
+        f"  Set them aside:     git -C {where} stash --include-untracked"
+    )
+
+
 class DeadRemoteRequiredError(DadaiaError):
     """Raised when dead() would remove a git repository that has no remote.
 
@@ -469,12 +488,7 @@ class SpecContextService:
                     rel == "AGENTS.md" or rel.startswith("specs/") for rel in dirty
                 )
                 if not scaffold_shaped:
-                    raise ContextStateError(
-                        f"Context '{name}' already has Git history with uncommitted "
-                        "changes outside the scaffold envelope (specs/**, AGENTS.md); "
-                        "baseline never sweeps operator content. Commit or stash your "
-                        "changes first."
-                    )
+                    raise ContextStateError(baseline_dirty_refusal(name=name, repo_path=repo_path))
                 self._require_no_untracked_secrets(name, repo_path)
                 self._git.commit_all(repo_path, message)
             if push:
