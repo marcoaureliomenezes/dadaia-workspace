@@ -226,13 +226,6 @@
     tab.addEventListener('click', function () {
       var target = tab.getAttribute('data-section');
 
-      // ── Workflows tab (first-class): load the per-step model pickers ──────────
-      if (target === 'workflows') {
-        if (window.WorkflowPolicy && !window.WorkflowPolicy.isLoaded()) {
-          window.WorkflowPolicy.load();
-        }
-      }
-
       if (target === 'sessions') {
         window.Panel.activate('sessions');
       }
@@ -246,14 +239,10 @@
   });
 
   // ── Hash-fragment routing on initial load ─────────────────────────────
-  // #workflows activates the first-class Workflows tab (Agentic tab removed).
   (function () {
     var hash = location.hash;
     if (!hash) { return; }
-    if (hash.startsWith('#workflows')) {
-      var workflowsTab = document.getElementById('tab-workflows');
-      if (workflowsTab) { workflowsTab.click(); }
-    } else if (hash.startsWith('#reports')) {
+    if (hash.startsWith('#reports')) {
       var reportsTab = document.getElementById('tab-reports');
       if (reportsTab) { reportsTab.click(); }
     } else if (hash.startsWith('#academy')) {

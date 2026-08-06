@@ -16,11 +16,10 @@ import pytest
 from dadaia_workspace.features.panel.views.assets.css.sessions import SESSIONS_CSS
 from dadaia_workspace.features.panel.views.assets.css.structure import STRUCTURE_CSS
 from dadaia_workspace.features.panel.views.assets.css.tokens import TOKENS_CSS
-from dadaia_workspace.features.panel.views.assets.css.workflows import WORKFLOWS_CSS
 
 pytestmark = pytest.mark.unit
 
-PANEL_CSS = TOKENS_CSS + STRUCTURE_CSS + WORKFLOWS_CSS + SESSIONS_CSS
+PANEL_CSS = TOKENS_CSS + STRUCTURE_CSS + SESSIONS_CSS
 
 
 def test_decorative_tokens_never_used_as_text_color_and_brand_tokens_have_fallbacks() -> None:

@@ -10,7 +10,7 @@
  * If these fail, other tests are unreliable.
  *
  * E2E-GUARD-01: Register a response listener BEFORE navigation. Fail on ANY
- *   response status >= 400 during a full tab tour (workflows, sessions, reports,
+ *   response status >= 400 during a full tab tour (sessions, reports,
  *   academy, servers, memories) PLUS clicking the first memory chip and
  *   waiting for networkidle. Include the failing URL+status list in the
  *   assertion message.
@@ -46,7 +46,6 @@ import { gotoPanel, PANEL_TOKEN, BASE_URL } from './helpers';
 // ---------------------------------------------------------------------------
 const ALL_TABS = [
   { tabId: '#tab-subagents', sectionId: 'subagents', label: '1º Agentic Layer' },
-  { tabId: '#tab-workflows', sectionId: 'workflows', label: '2º Agentic Layer' },
   { tabId: '#tab-reports', sectionId: 'reports', label: 'Reports' },
   { tabId: '#tab-academy', sectionId: 'academy', label: 'Academy' },
   { tabId: '#tab-servers', sectionId: 'servers', label: 'Servers' },

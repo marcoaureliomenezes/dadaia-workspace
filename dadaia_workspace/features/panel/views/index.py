@@ -81,7 +81,6 @@ def render_index(
   <link rel="stylesheet" href="/static/tokens.css">
   <link rel="stylesheet" href="/static/structure.css">
   <link rel="stylesheet" href="/static/projects.css">
-  <link rel="stylesheet" href="/static/workflows.css">
   <link rel="stylesheet" href="/static/workflow-policy.css">
   <link rel="stylesheet" href="/static/agent-policy.css">
   <link rel="stylesheet" href="/static/sessions.css">
@@ -171,7 +170,6 @@ def render_index(
   <script src="/static/themes.js"></script>
   <script src="/static/core.js"></script>
   <script src="/static/agent-policy.js"></script>
-  <script src="/static/workflow-policy.js"></script>
   <script src="/static/sessions.js" defer></script>
   <script src="/static/academy.js"></script>
   <script src="/static/reports.js"></script>
