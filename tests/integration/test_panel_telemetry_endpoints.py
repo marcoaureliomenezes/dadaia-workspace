@@ -202,7 +202,10 @@ def test_endpoints_no_auth_window_days_forwarding_404_body_and_security_headers(
     assert status == 404
     body_text = body.decode("utf-8", errors="replace")
     assert "/api/agents" in body_text
-    assert "/api/workflow-catalog" in body_text
+    # The demolished workflow routes must not be advertised: a path the panel names in
+    # its own 404 body and then answers 500 for is worse than one it never mentions
+    # (bug panel-dead-workflow-routes-500-after-demolition).
+    assert "workflow" not in body_text
 
     # Security headers: CSP on HTML, nosniff on JSON.
     status, headers, _ = _get(f"{base}/")
