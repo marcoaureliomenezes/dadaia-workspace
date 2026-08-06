@@ -23,7 +23,7 @@ report is the gate the verbs enforce.
 None — no dependency changes.
 
 ## Test strategy
-- Unit RED-first per FR (real dd-chain-capture atom fixture for FR1; the reporter's
+- Unit RED-first per FR (real sample-consumer atom fixture for FR1; the reporter's
   exact lock topology for FR2; the reporter's 12/12-protected counters for FR3).
 - Executed-path E2E (`test_pipeline_end_to_end_throwaway_context.py`) extended:
   Drive 0 preflight refusal (both verbs, no run created) → Drive 1 fake pipeline
@@ -32,4 +32,4 @@ None — no dependency changes.
 - `specs upgrade` driven via the REAL CLI against a copy of the real consumer tree.
 - Mutation-sanity per fix; full suite green.
 - Remote acceptance: full chain replayed on the operator's remote against live
-  dd-chain-capture v0.2.0.
+  sample-consumer v0.2.0.

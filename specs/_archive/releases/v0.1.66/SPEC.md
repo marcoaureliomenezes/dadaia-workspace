@@ -8,7 +8,7 @@ release: v0.1.66
 
 ## Objective
 
-A remote user driving `dd-chain-capture v0.2.0` through `dadaia lifecycle pipeline`
+A remote user driving `sample-consumer v0.2.0` through `dadaia lifecycle pipeline`
 hit 7 dadaia-workspace defects that made the pi AND codex Layer-2 worker paths
 unusable end-to-end: a pi setup failure silently reported as a generic block, a
 too-strict worker-result contract that rejected a valid worker output, an invalid
@@ -349,10 +349,10 @@ plumbing and the union computation; the operator supplies the paths via
 - **AC7(repro):** executed-path test
   `test_implement_pipeline_write_scope_covers_reserved_task_production_path`
   FAILS on current code (drives `dadaia lifecycle pipeline --harness fake
-  --write-scope repos/dd-chain-capture/docker/hermes-capture/**` through the
+  --write-scope repos/sample-consumer/docker/sample-capture/**` through the
   real CLI with an injected `FakeAgentRuntime` result whose
   `structured_output["changed_paths"]` includes
-  `repos/dd-chain-capture/docker/hermes-capture/Dockerfile` — on current code
+  `repos/sample-consumer/docker/sample-capture/Dockerfile` — on current code
   the gate's `out_of_scope_paths` check rejects that path because
   `allowed_paths` is handoff-only, so the pipeline blocks with
   `"agent result contains out-of-scope paths"`), PASSES after the fix (the

@@ -1,4 +1,4 @@
-"""Bug completed-workflow-rerun-not-refused (Hermes 0.3.2 confirmation run).
+"""Bug completed-workflow-rerun-not-refused (Consumer 0.3.2 confirmation run).
 
 A COMPLETED lifecycle run id is immutable history: EVERY workflow engine must refuse a
 fresh invocation over it with one clean CompletedRunRerunError line (non-zero exit, no

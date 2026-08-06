@@ -9,7 +9,7 @@
 Six bugs reported from the operator's remote against `c33a07aa` (round 3), all in or
 around the v0.1.69 preflight subsystem. Root architectural failure: **gates without
 repair paths + an advisory gate the guarded verbs never enforced.** The real consumer
-(dd-chain-capture v0.2.0, IMPLEMENTATION, everything mandated through `dadaia lifecycle`)
+(sample-consumer v0.2.0, IMPLEMENTATION, everything mandated through `dadaia lifecycle`)
 was fully deadlocked. Probes were validated on clean fixture workspaces, never against a
 lived-in one (old atoms, real harness lease lineage, accumulated protected evidence).
 
@@ -25,7 +25,7 @@ neither `doctor --fix` nor `specs upgrade` repaired the key.
   byte-preserving everything else (no YAML round-trip). Prose mentions untouched.
   Idempotent; dry-run plans without writing.
 - FR1.2 Law: a schema-drop MUST ship its migration.
-- **Acceptance:** the real dd-chain-capture tree (8 affected atoms) upgrades v1→3 and
+- **Acceptance:** the real sample-consumer tree (8 affected atoms) upgrades v1→3 and
   `specs doctor` is clean; on the remote, `specs upgrade` unblocks preflight's
   specs-doctor gate. Real atom committed as fixture.
 

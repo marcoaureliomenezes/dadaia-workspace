@@ -14,7 +14,7 @@ Two task grammars occur in real repos and BOTH are supported:
 
 - **Internal grammar** (this library's own releases): a ``### … `[-]``` H3 heading with
   the marker inline, and a bold ``- **Write set:**`` key.
-- **Consumer grammar** (e.g. dd-chain-capture): a **bold** ``**T-3.1 — …**`` task heading
+- **Consumer grammar** (e.g. sample-consumer): a **bold** ``**T-3.1 — …**`` task heading
   whose active marker lives in a **fenced block** ```` ```\n[-] T-3.1\n``` ```` elsewhere
   in the file, and a **plain** ``- Write set:`` key.
 

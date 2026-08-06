@@ -69,7 +69,7 @@ Gate evidence captured at the ship tree (`cdab4806`) and merged as PR #116 (`396
 | AC-7 schema property drop (D-1) | schema contract test + `dadaia public stage → install → doctor` | absence pin green; AC-9(d) re-add ⇒ FAIL ⇒ reverted (37 passed); public doctor exit 0 incl. `[ok] public-privacy` — T-61-41 |
 | AC-7 single AGENTS.md banner | canonical-banner grep on `repos/dadaia-workspace/AGENTS.md` | count before=2, after=1; body byte-preserved (diff vs `git show HEAD:AGENTS.md` = 8 header lines only) — T-61-41 |
 | AC-1..AC-4 memory truth pass A | negative + positive grep transcript + `dadaia specs doctor` | 0 hits for every retired claim; all QA61-2 positive greps present; doctor exit 0, LINT-1/TREE-5 clean; manual sabotage line captured — T-61-10 |
-| AC-8 workspace/archive hygiene | `dadaia doctor --fix` + shell (PM) | ROOT-2 `.mypy_cache` deleted; stale `tauan-games` lease GC'd (zero SPEC-DOC-029); `dist/` absent; v0.1.41 residue → `specs/_archive/wip-abandoned/v0.1.41/` + README — T-61-60 |
+| AC-8 workspace/archive hygiene | `dadaia doctor --fix` + shell (PM) | ROOT-2 `.mypy_cache` deleted; stale `sample-games` lease GC'd (zero SPEC-DOC-029); `dist/` absent; v0.1.41 residue → `specs/_archive/wip-abandoned/v0.1.41/` + README — T-61-60 |
 | AC-10 SDD + backlog doctors | `dadaia specs doctor` · `dadaia backlog doctor` | both exit 0 — T-61-60 |
 | AC-10 self-hosting reconcile | `public stage → doctor → install --target all → doctor` | all exit 0, `[ok] public-privacy` — T-61-60 |
 | Frozen v0.1.50 no-steal suite | `git diff` vs main on the lease/gate test files | **zero-diff** — every wave (A-3 deferred precisely to protect this) |
@@ -241,7 +241,7 @@ decision). Bug ledger: **0 open at pick, 0 filed mid-release → no bug terminal
 | 18 | G-14 public-asset-distribution 13→14 types | LOW | **fixed** | T-61-10 `92adaeb6` — AC-1 positive grep `plugins` in the 14-type list |
 | 19 | G-15 stale-claim cluster (sdd-gate/specs-doctor/workspace-init/brand) | LOW | **fixed** | T-61-10 `92adaeb6` — AC-1 positive grep `features/spec_context/lease.py` |
 | 20 | G-16 harness-pi auth claim | LOW | **fixed** | T-61-10 `92adaeb6` — AC-1 positive grep `ANTHROPIC_API_KEY` allowlist qualification |
-| 21 | G-22 stale tauan-games lease | LOW | **fixed** | T-61-60 `cdab4806` — lease GC'd; specs doctor zero SPEC-DOC-029 |
+| 21 | G-22 stale sample-games lease | LOW | **fixed** | T-61-60 `cdab4806` — lease GC'd; specs doctor zero SPEC-DOC-029 |
 | 22 | TREE-5 + LINT-1 (specs/AGENTS.md drift; estimates/headings) | LOW | **fixed** | T-61-10 `92adaeb6` (+ PM `plugin-packs.md` token_estimate, see Drifts) — AC-2: doctor exit 0, LINT-1/TREE-5 clean |
 | 23 | G-17 polish cluster (INFO) | INFO | **fixed** | T-61-10 `92adaeb6` — incl. AC-1 positive grep INV-5 prose==table |
 | 24 | G-20 audit naming convention | INFO | **fixed** | This CLOSURE + PM `git mv` → `specs/audits/_archive/2026-07-06-full-audit-{governance,architecture}-lane--dispositioned-v0.1.61.md` |

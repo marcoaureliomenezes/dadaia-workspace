@@ -439,12 +439,12 @@ an initialized workspace, create it:
 
 ---
 
-## Real-use matrix — the hermes day-to-day contract (v0.2.9)
+## Real-use matrix — the consumer day-to-day contract (v0.2.9)
 
 **This section is the release gate's second half.** The deterministic matrix above
 (F-01…F-26 + the structural certification) proves components in isolation; it is
 **never sufficient to approve a release alone**. A candidate is green only when the
-real-use statements below — built from the hermes agent's actual day-to-day
+real-use statements below — built from the consumer agent's actual day-to-day
 inventory — ALL pass with artifact-level evidence (bug
 certification-misses-live-codex-backlog-regression-040: a green certification that
 never exercised the live backlog path was false confidence).

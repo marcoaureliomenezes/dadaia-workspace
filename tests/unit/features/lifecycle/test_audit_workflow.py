@@ -269,7 +269,7 @@ def test_build_audit_workflow_rejects_undefined_release_id(tmp_path: Path) -> No
     assert not (specs / "releases" / bogus).exists(), "audit must not create a bogus release dir"
 
 
-# ── bug lifecycle-audit-worker-sandbox-cannot-read-bound-repo (hermes) ────────
+# ── bug lifecycle-audit-worker-sandbox-cannot-read-bound-repo (consumer) ────────
 #
 # Both audit runs returned ACCEPTED dispositions while every lens was
 # UNVERIFIABLE: the codex worker died before file inspection (bwrap namespace

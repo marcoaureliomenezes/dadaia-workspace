@@ -66,7 +66,7 @@ _VALID_CODEX_SANDBOX_MODES: frozenset[str] = frozenset(
 #: sandbox namespace via bwrap, which CANNOT be created in a nested/unprivileged container
 #: (bug codex-adapter-cannot-run-in-nested-container: "No permissions to create a new
 #: namespace"). The bypass skips that entirely. Safe ONLY where the OUTER container is the
-#: trust boundary (e.g. the Hermes worker, which already runs its own agent this way) — so
+#: trust boundary (e.g. the Consumer worker, which already runs its own agent this way) — so
 #: it is opt-in via DADAIA_CODEX_SANDBOX and never the default; the outer `dadaia lifecycle`
 #: allowed-paths/review gates remain the real security boundary (same reasoning as FR5).
 _SANDBOX_BYPASS = "danger-bypass"

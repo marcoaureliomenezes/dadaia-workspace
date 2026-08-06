@@ -668,7 +668,7 @@ def _capture_argv(cfg: CodexExecConfig) -> list[str]:
 def test_sandbox_bypass_mode_emits_dangerously_bypass_and_omits_sandbox(tmp_path: Path) -> None:
     """Bug codex-adapter-cannot-run-in-nested-container: dadaia's Codex adapter always
     passed `--sandbox <mode>`, which needs namespace creation (bwrap) that fails in a
-    nested/unprivileged container (e.g. the Hermes worker) — so Codex-harness workflows
+    nested/unprivileged container (e.g. the Consumer worker) — so Codex-harness workflows
     could not run there, even though the same container runs Codex fine with the bypass
     flag. The opt-in `danger-bypass` mode emits `--dangerously-bypass-approvals-and-sandbox`
     (mutually exclusive with `--sandbox`) so a trusted containerized consumer can run."""

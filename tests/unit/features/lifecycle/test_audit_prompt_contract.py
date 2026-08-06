@@ -1,4 +1,4 @@
-"""v0.2.8 (hermes-gate bug class) — audit step prompt contract alignment.
+"""v0.2.8 (consumer-gate bug class) — audit step prompt contract alignment.
 
 The collapsed audit step prompt is fragment + persona. The project-auditor persona once
 instructed a COMPETING output envelope (six-dimension compliance scorecard, drift

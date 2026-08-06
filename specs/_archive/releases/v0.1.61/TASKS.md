@@ -204,7 +204,7 @@ task line. **Zero golden re-baseline** across the whole release — any golden d
 
 - [x] T-61-60 FR7 + AC-10 full gates + ship. Owner: software-engineer (gates) + qa-engineer (ship-gate) +
   security-reviewer (push-gate) + operator/PM (shell hygiene). Write set: none in `specs/**`. Checklist:
-  - FR7 (operator/PM shell): `dadaia doctor --fix` (clears `.mypy_cache/` + the stale `tauan-games` lease —
+  - FR7 (operator/PM shell): `dadaia doctor --fix` (clears `.mypy_cache/` + the stale `sample-games` lease —
     verify, both may be transient-cleared already); surface `bug-space-war` for operator triage (record decision
     or explicit deferral — §6 row 15); delete stale `dist/` contents (D-2); `git mv
     specs/_archive/releases/v0.1.41 → specs/_archive/wip-abandoned/v0.1.41` + one-line README breadcrumb (G-23).
@@ -220,7 +220,7 @@ task line. **Zero golden re-baseline** across the whole release — any golden d
     noted: devops pack not installed in this workspace ⇒ software-engineer owns the YAML under the recorded
     audit-routing exception, or the operator installs the pack first.)*
   - **FR7 evidence (2026-07-07, PM shell):** `dadaia doctor --fix` → ROOT-2 deleted `.mypy_cache`; stale
-    `tauan-games.lock.json` lease GC'd (specs doctor: zero SPEC-DOC-029). `bug-space-war` root entry: operator
+    `sample-games.lock.json` lease GC'd (specs doctor: zero SPEC-DOC-029). `bug-space-war` root entry: operator
     unavailable at ship ⇒ **explicitly deferred to operator triage** (§6 row 15 residual — operator-created
     root entry, human-judgment call: `root_exceptions.txt` or relocate). D-2: stale `dist/` (mtime 2026-06-07)
     deleted; dir absent. G-23: `v0.1.41` residue (untracked-only: GRILL.md gitignored, OQ-DECISIONS.md untracked)

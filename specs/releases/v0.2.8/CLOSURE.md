@@ -99,12 +99,12 @@ plugin-manifest distribution as an alternative to the managed config block.
 Archive `specs/releases/v0.2.8/` to `specs/_archive/releases/` after the operator
 confirms the PyPI deploy of the validated candidate.
 
-## Hermes certification (deploy gate, 2026-07-19)
+## Consumer certification (deploy gate, 2026-07-19)
 
 The candidate wheel `dadaia_workspace-0.4.0` (commit `a649b91e`) passed the full
-hermes-crawler gate at dd-chain-capture: **CERTIFIED_100** — matrix 26 PASS / 0 FAIL,
+sample-crawler gate at sample-consumer: **CERTIFIED_100** — matrix 26 PASS / 0 FAIL,
 structural gates 5/5, deterministic certification 18/18, verdict JSON at
-`/opt/data/.val/matrix-verdict/hermes-certification-0.4.0.json`.
+`<consumer-root>/.val/matrix-verdict/consumer-certification-0.4.0.json`.
 
 Five certification rounds, each bug investigated to root cause (no workaround fixes):
 

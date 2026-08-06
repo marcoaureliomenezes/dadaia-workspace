@@ -1,4 +1,4 @@
-"""Bug release-commit-gate-ignores-existing-plan-review-payload (Hermes game cycle 3).
+"""Bug release-commit-gate-ignores-existing-plan-review-payload (Consumer game cycle 3).
 
 A release-definition run blocked at tasks_create (post-accept lint), was resumed with
 resume_from="definition_draft", and then the terminal definition_commit_gate declared
@@ -135,7 +135,7 @@ def test_commit_gate_recovers_ledger_record_from_persisted_payload(tmp_path: Pat
     assert first.completed is True
 
     # Simulate the loss: drop plan_review's record from the persisted run while its
-    # attempt-0 payload file stays on disk (exactly the Hermes evidence shape).
+    # attempt-0 payload file stays on disk (exactly the Consumer evidence shape).
     store = JsonLifecycleRunStore(tmp_path)
     run = store.load("recover-ledger")
     assert run is not None

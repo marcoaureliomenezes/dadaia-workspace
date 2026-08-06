@@ -164,7 +164,7 @@ def test_operator_demand_reaches_every_model_step_prompt(tmp_path: Path) -> None
         context_selector=selector,
         registry=_registry(tmp_path),
     )
-    demand_text = "Quero um jogo de corrida navegador-first para o Tauan."
+    demand_text = "Quero um jogo de corrida navegador-first para uma crianca."
     wf.run("demand-run", _cd_demand(), operator_demand=demand_text)
 
     assert captured, "at least one model step must have run"

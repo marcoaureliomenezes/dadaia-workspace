@@ -77,7 +77,7 @@ Verified at HEAD:
   `status: Open`**.
 - **Sampled acceptance criteria (3/3 PASS):**
   - **AC-R1-01** — `tests/unit/features/spec_context/test_gate_policy.py` exists with the
-    class × {root, in-repo} × {default `dadaia-workspace`, non-default `rand-engine`} matrix
+    class × {root, in-repo} × {default `dadaia-workspace`, non-default `sample-engine`} matrix
     incl. the two no-class-match MUTATING rows (read directly).
   - **AC-R2-04** — `tests/e2e/test_two_actor_lease.py` exists; scenarios (i)-(iv) + the rc-2
     hook-acquired-holder scenario (v) verified by the architect and qa lanes; in the HEAD

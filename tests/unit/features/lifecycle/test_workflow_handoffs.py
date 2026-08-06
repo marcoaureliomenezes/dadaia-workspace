@@ -759,7 +759,7 @@ def test_reset_run_zone_purges_ledger_and_exact_worker_outputs(tmp_path: Path) -
     assert writer.worker_outputs == set()
 
 
-# ── bug audit-fragment-schema-envelope-mismatch (Hermes 0.3.x live canary) ──────────
+# ── bug audit-fragment-schema-envelope-mismatch (Consumer 0.3.x live canary) ──────────
 #
 # The audit fragment instructs the worker to emit its domain fields (question, lenses,
 # findings, dispositions) TOP-LEVEL in the agent-run-result-v1 object. A worker that

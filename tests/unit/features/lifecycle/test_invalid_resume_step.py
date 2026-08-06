@@ -1,4 +1,4 @@
-"""Bug r4d-resume-preflight-invalid-step-traceback (Hermes R4-D, F-22 class).
+"""Bug r4d-resume-preflight-invalid-step-traceback (Consumer R4-D, F-22 class).
 
 A blocked preflight reports ``blocked_at_step: "preflight"``, so the operator applies
 ``--resume-from preflight`` — but ``preflight`` is a GATE, not a pipeline step
@@ -33,5 +33,5 @@ def test_preflight_is_not_a_resumable_step_and_says_so(bad: str) -> None:
     assert "implement" in msg and "review_combined" in msg and "close" in msg
     assert isinstance(err, DadaiaError)
     if bad == "preflight":
-        # The specific dead end Hermes hit: name it and point at the real remedy.
+        # The specific dead end Consumer hit: name it and point at the real remedy.
         assert "preflight" in msg.lower() and "gate" in msg.lower()

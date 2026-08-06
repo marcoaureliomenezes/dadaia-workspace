@@ -13,8 +13,8 @@ projection across **four** AI harnesses, and a real-time monitoring panel.
 
 It runs agents at **two distinct layers** (explained below) and supports, as
 peers: **Claude Code, Codex, PI (`pi-coding-agent`), and Kimi Code (the `kimi` CLI)**
-at the entry layer, **Codex and PI** as workflow workers, and the **Hermes agent** as
-the canonical consumer and release gate. It is designed to be operated by **humans
+at the entry layer, **Codex and PI** as workflow workers, and a **consumer-side
+validation agent** as the release gate. It is designed to be operated by **humans
 and by agents**: every capability is reachable through a discoverable CLI, and every
 state surface has a machine-readable form.
 
@@ -111,26 +111,28 @@ harness AND the default Layer-2 worker; Claude Code and Kimi Code are Layer-1 on
 Layer-2 workers are selected per workflow step by the model policy
 (`--harness codex|pi`, or an operator overlay).
 
-## Hermes agent — the canonical consumer & release gate
+## Consumer validation — the release gate
 
-The **Hermes agent** (the hermes-crawler runtime in `dd-chain-capture`) is the
-canonical consumer of dadaia-workspace: it certifies every candidate wheel before
-deploy, and no version is published without its `CERTIFIED_100` verdict. Since
-v0.2.9 it is a declared **supported environment** — meaning its day-to-day
-activities run on dadaia-workspace without product bugs, proven (not assumed):
+A **consumer-side validation agent** running the shipped recipe on a real
+workspace is the release gate of dadaia-workspace: it certifies every candidate
+wheel before deploy, and no version is published without its `CERTIFIED_100`
+verdict. A consumer environment is declared **supported** only when its
+day-to-day activities run on dadaia-workspace without product bugs, proven (not
+assumed):
 
 - The shipped consumer validation recipe
   (`dadaia_workspace/public/data/CONSUMER_VALIDATION_RECIPE.md`) carries a
-  **Real-use matrix (R-01…R-08)** built from the hermes day-to-day inventory:
-  the live Codex chain with per-link artifact proofs, canonical backlog
-  consumption, fresh/old-context doctor-clean repair, terminal-state honesty,
-  bug-ledger round-trip, fake-chain honesty, and the Kimi Code harness surface.
+  **Real-use matrix (R-01…R-08)** built from a real consumer's day-to-day
+  inventory: the live Codex chain with per-link artifact proofs, canonical
+  backlog consumption, fresh/old-context doctor-clean repair, terminal-state
+  honesty, bug-ledger round-trip, fake-chain honesty, and the Kimi Code harness
+  surface.
 - The deterministic certification (structural + F-01…F-26) is necessary but
   **never sufficient alone** — a candidate is green only when the full real-use
   round reports zero failures.
-- Hermes' own bug stream must converge to **zero open bugs** (product fixes land by
-  root-cause class; environment and wrong-usage findings are classified, never
-  patched over).
+- The consumer's own bug stream must converge to **zero open bugs** (product fixes
+  land by root-cause class; environment and wrong-usage findings are classified,
+  never patched over).
 
 **Harness profiles.** `dadaia init --harness <set>` scaffolds only the harnesses you
 use (persisted in `.dadaia/states/harness_profile.json`). `dadaia public install` and

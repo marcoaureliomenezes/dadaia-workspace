@@ -72,7 +72,7 @@ def test_legacy_marker_without_sid_reads_none(tmp_path: Path) -> None:
 def test_heartbeat_falls_back_to_the_marker_sid(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The hermes repro: after a default bind, `context heartbeat` works with NO env."""
+    """The consumer repro: after a default bind, `context heartbeat` works with NO env."""
     _ws(tmp_path)
     sessions = tmp_path / ".dadaia" / "sessions"
     sessions.mkdir(parents=True, exist_ok=True)

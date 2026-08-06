@@ -50,7 +50,7 @@ def _write_item(specs: Path, slug: str, frontmatter: str) -> None:
 
 
 def test_driving_fake_canary_item_is_doctor_valid(tmp_path: Path) -> None:
-    """Bug fake-backlog-workflow-materializes-doctor-invalid-status-042 (Hermes R1-B):
+    """Bug fake-backlog-workflow-materializes-doctor-invalid-status-042 (Consumer R1-B):
     the backlog-definition driving fake materialized `status: proposed`, a token
     outside the documented vocabulary — the workflow's own output failed the
     workflow's own doctor. Producer and validator must agree on the status set."""

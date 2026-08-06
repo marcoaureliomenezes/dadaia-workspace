@@ -311,7 +311,7 @@ def test_cli_generate_emits_both_catalog_and_index(tmp_path: Path) -> None:
         )
 
 
-# ── bug closure-breaks-canonical-backlog-anchor (Hermes real game cycle) ────────────
+# ── bug closure-breaks-canonical-backlog-anchor (Consumer real game cycle) ────────────
 #
 # `memory catalog generate` used to REPLACE index.md wholesale with a template whose
 # headings differ from the scaffold's — destroying canonical doc anchors

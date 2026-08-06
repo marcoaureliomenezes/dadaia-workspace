@@ -217,7 +217,7 @@ Body of {slug}.
 
 
 def test_independent_new_cli_commands_do_not_conflict(tmp_path: Path) -> None:
-    """Bug backlog-independent-cli-items-false-conflict-044 (Hermes R1-C1c): a 'hello'
+    """Bug backlog-independent-cli-items-false-conflict-044 (Consumer R1-C1c): a 'hello'
     command item and an independent 'version' command item for the same CLI were both
     forced onto the CLI's coarse existing anchor and classified DIVERGENT_CONFLICT —
     a conflict that does not exist. With ``surface: new`` each item's intent carries
@@ -294,7 +294,7 @@ intents:
 
 
 def test_review_gate_blocks_carry_operator_command(tmp_path: Path) -> None:
-    """Bug backlog-cli-intent-hallucinated-anchor-045 (remedy half, Hermes R1-C1d): a
+    """Bug backlog-cli-intent-hallucinated-anchor-045 (remedy half, Consumer R1-C1d): a
     review-gate block without an ``operator_command`` is an unrecoverable chain dead
     end. Every gate block names the exact resume command."""
     fake = _AuthoringFake(root=tmp_path, writes_item=False)
@@ -422,7 +422,7 @@ def test_sequence_shape() -> None:
 
 
 def test_author_prompt_carries_canonical_anchor_digest(tmp_path: Path) -> None:
-    """Bug backlog-author-missing-canonical-subject-input (Hermes live Codex canary).
+    """Bug backlog-author-missing-canonical-subject-input (Consumer live Codex canary).
 
     A normal demand made the live author invent an unresolvable ref
     (specs/backlog/README.md#Backlog) because nothing supplied the canonical anchor
@@ -443,7 +443,7 @@ def test_author_prompt_carries_canonical_anchor_digest(tmp_path: Path) -> None:
 
 
 def test_bare_worker_payload_is_enriched_with_authored_item_paths(tmp_path: Path) -> None:
-    """Bug backlog-author-bare-payload-breaks-release-handoff (Hermes live chain).
+    """Bug backlog-author-bare-payload-breaks-release-handoff (Consumer live chain).
 
     A live worker can materialize the backlog item on disk yet return a bare payload
     ("codex exec completed") — the author step passes on the real deliverable, but the
@@ -515,9 +515,9 @@ def test_live_backlog_progress_emits_started_and_accepted(tmp_path: Path, capsys
 
 
 def test_gate_blocks_authored_item_with_no_intents_at_candidate_status(tmp_path: Path) -> None:
-    """Bug r4g-backlog-surface-new-existing-accepted (Hermes R4-G), real mechanism.
+    """Bug r4g-backlog-surface-new-existing-accepted (Consumer R4-G), real mechanism.
 
-    Hermes reported this as "surface: new accepted on a resolvable anchor". His own
+    Consumer reported this as "surface: new accepted on a resolvable anchor". His own
     evidence says otherwise: `backlog doctor` failed with "no intents[] declared" — the
     authored item carried NO `intents[]` at all, at status `candidate`, and the review
     gate ACCEPTED it. (The surface:new guard itself is correct and is pinned by
@@ -581,7 +581,7 @@ def test_gate_allows_idea_status_without_intents(tmp_path: Path) -> None:
 
 
 def test_gate_blocks_preexisting_candidate_without_intents(tmp_path: Path) -> None:
-    """Bug r5c-backlog-gate-accepts-preexisting-candidate-without-intents (Hermes R5-C).
+    """Bug r5c-backlog-gate-accepts-preexisting-candidate-without-intents (Consumer R5-C).
 
     Gap in the first fix: the missing-intents check only swept the slugs CHANGED by this
     run, so an already-invalid item that the author never touched sailed through — while

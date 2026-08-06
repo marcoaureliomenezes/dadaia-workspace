@@ -439,7 +439,7 @@ def main() -> int:
         # The emission resolves through the SAME chain as a normal prompt (DADAIA_CONTEXT
         # env → self-keyed session record → bind-epoch marker), falling back to the
         # sentinel's recorded slug: a bind with NO prior prompt leaves no sentinel file,
-        # but its session record still names the bound context (hermes round-3 bug
+        # but its session record still names the bound context (consumer round-3 bug
         # kimi-postcompact-omits-bound-context-bootstrap).
         context = _resolve_context(workspace, session_id, sentinel_mtime, harness_pid)
         if not context:

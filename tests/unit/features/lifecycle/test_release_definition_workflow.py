@@ -507,7 +507,7 @@ def test_revision_retries_spec_create_with_the_reviewer_feedback_injected(tmp_pa
     assert "Prior rejection feedback" in create_prompts[1]
 
 
-# ── bug release-definition-approved-plan-not-persisted-041 (hermes 0.4.1) ─────
+# ── bug release-definition-approved-plan-not-persisted-041 (consumer 0.4.1) ─────
 #
 # plan_review returned APPROVED but PLAN.md stayed Draft on disk: the status flip
 # silently skipped (``path.is_file() → return None``) and the terminal gate blocked
@@ -581,7 +581,7 @@ def test_terminal_gate_names_resume_remedy_for_unflipped_artifact(tmp_path: Path
 def test_approved_review_with_unwritten_artifact_blocks_at_review_not_terminal_gate(
     tmp_path: Path,
 ) -> None:
-    """Full-run repro of the hermes symptom: the review worker's verdict arrives but
+    """Full-run repro of the consumer symptom: the review worker's verdict arrives but
     the artifact vanished before the flip — the run must block AT THE REVIEW with a
     remedy, never glide into a terminal-gate block steps later."""
     store = _MemoryRunStore()

@@ -246,9 +246,9 @@ def test_context_filter_scopes_runs_and_disk_scan_to_matched_runs_only(tmp_path:
     ledger."""
     _workspace(tmp_path)
     resolver = _resolver(tmp_path)
-    # Target run (dd-chain-capture/v0.2.0): coherent.
+    # Target run (sample-consumer/v0.2.0): coherent.
     tgt, _ = resolver.produce(
-        _run_in("run-target", "dd-chain-capture", "v0.2.0"),
+        _run_in("run-target", "sample-consumer", "v0.2.0"),
         producer_step="release_scope",
         attempt=0,
         output_schema="release-scope-handoff-v1",
@@ -278,7 +278,7 @@ def test_context_filter_scopes_runs_and_disk_scan_to_matched_runs_only(tmp_path:
         tmp_path,
         JsonLifecycleRunStore(tmp_path),
         now=NOW,
-        context="dd-chain-capture",
+        context="sample-consumer",
         release_id="v0.2.0",
     ).run()
     assert scoped.ok is True, [f.to_dict() for f in scoped.findings]

@@ -1,6 +1,6 @@
 """v0.2.9 follow-up — bug fake-release-definition-leaves-dirty-worktree.
 
-Hermes repro: a successful fake release-definition left ACTIVE.md, the backlog entry,
+Consumer repro: a successful fake release-definition left ACTIVE.md, the backlog entry,
 SPEC.md, PLAN.md and TASKS.md UNCOMMITTED, and implementation-reviews then blocked at
 preflight on the dirty tree. The completed definition now commits the context repo's
 definition artifacts (Python-owned, best-effort — mirroring the closure commit).

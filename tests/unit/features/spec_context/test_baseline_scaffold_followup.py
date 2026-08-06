@@ -1,4 +1,4 @@
-"""Bug context-baseline-rejects-official-scaffold-followup (Hermes R1-D1).
+"""Bug context-baseline-rejects-official-scaffold-followup (Consumer R1-D1).
 
 The official fresh-context sequence is ``context create`` → ``context alive`` (which
 commits its own scaffold) → optionally ``specs init`` (which adds more scaffold files) →

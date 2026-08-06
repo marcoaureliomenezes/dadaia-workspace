@@ -1,4 +1,4 @@
-"""Bug implementation-review-approves-unexecuted-validation (Hermes real game cycle).
+"""Bug implementation-review-approves-unexecuted-validation (Consumer real game cycle).
 
 The pipeline closed a release whose final payload listed every pytest command as
 "planned / not run" — and the generated environment could not even run pytest. Closure

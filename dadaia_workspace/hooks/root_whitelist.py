@@ -46,7 +46,7 @@ _ROOT_FILES: frozenset[str] = frozenset({"AGENTS.md", "CLAUDE.md", "prompt.md"})
 def _render_whitelist() -> str:
     """Render the whitelist for the block message — DERIVED from ``_WHITELIST`` so the
     operator-facing text can never drift from the enforced policy (bug class found
-    during the v0.2.8 hermes sweep: the message literal omitted ``.kimi-code/`` while
+    during the v0.2.8 consumer sweep: the message literal omitted ``.kimi-code/`` while
     the policy already allowed it)."""
     dirs = sorted(f"{name}/" for name in _WHITELIST if name not in _ROOT_FILES)
     return " ".join([*dirs, *sorted(_ROOT_FILES)])

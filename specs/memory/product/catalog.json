@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-22T02:17:38Z",
+  "generated_at": "2026-08-06T16:03:55Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -350,6 +350,29 @@
     },
     {
       "rank": 16,
+      "slug": "consumer-agent-support",
+      "title": "Consumer validation gate — supported consumer environments",
+      "category": "product",
+      "area": "platform",
+      "tldr": "A consumer-side validation agent running the shipped recipe is the release gate: no wheel is published without its CERTIFIED_100 verdict.",
+      "summary": "A consumer-side validation agent running the shipped consumer validation recipe on a real workspace is the canonical release gate of dadaia-workspace. A consumer environment is declared SUPPORTED only after a full real-use round reports zero failures. Deterministic certification alone never approves a release.",
+      "path": "specs/memory/product/platform/consumer-agent-support.md",
+      "tags": [
+        "consumer-validation",
+        "release-gate",
+        "sdd"
+      ],
+      "token_estimate": 300,
+      "depends_on": [
+        "workspace-init",
+        "tech-stack",
+        "spec-context-project",
+        "sdd-gate-v3",
+        "workspace-doctor"
+      ]
+    },
+    {
+      "rank": 17,
       "slug": "context-management",
       "title": "context-management",
       "category": "product",
@@ -372,7 +395,7 @@
       ]
     },
     {
-      "rank": 17,
+      "rank": 18,
       "slug": "cross-platform-portability",
       "title": "cross-platform-portability",
       "category": "product",
@@ -394,30 +417,6 @@
         "sdd-gate-v3",
         "architecture",
         "multi-platform-parity"
-      ]
-    },
-    {
-      "rank": 18,
-      "slug": "hermes-agent-support",
-      "title": "Hermes agent — supported consumer environment",
-      "category": "product",
-      "area": "platform",
-      "tldr": "Hermes agent is a supported consumer: certified end-to-end via the consumer recipe Real-use matrix, converged to zero failures in v0.2.9.",
-      "summary": "The hermes agent (dd-chain-capture hermes-crawler) is the canonical consumer and release gate of dadaia-workspace. Since v0.2.9 it is a declared SUPPORTED environment: the consumer validation recipe carries a Real-use matrix built from the hermes day-to-day inventory, and the 0.4.1 candidate converged to a full real-use round with zero failures (CERTIFIED_100, 35/35).",
-      "path": "specs/memory/product/platform/hermes-agent-support.md",
-      "tags": [
-        "hermes",
-        "consumer-validation",
-        "release-gate",
-        "sdd"
-      ],
-      "token_estimate": 400,
-      "depends_on": [
-        "workspace-init",
-        "tech-stack",
-        "spec-context-project",
-        "sdd-gate-v3",
-        "workspace-doctor"
       ]
     },
     {

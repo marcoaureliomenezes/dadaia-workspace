@@ -113,7 +113,7 @@ dadaia bugs status        # open bugs
 
 ## When a command fails
 
-Classify BEFORE registering anything (hermes deep-dive, v0.2.9): a failure is a
+Classify BEFORE registering anything (consumer deep-dive, v0.2.9): a failure is a
 **product bug of the library** only when the library's own contract is violated.
 Environment (quota/rate limits, network, sandbox), invalid input, and wrong usage are
 NOT product bugs — diagnose first, register with evidence second. When it IS a

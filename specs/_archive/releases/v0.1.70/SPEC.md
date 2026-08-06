@@ -56,7 +56,7 @@ it). But four surfaces still tell authors the opposite:
 - `specs/memory/architecture.md:281` — "the schema retains a deprecated optional
   `agent_tier` property … slated for removal". **MEMORY-class path.**
 
-Consumers (e.g. dd-chain-capture) follow the doc, emit `agent_tier`, and their doctor
+Consumers (e.g. sample-consumer) follow the doc, emit `agent_tier`, and their doctor
 rejects it. **The schema is correct; the docs are wrong.**
 
 **Invariant to restore:** all four surfaces state that `agent_tier` was removed

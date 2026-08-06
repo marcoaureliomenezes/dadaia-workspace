@@ -39,7 +39,7 @@ from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentMana
 
 _runner = CliRunner()
 _CONTEXT = "dadaia-workspace"
-_PRODUCTION_PATH = "repos/dd-chain-capture/docker/hermes-capture/Dockerfile"
+_PRODUCTION_PATH = "repos/sample-consumer/docker/sample-capture/Dockerfile"
 
 
 def _init_workspace(path: Path) -> Path:
@@ -113,7 +113,7 @@ def test_implement_pipeline_write_scope_covers_reserved_task_production_path(
             "--harness",
             "fake",
             "--write-scope",
-            "repos/dd-chain-capture/docker/hermes-capture/**",
+            "repos/sample-consumer/docker/sample-capture/**",
             "--json",
         ],
     )

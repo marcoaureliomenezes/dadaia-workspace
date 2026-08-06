@@ -319,9 +319,9 @@ def test_shared_host_ancestor_pids_do_not_shadow_the_own_session_marker(
     old any-membership set rule collapsed to ambiguity-None whenever >=2 live markers
     shared those deep pids."""
     ws = _mk_ws(tmp_path, slug="dadaia-workspace")
-    (ws / "repos" / "dd-chain-capture" / "specs").mkdir(parents=True)
+    (ws / "repos" / "sample-consumer" / "specs").mkdir(parents=True)
     _stamp(ws, "dadaia-workspace", chain=[2106163, 2084177, 2084140, 2064281, 2063868])
-    _stamp(ws, "dd-chain-capture", chain=[2067019, 2066011, 2064281, 2063868])
+    _stamp(ws, "sample-consumer", chain=[2067019, 2066011, 2064281, 2063868])
     caller_chain = (2109665, 2084177, 2084140, 2064281, 2063868, 2063864)
 
     assert specs_resolver._persisted_bind_context(ws, caller_chain) == "dadaia-workspace"  # type: ignore[arg-type]

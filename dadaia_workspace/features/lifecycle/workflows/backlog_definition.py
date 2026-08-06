@@ -954,7 +954,7 @@ class BacklogDefinitionWorkflow(_FragmentAssemblyMixin):
                 # Every backlog model step is a CREATE step: it must pass on a schema-valid
                 # payload, never a verdict (L1).
                 is_review=False,
-                # Bug codex-live-workflow-sandbox-unavailable-in-hermes-worker (0.3.1
+                # Bug codex-live-workflow-sandbox-unavailable-in-consumer-worker (0.3.1
                 # retest): a worker that "completes" without writing a backlog item must
                 # BLOCK AT THIS STEP with the worker's own diagnostic (and get the one
                 # bounded structural-correction retry), not sail through on its

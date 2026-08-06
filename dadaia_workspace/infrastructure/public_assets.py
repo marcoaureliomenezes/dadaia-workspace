@@ -777,7 +777,7 @@ class FileSystemPublicAssetManager:
                 self._install_kimi_code(agentic_dir, workspace_root, force, installed, only=only)
 
         # The git-chokepoint scripts are harness-independent: EVERY Layer-1 harness
-        # target gets them (v0.2.8 hermes bug kimi-only-init-public-doctor-missing-
+        # target gets them (v0.2.8 consumer bug kimi-only-init-public-doctor-missing-
         # managed-scripts — a pi-only or kimi-only workspace must also read doctor-green;
         # the doctor's dadaia:scripts/* lines are unconditional, so a per-harness install
         # that skipped them left single-harness workspaces permanently red).
