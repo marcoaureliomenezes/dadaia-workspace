@@ -10,6 +10,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from dadaia_workspace.core import kernel_tunables
+from dadaia_workspace.core.execute_bit import PLATFORM_HAS_EXECUTE_BIT
 from dadaia_workspace.core.models.spec_context import ContextState
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.core.protocols.context_store import ContextStore
@@ -370,7 +371,7 @@ class DoctorService:
                     fixable=False,
                 )
             ]
-        if not os.access(entry, os.X_OK):
+        if PLATFORM_HAS_EXECUTE_BIT and not os.access(entry, os.X_OK):
             return [
                 DoctorIssue(
                     code="VENV-1",

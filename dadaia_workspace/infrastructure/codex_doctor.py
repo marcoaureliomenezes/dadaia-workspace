@@ -15,6 +15,7 @@ import subprocess
 import tomllib
 from pathlib import Path
 
+from dadaia_workspace.core.execute_bit import PLATFORM_HAS_EXECUTE_BIT
 from dadaia_workspace.core.rule_corpus import (
     CITER_GLOBS,
     RULES_DIR,
@@ -313,7 +314,7 @@ def dcx9_codex_hook_shape(workspace_root: Path) -> list[str]:
         if not wrapper.is_file():
             out.append(f"[missing] codex hook wrapper {command} (D-CX-9)")
             continue
-        if not os.access(wrapper, os.X_OK):
+        if PLATFORM_HAS_EXECUTE_BIT and not os.access(wrapper, os.X_OK):
             out.append(f"[error] codex hook wrapper not executable {command} (D-CX-9)")
             continue
         try:

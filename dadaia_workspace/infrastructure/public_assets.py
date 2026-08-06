@@ -13,6 +13,7 @@ from typing import Literal
 
 from dadaia_workspace.core.agent_model_templates import CORE_AGENTS, resolve_agent_model
 from dadaia_workspace.core.exceptions import PublicAssetError
+from dadaia_workspace.core.execute_bit import PLATFORM_HAS_EXECUTE_BIT
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES, PROJECTION_TARGETS
 from dadaia_workspace.core.models.agent_model_policy import (
     AgentModelPolicyOverlay,
@@ -1456,6 +1457,12 @@ class FileSystemPublicAssetManager:
         hook wrapper that is not executable. One instance checked and the sibling left out
         is the shape this repository keeps rediscovering; this closes it for the chokepoints.
         """
+        if not PLATFORM_HAS_EXECUTE_BIT:
+            # Nothing to inspect and nothing to repair: git carries the executable flag in
+            # its index here, not in the filesystem. Reporting drift a chmod can never
+            # clear turns doctor into a permanent red (bug
+            # doctor-reports-unrepairable-exec-bit-drift-on-windows).
+            return []
         scripts_dir = workspace_root / ".dadaia" / "scripts"
         if not scripts_dir.is_dir():
             return []
@@ -1487,7 +1494,7 @@ class FileSystemPublicAssetManager:
             dst = home / "hooks" / name
             label = f"kimi-code:hooks/{name}"
             line = self._compare_content(content, dst, label)
-            if line.startswith("[ok]") and not os.access(dst, os.X_OK):
+            if line.startswith("[ok]") and PLATFORM_HAS_EXECUTE_BIT and not os.access(dst, os.X_OK):
                 # The installer chmods 0o755, so cleared mode bits ARE repairable drift.
                 # Intact mode bits with X_OK denied means the MOUNT forbids execution
                 # (noexec) — reinstalling can never fix that, so reporting it as drift

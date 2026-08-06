@@ -132,9 +132,12 @@ def test_the_baseline_refusal_prescribes_commands_not_advice() -> None:
     """
     from dadaia_workspace.features.spec_context.service import baseline_dirty_refusal
 
-    text = baseline_dirty_refusal(name="demo", repo_path=Path("/w/repos/demo"))
+    # Rendered through the same Path the caller passes: the claim is that the repository
+    # is NAMED, not that it is spelled with forward slashes (which is false on Windows).
+    repo = Path("/w/repos/demo")
+    text = baseline_dirty_refusal(name="demo", repo_path=repo)
 
-    assert "/w/repos/demo" in text, "name the repository, do not leave it implicit"
-    assert "git -C /w/repos/demo commit" in text, text
-    assert "git -C /w/repos/demo stash" in text, text
+    assert str(repo) in text, "name the repository, do not leave it implicit"
+    assert f"git -C {repo} commit" in text, text
+    assert f"git -C {repo} stash" in text, text
     assert "<" not in text and ">" not in text, f"no placeholders: {text}"

@@ -25,9 +25,17 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.execute_bit import PLATFORM_HAS_EXECUTE_BIT
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
+
+# The whole module is about repairing a permission bit. Where the platform has none there
+# is nothing to strip and nothing to restore, and the doctor deliberately stays silent
+# (bug doctor-reports-unrepairable-exec-bit-drift-on-windows).
+pytestmark = pytest.mark.skipif(
+    not PLATFORM_HAS_EXECUTE_BIT, reason="no POSIX execute bit on this platform"
+)
 
 pytestmark = pytest.mark.unit
 
