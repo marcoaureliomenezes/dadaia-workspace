@@ -16,6 +16,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.execute_bit import PLATFORM_HAS_EXECUTE_BIT
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.runtime_config import (
     KIMI_BLOCK_BEGIN,
@@ -142,6 +143,7 @@ def test_doctor_flags_shim_drift(workspace: Path, kimi_home: Path) -> None:
 
 
 @pytest.mark.skipif(os.name == "nt", reason="Windows cannot clear Unix exec bits via chmod")
+@pytest.mark.skipif(not PLATFORM_HAS_EXECUTE_BIT, reason="no POSIX execute bit on this platform")
 def test_doctor_flags_shim_not_executable(workspace: Path, kimi_home: Path) -> None:
     mgr = FileSystemPublicAssetManager()
     _install(workspace, mgr)
@@ -201,6 +203,7 @@ def test_doctor_without_kimi_projection_is_silent_when_out_of_profile(
 
 
 @pytest.mark.skipif(os.name == "nt", reason="POSIX mount semantics")
+@pytest.mark.skipif(not PLATFORM_HAS_EXECUTE_BIT, reason="no POSIX execute bit on this platform")
 def test_doctor_reports_noexec_home_as_unsupported_not_repairable_drift(
     workspace: Path, kimi_home: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

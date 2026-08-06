@@ -18,6 +18,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.execute_bit import PLATFORM_RUNS_POSIX_SCRIPTS
 from dadaia_workspace.features.specs import Severity, SpecsDoctor
 from dadaia_workspace.features.specs.scaffolder import scaffold, scaffold_release_segment
 
@@ -70,7 +71,13 @@ def test_the_prescribed_command_writes_every_key_active_md_needs(tmp_path: Path)
         assert key in payload, f"the remedy would write an ACTIVE.md with no {key}: {payload}"
 
 
-@pytest.mark.skipif(_SH is None, reason="the remedy is a POSIX shell command; no sh on this host")
+@pytest.mark.skipif(
+    _SH is None or not PLATFORM_RUNS_POSIX_SCRIPTS,
+    reason=(
+        "the remedy is a POSIX shell command over POSIX paths; Windows ships an sh via "
+        "Git but hands it backslash-separated paths, which sh reads as escapes"
+    ),
+)
 def test_the_prescribed_command_leaves_the_tree_clean(tmp_path: Path) -> None:
     specs = _tree(tmp_path)
 

@@ -15,6 +15,8 @@ import stat
 
 import pytest
 
+from dadaia_workspace.core.execute_bit import PLATFORM_HAS_EXECUTE_BIT
+
 pytest.importorskip("fcntl")
 
 from pathlib import Path  # noqa: E402
@@ -76,6 +78,10 @@ def _setup_non_executable(tp: Path) -> None:
             _setup_non_executable,
             True,
             id="non-executable-entrypoint-triggers-finding",
+            marks=pytest.mark.skipif(
+                not PLATFORM_HAS_EXECUTE_BIT,
+                reason="no POSIX execute bit on this platform",
+            ),
         ),
     ],
 )

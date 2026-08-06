@@ -33,11 +33,11 @@ from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentMana
 # The whole module is about repairing a permission bit. Where the platform has none there
 # is nothing to strip and nothing to restore, and the doctor deliberately stays silent
 # (bug doctor-reports-unrepairable-exec-bit-drift-on-windows).
-pytestmark = pytest.mark.skipif(
+_POSIX_ONLY = pytest.mark.skipif(
     not PLATFORM_HAS_EXECUTE_BIT, reason="no POSIX execute bit on this platform"
 )
 
-pytestmark = pytest.mark.unit
+pytestmark = [pytest.mark.unit, _POSIX_ONLY]
 
 _SHIM = "dadaia-kimi-pre-gate.sh"
 

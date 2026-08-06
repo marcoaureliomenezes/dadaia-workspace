@@ -30,6 +30,7 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.commands.public import app as public_app
+from dadaia_workspace.core.execute_bit import PLATFORM_RUNS_POSIX_SCRIPTS
 from dadaia_workspace.core.models.harness_profile import HarnessProfile
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
@@ -293,6 +294,13 @@ def test_out_of_profile_runtime_present_is_not_silent(
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skipif(
+    not PLATFORM_RUNS_POSIX_SCRIPTS,
+    reason=(
+        "the locked report contains the codex wrapper PROBE lines, and the probe runs a "
+        "#!-headed script — a platform that cannot launch one has no equivalent output"
+    ),
+)
 def test_absent_profile_doctor_byte_equals_all_four_golden(tmp_path: Path) -> None:
     """Q2/A4: the absent-profile doctor path reproduces the W1 all-four doctor golden byte-for-byte.
 

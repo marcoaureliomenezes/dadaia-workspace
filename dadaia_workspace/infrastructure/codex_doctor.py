@@ -15,7 +15,10 @@ import subprocess
 import tomllib
 from pathlib import Path
 
-from dadaia_workspace.core.execute_bit import PLATFORM_HAS_EXECUTE_BIT
+from dadaia_workspace.core.execute_bit import (
+    PLATFORM_HAS_EXECUTE_BIT,
+    PLATFORM_RUNS_POSIX_SCRIPTS,
+)
 from dadaia_workspace.core.rule_corpus import (
     CITER_GLOBS,
     RULES_DIR,
@@ -316,6 +319,14 @@ def dcx9_codex_hook_shape(workspace_root: Path) -> list[str]:
             continue
         if PLATFORM_HAS_EXECUTE_BIT and not os.access(wrapper, os.X_OK):
             out.append(f"[error] codex hook wrapper not executable {command} (D-CX-9)")
+            continue
+        if not PLATFORM_RUNS_POSIX_SCRIPTS:
+            # CreateProcess rejects a #!-headed script outright, so running it would
+            # report a launch failure that says nothing about the wrapper. Its content is
+            # already compared byte-for-byte above; the behavioural probe is POSIX-only.
+            # Stay SILENT rather than emit an [ok]: the POSIX success path reports nothing
+            # either, and a platform-conditional extra line breaks the byte-identical
+            # doctor goldens for no diagnostic gain.
             continue
         try:
             proc = subprocess.run(

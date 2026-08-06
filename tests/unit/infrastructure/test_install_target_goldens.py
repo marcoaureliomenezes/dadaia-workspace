@@ -45,6 +45,7 @@ from typing import Any
 
 import pytest
 
+from dadaia_workspace.core.execute_bit import PLATFORM_RUNS_POSIX_SCRIPTS
 from dadaia_workspace.core.models.agent import AgentDTO
 from dadaia_workspace.core.models.telemetry import AgentSummary, TokenTotals
 from dadaia_workspace.features.panel.service import PanelService
@@ -259,6 +260,13 @@ def test_panel_runtime_validation_is_byte_identical(tmp_path: Path) -> None:
     )
 
 
+@pytest.mark.skipif(
+    not PLATFORM_RUNS_POSIX_SCRIPTS,
+    reason=(
+        "the locked report contains the codex wrapper PROBE lines, and the probe runs a "
+        "#!-headed script — a platform that cannot launch one has no equivalent output"
+    ),
+)
 def test_doctor_all_four_report_is_byte_identical(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

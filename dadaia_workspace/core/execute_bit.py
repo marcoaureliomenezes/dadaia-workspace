@@ -17,6 +17,15 @@ from __future__ import annotations
 
 import os
 
+_POSIX = os.name != "nt"
+
 #: True where a file's execute permission is a real, inspectable, settable filesystem
 #: property. False on Windows, where the concept does not exist.
-PLATFORM_HAS_EXECUTE_BIT: bool = os.name != "nt"
+PLATFORM_HAS_EXECUTE_BIT: bool = _POSIX
+
+#: True where the OS can launch a ``#!``-headed script directly. On Windows it cannot —
+#: ``CreateProcess`` rejects a ``.sh`` with ``[WinError 193] %1 is not a valid Win32
+#: application`` — so probing a projected wrapper by running it reports a failure that
+#: says nothing about the wrapper. Same predicate as above today, deliberately a separate
+#: name: they are different questions, and a later platform could answer them differently.
+PLATFORM_RUNS_POSIX_SCRIPTS: bool = _POSIX
