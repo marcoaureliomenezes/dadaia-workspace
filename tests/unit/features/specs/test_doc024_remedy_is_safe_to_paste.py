@@ -12,13 +12,17 @@ tree the operator is left with is doctor-clean.
 from __future__ import annotations
 
 import re
+import shutil
 import subprocess
 from pathlib import Path
+
+import pytest
 
 from dadaia_workspace.features.specs import Severity, SpecsDoctor
 from dadaia_workspace.features.specs.scaffolder import scaffold, scaffold_release_segment
 
 _TEMPLATES_DIR = Path(__file__).resolve().parents[4] / "dadaia_workspace" / "public" / "templates"
+_SH = shutil.which("sh")
 
 
 def _tree(tmp_path: Path) -> Path:
@@ -46,16 +50,34 @@ def _tree(tmp_path: Path) -> Path:
     return specs
 
 
+def _remedy(specs: Path) -> str:
+    doc024 = [i for i in SpecsDoctor(specs).check() if i.code == "SPEC-DOC-024"]
+    assert doc024, "the fixture did not reproduce the finding"
+    command = re.search(r"(printf [^\s].*?ACTIVE\.md)", doc024[0].description)
+    assert command, f"no pasteable command in: {doc024[0].description}"
+    return command.group(1)
+
+
+def test_the_prescribed_command_writes_every_key_active_md_needs(tmp_path: Path) -> None:
+    """The regression was a payload missing `segment:`, and that is readable without a shell.
+
+    Kept separate from the execution test below so every platform still guards the defect
+    that actually happened — a partial ACTIVE.md — even where no POSIX shell exists.
+    """
+    payload = _remedy(_tree(tmp_path))
+
+    for key in ("release:", "segment:", "phase:"):
+        assert key in payload, f"the remedy would write an ACTIVE.md with no {key}: {payload}"
+
+
+@pytest.mark.skipif(_SH is None, reason="the remedy is a POSIX shell command; no sh on this host")
 def test_the_prescribed_command_leaves_the_tree_clean(tmp_path: Path) -> None:
     specs = _tree(tmp_path)
 
-    doc024 = [i for i in SpecsDoctor(specs).check() if i.code == "SPEC-DOC-024"]
-    assert doc024, "the fixture did not reproduce the finding"
-
-    command = re.search(r"(printf [^\s].*?ACTIVE\.md)", doc024[0].description)
-    assert command, f"no pasteable command in: {doc024[0].description}"
-
-    subprocess.run(command.group(1), shell=True, check=True, cwd=tmp_path)
+    # Run it through `sh` explicitly rather than shell=True, whose shell is cmd.exe on
+    # Windows — the remedy is POSIX-shell shaped (printf, redirection), so cmd.exe could
+    # never run it and the failure would say nothing about the remedy's correctness.
+    subprocess.run([str(_SH), "-c", _remedy(specs)], check=True, cwd=tmp_path)
 
     after = SpecsDoctor(specs).check()
     errors = [i for i in after if i.severity == Severity.ERROR]
