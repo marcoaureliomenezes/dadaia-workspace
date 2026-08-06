@@ -81,7 +81,6 @@ def render_index(
   <link rel="stylesheet" href="/static/tokens.css">
   <link rel="stylesheet" href="/static/structure.css">
   <link rel="stylesheet" href="/static/projects.css">
-  <link rel="stylesheet" href="/static/workflow-policy.css">
   <link rel="stylesheet" href="/static/agent-policy.css">
   <link rel="stylesheet" href="/static/sessions.css">
   <link rel="stylesheet" href="/static/academy.css">
