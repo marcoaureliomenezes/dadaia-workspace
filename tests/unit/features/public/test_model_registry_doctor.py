@@ -17,6 +17,16 @@ import pytest
 from dadaia_workspace.features.public.model_resolution import check_model_resolution
 
 
+def _rendered(result: object) -> list[str]:
+    """Legacy string view of a typed doctor result (DoctorReport | list[DoctorLine])."""
+    if hasattr(result, "rendered"):
+        return result.rendered()  # type: ignore[attr-defined, no-any-return]
+    return [
+        line.render() if hasattr(line, "render") else str(line)
+        for line in result  # type: ignore[union-attr]
+    ]
+
+
 def _write_agent(agents_dir: Path, name: str, model: str) -> None:
     agents_dir.mkdir(parents=True, exist_ok=True)
     (agents_dir / f"{name}.md").write_text(
@@ -47,7 +57,7 @@ def test_keyset_desync_modelmap_vs_pricing_errors(
     public_dir = tmp_path / "public"
     public_dir.mkdir()
 
-    reports = check_model_resolution(public_dir)
+    reports = _rendered(check_model_resolution(public_dir))
 
     assert _has_error(reports)
     desync_lines = [r for r in reports if "key-set" in r.lower() or "desync" in r.lower()]
@@ -65,7 +75,7 @@ def test_current_tree_resolves_clean() -> None:
     public_dir = Path(__file__).resolve().parents[4] / "dadaia_workspace" / "public"
     assert public_dir.is_dir(), public_dir
 
-    reports = check_model_resolution(public_dir)
+    reports = _rendered(check_model_resolution(public_dir))
 
     assert not _has_error(reports), reports
     assert "[ok] model-resolution" in reports
@@ -101,7 +111,7 @@ def test_unknown_model_variants(
     # agent frontmatter
     public_dir = tmp_path / "agent"
     _write_agent(public_dir / "agents", "ghost-agent", "claude-does-not-exist")
-    reports = check_model_resolution(public_dir)
+    reports = _rendered(check_model_resolution(public_dir))
     assert _has_error(reports)
     offending = [r for r in reports if "ghost-agent" in r]
     assert offending, reports
@@ -115,7 +125,7 @@ def test_unknown_model_variants(
         applied_template=None,
         overrides={"software-engineer": AgentModelOverride(model="claude-ghost-9")},
     )
-    overlay_reports = check_model_resolution(overlay_dir, overlay=bad_overlay)
+    overlay_reports = _rendered(check_model_resolution(overlay_dir, overlay=bad_overlay))
     assert _has_error(overlay_reports), overlay_reports
     assert any("software-engineer" in line for line in overlay_reports), overlay_reports
 
@@ -123,20 +133,20 @@ def test_unknown_model_variants(
     clean_overlay_dir = tmp_path / "overlay-clean"
     clean_overlay_dir.mkdir()
     good_overlay = AgentModelPolicyOverlay(applied_template="subscription-saver", overrides={})
-    clean_reports = check_model_resolution(clean_overlay_dir, overlay=good_overlay)
+    clean_reports = _rendered(check_model_resolution(clean_overlay_dir, overlay=good_overlay))
     assert clean_reports == ["[ok] model-resolution"], clean_reports
 
     # known model in agent frontmatter stays clean
     known_dir = tmp_path / "known"
     _write_agent(known_dir / "agents", "good-agent", "claude-fable-5")
     _write_agent(known_dir / "agents", "another", "claude-opus-4-8")
-    known_reports = check_model_resolution(known_dir)
+    known_reports = _rendered(check_model_resolution(known_dir))
     assert not _has_error(known_reports)
     assert "[ok] model-resolution" in known_reports
 
     # plugin pack staged frontmatter
     plugin_dir = tmp_path / "plugin"
     _write_agent(plugin_dir / "plugins" / "somepack" / "agents", "pack-agent", "claude-bogus-1")
-    plugin_reports = check_model_resolution(plugin_dir)
+    plugin_reports = _rendered(check_model_resolution(plugin_dir))
     assert _has_error(plugin_reports), plugin_reports
     assert any("pack-agent" in line for line in plugin_reports), plugin_reports

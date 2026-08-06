@@ -20,28 +20,19 @@ import fnmatch
 import os
 from pathlib import Path
 
+from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.hooks import _common
 
-#: Whitelisted root-level basenames (The Law).
-_WHITELIST: frozenset[str] = frozenset(
-    {
-        ".agents",
-        ".claude",
-        ".codex",
-        ".dadaia",
-        ".kimi-code",
-        ".pi",
-        "repos",
-        "AGENTS.md",
-        "CLAUDE.md",
-        "DADAIA.md",
-        "prompt.md",
-    }
+#: Whitelisted root-level basenames (The Law) — DERIVED from the single authority
+#: ``core/workspace_layout.py`` so this hook and the workspace doctor can never diverge
+#: (they did, the day DADAIA.md was added to one and not the other).
+_WHITELIST: frozenset[str] = (
+    workspace_layout.ROOT_ALLOWED_DIRS | workspace_layout.ROOT_ALLOWED_FILES
 )
 
 #: Root-level basenames that are FILES (everything else in ``_WHITELIST`` is a
 #: directory and renders with a trailing slash in operator-facing text).
-_ROOT_FILES: frozenset[str] = frozenset({"AGENTS.md", "CLAUDE.md", "DADAIA.md", "prompt.md"})
+_ROOT_FILES: frozenset[str] = workspace_layout.ROOT_ALLOWED_FILES
 
 
 def _render_whitelist() -> str:

@@ -20,7 +20,10 @@ from dadaia_workspace.core.models.agent_model_policy import (
     AgentModelPolicyStoreError,
     ResolvedAgentModel,
 )
+from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus, attest
+from dadaia_workspace.core.models.install_ledger import InstallLedger, LedgerEntry
 from dadaia_workspace.core.models.plugin_pack import InstalledPlugins
+from dadaia_workspace.core.protocols.install_ledger_store import InstallLedgerStore
 from dadaia_workspace.core.protocols.plugin_store import PluginStore
 from dadaia_workspace.infrastructure.codex_doctor import (
     check_agent_skill_refs,
@@ -60,6 +63,7 @@ from dadaia_workspace.infrastructure.json_agent_model_policy_store import (
     JsonAgentModelPolicyStore,
 )
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
+from dadaia_workspace.infrastructure.json_install_ledger_store import JsonInstallLedgerStore
 from dadaia_workspace.infrastructure.json_plugin_store import JsonPluginStore
 
 # Several names below are imported purely for re-export, so tests and other
@@ -141,11 +145,15 @@ from dadaia_workspace.infrastructure.workspace_guardrail import (  # noqa: F401
     _is_source_repo_root,
 )
 
+
 #: Non-silent doctor line for a runtime whose directory physically exists on disk but is
 #: NOT in the persisted harness profile (A3, v0.1.58 FR3). Emitted in place of the scoped
 #: drift block so a stale/hand-installed out-of-profile runtime never reads green-with-zero-
 #: lines. ``[warn]`` is non-blocking (CLI exit stays 0) but visible.
-_OUT_OF_PROFILE_WARN = "[warn] {harness}: out-of-profile runtime present (drift unchecked)"
+def _out_of_profile_warn(harness: str) -> DoctorLine:
+    return DoctorLine(
+        DoctorStatus.WARN, f"{harness}: out-of-profile runtime present (drift unchecked)"
+    )
 
 
 _DADAIA_MD_TARGETS_ALL: tuple[str, ...] = (
@@ -155,13 +163,18 @@ _DADAIA_MD_TARGETS_ALL: tuple[str, ...] = (
 
 
 class FileSystemPublicAssetManager:
-    def __init__(self, plugin_store: PluginStore = JsonPluginStore()) -> None:
+    def __init__(
+        self,
+        plugin_store: PluginStore = JsonPluginStore(),
+        install_ledger_store: InstallLedgerStore = JsonInstallLedgerStore(),
+    ) -> None:
         # Injectable installed-plugins ledger seam (T-61-20 / FR4). The same-layer
         # ``JsonPluginStore()`` default is legal (infrastructure consuming
         # infrastructure); the composition root (``container.build_plugin_store``)
         # injects the port for CLI consumers.
         self._public_dir = Path(__file__).parent.parent / "public"
         self._plugin_store = plugin_store
+        self._install_ledger_store = install_ledger_store
 
     # ------------------------------------------------------------------
     # Thin delegators (T-017-11) — preserve the historical method surface
@@ -225,22 +238,22 @@ class FileSystemPublicAssetManager:
             installed,
         )
 
-    def _check_codex_drift(self, agentic_dir: Path, workspace_root: Path) -> list[str]:
+    def _check_codex_drift(self, agentic_dir: Path, workspace_root: Path) -> list[DoctorLine]:
         return check_codex_drift(agentic_dir, workspace_root, self._public_dir)
 
-    def _dcx1_missing_toml(self, agentic_dir: Path, codex_dir: Path) -> list[str]:
+    def _dcx1_missing_toml(self, agentic_dir: Path, codex_dir: Path) -> list[DoctorLine]:
         return dcx1_missing_toml(agentic_dir, codex_dir)
 
-    def _dcx2_config_toml_entries(self, agentic_dir: Path, codex_dir: Path) -> list[str]:
+    def _dcx2_config_toml_entries(self, agentic_dir: Path, codex_dir: Path) -> list[DoctorLine]:
         return dcx2_config_toml_entries(agentic_dir, codex_dir)
 
-    def _dcx4_claude_strings(self, codex_dir: Path) -> list[str]:
+    def _dcx4_claude_strings(self, codex_dir: Path) -> list[DoctorLine]:
         return dcx4_claude_strings(codex_dir)
 
-    def _dcx5_empty_developer_instructions(self, codex_dir: Path) -> list[str]:
+    def _dcx5_empty_developer_instructions(self, codex_dir: Path) -> list[DoctorLine]:
         return dcx5_empty_developer_instructions(codex_dir)
 
-    def _dcx6_codex_runtime_adapters(self, workspace_root: Path) -> list[str]:
+    def _dcx6_codex_runtime_adapters(self, workspace_root: Path) -> list[DoctorLine]:
         return dcx6_codex_runtime_adapters(workspace_root, self._public_dir)
 
     def _claude_settings(self, workspace_root: Path) -> dict[str, object]:
@@ -583,7 +596,7 @@ class FileSystemPublicAssetManager:
         workspace_root: Path,
         active: set[str],
         overlay: AgentModelPolicyOverlay | None = None,
-    ) -> list[str]:
+    ) -> list[DoctorLine]:
         """Report ``[ok]``/``[drift]``/``[missing]`` per installed-pack projected file.
 
         A stale or out-of-manifest installed-pack file is never silent (AC-5). A no-op when
@@ -591,7 +604,7 @@ class FileSystemPublicAssetManager:
         golden (b).
         """
         packs = self._installed_plugins(workspace_root)
-        out: list[str] = []
+        out: list[DoctorLine] = []
         for pack in packs:
             pack_dir = agentic_dir / "plugins" / pack
             for md in sorted((pack_dir / "agents").glob("*.md")):
@@ -611,7 +624,11 @@ class FileSystemPublicAssetManager:
                 if "codex" in active:
                     toml = workspace_root / ".codex" / "agents" / f"{name}.toml"
                     label = f"plugin:{pack}:codex/agents/{name}.toml"
-                    out.append(f"[ok] {label}" if toml.exists() else f"[missing] {label}")
+                    out.append(
+                        DoctorLine(DoctorStatus.OK, f"{label}")
+                        if toml.exists()
+                        else DoctorLine(DoctorStatus.MISSING, f"{label}")
+                    )
             for skill in sorted(self._iter_files(pack_dir / "skills")):
                 if skill.name == ".gitkeep":
                     continue
@@ -631,7 +648,7 @@ class FileSystemPublicAssetManager:
                     )
         return out
 
-    def doctor_plugins(self, workspace_root: Path) -> list[str]:
+    def doctor_plugins(self, workspace_root: Path) -> list[DoctorLine]:
         """Public wrapper: per-installed-pack projected-file doctor lines (profile-scoped)."""
         agentic_dir = workspace_root / ".dadaia" / "agentic"
         profile = self._profile_harnesses(workspace_root)
@@ -818,31 +835,117 @@ class FileSystemPublicAssetManager:
         # canonical file shape; preserve any unrelated/operator-owned directory content.
         remove_legacy_workflow_projections(workspace_root, installed)
 
+        # LEDGER RECONCILIATION (bug retired-lib-asset-leaves-orphan-projection): the
+        # desired state is diffed against the RECORD of what a prior install wrote —
+        # never against whatever the current source happens to carry, which is blind to
+        # a retired family. Full reconciliation (prune) runs only on an all-target,
+        # all-scope install; a scoped install merges its entries and never prunes, so a
+        # `--target claude` run cannot see codex entries as stale.
+        self._reconcile_install_ledger(
+            workspace_root,
+            installed,
+            full=(target == "all" and scope == "all"),
+        )
+
         return installed
 
-    def doctor(self, workspace_root: Path) -> list[str]:
+    def _reconcile_install_ledger(
+        self,
+        workspace_root: Path,
+        installed: list[str],
+        *,
+        full: bool,
+    ) -> None:
+        """Record what this run projected; prune what a PRIOR run projected and the
+        library no longer ships.
+
+        Safety invariant (never weakened): a path is pruned only when it (a) appears in
+        the previous ledger, (b) is absent from the current projection set, and (c) still
+        carries the ledgered sha on disk. An operator-modified orphan is retained and
+        surfaced with a ``[warn]``; a missing/corrupt previous ledger bootstraps —
+        record everything, prune nothing.
+        """
+        states_dir = workspace_root / ".dadaia" / "states"
+        ws = workspace_root.resolve()
+
+        # The install transcript is the complete capture of every file this run wrote
+        # ([ok]) or verified as identical ([skip]) — the projection set of THIS run.
+        current: dict[str, LedgerEntry] = {}
+        for line in installed:
+            if line.startswith("[ok]   "):
+                raw = line[len("[ok]   ") :]
+            elif line.startswith("[skip] "):
+                raw = line[len("[skip] ") :]
+            else:
+                continue
+            candidate = Path(raw.split(" — ")[0].split(" (")[0].strip())
+            try:
+                rel = candidate.resolve().relative_to(ws)
+            except (ValueError, OSError):
+                continue  # user-level files (e.g. $KIMI_CODE_HOME) are not workspace state
+            rel_posix = rel.as_posix()
+            if rel_posix.startswith(".dadaia/states/"):
+                continue  # never ledger the state dir (the ledger itself lives there)
+            if not candidate.is_file():
+                continue
+            family = rel.parts[0].lstrip(".") if len(rel.parts) > 1 else "root"
+            current[rel_posix] = LedgerEntry(
+                relpath=rel_posix, sha256=_sha256(candidate), family=family
+            )
+
+        previous = self._install_ledger_store.read(states_dir)
+        merged: dict[str, LedgerEntry] = {}
+        if previous is not None:
+            merged.update(previous.by_relpath())
+
+        if full and previous is not None:
+            for rel_posix, entry in previous.by_relpath().items():
+                if rel_posix in current:
+                    continue
+                path = ws / entry.relpath
+                if not path.is_file():
+                    merged.pop(rel_posix, None)
+                    continue
+                if _sha256(path) == entry.sha256:
+                    path.unlink()
+                    installed.append(f"[prune] {path}")
+                    self._prune_empty_dirs(path.parent, ws)
+                    merged.pop(rel_posix, None)
+                else:
+                    installed.append(f"[warn] operator-modified orphan retained: {path}")
+                    merged.pop(rel_posix, None)
+
+        merged.update(current)
+        self._install_ledger_store.write(
+            states_dir,
+            InstallLedger.of(sorted(merged.values(), key=lambda e: e.relpath)),
+        )
+
+    def doctor(self, workspace_root: Path) -> list[DoctorLine]:
         if not self._public_dir.exists():
             raise PublicAssetError(f"Public assets directory not found: {self._public_dir}")
 
         agentic_dir = workspace_root / ".dadaia" / "agentic"
-        reports: list[str] = []
+        reports: list[DoctorLine] = []
 
         for src in self._iter_files(self._public_dir):
             rel = src.relative_to(self._public_dir)
             reports.append(self._compare(src, agentic_dir / rel, f"stage:{rel.as_posix()}"))
 
         if not (agentic_dir / "manifest.json").exists():
-            reports.append("[missing] stage:manifest.json")
+            reports.append(DoctorLine(DoctorStatus.MISSING, "stage:manifest.json"))
 
         index_path = agentic_dir / "agents.index.json"
         if not index_path.exists():
-            reports.append("[missing] stage:agents.index.json")
+            reports.append(DoctorLine(DoctorStatus.MISSING, "stage:agents.index.json"))
         else:
             try:
                 json.loads(index_path.read_text(encoding="utf-8"))
-                reports.append("[ok] stage:agents.index.json")
+                reports.append(DoctorLine(DoctorStatus.OK, "stage:agents.index.json"))
             except (json.JSONDecodeError, OSError):
-                reports.append("[drift] stage:agents.index.json (invalid JSON)")
+                reports.append(
+                    DoctorLine(DoctorStatus.DRIFT, "stage:agents.index.json (invalid JSON)")
+                )
 
         # Resolve the profile-scoped active harness set FIRST — it scopes BOTH the
         # runtime_expectations projection loop below (its claude:* projection lines) AND the
@@ -870,7 +973,7 @@ class FileSystemPublicAssetManager:
         try:
             overlay = self._load_agent_policy(workspace_root, agentic_dir)
         except AgentModelPolicyStoreError as exc:
-            reports.append(f"[drift] agent-model-policy ERROR: {exc}")
+            reports.append(DoctorLine(DoctorStatus.DRIFT, f"agent-model-policy ERROR: {exc}"))
         resolved_models = self._resolved_core_models(overlay)
 
         for expected_src, dst, label, transform in runtime_expectations(
@@ -903,7 +1006,7 @@ class FileSystemPublicAssetManager:
             if expected_src is None and transform:
                 reports.append(self._compare_content(_CLAUDE_MD_STUB, dst, label))
             elif expected_src is None:
-                reports.append(f"[unsupported] {label}")
+                reports.append(DoctorLine(DoctorStatus.UNSUPPORTED, f"{label}"))
             elif (
                 label.startswith("claude:agents/")
                 and label.endswith(".md")
@@ -930,13 +1033,15 @@ class FileSystemPublicAssetManager:
         # Without this the law was staged-checked only, and a hand-edited projection read
         # doctor-green.
         law_src = agentic_dir / "data" / "DADAIA.md"
+        law_lines: list[DoctorLine] = []
         if law_src.is_file():
             law_rels = ["DADAIA.md"] + [
                 rel for name, rel in sorted(_DADAIA_MD_HARNESS_TARGETS.items()) if name in active
             ]
             for law_rel in law_rels:
                 law_dst = workspace_root / law_rel
-                reports.append(self._compare(law_src, law_dst, f"law:{law_rel}"))
+                law_lines.append(self._compare(law_src, law_dst, f"law:{law_rel}"))
+        reports.extend(attest("law-projection", law_lines))
 
         # Consumer-repo guardrail pair (FR9, bug public-doctor-flags-hand-authored-consumer-
         # agents-md): the `repos/<slug>:AGENTS.md`/`:CLAUDE.md` lines flow through the SINGLE
@@ -963,7 +1068,7 @@ class FileSystemPublicAssetManager:
         if "claude" in active:
             reports.extend(self._doctor_claude_settings(workspace_root))
         elif (workspace_root / ".claude").exists():
-            reports.append(_OUT_OF_PROFILE_WARN.format(harness="claude"))
+            reports.append(_out_of_profile_warn("claude"))
 
         # Codex generated-config projection — scoped to `codex in profile`.
         if "codex" in active:
@@ -997,7 +1102,7 @@ class FileSystemPublicAssetManager:
                 )
             )
         elif (workspace_root / ".codex").exists():
-            reports.append(_OUT_OF_PROFILE_WARN.format(harness="codex"))
+            reports.append(_out_of_profile_warn("codex"))
 
         # PI (Layer-2 worker harness) — scoped to `pi in profile`.
         pi_staged = agentic_dir / "pi"
@@ -1007,7 +1112,7 @@ class FileSystemPublicAssetManager:
                 rel = staged.relative_to(pi_staged)
                 reports.append(self._compare(staged, pi_projected / rel, f"pi:{rel.as_posix()}"))
         elif pi_projected.exists():
-            reports.append(_OUT_OF_PROFILE_WARN.format(harness="pi"))
+            reports.append(_out_of_profile_warn("pi"))
 
         # Kimi Code (Layer-1 entry harness, v0.2.8) — scoped to `kimi-code in profile`.
         kimi_staged = agentic_dir / "kimi-code"
@@ -1020,7 +1125,7 @@ class FileSystemPublicAssetManager:
                 )
             reports.extend(self._check_kimi_user_hooks())
         elif kimi_projected.exists():
-            reports.append(_OUT_OF_PROFILE_WARN.format(harness="kimi-code"))
+            reports.append(_out_of_profile_warn("kimi-code"))
 
         # Harness-independent checks stay unconditional. The rule-corpus check
         # early-returns on an absent .codex/agents; skill/memory/privacy checks read the
@@ -1031,12 +1136,12 @@ class FileSystemPublicAssetManager:
         # which would make a claude-only/pi-only `public doctor` exit 1 (AC-5 unachievable).
         if "codex" in active:
             reports.extend(check_codex_drift(agentic_dir, workspace_root, self._public_dir))
-        reports.extend(check_codex_rule_corpus_reachable(workspace_root))
+        reports.extend(attest("rule-corpus", check_codex_rule_corpus_reachable(workspace_root)))
         if "codex" in active:
-            reports.extend(codex_trust_boundary_info())
+            reports.extend(attest("trust-boundary", codex_trust_boundary_info()))
         reports.extend(check_agent_skill_refs(self._public_dir))
         reports.extend(check_memory_phase_single_source(self._public_dir))
-        reports.extend(self._check_public_privacy())
+        reports.extend(attest("public-privacy", self._check_public_privacy()))
 
         try:
             git_result = subprocess.run(
@@ -1049,19 +1154,28 @@ class FileSystemPublicAssetManager:
             if git_result.returncode == 0:
                 for dirty_path in git_result.stdout.splitlines():
                     if dirty_path.strip():
-                        reports.append(f"[warn] git-dirty: {dirty_path.strip()}")
+                        reports.append(
+                            DoctorLine(DoctorStatus.WARN, f"git-dirty: {dirty_path.strip()}")
+                        )
             elif git_result.returncode == 128:
-                reports.append("[not-applicable] git-dirty check (not a git repo)")
+                reports.append(
+                    DoctorLine(DoctorStatus.NOT_APPLICABLE, "git-dirty check (not a git repo)")
+                )
         except FileNotFoundError:
-            reports.append("[not-applicable] git-dirty check (git not found)")
+            reports.append(
+                DoctorLine(DoctorStatus.NOT_APPLICABLE, "git-dirty check (git not found)")
+            )
         except subprocess.TimeoutExpired:
-            reports.append("[warn] git-dirty check timed out")
+            reports.append(DoctorLine(DoctorStatus.WARN, "git-dirty check timed out"))
 
         for harness_dir in (".agents", ".claude", ".codex", ".kimi-code"):
             legacy_dir = workspace_root / harness_dir / "workflows"
             for legacy in sorted(legacy_dir.glob("*.workflow.md")):
                 reports.append(
-                    f"[extra] retired-workflow-projection:{legacy.relative_to(workspace_root)}"
+                    DoctorLine(
+                        DoctorStatus.EXTRA,
+                        f"retired-workflow-projection:{legacy.relative_to(workspace_root)}",
+                    )
                 )
 
         return reports
@@ -1138,7 +1252,7 @@ class FileSystemPublicAssetManager:
             dst, _json_dump(_merge_claude_settings(existing, workspace_root)), force, installed
         )
 
-    def _doctor_claude_settings(self, workspace_root: Path) -> list[str]:
+    def _doctor_claude_settings(self, workspace_root: Path) -> list[DoctorLine]:
         """Doctor ONLY the dadaia-owned hook wiring inside ``.claude/settings.json``.
 
         Comparing the whole file made an operator's own ``permissions`` key read ``[drift]``
@@ -1148,17 +1262,17 @@ class FileSystemPublicAssetManager:
         label = "claude:settings.json"
         dst = workspace_root / ".claude" / "settings.json"
         if not dst.exists():
-            return [f"[missing] {label}"]
+            return [DoctorLine(DoctorStatus.MISSING, f"{label}")]
         try:
             loaded = json.loads(dst.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, ValueError, OSError):
-            return [f"[drift] {label} (not readable JSON)"]
+            return [DoctorLine(DoctorStatus.DRIFT, f"{label} (not readable JSON)")]
         if not isinstance(loaded, dict):
-            return [f"[drift] {label} (not a JSON object)"]
+            return [DoctorLine(DoctorStatus.DRIFT, f"{label} (not a JSON object)")]
         canonical = _build_claude_settings(workspace_root)
         if _dadaia_owned_claude_settings(loaded) != _dadaia_owned_claude_settings(canonical):
-            return [f"[drift] {label}"]
-        reports = [f"[ok] {label}"]
+            return [DoctorLine(DoctorStatus.DRIFT, f"{label}")]
+        reports = [DoctorLine(DoctorStatus.OK, f"{label}")]
         # Preserving the operator's hooks must not mean going BLIND to them. Narrowing the
         # comparison to the owned slice (so an operator key is no longer called drift) also
         # silenced a foreign entry added to a dadaia-wired event — a local hook-injection
@@ -1167,8 +1281,11 @@ class FileSystemPublicAssetManager:
         foreign = _foreign_claude_hook_commands(loaded, canonical)
         if foreign:
             reports.append(
-                f"[warn] {label}: non-dadaia hook command(s) in gated event(s) — "
-                + ", ".join(foreign)
+                DoctorLine(
+                    DoctorStatus.WARN,
+                    f"{label}: non-dadaia hook command(s) in gated event(s) — "
+                    + ", ".join(foreign),
+                )
             )
         return reports
 
@@ -1319,21 +1436,21 @@ class FileSystemPublicAssetManager:
             _PUBLIC_ASSET_IGNORED_DIRS.intersection(path.parts)
         )
 
-    def _compare(self, src: Path, dst: Path, label: str) -> str:
+    def _compare(self, src: Path, dst: Path, label: str) -> DoctorLine:
         if not dst.exists():
-            return f"[missing] {label}"
+            return DoctorLine(DoctorStatus.MISSING, f"{label}")
         if _sha256(src) != _sha256(dst):
-            return f"[drift] {label}"
-        return f"[ok] {label}"
+            return DoctorLine(DoctorStatus.DRIFT, f"{label}")
+        return DoctorLine(DoctorStatus.OK, f"{label}")
 
-    def _compare_content(self, expected: str, dst: Path, label: str) -> str:
+    def _compare_content(self, expected: str, dst: Path, label: str) -> DoctorLine:
         if not dst.exists():
-            return f"[missing] {label}"
+            return DoctorLine(DoctorStatus.MISSING, f"{label}")
         if dst.read_text(encoding="utf-8") != expected:
-            return f"[drift] {label}"
-        return f"[ok] {label}"
+            return DoctorLine(DoctorStatus.DRIFT, f"{label}")
+        return DoctorLine(DoctorStatus.OK, f"{label}")
 
-    def _check_kimi_user_hooks(self) -> list[str]:
+    def _check_kimi_user_hooks(self) -> list[DoctorLine]:
         """Doctor the user-level kimi wiring: shim currency + managed config block.
 
         Shims are content-compared against the generated bodies (and must stay
@@ -1342,38 +1459,39 @@ class FileSystemPublicAssetManager:
         and foreign config content outside the markers never false-fails.
         """
         home = kimi_code_home()
-        reports: list[str] = []
+        reports: list[DoctorLine] = []
         for name, content in kimi_hook_shims().items():
             dst = home / "hooks" / name
             label = f"kimi-code:hooks/{name}"
             line = self._compare_content(content, dst, label)
-            if line.startswith("[ok]") and not os.access(dst, os.X_OK):
+            if line.status is DoctorStatus.OK and not os.access(dst, os.X_OK):
                 # The installer chmods 0o755, so cleared mode bits ARE repairable drift.
                 # Intact mode bits with X_OK denied means the MOUNT forbids execution
                 # (noexec) — reinstalling can never fix that, so reporting it as drift
                 # sent every consumer into a repair loop and failed `reconcile` with
                 # rollback_required (bug kimi-hooks-noexec-home-reported-as-repairable-drift).
                 if dst.stat().st_mode & stat.S_IXUSR:
-                    line = (
-                        f"[unsupported] {label} (filesystem mounted noexec — the exec bits "
+                    line = DoctorLine(
+                        DoctorStatus.UNSUPPORTED,
+                        f"{label} (filesystem mounted noexec — the exec bits "
                         "are set but the mount forbids execution; point KIMI_CODE_HOME at a "
-                        "path on an executable filesystem)"
+                        "path on an executable filesystem)",
                     )
                 else:
-                    line = f"[drift] {label} (not executable)"
+                    line = DoctorLine(DoctorStatus.DRIFT, f"{label} (not executable)")
             reports.append(line)
         config_path = home / "config.toml"
         block_label = "kimi-code:config.toml managed hooks block"
         if not config_path.exists():
-            reports.append(f"[missing] {block_label}")
+            reports.append(DoctorLine(DoctorStatus.MISSING, f"{block_label}"))
         else:
             existing = config_path.read_text(encoding="utf-8")
             expected = upsert_kimi_hooks_block(existing, kimi_hooks_block(home))
-            status = "[ok]" if expected == existing else "[drift]"
-            reports.append(f"{status} {block_label}")
+            status = DoctorStatus.OK if expected == existing else DoctorStatus.DRIFT
+            reports.append(DoctorLine(status, block_label))
         return reports
 
-    def _check_public_privacy(self) -> list[str]:
+    def _check_public_privacy(self) -> list[DoctorLine]:
         """Fail doctor if public distributed assets contain known private identifiers."""
         return _check_public_privacy_fn(
             self._public_dir, self._iter_files, self._is_ignored_public_asset

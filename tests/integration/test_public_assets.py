@@ -36,6 +36,17 @@ from dadaia_workspace.infrastructure.public_assets import (
     FileSystemPublicAssetManager,
 )
 
+
+def _rendered(result: object) -> list[str]:
+    """Legacy string view of a typed doctor result (DoctorReport | list[DoctorLine])."""
+    if hasattr(result, "rendered"):
+        return result.rendered()  # type: ignore[attr-defined, no-any-return]
+    return [
+        line.render() if hasattr(line, "render") else str(line)
+        for line in result  # type: ignore[union-attr]
+    ]
+
+
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
 
 _runner = CliRunner()
@@ -90,7 +101,7 @@ def test_stage_manifest_codex_adapters_install_all_and_pi_projection_block(
     assert (workspace / ".pi" / "settings.json").exists()
 
     # T-PIO-04: doctor emits [ok] pi: lines after a clean install.
-    reports = manager.doctor(workspace)
+    reports = _rendered(manager.doctor(workspace))
     pi_lines = [r for r in reports if "pi:" in r]
     assert any("[ok] pi:SYSTEM.md" in r for r in reports), reports
     assert any("[ok] pi:settings.json" in r for r in reports), reports
@@ -129,7 +140,7 @@ def test_stage_manifest_codex_adapters_install_all_and_pi_projection_block(
     assert pi_results, "expected .pi/ projection lines on re-install"
     assert all("[skip]" in line for line in pi_results), pi_results
 
-    reports2 = FileSystemPublicAssetManager().doctor(pi_ws)
+    reports2 = _rendered(FileSystemPublicAssetManager().doctor(pi_ws))
     pi_lines2 = [r for r in reports2 if "pi:" in r]
     assert pi_lines2 and all(r.startswith("[ok]") for r in pi_lines2), pi_lines2
     drift = [r for r in reports2 if r.startswith(("[drift]", "[missing]")) and "pi" in r]
@@ -260,13 +271,13 @@ def test_install_refuses_source_root_overwrite_skip_force_and_doctor_drift_track
     drift_manager.stage(drift_ws)
     drift_manager.install(drift_ws, target="all", force=True)
 
-    clean_report = drift_manager.doctor(drift_ws)
+    clean_report = _rendered(drift_manager.doctor(drift_ws))
     assert "[ok] dadaia:AGENTS.md" in clean_report
     assert "[ok] dadaia:tmp/AGENTS.md" in clean_report
     assert "[ok] dadaia:states/AGENTS.md" in clean_report
 
     (drift_ws / ".dadaia" / "states" / "AGENTS.md").write_text("drift\n", encoding="utf-8")
-    drift_report = drift_manager.doctor(drift_ws)
+    drift_report = _rendered(drift_manager.doctor(drift_ws))
     assert "[drift] dadaia:states/AGENTS.md" in drift_report
 
 
@@ -301,8 +312,9 @@ def test_public_privacy_gate_flags_identifiers_and_ignores_bytecode(
 
     report = manager._check_public_privacy()  # noqa: SLF001
 
-    assert any(line.startswith("[error] public-privacy:") for line in report)
-    assert any(_PRIVACY_TEST_TERM in line.lower() for line in report)
+    rendered = [line.render() for line in report]
+    assert any(line.startswith("[error] public-privacy:") for line in rendered)
+    assert any(_PRIVACY_TEST_TERM in line.lower() for line in rendered)
 
     # A denylisted term inside a __pycache__/*.pyc is ignored (bytecode is not scanned).
     clean_repo_root = tmp_path / "repo-clean"
@@ -315,7 +327,9 @@ def test_public_privacy_gate_flags_identifiers_and_ignores_bytecode(
 
     clean_manager = FileSystemPublicAssetManager()
     clean_manager._public_dir = clean_public_dir  # noqa: SLF001
-    assert clean_manager._check_public_privacy() == ["[ok] public-privacy"]  # noqa: SLF001
+    assert [line.render() for line in clean_manager._check_public_privacy()] == [  # noqa: SLF001
+        "[ok] public-privacy"
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -530,7 +544,7 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
     doctor_manager = FileSystemPublicAssetManager()
     doctor_manager.install(doctor_ws, target="all")
 
-    clean = doctor_manager.doctor(doctor_ws)
+    clean = _rendered(doctor_manager.doctor(doctor_ws))
     assert not any("agent-model-policy ERROR" in r for r in clean), (
         "missing overlay must not emit an agent-model-policy ERROR line"
     )
@@ -548,7 +562,7 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
     )
     doctor_manager.install(doctor_ws, target="all")
 
-    reports = doctor_manager.doctor(doctor_ws)
+    reports = _rendered(doctor_manager.doctor(doctor_ws))
     agent_lines = [r for r in reports if r.split(" ", 1)[-1].startswith("claude:agents/")]
     assert agent_lines, "expected claude:agents doctor lines"
     bad = [r for r in agent_lines if not r.startswith("[ok]")]
@@ -566,14 +580,14 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
 
     target = doctor_ws / ".claude" / "agents" / "software-engineer.md"
     target.write_text(target.read_text(encoding="utf-8") + "\nHAND EDIT\n", encoding="utf-8")
-    reports2 = doctor_manager.doctor(doctor_ws)
+    reports2 = _rendered(doctor_manager.doctor(doctor_ws))
     assert any(
         r.startswith("[drift]") and r.endswith("claude:agents/software-engineer.md")
         for r in reports2
     ), [r for r in reports2 if "software-engineer" in r]
 
     (doctor_states / "agent_model_policy.json").write_text("{not json", encoding="utf-8")
-    reports3 = doctor_manager.doctor(doctor_ws)
+    reports3 = _rendered(doctor_manager.doctor(doctor_ws))
     assert any(r.startswith("[drift]") and "agent-model-policy" in r for r in reports3), [
         r for r in reports3 if "policy" in r
     ]

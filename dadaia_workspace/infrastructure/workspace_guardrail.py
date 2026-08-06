@@ -17,6 +17,7 @@ from collections.abc import Callable
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Literal
 
+from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
 from dadaia_workspace.infrastructure.public_assets_common import (
     _atomic_write_text,
     _package_version,
@@ -412,7 +413,7 @@ def _doctor_consumer_pair_lines(
     workspace_root: Path,
     *,
     emit_stderr: bool = True,
-) -> list[str]:
+) -> list[DoctorLine]:
     """The SINGLE authority for provenance-aware CONSUMER guardrail-pair doctor lines (FR9).
 
     This is the one classification used by BOTH ``manager.doctor()`` (the real
@@ -433,12 +434,12 @@ def _doctor_consumer_pair_lines(
     """
     source_sha = hashlib.sha256(source.read_bytes()).hexdigest()
 
-    def _emit(line: str) -> str:
+    def _emit(line: DoctorLine) -> DoctorLine:
         if emit_stderr:
-            sys.stderr.write(line + "\n")
+            sys.stderr.write(line.render() + "\n")
         return line
 
-    lines: list[str] = []
+    lines: list[DoctorLine] = []
     for consumer in _consumer_repos_for_root(workspace_root):
         if _is_self_repo(consumer):
             continue
@@ -449,27 +450,27 @@ def _doctor_consumer_pair_lines(
             # FR6: symlink-aware doctor — a symlinked pair FILE is [foreign] (never
             # [ok]/[drift]/[missing]) so doctor exits 0 and never prescribes an
             # install that would be refused. Symlinked consumer DIRS remain legit.
-            agents_line = f"[foreign] {a_label}"
+            agents_line = DoctorLine(DoctorStatus.FOREIGN, a_label)
         elif not agents_dst.exists():
-            agents_line = f"[missing] {a_label}"
+            agents_line = DoctorLine(DoctorStatus.MISSING, a_label)
         elif not _carries_canonical_banner(agents_dst):
-            agents_line = f"[foreign] {a_label}"
+            agents_line = DoctorLine(DoctorStatus.FOREIGN, a_label)
         elif hashlib.sha256(agents_dst.read_bytes()).hexdigest() != source_sha:
-            agents_line = f"[drift] {a_label}"
+            agents_line = DoctorLine(DoctorStatus.DRIFT, a_label)
         else:
-            agents_line = f"[ok] {a_label}"
+            agents_line = DoctorLine(DoctorStatus.OK, a_label)
         lines.append(_emit(agents_line))
 
         claude_dst = consumer / "CLAUDE.md"
         c_label = f"repos/{slug}:CLAUDE.md"
-        if agents_line.startswith("[foreign]") or claude_dst.is_symlink():
-            claude_line = f"[foreign] {c_label}"
+        if agents_line.status is DoctorStatus.FOREIGN or claude_dst.is_symlink():
+            claude_line = DoctorLine(DoctorStatus.FOREIGN, c_label)
         elif not claude_dst.exists():
-            claude_line = f"[missing] {c_label}"
+            claude_line = DoctorLine(DoctorStatus.MISSING, c_label)
         elif claude_dst.read_text(encoding="utf-8") != _CLAUDE_MD_STUB:
-            claude_line = f"[drift] {c_label}"
+            claude_line = DoctorLine(DoctorStatus.DRIFT, c_label)
         else:
-            claude_line = f"[ok] {c_label}"
+            claude_line = DoctorLine(DoctorStatus.OK, c_label)
         lines.append(_emit(claude_line))
     return lines
 
@@ -477,7 +478,7 @@ def _doctor_consumer_pair_lines(
 def _doctor_guardrail_pair(
     source: Path,
     workspace_root: Path,
-) -> list[str]:
+) -> list[DoctorLine]:
     """Return doctor parity lines for the guardrail pair projection.
 
     Emits 2 root lines + the provenance-aware consumer pair lines from the single authority
@@ -490,28 +491,28 @@ def _doctor_guardrail_pair(
     """
     source_sha = hashlib.sha256(source.read_bytes()).hexdigest()
 
-    def _check(dst: Path, label: str) -> str:
+    def _check(dst: Path, label: str) -> DoctorLine:
         if not dst.exists():
-            line = f"[missing] {label}"
+            line = DoctorLine(DoctorStatus.MISSING, label)
         elif hashlib.sha256(dst.read_bytes()).hexdigest() != source_sha:
-            line = f"[drift] {label}"
+            line = DoctorLine(DoctorStatus.DRIFT, label)
         else:
-            line = f"[ok] {label}"
-        sys.stderr.write(line + "\n")
+            line = DoctorLine(DoctorStatus.OK, label)
+        sys.stderr.write(line.render() + "\n")
         return line
 
-    def _check_stub(dst: Path, label: str) -> str:
+    def _check_stub(dst: Path, label: str) -> DoctorLine:
         """Verify that *dst* contains the expected 1-line CLAUDE.md stub (T-41)."""
         if not dst.exists():
-            line = f"[missing] {label}"
+            line = DoctorLine(DoctorStatus.MISSING, label)
         elif dst.read_text(encoding="utf-8") != _CLAUDE_MD_STUB:
-            line = f"[drift] {label}"
+            line = DoctorLine(DoctorStatus.DRIFT, label)
         else:
-            line = f"[ok] {label}"
-        sys.stderr.write(line + "\n")
+            line = DoctorLine(DoctorStatus.OK, label)
+        sys.stderr.write(line.render() + "\n")
         return line
 
-    lines: list[str] = []
+    lines: list[DoctorLine] = []
     lines.append(_check(workspace_root / "AGENTS.md", "root:AGENTS.md"))
     lines.append(_check_stub(workspace_root / "CLAUDE.md", "root:CLAUDE.md"))
     lines.extend(_doctor_consumer_pair_lines(source, workspace_root, emit_stderr=True))

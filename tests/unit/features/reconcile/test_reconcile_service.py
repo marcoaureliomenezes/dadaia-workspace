@@ -5,6 +5,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from dadaia_workspace.core.models.doctor_report import (
+    DoctorLine,
+    DoctorReport,
+    DoctorStatus,
+)
 from dadaia_workspace.features.reconcile import reconcile_workspace
 
 
@@ -28,8 +33,8 @@ class _Public:
             raise RuntimeError("injected install failure")
         return ["installed"]
 
-    def doctor(self, workspace_root: Path) -> list[str]:
-        return ["[ok] projections"]
+    def doctor(self, workspace_root: Path) -> DoctorReport:
+        return DoctorReport(lines=(DoctorLine(DoctorStatus.OK, "projections"),))
 
 
 def _v1_workspace(root: Path) -> Path:

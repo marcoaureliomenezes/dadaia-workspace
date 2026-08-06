@@ -5,6 +5,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
 from dadaia_workspace.core.models.server_registry import PortEntry
 from dadaia_workspace.core.models.spec_context import SpecContextProject
 
@@ -163,9 +164,9 @@ class FakePublicAssetManager:
     def list_all(self) -> dict[str, list[str]]:
         return {"agents": ["fake-agent"], "skills": ["fake-skill"]}
 
-    def doctor(self, workspace_root: Path) -> list[str]:
+    def doctor(self, workspace_root: Path) -> list[DoctorLine]:
         self.doctored.append(workspace_root)
-        return ["[ok] fake"]
+        return [DoctorLine(DoctorStatus.OK, "fake")]
 
 
 class FakeExcelReader:

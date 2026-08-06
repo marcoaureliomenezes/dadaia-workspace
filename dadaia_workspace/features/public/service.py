@@ -8,6 +8,7 @@ from dadaia_workspace.core.models.agent_model_policy import (
     AgentModelPolicyOverlay,
     AgentModelPolicyStoreError,
 )
+from dadaia_workspace.core.models.doctor_report import DoctorReport
 from dadaia_workspace.core.protocols.storage import PublicAssetManager
 from dadaia_workspace.features.public.model_resolution import check_model_resolution
 
@@ -44,7 +45,7 @@ class PublicAssetService:
     def list_all(self) -> dict[str, list[str]]:
         return self._public_assets.list_all()
 
-    def doctor(self, workspace_root: Path) -> list[str]:
+    def doctor(self, workspace_root: Path) -> DoctorReport:
         reports = self._public_assets.doctor(workspace_root)
         # R8b (T-010-24): model-resolution guard against
         # model-catalog-modelmap-pricing-drift-no-registry. Runs against the
@@ -61,4 +62,4 @@ class PublicAssetService:
             except AgentModelPolicyStoreError:
                 overlay = None
         reports.extend(check_model_resolution(public_dir, overlay=overlay))
-        return reports
+        return DoctorReport(lines=tuple(reports))

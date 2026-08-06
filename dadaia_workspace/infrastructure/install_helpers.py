@@ -14,6 +14,7 @@ from collections.abc import Callable, Iterable, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 
+from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.agent_model_templates import CORE_AGENTS
 from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.core.models.agent_model_policy import (
@@ -132,11 +133,7 @@ def install_dadaia_agents_md(
 #: Claude Code, Codex and Kimi Code read identical law with no indirection and no second
 #: source. Projection is PROFILE-AWARE: a claude-only workspace must not grow a `.codex/`
 #: (the harness-scope contract `init --harness` enforces).
-_DADAIA_MD_HARNESS_TARGETS: dict[str, str] = {
-    "claude": ".claude/rules/DADAIA.md",
-    "codex": ".codex/DADAIA.md",
-    "kimi-code": ".kimi-code/DADAIA.md",
-}
+_DADAIA_MD_HARNESS_TARGETS: dict[str, str] = workspace_layout.DADAIA_MD_HARNESS_TARGETS
 
 #: Read-only mode for projected law files. The gate blocks agent file-tool writes
 #: (PathClass.LAW); this closes the Bash redirect path the gate does not parse. A human
@@ -314,13 +311,9 @@ def install_claude_agents(
         else:
             content = render_claude_agent(src.read_text(encoding="utf-8"), resolved)
             write_generated(dst_dir / rel, content, force, installed)
-    for dst in iter_files_fn(dst_dir):
-        if dst.relative_to(dst_dir) not in managed:
-            dst.unlink(missing_ok=True)
-            installed.append(f"[prune] {dst}")
-    for d in sorted((p for p in dst_dir.rglob("*") if p.is_dir()), reverse=True):
-        if not any(d.iterdir()):
-            d.rmdir()
+    # Orphan pruning removed — ledger-driven reconciliation in install() owns it
+    # (see copy_tree's docstring for the rationale).
+    del managed
 
 
 def resolve_codex_agent_model(
@@ -395,21 +388,21 @@ def copy_tree(
     installed: list[str],
     iter_files_fn: Callable[[Path], Iterable[Path]],
 ) -> None:
-    """Copy all files from *src_dir* to *dst_dir*, pruning orphan projections."""
+    """Copy all files from *src_dir* to *dst_dir* (copy-and-record only).
+
+    Orphan pruning is NOT done here. The per-dir prune this function used to run
+    derived the desired state from the CURRENT source — and its ``src_dir.exists()``
+    guard meant a fully retired family never pruned at all (bug
+    retired-lib-asset-leaves-orphan-projection), while an operator file dropped into a
+    managed dir was deleted without record. Reconciliation now runs once, ledger-driven,
+    at the end of ``install()`` (``_reconcile_install_ledger``): it prunes only what a
+    prior install provably wrote, and retains + surfaces anything else.
+    """
     if not src_dir.exists():
         return
-    managed: set[Path] = set()
     for src in iter_files_fn(src_dir):
         rel = src.relative_to(src_dir)
-        managed.add(rel)
         copy_file(src, dst_dir / rel, force, installed)
-    for dst in iter_files_fn(dst_dir):
-        if dst.relative_to(dst_dir) not in managed:
-            dst.unlink(missing_ok=True)
-            installed.append(f"[prune] {dst}")
-    for d in sorted((p for p in dst_dir.rglob("*") if p.is_dir()), reverse=True):
-        if not any(d.iterdir()):
-            d.rmdir()
 
 
 def remove_stale_files(src_dir: Path, dst_dir: Path, pattern: str, installed: list[str]) -> None:

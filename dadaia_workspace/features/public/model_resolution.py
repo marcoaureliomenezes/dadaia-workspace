@@ -45,6 +45,7 @@ from dadaia_workspace.core.models.agent_model_policy import (
     CLAUDE_EFFORTS,
     AgentModelPolicyOverlay,
 )
+from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
 from dadaia_workspace.infrastructure.runtime_transforms.model_mapping import MODEL_MAP
 
 # Matches a frontmatter ``model:`` line (first match wins).
@@ -55,7 +56,9 @@ def _registry_claude_ids() -> set[str]:
     return {entry.claude_id for entry in REGISTRY}
 
 
-def _scan_frontmatter_models(agents_dir: Path, registry_ids: set[str], out: list[str]) -> None:
+def _scan_frontmatter_models(
+    agents_dir: Path, registry_ids: set[str], out: list[DoctorLine]
+) -> None:
     """Append an ERROR line for every authored ``model:`` not resolving in REGISTRY."""
     if not agents_dir.is_dir():
         return
@@ -70,15 +73,18 @@ def _scan_frontmatter_models(agents_dir: Path, registry_ids: set[str], out: list
         model_id = match.group(1)
         if model_id not in registry_ids:
             out.append(
-                f"[drift] model-resolution ERROR: agent '{md_file.stem}' declares "
-                f"model '{model_id}' which is not in core.model_registry.REGISTRY "
-                f"(known: {', '.join(sorted(registry_ids))})"
+                DoctorLine(
+                    DoctorStatus.DRIFT,
+                    f"model-resolution ERROR: agent '{md_file.stem}' declares "
+                    f"model '{model_id}' which is not in core.model_registry.REGISTRY "
+                    f"(known: {', '.join(sorted(registry_ids))})",
+                )
             )
 
 
 def check_model_resolution(
     public_dir: Path, overlay: AgentModelPolicyOverlay | None = None
-) -> list[str]:
+) -> list[DoctorLine]:
     """Return doctor report lines for the model-resolution invariants.
 
     Args:
@@ -97,7 +103,7 @@ def check_model_resolution(
         desync, and a single ``[ok] model-resolution`` line when every invariant
         holds.
     """
-    out: list[str] = []
+    out: list[DoctorLine] = []
     registry_ids = _registry_claude_ids()
 
     # 1a. Authored-frontmatter resolution: core/stub bodies (staged core bodies are
@@ -117,15 +123,21 @@ def check_model_resolution(
         resolved = resolve_agent_model(agent, overlay)
         if resolved.model not in registry_ids:
             out.append(
-                f"[drift] model-resolution ERROR: resolved policy for core agent "
-                f"'{agent}' yields model '{resolved.model}' which is not in "
-                f"core.model_registry.REGISTRY"
+                DoctorLine(
+                    DoctorStatus.DRIFT,
+                    f"model-resolution ERROR: resolved policy for core agent "
+                    f"'{agent}' yields model '{resolved.model}' which is not in "
+                    f"core.model_registry.REGISTRY",
+                )
             )
         if resolved.effort not in CLAUDE_EFFORTS:
             out.append(
-                f"[drift] model-resolution ERROR: resolved policy for core agent "
-                f"'{agent}' yields effort {resolved.effort!r} outside the vocabulary "
-                f"({', '.join(CLAUDE_EFFORTS)})"
+                DoctorLine(
+                    DoctorStatus.DRIFT,
+                    f"model-resolution ERROR: resolved policy for core agent "
+                    f"'{agent}' yields effort {resolved.effort!r} outside the vocabulary "
+                    f"({', '.join(CLAUDE_EFFORTS)})",
+                )
             )
 
     # 2. Key-set coherence: MODEL_MAP keys == PRICING_TABLE keys == REGISTRY ids.
@@ -140,12 +152,15 @@ def check_model_resolution(
     pricing_keys = registry_ids  # PRICING_TABLE is derived from REGISTRY (== registry_ids).
     if not (model_map_keys == pricing_keys == registry_ids):
         out.append(
-            "[drift] model-resolution ERROR: key-set desync — "
-            f"MODEL_MAP={sorted(model_map_keys)} "
-            f"PRICING_TABLE={sorted(pricing_keys)} "
-            f"REGISTRY={sorted(registry_ids)}"
+            DoctorLine(
+                DoctorStatus.DRIFT,
+                "model-resolution ERROR: key-set desync — "
+                f"MODEL_MAP={sorted(model_map_keys)} "
+                f"PRICING_TABLE={sorted(pricing_keys)} "
+                f"REGISTRY={sorted(registry_ids)}",
+            )
         )
 
     if not out:
-        out.append("[ok] model-resolution")
+        out.append(DoctorLine(DoctorStatus.OK, "model-resolution"))
     return out

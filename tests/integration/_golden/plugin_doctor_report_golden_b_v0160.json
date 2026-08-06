@@ -1,8 +1,4 @@
 [
-  "[error] codex hook wrapper probe failed .dadaia/hooks/codex-ctx-inject (D-CX-9)",
-  "[error] codex hook wrapper probe failed .dadaia/hooks/codex-ctx-inject-session-start (D-CX-9)",
-  "[error] codex hook wrapper probe failed .dadaia/hooks/codex-post-gate (D-CX-9)",
-  "[error] codex hook wrapper probe failed .dadaia/hooks/codex-pre-gate (D-CX-9)",
   "[info] codex:trust-boundary — Codex interactive hooks fire and block; `codex exec` headless does not (headless is protected by the git chokepoints only). (WS-CDX-HYGIENE)",
   "[ok] agents:skills/ai-context-engineering/SKILL.md",
   "[ok] agents:skills/ai-harness-claude-code/SKILL.md",
@@ -217,5 +213,9 @@
   "[ok] stage:templates/memory-feature.md",
   "[ok] stage:templates/release_hotfix.md.j2",
   "[ok] stage:templates/repo-AGENTS.md",
-  "[ok] stage:templates/specs-AGENTS.md"
+  "[ok] stage:templates/specs-AGENTS.md",
+  "[unsupported] codex hook wrapper probe failed .dadaia/hooks/codex-ctx-inject (D-CX-9)",
+  "[unsupported] codex hook wrapper probe failed .dadaia/hooks/codex-ctx-inject-session-start (D-CX-9)",
+  "[unsupported] codex hook wrapper probe failed .dadaia/hooks/codex-post-gate (D-CX-9)",
+  "[unsupported] codex hook wrapper probe failed .dadaia/hooks/codex-pre-gate (D-CX-9)"
 ]

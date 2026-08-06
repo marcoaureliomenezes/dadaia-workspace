@@ -57,6 +57,17 @@ from tests.helpers.golden_platform import (
     norm_path_line,
 )
 
+
+def _rendered(result: object) -> list[str]:
+    """Legacy string view of a typed doctor result (DoctorReport | list[DoctorLine])."""
+    if hasattr(result, "rendered"):
+        return result.rendered()  # type: ignore[attr-defined, no-any-return]
+    return [
+        line.render() if hasattr(line, "render") else str(line)
+        for line in result  # type: ignore[union-attr]
+    ]
+
+
 pytestmark = pytest.mark.unit
 
 _HERE = Path(__file__).resolve().parent
@@ -217,7 +228,7 @@ def _capture_doctor(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> list[str
     _redirect_kimi_home(monkeypatch, ws)
     mgr = FileSystemPublicAssetManager()
     mgr.install(ws, target="all")
-    report = mgr.doctor(ws)
+    report = _rendered(mgr.doctor(ws))
     return [norm_path_line(line, ws) for line in report if not is_env_doctor_line(line)]
 
 

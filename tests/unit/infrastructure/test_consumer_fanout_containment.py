@@ -34,6 +34,17 @@ from dadaia_workspace.infrastructure.public_assets import (
     _install_workspace_guardrail_pair,
 )
 
+
+def _rendered(result: object) -> list[str]:
+    """Legacy string view of a typed doctor result (DoctorReport | list[DoctorLine])."""
+    if hasattr(result, "rendered"):
+        return result.rendered()  # type: ignore[attr-defined, no-any-return]
+    return [
+        line.render() if hasattr(line, "render") else str(line)
+        for line in result  # type: ignore[union-attr]
+    ]
+
+
 _SOURCE = _CANONICAL_AGENTS_BANNER + "\n# dadaia-workspace — Root Rules\n\nBody.\n"
 
 _HOSTILE_SLUGS = [
@@ -276,7 +287,7 @@ def test_symlink_classification_and_regular_ladder(tmp_path: Path, case: str) ->
         target.write_text(_SOURCE, encoding="utf-8")  # byte-identical to source through link
         (repo / "AGENTS.md").symlink_to(target)
         (repo / "CLAUDE.md").symlink_to(tmp_path / "dangling.md")
-        lines = _doctor_consumer_pair_lines(_source(tmp_path), ws, emit_stderr=False)
+        lines = _rendered(_doctor_consumer_pair_lines(_source(tmp_path), ws, emit_stderr=False))
         assert lines == [
             "[foreign] repos/game:AGENTS.md",
             "[foreign] repos/game:CLAUDE.md",
@@ -293,7 +304,7 @@ def test_symlink_classification_and_regular_ladder(tmp_path: Path, case: str) ->
         (ws / "repos" / "game").symlink_to(real, target_is_directory=True)
         _write_registry(ws, ["game"])
         assert _consumer_repos_for_root(ws) == [ws / "repos" / "game"]
-        lines = _doctor_consumer_pair_lines(src, ws, emit_stderr=False)
+        lines = _rendered(_doctor_consumer_pair_lines(src, ws, emit_stderr=False))
         assert lines == [
             "[ok] repos/game:AGENTS.md",
             "[ok] repos/game:CLAUDE.md",

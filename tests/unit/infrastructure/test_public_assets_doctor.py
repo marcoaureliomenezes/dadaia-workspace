@@ -21,6 +21,16 @@ import pytest
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 
 
+def _rendered(result: object) -> list[str]:
+    """Legacy string view of a typed doctor result (DoctorReport | list[DoctorLine])."""
+    if hasattr(result, "rendered"):
+        return result.rendered()  # type: ignore[attr-defined, no-any-return]
+    return [
+        line.render() if hasattr(line, "render") else str(line)
+        for line in result  # type: ignore[union-attr]
+    ]
+
+
 def _make_agent_md(
     name: str, model: str = "claude-sonnet-4-6", tools: list[str] | None = None
 ) -> str:
@@ -119,22 +129,27 @@ def test_doctor_status_matrix(tmp_path: Path) -> None:
     cmp_content = b"hello\n"
     cmp_src.write_bytes(cmp_content)
     cmp_dst.write_bytes(cmp_content)
-    assert compare_manager._compare(cmp_src, cmp_dst, "test:label") == "[ok] test:label"
+    assert compare_manager._compare(cmp_src, cmp_dst, "test:label").render() == "[ok] test:label"
 
     cmp_src.write_bytes(b"aaa")
     cmp_dst.write_bytes(b"bbb")
-    assert compare_manager._compare(cmp_src, cmp_dst, "test:label") == "[drift] test:label"
+    assert compare_manager._compare(cmp_src, cmp_dst, "test:label").render() == "[drift] test:label"
 
     assert (
-        compare_manager._compare(cmp_src, tmp_path / "absent.txt", "test:label")
+        compare_manager._compare(cmp_src, tmp_path / "absent.txt", "test:label").render()
         == "[missing] test:label"
     )
 
     cmp_dst2 = tmp_path / "out.txt"
     cmp_dst2.write_text("hello\n", encoding="utf-8")
-    assert compare_manager._compare_content("hello\n", cmp_dst2, "lbl") == "[ok] lbl"
-    assert compare_manager._compare_content("different\n", cmp_dst2, "lbl") == "[drift] lbl"
-    assert compare_manager._compare_content("x", tmp_path / "no.txt", "lbl") == "[missing] lbl"
+    assert compare_manager._compare_content("hello\n", cmp_dst2, "lbl").render() == "[ok] lbl"
+    assert (
+        compare_manager._compare_content("different\n", cmp_dst2, "lbl").render() == "[drift] lbl"
+    )
+    assert (
+        compare_manager._compare_content("x", tmp_path / "no.txt", "lbl").render()
+        == "[missing] lbl"
+    )
 
     # missing public_dir -> raises
     missing_manager = _make_manager_with_fake_public(tmp_path / "nonexistent")
@@ -148,7 +163,7 @@ def test_doctor_status_matrix(tmp_path: Path) -> None:
     workspace_a.mkdir()
     (workspace_a / ".dadaia" / "agentic").mkdir(parents=True)
     manager_a = _make_manager_with_fake_public(public_dir_a)
-    reports_a = manager_a.doctor(workspace_a)
+    reports_a = _rendered(manager_a.doctor(workspace_a))
     assert "[missing] stage:manifest.json" in reports_a
 
     # in-sync staged file -> [ok]; modified -> [drift]
@@ -172,11 +187,11 @@ def test_doctor_status_matrix(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     manager_b = _make_manager_with_fake_public(public_dir_b)
-    reports_b = manager_b.doctor(workspace_b)
+    reports_b = _rendered(manager_b.doctor(workspace_b))
     assert any(r == "[ok] stage:testfile.txt" for r in reports_b)
 
     (agentic_b / "testfile.txt").write_text("modified\n", encoding="utf-8")
-    reports_b2 = manager_b.doctor(workspace_b)
+    reports_b2 = _rendered(manager_b.doctor(workspace_b))
     assert any(r == "[drift] stage:testfile.txt" for r in reports_b2)
 
     # CLAUDE.md-stub check: AGENTS.md correct, CLAUDE.md wrong -> [drift]
@@ -203,7 +218,7 @@ def test_doctor_status_matrix(tmp_path: Path) -> None:
     (workspace_c / "AGENTS.md").write_text("# AGENTS\n", encoding="utf-8")
     (workspace_c / "CLAUDE.md").write_text("# WRONG\n", encoding="utf-8")
     manager_c = _make_manager_with_fake_public(public_dir_c)
-    reports_c = manager_c.doctor(workspace_c)
+    reports_c = _rendered(manager_c.doctor(workspace_c))
     assert any("[drift]" in r and "CLAUDE.md" in r for r in reports_c)
 
 
@@ -226,7 +241,7 @@ def test_doctor_git_dirty_states_are_reported_without_side_effects(tmp_path: Pat
         stderr="",
     )
     with patch("subprocess.run", return_value=dirty_result):
-        reports = manager.doctor(workspace_root)
+        reports = _rendered(manager.doctor(workspace_root))
     assert "[warn] git-dirty: dadaia_workspace/public/agents/data-analyst.md" in reports
     assert "[warn] git-dirty: dadaia_workspace/public/rules/some-rule.md" in reports
 
@@ -234,7 +249,7 @@ def test_doctor_git_dirty_states_are_reported_without_side_effects(tmp_path: Pat
         args=["git", "diff", "--name-only", "HEAD"], returncode=0, stdout="", stderr=""
     )
     with patch("subprocess.run", return_value=clean_result):
-        reports_clean = manager.doctor(workspace_root)
+        reports_clean = _rendered(manager.doctor(workspace_root))
     assert [r for r in reports_clean if r.startswith("[warn] git-dirty:")] == []
 
     cases = [
@@ -260,7 +275,7 @@ def test_doctor_git_dirty_states_are_reported_without_side_effects(tmp_path: Pat
     ]
     for patch_kwargs, expected in cases:
         with patch("subprocess.run", **patch_kwargs):
-            reports_case = manager.doctor(workspace_root)
+            reports_case = _rendered(manager.doctor(workspace_root))
         assert expected in reports_case
 
     assert not (workspace_root / ".dadaia" / "bugs").exists()
@@ -382,7 +397,7 @@ def test_dcx1_dcx2_dcx3(tmp_path: Path) -> None:
     codex_dir = workspace_root / ".codex"
     codex_dir.mkdir()
     manager = FileSystemPublicAssetManager()
-    out = manager._dcx1_missing_toml(agentic_dir, codex_dir)
+    out = _rendered(manager._dcx1_missing_toml(agentic_dir, codex_dir))
     assert any("my-agent.toml" in line and "[missing]" in line for line in out)
 
     # Frontmatter-less agent falls back to using the file stem as the reported name.
@@ -392,7 +407,7 @@ def test_dcx1_dcx2_dcx3(tmp_path: Path) -> None:
     (stem_agents_dir / "fallback-agent.md").write_text("# No frontmatter\n", encoding="utf-8")
     stem_codex_dir = stem_ws / ".codex"
     stem_codex_dir.mkdir()
-    stem_out = manager._dcx1_missing_toml(stem_agentic, stem_codex_dir)
+    stem_out = _rendered(manager._dcx1_missing_toml(stem_agentic, stem_codex_dir))
     assert any("fallback-agent.toml" in line and "[missing]" in line for line in stem_out)
 
     for i, setup in enumerate((_dcx1_toml_present, _dcx1_empty_agents_dir, _dcx1_no_agents_dir)):
@@ -409,7 +424,7 @@ def test_dcx1_dcx2_dcx3(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     (dcx2_codex_dir / "config.toml").write_text("", encoding="utf-8")
-    dcx2_out = manager._dcx2_config_toml_entries(dcx2_agentic, dcx2_codex_dir)
+    dcx2_out = _rendered(manager._dcx2_config_toml_entries(dcx2_agentic, dcx2_codex_dir))
     assert any("my-agent" in line and "[missing]" in line for line in dcx2_out)
 
     config_text = 'config_file = "agents/my-agent.toml"\n'
@@ -512,7 +527,7 @@ def test_dcx4_claude_strings(
     tmp_path: Path, setup: Callable[[Path], Path], expect_clean: bool
 ) -> None:
     codex_dir = setup(tmp_path)
-    out = FileSystemPublicAssetManager()._dcx4_claude_strings(codex_dir)
+    out = _rendered(FileSystemPublicAssetManager()._dcx4_claude_strings(codex_dir))
     if expect_clean:
         assert out == []
     else:
@@ -528,7 +543,7 @@ def test_dcx5_empty_developer_instructions(tmp_path: Path) -> None:
         'name = "my-agent"\nmodel = "gpt-4o"\ndeveloper_instructions = "   "\n',
         encoding="utf-8",
     )
-    out1 = manager._dcx5_empty_developer_instructions(codex_dir1)
+    out1 = _rendered(manager._dcx5_empty_developer_instructions(codex_dir1))
     assert any("[error]" in line and "developer_instructions is empty" in line for line in out1)
 
     codex_dir2 = tmp_path / "case2" / ".codex"
@@ -536,7 +551,7 @@ def test_dcx5_empty_developer_instructions(tmp_path: Path) -> None:
     (codex_dir2 / "agents" / "my-agent.toml").write_text(
         'name = "my-agent"\nmodel = "gpt-4o"\n', encoding="utf-8"
     )
-    out2 = manager._dcx5_empty_developer_instructions(codex_dir2)
+    out2 = _rendered(manager._dcx5_empty_developer_instructions(codex_dir2))
     assert any("[error]" in line for line in out2)
 
     codex_dir3 = tmp_path / "case3" / ".codex"
@@ -550,7 +565,7 @@ def test_dcx5_empty_developer_instructions(tmp_path: Path) -> None:
     codex_dir4 = tmp_path / "case4" / ".codex"
     (codex_dir4 / "agents").mkdir(parents=True)
     (codex_dir4 / "agents" / "broken.toml").write_text("NOT VALID TOML ][[\n", encoding="utf-8")
-    out4 = manager._dcx5_empty_developer_instructions(codex_dir4)
+    out4 = _rendered(manager._dcx5_empty_developer_instructions(codex_dir4))
     assert any("[error]" in line and "unparseable TOML" in line for line in out4)
 
     codex_dir5 = tmp_path / "case5" / ".codex"
@@ -579,7 +594,7 @@ def test_dcx6_codex_runtime_adapters(tmp_path: Path) -> None:
     _setup_adapter(public_dir1, "my-adapter")
     ws1 = tmp_path / "case1" / "workspace"
     ws1.mkdir(parents=True)
-    out1 = _mgr(public_dir1)._dcx6_codex_runtime_adapters(ws1)
+    out1 = _rendered(_mgr(public_dir1)._dcx6_codex_runtime_adapters(ws1))
     assert any("[missing]" in line and "my-adapter" in line and "D-CX-6" in line for line in out1)
 
     # [drift]
@@ -590,7 +605,7 @@ def test_dcx6_codex_runtime_adapters(tmp_path: Path) -> None:
     dst2 = ws2 / ".codex" / "skills" / "my-adapter" / "SKILL.md"
     dst2.parent.mkdir(parents=True)
     dst2.write_text("# Modified\n", encoding="utf-8")
-    out2 = _mgr(public_dir2)._dcx6_codex_runtime_adapters(ws2)
+    out2 = _rendered(_mgr(public_dir2)._dcx6_codex_runtime_adapters(ws2))
     assert any("[drift]" in line and "my-adapter" in line and "D-CX-6" in line for line in out2)
 
     # [leak] into .claude/skills/
@@ -601,7 +616,7 @@ def test_dcx6_codex_runtime_adapters(tmp_path: Path) -> None:
     leak_path = ws3 / ".claude" / "skills" / "my-adapter" / "SKILL.md"
     leak_path.parent.mkdir(parents=True)
     leak_path.write_text("# Leak\n", encoding="utf-8")
-    out3 = _mgr(public_dir3)._dcx6_codex_runtime_adapters(ws3)
+    out3 = _rendered(_mgr(public_dir3)._dcx6_codex_runtime_adapters(ws3))
     assert any(
         "[leak]" in line and "claude" in line and "my-adapter" in line and "D-CX-6" in line
         for line in out3
@@ -629,7 +644,7 @@ def test_dcx6_codex_runtime_adapters(tmp_path: Path) -> None:
     agentic_dir6, workspace_root6 = _build_minimal_agentic_dir(tmp_path / "case6")
     public_dir6 = tmp_path / "case6" / "public_dir"
     _setup_adapter(public_dir6, "missing-adapter")
-    out6 = _mgr(public_dir6)._check_codex_drift(agentic_dir6, workspace_root6)
+    out6 = _rendered(_mgr(public_dir6)._check_codex_drift(agentic_dir6, workspace_root6))
     assert any(
         "[missing]" in line and "missing-adapter" in line and "D-CX-6" in line for line in out6
     )

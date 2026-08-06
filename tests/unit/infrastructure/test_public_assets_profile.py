@@ -43,6 +43,17 @@ from tests.helpers.golden_platform import (
     sort_line_lists,
 )
 
+
+def _rendered(result: object) -> list[str]:
+    """Legacy string view of a typed doctor result (DoctorReport | list[DoctorLine])."""
+    if hasattr(result, "rendered"):
+        return result.rendered()  # type: ignore[attr-defined, no-any-return]
+    return [
+        line.render() if hasattr(line, "render") else str(line)
+        for line in result  # type: ignore[union-attr]
+    ]
+
+
 pytestmark = pytest.mark.unit
 
 _DOCTOR_GOLDEN = Path(__file__).resolve().parent / "_golden" / "doctor_all_four_v0158.json"
@@ -189,7 +200,7 @@ def test_profile_scoped_doctor_is_green(
     ws.mkdir()
     mgr = install_tree(ws)  # type: ignore[operator]
 
-    reports = mgr.doctor(ws)
+    reports = _rendered(mgr.doctor(ws))
 
     assert not any("codex:agents/" in r and "(D-CX-1)" in r for r in reports), (
         "profile-scoped doctor must not run check_codex_drift for an out-of-codex-profile tree"
@@ -279,7 +290,7 @@ def test_out_of_profile_runtime_present_is_not_silent(
     leftover.mkdir(parents=True, exist_ok=True)
     (leftover / stale_filename).write_text(stale_content, encoding="utf-8")
 
-    reports = mgr.doctor(ws)
+    reports = _rendered(mgr.doctor(ws))
 
     non_silent = [r for r in reports if token in r and "out-of-profile" in r]
     assert non_silent, (
@@ -304,7 +315,7 @@ def test_absent_profile_doctor_byte_equals_all_four_golden(tmp_path: Path) -> No
     mgr = FileSystemPublicAssetManager()
     mgr.install(ws, target="all")
 
-    report = mgr.doctor(ws)
+    report = _rendered(mgr.doctor(ws))
     normalized = [norm_path_line(line, ws) for line in report if not is_env_doctor_line(line)]
 
     golden = sort_line_lists(json.loads(_DOCTOR_GOLDEN.read_text(encoding="utf-8")))

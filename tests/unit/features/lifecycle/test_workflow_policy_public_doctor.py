@@ -20,6 +20,16 @@ from dadaia_workspace.features.lifecycle.policy_public_doctor import (
 )
 
 
+def _rendered(result: object) -> list[str]:
+    """Legacy string view of a typed doctor result (DoctorReport | list[DoctorLine])."""
+    if hasattr(result, "rendered"):
+        return result.rendered()  # type: ignore[attr-defined, no-any-return]
+    return [
+        line.render() if hasattr(line, "render") else str(line)
+        for line in result  # type: ignore[union-attr]
+    ]
+
+
 def _public(tmp_path: Path) -> Path:
     schemas = tmp_path / "schemas"
     schemas.mkdir(parents=True)
@@ -84,7 +94,7 @@ def test_fixture_matrix(
         (public / d).mkdir(exist_ok=True)
     (public / rel_path).write_text(content, encoding="utf-8")
 
-    out = check_workflow_policy_layer2_residue(public)
+    out = _rendered(check_workflow_policy_layer2_residue(public))
 
     if expect_drift:
         drift_lines = [line for line in out if line.startswith("[drift]")]
@@ -98,7 +108,7 @@ def test_fixture_matrix(
 
 
 def test_missing_public_dir_is_noop(tmp_path: Path) -> None:
-    out = check_workflow_policy_layer2_residue(tmp_path / "nope")
+    out = _rendered(check_workflow_policy_layer2_residue(tmp_path / "nope"))
     assert out == []
 
 
@@ -107,6 +117,6 @@ def test_real_public_surface_is_clean() -> None:
     import dadaia_workspace
 
     public_dir = Path(dadaia_workspace.__file__).parent / "public"
-    out = check_workflow_policy_layer2_residue(public_dir)
+    out = _rendered(check_workflow_policy_layer2_residue(public_dir))
     drift = [line for line in out if line.startswith("[drift]")]
     assert drift == [], drift

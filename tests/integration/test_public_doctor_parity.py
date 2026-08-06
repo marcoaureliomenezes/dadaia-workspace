@@ -22,6 +22,17 @@ from dadaia_workspace.infrastructure.public_assets import (
     _install_workspace_guardrail_pair,
 )
 
+
+def _rendered(result: object) -> list[str]:
+    """Legacy string view of a typed doctor result (DoctorReport | list[DoctorLine])."""
+    if hasattr(result, "rendered"):
+        return result.rendered()  # type: ignore[attr-defined, no-any-return]
+    return [
+        line.render() if hasattr(line, "render") else str(line)
+        for line in result  # type: ignore[union-attr]
+    ]
+
+
 _SOURCE_CONTENT = b"# AGENTS\n\nLib-general guardrail content for testing.\n"
 _CONSUMER_VERSION = "0.0.0"
 _OWN_VERSION_SENTINEL = "99.99.99-test"
@@ -113,7 +124,7 @@ def test_doctor_root_consumer_labels_runtime_expectations_foreign_and_unregister
     workspace_root = tmp_path / "workspace"
     workspace_root.mkdir()
     _install_workspace_guardrail_pair(source, workspace_root, force=True)
-    lines = _doctor_guardrail_pair(source, workspace_root)
+    lines = _rendered(_doctor_guardrail_pair(source, workspace_root))
     labels = {ln.split(" ", 1)[1] for ln in lines if " " in ln}
     assert "root:AGENTS.md" in labels, (
         f"Expected 'root:AGENTS.md' in doctor output labels. Got: {labels}"
@@ -139,7 +150,7 @@ def test_doctor_root_consumer_labels_runtime_expectations_foreign_and_unregister
     slug = "sample-consumer"
     _add_consumer(consumer_ws, slug)
     _install_workspace_guardrail_pair(consumer_source, consumer_ws, force=True)
-    lines2 = _doctor_guardrail_pair(consumer_source, consumer_ws)
+    lines2 = _rendered(_doctor_guardrail_pair(consumer_source, consumer_ws))
     status = {ln.split(" ", 1)[1]: ln.split(" ", 1)[0] for ln in lines2 if " " in ln}
     expected = {
         "root:AGENTS.md",
@@ -168,7 +179,7 @@ def test_doctor_root_consumer_labels_runtime_expectations_foreign_and_unregister
     drift_ws.mkdir()
     _install_workspace_guardrail_pair(drift_source, drift_ws, force=True)
     (drift_ws / "CLAUDE.md").write_bytes(b"# Tampered CLAUDE\n")
-    lines3 = _doctor_guardrail_pair(drift_source, drift_ws)
+    lines3 = _rendered(_doctor_guardrail_pair(drift_source, drift_ws))
     label_map = {ln.split(" ", 1)[1]: ln.split(" ", 1)[0] for ln in lines3 if " " in ln}
     assert label_map.get("root:CLAUDE.md") == "[drift]", (
         f"Expected '[drift] root:CLAUDE.md'. Lines: {lines3}"
@@ -185,7 +196,7 @@ def test_doctor_root_consumer_labels_runtime_expectations_foreign_and_unregister
     manager._public_dir = public_dir  # noqa: SLF001
     manager.stage(smoke_ws)
     manager.install(smoke_ws, target="all", force=True)
-    doctor_lines = manager.doctor(smoke_ws)
+    doctor_lines = _rendered(manager.doctor(smoke_ws))
     label_set = set(doctor_lines)
     assert any("root:AGENTS.md" in ln for ln in label_set), (
         f"Expected 'root:AGENTS.md' in doctor output.\n  Lines: {sorted(label_set)}"
@@ -215,7 +226,7 @@ def test_doctor_root_consumer_labels_runtime_expectations_foreign_and_unregister
     assert not (consumer / "CLAUDE.md").exists()
 
     # DOCTOR side via the REAL manager.doctor(): the consumer pair is [foreign] (Ruling 16).
-    lines = manager.doctor(workspace_root2)
+    lines = _rendered(manager.doctor(workspace_root2))
     assert "[foreign] repos/game:AGENTS.md" in lines, lines
     assert "[foreign] repos/game:CLAUDE.md" in lines, lines
     consumer_lines = [ln for ln in lines if f"repos/{slug}" in ln]
@@ -234,7 +245,7 @@ def test_doctor_root_consumer_labels_runtime_expectations_foreign_and_unregister
     no_marker = unregistered_ws / "repos" / "no-marker-repo"
     no_marker.mkdir(parents=True)
     _install_workspace_guardrail_pair(unregistered_source, unregistered_ws, force=True)
-    unreg_lines = _doctor_guardrail_pair(unregistered_source, unregistered_ws)
+    unreg_lines = _rendered(_doctor_guardrail_pair(unregistered_source, unregistered_ws))
     unreg_labels = {ln.split(" ", 1)[1] for ln in unreg_lines if " " in ln}
     assert "repos/no-marker-repo:AGENTS.md" not in unreg_labels, (
         f"Marker-less consumer must not appear in doctor labels. Labels: {unreg_labels}"

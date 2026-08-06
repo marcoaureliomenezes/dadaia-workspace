@@ -477,7 +477,7 @@ def test_install_preserves_operator_settings(tmp_path: Path) -> None:
     # non-blocking advisory. Preserving the operator's hooks must not mean hiding them.
     # Asserted on the settings doctor directly: the full ``doctor()`` gates this block on
     # "claude in the harness profile", which this minimal fixture does not carry.
-    lines = manager._doctor_claude_settings(workspace_root)
+    lines = [line.render() for line in manager._doctor_claude_settings(workspace_root)]
     assert lines[0] == "[ok] claude:settings.json", lines
     warns = [line for line in lines if line.startswith("[warn]")]
     assert warns, f"a foreign PreToolUse hook must be surfaced: {lines}"

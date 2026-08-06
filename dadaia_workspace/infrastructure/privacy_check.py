@@ -24,6 +24,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
+from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 
 _PUBLIC_ASSET_IGNORED_DIRS = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"}
@@ -62,9 +63,11 @@ _PRIVACY_DENYLIST_REL = Path(".dadaia") / "states" / "privacy_denylist.json"
 _PRIVACY_BASELINE_PKG = "dadaia_workspace.infrastructure.data"
 _PRIVACY_BASELINE_FILE = "privacy_baseline.json"
 
-_OK_MARKER = "[ok] public-privacy"
+_OK_MARKER = DoctorLine(DoctorStatus.OK, "public-privacy")
 # Distinct ok line so an operator can tell which mode actually ran.
-_BASELINE_OK_MARKER = "[ok] public-privacy (baseline structural scan, no operator denylist)"
+_BASELINE_OK_MARKER = DoctorLine(
+    DoctorStatus.OK, "public-privacy (baseline structural scan, no operator denylist)"
+)
 
 
 @dataclass(frozen=True)
@@ -182,7 +185,7 @@ def check_public_privacy(
     public_dir: Path,
     iter_files_fn: Callable[[Path], Iterable[Path]],
     is_ignored_fn: Callable[[Path], bool],
-) -> list[str]:
+) -> list[DoctorLine]:
     """Fail doctor if public distributed assets contain private identifiers.
 
     Two complementary layers, always at least one runs (fail-closed):
@@ -204,7 +207,7 @@ def check_public_privacy(
     if root_agents.exists():
         roots.append(root_agents)
 
-    findings: list[str] = []
+    findings: list[DoctorLine] = []
     for root in roots:
         files: list[Path] = [root] if root.is_file() else list(iter_files_fn(root))
         for path in files:
@@ -221,11 +224,17 @@ def check_public_privacy(
             for term, reason in denylist:
                 if term.lower() in lowered:
                     findings.append(
-                        f"[error] public-privacy:{rel.as_posix()}: contains '{term}' ({reason})"
+                        DoctorLine(
+                            DoctorStatus.ERROR,
+                            f"public-privacy:{rel.as_posix()}: contains '{term}' ({reason})",
+                        )
                     )
             for value, reason in _scan_text_for_baseline(text, baseline):
                 findings.append(
-                    f"[error] public-privacy:{rel.as_posix()}: baseline match '{value}' ({reason})"
+                    DoctorLine(
+                        DoctorStatus.ERROR,
+                        f"public-privacy:{rel.as_posix()}: baseline match '{value}' ({reason})",
+                    )
                 )
     if findings:
         return findings

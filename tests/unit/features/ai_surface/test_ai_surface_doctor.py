@@ -20,6 +20,17 @@ from dadaia_workspace.features.ai_surface.doctor import (
     check_ai_surface_ritual,
 )
 
+
+def _rendered(result: object) -> list[str]:
+    """Legacy string view of a typed doctor result (DoctorReport | list[DoctorLine])."""
+    if hasattr(result, "rendered"):
+        return result.rendered()  # type: ignore[attr-defined, no-any-return]
+    return [
+        line.render() if hasattr(line, "render") else str(line)
+        for line in result  # type: ignore[union-attr]
+    ]
+
+
 _REAL_PUBLIC_DIR = Path(dadaia_workspace.__file__).parent / "public"
 
 _SDD_HARD_STOP_BLOCK = (
@@ -47,7 +58,7 @@ def _drift_lines(reports: list[str]) -> list[str]:
 
 
 def test_real_dehydrated_surface_passes() -> None:
-    reports = check_ai_surface_ritual(_REAL_PUBLIC_DIR)
+    reports = _rendered(check_ai_surface_ritual(_REAL_PUBLIC_DIR))
     assert _drift_lines(reports) == [], (
         "the shipped dehydrated AI surface must carry no reintroduced lifecycle ritual; "
         f"unexpected drift: {_drift_lines(reports)}"
@@ -63,7 +74,7 @@ def test_banner_does_not_exempt_dehydrated_agents_md(tmp_path: Path) -> None:
     (public / "scaffold" / "AGENTS.md").write_text(
         f"> {BANNER_MARKER}\n\n" + _SDD_HARD_STOP_BLOCK, encoding="utf-8"
     )
-    drifts = _drift_lines(check_ai_surface_ritual(public))
+    drifts = _drift_lines(_rendered(check_ai_surface_ritual(public)))
     assert drifts, "a banner must NOT exempt the fully-dehydrated AGENTS.md pair"
     assert "scaffold/AGENTS.md" in drifts[0]
 
@@ -117,7 +128,7 @@ def test_banner_exemption_flag_matrix(
     target = public / relpath
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(body_fn(), encoding="utf-8")  # type: ignore[operator]
-    drifts = _drift_lines(check_ai_surface_ritual(public))
+    drifts = _drift_lines(_rendered(check_ai_surface_ritual(public)))
     if expect_drift:
         assert drifts, f"expected drift for {relpath}, got none"
         if expect_code:
@@ -150,7 +161,7 @@ def test_not_flagged_negatives(tmp_path: Path, relpath: str, content: str) -> No
     target = public / relpath
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(content, encoding="utf-8")
-    drifts = _drift_lines(check_ai_surface_ritual(public))
+    drifts = _drift_lines(_rendered(check_ai_surface_ritual(public)))
     assert drifts == [], f"expected no false-positive drift; got: {drifts}"
     # A missing public/ dir is also never flagged — empty result, not an error.
     assert check_ai_surface_ritual(tmp_path / "nope") == []

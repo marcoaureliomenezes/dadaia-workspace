@@ -8,6 +8,7 @@ from dataclasses import asdict, replace
 from datetime import UTC, datetime
 from pathlib import Path
 
+from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.models.export import ExportManifest, ExportOptions, ExportResult
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.core.protocols.context_store import ContextStore
@@ -62,7 +63,7 @@ class ExportService:
         if options.include_reports:
             _add_if_exists(dadaia / "reports", ".dadaia/reports")
 
-        for name in ("CLAUDE.md", "AGENTS.md", "DADAIA.md"):
+        for name in sorted(workspace_layout.LAW_BASENAMES):
             _add_if_exists(root / name, name)
 
         _add_if_exists(root / ".agents" / "skills", ".agents/skills")

@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 
+from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.features.spec_context import presence
 
 __all__ = ["Decision", "PathClass", "classify_path", "evaluate"]
@@ -77,10 +78,8 @@ _PROTECTED_MESSAGE = (
 #: writing the projection. Matched as exact relative paths (workspace root, harness dirs,
 #: and each ``repos/<slug>/`` root) so library sources and test fixtures — which live
 #: deeper — are never caught.
-_LAW_BASENAMES: frozenset[str] = frozenset({"DADAIA.md", "AGENTS.md", "CLAUDE.md"})
-_LAW_HARNESS_DIRS: frozenset[str] = frozenset(
-    {".claude/rules", ".codex", ".kimi-code", ".agents", ".pi"}
-)
+_LAW_BASENAMES: frozenset[str] = workspace_layout.LAW_BASENAMES
+_LAW_HARNESS_DIRS: frozenset[str] = workspace_layout.LAW_HARNESS_DIRS
 _LAW_MESSAGE = (
     "[GATE] '{path}' is a projected law file (the workspace system prompt / scoped "
     "AGENTS.md). In an instantiated workspace only a human operator edits it by hand. "

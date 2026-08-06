@@ -323,7 +323,7 @@ class TestDoctor:
         mgr = _manager()
         mgr.install(workspace, target="all", force=True)
 
-        report = mgr.doctor(workspace)
+        report = [line.render() for line in mgr.doctor(workspace)]
 
         failures = [line for line in report if line.startswith(("[drift]", "[missing]"))]
         assert not failures, "Doctor reported failures after clean install:\n" + "\n".join(failures)
@@ -341,7 +341,7 @@ class TestDoctor:
             target.write_text(
                 target.read_text(encoding="utf-8") + "\n# drifted\n", encoding="utf-8"
             )
-            report = mgr.doctor(workspace)
+            report = [line.render() for line in mgr.doctor(workspace)]
             drift_lines = [
                 line for line in report if "[drift]" in line and "software-engineer" in line
             ]
@@ -352,7 +352,7 @@ class TestDoctor:
         else:
             target = workspace / ".claude" / "agents" / "qa-engineer.md"
             target.unlink()
-            report = mgr.doctor(workspace)
+            report = [line.render() for line in mgr.doctor(workspace)]
             missing_lines = [
                 line for line in report if "[missing]" in line and "qa-engineer" in line
             ]
@@ -420,7 +420,7 @@ def _assert_profile_doctor_green(workspace: Path, monkeypatch: pytest.MonkeyPatc
       blocker-free);
     * CLI surface — ``dadaia public doctor`` exits 0 (the mechanical Q7 second clause).
     """
-    report = _manager().doctor(workspace)
+    report = [line.render() for line in _manager().doctor(workspace)]
     blockers = _doctor_blockers(report)
     assert blockers == [], "profile doctor must be blocker-free, got:\n" + "\n".join(blockers)
 

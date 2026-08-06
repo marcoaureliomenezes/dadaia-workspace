@@ -33,6 +33,17 @@ import pytest
 
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 
+
+def _rendered(result: object) -> list[str]:
+    """Legacy string view of a typed doctor result (DoctorReport | list[DoctorLine])."""
+    if hasattr(result, "rendered"):
+        return result.rendered()  # type: ignore[attr-defined, no-any-return]
+    return [
+        line.render() if hasattr(line, "render") else str(line)
+        for line in result  # type: ignore[union-attr]
+    ]
+
+
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _PUBLIC = _REPO_ROOT / "dadaia_workspace" / "public"
 _PLUGINS = _PUBLIC / "plugins"
@@ -238,7 +249,7 @@ def test_pack_agent_codex_toml_is_plugin_tier_not_opus(
         f"discriminate the plugin tier"
     )
 
-    report = FileSystemPublicAssetManager().doctor(ws)
+    report = _rendered(FileSystemPublicAssetManager().doctor(ws))
     privacy = [ln for ln in report if ln.startswith("[ok] public-privacy")]
     assert privacy, f"no [ok] public-privacy line in doctor report: {report}"
     assert not [ln for ln in report if ln.startswith("[error] public-privacy")], report

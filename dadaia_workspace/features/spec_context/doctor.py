@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from dadaia_workspace.core import kernel_tunables
+from dadaia_workspace.core import kernel_tunables, workspace_layout
 from dadaia_workspace.core.models.spec_context import ContextState
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.core.protocols.context_store import ContextStore
@@ -36,19 +36,16 @@ _EFFICIENCY_AUDIT_MARKER = "last_efficiency_audit.json"
 # ROOT-* invariant constants
 # ---------------------------------------------------------------------------
 
-#: Directories allowed at workspace root (exact names, no wildcards).
-_ROOT_ALLOWED_DIRS: frozenset[str] = frozenset(
-    {".agents", ".claude", ".codex", ".dadaia", ".kimi-code", ".pi", "repos"}
-)
+#: Directories allowed at workspace root — DERIVED from the single authority
+#: ``core/workspace_layout.py`` (one fact, one place; see the hook's twin note).
+_ROOT_ALLOWED_DIRS: frozenset[str] = workspace_layout.ROOT_ALLOWED_DIRS
 
 #: Files allowed at workspace root (exact names, no wildcards). Mirrors the Workspace
 #: Root Law and ``hooks/root_whitelist.py``: ``DADAIA.md`` is the workspace system prompt
 #: (the single always-on law file), ``CLAUDE.md`` the required Claude Code bridge,
 #: ``prompt.md`` the optional operator long-prompt file (bug
 #: doctor-root-whitelist-contradicts-root-law).
-_ROOT_ALLOWED_FILES: frozenset[str] = frozenset(
-    {"AGENTS.md", "CLAUDE.md", "DADAIA.md", "prompt.md"}
-)
+_ROOT_ALLOWED_FILES: frozenset[str] = workspace_layout.ROOT_ALLOWED_FILES
 
 #: Caches and tool outputs that are forbidden at workspace root (ROOT-2).
 #: These are safe to delete — they regenerate.

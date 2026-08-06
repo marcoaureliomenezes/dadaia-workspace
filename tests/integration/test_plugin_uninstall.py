@@ -35,6 +35,17 @@ from dadaia_workspace.infrastructure.json_plugin_store import JsonPluginStore
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from tests.helpers.golden_platform import canon_env_line, is_env_doctor_line, norm_path_line
 
+
+def _rendered(result: object) -> list[str]:
+    """Legacy string view of a typed doctor result (DoctorReport | list[DoctorLine])."""
+    if hasattr(result, "rendered"):
+        return result.rendered()  # type: ignore[attr-defined, no-any-return]
+    return [
+        line.render() if hasattr(line, "render") else str(line)
+        for line in result  # type: ignore[union-attr]
+    ]
+
+
 pytestmark = pytest.mark.integration
 
 _HERE = Path(__file__).resolve().parent
@@ -146,8 +157,8 @@ def test_ac2_install_uninstall_cycle_equals_never_installed(tmp_path: Path) -> N
     assert mgr_b.doctor_plugins(ws_b) == []
 
     # (i) Same-run self-relative equivalence: doctor runtime surface A == B.
-    doctor_a = _norm_doctor(mgr_a.doctor(ws_a), ws_a)
-    doctor_b = _norm_doctor(mgr_b.doctor(ws_b), ws_b)
+    doctor_a = _rendered(_norm_doctor(mgr_a.doctor(ws_a), ws_a))
+    doctor_b = _rendered(_norm_doctor(mgr_b.doctor(ws_b), ws_b))
     assert doctor_b == doctor_a, "post-uninstall doctor surface diverges from never-installed"
 
     # (ii) Absolute anchor (Ruling 63-F): side B == the durable v0.1.60 golden (b)
@@ -218,8 +229,8 @@ def test_ac3_double_uninstall_noop_multi_pack_isolation_and_files_before_ledger(
     assert (ws2 / ".claude" / "agents" / "frontend-engineer.md").read_bytes() == fe_body
     assert _pack_skill_files(ws2), "frontend-design skill projection was collaterally removed"
     assert _ledger_plugins(ws2) == (_PACK,)
-    assert any(f"plugin:{_PACK}:" in ln for ln in mgr2.doctor_plugins(ws2))
-    assert not any("plugin:devops:" in ln for ln in mgr2.doctor_plugins(ws2))
+    assert any(f"plugin:{_PACK}:" in ln.text for ln in mgr2.doctor_plugins(ws2))
+    assert not any("plugin:devops:" in ln.text for ln in mgr2.doctor_plugins(ws2))
 
     # ADR-U4: files-before-ledger ordering, own workspace (a failure injected at the
     # ledger write leaves the ledger entry present — never a silent half-state).

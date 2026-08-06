@@ -24,6 +24,17 @@ from dadaia_workspace.infrastructure.runtime_config import (
     kimi_hooks_block,
 )
 
+
+def _rendered(result: object) -> list[str]:
+    """Legacy string view of a typed doctor result (DoctorReport | list[DoctorLine])."""
+    if hasattr(result, "rendered"):
+        return result.rendered()  # type: ignore[attr-defined, no-any-return]
+    return [
+        line.render() if hasattr(line, "render") else str(line)
+        for line in result  # type: ignore[union-attr]
+    ]
+
+
 pytestmark = pytest.mark.unit
 
 
@@ -45,10 +56,14 @@ def _install(workspace: Path, manager: FileSystemPublicAssetManager | None = Non
     return mgr.install(workspace, target="kimi-code")
 
 
-def _kimi_lines(reports: list[str]) -> list[str]:
+def _kimi_lines(reports: object) -> list[str]:
     # Projection/wiring labels only — the unconditional `stage:kimi-code/*` staged-tree
     # compare lines are out of scope for these assertions.
-    return [line for line in reports if "kimi-code" in line and "stage:kimi-code" not in line]
+    rendered = [
+        line.render() if hasattr(line, "render") else str(line)
+        for line in reports  # type: ignore[attr-defined]
+    ]
+    return [line for line in rendered if "kimi-code" in line and "stage:kimi-code" not in line]
 
 
 # ---------------------------------------------------------------------------
@@ -122,7 +137,7 @@ def test_install_refreshes_stale_block_and_shims(workspace: Path, kimi_home: Pat
 def test_doctor_ok_after_install(workspace: Path, kimi_home: Path) -> None:
     mgr = FileSystemPublicAssetManager()
     _install(workspace, mgr)
-    reports = mgr.doctor(workspace)
+    reports = _rendered(mgr.doctor(workspace))
     kimi = _kimi_lines(reports)
     assert any(line.startswith("[ok] kimi-code:AGENTS.md") for line in kimi)
     assert any(line.startswith("[ok] kimi-code:hooks/") for line in kimi)
@@ -135,7 +150,7 @@ def test_doctor_flags_shim_drift(workspace: Path, kimi_home: Path) -> None:
     _install(workspace, mgr)
     shim = kimi_home / "hooks" / "dadaia-kimi-pre-gate.sh"
     shim.write_text("#!/usr/bin/env sh\n# tampered\n", encoding="utf-8")
-    reports = mgr.doctor(workspace)
+    reports = _rendered(mgr.doctor(workspace))
     assert any(
         line == "[drift] kimi-code:hooks/dadaia-kimi-pre-gate.sh" for line in _kimi_lines(reports)
     )
@@ -148,7 +163,7 @@ def test_doctor_flags_shim_not_executable(workspace: Path, kimi_home: Path) -> N
     shim = kimi_home / "hooks" / "dadaia-kimi-pre-gate.sh"
     # Restored content but lost executable bit ⇒ drift (not executable).
     shim.chmod(0o644)
-    reports = mgr.doctor(workspace)
+    reports = _rendered(mgr.doctor(workspace))
     assert any(
         line == "[drift] kimi-code:hooks/dadaia-kimi-pre-gate.sh (not executable)"
         for line in _kimi_lines(reports)
@@ -160,14 +175,14 @@ def test_doctor_flags_missing_and_drifted_config_block(workspace: Path, kimi_hom
     _install(workspace, mgr)
 
     (kimi_home / "config.toml").unlink()
-    reports = mgr.doctor(workspace)
+    reports = _rendered(mgr.doctor(workspace))
     assert any(
         line == "[missing] kimi-code:config.toml managed hooks block"
         for line in _kimi_lines(reports)
     )
 
     (kimi_home / "config.toml").write_text('default_model = "k3"\n', encoding="utf-8")
-    reports = mgr.doctor(workspace)
+    reports = _rendered(mgr.doctor(workspace))
     assert any(
         line == "[drift] kimi-code:config.toml managed hooks block" for line in _kimi_lines(reports)
     )
@@ -181,7 +196,7 @@ def test_doctor_scopes_kimi_out_of_profile(workspace: Path, kimi_home: Path) -> 
     (states / "harness_profile.json").write_text(
         json.dumps({"schema_version": "1", "harnesses": ["claude"]}), encoding="utf-8"
     )
-    reports = mgr.doctor(workspace)
+    reports = _rendered(mgr.doctor(workspace))
     kimi = _kimi_lines(reports)
     assert kimi == ["[warn] kimi-code: out-of-profile runtime present (drift unchecked)"]
 
@@ -196,7 +211,7 @@ def test_doctor_without_kimi_projection_is_silent_when_out_of_profile(
     (states / "harness_profile.json").write_text(
         json.dumps({"schema_version": "1", "harnesses": ["claude"]}), encoding="utf-8"
     )
-    reports = mgr.doctor(workspace)
+    reports = _rendered(mgr.doctor(workspace))
     assert _kimi_lines(reports) == []
 
 
@@ -233,7 +248,7 @@ def test_doctor_reports_noexec_home_as_unsupported_not_repairable_drift(
         return real_access(path, mode, **kwargs)  # type: ignore[arg-type]
 
     monkeypatch.setattr("dadaia_workspace.infrastructure.public_assets.os.access", noexec_access)
-    lines = _kimi_lines(mgr.doctor(workspace))
+    lines = _rendered(_kimi_lines(mgr.doctor(workspace)))
     shim_lines = [line for line in lines if "hooks/dadaia-kimi-pre-gate.sh" in line]
     assert shim_lines, lines
     line = shim_lines[0]

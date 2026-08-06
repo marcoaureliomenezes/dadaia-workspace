@@ -40,6 +40,17 @@ from dadaia_workspace.infrastructure.json_plugin_store import JsonPluginStore
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from tests.helpers.golden_platform import assert_golden, is_env_doctor_line, norm_path_line
 
+
+def _rendered(result: object) -> list[str]:
+    """Legacy string view of a typed doctor result (DoctorReport | list[DoctorLine])."""
+    if hasattr(result, "rendered"):
+        return result.rendered()  # type: ignore[attr-defined, no-any-return]
+    return [
+        line.render() if hasattr(line, "render") else str(line)
+        for line in result  # type: ignore[union-attr]
+    ]
+
+
 pytestmark = pytest.mark.integration
 
 _HERE = Path(__file__).resolve().parent
@@ -89,7 +100,7 @@ def _capture_doctor(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> list[str
     _redirect_kimi_home(monkeypatch, ws)
     mgr = FileSystemPublicAssetManager()
     mgr.install(ws, target="all")
-    report = mgr.doctor(ws)
+    report = _rendered(mgr.doctor(ws))
     return [norm_path_line(line, ws) for line in report if not is_env_doctor_line(line)]
 
 
@@ -260,15 +271,15 @@ def test_plugin_install_projects_body_idempotent_core_precedence_claude_only_and
     doctor_root.mkdir()
     doctor_ws, doctor_mgr = _staged_workspace_with_pack_body(doctor_root)
     doctor_mgr.install_plugin(doctor_ws, _PACK)
-    report = doctor_mgr.doctor(doctor_ws)
+    report = _rendered(doctor_mgr.doctor(doctor_ws))
     assert f"[ok] plugin:{_PACK}:claude/agents/{_AGENT}.md" in report
     assert f"[drift] claude:agents/{_AGENT}.md" not in report
 
     doctor_agent = _claude_agent(doctor_ws)
     doctor_agent.write_text("# tampered\n", encoding="utf-8")
-    report2 = doctor_mgr.doctor(doctor_ws)
+    report2 = _rendered(doctor_mgr.doctor(doctor_ws))
     assert f"[drift] plugin:{_PACK}:claude/agents/{_AGENT}.md" in report2
 
     doctor_agent.unlink()
-    report3 = doctor_mgr.doctor(doctor_ws)
+    report3 = _rendered(doctor_mgr.doctor(doctor_ws))
     assert f"[missing] plugin:{_PACK}:claude/agents/{_AGENT}.md" in report3

@@ -81,7 +81,7 @@ def test_baseline_fires_with_no_operator_denylist(
     data_dir.mkdir(parents=True)
     (data_dir / "AGENTS.md").write_text(content, encoding="utf-8")
 
-    report = _manager(public_dir)._check_public_privacy()  # noqa: SLF001
+    report = [line.render() for line in _manager(public_dir)._check_public_privacy()]  # noqa: SLF001
     assert any(line.startswith("[error] public-privacy:") for line in report)
     assert any(expect_fragment in line for line in report)
 
@@ -137,7 +137,7 @@ def test_operator_denylist_merges_additive_over_baseline(
     # operator term + a baseline-only hit (internal hostname)
     (data_dir / "AGENTS.md").write_text(f"ip {_TEST_TERM}\nhost db.internal\n", encoding="utf-8")
 
-    report = _manager(public_dir)._check_public_privacy()  # noqa: SLF001
+    report = [line.render() for line in _manager(public_dir)._check_public_privacy()]  # noqa: SLF001
     assert any(_TEST_TERM in line for line in report)
     assert any("db.internal" in line for line in report)
 
@@ -156,7 +156,7 @@ def test_text_denylist_flags_and_scans_root_agents_md(
     data_dir.mkdir(parents=True)
     (data_dir / "AGENTS.md").write_text(f"Private endpoint: {_TEST_TERM}\n", encoding="utf-8")
 
-    report = _manager(public_dir)._check_public_privacy()  # noqa: SLF001
+    report = [line.render() for line in _manager(public_dir)._check_public_privacy()]  # noqa: SLF001
     assert any(line.startswith("[error] public-privacy:") for line in report)
     assert any(_TEST_TERM in line.lower() for line in report)
 
@@ -165,7 +165,9 @@ def test_text_denylist_flags_and_scans_root_agents_md(
     repo_public_dir = repo_root / "dadaia_workspace" / "public"
     repo_public_dir.mkdir(parents=True)
     (repo_root / "AGENTS.md").write_text(f"host: {_TEST_TERM}\n", encoding="utf-8")
-    root_report = _manager(repo_public_dir)._check_public_privacy()  # noqa: SLF001
+    root_report = [  # noqa: SLF001
+        line.render() for line in _manager(repo_public_dir)._check_public_privacy()
+    ]
     assert any("AGENTS.md" in line and _TEST_TERM in line.lower() for line in root_report)
 
 
@@ -180,7 +182,9 @@ def test_bytecode_cache_ignored_and_baseline_data_loads_with_version_header(
     (public_dir / "data").mkdir()
     (public_dir / "data" / "AGENTS.md").write_text("# clean\n", encoding="utf-8")
 
-    assert _manager(public_dir)._check_public_privacy() == ["[ok] public-privacy"]  # noqa: SLF001
+    assert [  # noqa: SLF001
+        line.render() for line in _manager(public_dir)._check_public_privacy()
+    ] == ["[ok] public-privacy"]
 
     # Packaged baseline data ships with a versioned, documented header.
     patterns = _load_privacy_baseline()

@@ -27,6 +27,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
+
 #: Forbidden Layer-2 worker harness names (LAW 1).
 _FORBIDDEN = ("claude", "opencode")
 
@@ -69,7 +71,7 @@ def _scan_files(public_dir: Path) -> list[Path]:
     return paths
 
 
-def check_workflow_policy_layer2_residue(public_dir: Path) -> list[str]:
+def check_workflow_policy_layer2_residue(public_dir: Path) -> list[DoctorLine]:
     """Scan public workflow-policy docs for a Layer-2 ``claude``/``opencode`` leak.
 
     Returns doctor report lines. ``[drift]`` (one per offending line) makes
@@ -79,7 +81,7 @@ def check_workflow_policy_layer2_residue(public_dir: Path) -> list[str]:
     public_dir = Path(public_dir)
     if not public_dir.exists():
         return []
-    out: list[str] = []
+    out: list[DoctorLine] = []
     for path in _scan_files(public_dir):
         try:
             text = path.read_text(encoding="utf-8")
@@ -90,12 +92,19 @@ def check_workflow_policy_layer2_residue(public_dir: Path) -> list[str]:
             harness = _is_residue_line(line)
             if harness is not None:
                 out.append(
-                    f"[drift] workflow-policy:{rel}:{line_no}: forbidden Layer-2 worker "
-                    f"harness {harness!r} offered as a selectable choice — Layer-2 workers "
-                    "are codex/pi only (LAW 1)."
+                    DoctorLine(
+                        DoctorStatus.DRIFT,
+                        f"workflow-policy:{rel}:{line_no}: forbidden Layer-2 worker "
+                        f"harness {harness!r} offered as a selectable choice — Layer-2 workers "
+                        "are codex/pi only (LAW 1).",
+                    )
                 )
     if not out:
-        out.append("[ok] workflow-policy (no Layer-2 claude/opencode worker residue)")
+        out.append(
+            DoctorLine(
+                DoctorStatus.OK, "workflow-policy (no Layer-2 claude/opencode worker residue)"
+            )
+        )
     return out
 
 

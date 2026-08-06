@@ -62,6 +62,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
+
 # The non-authoritative banner marker the ai-engineer added to retained lifecycle
 # skills (a blockquote line: "> **Not the lifecycle enforcement mechanism.** ...").
 BANNER_MARKER = "**Not the lifecycle enforcement mechanism.**"
@@ -134,7 +136,7 @@ def _ritual_findings(text: str) -> list[tuple[int, str]]:
     return findings
 
 
-def check_ai_surface_ritual(public_dir: Path) -> list[str]:
+def check_ai_surface_ritual(public_dir: Path) -> list[DoctorLine]:
     """Scan the dehydrated AI surface for reintroduced ordered-lifecycle ritual.
 
     Returns doctor report lines. ``[drift]`` lines (one per violation) make
@@ -146,7 +148,7 @@ def check_ai_surface_ritual(public_dir: Path) -> list[str]:
     if not public_dir.exists():
         return []
 
-    out: list[str] = []
+    out: list[DoctorLine] = []
     for path in _governed_files(public_dir):
         rel = path.relative_to(public_dir)
         rel_posix = rel.as_posix()
@@ -171,12 +173,15 @@ def check_ai_surface_ritual(public_dir: Path) -> list[str]:
 
         for line_no, rule_id in findings:
             out.append(
-                f"[drift] ai-surface:{rel_posix}:{line_no}: mandatory ordered-lifecycle "
-                f"ritual reintroduced into a dehydrated surface ({rule_id}). Lifecycle is "
-                f"owned by the dadaia-workflows — point at them, or carry the "
-                f"non-authoritative banner ({BANNER_MARKER!r})."
+                DoctorLine(
+                    DoctorStatus.DRIFT,
+                    f"ai-surface:{rel_posix}:{line_no}: mandatory ordered-lifecycle "
+                    f"ritual reintroduced into a dehydrated surface ({rule_id}). Lifecycle is "
+                    f"owned by the dadaia-workflows — point at them, or carry the "
+                    f"non-authoritative banner ({BANNER_MARKER!r}).",
+                )
             )
 
     if not out:
-        out.append("[ok] ai-surface (no reintroduced lifecycle ritual)")
+        out.append(DoctorLine(DoctorStatus.OK, "ai-surface (no reintroduced lifecycle ritual)"))
     return out
