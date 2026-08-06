@@ -35,7 +35,7 @@ from dadaia_workspace.infrastructure.runtime_transforms.model_mapping import MOD
 # ---------------------------------------------------------------------------
 
 _REPLACEMENTS: tuple[tuple[str, str], ...] = (
-    (".claude/rules/workspace-protocol.md", "AGENTS.md and projected workspace protocols"),
+    (".claude/rules/workspace-protocol.md", "DADAIA.md, the projected workspace law"),
     ("`Agent` tool", "explicit Codex subagent delegation"),
     ("Agent tool", "explicit Codex subagent delegation"),
     ("Agent.dispatch", "explicit Codex subagent delegation"),

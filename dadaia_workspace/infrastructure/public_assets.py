@@ -35,6 +35,7 @@ from dadaia_workspace.infrastructure.codex_doctor import (
     dcx6_codex_runtime_adapters,
 )
 from dadaia_workspace.infrastructure.install_helpers import (
+    _DADAIA_MD_HARNESS_TARGETS,
     build_agents_index,
     build_manifest,
     copy_file,
@@ -44,10 +45,12 @@ from dadaia_workspace.infrastructure.install_helpers import (
     install_codex_agents,
     install_codex_runtime_adapters,
     install_dadaia_agents_md,
+    install_dadaia_md,
     install_handoff_agents_md,
     install_reports_agents_md,
     install_universal_skills,
     remove_legacy_workflow_projections,
+    remove_retired_core_rules,
     render_claude_agent,
     resolve_codex_agent_model,
     runtime_expectations,
@@ -143,6 +146,12 @@ from dadaia_workspace.infrastructure.workspace_guardrail import (  # noqa: F401
 #: drift block so a stale/hand-installed out-of-profile runtime never reads green-with-zero-
 #: lines. ``[warn]`` is non-blocking (CLI exit stays 0) but visible.
 _OUT_OF_PROFILE_WARN = "[warn] {harness}: out-of-profile runtime present (drift unchecked)"
+
+
+_DADAIA_MD_TARGETS_ALL: tuple[str, ...] = (
+    "DADAIA.md",
+    *sorted(_DADAIA_MD_HARNESS_TARGETS.values()),
+)
 
 
 class FileSystemPublicAssetManager:
@@ -784,6 +793,18 @@ class FileSystemPublicAssetManager:
         if target in {"all", *L1_ENTRY_HARNESSES}:
             self._install_scripts(agentic_dir, workspace_root, force, installed)
 
+        # DADAIA.md lands AFTER the per-harness projections: copy_tree prunes orphans in
+        # .claude/rules/ and .kimi-code/, and the law file is sourced from data/, not from
+        # those trees — installing it earlier had it pruned moments later.
+        install_dadaia_md(
+            agentic_dir,
+            workspace_root,
+            force,
+            installed,
+            harnesses={item for item in targets if item in L1_ENTRY_HARNESSES},
+        )
+        remove_retired_core_rules(workspace_root, installed)
+
         # Projection precedence (FR3, AC-4): after the core projection, overlay any installed
         # pack's real body over its stub — scoped to the harnesses actually being projected —
         # so a routine `public install` never silently reverts an installed pack agent to its
@@ -903,6 +924,19 @@ class FileSystemPublicAssetManager:
                 reports.append(self._compare_content(expected, dst, label))
             else:
                 reports.append(self._compare(expected_src, dst, label))
+
+        # The workspace law (DADAIA.md) is the single always-on rule file and the one
+        # projection an agent may never hand-edit — so every copy is byte-compared here.
+        # Without this the law was staged-checked only, and a hand-edited projection read
+        # doctor-green.
+        law_src = agentic_dir / "data" / "DADAIA.md"
+        if law_src.is_file():
+            law_rels = ["DADAIA.md"] + [
+                rel for name, rel in sorted(_DADAIA_MD_HARNESS_TARGETS.items()) if name in active
+            ]
+            for law_rel in law_rels:
+                law_dst = workspace_root / law_rel
+                reports.append(self._compare(law_src, law_dst, f"law:{law_rel}"))
 
         # Consumer-repo guardrail pair (FR9, bug public-doctor-flags-hand-authored-consumer-
         # agents-md): the `repos/<slug>:AGENTS.md`/`:CLAUDE.md` lines flow through the SINGLE

@@ -62,7 +62,7 @@ class ExportService:
         if options.include_reports:
             _add_if_exists(dadaia / "reports", ".dadaia/reports")
 
-        for name in ("CLAUDE.md", "AGENTS.md"):
+        for name in ("CLAUDE.md", "AGENTS.md", "DADAIA.md"):
             _add_if_exists(root / name, name)
 
         _add_if_exists(root / ".agents" / "skills", ".agents/skills")

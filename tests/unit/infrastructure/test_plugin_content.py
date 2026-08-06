@@ -14,7 +14,7 @@ shipped content:
   "gpt-5.6-terra"``, NOT ``gpt-5.6-sol`` (ARCH-2: the Codex ``model`` field is the discriminator,
   ``model_reasoning_effort`` is not) — and with the pack staged, doctor still reports ``[ok]
   public-privacy``; EXACTLY the two named skills exist per pack (ADR-C1 ceiling).
-* **AC-7** — the PROJECTED ``.claude/rules/plugin-scope.md`` is install-gated: it names
+* **AC-7** — the PROJECTED ``.claude/rules/DADAIA.md`` is install-gated: it names
   ``dadaia plugin install`` and the retired ``not yet distributed`` / ``no install command
   exists`` wording is GONE. RED-first: before the source rewrite lands, an in-tmp install
   projects the old wording and this test fails.
@@ -255,7 +255,7 @@ def _projected_plugin_scope(tmp_path: Path) -> str:
     ws = tmp_path / "ws"
     ws.mkdir()
     FileSystemPublicAssetManager().install(ws, target="all")
-    return (ws / ".claude" / "rules" / "plugin-scope.md").read_text(encoding="utf-8")
+    return (ws / ".claude" / "rules" / "DADAIA.md").read_text(encoding="utf-8")
 
 
 @pytest.mark.integration

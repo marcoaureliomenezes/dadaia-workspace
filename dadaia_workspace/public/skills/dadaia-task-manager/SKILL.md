@@ -30,7 +30,7 @@ applyTo: "specs/**/TASKS.md"
 **Honesty note — markers are discipline, not a hook check.** The SDD-gate stage of the
 merged `dadaia_workspace.hooks.pre_gate` PreToolUse hook never reads `TASKS.md`,
 `SPEC.md`, or any status marker. What it enforces deterministically is path-class ×
-presence × phase × mode on file-write tool calls (see the `workspace-protocol` rule §1). Marker discipline exists
+presence × phase × mode on file-write tool calls (see the `DADAIA.md` (the workspace law) §1). Marker discipline exists
 for traceability and coordination between agents and the operator — uphold it even
 though no hook will block you for skipping it.
 

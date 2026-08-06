@@ -76,7 +76,7 @@ Current-doc corrections to keep active:
 ### Rule-law corpus reachability (WS-CDX-PROTOCOL — onboarding)
 
 Codex agent instructions cite governance rules **by name** (e.g. "the
-`workspace-protocol` rule §4", "the `release-governance` rule"). Codex has no native
+`DADAIA.md` §4 (Emission is handoff-first)", "the `DADAIA.md` §5 (Releases)"). Codex has no native
 rule-loading for that corpus the way Claude Code loads `.claude/rules/*.md`, but the
 corpus **is reachable**: every by-name rule is a real on-disk file at
 `.claude/rules/<rule-name>.md` (workspace root, identical across harnesses). When an
@@ -462,7 +462,7 @@ Consult on demand. URLs sourced from the academy lessons; not transcribed conten
 
 ## Authoring guardrails (apply every time)
 
-- This skill is restricted to `ai-engineer` (`harness-skill-scope` rule). General
+- This skill is restricted to `ai-engineer` (`DADAIA.md` §2 (skill scope)). General
   agents use `harness-primitives`.
 - All authoring targets are `dadaia_workspace/public/...` source. Never hand-edit
   `.codex/`, `.claude/`, `.agents/` projections; propagate via

@@ -125,7 +125,7 @@ contract the engine's transitions correspond to — kept as a pointer, not a pro
 
 `project-manager` owns orchestration discipline; `product-engineer` owns SDD artifact
 approval; implementers and reviewers own their evidence. Per ADR-3 (segment/ship
-boundaries, not per task), and per the `release-governance` rule and the
+boundaries, not per task), and per the `DADAIA.md` §5 (Releases) and the
 `dadaia-task-manager` skill (marker discipline):
 
 | Boundary | Who validates | What unlocks |
@@ -239,7 +239,7 @@ Use when the operator wants a new release built from reported bugs + backlog.
 picked backlog item supersedes it (`superseded_by: <slug>` on the bug + SPEC
 note); (4) a **MANDATORY** `dadaia-grill-me` session before the SPEC; (5) author
 the SPEC. `project-manager` owns the gate: a release-from-backlog must not reach
-SPEC without the grill report. See the `release-governance` rule.
+SPEC without the grill report. See the `DADAIA.md` §5 (Releases).
 
 ### Playbook — security-patch
 

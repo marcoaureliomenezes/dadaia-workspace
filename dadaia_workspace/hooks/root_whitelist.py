@@ -3,7 +3,7 @@
 The Law: the workspace root may contain ONLY these entries::
 
     .agents/ .claude/ .codex/ .dadaia/ .kimi-code/ .pi/ repos/  (directories)
-    AGENTS.md CLAUDE.md prompt.md                               (files)
+    AGENTS.md CLAUDE.md DADAIA.md prompt.md                     (files)
 
 Any other top-level entry is blocked. An operator exception list at
 ``.dadaia/states/root_exceptions.txt`` (one fnmatch glob per line) documents deliberate
@@ -34,13 +34,14 @@ _WHITELIST: frozenset[str] = frozenset(
         "repos",
         "AGENTS.md",
         "CLAUDE.md",
+        "DADAIA.md",
         "prompt.md",
     }
 )
 
 #: Root-level basenames that are FILES (everything else in ``_WHITELIST`` is a
 #: directory and renders with a trailing slash in operator-facing text).
-_ROOT_FILES: frozenset[str] = frozenset({"AGENTS.md", "CLAUDE.md", "prompt.md"})
+_ROOT_FILES: frozenset[str] = frozenset({"AGENTS.md", "CLAUDE.md", "DADAIA.md", "prompt.md"})
 
 
 def _render_whitelist() -> str:

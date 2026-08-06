@@ -98,7 +98,7 @@ BL-STALE. Rules:
 `product-engineer` owns picking and SPEC authorship; `project-manager` dispatches
 this work and owns the mandatory-grill gate (it must not let a release-from-backlog
 proceed to SPEC without the grill). See the `project-orchestration` skill's
-release-definition playbook and the `release-governance` rule.
+release-definition playbook and the `DADAIA.md` §5 (Releases).
 
 ## Checklist
 

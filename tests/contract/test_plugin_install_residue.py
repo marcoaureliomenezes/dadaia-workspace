@@ -25,7 +25,10 @@ pytestmark = pytest.mark.contract
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _PUBLIC_ROOT = _REPO_ROOT / "dadaia_workspace" / "public"
-_PLUGIN_SCOPE = _PUBLIC_ROOT / "rules" / "plugin-scope.md"
+#: The plugin-scope law moved into the single always-on law file: the workspace system
+#: prompt (``DADAIA.md``) replaced the nine ``public/rules/*.md``. The law is unchanged —
+#: only its home is — so this contract follows it rather than pinning a retired path.
+_PLUGIN_SCOPE = _PUBLIC_ROOT / "data" / "DADAIA.md"
 
 # The install-gated command the rewritten rule must name (v0.1.60 FR2/FR5).
 _INSTALL_COMMAND = "dadaia plugin install"
@@ -37,7 +40,7 @@ _RETIRED_WORDING = ("not yet distributed", "no install command exists")
 def test_plugin_scope_names_install_command_and_dropped_retired_wording() -> None:
     """The canonical ``plugin-scope`` rule names ``dadaia plugin install`` (v0.1.60
     FR5) and the retired ADR-4 honest-relabel wording is gone from it (v0.1.60)."""
-    assert _PLUGIN_SCOPE.is_file(), f"plugin-scope rule missing: {_PLUGIN_SCOPE}"
+    assert _PLUGIN_SCOPE.is_file(), f"workspace law file missing: {_PLUGIN_SCOPE}"
     text = _PLUGIN_SCOPE.read_text(encoding="utf-8")
     assert _INSTALL_COMMAND in text, (
         "the plugin-scope rule must name the install command "

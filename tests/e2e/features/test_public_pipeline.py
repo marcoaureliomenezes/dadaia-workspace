@@ -150,8 +150,12 @@ class TestStage:
         _manager().stage(workspace)
 
         agentic = workspace / ".dadaia" / "agentic"
-        for subdir in ("agents", "skills", "rules", "scripts", "data"):
+        # ``rules`` is NOT staged: the nine core rules were consolidated into the single
+        # always-on law file (``data/DADAIA.md``), so the family no longer exists as a
+        # core asset dir. Plugin-pack rules stage under ``plugins/<pack>/rules/``.
+        for subdir in ("agents", "skills", "scripts", "data"):
             assert (agentic / subdir).is_dir(), f".dadaia/agentic/{subdir}/ not created by stage"
+        assert (agentic / "data" / "DADAIA.md").is_file(), "the workspace law file is not staged"
 
         manifest_path = agentic / "manifest.json"
         assert manifest_path.exists(), "manifest.json not created"

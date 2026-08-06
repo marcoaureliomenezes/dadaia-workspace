@@ -42,10 +42,13 @@ _ROOT_ALLOWED_DIRS: frozenset[str] = frozenset(
 )
 
 #: Files allowed at workspace root (exact names, no wildcards). Mirrors the Workspace
-#: Root Law and ``hooks/root_whitelist.py``: ``CLAUDE.md`` is the required Claude Code
-#: bridge, ``prompt.md`` the optional operator long-prompt file (bug
+#: Root Law and ``hooks/root_whitelist.py``: ``DADAIA.md`` is the workspace system prompt
+#: (the single always-on law file), ``CLAUDE.md`` the required Claude Code bridge,
+#: ``prompt.md`` the optional operator long-prompt file (bug
 #: doctor-root-whitelist-contradicts-root-law).
-_ROOT_ALLOWED_FILES: frozenset[str] = frozenset({"AGENTS.md", "CLAUDE.md", "prompt.md"})
+_ROOT_ALLOWED_FILES: frozenset[str] = frozenset(
+    {"AGENTS.md", "CLAUDE.md", "DADAIA.md", "prompt.md"}
+)
 
 #: Caches and tool outputs that are forbidden at workspace root (ROOT-2).
 #: These are safe to delete — they regenerate.

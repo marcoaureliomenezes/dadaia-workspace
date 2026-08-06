@@ -17,7 +17,7 @@ Every completed agent task ends with a structured JSON handoff under
 `.dadaia/handoff/<context>/` so downstream agents, the panel, and
 `dadaia reports validate` can consume the result as a machine contract.
 
-Emission is **handoff-first** (`workspace-protocol` rule §4):
+Emission is **handoff-first** (`DADAIA.md` §4 (Emission is handoff-first)):
 
 | Mode | When | What the handoff carries |
 |---|---|---|

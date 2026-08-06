@@ -538,12 +538,22 @@ def check_codex_rule_corpus_reachable(workspace_root: Path) -> list[str]:
             cited_any = True
             if not (rules_dir / f"{name}.md").is_file():
                 unreachable.add(name)
+        # The nine by-name rules were consolidated into the single always-on law file, so
+        # artifacts now cite ``DADAIA.md`` instead. Same invariant, same verdict labels: an
+        # artifact that cites the law must be able to reach it. Without this the check
+        # would go SILENT once the last by-name citation disappeared — a check that stops
+        # emitting is a check that stopped protecting.
+        if "DADAIA.md" in text:
+            cited_any = True
+            if not (rules_dir / "DADAIA.md").is_file():
+                unreachable.add("DADAIA.md")
 
     if unreachable:
         for name in sorted(unreachable):
             out.append(
                 f"[error] codex:rule-corpus: by-name rule '{name}' cited in a Codex "
-                f"artifact has no reachable surface .claude/rules/{name}.md "
+                f"artifact has no reachable surface "
+                f".claude/rules/{name if name.endswith('.md') else name + '.md'} "
                 "(WS-CDX-PROTOCOL)"
             )
     elif cited_any:

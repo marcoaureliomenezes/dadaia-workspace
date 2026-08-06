@@ -63,7 +63,7 @@ paths:
 
 # Frontend Engineer [plugin]
 
-> Reports follow the `workspace-protocol` rule §4 (handoff-first): emit a JSON handoff by default; write an HTML report (template + required sections in `.dadaia/reports/AGENTS.md`) only when the operator requests one or the next handoff target is human.
+> Reports follow the `DADAIA.md` §4 (Emission is handoff-first) (handoff-first): emit a JSON handoff by default; write an HTML report (template + required sections in `.dadaia/reports/AGENTS.md`) only when the operator requests one or the next handoff target is human.
 
 > This agent follows the shared workspace protocol: `AGENTS.md` and the projected workspace protocol.
 
@@ -233,7 +233,7 @@ pre-commit gate.
 
 ## Report
 
-Emission is handoff-first (`workspace-protocol` rule §4): default to a JSON handoff
+Emission is handoff-first (`DADAIA.md` §4 (Emission is handoff-first)): default to a JSON handoff
 only. When the operator requests a report or the next handoff target is human, write
 the HTML report to:
 
@@ -250,7 +250,7 @@ touched), Commit/branch, Review status (gate reports or "pending").
 After finalizing any HTML report under `.dadaia/reports/`, invoke the
 `dadaia-handoff-emitter` skill to emit handoff JSON under `.dadaia/handoff/<context>/`.
 
-> Report/handoff emission follows the `workspace-protocol` rule §4 (handoff-first; HTML only on `--with-report` or `next_handoff.agent == "human"`; schema handoff-v1.2, with `self_pull.refs` = the memory atoms this session actually self-pulled/read — `specs/`-prefixed, context-relative; never list an atom you did not read).
+> Report/handoff emission follows the `DADAIA.md` §4 (Emission is handoff-first) (handoff-first; HTML only on `--with-report` or `next_handoff.agent == "human"`; schema handoff-v1.2, with `self_pull.refs` = the memory atoms this session actually self-pulled/read — `specs/`-prefixed, context-relative; never list an atom you did not read).
 
 ---
 ## Implementation review gate
