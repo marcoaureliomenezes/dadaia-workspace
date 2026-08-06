@@ -160,6 +160,13 @@ def _restore_execute_bit(dst: Path) -> str | None:
     mistake — erasing the outcome was. The mode is read back rather than inferred from
     chmod returning cleanly, because a filesystem may accept the call and ignore it.
     """
+    if not PLATFORM_HAS_EXECUTE_BIT:
+        # The read-back below is the whole point of this function, and on Windows it can
+        # only ever fail: chmod there toggles the read-only attribute and never sets an
+        # execute bit, so every managed script would be installed with an [error] line
+        # naming a mode the filesystem does not have (bug
+        # doctor-reports-unrepairable-exec-bit-drift-on-windows).
+        return None
     try:
         dst.chmod(0o755)
     except OSError as exc:

@@ -10,7 +10,6 @@ All fixtures are SYNTHETIC trees (mkdir/touch/chmod) — NEVER a real venv build
 
 from __future__ import annotations
 
-import os
 import stat
 
 import pytest
@@ -25,7 +24,7 @@ from dadaia_workspace.core.platform import PLATFORM  # noqa: E402
 from dadaia_workspace.features.spec_context.doctor import DoctorService  # noqa: E402
 from tests.fakes import FakeContextStore, FakeGitClient  # noqa: E402
 
-_WINDOWS = os.name == "nt"
+_WINDOWS = not PLATFORM_HAS_EXECUTE_BIT
 
 
 def _make_doctor(workspace_root: Path) -> DoctorService:

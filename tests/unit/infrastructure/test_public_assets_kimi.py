@@ -74,7 +74,7 @@ def test_install_projects_workspace_tree_and_user_wiring(workspace: Path, kimi_h
         assert shim.is_file()
         assert shim.read_text(encoding="utf-8") == content
         assert os.access(shim, os.X_OK)
-        if os.name != "nt":
+        if PLATFORM_HAS_EXECUTE_BIT:
             # POSIX-only: Windows cannot materialise Unix exec bits (os.chmod there
             # toggles only the read-only flag), so the mode assertion is POSIX-scoped.
             assert stat.S_IXUSR & shim.stat().st_mode
@@ -142,7 +142,9 @@ def test_doctor_flags_shim_drift(workspace: Path, kimi_home: Path) -> None:
     )
 
 
-@pytest.mark.skipif(os.name == "nt", reason="Windows cannot clear Unix exec bits via chmod")
+@pytest.mark.skipif(
+    not PLATFORM_HAS_EXECUTE_BIT, reason="Windows cannot clear Unix exec bits via chmod"
+)
 @pytest.mark.skipif(not PLATFORM_HAS_EXECUTE_BIT, reason="no POSIX execute bit on this platform")
 def test_doctor_flags_shim_not_executable(workspace: Path, kimi_home: Path) -> None:
     mgr = FileSystemPublicAssetManager()
@@ -202,7 +204,7 @@ def test_doctor_without_kimi_projection_is_silent_when_out_of_profile(
     assert _kimi_lines(reports) == []
 
 
-@pytest.mark.skipif(os.name == "nt", reason="POSIX mount semantics")
+@pytest.mark.skipif(not PLATFORM_HAS_EXECUTE_BIT, reason="POSIX mount semantics")
 @pytest.mark.skipif(not PLATFORM_HAS_EXECUTE_BIT, reason="no POSIX execute bit on this platform")
 def test_doctor_reports_noexec_home_as_unsupported_not_repairable_drift(
     workspace: Path, kimi_home: Path, monkeypatch: pytest.MonkeyPatch

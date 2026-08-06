@@ -17,6 +17,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.execute_bit import PLATFORM_RUNS_POSIX_SCRIPTS
 from dadaia_workspace.infrastructure.public_assets import (
     FileSystemPublicAssetManager,
 )
@@ -236,7 +237,9 @@ def test_wrapper_contents_and_inert_config_keys_omitted(tmp_path: Path) -> None:
     assert "[skills]" not in config_text
 
 
-@pytest.mark.skipif(os.name == "nt", reason="generated Codex hook wrappers are POSIX shell")
+@pytest.mark.skipif(
+    not PLATFORM_RUNS_POSIX_SCRIPTS, reason="generated Codex hook wrappers are POSIX shell"
+)
 def test_codex_pre_gate_wrapper_never_creates_repo_bytecode(tmp_path: Path) -> None:
     """The projected wrapper is repository-clean even when cwd shadows the package."""
     from dadaia_workspace.infrastructure.runtime_config import codex_hook_wrapper_contents
