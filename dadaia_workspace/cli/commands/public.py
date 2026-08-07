@@ -12,7 +12,6 @@ import dadaia_workspace
 from dadaia_workspace import container
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
-from dadaia_workspace.features.ai_surface.doctor import check_ai_surface_ritual
 
 #: Display styles by status. Rendering only — the verdict NEVER depends on this map:
 #: an unmapped status prints unstyled and still blocks if its status blocks.
@@ -156,24 +155,7 @@ def doctor() -> None:
     """Diagnose drift between package source, staging, and runtime projections."""
     workspace_root = resolve_workspace_root()
     report = container.build_public_service().doctor(workspace_root)
-    # AI-surface check (v0.1.24 WS-7): fail if mandatory ordered-lifecycle ritual is
-    # reintroduced into a dehydrated surface. Wired at the CLI (not the infrastructure
-    # service) because the `infrastructure → features` import is forbidden by the
-    # import-linter `features-no-subprocess`/layering contract.
-    public_dir = Path(dadaia_workspace.__file__).parent / "public"
-    check_ai_surface_lines = check_ai_surface_ritual(public_dir)
-    # Workflow-policy Layer-2 residue check (v0.1.28 T-28-D-02): no claude/opencode leaks
-    # into the public docs as a selectable Layer-2 worker harness (LAW 1). Wired at the CLI
-    # for the same import-layering reason as the AI-surface check above.
-    from dadaia_workspace.features.lifecycle.policy_public_doctor import (
-        check_workflow_policy_layer2_residue,
-    )
-
-    lines: list[DoctorLine] = [
-        *report.lines,
-        *check_ai_surface_lines,
-        *check_workflow_policy_layer2_residue(public_dir),
-    ]
+    lines: list[DoctorLine] = list(report.lines)
     for line in lines:
         console.print(line.render(), style=_STYLE_BY_STATUS.get(line.status), markup=False)
     # The verdict is the typed report's — fail-closed: EVERY blocking status exits 1,

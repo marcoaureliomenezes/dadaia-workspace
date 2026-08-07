@@ -14,7 +14,6 @@ from dadaia_workspace.cli.commands import (
     context,
     doctor,
     init,
-    lifecycle,
     migrate,
     panel,
     plugin,
@@ -89,7 +88,6 @@ app.add_typer(clean.app, name="clean")
 
 # Sub-command groups
 app.add_typer(context.app, name="context")
-app.add_typer(lifecycle.app, name="lifecycle")
 app.add_typer(ci.app, name="ci")
 app.add_typer(repos.app, name="repos")
 app.add_typer(public.app, name="public")
