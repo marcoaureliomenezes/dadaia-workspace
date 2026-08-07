@@ -52,7 +52,7 @@ suite collects.
 
 ---
 
-- [ ] **T-30-02 — Sever the panel edge; delete the Workflows and Model-policy tabs**
+- [x] **T-30-02 — Sever the panel edge; delete the Workflows and Model-policy tabs**
 
 **Owner role:** software-engineer
 
@@ -83,7 +83,7 @@ in T-30-04 with the builders they pin.
 
 ---
 
-- [ ] **T-30-03 — Sever certification + capabilities; mint `dadaia-capabilities-v2`**
+- [-] **T-30-03 — Sever certification + capabilities; mint `dadaia-capabilities-v2`**
 
 **Owner role:** software-engineer
 

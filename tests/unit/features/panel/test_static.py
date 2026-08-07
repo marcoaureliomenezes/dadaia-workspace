@@ -33,15 +33,8 @@ def _view(name: str) -> tuple[int, str, bytes]:
     [
         pytest.param("tokens.css", 200, "text/css; charset=utf-8", id="tokens-css"),
         pytest.param("structure.css", 200, "text/css; charset=utf-8", id="structure-css"),
-        pytest.param("workflows.css", 200, "text/css; charset=utf-8", id="workflows-css"),
         pytest.param("core.js", 200, "application/javascript; charset=utf-8", id="core-js"),
         pytest.param("themes.js", 200, "application/javascript; charset=utf-8", id="themes-js"),
-        pytest.param(
-            "workflow-policy.js",
-            200,
-            "application/javascript; charset=utf-8",
-            id="workflow-policy-js",
-        ),
         pytest.param("runtime.js", 200, "application/javascript; charset=utf-8", id="runtime-js"),
         pytest.param("logo-rhino-24.svg", 200, "image/svg+xml; charset=utf-8", id="logo-rhino-24"),
         pytest.param("logo-rhino-16.svg", 200, "image/svg+xml; charset=utf-8", id="logo-rhino-16"),
@@ -105,7 +98,7 @@ def test_runtime_js_registered_before_dependents() -> None:
 
     keys = list(_ASSETS.keys())
     idx_runtime = keys.index("runtime.js")
-    for dependent in ("workflow-policy.js", "sessions.js"):
+    for dependent in ("sessions.js",):
         assert idx_runtime < keys.index(dependent), (
             f"runtime.js ({idx_runtime}) must precede {dependent} ({keys.index(dependent)}) in _ASSETS"
         )

@@ -97,17 +97,6 @@ from dadaia_workspace.features.panel.views.api_sessions import render_api_sessio
 from dadaia_workspace.features.panel.views.index import render_index
 from dadaia_workspace.features.panel.views.memory import render_memory
 from dadaia_workspace.features.panel.views.static import render_static
-from dadaia_workspace.features.panel.views.workflow_policy import (
-    render_api_lifecycle_runs,
-    render_api_workflow_catalog,
-    render_api_workflow_catalog_detail,
-    render_api_workflow_fragment,
-    render_api_workflow_model_policy,
-    render_api_workflow_model_profiles,
-    render_api_workflow_step_ledger,
-    render_post_workflow_model_policy_validate,
-    render_put_workflow_model_policy,
-)
 from dadaia_workspace.features.panel.views.wrapper import render_memory_wrapper
 from dadaia_workspace.features.public.service import PublicAssetService
 from dadaia_workspace.features.reports.next import ReportsNextService
@@ -118,7 +107,6 @@ from dadaia_workspace.features.server_registry.service import ServerRegistryServ
 from dadaia_workspace.features.spec_context.doctor import DoctorService
 from dadaia_workspace.features.spec_context.service import SpecContextService
 from dadaia_workspace.features.telemetry.aggregator.runtimes import ADAPTER_REGISTRY
-from dadaia_workspace.features.workflows.service import WorkflowsService
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.excel_reader import OpenpyxlExcelReader
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
@@ -455,11 +443,6 @@ def build_server_registry_service(workspace_root: Path) -> ServerRegistryService
     )
 
 
-def build_workflow_catalog_service(workspace_root: Path) -> WorkflowsService:
-    """Compose a ``WorkflowsService`` for the given workspace root."""
-    return WorkflowsService(workspace_root)
-
-
 def run_certification(workspace_root: Path, *, keep: bool = False) -> "CertificationResult":
     """Compose and run the disposable full-capability certification journey."""
     from dadaia_workspace.features.certification import certify
@@ -481,7 +464,6 @@ def build_panel_service(
         workspace_root=workspace_root,
         telemetry=telemetry,
         academy=academy,
-        workflows_service=build_workflow_catalog_service(workspace_root),
         report_retention=ReportRetentionService(workspace_root),
         adapter_registry=dict(ADAPTER_REGISTRY),
         agents_provider=FileSystemAgentsProvider(store_factory=MarkdownAgentStore),
@@ -2217,23 +2199,9 @@ def build_panel_views(
     academy = build_academy_service(workspace_root)
     service = build_panel_service(workspace_root, telemetry=telemetry, academy=academy)
 
-    # Workflow model-governance control plane (Wave C). The panel reads the SAME governed
-    # catalog + built-in profiles + policy store + run snapshots the CLI uses, through the
-    # shared resolver — one source of truth, no second model table. The resolver +
-    # overlay types are TYPE_CHECKING-only imports (used in the closure's string
-    # annotations below).
-    wf_catalog = build_workflow_model_profile_registry()
-    policy_store = build_workflow_model_policy_store(workspace_root)
-    run_store = build_lifecycle_run_store(workspace_root)
-    fragment_loader = build_fragment_loader()
     # L1 agent model-governance (v0.1.65 FR8): store + re-render injected via the
     # dedicated factory (D-4 — the feature service never imports infrastructure).
     agent_policy_service = build_agent_model_policy_service(workspace_root)
-
-    def _resolver_factory(
-        context: str, *, overlay: "WorkflowModelPolicyOverlay | None" = None
-    ) -> "WorkflowExecutionPolicyResolver":
-        return build_workflow_policy_resolver(workspace_root, context=context, overlay=overlay)
 
     return {
         "index": render_index(service),
@@ -2249,21 +2217,6 @@ def build_panel_views(
         "api_report_unmark_important": unmark_report_important(service),
         "api_agents": render_api_agents_canonical(service),
         "api_agent_prompt": render_api_agent_prompt(service),
-        # Workflow model-governance control plane (Wave C — T-28-C-01/02).
-        "api_workflow_catalog": render_api_workflow_catalog(wf_catalog, _resolver_factory),
-        "api_workflow_catalog_detail": render_api_workflow_catalog_detail(
-            wf_catalog, _resolver_factory
-        ),
-        "api_workflow_model_profiles": render_api_workflow_model_profiles(),
-        # Read-only fragment inspector (Wave D — T-28-D-01).
-        "api_workflow_fragment": render_api_workflow_fragment(fragment_loader),
-        "api_workflow_model_policy": render_api_workflow_model_policy(policy_store),
-        "api_workflow_model_policy_validate": render_post_workflow_model_policy_validate(
-            policy_store, _resolver_factory
-        ),
-        "api_workflow_model_policy_put": render_put_workflow_model_policy(
-            policy_store, _resolver_factory
-        ),
         # L1 agent model-governance control plane (v0.1.65 FR8 — T-65-11).
         "api_agent_model_policy": render_api_agent_model_policy(agent_policy_service),
         "api_agent_model_templates": render_api_agent_model_templates(agent_policy_service),
@@ -2271,8 +2224,6 @@ def build_panel_views(
             agent_policy_service
         ),
         "api_agent_model_policy_put": render_put_agent_model_policy(agent_policy_service),
-        "api_lifecycle_runs": render_api_lifecycle_runs(run_store),
-        "api_workflow_step_ledger": render_api_workflow_step_ledger(run_store),
         "api_sessions": render_api_sessions(service),
         "memory": render_memory(workspace_root),
         "memory_view": render_memory_wrapper(workspace_root),

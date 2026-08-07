@@ -61,7 +61,6 @@ def test_build_service_succeeds_table(tmp_path: Path) -> None:
     from dadaia_workspace.features.public.service import PublicAssetService
     from dadaia_workspace.features.repos.service import ReposService
     from dadaia_workspace.features.spec_context.doctor import DoctorService
-    from dadaia_workspace.features.workflows.service import WorkflowsService
     from dadaia_workspace.features.workspace.service import WorkspaceService
 
     # No initialization required.
@@ -72,7 +71,6 @@ def test_build_service_succeeds_table(tmp_path: Path) -> None:
     _init_states(tmp_path)
     assert container.build_spec_context_service(tmp_path) is not None
     assert container.build_academy_service(tmp_path) is not None
-    assert isinstance(container.build_workflow_catalog_service(tmp_path), WorkflowsService)
     assert isinstance(container.build_export_service(tmp_path), ExportService)
     assert isinstance(container.build_doctor_service(tmp_path), DoctorService)
 

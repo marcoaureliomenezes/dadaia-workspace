@@ -10,7 +10,7 @@ the "1º Agentic Layer" (subagents) tabpanel as a sub-section (still rendered
 via ``#section-sessions``, just no longer a top-level ``.section``/tabpanel).
 "Sub-agents" -> "1º Agentic Layer" (id stays ``tab-subagents`` /
 ``section-subagents``); "Workflows" -> "2º Agentic Layer" (id stays
-``tab-workflows`` / ``section-workflows``).
+``tab-subagents`` / ``section-subagents``).
 """
 
 from __future__ import annotations
@@ -22,7 +22,6 @@ from __future__ import annotations
 PANEL_PRIMARY_TABS: list[tuple[str, str]] = [
     ("memories", "Projects"),
     ("subagents", "1º Agentic Layer"),
-    ("workflows", "2º Agentic Layer"),
     ("reports", "Reports"),
     ("academy", "Academy"),
     ("servers", "Servers"),

@@ -2,7 +2,7 @@
 
 v0.1.55 FR2 splits the 1,279-line ``features/panel/views/api.py`` (24 functions / 8 domains)
 into per-domain view modules (``api_servers`` / ``api_contexts`` / ``api_agents`` /
-``api_workflows`` / ``api_sessions`` / ``api_academy`` / ``api_reports`` / ``api_health``) and
+``api_sessions`` / ``api_academy`` / ``api_reports`` / ``api_health``) and
 DELETES ``api.py`` (no facade, no re-export barrel). The refactor MUST be behavior-preserving:
 every panel route's ``(status, content_type, body)`` has to be byte-identical to the pre-split
 tree.
@@ -15,7 +15,7 @@ source moves; the captured bytes do not).
 
 Determinism (AC-2 / R-4 analogue):
 
-* **Fixed fake services** — servers/contexts/agents/workflows/sessions/academy are driven by
+* **Fixed fake services** — servers/contexts/agents/sessions/academy are driven by
   hand-built fakes with fixed data; reports use a real ``ReportRetentionService`` over a
   ``tmp_path`` reports tree whose route-relative paths never leak an absolute path.
 * **Timestamp + version normalization** — every ISO-8601 timestamp in a captured body is replaced
@@ -65,7 +65,6 @@ from dadaia_workspace.features.panel.views.api_reports import (
 )
 from dadaia_workspace.features.panel.views.api_servers import render_api_servers
 from dadaia_workspace.features.panel.views.api_sessions import render_api_sessions
-from dadaia_workspace.features.panel.views.workflow_policy import render_api_workflow_catalog
 from dadaia_workspace.features.reports.retention import ReportRetentionService
 from dadaia_workspace.features.telemetry.aggregator.models import AgentSummary, TokenTotals
 
@@ -85,7 +84,6 @@ _ALL_DOMAINS = {
     "servers",
     "contexts",
     "agents",
-    "workflows",
     "sessions",
     "academy",
     "reports",
@@ -186,67 +184,6 @@ class _FakeAgentsProvider:
         )
 
 
-class _FakeDadaiaWorkflowsService:
-    """Backs governed workflow membership in the agents catalog."""
-
-    def _wf(self) -> SimpleNamespace:
-        step = SimpleNamespace(
-            order=1,
-            label="Define",
-            role="product-engineer",
-            purpose="Author SPEC.",
-            is_gate=False,
-            harness_options=["claude"],
-            model_options={"claude": ["claude-opus-4-8"]},
-            runtime_kind="model",
-            fragment_id="release_definition/define",
-        )
-        return SimpleNamespace(
-            name="release_definition",
-            display_name="Release Definition",
-            purpose="Author SPEC/PLAN/TASKS.",
-            availability="available",
-            step_count=1,
-            steps=[step],
-            diagram_svg="<svg role='img'><g/></svg>",
-        )
-
-    def list_dadaia_workflows(self) -> list[SimpleNamespace]:
-        return [self._wf()]
-
-    def get_dadaia_workflow(self, name: str) -> SimpleNamespace | None:
-        return self._wf() if name == "release_definition" else None
-
-
-class _FakeWorkflowCatalog:
-    def __init__(self) -> None:
-        step = SimpleNamespace(
-            label="release_scope",
-            role="product-engineer",
-            default_harness="codex",
-            default_profile="codex-implementation-standard",
-            default_profiles={"codex": "codex-implementation-standard"},
-        )
-        self.workflows = (SimpleNamespace(workflow_id="release_definition", steps=(step,)),)
-
-    def workflow(self, workflow_id: str) -> SimpleNamespace | None:
-        return self.workflows[0] if workflow_id == "release_definition" else None
-
-
-class _FakeWorkflowResolver:
-    def resolve(self, workflow_id: str, *, context: str) -> SimpleNamespace:
-        entry = SimpleNamespace(
-            harness="codex",
-            model_profile="codex-implementation-standard",
-            model="gpt-5.5",
-            reasoning="medium",
-            source=SimpleNamespace(value="library-default"),
-            fragments=("release_definition.definition_draft",),
-            output_schema="agent-run-result-v1",
-        )
-        return SimpleNamespace(step=lambda label: entry)
-
-
 def _make_entry() -> tuple[PortEntry, PortStatus]:
     return (
         PortEntry(
@@ -299,7 +236,6 @@ def _build_service(tmp_path: Path, *, telemetry: Any) -> PanelService:
         academy=_FakeAcademy(),
         report_retention=ReportRetentionService(tmp_path),
         agents_provider=_FakeAgentsProvider(),
-        workflows_service=_FakeDadaiaWorkflowsService(),
     )
     svc._canonical_agents_override = [_make_dto()]  # type: ignore[attr-defined]
     return svc
@@ -353,7 +289,6 @@ def _capture(tmp_path: Path) -> dict[str, dict[str, object]]:
     _seed_report_tree(tmp_path)
     service = _build_service(tmp_path, telemetry=_FakeTelemetry())
     service_no_tel = _build_service(tmp_path, telemetry=None)
-    workflow_catalog = _FakeWorkflowCatalog()
 
     rpath = "ctx/qa-engineer/report.html"
     plan: list[tuple[str, str, Any, dict[str, object]]] = [
@@ -365,12 +300,6 @@ def _capture(tmp_path: Path) -> dict[str, dict[str, object]]:
             "api_agents_400",
             render_api_agents_canonical(service),
             {"active_window_days": 0},
-        ),
-        (
-            "workflows",
-            "api_workflow_catalog",
-            render_api_workflow_catalog(workflow_catalog, lambda context: _FakeWorkflowResolver()),
-            {},
         ),
         (
             "agents",

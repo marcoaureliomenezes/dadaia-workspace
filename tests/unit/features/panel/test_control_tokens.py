@@ -1,7 +1,7 @@
 """Control token-anchor discipline for the panel (FR2 / AC-3, v0.1.59).
 
 Proves the **restyled interactive controls** (nav tabs, theme button, runtime
-switcher, workflow per-step pickers, report/academy CTAs and the report trash
+switcher, report/academy CTAs and the report trash
 button) consume the design-token vocabulary rather than ad-hoc literals. Also
 absorbs the former ``test_palette.py`` PANEL_CSS-grep prior art: the brand-color
 token *contract* (definition + consumption) holds across the concatenated
@@ -10,8 +10,8 @@ stylesheet.
 Mechanism (Q3, grep-falsifiable):
   * an explicit **selector allowlist** of the controls the W2 restyle touches;
   * for each allowlisted selector, the matching rule bodies are extracted from the
-    **served control-surface** stylesheet strings — ``structure.py`` / ``workflows.py``
-    / ``workflow_policy.py`` / ``reports.py`` / ``academy.py``;
+    **served control-surface** stylesheet strings — ``structure.py``
+    / ``reports.py`` / ``academy.py``;
   * the token-DEFINITION file ``tokens.py`` is **excluded** from the control-anchor
     scan — that is where ``--color-accent: #9cddc8`` etc. legitimately define the
     tokens (scanning it would false-positive on the definitions). The ``.runtime-btn``
@@ -37,13 +37,11 @@ from dadaia_workspace.features.panel.views.assets.css.reports import REPORTS_CSS
 from dadaia_workspace.features.panel.views.assets.css.sessions import SESSIONS_CSS
 from dadaia_workspace.features.panel.views.assets.css.structure import STRUCTURE_CSS
 from dadaia_workspace.features.panel.views.assets.css.tokens import TOKENS_CSS
-from dadaia_workspace.features.panel.views.assets.css.workflow_policy import WORKFLOW_POLICY_CSS
-from dadaia_workspace.features.panel.views.assets.css.workflows import WORKFLOWS_CSS
 
 pytestmark = pytest.mark.unit
 
 # The former test_palette.py PANEL_CSS (definition + consumption prior art).
-PANEL_CSS = TOKENS_CSS + STRUCTURE_CSS + WORKFLOWS_CSS + SESSIONS_CSS
+PANEL_CSS = TOKENS_CSS + STRUCTURE_CSS + SESSIONS_CSS
 _REQUIRED_COLOR_TOKENS = {
     "--color-accent",
     "--color-accent-secondary",
@@ -56,8 +54,6 @@ _REQUIRED_COLOR_TOKENS = {
 # deliberately EXCLUDED — see the module docstring.
 CONTROL_SURFACES: dict[str, str] = {
     "structure.py": STRUCTURE_CSS,
-    "workflows.py": WORKFLOWS_CSS,
-    "workflow_policy.py": WORKFLOW_POLICY_CSS,
     "reports.py": REPORTS_CSS,
     "academy.py": ACADEMY_CSS,
 }
@@ -67,8 +63,6 @@ CONTROL_SELECTORS: tuple[str, ...] = (
     ".nav-tab",
     ".theme-btn",
     ".runtime-btn",
-    ".wfp-picker",
-    ".wfp-profile-select",
     ".academy-card__cta",
     ".academy-back-btn",
     ".reports-row__trash",

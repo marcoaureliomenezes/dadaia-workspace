@@ -119,7 +119,7 @@ _NOT_FOUND_BODY = (
     b"Route not found. "
     b"The panel exposes / /api/panel-status /api/contexts "
     b"/api/agents /api/agents/<id>/prompt /api/agents/<id>/sessions "
-    b"/api/sessions /api/workflow-catalog /api/workflow-catalog/<id> "
+    b"/api/sessions "
     b"/health /memory/<slug>/<file> /memory-view/<slug>/<file> /static/<name>. "
     b"Open / for the index."
 )
@@ -197,28 +197,9 @@ _ROUTE_TABLE: list[tuple[str, str, AuthClass]] = [
     (r"^/api/reports/(?P<path>.+)/important$", "api_report_mark_important", AuthClass.BEARER),
     (r"^/api/reports/(?P<path>.+)$", "api_report_delete", AuthClass.BEARER),
     (r"^/api/agents/(?P<agent_id>[^/]+)/prompt$", "api_agent_prompt", AuthClass.BEARER),
-    # Workflow model-governance control plane (Wave C — T-28-C-01/02). The
-    # /<id> detail pattern MUST precede the list pattern (more specific first).
-    # The static /validate path MUST precede the catch-all policy route.
-    (
-        r"^/api/workflow-catalog/(?P<workflow_id>[^/]+)$",
-        "api_workflow_catalog_detail",
-        AuthClass.BEARER,
-    ),
-    (r"^/api/workflow-catalog$", "api_workflow_catalog", AuthClass.BEARER),
-    (r"^/api/workflow-model-profiles$", "api_workflow_model_profiles", AuthClass.BEARER),
-    # Read-only fragment inspector (Wave D — T-28-D-01): /<fragment_id> path param.
-    (
-        r"^/api/workflow-fragments/(?P<fragment_id>[^/]+)$",
-        "api_workflow_fragment",
-        AuthClass.BEARER,
-    ),
-    (r"^/api/workflow-model-policy$", "api_workflow_model_policy", AuthClass.BEARER),
     # L1 agent model-governance control plane (v0.1.65 FR8 — T-65-11).
     (r"^/api/agent-model-policy$", "api_agent_model_policy", AuthClass.BEARER),
     (r"^/api/agent-model-templates$", "api_agent_model_templates", AuthClass.BEARER),
-    (r"^/api/lifecycle-runs$", "api_lifecycle_runs", AuthClass.BEARER),
-    (r"^/api/workflow-step-ledger$", "api_workflow_step_ledger", AuthClass.BEARER),
     # BEARER_TELEMETRY routes (require active telemetry service)
     (
         r"^/api/agents/(?P<agent_id>[^/]+)/sessions$",
@@ -275,11 +256,6 @@ _RAW_ROUTES: list[tuple[str, str]] = [(pat, name) for pat, name, _ in _ROUTE_TAB
 # call convention unchanged.
 _QS_AWARE_GET_ROUTES: frozenset[str] = frozenset(
     {
-        "api_workflow_catalog",
-        "api_workflow_catalog_detail",
-        "api_workflow_model_policy",
-        "api_lifecycle_runs",
-        "api_workflow_step_ledger",
     }
 )
 
@@ -287,12 +263,10 @@ _QS_AWARE_GET_ROUTES: frozenset[str] = frozenset(
 # policy route; POST targets the validate route. Both read the request body + content
 # type and call the view with ``body`` / ``content_type`` / ``qs``.
 _PUT_ROUTE_TABLE: list[tuple[str, str]] = [
-    (r"^/api/workflow-model-policy$", "api_workflow_model_policy_put"),
     # L1 agent model-governance Apply (v0.1.65 FR8 / G-2 — T-65-11).
     (r"^/api/agent-model-policy$", "api_agent_model_policy_put"),
 ]
 _POST_BODY_ROUTE_TABLE: list[tuple[str, str]] = [
-    (r"^/api/workflow-model-policy/validate$", "api_workflow_model_policy_validate"),
     (r"^/api/agent-model-policy/validate$", "api_agent_model_policy_validate"),
 ]
 _COMPILED_PUT_ROUTE_TABLE: list[tuple[re.Pattern[str], str]] = [

@@ -130,24 +130,9 @@ def test_route_table_invariants() -> None:
         pytest.param(
             "api_report_mark_important", AuthClass.BEARER, id="api-report-mark-important-bearer"
         ),
-        pytest.param("api_workflow_fragment", AuthClass.BEARER, id="api-workflow-fragment-bearer"),
         pytest.param("api_session_detail", None, id="api-session-detail-removed-v0152"),
     ],
 )
 def test_route_classification_table(route_name: str, expected_auth: AuthClass | None) -> None:
     assert _get_auth(route_name) == expected_auth
 
-    if route_name != "api_workflow_fragment":
-        return
-
-    # The fragment route also resolves + captures the fragment_id group (Wave D).
-    matched_name: str | None = None
-    captured: str | None = None
-    for pattern, name, _auth in _COMPILED_ROUTE_TABLE:
-        m = pattern.match("/api/workflow-fragments/implementation.implement_tdd")
-        if m:
-            matched_name = name
-            captured = m.groupdict().get("fragment_id")
-            break
-    assert matched_name == "api_workflow_fragment"
-    assert captured == "implementation.implement_tdd"

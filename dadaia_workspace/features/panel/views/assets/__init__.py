@@ -7,10 +7,8 @@ module so specialists can write into separate files in parallel without merge co
 
 from dadaia_workspace.features.panel.views.assets.css.structure import STRUCTURE_CSS
 from dadaia_workspace.features.panel.views.assets.css.tokens import TOKENS_CSS
-from dadaia_workspace.features.panel.views.assets.css.workflows import WORKFLOWS_CSS
 
 __all__ = [
     "TOKENS_CSS",
     "STRUCTURE_CSS",
-    "WORKFLOWS_CSS",
 ]

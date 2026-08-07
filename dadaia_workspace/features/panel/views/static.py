@@ -35,8 +35,6 @@ from dadaia_workspace.features.panel.views.assets.css.reports_doc import (
 from dadaia_workspace.features.panel.views.assets.css.sessions import SESSIONS_CSS
 from dadaia_workspace.features.panel.views.assets.css.structure import STRUCTURE_CSS
 from dadaia_workspace.features.panel.views.assets.css.tokens import TOKENS_CSS
-from dadaia_workspace.features.panel.views.assets.css.workflow_policy import WORKFLOW_POLICY_CSS
-from dadaia_workspace.features.panel.views.assets.css.workflows import WORKFLOWS_CSS
 
 _ASSETS_DIR = Path(__file__).parent / "assets"
 _JS_DIR = _ASSETS_DIR / "js"
@@ -66,8 +64,6 @@ _ASSETS: dict[str, tuple[str, bytes]] = {
     ),
     "structure.css": ("text/css; charset=utf-8", STRUCTURE_CSS.encode("utf-8")),
     "projects.css": ("text/css; charset=utf-8", PROJECTS_CSS.encode("utf-8")),
-    "workflows.css": ("text/css; charset=utf-8", WORKFLOWS_CSS.encode("utf-8")),
-    "workflow-policy.css": ("text/css; charset=utf-8", WORKFLOW_POLICY_CSS.encode("utf-8")),
     "agent-policy.css": ("text/css; charset=utf-8", AGENT_POLICY_CSS.encode("utf-8")),
     "sessions.css": ("text/css; charset=utf-8", SESSIONS_CSS.encode("utf-8")),
     "academy.css": ("text/css; charset=utf-8", ACADEMY_CSS.encode("utf-8")),
@@ -81,17 +77,13 @@ _ASSETS: dict[str, tuple[str, bytes]] = {
         "application/javascript; charset=utf-8",
         (_JS_DIR / "themes.js").read_bytes(),
     ),
-    # runtime.js MUST be registered before workflow-policy.js and sessions.js
+    # runtime.js MUST be registered before sessions.js
     # (load-order invariant, PR5-D7).  window.Runtime must be defined before any
     # module calls Runtime.get() or subscribes to dadaia:runtime-change.  The
     # dict insertion order here mirrors the <script> order enforced in index.py.
     "runtime.js": (
         "application/javascript; charset=utf-8",
         (_JS_DIR / "runtime.js").read_bytes(),
-    ),
-    "workflow-policy.js": (
-        "application/javascript; charset=utf-8",
-        (_JS_DIR / "workflow_policy.js").read_bytes(),
     ),
     "agent-policy.js": (
         "application/javascript; charset=utf-8",
