@@ -327,7 +327,7 @@ survives and must not match); every gate green.
 
 ---
 
-- [ ] **T-30-12 — Quantified removal report (LOC + deleted tests)**
+- [x] **T-30-12 — Quantified removal report (LOC + deleted tests)**
 
 **Owner role:** qa-engineer
 
@@ -358,7 +358,7 @@ measured removal differs from the map by more than 10%.
 
 ---
 
-- [ ] **T-30-13 — Constitution, memory atoms, CLOSURE**
+- [-] **T-30-13 — Constitution, memory atoms, CLOSURE**
 
 **Owner role:** product-engineer
 
