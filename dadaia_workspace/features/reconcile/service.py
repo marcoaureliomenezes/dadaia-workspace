@@ -139,7 +139,7 @@ def reconcile_workspace(
         steps.append("workspace-doctor")
 
         capabilities = build_capabilities()
-        if capabilities.get("schema_version") != "dadaia-capabilities-v1":
+        if capabilities.get("schema_version") != "dadaia-capabilities-v2":
             raise RuntimeError("capability canary returned an unsupported schema version")
         if capabilities["provider"]["distribution_version"] != expected_version:
             raise RuntimeError("capability canary does not identify the expected provider")

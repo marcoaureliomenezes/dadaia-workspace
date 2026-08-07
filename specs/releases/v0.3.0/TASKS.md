@@ -83,7 +83,7 @@ in T-30-04 with the builders they pin.
 
 ---
 
-- [-] **T-30-03 — Sever certification + capabilities; mint `dadaia-capabilities-v2`**
+- [x] **T-30-03 — Sever certification + capabilities; mint `dadaia-capabilities-v2`**
 
 **Owner role:** software-engineer
 
@@ -108,7 +108,7 @@ unchanged (the check list is data). Keep `context-bind-heartbeat`,
 
 ---
 
-- [ ] **T-30-04 — Sever `container.py` (~1,400 of 2,300 lines)**
+- [-] **T-30-04 — Sever `container.py` (~1,400 of 2,300 lines)**
 
 **Owner role:** software-engineer
 

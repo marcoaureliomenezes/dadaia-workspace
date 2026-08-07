@@ -23,19 +23,14 @@ def test_capabilities_json_matches_service_and_public_schema() -> None:
         / "dadaia_workspace"
         / "public"
         / "schemas"
-        / "dadaia-capabilities-v1.schema.json"
+        / "dadaia-capabilities-v2.schema.json"
     )
     schema = json.loads(schema_path.read_text(encoding="utf-8"))
     Draft202012Validator(schema).validate(payload)
 
 
-def test_capabilities_pin_exact_workflow_commands_and_context_safety() -> None:
+def test_capabilities_pin_context_safety() -> None:
     payload = build_capabilities()
-    assert {item["command"] for item in payload["workflows"]} == {
-        "dadaia lifecycle backlog-definition",
-        "dadaia lifecycle release-definition",
-        "dadaia lifecycle implementation-reviews",
-        "dadaia lifecycle audit",
-    }
+    assert "workflows" not in payload
     assert payload["contexts"]["selection_contract"] == "explicit-or-caller-owned-bind"
     assert payload["consumer_requirements"]["exact_provider_version"] is True

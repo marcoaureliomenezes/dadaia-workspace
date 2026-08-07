@@ -108,7 +108,7 @@ def test_reconcile_quarantines_legacy_dadaia_dirs(tmp_path: Path, monkeypatch) -
     monkeypatch.setattr(
         "dadaia_workspace.features.reconcile.service.build_capabilities",
         lambda: {
-            "schema_version": "dadaia-capabilities-v1",
+            "schema_version": "dadaia-capabilities-v2",
             "provider": {"distribution_version": "1.2.3"},
         },
     )
@@ -135,7 +135,7 @@ def test_success_runs_all_postconditions(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(
         "dadaia_workspace.features.reconcile.service.build_capabilities",
         lambda: {
-            "schema_version": "dadaia-capabilities-v1",
+            "schema_version": "dadaia-capabilities-v2",
             "provider": {"distribution_version": "1.2.3"},
         },
     )
