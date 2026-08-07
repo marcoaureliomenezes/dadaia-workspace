@@ -32,7 +32,10 @@ from typer.testing import CliRunner
 from dadaia_workspace.cli.commands.public import app as public_app
 from dadaia_workspace.core.models.harness_profile import HarnessProfile
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
-from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+from dadaia_workspace.infrastructure.public_assets import (
+    FileSystemPublicAssetManager,
+    OverwritePolicy,
+)
 
 # Reuse the EXACT W1 golden normalizer + committed golden (Q2/A4 byte-equality lock) — the
 # same path-normalization and git-dirty line exclusion the W1 doctor golden was captured
@@ -93,7 +96,7 @@ def _install_claude_only_tree(ws: Path) -> FileSystemPublicAssetManager:
 def _scaffold_chokepoint_scripts(mgr: FileSystemPublicAssetManager, ws: Path) -> None:
     """Install the harness-independent git chokepoint scripts into ``.dadaia/scripts``."""
     agentic_dir = ws / ".dadaia" / "agentic"
-    mgr._install_scripts(agentic_dir, ws, False, [])
+    mgr._install_scripts(agentic_dir, ws, OverwritePolicy.PRESERVE, [])
 
 
 def _install_codex_only_tree(ws: Path) -> FileSystemPublicAssetManager:

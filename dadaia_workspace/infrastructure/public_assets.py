@@ -8,7 +8,8 @@ import os
 import shutil
 import stat
 import subprocess
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
@@ -85,6 +86,7 @@ from dadaia_workspace.infrastructure.public_assets_common import (  # noqa: F401
     _PI_DIRS,
     _SCHEMA_VERSION,
     _VALID_TARGETS,
+    OverwritePolicy,
     _atomic_write_text,
     _json_dump,
     _log_cleanup_error,
@@ -162,6 +164,37 @@ _DADAIA_MD_TARGETS_ALL: tuple[str, ...] = (
 )
 
 
+@dataclass(frozen=True)
+class InstallPlan:
+    """The ONE resolution of ``install()``'s port-conforming arguments (FR6, T-30-10).
+
+    ``install()`` builds exactly one ``InstallPlan`` from its
+    ``(workspace_root, target, force, scope, only)`` parameters, THEN runs an ordered
+    list of flag-free steps over it — the flags never travel any further than this
+    dataclass. ``force`` is resolved to an :class:`OverwritePolicy`; ``target``/``scope``
+    are resolved to the concrete harness targets and active-harness set the step
+    pipeline selects on; the agent-model overlay and the resolved core-agent roster are
+    loaded once and carried alongside so no step re-reads them.
+    """
+
+    workspace_root: Path
+    agentic_dir: Path
+    target: str
+    scope: Literal["all", "repos-only", "workspace-only"]
+    only: str | None
+    overwrite: OverwritePolicy
+    harness_targets: tuple[str, ...]
+    active_harnesses: frozenset[str]
+    overlay: AgentModelPolicyOverlay | None
+    resolved_models: dict[str, ResolvedAgentModel]
+
+
+#: A pipeline step consumes the resolved plan and the shared install transcript. No step
+#: takes a raw ``bool`` — the ONE overwrite flag lives on ``plan.overwrite``, and ``scope``/
+#: ``only`` have already been resolved into which steps are present in the pipeline.
+_InstallStep = Callable[[InstallPlan, list[str]], None]
+
+
 class FileSystemPublicAssetManager:
     def __init__(
         self,
@@ -182,14 +215,20 @@ class FileSystemPublicAssetManager:
     # (install_helpers, codex_doctor, runtime_config, codex_assets).
     # ------------------------------------------------------------------
 
-    def _copy_file(self, src: Path, dst: Path, force: bool, installed: list[str]) -> None:
-        copy_file(src, dst, force, installed)
+    def _copy_file(
+        self, src: Path, dst: Path, overwrite: OverwritePolicy, installed: list[str]
+    ) -> None:
+        copy_file(src, dst, overwrite.force, installed)
 
-    def _copy_tree(self, src: Path, dst: Path, force: bool, installed: list[str]) -> None:
-        copy_tree(src, dst, force, installed, self._iter_files)
+    def _copy_tree(
+        self, src: Path, dst: Path, overwrite: OverwritePolicy, installed: list[str]
+    ) -> None:
+        copy_tree(src, dst, overwrite.force, installed, self._iter_files)
 
-    def _write_generated(self, dst: Path, content: str, force: bool, installed: list[str]) -> None:
-        write_generated(dst, content, force, installed)
+    def _write_generated(
+        self, dst: Path, content: str, overwrite: OverwritePolicy, installed: list[str]
+    ) -> None:
+        write_generated(dst, content, overwrite.force, installed)
 
     def _runtime_expectations(
         self, agentic_dir: Path, workspace_root: Path
@@ -203,12 +242,16 @@ class FileSystemPublicAssetManager:
         )
 
     def _install_codex_agents(
-        self, agentic_dir: Path, workspace_root: Path, force: bool, installed: list[str]
+        self,
+        agentic_dir: Path,
+        workspace_root: Path,
+        overwrite: OverwritePolicy,
+        installed: list[str],
     ) -> None:
         install_codex_agents(
             agentic_dir,
             workspace_root,
-            force,
+            overwrite.force,
             installed,
             resolved_models=self._resolved_core_models(
                 self._load_agent_policy(workspace_root, agentic_dir)
@@ -216,25 +259,29 @@ class FileSystemPublicAssetManager:
         )
 
     def _install_codex_runtime_adapters(
-        self, workspace_root: Path, force: bool, installed: list[str]
+        self, workspace_root: Path, overwrite: OverwritePolicy, installed: list[str]
     ) -> None:
         install_codex_runtime_adapters(
-            self._public_dir, workspace_root, force, installed, copy_file
+            self._public_dir, workspace_root, overwrite.force, installed, copy_file
         )
 
     def _install_codex_rules(
-        self, agentic_dir: Path, workspace_root: Path, force: bool, installed: list[str]
+        self,
+        agentic_dir: Path,
+        workspace_root: Path,
+        overwrite: OverwritePolicy,
+        installed: list[str],
     ) -> None:
         dst_dir = workspace_root / ".codex" / "rules"
         dst_dir.mkdir(parents=True, exist_ok=True)
-        if force:
+        if overwrite is OverwritePolicy.FORCE:
             for stale in sorted(dst_dir.glob("*.md")):
                 stale.unlink()
                 installed.append(f"[rm]   {stale}")
         write_generated(
             dst_dir / "dadaia-command-policy.rules",
             _render_codex_command_policy_rules(),
-            force,
+            overwrite.force,
             installed,
         )
 
@@ -387,7 +434,7 @@ class FileSystemPublicAssetManager:
         self,
         md_path: Path,
         workspace_root: Path,
-        force: bool,
+        overwrite: OverwritePolicy,
         installed: list[str],
         resolved: ResolvedAgentModel | None = None,
     ) -> None:
@@ -399,7 +446,7 @@ class FileSystemPublicAssetManager:
         write_generated(
             workspace_root / ".codex" / "agents" / f"{agent_name}.toml",
             toml_content,
-            force,
+            overwrite.force,
             installed,
         )
 
@@ -408,7 +455,7 @@ class FileSystemPublicAssetManager:
         agentic_dir: Path,
         workspace_root: Path,
         active: set[str],
-        force: bool,
+        overwrite: OverwritePolicy,
         installed: list[str],
         overlay: AgentModelPolicyOverlay | None = None,
     ) -> None:
@@ -436,30 +483,37 @@ class FileSystemPublicAssetManager:
                 if "claude" in active:
                     if resolved is None:
                         copy_file(
-                            md, workspace_root / ".claude" / "agents" / md.name, force, installed
+                            md,
+                            workspace_root / ".claude" / "agents" / md.name,
+                            overwrite.force,
+                            installed,
                         )
                     else:
                         write_generated(
                             workspace_root / ".claude" / "agents" / md.name,
                             render_claude_agent(md.read_text(encoding="utf-8"), resolved),
-                            force,
+                            overwrite.force,
                             installed,
                         )
                 if "codex" in active:
                     self._render_codex_pack_agent(
-                        md, workspace_root, force, installed, resolved=resolved
+                        md, workspace_root, overwrite, installed, resolved=resolved
                     )
             for skill in sorted(self._iter_files(pack_dir / "skills")):
                 if skill.name == ".gitkeep":
                     continue
                 rel = skill.relative_to(pack_dir / "skills")
-                copy_file(skill, workspace_root / ".agents" / "skills" / rel, force, installed)
+                copy_file(
+                    skill, workspace_root / ".agents" / "skills" / rel, overwrite.force, installed
+                )
             if "claude" in active:
                 for rule in sorted(self._iter_files(pack_dir / "rules")):
                     if rule.name == ".gitkeep":
                         continue
                     rel = rule.relative_to(pack_dir / "rules")
-                    copy_file(rule, workspace_root / ".claude" / "rules" / rel, force, installed)
+                    copy_file(
+                        rule, workspace_root / ".claude" / "rules" / rel, overwrite.force, installed
+                    )
 
     def install_plugin(
         self, workspace_root: Path, pack_name: str, force: bool = False
@@ -484,7 +538,12 @@ class FileSystemPublicAssetManager:
         active = set(L1_ENTRY_HARNESSES) if profile is None else profile
         overlay = self._load_agent_policy(workspace_root, agentic_dir)
         self._project_installed_plugins(
-            agentic_dir, workspace_root, active, force, installed, overlay=overlay
+            agentic_dir,
+            workspace_root,
+            active,
+            OverwritePolicy.of(force),
+            installed,
+            overlay=overlay,
         )
         return installed
 
@@ -714,126 +773,28 @@ class FileSystemPublicAssetManager:
         scope: Literal["all", "repos-only", "workspace-only"] = "all",
         only: str | None = None,
     ) -> list[str]:
-        if target not in _VALID_TARGETS:
-            valid = ", ".join(sorted(_VALID_TARGETS))
-            raise PublicAssetError(
-                f"Unsupported public install target '{target}'. Expected one of: {valid}"
-            )
-        if (
-            _is_source_repo_root(workspace_root)
-            and os.environ.get("DADAIA_ALLOW_SOURCE_ROOT_PUBLIC_INSTALL") != "1"
-        ):
-            raise PublicAssetError(
-                "Refusing to project public runtime assets into the dadaia-workspace source "
-                "repository root. Use a temporary workspace for install smoke tests, or set "
-                "DADAIA_ALLOW_SOURCE_ROOT_PUBLIC_INSTALL=1 for an explicit local-only override."
-            )
+        """Install staged public assets into runtime projections (the port contract).
+
+        This is the boundary translator (FR6, v0.3.0 T-30-10): the port-conforming
+        signature is exhaustively validated and resolved HERE, once, into an immutable
+        :class:`InstallPlan`; the flags never travel any further. The auto-stage guard
+        runs first (a fresh workspace needs a staged tree before the plan can even read
+        the agent-model overlay), then the ordered, flag-free step pipeline runs over
+        the plan, and finally the install ledger is reconciled exactly as before.
+        """
+        self._validate_install_target(target)
+        self._guard_source_root_install(workspace_root)
 
         agentic_dir = workspace_root / ".dadaia" / "agentic"
         installed: list[str] = []
         if not (agentic_dir / "manifest.json").exists():
             installed.extend(self.stage(workspace_root))
 
-        # v0.1.65 FR5: load the agent-model policy ONCE per install run and resolve the
-        # core roster through the single resolver (FR4). An invalid overlay raises the
-        # typed store error HERE — loud, before any projection write (NFR-4). A missing
-        # overlay resolves the `balanced` defaults.
-        overlay = self._load_agent_policy(workspace_root, agentic_dir)
-        resolved_models = self._resolved_core_models(overlay)
-
-        # Install-all reads the persisted profile (Ruling D, FR3): a claude-only workspace
-        # installs only the claude projection. An absent profile ⇒ all-four (back-compat).
-        # An explicit --target X always overrides (it never reaches this branch).
-        if target == "all":
-            profile_harnesses = self._profile_harnesses(workspace_root)
-            if profile_harnesses is None:
-                targets: tuple[str, ...] = PROJECTION_TARGETS
-            else:
-                targets = ("agents", *(h for h in L1_ENTRY_HARNESSES if h in profile_harnesses))
-        else:
-            targets = (target,)
-        data_agents_md = agentic_dir / "data" / "AGENTS.md"
-        if data_agents_md.exists():
-            guard_targets: dict[str, set[Literal["workspace", "repos"]]] = {
-                "all": {"workspace", "repos"},
-                "workspace-only": {"workspace"},
-                "repos-only": {"repos"},
-            }
-            _install_guardrail_pair(
-                data_agents_md,
-                workspace_root,
-                force,
-                installed,
-                targets=guard_targets.get(scope, {"workspace", "repos"}),
-            )
-        elif scope in ("all", "workspace-only"):
-            install_agents_md(agentic_dir, workspace_root, force, installed, self._agents_md_source)
-
-        install_dadaia_agents_md(agentic_dir, workspace_root, force, installed)
-        install_reports_agents_md(agentic_dir, workspace_root, force, installed)
-        install_handoff_agents_md(agentic_dir, workspace_root, force, installed)
-
-        for item in targets:
-            if item == "agents":
-                if only is None or only == "skills":
-                    install_universal_skills(
-                        agentic_dir, workspace_root, force, installed, self._iter_files
-                    )
-            elif item == "claude":
-                self._install_claude(
-                    agentic_dir,
-                    workspace_root,
-                    force,
-                    installed,
-                    only=only,
-                    resolved_models=resolved_models,
-                )
-            elif item == "codex":
-                self._install_codex(
-                    agentic_dir,
-                    workspace_root,
-                    force,
-                    installed,
-                    only=only,
-                    resolved_models=resolved_models,
-                )
-            elif item == "pi":
-                self._install_pi(agentic_dir, workspace_root, force, installed, only=only)
-            elif item == "kimi-code":
-                self._install_kimi_code(agentic_dir, workspace_root, force, installed, only=only)
-
-        # The git-chokepoint scripts are harness-independent: EVERY Layer-1 harness
-        # target gets them (v0.2.8 consumer bug kimi-only-init-public-doctor-missing-
-        # managed-scripts — a pi-only or kimi-only workspace must also read doctor-green;
-        # the doctor's dadaia:scripts/* lines are unconditional, so a per-harness install
-        # that skipped them left single-harness workspaces permanently red).
-        if target in {"all", *L1_ENTRY_HARNESSES}:
-            self._install_scripts(agentic_dir, workspace_root, force, installed)
-
-        # DADAIA.md lands AFTER the per-harness projections: copy_tree prunes orphans in
-        # .claude/rules/ and .kimi-code/, and the law file is sourced from data/, not from
-        # those trees — installing it earlier had it pruned moments later.
-        install_dadaia_md(
-            agentic_dir,
-            workspace_root,
-            force,
-            installed,
-            harnesses={item for item in targets if item in L1_ENTRY_HARNESSES},
+        plan = self._resolve_install_plan(
+            workspace_root, agentic_dir, target, OverwritePolicy.of(force), scope, only
         )
-        remove_retired_core_rules(workspace_root, installed)
-
-        # Projection precedence (FR3, AC-4): after the core projection, overlay any installed
-        # pack's real body over its stub — scoped to the harnesses actually being projected —
-        # so a routine `public install` never silently reverts an installed pack agent to its
-        # stub. A no-op when no pack is installed (byte-lock golden (b)).
-        active_harnesses = {item for item in targets if item in L1_ENTRY_HARNESSES}
-        self._project_installed_plugins(
-            agentic_dir, workspace_root, active_harnesses, force, installed, overlay=overlay
-        )
-
-        # Markdown workflow projections were retired in v0.2.3. Remove only their
-        # canonical file shape; preserve any unrelated/operator-owned directory content.
-        remove_legacy_workflow_projections(workspace_root, installed)
+        for step in self._install_pipeline(plan):
+            step(plan, installed)
 
         # LEDGER RECONCILIATION (bug retired-lib-asset-leaves-orphan-projection): the
         # desired state is diffed against the RECORD of what a prior install wrote —
@@ -844,10 +805,247 @@ class FileSystemPublicAssetManager:
         self._reconcile_install_ledger(
             workspace_root,
             installed,
-            full=(target == "all" and scope == "all"),
+            full=(plan.target == "all" and plan.scope == "all"),
         )
 
         return installed
+
+    @staticmethod
+    def _validate_install_target(target: str) -> None:
+        if target not in _VALID_TARGETS:
+            valid = ", ".join(sorted(_VALID_TARGETS))
+            raise PublicAssetError(
+                f"Unsupported public install target '{target}'. Expected one of: {valid}"
+            )
+
+    @staticmethod
+    def _guard_source_root_install(workspace_root: Path) -> None:
+        if (
+            _is_source_repo_root(workspace_root)
+            and os.environ.get("DADAIA_ALLOW_SOURCE_ROOT_PUBLIC_INSTALL") != "1"
+        ):
+            raise PublicAssetError(
+                "Refusing to project public runtime assets into the dadaia-workspace source "
+                "repository root. Use a temporary workspace for install smoke tests, or set "
+                "DADAIA_ALLOW_SOURCE_ROOT_PUBLIC_INSTALL=1 for an explicit local-only override."
+            )
+
+    def _resolve_install_plan(
+        self,
+        workspace_root: Path,
+        agentic_dir: Path,
+        target: str,
+        overwrite: OverwritePolicy,
+        scope: Literal["all", "repos-only", "workspace-only"],
+        only: str | None,
+    ) -> InstallPlan:
+        """Resolve ``install()``'s arguments ONCE (FR6): the single translation point.
+
+        v0.1.65 FR5: the agent-model policy is loaded ONCE per install run and the core
+        roster resolved through the single resolver (FR4). An invalid overlay raises the
+        typed store error HERE — loud, before any projection write (NFR-4). A missing
+        overlay resolves the `balanced` defaults.
+        """
+        overlay = self._load_agent_policy(workspace_root, agentic_dir)
+        resolved_models = self._resolved_core_models(overlay)
+
+        # Install-all reads the persisted profile (Ruling D, FR3): a claude-only workspace
+        # installs only the claude projection. An absent profile ⇒ all-four (back-compat).
+        # An explicit --target X always overrides (it never reaches this branch).
+        if target == "all":
+            profile_harnesses = self._profile_harnesses(workspace_root)
+            if profile_harnesses is None:
+                harness_targets: tuple[str, ...] = PROJECTION_TARGETS
+            else:
+                harness_targets = (
+                    "agents",
+                    *(h for h in L1_ENTRY_HARNESSES if h in profile_harnesses),
+                )
+        else:
+            harness_targets = (target,)
+
+        active_harnesses = frozenset(item for item in harness_targets if item in L1_ENTRY_HARNESSES)
+
+        return InstallPlan(
+            workspace_root=workspace_root,
+            agentic_dir=agentic_dir,
+            target=target,
+            scope=scope,
+            only=only,
+            overwrite=overwrite,
+            harness_targets=harness_targets,
+            active_harnesses=active_harnesses,
+            overlay=overlay,
+            resolved_models=resolved_models,
+        )
+
+    #: Maps a resolved harness target name to its step. A target absent from
+    #: ``plan.harness_targets`` is simply absent from the pipeline — never guarded by an
+    #: ``if`` inside a step (FR6: scope/only are step SELECTION, not internal flags).
+    def _harness_steps(self) -> dict[str, _InstallStep]:
+        return {
+            "agents": self._step_install_universal_skills,
+            "claude": self._step_install_claude,
+            "codex": self._step_install_codex,
+            "pi": self._step_install_pi,
+            "kimi-code": self._step_install_kimi_code,
+        }
+
+    def _install_pipeline(self, plan: InstallPlan) -> list[_InstallStep]:
+        """Build the ordered, flag-free step list for *plan* (FR6, T-30-10).
+
+        Order matches the pre-refactor sequence exactly (byte-neutral default path):
+        the AGENTS.md family, THEN the selected per-harness projections, THEN the
+        harness-independent chokepoint scripts (selected only when at least one Layer-1
+        harness is in scope), THEN ``DADAIA.md`` (after the per-harness projections so
+        ``copy_tree``'s orphan pruning cannot prune it moments later), THEN the retired
+        core rules, THEN plugin-pack precedence (after the core projection so a pack
+        body is never silently reverted to its stub), THEN the retired workflow sweep.
+        """
+        harness_steps = self._harness_steps()
+        steps: list[_InstallStep] = [
+            self._step_agents_md_guardrail,
+            self._step_dadaia_agents_md,
+            self._step_reports_agents_md,
+            self._step_handoff_agents_md,
+            *(harness_steps[item] for item in plan.harness_targets if item in harness_steps),
+        ]
+        # The git-chokepoint scripts are harness-independent: EVERY Layer-1 harness
+        # target gets them (v0.2.8 consumer bug kimi-only-init-public-doctor-missing-
+        # managed-scripts — a pi-only or kimi-only workspace must also read doctor-green;
+        # the doctor's dadaia:scripts/* lines are unconditional, so a per-harness install
+        # that skipped them left single-harness workspaces permanently red). Selected
+        # here (present/absent), never guarded by an `if` inside the step.
+        if plan.target in {"all", *L1_ENTRY_HARNESSES}:
+            steps.append(self._step_install_scripts)
+        steps.extend(
+            [
+                self._step_install_dadaia_md,
+                self._step_remove_retired_core_rules,
+                self._step_project_installed_plugins,
+                self._step_remove_legacy_workflow_projections,
+            ]
+        )
+        return steps
+
+    def _step_agents_md_guardrail(self, plan: InstallPlan, installed: list[str]) -> None:
+        data_agents_md = plan.agentic_dir / "data" / "AGENTS.md"
+        if data_agents_md.exists():
+            guard_targets: dict[str, set[Literal["workspace", "repos"]]] = {
+                "all": {"workspace", "repos"},
+                "workspace-only": {"workspace"},
+                "repos-only": {"repos"},
+            }
+            _install_guardrail_pair(
+                data_agents_md,
+                plan.workspace_root,
+                plan.overwrite.force,
+                installed,
+                targets=guard_targets.get(plan.scope, {"workspace", "repos"}),
+            )
+        elif plan.scope in ("all", "workspace-only"):
+            install_agents_md(
+                plan.agentic_dir,
+                plan.workspace_root,
+                plan.overwrite.force,
+                installed,
+                self._agents_md_source,
+            )
+
+    def _step_dadaia_agents_md(self, plan: InstallPlan, installed: list[str]) -> None:
+        install_dadaia_agents_md(
+            plan.agentic_dir, plan.workspace_root, plan.overwrite.force, installed
+        )
+
+    def _step_reports_agents_md(self, plan: InstallPlan, installed: list[str]) -> None:
+        install_reports_agents_md(
+            plan.agentic_dir, plan.workspace_root, plan.overwrite.force, installed
+        )
+
+    def _step_handoff_agents_md(self, plan: InstallPlan, installed: list[str]) -> None:
+        install_handoff_agents_md(
+            plan.agentic_dir, plan.workspace_root, plan.overwrite.force, installed
+        )
+
+    def _step_install_universal_skills(self, plan: InstallPlan, installed: list[str]) -> None:
+        if plan.only is None or plan.only == "skills":
+            install_universal_skills(
+                plan.agentic_dir,
+                plan.workspace_root,
+                plan.overwrite.force,
+                installed,
+                self._iter_files,
+            )
+
+    def _step_install_claude(self, plan: InstallPlan, installed: list[str]) -> None:
+        self._install_claude(
+            plan.agentic_dir,
+            plan.workspace_root,
+            plan.overwrite,
+            installed,
+            only=plan.only,
+            resolved_models=plan.resolved_models,
+        )
+
+    def _step_install_codex(self, plan: InstallPlan, installed: list[str]) -> None:
+        self._install_codex(
+            plan.agentic_dir,
+            plan.workspace_root,
+            plan.overwrite,
+            installed,
+            only=plan.only,
+            resolved_models=plan.resolved_models,
+        )
+
+    def _step_install_pi(self, plan: InstallPlan, installed: list[str]) -> None:
+        self._install_pi(
+            plan.agentic_dir, plan.workspace_root, plan.overwrite, installed, only=plan.only
+        )
+
+    def _step_install_kimi_code(self, plan: InstallPlan, installed: list[str]) -> None:
+        self._install_kimi_code(
+            plan.agentic_dir, plan.workspace_root, plan.overwrite, installed, only=plan.only
+        )
+
+    def _step_install_scripts(self, plan: InstallPlan, installed: list[str]) -> None:
+        self._install_scripts(plan.agentic_dir, plan.workspace_root, plan.overwrite, installed)
+
+    def _step_install_dadaia_md(self, plan: InstallPlan, installed: list[str]) -> None:
+        # DADAIA.md lands AFTER the per-harness projections: copy_tree prunes orphans in
+        # .claude/rules/ and .kimi-code/, and the law file is sourced from data/, not from
+        # those trees — installing it earlier had it pruned moments later.
+        install_dadaia_md(
+            plan.agentic_dir,
+            plan.workspace_root,
+            plan.overwrite.force,
+            installed,
+            harnesses=plan.active_harnesses,
+        )
+
+    def _step_remove_retired_core_rules(self, plan: InstallPlan, installed: list[str]) -> None:
+        remove_retired_core_rules(plan.workspace_root, installed)
+
+    def _step_project_installed_plugins(self, plan: InstallPlan, installed: list[str]) -> None:
+        # Projection precedence (FR3, AC-4): after the core projection, overlay any
+        # installed pack's real body over its stub — scoped to the harnesses actually
+        # being projected — so a routine `public install` never silently reverts an
+        # installed pack agent to its stub. A no-op when no pack is installed (byte-lock
+        # golden (b)).
+        self._project_installed_plugins(
+            plan.agentic_dir,
+            plan.workspace_root,
+            set(plan.active_harnesses),
+            plan.overwrite,
+            installed,
+            overlay=plan.overlay,
+        )
+
+    def _step_remove_legacy_workflow_projections(
+        self, plan: InstallPlan, installed: list[str]
+    ) -> None:
+        # Markdown workflow projections were retired in v0.2.3. Remove only their
+        # canonical file shape; preserve any unrelated/operator-owned directory content.
+        remove_legacy_workflow_projections(plan.workspace_root, installed)
 
     def _reconcile_install_ledger(
         self,
@@ -1193,14 +1391,17 @@ class FileSystemPublicAssetManager:
     def _consumer_repos(self, workspace_root: Path) -> list[Path]:
         return _consumer_repos_for_root(workspace_root)
 
-    def _is_self_repo(self, consumer: Path) -> bool:
+    def _is_self_repo(
+        self,
+        consumer: Path,
+    ) -> bool:
         return _is_self_repo(consumer)
 
     def _install_claude(
         self,
         agentic_dir: Path,
         workspace_root: Path,
-        force: bool,
+        overwrite: OverwritePolicy,
         installed: list[str],
         only: str | None = None,
         resolved_models: dict[str, ResolvedAgentModel] | None = None,
@@ -1218,15 +1419,26 @@ class FileSystemPublicAssetManager:
                 # v0.1.65 FR5: core agents are RENDERED (staged generic body +
                 # resolved policy) through the D-6 seam; stubs copy verbatim.
                 install_claude_agents(
-                    agentic_dir, claude_dir, force, installed, self._iter_files, resolved_models
+                    agentic_dir,
+                    claude_dir,
+                    overwrite.force,
+                    installed,
+                    self._iter_files,
+                    resolved_models,
                 )
                 continue
-            copy_tree(agentic_dir / name, claude_dir / name, force, installed, self._iter_files)
+            copy_tree(
+                agentic_dir / name, claude_dir / name, overwrite.force, installed, self._iter_files
+            )
         if only is None:
-            self._install_claude_settings(claude_dir, workspace_root, force, installed)
+            self._install_claude_settings(claude_dir, workspace_root, overwrite, installed)
 
     def _install_claude_settings(
-        self, claude_dir: Path, workspace_root: Path, force: bool, installed: list[str]
+        self,
+        claude_dir: Path,
+        workspace_root: Path,
+        overwrite: OverwritePolicy,
+        installed: list[str],
     ) -> None:
         """Fold dadaia's hook wiring into ``.claude/settings.json``, preserving the rest.
 
@@ -1249,7 +1461,10 @@ class FileSystemPublicAssetManager:
                 ) from None
             existing = loaded if isinstance(loaded, dict) else None
         write_generated(
-            dst, _json_dump(_merge_claude_settings(existing, workspace_root)), force, installed
+            dst,
+            _json_dump(_merge_claude_settings(existing, workspace_root)),
+            overwrite.force,
+            installed,
         )
 
     def _doctor_claude_settings(self, workspace_root: Path) -> list[DoctorLine]:
@@ -1293,7 +1508,7 @@ class FileSystemPublicAssetManager:
         self,
         agentic_dir: Path,
         workspace_root: Path,
-        force: bool,
+        overwrite: OverwritePolicy,
         installed: list[str],
         only: str | None = None,
         resolved_models: dict[str, ResolvedAgentModel] | None = None,
@@ -1303,8 +1518,9 @@ class FileSystemPublicAssetManager:
             resolved_models = self._resolved_core_models(
                 self._load_agent_policy(workspace_root, agentic_dir)
             )
+        force = overwrite.force
         if only is None or only == "rules":
-            self._install_codex_rules(agentic_dir, workspace_root, force, installed)
+            self._install_codex_rules(agentic_dir, workspace_root, overwrite, installed)
         if only is None or only == "skills":
             install_universal_skills(
                 agentic_dir, workspace_root, force, installed, self._iter_files
@@ -1340,7 +1556,7 @@ class FileSystemPublicAssetManager:
         self,
         agentic_dir: Path,
         workspace_root: Path,
-        force: bool,
+        overwrite: OverwritePolicy,
         installed: list[str],
         only: str | None = None,
     ) -> None:
@@ -1356,17 +1572,17 @@ class FileSystemPublicAssetManager:
         pi_src = agentic_dir / "pi"
         pi_dst = workspace_root / ".pi"
         if only is None:
-            copy_tree(pi_src, pi_dst, force, installed, self._iter_files)
+            copy_tree(pi_src, pi_dst, overwrite.force, installed, self._iter_files)
             return
         # `only` filters to a single staged subdirectory (e.g. "prompts").
         if only in _PI_DIRS:
-            copy_tree(pi_src / only, pi_dst / only, force, installed, self._iter_files)
+            copy_tree(pi_src / only, pi_dst / only, overwrite.force, installed, self._iter_files)
 
     def _install_kimi_code(
         self,
         agentic_dir: Path,
         workspace_root: Path,
-        force: bool,
+        overwrite: OverwritePolicy,
         installed: list[str],
         only: str | None = None,
     ) -> None:
@@ -1383,19 +1599,21 @@ class FileSystemPublicAssetManager:
         kimi_src = agentic_dir / "kimi-code"
         kimi_dst = workspace_root / ".kimi-code"
         if only is None:
-            copy_tree(kimi_src, kimi_dst, force, installed, self._iter_files)
-            self._install_kimi_user_hooks(force, installed)
+            copy_tree(kimi_src, kimi_dst, overwrite.force, installed, self._iter_files)
+            self._install_kimi_user_hooks(overwrite, installed)
             return
         # `only` filters to a single staged subdirectory (none today — _KIMI_DIRS is empty).
         if only in _KIMI_DIRS:
-            copy_tree(kimi_src / only, kimi_dst / only, force, installed, self._iter_files)
+            copy_tree(
+                kimi_src / only, kimi_dst / only, overwrite.force, installed, self._iter_files
+            )
 
-    def _install_kimi_user_hooks(self, force: bool, installed: list[str]) -> None:
+    def _install_kimi_user_hooks(self, overwrite: OverwritePolicy, installed: list[str]) -> None:
         """Write the kimi shims (chmod 755) and upsert the managed config.toml block."""
         home = kimi_code_home()
         for name, content in kimi_hook_shims().items():
             dst = home / "hooks" / name
-            write_generated(dst, content, force, installed)
+            write_generated(dst, content, overwrite.force, installed)
             with contextlib.suppress(OSError):
                 dst.chmod(0o755)
         config_path = home / "config.toml"
@@ -1408,12 +1626,16 @@ class FileSystemPublicAssetManager:
             installed.append(f"[skip] {config_path}")
 
     def _install_scripts(
-        self, agentic_dir: Path, workspace_root: Path, force: bool, installed: list[str]
+        self,
+        agentic_dir: Path,
+        workspace_root: Path,
+        overwrite: OverwritePolicy,
+        installed: list[str],
     ) -> None:
         copy_tree(
             agentic_dir / "scripts",
             workspace_root / ".dadaia" / "scripts",
-            force,
+            overwrite.force,
             installed,
             self._iter_files,
         )
@@ -1431,7 +1653,10 @@ class FileSystemPublicAssetManager:
             if path.is_file() and not self._is_ignored_public_asset(path)
         )
 
-    def _is_ignored_public_asset(self, path: Path) -> bool:
+    def _is_ignored_public_asset(
+        self,
+        path: Path,
+    ) -> bool:
         return path.suffix in _PUBLIC_ASSET_IGNORED_SUFFIXES or bool(
             _PUBLIC_ASSET_IGNORED_DIRS.intersection(path.parts)
         )

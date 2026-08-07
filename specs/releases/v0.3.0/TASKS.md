@@ -263,7 +263,7 @@ ignores; contract suite green.
 
 ---
 
-- [-] **T-30-10 — De-flag `infrastructure/public_assets.py` into a flag-free step pipeline**
+- [x] **T-30-10 — De-flag `infrastructure/public_assets.py` into a flag-free step pipeline**
 
 **Owner role:** software-engineer
 
