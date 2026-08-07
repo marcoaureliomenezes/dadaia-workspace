@@ -197,10 +197,8 @@ def test_panel_renders_sections_credentialless_and_no_token_banner(tmp_path: Pat
             assert resp.status == 200
             body = resp.read().decode("utf-8", errors="replace")
 
-        # The 3 section identifiers that must appear in the rendered HTML.
-        # The index view renders sections for Servers, Projects (memories), and
-        # Workflows (v0.1.45 redesign: the Agentic tab was removed and the
-        # dadaia-workflows catalog became a first-class section).
+        # The section identifiers that must appear in the rendered HTML.
+        # The index view renders sections for Servers and Projects (memories).
         assert "Servers" in body, "Index page missing 'Servers' section"
         assert any(marker in body for marker in ("Memórias", "Memories", "memories", "memory")), (
             "Index page missing Memories section marker"

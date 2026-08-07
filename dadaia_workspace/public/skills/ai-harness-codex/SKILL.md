@@ -343,16 +343,17 @@ done — exactly the SDD shape. Map Codex workflow expectations onto dadaia's ga
 | QA / review | `qa-engineer`, `security-reviewer`, `code-reviewer` | all approve | consolidated verdict |
 | Closure | `product-engineer` | triple evidence | CLOSURE + memory update + archived release |
 
-**No `.codex/workflows/` projection.** The retired `*.workflow.md` reference layer
-duplicated executable lifecycle behavior without providing an executor. The four
-Python-backed `dadaia lifecycle` commands are the sole workflow authority; their
-fragments live under `public/lifecycle_fragments/` and their operative role mandates
-under `public/personas/`. The installer removes legacy projected workflow files and
-the doctor reports any residue. `.codex/config.toml` carries no inert workflow keys.
+**No `.codex/workflows/` projection.** There is no workflow engine and no executor for a
+declarative workflow file. The retired `*.workflow.md` reference layer duplicated that
+behavior without providing one; the installer removes legacy projected workflow files
+and the doctor reports any residue. `.codex/config.toml` carries no inert workflow keys.
+The ordered SDD flow is agent-dispatched: each stage is carried out by dispatching the
+owning agent against the SDD documents themselves.
 
 Authoring consequences:
-- Hooks and Python lifecycle workflows enforce *mechanics* of these gates; they must never decide
-  product scope, rewrite the SPEC to justify code, or hide human approval.
+- Hooks enforce *mechanics* of these gates (path-class, presence, the push chokepoint);
+  they must never decide product scope, rewrite the SPEC to justify code, or hide human
+  approval.
 - For difficult tasks, plan before implementing (reduces rework). For bugs,
   reproduction + verification matter more than a vague description.
 - Path contract is part of UX: every agent writes handoff to

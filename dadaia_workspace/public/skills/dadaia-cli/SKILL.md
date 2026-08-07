@@ -2,9 +2,9 @@
 name: dadaia-cli
 description: >
   Use this skill whenever you need to operate the dadaia-workspace CLI — open the
-  panel, bind a Spec Context, run a lifecycle workflow, check state, register a bug,
-  or discover any command. The CLI is self-documenting; this is the map plus the few
-  non-obvious idioms. All agents may use it.
+  panel, bind a Spec Context, author backlog/release artifacts, check state, register
+  a bug, or discover any command. The CLI is self-documenting; this is the map plus the
+  few non-obvious idioms. All agents may use it.
 ---
 
 # Skill: dadaia-cli
@@ -14,7 +14,7 @@ The `dadaia` CLI is the single control surface for the workspace. It is **self-d
 ## Discover
 
 - `dadaia --help` — all command groups.
-- `dadaia <group> --help` — a group's subcommands (e.g. `dadaia context --help`, `dadaia lifecycle --help`).
+- `dadaia <group> --help` — a group's subcommands (e.g. `dadaia context --help`, `dadaia backlog --help`).
 - Always call the binary in the workspace venv: `.dadaia/.venv/bin/dadaia`. Never system Python/pip.
 - Add `--json` to most read commands for machine-readable output.
 - Start every new or upgraded runtime with `dadaia capabilities --json`; this versioned
@@ -22,14 +22,13 @@ The `dadaia` CLI is the single control surface for the workspace. It is **self-d
 
 ## Panel — see everything
 
-`dadaia panel` starts the local UI (default port 4999). Tabs: Contexts (ALIVE/DEAD + advisory presence), Workflows (verbs, diagrams, model pickers), Servers, Reports/Handoffs, Sub-agents, projection health. Use it to inspect state instead of reading files.
+`dadaia panel` starts the local UI (default port 4999). Tabs: Projects (Spec Context Projects, ALIVE/DEAD + advisory presence), 1º Agentic Layer (entry-harness sub-agent model/effort policy), Reports (reports/handoffs), Academy, Servers, Games. Use it to inspect state instead of reading files.
 
 ## Command groups (`dadaia <group> --help` for detail)
 
 | Group | What |
 |---|---|
 | `context` | Spec Context Projects: `list show create alive dead bind release heartbeat delete` |
-| `lifecycle` | Deterministic workflow verbs (see below) |
 | `specs` | SDD structure: `doctor upgrade init hotfix release segment` |
 | `capabilities` / `certify` / `reconcile` | Discover, prove, and converge the installed provider |
 | `bugs` | Event-sourced bug telemetry: `append status stats` |
@@ -53,22 +52,13 @@ dadaia context baseline <ctx> --yes --push                       # explicit unbo
 
 Bind binds the **context** (persists mode + session id in the session record, self-scoped); no shell `eval` needed. ADDITIVE work (bugs/backlog/audits/reports) needs no bind.
 
-## Workflows (`dadaia lifecycle <verb>`)
+## SDD stages (agent-dispatched, not a CLI verb)
 
-Deterministic, Python-gated. Pass `--context <ctx> --release-id <id>` on every workflow command; add `--harness pi|codex|fake` + `--step-model` to select the Layer-2 worker.
-
-| Verb | Purpose |
-|---|---|
-| `backlog-definition` | Research/grill a demand or bug and author one consistent backlog item |
-| `release-definition` | Author and review SPEC, PLAN, and TASKS |
-| `implementation-reviews` | Implement, self-verify, run QA/security/code review, correct, and close |
-| `audit` | Scope, inspect, disposition findings, and verify handoff coherence |
-
-These are the only workflow commands. Status, cleanup, report validation, model policy,
-and handoff doctors are diagnostics under their owning top-level command groups; they are
-not workflows.
-
-Full per-verb detail (steps, harness/model, diagrams): the panel **Workflows** tab.
+There is no workflow engine and no lifecycle command group. Each SDD stage —
+backlog definition, release definition, implementation with its reviews, and audit — is
+carried out by dispatching the owning agent (`DADAIA.md` §2) against the SDD documents,
+using the ordinary command groups above (`backlog`, `release`, `specs`) to scaffold and
+validate what that agent authors.
 
 ## Runtime convergence and certification
 
@@ -85,19 +75,21 @@ ${DADAIA_BIN:-.dadaia/.venv/bin/dadaia} certify --json
 `reconcile` validates the exact provider version, migrates state, reinstalls projections,
 runs public/workspace doctors, and executes a capability canary. `certify` creates a
 disposable workspace and proves init, projections, clean specs scaffolds, empty Git remote
-baseline, caller-owned bind/heartbeat, all four fake workflows through closure, strict
-handoff validation, panel HTTP/server registry, and ALIVE/DEAD/delete teardown. Any failed
-check is a release blocker. Real Codex and PI canaries remain required before publishing a
-provider release; `fake` is only the deterministic workflow contract harness.
+baseline, caller-owned bind/heartbeat, strict handoff validation, panel HTTP/server
+registry, and ALIVE/DEAD/delete teardown (checks: `capability-contract`,
+`exact-version-reconciliation`, `context-empty-remote-baseline`, `context-list-show-json`,
+`context-bind-heartbeat`, `reports-handoff-validation`, `panel-and-server-registry`,
+`context-dead-alive-delete-roundtrip`). Any failed check is a release blocker.
 
 ## Agent operating sequence
 
 1. Read `dadaia capabilities --json`; never infer features from an older conversation.
 2. Select the target with `context list/show --json`, then bind this session explicitly.
 3. Run `specs doctor --context <ctx> --json`; do not implement against errors or warnings.
-4. Use exactly one current lifecycle verb with explicit `--context` and `--release-id`.
-5. Preserve the complete JSON result and worker diagnostic when blocked; never reduce it
-   to “workflow failed”.
+4. Reserve your task in TASKS.md (`dadaia-task-manager`) before writing any production
+   file, with explicit `--context` and `--release-id` for every command you run.
+5. Preserve the complete evidence trail when blocked (command, exit code, output); never
+   reduce it to a vague "it failed".
 6. Use `dadaia panel` for the human view and the server registry for ports.
 7. Emit/validate the final handoff and register genuine provider bugs before workarounds.
 

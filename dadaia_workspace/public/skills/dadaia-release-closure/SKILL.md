@@ -6,9 +6,9 @@ applyTo: "specs/releases/*/CLOSURE.md"
 
 # dadaia-release-closure
 
-> **Not the lifecycle enforcement mechanism.** Ordered lifecycle execution (the closure
-> sequence and its gates) is owned by the dadaia-workflows (`dadaia lifecycle`). This
-> skill is reference / manual-operator guidance only.
+> **Not a hook-enforced mechanism.** There is no workflow engine that runs the closure
+> sequence or its gates. `product-engineer` drives every step of this protocol directly.
+> This skill is the authoritative protocol for that flow.
 
 ## When to invoke
 

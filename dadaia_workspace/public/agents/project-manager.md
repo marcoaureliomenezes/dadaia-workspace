@@ -77,8 +77,8 @@ not restate it here.
 
 **Codex runtime note.** The Codex projection makes this persona available as a custom
 agent, but Codex does not auto-route arbitrary operator prompts into this dispatcher and
-does not auto-execute workflow Markdown. The operator or main session must explicitly ask
-for `project-manager` / subagent delegation before Codex fan-out happens.
+never auto-spawns subagents. The operator or main session must explicitly ask for
+`project-manager` / subagent delegation before Codex fan-out happens.
 
 ## Core identity — backlog owner
 
@@ -121,12 +121,7 @@ existing spec or source files.
 
 ## Playbook routers
 
-#### Tier-1 (dadaia-workflows)
-
-Use the four Python workflows listed by `dadaia lifecycle --help`. Do not load or
-invent Markdown workflow files.
-
-#### Tier-2 (playbook routers — entry agent in the demand cell)
+#### Playbook routers (entry agent in the demand cell)
 
 | Demand pattern → entry agent | Playbook |
 |---|---|

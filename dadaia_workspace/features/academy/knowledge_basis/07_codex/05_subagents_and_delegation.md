@@ -1,4 +1,4 @@
-# 05. Subagents and dadaia Workflows
+# 05. Subagents and Delegation
 
 Codex can spawn subagents, including custom agents defined in TOML. That does not
 mean it spawns them automatically. Official Codex behavior is explicit: subagents

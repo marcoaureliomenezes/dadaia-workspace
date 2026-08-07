@@ -17,7 +17,8 @@ Drive the workspace through the `dadaia` CLI (use the workspace venv binary):
 
 - `dadaia context show --json` — resolve the active Spec Context Project and phase.
 - `dadaia specs doctor` — SDD structural health check.
-- `dadaia lifecycle …` — run a lifecycle phase / pipeline step.
+- `dadaia backlog new` / `dadaia release new` — scaffold the SDD documents each stage of
+  the flow drives against.
 
 Follow the SDD discipline the `AGENTS.md` defines: reserve a task before editing
 production files, stay inside your declared write set, and emit a handoff at the end.

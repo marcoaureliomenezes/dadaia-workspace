@@ -34,14 +34,12 @@ Yes → Arm B, fixed on the spot. No → Arm A, matured through a release.
 
 Bugs are never release material and never wait for one. Features never skip the backlog.
 
-The four ordered lifecycle workflows execute Arm A: `dadaia lifecycle backlog-definition`,
-`release-definition`, `implementation-reviews`, and `audit`. Each assembles per-step
-prompts, calls worker agents, and advances Python-validated gates. In a Codex or Kimi
-entry session, prefer these workflows and default the worker harness to your entry
-harness; an explicit `--harness` always wins. Claude Code is a Layer-1 entry harness only.
-
-Dispatch the owning agent for the work (§2). This harness does not auto-spawn agents from
-workflow files — you fan out explicitly.
+Arm A is agent-dispatched, not engine-run: each stage — backlog-definition,
+release-definition, implementation with its reviews and gates, and audit — is carried out
+by dispatching the owning agent for that stage (§2) against the SDD documents
+(`ACTIVE.md`, SPEC, PLAN, TASKS, CLOSURE, per §5). No workflow engine assembles prompts or
+advances gates on your behalf; you fan out explicitly and the documents themselves are
+the record of progress.
 
 ---
 
@@ -287,7 +285,6 @@ receives only the values it needs from that root `.env` and never writes a secon
 |---|---|
 | Scoped law | `specs/AGENTS.md`, `.dadaia/reports/AGENTS.md`, `.dadaia/handoff/AGENTS.md`, `repos/<slug>/AGENTS.md`, and any nested `AGENTS.md` |
 | Skills | `.claude/skills/`, `.agents/skills/` — `dadaia-cli` maps the CLI; `harness-primitives` covers harness literacy |
-| Workflows | `dadaia panel` → 2º Agentic Layer: purpose, steps, per-step harness and model |
 | State | `dadaia context show --json`, `dadaia specs doctor`, `dadaia public doctor`, `dadaia server list`, `dadaia bugs status`, `dadaia panel` |
 
 Language: follow the operator's preference, defaulting to English. Tone: direct, concise,

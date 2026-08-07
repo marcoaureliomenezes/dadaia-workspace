@@ -11,10 +11,9 @@ applyTo: "specs/**/TASKS.md"
 
 # dadaia-task-manager — Task State Protocol
 
-> **Not the lifecycle enforcement mechanism.** Ordered task reservation and the
-> per-phase lifecycle sequence are owned by the dadaia-workflows (`dadaia lifecycle`),
-> whose Python gates own task-state transitions. This skill is reference / manual-operator
-> guidance for the human-auditable marker discipline only.
+> **Not a hook-enforced mechanism.** There is no workflow engine and no gate that reads
+> `TASKS.md`. Task-state transitions hold only because every agent upholds this marker
+> discipline itself. This skill is the authoritative protocol for that discipline.
 
 ## The 3-marker contract
 
@@ -33,17 +32,6 @@ merged `dadaia_workspace.hooks.pre_gate` PreToolUse hook never reads `TASKS.md`,
 presence × phase × mode on file-write tool calls (see the `DADAIA.md` (the workspace law) §1). Marker discipline exists
 for traceability and coordination between agents and the operator — uphold it even
 though no hook will block you for skipping it.
-
-## Mechanics moved to the engine (D12)
-
-The **ordered task-state mechanics** — reserve `[ ]`→`[-]`, run the work, complete
-`[-]`→`[x]`, and the per-step sequencing — are now enforced by the lifecycle engine:
-`features/lifecycle/state_machine.py` owns the legal phase transitions
-(`is_legal_transition`, `TransitionDecision`) and `features/lifecycle/pipeline.py` owns
-per-step sequencing (each `PipelineStep` carries the `task_id` it transitions). This
-skill no longer narrates that ordered procedure; it records the **human-auditable marker
-discipline** the engine's transitions correspond to, plus the judgment a human applies
-when the mechanics meet reality (recovery, gate blocks, where TASKS.md lives).
 
 ## Marker discipline (the human-auditable trace)
 

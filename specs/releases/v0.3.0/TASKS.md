@@ -187,7 +187,7 @@ scratch workspace with no orphan directory left behind.
 
 ---
 
-- [-] **T-30-07 — Rewrite `DADAIA.md` §1 (Arm A without the engine) and re-project**
+- [x] **T-30-07 — Rewrite `DADAIA.md` §1 (Arm A without the engine) and re-project**
 
 **Owner role:** ai-engineer
 
@@ -211,7 +211,7 @@ the projected `DADAIA.md` copies are byte-identical to the source.
 
 ---
 
-- [-] **T-30-08 — Grep-driven prose sweep to zero residue**
+- [x] **T-30-08 — Grep-driven prose sweep to zero residue**
 
 **Owner role:** ai-engineer
 
@@ -238,7 +238,7 @@ returns nothing (`features/backlog/removal_lifecycle.py` survives and must not m
 
 ---
 
-- [ ] **T-30-09 — Prune import-linter contracts, lower the caps, update the contract tests**
+- [x] **T-30-09 — Prune import-linter contracts, lower the caps, update the contract tests**
 
 **Owner role:** software-architect
 
@@ -263,7 +263,7 @@ ignores; contract suite green.
 
 ---
 
-- [ ] **T-30-10 — De-flag `infrastructure/public_assets.py` into a flag-free step pipeline**
+- [-] **T-30-10 — De-flag `infrastructure/public_assets.py` into a flag-free step pipeline**
 
 **Owner role:** software-engineer
 

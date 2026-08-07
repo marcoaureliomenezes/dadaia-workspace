@@ -6,14 +6,11 @@ applyTo: "specs/backlog/**"
 
 # dadaia-release-definition
 
-> **Not the lifecycle enforcement mechanism.** Ordered release-definition execution is
-> owned by the **release-definition dadaia-workflow**
-> (`dadaia lifecycle release-definition`) —
-> a Python workflow body that assembles fragment-scoped per-step prompts
-> (`release_scope → spec_create → spec_*_review → plan_create → … → definition_commit_gate`)
-> and advances Python-validated gates. This skill is reference / manual-operator guidance
-> only; it does not enforce the sequence. See **`dadaia panel` → 2º Agentic Layer**
-> for the live workflow description.
+> **Not a hook-enforced mechanism.** There is no workflow engine that assembles
+> per-step prompts or advances gates. `product-engineer` (dispatched by
+> `project-manager`) drives every step of this protocol directly, from picking the set
+> through authoring SPEC → PLAN → TASKS, with reviews per the segment/release cadence.
+> This skill is the authoritative protocol for that flow.
 
 ## When to invoke
 
@@ -78,14 +75,14 @@ machine-readable bold-key line in the SPEC, alongside `**Status:**` / `**Release
 **Consumes:** slug-a, slug-b
 ```
 
-This is the producer half of removal-on-release. At `dadaia lifecycle release-definition`,
-a guarded post-step parses this line, binds each declared slug's `intents[]` through the
-canonical-subject registry → the verified **shipped-anchor set**, and writes
-`specs/_archive/<release-id>/consumed_backlog.json`. At
-`dadaia lifecycle implementation-reviews`, the
-residual-aware removal hook reads that ledger and drops each fully-consumed item from the
-live `specs/backlog/` SET (archiving a copy first), so `backlog doctor` reports zero
-BL-STALE. Rules:
+This is the producer half of removal-on-release. `features/backlog/removal_lifecycle.py`
+still carries the library functions that bind each declared slug's `intents[]` through
+the canonical-subject registry into a verified **shipped-anchor set** and write
+`specs/_archive/<release-id>/consumed_backlog.json` — but no CLI verb currently invokes
+them (their former caller was the deleted workflow engine). Until a CLI wrapper ships,
+treat the `dadaia-release-closure` skill's manual **Disposition sweep** (flip each fully
+consumed item's status to `DELIVERED`/`CONSUMED`/`SUPERSEDED` in its own frontmatter) as
+the live mechanism that keeps `backlog doctor` at zero BL-STALE. Rules:
 - **Full-slug granularity:** a declared slug is treated as *fully* consumed (all its bound
   anchors shipped). A partially-shipped item must NOT be declared — leave it in the
   backlog and rewrite it to its residual by hand.

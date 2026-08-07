@@ -2,16 +2,17 @@
 name: project-orchestration
 description: >
   Generic dispatch reference for project-manager and project-auditor agents.
-  Defines the default public agent inventory, workflow inventory, dispatch
+  Defines the default public agent inventory, SDD stage inventory, dispatch
   protocol, mediation rules, escalation triggers, and forbidden actions.
 applyTo: ".dadaia/handoff/**"
 ---
 
 # project-orchestration
 
-> **Not the lifecycle enforcement mechanism.** Ordered lifecycle execution and dispatch
-> sequencing are owned by the dadaia-workflows (`dadaia lifecycle`), whose Python
-> orchestrator owns the sequence. This skill is reference / manual-operator guidance only.
+> **Not an enforcement mechanism.** There is no workflow engine: the ordered SDD flow
+> (`DADAIA.md` §1) is agent-dispatched — carried out by dispatching the owning agent for
+> each stage against the SDD documents. This skill is reference / dispatcher guidance,
+> not a substitute for the documents themselves.
 
 This is the public default orchestration skill. It must stay generic: no
 operator-private project names, hostnames, IPs, customer names, private repo
@@ -38,7 +39,7 @@ when it runs as the top-level session agent.
 | `product-engineer` | 5 + 8 (definition, closure) | SPEC, PLAN, TASKS, CLOSURE, ACTIVE.md, memory | software-architect, project-manager | Task is code-only and already approved |
 | `software-architect` | feeds 4/5 | Architecture decisions, ADRs, dependency contracts | software-engineer | No architectural trade-off exists |
 | `software-engineer` | 6 (implementation) | Production code + tests for the bound context | qa-engineer | Task is spec authorship, AI-entity surface, or pure review |
-| `ai-engineer` | surface owner (`dadaia_workspace/public/**`) | Agents, personas, lifecycle fragments, skills, rules, commands, hooks | security-reviewer, code-reviewer | Task is product code or spec authorship |
+| `ai-engineer` | surface owner (`dadaia_workspace/public/**`) | Agents, skills, rules, commands, hooks | security-reviewer, code-reviewer | Task is product code or spec authorship |
 | `qa-engineer` | 7 gate → commit | E2E strategy, acceptance validation, smoke evidence | none | Only unit/integration tests are needed |
 | `security-reviewer` | 7 gate → push | Security audit, threat modeling, secret/leak review | implementer | No security-relevant surface is involved |
 | `code-reviewer` | 7 gate → PR | Diff/PR review, no authoring | none | There is no diff, PR, or staged set |
@@ -47,18 +48,20 @@ Plugins (not in core roster, constitution §14): `frontend-engineer`, `design-sp
 `devops-engineer`. They may be dispatched within a release when their surface is in scope,
 but they do not appear in the default core topology above.
 
-## Workflow Inventory
+## SDD Stage Inventory
 
-Python owns exactly four executable workflows. Run them only through `dadaia lifecycle`:
+Arm A (`DADAIA.md` §1) has exactly four stages. Each is agent-dispatched — there is no
+engine that runs them; the dispatcher hands the stage to its owning agent against the
+SDD documents (`ACTIVE.md`, SPEC, PLAN, TASKS, CLOSURE):
 
-| Workflow | Command |
-|---|---|
-| `backlog_definition` | `dadaia lifecycle backlog-definition` |
-| `release_definition` | `dadaia lifecycle release-definition` |
-| `implementation_reviews` | `dadaia lifecycle implementation-reviews` |
-| `audit` | `dadaia lifecycle audit` |
+| Stage | Entry agent | Governing document(s) |
+|---|---|---|
+| Backlog definition | `project-manager` (curates), `product-engineer` (reads to author) | `specs/backlog/**` |
+| Release definition | `product-engineer` | SPEC, PLAN, TASKS |
+| Implementation + reviews | surface implementer, then the review trio | TASKS, review handoffs |
+| Audit | `project-auditor` | `specs/audits/**` |
 
-There is no parallel Markdown workflow catalog and no manual workflow executor.
+There is no parallel Markdown workflow catalog and no workflow executor to invoke.
 
 ## Dispatch Protocol
 
@@ -103,25 +106,22 @@ Every HTML report that feeds another agent must have a handoff JSON file under:
 .dadaia/handoff/<context-name>/<UTC>-<agent-name>-<task-slug>.handoff.json
 ```
 
-## Mechanics moved to the engine (D12)
+## Orchestration judgment (no engine backstop)
 
 The **ordered review/QA sequence** — the per-task → end-of-alpha → rc-ship transition
-ladder and its gate ordering — is the engine's TRANSITIONS made executable:
-`features/lifecycle/state_machine.py` owns the legal phase transitions and gate ordering
-(`is_legal_transition`, `TransitionDecision`), `features/lifecycle/gates.py` owns the
-typed handoff gate (the APPROVED-verdict requirement), and
-`features/lifecycle/pipeline.py` + `phase_workflow.py` own run sequencing and the
-per-step **Layer-2 worker harness** — the bounded Codex or PI headless worker each step
-drives behind `AgentRuntimePort`; FAKE is the deterministic test adapter. Claude Code is
-Layer-1-only. See constitution §0 "The two agentic layers". This skill no longer narrates
-that ordered procedure step by step.
+ladder — is not mechanically enforced anywhere: there is no engine state machine and no
+gate that reads TASKS.md. It holds only because `project-manager` (dispatch discipline),
+implementers (marker discipline, `dadaia-task-manager`), and reviewers (evidence-backed
+`APPROVE`/`REQUEST_CHANGES`) each uphold their half. The only mechanical backstops are
+the git chokepoints (`DADAIA.md` §3): pre-commit warns and always allows; pre-push
+requires an APPROVED `security-reviewer` handoff whose `metrics.commit_sha` matches.
 
-What it keeps is the **orchestration judgment** the engine cannot make: who may dispatch
-(dispatcher purity), the persona inventory and routing, decision authority, mediation,
-escalation, and the forbidden actions. The gate cadence below is the human-readable
-contract the engine's transitions correspond to — kept as a pointer, not a procedure.
+This skill carries the **orchestration judgment** a document alone cannot supply: who may
+dispatch (dispatcher purity), the persona inventory and routing, decision authority,
+mediation, escalation, and the forbidden actions. The gate cadence below is the
+human-readable contract every agent upholds by convention.
 
-## Review/QA gate cadence (the contract the engine enforces)
+## Review/QA gate cadence (upheld by convention, backstopped by the push chokepoint)
 
 `project-manager` owns orchestration discipline; `product-engineer` owns SDD artifact
 approval; implementers and reviewers own their evidence. Per ADR-3 (segment/ship

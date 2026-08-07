@@ -3,21 +3,20 @@
 Consulta oficial: 2026-05-09. Integracao dadaia: WS-PI-6 (release v0.1.30).
 
 Os modulos 01-03 ensinam o Pi como ferramenta isolada. Este modulo posiciona o Pi
-dentro do dadaia-workspace: ele e o **quarto harness** suportado, ao lado de Claude
-Code, Codex e OpenCode. Aqui voce aprende o fluxo de entrada, a fronteira de
-confianca (trust boundary) e como selecionar o Pi por etapa em workflows.
+dentro do dadaia-workspace: ele e um harness de entrada suportado, ao lado de Claude
+Code e Codex. Aqui voce aprende o fluxo de entrada e a fronteira de confianca (trust
+boundary).
 
-## Os quatro harnesses
+## Os harnesses de entrada
 
 O dadaia-workspace projeta a mesma fonte canonica (`dadaia_workspace/public/`) para
 cada harness suportado:
 
-| Harness | Camada | Superficie projetada |
-|---|---|---|
-| Claude Code | Layer-1 (entrada) + Layer-2 (worker) | `.claude/` |
-| Codex | Layer-1 (entrada) + Layer-2 (worker) | `.codex/` |
-| OpenCode | Layer-1 (entrada, advisory) | `.agents/` (compartilhado) |
-| **Pi** | Layer-1 (entrada) + Layer-2 (worker) | `.pi/` |
+| Harness | Superficie projetada |
+|---|---|
+| Claude Code | `.claude/` |
+| Codex | `.codex/` |
+| **Pi** | `.pi/` |
 
 O Pi entrou como quarto harness nas releases v0.1.18-v0.1.21 (WS-PI-1..4). A release
 v0.1.30 (WS-PI-6) fecha o residual de telemetria: as sessoes do Pi passam a ser
@@ -44,31 +43,13 @@ que delega ao `pre_gate` em Python.
 
 - **Interativo (`pi`)**: a extensao de gate carregada apos o trust roda e participa
   da aplicacao do SDD gate, como o hook PreToolUse do Claude.
-- **Headless / one-shot (`pi --mode json`)**: usado como worker Layer-2 atras do
-  `PiHeadlessAdapter`. Nesse caminho, a cobertura deterministica vem dos
+- **Headless / one-shot (`pi --mode json`)**: a cobertura deterministica vem dos
   **git chokepoints** (pre-commit presence warning + pre-push security-verdict gate), que
   rodam como git hooks independentemente de qualquer hook de harness.
 
 Regra de ouro: nunca afirme "aplicacao por hook de harness no Pi" sem qualificar o
 caminho. Os chokepoints de git protegem ambos os caminhos; a extensao de gate cobre
 o interativo apos o trust.
-
-## Selecionar o Pi por etapa (`--harness pi`)
-
-O motor de workflows do dadaia (`dadaia lifecycle`) escolhe o harness por etapa. Para
-rodar uma etapa (ou um pipeline) com o Pi como worker Layer-2:
-
-```bash
-.dadaia/.venv/bin/dadaia lifecycle implementation-reviews --harness pi
-```
-
-A resolucao de harness segue a precedencia CLI > overlay > catalogo (governanca de
-modelo de workflow). Com `--harness pi`, o resolvedor seleciona os modelos do Pi
-(perfis com `harness: pi`) e o `PiHeadlessAdapter` executa cada etapa via
-`pi --mode json`. O Pi roda na assinatura Codex do operador; todo perfil GPT usa
-o provedor explicito `openai-codex/` (por exemplo,
-`openai-codex/gpt-5.5`) para nunca cair implicitamente em OpenRouter. Modelos Claude
-nao sao workers Layer-2.
 
 ## Telemetria do Pi no painel (WS-PI-6)
 
@@ -92,12 +73,10 @@ A partir de v0.1.30, as sessoes do Pi aparecem na telemetria local:
 - [ ] Contexto vinculado via `dadaia context bind`.
 - [ ] Entender que hooks de gate sao interativo-pos-trust; headless e coberto por
       chokepoints de git.
-- [ ] Saber rodar uma etapa com `dadaia lifecycle ... --harness pi`.
 - [ ] Saber que a telemetria do Pi e metadata-only e custo-desconhecido.
 
 ## Resultado esperado
 
-Ao final, voce deve conseguir posicionar o Pi como quarto harness do
-dadaia-workspace: entrar com trust, vincular contexto, selecionar o Pi por etapa em
-workflows e entender a fronteira de confianca e a postura de telemetria (metadata
-only, custo desconhecido).
+Ao final, voce deve conseguir posicionar o Pi como harness de entrada do
+dadaia-workspace: entrar com trust, vincular contexto, e entender a fronteira de
+confianca e a postura de telemetria (metadata only, custo desconhecido).

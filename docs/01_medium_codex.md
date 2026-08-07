@@ -259,7 +259,7 @@ while allowing many read-only or additive sessions.
 
 ## 9. Agent Model
 
-Agents are generic public roles specialized for the dadaia lifecycle, not for a
+Agents are generic public roles specialized for the SDD flow, not for a
 private domain.
 
 Good agents have narrow responsibility, clear lifecycle ownership, role-specific

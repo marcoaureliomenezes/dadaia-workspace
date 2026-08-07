@@ -10,13 +10,11 @@
 > Parallelism: tasks in the same phase with disjoint write sets may run in parallel; at most
 > one `[-]` per owner otherwise. Reserve `[ ]` → `[-]` before writing, `[-]` → `[x]` after
 > review approval (`dadaia-task-manager` discipline).
-> Workflow law: implementation and review work MUST be driven through `dadaia lifecycle`
-> workflows, with explicit `--context sample-consumer --release-id v0.2.0` on every
-> workflow command. Manual implementation/reviewer prompts are not an acceptable substitute
-> for the workflow engine. Any failure, wrong result, blocked workflow step, invalid
-> workflow handoff, context/bind inconsistency, or other `dadaia` tooling issue encountered
-> while running the workflow MUST be registered immediately with `dadaia bugs append`
-> before continuing or working around it.
+> Dispatch law: implementation and review work MUST be driven by dispatching the owning
+> agent for each SDD stage, with explicit `--context sample-consumer --release-id v0.2.0`
+> on every command. Any failure, wrong result, invalid handoff, context/bind
+> inconsistency, or other `dadaia` tooling issue encountered along the way MUST be
+> registered immediately with `dadaia bugs append` before continuing or working around it.
 > [PLUGIN] markers: NONE in this release — CI/GHCR is descoped (SPEC DEC-3). The freshness
 > gate and image-path gate are plain scripts run locally / in the build lane, not GHA YAML.
 
@@ -279,13 +277,13 @@
 [ ] T-4.2
 ```
 
-**T-4.3 — Drive `dadaia lifecycle` with `--harness pi` + explicit pi/OpenRouter model** (HOP-1.4; FR-4.1, FR-4.3 / RL-1)
+**T-4.3 — Drive the pi worker with `--harness pi` + explicit pi/OpenRouter model** (HOP-1.4; FR-4.1, FR-4.3 / RL-1)
 - Owner: ai-engineer (lifecycle wiring) + software-engineer
 - Write set: Consumer driver (the `/new_app` handler path in `telegram_listener.py` and/or a
   dedicated `workspace/scripts/lifecycle_driver.py`),
   `docker/sample-capture/defaults/playbook.md` (Layer-2 invocation law)
 - Precondition: T-1.2, T-1.3, T-4.1, T-4.2
-- Done: Consumer invokes `dadaia lifecycle <verb> --harness pi --step-model
+- Done: Consumer invokes the worker verb with `--harness pi --step-model
   <label>=pi-openrouter-<...>` (e.g. `pi-openrouter-kimi-high`) — the `--harness pi` flag and
   an explicit `--step-model` are ALWAYS passed; the `fake` default is NEVER used for a Layer-2
   step; the playbook documents that **no Layer-2 work runs on Codex or Claude** (RL-1);
@@ -300,7 +298,7 @@
 - Owner: software-engineer (orchestration) + qa-engineer (acceptance)
 - Write set: `scripts/pi-layer2-proof.sh` (new); evidence captured for CLOSURE
 - Precondition: T-4.1, T-4.2, T-4.3
-- Done: **one** `dadaia lifecycle` step runs a **real pi worker against an OpenRouter model
+- Done: **one** worker step runs a **real pi worker against an OpenRouter model
   end-to-end inside the container** (`--harness pi --step-model <label>=pi-openrouter-<...>`,
   creds via pi trusted config) — the worker produces real Layer-2 output, NOT a `fake` stub
   (asserted); egress to `openrouter.ai` succeeds, a non-listed domain fails; no Layer-2
@@ -325,7 +323,7 @@
   (1) the rebuilt image boots and `check-image-paths.sh` + freshness gate are green (DL-1,
   DL-2); (2) the operator sends a Telegram command from the operator chat and gets a correct
   handled response, a non-operator mutation is rejected, restart does not replay (DL-3);
-  (3) one `dadaia lifecycle` step runs a real pi/OpenRouter Layer-2 worker end-to-end (DL-4);
+  (3) one worker step runs a real pi/OpenRouter worker end-to-end (DL-4);
   (4) a test NDJSON object lands in MinIO under `raw/<source>/dt=<YYYY-MM-DD>/` (DL-5);
   (5) **zero** real-S3 writes — no AWS creds present, endpoint is MinIO (DL-6);
   (6) security-reviewer audits and confirms every epic §12 red line (RL-1..RL-7) is honored,
