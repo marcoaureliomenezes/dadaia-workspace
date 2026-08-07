@@ -179,7 +179,7 @@
   "[ok] stage:scaffold/releases/README.md",
   "[ok] stage:schemas/agent-model-policy-v1.schema.json",
   "[ok] stage:schemas/bugs/bug-event-v1.schema.json",
-  "[ok] stage:schemas/dadaia-capabilities-v1.schema.json",
+  "[ok] stage:schemas/dadaia-capabilities-v2.schema.json",
   "[ok] stage:schemas/handoff-v1.schema.json",
   "[ok] stage:schemas/lifecycle-run-workflow-steps-v1.schema.json",
   "[ok] stage:schemas/memory/memory-frontmatter-v1.schema.json",

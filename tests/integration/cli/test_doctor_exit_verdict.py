@@ -33,7 +33,6 @@ def _run_doctor_with(monkeypatch, tmp_path: Path, lines: tuple[DoctorLine, ...])
 
     monkeypatch.setattr(public_cmd, "container", _FakeContainer())
     monkeypatch.setattr(public_cmd, "resolve_workspace_root", lambda: tmp_path)
-    monkeypatch.setattr(public_cmd, "check_ai_surface_ritual", lambda public_dir: [])
     return _runner.invoke(app, ["public", "doctor"])
 
 

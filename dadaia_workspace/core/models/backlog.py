@@ -41,12 +41,9 @@ def is_intents_exempt(status: str | None) -> bool:
     requirement. Every other status (candidate and beyond, or a missing status) must
     carry bound, resolvable intents.
 
-    Lives in ``core`` so the backlog doctor and the backlog-definition gate share ONE
-    predicate. They previously diverged — the gate accepted a pre-existing ``candidate``
-    with no intents that the doctor then rejected as ``BL-SCHEMA`` (bug
-    ``r5c-backlog-gate-accepts-preexisting-candidate-without-intents``) — and the layering
-    contract forbids ``features.lifecycle`` importing ``features.backlog``, so the one
-    shared home has to be here.
+    Lives in ``core`` so every backlog validator shares ONE predicate — validators
+    previously diverged on whether a pre-existing ``candidate`` with no intents was
+    acceptable (bug ``r5c-backlog-gate-accepts-preexisting-candidate-without-intents``).
     """
     return status is not None and status.strip().lower() == INTENTS_EXEMPT_STATUS
 

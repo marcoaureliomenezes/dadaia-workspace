@@ -131,10 +131,6 @@ def scrub_entry_signal_env(monkeypatch: Any) -> None:
 #:     ``hooks/ctx_inject._resolve_context`` and ``hooks/sdd_gate`` context resolution.
 #:   - ``DADAIA_AGENTS_DIR`` — agents-dir override (resolution branch 1); read by
 #:     ``features/agents/reader`` (``os.environ.get("DADAIA_AGENTS_DIR")``).
-#:   - ``DADAIA_WORKFLOWS_DIR`` — workflows-dir override (resolution branch 1); read by
-#:     ``features/workflows/service`` (``os.environ.get("DADAIA_WORKFLOWS_DIR")``).
-#:   - ``DADAIA_AGENT_RUNTIME`` — runtime selector; read by the lifecycle runtime
-#:     wiring and the ``context`` CLI command.
 #:   - ``DADAIA_SESSION_ID`` — the operator **override** leg of ``resolve_session_id``
 #:     (``hooks/_common`` reads it first, ahead of the harness-native id vars). The harness
 #:     never sets it (so it stays in :data:`_FORBIDDEN_HOOK_ENV`, scrubbed from a real hook
@@ -154,35 +150,17 @@ ALLOWLISTED_DADAIA_ENV: Final[frozenset[str]] = frozenset(
         # (consumer-validation norm; bug init-bootstrap-pins-unpublished-version).
         "DADAIA_BOOTSTRAP_PACKAGE",
         "DADAIA_AGENTS_DIR",
-        "DADAIA_WORKFLOWS_DIR",
-        "DADAIA_AGENT_RUNTIME",
         "DADAIA_SESSION_ID",
         "DADAIA_MODE",
         # Operator/test path-override knob read by production in
         # features/telemetry/service.py (PI session-store ingest, WS-PI-6) — same
-        # category as DADAIA_AGENTS_DIR/DADAIA_WORKFLOWS_DIR above.
+        # category as DADAIA_AGENTS_DIR above.
         "DADAIA_PI_SESSIONS_DIR",
         # Entry-harness pin (v0.1.64 FR3/FR4) — an operator-shell / PI-Ring-1 input read
         # by production BY DESIGN in core/session_env.entry_harness (the --harness auto
         # sentinel). Setting it in a test exercises that real env-read path; the autouse
         # AC-4 envelope scrub (scrub_entry_signal_env) keeps the suite hermetic.
         "DADAIA_ENTRY_HARNESS",
-        # Codex sandbox override (v0.1.66 FR5) — an operator-shell input read by
-        # production BY DESIGN in infrastructure/codex_runtime.CodexExecConfig.__post_init__
-        # (os.environ.get(_DADAIA_CODEX_SANDBOX_ENV)), used to widen the codex sandbox mode
-        # in constrained containers where the read-only default fails under bwrap.
-        "DADAIA_CODEX_SANDBOX",
-        # FR3 (v0.1.67, T-67-08/T-67-09) real-binary live-opt-in flags — read BY DESIGN
-        # by tests/conftest.py's _real_worker_opt_in() (the suite-wide guard predicate)
-        # and independently by each tests/integration/{pi,codex,claude}_live/ suite's own
-        # skipif precondition. Not a production (dadaia_workspace/) reader — the reader is
-        # test infrastructure itself, exercising the real live-opt-in env-read path a
-        # per-flag non-interference proof (T-67-09) must genuinely set via
-        # monkeypatch.setenv rather than simulate.
-        "DADAIA_E2E_REAL_WORKER",
-        "DADAIA_PI_LIVE",
-        "DADAIA_CODEX_LIVE",
-        "DADAIA_CLAUDE_LIVE",
     }
 )
 

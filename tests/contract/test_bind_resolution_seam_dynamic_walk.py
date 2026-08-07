@@ -32,9 +32,6 @@ fixed centrally — each fix patched one command surface and the family kept rec
    deliberately:
      - ``bugs append --context`` is bug-event METADATA (flows into ``BugEvent(context=...)``,
        never into a resolution call) — never a specs-dir resolution input.
-     - ``reports workflow-status --context`` / ``reports workflow-handoffs-doctor --context`` are OPTIONAL
-       RUN FILTERS (``LifecycleRun.context`` equality; omitting means "no filter, show
-       everything" per the v0.1.71 FR2 docstring) — never a specs-dir resolution input.
    The reachability check is itself dynamic (graph search over the real source), not a
    hand-maintained exclude list, so a future non-resolver ``context``/``specs_dir`` param
    is correctly excluded automatically, and a future resolver-driven one is correctly
@@ -412,10 +409,6 @@ def test_every_resolver_driven_verb_reaches_the_seam_family() -> None:
     # now a ROUTING key resolved through the seam (bug
     # bugs-append-ledger-ignores-context-flag), no longer inert event metadata.
     known_non_resolver = {
-        "dadaia.reports.workflow-handoffs-doctor --context",
-        # Diagnostic filter only: it narrows persisted run summaries and does not
-        # resolve a Spec Context filesystem root.
-        "dadaia.reports.workflow-status --context",
         "dadaia.specs.init --specs-dir",
     }
     unexpected_non_resolver = set(not_seam_reaching) - known_non_resolver

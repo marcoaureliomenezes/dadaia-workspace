@@ -71,67 +71,8 @@ def _run(workspace: Path, *args: str) -> dict:
     return json.loads(proc.stdout)
 
 
-def test_the_whole_lifecycle_works_when_name_differs_from_slug(workspace: Path) -> None:
-    specs = workspace / "repos" / _SLUG / "specs"
-    assert specs.is_dir(), "the repo was cloned under its SLUG, not its name"
-    assert not (workspace / "repos" / _NAME).exists()
-
-    for i in (1, 2, 3):
-        payload = _run(
-            workspace,
-            "lifecycle",
-            "backlog-definition",
-            "--context",
-            _NAME,
-            "--release-id",
-            _RELEASE,
-            "--run-id",
-            f"b{i}",
-            "--harness",
-            "fake",
-            "--demand",
-            f"capability {i}",
-        )
-        assert payload["completed"] is True, payload
-
-    # The items must be on disk under the SLUG. Reporting success while writing nothing is
-    # the exact failure this pins.
-    items = sorted(p for p in (specs / "backlog").glob("*.md") if p.name != "README.md")
-    assert len(items) == 3, [p.name for p in items]
-
-    release = _run(
-        workspace,
-        "lifecycle",
-        "release-definition",
-        "--context",
-        _NAME,
-        "--release-id",
-        _RELEASE,
-        "--run-id",
-        "r1",
-        "--harness",
-        "fake",
-    )
-    assert release["completed"] is True, release
-    assert sorted(release["post_step"]["consumed_slugs"]) == sorted(p.stem for p in items)
-    assert (workspace / release["post_step"]["ledger"]).is_file()
 
 
-def test_audit_cannot_complete_without_materializing_a_report(workspace: Path) -> None:
-    """An audit whose findings exist only in a transient payload is not an audit.
-
-    It used to report `completed: true` with nothing in `specs/audits/` — so there was
-    nothing to disposition, archive, or read. The step now declares that zone as its
-    deliverable, which the deterministic gate enforces.
-    """
-    from dadaia_workspace.features.lifecycle.workflows.audit import _SEQUENCE
-
-    report_step = next(s for s in _SEQUENCE if s.label == "audit_report")
-    assert report_step.extra_allowed_paths, (
-        "audit_report declares no deliverable zone, so it can pass on a handoff payload "
-        "alone and materialize no report"
-    )
-    assert any("specs/audits/" in p for p in report_step.extra_allowed_paths)
 
 
 def test_bugs_append_resolves_the_slug_and_closure_lands_in_scope(workspace: Path) -> None:
@@ -182,20 +123,6 @@ def test_bugs_append_resolves_the_slug_and_closure_lands_in_scope(workspace: Pat
     )
 
 
-def test_no_release_gate_can_block_without_a_remedy() -> None:
-    """A block with `operator_command: None` is a dead end.
-
-    The commit gate mapped each artifact to the review that re-asserts its flip; an
-    artifact missing ENTIRELY maps to no review, so the remedy list came back empty and the
-    gate blocked with nothing to run (a2-release-missing-spec-gate-lacks-resume-remedy).
-    Re-authoring is always valid, so it is now the floor.
-    """
-    from dadaia_workspace.features.lifecycle.workflows import release_definition
-
-    body = Path(release_definition.__file__).read_text(encoding="utf-8")
-    assert 'or ["--resume-from definition_draft"]' in body, (
-        "the commit gate must fall back to re-authoring instead of emitting a null remedy"
-    )
 
 
 def test_create_refuses_a_name_no_other_verb_can_use(workspace: Path) -> None:

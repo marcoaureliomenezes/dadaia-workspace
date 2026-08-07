@@ -1,75 +1,29 @@
 """Composition root — builds services with concrete infrastructure."""
 
 import contextlib
-import datetime as dt
-import os
 import re
 from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from dadaia_workspace.core.models.lifecycle import LifecyclePhase
-    from dadaia_workspace.core.models.workflow_execution import (
-        WorkflowModelPolicyOverlay,
-        WorkflowPolicySnapshot,
-    )
     from dadaia_workspace.core.protocols.git_client import GitClient
     from dadaia_workspace.core.protocols.plugin_store import PluginStore
-    from dadaia_workspace.core.protocols.workflow_model_policy_store import (
-        WorkflowModelPolicyStorePort,
-    )
     from dadaia_workspace.features.agents.model_policy import AgentModelPolicyService
     from dadaia_workspace.features.backlog.removal_lifecycle import (
         BacklogRemovalLifecycle,
     )
     from dadaia_workspace.features.certification import CertificationResult
-    from dadaia_workspace.features.lifecycle.fragments.loader import FragmentLoader
-    from dadaia_workspace.features.lifecycle.policy_resolver import (
-        WorkflowCatalog,
-        WorkflowExecutionPolicyResolver,
-    )
-    from dadaia_workspace.features.lifecycle.service import LifecyclePreflightInput
-    from dadaia_workspace.features.lifecycle.workflow_handoff_doctor import (
-        WorkflowHandoffDoctor,
-    )
-    from dadaia_workspace.features.lifecycle.workflow_handoffs import (
-        WorkflowHandoffResolver,
-    )
-    from dadaia_workspace.features.lifecycle.workflows.audit import AuditWorkflow
-    from dadaia_workspace.features.lifecycle.workflows.backlog_definition import (
-        BacklogDefinitionWorkflow,
-    )
-    from dadaia_workspace.features.lifecycle.workflows.release_definition import (
-        ReleaseDefinitionWorkflow,
-    )
-    from dadaia_workspace.infrastructure.json_local_model_profile_store import (
-        JsonLocalModelProfileStore,
-    )
 
 from dadaia_workspace.core.exceptions import (
     NoActiveReleaseError,
-    ReleaseNotFoundError,
     WorkspaceNotInitializedError,
 )
-from dadaia_workspace.core.harness_models import HarnessModelOption
-from dadaia_workspace.core.models.hygiene import SlopPolicy
-from dadaia_workspace.core.models.lifecycle import AgentRuntimeKind
-from dadaia_workspace.core.protocols.agent_runtime import AgentRuntimePort
 from dadaia_workspace.core.protocols.process_ancestry import ProcessAncestry
-from dadaia_workspace.core.session_env import harness_session_id
 from dadaia_workspace.core.specs_resolver import repo_slug_for_context, resolve_bound_context_name
 from dadaia_workspace.features.academy.service import AcademyService
 from dadaia_workspace.features.agents.reader import FileSystemAgentsProvider
 from dadaia_workspace.features.export.service import ExportService
-from dadaia_workspace.features.lifecycle.antislop.retention import RetentionSweep
-from dadaia_workspace.features.lifecycle.antislop.slop_scan import SlopReport, slop_scan
-from dadaia_workspace.features.lifecycle.hygiene import LifecycleHygieneService
-from dadaia_workspace.features.lifecycle.phase_workflow import LifecyclePhaseWorkflow
-from dadaia_workspace.features.lifecycle.pipeline import LifecyclePipeline
-from dadaia_workspace.features.lifecycle.prompt_builder import PromptPrefix
-from dadaia_workspace.features.lifecycle.report_workflow import LifecycleReportWorkflow
-from dadaia_workspace.features.lifecycle.service import LifecyclePreflightService
 from dadaia_workspace.features.panel.service import PanelService
 from dadaia_workspace.features.panel.views.academy import render_academy_lesson
 from dadaia_workspace.features.panel.views.agent_policy import (
@@ -112,7 +66,6 @@ from dadaia_workspace.infrastructure.excel_reader import OpenpyxlExcelReader
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.json_course_store import JsonCourseStore
-from dadaia_workspace.infrastructure.json_lifecycle_run_store import JsonLifecycleRunStore
 from dadaia_workspace.infrastructure.json_server_registry_store import JsonServerRegistryStore
 from dadaia_workspace.infrastructure.markdown_agent_store import MarkdownAgentStore
 from dadaia_workspace.infrastructure.process_ancestry_adapter import (
@@ -123,7 +76,6 @@ from dadaia_workspace.infrastructure.process_ancestry_adapter import (
 from dadaia_workspace.infrastructure.process_probe_adapter import OsProcessProbe, build_pid_probe
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
-from dadaia_workspace.infrastructure.runtime_files import FilesystemRuntimeFileAdapter
 from dadaia_workspace.infrastructure.stdlib_handoff_validator import StdlibHandoffValidator
 
 
@@ -369,69 +321,6 @@ def build_export_service(workspace_root: Path) -> ExportService:
     )
 
 
-def build_agent_runtime(
-    kind: AgentRuntimeKind,
-    *,
-    cwd: Path | None = None,
-    model: HarnessModelOption | None = None,
-) -> AgentRuntimePort:
-    """Map an ``AgentRuntimeKind`` to its concrete adapter behind ``AgentRuntimePort``.
-
-    This is the single seam that binds a runtime kind to an infrastructure adapter —
-    the runtime-adapter analogue of ``PLATFORM`` selecting OS adapters. ``core/`` and
-    ``features/`` stay provider-agnostic and never import an adapter directly; a
-    lifecycle workflow asks for the kind a step declares and injects the result into
-    ``LifecycleAgentRunner``.
-
-    ``model`` is the discrete Layer-2 model selection (LAW 2 / ADR-B) resolved from
-    :mod:`core.harness_models` — a ``(model_id, effort)`` pair. When supplied it is
-    threaded verbatim into the adapter config: PI passes ``pi --model <model_id>`` and
-    Codex passes ``-m <model_id> -c model_reasoning_effort=<effort>``. When ``None``
-    each adapter keeps its prior behaviour (PI omits ``--model``; Codex falls back to
-    the registry tier view). ``model`` is inert for ``FAKE`` and ``CLAUDE_SDK`` (the
-    latter is Layer-1 only — LAW 1).
-
-    Codex (``codex exec``) and PI (``pi --mode json``) are live CLI-headless adapters,
-    each carrying a real git-diff Ring-2 ``changed_paths`` boundary via the injected
-    ``GitSubprocessClient``.
-    The Claude SDK adapter body is real (Ring-1 write boundary via ``core/scope_match``);
-    only its default ``query_fn`` transport is deferred (lazy ``claude-agent-sdk`` import).
-    The factory is total over the enum: an unhandled kind raises ``ValueError``.
-    """
-    run_dir = cwd or Path.cwd()
-    if kind is AgentRuntimeKind.FAKE:
-        from dadaia_workspace.infrastructure.fake_runtime import FakeAgentRuntime
-
-        return FakeAgentRuntime()
-    if kind is AgentRuntimeKind.CODEX_EXEC:
-        from dadaia_workspace.infrastructure.codex_runtime import (
-            CodexExecAdapter,
-            CodexExecConfig,
-        )
-
-        codex_config = (
-            CodexExecConfig(cwd=run_dir, model=model.model_id, reasoning_effort=model.effort)
-            if model is not None
-            else CodexExecConfig(cwd=run_dir)
-        )
-        return CodexExecAdapter(codex_config, git=GitSubprocessClient())
-    if kind is AgentRuntimeKind.CLAUDE_SDK:
-        from dadaia_workspace.infrastructure.claude_sdk_runtime import ClaudeSdkAdapter
-
-        return ClaudeSdkAdapter(cwd=run_dir)
-    if kind is AgentRuntimeKind.PI_HEADLESS:
-        from dadaia_workspace.infrastructure.pi_runtime import (
-            PiHeadlessAdapter,
-            PiHeadlessConfig,
-        )
-
-        pi_config = (
-            PiHeadlessConfig(cwd=run_dir, model=model.model_id, reasoning_effort=model.effort)
-            if model is not None
-            else PiHeadlessConfig(cwd=run_dir)
-        )
-        return PiHeadlessAdapter(pi_config, git=GitSubprocessClient())
-    raise ValueError(f"unsupported agent runtime kind: {kind!r}")
 
 
 def build_server_registry_service(workspace_root: Path) -> ServerRegistryService:
@@ -527,450 +416,36 @@ def build_reports_retention_service(workspace_root: Path) -> ReportRetentionServ
     return ReportRetentionService(workspace_root)
 
 
-def build_lifecycle_hygiene_service(workspace_root: Path) -> LifecycleHygieneService:
-    """Compose lifecycle hygiene service.
-
-    v0.1.78 T-C / FR-C: always wires a real run store, so ``cleanup()``'s step-payload
-    coverage (``.dadaia/runs/lifecycle/``) is live in every production caller — the CLI
-    ``hygiene clean``/``hygiene status`` commands and the preflight gate's remediation
-    text alike now share the SAME candidate classifier the handoffs doctor and the
-    retention sweep already use for that zone.
-    """
-    _guard_initialized(workspace_root)
-    return LifecycleHygieneService(
-        workspace_root, run_store=build_lifecycle_run_store(workspace_root)
-    )
-
-
-def build_slop_report(
-    workspace_root: Path,
-    *,
-    now: dt.datetime | None = None,
-    policy: SlopPolicy | None = None,
-) -> SlopReport:
-    """Run the read-only directory-aware anti-slop metric (WS-6).
-
-    Pure measurement: walks the canonical swept ``.dadaia/`` zones and classifies each
-    reporting unit (a directory tree counts as one entry with recursive size). Never
-    mutates the filesystem. The clock is injectable for hermetic tests.
-    """
-    _guard_initialized(workspace_root)
-    scan_now = now or dt.datetime.now(tz=dt.UTC)
-    return slop_scan(workspace_root, now=scan_now, policy=policy or SlopPolicy())
-
-
-def _live_lifecycle_claims(workspace_root: Path) -> Callable[[], frozenset[str]]:
-    """Composition-root provider of swept-zone paths claimed by LIVE lifecycle runs (D6).
-
-    The retention SWEEP must NEVER reclaim a tmp/handoff/report path that a live worker is
-    mid-flight on. This callable reads the persisted ``LifecycleRun`` records and, for every
-    NON-TERMINAL run (status not COMPLETED/FAILED), claims any of that run's
-    ``expected_artifacts`` whose path falls inside a recognised swept zone
-    (``.dadaia/{tmp,reports,handoff,runs}``). The deleter (``RetentionSweep``) spares any
-    candidate equal to, nested under, or containing a claim.
-
-    ``features/lifecycle/antislop/retention.py`` never imports the run-store adapter — the
-    container injects this callable, mirroring the ``pid_probe`` seam. Fail-soft: any
-    store/parse error ⇒ empty set (the sweep then relies on TTL + zone + escape guards
-    alone, never reclaiming inside ``.dadaia/`` it cannot read).
-    """
-    from dadaia_workspace.core.models.lifecycle import LifecycleRunStatus
-
-    terminal = {LifecycleRunStatus.COMPLETED, LifecycleRunStatus.FAILED}
-    swept_prefixes = tuple(f".dadaia/{zone}/" for zone in ("tmp", "reports", "handoff", "runs"))
-
-    def _provider() -> frozenset[str]:
-        store = build_lifecycle_run_store(workspace_root)
-        run_dir = store.root
-        if not run_dir.is_dir():
-            return frozenset()
-        claims: set[str] = set()
-        for record in sorted(run_dir.glob("*.json")):
-            try:
-                run = store.load(record.stem)
-            except Exception:  # noqa: BLE001 — a single bad record never breaks the sweep.
-                continue
-            if run is None or run.status in terminal:
-                continue
-            for artifact in run.expected_artifacts:
-                ref = artifact.lstrip("/")
-                if ref.startswith(swept_prefixes):
-                    claims.add(ref)
-            # A live run's workflow-step payloads are sacrosanct — claim each one so the
-            # retention sweep never reclaims a mid-flight step's payload (A23).
-            for step_record in run.workflow_steps:
-                claims.add(step_record.payload_ref.lstrip("/"))
-        return frozenset(claims)
-
-    return _provider
-
-
-def _step_payload_reclaim_allow(
-    workspace_root: Path,
-) -> Callable[[], frozenset[str]]:
-    """Provider of cleanup-eligible workflow-step payload refs (T-30-D-07 / A23).
-
-    A step payload is reclaim-eligible only when its ledger record is ``cleanup_eligible``
-    (every declared consumer consumed it AND its retention mode is delete-after-consumed)
-    AND the run is terminal (a live run's payloads are protected by ``_live_lifecycle_claims``).
-    Promoted-to-evidence payloads are never cleanup-eligible, so they are never in this set
-    and always survive. The retention sweep applies its own past-TTL gate on top of this
-    allow-list. Fail-soft: a bad record is skipped, never crashing the sweep.
-    """
-    from dadaia_workspace.core.models.lifecycle import LifecycleRunStatus
-
-    terminal = {LifecycleRunStatus.COMPLETED, LifecycleRunStatus.FAILED}
-
-    def _provider() -> frozenset[str]:
-        store = build_lifecycle_run_store(workspace_root)
-        run_dir = store.root
-        if not run_dir.is_dir():
-            return frozenset()
-        allow: set[str] = set()
-        for record in sorted(run_dir.glob("*.json")):
-            try:
-                run = store.load(record.stem)
-            except Exception:  # noqa: BLE001 — a single bad record never breaks the sweep.
-                continue
-            if run is None or run.status not in terminal:
-                continue
-            for step_record in run.workflow_steps:
-                if step_record.is_cleanup_eligible():
-                    allow.add(step_record.payload_ref.lstrip("/"))
-        return frozenset(allow)
-
-    return _provider
-
-
-def build_retention_sweep(
-    workspace_root: Path,
-    *,
-    now: dt.datetime | None = None,
-    policy: SlopPolicy | None = None,
-) -> RetentionSweep:
-    """Compose the directory-aware retention SWEEP (D5) — the guarded deleter.
-
-    Dry-run by default; deletes only when ``RetentionSweep.sweep(apply=True)`` is called
-    explicitly. The live-claim provider (``_live_lifecycle_claims``) gates the destructive
-    path against in-flight lifecycle runs (D6); the important-ref provider reuses
-    ``LifecycleHygieneService`` so operator-marked reports and current-release evidence are
-    spared. The clock is injectable for hermetic tests.
-    """
-    _guard_initialized(workspace_root)
-    hygiene = LifecycleHygieneService(workspace_root)
-    return RetentionSweep(
-        workspace_root,
-        now=now or dt.datetime.now(tz=dt.UTC),
-        policy=policy or SlopPolicy(),
-        live_claims=_live_lifecycle_claims(workspace_root),
-        important_paths=hygiene.protected_refs,
-        step_payload_reclaim_allow=_step_payload_reclaim_allow(workspace_root),
-    )
-
-
-def build_lifecycle_preflight_service(workspace_root: Path) -> LifecyclePreflightService:
-    """Compose lifecycle preflight service."""
-    _guard_initialized(workspace_root)
-    return LifecyclePreflightService()
-
-
-def _expected_phase_for_active_phase(raw_phase: str | None) -> "LifecyclePhase":
-    """Resolve the preflight ``expected_phase`` from an ``ACTIVE.md`` phase token (FR3).
-
-    Maps an ``ACTIVE.md`` ``phase:`` token (release-lifecycle vocabulary) to the
-    corresponding step-lifecycle
-    :class:`~dadaia_workspace.core.models.lifecycle.LifecyclePhase`.
-    ``DEFINITION``/``SPEC``/``PLAN``/``TASKS`` all precede implementation and map to
-    ``RELEASE_DEFINITION``; anything unrecognized (incl. ``BLOCKED``/absent) degrades to
-    ``IMPLEMENTATION`` — the safest default (most releases spend most of their life
-    there, and a preflight run is itself an implementation-phase diagnostic).
-    """
-    from dadaia_workspace.core.models.lifecycle import LifecyclePhase
-
-    normalized = (raw_phase or "").strip().upper()
-    mapping: dict[str, LifecyclePhase] = {
-        "DEFINITION": LifecyclePhase.RELEASE_DEFINITION,
-        "SPEC": LifecyclePhase.RELEASE_DEFINITION,
-        "PLAN": LifecyclePhase.RELEASE_DEFINITION,
-        "TASKS": LifecyclePhase.RELEASE_DEFINITION,
-        "IMPLEMENTATION": LifecyclePhase.IMPLEMENTATION,
-        "CLOSURE": LifecyclePhase.CLOSURE,
-    }
-    return mapping.get(normalized, LifecyclePhase.IMPLEMENTATION)
-
-
-def _required_mode_for_expected_phase(expected_phase: "LifecyclePhase") -> str:
-    """Resolve the preflight ``required_mode`` policy from the expected phase (FR3).
-
-    Only ``CLOSURE`` calls for ``review`` (the closing gate ladder); every other phase —
-    including the release-definition phases, which still require a session bound to
-    actually edit SPEC/PLAN/TASKS — requires ``implementation``.
-    """
-    from dadaia_workspace.core.models.lifecycle import LifecyclePhase
-
-    if expected_phase is LifecyclePhase.CLOSURE:
-        return "review"
-    return "implementation"
-
-
-def build_lifecycle_preflight_input(
-    workspace_root: Path,
-    *,
-    context: str,
-    release_id: str | None = None,
-) -> "LifecyclePreflightInput":
-    """Compose the real preflight-input probe assembly (v0.1.69 FR3).
-
-    ``LifecyclePreflightInput``'s state classes (``ActiveReleaseState``,
-    ``GitPreflightState``, ``SpecsDoctorState``, ``PresenceState``, ``HygieneCounters``)
-    had ZERO production producers before this builder — only
-    ``test_preflight_service.py`` hand-fed them. This composes each from an EXISTING
-    reader (never a second/forked implementation):
-
-    * ``active_release`` ← ``ACTIVE.md`` via the shared ``read_active_md`` parser
-      (``features.specs.doctor_common``, the same reader ``specs doctor``/CLI verbs use).
-    * ``git`` ← ``GitSubprocessClient`` (``infrastructure.git_subprocess`` — the same
-      client every other git-backed builder in this module composes) against
-      ``repos/<context>``.
-    * ``specs_doctor`` ← a real ``SpecsDoctor(specs_dir).check()`` run (the same doctor
-      ``dadaia specs doctor`` invokes); ``ok`` is true iff no ERROR-severity issue fired.
-    * ``presence``/``binding`` ← caller-owned session identity plus advisory presence.
-    * ``hygiene`` ← ``build_lifecycle_hygiene_service(workspace_root).status()``
-      (unchanged, reused directly).
-    * ``expected_phase``/``required_mode`` ← a small policy derived from the ACTIVE.md
-      phase token (:func:`_expected_phase_for_active_phase` /
-      :func:`_required_mode_for_expected_phase`).
-
-    ``release_id=None`` defaults to the context's ACTIVE.md release id (a bare
-    ``preflight --context <ctx>`` with no explicit ``--release-id`` targets whatever
-    release is currently active).
-    """
-    from dadaia_workspace.core.models.lifecycle import LifecyclePhase
-    from dadaia_workspace.features.lifecycle.service import (
-        ActiveReleaseState,
-        BoundContext,
-        GitPreflightState,
-        LifecyclePreflightInput,
-        PresenceState,
-        SpecsDoctorState,
-    )
-    from dadaia_workspace.features.spec_context import presence, session_identity
-    from dadaia_workspace.features.specs import Severity, SpecsDoctor
-    from dadaia_workspace.features.specs.doctor_common import read_active_md
-    from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
-
-    _guard_initialized(workspace_root)
-    specs_dir = _context_specs_dir(workspace_root, context)
-    repo_dir = workspace_root / "repos" / repo_slug_for_context(workspace_root, context)
-
-    # --- active-release ← ACTIVE.md ------------------------------------------------
-    active_md_release, _segment, active_md_phase, _err = read_active_md(
-        specs_dir / "releases" / "ACTIVE.md"
-    )
-    active_release = ActiveReleaseState(release_id=active_md_release, phase=active_md_phase)
-    resolved_release_id = release_id if release_id is not None else (active_md_release or "")
-
-    # --- expected_phase / required_mode policy -------------------------------------
-    expected_phase: LifecyclePhase = _expected_phase_for_active_phase(active_md_phase)
-    required_mode = _required_mode_for_expected_phase(expected_phase)
-
-    # --- git ← GitSubprocessClient --------------------------------------------------
-    # v0.1.69 FR3: reuses the SAME infrastructure git adapter every other builder in this
-    # module composes — never a second/forked git implementation. upstream_branch()/
-    # unpushed_commit_count() are the two producer-specific reads this state needs.
-    git_client = GitSubprocessClient()
-    if repo_dir.is_dir() and git_client.is_git_root(repo_dir):
-        dirty_paths = tuple(git_client.diff_name_only(repo_dir))
-        upstream_branch = git_client.upstream_branch(repo_dir)
-        unpushed_commit_count = (
-            git_client.unpushed_commit_count(repo_dir) if upstream_branch is not None else 0
-        )
-        git_state = GitPreflightState(
-            dirty_paths=dirty_paths,
-            upstream_branch=upstream_branch,
-            unpushed_commit_count=unpushed_commit_count,
-        )
-    else:
-        # No repo on disk (e.g. the self-hosting workspace-root specs tree, or a context
-        # never cloned): nothing to report dirty/unpushed on; no upstream to demand.
-        git_state = GitPreflightState()
-
-    # --- specs_doctor ← a real SpecsDoctor run --------------------------------------
-    doctor_issues = SpecsDoctor(specs_dir).check()
-    doctor_errors = [i for i in doctor_issues if i.severity is Severity.ERROR]
-    specs_doctor_state = SpecsDoctorState(
-        ok=not doctor_errors,
-        summary=(
-            "; ".join(f"{i.code}: {i.description}" for i in doctor_errors) if doctor_errors else ""
-        ),
-    )
-
-    # --- caller-owned binding + advisory sibling presence ----------------------------
-    # Never consult context-global state here. Another session's bind must not change this
-    # caller's mode or make a workflow fail preflight.
-    own_sid = os.environ.get("DADAIA_SESSION_ID") or harness_session_id()
-    binding: BoundContext | None = None
-    if own_sid:
-        rec = session_identity.read_session(workspace_root, own_sid)
-        if rec is not None:
-            binding = BoundContext(
-                context=str(rec.get("context") or context),
-                release_id=str(rec.get("release") or resolved_release_id),
-                mode=str(rec.get("mode") or ""),
-                session_id=own_sid,
-            )
-
-    others = presence.others_alive(workspace_root, context, own_sid or "preflight")
-    holder_session_id = others[0].session_id if others else None
-    presence_state = PresenceState(
-        mode=binding.mode if binding else "",
-        holder_session_id=holder_session_id,
-        live_foreign_holder=bool(others),
-    )
-
-    # --- hygiene ← the existing lifecycle hygiene service ---------------------------
-    hygiene_counters = build_lifecycle_hygiene_service(workspace_root).status()
-
-    return LifecyclePreflightInput(
-        context=context,
-        release_id=resolved_release_id,
-        expected_phase=expected_phase,
-        required_mode=required_mode,
-        current_step="preflight",
-        binding=binding,
-        active_release=active_release,
-        git=git_state,
-        specs_doctor=specs_doctor_state,
-        presence=presence_state,
-        hygiene=hygiene_counters,
-    )
-
-
-def build_lifecycle_run_store(workspace_root: Path) -> JsonLifecycleRunStore:
-    """Compose lifecycle run-state store."""
-    _guard_initialized(workspace_root)
-    return JsonLifecycleRunStore(workspace_root)
-
-
-def build_workflow_handoff_doctor(
-    workspace_root: Path,
-    *,
-    now: dt.datetime | None = None,
-    context: str | None = None,
-    release_id: str | None = None,
-) -> "WorkflowHandoffDoctor":
-    """Compose the workflow-step handoff doctor (v0.1.30 Item 5 / T-30-D-08 / A26).
-
-    Read-only reconciliation of every run's ``workflow_steps`` ledger against the on-disk
-    payloads under ``.dadaia/runs/lifecycle/<run>/steps/``; reports orphan / malformed /
-    stale / undeclared / unconsumed-required incoherences. The clock is injectable for
-    hermetic tests. v0.1.71 FR2: optional ``context``/``release_id`` narrow the report to
-    the runs of one Spec Context release (``LifecycleRun`` carries both); ``None`` on both
-    preserves the whole-workspace scope.
-    """
-    from dadaia_workspace.features.lifecycle.workflow_handoff_doctor import WorkflowHandoffDoctor
-
-    _guard_initialized(workspace_root)
-    return WorkflowHandoffDoctor(
-        workspace_root,
-        build_lifecycle_run_store(workspace_root),
-        now=now,
-        context=context,
-        release_id=release_id,
-    )
-
-
-def build_workflow_handoff_resolver(
-    workspace_root: Path,
-) -> "WorkflowHandoffResolver":
-    """Compose the run-scoped workflow-step handoff resolver (v0.1.30 Item 5 / T-30-D-03).
-
-    The resolver is the queue engine over the ``LifecycleRun.workflow_steps`` control plane
-    (persisted atomically through the run store) and the immutable step payload data plane
-    (written under the WORKSPACE-ROOT ``.dadaia/runs/lifecycle/<run_id>/steps/`` canonical
-    zone by ``FilesystemRuntimeFileAdapter``, which satisfies the narrow
-    ``WorkflowStepPayloadWriter`` port). The clock is injected as an ISO-8601-UTC string
-    factory.
-    """
-    from dadaia_workspace.features.lifecycle.workflow_handoffs import WorkflowHandoffResolver
-
-    _guard_initialized(workspace_root)
-
-    def _clock() -> str:
-        return dt.datetime.now(tz=dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-    return WorkflowHandoffResolver(
-        run_store=build_lifecycle_run_store(workspace_root),
-        payload_writer=FilesystemRuntimeFileAdapter(workspace_root),
-        clock=_clock,
-    )
-
-
-def build_workflow_model_profile_registry() -> "WorkflowCatalog":
-    """Compose the governed workflow catalog the policy resolver reads (T-28-B-01).
-
-    Wave B promotes the governed catalog to **the** governed source: every worker step
-    carries a default harness + a default model profile per supported harness (validated at
-    import time against the built-in :mod:`model_profiles` registry).
-    :func:`governed_workflow_catalog` projects that single source onto the resolver's
-    :class:`WorkflowCatalog` seam, so the resolver and the panel read the *same* catalog (no
-    second table). The function is pure (no I/O), so it takes no ``workspace_root``. v0.1.54
-    FR2: the governed catalog now lives in ``features/lifecycle/governed_catalog`` (the
-    cycle-break home); import it directly from the canonical lifecycle module.
-    """
-    from dadaia_workspace.features.lifecycle.governed_catalog import governed_workflow_catalog
-
-    return governed_workflow_catalog()
-
-
-def build_fragment_loader() -> "FragmentLoader":
-    """Compose the shared :class:`FragmentLoader` over the packaged fragment library.
-
-    Used by the read-only panel fragment inspector (Wave D — T-28-D-01) to resolve a
-    governed step's fragment id to its resolved body + metadata. The loader reads from
-    the packaged ``public/lifecycle_fragments/`` root (no I/O at construction), so it
-    takes no ``workspace_root``.
-    """
-    from dadaia_workspace.features.lifecycle.fragments.loader import FragmentLoader
-
-    return FragmentLoader()
-
-
-def build_workflow_model_policy_store(workspace_root: Path) -> "WorkflowModelPolicyStorePort":
-    """Compose the workflow-model-policy overlay store (T-28-A-08).
-
-    Returns the store typed as the :class:`WorkflowModelPolicyStorePort` seam (FR1a): the
-    consumers (``policy_doctor``, ``panel.views.workflow_policy``) depend on the port in
-    ``core``, never the concrete JSON adapter. Reads/writes
-    ``.dadaia/states/workflow_model_policy.json`` with atomic temp+rename and a
-    ``.last-good.json`` backup. ``load()`` returns ``None`` on a missing file (defaults); a
-    present-but-invalid file raises (missing != invalid).
-    """
-    from dadaia_workspace.infrastructure.json_workflow_model_policy_store import (
-        JsonWorkflowModelPolicyStore,
-    )
-
-    _guard_initialized(workspace_root)
-    return JsonWorkflowModelPolicyStore(workspace_root)
-
-
-def build_local_model_profile_store(
-    workspace_root: Path,
-) -> "JsonLocalModelProfileStore":
-    """Compose the operator-local model-profile store (T-30-C-01 / WS-PROFILES).
-
-    Reads ``.dadaia/states/workflow_model_profiles.local.json`` with atomic temp+rename.
-    ``load()`` returns ``()`` on a missing file (default-first — L3) and raises on a
-    present-but-invalid store (``harness != "pi"`` per L1, any API-key-bearing field per
-    L8, corrupt JSON, unknown field). The store is workspace-local and **never projected**
-    into ``public/`` (L8).
-    """
-    from dadaia_workspace.infrastructure.json_local_model_profile_store import (
-        JsonLocalModelProfileStore,
-    )
-
-    _guard_initialized(workspace_root)
-    return JsonLocalModelProfileStore(workspace_root)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 def build_agent_model_policy_service(workspace_root: Path) -> "AgentModelPolicyService":
@@ -1037,74 +512,16 @@ def build_plugin_store() -> "PluginStore":
     return JsonPluginStore()
 
 
-def load_operator_model_profiles(workspace_root: Path) -> None:
-    """Load + merge the operator-local profiles into the process registry (WS-PROFILES).
-
-    Idempotent: re-reads the local store and re-registers its profiles with
-    :mod:`features.lifecycle.model_profiles`, so :func:`model_profiles.list_profiles` /
-    :func:`profiles_for` / :func:`resolve` surface built-in + operator profiles. A missing
-    store loads nothing (default-first — L3); a present-but-invalid store raises through the
-    store's typed error, before any model call.
-    """
-    from dadaia_workspace.features.lifecycle import model_profiles
-
-    store = build_local_model_profile_store(workspace_root)
-    model_profiles.load_operator_profiles(store)
 
 
-def build_workflow_policy_resolver(
-    workspace_root: Path,
-    *,
-    context: str = "default",
-    overlay: "WorkflowModelPolicyOverlay | None" = None,
-) -> "WorkflowExecutionPolicyResolver":
-    """Compose the single shared :class:`WorkflowExecutionPolicyResolver` (T-28-A-08).
-
-    Loads the overlay from the policy store (missing ⇒ ``None`` ⇒ library defaults; an
-    invalid overlay raises here, before any model call — LAW 4/5) and binds it to the
-    governed catalog. CLI and panel both consume *this* resolver so they never disagree on
-    which model a step runs. ``context`` is reserved for future per-context overlays; only
-    the ``default`` context is honored this release (D-2).
-
-    ``overlay`` lets a caller bind a **candidate** overlay (the panel validate/PUT path,
-    T-28-C-02) instead of the on-disk one — the validation resolve runs against the
-    candidate without persisting it. When ``overlay`` is ``None`` the on-disk overlay is
-    loaded (the normal execution path).
-    """
-    from dadaia_workspace.features.lifecycle.policy_resolver import (
-        WorkflowExecutionPolicyResolver,
-    )
-
-    _guard_initialized(workspace_root)
-    _ = context  # reserved (D-2: only `default` honored); recorded for call-site clarity.
-    resolved_overlay = (
-        overlay if overlay is not None else build_workflow_model_policy_store(workspace_root).load()
-    )
-    return WorkflowExecutionPolicyResolver(
-        catalog=build_workflow_model_profile_registry(),
-        overlay=resolved_overlay,
-    )
 
 
-def build_lifecycle_report_workflow(workspace_root: Path) -> LifecycleReportWorkflow:
-    """Compose lifecycle report workflow."""
-    _guard_initialized(workspace_root)
-    return LifecycleReportWorkflow(
-        workspace_root=workspace_root,
-        runtime_files=FilesystemRuntimeFileAdapter(workspace_root),
-        # v0.1.78 T-C / FR-C: same run-store wiring as build_lifecycle_hygiene_service so an
-        # explicit report-workflow cleanup shares the one canonical candidate classifier.
-        hygiene=LifecycleHygieneService(
-            workspace_root, run_store=build_lifecycle_run_store(workspace_root)
-        ),
-        validation=build_reports_validation_service(workspace_root),
-    )
 
 
 def _context_specs_dir(workspace_root: Path, context: str) -> Path:
     """Resolve a context's ``specs/`` tree (v0.1.57 FR2 / A1 — role→atom map wiring).
 
-    Mirrors :func:`build_release_definition_workflow`'s resolution: a consumer context resolves
+    A consumer context resolves
     to ``workspace_root/repos/<ctx>/specs``; the self-hosting library repo falls back to the
     workspace-root ``specs`` tree. All roots derive from ``workspace_root`` — never cwd.
     """
@@ -1120,177 +537,16 @@ def _context_specs_dir(workspace_root: Path, context: str) -> Path:
 def resolve_context_specs_dir(workspace_root: Path, context: str) -> Path:
     """Public seam for :func:`_context_specs_dir` (FR3, v0.1.68).
 
-    Lets a CLI verb resolve the same context→``specs/`` mapping the pipeline container
-    already uses internally — e.g. so ``lifecycle pipeline`` can derive the implement
-    step's write scope from the release's ``TASKS.md`` (see
-    :func:`dadaia_workspace.features.lifecycle.tasks_write_scope.write_scope_from_release_tasks`)
-    without duplicating the resolution logic.
+    Lets a CLI verb resolve the same context→``specs/`` mapping the container
+    uses internally, without duplicating the resolution logic.
     """
     return _context_specs_dir(workspace_root, context)
 
 
-def _active_phase(specs_dir: Path) -> str | None:
-    """Resolve the active ``ACTIVE.md`` lifecycle phase under *specs_dir* (v0.1.57 FR2).
-
-    Reads ``<specs_dir>/releases/ACTIVE.md`` via the shared ``read_active_md`` parser. An
-    absent or malformed ``ACTIVE.md`` (no ``release:``/``phase:`` line) degrades to ``None``
-    (fail-open) so a context with no active release never crashes workflow construction.
-    """
-    from dadaia_workspace.features.specs.doctor_common import read_active_md
-
-    _, _, phase, err = read_active_md(specs_dir / "releases" / "ACTIVE.md")
-    return phase if err is None else None
 
 
-def build_lifecycle_phase_workflow(
-    workspace_root: Path,
-    *,
-    runtime_kind: AgentRuntimeKind,
-    cwd: Path | None = None,
-    model: HarnessModelOption | None = None,
-) -> LifecyclePhaseWorkflow:
-    """Compose the single-step lifecycle phase workflow on a selected harness.
-
-    Binds the per-step runtime adapter (via :func:`build_agent_runtime`) to the
-    persistent run store. The chosen ``runtime_kind`` is what makes the harness
-    selectable per verb invocation; ``model`` is the discrete Layer-2 model (LAW 2)
-    threaded into the adapter when supplied. The caller passes a resolved
-    ``policy_snapshot`` to ``LifecyclePhaseWorkflow.run`` (composed via
-    :func:`build_workflow_policy_resolver`) — the workflow itself never parses policy JSON.
-    The ``specs_dir_resolver`` (v0.1.57 FR2 / A1) closes over ``workspace_root`` so the
-    role→atom map resolves the run's context (only known at ``run()`` from ``scope.context``)
-    to its ``specs/`` tree with a real path — the map is not inert in the real phase-verb path.
-    """
-    _guard_initialized(workspace_root)
-    return LifecyclePhaseWorkflow(
-        runtime=build_agent_runtime(runtime_kind, cwd=cwd or workspace_root, model=model),
-        run_store=build_lifecycle_run_store(workspace_root),
-        specs_dir_resolver=lambda ctx: _context_specs_dir(workspace_root, ctx),
-        # v0.1.78 T-D / FR-D: a noncompliant worker attempt's diagnostic is persisted under
-        # the run's step-artifact zone via the same canonical runtime-file writer every other
-        # lifecycle artifact uses.
-        runtime_files=FilesystemRuntimeFileAdapter(workspace_root),
-        # Bug gate-accepts-phantom-artifact-evidence: declared refs must exist.
-        artifact_root=workspace_root,
-    )
 
 
-def build_lifecycle_pipeline(
-    workspace_root: Path,
-    *,
-    context: str,
-    release_id: str,
-    prefix: PromptPrefix | None = None,
-    cwd: Path | None = None,
-    models: dict[AgentRuntimeKind, HarnessModelOption] | None = None,
-    policy_snapshot: "WorkflowPolicySnapshot | None" = None,
-    runtime_factory: "Callable[[AgentRuntimeKind], AgentRuntimePort] | None" = None,
-    max_review_retries: int = 2,
-) -> LifecyclePipeline:
-    """Compose the multi-step lifecycle pipeline with a per-step harness factory.
-
-    The injected ``runtime_factory`` resolves each step's declared ``AgentRuntimeKind`` to
-    its adapter, so a single run can mix harnesses across steps (pi implements, codex
-    reviews, ...). ``models`` maps a runtime kind to its discrete Layer-2 model (LAW 2),
-    so a step running on a given harness gets that harness's selected ``(id, effort)``.
-    An optional cacheable ``prefix`` (WS-7) is assembled once and reused verbatim by
-    every step. ``policy_snapshot`` is the resolved governance snapshot (T-28-A-08, from
-    :func:`build_workflow_policy_resolver`); when present it is frozen onto the run before
-    the first step (LAW 7) — an overlay mutated after start cannot change the in-flight run.
-
-    v0.1.78 T-B / FR-B: the ``handoff_resolver`` is now ALWAYS wired (bug
-    ``full-pipeline-success-persists-running-empty-ledger`` — the production ``pipeline``
-    CLI verb used to build a pipeline with no resolver, so every full-ladder run's
-    ``workflow_steps`` ledger stayed permanently empty). Every real ``build_lifecycle_pipeline``
-    caller now gets the same run-scoped per-step handoff-ledger payloads
-    the implementation workflow consumes; only a direct, fixture-level
-    ``LifecyclePipeline(...)`` construction (tests) can still omit it.
-    """
-    from dadaia_workspace.features.lifecycle.context_selector import ContextSelector, SpecContext
-    from dadaia_workspace.infrastructure.git_evidence import (
-        build_executed_test_gate,
-        build_git_diff_provider,
-        build_test_output_provider,
-    )
-
-    _guard_initialized(workspace_root)
-    run_cwd = cwd or workspace_root
-    model_by_kind = models or {}
-    context_name = resolve_bound_context_name(context) or context
-    specs_dir = _context_specs_dir(workspace_root, context_name)
-    # Runtime-evidence providers (review R-04): reviewers judge the ACTUAL diff of the
-    # release's declared write set + executed test output instead of re-exploring the
-    # repo or refusing for lack of evidence. Scoped to the TASKS write-set paths so a
-    # pre-dirty tree outside the release never pollutes the review evidence.
-    from dadaia_workspace.features.lifecycle.tasks_write_scope import (
-        write_scope_from_release_tasks,
-    )
-
-    write_set = write_scope_from_release_tasks(specs_dir, release_id)
-    repo_root = specs_dir.parent
-    # TASKS write sets are WORKSPACE-relative (repos/<ctx>/...); the evidence providers
-    # run git/pytest inside repo_root — strip the repo prefix so pathspecs resolve.
-    try:
-        repo_prefix = repo_root.resolve().relative_to(workspace_root.resolve()).as_posix() + "/"
-    except ValueError:
-        repo_prefix = ""
-    repo_write_set = tuple(
-        path[len(repo_prefix) :] if repo_prefix and path.startswith(repo_prefix) else path
-        for path in write_set
-    )
-    selector = ContextSelector(
-        SpecContext(
-            specs_dir=specs_dir,
-            release_id=release_id,
-            handoff_dir=workspace_root / ".dadaia" / "handoff" / context_name,
-            phase=_active_phase(specs_dir),
-        ),
-        diff_provider=build_git_diff_provider(repo_root, paths=repo_write_set),
-        test_output_provider=build_test_output_provider(
-            repo_root, paths=repo_write_set, python_bin=_workspace_python_bin(workspace_root)
-        ),
-    )
-    return LifecyclePipeline(
-        context=context,
-        release_id=release_id,
-        run_store=build_lifecycle_run_store(workspace_root),
-        # v0.1.72 FR5: an injected factory (the CLI's driving-fake-aware seam) wins;
-        # the bare default remains for direct composition in tests.
-        runtime_factory=runtime_factory
-        or (lambda kind: build_agent_runtime(kind, cwd=run_cwd, model=model_by_kind.get(kind))),
-        prefix=prefix,
-        policy_snapshot=policy_snapshot,
-        handoff_resolver=build_workflow_handoff_resolver(workspace_root),
-        context_selector=selector,
-        # Bug gate-accepts-phantom-artifact-evidence: declared refs must exist.
-        artifact_root=workspace_root,
-        # FR2 (A1): the real ``specs/`` tree so the role→atom map grounds the review_qa step
-        # (qa-engineer → quality-assurance.md) in the production pipeline path, not just fixtures.
-        specs_dir=specs_dir,
-        # v0.1.78 T-D / FR-D: same canonical runtime-file writer as the phase workflow —
-        # a noncompliant worker attempt persists its diagnostic under the run's
-        # step-artifact zone.
-        runtime_files=FilesystemRuntimeFileAdapter(workspace_root),
-        max_review_retries=max_review_retries,
-        # Bug implementation-review-approves-unexecuted-validation: closure requires an
-        # EXECUTED, green test run over the release's declared test paths.
-        executed_test_gate=build_executed_test_gate(
-            repo_root, paths=repo_write_set, python_bin=_workspace_python_bin(workspace_root)
-        ),
-        # Bug closure-catalog-references-missing-memory-atom: the catalog is derived
-        # from the atoms — closure regenerates catalog.json + index.md so phantom
-        # entries cannot survive the cycle.
-        memory_catalog_regenerator=_memory_catalog_regenerator(specs_dir),
-        # Bug closure-allows-memory-doctor-warnings: closure leaves memory lint-clean
-        # or blocks with the findings digest.
-        memory_lint_gate=_memory_lint_gate(specs_dir),
-        # Bug lifecycle-workflows-leave-python-bytecode-in-repo: a completed cycle
-        # sweeps cache dirs out of the context repo.
-        repo_hygiene_sweeper=_repo_hygiene_sweeper(repo_root),
-        # Bug implementation-closure-leaves-uncommitted-release-tree: a completed cycle
-        # commits the repo's release/implementation/memory changes.
-        closure_committer=_closure_committer(repo_root, release_id),
-    )
 
 
 def _workspace_python_bin(workspace_root: Path) -> str | None:
@@ -1558,188 +814,8 @@ def _fake_spec_stub(prompt: str) -> str:
     )
 
 
-def _release_definition_runtime_factory(
-    *,
-    context: str,
-    run_cwd: Path,
-    release_id: str | None = None,
-) -> Callable[[AgentRuntimeKind], AgentRuntimePort]:
-    """Build the per-step runtime factory for the release-definition workflow.
-
-    Real harnesses (pi/codex/claude) resolve to their live adapters — the policy-resolved
-    concrete model reaches each adapter through ``request.resolved_model`` (threaded from
-    the step's ``resolved_model`` by ``apply_resolved_policy``), not a construction-time
-    model. ``FAKE`` resolves to a *driving* fake so ``--harness fake`` walks the whole
-    §6.1 sequence deterministically. The fake is STEP-AWARE: a create step
-    (spec/plan/tasks) also declares + materializes its real deliverable under the
-    release's specs zone — the gate now requires deliverable-zone evidence and verifies
-    refs exist (bugs gate-accepts-phantom-artifact-evidence /
-    create-step-gate-accepts-refusal-handoff-as-success).
-    """
-    from dadaia_workspace.core.models.lifecycle import (
-        AgentRunRequest,
-        AgentRunResult,
-        AgentRunStatus,
-    )
-
-    #: The ONE draft step authors all three artifacts (v0.2.x: 7 steps collapsed to 3).
-    _CREATE_DELIVERABLES = {
-        "definition_draft": ("SPEC.md", "PLAN.md", "TASKS.md"),
-    }
-
-    # Deliverable stubs must be VALID under the workflow's own deterministic gates
-    # (bug fake-backlog-definition-cannot-complete-user-flow, release-definition leg):
-    # PLAN.md carries the mandatory Validation Dependency Table so the plan lint passes
-    # and `--harness fake` walks the WHOLE §6.1 sequence to the terminal commit gate.
-    _STUB_CONTENT = {
-        # SPEC.md is built per-run by _fake_spec_stub: it must declare the **Consumes:**
-        # line for the items its own scope directive named, or the consumption half of the
-        # flow cannot be driven at all (bug
-        # release-definition-consumes-nothing-while-scope-declares-items).
-        "PLAN.md": (
-            "# PLAN: driving-fake stub\n\n> **Status:** Draft\n\n"
-            "## Validation Dependency Table\n\n"
-            "| Workstream | Produces by end | Direct validation | "
-            "Validation dependencies | Deferred integration evidence |\n"
-            "|---|---|---|---|---|\n"
-            "| WS-1 | driving-fake stub deliverable | deterministic gate walk | "
-            "none | none |\n"
-        ),
-        "TASKS.md": (
-            "# TASKS: driving-fake stub\n\n> **Status:** Draft\n\n"
-            "Marks: `[ ]` OPEN, `[-]` IN PROGRESS, `[x]` DONE.\n\n"
-            "## Tasks\n\n"
-            "- [ ] T-1 - driving-fake stub task\n"
-            "  - **Owner:** software-engineer\n"
-            "  - **Acceptance:** deterministic gate walk completes\n"
-        ),
-    }
-
-    class _ReleaseDefinitionDrivingFake:
-        def __init__(self, kind: AgentRuntimeKind) -> None:
-            self._kind = kind
-
-        def runtime_kind(self) -> AgentRuntimeKind:
-            return self._kind
-
-        def run(self, request: AgentRunRequest) -> AgentRunResult:
-            label = (request.task_id or "").rsplit(":", 1)[-1]
-            refs = [
-                f".dadaia/tmp/lifecycle-worker/{context}/release-definition-step.step-output.json"
-            ]
-            deliverables = _CREATE_DELIVERABLES.get(label, ())
-            if deliverables and release_id is not None:
-                slug = repo_slug_for_context(run_cwd, context)
-                specs_prefix = (
-                    f"repos/{slug}/specs"
-                    if (run_cwd / "repos" / slug / "specs").is_dir()
-                    else "specs"
-                )
-                refs.extend(f"{specs_prefix}/releases/{release_id}/{name}" for name in deliverables)
-            for ref in refs:
-                target = run_cwd / ref
-                if not target.exists():
-                    target.parent.mkdir(parents=True, exist_ok=True)
-                    if ref.endswith(".json"):
-                        content = '{"fake": true, "summary": "driving-fake stub artifact"}\n'
-                    elif Path(ref).name == "SPEC.md":
-                        content = _fake_spec_stub(request.prompt)
-                    else:
-                        content = _STUB_CONTENT.get(
-                            Path(ref).name,
-                            "# driving-fake stub artifact\n\n> **Status:** Draft\n",
-                        )
-                    target.write_text(content, encoding="utf-8")
-            return AgentRunResult(
-                status=AgentRunStatus.SUCCEEDED,
-                summary="fake release-definition worker: APPROVED",
-                artifact_refs=tuple(refs),
-                structured_output={"verdict": "APPROVED"},
-            )
-
-    def factory(kind: AgentRuntimeKind) -> AgentRuntimePort:
-        if kind is AgentRuntimeKind.FAKE:
-            return _ReleaseDefinitionDrivingFake(kind)
-        return build_agent_runtime(kind, cwd=run_cwd)
-
-    return factory
 
 
-def build_release_definition_workflow(
-    workspace_root: Path,
-    *,
-    context: str,
-    release_id: str,
-    default_runtime_kind: AgentRuntimeKind = AgentRuntimeKind.FAKE,
-    prefix: PromptPrefix | None = None,
-    cwd: Path | None = None,
-    policy_snapshot: "WorkflowPolicySnapshot | None" = None,
-) -> "ReleaseDefinitionWorkflow":
-    """Compose the fragment-driven release-definition workflow (WS-5 / §6.1).
-
-    The workflow runs the §6.1 step sequence with fragment-assembled, scoped prompts and
-    Python-owned gates (no generic ``"Run the step"`` suffix). The injected runtime
-    factory resolves each step's ``AgentRuntimeKind`` to its adapter so harnesses can be
-    mixed per step; ``FAKE`` drives the sequence end-to-end. The :class:`ContextSelector`
-    resolves each fragment's dynamic inputs, bounded by the fragment's ``max_context_policy``.
-    ``policy_snapshot`` is the resolved governance snapshot (v0.1.56 / FR1, from
-    :func:`build_workflow_policy_resolver`); when present it is frozen onto the run before
-    the first step (LAW 7). The per-step concrete model reaches the adapter through the
-    step's ``resolved_model`` (threaded by ``apply_resolved_policy``), so no model-by-kind
-    construction arg is needed.
-    """
-    from dadaia_workspace.features.lifecycle.context_selector import (
-        ContextSelector,
-        SpecContext,
-    )
-    from dadaia_workspace.features.lifecycle.workflows.release_definition import (
-        ReleaseDefinitionWorkflow,
-    )
-
-    _guard_initialized(workspace_root)
-    run_cwd = cwd or workspace_root
-    context_name = resolve_bound_context_name(context) or context
-    specs_dir = (
-        workspace_root / "repos" / repo_slug_for_context(workspace_root, context_name) / "specs"
-    )
-    if not specs_dir.is_dir():
-        # Self-hosting library repo: specs live at the workspace-root tree.
-        specs_dir = workspace_root / "specs"
-    handoff_dir = workspace_root / ".dadaia" / "handoff" / context_name
-    selector = ContextSelector(
-        SpecContext(
-            specs_dir=specs_dir,
-            release_id=release_id,
-            handoff_dir=handoff_dir,
-            phase=_active_phase(specs_dir),
-        )
-    )
-    return ReleaseDefinitionWorkflow(
-        context=context,
-        release_id=release_id,
-        run_store=build_lifecycle_run_store(workspace_root),
-        runtime_factory=_release_definition_runtime_factory(
-            context=context, run_cwd=run_cwd, release_id=release_id
-        ),
-        context_selector=selector,
-        default_runtime_kind=default_runtime_kind,
-        prefix=prefix,
-        policy_snapshot=policy_snapshot,
-        # Bug fragment-workflows-never-persist-step-handoffs: same ALWAYS-wired rule as
-        # build_lifecycle_pipeline (v0.1.78 FR-B) — without it every produces= step's
-        # payload is silently dropped and the run's ledger stays empty.
-        handoff_resolver=build_workflow_handoff_resolver(workspace_root),
-        # Bug gate-accepts-phantom-artifact-evidence: declared refs must exist.
-        artifact_root=workspace_root,
-        runtime_files=FilesystemRuntimeFileAdapter(workspace_root),
-        # Bug fake-release-definition-leaves-dirty-worktree: a completed definition
-        # commits the context repo's definition artifacts so implementation preflight
-        # never inherits a dirty tree (None for non-git fixtures).
-        definition_committer=_definition_committer(
-            workspace_root / "repos" / repo_slug_for_context(workspace_root, context_name),
-            release_id,
-        ),
-    )
 
 
 #: Slug prefix of the items the backlog driving fake upserts. The slug is scoped by RUN id:
@@ -1791,324 +867,12 @@ def _fake_backlog_canary_ref(backlog_dir: Path, slug: str) -> str:
     return preferred[0] if preferred[0] in anchors else min(anchors)
 
 
-def _backlog_definition_runtime_factory(
-    *,
-    context: str,
-    run_cwd: Path,
-) -> Callable[[AgentRuntimeKind], AgentRuntimePort]:
-    """Build the per-step runtime factory for the backlog-definition workflow.
-
-    Real harnesses (pi/codex) resolve to their live adapters — the policy-resolved concrete
-    model reaches each adapter through ``request.resolved_model`` (threaded from the step's
-    ``resolved_model``), not a construction-time model. ``FAKE`` resolves to a *driving*,
-    STEP-AWARE fake (bug fake-backlog-definition-cannot-complete-user-flow, mirroring the
-    release-definition driving fake): ``backlog_author`` upserts a REAL synthetic backlog
-    item (valid ``intents[]`` binding a live cli anchor, ``change`` text unique per run)
-    so the real post-authoring review gate validates real disk state and the whole §4
-    sequence COMPLETES deterministically.
-    """
-    from dadaia_workspace.core.models.lifecycle import (
-        AgentRunRequest,
-        AgentRunResult,
-        AgentRunStatus,
-    )
-
-    class _BacklogDefinitionDrivingFake:
-        def __init__(self, kind: AgentRuntimeKind) -> None:
-            self._kind = kind
-
-        def runtime_kind(self) -> AgentRuntimeKind:
-            return self._kind
-
-        def run(self, request: AgentRunRequest) -> AgentRunResult:
-            task_id = request.task_id or ""
-            label = task_id.rsplit(":", 1)[-1]
-            refs = [
-                f".dadaia/tmp/lifecycle-worker/{context}/backlog-definition-step.step-output.json"
-            ]
-            if label == "backlog_author":
-                slug = repo_slug_for_context(run_cwd, context)
-                specs_prefix = (
-                    f"repos/{slug}/specs"
-                    if (run_cwd / "repos" / slug / "specs").is_dir()
-                    else "specs"
-                )
-                run_id = task_id.rsplit(":", 1)[0]
-                slug = _fake_backlog_canary_slug(run_id)
-                item_ref = f"{specs_prefix}/backlog/{slug}.md"
-                refs.append(item_ref)
-                target = run_cwd / item_ref
-                target.parent.mkdir(parents=True, exist_ok=True)
-                anchor = _fake_backlog_canary_ref(target.parent, slug)
-                # Upsert (never append): the change text carries the task id so a re-run
-                # is a detectable EDIT of the one canary item.
-                # `candidate` is the documented vocabulary token for an intents-carrying
-                # item (scaffold README + backlog doctor _KNOWN_STATUSES) — the fake's
-                # output must pass the workflow's own doctor (bug
-                # fake-backlog-workflow-materializes-doctor-invalid-status-042).
-                target.write_text(
-                    "---\n"
-                    "status: candidate\n"
-                    "intents:\n"
-                    "  - subject:\n"
-                    "      kind: cli\n"
-                    f"      ref: {anchor}\n"
-                    f"    change: driving-fake canary authored by run '{task_id}'\n"
-                    "---\n\n"
-                    "# Driving-fake backlog canary\n\n"
-                    "Synthetic item written by `--harness fake` so the documented\n"
-                    "backlog-definition flow completes deterministically. Safe to delete.\n",
-                    encoding="utf-8",
-                )
-            for ref in refs:
-                if ref.endswith(".json"):
-                    target = run_cwd / ref
-                    if not target.exists():
-                        target.parent.mkdir(parents=True, exist_ok=True)
-                        target.write_text(
-                            '{"fake": true, "summary": "driving-fake stub artifact"}\n',
-                            encoding="utf-8",
-                        )
-            return AgentRunResult(
-                status=AgentRunStatus.SUCCEEDED,
-                summary="fake backlog-definition worker: APPROVED",
-                artifact_refs=tuple(refs),
-                structured_output={"verdict": "APPROVED"},
-            )
-
-    def factory(kind: AgentRuntimeKind) -> AgentRuntimePort:
-        if kind is AgentRuntimeKind.FAKE:
-            return _BacklogDefinitionDrivingFake(kind)
-        return build_agent_runtime(kind, cwd=run_cwd)
-
-    return factory
 
 
-def build_backlog_definition_workflow(
-    workspace_root: Path,
-    *,
-    context: str,
-    release_id: str,
-    default_runtime_kind: AgentRuntimeKind = AgentRuntimeKind.FAKE,
-    prefix: PromptPrefix | None = None,
-    cwd: Path | None = None,
-    policy_snapshot: "WorkflowPolicySnapshot | None" = None,
-) -> "BacklogDefinitionWorkflow":
-    """Compose the fragment-driven backlog-definition workflow (R2 / epic §4).
-
-    Mirrors :func:`build_release_definition_workflow` field-for-field: the injected runtime
-    factory resolves each step's ``AgentRuntimeKind`` to its adapter (``FAKE`` drives the
-    sequence end-to-end); the :class:`ContextSelector` resolves each fragment's dynamic
-    inputs bounded by ``max_context_policy``; the R1 canonical-subject :class:`Registry`
-    backs the ``subject_bind`` Python step. ``policy_snapshot`` is the resolved governance
-    snapshot (v0.1.56 / FR1) frozen onto the run before the first step; the per-step model
-    reaches the adapter through the step's ``resolved_model``. All roots are derived from
-    ``workspace_root`` — never cwd.
-    """
-    from dadaia_workspace.cli.anchors import derive_cli_anchors
-    from dadaia_workspace.features.backlog.subject_registry import build_registry
-    from dadaia_workspace.features.lifecycle.context_selector import (
-        ContextSelector,
-        SpecContext,
-    )
-    from dadaia_workspace.features.lifecycle.workflows.backlog_definition import (
-        BacklogDefinitionWorkflow,
-    )
-
-    _guard_initialized(workspace_root)
-    run_cwd = cwd or workspace_root
-    context_name = resolve_bound_context_name(context) or context
-    specs_dir = (
-        workspace_root / "repos" / repo_slug_for_context(workspace_root, context_name) / "specs"
-    )
-    source_root = workspace_root / "repos" / context_name
-    if not specs_dir.is_dir():
-        # Self-hosting library repo: specs live at the workspace-root tree.
-        specs_dir = workspace_root / "specs"
-        source_root = workspace_root
-    handoff_dir = workspace_root / ".dadaia" / "handoff" / context_name
-    # cli-kind anchors derived at the composition boundary (FR1b) — the selector's
-    # ``backlog_index`` resolution and the ``subject_bind`` registry both bind cli subjects.
-    cli_anchors = derive_cli_anchors()
-    selector = ContextSelector(
-        SpecContext(
-            specs_dir=specs_dir,
-            release_id=release_id,
-            handoff_dir=handoff_dir,
-            phase=_active_phase(specs_dir),
-        ),
-        cli_anchors=cli_anchors,
-    )
-    registry = build_registry(
-        source_root=source_root,
-        catalog_path=specs_dir / "memory" / "product" / "catalog.json",
-        alias_map_path=workspace_root / ".dadaia" / "states" / "backlog_subject_aliases.txt",
-        specs_dir=specs_dir,
-        cli_anchors=cli_anchors,
-    )
-    return BacklogDefinitionWorkflow(
-        context=context,
-        release_id=release_id,
-        run_store=build_lifecycle_run_store(workspace_root),
-        runtime_factory=_backlog_definition_runtime_factory(context=context, run_cwd=run_cwd),
-        context_selector=selector,
-        registry=registry,
-        default_runtime_kind=default_runtime_kind,
-        prefix=prefix,
-        policy_snapshot=policy_snapshot,
-        # Bug gate-accepts-phantom-artifact-evidence: declared refs must exist.
-        artifact_root=workspace_root,
-        runtime_files=FilesystemRuntimeFileAdapter(workspace_root),
-        handoff_resolver=build_workflow_handoff_resolver(workspace_root),
-    )
 
 
-def _step_output_driving_fake_factory(
-    *,
-    context: str,
-    run_cwd: Path,
-    summary: str,
-    artifact_ref: str,
-    extra_artifact_refs: tuple[str, ...] = (),
-    domain_payload: dict[str, object] | None = None,
-) -> Callable[[AgentRuntimeKind], AgentRuntimePort]:
-    """Build a runtime factory whose FAKE returns one in-scope raw step output.
-
-    Shared by the ``audit`` and ``research`` builders (v0.1.56 / FR2): every step of those
-    workflows scope raw results to ``.dadaia/tmp/lifecycle-worker/<ctx>/**``, so one
-    APPROVED step-output ref is in-scope for the sequence. Real
-    harnesses (pi/codex) resolve to their live adapters; the policy-resolved concrete model
-    reaches each adapter through ``request.resolved_model`` (threaded from the step's
-    ``resolved_model`` by ``apply_resolved_policy``), not a construction-time model.
-    ``domain_payload`` (bug certification-passes-without-complete-workflow-chain) lets a
-    workflow whose step schema is stricter than the generic handoff (e.g. audit's
-    ``audit-report-v1``) hand the fake a schema-VALID payload so ``--harness fake`` walks
-    that sequence to completion instead of always blocking on payload validation.
-    """
-    from dadaia_workspace.core.models.lifecycle import (
-        AgentRunResult,
-        AgentRunStatus,
-    )
-    from dadaia_workspace.infrastructure.fake_runtime import FakeAgentRuntime
-
-    approving = AgentRunResult(
-        status=AgentRunStatus.SUCCEEDED,
-        summary=summary,
-        artifact_refs=(artifact_ref, *extra_artifact_refs),
-        structured_output={"verdict": "APPROVED"},
-        domain_payload=domain_payload or {},
-    )
-
-    def factory(kind: AgentRuntimeKind) -> AgentRuntimePort:
-        if kind is AgentRuntimeKind.FAKE:
-            # materialize_root: the gate now verifies declared refs EXIST (bug
-            # gate-accepts-phantom-artifact-evidence) — the driving fake writes its stub.
-            return FakeAgentRuntime(result=approving, materialize_root=run_cwd)
-        return build_agent_runtime(kind, cwd=run_cwd)
-
-    return factory
 
 
-def build_audit_workflow(
-    workspace_root: Path,
-    *,
-    context: str,
-    release_id: str,
-    default_runtime_kind: AgentRuntimeKind = AgentRuntimeKind.FAKE,
-    prefix: PromptPrefix | None = None,
-    cwd: Path | None = None,
-    policy_snapshot: "WorkflowPolicySnapshot | None" = None,
-) -> "AuditWorkflow":
-    """Compose the fragment-driven audit workflow (v0.1.56 / FR2), born resolver-governed.
-
-    Mirrors :func:`build_release_definition_workflow`: the injected runtime factory resolves
-    each step's ``AgentRuntimeKind`` to its adapter (``FAKE`` drives the whole
-    scope→drift-scan→triage sequence end-to-end with an in-scope handoff ref); the
-    :class:`ContextSelector` resolves each fragment's dynamic inputs, bounded by
-    ``max_context_policy``. ``policy_snapshot`` is the resolved governance snapshot frozen onto
-    the run before the first step (LAW 7); the per-step model reaches the adapter through the
-    step's ``resolved_model``.
-    """
-    from dadaia_workspace.features.lifecycle.context_selector import (
-        ContextSelector,
-        SpecContext,
-    )
-    from dadaia_workspace.features.lifecycle.workflows.audit import AuditWorkflow
-
-    _guard_initialized(workspace_root)
-    run_cwd = cwd or workspace_root
-    context_name = resolve_bound_context_name(context) or context
-    specs_dir = (
-        workspace_root / "repos" / repo_slug_for_context(workspace_root, context_name) / "specs"
-    )
-    if not specs_dir.is_dir():
-        specs_dir = workspace_root / "specs"
-    # Bug audit-accepts-undefined-release-and-creates-release-tree: audit runs against an
-    # EXISTING release. Its step payloads route to specs/releases/<release_id>/handoffs/
-    # (release-scoped, unlike backlog_definition), so an undefined id would synthesize a
-    # bogus release tree. Reject before any run/write.
-    if not (specs_dir / "releases" / release_id).is_dir():
-        raise ReleaseNotFoundError(
-            f"Audit target release '{release_id}' does not exist under "
-            f"{specs_dir.as_posix()}/releases/. Audit runs against an existing release — "
-            "define/approve the release first, or pass an existing --release-id."
-        )
-    handoff_dir = workspace_root / ".dadaia" / "handoff" / context_name
-    selector = ContextSelector(
-        SpecContext(
-            specs_dir=specs_dir,
-            release_id=release_id,
-            handoff_dir=handoff_dir,
-            phase=_active_phase(specs_dir),
-        )
-    )
-    return AuditWorkflow(
-        context=context,
-        release_id=release_id,
-        run_store=build_lifecycle_run_store(workspace_root),
-        runtime_factory=_step_output_driving_fake_factory(
-            context=context,
-            run_cwd=run_cwd,
-            summary="fake audit worker: APPROVED",
-            artifact_ref=(f".dadaia/tmp/lifecycle-worker/{context}/audit-step.step-output.json"),
-            # The audit step must land a REPORT in specs/audits/, not just a payload: an
-            # audit whose findings live only in a transient handoff cannot be dispositioned
-            # or archived (bug a1-audit-completes-without-audit-report).
-            extra_artifact_refs=(
-                f"{specs_dir.relative_to(workspace_root).as_posix()}/audits/"
-                "driving-fake-audit-canary.md",
-            ),
-            # A schema-VALID audit-report-v1 canary (one INFO finding routed to
-            # accepted-risk) so the fake exercises the real referential-integrity gate
-            # and the sequence COMPLETES (bug
-            # certification-passes-without-complete-workflow-chain). The finding MUST
-            # carry evidence — the validator requires it (bug
-            # lifecycle-audit-worker-sandbox-cannot-read-bound-repo).
-            domain_payload={
-                "question": "driving-fake audit canary: does the audit chain complete?",
-                "lenses": ["workflow-wiring"],
-                "findings": [
-                    {
-                        "id": "F-FAKE-1",
-                        "severity": "INFO",
-                        "lens": "workflow-wiring",
-                        "summary": "driving-fake canary finding (no real defect)",
-                        "evidence": "certify canary: synthetic finding by construction",
-                    }
-                ],
-                "dispositions": [{"finding_id": "F-FAKE-1", "route": "accepted-risk"}],
-            },
-        ),
-        context_selector=selector,
-        default_runtime_kind=default_runtime_kind,
-        prefix=prefix,
-        policy_snapshot=policy_snapshot,
-        # Bug fragment-workflows-never-persist-step-handoffs (v0.1.78 FR-B parity).
-        handoff_resolver=build_workflow_handoff_resolver(workspace_root),
-        # Bug gate-accepts-phantom-artifact-evidence: declared refs must exist.
-        artifact_root=workspace_root,
-        runtime_files=FilesystemRuntimeFileAdapter(workspace_root),
-    )
 
 
 def _backlog_context_roots(workspace_root: Path, context: str) -> tuple[Path, Path]:
@@ -2129,22 +893,6 @@ def _backlog_context_roots(workspace_root: Path, context: str) -> tuple[Path, Pa
     return specs_dir, source_root
 
 
-def build_release_spec_path(
-    workspace_root: Path,
-    *,
-    context: str,
-    release_id: str,
-) -> Path:
-    """Resolve ``<specs_dir>/releases/<release_id>/SPEC.md`` for a context's release.
-
-    Uses the same root resolution as :func:`build_backlog_removal_lifecycle`
-    (:func:`_backlog_context_roots`): a consumer context resolves to ``repos/<ctx>/specs``;
-    the self-hosting library repo falls back to the workspace-root ``specs``. All roots are
-    derived from ``workspace_root`` — never cwd. The producer post-step reads the
-    ``**Consumes:**`` line from this path (SPEC §3.2).
-    """
-    specs_dir, _source_root = _backlog_context_roots(workspace_root, context)
-    return specs_dir / "releases" / release_id / "SPEC.md"
 
 
 def build_backlog_removal_lifecycle(

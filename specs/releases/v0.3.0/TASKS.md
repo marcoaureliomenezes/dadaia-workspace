@@ -108,7 +108,7 @@ unchanged (the check list is data). Keep `context-bind-heartbeat`,
 
 ---
 
-- [-] **T-30-04 — Sever `container.py` (~1,400 of 2,300 lines)**
+- [x] **T-30-04 — Sever `container.py` (~1,400 of 2,300 lines)**
 
 **Owner role:** software-engineer
 
@@ -139,7 +139,7 @@ T-30-09, and is updated — never disabled.
 
 ---
 
-- [ ] **T-30-05 — Delete the engine and its adapters, models, protocols and tests**
+- [x] **T-30-05 — Delete the engine and its adapters, models, protocols and tests**
 
 **Owner role:** software-engineer
 
@@ -164,7 +164,7 @@ suite green.
 
 ---
 
-- [ ] **T-30-06 — Delete the engine assets and their projection dirs**
+- [-] **T-30-06 — Delete the engine assets and their projection dirs**
 
 **Owner role:** software-engineer
 
