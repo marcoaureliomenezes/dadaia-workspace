@@ -44,5 +44,3 @@ def test_creates_spec_plan_tasks_under_segment(tmp_path: Path, version: str, seg
 def test_rejects_invalid_input(tmp_path: Path, version: str, segment: str, match: str) -> None:
     with pytest.raises(ValueError, match=match):
         scaffold_release_segment(tmp_path, version, segment)
-
-

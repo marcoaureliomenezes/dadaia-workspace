@@ -19,5 +19,3 @@ def test_canon_accepts_plain_and_suffixed_semver() -> None:
 def test_canon_rejects_noncanonical_ids() -> None:
     for bad in ("valgame-v0.1.0", "release1", "0.1.0", "v1.2", "v1.2.3-", "v1.2.3 x"):
         assert not RELEASE_SEMVER_RE.match(bad), bad
-
-

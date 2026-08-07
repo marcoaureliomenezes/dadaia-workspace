@@ -160,9 +160,3 @@ def test_build_doctor_service_wires_pid_probe_dead_holder_reclaimed(tmp_path: Pa
 # ---------------------------------------------------------------------------
 # T-28-A-08 — governance layer composition (registry / store / resolver)
 # ---------------------------------------------------------------------------
-
-
-
-
-
-

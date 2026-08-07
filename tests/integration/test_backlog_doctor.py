@@ -49,8 +49,6 @@ def _write_item(specs: Path, slug: str, frontmatter: str) -> None:
     )
 
 
-
-
 def _run(specs: Path, src: Path) -> list:
     return run_backlog_doctor(
         specs_dir=specs,
@@ -179,5 +177,3 @@ def test_clean_tree_matrix_each_violation_flagged_stale_noop_and_fresh_stub_stat
     assert fresh_schema2, (
         "a candidate with no intents[] must fire BL-SCHEMA (status-gate not blanket)"
     )
-
-

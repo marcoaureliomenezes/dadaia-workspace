@@ -18,7 +18,6 @@ import pytest
 from dadaia_workspace.features.panel.handler import (
     _BEARER_ONLY_ROUTE_NAMES,
     _COMPILED_DELETE_ROUTE_TABLE,
-    _COMPILED_ROUTE_TABLE,
     _DELETE_ROUTE_TABLE,
     _ROUTE_TABLE,
     _SECOND_LOOP_AUTH_ROUTE_NAMES,
@@ -135,4 +134,3 @@ def test_route_table_invariants() -> None:
 )
 def test_route_classification_table(route_name: str, expected_auth: AuthClass | None) -> None:
     assert _get_auth(route_name) == expected_auth
-

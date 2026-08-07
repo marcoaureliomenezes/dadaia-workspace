@@ -303,7 +303,7 @@ pass **unchanged**; `public stage/install/doctor` byte-stable.
 
 ---
 
-- [ ] **T-30-11 — Quality gates, residue grep, CHANGELOG**
+- [x] **T-30-11 — Quality gates, residue grep, CHANGELOG**
 
 **Owner role:** qa-engineer
 

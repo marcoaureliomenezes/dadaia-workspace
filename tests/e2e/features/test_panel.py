@@ -203,9 +203,6 @@ def test_panel_renders_sections_credentialless_and_no_token_banner(tmp_path: Pat
         assert any(marker in body for marker in ("Memórias", "Memories", "memories", "memory")), (
             "Index page missing Memories section marker"
         )
-        assert any(marker in body for marker in ("Workflows", "section-workflows")), (
-            "Index page missing Workflows section marker"
-        )
 
         # --- /api/panel-status (credential-less — no-auth contract) ---
         # Response shape: {"groups": [...]}  (see views/api_servers.py contract docstring)

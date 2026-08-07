@@ -190,7 +190,6 @@ def render_api_agents_canonical(
         # override (for tests) or by calling the real reader.
         canonical_agents = service.list_canonical_agents()
 
-
         # Build output — one entry per canonical agent.
         # Filter by runtime: include agent if its telemetry providers list contains
         # the requested runtime.  When runtime="claude" and the agent has no telemetry

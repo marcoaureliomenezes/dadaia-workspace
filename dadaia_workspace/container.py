@@ -321,8 +321,6 @@ def build_export_service(workspace_root: Path) -> ExportService:
     )
 
 
-
-
 def build_server_registry_service(workspace_root: Path) -> ServerRegistryService:
     _guard_initialized(workspace_root)
     states = _states_dir(workspace_root)
@@ -416,38 +414,6 @@ def build_reports_retention_service(workspace_root: Path) -> ReportRetentionServ
     return ReportRetentionService(workspace_root)
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 def build_agent_model_policy_service(workspace_root: Path) -> "AgentModelPolicyService":
     """Compose the panel-facing L1 agent-model-policy service (v0.1.65 FR8 / T-65-10).
 
@@ -512,12 +478,6 @@ def build_plugin_store() -> "PluginStore":
     return JsonPluginStore()
 
 
-
-
-
-
-
-
 def _context_specs_dir(workspace_root: Path, context: str) -> Path:
     """Resolve a context's ``specs/`` tree (v0.1.57 FR2 / A1 — role→atom map wiring).
 
@@ -541,12 +501,6 @@ def resolve_context_specs_dir(workspace_root: Path, context: str) -> Path:
     uses internally, without duplicating the resolution logic.
     """
     return _context_specs_dir(workspace_root, context)
-
-
-
-
-
-
 
 
 def _workspace_python_bin(workspace_root: Path) -> str | None:
@@ -814,10 +768,6 @@ def _fake_spec_stub(prompt: str) -> str:
     )
 
 
-
-
-
-
 #: Slug prefix of the items the backlog driving fake upserts. The slug is scoped by RUN id:
 #: re-running one run EDITs that run's own item (idempotent, which is what the former single
 #: fixed slug was protecting), while distinct runs author DISTINCT items — without which the
@@ -867,14 +817,6 @@ def _fake_backlog_canary_ref(backlog_dir: Path, slug: str) -> str:
     return preferred[0] if preferred[0] in anchors else min(anchors)
 
 
-
-
-
-
-
-
-
-
 def _backlog_context_roots(workspace_root: Path, context: str) -> tuple[Path, Path]:
     """Resolve ``(specs_dir, source_root)`` for a context's backlog ops.
 
@@ -891,8 +833,6 @@ def _backlog_context_roots(workspace_root: Path, context: str) -> tuple[Path, Pa
         specs_dir = workspace_root / "specs"
         source_root = workspace_root
     return specs_dir, source_root
-
-
 
 
 def build_backlog_removal_lifecycle(

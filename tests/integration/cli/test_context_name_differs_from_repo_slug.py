@@ -71,10 +71,6 @@ def _run(workspace: Path, *args: str) -> dict:
     return json.loads(proc.stdout)
 
 
-
-
-
-
 def test_bugs_append_resolves_the_slug_and_closure_lands_in_scope(workspace: Path) -> None:
     """Two more sites that assumed name == slug, both validator-reported.
 
@@ -121,8 +117,6 @@ def test_bugs_append_resolves_the_slug_and_closure_lands_in_scope(workspace: Pat
     assert (workspace / "repos" / _SLUG / "specs" / "bugs" / "bugs.jsonl").is_file(), (
         "the event must land in the context's real ledger, under its SLUG"
     )
-
-
 
 
 def test_create_refuses_a_name_no_other_verb_can_use(workspace: Path) -> None:

@@ -8,7 +8,6 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-import dadaia_workspace
 from dadaia_workspace import container
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root

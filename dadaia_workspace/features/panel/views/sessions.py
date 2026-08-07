@@ -5,7 +5,7 @@ panel-plumbing v0.1.52 FR2 introduced the dashboard-only scaffold; v0.1.79
 into a sub-section rendered INSIDE the "1º Agentic Layer" (``#section-subagents``)
 tabpanel. ``#section-sessions`` survives as the nested mount id — ``sessions.js``
 keys on it unchanged — but it is now a plain ``<div>`` sub-section (like
-``.ops-subsection`` in ``workflows.py``), not a standalone ``role="tabpanel"``.
+``.ops-subsection``), not a standalone ``role="tabpanel"``.
 
 Security (OWASP A03):
   This module returns a static HTML scaffold only. No session data is serialised

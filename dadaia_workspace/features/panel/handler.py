@@ -251,14 +251,6 @@ _SECOND_LOOP_AUTH_ROUTES = _SECOND_LOOP_AUTH_ROUTE_NAMES
 # Backward-compatible flat raw routes list (pattern, name) — consumed by some tests.
 _RAW_ROUTES: list[tuple[str, str]] = [(pat, name) for pat, name, _ in _ROUTE_TABLE]
 
-# Control-plane GET routes (Wave C) that read the parsed query string. Only these
-# receive the ``qs`` kwarg in GET dispatch; every other view keeps its captured-groups
-# call convention unchanged.
-_QS_AWARE_GET_ROUTES: frozenset[str] = frozenset(
-    {
-    }
-)
-
 # Mutation routes (Wave C) dispatched from do_PUT / do_POST with a body. PUT targets the
 # policy route; POST targets the validate route. Both read the request body + content
 # type and call the view with ``body`` / ``content_type`` / ``qs``.
@@ -462,13 +454,7 @@ def make_handler_class(
                         AuthClass.BEARER,
                         AuthClass.BEARER_SECOND_LOOP,
                     ):
-                        # Only the query-string-aware control-plane GET routes
-                        # receive ``qs``; existing views keep their call convention
-                        # (captured groups only).
-                        if route_name in _QS_AWARE_GET_ROUTES:
-                            status, content_type, body = view(qs=qs, **m.groupdict())
-                        else:
-                            status, content_type, body = view(**m.groupdict())
+                        status, content_type, body = view(**m.groupdict())
                         is_static = path.startswith("/static/")
                         self._respond(
                             status,

@@ -215,6 +215,7 @@ def certify(
         "context-specs-doctor",
         lambda: doctor_clean("specs", "doctor", "--context", "certified-consumer", "--json"),
     )
+
     def handoff_validation() -> str:
         path = target / ".dadaia" / "handoff" / "certified-consumer" / "cert.handoff.json"
         path.parent.mkdir(parents=True, exist_ok=True)

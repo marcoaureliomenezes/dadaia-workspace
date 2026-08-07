@@ -726,4 +726,3 @@ def next_(
         console.print(f"  Already completed: {completed}")
         console.print(f"  Pending: {pending}")
     raise typer.Exit(0)
-

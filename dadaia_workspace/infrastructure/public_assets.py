@@ -183,6 +183,8 @@ class InstallPlan:
     scope: Literal["all", "repos-only", "workspace-only"]
     only: str | None
     overwrite: OverwritePolicy
+    #: Which guardrail projections the scope selects: subset of {"workspace", "repos"}.
+    guardrail_targets: frozenset[str]
     harness_targets: tuple[str, ...]
     active_harnesses: frozenset[str]
     overlay: AgentModelPolicyOverlay | None
@@ -873,6 +875,13 @@ class FileSystemPublicAssetManager:
             scope=scope,
             only=only,
             overwrite=overwrite,
+            guardrail_targets=frozenset(
+                {
+                    "all": ("workspace", "repos"),
+                    "workspace-only": ("workspace",),
+                    "repos-only": ("repos",),
+                }[scope]
+            ),
             harness_targets=harness_targets,
             active_harnesses=active_harnesses,
             overlay=overlay,
@@ -903,6 +912,10 @@ class FileSystemPublicAssetManager:
         body is never silently reverted to its stub), THEN the retired workflow sweep.
         """
         harness_steps = self._harness_steps()
+        # `--only` selection for the universal-skills target happens HERE (present/absent
+        # in the pipeline), never inside the step (FR6).
+        if plan.only is not None and plan.only != "skills":
+            harness_steps.pop("agents", None)
         steps: list[_InstallStep] = [
             self._step_agents_md_guardrail,
             self._step_dadaia_agents_md,
@@ -931,19 +944,18 @@ class FileSystemPublicAssetManager:
     def _step_agents_md_guardrail(self, plan: InstallPlan, installed: list[str]) -> None:
         data_agents_md = plan.agentic_dir / "data" / "AGENTS.md"
         if data_agents_md.exists():
-            guard_targets: dict[str, set[Literal["workspace", "repos"]]] = {
-                "all": {"workspace", "repos"},
-                "workspace-only": {"workspace"},
-                "repos-only": {"repos"},
+            literals: tuple[Literal["workspace", "repos"], ...] = ("workspace", "repos")
+            guard_targets: set[Literal["workspace", "repos"]] = {
+                t for t in literals if t in plan.guardrail_targets
             }
             _install_guardrail_pair(
                 data_agents_md,
                 plan.workspace_root,
                 plan.overwrite.force,
                 installed,
-                targets=guard_targets.get(plan.scope, {"workspace", "repos"}),
+                targets=guard_targets,
             )
-        elif plan.scope in ("all", "workspace-only"):
+        elif "workspace" in plan.guardrail_targets:
             install_agents_md(
                 plan.agentic_dir,
                 plan.workspace_root,
@@ -968,14 +980,13 @@ class FileSystemPublicAssetManager:
         )
 
     def _step_install_universal_skills(self, plan: InstallPlan, installed: list[str]) -> None:
-        if plan.only is None or plan.only == "skills":
-            install_universal_skills(
-                plan.agentic_dir,
-                plan.workspace_root,
-                plan.overwrite.force,
-                installed,
-                self._iter_files,
-            )
+        install_universal_skills(
+            plan.agentic_dir,
+            plan.workspace_root,
+            plan.overwrite.force,
+            installed,
+            self._iter_files,
+        )
 
     def _step_install_claude(self, plan: InstallPlan, installed: list[str]) -> None:
         self._install_claude(

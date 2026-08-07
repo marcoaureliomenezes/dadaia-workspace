@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
@@ -136,10 +136,6 @@ class HygieneCandidate:
             protected=bool(data.get("protected", False)),
             protection_kind=HygieneProtectionKind(str(protection)) if protection else None,
         )
-
-
-
-
 
 
 def _required_int(value: object) -> int:

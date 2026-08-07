@@ -85,24 +85,12 @@ CLAUDE_SESSION_ENV_VAR: Final[str] = "CLAUDE_CODE_SESSION_ID"
 #: The native session-id env var Codex provides to a hook subprocess.
 CODEX_SESSION_ENV_VAR: Final[str] = "CODEX_SESSION_ID"
 
-#: The entry-harness auto-default signal vars (v0.1.64 FR3/AC-4). A developer running
-#: pytest inside a codex TUI (or a PI session with the Ring-1 pin) legitimately carries
-#: these in the shell; the test envelope must scrub them so a lifecycle verb invoked
-#: without ``--harness`` in a test always resolves ``fake`` — never a real,
-#: credit-spending worker. ``CLAUDE_CODE_SESSION_ID`` is included for symmetry (it is
-#: never an entry signal, but scrubbing it keeps the envelope deterministic).
-#:
-#: ``CODEX_THREAD_ID`` (v0.1.69 FR1.5, bug ``codex-thread-id-bind-resolution-breaks-cli``,
-#: SAFETY-mandatory): since ``core.session_env.entry_harness()`` now treats
-#: ``CODEX_THREAD_ID`` as a Codex entry signal (FR1.2), a modern Codex tool subprocess
-#: exports it INSTEAD of ``CODEX_SESSION_ID`` — a developer running pytest inside such a
-#: Codex TUI would otherwise have ``entry_harness()`` resolve ``"codex"`` mid-suite and
-#: auto-default a real, credit-spending Layer-2 worker. Adding it here is a mandatory
-#: extension of the existing hermeticity envelope (documented, not a weakening): the
-#: autouse scrub (:func:`scrub_entry_signal_env`) and
-#: ``test_ci_job_env_carries_no_entry_signal_vars`` both inherit it automatically.
+#: The harness session-id env vars a developer's shell may legitimately carry (a codex
+#: TUI exports ``CODEX_SESSION_ID`` or ``CODEX_THREAD_ID``; Claude Code exports
+#: ``CLAUDE_CODE_SESSION_ID``). The test envelope scrubs them so session-id resolution
+#: stays hermetic; the autouse scrub (:func:`scrub_entry_signal_env`) inherits this
+#: list automatically.
 ENTRY_SIGNAL_ENV_VARS: Final[tuple[str, ...]] = (
-    "DADAIA_ENTRY_HARNESS",
     CODEX_SESSION_ENV_VAR,
     "CODEX_THREAD_ID",
     CLAUDE_SESSION_ENV_VAR,
@@ -110,10 +98,10 @@ ENTRY_SIGNAL_ENV_VARS: Final[tuple[str, ...]] = (
 
 
 def scrub_entry_signal_env(monkeypatch: Any) -> None:
-    """Delete the three entry-signal vars from ``os.environ`` for the current test.
+    """Delete the harness session-id vars from ``os.environ`` for the current test.
 
     The autouse fixture in the root ``tests/conftest.py`` applies this over the whole
-    suite (the AC-4 hermeticity envelope); tests that exercise the auto-default set the
+    suite (hermeticity envelope); tests that exercise session-id resolution set the
     vars explicitly AFTER the scrub via their own ``monkeypatch.setenv``.
     """
     for name in ENTRY_SIGNAL_ENV_VARS:
@@ -156,11 +144,6 @@ ALLOWLISTED_DADAIA_ENV: Final[frozenset[str]] = frozenset(
         # features/telemetry/service.py (PI session-store ingest, WS-PI-6) — same
         # category as DADAIA_AGENTS_DIR above.
         "DADAIA_PI_SESSIONS_DIR",
-        # Entry-harness pin (v0.1.64 FR3/FR4) — an operator-shell / PI-Ring-1 input read
-        # by production BY DESIGN in core/session_env.entry_harness (the --harness auto
-        # sentinel). Setting it in a test exercises that real env-read path; the autouse
-        # AC-4 envelope scrub (scrub_entry_signal_env) keeps the suite hermetic.
-        "DADAIA_ENTRY_HARNESS",
     }
 )
 
