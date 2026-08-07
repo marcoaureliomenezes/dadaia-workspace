@@ -1,10 +1,9 @@
-"""Typed Layer-1/Layer-2 harness identity registry — ``core/harness_registry.py``.
+"""Typed harness identity registry — ``core/harness_registry.py``.
 
 The **code embodiment** of the agent-runtime roster that ``specs/memory/tech-stack.md``
 ("Agent runtimes") documents as the single source of truth (SPEC-DOC-037). This module
-does not compete with that doc — it *types* it, so the prose distinction "claude is a
-Layer-1 entry harness only; codex/pi are also Layer-2 workers" becomes a typed lookup
-instead of bare string literals scattered across the codebase.
+does not compete with that doc — it *types* the entry-harness roster so no bare string
+literal is scattered across the codebase.
 
 One roster lives here:
 

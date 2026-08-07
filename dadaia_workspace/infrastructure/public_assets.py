@@ -1313,7 +1313,7 @@ class FileSystemPublicAssetManager:
         elif (workspace_root / ".codex").exists():
             reports.append(_out_of_profile_warn("codex"))
 
-        # PI (Layer-2 worker harness) — scoped to `pi in profile`.
+        # PI entry harness — scoped to `pi in profile`.
         pi_staged = agentic_dir / "pi"
         pi_projected = workspace_root / ".pi"
         if "pi" in active:
@@ -1577,7 +1577,7 @@ class FileSystemPublicAssetManager:
         ``prompts/`` affordance dir) are plain md/json — a straight hash-compare copy
         with orphan-pruning, idempotent on re-install.
 
-        The PI harness is a Layer-2 worker; its files carry no workspace-specific or
+        The PI harness projection carries no workspace-specific or
         operator-local values, so the copy is verbatim (no generated config file).
         """
         pi_src = agentic_dir / "pi"

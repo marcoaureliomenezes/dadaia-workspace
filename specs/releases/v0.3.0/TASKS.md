@@ -358,7 +358,7 @@ measured removal differs from the map by more than 10%.
 
 ---
 
-- [-] **T-30-13 — Constitution, memory atoms, CLOSURE**
+- [x] **T-30-13 — Constitution, memory atoms, CLOSURE**
 
 **Owner role:** product-engineer
 
@@ -382,3 +382,13 @@ open engine bug `Closed` with `superseded_by`, and
 
 **Done criterion:** `dadaia specs doctor` green; CLOSURE.md complete with the T-30-12
 metrics table; release archived via `git mv` and `ACTIVE.md` repointed.
+
+**Closed 2026-08-07 with three amendments, all recorded in CLOSURE.md:**
+
+1. `specs/constitution.md` was **not** edited — it requires explicit operator
+   confirmation (Operator decisions (a)).
+2. The two retired memory atoms were left byte-untouched: `specs/_archive/**` is a FROZEN
+   path class and product-engineer has no `Bash`, so the archival is a pending `git mv`
+   (CLOSURE → *Pending mechanical steps*, drift `archive-path-is-frozen`).
+3. The release directory was **not** archived and `ACTIVE.md` was **not** repointed —
+   that is the operator's ship decision, gated on the security verdict.

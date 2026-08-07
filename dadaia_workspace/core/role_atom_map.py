@@ -13,7 +13,7 @@ from __future__ import annotations
 #: The declarative role → memory-atom map. Each value is the atom's path relative to the
 #: active context's ``specs_dir`` (so the recorded/expected handoff ref is
 #: ``specs/<value>``). A role not listed here (e.g. ``software-engineer``,
-#: ``security-reviewer``, ``project-auditor``) carries no mapped atom: Layer-2 injects
+#: ``security-reviewer``, ``project-auditor``) carries no mapped atom: the harness injects
 #: nothing for it, and the v1.2 coverage check imposes no requirement on it.
 ROLE_ATOM_MAP: dict[str, str] = {
     "software-architect": "memory/architecture.md",

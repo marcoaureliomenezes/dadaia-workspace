@@ -12,7 +12,7 @@
 |------|-------|------|
 | `agent-comms` | agent-comms — Handoff Contract v1 | handoff-v1.2 separates HTML reports from JSON handoffs and carries the self_pull Layer-1 read-proof line. |
 | `agent-monitoring` | agent-monitoring | stdlib-only local telemetry (Claude/Codex/PI sessions) → panel Sessions tab + /api/agents; allowlist gate preserves privacy. |
-| `agent-orchestration` | agent-orchestration | Nine core Layer-1 roles, eight Layer-2 personas, two dispatchers, four workflows, and advisory-only concurrency. |
+| `agent-orchestration` | agent-orchestration | Nine core Layer-1 roles, two dispatchers, document-governed ordered work, and advisory-only concurrency. |
 
 ### distribution
 
@@ -27,23 +27,23 @@
 
 | slug | title | tldr |
 |------|-------|------|
-| `harness-claude-code` | Harness — Claude Code | Layer-1-only entry harness; richest deterministic enforcement; scaffold = CLAUDE.md bridge + .claude/ projection (agents, skills, rules, hooks). |
-| `harness-codex` | Harness — Codex | Dual-layer harness: Layer-1 TUI (deterministic hooks) vs headless exec (chokepoints only); Layer-2 CODEX_EXEC worker; scaffold = .codex/ projection. |
+| `harness-claude-code` | Harness — Claude Code | Entry harness with native sub-agent dispatch; scaffold = CLAUDE.md bridge + .claude/ projection. |
+| `harness-codex` | Harness — Codex | Entry harness on the operator's Codex subscription: TUI with deterministic hooks, Starlark command policy, and a .codex/ projection of agents, skills and rules. |
 | `harness-kimi-code` | Harness — Kimi Code | Layer-1-only harness: `.kimi-code/` projection + hooks via a managed block in the user-level `config.toml`; first with post-compact re-injection. |
-| `harness-pi` | Harness - PI (pi-coding-agent) | Dual-layer PI runtime with a trusted TypeScript entry extension and a governed headless worker supporting Codex-subscription and explicit OpenRouter profiles. |
+| `harness-pi` | Harness - PI (pi-coding-agent) | Entry harness with a trusted TypeScript gate extension projected into .pi/, plus allowlisted PI session telemetry. |
 
 ### panel
 
 | slug | title | tldr |
 |------|-------|------|
 | `brand-identity` | brand-identity | canonical 5-color palette and CSS tokens of the panel (release dadaia-workspace-brand-identity-v1). |
-| `panel` | panel | Local seven-tab panel with workflow governance, telemetry, reports, and wall-wrapping Snake/Tetris plus Codex Pong and PI Breakout. |
+| `panel` | panel | Local five-tab panel with Layer-1 model governance, telemetry, reports, academy, servers, and wall-wrapping Snake/Tetris plus Codex Pong and PI Breakout. |
 
 ### philosophy
 
 | slug | title | tldr |
 |------|-------|------|
-| `product-vision` | product-vision | A strict, portable SDD workspace that gives agents current context, four reliable workflows, visible concurrency, and strong anti-slop boundaries. |
+| `product-vision` | product-vision | A strict, portable SDD workspace that gives agents current context, a document-governed lifecycle, visible concurrency, and strong anti-slop boundaries. |
 | `spec-context-project` | spec-context-project | One canonical specs tree plus one repository, explicitly bindable by each session and safe for visible concurrent work. |
 
 ### platform
@@ -64,9 +64,6 @@
 
 | slug | title | tldr |
 |------|-------|------|
-| `dadaia-workflows` | dadaia-workflows | Exactly four executable Layer-2 workflows: backlog definition, release definition, implementation plus reviews, and audit. |
-| `lifecycle-foundation` | lifecycle-foundation | Deterministic Python workflow engine with fragment-scoped workers, semantic gates, bounded retries, and immutable handoff evidence. |
-| `sdd-bug-backlog-governance` | sdd-bug-backlog-governance | Event-sourced JSONL bugs, duplicate-safe backlog definition, release consumption, audit dispositions, and exact-commit security-gated push. |
+| `sdd-bug-backlog-governance` | sdd-bug-backlog-governance | Event-sourced JSONL bugs, PM-curated backlog, release consumption, audit dispositions, and exact-commit security-gated push. |
 | `sdd-gate-v3` | sdd-gate-v3 | No-lock SDD enforcement: deterministic path/mode gates, advisory presence, warn-only concurrent commits, and a security-gated push boundary. |
 | `specs-doctor` | specs-doctor | Validates canonical specs structure, memory/catalog integrity, release markers, closure evidence, dispositions, bug ledgers, and audit coherence. |
-

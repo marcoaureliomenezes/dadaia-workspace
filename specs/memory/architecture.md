@@ -2,20 +2,20 @@
 slug: architecture
 title: Architecture Memory
 category: core
-tldr: Three-ring Python architecture, four workflow control plane, no-lock SDD boundary, runtime-state map, and cross-harness projection chain.
+tldr: Three-ring Python architecture, document-governed SDD lifecycle, no-lock boundary, runtime-state map, and cross-harness projection chain.
 summary: >-
   Defines the CLI/features/infrastructure dependency structure, core ports and models,
-  composition root, Spec Context boundary, lifecycle and handoff data planes, panel,
-  public asset projections, concurrency posture, and canonical runtime state.
+  composition root, Spec Context boundary, handoff data plane, panel, public asset
+  projections, concurrency posture, and canonical runtime state.
 tags:
 - architecture
 - layers
 - dependency-rules
 - agents
-- workflows
-token_estimate: 1250
-last_updated: '2026-07-16'
-release_origin: v0.2.7
+- sdd
+token_estimate: 1150
+last_updated: '2026-08-07'
+release_origin: v0.3.0
 ---
 
 ## Overview
@@ -36,11 +36,16 @@ flowchart LR
 - `cli/` parses operator input, renders output, and delegates.
 - `features/` owns product behavior by domain.
 - `core/` owns pure models, protocols, constants, and classifiers.
-- `infrastructure/` owns filesystem, Git, subprocess, JSON, runtime, and platform adapters.
+- `infrastructure/` owns filesystem, Git, subprocess, JSON, and platform adapters.
 - `container.py` is the only general composition root.
 
 Import-linter and AST contract tests enforce the intended direction and cap deliberate
 legacy exceptions. New feature code depends on ports, not concrete adapters.
+
+**The workspace ships no agent-execution runtime.** It provides context, law,
+deterministic boundaries, evidence validation, and diagnostics; the agents themselves
+are driven by their harnesses against the SDD documents. A mechanism exists here only
+while a demand requires it.
 
 ## Primary Subsystems
 
@@ -50,7 +55,8 @@ legacy exceptions. New feature code depends on ports, not concrete adapters.
 identity, advisory presence, path classification, and workspace doctor checks. There is
 no lease or locking module. `hooks/pre_gate.py` composes root whitelist, venv guard, and
 the SDD path/phase/mode gate. `hooks/sdd_post_gate.py` refreshes advisory presence and
-runs the nonblocking reconciler.
+runs the nonblocking reconciler. `hooks/ctx_inject.py` emits the once-per-session
+context bootstrap, re-armed by the bind-epoch marker.
 
 Exit codes tell the truth: `dadaia doctor` (and `reports validate`) exit non-zero
 whenever issues remain — a green exit is proof, never a formality. Tool-initiated
@@ -63,41 +69,33 @@ Git chokepoints are installed from:
 - `public/scripts/pre-commit-presence-gate.sh` - concurrency warning only;
 - `public/scripts/pre-push-ci-gate.sh` - CI and exact-commit security verdict.
 
-### Lifecycle
-
-`features/lifecycle/` owns exactly four executable workflows, prompt assembly, persona
-loading, model profiles/policy, worker invocation, semantic gates, immutable attempt
-payloads, dependency resolution, diagnostics, and retention. The presentation catalog
-is assembled in `features/lifecycle/governed_catalog.py` and exposed through
-`features/workflows/dadaia_catalog.py`; `features/workflows/dag.py` renders offline SVG
-diagrams.
-
-The supported Layer-2 real runtimes are Codex and PI behind `AgentRuntimePort`. Claude
-Code and Kimi Code are Layer-1-only. `fake` is the deterministic test adapter.
-
 ### Handoffs and reports
 
 `features/reports/` validates, discovers, and retains handoff-first communication.
-Workflow-internal payloads live in run state; cross-agent handoffs live under
-`.dadaia/handoff/<context>/`. HTML reports are optional and live under
-`.dadaia/reports/<context>/<agent>/`.
+Cross-agent handoffs live under `.dadaia/handoff/<context>/`; HTML reports are optional
+and live under `.dadaia/reports/<context>/<agent>/`. Handoff validation is stdlib-only
+behind `ValidatorPort`.
 
 ### Panel
 
 `features/panel/` serves a loopback-only stdlib HTTP UI. Route/view modules are split by
-domain. The panel has seven tabs: Projects, 1st Agentic Layer, 2nd Agentic Layer,
-Reports, Academy, Servers, and Games. Workflow diagrams are server-rendered; policy and
-game interactions are local JavaScript.
+domain. The panel has five governance tabs — Projects, 1st Agentic Layer, Reports,
+Academy, Servers — plus a Games surface. Layer-1 model policy is the panel's only
+governance editor; game interactions are local JavaScript.
 
 ### Public assets
 
 Canonical harness assets live in `dadaia_workspace/public/`. `public stage` copies
-versioned source into `.dadaia/agentic/`; `public install` projects runtime-specific
-assets to `.claude/`, `.codex/`, `.pi/`, `.kimi-code/`, and shared `.agents/`; `public doctor` compares
-source, staging, projection, privacy, and policy-aware rendering.
+versioned source into `.dadaia/agentic/`; `public install` resolves its arguments once
+into an immutable install plan and runs an ordered list of flag-free steps that project
+runtime-specific assets to `.claude/`, `.codex/`, `.pi/`, `.kimi-code/`, and shared
+`.agents/`; `public doctor` compares source, staging, projection, privacy, and
+policy-aware rendering.
 
-Generated projection files are never edited in place. The source repository itself
-must not contain generated workspace projection roots.
+Generated projection files are never edited in place. The projected law files
+(`DADAIA.md` and library-originated `AGENTS.md`) are PROTECTED and human-only in an
+instantiated workspace. The source repository itself must not contain generated
+workspace projection roots.
 
 ### Specs and memory
 
@@ -109,10 +107,12 @@ schema; all nine current fields are required and unknown fields are invalid.
 
 ### Other feature domains
 
-Backlog and bugs own intake consistency and event-sourced bug state. Telemetry owns
-allowlisted local metadata and its separate refresh serialization primitive. Server
-registry owns collision-free dev-port allocation. Repos, plugins, academy, import/export,
-migration, workspace initialization, and cleanup remain bounded feature packages.
+Backlog and bugs own intake consistency and event-sourced bug state. Certification runs
+the deterministic capability checks behind `dadaia certify`. Capabilities publishes the
+`dadaia-capabilities-v2` payload. Telemetry owns allowlisted local metadata and its
+separate refresh serialization primitive. Server registry owns collision-free dev-port
+allocation. Repos, plugins, academy, import/export, migration, workspace initialization,
+and cleanup remain bounded feature packages.
 
 ## Concurrency
 
@@ -137,10 +137,9 @@ else); this table mirrors it:
 | `states/bind_epoch/` | context injection markers |
 | `states/presence/` | advisory live-session records |
 | `states/server_registry.json` | development server registry |
-| `states/*model*policy*.json` | Layer-1/Layer-2 governance overlays |
+| `states/agent_model_policy.json` | Layer-1 agent model governance overlay |
 | `states/root_exceptions.txt` | operator-approved root-whitelist exceptions |
 | `states/import-manifest.json` | provenance of the last `dadaia import` |
-| `runs/lifecycle/` | workflow run state (durable step payloads live in the Spec Context: `specs/releases/<id>/handoffs/`, backlog runs in `specs/backlog/handoffs/`) |
 | `handoff/` | machine-readable agent handoffs |
 | `reports/` | optional human-readable reports |
 | `tmp/` | bounded ephemeral files (incl. `tmp/legacy-quarantine/`) |
@@ -169,23 +168,20 @@ Playwright reports, or coverage artifacts.
 
 `core/` is stdlib-pure; file I/O is allowed only in the ratchet-authorized set:
 `specs_backup` (consumer-tree migration), `specs_version` (pattern-version stamp),
-`specs_resolver` and `workspace_resolver` (tree walks), and — since v0.2.9 —
-`specs_repair` (removal of unfilled placeholder atoms from old-scaffold trees; the
-single home both repair surfaces, `features.specs` and `features.migrate`, may
-import without a forbidden sibling edge).
+`specs_resolver` and `workspace_resolver` (tree walks), and `specs_repair` (removal of
+unfilled placeholder atoms from old-scaffold trees; the single home both repair
+surfaces, `features.specs` and `features.migrate`, may import without a forbidden
+sibling edge).
 
-## Agentic Layers
+## Agent Surface
 
-
-Layer 1 is the interactive agent surface: nine core roles with two dispatchers. Layer 2
-is a bounded Codex/PI workflow worker governed by one of eight non-PM personas. Personas
-carry role behavior only; workflow policy carries harness/model/effort.
-
-The four workflow bodies, not AGENTS prose or hooks, own the ordered release ritual.
-Hooks enforce mechanical file/Git boundaries only.
+Nine core agent roles with two dispatchers run inside the entry harness. Their bodies are
+canonical Markdown under `public/agents/`, rendered at install with the resolved
+model/effort policy and projected per harness. The ordered release ritual is owned by the
+SDD documents — `ACTIVE.md`, SPEC, PLAN, TASKS, CLOSURE — and by the agents that write
+them. Hooks enforce mechanical file/Git boundaries only.
 
 ## Dependencies
 
 [[spec-context-project]], [[context-management]], [[sdd-gate-v3]],
-[[dadaia-workflows]], [[lifecycle-foundation]], [[agent-orchestration]], [[panel]],
-[[public-asset-distribution]], [[tech-stack]].
+[[agent-orchestration]], [[panel]], [[public-asset-distribution]], [[tech-stack]].
