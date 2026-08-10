@@ -33,7 +33,7 @@ dadaia = "dadaia_workspace.cli.main:_safe_app"
 
 [tool.poetry.dependencies]
 python = "^3.12"
-typer = ">=0.25"
+typer = ">=0.27.1"
 rich = ">=13,<16"
 openpyxl = "^3.1"
 pyyaml = "^6.0"
