@@ -21,7 +21,6 @@
         "input_contract": dict | null,
         "gate_role":      str | null,  # §7 review-gate / phase role from frontmatter
         "phases":         list[str],   # §7 lifecycle phase(s) owned/gated (constitution-derived)
-        "workflows":      list[str],   # workflow display names this agent takes part in
         "telemetry": {
           "session_count":      int,
           "total_cost_usd":     float | null,
@@ -103,29 +102,6 @@ def _agent_phases(agent_id: str) -> list[str]:
     neutral placeholder, never a fabricated phase.
     """
     return list(_AGENT_PHASES.get(agent_id, []))
-
-
-def _workflow_membership(service: PanelService) -> dict[str, list[str]]:
-    """Build an ``agent_id -> [workflow display names]`` map.
-
-    Derived at request time from the governed Python workflow catalog. Best-effort:
-    a catalog-read failure yields an empty map rather than failing /api/agents.
-    """
-    membership: dict[str, list[str]] = {}
-    try:
-        workflows = service.list_dadaia_workflows()
-    except Exception:  # noqa: BLE001
-        logger.warning(
-            "_workflow_membership: list_dadaia_workflows() failed; "
-            "continuing with empty workflow membership"
-        )
-        return membership
-    for wf in workflows:
-        for agent_id in dict.fromkeys(step.role for step in wf.steps):
-            bucket = membership.setdefault(agent_id, [])
-            if wf.display_name not in bucket:
-                bucket.append(wf.display_name)
-    return membership
 
 
 def render_api_agents_canonical(
@@ -214,10 +190,6 @@ def render_api_agents_canonical(
         # override (for tests) or by calling the real reader.
         canonical_agents = service.list_canonical_agents()
 
-        # Workflow membership: agent_id -> [workflow display names], derived once
-        # per request by parsing the canonical workflow definitions.
-        membership = _workflow_membership(service)
-
         # Build output — one entry per canonical agent.
         # Filter by runtime: include agent if its telemetry providers list contains
         # the requested runtime.  When runtime="claude" and the agent has no telemetry
@@ -305,7 +277,6 @@ def render_api_agents_canonical(
                     "input_contract": dto.input_contract,
                     "gate_role": dto.gate_role,
                     "phases": _agent_phases(dto.id),
-                    "workflows": list(membership.get(dto.id, [])),
                     "telemetry": telemetry_sub,
                 }
             )

@@ -44,33 +44,3 @@ def test_creates_spec_plan_tasks_under_segment(tmp_path: Path, version: str, seg
 def test_rejects_invalid_input(tmp_path: Path, version: str, segment: str, match: str) -> None:
     with pytest.raises(ValueError, match=match):
         scaffold_release_segment(tmp_path, version, segment)
-
-
-def test_segment_artifacts_pass_the_workflows_own_gates(tmp_path: Path) -> None:
-    """Bug scaffold-artifacts-fail-own-workflow-gates (regression pin): a scaffolded
-    segment's PLAN.md satisfies the plan dependency-table lint and the TASKS command
-    hygiene lint, and every task line matches the implementation pipeline's marker
-    grammar — a template regression must fail HERE, not in a consumer workflow run."""
-    from types import SimpleNamespace
-
-    from dadaia_workspace.features.lifecycle.pipeline import _TASK_MARKER_LINE_RES
-    from dadaia_workspace.features.lifecycle.workflows.release_definition import (
-        ReleaseDefinitionWorkflow,
-    )
-
-    res = scaffold_release_segment(tmp_path, "v0.1.6", "alpha-1")
-    assert res.errors == []
-    stub = SimpleNamespace(
-        _selector=SimpleNamespace(spec_context=SimpleNamespace(specs_dir=tmp_path)),
-        _release_id="v0.1.6/alpha-1",
-    )
-    assert ReleaseDefinitionWorkflow._validate_plan_dependency_table(stub) is None
-    assert ReleaseDefinitionWorkflow._validate_tasks_command_hygiene(stub) is None
-
-    tasks_text = (tmp_path / "releases" / "v0.1.6" / "alpha-1" / "TASKS.md").read_text(
-        encoding="utf-8"
-    )
-    task_lines = [ln for ln in tasks_text.splitlines() if ln.lstrip().startswith("- [")]
-    assert task_lines, "segment TASKS stub must carry at least one task line"
-    for line in task_lines:
-        assert any(rx.search(line) for rx in _TASK_MARKER_LINE_RES), line

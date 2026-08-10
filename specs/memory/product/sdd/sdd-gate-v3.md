@@ -15,8 +15,8 @@ tags:
 - enforcement
 - no-locks
 token_estimate: 552
-last_updated: '2026-07-13'
-release_origin: v0.2.3
+last_updated: '2026-08-07'
+release_origin: v0.3.0
 ---
 
 ## Purpose
@@ -41,8 +41,8 @@ Path classes:
 |---|---|
 | ADDITIVE | `specs/bugs`, `specs/backlog`, `specs/audits`, and workspace reports/handoffs/tmp are writable. |
 | MEMORY | Writable only in `DEFINITION` or `CLOSURE`. |
-| FROZEN | Archived specs are never writable. |
-| PROTECTED | Session identity records are fail-closed. |
+| FROZEN | Archived specs are never writable — archive by `git mv`. |
+| PROTECTED | Session identity records and projected law files are fail-closed. |
 | MUTATING | Writable unless this session explicitly resolves to READ mode. |
 
 Mode resolution is environment, then this session's own record, then
@@ -78,9 +78,11 @@ preflight only. A foreign session's bind cannot alter this session's context or 
 
 ## Non-Goals
 
-The hook does not read approval status, task markers, personas, or task write sets.
-Those ordered checks belong to the four dadaia-workflows. It also does not parse
-arbitrary shell strings; git chokepoints provide the independent commit/push boundary.
+The hook does not read approval status, task markers, or task write sets. It constrains
+**what** may be written, never **how** the change was produced — the ordered SDD
+sequence is carried by the specs documents and upheld by the agents. It also does not
+parse arbitrary shell strings; git chokepoints provide the independent commit/push
+boundary.
 
 ## Runtime State
 
@@ -95,4 +97,4 @@ doctor reports and removes them.
 
 ## Dependencies
 
-[[context-management]], [[dadaia-workflows]], [[workspace-doctor]], [[architecture]].
+[[context-management]], [[workspace-doctor]], [[architecture]].

@@ -1,6 +1,6 @@
 """CLI help must render the slug/id constraint intelligibly.
 
-Bug (found by the dd-chain-capture Hermes consumer, recipe F-22 clareza): a Typer
+Bug (found by the sample-consumer Consumer consumer, recipe F-22 clareza): a Typer
 Option/Argument help string that embeds a regex like ``^[a-z][a-z0-9-]+$`` is rendered
 through Rich markup mode, which interprets ``[a-z]`` / ``[a-z0-9-]`` as style tags and
 EATS them — the consumer sees ``Must match ^+$.``, a meaningless pattern. The help must

@@ -1,7 +1,6 @@
 """Built-in L1 agent-model templates + the single resolver (v0.1.65 FR2/FR4).
 
-Analog of ``features/lifecycle/model_profiles.py#_BUILT_IN`` for the Layer-1 agent
-roster: three named :class:`AgentModelTemplate`s (``balanced`` — the default,
+The Layer-1 agent-roster model catalog: three named :class:`AgentModelTemplate`s (``balanced`` — the default,
 ``subscription-saver``, ``max-quality``), each a full 9-core-agent map of
 ``(model, effort)`` — the FR2 table encoded verbatim.
 

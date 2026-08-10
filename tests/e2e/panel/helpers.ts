@@ -58,19 +58,21 @@ export async function gotoPanel(page: Page, options?: { path?: string }): Promis
  * Activate a tab by clicking it and wait for the section to have class "active".
  *
  * v0.1.45 panel redesign: the Agentic (`ops`) tab was deleted along with the
- * agents grid, personas UI, legacy workflow-DAG cards, and the Kanban view.
+ * agents grid, personas UI, and the Kanban view.
  * v0.1.79 panel agentic-layers reorg: the standalone Sessions tab was REMOVED
  * — its cost/telemetry dashboard is now a sub-section rendered inside the
- * `subagents` ("1º Agentic Layer") tabpanel. There is no `#tab-sessions` /
+ * `subagents` ("Agents") tabpanel. There is no `#tab-sessions` /
  * `#section-sessions.active` to wait on any more; use
  * `activateTab(page, 'subagents')` and locate `#section-sessions` within the
  * opened tabpanel (see `activateSessionsSubsection` below). The surviving
- * primary nav is exactly: Projects (`memories`), 2º Agentic Layer
- * (`workflows`), 1º Agentic Layer (`subagents`), Reports, Academy, Servers.
+ * primary nav is exactly: Projects (`memories`), Agents (`subagents`),
+ * Agentic Entities (`entities`), Reports, Academy, Servers (v0.3.0: the
+ * 2º Agentic Layer `workflows` tab died with the workflow engine; `entities`
+ * renders the abstract-entity registry server-side).
  */
 export async function activateTab(
   page: Page,
-  sectionId: 'memories' | 'servers' | 'reports' | 'academy' | 'workflows' | 'subagents'
+  sectionId: 'memories' | 'servers' | 'reports' | 'academy' | 'subagents' | 'entities'
 ): Promise<void> {
   const tabId = `#tab-${sectionId}`;
   await page.click(tabId);
@@ -78,7 +80,7 @@ export async function activateTab(
 }
 
 /**
- * Activate the "1º Agentic Layer" (subagents) tab and wait for the relocated
+ * Activate the "Agents" (subagents) tab and wait for the relocated
  * Sessions cost/telemetry dashboard sub-section to be present in the DOM
  * (v0.1.79 — the Sessions tab merged into this tabpanel).
  */
@@ -87,51 +89,12 @@ export async function activateSessionsSubsection(page: Page): Promise<void> {
   await page.waitForSelector('#section-subagents #section-sessions', { timeout: 8000 });
 }
 
-/**
- * Expand a Workflows-tab diagram card and wait for its inline per-step model
- * pickers to hydrate.
- *
- * v0.1.45 redesign: the Workflows tab LEADS with `.dadaia-wf-catalog` diagram
- * cards, each a native `<details class="dadaia-wf-card" data-workflow="<id>">`.
- * Expanding a card (clicking its `<summary>`) reveals the flow strip
- * (`.dadaia-wf-flux`) and one `.dadaia-wf-step` card per step. The per-step
- * model governance moved INTO the expand: every model-driven step carries a
- * `.wf-step-picker` mount that `workflow-policy.js` hydrates with a `.wfp-picker`
- * (harness segment + `.wfp-profile-select` + diff + reset). There is no longer a
- * separate collapsed "Model policy" matrix.
- *
- * The picker mounts exist in the DOM even while the card is collapsed, but they
- * are only interactable once the `<details>` is open — so any test that clicks a
- * picker must expand its card first.
- */
-export async function expandWorkflowCard(page: Page, workflowId: string): Promise<void> {
-  const card = page.locator(`details.dadaia-wf-card[data-workflow="${workflowId}"]`);
-  await card.waitFor({ state: 'attached', timeout: 8000 });
-  const isOpen = await card.evaluate((el) => (el as HTMLDetailsElement).open);
-  if (!isOpen) {
-    await card.locator('summary.dadaia-wf-card-summary').click();
-  }
-  await page.waitForFunction(
-    (wf) => {
-      const d = document.querySelector(
-        `details.dadaia-wf-card[data-workflow="${wf}"]`
-      ) as HTMLDetailsElement | null;
-      if (!d || !d.open) {
-        return false;
-      }
-      // The inline picker is hydrated by workflow-policy.js after the catalog loads.
-      return !!d.querySelector('.wf-step-picker .wfp-picker');
-    },
-    workflowId,
-    { timeout: 15000 }
-  );
-}
 
 /**
  * Deterministic save wait (FR11, v0.1.65): arm a `waitForResponse` for the
  * matching PUT BEFORE clicking the trigger, then await the 200 response.
  *
- * Rationale: the workflow-policy banner reuses the same `wfp-banner--ok` class
+ * Rationale: the policy banner reuses the same ok-banner class
  * for validate and save outcomes, so a post-save banner assertion can pass
  * instantly against the STALE validate banner while the save PUT is still in
  * flight — any follow-up GET then races the write (the CI flake in

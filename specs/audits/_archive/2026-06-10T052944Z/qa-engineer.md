@@ -42,7 +42,7 @@ Verified:
   location × slug **and** `{one_ctx, two_ctx}` (lines 110–158).
 - `tests/integration/gate/test_classifier_reroot_matrix.py` (T-010-03) — drives the whole
   `gate_policy.evaluate` pipeline (classify → lease) for in-repo paths under both
-  `dadaia-workspace` and `rand-engine` slugs; asserts the lease record stays *absent* for
+  `dadaia-workspace` and `sample-engine` slugs; asserts the lease record stays *absent* for
   ADDITIVE (FR-R1-01) and the holder stays untouched in the incident regression
   (FR-R1-08), on file content, not return values.
 - Two-actor e2e scenario (iii) — two ALIVE contexts mutating disjoint repos concurrently,

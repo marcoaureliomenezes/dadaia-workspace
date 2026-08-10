@@ -1,4 +1,4 @@
-# TASKS — Release v0.2.9 — Hermes real-use convergence (zero-bug gate)
+# TASKS — Release v0.2.9 — Consumer real-use convergence (zero-bug gate)
 
 > **Status:** Aprovado
 
@@ -45,7 +45,7 @@ bug (`codex-backlog-author-no-materialization-regression-040`) reported+resolved
 
 **Owner role:** software-engineer
 
-**Preconditions:** T1 `[x]` (independent in practice; order kept for one-hermes-round batching).
+**Preconditions:** T1 `[x]` (independent in practice; order kept for one-consumer-round batching).
 
 **Write set:**
 
@@ -83,7 +83,7 @@ and `specs doctor --fix`, documented in their help. Register
 
 **Description:**
 
-Reproduce the hermes-observed "release-definition stalled after writing only
+Reproduce the consumer-observed "release-definition stalled after writing only
 SPEC.md with no terminal state/diagnostic". Root-cause (likely a blocked step
 whose `blocked` detail is not persisted/surfaced) and make the terminal state
 honest (completed or blocked with the reason). Register the bug.
@@ -166,11 +166,11 @@ release.
 
 **Validation:**
 
-- Recipe ships in the wheel; hermes reads and executes it.
+- Recipe ships in the wheel; consumer reads and executes it.
 
 ---
 
-- [x] **T7 - Hermes convergence rounds until zero real-use failures**
+- [x] **T7 - Consumer convergence rounds until zero real-use failures**
 
 **Owner role:** qa-engineer
 
@@ -182,7 +182,7 @@ release.
 
 **Description:**
 
-Build the candidate wheel, stage to hermes (`candidate/` + `CANDIDATE.txt`),
+Build the candidate wheel, stage to consumer (`candidate/` + `CANDIDATE.txt`),
 submit the expanded contract round via the task journal + worker socket.
 Root-cause every finding (product bug vs docs/misuse vs false positive), fix
 classes, register bugs, re-run. Iterate until one complete round reports zero
@@ -191,7 +191,7 @@ sibling surfaces before reporting any round done.
 
 **Validation:**
 
-- Final hermes verdict: zero failures on the full real-use matrix.
+- Final consumer verdict: zero failures on the full real-use matrix.
 
 ---
 
@@ -203,13 +203,13 @@ sibling surfaces before reporting any round done.
 
 **Write set:**
 
-- `README.md`, `specs/memory/product/harness/` (hermes support atom or equivalent),
+- `README.md`, `specs/memory/product/harness/` (consumer support atom or equivalent),
   `specs/memory/product/catalog.json`, `specs/memory/product/index.md`,
   `specs/releases/v0.2.9/CLOSURE.md`, `pyproject.toml`
 
 **Description:**
 
-Declare Hermes a supported environment (only after T7's zero round); bump
+Declare Consumer a supported environment (only after T7's zero round); bump
 `pyproject.toml` to 0.4.1; CLOSURE.md with the rounds table; run the standard
 gates (full pytest, ruff, mypy, security review handoff, push, PR, CI,
 release-gate approval, deploy).

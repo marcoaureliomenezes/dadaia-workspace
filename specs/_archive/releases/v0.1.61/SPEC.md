@@ -233,7 +233,7 @@ shipped the reality (v0.1.60 precedent), never phrased as a v0.1.61 change. Scop
 
 ### FR7 — Workspace + archive hygiene (G-21, G-22, G-23, D-2)
 
-- **G-21/G-22:** `dadaia doctor --fix` clears `.mypy_cache/` (ROOT) + the stale `tauan-games` lease (LOCK-GC =
+- **G-21/G-22:** `dadaia doctor --fix` clears `.mypy_cache/` (ROOT) + the stale `sample-games` lease (LOCK-GC =
   SPEC-DOC-029; transient — verify, may already be clear). The `bug-space-war` root entry is **operator triage**
   (operator-created → `root_exceptions.txt`; else relocate) — deferred to the operator in §6, surfaced at ship.
 - **G-23:** the `v0.1.41` residue (`GRILL.md` + `OQ-DECISIONS.md` only) relocated via `git mv` (operator/PM —
@@ -310,7 +310,7 @@ shipped the reality (v0.1.60 precedent), never phrased as a v0.1.61 change. Scop
   passes post-fix, FAILS pre-fix (CI-1/CI-2); the memory-frontmatter schema carries no `agent_tier` (D-1);
   `repos/dadaia-workspace/AGENTS.md` has exactly ONE workspace-law header block (grep: one occurrence of the
   canonical banner line).
-- **AC-8 (workspace/archive hygiene):** workspace doctor shows no ROOT cache issue and no stale `tauan-games`
+- **AC-8 (workspace/archive hygiene):** workspace doctor shows no ROOT cache issue and no stale `sample-games`
   lease; `specs/_archive/releases/v0.1.41/` no longer exists (residue relocated with README breadcrumb);
   `bug-space-war` triage recorded (operator decision or explicitly deferred at ship).
 - **AC-9 (mutation-sanity — per new test, sabotage → FAIL → revert, captured on the task line):** (a) re-inline
@@ -356,7 +356,7 @@ filed as a finding but never tallied; this SPEC restores it) + architecture lane
 | 18 | G-14 public-asset-distribution 13→14 types | LOW | **fixed** | FR1 |
 | 19 | G-15 stale-claim cluster (sdd-gate/specs-doctor/workspace-init/brand) | LOW | **fixed** | FR1 |
 | 20 | G-16 harness-pi auth claim | LOW | **fixed** (qualified) | FR1 |
-| 21 | G-22 stale tauan-games lease | LOW | **fixed** (`doctor --fix`; transient) | FR7 |
+| 21 | G-22 stale sample-games lease | LOW | **fixed** (`doctor --fix`; transient) | FR7 |
 | 22 | TREE-5 + LINT-1 (specs/AGENTS.md drift; estimates/headings) | LOW | **fixed** | FR1 |
 | 23 | G-17 polish cluster (INFO) | INFO | **fixed** (folded) | FR1 |
 | 24 | G-20 audit naming convention | INFO | **fixed** (normalized at archive) | FR8 |

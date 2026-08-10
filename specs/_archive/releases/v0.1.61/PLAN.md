@@ -81,7 +81,7 @@ run after W3. W5 gates+ship; W6 closure carries memory pass B + the disposition 
 
 - **W5 — FR7 + gates + ship (T-61-60).** Owner: software-engineer (gates) + qa-engineer (ship-gate) +
   security-reviewer (push-gate); operator/PM shell for the FR7 items.
-  1. FR7: `dadaia doctor --fix` (`.mypy_cache/`, stale `tauan-games` lease); surface `bug-space-war` to the
+  1. FR7: `dadaia doctor --fix` (`.mypy_cache/`, stale `sample-games` lease); surface `bug-space-war` to the
      operator (record the triage or the explicit deferral); delete stale `dist/` contents; request `git mv` of
      the v0.1.41 residue → `specs/_archive/wip-abandoned/v0.1.41/` + README breadcrumb (operator/PM — `_archive`
      is FROZEN for file tools).

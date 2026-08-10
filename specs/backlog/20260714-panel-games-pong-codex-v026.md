@@ -1,6 +1,7 @@
 ---
 name: panel-games-pong-codex-v026
-status: candidate
+status: rejected
+rejected_reason: "Panel Games surface removed in v0.3.0 (test-only experiment); PI harness support also removed — nothing left to validate."
 opened: 2026-07-14
 owner: project-manager (curates)
 priority: P1
@@ -9,7 +10,7 @@ source: 'operator demand 2026-07-14: expand the panel Games tab to four local ga
 intents:
   - subject:
       kind: code
-      ref: tests/unit/features/panel/test_games_tab.py#test_games_section_has_playable_canvas_surfaces_for_three_games
+      ref: dadaia_workspace/features/panel/views/index.py#render_index
     change: |
       Extend unit coverage for the Games tab to assert the new Breakout switch button,
       `data-game-panel="breakout"` panel rendering, and left/right control paths (keyboard

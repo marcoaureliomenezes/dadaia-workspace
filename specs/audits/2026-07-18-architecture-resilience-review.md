@@ -1,6 +1,6 @@
 # Architecture Resilience Review — the 21-bug retrospective (2026-07-18)
 
-**Mandate (operator):** the Hermes validation cycle surfaced ~21 defects one after
+**Mandate (operator):** the Consumer validation cycle surfaced ~21 defects one after
 another. That pattern is architectural, not incidental. This review classifies every
 defect of the cycle by systemic root cause, names the structural weaknesses, states
 which laws are now enforced in code, and proposes the remaining simplifications.

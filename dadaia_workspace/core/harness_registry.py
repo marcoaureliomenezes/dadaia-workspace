@@ -1,27 +1,16 @@
-"""Typed Layer-1/Layer-2 harness identity registry — ``core/harness_registry.py``.
+"""Typed harness identity registry — ``core/harness_registry.py``.
 
 The **code embodiment** of the agent-runtime roster that ``specs/memory/tech-stack.md``
 ("Agent runtimes") documents as the single source of truth (SPEC-DOC-037). This module
-does not compete with that doc — it *types* it, so the prose distinction "claude is a
-Layer-1 entry harness only; codex/pi are also Layer-2 workers" becomes a typed lookup
-instead of bare string literals scattered across the codebase.
+does not compete with that doc — it *types* the entry-harness roster so no bare string
+literal is scattered across the codebase.
 
-Two distinct rosters live here:
+One roster lives here:
 
 * :data:`L1_ENTRY_HARNESSES` — the Layer-1 *entry* harnesses an operator can drive the
-  workspace from: ``claude``, ``codex``, ``pi``, ``kimi-code``. This is the identity set
+  workspace from: ``claude``, ``codex``, ``kimi-code``. This is the identity set
   the panel runtime-validation and the ``dadaia init --harness`` / projection vocabulary
-  key on. ``kimi-code`` is Layer-1 only — never a Layer-2 worker (v0.2.8).
-* :data:`L2_WORKER_HARNESSES` — the Layer-2 *worker* harnesses a governed workflow step
-  may resolve to: ``codex``, ``pi``. ``claude`` is **never** a Layer-2 worker (cost
-  bound, LAW 1). ``fake`` is the deterministic test adapter and is handled at the
-  pipeline/runtime layer, not in this identity registry.
-
-The Layer-2 model *catalog* lives separately in ``core/harness_models.py`` (the
-``(model_id, effort)`` options per harness). :data:`L2_WORKER_HARNESSES` and
-``harness_models.harnesses()`` are two coincident encodings of the same worker roster;
-a contract test locks them equal (as sets — ``harnesses()`` returns PI-first while this
-registry keeps canonical order ``("codex", "pi")``) so they can never silently fork.
+  key on.
 
 Layering: a pure ``core`` leaf — **stdlib only, no upward import** (import-linter clean).
 Consumed downward by ``infrastructure`` / ``features`` / ``cli``.
@@ -32,13 +21,7 @@ from __future__ import annotations
 #: The Layer-1 entry-harness roster — the harnesses an operator enters the workspace
 #: from. Canonical order (also the ``init --harness all`` / projection order).
 #: ``kimi-code`` (v0.2.8) is Layer-1 only.
-L1_ENTRY_HARNESSES: tuple[str, ...] = ("claude", "codex", "pi", "kimi-code")
-
-#: The Layer-2 worker-harness roster — the harnesses a governed workflow step may resolve
-#: to. ``claude`` is never a Layer-2 worker (cost bound, LAW 1). Canonical order kept
-#: ``("codex", "pi")``; the model catalog (``harness_models.harnesses()``) returns the
-#: same set PI-first — the contract test asserts set-equality, not order.
-L2_WORKER_HARNESSES: tuple[str, ...] = ("codex", "pi")
+L1_ENTRY_HARNESSES: tuple[str, ...] = ("claude", "codex", "kimi-code")
 
 #: The projectable install targets in canonical order: the shared ``agents`` skills root
 #: plus one projection per Layer-1 entry harness. Consumed by ``public_assets.install``'s
@@ -51,30 +34,11 @@ PROJECTION_TARGETS: tuple[str, ...] = ("agents", *L1_ENTRY_HARNESSES)
 INSTALL_TARGETS: frozenset[str] = frozenset({"all", *PROJECTION_TARGETS})
 
 _L1_SET: frozenset[str] = frozenset(L1_ENTRY_HARNESSES)
-_L2_SET: frozenset[str] = frozenset(L2_WORKER_HARNESSES)
 
 
 def is_l1(harness: str) -> bool:
-    """Return ``True`` iff *harness* is a Layer-1 entry harness (``claude``/``codex``/``pi``/``kimi-code``)."""
+    """Return ``True`` iff *harness* is a Layer-1 entry harness (``claude``/``codex``/``kimi-code``)."""
     return harness in _L1_SET
-
-
-def is_l2(harness: str) -> bool:
-    """Return ``True`` iff *harness* is a Layer-2 worker harness (``codex``/``pi``).
-
-    ``is_l2("claude")`` is ``False`` — claude is never a Layer-2 worker (cost bound).
-    """
-    return harness in _L2_SET
-
-
-def can_be_workflow_worker(harness: str) -> bool:
-    """Return ``True`` iff *harness* may run as a governed workflow (Layer-2) worker.
-
-    Equivalent to :func:`is_l2` for the identity roster — ``claude`` can never be a
-    workflow worker. (``fake`` is the deterministic test adapter and is resolved at the
-    pipeline/runtime layer, not through this identity registry.)
-    """
-    return is_l2(harness)
 
 
 def parse_harness_set(value: str) -> tuple[str, ...]:
@@ -86,7 +50,7 @@ def parse_harness_set(value: str) -> tuple[str, ...]:
     input order.
 
     Args:
-        value: the raw selector, e.g. ``"claude"``, ``"codex,pi"``, ``"all"``.
+        value: the raw selector, e.g. ``"claude"``, ``"codex,kimi-code"``, ``"all"``.
 
     Returns:
         The validated harness tuple in canonical L1 order.

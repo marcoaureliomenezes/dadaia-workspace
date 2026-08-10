@@ -10,6 +10,11 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.models.doctor_report import (
+    DoctorLine,
+    DoctorReport,
+    DoctorStatus,
+)
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
@@ -51,7 +56,12 @@ def test_public_stage_install_force_smoke_and_doctor_exit_code_routing(
     force_result = _runner.invoke(app, ["public", "install", "--force"])
     assert force_result.exit_code == 0, force_result.output
 
-    ok_lines = ["[ok] stage:agents/qa-engineer.md", "[not-applicable] codex:config.toml"]
+    ok_lines = DoctorReport(
+        lines=(
+            DoctorLine(DoctorStatus.OK, "stage:agents/qa-engineer.md"),
+            DoctorLine(DoctorStatus.NOT_APPLICABLE, "codex:config.toml"),
+        )
+    )
     with patch("dadaia_workspace.cli.commands.public.container") as mock_container:
         mock_svc = MagicMock()
         mock_svc.doctor.return_value = ok_lines
@@ -68,7 +78,12 @@ def test_public_stage_install_force_smoke_and_doctor_exit_code_routing(
     )
     assert "[ok]" in clean_result.output
 
-    drift_lines = ["[ok] stage:agents/qa-engineer.md", "[drift] claude:rules/some-rule.md"]
+    drift_lines = DoctorReport(
+        lines=(
+            DoctorLine(DoctorStatus.OK, "stage:agents/qa-engineer.md"),
+            DoctorLine(DoctorStatus.DRIFT, "claude:rules/some-rule.md"),
+        )
+    )
     with patch("dadaia_workspace.cli.commands.public.container") as mock_container:
         mock_svc = MagicMock()
         mock_svc.doctor.return_value = drift_lines

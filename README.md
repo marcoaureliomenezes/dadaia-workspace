@@ -6,17 +6,18 @@
 **AI-native workspace management for multi-agent, Spec-Driven Development.**
 
 `dadaia-workspace` gives AI coding agents a structured, governed shared workspace:
-scoped project contexts, a Spec-Driven Development (SDD) lifecycle with deterministic
-gates, a procedural multi-harness **workflow engine** (the *dadaia-workflows*), a
-persona-based agent roster with installable **plugin packs**, canonical agentic-asset
-projection across **four** AI harnesses, and a real-time monitoring panel.
+scoped project contexts, a Spec-Driven Development (SDD) flow with deterministic
+gates, a persona-based agent roster with installable **plugin packs**, canonical
+agentic-asset projection across **four** AI harnesses, and a real-time monitoring
+panel.
 
-It runs agents at **two distinct layers** (explained below) and supports, as
-peers: **Claude Code, Codex, PI (`pi-coding-agent`), and Kimi Code (the `kimi` CLI)**
-at the entry layer, **Codex and PI** as workflow workers, and the **Hermes agent** as
-the canonical consumer and release gate. It is designed to be operated by **humans
-and by agents**: every capability is reachable through a discoverable CLI, and every
-state surface has a machine-readable form.
+It supports, as peer entry harnesses: **Claude Code, Codex,
+and Kimi Code (the `kimi` CLI)**, plus a **consumer-side validation agent** as the
+release gate. There is no separate workflow-engine layer — the ordered SDD flow is
+agent-dispatched, carried out by dispatching the owning agent for each stage against
+the SDD documents, inside whichever entry harness is running. It is designed to be
+operated by **humans and by agents**: every capability is reachable through a
+discoverable CLI, and every state surface has a machine-readable form.
 
 Open source under the MIT license. Source, issues, and contributions:
 [github.com/marcoaureliomenezes/dadaia-workspace](https://github.com/marcoaureliomenezes/dadaia-workspace).
@@ -36,8 +37,8 @@ Requires Python 3.12+.
 ## Quick start
 
 ```bash
-dadaia init                        # bootstrap .dadaia/ + project agent assets (.claude/, .codex/, .pi/, .kimi-code/)
-dadaia init --harness claude,pi    # or scaffold only a subset of harnesses (harness profile)
+dadaia init                        # bootstrap .dadaia/ + project agent assets (.claude/, .codex/, .kimi-code/)
+dadaia init --harness claude,codex # or scaffold only a subset of harnesses (harness profile)
 dadaia doctor                      # health check: contexts, assets, gates, presence
 dadaia panel                       # local dashboard (http://localhost:4999)
 ```
@@ -47,90 +48,74 @@ supports `--help` at every level.
 
 ---
 
-## The two agentic layers
+## The entry harnesses
 
-The single most important concept in the architecture. "Harness" means a different
-thing at each layer — conflating them causes most confusion.
+There is no separate workflow-engine layer. Every agent — whether the operator's own
+entry session or a dispatched sub-agent — runs inside one of the four supported entry
+harnesses, and the ordered SDD flow (backlog definition → release definition →
+implementation with its reviews → audit) is carried out by dispatching the owning
+agent for each stage against the SDD documents (`ACTIVE.md`, SPEC, PLAN, TASKS,
+CLOSURE) — never by a procedural engine.
 
 ```mermaid
 flowchart TB
     OP(["Operator in the terminal"])
-    subgraph L1["LAYER 1 — entry harness (what you launch)"]
+    subgraph L1["Entry harness (what you launch)"]
         direction LR
         CC["claude"]:::h
         CX["codex"]:::h
-        PI["pi"]:::h
         KC["kimi"]:::h
     end
-    GOV["Governance: AGENTS.md read up-tree natively<br/>+ projected .claude/ .codex/ .pi/ .kimi-code/<br/>+ PreToolUse gate (where supported) + git chokepoints"]
-    CLI["dadaia lifecycle &lt;verb&gt; --harness &lt;x&gt;<br/>(a procedural Python workflow)"]
-    subgraph L2["LAYER 2 — dadaia-workflows worker (inside the workflow engine)"]
-        direction LR
-        FK["FAKE (test adapter)"]:::w
-        CXk["CODEX_EXEC"]:::w
-        PIk["PI_HEADLESS"]:::w
-    end
-    OP --> L1 --> GOV
-    L1 -->|"the harness calls the dadaia CLI"| CLI --> L2
-    L2 -->|"git-diff write boundary + git chokepoints"| OUT(["production: code · specs · memory"])
+    GOV["Governance: AGENTS.md read up-tree natively<br/>+ projected .claude/ .codex/ .kimi-code/<br/>+ PreToolUse gate (where supported) + git chokepoints"]
+    DISPATCH["Agent-dispatched SDD flow<br/>(owning agent per stage, against SPEC/PLAN/TASKS)"]
+    OP --> L1 --> GOV --> DISPATCH
+    DISPATCH -->|"git-diff write boundary + git chokepoints"| OUT(["production: code · specs · memory"])
     classDef h fill:#1f6feb,color:#fff,stroke:#1f6feb;
-    classDef w fill:#238636,color:#fff,stroke:#238636;
 ```
 
-- **Layer 1 — the entry harness (the CLI you launch).** The AI coding agent a
-  human launches in the terminal: **Claude Code, Codex, PI (`pi-coding-agent`), or
-  Kimi Code** (the `kimi` CLI). It is governed by the workspace-root `AGENTS.md`
-  (read natively up the directory tree) plus the projected per-runtime asset trees
-  (`.claude/`, `.codex/`, `.pi/`, `.kimi-code/`) and the deterministic gate wiring
-  each harness gets (hooks, rules, skills, sub-agents where the harness supports
-  them). **All four are supported entry harnesses.**
-- **Layer 2 — the workflow engine (the dadaia-workflows).** The four procedural
-  Python workflows invoked through the dadaia CLI — `dadaia lifecycle
-  backlog-definition | release-definition | implementation-reviews | audit`. Each
-  workflow step is executed by a bounded **worker agent**, selected per step behind a
-  single `AgentRuntimePort`. **Supported worker harnesses: Codex (`codex exec`
-  headless) and PI (`pi --mode json` headless) — only these two.** `FAKE` is the
-  deterministic test adapter, not a production worker. Claude Code is **never** a
-  workflow worker (cost bound, LAW 1), and Kimi Code is Layer-1 only.
-
-A harness can exist at one layer and not the other: PI exists at both (a `.pi/`
-Layer-1 projection and a `PI_HEADLESS` Layer-2 worker); Codex is a Layer-1 entry
-harness AND the default Layer-2 worker; Claude Code and Kimi Code are Layer-1 only.
+- **The entry harness (the CLI you launch).** The AI coding agent a human launches
+  in the terminal: **Claude Code, Codex, or Kimi Code** (the
+  `kimi` CLI). It is governed by the workspace-root `AGENTS.md` (read natively up the
+  directory tree) plus the projected per-runtime asset trees (`.claude/`, `.codex/`,
+  `.kimi-code/`) and the deterministic gate wiring each harness gets (hooks,
+  rules, skills, sub-agents where the harness supports them). **All four are
+  supported entry harnesses.**
+- Headless codex sessions (e.g. a dispatched sub-agent) remain bounded by the same
+  **git chokepoints** as any other session — pre-commit presence warning and the
+  pre-push security-verdict gate — regardless of which harness is running.
 
 ---
 
-## Supported harnesses & harness profiles
+## Supported harnesses
 
-| Harness | Layer 1 (entry harness) | Layer 2 (dadaia-workflows worker) |
-|---|---|---|
-| **Claude Code** | ✅ `.claude/` + PreToolUse hook + git chokepoints | ❌ never a workflow worker (cost bound, LAW 1) |
-| **Codex** | ✅ `.codex/` (hooks fire in the interactive TUI; headless `codex exec` is chokepoints-only) | ✅ `CODEX_EXEC` — CLI-headless (`codex exec`) |
-| **PI** (`pi-coding-agent`) | ✅ `.pi/` (no PreToolUse hook → chokepoints-only) | ✅ `PI_HEADLESS` — CLI-headless (`pi --mode json`) |
-| **Kimi Code** (`kimi` CLI) | ✅ `.kimi-code/` + PreToolUse/PostCompact hooks via a managed block in `~/.kimi-code/config.toml` (Kimi Code has no project-level config file) | ❌ Layer-1 only |
+| Harness | Entry harness support |
+|---|---|
+| **Claude Code** | ✅ `.claude/` + PreToolUse hook + git chokepoints |
+| **Codex** | ✅ `.codex/` (hooks fire in the interactive TUI; headless `codex exec` is chokepoints-only) |
+| **Kimi Code** (`kimi` CLI) | ✅ `.kimi-code/` + PreToolUse/PostCompact hooks via a managed block in `~/.kimi-code/config.toml` (Kimi Code has no project-level config file) |
 
-Layer-2 workers are selected per workflow step by the model policy
-(`--harness codex|pi`, or an operator overlay).
+## Consumer validation — the release gate
 
-## Hermes agent — the canonical consumer & release gate
-
-The **Hermes agent** (the hermes-crawler runtime in `dd-chain-capture`) is the
-canonical consumer of dadaia-workspace: it certifies every candidate wheel before
-deploy, and no version is published without its `CERTIFIED_100` verdict. Since
-v0.2.9 it is a declared **supported environment** — meaning its day-to-day
-activities run on dadaia-workspace without product bugs, proven (not assumed):
+A **consumer-side validation agent** running the shipped recipe on a real
+workspace is the release gate of dadaia-workspace: it certifies every candidate
+wheel before deploy, and no version is published without its `CERTIFIED_100`
+verdict. A consumer environment is declared **supported** only when its
+day-to-day activities run on dadaia-workspace without product bugs, proven (not
+assumed):
 
 - The shipped consumer validation recipe
   (`dadaia_workspace/public/data/CONSUMER_VALIDATION_RECIPE.md`) carries a
-  **Real-use matrix (R-01…R-08)** built from the hermes day-to-day inventory:
-  the live Codex chain with per-link artifact proofs, canonical backlog
-  consumption, fresh/old-context doctor-clean repair, terminal-state honesty,
-  bug-ledger round-trip, fake-chain honesty, and the Kimi Code harness surface.
+  **Real-use matrix (R-01…R-08)** built from a real consumer's day-to-day
+  inventory: the live Codex chain with per-link artifact proofs, canonical
+  backlog consumption, fresh/old-context doctor-clean repair, terminal-state
+  honesty, bug-ledger round-trip, fake-chain honesty, and the Kimi Code harness
+  surface.
 - The deterministic certification (structural + F-01…F-26) is necessary but
   **never sufficient alone** — a candidate is green only when the full real-use
   round reports zero failures.
-- Hermes' own bug stream must converge to **zero open bugs** (product fixes land by
-  root-cause class; environment and wrong-usage findings are classified, never
-  patched over).
+- The consumer's own bug stream must converge to **zero open bugs** (product fixes
+  land by root-cause class; environment and wrong-usage findings are classified,
+  never patched over).
 
 **Harness profiles.** `dadaia init --harness <set>` scaffolds only the harnesses you
 use (persisted in `.dadaia/states/harness_profile.json`). `dadaia public install` and
@@ -139,7 +124,7 @@ doctors only `.claude/`, and out-of-profile assets found on disk are surfaced, n
 silently ignored. With no profile, all harnesses are targeted (back-compatible).
 
 All projections are generated from one canonical source at `dadaia_workspace/public/`
-via `dadaia public stage && dadaia public install`. The Claude SDK and PI runtimes are
+via `dadaia public stage && dadaia public install`. Retired runtimes are
 **optional, operator-installed** externals — the build stays offline-first without them.
 
 ---
@@ -185,11 +170,6 @@ harness in the profile; `project-manager` is the Layer-1 coordinator.
 | `design-specialist` | UX/UI, design specs, visual review | `frontend-design` |
 | `devops-engineer` | CI/CD, GitHub Actions, gitflow, deploy | `devops` |
 
-**Personas** are the Layer-2 equivalent of Claude sub-agents: per-role behavioral
-mandates (8 non-PM roles) injected into every workflow step prompt alongside the
-step's instruction fragment, on **every** worker harness. The same role identity
-governs an agent whether it runs interactively in Layer 1 or headless in Layer 2.
-
 ---
 
 ## Plugin packs
@@ -211,40 +191,23 @@ to stubs), and `plugin install` is idempotent.
 
 ---
 
-## dadaia-workflows — the lifecycle engine
+## The SDD flow — agent-dispatched, not engine-run
 
-A **workflow** is procedural Python the `dadaia` CLI runs; each step drives a Layer-2
-worker behind `AgentRuntimePort`. Python owns the state machine, gates, and hygiene —
-agents produce evidence, Python decides whether state advances. Every step prompt is
-assembled from its **fragment** (the step-specific instruction: inputs, task, output
-schema) plus its **persona** (the role's mandate), with role-scoped memory context
-injected from the bound Spec Context.
+There is no workflow engine. The ordered SDD flow has exactly **four** stages —
+backlog definition, release definition, implementation with its reviews, and audit
+— and each is carried out by dispatching the owning agent for that stage (see
+"Agents & personas" above) against the SDD documents themselves:
 
-There are exactly **four** workflows — lean by design, so weaker/cheaper worker
-models produce reliable results from scoped, evidence-grounded prompts:
-
-| Workflow | Verb | Shape |
+| Stage | Entry agent | Governing document(s) |
 |---|---|---|
-| Backlog definition | `dadaia lifecycle backlog-definition` | ONE authoring worker call; a Python review gate validates what actually landed on disk (registry bind + duplicate/conflict classification). `--grill` opts into an evidence-first intake step. |
-| Release definition | `dadaia lifecycle release-definition` | SPEC → merged SPEC review (architecture + QA in one call) → PLAN → PLAN review → TASKS → implementability review → commit gate. A consumed backlog pick skips the scope step; rejected reviews and failed lints auto-revise their create step once in-run. |
-| Implementation + reviews | `dadaia lifecycle implementation-reviews` | implement → ONE combined tri-angle review (QA + security + code) over injected write-set diff + executed test output → close, with a bounded correction loop. |
-| Audit | `dadaia lifecycle audit` | ONE audit_report pass (question, lenses, findings, dispositions); the terminal gate checks referential integrity only. |
+| Backlog definition | `project-manager` (curates), `product-engineer` (reads to author) | `specs/backlog/**` |
+| Release definition | `product-engineer` | SPEC, PLAN, TASKS |
+| Implementation + reviews | surface implementer, then the review trio | TASKS, review handoffs |
+| Audit | `project-auditor` | `specs/audits/**` |
 
-Durable step handoffs are **registered in the Spec Context release folder**
-(`specs/releases/<id>/handoffs/`, backlog runs in `specs/backlog/handoffs/`) — never
-in an opaque runtime path.
-
-```bash
-dadaia lifecycle implementation-reviews --release-id <id> \
-    --harness codex --step-model review_combined=codex-review-deep
-dadaia lifecycle release-definition --release-id <id> --resume-from plan_create
-```
-
-**Model & harness governance.** Which model and harness each workflow step uses is
-resolver-governed: an operator **profile registry** plus per-context **overlays**
-feed a single policy resolver; every run freezes its resolved policy snapshot onto
-the run record. Precedence: CLI flag > overlay > catalog default. The panel's
-Workflows tab renders each workflow's diagram with inline model pickers.
+Durable handoffs from each stage are **registered under the Spec Context**
+(`specs/releases/<id>/handoffs/`, backlog work in `specs/backlog/handoffs/`) —
+never in an opaque runtime path.
 
 ---
 
@@ -321,7 +284,6 @@ dadaia [COMMAND] --help   # always works at every level
 | `dadaia init` | Bootstrap workspace; `--harness` selects the harness profile |
 | `dadaia doctor [--fix]` | Diagnose and repair workspace state (contexts, assets, presence) |
 | `dadaia context` | Manage Spec Context Projects (list, bind, show, …) |
-| `dadaia lifecycle` | The dadaia-workflows engine (see the workflow table above) |
 | `dadaia plugin` | Install and inspect distributed plugin packs |
 | `dadaia ci` | Local CI-equivalent preflight gate + git-hook chokepoints |
 | `dadaia public` | Stage, install (profile-aware), and doctor agentic assets |
@@ -335,7 +297,6 @@ dadaia [COMMAND] --help   # always works at every level
 | `dadaia server` | Dev server port registry |
 | `dadaia academy` | Manage Academy courses |
 | `dadaia migrate` / `clean` / `export` / `import` | Migrations, cleanup, portable archive |
-| `dadaia orchestrate` | Read-only workflow reference docs (execution is `dadaia lifecycle`) |
 | `dadaia panel` | Start the local monitoring panel |
 
 ### Asset projection pipeline
@@ -343,7 +304,7 @@ dadaia [COMMAND] --help   # always works at every level
 ```bash
 dadaia public stage                     # stage canonical assets into .dadaia/agentic/
 dadaia public install --target all      # project to the harness profile (or all)
-dadaia public install --target pi       # project to one runtime (claude|codex|pi|agents)
+dadaia public install --target codex    # project to one runtime (claude|codex|kimi-code|agents)
 dadaia public doctor                    # drift detection: source → staging → projection
 ```
 
@@ -361,11 +322,11 @@ dadaia panel                            # http://localhost:4999
 ```
 
 The panel is a local, loopback-bound dashboard (Host-header guarded, no auth on
-loopback). Tabs: **Workflows** (per-workflow diagram cards with inline model
-pickers), **Projects** (Spec Context Projects with clickable memory chips),
-**Sessions cost dashboard**, **Reports**, **Academy**, **Servers** (the dev server
-registry), and **Games** — four playable canvas games (Snake, Tetris, Pong, Breakout),
-each implemented end-to-end by a Layer-2 worker through the dadaia-workflows. It exposes a no-auth health probe for automated checks:
+loopback). Tabs: **Projects** (Spec Context Projects with clickable memory chips),
+**1º Agentic Layer** (entry-harness sub-agent model/effort policy), **Reports**,
+**Academy**, **Servers** (the dev server registry), and **Games** — four playable
+canvas games (Snake, Tetris, Pong, Breakout), each built agent-dispatched. It exposes
+a no-auth health probe for automated checks:
 
 ```
 GET http://localhost:4999/health   →   {"status": "ok", "version": "<running version>"}

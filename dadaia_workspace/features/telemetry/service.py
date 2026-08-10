@@ -46,7 +46,7 @@ _DEFAULT_STATE_DIR = pathlib.Path("~/.dadaia/state/telemetry").expanduser()
 _DEFAULT_SQLITE_FILENAME = "telemetry.sqlite"
 _DEFAULT_CODEX_PATH = pathlib.Path("~/.codex/state_5.sqlite").expanduser()
 _CLAUDE_PROJECTS_DIR = pathlib.Path("~/.claude/projects").expanduser()
-_DEFAULT_PI_SESSIONS_DIR = pathlib.Path("~/.pi/agent/sessions").expanduser()
+_DEFAULT_KIMI_INDEX = pathlib.Path("~/.kimi-code/session_index.jsonl").expanduser()
 
 
 def _default_refresh_lock() -> TelemetryRefreshLock:
@@ -96,9 +96,9 @@ class TelemetryService:
     reader_factory:
         Callable returning a tuple of reader modules. The first two elements are
         (claude_reader_module, codex_reader_module); an optional third element is
-        the PI reader module (WS-PI-6). Each module must expose its read function
+        the Kimi reader module. Each module must expose its read function
         (read_session_file, read_codex_db, read_pi_sessions respectively). A legacy
-        2-tuple is still accepted — PI ingestion is skipped when no third element
+        2-tuple is still accepted — Kimi ingestion is skipped when no third element
         is present.
     pricing_module:
         The features/telemetry/pricing module (or compatible stub).  Must
@@ -353,11 +353,11 @@ class TelemetryService:
                 self._restrict_owner_only(db_path, is_dir=False)
 
             # The reader factory returns (claude, codex) historically, or
-            # (claude, codex, pi) once the PI reader is wired (WS-PI-6). Unpack
+            # (claude, codex, kimi) once the Kimi reader is wired. Unpack
             # tolerantly so legacy 2-tuple callers keep working unchanged.
             readers = self._reader_factory()
             claude_reader, codex_reader = readers[0], readers[1]
-            pi_reader = readers[2] if len(readers) > 2 else None
+            kimi_reader = readers[2] if len(readers) > 2 else None
             now_iso = datetime.datetime.now(tz=datetime.UTC).isoformat()
 
             # --- Claude reader ---
@@ -382,17 +382,17 @@ class TelemetryService:
             except Exception as exc:  # noqa: BLE001
                 logger.warning("TelemetryService: codex reader error: %s", exc)
 
-            # --- PI reader (WS-PI-6) ---
-            # Ingests PI session metadata from ~/.pi/agent/sessions/ (env
-            # override: DADAIA_PI_SESSIONS_DIR). Degrades to a no-op when the dir
-            # is absent or any IO/parse failure occurs (the reader is graceful).
-            if pi_reader is not None:
-                pi_dir_env = os.environ.get("DADAIA_PI_SESSIONS_DIR")
-                pi_dir = pathlib.Path(pi_dir_env) if pi_dir_env else _DEFAULT_PI_SESSIONS_DIR
+            # --- Kimi reader ---
+            # Ingests Kimi session metadata from ~/.kimi-code/session_index.jsonl
+            # (env override: DADAIA_KIMI_SESSION_INDEX). Degrades to a no-op when
+            # absent or on any IO/parse failure (the reader is graceful).
+            if kimi_reader is not None:
+                kimi_env = os.environ.get("DADAIA_KIMI_SESSION_INDEX")
+                kimi_index = pathlib.Path(kimi_env) if kimi_env else _DEFAULT_KIMI_INDEX
                 try:
-                    pi_reader.read_pi_sessions(pi_dir, dao, now_iso)
+                    kimi_reader.read_kimi_sessions(kimi_index, dao, now_iso)
                 except Exception as exc:  # noqa: BLE001
-                    logger.warning("TelemetryService: pi reader error: %s", exc)
+                    logger.warning("TelemetryService: kimi reader error: %s", exc)
 
             # --- Cost backfill ---
             self._backfill_costs(dao, now_iso)

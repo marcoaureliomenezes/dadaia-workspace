@@ -209,7 +209,7 @@ def test_repack_returns_none_for_editable_install(tmp_path: Path) -> None:
 def test_bootstrap_falls_back_to_repacked_wheel_when_index_cannot_resolve(
     tmp_path: Path, recorder: _Recorder, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The Hermes-consumer scenario: installed 0.X.Y is not on the index → repack + install."""
+    """The Consumer-consumer scenario: installed 0.X.Y is not on the index → repack + install."""
     import subprocess as _subprocess
 
     mgr = VenvPythonEnvironmentManager()
@@ -258,7 +258,7 @@ def test_bootstrap_error_names_escape_hatch_when_repack_also_unavailable(
     assert "DADAIA_BOOTSTRAP_PACKAGE" in str(excinfo.value)
 
 
-# ── bug init-succeeds-after-provider-bootstrap-failure (Hermes live canary) ─────────
+# ── bug init-succeeds-after-provider-bootstrap-failure (Consumer live canary) ─────────
 #
 # init used to leak pip's raw "ERROR: Could not find a version..." into its output while
 # the repack fallback quietly saved the bootstrap — indistinguishable, for a consumer,
@@ -349,7 +349,7 @@ def test_verify_venv_provider_uses_clean_env_and_checks_exact_version(
 def test_venv_create_oserror_becomes_clean_bootstrap_error_not_raw_traceback(
     tmp_path: Path, recorder: _Recorder, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Bug r3b-portability-import-venv-permission (Hermes R3-B, F-16/F-22 class).
+    """Bug r3b-portability-import-venv-permission (Consumer R3-B, F-16/F-22 class).
 
     ``dadaia import`` restored a workspace onto a **noexec** filesystem: ``venv.create``
     got far enough to write ``bin/python3.13`` and then died in ``ensurepip`` with

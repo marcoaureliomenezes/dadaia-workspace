@@ -61,7 +61,6 @@ def test_build_service_succeeds_table(tmp_path: Path) -> None:
     from dadaia_workspace.features.public.service import PublicAssetService
     from dadaia_workspace.features.repos.service import ReposService
     from dadaia_workspace.features.spec_context.doctor import DoctorService
-    from dadaia_workspace.features.workflows.service import WorkflowsService
     from dadaia_workspace.features.workspace.service import WorkspaceService
 
     # No initialization required.
@@ -72,7 +71,6 @@ def test_build_service_succeeds_table(tmp_path: Path) -> None:
     _init_states(tmp_path)
     assert container.build_spec_context_service(tmp_path) is not None
     assert container.build_academy_service(tmp_path) is not None
-    assert isinstance(container.build_workflow_catalog_service(tmp_path), WorkflowsService)
     assert isinstance(container.build_export_service(tmp_path), ExportService)
     assert isinstance(container.build_doctor_service(tmp_path), DoctorService)
 
@@ -162,82 +160,3 @@ def test_build_doctor_service_wires_pid_probe_dead_holder_reclaimed(tmp_path: Pa
 # ---------------------------------------------------------------------------
 # T-28-A-08 — governance layer composition (registry / store / resolver)
 # ---------------------------------------------------------------------------
-
-
-def test_build_workflow_model_profile_registry_catalog_and_policy_store(tmp_path: Path) -> None:
-    catalog = container.build_workflow_model_profile_registry()
-    impl = catalog.workflow("implementation_reviews")
-    assert impl is not None
-    assert [s.label for s in impl.steps] == [
-        "implement",
-        "review_combined",
-        "close",
-    ]
-
-    with pytest.raises(WorkspaceNotInitializedError):
-        container.build_workflow_model_policy_store(tmp_path)
-
-    _init_states(tmp_path)
-    store = container.build_workflow_model_policy_store(tmp_path)
-    assert store.path == tmp_path / ".dadaia" / "states" / "workflow_model_policy.json"
-
-
-def test_build_workflow_policy_resolver_defaults_and_overlay(tmp_path: Path) -> None:
-    from dadaia_workspace.core.models.workflow_execution import PolicySource
-
-    _init_states(tmp_path)
-    resolver = container.build_workflow_policy_resolver(tmp_path)
-    snapshot = resolver.resolve("implementation_reviews", context="default")
-    impl = snapshot.step("implement")
-    assert impl is not None
-    assert impl.source is PolicySource.LIBRARY_DEFAULT
-    assert impl.model_profile == "codex-implementation-standard"
-
-    store = container.build_workflow_model_policy_store(tmp_path)
-    overlay = store.parse(
-        {
-            "schema_version": "workflow-model-policy-v1",
-            "policy_id": "default",
-            "contexts": {
-                "default": {
-                    "workflows": {
-                        "implementation_reviews": {"steps": {"implement": "codex-review-deep"}}
-                    }
-                }
-            },
-        }
-    )
-    store.save(overlay)
-
-    overlay_resolver = container.build_workflow_policy_resolver(tmp_path)
-    overlay_impl = overlay_resolver.resolve("implementation_reviews", context="default").step(
-        "implement"
-    )
-    assert overlay_impl is not None
-    assert overlay_impl.model_profile == "codex-review-deep"
-
-    # An invalid (unparseable) overlay file raises rather than silently degrading.
-    bad_ws = tmp_path.parent / (tmp_path.name + "-bad-overlay")
-    _init_states(bad_ws)
-    bad = bad_ws / ".dadaia" / "states" / "workflow_model_policy.json"
-    bad.write_text("{ not valid json", encoding="utf-8")
-    from dadaia_workspace.core.models.workflow_execution import (
-        WorkflowModelPolicyStoreError,
-    )
-
-    with pytest.raises(WorkflowModelPolicyStoreError):
-        container.build_workflow_policy_resolver(bad_ws)
-
-
-def test_build_lifecycle_pipeline_accepts_policy_snapshot(tmp_path: Path) -> None:
-    _init_states(tmp_path)
-    (tmp_path / "repos").mkdir(exist_ok=True)
-    resolver = container.build_workflow_policy_resolver(tmp_path)
-    snapshot = resolver.resolve("implementation_reviews", context="default")
-    pipe = container.build_lifecycle_pipeline(
-        tmp_path,
-        context="dadaia-workspace",
-        release_id="v0.1.28",
-        policy_snapshot=snapshot,
-    )
-    assert pipe is not None

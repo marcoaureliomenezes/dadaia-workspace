@@ -114,7 +114,7 @@ def test_second_session_write_surfaces_advisory_naming_the_other_session(tmp_pat
     assert result_b.returncode == 0, result_b.stderr
     # ALLOW: no block envelope on stdout.
     assert result_b.block_envelope() is None
-    # Bug pre-gate-drops-live-presence-advisory-042 (Hermes R1-B): the doctrine
+    # Bug pre-gate-drops-live-presence-advisory-042 (Consumer R1-B): the doctrine
     # MANDATES the throttled advisory on detection — a neutral allow envelope that
     # swallows it blinds concurrency diagnosis. The advisory rides the allow
     # envelope's systemMessage and names the other live session.

@@ -2,10 +2,10 @@
 slug: agent-monitoring
 title: agent-monitoring
 category: product
-tldr: stdlib-only local telemetry (Claude/Codex/PI sessions) → panel Sessions tab
+tldr: stdlib-only local telemetry (Claude/Codex/Kimi sessions) → panel Sessions tab
   + /api/agents; allowlist gate preserves privacy.
 summary: stdlib-only local telemetry consuming Claude Code jsonl + Codex sqlite
-  (~/.codex/state_5.sqlite) + PI session jsonl (~/.pi/agent/sessions/); feeds the
+  (~/.codex/state_5.sqlite) + Kimi session index (~/.kimi-code/session_index.jsonl); feeds the
   panel's Sessions tab and the /api/agents and /api/sessions endpoints; a hardcoded
   allowlist gate preserves privacy by construction; endpoints served with no
   credential behind the panel's loopback bind + Host allowlist.
@@ -24,7 +24,7 @@ CLI surface: integrated into `dadaia panel` (Sessions tab + endpoints `/api/agen
 
 Local agent telemetry consumed exclusively from the operator's files (Claude Code `~/.claude/projects/*.jsonl` + Codex `~/.codex/state_5.sqlite`) — zero remote APIs, zero Node dependencies, zero `ccusage`. The `features/telemetry/` module (peer of `features/panel/`) materializes a local SQLite layer (`~/.dadaia/state/telemetry/telemetry.sqlite`) with WAL + foreign keys + schema versioned via `PRAGMA user_version`, and exposes the `/api/agents` (+ drill-down `/api/agents/{id}/sessions`) and `/api/sessions` endpoints consumed by the [[panel]] Sessions tab — served **with no credential**, behind the panel's loopback bind + Host allowlist.
 
-**The three telemetry runtimes are `{claude, codex, pi}`.** `reader/pi.py` ingests PI session metadata from `~/.pi/agent/sessions/` (jsonl per dir-slug) and the `PiRuntimeAdapter` (`ADAPTER_REGISTRY["pi"]`, `aggregator/runtimes.py`) does enrichment + liveness by session-file mtime, mirroring the Claude/Codex posture; cost is unknown for PI (no per-event pricing) ⇒ `cumulative_cost_usd=None`/`cost_known=False`, never faked. Invariant T1: the reader reads only `session`/`model_change`/`thinking_level_change` lines (id, cwd, timestamp, modelId, provider) and **excludes the entire `message` line** (no body/content), degrading idle on IO/parse failure. PI sessions contribute to the Sessions dashboard aggregate when a real local source exists.
+**The three telemetry runtimes are `{claude, codex, kimi-code}`.** `reader/kimi.py` ingests Kimi session metadata from `~/.kimi-code/session_index.jsonl` (sessionId, sessionDir, workDir) and the `KimiRuntimeAdapter` (`ADAPTER_REGISTRY["kimi-code"]`, `aggregator/runtimes.py`) does enrichment + liveness by session-directory mtime, mirroring the Claude/Codex posture; cost is unknown for Kimi (no per-event pricing) ⇒ `cumulative_cost_usd=None`/`cost_known=False`, never faked. Invariant T1: the reader reads only the index metadata and never opens session content, degrading gracefully on IO/parse failure.
 
 The pragmatized factory `store/schema.open_connection` (WAL + synchronous=NORMAL + foreign_keys) **is wired into the real connection paths** (since v0.1.52 — `features/telemetry/service.py`, `aggregator/queries.py`); a corrupt database at boot degrades to the 503 "no-telemetry" mode described in the usage flow.
 
@@ -47,7 +47,7 @@ flowchart LR
     SVC -.cache miss.-> RFR[refresh: lock+read+filter+insert]
     RFR -->|reader factory| CR[reader/claude.py jsonl]
     RFR -->|reader factory| CX[reader/codex.py sqlite RO]
-    RFR -->|reader factory| PIr[reader/pi.py jsonl metadata]
+    RFR -->|reader factory| KIr[reader/kimi.py index metadata]
     CR -->|allowlist gate T1| ALW[reader/allowlist.py]
     CX -->|allowlist gate T1| ALW
     ALW -->|approved keys| DAO[store/dao.py]
@@ -68,10 +68,10 @@ Without this module, `ccusage` (npm) was the only alternative: an external Node 
 
 ## Runtime state touched
 
-  * **Read**: `~/.claude/projects/*/.jsonl` (Claude Code transcripts) incremental tail with `byte_offset` checkpoint in `reader_state` + inode detection for rotation; `~/.codex/state_5.sqlite` (default; env-overridable) via `sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=5.0)` with defensive column selection; `~/.pi/agent/sessions/` (PI session jsonl per dir-slug, metadata-only, T1). Telemetry does NOT ingest workflows — workflow ingestion was removed (the panel reads workflows from the canonical store; [[panel]]).
+  * **Read**: `~/.claude/projects/*/.jsonl` (Claude Code transcripts) incremental tail with `byte_offset` checkpoint in `reader_state` + inode detection for rotation; `~/.codex/state_5.sqlite` (default; env-overridable) via `sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=5.0)` with defensive column selection; `~/.kimi-code/session_index.jsonl` (Kimi session index, metadata-only, T1). Telemetry does NOT ingest workflows — workflow ingestion was removed (the panel reads workflows from the canonical store; [[panel]]).
   * **Read+Write**: `~/.dadaia/state/telemetry/telemetry.sqlite` (chmod 600, dir 0o700) with schema `PRAGMA user_version=6` (`store/schema.py`, migrations 1→6): 4 tables (`reader_state`, `sessions`, `agents`, `events`) + 6 indices — migration 6 dropped the dead `workflows`/`workflow_agents` tables (workflow data moved to the canonical store). WAL + synchronous=NORMAL + foreign_keys=ON. **NO** content column (`content`/`text`/`messages`/`snapshot`/`thinking`/`prompt`/`response`) — blocked by construction via the allowlist gate.
   * **Read+Write**: `~/.dadaia/state/telemetry/telemetry.lock` — process lock via `fcntl.flock` prevents concurrent refresh. (There is no token file: the panel is no-auth; no `panel.token` residue remains in `features/telemetry/` — the tracked cleanup completed.)
-  * **HTTP routes**: `GET /api/sessions?runtime=…` (aggregate-only envelope), `GET /api/agents` (query params: `limit`, `context`, `days`), `GET /api/agents/{id}/sessions` (pagination), and `/api/agents/{id}/prompt` (agent-prompt surface). Workflow presentation belongs to the panel's `2º Agentic Layer` and has no separate `/api/workflows` endpoint. All routes are served **with no credential** behind the loopback bind + Host allowlist ([[panel]]), with `X-Content-Type-Options: nosniff` on JSON.
+  * **HTTP routes**: `GET /api/sessions?runtime=…` (aggregate-only envelope), `GET /api/agents` (query params: `limit`, `context`, `days`), `GET /api/agents/{id}/sessions` (pagination), and `/api/agents/{id}/prompt` (agent-prompt surface). All routes are served **with no credential** behind the loopback bind + Host allowlist ([[panel]]), with `X-Content-Type-Options: nosniff` on JSON.
   * **Retention**: none — no retention/compaction/deletion machinery exists and there is no daily-aggregate table; raw events accumulate in `events` indefinitely. The only 180-day figure is the aggregation-query default `window_days=180` (`features/telemetry/service.py`), surfaced as the `days` query param default.
   * **Guard**: `os.getuid() == 0` refuses to start the TelemetryService (devops T6 — does not read other users' `~/.claude/projects/`).
 

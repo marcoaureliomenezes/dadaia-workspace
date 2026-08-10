@@ -35,7 +35,8 @@
   }
 
   var templates = [];        // [{id, label, default, assignments}]
-  var models = [];           // registry claude ids
+  var models = [];           // registry claude ids (canonical storage vocabulary)
+  var modelsByHarness = {};  // harness -> {claudeId: harness-native display id}
   var efforts = [];          // low..max
   var policy = null;         // last GET policy document
   var resolved = {};         // last GET resolved roster {agent: {model, effort, source}}
@@ -119,6 +120,38 @@
     sel.innerHTML = out;
   }
 
+  // --- Harness-native model view (bug agents-tab-model-picker-ignores-harness-runtime).
+  // The overlay stores canonical claude ids; the picker DISPLAYS the toggled
+  // harness's native vocabulary (codex -> gpt-*, kimi -> moonshotai/*). Values
+  // submitted stay canonical: a native pick maps back to the first canonical id
+  // that projects to it.
+  function activeRuntime() {
+    return (window.Runtime && window.Runtime.get && window.Runtime.get()) || 'claude';
+  }
+
+  function nativeMap() {
+    return modelsByHarness[activeRuntime()] || null;
+  }
+
+  function renderModelOptions(selectedCanonical) {
+    var map = nativeMap();
+    if (!map || activeRuntime() === 'claude') {
+      return renderSelectOptions(models, selectedCanonical, null);
+    }
+    // Distinct native ids, each carrying a representative canonical value.
+    var seen = {};
+    var out = '';
+    var selectedNative = map[selectedCanonical] || selectedCanonical;
+    for (var i = 0; i < models.length; i++) {
+      var nat = map[models[i]] || models[i];
+      if (seen[nat]) { continue; }
+      seen[nat] = models[i];
+      out += '<option value="' + escHtml(seen[nat]) + '"' +
+        (nat === selectedNative ? ' selected' : '') + '>' + escHtml(nat) + '</option>';
+    }
+    return out;
+  }
+
   function renderSelectOptions(values, selected, emptyLabel) {
     var out = '';
     if (emptyLabel != null) {
@@ -161,7 +194,7 @@
         '<td class="ap-agent-name">' + escHtml(agent) + '</td>' +
         '<td><select class="ap-model-select" aria-label="Model for ' + escHtml(agent) + '" ' +
           'data-ap-agent="' + escHtml(agent) + '">' +
-          renderSelectOptions(models, eff.model, null) + '</select></td>' +
+          renderModelOptions(eff.model) + '</select></td>' +
         '<td><select class="ap-effort-select" aria-label="Effort for ' + escHtml(agent) + '" ' +
           'data-ap-agent="' + escHtml(agent) + '">' + effortSelect + '</select></td>' +
         '<td><span class="ap-source-badge' + (isOverride ? ' ap-source-badge--override' : '') +
@@ -286,6 +319,7 @@
     return fetchJson('/api/agent-model-templates').then(function (res) {
       templates = (res.body && res.body.templates) || [];
       models = (res.body && res.body.models) || [];
+      modelsByHarness = (res.body && res.body.models_by_harness) || {};
       efforts = (res.body && res.body.efforts) || [];
     });
   }
@@ -344,6 +378,11 @@
     }
     loadTemplates().then(loadPolicy).catch(function () {
       setBanner('error', 'Could not load the agent model governance data.');
+    });
+    // The model pickers show the toggled harness's native vocabulary — re-render
+    // on every runtime switch so codex/kimi never display claude-* ids.
+    document.addEventListener('dadaia:runtime-change', function () {
+      if (loaded) { renderRoster(); }
     });
   }
 

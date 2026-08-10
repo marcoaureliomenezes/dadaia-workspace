@@ -34,12 +34,10 @@ _DEF_RE = re.compile(r"^def _?(?:" + "|".join(_CONSOLIDATED_NAMES) + r")\(", re.
 _CROSS_IMPORT = "from tests.unit.infrastructure.test_install_target_goldens import"
 
 # SPEC v0.1.64 FR2: the bespoke normalizers are NOT force-migrated — each carries
-# test-specific scrubs (e.g. test_fragment_gate_goldens' _assert_golden takes a
-# workspace_root and applies fragment-specific normalization). Explicit, cited exemptions
-# only; any NEW file re-declaring a consolidated helper still fails this contract.
+# test-specific scrubs. Explicit, cited exemptions only; any NEW file re-declaring a
+# consolidated helper still fails this contract.
 _BESPOKE_EXEMPT = frozenset(
     {
-        "unit/features/lifecycle/test_fragment_gate_goldens.py",
         "unit/features/panel/test_api_golden.py",
         "unit/features/specs/test_doctor_golden.py",
     }

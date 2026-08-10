@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 
+from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.features.spec_context import presence
 
 __all__ = ["Decision", "PathClass", "classify_path", "evaluate"]
@@ -70,6 +71,22 @@ _PROTECTED_MESSAGE = (
     "here via file tools; use dadaia context commands. Blocked to preserve caller session "
     "identity integrity (SEC-01 / CWE-284)."
 )
+#: Projected LAW files. ``DADAIA.md`` is the workspace system prompt and the sole
+#: always-on rule file the library ships; the ``AGENTS.md``/``CLAUDE.md`` pair is its
+#: scoped/bridge counterpart. In an INSTANTIATED workspace these are human-only: an agent
+#: changes the law by editing ``dadaia_workspace/public/`` and re-projecting, never by
+#: writing the projection. Matched as exact relative paths (workspace root, harness dirs,
+#: and each ``repos/<slug>/`` root) so library sources and test fixtures — which live
+#: deeper — are never caught.
+_LAW_BASENAMES: frozenset[str] = workspace_layout.LAW_BASENAMES
+_LAW_HARNESS_DIRS: frozenset[str] = workspace_layout.LAW_HARNESS_DIRS
+_LAW_MESSAGE = (
+    "[GATE] '{path}' is a projected law file (the workspace system prompt / scoped "
+    "AGENTS.md). In an instantiated workspace only a human operator edits it by hand. "
+    "To change the law, edit the source under dadaia_workspace/public/ and re-project: "
+    "`dadaia public stage && dadaia public install --target all && dadaia public doctor`."
+)
+
 #: Phases in which product-engineer may write memory atoms (FR-P1-13).
 _MEMORY_WRITE_PHASES: frozenset[str] = frozenset({"DEFINITION", "CLOSURE"})
 
@@ -92,7 +109,7 @@ _READ_BLOCK_MESSAGE = (
 #: The default session id when no harness-native id resolves (``hooks/sdd_gate.py``'s
 #: ``resolve_session_id(payload, default="anon-session")``). FR5: an anonymous identity
 #: never creates a presence record — it degrades presence accuracy only, never the write
-#: (v0.1.76, kills the PI anon-session dual-writer facet of the CRITICAL bug at the root).
+#: (v0.1.76, kills the anon-session dual-writer facet of the CRITICAL bug at the root).
 _ANON_SESSION_ID = "anon-session"
 
 
@@ -170,6 +187,7 @@ class PathClass(Enum):
     FROZEN = "FROZEN"
     MUTATING = "MUTATING"
     PROTECTED = "PROTECTED"
+    LAW = "LAW"
     UNGATED = "UNGATED"
 
 
@@ -221,6 +239,22 @@ def _context_relative(p: str) -> str | None:
     return rest[slash + 1 :]
 
 
+def _is_law_path(rel_path: str, ctx_rel: str | None) -> bool:
+    """True when *rel_path* is a PROJECTED law file (see ``_LAW_BASENAMES``).
+
+    Exact-path match only: the workspace root, a harness projection dir, or the root of a
+    ``repos/<slug>/``. Library sources (``dadaia_workspace/public/**``) and test fixtures
+    sit deeper and never match, so authoring the law stays fully writable.
+    """
+    if ctx_rel is not None:
+        return ctx_rel in _LAW_BASENAMES
+    parts = rel_path.split("/")
+    if len(parts) == 1:
+        return parts[0] in _LAW_BASENAMES
+    parent = "/".join(parts[:-1])
+    return parent in _LAW_HARNESS_DIRS and parts[-1] in _LAW_BASENAMES
+
+
 def classify_path(rel_path: str) -> PathClass:
     """Classify a workspace-relative path. Ordered; first match wins (FR-P1-05).
 
@@ -234,6 +268,8 @@ def classify_path(rel_path: str) -> PathClass:
     p = rel_path.lstrip("/")
 
     ctx_rel = _context_relative(p)
+    if _is_law_path(p, ctx_rel):
+        return PathClass.LAW
     if ctx_rel is not None:
         # In-repo: re-root the taxonomy at the context. Unmatched ⇒ MUTATING (never UNGATED).
         return _classify_specs_relative(ctx_rel) or PathClass.MUTATING
@@ -295,6 +331,8 @@ def evaluate(
     cls = classify_path(rel_path)
 
     # PROTECTED is the sole fail-closed path and is evaluated before fail-open branches.
+    if cls == PathClass.LAW:
+        return Decision.BLOCK, _LAW_MESSAGE.format(path=rel_path)
     if cls == PathClass.PROTECTED:
         return Decision.BLOCK, _PROTECTED_MESSAGE
 

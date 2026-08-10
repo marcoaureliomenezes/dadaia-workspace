@@ -147,7 +147,7 @@ Implement RULE F and the one-[-]-warn as specified in PLAN §5.
     `dadaia_workspace/public/**`.
   - `ai-engineer.md` write_allowlist: contains `dadaia_workspace/public/**`
     and no raw Python source paths.
-  - `grep -r "openclaw\|hermes\|burrinhos\|dd-chain\|bothub" dadaia_workspace/public/`
+  - `grep -r "private-infra\|consumer\|sample-project\|sample-chain\|sample-provisioner" dadaia_workspace/public/`
     returns zero matches.
 
 Tighten write allowlists per AC-CONS-3. Remove any consumer-specific project

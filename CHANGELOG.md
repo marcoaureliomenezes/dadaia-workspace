@@ -4,6 +4,31 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] — Unreleased (spec release v0.3.0)
+
+### Removed
+- **Removed the dadaia-workflows engine entirely.** The four `dadaia lifecycle`
+  Python workflows (backlog-definition, release-definition, implementation-reviews,
+  audit), the Layer-2 worker runtimes (codex/pi/claude-sdk/fake adapters,
+  headless adapter base), workflow model policy + profiles, lifecycle fragments and
+  personas assets, the lifecycle run store, workflow handoff models/doctors, the
+  panel Workflows and Model-policy tabs, the `dadaia reports workflow-*` verbs, the
+  certification `workflow-*` checks, `features/ai_surface`, and every related test
+  (~52k LOC total). The SDD flow (Arm A) is now agent-dispatched and
+  document-governed — SPEC/PLAN/TASKS + ACTIVE.md + the deterministic gate and git
+  chokepoints are unchanged. Rationale: the bug-ledger audit measured 200/416 bugs
+  (48%) in this subsystem with a 96% additive-fix ratio and 0.48-day median
+  family recurrence; deleted surface goes quiet, patched surface does not.
+- `dadaia-capabilities-v1` schema replaced by **`dadaia-capabilities-v2`** (breaking):
+  the required `workflows` key and the certification `deterministic_fake_workflows` /
+  `live_harness_canaries_required_for_release` constants are gone.
+
+### Changed
+- **`public_assets` install de-flagged**: `install()` now resolves its arguments once
+  into an immutable `InstallPlan` and runs an ordered, flag-free step pipeline
+  (`OverwritePolicy` replaces `force: bool` internally; `scope`/`only` select steps).
+  Public port signatures and install output are byte-identical.
+
 ## [0.1.24] — Unreleased
 
 ### Removed

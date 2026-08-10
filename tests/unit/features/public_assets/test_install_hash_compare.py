@@ -24,6 +24,7 @@ import pytest
 
 from dadaia_workspace.infrastructure.public_assets import (  # type: ignore[attr-defined]
     FileSystemPublicAssetManager,
+    OverwritePolicy,
     _install_workspace_root_guardrail_pair,
 )
 
@@ -57,13 +58,15 @@ def _run_install(
         _write(src, src_content)
         _write(dst, dst_content)
         mtime_before = dst.stat().st_mtime
-        manager._copy_file(src, dst, force=force, installed=installed)
+        manager._copy_file(src, dst, overwrite=OverwritePolicy.of(force), installed=installed)
         return dst, installed, mtime_before
     if write_class == "write_generated":
         dst = tmp_path / "dst" / "generated.json"
         _write(dst, dst_content)
         mtime_before = dst.stat().st_mtime
-        manager._write_generated(dst, src_content.decode(), force=force, installed=installed)
+        manager._write_generated(
+            dst, src_content.decode(), overwrite=OverwritePolicy.of(force), installed=installed
+        )
         return dst, installed, mtime_before
     # guardrail
     workspace = tmp_path / "ws"

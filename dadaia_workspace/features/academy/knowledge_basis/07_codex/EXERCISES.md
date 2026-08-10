@@ -48,8 +48,8 @@ You inspect a Codex projection and find:
 The operator says: "Why did the audit not fan out automatically?"
 
 Answer: projected agents and skills make roles and operating guidance available; they
-do not trigger execution. Run `dadaia lifecycle audit` for the Python-gated workflow,
-or explicitly ask Codex to spawn/delegate when ad-hoc parallel review is intended.
+do not trigger execution. Explicitly ask Codex to spawn/delegate `project-auditor`, or
+have the operator dispatch it, to start the audit stage of the SDD flow.
 
 ## 4. Review a Rule
 

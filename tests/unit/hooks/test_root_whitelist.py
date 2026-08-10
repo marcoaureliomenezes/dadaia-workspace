@@ -41,7 +41,7 @@ def _run(tmp_path: Path, payload: dict[str, Any]) -> tuple[str, dict[str, Any] |
 def test_block_message_lists_every_whitelisted_entry(tmp_path: Path) -> None:
     """The block reason is DERIVED from the policy — it can never lag the whitelist.
 
-    Hermes-gate bug class (v0.2.8): the message literal omitted `.kimi-code/` while the
+    Consumer-gate bug class (v0.2.8): the message literal omitted `.kimi-code/` while the
     policy already allowed it. Assert the reason names EVERY whitelisted basename.
     """
     from dadaia_workspace.hooks.root_whitelist import _WHITELIST
@@ -88,12 +88,12 @@ def test_block_table(
         ("non_write_tool", None, lambda ws: "x", "Read", "path"),
         ("whitelisted_root_entry", None, lambda ws: ws / "AGENTS.md", "Write", "file_path"),
         (
-            # `.pi` is a whitelisted root entry (PI Layer-2 harness home). A write whose
-            # immediate parent is the workspace root and whose basename is `.pi` must be
-            # ALLOWED; before T-PIO-05 this was BLOCKED.
-            "pi_root_entry",
+            # `.kimi-code` is a whitelisted root entry (Kimi harness home). A write whose
+            # immediate parent is the workspace root and whose basename is `.kimi-code`
+            # must be ALLOWED.
+            "kimi_root_entry",
             None,
-            lambda ws: ws / ".pi",
+            lambda ws: ws / ".kimi-code",
             "Write",
             "file_path",
         ),

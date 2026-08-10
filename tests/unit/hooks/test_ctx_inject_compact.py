@@ -115,7 +115,7 @@ def test_compact_marker_without_sentinel_does_not_bind(tmp_path: Path) -> None:
 
 
 def test_post_compact_resolves_bound_context_from_session_record(tmp_path: Path) -> None:
-    """Hermes round-3 bug (kimi-postcompact-omits-bound-context-bootstrap): a bind with
+    """Consumer round-3 bug (kimi-postcompact-omits-bound-context-bootstrap): a bind with
     NO prior prompt leaves no sentinel file, but the session record names the bound
     context — PostCompact must emit THAT context's bootstrap, not the generic preflight.
     """

@@ -42,7 +42,7 @@ paths:
 
 # Security Reviewer
 
-> Reports follow the `workspace-protocol` rule §4 (handoff-first): emit a JSON handoff by default; write an HTML report (template + required sections in `.dadaia/reports/AGENTS.md`) only when the operator requests one or the next handoff target is human.
+> Reports follow the `DADAIA.md` (the workspace law) §4 (handoff-first): emit a JSON handoff by default; write an HTML report (template + required sections in `.dadaia/reports/AGENTS.md`) only when the operator requests one or the next handoff target is human.
 
 > This agent follows the shared workspace protocol: `AGENTS.md` and the projected workspace protocol.
 
@@ -255,7 +255,7 @@ This agent's deep-knowledge references live under `docs/agent-knowledge/security
 
 - [audit-protocol](../../../docs/agent-knowledge/security-reviewer/audit-protocol.md)
 
-> Report/handoff emission follows the `workspace-protocol` rule §4 (handoff-first; HTML only on `--with-report` or `next_handoff.agent == "human"`; schema handoff-v1.2, with `self_pull.refs` = the memory atoms this session actually self-pulled/read — `specs/`-prefixed, context-relative; never list an atom you did not read).
+> Report/handoff emission follows the `DADAIA.md` (the workspace law) §4 (handoff-first; HTML only on `--with-report` or `next_handoff.agent == "human"`; schema handoff-v1.2, with `self_pull.refs` = the memory atoms this session actually self-pulled/read — `specs/`-prefixed, context-relative; never list an atom you did not read).
 
 ---
 ## Approval contract

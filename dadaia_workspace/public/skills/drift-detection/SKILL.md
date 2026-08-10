@@ -9,9 +9,9 @@ applyTo: ".dadaia/reports/**"
 
 # drift-detection — Memory ↔ Implementation Drift Audit
 
-> **Not the lifecycle enforcement mechanism.** Ordered lifecycle execution (the audit
-> workflow and its gates) is owned by the dadaia-workflows (`dadaia lifecycle`). This
-> skill is reference / manual-operator guidance only.
+> **Not a hook-enforced mechanism.** There is no workflow engine that runs the audit
+> stage or its gates. `project-auditor` drives this protocol directly, dispatched by
+> the operator or a dispatching agent. This skill is the authoritative protocol.
 
 ## Memory Atom Inventory
 

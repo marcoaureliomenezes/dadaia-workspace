@@ -9,7 +9,7 @@ the key — a governance deadlock that blocked the consumer's release preflight 
 
 The migration is the legal repair path (CLI-owned, any phase): strip the top-level
 ``agent_tier`` key from every ``specs/memory/**/*.md`` frontmatter block, byte-preserving
-everything else. Fixture = a REAL dd-chain-capture atom pulled from the reporting remote
+everything else. Fixture = a REAL sample-consumer atom pulled from the reporting remote
 (real-consumer-artifact law).
 """
 
@@ -37,7 +37,7 @@ def _specs(tmp_path: Path, *atoms: tuple[str, str]) -> Path:
 
 
 def test_strips_agent_tier_from_real_consumer_atom(tmp_path: Path) -> None:
-    """The REAL dd-chain-capture atom: ``agent_tier: self-pull`` is removed; every other
+    """The REAL sample-consumer atom: ``agent_tier: self-pull`` is removed; every other
     byte of frontmatter and body is preserved."""
     original = _REAL_ATOM.read_text(encoding="utf-8")
     assert "agent_tier:" in original  # fixture sanity

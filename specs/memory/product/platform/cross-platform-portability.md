@@ -37,7 +37,7 @@ capabilities fail during service construction.
 
 ## Hooks
 
-Harness governance hooks are Python modules. PI invokes them through its trusted
+Harness governance hooks are Python modules. Kimi Code invokes them through user-level
 TypeScript extension. Git chokepoints remain shell scripts because Git for Windows
 ships a compatible shell: `pre-commit-presence-gate.sh` and `pre-push-ci-gate.sh`.
 

@@ -68,7 +68,7 @@ _TS_RE = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2
 
 # The D-CX-9 probe EXECUTES the codex hook wrapper, so its error text is OS-phrased.
 _DCX9_WRAPPER_RE = re.compile(
-    r"^\[error\] codex hook wrapper .*? (\.dadaia/hooks/\S+?):.*\(D-CX-9\)$"
+    r"^\[(?:error|unsupported)\] codex hook wrapper .*? (\.dadaia/hooks/\S+?):.*\(D-CX-9\)$"
 )
 
 # ANSI colour escapes emitted by Rich when it detects (or is forced into) a colour tty.
@@ -93,7 +93,7 @@ def norm_path_line(line: str, ws: Path) -> str:
     scan, no operator denylist)" variant. Both normalize to the bare marker — same
     rationale as the git-dirty exclusion in :func:`is_env_doctor_line`.
     """
-    out = line.replace(ws.as_posix(), "<WS>").replace(str(ws), "<WS>")
+    out = _as_text(line).replace(ws.as_posix(), "<WS>").replace(str(ws), "<WS>")
     out = out.replace(
         "[ok] public-privacy (baseline structural scan, no operator denylist)",
         "[ok] public-privacy",
@@ -114,16 +114,21 @@ def norm_panel_body(body: bytes, ws: Path) -> str:
     return _TS_RE.sub("<TS>", text)
 
 
-def is_env_doctor_line(line: str) -> bool:
+def _as_text(line: object) -> str:
+    """Legacy string view — doctor surfaces now emit typed DoctorLine values."""
+    return line.render() if hasattr(line, "render") else str(line)  # type: ignore[attr-defined]
+
+
+def is_env_doctor_line(line: object) -> bool:
     """True for a doctor line whose content is environmental, not behaviour (leak class 1).
 
     The doctor ``git-dirty`` lines reference the LIVE source-repo working tree (not the
     fixture) and vary between capture and replay — exclude them from goldens.
     """
-    return "git-dirty" in line
+    return "git-dirty" in _as_text(line)
 
 
-def canon_env_line(line: str) -> str:
+def canon_env_line(line: object) -> str:
     """Canonicalize OS-dependent doctor probe text (leak class 3 — the D-CX-9 wrapper).
 
     The D-CX-9 probe EXECUTES the codex hook wrapper, so its error text is the host
@@ -132,7 +137,9 @@ def canon_env_line(line: str) -> str:
     for that wrapper — not the OS's words. Keep the wrapper path, canonicalize the
     reason.
     """
-    return _DCX9_WRAPPER_RE.sub(r"[error] codex hook wrapper probe failed \1 (D-CX-9)", line)
+    return _DCX9_WRAPPER_RE.sub(
+        r"[unsupported] codex hook wrapper probe failed \1 (D-CX-9)", _as_text(line)
+    )
 
 
 def sort_line_lists(obj: object) -> object:
@@ -143,7 +150,7 @@ def sort_line_lists(obj: object) -> object:
     count-preserving. String lines are additionally canonicalized for OS-dependent
     probe text (:func:`canon_env_line`).
     """
-    if isinstance(obj, list) and all(isinstance(x, str) for x in obj):
+    if isinstance(obj, list) and all(isinstance(x, str) or hasattr(x, "render") for x in obj):
         return sorted(canon_env_line(x) for x in obj)
     if isinstance(obj, dict):
         return {k: sort_line_lists(v) for k, v in obj.items()}

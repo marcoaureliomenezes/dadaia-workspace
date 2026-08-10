@@ -1,7 +1,7 @@
 """AC-3 (v0.1.58 FR2) — ``dadaia init --harness <set>`` scaffolds ONLY the chosen harnesses.
 
 RED-first: before FR2 ``dadaia init`` had no ``--harness`` flag and ALWAYS produced the
-all-four scaffold (``.claude`` + ``.codex`` + ``.pi``). This suite pins the harness-aware
+full scaffold (``.claude`` + ``.codex`` + ``.kimi-code``). This suite pins the harness-aware
 behaviour — each L1 harness gets its projection ONLY when named in the set, the default
 (omitted) stays all-four (back-compat), and a bad value is a width-independent Click
 ``BadParameter`` (exit 2, message on stderr, empty stdout). The AC-9(b) mutation-sanity
@@ -39,14 +39,14 @@ def _ctx_inject_commands(claude_dir: Path) -> list[str]:
     ("name", "harness_set", "expect_present", "expect_absent"),
     [
         # AC-9(b) sabotage detector: --harness claude → .claude/ + ctx-inject hook, and
-        # NO .codex/ / .pi/.
-        ("claude_only", "claude", ("claude",), ("codex", "pi")),
-        # --harness codex,pi → .codex/ (+ .dadaia/hooks/codex-*) + .pi/, NO .claude/
-        # agents.
-        ("codex_and_pi", "codex,pi", ("codex", "pi"), ("claude",)),
+        # NO .codex/ / .kimi-code/.
+        ("claude_only", "claude", ("claude",), ("codex", "kimi-code")),
+        # --harness codex,kimi-code → .codex/ (+ .dadaia/hooks/codex-*) + .kimi-code/,
+        # NO .claude/ agents.
+        ("codex_and_kimi", "codex,kimi-code", ("codex", "kimi-code"), ("claude",)),
         # v0.2.8: --harness kimi-code → .kimi-code/ (+ user-level shim/block wiring
-        # redirected by the conftest KIMI_CODE_HOME guard), NO .claude/ / .codex/ / .pi/.
-        ("kimi_only", "kimi-code", ("kimi-code",), ("claude", "codex", "pi")),
+        # redirected by the conftest KIMI_CODE_HOME guard), NO .claude/ / .codex/.
+        ("kimi_only", "kimi-code", ("kimi-code",), ("claude", "codex")),
     ],
 )
 def test_harness_scopes_scaffold(
@@ -88,7 +88,6 @@ def test_harness_omitted_scaffolds_all_four(
 
     assert (tmp_path / ".claude").is_dir()
     assert (tmp_path / ".codex").is_dir()
-    assert (tmp_path / ".pi").is_dir()
     assert (tmp_path / ".kimi-code").is_dir()
 
 

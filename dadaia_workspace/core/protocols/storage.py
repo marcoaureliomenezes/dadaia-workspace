@@ -3,6 +3,8 @@
 from pathlib import Path
 from typing import Literal, Protocol
 
+from dadaia_workspace.core.models.doctor_report import DoctorLine
+
 
 class PublicAssetManager(Protocol):
     def stage(self, workspace_root: Path) -> list[str]:
@@ -24,7 +26,7 @@ class PublicAssetManager(Protocol):
         """Return all public asset names grouped by category directory."""
         ...
 
-    def doctor(self, workspace_root: Path) -> list[str]:
+    def doctor(self, workspace_root: Path) -> list[DoctorLine]:
         """Compare package source, staging, and runtime projections."""
         ...
 

@@ -428,7 +428,7 @@ finds repeated context across personas.
 
 ## Authoring guardrails (apply every time)
 
-- This skill is restricted to `ai-engineer` (`harness-skill-scope` rule). General
+- This skill is restricted to `ai-engineer` (`DADAIA.md` §2 (skill scope)). General
   agents use `harness-primitives`. Phase mapping: ai-engineer / harness literacy.
 - All authoring targets are `dadaia_workspace/public/...` source. Never hand-edit
   `.claude/`, `.codex/`, `.agents/` projections; propagate via

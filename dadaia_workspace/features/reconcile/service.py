@@ -124,14 +124,10 @@ def reconcile_workspace(
         )
         steps.append("public-install")
 
-        public_reports = public_service.doctor(workspace_root)
-        drift = [
-            item
-            for item in public_reports
-            if item.startswith("[missing]") or item.startswith("[drift]")
-        ]
-        if drift:
-            raise RuntimeError("public doctor failed: " + "; ".join(drift[:8]))
+        public_report = public_service.doctor(workspace_root)
+        blocking = [line.render() for line in public_report.lines if line.status.blocking]
+        if blocking:
+            raise RuntimeError("public doctor failed: " + "; ".join(blocking[:8]))
         steps.append("public-doctor")
 
         workspace_issues = doctor_service.check()
@@ -143,7 +139,7 @@ def reconcile_workspace(
         steps.append("workspace-doctor")
 
         capabilities = build_capabilities()
-        if capabilities.get("schema_version") != "dadaia-capabilities-v1":
+        if capabilities.get("schema_version") != "dadaia-capabilities-v2":
             raise RuntimeError("capability canary returned an unsupported schema version")
         if capabilities["provider"]["distribution_version"] != expected_version:
             raise RuntimeError("capability canary does not identify the expected provider")

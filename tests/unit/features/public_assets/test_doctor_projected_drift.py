@@ -19,9 +19,28 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from dadaia_workspace.core.models.doctor_report import (
+    DoctorLine,
+    DoctorReport,
+    DoctorStatus,
+)
 from dadaia_workspace.infrastructure.public_assets import (
     FileSystemPublicAssetManager,
 )
+
+
+def _render_one(line: object) -> str:
+    return line.render() if hasattr(line, "render") else str(line)  # type: ignore[attr-defined]
+
+
+def _rendered(result: object) -> list[str]:
+    """Legacy string view of a typed doctor result (DoctorReport | list[DoctorLine])."""
+    if hasattr(result, "rendered"):
+        return result.rendered()  # type: ignore[attr-defined, no-any-return]
+    return [
+        line.render() if hasattr(line, "render") else str(line)
+        for line in result  # type: ignore[union-attr]
+    ]
 
 
 def _write(path: Path, content: bytes) -> None:
@@ -47,7 +66,7 @@ def test_drift_and_missing_exit_nonzero(tmp_path: Path) -> None:
     _write(staged, b"# new staged content\n")
     _write(projected, b"# old projected content\n")
 
-    line = mgr._compare(staged, projected, "stage:test.md")
+    line = _render_one(mgr._compare(staged, projected, "stage:test.md"))
     assert line.startswith("[drift]"), f"Expected [drift], got: {line!r}"
 
     staged2 = tmp_path / "staged2.md"
@@ -55,7 +74,7 @@ def test_drift_and_missing_exit_nonzero(tmp_path: Path) -> None:
     _write(staged2, b"# some content\n")
     # projected2 does NOT exist
 
-    line2 = mgr._compare(staged2, projected2, "stage:test.md")
+    line2 = _render_one(mgr._compare(staged2, projected2, "stage:test.md"))
     assert line2.startswith("[missing]"), f"Expected [missing], got: {line2!r}"
 
 
@@ -71,7 +90,7 @@ def test_clean_ok_paths_incl_scripts(tmp_path: Path) -> None:
     content = b"# identical content\n"
     _write(staged, content)
     _write(projected, content)
-    line = mgr._compare(staged, projected, "stage:test.md")
+    line = _render_one(mgr._compare(staged, projected, "stage:test.md"))
     assert line.startswith("[ok]"), f"Expected [ok], got: {line!r}"
     assert "[drift]" not in line
     assert "[missing]" not in line
@@ -99,7 +118,7 @@ def test_clean_ok_paths_incl_scripts(tmp_path: Path) -> None:
         f"got expectations: {[lbl for (_, _, lbl, _) in expectations]}"
     )
     src, dst, label, _transform = script_expectations[0]
-    script_line = mgr._compare(src, dst, label)
+    script_line = _render_one(mgr._compare(src, dst, label))
     assert script_line.startswith("[ok]"), (
         f"Expected [ok] for matching scripts, got: {script_line!r}"
     )
@@ -108,20 +127,41 @@ def test_clean_ok_paths_incl_scripts(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     ("reports", "expect_zero"),
     [
-        pytest.param(["[ok] stage:foo.md", "[ok] claude:rules/bar.md"], True, id="all-ok-exits-0"),
         pytest.param(
-            ["[ok] stage:foo.md", "[drift] stage:scripts/hook.sh"],
+            DoctorReport(
+                lines=(
+                    DoctorLine(DoctorStatus.OK, "stage:foo.md"),
+                    DoctorLine(DoctorStatus.OK, "claude:rules/bar.md"),
+                )
+            ),
+            True,
+            id="all-ok-exits-0",
+        ),
+        pytest.param(
+            DoctorReport(
+                lines=(
+                    DoctorLine(DoctorStatus.OK, "stage:foo.md"),
+                    DoctorLine(DoctorStatus.DRIFT, "stage:scripts/hook.sh"),
+                )
+            ),
             False,
             id="drift-exits-nonzero",
         ),
         pytest.param(
-            ["[ok] stage:foo.md", "[missing] claude:rules/bar.md"],
+            DoctorReport(
+                lines=(
+                    DoctorLine(DoctorStatus.OK, "stage:foo.md"),
+                    DoctorLine(DoctorStatus.MISSING, "claude:rules/bar.md"),
+                )
+            ),
             False,
             id="missing-exits-nonzero",
         ),
     ],
 )
-def test_cli_exit_code_propagation(tmp_path: Path, reports: list[str], expect_zero: bool) -> None:
+def test_cli_exit_code_propagation(
+    tmp_path: Path, reports: DoctorReport, expect_zero: bool
+) -> None:
     """The CLI doctor command must propagate [drift]/[missing] to a non-zero exit."""
     from typer.testing import CliRunner
 

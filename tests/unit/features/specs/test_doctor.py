@@ -229,7 +229,7 @@ def test_clean_tree_has_no_errors(tmp_path: Path) -> None:
 
 
 def test_freshly_opened_release_segment_is_doctor_clean(tmp_path: Path) -> None:
-    """Bug fresh-release-scaffold-emits-spec-doctor-warnings-042 (Hermes R1-A): the
+    """Bug fresh-release-scaffold-emits-spec-doctor-warnings-042 (Consumer R1-A): the
     canonical 'specs release open' output — Draft SPEC/PLAN/TASKS with ACTIVE.md
     phase SPEC — instantly drew three SPEC-DOC-004 warnings. Draft IS the legitimate
     state of an authoring-phase release; the scaffolder and the doctor must agree on

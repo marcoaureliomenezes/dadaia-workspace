@@ -150,8 +150,12 @@ class TestStage:
         _manager().stage(workspace)
 
         agentic = workspace / ".dadaia" / "agentic"
-        for subdir in ("agents", "skills", "rules", "scripts", "data"):
+        # ``rules`` is NOT staged: the nine core rules were consolidated into the single
+        # always-on law file (``data/DADAIA.md``), so the family no longer exists as a
+        # core asset dir. Plugin-pack rules stage under ``plugins/<pack>/rules/``.
+        for subdir in ("agents", "skills", "scripts", "data"):
             assert (agentic / subdir).is_dir(), f".dadaia/agentic/{subdir}/ not created by stage"
+        assert (agentic / "data" / "DADAIA.md").is_file(), "the workspace law file is not staged"
 
         manifest_path = agentic / "manifest.json"
         assert manifest_path.exists(), "manifest.json not created"
@@ -319,7 +323,7 @@ class TestDoctor:
         mgr = _manager()
         mgr.install(workspace, target="all", force=True)
 
-        report = mgr.doctor(workspace)
+        report = [line.render() for line in mgr.doctor(workspace)]
 
         failures = [line for line in report if line.startswith(("[drift]", "[missing]"))]
         assert not failures, "Doctor reported failures after clean install:\n" + "\n".join(failures)
@@ -337,7 +341,7 @@ class TestDoctor:
             target.write_text(
                 target.read_text(encoding="utf-8") + "\n# drifted\n", encoding="utf-8"
             )
-            report = mgr.doctor(workspace)
+            report = [line.render() for line in mgr.doctor(workspace)]
             drift_lines = [
                 line for line in report if "[drift]" in line and "software-engineer" in line
             ]
@@ -348,7 +352,7 @@ class TestDoctor:
         else:
             target = workspace / ".claude" / "agents" / "qa-engineer.md"
             target.unlink()
-            report = mgr.doctor(workspace)
+            report = [line.render() for line in mgr.doctor(workspace)]
             missing_lines = [
                 line for line in report if "[missing]" in line and "qa-engineer" in line
             ]
@@ -416,7 +420,7 @@ def _assert_profile_doctor_green(workspace: Path, monkeypatch: pytest.MonkeyPatc
       blocker-free);
     * CLI surface — ``dadaia public doctor`` exits 0 (the mechanical Q7 second clause).
     """
-    report = _manager().doctor(workspace)
+    report = [line.render() for line in _manager().doctor(workspace)]
     blockers = _doctor_blockers(report)
     assert blockers == [], "profile doctor must be blocker-free, got:\n" + "\n".join(blockers)
 
@@ -425,27 +429,9 @@ def _assert_profile_doctor_green(workspace: Path, monkeypatch: pytest.MonkeyPatc
     assert result.exit_code == 0, result.output
 
 
-@pytest.fixture(scope="module")
-def _staged_pi_files() -> set[str]:
-    """FR5/Q4 shared fixture — stage the asset set ONCE and derive the canonical `.pi/`
-    projection file set, reused across the profile E2Es (avoids an explicit per-profile
-    stage). Each profile's `init --harness X` re-stages internally (0.12s — negligible);
-    this fixture is the single reused expectation baseline for the pi projection.
-    """
-    import tempfile
-
-    with tempfile.TemporaryDirectory(prefix="dadaia-staged-template-") as tmp:
-        ws = Path(tmp) / "ws"
-        _manager().stage(ws)
-        pi_base = ws / ".dadaia" / "agentic" / "pi"
-        return {p.relative_to(pi_base).as_posix() for p in pi_base.rglob("*") if p.is_file()}
-
-
 class TestPerProfileInit:
-    def test_claude_only_profile(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _staged_pi_files: set[str]
-    ) -> None:
-        """AC-8 claude-only: `.claude/` (agents/skills/rules) + ctx-inject hook; NO .codex/ NO .pi/."""
+    def test_claude_only_profile(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """AC-8 claude-only: `.claude/` (agents/skills/rules) + ctx-inject hook; NO .codex/ NO .kimi-code/."""
         ws = tmp_path / "claude_only"
         monkeypatch.chdir(tmp_path)
         result = _run_init(ws, "claude")
@@ -459,15 +445,13 @@ class TestPerProfileInit:
         )
         # AC-9(f) discriminating anchor: the two un-chosen harnesses get NO projection dir.
         assert not (ws / ".codex").exists(), "codex must NOT be scaffolded for a claude profile"
-        assert not (ws / ".pi").exists(), "pi must NOT be scaffolded for a claude profile"
+        assert not (ws / ".kimi-code").exists(), "kimi must NOT be scaffolded for a claude profile"
 
         assert _persisted_profile(ws) == ["claude"]
         _assert_profile_doctor_green(ws, monkeypatch)
 
-    def test_codex_only_profile(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _staged_pi_files: set[str]
-    ) -> None:
-        """AC-8 codex-only: `.codex/` (agents/config/rules/hooks.json) + `.dadaia/hooks/codex-*`; NO .claude/ NO .pi/."""
+    def test_codex_only_profile(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """AC-8 codex-only: `.codex/` (agents/config/rules/hooks.json) + `.dadaia/hooks/codex-*`; NO .claude/ NO .kimi-code/."""
         ws = tmp_path / "codex_only"
         monkeypatch.chdir(tmp_path)
         result = _run_init(ws, "codex")
@@ -482,46 +466,15 @@ class TestPerProfileInit:
         assert codex_wrappers, "expected .dadaia/hooks/codex-* wrappers for a codex profile"
         # un-chosen harnesses get no projection.
         assert not (ws / ".claude").exists(), "claude must NOT be scaffolded for a codex profile"
-        assert not (ws / ".pi").exists(), "pi must NOT be scaffolded for a codex profile"
+        assert not (ws / ".kimi-code").exists(), "kimi must NOT be scaffolded for a codex profile"
 
         assert _persisted_profile(ws) == ["codex"]
         # Green requires the W5 boundary completion (runtime_expectations claude:* loop scoped);
         # without it a codex-only doctor emits ×40 [missing] claude:* lines and exits 1.
         _assert_profile_doctor_green(ws, monkeypatch)
 
-    def test_pi_only_profile(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _staged_pi_files: set[str]
-    ) -> None:
-        """AC-8 pi-only: `.pi/` post-trust projection; NO .claude/ NO .codex/."""
-        ws = tmp_path / "pi_only"
-        monkeypatch.chdir(tmp_path)
-        result = _run_init(ws, "pi")
-        assert result.exit_code == 0, result.output
-
-        # EXACT structure — the `.pi/` projection matches the staged pi file set (shared fixture).
-        assert (ws / ".pi").is_dir(), ".pi/ missing for a pi profile"
-        projected_pi = {
-            p.relative_to(ws / ".pi").as_posix() for p in (ws / ".pi").rglob("*") if p.is_file()
-        }
-        assert projected_pi == _staged_pi_files, (
-            f".pi/ projection mismatch.\n  Missing: {sorted(_staged_pi_files - projected_pi)}\n"
-            f"  Extra:   {sorted(projected_pi - _staged_pi_files)}"
-        )
-        # un-chosen harnesses get no projection.
-        assert not (ws / ".claude").exists(), "claude must NOT be scaffolded for a pi profile"
-        assert not (ws / ".codex").exists(), "codex must NOT be scaffolded for a pi profile"
-
-        assert _persisted_profile(ws) == ["pi"]
-
-        # Scripts boundary (v0.2.8 fix): the harness-independent chokepoint scripts
-        # install for EVERY L1 target, so a pi-only tree is doctor-green with no
-        # fixture scaffolding (the old {all, claude, codex} gate left it red).
-        _assert_profile_doctor_green(ws, monkeypatch)
-
-    def test_kimi_code_only_profile(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _staged_pi_files: set[str]
-    ) -> None:
-        """AC-8 kimi-code-only (v0.2.8): `.kimi-code/` projection; NO .claude/ NO .codex/ NO .pi/."""
+    def test_kimi_code_only_profile(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """AC-8 kimi-code-only (v0.2.8): `.kimi-code/` projection; NO .claude/ NO .codex/ NO .kimi-code/."""
         ws = tmp_path / "kimi_code_only"
         monkeypatch.chdir(tmp_path)
         result = _run_init(ws, "kimi-code")
@@ -534,16 +487,15 @@ class TestPerProfileInit:
             "claude must NOT be scaffolded for a kimi-code profile"
         )
         assert not (ws / ".codex").exists(), "codex must NOT be scaffolded for a kimi-code profile"
-        assert not (ws / ".pi").exists(), "pi must NOT be scaffolded for a kimi-code profile"
 
         assert _persisted_profile(ws) == ["kimi-code"]
 
-        # Same scripts boundary as the pi-only profile: chokepoint scripts install for
+        # Same scripts boundary: chokepoint scripts install for
         # every L1 target (v0.2.8), so the kimi-only tree is doctor-green directly.
         _assert_profile_doctor_green(ws, monkeypatch)
 
-    def test_default_no_flag_scaffolds_all_four(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _staged_pi_files: set[str]
+    def test_default_no_flag_scaffolds_all_three(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """AC-8 all-harness: default (no `--harness`) is still all-four; green doctor (back-compat)."""
         ws = tmp_path / "all_default"
@@ -553,11 +505,10 @@ class TestPerProfileInit:
 
         assert (ws / ".claude" / "agents").is_dir()
         assert (ws / ".codex").is_dir()
-        assert (ws / ".pi").is_dir()
         assert (ws / ".kimi-code").is_dir()
         assert _ctx_inject_registered(ws / ".claude")
         # The all-four install path also lays the chokepoint scripts (target=="all").
         assert (ws / ".dadaia" / "scripts").is_dir()
 
-        assert _persisted_profile(ws) == ["claude", "codex", "pi", "kimi-code"]
+        assert _persisted_profile(ws) == ["claude", "codex", "kimi-code"]
         _assert_profile_doctor_green(ws, monkeypatch)

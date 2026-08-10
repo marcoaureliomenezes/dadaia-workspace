@@ -16,7 +16,7 @@ from dadaia_workspace.features.spec_context.gate_policy import (
 # The default (self-hosting) context slug and a non-default consumer slug. The class of a
 # path must depend only on its context-relative remainder, never on which slug it is.
 _DEFAULT_SLUG = "dadaia-workspace"
-_NONDEFAULT_SLUG = "rand-engine"
+_NONDEFAULT_SLUG = "sample-engine"
 
 
 def _in_repo(slug: str, ctx_rel: str) -> str:

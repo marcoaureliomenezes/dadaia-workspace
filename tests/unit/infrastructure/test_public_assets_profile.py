@@ -8,8 +8,8 @@ now scopes install-all and the doctor's inline projection block:
   ``--target X`` always overrides.
 * **Doctor scopes the inline ``_compare`` block** — claude ``settings.json`` only when
   ``claude`` in profile; the codex projection + codex-parity drift (``check_codex_drift``
-  D-CX-1..10 / ``codex_trust_boundary_info``) only when ``codex`` in profile; the ``.pi/``
-  tree only when ``pi`` in profile. The absent-profile path stays **byte-identical** to the
+  D-CX-1..10 / ``codex_trust_boundary_info``) only when ``codex`` in profile; the
+  ``.kimi-code/`` tree only when ``kimi-code`` in profile. The absent-profile path stays **byte-identical** to the
   W1 all-four doctor golden (Q2/A4).
 * **Out-of-profile-but-present is never silent (A3)** — a runtime dir that physically exists
   outside the profile emits a ``[warn] <harness>: out-of-profile runtime present`` line,
@@ -32,7 +32,10 @@ from typer.testing import CliRunner
 from dadaia_workspace.cli.commands.public import app as public_app
 from dadaia_workspace.core.models.harness_profile import HarnessProfile
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
-from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+from dadaia_workspace.infrastructure.public_assets import (
+    FileSystemPublicAssetManager,
+    OverwritePolicy,
+)
 
 # Reuse the EXACT W1 golden normalizer + committed golden (Q2/A4 byte-equality lock) — the
 # same path-normalization and git-dirty line exclusion the W1 doctor golden was captured
@@ -42,6 +45,17 @@ from tests.helpers.golden_platform import (
     norm_path_line,
     sort_line_lists,
 )
+
+
+def _rendered(result: object) -> list[str]:
+    """Legacy string view of a typed doctor result (DoctorReport | list[DoctorLine])."""
+    if hasattr(result, "rendered"):
+        return result.rendered()  # type: ignore[attr-defined, no-any-return]
+    return [
+        line.render() if hasattr(line, "render") else str(line)
+        for line in result  # type: ignore[union-attr]
+    ]
+
 
 pytestmark = pytest.mark.unit
 
@@ -82,7 +96,7 @@ def _install_claude_only_tree(ws: Path) -> FileSystemPublicAssetManager:
 def _scaffold_chokepoint_scripts(mgr: FileSystemPublicAssetManager, ws: Path) -> None:
     """Install the harness-independent git chokepoint scripts into ``.dadaia/scripts``."""
     agentic_dir = ws / ".dadaia" / "agentic"
-    mgr._install_scripts(agentic_dir, ws, False, [])
+    mgr._install_scripts(agentic_dir, ws, OverwritePolicy.PRESERVE, [])
 
 
 def _install_codex_only_tree(ws: Path) -> FileSystemPublicAssetManager:
@@ -94,18 +108,18 @@ def _install_codex_only_tree(ws: Path) -> FileSystemPublicAssetManager:
     return mgr
 
 
-def _install_pi_only_tree(ws: Path) -> FileSystemPublicAssetManager:
-    """Build a genuinely pi-only projection tree (isolates the doctor claude-loop fix)."""
+def _install_kimi_only_tree(ws: Path) -> FileSystemPublicAssetManager:
+    """Build a genuinely kimi-only projection tree (isolates the doctor claude-loop fix)."""
     mgr = FileSystemPublicAssetManager()
     mgr.install(ws, target="agents")
-    mgr.install(ws, target="pi")
+    mgr.install(ws, target="kimi-code")
     _scaffold_chokepoint_scripts(mgr, ws)
-    _write_profile(ws, ("pi",))
+    _write_profile(ws, ("kimi-code",))
     return mgr
 
 
-def _mentions_codex_or_pi(line: str) -> bool:
-    return "codex" in line or "pi:" in line or ".codex" in line or "/.pi" in line
+def _mentions_codex_or_kimi(line: str) -> bool:
+    return "codex" in line or "kimi-code:" in line or ".codex" in line or "/.kimi-code" in line
 
 
 def _mentions_claude(line: str) -> bool:
@@ -119,10 +133,10 @@ def _mentions_claude(line: str) -> bool:
 
 
 def test_claude_only_profile_install_all_writes_only_claude(tmp_path: Path) -> None:
-    """AC-5 (install): a claude-only profile makes ``install(target="all")`` skip codex/pi.
+    """AC-5 (install): a claude-only profile makes ``install(target="all")`` skip codex/kimi.
 
     RED-first: pre-fix, ``install(target="all")`` ignores the profile and scaffolds all-four,
-    so ``.codex/`` / ``.pi/`` ARE written and the assertions below FAIL.
+    so ``.codex/`` / ``.kimi-code/`` ARE written and the assertions below FAIL.
     """
     ws = tmp_path / "ws"
     ws.mkdir()
@@ -133,7 +147,7 @@ def test_claude_only_profile_install_all_writes_only_claude(tmp_path: Path) -> N
     assert (ws / ".claude").exists(), "claude projection must be written for a claude profile"
     assert (ws / ".agents" / "skills").exists(), "shared agents skills root is always written"
     assert not (ws / ".codex").exists(), "codex projection must NOT be written (out of profile)"
-    assert not (ws / ".pi").exists(), "pi projection must NOT be written (out of profile)"
+    assert not (ws / ".kimi-code").exists(), "kimi projection must NOT be written (out of profile)"
 
     # A pre-v0.1.58 workspace (no profile file) still installs all-four (back-compat).
     ws2 = tmp_path / "ws2"
@@ -141,7 +155,7 @@ def test_claude_only_profile_install_all_writes_only_claude(tmp_path: Path) -> N
     FileSystemPublicAssetManager().install(ws2, target="all")
     assert (ws2 / ".claude").exists()
     assert (ws2 / ".codex").exists()
-    assert (ws2 / ".pi").exists()
+    assert (ws2 / ".kimi-code").exists()
 
     # Explicit --target codex installs codex regardless of the profile.
     ws3 = tmp_path / "ws3"
@@ -162,7 +176,7 @@ def test_claude_only_profile_install_all_writes_only_claude(tmp_path: Path) -> N
         pytest.param(
             _install_claude_only_tree,
             "[ok] claude:settings.json",
-            lambda r: not (r.startswith(_BLOCKER_PREFIXES[0]) and _mentions_codex_or_pi(r)),
+            lambda r: not (r.startswith(_BLOCKER_PREFIXES[0]) and _mentions_codex_or_kimi(r)),
             id="claude-only",
         ),
         pytest.param(
@@ -172,10 +186,10 @@ def test_claude_only_profile_install_all_writes_only_claude(tmp_path: Path) -> N
             id="codex-only",
         ),
         pytest.param(
-            _install_pi_only_tree,
+            _install_kimi_only_tree,
             None,  # checked via startswith below
             lambda r: not (r.startswith(_BLOCKER_PREFIXES[0]) and _mentions_claude(r)),
-            id="pi-only",
+            id="kimi-only",
         ),
     ],
 )
@@ -184,12 +198,12 @@ def test_profile_scoped_doctor_is_green(
 ) -> None:
     """AC-5/Q1/Q7/W5 (report list): a per-profile doctor emits no out-of-profile [missing]
     lines (incl. the D-CX-1 codex:agents ×12 blocker for claude-only, and the unscoped
-    runtime_expectations claude ×40 lines for codex/pi-only) and is blocker-free."""
+    runtime_expectations claude ×40 lines for codex/kimi-only) and is blocker-free."""
     ws = tmp_path / "ws"
     ws.mkdir()
     mgr = install_tree(ws)  # type: ignore[operator]
 
-    reports = mgr.doctor(ws)
+    reports = _rendered(mgr.doctor(ws))
 
     assert not any("codex:agents/" in r and "(D-CX-1)" in r for r in reports), (
         "profile-scoped doctor must not run check_codex_drift for an out-of-codex-profile tree"
@@ -200,22 +214,22 @@ def test_profile_scoped_doctor_is_green(
 
     if expect_ok_line is not None:
         assert any(r == expect_ok_line for r in reports)
-    else:  # pi-only
-        assert any(r.startswith("[ok] pi:") for r in reports)
+    else:  # kimi-only
+        assert any(r.startswith("[ok] kimi-code:") for r in reports)
 
     assert not any(":workflows/" in report for report in reports)
 
 
 @pytest.mark.parametrize(
     "install_tree",
-    [_install_claude_only_tree, _install_codex_only_tree, _install_pi_only_tree],
-    ids=["claude-only", "codex-only", "pi-only"],
+    [_install_claude_only_tree, _install_codex_only_tree, _install_kimi_only_tree],
+    ids=["claude-only", "codex-only", "kimi-only"],
 )
 def test_profile_scoped_cli_doctor_exits_zero(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, install_tree: object
 ) -> None:
     """AC-5/W5/AC-8 (CLI surface): ``dadaia public doctor`` exits 0 for every per-profile
-    workspace shape (claude-only/codex-only/pi-only)."""
+    workspace shape (claude-only/codex-only/kimi-only)."""
     ws = tmp_path / "ws"
     ws.mkdir()
     install_tree(ws)  # type: ignore[operator]
@@ -245,11 +259,11 @@ def test_profile_scoped_cli_doctor_exits_zero(
         ),
         pytest.param(
             _install_claude_only_tree,
-            ".pi",
+            ".kimi-code",
             "SYSTEM.md",
             "# stale\n",
-            "pi",
-            id="stale-pi-on-claude-only",
+            "kimi-code",
+            id="stale-kimi-on-claude-only",
         ),
         pytest.param(
             _install_codex_only_tree,
@@ -279,7 +293,7 @@ def test_out_of_profile_runtime_present_is_not_silent(
     leftover.mkdir(parents=True, exist_ok=True)
     (leftover / stale_filename).write_text(stale_content, encoding="utf-8")
 
-    reports = mgr.doctor(ws)
+    reports = _rendered(mgr.doctor(ws))
 
     non_silent = [r for r in reports if token in r and "out-of-profile" in r]
     assert non_silent, (
@@ -304,7 +318,7 @@ def test_absent_profile_doctor_byte_equals_all_four_golden(tmp_path: Path) -> No
     mgr = FileSystemPublicAssetManager()
     mgr.install(ws, target="all")
 
-    report = mgr.doctor(ws)
+    report = _rendered(mgr.doctor(ws))
     normalized = [norm_path_line(line, ws) for line in report if not is_env_doctor_line(line)]
 
     golden = sort_line_lists(json.loads(_DOCTOR_GOLDEN.read_text(encoding="utf-8")))

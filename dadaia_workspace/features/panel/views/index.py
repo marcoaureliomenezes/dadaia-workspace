@@ -16,25 +16,20 @@ SSR (data inlined into the initial HTML response, no auth required):
 Client-side (fetched via XHR/fetch after Bearer auth):
   - Agents    — auth-gated; telemetry-enriched; dynamic
   - Sessions  — auth-gated; large/dynamic; runtime-dependent; rendered as a
-                sub-section INSIDE the 1º Agentic Layer (subagents) tabpanel
+                sub-section INSIDE the Agents (subagents) tabpanel
                 (v0.1.79 — the standalone Sessions tab was removed)
-  - Workflows — auth-gated; file-system backed
   - Reports   — auth-gated; file-system backed; sidecar-indexed
 
-Primary tabs (v0.1.79 panel agentic-layers reorg — 7 -> 6 tabs):
-  Projects | 1º Agentic Layer (id ``tab-subagents``) |
-  2º Agentic Layer (id ``tab-workflows``) | Reports | Academy | Servers.
-  The 1º Agentic Layer governs Layer-1 Claude sub-agent model+effort
-  (v0.1.65 L1 governance) and now also hosts the Sessions cost/telemetry
-  dashboard as a sub-section (``render_sessions_section``, appended inside
-  ``_render_subagents_section``); the 2º Agentic Layer governs Layer-2
-  pi/codex workflow model policy. Tab/section
-  ids are unchanged (``tab-subagents``/``section-subagents``,
-  ``tab-workflows``/``section-workflows``) — label-only rename plus the
-  Sessions relocation. The nav-button order AND the tabpanel body order both
-  place 1º Agentic Layer before 2º Agentic Layer (ratified SPEC order); the
-  ``.active`` class toggle in core.js is position-independent, but body order
-  is kept aligned with button order for visual/reading-order sanity.
+Primary tabs (v0.3.0 — 6 tabs):
+  Projects | Agents (id ``tab-subagents``) | Agentic Entities (id
+  ``tab-entities``) | Reports | Academy | Servers. The Agents tab opens with the
+  abstract Persona definition cards (``render_personas_section``), governs
+  sub-agent model+effort (v0.1.65 L1 governance) and hosts the Sessions
+  cost/telemetry dashboard as a sub-section (``render_sessions_section``,
+  appended inside ``_render_subagents_section``). The Agentic Entities tab
+  (``render_entities_section``) is fully server-rendered from the packaged
+  abstract-entity registry — universal skills/AGENTS.md, Deterministic
+  Behaviors and Abstract Rules with their per-harness derivations.
 """
 
 from __future__ import annotations
@@ -45,13 +40,13 @@ from collections.abc import Callable, Sequence
 from dadaia_workspace.features.panel.service import PanelContext, PanelService, ServerGroup
 from dadaia_workspace.features.panel.views._md_render import memory_view_url
 from dadaia_workspace.features.panel.views.academy import render_academy_section
-from dadaia_workspace.features.panel.views.games import render_games_section
+from dadaia_workspace.features.panel.views.entities import (
+    render_entities_section,
+    render_personas_section,
+)
 from dadaia_workspace.features.panel.views.reports import render_reports_section
 from dadaia_workspace.features.panel.views.sessions import render_sessions_section
 from dadaia_workspace.features.panel.views.static import LOGO_RHINO_36
-from dadaia_workspace.features.panel.views.workflows import (
-    render_workflows_first_class_section,
-)
 
 
 def render_index(
@@ -71,8 +66,7 @@ def render_index(
 
         academy_section = render_academy_section()
         reports_section = render_reports_section()
-        workflows_section = render_workflows_first_class_section()
-        games_section = render_games_section()
+        entities_section = render_entities_section()
 
         body = f"""<!DOCTYPE html>
 <html lang="pt-BR">
@@ -81,17 +75,15 @@ def render_index(
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Dadaia Workspace Panel</title>
   <script>(function(){{var t=localStorage.getItem('dadaia-panel-theme');if(t&&(t==='mint'||t==='sage'||t==='warm')){{document.documentElement.dataset.theme=t;}}}})();</script>
-  <script>(function(){{var r=localStorage.getItem('dadaia-panel-runtime');if(r&&(r==='claude'||r==='codex'||r==='pi')){{document.documentElement.dataset.runtime=r;}}}})();</script>
+  <script>(function(){{var r=localStorage.getItem('dadaia-panel-runtime');if(r&&(r==='claude'||r==='codex'||r==='kimi-code')){{document.documentElement.dataset.runtime=r;}}}})();</script>
   <link rel="stylesheet" href="/static/tokens.css">
   <link rel="stylesheet" href="/static/structure.css">
   <link rel="stylesheet" href="/static/projects.css">
-  <link rel="stylesheet" href="/static/workflows.css">
-  <link rel="stylesheet" href="/static/workflow-policy.css">
   <link rel="stylesheet" href="/static/agent-policy.css">
   <link rel="stylesheet" href="/static/sessions.css">
   <link rel="stylesheet" href="/static/academy.css">
+  <link rel="stylesheet" href="/static/entities.css">
   <link rel="stylesheet" href="/static/reports.css">
-  <link rel="stylesheet" href="/static/games.css">
 </head>
 <body>
   <header class="topbar" role="banner">
@@ -127,12 +119,11 @@ def render_index(
   </header>
   <nav class="nav-tabs" aria-label="Panel sections" role="tablist">
     <button class="nav-tab active tab-memories-btn" data-section="memories" aria-selected="true" role="tab" id="tab-memories" aria-label="Projects">Projects</button>
-    <button class="nav-tab" data-section="subagents" aria-selected="false" role="tab" id="tab-subagents" aria-label="1º Agentic Layer">1&#186; Agentic Layer</button>
-    <button class="nav-tab" data-section="workflows" aria-selected="false" role="tab" id="tab-workflows" aria-label="2º Agentic Layer">2&#186; Agentic Layer</button>
+    <button class="nav-tab" data-section="subagents" aria-selected="false" role="tab" id="tab-subagents" aria-label="Agents">Agents</button>
+    <button class="nav-tab" data-section="entities" aria-selected="false" role="tab" id="tab-entities" aria-label="Agentic Entities">Agentic Entities</button>
     <button class="nav-tab" data-section="reports" aria-selected="false" role="tab" id="tab-reports">Reports</button>
     <button class="nav-tab" data-section="academy" aria-selected="false" role="tab" id="tab-academy">Academy</button>
     <button class="nav-tab" data-section="servers" aria-selected="false" role="tab" id="tab-servers">Servers</button>
-    <button class="nav-tab" data-section="games" aria-selected="false" role="tab" id="tab-games">Games</button>
   </nav>
   <main class="main" role="main">
 
@@ -164,33 +155,20 @@ def render_index(
 
     {_render_subagents_section()}
 
-    {workflows_section}
+    {entities_section}
 
     {academy_section}
 
     {reports_section}
-
-    {games_section}
 
   </main>
   <script src="/static/runtime.js"></script>
   <script src="/static/themes.js"></script>
   <script src="/static/core.js"></script>
   <script src="/static/agent-policy.js"></script>
-  <script src="/static/workflow-policy.js"></script>
   <script src="/static/sessions.js" defer></script>
   <script src="/static/academy.js"></script>
   <script src="/static/reports.js"></script>
-  <script src="/static/games.js"></script>
-  <!--
-    The dadaia-workflow catalog renders each step-sequence diagram as a
-    server-rendered SVG DAG (.dadaia-wf-diagram-svg) plus the raw mermaid source
-    in a <pre class="mermaid"> block (same convention as memory atoms). No
-    client-side mermaid hydration is attempted: the panel is loopback with a
-    strict CSP whose script-src is 'self' + hashed inline snippets only — it does
-    not allow an external CDN origin, so a CDN mermaid import can never execute.
-    The server-rendered SVG is the canonical, offline diagram.
-  -->
 </body>
 </html>"""
         return (200, "text/html; charset=utf-8", body.encode("utf-8"))
@@ -199,7 +177,7 @@ def render_index(
 
 
 def _render_subagents_section() -> str:
-    """The "1º Agentic Layer" tab scaffold (v0.1.65 FR8; relabeled + Sessions-merged
+    """The "Agents" tab scaffold (v0.1.65 FR8; relabeled + Sessions-merged
     v0.1.79) — hydrated by agent_policy.js (roster) and sessions.js (dashboard).
 
     Static server-rendered shell: section header with the template selector + explicit
@@ -218,7 +196,7 @@ def _render_subagents_section() -> str:
         'aria-label="Layer-1 sub-agent model governance" role="tabpanel" tabindex="0" '
         'aria-labelledby="tab-subagents">\n'
         '      <header class="section-header">\n'
-        "        <h2>1&#186; Agentic Layer</h2>\n"
+        "        <h2>Agents</h2>\n"
         '        <div class="ap-toolbar">\n'
         '          <select id="ap-template-select" class="ap-template-select" '
         'aria-label="Agent model template"></select>\n'
@@ -230,6 +208,7 @@ def _render_subagents_section() -> str:
         "        <p>Layer-1 agent model governance — pick a template or set per-agent "
         "model/effort overrides, then Apply to re-render both harness projections.</p>\n"
         "      </details>\n"
+        f"      {render_personas_section()}\n"
         '      <div id="ap-banner" class="ap-banner" hidden></div>\n'
         '      <div id="ap-roster" aria-live="polite"></div>\n'
         '      <div id="ap-popup" class="ap-popup" role="dialog" aria-modal="true" '

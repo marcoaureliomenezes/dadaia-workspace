@@ -8,7 +8,7 @@ from typing import Any
 from dadaia_workspace.core.spec_status import CANONICAL_STATUS
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
 
-CAPABILITY_SCHEMA_VERSION = "dadaia-capabilities-v1"
+CAPABILITY_SCHEMA_VERSION = "dadaia-capabilities-v2"
 
 
 def _distribution_version() -> str:
@@ -58,31 +58,14 @@ def build_capabilities() -> dict[str, Any]:
             ],
             "selection_contract": "explicit-or-caller-owned-bind",
         },
-        "workflows": [
-            {
-                "id": "backlog_definition",
-                "command": "dadaia lifecycle backlog-definition",
-            },
-            {
-                "id": "release_definition",
-                "command": "dadaia lifecycle release-definition",
-            },
-            {
-                "id": "implementation_reviews",
-                "command": "dadaia lifecycle implementation-reviews",
-            },
-            {"id": "audit", "command": "dadaia lifecycle audit"},
-        ],
         "harnesses": {
-            "layer_1": ["claude-code", "codex", "pi", "kimi-code"],
-            "layer_2_workers": ["codex", "pi", "fake"],
-            "claude_layer_2_supported": False,
+            "layer_1": ["claude-code", "codex", "kimi-code"],
         },
         "surfaces": {
             "workspace": ["init", "export", "import", "doctor", "clean"],
             "public_projections": ["stage", "install", "doctor", "list"],
-            "panel": ["panel", "server registry", "workflow catalog"],
-            "evidence": ["reports", "handoff validation", "workflow state"],
+            "panel": ["panel", "server registry"],
+            "evidence": ["reports", "handoff validation"],
             "knowledge": ["memory", "academy", "projected skills", "rules"],
             "governance": ["bugs", "backlog", "releases", "ci preflight"],
             "extensions": ["plugins", "repository catalog"],
@@ -97,7 +80,5 @@ def build_capabilities() -> dict[str, Any]:
         "certification": {
             "command": "dadaia certify --json",
             "schema_version": "dadaia-certification-v1",
-            "deterministic_fake_workflows": True,
-            "live_harness_canaries_required_for_release": True,
         },
     }

@@ -14,7 +14,7 @@ shipped content:
   "gpt-5.6-terra"``, NOT ``gpt-5.6-sol`` (ARCH-2: the Codex ``model`` field is the discriminator,
   ``model_reasoning_effort`` is not) — and with the pack staged, doctor still reports ``[ok]
   public-privacy``; EXACTLY the two named skills exist per pack (ADR-C1 ceiling).
-* **AC-7** — the PROJECTED ``.claude/rules/plugin-scope.md`` is install-gated: it names
+* **AC-7** — the PROJECTED ``.claude/rules/DADAIA.md`` is install-gated: it names
   ``dadaia plugin install`` and the retired ``not yet distributed`` / ``no install command
   exists`` wording is GONE. RED-first: before the source rewrite lands, an in-tmp install
   projects the old wording and this test fails.
@@ -32,6 +32,17 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+
+
+def _rendered(result: object) -> list[str]:
+    """Legacy string view of a typed doctor result (DoctorReport | list[DoctorLine])."""
+    if hasattr(result, "rendered"):
+        return result.rendered()  # type: ignore[attr-defined, no-any-return]
+    return [
+        line.render() if hasattr(line, "render") else str(line)
+        for line in result  # type: ignore[union-attr]
+    ]
+
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _PUBLIC = _REPO_ROOT / "dadaia_workspace" / "public"
@@ -238,7 +249,7 @@ def test_pack_agent_codex_toml_is_plugin_tier_not_opus(
         f"discriminate the plugin tier"
     )
 
-    report = FileSystemPublicAssetManager().doctor(ws)
+    report = _rendered(FileSystemPublicAssetManager().doctor(ws))
     privacy = [ln for ln in report if ln.startswith("[ok] public-privacy")]
     assert privacy, f"no [ok] public-privacy line in doctor report: {report}"
     assert not [ln for ln in report if ln.startswith("[error] public-privacy")], report
@@ -255,7 +266,7 @@ def _projected_plugin_scope(tmp_path: Path) -> str:
     ws = tmp_path / "ws"
     ws.mkdir()
     FileSystemPublicAssetManager().install(ws, target="all")
-    return (ws / ".claude" / "rules" / "plugin-scope.md").read_text(encoding="utf-8")
+    return (ws / ".claude" / "rules" / "DADAIA.md").read_text(encoding="utf-8")
 
 
 @pytest.mark.integration

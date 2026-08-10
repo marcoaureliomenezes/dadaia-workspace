@@ -22,10 +22,10 @@ def init(
     harness: str = typer.Option(
         "all",
         "--harness",
-        help="Harness set to scaffold: 'all' or a comma-separated subset of claude,codex,pi,kimi-code.",
+        help="Harness set to scaffold: 'all' or a comma-separated subset of claude,codex,kimi-code.",
     ),
 ) -> None:
-    """Bootstrap a dadaia workspace: creates .dadaia/ and projects agent assets for the chosen harness set (default all: .claude/, .codex/, .pi/, .kimi-code/, .agents/)."""
+    """Bootstrap a dadaia workspace: creates .dadaia/ and projects agent assets for the chosen harness set (default all: .claude/, .codex/, .kimi-code/, .agents/)."""
     # Parse --harness BEFORE any output so a bad value is a clean BadParameter
     # (exit 2, message on stderr, empty stdout — no partial payload leaks).
     try:

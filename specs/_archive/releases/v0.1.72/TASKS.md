@@ -71,7 +71,7 @@
 
 ### T-7.1 — Full-chain remote replay acceptance `[ ]`
 - **Write set:** none (acceptance evidence in CLOSURE)
-- Done: on the operator's remote against live dd-chain-capture v0.2.0 — upgrade heals
+- Done: on the operator's remote against live sample-consumer v0.2.0 — upgrade heals
   memory → bind adopts lease → preflight PASSES → fake pipeline completes → blocked
   preflight refuses verbs.
 

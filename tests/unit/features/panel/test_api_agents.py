@@ -15,7 +15,6 @@ from __future__ import annotations
 import datetime
 import json
 from pathlib import Path
-from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -47,15 +46,12 @@ class FakeSpecContextService:
         return []
 
 
-def _make_service(
-    agents: list[AgentDTO], telemetry_stub: Any = None, workflows_service: Any = None
-) -> PanelService:
+def _make_service(agents: list[AgentDTO], telemetry_stub: Any = None) -> PanelService:
     svc = PanelService(
         registry=FakeServerRegistryService(),  # type: ignore[arg-type]
         spec_context=FakeSpecContextService(),  # type: ignore[arg-type]
         workspace_root=Path("/workspace"),
         telemetry=telemetry_stub,
-        workflows_service=workflows_service,
     )
     svc._canonical_agents_override = agents  # type: ignore[attr-defined]
     return svc
@@ -292,56 +288,12 @@ def test_plugin_exclusion_and_phase_derivation(
 
 
 # ---------------------------------------------------------------------------
-# 5. Workflow membership + provider-failure→empty + model_inherited
+# 5. model_inherited
 # ---------------------------------------------------------------------------
 
 
-class _FakeWorkflowsService:
-    def __init__(self, workflows: list[SimpleNamespace]) -> None:
-        self._workflows = workflows
-
-    def list_dadaia_workflows(self) -> list[SimpleNamespace]:
-        return list(self._workflows)
-
-    def get_dadaia_workflow(self, name: str) -> None:
-        return None
-
-
-def test_workflow_membership_provider_failure_and_model_inherited() -> None:
-    """Membership derives from workflow agent_ids; a provider failure yields empty (never 500);
-    model_inherited flips true only when no model: frontmatter is set."""
-    agents = [_make_dto(agent_id="project-manager"), _make_dto(agent_id="software-engineer")]
-    workflows = _FakeWorkflowsService(
-        [
-            SimpleNamespace(
-                display_name="Audit",
-                steps=[SimpleNamespace(role="project-auditor")],
-            ),
-            SimpleNamespace(
-                display_name="Implementation & Reviews",
-                steps=[SimpleNamespace(role="software-engineer")],
-            ),
-        ]
-    )
-    svc = _make_service(
-        agents,
-        telemetry_stub=FakeTelemetryService(),
-        workflows_service=workflows,
-    )
-    _, _, data = _api_data(svc)
-    by_id = {a["agent_id"]: a for a in data["agents"]}
-    assert by_id["project-manager"]["workflows"] == []
-    assert by_id["software-engineer"]["workflows"] == ["Implementation & Reviews"]
-
-    # No workflows service injected -> catalog read raises internally -> caught.
-    svc_no_wf = _make_service(
-        [_make_dto(agent_id="software-engineer")], telemetry_stub=FakeTelemetryService()
-    )
-    status, _, data_no_wf = _api_data(svc_no_wf)
-    assert status == 200
-    assert data_no_wf["agents"][0]["workflows"] == []
-
-    # model_inherited: true only with no model: frontmatter.
+def test_model_inherited() -> None:
+    """model_inherited flips true only when no model: frontmatter is set."""
     svc_no_model = _make_service(
         [_make_dto(agent_id="x", model=None)], telemetry_stub=FakeTelemetryService()
     )

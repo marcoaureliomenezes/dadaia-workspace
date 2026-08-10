@@ -1,6 +1,6 @@
 """Pure data model for the Layer-1 agent-model policy (v0.1.65 FR2/FR3/FR4).
 
-Mirrors the Layer-2 workflow-model-policy shapes (``core/models/workflow_execution.py``)
+Typed overlay shapes
 for the L1 agent roster: an operator overlay (``applied_template`` + per-agent per-field
 ``overrides``) layered over library-shipped templates, resolved by the single resolver in
 ``core/agent_model_templates.py``.

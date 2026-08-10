@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 import sys
+from enum import StrEnum
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
@@ -17,6 +18,34 @@ from typing import Any
 from dadaia_workspace.core.harness_registry import INSTALL_TARGETS
 
 _SCHEMA_VERSION = "1"
+
+
+class OverwritePolicy(StrEnum):
+    """Whether a projected file that already exists on disk is replaced (FR6, T-30-10).
+
+    Replaces the ``force: bool`` flag that used to travel through every private
+    install-pipeline signature in ``public_assets.py``. ``FORCE`` is the historical
+    ``force=True`` (clobber regardless of hash match); ``PRESERVE`` is the historical
+    ``force=False`` default (hash-compare skip on a match, overwrite only on drift —
+    the T-PROP-01 contract lives in the ``install_helpers``/``copy_file`` layer, which
+    this enum does not change). ``install()``'s public ``force: bool`` parameter stays
+    the port-conforming boundary; :meth:`of` is the ONE translation point.
+    """
+
+    FORCE = "force"
+    PRESERVE = "preserve"
+
+    @classmethod
+    def of(cls, force: bool) -> OverwritePolicy:
+        """Translate the port-conforming ``force: bool`` into a plan-carried policy."""
+        return cls.FORCE if force else cls.PRESERVE
+
+    @property
+    def force(self) -> bool:
+        """The raw ``bool`` the (out-of-scope) ``install_helpers``/``copy_file`` layer
+        still expects — the ONE point where the policy is converted back."""
+        return self is OverwritePolicy.FORCE
+
 
 # Shared layout constants for the install/stage pipeline. The valid ``--target``
 # vocabulary is single-sourced in ``core/harness_registry`` (v0.1.58 FR1); this name is
@@ -27,6 +56,7 @@ _COPY_DIRS = (
     "skills",
     "commands",
     "agents",
+    "entities",
     "scripts",
     "schemas",
     "data",
@@ -34,14 +64,9 @@ _COPY_DIRS = (
     "templates",
     "plugins",
     "runtime",
-    "lifecycle_fragments",
-    "personas",
-    "pi",
     "kimi-code",
 )
 _CLAUDE_DIRS = ("rules", "skills", "commands", "agents")
-#: Subdirectories of the staged ``pi/`` tree that are copied as-is into ``.pi/``.
-_PI_DIRS = ("prompts", "extensions")
 #: Subdirectories of the staged ``kimi-code/`` tree for ``--only`` filtering (v0.2.8).
 #: Empty for now — the tree currently ships a single root ``AGENTS.md``.
 _KIMI_DIRS: tuple[str, ...] = ()

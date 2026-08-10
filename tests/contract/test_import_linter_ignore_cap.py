@@ -70,15 +70,19 @@ _SETUP_CFG = _REPO_ROOT / "setup.cfg"
 # re-enumerated by grep at implementation time = 10 module-pair edges. None is
 # composition-root wiring (container.py's monopoly); all are accepted, capped, ratcheted
 # debt. Cap raised 26 -> 36 (+10) in the same commit as the setup.cfg contract.
-_RECORDED_IGNORE_EDGE_CAP = 29
+# v0.3.0 DEMOLITION NOTE: deleting the workflow engine removed the whole
+# `lifecycle-no-workflows` contract and 13 ignored edges (panel->lifecycle x4,
+# panel->workflows x1, workflows->lifecycle x1, lifecycle->reports x1,
+# lifecycle->backlog x5, cli.lifecycle->fake_runtime x1). Cap ratcheted 29 -> 16.
+_RECORDED_IGNORE_EDGE_CAP = 16
 
 # Per-family recorded breakdown, pinned per contract section so a wrong 13-edge cross-feature
 # set (or a silent shift between families) fails loudly, not just the grand total.
 _RECORDED_PER_FAMILY_CAP: dict[str, int] = {
     "features-no-infrastructure": 7,
     "features-no-subprocess": 4,
-    "features-no-cross-feature": 13,
-    "cli-no-infrastructure": 5,
+    "features-no-cross-feature": 1,
+    "cli-no-infrastructure": 4,
 }
 
 

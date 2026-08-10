@@ -2,8 +2,7 @@
 
 Reads/writes the operator-editable overlay at
 ``.dadaia/states/agent_model_policy.json`` (schema ``agent-model-policy-v1`` —
-``public/schemas/agent-model-policy-v1.schema.json``), mirroring
-:class:`~dadaia_workspace.infrastructure.json_workflow_model_policy_store.JsonWorkflowModelPolicyStore`:
+``public/schemas/agent-model-policy-v1.schema.json``):
 atomic temp+rename write (``tempfile.mkstemp`` in the target dir → ``os.replace``) and a
 ``.last-good.json`` backup of the prior valid file.
 

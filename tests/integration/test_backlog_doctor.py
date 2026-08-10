@@ -49,43 +49,6 @@ def _write_item(specs: Path, slug: str, frontmatter: str) -> None:
     )
 
 
-def test_driving_fake_canary_item_is_doctor_valid(tmp_path: Path) -> None:
-    """Bug fake-backlog-workflow-materializes-doctor-invalid-status-042 (Hermes R1-B):
-    the backlog-definition driving fake materialized `status: proposed`, a token
-    outside the documented vocabulary — the workflow's own output failed the
-    workflow's own doctor. Producer and validator must agree on the status set."""
-    from dadaia_workspace.container import _backlog_definition_runtime_factory
-    from dadaia_workspace.core.models.lifecycle import AgentRunRequest, AgentRuntimeKind
-
-    specs, src = _build_specs(tmp_path)
-    factory = _backlog_definition_runtime_factory(context="ctx", run_cwd=tmp_path)
-    fake = factory(AgentRuntimeKind.FAKE)
-    fake.run(
-        AgentRunRequest(
-            role="product-engineer",
-            prompt="author the item",
-            runtime=AgentRuntimeKind.FAKE,
-            context="ctx",
-            release_id="v0.1.0",
-            task_id="bd-canary:backlog_author",
-        )
-    )
-    # The slug is run-scoped (bug fake-backlog-canary-fixed-slug-blocks-multi-item-release-flow).
-    item = specs / "backlog" / "dadaia-fake-harness-canary-bd-canary.md"
-    assert item.is_file(), "driving fake must materialize the canary item"
-
-    findings = run_backlog_doctor(
-        specs_dir=specs,
-        source_root=src,
-        catalog_path=specs / "memory" / "product" / "catalog.json",
-        alias_map_path=specs / "no-aliases.txt",
-        archive_root=specs / "_archive",
-        cli_anchors=frozenset({"backlog doctor"}),
-    )
-    invalid = [f for f in findings if "invalid status" in f.message]
-    assert not invalid, [f.message for f in invalid]
-
-
 def _run(specs: Path, src: Path) -> list:
     return run_backlog_doctor(
         specs_dir=specs,
@@ -214,62 +177,3 @@ def test_clean_tree_matrix_each_violation_flagged_stale_noop_and_fresh_stub_stat
     assert fresh_schema2, (
         "a candidate with no intents[] must fire BL-SCHEMA (status-gate not blanket)"
     )
-
-
-def test_distinct_runs_author_distinct_non_colliding_items(tmp_path: Path) -> None:
-    """Bug fake-backlog-canary-fixed-slug-blocks-multi-item-release-flow.
-
-    The fake upserted ONE hardcoded slug, so three runs reporting success left one item on
-    disk — each silently overwriting the previous. That made the documented flow the
-    operator actually validates (author N backlog items, then define one release consuming
-    the set) unreachable with the fake, i.e. unreachable without spending Layer-2 credits.
-
-    Two properties are required together, and the second is why a naive per-run slug is not
-    enough: items sharing a canonical anchor with differing ``change`` text are a
-    fail-closed ``DIVERGENT_CONFLICT``, so per-run items must also claim per-run anchors.
-    """
-    from dadaia_workspace.container import _backlog_definition_runtime_factory
-    from dadaia_workspace.core.models.lifecycle import AgentRunRequest, AgentRuntimeKind
-
-    specs, _src = _build_specs(tmp_path)
-    factory = _backlog_definition_runtime_factory(context="ctx", run_cwd=tmp_path)
-    fake = factory(AgentRuntimeKind.FAKE)
-
-    def _author(run_id: str) -> None:
-        fake.run(
-            AgentRunRequest(
-                role="product-engineer",
-                prompt="author the item",
-                runtime=AgentRuntimeKind.FAKE,
-                context="ctx",
-                release_id="v0.1.0",
-                task_id=f"{run_id}:backlog_author",
-            )
-        )
-
-    for run_id in ("bl-1", "bl-2", "bl-3"):
-        _author(run_id)
-
-    items = sorted(p for p in (specs / "backlog").glob("*.md") if p.name != "README.md")
-    assert len(items) == 3, (
-        "three runs must leave three items on disk; "
-        f"found {[p.name for p in items]} — a run silently overwrote another's deliverable"
-    )
-
-    # Each item must claim a DIFFERENT anchor, else the pair is DIVERGENT_CONFLICT and a
-    # release can never consume the set.
-    anchors = [
-        line.split("ref:", 1)[1].strip()
-        for item in items
-        for line in item.read_text(encoding="utf-8").splitlines()
-        if "ref:" in line
-    ]
-    assert len(anchors) == 3, anchors
-    assert len(set(anchors)) == 3, f"items must not collide on one anchor: {anchors}"
-
-    # Re-running the SAME run id stays an idempotent EDIT of that run's own item — the
-    # property the original fixed slug was protecting.
-    before = {p.name for p in items}
-    _author("bl-2")
-    after = {p.name for p in (specs / "backlog").glob("*.md") if p.name != "README.md"}
-    assert after == before, f"re-run must not create a new item: {after - before}"

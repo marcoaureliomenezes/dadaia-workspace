@@ -101,7 +101,7 @@ def test_symlink_into_in_repo_memory_classifies_memory_block_and_definition_allo
 @pytest.mark.skipif(os.name == "nt", reason="dir symlink perms differ on Windows CI; covered above")
 def test_symlink_directory_into_memory_classifies_memory(tmp_path: Path) -> None:
     """A symlinked *directory* into specs/memory also resolves before classification."""
-    slug = "rand-engine"
+    slug = "sample-engine"
     ws = _make_workspace(tmp_path, slug=slug, phase="SPEC")
     mem_dir = ws / "repos" / slug / "specs" / "memory"
 

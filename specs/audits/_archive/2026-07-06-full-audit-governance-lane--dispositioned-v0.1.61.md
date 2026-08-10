@@ -64,7 +64,7 @@ Doctor exits (all commands run with captured exit codes, no pipes): `specs docto
 | 1 | TREE-5: `specs/AGENTS.md` drifted from canonical template (sha `5cd7e718…` vs `c4f20914…`) | **Actionable (LOW)** — known tri-copy hand-sync debt; review diff + merge |
 | 2 | LINT-1: 7 atoms warned — token_estimate drift ×5 (`architecture` 29%, `quality-assurance` 48%, `plugin-packs` 22%, `public-asset-distribution` 57%, `lifecycle-foundation` 26%) + unknown headings ×3 (`tech-stack` "Model assignments (9 core + 3 plugin)", `workspace-init` "Harness profiles", `lifecycle-foundation` "Prompt-assembly canon (v0.1.57)") | **Actionable (LOW)** — PE fixes frontmatter estimates + allowlists headings in the same memory pass as Area 1 |
 | 3-4 | SPEC-DOC-027 ×2: legacy release dir names (`multiharness-engine-v0116`, `pi-fourth-harness-v1`) | **Accepted debt** — explicitly "preserved until renamed" |
-| 5 | SPEC-DOC-029: stale lease `tauan-games` (dead session `a8f129a6…`) | **Actionable (transient)** — `dadaia doctor --fix`; same item as LOCK-GC below |
+| 5 | SPEC-DOC-029: stale lease `sample-games` (dead session `a8f129a6…`) | **Actionable (transient)** — `dadaia doctor --fix`; same item as LOCK-GC below |
 | 6-14 | SPEC-DOC-031 ×9: backlog entries with status `candidate` referenced by archived releases (`fast-tier-persona-validation`, `golden-platform-normalization-layer`, `layer1-selfpull-handoff-audit-line`, `plugin-pack-content-libraries`, `plugin-uninstall`, `response-guard-chip-presence-hardening`, `selfrepo-agents-md-doubled-header`, `tier-taxonomy-rename`, `workflow-spawn-entry-harness-autodefault`) | **Accepted debt / known false-positive class (ADR-6)** — all 9 are the deliberately-live "backlog returns" enumerated in `ACTIVE.md` |
 
 ### Workspace doctor (4 issues, exit 0)
@@ -72,7 +72,7 @@ Doctor exits (all commands run with captured exit codes, no pipes): `specs docto
 | ID | Sev | Issue | Remediation direction |
 |---|---|---|---|
 | G-21 | MEDIUM | ROOT-1/ROOT-2: workspace root contains `.mypy_cache/` (forbidden cache dir, fixable) and `bug-space-war` (non-whitelisted entry, manual) | `dadaia doctor --fix` for the cache; operator triages `bug-space-war` (operator-created → add to `root_exceptions.txt`; else relocate) |
-| G-22 | LOW | LOCK-GC: stale `tauan-games` lease (= SPEC-DOC-029) | `dadaia doctor --fix` |
+| G-22 | LOW | LOCK-GC: stale `sample-games` lease (= SPEC-DOC-029) | `dadaia doctor --fix` |
 | — | INFO | LOCK-5: BLOCKED_ATTEMPT event on `lock-events.jsonl:98` | Historical telemetry; no action |
 
 ### Releases / archive integrity

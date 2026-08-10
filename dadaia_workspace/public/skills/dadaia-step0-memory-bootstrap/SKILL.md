@@ -24,16 +24,14 @@ any source file or writing any output.
 
 ---
 
-## Mechanics moved to the engine (D12)
+## Deterministic load sequence (the ctx-inject hook)
 
-The **deterministic load sequence** — assembling the lean bootstrap prefix (tech-stack
-+ catalog) and laying it into the context once per session — is now the engine's
-prompt-prefix assembly: `features/lifecycle/prompt_builder.py` constructs the cacheable
-`PromptPrefix` that carries the bootstrapped context. The lean payload (tech-stack
-verbatim + `catalog.json`) is also injected once per session by the ctx-inject hook
-(`dadaia_workspace.hooks.ctx_inject`); when present, it is already in your context.
+The lean bootstrap prefix (tech-stack verbatim + `catalog.json`) is injected once per
+session by the ctx-inject hook (`dadaia_workspace.hooks.ctx_inject`), bind-driven: it
+fires again only on a bind-epoch marker newer than the session's own sentinel. When
+present, that prefix is already in your context — no separate assembly step to run.
 
-What this skill keeps is the **judgment** the engine cannot make for you: *read the
+What this skill keeps is the **judgment** the hook cannot make for you: *read the
 relevant atoms before acting.* The prefix gives you the catalog; choosing which atoms
 the task actually needs, and reading them before deciding, is yours.
 

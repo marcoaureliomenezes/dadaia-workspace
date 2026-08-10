@@ -2,10 +2,10 @@
 
 panel-plumbing v0.1.52 FR2 introduced the dashboard-only scaffold; v0.1.79
 (panel agentic-layers reorg) relocated it from its own standalone primary tab
-into a sub-section rendered INSIDE the "1º Agentic Layer" (``#section-subagents``)
+into a sub-section rendered INSIDE the "Agents" tab (``#section-subagents``)
 tabpanel. ``#section-sessions`` survives as the nested mount id — ``sessions.js``
 keys on it unchanged — but it is now a plain ``<div>`` sub-section (like
-``.ops-subsection`` in ``workflows.py``), not a standalone ``role="tabpanel"``.
+``.ops-subsection``), not a standalone ``role="tabpanel"``.
 
 Security (OWASP A03):
   This module returns a static HTML scaffold only. No session data is serialised
@@ -29,10 +29,10 @@ from __future__ import annotations
 def render_sessions_section() -> str:
     """Return the static HTML scaffold for the dashboard-only Sessions sub-section.
 
-    ``sessions.js`` fetches the ``/api/sessions`` aggregate on 1º Agentic Layer
+    ``sessions.js`` fetches the ``/api/sessions`` aggregate on Agents-tab
     tab load and on every ``dadaia:runtime-change`` event, renders the four stat
     cards into #sessions-dashboard, toggles #sessions-banner for cost-unknown
-    runtimes (codex/pi), and updates the #sessions-last-updated badge. No
+    runtimes (codex/kimi), and updates the #sessions-last-updated badge. No
     per-session rows are rendered.
 
     v0.1.79: rendered as a plain ``<div id="section-sessions" class="ops-subsection">``
@@ -55,10 +55,10 @@ def render_sessions_section() -> str:
         '        <span class="runtime-btn-icon" aria-hidden="true">&#9667;</span>\n'
         '        <span class="runtime-btn-label">Codex</span>\n'
         "      </button>\n"
-        '      <button type="button" class="runtime-btn runtime-btn--pi" id="sessions-runtime-btn-pi"\n'
-        '        role="radio" aria-checked="false" data-runtime-value="pi" aria-label="PI runtime">\n'
+        '      <button type="button" class="runtime-btn runtime-btn--kimi" id="sessions-runtime-btn-kimi"\n'
+        '        role="radio" aria-checked="false" data-runtime-value="kimi-code" aria-label="Kimi runtime">\n'
         '        <span class="runtime-btn-icon" aria-hidden="true">&#9678;</span>\n'
-        '        <span class="runtime-btn-label">PI</span>\n'
+        '        <span class="runtime-btn-label">Kimi</span>\n'
         "      </button>\n"
         "    </div>\n"
         "  </header>\n"
@@ -69,7 +69,7 @@ def render_sessions_section() -> str:
         '  <span id="sessions-last-updated" class="sessions-last-updated"\n'
         '        aria-live="polite" data-testid="sessions-last-updated">Never</span>\n'
         # Cost-unknown banner — hidden by default; JS shows it when the runtime is
-        # codex or pi. aria-live="polite" so screen readers announce it when it appears.
+        # codex or kimi. aria-live="polite" so screen readers announce it when it appears.
         '  <div id="sessions-banner" class="sessions-banner"\n'
         '       role="status" aria-live="polite" hidden></div>\n'
         "</div>"

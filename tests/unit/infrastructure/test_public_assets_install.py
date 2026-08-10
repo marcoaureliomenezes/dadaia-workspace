@@ -23,6 +23,7 @@ from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.infrastructure.public_assets import (
     _CLAUDE_MD_STUB,
     FileSystemPublicAssetManager,
+    OverwritePolicy,
     _install_consumer_repos_guardrail_pair,
     _install_workspace_guardrail_pair,
     _install_workspace_root_guardrail_pair,
@@ -187,12 +188,16 @@ def _codex_agents_case(
     agents_src.mkdir()
     (agents_src / "my-agent.md").write_text(_make_agent_md("my-agent"), encoding="utf-8")
     manager = FileSystemPublicAssetManager()
-    manager._install_codex_agents(agentic_dir, workspace_root, force=True, installed=[])
+    manager._install_codex_agents(
+        agentic_dir, workspace_root, overwrite=OverwritePolicy.FORCE, installed=[]
+    )
     toml_path = workspace_root / ".codex" / "agents" / "my-agent.toml"
     canonical = toml_path.read_text(encoding="utf-8")
 
     def run(force: bool, installed: list[str]) -> None:
-        manager._install_codex_agents(agentic_dir, workspace_root, force=force, installed=installed)
+        manager._install_codex_agents(
+            agentic_dir, workspace_root, overwrite=OverwritePolicy.of(force), installed=installed
+        )
 
     return run, toml_path, canonical, "stale content differs\n"
 
@@ -202,12 +207,16 @@ def _claude_settings_case(
 ) -> tuple[Callable[[bool, list[str]], None], Path, str, str]:
     agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
     manager = FileSystemPublicAssetManager()
-    manager._install_claude(agentic_dir, workspace_root, force=True, installed=[])
+    manager._install_claude(
+        agentic_dir, workspace_root, overwrite=OverwritePolicy.FORCE, installed=[]
+    )
     settings_path = workspace_root / ".claude" / "settings.json"
     canonical = settings_path.read_text(encoding="utf-8")
 
     def run(force: bool, installed: list[str]) -> None:
-        manager._install_claude(agentic_dir, workspace_root, force=force, installed=installed)
+        manager._install_claude(
+            agentic_dir, workspace_root, overwrite=OverwritePolicy.of(force), installed=installed
+        )
 
     # The stale content must be a file dadaia OWNS end to end, so the hash-compare sweep
     # asserts drift repair — NOT operator data loss. `{"existing": true}` used to sit here,
@@ -233,7 +242,9 @@ def _codex_runtime_adapters_case(
     dst = workspace_root / ".codex" / "skills" / "my-adapter" / "SKILL.md"
 
     def run(force: bool, installed: list[str]) -> None:
-        manager._install_codex_runtime_adapters(workspace_root, force=force, installed=installed)
+        manager._install_codex_runtime_adapters(
+            workspace_root, overwrite=OverwritePolicy.of(force), installed=installed
+        )
 
     return run, dst, canonical, "# ORIGINAL\n"
 
@@ -304,7 +315,9 @@ def test_install_codex_agents_shape_and_edge_cases(tmp_path: Path) -> None:
 
     manager = FileSystemPublicAssetManager()
     installed: list[str] = []
-    manager._install_codex_agents(agentic_dir, workspace_root, force=True, installed=installed)
+    manager._install_codex_agents(
+        agentic_dir, workspace_root, overwrite=OverwritePolicy.FORCE, installed=installed
+    )
 
     toml_path = workspace_root / ".codex" / "agents" / "my-agent.toml"
     assert toml_path.exists()
@@ -319,7 +332,9 @@ def test_install_codex_agents_shape_and_edge_cases(tmp_path: Path) -> None:
     empty_agentic, empty_ws = _build_minimal_agentic_dir(empty_root)
     (empty_agentic / "agents").mkdir()
     empty_installed: list[str] = []
-    manager._install_codex_agents(empty_agentic, empty_ws, force=True, installed=empty_installed)
+    manager._install_codex_agents(
+        empty_agentic, empty_ws, overwrite=OverwritePolicy.FORCE, installed=empty_installed
+    )
     assert empty_installed == []
 
     # Regression companion to test_public_assets_render.py's precedence test: the
@@ -348,7 +363,9 @@ def test_install_codex_rules(tmp_path: Path) -> None:
     (rules_dir / "prose.md").write_text("# Prose (no frontmatter)\n", encoding="utf-8")
     installed: list[str] = []
     manager = FileSystemPublicAssetManager()
-    manager._install_codex_rules(agentic_dir, workspace_root, force=True, installed=installed)
+    manager._install_codex_rules(
+        agentic_dir, workspace_root, overwrite=OverwritePolicy.FORCE, installed=installed
+    )
     assert (workspace_root / ".codex" / "rules" / "dadaia-command-policy.rules").exists()
     assert not (workspace_root / ".codex" / "rules" / "exec.md").exists()
     assert not (workspace_root / ".codex" / "rules" / "prose.md").exists()
@@ -381,7 +398,9 @@ def test_install_scripts_chmod_applied(tmp_path: Path) -> None:
     (scripts_src / "test.sh").write_text("#!/bin/bash\n", encoding="utf-8")
     installed: list[str] = []
     manager = FileSystemPublicAssetManager()
-    manager._install_scripts(agentic_dir, workspace_root, force=True, installed=installed)
+    manager._install_scripts(
+        agentic_dir, workspace_root, overwrite=OverwritePolicy.FORCE, installed=installed
+    )
     dst_script = workspace_root / ".dadaia" / "scripts" / "test.sh"
     assert dst_script.exists()
     mode = oct(dst_script.stat().st_mode)[-3:]
@@ -422,7 +441,9 @@ def test_install_preserves_operator_settings(tmp_path: Path) -> None:
     """
     agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
     manager = FileSystemPublicAssetManager()
-    manager._install_claude(agentic_dir, workspace_root, force=True, installed=[])
+    manager._install_claude(
+        agentic_dir, workspace_root, overwrite=OverwritePolicy.FORCE, installed=[]
+    )
     settings_path = workspace_root / ".claude" / "settings.json"
 
     settings = json.loads(settings_path.read_text(encoding="utf-8"))
@@ -461,7 +482,9 @@ def test_install_preserves_operator_settings(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    manager._install_claude(agentic_dir, workspace_root, force=False, installed=[])
+    manager._install_claude(
+        agentic_dir, workspace_root, overwrite=OverwritePolicy.PRESERVE, installed=[]
+    )
     after = json.loads(settings_path.read_text(encoding="utf-8"))
 
     assert after.get("permissions") == {"allow": ["Bash(git status:*)"]}
@@ -477,7 +500,7 @@ def test_install_preserves_operator_settings(tmp_path: Path) -> None:
     # non-blocking advisory. Preserving the operator's hooks must not mean hiding them.
     # Asserted on the settings doctor directly: the full ``doctor()`` gates this block on
     # "claude in the harness profile", which this minimal fixture does not carry.
-    lines = manager._doctor_claude_settings(workspace_root)
+    lines = [line.render() for line in manager._doctor_claude_settings(workspace_root)]
     assert lines[0] == "[ok] claude:settings.json", lines
     warns = [line for line in lines if line.startswith("[warn]")]
     assert warns, f"a foreign PreToolUse hook must be surfaced: {lines}"
@@ -508,10 +531,14 @@ def test_install_refuses_to_clobber_unreadable_settings(tmp_path: Path) -> None:
     """
     agentic_dir, workspace_root = _build_minimal_agentic_dir(tmp_path)
     manager = FileSystemPublicAssetManager()
-    manager._install_claude(agentic_dir, workspace_root, force=True, installed=[])
+    manager._install_claude(
+        agentic_dir, workspace_root, overwrite=OverwritePolicy.FORCE, installed=[]
+    )
     settings_path = workspace_root / ".claude" / "settings.json"
     settings_path.write_text("{ not json at all", encoding="utf-8")
 
     with pytest.raises(PublicAssetError, match="not readable JSON"):
-        manager._install_claude(agentic_dir, workspace_root, force=True, installed=[])
+        manager._install_claude(
+            agentic_dir, workspace_root, overwrite=OverwritePolicy.FORCE, installed=[]
+        )
     assert settings_path.read_text(encoding="utf-8") == "{ not json at all"

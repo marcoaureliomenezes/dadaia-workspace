@@ -22,6 +22,17 @@ import pytest
 
 from dadaia_workspace.infrastructure.codex_doctor import check_agent_skill_refs
 
+
+def _rendered(result: object) -> list[str]:
+    """Legacy string view of a typed doctor result (DoctorReport | list[DoctorLine])."""
+    if hasattr(result, "rendered"):
+        return result.rendered()  # type: ignore[attr-defined, no-any-return]
+    return [
+        line.render() if hasattr(line, "render") else str(line)
+        for line in result  # type: ignore[union-attr]
+    ]
+
+
 _AGENT_TEMPLATE = """---
 name: {name}
 description: test agent
@@ -64,7 +75,7 @@ def _public_tree(tmp_path: Path) -> Path:
 def test_core_agent_sweep(tmp_path: Path, skills: list[str], expect_drift: bool) -> None:
     public = _public_tree(tmp_path)
     _mk_agent(public / "agents" / "core-agent.md", "core-agent", skills)
-    out = check_agent_skill_refs(public)
+    out = _rendered(check_agent_skill_refs(public))
     if expect_drift:
         assert len(out) == 1
         assert out[0].startswith("[drift] agent:core-agent:")
@@ -99,7 +110,7 @@ def test_core_agent_sweep(tmp_path: Path, skills: list[str], expect_drift: bool)
 def test_pack_agent_sweep(tmp_path: Path, skills: list[str], expected: list[str] | str) -> None:
     public = _public_tree(tmp_path)
     _mk_agent(public / "plugins" / "pack-a" / "agents" / "pack-agent.md", "pack-agent", skills)
-    out = check_agent_skill_refs(public)
+    out = _rendered(check_agent_skill_refs(public))
     drift = [r for r in out if r.startswith("[drift]")]
     if expected == "foreign-pack-not-resolved":
         assert len(drift) == 1

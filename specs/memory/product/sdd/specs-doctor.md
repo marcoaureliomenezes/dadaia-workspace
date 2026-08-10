@@ -12,8 +12,8 @@ tags:
 - validation
 - sdd
 token_estimate: 212
-last_updated: '2026-07-13'
-release_origin: v0.2.3
+last_updated: '2026-08-07'
+release_origin: v0.3.0
 ---
 
 ## Purpose
@@ -51,4 +51,4 @@ operator decisions.
 
 ## Dependencies
 
-[[dadaia-workflows]], [[sdd-bug-backlog-governance]], [[workspace-doctor]].
+[[sdd-bug-backlog-governance]], [[workspace-doctor]], [[sdd-gate-v3]].

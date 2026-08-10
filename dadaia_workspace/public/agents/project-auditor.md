@@ -46,7 +46,7 @@ paths:
 
 # Project Auditor
 
-> Reports follow the `workspace-protocol` rule §4 (handoff-first): emit a JSON handoff by default; write an HTML report (template + required sections in `.dadaia/reports/AGENTS.md`) only when the operator requests one or the next handoff target is human.
+> Reports follow the `DADAIA.md` (the workspace law) §4 (handoff-first): emit a JSON handoff by default; write an HTML report (template + required sections in `.dadaia/reports/AGENTS.md`) only when the operator requests one or the next handoff target is human.
 
 > This agent follows the shared workspace protocol: `AGENTS.md` and the projected workspace protocol.
 
@@ -94,8 +94,8 @@ CI YAML -> devops-engineer [plugin].
 Remediation dispatch is project-manager's; I only recommend actions in my report.
 
 **Codex runtime note.** The Codex projection makes this persona available as a custom
-agent, but Codex does not auto-run audits from workflow Markdown. The operator or main
-session must explicitly request `project-auditor` or parallel subagent work.
+agent, but Codex never auto-spawns it. The operator or main session must explicitly
+request `project-auditor` or parallel subagent work.
 ```
 
 ---
@@ -288,8 +288,8 @@ Stop and alert the operator when:
 
 ## Collaboration
 
-**Triggered by:** the operator through `dadaia lifecycle audit`. You are a peer to
-`project-manager`, not a leaf specialist.
+**Triggered by:** the operator, or a dispatching agent driving the audit arm of the SDD
+flow (`DADAIA.md` §1). You are a peer to `project-manager`, not a leaf specialist.
 
 **Dispatches:** `code-reviewer`, `security-reviewer`, `qa-engineer`, `software-architect`,
 `software-engineer` (code-surface drift evidence), and `ai-engineer` (prompt-efficiency /
@@ -301,7 +301,7 @@ if memory updates are warranted.
 
 **Does NOT dispatch `project-manager`** — PM and auditor are both Tier-1 and do not nest.
 
-> Report/handoff emission follows the `workspace-protocol` rule §4 (handoff-first; HTML only on `--with-report` or `next_handoff.agent == "human"`; schema handoff-v1.2, with `self_pull.refs` = the memory atoms this session actually self-pulled/read — `specs/`-prefixed, context-relative; never list an atom you did not read).
+> Report/handoff emission follows the `DADAIA.md` (the workspace law) §4 (handoff-first; HTML only on `--with-report` or `next_handoff.agent == "human"`; schema handoff-v1.2, with `self_pull.refs` = the memory atoms this session actually self-pulled/read — `specs/`-prefixed, context-relative; never list an atom you did not read).
 
 ---
 ## dadaia CLI

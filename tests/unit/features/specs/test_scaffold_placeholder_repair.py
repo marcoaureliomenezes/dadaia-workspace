@@ -2,7 +2,7 @@
 placeholder-atom).
 
 Old scaffolds shipped a raw ``memory/product/feature.md`` template
-(``SLUG_PLACEHOLDER`` & friends) that NO verb could remediate — hermes' real contexts
+(``SLUG_PLACEHOLDER`` & friends) that NO verb could remediate — consumer' real contexts
 failed ``specs doctor`` forever. Now: the doctor flags it as fixable
 (MEM-PLACEHOLDER-1), ``--fix`` removes it, and ``specs upgrade`` repairs even a
 current-version tree (dry-run reports without deleting). Exact-token detection means
@@ -64,7 +64,7 @@ def _doctor(specs: Path) -> SpecsDoctor:
 
 
 def test_fresh_scaffold_is_doctor_clean_without_feature_placeholder(tmp_path: Path) -> None:
-    """Hermes P3: a fresh tree reaches 0/0 with no manual edit (no feature.md at all)."""
+    """Consumer P3: a fresh tree reaches 0/0 with no manual edit (no feature.md at all)."""
     specs = _fresh_specs(tmp_path)
     assert not (specs / "memory" / "product" / "feature.md").exists()
     issues = _doctor(specs).check()
@@ -125,7 +125,7 @@ def test_filled_atom_is_never_flagged_or_removed(tmp_path: Path) -> None:
 
 
 def test_upgrade_repairs_current_version_tree(tmp_path: Path) -> None:
-    """Hermes' exact case: tree already at canonical version + placeholder → repaired."""
+    """Consumer' exact case: tree already at canonical version + placeholder → repaired."""
     specs = _fresh_specs(tmp_path)
     atom = specs / "memory" / "product" / "feature.md"
     atom.write_text(_PLACEHOLDER_ATOM, encoding="utf-8")
