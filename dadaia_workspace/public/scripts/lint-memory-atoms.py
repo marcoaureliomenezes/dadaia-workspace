@@ -84,7 +84,6 @@ _HEADING_GROUP_B: frozenset[str] = frozenset(
         "Decision Authority Matrix — domínios novos (r3)",
         "Handoff-first emission contract (ADR-X5)",
         "Dispatch-to-researcher pattern (ADR-X6)",
-        "Plugin-scope enforcement (ADR-X7)",
         "Codex Dispatcher Capability Matrix (ADR-3)",
     ]
 )
@@ -111,7 +110,6 @@ _HEADING_GROUP_C: frozenset[str] = frozenset(
         "Runtimes e ferramentas",
         "Agent runtimes",
         # "Model assignments (20 agentes)" pruned in v0.1.48 (F-79): 0 usages in specs/memory/.
-        "Plugin inventory",
         "Schema handoff-v1.1",
         "Dependências aprovadas",
         "Restrições e proibições",
@@ -140,7 +138,7 @@ _HEADING_GROUP_D: frozenset[str] = frozenset(
         "Gating note (current behavior)",
         "Harness runtime boundary",
         "Hygiene and anti-slop behavior",
-        "Model assignments (9 core agents + 3 plugin stubs)",
+        "Model assignments (9 core agents)",
         "Modelo de concorrência e lease (v0.1.14)",
         "Multi-harness runtime parity (constitution §4)",
         "Os 3 canais de reporte/comunicação (constitution §11)",
@@ -152,7 +150,7 @@ _HEADING_GROUP_D: frozenset[str] = frozenset(
         "Python governance hooks package",
         "Structured-memory-source subsystem (memory-markdown-source-v1)",
         "Sub-agent model (constitution §9)",
-        "Topologia de agentes (9 core + 3 plugins)",
+        "Topologia de agentes (9 core)",
     ]
 )
 
@@ -197,7 +195,7 @@ _HEADING_GROUP_G: frozenset[str] = frozenset(
         # v0.1.48 W4 English-canon renames of the accreted non-Group-A headings
         # (PT originals retained above for consumer-workspace compatibility).
         "Adoption (9 core agents)",
-        "Agent topology (9 core + 3 plugins)",
+        "Agent topology (9 core)",
         "Approved dependencies",
         "Canonical commands",
         "Capability map",

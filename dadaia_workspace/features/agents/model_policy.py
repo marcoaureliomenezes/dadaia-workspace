@@ -6,10 +6,7 @@ The feature seam between the panel views and the agent-model governance stack:
   is injected through the :class:`AgentModelPolicyStorePort` protocol — this module
   never imports infrastructure (D-4, ``features-no-infrastructure``);
 - the **re-render callable** (the agents-only ``public install`` path — G-2 Apply
-  semantics) is injected by the composition root (``container.build_panel_views``);
-- the **plugin pack defaults** provider returns ``{agent_name: pack_default_model}``
-  for the installed packs, so the resolved roster covers the 9 core agents plus every
-  installed plugin agent (G-4/D-5).
+  semantics) is injected by the composition root (``container.build_panel_views``).
 
 All precedence goes through the single resolver
 (:func:`~dadaia_workspace.core.agent_model_templates.resolve_agent_model` — FR4); this
@@ -61,11 +58,9 @@ class AgentModelPolicyService:
         self,
         store: AgentModelPolicyStorePort,
         rerender: Callable[[], list[str]],
-        plugin_pack_defaults: Callable[[], dict[str, str]] | None = None,
     ) -> None:
         self._store = store
         self._rerender = rerender
-        self._plugin_pack_defaults = plugin_pack_defaults or (lambda: {})
 
     # -- read ---------------------------------------------------------------
 
@@ -85,7 +80,7 @@ class AgentModelPolicyService:
         }
 
     def resolved_roster(self) -> dict[str, dict[str, object]]:
-        """The full resolved roster (core + installed plugin agents), source-tagged."""
+        """The full resolved core roster, source-tagged."""
         return self._resolved_roster(self._store.load())
 
     def templates_payload(self) -> dict[str, object]:
@@ -153,13 +148,6 @@ class AgentModelPolicyService:
         roster: dict[str, dict[str, object]] = {}
         for agent in CORE_AGENTS:
             resolved = resolve_agent_model(agent, overlay)
-            roster[agent] = {
-                "model": resolved.model,
-                "effort": resolved.effort,
-                "source": resolved.source,
-            }
-        for agent, pack_default in sorted(self._plugin_pack_defaults().items()):
-            resolved = resolve_agent_model(agent, overlay, pack_default=pack_default)
             roster[agent] = {
                 "model": resolved.model,
                 "effort": resolved.effort,

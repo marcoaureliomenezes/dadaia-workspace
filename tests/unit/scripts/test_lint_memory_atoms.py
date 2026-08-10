@@ -573,7 +573,7 @@ def test_memory_feature_template_headings_are_allowlisted() -> None:
                 "Gating note (current behavior)",
                 "Harness runtime boundary",
                 "Hygiene and anti-slop behavior",
-                "Model assignments (9 core agents + 3 plugin stubs)",
+                "Model assignments (9 core agents)",
                 "Modelo de concorrência e lease (v0.1.14)",
                 "Multi-harness runtime parity (constitution §4)",
                 "Os 3 canais de reporte/comunicação (constitution §11)",
@@ -585,7 +585,7 @@ def test_memory_feature_template_headings_are_allowlisted() -> None:
                 "Python governance hooks package",
                 "Structured-memory-source subsystem (memory-markdown-source-v1)",
                 "Sub-agent model (constitution §9)",
-                "Topologia de agentes (9 core + 3 plugins)",
+                "Topologia de agentes (9 core)",
             ],
         ),
         (

@@ -265,14 +265,6 @@ an initialized workspace, create it:
   (Init may reach an index — if egress is fully blocked AND the fallback cannot apply,
   mark EXCEPTION with the network cause, else FAIL.)
 
-### F-19 — Plugins
-- Run in an initialized workspace: `$D plugin list`.
-- **PASS if:** it lists installed packs (empty set on a fresh workspace is a valid
-  answer — exit 0, "no plugins", NOT an error). Then install one of the two in-package
-  packs — `$D plugin install frontend-design` (or `devops`) — which records the ledger and
-  leaves doctor green. `plugin list` in an UNINITIALIZED dir returning a clean "run init
-  first" message (non-zero) is acceptable, not a FAIL.
-
 ### F-20 — Academy
 - Run: `$D academy --help` and a read verb.
 - **PASS if:** the academy verbs exist and read without touching governed paths.

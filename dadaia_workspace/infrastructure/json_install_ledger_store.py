@@ -2,7 +2,7 @@
 
 The ``infrastructure`` adapter for
 :class:`~dadaia_workspace.core.protocols.install_ledger_store.InstallLedgerStore`,
-mirroring ``json_plugin_store.py`` (stateless, per-call ``states_dir``, atomic write,
+(stateless, per-call ``states_dir``, atomic write,
 idempotent no-op on identical bytes). Persists to
 ``.dadaia/states/install_ledger.json``:
 

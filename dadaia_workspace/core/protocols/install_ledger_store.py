@@ -1,7 +1,7 @@
 """InstallLedgerStore protocol — read/write the persisted projection install ledger.
 
 The ``core.protocols`` port for ``.dadaia/states/install_ledger.json`` persistence,
-mirroring :class:`~dadaia_workspace.core.protocols.plugin_store.PluginStore`. The
+a stateless, path-parametric port. The
 concrete adapter is ``infrastructure/json_install_ledger_store.py``.
 
 Read semantics: ``read`` returns ``None`` when the ledger file is absent — a workspace

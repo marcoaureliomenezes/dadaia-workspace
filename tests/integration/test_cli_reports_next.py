@@ -33,7 +33,7 @@ def _seed_context(
     workspace: Path,
     *,
     active: str = f"release: {_RELEASE}\nphase: TASKS\n",
-    plan: str = "**Owner:** qa-engineer\n**Owner:** devops-engineer\n",
+    plan: str = "**Owner:** qa-engineer\n**Owner:** product-engineer\n",
     handoffs: dict[str, str] | None = None,
 ) -> None:
     releases = workspace / "repos" / _CTX / "specs" / "releases"
@@ -61,10 +61,10 @@ def test_next_json_text_all_completed_no_active_release_and_plan_without_owners(
     json_result = _runner.invoke(app, ["reports", "next", "--context", _CTX, "--json"])
     assert json_result.exit_code == 0, json_result.output
     payload = json.loads(json_result.output)
-    assert payload["next_agent"] == "devops-engineer"
+    assert payload["next_agent"] == "product-engineer"
     assert payload["release_id"] == _RELEASE
     assert payload["completed_agents"] == ["qa-engineer"]
-    assert payload["pending_agents"] == ["devops-engineer"]
+    assert payload["pending_agents"] == ["product-engineer"]
 
     text_ws = tmp_path / "text-case"
     _init_workspace(text_ws)
@@ -76,7 +76,7 @@ def test_next_json_text_all_completed_no_active_release_and_plan_without_owners(
 
     completed_ws = tmp_path / "completed-case"
     _init_workspace(completed_ws)
-    _seed_context(completed_ws, handoffs={"qa-engineer": _RELEASE, "devops-engineer": _RELEASE})
+    _seed_context(completed_ws, handoffs={"qa-engineer": _RELEASE, "product-engineer": _RELEASE})
     monkeypatch.chdir(completed_ws)
     completed_result = _runner.invoke(app, ["reports", "next", "--context", _CTX, "--json"])
     assert completed_result.exit_code == 0, completed_result.output

@@ -43,7 +43,7 @@ the exact-commit security verdict.
 ## Projection Validation
 
 `dadaia public doctor` checks manifest hashes, runtime-specific rendering, skill/agent
-references, policy resolution, plugin precedence, and public privacy. Unknown install
+references, policy resolution, and public privacy. Unknown install
 targets fail; profile-aware install/doctor operate only on configured harnesses.
 
 ## Dependencies

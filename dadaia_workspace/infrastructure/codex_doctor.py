@@ -50,7 +50,6 @@ _CODEX_TEXT_SUFFIXES: frozenset[str] = frozenset({".toml", ".md", ".json", ".txt
 _CODEX_EXPECTED_READ_ONLY_AGENTS: frozenset[str] = frozenset(
     {
         "code-reviewer",
-        "design-specialist",
         "project-auditor",
         "qa-engineer",
         "security-reviewer",
@@ -453,8 +452,7 @@ def check_agent_skill_refs(public_dir: Path) -> list[DoctorLine]:
     skills_dir = public_dir / "skills"
     out: list[DoctorLine] = []
     if not agents_dir.exists():
-        # Plugin sweep still runs — pack agents live outside public/agents/.
-        return _check_plugin_agent_skill_refs(public_dir, skills_dir)
+        return []
 
     for md_file in sorted(agents_dir.glob("*.md")):
         try:
@@ -505,48 +503,9 @@ def check_agent_skill_refs(public_dir: Path) -> list[DoctorLine]:
                 )
                 already_flagged.add(candidate)
 
-    # Plugin-aware sweep (v0.1.63 FR6 / ADR-C3, read fact 6): pack agents under
-    # public/plugins/<pack>/agents/ resolve their frontmatter ``skills:`` refs against
-    # public/skills/ UNION that pack's OWN plugins/<pack>/skills/ — never a foreign
-    # pack's. Additive: the core-agent sweep above is untouched.
-    out.extend(_check_plugin_agent_skill_refs(public_dir, skills_dir))
     return out
 
 
-def _check_plugin_agent_skill_refs(public_dir: Path, skills_dir: Path) -> list[DoctorLine]:
-    """Sweep pack-agent frontmatter skill refs (D-CX-SKILLS, plugin-aware half)."""
-    plugins_dir = public_dir / "plugins"
-    out: list[DoctorLine] = []
-    if not plugins_dir.exists():
-        return out
-    for pack_dir in sorted(plugins_dir.iterdir()):
-        pack_agents = pack_dir / "agents"
-        if not pack_dir.is_dir() or not pack_agents.exists():
-            continue
-        pack_skills = pack_dir / "skills"
-        for md_file in sorted(pack_agents.glob("*.md")):
-            try:
-                text = md_file.read_text(encoding="utf-8")
-            except OSError:
-                continue
-            fm = _parse_agent_frontmatter(text)
-            agent_name = str(fm.get("name", md_file.stem)) if fm else md_file.stem
-            for skill in _parse_skills_from_frontmatter(text):
-                if (skills_dir / skill).is_dir() or (pack_skills / skill).is_dir():
-                    continue
-                out.append(
-                    DoctorLine(
-                        DoctorStatus.DRIFT,
-                        f"plugin-agent:{pack_dir.name}/{agent_name}: frontmatter "
-                        f"references non-existent skill '{skill}' (D-CX-SKILLS)",
-                    )
-                )
-    return out
-
-
-# Phrases that assert the memory-write PHASE permission (as opposed to incidental mentions
-# of "release closure" + "memory" in the same line). A governance-bearing line matches one
-# of these AND cites CLOSURE without DEFINITION → single-source drift.
 _MEMORY_PHASE_CLAIM_MARKERS = (
     "write-locked",
     "only allows memory",

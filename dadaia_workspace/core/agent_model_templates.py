@@ -14,9 +14,6 @@ default.
 :func:`resolve_agent_model` is the ONLY precedence implementation (FR4): install,
 doctor, codex projection, and the panel all consume it. Per-field precedence for core
 agents: per-agent overlay override > applied template > library default (``balanced``).
-Plugin agents (not in the templates — G-4): override > pack-provided default (D-5),
-with the F-6 asymmetry — a pack default with no override resolves the model only
-(``effort`` is ``None``, never a placeholder).
 
 Layering (D-4): pure data + pure functions, zero I/O (``core-no-os-primitives`` holds).
 """
@@ -195,19 +192,14 @@ def template_by_id(template_id: str) -> AgentModelTemplate:
 def resolve_agent_model(
     agent_name: str,
     overlay: AgentModelPolicyOverlay | None,
-    *,
-    pack_default: str | None = None,
 ) -> ResolvedAgentModel:
     """Resolve one agent's (model, effort, source) — the ONLY precedence implementation.
 
     Core agents (per-field): override > applied template > ``balanced`` default.
-    Plugin agents (``pack_default`` supplied, agent not in templates): override >
-    pack default; a pack default with no effort override resolves ``effort=None``
-    (F-6 — the render seam then omits ``effort:`` entirely).
 
     Raises:
-        ValueError: for an agent that is neither a core agent nor supplied with a
-            ``pack_default``, or an unknown ``applied_template`` id in the overlay.
+        ValueError: for an agent that is not a core agent, or an unknown
+            ``applied_template`` id in the overlay.
     """
     override = overlay.overrides.get(agent_name) if overlay is not None else None
 
@@ -231,18 +223,7 @@ def resolve_agent_model(
             source="template" if base_source == "template" else "default",
         )
 
-    if pack_default is None:
-        raise ValueError(
-            f"unknown agent {agent_name!r}: not a core agent and no pack default "
-            "supplied (plugin agents resolve only when their pack provides a default)"
-        )
-    if override is not None and not override.is_empty:
-        return ResolvedAgentModel(
-            model=override.model if override.model is not None else pack_default,
-            effort=override.effort,
-            source="override",
-        )
-    return ResolvedAgentModel(model=pack_default, effort=None, source="pack")
+    raise ValueError(f"unknown agent {agent_name!r}: not a core agent")
 
 
 __all__ = [

@@ -1,6 +1,6 @@
 // agent_policy.js — Sub-agents tab: L1 agent model governance (v0.1.65 FR8).
 //
-// Renders the roster table (9 core agents + installed plugin agents) with a per-agent
+// Renders the roster table (the 9 core agents) with a per-agent
 // model picker (registry models) + effort picker (low|medium|high|xhigh|max), a
 // template selector, and an explicit Apply button (validate-before-save — G-2 Apply
 // semantics: PUT persists the overlay AND re-renders BOTH L1 projections). After a
@@ -40,7 +40,6 @@
   var efforts = [];          // low..max
   var policy = null;         // last GET policy document
   var resolved = {};         // last GET resolved roster {agent: {model, effort, source}}
-  var packBaseline = {};     // plugin agent -> pack default model (source === 'pack')
   var selectedTemplate = null;   // template id driving the pickers
   var pendingOverrides = {};     // {agent: {model?, effort?}} — the edit state
 
@@ -63,12 +62,10 @@
     return !!(t && t.assignments[agent]);
   }
 
-  // The template baseline for one agent: {model, effort} for core agents; the pack
-  // default (model only) for plugin agents.
+  // The template baseline for one agent: {model, effort} from the active template.
   function baselineFor(agent) {
     var t = templateById(selectedTemplate);
     if (t && t.assignments[agent]) { return t.assignments[agent]; }
-    if (packBaseline[agent]) { return { model: packBaseline[agent], effort: null }; }
     return null;
   }
 
@@ -181,15 +178,12 @@
       return;
     }
     var core = agents.filter(isCoreAgent).sort();
-    var plugin = agents.filter(function (a) { return !isCoreAgent(a); }).sort();
     var rows = '';
-    core.concat(plugin).forEach(function (agent) {
+    core.forEach(function (agent) {
       var eff = effectiveFor(agent);
       var source = sourceFor(agent);
       var isOverride = source.indexOf('override') === 0;
-      var effortSelect = isCoreAgent(agent)
-        ? renderSelectOptions(efforts, eff.effort, null)
-        : renderSelectOptions(efforts, eff.effort, '(pack default)');
+      var effortSelect = renderSelectOptions(efforts, eff.effort, null);
       rows += '<tr>' +
         '<td class="ap-agent-name">' + escHtml(agent) + '</td>' +
         '<td><select class="ap-model-select" aria-label="Model for ' + escHtml(agent) + '" ' +
@@ -333,11 +327,6 @@
       }
       policy = res.body.policy || {};
       resolved = res.body.resolved || {};
-      for (var agent in resolved) {
-        if (resolved[agent].source === 'pack') {
-          packBaseline[agent] = resolved[agent].model;
-        }
-      }
       selectedTemplate = policy.applied_template || defaultTemplateId();
       // Seed the edit state from the persisted overrides so Apply round-trips them.
       pendingOverrides = {};

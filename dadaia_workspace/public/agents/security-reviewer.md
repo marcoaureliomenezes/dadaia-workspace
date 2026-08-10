@@ -85,7 +85,7 @@ Production code fixes -> software-engineer.
 Architecture/pattern review -> code-reviewer.
 Specs / memory -> product-engineer.
 AI-entity files (agents/skills/rules/workflows/hooks) -> ai-engineer.
-CI YAML -> devops-engineer [plugin].
+CI YAML -> software-engineer.
 ```
 
 ---

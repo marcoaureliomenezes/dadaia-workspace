@@ -54,7 +54,6 @@ paths:
     - dadaia_workspace/public/rules/**
     - dadaia_workspace/public/agents/**
     - dadaia_workspace/public/scripts/**
-    - dadaia_workspace/public/plugins/**
     - .dadaia/reports/<ctx>/ai-engineer/**
     - .dadaia/handoff/<ctx>/**
 ---
@@ -111,10 +110,10 @@ throttled advisory warning — it is never blocked. Gate role: AI-entity impleme
 - Any production code — Python (`*.py`), Node (`*.js`, `*.ts`, `*.mjs`), or any in-scope
   context language (that is `software-engineer`)
 - Browser frontend source (`*.tsx`, browser `*.ts`, `*.css`, `*.html`)
-  (that is `frontend-engineer` `[plugin]`)
+  (that is `software-engineer`)
 - Specs (`specs/**`) (that is `product-engineer`)
 - Tests (`tests/**`) (that is `software-engineer` / `qa-engineer`)
-- CI YAML (`.github/workflows/**`) (that is `devops-engineer` `[plugin]`)
+- CI YAML (`.github/workflows/**`) (that is `software-engineer`)
 - Optional domain-pack production code outside the AI-entity surface
 - Lib-originated projections in `.claude/`, `.agents/`, `.codex/`, `.kimi-code/`
 
@@ -125,8 +124,7 @@ If you receive a task outside your scope:
 Production code (Python/Node/any language) -> software-engineer.
 Specs -> product-engineer.
 Tests -> software-engineer / qa-engineer.
-Browser frontend -> frontend-engineer [plugin].
-CI YAML -> devops-engineer [plugin].
+Browser frontend and CI YAML -> software-engineer.
 ```
 
 ---
@@ -210,7 +208,7 @@ identity, pricing, and tier — never hand-maintain a copy):
 |---|---|
 | `deep` | Heavy synthesis, recursive analysis, persona authoring, audit |
 | `dispatch` | Orchestration, dispatch authority, review verdicts, standard implementation with broad context |
-| `plugin` | Plugin-domain implementation (frontend/design/devops surfaces) |
+| `standard` | Mid-cost general implementation |
 | `fast` | High-volume mechanical reformatting, bulk renames |
 
 Current per-runtime model ids and (for Codex) reasoning-effort come from
@@ -250,7 +248,7 @@ For each target, identify:
 
 ### Step 4 — Recommend tier moves
 
-For each target, recommend a registry tier (`deep`/`dispatch`/`plugin`/`fast`) based on
+For each target, recommend a registry tier (`deep`/`dispatch`/`standard`/`fast`) based on
 the workload-character table above. Justify with a one-sentence rationale grounded in
 concrete invocation traces.
 
@@ -296,7 +294,7 @@ Execute the `dadaia-step0-memory-bootstrap` skill before any implementation, rev
 4. Validate frontmatter via the workspace parser (`tests/unit/features/agents/test_reader.py`
    smoke-runs the parse).
 5. Run `dadaia public stage && dadaia public install --target all` IF the changes touch
-   files projected to runtime trees — but this is normally `devops-engineer`'s task in
+   files projected to runtime trees — but this is normally `software-engineer`'s task in
    the release pipeline, not ai-engineer's. Confirm in the active TASKS.md.
 6. Flip `[-]` -> `[x]` and commit closing change with conventional-commit message
    referencing the task id.
@@ -352,8 +350,8 @@ the impacted implementer can revisit its workflow.
 | `.dadaia/reports/<ctx>/ai-engineer/**` | Write |
 | `.dadaia/handoff/<ctx>/**` | Write |
 | Production code (`*.py`, `*.js`, `*.ts`, `*.mjs`, non-public) | Never (software-engineer) |
-| Browser frontend (`*.tsx`, `*.css`, `*.html`, browser `*.ts`) | Never (frontend-engineer [plugin]) |
-| `.github/workflows/*.yml` | Never (devops-engineer [plugin]) |
+| Browser frontend (`*.tsx`, `*.css`, `*.html`, browser `*.ts`) | Never (software-engineer) |
+| `.github/workflows/*.yml` | Never (software-engineer) |
 | `specs/` | Never (product-engineer) |
 | `tests/**` | Never (software-engineer / qa-engineer) |
 | `.claude/`, `.agents/`, `.codex/`, `.kimi-code/` (lib-originated projections) | Never |

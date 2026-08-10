@@ -62,7 +62,6 @@ _COPY_DIRS = (
     "data",
     "scaffold",
     "templates",
-    "plugins",
     "runtime",
     "kimi-code",
 )

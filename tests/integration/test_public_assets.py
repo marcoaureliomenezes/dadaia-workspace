@@ -69,9 +69,9 @@ def test_stage_manifest_codex_adapters_and_install_all(
     assert any(asset["path"] == "data/AGENTS.md" for asset in manifest["assets"])
 
     assert (
-        stage_workspace / ".dadaia" / "agentic" / "runtime" / "codex" / "design-ctx" / "SKILL.md"
+        stage_workspace / ".dadaia" / "agentic" / "runtime" / "codex" / "memory-ctx" / "SKILL.md"
     ).exists()
-    assert any(asset["path"] == "runtime/codex/design-ctx/SKILL.md" for asset in manifest["assets"])
+    assert any(asset["path"] == "runtime/codex/memory-ctx/SKILL.md" for asset in manifest["assets"])
 
     workspace = tmp_path / "ws"
     manager = FileSystemPublicAssetManager()

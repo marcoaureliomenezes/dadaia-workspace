@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-10T17:11:08Z",
+  "generated_at": "2026-08-10T20:33:00Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -111,35 +111,12 @@
     },
     {
       "rank": 6,
-      "slug": "plugin-packs",
-      "title": "plugin-packs",
-      "category": "product",
-      "area": "distribution",
-      "tldr": "in-package plugin packs (4 skills each) enabled via `dadaia plugin install`, disabled via `uninstall`; 3 stub agents gain real behavior once installed.",
-      "summary": "The plugin-distribution capability — in-package packs under public/plugins/ (frontend-design + devops, 4 skills each), the `dadaia plugin install/uninstall/list/doctor` CLI on a ports-and-adapters seam (PluginPack/InstalledPlugins core model + PluginStore port + JsonPluginStore adapter), a per-workspace installed_plugins.json ledger, profile-scoped projection that overwrites the projected core stub with the pack's real agent body, core-install precedence so a later public install never reverts an installed pack, an uninstall inverse (files-first/ledger-last, never-silent drift restore, never-installed equivalence), plugin doctor per-file status, machine-checked pack-agent skill refs, and the three plugin agents (frontend-engineer, design-specialist, devops-engineer) carrying real behavior on the registry plugin/sonnet tier once their pack is installed.",
-      "path": "specs/memory/product/distribution/plugin-packs.md",
-      "tags": [
-        "plugins",
-        "distribution",
-        "install",
-        "agents"
-      ],
-      "token_estimate": 900,
-      "depends_on": [
-        "public-asset-distribution",
-        "agent-orchestration",
-        "tech-stack",
-        "workspace-init"
-      ]
-    },
-    {
-      "rank": 7,
       "slug": "public-asset-distribution",
       "title": "public-asset-distribution",
       "category": "product",
       "area": "distribution",
       "tldr": "canonical public assets are staged to .dadaia/agentic and projected to Claude Code, Codex, Kimi Code, and shared .agents roots.",
-      "summary": "Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, harness-profile-aware install/doctor, render-at-install of core agents (staged generic body + resolved agent-model policy composed into both L1 projections) with a policy-aware doctor render-compare, plugin-pack projection with installed-plugins ledger + core-install precedence + uninstall reconciliation (files-first/ledger-last inverse), provenance-gated consumer AGENTS fan-out (banner-canonical restored vs hand-authored left [foreign]) with lexical repo-slug containment + destination-file symlink refusal, scoped AGENTS projections, source-root hygiene guard, and runtime projection contract.",
+      "summary": "Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, harness-profile-aware install/doctor, render-at-install of core agents (staged generic body + resolved agent-model policy composed into both L1 projections) with a policy-aware doctor render-compare, provenance-gated consumer AGENTS fan-out (banner-canonical restored vs hand-authored left [foreign]) with lexical repo-slug containment + destination-file symlink refusal, scoped AGENTS projections, source-root hygiene guard, and runtime projection contract.",
       "path": "specs/memory/product/distribution/public-asset-distribution.md",
       "tags": [
         "public",
@@ -150,19 +127,18 @@
       ],
       "token_estimate": 2524,
       "depends_on": [
-        "plugin-packs",
         "agent-orchestration",
         "workspace-init"
       ]
     },
     {
-      "rank": 8,
+      "rank": 7,
       "slug": "pypi-distribution",
       "title": "pypi-distribution",
       "category": "product",
       "area": "distribution",
       "tldr": "The published dadaia-workspace 0.2.x PyPI package, the release.yml OIDC publish pipeline, the wheel content contract, and the SDD-vs-package version split.",
-      "summary": "Owns PyPI distribution as product behavior — the live `dadaia-workspace` 0.2.x package (PyPI since PRs #112/#113, ratified v0.1.61), the `.github/workflows/release.yml` pipeline (version-vs-tag check → five test legs → build → release-gate approval → OIDC trusted publishing + tag → post-publish smoke), the wheel content contract (plugin packs and public assets ship in-package), and the documented version-scheme split: SDD releases `v0.1.x` version the SDD process while the package `0.2.x` versions the shipped library (ADR-2 — documented, never renumbered).",
+      "summary": "Owns PyPI distribution as product behavior — the live `dadaia-workspace` 0.2.x package (PyPI since PRs #112/#113, ratified v0.1.61), the `.github/workflows/release.yml` pipeline (version-vs-tag check → five test legs → build → release-gate approval → OIDC trusted publishing + tag → post-publish smoke), the wheel content contract (public assets ship in-package), and the documented version-scheme split: SDD releases `v0.1.x` version the SDD process while the package `0.2.x` versions the shipped library (ADR-2 — documented, never renumbered).",
       "path": "specs/memory/product/distribution/pypi-distribution.md",
       "tags": [
         "distribution",
@@ -174,12 +150,11 @@
       "depends_on": [
         "quality-assurance",
         "public-asset-distribution",
-        "plugin-packs",
         "cross-platform-portability"
       ]
     },
     {
-      "rank": 9,
+      "rank": 8,
       "slug": "harness-claude-code",
       "title": "Harness — Claude Code",
       "category": "product",
@@ -203,7 +178,7 @@
       ]
     },
     {
-      "rank": 10,
+      "rank": 9,
       "slug": "harness-codex",
       "title": "Harness — Codex",
       "category": "product",
@@ -227,7 +202,7 @@
       ]
     },
     {
-      "rank": 11,
+      "rank": 10,
       "slug": "harness-kimi-code",
       "title": "Harness — Kimi Code",
       "category": "product",
@@ -251,7 +226,7 @@
       ]
     },
     {
-      "rank": 12,
+      "rank": 11,
       "slug": "brand-identity",
       "title": "brand-identity",
       "category": "product",
@@ -271,7 +246,7 @@
       ]
     },
     {
-      "rank": 13,
+      "rank": 12,
       "slug": "panel",
       "title": "panel",
       "category": "product",
@@ -295,7 +270,7 @@
       ]
     },
     {
-      "rank": 14,
+      "rank": 13,
       "slug": "product-vision",
       "title": "product-vision",
       "category": "product",
@@ -319,7 +294,7 @@
       ]
     },
     {
-      "rank": 15,
+      "rank": 14,
       "slug": "spec-context-project",
       "title": "spec-context-project",
       "category": "product",
@@ -341,7 +316,7 @@
       ]
     },
     {
-      "rank": 16,
+      "rank": 15,
       "slug": "consumer-agent-support",
       "title": "Consumer validation gate — supported consumer environments",
       "category": "product",
@@ -364,7 +339,7 @@
       ]
     },
     {
-      "rank": 17,
+      "rank": 16,
       "slug": "context-management",
       "title": "context-management",
       "category": "product",
@@ -387,7 +362,7 @@
       ]
     },
     {
-      "rank": 18,
+      "rank": 17,
       "slug": "cross-platform-portability",
       "title": "cross-platform-portability",
       "category": "product",
@@ -412,7 +387,7 @@
       ]
     },
     {
-      "rank": 19,
+      "rank": 18,
       "slug": "multi-platform-parity",
       "title": "multi-platform-parity",
       "category": "product",
@@ -437,7 +412,7 @@
       ]
     },
     {
-      "rank": 20,
+      "rank": 19,
       "slug": "repos-catalog",
       "title": "repos-catalog",
       "category": "product",
@@ -457,7 +432,7 @@
       ]
     },
     {
-      "rank": 21,
+      "rank": 20,
       "slug": "server-registry",
       "title": "server-registry",
       "category": "product",
@@ -478,7 +453,7 @@
       ]
     },
     {
-      "rank": 22,
+      "rank": 21,
       "slug": "workspace-doctor",
       "title": "workspace-doctor",
       "category": "product",
@@ -500,7 +475,7 @@
       ]
     },
     {
-      "rank": 23,
+      "rank": 22,
       "slug": "workspace-init",
       "title": "workspace-init",
       "category": "product",
@@ -522,7 +497,7 @@
       ]
     },
     {
-      "rank": 24,
+      "rank": 23,
       "slug": "workspace-portability",
       "title": "workspace-portability",
       "category": "product",
@@ -543,7 +518,7 @@
       ]
     },
     {
-      "rank": 25,
+      "rank": 24,
       "slug": "sdd-bug-backlog-governance",
       "title": "sdd-bug-backlog-governance",
       "category": "product",
@@ -566,7 +541,7 @@
       ]
     },
     {
-      "rank": 26,
+      "rank": 25,
       "slug": "sdd-gate-v3",
       "title": "sdd-gate-v3",
       "category": "product",
@@ -589,7 +564,7 @@
       ]
     },
     {
-      "rank": 27,
+      "rank": 26,
       "slug": "specs-doctor",
       "title": "specs-doctor",
       "category": "product",

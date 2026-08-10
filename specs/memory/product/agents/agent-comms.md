@@ -82,8 +82,8 @@ Minimal handoff: ~500 bytes (required fields only); typical: <2 KB; warning if >
 
 Every emission-instruction surface carries the v1.2/`self_pull` instruction, pinned by a
 file-enumerated contract test (`tests/contract/test_handoff_instruction_adoption.py`, 15
-surfaces): the 13 whole files — 12 agent bodies (9 core `public/agents/*.md` + 3 plugin
-`public/plugins/*/agents/*.md`) plus `public/data/handoff-AGENTS.md` — and the
+surfaces): the 10 whole files — the 9 core agent bodies (`public/agents/*.md`)
+plus `public/data/handoff-AGENTS.md` — and the
 `dadaia-handoff-emitter` skill's two JSON examples. The 9 core public agents declare
 `dadaia-handoff-emitter` when they produce reports/handoffs that need a machine-readable
 sidecar. A roster-completeness assert backs the enumeration, so a renamed or new agent

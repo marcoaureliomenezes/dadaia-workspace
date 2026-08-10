@@ -25,7 +25,7 @@ def _build(
     tmp_path: Path,
     *,
     active: str | None = f"release: {_RELEASE}\nphase: TASKS\n",
-    plan: str | None = "**Owner:** qa-engineer\n**Owner:** devops-engineer\n",
+    plan: str | None = "**Owner:** qa-engineer\n**Owner:** product-engineer\n",
     handoffs: dict[str, str] | None = None,
 ) -> ReportsNextService:
     """Construct a service over a temp specs/reports layout.
@@ -57,13 +57,13 @@ def test_first_pending_agent_identified_and_other_release_handoff_excluded(
 ) -> None:
     svc = _build(
         tmp_path,
-        plan="**Owner:** qa-engineer\n**Owner:** devops-engineer\n**Owner:** software-engineer\n",
+        plan="**Owner:** qa-engineer\n**Owner:** product-engineer\n**Owner:** software-engineer\n",
         handoffs={"qa-engineer": _RELEASE},
     )
     result = svc.resolve_next()
-    assert result.next_agent == "devops-engineer"
+    assert result.next_agent == "product-engineer"
     assert result.completed_agents == ["qa-engineer"]
-    assert result.pending_agents == ["devops-engineer", "software-engineer"]
+    assert result.pending_agents == ["product-engineer", "software-engineer"]
 
     other_release_svc = _build(
         tmp_path.parent / (tmp_path.name + "-other-release"),
@@ -78,7 +78,7 @@ def test_first_pending_agent_identified_and_other_release_handoff_excluded(
 
 
 _DEFAULT_ACTIVE = f"release: {_RELEASE}\nphase: TASKS\n"
-_DEFAULT_PLAN = "**Owner:** qa-engineer\n**Owner:** devops-engineer\n"
+_DEFAULT_PLAN = "**Owner:** qa-engineer\n**Owner:** product-engineer\n"
 
 
 @pytest.mark.parametrize(
@@ -121,12 +121,12 @@ def test_error_raises_matrix(
     ("plan", "handoffs", "assert_fn"),
     [
         pytest.param(
-            "**Owner:** qa-engineer\n**Owner:** devops-engineer\n",
-            {"qa-engineer": _RELEASE, "devops-engineer": _RELEASE},
+            "**Owner:** qa-engineer\n**Owner:** product-engineer\n",
+            {"qa-engineer": _RELEASE, "product-engineer": _RELEASE},
             lambda r: (
                 r.next_agent is None
                 and r.pending_agents == []
-                and r.completed_agents == ["qa-engineer", "devops-engineer"]
+                and r.completed_agents == ["qa-engineer", "product-engineer"]
                 and r.release_id == _RELEASE
             ),
             id="all-completed-returns-none",
@@ -152,12 +152,12 @@ def test_error_raises_matrix(
         pytest.param(
             (
                 "**Owner:** qa-engineer\n"
-                "(owner: devops-engineer)\n"
+                "(owner: product-engineer)\n"
                 "**Owner:** qa-engineer\n"  # duplicate — must not reappear
                 "owner: software-engineer\n"
             ),
             {},
-            lambda r: r.pending_agents == ["qa-engineer", "devops-engineer", "software-engineer"],
+            lambda r: r.pending_agents == ["qa-engineer", "product-engineer", "software-engineer"],
             id="sequence-order-and-dedup",
         ),
     ],

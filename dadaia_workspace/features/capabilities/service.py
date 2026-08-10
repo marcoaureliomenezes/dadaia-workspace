@@ -68,7 +68,7 @@ def build_capabilities() -> dict[str, Any]:
             "evidence": ["reports", "handoff validation"],
             "knowledge": ["memory", "academy", "projected skills", "rules"],
             "governance": ["bugs", "backlog", "releases", "ci preflight"],
-            "extensions": ["plugins", "repository catalog"],
+            "extensions": ["repository catalog"],
         },
         "consumer_requirements": {
             "exact_provider_version": True,

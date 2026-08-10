@@ -8,7 +8,7 @@ summary: >-
   package (PyPI since PRs #112/#113, ratified v0.1.61), the `.github/workflows/release.yml`
   pipeline (version-vs-tag check → five test legs → build → release-gate approval →
   OIDC trusted publishing + tag → post-publish smoke), the wheel content contract
-  (plugin packs and public assets ship in-package), and the documented version-scheme
+  (public assets ship in-package), and the documented version-scheme
   split: SDD releases `v0.1.x` version the SDD process while the package `0.2.x`
   versions the shipped library (ADR-2 — documented, never renumbered).
 tags:
@@ -78,9 +78,8 @@ history and break tag/PR continuity for zero information gain. When reading any
 **Wheel content contract:** the wheel ships the complete runtime product —
 `dadaia_workspace/` with the full `public/` asset tree (agents, skills, rules,
 workflows, scripts, schemas, templates, data, scaffold, runtime, personas,
-lifecycle_fragments, pi) **including the in-package plugin packs**
-(`public/plugins/{frontend-design,devops}/` — verified at the v0.1.60 audit), so
-`dadaia init` and `dadaia plugin install` work offline from a bare pip install
+lifecycle_fragments) so
+`dadaia init` works offline from a bare pip install
 with no network fetch of assets. The wheel also ships
 `public/data/CONSUMER_VALIDATION_RECIPE.md` — the canonical consumer-side
 validation matrix (statements F-01..F-23, verdict APROVADA / BLOQUEADA /
@@ -106,5 +105,4 @@ workspace-venv bootstraps install the candidate itself instead of pinning the
 - [[quality-assurance]] — the five test legs the pipeline re-runs, and the CI
   workflow inventory row for `release.yml`.
 - [[public-asset-distribution]] — the `public/` asset tree the wheel carries.
-- [[plugin-packs]] — the in-package packs whose wheel presence this contract pins.
 - [[cross-platform-portability]] — the PyPI OS classifiers the 3-OS CI matrix backs.

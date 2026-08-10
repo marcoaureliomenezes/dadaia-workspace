@@ -8,7 +8,7 @@ Covers (ADR-2 golden tests):
   the Opus/Sonnet/Haiku tier-recommendation phrase is rewritten to Codex-native
   registry-tier terms (T-013-12 defense-in-depth).
 - software-architect body (no Agent tool): output is identical to input (verbatim).
-- All 12 canonical agents (9 core + 3 plugin stubs): output is non-empty after strip().
+- All 9 canonical core agents: output is non-empty after strip().
 """
 
 from __future__ import annotations
@@ -45,13 +45,10 @@ def _load_body(agent_id: str) -> str:
     return _strip_frontmatter(raw)
 
 
-# All 12 canonical agent IDs (v0.1.8/v0.1.9 surface: 9 core + 3 plugin stubs).
+# All 9 canonical core agent IDs.
 _CANONICAL_AGENTS: tuple[str, ...] = (
     "ai-engineer",
     "code-reviewer",
-    "design-specialist",
-    "devops-engineer",
-    "frontend-engineer",
     "product-engineer",
     "project-auditor",
     "project-manager",

@@ -37,21 +37,6 @@
     {
       "id": "ai-engineer",
       "mandate": "Exclusive owner of the AI surface: agents, skills, rules, hooks, context engineering, model tiering."
-    },
-    {
-      "id": "frontend-engineer",
-      "mandate": "[plugin stub] Browser HTML/CSS/JS/TS implementer — behavior-less until the frontend-design pack installs.",
-      "plugin": true
-    },
-    {
-      "id": "design-specialist",
-      "mandate": "[plugin stub] UX/UI specialist — behavior-less until the frontend-design pack installs.",
-      "plugin": true
-    },
-    {
-      "id": "devops-engineer",
-      "mandate": "[plugin stub] CI/CD and deploy specialist — behavior-less until the devops pack installs.",
-      "plugin": true
     }
   ],
   "behaviors": [

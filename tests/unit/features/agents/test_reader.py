@@ -312,19 +312,14 @@ def test_skip_bad_frontmatter_file_others_still_load(
             id="out-of-range-band-raises",
         ),
         pytest.param(
-            {"name": "design-specialist", "description": "[PLUGIN] stub.", "plugin": True},
-            lambda dto: dto is not None and dto.plugin is True,
-            id="plugin-stub-frontmatter-maps-to-dto",
-        ),
-        pytest.param(
             {
                 "name": "software-engineer",
                 "description": "Implementer.",
                 "dispatch_band": 3,
                 "gate_role": "implementer",
             },
-            lambda dto: dto is not None and dto.plugin is False and dto.gate_role == "implementer",
-            id="non-plugin-defaults-plugin-false-maps-gate-role",
+            lambda dto: dto is not None and dto.gate_role == "implementer",
+            id="defaults-map-gate-role",
         ),
     ],
 )

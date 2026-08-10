@@ -175,7 +175,7 @@ Every workflow step starts from the content of `specs/releases/ACTIVE.md`.
 > required. When `release_id` is omitted from the dispatch briefing, PE reads the file
 > itself. PE does not run CLI commands (no `Bash` tool); for commands like
 > `dadaia public stage`, surface them to the operator or request PM to dispatch
-> `devops-engineer`.
+> `software-engineer`.
 
 Expected format (two lines):
 ```
@@ -350,7 +350,7 @@ unblock implementer agents.
 
 ### Phase 7 — Implementation (no-write for product-engineer)
 
-The implementer agent (`software-engineer` for all production code; plugin agents for
+The implementer agent (`software-engineer` for all production code; `ai-engineer` for
 browser frontend or CI/CD when installed) follows the `dadaia-task-manager` protocol: pick
 `[ ]`, flip to `[-]`, commit, work, flip to `[x]`, commit. Product-engineer **does not
 implement** — only answers questions and updates specs if the operator approves changes.
@@ -375,15 +375,15 @@ this release atomically. The release contribution is captured in CLOSURE; memory
 changelog section.
 
 After CLOSURE is written and memory is updated, set `ACTIVE.md` phase to `ARCHIVED` and
-move the release directory using the Write tool to update ACTIVE.md and the devops-engineer
-to run the `git mv` command:
+move the release directory using the Write tool to update ACTIVE.md and request
+the `git mv` command:
 
 ```
 git mv specs/releases/<release-id> specs/_archive/releases/<release-id>
 ```
 
 > **Delegation:** PE uses the Write/Edit tools to update `ACTIVE.md` and spec files.
-> For `git mv` operations, request that project-manager dispatches devops-engineer or
+> For `git mv` operations, request that project-manager dispatches software-engineer or
 > surfaces the command for the operator to run.
 
 Then update `ACTIVE.md` to point to the next release (or `release: none` if no release is
@@ -468,11 +468,9 @@ I can start the proper sub-workflow now:
 | Request | Right agent |
 |---------|------------|
 | Any production code + unit/integration tests (Python, Node, in-scope language) | **software-engineer** |
-| Browser frontend (HTML/CSS/TS/React) implementation | **frontend-engineer** `[plugin]` |
 | AI-entity surface (agents/skills/rules/workflows/hooks) | **ai-engineer** |
 | Pure architectural review or audit | **software-architect** |
 | E2E tests or deploy validation | **qa-engineer** |
-| CI/CD pipelines (`.github/workflows/*.yml`) | **devops-engineer** `[plugin]` |
 
 If you receive a task outside your scope:
 ```
@@ -482,7 +480,7 @@ Production code + tests -> software-engineer.
 AI-entity files (agents/skills/rules/workflows/hooks) -> ai-engineer.
 Architecture review / audit -> software-architect.
 Backlog curation / dispatch -> project-manager.
-Browser frontend -> frontend-engineer [plugin]. CI YAML -> devops-engineer [plugin].
+Browser frontend and CI YAML -> software-engineer.
 ```
 
 ---
@@ -531,9 +529,9 @@ PE does not run shell commands. The following CLI commands are run by project-ma
 | `eval $(dadaia context bind <name> --mode read)` | Bind context into shell env | PM or operator |
 | `dadaia doctor` | Workspace health check | PM or operator |
 | `dadaia specs doctor` | SDD-specific health check | PM (surfaces output to PE) |
-| `dadaia public stage` | Stage canonical assets | devops-engineer |
-| `dadaia public install --target all` | Propagate canonical → projections | devops-engineer |
-| `dadaia public doctor` | Verify projection consistency | devops-engineer |
+| `dadaia public stage` | Stage canonical assets | software-engineer |
+| `dadaia public install --target all` | Propagate canonical → projections | software-engineer |
+| `dadaia public doctor` | Verify projection consistency | software-engineer |
 
 If PE needs the output of any of these commands during a workflow step, ask PM to run
 it and include the result in the next turn.

@@ -44,10 +44,6 @@ when it runs as the top-level session agent.
 | `security-reviewer` | 7 gate → push | Security audit, threat modeling, secret/leak review | implementer | No security-relevant surface is involved |
 | `code-reviewer` | 7 gate → PR | Diff/PR review, no authoring | none | There is no diff, PR, or staged set |
 
-Plugins (not in core roster, constitution §14): `frontend-engineer`, `design-specialist`,
-`devops-engineer`. They may be dispatched within a release when their surface is in scope,
-but they do not appear in the default core topology above.
-
 ## SDD Stage Inventory
 
 Arm A (`DADAIA.md` §1) has exactly four stages. Each is agent-dispatched — there is no
@@ -132,7 +128,7 @@ boundaries, not per task), and per the `DADAIA.md` §5 (Releases) and the
 |---|---|---|
 | Per task | implementer discipline only — TDD, unit/integration tests, pre-push CI gate, `implementation-complete` handoff; marker stays `[-]` | nothing; no per-task reviewer gate |
 | End of each `alpha-N` | `qa-engineer` only returns `APPROVE`/`REQUEST_CHANGES` (the **Review/QA Fan-Out**, qa-only) | a qa-gated commit on `feature/{version}` — no push/PR/merge/CLOSURE |
-| At `rc-N` ship (operator elects) | full **Review/QA Fan-Out** — `qa-engineer` + `code-reviewer` + `security-reviewer` (+ `design-specialist` plugin for UI, if installed) must all `APPROVE` the **same implementation commit** | mark the task `[x]`, push implementation commits, open or update a PR, merge, deploy, or close the release, write `CLOSURE.md`/memory |
+| At `rc-N` ship (operator elects) | full **Review/QA Fan-Out** — `qa-engineer` + `code-reviewer` + `security-reviewer` must all `APPROVE` the **same implementation commit** | mark the task `[x]`, push implementation commits, open or update a PR, merge, deploy, or close the release, write `CLOSURE.md`/memory |
 
 Any `REQUEST_CHANGES`, CRITICAL/HIGH security finding, failed E2E, missing evidence, or
 stale report sends the work back to implementation; the rework loop continues until every
@@ -143,8 +139,7 @@ forbidden; a local commit is workspace evidence, never release completion.
 
 **Pre-Implementation Agreement (settled at TASKS approval, not at implementation time).**
 The task definition must be agreed by the owning implementer set, `qa-engineer`,
-`code-reviewer`, `security-reviewer`, and the `design-specialist` plugin for browser
-UI/UX/design-token tasks (if installed). The approved task states implementation scope,
+`code-reviewer`, and `security-reviewer`. The approved task states implementation scope,
 declared write set, unit and integration test plan, E2E/validation plan, code-review
 criteria, security and privacy checks, and expected evidence paths. Missing agreement
 blocks TASKS approval.
@@ -246,8 +241,7 @@ SPEC without the grill report. See the `DADAIA.md` §5 (Releases).
 Entry: `security-reviewer`.
 
 Reviewer triages severity and blast radius. `project-manager` then dispatches
-`software-engineer` (or the relevant plugin implementer when the surface is
-plugin-owned), followed by security verification.
+`software-engineer`, followed by security verification.
 
 ### Playbook — deploy-validation-only
 

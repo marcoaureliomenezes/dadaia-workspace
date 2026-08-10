@@ -267,7 +267,7 @@ that can drift):
 |---|---|
 | `deep` | Heavy synthesis, recursive analysis, persona/skill authoring, fleet audit, security reasoning |
 | `dispatch` | Orchestration, dispatch authority, review verdicts, standard implementation with broad context |
-| `plugin` | Plugin-domain implementation (frontend/design/devops surfaces) |
+| `standard` | Mid-cost general implementation |
 | `fast` | High-volume mechanical reformatting, bulk renames, deterministic transforms |
 
 Current per-runtime model ids and (for Codex) reasoning-effort come from

@@ -36,7 +36,6 @@ worker.
 | `ai-engineer` | Agent, skill, rule, hook, and harness surface. |
 | `software-architect` | Architecture analysis and release-definition review. |
 
-Optional plugin packs add domain workers without changing the core roster.
 
 ## How Ordered Work Happens
 

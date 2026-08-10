@@ -34,11 +34,6 @@ class AgentDTO:
     max_turns: int | None = None
     input_contract: dict[str, Any] | None = None
     paths: dict[str, list[str]] | None = None
-    # ``plugin: true`` in the agent frontmatter marks a plugin STUB — an agent
-    # that carries no behavior in the core install (constitution §14, the
-    # ``plugin-scope`` rule). Plugin stubs are excluded from the panel agent
-    # roster so the Agentic tab never shows ghost/uninstalled agents.
-    plugin: bool = False
     # ``gate_role`` frontmatter — the agent's role at a §7 review gate or phase
     # (e.g. "implementer", "checkpoint-pre-commit"). Used to derive the
     # development-lifecycle phase(s) the agent owns or gates, honestly, from the

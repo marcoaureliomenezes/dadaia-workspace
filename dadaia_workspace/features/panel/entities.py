@@ -41,7 +41,7 @@ def load_registry() -> dict[str, Any]:
 
 
 def persona_ids(registry: dict[str, Any]) -> frozenset[str]:
-    """All persona ids (core + plugin stubs)."""
+    """All persona ids (the 9 core personas)."""
     return frozenset(p["id"] for p in registry["personas"])
 
 

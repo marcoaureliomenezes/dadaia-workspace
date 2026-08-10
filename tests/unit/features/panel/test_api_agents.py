@@ -98,7 +98,6 @@ class FakeTelemetryService:
 def _make_dto(
     agent_id: str = "software-engineer",
     model: str | None = "claude-sonnet-4-6",
-    plugin: bool = False,
 ) -> AgentDTO:
     return AgentDTO(
         id=agent_id,
@@ -110,7 +109,6 @@ def _make_dto(
         model=model,
         max_turns=60,
         input_contract=None,
-        plugin=plugin,
     )
 
 
@@ -253,38 +251,23 @@ def test_no_telemetry_defaults_and_telemetry_only_exclusion() -> None:
 
 
 # ---------------------------------------------------------------------------
-# 4. Plugin-stub exclusion + phases derivation
+# 4. Phases derivation
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
-    ("agent_id", "is_plugin", "expected_present", "expected_phases"),
+    ("agent_id", "expected_phases"),
     [
-        pytest.param(
-            "software-engineer",
-            False,
-            True,
-            ["Implementation"],
-            id="core-agent-included-with-phase",
-        ),
-        pytest.param("design-specialist", True, False, None, id="plugin-stub-excluded"),
-        pytest.param("mystery-agent", False, True, [], id="unknown-agent-empty-phases-not-faked"),
+        pytest.param("software-engineer", ["Implementation"], id="core-agent-phase"),
+        pytest.param("mystery-agent", [], id="unknown-agent-empty-phases-not-faked"),
     ],
 )
-def test_plugin_exclusion_and_phase_derivation(
-    agent_id: str,
-    is_plugin: bool,
-    expected_present: bool,
-    expected_phases: list[str] | None,
-) -> None:
-    agents = [_make_dto(agent_id=agent_id, plugin=is_plugin)]
+def test_phase_derivation(agent_id: str, expected_phases: list[str]) -> None:
+    agents = [_make_dto(agent_id=agent_id)]
     svc = _make_service(agents, telemetry_stub=FakeTelemetryService())
     _, _, data = _api_data(svc)
-    ids = {card["agent_id"] for card in data["agents"]}
-    assert (agent_id in ids) is expected_present
-    if expected_present:
-        card = next(c for c in data["agents"] if c["agent_id"] == agent_id)
-        assert card["phases"] == expected_phases
+    card = next(c for c in data["agents"] if c["agent_id"] == agent_id)
+    assert card["phases"] == expected_phases
 
 
 # ---------------------------------------------------------------------------

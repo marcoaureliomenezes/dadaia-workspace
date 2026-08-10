@@ -41,8 +41,6 @@
 
   Validation: active_window_days must be in range [1, 365]. Returns 400 if
   out of range. Telemetry-only agents (not in canonical catalog) are excluded.
-  Plugin STUBS (frontmatter ``plugin: true`` — design-specialist, devops-engineer,
-  frontend-engineer) are excluded from the roster (constitution §14).
 
 Security (R3-A): json.dumps() handles JSON-string escaping; no HTML escaping needed here.
 Content-Type is always set to application/json; charset=utf-8.
@@ -196,12 +194,6 @@ def render_api_agents_canonical(
         # entry, it is included (all canonical agents default to claude).
         agent_entries = []
         for dto in canonical_agents:
-            # Exclude plugin STUBS (constitution §14 / plugin-scope rule): they
-            # carry no behavior in the core install and must never appear as
-            # ghost agents in the Agentic tab.
-            if dto.plugin:
-                continue
-
             tel_summary: AgentSummary | None = tel_by_id.get(dto.id)
 
             # Runtime-scoped filter (FR5 / NFR5).

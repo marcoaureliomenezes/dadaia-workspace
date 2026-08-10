@@ -41,7 +41,7 @@ dev dependency set is installed.
 - Wheels/sdists exclude bytecode (`**/__pycache__`, `*.pyc`, `*.pyo`); the canonical
   `public/` asset tree ships via the package include (`dadaia_workspace` package), so
   every consumer install carries agents, skills, the `DADAIA.md` law, schemas, templates,
-  scaffold, plugin packs, and the consumer validation recipe.
+  scaffold, and the consumer validation recipe.
 - Agent model/effort comes from the selected agent-policy template plus operator
   overrides, resolved at `public install` and rendered into each projection.
 - The capabilities payload is `dadaia-capabilities-v2`; `dadaia certify` runs the

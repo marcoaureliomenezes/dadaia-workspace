@@ -44,7 +44,6 @@ _ONLY_CHOICES = (
     "runtime",
     "templates",
     "data",
-    "plugins",
 )
 
 

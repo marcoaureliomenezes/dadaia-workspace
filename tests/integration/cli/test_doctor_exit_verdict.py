@@ -72,24 +72,3 @@ def test_drift_and_missing_still_exit_nonzero(monkeypatch, tmp_path: Path) -> No
             monkeypatch, tmp_path, (DoctorLine(status, "claude:agents/x.md"),)
         )
         assert result.exit_code == 1, (status, result.output)
-
-
-def test_plugin_doctor_gains_exit_code(monkeypatch, tmp_path: Path) -> None:
-    """``dadaia plugin doctor`` had NO exit-code logic at all — same verdict now."""
-    import dadaia_workspace.cli.commands.plugin as plugin_cmd
-
-    class _FakeManager:
-        def __init__(self, *args: object, **kwargs: object) -> None: ...
-
-        def doctor_plugins(self, workspace_root: Path) -> list[DoctorLine]:
-            return [DoctorLine(DoctorStatus.DRIFT, "plugin:devops:claude/agents/x.md")]
-
-    states = tmp_path / ".dadaia" / "states"
-    states.mkdir(parents=True)
-    (states / "installed_plugins.json").write_text(
-        '{"schema_version": "1", "plugins": ["devops"]}', encoding="utf-8"
-    )
-    monkeypatch.setattr(plugin_cmd, "FileSystemPublicAssetManager", _FakeManager)
-    monkeypatch.setattr(plugin_cmd, "_states_dir", lambda: states)
-    result = _runner.invoke(app, ["plugin", "doctor"])
-    assert result.exit_code == 1, result.output

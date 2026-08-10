@@ -88,10 +88,8 @@ def check_model_resolution(
     """Return doctor report lines for the model-resolution invariants.
 
     Args:
-        public_dir: the canonical public-asset source directory (the one that
-            contains ``agents/`` and ``plugins/``). Agent frontmatter is read from
-            ``public_dir / "agents" / "*.md"`` and every
-            ``public_dir / "plugins" / "<pack>" / "agents" / "*.md"``.
+        public_dir: the canonical public-asset source directory. Agent
+            frontmatter is read from ``public_dir / "agents" / "*.md"``.
         overlay: the loaded agent-model-policy overlay (v0.1.65 FR7) — ``None``
             when absent/invalid (an invalid overlay is reported as a doctor ERROR
             by the asset manager, not here). The RESOLVED (model, effort) per core
@@ -106,15 +104,9 @@ def check_model_resolution(
     out: list[DoctorLine] = []
     registry_ids = _registry_claude_ids()
 
-    # 1a. Authored-frontmatter resolution: core/stub bodies (staged core bodies are
-    # model-agnostic since FR1 — the regex simply finds nothing there) PLUS every
-    # plugin pack's staged agent bodies (their authored ``model:`` is the D-5 pack
-    # default consumed by the resolver, so it must be registry-known).
+    # 1a. Authored-frontmatter resolution (staged core bodies are model-agnostic
+    # since FR1 — the regex simply finds nothing there).
     _scan_frontmatter_models(public_dir / "agents", registry_ids, out)
-    plugins_dir = public_dir / "plugins"
-    if plugins_dir.is_dir():
-        for pack_dir in sorted(p for p in plugins_dir.iterdir() if p.is_dir()):
-            _scan_frontmatter_models(pack_dir / "agents", registry_ids, out)
 
     # 1b. RESOLVED-roster validation (v0.1.65 FR7): the resolver's answer for each
     # core agent — templates assert at import; a present overlay layers on top —

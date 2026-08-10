@@ -64,9 +64,9 @@ or:
 
 ```python
 prefix_rule(
-    pattern = ["git", "push"],
-    decision = "prompt",
-    justification = "Publishing requires operator approval.",
+    pattern=["git", "push"],
+    decision="prompt",
+    justification="Publishing requires operator approval.",
 )
 ```
 

@@ -74,7 +74,7 @@ _SETUP_CFG = _REPO_ROOT / "setup.cfg"
 # `lifecycle-no-workflows` contract and 13 ignored edges (panel->lifecycle x4,
 # panel->workflows x1, workflows->lifecycle x1, lifecycle->reports x1,
 # lifecycle->backlog x5, cli.lifecycle->fake_runtime x1). Cap ratcheted 29 -> 16.
-_RECORDED_IGNORE_EDGE_CAP = 16
+_RECORDED_IGNORE_EDGE_CAP = 15
 
 # Per-family recorded breakdown, pinned per contract section so a wrong 13-edge cross-feature
 # set (or a silent shift between families) fails loudly, not just the grand total.
@@ -82,7 +82,7 @@ _RECORDED_PER_FAMILY_CAP: dict[str, int] = {
     "features-no-infrastructure": 7,
     "features-no-subprocess": 4,
     "features-no-cross-feature": 1,
-    "cli-no-infrastructure": 4,
+    "cli-no-infrastructure": 3,
 }
 
 
