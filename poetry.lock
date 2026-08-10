@@ -237,19 +237,19 @@ pycparser = {version = "*", markers = "implementation_name != \"PyPy\""}
 
 [[package]]
 name = "claude-agent-sdk"
-version = "0.2.110"
+version = "0.2.132"
 description = "Python SDK for Claude Code"
 optional = true
 python-versions = ">=3.10"
 groups = ["main"]
 markers = "extra == \"claude-sdk\""
 files = [
-    {file = "claude_agent_sdk-0.2.110-py3-none-macosx_11_0_arm64.whl", hash = "sha256:fed0e0f4804d9f9cff80ab7d1b44142ebd1046cdd29ca74caef4c92c35fff8d8"},
-    {file = "claude_agent_sdk-0.2.110-py3-none-macosx_11_0_x86_64.whl", hash = "sha256:62b23869d46cef6f6ff1d00ceaa5e846e2f1d297478421c835efb8fe99369d4f"},
-    {file = "claude_agent_sdk-0.2.110-py3-none-manylinux_2_17_aarch64.whl", hash = "sha256:324e49553c6303d6b267217dc2912652b97af2bc96503efd12095ae915b46b83"},
-    {file = "claude_agent_sdk-0.2.110-py3-none-manylinux_2_17_x86_64.whl", hash = "sha256:56371dd7a2c66c0bd497dc0b3cab4193a228b196f600676393d69c0ecee37cfb"},
-    {file = "claude_agent_sdk-0.2.110-py3-none-win_amd64.whl", hash = "sha256:4235d4de6d685a189c12612095ab192b759280ede1f3aed0c3e784d52c3555f9"},
-    {file = "claude_agent_sdk-0.2.110.tar.gz", hash = "sha256:538b548bac07a22f65686abab063a902ac76ba35989d0f073c942f96248e9fa3"},
+    {file = "claude_agent_sdk-0.2.132-py3-none-macosx_11_0_arm64.whl", hash = "sha256:9162fd2675f366d376529b017fdff6dc522658f88c5f3c49afdd45d77228a4ef"},
+    {file = "claude_agent_sdk-0.2.132-py3-none-macosx_11_0_x86_64.whl", hash = "sha256:1465ca52437921be79dfe1a4e5e1d35a2f850d5dbe5025256729de9befa7a62b"},
+    {file = "claude_agent_sdk-0.2.132-py3-none-manylinux_2_17_aarch64.whl", hash = "sha256:cd13af6ee4240b48fb01831a41248f57f3c83d235f218704f9a14e8c29af8a61"},
+    {file = "claude_agent_sdk-0.2.132-py3-none-manylinux_2_17_x86_64.whl", hash = "sha256:a1085b8be7fcda441cfb1c86966e008ba72d4d2f6e20da5466bebb15c4765b55"},
+    {file = "claude_agent_sdk-0.2.132-py3-none-win_amd64.whl", hash = "sha256:4860d059b89d0394acce8a7e767ea1b2da4fa73c07cf5c0ccdd86aa7ad5173ba"},
+    {file = "claude_agent_sdk-0.2.132.tar.gz", hash = "sha256:efc54a6fac96232105a40b6aed870a482dea221151a3b3356c5c514a5844cf7f"},
 ]
 
 [package.dependencies]
@@ -2193,4 +2193,4 @@ claude-sdk = ["claude-agent-sdk"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "6b0617be818682709202a5e913aecd9e9b58d001b5dbe147e6a9f60219e506ad"
+content-hash = "ef16b382fd6d69a9136b4a5fc42c7ab4ac1913121dde91fbbf376e96105f171a"
