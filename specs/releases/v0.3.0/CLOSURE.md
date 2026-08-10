@@ -266,7 +266,7 @@ chokepoint requires an APPROVED `security-reviewer` handoff whose `metrics.commi
 equals each pushed ref sha; no security review has been run for this branch. Ship sequence:
 `security-reviewer` → push → PR → watch CI to green → merge.
 
-**(c) Hermes history-rewrite option 2.** Unrelated carry-over from a prior session,
+**(c) consumer-validator history-rewrite option 2.** Unrelated carry-over from a prior session,
 surfaced here so it is not lost. No v0.3.0 dependency in either direction.
 
 ## Archive decision
