@@ -1,2 +1,2 @@
-release: v0.3.0
+release: v0.4.0
 phase: CLOSURE
