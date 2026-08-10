@@ -25,6 +25,6 @@ After this module, you should be able to:
 2. `02_agents_md_and_scoped_instructions.md` - how Codex discovers scoped guidance.
 3. `03_skills_plugins_and_mcp.md` - reusable workflows and distribution.
 4. `04_hooks_rules_and_config.md` - lifecycle hooks, command policy, and config trust.
-5. `05_subagents_and_dadaia_workflows.md` - explicit delegation and dadaia workflow mapping.
+5. `05_subagents_and_delegation.md` - explicit delegation and the dadaia dispatcher mapping.
 
 Use `EXAMPLE.md` for a worked mapping and `EXERCISES.md` for review drills.

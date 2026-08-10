@@ -28,4 +28,6 @@ def test_stage_install_doctor_delegate_to_manager(tmp_path: Path) -> None:
 
     doctor_result = svc.doctor(tmp_path)
     assert tmp_path in fake.doctored
-    assert isinstance(doctor_result, list)
+    # The service returns the typed DoctorReport aggregate (the verdict authority).
+    assert doctor_result.blocking is False
+    assert "[ok] fake" in doctor_result.rendered()

@@ -1,6 +1,6 @@
 """v0.2.9 follow-up — bug context-delete-leaves-stale-session-bind.
 
-Hermes repro (0.4.1 candidate): bind a context, ``dead`` it, ``delete`` it — the
+Consumer repro (0.4.1 candidate): bind a context, ``dead`` it, ``delete`` it — the
 session bind kept pointing at the removed context, and the next bind-resolved command
 (``bugs status``) failed on the missing specs dir. Fixes: the resolver's existence
 check (a bind to a deleted context resolves as unbound) and ``context delete``
@@ -124,7 +124,7 @@ def test_marker_bind_to_deleted_context_resolves_unbound(tmp_path: Path) -> None
 def test_resolve_specs_dir_after_delete_gives_clean_unbound(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The hermes case: after dead+delete, a bind-resolved command sees NO context —
+    """The consumer case: after dead+delete, a bind-resolved command sees NO context —
     the clean 'bind one or pass --specs-dir' path, never a missing-specs-dir failure."""
     _mk_ws(tmp_path)
     _write_session_record(tmp_path, "sess-del2", "reinject")

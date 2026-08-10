@@ -70,7 +70,7 @@ def test_norm_path_line_table(tmp_path: Path, name: str, line_fn: object, expect
 # canon_env_line — OS-phrase leak class (D-CX-9)
 # ---------------------------------------------------------------------------
 
-_DCX9_CANON = "[error] codex hook wrapper probe failed .dadaia/hooks/pre_gate.sh (D-CX-9)"
+_DCX9_CANON = "[unsupported] codex hook wrapper probe failed .dadaia/hooks/pre_gate.sh (D-CX-9)"
 
 
 @pytest.mark.parametrize(
@@ -128,10 +128,12 @@ def test_sort_line_lists_locks_sorted_multiset_recurses_and_leaves_mixed_untouch
         "scalar": 3,
     }
     out = sort_line_lists(obj)
+    # NOTE the sorted order: '[ok]' < '[unsupported]' lexically, so the canonicalized
+    # probe line now sorts AFTER the ok line (it sorted first as '[error]').
     assert out == {
         "doctor": [
-            "[error] codex hook wrapper probe failed .dadaia/hooks/w.sh (D-CX-9)",
             "[ok] a",
+            "[unsupported] codex hook wrapper probe failed .dadaia/hooks/w.sh (D-CX-9)",
         ],
         "nested": {"install": ["a", "b"]},
         "scalar": 3,

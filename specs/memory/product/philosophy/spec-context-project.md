@@ -5,29 +5,28 @@ category: product
 tldr: One canonical specs tree plus one repository, explicitly bindable by each session and safe for visible concurrent work.
 summary: >-
   The central unit of dadaia-workspace. Binding selects the project and injects its
-  current memory for the caller; the SDD gate and workflows constrain writes while
-  advisory presence surfaces concurrent sessions without locking them out.
+  current memory for the caller; the SDD gate constrains writes while advisory presence
+  surfaces concurrent sessions without locking them out.
 tags:
 - spec-context
 - sdd
 - lifecycle
 - concurrency
-token_estimate: 185
-last_updated: '2026-07-13'
-release_origin: v0.2.3
+token_estimate: 180
+last_updated: '2026-08-07'
+release_origin: v0.3.0
 ---
 
 ## Purpose
 
 A Spec Context Project is one canonical `specs/` tree bound to one repository. It is
-the unit used for memory, backlog, bugs, releases, workflow execution, reports, and
-handoffs.
+the unit used for memory, backlog, bugs, releases, reports, and handoffs.
 
 ## Operating Chain
 
 1. **Bind** - the caller selects a context and mode; only its own session record changes.
 2. **Inject** - the bind-epoch marker triggers current memory and release-context loading.
-3. **Enforce** - deterministic path/phase/mode gates and the four workflows constrain
+3. **Enforce** - deterministic path/phase/mode gates and the Git chokepoints constrain
    unsafe changes.
 4. **Work concurrently** - other sessions may use the same or different contexts;
    presence warnings expose overlap but never block progress.
@@ -45,4 +44,4 @@ the workspace root under `.dadaia/`; a repo-local `.dadaia/` is always invalid.
 
 ## Dependencies
 
-[[context-management]], [[sdd-gate-v3]], [[dadaia-workflows]], [[architecture]].
+[[context-management]], [[sdd-gate-v3]], [[architecture]].

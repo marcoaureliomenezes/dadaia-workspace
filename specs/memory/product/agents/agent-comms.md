@@ -16,9 +16,9 @@ tags:
 - agent-comms
 - handoff
 - schema
-token_estimate: 1560
-last_updated: '2026-07-16'
-release_origin: v0.1.62
+token_estimate: 1500
+last_updated: '2026-08-07'
+release_origin: v0.3.0
 ---
 
 CLI surface: `dadaia reports validate [PATHS...] [--all] [--release <id>] [--strict|--no-strict] [--json]` · `dadaia reports lint [DIR]` · `dadaia reports next [--context <ctx>] [--json]`
@@ -27,7 +27,7 @@ CLI surface: `dadaia reports validate [PATHS...] [--all] [--release <id>] [--str
 
 **handoff-v1** is the structured JSON contract family every specialist agent emits for agent-to-agent coordination; the current version token is **`handoff-v1.2`**. HTML reports stay in `.dadaia/reports/<context>/<agent>/`; JSON handoffs live in `.dadaia/handoff/<context>/<UTC>-<agent>-<slug>.handoff.json`. The document references the delivered report or artifact via `artifact.path` and `artifact.content_hash`.
 
-A v1.2 handoff carries the **`self_pull` audit line** — `self_pull.refs` records the Layer-1 memory atoms the emitting session **actually self-pulled/read** (step0 atoms + any deep atom read during the task), as `specs/`-prefixed context-relative paths (e.g. `specs/memory/architecture.md`). This is the Layer-1 mirror of the Layer-2 mechanical proof (the role→atom map recording refs in `InjectedContext.refs`, checked by FRAG-COH-4 — [[lifecycle-foundation]]): it turns the step0 self-pull discipline into a validator-checkable contract. An agent must never list an atom it did not read; the contract is honest-by-construction where mechanical (existence + coverage checks below) and discipline beyond that.
+A v1.2 handoff carries the **`self_pull` audit line** — `self_pull.refs` records the memory atoms the emitting session **actually self-pulled/read** (step0 atoms + any deep atom read during the task), as `specs/`-prefixed context-relative paths (e.g. `specs/memory/architecture.md`). It turns the step0 self-pull discipline into a validator-checkable contract, backed by the role→atom map (`core/role_atom_map.py`). An agent must never list an atom it did not read; the contract is honest-by-construction where mechanical (existence + coverage checks below) and discipline beyond that.
 
 It materializes the symbolic referent `schema_ref: handoff-schema-v1` declared by the topology's agents; the schema lives on disk (`public/schemas/` → staging) and is consumed by CLI + skill.
 
@@ -39,7 +39,7 @@ The contract separates human evidence from machine coordination: HTML reports ar
 
   * **Canonical:** `dadaia_workspace/public/schemas/handoff-v1.schema.json` (JSON Schema Draft 2020-12, `$schema = "https://json-schema.org/draft/2020-12/schema"`).
   * **Staging projection:** `.dadaia/agentic/schemas/handoff-v1.schema.json` (generated via `dadaia public stage`). It is the logical path CLI + skill consume at runtime.
-  * **NOT projected** to `.claude/schemas/`, `.codex/schemas/`, `.pi/schemas/` — the schema is consumed only by the Python CLI, not by the agents' runtime. Decision A1 saved 3 duplications.
+  * **NOT projected** to `.claude/schemas/`, `.codex/schemas/` — the schema is consumed only by the Python CLI, not by the agents' runtime. Decision A1 saved 3 duplications.
   * **Asset type:** `schemas` is one of the asset types in `_COPY_DIRS` in `dadaia_workspace/infrastructure/public_assets_common.py`. The live list of asset types is documented in [[public-asset-distribution]] (the constitution does not enumerate asset types).
 
 
@@ -68,7 +68,7 @@ The field contract's single source of truth is the schema file itself: `dadaia_w
 
 ## Skill: dadaia-handoff-emitter
 
-Standalone skill at `dadaia_workspace/public/skills/dadaia-handoff-emitter/SKILL.md`, projected to `.agents/skills/` (universal projection — the Codex runtime consumes this dir) and `.claude/skills/`; nothing lands in `.codex/skills/` or `.pi/` (the PI projection carries only the staged `pi/` tree). 3-step protocol:
+Standalone skill at `dadaia_workspace/public/skills/dadaia-handoff-emitter/SKILL.md`, projected to `.agents/skills/` (universal projection — the Codex runtime consumes this dir) and `.claude/skills/`; nothing lands in `.codex/skills/`. 3-step protocol:
 
   1. **sha256sum** of the just-generated HTML report (report mode only).
   2. **Assemble dict** with the required fields — `schema_version: "handoff-v1.2"` + `self_pull.refs` (the atoms actually read; honest v1.1 fallback when zero) — plus the optional fields applicable to the agent, referencing the schema by the logical path `.dadaia/agentic/schemas/handoff-v1.schema.json` (A10 — the skill does not duplicate schema content inside the markdown; single source of truth). The skill's required-fields table and both examples carry `self_pull`.
@@ -78,17 +78,16 @@ Standalone skill at `dadaia_workspace/public/skills/dadaia-handoff-emitter/SKILL
 
 Minimal handoff: ~500 bytes (required fields only); typical: <2 KB; warning if >4 KB. For an average 50–70 KB HTML report, overhead is ~3% worst case (NFR5).
 
-## Adoption (16 instruction surfaces)
+## Adoption (15 instruction surfaces)
 
 Every emission-instruction surface carries the v1.2/`self_pull` instruction, pinned by a
-file-enumerated contract test (`tests/contract/test_handoff_instruction_adoption.py`, 16
-surfaces): the 12 agent bodies (9 core `public/agents/*.md` + 3 plugin
-`public/plugins/*/agents/*.md`), the `dadaia-handoff-emitter` skill's two examples,
-`public/data/handoff-AGENTS.md`, and the shared
-`public/lifecycle_fragments/shared/output-handoff.md` fragment. The 9 core public agents
-declare `dadaia-handoff-emitter` when they produce reports/handoffs that need a
-machine-readable sidecar. The two Layer-2 code emitters emit v1.2 as well
-([[lifecycle-foundation]]).
+file-enumerated contract test (`tests/contract/test_handoff_instruction_adoption.py`, 15
+surfaces): the 13 whole files — 12 agent bodies (9 core `public/agents/*.md` + 3 plugin
+`public/plugins/*/agents/*.md`) plus `public/data/handoff-AGENTS.md` — and the
+`dadaia-handoff-emitter` skill's two JSON examples. The 9 core public agents declare
+`dadaia-handoff-emitter` when they produce reports/handoffs that need a machine-readable
+sidecar. A roster-completeness assert backs the enumeration, so a renamed or new agent
+body fails loudly instead of silently shrinking the contract.
 
 ```mermaid
 flowchart LR

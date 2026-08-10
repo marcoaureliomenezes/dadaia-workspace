@@ -62,7 +62,7 @@ class WorkspaceService:
         """Bootstrap .dadaia/ template. Idempotent. Returns (workspace, installed_assets).
 
         *harnesses* selects which Layer-1 entry harnesses to scaffold (the ``.claude``/
-        ``.codex``/``.pi``/``.kimi-code`` projections plus per-harness hook registration).
+        ``.codex``/``.kimi-code`` projections plus per-harness hook registration).
         ``None`` ⇒ the full harness set (back-compat with pre-v0.1.58 init). Only the
         chosen harnesses' directories, hooks, and asset projections are created; the
         selected set is persisted to ``.dadaia/states/harness_profile.json`` (the source
@@ -82,7 +82,7 @@ class WorkspaceService:
             workspace.claude_dir.mkdir(parents=True, exist_ok=True)
         if "codex" in chosen_set:
             (workspace.root / ".codex").mkdir(parents=True, exist_ok=True)
-        # `.pi/` and `.kimi-code/` are materialised by their install targets below (no
+        # `.kimi-code/` is materialised by its install target below (no
         # bare mkdir).
 
         # Initialize JSON state files (idempotent — never overwrite existing data)
@@ -139,8 +139,19 @@ class WorkspaceService:
         shape is produced by ``infrastructure/json_harness_profile_store.py`` (the W3 read
         side), so the two writers never fork. Idempotent — no spurious rewrite when the
         on-disk bytes already match (satisfies AC-4's re-run-is-a-no-op).
+
+        Bug init-harness-profile-silent-narrowing: init deletes no projection, so it must
+        never un-manage one — a re-init with a harness subset MERGES into the persisted
+        profile (canonical L1 order, unknown names appended sorted). Narrowing the
+        managed set is a deliberate operator state edit, never an init side effect;
+        before this, adding one harness silently dropped the others out of
+        install/doctor scope ([warn] out-of-profile) and their projections rotted.
         """
-        profile = HarnessProfile.of(harnesses)
+        merged = set(harnesses) | self._persisted_profile_harnesses(workspace)
+        ordered = tuple(h for h in L1_ENTRY_HARNESSES if h in merged) + tuple(
+            sorted(merged - set(L1_ENTRY_HARNESSES))
+        )
+        profile = HarnessProfile.of(ordered)
         payload = {
             "schema_version": profile.schema_version,
             "harnesses": list(profile.harnesses),
@@ -150,6 +161,23 @@ class WorkspaceService:
         if path.exists() and path.read_text(encoding="utf-8") == new_text:
             return
         path.write_text(new_text, encoding="utf-8")
+
+    def _persisted_profile_harnesses(self, workspace: Workspace) -> set[str]:
+        """Read the harness set already persisted in the profile (empty on absence/corruption).
+
+        Inline read mirroring the inline write above (the infrastructure store stays the
+        W3 read side for install/doctor). A corrupt or unreadable profile contributes
+        nothing — init then persists exactly the requested set, the pre-merge behavior.
+        """
+        path = workspace.states_dir / "harness_profile.json"
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError, ValueError):
+            return set()
+        raw = data.get("harnesses", []) if isinstance(data, dict) else []
+        if not isinstance(raw, list):
+            return set()
+        return {str(h) for h in raw}
 
     def is_initialized(self, workspace_root: Path) -> bool:
         return (workspace_root / ".dadaia" / "states" / "spec_contexts.json").exists()

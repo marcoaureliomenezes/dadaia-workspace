@@ -76,7 +76,7 @@ Current-doc corrections to keep active:
 ### Rule-law corpus reachability (WS-CDX-PROTOCOL — onboarding)
 
 Codex agent instructions cite governance rules **by name** (e.g. "the
-`workspace-protocol` rule §4", "the `release-governance` rule"). Codex has no native
+`DADAIA.md` §4 (Emission is handoff-first)", "the `DADAIA.md` §5 (Releases)"). Codex has no native
 rule-loading for that corpus the way Claude Code loads `.claude/rules/*.md`, but the
 corpus **is reachable**: every by-name rule is a real on-disk file at
 `.claude/rules/<rule-name>.md` (workspace root, identical across harnesses). When an
@@ -343,16 +343,17 @@ done — exactly the SDD shape. Map Codex workflow expectations onto dadaia's ga
 | QA / review | `qa-engineer`, `security-reviewer`, `code-reviewer` | all approve | consolidated verdict |
 | Closure | `product-engineer` | triple evidence | CLOSURE + memory update + archived release |
 
-**No `.codex/workflows/` projection.** The retired `*.workflow.md` reference layer
-duplicated executable lifecycle behavior without providing an executor. The four
-Python-backed `dadaia lifecycle` commands are the sole workflow authority; their
-fragments live under `public/lifecycle_fragments/` and their operative role mandates
-under `public/personas/`. The installer removes legacy projected workflow files and
-the doctor reports any residue. `.codex/config.toml` carries no inert workflow keys.
+**No `.codex/workflows/` projection.** There is no workflow engine and no executor for a
+declarative workflow file. The retired `*.workflow.md` reference layer duplicated that
+behavior without providing one; the installer removes legacy projected workflow files
+and the doctor reports any residue. `.codex/config.toml` carries no inert workflow keys.
+The ordered SDD flow is agent-dispatched: each stage is carried out by dispatching the
+owning agent against the SDD documents themselves.
 
 Authoring consequences:
-- Hooks and Python lifecycle workflows enforce *mechanics* of these gates; they must never decide
-  product scope, rewrite the SPEC to justify code, or hide human approval.
+- Hooks enforce *mechanics* of these gates (path-class, presence, the push chokepoint);
+  they must never decide product scope, rewrite the SPEC to justify code, or hide human
+  approval.
 - For difficult tasks, plan before implementing (reduces rework). For bugs,
   reproduction + verification matter more than a vague description.
 - Path contract is part of UX: every agent writes handoff to
@@ -462,7 +463,7 @@ Consult on demand. URLs sourced from the academy lessons; not transcribed conten
 
 ## Authoring guardrails (apply every time)
 
-- This skill is restricted to `ai-engineer` (`harness-skill-scope` rule). General
+- This skill is restricted to `ai-engineer` (`DADAIA.md` §2 (skill scope)). General
   agents use `harness-primitives`.
 - All authoring targets are `dadaia_workspace/public/...` source. Never hand-edit
   `.codex/`, `.claude/`, `.agents/` projections; propagate via

@@ -10,8 +10,8 @@
 ### T-1.1 — FR1 write-scope parser handles real consumer grammar `[-]`
 - **Write set:** `dadaia_workspace/features/lifecycle/tasks_write_scope.py`,
   `tests/unit/features/lifecycle/test_tasks_write_scope.py`,
-  `tests/fixtures/tasks/ddcc-specs/releases/v0.2.0/TASKS.md`
-- Done: real dd-chain-capture TASKS.md fixture with `[-] T-3.1` yields its 3 declared
+  `tests/fixtures/tasks/consumer-specs/releases/v0.2.0/TASKS.md`
+- Done: real sample-consumer TASKS.md fixture with `[-] T-3.1` yields its 3 declared
   paths; internal `###`+bold-key grammar still parses; zero/many reserved → `()`.
 
 ```
@@ -53,7 +53,7 @@
 ### T-5.1 — Remote replay acceptance (all 4 reporters) `[ ]`
 - **Write set:** none (acceptance evidence in CLOSURE)
 - Done: on the operator's remote, feature branch installed, all four reporter commands
-  pass against dd-chain-capture v0.2.0.
+  pass against sample-consumer v0.2.0.
 
 ```
 [x] T-5.1

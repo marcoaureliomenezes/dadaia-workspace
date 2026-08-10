@@ -11,10 +11,10 @@ shipped content:
   (referenced by name only); the full-sweep ``check_agent_skill_refs`` doctor check reports
   zero plugin-agent drift on the real tree; a real in-tmp install + ``install_plugin`` renders
   the projected ``.codex/agents/<name>.toml`` on the sonnet/plugin tier — ``model =
-  "gpt-5.3-codex"``, NOT ``gpt-5.5`` (ARCH-2: the Codex ``model`` field is the discriminator,
+  "gpt-5.6-terra"``, NOT ``gpt-5.6-sol`` (ARCH-2: the Codex ``model`` field is the discriminator,
   ``model_reasoning_effort`` is not) — and with the pack staged, doctor still reports ``[ok]
   public-privacy``; EXACTLY the two named skills exist per pack (ADR-C1 ceiling).
-* **AC-7** — the PROJECTED ``.claude/rules/plugin-scope.md`` is install-gated: it names
+* **AC-7** — the PROJECTED ``.claude/rules/DADAIA.md`` is install-gated: it names
   ``dadaia plugin install`` and the retired ``not yet distributed`` / ``no install command
   exists`` wording is GONE. RED-first: before the source rewrite lands, an in-tmp install
   projects the old wording and this test fails.
@@ -32,6 +32,17 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+
+
+def _rendered(result: object) -> list[str]:
+    """Legacy string view of a typed doctor result (DoctorReport | list[DoctorLine])."""
+    if hasattr(result, "rendered"):
+        return result.rendered()  # type: ignore[attr-defined, no-any-return]
+    return [
+        line.render() if hasattr(line, "render") else str(line)
+        for line in result  # type: ignore[union-attr]
+    ]
+
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _PUBLIC = _REPO_ROOT / "dadaia_workspace" / "public"
@@ -59,8 +70,8 @@ _EXPECTED_SKILLS = {skill for roster in _PACK_SKILLS.values() for skill in roste
 
 # Claude → Codex model mapping under test (registry single source of truth).
 _PLUGIN_CLAUDE_MODEL = "claude-sonnet-5"
-_PLUGIN_CODEX_MODEL = "gpt-5.3-codex"
-_OPUS_CODEX_MODEL = "gpt-5.5"
+_PLUGIN_CODEX_MODEL = "gpt-5.6-terra"
+_OPUS_CODEX_MODEL = "gpt-5.6-sol"
 
 
 # ---------------------------------------------------------------------------
@@ -228,8 +239,8 @@ def _install_pack(tmp_path: Path, pack: str) -> Path:
 def test_pack_agent_codex_toml_is_plugin_tier_not_opus(
     tmp_path: Path, pack: str, agent: str
 ) -> None:
-    """AC-6 (ARCH-2): projected .codex TOML renders gpt-5.3-codex (sonnet/plugin), NOT
-    gpt-5.5; with the pack content staged, doctor still reports [ok] public-privacy."""
+    """AC-6 (ARCH-2): projected .codex TOML renders gpt-5.6-terra (sonnet/plugin), NOT
+    gpt-5.6-sol; with the pack content staged, doctor still reports [ok] public-privacy."""
     ws = _install_pack(tmp_path, pack)
     toml = _projected_codex_toml(ws, agent)
     assert f'model = "{_PLUGIN_CODEX_MODEL}"' in toml, toml
@@ -238,7 +249,7 @@ def test_pack_agent_codex_toml_is_plugin_tier_not_opus(
         f"discriminate the plugin tier"
     )
 
-    report = FileSystemPublicAssetManager().doctor(ws)
+    report = _rendered(FileSystemPublicAssetManager().doctor(ws))
     privacy = [ln for ln in report if ln.startswith("[ok] public-privacy")]
     assert privacy, f"no [ok] public-privacy line in doctor report: {report}"
     assert not [ln for ln in report if ln.startswith("[error] public-privacy")], report
@@ -255,7 +266,7 @@ def _projected_plugin_scope(tmp_path: Path) -> str:
     ws = tmp_path / "ws"
     ws.mkdir()
     FileSystemPublicAssetManager().install(ws, target="all")
-    return (ws / ".claude" / "rules" / "plugin-scope.md").read_text(encoding="utf-8")
+    return (ws / ".claude" / "rules" / "DADAIA.md").read_text(encoding="utf-8")
 
 
 @pytest.mark.integration

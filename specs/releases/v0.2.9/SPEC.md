@@ -1,21 +1,21 @@
-# SPEC — Release v0.2.9 — Hermes real-use convergence (zero-bug gate)
+# SPEC — Release v0.2.9 — Consumer real-use convergence (zero-bug gate)
 
 > **Status:** Aprovado
 
 **Release ID:** v0.2.9
 **Owner:** product-engineer
-**Source:** operator demand + hermes-crawler discovery task tg-1784485392
+**Source:** operator demand + sample-crawler discovery task tg-1784485392
 **Workflow:** release-definition / spec_create
 
 ## 1. Problem
 
 The consumer validation recipe certifies point checks and fake-harness flows, but the
-hermes agent — the canonical consumer and release gate — finds real-use bugs on the
+consumer agent — the canonical consumer and release gate — finds real-use bugs on the
 first round of every version. The declared gate for the NEXT package version (0.4.1):
-**the hermes agent operates 100% of its real activities with dadaia-workspace, zero
-bugs.** Only then does "Hermes agent" enter the docs as a supported environment.
+**the consumer agent operates 100% of its real activities with dadaia-workspace, zero
+bugs.** Only then does "Consumer agent" enter the docs as a supported environment.
 
-Hermes' real-usage inventory (discovery task tg-1784485392): certify candidate
+Consumer' real-usage inventory (discovery task tg-1784485392): certify candidate
 wheels; create/alive/baseline/bind/inspect Spec Contexts; make specs valid
 (init/scaffold/upgrade/doctor/catalog); run the REAL lifecycle chain with Codex
 (backlog → release → implementation-reviews → audit) — never once completed
@@ -31,8 +31,8 @@ insufficient alone; (P3) autoconsistent scaffold+repair — a fresh context reac
 
 ## 2. Objective
 
-Converge the hermes × dadaia-workspace loop to **zero failures on a full real-use
-round** by fixing the root-cause classes hermes already proved (materialization,
+Converge the consumer × dadaia-workspace loop to **zero failures on a full real-use
+round** by fixing the root-cause classes consumer already proved (materialization,
 placeholder repair, live-chain gate coverage) instead of patching instances.
 
 ## 3. Scope
@@ -53,7 +53,7 @@ Acceptance / verification:
 
 - Unit + integration tests: a fake/worker that writes nothing blocks at the step
   (with retry diagnostics); a worker that writes/edits an item is accepted.
-- Hermes live backlog-definition with Codex materializes and the chain proceeds.
+- Consumer live backlog-definition with Codex materializes and the chain proceeds.
 
 ### FR2 — Scaffold and placeholder-atom repair (P3)
 
@@ -71,7 +71,7 @@ Acceptance / verification:
 - A tree seeded with the raw placeholder atom is repaired by `upgrade` AND by
   `doctor --fix`; both are covered by tests and help text documents the repair.
 
-### FR3 — Pain-sweep fixes from the hermes inventory (root cause each)
+### FR3 — Pain-sweep fixes from the consumer inventory (root cause each)
 
 - release-definition stalling after writing only SPEC.md (no terminal
   state/diagnostic) — investigate and fix the honest-terminal-state class.
@@ -97,20 +97,20 @@ explicitly: deterministic certification alone NEVER approves a release.
 
 Bug: `certification-misses-live-codex-backlog-regression-040`.
 
-Acceptance / verification: hermes runs the expanded matrix end to end.
+Acceptance / verification: consumer runs the expanded matrix end to end.
 
 ### FR5 — Convergence protocol and documentation
 
-Iterate candidate → hermes full real-use round → root-cause all findings → fix
+Iterate candidate → consumer full real-use round → root-cause all findings → fix
 classes → re-certify, until one complete round reports zero failures. Only then:
-docs page/memory atom declaring Hermes a supported environment; package 0.4.1 with
-the standard gates (security review, hermes certification, CI, release-gate).
+docs page/memory atom declaring Consumer a supported environment; package 0.4.1 with
+the standard gates (security review, consumer certification, CI, release-gate).
 
 ## 4. Out of scope
 
-- Changes to the hermes runtime itself (dd-chain-capture) — consumption/feedback only.
+- Changes to the consumer runtime itself (sample-consumer) — consumption/feedback only.
 - New harnesses; Layer-2 stays codex/pi.
-- Hermes-side housekeeping of operator files (it keeps its own authorship rules).
+- Consumer-side housekeeping of operator files (it keeps its own authorship rules).
 
 ## 5. Dependencies and risks
 

@@ -15,7 +15,10 @@ from importlib import metadata
 from pathlib import Path
 
 import dadaia_workspace
-from dadaia_workspace.core.exceptions import WorkspaceVenvBootstrapError
+from dadaia_workspace.core.exceptions import (
+    BootstrapPackageError,
+    WorkspaceVenvBootstrapError,
+)
 from dadaia_workspace.core.platform import PLATFORM
 
 __all__ = [
@@ -118,7 +121,7 @@ class VenvPythonEnvironmentManager:
         if candidate:
             candidate_path = Path(candidate).expanduser().resolve()
             if not candidate_path.is_file() or candidate_path.suffix != ".whl":
-                raise ValueError("DADAIA_BOOTSTRAP_PACKAGE must name an existing local wheel")
+                raise BootstrapPackageError.for_value(candidate)
             return str(candidate_path)
         src_root = Path(dadaia_workspace.__file__).resolve().parent.parent
         if (src_root / "pyproject.toml").is_file():
@@ -135,7 +138,23 @@ class VenvPythonEnvironmentManager:
         """
         venv_dir = self._venv_path(workspace_root)
         if not venv_dir.exists():
-            venv.create(str(venv_dir), with_pip=True)
+            try:
+                venv.create(str(venv_dir), with_pip=True)
+            except OSError as exc:
+                # Bug r3b-portability-import-venv-permission (F-16/F-22 class): on a
+                # noexec mount, venv.create writes bin/python and then dies inside
+                # ensurepip because that interpreter cannot be EXECUTED there. The
+                # filesystem limit is legitimate; the ~40-line raw traceback that used
+                # to reach the operator was not. Surface every OSError as one clean,
+                # actionable DadaiaError line naming the path and the likely cause.
+                raise WorkspaceVenvBootstrapError(
+                    f"could not create the workspace venv at '{venv_dir}': {exc}. "
+                    "The most common cause is a target filesystem mounted 'noexec' "
+                    "(or lacking execute permission), where the venv's own python "
+                    "cannot be run — /tmp is mounted this way on many hardened hosts "
+                    "and containers. Re-target the workspace onto an exec-capable "
+                    "filesystem, or remount it without 'noexec', then retry."
+                ) from exc
         if not self._dadaia_entrypoint(workspace_root).exists():
             spec = self._install_spec()
             pip = self.pip_executable(workspace_root)

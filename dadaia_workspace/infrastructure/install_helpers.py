@@ -14,6 +14,7 @@ from collections.abc import Callable, Iterable, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 
+from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.agent_model_templates import CORE_AGENTS
 from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.core.models.agent_model_policy import (
@@ -127,6 +128,51 @@ def install_dadaia_agents_md(
             copy_file(src, dst, force, installed)
 
 
+#: Where the workspace system prompt lands, per Layer-1 harness. The workspace root is
+#: the canonical copy and is always written; each harness dir gets the SAME bytes so
+#: Claude Code, Codex and Kimi Code read identical law with no indirection and no second
+#: source. Projection is PROFILE-AWARE: a claude-only workspace must not grow a `.codex/`
+#: (the harness-scope contract `init --harness` enforces).
+_DADAIA_MD_HARNESS_TARGETS: dict[str, str] = workspace_layout.DADAIA_MD_HARNESS_TARGETS
+
+#: Read-only mode for projected law files. The gate blocks agent file-tool writes
+#: (PathClass.LAW); this closes the Bash redirect path the gate does not parse. A human
+#: operator can still chmod and edit — the restriction is against accidental and agent
+#: writes, not against the operator.
+_LAW_FILE_MODE = 0o444
+
+
+def install_dadaia_md(
+    agentic_dir: Path,
+    workspace_root: Path,
+    force: bool,
+    installed: list[str],
+    harnesses: Iterable[str] | None = None,
+) -> None:
+    """Project ``DADAIA.md`` — the workspace system prompt — read-only.
+
+    The workspace root always receives it. Harness directories receive it only for the
+    harnesses actually being projected (*harnesses*); ``None`` means every harness.
+    """
+    src = agentic_dir / "data" / "DADAIA.md"
+    if not src.exists():
+        return
+    active = set(_DADAIA_MD_HARNESS_TARGETS) if harnesses is None else set(harnesses)
+    rels = ["DADAIA.md"] + [
+        rel for name, rel in sorted(_DADAIA_MD_HARNESS_TARGETS.items()) if name in active
+    ]
+    for rel in rels:
+        dst = workspace_root / rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        # A previous projection is 0444; make it writable before copying over it.
+        if dst.exists():
+            with contextlib.suppress(OSError):
+                dst.chmod(0o644)
+        copy_file(src, dst, force, installed)
+        with contextlib.suppress(OSError):
+            dst.chmod(_LAW_FILE_MODE)
+
+
 def install_universal_skills(
     agentic_dir: Path,
     workspace_root: Path,
@@ -160,6 +206,41 @@ def remove_legacy_workflow_projections(
         # this migration's ownership.
         with contextlib.suppress(OSError):
             legacy_dir.rmdir()
+
+
+#: The nine always-on rule files the library published before ``DADAIA.md``. Their law is
+#: carried in full by the single system-prompt file; the projections are removed by name.
+#: A blanket prune of the rules directory is NOT correct — it also hosts operator-authored
+#: rules and plugin-pack rules, which this migration does not own.
+_RETIRED_CORE_RULES: tuple[str, ...] = (
+    "backlog-ownership.md",
+    "bug-hotfix-doctrine.md",
+    "bug-registration-guardrail.md",
+    "dadaia-workspace-dev-guardrail.md",
+    "harness-skill-scope.md",
+    "plugin-scope.md",
+    "release-governance.md",
+    "tmp-file-guardrail.md",
+    "workspace-protocol.md",
+)
+
+
+def remove_retired_core_rules(workspace_root: Path, installed: list[str]) -> None:
+    """Remove the pre-DADAIA.md core rule projections, by name, without touching others.
+
+    Bug ``retired-lib-asset-leaves-orphan-projection``: ``copy_tree`` returns before its
+    orphan-prune loop when the source directory no longer exists, so retiring a whole
+    asset family never propagates to the instance. Until that is fixed generically, this
+    named migration keeps the instance honest — the law must live in exactly one file.
+    """
+    rules_dir = workspace_root / ".claude" / "rules"
+    if not rules_dir.is_dir():
+        return
+    for name in _RETIRED_CORE_RULES:
+        path = rules_dir / name
+        if path.is_file():
+            path.unlink()
+            installed.append(f"[rm] {path}")
 
 
 # ---------------------------------------------------------------------------
@@ -230,13 +311,9 @@ def install_claude_agents(
         else:
             content = render_claude_agent(src.read_text(encoding="utf-8"), resolved)
             write_generated(dst_dir / rel, content, force, installed)
-    for dst in iter_files_fn(dst_dir):
-        if dst.relative_to(dst_dir) not in managed:
-            dst.unlink(missing_ok=True)
-            installed.append(f"[prune] {dst}")
-    for d in sorted((p for p in dst_dir.rglob("*") if p.is_dir()), reverse=True):
-        if not any(d.iterdir()):
-            d.rmdir()
+    # Orphan pruning removed — ledger-driven reconciliation in install() owns it
+    # (see copy_tree's docstring for the rationale).
+    del managed
 
 
 def resolve_codex_agent_model(
@@ -311,21 +388,21 @@ def copy_tree(
     installed: list[str],
     iter_files_fn: Callable[[Path], Iterable[Path]],
 ) -> None:
-    """Copy all files from *src_dir* to *dst_dir*, pruning orphan projections."""
+    """Copy all files from *src_dir* to *dst_dir* (copy-and-record only).
+
+    Orphan pruning is NOT done here. The per-dir prune this function used to run
+    derived the desired state from the CURRENT source — and its ``src_dir.exists()``
+    guard meant a fully retired family never pruned at all (bug
+    retired-lib-asset-leaves-orphan-projection), while an operator file dropped into a
+    managed dir was deleted without record. Reconciliation now runs once, ledger-driven,
+    at the end of ``install()`` (``_reconcile_install_ledger``): it prunes only what a
+    prior install provably wrote, and retains + surfaces anything else.
+    """
     if not src_dir.exists():
         return
-    managed: set[Path] = set()
     for src in iter_files_fn(src_dir):
         rel = src.relative_to(src_dir)
-        managed.add(rel)
         copy_file(src, dst_dir / rel, force, installed)
-    for dst in iter_files_fn(dst_dir):
-        if dst.relative_to(dst_dir) not in managed:
-            dst.unlink(missing_ok=True)
-            installed.append(f"[prune] {dst}")
-    for d in sorted((p for p in dst_dir.rglob("*") if p.is_dir()), reverse=True):
-        if not any(d.iterdir()):
-            d.rmdir()
 
 
 def remove_stale_files(src_dir: Path, dst_dir: Path, pattern: str, installed: list[str]) -> None:

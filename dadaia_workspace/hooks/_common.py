@@ -145,19 +145,67 @@ def resolve_session_id(payload: dict[str, Any], *, default: str = "") -> str:
 
 
 def emit_block(reason: str) -> None:
-    """Print the ``{"decision":"block",...}`` envelope (the harness then blocks the tool)."""
-    print(json.dumps({"decision": "block", "reason": reason}))
+    """Print the merged block envelope: legacy + documented Claude Code contract.
+
+    Bug claude-pre-gate-envelope-contract: the documented Claude Code PreToolUse verdict
+    is ``hookSpecificOutput.permissionDecision: "deny"`` — the top-level
+    ``"decision": "block"`` only rides an undocumented legacy fallback there. Both are
+    carried in ONE envelope because each has its own consumer:
+
+    - ``decision``/``reason`` — codex hooks and the kimi pre-gate shim. Key placement is
+      part of the contract: the shim greps the literal ``"decision": "block"`` and its
+      sed reason extraction (``.*"reason": "\\(.*\\)".*``) captures cleanly only while
+      the top-level ``reason`` stays the LAST key.
+    - ``hookSpecificOutput`` — Claude Code's documented PreToolUse decision control.
+    """
+    print(
+        json.dumps(
+            {
+                "decision": "block",
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "deny",
+                    "permissionDecisionReason": reason,
+                },
+                "reason": reason,
+            }
+        )
+    )
 
 
-def emit_allow() -> None:
-    """Print the ``{"decision":"allow"}`` envelope (explicit, verifiable allow).
+def emit_allow(system_message: str | None = None) -> None:
+    """Print the explicit allow envelope (observable AND Claude-Code schema-valid).
+
+    ``system_message`` (bug pre-gate-drops-live-presence-advisory-042) carries the
+    NO-LOCKS presence advisory of an allowed MUTATING write: it rides the envelope's
+    ``systemMessage`` field (shown to the user, no permission verdict attached) and is
+    additionally echoed to stderr so grep-based consumers (kimi shim, codex hooks,
+    logs) see it without parsing JSON. Absent → the envelope is byte-identical to the
+    pre-advisory shape.
 
     Bug projected-pre-gate-silent-allow: allow used to be silence + exit 0, so external
-    automation could not distinguish an explicit allow from a hook that never ran. Every
-    harness treats a non-block envelope (or unrecognized JSON) as allow, so the explicit
-    envelope changes no gating behavior — it only makes the contract observable.
+    automation could not distinguish an explicit allow from a hook that never ran — the
+    envelope must stay non-empty. Bug pre-gate-allow-envelope-fails-claude-schema: it
+    must also carry NO permission verdict, because Claude Code's PreToolUse output
+    schema rejects everything else this gate could say:
+
+    - top-level ``decision`` enum is ``["approve", "block"]`` — ``"allow"`` fails
+      validation of the WHOLE envelope on every allowed call, and ``"approve"`` would
+      BYPASS the user's permission prompts;
+    - ``permissionDecision: "defer"`` is print-mode only — interactive sessions warn
+      and ignore it (and ``"allow"`` there also bypasses prompts).
+
+    So the gate steps aside with only schema-neutral fields. Codex hooks and the kimi
+    shim treat any envelope without the literal ``"decision": "block"`` as allow.
     """
-    print(json.dumps({"decision": "allow"}))
+    envelope: dict[str, object] = {
+        "continue": True,
+        "hookSpecificOutput": {"hookEventName": "PreToolUse"},
+    }
+    if system_message:
+        envelope["systemMessage"] = system_message
+        print(system_message, file=sys.stderr)
+    print(json.dumps(envelope))
 
 
 def default_python_bin(workspace: Path) -> str:

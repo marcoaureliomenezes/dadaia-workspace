@@ -203,7 +203,7 @@ the rule-rewrite regrows the exact drift being fixed (see §5 risk R-1).
   `specs/audits/2026-06-12T001813Z` missing its session-id suffix (SPEC-DOC-030), and the
   4 unknown-heading LINT-1 warnings (heading allowlist). Do **not** touch the
   benign/grandfathered items the audit lists (SPEC-DOC-027 legacy names, SPEC-DOC-029
-  stale tauan lease, TREE-5 template drift, SPEC-DOC-016 grandfathered v0.1.45).
+  stale sample lease, TREE-5 template drift, SPEC-DOC-016 grandfathered v0.1.45).
 - **Owner:** product-engineer, DEFINITION/CLOSURE phase (memory writes are gate-allowed
   only in those phases).
 - **How to verify:** grep of `specs/memory/product/*.md` finds no OpenCode-as-live claim;

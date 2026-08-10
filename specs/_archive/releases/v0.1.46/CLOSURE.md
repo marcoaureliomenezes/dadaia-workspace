@@ -88,7 +88,7 @@ disposition invariants, the FROZEN `_archive` gate class, the audit-disposition 
 shipped in v0.1.46. The now-live SPEC-DOC-035/036 warnings are exactly the signal that
 drives the v0.1.47 sweep. Of specs doctor's 15 warnings: these disposition/taxonomy
 warnings plus grandfathered TREE-5 (template drift), SPEC-DOC-027 (legacy names),
-SPEC-DOC-029 (stale tauan lease), and SPEC-DOC-031 (referenced-EPIC status) — none are
+SPEC-DOC-029 (stale sample lease), and SPEC-DOC-031 (referenced-EPIC status) — none are
 regressions introduced by this release.
 
 **Memory updates:** none — the slipped sweep touches `specs/audits/**` and

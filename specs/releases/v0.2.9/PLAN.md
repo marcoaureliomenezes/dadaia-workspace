@@ -1,4 +1,4 @@
-# PLAN — Release v0.2.9 — Hermes real-use convergence (zero-bug gate)
+# PLAN — Release v0.2.9 — Consumer real-use convergence (zero-bug gate)
 
 > **Status:** Aprovado
 
@@ -10,7 +10,7 @@
 ## 1. Planning problem
 
 Four independent fix classes plus a recipe expansion, sequenced so each lands with
-tests before the next hermes round. The discipline rule from the operator: fix
+tests before the next consumer round. The discipline rule from the operator: fix
 CLASSES, never instances; no workarounds that bend the architecture.
 
 ## 2. Architectural approach
@@ -60,7 +60,7 @@ refutation:
 
 New section in `public/data/CONSUMER_VALIDATION_RECIPE.md` (shipped in the wheel):
 "Real-use matrix" with the live-chain gate and per-activity statements from the
-hermes inventory; explicit note that deterministic certification never approves a
+consumer inventory; explicit note that deterministic certification never approves a
 release alone.
 
 ## 3. Implementation contract bindings
@@ -76,7 +76,7 @@ release alone.
   doctor on a repaired tree reports 0/0.
 - FR3: one commit per fixed class, each with its bug registration (reported +
   resolved) and tests.
-- FR4: recipe section + hermes round protocol.
+- FR4: recipe section + consumer round protocol.
 
 ## 4. File-touch map (expected)
 
@@ -92,6 +92,6 @@ release alone.
 
 ## 5. Validation strategy
 
-- Per-class pytest runs; full suite before each hermes round.
-- Hermes rounds with the expanded contract until a full real-use round = zero failures.
+- Per-class pytest runs; full suite before each consumer round.
+- Consumer rounds with the expanded contract until a full real-use round = zero failures.
 - Final: security review, push, PR, CI, release-gate, deploy 0.4.1.

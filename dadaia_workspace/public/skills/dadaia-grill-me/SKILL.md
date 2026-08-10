@@ -38,7 +38,7 @@ bugs + backlog (the `dadaia-release-definition` protocol). `product-engineer` ru
 it on the picked bug + backlog set **before** writing the SPEC; `project-manager`
 will not let the release advance to SPEC without the resulting refinement report.
 This is not optional even when the scope "looks obvious". See the
-`release-governance` rule and the `dadaia-release-definition` skill.
+`DADAIA.md` §5 (Releases) and the `dadaia-release-definition` skill.
 
 ---
 

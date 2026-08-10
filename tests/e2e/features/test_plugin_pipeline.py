@@ -10,7 +10,7 @@ Scenarios (AC-10):
       ``public doctor`` is green + golden (b) byte-lock (reuses the integration golden (b)
       fixtures + normalization);
   (b) ``plugin install frontend-design`` → both agents carry real pack bodies (Claude md +
-      Codex ``gpt-5.3-codex`` toml) + ``installed_plugins.json`` correct + doctor green;
+      Codex ``gpt-5.6-terra`` toml) + ``installed_plugins.json`` correct + doctor green;
   (c) ``plugin install devops`` → ``devops-engineer`` real;
   (d) a following core ``public install --target all`` keeps the pack bodies (AC-4 precedence);
   (e/FR9, QA-4) a REGISTERED consumer repo with a hand-authored root ``AGENTS.md`` survives
@@ -249,11 +249,11 @@ def test_bcd_install_chain_and_core_reinstall_precedence(
     assert result.exit_code == 0, result.output
     _assert_real_pack_body(ws, "frontend-engineer")
     _assert_real_pack_body(ws, "design-specialist")
-    # Codex render is on the sonnet/plugin tier (gpt-5.3-codex), NOT opus (gpt-5.5).
+    # Codex render is on the sonnet/plugin tier (gpt-5.6-terra), NOT opus (gpt-5.6-sol).
     for stem in _PLUGIN_AGENTS["frontend-design"]:
         toml = (ws / ".codex" / "agents" / f"{stem}.toml").read_text(encoding="utf-8")
-        assert 'model = "gpt-5.3-codex"' in toml, f"{stem} codex render not on the plugin tier"
-        assert "gpt-5.5" not in toml, f"{stem} codex render leaked the opus model"
+        assert 'model = "gpt-5.6-terra"' in toml, f"{stem} codex render not on the plugin tier"
+        assert "gpt-5.6-sol" not in toml, f"{stem} codex render leaked the opus model"
     # Ledger records the pack (schema v1); doctor stays green with a pack installed.
     assert _ledger_plugins(ws) == ("frontend-design",)
     raw = json.loads(
@@ -418,7 +418,7 @@ def test_h_install_uninstall_reinstall_leaves_reinstallable_state(
     _assert_real_pack_body(ws, "design-specialist")
     assert _ledger_plugins(ws) == ("frontend-design",)
     toml = (ws / ".codex" / "agents" / "frontend-engineer.toml").read_text(encoding="utf-8")
-    assert 'model = "gpt-5.3-codex"' in toml, "reinstall did not re-land the pack codex render"
+    assert 'model = "gpt-5.6-terra"' in toml, "reinstall did not re-land the pack codex render"
 
     elapsed = time.monotonic() - start
     assert elapsed < 12.0, f"reinstall e2e leg exceeded its ~12s bracket ({elapsed:.1f}s)"

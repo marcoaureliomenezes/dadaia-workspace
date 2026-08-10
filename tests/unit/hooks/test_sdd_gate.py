@@ -558,3 +558,34 @@ def test_resolve_mode_foreign_read_bind_end_to_end_never_blocks_my_write(tmp_pat
     result2 = run_hook_subprocess("sdd_gate", {**payload2, "session_id": "harness-reviewer2"}, env2)
     assert result2.returncode == 0, result2.stderr
     assert result2.block_envelope() is None  # doctrine: never blocked by a foreign bind
+
+
+def test_unreadable_active_md_fails_closed_for_memory(tmp_path: Path) -> None:
+    """An unreadable ``ACTIVE.md`` must never open the MEMORY gate.
+
+    ``_active_field`` is tri-state and its docstring tells callers to treat ``None`` as
+    UNKNOWN, never as "none"; the caller collapses it to ``""``. ``""`` is not in
+    ``{DEFINITION, CLOSURE}``, so the write BLOCKS — the collapse is fail-CLOSED. Driven
+    through the real subprocess entrypoint so the workspace resolves the way production
+    resolves it; pinned so a future "cleanup" of the collapse cannot silently invert it.
+    """
+    workspace = _mk_workspace(tmp_path, "demo")
+    specs = workspace / "repos" / "demo" / "specs"
+    (specs / "memory").mkdir(parents=True)
+    active = specs / "releases" / "ACTIVE.md"
+    active.write_text("release: rel-1\nphase: DEFINITION\n", encoding="utf-8")
+    target = str(specs / "memory" / "product.md")
+    payload: dict[str, Any] = {"tool_name": "Write", "tool_input": {"file_path": target}}
+
+    # DEFINITION phase, readable ⇒ ALLOW. Proves the probe reaches the MEMORY arm at all.
+    assert _run(tmp_path, payload) is None, "DEFINITION must allow a memory write"
+
+    active.chmod(0o000)
+    try:
+        if os.access(active, os.R_OK):  # running as root ignores the mode bits
+            pytest.skip("cannot make a file unreadable as this uid")
+        envelope = _run(tmp_path, payload)
+        assert envelope is not None, "unreadable ACTIVE.md must not open the MEMORY gate"
+        assert "DEFINITION or CLOSURE" in str(envelope.get("reason", "")), envelope
+    finally:
+        active.chmod(0o644)

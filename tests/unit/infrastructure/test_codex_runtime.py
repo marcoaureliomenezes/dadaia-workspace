@@ -14,7 +14,10 @@ from __future__ import annotations
 import hashlib
 import pathlib
 
-from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+from dadaia_workspace.infrastructure.public_assets import (
+    FileSystemPublicAssetManager,
+    OverwritePolicy,
+)
 
 _ADAPTER_CONTENT = "# Test adapter SKILL.md\n## Purpose\nCodex-only test adapter.\n"
 _EXISTING_CLAUDE_SKILL_CONTENT = "# Existing shared skill\n## Purpose\nAlready installed.\n"
@@ -85,7 +88,9 @@ def test_codex_null_regression_claude_unchanged_and_adapter_installed(
 
     sha_before = _sha_tree(workspace_root / ".claude")
     installed: list[str] = []
-    manager._install_codex_runtime_adapters(workspace_root, force=False, installed=installed)
+    manager._install_codex_runtime_adapters(
+        workspace_root, overwrite=OverwritePolicy.PRESERVE, installed=installed
+    )
     sha_after = _sha_tree(workspace_root / ".claude")
 
     assert sha_before == sha_after, (

@@ -115,7 +115,7 @@ def test_compact_marker_without_sentinel_does_not_bind(tmp_path: Path) -> None:
 
 
 def test_post_compact_resolves_bound_context_from_session_record(tmp_path: Path) -> None:
-    """Hermes round-3 bug (kimi-postcompact-omits-bound-context-bootstrap): a bind with
+    """Consumer round-3 bug (kimi-postcompact-omits-bound-context-bootstrap): a bind with
     NO prior prompt leaves no sentinel file, but the session record names the bound
     context — PostCompact must emit THAT context's bootstrap, not the generic preflight.
     """
@@ -134,3 +134,79 @@ def test_post_compact_resolves_bound_context_from_session_record(tmp_path: Path)
     assert _compact_marker(tmp_path, sid).is_file()
     # And the next prompt (first real prompt) resolves the same context and injects.
     assert "[ctx]" in _run(tmp_path, sid)
+
+
+# --------------------------------------------------------------------------- #
+# Claude Code SessionStart re-injection (bug claude-compact-reinjection-missing)
+# --------------------------------------------------------------------------- #
+
+
+def _run_session_start(tmp_path: Path, session_id: str, source: str) -> str:
+    """Drive ctx_inject with a Claude Code SessionStart payload (no env event var)."""
+    env = claude_hook_env(tmp_path)
+    env.pop("CLAUDE_CODE_SESSION_ID", None)
+    env.pop("DADAIA_CONTEXT", None)
+    payload = {
+        "session_id": session_id,
+        "harness_pid": _PID_A,
+        "hook_event_name": "SessionStart",
+        "source": source,
+    }
+    result = run_hook_subprocess("ctx_inject", payload, env)
+    assert result.returncode == 0, result.stderr
+    return result.stdout
+
+
+def test_claude_session_start_compact_reinjects_and_restamps(tmp_path: Path) -> None:
+    """Bug claude-compact-reinjection-missing: SessionStart(compact) re-injects NOW.
+
+    Claude Code consumes SessionStart stdout as injected context (unlike Kimi's
+    discard-stdout PostCompact), so the bootstrap re-emits at the event itself and the
+    sentinel is restamped immediately — the NEXT prompt stays silent (no double
+    injection) and no kimi compact marker is left behind.
+    """
+    _ws(tmp_path)
+    sid = "sess-cc1"
+    assert "[no bound context]" in _run(tmp_path, sid)
+    _stamp_bind_epoch(tmp_path, "ctx", pid=_PID_A)
+    assert "[ctx]" in _run(tmp_path, sid)
+    assert _run(tmp_path, sid) == ""
+
+    out = _run_session_start(tmp_path, sid, "compact")
+    assert "[ctx]" in out
+    assert "dispatcher preflight" in out
+    assert not _compact_marker(tmp_path, sid).exists()
+    # Sentinel restamped at the event: the following prompt is silent again.
+    assert _run(tmp_path, sid) == ""
+
+
+def test_claude_session_start_clear_reinjects_bound_context(tmp_path: Path) -> None:
+    """SessionStart(clear): a still-bound session gets its bootstrap back at once (the
+    bind survives /clear — only the conversation was wiped), and the restamped sentinel
+    keeps the following prompt silent. An unbound wiped session gets the generic
+    preflight back the same way."""
+    _ws(tmp_path)
+    sid = "sess-cc2"
+    assert "[no bound context]" in _run(tmp_path, sid)
+    _stamp_bind_epoch(tmp_path, "ctx", pid=_PID_A)
+    assert "[ctx]" in _run(tmp_path, sid)
+    assert _run(tmp_path, sid) == ""
+
+    out = _run_session_start(tmp_path, sid, "clear")
+    assert "[ctx]" in out
+    assert _run(tmp_path, sid) == ""
+
+    sid2 = "sess-cc2b"
+    assert "[no bound context]" in _run_session_start(tmp_path, sid2, "clear")
+    assert _run(tmp_path, sid2) == ""
+
+
+def test_claude_session_start_other_sources_follow_normal_flow(tmp_path: Path) -> None:
+    """A SessionStart source outside {compact, clear} is NOT a re-inject trigger — a
+    bound repeat session stays silent exactly like a repeat prompt."""
+    _ws(tmp_path)
+    sid = "sess-cc3"
+    assert "[no bound context]" in _run(tmp_path, sid)
+    _stamp_bind_epoch(tmp_path, "ctx", pid=_PID_A)
+    assert "[ctx]" in _run(tmp_path, sid)
+    assert _run_session_start(tmp_path, sid, "startup") == ""

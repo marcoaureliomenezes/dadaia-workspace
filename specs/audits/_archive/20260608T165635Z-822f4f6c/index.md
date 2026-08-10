@@ -111,7 +111,7 @@ Score formula: weighted_avg = 9×0.20 + 9×0.25 + 9×0.15 + 9×0.20 + 9×0.15 + 
 | `git check-ignore` returns empty | `git check-ignore specs/audits/20260608T134914Z-ve4r8ifs/index.md; echo "exit:$?"` | **exit:1** (file is NOT gitignored) |
 | Carve-out tracks only `*.md` | `.gitignore` lines 103-108 | `/specs/audits/*/*` then `!/specs/audits/*/*.md` — only Markdown opt-in |
 | Non-md files still ignored | `git check-ignore specs/audits/20260608T134914Z-ve4r8ifs/somefile.json` | `.gitignore:107` match — non-md ignored |
-| No private infra in committed audit md | `grep -iE 'openclaw\|hermes\|bothub...' 20260608T134914Z-ve4r8ifs/index.md` | **Empty — no matches** |
+| No private infra in committed audit md | `grep -iE 'private-infra\|consumer\|sample-provisioner...' 20260608T134914Z-ve4r8ifs/index.md` | **Empty — no matches** |
 
 ---
 

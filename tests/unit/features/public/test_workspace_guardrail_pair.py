@@ -29,6 +29,17 @@ from dadaia_workspace.infrastructure.public_assets import (  # type: ignore[attr
     _package_version,
 )
 
+
+def _rendered(result: object) -> list[str]:
+    """Legacy string view of a typed doctor result (DoctorReport | list[DoctorLine])."""
+    if hasattr(result, "rendered"):
+        return result.rendered()  # type: ignore[attr-defined, no-any-return]
+    return [
+        line.render() if hasattr(line, "render") else str(line)
+        for line in result  # type: ignore[union-attr]
+    ]
+
+
 _REPO_ROOT = Path(__file__).parent.parent.parent.parent.parent
 
 
@@ -152,7 +163,7 @@ def test_skip_and_doctor_matrix(tmp_path: Path, capsys: pytest.CaptureFixture[st
     consumer_c.mkdir(parents=True)
     _register_context(ws_c, slug)
     _install_workspace_guardrail_pair(source, ws_c, force=True)
-    lines = _doctor_guardrail_pair(source, ws_c)
+    lines = _rendered(_doctor_guardrail_pair(source, ws_c))
     expected_labels = {
         "root:AGENTS.md",
         "root:CLAUDE.md",

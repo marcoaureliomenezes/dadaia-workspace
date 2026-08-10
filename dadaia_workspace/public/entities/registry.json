@@ -1,0 +1,133 @@
+{
+  "schema_version": "agentic-entities-v1",
+  "doc": "The abstract, harness-agnostic entity registry — THE source the scaffolded core surface derives from. dadaia-workspace defines behaviors, personas, rules and skills agnostically; each harness receives an IMPLEMENTATION of them. A scaffolded core sub-agent without a Persona here, a core hook without a Deterministic Behavior here, or a core rule without an Abstract Rule here is forbidden (constitution §12.5). Operator-created entities are out of scope.",
+  "personas": [
+    {
+      "id": "project-manager",
+      "mandate": "Coordinator and sole dispatch authority: intake, grill-me, backlog curation, dispatching every other persona. Never writes code, specs, memory or tests."
+    },
+    {
+      "id": "product-engineer",
+      "mandate": "Spec author and memory guardian: SPEC/PLAN/TASKS/CLOSURE and specs/memory/**. Never dispatches or implements code."
+    },
+    {
+      "id": "software-engineer",
+      "mandate": "Generic implementer: production code and its tests, TDD-first, inside the task's declared write set."
+    },
+    {
+      "id": "qa-engineer",
+      "mandate": "E2E and test-pyramid owner; validates deploys; the pre-commit review checkpoint."
+    },
+    {
+      "id": "code-reviewer",
+      "mandate": "Six-axis review before a PR (architecture/patterns/tests/security/perf/dead code). Never edits code."
+    },
+    {
+      "id": "security-reviewer",
+      "mandate": "Vulnerability auditor and the pre-push checkpoint: OWASP, secrets, CVEs; emits the sha-matched push verdict."
+    },
+    {
+      "id": "software-architect",
+      "mandate": "Anti-slop architecture specialist: DRAFT/REVIEW/ONBOARD; root-cause and fidelity gates on every spec review."
+    },
+    {
+      "id": "project-auditor",
+      "mandate": "Drift anchor: audits specs/memory vs code, dispatches evidence agents, scores compliance. Never fixes drift."
+    },
+    {
+      "id": "ai-engineer",
+      "mandate": "Exclusive owner of the AI surface: agents, skills, rules, hooks, context engineering, model tiering."
+    },
+    {
+      "id": "frontend-engineer",
+      "mandate": "[plugin stub] Browser HTML/CSS/JS/TS implementer — behavior-less until the frontend-design pack installs.",
+      "plugin": true
+    },
+    {
+      "id": "design-specialist",
+      "mandate": "[plugin stub] UX/UI specialist — behavior-less until the frontend-design pack installs.",
+      "plugin": true
+    },
+    {
+      "id": "devops-engineer",
+      "mandate": "[plugin stub] CI/CD and deploy specialist — behavior-less until the devops pack installs.",
+      "plugin": true
+    }
+  ],
+  "behaviors": [
+    {
+      "id": "root-whitelist",
+      "mandate": "The workspace root holds only the sanctioned entries; any file-tool write that would mint a new top-level entry is blocked.",
+      "implementations": {
+        "claude": "PreToolUse hook (.claude/settings.json → dadaia_workspace.hooks.pre_gate)",
+        "codex": ".codex/hooks.json wrapper → .dadaia/hooks/pre_gate.sh (interactive sessions)",
+        "kimi-code": "managed hook block in $KIMI_CODE_HOME/config.toml → the same Python gate"
+      }
+    },
+    {
+      "id": "venv-guard",
+      "mandate": "dadaia/pip/python -m dadaia_workspace run only from the workspace venv; the block message carries the corrected command.",
+      "implementations": {
+        "claude": "PreToolUse hook (Bash payloads) via dadaia_workspace.hooks.pre_gate",
+        "codex": ".codex/hooks.json wrapper → the same Python gate",
+        "kimi-code": "managed hook block → the same Python gate"
+      }
+    },
+    {
+      "id": "sdd-gate",
+      "mandate": "Path class × presence × phase × mode on every write: ADDITIVE always writable, MEMORY phase-gated, FROZEN/PROTECTED/LAW blocked; races surfaced, never prevented.",
+      "implementations": {
+        "claude": "PreToolUse hook via dadaia_workspace.hooks.pre_gate (single merged entrypoint) + PostToolUse advisory presence via dadaia_workspace.hooks.sdd_post_gate",
+        "codex": ".codex/hooks.json wrapper → the same Python gate (pre + post)",
+        "kimi-code": "managed hook block → the same Python gate (pre + post)"
+      }
+    },
+    {
+      "id": "context-memory-injection",
+      "mandate": "The session's own bind selects which product memory is injected at prompt time; never another session's bind.",
+      "implementations": {
+        "claude": "UserPromptSubmit + SessionStart hooks via dadaia_workspace.hooks.ctx_inject",
+        "codex": "session bootstrap via the projected wrapper (headless sessions read AGENTS.md natively)",
+        "kimi-code": "managed hook block → the same ctx_inject module"
+      }
+    },
+    {
+      "id": "git-chokepoints",
+      "mandate": "Harness-independent: pre-commit warns on peer presence and always allows; pre-push requires the sha-matched security APPROVE verdict and the green CI preflight.",
+      "implementations": {
+        "claude": ".dadaia git hooks (pre-commit-presence-gate.sh, pre-push-ci-gate.sh) — identical for every harness",
+        "codex": "same git hooks (harness-independent)",
+        "kimi-code": "same git hooks (harness-independent)"
+      }
+    }
+  ],
+  "rules": [
+    {
+      "id": "workspace-law",
+      "mandate": "DADAIA.md — the one always-on law file (the workspace system prompt), projected read-only per harness; human-only in an instantiated workspace.",
+      "implementations": {
+        "claude": ".claude/rules/DADAIA.md",
+        "codex": ".codex/DADAIA.md",
+        "kimi-code": ".kimi-code/DADAIA.md"
+      }
+    },
+    {
+      "id": "codex-command-policy",
+      "mandate": "Codex-native executable command policy derived from the venv-guard behavior (Starlark, the only rule dialect Codex executes).",
+      "implementations": {
+        "codex": ".codex/rules/dadaia-command-policy.rules"
+      }
+    }
+  ],
+  "universal": {
+    "doc": "Harness-agnostic by construction — every supported harness reads these natively, so they need no per-harness derivation and no harness toggle.",
+    "skills_root": ".agents/skills/",
+    "agents_md": [
+      "AGENTS.md (workspace root guardrail)",
+      "specs/AGENTS.md (spec-context rules)",
+      ".dadaia/reports/AGENTS.md",
+      ".dadaia/handoff/AGENTS.md",
+      "repos/<slug>/AGENTS.md (repo guardrail pair)"
+    ]
+  }
+}

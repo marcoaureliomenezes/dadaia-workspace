@@ -9,7 +9,7 @@ Round-3 remediation: six bugs reported from the operator's remote against `c33a0
 all in/around the v0.1.69 preflight subsystem. Root architectural failure, now
 corrected: **gates shipped without repair paths, and an advisory gate the guarded verbs
 never enforced** — probes validated on clean fixtures deadlocked a lived-in consumer
-workspace (dd-chain-capture v0.2.0) completely.
+workspace (sample-consumer v0.2.0) completely.
 
 | Bug | Fix | Disposition |
 |---|---|---|
@@ -30,7 +30,7 @@ byproduct re-trips the dirty-tree gate it repairs.
 |---|---|---|
 | Full test suite | PASS — 5060 passed / 19 skipped / 0 failed | `pytest -p no:cacheprovider` |
 | Mutation-sanity | PASS 4/4 — service.py/container.py/lease.py/registry reverts each RED their targeted tests; FR5/FR6 proven RED-first via the inverted E2E + Drive 0 | local |
-| Remote full-chain replay (live dd-chain-capture v0.2.0) | PASS — upgrade v1→3 heals 8 atoms + doctor clean; adoption sandbox on-box (`adopted: True`, `live_foreign_holder: False`); pipeline WITHOUT skip REFUSES (honest reason, no run created); pipeline `--skip-preflight --harness fake` completes to closure; `context show` live branch `feature/v0.1.1` vs stored `main` | replay transcript |
+| Remote full-chain replay (live sample-consumer v0.2.0) | PASS — upgrade v1→3 heals 8 atoms + doctor clean; adoption sandbox on-box (`adopted: True`, `live_foreign_holder: False`); pipeline WITHOUT skip REFUSES (honest reason, no run created); pipeline `--skip-preflight --harness fake` completes to closure; `context show` live branch `feature/v0.1.1` vs stored `main` | replay transcript |
 | ruff format+check / mypy --strict | PASS | pre-push + CI |
 | Security | APPROVED, keyed to pushed sha | security-reviewer handoff |
 | CI (full matrix) | GREEN — PR #139 merged `6b517d79`; post-merge main green | GitHub Actions |
@@ -54,13 +54,13 @@ path; (3) the gate a diagnostic reports is the gate the verbs enforce (advisory 
 are theater); (4) probes must be validated against a LIVED-IN workspace (old atoms,
 real lease lineage, accumulated evidence), not only clean fixtures.
 
-## Operator runbook (dd-chain-capture, after upgrading dadaia-workspace)
+## Operator runbook (sample-consumer, after upgrading dadaia-workspace)
 
 1. Inside the Codex session: commit the migrated `specs/memory/` (already healed on the
    remote by this validation) and remove/relocate `specs_bkp/`.
-2. `dadaia context bind dd-chain-capture --mode implementation --release v0.2.0` — the
+2. `dadaia context bind sample-consumer --mode implementation --release v0.2.0` — the
    same-process lease adopts automatically.
-3. `dadaia lifecycle preflight --context dd-chain-capture --release-id v0.2.0 --json` —
+3. `dadaia lifecycle preflight --context sample-consumer --release-id v0.2.0 --json` —
    passes (doctor clean, lease adopted, protected evidence exempt, tree clean).
 4. Proceed with the v0.2.0 workflow verbs; a blocked preflight now refuses them with the
    actionable reason instead of running unsafely.

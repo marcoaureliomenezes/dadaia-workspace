@@ -29,9 +29,12 @@ environment at `.dadaia/.venv`, an empty context registry, and the selected harn
 roots. Unless `--skip-assets` is used, it runs public stage/install and registers the
 merged Python gate, context injection, and post-gate hooks for supported runtimes.
 
-The persisted harness profile accepts `claude`, `codex`, `pi`, or `all`; omitted means
-all. Public install and doctor honor that profile. PI's projection is created only when
-PI is selected or assets are installed for all targets.
+The persisted harness profile accepts `claude`, `codex`, `kimi-code`, or `all`; omitted means
+all. Public install and doctor honor that profile. A harness projection is created only
+when that harness is selected or assets are installed for all targets. A re-init with a harness subset
+**merges** into the persisted profile (canonical L1 order) — init deletes no projection,
+so it never un-manages one; narrowing the managed set is a deliberate operator state
+edit, never an init side effect (bug init-harness-profile-silent-narrowing).
 
 Git chokepoints are installed separately through `dadaia ci install-hook` from
 `pre-commit-presence-gate.sh` and `pre-push-ci-gate.sh`.
@@ -42,7 +45,7 @@ Git chokepoints are installed separately through `dadaia ci install-hook` from
 - `.dadaia/states/spec_contexts.json`
 - `.dadaia/states/harness_profile.json`
 - `.dadaia/agentic/`
-- `.claude/`, `.codex/`, `.pi/`, `.agents/` according to the profile
+- `.claude/`, `.codex/`, `.kimi-code/`, `.agents/` according to the profile
 
 No `src/` cache or repo-local `.dadaia/` is part of workspace initialization.
 

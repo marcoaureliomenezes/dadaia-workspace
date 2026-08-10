@@ -15,8 +15,8 @@ The aggregate's ``cost_known``/``total_cost_usd`` semantics mirror the client
     None;
   * ``cost_known`` is True iff at least one session contributes;
   * ``total_cost_usd`` is None when no session contributes (rendered '—' for a
-    cost-tracking runtime, distinct from the client 'N/A' for codex/pi);
-  * codex/pi are cost-unknown runtimes: total is forced None and cost_known
+    cost-tracking runtime, distinct from the client 'N/A' for codex/kimi);
+  * codex/kimi are cost-unknown runtimes: total is forced None and cost_known
     False regardless of stored data.
 """
 
@@ -166,7 +166,7 @@ def test_cost_nullability_matrix() -> None:
     assert zero_result.total_cost_usd is not None
     assert zero_result.cost_known is True
 
-    # codex/pi: cost forced null + unknown, even with a stray non-null cost row.
+    # codex/kimi: cost forced null + unknown, even with a stray non-null cost row.
     conn_codex = _make_conn()
     _insert_agent(conn_codex, "agent-x", "codex")
     _insert_session(conn_codex, "cx1", "codex", "agent-x")
@@ -179,14 +179,14 @@ def test_cost_nullability_matrix() -> None:
     assert codex_result.cost_known is False
     assert codex_result.total_sessions == 2
 
-    conn_pi = _make_conn()
-    _insert_agent(conn_pi, "agent-p", "pi")
-    _insert_session(conn_pi, "pi1", "pi", "agent-p")
-    _insert_event(conn_pi, "e-pi1", "pi1", "agent-p", cost_micro_usd=None)
-    conn_pi.commit()
-    pi_result = _make_aggregator(conn_pi).aggregate_sessions("pi")
-    assert pi_result.total_cost_usd is None
-    assert pi_result.cost_known is False
+    conn_kimi = _make_conn()
+    _insert_agent(conn_kimi, "agent-k", "kimi-code")
+    _insert_session(conn_kimi, "k1", "kimi-code", "agent-k")
+    _insert_event(conn_kimi, "e-k1", "k1", "agent-k", cost_micro_usd=None)
+    conn_kimi.commit()
+    kimi_result = _make_aggregator(conn_kimi).aggregate_sessions("kimi-code")
+    assert kimi_result.total_cost_usd is None
+    assert kimi_result.cost_known is False
 
     # claude, empty store -> zeros + total null.
     conn_empty = _make_conn()

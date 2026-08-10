@@ -283,8 +283,8 @@ Must it hold EVERY time, regardless of what the model decides?
 
 F6 / F7 as standing reminders: prune stale/dead permission entries and machine-specific
 paths from settings before they mislead (F6); do not project a `.claude/workflows/`
-reference directory. The four Python-backed `dadaia lifecycle` commands are the sole
-workflow authority; Claude Code remains a Layer-1 entry harness, never a Layer-2 worker (F7).
+reference directory — there is no workflow engine, and the ordered SDD flow is
+agent-dispatched, never a declarative workflow file Claude Code executes (F7).
 
 ---
 
@@ -309,7 +309,7 @@ Consult these only when a specific detail is needed; cite the URL, do not transc
 
 ## Authoring guardrails (apply every time)
 
-- This skill is restricted to `ai-engineer` (`harness-skill-scope` rule). General
+- This skill is restricted to `ai-engineer` (`DADAIA.md` §2 (skill scope)). General
   agents use `harness-primitives`. Phase mapping: ai-engineer / harness literacy.
 - All authoring targets are `dadaia_workspace/public/...` source. Never hand-edit
   `.claude/`, `.codex/`, `.agents/` projections; propagate via

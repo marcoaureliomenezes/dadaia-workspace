@@ -106,25 +106,34 @@ def current_pricing(entry: ModelEntry) -> ModelPricing:
 REGISTRY: tuple[ModelEntry, ...] = (
     ModelEntry(
         claude_id="claude-fable-5",
-        codex_id="gpt-5.5",
+        codex_id="gpt-5.6-sol",
         pricing=(ModelPricing(10.00, 50.00, 12.50, 1.00, date(2026, 6, 1)),),
         tier="deep",
     ),
     ModelEntry(
         claude_id="claude-opus-4-7",
-        codex_id="gpt-5.5",
+        codex_id="gpt-5.6-sol",
         pricing=(ModelPricing(15.00, 75.00, 18.75, 1.50, date(2025, 1, 1)),),
         tier="dispatch",
     ),
     ModelEntry(
         claude_id="claude-opus-4-8",
-        codex_id="gpt-5.5",
+        codex_id="gpt-5.6-sol",
         pricing=(ModelPricing(15.00, 75.00, 18.75, 1.50, date(2025, 1, 1)),),
         tier="dispatch",
     ),
     ModelEntry(
+        # Claude Opus 5 — the current Opus-tier model (operator remap). Shares the
+        # dispatch tier with 4.7/4.8, so it MUST carry their codex_id: a tier
+        # resolving to two Codex ids raises in ``_codex_id_for_tier``.
+        claude_id="claude-opus-5",
+        codex_id="gpt-5.6-sol",
+        pricing=(ModelPricing(5.00, 25.00, 6.25, 0.50, date(2026, 7, 1)),),
+        tier="dispatch",
+    ),
+    ModelEntry(
         claude_id="claude-sonnet-4-6",
-        codex_id="gpt-5.3-codex",
+        codex_id="gpt-5.6-terra",
         pricing=(ModelPricing(3.00, 15.00, 3.75, 0.30, date(2025, 1, 1)),),
         tier="plugin",
     ),
@@ -135,7 +144,7 @@ REGISTRY: tuple[ModelEntry, ...] = (
         # violates the _codex_id_for_tier / codex_tier_views invariants. The
         # 'plugin' tier-NAME mismatch is a tracked backlog return.
         claude_id="claude-sonnet-5",
-        codex_id="gpt-5.3-codex",
+        codex_id="gpt-5.6-terra",
         pricing=(ModelPricing(3.00, 15.00, 3.75, 0.30, date(2026, 7, 1)),),
         tier="plugin",
     ),
@@ -163,6 +172,28 @@ def registry_by_claude_id() -> dict[str, ModelEntry]:
             raise ValueError(f"Duplicate claude_id in REGISTRY: {entry.claude_id!r}")
         index[entry.claude_id] = entry
     return index
+
+
+#: The Kimi Code model id (the only model the Kimi CLI runs agents on today).
+#: Single source — the panel per-harness model view and any Kimi projection
+#: derive from this constant, never a scattered literal.
+KIMI_MODEL_ID = "moonshotai/kimi-k2.5"
+
+
+def harness_native_model_map() -> dict[str, dict[str, str]]:
+    """Map each canonical claude model id to its harness-NATIVE display id.
+
+    The overlay stores canonical claude ids; each harness projects them to its
+    own vocabulary (Codex TOML uses ``codex_id``; Kimi runs :data:`KIMI_MODEL_ID`).
+    The panel model picker uses this map so a codex/kimi toggle never shows a
+    ``claude-*`` id (bug agents-tab-model-picker-ignores-harness-runtime).
+    """
+    by_claude = registry_by_claude_id()
+    return {
+        "claude": {cid: cid for cid in by_claude},
+        "codex": {cid: entry.codex_id for cid, entry in by_claude.items()},
+        "kimi-code": {cid: KIMI_MODEL_ID for cid in by_claude},
+    }
 
 
 # ---------------------------------------------------------------------------

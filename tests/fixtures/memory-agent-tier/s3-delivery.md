@@ -20,9 +20,9 @@ release_origin: v0.1.1
 
 ## Propósito
 
-A entrega S3 é a **fronteira única de integração** do `dd-chain-capture` (ADR-001): tudo
+A entrega S3 é a **fronteira única de integração** do `sample-consumer` (ADR-001): tudo
 que a lane de streaming produz no Kafka é materializado em objetos S3 sob `raw/*`, e os
-consumidores downstream (dd-chain-explorer, camadas analíticas) leem exclusivamente esses
+consumidores downstream (sample-explorer, camadas analíticas) leem exclusivamente esses
 prefixos. Kafka, Redis e o estado interno dos jobs nunca são contrato externo.
 
 O worker Kafka Connect (imagem construída de `infra/kafka-connect/`) roda três S3 Sink

@@ -1,7 +1,6 @@
 """Built-in L1 agent-model templates + the single resolver (v0.1.65 FR2/FR4).
 
-Analog of ``features/lifecycle/model_profiles.py#_BUILT_IN`` for the Layer-1 agent
-roster: three named :class:`AgentModelTemplate`s (``balanced`` — the default,
+The Layer-1 agent-roster model catalog: three named :class:`AgentModelTemplate`s (``balanced`` — the default,
 ``subscription-saver``, ``max-quality``), each a full 9-core-agent map of
 ``(model, effort)`` — the FR2 table encoded verbatim.
 
@@ -70,10 +69,10 @@ _BUILT_IN: tuple[AgentModelTemplate, ...] = (
         assignments={
             "project-manager": _a("claude-fable-5", "high"),
             "software-architect": _a("claude-fable-5", "high"),
-            "product-engineer": _a("claude-opus-4-8", "high"),
-            "project-auditor": _a("claude-opus-4-8", "xhigh"),
-            "security-reviewer": _a("claude-opus-4-8", "xhigh"),
-            "code-reviewer": _a("claude-opus-4-8", "high"),
+            "product-engineer": _a("claude-opus-5", "high"),
+            "project-auditor": _a("claude-opus-5", "xhigh"),
+            "security-reviewer": _a("claude-opus-5", "xhigh"),
+            "code-reviewer": _a("claude-opus-5", "high"),
             "ai-engineer": _a("claude-sonnet-5", "high"),
             "software-engineer": _a("claude-sonnet-5", "xhigh"),
             "qa-engineer": _a("claude-sonnet-5", "high"),
@@ -84,11 +83,11 @@ _BUILT_IN: tuple[AgentModelTemplate, ...] = (
         label="Subscription saver",
         default=False,
         assignments={
-            "project-manager": _a("claude-opus-4-8", "high"),
-            "software-architect": _a("claude-opus-4-8", "high"),
+            "project-manager": _a("claude-opus-5", "high"),
+            "software-architect": _a("claude-opus-5", "high"),
             "product-engineer": _a("claude-sonnet-5", "xhigh"),
             "project-auditor": _a("claude-sonnet-5", "xhigh"),
-            "security-reviewer": _a("claude-opus-4-8", "high"),
+            "security-reviewer": _a("claude-opus-5", "high"),
             "code-reviewer": _a("claude-sonnet-5", "xhigh"),
             "ai-engineer": _a("claude-sonnet-5", "high"),
             "software-engineer": _a("claude-sonnet-5", "xhigh"),
@@ -104,11 +103,11 @@ _BUILT_IN: tuple[AgentModelTemplate, ...] = (
             "software-architect": _a("claude-fable-5", "high"),
             "product-engineer": _a("claude-fable-5", "high"),
             "project-auditor": _a("claude-fable-5", "high"),
-            "security-reviewer": _a("claude-opus-4-8", "xhigh"),
-            "code-reviewer": _a("claude-opus-4-8", "xhigh"),
-            "ai-engineer": _a("claude-opus-4-8", "medium"),
+            "security-reviewer": _a("claude-opus-5", "xhigh"),
+            "code-reviewer": _a("claude-opus-5", "xhigh"),
+            "ai-engineer": _a("claude-opus-5", "medium"),
             "software-engineer": _a("claude-sonnet-5", "xhigh"),
-            "qa-engineer": _a("claude-opus-4-8", "high"),
+            "qa-engineer": _a("claude-opus-5", "high"),
         },
     ),
 )

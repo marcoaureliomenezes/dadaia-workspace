@@ -24,6 +24,7 @@ from rich.console import Console
 import dadaia_workspace
 from dadaia_workspace import container
 from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
+from dadaia_workspace.core.models.doctor_report import DoctorStatus
 from dadaia_workspace.core.models.plugin_pack import InstalledPlugins, PluginPack
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
@@ -218,6 +219,13 @@ def doctor() -> None:
             )
 
     manager = FileSystemPublicAssetManager(plugin_store=container.build_plugin_store())
-    for line in manager.doctor_plugins(workspace_root):
-        style = "green" if line.startswith("[ok]") else "yellow"
-        console.print(line, style=style, markup=False)
+    lines = manager.doctor_plugins(workspace_root)
+    for line in lines:
+        style = "green" if line.status is DoctorStatus.OK else "yellow"
+        console.print(line.render(), style=style, markup=False)
+    # Same verdict authority as `public doctor` — this command used to have NO exit
+    # code at all, so drift here never failed any pipeline.
+    if any(line.status.blocking for line in lines) or any(
+        name not in available for name in installed
+    ):
+        raise typer.Exit(1)

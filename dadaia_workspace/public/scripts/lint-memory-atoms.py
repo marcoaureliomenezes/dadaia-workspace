@@ -120,7 +120,7 @@ _HEADING_GROUP_C: frozenset[str] = frozenset(
 )
 
 # Group D — Legitimate current-atom canon headings (F9 / T-PIO-09).
-# The PI / two-layer drift audit flagged these real headings from architecture,
+# A drift audit flagged these real headings from architecture,
 # lifecycle-foundation, spec-context-project, multi-platform-parity, and the agent
 # atoms as LINT-1 WARNings even though they are legitimate, stable section headings.
 # Adding them here resolves the EN/PT canon and silences the spurious WARNs without

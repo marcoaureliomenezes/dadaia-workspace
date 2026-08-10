@@ -34,7 +34,7 @@ from dadaia_workspace.features.telemetry.aggregator.models import (
 # Runtimes that do not track token cost. Their aggregate cost is always
 # unknown regardless of any stray stored value (SPEC v0.1.52 FR1, matrix case 1;
 # mirrors the client ``isCostUnknownRuntime``).
-_COST_UNKNOWN_RUNTIMES: frozenset[str] = frozenset({"codex", "pi"})
+_COST_UNKNOWN_RUNTIMES: frozenset[str] = frozenset({"codex", "kimi-code"})
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -735,7 +735,7 @@ class TelemetryAggregator:
           cost;
         * ``total_cost_usd`` is None when no session contributes;
         * ``cost_known`` is True iff at least one session contributes;
-        * codex/pi are cost-unknown runtimes: cost is forced None / False.
+        * codex/kimi are cost-unknown runtimes: cost is forced None / False.
 
         Cost-unknown sessions still count toward ``total_sessions``,
         ``active_sessions``, ``total_messages`` and ``top_agent``.
@@ -786,7 +786,7 @@ class TelemetryAggregator:
         active_sessions = sum(1 for r in rows if r["status"] == "active")
         total_messages = sum(int(r["message_count"]) for r in rows)
 
-        # Cost aggregation — forced unknown for codex/pi (never track cost).
+        # Cost aggregation — forced unknown for codex/kimi (never track cost).
         total_cost_usd: float | None = None
         cost_known = False
         if runtime not in _COST_UNKNOWN_RUNTIMES:

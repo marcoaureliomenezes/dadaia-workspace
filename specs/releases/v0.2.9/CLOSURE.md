@@ -7,9 +7,9 @@
 
 ## Summary
 
-v0.2.9 converges the hermes × dadaia-workspace loop to **zero failures on a full
+v0.2.9 converges the consumer × dadaia-workspace loop to **zero failures on a full
 real-use round** — the declared gate for package 0.4.1. The work started from a
-directed discovery with the hermes agent itself (task tg-1784485392): its full
+directed discovery with the consumer agent itself (task tg-1784485392): its full
 day-to-day inventory became the validation contract, and every finding was fixed
 by root-cause CLASS, never by instance patch.
 
@@ -25,20 +25,20 @@ consumer recipe gained the **Real-use matrix (R-01…R-08)**: the live Codex cha
 with per-link artifact proofs is now required for every release, and deterministic
 certification alone never approves one.
 
-Hermes verdict for the 0.4.1 candidate: **CERTIFIED_100 — 35 PASS / 0 FAIL /
-0 EXCEPTION** (`/opt/data/.val/matrix-verdict/hermes-certification-0.4.1.json`).
+Consumer verdict for the 0.4.1 candidate: **CERTIFIED_100 — 35 PASS / 0 FAIL /
+0 EXCEPTION** (`<consumer-root>/.val/matrix-verdict/consumer-certification-0.4.1.json`).
 
 ## Scope and task completion
 
 | Task ID | Planned scope | Final state | Evidence |
 |---|---|---|---|
-| T1 | backlog_author acceptance requires an authored delta | Implemented | `tests/unit/features/lifecycle/test_backlog_materialization.py` (4 tests); hermes R1: live backlog materialized |
-| T2 | scaffold placeholder repair (init/upgrade/--fix) | Implemented | `tests/unit/features/specs/test_scaffold_placeholder_repair.py` (7 tests); hermes R1: both real contexts reach specs doctor 0/0 |
-| T3 | release-definition honest terminal state | Dispositioned: old-version record; class fixed in 0.3.x line | hermes diagnostics task tg-1784488200; R-05 re-run passes |
+| T1 | backlog_author acceptance requires an authored delta | Implemented | `tests/unit/features/lifecycle/test_backlog_materialization.py` (4 tests); consumer R1: live backlog materialized |
+| T2 | scaffold placeholder repair (init/upgrade/--fix) | Implemented | `tests/unit/features/specs/test_scaffold_placeholder_repair.py` (7 tests); consumer R1: both real contexts reach specs doctor 0/0 |
+| T3 | release-definition honest terminal state | Dispositioned: old-version record; class fixed in 0.3.x line | consumer diagnostics task tg-1784488200; R-05 re-run passes |
 | T4 | bounded rejection-correction digest | Implemented | `tests/unit/features/lifecycle/test_rejection_digest_budget.py` (4 tests) |
 | T5 | release-id canon, skills/CLI audit, root-exceptions guidance | Verified already covered on main | `_require_canonical_release_id` at intake; doctor error text; skills audit clean |
 | T6 | Recipe v2: real-use matrix | Implemented | `public/data/CONSUMER_VALIDATION_RECIPE.md` R-01…R-08 shipped in the wheel |
-| T7 | Hermes convergence rounds until zero | **ACHIEVED** | 3 rounds → CERTIFIED_100 (35/35) |
+| T7 | Consumer convergence rounds until zero | **ACHIEVED** | 3 rounds → CERTIFIED_100 (35/35) |
 | T8 | Docs, memory, 0.4.1 gates, deploy | Implemented (this file + gates below) | — |
 
 ## Validations
@@ -47,17 +47,17 @@ Hermes verdict for the 0.4.1 candidate: **CERTIFIED_100 — 35 PASS / 0 FAIL /
 |---|---|---|
 | Full pytest suite | `pytest -p no:cacheprovider tests/unit tests/contract tests/integration tests/e2e` | `2811 passed, 10 skipped` |
 | ruff + mypy | `ruff format/check dadaia_workspace/ tests/`; `mypy --strict` changed files | clean |
-| Hermes convergence round 1 | candidate 0.4.1 | 10 PASS / 1 FAIL (revision observability bug) |
-| Hermes convergence round 2 | candidate 0.4.1 | 7 PASS / 1 FAIL (pipeline retry observability + plan-author flake) |
-| Hermes convergence round 3 | candidate 0.4.1 | **CERTIFIED_100 — 35 PASS / 0 FAIL / 0 EXCEPTION** |
+| Consumer convergence round 1 | candidate 0.4.1 | 10 PASS / 1 FAIL (revision observability bug) |
+| Consumer convergence round 2 | candidate 0.4.1 | 7 PASS / 1 FAIL (pipeline retry observability + plan-author flake) |
+| Consumer convergence round 3 | candidate 0.4.1 | **CERTIFIED_100 — 35 PASS / 0 FAIL / 0 EXCEPTION** |
 
-## Bugs registered and dispositioned (hermes loop)
+## Bugs registered and dispositioned (consumer loop)
 
 | Bug | Disposition |
 |---|---|
 | `codex-backlog-author-no-materialization-regression-040` | resolved (T1 delta gate) |
 | `scaffold-repair-cannot-remediate-invalid-placeholder-atom` | resolved (T2 repair) |
-| `lifecycle-release-define-stalls-before-worker` | deferred→confirmed: old-layout record (2026-07-12); class fixed in 0.3.x; hermes R-05 re-run passes |
+| `lifecycle-release-define-stalls-before-worker` | deferred→confirmed: old-layout record (2026-07-12); class fixed in 0.3.x; consumer R-05 re-run passes |
 | `impl-reviews-retry-prompt-exceeds-codex-window` | resolved (T4 bounded digests) |
 | `release-definition-retry-stalls-with-empty-workflow-steps-041` | resolved (`revision_note` on the run record) |
 | `implementation-reviews-hangs-after-worker-output-041` | resolved (pipeline retry `revision_note`, sibling surface) |
@@ -66,11 +66,11 @@ Hermes verdict for the 0.4.1 candidate: **CERTIFIED_100 — 35 PASS / 0 FAIL /
 
 ## Memory updates
 
-- `specs/memory/product/platform/hermes-agent-support.md` — NEW atom declaring
-  hermes a supported consumer environment, with the support contract and the
+- `specs/memory/product/platform/consumer-agent-support.md` — NEW atom declaring
+  consumer a supported consumer environment, with the support contract and the
   convergence posture.
 - `specs/memory/product/catalog.json` + `index.md` — regenerated (29 features).
-- `README.md` — Hermes agent declared a supported consumer alongside the harness
+- `README.md` — Consumer agent declared a supported consumer alongside the harness
   table.
 
 ## Drifts
@@ -85,9 +85,9 @@ resume path — the intended behavior. Refuted with evidence and closed.
 
 ## Backlog returns
 
-Candidate future work (not commitments): the hermes runtime's own F-statement
+Candidate future work (not commitments): the consumer runtime's own F-statement
 fixtures (its local runner's F-08/F-10/F-11/F-13/F-26 predicates) belong to
-dd-chain-capture maintenance, not this repo.
+sample-consumer maintenance, not this repo.
 
 ## Archive decision
 

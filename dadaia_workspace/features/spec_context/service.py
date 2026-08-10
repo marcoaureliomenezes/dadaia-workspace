@@ -445,15 +445,26 @@ class SpecContextService:
         if self._git.has_commits(repo_path):
             # Convergent contract (bug baseline-refuses-alive-scaffold-commit):
             # alive() commits its own scaffold, so history + clean tree is the
-            # canonical post-alive state — success, not refusal. Only a dirty tree
-            # on top of existing history refuses: operator content must never be
-            # swept into a "baseline" commit.
+            # canonical post-alive state — success, not refusal. A dirty tree on top
+            # of history converges too when EVERY dirty path is scaffold-shaped
+            # (specs/** or AGENTS.md) — the official alive → `specs init` → baseline
+            # sequence leaves exactly those tool-authored files (bug
+            # context-baseline-rejects-official-scaffold-followup). Anything else
+            # refuses: operator content must never be swept into a baseline commit.
             if self._git.is_dirty(repo_path):
-                raise ContextStateError(
-                    f"Context '{name}' already has Git history with uncommitted changes; "
-                    "baseline never commits on top of existing history. Commit or stash "
-                    "your changes first."
+                dirty = tuple(self._git.diff_name_only(repo_path))
+                scaffold_shaped = bool(dirty) and all(
+                    rel == "AGENTS.md" or rel.startswith("specs/") for rel in dirty
                 )
+                if not scaffold_shaped:
+                    raise ContextStateError(
+                        f"Context '{name}' already has Git history with uncommitted "
+                        "changes outside the scaffold envelope (specs/**, AGENTS.md); "
+                        "baseline never sweeps operator content. Commit or stash your "
+                        "changes first."
+                    )
+                self._require_no_untracked_secrets(name, repo_path)
+                self._git.commit_all(repo_path, message)
             if push:
                 if not self._git.has_remote(repo_path):
                     raise GitSyncError(f"Context '{name}' has no remote; baseline cannot push.")
@@ -464,18 +475,7 @@ class SpecContextService:
                 f"Context '{name}' has no scaffold content to commit as a baseline."
             )
 
-        flagged: list[str] = []
-        for rel in self._git.list_untracked(repo_path):
-            path = repo_path / rel
-            if path.is_file():
-                hits = _scan_file_for_secrets(path)
-                if hits:
-                    flagged.append(f"  {rel}: {', '.join(sorted(set(hits)))}")
-        if flagged:
-            raise DeadSecretFoundError(
-                f"Context '{name}': secret scan blocked initial baseline (values redacted):\n"
-                + "\n".join(flagged)
-            )
+        self._require_no_untracked_secrets(name, repo_path)
 
         self._git.commit_all(repo_path, message)
         if not self._git.has_commits(repo_path):
@@ -490,6 +490,21 @@ class SpecContextService:
                 )
             self._git.push(repo_path)
         return ctx
+
+    def _require_no_untracked_secrets(self, name: str, repo_path: Path) -> None:
+        """Secret-scan every untracked file; raise before any baseline commit sweeps one."""
+        flagged: list[str] = []
+        for rel in self._git.list_untracked(repo_path):
+            path = repo_path / rel
+            if path.is_file():
+                hits = _scan_file_for_secrets(path)
+                if hits:
+                    flagged.append(f"  {rel}: {', '.join(sorted(set(hits)))}")
+        if flagged:
+            raise DeadSecretFoundError(
+                f"Context '{name}': secret scan blocked initial baseline (values redacted):\n"
+                + "\n".join(flagged)
+            )
 
     # ------------------------------------------------------------------ dead (T-10b / T-11)
 

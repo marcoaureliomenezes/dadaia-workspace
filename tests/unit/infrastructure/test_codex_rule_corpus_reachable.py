@@ -21,6 +21,16 @@ from dadaia_workspace.infrastructure.codex_doctor import (
 )
 
 
+def _rendered(result: object) -> list[str]:
+    """Legacy string view of a typed doctor result (DoctorReport | list[DoctorLine])."""
+    if hasattr(result, "rendered"):
+        return result.rendered()  # type: ignore[attr-defined, no-any-return]
+    return [
+        line.render() if hasattr(line, "render") else str(line)
+        for line in result  # type: ignore[union-attr]
+    ]
+
+
 def _make_codex_agent(workspace: pathlib.Path, name: str, body: str) -> None:
     agents = workspace / ".codex" / "agents"
     agents.mkdir(parents=True, exist_ok=True)
@@ -56,7 +66,7 @@ def test_rule_corpus_reachable(tmp_path: pathlib.Path, case: str) -> None:
         _make_rule(tmp_path, "workspace-protocol")
         _make_rule(tmp_path, "release-governance")
 
-        out = check_codex_rule_corpus_reachable(tmp_path)
+        out = _rendered(check_codex_rule_corpus_reachable(tmp_path))
         assert out == ["[ok] codex:rule-corpus-reachable (WS-CDX-PROTOCOL)"]
 
     elif case == "unreachable-reports-error":
@@ -68,7 +78,7 @@ def test_rule_corpus_reachable(tmp_path: pathlib.Path, case: str) -> None:
         _make_rule(tmp_path, "workspace-protocol")
         # nonexistent-rule.md deliberately absent.
 
-        out = check_codex_rule_corpus_reachable(tmp_path)
+        out = _rendered(check_codex_rule_corpus_reachable(tmp_path))
         assert len(out) == 1
         assert "nonexistent-rule" in out[0]
         assert out[0].startswith("[error] codex:rule-corpus")
@@ -85,14 +95,14 @@ def test_rule_corpus_reachable(tmp_path: pathlib.Path, case: str) -> None:
         _make_codex_agent(tmp_path, "a", "Use the `missing-rule` rule.")
         _make_codex_agent(tmp_path, "b", "Also the `missing-rule` rule.")
 
-        out = check_codex_rule_corpus_reachable(tmp_path)
+        out = _rendered(check_codex_rule_corpus_reachable(tmp_path))
         assert len(out) == 1
         assert "missing-rule" in out[0]
 
 
 def test_trust_boundary_info_line_states_boundary() -> None:
     """A7: INFO line names interactive-fire and headless-no-fire honestly."""
-    out = codex_trust_boundary_info()
+    out = _rendered(codex_trust_boundary_info())
 
     assert len(out) == 1
     line = out[0]

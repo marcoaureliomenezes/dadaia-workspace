@@ -26,7 +26,7 @@ from dadaia_workspace.core.agent_model_templates import (
     list_templates,
     resolve_agent_model,
 )
-from dadaia_workspace.core.model_registry import registry_by_claude_id
+from dadaia_workspace.core.model_registry import harness_native_model_map, registry_by_claude_id
 from dadaia_workspace.core.models.agent_model_policy import (
     _SCHEMA_VERSION,
     CLAUDE_EFFORTS,
@@ -106,6 +106,11 @@ class AgentModelPolicyService:
         return {
             "templates": templates,
             "models": sorted(registry_by_claude_id()),
+            # Per-harness NATIVE display ids keyed by canonical claude id — the
+            # panel picker shows the toggled harness's own vocabulary, never a
+            # claude-* id on codex/kimi (bug
+            # agents-tab-model-picker-ignores-harness-runtime).
+            "models_by_harness": harness_native_model_map(),
             "efforts": list(CLAUDE_EFFORTS),
         }
 

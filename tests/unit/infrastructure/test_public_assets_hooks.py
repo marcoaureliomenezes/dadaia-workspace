@@ -168,6 +168,28 @@ def test_claude_settings_contract(tmp_path: Path) -> None:
     assert not any("root-whitelist-gate.sh" in cmd for cmd in all_pre_commands)
 
 
+def test_claude_settings_session_start_reinjection(tmp_path: Path) -> None:
+    """Bug claude-compact-reinjection-missing: SessionStart(compact|clear) → ctx_inject.
+
+    A Claude Code compact (auto or manual) erases the injected bootstrap; /clear wipes
+    the whole context. Both SessionStart sources re-run ctx_inject, whose stdout Claude
+    Code adds back to context — parity with kimi-code's PostCompact shim (v0.2.8) and
+    the codex SessionStart wrapper. Matchers are the exact documented source names, one
+    entry each — never an empty match-all (a plain startup must stay on the
+    UserPromptSubmit path, FR-W2 bind-driven injection).
+    """
+    manager = FileSystemPublicAssetManager()
+    hooks = manager._claude_settings(tmp_path)["hooks"]
+    session_start = hooks["SessionStart"]
+    assert isinstance(session_start, list)
+    assert {entry["matcher"] for entry in session_start} == {"compact", "clear"}
+    for entry in session_start:
+        cmds = [str(h["command"]) for h in entry["hooks"]]
+        assert len(cmds) == 1
+        assert "dadaia_workspace.hooks.ctx_inject" in cmds[0]
+        assert " -B -m " in cmds[0]
+
+
 def test_seed5_single_pretooluse_command_per_runtime(tmp_path: Path) -> None:
     """Seed-5 static proof (T-014-05): exactly ONE registered PreToolUse hook command
     per runtime config (the merged pre_gate), down from the old dual sdd_gate +

@@ -40,7 +40,7 @@ def _try_build_telemetry(workspace_root: Path) -> object | None:
         from dadaia_workspace.features.telemetry.aggregator.queries import TelemetryAggregator
         from dadaia_workspace.features.telemetry.reader import claude as _claude_reader
         from dadaia_workspace.features.telemetry.reader import codex as _codex_reader
-        from dadaia_workspace.features.telemetry.reader import pi as _pi_reader
+        from dadaia_workspace.features.telemetry.reader import kimi as _kimi_reader
         from dadaia_workspace.features.telemetry.service import TelemetryService
         from dadaia_workspace.features.telemetry.store.dao import TelemetryDao
         from dadaia_workspace.features.telemetry.store.schema import (
@@ -83,7 +83,7 @@ def _try_build_telemetry(workspace_root: Path) -> object | None:
         )
 
         def _reader_factory() -> tuple[Any, ...]:
-            return (_claude_reader, _codex_reader, _pi_reader)
+            return (_claude_reader, _codex_reader, _kimi_reader)
 
         return TelemetryService(
             dao_factory=_write_dao_factory,

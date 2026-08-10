@@ -6,10 +6,10 @@ repository, follows instructions, uses tools, can run hooks, can load skills, an
 can spawn custom agents when explicitly asked.
 
 The first correction is simple: Codex is not a workflow daemon. It follows
-instructions in the current session. The four Python-backed `dadaia lifecycle`
-commands run the governed SDD workflows and call Layer-2 workers explicitly. Outside
-those workflows, the operator or dispatcher must explicitly ask Codex to spawn or
-delegate when subagents are needed.
+instructions in the current session. There is no separate workflow engine — the
+ordered SDD flow is agent-dispatched, carried out by dispatching the owning agent for
+each stage against the SDD documents. The operator or dispatcher must explicitly ask
+Codex to spawn or delegate when subagents are needed.
 
 ## The Surfaces That Matter
 

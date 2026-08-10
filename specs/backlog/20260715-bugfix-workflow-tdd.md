@@ -1,14 +1,12 @@
 ---
 name: bugfix-workflow-tdd
-status: OPEN
+status: rejected
 created: 2026-07-15
 origin: operator demand 2026-07-15 (same session as the bug-hotfix doctrine decree)
 owner: project-manager (curates)
 intents:
-  - subject: { kind: code, ref: "dadaia_workspace/features/lifecycle/workflows/audit.py#AuditWorkflow" }
-    change: "add a sibling FragmentGateWorkflow body `bugfix.py` implementing the ceremony-free strict-TDD bug-handling sequence (intake/ledger gate, executed-path reproduce, root cause + recurrence surface, RED tests re-run by a deterministic gate, qa test-reliability review, causal fix, GREEN gate, code review, resolved-event close gate)"
-  - subject: { kind: code, ref: "dadaia_workspace/features/lifecycle/prompt_builder.py#FragmentBundle" }
-    change: "new bugfix/ fragment set (7 one-job fragments + bugfix-*-v1 output schemas) reusing shared/anti-slop, shared/write-scope, shared/output-handoff"
+  - subject: { kind: doc, ref: "memory/quality-assurance.md#Purpose" }
+    change: "REJECTED (v0.3.0): the item asked for a bugfix workflow inside the dadaia-workflows engine; the engine was demolished in v0.3.0. The strict-TDD bug flow it wanted is law — constitution §1 bug-hotfix lane (register → root cause → RED → fix → GREEN → resolved + evidence). No mechanism needed."
 ---
 
 # Backlog — `bugfix` dadaia-workflow: strict-TDD bug handling

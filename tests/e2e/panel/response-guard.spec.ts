@@ -10,7 +10,7 @@
  * If these fail, other tests are unreliable.
  *
  * E2E-GUARD-01: Register a response listener BEFORE navigation. Fail on ANY
- *   response status >= 400 during a full tab tour (workflows, sessions, reports,
+ *   response status >= 400 during a full tab tour (sessions, reports,
  *   academy, servers, memories) PLUS clicking the first memory chip and
  *   waiting for networkidle. Include the failing URL+status list in the
  *   assertion message.
@@ -32,7 +32,7 @@
  *   view were removed. The tour now covers the surviving nav set.
  *
  * v0.1.79 amendment: the standalone Sessions tab was removed — its cost
- *   dashboard is now a sub-section inside the "1º Agentic Layer" (subagents)
+ *   dashboard is now a sub-section inside the "Agents" (subagents)
  *   tabpanel, so the tab tour below drives `#tab-subagents` (which loads both
  *   the agent-policy roster AND the relocated Sessions dashboard) in place of
  *   the deleted `#tab-sessions`.
@@ -42,11 +42,10 @@ import { test, expect } from '@playwright/test';
 import { gotoPanel, PANEL_TOKEN, BASE_URL } from './helpers';
 
 // ---------------------------------------------------------------------------
-// Tab tour definition — 6 primary tabs in display order (v0.1.79 nav set)
+// Tab tour definition — primary tabs in display order (v0.3.0 nav set)
 // ---------------------------------------------------------------------------
 const ALL_TABS = [
-  { tabId: '#tab-subagents', sectionId: 'subagents', label: '1º Agentic Layer' },
-  { tabId: '#tab-workflows', sectionId: 'workflows', label: '2º Agentic Layer' },
+  { tabId: '#tab-subagents', sectionId: 'subagents', label: 'Agents' },
   { tabId: '#tab-reports', sectionId: 'reports', label: 'Reports' },
   { tabId: '#tab-academy', sectionId: 'academy', label: 'Academy' },
   { tabId: '#tab-servers', sectionId: 'servers', label: 'Servers' },

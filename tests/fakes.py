@@ -5,6 +5,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
 from dadaia_workspace.core.models.server_registry import PortEntry
 from dadaia_workspace.core.models.spec_context import SpecContextProject
 
@@ -56,6 +57,8 @@ class FakeGitClient:
         self._remote_urls: dict[Path, str] = {}
         self._upstream_branches: dict[Path, str | None] = {}
         self._unpushed_commit_counts: dict[Path, int] = {}
+        self._has_commits: set[Path] = set()
+        self._diff_names: dict[Path, tuple[str, ...]] = {}
 
     def clone(self, url: str, dest: Path) -> None:
         dest.mkdir(parents=True, exist_ok=True)
@@ -64,8 +67,18 @@ class FakeGitClient:
     def is_dirty(self, path: Path) -> bool:
         return path in self._dirty
 
+    def has_commits(self, path: Path) -> bool:
+        return path in self._has_commits
+
+    def diff_name_only(self, path: Path) -> tuple[str, ...]:
+        return self._diff_names.get(path, ())
+
     def commit_all(self, path: Path, msg: str) -> None:
         self.committed.append(path)
+        self._has_commits.add(path)
+        self._dirty.discard(path)
+        self._diff_names.pop(path, None)
+        self._untracked.pop(path, None)
 
     def has_remote(self, path: Path) -> bool:
         return path in self._has_remote
@@ -151,9 +164,9 @@ class FakePublicAssetManager:
     def list_all(self) -> dict[str, list[str]]:
         return {"agents": ["fake-agent"], "skills": ["fake-skill"]}
 
-    def doctor(self, workspace_root: Path) -> list[str]:
+    def doctor(self, workspace_root: Path) -> list[DoctorLine]:
         self.doctored.append(workspace_root)
-        return ["[ok] fake"]
+        return [DoctorLine(DoctorStatus.OK, "fake")]
 
 
 class FakeExcelReader:

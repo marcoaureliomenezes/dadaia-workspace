@@ -21,26 +21,22 @@ test('E2E-TAB-01 — Tab bar contains the current tabs in correct order', async 
   await gotoPanel(page);
   await page.waitForSelector('[role="tab"]');
 
-  // Scope to the primary nav tablist: the Games tab hosts its own game-switch
+  // Scope to the primary nav tablist
   // tablist (Snake/Tetris/Pong/Breakout choice buttons also carry role="tab").
   const tabs = await page.$$eval('.nav-tab[role="tab"]', (els) =>
     els.map((el) => el.textContent?.trim() ?? '')
   );
 
-  // v0.1.79 panel agentic-layers reorg: 7 -> 6 primary tabs. The standalone
-  // Sessions tab is merged into "1º Agentic Layer" (ex "Sub-agents") as a
-  // sub-section; "Workflows" is renamed "2º Agentic Layer". Per the ratified
-  // SPEC order, 1º Agentic Layer comes BEFORE 2º Agentic Layer. The nav is
-  // now exactly Projects, 1º Agentic Layer, 2º Agentic Layer, Reports,
-  // Academy, Servers (tab ids are unchanged: tab-subagents, tab-workflows).
+  // v0.3.0: the Workflows tab died with the workflow engine; the Games tab was
+  // removed (test-only surface); "Agentic Entities" renders the abstract-entity
+  // registry (constitution §12.5).
   expect(tabs).toEqual([
     'Projects',
-    '1º Agentic Layer',
-    '2º Agentic Layer',
+    'Agents',
+    'Agentic Entities',
     'Reports',
     'Academy',
     'Servers',
-    'Games',
   ]);
 
   await page.screenshot({
@@ -84,7 +80,6 @@ test('E2E-TAB-03 — Clicking each tab activates the correct section', async ({ 
 
   const tabs: Array<{ tabId: string; sectionId: string }> = [
     { tabId: '#tab-subagents', sectionId: 'subagents' },
-    { tabId: '#tab-workflows', sectionId: 'workflows' },
     { tabId: '#tab-reports', sectionId: 'reports' },
     { tabId: '#tab-academy', sectionId: 'academy' },
     { tabId: '#tab-servers', sectionId: 'servers' },
@@ -113,9 +108,9 @@ test('E2E-TAB-03 — Clicking each tab activates the correct section', async ({ 
 });
 
 // ---------------------------------------------------------------------------
-// E2E-TAB-07 — Sessions dashboard merged into 1º Agentic Layer, no standalone tab
+// E2E-TAB-07 — Sessions dashboard merged into the Agents tab, no standalone tab
 // ---------------------------------------------------------------------------
-test('E2E-TAB-07 — Sessions dashboard renders inside 1º Agentic Layer, no #tab-sessions', async ({
+test('E2E-TAB-07 — Sessions dashboard renders inside the Agents tab, no #tab-sessions', async ({
   page,
 }) => {
   await gotoPanel(page);
@@ -129,7 +124,7 @@ test('E2E-TAB-07 — Sessions dashboard renders inside 1º Agentic Layer, no #ta
   await page.waitForSelector('#section-subagents.active', { timeout: 8000 });
 
   // The relocated Sessions cost/telemetry dashboard is a sub-section inside
-  // the 1º Agentic Layer tabpanel.
+  // the Agents tabpanel.
   const sessionsMount = page.locator('#section-subagents #section-sessions');
   await expect(sessionsMount).toHaveCount(1);
   await expect(page.locator('#section-subagents #sessions-dashboard')).toHaveCount(1);
@@ -159,7 +154,7 @@ test('E2E-TAB-04 — No CSP violations on load and all tab activations', async (
   await page.waitForSelector('[role="tab"]');
 
   // Navigate across the surviving tabs (Agentic/agents/kanban removed in v0.1.45).
-  for (const sectionId of ['subagents', 'workflows', 'servers', 'memories'] as const) {
+  for (const sectionId of ['subagents', 'servers', 'memories'] as const) {
     await activateTab(page, sectionId);
   }
 

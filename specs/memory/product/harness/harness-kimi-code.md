@@ -7,7 +7,7 @@ summary: >-
   Kimi Code enters the workspace as a first-class Layer-1 harness. The projection
   tree is inert Markdown; the live wiring is four POSIX shims registered via a
   marker-delimited managed block of TOML hook rules in `$KIMI_CODE_HOME/config.toml`,
-  delegating to the shared Python hook modules. Layer-2 workers remain codex/pi only.
+  delegating to the shared Python hook modules.
 tags:
 - harness
 - kimi-code
@@ -50,7 +50,7 @@ managed block. Generated `.kimi-code/**` files must not be hand-edited.
 
 ## Layer 2
 
-None. Layer-2 workflow workers stay `codex`/`pi`. Kimi built-in sub-agents
+None. Kimi built-in sub-agents
 (`coder`/`explore`/`plan`) are a harness-native surface, not dadaia personas.
 
 ## Dependencies

@@ -85,24 +85,12 @@ CLAUDE_SESSION_ENV_VAR: Final[str] = "CLAUDE_CODE_SESSION_ID"
 #: The native session-id env var Codex provides to a hook subprocess.
 CODEX_SESSION_ENV_VAR: Final[str] = "CODEX_SESSION_ID"
 
-#: The entry-harness auto-default signal vars (v0.1.64 FR3/AC-4). A developer running
-#: pytest inside a codex TUI (or a PI session with the Ring-1 pin) legitimately carries
-#: these in the shell; the test envelope must scrub them so a lifecycle verb invoked
-#: without ``--harness`` in a test always resolves ``fake`` — never a real,
-#: credit-spending worker. ``CLAUDE_CODE_SESSION_ID`` is included for symmetry (it is
-#: never an entry signal, but scrubbing it keeps the envelope deterministic).
-#:
-#: ``CODEX_THREAD_ID`` (v0.1.69 FR1.5, bug ``codex-thread-id-bind-resolution-breaks-cli``,
-#: SAFETY-mandatory): since ``core.session_env.entry_harness()`` now treats
-#: ``CODEX_THREAD_ID`` as a Codex entry signal (FR1.2), a modern Codex tool subprocess
-#: exports it INSTEAD of ``CODEX_SESSION_ID`` — a developer running pytest inside such a
-#: Codex TUI would otherwise have ``entry_harness()`` resolve ``"codex"`` mid-suite and
-#: auto-default a real, credit-spending Layer-2 worker. Adding it here is a mandatory
-#: extension of the existing hermeticity envelope (documented, not a weakening): the
-#: autouse scrub (:func:`scrub_entry_signal_env`) and
-#: ``test_ci_job_env_carries_no_entry_signal_vars`` both inherit it automatically.
+#: The harness session-id env vars a developer's shell may legitimately carry (a codex
+#: TUI exports ``CODEX_SESSION_ID`` or ``CODEX_THREAD_ID``; Claude Code exports
+#: ``CLAUDE_CODE_SESSION_ID``). The test envelope scrubs them so session-id resolution
+#: stays hermetic; the autouse scrub (:func:`scrub_entry_signal_env`) inherits this
+#: list automatically.
 ENTRY_SIGNAL_ENV_VARS: Final[tuple[str, ...]] = (
-    "DADAIA_ENTRY_HARNESS",
     CODEX_SESSION_ENV_VAR,
     "CODEX_THREAD_ID",
     CLAUDE_SESSION_ENV_VAR,
@@ -110,10 +98,10 @@ ENTRY_SIGNAL_ENV_VARS: Final[tuple[str, ...]] = (
 
 
 def scrub_entry_signal_env(monkeypatch: Any) -> None:
-    """Delete the three entry-signal vars from ``os.environ`` for the current test.
+    """Delete the harness session-id vars from ``os.environ`` for the current test.
 
     The autouse fixture in the root ``tests/conftest.py`` applies this over the whole
-    suite (the AC-4 hermeticity envelope); tests that exercise the auto-default set the
+    suite (hermeticity envelope); tests that exercise session-id resolution set the
     vars explicitly AFTER the scrub via their own ``monkeypatch.setenv``.
     """
     for name in ENTRY_SIGNAL_ENV_VARS:
@@ -131,10 +119,6 @@ def scrub_entry_signal_env(monkeypatch: Any) -> None:
 #:     ``hooks/ctx_inject._resolve_context`` and ``hooks/sdd_gate`` context resolution.
 #:   - ``DADAIA_AGENTS_DIR`` — agents-dir override (resolution branch 1); read by
 #:     ``features/agents/reader`` (``os.environ.get("DADAIA_AGENTS_DIR")``).
-#:   - ``DADAIA_WORKFLOWS_DIR`` — workflows-dir override (resolution branch 1); read by
-#:     ``features/workflows/service`` (``os.environ.get("DADAIA_WORKFLOWS_DIR")``).
-#:   - ``DADAIA_AGENT_RUNTIME`` — runtime selector; read by the lifecycle runtime
-#:     wiring and the ``context`` CLI command.
 #:   - ``DADAIA_SESSION_ID`` — the operator **override** leg of ``resolve_session_id``
 #:     (``hooks/_common`` reads it first, ahead of the harness-native id vars). The harness
 #:     never sets it (so it stays in :data:`_FORBIDDEN_HOOK_ENV`, scrubbed from a real hook
@@ -145,40 +129,21 @@ def scrub_entry_signal_env(monkeypatch: Any) -> None:
 ALLOWLISTED_DADAIA_ENV: Final[frozenset[str]] = frozenset(
     {
         "DADAIA_CONTEXT",
+        # Read by cli/main._traceback_requested BY DESIGN: the operator's opt-in for a full
+        # traceback, since the CLI boundary otherwise renders every failure as one line
+        # (bug f22-cli-boundary-is-a-whitelist-not-a-boundary).
+        "DADAIA_TRACEBACK",
         # Read by infrastructure/python_env.VenvPythonEnvironmentManager.ensure_workspace_venv
         # BY DESIGN: points workspace-venv bootstraps at an unpublished candidate wheel
         # (consumer-validation norm; bug init-bootstrap-pins-unpublished-version).
         "DADAIA_BOOTSTRAP_PACKAGE",
         "DADAIA_AGENTS_DIR",
-        "DADAIA_WORKFLOWS_DIR",
-        "DADAIA_AGENT_RUNTIME",
         "DADAIA_SESSION_ID",
         "DADAIA_MODE",
         # Operator/test path-override knob read by production in
         # features/telemetry/service.py (PI session-store ingest, WS-PI-6) — same
-        # category as DADAIA_AGENTS_DIR/DADAIA_WORKFLOWS_DIR above.
-        "DADAIA_PI_SESSIONS_DIR",
-        # Entry-harness pin (v0.1.64 FR3/FR4) — an operator-shell / PI-Ring-1 input read
-        # by production BY DESIGN in core/session_env.entry_harness (the --harness auto
-        # sentinel). Setting it in a test exercises that real env-read path; the autouse
-        # AC-4 envelope scrub (scrub_entry_signal_env) keeps the suite hermetic.
-        "DADAIA_ENTRY_HARNESS",
-        # Codex sandbox override (v0.1.66 FR5) — an operator-shell input read by
-        # production BY DESIGN in infrastructure/codex_runtime.CodexExecConfig.__post_init__
-        # (os.environ.get(_DADAIA_CODEX_SANDBOX_ENV)), used to widen the codex sandbox mode
-        # in constrained containers where the read-only default fails under bwrap.
-        "DADAIA_CODEX_SANDBOX",
-        # FR3 (v0.1.67, T-67-08/T-67-09) real-binary live-opt-in flags — read BY DESIGN
-        # by tests/conftest.py's _real_worker_opt_in() (the suite-wide guard predicate)
-        # and independently by each tests/integration/{pi,codex,claude}_live/ suite's own
-        # skipif precondition. Not a production (dadaia_workspace/) reader — the reader is
-        # test infrastructure itself, exercising the real live-opt-in env-read path a
-        # per-flag non-interference proof (T-67-09) must genuinely set via
-        # monkeypatch.setenv rather than simulate.
-        "DADAIA_E2E_REAL_WORKER",
-        "DADAIA_PI_LIVE",
-        "DADAIA_CODEX_LIVE",
-        "DADAIA_CLAUDE_LIVE",
+        # category as DADAIA_AGENTS_DIR above.
+        "DADAIA_KIMI_SESSION_INDEX",
     }
 )
 
@@ -371,9 +336,44 @@ class HookResult:
             data = json.loads(raw)
         except (json.JSONDecodeError, ValueError):
             return None
-        if isinstance(data, dict) and data.get("decision") == "block":
+        if not isinstance(data, dict):
+            return None
+        # A block is only a block if Claude Code READS it as one. The verdict Claude Code
+        # acts on is `hookSpecificOutput.permissionDecision == "deny"`; the top-level
+        # `decision` key is the legacy fallback the codex hooks and the kimi shim grep.
+        # Keying this predicate on the legacy field alone left every subprocess block
+        # assertion blind to the field that actually enforces: stripping
+        # `permissionDecision` from `emit_block` cost exactly ONE test out of 180 while
+        # turning every deny into a silent allow in production.
+        specific = data.get("hookSpecificOutput")
+        denies = isinstance(specific, dict) and specific.get("permissionDecision") == "deny"
+        if denies or data.get("decision") == "block":
+            assert denies, (
+                "block envelope carries no hookSpecificOutput.permissionDecision='deny' — "
+                f"Claude Code would read this as ALLOW: {data!r}"
+            )
+            assert data.get("decision") == "block", (
+                "block envelope lost the legacy top-level decision the codex hooks and the "
+                f"kimi shim grep: {data!r}"
+            )
             return data
         return None
+
+
+def is_allow_envelope(line: str) -> bool:
+    """True when *line* is the gate's explicit allow envelope (any envelope revision).
+
+    Keyed on "JSON envelope that is not a block" rather than a byte-exact literal so
+    consumers (advisory-line filters) survive envelope evolution — the same non-block
+    reading the codex hooks and the kimi shim apply. The allow envelope carries no
+    ``decision`` at all since bug pre-gate-allow-envelope-fails-claude-schema (Claude
+    Code's top-level enum is ``["approve", "block"]``).
+    """
+    try:
+        data = json.loads(line)
+    except (json.JSONDecodeError, ValueError):
+        return False
+    return isinstance(data, dict) and data.get("decision") != "block"
 
 
 def run_hook_subprocess(

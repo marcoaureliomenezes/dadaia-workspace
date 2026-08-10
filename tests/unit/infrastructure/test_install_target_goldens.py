@@ -4,17 +4,17 @@ Three behaviour-bearing surfaces are byte-locked here so the typed-harness-regis
 refactor (T-58-11) and the FR3 profile-aware doctor (W3) can be proven regression-free:
 
 1. ``FileSystemPublicAssetManager.install()`` per-``--target`` resolution for each of
-   ``{all, agents, claude, codex, pi}`` — the produced ``installed`` list, path-normalized.
+   ``{all, agents, claude, codex, kimi-code}`` — the produced ``installed`` list, path-normalized.
    AC-1: this list must reproduce byte-identically once ``public_assets`` resolves the
    install-target vocabulary through ``core/harness_registry`` (T-58-11).
 2. The panel runtime-validation accept/reject behaviour of ``render_api_workflows_list``
    and ``render_api_agents_canonical`` for ``claude`` / ``codex`` / ``pi`` and a bogus
    value. The api_agents runtime filter surfaces the accept/reject decision in the
    response body — each valid runtime yields a DISTINCT agent set (claude → the
-   claude-provider agent, codex → the codex-provider agent, pi → the pi-provider agent),
+   claude-provider agent, codex → the codex-provider agent, kimi-code → the kimi-provider agent),
    while a bogus runtime normalizes to ``claude`` — so this golden genuinely exercises the
    L1-entry-harness membership that T-58-11 repoints to
-   ``harness_registry.L1_ENTRY_HARNESSES`` (a broken ``pi`` membership would flip the pi
+   ``harness_registry.L1_ENTRY_HARNESSES`` (a broken ``kimi-code`` membership would flip that
    body to the claude body and this golden would catch it).
 3. ``FileSystemPublicAssetManager.doctor()``'s full report list on a fully-installed
    all-four (no-profile) tree (Q2/A4). This is the FR3 absent-profile back-compat lock:
@@ -57,6 +57,17 @@ from tests.helpers.golden_platform import (
     norm_path_line,
 )
 
+
+def _rendered(result: object) -> list[str]:
+    """Legacy string view of a typed doctor result (DoctorReport | list[DoctorLine])."""
+    if hasattr(result, "rendered"):
+        return result.rendered()  # type: ignore[attr-defined, no-any-return]
+    return [
+        line.render() if hasattr(line, "render") else str(line)
+        for line in result  # type: ignore[union-attr]
+    ]
+
+
 pytestmark = pytest.mark.unit
 
 _HERE = Path(__file__).resolve().parent
@@ -65,8 +76,8 @@ _INSTALL_GOLDEN = _GOLDEN_DIR / "install_target_resolution_v0158.json"
 _PANEL_GOLDEN = _GOLDEN_DIR / "panel_runtime_validation_v0158.json"
 _DOCTOR_GOLDEN = _GOLDEN_DIR / "doctor_all_four_v0158.json"
 
-_INSTALL_TARGETS = ("all", "agents", "claude", "codex", "pi", "kimi-code")
-_RUNTIMES = ("claude", "codex", "pi", "bogus")
+_INSTALL_TARGETS = ("all", "agents", "claude", "codex", "kimi-code")
+_RUNTIMES = ("claude", "codex", "kimi-code", "bogus")
 
 
 def _redirect_kimi_home(monkeypatch: pytest.MonkeyPatch, ws: Path) -> None:
@@ -100,19 +111,11 @@ class _FakeSpecContext:
         return []
 
 
-class _FakeWorkflows:
-    def list_dadaia_workflows(self) -> list[Any]:
-        return []
-
-    def get_dadaia_workflow(self, name: str) -> None:
-        return None
-
-
 class _FakeTelemetry:
     """One agent per L1 runtime, each with a distinct ``providers`` list.
 
     This makes the api_agents runtime filter DISCRIMINATING per runtime: claude →
-    software-engineer, codex → qa-engineer, pi → security-reviewer. A bogus runtime
+    software-engineer, codex → qa-engineer, kimi-code → security-reviewer. A bogus runtime
     normalizes to claude → software-engineer.
     """
 
@@ -144,7 +147,7 @@ class _FakeTelemetry:
             agents=[
                 summ("software-engineer", ["claude"]),
                 summ("qa-engineer", ["codex"]),
-                summ("security-reviewer", ["pi"]),
+                summ("security-reviewer", ["kimi-code"]),
             ],
         )
 
@@ -173,7 +176,6 @@ def _build_panel_service(tmp_path: Path) -> PanelService:
         spec_context=_FakeSpecContext(),  # type: ignore[arg-type]
         workspace_root=tmp_path,
         telemetry=_FakeTelemetry(),
-        workflows_service=_FakeWorkflows(),
     )
     svc._canonical_agents_override = _canonical_agents()  # type: ignore[attr-defined]
     return svc
@@ -217,7 +219,7 @@ def _capture_doctor(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> list[str
     _redirect_kimi_home(monkeypatch, ws)
     mgr = FileSystemPublicAssetManager()
     mgr.install(ws, target="all")
-    report = mgr.doctor(ws)
+    report = _rendered(mgr.doctor(ws))
     return [norm_path_line(line, ws) for line in report if not is_env_doctor_line(line)]
 
 
@@ -275,16 +277,16 @@ def test_doctor_all_four_report_is_byte_identical(
 def test_panel_runtime_accept_reject_is_discriminating(tmp_path: Path) -> None:
     """Guard: the panel golden actually distinguishes each L1 runtime (not a vacuous lock).
 
-    claude/codex/pi must each produce a DISTINCT api_agents body, and a bogus runtime must
+    claude/codex/kimi must each produce a DISTINCT api_agents body, and a bogus runtime must
     reproduce the claude body (normalized). If this ever collapses, the golden would stop
     catching an L1-membership regression in T-58-11.
     """
     captured = _capture_panel(tmp_path)
     claude_body = captured["api_agents:claude"]["body"]
     codex_body = captured["api_agents:codex"]["body"]
-    pi_body = captured["api_agents:pi"]["body"]
+    kimi_body = captured["api_agents:kimi-code"]["body"]
     bogus_body = captured["api_agents:bogus"]["body"]
     assert claude_body != codex_body
-    assert claude_body != pi_body
-    assert codex_body != pi_body
+    assert claude_body != kimi_body
+    assert codex_body != kimi_body
     assert bogus_body == claude_body

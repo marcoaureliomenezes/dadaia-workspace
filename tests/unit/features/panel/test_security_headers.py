@@ -112,7 +112,9 @@ def test_security_headers_matrix(content_type: str) -> None:
 # Hardcoded W1 baseline values (handler.py:111,116 as of the v0.1.59 branch point).
 # Do NOT update these during v0.1.59 — a change here is a Ruling-B violation, not a fix.
 _W1_BASELINE_CSP_HASH_1 = "'sha256-GRTndW6m1zCm5uxB5kEDoOXw05c1c9MDdem3TFqSMfQ='"
-_W1_BASELINE_CSP_HASH_2 = "'sha256-rrb6m84iyHOhA+A1XebxK17XtUkbhWfR95KsYvJgmpA='"
+# Baseline re-pinned once (PI removal): the runtime pre-paint script's value set
+# changed 'pi' -> 'kimi-code' — a deliberate product change, not drift.
+_W1_BASELINE_CSP_HASH_2 = "'sha256-RSFA3aRvQBf2fCuuTX2WgBq5hIbpATPJs4WDnw3YeNw='"
 
 
 def test_csp_script_hashes_frozen_to_w1_baseline() -> None:

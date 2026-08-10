@@ -32,6 +32,17 @@ from dadaia_workspace.infrastructure.public_assets import (
     _install_workspace_guardrail_pair,
 )
 
+
+def _rendered(result: object) -> list[str]:
+    """Legacy string view of a typed doctor result (DoctorReport | list[DoctorLine])."""
+    if hasattr(result, "rendered"):
+        return result.rendered()  # type: ignore[attr-defined, no-any-return]
+    return [
+        line.render() if hasattr(line, "render") else str(line)
+        for line in result  # type: ignore[union-attr]
+    ]
+
+
 # A realistic BANNERED source (production data/AGENTS.md starts with the banner).
 _SOURCE = _CANONICAL_AGENTS_BANNER + "\n# dadaia-workspace — Root Rules\n\nBody.\n"
 _HAND_AUTHORED = "# My Game Repo\n\nHand-authored, repo-specific rules. NOT lib-originated.\n"
@@ -126,7 +137,7 @@ def test_stale_canonical_consumer_is_restored_with_updated_line(tmp_path: Path) 
     (repo / "AGENTS.md").write_text(_CANONICAL_AGENTS_BANNER + "\n# OLD body\n", encoding="utf-8")
     (repo / "CLAUDE.md").write_text(_CLAUDE_MD_STUB, encoding="utf-8", newline="")
 
-    pre_lines = _doctor_guardrail_pair(src, tmp_path)
+    pre_lines = _rendered(_doctor_guardrail_pair(src, tmp_path))
     assert "[drift] repos/game:AGENTS.md" in pre_lines, pre_lines
 
     installed: list[str] = []
@@ -154,7 +165,7 @@ def test_absent_consumer_agents_is_created(tmp_path: Path) -> None:
     assert (repo / "CLAUDE.md").read_text(encoding="utf-8") == _CLAUDE_MD_STUB
     assert any(e.startswith("[ok]") and str(repo / "AGENTS.md") in e for e in installed), installed
 
-    lines = _doctor_guardrail_pair(src, tmp_path)
+    lines = _rendered(_doctor_guardrail_pair(src, tmp_path))
     assert "[ok] repos/game:AGENTS.md" in lines, lines
     assert "[ok] repos/game:CLAUDE.md" in lines, lines
 
@@ -175,7 +186,7 @@ def test_doctor_pair_foreign_for_hand_authored_repo_exits_zero(tmp_path: Path) -
     (repo / "AGENTS.md").write_text(_HAND_AUTHORED, encoding="utf-8")
     _install_workspace_guardrail_pair(src, tmp_path, force=False)  # leaves it foreign
 
-    lines = _doctor_guardrail_pair(src, tmp_path)
+    lines = _rendered(_doctor_guardrail_pair(src, tmp_path))
 
     assert "[foreign] repos/game:AGENTS.md" in lines, lines
     assert "[foreign] repos/game:CLAUDE.md" in lines, lines

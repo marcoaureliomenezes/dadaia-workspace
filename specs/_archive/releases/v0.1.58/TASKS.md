@@ -457,8 +457,8 @@ on the task line. **FR1 lands FIRST** — it is the identity seam FR2–FR5 buil
   frozen v0.1.50 no-steal suite **zero-diff**; no `public/**` asset content changed; no
   `specs/backlog/**` staged (both anchors survive → CLOSURE archival). **AC-12 reconcile (Ruling M,
   doctor-before-install, executed + recorded):** stage exit 0 → pre-install doctor surfaced the FULL
-  consumer write set — 6 consumer repos (bothub-provisioner, burrinhos-barbe, dadaia-bots,
-  dd-chain-capture, dd-chain-explorer, tauan-games), each `[drift]` AGENTS.md + `[missing]` CLAUDE.md,
+  consumer write set — 6 consumer repos (sample-provisioner, sample-project, sample-bots,
+  sample-consumer, sample-explorer, sample-games), each `[drift]` AGENTS.md + `[missing]` CLAUDE.md,
   12 targets total, self-repo absent — PM reviewed: all lib-owned root law files, no nested/operator
   files → install restored each divergent root with the DISTINCT `[updated]` line + created the
   CLAUDE.md bridges, self-repo `[skip]` (self-projection) → confirming doctor exit 0, **0

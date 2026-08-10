@@ -61,10 +61,10 @@ def test_template_ids_default_and_balanced_roster_golden() -> None:
     expected = {
         "project-manager": ("claude-fable-5", "high"),
         "software-architect": ("claude-fable-5", "high"),
-        "product-engineer": ("claude-opus-4-8", "high"),
-        "project-auditor": ("claude-opus-4-8", "xhigh"),
-        "security-reviewer": ("claude-opus-4-8", "xhigh"),
-        "code-reviewer": ("claude-opus-4-8", "high"),
+        "product-engineer": ("claude-opus-5", "high"),
+        "project-auditor": ("claude-opus-5", "xhigh"),
+        "security-reviewer": ("claude-opus-5", "xhigh"),
+        "code-reviewer": ("claude-opus-5", "high"),
         "ai-engineer": ("claude-sonnet-5", "high"),
         "software-engineer": ("claude-sonnet-5", "xhigh"),
         "qa-engineer": ("claude-sonnet-5", "high"),
@@ -195,7 +195,7 @@ def test_codex_effort_clamp_map(claude_effort: str, codex_effort: str) -> None:
             "project-manager",
             lambda: AgentModelPolicyOverlay(applied_template="subscription-saver", overrides={}),
             None,
-            ("claude-opus-4-8", "high", "template"),
+            ("claude-opus-5", "high", "template"),
         ),
         (
             # AC-3: template subscription-saver + override {SE: model=opus-4-8} →

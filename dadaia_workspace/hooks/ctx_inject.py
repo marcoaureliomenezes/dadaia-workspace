@@ -89,17 +89,18 @@ Before acting on a request in this workspace:
    SPEC/PLAN/TASKS -> product-engineer; hooks/agents/skills/rules/
    workflows (the AI surface) -> ai-engineer audit; production code ->
    software-engineer; reviews -> code/security/qa reviewers.
-2. Ordered lifecycle work uses exactly four Python workflows:
-   backlog-definition, release-definition, implementation-reviews,
-   and audit. Ownership is a coordination convention; concurrent
-   sessions are surfaced through advisory presence and never blocked.
+2. The ordered SDD flow has exactly four stages -- backlog-definition,
+   release-definition, implementation-reviews, and audit -- each carried
+   out by dispatching the owning agent against the SDD documents; there
+   is no workflow engine. Ownership is a coordination convention;
+   concurrent sessions are surfaced through advisory presence and never
+   blocked.
 3. If the operator asks for multi-agent / deep / AI-surface work and a
    subagent or dispatch tool is not in your active tool set, DISCOVER it
    first (e.g. tool_search for the agent/dispatch tool) BEFORE starting
    the main task -- do not silently proceed as a generic single agent.
-4. Limitation (truthful): this harness does NOT auto-spawn subagents
-   from static .codex/.claude workflow files. Workflow files are
-   reference docs; explicit dispatcher/operator fan-out is required.
+4. Limitation (truthful): this harness does NOT auto-spawn subagents on
+   its own. Explicit dispatcher/operator fan-out is always required.
 === end dispatcher preflight ==="""
 
 
@@ -259,11 +260,10 @@ def _digest_catalog(raw: str) -> str:
 
 
 #: Max non-empty lines of ``tech-stack.md`` kept in the bind-time SESSION bootstrap digest.
-#: WS-C dehydration (v0.1.30 / T-30-E-05): the bootstrap is a lean session-orientation aid,
-#: NOT the source of lifecycle-prompt context. Lifecycle prompts compose their context from
-#: the Python dynamic selector (``ContextSelector`` + ``LifecyclePromptBuilder``), so the
-#: hook no longer dumps the FULL tech-stack body — it emits a bounded digest plus a self-pull
-#: pointer. A small tech-stack file (≤ the cap) is emitted in full; a large one is reduced.
+#: WS-C dehydration (v0.1.30 / T-30-E-05): the bootstrap is a lean session-orientation aid
+#: for an interactive agent session, so the hook does not dump the FULL tech-stack body —
+#: it emits a bounded digest plus a self-pull pointer. A small tech-stack file (≤ the cap)
+#: is emitted in full; a large one is reduced.
 _TECH_STACK_DIGEST_MAX_LINES = 24
 
 
@@ -272,9 +272,9 @@ def _digest_tech_stack(raw: str) -> str:
 
     Keeps the leading non-empty lines, capped at :data:`_TECH_STACK_DIGEST_MAX_LINES`. When
     the file is already within the cap it is returned verbatim (so a small atom is unchanged).
-    A truncated digest appends a self-pull pointer: the full atom stays on disk and the
-    dynamic selector resolves it per-step when a lifecycle prompt actually needs it. Fail-open
-    is implicit — the caller suppresses OSError around the read.
+    A truncated digest appends a self-pull pointer: the full atom stays on disk for the agent
+    to read directly when it needs more detail. Fail-open is implicit — the caller suppresses
+    OSError around the read.
     """
     lines = raw.splitlines()
     non_empty_total = sum(1 for ln in lines if ln.strip())
@@ -290,8 +290,7 @@ def _digest_tech_stack(raw: str) -> str:
             break
     return (
         "\n".join(kept).strip()
-        + "\n\n… (tech-stack digest — self-pull specs/memory/tech-stack.md for full detail; "
-        "lifecycle prompts get tech context from the dynamic selector, not this bootstrap)"
+        + "\n\n… (tech-stack digest — self-pull specs/memory/tech-stack.md for full detail)"
     )
 
 
@@ -299,12 +298,11 @@ def _build_memory(specs_dir: Path) -> str:
     """Build the once-per-session LEAN memory bootstrap (tech-stack digest + catalog digest).
 
     WS-C (v0.1.30 / T-30-E-05): this is a session-orientation bootstrap for an interactive
-    operator session — it is NOT the context source for lifecycle prompts. Lifecycle workflow
-    steps compose their prompts entirely from the Python dynamic selector
-    (``ContextSelector``) bounded by each fragment's ``max_context_policy``; nothing in the
-    lifecycle prompt path reads this injection or its sentinel (A30). So the bootstrap stays
-    lean — a bounded tech-stack digest + the lean catalog tldr-digest, never the full memory
-    tree.
+    agent session — a lightweight orientation aid, not the full memory tree. The agent
+    self-pulls deeper atoms (e.g. ``architecture.md``, a specific product atom) directly when
+    a decision needs them, per the ``dadaia-step0-memory-bootstrap`` skill. So the bootstrap
+    stays lean — a bounded tech-stack digest + the lean catalog tldr-digest, never the full
+    memory tree.
     """
     memory_dir = specs_dir / "memory"
     if not memory_dir.is_dir():
@@ -439,7 +437,7 @@ def main() -> int:
         # The emission resolves through the SAME chain as a normal prompt (DADAIA_CONTEXT
         # env → self-keyed session record → bind-epoch marker), falling back to the
         # sentinel's recorded slug: a bind with NO prior prompt leaves no sentinel file,
-        # but its session record still names the bound context (hermes round-3 bug
+        # but its session record still names the bound context (consumer round-3 bug
         # kimi-postcompact-omits-bound-context-bootstrap).
         context = _resolve_context(workspace, session_id, sentinel_mtime, harness_pid)
         if not context:
@@ -448,6 +446,33 @@ def main() -> int:
             _emit_bootstrap(workspace, context)
         else:
             _emit(_generic_preflight(workspace))
+        return 0
+
+    # Claude Code SessionStart re-injection (bug claude-compact-reinjection-missing):
+    # a compact erased the injected bootstrap; a /clear wiped the whole context. Claude
+    # Code ADDS SessionStart stdout back to context (unlike Kimi's discard-stdout
+    # PostCompact), so the bootstrap re-emits at the event ITSELF and the sentinel is
+    # restamped immediately — the next prompt stays silent (exactly-once discipline) and
+    # no compact marker is stamped (it would double-inject at the next prompt). Detection
+    # is payload-driven (hook_event_name + source), never an env prefix — the settings
+    # command stays a plain, Windows-safe module invocation. Sources outside
+    # {compact, clear} (startup/resume/fork) fall through to the normal bind-driven flow.
+    if str(payload.get("hook_event_name") or "") == "SessionStart" and str(
+        payload.get("source") or ""
+    ) in ("compact", "clear"):
+        sentinel = tmp_dir / f"{_SENTINEL_PREFIX}{session_id}"
+        sentinel_mtime, recorded_slug = _read_sentinel(sentinel)
+        harness_pid = _resolve_harness_pid(payload)
+        # Same resolution chain + recorded-slug fallback as PostCompact above.
+        context = _resolve_context(workspace, session_id, sentinel_mtime, harness_pid)
+        if not context:
+            context = recorded_slug
+        if context and (workspace / "repos" / context / "specs").is_dir():
+            _emit_bootstrap(workspace, context)
+            _stamp_sentinel(tmp_dir, sentinel, context)
+        else:
+            _emit(_generic_preflight(workspace))
+            _stamp_sentinel(tmp_dir, sentinel, "")
         return 0
 
     sentinel = tmp_dir / f"{_SENTINEL_PREFIX}{session_id}"

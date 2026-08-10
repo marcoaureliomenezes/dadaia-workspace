@@ -15,7 +15,7 @@
  * aggregate endpoint is intercepted.
  *
  * v0.1.79 amendment: the standalone Sessions tab was removed — the dashboard is now
- * a sub-section rendered inside the "1º Agentic Layer" (`#section-subagents`)
+ * a sub-section rendered inside the "Agents" (`#section-subagents`)
  * tabpanel. `activateSessionsSubsection()` opens that tab and waits for the
  * relocated `#section-sessions` mount; `sessions.js` and the `/api/sessions`
  * contract are otherwise unchanged.
@@ -78,8 +78,8 @@ const CODEX_AGG: SessionAggregate = {
   generated_at: '2026-07-02T18:00:00+00:00',
 };
 
-const PI_AGG: SessionAggregate = {
-  runtime: 'pi',
+const KIMI_AGG: SessionAggregate = {
+  runtime: 'kimi-code',
   total_sessions: 1,
   active_sessions: 0,
   total_cost_usd: null,
@@ -226,14 +226,14 @@ test('E2E-SES-DASH-03 — codex renders N/A cost and the cost-unknown banner', a
 });
 
 // ---------------------------------------------------------------------------
-// E2E-SES-DASH-04 — pi → 'N/A' cost + PI banner visible
+// E2E-SES-DASH-04 — kimi → 'N/A' cost + Kimi banner visible
 // ---------------------------------------------------------------------------
-test('E2E-SES-DASH-04 — pi renders N/A cost and the PI cost-unknown banner', async ({
+test('E2E-SES-DASH-04 — kimi renders N/A cost and the Kimi cost-unknown banner', async ({
   page,
 }) => {
   const errors = collectConsoleErrors(page);
-  await seedRuntime(page, 'pi');
-  await mockAggregate(page, PI_AGG);
+  await seedRuntime(page, 'kimi-code');
+  await mockAggregate(page, KIMI_AGG);
 
   await gotoPanel(page);
   await activateSessionsSubsection(page);
@@ -242,7 +242,7 @@ test('E2E-SES-DASH-04 — pi renders N/A cost and the PI cost-unknown banner', a
 
   const banner = page.locator('#sessions-banner');
   await expect(banner).toBeVisible();
-  await expect(banner).toHaveText('Cost not tracked for PI');
+  await expect(banner).toHaveText('Cost not tracked for Kimi');
 
   await assertNoConsoleErrors(page, errors);
 });

@@ -217,29 +217,44 @@ def evaluate_payload(payload: dict[str, object]) -> str | None:
     """Pure SDD-gate policy over an ALREADY-PARSED hook payload.
 
     Returns a block reason string when the write must be BLOCKed, else ``None`` (ALLOW).
-    This is the reusable policy surface the merged ``pre_gate`` entrypoint drives (it reads
-    stdin once and dispatches). ``main`` is a thin wrapper kept one release for back-compat
-    direct wiring (``python -m dadaia_workspace.hooks.sdd_gate``).
+    Back-compat surface — the merged ``pre_gate`` entrypoint drives
+    :func:`evaluate_payload_with_advisory` so an ALLOW's presence advisory survives.
+    """
+    block, _advisory = evaluate_payload_with_advisory(payload)
+    return block
+
+
+def evaluate_payload_with_advisory(payload: dict[str, object]) -> tuple[str | None, str | None]:
+    """Evaluate the SDD gate returning ``(block_reason, allow_advisory)``.
+
+    ``block_reason`` is non-``None`` when the write must be BLOCKed. ``allow_advisory``
+    carries the NO-LOCKS presence advisory an allowed MUTATING write may produce (bug
+    pre-gate-drops-live-presence-advisory-042: ``gate_policy.evaluate`` returns it, but
+    the old bool-shaped surface flattened ALLOW to ``None`` and the mandated throttled
+    warning never reached the caller).
 
     FR-W4-04: classify EVERY write target. A multi-file apply_patch surfaces every file
     header; the most restrictive verdict wins — the first BLOCK stops the whole patch.
     """
     name = _common.tool_name(payload)
     if not _common.is_write_tool(name):
-        return None
+        return None, None
 
     raw_paths = _common.target_paths(payload)
     if not raw_paths:
         # Fail-safe: unparseable target → ALLOW (never deadlock on a parse miss).
-        return None
+        return None, None
 
     try:
         workspace = _resolve_workspace()
     except Exception:  # noqa: BLE001 — fail-open: unresolved workspace must not block
-        return None
+        return None, None
 
+    advisory: str | None = None
     for raw_path in raw_paths:
         decision, reason = _evaluate_target(payload, workspace, raw_path)
         if decision == gate_policy.Decision.BLOCK:
-            return reason
-    return None
+            return reason, None
+        if reason and advisory is None:
+            advisory = reason
+    return None, advisory

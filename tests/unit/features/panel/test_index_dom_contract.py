@@ -144,8 +144,9 @@ def test_tab_and_section_present(index_html: str, section: str) -> None:
 
 
 def test_exactly_six_primary_tabs_in_order(index_html: str) -> None:
-    """v0.1.79: exactly 6 primary tabs render, in the exact PANEL_PRIMARY_TABS order,
-    with the operator's exact label strings (masculine ordinal º)."""
+    """v0.3.0: exactly 6 primary tabs render (the 2º Agentic Layer tab died with the
+    workflow engine; Agentic Entities renders the abstract-entity registry), in the
+    exact PANEL_PRIMARY_TABS order, with the operator's exact label strings."""
     assert len(PANEL_PRIMARY_TABS) == 6
 
     positions = []
@@ -180,7 +181,7 @@ def test_no_sessions_tab_or_section_remnants(index_html: str) -> None:
 
 def test_sessions_dashboard_relocated_inside_agentic_layer_one(index_html: str) -> None:
     """v0.1.79 FR1: the Sessions cost/telemetry dashboard renders as a sub-section
-    INSIDE the 1º Agentic Layer (#section-subagents) tabpanel — #section-sessions
+    INSIDE the Agents (#section-subagents) tabpanel — #section-sessions
     survives as a nested mount (sessions.js keys on this id), #sessions-dashboard
     and #sessions-banner render after #section-subagents opens and before it closes."""
     subagents_start = index_html.find('id="section-subagents"')
@@ -257,5 +258,5 @@ def test_theme_and_runtime_clusters(index_html: str) -> None:
 
     assert 'class="runtime-switcher"' in index_html
     assert 'class="runtime-btn' in index_html
-    for value in ("claude", "codex", "pi"):
+    for value in ("claude", "codex", "kimi-code"):
         assert f'data-runtime-value="{value}"' in index_html, f"missing data-runtime-value={value}"

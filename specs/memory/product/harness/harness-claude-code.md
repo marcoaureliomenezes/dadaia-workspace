@@ -2,29 +2,27 @@
 slug: harness-claude-code
 title: Harness — Claude Code
 category: product
-tldr: Layer-1-only entry harness; richest deterministic enforcement; scaffold = CLAUDE.md bridge + .claude/ projection (agents, skills, rules, hooks).
-summary: Capability and scaffold truth for the Claude Code harness — what it can do at
-  each agentic layer, what dadaia projects for it, its enforcement posture, and what a
-  Claude-only workspace installation contains.
+tldr: Entry harness with native sub-agent dispatch; scaffold = CLAUDE.md bridge + .claude/ projection.
+summary: Capability and scaffold truth for the Claude Code harness — what it can do,
+  what dadaia projects for it, its enforcement posture, and what a Claude-only workspace
+  installation contains.
 tags:
 - harness
 - claude-code
-- layer-1
 - projection
-token_estimate: 500
-last_updated: '2026-07-16'
-release_origin: v0.1.58
+- dispatch
+token_estimate: 480
+last_updated: '2026-08-07'
+release_origin: v0.3.0
 ---
 
 ## Purpose
 
-Claude Code is a **Layer-1-only** harness: the operator's interactive coding agent, and
-the only harness with native sub-agent dispatch (the Agent tool). By law it is **never a
-Layer-2 workflow worker** — running Claude workers would spend credits outside the
-operator's subscription, so `claude` is rejected as a `--harness` value (the
-`ClaudeSdkAdapter` remains importable and unit-tested for Layer-1 SDK use only). When
-the operator works Claude-only, the 9-agent roster runs entirely inside Claude Code via
-sub-agents; dadaia-workflows remain available but drive pi/codex workers.
+Claude Code is the operator's interactive coding agent and the only harness with native
+sub-agent dispatch (the Agent tool). The 9-agent roster runs entirely inside Claude Code
+via sub-agents: coordinators dispatch role agents, and the ordered SDD flow is carried by
+the specs documents rather than by any runtime. The `ClaudeSdkAdapter` remains importable
+and unit-tested for programmatic SDK use.
 
 ## Usage flow
 
@@ -36,30 +34,37 @@ sub-agents; dadaia-workflows remain available but drive pi/codex workers.
    injection.
 3. Work proceeds under the deterministic gate: PreToolUse `pre_gate` (matcher
    `Edit|Write|MultiEdit|NotebookEdit|Bash`), PostToolUse heartbeat/reconciler
-   (match-all), plus the git chokepoints.
-4. Coordinators (project-manager, project-auditor) dispatch role sub-agents from
+   (match-all), plus the git chokepoints. The pre-gate emits the MERGED envelope —
+   `hookSpecificOutput.permissionDecision` `deny`/`defer` is the operative documented
+   Claude Code contract; the top-level `decision`/`reason` pair rides along for codex
+   hooks and the kimi shim (bug claude-pre-gate-envelope-contract; the gate never
+   answers `permissionDecision: allow`, which would bypass the permission prompts).
+4. Compaction survival: `.claude/settings.json` registers `SessionStart` matchers
+   `compact` and `clear` on ctx-inject — after a compact (or /clear) the bootstrap
+   re-emits at the event and the sentinel restamps, so the next prompt stays silent
+   (bug claude-compact-reinjection-missing; parity with kimi's PostCompact shim and
+   the codex SessionStart wrapper).
+5. Coordinators (project-manager, project-auditor) dispatch role sub-agents from
    `.claude/agents/`; skills load on invocation.
 
 ## Typical trigger
 
 Any interactive session: releases coordinated by PM sub-agents, audits, reviews,
-ad-hoc engineering. Also the harness of choice when the operator wants multi-agent
-fan-out without the lifecycle engine.
+ad-hoc engineering. The harness of choice when the operator wants multi-agent fan-out.
 
 ## Differentiator
 
-Strongest Layer-1 posture: deterministic hooks + chokepoints, native sub-agents,
-first-message context injection. The trade-off is the Layer-2 exclusion — heavy
-batch/workflow execution is delegated to pi/codex workers.
+Strongest enforcement posture of any harness: deterministic hooks + chokepoints, native
+sub-agents, first-message context injection.
 
 ## Runtime state touched
 
 Scaffold projected by `dadaia public install --target claude` (all lib-originated,
 manifest-tracked, never hand-edited): `.claude/agents/` (12 = 9 core + 3 plugin stubs),
-`.claude/skills/` (19), `.claude/rules/` (9), `.claude/workflows/` (2, reference),
-`.claude/settings.json` (hook registration). Root `CLAUDE.md` + `AGENTS.md` written by
+`.claude/skills/` (19), `.claude/rules/DADAIA.md` (the projected law file — read-only,
+PROTECTED), `.claude/settings.json` (hook registration). Root `CLAUDE.md` + `AGENTS.md` written by
 the guardrail pair. A Claude-only workspace = `--target claude` (+ the shared
-`--target agents` tree); no `.codex/` or `.pi/` is required. This isolation is now
+`--target agents` tree); no `.codex/` or `.kimi-code/` is required. This isolation is now
 **enforced mechanically at init** — `dadaia init --harness claude` scaffolds only the
 claude surface and persists the profile, so `public install`/`doctor` stay claude-scoped
 ([[workspace-init]]) — not merely documented.

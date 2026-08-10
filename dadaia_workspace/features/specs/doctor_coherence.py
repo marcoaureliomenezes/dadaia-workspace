@@ -12,7 +12,7 @@ from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIs
 # the roster single-source. Any standalone ``AgentRuntimeKind`` member token (the distinctive
 # ALL-CAPS enum identifiers) enumerated in ``specs/constitution.md`` is an ERROR — this is the
 # recurrence guard behind the v0.1.47 constitution rewrite. The tokens are word-bounded and
-# uppercase, so lowercase English prose ("fake") never matches; ``{claude, codex, pi}`` (the
+# uppercase, so lowercase English prose ("fake") never matches; ``{claude, codex, kimi-code}`` (the
 # Layer model set W2 keeps) is deliberately NOT matched — only runtime-kind ENUM members are.
 _CONSTITUTION_RUNTIME_KIND_RE = re.compile(
     r"\b(FAKE|CODEX_EXEC|CLAUDE_SDK|PI_HEADLESS|OPENCODE_RUN)\b"
@@ -125,7 +125,7 @@ class CoherenceValidator:
         Any standalone enum-member token (FAKE / CODEX_EXEC / CLAUDE_SDK / PI_HEADLESS /
         OPENCODE_RUN, matched word-bounded + uppercase per :data:`_CONSTITUTION_RUNTIME_KIND_RE`)
         in ``specs/constitution.md`` is an ERROR — the recurrence guard behind the constitution
-        rewrite. The Layer model set ``{claude, codex, pi}`` is not a runtime-kind enumeration
+        rewrite. The harness set ``{claude, codex, kimi-code}`` is not a runtime-kind enumeration
         and is deliberately not matched. Absent constitution → no-op (SPEC-DOC-001 owns that).
         """
         path = self.specs_dir / "constitution.md"

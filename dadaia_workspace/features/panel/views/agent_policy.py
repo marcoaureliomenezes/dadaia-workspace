@@ -1,6 +1,6 @@
 """Panel L1 agent-model-policy views (v0.1.65 FR8 / T-65-11).
 
-Endpoint half of the Sub-agents tab, mirroring ``views/workflow_policy.py`` exactly:
+Endpoint half of the Sub-agents tab:
 same security posture (loopback bind + Host-guard in the handler BEFORE any view
 runs, NO bearer), same mutation validation pipeline (415 content-type → 413 size →
 400 JSON parse → 400 shape/semantic with field-path errors) BEFORE any write.
@@ -50,7 +50,7 @@ class AgentModelPolicyServicePort(Protocol):
     def apply(self, raw: object) -> dict[str, object]: ...
 
 
-#: Max accepted policy mutation body, in bytes — same envelope as the workflow-policy
+#: Max accepted policy mutation body, in bytes — same envelope as the handler-level
 #: mutation views (a real overlay is a few hundred bytes; 64 KiB is a hard ceiling).
 _MAX_POLICY_BODY_BYTES = 64 * 1024
 
@@ -156,7 +156,7 @@ def _validate_policy_request(
     """Validate a mutation request; return the parsed overlay or an error response.
 
     Shared by PUT and POST-validate so the two endpoints validate identically —
-    the same pipeline order as the workflow-policy mutation views.
+    the canonical mutation-view pipeline order.
     """
     # 415: content-type must be JSON.
     media_type = content_type.split(";", 1)[0].strip().lower()

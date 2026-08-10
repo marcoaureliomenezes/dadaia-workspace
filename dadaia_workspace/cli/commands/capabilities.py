@@ -35,9 +35,5 @@ def capabilities(
         "Contexts",
         ", ".join(payload["contexts"]["commands"]),
     )
-    table.add_row(
-        "Workflows",
-        ", ".join(workflow["id"] for workflow in payload["workflows"]),
-    )
     table.add_row("Machine output", "dadaia capabilities --json")
     console.print(table)

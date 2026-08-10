@@ -103,7 +103,7 @@ def test_policy_read_apply_roundtrip(tmp_path: Path) -> None:
         "source": "override",
     }
     assert roster["project-manager"]["source"] == "template"
-    assert roster["project-manager"]["model"] == "claude-opus-4-8"
+    assert roster["project-manager"]["model"] == "claude-opus-5"
     assert roster["devops-engineer"] == {
         "model": "claude-sonnet-5",
         "effort": None,

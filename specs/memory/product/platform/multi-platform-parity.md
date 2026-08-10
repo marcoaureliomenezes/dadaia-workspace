@@ -2,15 +2,15 @@
 slug: multi-platform-parity
 title: multi-platform-parity
 category: product
-tldr: Claude Code, Codex, and PI receive truthful runtime-specific projections from one canonical public source.
+tldr: Claude Code, Codex, and Kimi Code receive truthful runtime-specific projections from one canonical public source.
 summary: >-
   Defines Layer-1 projection parity without pretending the harnesses have identical
-  primitives. Codex and PI also provide Layer-2 workflow workers; Claude remains
+  primitives; the workspace runs no agent-execution runtime. Claude remains
   Layer-1-only. Git chokepoints protect commit/push independently of harness hooks.
 tags:
 - codex
 - claude-code
-- pi
+- kimi
 - parity
 - multi-platform
 token_estimate: 271
@@ -29,17 +29,10 @@ honest.
 - Claude Code receives agents, skills, rules, workflows, and Python hook registration.
 - Codex receives `AGENTS.md`, native custom-agent TOML, skills, Starlark command rules,
   and interactive hook registration. `codex exec` does not rely on interactive hooks.
-- PI receives `SYSTEM.md`, prompts, skills, and a post-trust TypeScript extension that
+- Kimi Code receives `AGENTS.md`, skills, and a managed hook block in the user-level config that
   delegates write decisions to the Python gate.
 
-`.pi/**` is executable after trust and therefore contains no secrets or operator-local
-paths. Generated projection files are never edited in place.
-
-## Layer 2
-
-Codex and PI are selectable workflow workers behind `AgentRuntimePort`; `fake` is the
-test adapter. Claude is rejected as a Layer-2 workflow harness. Personas are shared,
-while model/profile selection remains harness-specific.
+Generated projection files are never edited in place.
 
 ## Independent Boundaries
 
@@ -56,4 +49,4 @@ targets fail; profile-aware install/doctor operate only on configured harnesses.
 ## Dependencies
 
 [[public-asset-distribution]], [[harness-claude-code]], [[harness-codex]],
-[[harness-pi]], [[sdd-gate-v3]].
+[[harness-kimi-code]], [[sdd-gate-v3]].

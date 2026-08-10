@@ -209,7 +209,7 @@ def test_repack_returns_none_for_editable_install(tmp_path: Path) -> None:
 def test_bootstrap_falls_back_to_repacked_wheel_when_index_cannot_resolve(
     tmp_path: Path, recorder: _Recorder, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The Hermes-consumer scenario: installed 0.X.Y is not on the index → repack + install."""
+    """The Consumer-consumer scenario: installed 0.X.Y is not on the index → repack + install."""
     import subprocess as _subprocess
 
     mgr = VenvPythonEnvironmentManager()
@@ -258,7 +258,7 @@ def test_bootstrap_error_names_escape_hatch_when_repack_also_unavailable(
     assert "DADAIA_BOOTSTRAP_PACKAGE" in str(excinfo.value)
 
 
-# ── bug init-succeeds-after-provider-bootstrap-failure (Hermes live canary) ─────────
+# ── bug init-succeeds-after-provider-bootstrap-failure (Consumer live canary) ─────────
 #
 # init used to leak pip's raw "ERROR: Could not find a version..." into its output while
 # the repack fallback quietly saved the bootstrap — indistinguishable, for a consumer,
@@ -344,3 +344,48 @@ def test_verify_venv_provider_uses_clean_env_and_checks_exact_version(
     assert "9.9.8" in str(excinfo.value) and "9.9.9" in str(excinfo.value)
     env = seen["env"]
     assert isinstance(env, dict) and "PYTHONPATH" not in env
+
+
+def test_venv_create_oserror_becomes_clean_bootstrap_error_not_raw_traceback(
+    tmp_path: Path, recorder: _Recorder, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Bug r3b-portability-import-venv-permission (Consumer R3-B, F-16/F-22 class).
+
+    ``dadaia import`` restored a workspace onto a **noexec** filesystem: ``venv.create``
+    got far enough to write ``bin/python3.13`` and then died in ``ensurepip`` with
+    ``PermissionError`` because that interpreter cannot be executed there. The call was
+    unguarded, so a ~40-line raw Python traceback reached the operator — the F-22 defect
+    class ("a raw traceback from any dadaia CLI verb is a defect").
+
+    The environment limit is legitimate and not ours to fix; surfacing it as a crash is.
+    Every ``OSError`` out of ``venv.create`` must become a ``WorkspaceVenvBootstrapError``
+    (a ``DadaiaError``, rendered as one clean line) that names the target path and the
+    likely cause so the operator can act.
+    """
+
+    def exploding_venv_create(path: str, with_pip: bool = False) -> None:
+        raise PermissionError(
+            13, "Permission denied", f"{path}/bin/python{PLATFORM.venv_exe_suffix or '3.13'}"
+        )
+
+    monkeypatch.setattr(python_env_module.venv, "create", exploding_venv_create)
+    mgr = VenvPythonEnvironmentManager()
+
+    with pytest.raises(python_env_module.WorkspaceVenvBootstrapError) as excinfo:
+        mgr.ensure_workspace_venv(str(tmp_path))
+
+    message = str(excinfo.value)
+    # Actionable: names the venv path AND the noexec/permission cause.
+    assert str(tmp_path) in message
+    assert "noexec" in message.lower()
+    # It is a DadaiaError, so the CLI entrypoint renders it as one line, never a traceback.
+    from dadaia_workspace.core.exceptions import DadaiaError
+
+    assert isinstance(excinfo.value, DadaiaError)
+
+
+def test_venv_create_success_path_is_unchanged(tmp_path: Path, recorder: _Recorder) -> None:
+    """Guard against over-catching: a normal bootstrap still creates and installs."""
+    mgr = VenvPythonEnvironmentManager()
+    mgr.ensure_workspace_venv(str(tmp_path))
+    assert recorder.venv_created == [str(tmp_path / ".dadaia" / ".venv")]

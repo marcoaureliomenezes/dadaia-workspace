@@ -2,8 +2,8 @@
 
 The Law: the workspace root may contain ONLY these entries::
 
-    .agents/ .claude/ .codex/ .dadaia/ .kimi-code/ .pi/ repos/  (directories)
-    AGENTS.md CLAUDE.md prompt.md                               (files)
+    .agents/ .claude/ .codex/ .dadaia/ .kimi-code/ repos/  (directories)
+    AGENTS.md CLAUDE.md DADAIA.md prompt.md                     (files)
 
 Any other top-level entry is blocked. An operator exception list at
 ``.dadaia/states/root_exceptions.txt`` (one fnmatch glob per line) documents deliberate
@@ -20,33 +20,25 @@ import fnmatch
 import os
 from pathlib import Path
 
+from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.hooks import _common
 
-#: Whitelisted root-level basenames (The Law).
-_WHITELIST: frozenset[str] = frozenset(
-    {
-        ".agents",
-        ".claude",
-        ".codex",
-        ".dadaia",
-        ".kimi-code",
-        ".pi",
-        "repos",
-        "AGENTS.md",
-        "CLAUDE.md",
-        "prompt.md",
-    }
+#: Whitelisted root-level basenames (The Law) — DERIVED from the single authority
+#: ``core/workspace_layout.py`` so this hook and the workspace doctor can never diverge
+#: (they did, the day DADAIA.md was added to one and not the other).
+_WHITELIST: frozenset[str] = (
+    workspace_layout.ROOT_ALLOWED_DIRS | workspace_layout.ROOT_ALLOWED_FILES
 )
 
 #: Root-level basenames that are FILES (everything else in ``_WHITELIST`` is a
 #: directory and renders with a trailing slash in operator-facing text).
-_ROOT_FILES: frozenset[str] = frozenset({"AGENTS.md", "CLAUDE.md", "prompt.md"})
+_ROOT_FILES: frozenset[str] = workspace_layout.ROOT_ALLOWED_FILES
 
 
 def _render_whitelist() -> str:
     """Render the whitelist for the block message — DERIVED from ``_WHITELIST`` so the
     operator-facing text can never drift from the enforced policy (bug class found
-    during the v0.2.8 hermes sweep: the message literal omitted ``.kimi-code/`` while
+    during the v0.2.8 consumer sweep: the message literal omitted ``.kimi-code/`` while
     the policy already allowed it)."""
     dirs = sorted(f"{name}/" for name in _WHITELIST if name not in _ROOT_FILES)
     return " ".join([*dirs, *sorted(_ROOT_FILES)])

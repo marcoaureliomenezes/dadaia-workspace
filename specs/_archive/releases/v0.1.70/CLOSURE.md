@@ -7,7 +7,7 @@
 ## Summary
 
 Final release of the 3-release remediation arc (v0.1.68–70) that dispositioned the **9
-live dd-chain-capture bugs** — all live on `main` at HEAD `54e9be0e`, the exact commit
+live sample-consumer bugs** — all live on `main` at HEAD `54e9be0e`, the exact commit
 the remote reporter ran. Release C fixed two shipped self-inconsistencies:
 
 | Bug | Fix | Disposition |

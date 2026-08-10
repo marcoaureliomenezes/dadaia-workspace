@@ -1,8 +1,8 @@
 // Hash navigation grammar. The initial-load router (below) maps three hash routes to a
-// bare tab activation on page load: #workflows | #reports | #academy | #games (prefix match, so a
+// bare tab activation on page load: #reports | #academy (prefix match, so a
 // trailing ?key=val is tolerated but not parsed). The Sessions tab is click-activated,
 // not an initial-load hash route. No other hash routes exist (the former
-// #memories/#agents/#servers routes and the #agents?filter= / #workflows?detail= params
+// #memories/#agents/#servers routes and the #agents?filter= params
 // were never wired — v0.1.48 F-truth fix).
 
 (function () {
@@ -218,7 +218,7 @@
   setInterval(fetchServers, 5000);
   setInterval(updateStatusLabel, 5000);
 
-  // ── Tab activation hook — lazy fetch for workflows/sessions/academy/reports ──
+  // ── Tab activation hook — lazy fetch for sessions/academy/reports ──
   // Sessions module: window.Sessions (sessions.js, loaded after this script).
   // Academy module: window.Academy (academy.js, loaded after this script).
   // Reports module: window.Reports (reports.js, loaded after this script).
@@ -227,11 +227,6 @@
       var target = tab.getAttribute('data-section');
 
       // ── Workflows tab (first-class): load the per-step model pickers ──────────
-      if (target === 'workflows') {
-        if (window.WorkflowPolicy && !window.WorkflowPolicy.isLoaded()) {
-          window.WorkflowPolicy.load();
-        }
-      }
 
       if (target === 'sessions') {
         window.Panel.activate('sessions');
@@ -246,22 +241,15 @@
   });
 
   // ── Hash-fragment routing on initial load ─────────────────────────────
-  // #workflows activates the first-class Workflows tab (Agentic tab removed).
   (function () {
     var hash = location.hash;
     if (!hash) { return; }
-    if (hash.startsWith('#workflows')) {
-      var workflowsTab = document.getElementById('tab-workflows');
-      if (workflowsTab) { workflowsTab.click(); }
-    } else if (hash.startsWith('#reports')) {
+    if (hash.startsWith('#reports')) {
       var reportsTab = document.getElementById('tab-reports');
       if (reportsTab) { reportsTab.click(); }
     } else if (hash.startsWith('#academy')) {
       var academyTab = document.getElementById('tab-academy');
       if (academyTab) { academyTab.click(); }
-    } else if (hash.startsWith('#games')) {
-      var gamesTab = document.getElementById('tab-games');
-      if (gamesTab) { gamesTab.click(); }
     }
   })();
 

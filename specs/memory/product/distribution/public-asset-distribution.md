@@ -2,7 +2,7 @@
 slug: public-asset-distribution
 title: public-asset-distribution
 category: product
-tldr: canonical public assets are staged to .dadaia/agentic and projected to Claude Code, Codex, PI, and shared .agents roots.
+tldr: canonical public assets are staged to .dadaia/agentic and projected to Claude Code, Codex, Kimi Code, and shared .agents roots.
 summary: Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, harness-profile-aware install/doctor, render-at-install of core agents (staged generic body + resolved agent-model policy composed into both L1 projections) with a policy-aware doctor render-compare, plugin-pack projection with installed-plugins ledger + core-install precedence + uninstall reconciliation (files-first/ledger-last inverse), provenance-gated consumer AGENTS fan-out (banner-canonical restored vs hand-authored left [foreign]) with lexical repo-slug containment + destination-file symlink refusal, scoped AGENTS projections, source-root hygiene guard, and runtime projection contract.
 tags:
 - public
@@ -20,14 +20,14 @@ release_origin: v0.1.65
 `dadaia public {stage|install|doctor}` distributes the public agentic surface of
 `dadaia-workspace`. The 14 live asset types under `dadaia_workspace/public/` are:
 `agents`, `skills`, `rules`, `workflows`, `scripts`, `schemas`, `templates`, `data`,
-`scaffold`, `runtime`, `personas`, `lifecycle_fragments`, `pi`, and `plugins`
+`scaffold`, `runtime`, and `plugins`
 (in-package plugin packs, v0.1.60 — [[plugin-packs]]; there is no `public/commands/`
 or `public/hooks/` — governance hooks are the Python package
 `dadaia_workspace/hooks/`, not a projected asset type).
 
 `public stage` copies that source into `.dadaia/agentic/<type>/` with a manifest.
 `public install` projects staged assets into runtime-specific roots: `.claude/`,
-`.codex/`, `.pi/`, `.agents/`, workspace-root `AGENTS.md`/`CLAUDE.md`, scoped
+`.codex/`, `.kimi-code/`, `.agents/`, workspace-root `AGENTS.md`/`CLAUDE.md`, scoped
 runtime rule files, and the Codex hook wrappers under `.dadaia/hooks/`.
 
 ## Differentiator
@@ -83,11 +83,11 @@ Install-all and doctor are **harness-profile-aware**. When
 [[workspace-init]]), `install` with no `--target` (and `--target all`) installs only the
 profile's harness set (plus the shared `agents` tree); an **absent profile ⇒ all-four**
 (back-compat, byte-identical to the pre-profile behaviour, golden-locked). An explicit
-`--target claude|codex|pi|agents` always overrides regardless of profile. `doctor` scopes
+`--target claude|codex|kimi-code|agents` always overrides regardless of profile. `doctor` scopes
 its per-runtime expectations to the profile: the inline projection comparison for `.claude/`
 `settings.json`, the `.codex/` hooks/config/rules/wrappers (**including** the codex-parity
 drift block `check_codex_drift` / D-CX-1..10 that would otherwise emit
-`[missing] codex:agents/*.toml` for any codex-absent tree), and the `.pi/` tree each run
+`[missing] codex:agents/*.toml` for any codex-absent tree), each runtime tree per run
 only when their harness is in the profile. The shared surfaces stay unconditional
 (agents/`.agents` skills, the AGENTS.md guardrail pair, the harness-independent git
 chokepoint scripts, `_check_public_privacy`, the git-dirty check). **Out-of-profile is
@@ -198,7 +198,7 @@ against `public/skills/` ∪ the pack's own `plugins/<pack>/skills/` (non-zero e
 
 The `dadaia-workspace` source repo must stay free of root runtime projections
 and local harness files. Generated/local artefacts such as `.dadaia/`,
-`.agents/`, `.claude/`, `.codex/`, `.pi/`, `CLAUDE.md`,
+`.agents/`, `.claude/`, `.codex/`, `.kimi-code/`, `CLAUDE.md`,
 `Makefile`, root `playwright.config.ts`, `playwright-report/`, and
 `test-results/` are ignored and guarded by tests/CI.
 
@@ -213,9 +213,6 @@ Staged temp workspaces remain supported.
 - Codex: `.codex/config.toml`, `.codex/hooks.json` (referencing the `.dadaia/hooks/codex-*`
   wrappers), `.codex/agents`, `.codex/rules`, `.codex/skills`, reference workflows, and
   `AGENTS.md` context.
-- PI: `.pi/` Layer-1 surface — exactly `SYSTEM.md`, `settings.json`,
-  `prompts/dadaia-context.md`, and `extensions/dadaia-sdd-gate.ts` (post-trust
-  executable). This atom is the sole owner of the `.pi/` surface inventory.
 - Shared: `.agents/skills` and workspace/repo AGENTS.md/CLAUDE.md pairs.
 
 `public doctor` compares canonical source, staging, and projections across three
