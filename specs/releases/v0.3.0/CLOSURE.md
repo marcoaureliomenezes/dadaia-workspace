@@ -276,3 +276,16 @@ move the release directory to `specs/_archive/releases/v0.3.0/` via `git mv` and
 `specs/releases/ACTIVE.md`. **Deliberately not performed in this task:** archiving and
 repointing `ACTIVE.md` are the operator's ship decision, and repointing now would close the
 CLOSURE phase while memory writes and the disposition sweep are still outstanding.
+
+## Shipped in the same span (PR #181)
+
+`feature/v0.3.0` was squash-merged to `main` as **PR #181** on 2026-08-10, shipping commit
+`153a0722`. Beyond the engine demolition and the `public_assets` de-flag recorded above,
+the branch carried four changes this CLOSURE did not originally describe. They are listed
+here so the release span is factually complete; the Status, Metrics, Validations and
+Dispositions sections above are unchanged and continue to measure the demolition alone.
+
+- **PI-agent harness removal (complete).** The `pi` harness left the product: the entry-harness roster is now Claude Code / Codex / Kimi Code (`core/harness_registry.L1_ENTRY_HARNESSES`), the `.pi/` projection tree and its assets are deleted, the `harness-pi` memory atom is retired, and a Kimi telemetry reader + adapter and a per-harness model picker in the panel Agents tab took its place.
+- **Agentic Entities.** `dadaia_workspace/public/entities/registry.json` declares the workspace's Personas, Deterministic Behaviors, Abstract Rules and universal surface; `specs/constitution.md` 3.1.0 adds the §0 *Agentic entity* definition and the §12.5 derivation law (every scaffolded sub-agent, hook and rule file is a per-harness derivation of a registry entity); the panel gains an **Agentic Entities** tab plus Personas cards; enforcement is the `entities-derivation` check in `dadaia public doctor` and a derivation contract test.
+- **Panel Games tab deleted; governance tab renamed to "Agents".** The panel's final tab set is Projects, Agents, Agentic Entities, Reports, Academy, Servers — six tabs, no Games surface. This supersedes the "5 governance tabs plus the Games button" wording in *Memory updates* above.
+- **Privacy scrubs and dependency bump.** Operator-local and private identifiers scrubbed from public assets and prose (`dadaia public doctor` → `[ok] public-privacy`); Dependabot bump of `cryptography` to **50.0.0**.

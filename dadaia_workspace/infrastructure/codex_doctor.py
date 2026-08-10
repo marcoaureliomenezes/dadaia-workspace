@@ -503,7 +503,6 @@ def check_agent_skill_refs(public_dir: Path) -> list[DoctorLine]:
                 )
                 already_flagged.add(candidate)
 
-    # pack's. Additive: the core-agent sweep above is untouched.
     return out
 
 

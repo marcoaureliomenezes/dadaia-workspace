@@ -56,6 +56,7 @@ paths:
     - dadaia_workspace/__init__.py
     - scripts/**
     - tests/**
+    - .github/workflows/**
     - repos/**
     - .dadaia/reports/<ctx>/software-engineer/**
     - .dadaia/handoff/<ctx>/**
