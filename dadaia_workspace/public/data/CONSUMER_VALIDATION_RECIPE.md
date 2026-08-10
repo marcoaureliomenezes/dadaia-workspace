@@ -13,7 +13,7 @@ listed commands in the listed setup, capture command+exit+output as evidence, th
 - **PASS** — the PASS assertion is objectively true from the captured output.
 - **FAIL** — the assertion is false (a real defect). Register a `dadaia bugs append`.
 - **EXCEPTION** — the assertion cannot run because the validation environment lacks a
-  prerequisite the wheel does not own (e.g. no codex/pi binary reachable for a live
+  prerequisite the wheel does not own (e.g. no codex binary reachable for a live
   model-reachability check). Record why; an EXCEPTION is NOT a FAIL and does not block
   on its own.
 
@@ -439,7 +439,7 @@ gates cannot catch, because they never call the model.
 - **G-1 stands:** `claude-fable-5` is NEVER the resolved model for
   `security-reviewer`, under any template or override.
 - **PASS if ALL of the above hold.** A registry-derived allowlist narrowing (e.g. a
-  provider-qualified PI id that no longer maps) must fail LOUDLY at load with a
+  provider-qualified model id that no longer maps) must fail LOUDLY at load with a
   message naming the rejected id — never silently accept an unmapped model.
 
 ### R-17 — Bootstrap survives a hostile filesystem, cleanly

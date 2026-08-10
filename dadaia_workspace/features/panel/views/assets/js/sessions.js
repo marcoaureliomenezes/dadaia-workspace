@@ -37,7 +37,7 @@
   var KIMI_BANNER_TEXT = 'Cost not tracked for Kimi';
 
   // Runtimes with no per-event pricing — cost is unknown and never fabricated.
-  // Codex and PI share this posture; the Cost card renders 'N/A' and the banner
+  // Codex and Kimi share this posture; the Cost card renders 'N/A' and the banner
   // appears for both.
   function isCostUnknownRuntime(runtime) {
     return runtime === 'codex' || runtime === 'kimi-code';

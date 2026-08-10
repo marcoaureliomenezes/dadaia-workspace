@@ -31,10 +31,10 @@ explicit opt-in.
 | Contract | Public API/schema, architecture, security, projection, and invariant checks. |
 | Integration | CLI plus real temporary filesystem/state and composed services. |
 | E2E | Complete Python journeys and browser-backed panel behavior. |
-| Live opt-in | Explicit Codex/PI binary validation outside default CI. |
+| Live opt-in | Explicit Codex binary validation outside default CI. |
 
 `tests/conftest.py` carries two autouse safety backstops: it blocks accidental real
-PI/Codex invocation unless the corresponding live flag is set
+Codex invocation unless the corresponding live flag is set
 (`DADAIA_E2E_REAL_WORKER` / `DADAIA_PI_LIVE` / `DADAIA_CODEX_LIVE` /
 `DADAIA_CLAUDE_LIVE`), and it fakes `ensure_workspace_venv` so no test ever builds a
 real venv (disk/time protection). Temporary workspaces use pytest `tmp_path` or

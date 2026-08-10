@@ -176,7 +176,7 @@ class SessionAggregate:
         contributes (rendered '—' for a cost-tracking runtime, distinct from the
         client 'N/A' for cost-unknown runtimes).
     cost_known: True iff at least one session contributes a known cost. Forced
-        False for cost-unknown runtimes (codex/pi), which never track cost.
+        False for cost-unknown runtimes (codex/kimi), which never track cost.
     active_sessions / total_messages / top_agent: computed from every session in
         the runtime, including cost-unknown ones.
     """

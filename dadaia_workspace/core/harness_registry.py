@@ -37,7 +37,7 @@ _L1_SET: frozenset[str] = frozenset(L1_ENTRY_HARNESSES)
 
 
 def is_l1(harness: str) -> bool:
-    """Return ``True`` iff *harness* is a Layer-1 entry harness (``claude``/``codex``/``pi``/``kimi-code``)."""
+    """Return ``True`` iff *harness* is a Layer-1 entry harness (``claude``/``codex``/``kimi-code``)."""
     return harness in _L1_SET
 
 

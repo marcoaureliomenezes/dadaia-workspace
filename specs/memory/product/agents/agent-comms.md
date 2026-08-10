@@ -39,7 +39,7 @@ The contract separates human evidence from machine coordination: HTML reports ar
 
   * **Canonical:** `dadaia_workspace/public/schemas/handoff-v1.schema.json` (JSON Schema Draft 2020-12, `$schema = "https://json-schema.org/draft/2020-12/schema"`).
   * **Staging projection:** `.dadaia/agentic/schemas/handoff-v1.schema.json` (generated via `dadaia public stage`). It is the logical path CLI + skill consume at runtime.
-  * **NOT projected** to `.claude/schemas/`, `.codex/schemas/`, `.pi/schemas/` — the schema is consumed only by the Python CLI, not by the agents' runtime. Decision A1 saved 3 duplications.
+  * **NOT projected** to `.claude/schemas/`, `.codex/schemas/` — the schema is consumed only by the Python CLI, not by the agents' runtime. Decision A1 saved 3 duplications.
   * **Asset type:** `schemas` is one of the asset types in `_COPY_DIRS` in `dadaia_workspace/infrastructure/public_assets_common.py`. The live list of asset types is documented in [[public-asset-distribution]] (the constitution does not enumerate asset types).
 
 
@@ -68,7 +68,7 @@ The field contract's single source of truth is the schema file itself: `dadaia_w
 
 ## Skill: dadaia-handoff-emitter
 
-Standalone skill at `dadaia_workspace/public/skills/dadaia-handoff-emitter/SKILL.md`, projected to `.agents/skills/` (universal projection — the Codex runtime consumes this dir) and `.claude/skills/`; nothing lands in `.codex/skills/` or `.pi/` (the PI projection carries only the staged `pi/` tree). 3-step protocol:
+Standalone skill at `dadaia_workspace/public/skills/dadaia-handoff-emitter/SKILL.md`, projected to `.agents/skills/` (universal projection — the Codex runtime consumes this dir) and `.claude/skills/`; nothing lands in `.codex/skills/`. 3-step protocol:
 
   1. **sha256sum** of the just-generated HTML report (report mode only).
   2. **Assemble dict** with the required fields — `schema_version: "handoff-v1.2"` + `self_pull.refs` (the atoms actually read; honest v1.1 fallback when zero) — plus the optional fields applicable to the agent, referencing the schema by the logical path `.dadaia/agentic/schemas/handoff-v1.schema.json` (A10 — the skill does not duplicate schema content inside the markdown; single source of truth). The skill's required-fields table and both examples carry `self_pull`.

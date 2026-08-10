@@ -109,7 +109,7 @@ _READ_BLOCK_MESSAGE = (
 #: The default session id when no harness-native id resolves (``hooks/sdd_gate.py``'s
 #: ``resolve_session_id(payload, default="anon-session")``). FR5: an anonymous identity
 #: never creates a presence record — it degrades presence accuracy only, never the write
-#: (v0.1.76, kills the PI anon-session dual-writer facet of the CRITICAL bug at the root).
+#: (v0.1.76, kills the anon-session dual-writer facet of the CRITICAL bug at the root).
 _ANON_SESSION_ID = "anon-session"
 
 

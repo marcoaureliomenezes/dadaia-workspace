@@ -64,7 +64,7 @@ manifest-tracked, never hand-edited): `.claude/agents/` (12 = 9 core + 3 plugin 
 `.claude/skills/` (19), `.claude/rules/DADAIA.md` (the projected law file — read-only,
 PROTECTED), `.claude/settings.json` (hook registration). Root `CLAUDE.md` + `AGENTS.md` written by
 the guardrail pair. A Claude-only workspace = `--target claude` (+ the shared
-`--target agents` tree); no `.codex/` or `.pi/` is required. This isolation is now
+`--target agents` tree); no `.codex/` or `.kimi-code/` is required. This isolation is now
 **enforced mechanically at init** — `dadaia init --harness claude` scaffolds only the
 claude surface and persists the profile, so `public install`/`doctor` stay claude-scoped
 ([[workspace-init]]) — not merely documented.

@@ -13,7 +13,7 @@ Privacy invariant T1 — METADATA ONLY:
     Only the session id, the workDir (cwd) and the session directory's mtime are
     read. The per-session directories' CONTENT (conversation, tool traffic) is
     never opened. Kimi has no per-event pricing feed here, so cost is unknown
-    (``cost_micro_usd = NULL``), never faked — the Codex/PI posture carried over.
+    (``cost_micro_usd = NULL``), never faked — the Codex posture carried over.
 
 Graceful degradation:
     Missing index, IO error, or a malformed line degrades to an empty (or

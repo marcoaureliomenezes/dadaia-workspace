@@ -34,7 +34,7 @@ class LedgerEntry:
     """One installed file: workspace-root-relative path, owned content sha, family.
 
     ``family`` names the projection group that wrote the file (``claude``, ``codex``,
-    ``agents``, ``pi``, ``kimi-code``, ``scripts``, ``guardrail``, ``law``,
+    ``agents``, ``kimi-code``, ``scripts``, ``guardrail``, ``law``,
     ``plugin:<pack>``, …) — diagnostics and scoped operations only; the reconciliation
     invariant never depends on it.
     """

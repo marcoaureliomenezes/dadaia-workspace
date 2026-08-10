@@ -88,7 +88,7 @@ governance editor; game interactions are local JavaScript.
 Canonical harness assets live in `dadaia_workspace/public/`. `public stage` copies
 versioned source into `.dadaia/agentic/`; `public install` resolves its arguments once
 into an immutable install plan and runs an ordered list of flag-free steps that project
-runtime-specific assets to `.claude/`, `.codex/`, `.pi/`, `.kimi-code/`, and shared
+runtime-specific assets to `.claude/`, `.codex/`, `.kimi-code/`, and shared
 `.agents/`; `public doctor` compares source, staging, projection, privacy, and
 policy-aware rendering.
 

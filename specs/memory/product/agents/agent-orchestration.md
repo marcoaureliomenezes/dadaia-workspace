@@ -77,4 +77,4 @@ this policy.
 ## Dependencies
 
 [[sdd-gate-v3]], [[agent-comms]], [[harness-claude-code]], [[harness-codex]],
-[[harness-pi]].
+[[harness-kimi-code]].

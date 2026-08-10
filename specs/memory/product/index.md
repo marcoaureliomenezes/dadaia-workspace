@@ -11,7 +11,7 @@
 | slug | title | tldr |
 |------|-------|------|
 | `agent-comms` | agent-comms — Handoff Contract v1 | handoff-v1.2 separates HTML reports from JSON handoffs and carries the self_pull Layer-1 read-proof line. |
-| `agent-monitoring` | agent-monitoring | stdlib-only local telemetry (Claude/Codex/PI sessions) → panel Sessions tab + /api/agents; allowlist gate preserves privacy. |
+| `agent-monitoring` | agent-monitoring | stdlib-only local telemetry (Claude/Codex/Kimi sessions) → panel Sessions tab + /api/agents; allowlist gate preserves privacy. |
 | `agent-orchestration` | agent-orchestration | Nine core Layer-1 roles, two dispatchers, document-governed ordered work, and advisory-only concurrency. |
 
 ### distribution
@@ -20,7 +20,7 @@
 |------|-------|------|
 | `academy` | academy | browsable knowledge_basis in the panel's Academy tab + copy-from-template management via CLI. |
 | `plugin-packs` | plugin-packs | in-package plugin packs (4 skills each) enabled via `dadaia plugin install`, disabled via `uninstall`; 3 stub agents gain real behavior once installed. |
-| `public-asset-distribution` | public-asset-distribution | canonical public assets are staged to .dadaia/agentic and projected to Claude Code, Codex, PI, and shared .agents roots. |
+| `public-asset-distribution` | public-asset-distribution | canonical public assets are staged to .dadaia/agentic and projected to Claude Code, Codex, Kimi Code, and shared .agents roots. |
 | `pypi-distribution` | pypi-distribution | The published dadaia-workspace 0.2.x PyPI package, the release.yml OIDC publish pipeline, the wheel content contract, and the SDD-vs-package version split. |
 
 ### harness
@@ -30,7 +30,6 @@
 | `harness-claude-code` | Harness — Claude Code | Entry harness with native sub-agent dispatch; scaffold = CLAUDE.md bridge + .claude/ projection. |
 | `harness-codex` | Harness — Codex | Entry harness on the operator's Codex subscription: TUI with deterministic hooks, Starlark command policy, and a .codex/ projection of agents, skills and rules. |
 | `harness-kimi-code` | Harness — Kimi Code | Layer-1-only harness: `.kimi-code/` projection + hooks via a managed block in the user-level `config.toml`; first with post-compact re-injection. |
-| `harness-pi` | Harness - PI (pi-coding-agent) | Entry harness with a trusted TypeScript gate extension projected into .pi/, plus allowlisted PI session telemetry. |
 
 ### panel
 
@@ -53,7 +52,7 @@
 | `consumer-agent-support` | Consumer validation gate — supported consumer environments | A consumer-side validation agent running the shipped recipe is the release gate: no wheel is published without its CERTIFIED_100 verdict. |
 | `context-management` | context-management | ALIVE/DEAD context registry, caller-owned session binding, bind-driven memory injection, and advisory presence with no concurrency locks. |
 | `cross-platform-portability` | cross-platform-portability | Linux, macOS, and Windows support through a single platform capability seam, injected adapters, Python hooks, and hard-gated cross-OS tests. |
-| `multi-platform-parity` | multi-platform-parity | Claude Code, Codex, and PI receive truthful runtime-specific projections from one canonical public source. |
+| `multi-platform-parity` | multi-platform-parity | Claude Code, Codex, and Kimi Code receive truthful runtime-specific projections from one canonical public source. |
 | `repos-catalog` | repos-catalog | repos.xlsx lookup for fast discovery of known repos with slug + URL. |
 | `server-registry` | server-registry | internal port registry with TTL+PID to avoid conflicts between parallel agents' dev servers; the 3000-3999 range applies only to next_port allocation. |
 | `workspace-doctor` | workspace-doctor | Diagnoses root hygiene, venv health, context coherence, stale presence, and retired lock-state residue; repairs only deterministic state. |

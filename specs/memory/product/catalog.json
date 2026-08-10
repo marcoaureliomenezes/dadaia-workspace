@@ -27,8 +27,8 @@
       "title": "agent-monitoring",
       "category": "product",
       "area": "agents",
-      "tldr": "stdlib-only local telemetry (Claude/Codex/PI sessions) → panel Sessions tab + /api/agents; allowlist gate preserves privacy.",
-      "summary": "stdlib-only local telemetry consuming Claude Code jsonl + Codex sqlite (~/.codex/state_5.sqlite) + PI session jsonl (~/.pi/agent/sessions/); feeds the panel's Sessions tab and the /api/agents and /api/sessions endpoints; a hardcoded allowlist gate preserves privacy by construction; endpoints served with no credential behind the panel's loopback bind + Host allowlist.",
+      "tldr": "stdlib-only local telemetry (Claude/Codex/Kimi sessions) → panel Sessions tab + /api/agents; allowlist gate preserves privacy.",
+      "summary": "stdlib-only local telemetry consuming Claude Code jsonl + Codex sqlite (~/.codex/state_5.sqlite) + Kimi session index (~/.kimi-code/session_index.jsonl); feeds the panel's Sessions tab and the /api/agents and /api/sessions endpoints; a hardcoded allowlist gate preserves privacy by construction; endpoints served with no credential behind the panel's loopback bind + Host allowlist.",
       "path": "specs/memory/product/agents/agent-monitoring.md",
       "tags": [
         "monitoring",
@@ -62,8 +62,7 @@
         "sdd-gate-v3",
         "agent-comms",
         "harness-claude-code",
-        "harness-codex",
-        "harness-pi"
+        "harness-codex"
       ]
     },
     {
@@ -115,7 +114,7 @@
       "title": "public-asset-distribution",
       "category": "product",
       "area": "distribution",
-      "tldr": "canonical public assets are staged to .dadaia/agentic and projected to Claude Code, Codex, PI, and shared .agents roots.",
+      "tldr": "canonical public assets are staged to .dadaia/agentic and projected to Claude Code, Codex, Kimi Code, and shared .agents roots.",
       "summary": "Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, harness-profile-aware install/doctor, render-at-install of core agents (staged generic body + resolved agent-model policy composed into both L1 projections) with a policy-aware doctor render-compare, plugin-pack projection with installed-plugins ledger + core-install precedence + uninstall reconciliation (files-first/ledger-last inverse), provenance-gated consumer AGENTS fan-out (banner-canonical restored vs hand-authored left [foreign]) with lexical repo-slug containment + destination-file symlink refusal, scoped AGENTS projections, source-root hygiene guard, and runtime projection contract.",
       "path": "specs/memory/product/distribution/public-asset-distribution.md",
       "tags": [
@@ -225,29 +224,6 @@
         "sdd-gate-v3",
         "public-asset-distribution",
         "harness-claude-code"
-      ]
-    },
-    {
-      "rank": 11,
-      "slug": "harness-pi",
-      "title": "Harness - PI (pi-coding-agent)",
-      "category": "product",
-      "area": "harness",
-      "tldr": "Entry harness with a trusted TypeScript gate extension projected into .pi/, plus allowlisted PI session telemetry.",
-      "summary": "PI enters the workspace interactively after the operator explicitly trusts it. The `.pi/` projection carries prompts and the TypeScript SDD gate extension that maps PI tool events onto the same Python gate policies. PI session metadata feeds the panel's telemetry surface.",
-      "path": "specs/memory/product/harness/harness-pi.md",
-      "tags": [
-        "harness",
-        "pi",
-        "projection",
-        "telemetry"
-      ],
-      "token_estimate": 300,
-      "depends_on": [
-        "multi-platform-parity",
-        "agent-monitoring",
-        "sdd-gate-v3",
-        "public-asset-distribution"
       ]
     },
     {
@@ -416,13 +392,12 @@
       "title": "multi-platform-parity",
       "category": "product",
       "area": "platform",
-      "tldr": "Claude Code, Codex, and PI receive truthful runtime-specific projections from one canonical public source.",
+      "tldr": "Claude Code, Codex, and Kimi Code receive truthful runtime-specific projections from one canonical public source.",
       "summary": "Defines projection parity without pretending the harnesses have identical primitives. Each entry harness receives the projection its runtime can actually honor. Git chokepoints protect commit/push independently of harness hooks.",
       "path": "specs/memory/product/platform/multi-platform-parity.md",
       "tags": [
         "codex",
         "claude-code",
-        "pi",
         "parity",
         "multi-platform"
       ],
@@ -431,7 +406,6 @@
         "public-asset-distribution",
         "harness-claude-code",
         "harness-codex",
-        "harness-pi",
         "sdd-gate-v3"
       ]
     },

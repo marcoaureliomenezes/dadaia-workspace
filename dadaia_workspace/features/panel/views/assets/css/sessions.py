@@ -14,7 +14,7 @@ banner, and the last-updated badge survive here.
 
 SESSIONS_CSS: str = """
 /* ── Cost-unknown banner ──────────────────────────────────────────── */
-/* Shown by JS when the runtime is codex/pi; hidden by default via [hidden]. */
+/* Shown by JS when the runtime is codex/kimi; hidden by default via [hidden]. */
 .sessions-banner {
   padding: 0.55rem 1rem;
   margin-bottom: 0.75rem;

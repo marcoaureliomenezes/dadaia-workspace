@@ -44,7 +44,7 @@ specs tree, current memory, and auditable lifecycle evidence.
 
 ## Harness Model
 
-Claude Code, Codex, PI, and Kimi Code are Layer-1 entry harnesses. Public assets
+Claude Code, Codex, and Kimi Code are Layer-1 entry harnesses. Public assets
 originate once under `dadaia_workspace/public/`, stage under `.dadaia/agentic/`, and
 project to the runtime-specific roots.
 

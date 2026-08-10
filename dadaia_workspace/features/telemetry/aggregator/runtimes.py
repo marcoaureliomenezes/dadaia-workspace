@@ -385,34 +385,42 @@ class KimiRuntimeAdapter:
         """Kimi: cost is not tracked; set cumulative_cost_usd=None, cost_known=False."""
         return SessionRow(
             session_id=row.session_id,
-            provider=row.provider,
-            agent_name=row.agent_name,
-            ai_title=row.ai_title,
+            runtime=row.runtime,
+            project=row.project,
             cwd=row.cwd,
-            first_event_at=row.first_event_at,
-            last_event_at=row.last_event_at,
-            status=row.status,
+            model=row.model,
+            started_at=row.started_at,
+            last_activity_at=row.last_activity_at,
+            message_count=row.message_count,
+            context_size_tokens=row.context_size_tokens,
             cumulative_cost_usd=None,
             cost_known=False,
+            status=row.status,
+            agent_name=row.agent_name,
+            ai_title=row.ai_title,
         )
 
     def enrich_detail(self, detail: SessionDetail) -> SessionDetail:
         """Kimi: cost is not tracked; set cumulative_cost_usd=None, cost_known=False."""
         return SessionDetail(
             session_id=detail.session_id,
-            provider=detail.provider,
-            agent_name=detail.agent_name,
-            ai_title=detail.ai_title,
+            runtime=detail.runtime,
+            project=detail.project,
             cwd=detail.cwd,
-            first_event_at=detail.first_event_at,
-            last_event_at=detail.last_event_at,
-            status=detail.status,
+            model=detail.model,
+            started_at=detail.started_at,
+            last_activity_at=detail.last_activity_at,
+            message_count=detail.message_count,
+            context_size_tokens=detail.context_size_tokens,
             cumulative_cost_usd=None,
             cost_known=False,
-            events=detail.events,
+            status=detail.status,
+            agent_name=detail.agent_name,
+            ai_title=detail.ai_title,
+            event_timestamps=detail.event_timestamps,
         )
 
-    def liveness(self, session_id: str, now: datetime.datetime) -> str:
+    def liveness(self, session_id: str, cwd: str) -> Literal["active", "idle", "ended"]:
         """Classify liveness from the session directory's mtime (metadata only)."""
         try:
             match: pathlib.Path | None = None
@@ -424,7 +432,8 @@ class KimiRuntimeAdapter:
                         break
             if match is None:
                 return "ended"
-            mtime = datetime.datetime.fromtimestamp(match.stat().st_mtime, tz=datetime.UTC)
+            mtime = datetime.fromtimestamp(match.stat().st_mtime, tz=UTC)
+            now = datetime.now(tz=UTC)
             delta_minutes = (now - mtime).total_seconds() / 60
             if delta_minutes <= _KIMI_ACTIVE_MINUTES:
                 return "active"
