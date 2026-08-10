@@ -5,15 +5,15 @@ created: 2026-08-06
 origin: operator goal 2026-08-06 (bug-ledger deep audit; report 2026-08-06T210000Z-bug-ledger-architecture-audit.html)
 owner: project-manager (curates)
 intents:
-  - subject: { kind: decision, ref: "features/lifecycle (dadaia-workflows)" }
-    change: "OPERATOR DECISION REQUIRED — demolish or freeze; continuing to fix is the one option the data forbids (96% fix-ratio, 200/416 bugs, recurrence 0.24d)"
-  - subject: { kind: code, ref: "dadaia_workspace/features/lifecycle/workflows/_fragment_gate.py + pipeline.py" }
-    change: "if kept: demolish the retry/bounded-revision machinery (47+47 mentions) — replace with fail-loud single attempt + operator resume"
-  - subject: { kind: code, ref: "dadaia_workspace/infrastructure/public_assets.py" }
-    change: "de-flag: 18 boolean params + 21 compat mentions → pipeline of flag-free steps"
-  - subject: { kind: code, ref: "dadaia_workspace/core/specs_resolver.py + hooks/ctx_inject.py" }
+  - subject: { kind: doc, ref: "memory/architecture.md#Overview" }
+    change: "CONSUMED — v0.3.0: operator chose DEMOLISH; the engine was deleted entirely (−61,883 lines)"
+  - subject: { kind: doc, ref: "memory/architecture.md#Overview" }
+    change: "SUPERSEDED — v0.3.0: the retry/bounded-revision machinery died with the engine demolition"
+  - subject: { kind: doc, ref: "memory/architecture.md#Primary Subsystems" }
+    change: "CONSUMED — v0.3.0: public_assets de-flagged into InstallPlan + flag-free step pipeline (16→1 private bools)"
+  - subject: { kind: code, ref: "dadaia_workspace/core/specs_resolver.py#resolve_bound_context_name" }
     change: "one resolution rung: finish what v0.1.77 started, delete the accreted ladder + 5 env-vars"
-  - subject: { kind: doc, ref: "dadaia_workspace/public/data/DADAIA.md §6" }
+  - subject: { kind: doc, ref: "memory/quality-assurance.md#Root Cause, Always" }
     change: "conduct law: additive-only fixes require explicit justification; family recurrence REOPENS the original bug"
 ---
 

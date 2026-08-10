@@ -312,11 +312,11 @@ test('E2E-THM-10 — Deep-interaction: click control → option visible → them
 });
 
 // ---------------------------------------------------------------------------
-// E2E-THM-09 — axe-core: all 3 themes pass on the Workflows tab
+// E2E-THM-09 — axe-core: all 3 themes pass on the 1º Agentic Layer tab
 //
-// v0.1.45 redesign: the Agents tab was removed with the Agentic tab. The a11y
-// audit now runs on the Workflows tab (the workflow diagram-card catalog), which
-// carries the richest surviving interactive surface (cards, pickers, toolbar).
+// v0.3.0: the Workflows tab died with the workflow engine. The a11y audit now
+// runs on the 1º Agentic Layer tab (agent cards + sessions dashboard), the
+// richest surviving interactive surface.
 // ---------------------------------------------------------------------------
 test('E2E-THM-09 — axe-core: zero critical/serious violations for all 3 themes', async ({
   page,
@@ -326,8 +326,8 @@ test('E2E-THM-09 — axe-core: zero critical/serious violations for all 3 themes
   for (const theme of ['mint', 'sage', 'warm'] as const) {
     // Navigate fresh for each theme.
     await gotoPanel(page);
-    await activateTab(page, 'workflows');
-    await page.waitForSelector('.dadaia-wf-catalog .dadaia-wf-card', {
+    await activateTab(page, 'subagents');
+    await page.waitForSelector('#section-subagents .agent-card, #section-subagents', {
       timeout: 15000,
     });
 

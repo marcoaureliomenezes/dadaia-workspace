@@ -5,13 +5,13 @@ created: 2026-08-06
 origin: operator demand 2026-08-06 (rules-efficiency analysis session; declared ARCHITECTURAL)
 owner: project-manager (curates)
 intents:
-  - subject: { kind: doc, ref: "dadaia_workspace/public/data/DADAIA.md" }
+  - subject: { kind: doc, ref: "memory/architecture.md#Agent Surface" }
     change: "NEW single always-on law file — the workspace system prompt. Consolidates every always-on rule the library ships (today: 9 public/rules/*.md + the law body of the root AGENTS.md) into one optimized, auditable, affirmative document."
-  - subject: { kind: code, ref: "dadaia_workspace/infrastructure/public_assets.py" }
+  - subject: { kind: code, ref: "dadaia_workspace/infrastructure/public_assets.py#FileSystemPublicAssetManager" }
     change: "project DADAIA.md to every Layer-1 harness (.claude/rules/DADAIA.md, .codex/ and .kimi-code/ equivalents); retire the per-rule projection of public/rules/*.md"
-  - subject: { kind: code, ref: "dadaia_workspace/hooks/pre_gate.py" }
+  - subject: { kind: code, ref: "dadaia_workspace/hooks/pre_gate.py#evaluate_payload" }
     change: "new deterministic policy: projected law files (DADAIA.md + library-originated AGENTS.md) are HUMAN-ONLY in an instantiated workspace — agent file-writes are blocked with the edit-the-lib-and-reproject remedy"
-  - subject: { kind: code, ref: "dadaia_workspace/infrastructure/public_assets.py" }
+  - subject: { kind: code, ref: "dadaia_workspace/infrastructure/public_assets.py#FileSystemPublicAssetManager" }
     change: "write projected law files read-only (0444) so the restriction also holds outside the harness hook envelope"
 ---
 
