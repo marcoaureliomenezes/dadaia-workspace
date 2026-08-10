@@ -30,6 +30,7 @@ from dadaia_workspace.infrastructure.codex_doctor import (
     check_agent_skill_refs,
     check_codex_drift,
     check_codex_rule_corpus_reachable,
+    check_entities_derivation,
     check_memory_phase_single_source,
     codex_trust_boundary_info,
     dcx1_missing_toml,
@@ -1334,6 +1335,7 @@ class FileSystemPublicAssetManager:
         reports.extend(check_agent_skill_refs(self._public_dir))
         reports.extend(check_memory_phase_single_source(self._public_dir))
         reports.extend(attest("public-privacy", self._check_public_privacy()))
+        reports.extend(attest("entities-derivation", check_entities_derivation(self._public_dir)))
 
         try:
             git_result = subprocess.run(

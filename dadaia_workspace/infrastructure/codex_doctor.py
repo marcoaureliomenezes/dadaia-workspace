@@ -15,6 +15,7 @@ import subprocess
 import tomllib
 from pathlib import Path
 
+from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
     _CODEX_SKILL_REF_PREFIXES,
@@ -673,3 +674,83 @@ def codex_trust_boundary_info() -> list[DoctorLine]:
             "chokepoints only). (WS-CDX-HYGIENE)",
         )
     ]
+
+
+def check_entities_derivation(public_dir: Path) -> list[DoctorLine]:
+    """ENT-DERIVE-1 (constitution §12.5): the abstract-entity registry grounds the scaffold.
+
+    Independent verifier read — deliberately does NOT share the features-layer loader
+    (``features.agents.entities``), so a loader bug cannot vouch for itself. Attests:
+
+    1. ``public/entities/registry.json`` exists, parses, and carries the expected schema.
+    2. Persona ↔ core sub-agent bijection: every ``public/agents/*.md`` derives from a
+       Persona and every Persona has its derived sub-agent.
+    3. Every Deterministic Behavior is derived for exactly the entry harnesses.
+
+    Any violation is DRIFT/ERROR (blocking): a scaffolded core implementation without
+    its abstract entity is forbidden, not advisory.
+    """
+    registry_path = public_dir / "entities" / "registry.json"
+    try:
+        registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return [
+            DoctorLine(
+                DoctorStatus.ERROR,
+                f"entities-derivation: registry unreadable at entities/registry.json "
+                f"({exc.__class__.__name__}) (ENT-DERIVE-1)",
+            )
+        ]
+    if registry.get("schema_version") != "agentic-entities-v1":
+        return [
+            DoctorLine(
+                DoctorStatus.ERROR,
+                "entities-derivation: registry schema_version is not "
+                "'agentic-entities-v1' (ENT-DERIVE-1)",
+            )
+        ]
+
+    out: list[DoctorLine] = []
+    personas = {str(p.get("id")) for p in registry.get("personas", [])}
+    agents_dir = public_dir / "agents"
+    scaffolded = {p.stem for p in agents_dir.glob("*.md")} if agents_dir.exists() else set()
+    for orphan in sorted(scaffolded - personas):
+        out.append(
+            DoctorLine(
+                DoctorStatus.DRIFT,
+                f"entities-derivation: core sub-agent '{orphan}' has no abstract "
+                f"Persona in the registry (ENT-DERIVE-1)",
+            )
+        )
+    for dead in sorted(personas - scaffolded):
+        out.append(
+            DoctorLine(
+                DoctorStatus.DRIFT,
+                f"entities-derivation: Persona '{dead}' has no derived core "
+                f"sub-agent under public/agents/ (ENT-DERIVE-1)",
+            )
+        )
+
+    harnesses = set(L1_ENTRY_HARNESSES)
+    for behavior in registry.get("behaviors", []):
+        implemented = set(behavior.get("implementations", {}))
+        if implemented != harnesses:
+            out.append(
+                DoctorLine(
+                    DoctorStatus.DRIFT,
+                    f"entities-derivation: behavior '{behavior.get('id')}' is derived for "
+                    f"{sorted(implemented)}, expected every entry harness "
+                    f"{sorted(harnesses)} (ENT-DERIVE-1)",
+                )
+            )
+
+    if not out:
+        out.append(
+            DoctorLine(
+                DoctorStatus.OK,
+                f"entities-derivation: {len(personas)} Personas ↔ {len(scaffolded)} core "
+                f"sub-agents; {len(registry.get('behaviors', []))} Deterministic Behaviors "
+                f"derived for all entry harnesses (ENT-DERIVE-1)",
+            )
+        )
+    return out

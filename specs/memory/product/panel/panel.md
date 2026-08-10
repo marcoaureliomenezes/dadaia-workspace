@@ -2,11 +2,11 @@
 slug: panel
 title: panel
 category: product
-tldr: Local five-tab panel with agent model governance, telemetry, reports, academy, and servers.
+tldr: Local six-tab panel with agent model governance, agentic entities, telemetry, reports, academy, and servers.
 summary: >-
-  `dadaia panel` serves the local workspace UI. Its five tabs are Projects,
-  Agents, Reports, Academy, and Servers. It is loopback-only, no-auth,
-  Host-guarded, and CSP-constrained.
+  `dadaia panel` serves the local workspace UI. Its six tabs are Projects,
+  Agents, Agentic Entities, Reports, Academy, and Servers. It is loopback-only,
+  no-auth, Host-guarded, and CSP-constrained.
 tags:
 - panel
 - ui
@@ -26,11 +26,14 @@ There is no panel token, cookie, or credential store.
 ## Tabs
 
 1. **Projects** - active Spec Context Projects and current memory.
-2. **Agents** - agent model templates/overrides plus the aggregate
-   Sessions telemetry dashboard.
-3. **Reports** - handoff/report discovery and retention controls.
-4. **Academy** - packaged knowledge-base content.
-5. **Servers** - registered development servers and TTL/PID status.
+2. **Agents** - Persona definition cards, agent model templates/overrides, plus
+   the aggregate Sessions telemetry dashboard.
+3. **Agentic Entities** - the abstract-entity registry rendered server-side:
+   universal Skills/AGENTS.md, Deterministic Actions, and Rules with their
+   per-harness derivations ([[agentic-entities]]).
+4. **Reports** - handoff/report discovery and retention controls.
+5. **Academy** - packaged knowledge-base content.
+6. **Servers** - registered development servers and TTL/PID status.
 
 ## Model Governance Surface
 
@@ -56,4 +59,4 @@ source; no external CDN is required.
 
 ## Dependencies
 
-[[agent-orchestration]], [[agent-monitoring]], [[server-registry]], [[brand-identity]].
+[[agent-orchestration]], [[agent-monitoring]], [[agentic-entities]], [[server-registry]], [[brand-identity]].

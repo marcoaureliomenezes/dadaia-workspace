@@ -20,12 +20,16 @@ Client-side (fetched via XHR/fetch after Bearer auth):
                 (v0.1.79 — the standalone Sessions tab was removed)
   - Reports   — auth-gated; file-system backed; sidecar-indexed
 
-Primary tabs (v0.3.0 — 5 tabs):
-  Projects | Agents (id ``tab-subagents``) | Reports | Academy |
-  Servers. The Agents tab governs Claude sub-agent model+effort
-  (v0.1.65 L1 governance) and hosts the Sessions cost/telemetry dashboard as a
-  sub-section (``render_sessions_section``, appended inside
-  ``_render_subagents_section``).
+Primary tabs (v0.3.0 — 6 tabs):
+  Projects | Agents (id ``tab-subagents``) | Agentic Entities (id
+  ``tab-entities``) | Reports | Academy | Servers. The Agents tab opens with the
+  abstract Persona definition cards (``render_personas_section``), governs
+  sub-agent model+effort (v0.1.65 L1 governance) and hosts the Sessions
+  cost/telemetry dashboard as a sub-section (``render_sessions_section``,
+  appended inside ``_render_subagents_section``). The Agentic Entities tab
+  (``render_entities_section``) is fully server-rendered from the packaged
+  abstract-entity registry — universal skills/AGENTS.md, Deterministic
+  Behaviors and Abstract Rules with their per-harness derivations.
 """
 
 from __future__ import annotations
@@ -36,6 +40,10 @@ from collections.abc import Callable, Sequence
 from dadaia_workspace.features.panel.service import PanelContext, PanelService, ServerGroup
 from dadaia_workspace.features.panel.views._md_render import memory_view_url
 from dadaia_workspace.features.panel.views.academy import render_academy_section
+from dadaia_workspace.features.panel.views.entities import (
+    render_entities_section,
+    render_personas_section,
+)
 from dadaia_workspace.features.panel.views.reports import render_reports_section
 from dadaia_workspace.features.panel.views.sessions import render_sessions_section
 from dadaia_workspace.features.panel.views.static import LOGO_RHINO_36
@@ -58,6 +66,7 @@ def render_index(
 
         academy_section = render_academy_section()
         reports_section = render_reports_section()
+        entities_section = render_entities_section()
 
         body = f"""<!DOCTYPE html>
 <html lang="pt-BR">
@@ -73,6 +82,7 @@ def render_index(
   <link rel="stylesheet" href="/static/agent-policy.css">
   <link rel="stylesheet" href="/static/sessions.css">
   <link rel="stylesheet" href="/static/academy.css">
+  <link rel="stylesheet" href="/static/entities.css">
   <link rel="stylesheet" href="/static/reports.css">
 </head>
 <body>
@@ -110,6 +120,7 @@ def render_index(
   <nav class="nav-tabs" aria-label="Panel sections" role="tablist">
     <button class="nav-tab active tab-memories-btn" data-section="memories" aria-selected="true" role="tab" id="tab-memories" aria-label="Projects">Projects</button>
     <button class="nav-tab" data-section="subagents" aria-selected="false" role="tab" id="tab-subagents" aria-label="Agents">Agents</button>
+    <button class="nav-tab" data-section="entities" aria-selected="false" role="tab" id="tab-entities" aria-label="Agentic Entities">Agentic Entities</button>
     <button class="nav-tab" data-section="reports" aria-selected="false" role="tab" id="tab-reports">Reports</button>
     <button class="nav-tab" data-section="academy" aria-selected="false" role="tab" id="tab-academy">Academy</button>
     <button class="nav-tab" data-section="servers" aria-selected="false" role="tab" id="tab-servers">Servers</button>
@@ -143,6 +154,8 @@ def render_index(
     </section>
 
     {_render_subagents_section()}
+
+    {entities_section}
 
     {academy_section}
 
@@ -195,6 +208,7 @@ def _render_subagents_section() -> str:
         "        <p>Layer-1 agent model governance — pick a template or set per-agent "
         "model/effort overrides, then Apply to re-render both harness projections.</p>\n"
         "      </details>\n"
+        f"      {render_personas_section()}\n"
         '      <div id="ap-banner" class="ap-banner" hidden></div>\n'
         '      <div id="ap-roster" aria-live="polite"></div>\n'
         '      <div id="ap-popup" class="ap-popup" role="dialog" aria-modal="true" '

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-07T00:00:00Z",
+  "generated_at": "2026-08-10T16:38:11Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -62,11 +62,35 @@
         "sdd-gate-v3",
         "agent-comms",
         "harness-claude-code",
-        "harness-codex"
+        "harness-codex",
+        "harness-kimi-code"
       ]
     },
     {
       "rank": 4,
+      "slug": "agentic-entities",
+      "title": "agentic-entities",
+      "category": "product",
+      "area": "agents",
+      "tldr": "Abstract-entity registry — Personas, Deterministic Behaviors, Abstract Rules, universal surface — that every scaffolded core implementation derives from.",
+      "summary": "The workspace method is defined abstractly first: `public/entities/registry.json` holds the Personas, Deterministic Behaviors, Abstract Rules, and universal skills/AGENTS.md surface. Every scaffolded core sub-agent, hook, and rule file is a per-harness derivation of one of these entities (constitution §12.5); the derivation contract test and the `public doctor` `entities-derivation` check enforce the prohibition. The panel renders the registry in the Agentic Entities tab and as the Personas section of the Agents tab.",
+      "path": "specs/memory/product/agents/agentic-entities.md",
+      "tags": [
+        "agents",
+        "entities",
+        "derivation",
+        "governance"
+      ],
+      "token_estimate": 420,
+      "depends_on": [
+        "agent-orchestration",
+        "panel",
+        "public-asset-distribution",
+        "tech-stack"
+      ]
+    },
+    {
+      "rank": 5,
       "slug": "academy",
       "title": "academy",
       "category": "product",
@@ -86,7 +110,7 @@
       ]
     },
     {
-      "rank": 5,
+      "rank": 6,
       "slug": "plugin-packs",
       "title": "plugin-packs",
       "category": "product",
@@ -109,7 +133,7 @@
       ]
     },
     {
-      "rank": 6,
+      "rank": 7,
       "slug": "public-asset-distribution",
       "title": "public-asset-distribution",
       "category": "product",
@@ -132,13 +156,13 @@
       ]
     },
     {
-      "rank": 7,
+      "rank": 8,
       "slug": "pypi-distribution",
       "title": "pypi-distribution",
       "category": "product",
       "area": "distribution",
       "tldr": "The published dadaia-workspace 0.2.x PyPI package, the release.yml OIDC publish pipeline, the wheel content contract, and the SDD-vs-package version split.",
-      "summary": "Owns PyPI distribution as product behavior — the live `dadaia-workspace` PyPI package, the `.github/workflows/release.yml` pipeline (version-vs-tag check → five test legs → build → release-gate approval → OIDC trusted publishing + tag → post-publish smoke), the wheel content contract (plugin packs and public assets ship in-package), and the documented version-scheme split: SDD release ids version the SDD process while the package version versions the shipped library (ADR-2 — documented, never renumbered).",
+      "summary": "Owns PyPI distribution as product behavior — the live `dadaia-workspace` 0.2.x package (PyPI since PRs #112/#113, ratified v0.1.61), the `.github/workflows/release.yml` pipeline (version-vs-tag check → five test legs → build → release-gate approval → OIDC trusted publishing + tag → post-publish smoke), the wheel content contract (plugin packs and public assets ship in-package), and the documented version-scheme split: SDD releases `v0.1.x` version the SDD process while the package `0.2.x` versions the shipped library (ADR-2 — documented, never renumbered).",
       "path": "specs/memory/product/distribution/pypi-distribution.md",
       "tags": [
         "distribution",
@@ -155,7 +179,7 @@
       ]
     },
     {
-      "rank": 8,
+      "rank": 9,
       "slug": "harness-claude-code",
       "title": "Harness — Claude Code",
       "category": "product",
@@ -179,7 +203,7 @@
       ]
     },
     {
-      "rank": 9,
+      "rank": 10,
       "slug": "harness-codex",
       "title": "Harness — Codex",
       "category": "product",
@@ -203,13 +227,13 @@
       ]
     },
     {
-      "rank": 10,
+      "rank": 11,
       "slug": "harness-kimi-code",
       "title": "Harness — Kimi Code",
       "category": "product",
       "area": "harness",
       "tldr": "Layer-1-only harness: `.kimi-code/` projection + hooks via a managed block in the user-level `config.toml`; first with post-compact re-injection.",
-      "summary": "Kimi Code enters the workspace as a first-class Layer-1 harness. The projection tree is inert Markdown; the live wiring is four POSIX shims registered via a marker-delimited managed block of TOML hook rules in `$KIMI_CODE_HOME/config.toml`.",
+      "summary": "Kimi Code enters the workspace as a first-class Layer-1 harness. The projection tree is inert Markdown; the live wiring is four POSIX shims registered via a marker-delimited managed block of TOML hook rules in `$KIMI_CODE_HOME/config.toml`, delegating to the shared Python hook modules.",
       "path": "specs/memory/product/harness/harness-kimi-code.md",
       "tags": [
         "harness",
@@ -252,8 +276,8 @@
       "title": "panel",
       "category": "product",
       "area": "panel",
-      "tldr": "Local five-tab panel with agent model governance, telemetry, reports, academy, and servers.",
-      "summary": "`dadaia panel` serves the local workspace UI. Its five tabs are Projects, Agents, Reports, Academy, and Servers. It is loopback-only, no-auth, Host-guarded, and CSP-constrained.",
+      "tldr": "Local six-tab panel with agent model governance, agentic entities, telemetry, reports, academy, and servers.",
+      "summary": "`dadaia panel` serves the local workspace UI. Its six tabs are Projects, Agents, Agentic Entities, Reports, Academy, and Servers. It is loopback-only, no-auth, Host-guarded, and CSP-constrained.",
       "path": "specs/memory/product/panel/panel.md",
       "tags": [
         "panel",
@@ -263,6 +287,7 @@
       ],
       "token_estimate": 430,
       "depends_on": [
+        "agentic-entities",
         "agent-orchestration",
         "agent-monitoring",
         "server-registry",
@@ -393,11 +418,12 @@
       "category": "product",
       "area": "platform",
       "tldr": "Claude Code, Codex, and Kimi Code receive truthful runtime-specific projections from one canonical public source.",
-      "summary": "Defines projection parity without pretending the harnesses have identical primitives. Each entry harness receives the projection its runtime can actually honor. Git chokepoints protect commit/push independently of harness hooks.",
+      "summary": "Defines Layer-1 projection parity without pretending the harnesses have identical primitives; the workspace runs no agent-execution runtime. Claude remains Layer-1-only. Git chokepoints protect commit/push independently of harness hooks.",
       "path": "specs/memory/product/platform/multi-platform-parity.md",
       "tags": [
         "codex",
         "claude-code",
+        "kimi",
         "parity",
         "multi-platform"
       ],
@@ -406,6 +432,7 @@
         "public-asset-distribution",
         "harness-claude-code",
         "harness-codex",
+        "harness-kimi-code",
         "sdd-gate-v3"
       ]
     },

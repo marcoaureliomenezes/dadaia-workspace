@@ -13,6 +13,7 @@
 | `agent-comms` | agent-comms — Handoff Contract v1 | handoff-v1.2 separates HTML reports from JSON handoffs and carries the self_pull Layer-1 read-proof line. |
 | `agent-monitoring` | agent-monitoring | stdlib-only local telemetry (Claude/Codex/Kimi sessions) → panel Sessions tab + /api/agents; allowlist gate preserves privacy. |
 | `agent-orchestration` | agent-orchestration | Nine core Layer-1 roles, two dispatchers, document-governed ordered work, and advisory-only concurrency. |
+| `agentic-entities` | agentic-entities | Abstract-entity registry — Personas, Deterministic Behaviors, Abstract Rules, universal surface — that every scaffolded core implementation derives from. |
 
 ### distribution
 
@@ -36,7 +37,7 @@
 | slug | title | tldr |
 |------|-------|------|
 | `brand-identity` | brand-identity | canonical 5-color palette and CSS tokens of the panel (release dadaia-workspace-brand-identity-v1). |
-| `panel` | panel | Local five-tab panel with agent model governance, telemetry, reports, academy, and servers. |
+| `panel` | panel | Local six-tab panel with agent model governance, agentic entities, telemetry, reports, academy, and servers. |
 
 ### philosophy
 
@@ -66,3 +67,4 @@
 | `sdd-bug-backlog-governance` | sdd-bug-backlog-governance | Event-sourced JSONL bugs, PM-curated backlog, release consumption, audit dispositions, and exact-commit security-gated push. |
 | `sdd-gate-v3` | sdd-gate-v3 | No-lock SDD enforcement: deterministic path/mode gates, advisory presence, warn-only concurrent commits, and a security-gated push boundary. |
 | `specs-doctor` | specs-doctor | Validates canonical specs structure, memory/catalog integrity, release markers, closure evidence, dispositions, bug ledgers, and audit coherence. |
+

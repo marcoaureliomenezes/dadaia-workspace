@@ -79,9 +79,10 @@ behind `ValidatorPort`.
 ### Panel
 
 `features/panel/` serves a loopback-only stdlib HTTP UI. Route/view modules are split by
-domain. The panel has five governance tabs — Projects, Agents, Reports,
-Academy, Servers — plus a Games surface. Layer-1 model policy is the panel's only
-governance editor; game interactions are local JavaScript.
+domain. The panel has six governance tabs — Projects, Agents, Agentic Entities,
+Reports, Academy, Servers. Layer-1 model policy is the panel's only governance
+editor; the Agentic Entities tab and the Agents tab's Persona cards are
+server-rendered from the abstract-entity registry.
 
 ### Public assets
 
@@ -96,6 +97,14 @@ Generated projection files are never edited in place. The projected law files
 (`DADAIA.md` and library-originated `AGENTS.md`) are PROTECTED and human-only in an
 instantiated workspace. The source repository itself must not contain generated
 workspace projection roots.
+
+The projection chain is a derivation, not an origin: every core sub-agent, hook, and
+rule file the installer projects implements an abstract, harness-agnostic entity —
+Persona, Deterministic Behavior, or Abstract Rule — declared in
+`public/entities/registry.json`; skills and `AGENTS.md` are universal, read natively
+by every entry harness. Underived core surface is forbidden (constitution §12.5,
+[[agentic-entities]]), enforced by the derivation contract test and the
+`entities-derivation` doctor check.
 
 ### Specs and memory
 

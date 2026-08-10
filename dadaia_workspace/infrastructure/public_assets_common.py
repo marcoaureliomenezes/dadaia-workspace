@@ -56,6 +56,7 @@ _COPY_DIRS = (
     "skills",
     "commands",
     "agents",
+    "entities",
     "scripts",
     "schemas",
     "data",

@@ -23,6 +23,7 @@ from pathlib import Path
 
 from dadaia_workspace.features.panel.views.assets.css.academy import ACADEMY_CSS
 from dadaia_workspace.features.panel.views.assets.css.agent_policy import AGENT_POLICY_CSS
+from dadaia_workspace.features.panel.views.assets.css.entities import ENTITIES_CSS
 from dadaia_workspace.features.panel.views.assets.css.memory import MEMORY_CSS
 from dadaia_workspace.features.panel.views.assets.css.memory_doc import MEMORY_DOC_CSS
 from dadaia_workspace.features.panel.views.assets.css.projects import PROJECTS_CSS
@@ -66,6 +67,7 @@ _ASSETS: dict[str, tuple[str, bytes]] = {
     "agent-policy.css": ("text/css; charset=utf-8", AGENT_POLICY_CSS.encode("utf-8")),
     "sessions.css": ("text/css; charset=utf-8", SESSIONS_CSS.encode("utf-8")),
     "academy.css": ("text/css; charset=utf-8", ACADEMY_CSS.encode("utf-8")),
+    "entities.css": ("text/css; charset=utf-8", ENTITIES_CSS.encode("utf-8")),
     "reports.css": ("text/css; charset=utf-8", REPORTS_CSS.encode("utf-8")),
     "core.js": (
         "application/javascript; charset=utf-8",

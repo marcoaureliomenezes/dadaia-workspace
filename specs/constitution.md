@@ -1,6 +1,6 @@
 ---
 specs_pattern_version: 4
-constitution_version: 3.0.0
+constitution_version: 3.1.0
 ---
 
 # Constitution — dadaia-workspace
@@ -29,6 +29,11 @@ to work and without colliding. Vision: [[product-vision]]. Layout and module map
 - **Harness isolation** — a workspace may be installed for any subset of the entry
   harnesses (`dadaia public install --target <t>`); scaffolding follows the choice.
   Per-harness capability and scaffold truth: the `memory/product/harness/` atoms.
+- **Agentic entity** — an abstract, harness-agnostic definition the workspace owns:
+  **Persona** (agent role), **Deterministic Behavior** (enforced action), **Abstract
+  Rule** (always-on law), and the **universal** surface (skills under
+  `.agents/skills/`, `AGENTS.md` guardrails) that every entry harness reads natively.
+  Registry: `public/entities/registry.json` ([[agentic-entities]]).
 
 The SDD flow is agent-dispatched and document-governed: agents execute the phases of §7
 against the SDD documents (SPEC/PLAN/TASKS/ACTIVE.md), constrained by the deterministic
@@ -184,6 +189,13 @@ panel serves only channel 1. No `specs/releases/<id>/evidence/` subtree exists.
 4. A bug fix that only adds code carries an explicit justification of why removal was
    impossible; reviewers reject additive-by-default. Deleted surface stops producing
    bugs; surface added by a fix produces the next one.
+5. **Derivation law.** The workspace defines its method abstractly and only then
+   implements it per harness. No scaffolded core sub-agent exists without its Persona,
+   no core hook without its Deterministic Behavior, no core rule file without its
+   Abstract Rule — all in the agentic-entity registry (§0), enforced by the derivation
+   contract test and the `public doctor` `entities-derivation` check. Operator-created
+   agents, skills and rules are exempt: the law governs only what the library
+   scaffolds.
 
 ## 13. Memory Canon
 
