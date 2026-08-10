@@ -18,16 +18,13 @@ from pathlib import Path
 
 from dadaia_workspace.core.exceptions import NoActiveReleaseError, NoAgentSequenceError
 
-#: Canonical 12-agent public topology (9 core + 3 plugins). Owner names parsed from
+#: Canonical 9-agent core topology. Owner names parsed from
 #: PLAN.md are filtered to this set so prose like ``owner: TBD`` never enters a sequence.
 #: Source of truth: .dadaia/agentic/agents.index.json (updated v0.1.7).
 CANONICAL_AGENTS: frozenset[str] = frozenset(
     {
         "ai-engineer",
         "code-reviewer",
-        "design-specialist",
-        "devops-engineer",
-        "frontend-engineer",
         "product-engineer",
         "project-auditor",
         "project-manager",

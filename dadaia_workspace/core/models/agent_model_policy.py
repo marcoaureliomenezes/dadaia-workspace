@@ -107,8 +107,7 @@ class AgentModelPolicyOverlay:
 
 @dataclass(frozen=True)
 class ResolvedAgentModel:
-    """The resolver's answer for one agent: model, effort (``None`` only for a plugin
-    agent resolved from its pack default with no effort override — F-6), and source."""
+    """The resolver's answer for one agent: model, effort, and precedence source."""
 
     model: str
     effort: ClaudeEffort | None

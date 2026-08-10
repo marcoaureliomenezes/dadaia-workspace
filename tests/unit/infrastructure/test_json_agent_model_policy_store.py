@@ -121,12 +121,6 @@ def test_valid_doc_and_minimal_doc_parse(tmp_path: Path) -> None:
     assert minimal.applied_template is None
     assert minimal.overrides == {}
 
-    plugin_store = _store(tmp_path / "plugin", plugin_agent_names=frozenset({"frontend-engineer"}))
-    plugin_doc = _valid_doc()
-    plugin_doc["overrides"] = {"frontend-engineer": {"effort": "high"}}
-    plugin_overlay = plugin_store.parse(plugin_doc)
-    assert plugin_overlay.overrides["frontend-engineer"] == AgentModelOverride(effort="high")
-
 
 def test_d7_rejects_fable_on_security_reviewer_but_allows_on_other_agents(
     tmp_path: Path,

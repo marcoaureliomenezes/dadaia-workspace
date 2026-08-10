@@ -27,7 +27,6 @@ _FRONTMATTER_PARALLEL_GROUP_RE = re.compile(r"^\s*parallel_group:\s*\S", re.MULT
 _CODEX_READ_ONLY_AGENTS = frozenset(
     {
         "code-reviewer",
-        "design-specialist",
         "project-auditor",
         "qa-engineer",
         "security-reviewer",
@@ -40,9 +39,7 @@ _CODEX_DEFAULT_EFFORT = "medium"
 _CODEX_SKILL_REF_PREFIXES = (
     "ai-harness-",
     "dev-server-registry",
-    "design-ctx",
     "drift-detection",
-    "frontend-ctx",
     "harness-primitives",
     "memory-ctx",
     "project-orchestration",
@@ -136,7 +133,7 @@ def _render_codex_agent_toml(
     - ``model_reasoning_effort`` — explicit reasoning profile: *reasoning_effort*
       when supplied (the D-3 clamp of the RESOLVED agent-model-policy effort,
       v0.1.65 FR5); otherwise derived from the registry tier of *claude_model*
-      via the per-runtime tier view (legacy path — plugin bodies/stubs without a
+      via the per-runtime tier view (legacy path — staged bodies without a
       resolved policy)
     - ``developer_instructions`` — triple-quoted multiline basic string
 

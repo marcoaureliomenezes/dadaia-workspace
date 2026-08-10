@@ -4,7 +4,7 @@ The word "tier" names two distinct axes and this contract machine-enforces the s
 
   * the numeric frontmatter ``dispatch_band: 1/2/3`` = the agent dispatch/priority band
     (renamed from the legacy ``tier:`` spelling in v0.1.64 FR5);
-  * the registry ``Tier`` (``deep``/``dispatch``/``fast``/``plugin``) = the model-cost
+  * the registry ``Tier`` (``deep``/``dispatch``/``fast``/``standard``) = the model-cost
     class resolved from a Claude model id via ``core/model_registry``.
 
 v0.1.65 rework (FR9): the staged core agent bodies are now MODEL-AGNOSTIC templates
@@ -17,9 +17,7 @@ registry** in ``core/agent_model_templates.py``:
   (c) no template assigns ``claude-fable-5`` to security-reviewer (operator ruling G-1);
   (d) every template model resolves in REGISTRY with the expected tier;
   (e) staged core bodies carry NO ``model:``/``effort:`` frontmatter (AC-1);
-  (f) plugin pack bodies carry ``dispatch_band: 3`` + ``model: claude-sonnet-5``
-      (registry tier ``plugin``);
-  (g) roster counts unchanged: 9 core / 3 plugin.
+  (f) roster count: exactly the 9 core agents.
 
 This is NON-OPTIONAL: it must fail loudly if a template roster drifts from the FR2
 table, if a staged core body re-grows a hardcoded model, or if the roster count drifts.
@@ -56,17 +54,8 @@ def _frontmatter(md: Path) -> dict[str, object]:
 
 
 def _core_agents() -> list[Path]:
-    """Non-plugin core agents in public/agents/ (excludes the plugin stubs)."""
-    return [
-        p
-        for p in sorted((_PUBLIC / "agents").glob("*.md"))
-        if _frontmatter(p).get("plugin") is not True
-    ]
-
-
-def _plugin_body_agents() -> list[Path]:
-    """The real plugin agent bodies distributed in the packs (W3 content)."""
-    return sorted((_PUBLIC / "plugins").glob("*/agents/*.md"))
+    """Core agents in public/agents/."""
+    return sorted((_PUBLIC / "agents").glob("*.md"))
 
 
 # ---------------------------------------------------------------------------
@@ -119,7 +108,7 @@ _EXPECTED_TEMPLATES: dict[str, dict[str, tuple[str, str]]] = {
 _MODEL_TIER: dict[str, str] = {
     "claude-fable-5": "deep",
     "claude-opus-5": "dispatch",
-    "claude-sonnet-5": "plugin",
+    "claude-sonnet-5": "standard",
 }
 
 
@@ -166,21 +155,13 @@ def test_no_template_assigns_fable_to_security_reviewer() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_core_and_plugin_agent_frontmatter_tiers() -> None:
-    """(g): roster counts unchanged (9 core, 3 plugin). (e): staged core bodies carry
+def test_core_agent_frontmatter_tiers() -> None:
+    """(f): roster count is exactly the 9 core agents. (e): staged core bodies carry
     ``dispatch_band`` but NO ``model:``/``effort:`` (v0.1.65 FR1: the model/effort
     pinning moved from per-file frontmatter to the template registry, asserted above;
-    the projected files carry them, the staged sources must not). (f): plugin pack
-    bodies carry ``dispatch_band: 3`` + ``model: claude-sonnet-5`` (registry tier
-    ``plugin``)."""
+    the projected files carry them, the staged sources must not)."""
     assert len(_core_agents()) == 9, [p.name for p in _core_agents()]
     assert {p.stem for p in _core_agents()} == set(CORE_AGENTS)
-    bodies = _plugin_body_agents()
-    assert {p.stem for p in bodies} == {
-        "frontend-engineer",
-        "design-specialist",
-        "devops-engineer",
-    }, [p.name for p in bodies]
 
     seen: set[str] = set()
     for md in _core_agents():
@@ -199,19 +180,3 @@ def test_core_and_plugin_agent_frontmatter_tiers() -> None:
         )
         seen.add(md.stem)
     assert seen == set(CORE_AGENTS), f"roster/template mismatch: missing {set(CORE_AGENTS) - seen}"
-
-    registry = registry_by_claude_id()
-    for md in _plugin_body_agents():
-        fm = _frontmatter(md)
-        assert fm.get("dispatch_band") == 3, (
-            f"{md.name}: plugin agent must carry 'dispatch_band: 3', "
-            f"got {fm.get('dispatch_band')!r}"
-        )
-        model = fm.get("model")
-        assert model == "claude-sonnet-5", (
-            f"{md.name}: plugin agent must carry the pack default "
-            f"'claude-sonnet-5' (G-4/D-5), got {model!r}"
-        )
-        assert registry[str(model)].tier == "plugin", (
-            f"{md.name}: {model!r} must resolve to the 'plugin' registry tier"
-        )

@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from dadaia_workspace.core.protocols.git_client import GitClient
-    from dadaia_workspace.core.protocols.plugin_store import PluginStore
     from dadaia_workspace.features.agents.model_policy import AgentModelPolicyService
     from dadaia_workspace.features.backlog.removal_lifecycle import (
         BacklogRemovalLifecycle,
@@ -420,62 +419,20 @@ def build_agent_model_policy_service(workspace_root: Path) -> "AgentModelPolicyS
     Injects (D-4 — the features module carries no infrastructure import):
 
     - the concrete :class:`JsonAgentModelPolicyStore` (typed to the feature's store
-      port), whose valid override targets are the 9 core agents plus the INSTALLED
-      plugin agents (FR3);
+      port), whose valid override targets are the 9 core agents;
     - the **re-render callable** — the agents-only ``public install`` path over both
-      L1 projections (G-2 Apply semantics; profile-scoped like every install);
-    - the **plugin pack defaults** provider — ``{agent_name: pack model}`` parsed from
-      the installed packs' staged bodies (D-5), so the resolved roster covers them.
+      L1 projections (G-2 Apply semantics; profile-scoped like every install).
     """
     from dadaia_workspace.features.agents.model_policy import AgentModelPolicyService
     from dadaia_workspace.infrastructure.json_agent_model_policy_store import (
         JsonAgentModelPolicyStore,
     )
-    from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
-        _parse_agent_frontmatter,
-    )
-
-    def _installed_pack_defaults() -> dict[str, str]:
-        states_dir = workspace_root / ".dadaia" / "states"
-        ledger = build_plugin_store().read(states_dir)
-        packs = ledger.plugins if ledger is not None else ()
-        agentic_dir = workspace_root / ".dadaia" / "agentic"
-        defaults: dict[str, str] = {}
-        for pack in packs:
-            for md in sorted((agentic_dir / "plugins" / pack / "agents").glob("*.md")):
-                fm = _parse_agent_frontmatter(md.read_text(encoding="utf-8"))
-                model = str(fm.get("model", "")) or None
-                if model is None:
-                    continue
-                name = str(fm.get("name", "")) or md.stem
-                defaults[name] = model
-        return defaults
 
     def _rerender_agents() -> list[str]:
         return build_public_service().install(workspace_root, target="all", only="agents")
 
-    store = JsonAgentModelPolicyStore(
-        workspace_root, plugin_agent_names=frozenset(_installed_pack_defaults())
-    )
-    return AgentModelPolicyService(
-        store=store,
-        rerender=_rerender_agents,
-        plugin_pack_defaults=_installed_pack_defaults,
-    )
-
-
-def build_plugin_store() -> "PluginStore":
-    """Compose the installed-plugins ledger store (T-61-20 / FR4 — A-1 wired).
-
-    Returns the store typed as the :class:`PluginStore` port: consumers (the ``dadaia
-    plugin`` CLI and ``infrastructure/public_assets``) depend on the Protocol in ``core``,
-    never on the ``JsonPluginStore`` adapter directly. The store is path-parametric —
-    ``read``/``write`` take the target ``states_dir`` per call — so composition needs no
-    workspace root.
-    """
-    from dadaia_workspace.infrastructure.json_plugin_store import JsonPluginStore
-
-    return JsonPluginStore()
+    store = JsonAgentModelPolicyStore(workspace_root)
+    return AgentModelPolicyService(store=store, rerender=_rerender_agents)
 
 
 def _context_specs_dir(workspace_root: Path, context: str) -> Path:

@@ -4,7 +4,7 @@ Covers the FR2 built-in templates (9-core-agent coverage, registry-known models,
 effort vocabulary, never-Fable-on-security — G-1, unique ids, ``balanced`` default),
 the import-time assert failure modes, the D-3 claude→codex effort clamp map, and the
 ``resolve_agent_model`` precedence matrix (FR4): per-agent overlay override > applied
-template > library default (``balanced``); plugin agents: override > pack default,
+template > library default (``balanced``),
 with the F-6 asymmetry (pack default with no override resolves model only —
 ``effort`` is ``None``, never a placeholder).
 """
@@ -181,20 +181,18 @@ def test_codex_effort_clamp_map(claude_effort: str, codex_effort: str) -> None:
 
 
 @pytest.mark.parametrize(
-    ("name", "agent", "overlay_fn", "pack_default", "expected"),
+    ("name", "agent", "overlay_fn", "expected"),
     [
         (
             "no_overlay_resolves_balanced_default",
             "software-engineer",
             lambda: None,
-            None,
             ("claude-sonnet-5", "xhigh", "default"),
         ),
         (
             "applied_template_resolves_source_template",
             "project-manager",
             lambda: AgentModelPolicyOverlay(applied_template="subscription-saver", overrides={}),
-            None,
             ("claude-opus-5", "high", "template"),
         ),
         (
@@ -206,7 +204,6 @@ def test_codex_effort_clamp_map(claude_effort: str, codex_effort: str) -> None:
                 applied_template="subscription-saver",
                 overrides={"software-engineer": AgentModelOverride(model="claude-opus-4-8")},
             ),
-            None,
             ("claude-opus-4-8", "xhigh", "override"),
         ),
         (
@@ -216,7 +213,6 @@ def test_codex_effort_clamp_map(claude_effort: str, codex_effort: str) -> None:
                 applied_template=None,
                 overrides={"qa-engineer": AgentModelOverride(effort="max")},
             ),
-            None,
             ("claude-sonnet-5", "max", "override"),
         ),
         (
@@ -230,38 +226,7 @@ def test_codex_effort_clamp_map(claude_effort: str, codex_effort: str) -> None:
                     )
                 },
             ),
-            None,
             ("claude-haiku-4-5-20251001", "low", "override"),
-        ),
-        (
-            # F-6 asymmetry: pack default with no override → model only; effort is None.
-            "plugin_pack_default_without_override_resolves_model_only",
-            "frontend-engineer",
-            lambda: None,
-            "claude-sonnet-5",
-            ("claude-sonnet-5", None, "pack"),
-        ),
-        (
-            "plugin_override_beats_pack_default",
-            "frontend-engineer",
-            lambda: AgentModelPolicyOverlay(
-                applied_template=None,
-                overrides={
-                    "frontend-engineer": AgentModelOverride(model="claude-opus-4-8", effort="high")
-                },
-            ),
-            "claude-sonnet-5",
-            ("claude-opus-4-8", "high", "override"),
-        ),
-        (
-            "plugin_effort_only_override_keeps_pack_model",
-            "frontend-engineer",
-            lambda: AgentModelPolicyOverlay(
-                applied_template=None,
-                overrides={"frontend-engineer": AgentModelOverride(effort="medium")},
-            ),
-            "claude-sonnet-5",
-            ("claude-sonnet-5", "medium", "override"),
         ),
         (
             # AC-3: an unrelated agent keeps the applied template when only ONE
@@ -272,7 +237,6 @@ def test_codex_effort_clamp_map(claude_effort: str, codex_effort: str) -> None:
                 applied_template="subscription-saver",
                 overrides={"software-engineer": AgentModelOverride(model="claude-opus-4-8")},
             ),
-            None,
             ("claude-sonnet-5", "high", "template"),
         ),
     ],
@@ -281,18 +245,17 @@ def test_resolve_agent_model_precedence_table(
     name: str,
     agent: str,
     overlay_fn: object,
-    pack_default: str | None,
     expected: tuple[str, str | None, str],
 ) -> None:
     overlay = overlay_fn()  # type: ignore[operator]
-    resolved = resolve_agent_model(agent, overlay, pack_default=pack_default)
+    resolved = resolve_agent_model(agent, overlay)
     assert (resolved.model, resolved.effort, resolved.source) == expected
 
 
 @pytest.mark.parametrize(
     ("name", "agent", "overlay_fn", "match"),
     [
-        ("unknown_agent_without_pack_default", "not-an-agent", lambda: None, "unknown agent"),
+        ("unknown_agent", "not-an-agent", lambda: None, "unknown agent"),
         (
             "unknown_applied_template",
             "qa-engineer",

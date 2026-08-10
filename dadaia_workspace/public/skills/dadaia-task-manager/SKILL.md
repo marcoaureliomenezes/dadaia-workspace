@@ -54,8 +54,8 @@ finishes code, unit tests, and integration tests, the task remains `[-]` until
 same commit (per the `release-governance` cadence: alpha-N boundaries are qa-only;
 reviews mature the release, and the push boundary itself is mechanically gated — the
 pre-push security-verdict chokepoint requires an APPROVED `security-reviewer` handoff
-whose `metrics.commit_sha` equals each pushed ref sha, per push-cycle). UI tasks also
-require `design-specialist` approval. Before those approvals it is forbidden to mark
+whose `metrics.commit_sha` equals each pushed ref sha, per push-cycle). Before those
+approvals it is forbidden to mark
 `[x]`, open a PR, request merge, deploy, close the release, write `CLOSURE.md`, or update
 memory. If any reviewer requests changes, return to step 2 and keep `[-]`.
 

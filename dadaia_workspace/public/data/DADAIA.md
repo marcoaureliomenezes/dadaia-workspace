@@ -66,16 +66,6 @@ the backlog. `ai-engineer` alone invokes the `ai-harness-*` and `ai-context-engi
 skills — every other agent uses `harness-primitives` for harness literacy and dispatches
 `ai-engineer` for depth.
 
-**Plugin agents.** `frontend-engineer` and `design-specialist` (pack `frontend-design`)
-and `devops-engineer` (pack `devops`) are stubs until their pack is installed here with
-`dadaia plugin install <pack>`. A core agent handed a plugin-domain task while the pack is
-absent answers:
-
-```
-[PLUGIN REQUIRED] <agent> is a plugin agent and its pack is not installed in this
-workspace. Enable it with `dadaia plugin install <pack>`, or route this task to the operator.
-```
-
 ---
 
 ## 3. What is enforced deterministically

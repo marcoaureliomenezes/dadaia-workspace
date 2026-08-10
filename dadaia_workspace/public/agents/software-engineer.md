@@ -102,8 +102,6 @@ implementer. You advance a task to `[x]` only after the review gate clears (see 
 
 - Specs, plans, TASKS.md, CLOSURE.md, memory atoms (that is `product-engineer`)
 - AI-entity files in `dadaia_workspace/public/**` (that is `ai-engineer`)
-- Browser frontend: `*.tsx`, browser `*.ts`/`*.js`, `*.css`, `*.html` (plugin: `frontend-engineer`)
-- CI YAML in `.github/workflows/**` (plugin: `devops-engineer`)
 - E2E test directories (that is `qa-engineer`)
 - Lib-originated projections in `.claude/`, `.agents/`, `.codex/`, `.kimi-code/`
 
@@ -113,8 +111,6 @@ If you receive a task outside your scope:
 tests (Python, server-side Node, any in-scope context language).
 Specs / memory -> product-engineer.
 AI-entity files (agents/skills/rules/workflows/hooks) -> ai-engineer.
-Browser frontend -> frontend-engineer [plugin].
-CI YAML -> devops-engineer [plugin].
 E2E tests -> qa-engineer.
 ```
 
@@ -236,8 +232,7 @@ guess and never widen scope.
 | `.dadaia/reports/<ctx>/software-engineer/**` | Write |
 | `.dadaia/handoff/<ctx>/**` | Write |
 | `dadaia_workspace/public/**` (AI-entity surface) | Never (ai-engineer) |
-| Browser frontend (`*.tsx`, browser `*.ts`/`*.js`, `*.css`, `*.html`) | Never (frontend-engineer [plugin]) |
-| `.github/workflows/*.yml` | Never (devops-engineer [plugin]) |
+| Browser frontend and CI YAML | Write (generic implementer surface) |
 | `specs/**` | Never (product-engineer) |
 | E2E test directories | Never (qa-engineer) |
 | `.claude/`, `.agents/`, `.codex/`, `.kimi-code/` (lib-originated) | Never |

@@ -19,7 +19,7 @@
     },
     "overrides": {
       "type": "object",
-      "description": "Per-agent overrides keyed by agent name (a core agent or an installed plugin agent). Each override layers on top of the applied template per field: model, effort, or both.",
+      "description": "Per-agent overrides keyed by agent name (a core agent). Each override layers on top of the applied template per field: model, effort, or both.",
       "additionalProperties": {
         "$ref": "#/$defs/agentOverride"
       }

@@ -23,9 +23,7 @@ from dadaia_workspace.core.models.agent_model_policy import (
 )
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus, attest
 from dadaia_workspace.core.models.install_ledger import InstallLedger, LedgerEntry
-from dadaia_workspace.core.models.plugin_pack import InstalledPlugins
 from dadaia_workspace.core.protocols.install_ledger_store import InstallLedgerStore
-from dadaia_workspace.core.protocols.plugin_store import PluginStore
 from dadaia_workspace.infrastructure.codex_doctor import (
     check_agent_skill_refs,
     check_codex_drift,
@@ -66,7 +64,6 @@ from dadaia_workspace.infrastructure.json_agent_model_policy_store import (
 )
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
 from dadaia_workspace.infrastructure.json_install_ledger_store import JsonInstallLedgerStore
-from dadaia_workspace.infrastructure.json_plugin_store import JsonPluginStore
 
 # Several names below are imported purely for re-export, so tests and other
 # consumers can keep importing them from public_assets after the T-017-11 split.
@@ -200,15 +197,9 @@ _InstallStep = Callable[[InstallPlan, list[str]], None]
 class FileSystemPublicAssetManager:
     def __init__(
         self,
-        plugin_store: PluginStore = JsonPluginStore(),
         install_ledger_store: InstallLedgerStore = JsonInstallLedgerStore(),
     ) -> None:
-        # Injectable installed-plugins ledger seam (T-61-20 / FR4). The same-layer
-        # ``JsonPluginStore()`` default is legal (infrastructure consuming
-        # infrastructure); the composition root (``container.build_plugin_store``)
-        # injects the port for CLI consumers.
         self._public_dir = Path(__file__).parent.parent / "public"
-        self._plugin_store = plugin_store
         self._install_ledger_store = install_ledger_store
 
     # ------------------------------------------------------------------
@@ -337,13 +328,10 @@ class FileSystemPublicAssetManager:
 
         Raises the typed ``AgentModelPolicyStoreError`` on an invalid overlay — install
         fails loud BEFORE any projection write (NFR-4); doctor converts it to an ERROR
-        line. Valid override targets are the 9 core agents plus the installed packs'
-        agents (FR3).
+        line. Valid override targets are the 9 core agents.
         """
-        plugin_names = frozenset(
-            self._plugin_agent_stems(agentic_dir, self._installed_plugins(workspace_root))
-        )
-        return JsonAgentModelPolicyStore(workspace_root, plugin_agent_names=plugin_names).load()
+        del agentic_dir
+        return JsonAgentModelPolicyStore(workspace_root).load()
 
     @staticmethod
     def _resolved_core_models(
@@ -351,45 +339,6 @@ class FileSystemPublicAssetManager:
     ) -> dict[str, ResolvedAgentModel]:
         """Resolve the full core roster through the single resolver (FR4)."""
         return {agent: resolve_agent_model(agent, overlay) for agent in CORE_AGENTS}
-
-    def _resolve_pack_agent(
-        self, md_path: Path, overlay: AgentModelPolicyOverlay | None
-    ) -> ResolvedAgentModel | None:
-        """Resolve an installed pack agent: override > pack-provided default (D-5).
-
-        Returns ``None`` when the pack body authors no ``model:`` (defensive — the
-        projection then falls back to the legacy verbatim/staged-model path).
-        """
-        fm = _parse_agent_frontmatter(md_path.read_text(encoding="utf-8"))
-        staged_model = str(fm.get("model", "")) or None
-        if staged_model is None:
-            return None
-        agent_name = str(fm.get("name", "")) or md_path.stem
-        return resolve_agent_model(agent_name, overlay, pack_default=staged_model)
-
-    # ------------------------------------------------------------------
-    # Plugin packs (v0.1.60 FR3) — projection, precedence, doctor
-    # ------------------------------------------------------------------
-
-    def _installed_plugins(self, workspace_root: Path) -> tuple[str, ...]:
-        """Return the installed plugin-pack names from the ledger (empty when absent).
-
-        An absent ``installed_plugins.json`` ⇒ no packs installed. This is the single
-        precedence source read by ``install`` (core projection precedence) and ``doctor``;
-        when it is empty EVERY plugin code path is a strict no-op, so the zero-plugin
-        install/doctor surface is byte-identical to golden (b).
-        """
-        states_dir = workspace_root / ".dadaia" / "states"
-        ledger = self._plugin_store.read(states_dir)
-        return ledger.plugins if ledger is not None else ()
-
-    def _plugin_agent_stems(self, agentic_dir: Path, packs: tuple[str, ...]) -> set[str]:
-        """Return the agent-file stems owned by the installed packs (from the staged tree)."""
-        stems: set[str] = set()
-        for pack in packs:
-            for md in (agentic_dir / "plugins" / pack / "agents").glob("*.md"):
-                stems.add(md.stem)
-        return stems
 
     def _codex_toml_from_md(
         self, md_path: Path, resolved: ResolvedAgentModel | None = None
@@ -452,103 +401,6 @@ class FileSystemPublicAssetManager:
             installed,
         )
 
-    def _project_installed_plugins(
-        self,
-        agentic_dir: Path,
-        workspace_root: Path,
-        active: set[str],
-        overwrite: OverwritePolicy,
-        installed: list[str],
-        overlay: AgentModelPolicyOverlay | None = None,
-    ) -> None:
-        """Project every installed pack's agents/skills/rules over the core projections.
-
-        Profile-scoped (Ruling 13): a pack agent lands in a runtime ONLY when that harness is
-        in *active*, so a claude-only workspace never gets a ``.codex/`` orphan (AC-15). The
-        pack agent body OVERWRITES the projected core stub (ADR-4 stub replacement); because
-        this runs AFTER the core projection loop it is the projection-precedence step
-        (AC-4 clobber-safety). A no-op when no pack is installed (byte-lock golden (b)).
-
-        v0.1.65 FR5: pack agents render through the same seam as core agents —
-        override > pack-provided default (D-5), with the F-6 effort asymmetry
-        (``effort:`` omitted when no override supplies one).
-        """
-        packs = self._installed_plugins(workspace_root)
-        if not packs:
-            return
-        for pack in packs:
-            pack_dir = agentic_dir / "plugins" / pack
-            if not pack_dir.is_dir():
-                continue
-            for md in sorted((pack_dir / "agents").glob("*.md")):
-                resolved = self._resolve_pack_agent(md, overlay)
-                if "claude" in active:
-                    if resolved is None:
-                        copy_file(
-                            md,
-                            workspace_root / ".claude" / "agents" / md.name,
-                            overwrite.force,
-                            installed,
-                        )
-                    else:
-                        write_generated(
-                            workspace_root / ".claude" / "agents" / md.name,
-                            render_claude_agent(md.read_text(encoding="utf-8"), resolved),
-                            overwrite.force,
-                            installed,
-                        )
-                if "codex" in active:
-                    self._render_codex_pack_agent(
-                        md, workspace_root, overwrite, installed, resolved=resolved
-                    )
-            for skill in sorted(self._iter_files(pack_dir / "skills")):
-                if skill.name == ".gitkeep":
-                    continue
-                rel = skill.relative_to(pack_dir / "skills")
-                copy_file(
-                    skill, workspace_root / ".agents" / "skills" / rel, overwrite.force, installed
-                )
-            if "claude" in active:
-                for rule in sorted(self._iter_files(pack_dir / "rules")):
-                    if rule.name == ".gitkeep":
-                        continue
-                    rel = rule.relative_to(pack_dir / "rules")
-                    copy_file(
-                        rule, workspace_root / ".claude" / "rules" / rel, overwrite.force, installed
-                    )
-
-    def install_plugin(
-        self, workspace_root: Path, pack_name: str, force: bool = False
-    ) -> list[str]:
-        """Enable a plugin pack: record the ledger and project it (profile-scoped).
-
-        Records *pack_name* in ``installed_plugins.json`` via the injected ``PluginStore``
-        port (idempotent — a re-install adds nothing) and projects the installed packs from the
-        already-staged ``.dadaia/agentic/plugins/`` tree into the profile-scoped runtime
-        projections. Re-install is a no-op (hash-compare ``[skip]`` on every file). Staging is
-        the caller's responsibility (``dadaia init`` / ``public install`` always stage first);
-        when a pack has not been staged, the ledger is still recorded and projection is a
-        no-op for that pack.
-        """
-        agentic_dir = workspace_root / ".dadaia" / "agentic"
-        installed: list[str] = []
-        states_dir = workspace_root / ".dadaia" / "states"
-        store = self._plugin_store
-        ledger = store.read(states_dir) or InstalledPlugins.empty()
-        store.write(states_dir, ledger.with_added(pack_name))
-        profile = self._profile_harnesses(workspace_root)
-        active = set(L1_ENTRY_HARNESSES) if profile is None else profile
-        overlay = self._load_agent_policy(workspace_root, agentic_dir)
-        self._project_installed_plugins(
-            agentic_dir,
-            workspace_root,
-            active,
-            OverwritePolicy.of(force),
-            installed,
-            overlay=overlay,
-        )
-        return installed
-
     @staticmethod
     def _prune_empty_dirs(start: Path, stop: Path) -> None:
         """Remove now-empty directories from *start* up to (exclusive) *stop*."""
@@ -556,173 +408,6 @@ class FileSystemPublicAssetManager:
         while current != stop and current.is_dir() and not any(current.iterdir()):
             current.rmdir()
             current = current.parent
-
-    def uninstall_plugin(self, workspace_root: Path, pack_name: str) -> list[str]:
-        """Disable a plugin pack — the exact inverse of :meth:`install_plugin` (v0.1.63 FR2).
-
-        Enumerates the staged pack tree (``.dadaia/agentic/plugins/<pack>/``) as the removal
-        set, profile-scoped exactly like install (ADR-U3): each pack agent's projection is
-        re-projected back to the CORE STUB (claude md copy + codex stub toml render); each
-        pack-only skill/rule projection is deleted (with now-empty dirs pruned). A drifted
-        (hand-edited) projected pack file is restored/removed anyway — the runtime projection
-        surface is lib-owned — but never silently: a ``[drift-restored]``/``[drift-removed]``
-        line is emitted per file (ADR-U1). An unstaged pack degrades to a ledger-only removal
-        with a non-silent line. Ordering is FILES FIRST, LEDGER LAST (ADR-U4): an interrupted
-        uninstall leaves the ledger entry present so ``plugin doctor`` still surfaces the
-        pack's file state. Idempotent end-to-end.
-        """
-        agentic_dir = workspace_root / ".dadaia" / "agentic"
-        states_dir = workspace_root / ".dadaia" / "states"
-        pack_dir = agentic_dir / "plugins" / pack_name
-        out: list[str] = []
-        profile = self._profile_harnesses(workspace_root)
-        active = set(L1_ENTRY_HARNESSES) if profile is None else profile
-
-        if not pack_dir.is_dir():
-            out.append(f"[skip] pack '{pack_name}' is not staged — ledger-only removal")
-        else:
-            overlay = self._load_agent_policy(workspace_root, agentic_dir)
-            # Pack agents: restore the core stub over the pack body (profile-scoped).
-            for md in sorted((pack_dir / "agents").glob("*.md")):
-                stub_src = agentic_dir / "agents" / md.name
-                resolved = self._resolve_pack_agent(md, overlay)
-                if "claude" in active:
-                    dst = workspace_root / ".claude" / "agents" / md.name
-                    # The projected pack claude file is the RENDER output (FR5), so
-                    # drift is measured against the rendered pack body, not raw bytes.
-                    expected_pack = (
-                        render_claude_agent(md.read_text(encoding="utf-8"), resolved)
-                        if resolved is not None
-                        else md.read_text(encoding="utf-8")
-                    )
-                    if (
-                        dst.exists()
-                        and dst.read_text(encoding="utf-8") != expected_pack
-                        and (not stub_src.exists() or dst.read_bytes() != stub_src.read_bytes())
-                    ):
-                        out.append(f"[drift-restored] {dst}")
-                    if stub_src.exists():
-                        copy_file(stub_src, dst, False, out)
-                if "codex" in active:
-                    dst = workspace_root / ".codex" / "agents" / f"{md.stem}.toml"
-                    stub_render = self._codex_toml_from_md(stub_src) if stub_src.exists() else None
-                    pack_render = self._codex_toml_from_md(md, resolved=resolved)
-                    if dst.exists():
-                        current = dst.read_text(encoding="utf-8")
-                        if (pack_render is None or current != pack_render[1]) and (
-                            stub_render is None or current != stub_render[1]
-                        ):
-                            out.append(f"[drift-restored] {dst}")
-                    if stub_render is not None:
-                        write_generated(dst, stub_render[1], False, out)
-            # Pack-only skill projections: delete (+ prune now-empty dirs).
-            skills_root = workspace_root / ".agents" / "skills"
-            for skill in sorted(self._iter_files(pack_dir / "skills")):
-                if skill.name == ".gitkeep":
-                    continue
-                rel = skill.relative_to(pack_dir / "skills")
-                dst = skills_root / rel
-                if dst.exists():
-                    if dst.read_bytes() != skill.read_bytes():
-                        out.append(f"[drift-removed] {dst}")
-                    dst.unlink()
-                    out.append(f"[rm]   {dst}")
-                    self._prune_empty_dirs(dst.parent, skills_root)
-            # Pack-only rule projections (claude-scoped, mirroring install).
-            if "claude" in active:
-                rules_root = workspace_root / ".claude" / "rules"
-                for rule in sorted(self._iter_files(pack_dir / "rules")):
-                    if rule.name == ".gitkeep":
-                        continue
-                    rel = rule.relative_to(pack_dir / "rules")
-                    dst = rules_root / rel
-                    if dst.exists():
-                        if dst.read_bytes() != rule.read_bytes():
-                            out.append(f"[drift-removed] {dst}")
-                        dst.unlink()
-                        out.append(f"[rm]   {dst}")
-                        self._prune_empty_dirs(dst.parent, rules_root)
-
-        # LEDGER LAST (ADR-U4): dropped only after every file operation completed.
-        store = self._plugin_store
-        ledger = store.read(states_dir) or InstalledPlugins.empty()
-        if pack_name in ledger.plugins:
-            store.write(states_dir, ledger.with_removed(pack_name))
-            out.append(f"[ledger] removed '{pack_name}' from installed_plugins.json")
-        return out
-
-    def _doctor_installed_plugins(
-        self,
-        agentic_dir: Path,
-        workspace_root: Path,
-        active: set[str],
-        overlay: AgentModelPolicyOverlay | None = None,
-    ) -> list[DoctorLine]:
-        """Report ``[ok]``/``[drift]``/``[missing]`` per installed-pack projected file.
-
-        A stale or out-of-manifest installed-pack file is never silent (AC-5). A no-op when
-        no pack is installed, so the zero-plugin doctor surface stays byte-identical to
-        golden (b).
-        """
-        packs = self._installed_plugins(workspace_root)
-        out: list[DoctorLine] = []
-        for pack in packs:
-            pack_dir = agentic_dir / "plugins" / pack
-            for md in sorted((pack_dir / "agents").glob("*.md")):
-                name = md.stem
-                if "claude" in active:
-                    dst = workspace_root / ".claude" / "agents" / f"{name}.md"
-                    label = f"plugin:{pack}:claude/agents/{name}.md"
-                    # v0.1.65 FR5/FR7: the installed pack projection is the RENDER
-                    # output (override > pack default), so the doctor expectation is
-                    # the rendered content, not raw pack bytes.
-                    resolved = self._resolve_pack_agent(md, overlay)
-                    if resolved is None:
-                        out.append(self._compare(md, dst, label))
-                    else:
-                        expected = render_claude_agent(md.read_text(encoding="utf-8"), resolved)
-                        out.append(self._compare_content(expected, dst, label))
-                if "codex" in active:
-                    toml = workspace_root / ".codex" / "agents" / f"{name}.toml"
-                    label = f"plugin:{pack}:codex/agents/{name}.toml"
-                    out.append(
-                        DoctorLine(DoctorStatus.OK, f"{label}")
-                        if toml.exists()
-                        else DoctorLine(DoctorStatus.MISSING, f"{label}")
-                    )
-            for skill in sorted(self._iter_files(pack_dir / "skills")):
-                if skill.name == ".gitkeep":
-                    continue
-                rel = skill.relative_to(pack_dir / "skills")
-                dst = workspace_root / ".agents" / "skills" / rel
-                out.append(
-                    self._compare(skill, dst, f"plugin:{pack}:agents/skills/{rel.as_posix()}")
-                )
-            if "claude" in active:
-                for rule in sorted(self._iter_files(pack_dir / "rules")):
-                    if rule.name == ".gitkeep":
-                        continue
-                    rel = rule.relative_to(pack_dir / "rules")
-                    dst = workspace_root / ".claude" / "rules" / rel
-                    out.append(
-                        self._compare(rule, dst, f"plugin:{pack}:claude/rules/{rel.as_posix()}")
-                    )
-        return out
-
-    def doctor_plugins(self, workspace_root: Path) -> list[DoctorLine]:
-        """Public wrapper: per-installed-pack projected-file doctor lines (profile-scoped)."""
-        agentic_dir = workspace_root / ".dadaia" / "agentic"
-        profile = self._profile_harnesses(workspace_root)
-        active = set(L1_ENTRY_HARNESSES) if profile is None else profile
-        try:
-            overlay = self._load_agent_policy(workspace_root, agentic_dir)
-        except AgentModelPolicyStoreError:
-            overlay = None  # `public doctor` reports the invalid overlay separately
-        return self._doctor_installed_plugins(agentic_dir, workspace_root, active, overlay)
-
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
 
     def stage(self, workspace_root: Path) -> list[str]:
         if not self._public_dir.exists():
@@ -907,8 +592,7 @@ class FileSystemPublicAssetManager:
         harness-independent chokepoint scripts (selected only when at least one Layer-1
         harness is in scope), THEN ``DADAIA.md`` (after the per-harness projections so
         ``copy_tree``'s orphan pruning cannot prune it moments later), THEN the retired
-        core rules, THEN plugin-pack precedence (after the core projection so a pack
-        body is never silently reverted to its stub), THEN the retired workflow sweep.
+        core rules, THEN the retired workflow sweep.
         """
         harness_steps = self._harness_steps()
         # `--only` selection for the universal-skills target happens HERE (present/absent
@@ -934,7 +618,6 @@ class FileSystemPublicAssetManager:
             [
                 self._step_install_dadaia_md,
                 self._step_remove_retired_core_rules,
-                self._step_project_installed_plugins,
                 self._step_remove_legacy_workflow_projections,
             ]
         )
@@ -1029,21 +712,6 @@ class FileSystemPublicAssetManager:
 
     def _step_remove_retired_core_rules(self, plan: InstallPlan, installed: list[str]) -> None:
         remove_retired_core_rules(plan.workspace_root, installed)
-
-    def _step_project_installed_plugins(self, plan: InstallPlan, installed: list[str]) -> None:
-        # Projection precedence (FR3, AC-4): after the core projection, overlay any
-        # installed pack's real body over its stub — scoped to the harnesses actually
-        # being projected — so a routine `public install` never silently reverts an
-        # installed pack agent to its stub. A no-op when no pack is installed (byte-lock
-        # golden (b)).
-        self._project_installed_plugins(
-            plan.agentic_dir,
-            plan.workspace_root,
-            set(plan.active_harnesses),
-            plan.overwrite,
-            installed,
-            overlay=plan.overlay,
-        )
 
     def _step_remove_legacy_workflow_projections(
         self, plan: InstallPlan, installed: list[str]
@@ -1161,13 +829,6 @@ class FileSystemPublicAssetManager:
         active = set(L1_ENTRY_HARNESSES) if profile_harnesses is None else profile_harnesses
         claude_active = "claude" in active
 
-        # Plugin precedence (FR3): an installed pack's claude agent projection is the PACK
-        # body, so its `claude:agents/<name>.md` line is reported by the plugin block below
-        # (compared vs the pack body) — skipping it in the core loop avoids a false [drift]
-        # against the stub. Empty when no pack is installed ⇒ zero skips (byte-lock golden b).
-        installed_packs = self._installed_plugins(workspace_root)
-        plugin_agent_stems = self._plugin_agent_stems(agentic_dir, installed_packs)
-
         # v0.1.65 FR7: load the agent-model policy ONCE per doctor run. An INVALID
         # overlay is a doctor ERROR line (and the render compare below degrades to the
         # `balanced` defaults); a MISSING overlay is silent and resolves the defaults
@@ -1199,13 +860,6 @@ class FileSystemPublicAssetManager:
             # path is unchanged (claude ∈ all-four ⇒ the loop runs fully → golden byte-lock).
             if not claude_active and label.startswith("claude:"):
                 continue
-            if (
-                plugin_agent_stems
-                and label.startswith("claude:agents/")
-                and label.endswith(".md")
-                and label[len("claude:agents/") : -len(".md")] in plugin_agent_stems
-            ):
-                continue
             if expected_src is None and transform:
                 reports.append(self._compare_content(_CLAUDE_MD_STUB, dst, label))
             elif expected_src is None:
@@ -1215,7 +869,7 @@ class FileSystemPublicAssetManager:
                 and label.endswith(".md")
                 and expected_src.stem in resolved_models
             ):
-                # v0.1.65 FR7/D-6 — THE pinned interception (F-2): non-plugin core
+                # v0.1.65 FR7/D-6 — THE pinned interception (F-2): core
                 # `claude:agents/*.md` projections are compared against
                 # render(staged generic + resolved policy), never raw staged bytes,
                 # so a policy re-render is [ok] and a hand-edit is [drift]. The
@@ -1256,11 +910,6 @@ class FileSystemPublicAssetManager:
             reports.extend(
                 _doctor_consumer_pair_lines(consumer_source, workspace_root, emit_stderr=False)
             )
-
-        # Installed-pack projected-file doctoring (FR3, AC-5): a stale/out-of-manifest
-        # installed-pack file is never silent. Empty when no pack is installed ⇒ zero lines
-        # (byte-lock golden b).
-        reports.extend(self._doctor_installed_plugins(agentic_dir, workspace_root, active, overlay))
 
         # Profile-scoped inline projection block (FR3). The `active`/`profile_harnesses`
         # resolution above is reused here (claude settings.json / codex hooks+config+rules /

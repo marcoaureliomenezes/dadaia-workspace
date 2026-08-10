@@ -73,7 +73,7 @@ def render_personas_section() -> str:
     cards = "".join(
         _card(
             persona["id"],
-            "plugin stub" if persona.get("plugin") else "persona",
+            "persona",
             f"<p>{html.escape(persona['mandate'])}</p>",
         )
         for persona in registry["personas"]

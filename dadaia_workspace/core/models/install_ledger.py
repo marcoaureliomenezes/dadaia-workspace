@@ -16,7 +16,7 @@ enables (enforced in ``infrastructure/public_assets.py``):
     An operator-modified orphan is retained and surfaced, never deleted.
 
 Pure ``core`` value object — no I/O, no ``json``/``pathlib`` coupling (the A-seam
-discipline of :mod:`dadaia_workspace.core.models.plugin_pack`). The JSON adapter is
+discipline of the core model layer). The JSON adapter is
 ``infrastructure/json_install_ledger_store.py`` (``.dadaia/states/install_ledger.json``).
 """
 
@@ -35,7 +35,7 @@ class LedgerEntry:
 
     ``family`` names the projection group that wrote the file (``claude``, ``codex``,
     ``agents``, ``kimi-code``, ``scripts``, ``guardrail``, ``law``,
-    ``plugin:<pack>``, …) — diagnostics and scoped operations only; the reconciliation
+    …) — diagnostics and scoped operations only; the reconciliation
     invariant never depends on it.
     """
 

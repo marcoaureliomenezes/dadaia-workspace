@@ -46,8 +46,8 @@ from typing import Literal
 
 # Tier names. ``deep`` = deep-reasoning leaves (spec/QA/arch/audit/harness),
 # ``dispatch`` = dispatchers + gate leaves, ``fast`` = high-volume mechanical,
-# ``plugin`` = plugin-stub agents (no behavior until the plugin is installed).
-Tier = Literal["deep", "dispatch", "fast", "plugin"]
+# ``standard`` = the mid-cost general implementation tier.
+Tier = Literal["deep", "dispatch", "fast", "standard"]
 
 
 @dataclass(frozen=True)
@@ -135,18 +135,17 @@ REGISTRY: tuple[ModelEntry, ...] = (
         claude_id="claude-sonnet-4-6",
         codex_id="gpt-5.6-terra",
         pricing=(ModelPricing(3.00, 15.00, 3.75, 0.30, date(2025, 1, 1)),),
-        tier="plugin",
+        tier="standard",
     ),
     ModelEntry(
         # v0.1.65 FR6/D-2: sonnet-5 shares sonnet-4-6's cost class and codex
-        # mapping. ``tier="plugin"`` is a FORCED cost-axis label (decoupled from
+        # mapping. ``tier="standard"`` is a FORCED cost-axis label (decoupled from
         # dispatch-band/agent behavior — D-2 addendum, F-4); any other tier
-        # violates the _codex_id_for_tier / codex_tier_views invariants. The
-        # 'plugin' tier-NAME mismatch is a tracked backlog return.
+        # violates the _codex_id_for_tier / codex_tier_views invariants.
         claude_id="claude-sonnet-5",
         codex_id="gpt-5.6-terra",
         pricing=(ModelPricing(3.00, 15.00, 3.75, 0.30, date(2026, 7, 1)),),
-        tier="plugin",
+        tier="standard",
     ),
     ModelEntry(
         # Haiku drift resolved: canonical id is haiku-4-5; the historical
@@ -216,7 +215,7 @@ CodexEffort = Literal["high", "medium", "low"]
 _CODEX_TIER_EFFORT: dict[Tier, CodexEffort] = {
     "deep": "high",
     "dispatch": "medium",
-    "plugin": "medium",
+    "standard": "medium",
     "fast": "medium",
 }
 
@@ -237,7 +236,7 @@ class CodexTierView:
 
 # Ordered tier presentation for the rendered Codex tier table (most → least
 # capable). Every registry ``Tier`` literal MUST appear exactly once.
-_CODEX_TIER_ORDER: tuple[Tier, ...] = ("deep", "dispatch", "plugin", "fast")
+_CODEX_TIER_ORDER: tuple[Tier, ...] = ("deep", "dispatch", "standard", "fast")
 
 
 def _codex_id_for_tier(tier: Tier) -> str:

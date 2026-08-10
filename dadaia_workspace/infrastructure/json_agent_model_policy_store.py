@@ -14,7 +14,7 @@ Two load paths, deliberately distinct (NFR-4, "missing != invalid"):
   :class:`AgentModelPolicyStoreError` with a distinct, actionable message per FR3
   rejection: corrupt JSON, non-object root, unknown top-level/override key, wrong
   schema version, unknown ``applied_template`` id, unknown agent name (valid names =
-  the 9 core agents plus installed plugin agents), a model not in the registry, an
+  the 9 core agents), a model not in the registry, an
   effort outside the D-3 vocabulary, an empty override, and — D-7 — any combination
   that resolves ``claude-fable-5`` onto ``security-reviewer``.
 
@@ -62,13 +62,9 @@ class JsonAgentModelPolicyStore:
     def __init__(
         self,
         workspace_root: Path,
-        plugin_agent_names: frozenset[str] = frozenset(),
     ) -> None:
         self._workspace_root = workspace_root.resolve()
         self._path = self._workspace_root / ".dadaia" / "states" / _FILENAME
-        #: Installed plugin agent names — valid override targets beyond the core 9
-        #: (FR3; injected by the composition boundary so this store stays wiring-free).
-        self._plugin_agent_names = plugin_agent_names
 
     @property
     def path(self) -> Path:
@@ -161,7 +157,7 @@ class JsonAgentModelPolicyStore:
             raise AgentModelPolicyStoreError(
                 "agent-model-policy 'overrides' must be an object keyed by agent name", path
             )
-        valid_agents = set(CORE_AGENTS) | set(self._plugin_agent_names)
+        valid_agents = set(CORE_AGENTS)
         overrides: dict[str, AgentModelOverride] = {}
         for agent_name, override_value in value.items():
             agent = str(agent_name)

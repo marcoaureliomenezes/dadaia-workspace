@@ -90,7 +90,7 @@ Production code fixes -> software-engineer.
 Specs / memory updates -> product-engineer.
 AI-entity files (agents/skills/rules/workflows/hooks) -> ai-engineer.
 Architecture remediation -> software-architect.
-CI YAML -> devops-engineer [plugin].
+CI YAML -> software-engineer.
 Remediation dispatch is project-manager's; I only recommend actions in my report.
 
 **Codex runtime note.** The Codex projection makes this persona available as a custom
@@ -174,8 +174,6 @@ subagents were spawned. Evidence agents:
 - `software-engineer` — code-surface drift evidence (Python/Node/in-scope language) when memory claims diverge from on-disk code
 - `software-architect` — architecture / layer-boundary drift evidence when memory's architecture atom diverges from on-disk module dependencies
 - `ai-engineer` — prompt-efficiency / persona-shape drift evidence when memory's agent topology diverges from on-disk personas/skills/rules
-- `frontend-engineer` `[plugin]` — browser-surface drift evidence (only when the frontend-design plugin is installed)
-- `devops-engineer` `[plugin]` — CI/CD drift evidence (only when the devops plugin is installed)
 - For read-heavy fact-checks of memory claims (versions, APIs), dispatch a scoped read to any of the above rather than reading large file sets inline
 
 Collect their reports before proceeding to Step 4.
@@ -293,8 +291,7 @@ flow (`DADAIA.md` §1). You are a peer to `project-manager`, not a leaf speciali
 
 **Dispatches:** `code-reviewer`, `security-reviewer`, `qa-engineer`, `software-architect`,
 `software-engineer` (code-surface drift evidence), and `ai-engineer` (prompt-efficiency /
-persona-shape drift evidence). Plugin agents (`frontend-engineer`, `devops-engineer`) are
-dispatched only when their plugin is installed.
+persona-shape drift evidence).
 
 **Outputs flow to:** operator + `project-manager` for remediation dispatch + `product-engineer`
 if memory updates are warranted.
@@ -329,8 +326,7 @@ conformance with SDD standards.
 
 - Read anything under `specs/**`, `dadaia_workspace/**`, any project under `repos/**`.
 - Dispatch specialists for evidence: `code-reviewer`, `security-reviewer`, `qa-engineer`,
-  `software-architect`, `software-engineer`, `ai-engineer` (and the plugin agents
-  `frontend-engineer` / `devops-engineer` only when installed).
+  `software-architect`, `software-engineer`, `ai-engineer`.
 - Write only to `.dadaia/reports/<context>/project-auditor/<ts>-*.html`
   (audit reports + handoff JSONs).
 - Recommend opening a hotfix/feature release when severe drift is detected — the

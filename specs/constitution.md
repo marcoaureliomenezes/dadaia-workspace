@@ -1,6 +1,6 @@
 ---
 specs_pattern_version: 4
-constitution_version: 3.1.0
+constitution_version: 4.0.0
 ---
 
 # Constitution — dadaia-workspace
@@ -179,7 +179,7 @@ panel serves only channel 1. No `specs/releases/<id>/evidence/` subtree exists.
 ## 12. Anti-Slop Law
 
 1. No agent, skill, rule, or hook ships without a §7 phase it owns or gates; phase-less
-   artifacts are removed. Plugin stubs are the named exemption (§14).
+   artifacts are removed.
 2. No store without a GC mechanism: every state file, session record, or cache has a
    defined expiry and cleanup path.
 3. No fact in two sources, no fact in two channels. The constitution states law once;
@@ -211,7 +211,7 @@ atoms, with operator confirmation outside a release span) and CLOSURE.
 
 ## 14. Agent Roster
 
-Nine core agents; agents not listed are plugins.
+Nine core agents — the complete scaffolded roster; there are no plugin agents.
 
 | Agent | Phase | Class | Concurrency |
 |-------|-------|-------|-------------|
@@ -225,11 +225,12 @@ Nine core agents; agents not listed are plugins.
 | ai-engineer | AI-entity surface (`public/**`) | MUTATING | caller-scoped bind |
 | software-architect | feeds 4/5 | ADDITIVE | concurrent |
 
-Plugins (stubs, behavior-less until their pack installs; exempt from §12.1):
-frontend-engineer, design-specialist, devops-engineer. Every core persona in
-`public/agents/` must own or gate a §7 phase; personas for removed agents must not
-exist. Agents are generic AI implementations specialized only in their SDD role; all
-project-domain knowledge lives in the bound context's `specs/`.
+Every core persona in `public/agents/` must own or gate a §7 phase; personas for
+removed agents must not exist. Agents are generic AI implementations specialized only
+in their SDD role; all project-domain knowledge lives in the bound context's `specs/`.
+Domains without a dedicated persona (browser frontend, CI/CD) belong to
+`software-engineer`, the generic implementer; operators may author their OWN agents,
+which are exempt from the derivation law (§12.5) and never scaffolded by the library.
 
 ## 15. Governance
 

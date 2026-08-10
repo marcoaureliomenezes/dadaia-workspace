@@ -94,7 +94,7 @@ def test_current_tree_resolves_clean() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Unknown-model / overlay / plugin variants — 1 param matrix
+# Unknown-model / overlay variants — 1 param matrix
 # ---------------------------------------------------------------------------
 
 
@@ -102,7 +102,7 @@ def test_unknown_model_variants(
     tmp_path: Path,
 ) -> None:
     """Unknown model ids surface as ERROR across every source: agent frontmatter,
-    resolved overlay (FR7 T-65-09), and plugin pack staged frontmatter."""
+    and resolved overlay (FR7 T-65-09)."""
     from dadaia_workspace.core.models.agent_model_policy import (
         AgentModelOverride,
         AgentModelPolicyOverlay,
@@ -143,10 +143,3 @@ def test_unknown_model_variants(
     known_reports = _rendered(check_model_resolution(known_dir))
     assert not _has_error(known_reports)
     assert "[ok] model-resolution" in known_reports
-
-    # plugin pack staged frontmatter
-    plugin_dir = tmp_path / "plugin"
-    _write_agent(plugin_dir / "plugins" / "somepack" / "agents", "pack-agent", "claude-bogus-1")
-    plugin_reports = _rendered(check_model_resolution(plugin_dir))
-    assert _has_error(plugin_reports), plugin_reports
-    assert any("pack-agent" in line for line in plugin_reports), plugin_reports

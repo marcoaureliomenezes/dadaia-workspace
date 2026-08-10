@@ -60,7 +60,7 @@ sub-agents, first-message context injection.
 ## Runtime state touched
 
 Scaffold projected by `dadaia public install --target claude` (all lib-originated,
-manifest-tracked, never hand-edited): `.claude/agents/` (12 = 9 core + 3 plugin stubs),
+manifest-tracked, never hand-edited): `.claude/agents/` (the 9 core personas),
 `.claude/skills/` (19), `.claude/rules/DADAIA.md` (the projected law file — read-only,
 PROTECTED), `.claude/settings.json` (hook registration). Root `CLAUDE.md` + `AGENTS.md` written by
 the guardrail pair. A Claude-only workspace = `--target claude` (+ the shared

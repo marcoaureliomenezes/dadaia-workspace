@@ -4,7 +4,7 @@ T-PUX-03 (FE): Memory page shell CSS — applied by wrapper.py when serving
 memory HTML files via /memory-view/. The /memory/ route remains byte-identical.
 
 All values use CSS custom properties from tokens.py; never raw hex.
-Design spec: design-specialist report panel-ux-fix-v1.
+Design spec: panel-ux-fix-v1 report.
 """
 
 MEMORY_CSS: str = """

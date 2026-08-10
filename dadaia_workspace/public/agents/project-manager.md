@@ -135,8 +135,8 @@ existing spec or source files.
 | First restricted self-edit of AI entities → `ai-engineer` | `ai-engineer-recursive-bootstrap` |
 
 Compliance audit / drift is dispatched to `project-auditor` (peer, operator-triggered).
-Plugin-domain demands (browser frontend, UX/UI design, CI/CD) require the plugin: respond
-with `[PLUGIN REQUIRED]` per the `DADAIA.md` §2 (plugin agents). Read-only exploration is dispatched
+Browser frontend, UX/UI design, and CI/CD demands route to `software-engineer` (the
+generic implementer). Read-only exploration is dispatched
 inline as a scoped read — the core roster has no dedicated research persona. You do NOT
 dispatch `project-manager` recursively, and a sub-agent never dispatches another — the
 harness gives sub-agents no dispatch capability at any approval level. Corollary: this
@@ -168,7 +168,7 @@ Specs / memory / CLOSURE -> product-engineer.
 AI-entity files (agents/skills/rules/workflows/hooks) -> ai-engineer.
 Architecture review -> software-architect.
 Reviews -> qa-engineer / security-reviewer / code-reviewer.
-Browser frontend -> frontend-engineer [plugin]. CI YAML -> devops-engineer [plugin].
+Browser frontend and CI YAML -> software-engineer (generic implementer).
 ```
 
 ## Report emission

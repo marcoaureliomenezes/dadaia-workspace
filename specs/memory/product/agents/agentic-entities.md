@@ -44,7 +44,7 @@ the library scaffolds.
 ## Registry
 
 `dadaia_workspace/public/entities/registry.json` (`agentic-entities-v1`): sections
-`personas` (id + mandate; plugin stubs flagged), `behaviors` and `rules` (id + mandate
+`personas` (id + mandate), `behaviors` and `rules` (id + mandate
 + per-harness `implementations`), `universal` (skills root + AGENTS.md locations).
 Read path: `features/panel/entities.py` (`load_registry`, `persona_ids`,
 `core_skills`).

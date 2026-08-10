@@ -83,7 +83,6 @@ _ALLOWED_FIELDS: frozenset[str] = frozenset(
         "input_contract",
         "paths",  # declarative path allowlist (AGT-32; not enforced this release)
         "color",  # optional display hint (game agents); not enforced
-        "plugin",  # plugin STUB marker (constitution §14); excluded from panel roster
         "gate_role",  # §7 phase / review-gate role hint (panel lifecycle derivation)
         "activity_class",  # §1 activity class hint (not mapped to a DTO field yet)
         "concurrency_relationship",  # advisory concurrency note (not mapped yet)
@@ -151,21 +150,15 @@ def _raw_to_dto(raw: dict[str, Any]) -> AgentDTO | None:
     if not description or not isinstance(description, str):
         description = ""
 
-    # Plugin stubs (``plugin: true``) carry no behavior and intentionally omit
-    # the full frontmatter (dispatch_band/model/etc.). They are excluded from the
-    # panel roster downstream, so suppress the missing-band warning for them.
-    is_plugin_stub = raw.get("plugin") is True
-
     # dispatch_band: int in {1, 2, 3}. Missing → default 3 with warning;
     # invalid → MissingDispatchBandError.
     band_raw = raw.get("dispatch_band")
     if band_raw is None:
-        if not is_plugin_stub:
-            sys.stderr.write(
-                f"agent_reader: WARNING — '{name}' is missing the 'dispatch_band' frontmatter "
-                "field; defaulting to dispatch_band=3 (leaf specialist). "
-                "Add 'dispatch_band: 3' (or 1/2) to silence this warning.\n"
-            )
+        sys.stderr.write(
+            f"agent_reader: WARNING — '{name}' is missing the 'dispatch_band' frontmatter "
+            "field; defaulting to dispatch_band=3 (leaf specialist). "
+            "Add 'dispatch_band: 3' (or 1/2) to silence this warning.\n"
+        )
         dispatch_band = 3
     else:
         try:
@@ -210,8 +203,6 @@ def _raw_to_dto(raw: dict[str, Any]) -> AgentDTO | None:
     paths_raw = raw.get("paths")
     paths: dict[str, list[str]] | None = paths_raw if isinstance(paths_raw, dict) else None
 
-    plugin = bool(raw.get("plugin") is True)
-
     gate_role_raw = raw.get("gate_role")
     gate_role: str | None = str(gate_role_raw) if gate_role_raw is not None else None
 
@@ -226,7 +217,6 @@ def _raw_to_dto(raw: dict[str, Any]) -> AgentDTO | None:
         max_turns=max_turns,
         input_contract=input_contract,
         paths=paths,
-        plugin=plugin,
         gate_role=gate_role,
     )
 

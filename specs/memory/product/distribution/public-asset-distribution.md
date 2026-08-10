@@ -3,7 +3,7 @@ slug: public-asset-distribution
 title: public-asset-distribution
 category: product
 tldr: canonical public assets are staged to .dadaia/agentic and projected to Claude Code, Codex, Kimi Code, and shared .agents roots.
-summary: Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, harness-profile-aware install/doctor, render-at-install of core agents (staged generic body + resolved agent-model policy composed into both L1 projections) with a policy-aware doctor render-compare, plugin-pack projection with installed-plugins ledger + core-install precedence + uninstall reconciliation (files-first/ledger-last inverse), provenance-gated consumer AGENTS fan-out (banner-canonical restored vs hand-authored left [foreign]) with lexical repo-slug containment + destination-file symlink refusal, scoped AGENTS projections, source-root hygiene guard, and runtime projection contract.
+summary: Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, harness-profile-aware install/doctor, render-at-install of core agents (staged generic body + resolved agent-model policy composed into both L1 projections) with a policy-aware doctor render-compare, provenance-gated consumer AGENTS fan-out (banner-canonical restored vs hand-authored left [foreign]) with lexical repo-slug containment + destination-file symlink refusal, scoped AGENTS projections, source-root hygiene guard, and runtime projection contract.
 tags:
 - public
 - assets
@@ -20,8 +20,8 @@ release_origin: v0.1.65
 `dadaia public {stage|install|doctor}` distributes the public agentic surface of
 `dadaia-workspace`. The 14 live asset types under `dadaia_workspace/public/` are:
 `agents`, `skills`, `rules`, `workflows`, `scripts`, `schemas`, `templates`, `data`,
-`scaffold`, `runtime`, and `plugins`
-(in-package plugin packs, v0.1.60 — [[plugin-packs]]; there is no `public/commands/`
+`scaffold`, and `runtime`
+(there is no `public/commands/`
 or `public/hooks/` — governance hooks are the Python package
 `dadaia_workspace/hooks/`, not a projected asset type).
 
@@ -52,8 +52,7 @@ frontmatter lines of `.claude/agents/<name>.md`, and the SAME resolved config fe
 projection (`.codex/agents/*.toml` codex model id via the registry mapping;
 `model_reasoning_effort` from the resolved effort via the D-3 clamp). Core codex render **fails
 closed** when neither a staged nor a resolved model is supplied (no silent default); `--force`
-re-renders to the render output (never raw staged bytes); a plugin agent's `effort:` is omitted
-entirely when unresolved. No overlay ⇒ render `balanced`, deterministic and byte-stable across
+re-renders to the render output (never raw staged bytes). No overlay ⇒ render `balanced`, deterministic and byte-stable across
 repeated installs. The staging **manifest keeps hashing staged (policy-free) bytes** — only the
 projection write/compare goes through the render seam. The new schema asset
 `schemas/agent-model-policy-v1.schema.json` stages like any other asset.
@@ -62,7 +61,7 @@ projection write/compare goes through the render seam. The new schema asset
 vs projected (one pass per runtime target). Any mismatch emits `[drift] <path>` and
 returns a non-zero exit code, giving an accurate all-clear only when all three tiers
 agree. The `dadaia-workspace-dev-guardrail` rule reflects this corrected workflow.
-**Policy-aware for agents (v0.1.65):** the staging↔projected pass for a non-plugin
+**Policy-aware for agents (v0.1.65):** the staging↔projected pass for a core
 `claude:agents/*.md` label compares against `render(staged generic + resolved policy)`, not raw
 staged bytes — so an operator policy Apply reads `[ok]` and a hand-edited `.claude/agents/*.md`
 reads `[drift]`. The overlay is loaded once per doctor run (missing ⇒ silent `balanced`; invalid
@@ -71,7 +70,7 @@ non-agent label stay on the raw compare path. The render-compare guarantee is **
 — codex agent TOMLs are structural-checked only (`check_codex_drift`, no byte-compare); codex
 model/effort correctness is asserted install-time by the lockstep integration test.
 `features/public/model_resolution.py#check_model_resolution` validates the RESOLVED core roster
-(registry + effort vocabulary) + plugin staged models.
+(registry + effort vocabulary).
 
 `dadaia public doctor` also includes a public privacy gate. It scans source/staged
 public assets with a denylist for private identifiers and reports
@@ -167,32 +166,6 @@ lines report `[foreign]` (never `[missing]`/`[drift]`), so `dadaia public doctor
 instead of perpetually red; a banner-bearing (canonical) copy keeps `[ok]`/`[drift]`/`[missing]`
 on both lines. The memory/scaffold `AGENTS.md` tri-copy (`specs/AGENTS.md`,
 `specs/memory/AGENTS.md`) is untouched by this fan-out.
-
-**Plugin-pack projection ([[plugin-packs]]).** `public/plugins/<pack>/` is staged into
-`.dadaia/agentic/plugins/<pack>/` like every other asset type. `dadaia plugin install <pack>`
-projects a pack's agents/skills/rules into the runtime roots (profile-scoped, exactly like core
-`install --target all`), overwriting the projected core stub agent with the pack's real body,
-and records the pack in the per-workspace ledger `.dadaia/states/installed_plugins.json`.
-**Projection precedence:** core `public install` reads that ledger and re-projects the pack body
-(not the stub) for any installed plugin, so a later core install never silently reverts an
-installed pack agent. `plugin doctor` reports `[ok]`/`[drift]`/`[missing]` per installed-pack
-file; with no plugin installed the install/doctor surface is byte-identical to the no-plugin
-baseline (golden-locked).
-
-**Plugin uninstall reconciliation.** `dadaia plugin uninstall <pack>` is the exact inverse of
-the pack projection: profile-scoped, it restores the projected **core stubs** over the pack
-agent bodies (the same core-projection slice `public install` runs — `.claude/` md +
-`.codex/` stub render), deletes pack-only skill/rule projections (+ now-empty dirs), and
-drops the ledger entry **last** (files first, ledger last — an interrupted uninstall never
-leaves a silent half-state, because `plugin doctor` stays ledger-driven). A hand-edited
-(drifted) projected pack file is restored/removed anyway — runtime projections are lib-owned —
-but never silently: one `[drift-restored]`/`[drift-removed]` line per file. An
-install→uninstall cycle leaves the runtime surface equivalent to a never-installed workspace
-(asserted same-run A/B and against the durable never-installed golden baseline); `repos/**`
-(the `[foreign]`-protected consumer surface) is disjoint and never touched. Pack-agent
-`skills:` frontmatter refs are machine-checked through the same `public doctor` path: a
-plugin-aware sweep on the `check_agent_skill_refs` `[drift]` surface resolves each ref
-against `public/skills/` ∪ the pack's own `plugins/<pack>/skills/` (non-zero exit on drift).
 
 ## Runtime state touched
 

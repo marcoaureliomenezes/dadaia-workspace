@@ -120,7 +120,7 @@ Backlog and bugs own intake consistency and event-sourced bug state. Certificati
 the deterministic capability checks behind `dadaia certify`. Capabilities publishes the
 `dadaia-capabilities-v2` payload. Telemetry owns allowlisted local metadata and its
 separate refresh serialization primitive. Server registry owns collision-free dev-port
-allocation. Repos, plugins, academy, import/export, migration, workspace initialization,
+allocation. Repos, academy, import/export, migration, workspace initialization,
 and cleanup remain bounded feature packages.
 
 ## Concurrency

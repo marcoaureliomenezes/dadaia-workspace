@@ -211,7 +211,7 @@ def remove_legacy_workflow_projections(
 #: The nine always-on rule files the library published before ``DADAIA.md``. Their law is
 #: carried in full by the single system-prompt file; the projections are removed by name.
 #: A blanket prune of the rules directory is NOT correct — it also hosts operator-authored
-#: rules and plugin-pack rules, which this migration does not own.
+#: rules, which this migration does not own.
 _RETIRED_CORE_RULES: tuple[str, ...] = (
     "backlog-ownership.md",
     "bug-hotfix-doctrine.md",
@@ -256,7 +256,7 @@ def render_claude_agent(staged_text: str, resolved: ResolvedAgentModel) -> str:
     stripped (pack bodies author ``model:`` as their pack default — D-5), then the
     resolved ``model:`` and ``effort:`` are appended deterministically as the LAST
     lines of the frontmatter block. ``effort:`` is OMITTED entirely when unresolved
-    (F-6 plugin asymmetry — never empty or placeholder), keeping render output
+    (F-6 — never empty or placeholder), keeping render output
     deterministic for the doctor render-compare.
 
     Raises:
@@ -293,7 +293,7 @@ def install_claude_agents(
 
     Core agents (present in *resolved_models*) are RENDERED — staged generic body +
     resolved ``(model, effort)`` — via ``write_generated`` hash-compare; any other
-    staged body (the plugin stubs) is copied verbatim. ``--force`` therefore
+    staged body is copied verbatim. ``--force`` therefore
     re-RENDERS a diverged projection back to the render output, never to raw staged
     bytes (F-5). Orphan projections are pruned exactly like ``copy_tree``.
     """
@@ -324,8 +324,7 @@ def resolve_codex_agent_model(
     """Resolve the ``(claude_model, reasoning_effort)`` for one codex agent render.
 
     Precedence: resolved policy (core agents + installed pack agents) > staged
-    authored ``model:`` (plugin bodies — F-3 keeps this path) > the legacy
-    ``claude-sonnet-4-6`` default (plugin STUBS only, which author no model).
+    authored ``model:`` > the legacy ``claude-sonnet-4-6`` default.
 
     Raises:
         PublicAssetError: F-3 fail-closed — a CORE agent supplied with neither a

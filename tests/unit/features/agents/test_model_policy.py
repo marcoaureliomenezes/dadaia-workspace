@@ -43,19 +43,16 @@ class _RecordingRerender:
 def _service(
     tmp_path: Path,
     *,
-    plugin_defaults: dict[str, str] | None = None,
     rerender: _RecordingRerender | None = None,
 ) -> tuple[AgentModelPolicyService, JsonAgentModelPolicyStore, _RecordingRerender]:
     tmp_path.mkdir(parents=True, exist_ok=True)
     (tmp_path / ".dadaia").mkdir(exist_ok=True)
-    plugin_defaults = plugin_defaults or {}
-    store = JsonAgentModelPolicyStore(tmp_path, plugin_agent_names=frozenset(plugin_defaults))
+    store = JsonAgentModelPolicyStore(tmp_path)
     rerender = rerender if rerender is not None else _RecordingRerender()
     return (
         AgentModelPolicyService(
             store=store,
             rerender=rerender,
-            plugin_pack_defaults=lambda: dict(plugin_defaults),
         ),
         store,
         rerender,
@@ -87,9 +84,7 @@ def test_policy_read_apply_roundtrip(tmp_path: Path) -> None:
 
     # 2. Save an overlay directly (with a plugin default present); resolved_roster
     #    tags override/template/pack.
-    service, store, rerender = _service(
-        tmp_path / "overlay", plugin_defaults={"devops-engineer": "claude-sonnet-5"}
-    )
+    service, store, rerender = _service(tmp_path / "overlay")
     store.save(
         AgentModelPolicyOverlay(
             applied_template="subscription-saver",
@@ -104,11 +99,6 @@ def test_policy_read_apply_roundtrip(tmp_path: Path) -> None:
     }
     assert roster["project-manager"]["source"] == "template"
     assert roster["project-manager"]["model"] == "claude-opus-5"
-    assert roster["devops-engineer"] == {
-        "model": "claude-sonnet-5",
-        "effort": None,
-        "source": "pack",
-    }
 
     # 3. apply(): validates, saves, re-renders, and returns a summary; persisted state
     #    round-trips through a fresh load.

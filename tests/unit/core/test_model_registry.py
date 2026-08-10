@@ -49,7 +49,7 @@ def test_registry_invariant_sweep_with_content_pins() -> None:
 
     for entry in REGISTRY:
         assert entry.codex_id, f"{entry.claude_id} has empty codex_id"
-        assert entry.tier in ("deep", "dispatch", "fast", "plugin")
+        assert entry.tier in ("deep", "dispatch", "fast", "standard")
         assert entry.pricing, f"{entry.claude_id} has no pricing rows"
         # ADR-5: Codex TOML must never carry a claude-* string.
         assert not entry.codex_id.startswith("claude-")
@@ -71,12 +71,12 @@ def test_registry_invariant_sweep_with_content_pins() -> None:
     assert haiku_pricing.output_per_mtok == 4.00
 
     # Content pin (FR6/D-2, v0.1.65; codex id remapped by the operator codex remap):
-    # claude-sonnet-5 -> gpt-5.6-terra, tier 'plugin' (forced cost-axis label, sonnet
+    # claude-sonnet-5 -> gpt-5.6-terra, tier 'standard' (forced cost-axis label, sonnet
     # cost class), pricing 3.00/15.00/3.75/0.30 from 2026-07-01.
     assert "claude-sonnet-5" in index
     sonnet5 = index["claude-sonnet-5"]
     assert sonnet5.codex_id == "gpt-5.6-terra"
-    assert sonnet5.tier == "plugin"
+    assert sonnet5.tier == "standard"
     sonnet_pricing = current_pricing(sonnet5)
     assert (
         sonnet_pricing.input_per_mtok,
@@ -145,7 +145,7 @@ def test_codex_tier_views_yield_effort_map_and_deep_dispatch_share_id() -> None:
     """
     views = codex_tier_views()
     tiers = {v.tier for v in views}
-    assert tiers == {"deep", "dispatch", "fast", "plugin"}
+    assert tiers == {"deep", "dispatch", "fast", "standard"}
     for view in views:
         assert view.codex_id, f"{view.tier} has empty codex_id"
         assert not view.codex_id.startswith("claude-")
@@ -159,7 +159,7 @@ def test_codex_tier_views_yield_effort_map_and_deep_dispatch_share_id() -> None:
     assert codex_effort_for_tier("deep") == "high"
     assert codex_effort_for_tier("dispatch") == "medium"
     assert codex_effort_for_tier("fast") == "medium"
-    assert codex_effort_for_tier("plugin") == "medium"
+    assert codex_effort_for_tier("standard") == "medium"
 
 
 def test_codex_tier_views_raises_on_collapse() -> None:
@@ -179,7 +179,9 @@ def test_codex_tier_views_raises_on_collapse() -> None:
             "claude-b", "gpt-collide", (ModelPricing(1, 1, 1, 1, date(2025, 1, 1)),), "dispatch"
         ),
         ModelEntry("claude-c", "gpt-fast", (ModelPricing(1, 1, 1, 1, date(2025, 1, 1)),), "fast"),
-        ModelEntry("claude-d", "gpt-plg", (ModelPricing(1, 1, 1, 1, date(2025, 1, 1)),), "plugin"),
+        ModelEntry(
+            "claude-d", "gpt-plg", (ModelPricing(1, 1, 1, 1, date(2025, 1, 1)),), "standard"
+        ),
     )
     original_reg = mr.REGISTRY
     original_effort = dict(mr._CODEX_TIER_EFFORT)
@@ -198,7 +200,7 @@ def test_codex_tier_views_raises_on_collapse() -> None:
         ModelEntry("claude-b", "gpt-y", (ModelPricing(1, 1, 1, 1, date(2025, 1, 1)),), "deep"),
         ModelEntry("claude-c", "gpt-d", (ModelPricing(1, 1, 1, 1, date(2025, 1, 1)),), "dispatch"),
         ModelEntry("claude-e", "gpt-f", (ModelPricing(1, 1, 1, 1, date(2025, 1, 1)),), "fast"),
-        ModelEntry("claude-g", "gpt-p", (ModelPricing(1, 1, 1, 1, date(2025, 1, 1)),), "plugin"),
+        ModelEntry("claude-g", "gpt-p", (ModelPricing(1, 1, 1, 1, date(2025, 1, 1)),), "standard"),
     )
     original = mr.REGISTRY
     mr.REGISTRY = ambiguous
