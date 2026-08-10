@@ -25,7 +25,7 @@
  * re-reds this spec at the pinned width.)
  *
  * v0.1.79 amendment: the Sessions dashboard relocated from its own standalone tab
- * into a sub-section inside the "1º Agentic Layer" (`#section-subagents`) tabpanel;
+ * into a sub-section inside the "Agents" (`#section-subagents`) tabpanel;
  * `#section-sessions` and its `.section-header` survive unchanged as the nested
  * mount, so this guard still applies at its original selector, now scoped under
  * `#section-subagents`.

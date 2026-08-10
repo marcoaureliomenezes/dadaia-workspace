@@ -16,13 +16,13 @@ SSR (data inlined into the initial HTML response, no auth required):
 Client-side (fetched via XHR/fetch after Bearer auth):
   - Agents    — auth-gated; telemetry-enriched; dynamic
   - Sessions  — auth-gated; large/dynamic; runtime-dependent; rendered as a
-                sub-section INSIDE the 1º Agentic Layer (subagents) tabpanel
+                sub-section INSIDE the Agents (subagents) tabpanel
                 (v0.1.79 — the standalone Sessions tab was removed)
   - Reports   — auth-gated; file-system backed; sidecar-indexed
 
 Primary tabs (v0.3.0 — 5 tabs):
-  Projects | 1º Agentic Layer (id ``tab-subagents``) | Reports | Academy |
-  Servers. The 1º Agentic Layer governs Layer-1 Claude sub-agent model+effort
+  Projects | Agents (id ``tab-subagents``) | Reports | Academy |
+  Servers. The Agents tab governs Claude sub-agent model+effort
   (v0.1.65 L1 governance) and hosts the Sessions cost/telemetry dashboard as a
   sub-section (``render_sessions_section``, appended inside
   ``_render_subagents_section``).
@@ -36,7 +36,6 @@ from collections.abc import Callable, Sequence
 from dadaia_workspace.features.panel.service import PanelContext, PanelService, ServerGroup
 from dadaia_workspace.features.panel.views._md_render import memory_view_url
 from dadaia_workspace.features.panel.views.academy import render_academy_section
-from dadaia_workspace.features.panel.views.games import render_games_section
 from dadaia_workspace.features.panel.views.reports import render_reports_section
 from dadaia_workspace.features.panel.views.sessions import render_sessions_section
 from dadaia_workspace.features.panel.views.static import LOGO_RHINO_36
@@ -59,7 +58,6 @@ def render_index(
 
         academy_section = render_academy_section()
         reports_section = render_reports_section()
-        games_section = render_games_section()
 
         body = f"""<!DOCTYPE html>
 <html lang="pt-BR">
@@ -76,7 +74,6 @@ def render_index(
   <link rel="stylesheet" href="/static/sessions.css">
   <link rel="stylesheet" href="/static/academy.css">
   <link rel="stylesheet" href="/static/reports.css">
-  <link rel="stylesheet" href="/static/games.css">
 </head>
 <body>
   <header class="topbar" role="banner">
@@ -112,11 +109,10 @@ def render_index(
   </header>
   <nav class="nav-tabs" aria-label="Panel sections" role="tablist">
     <button class="nav-tab active tab-memories-btn" data-section="memories" aria-selected="true" role="tab" id="tab-memories" aria-label="Projects">Projects</button>
-    <button class="nav-tab" data-section="subagents" aria-selected="false" role="tab" id="tab-subagents" aria-label="1º Agentic Layer">1&#186; Agentic Layer</button>
+    <button class="nav-tab" data-section="subagents" aria-selected="false" role="tab" id="tab-subagents" aria-label="Agents">Agents</button>
     <button class="nav-tab" data-section="reports" aria-selected="false" role="tab" id="tab-reports">Reports</button>
     <button class="nav-tab" data-section="academy" aria-selected="false" role="tab" id="tab-academy">Academy</button>
     <button class="nav-tab" data-section="servers" aria-selected="false" role="tab" id="tab-servers">Servers</button>
-    <button class="nav-tab" data-section="games" aria-selected="false" role="tab" id="tab-games">Games</button>
   </nav>
   <main class="main" role="main">
 
@@ -152,8 +148,6 @@ def render_index(
 
     {reports_section}
 
-    {games_section}
-
   </main>
   <script src="/static/runtime.js"></script>
   <script src="/static/themes.js"></script>
@@ -162,7 +156,6 @@ def render_index(
   <script src="/static/sessions.js" defer></script>
   <script src="/static/academy.js"></script>
   <script src="/static/reports.js"></script>
-  <script src="/static/games.js"></script>
 </body>
 </html>"""
         return (200, "text/html; charset=utf-8", body.encode("utf-8"))
@@ -171,7 +164,7 @@ def render_index(
 
 
 def _render_subagents_section() -> str:
-    """The "1º Agentic Layer" tab scaffold (v0.1.65 FR8; relabeled + Sessions-merged
+    """The "Agents" tab scaffold (v0.1.65 FR8; relabeled + Sessions-merged
     v0.1.79) — hydrated by agent_policy.js (roster) and sessions.js (dashboard).
 
     Static server-rendered shell: section header with the template selector + explicit
@@ -190,7 +183,7 @@ def _render_subagents_section() -> str:
         'aria-label="Layer-1 sub-agent model governance" role="tabpanel" tabindex="0" '
         'aria-labelledby="tab-subagents">\n'
         '      <header class="section-header">\n'
-        "        <h2>1&#186; Agentic Layer</h2>\n"
+        "        <h2>Agents</h2>\n"
         '        <div class="ap-toolbar">\n'
         '          <select id="ap-template-select" class="ap-template-select" '
         'aria-label="Agent model template"></select>\n'

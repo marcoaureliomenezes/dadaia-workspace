@@ -276,15 +276,14 @@
       "title": "panel",
       "category": "product",
       "area": "panel",
-      "tldr": "Local five-tab panel with Layer-1 model governance, telemetry, reports, academy, servers, and wall-wrapping Snake/Tetris plus Codex Pong and PI Breakout.",
-      "summary": "`dadaia panel` serves the local workspace UI. Its five tabs are Projects, 1st Agentic Layer, Reports, Academy, and Servers, with the Games surface reachable from the panel shell. It is loopback-only, no-auth, Host-guarded, and CSP-constrained.",
+      "tldr": "Local five-tab panel with agent model governance, telemetry, reports, academy, and servers.",
+      "summary": "`dadaia panel` serves the local workspace UI. Its five tabs are Projects, Agents, Reports, Academy, and Servers. It is loopback-only, no-auth, Host-guarded, and CSP-constrained.",
       "path": "specs/memory/product/panel/panel.md",
       "tags": [
         "panel",
         "ui",
         "http",
-        "dashboard",
-        "games"
+        "dashboard"
       ],
       "token_estimate": 430,
       "depends_on": [

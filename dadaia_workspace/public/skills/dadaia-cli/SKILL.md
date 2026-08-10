@@ -22,7 +22,7 @@ The `dadaia` CLI is the single control surface for the workspace. It is **self-d
 
 ## Panel — see everything
 
-`dadaia panel` starts the local UI (default port 4999). Tabs: Projects (Spec Context Projects, ALIVE/DEAD + advisory presence), 1º Agentic Layer (entry-harness sub-agent model/effort policy), Reports (reports/handoffs), Academy, Servers, Games. Use it to inspect state instead of reading files.
+`dadaia panel` starts the local UI (default port 4999). Tabs: Projects (Spec Context Projects, ALIVE/DEAD + advisory presence), Agents (sub-agent model/effort policy + sessions dashboard), Reports (reports/handoffs), Academy, Servers. Use it to inspect state instead of reading files.
 
 ## Command groups (`dadaia <group> --help` for detail)
 

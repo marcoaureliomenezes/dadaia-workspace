@@ -15,7 +15,7 @@
  * aggregate endpoint is intercepted.
  *
  * v0.1.79 amendment: the standalone Sessions tab was removed — the dashboard is now
- * a sub-section rendered inside the "1º Agentic Layer" (`#section-subagents`)
+ * a sub-section rendered inside the "Agents" (`#section-subagents`)
  * tabpanel. `activateSessionsSubsection()` opens that tab and waits for the
  * relocated `#section-sessions` mount; `sessions.js` and the `/api/sessions`
  * contract are otherwise unchanged.

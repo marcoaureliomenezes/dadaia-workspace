@@ -79,7 +79,7 @@ behind `ValidatorPort`.
 ### Panel
 
 `features/panel/` serves a loopback-only stdlib HTTP UI. Route/view modules are split by
-domain. The panel has five governance tabs — Projects, 1st Agentic Layer, Reports,
+domain. The panel has five governance tabs — Projects, Agents, Reports,
 Academy, Servers — plus a Games surface. Layer-1 model policy is the panel's only
 governance editor; game interactions are local JavaScript.
 

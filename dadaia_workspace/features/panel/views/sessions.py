@@ -2,7 +2,7 @@
 
 panel-plumbing v0.1.52 FR2 introduced the dashboard-only scaffold; v0.1.79
 (panel agentic-layers reorg) relocated it from its own standalone primary tab
-into a sub-section rendered INSIDE the "1º Agentic Layer" (``#section-subagents``)
+into a sub-section rendered INSIDE the "Agents" tab (``#section-subagents``)
 tabpanel. ``#section-sessions`` survives as the nested mount id — ``sessions.js``
 keys on it unchanged — but it is now a plain ``<div>`` sub-section (like
 ``.ops-subsection``), not a standalone ``role="tabpanel"``.
@@ -29,7 +29,7 @@ from __future__ import annotations
 def render_sessions_section() -> str:
     """Return the static HTML scaffold for the dashboard-only Sessions sub-section.
 
-    ``sessions.js`` fetches the ``/api/sessions`` aggregate on 1º Agentic Layer
+    ``sessions.js`` fetches the ``/api/sessions`` aggregate on Agents-tab
     tab load and on every ``dadaia:runtime-change`` event, renders the four stat
     cards into #sessions-dashboard, toggles #sessions-banner for cost-unknown
     runtimes (codex/pi), and updates the #sessions-last-updated badge. No

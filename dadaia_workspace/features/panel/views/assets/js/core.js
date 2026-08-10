@@ -1,5 +1,5 @@
 // Hash navigation grammar. The initial-load router (below) maps three hash routes to a
-// bare tab activation on page load: #reports | #academy | #games (prefix match, so a
+// bare tab activation on page load: #reports | #academy (prefix match, so a
 // trailing ?key=val is tolerated but not parsed). The Sessions tab is click-activated,
 // not an initial-load hash route. No other hash routes exist (the former
 // #memories/#agents/#servers routes and the #agents?filter= params
@@ -250,9 +250,6 @@
     } else if (hash.startsWith('#academy')) {
       var academyTab = document.getElementById('tab-academy');
       if (academyTab) { academyTab.click(); }
-    } else if (hash.startsWith('#games')) {
-      var gamesTab = document.getElementById('tab-games');
-      if (gamesTab) { gamesTab.click(); }
     }
   })();
 

@@ -32,7 +32,7 @@
  *   view were removed. The tour now covers the surviving nav set.
  *
  * v0.1.79 amendment: the standalone Sessions tab was removed — its cost
- *   dashboard is now a sub-section inside the "1º Agentic Layer" (subagents)
+ *   dashboard is now a sub-section inside the "Agents" (subagents)
  *   tabpanel, so the tab tour below drives `#tab-subagents` (which loads both
  *   the agent-policy roster AND the relocated Sessions dashboard) in place of
  *   the deleted `#tab-sessions`.
@@ -45,7 +45,7 @@ import { gotoPanel, PANEL_TOKEN, BASE_URL } from './helpers';
 // Tab tour definition — primary tabs in display order (v0.3.0 nav set)
 // ---------------------------------------------------------------------------
 const ALL_TABS = [
-  { tabId: '#tab-subagents', sectionId: 'subagents', label: '1º Agentic Layer' },
+  { tabId: '#tab-subagents', sectionId: 'subagents', label: 'Agents' },
   { tabId: '#tab-reports', sectionId: 'reports', label: 'Reports' },
   { tabId: '#tab-academy', sectionId: 'academy', label: 'Academy' },
   { tabId: '#tab-servers', sectionId: 'servers', label: 'Servers' },

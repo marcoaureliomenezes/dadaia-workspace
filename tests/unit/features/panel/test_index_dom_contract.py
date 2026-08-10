@@ -181,7 +181,7 @@ def test_no_sessions_tab_or_section_remnants(index_html: str) -> None:
 
 def test_sessions_dashboard_relocated_inside_agentic_layer_one(index_html: str) -> None:
     """v0.1.79 FR1: the Sessions cost/telemetry dashboard renders as a sub-section
-    INSIDE the 1º Agentic Layer (#section-subagents) tabpanel — #section-sessions
+    INSIDE the Agents (#section-subagents) tabpanel — #section-sessions
     survives as a nested mount (sessions.js keys on this id), #sessions-dashboard
     and #sessions-banner render after #section-subagents opens and before it closes."""
     subagents_start = index_html.find('id="section-subagents"')

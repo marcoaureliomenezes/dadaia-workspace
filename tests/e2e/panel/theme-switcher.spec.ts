@@ -312,10 +312,10 @@ test('E2E-THM-10 — Deep-interaction: click control → option visible → them
 });
 
 // ---------------------------------------------------------------------------
-// E2E-THM-09 — axe-core: all 3 themes pass on the 1º Agentic Layer tab
+// E2E-THM-09 — axe-core: all 3 themes pass on the Agents tab
 //
 // v0.3.0: the Workflows tab died with the workflow engine. The a11y audit now
-// runs on the 1º Agentic Layer tab (agent cards + sessions dashboard), the
+// runs on the Agents tab (agent cards + sessions dashboard), the
 // richest surviving interactive surface.
 // ---------------------------------------------------------------------------
 test('E2E-THM-09 — axe-core: zero critical/serious violations for all 3 themes', async ({

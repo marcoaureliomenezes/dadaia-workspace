@@ -63,7 +63,7 @@ test('FR7 — restyled controls carry token-driven padding rhythm (not browser-d
   const themeBtn = await readControlStyle(page, '.theme-btn');
 
   // .runtime-btn lives in the Sessions sub-section header, now nested inside the
-  // 1º Agentic Layer tabpanel — activate it so the control is laid out exactly as
+  // Agents tabpanel — activate it so the control is laid out exactly as
   // the operator sees it (v0.1.79 relocation).
   await activateSessionsSubsection(page);
   const runtimeBtn = await readControlStyle(page, '.runtime-btn');

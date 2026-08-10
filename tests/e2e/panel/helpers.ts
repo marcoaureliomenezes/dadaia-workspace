@@ -61,12 +61,12 @@ export async function gotoPanel(page: Page, options?: { path?: string }): Promis
  * agents grid, personas UI, and the Kanban view.
  * v0.1.79 panel agentic-layers reorg: the standalone Sessions tab was REMOVED
  * — its cost/telemetry dashboard is now a sub-section rendered inside the
- * `subagents` ("1º Agentic Layer") tabpanel. There is no `#tab-sessions` /
+ * `subagents` ("Agents") tabpanel. There is no `#tab-sessions` /
  * `#section-sessions.active` to wait on any more; use
  * `activateTab(page, 'subagents')` and locate `#section-sessions` within the
  * opened tabpanel (see `activateSessionsSubsection` below). The surviving
- * primary nav is exactly: Projects (`memories`), 2º Agentic Layer
- * 1º Agentic Layer (`subagents`), Reports, Academy, Servers (v0.3.0: the
+ * primary nav is exactly: Projects (`memories`),
+ * Agents (`subagents`), Reports, Academy, Servers (v0.3.0: the
  * 2º Agentic Layer `workflows` tab died with the workflow engine).
  */
 export async function activateTab(
@@ -79,7 +79,7 @@ export async function activateTab(
 }
 
 /**
- * Activate the "1º Agentic Layer" (subagents) tab and wait for the relocated
+ * Activate the "Agents" (subagents) tab and wait for the relocated
  * Sessions cost/telemetry dashboard sub-section to be present in the DOM
  * (v0.1.79 — the Sessions tab merged into this tabpanel).
  */

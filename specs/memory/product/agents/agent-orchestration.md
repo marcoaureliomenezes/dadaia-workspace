@@ -71,7 +71,7 @@ approved security handoff for the exact commit SHA.
 ## Model Governance
 
 Layer-1 agent sources are model-agnostic and receive model/effort at public install from
-the selected template plus operator overlay. The panel's 1st Agentic Layer tab manages
+the selected template plus operator overlay. The panel's Agents tab manages
 this policy.
 
 ## Dependencies

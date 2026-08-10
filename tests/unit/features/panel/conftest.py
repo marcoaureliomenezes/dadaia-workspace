@@ -6,10 +6,10 @@ the tab/section/tabpanel set picks it up automatically.
 
 v0.1.79 (panel agentic-layers reorg): 7 -> 6 primary tabs. The standalone
 Sessions tab/section is REMOVED — the cost/telemetry dashboard relocates into
-the "1º Agentic Layer" (subagents) tabpanel as a sub-section (still rendered
+the "Agents" (subagents) tabpanel as a sub-section (still rendered
 via ``#section-sessions``, just no longer a top-level ``.section``/tabpanel).
-"Sub-agents" -> "1º Agentic Layer" (id stays ``tab-subagents`` /
-``section-subagents``); "Workflows" -> "2º Agentic Layer" (id stays
+"Sub-agents" -> "Agents" (id stays ``tab-subagents`` /
+``section-subagents``); "Workflows" died with the engine (v0.3.0; id was
 ``tab-subagents`` / ``section-subagents``).
 """
 
@@ -21,7 +21,7 @@ from __future__ import annotations
 # consumption point for every surviving DOM-contract test in this cluster.
 PANEL_PRIMARY_TABS: list[tuple[str, str]] = [
     ("memories", "Projects"),
-    ("subagents", "1º Agentic Layer"),
+    ("subagents", "Agents"),
     ("reports", "Reports"),
     ("academy", "Academy"),
     ("servers", "Servers"),
