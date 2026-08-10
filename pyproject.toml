@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "dadaia-workspace"
 version = "0.5.0"
-description = "AI-native workspace management CLI for multi-agent development with Claude Code, Codex, PI and Kimi Code"
+description = "AI-native workspace management CLI for multi-agent development with Claude Code, Codex and Kimi Code"
 authors = ["Marco Menezes <marcoaurelioreislima@gmail.com>"]
 readme = "README.md"
 packages = [{include = "dadaia_workspace"}]
