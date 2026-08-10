@@ -82,7 +82,7 @@ def render_personas_section() -> str:
         '<div class="ent-topic" id="ap-personas">\n'
         "        <h3>Personas <span class='ent-topic-note'>the abstract entities "
         "— every scaffolded sub-agent below derives from one of these</span></h3>\n"
-        f'        <div class="ent-grid" role="list" aria-label="Personas">{cards}</div>\n'
+        f'        <div class="ent-grid">{cards}</div>\n'
         "      </div>"
     )
 
@@ -105,7 +105,7 @@ def _impl_rows(implementations: dict[str, str]) -> str:
         f"<code>{html.escape(impl)}</code></div>"
         for harness, impl in implementations.items()
     )
-    return f'<div class="ent-impl" aria-label="Per-harness implementations">{rows}</div>'
+    return f'<div class="ent-impl">{rows}</div>'
 
 
 def _render_universal(registry: dict[str, Any]) -> str:
@@ -133,9 +133,9 @@ def _render_universal(registry: dict[str, Any]) -> str:
         "        <h3>Agnostic <span class='ent-topic-note'>universal — no harness "
         "dimension; Claude Code, Codex and Kimi CLI all read these natively</span></h3>\n"
         f'        <h4>Skills <code class="ent-path">{html.escape(skills_root)}</code></h4>\n'
-        f'        <div class="ent-grid" role="list" aria-label="Core skills">{skill_cards}</div>\n'
+        f'        <div class="ent-grid">{skill_cards}</div>\n'
         "        <h4>AGENTS.md</h4>\n"
-        '        <div class="ent-grid" role="list" aria-label="AGENTS.md guardrails">'
+        '        <div class="ent-grid">'
         f"{agents_md_cards}</div>\n"
         "      </div>\n"
     )
@@ -154,7 +154,7 @@ def _render_behaviors(registry: dict[str, Any]) -> str:
         '      <div class="ent-topic">\n'
         "        <h3>Deterministic Actions <span class='ent-topic-note'>abstract "
         "behavior first, then the hook that enforces it per harness</span></h3>\n"
-        '        <div class="ent-grid" role="list" aria-label="Deterministic behaviors">'
+        '        <div class="ent-grid">'
         f"{cards}</div>\n"
         "      </div>\n"
     )
@@ -173,7 +173,7 @@ def _render_rules(registry: dict[str, Any]) -> str:
         '      <div class="ent-topic">\n'
         "        <h3>Rules <span class='ent-topic-note'>abstract rule first, then "
         "its projection per harness</span></h3>\n"
-        '        <div class="ent-grid" role="list" aria-label="Abstract rules">'
+        '        <div class="ent-grid">'
         f"{cards}</div>\n"
         "      </div>\n"
     )

@@ -28,10 +28,12 @@ test('E2E-TAB-01 — Tab bar contains the current tabs in correct order', async 
   );
 
   // v0.3.0: the Workflows tab died with the workflow engine; the Games tab was
-  // removed (test-only surface); "Agents" is renamed "Agents".
+  // removed (test-only surface); "Agentic Entities" renders the abstract-entity
+  // registry (constitution §12.5).
   expect(tabs).toEqual([
     'Projects',
     'Agents',
+    'Agentic Entities',
     'Reports',
     'Academy',
     'Servers',
