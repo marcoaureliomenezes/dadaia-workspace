@@ -51,6 +51,7 @@ def test_attesting_registry_is_pinned() -> None:
         "trust-boundary",
         "public-privacy",
         "law-projection",
+        "entities-derivation",
     )
 
 
@@ -71,6 +72,7 @@ def test_golden_never_buries_an_attesting_check() -> None:
         "trust-boundary": ("codex:trust-boundary", "check:trust-boundary"),
         "public-privacy": ("public-privacy", "check:public-privacy"),
         "law-projection": ("law:", "check:law-projection"),
+        "entities-derivation": ("entities-derivation", "check:entities-derivation"),
     }
     for check_id in ATTESTING_CHECK_IDS:
         assert any(m in text for m in markers[check_id]), (

@@ -33,9 +33,7 @@ def load_registry() -> dict[str, Any]:
         raise ValueError(f"agentic-entity registry unreadable at {_REGISTRY_PATH}: {exc}") from exc
     data = json.loads(raw)
     if not isinstance(data, dict) or data.get("schema_version") != SCHEMA_VERSION:
-        raise ValueError(
-            f"agentic-entity registry at {_REGISTRY_PATH} is not {SCHEMA_VERSION!r}"
-        )
+        raise ValueError(f"agentic-entity registry at {_REGISTRY_PATH} is not {SCHEMA_VERSION!r}")
     for key in ("personas", "behaviors", "rules", "universal"):
         if key not in data:
             raise ValueError(f"agentic-entity registry missing required section {key!r}")

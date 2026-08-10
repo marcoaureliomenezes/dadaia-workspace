@@ -2,7 +2,7 @@
 
 Renders the packaged abstract-entity registry
 (``dadaia_workspace/public/entities/registry.json`` via
-``features.agents.entities``) plus the packaged core-skill tree into the
+``features.panel.entities``) plus the packaged core-skill tree into the
 "Agentic Entities" tabpanel:
 
   - **Agnostic (Universal)** — Skills (``.agents/skills/``) and the AGENTS.md
@@ -31,7 +31,7 @@ from __future__ import annotations
 import html
 from typing import Any
 
-from dadaia_workspace.features.agents.entities import core_skills, load_registry
+from dadaia_workspace.features.panel.entities import core_skills, load_registry
 
 
 def render_entities_section() -> str:
@@ -146,8 +146,7 @@ def _render_behaviors(registry: dict[str, Any]) -> str:
         _card(
             behavior["id"],
             "behavior",
-            f"<p>{html.escape(behavior['mandate'])}</p>"
-            + _impl_rows(behavior["implementations"]),
+            f"<p>{html.escape(behavior['mandate'])}</p>" + _impl_rows(behavior["implementations"]),
         )
         for behavior in registry["behaviors"]
     )

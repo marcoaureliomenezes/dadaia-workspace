@@ -143,11 +143,11 @@ def test_tab_and_section_present(index_html: str, section: str) -> None:
     assert 'class="nav-tab' in index_html
 
 
-def test_exactly_five_primary_tabs_in_order(index_html: str) -> None:
-    """v0.3.0: exactly 5 primary tabs render (the 2º Agentic Layer tab died with the
-    workflow engine), in the exact PANEL_PRIMARY_TABS order, with the operator's exact
-    label strings (masculine ordinal º)."""
-    assert len(PANEL_PRIMARY_TABS) == 5
+def test_exactly_six_primary_tabs_in_order(index_html: str) -> None:
+    """v0.3.0: exactly 6 primary tabs render (the 2º Agentic Layer tab died with the
+    workflow engine; Agentic Entities renders the abstract-entity registry), in the
+    exact PANEL_PRIMARY_TABS order, with the operator's exact label strings."""
+    assert len(PANEL_PRIMARY_TABS) == 6
 
     positions = []
     for slug, label in PANEL_PRIMARY_TABS:

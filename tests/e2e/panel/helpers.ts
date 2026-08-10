@@ -65,13 +65,14 @@ export async function gotoPanel(page: Page, options?: { path?: string }): Promis
  * `#section-sessions.active` to wait on any more; use
  * `activateTab(page, 'subagents')` and locate `#section-sessions` within the
  * opened tabpanel (see `activateSessionsSubsection` below). The surviving
- * primary nav is exactly: Projects (`memories`),
- * Agents (`subagents`), Reports, Academy, Servers (v0.3.0: the
- * 2º Agentic Layer `workflows` tab died with the workflow engine).
+ * primary nav is exactly: Projects (`memories`), Agents (`subagents`),
+ * Agentic Entities (`entities`), Reports, Academy, Servers (v0.3.0: the
+ * 2º Agentic Layer `workflows` tab died with the workflow engine; `entities`
+ * renders the abstract-entity registry server-side).
  */
 export async function activateTab(
   page: Page,
-  sectionId: 'memories' | 'servers' | 'reports' | 'academy' | 'subagents'
+  sectionId: 'memories' | 'servers' | 'reports' | 'academy' | 'subagents' | 'entities'
 ): Promise<void> {
   const tabId = `#tab-${sectionId}`;
   await page.click(tabId);

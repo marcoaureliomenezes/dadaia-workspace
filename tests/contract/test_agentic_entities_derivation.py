@@ -24,7 +24,7 @@ import re
 from pathlib import Path
 
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
-from dadaia_workspace.features.agents.entities import (
+from dadaia_workspace.features.panel.entities import (
     core_skills,
     load_registry,
     persona_ids,

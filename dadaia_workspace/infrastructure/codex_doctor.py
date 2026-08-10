@@ -75,6 +75,7 @@ ATTESTING_CHECK_IDS: tuple[str, ...] = (
     "trust-boundary",
     "public-privacy",
     "law-projection",
+    "entities-derivation",
 )
 
 
@@ -680,7 +681,7 @@ def check_entities_derivation(public_dir: Path) -> list[DoctorLine]:
     """ENT-DERIVE-1 (constitution §12.5): the abstract-entity registry grounds the scaffold.
 
     Independent verifier read — deliberately does NOT share the features-layer loader
-    (``features.agents.entities``), so a loader bug cannot vouch for itself. Attests:
+    (``features.panel.entities``), so a loader bug cannot vouch for itself. Attests:
 
     1. ``public/entities/registry.json`` exists, parses, and carries the expected schema.
     2. Persona ↔ core sub-agent bijection: every ``public/agents/*.md`` derives from a
