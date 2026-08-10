@@ -7,7 +7,7 @@
 
 `dadaia-workspace` gives AI coding agents a structured, governed shared workspace:
 scoped project contexts, a Spec-Driven Development (SDD) flow with deterministic
-gates, a persona-based agent roster with installable **plugin packs**, canonical
+gates, a persona-based agent roster, canonical
 agentic-asset projection across **four** AI harnesses, and a real-time monitoring
 panel.
 
@@ -148,9 +148,10 @@ dadaia context bind <name>       # bind the session (selects injected memory; re
 
 ## Agent roster & personas
 
-The workspace ships a **9-agent core roster** plus **3 plugin agents** (enabled by
-installing their pack — see the next section). Each agent is projected into every
-harness in the profile; `project-manager` is the Layer-1 coordinator.
+The workspace ships a **9-agent core roster** — the complete set. Each agent is
+projected into every harness in the profile; `project-manager` is the Layer-1
+coordinator. Operators may author their own agents; those are never scaffolded or
+governed by the library.
 
 | Core agent | Role |
 |---|---|
@@ -164,30 +165,8 @@ harness in the profile; `project-manager` is the Layer-1 coordinator.
 | `project-auditor` | Spec/memory-vs-code drift audits, scorecards |
 | `ai-engineer` | Exclusive owner of agents/skills/rules/workflows; context engineering |
 
-| Plugin agent | Domain | Pack |
-|---|---|---|
-| `frontend-engineer` | Browser HTML/CSS/JS/TS/React | `frontend-design` |
-| `design-specialist` | UX/UI, design specs, visual review | `frontend-design` |
-| `devops-engineer` | CI/CD, GitHub Actions, gitflow, deploy | `devops` |
-
----
-
-## Plugin packs
-
-Plugin agents ship as inert stubs until their pack is installed:
-
-```bash
-dadaia plugin list                       # available packs + install state
-dadaia plugin install frontend-design    # enable frontend-engineer + design-specialist
-dadaia plugin install devops             # enable devops-engineer
-dadaia plugin doctor                     # per-projected-file status of installed packs
-```
-
-Packs are distributed **inside the package** (no network fetch): real agent bodies
-plus curated skills, projected into the harness profile like any canonical asset.
-Installs are recorded in `.dadaia/states/installed_plugins.json`; a later core
-`dadaia public install` **preserves installed pack bodies** (it never regresses them
-to stubs), and `plugin install` is idempotent.
+Browser frontend and CI/CD work belong to `software-engineer`, the generic
+implementer.
 
 ---
 
@@ -284,7 +263,6 @@ dadaia [COMMAND] --help   # always works at every level
 | `dadaia init` | Bootstrap workspace; `--harness` selects the harness profile |
 | `dadaia doctor [--fix]` | Diagnose and repair workspace state (contexts, assets, presence) |
 | `dadaia context` | Manage Spec Context Projects (list, bind, show, …) |
-| `dadaia plugin` | Install and inspect distributed plugin packs |
 | `dadaia ci` | Local CI-equivalent preflight gate + git-hook chokepoints |
 | `dadaia public` | Stage, install (profile-aware), and doctor agentic assets |
 | `dadaia specs` | SDD release-lifecycle structural checks (`specs doctor`) |
