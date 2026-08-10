@@ -174,6 +174,28 @@ def registry_by_claude_id() -> dict[str, ModelEntry]:
     return index
 
 
+#: The Kimi Code model id (the only model the Kimi CLI runs agents on today).
+#: Single source — the panel per-harness model view and any Kimi projection
+#: derive from this constant, never a scattered literal.
+KIMI_MODEL_ID = "moonshotai/kimi-k2.5"
+
+
+def harness_native_model_map() -> dict[str, dict[str, str]]:
+    """Map each canonical claude model id to its harness-NATIVE display id.
+
+    The overlay stores canonical claude ids; each harness projects them to its
+    own vocabulary (Codex TOML uses ``codex_id``; Kimi runs :data:`KIMI_MODEL_ID`).
+    The panel model picker uses this map so a codex/kimi toggle never shows a
+    ``claude-*`` id (bug agents-tab-model-picker-ignores-harness-runtime).
+    """
+    by_claude = registry_by_claude_id()
+    return {
+        "claude": {cid: cid for cid in by_claude},
+        "codex": {cid: entry.codex_id for cid, entry in by_claude.items()},
+        "kimi-code": {cid: KIMI_MODEL_ID for cid in by_claude},
+    }
+
+
 # ---------------------------------------------------------------------------
 # Per-runtime tier view (bug codex-personas-claude-model-tiering-leak).
 #

@@ -11,7 +11,7 @@ gates, a persona-based agent roster with installable **plugin packs**, canonical
 agentic-asset projection across **four** AI harnesses, and a real-time monitoring
 panel.
 
-It supports, as peer entry harnesses: **Claude Code, Codex, PI (`pi-coding-agent`),
+It supports, as peer entry harnesses: **Claude Code, Codex,
 and Kimi Code (the `kimi` CLI)**, plus a **consumer-side validation agent** as the
 release gate. There is no separate workflow-engine layer — the ordered SDD flow is
 agent-dispatched, carried out by dispatching the owning agent for each stage against
@@ -37,8 +37,8 @@ Requires Python 3.12+.
 ## Quick start
 
 ```bash
-dadaia init                        # bootstrap .dadaia/ + project agent assets (.claude/, .codex/, .pi/, .kimi-code/)
-dadaia init --harness claude,pi    # or scaffold only a subset of harnesses (harness profile)
+dadaia init                        # bootstrap .dadaia/ + project agent assets (.claude/, .codex/, .kimi-code/)
+dadaia init --harness claude,codex # or scaffold only a subset of harnesses (harness profile)
 dadaia doctor                      # health check: contexts, assets, gates, presence
 dadaia panel                       # local dashboard (http://localhost:4999)
 ```
@@ -64,10 +64,9 @@ flowchart TB
         direction LR
         CC["claude"]:::h
         CX["codex"]:::h
-        PI["pi"]:::h
         KC["kimi"]:::h
     end
-    GOV["Governance: AGENTS.md read up-tree natively<br/>+ projected .claude/ .codex/ .pi/ .kimi-code/<br/>+ PreToolUse gate (where supported) + git chokepoints"]
+    GOV["Governance: AGENTS.md read up-tree natively<br/>+ projected .claude/ .codex/ .kimi-code/<br/>+ PreToolUse gate (where supported) + git chokepoints"]
     DISPATCH["Agent-dispatched SDD flow<br/>(owning agent per stage, against SPEC/PLAN/TASKS)"]
     OP --> L1 --> GOV --> DISPATCH
     DISPATCH -->|"git-diff write boundary + git chokepoints"| OUT(["production: code · specs · memory"])
@@ -75,13 +74,13 @@ flowchart TB
 ```
 
 - **The entry harness (the CLI you launch).** The AI coding agent a human launches
-  in the terminal: **Claude Code, Codex, PI (`pi-coding-agent`), or Kimi Code** (the
+  in the terminal: **Claude Code, Codex, or Kimi Code** (the
   `kimi` CLI). It is governed by the workspace-root `AGENTS.md` (read natively up the
   directory tree) plus the projected per-runtime asset trees (`.claude/`, `.codex/`,
-  `.pi/`, `.kimi-code/`) and the deterministic gate wiring each harness gets (hooks,
+  `.kimi-code/`) and the deterministic gate wiring each harness gets (hooks,
   rules, skills, sub-agents where the harness supports them). **All four are
   supported entry harnesses.**
-- Headless codex/pi sessions (e.g. a dispatched sub-agent) remain bounded by the same
+- Headless codex sessions (e.g. a dispatched sub-agent) remain bounded by the same
   **git chokepoints** as any other session — pre-commit presence warning and the
   pre-push security-verdict gate — regardless of which harness is running.
 
@@ -93,7 +92,6 @@ flowchart TB
 |---|---|
 | **Claude Code** | ✅ `.claude/` + PreToolUse hook + git chokepoints |
 | **Codex** | ✅ `.codex/` (hooks fire in the interactive TUI; headless `codex exec` is chokepoints-only) |
-| **PI** (`pi-coding-agent`) | ✅ `.pi/` (no PreToolUse hook → chokepoints-only) |
 | **Kimi Code** (`kimi` CLI) | ✅ `.kimi-code/` + PreToolUse/PostCompact hooks via a managed block in `~/.kimi-code/config.toml` (Kimi Code has no project-level config file) |
 
 ## Consumer validation — the release gate
@@ -126,7 +124,7 @@ doctors only `.claude/`, and out-of-profile assets found on disk are surfaced, n
 silently ignored. With no profile, all harnesses are targeted (back-compatible).
 
 All projections are generated from one canonical source at `dadaia_workspace/public/`
-via `dadaia public stage && dadaia public install`. The Claude SDK and PI runtimes are
+via `dadaia public stage && dadaia public install`. Retired runtimes are
 **optional, operator-installed** externals — the build stays offline-first without them.
 
 ---
@@ -306,7 +304,7 @@ dadaia [COMMAND] --help   # always works at every level
 ```bash
 dadaia public stage                     # stage canonical assets into .dadaia/agentic/
 dadaia public install --target all      # project to the harness profile (or all)
-dadaia public install --target pi       # project to one runtime (claude|codex|pi|agents)
+dadaia public install --target codex    # project to one runtime (claude|codex|kimi-code|agents)
 dadaia public doctor                    # drift detection: source → staging → projection
 ```
 

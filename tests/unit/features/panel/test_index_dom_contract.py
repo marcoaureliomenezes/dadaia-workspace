@@ -258,5 +258,5 @@ def test_theme_and_runtime_clusters(index_html: str) -> None:
 
     assert 'class="runtime-switcher"' in index_html
     assert 'class="runtime-btn' in index_html
-    for value in ("claude", "codex", "pi"):
+    for value in ("claude", "codex", "kimi-code"):
         assert f'data-runtime-value="{value}"' in index_html, f"missing data-runtime-value={value}"

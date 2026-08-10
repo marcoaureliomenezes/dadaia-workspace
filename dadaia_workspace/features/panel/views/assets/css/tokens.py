@@ -199,7 +199,7 @@ html:not([data-theme]) {
   */
   --color-runtime-claude:   #b35800; /* warm gold — Claude runtime indicator */
   --color-runtime-codex:    #2d7d9a; /* teal-blue — Codex runtime indicator */
-  --color-runtime-pi:       #7c5cbf; /* violet — PI runtime indicator */
+  --color-runtime-kimi:     #7c5cbf; /* violet — Kimi runtime indicator */
   --color-runtime-active:   var(--color-runtime-claude); /* default; overridden by [data-runtime] selector below */
 }
 
@@ -240,7 +240,7 @@ html[data-theme="sage"] {
   */
   --color-runtime-claude:   #a05500; /* muted amber-gold — Claude (Sage theme) */
   --color-runtime-codex:    #4a7c59; /* deep sage-green — Codex (Sage theme) */
-  --color-runtime-pi:       #6b5b95; /* muted violet — PI (Sage theme) */
+  --color-runtime-kimi:     #6b5b95; /* muted violet — Kimi (Sage theme) */
   --color-runtime-active:   var(--color-runtime-claude);
 }
 
@@ -283,7 +283,7 @@ html[data-theme="warm"] {
   */
   --color-runtime-claude:   #9a4400; /* deep rust-gold — Claude (Warm theme) */
   --color-runtime-codex:    #3d6e50; /* forest-green — Codex (Warm theme) */
-  --color-runtime-pi:       #6d5694; /* deep violet — PI (Warm theme) */
+  --color-runtime-kimi:     #6d5694; /* deep violet — Kimi (Warm theme) */
   --color-runtime-active:   var(--color-runtime-claude);
 }
 
@@ -307,10 +307,10 @@ html:not([data-theme])[data-runtime="claude"] {
   --color-runtime-active: var(--color-runtime-claude); /* #b35800 */
 }
 
-/* Mint theme (default / explicit) — PI active colour */
-html[data-theme="mint"][data-runtime="pi"],
-html:not([data-theme])[data-runtime="pi"] {
-  --color-runtime-active: var(--color-runtime-pi); /* #7c5cbf */
+/* Mint theme (default / explicit) — Kimi active colour */
+html[data-theme="mint"][data-runtime="kimi-code"],
+html:not([data-theme])[data-runtime="kimi-code"] {
+  --color-runtime-active: var(--color-runtime-kimi); /* #7c5cbf */
 }
 
 /* Sage theme — Codex active colour */
@@ -323,9 +323,9 @@ html[data-theme="sage"][data-runtime="claude"] {
   --color-runtime-active: var(--color-runtime-claude); /* #a05500 */
 }
 
-/* Sage theme — PI active colour */
-html[data-theme="sage"][data-runtime="pi"] {
-  --color-runtime-active: var(--color-runtime-pi); /* #6b5b95 */
+/* Sage theme — Kimi active colour */
+html[data-theme="sage"][data-runtime="kimi-code"] {
+  --color-runtime-active: var(--color-runtime-kimi); /* #6b5b95 */
 }
 
 /* Warm theme — Codex active colour */
@@ -338,9 +338,9 @@ html[data-theme="warm"][data-runtime="claude"] {
   --color-runtime-active: var(--color-runtime-claude); /* #9a4400 */
 }
 
-/* Warm theme — PI active colour */
-html[data-theme="warm"][data-runtime="pi"] {
-  --color-runtime-active: var(--color-runtime-pi); /* #6d5694 */
+/* Warm theme — Kimi active colour */
+html[data-theme="warm"][data-runtime="kimi-code"] {
+  --color-runtime-active: var(--color-runtime-kimi); /* #6d5694 */
 }
 
 /* NOTE (v0.1.59 / FR2): the runtime-switcher COMPONENT rules (.runtime-switcher,

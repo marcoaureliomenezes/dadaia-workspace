@@ -1,6 +1,0 @@
-{
-  "$schema": "https://pi.dev/schemas/settings.json",
-  "system": "SYSTEM.md",
-  "prompts": ["prompts"],
-  "extensions": [".pi/extensions/dadaia-sdd-gate.ts"]
-}

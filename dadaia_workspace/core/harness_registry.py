@@ -8,7 +8,7 @@ literal is scattered across the codebase.
 One roster lives here:
 
 * :data:`L1_ENTRY_HARNESSES` — the Layer-1 *entry* harnesses an operator can drive the
-  workspace from: ``claude``, ``codex``, ``pi``, ``kimi-code``. This is the identity set
+  workspace from: ``claude``, ``codex``, ``kimi-code``. This is the identity set
   the panel runtime-validation and the ``dadaia init --harness`` / projection vocabulary
   key on.
 
@@ -21,7 +21,7 @@ from __future__ import annotations
 #: The Layer-1 entry-harness roster — the harnesses an operator enters the workspace
 #: from. Canonical order (also the ``init --harness all`` / projection order).
 #: ``kimi-code`` (v0.2.8) is Layer-1 only.
-L1_ENTRY_HARNESSES: tuple[str, ...] = ("claude", "codex", "pi", "kimi-code")
+L1_ENTRY_HARNESSES: tuple[str, ...] = ("claude", "codex", "kimi-code")
 
 #: The projectable install targets in canonical order: the shared ``agents`` skills root
 #: plus one projection per Layer-1 entry harness. Consumed by ``public_assets.install``'s
@@ -50,7 +50,7 @@ def parse_harness_set(value: str) -> tuple[str, ...]:
     input order.
 
     Args:
-        value: the raw selector, e.g. ``"claude"``, ``"codex,pi"``, ``"all"``.
+        value: the raw selector, e.g. ``"claude"``, ``"codex,kimi-code"``, ``"all"``.
 
     Returns:
         The validated harness tuple in canonical L1 order.

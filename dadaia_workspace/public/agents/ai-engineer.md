@@ -55,7 +55,6 @@ paths:
     - dadaia_workspace/public/agents/**
     - dadaia_workspace/public/scripts/**
     - dadaia_workspace/public/plugins/**
-    - dadaia_workspace/public/pi/extensions/**
     - .dadaia/reports/<ctx>/ai-engineer/**
     - .dadaia/handoff/<ctx>/**
 ---
@@ -101,8 +100,7 @@ throttled advisory warning — it is never blocked. Gate role: AI-entity impleme
   supporting assets.
 - Rule files under `dadaia_workspace/public/rules/*.md`.
 - Shell assets under `dadaia_workspace/public/scripts/` (after the v0.1.10 bash-quartet
-  retirement, only `pre-push-ci-gate.sh` remains) and the PI Layer-1 extension under
-  `dadaia_workspace/public/pi/extensions/` (TS). The **runtime governance hooks are production
+  retirement, only `pre-push-ci-gate.sh` remains). The **runtime governance hooks are production
   Python** (`dadaia_workspace/hooks/*.py`, owned by `software-engineer`) — you review
   their wiring and behavioral contract, you never author them.
 - Efficiency / cost / context-engineering audit reports under
@@ -118,7 +116,7 @@ throttled advisory warning — it is never blocked. Gate role: AI-entity impleme
 - Tests (`tests/**`) (that is `software-engineer` / `qa-engineer`)
 - CI YAML (`.github/workflows/**`) (that is `devops-engineer` `[plugin]`)
 - Optional domain-pack production code outside the AI-entity surface
-- Lib-originated projections in `.claude/`, `.agents/`, `.codex/`, `.pi/`
+- Lib-originated projections in `.claude/`, `.agents/`, `.codex/`, `.kimi-code/`
 
 If you receive a task outside your scope:
 ```
@@ -141,11 +139,11 @@ Know how each one assembles context and enforces rules; pick the right primitive
 re-derivation.
 
 **The entry harnesses.** A human launches one of three terminal harnesses (`claude`,
-`codex`, `pi`), each governed by the workspace-root `AGENTS.md` + its per-harness
-projection (`.claude/`, `.codex/`, `.pi/`). There is no separate workflow-engine layer:
+`codex`, `kimi-code`), each governed by the workspace-root `AGENTS.md` + its per-harness
+projection (`.claude/`, `.codex/`, `.kimi-code/`). There is no separate workflow-engine layer:
 the ordered SDD flow (§1 of `DADAIA.md`) is agent-dispatched — an operator or a
 dispatching agent hands work to the owning agent for each stage, inside whichever entry
-harness is running. Headless codex/pi sessions remain bounded by the git chokepoints
+harness is running. Headless codex sessions remain bounded by the git chokepoints
 (pre-commit, pre-push) regardless of harness. You own the AI-entity surface across all
 three entry harnesses.
 
@@ -153,7 +151,6 @@ three entry harnesses.
 |---------|--------|-----------------|
 | Claude Code | Active | CLAUDE.md, rules, skills, hooks, subagents, MCP wiring |
 | Codex (OpenAI) | Active | AGENTS.md layers, Codex Rules (`.rules`), skills, config layers, hooks |
-| PI (`pi-coding-agent`) | Active | `.pi/` projection (`SYSTEM.md`, `settings.json`, prompts); post-trust executable TS; AGENTS.md read natively; advisory + chokepoint (no Ring-1 yet) |
 
 You carry the harness-mastery synthesis workload: these deep skills (restricted to
 you by the `DADAIA.md` §2 (skill scope)) are the compiled-protocol carriers. Reach for them
@@ -352,7 +349,6 @@ the impacted implementer can revisit its workflow.
 | `dadaia_workspace/public/rules/**` | Write |
 | `dadaia_workspace/public/agents/**` | Write |
 | `dadaia_workspace/public/scripts/**` | Write (shell assets; post-v0.1.10 only `pre-push-ci-gate.sh` — runtime hooks are `dadaia_workspace/hooks/*.py`, software-engineer's) |
-| `dadaia_workspace/public/pi/extensions/**` | Write (PI Layer-1 TS extension) |
 | `.dadaia/reports/<ctx>/ai-engineer/**` | Write |
 | `.dadaia/handoff/<ctx>/**` | Write |
 | Production code (`*.py`, `*.js`, `*.ts`, `*.mjs`, non-public) | Never (software-engineer) |
@@ -360,10 +356,10 @@ the impacted implementer can revisit its workflow.
 | `.github/workflows/*.yml` | Never (devops-engineer [plugin]) |
 | `specs/` | Never (product-engineer) |
 | `tests/**` | Never (software-engineer / qa-engineer) |
-| `.claude/`, `.agents/`, `.codex/`, `.pi/` (lib-originated projections) | Never |
+| `.claude/`, `.agents/`, `.codex/`, `.kimi-code/` (lib-originated projections) | Never |
 
 Note: `dadaia_workspace/public/` IS your territory (you author AI-entity sources);
-`.claude/`, `.agents/`, `.codex/`, `.pi/` are the propagated projections (never
+`.claude/`, `.agents/`, `.codex/`, `.kimi-code/` are the propagated projections (never
 hand-edit).
 
 ---

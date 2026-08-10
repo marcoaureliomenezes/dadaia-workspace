@@ -23,7 +23,7 @@ __all__ = [
 
 #: Directories the workspace root may contain (the Workspace Root Law).
 ROOT_ALLOWED_DIRS: frozenset[str] = frozenset(
-    {".agents", ".claude", ".codex", ".dadaia", ".kimi-code", ".pi", "repos"}
+    {".agents", ".claude", ".codex", ".dadaia", ".kimi-code", "repos"}
 )
 
 #: Files the workspace root may contain. ``DADAIA.md`` is the workspace system prompt
@@ -38,9 +38,7 @@ LAW_BASENAMES: frozenset[str] = frozenset({"DADAIA.md", "AGENTS.md", "CLAUDE.md"
 #: Harness/projection directories that host a projected law file (relative to the
 #: workspace root). The gate composes its guarded set FROM this; the installer projects
 #: ``DADAIA.md`` into the subset in :data:`DADAIA_MD_HARNESS_TARGETS`.
-LAW_HARNESS_DIRS: frozenset[str] = frozenset(
-    {".claude/rules", ".codex", ".kimi-code", ".agents", ".pi"}
-)
+LAW_HARNESS_DIRS: frozenset[str] = frozenset({".claude/rules", ".codex", ".kimi-code", ".agents"})
 
 #: Where the workspace system prompt is projected, per Layer-1 harness. The workspace
 #: root copy (``DADAIA.md``) is canonical and always written.

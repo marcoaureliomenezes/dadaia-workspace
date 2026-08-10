@@ -59,7 +59,7 @@ def build_capabilities() -> dict[str, Any]:
             "selection_contract": "explicit-or-caller-owned-bind",
         },
         "harnesses": {
-            "layer_1": ["claude-code", "codex", "pi", "kimi-code"],
+            "layer_1": ["claude-code", "codex", "kimi-code"],
         },
         "surfaces": {
             "workspace": ["init", "export", "import", "doctor", "clean"],

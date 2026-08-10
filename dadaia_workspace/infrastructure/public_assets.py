@@ -83,7 +83,6 @@ from dadaia_workspace.infrastructure.public_assets_common import (  # noqa: F401
     _CLAUDE_DIRS,
     _COPY_DIRS,
     _KIMI_DIRS,
-    _PI_DIRS,
     _SCHEMA_VERSION,
     _VALID_TARGETS,
     OverwritePolicy,
@@ -896,7 +895,6 @@ class FileSystemPublicAssetManager:
             "agents": self._step_install_universal_skills,
             "claude": self._step_install_claude,
             "codex": self._step_install_codex,
-            "pi": self._step_install_pi,
             "kimi-code": self._step_install_kimi_code,
         }
 
@@ -925,7 +923,7 @@ class FileSystemPublicAssetManager:
         ]
         # The git-chokepoint scripts are harness-independent: EVERY Layer-1 harness
         # target gets them (v0.2.8 consumer bug kimi-only-init-public-doctor-missing-
-        # managed-scripts — a pi-only or kimi-only workspace must also read doctor-green;
+        # managed-scripts — a kimi-only workspace must also read doctor-green;
         # the doctor's dadaia:scripts/* lines are unconditional, so a per-harness install
         # that skipped them left single-harness workspaces permanently red). Selected
         # here (present/absent), never guarded by an `if` inside the step.
@@ -1006,11 +1004,6 @@ class FileSystemPublicAssetManager:
             installed,
             only=plan.only,
             resolved_models=plan.resolved_models,
-        )
-
-    def _step_install_pi(self, plan: InstallPlan, installed: list[str]) -> None:
-        self._install_pi(
-            plan.agentic_dir, plan.workspace_root, plan.overwrite, installed, only=plan.only
         )
 
     def _step_install_kimi_code(self, plan: InstallPlan, installed: list[str]) -> None:
@@ -1194,7 +1187,7 @@ class FileSystemPublicAssetManager:
         ):
             # FR3 boundary completion (W5, T-58-50): runtime_expectations yields the
             # claude:<dir>/* projection expectations unconditionally. For a codex-only /
-            # pi-only profile those files are genuinely absent, so an unscoped loop emits
+            # codex-absent profile those files are genuinely absent, so an unscoped loop emits
             # `[missing] claude:*` (40 lines) and the doctor false-fails (CLI exit 1) — the
             # exact boundary W3 flagged for W5. Scope the claude:* projection lines to
             # `claude in profile`; the shared agents:skills/*, the AGENTS.md guardrail pairs,
@@ -1270,7 +1263,7 @@ class FileSystemPublicAssetManager:
 
         # Profile-scoped inline projection block (FR3). The `active`/`profile_harnesses`
         # resolution above is reused here (claude settings.json / codex hooks+config+rules /
-        # the .pi/ tree each gated on membership; a physically-present out-of-profile runtime
+        # each runtime tree gated on membership; a physically-present out-of-profile runtime
         # emits the A3 `[warn]` line).
 
         # Claude generated-config projection — scoped to `claude in profile`.
@@ -1313,16 +1306,6 @@ class FileSystemPublicAssetManager:
         elif (workspace_root / ".codex").exists():
             reports.append(_out_of_profile_warn("codex"))
 
-        # PI entry harness — scoped to `pi in profile`.
-        pi_staged = agentic_dir / "pi"
-        pi_projected = workspace_root / ".pi"
-        if "pi" in active:
-            for staged in self._iter_files(pi_staged):
-                rel = staged.relative_to(pi_staged)
-                reports.append(self._compare(staged, pi_projected / rel, f"pi:{rel.as_posix()}"))
-        elif pi_projected.exists():
-            reports.append(_out_of_profile_warn("pi"))
-
         # Kimi Code (Layer-1 entry harness, v0.2.8) — scoped to `kimi-code in profile`.
         kimi_staged = agentic_dir / "kimi-code"
         kimi_projected = workspace_root / ".kimi-code"
@@ -1342,7 +1325,7 @@ class FileSystemPublicAssetManager:
         # Codex-parity drift (D-CX-1..10) + trust-boundary info are codex-specific and MUST
         # gate on `codex in profile` (Q1): check_codex_drift iterates the staged agents and
         # emits `[missing] codex:agents/<name>.toml (D-CX-1)` ×12 for ANY codex-absent tree,
-        # which would make a claude-only/pi-only `public doctor` exit 1 (AC-5 unachievable).
+        # which would make a single-harness `public doctor` exit 1 (AC-5 unachievable).
         if "codex" in active:
             reports.extend(check_codex_drift(agentic_dir, workspace_root, self._public_dir))
         reports.extend(attest("rule-corpus", check_codex_rule_corpus_reachable(workspace_root)))
@@ -1563,32 +1546,6 @@ class FileSystemPublicAssetManager:
                 installed,
             )
 
-    def _install_pi(
-        self,
-        agentic_dir: Path,
-        workspace_root: Path,
-        overwrite: OverwritePolicy,
-        installed: list[str],
-        only: str | None = None,
-    ) -> None:
-        """Project the staged ``pi/`` tree into ``<workspace_root>/.pi/``.
-
-        The staged ``pi/`` assets (``SYSTEM.md``, ``settings.json`` and the
-        ``prompts/`` affordance dir) are plain md/json — a straight hash-compare copy
-        with orphan-pruning, idempotent on re-install.
-
-        The PI harness projection carries no workspace-specific or
-        operator-local values, so the copy is verbatim (no generated config file).
-        """
-        pi_src = agentic_dir / "pi"
-        pi_dst = workspace_root / ".pi"
-        if only is None:
-            copy_tree(pi_src, pi_dst, overwrite.force, installed, self._iter_files)
-            return
-        # `only` filters to a single staged subdirectory (e.g. "prompts").
-        if only in _PI_DIRS:
-            copy_tree(pi_src / only, pi_dst / only, overwrite.force, installed, self._iter_files)
-
     def _install_kimi_code(
         self,
         agentic_dir: Path,
@@ -1600,7 +1557,7 @@ class FileSystemPublicAssetManager:
         """Project the staged ``kimi-code/`` tree into ``<workspace_root>/.kimi-code/`` and
         upsert the user-level Kimi hook wiring (v0.2.8).
 
-        The workspace tree (``AGENTS.md``) is a verbatim hash-compare copy like the pi
+        The workspace tree (``AGENTS.md``) is a verbatim hash-compare copy like the kimi
         projection. The hook *registration* cannot live in the workspace — Kimi Code has
         no project-level config file — so it is upserted into the user-level
         ``$KIMI_CODE_HOME/config.toml`` managed block, and the four workspace-agnostic

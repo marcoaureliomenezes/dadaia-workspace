@@ -107,7 +107,7 @@ review gate clears (see below).
 - Design decisions — tokens, palettes, spacing scales, typography (that is `design-specialist`)
 - CI YAML in `.github/workflows/**` (that is `devops-engineer`)
 - E2E test directories / Playwright suites (that is `qa-engineer`)
-- Lib-originated projections in `.claude/`, `.agents/`, `.codex/`, `.pi/`
+- Lib-originated projections in `.claude/`, `.agents/`, `.codex/`, `.kimi-code/`
 
 If you receive a task outside your scope:
 ```
@@ -227,7 +227,7 @@ pre-commit gate.
 | `.github/workflows/*.yml` | Never (devops-engineer) |
 | `specs/**` | Never (product-engineer) |
 | E2E test directories | Never (qa-engineer) |
-| `.claude/`, `.agents/`, `.codex/`, `.pi/` (lib-originated) | Never |
+| `.claude/`, `.agents/`, `.codex/`, `.kimi-code/` (lib-originated) | Never |
 
 ---
 

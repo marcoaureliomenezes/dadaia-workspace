@@ -35,10 +35,10 @@ _PKG = Path(__file__).resolve().parents[3] / "dadaia_workspace"
 
 
 def test_roster_vocabulary_golden() -> None:
-    assert L1_ENTRY_HARNESSES == ("claude", "codex", "pi", "kimi-code")
-    assert PROJECTION_TARGETS == ("agents", "claude", "codex", "pi", "kimi-code")
+    assert L1_ENTRY_HARNESSES == ("claude", "codex", "kimi-code")
+    assert PROJECTION_TARGETS == ("agents", "claude", "codex", "kimi-code")
     assert ("agents", *L1_ENTRY_HARNESSES) == PROJECTION_TARGETS
-    assert frozenset({"all", "agents", "claude", "codex", "pi", "kimi-code"}) == INSTALL_TARGETS
+    assert frozenset({"all", "agents", "claude", "codex", "kimi-code"}) == INSTALL_TARGETS
     assert frozenset({"all", *PROJECTION_TARGETS}) == INSTALL_TARGETS
 
 
@@ -52,7 +52,6 @@ def test_roster_vocabulary_golden() -> None:
     [
         ("claude", True),
         ("codex", True),
-        ("pi", True),
         ("kimi-code", True),
         ("bogus", False),
         ("fake", False),
@@ -72,12 +71,11 @@ def test_capability_predicates_table(harness: str, expect_l1: bool) -> None:
 @pytest.mark.parametrize(
     ("raw", "expected"),
     [
-        ("all", ("claude", "codex", "pi", "kimi-code")),
-        ("codex,pi", ("codex", "pi")),
+        ("all", ("claude", "codex", "kimi-code")),
+        ("codex,kimi-code", ("codex", "kimi-code")),
         # input order does not leak — result is always canonical L1 order.
-        ("kimi-code,pi,codex", ("codex", "pi", "kimi-code")),
+        ("kimi-code,codex", ("codex", "kimi-code")),
         ("claude", ("claude",)),
-        (" PI , pi ", ("pi",)),
         ("CLAUDE,Codex", ("claude", "codex")),
         ("Kimi-Code", ("kimi-code",)),
     ],
@@ -94,7 +92,7 @@ def test_parse_harness_set_accept_table(raw: str, expected: tuple[str, ...]) -> 
 @pytest.mark.parametrize(
     ("raw", "expect_in_message"),
     [
-        ("bogus", ["bogus", "claude", "codex", "pi"]),
+        ("bogus", ["bogus", "claude", "codex", "kimi-code"]),
         ("claude,zzz", ["zzz"]),
         ("", []),
         ("  ,  ", []),

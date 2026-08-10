@@ -143,7 +143,7 @@ ALLOWLISTED_DADAIA_ENV: Final[frozenset[str]] = frozenset(
         # Operator/test path-override knob read by production in
         # features/telemetry/service.py (PI session-store ingest, WS-PI-6) — same
         # category as DADAIA_AGENTS_DIR above.
-        "DADAIA_PI_SESSIONS_DIR",
+        "DADAIA_KIMI_SESSION_INDEX",
     }
 )
 

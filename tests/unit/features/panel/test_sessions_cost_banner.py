@@ -25,7 +25,7 @@ def _banner_tag(html: str) -> str:
 
 
 def test_sessions_scaffold_dom_hooks() -> None:
-    """The scaffold keeps dashboard + banner + badge + pi runtime button, drops all
+    """The scaffold keeps dashboard + banner + badge + kimi runtime button, drops all
     list markup, and the banner is an accessible hidden status slot after the
     dashboard, styled with hidden state + design tokens."""
     from dadaia_workspace.features.panel.views.assets.css.sessions import SESSIONS_CSS
@@ -37,7 +37,7 @@ def test_sessions_scaffold_dom_hooks() -> None:
     assert 'id="sessions-dashboard"' in html
     assert 'id="sessions-banner"' in html
     assert 'id="sessions-last-updated"' in html
-    assert 'id="sessions-runtime-btn-pi"' in html
+    assert 'id="sessions-runtime-btn-kimi"' in html
 
     # Deleted list-era machinery.
     assert "sessions-table" not in html

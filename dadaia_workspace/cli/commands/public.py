@@ -31,7 +31,7 @@ TargetOption = Annotated[
     str,
     typer.Option(
         "--target",
-        help="Runtime target: all, agents, claude, codex, pi, or kimi-code",
+        help="Runtime target: all, agents, claude, codex, or kimi-code",
     ),
 ]
 

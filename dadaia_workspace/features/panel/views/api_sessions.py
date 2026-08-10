@@ -39,7 +39,7 @@ def render_api_sessions(
     """Return a closure that serves GET /api/sessions.
 
     Query parameters:
-    - runtime: "claude" | "codex" | "pi" (default: "claude")
+    - runtime: "claude" | "codex" | "kimi-code" (default: "claude")
 
     Status codes:
         200 — success

@@ -58,7 +58,7 @@ _GOLDEN_DIR = _HERE / "_golden"
 _INSTALL_GOLDEN_B = _GOLDEN_DIR / "plugin_install_targets_golden_b_v0160.json"
 _DOCTOR_GOLDEN_B = _GOLDEN_DIR / "plugin_doctor_report_golden_b_v0160.json"
 
-_INSTALL_TARGETS = ("all", "agents", "claude", "codex", "pi", "kimi-code")
+_INSTALL_TARGETS = ("all", "agents", "claude", "codex", "kimi-code")
 
 
 def _redirect_kimi_home(monkeypatch: pytest.MonkeyPatch, ws: Path) -> None:

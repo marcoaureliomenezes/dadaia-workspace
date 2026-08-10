@@ -51,11 +51,11 @@ def test_persists_selected_set_roundtrips_and_defaults_to_all_four(
     service.init(
         tmp_path.parent / (tmp_path.name + "-roundtrip"),
         skip_assets=True,
-        harnesses=("claude", "pi"),
+        harnesses=("claude", "kimi-code"),
     )
     states_dir = tmp_path.parent / (tmp_path.name + "-roundtrip") / ".dadaia" / "states"
     profile = JsonHarnessProfileStore().read(states_dir)
-    assert profile == HarnessProfile(schema_version="1", harnesses=("claude", "pi"))
+    assert profile == HarnessProfile(schema_version="1", harnesses=("claude", "kimi-code"))
 
     # omitting *harnesses* persists the full L1 roster (default all-four).
     default_root = tmp_path.parent / (tmp_path.name + "-default")

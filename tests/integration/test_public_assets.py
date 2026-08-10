@@ -2,9 +2,8 @@
 
 Merged per plan-integration.md (39 -> ~8):
   - Keep: install-refuses-dadaia-workspace-source-root (safety), public-privacy gate
-    (flags identifiers + ignores bytecode, merged -> 1), CLI pi install+doctor-clean.
-  - Merge: stage (manifest + codex adapters) -> 1; install-all + pi projection block
-    (ring-1, tree, idempotent, system-note markers, doctor pi-ok) -> 1;
+    (flags identifiers + ignores bytecode, merged -> 1).
+  - Merge: stage (manifest + codex adapters) -> 1; install-all -> 1;
     overwrite-stale/skip-canonical/force -> 1; codex projection (config omits/emits +
     legacy workflow cleanup + native-rules-only) -> 1; model-governance
     overlay (no-overlay lockstep + overlay-change lockstep + invalid-overlay-loud +
@@ -22,14 +21,11 @@ no fs/subprocess needed there.
 from __future__ import annotations
 
 import json
-import shutil
-import sys
 from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
-from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.infrastructure.public_assets import (
     _PRIVACY_DENYLIST_ENV,
@@ -54,12 +50,11 @@ _runner = CliRunner()
 
 # ---------------------------------------------------------------------------
 # stage() — manifest + codex runtime adapters, plus
-# install(target="all") + pi projection block (Ring-1, tree, idempotent, system-note,
-# doctor pi-ok)
+# install(target="all") full-projection block
 # ---------------------------------------------------------------------------
 
 
-def test_stage_manifest_codex_adapters_install_all_and_pi_projection_block(
+def test_stage_manifest_codex_adapters_and_install_all(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     stage_workspace = tmp_path / "stage-ws"
@@ -96,111 +91,6 @@ def test_stage_manifest_codex_adapters_install_all_and_pi_projection_block(
     assert not (workspace / ".codex" / "rules" / "game-agents-coordination.md").exists()
     assert not (workspace / ".codex" / "rules" / "game-developer-scope.md").exists()
     assert (workspace / ".codex" / "rules" / "dadaia-command-policy.rules").exists()
-    # T-PIO-03: the `pi` target is part of `all`.
-    assert (workspace / ".pi" / "SYSTEM.md").exists()
-    assert (workspace / ".pi" / "settings.json").exists()
-
-    # T-PIO-04: doctor emits [ok] pi: lines after a clean install.
-    reports = _rendered(manager.doctor(workspace))
-    pi_lines = [r for r in reports if "pi:" in r]
-    assert any("[ok] pi:SYSTEM.md" in r for r in reports), reports
-    assert any("[ok] pi:settings.json" in r for r in reports), reports
-    assert all(r.startswith("[ok]") for r in pi_lines), pi_lines
-
-    # WS-PI-4: --target pi (isolated) projects the Layer-1 Ring-1 SDD-gate extension;
-    # settings.json lists it, the body carries its invariants, and — as a post-trust
-    # executable asset — carries NO operator-local path or secret.
-    pi_ws = tmp_path / "pi-only"
-    FileSystemPublicAssetManager().install(pi_ws, target="pi")
-
-    ext = pi_ws / ".pi" / "extensions" / "dadaia-sdd-gate.ts"
-    assert ext.exists()
-    body = ext.read_text(encoding="utf-8")
-    assert "dadaia_workspace.hooks.pre_gate" in body
-    assert '["-B", "-m", "dadaia_workspace.hooks.pre_gate"]' in body
-    assert 'pi.on("tool_call"' in body or "pi.on('tool_call'" in body
-    assert "write" in body and "Write" in body and "edit" in body and "Edit" in body
-    assert '"decision":"block"' in body or "decision" in body
-    assert "block: true" in body
-    assert ".venv" in body and "python" in body
-    assert "/home/" not in body and "/Users/" not in body
-    for secret_token in ("ANTHROPIC_API_KEY", "TOKEN=", "SECRET", "password"):
-        assert secret_token not in body
-
-    settings = json.loads((pi_ws / ".pi" / "settings.json").read_text(encoding="utf-8"))
-    assert any("dadaia-sdd-gate" in entry for entry in settings.get("extensions", [])), settings
-
-    # T-PIO-03: public/pi/ -> .pi/ tree.
-    assert (pi_ws / ".pi" / "prompts" / "dadaia-context.md").exists()
-    assert isinstance(settings, dict)
-
-    # T-PIO-03/07: re-install is idempotent (hash-compare skip); doctor stays clean.
-    second = FileSystemPublicAssetManager().install(pi_ws, target="pi")
-    pi_results = [line for line in second if str(pi_ws / ".pi") in line]
-    assert pi_results, "expected .pi/ projection lines on re-install"
-    assert all("[skip]" in line for line in pi_results), pi_results
-
-    reports2 = _rendered(FileSystemPublicAssetManager().doctor(pi_ws))
-    pi_lines2 = [r for r in reports2 if "pi:" in r]
-    assert pi_lines2 and all(r.startswith("[ok]") for r in pi_lines2), pi_lines2
-    drift = [r for r in reports2 if r.startswith(("[drift]", "[missing]")) and "pi" in r]
-    assert not drift, drift
-
-    # Layer-1 governance content in the projected .pi/SYSTEM.md + context prompt.
-    system_note = (pi_ws / ".pi" / "SYSTEM.md").read_text(encoding="utf-8")
-    context_prompt = (pi_ws / ".pi" / "prompts" / "dadaia-context.md").read_text(encoding="utf-8")
-    assert "AGENTS.md" in system_note
-    assert "dadaia" in system_note
-    assert "SDD" in system_note
-    assert "Layer-1" in system_note
-    assert "post-trust" in system_note
-    assert "this note carries none" in system_note
-    assert "/home/" not in system_note
-    assert "/home/" not in context_prompt
-    assert "dadaia" in context_prompt
-
-    # Layer-1 e2e through the REAL CLI: `dadaia public install --target pi` is the
-    # command the operator runs to 'enter pi'. Drive it via CliRunner against an
-    # isolated temp workspace, then `dadaia public doctor` — assert the `.pi/` tree
-    # lands and doctor reports the pi projection green (proving the operator-facing
-    # path, not just the manager API).
-    from dadaia_workspace.core.platform import PLATFORM
-    from dadaia_workspace.features.workspace.service import WorkspaceService
-    from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
-
-    cli_workspace = tmp_path / "cli-ws"
-    # The suite-wide venv fixture intentionally creates only the directory. Public init
-    # renders absolute hook commands and public doctor executes Codex wrappers, so provide
-    # the temp interpreter before init without constructing or installing a real venv.
-    python_bin = (
-        cli_workspace
-        / ".dadaia"
-        / ".venv"
-        / PLATFORM.venv_scripts_dir
-        / f"python{PLATFORM.venv_exe_suffix}"
-    )
-    python_bin.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        python_bin.symlink_to(Path(sys.executable))
-    except OSError:
-        shutil.copy2(sys.executable, python_bin)
-
-    WorkspaceService(
-        public_assets=FileSystemPublicAssetManager(),
-        python_env=VenvPythonEnvironmentManager(),
-    ).init(cli_workspace)
-    monkeypatch.chdir(cli_workspace)
-
-    install = _runner.invoke(app, ["public", "install", "--target", "pi"])
-    assert install.exit_code == 0, install.output
-
-    assert (cli_workspace / ".pi" / "SYSTEM.md").exists()
-    assert (cli_workspace / ".pi" / "settings.json").exists()
-    assert (cli_workspace / ".pi" / "prompts" / "dadaia-context.md").exists()
-
-    doctor = _runner.invoke(app, ["public", "doctor"])
-    assert doctor.exit_code == 0, doctor.output
-    assert "pi:" in doctor.output
 
 
 # ---------------------------------------------------------------------------

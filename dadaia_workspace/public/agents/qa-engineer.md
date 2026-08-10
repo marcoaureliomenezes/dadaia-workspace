@@ -85,7 +85,7 @@ verdict keeps the task `[-]` and re-opens it for the implementer.
 - Unit tests or integration tests — those are owned by the same implementer who wrote the code under test
 - Specs, plans, or TASKS.md (that is `product-engineer`)
 - GitHub Actions YAML in `.github/workflows/` (that is `devops-engineer` `[plugin]`)
-- Lib-originated files in `.claude/`, `.agents/`, `.codex/`, `.pi/` (rule: `dadaia-workspace-dev-guardrail`)
+- Lib-originated files in `.claude/`, `.agents/`, `.codex/`, `.kimi-code/` (rule: `dadaia-workspace-dev-guardrail`)
 
 If you receive a task outside your scope:
 ```
@@ -308,7 +308,7 @@ On request, you audit any project's test suite:
 | `specs/`, `TASKS.md`, `PLAN.md`, `SPEC.md` | ❌ Never (product-engineer) |
 | `.github/workflows/*.yml` | ❌ Never (devops-engineer) |
 | Optional domain-pack production source | ❌ Never (read to understand; write belongs to installed domain specialist) |
-| `.claude/`, `.agents/`, `.codex/`, `.pi/` (lib-originated) | ❌ Never |
+| `.claude/`, `.agents/`, `.codex/`, `.kimi-code/` (lib-originated) | ❌ Never |
 
 ---
 

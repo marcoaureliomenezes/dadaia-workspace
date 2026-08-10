@@ -1,6 +1,7 @@
 ---
 name: snake-wall-wrap-v025-pi-validation
-status: candidate
+status: rejected
+rejected_reason: "Panel Games surface removed in v0.3.0 (test-only experiment); PI harness support also removed — nothing left to validate."
 opened: 2026-07-14
 owner: project-manager (curates)
 priority: P0
@@ -10,7 +11,7 @@ source: 'operator demand 2026-07-14: deliberately small PI workflow validation r
 intents:
 - subject:
     kind: code
-    ref: dadaia_workspace/features/panel/views/games.py#render_games_section
+    ref: dadaia_workspace/features/panel/views/static.py#render_static
   change: Keep the rendered Snake/Tetris game surface and controls unchanged except
     as directly required to expose the wrapped Snake behavior; do not change Tetris
     or non-game panel sections.
@@ -22,7 +23,7 @@ intents:
     is introduced.
 - subject:
     kind: code
-    ref: tests/unit/features/panel/test_games_tab.py#test_games_assets_are_served
+    ref: dadaia_workspace/features/panel/views/static.py#render_static
   change: Add focused automated regression coverage for Snake horizontal wall wrapping,
     vertical wall wrapping, self-collision still ending/resetting, score/food behavior,
     controls, and board dimensions while keeping tests scoped to the Games tab assets

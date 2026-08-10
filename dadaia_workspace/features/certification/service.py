@@ -125,7 +125,7 @@ def certify(
         "workspace-init-all-harnesses",
         lambda: (
             cli("init", "--workspace", str(target), "--harness", "all", cwd=run_root)
-            and "workspace initialized with Claude, Codex, and PI projections"
+            and "workspace initialized with Claude, Codex, and Kimi projections"
         ),
     )
 

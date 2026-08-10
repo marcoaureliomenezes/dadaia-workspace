@@ -105,7 +105,7 @@ implementer. You advance a task to `[x]` only after the review gate clears (see 
 - Browser frontend: `*.tsx`, browser `*.ts`/`*.js`, `*.css`, `*.html` (plugin: `frontend-engineer`)
 - CI YAML in `.github/workflows/**` (plugin: `devops-engineer`)
 - E2E test directories (that is `qa-engineer`)
-- Lib-originated projections in `.claude/`, `.agents/`, `.codex/`, `.pi/`
+- Lib-originated projections in `.claude/`, `.agents/`, `.codex/`, `.kimi-code/`
 
 If you receive a task outside your scope:
 ```
@@ -240,7 +240,7 @@ guess and never widen scope.
 | `.github/workflows/*.yml` | Never (devops-engineer [plugin]) |
 | `specs/**` | Never (product-engineer) |
 | E2E test directories | Never (qa-engineer) |
-| `.claude/`, `.agents/`, `.codex/`, `.pi/` (lib-originated) | Never |
+| `.claude/`, `.agents/`, `.codex/`, `.kimi-code/` (lib-originated) | Never |
 
 ---
 

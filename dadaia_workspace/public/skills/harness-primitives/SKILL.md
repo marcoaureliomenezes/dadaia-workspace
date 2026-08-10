@@ -13,14 +13,14 @@ applyTo: "**"
 
 You run inside an *agentic harness* — the tooling, context management, and
 execution loop that turn a model into a working agent. The harness (Claude Code,
-Codex, or PI) is not the model; it supplies your file access, shell,
+Codex, or Kimi Code) is not the model; it supplies your file access, shell,
 permission gating, memory loading, and the gather→act→verify loop. This skill gives
 every agent a working mental model of the primitives that harness exposes, so you can
 read your own configuration intelligently and know when a question is beyond your
 remit.
 
 **Entry harnesses.** A human launches one of three terminal harnesses (`claude`,
-`codex`, `pi`). There is no separate workflow-engine layer: the ordered SDD flow
+`codex`, `kimi-code`). There is no separate workflow-engine layer: the ordered SDD flow
 (`DADAIA.md` §1) is agent-dispatched, not run by an engine. This literacy skill
 describes the entry-harness primitives; deep per-harness reasoning is defer-to-`ai-engineer`
 territory.
@@ -57,9 +57,9 @@ Mental shortcuts:
 
 The same word can mean different things across harnesses. The most dangerous
 collision is "rules". Read this table before assuming a primitive behaves the same
-way in both runtimes. (PI is the third Layer-1 projection target — under `.pi/`
+way in both runtimes. (Kimi Code is the third Layer-1 projection target — under `.kimi-code/`
 (post-trust executable); it reads `AGENTS.md` natively up-tree, with an advisory +
-git-chokepoint posture. Deep PI protocol is out of scope for this literacy skill.)
+git-chokepoint posture. Deep Kimi protocol is out of scope for this literacy skill.)
 
 | Primitive | Claude Code | Codex | Watch out for |
 |---|---|---|---|
@@ -89,7 +89,6 @@ dadaia_workspace/public/<type>/<file>     # canonical source — the ONLY editab
         ├─ .claude/    (agents, rules, skills)
         ├─ .agents/    (skills)
         ├─ .codex/     (agents .toml, config, hooks, rules, Codex-only skills)
-        └─ .pi/        (SYSTEM.md, settings.json, prompts — post-trust executable)
         │
         ▼  dadaia public doctor            # verifies every projection matches the staged SHA256
 ```
@@ -97,7 +96,7 @@ dadaia_workspace/public/<type>/<file>     # canonical source — the ONLY editab
 Rules that follow directly from this chain:
 
 - **Never hand-edit a projection.** Files under `.claude/`, `.agents/`, `.codex/`,
-  `.pi/`, and projected `AGENTS.md` are lib-originated and manifest-tracked.
+  and projected `AGENTS.md` are lib-originated and manifest-tracked.
   Editing them in place is overwritten on the next install and is a guardrail
   violation. Edit the `public/` source, then stage + install.
 - **`dadaia public doctor`** compares each projection against the staged hash and
@@ -127,7 +126,7 @@ the question to ai-engineer rather than guessing.
 | You need to reason about *why* a primitive behaves a certain way (e.g. why a rule loaded but did not block) | Defer to ai-engineer. |
 | You are diagnosing a hook/skill/rule interaction or a projection drift you do not understand | Defer to ai-engineer (drift *repair* via `--force` is operator/devops-only). |
 | You want to design, author, or modify any AI-entity file (persona, skill, rule, hook) | Defer to ai-engineer — product-engineer specs it, ai-engineer implements it. |
-| You want the deep decision protocol for any entry harness (Claude Code, Codex, PI), or context engineering | Defer to ai-engineer. Those deep skills (`ai-harness-claude-code`, `ai-harness-codex`, `ai-context-engineering`) are restricted to ai-engineer by the `DADAIA.md` §2 (skill scope) — do not attempt to invoke them. |
+| You want the deep decision protocol for any entry harness (Claude Code, Codex, Kimi Code), or context engineering | Defer to ai-engineer. Those deep skills (`ai-harness-claude-code`, `ai-harness-codex`, `ai-context-engineering`) are restricted to ai-engineer by the `DADAIA.md` §2 (skill scope) — do not attempt to invoke them. |
 | You just need to *read* your own persona/rule/skill to do your task | No deferral — that is normal literacy, which is what this skill is for. |
 
 In one sentence: know the primitives well enough to read your own configuration

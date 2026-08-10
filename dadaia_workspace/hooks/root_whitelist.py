@@ -2,7 +2,7 @@
 
 The Law: the workspace root may contain ONLY these entries::
 
-    .agents/ .claude/ .codex/ .dadaia/ .kimi-code/ .pi/ repos/  (directories)
+    .agents/ .claude/ .codex/ .dadaia/ .kimi-code/ repos/  (directories)
     AGENTS.md CLAUDE.md DADAIA.md prompt.md                     (files)
 
 Any other top-level entry is blocked. An operator exception list at

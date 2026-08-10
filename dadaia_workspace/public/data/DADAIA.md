@@ -132,7 +132,7 @@ change was produced. Everything in §5 you uphold yourself.
 ## 4. Where things are written
 
 **Workspace root** holds only: `.agents/` `.claude/` `.codex/` `.dadaia/` `.kimi-code/`
-`.pi/` `repos/` `AGENTS.md` `CLAUDE.md` `DADAIA.md` `prompt.md`. Anything the operator
+`repos/` `AGENTS.md` `CLAUDE.md` `DADAIA.md` `prompt.md`. Anything the operator
 created by hand stays and is never auto-deleted. A tool that genuinely requires another
 root entry gets a documented glob in `.dadaia/states/root_exceptions.txt`.
 

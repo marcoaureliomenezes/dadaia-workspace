@@ -62,7 +62,7 @@ class WorkspaceService:
         """Bootstrap .dadaia/ template. Idempotent. Returns (workspace, installed_assets).
 
         *harnesses* selects which Layer-1 entry harnesses to scaffold (the ``.claude``/
-        ``.codex``/``.pi``/``.kimi-code`` projections plus per-harness hook registration).
+        ``.codex``/``.kimi-code`` projections plus per-harness hook registration).
         ``None`` ⇒ the full harness set (back-compat with pre-v0.1.58 init). Only the
         chosen harnesses' directories, hooks, and asset projections are created; the
         selected set is persisted to ``.dadaia/states/harness_profile.json`` (the source
@@ -82,7 +82,7 @@ class WorkspaceService:
             workspace.claude_dir.mkdir(parents=True, exist_ok=True)
         if "codex" in chosen_set:
             (workspace.root / ".codex").mkdir(parents=True, exist_ok=True)
-        # `.pi/` and `.kimi-code/` are materialised by their install targets below (no
+        # `.kimi-code/` is materialised by its install target below (no
         # bare mkdir).
 
         # Initialize JSON state files (idempotent — never overwrite existing data)

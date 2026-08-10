@@ -16,7 +16,7 @@
 //       }
 //
 // Cost render mapping (SPEC §FR1 matrix, preserved client-side):
-//   - cost-unknown runtime (codex/pi)  → 'N/A'
+//   - cost-unknown runtime (codex/kimi)  → 'N/A'
 //   - claude, total_cost_usd === null  → '—'
 //   - otherwise                        → '$X.XX' (incl. '$0.00' for 0.0)
 //
@@ -34,13 +34,13 @@
   // ── Constants ─────────────────────────────────────────────────────────────────
   var DEFAULT_RUNTIME = 'claude';
   var CODEX_BANNER_TEXT = 'Cost not tracked for Codex';
-  var PI_BANNER_TEXT = 'Cost not tracked for PI';
+  var KIMI_BANNER_TEXT = 'Cost not tracked for Kimi';
 
   // Runtimes with no per-event pricing — cost is unknown and never fabricated.
   // Codex and PI share this posture; the Cost card renders 'N/A' and the banner
   // appears for both.
   function isCostUnknownRuntime(runtime) {
-    return runtime === 'codex' || runtime === 'pi';
+    return runtime === 'codex' || runtime === 'kimi-code';
   }
 
   // ── Module state ─────────────────────────────────────────────────────────────
@@ -72,13 +72,13 @@
   // ── Banner: show/hide the "Cost not tracked for …" notice ────────────────────
   // Called before each fetchAggregate() and on every dadaia:runtime-change. The
   // #sessions-banner element starts with the HTML [hidden] attribute (set in the
-  // scaffold); JS shows it only when the runtime is cost-unknown (codex/pi).
+  // scaffold); JS shows it only when the runtime is cost-unknown (codex/kimi).
   function updateBanner() {
     var banner = document.getElementById('sessions-banner');
     if (!banner) { return; }
     var runtime = getRuntime();
     if (isCostUnknownRuntime(runtime)) {
-      banner.textContent = (runtime === 'pi') ? PI_BANNER_TEXT : CODEX_BANNER_TEXT;
+      banner.textContent = (runtime === 'kimi-code') ? KIMI_BANNER_TEXT : CODEX_BANNER_TEXT;
       banner.removeAttribute('hidden');
     } else {
       banner.textContent = '';
@@ -110,7 +110,7 @@
       ? 'sessions-stat-value sessions-stat-value--cost'
       : 'sessions-stat-value';
     var costSub = isCostUnknown
-      ? ('not tracked for ' + (runtime === 'pi' ? 'PI' : 'Codex'))
+      ? ('not tracked for ' + (runtime === 'kimi-code' ? 'Kimi' : 'Codex'))
       : '&nbsp;';
 
     var activeSub = activeSessions > 0

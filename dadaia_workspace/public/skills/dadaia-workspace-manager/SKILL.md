@@ -128,7 +128,7 @@ left for it to do.
 ```bash
 dadaia repos list                    # show known repos catalog
 dadaia public stage                  # project lib assets into .dadaia/agentic/
-dadaia public install --target all   # deploy assets to .agents/, .claude/, .codex/, .pi/
+dadaia public install --target all   # deploy assets to .agents/, .claude/, .codex/, .kimi-code/
 dadaia public install --target claude # deploy to .claude/ only
 dadaia public doctor                 # audit asset drift
 dadaia academy list                  # list courses

@@ -39,7 +39,7 @@ def _states(tmp_path: Path) -> Path:
             JsonHarnessProfileStore(),
             "harness_profile.json",
             HarnessProfile(schema_version="1", harnesses=("claude", "codex")),
-            HarnessProfile(schema_version="1", harnesses=("claude", "codex", "pi")),
+            HarnessProfile(schema_version="1", harnesses=("claude", "codex", "kimi-code")),
             {"schema_version": "1", "harnesses": ["claude", "codex"]},
             id="harness-profile-store",
         ),

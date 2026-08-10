@@ -9,7 +9,7 @@ packages = [{include = "dadaia_workspace"}]
 # sdist/wheel. poetry-core honours these globs for both artifacts.
 exclude = ["**/__pycache__", "**/*.pyc", "**/*.pyo"]
 keywords = [
-    "ai-agents", "claude-code", "codex", "pi", "kimi-code",
+    "ai-agents", "claude-code", "codex", "kimi-code",
     "workspace", "multi-agent", "sdd", "spec-driven-development",
     "developer-tools", "cli", "agentic"
 ]

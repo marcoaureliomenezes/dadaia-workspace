@@ -36,4 +36,4 @@ workspace-absolute paths. Re-install or verify the wiring with
 - Bind the session before SDD work: `.dadaia/.venv/bin/dadaia context bind <ctx>`.
 - Universal skills live in `.agents/skills/` — invoke with `/skill:<name>`.
 - Sub-agents: Kimi built-ins (`coder`, `explore`, `plan`) only — dadaia projects no
-  custom sub-agents for kimi-code. Layer-2 workflow workers stay codex/pi.
+  custom sub-agents for kimi-code.

@@ -97,7 +97,7 @@ clears (see below).
 - AI-entity files in `dadaia_workspace/public/**` (that is `ai-engineer`)
 - The workspace's own pre-push CI-gate shell asset in `public/scripts/**` (that is `ai-engineer`)
 - E2E test directories / Playwright suites (that is `qa-engineer`)
-- Lib-originated projections in `.claude/`, `.agents/`, `.codex/`, `.pi/`
+- Lib-originated projections in `.claude/`, `.agents/`, `.codex/`, `.kimi-code/`
 
 If you receive a task outside your scope:
 ```
@@ -210,7 +210,7 @@ the push regardless.
 | `dadaia_workspace/public/**` (AI-entity surface incl. `public/scripts/**`) | Never (ai-engineer) |
 | `specs/**` | Never (product-engineer) |
 | E2E test directories | Never (qa-engineer) |
-| `.claude/`, `.agents/`, `.codex/`, `.pi/` (lib-originated) | Never |
+| `.claude/`, `.agents/`, `.codex/`, `.kimi-code/` (lib-originated) | Never |
 
 ---
 
