@@ -14,6 +14,7 @@ internal imports — a pure constants leaf, pinned by contract tests.
 from __future__ import annotations
 
 __all__ = [
+    "DADAIA_ADDITIVE_PREFIXES",
     "DADAIA_MD_HARNESS_TARGETS",
     "LAW_BASENAMES",
     "LAW_HARNESS_DIRS",
@@ -31,6 +32,17 @@ ROOT_ALLOWED_DIRS: frozenset[str] = frozenset(
 #: ``CLAUDE.md`` the Claude Code import bridge; ``prompt.md`` the optional operator
 #: long-prompt file.
 ROOT_ALLOWED_FILES: frozenset[str] = frozenset({"AGENTS.md", "CLAUDE.md", "DADAIA.md", "prompt.md"})
+
+#: The ``.dadaia/`` runtime zones that are operator/agent-writable by law (DADAIA.md §3
+#: ADDITIVE class) — always writable, expected to hold non-lib files. Consumers: the SDD
+#: gate (``features/spec_context/gate_policy``) allows writes here unconditionally, and
+#: the public doctor's foreign-projections scan skips them (a runtime artifact in an
+#: ADDITIVE zone is normal operation, never a ``[foreign]`` finding).
+DADAIA_ADDITIVE_PREFIXES: tuple[str, ...] = (
+    ".dadaia/reports/",
+    ".dadaia/handoff/",
+    ".dadaia/tmp/",
+)
 
 #: Basenames of the projected LAW files — human-only in an instantiated workspace.
 LAW_BASENAMES: frozenset[str] = frozenset({"DADAIA.md", "AGENTS.md", "CLAUDE.md"})

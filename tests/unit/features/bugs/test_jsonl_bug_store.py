@@ -104,9 +104,15 @@ def test_redact_matrix_scrubs_every_free_text_field(field: str, tmp_path: Path) 
     assert "10.1.2.3" not in value
 
     # End-to-end: BugService.append_event persists the redacted value, not the raw one.
+    # A terminal event needs an open stream first — append_event enforces coherence.
     store = JsonlBugStore(tmp_path / field)
-    BugService(store).append_event(event)
-    persisted = list(store.iter_events())[0]
+    service = BugService(store)
+    if event.is_terminal:
+        service.append_event(
+            BugEvent(bug_id=event.bug_id, event="reported", ts=_HOUR_TS, reported_by="se")
+        )
+    service.append_event(event)
+    persisted = list(store.iter_events())[-1]
     persisted_value = getattr(persisted, field)
     assert persisted_value is not None
     assert "marco" not in persisted_value

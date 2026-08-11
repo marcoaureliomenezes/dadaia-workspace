@@ -52,6 +52,7 @@ def test_attesting_registry_is_pinned() -> None:
         "public-privacy",
         "law-projection",
         "entities-derivation",
+        "foreign-projections",
     )
 
 
@@ -73,6 +74,7 @@ def test_golden_never_buries_an_attesting_check() -> None:
         "public-privacy": ("public-privacy", "check:public-privacy"),
         "law-projection": ("law:", "check:law-projection"),
         "entities-derivation": ("entities-derivation", "check:entities-derivation"),
+        "foreign-projections": ("ledger:foreign-scan", "check:foreign-projections"),
     }
     for check_id in ATTESTING_CHECK_IDS:
         assert any(m in text for m in markers[check_id]), (

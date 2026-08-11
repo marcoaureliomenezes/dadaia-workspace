@@ -188,7 +188,14 @@ def bugs_append_cmd(
         typer.echo(f"[error] bug event invalid: {exc.message}", err=True)
         raise typer.Exit(code=1) from exc
 
-    path = JsonlBugStore(target / "bugs").append_event(model)
+    # The service is the enforced side of the stream-coherence authority — appending
+    # through the raw store here is what let incoherent events into the ledger.
+    service = BugService(JsonlBugStore(target / "bugs"))
+    try:
+        path = service.append_event(model)
+    except ValueError as exc:
+        typer.echo(f"[error] bug event incoherent: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
     typer.echo(f"[ok] appended {event.value} for {bug_id} -> {path}")
 
 

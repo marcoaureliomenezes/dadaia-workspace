@@ -75,6 +75,7 @@ ATTESTING_CHECK_IDS: tuple[str, ...] = (
     "public-privacy",
     "law-projection",
     "entities-derivation",
+    "foreign-projections",
 )
 
 

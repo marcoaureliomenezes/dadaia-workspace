@@ -50,11 +50,9 @@ _ARCHIVE_SUBDIR_PREFIXES: tuple[str, ...] = (
     "specs/audits/_archive/",
     "specs/bugs/_archive/",
 )
-_DADAIA_ADDITIVE_PREFIXES: tuple[str, ...] = (
-    ".dadaia/reports/",
-    ".dadaia/handoff/",
-    ".dadaia/tmp/",
-)
+# Single authority in core (also consumed by the public doctor's foreign scan) —
+# the local name is kept for the module's existing readers.
+_DADAIA_ADDITIVE_PREFIXES: tuple[str, ...] = workspace_layout.DADAIA_ADDITIVE_PREFIXES
 _MEMORY_PREFIX = "specs/memory/"
 _FROZEN_PREFIX = "specs/_archive/"
 #: A path under ``repos/<slug>/`` whose context-relative remainder matches one of these

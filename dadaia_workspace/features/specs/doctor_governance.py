@@ -348,8 +348,6 @@ class GovernanceValidator:
         Pure module: reads only under ``specs_dir`` plus the packaged schema resource.
         Absent ``bugs/`` dir → no-op.
         """
-        from dadaia_workspace.core.models.bugs import TERMINAL_EVENTS
-
         bugs_dir = self.specs_dir / "bugs"
         if not bugs_dir.is_dir():
             return []
@@ -426,9 +424,7 @@ class GovernanceValidator:
                 if not isinstance(obj, dict):
                     continue
                 issues.extend(
-                    self._fold_bug_coherence(
-                        obj, jsonl_path, lineno, TERMINAL_EVENTS, seen_reported, terminated
-                    )
+                    self._fold_bug_coherence(obj, jsonl_path, lineno, seen_reported, terminated)
                 )
         return issues
 
@@ -437,51 +433,34 @@ class GovernanceValidator:
         obj: dict[str, object],
         jsonl_path: Path,
         lineno: int,
-        terminal_events: frozenset[str],
         seen_reported: set[str],
         terminated: set[str],
     ) -> list[SpecsDoctorIssue]:
-        """Advance the coherence fold for one event, emitting any coherence ERROR."""
+        """Advance the coherence fold for one event, emitting any coherence ERROR.
+
+        The fold itself is the core authority (:func:`advance_coherence`) — the same
+        function ``BugService.append_event`` uses to REFUSE an incoherent append, so
+        the diagnostic gate and the enforced gate can never diverge.
+        """
+        from dadaia_workspace.core.models.bugs import advance_coherence
+
         bug_id = obj.get("bug_id")
         event = obj.get("event")
         if not isinstance(bug_id, str) or not isinstance(event, str):
             return []
-        if event == "reported":
-            seen_reported.add(bug_id)
-            terminated.discard(bug_id)  # a reopen clears the prior terminal state
+        violation = advance_coherence(bug_id, event, seen_reported, terminated)
+        if violation is None:
             return []
-        if event not in terminal_events:
-            # ARCHIVED and any non-terminal annotation are ignored by the coherence rule.
-            return []
-        if bug_id in terminated:
-            return [
-                SpecsDoctorIssue(
-                    code="SPEC-DOC-033",
-                    severity=Severity.ERROR,
-                    description=(
-                        f"bugs/{jsonl_path.name} line {lineno}: bug '{bug_id}' has a second "
-                        f"terminal event '{event}' after an existing terminal — a bug_id may "
-                        "carry at most one terminal (SPEC-DOC-033, ERROR)."
-                    ),
-                    path=str(jsonl_path),
-                )
-            ]
-        if bug_id not in seen_reported:
-            terminated.add(bug_id)
-            return [
-                SpecsDoctorIssue(
-                    code="SPEC-DOC-033",
-                    severity=Severity.ERROR,
-                    description=(
-                        f"bugs/{jsonl_path.name} line {lineno}: terminal event '{event}' for "
-                        f"bug '{bug_id}' with no prior 'reported' event — every stream must "
-                        "open with 'reported' (SPEC-DOC-033, ERROR)."
-                    ),
-                    path=str(jsonl_path),
-                )
-            ]
-        terminated.add(bug_id)
-        return []
+        return [
+            SpecsDoctorIssue(
+                code="SPEC-DOC-033",
+                severity=Severity.ERROR,
+                description=(
+                    f"bugs/{jsonl_path.name} line {lineno}: {violation} (SPEC-DOC-033, ERROR)."
+                ),
+                path=str(jsonl_path),
+            )
+        ]
 
     def check_unarchived_terminal_backlog(self) -> list[SpecsDoctorIssue]:
         """SPEC-DOC-035 (v0.1.46 AC-4): terminal-status backlog entry still loose → WARN.
