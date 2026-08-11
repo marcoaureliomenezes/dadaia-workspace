@@ -19,6 +19,7 @@ __all__ = [
     "TERMINAL_EVENTS",
     "BugEvent",
     "BugEventKind",
+    "advance_coherence",
     "redact_text",
 ]
 
@@ -46,6 +47,44 @@ TERMINAL_EVENTS: frozenset[str] = frozenset(
         BugEventKind.REJECTED.value,
     }
 )
+
+def advance_coherence(
+    bug_id: str,
+    event: str,
+    seen_reported: set[str],
+    terminated: set[str],
+) -> str | None:
+    """Advance the one-terminal stream-coherence fold by a single event.
+
+    THE single authority for the coherence invariant — every stream opens with
+    ``reported``; an open stream carries at most one terminal; ``reported`` reopens. The
+    specs doctor folds history through it to DIAGNOSE (SPEC-DOC-033) and
+    ``BugService.append_event`` folds through it to REFUSE, so the diagnostic gate and
+    the enforced gate can never diverge (v0.1.72 law).
+
+    Mutates the fold state (*seen_reported*/*terminated*) in place; returns the
+    violation clause for THIS event, or ``None`` when it is coherent. ``archived`` and
+    any other non-terminal annotation always advance cleanly.
+    """
+    if event == BugEventKind.REPORTED.value:
+        seen_reported.add(bug_id)
+        terminated.discard(bug_id)  # a reopen clears the prior terminal state
+        return None
+    if event not in TERMINAL_EVENTS:
+        return None
+    if bug_id in terminated:
+        return (
+            f"bug '{bug_id}' has a second terminal event '{event}' after an existing "
+            "terminal — a bug_id may carry at most one terminal"
+        )
+    terminated.add(bug_id)
+    if bug_id not in seen_reported:
+        return (
+            f"terminal event '{event}' for bug '{bug_id}' with no prior 'reported' "
+            "event — every stream must open with 'reported'"
+        )
+    return None
+
 
 #: Optional string payload fields (everything except ``tags``, which is a list).
 _OPTIONAL_STR_FIELDS: tuple[str, ...] = (

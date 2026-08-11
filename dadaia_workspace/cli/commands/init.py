@@ -50,6 +50,10 @@ def init(
 
     if skip_assets:
         console.print("[dim]Skipped public asset installation (--skip-assets)[/dim]")
+        # The service reports the consequence loudly — the workspace has NO hook wiring
+        # (no gate, no venv guard) until `dadaia public install` runs.
+        for item in installed:
+            console.print(f"  {item}")
     else:
         if installed:
             console.print(

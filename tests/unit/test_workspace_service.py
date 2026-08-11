@@ -64,64 +64,24 @@ def test_init_creates_dirs_state_files_and_is_idempotent(
     assert data["contexts"] == [{"name": "x"}]
 
 
-def _user_prompt_submit(settings_path: Path) -> list:  # type: ignore[type-arg]
-    data = json.loads(settings_path.read_text(encoding="utf-8"))
-    return data["hooks"]["UserPromptSubmit"]
-
-
-def test_configure_hook_writes_canonical_schema_and_supersedes_stale_sh(
+def test_init_skip_assets_writes_no_settings_and_says_ungated(
     service: WorkspaceService, workspace_root: Path
 ) -> None:
-    """_configure_hook must write the canonical nested Claude Code hook schema (a
-    matcher entry with a nested `hooks` array), never the legacy flat entry — and
-    given a stale ctx-inject.sh entry it must REPLACE it with the Python module
-    command, not append a duplicate (bug pin: T-018-17, hooks.UserPromptSubmit.1.hooks
-    Expected array)."""
-    ws = Workspace.from_root(workspace_root)
-    service._configure_hook(ws)
+    """Bug init-skip-assets-writes-gateless-claude-settings: init carried a SECOND
+    ``.claude/settings.json`` writer (``_configure_hook``) that emitted a gateless file
+    (UserPromptSubmit only — no gate, no venv guard, no root whitelist), silently. The
+    canonical writer is ``public install`` (runtime_config); init writes NO settings.
+    Under ``--skip-assets`` the ungated state is loud instead of silently half-wired."""
+    _, installed = service.init(workspace_root, skip_assets=True)
+    assert not (workspace_root / ".claude" / "settings.json").exists()
+    assert any("ungated" in line and "dadaia public install" in line for line in installed)
 
-    entries = _user_prompt_submit(ws.claude_dir / "settings.json")
-    assert len(entries) == 1
-    entry = entries[0]
-    assert entry["matcher"] == ""
-    assert isinstance(entry["hooks"], list) and entry["hooks"]
-    assert entry["hooks"][0]["type"] == "command"
-    # T-018-17: command is now Python module invocation, not .sh path.
-    assert "dadaia_workspace.hooks.ctx_inject" in entry["hooks"][0]["command"]
-    assert "ctx-inject.sh" not in entry["hooks"][0]["command"]
-    # Legacy flat schema must not leak to the top level.
-    assert "command" not in entry
 
-    # Now supersede: pre-populate with the stale .sh command (simulates a workspace
-    # that was initialized before T-018-17).
-    stale_ws_root = workspace_root.parent / "stale-ws"
-    stale_ws = Workspace.from_root(stale_ws_root)
-    stale_sh_command = str(stale_ws.dadaia_dir / "scripts" / "ctx-inject.sh")
-    stale_ws.claude_dir.mkdir(parents=True, exist_ok=True)
-    settings_path = stale_ws.claude_dir / "settings.json"
-    settings_path.write_text(
-        json.dumps(
-            {
-                "hooks": {
-                    "UserPromptSubmit": [
-                        {
-                            "matcher": "",
-                            "hooks": [{"type": "command", "command": stale_sh_command}],
-                        }
-                    ]
-                }
-            }
-        ),
-        encoding="utf-8",
-    )
-
-    service._configure_hook(stale_ws)
-
-    superseded_entries = _user_prompt_submit(settings_path)
-    # SUPERSEDE: exactly one entry — the .sh was replaced, not duplicated.
-    assert len(superseded_entries) == 1, "must not append a duplicate; stale .sh must be superseded"
-    superseded_entry = superseded_entries[0]
-    assert isinstance(superseded_entry.get("hooks"), list)
-    cmd = superseded_entry["hooks"][0]["command"]
-    assert "dadaia_workspace.hooks.ctx_inject" in cmd
-    assert "ctx-inject.sh" not in cmd
+def test_init_with_assets_never_writes_settings_itself(
+    service: WorkspaceService, workspace_root: Path
+) -> None:
+    """On the normal path the full settings projection is ``public install``'s output —
+    the service itself must not touch the file (one writer, one format)."""
+    _, installed = service.init(workspace_root, skip_assets=False)
+    assert not any("ungated" in line for line in installed)
+    assert not (workspace_root / ".claude" / "settings.json").exists()

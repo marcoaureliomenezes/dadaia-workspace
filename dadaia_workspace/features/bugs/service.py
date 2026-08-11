@@ -10,7 +10,12 @@ from __future__ import annotations
 from collections import Counter
 from dataclasses import dataclass, field, replace
 
-from dadaia_workspace.core.models.bugs import TERMINAL_EVENTS, BugEvent, BugEventKind
+from dadaia_workspace.core.models.bugs import (
+    TERMINAL_EVENTS,
+    BugEvent,
+    BugEventKind,
+    advance_coherence,
+)
 
 # The store is an infrastructure concern; the service holds it behind the ``BugStore``
 # core Protocol (DI seam) — the concrete ``JsonlBugStore`` is injected at the CLI
@@ -49,9 +54,25 @@ class BugService:
     def __init__(self, store: BugStore) -> None:
         self._store = store
 
-    def append_event(self, event: BugEvent) -> None:
-        """Redact ``notes`` then append the event (append-only, never rewrites history)."""
-        self._store.append_event(event.redact())
+    def append_event(self, event: BugEvent) -> object:
+        """Refuse an incoherent event, then redact and append (never rewrites history).
+
+        Coherence is judged by the SAME core fold the specs doctor diagnoses with
+        (:func:`advance_coherence`) — before this, the one-terminal invariant lived only
+        in the doctor, so the CLI happily wrote what the doctor then flagged (bugs
+        bugs-append-accepts-second-terminal-event /
+        bugs-append-allows-terminal-event-without-reported). History is folded
+        tolerantly: an existing incoherent row is the doctor's finding, never an append
+        blocker — only the NEW event is refused. Returns the store's append result.
+        """
+        seen_reported: set[str] = set()
+        terminated: set[str] = set()
+        for prior in self._store.iter_events():
+            advance_coherence(prior.bug_id, prior.event, seen_reported, terminated)
+        violation = advance_coherence(event.bug_id, event.event, seen_reported, terminated)
+        if violation is not None:
+            raise ValueError(violation)
+        return self._store.append_event(event.redact())
 
     def _fold(self) -> dict[str, BugState]:
         """Reduce the event stream to current per-``bug_id`` state.
