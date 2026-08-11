@@ -106,20 +106,14 @@ def test_reinit_with_subset_merges_previously_persisted_harnesses(
 def test_reinit_same_set_does_not_duplicate_ctx_inject_hook(
     service: WorkspaceService, tmp_path: Path
 ) -> None:
-    """A claude re-init leaves exactly one ctx-inject hook entry (no second registration).
+    """A claude re-init never writes ``.claude/settings.json`` at all.
 
     Kept named — this proved a real drift-bug class (duplicate hook registration on
-    repeated init)."""
+    repeated init). The whole class is now unrepresentable: init's own settings writer
+    was deleted (bug init-skip-assets-writes-gateless-claude-settings), so hook wiring
+    exists only as ``public install`` output — there is no second registrar left to
+    duplicate anything."""
     service.init(tmp_path, skip_assets=True, harnesses=("claude",))
     service.init(tmp_path, skip_assets=True, harnesses=("claude",))
 
-    settings = json.loads((tmp_path / ".claude" / "settings.json").read_text(encoding="utf-8"))
-    entries = settings["hooks"]["UserPromptSubmit"]
-    ctx_inject = [
-        h
-        for entry in entries
-        for h in entry.get("hooks", [])
-        if "dadaia_workspace.hooks.ctx_inject" in h.get("command", "")
-    ]
-    assert len(ctx_inject) == 1, entries
-    assert " -B -m dadaia_workspace.hooks.ctx_inject" in ctx_inject[0]["command"]
+    assert not (tmp_path / ".claude" / "settings.json").exists()

@@ -48,18 +48,22 @@ def test_operator_skill_dir_and_root_files_are_not_flagged(tmp_path: Path) -> No
     own_skill.mkdir(parents=True)
     (own_skill / "SKILL.md").write_text("---\nname: my-private-skill\n---\n", "utf-8")
     (ws / "prompt.md").write_text("operator root file\n", "utf-8")
+    # ADDITIVE runtime zones (.dadaia/reports|handoff|tmp) hold non-lib files by design
+    # — even though the ledger owns the scoped AGENTS.md projected into them.
+    (ws / ".dadaia" / "tmp" / "runtime-sentinel").write_text("x", "utf-8")
 
     hits = _foreign(list(mgr.doctor(ws)))
     assert not any("my-private-skill" in t for t in hits)
     assert not any("prompt.md" in t for t in hits)
+    assert not any("runtime-sentinel" in t for t in hits)
 
 
 def test_foreign_scan_attests_clean_and_not_applicable(tmp_path: Path) -> None:
     ws, mgr = _installed_ws(tmp_path)
     rendered = [line.render() for line in mgr.doctor(ws)]
-    assert any(
-        line.startswith("[ok] ledger:foreign-scan") for line in rendered
-    ), "a clean scan must still speak — silence is indistinguishable from a vanished check"
+    assert any(line.startswith("[ok] ledger:foreign-scan") for line in rendered), (
+        "a clean scan must still speak — silence is indistinguishable from a vanished check"
+    )
 
     # No ledger (pre-ledger workspace) ⇒ no authority to scan against ⇒ explicit stamp.
     (ws / ".dadaia" / "states" / "install_ledger.json").unlink()

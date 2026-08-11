@@ -48,6 +48,7 @@ TERMINAL_EVENTS: frozenset[str] = frozenset(
     }
 )
 
+
 def advance_coherence(
     bug_id: str,
     event: str,

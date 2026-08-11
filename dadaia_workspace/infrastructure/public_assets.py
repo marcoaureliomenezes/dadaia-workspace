@@ -24,6 +24,7 @@ from dadaia_workspace.core.models.agent_model_policy import (
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus, attest
 from dadaia_workspace.core.models.install_ledger import InstallLedger, LedgerEntry
 from dadaia_workspace.core.protocols.install_ledger_store import InstallLedgerStore
+from dadaia_workspace.core.workspace_layout import DADAIA_ADDITIVE_PREFIXES
 from dadaia_workspace.infrastructure.codex_doctor import (
     check_agent_skill_refs,
     check_codex_drift,
@@ -1363,7 +1364,14 @@ class FileSystemPublicAssetManager:
             return []
         owned = ledger.by_relpath()
         managed_dirs = sorted(
-            {parent for rel in owned if (parent := PurePosixPath(rel).parent.as_posix()) != "."}
+            {
+                parent
+                for rel in owned
+                if (parent := PurePosixPath(rel).parent.as_posix()) != "."
+                # ADDITIVE runtime zones hold non-lib files by design (same core
+                # authority the SDD gate derives its always-writable class from).
+                and not any(f"{parent}/".startswith(p) for p in DADAIA_ADDITIVE_PREFIXES)
+            }
         )
         lines: list[DoctorLine] = []
         for rel_dir in managed_dirs:
@@ -1381,9 +1389,7 @@ class FileSystemPublicAssetManager:
                         )
                     )
         if not lines:
-            lines.append(
-                DoctorLine(
-                    DoctorStatus.OK, f"ledger:foreign-scan ({len(managed_dirs)} managed dirs clean)"
-                )
-            )
+            # No dir count in the claim — the managed-dir set varies per environment
+            # (harness profile, user-level targets) and a byte-locked golden line must not.
+            lines.append(DoctorLine(DoctorStatus.OK, "ledger:foreign-scan (managed dirs clean)"))
         return lines

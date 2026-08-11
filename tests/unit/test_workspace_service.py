@@ -5,7 +5,6 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.models.workspace import Workspace
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from tests.fakes import FakePublicAssetManager, FakePythonEnvironmentManager
 
