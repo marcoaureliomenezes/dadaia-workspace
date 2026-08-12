@@ -422,7 +422,7 @@ verdict covers the `origin/develop..develop` delta about to be pushed. Any
 
 ---
 
-- [-] **T-070-10 — Milestone (b): merge to `develop`, push, PR to `main`, CI green**
+- [x] **T-070-10 — Milestone (b): merge to `develop`, push, PR to `main`, CI green**
 
 **Owner role:** software-engineer · **Commit:** merge commit + any CI fix
 
