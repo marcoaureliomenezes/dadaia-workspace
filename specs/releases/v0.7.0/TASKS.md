@@ -231,7 +231,7 @@ Re-project at the end (same chain as T-070-02).
 
 ---
 
-- [ ] **T-070-05 — Markers, tiered timeouts, preflight (TDD: RED before GREEN)**
+- [-] **T-070-05 — Markers, tiered timeouts, preflight (TDD: RED before GREEN)**
 
 **Owner role:** software-engineer · **Commits:** `test(T-070-05): RED contracts for tier timeouts and quarantine markers` then `feat(T-070-05): pytest-timeout tiers, flaky/quarantine markers, preflight cleanup`
 
