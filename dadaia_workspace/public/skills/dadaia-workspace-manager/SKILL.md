@@ -43,15 +43,16 @@ auto-resolve it by searching cwd and parent directories. You never need to pass
 `dadaia context bind <name> [--mode <read|implementation|review>] [--release <id>]`.
 The command **persists** the bound context, mode, and session id in the session record
 — the SDD gate resolves each session's own mode strictly self-scoped (env → the
-session's own record → IMPLEMENTATION default), so bind never needs a shell `eval` and a
-foreign session's bind can never change your mode (NO-LOCKS DOCTRINE, v0.1.76). Bind
-also stamps a bind-epoch marker (`.dadaia/states/bind_epoch/<ctx>`) — the SOLE trigger
-for context-memory injection: an unbound session gets generic preflight only (no
-first-ALIVE injection fallback), and bind is never a precondition for ADDITIVE work.
-Pass `--print-env` to
-additionally emit `export DADAIA_CONTEXT=… DADAIA_SESSION_ID=…` lines for legacy
-`eval $(…)` callers. Spec navigation, gates, and workflow commands use this
-session-bound state or explicit `--context` flags.
+session's own record → IMPLEMENTATION default), so a foreign session's bind can never
+change your mode (NO-LOCKS DOCTRINE, v0.1.76). The session record's bind timestamp is
+the SOLE trigger for context-memory injection: an unbound session gets generic preflight
+only, and bind is never a precondition for ADDITIVE work. The record is keyed by your
+harness session id; in a **plain shell** (no harness id — also the kimi-code posture,
+which exposes none) the exported `DADAIA_CONTEXT=<ctx>` env var **is** the binding —
+`bind` prints the export line and warns loudly when neither channel can carry the
+binding. Spec navigation, gates, and workflow commands use this session-bound state or
+explicit `--context` flags. `context heartbeat`/`release`/`show` resolve your own
+session the same way (harness id, else `DADAIA_CONTEXT`) — there is no marker fallback.
 
 **Repos on disk** - `repos/<slug>/` exists only when a context is `alive`.
 Making a context dead git-syncs and removes it. Making it alive clones it back

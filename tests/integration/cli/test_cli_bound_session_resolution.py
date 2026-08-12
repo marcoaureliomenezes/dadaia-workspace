@@ -1,22 +1,24 @@
 """Bound-session specs-dir resolution for resolver-driven CLIs (v0.1.50 FR4).
 
 Root cause (pinned at definition review): `bugs.py` called the shared
-`resolve_specs_dir` WITHOUT `ancestry_pids`, degrading bind-marker attribution to
-single-`getppid()` equality — a bound harness session's CLI calls fell through to
-`cwd/specs`, silently landing governance artifacts in a root-law-violating
-workspace-root `specs/`. The fix centralizes ancestry-threading in ONE shared CLI
-seam and adds a root-law guard to the cwd fallback.
+`resolve_specs_dir` in a way that silently degraded resolution for a bound harness
+session, whose CLI calls fell through to `cwd/specs` — landing governance artifacts in
+a root-law-violating workspace-root `specs/`. The fix centralizes resolution in ONE
+shared CLI seam (`cli._specs_resolution`, T-50-04: now the single resolution authority).
+
+T-50-05 (SPEC v0.5.0 FR1 deletion item 4): the `cwd/specs` fallback this module used to
+pin as a legitimate "outside any workspace" escape hatch is deleted outright —
+`DADAIA.md` §3 grants no rung for it. That case is re-pointed below to assert the new
+terminal, actionable failure instead of a silent success into an ungoverned directory.
 """
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
-from dadaia_workspace import container
 from dadaia_workspace.cli.main import app
 
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
@@ -67,38 +69,38 @@ def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv(var, raising=False)
 
 
-def test_bound_session_resolution_ancestry_rootlaw_and_plain_repo_fallback(
+def test_bound_session_resolution_context_flag_rootlaw_and_no_workspace_fails_clean(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """CRITICAL (minimal merge only, v0.1.76 rewrites): (1) a bind marker anchored at
-    a DEEP ancestor (beyond getppid) must attribute — the CLI seam threads the full
-    ancestry chain (degraded getppid-only misses it); (2) the cwd fallback must refuse
-    a root-law-violating workspace-root specs/; (3) outside any workspace, cwd/specs
-    stays a legitimate fallback (plain repo layout)."""
-    # (1) deep-ancestry bind attribution.
+    """CRITICAL (minimal merge only, v0.1.76 rewrites; T-50-04 deletes the bind-epoch
+    marker attribution this test used to exercise as part (1) — the harness-real,
+    real-bind end-to-end coverage for the bound-session leg itself now lives in
+    ``test_bind_resolution_seam_executed_path.py``): (1) ``bugs append``'s
+    ``--context`` routing key (v0.1.82, bug ``bugs-append-ledger-ignores-context-flag``)
+    lands the event in that context's ledger; (2) a specs/ AT the workspace root with no
+    bound context now fails via the SAME generic terminal error every unresolved case
+    raises (T-50-05 deletes the specific "Workspace Root Law" refusal patch along with
+    the fallback it was bolted onto — the outcome, refusal, is unchanged); (3) T-50-05
+    deletes the ``cwd/specs`` fallback outright — a bare directory outside any dadaia
+    workspace no longer resolves via its own local specs/, even when one is right
+    there on disk, because ``DADAIA.md`` §3 grants no rung for it."""
+    # (1) --context routing key attribution.
     ws = tmp_path / "ws"
     _make_workspace(ws)
     ctx_bugs = ws / "repos" / "projx" / "specs" / "bugs"
     ctx_bugs.mkdir(parents=True)
 
-    chain = container.build_ancestry_pid_chain(os.getppid())
-    if len(chain) < 2:
-        pytest.skip("no grandparent pid available on this platform")
-    deep_ancestor = chain[1]
-    epoch = ws / ".dadaia" / "states" / "bind_epoch"
-    epoch.mkdir(parents=True)
-    (epoch / "projx").write_text(f"{deep_ancestor}\n", encoding="utf-8")
-
     monkeypatch.chdir(ws)
     result = _runner.invoke(app, _APPEND_ARGS)
 
     assert result.exit_code == 0, result.output
-    assert list(ctx_bugs.glob("*.jsonl")), "event must land in the BOUND context's specs/bugs/"
+    assert list(ctx_bugs.glob("*.jsonl")), "event must land in the routed context's specs/bugs/"
 
-    # (2) cwd fallback refuses root-law-violating workspace-root specs/.
+    # (2) a workspace-root specs/ with NO bound context fails via the generic terminal
+    # error (not the old specific "Workspace Root Law" message — that patch is gone).
     rootlaw_ws = tmp_path / "rootlaw-ws"
     _make_workspace(rootlaw_ws)
-    (rootlaw_ws / "specs" / "bugs").mkdir(parents=True)  # illegal top-level entry
+    (rootlaw_ws / "specs" / "bugs").mkdir(parents=True)
 
     monkeypatch.chdir(rootlaw_ws)
     rootlaw_result = _runner.invoke(app, _APPEND_ARGS)
@@ -108,12 +110,13 @@ def test_bound_session_resolution_ancestry_rootlaw_and_plain_repo_fallback(
     # Redaction-safe: no absolute operator-local path echoed.
     assert str(rootlaw_ws) not in rootlaw_result.output
 
-    # (3) plain-repo fallback still works outside any workspace.
+    # (3) T-50-05: outside any dadaia workspace, the old cwd/specs fallback is deleted —
+    # this now fails clean instead of silently writing into an ungoverned directory.
     repo = tmp_path / "repo"
     (repo / "specs" / "bugs").mkdir(parents=True)
 
     monkeypatch.chdir(repo)
     repo_result = _runner.invoke(app, _APPEND_ARGS)
 
-    assert repo_result.exit_code == 0, repo_result.output
-    assert list((repo / "specs" / "bugs").glob("*.jsonl"))
+    assert repo_result.exit_code != 0
+    assert not list((repo / "specs" / "bugs").glob("*.jsonl"))

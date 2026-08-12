@@ -1,9 +1,36 @@
 ---
 name: security-low-carryforwards-v030
-status: OPEN
+status: CONSUMED — v0.5.0
 created: 2026-08-10
 origin: security-reviewer push verdicts for v0.3.0/v0.4.0 (handoffs 2026-08-10, dadaia-workspace context) — 4 LOW findings, none push-blocking, routed per §6
 owner: project-manager (curates)
+disposition:
+  terminal_status: CONSUMED
+  closed_by: v0.5.0
+  closed_at: '2026-08-12'
+  evidence: specs/releases/v0.5.0/CLOSURE.md#dispositions
+  findings:
+    - finding: install-ledger relpath (CWE-22 class)
+      status: FIXED
+      by: v0.5.0 FR3.1 — validated in LedgerEntry.__post_init__, the one construction
+        authority; zero validation added at either call site
+    - finding: entities-derivation shape tolerance
+      status: FIXED
+      by: v0.5.0 FR3.3 — typed ENT-DERIVE-1 DoctorLine at the one parse seam
+    - finding: kimi telemetry reader path containment
+      status: FIXED
+      by: v0.5.0 FR3.4 — lexical containment before stat, plus the reader's first test file
+    - finding: certify surface re-scope post-engine-demolition
+      status: RE-SCOPED (verified, no code)
+      by: v0.5.0 FR3.5 — all 11 checks live, zero dead references; missing automated
+        test routed to the backlog as a return
+    - finding: CWE-117 doctor-line injection (new LOW, 2026-08-11 verdict)
+      status: FIXED
+      by: v0.5.0 FR3.2 — control-character escaping in DoctorLine.render()
+    - finding: hook write-path latency on the resolution seam (new LOW, 2026-08-11 verdict)
+      status: FIXED
+      by: v0.5.0 six-axis review F-01 — container import removed from the hook path
+        (2.25s → 0.46s measured), pinned by an attesting import-surface guard test
 intents:
   - subject: { kind: code, ref: "dadaia_workspace/infrastructure/codex_doctor.py#check_entities_derivation" }
     change: "malformed-but-valid JSON (non-dict personas entries, non-dict implementations) raises AttributeError instead of an [error] line; fails closed today, but the verifier should degrade to a typed error line like the loader does"

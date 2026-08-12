@@ -47,3 +47,24 @@ def test_copy_tree_missing_source_is_a_noop(tmp_path: Path) -> None:
         tmp_path / "absent", tmp_path / "dst", overwrite=OverwritePolicy.FORCE, installed=installed
     )
     assert installed == []
+
+
+def test_remove_legacy_bind_epoch_state_sweeps_orphan_markers(tmp_path: Path) -> None:
+    """F-09 (v0.5.0 six-axis review): the marker subsystem is deleted, so leftover
+    ``.dadaia/states/bind_epoch/`` markers are orphan state — the named migration
+    sweeps the files and the dir, and is a no-op when the dir is absent."""
+    from dadaia_workspace.infrastructure.install_helpers import remove_legacy_bind_epoch_state
+
+    ws = tmp_path / "ws"
+    epoch = ws / ".dadaia" / "states" / "bind_epoch"
+    epoch.mkdir(parents=True)
+    (epoch / "demo").write_text("12345\n", encoding="utf-8")
+    installed: list[str] = []
+    remove_legacy_bind_epoch_state(ws, installed)
+    assert not epoch.exists()
+    assert any(line.startswith("[rm] ") and "bind_epoch" in line for line in installed)
+
+    # Absent dir: silent no-op.
+    installed2: list[str] = []
+    remove_legacy_bind_epoch_state(ws, installed2)
+    assert installed2 == []

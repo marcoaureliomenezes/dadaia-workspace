@@ -6,10 +6,14 @@ it delegates classification + decision to :func:`gate_policy.classify_path` and
 :func:`gate_policy.evaluate`, which is the single source of truth (avoids a third
 drifting copy alongside the bash gate).
 
-1. **PATH-first context slug.** The context is derived from the write-target path
-   (``repos/<slug>/...``); ``DADAIA_CONTEXT`` is consulted only as an override when the
-   path is under no repo. A write under ``repos/B/...`` therefore never touches
-   ``repos/A``'s presence.
+1. **PATH-first context slug.** The context is derived via the single resolution
+   authority (:func:`dadaia_workspace.container.resolve_context`, ``DADAIA.md`` §3),
+   called with ``target_path=fpath`` so the write-target path (``repos/<slug>/...``)
+   wins ahead of every other rung — a write under ``repos/B/...`` therefore never
+   touches ``repos/A``'s presence, even while ``DADAIA_CONTEXT`` names a different
+   context (T-50-02, SPEC v0.5.0 FR1). A write under NO repo falls through to
+   ``DADAIA_CONTEXT``, then this session's own live record, then the repo containing
+   the current working directory, before resolving unattributed.
 2. **PROTECTED is the sole fail-CLOSED path.** ``.dadaia/sessions/`` writes are blocked
    unconditionally (SEC-01); every other class fails OPEN.
 3. **Fail-open posture.** No non-PROTECTED, non-self-READ write blocks because of
@@ -74,26 +78,33 @@ def _resolve_workspace() -> Path:
     return resolve_workspace_root()
 
 
-def _context_slug(workspace: Path, fpath: Path) -> str:
-    """Derive the context slug PATH-first from the write target.
+def _context_slug(fpath: Path) -> str:
+    """Derive the context slug via the single resolution authority (T-50-02, SPEC v0.5.0
+    FR1 — re-points consumer "E").
 
-    A target under ``<ws>/repos/<slug>/...`` belongs to context ``<slug>`` regardless of
-    which context is first-ALIVE in the registry. ``DADAIA_CONTEXT`` is honored only as an
-    explicit override when the path is under no repo. The result is sanitized to
-    ``[A-Za-z0-9_-]`` (CWE-22).
+    Delegates to :func:`dadaia_workspace.container.resolve_context` with
+    ``target_path=fpath`` (``core.specs_resolver`` is a forbidden direct import for
+    ``hooks`` — ``bind-resolution-seam-is-a-single-home``, ZERO ``ignore_imports`` —
+    so the composition-root seam in ``container`` is the sanctioned path). ``target_path``
+    is what preserves this hook's PATH-FIRST semantics through the authority's rung 0: a
+    target under ``<ws>/repos/<slug>/...`` belongs to context ``<slug>`` regardless of
+    ``DADAIA_CONTEXT`` or which context is first-ALIVE in the registry — rung 0 is
+    consulted before rung 1 (the env var).
+
+    **Intended semantic widening (SPEC FR1, this task's acceptance criterion):** a write
+    under NO repo used to resolve via ``DADAIA_CONTEXT`` only (the old 2-rung ladder this
+    function used to implement). It now falls through the authority's remaining rungs —
+    this session's own LIVE record (rung 2), then the repo containing the current
+    working directory (rung 3) — before giving up unattributed. The result is sanitized
+    to ``[A-Za-z0-9_-]`` (CWE-22), matching the authority's own allowlist.
     """
-    repos = workspace / "repos"
-    slug = ""
-    try:
-        rel = fpath.resolve().relative_to(repos.resolve())
-        parts = rel.parts
-        if parts:
-            slug = parts[0]
-    except (ValueError, OSError):
-        slug = ""
-    if not slug:
-        slug = os.environ.get("DADAIA_CONTEXT", "")  # explicit override only
-    return _SLUG_STRIP.sub("", slug or "")
+    # Direct core import (F-01, v0.5.0 code review): the container is the DI
+    # composition root and costs ~2s of import graph per one-shot hook process; the
+    # seam contract sanctions hooks as direct importers of the single authority.
+    from dadaia_workspace.core.specs_resolver import resolve_context
+
+    slug = resolve_context(target_path=fpath) or ""
+    return _SLUG_STRIP.sub("", slug)
 
 
 def _resolve_mode(workspace: Path, session_id: str, ctx: str = "") -> str:
@@ -178,8 +189,18 @@ def _evaluate_target(
             mode="",
         )
 
-    ctx = _context_slug(workspace, fpath)
-    specs_dir = workspace / "repos" / ctx / "specs" if ctx else workspace / "specs"
+    ctx = _context_slug(fpath)
+    # F-02 (v0.5.0 code review): the authority returns the context NAME; the on-disk
+    # directory is the registry's repo_slug, and the two legitimately differ
+    # (`context create <name> --repo <slug>`). Map before joining, like
+    # container._context_specs_dir does — otherwise ACTIVE.md is read from a
+    # non-existent dir and MEMORY writes are wrongly phase-blocked.
+    if ctx:
+        from dadaia_workspace.core.specs_resolver import repo_slug_for_context
+
+        specs_dir = workspace / "repos" / repo_slug_for_context(workspace, ctx) / "specs"
+    else:
+        specs_dir = workspace / "specs"
     phase = _active_field(specs_dir, "phase") or ""
     release_raw = _active_field(specs_dir, "release")
     release = release_raw or "none"
@@ -197,7 +218,7 @@ def _evaluate_target(
     if cls == gate_policy.PathClass.MUTATING and not ctx:
         return gate_policy.Decision.ALLOW, ""
 
-    runtime = os.environ.get("DADAIA_RUNTIME") or os.environ.get("DADAIA_AGENT_RUNTIME", "unknown")
+    runtime = os.environ.get("DADAIA_RUNTIME", "unknown")
     return gate_policy.evaluate(
         workspace,
         rel_path,

@@ -434,8 +434,8 @@ interpreter spawn per tool call; `Bash` is in the matcher only for the venv-guar
 fixed-pattern check — no shell parsing); `PostToolUse → …hooks.sdd_post_gate` with the
 matcher **omitted** — Codex's canonical match-all form — so the presence heartbeat fires
 after every tool; `SessionStart → …hooks.ctx_inject` (injection itself is bind-driven:
-re-injection only on a bind-epoch marker newer than the session sentinel; no first-ALIVE
-fallback). The anchored matcher is documented-valid and NOT to be changed
+re-injection only when the session record's bind timestamp is newer than the session
+sentinel; no first-ALIVE fallback). The anchored matcher is documented-valid and NOT to be changed
 (live-verified; see the contract table above). The legacy bash hook quartet was retired
 in v0.1.10 (Decision D-1) — the hooks are production Python owned by software-engineer.
 This wiring enforces only in interactive sessions; headless commits/pushes are covered

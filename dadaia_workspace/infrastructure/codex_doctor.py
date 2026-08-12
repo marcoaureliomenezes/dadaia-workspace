@@ -13,7 +13,9 @@ import os
 import re
 import subprocess
 import tomllib
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
@@ -637,6 +639,37 @@ def codex_trust_boundary_info() -> list[DoctorLine]:
     ]
 
 
+def _entities_registry_shape_problem(raw: Any) -> str | None:
+    """The single shape-tolerance seam for ``check_entities_derivation`` (ENT-DERIVE-1).
+
+    Returns a human-readable description of the first shape violation found, or
+    ``None`` when ``raw`` is safe for every ``.get``/iteration the caller performs
+    downstream. Deliberately does not validate ``rules``/``universal`` — this check
+    never reads those sections (only ``schema_version``, ``personas`` and
+    ``behaviors[*].implementations``), so nothing beyond that is shape-checked here.
+    """
+    if not isinstance(raw, dict):
+        return f"registry top level is a JSON {type(raw).__name__}, expected an object"
+
+    personas = raw.get("personas", [])
+    if not isinstance(personas, list) or not all(isinstance(p, dict) for p in personas):
+        return "'personas' is not a list of JSON objects"
+
+    behaviors = raw.get("behaviors", [])
+    if not isinstance(behaviors, list) or not all(isinstance(b, dict) for b in behaviors):
+        return "'behaviors' is not a list of JSON objects"
+
+    for behavior in behaviors:
+        implementations = behavior.get("implementations", {})
+        if not isinstance(implementations, Mapping):
+            return (
+                f"behavior '{behavior.get('id')}' implementations is a "
+                f"{type(implementations).__name__}, expected a JSON object"
+            )
+
+    return None
+
+
 def check_entities_derivation(public_dir: Path) -> list[DoctorLine]:
     """ENT-DERIVE-1 (constitution §12.5): the abstract-entity registry grounds the scaffold.
 
@@ -653,7 +686,7 @@ def check_entities_derivation(public_dir: Path) -> list[DoctorLine]:
     """
     registry_path = public_dir / "entities" / "registry.json"
     try:
-        registry = json.loads(registry_path.read_text(encoding="utf-8"))
+        raw_registry = json.loads(registry_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         return [
             DoctorLine(
@@ -662,6 +695,23 @@ def check_entities_derivation(public_dir: Path) -> list[DoctorLine]:
                 f"({exc.__class__.__name__}) (ENT-DERIVE-1)",
             )
         ]
+
+    # Shape-validate the parsed JSON HERE, once, so every line below this seam may
+    # assume the shape it needs — no isinstance scattered downstream. A malformed-but
+    # -valid-JSON registry (wrong top-level type, non-dict entries, a string standing
+    # in for a mapping) must never reach ``.get``/``set(...)`` and raise
+    # AttributeError/TypeError, and must never be silently misread into a wrong DRIFT
+    # line (e.g. ``set("codex")`` iterating characters as if they were harness ids).
+    shape_problem = _entities_registry_shape_problem(raw_registry)
+    if shape_problem is not None:
+        return [
+            DoctorLine(
+                DoctorStatus.ERROR,
+                f"entities-derivation: {shape_problem} (ENT-DERIVE-1)",
+            )
+        ]
+    registry: dict[str, Any] = raw_registry
+
     if registry.get("schema_version") != "agentic-entities-v1":
         return [
             DoctorLine(

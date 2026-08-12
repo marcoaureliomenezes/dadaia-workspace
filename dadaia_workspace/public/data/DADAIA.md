@@ -101,11 +101,13 @@ IMPLEMENTATION. A session in READ mode blocks only its *own* MUTATING writes, as
 self-protection; ADDITIVE paths stay writable and no other session is affected.
 
 **Context and memory.** Resolve the active context from `DADAIA_CONTEXT`, then your own
-session binding, then the repo containing the working directory; inspect the result with
-`dadaia context show --json`. `dadaia context bind` refreshes your session record and is
-the sole trigger for context-memory injection. Bind selects which memory you receive — it
-is never a precondition for work, and ADDITIVE work needs none. Keep working; tell the
-operator only when the workspace has no ALIVE context at all.
+session binding — the live session record keyed by your harness session id — then the
+repo containing the working directory; inspect the result with `dadaia context show
+--json`. `dadaia context bind` refreshes your session record and is the sole trigger for
+context-memory injection; in a plain shell with no harness session id, the exported
+`DADAIA_CONTEXT` env var **is** the binding (`bind` prints the export line). Bind selects
+which memory you receive — it is never a precondition for work, and ADDITIVE work needs
+none. Keep working; tell the operator only when the workspace has no ALIVE context at all.
 
 **Git chokepoints** close the `Bash` write path, which the gate does not parse. They run
 as git hooks and do not depend on any harness hook firing:

@@ -23,7 +23,7 @@ existing purpose, it does not belong in `.dadaia/` at all.
 | `hooks/` | Projected Python governance hook entrypoints (`pre_gate`, `sdd_post_gate`, `ctx_inject`) the harness runs pre/post tool use. | projection | No — lib-originated |
 | `scripts/` | Projected runtime/git-hook scripts (pre-push CI + security gate, memory-atom lint). | projection | No — edit public source |
 | `mcps/` | Per-MCP-server working directories (`mcps/<server>/`). All MCP runtime state lives here — never at the root. | runtime | Server-managed |
-| `states/` | Machine-readable runtime state JSON: `spec_contexts`, `presence/`, `bind_epoch/`, `server_registry`, model policies, `root_exceptions.txt`. | state | No — change via `dadaia` CLI / service code |
+| `states/` | Machine-readable runtime state JSON: `spec_contexts`, `presence/`, `server_registry`, model policies, `root_exceptions.txt`. | state | No — change via `dadaia` CLI / service code |
 | `sessions/` | Per-session identity + bind records (one file per session id). PROTECTED path class — the gate fails closed here. | state | No — written by bind/gate |
 | `handoff/` | Machine-readable agent handoff JSON, `handoff/<context>/<UTC>-<agent>-<slug>.handoff.json`. See `handoff/AGENTS.md`. | output | Append-only, schema-validated |
 | `reports/` | Human-readable HTML reports, `reports/<context>/<agent>/<UTC>-<slug>.html`. See `reports/AGENTS.md`. | output | Follow the scoped rule |

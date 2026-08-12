@@ -28,7 +28,8 @@ any source file or writing any output.
 
 The lean bootstrap prefix (tech-stack verbatim + `catalog.json`) is injected once per
 session by the ctx-inject hook (`dadaia_workspace.hooks.ctx_inject`), bind-driven: it
-fires again only on a bind-epoch marker newer than the session's own sentinel. When
+fires again only when the session record's bind timestamp is newer than the session's
+own sentinel (so a re-bind — even to the same context — re-injects). When
 present, that prefix is already in your context — no separate assembly step to run.
 
 What this skill keeps is the **judgment** the hook cannot make for you: *read the

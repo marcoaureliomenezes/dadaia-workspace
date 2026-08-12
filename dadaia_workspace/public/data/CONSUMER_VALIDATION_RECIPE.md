@@ -369,11 +369,14 @@ never exercised the live backlog path was false confidence).
 
 - Setup: `export KIMI_CODE_HOME=<throwaway>`; `$D init --harness kimi-code` in a
   disposable dir.
+- **Binding posture:** kimi-code exposes no session-id env var, so its binding is the
+  exported `DADAIA_CONTEXT=<ctx>` at harness launch (the law's rung 1) — `dadaia
+  context bind` alone cannot key a kimi session record and warns saying so.
 - **PASS if ALL of:** `.kimi-code/AGENTS.md` exists; the managed `[[hooks]]` block
   and four `dadaia-kimi-*` shims exist under `$KIMI_CODE_HOME`; the pre-gate shim
   allows a normal write (exit 0) and blocks a root-law violation (exit 2 + stderr
-  reason naming `.kimi-code/` among allowed entries); ctx-inject injects after
-  `dadaia context bind`; the post-compact shim stamps `ctx-compact-<sid>` AND
+  reason naming `.kimi-code/` among allowed entries); ctx-inject injects with
+  `DADAIA_CONTEXT` exported at launch; the post-compact shim stamps `ctx-compact-<sid>` AND
   re-emits the bootstrap on stdout, and the next prompt re-injects exactly once;
   `dadaia public doctor` is green (incl. `dadaia:scripts/*` on a kimi-only profile);
   `dadaia public doctor` flags a tampered shim/block and `install` heals it.

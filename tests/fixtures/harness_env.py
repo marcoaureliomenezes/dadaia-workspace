@@ -382,6 +382,7 @@ def run_hook_subprocess(
     env: dict[str, str],
     *,
     timeout: float = 30.0,
+    cwd: Path | str | None = None,
 ) -> HookResult:
     """Invoke a dadaia hook as a real subprocess, the way the harness does.
 
@@ -389,6 +390,18 @@ def run_hook_subprocess(
     stdin as the hook JSON envelope and ``env`` as the *complete* process environment
     (use :func:`claude_hook_env` / :func:`codex_hook_env` to build it). Captures exit code,
     stdout, and stderr.
+
+    ``cwd`` (T-50-02, SPEC v0.5.0 FR1): the real harness spawns a hook with the operator's
+    session cwd, which — structurally, in every real workspace — sits somewhere UNDER the
+    true workspace root. Every consumer now routed through
+    ``core.specs_resolver.resolve_context`` may consult that cwd (rungs 0/3), so a test
+    that leaves it unset inherits the PYTEST PROCESS's own cwd instead — which, in this
+    self-hosting checkout, is itself nested under a REAL, registered dadaia-workspace
+    instance, and would leak that real context into an "isolated" ``tmp_path`` fixture.
+    Defaults to ``env["WORKSPACE_ROOT"]`` when present (the harness-realistic stand-in: a
+    hook invoked from the workspace root itself) so every existing caller stays hermetic
+    for free; pass an explicit ``cwd`` to simulate a session working from a specific
+    ``repos/<slug>/`` subdirectory (rung 3).
 
     This is the single sanctioned channel for hook *behavior* tests in
     ``tests/**/hooks|gate/**``; importing a hook module and calling ``main()`` in-process
@@ -409,6 +422,7 @@ def run_hook_subprocess(
         cmd = [sys.executable, "-c", _POLICY_DRIVER.format(module=hook_module)]
     else:
         cmd = [sys.executable, "-m", f"dadaia_workspace.hooks.{hook_module}"]
+    effective_cwd = cwd if cwd is not None else env.get("WORKSPACE_ROOT")
     proc = subprocess.run(
         cmd,
         input=json.dumps(payload),
@@ -416,5 +430,6 @@ def run_hook_subprocess(
         text=True,
         env=env,
         timeout=timeout,
+        cwd=str(effective_cwd) if effective_cwd else None,
     )
     return HookResult(returncode=proc.returncode, stdout=proc.stdout, stderr=proc.stderr)

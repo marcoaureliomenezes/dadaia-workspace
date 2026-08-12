@@ -5,15 +5,25 @@ kimi-code compaction flow: ``UserPromptSubmit`` injections, the ``PostCompact`` 
 (stamps ``ctx-compact-<sid>`` AND re-emits the bootstrap on stdout — the observable
 contract; Kimi discards PostCompact stdout), and the next-prompt re-injection that
 fires exactly once. Also covers the unbound-session variant (generic preflight).
+
+T-50-03 (SPEC v0.5.0 FR1 coupling 1): a NORMAL (``UserPromptSubmit``) bind is simulated
+via :func:`_bind_session` (a self-keyed session record with a ``bound_at`` timestamp —
+the same field ``dadaia context bind`` persists), not a bind-epoch marker: the marker
+subsystem is no longer consulted by the injection path (T-50-04 deletes it outright). The
+PostCompact and SessionStart(compact|clear) event blocks are UNCHANGED by this task —
+they resolve context unconditionally (no sentinel/``bound_at`` gating) and emit every
+time they fire, per ``CONSUMER_VALIDATION_RECIPE.md:376``.
 """
 
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.features.spec_context import session_identity
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
 pytestmark = pytest.mark.unit
@@ -36,12 +46,23 @@ def _ws(tmp_path: Path, slug: str = "ctx") -> Path:
     return tmp_path
 
 
-def _stamp_bind_epoch(tmp_path: Path, slug: str, *, pid: int) -> Path:
-    epoch_dir = tmp_path / ".dadaia" / "states" / "bind_epoch"
-    epoch_dir.mkdir(parents=True, exist_ok=True)
-    marker = epoch_dir / slug
-    marker.write_text(f"{pid}\n", encoding="utf-8")
-    return marker
+def _bind_session(tmp_path: Path, session_id: str, context: str) -> None:
+    """Simulate a NORMAL ``dadaia context bind <context>`` for *session_id* (T-50-03).
+
+    Writes/refreshes the self-keyed session record with ``context`` and a ``bound_at``
+    ISO timestamp of "now" — the field the injection trigger (T-50-03) compares against
+    the sentinel's mtime.
+    """
+    session_identity.write_session(
+        tmp_path,
+        session_id,
+        {
+            "session_id": session_id,
+            "context": context,
+            "mode": "read",
+            "bound_at": datetime.now(tz=UTC).isoformat(),
+        },
+    )
 
 
 def _run(tmp_path: Path, session_id: str, *, event: str | None = None) -> str:
@@ -75,7 +96,7 @@ def test_bound_session_reinjects_once_after_compact(tmp_path: Path) -> None:
 
     # Fresh session: generic preflight (sentinel stamped), then bind, then injection.
     assert "[no bound context]" in _run(tmp_path, sid)
-    _stamp_bind_epoch(tmp_path, "ctx", pid=_PID_A)
+    _bind_session(tmp_path, sid, "ctx")
     assert "[ctx]" in _run(tmp_path, sid)
     # Repeat prompt: silent.
     assert _run(tmp_path, sid) == ""
@@ -104,13 +125,13 @@ def test_unbound_session_reemits_generic_preflight_after_compact(tmp_path: Path)
     assert _run(tmp_path, sid) == ""
 
 
-def test_compact_marker_without_sentinel_does_not_bind(tmp_path: Path) -> None:
-    """A compact marker on a fresh session (no sentinel) must not inject context memory."""
+def test_compact_without_self_keyed_record_or_env_does_not_bind(tmp_path: Path) -> None:
+    """A PostCompact event on a session with no self-keyed record and no ``DADAIA_CONTEXT``
+    must not inject context memory."""
     _ws(tmp_path)
     sid = "sess-4"
-    _stamp_bind_epoch(tmp_path, "ctx", pid=_PID_A)
     assert "[no bound context]" in _run(tmp_path, sid, event="PostCompact")
-    # Fresh session: still only the generic preflight (bind-epoch never binds fresh sid).
+    # Fresh session: still only the generic preflight (no session record, no env var).
     assert "[no bound context]" in _run(tmp_path, sid)
 
 
@@ -168,7 +189,7 @@ def test_claude_session_start_compact_reinjects_and_restamps(tmp_path: Path) -> 
     _ws(tmp_path)
     sid = "sess-cc1"
     assert "[no bound context]" in _run(tmp_path, sid)
-    _stamp_bind_epoch(tmp_path, "ctx", pid=_PID_A)
+    _bind_session(tmp_path, sid, "ctx")
     assert "[ctx]" in _run(tmp_path, sid)
     assert _run(tmp_path, sid) == ""
 
@@ -188,7 +209,7 @@ def test_claude_session_start_clear_reinjects_bound_context(tmp_path: Path) -> N
     _ws(tmp_path)
     sid = "sess-cc2"
     assert "[no bound context]" in _run(tmp_path, sid)
-    _stamp_bind_epoch(tmp_path, "ctx", pid=_PID_A)
+    _bind_session(tmp_path, sid, "ctx")
     assert "[ctx]" in _run(tmp_path, sid)
     assert _run(tmp_path, sid) == ""
 
@@ -207,6 +228,6 @@ def test_claude_session_start_other_sources_follow_normal_flow(tmp_path: Path) -
     _ws(tmp_path)
     sid = "sess-cc3"
     assert "[no bound context]" in _run(tmp_path, sid)
-    _stamp_bind_epoch(tmp_path, "ctx", pid=_PID_A)
+    _bind_session(tmp_path, sid, "ctx")
     assert "[ctx]" in _run(tmp_path, sid)
     assert _run_session_start(tmp_path, sid, "startup") == ""

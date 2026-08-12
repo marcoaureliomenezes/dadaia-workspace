@@ -13,8 +13,8 @@ tags:
 - dependency-rules
 - agents
 - sdd
-token_estimate: 1150
-last_updated: '2026-08-07'
+token_estimate: 1240
+last_updated: '2026-08-12'
 release_origin: v0.3.0
 ---
 
@@ -56,7 +56,26 @@ identity, advisory presence, path classification, and workspace doctor checks. T
 no lease or locking module. `hooks/pre_gate.py` composes root whitelist, venv guard, and
 the SDD path/phase/mode gate. `hooks/sdd_post_gate.py` refreshes advisory presence and
 runs the nonblocking reconciler. `hooks/ctx_inject.py` emits the once-per-session
-context bootstrap, re-armed by the bind-epoch marker.
+context bootstrap, re-armed when this session's own bind record is newer than its
+injection sentinel.
+
+#### The resolution seam
+
+`core/specs_resolver.resolve_context()` is the single authority that resolves a Spec
+Context NAME, and the `DADAIA.md` §3 rung law is its docstring ([[context-management]]).
+There is one such function in the package: the CLI seam, `container`, the SDD gate and
+ctx-inject all consume it, each supplying its own caller input — the gate passes the
+write target so attribution stays path-first. Session-record reading inside `core` is a
+documented §6 duplicate of `features/spec_context/session_identity`, because `core` may
+not import `features`.
+
+The import-linter contract `bind-resolution-seam-is-a-single-home` names exactly three
+sanctioned direct importers — `cli._specs_resolution`, `container`, and `hooks` — and
+takes zero ignored imports; a verb reaching the authority directly is a contract break.
+Hooks are direct importers by law rather than by exception: they are one-shot processes
+on the write hot path, and routing them through the composition root costs seconds of
+import graph per gated tool call, so **no hook imports `container`**. An attesting
+import-surface test pins that fact.
 
 Exit codes tell the truth: `dadaia doctor` (and `reports validate`) exit non-zero
 whenever issues remain — a green exit is proof, never a formality. Tool-initiated
@@ -143,7 +162,6 @@ else); this table mirrors it:
 |---|---|
 | `states/spec_contexts.json` | context registry |
 | `sessions/` | caller-owned bind records (protected) |
-| `states/bind_epoch/` | context injection markers |
 | `states/presence/` | advisory live-session records |
 | `states/server_registry.json` | development server registry |
 | `states/agent_model_policy.json` | Layer-1 agent model governance overlay |
@@ -163,7 +181,9 @@ else); this table mirrors it:
 | `.venv/`, `.cache/` | workspace Python runtime and tool caches |
 
 Legacy `states/ctx_locks/` and `sessions/runtime/` are invalid retired state. Doctor
-removes them with `--fix`. Known-legacy `.dadaia/` subdirs (`bugs`, `src`, `locks`,
+removes them with `--fix`. `states/bind_epoch/` is orphan state in a workspace upgraded
+from an older release; the named `remove_legacy_bind_epoch_state` install migration
+sweeps it and is retained for one release. Known-legacy `.dadaia/` subdirs (`bugs`, `src`, `locks`,
 `figma-bridge`, `imgs`, `references`) are quarantined — never deleted — by the
 reconcile `legacy-dir-quarantine` step (`features/migrate/legacy_dadaia_dirs.py`) into
 `tmp/legacy-quarantine/run-<id>/` with a manifest. `dadaia import` relocates the

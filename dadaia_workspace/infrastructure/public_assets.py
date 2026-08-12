@@ -53,6 +53,7 @@ from dadaia_workspace.infrastructure.install_helpers import (
     install_handoff_agents_md,
     install_reports_agents_md,
     install_universal_skills,
+    remove_legacy_bind_epoch_state,
     remove_legacy_workflow_projections,
     remove_retired_core_rules,
     render_claude_agent,
@@ -620,6 +621,7 @@ class FileSystemPublicAssetManager:
                 self._step_install_dadaia_md,
                 self._step_remove_retired_core_rules,
                 self._step_remove_legacy_workflow_projections,
+                self._step_remove_legacy_bind_epoch_state,
             ]
         )
         return steps
@@ -713,6 +715,10 @@ class FileSystemPublicAssetManager:
 
     def _step_remove_retired_core_rules(self, plan: InstallPlan, installed: list[str]) -> None:
         remove_retired_core_rules(plan.workspace_root, installed)
+
+    def _step_remove_legacy_bind_epoch_state(self, plan: InstallPlan, installed: list[str]) -> None:
+        # v0.5.0 FR1 (F-09): the marker subsystem is deleted; sweep its orphan state.
+        remove_legacy_bind_epoch_state(plan.workspace_root, installed)
 
     def _step_remove_legacy_workflow_projections(
         self, plan: InstallPlan, installed: list[str]

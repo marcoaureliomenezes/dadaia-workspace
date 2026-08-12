@@ -96,7 +96,7 @@ _SEAM_FUNCTION_NAMES = frozenset({"resolve_specs_dir_for_cli", "resolve_context_
 #: ``LifecycleRun.context ==``), never a specs-dir/bound-context RESOLUTION input — the
 #: general "reaches a container.build_*/resolve_* call" heuristic below would otherwise
 #: false-positive on these (their factory happens to accept ``context`` as a plain
-#: pass-through kwarg with no ``resolve_bound_context_name`` in its own body). Verified by
+#: pass-through kwarg with no ``resolve_context`` in its own body). Verified by
 #: reading each factory's source at v0.1.77 T-2 time; a factory added here must be
 #: re-verified whenever its body changes, since this is a manually-audited exception list,
 #: not an automatically-derived one.
@@ -215,7 +215,7 @@ def _names_reaching_seam(func: ast.FunctionDef) -> set[str]:
     ``_SEAM_FUNCTION_NAMES``, OR into any ``container.build_*``/``container.resolve_*``
     attribute call EXCEPT the documented filter-only factories in
     ``_FILTER_ONLY_CONTAINER_FACTORIES`` (the container's other factories internally
-    resolve through ``resolve_bound_context_name`` — reaching one of them IS reaching the
+    resolve through ``resolve_context`` — reaching one of them IS reaching the
     seam family; the filter-only ones do not)."""
     reached: set[str] = set()
     for node in ast.walk(func):

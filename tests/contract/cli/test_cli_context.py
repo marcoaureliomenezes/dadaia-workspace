@@ -26,12 +26,14 @@ def workspace(tmp_path: Path, monkeypatch) -> Path:
     monkeypatch.chdir(tmp_path)
     # Hermetic session identity: bind resolves DADAIA_SESSION_ID → harness-native id →
     # mint (bug bind-session-id-divergence). Strip inherited ids so each test controls
-    # exactly which identity source is present.
+    # exactly which identity source is present. DADAIA_CONTEXT is stripped too (T-50-05
+    # bind-warning tests need to control it precisely; other tests never relied on it).
     for var in (
         "DADAIA_SESSION_ID",
         "CLAUDE_CODE_SESSION_ID",
         "CODEX_SESSION_ID",
         "CODEX_THREAD_ID",
+        "DADAIA_CONTEXT",
     ):
         monkeypatch.delenv(var, raising=False)
     return tmp_path
@@ -291,39 +293,6 @@ def test_context_bind_persists_harness_owned_record(
     assert not (workspace / ".dadaia" / "sessions" / "runtime").exists()
 
 
-# --- FR-W2-02 (T-014-09): bind writes the standalone bind-epoch marker --------
-
-
-def test_context_bind_epoch_marker_lifecycle(workspace: Path) -> None:
-    """FR-W2-02: a successful bind stamps `.dadaia/states/bind_epoch/<ctx>`
-    (standalone) — created on demand and refreshed on re-bind.
-
-    The marker is the SOLE trigger for context-memory injection and the ctx-inject
-    hook's harness-real discovery source.
-    """
-
-    _register_alive_ctx(workspace)
-    marker_dir = workspace / ".dadaia" / "states" / "bind_epoch"
-    marker = marker_dir / "myctx"
-    assert not marker_dir.exists()
-
-    result = _runner.invoke(app, ["context", "bind", "myctx", "--mode", "read"])
-    assert result.exit_code == 0, result.output
-    assert marker_dir.is_dir()
-    assert marker.is_file(), "bind must write a standalone bind-epoch marker"
-
-    _session_record_for(workspace, result.output)
-    assert not (workspace / ".dadaia" / "sessions" / "runtime").exists()
-
-    first_mtime = marker.stat().st_mtime
-    # Backdate the marker so a refresh is observable regardless of clock granularity.
-    os.utime(marker, (first_mtime - 100, first_mtime - 100))
-    backdated = marker.stat().st_mtime
-
-    assert _runner.invoke(app, ["context", "bind", "myctx", "--mode", "read"]).exit_code == 0
-    assert marker.stat().st_mtime > backdated, "re-bind must refresh the bind-epoch mtime"
-
-
 # --- FR-R4-02: implementation / review bind persistence --------------------
 
 
@@ -361,6 +330,69 @@ def test_context_bind_second_implementation_does_not_block(workspace: Path) -> N
         app, ["context", "bind", "myctx", "--mode", "implementation", "--release", "v1"]
     )
     assert result2.exit_code == 0, result2.output
+
+
+# ---------------------------------------------------------------------------
+# T-50-05 (SPEC v0.5.0 FR1): the loud bind warning. T-50-04 deleted
+# `_adopt_attributed_bind`, the ancestry-marker path that used to make a bind
+# reachable for a caller with no harness-native id and no DADAIA_CONTEXT. Without a
+# warning the deletion converts a working flow into a silent no-op.
+# ---------------------------------------------------------------------------
+
+
+def test_bind_warns_when_neither_harness_id_nor_dadaia_context(workspace: Path) -> None:
+    _register_alive_ctx(workspace)
+    result = _runner.invoke(app, ["context", "bind", "myctx"])
+    assert result.exit_code == 0, result.output
+    assert "reachable only" in result.output
+    assert "DADAIA_CONTEXT" in result.output
+    # Never a real shell-export line (would corrupt `eval $(...)` if it leaked to stdout
+    # in the --print-env path) — this is prose guidance, not an executable line.
+    assert "export DADAIA_CONTEXT" not in result.output
+
+
+def test_bind_silent_when_harness_native_id_present(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "claude-warn-check")
+    _register_alive_ctx(workspace)
+    result = _runner.invoke(app, ["context", "bind", "myctx"])
+    assert result.exit_code == 0, result.output
+    assert "reachable only" not in result.output
+
+
+def test_bind_silent_when_dadaia_context_present(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("DADAIA_CONTEXT", "myctx")
+    _register_alive_ctx(workspace)
+    result = _runner.invoke(app, ["context", "bind", "myctx"])
+    assert result.exit_code == 0, result.output
+    assert "reachable only" not in result.output
+
+
+# ---------------------------------------------------------------------------
+# T-50-05 (SPEC v0.5.0 FR1 deletion item 5): the sole surviving runtime source is
+# DADAIA_RUNTIME (which the kimi-code shims actually export). The dead alias this site
+# used to also read has zero writers anywhere in the tree and is deleted outright — a
+# grep for its exact name returns 0 matches in this code universe, so these tests prove
+# the positive (default + the real var honored) rather than naming the deleted one.
+# ---------------------------------------------------------------------------
+
+
+def test_bind_records_dadaia_runtime_env(workspace: Path) -> None:
+    _register_alive_ctx(workspace)
+
+    result = _runner.invoke(app, ["context", "bind", "myctx"])
+    assert result.exit_code == 0, result.output
+    record = _session_record_for(workspace, result.output)
+    assert record["runtime"] == "unknown"
+
+    env_real = {**os.environ, "DADAIA_RUNTIME": "kimi-code"}
+    result2 = _runner.invoke(app, ["context", "bind", "myctx"], env=env_real)
+    assert result2.exit_code == 0, result2.output
+    record2 = _session_record_for(workspace, result2.output)
+    assert record2["runtime"] == "kimi-code"
 
 
 def test_context_heartbeat_resolves_harness_native_persisted_bind(

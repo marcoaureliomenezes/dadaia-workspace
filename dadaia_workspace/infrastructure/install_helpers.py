@@ -225,6 +225,25 @@ _RETIRED_CORE_RULES: tuple[str, ...] = (
 )
 
 
+def remove_legacy_bind_epoch_state(workspace_root: Path, installed: list[str]) -> None:
+    """Remove the retired bind-epoch marker state dir (v0.5.0 FR1, F-09).
+
+    The marker subsystem was deleted in v0.5.0 — nothing reads or writes
+    ``.dadaia/states/bind_epoch/`` anymore, so markers left by earlier releases are
+    orphan state in every upgraded workspace. Markers are single-line pid-chain files
+    the bind CLI wrote; the directory holds nothing else, so a full sweep is safe.
+    Named migration, kept one release (same regime as the other ``remove_*`` steps).
+    """
+    epoch_dir = workspace_root / ".dadaia" / "states" / "bind_epoch"
+    if not epoch_dir.is_dir():
+        return
+    for path in sorted(p for p in epoch_dir.iterdir() if p.is_file()):
+        path.unlink()
+        installed.append(f"[rm] {path}")
+    with contextlib.suppress(OSError):
+        epoch_dir.rmdir()
+
+
 def remove_retired_core_rules(workspace_root: Path, installed: list[str]) -> None:
     """Remove the pre-DADAIA.md core rule projections, by name, without touching others.
 

@@ -119,12 +119,54 @@ def test_dirty_mutating_emits_flag_advisory_only(
 def test_no_flag_table(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, name: str, setup_fn: object
 ) -> None:
+    # T-50-02 (SPEC v0.5.0 FR1): "no_bound_context" now falls through
+    # _bound_context's leg 2 (the single resolution authority, rungs 1-3) instead of
+    # stopping at the direct record read. This suite runs inside the dadaia-workspace
+    # SOURCE checkout, itself nested under a REAL registered "dadaia-workspace" context
+    # — chdir + a scrubbed DADAIA_CONTEXT keep rung 3 (cwd) and rung 1 (env) from
+    # leaking that real context into this "isolated" tmp_path fixture.
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("DADAIA_CONTEXT", raising=False)
     ws = _make_workspace(tmp_path)
     if name != "no_bound_context":
         _bind_session(ws)
     setup_fn(ws, monkeypatch)  # type: ignore[operator]
     sdd_post_gate._reconcile_working_tree(ws, _SID)
     assert _flags(ws) == []
+
+
+def test_bound_context_leg2_falls_through_to_authority_via_dadaia_context_env(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """T-50-02 (SPEC v0.5.0 FR1): ``_bound_context``'s NEW leg 2 — no own session
+    record at all, but ``DADAIA_CONTEXT`` resolves via the single authority (the SPEC's
+    kimi-launch-env disposition: a kimi session carries no native session-id env var, so
+    its record can never be found by leg 1). Purely additive: leg 1 (the direct record
+    read) is untouched, proven by ``test_no_flag_table``'s ``no_bound_context`` case
+    staying flag-free when NEITHER leg resolves anything usable."""
+    ws = _make_workspace(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("DADAIA_CONTEXT", "env-ctx")
+
+    assert sdd_post_gate._bound_context(ws, "never-bound-sid") == "env-ctx"
+
+
+def test_bound_context_env_wins_over_own_record_law_order(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """F-03 (v0.5.0 six-axis review): rung 1 ``DADAIA_CONTEXT`` beats rung 2 (the
+    session binding) here too — presence attribution must agree with the gate and
+    ctx_inject on the same prompt, per the DADAIA.md §3 rung order."""
+    ws = _make_workspace(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("DADAIA_CONTEXT", "env-ctx")
+    _bind_session(ws, ctx=_CTX)
+
+    assert sdd_post_gate._bound_context(ws, _SID) == "env-ctx"
+
+    # Without the env override the own record is the binding (rung 2), unchanged.
+    monkeypatch.delenv("DADAIA_CONTEXT")
+    assert sdd_post_gate._bound_context(ws, _SID) == _CTX
 
 
 @pytest.mark.parametrize(

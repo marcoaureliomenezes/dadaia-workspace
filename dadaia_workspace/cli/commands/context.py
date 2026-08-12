@@ -118,6 +118,30 @@ def _session_is_stale(session_data: dict) -> bool:  # type: ignore[type-arg]
         return False
 
 
+def _resolve_own_session_id(*, explicit: str | None = None, mint: bool = False) -> str | None:
+    """Resolve THIS caller's own session identity (T-50-05: the single helper every verb
+    below used to duplicate as its own copy-pasted micro-ladder).
+
+    Order: *explicit* (a verb's own CLI override, e.g. ``release --session``) -> the
+    eval-flow ``DADAIA_SESSION_ID`` (sanitized, CWE-22 — every site now gets the same
+    defence ``bind`` already had) -> the harness-native session id
+    (:func:`harness_session_id`) -> when *mint* is set, a freshly minted ``sess_*`` id
+    (``bind``'s own fallback when a record must be created but neither channel carries
+    an identity yet). Session IDENTITY only — never a context-resolution rung.
+    """
+    if explicit:
+        return explicit
+    env_sid = sanitize_session_id(os.environ.get("DADAIA_SESSION_ID"))
+    if env_sid:
+        return env_sid
+    harness_id = harness_session_id()
+    if harness_id:
+        return harness_id
+    if mint:
+        return f"sess_{uuid.uuid4().hex[:8]}"
+    return None
+
+
 @app.command()
 def create(
     name: str = typer.Argument(..., help="Context name"),
@@ -273,19 +297,7 @@ def show(
             # expose foreign state as the caller's own and can never be authoritative.
             workspace_root = resolve_workspace_root()
             sessions_dir = _sessions_dir(workspace_root)
-            session_id = os.environ.get("DADAIA_SESSION_ID") or harness_session_id()
-            if not session_id:
-                # Same marker-only fallback as the heartbeat (bug
-                # context-bind-session-id-mismatch): show reports the session the bind
-                # actually minted, not a divergent/absent identity — routed through
-                # the sanctioned seam (FR3).
-                from dadaia_workspace.cli._specs_resolution import resolve_context_for_cli
-
-                bound_ctx = None
-                with contextlib.suppress(Exception):
-                    bound_ctx = resolve_context_for_cli(None)
-                if bound_ctx:
-                    session_id = session_identity.read_bind_epoch_sid(workspace_root, bound_ctx)
+            session_id = _resolve_own_session_id()
             session_obj = None
             if session_id:
                 session_data = _load_session(sessions_dir, session_id)
@@ -510,13 +522,13 @@ def bind(
         raise typer.Exit(1) from None
 
     # Stable session identity (bug bind-session-id-divergence, 2026-07-15): reuse the
-    # SAME resolution order the gate/hooks use — explicit DADAIA_SESSION_ID (eval-flow
-    # contract) → harness-native id → mint. Rebinds in one session therefore UPDATE one
-    # record instead of minting a divergent sess_* per invocation.
-    env_sid = sanitize_session_id(os.environ.get("DADAIA_SESSION_ID"))
-    session_id = env_sid or harness_session_id() or f"sess_{uuid.uuid4().hex[:8]}"
+    # SAME resolution order the gate/hooks use. Rebinds in one session therefore UPDATE
+    # one record instead of minting a divergent sess_* per invocation.
+    session_id = _resolve_own_session_id(mint=True)
+    if session_id is None:  # pragma: no cover — mint=True always yields one
+        raise RuntimeError("session-id resolution returned None despite mint=True")
     now = _now_iso()
-    runtime = os.environ.get("DADAIA_AGENT_RUNTIME", "unknown")
+    runtime = os.environ.get("DADAIA_RUNTIME", "unknown")
     pid = os.getpid()
 
     # The persisted mode the gate reads: mutating modes carry BOUND_; READ stays bare.
@@ -543,13 +555,28 @@ def bind(
     # F-07, 2026-07-15): hooks resolve DADAIA_SESSION_ID first too, so the alias never
     # carried information the primary record does not.
     session_identity.write_session(workspace_root, session_id, session_data)
-    # The bind epoch is the sole context-memory injection trigger.
-    session_identity.write_bind_epoch(
-        workspace_root,
-        name,
-        pids=container.build_ancestry_pid_chain(os.getppid()),
-        session_id=session_id,
-    )
+
+    # T-50-05 (SPEC v0.5.0 FR1, the one addition in an otherwise subtractive lane):
+    # T-50-04 deleted `_adopt_attributed_bind`, the ancestry-marker path that used to make
+    # THIS exact binding reachable for a caller with no harness-native id and no
+    # DADAIA_CONTEXT. Without this loud warning, that deletion turns a working flow into a
+    # silent no-op — printed to stderr (never stdout) so it never corrupts
+    # `eval $(dadaia context bind ... --print-env)`.
+    # F-06 (v0.5.0 review): an exported DADAIA_SESSION_ID keys a reachable record (the
+    # hooks' identity channel), and a `--print-env` caller is mid `eval $(...)` — both
+    # flows produce a working binding, so warning there is noise, not signal.
+    if (
+        not harness_session_id()
+        and not os.environ.get("DADAIA_CONTEXT")
+        and not os.environ.get("DADAIA_SESSION_ID")
+        and not print_env
+    ):
+        err_console.print(
+            f"[yellow]![/yellow] No harness-native session id and DADAIA_CONTEXT is "
+            f"unset in this shell — this binding is reachable only if DADAIA_CONTEXT="
+            f"{name} is exported here (e.g. `eval $(dadaia context bind {name} "
+            "--mode read --print-env)`)."
+        )
 
     # Back-compat escape: emit ONLY the legacy export lines when requested, so the output
     # stays eval-safe for operators still running `eval $(dadaia context bind ... --print-env)`.
@@ -596,7 +623,7 @@ def release_cmd(
     workspace_root = resolve_workspace_root()
     sessions_dir = _sessions_dir(workspace_root)
 
-    resolved_sid = session or os.environ.get("DADAIA_SESSION_ID") or harness_session_id()
+    resolved_sid = _resolve_own_session_id(explicit=session)
     if not resolved_sid:
         err_console.print(
             "[red]Error:[/red] No active session. Pass --session <id> or set "
@@ -627,24 +654,7 @@ def heartbeat() -> None:
 
     Run: dadaia context heartbeat
     """
-    session_id = os.environ.get("DADAIA_SESSION_ID") or harness_session_id()
-    if not session_id:
-        # Bug context-heartbeat-requires-env-after-persisted-bind: fall back to the
-        # persisted bind-epoch marker — the bound shell resolves the recorded session
-        # id by ancestry attribution (the W1-8 marker-only resolution extended to
-        # session identity; no exported DADAIA_SESSION_ID needed). Routed through the
-        # sanctioned seam (FR3: no verb imports core.specs_resolver directly).
-        from dadaia_workspace.cli._specs_resolution import resolve_context_for_cli
-
-        # Degrade silently on any resolution failure (no bind / no workspace): the
-        # unbound case must keep the original actionable error, never a resolution
-        # exception leaking out of the fallback.
-        bound_ctx = None
-        with contextlib.suppress(Exception):
-            bound_ctx = resolve_context_for_cli(None)
-        if bound_ctx:
-            workspace_root = resolve_workspace_root()
-            session_id = session_identity.read_bind_epoch_sid(workspace_root, bound_ctx)
+    session_id = _resolve_own_session_id()
     if not session_id:
         err_console.print(
             "[red]Error:[/red] No caller-owned session identity. Run "

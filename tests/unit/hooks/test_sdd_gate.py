@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -226,6 +227,163 @@ def test_path_first_context_slug_parity_no_context_fails_open_never_blocks(
         session_id="intruder",
     )
     assert block3 is None
+
+
+def _write_live_harness_record(ws: Path, harness_id: str, context: str) -> None:
+    """Seed a fresh, LIVE ``sessions/<harness_id>.json`` bind (rung 2 fixture)."""
+    session_identity.write_session(
+        ws,
+        harness_id,
+        {
+            "session_id": harness_id,
+            "context": context,
+            "mode": "IMPLEMENTATION",
+            "last_seen_at": datetime.now(tz=UTC).isoformat(),
+            "ttl_seconds": 300,
+            "pid": 999999,
+        },
+    )
+
+
+# --------------------------------------------------------------------------- #
+# T-50-02 (SPEC v0.5.0 FR1): the two acceptance tests named by the task —
+# (a) path-first beats DADAIA_CONTEXT; (b) a no-repo write now falls through to
+# rungs 2-3 instead of resolving unattributed. Driven directly through
+# claude_hook_env/run_hook_subprocess (not the file's own ``_run()``, which pops
+# CLAUDE_CODE_SESSION_ID/DADAIA_CONTEXT — exactly the signals these tests need present).
+# An explicit ``cwd=ws`` keeps every case hermetic: this suite runs inside the
+# dadaia-workspace SOURCE checkout, itself nested under a REAL, registered
+# "dadaia-workspace" context — an un-scoped subprocess cwd would silently resolve that
+# real context instead of the fixture's isolated tmp_path workspace.
+# --------------------------------------------------------------------------- #
+
+
+def test_gate_attributes_repo_target_over_dadaia_context_env(tmp_path: Path) -> None:
+    """(a) A write into ``repos/x/...`` attributes ``x`` even while
+    ``DADAIA_CONTEXT=y`` names a DIFFERENT registered context — rung 0 (the write
+    target) is consulted before rung 1 (the env var). This is the release's single
+    named inversion risk: a wrong re-point would let the env var win."""
+    ws = _mk_workspace(tmp_path, "x", "y")
+    target = ws / "repos" / "x" / "specs" / "releases" / "rel-1" / "TASKS.md"
+    target.parent.mkdir(parents=True, exist_ok=True)
+
+    env = claude_hook_env(ws, session_id="sess-path-first", extra={"DADAIA_CONTEXT": "y"})
+    result = run_hook_subprocess(
+        "sdd_gate",
+        {
+            "tool_name": "Write",
+            "tool_input": {"file_path": str(target)},
+            "session_id": "sess-path-first",
+        },
+        env,
+        cwd=ws,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.block_envelope() is None
+
+    presence_root = ws / ".dadaia" / "states" / "presence"
+    assert (presence_root / "x" / "sess-path-first.json").exists()
+    assert not (presence_root / "y").exists()
+
+
+def test_no_repo_write_resolves_via_rung2_live_session_record(tmp_path: Path) -> None:
+    """(b) A write outside every ``repos/<slug>/`` — which used to resolve via
+    ``DADAIA_CONTEXT`` ONLY and fail open with no presence when that was absent — now
+    falls through to rung 2: this session's own LIVE record. No ``DADAIA_CONTEXT`` is
+    set here at all."""
+    ws = _mk_workspace(tmp_path, "a")
+    _write_live_harness_record(ws, "claude-live-sess", "a")
+    target = ws / "specs" / "releases" / "rel-1" / "TASKS.md"
+
+    env = claude_hook_env(ws, session_id="claude-live-sess")
+    env.pop("DADAIA_CONTEXT", None)  # hermeticity: never inherit the operator's own shell
+    result = run_hook_subprocess(
+        "sdd_gate",
+        {
+            "tool_name": "Write",
+            "tool_input": {"file_path": str(target)},
+            "session_id": "claude-live-sess",
+        },
+        env,
+        cwd=ws,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.block_envelope() is None
+
+    presence_root = ws / ".dadaia" / "states" / "presence"
+    assert (presence_root / "a" / "claude-live-sess.json").exists()
+
+
+def test_no_repo_write_resolves_via_rung3_cwd_repo(tmp_path: Path) -> None:
+    """(b) companion: no ``DADAIA_CONTEXT``, no live session record — the write still
+    resolves via rung 3, the repo containing the hook's own working directory."""
+    ws = _mk_workspace(tmp_path, "a")
+    target = ws / "specs" / "releases" / "rel-1" / "TASKS.md"
+
+    env = claude_hook_env(ws, session_id="sess-cwd-repo")
+    env.pop("CLAUDE_CODE_SESSION_ID", None)  # no live rung-2 record to find anyway
+    env.pop("DADAIA_CONTEXT", None)  # hermeticity: never inherit the operator's own shell
+    result = run_hook_subprocess(
+        "sdd_gate",
+        {
+            "tool_name": "Write",
+            "tool_input": {"file_path": str(target)},
+            "session_id": "sess-cwd-repo",
+        },
+        env,
+        cwd=ws / "repos" / "a",
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.block_envelope() is None
+
+    presence_root = ws / ".dadaia" / "states" / "presence"
+    assert (presence_root / "a" / "sess-cwd-repo.json").exists()
+
+
+def test_runtime_reads_dadaia_runtime_env(tmp_path: Path) -> None:
+    """T-50-05 (SPEC v0.5.0 FR1 deletion item 5): the sole surviving runtime source is
+    ``DADAIA_RUNTIME`` (which the kimi-code shims actually export); the dead alias this
+    site used to also read has zero writers anywhere in the tree and is deleted outright
+    — a grep for its exact name returns 0 matches in this code universe, so this test
+    proves the positive (the real var is honored) rather than naming the deleted one."""
+    ws = _mk_workspace(tmp_path, "a")
+    target = ws / "repos" / "a" / "specs" / "releases" / "rel-1" / "TASKS.md"
+
+    env = claude_hook_env(ws, session_id="sess-runtime-default")
+    result = run_hook_subprocess(
+        "sdd_gate",
+        {
+            "tool_name": "Write",
+            "tool_input": {"file_path": str(target)},
+            "session_id": "sess-runtime-default",
+        },
+        env,
+        cwd=ws,
+    )
+    assert result.returncode == 0, result.stderr
+    record = json.loads(
+        (ws / ".dadaia" / "states" / "presence" / "a" / "sess-runtime-default.json").read_text()
+    )
+    assert record["runtime"] == "unknown"
+
+    env2 = claude_hook_env(
+        ws, session_id="sess-runtime-real", extra={"DADAIA_RUNTIME": "kimi-code"}
+    )
+    result2 = run_hook_subprocess(
+        "sdd_gate",
+        {
+            "tool_name": "Write",
+            "tool_input": {"file_path": str(target)},
+            "session_id": "sess-runtime-real",
+        },
+        env2,
+        cwd=ws,
+    )
+    assert result2.returncode == 0, result2.stderr
+    record2 = json.loads(
+        (ws / ".dadaia" / "states" / "presence" / "a" / "sess-runtime-real.json").read_text()
+    )
+    assert record2["runtime"] == "kimi-code"
 
 
 # --------------------------------------------------------------------------- #
@@ -589,3 +747,24 @@ def test_unreadable_active_md_fails_closed_for_memory(tmp_path: Path) -> None:
         assert "DEFINITION or CLOSURE" in str(envelope.get("reason", "")), envelope
     finally:
         active.chmod(0o644)
+
+
+def test_memory_gate_reads_active_via_repo_slug_when_name_differs(tmp_path: Path) -> None:
+    """F-02 (v0.5.0 six-axis review): the authority returns the context NAME; the gate
+    must map it to the registry ``repo_slug`` before joining ``repos/<...>/specs`` —
+    a `context create <name> --repo <slug>` workspace otherwise reads ``ACTIVE.md``
+    from a non-existent dir, collapses phase to ``""``, and wrongly blocks MEMORY."""
+    (tmp_path / ".dadaia" / "states").mkdir(parents=True)
+    (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text(
+        json.dumps({"contexts": [{"name": "meu-projeto", "repo_slug": "demo", "state": "alive"}]}),
+        encoding="utf-8",
+    )
+    rel = tmp_path / "repos" / "demo" / "specs" / "releases"
+    rel.mkdir(parents=True)
+    (rel / "ACTIVE.md").write_text("release: rel-1\nphase: DEFINITION\n", encoding="utf-8")
+    (tmp_path / "repos" / "demo" / "specs" / "memory").mkdir(parents=True)
+    target = str(tmp_path / "repos" / "demo" / "specs" / "memory" / "product.md")
+    payload: dict[str, Any] = {"tool_name": "Write", "tool_input": {"file_path": target}}
+    assert _run(tmp_path, payload) is None, (
+        "DEFINITION phase must open the MEMORY gate even when name != repo_slug"
+    )

@@ -77,6 +77,90 @@ def test_coherence_spans_multiple_files_in_chronological_order(tmp_path: Path) -
 
 
 # ---------------------------------------------------------------------------
+# FR2 (v0.5.0 T-50-09) — the healing rule: a violation row is reported only while no
+# LATER `reported` event exists for the same bug_id.
+# ---------------------------------------------------------------------------
+
+
+def test_later_reported_heals_the_violation_row(tmp_path: Path) -> None:
+    """A violation row followed by a later `reported` for the same bug_id -> the doctor
+    reports NOTHING for it."""
+    specs = tmp_path / "specs"
+    bugs = _bugs_dir(specs)
+    _write_log(
+        bugs,
+        "20260701T13Z-00.jsonl",
+        [
+            _reported("ghost"),
+            _resolved("ghost", ts="2026-07-01T14:00:00Z"),
+            _resolved("ghost", ts="2026-07-01T15:00:00Z"),  # double-terminal violation
+            _reported("ghost", ts="2026-07-01T16:00:00Z"),  # compensation: heals it
+        ],
+    )
+    assert _doc033(specs) == []
+
+
+def test_uncompensated_violation_still_errors_with_todays_exact_message(
+    tmp_path: Path,
+) -> None:
+    """No later `reported` anywhere -> the violation still ERRORs, and the message is
+    byte-identical to the pre-FR2 format: `bugs/<name> line <n>: <clause> (SPEC-DOC-033,
+    ERROR).`"""
+    specs = tmp_path / "specs"
+    bugs = _bugs_dir(specs)
+    _write_log(bugs, "20260701T13Z-00.jsonl", [_resolved("orphan")])
+    errors = _doc033(specs)
+    assert len(errors) == 1
+    assert errors[0].description == (
+        "bugs/20260701T13Z-00.jsonl line 1: terminal event 'resolved' for bug 'orphan' "
+        "with no prior 'reported' event — every stream must open with 'reported' "
+        "(SPEC-DOC-033, ERROR)."
+    )
+    assert errors[0].severity is Severity.ERROR
+
+
+def test_healed_then_reviolated_stream_errors_only_on_the_new_row(tmp_path: Path) -> None:
+    """A `reported` heals an earlier violation; a NEW second-terminal after that healing
+    `reported` still ERRORs, citing the new row's own line number."""
+    specs = tmp_path / "specs"
+    bugs = _bugs_dir(specs)
+    _write_log(
+        bugs,
+        "20260701T13Z-00.jsonl",
+        [
+            _reported("bug-x", ts="2026-07-01T13:00:00Z"),
+            _resolved("bug-x", ts="2026-07-01T14:00:00Z"),
+            _resolved("bug-x", ts="2026-07-01T15:00:00Z"),  # V1: healed below
+            _reported("bug-x", ts="2026-07-01T16:00:00Z"),  # heals V1 (reopen)
+            _resolved("bug-x", ts="2026-07-01T17:00:00Z"),
+            _resolved("bug-x", ts="2026-07-01T18:00:00Z"),  # V2: NEW, stays unhealed
+        ],
+    )
+    errors = _doc033(specs)
+    assert len(errors) == 1
+    assert "line 6" in errors[0].description
+    assert "second terminal event" in errors[0].description
+
+
+def test_healing_reported_spans_files_in_glob_order(tmp_path: Path) -> None:
+    """The healing `reported` may live in a LATER file — the whole-history fold spans
+    every `*.jsonl` file, not just one."""
+    specs = tmp_path / "specs"
+    bugs = _bugs_dir(specs)
+    _write_log(
+        bugs,
+        "20260701T13Z-00.jsonl",
+        [
+            _reported("bug-y"),
+            _resolved("bug-y", ts="2026-07-01T14:00:00Z"),
+            _resolved("bug-y", ts="2026-07-01T15:00:00Z"),  # violation
+        ],
+    )
+    _write_log(bugs, "20260701T16Z-00.jsonl", [_reported("bug-y", ts="2026-07-01T16:00:00Z")])
+    assert _doc033(specs) == []
+
+
+# ---------------------------------------------------------------------------
 # Violation rows — terminal-without-reported, double-terminal, malformed,
 # schema-fail (x2), over-ceiling — 1 param
 # ---------------------------------------------------------------------------

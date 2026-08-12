@@ -1,9 +1,26 @@
 ---
 name: dadaia-md-workspace-system-prompt
-status: OPEN
+status: CONSUMED — v0.5.0
 created: 2026-08-06
 origin: operator demand 2026-08-06 (rules-efficiency analysis session; declared ARCHITECTURAL)
 owner: project-manager (curates)
+disposition:
+  terminal_status: CONSUMED
+  closed_by: v0.5.0
+  closed_at: '2026-08-12'
+  evidence: specs/releases/v0.5.0/CLOSURE.md#dispositions
+  verified:
+    - One DADAIA.md ships; public/rules/*.md no longer projects always-on files.
+    - The projected law is byte-identical across the four projections and mode 0444.
+    - Projected law files are a PROTECTED gate class; an agent write is blocked with
+      the edit-the-lib-and-reproject remedy.
+    - Library development under dadaia_workspace/public/ is unaffected; v0.5.0 T-50-07
+      amended §3 at source and re-projected via stage → install → public doctor.
+    - dadaia public doctor reports [ok] public-privacy with zero drift.
+  accepted_deviation:
+    criterion: Measured always-on token count ≤ 3k.
+    measured: ~3.5k
+    decision: accepted, operator-approved at v0.3.0 — recorded, not silently missed.
 intents:
   - subject: { kind: doc, ref: "memory/architecture.md#Agent Surface" }
     change: "NEW single always-on law file — the workspace system prompt. Consolidates every always-on rule the library ships (today: 9 public/rules/*.md + the law body of the root AGENTS.md) into one optimized, auditable, affirmative document."

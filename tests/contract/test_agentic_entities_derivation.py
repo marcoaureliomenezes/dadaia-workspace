@@ -24,6 +24,7 @@ import re
 from pathlib import Path
 
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
+from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
 from dadaia_workspace.features.panel.entities import (
     core_skills,
     load_registry,
@@ -167,3 +168,132 @@ def test_doctor_check_passes_on_the_packaged_registry() -> None:
     lines = check_entities_derivation(_PUBLIC)
     assert len(lines) == 1 and not lines[0].status.blocking
     assert "entities-derivation" in lines[0].text
+
+
+def _write_registry(tmp_path: Path, payload: object) -> None:
+    (tmp_path / "entities").mkdir()
+    (tmp_path / "entities" / "registry.json").write_text(json.dumps(payload), encoding="utf-8")
+
+
+def _assert_single_typed_blocking_line(lines: list[DoctorLine]) -> None:
+    """FR3.3 (ENT-DERIVE-1): a malformed-but-valid-JSON shape must yield exactly one
+    typed **ERROR** DoctorLine from the parse seam itself — never a Python traceback
+    (AttributeError/TypeError), and never the *wrong* DRIFT line a downstream check
+    would fabricate by silently misreading the malformed shape (e.g. iterating a
+    string's characters as if they were harness names)."""
+    assert len(lines) == 1, lines
+    assert lines[0].status is DoctorStatus.ERROR, lines
+    assert "entities-derivation:" in lines[0].text
+    assert "(ENT-DERIVE-1)" in lines[0].text
+
+
+def test_doctor_check_blocks_on_non_dict_top_level(tmp_path: Path) -> None:
+    """Top-level JSON list instead of an object must not raise AttributeError on
+    ``registry.get(...)`` downstream — it must yield a typed blocking line."""
+    from dadaia_workspace.infrastructure.codex_doctor import check_entities_derivation
+
+    _write_registry(tmp_path, ["not", "a", "dict"])
+
+    lines = check_entities_derivation(tmp_path)
+    _assert_single_typed_blocking_line(lines)
+
+
+def test_doctor_check_blocks_on_personas_as_list_of_strings(tmp_path: Path) -> None:
+    """``personas`` entries must be objects — a list of bare strings must not raise
+    AttributeError on ``p.get("id")`` downstream."""
+    from dadaia_workspace.infrastructure.codex_doctor import check_entities_derivation
+
+    _write_registry(
+        tmp_path,
+        {
+            "schema_version": "agentic-entities-v1",
+            "personas": ["known", "rogue"],
+            "behaviors": [],
+            "rules": [],
+            "universal": {},
+        },
+    )
+
+    lines = check_entities_derivation(tmp_path)
+    _assert_single_typed_blocking_line(lines)
+
+
+def test_doctor_check_blocks_on_personas_as_dict(tmp_path: Path) -> None:
+    """``personas`` as a mapping instead of a list must not silently iterate its
+    keys as if they were persona objects."""
+    from dadaia_workspace.infrastructure.codex_doctor import check_entities_derivation
+
+    _write_registry(
+        tmp_path,
+        {
+            "schema_version": "agentic-entities-v1",
+            "personas": {"known": {"id": "known"}},
+            "behaviors": [],
+            "rules": [],
+            "universal": {},
+        },
+    )
+
+    lines = check_entities_derivation(tmp_path)
+    _assert_single_typed_blocking_line(lines)
+
+
+def test_doctor_check_blocks_on_non_dict_behavior_element(tmp_path: Path) -> None:
+    """A ``behaviors`` list containing a non-dict element must not raise
+    AttributeError on ``behavior.get(...)`` downstream."""
+    from dadaia_workspace.infrastructure.codex_doctor import check_entities_derivation
+
+    _write_registry(
+        tmp_path,
+        {
+            "schema_version": "agentic-entities-v1",
+            "personas": [],
+            "behaviors": [{"id": "b1", "implementations": {}}, "rogue-behavior"],
+            "rules": [],
+            "universal": {},
+        },
+    )
+
+    lines = check_entities_derivation(tmp_path)
+    _assert_single_typed_blocking_line(lines)
+
+
+def test_doctor_check_blocks_on_implementations_as_int(tmp_path: Path) -> None:
+    """``implementations`` must be a mapping — an int must not raise TypeError on
+    ``set(behavior.get("implementations", {}))`` downstream."""
+    from dadaia_workspace.infrastructure.codex_doctor import check_entities_derivation
+
+    _write_registry(
+        tmp_path,
+        {
+            "schema_version": "agentic-entities-v1",
+            "personas": [],
+            "behaviors": [{"id": "b1", "implementations": 42}],
+            "rules": [],
+            "universal": {},
+        },
+    )
+
+    lines = check_entities_derivation(tmp_path)
+    _assert_single_typed_blocking_line(lines)
+
+
+def test_doctor_check_blocks_on_implementations_as_string(tmp_path: Path) -> None:
+    """The trap case: ``implementations`` as a bare string is iterable, so
+    ``set("codex")`` silently produces a set of characters — a WRONG DRIFT line,
+    not a crash. This must become a typed error, not a misleading DRIFT diagnosis."""
+    from dadaia_workspace.infrastructure.codex_doctor import check_entities_derivation
+
+    _write_registry(
+        tmp_path,
+        {
+            "schema_version": "agentic-entities-v1",
+            "personas": [],
+            "behaviors": [{"id": "b1", "implementations": "codex"}],
+            "rules": [],
+            "universal": {},
+        },
+    )
+
+    lines = check_entities_derivation(tmp_path)
+    _assert_single_typed_blocking_line(lines)

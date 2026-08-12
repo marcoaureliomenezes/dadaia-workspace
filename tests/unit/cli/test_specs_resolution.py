@@ -95,6 +95,24 @@ def test_explicit_and_env_resolve_without_fallback(
     assert resolve_context_for_cli(None) == "env-ctx"
 
 
+@pytest.mark.usefixtures("_clean_session_env")
+def test_repo_cwd_resolves_via_rung3_no_bind_no_env(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """T-50-02 (SPEC v0.5.0 FR1) widening: the single authority's rung 3 (the repo
+    containing cwd) now resolves ANY registered ``repos/<slug>``, generalizing the OLD
+    hardcoded self-hosting-literal special case (which recognized only a checkout named
+    exactly ``"dadaia-workspace"``). No explicit argument, no ``DADAIA_CONTEXT``, no
+    bound session record — the cwd alone resolves it."""
+    ws = tmp_path / "ws"
+    _mk_workspace(ws, ["alive-ctx"])
+    repo_dir = ws / "repos" / "alive-ctx"
+    repo_dir.mkdir(parents=True)
+    monkeypatch.chdir(repo_dir)
+
+    assert resolve_context_for_cli(None) == "alive-ctx"
+
+
 # --- FR3: context-name allowlist at the explicit/env resolution rungs ----------------
 
 
@@ -130,6 +148,27 @@ def test_traversal_shaped_explicit_raises_actionable_error(
     # Actionable: the message names the rejected value so an operator can see what was
     # typed/passed, not just "invalid context".
     assert repr(name) in str(exc_info.value) or name in str(exc_info.value)
+
+
+@pytest.mark.usefixtures("_clean_session_env")
+def test_traversal_shaped_env_never_echoes_through_even_with_rung3_available(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """T-50-05: the pop/restore env mutation this seam used to need (to stop the
+    delegated authority call from re-reading and echoing back the SAME rejected
+    ``DADAIA_CONTEXT``) is deleted; the replacement is validating whatever the authority
+    returns against the SAME allowlist. A traversal-shaped ``DADAIA_CONTEXT`` still never
+    reaches the caller — even from a cwd that WOULD otherwise resolve via rung 3 —
+    because the authority's own rung 1 short-circuits on any truthy env var before rung
+    3 is ever consulted, and the echoed-back invalid value fails the allowlist check."""
+    ws = tmp_path / "ws"
+    _mk_workspace(ws, ["alive-ctx"])
+    repo_dir = ws / "repos" / "alive-ctx"
+    repo_dir.mkdir(parents=True)
+    monkeypatch.chdir(repo_dir)
+    monkeypatch.setenv("DADAIA_CONTEXT", "../escape")
+    with pytest.raises(ValueError, match="context bind"):
+        resolve_context_for_cli(None)
 
 
 @pytest.mark.usefixtures("_clean_session_env")
