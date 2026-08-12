@@ -1,5 +1,9 @@
 # Test Rules — <project-name>
 
+> Installed by dadaia. Replace every `<ANGLE-BRACKET>` placeholder below with this
+> project's own values before relying on it — a placeholder left in place means that
+> section is not yet calibrated.
+
 These rules override general workspace guidance for everything under `tests/`.
 Agents creating or editing tests must follow them. Full protocol: skill
 `dadaia-test-stewardship`. Numbers below are this project's adjustable defaults.
