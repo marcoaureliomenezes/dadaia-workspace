@@ -392,7 +392,7 @@ to `[-]` and is preserved verbatim in the review file as the historical record.
 
 ---
 
-- [ ] **T-070-09 — Review + diff-based security verdict**
+- [-] **T-070-09 — Review + diff-based security verdict**
 
 **Owner role:** code-reviewer + security-reviewer (verdicts); software-engineer applies any
 required fix · **Commit:** fixes only, each returning its task to `[-]`
