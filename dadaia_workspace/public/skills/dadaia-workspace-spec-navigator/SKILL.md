@@ -15,11 +15,13 @@ canonical order for the current task.
 1. **Resolve workspace context.**
    - If the task is about the `dadaia-workspace` repository itself, treat its local
      `specs/` as the target spec context.
-   - Otherwise, resolve in priority order:
+   - Otherwise, resolve exactly as the law (DADAIA.md §3) does:
      - **a) `DADAIA_CONTEXT` env var** — if set, use
        `<workspace-root>/repos/<DADAIA_CONTEXT>/specs/`.
-     - **b) `spec_contexts.json`** — read `.dadaia/states/spec_contexts.json`, find the first
-       entry with `state: alive`, and derive `repos/<slug>/specs/`. Fallback: `dadaia context show --json`.
+     - **b) your own session binding** — `dadaia context show --json` reports it (the
+       live session record; never scan for a "first alive" context).
+     - **c) the repo containing the working directory** — a cwd under
+       `repos/<slug>/` selects that context.
    - Context resolves automatically from the registry — never halt to ask the
      operator to bind or rebind. Binding is optional. Only if the workspace has no
      ALIVE context at all is there nothing to navigate.

@@ -65,11 +65,8 @@ backlog_app = typer.Typer(help="Backlog entry management commands.")
 def _resolve_specs_dir(specs_dir: str | None) -> Path:
     """Resolve the target specs/ directory.
 
-    Priority:
-    1. Explicit ``--specs-dir`` argument.
-    2. Bound context session (``DADAIA_CONTEXT`` / ``DADAIA_SESSION_ID`` / persisted-bind
-       marker attributed by ancestry-chain membership — W1-8).
-    3. ``<cwd>/specs`` fallback.
+    Priority: explicit ``--specs-dir``, else the single resolution authority
+    (``DADAIA.md`` §3: ``DADAIA_CONTEXT`` → own live session record → repo-of-cwd).
     """
     return resolve_specs_dir_for_cli(specs_dir)
 

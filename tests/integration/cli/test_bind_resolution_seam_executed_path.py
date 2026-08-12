@@ -6,9 +6,10 @@ STRUCTURE (no hardcoded default, every classified-resolver-driven param AST-reac
 seam); this module proves the RUNTIME BEHAVIOR for a representative read-only verb per
 command module, in a hermetic tmp workspace with TWO live contexts, using the REAL Typer
 CLI (``CliRunner`` against ``cli.main.app`` — never calling the resolver functions
-directly): after a bare ``dadaia context bind ctx-b`` (no ``DADAIA_SESSION_ID`` exported —
-the normal harness-shell shape), every probed verb resolves ``ctx-b``, never ``ctx-a``
-and never a hardcoded/no-op fallback.
+directly): after ``dadaia context bind ctx-b`` followed by ``export DADAIA_CONTEXT=ctx-b``
+(the plain-shell binding channel with no harness-native session id — T-50-04, SPEC
+v0.5.0 FR1 coupling 3), every probed verb resolves ``ctx-b``, never ``ctx-a`` and never a
+hardcoded/no-op fallback.
 
 Probed resolver-driven verbs:
   - ``context show`` (no positional name) — context.py
@@ -123,6 +124,14 @@ def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture
 def two_ctx_workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Bind ``ctx-b``, then export ``DADAIA_CONTEXT`` — the plain-shell binding channel
+    (T-50-04, SPEC v0.5.0 FR1 coupling 3: "for a non-harness shell the env var IS the
+    binding"). This fixture models a shell with NO harness-native session id (the
+    ``_clean_env`` autouse fixture scrubs those) exactly as ``dadaia context bind ...
+    --print-env`` instructs: the bind-epoch marker this test used to rely on for
+    same-process ancestry attribution is retired, so this is now the only channel by
+    which a plain shell's later CLI calls see the bind.
+    """
     ws = _make_two_context_workspace(tmp_path)
     monkeypatch.chdir(ws)
     bind_result = _runner.invoke(
@@ -130,6 +139,7 @@ def two_ctx_workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         ["context", "bind", _CTX_B, "--mode", "implementation", "--release", "v0.9.9"],
     )
     assert bind_result.exit_code == 0, bind_result.output
+    monkeypatch.setenv("DADAIA_CONTEXT", _CTX_B)
     return ws
 
 

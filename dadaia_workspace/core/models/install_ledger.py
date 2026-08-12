@@ -37,11 +37,42 @@ class LedgerEntry:
     ``agents``, ``kimi-code``, ``scripts``, ``guardrail``, ``law``,
     …) — diagnostics and scoped operations only; the reconciliation
     invariant never depends on it.
+
+    ``relpath`` is validated HERE, in ``__post_init__``, so **every** construction path
+    is covered — direct construction, :meth:`InstallLedger.from_dict` (a persisted or
+    foreign ledger file), and the installer's own writer alike (CWE-22 class,
+    ``infrastructure/public_assets.py:753-765``). Rejected: empty, absolute, any ``..``
+    part, any backslash, and any relpath that is not already its normalized POSIX form
+    (no doubled/trailing separators, no ``.`` components). A ``ValueError`` raised while
+    parsing a persisted ledger (``from_dict``) propagates to
+    ``JsonInstallLedgerStore.read`` returning ``None`` — a malformed record degrades to
+    bootstrap (record everything, prune nothing), never to a crash or a traversal.
     """
 
     relpath: str
     sha256: str
     family: str
+
+    def __post_init__(self) -> None:
+        relpath = self.relpath
+        if not relpath:
+            raise ValueError("install_ledger: relpath must not be empty")
+        if "\\" in relpath:
+            raise ValueError(f"install_ledger: relpath must not contain a backslash: {relpath!r}")
+        if relpath.startswith("/"):
+            raise ValueError(f"install_ledger: relpath must not be absolute: {relpath!r}")
+        parts = relpath.split("/")
+        if ".." in parts:
+            raise ValueError(f"install_ledger: relpath must not contain a '..' part: {relpath!r}")
+        if "" in parts or "." in parts:
+            # Deliberately no pathlib coupling here (the A-seam discipline this module's
+            # docstring names) — a normalized POSIX form has no empty segment (double or
+            # trailing separator) and no bare "." segment; this string check is
+            # equivalent to ``PurePosixPath(relpath).as_posix() == relpath`` for a
+            # relpath that already passed the checks above.
+            raise ValueError(
+                f"install_ledger: relpath is not its normalized POSIX form: {relpath!r}"
+            )
 
 
 @dataclass(frozen=True)

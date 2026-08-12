@@ -65,6 +65,23 @@ _BLOCKING: frozenset[DoctorStatus] = frozenset(
 )
 
 
+#: Escapes for every C0 control character (0x00-0x1F), the rendering authority's CWE-117
+#: fix (FR3 item 2): a producer's ``text`` can never forge a second physical line
+#: through an embedded ``\n``/``\r``/ESC (or any other C0 byte). ``\n``/``\r``/ESC keep
+#: their familiar short form; every other C0 byte gets a ``\xHH`` escape. A NO-OP on
+#: clean text — no key in this table ever appears in a committed golden line, so
+#: existing goldens stay byte-identical.
+_CONTROL_CHAR_ESCAPES: dict[int, str] = {
+    code: {0x0A: "\\n", 0x0D: "\\r", 0x1B: "\\x1b"}.get(code, f"\\x{code:02x}")
+    for code in range(0x20)
+}
+
+
+def _escape_control_chars(text: str) -> str:
+    """Escape every C0 control character in *text* — see ``_CONTROL_CHAR_ESCAPES``."""
+    return text.translate(_CONTROL_CHAR_ESCAPES)
+
+
 @dataclass(frozen=True)
 class DoctorLine:
     """One diagnostic finding: a status chosen by the producer plus its message."""
@@ -73,8 +90,14 @@ class DoctorLine:
     text: str
 
     def render(self) -> str:
-        """Legacy wire format, byte-identical to the historical string lines."""
-        return f"[{self.status}] {self.text}"
+        """Legacy wire format, byte-identical to the historical string lines.
+
+        ``text`` is escaped for C0 control characters (``\\n``, ``\\r``, ESC, and every
+        other 0x00-0x1F byte) before rendering — CWE-117: no producer, present or
+        future, can forge a second physical line through this, the ONE rendering
+        authority every doctor golden already passes through.
+        """
+        return f"[{self.status}] {_escape_control_chars(self.text)}"
 
 
 @dataclass(frozen=True)

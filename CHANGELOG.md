@@ -4,6 +4,65 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — spec release v0.5.0
+
+Lands in the same unreleased `0.5.0` package version as spec release v0.3.0 below.
+
+### Removed
+- **The four competing context-resolution ladders and the bind-epoch marker
+  subsystem.** `core.specs_resolver.resolve_context()` is now the single authority
+  implementing the `DADAIA.md` §3 rung law verbatim (rung 0 caller input / explicit write
+  target, rung 1 `DADAIA_CONTEXT`, rung 2 this session's own live record keyed by the
+  harness-native session id, rung 3 the repo containing the cwd). The CLI seam, the SDD
+  gate, `container` and the ctx-inject hook all consume it. Deleted with the ladders: all
+  three marker-attribution algorithms, the `session_identity` marker writers/readers,
+  `sdd_post_gate._adopt_attributed_bind`, `.dadaia/states/bind_epoch/`, and
+  `cli._specs_resolution.current_ancestry_pids` — 132 occurrences across 18 files → 0.
+  `core/specs_resolver.py` went 369 → 202 lines; the production package is net −194 lines
+  across the release.
+- The `DADAIA_SESSION_ID` **resolution** channel (it survives only as a session identity
+  for the CLI/hook heartbeat), the dead `DADAIA_AGENT_RUNTIME` alias (zero writers), the
+  hardcoded self-hosting-slug rung, the env pop/restore workaround, and the `cwd/specs`
+  fallback in `resolve_specs_dir`. Resolution now reads one environment variable:
+  `DADAIA_CONTEXT`.
+
+### Changed
+- **Context-memory injection triggers on the session record's `bound_at`** instead of a
+  marker mtime. One intended behavior difference: a **same-context re-bind now
+  re-injects**, so a mode or release change reaches a live session.
+- **Kimi Code binds through `DADAIA_CONTEXT` exported at harness launch** (rung 1) — the
+  harness exposes no session-id environment variable. `dadaia context bind` now prints a
+  loud warning when it can neither key a harness-native record nor see `DADAIA_CONTEXT`,
+  so a binding can never become a silent no-op.
+- `DADAIA.md` §3 amended for precision and re-projected; the skills and
+  `CONSUMER_VALIDATION_RECIPE.md` teach the three rungs, the plain-shell path and the kimi
+  launch-env profile.
+- The import-linter contract `bind-resolution-seam-is-a-single-home` rewritten for the new
+  seam: exactly three sanctioned direct importers (`cli._specs_resolution`, `container`,
+  `hooks`), still zero `ignore_imports`. Hooks import the authority directly by law — no
+  hook imports `container`, pinned by a new attesting import-surface test (hook write-path
+  latency 2.25 s → 0.46 s).
+
+### Fixed
+- **`dadaia specs doctor` is satisfiable again.** A bug-ledger coherence violation is now
+  reported only while no later compensating `reported` event exists for the same `bug_id` —
+  the append-only store's own vocabulary heals its history, while per-event enforcement is
+  unchanged and a fresh uncompensated violation still ERRORs. Two legal appends healed the
+  one historical row; the doctor exits 0 on the self-hosting context for the first time.
+- Install-ledger relpaths are validated in `LedgerEntry.__post_init__` — empty, absolute,
+  `..`-bearing, backslashed and non-normalized POSIX forms are rejected at the one
+  construction authority, covering both the prune loop and the foreign-projection scan
+  (CWE-22 class).
+- `DoctorLine.render()` escapes control characters, so no producer can forge a second
+  physical doctor line (CWE-117).
+- The `entities-derivation` verifier emits a typed `ENT-DERIVE-1` error line for
+  malformed-but-valid JSON shapes instead of letting `AttributeError`/`TypeError` escape.
+- The kimi telemetry reader contains `sessionDir` lexically against the index parent before
+  `stat`, degrading through its existing `OSError` branch; ships with the reader's first
+  test file.
+- A new `remove_legacy_bind_epoch_state` install migration sweeps orphan
+  `.dadaia/states/bind_epoch/` markers left by earlier releases (retained one release).
+
 ## [0.5.0] — Unreleased (spec release v0.3.0)
 
 ### Removed

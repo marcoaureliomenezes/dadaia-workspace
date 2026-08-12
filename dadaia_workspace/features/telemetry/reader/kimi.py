@@ -26,6 +26,7 @@ import datetime
 import hashlib
 import json
 import logging
+import os
 import pathlib
 from dataclasses import dataclass
 
@@ -56,6 +57,27 @@ def _compute_event_id(session_id: str) -> str:
     """Compute idempotent event_id = sha1(kimi||session_id)[:20]."""
     digest = hashlib.sha1(f"kimi||{session_id}".encode()).hexdigest()
     return digest[:20]
+
+
+def _session_dir_is_contained(session_dir: str, index_parent: pathlib.Path) -> bool:
+    """FR3.4: lexical (non-resolving) containment of ``sessionDir`` against
+    ``index_path.parent``, run BEFORE any ``Path(...).stat()`` call.
+
+    Neither side is ``.resolve()``d — no symlink following, no disk I/O. This is a
+    pure string/path normalization check (``os.path.normpath``), so an escaping
+    value (an absolute path outside ``index_parent``, or a ``..``-escape) never
+    reaches the filesystem call at all. A relative candidate is rejected outright
+    — the session-index shape always carries an absolute ``sessionDir``.
+    """
+    normalized_parent = pathlib.PurePath(os.path.normpath(str(index_parent)))
+    normalized_candidate = pathlib.PurePath(os.path.normpath(session_dir))
+    if not normalized_candidate.is_absolute():
+        return False
+    try:
+        normalized_candidate.relative_to(normalized_parent)
+    except ValueError:
+        return False
+    return True
 
 
 def read_kimi_sessions(
@@ -98,10 +120,17 @@ def read_kimi_sessions(
         cwd = obj.get("workDir") if isinstance(obj.get("workDir"), str) else None
 
         # Liveness signal: the session directory's mtime (metadata only — the
-        # directory content is never opened).
+        # directory content is never opened). ``sessionDir`` is lexically
+        # contained against index_path.parent BEFORE Path(...).stat() (FR3.4) —
+        # an escaping value never reaches the filesystem call; a containment
+        # failure takes the same degrade as the pre-existing OSError branch below.
         last_ts = now_iso
         session_dir = obj.get("sessionDir")
-        if isinstance(session_dir, str) and session_dir:
+        if (
+            isinstance(session_dir, str)
+            and session_dir
+            and _session_dir_is_contained(session_dir, index_path.parent)
+        ):
             try:
                 mtime = pathlib.Path(session_dir).stat().st_mtime
                 last_ts = datetime.datetime.fromtimestamp(mtime, tz=datetime.UTC).isoformat()

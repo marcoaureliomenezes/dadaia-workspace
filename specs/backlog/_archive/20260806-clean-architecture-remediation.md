@@ -1,9 +1,33 @@
 ---
 name: clean-architecture-remediation
-status: OPEN
+status: CONSUMED — v0.5.0
 created: 2026-08-06
 origin: operator goal 2026-08-06 (bug-ledger deep audit; report 2026-08-06T210000Z-bug-ledger-architecture-audit.html)
 owner: project-manager (curates)
+disposition:
+  terminal_status: CONSUMED
+  closed_by: v0.5.0
+  closed_at: '2026-08-12'
+  evidence: specs/releases/v0.5.0/CLOSURE.md#dispositions
+  items:
+    - item: 1 — fate of dadaia-workflows
+      status: CONSUMED
+      by: v0.3.0 — operator chose DEMOLISH; the engine was deleted entirely
+    - item: 2 — retry-machinery demolition
+      status: SUPERSEDED
+      by: v0.3.0 — the retry/bounded-revision machinery died with the engine
+    - item: 3 — de-flag public_assets.py
+      status: CONSUMED
+      by: v0.3.0 — install() resolves an immutable InstallPlan and runs flag-free steps
+    - item: 4 — one context-resolution rung
+      status: CONSUMED
+      by: v0.5.0 FR1 — five ladders collapsed into core.specs_resolver.resolve_context
+    - item: 5 — conduct law (additive-fix justification, family recurrence reopens)
+      status: CONSUMED
+      by: constitution §12.4 + memory/quality-assurance.md "Root Cause, Always"
+    - item: 6 — deferred-debt triage
+      status: CONSUMED
+      by: v0.5.0 FR4 — all 12 deferred bugs dispositioned with evidence
 intents:
   - subject: { kind: doc, ref: "memory/architecture.md#Overview" }
     change: "CONSUMED — v0.3.0: operator chose DEMOLISH; the engine was deleted entirely (−61,883 lines)"

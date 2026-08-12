@@ -29,9 +29,10 @@ and unit-tested for programmatic SDK use.
 1. Operator launches `claude` at the workspace root; `CLAUDE.md` (`@AGENTS.md` bridge)
    loads the workspace law — Claude Code does not read `AGENTS.md` natively.
 2. `dadaia context bind <ctx>` → the ctx-inject hook (UserPromptSubmit) injects the
-   bound context's tech-stack digest + feature catalog once per session; the bind-epoch
-   marker is pid-attributed, so a concurrent session's bind never steals this session's
-   injection.
+   bound context's tech-stack digest + feature catalog once per session. Claude Code
+   exposes a native session id, so the bind record is this session's own (rung 2 of the
+   resolution law) and the trigger is that record's `bound_at` against this session's
+   sentinel — a concurrent session's bind never reaches this session's injection.
 3. Work proceeds under the deterministic gate: PreToolUse `pre_gate` (matcher
    `Edit|Write|MultiEdit|NotebookEdit|Bash`), PostToolUse heartbeat/reconciler
    (match-all), plus the git chokepoints. The pre-gate emits the MERGED envelope —

@@ -14,8 +14,8 @@ tags:
 - hooks
 - enforcement
 - no-locks
-token_estimate: 552
-last_updated: '2026-08-07'
+token_estimate: 570
+last_updated: '2026-08-12'
 release_origin: v0.3.0
 ---
 
@@ -49,6 +49,18 @@ Mode resolution is environment, then this session's own record, then
 `IMPLEMENTATION`. There is no context-global mode or foreign-session fallback. A READ
 session blocks only its own mutating writes; it does not affect another session.
 
+## Context Attribution
+
+The gate does not carry a resolution ladder of its own. It calls the shared authority
+`core.specs_resolver.resolve_context()` ([[context-management]]) and passes the write's
+target path as the caller-supplied input, which keeps attribution **path-first**: a
+write under `repos/<slug>/` is attributed to that slug's context even when
+`DADAIA_CONTEXT` names another. A write under no repo falls through the remaining law
+rungs — the environment, then this session's own live record, then the repo containing
+the working directory — so a demonstrably bound session's out-of-repo write belongs to
+its own context. The slug reaching the classifier is mapped back to the context NAME
+through the registry.
+
 ## Presence
 
 A mutating write best-effort upserts
@@ -72,9 +84,11 @@ missing review evidence; pushes are.
 
 ## Context Injection
 
-`dadaia context bind` writes the caller's session record and a bind-epoch marker. The
-marker is the only trigger for context-memory injection. An unbound session gets generic
-preflight only. A foreign session's bind cannot alter this session's context or mode.
+`dadaia context bind` writes the caller's session record. That record's `bound_at`
+timestamp, compared against this session's injection sentinel, is the only trigger for
+context-memory injection — so a re-bind reaches a live session. An unbound session gets
+generic preflight only. A foreign session's bind cannot alter this session's context or
+mode.
 
 ## Non-Goals
 
@@ -88,7 +102,7 @@ boundary.
 
 - `.dadaia/states/presence/<context>/<session-id>.json`
 - `.dadaia/sessions/<session-id>.json`
-- `.dadaia/states/bind_epoch/<context>`
+- `.dadaia/tmp/ctx-inject-fired-<session-id>`
 - `.dadaia/logs/hook-latency.jsonl`
 - `.dadaia/logs/reconciler-events.jsonl`
 

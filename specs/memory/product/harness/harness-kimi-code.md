@@ -2,19 +2,21 @@
 slug: harness-kimi-code
 title: Harness — Kimi Code
 category: product
-tldr: 'Layer-1-only harness: `.kimi-code/` projection + hooks via a managed block in the user-level `config.toml`; first with post-compact re-injection.'
+tldr: 'Layer-1-only harness: `.kimi-code/` projection + user-level TOML hook shims; binds through `DADAIA_CONTEXT` at launch.'
 summary: >-
   Kimi Code enters the workspace as a first-class Layer-1 harness. The projection
   tree is inert Markdown; the live wiring is four POSIX shims registered via a
   marker-delimited managed block of TOML hook rules in `$KIMI_CODE_HOME/config.toml`,
-  delegating to the shared Python hook modules.
+  delegating to the shared Python hook modules. Kimi exposes no session-id environment
+  variable, so its context binding is `DADAIA_CONTEXT` exported at harness launch.
 tags:
 - harness
 - kimi-code
 - layer-1
 - projection
-token_estimate: 400
-last_updated: '2026-07-19'
+- binding
+token_estimate: 481
+last_updated: '2026-08-12'
 release_origin: v0.2.8
 ---
 
@@ -37,16 +39,33 @@ same Python hook modules the other harnesses use: `PreToolUse` → merged pre-ga
 compact-epoch marker plus an observable stdout re-emission of the bootstrap (Kimi
 discards it; the next prompt still re-injects deterministically).
 
+The shims fail open outside dadaia workspaces, carry no secrets and no
+workspace-absolute paths, and are the only dadaia assets installed outside the
+workspace tree. `dadaia public doctor` verifies the projection, the shims, and the
+managed block. Generated `.kimi-code/**` files must not be hand-edited.
+
+## Binding
+
+Kimi Code exposes no session-id environment variable of its own, so its binding is
+**`DADAIA_CONTEXT`, exported into the environment the `kimi` process is launched with** —
+rung 1 of the resolution law ([[context-management]]), the same channel any non-harness
+shell uses. With that variable set, all three effects follow from the shared authority:
+the `UserPromptSubmit` shim injects the bound context's memory, the pre-gate shim
+resolves the bind mode and attributes the write, and the post-gate shim's heartbeat
+carries the context.
+
+Running `dadaia context bind` from inside a kimi shell tool writes a session record the
+kimi session cannot key back to, so `bind` prints its loud warning naming the export to
+add. Exporting `DADAIA_CONTEXT` at launch is the supported flow; the consumer validation
+recipe teaches it as the kimi profile.
+
+## Post-compaction
+
 Kimi is the first harness with deterministic post-compaction context re-injection:
 the `PostCompact` hook stamps `.dadaia/tmp/ctx-compact-<session_id>`; the next
 `UserPromptSubmit` treats the newer marker as a re-injection trigger and re-delivers
 the bound context's bootstrap exactly once (sentinel restamp keeps later prompts
 silent).
-
-The shims fail open outside dadaia workspaces, carry no secrets and no
-workspace-absolute paths, and are the only dadaia assets installed outside the
-workspace tree. `dadaia public doctor` verifies the projection, the shims, and the
-managed block. Generated `.kimi-code/**` files must not be hand-edited.
 
 ## Layer 2
 

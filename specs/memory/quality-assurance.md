@@ -12,8 +12,8 @@ tags:
 - ci
 - quality
 - test-architecture
-token_estimate: 520
-last_updated: '2026-08-07'
+token_estimate: 580
+last_updated: '2026-08-12'
 release_origin: v0.3.0
 ---
 
@@ -49,6 +49,23 @@ not acceptable outcomes. The recurrence evidence is unambiguous: structural fixe
 **delete** surface stay quiet, while additive fixes reproduce the next defect in the same
 family within a day. Removal is the preferred remedy; an additive-only fix carries an
 explicit justification of why removal was impossible.
+
+## Satisfiable Diagnostics
+
+A gate never demands what its own tooling refuses. Every diagnostic must be **healable by
+an action the product accepts**: for each violation a check reports, some legal operation
+must exist that clears it, and that operation is the one the check's message names. A
+check that no legal action can satisfy is a defect in the check, not a standing debt in
+the data.
+
+In an append-only, event-sourced store the healing action is a compensating **event**,
+never an edit: a violation is reported only while no later event of the compensating kind
+exists for the same subject, and history is corrected by appending rather than by
+rewriting a row. Enforcement and diagnosis are separate authorities that must agree by
+construction — enforcement answers *may this next event be appended*, diagnosis answers
+*is this history healed*, and they agree precisely because the compensation is an event
+enforcement already accepts. Healing history never disables the check: a fresh,
+uncompensated violation still fails.
 
 ## Browser Validation
 

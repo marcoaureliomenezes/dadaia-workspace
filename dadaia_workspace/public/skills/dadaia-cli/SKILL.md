@@ -50,7 +50,7 @@ dadaia context alive <ctx> / dead <ctx>                          # lifecycle tra
 dadaia context baseline <ctx> --yes --push                       # explicit unborn-repo baseline
 ```
 
-Bind binds the **context** (persists mode + session id in the session record, self-scoped); no shell `eval` needed. ADDITIVE work (bugs/backlog/audits/reports) needs no bind.
+Bind binds the **context** (persists mode + session id in the session record, keyed by your harness session id, self-scoped). In a plain shell — or under kimi-code, which exposes no session-id env — export `DADAIA_CONTEXT=<ctx>` instead: the env var **is** the binding there, and `bind` warns when neither channel can carry it. ADDITIVE work (bugs/backlog/audits/reports) needs no bind.
 
 ## SDD stages (agent-dispatched, not a CLI verb)
 

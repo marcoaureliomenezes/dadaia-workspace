@@ -19,7 +19,8 @@ from dadaia_workspace.core.exceptions import (
     WorkspaceNotInitializedError,
 )
 from dadaia_workspace.core.protocols.process_ancestry import ProcessAncestry
-from dadaia_workspace.core.specs_resolver import repo_slug_for_context, resolve_bound_context_name
+from dadaia_workspace.core.specs_resolver import repo_slug_for_context
+from dadaia_workspace.core.specs_resolver import resolve_context as _core_resolve_context
 from dadaia_workspace.features.academy.service import AcademyService
 from dadaia_workspace.features.agents.reader import FileSystemAgentsProvider
 from dadaia_workspace.features.export.service import ExportService
@@ -213,11 +214,6 @@ def build_process_ancestry() -> ProcessAncestry:
     return WindowsToolhelpAncestry()
 
 
-#: Default cap on ancestry pids collected into a bind-epoch marker / a resolver-side
-#: attribution set (W1-7/W1-8, v0.1.47). Mirrors ``session_identity._BIND_EPOCH_MAX_CHAIN``.
-_ANCESTRY_CHAIN_CAP = 8
-
-
 def is_source_repo_root(path: Path) -> bool:
     """Composition-root seam for the source-repo test (``cli`` may not import ``infrastructure``).
 
@@ -231,63 +227,18 @@ def is_source_repo_root(path: Path) -> bool:
     return _is_source_repo_root(path)
 
 
-def resolve_persisted_bind_context(
-    workspace_root: Path, ancestry_pids: tuple[int, ...] | list[int] | None = None
-) -> str | None:
-    """Composition-root seam for ancestry-attributed bind resolution (hooks path).
+def resolve_context(explicit: str | None = None, *, target_path: Path | None = None) -> str | None:
+    """Composition-root seam for the single context-resolution authority (hooks path).
 
-    ``core.specs_resolver`` is a forbidden direct import for ``hooks``
-    (``bind-resolution-seam-is-a-single-home``, ZERO ignore_imports): the CLI routes
-    through ``cli._specs_resolution`` and everything else routes here. Hooks need the
-    attribution against the workspace THEY resolved — not the public
-    ``resolve_bound_context_name``, which re-resolves from the process cwd and would
-    attribute against a different tree than the one the hook writes.
+    T-50-02 (SPEC v0.5.0 FR1). ``core.specs_resolver`` is a forbidden direct import for
+    ``hooks`` (``bind-resolution-seam-is-a-single-home``, ZERO ``ignore_imports``): the
+    CLI routes through ``cli._specs_resolution`` (a sanctioned direct-import seam) and
+    every hook routes here instead. A thin, transparent pass-through to
+    :func:`dadaia_workspace.core.specs_resolver.resolve_context` (``DADAIA.md`` §3): no
+    behavior of its own, so a hook consumer resolves the EXACT same rungs the CLI seam
+    and every other consumer resolves.
     """
-    from dadaia_workspace.core import specs_resolver
-
-    return specs_resolver._persisted_bind_context(workspace_root, ancestry_pids)  # noqa: SLF001
-
-
-def build_ancestry_pid_chain(start_pid: int, *, cap: int = _ANCESTRY_CHAIN_CAP) -> list[int]:
-    """Return ``[start_pid, parent, grandparent, …]`` nearest-first, capped at ``cap``.
-
-    Walks the PPID chain upward from ``start_pid`` using the platform-selected read-only
-    :class:`ProcessAncestry` adapter (the SAME accessor the pre-commit chokepoint and
-    ``context release`` use — :func:`build_process_ancestry`). This is the composition-root
-    seam for the bind-epoch ancestry-chain attribution: ``dadaia context bind`` records this
-    chain in the marker (W1-7) and the CLI resolver seam builds it for the current process
-    (W1-8), so a marker written from an ephemeral harness shell is still attributable on a
-    later call via the stable harness pid deeper in the chain.
-
-    The adapter's ppid walk is private to each concrete adapter; the port itself only
-    promises :meth:`~ProcessAncestry.is_ancestor`. When no ppid walk is available on this
-    platform (or any probe error), we degrade to the single ``[start_pid]`` line — exactly
-    the pre-v0.1.47 single-getppid behavior. Non-destructive (read-only /proc, ``ps``, or a
-    Toolhelp32 snapshot); never raises.
-    """
-    if start_pid <= 0:
-        return []
-    chain: list[int] = [start_pid]
-    try:
-        ancestry = build_process_ancestry()
-        ppid_of = getattr(ancestry, "_ppid_of", None)
-        if not callable(ppid_of):
-            return chain
-        seen = {start_pid}
-        current = start_pid
-        while len(chain) < cap:
-            raw = ppid_of(current)
-            parent = raw if isinstance(raw, int) else None
-            # Stop at an unreadable link, a root pid (0/1), or a cycle — none extend a
-            # useful attribution chain.
-            if parent is None or parent <= 1 or parent in seen:
-                break
-            chain.append(parent)
-            seen.add(parent)
-            current = parent
-    except Exception:  # noqa: BLE001 — attribution is best-effort; bind/resolve never fail on it.
-        return chain
-    return chain
+    return _core_resolve_context(explicit, target_path=target_path)
 
 
 def build_doctor_service(workspace_root: Path) -> DoctorService:
@@ -393,7 +344,7 @@ def build_reports_next_service(
     """
     _guard_initialized(workspace_root)
     reports_root = workspace_root / ".dadaia" / "handoff"
-    context_name = resolve_bound_context_name(context)
+    context_name = _core_resolve_context(context)
     if not context_name:
         raise NoActiveReleaseError(
             "No bound context. Run `eval $(dadaia context bind <name> --mode read)` "
@@ -442,7 +393,7 @@ def _context_specs_dir(workspace_root: Path, context: str) -> Path:
     to ``workspace_root/repos/<ctx>/specs``; the self-hosting library repo falls back to the
     workspace-root ``specs`` tree. All roots derive from ``workspace_root`` — never cwd.
     """
-    context_name = resolve_bound_context_name(context) or context
+    context_name = _core_resolve_context(context) or context
     specs_dir = (
         workspace_root / "repos" / repo_slug_for_context(workspace_root, context_name) / "specs"
     )
@@ -781,7 +732,7 @@ def _backlog_context_roots(workspace_root: Path, context: str) -> tuple[Path, Pa
     ``repos/<ctx>/specs`` + ``repos/<ctx>``; the self-hosting library repo falls back to the
     workspace-root tree. All roots are derived from ``workspace_root`` — never cwd.
     """
-    context_name = resolve_bound_context_name(context) or context
+    context_name = _core_resolve_context(context) or context
     specs_dir = (
         workspace_root / "repos" / repo_slug_for_context(workspace_root, context_name) / "specs"
     )

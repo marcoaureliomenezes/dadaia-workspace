@@ -8,26 +8,32 @@ the output contract (``DADAIA_HOOK_OUTPUT`` / ``DADAIA_HOOK_EVENT``) is passed t
 *subprocess* env via the fixture's ``extra`` — the harness-wiring channel — never an
 in-process ``setenv``.
 
-Bind-driven injection (FR-W2-01 / FR-W2-02, v0.1.14)
-----------------------------------------------------
+Bind-driven injection (FR-W2-01 / FR-W2-02, v0.1.14; bound_at trigger, T-50-03)
+--------------------------------------------------------------------------------
 The first-ALIVE fallback is DELETED from injection. An UNBOUND session now yields generic
 preflight (``[no bound context]`` + dispatcher preflight + ALIVE list) with NO context
-memory. Context memory is injected only when a context is RESOLVED through the chain:
-``DADAIA_CONTEXT`` env → self-keyed session record → newest bind-epoch marker newer than
-the sentinel. A pre-existing marker never binds a fresh session.
+memory. Context NAME resolution delegates to the single authority (T-50-03, SPEC v0.5.0
+FR1): this session's own self-keyed session record → ``DADAIA_CONTEXT`` env → this
+session's own live harness-native record → the repo containing cwd. The bind-epoch marker
+subsystem is NO LONGER consulted by the injection path — a session bound only via a
+marker (no harness id, no ``DADAIA_CONTEXT``) no longer resolves a context (the accepted
+FR1 coupling); T-50-04 deletes the marker-attribution algorithm and its harness-pid
+resolver outright (both were already uncalled from the injection path).
 
-CRIT: bind-driven injection + cross-session context-steal prevention (pid/ancestry
-attribution). Injection-without-bind and steal-via-newer-foreign-marker negatives survive
-verbatim below. The sentinel filename byte-parity test is DELETED — the digest-GC tests
-(test_ctx_inject_digest.py) construct the same ``ctx-inject-fired-<sid>`` names and would
-break on a rename, so the filename contract is already pinned implicitly.
+The INJECTION TRIGGER is this session's own session record ``bound_at`` (written by
+``dadaia context bind``) compared against the sentinel's mtime — not the bind-epoch marker
+mtime. A same-context re-bind now re-injects (new pin, T-50-03).
+
+CRIT: bind-driven injection survives below. The sentinel filename byte-parity test is
+DELETED — the digest-GC tests (test_ctx_inject_digest.py) construct the same
+``ctx-inject-fired-<sid>`` names and would break on a rename, so the filename contract is
+already pinned implicitly.
 """
 
 from __future__ import annotations
 
 import json
-import os
-import time
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -35,16 +41,6 @@ import pytest
 
 from dadaia_workspace.features.spec_context import session_identity
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
-
-# Two distinct, clearly-synthetic harness pids used to drive W1-7 session attribution. A
-# bind-epoch marker is honored only when its recorded pid matches the pid the hook resolves
-# for THIS session; the hook resolves it from the stdin ``harness_pid`` payload field (the
-# sanctioned test channel — see ``sdd_gate._resolve_holder_pid``), so passing a known pid
-# and stamping the marker with the same/different value lets a single test process simulate
-# two concurrent harness sessions with different pids. The values need only be positive and
-# distinct — ctx_inject compares them for equality, it never probes them for liveness.
-_PID_A = 990001
-_PID_B = 990002
 
 
 def _ws(tmp_path: Path, slug: str = "ctx", *, with_memory: bool = True) -> Path:
@@ -81,37 +77,28 @@ def _add_context(tmp_path: Path, slug: str, *, with_memory: bool = True) -> None
         (mem / "product" / "catalog.json").write_text('{"features": []}', encoding="utf-8")
 
 
-def _stamp_bind_epoch(
-    tmp_path: Path,
-    slug: str,
-    *,
-    mtime: float | None = None,
-    pid: int | None = None,
-    chain: list[int] | None = None,
-) -> Path:
-    """Write a bind-epoch marker for ``slug`` (optionally with an explicit mtime).
+def _bind_session(tmp_path: Path, session_id: str, context: str) -> None:
+    """Simulate ``dadaia context bind <context>`` for *session_id* (T-50-03).
 
-    W1-7/W1-8 session attribution: the marker CONTENT is the bind process's nearest-first
-    ancestry pid chain, one decimal pid per line (the shape
-    ``session_identity.write_bind_epoch`` produces). ``chain`` writes a multi-line ancestry
-    chain [shell, harness, …]; ``pid`` writes a single-line (legacy) marker; ``pid=None``
-    and ``chain=None`` write a legacy EMPTY marker — the pre-W1-7 shape, unattributable and
-    never honored for injection. The hook honors a marker when this session's harness pid is
-    a MEMBER of the recorded chain. An explicit ``mtime`` is applied after the content is
-    written so the epoch ordering is deterministic.
+    Writes/refreshes the self-keyed session record with ``context`` and a ``bound_at``
+    ISO timestamp of "now" — the same field ``cli/commands/context.py:bind`` persists on
+    every successful bind, including a same-context re-bind (which refreshes it). The
+    injection trigger (``ctx_inject._session_bound_at``) compares this against the
+    sentinel's mtime, so calling this AFTER a prior sentinel stamp and BEFORE the next
+    ``_run`` deterministically produces a ``bound_at`` newer than that sentinel — real
+    wall-clock ordering across sequential, single-threaded calls, no synthetic offset
+    needed.
     """
-    epoch_dir = tmp_path / ".dadaia" / "states" / "bind_epoch"
-    epoch_dir.mkdir(parents=True, exist_ok=True)
-    marker = epoch_dir / slug
-    if chain is not None:
-        marker.write_text("".join(f"{p}\n" for p in chain), encoding="utf-8")
-    elif pid is None:
-        marker.touch()  # legacy EMPTY marker — no attribution
-    else:
-        marker.write_text(f"{pid}\n", encoding="utf-8")
-    if mtime is not None:
-        os.utime(marker, (mtime, mtime))
-    return marker
+    session_identity.write_session(
+        tmp_path,
+        session_id,
+        {
+            "session_id": session_id,
+            "context": context,
+            "mode": "read",
+            "bound_at": datetime.now(tz=UTC).isoformat(),
+        },
+    )
 
 
 def _run(
@@ -119,29 +106,19 @@ def _run(
     session_id: str,
     *,
     extra: dict[str, str] | None = None,
-    harness_pid: int | None = None,
 ) -> str:
     """Invoke ctx_inject as a real subprocess; return its stdout.
 
     The session id is delivered the harness-real way: the stdin ``session_id`` field, with a
     clean env that carries no native session-id var (``claude_hook_env`` then pops it so the
     stdin field wins resolution). ``extra`` supplies harness-control output-contract vars.
-    ``DADAIA_CONTEXT`` is popped so context resolution comes only from the bind-epoch /
-    session chain (a developer shell exporting it must not leak into these tmp-workspace runs).
-
-    ``harness_pid`` (W1-7) is threaded into the stdin payload as the ``harness_pid`` field —
-    the sanctioned channel the hook resolves its owning harness pid from
-    (``sdd_gate._resolve_holder_pid``). Supplying it lets a test pin the pid the hook uses to
-    attribute bind-epoch markers, so one test process can simulate two concurrent sessions
-    with distinct pids. Omitted ⇒ the payload carries no pid and the hook falls back to
-    ``os.getppid()`` (the parent pytest process), the same-parent case the e2e exercises.
+    ``DADAIA_CONTEXT`` is popped so context resolution comes only from the bound session
+    record (a developer shell exporting it must not leak into these tmp-workspace runs).
     """
     env = claude_hook_env(tmp_path, extra=extra)
     env.pop("CLAUDE_CODE_SESSION_ID", None)  # force resolution from the stdin field
-    env.pop("DADAIA_CONTEXT", None)  # context comes only from the bind / marker chain
+    env.pop("DADAIA_CONTEXT", None)  # context comes only from the bound session record
     payload: dict[str, object] = {"session_id": session_id}
-    if harness_pid is not None:
-        payload["harness_pid"] = harness_pid
     result = run_hook_subprocess("ctx_inject", payload, env)
     assert result.returncode == 0, result.stderr
     return result.stdout
@@ -184,11 +161,17 @@ def _assert_no_alive_context_still_generic(out: str) -> bool:
     return "[no bound context]" in out and "end memory bootstrap" not in out
 
 
-def _setup_preexisting_marker(tp: Path) -> None:
-    # STALE-MARKER NEGATIVE (architect MEDIUM): a marker that predates the (absent)
-    # sentinel must NOT inject memory into a fresh session.
+def _setup_foreign_session_bind_never_leaks(tp: Path) -> None:
+    """FR-W2-02 re-proof under the T-50-03 bound_at trigger.
+
+    A DIFFERENT session ("other-sess") is bound to "ctx" (a real self-keyed session
+    record, not a marker). THIS test's session ("fresh", no record of its own, no
+    DADAIA_CONTEXT) must never resolve — or inject — that foreign binding. Name
+    resolution's self-keyed leg is scoped by session id by construction, so this also
+    proves there is no cross-session leak through the single authority.
+    """
     _ws(tp)
-    _stamp_bind_epoch(tp, "ctx", mtime=time.time() - 500)
+    _bind_session(tp, "other-sess", "ctx")
 
 
 @pytest.mark.parametrize(
@@ -213,8 +196,8 @@ def _setup_preexisting_marker(tp: Path) -> None:
             _assert_no_alive_context_still_generic,
         ),
         (
-            "preexisting_marker_does_not_bind_fresh_session",
-            _setup_preexisting_marker,
+            "foreign_session_bind_never_leaks_into_fresh_session",
+            _setup_foreign_session_bind_never_leaks,
             "fresh",
             _assert_unbound_no_memory,
         ),
@@ -265,133 +248,75 @@ def test_env_override_injects_context_memory(tmp_path: Path) -> None:
     assert "Python 3.12" in result.stdout
 
 
-# --- FR-W2-02: bind-epoch marker drives re-injection -------------------------
+# --- T-50-03: bound_at drives the injection trigger ---------------------------
 
 
-def test_bind_marker_newer_than_sentinel_injects_memory_then_rebind_and_repeat_prompt(
+def test_bind_via_session_record_drives_injection_then_rebind_and_repeat_prompt(
     tmp_path: Path,
 ) -> None:
+    """The injection trigger is this session's own record ``bound_at`` vs the sentinel
+    (T-50-03, SPEC v0.5.0 FR1 coupling 1) — not a bind-epoch marker.
+
+    Covers: injection fires once per bind and not on a re-prompt; a rebind to a DIFFERENT
+    context re-injects; a repeat prompt with no new bind stays silent.
+    """
     _ws(tmp_path)
     # First prompt: unbound ⇒ generic, stamps the sentinel.
-    first = _run(tmp_path, "sess", harness_pid=_PID_A)
+    first = _run(tmp_path, "sess")
     assert "[no bound context]" in first
-    # A bind stamps a marker NEWER than the sentinel AND attributed to this session's harness
-    # pid ⇒ next prompt injects the context (W1-7).
-    sentinel = tmp_path / ".dadaia" / "tmp" / "ctx-inject-fired-sess"
-    _stamp_bind_epoch(tmp_path, "ctx", mtime=sentinel.stat().st_mtime + 5, pid=_PID_A)
-    second = _run(tmp_path, "sess", harness_pid=_PID_A)
+
+    # A bind (self-keyed session record, bound_at = now) ⇒ next prompt injects the context.
+    _bind_session(tmp_path, "sess", "ctx")
+    second = _run(tmp_path, "sess")
     assert "[ctx]" in second
     assert "end memory bootstrap" in second
     assert "Python 3.12" in second
 
-    # W1-7 acceptance (c): a same-pid re-bind to ANOTHER context re-injects, and a repeat
-    # prompt with no new marker stays silent.
+    # Repeat prompt, no new bind ⇒ silent.
+    assert _run(tmp_path, "sess") == ""
+
+    # Re-bind to a DIFFERENT context ⇒ re-injects (the resolved name changed).
     ws2 = tmp_path.parent / (tmp_path.name + "-rebind")
     _ws(ws2, slug="alpha")
     _add_context(ws2, "beta")
-    sentinel2 = ws2 / ".dadaia" / "tmp" / "ctx-inject-fired-rb"
-    # First prompt establishes the sentinel (a marker qualifies only against an EXISTING one).
-    _run(ws2, "rb", harness_pid=_PID_A)
-    # Bind alpha newer than the sentinel, attributed to this session ⇒ inject alpha.
-    _stamp_bind_epoch(ws2, "alpha", mtime=sentinel2.stat().st_mtime + 5, pid=_PID_A)
-    out_a = _run(ws2, "rb", harness_pid=_PID_A)
+    # First prompt establishes the sentinel.
+    _run(ws2, "rb")
+    _bind_session(ws2, "rb", "alpha")
+    out_a = _run(ws2, "rb")
     assert "[alpha]" in out_a
-    # Re-bind beta with a still-newer marker, same harness pid ⇒ re-inject beta.
-    _stamp_bind_epoch(ws2, "beta", mtime=sentinel2.stat().st_mtime + 5, pid=_PID_A)
-    out_b = _run(ws2, "rb", harness_pid=_PID_A)
+    _bind_session(ws2, "rb", "beta")
+    out_b = _run(ws2, "rb")
     assert "[beta]" in out_b
     assert "Node 20" in out_b
-    # A repeat prompt with NO newer marker ⇒ silent.
-    out_repeat = _run(ws2, "rb", harness_pid=_PID_A)
-    assert out_repeat == ""
+    # A repeat prompt with NO new bind ⇒ silent.
+    assert _run(ws2, "rb") == ""
 
 
-# --- W1-7 (T-47-16): bind-epoch session attribution ---------------------------
-
-
-@pytest.mark.parametrize(
-    ("session", "chain", "legacy_empty", "expect_inject"),
-    [
-        pytest.param("chain", [555001, _PID_A, 700000], False, True, id="membership-injects"),
-        pytest.param("dj", [555002, _PID_B, 700001], False, False, id="disjoint-pid-never-injects"),
-        pytest.param(
-            # Pre-W1-7 markers carry no harness pid (empty file). Such a marker is
-            # unattributable, so the hook ignores it and stays on generic preflight —
-            # NEVER injecting a context. Backward compatibility with old markers while
-            # closing the cross-session steal; tolerates empty content without crashing.
-            "legacy",
-            None,
-            True,
-            False,
-            id="legacy-empty-marker-never-injects",
-        ),
-    ],
-)
-def test_marker_ancestry_chain_matrix(
-    tmp_path: Path,
-    session: str,
-    chain: list[int] | None,
-    legacy_empty: bool,
-    expect_inject: bool,
-) -> None:
-    """W1-8 (v0.1.47): the hook harness pid deep in a marker's ancestry chain still injects;
-    a chain that does NOT contain this session's harness pid is never honored; a legacy
-    EMPTY (un-attributed) marker is never honored either.
-
-    The marker records the bind process's chain [ephemeral shell, harness, …]. The ephemeral
-    bind shell (first entry) has since died, but this session's hook resolves the SAME
-    long-lived harness pid — the SECOND entry — so membership matches and the context is
-    injected. This is the exact ephemeral-shell case the single-pid-equality design missed.
+def test_same_context_rebind_reinjects(tmp_path: Path) -> None:
+    """New pin (T-50-03, SPEC v0.5.0 FR1 coupling 1): a SAME-CONTEXT re-bind now
+    re-injects — a re-bind is how a mode/release change reaches a live session, which
+    the OLD ``recorded_slug == context`` guard alone could never deliver.
     """
     _ws(tmp_path)
-    sentinel = tmp_path / ".dadaia" / "tmp" / f"ctx-inject-fired-{session}"
-    first = _run(tmp_path, session, harness_pid=_PID_A)  # establish the sentinel (generic)
-    if legacy_empty:
-        assert "[no bound context]" in first
-        _stamp_bind_epoch(tmp_path, "ctx", mtime=sentinel.stat().st_mtime + 5)  # pid=None
-    else:
-        _stamp_bind_epoch(tmp_path, "ctx", mtime=sentinel.stat().st_mtime + 5, chain=chain)
-    out = _run(tmp_path, session, harness_pid=_PID_A)
-    if expect_inject:
-        assert "[ctx]" in out
-        assert "end memory bootstrap" in out
-        assert "Python 3.12" in out
-    else:
-        assert "[ctx]" not in out
-        assert "end memory bootstrap" not in out
+    sid = "same-ctx-sess"
+    assert "[no bound context]" in _run(tmp_path, sid)
 
+    _bind_session(tmp_path, sid, "ctx")
+    first_inject = _run(tmp_path, sid)
+    assert "[ctx]" in first_inject
 
-def test_two_session_marker_attribution_never_steals(tmp_path: Path) -> None:
-    """W1-7 core: marker A (pid X) + a NEWER marker B (pid Y) never cross sessions.
+    # Repeat prompt, no new bind ⇒ silent (baseline: still true).
+    assert _run(tmp_path, sid) == ""
 
-    Regression for bug ``ctx-inject-newest-bind-epoch-steals-other-sessions-context``. A
-    hook resolving pid X injects context A even though B's marker is strictly newer; a hook
-    resolving pid Y injects context B. Neither session ever receives the other's context.
-    """
-    _ws(tmp_path, slug="alpha")  # context A
-    _add_context(tmp_path, "beta")  # context B
+    # SAME-CONTEXT re-bind: a fresh bound_at re-injects even though the resolved name is
+    # unchanged.
+    _bind_session(tmp_path, sid, "ctx")
+    reinjected = _run(tmp_path, sid)
+    assert "[ctx]" in reinjected
+    assert "end memory bootstrap" in reinjected
 
-    # Session X establishes its own sentinel, then A is attributed to X and a strictly-NEWER
-    # B is attributed to Y.
-    sx = tmp_path / ".dadaia" / "tmp" / "ctx-inject-fired-sx"
-    _run(tmp_path, "sx", harness_pid=_PID_A)
-    base_x = sx.stat().st_mtime
-    _stamp_bind_epoch(tmp_path, "alpha", mtime=base_x + 5, pid=_PID_A)
-    _stamp_bind_epoch(tmp_path, "beta", mtime=base_x + 10, pid=_PID_B)  # newer, foreign pid
-    out_x = _run(tmp_path, "sx", harness_pid=_PID_A)
-    assert "[alpha]" in out_x
-    assert "[beta]" not in out_x  # the newer, foreign-pid marker is never stolen
-
-    # Symmetric: session Y (its own sentinel, pid Y) injects beta, never alpha. Re-stamp both
-    # markers newer than Y's just-created sentinel, same attribution.
-    sy = tmp_path / ".dadaia" / "tmp" / "ctx-inject-fired-sy"
-    _run(tmp_path, "sy", harness_pid=_PID_B)
-    base_y = sy.stat().st_mtime
-    _stamp_bind_epoch(tmp_path, "alpha", mtime=base_y + 5, pid=_PID_A)
-    _stamp_bind_epoch(tmp_path, "beta", mtime=base_y + 10, pid=_PID_B)
-    out_y = _run(tmp_path, "sy", harness_pid=_PID_B)
-    assert "[beta]" in out_y
-    assert "[alpha]" not in out_y
+    # And a subsequent repeat prompt (no further bind) goes silent again.
+    assert _run(tmp_path, sid) == ""
 
 
 # --- output-contract envelopes (unchanged contract, generic-preflight payload) ---
@@ -423,3 +348,32 @@ def test_output_contract_envelopes(
     assert env["hookSpecificOutput"]["hookEventName"] == expect_event
     if name == "codex_json_envelope":
         assert "[no bound context]" in env["hookSpecificOutput"]["additionalContext"]
+
+
+def test_env_context_beats_own_session_record(tmp_path: Path) -> None:
+    """F-03 (v0.5.0 six-axis review): rung 1 ``DADAIA_CONTEXT`` beats rung 2 (the
+    session binding) in EVERY consumer — the gate already resolves env-first, so an
+    inject that preferred its own record would attribute one context and inject
+    another on the same prompt."""
+    _ws(tmp_path)
+    # Register a second ALIVE context so the record's binding survives the
+    # deleted-context guard and the env override is proven against a LIVE alternative.
+    states = tmp_path / ".dadaia" / "states" / "spec_contexts.json"
+    states.write_text(
+        json.dumps(
+            {
+                "contexts": [
+                    {"repo_slug": "ctx", "state": "alive"},
+                    {"repo_slug": "other", "state": "alive"},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "repos" / "other" / "specs").mkdir(parents=True)
+    _bind_session(tmp_path, "ordersid", "other")
+    env = claude_hook_env(tmp_path, extra={"DADAIA_CONTEXT": "ctx"})
+    env.pop("CLAUDE_CODE_SESSION_ID", None)
+    result = run_hook_subprocess("ctx_inject", {"session_id": "ordersid"}, env)
+    assert result.returncode == 0, result.stderr
+    assert "[ctx]" in result.stdout, "rung 1 env must win over the bound record"

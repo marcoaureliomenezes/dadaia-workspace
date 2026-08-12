@@ -647,8 +647,7 @@ class SpecContextService:
                 f"Context '{name}' is active. Run 'dadaia context dead {name}' before deleting."
             )
         self._store.delete(name)
-        # Bug context-delete-leaves-stale-session-bind: the delete owns its bind
-        # artifacts — the bind-epoch marker for the removed context goes with it
-        # (session records degrade to unbound via the resolver's existence check).
-        with contextlib.suppress(OSError):
-            (self._workspace_root / ".dadaia" / "states" / "bind_epoch" / name).unlink()
+        # Bug context-delete-leaves-stale-session-bind: a session record pointing at a
+        # DELETED context degrades to unbound via the resolver's own existence check
+        # (core.specs_resolver._context_registered) — no marker artifact to clean up
+        # here since T-50-04 (SPEC v0.5.0 FR1) retires the bind-epoch marker subsystem.

@@ -2,12 +2,8 @@
 
 Every resolver-driven ``dadaia`` command resolves through this module — its specs
 directory via :func:`resolve_specs_dir_for_cli`, or (v0.1.77) the bound CONTEXT NAME
-itself via :func:`resolve_context_for_cli`. Both ALWAYS thread the current process's
-ancestry pid chain into the core resolver, so bind-marker attribution works from any
-ephemeral harness shell. Five per-command wrappers used to hand-copy the specs-dir call
-and four of them omitted ``ancestry_pids`` (bug
-``bugs-append-bound-session-falls-through-to-cwd-specs``): centralizing here makes the
-omission structurally impossible.
+itself via :func:`resolve_context_for_cli`. Five per-command wrappers used to hand-copy
+the specs-dir call, which is exactly the drift centralizing here prevents.
 
 v0.1.77 (backlog ``central-bind-resolution-seam``, recurrence family F2 — 8 reports, 5
 partial per-command fixes v0.1.47->v0.1.71): a partial seam existed here
@@ -15,19 +11,18 @@ partial per-command fixes v0.1.47->v0.1.71): a partial seam existed here
 NOT the ~15 lifecycle verbs, whose ``--context`` Typer default was the hardcoded literal
 ``"dadaia-workspace"`` passed as if explicit — the bind was never consulted.
 :func:`resolve_context_for_cli` is the single canonical order (SPEC FR1) every verb now
-resolves through: explicit -> ``DADAIA_CONTEXT`` env -> this session's OWN record
-(harness-native id / ancestry-marker membership, via
-:func:`~dadaia_workspace.core.specs_resolver.resolve_bound_context_name` — never a
-foreign session's bind, consistent with the v0.1.76 NO-LOCKS DOCTRINE's self-scoped
-identity) -> first-ALIVE context (fail-soft; mirrors ``context show``'s pre-v0.1.77
-no-arg fallback, folded into the seam here per SPEC FR1's explicit disposition).
+resolves through: explicit -> ``DADAIA_CONTEXT`` env -> the single resolution authority's
+rung 2 (this session's own LIVE record, keyed by the harness-native session id) -> the
+repo containing cwd (the single authority's rung 3, SPEC v0.5.0 FR1 widening, which
+subsumes and generalizes the old hardcoded self-hosting-checkout literal this seam used
+to fall back to — T-50-05 deletes it).
 
 v0.1.80 FR3 (backlog ``20260711-context-name-allowlist-at-resolution-rungs``, P4,
 defense-in-depth per v0.1.77 security review INFO): the *explicit* and ``DADAIA_CONTEXT``
 env rungs both feed a ``repos/<name>/specs`` path join further downstream (this module's
 own :func:`resolve_specs_dir_for_cli`, and every ``container.build_*`` factory keyed by
 context name), unvalidated. Both rungs are gated by the SAME ``[A-Za-z0-9_-]+`` allowlist
-already enforced for bind-epoch marker filenames
+the resolution authority already enforces on every repo-slug path component
 (:data:`~dadaia_workspace.core.specs_resolver._CONTEXT_NAME_RE`, mirrored in
 ``features.spec_context.presence._valid_name``) BEFORE either value is used — an
 operator-controlled input has no privilege elevation here (the operator can already touch
@@ -46,7 +41,7 @@ from pathlib import Path
 
 from dadaia_workspace.core.specs_resolver import _CONTEXT_NAME_RE
 from dadaia_workspace.core.specs_resolver import repo_slug_for_context as _core_repo_slug
-from dadaia_workspace.core.specs_resolver import resolve_bound_context_name as _resolve_bound_name
+from dadaia_workspace.core.specs_resolver import resolve_context as _resolve_context_authority
 from dadaia_workspace.core.specs_resolver import resolve_specs_dir as _core_resolve_specs_dir
 
 #: Re-exports so a verb never reaches ``core.specs_resolver`` directly (FR3,
@@ -66,59 +61,31 @@ def repo_slug_for_context(workspace_root: Path, name: str) -> str:
     return _core_repo_slug(workspace_root, name)
 
 
-#: Self-hosting source checkout slug. It is returned only when the current working
-#: directory is recognizably this library checkout, never as a consumer-workspace fallback.
-_SELF_HOSTING_SLUG = "dadaia-workspace"
-
-
-def current_ancestry_pids() -> tuple[int, ...] | None:
-    """This ``dadaia`` process's nearest-first ORDERED ancestry pid chain (bind attribution).
-
-    W1-8 (v0.1.47): the persisted-bind fallback attributes a bind-epoch marker by
-    ancestry-chain MEMBERSHIP. A marker written from an ephemeral harness shell
-    records the bind process's chain (incl. the long-lived harness pid); this CLI
-    runs under a DIFFERENT short-lived shell but shares that harness pid deeper in
-    ITS chain. ORDER PRESERVED (bug ancestry-attribution-cross-session-ambiguity):
-    the resolver scores each marker by its shallowest shared pid — session-unique
-    pids (this process's harness) sit at low indices, host-level ancestors shared
-    with foreign sessions at high ones — so the caller's own bind outranks foreign
-    markers instead of collapsing to ambiguity. Any failure ⇒ ``None`` ⇒ the
-    resolver degrades to single-getppid equality.
-    """
-    try:
-        from dadaia_workspace import container
-
-        return tuple(container.build_ancestry_pid_chain(os.getppid()))
-    except Exception:  # noqa: BLE001 — attribution is best-effort; never break resolution.
-        return None
-
-
-def _is_self_hosting_checkout() -> bool:
-    """Return whether cwd is the dadaia-workspace source checkout."""
-    cwd = Path.cwd().resolve()
-    return (
-        cwd.name == _SELF_HOSTING_SLUG
-        and (cwd / "dadaia_workspace").is_dir()
-        and (cwd / "specs").is_dir()
-    )
-
-
 def resolve_context_for_cli(explicit: str | None) -> str:
-    """Resolve the target Spec Context NAME (SPEC FR1 canonical order, v0.1.77).
+    """Resolve the target Spec Context NAME (SPEC FR1 canonical order, v0.1.77; T-50-02/04
+    delegate the bound-session leg to the single resolution authority, SPEC v0.5.0 FR1 —
+    the bind-epoch marker ladder this seam used to call FIRST is deleted).
 
-    Order: *explicit* -> ``DADAIA_CONTEXT`` env -> this session's OWN bound record
-    (harness-native id, then ancestry-marker membership — never a foreign session's
-    bind) -> the self-hosting slug only from the recognizable source checkout. A
-    consumer workspace without caller-owned selection raises an actionable error;
-    it never borrows the first ALIVE context.
+    Order: *explicit* -> ``DADAIA_CONTEXT`` env -> the single authority's rung 2 (this
+    session's own LIVE record, keyed by the harness-native session id) -> the repo
+    containing the current working directory (the single authority's rung 3, SPEC v0.5.0
+    FR1's *intended widening*). A consumer workspace without caller-owned selection
+    raises an actionable error; it never borrows the first ALIVE context, and T-50-05
+    deletes the old hardcoded self-hosting-checkout special case — rung 3 already
+    generalizes it (any registered ``repos/<slug>``, not only one literally named
+    ``dadaia-workspace``).
 
     v0.1.80 FR3: both the *explicit* and ``DADAIA_CONTEXT`` env rungs are validated
     against the ``[A-Za-z0-9_-]+`` context-name allowlist before use (defense-in-depth
     against a traversal-shaped name reaching the downstream ``repos/<name>/specs`` path
     join). A traversal-shaped *explicit* value raises :class:`ValueError` (deliberate
-    call-site input — reject loudly). A traversal-shaped ``DADAIA_CONTEXT`` value is
-    treated as unset (ambient environment — never crash the CLI over it) and resolution
-    continues to the next rung.
+    call-site input — reject loudly). A traversal-shaped ``DADAIA_CONTEXT`` value never
+    crashes the CLI with a traceback — but it does ABORT resolution with the terminal
+    :class:`ValueError` (pinned by test): the authority's own rung 1 re-reads the SAME
+    env var and echoes the invalid value back, the allowlist check on ``resolved``
+    rejects the echo, and rungs 2-3 are deliberately NOT reachable past a set-but-invalid
+    env var — silently ignoring an operator's explicit (mistyped) selection would resolve
+    a context they did not choose (T-50-05; replaces the pop/restore env mutation).
     """
     if explicit:
         if not _CONTEXT_NAME_RE.fullmatch(explicit):
@@ -131,25 +98,9 @@ def resolve_context_for_cli(explicit: str | None) -> str:
     env_context = os.environ.get("DADAIA_CONTEXT")
     if env_context and _CONTEXT_NAME_RE.fullmatch(env_context):
         return env_context
-    # A present-but-INVALID DADAIA_CONTEXT (``env_context`` truthy but rejected above)
-    # must not silently reach ``resolve_bound_context_name`` below — that function
-    # re-reads the same env var internally (its own explicit -> env -> session ->
-    # persisted-bind order) and would otherwise return the same unvalidated value we
-    # just rejected. Scope the env var out for the duration of this single delegated
-    # call only, restoring it immediately after on every exit path (it is present, by
-    # construction, whenever we reach this branch, so the restore is unconditional).
-    if env_context:
-        os.environ.pop("DADAIA_CONTEXT")
-        try:
-            resolved = _resolve_bound_name(ancestry_pids=current_ancestry_pids())
-        finally:
-            os.environ["DADAIA_CONTEXT"] = env_context
-    else:
-        resolved = _resolve_bound_name(ancestry_pids=current_ancestry_pids())
-    if resolved:
+    resolved = _resolve_context_authority()
+    if resolved and _CONTEXT_NAME_RE.fullmatch(resolved):
         return resolved
-    if _is_self_hosting_checkout():
-        return _SELF_HOSTING_SLUG
     raise ValueError(
         "No caller-owned Spec Context is selected. Run "
         "'dadaia context bind <name> --mode <mode>' in this session or pass "
@@ -159,5 +110,5 @@ def resolve_context_for_cli(explicit: str | None) -> str:
 
 
 def resolve_specs_dir_for_cli(specs_dir: str | None) -> Path:
-    """Resolve the target specs/ dir (explicit flag → bound context → cwd/specs)."""
-    return _core_resolve_specs_dir(specs_dir, ancestry_pids=current_ancestry_pids())
+    """Resolve the target specs/ dir (explicit flag, else the resolution authority)."""
+    return _core_resolve_specs_dir(specs_dir)

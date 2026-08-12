@@ -40,7 +40,7 @@ _SCHEMA_ID = "bug-event-v1"
 
 
 def _resolve_specs_dir(specs_dir: str | None) -> Path:
-    """Resolve the target specs/ directory (explicit flag → bound context → cwd/specs)."""
+    """Resolve the target specs/ directory (explicit flag, else the resolution authority)."""
     return resolve_specs_dir_for_cli(specs_dir)
 
 

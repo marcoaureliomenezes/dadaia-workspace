@@ -14,6 +14,7 @@ import re
 from datetime import UTC, datetime
 from pathlib import Path
 
+from dadaia_workspace.core.models.bugs import BugCoherenceRecord, diagnose_bug_coherence_history
 from dadaia_workspace.features.specs.doctor_common import iter_archive_release_dirs
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
 
@@ -360,8 +361,11 @@ class GovernanceValidator:
             validator = Draft202012Validator(json.loads(schema_path.read_text(encoding="utf-8")))
 
         issues: list[SpecsDoctorIssue] = []
-        seen_reported: set[str] = set()
-        terminated: set[str] = set()
+        # v0.5.0 FR2: coherence is a WHOLE-HISTORY diagnosis (the healing rule needs to
+        # see events that come later than a violation), so this loop only COLLECTS one
+        # (bug_id, event, position) record per valid line; the fold itself runs once,
+        # after every file has been read, in `_fold_bug_coherence`.
+        coherence_records: list[BugCoherenceRecord[tuple[Path, int]]] = []
 
         for jsonl_path in sorted(bugs_dir.glob("*.jsonl")):
             # v0.1.73 FR1: the single canonical bugs.jsonl gets schema + coherence checks
@@ -423,44 +427,47 @@ class GovernanceValidator:
                         continue
                 if not isinstance(obj, dict):
                     continue
-                issues.extend(
-                    self._fold_bug_coherence(obj, jsonl_path, lineno, seen_reported, terminated)
-                )
+                bug_id = obj.get("bug_id")
+                event = obj.get("event")
+                if isinstance(bug_id, str) and isinstance(event, str):
+                    coherence_records.append(
+                        BugCoherenceRecord(
+                            bug_id=bug_id, event=event, position=(jsonl_path, lineno)
+                        )
+                    )
+        issues.extend(self._fold_bug_coherence(coherence_records))
         return issues
 
     @staticmethod
     def _fold_bug_coherence(
-        obj: dict[str, object],
-        jsonl_path: Path,
-        lineno: int,
-        seen_reported: set[str],
-        terminated: set[str],
+        records: list[BugCoherenceRecord[tuple[Path, int]]],
     ) -> list[SpecsDoctorIssue]:
-        """Advance the coherence fold for one event, emitting any coherence ERROR.
+        """Format the WHOLE-HISTORY coherence diagnosis as ``SpecsDoctorIssue`` lines.
 
-        The fold itself is the core authority (:func:`advance_coherence`) — the same
-        function ``BugService.append_event`` uses to REFUSE an incoherent append, so
-        the diagnostic gate and the enforced gate can never diverge.
+        A thin caller: every coherence semantic — the per-event fold, the one-terminal
+        invariant, and the v0.5.0 FR2 healing rule (a violation is reported only while
+        no LATER ``reported`` event exists for the same ``bug_id``) — lives in
+        :func:`dadaia_workspace.core.models.bugs.diagnose_bug_coherence_history`, the
+        same authority ``BugService.append_event`` folds through (via
+        :func:`advance_coherence`) to REFUSE an incoherent append, so the diagnostic
+        gate and the enforced gate can never diverge (v0.1.72 law). This method only
+        renders the message — byte-identical to the pre-FR2 format.
         """
-        from dadaia_workspace.core.models.bugs import advance_coherence
-
-        bug_id = obj.get("bug_id")
-        event = obj.get("event")
-        if not isinstance(bug_id, str) or not isinstance(event, str):
-            return []
-        violation = advance_coherence(bug_id, event, seen_reported, terminated)
-        if violation is None:
-            return []
-        return [
-            SpecsDoctorIssue(
-                code="SPEC-DOC-033",
-                severity=Severity.ERROR,
-                description=(
-                    f"bugs/{jsonl_path.name} line {lineno}: {violation} (SPEC-DOC-033, ERROR)."
-                ),
-                path=str(jsonl_path),
+        issues: list[SpecsDoctorIssue] = []
+        for violation in diagnose_bug_coherence_history(records):
+            jsonl_path, lineno = violation.position
+            issues.append(
+                SpecsDoctorIssue(
+                    code="SPEC-DOC-033",
+                    severity=Severity.ERROR,
+                    description=(
+                        f"bugs/{jsonl_path.name} line {lineno}: {violation.clause} "
+                        "(SPEC-DOC-033, ERROR)."
+                    ),
+                    path=str(jsonl_path),
+                )
             )
-        ]
+        return issues
 
     def check_unarchived_terminal_backlog(self) -> list[SpecsDoctorIssue]:
         """SPEC-DOC-035 (v0.1.46 AC-4): terminal-status backlog entry still loose → WARN.

@@ -11,15 +11,18 @@ bugs`` CLI serialize these; the doctor coherence check folds them. Field set mir
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from enum import StrEnum
 
 __all__ = [
     "TERMINAL_EVENTS",
+    "BugCoherenceRecord",
+    "BugCoherenceViolation",
     "BugEvent",
     "BugEventKind",
     "advance_coherence",
+    "diagnose_bug_coherence_history",
     "redact_text",
 ]
 
@@ -85,6 +88,89 @@ def advance_coherence(
             "event — every stream must open with 'reported'"
         )
     return None
+
+
+@dataclass(frozen=True)
+class BugCoherenceRecord[P]:
+    """One ``(bug_id, event)`` pair from a whole-history bug-event stream, tagged with an
+    opaque *position* the caller supplies (e.g. ``(jsonl_path, lineno)``) purely so a
+    returned violation can be traced back to its source line. The fold in
+    :func:`diagnose_bug_coherence_history` never inspects *position* — it only round-trips
+    it back onto the matching :class:`BugCoherenceViolation`.
+    """
+
+    bug_id: str
+    event: str
+    position: P
+
+
+@dataclass(frozen=True)
+class BugCoherenceViolation[P]:
+    """One still-UNHEALED coherence violation surfaced by
+    :func:`diagnose_bug_coherence_history`, carrying the offending record's *clause* (the
+    exact text :func:`advance_coherence` produced) and its *position* back to the caller.
+    """
+
+    bug_id: str
+    event: str
+    clause: str
+    position: P
+
+
+def diagnose_bug_coherence_history[P](
+    records: Sequence[BugCoherenceRecord[P]],
+) -> list[BugCoherenceViolation[P]]:
+    """Diagnose a WHOLE ``bug_id``/``event`` history for still-unhealed coherence
+    violations — SPEC-DOC-033's diagnostic half, and the ONE place the healing rule
+    lives (v0.5.0 FR2).
+
+    Folds *records*, in order, through :func:`advance_coherence` — the SAME per-event
+    authority ``BugService.append_event`` folds through to REFUSE an append — so a
+    violation this function reports is always one the append path would also have
+    refused, and vice versa (the v0.1.72 law: the diagnostic gate and the enforced gate
+    can never diverge).
+
+    **The healing rule.** A violation for ``bug_id`` is HEALED — dropped from the
+    result — when a LATER ``reported`` event for the same ``bug_id`` exists anywhere
+    after it in *records*. A later ``reported`` is the store's own append-only
+    compensation vocabulary: it already clears the prior terminal state inside the fold
+    (see the ``reported`` branch above, which discards *terminated*), so a history that
+    reopens and re-terminates coherently is, as a whole, healed. A violation with no
+    later ``reported`` for its ``bug_id`` — including a FRESH violation that occurs
+    *after* a healing ``reported`` (a re-violation of an already-reopened stream) —
+    has no later compensation and stays UNHEALED.
+
+    This function only DIAGNOSES: it never mutates, reorders, or drops any record from
+    the underlying append-only store — healing is a reporting decision, not a rewrite.
+    Returned violations preserve the input order of *records*.
+    """
+    seen_reported: set[str] = set()
+    terminated: set[str] = set()
+    last_reported_index: dict[str, int] = {}
+    raw_violations: list[tuple[int, BugCoherenceViolation[P]]] = []
+
+    for index, record in enumerate(records):
+        if record.event == BugEventKind.REPORTED.value:
+            last_reported_index[record.bug_id] = index
+        clause = advance_coherence(record.bug_id, record.event, seen_reported, terminated)
+        if clause is not None:
+            raw_violations.append(
+                (
+                    index,
+                    BugCoherenceViolation(
+                        bug_id=record.bug_id,
+                        event=record.event,
+                        clause=clause,
+                        position=record.position,
+                    ),
+                )
+            )
+
+    return [
+        violation
+        for index, violation in raw_violations
+        if last_reported_index.get(violation.bug_id, -1) <= index
+    ]
 
 
 #: Optional string payload fields (everything except ``tags``, which is a list).

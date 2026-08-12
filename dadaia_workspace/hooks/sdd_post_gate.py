@@ -97,83 +97,35 @@ def _stamp_throttle(workspace: Path, sess_id: str) -> None:
 
 
 def _bound_context(workspace: Path, sess_id: str) -> str | None:
-    """The context this session is bound to (from its session record), or ``None``."""
-    record = session_identity.read_session(workspace, sess_id)
-    if not isinstance(record, dict):
-        return None
-    ctx = record.get("context")
-    return ctx if isinstance(ctx, str) and ctx else None
+    """The context this session resolves to, for the advisory reconciler's own read side.
 
-
-def _adopt_attributed_bind(workspace: Path, sess_id: str, payload: dict[str, object]) -> None:
-    """Key this session's ancestry-attributed bind to its OWN session record.
-
-    Bug kimi-ctx-inject-bind-attribution-gap: kimi-code exposes no native session-id
-    env var, so ``dadaia context bind`` (run through the harness Bash tool) mints a
-    CLI sid the kimi hooks can never key on — context injection, bind mode, and this
-    hook's session-record heartbeat all missed the kimi session. But the hook's own
-    ANCESTRY still contains the long-lived harness pid the bind-epoch marker records
-    (the bind ran under the same harness), so the marker is attributable from HERE via
-    depth attribution (bug ancestry-attribution-cross-session-ambiguity). Adoption is
-    self-scoped by construction: only a marker attributed to THIS session's own
-    ancestry qualifies, so a foreign session's bind can never leak in. Fail-open like
-    everything in this hook — any error, no write.
+    ``DADAIA.md`` §3 law order (F-03, v0.5.0 review): rung 1 ``DADAIA_CONTEXT`` first —
+    presence attribution always agrees with the gate and ctx_inject on the same prompt,
+    and the env rung is also kimi-code's bridge (launched with ``DADAIA_CONTEXT``
+    exported, the SPEC coupling-2 disposition, since T-50-04 deleted the
+    marker-attributed self-adoption that used to key a kimi session's record). Rung 2 is
+    the session binding: this session's OWN record (``session_identity.read_session``
+    keyed by ``sess_id``), then the authority
+    (:func:`dadaia_workspace.core.specs_resolver.resolve_context` — hooks are sanctioned
+    DIRECT importers per the seam contract; the container never loads on a hook path,
+    F-01), which adds rung 3, the repo containing the current working directory.
     """
-    existing = session_identity.read_session(workspace, sess_id)
-    existing_ctx = ""
-    existing_mode = ""
-    if isinstance(existing, dict):
-        existing_ctx = str(existing.get("context") or "")
-        existing_mode = str(existing.get("mode") or "")
+    # Law order (F-03, v0.5.0 code review): rung 1 `DADAIA_CONTEXT` first, so presence
+    # attribution always agrees with the gate and ctx_inject on the same prompt.
+    env_context = os.environ.get("DADAIA_CONTEXT")
+    if env_context:
+        return env_context
 
-    # Lazy imports: the unattributed hot path (no bind anywhere) must stay cheap and the
-    # DI container is heavy for a per-tool-call hook.
-    from dadaia_workspace import container
+    record = session_identity.read_session(workspace, sess_id)
+    if isinstance(record, dict):
+        ctx = record.get("context")
+        if isinstance(ctx, str) and ctx:
+            return ctx
 
-    chain = tuple(container.build_ancestry_pid_chain(os.getppid()))
-    if not chain:
-        return
-    # Attribute against the hook's OWN resolved workspace — never the public
-    # ``resolve_bound_context_name``, which re-resolves the workspace from the process
-    # cwd and would attribute against a DIFFERENT tree than the one this hook writes.
-    # ``DADAIA_CONTEXT`` remains the operator-shell override (same precedence as
-    # ctx_inject's own chain).
-    attributed = os.environ.get("DADAIA_CONTEXT") or container.resolve_persisted_bind_context(
-        workspace, chain
-    )
-    if not attributed:
-        return
+    # Direct core import (F-01): never pay the container's import graph in a hook.
+    from dadaia_workspace.core.specs_resolver import resolve_context
 
-    sid = session_identity.read_bind_epoch_sid(workspace, attributed)
-    bind_rec = session_identity.read_session(workspace, sid) if sid else None
-    attributed_mode = str((bind_rec or {}).get("mode") or "")
-    # Nothing to do when the own record already carries the attributed context AND the
-    # attributed mode (a same-context re-bind with a DIFFERENT mode must still update —
-    # that re-bind is how mode changes reach this session at all).
-    if attributed == existing_ctx and (not attributed_mode or attributed_mode == existing_mode):
-        return
-    now = datetime.now(tz=UTC).isoformat()
-    record: dict[str, object] = dict(existing) if isinstance(existing, dict) else {}
-    from dadaia_workspace.hooks.sdd_gate import _resolve_holder_pid
-
-    record.update(
-        {
-            "session_id": sess_id,
-            "context": attributed,
-            "mode": str((bind_rec or {}).get("mode") or record.get("mode") or "implementation"),
-            "release": str((bind_rec or {}).get("release") or record.get("release") or ""),
-            "runtime": os.environ.get("DADAIA_RUNTIME") or record.get("runtime") or "unknown",
-            "pid": record.get("pid") or _resolve_holder_pid(payload),
-            "bound_at": record.get("bound_at") or now,
-            "last_seen_at": now,
-            "ttl_seconds": record.get("ttl_seconds") or 300,
-            "is_stale": False,
-        }
-    )
-    try:
-        session_identity.write_session(workspace, sess_id, record)
-    except (OSError, ValueError):
-        return
+    return resolve_context()
 
 
 def _porcelain_paths(repo_root: Path) -> list[str] | None:
@@ -291,17 +243,6 @@ def main() -> int:
         presence.renew(workspace, sess_id)
         _refresh_session_record(workspace, sess_id)
     except Exception:  # noqa: BLE001 — fail-open: any error ⇒ exit 0, never break harness
-        return 0
-
-    # Bug kimi-ctx-inject-bind-attribution-gap: adopt this session's ancestry-attributed
-    # bind into its OWN session record, so context injection (ctx_inject's self-keyed
-    # leg), bind mode (sdd_gate._resolve_mode), and the heartbeat above all reach
-    # harnesses with no native session-id env var (kimi-code). Strictly additive and
-    # self-scoped — isolated like the reconciler so an adoption bug can never break the
-    # heartbeat or the exit code.
-    try:
-        _adopt_attributed_bind(workspace, sess_id, payload)
-    except Exception:  # noqa: BLE001 — never blocks; any error ⇒ still exit 0.
         return 0
 
     # Advisory working-tree reconciler (FR-W1-03) — strictly advisory, isolated in its own

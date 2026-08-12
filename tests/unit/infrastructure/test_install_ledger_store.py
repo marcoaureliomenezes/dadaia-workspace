@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from dadaia_workspace.core.models.install_ledger import InstallLedger, LedgerEntry
@@ -39,6 +40,23 @@ def test_corrupt_ledger_reads_as_none_never_raises(tmp_path: Path) -> None:
     assert JsonInstallLedgerStore().read(tmp_path) is None
     (tmp_path / "install_ledger.json").write_text('{"schema_version": 3}', encoding="utf-8")
     assert JsonInstallLedgerStore().read(tmp_path) is None
+
+
+def test_malicious_persisted_relpath_reads_as_none_never_raises(tmp_path: Path) -> None:
+    """FR3 item 1: a persisted ledger carrying a traversal/absolute relpath must fail
+    the SAME way any other malformed ledger does — ``LedgerEntry.__post_init__``
+    raises ``ValueError`` while ``from_dict`` parses it, and ``read`` absorbs that into
+    bootstrap semantics (record everything, prune nothing), never a crash or a write
+    outside the workspace root."""
+    for bad_relpath in ("../x", "/etc/passwd"):
+        payload = json.dumps(
+            {
+                "schema_version": "1",
+                "entries": [{"relpath": bad_relpath, "sha256": "a" * 64, "family": "law"}],
+            }
+        )
+        (tmp_path / "install_ledger.json").write_text(payload, encoding="utf-8")
+        assert JsonInstallLedgerStore().read(tmp_path) is None
 
 
 def test_by_relpath_indexes_entries() -> None:

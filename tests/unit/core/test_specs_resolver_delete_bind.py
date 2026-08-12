@@ -2,28 +2,28 @@
 
 Consumer repro (0.4.1 candidate): bind a context, ``dead`` it, ``delete`` it — the
 session bind kept pointing at the removed context, and the next bind-resolved command
-(``bugs status``) failed on the missing specs dir. Fixes: the resolver's existence
-check (a bind to a deleted context resolves as unbound) and ``context delete``
-removing the context's bind-epoch marker.
+(``bugs status``) failed on the missing specs dir. Fix: the resolver's existence check
+(a bind to a deleted context resolves as unbound).
+
+T-50-04 (SPEC v0.5.0 FR1): the eval-flow (``DADAIA_SESSION_ID``) and bind-epoch-marker
+cases this file used to pin die with the mechanisms they exercised
+(``_session_context``'s ``DADAIA_SESSION_ID`` channel, ``_persisted_bind_context``, and
+the marker ``context delete`` used to clean up). What survives is the harness-native
+channel's own deleted-context guard, re-pointed at :func:`_live_session_context` — the
+rung 2 the single authority (T-50-01) now uses.
 """
 
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.specs_resolver import (
-    _persisted_bind_context,
-    _session_context,
-    resolve_bound_context_name,
-)
-from dadaia_workspace.features.spec_context.service import SpecContextService
+from dadaia_workspace.core.specs_resolver import _live_session_context
 
 pytestmark = pytest.mark.unit
-
-_PID = 990007
 
 
 def _mk_ws(tmp_path: Path, slug: str = "reinject") -> Path:
@@ -47,7 +47,6 @@ def _mk_ws(tmp_path: Path, slug: str = "reinject") -> Path:
         ),
         encoding="utf-8",
     )
-    (states / "bind_epoch").mkdir()
     (tmp_path / "repos" / slug / "specs").mkdir(parents=True)
     return tmp_path
 
@@ -59,38 +58,11 @@ def _delete_registry_entry(tmp_path: Path) -> None:
     registry.write_text(json.dumps(data), encoding="utf-8")
 
 
-def _write_session_record(tmp_path: Path, session_id: str, context: str) -> None:
-    sessions = tmp_path / ".dadaia" / "sessions"
-    sessions.mkdir(parents=True, exist_ok=True)
-    (sessions / f"{session_id}.json").write_text(
-        json.dumps({"session_id": session_id, "context": context, "mode": "read"}),
-        encoding="utf-8",
-    )
-
-
-def test_eval_flow_bind_to_deleted_context_resolves_unbound(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """The eval flow's no-gate exemption covers heartbeat-TTL staleness, never context
-    existence: a bind to a DELETED context resolves unbound on every channel."""
-    _mk_ws(tmp_path)
-    _write_session_record(tmp_path, "sess-del", "reinject")
-    monkeypatch.setenv("DADAIA_SESSION_ID", "sess-del")
-    assert _session_context(tmp_path) == "reinject"
-
-    _delete_registry_entry(tmp_path)
-    assert _session_context(tmp_path) is None
-
-
-def test_harness_channel_bind_to_deleted_context_resolves_unbound(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """The implicit harness channel never resolves a stale pointer (the bug)."""
+def test_harness_channel_bind_to_deleted_context_resolves_unbound(tmp_path: Path) -> None:
+    """The harness-native channel never resolves a stale pointer (the bug)."""
     _mk_ws(tmp_path)
     sessions = tmp_path / ".dadaia" / "sessions"
     sessions.mkdir(parents=True, exist_ok=True)
-    from datetime import UTC, datetime
-
     (sessions / "codex-1.json").write_text(
         json.dumps(
             {
@@ -103,69 +75,31 @@ def test_harness_channel_bind_to_deleted_context_resolves_unbound(
         ),
         encoding="utf-8",
     )
-    monkeypatch.delenv("DADAIA_SESSION_ID", raising=False)
-    monkeypatch.setenv("CODEX_SESSION_ID", "codex-1")
-    assert _session_context(tmp_path) == "reinject"
-
-    _delete_registry_entry(tmp_path)
-    assert _session_context(tmp_path) is None
+    assert _live_session_context(tmp_path) is None  # no harness id set: nothing resolves yet
 
 
-def test_marker_bind_to_deleted_context_resolves_unbound(tmp_path: Path) -> None:
-    _mk_ws(tmp_path)
-    marker = tmp_path / ".dadaia" / "states" / "bind_epoch" / "reinject"
-    marker.write_text(f"{_PID}\n", encoding="utf-8")
-    assert _persisted_bind_context(tmp_path, frozenset({_PID})) == "reinject"
-
-    _delete_registry_entry(tmp_path)
-    assert _persisted_bind_context(tmp_path, frozenset({_PID})) is None
-
-
-def test_resolve_specs_dir_after_delete_gives_clean_unbound(
+def test_live_session_context_stops_resolving_once_context_is_deleted(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The consumer case: after dead+delete, a bind-resolved command sees NO context —
-    the clean 'bind one or pass --specs-dir' path, never a missing-specs-dir failure."""
+    """A LIVE harness-keyed record survives a context delete out from under it: the next
+    resolution sees NO context — never a stale pointer."""
     _mk_ws(tmp_path)
-    _write_session_record(tmp_path, "sess-del2", "reinject")
-    monkeypatch.setenv("DADAIA_SESSION_ID", "sess-del2")
-    monkeypatch.chdir(tmp_path / "repos" / "reinject")
-    _delete_registry_entry(tmp_path)
-
-    assert resolve_bound_context_name() is None
-
-
-def test_registry_read_error_fails_open(tmp_path: Path) -> None:
-    """A corrupt registry must NOT invalidate every live bind (fail-open)."""
-    _mk_ws(tmp_path)
-    marker = tmp_path / ".dadaia" / "states" / "bind_epoch" / "reinject"
-    marker.write_text(f"{_PID}\n", encoding="utf-8")
-    registry = tmp_path / ".dadaia" / "states" / "spec_contexts.json"
-    registry.write_text("{not json", encoding="utf-8")
-    assert _persisted_bind_context(tmp_path, frozenset({_PID})) == "reinject"
-
-
-def test_context_delete_removes_the_bind_epoch_marker(tmp_path: Path) -> None:
-    _mk_ws(tmp_path)
-    marker = tmp_path / ".dadaia" / "states" / "bind_epoch" / "reinject"
-    marker.write_text(f"{_PID}\n", encoding="utf-8")
-
-    # The context must be dead first (alive contexts refuse deletion).
-    registry = tmp_path / ".dadaia" / "states" / "spec_contexts.json"
-    data = json.loads(registry.read_text(encoding="utf-8"))
-    data["contexts"][0]["state"] = "dead"
-    data["contexts"][0]["dead_since"] = "2026-07-19T01:00:00Z"
-    registry.write_text(json.dumps(data), encoding="utf-8")
-
-    from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
-    from tests.fakes import FakeGitClient
-
-    svc = SpecContextService(
-        JsonContextStore(states_dir=tmp_path / ".dadaia" / "states"),
-        FakeGitClient(),
-        tmp_path,
+    sessions = tmp_path / ".dadaia" / "sessions"
+    sessions.mkdir(parents=True, exist_ok=True)
+    (sessions / "codex-1.json").write_text(
+        json.dumps(
+            {
+                "session_id": "codex-1",
+                "context": "reinject",
+                "mode": "read",
+                "last_seen_at": datetime.now(tz=UTC).isoformat(),
+                "ttl_seconds": 300,
+            }
+        ),
+        encoding="utf-8",
     )
-    svc.delete("reinject")
+    monkeypatch.setenv("CODEX_SESSION_ID", "codex-1")
+    assert _live_session_context(tmp_path) == "reinject"
 
-    assert not marker.exists()
-    assert _persisted_bind_context(tmp_path, frozenset({_PID})) is None
+    _delete_registry_entry(tmp_path)
+    assert _live_session_context(tmp_path) is None
