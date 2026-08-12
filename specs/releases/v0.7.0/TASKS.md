@@ -123,7 +123,7 @@ outcome. If the increment exceeds the cap, **cut law text** — never raise the 
 
 ---
 
-- [ ] **T-070-03 — Consumer surface: constitution §8, `tests-AGENTS.md` template, memory template**
+- [-] **T-070-03 — Consumer surface: constitution §8, `tests-AGENTS.md` template, memory template**
 
 **Owner role:** ai-engineer · **Commit:** `feat(T-070-03): consumer test doctrine — constitution §8 + tests/AGENTS.md template`
 
