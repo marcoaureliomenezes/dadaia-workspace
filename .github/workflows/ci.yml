@@ -364,7 +364,7 @@ jobs:
           fi
           # Degenerate-report hardening (T-070-09 finding 1): jq failure, a non-object
           # report, or a missing stats key are all hard errors — never a silent pass.
-          FLAKY=$(jq -er '.stats.flaky // 0' "$REPORT") || {
+          FLAKY=$(jq -er '.stats.flaky' "$REPORT") || {
             echo "::error::Playwright JSON report at $REPORT is malformed or lacks stats — hard error, never a pass (v0.7.0 R9)."
             exit 1
           }
