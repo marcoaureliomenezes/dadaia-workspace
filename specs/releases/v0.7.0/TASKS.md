@@ -353,7 +353,7 @@ created, no file written**. The third case is the one that catches a naive
 
 ---
 
-- [ ] **T-070-08 — QA `alpha-1`: validate the contract on the live instance**
+- [x] **T-070-08 — QA `alpha-1`: validate the contract on the live instance**
 
 **Owner role:** qa-engineer · **Commit:** `test(T-070-08): alpha-1 QA review committed to the branch`
 
