@@ -45,7 +45,7 @@
 
 ---
 
-- [ ] **T-060-01 — `dadaia-gitflow`: the single home of the git contract**
+- [x] **T-060-01 — `dadaia-gitflow`: the single home of the git contract**
 
 **Owner role:** ai-engineer · **Commit:** `feat(T-060-01): add dadaia-gitflow universal skill`
 
@@ -85,7 +85,7 @@ SPEC FR2:
 
 ---
 
-- [ ] **T-060-02 — `DADAIA.md` §5/§6 rewrite + projection**
+- [x] **T-060-02 — `DADAIA.md` §5/§6 rewrite + projection**
 
 **Owner role:** ai-engineer · **Commit:** `refactor(T-060-02): four-branch law in DADAIA.md §5/§6`
 
@@ -124,7 +124,15 @@ numbers regardless of the outcome.
 
 ---
 
-- [ ] **T-060-03 — Tier-2 dedup + hygiene on the `public/` surface**
+- [x] **T-060-03 — Tier-2 dedup + hygiene on the `public/` surface** — **reopened by
+  T-060-06 (REJECTED alpha-1 QA):** `dadaia public doctor` shows `[drift]
+  stage:agents/security-reviewer.md` — the source landed at 1e6d0da4 (T-060-03's own
+  commit) but the projection chain (`dadaia public stage` → `install --target all`) was
+  never re-run to completion afterward, so the installed `.claude/agents/security-reviewer.md`
+  still carries pre-T-060-03 wording. Content is substantively unaffected (the diff-only
+  scan-target clause is intact in the installed copy), but the Done criterion "`dadaia
+  public doctor` ... exit 0" (A6.5) is unmet on the live instance. See
+  `specs/releases/v0.6.0/ALPHA-1-QA.md` item 4 for full evidence.
 
 **Owner role:** ai-engineer · **Commit:** `refactor(T-060-03): defer git contract to dadaia-gitflow; fix stale citations`
 
@@ -190,7 +198,17 @@ Re-project at the end (same chain as T-060-02).
 
 ---
 
-- [ ] **T-060-04 — Chokepoint enforcement, TDD (RED before GREEN)**
+- [x] **T-060-04 — Chokepoint enforcement, TDD (RED before GREEN)** — **reopened by
+  T-060-06 (REJECTED alpha-1 QA):** the Done criterion "Full suite green: `pytest
+  -p no:cacheprovider -q`" is unmet on the live instance — `tests/e2e/test_push_gate_check.py`
+  has 3 pre-existing tests that push `refs/heads/main` expecting the old
+  security-verdict-only refusal message; the new develop-only ref policy now refuses
+  `main` first with a different (correct, more specific) message, so these tests fail.
+  `tests/e2e/features/test_public_pipeline.py` has 2 pre-existing tests whose
+  `EXPECTED_SKILLS` fixture was never updated to include `dadaia-gitflow` (added by
+  T-060-01). Neither test file was in this task's declared write set
+  (`tests/contract/**` + `tests/unit/features/chokepoints/**` only), so the gap was
+  never caught. See `specs/releases/v0.6.0/ALPHA-1-QA.md` item 5 for full evidence.
 
 **Owner role:** software-engineer · **Commits:** `test(T-060-04): RED contract tests for develop-only push policy` then `feat(T-060-04): develop-only push, branch-name validation, develop-diff verdict`
 
@@ -244,7 +262,7 @@ non-covering-handoff refusal test is the one that matters most.
 
 ---
 
-- [ ] **T-060-05 — CI: `pr-source-guard` + retire the local-only push triggers**
+- [x] **T-060-05 — CI: `pr-source-guard` + retire the local-only push triggers**
 
 **Owner role:** software-engineer · **Commit:** `ci(T-060-05): pr-source-guard; retire feature/hotfix push triggers`
 
@@ -281,7 +299,11 @@ one.
 
 ---
 
-- [ ] **T-060-06 — QA `alpha-1`: validate the contract on the live instance**
+- [x] **T-060-06 — QA `alpha-1`: validate the contract on the live instance** — review
+  filed at `specs/releases/v0.6.0/ALPHA-1-QA.md`, verdict **REJECTED**. QA's own
+  deliverable (the committed review) is complete; T-060-03 and T-060-04 are reopened
+  above to `[-]` as the offending tasks per this task's own Done criterion ("A REJECTED
+  verdict returns the offending task to `[-]`").
 
 **Owner role:** qa-engineer · **Commit:** `test(T-060-06): alpha-1 QA review committed to the branch`
 
@@ -314,7 +336,7 @@ preserved verbatim in the review file as the historical record.
 
 ---
 
-- [ ] **T-060-07 — Review + diff-based security verdict**
+- [x] **T-060-07 — Review + diff-based security verdict**
 
 **Owner role:** code-reviewer + security-reviewer (verdicts); software-engineer applies any
 required fix · **Commit:** fixes only, each returning its task to `[-]`
@@ -343,7 +365,7 @@ verdict covers the `origin/develop..develop` delta about to be pushed. Any
 
 ---
 
-- [ ] **T-060-08 — Milestone (b): merge to `develop`, push, PR to `main`, CI green**
+- [-] **T-060-08 — Milestone (b): merge to `develop`, push, PR to `main`, CI green**
 
 **Owner role:** software-engineer · **Commit:** merge commit + any CI fix
 

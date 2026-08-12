@@ -1,12 +1,14 @@
 name: CI
 
+# Gitflow law (v0.6.0 / DADAIA.md §5): develop is the only pushable branch and main
+# advances via PR from develop only — feature/** and hotfix/v* are local-only, so
+# their push triggers were retired (dead configuration that advertised a forbidden
+# workflow).
 on:
   push:
     branches:
       - main
       - develop
-      - 'hotfix/v*'
-      - 'feature/**'
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -400,24 +402,24 @@ jobs:
       - name: dadaia backlog doctor
         run: dadaia backlog doctor --specs-dir specs --source-root .
 
-  hotfix-branch-name:
-    name: Hotfix branch SemVer (PATCH>=1)
+  pr-source-guard:
+    name: PR source guard (main accepts develop only)
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/hotfix/')
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
     timeout-minutes: 1
     steps:
-      - name: Validate hotfix branch name
+      - name: Refuse PRs to main from any head but develop
         env:
-          REF: ${{ github.ref }}
+          # head.ref is fork-influenceable input: never interpolate it into the
+          # shell command string — read it from the environment and compare.
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
-          BRANCH="${REF#refs/heads/}"
-          # Required: hotfix/v<MAJOR>.<MINOR>.<PATCH>[-<slug>]  where PATCH >= 1
-          if ! echo "$BRANCH" | grep -Eq '^hotfix/v[0-9]+\.[0-9]+\.[1-9][0-9]*(-[a-z0-9._-]+)?$'; then
-            echo "::error::Hotfix branch must be hotfix/v<M>.<m>.<p> with PATCH>=1 (optional -slug). Got: $BRANCH"
-            echo "::error::Examples accepted: hotfix/v1.0.1, hotfix/v0.2.3-fix-auth-crash"
-            echo "::error::Examples rejected: hotfix/v1.0 (no patch), hotfix/v1.0.0 (patch=0 reserved for feature releases), hotfix/v1.0.0-beta (pre-release tag)"
+          if [ "$HEAD_REF" != "develop" ]; then
+            echo "::error::Gitflow law (DADAIA.md §5): main accepts PRs from 'develop' only. Got head '$HEAD_REF'."
+            echo "::error::Fix: merge your branch into develop, push develop, and open the PR develop -> main."
             exit 1
           fi
+          echo "PR head is develop - gitflow source rule satisfied."
 
   # ---------------------------------------------------------------------------
   # Dual-approval verdict gate (panel-kanban-v1 §3 K-3 / §9)

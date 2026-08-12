@@ -99,12 +99,13 @@ def test_push_without_security_approve_is_blocked(tmp_path: Path) -> None:
     repo = _init_repo(workspace, _SLUG)
     # No handoff on disk at all → no APPROVE → blocked with an actionable message.
     result = _run_push_gate(
-        repo, workspace, f"refs/heads/main {_PUSHED_SHA} refs/heads/main {_ZERO}\n"
+        repo, workspace, f"refs/heads/develop {_PUSHED_SHA} refs/heads/develop {_ZERO}\n"
     )
     out = result.stdout + result.stderr
     assert result.returncode != 0, out
     assert "BLOCKED" in out, out
     assert "security-reviewer APPROVE" in out, out
+    assert "origin/develop..develop" in out, out
 
 
 @pytest.mark.parametrize(
@@ -121,7 +122,7 @@ def test_pass_matrix(tmp_path: Path, variant: str) -> None:
     if variant == "matching-approve":
         _write_security_approve(workspace, commit_sha=_PUSHED_SHA)
         result = _run_push_gate(
-            repo, workspace, f"refs/heads/main {_PUSHED_SHA} refs/heads/main {_ZERO}\n"
+            repo, workspace, f"refs/heads/develop {_PUSHED_SHA} refs/heads/develop {_ZERO}\n"
         )
     elif variant == "branch-deletion":
         # Zero local sha = branch deletion; never review-gated, even with no handoff on disk.
@@ -152,7 +153,7 @@ def test_predicate_keys_on_stdin_sha_not_head(tmp_path: Path) -> None:
 
     _write_security_approve(workspace, commit_sha=_PUSHED_SHA)
     result = _run_push_gate(
-        repo, workspace, f"refs/heads/main {_PUSHED_SHA} refs/heads/main {_ZERO}\n"
+        repo, workspace, f"refs/heads/develop {_PUSHED_SHA} refs/heads/develop {_ZERO}\n"
     )
     assert result.returncode == 0, (
         "gate must key on the pushed sha, not HEAD: " + result.stdout + result.stderr

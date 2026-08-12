@@ -83,8 +83,11 @@ def test_panel_starts_serves_shuts_down_clean(workspace: Path) -> None:
     )
 
     try:
-        found = _wait_for_line(proc, "Panel running at", timeout=10.0)
-        assert found, "Panel did not print 'Panel running at' within 10 s"
+        # 30 s bound (bug panel-command-readiness-flaky-under-xdist-load): 10 s missed
+        # under full-suite xdist load — the exact mode the pre-push preflight runs.
+        # Returns on the ready line, so the green-path cost is unchanged.
+        found = _wait_for_line(proc, "Panel running at", timeout=30.0)
+        assert found, "Panel did not print 'Panel running at' within 30 s"
 
         # Fetch the index page and assert HTTP 200
         url = f"http://127.0.0.1:{port}/"

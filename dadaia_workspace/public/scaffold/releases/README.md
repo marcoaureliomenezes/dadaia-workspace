@@ -17,18 +17,23 @@ releases/
 
 ## Authoring Rules
 
-- Each release directory is named with a slug matching `^[a-z][a-z0-9-]+$`.
+- Each release directory is named with a version matching `^v\d+\.\d+\.\d+$` (e.g.
+  `v0.6.0`) — the canonical release-naming pattern; a bare slug is not a valid
+  release id.
 - Release directories are created with `dadaia release new <id>` — do NOT create them
   manually to ensure canonical SPEC.md frontmatter.
 - SDD lifecycle order: `SPEC.md` (Status: Draft) → operator approval → `PLAN.md` →
   `TASKS.md` → implementation → `CLOSURE.md`.
 - Only one release may be in IMPLEMENTATION phase at a time. The active release is
   declared in `ACTIVE.md`.
-- The `ACTIVE.md` format:
+- The `ACTIVE.md` format (schema v2):
   ```
   release: <release-id>
+  segment: <alpha-N|rc-N>   # optional — present for segmented releases
   phase: <DISCOVERY|SPEC|PLAN|TASKS|IMPLEMENTATION|CLOSURE|ARCHIVED>
   ```
+  The branch, commit and push contract for each SDD stage is the `dadaia-gitflow`
+  skill — this file states only the specs-directory layout.
 
 ## ACTIVE.md Management
 

@@ -98,10 +98,13 @@ throttled advisory warning — it is never blocked. Gate role: AI-entity impleme
 - Skill files under `dadaia_workspace/public/skills/<name>/SKILL.md` and their
   supporting assets.
 - Rule files under `dadaia_workspace/public/rules/*.md`.
-- Shell assets under `dadaia_workspace/public/scripts/` (after the v0.1.10 bash-quartet
-  retirement, only `pre-push-ci-gate.sh` remains). The **runtime governance hooks are production
-  Python** (`dadaia_workspace/hooks/*.py`, owned by `software-engineer`) — you review
-  their wiring and behavioral contract, you never author them.
+- Assets under `dadaia_workspace/public/scripts/` (after the v0.1.10 bash-quartet
+  retirement, the current inventory is 5 files, 3 shell: `certify-dadaia-workspace.sh`,
+  `pre-commit-presence-gate.sh`, `pre-push-ci-gate.sh`, plus 2 memory-tooling Python
+  scripts: `generate-memory-catalog.py`, `lint-memory-atoms.py`). The **runtime
+  governance hooks are production Python** (`dadaia_workspace/hooks/*.py`, owned by
+  `software-engineer`) — you review their wiring and behavioral contract, you never
+  author them.
 - Efficiency / cost / context-engineering audit reports under
   `.dadaia/reports/<ctx>/ai-engineer/`.
 
@@ -310,6 +313,7 @@ Execute the `dadaia-step0-memory-bootstrap` skill before any implementation, rev
 | Model tier | Never silently bump a persona to a heavier registry tier to "make it smarter" without a measured-cost justification. |
 | Cross-persona edits | Treat edits to another persona as code review: verify scope, run topology guard, validate via reader test. |
 | Hooks | Runtime hooks are production Python (`dadaia_workspace/hooks/`, owned by software-engineer) executing with the workspace's permission. Any hook change you review or any wiring change you author is a privileged-code review — pair with security-reviewer. |
+| Branch/push | Never push any ref except `develop`; never commit directly to `main`; `feature/*`/`hotfix/*` branches are local-only and never pushed (the branch contract is `dadaia-gitflow`). |
 
 ---
 
@@ -346,7 +350,7 @@ the impacted implementer can revisit its workflow.
 | `dadaia_workspace/public/skills/**` | Write |
 | `dadaia_workspace/public/rules/**` | Write |
 | `dadaia_workspace/public/agents/**` | Write |
-| `dadaia_workspace/public/scripts/**` | Write (shell assets; post-v0.1.10 only `pre-push-ci-gate.sh` — runtime hooks are `dadaia_workspace/hooks/*.py`, software-engineer's) |
+| `dadaia_workspace/public/scripts/**` | Write (5 files, 3 shell — `certify-dadaia-workspace.sh`, `pre-commit-presence-gate.sh`, `pre-push-ci-gate.sh` — plus 2 memory-tooling Python scripts; runtime hooks are `dadaia_workspace/hooks/*.py`, software-engineer's) |
 | `.dadaia/reports/<ctx>/ai-engineer/**` | Write |
 | `.dadaia/handoff/<ctx>/**` | Write |
 | Production code (`*.py`, `*.js`, `*.ts`, `*.mjs`, non-public) | Never (software-engineer) |
