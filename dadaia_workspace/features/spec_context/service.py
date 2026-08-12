@@ -400,6 +400,10 @@ class SpecContextService:
             tests_dir.is_dir()
             and not tests_dir.is_symlink()  # a symlinked tests/ escapes the repo tree
             and not tests_agents_dst.exists()
+            # A DANGLING destination symlink reports not-exists yet copy2 would write
+            # through it (workspace_guardrail refuses destination-file symlinks — the
+            # same posture holds at this seam).
+            and not tests_agents_dst.is_symlink()
             and tests_agents_src.exists()
         ):
             shutil.copy2(tests_agents_src, tests_agents_dst)

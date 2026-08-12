@@ -98,3 +98,18 @@ def test_symlinked_tests_dir_is_left_alone(
     (repo / "tests").symlink_to(outside, target_is_directory=True)
     service.alive("proj")
     assert not (outside / "AGENTS.md").exists()
+
+
+def test_dangling_destination_symlink_is_never_written_through(
+    service: SpecContextService, workspace_root: Path, tmp_path: Path
+) -> None:
+    """v0.7.0 ship-review LOW: a dangling tests/AGENTS.md symlink reports not-exists,
+    but copy2 would write through it to a path outside commit_all's reach."""
+    service.create("proj", "my-repo", "https://github.com/org/my-repo")
+    repo = workspace_root / "repos" / "my-repo"
+    (repo / "tests").mkdir(parents=True, exist_ok=True)
+    target = tmp_path / "outside-agents.md"
+    (repo / "tests" / "AGENTS.md").symlink_to(target)
+    assert not target.exists()
+    service.alive("proj")
+    assert not target.exists(), "the dangling symlink was written through"
