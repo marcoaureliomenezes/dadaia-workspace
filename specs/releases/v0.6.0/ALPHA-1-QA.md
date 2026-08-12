@@ -322,3 +322,90 @@ pair). Fix required before re-review:
    policy.
 
 No source file was modified by this review — findings only, per qa-engineer scope.
+
+---
+
+# RE-REVIEW — 2026-08-12 — rework head `3497fe78`
+
+**Task:** T-060-06 (re-review) · **Reviewer:** qa-engineer
+**Scope:** re-verify only the three findings above, on `feature/v0.6.0` at commit
+`3497fe78` (`fix(T-060-04): QA rework — e2e gate tests updated to the new contract;
+projection re-synced`). The original REJECTED review above is preserved verbatim as the
+historical record; this section supersedes only the verdict.
+
+## Verdict: APPROVED (QA only)
+
+All three findings from the original review are resolved, re-verified with fresh
+commands on the live instance. A QA approval alone does not close the task — code-review
+and security-review verdicts are still required (T-060-07) before `[x]`/ship.
+
+### Re-verification evidence
+
+**1. HIGH — e2e test staleness (`test_push_gate_check.py`, `test_public_pipeline.py`,
+plus the `test_panel_command.py` flake surfaced during rework).**
+
+```
+$ pytest -q -p no:cacheprovider tests/e2e/features/test_public_pipeline.py \
+    tests/e2e/test_push_gate_check.py tests/integration/cli/test_panel_command.py
+..................                                                       [100%]
+18 passed in 50.83s
+```
+
+All 18 tests across the three files pass. `test_push_gate_check.py` now pushes
+`refs/heads/develop` and asserts the `origin/develop..develop` diff-verdict refusal
+wording (no longer targets `refs/heads/main`, which the develop-only policy now refuses
+for an unrelated, earlier reason). `test_public_pipeline.py`'s `EXPECTED_SKILLS` fixture
+now includes `dadaia-gitflow`. `test_panel_command.py` — not part of the original three
+findings, but the rework's own report named a second site of the same
+10-second-readiness-bound flake class found during the full-suite rerun; confirmed
+resolved: bug `panel-command-readiness-flaky-under-xdist-load` (`specs/bugs/`) is
+`reported` → `resolved`, root-caused to the fixed 10s readiness bound under 22-worker
+xdist load, fixed by raising the bound to 30s. Isolated + combined re-run above is green.
+
+**2. MEDIUM — `dadaia public doctor` drift on `security-reviewer.md`.**
+
+```
+$ dadaia public doctor; echo exit=$?
+... (full asset ladder, all [ok]/[foreign]/[info]) ...
+exit=0
+$ grep -c '\[drift\]' <captured output>
+0
+```
+
+Zero `[drift]` lines. The projection chain was re-run to completion; the installed
+`.claude/agents/security-reviewer.md` now matches source.
+
+**3. LOW — `dadaia doctor` stale presence + unrelated environmental noise.**
+
+```
+$ dadaia doctor; echo exit=$?
+All invariants OK — workspace is healthy.
+exit=0
+```
+
+Healthy, exit 0. The stale `an-unrelated-consumer-context` presence record was cleared via
+`dadaia doctor --fix`.
+
+**4. TASKS.md markers.**
+
+```
+$ grep -n "T-060-03\|T-060-04" specs/releases/v0.6.0/TASKS.md
+127:- [x] **T-060-03 — Tier-2 dedup + hygiene on the `public/` surface** — **reopened by...
+201:- [x] **T-060-04 — Chokepoint enforcement, TDD (RED before GREEN)** — **reopened by...
+```
+
+Both `[x]`, confirming the rework's own commit closed them (this session did not flip
+them — they were already `[x]` at `3497fe78` when read).
+
+### Summary — pass/fail table (delta only)
+
+| Finding (original severity) | Re-check | Result |
+|---|---|---|
+| HIGH — 5 e2e tests broken by branch-policy/skill-roster change | pytest, 3 target files | **PASS** — 18/18 green |
+| MEDIUM — `public doctor` drift on `security-reviewer.md` | `dadaia public doctor` | **PASS** — 0 drift, exit 0 |
+| LOW — `dadaia doctor` stale presence (unrelated context) | `dadaia doctor` | **PASS** — healthy, exit 0 |
+| TASKS markers T-060-03 / T-060-04 | grep TASKS.md | **PASS** — both `[x]` |
+
+**Verdict: APPROVED (QA only).** All findings from the original REJECTED review are
+closed with fresh evidence on the rework head. Next: T-060-07 (code-review +
+diff-based security review) before ship (T-060-08).
