@@ -244,7 +244,7 @@ non-covering-handoff refusal test is the one that matters most.
 
 ---
 
-- [ ] **T-060-05 — CI: `pr-source-guard` + retire the local-only push triggers**
+- [-] **T-060-05 — CI: `pr-source-guard` + retire the local-only push triggers**
 
 **Owner role:** software-engineer · **Commit:** `ci(T-060-05): pr-source-guard; retire feature/hotfix push triggers`
 
