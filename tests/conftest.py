@@ -34,9 +34,12 @@ Session-level pollution guard (_session_root_pollution_guard):
 from __future__ import annotations
 
 import sys
+from collections.abc import Iterator, Sequence
 from pathlib import Path
 
 import pytest
+
+from dadaia_workspace.core.protocols.process_runner import ProcessResult
 
 # Repo-cleanliness law: the test run must never materialize bytecode caches inside
 # the working tree. Import-time compilation happens BEFORE any in-script
@@ -157,8 +160,8 @@ def _collect_entries(
     return frozenset(entries)
 
 
-@pytest.fixture(autouse=True)
-def _no_real_venv_in_tests(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.fixture(scope="session", autouse=True)
+def _no_real_venv_in_tests() -> Iterator[None]:
     """Disk guard: never build a real Python venv during the test suite.
 
     `WorkspaceService.init()` calls `VenvPythonEnvironmentManager.ensure_workspace_venv`,
@@ -168,17 +171,59 @@ def _no_real_venv_in_tests(monkeypatch: pytest.MonkeyPatch) -> None:
     disk (ENOSPC) and made the suite take 15-24 min. No test asserts venv contents or execs
     the venv python, so we replace the builder with a no-op that just materialises the
     directory and returns its path (matching FakePythonEnvironmentManager's behaviour).
+
+    Bug test-suite-real-venv-and-ci-longpole — two escapes closed, both guarded by
+    tests/unit/test_no_real_venv_backstop.py and the import round-trip assertion:
+
+    1. SCOPE: this fixture is session-scoped (was function-scoped). pytest instantiates
+       higher-scoped fixtures first, so a module-scoped fixture calling ``init()`` (e.g.
+       ``projected`` in test_claude_scaffold_is_loadable.py) used to run BEFORE the guard
+       existed and built a real venv (~17 s unloaded / 159 s loaded, per module).
+       Session scope guarantees the patch is in place before every other fixture.
+       Tests that need the REAL method (test_python_env.py) already capture it at import
+       time and restore it locally — that pattern is unaffected.
+
+    2. SUBPROCESS: ``ImportService.bootstrap`` runs ``dadaia init`` through
+       ``SubprocessProcessRunner`` — a child process an in-process monkeypatch cannot
+       reach, which rebuilt a real venv (~19 s unloaded / 242 s loaded) AND exercised
+       whatever dadaia happened to be installed in the ambient interpreter instead of
+       the source under test. The runner is patched to execute ``init`` in-process via
+       the CLI app (same argv contract), where the venv stub above applies. Every other
+       argv passes through to the real subprocess runner untouched.
     """
     from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
+    from dadaia_workspace.infrastructure.subprocess_runner import SubprocessProcessRunner
 
     def _fake_ensure(self: object, workspace_root: str) -> str:  # noqa: ANN001
         venv_dir = Path(workspace_root) / ".dadaia" / ".venv"
         venv_dir.mkdir(parents=True, exist_ok=True)
         return str(venv_dir)
 
-    monkeypatch.setattr(
-        VenvPythonEnvironmentManager, "ensure_workspace_venv", _fake_ensure, raising=True
-    )
+    real_run = SubprocessProcessRunner.run
+
+    def _run_dadaia_init_in_process(
+        self: SubprocessProcessRunner,
+        argv: Sequence[str],
+        *,
+        cwd: Path | None = None,
+        timeout: float | None = None,
+    ) -> ProcessResult:
+        argv = list(argv)
+        if argv and Path(argv[0]).name.startswith("dadaia") and argv[1:2] == ["init"]:
+            from typer.testing import CliRunner
+
+            from dadaia_workspace.cli.main import app
+
+            target = Path(cwd) if cwd is not None else Path.cwd()
+            result = CliRunner().invoke(app, ["init", "--workspace", str(target), *argv[2:]])
+            return ProcessResult(returncode=result.exit_code, stdout=result.output, stderr="")
+        return real_run(self, argv, cwd=cwd, timeout=timeout)
+
+    mp = pytest.MonkeyPatch()
+    mp.setattr(VenvPythonEnvironmentManager, "ensure_workspace_venv", _fake_ensure, raising=True)
+    mp.setattr(SubprocessProcessRunner, "run", _run_dadaia_init_in_process, raising=True)
+    yield
+    mp.undo()
 
 
 @pytest.fixture(autouse=True)

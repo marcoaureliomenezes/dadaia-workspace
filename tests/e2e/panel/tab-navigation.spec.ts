@@ -175,7 +175,10 @@ test('E2E-TAB-05 — No 4xx/5xx responses on initial panel load', async ({ page 
   });
 
   await gotoPanel(page);
-  await page.waitForLoadState('networkidle');
+  // Bounded settle (bug test-suite-real-venv-and-ci-longpole): this was the suite's
+  // only UNbounded networkidle — with any persistent connection it rides the full
+  // 30 s test timeout. The guard only needs initial-load requests to have fired.
+  await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
 
   // Allow 401s only for API endpoints that are fetched without explicit auth
   // by the page during initial load (if any). However, per spec, the initial

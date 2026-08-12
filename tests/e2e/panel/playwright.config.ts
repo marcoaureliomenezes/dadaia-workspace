@@ -33,7 +33,12 @@ export default defineConfig({
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  workers: 1,
+  // Bug test-suite-real-venv-and-ci-longpole: workers was 1, serialising 11 spec
+  // files that mostly only READ the shared panel. Files parallelise across workers
+  // (fullyParallel stays false, so tests within a file keep their order); the two
+  // specs that MUTATE shared panel state run in their own dependent projects below,
+  // one at a time, after the read-only pass.
+  workers: process.env.CI ? 2 : 4,
   reporter: [['list'], ['html', { open: 'never', outputFolder: REPORT_DIR }]],
   webServer: {
     command: PANEL_WEB_SERVER_COMMAND,
@@ -49,7 +54,11 @@ export default defineConfig({
     },
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
-    timeout: 30_000,
+    // 60 s validity fix (bug test-suite-real-venv-and-ci-longpole): the hermetic
+    // bootstrap (init + stage + install + panel start) measured ~24 s unloaded with
+    // the venv stub; 30 s made the whole suite fail ERR_CONNECTION_REFUSED on any
+    // loaded host — the server was still bootstrapping when playwright gave up.
+    timeout: 60_000,
     stdout: 'pipe',
     stderr: 'pipe',
   },
@@ -62,10 +71,28 @@ export default defineConfig({
     extraHTTPHeaders: {},
   },
 
+  // Shared-state isolation: agent-policy.spec.ts (Apply PUT re-renders the temp
+  // workspace's projections) and spec-context-operation-journey.spec.ts (drives real
+  // context alive/dead transitions through the registry) mutate state every other
+  // spec reads. They run AFTER the read-only pass, serially — each in its own
+  // single-file project, chained via `dependencies`.
   projects: [
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+      testIgnore: ['**/agent-policy.spec.ts', '**/spec-context-operation-journey.spec.ts'],
+    },
+    {
+      name: 'chromium-agent-policy',
+      use: { ...devices['Desktop Chrome'] },
+      testMatch: '**/agent-policy.spec.ts',
+      dependencies: ['chromium'],
+    },
+    {
+      name: 'chromium-context-journey',
+      use: { ...devices['Desktop Chrome'] },
+      testMatch: '**/spec-context-operation-journey.spec.ts',
+      dependencies: ['chromium-agent-policy'],
     },
   ],
 });

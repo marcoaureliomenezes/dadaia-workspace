@@ -165,7 +165,10 @@ jobs:
         # Redirect coverage's data file outside the checkout (pyproject data_file removed in T-018-07).
         env:
           COVERAGE_FILE: ${{ runner.temp }}/.coverage
-        run: poetry run pytest -q -m "unit or contract" --cov=dadaia_workspace --cov-report=term-missing --cov-fail-under=80 tests/unit tests/contract
+        # -n auto: this was the only pytest job without xdist and the CI long pole
+        # (bug test-suite-real-venv-and-ci-longpole); pytest-cov combines per-worker
+        # coverage automatically.
+        run: poetry run pytest -q -m "unit or contract" -n auto --cov=dadaia_workspace --cov-report=term-missing --cov-fail-under=80 tests/unit tests/contract
 
   # CI matrix (T-018-21 / WS-2 → GRADUATED in 0.1.8 rc-2): unit + contract on Windows/macOS.
   # Ubuntu hard-gating jobs above remain separate companion jobs so the original required
@@ -217,7 +220,8 @@ jobs:
       - name: pytest unit/contract coverage
         env:
           COVERAGE_FILE: ${{ runner.temp }}/.coverage
-        run: poetry run pytest -q -m "unit or contract" --cov=dadaia_workspace --cov-report=term-missing tests/unit tests/contract
+        # -n auto: same long-pole fix as the ubuntu contract-coverage job (windows was 2:55).
+        run: poetry run pytest -q -m "unit or contract" -n auto --cov=dadaia_workspace --cov-report=term-missing tests/unit tests/contract
 
   integration:
     name: Integration (pytest)
@@ -296,9 +300,28 @@ jobs:
       - name: Install Node deps
         working-directory: tests/e2e
         run: npm ci
+      # Cache the browser download (~/.cache/ms-playwright) keyed on the resolved
+      # @playwright/test version — the browser build only changes when the package
+      # does (bug test-suite-real-venv-and-ci-longpole: Chromium was re-downloaded
+      # every run). On a hit only the apt system deps still install.
+      - name: Resolve Playwright version
+        id: playwright-version
+        working-directory: tests/e2e
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
       - name: Install Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         working-directory: tests/e2e
         run: npx playwright install --with-deps chromium
+      - name: Install Chromium system deps (cached browser)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        working-directory: tests/e2e
+        run: npx playwright install-deps chromium
       - name: playwright panel e2e
         working-directory: tests/e2e
         env:

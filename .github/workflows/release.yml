@@ -62,7 +62,8 @@ jobs:
       - run: pipx install poetry==1.8.3
       - run: poetry install --no-interaction --no-ansi --with dev
       - name: pytest unit/contract coverage
-        run: poetry run pytest -q -m "unit or contract" --cov=dadaia_workspace --cov-report=term-missing --cov-fail-under=80 tests/unit tests/contract
+        # -n auto: same long-pole fix as ci.yml (bug test-suite-real-venv-and-ci-longpole).
+        run: poetry run pytest -q -m "unit or contract" -n auto --cov=dadaia_workspace --cov-report=term-missing --cov-fail-under=80 tests/unit tests/contract
 
   integration:
     name: Integration (pytest)
@@ -117,9 +118,26 @@ jobs:
       - name: Install Node deps
         working-directory: tests/e2e
         run: npm ci
+      # Browser cache — see ci.yml e2e-panel for the rationale
+      # (bug test-suite-real-venv-and-ci-longpole).
+      - name: Resolve Playwright version
+        id: playwright-version
+        working-directory: tests/e2e
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
       - name: Install Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         working-directory: tests/e2e
         run: npx playwright install --with-deps chromium
+      - name: Install Chromium system deps (cached browser)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        working-directory: tests/e2e
+        run: npx playwright install-deps chromium
       - name: playwright panel e2e
         working-directory: tests/e2e
         env:
