@@ -190,7 +190,7 @@ Re-project at the end (same chain as T-060-02).
 
 ---
 
-- [ ] **T-060-04 — Chokepoint enforcement, TDD (RED before GREEN)**
+- [-] **T-060-04 — Chokepoint enforcement, TDD (RED before GREEN)**
 
 **Owner role:** software-engineer · **Commits:** `test(T-060-04): RED contract tests for develop-only push policy` then `feat(T-060-04): develop-only push, branch-name validation, develop-diff verdict`
 
