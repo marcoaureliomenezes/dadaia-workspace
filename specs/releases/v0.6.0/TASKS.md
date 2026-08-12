@@ -336,7 +336,7 @@ preserved verbatim in the review file as the historical record.
 
 ---
 
-- [-] **T-060-07 — Review + diff-based security verdict**
+- [x] **T-060-07 — Review + diff-based security verdict**
 
 **Owner role:** code-reviewer + security-reviewer (verdicts); software-engineer applies any
 required fix · **Commit:** fixes only, each returning its task to `[-]`
@@ -365,7 +365,7 @@ verdict covers the `origin/develop..develop` delta about to be pushed. Any
 
 ---
 
-- [ ] **T-060-08 — Milestone (b): merge to `develop`, push, PR to `main`, CI green**
+- [-] **T-060-08 — Milestone (b): merge to `develop`, push, PR to `main`, CI green**
 
 **Owner role:** software-engineer · **Commit:** merge commit + any CI fix
 
