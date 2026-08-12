@@ -93,6 +93,20 @@ backlog item and bug picked into (or superseded by) this release.
 | `specs/backlog/<slug>.md` | backlog | `DELIVERED — <release-id>` | `<CLOSURE section \| commit sha>` |
 | ... | ... | ... | ... |
 
+## Test dispositions
+
+Demotion map (S-15) and the quarantine/SCAFFOLD expiry sweep, per `dadaia-test-stewardship`.
+Every LARGE test demoted or deleted during this release, and every quarantine/SCAFFOLD that
+expired, is a row here — the closer **records** the disposition, it does not author the
+replacement test.
+
+| Kind | Deleted/expired test | Replacement / disposition | Evidence |
+|------|----------------------|----------------------------|----------|
+| demotion | `tests/e2e/<file>::<test>` | `tests/{unit,contract,integration}/<file>:<line>` or "kept as SENTINEL" | `<CLOSURE section \| commit sha>` |
+| quarantine expiry | `tests/<path>::<test>` | `disabled` / `restored` / `deleted` | `<bug-id \| commit sha>` |
+| SCAFFOLD expiry | `tests/<path>::<test>` | `deleted` / `promoted to CONTRACT` | `<commit sha>` |
+| ... | ... | ... | ... |
+
 ## Backlog returns
 
 Items discovered during implementation that did not fit this release's scope. Each goes
@@ -181,7 +195,8 @@ snapshot.
 
 ## Out of scope for this skill
 
-- Writing source code, tests, or pipelines (other agents).
+- Writing source code, tests, or pipelines (other agents). The closer **records** test
+  dispositions (the `## Test dispositions` table above) — it never authors a test.
 - Modifying `specs/constitution.md` (requires explicit operator approval).
 - Memory updates via this skill happen in the CLOSURE phase only. (product-engineer
   may also write memory in the DEFINITION phase under a separate §13 authorization —

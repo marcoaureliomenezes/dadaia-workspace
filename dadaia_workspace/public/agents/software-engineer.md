@@ -175,6 +175,11 @@ incomplete.
 - Run pytest with `-p no:cacheprovider` (no cache dir leaks into the repo).
 - Tests assert real behavior, not the absence of failure. Coverage is a by-product of real
   tests, never a target you fabricate tests to hit.
+- Admission rules (what makes a new test eligible) are owned by `tests/AGENTS.md` —
+  follow it, do not restate it here.
+- You **execute** `qa-engineer`'s curation verdicts (delete/demote/quarantine), quoting
+  the verdict's `file:line` evidence in the commit message. You never prune, skip or
+  disable a test on your own initiative — see `dadaia-test-stewardship`.
 
 ---
 

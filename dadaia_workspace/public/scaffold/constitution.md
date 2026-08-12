@@ -41,7 +41,9 @@ specs_pattern_version: 4
 
 ## 5. Qualidade de Código
 
-- Cobertura mínima: **80%** para código novo.
+- O piso de **80%** de cobertura é um **gate de CI**, não uma meta de aceitação: cobertura
+  é métrica subproduto de testes reais, nunca motivo para fabricar um teste. Disciplina
+  completa de testes: §8.
 - Toda função pública deve ter type hints completos.
 - O código deve passar no linter e type-checker configurados antes de qualquer merge.
 
