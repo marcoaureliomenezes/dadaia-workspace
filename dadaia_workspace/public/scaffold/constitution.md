@@ -69,6 +69,24 @@ specs_pattern_version: 4
 
 ---
 
+## 8. Disciplina de Testes
+
+- Todo teste declara **intenção** (CONTRACT/SENTINEL/SCAFFOLD/QUARANTINE) e **tamanho** ao
+  nascer; um teste sem intenção declarada é SCAFFOLD e expira.
+- Admissão na suíte permanente exige detecção real — cobrir comportamento não coberto ou
+  matar um mutante que nenhum teste atual mata.
+- Rebaixamento (substituir um teste grande por cobertura equivalente mais barata) é etapa
+  obrigatória do fechamento de release, nunca uma decisão avulsa.
+- Poda (deletar, pular ou desabilitar um teste) é veredito do steward de qualidade, nunca
+  iniciativa de quem implementou o teste.
+- Teste-lápide e SCAFFOLD expirado são lixo (slop), não histórico da suíte.
+- Artefatos de teste são capturados só em falha.
+
+Protocolo operacional completo: skill `dadaia-test-stewardship`. Os parâmetros numéricos
+(timeouts, tetos, prazos) são padrões ajustáveis por projeto, não regras fixas.
+
+---
+
 ## 9. Autoridade de Dispatch
 
 Apenas o(s) agente(s) coordenador(es) do projeto despacham sub-agentes; todo agente
