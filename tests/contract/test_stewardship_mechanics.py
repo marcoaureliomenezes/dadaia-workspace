@@ -97,7 +97,7 @@ def test_marker_set_is_pinned_across_pyproject_and_conftest() -> None:
     pyproject = (_REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
     block = re.search(r"markers\s*=\s*\[(.*?)\]", pyproject, re.S)
     assert block is not None, "pyproject.toml declares no pytest markers block"
-    declared = set(re.findall(r'"([a-z]+):', block.group(1)))
+    declared = set(re.findall(r'"([a-z0-9]+):', block.group(1)))
     assert declared == set(_KNOWN_MARKERS), (
         f"marker drift: pyproject={sorted(declared)} conftest={sorted(_KNOWN_MARKERS)}"
     )
@@ -113,7 +113,7 @@ def test_preflight_pytest_excludes_quarantine_and_drops_dead_ignore() -> None:
     from dadaia_workspace.features.ci_preflight.service import _pytest_check
 
     check = _pytest_check(quick=True, python_executable=None, dadaia_bin=None)
-    command = tuple(check.command)
+    command = tuple(check.argv)
     assert "--ignore=tests/performance" not in command, (
         "dead ignore: tests/performance no longer exists"
     )

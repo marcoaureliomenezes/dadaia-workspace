@@ -123,13 +123,45 @@ _PATH_MARKERS: tuple[tuple[str, str], ...] = (
     ("tests/tmp/", "tmp"),
 )
 
+# T-070-05 (v0.7.0 FR5): tier -> enforced timeout seconds (dadaia-test-stewardship
+# S-08/S-09). A test that trips its tier ceiling is MIS-TIERED — fix the tier or
+# declare an explicit justified @pytest.mark.timeout; never raise these defaults.
+_TIER_TIMEOUTS: dict[str, int] = {"unit": 10, "contract": 30, "integration": 60, "e2e": 120}
+
+#: The closed marker set — must stay set-equal with pyproject.toml's markers block
+#: (pinned by tests/contract/test_stewardship_mechanics.py).
+_KNOWN_MARKERS: frozenset[str] = frozenset(
+    {"unit", "contract", "integration", "e2e", "slow", "tmp", "flaky", "quarantine"}
+)
+
+
+def _validate_quarantine_markers(items: list[pytest.Item]) -> None:
+    """S-20/S-21: a quarantined test without a registered bug id refuses collection.
+
+    Quarantine is a lane out of the gating selectors — usable ONLY with a live bug
+    (`@pytest.mark.quarantine(bug="<bug-slug>")`). An unregistered quarantine would be
+    a silent green-with-exclusions, the exact failure the stewardship law forbids.
+    """
+    for item in items:
+        marker = item.get_closest_marker("quarantine")
+        if marker is None:
+            continue
+        bug = marker.kwargs.get("bug")
+        if not isinstance(bug, str) or not bug.strip():
+            raise pytest.UsageError(
+                f"{item.nodeid}: @pytest.mark.quarantine requires a registered bug id — "
+                "use @pytest.mark.quarantine(bug='<bug-slug>') and register the bug via "
+                "`dadaia bugs append` first (dadaia-test-stewardship, group F)."
+            )
+
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    """Apply layer markers from test directory layout.
+    """Apply layer markers + tier timeouts from test directory layout.
 
     Directory placement is the first enforcement mechanism for the existing
     suite. Tests may still add explicit markers, but unmarked legacy tests do
-    not fall out of layer-specific commands.
+    not fall out of layer-specific commands. The tier timeout is applied only
+    when the test declares no explicit ``timeout`` marker of its own.
     """
     for item in items:
         rel = Path(str(item.fspath)).resolve().relative_to(_REPO_ROOT).as_posix()
@@ -138,7 +170,11 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
                 item.add_marker(getattr(pytest.mark, marker))
                 if marker == "e2e":
                     item.add_marker(pytest.mark.slow(reason="e2e process-boundary suite"))
+                tier_timeout = _TIER_TIMEOUTS.get(marker)
+                if tier_timeout is not None and item.get_closest_marker("timeout") is None:
+                    item.add_marker(pytest.mark.timeout(tier_timeout))
                 break
+    _validate_quarantine_markers(items)
 
 
 def _collect_entries(
