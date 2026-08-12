@@ -163,7 +163,7 @@ T-070-06 disjoint.
 
 ---
 
-- [ ] **T-070-04 — Tier-2 single-home edits (C1–C13)**
+- [-] **T-070-04 — Tier-2 single-home edits (C1–C13)**
 
 **Owner role:** ai-engineer · **Commit:** `refactor(T-070-04): single-home test doctrine; reconcile coverage stance`
 
