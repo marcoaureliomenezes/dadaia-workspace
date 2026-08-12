@@ -91,7 +91,7 @@ Two things the skill must get exactly right:
 
 ---
 
-- [-] **T-070-02 — `DADAIA.md` §6 increment + projection**
+- [x] **T-070-02 — `DADAIA.md` §6 increment + projection**
 
 **Owner role:** ai-engineer · **Commit:** `refactor(T-070-02): test-lifecycle law in DADAIA.md §6`
 
