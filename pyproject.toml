@@ -87,6 +87,7 @@ import-linter = ">=2.11"
 #     then re-verify: .dadaia/.venv/bin/pip list | grep -Ei '^(pip|poetry|dulwich) '
 hypothesis = ">=6.165.2"
 pytest-xdist = "^3.8.0"
+pytest-timeout = "^2.3.1"
 
 [build-system]
 requires = ["poetry-core"]
@@ -127,6 +128,8 @@ markers = [
     "e2e: full user journeys and browser-backed flows",
     "slow: tests over 1s or tests that start a server/subprocess",
     "tmp: temporary debugging tests excluded from default runs",
+    "flaky: observed pass+fail on identical code; being diagnosed (dadaia-test-stewardship F)",
+    "quarantine: out of gating selectors; requires bug= id and expires (dadaia-test-stewardship F)",
 ]
 norecursedirs = [
     ".*",

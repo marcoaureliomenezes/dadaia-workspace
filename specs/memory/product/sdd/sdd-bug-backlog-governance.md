@@ -2,19 +2,23 @@
 slug: sdd-bug-backlog-governance
 title: sdd-bug-backlog-governance
 category: product
-tldr: Event-sourced JSONL bugs, PM-curated backlog, release consumption, audit dispositions, and exact-commit security-gated push.
+tldr: Event-sourced JSONL bugs, PM-curated backlog, release consumption, audit dispositions, and a four-branch git contract whose only pushable branch is develop.
 summary: >-
   Bugs are append-only events; the backlog is curated by project-manager and sanitized
   continuously; a release consumes an explicit picked set; closure and audit require
-  terminal dispositions. Intake is additive and never lock-gated.
+  terminal dispositions. Work is placed on four branch patterns with develop the only
+  pushable one; a feature branch merges into develop at two milestones, each followed by a
+  diff-based security review of the develop delta and a push. Intake is additive and never
+  lock-gated.
 tags:
 - sdd
 - governance
 - release-lifecycle
 - backlog
 - bugs
-token_estimate: 370
-last_updated: '2026-08-07'
+- gitflow
+token_estimate: 620
+last_updated: '2026-08-12'
 release_origin: v0.3.0
 ---
 
@@ -31,7 +35,12 @@ not product bugs.
 
 **Bug-hotfix doctrine:** a bug is fixed ON THE SPOT — register → root-cause → RED
 reproducing test → fix → GREEN → `resolved` event with evidence → commit. Releases are
-never created to fix bugs; they exist for backlog feature work.
+never created to fix bugs; they exist for backlog feature work. The fix runs on
+`hotfix/{M.m.p}` at the next PATCH, merged into `develop`; that merge commit also bumps
+`pyproject.toml` `version` to the minted PATCH and adds the `CHANGELOG.md` entry. A hotfix
+carries no ceremony: no SPEC, PLAN, TASKS or CLOSURE, and no `specs/releases/<id>/`
+directory. The record of what shipped is the bug ledger's `resolved` event plus that
+CHANGELOG entry.
 
 ## Backlog
 
@@ -41,6 +50,30 @@ is authored: overlap forces an update or merge, divergent conflicts are resolved
 new item is allowed only when every existing item is unrelated. Entries are sanitized
 continuously — stale or invalid ones are marked `deferred` or `rejected` with a reason.
 Backlog entries and bugs are kept forever: mark them, never delete them.
+
+## Branches And Stage Placement
+
+Four branch patterns exist and no fifth: `main`, `develop`, `feature/{M.m.p}`, and
+`hotfix/{M.m.p}` with PATCH ≥ 1. `develop` is the only pushable branch; `feature/*` and
+`hotfix/*` live local-only; `main` takes no direct commit and no direct push and advances
+only through a pull request from `develop`. The operational contract — the per-stage table
+and the mechanical-versus-discipline split — lives in the universal skill `dadaia-gitflow`;
+the law states it once in `DADAIA.md` §5/§6 and every other surface references it.
+
+Stage placement follows the branch a stage belongs to. Backlog definition, research, and
+bug registration happen on `develop`, with a commit after every registration. Release
+definition and release implementation both happen on `feature/{M.m.p}` cut from `develop`.
+Bug fixes happen on `hotfix/{M.m.p}`.
+
+## Merge Cadence
+
+A feature branch merges into local `develop` at exactly two milestones: (a) when the
+definition trio SPEC/PLAN/TASKS is `Aprovado`, and (b) at ship. Each merge is followed, in
+that order, by a diff-based security review of `origin/develop..develop` and a push of
+`develop`. Ship continues from there: PR `develop` → `main`, every CI job green, merge.
+
+Release finalization order is memory update → CLOSURE → archive. A group of completed tasks
+is one commit; a release defined and reviewed is a mandatory commit and push.
 
 ## Release And Audit
 
@@ -53,8 +86,10 @@ and an audit archives only once a named approved release has dispositioned it fu
 Bug, backlog, and audit paths are additive and writable without a bind or concurrency
 lock. Production release artifacts and code follow the ordinary path and phase rules.
 
-Push is blocked until an APPROVED security-reviewer handoff names each exact pushed
-commit SHA. This is a quality boundary, not a concurrency mechanism.
+Push is blocked until an APPROVED security-reviewer handoff covers the
+`origin/develop..develop` delta being pushed, keyed to the pushed `develop` tip. The
+push-gate review is that diff only; a full-tree scan exists solely in the audit lane. This
+is a quality boundary, not a concurrency mechanism.
 
 ## Runtime State
 
@@ -62,6 +97,7 @@ commit SHA. This is a quality boundary, not a concurrency mechanism.
 - `specs/backlog/*.md`
 - `specs/releases/<id>/consumed_backlog.json` or its archived equivalent
 - `specs/audits/<timestamp>-<session>/`
+- `pyproject.toml` and `CHANGELOG.md` at a hotfix merge into `develop`
 
 ## Dependencies
 

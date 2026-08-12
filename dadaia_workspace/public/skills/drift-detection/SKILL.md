@@ -172,14 +172,20 @@ calibration points; interpolate for intermediate values.
 | 4 | 1 HIGH finding open; or 3+ MEDIUMs unmitigated |
 | 1 | CRITICAL open; secrets in repo; auth bypasses present |
 
-### Dimension E — Test Coverage
+### Dimension E — Test Detection Quality
+
+Line coverage measures execution, not detection — it never anchors this score. See
+`dadaia-test-stewardship`.
 
 | Score | Anchor |
 |---|---|
-| 10 | ≥ 90% line coverage; every public API has unit + integration tests |
-| 7 | 75–89% coverage; all critical paths tested |
-| 4 | 50–74% coverage; some public functions untested |
-| 1 | < 50% coverage; core features untested |
+| 10 | Every test declares intent; every LARGE demoted or SENTINEL-justified at closure; flake within ceiling; quarantine within cap and not expired; every LARGE has a named owner |
+| 7 | Intent mostly declared; 1–2 undemoted LARGE with a tracked plan; flake and quarantine within limits |
+| 4 | Intent sparsely declared; LARGE tests accumulate without demotion; quarantine over cap or an expired entry |
+| 1 | No intent taxonomy in use; tombstone tests present; flake above the ceiling with no quarantine |
+
+The CI coverage floor (`DADAIA.md` §6) is checked separately as a pass/fail gate, never
+scored here.
 
 ### Dimension F — Design / UX
 

@@ -1,3 +1,3 @@
-release: v0.6.0
+release: v0.7.0
 segment: alpha-1
 phase: IMPLEMENTATION

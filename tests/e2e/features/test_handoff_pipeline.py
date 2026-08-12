@@ -76,8 +76,15 @@ def _write_valid_handoff(base_dir: Path, stem: str = "report") -> Path:
     return handoff_path
 
 
+@pytest.mark.timeout(300)
 def test_full_handoff_emit_and_validate(tmp_path: Path) -> None:
-    """Bootstrap workspace, write valid handoff, validate → exit 0, '1 valid'."""
+    """Bootstrap workspace, write valid handoff, validate → exit 0, '1 valid'.
+
+    Explicit timeout (dadaia-test-stewardship S-09/S-10): measured 71 s solo — a full
+    bootstrap + emit + validate pipeline over real subprocesses, above the 120 s e2e
+    ceiling under xdist load. The structural split is queued in
+    test-suite-remediation-stewardship.
+    """
     _bootstrap(tmp_path)
 
     # Write a valid handoff adjacent to a fake HTML report.

@@ -365,7 +365,7 @@ verdict covers the `origin/develop..develop` delta about to be pushed. Any
 
 ---
 
-- [-] **T-060-08 — Milestone (b): merge to `develop`, push, PR to `main`, CI green**
+- [x] **T-060-08 — Milestone (b): merge to `develop`, push, PR to `main`, CI green**
 
 **Owner role:** software-engineer · **Commit:** merge commit + any CI fix
 
@@ -393,7 +393,7 @@ gate is wrong and is fixed.
 
 ---
 
-- [ ] **T-060-09 — `pr-source-guard` becomes a required check**
+- [x] **T-060-09 — `pr-source-guard` becomes a required check**
 
 **Owner role:** software-engineer · **Commit:** none (GitHub branch-rule change; recorded in
 CLOSURE)
@@ -414,7 +414,7 @@ PR is blocked from merging, not just failing.
 
 ---
 
-- [ ] **T-060-10 — Memory update → CLOSURE → archive (in that order)**
+- [x] **T-060-10 — Memory update → CLOSURE → archive (in that order)**
 
 **Owner role:** product-engineer · **Commit:** `docs(T-060-10): v0.6.0 closure, memory atoms, dispositions`
 

@@ -2,19 +2,19 @@
 slug: sdd-gate-v3
 title: sdd-gate-v3
 category: product
-tldr: "No-lock SDD enforcement: deterministic path/mode gates, advisory presence, warn-only concurrent commits, and a security-gated push boundary."
+tldr: "No-lock SDD enforcement: deterministic path/mode gates, advisory presence, warn-only concurrent commits, and a develop-only, security-gated push boundary."
 summary: >-
   The merged Python PreToolUse gate enforces root whitelist, workspace venv usage,
   path class, phase, and the caller's own mode. It never waits for or blocks on another
-  session. Presence is advisory. Git pre-commit warns only; pre-push enforces CI and an
-  approved security handoff for every pushed commit.
+  session. Presence is advisory. Git pre-commit warns only; pre-push enforces the CI
+  preflight, develop-only branch policy, and a security verdict covering the develop delta.
 tags:
 - sdd
 - gate
 - hooks
 - enforcement
 - no-locks
-token_estimate: 570
+token_estimate: 760
 last_updated: '2026-08-12'
 release_origin: v0.3.0
 ---
@@ -75,11 +75,27 @@ presence. It never blocks.
 
 - `pre-commit-presence-gate.sh` may warn about another live session but always permits
   the commit on concurrency grounds.
-- `pre-push-ci-gate.sh` runs the local CI preflight and requires an APPROVED
-  `security-reviewer` handoff whose `metrics.commit_sha` equals every pushed commit.
-  Branch deletion and tag-only updates are exempt.
+- `pre-push-ci-gate.sh` runs the local CI preflight and then applies branch policy and the
+  security verdict, in that order.
 
-The push rule is a quality gate, not a concurrency lock. Commits are never blocked for
+Branch policy at the push boundary: `refs/heads/develop` is the only pushable ref. A push
+of `main` is refused and named as PR-only from `develop`; a push of a `feature/*` or
+`hotfix/*` ref is refused as local-only; a ref outside the four permitted patterns
+(`main`, `develop`, `feature/vM.m.p`, `hotfix/vM.m.p` with PATCH ≥ 1) is refused by the
+branch-name validator; a local ref that is not a branch head gets its own diagnosis. The
+remote side is policed too — a refspec aiming local `develop` at another remote ref is
+refused, so only `refs/heads/develop → refs/heads/develop` passes. Parsing is fail-closed:
+any unparseable stdin line refuses the whole push and the message names `git push
+--no-verify` as the one traceable bypass, while empty stdin remains the distinct
+"nothing to gate" allow. Tag pushes and branch deletions keep their carve-out, which is
+what release publication depends on.
+
+Security verdict: an APPROVED `security-reviewer` handoff whose `metrics.commit_sha`
+equals the pushed `develop` tip, i.e. a verdict covering the `origin/develop..develop`
+delta. Every refusal names the rule that fired, the permitted value, and the corrective
+action, so each one is clearable by an action the product accepts.
+
+The push rules are a quality gate, not a concurrency lock. Commits are never blocked for
 missing review evidence; pushes are.
 
 ## Context Injection

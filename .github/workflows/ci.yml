@@ -141,7 +141,7 @@ jobs:
       - name: Install
         run: poetry install --no-interaction --no-ansi --with dev
       - name: pytest unit fast
-        run: poetry run pytest -q -m "unit and not slow" tests/unit -n auto
+        run: poetry run pytest -q -m "unit and not slow and not quarantine" tests/unit -n auto --durations=25
 
   contract-coverage:
     name: Contract coverage (pytest)
@@ -171,7 +171,7 @@ jobs:
         # -n auto: this was the only pytest job without xdist and the CI long pole
         # (bug test-suite-real-venv-and-ci-longpole); pytest-cov combines per-worker
         # coverage automatically.
-        run: poetry run pytest -q -m "unit or contract" -n auto --cov=dadaia_workspace --cov-report=term-missing --cov-fail-under=80 tests/unit tests/contract
+        run: poetry run pytest -q -m "(unit or contract) and not quarantine" -n auto --cov=dadaia_workspace --cov-report=term-missing --cov-fail-under=80 tests/unit tests/contract --durations=25
 
   # CI matrix (T-018-21 / WS-2 → GRADUATED in 0.1.8 rc-2): unit + contract on Windows/macOS.
   # Ubuntu hard-gating jobs above remain separate companion jobs so the original required
@@ -198,7 +198,7 @@ jobs:
       - name: Install
         run: poetry install --no-interaction --no-ansi --with dev
       - name: pytest unit fast
-        run: poetry run pytest -q -m "unit and not slow" tests/unit -n auto
+        run: poetry run pytest -q -m "unit and not slow and not quarantine" tests/unit -n auto --durations=25
 
   contract-coverage-cross:
     name: Contract coverage (Windows/macOS)
@@ -224,12 +224,13 @@ jobs:
         env:
           COVERAGE_FILE: ${{ runner.temp }}/.coverage
         # -n auto: same long-pole fix as the ubuntu contract-coverage job (windows was 2:55).
-        run: poetry run pytest -q -m "unit or contract" -n auto --cov=dadaia_workspace --cov-report=term-missing tests/unit tests/contract
+        run: poetry run pytest -q -m "(unit or contract) and not quarantine" -n auto --cov=dadaia_workspace --cov-report=term-missing tests/unit tests/contract --durations=25
 
   integration:
     name: Integration (pytest)
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    # v0.7.0 P6 ratchet: ~1.5x measured job wall; raising this needs a CLOSURE justification.
+    timeout-minutes: 6
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
@@ -248,12 +249,13 @@ jobs:
       - name: Install
         run: poetry install --no-interaction --no-ansi --with dev
       - name: pytest integration
-        run: poetry run pytest -q -m integration tests/integration --durations=30
+        run: poetry run pytest -q -m "integration and not quarantine" tests/integration --durations=30
 
   e2e-python:
     name: E2E Python (pytest)
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    # v0.7.0 P6 ratchet: ~1.5x measured job wall; raising this needs a CLOSURE justification.
+    timeout-minutes: 6
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
@@ -272,7 +274,7 @@ jobs:
       - name: Install
         run: poetry install --no-interaction --no-ansi --with dev
       - name: pytest e2e python
-        run: poetry run pytest -q -m e2e tests/e2e/features --durations=30
+        run: poetry run pytest -q -m "e2e and not quarantine" tests/e2e/features --durations=30
 
   e2e-panel:
     name: E2E panel (Playwright)
@@ -349,7 +351,33 @@ jobs:
           # config runs the list reporter only — failure evidence is the
           # only-on-failure screenshots + first-retry traces in this dir.
           PLAYWRIGHT_OUTPUT_DIR: ${{ runner.temp }}/pw-output
+          # Loud flake (v0.7.0 FR5): JSON report outside the repo; the step below
+          # fails the job on any unregistered pass-on-retry.
+          PLAYWRIGHT_JSON_REPORT: ${{ runner.temp }}/pw-flake.json
         run: npm run test:e2e
+      - name: Fail on unregistered pass-on-retry (loud flake)
+        run: |
+          REPORT="${{ runner.temp }}/pw-flake.json"
+          if [ ! -f "$REPORT" ] || [ ! -s "$REPORT" ]; then
+            echo "::error::Playwright JSON report missing or empty at $REPORT — a missing report is a hard error, never a pass (v0.7.0 R9)."
+            exit 1
+          fi
+          # Degenerate-report hardening (T-070-09 finding 1): jq failure, a non-object
+          # report, or a missing stats key are all hard errors — never a silent pass.
+          FLAKY=$(jq -er '.stats.flaky' "$REPORT") || {
+            echo "::error::Playwright JSON report at $REPORT is malformed or lacks stats — hard error, never a pass (v0.7.0 R9)."
+            exit 1
+          }
+          case "$FLAKY" in (*[!0-9]*|"")
+            echo "::error::Playwright stats.flaky is not a number ('$FLAKY') — hard error."
+            exit 1 ;;
+          esac
+          if [ "$FLAKY" -gt 0 ]; then
+            jq -r '.. | objects | select(.tests? != null) | select([.tests[].status] | index("flaky")) | .title // empty' "$REPORT" | head -10
+            echo "::error::$FLAKY test(s) passed only on retry (flaky). A pass-on-retry is not a pass: register the flake (quarantine + bug via dadaia bugs append) or fix it (dadaia-test-stewardship, group F)."
+            exit 1
+          fi
+          echo "no unregistered pass-on-retry."
       - name: Upload failure evidence (traces + screenshots)
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1

@@ -4,6 +4,76 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — spec release v0.6.0
+
+Gitflow standardization. Lands in the same unreleased `0.5.0` package version as the spec
+releases below — this release changes no dependency, no Python version and no packaging
+contract.
+
+### Added
+- **`dadaia-gitflow`, the single operational home of the git contract.** A new universal
+  skill (89 lines) carrying the four-branch table, a seven-row stage table mapping every
+  lifecycle stage to its branch, commit cadence, merge target and push trigger, the two
+  merge milestones with their mandatory post-merge sequence, the hotfix PATCH-mint rule, and
+  an explicit split between what is mechanically enforced and what is discipline. Projected
+  to the canonical `.agents/skills/` home plus `.claude/skills/`; read natively by Codex and
+  Kimi Code, so no per-harness derivation and no registry entry.
+- **`pr-source-guard`**, a required check on `main`: any pull request targeting `main` whose
+  head is not exactly `develop` fails and is mechanically unmergeable. The fork-controlled
+  head ref is bound through `env:` and compared as a quoted literal, never interpolated into
+  a shell string.
+
+### Changed
+- **`DADAIA.md` §5/§6 state one git contract.** Four branch patterns and no fifth — `main`,
+  `develop`, `feature/{M.m.p}`, `hotfix/{M.m.p}` with PATCH ≥ 1; `develop` is the only
+  pushable branch, feature and hotfix branches are local-only, and `main` advances only via
+  a PR from `develop`. Stage placement, the two-milestone merge cadence
+  (definition-trio `Aprovado` and ship, each followed by a diff-based security review of
+  `origin/develop..develop` and a push of `develop`) and the finalization order
+  memory → CLOSURE → archive are stated once at law level; every other skill and agent
+  references the skill instead of restating it. Always-on cost +389 tokens against a +400
+  cap.
+- **BREAKING — the pre-push chokepoint enforces branch policy.** Any pushed ref other than
+  `refs/heads/develop` is refused, branch names are validated against the four patterns, a
+  refspec aiming local `develop` at another remote ref is refused, a local ref that is not a
+  branch head gets its own diagnosis, and an unparseable stdin line now fails **closed**
+  (the one traceable bypass, `git push --no-verify`, is named in the message). Tag pushes and
+  branch deletions keep their carve-out, so publishing is unaffected. *Consumer workspaces
+  with no `develop` branch, or with `release/*`-style branch names, will get hard push
+  refusals after upgrading; bootstrap a `develop` branch first.*
+- **The push-gate security verdict is keyed to the develop delta** — an APPROVED
+  `security-reviewer` handoff covering `origin/develop..develop` — instead of a bare per-ref
+  sha match. `security-reviewer` admits exactly one push-gate scan target, the diff; a
+  full-tree scan survives only in the audit lane.
+- CI push triggers are `main` and `develop` only. The `feature/**` and `hotfix/v*` triggers
+  and the push-triggered `hotfix-branch-name` job are retired — those branches are
+  local-only, and the PATCH ≥ 1 pattern now lives in the chokepoint validator, at the
+  boundary that actually exists.
+
+### Removed
+- **The hotfix *release* ceremony is revoked.** A bug fix is Arm B in full, run on
+  `hotfix/{M.m.p}`; at merge into `develop` the same commit bumps `pyproject.toml` and adds
+  the `CHANGELOG.md` entry. No hotfix SPEC, PLAN, TASKS or CLOSURE, and no
+  `specs/releases/<id>/` directory. The record is the bug ledger's `resolved` event plus
+  that CHANGELOG entry. `product-engineer` states the revocation explicitly so the ceremony
+  is not restored as a perceived regression; removal of the now-dead verb and templates is
+  queued in the backlog.
+- The operational restatements of the branch model across four skills and seven agents —
+  relocated to `dadaia-gitflow`, proven by a relocation grep run independently by the author
+  and by QA.
+
+### Fixed
+- The four dangling `release-governance` citations (two skills, two package modules) now
+  cite `DADAIA.md` §5 or `dadaia-gitflow`.
+- The scaffold constitution gained `## 11. Checkpoints de Revisão` and
+  `## 13. Propriedade da Memória`, so every `constitution §N` citation across the shipped
+  agents resolves.
+- `scaffold/releases/README.md` states the canon release-directory regex
+  `^v\d+\.\d+\.\d+$` — the previous expression rejected `v0.6.0` itself — and its `ACTIVE.md`
+  block matches the v2 schema including the optional `segment:` line.
+- `ai-engineer` inventories the real `public/scripts/` contents (5 files, 3 shell) instead
+  of claiming `pre-push-ci-gate.sh` is the only asset there.
+
 ## [Unreleased] — spec release v0.5.0
 
 Lands in the same unreleased `0.5.0` package version as spec release v0.3.0 below.

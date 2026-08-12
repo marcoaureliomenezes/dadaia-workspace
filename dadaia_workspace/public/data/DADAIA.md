@@ -176,7 +176,8 @@ phases; every other agent reads it. Changelog and history live in `CLOSURE.md` a
 **Backlog.** `project-manager` curates `specs/backlog/**`; everyone reads it freely and
 routes additions through the PM. Entries are sanitized continuously — stale or invalid
 ones are marked `deferred` or `rejected` with a reason. Backlog entries and bugs are kept
-forever: mark them, never delete them.
+forever: mark them, never delete them. This never-delete law covers bugs and backlog
+only — tests are prunable under the stewardship criteria (§6).
 
 **Branches.** Exactly four patterns, no fifth: `main` (remote+local, never committed or
 pushed to directly, advances only via a GitHub-enforced PR from `develop`); `develop`
@@ -214,6 +215,14 @@ that release.
 fails for the real reason, fix the cause, prove it green. Workarounds and symptom patches
 are not acceptable outcomes.
 
+**Test lifecycle.** Every test declares its intent and its size at birth; an undeclared
+test is SCAFFOLD and expires. Demotion — replacing a LARGE test with equivalent cheaper
+coverage — is a step of release closure, never an afterthought. The implementer never
+prunes to go green: deleting, skipping or disabling a test is a `qa-engineer` verdict
+carrying evidence, executed by `software-engineer`. Tombstone tests and expired SCAFFOLD
+are slop. Test-artifact capture is failure-gated, written where §4 already says. Full
+protocol: `dadaia-test-stewardship`.
+
 **Register every bug you hit** while operating this tooling — projection, doctor, upgrade,
 scaffolding, hooks, the gate, presence, context, panel, reports, the CLI, or any behavior
 that breaks its own contract. Append the `reported` event before the turn ends:
@@ -244,7 +253,9 @@ requires an APPROVED `security-reviewer` handoff whose review covers the
 surviving solely in the audit lane (`project-auditor` dispatch). Run the tests locally
 before you push. Commits are never review-blocked — only pushes. After every push or PR,
 watch CI until every job is green; read the failing log, fix the cause, push again, and
-keep watching.
+keep watching. A `quarantine`-marked test sits outside the gating selectors by design and
+requires a registered bug — a green run with quarantined tests is still green, but an
+unregistered pass-on-retry is a failure.
 
 **Approval.** A candidate is approved when the operator and the consumer-side validation
 agent agree, after validating a real workspace. A green internal gate that diverges from
