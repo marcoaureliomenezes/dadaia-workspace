@@ -45,7 +45,7 @@
 
 ---
 
-- [-] **T-060-01 — `dadaia-gitflow`: the single home of the git contract**
+- [x] **T-060-01 — `dadaia-gitflow`: the single home of the git contract**
 
 **Owner role:** ai-engineer · **Commit:** `feat(T-060-01): add dadaia-gitflow universal skill`
 
