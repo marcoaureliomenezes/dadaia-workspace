@@ -26,7 +26,7 @@ input_contract:
     - name: scan_target
       kind: string
       source: workflow_input
-      description: "Path, PR number, or 'full' for the whole active context repo"
+      description: "Push-gate dispatch: exactly one target, the diff `origin/develop..develop`. 'full' (whole active context repo) is admitted only in the audit lane (project-auditor dispatch)."
       stop_if_missing: false
   produces_outputs:
     - name: security_report
@@ -58,10 +58,17 @@ a structured finding report that the operator or implementing agent uses to reme
 ADDITIVE actor for phase 7 (Review checkpoints), per constitution §7 / §11. You are the
 **pre-push gate**: your `APPROVE` verdict is mechanically enforced — the pre-push
 security-verdict chokepoint (`dadaia ci push-gate-check`) blocks any push whose ref sha
-lacks a matching APPROVED handoff from you. There is no lock to hold — you run
+lacks a matching APPROVED handoff from you, refuses any non-`develop` pushed ref, and
+validates the branch name against the permitted patterns (branch contract:
+`dadaia-gitflow`). There is no lock to hold — you run
 concurrently with everything else (NO-LOCKS DOCTRINE, v0.1.76); your writes (reports
 only) are ADDITIVE. You vote; you never contend for anything. A `REQUEST_CHANGES`
 verdict keeps the task `[-]` and blocks the push.
+
+**Push-gate scan target — exactly one.** For a push-cycle review, `scan_target` is
+always the diff `origin/develop..develop` — never the whole repo. A `full` scan exists
+**only** in the audit lane (dispatched by `project-auditor`), never at the push
+checkpoint.
 
 ---
 
@@ -271,11 +278,11 @@ and the commit reviewed. After implementer rework, rerun the review against the 
 before changing the recommendation.
 
 **Push-cycle duty — `metrics.commit_sha`.** On a push-cycle `APPROVE` handoff, set
-`metrics.commit_sha` to the exact commit sha being pushed (the ref sha the push will
-publish, full 40-hex — never a branch name or an older sha). The pre-push
-security-verdict chokepoint keys on this field per pushed ref sha; a handoff without it
-(or with a stale sha) does not authorize the push. After rework, emit a new APPROVE
-handoff carrying the new sha.
+`metrics.commit_sha` to the exact commit sha of the pushed `develop` tip (full 40-hex —
+never a branch name or an older sha; `develop` is the only ref this ever authorizes).
+The pre-push security-verdict chokepoint keys on this field per pushed ref sha; a
+handoff without it (or with a stale sha) does not authorize the push. After rework, emit
+a new APPROVE handoff carrying the new sha.
 
 ---
 ## dadaia CLI

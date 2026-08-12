@@ -124,7 +124,7 @@ numbers regardless of the outcome.
 
 ---
 
-- [ ] **T-060-03 — Tier-2 dedup + hygiene on the `public/` surface**
+- [x] **T-060-03 — Tier-2 dedup + hygiene on the `public/` surface**
 
 **Owner role:** ai-engineer · **Commit:** `refactor(T-060-03): defer git contract to dadaia-gitflow; fix stale citations`
 
