@@ -324,7 +324,7 @@ chain). No Python package file, no `public/` text file.
 
 ---
 
-- [-] **T-070-07 — Scaffolder wiring: consumer repos receive `tests/AGENTS.md` (TDD)**
+- [x] **T-070-07 — Scaffolder wiring: consumer repos receive `tests/AGENTS.md` (TDD)**
 
 **Owner role:** software-engineer · **Commits:** `test(T-070-07): RED cases for tests/AGENTS.md scaffolding` then `feat(T-070-07): copy tests-AGENTS.md template on context alive`
 
