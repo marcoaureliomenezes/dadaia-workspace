@@ -283,7 +283,7 @@ class ClosureAuditValidator:
     def check_loose_undisposed_audits(self) -> list[SpecsDoctorIssue]:
         """SPEC-DOC-038 (v0.1.47 W1-9): WARN per loose audit directory in ``specs/audits/``.
 
-        Audit-disposition law (release-governance): a dispositioned audit archives to
+        Audit-disposition law (DADAIA.md §5, Audits): a dispositioned audit archives to
         ``specs/audits/_archive/``. Every audit DIRECTORY still loose directly under
         ``specs/audits/`` (not under ``_archive/``) is the signal it has not been archived —
         one WARN each, so an undisposed/loose audit is visible until its remediation release

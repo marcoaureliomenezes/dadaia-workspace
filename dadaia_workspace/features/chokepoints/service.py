@@ -16,6 +16,7 @@ Two gates, one shared shape (:class:`Decision`):
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -82,18 +83,97 @@ class PushRef:
         return self.local_ref.startswith("refs/tags/")
 
 
-def parse_push_refs(stdin_text: str) -> list[PushRef]:
-    """Parse pre-push stdin into :class:`PushRef` rows. Malformed lines are skipped."""
+# ── Branch policy (v0.6.0 FR4 / T-060-04) ───────────────────────────────────────
+#
+# The gitflow law (DADAIA.md §5, operator ruling 2026-08-12): exactly four branch
+# patterns exist, and ``develop`` is the ONLY pushable branch. This tuple is the ONE
+# pattern source — the pre-push hook and the CI pr-source-guard both encode the model,
+# and any second regex copy is drift.
+_PERMITTED_BRANCH_RES: tuple[re.Pattern[str], ...] = (
+    re.compile(r"^main$"),
+    re.compile(r"^develop$"),
+    re.compile(r"^feature/v\d+\.\d+\.\d+$"),
+    # PATCH >= 1: patch 0 is feature-release territory (the retired CI
+    # hotfix-branch-name job's knowledge, relocated per SPEC FR5.2).
+    re.compile(r"^hotfix/v\d+\.\d+\.[1-9]\d*$"),
+)
+
+_PUSHABLE_BRANCH = "develop"
+_HEADS_PREFIX = "refs/heads/"
+
+
+def branch_name_is_permitted(branch: str) -> bool:
+    """True when *branch* matches one of the four permitted patterns.
+
+    ``main`` | ``develop`` | ``feature/vM.m.p`` | ``hotfix/vM.m.p`` — the version part
+    follows the release-id canon (leading ``v``, three numeric fields, no suffix:
+    pre-release suffixes are release-id territory, never branch names).
+    """
+    return any(pattern.match(branch) for pattern in _PERMITTED_BRANCH_RES)
+
+
+def _refuse_branch(branch: str, local_ref: str) -> Decision:
+    """Actionable refusal for a non-``develop`` ref (A4.2: rule + permitted + fix)."""
+    if branch == "main":
+        return Decision(
+            allowed=False,
+            message=(
+                "[pre-push] BLOCKED: 'main' is never pushed directly — it advances only "
+                "via a PR from 'develop' (gitflow law, DADAIA.md §5).\n"
+                "  Fix: merge your work into 'develop', push 'develop', then open the "
+                "PR develop → main."
+            ),
+        )
+    if branch_name_is_permitted(branch):
+        kind = "feature" if branch.startswith("feature/") else "hotfix"
+        return Decision(
+            allowed=False,
+            message=(
+                f"[pre-push] BLOCKED: '{branch}' is a {kind} branch — {kind} branches "
+                "are local-only and are never pushed (gitflow law, DADAIA.md §5). Only "
+                "'develop' is pushable.\n"
+                "  Fix: merge the branch into local 'develop', obtain the diff-based "
+                "security APPROVE, then push 'develop'."
+            ),
+        )
+    return Decision(
+        allowed=False,
+        message=(
+            f"[pre-push] BLOCKED: ref '{local_ref}' is outside the four permitted branch "
+            "patterns — main, develop, feature/vM.m.p, hotfix/vM.m.p (gitflow law, "
+            "DADAIA.md §5).\n"
+            "  Fix: rebuild the work on a permitted branch (git checkout -b "
+            "feature/vM.m.p or hotfix/vM.m.p from develop), merge it into 'develop', "
+            "and push 'develop'."
+        ),
+    )
+
+
+def parse_push_stdin(stdin_text: str) -> tuple[list[PushRef], int]:
+    """Parse pre-push stdin into :class:`PushRef` rows plus a malformed-line count.
+
+    A non-empty line that does not split into exactly four fields is counted, not
+    silently dropped — the gate FAILS CLOSED on any malformed line (T-060-07 finding 1:
+    a policy gate that skips what it cannot parse is a policy gate that can be
+    disabled without a trace; ``git push --no-verify`` is the sanctioned bypass).
+    """
     refs: list[PushRef] = []
+    malformed = 0
     for raw in stdin_text.splitlines():
         line = raw.strip()
         if not line:
             continue
         parts = line.split()
         if len(parts) != 4:
+            malformed += 1
             continue
         refs.append(PushRef(parts[0], parts[1], parts[2], parts[3]))
-    return refs
+    return refs, malformed
+
+
+def parse_push_refs(stdin_text: str) -> list[PushRef]:
+    """Back-compat wrapper over :func:`parse_push_stdin` (refs only)."""
+    return parse_push_stdin(stdin_text)[0]
 
 
 # ---------------------------------------------------------------------------------------
@@ -229,26 +309,79 @@ def iter_security_approvals(handoff_root: Path) -> list[_Approval]:
 def push_gate_decision(
     handoff_root: Path,
     refs: list[PushRef],
+    *,
+    malformed_lines: int = 0,
 ) -> Decision:
-    """Decide whether a push may proceed (FR-W1-02 / DP-5).
+    """Decide whether a push may proceed (FR-W1-02 / DP-5 / v0.6.0 FR4).
 
-    For every ref being pushed that is NOT a deletion and NOT a tag, an APPROVED
-    security-reviewer handoff whose ``metrics.commit_sha`` equals that ref's ``local_sha``
-    must exist. Deletions (zero sha) and tag-only refs pass with no verdict. A stale
-    approval (an APPROVE for a different/older sha) does not satisfy a ref. Commits are
-    never review-blocked — this runs at push only.
+    Policy order, first refusal wins:
+
+    1. **Branch policy** — every non-deletion, non-tag ref must be
+       ``refs/heads/develop``: ``main`` advances via PR only; feature/hotfix branches
+       are local-only; names outside the four permitted patterns are refused outright.
+    2. **Diff-based security verdict** — the pushed ``develop`` tip must carry an
+       APPROVED security-reviewer handoff whose ``metrics.commit_sha`` equals it. The
+       tip sha anchors the reviewed range ``origin/develop..develop``; a stale approval
+       (different/older tip) does not cover the delta.
+
+    Deletions (zero sha) and tag pushes pass with no verdict (DP-5 carve-out —
+    publishing depends on tag pushes). Commits are never review-blocked — push only.
+    A malformed stdin line fails CLOSED (finding 1) and the REMOTE side of every
+    review ref must also be ``refs/heads/develop`` (finding 2: ``push develop:main``).
     """
-    approved_shas = {a.commit_sha for a in iter_security_approvals(handoff_root)}
+    if malformed_lines > 0:
+        return Decision(
+            allowed=False,
+            message=(
+                f"[pre-push] BLOCKED: {malformed_lines} unparseable pre-push stdin "
+                "line(s) — a policy gate never skips what it cannot parse (fail "
+                "closed).\n"
+                "  If this push is a genuine emergency, git's sanctioned, traceable "
+                "bypass is `git push --no-verify` (discouraged; leaves a reflog trace)."
+            ),
+        )
 
     review_refs = [r for r in refs if not r.is_deletion and not r.is_tag]
     if not review_refs:
         return Decision(allowed=True, message="[pre-push] no review-gated refs; allow.")
 
+    for ref in review_refs:
+        if not ref.local_ref.startswith(_HEADS_PREFIX):
+            return Decision(
+                allowed=False,
+                message=(
+                    f"[pre-push] BLOCKED: local ref '{ref.local_ref}' is not a branch "
+                    "head — only 'refs/heads/develop' may be pushed (gitflow law, "
+                    "DADAIA.md §5).\n"
+                    "  Fix: check out 'develop' (git checkout develop) and push it "
+                    "directly instead of pushing a detached or symbolic ref."
+                ),
+            )
+        branch = ref.local_ref[len(_HEADS_PREFIX) :]
+        if branch != _PUSHABLE_BRANCH:
+            return _refuse_branch(branch, ref.local_ref)
+        if ref.remote_ref != f"{_HEADS_PREFIX}{_PUSHABLE_BRANCH}":
+            return Decision(
+                allowed=False,
+                message=(
+                    f"[pre-push] BLOCKED: refspec aims local 'develop' at remote "
+                    f"'{ref.remote_ref}' — only refs/heads/develop → refs/heads/develop "
+                    "is pushable (gitflow law, DADAIA.md §5; 'main' advances via PR "
+                    "from develop only).\n"
+                    "  Fix: push develop to develop (git push origin develop) and open "
+                    "the PR develop → main for anything aimed at main."
+                ),
+            )
+
+    approved_shas = {a.commit_sha for a in iter_security_approvals(handoff_root)}
     missing = [r for r in review_refs if r.local_sha not in approved_shas]
     if not missing:
         return Decision(
             allowed=True,
-            message="[pre-push] every pushed commit carries a security-reviewer APPROVE; allow.",
+            message=(
+                "[pre-push] develop push carries a security-reviewer APPROVE covering "
+                "its delta; allow."
+            ),
         )
 
     found = (
@@ -260,10 +393,11 @@ def push_gate_decision(
     return Decision(
         allowed=False,
         message=(
-            "[pre-push] BLOCKED: no security-reviewer APPROVE handoff covers "
-            f"{wanted}.\n"
+            "[pre-push] BLOCKED: no security-reviewer APPROVE covers the "
+            f"origin/develop..develop delta being pushed ({wanted}).\n"
             f"  APPROVE shas on disk: {found}\n"
-            "  A security-reviewer must emit an APPROVED handoff with "
-            "metrics.commit_sha == the pushed commit sha before this push can proceed."
+            "  Fix: dispatch a security-reviewer DIFF review of origin/develop..develop "
+            "and emit an APPROVED handoff with metrics.commit_sha == the pushed develop "
+            "tip sha, then push again."
         ),
     )

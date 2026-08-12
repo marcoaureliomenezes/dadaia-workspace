@@ -162,7 +162,7 @@ SPEC→CLOSURE; DISCOVERY/intake is `project-manager`. Full step detail is in th
 | PLAN | product-engineer | write `PLAN.md` (≤300 lines) Draft → `Aprovado` | PLAN `**Status:** Aprovado` |
 | TASKS | product-engineer | write `TASKS.md` with `[ ]` markers → `Aprovado` | TASKS `**Status:** Aprovado` |
 | IMPLEMENTATION | implementers | no-write for you; answer questions, set ACTIVE.md phase | all tasks `[x]` + trio review |
-| CLOSURE | product-engineer | write `CLOSURE.md` + update memory atoms (DEFINITION + CLOSURE are the memory-write phases, per §13) | CLOSURE evidence complete |
+| CLOSURE | product-engineer | update memory atoms, then write `CLOSURE.md` (finalization order memory → CLOSURE → archive, per `dadaia-release-closure`; DEFINITION + CLOSURE are the memory-write phases, per §13) | CLOSURE evidence complete |
 | ARCHIVED | product-engineer | set ACTIVE.md phase, request `git mv` to `_archive/` | release archived |
 
 ---
@@ -370,11 +370,12 @@ template. Write `specs/releases/<release-id>/CLOSURE.md` with:
 6. **Backlog returns** — items pushed to `backlog/ideas.md` or `backlog/candidates.md`
 7. **Archive decision** — usually `MOVE`
 
-In the same CLOSURE phase, update memory Markdown. Memory describes the product after
-this release atomically. The release contribution is captured in CLOSURE; memory has no
-changelog section.
+In the same CLOSURE phase, **update memory Markdown first, then write `CLOSURE.md`**
+(finalization order memory → CLOSURE → archive, `dadaia-release-closure`). Memory
+describes the product after this release atomically. The release contribution is
+captured in CLOSURE; memory has no changelog section.
 
-After CLOSURE is written and memory is updated, set `ACTIVE.md` phase to `ARCHIVED` and
+After memory is updated and CLOSURE is written, set `ACTIVE.md` phase to `ARCHIVED` and
 move the release directory using the Write tool to update ACTIVE.md and request
 the `git mv` command:
 
@@ -391,54 +392,26 @@ active).
 
 ---
 
-## Hotfix release lifecycle
+## Hotfix release lifecycle — REVOKED (operator ruling D4, 2026-08-12)
 
-A hotfix release is a **regular release** under `specs/releases/v<M>.<m>.<p>/` with
-PATCH ≥ 1 (per D1). It uses a condensed flow — no separate directory, no special status
-ladder, no gate changes. All three differences are in what is optional versus mandatory.
+**The entire hotfix-*release* lifecycle described in earlier revisions of this file is
+revoked.** The PATCH≥1-means-hotfix-release rule, the condensed 7-step flow and the
+hotfix-specific status ladder are dead law; the `release_hotfix.md.j2` /
+`closure_hotfix.md.j2` templates and the `dadaia specs hotfix open` CLI verb are dead
+surface — never invoked, their removal queued in the backlog. A bug fix
+is Arm B in full (`DADAIA.md` §1) — register, reproduce, RED, root-cause fix, GREEN,
+`resolved` event, commit — run on `hotfix/{M.m.p}` (branch contract: `dadaia-gitflow`).
+`product-engineer` authors **no** hotfix SPEC/PLAN/TASKS and creates **no**
+`specs/releases/<id>/` directory for a hotfix.
 
-### Hard rule — origin (D4)
+**Where the record now lives.** At merge into `develop`, in the same commit: the
+append-only bug ledger's `resolved` event, a `pyproject.toml` version bump to the minted
+PATCH, and a `CHANGELOG.md` entry — no release ceremony. The release-naming canon
+`^v\d+\.\d+\.\d+$` (D3) still governs **release** directories (PATCH = 0 for a feature
+release); it no longer implies a hotfix creates one.
 
-A hotfix release may only be created from a bullet that exists in
-`specs/backlog/candidates.md` section `## Hotfixes pendentes`. No shortcut. If the bullet
-does not exist there, file it first — then promote. Skipping this step is a process violation.
-
-### Condensed flow (compared to 8-phase feature release)
-
-1. **File** — bullet in `## Hotfixes pendentes` (qa-engineer or operator)
-2. **Promote** — assign `v<M>.<m>.<p+1>` (PATCH bump of current feature release), move
-   bullet to `## Histórico` with the release-id (D23), create `specs/releases/<v-id>/`,
-   update `ACTIVE.md`
-3. **SPEC** — use template `release_hotfix.md.j2` (D24); ≤ 100 lines; 6 mandatory
-   sections; "Fix scope" declares whether PLAN is needed
-4. **TASKS** — 1-N small tasks
-5. **PLAN** (optional) — only if SPEC declared it required
-6. **Implementation** — standard marker `[-]` flow
-7. **CLOSURE** — smoke evidence in `## Validations` is non-negotiable (D25); memory
-   update is optional if bug did not change visible behaviour (D16); use template
-   `closure_hotfix.md.j2`; `git mv` to `_archive/releases/`
-
-### Naming (D3)
-
-Folder name: `v<M>.<m>.<p>` matching `^v\d+\.\d+\.\d+$`. PATCH ≥ 1 for hotfix;
-PATCH = 0 for feature release. No other format is accepted for new releases.
-
-### Scaffolding
-
-> **Delegation:** Ask project-manager (or the operator directly) to run the following CLI
-> command to scaffold the hotfix stubs:
-
-```
-dadaia specs hotfix open v<M>.<m>.<p> --patches <patches-release-id> --severity <S>
-```
-
-This creates SPEC.md + TASKS.md stub. Edit SPEC.md to fill the 6 sections, get
-`**Status:** Aprovado`, then update `ACTIVE.md`.
-
-### Status ladder
-
-Same as feature releases: `Draft → Em revisão → Aprovado`. There is no hotfix-specific
-status ladder (D2).
+Do not restore any part of this lifecycle as a perceived regression fix — it is
+deliberately gone.
 
 ---
 

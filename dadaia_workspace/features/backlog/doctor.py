@@ -53,7 +53,7 @@ _TERMINAL_STATUSES = frozenset({"delivered", "rejected", "done", "closed"})
 _INTENTS_EXEMPT_STATUS = INTENTS_EXEMPT_STATUS
 
 #: Statuses accepted as valid in BL-SCHEMA (kept permissive; the backlog status vocabulary is
-#: informal — see ``release-governance``). ``None``/empty is the only invalid case here.
+#: informal — see ``DADAIA.md`` §5, Backlog). ``None``/empty is the only invalid case here.
 _KNOWN_STATUSES = frozenset(
     {
         "idea",

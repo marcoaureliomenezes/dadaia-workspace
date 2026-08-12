@@ -1,2 +1,3 @@
-release: v0.5.0
-phase: CLOSURE
+release: v0.6.0
+segment: alpha-1
+phase: IMPLEMENTATION

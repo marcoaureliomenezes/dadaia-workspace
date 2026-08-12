@@ -76,7 +76,7 @@ def _spawn_panel(
     )
 
 
-def _wait_for_ready(proc: subprocess.Popen[str], port: int, timeout: float = 10.0) -> None:
+def _wait_for_ready(proc: subprocess.Popen[str], port: int, timeout: float = 30.0) -> None:
     """Block until the 'Panel running at' line appears on stdout or timeout.
 
     Panel auth was removed by operator decision (2026-06-11): the panel is a
@@ -130,6 +130,12 @@ def _drain_stderr_nonblocking(proc: subprocess.Popen[str], wait: float = 0.3) ->
     The panel runs ``serve_forever`` and never closes its pipes, so a plain
     ``proc.stderr.read()`` on a live process blocks forever.  We mark the fd
     non-blocking and read what is buffered so diagnostics never hang the suite.
+
+    Bug panel-e2e-readiness-flaky-under-xdist-load: reading through the TEXT-mode
+    wrapper here is unsound — on an empty non-blocking pipe the raw layer returns
+    ``None`` and the codec crashes with ``TypeError: can't concat NoneType to
+    bytes``, turning this diagnostic path into the test failure itself whenever a
+    panel was merely slow to start. Read the fd directly and decode.
     """
     if proc.stderr is None:
         return ""
@@ -137,10 +143,16 @@ def _drain_stderr_nonblocking(proc: subprocess.Popen[str], wait: float = 0.3) ->
     fd = proc.stderr.fileno()
     flags = fcntl.fcntl(fd, fcntl.F_GETFL)
     fcntl.fcntl(fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+    chunks: list[bytes] = []
     try:
-        return proc.stderr.read() or ""
+        while True:
+            chunk = os.read(fd, 65536)
+            if not chunk:
+                break
+            chunks.append(chunk)
     except (BlockingIOError, OSError):
-        return ""
+        pass
+    return b"".join(chunks).decode("utf-8", errors="replace")
 
 
 def _get(url: str, timeout: float = 5.0) -> http.client.HTTPResponse:
@@ -433,3 +445,44 @@ def test_panel_clean_shutdown_within_2s(tmp_path: Path) -> None:
                 f"Port {port} still bound after panel shutdown: {exc}. "
                 "NFR-4 requires port to be freed within 2s."
             )
+
+
+# ---------------------------------------------------------------------------
+# Bug panel-e2e-readiness-flaky-under-xdist-load — regression locks for the
+# stderr drain. Under full-suite xdist load a slow panel start routed every
+# failure through _drain_stderr_nonblocking, which crashed with
+# ``TypeError: can't concat NoneType to bytes`` (non-blocking read through the
+# text-mode wrapper) and replaced the real diagnostic with a codec traceback.
+# ---------------------------------------------------------------------------
+
+
+def test_drain_stderr_nonblocking_returns_empty_on_quiet_live_process() -> None:
+    """The drain must never raise on a live process whose stderr has nothing buffered."""
+    proc = subprocess.Popen(
+        [sys.executable, "-c", "import time; time.sleep(30)"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        assert _drain_stderr_nonblocking(proc, wait=0.0) == ""
+    finally:
+        _kill_proc(proc)
+
+
+def test_drain_stderr_nonblocking_returns_buffered_content() -> None:
+    """Whatever the child already wrote to stderr must come back as text."""
+    proc = subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            "import sys, time; print('boom-diagnostic', file=sys.stderr, flush=True); time.sleep(30)",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        assert "boom-diagnostic" in _drain_stderr_nonblocking(proc, wait=0.5)
+    finally:
+        _kill_proc(proc)

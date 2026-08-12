@@ -60,7 +60,9 @@ def _refs(*lines: str) -> list[PushRef]:
 
 def test_approved_pushed_sha_passes(tmp_path: Path) -> None:
     _handoff(tmp_path, "sec-approve", commit_sha=_SHA_A)
-    d = push_gate_decision(tmp_path, _refs(f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}"))
+    d = push_gate_decision(
+        tmp_path, _refs(f"refs/heads/develop {_SHA_A} refs/heads/develop {_ZERO}")
+    )
     assert d.allowed, d.message
 
 
@@ -68,7 +70,9 @@ def test_stale_sha_approve_blocks(tmp_path: Path) -> None:
     """An APPROVE for a different (older) sha than the one being pushed never passes —
     stale approvals do not carry forward across commits (per-sha re-key law)."""
     _handoff(tmp_path, "sec-approve", commit_sha=_SHA_B)
-    d = push_gate_decision(tmp_path, _refs(f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}"))
+    d = push_gate_decision(
+        tmp_path, _refs(f"refs/heads/develop {_SHA_A} refs/heads/develop {_ZERO}")
+    )
     assert not d.allowed
     assert _SHA_A[:12] in d.message
 
@@ -86,7 +90,7 @@ def test_stale_sha_approve_blocks(tmp_path: Path) -> None:
         pytest.param(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}", None, id="tag-push"),
         pytest.param("", None, id="empty-stdin-no-refs"),
         pytest.param(
-            f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}",
+            f"refs/heads/develop {_SHA_A} refs/heads/develop {_ZERO}",
             "malformed_sibling",
             id="malformed-handoff-skipped-good-approve-still-passes",
         ),
@@ -107,10 +111,10 @@ def test_passes_without_verdict(tmp_path: Path, ref_line: str, setup: str | None
 # ---------------------------------------------------------------------------
 
 
-_MAIN_ONLY = (f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}",)
-_MAIN_PLUS_FEATURE = (
-    f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}",
-    f"refs/heads/feature {_SHA_B} refs/heads/feature {_ZERO}",
+_DEVELOP_ONLY = (f"refs/heads/develop {_SHA_A} refs/heads/develop {_ZERO}",)
+_DEVELOP_TWO_TIPS = (
+    f"refs/heads/develop {_SHA_A} refs/heads/develop {_ZERO}",
+    f"refs/heads/develop {_SHA_B} refs/heads/develop {_ZERO}",
 )
 
 
@@ -119,39 +123,39 @@ _MAIN_PLUS_FEATURE = (
     [
         pytest.param(
             lambda tp: None,
-            _MAIN_ONLY,
+            _DEVELOP_ONLY,
             "no security-reviewer APPROVE found",
             id="no-approve-at-all",
         ),
         pytest.param(
             lambda tp: _handoff(tp, "sec-reject", verdict="REJECTED", commit_sha=_SHA_A),
-            _MAIN_ONLY,
+            _DEVELOP_ONLY,
             None,
             id="rejected-verdict-does-not-count",
         ),
         pytest.param(
             lambda tp: _handoff(tp, "qa-approve", agent="qa-engineer", commit_sha=_SHA_A),
-            _MAIN_ONLY,
+            _DEVELOP_ONLY,
             None,
             id="non-security-agent-does-not-count",
         ),
         pytest.param(
             lambda tp: _handoff(tp, "sec-scope", commit_sha=None, scope=_SHA_A),
-            _MAIN_ONLY,
+            _DEVELOP_ONLY,
             None,
             id="scope-field-is-not-a-fallback-for-commit-sha",
         ),
         pytest.param(
             lambda tp: _handoff(tp, "sec-head", commit_sha="c" * 40),
-            _MAIN_ONLY,
+            _DEVELOP_ONLY,
             None,
             id="approve-for-unrelated-sha-does-not-satisfy-pushed-sha",
         ),
         pytest.param(
             lambda tp: _handoff(tp, "sec-a", commit_sha=_SHA_A),
-            _MAIN_PLUS_FEATURE,
+            _DEVELOP_TWO_TIPS,
             _SHA_B[:12],
-            id="multiple-refs-all-must-be-covered",
+            id="every-develop-tip-line-must-be-covered",
         ),
     ],
 )

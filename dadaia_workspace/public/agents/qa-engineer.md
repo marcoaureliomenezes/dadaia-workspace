@@ -307,6 +307,7 @@ On request, you audit any project's test suite:
 | `.github/workflows/*.yml` | ❌ Never (software-engineer) |
 | Optional domain-pack production source | ❌ Never (read to understand; write belongs to installed domain specialist) |
 | `.claude/`, `.agents/`, `.codex/`, `.kimi-code/` (lib-originated) | ❌ Never |
+| Any ref except `develop` | ❌ Never push it — never commit to `main`; `feature/*`/`hotfix/*` branches are never pushed (branch contract: `dadaia-gitflow`) |
 
 ---
 

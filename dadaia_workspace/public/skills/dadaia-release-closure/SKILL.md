@@ -16,6 +16,11 @@ After every task in `specs/releases/<release-id>/TASKS.md` is marked `[x] DONE` 
 implementation is verified. Set `specs/releases/ACTIVE.md` phase to `CLOSURE` **before**
 writing CLOSURE.md or memory Markdown — gate v3 allows memory writes in the DEFINITION and CLOSURE phases (this skill operates in CLOSURE).
 
+**Finalization order: memory → CLOSURE → archive**, in one commit on `develop` that rides
+the next push (the branch/commit mechanics are the `dadaia-gitflow` skill's contract):
+update the memory atoms first, write `CLOSURE.md` next (it records which atoms changed),
+then move the release directory to `_archive/` last.
+
 ## CLOSURE.md template
 
 ```markdown
@@ -118,7 +123,7 @@ commit SHA). A release whose CLOSURE lacks the sweep is not closeable.
 | Bug (`specs/bugs/**`) | `Closed` | frontmatter `status: Closed`; add `superseded_by: <backlog-slug>` when a picked backlog item superseded the fix |
 | Backlog (`specs/backlog/**`) | `DELIVERED`, `SUPERSEDED`, `RESOLVED`, `CONSUMED`, `DEFERRED`, `REJECTED` | Status line, case-insensitive prefix match; suffix allowed, e.g. `DELIVERED — vX.Y.Z`, `SUPERSEDED — <slug>` |
 
-Never-delete law (release-governance): a bug or backlog file is **never deleted** —
+Never-delete law (`DADAIA.md` §5 (Releases)): a bug or backlog file is **never deleted** —
 always marked with a terminal token and a reason. A bug is never silently dropped:
 either it is fixed (`Closed`) or a superseding backlog item covers its acceptance
 (`Closed` + `superseded_by: <slug>`). Stale or invalid items are dispositioned

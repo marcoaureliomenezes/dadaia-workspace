@@ -1,11 +1,14 @@
 name: CI
 
+# Gitflow law (v0.6.0 / DADAIA.md §5): develop is the only pushable branch and main
+# advances via PR from develop only — feature/** and hotfix/v* are local-only, so
+# their push triggers were retired (dead configuration that advertised a forbidden
+# workflow).
 on:
   push:
     branches:
       - main
-      - 'hotfix/v*'
-      - 'feature/**'
+      - develop
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -165,7 +168,10 @@ jobs:
         # Redirect coverage's data file outside the checkout (pyproject data_file removed in T-018-07).
         env:
           COVERAGE_FILE: ${{ runner.temp }}/.coverage
-        run: poetry run pytest -q -m "unit or contract" --cov=dadaia_workspace --cov-report=term-missing --cov-fail-under=80 tests/unit tests/contract
+        # -n auto: this was the only pytest job without xdist and the CI long pole
+        # (bug test-suite-real-venv-and-ci-longpole); pytest-cov combines per-worker
+        # coverage automatically.
+        run: poetry run pytest -q -m "unit or contract" -n auto --cov=dadaia_workspace --cov-report=term-missing --cov-fail-under=80 tests/unit tests/contract
 
   # CI matrix (T-018-21 / WS-2 → GRADUATED in 0.1.8 rc-2): unit + contract on Windows/macOS.
   # Ubuntu hard-gating jobs above remain separate companion jobs so the original required
@@ -217,7 +223,8 @@ jobs:
       - name: pytest unit/contract coverage
         env:
           COVERAGE_FILE: ${{ runner.temp }}/.coverage
-        run: poetry run pytest -q -m "unit or contract" --cov=dadaia_workspace --cov-report=term-missing tests/unit tests/contract
+        # -n auto: same long-pole fix as the ubuntu contract-coverage job (windows was 2:55).
+        run: poetry run pytest -q -m "unit or contract" -n auto --cov=dadaia_workspace --cov-report=term-missing tests/unit tests/contract
 
   integration:
     name: Integration (pytest)
@@ -296,9 +303,28 @@ jobs:
       - name: Install Node deps
         working-directory: tests/e2e
         run: npm ci
+      # Cache the browser download (~/.cache/ms-playwright) keyed on the resolved
+      # @playwright/test version — the browser build only changes when the package
+      # does (bug test-suite-real-venv-and-ci-longpole: Chromium was re-downloaded
+      # every run). On a hit only the apt system deps still install.
+      - name: Resolve Playwright version
+        id: playwright-version
+        working-directory: tests/e2e
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
       - name: Install Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         working-directory: tests/e2e
         run: npx playwright install --with-deps chromium
+      - name: Install Chromium system deps (cached browser)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        working-directory: tests/e2e
+        run: npx playwright install-deps chromium
       - name: playwright panel e2e
         working-directory: tests/e2e
         env:
@@ -317,7 +343,21 @@ jobs:
           # for real in CI, rather than deterministically skipping.
           PANEL_E2E_WS: ${{ runner.temp }}/dadaia-panel-e2e-ws
           PANEL_TEST_REGISTRY: ${{ runner.temp }}/dadaia-panel-e2e-ws/.dadaia/states/spec_contexts.json
+          # Known artifact path so the failure-evidence upload below can find it
+          # (bug panel-e2e-artifacts-no-consumer: evidence used to land in an
+          # anonymous tmpdir and was discarded even on failure). In CI the
+          # config runs the list reporter only — failure evidence is the
+          # only-on-failure screenshots + first-retry traces in this dir.
+          PLAYWRIGHT_OUTPUT_DIR: ${{ runner.temp }}/pw-output
         run: npm run test:e2e
+      - name: Upload failure evidence (traces + screenshots)
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: panel-e2e-failure-evidence
+          path: ${{ runner.temp }}/pw-output
+          retention-days: 7
+          if-no-files-found: ignore
 
   pr-title:
     name: PR title (conventional commits)
@@ -362,24 +402,24 @@ jobs:
       - name: dadaia backlog doctor
         run: dadaia backlog doctor --specs-dir specs --source-root .
 
-  hotfix-branch-name:
-    name: Hotfix branch SemVer (PATCH>=1)
+  pr-source-guard:
+    name: PR source guard (main accepts develop only)
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/hotfix/')
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
     timeout-minutes: 1
     steps:
-      - name: Validate hotfix branch name
+      - name: Refuse PRs to main from any head but develop
         env:
-          REF: ${{ github.ref }}
+          # head.ref is fork-influenceable input: never interpolate it into the
+          # shell command string — read it from the environment and compare.
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
-          BRANCH="${REF#refs/heads/}"
-          # Required: hotfix/v<MAJOR>.<MINOR>.<PATCH>[-<slug>]  where PATCH >= 1
-          if ! echo "$BRANCH" | grep -Eq '^hotfix/v[0-9]+\.[0-9]+\.[1-9][0-9]*(-[a-z0-9._-]+)?$'; then
-            echo "::error::Hotfix branch must be hotfix/v<M>.<m>.<p> with PATCH>=1 (optional -slug). Got: $BRANCH"
-            echo "::error::Examples accepted: hotfix/v1.0.1, hotfix/v0.2.3-fix-auth-crash"
-            echo "::error::Examples rejected: hotfix/v1.0 (no patch), hotfix/v1.0.0 (patch=0 reserved for feature releases), hotfix/v1.0.0-beta (pre-release tag)"
+          if [ "$HEAD_REF" != "develop" ]; then
+            echo "::error::Gitflow law (DADAIA.md §5): main accepts PRs from 'develop' only. Got head '$HEAD_REF'."
+            echo "::error::Fix: merge your branch into develop, push develop, and open the PR develop -> main."
             exit 1
           fi
+          echo "PR head is develop - gitflow source rule satisfied."
 
   # ---------------------------------------------------------------------------
   # Dual-approval verdict gate (panel-kanban-v1 §3 K-3 / §9)

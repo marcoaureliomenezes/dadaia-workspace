@@ -11,9 +11,6 @@
 
 import { test, expect, Page } from '@playwright/test';
 import { gotoPanel, activateTab } from './helpers';
-import * as path from 'path';
-
-const SCREENSHOTS_DIR = path.join(__dirname, 'screenshots');
 
 async function openThemeSwitcher(page: Page): Promise<void> {
   await gotoPanel(page);
@@ -52,11 +49,6 @@ test('E2E-THM-01 — Theme switcher button is visible in topbar', async ({ page 
     return false;
   });
   expect(inTopbar).toBe(true);
-
-  await page.screenshot({
-    path: path.join(SCREENSHOTS_DIR, 'topbar-with-theme-switcher.png'),
-    fullPage: false,
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -81,11 +73,6 @@ test('E2E-THM-02 — Theme switcher dropdown has 3 options with correct roles', 
   expect(labels).toContain('Mint');
   expect(labels).toContain('Sage');
   expect(labels).toContain('Warm');
-
-  await page.screenshot({
-    path: path.join(SCREENSHOTS_DIR, 'theme-switcher-dropdown-open.png'),
-    fullPage: false,
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -108,11 +95,6 @@ test('E2E-THM-03 — Selecting Sage theme applies data-theme="sage" to html elem
   // Dropdown must be closed
   const menuHidden = await page.$eval('#theme-menu', (el) => el.hasAttribute('hidden'));
   expect(menuHidden).toBe(true);
-
-  await page.screenshot({
-    path: path.join(SCREENSHOTS_DIR, 'theme-sage-applied.png'),
-    fullPage: false,
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -129,11 +111,6 @@ test('E2E-THM-04 — Selecting Warm theme applies data-theme="warm" to html elem
     () => document.documentElement.dataset.theme
   );
   expect(theme).toBe('warm');
-
-  await page.screenshot({
-    path: path.join(SCREENSHOTS_DIR, 'theme-warm-applied.png'),
-    fullPage: false,
-  });
 });
 
 // ---------------------------------------------------------------------------

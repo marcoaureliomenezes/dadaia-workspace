@@ -62,7 +62,14 @@ jobs:
       - run: pipx install poetry==1.8.3
       - run: poetry install --no-interaction --no-ansi --with dev
       - name: pytest unit/contract coverage
-        run: poetry run pytest -q -m "unit or contract" --cov=dadaia_workspace --cov-report=term-missing --cov-fail-under=80 tests/unit tests/contract
+        # -n auto: same long-pole fix as ci.yml (bug test-suite-real-venv-and-ci-longpole).
+        # COVERAGE_FILE redirect mirrors ci.yml (pyproject data_file removed in
+        # T-018-07; bug release-workflow-coverage-file-in-checkout — .coverage
+        # must never land in the checkout). Pinned by
+        # tests/contract/test_workflow_coverage_redirect.py.
+        env:
+          COVERAGE_FILE: ${{ runner.temp }}/.coverage
+        run: poetry run pytest -q -m "unit or contract" -n auto --cov=dadaia_workspace --cov-report=term-missing --cov-fail-under=80 tests/unit tests/contract
 
   integration:
     name: Integration (pytest)
@@ -117,9 +124,26 @@ jobs:
       - name: Install Node deps
         working-directory: tests/e2e
         run: npm ci
+      # Browser cache — see ci.yml e2e-panel for the rationale
+      # (bug test-suite-real-venv-and-ci-longpole).
+      - name: Resolve Playwright version
+        id: playwright-version
+        working-directory: tests/e2e
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
       - name: Install Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         working-directory: tests/e2e
         run: npx playwright install --with-deps chromium
+      - name: Install Chromium system deps (cached browser)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        working-directory: tests/e2e
+        run: npx playwright install-deps chromium
       - name: playwright panel e2e
         working-directory: tests/e2e
         env:
@@ -132,7 +156,18 @@ jobs:
           # needs a known PANEL_TEST_REGISTRY to run for real, not skip).
           PANEL_E2E_WS: ${{ runner.temp }}/dadaia-panel-e2e-ws
           PANEL_TEST_REGISTRY: ${{ runner.temp }}/dadaia-panel-e2e-ws/.dadaia/states/spec_contexts.json
+          # Known artifact path for the failure-evidence upload below
+          # (bug panel-e2e-artifacts-no-consumer); CI runs list reporter only.
+          PLAYWRIGHT_OUTPUT_DIR: ${{ runner.temp }}/pw-output
         run: npm run test:e2e
+      - name: Upload failure evidence (traces + screenshots)
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: panel-e2e-failure-evidence
+          path: ${{ runner.temp }}/pw-output
+          retention-days: 7
+          if-no-files-found: ignore
 
   build:
     name: Build sdist + wheel

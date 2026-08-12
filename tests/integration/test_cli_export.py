@@ -75,3 +75,17 @@ def test_export_list_create_archive_excluding_mnt_and_import_round_trip(
     )
     assert import_result.exit_code == 0, import_result.output
     assert (import_dest / ".dadaia" / "states").exists()
+
+    # Bug test-suite-real-venv-and-ci-longpole: import's bootstrap phase shells out to
+    # `dadaia init`, which escapes the in-process no-real-venv backstop and built a REAL
+    # venv + pip install in the destination (~19 s unloaded, 242 s on a loaded host).
+    # The conftest backstop now intercepts that subprocess and runs init in-process
+    # (against the source under test, venv stubbed) — a real venv materialising here
+    # means the interception regressed.
+    imported_venv = import_dest / ".dadaia" / ".venv"
+    real_venv_files = (
+        sorted(p.name for p in imported_venv.iterdir()) if imported_venv.exists() else []
+    )
+    assert real_venv_files == [], (
+        f"import bootstrap built a REAL venv in the destination (found {real_venv_files})"
+    )

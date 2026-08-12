@@ -33,8 +33,20 @@ export default defineConfig({
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  workers: 1,
-  reporter: [['list'], ['html', { open: 'never', outputFolder: REPORT_DIR }]],
+  // Bug test-suite-real-venv-and-ci-longpole: workers was 1, serialising 11 spec
+  // files that mostly only READ the shared panel. Files parallelise across workers
+  // (fullyParallel stays false, so tests within a file keep their order); the two
+  // specs that MUTATE shared panel state run in their own dependent projects below,
+  // one at a time, after the read-only pass.
+  workers: process.env.CI ? 2 : 4,
+  // Bug panel-e2e-artifacts-no-consumer: in CI the HTML report was written to the
+  // runner tmpdir and discarded every run, even on failure. CI now runs list-only
+  // (failure evidence = only-on-failure screenshots + first-retry traces in
+  // outputDir, uploaded by the workflow on failure); the HTML report stays a
+  // local-only convenience, overwritten in place each run.
+  reporter: process.env.CI
+    ? [['list']]
+    : [['list'], ['html', { open: 'never', outputFolder: REPORT_DIR }]],
   webServer: {
     command: PANEL_WEB_SERVER_COMMAND,
     cwd: REPO_ROOT,
@@ -49,7 +61,11 @@ export default defineConfig({
     },
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
-    timeout: 30_000,
+    // 60 s validity fix (bug test-suite-real-venv-and-ci-longpole): the hermetic
+    // bootstrap (init + stage + install + panel start) measured ~24 s unloaded with
+    // the venv stub; 30 s made the whole suite fail ERR_CONNECTION_REFUSED on any
+    // loaded host — the server was still bootstrapping when playwright gave up.
+    timeout: 60_000,
     stdout: 'pipe',
     stderr: 'pipe',
   },
@@ -58,14 +74,35 @@ export default defineConfig({
     baseURL: BASE_URL,
     headless: true,
     screenshot: 'only-on-failure',
+    // Free on green runs (CI retries=1, local retries=0 → never recorded); a CI
+    // failure's retry captures a full trace into outputDir for the evidence upload.
+    trace: 'on-first-retry',
     video: 'off',
     extraHTTPHeaders: {},
   },
 
+  // Shared-state isolation: agent-policy.spec.ts (Apply PUT re-renders the temp
+  // workspace's projections) and spec-context-operation-journey.spec.ts (drives real
+  // context alive/dead transitions through the registry) mutate state every other
+  // spec reads. They run AFTER the read-only pass, serially — each in its own
+  // single-file project, chained via `dependencies`.
   projects: [
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+      testIgnore: ['**/agent-policy.spec.ts', '**/spec-context-operation-journey.spec.ts'],
+    },
+    {
+      name: 'chromium-agent-policy',
+      use: { ...devices['Desktop Chrome'] },
+      testMatch: '**/agent-policy.spec.ts',
+      dependencies: ['chromium'],
+    },
+    {
+      name: 'chromium-context-journey',
+      use: { ...devices['Desktop Chrome'] },
+      testMatch: '**/spec-context-operation-journey.spec.ts',
+      dependencies: ['chromium-agent-policy'],
     },
   ],
 });

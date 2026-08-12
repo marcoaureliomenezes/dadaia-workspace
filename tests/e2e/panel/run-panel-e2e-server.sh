@@ -81,6 +81,19 @@ trap cleanup_on_bootstrap_failure EXIT
 # 1. Initialize a minimal workspace (assets staged/installed explicitly
 #    below, not via --skip-assets's opposite — we want full control of the
 #    order relative to the repos/ symlink + spec_contexts.json below).
+#
+#    Pre-seed a STUB workspace venv first (bug
+#    test-suite-real-venv-and-ci-longpole): `init` otherwise runs
+#    `venv.create(with_pip=True)` + a pip install of dadaia-workspace into
+#    the temp workspace — ~20 s of the bootstrap budget on an unloaded host,
+#    enough to blow the playwright webServer timeout on a loaded one. Nothing
+#    in the panel e2e path ever execs that venv (the panel itself runs on
+#    $PYTHON_BIN); `ensure_workspace_venv` skips creation when the dir and
+#    the `dadaia` entrypoint already exist, mirroring the pytest suite's
+#    `_no_real_venv_in_tests` backstop.
+mkdir -p "$TEMP_WS/.dadaia/.venv/bin"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$TEMP_WS/.dadaia/.venv/bin/dadaia"
+chmod +x "$TEMP_WS/.dadaia/.venv/bin/dadaia"
 "$PYTHON_BIN" -m dadaia_workspace.cli.main init --workspace "$TEMP_WS" --skip-assets
 
 # 2. Register THIS checkout as the sole ALIVE consumer repo. The panel's

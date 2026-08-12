@@ -113,8 +113,10 @@ none. Keep working; tell the operator only when the workspace has no ALIVE conte
 as git hooks and do not depend on any harness hook firing:
 
 - **pre-commit** warns and always allows — commits flow, presence is surfaced.
-- **pre-push** requires an APPROVED `security-reviewer` handoff whose
-  `metrics.commit_sha` equals each pushed ref sha, and runs the CI preflight (§6).
+- **pre-push** refuses any pushed ref other than `refs/heads/develop` (tag pushes carve
+  out), validates the branch name against the four permitted patterns (§5), and requires
+  an APPROVED `security-reviewer` verdict covering the delta being pushed, plus the CI
+  preflight (§6).
 
 The gate reads no SDD artifacts: it constrains **what** may be written, never **how** the
 change was produced. Everything in §5 you uphold yourself.
@@ -176,12 +178,27 @@ routes additions through the PM. Entries are sanitized continuously — stale or
 ones are marked `deferred` or `rejected` with a reason. Backlog entries and bugs are kept
 forever: mark them, never delete them.
 
-**Releases.** A release is `major.minor.patch`, matures through `alpha-N → rc-N`, and is
-implemented on a single `feature/{version}` branch. A `dadaia-grill-me` session on the
-picked set precedes the SPEC. Each `alpha-N` closes with a `qa-engineer` review committed
-to the branch. Each `rc-N` ends with the operator choosing to ship (push → PR → merge →
-CLOSURE) or to open `rc-(N+1)`. At pick time, open bugs and undispositioned audits
-outrank fresh backlog.
+**Branches.** Exactly four patterns, no fifth: `main` (remote+local, never committed or
+pushed to directly, advances only via a GitHub-enforced PR from `develop`); `develop`
+(remote+local, **the only pushable branch**); `feature/{M.m.p}` and `hotfix/{M.m.p}`
+(both local-only, cut from `develop`). Backlog-definition, research and bug registration
+run directly on `develop`, one commit per entry. Stage contract, mechanical enforcers,
+and the mechanical-vs-discipline split: the `dadaia-gitflow` skill.
+
+**Releases.** A release is `major.minor.patch`, matures through `alpha-N → rc-N`.
+Definition and implementation both run on `feature/{M.m.p}`, which merges into local
+`develop` at two milestones — (a) when SPEC+PLAN+TASKS are `Aprovado`, (b) at ship — each
+followed, in order, by a diff-based security review of `origin/develop..develop` and a
+push of `develop`; ship then opens a PR `develop` → `main`. A `dadaia-grill-me` session
+on the picked set precedes the SPEC. Each `alpha-N` closes with a `qa-engineer` review
+committed to the branch. At pick time, open bugs and undispositioned audits outrank fresh
+backlog. Finalization order is **memory update → CLOSURE → archive**; a completed task
+group is one commit.
+
+**Hotfixes.** A bug fix stays Arm B (§1) in full, now run on `hotfix/{M.m.p}` at the next
+PATCH. At merge to `develop`, the same commit bumps `pyproject.toml`'s version and adds
+the `CHANGELOG.md` entry — **no release ceremony**: no SPEC, PLAN, TASKS, or
+`specs/releases/<id>/` directory.
 
 **Audits.** One audit generates exactly one remediation release, and that release gives
 **every** finding an explicit disposition — `fixed`, `superseded` by a broader picked
@@ -219,11 +236,15 @@ Close a bug in the same session you prove the fix: append `resolved` with
 exactly what the fix touched, never `-A` over a shared tree. A solved bug leaves a clean
 worktree.
 
-**Push green.** The pre-push hook runs `ruff format --check`, `ruff check`,
-`mypy --strict` and `pytest`, and forwards its ref lines to the security-verdict check.
-Run the tests locally before you push. Commits are never review-blocked — only pushes.
-After every push or PR, watch CI until every job is green; read the failing log, fix the
-cause, push again, and keep watching.
+**Push green.** The pre-push hook refuses any pushed ref other than `refs/heads/develop`
+(tag pushes carve out) and validates the branch name against the four permitted patterns
+(§5); it runs `ruff format --check`, `ruff check`, `mypy --strict` and `pytest`; and it
+requires an APPROVED `security-reviewer` handoff whose review covers the
+`origin/develop..develop` delta being pushed — diff-based only, with a full scan
+surviving solely in the audit lane (`project-auditor` dispatch). Run the tests locally
+before you push. Commits are never review-blocked — only pushes. After every push or PR,
+watch CI until every job is green; read the failing log, fix the cause, push again, and
+keep watching.
 
 **Approval.** A candidate is approved when the operator and the consumer-side validation
 agent agree, after validating a real workspace. A green internal gate that diverges from
@@ -276,7 +297,7 @@ receives only the values it needs from that root `.env` and never writes a secon
 | Surface | Where |
 |---|---|
 | Scoped law | `specs/AGENTS.md`, `.dadaia/reports/AGENTS.md`, `.dadaia/handoff/AGENTS.md`, `repos/<slug>/AGENTS.md`, and any nested `AGENTS.md` |
-| Skills | `.claude/skills/`, `.agents/skills/` — `dadaia-cli` maps the CLI; `harness-primitives` covers harness literacy |
+| Skills | `.claude/skills/`, `.agents/skills/` — `dadaia-cli` maps the CLI; `harness-primitives` covers harness literacy; `dadaia-gitflow` covers the branch contract |
 | State | `dadaia context show --json`, `dadaia specs doctor`, `dadaia public doctor`, `dadaia server list`, `dadaia bugs status`, `dadaia panel` |
 
 Language: follow the operator's preference, defaulting to English. Tone: direct, concise,

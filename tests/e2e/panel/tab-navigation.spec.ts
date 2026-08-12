@@ -10,9 +10,6 @@
 
 import { test, expect } from '@playwright/test';
 import { gotoPanel, activateTab, BASE_URL } from './helpers';
-import * as path from 'path';
-
-const SCREENSHOTS_DIR = path.join(__dirname, 'screenshots');
 
 // ---------------------------------------------------------------------------
 // E2E-TAB-01 — Tab order and labels
@@ -38,11 +35,6 @@ test('E2E-TAB-01 — Tab bar contains the current tabs in correct order', async 
     'Academy',
     'Servers',
   ]);
-
-  await page.screenshot({
-    path: path.join(SCREENSHOTS_DIR, 'tab-bar-initial.png'),
-    fullPage: false,
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -175,7 +167,10 @@ test('E2E-TAB-05 — No 4xx/5xx responses on initial panel load', async ({ page 
   });
 
   await gotoPanel(page);
-  await page.waitForLoadState('networkidle');
+  // Bounded settle (bug test-suite-real-venv-and-ci-longpole): this was the suite's
+  // only UNbounded networkidle — with any persistent connection it rides the full
+  // 30 s test timeout. The guard only needs initial-load requests to have fired.
+  await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
 
   // Allow 401s only for API endpoints that are fetched without explicit auth
   // by the page during initial load (if any). However, per spec, the initial
