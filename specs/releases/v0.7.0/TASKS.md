@@ -48,7 +48,7 @@
 
 ---
 
-- [ ] **T-070-01 — `dadaia-test-stewardship`: the single operational home**
+- [-] **T-070-01 — `dadaia-test-stewardship`: the single operational home**
 
 **Owner role:** ai-engineer · **Commit:** `feat(T-070-01): add dadaia-test-stewardship universal skill`
 
