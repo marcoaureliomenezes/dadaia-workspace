@@ -1,7 +1,34 @@
 ---
 title: "Test stewardship — lifecycle law, dadaia-test-stewardship skill, tiered enforcement"
-status: candidate
+status: DELIVERED — v0.7.0
 opened: 2026-08-12
+delivered: 2026-08-12
+delivered_by: v0.7.0
+intent_map:
+  - intent: quality-assurance.md#Layers
+    consumed_by: [FR1, FR2, FR4, FR7]
+    note: >-
+      The doctrine itself. FR1 authored the universal skill as its single operational
+      home; FR2 stated the five points plus the never-delete scoping sentence at law
+      level; FR4 executed the C1-C13 single-home edits (edit, never append); FR7
+      reconciled the four-way coverage split into one stance.
+  - intent: public-asset-distribution
+    consumed_by: [FR1, FR2, FR3]
+    note: >-
+      The distribution surface. FR1 shipped public/skills/dadaia-test-stewardship as a
+      universal skill (no registry entry, projected to the canonical .agents/skills home);
+      FR3 added scaffold constitution article 8 and the parameterized
+      public/templates/tests-AGENTS.md, wired into repo scaffolding at alive(); FR2
+      carried the law increment consumers read.
+  - intent: quality-assurance.md#CI
+    consumed_by: [FR5, FR6]
+    note: >-
+      The mechanical wiring. FR5 landed pytest-timeout with per-tier defaults, the two
+      new markers across all six surfaces with a bug-id collection refusal, the
+      quarantine exclusion in every gating selector, the loud-flake CI gate, --durations
+      and the timeout-minutes ratchet, and retired the dead --ignore=tests/performance
+      with its pin; FR6 refreshed the stale memory facts (test count, xdist/randomly,
+      marker set).
 description: >-
   Operator ruling (2026-08-12): agents create tests well and curate them badly — the
   workspace must make every agent build, maintain and prune tests against an explicit
@@ -58,6 +85,11 @@ intents:
 ---
 
 # Test stewardship — lifecycle law, skill, tiered enforcement
+
+**Status: DELIVERED — v0.7.0.** Consumed in full, all three intents; see the `intent_map`
+above and `specs/_archive/releases/v0.7.0/CLOSURE.md` for the evidence per acceptance
+criterion. The companion entry `test-suite-remediation-stewardship` stays `candidate` and
+is now **unblocked** — it applies this doctrine to this repository's own suite.
 
 ## Description
 
