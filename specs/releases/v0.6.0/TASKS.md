@@ -124,7 +124,7 @@ numbers regardless of the outcome.
 
 ---
 
-- [-] **T-060-03 — Tier-2 dedup + hygiene on the `public/` surface** — **reopened by
+- [x] **T-060-03 — Tier-2 dedup + hygiene on the `public/` surface** — **reopened by
   T-060-06 (REJECTED alpha-1 QA):** `dadaia public doctor` shows `[drift]
   stage:agents/security-reviewer.md` — the source landed at 1e6d0da4 (T-060-03's own
   commit) but the projection chain (`dadaia public stage` → `install --target all`) was
@@ -198,7 +198,7 @@ Re-project at the end (same chain as T-060-02).
 
 ---
 
-- [-] **T-060-04 — Chokepoint enforcement, TDD (RED before GREEN)** — **reopened by
+- [x] **T-060-04 — Chokepoint enforcement, TDD (RED before GREEN)** — **reopened by
   T-060-06 (REJECTED alpha-1 QA):** the Done criterion "Full suite green: `pytest
   -p no:cacheprovider -q`" is unmet on the live instance — `tests/e2e/test_push_gate_check.py`
   has 3 pre-existing tests that push `refs/heads/main` expecting the old
