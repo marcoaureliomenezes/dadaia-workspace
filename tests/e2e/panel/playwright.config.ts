@@ -39,7 +39,14 @@ export default defineConfig({
   // specs that MUTATE shared panel state run in their own dependent projects below,
   // one at a time, after the read-only pass.
   workers: process.env.CI ? 2 : 4,
-  reporter: [['list'], ['html', { open: 'never', outputFolder: REPORT_DIR }]],
+  // Bug panel-e2e-artifacts-no-consumer: in CI the HTML report was written to the
+  // runner tmpdir and discarded every run, even on failure. CI now runs list-only
+  // (failure evidence = only-on-failure screenshots + first-retry traces in
+  // outputDir, uploaded by the workflow on failure); the HTML report stays a
+  // local-only convenience, overwritten in place each run.
+  reporter: process.env.CI
+    ? [['list']]
+    : [['list'], ['html', { open: 'never', outputFolder: REPORT_DIR }]],
   webServer: {
     command: PANEL_WEB_SERVER_COMMAND,
     cwd: REPO_ROOT,
@@ -67,6 +74,9 @@ export default defineConfig({
     baseURL: BASE_URL,
     headless: true,
     screenshot: 'only-on-failure',
+    // Free on green runs (CI retries=1, local retries=0 → never recorded); a CI
+    // failure's retry captures a full trace into outputDir for the evidence upload.
+    trace: 'on-first-retry',
     video: 'off',
     extraHTTPHeaders: {},
   },

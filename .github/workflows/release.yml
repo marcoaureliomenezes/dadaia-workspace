@@ -150,7 +150,18 @@ jobs:
           # needs a known PANEL_TEST_REGISTRY to run for real, not skip).
           PANEL_E2E_WS: ${{ runner.temp }}/dadaia-panel-e2e-ws
           PANEL_TEST_REGISTRY: ${{ runner.temp }}/dadaia-panel-e2e-ws/.dadaia/states/spec_contexts.json
+          # Known artifact path for the failure-evidence upload below
+          # (bug panel-e2e-artifacts-no-consumer); CI runs list reporter only.
+          PLAYWRIGHT_OUTPUT_DIR: ${{ runner.temp }}/pw-output
         run: npm run test:e2e
+      - name: Upload failure evidence (traces + screenshots)
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: panel-e2e-failure-evidence
+          path: ${{ runner.temp }}/pw-output
+          retention-days: 7
+          if-no-files-found: ignore
 
   build:
     name: Build sdist + wheel

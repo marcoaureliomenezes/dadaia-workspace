@@ -10,9 +10,6 @@
 
 import { test, expect } from '@playwright/test';
 import { gotoPanel, activateTab, BASE_URL } from './helpers';
-import * as path from 'path';
-
-const SCREENSHOTS_DIR = path.join(__dirname, 'screenshots');
 
 // ---------------------------------------------------------------------------
 // E2E-TAB-01 — Tab order and labels
@@ -38,11 +35,6 @@ test('E2E-TAB-01 — Tab bar contains the current tabs in correct order', async 
     'Academy',
     'Servers',
   ]);
-
-  await page.screenshot({
-    path: path.join(SCREENSHOTS_DIR, 'tab-bar-initial.png'),
-    fullPage: false,
-  });
 });
 
 // ---------------------------------------------------------------------------

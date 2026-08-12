@@ -10,9 +10,6 @@
 
 import { test, expect } from '@playwright/test';
 import { gotoPanel, BASE_URL, PANEL_TOKEN } from './helpers';
-import * as path from 'path';
-
-const SCREENSHOTS_DIR = path.join(__dirname, 'screenshots');
 
 // ---------------------------------------------------------------------------
 // E2E-SCP-01 — Spec Context Projects tab renders context cards
@@ -37,11 +34,6 @@ test('E2E-SCP-01 — Spec Context Projects tab renders context cards with three 
     expect(linkLabels).toContain('Tech Stack');
     expect(linkLabels).toContain('Product');
   }
-
-  await page.screenshot({
-    path: path.join(SCREENSHOTS_DIR, 'spec-context-tab.png'),
-    fullPage: false,
-  });
 });
 
 // ---------------------------------------------------------------------------
