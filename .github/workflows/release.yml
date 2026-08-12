@@ -63,6 +63,12 @@ jobs:
       - run: poetry install --no-interaction --no-ansi --with dev
       - name: pytest unit/contract coverage
         # -n auto: same long-pole fix as ci.yml (bug test-suite-real-venv-and-ci-longpole).
+        # COVERAGE_FILE redirect mirrors ci.yml (pyproject data_file removed in
+        # T-018-07; bug release-workflow-coverage-file-in-checkout — .coverage
+        # must never land in the checkout). Pinned by
+        # tests/contract/test_workflow_coverage_redirect.py.
+        env:
+          COVERAGE_FILE: ${{ runner.temp }}/.coverage
         run: poetry run pytest -q -m "unit or contract" -n auto --cov=dadaia_workspace --cov-report=term-missing --cov-fail-under=80 tests/unit tests/contract
 
   integration:
