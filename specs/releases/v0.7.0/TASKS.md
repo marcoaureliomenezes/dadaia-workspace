@@ -284,7 +284,7 @@ release.
 
 ---
 
-- [-] **T-070-06 — CI: selectors, durations, ceilings, loud flake**
+- [x] **T-070-06 — CI: selectors, durations, ceilings, loud flake**
 
 **Owner role:** software-engineer · **Commit:** `ci(T-070-06): quarantine selectors, durations, budget ceilings, flake detection`
 
@@ -324,7 +324,7 @@ chain). No Python package file, no `public/` text file.
 
 ---
 
-- [ ] **T-070-07 — Scaffolder wiring: consumer repos receive `tests/AGENTS.md` (TDD)**
+- [-] **T-070-07 — Scaffolder wiring: consumer repos receive `tests/AGENTS.md` (TDD)**
 
 **Owner role:** software-engineer · **Commits:** `test(T-070-07): RED cases for tests/AGENTS.md scaffolding` then `feat(T-070-07): copy tests-AGENTS.md template on context alive`
 
