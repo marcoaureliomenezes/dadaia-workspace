@@ -85,7 +85,7 @@ SPEC FR2:
 
 ---
 
-- [-] **T-060-02 — `DADAIA.md` §5/§6 rewrite + projection**
+- [x] **T-060-02 — `DADAIA.md` §5/§6 rewrite + projection**
 
 **Owner role:** ai-engineer · **Commit:** `refactor(T-060-02): four-branch law in DADAIA.md §5/§6`
 
