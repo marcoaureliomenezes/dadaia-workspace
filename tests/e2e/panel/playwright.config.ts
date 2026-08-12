@@ -44,8 +44,13 @@ export default defineConfig({
   // (failure evidence = only-on-failure screenshots + first-retry traces in
   // outputDir, uploaded by the workflow on failure); the HTML report stays a
   // local-only convenience, overwritten in place each run.
+  // PLAYWRIGHT_JSON_REPORT (v0.7.0 FR5, loud flake): when set, a JSON report is
+  // written OUTSIDE the repo so CI can fail on an unregistered pass-on-retry —
+  // retries stay at 1; what changes is that the retry stops being invisible.
   reporter: process.env.CI
-    ? [['list']]
+    ? process.env.PLAYWRIGHT_JSON_REPORT
+      ? [['list'], ['json', { outputFile: process.env.PLAYWRIGHT_JSON_REPORT }]]
+      : [['list']]
     : [['list'], ['html', { open: 'never', outputFolder: REPORT_DIR }]],
   webServer: {
     command: PANEL_WEB_SERVER_COMMAND,
