@@ -395,9 +395,10 @@ active).
 ## Hotfix release lifecycle — REVOKED (operator ruling D4, 2026-08-12)
 
 **The entire hotfix-*release* lifecycle described in earlier revisions of this file is
-revoked.** There is no longer a PATCH≥1-means-hotfix-release rule, no
-`release_hotfix.md.j2` / `closure_hotfix.md.j2` template pair, no `dadaia specs hotfix
-open` CLI verb, and no condensed 7-step flow or hotfix-specific status ladder. A bug fix
+revoked.** The PATCH≥1-means-hotfix-release rule, the condensed 7-step flow and the
+hotfix-specific status ladder are dead law; the `release_hotfix.md.j2` /
+`closure_hotfix.md.j2` templates and the `dadaia specs hotfix open` CLI verb are dead
+surface — never invoked, their removal queued in the backlog. A bug fix
 is Arm B in full (`DADAIA.md` §1) — register, reproduce, RED, root-cause fix, GREEN,
 `resolved` event, commit — run on `hotfix/{M.m.p}` (branch contract: `dadaia-gitflow`).
 `product-engineer` authors **no** hotfix SPEC/PLAN/TASKS and creates **no**

@@ -159,3 +159,60 @@ def test_unpatterned_branch_names_are_rejected_by_the_validator(branch: str) -> 
     from dadaia_workspace.features.chokepoints.service import branch_name_is_permitted
 
     assert not branch_name_is_permitted(branch)
+
+
+# ---------------------------------------------------------------------------
+# T-060-07 review findings — the gate fails CLOSED and polices the REMOTE ref
+# ---------------------------------------------------------------------------
+
+
+def test_malformed_stdin_fails_closed_naming_the_sanctioned_bypass(tmp_path: Path) -> None:
+    """Finding 1: present-but-unparseable stdin must refuse, never silently allow.
+
+    Empty stdin (nothing to gate) still allows; stdin whose lines cannot be parsed
+    is a different case — the gate must fail CLOSED and name git's sanctioned,
+    traceable bypass (--no-verify) instead of silently disabling the whole law.
+    """
+    from dadaia_workspace.features.chokepoints.service import parse_push_stdin
+
+    refs, malformed = parse_push_stdin("this line has three fields\n")
+    assert refs == []
+    assert malformed == 1
+    decision = push_gate_decision(tmp_path, refs, malformed_lines=malformed)
+    assert not decision.allowed
+    assert "--no-verify" in decision.message
+
+    empty_refs, empty_malformed = parse_push_stdin("")
+    assert empty_malformed == 0
+    assert push_gate_decision(tmp_path, empty_refs, malformed_lines=0).allowed
+
+
+def test_pushing_develop_to_a_foreign_remote_ref_is_refused(tmp_path: Path) -> None:
+    """Finding 2: `git push origin develop:main` — local develop, remote main.
+
+    The policy must key on BOTH sides: a valid local develop tip aimed at any
+    remote ref other than refs/heads/develop is a refusal.
+    """
+    _handoff(tmp_path, "approve-a", commit_sha=_SHA_A)
+    decision = push_gate_decision(
+        tmp_path, _refs(f"refs/heads/develop {_SHA_A} refs/heads/main {_ZERO}")
+    )
+    assert not decision.allowed
+    assert "refs/heads/main" in decision.message
+    assert "develop" in decision.message
+
+
+def test_detached_head_ref_gets_a_pushable_branch_diagnosis(tmp_path: Path) -> None:
+    """Finding 6: `git push origin HEAD:develop` — right outcome needs the right words."""
+    decision = push_gate_decision(tmp_path, _refs(f"HEAD {_SHA_A} refs/heads/develop {_ZERO}"))
+    assert not decision.allowed
+    assert "refs/heads/develop" in decision.message
+
+
+def test_hotfix_patch_zero_is_not_a_permitted_branch_name() -> None:
+    """Finding 3 (SPEC FR5.2): the retired CI job's PATCH>=1 knowledge lives here now."""
+    from dadaia_workspace.features.chokepoints.service import branch_name_is_permitted
+
+    assert not branch_name_is_permitted("hotfix/v1.0.0")
+    assert branch_name_is_permitted("hotfix/v1.0.1")
+    assert branch_name_is_permitted("hotfix/v0.6.10")

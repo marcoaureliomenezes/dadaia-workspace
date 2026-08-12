@@ -1,13 +1,18 @@
 #!/usr/bin/env bash
-# Mandatory pre-push gate — dadaia-workspace v0.1.5 (CI) + v0.1.14 (security verdict).
+# Mandatory pre-push gate — dadaia-workspace v0.1.5 (CI) + v0.1.14 (security verdict)
+# + v0.6.0 (gitflow branch policy).
 #
 # Two gates run in sequence and BOTH must pass before a push proceeds:
 #   1. CI-equivalent preflight (ruff format --check, ruff check, mypy --strict, pytest).
 #      Locally-solvable failures must never reach a push (post-mortem: the v0.1.4 family
 #      was pushed + closed while CI was red).
-#   2. Security-verdict gate (FR-W1-02, T-014-15): every non-zero, non-tag pushed sha must
-#      be covered by a security-reviewer APPROVE handoff (`metrics.commit_sha` == sha).
-#      The pre-push ref lines git feeds on STDIN are forwarded to `ci push-gate-check`.
+#   2. Branch policy + security-verdict gate (FR-W1-02 / v0.6.0 FR4): only
+#      refs/heads/develop is pushable (main advances via PR from develop only;
+#      feature/hotfix branches are local-only; names outside the four permitted
+#      patterns are refused; tag pushes carve out), and the pushed develop tip must be
+#      covered by a security-reviewer APPROVE handoff whose `metrics.commit_sha`
+#      equals it — a DIFF review of origin/develop..develop. The pre-push ref lines
+#      git feeds on STDIN are forwarded to `ci push-gate-check`.
 #
 # Installed to .git/hooks/pre-push by `dadaia ci install-hook`.
 # Emergency bypass (discouraged, leaves a trace in reflog): git push --no-verify
@@ -102,5 +107,5 @@ fi
 echo "[pre-push] CI-equivalent preflight via $RUNNER_LABEL (ruff · mypy --strict · pytest, --quick: no e2e)…"
 "${RUNNER_BIN[@]}" ci preflight --quick
 
-echo "[pre-push] security-verdict gate (every pushed commit needs a security-reviewer APPROVE)…"
+echo "[pre-push] branch-policy + security-verdict gate (develop-only push; diff-covering security-reviewer APPROVE)…"
 printf '%s' "$PUSH_REFS" | "${RUNNER_BIN[@]}" ci push-gate-check

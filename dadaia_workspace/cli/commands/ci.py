@@ -236,15 +236,15 @@ def push_gate_check() -> None:
     Commits are never review-blocked here.
     """
     from dadaia_workspace.features.chokepoints import push_gate_decision
-    from dadaia_workspace.features.chokepoints.service import parse_push_refs
+    from dadaia_workspace.features.chokepoints.service import parse_push_stdin
 
     repo_root = _repo_root()
     workspace = _resolve_workspace_root(repo_root)
     handoff_root = workspace / ".dadaia" / "handoff"
 
     stdin_text = sys.stdin.read() if not sys.stdin.isatty() else ""
-    refs = parse_push_refs(stdin_text)
-    decision = push_gate_decision(handoff_root, refs)
+    refs, malformed = parse_push_stdin(stdin_text)
+    decision = push_gate_decision(handoff_root, refs, malformed_lines=malformed)
     if not decision.allowed:
         typer.secho(decision.message, fg=typer.colors.RED, err=True)
         raise typer.Exit(1)

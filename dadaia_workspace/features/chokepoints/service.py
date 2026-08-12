@@ -93,7 +93,9 @@ _PERMITTED_BRANCH_RES: tuple[re.Pattern[str], ...] = (
     re.compile(r"^main$"),
     re.compile(r"^develop$"),
     re.compile(r"^feature/v\d+\.\d+\.\d+$"),
-    re.compile(r"^hotfix/v\d+\.\d+\.\d+$"),
+    # PATCH >= 1: patch 0 is feature-release territory (the retired CI
+    # hotfix-branch-name job's knowledge, relocated per SPEC FR5.2).
+    re.compile(r"^hotfix/v\d+\.\d+\.[1-9]\d*$"),
 )
 
 _PUSHABLE_BRANCH = "develop"
@@ -147,18 +149,31 @@ def _refuse_branch(branch: str, local_ref: str) -> Decision:
     )
 
 
-def parse_push_refs(stdin_text: str) -> list[PushRef]:
-    """Parse pre-push stdin into :class:`PushRef` rows. Malformed lines are skipped."""
+def parse_push_stdin(stdin_text: str) -> tuple[list[PushRef], int]:
+    """Parse pre-push stdin into :class:`PushRef` rows plus a malformed-line count.
+
+    A non-empty line that does not split into exactly four fields is counted, not
+    silently dropped — the gate FAILS CLOSED on any malformed line (T-060-07 finding 1:
+    a policy gate that skips what it cannot parse is a policy gate that can be
+    disabled without a trace; ``git push --no-verify`` is the sanctioned bypass).
+    """
     refs: list[PushRef] = []
+    malformed = 0
     for raw in stdin_text.splitlines():
         line = raw.strip()
         if not line:
             continue
         parts = line.split()
         if len(parts) != 4:
+            malformed += 1
             continue
         refs.append(PushRef(parts[0], parts[1], parts[2], parts[3]))
-    return refs
+    return refs, malformed
+
+
+def parse_push_refs(stdin_text: str) -> list[PushRef]:
+    """Back-compat wrapper over :func:`parse_push_stdin` (refs only)."""
+    return parse_push_stdin(stdin_text)[0]
 
 
 # ---------------------------------------------------------------------------------------
@@ -294,6 +309,8 @@ def iter_security_approvals(handoff_root: Path) -> list[_Approval]:
 def push_gate_decision(
     handoff_root: Path,
     refs: list[PushRef],
+    *,
+    malformed_lines: int = 0,
 ) -> Decision:
     """Decide whether a push may proceed (FR-W1-02 / DP-5 / v0.6.0 FR4).
 
@@ -309,17 +326,52 @@ def push_gate_decision(
 
     Deletions (zero sha) and tag pushes pass with no verdict (DP-5 carve-out —
     publishing depends on tag pushes). Commits are never review-blocked — push only.
+    A malformed stdin line fails CLOSED (finding 1) and the REMOTE side of every
+    review ref must also be ``refs/heads/develop`` (finding 2: ``push develop:main``).
     """
+    if malformed_lines > 0:
+        return Decision(
+            allowed=False,
+            message=(
+                f"[pre-push] BLOCKED: {malformed_lines} unparseable pre-push stdin "
+                "line(s) — a policy gate never skips what it cannot parse (fail "
+                "closed).\n"
+                "  If this push is a genuine emergency, git's sanctioned, traceable "
+                "bypass is `git push --no-verify` (discouraged; leaves a reflog trace)."
+            ),
+        )
+
     review_refs = [r for r in refs if not r.is_deletion and not r.is_tag]
     if not review_refs:
         return Decision(allowed=True, message="[pre-push] no review-gated refs; allow.")
 
     for ref in review_refs:
         if not ref.local_ref.startswith(_HEADS_PREFIX):
-            return _refuse_branch(ref.local_ref, ref.local_ref)
+            return Decision(
+                allowed=False,
+                message=(
+                    f"[pre-push] BLOCKED: local ref '{ref.local_ref}' is not a branch "
+                    "head — only 'refs/heads/develop' may be pushed (gitflow law, "
+                    "DADAIA.md §5).\n"
+                    "  Fix: check out 'develop' (git checkout develop) and push it "
+                    "directly instead of pushing a detached or symbolic ref."
+                ),
+            )
         branch = ref.local_ref[len(_HEADS_PREFIX) :]
         if branch != _PUSHABLE_BRANCH:
             return _refuse_branch(branch, ref.local_ref)
+        if ref.remote_ref != f"{_HEADS_PREFIX}{_PUSHABLE_BRANCH}":
+            return Decision(
+                allowed=False,
+                message=(
+                    f"[pre-push] BLOCKED: refspec aims local 'develop' at remote "
+                    f"'{ref.remote_ref}' — only refs/heads/develop → refs/heads/develop "
+                    "is pushable (gitflow law, DADAIA.md §5; 'main' advances via PR "
+                    "from develop only).\n"
+                    "  Fix: push develop to develop (git push origin develop) and open "
+                    "the PR develop → main for anything aimed at main."
+                ),
+            )
 
     approved_shas = {a.commit_sha for a in iter_security_approvals(handoff_root)}
     missing = [r for r in review_refs if r.local_sha not in approved_shas]
