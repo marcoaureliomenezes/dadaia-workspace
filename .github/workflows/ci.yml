@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - develop
       - 'hotfix/v*'
       - 'feature/**'
   pull_request:
