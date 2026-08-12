@@ -60,9 +60,11 @@ tier, never raise the default (mechanical enforcement: T-070-05). LARGE cap for
 this repo: **30**, declared and measured as a WARN (current ~84 is the companion
 release's remediation target), never a hard failure in this release.
 
-`flaky` and `quarantine` markers are declared by this doctrine; their mechanical
-enforcement (marker registration, the collection-time bug-id check, the gating-
-selector exclusion) lands in T-070-05 — do not assume they are wired yet.
+`flaky` and `quarantine` markers are mechanically wired (T-070-05): both are
+registered in `pyproject.toml`, a `quarantine` marker without `bug="<bug-slug>"`
+refuses collection, and every gating selector (CI jobs, release jobs, the pre-push
+preflight) excludes the quarantine lane. Diagnosis runs use `-m quarantine`
+explicitly.
 
 ## No Slop
 

@@ -46,7 +46,7 @@ jobs:
       - run: pipx install poetry==1.8.3
       - run: poetry install --no-interaction --no-ansi --with dev
       - name: pytest unit fast
-        run: poetry run pytest -q -m "unit and not slow" tests/unit -n auto
+        run: poetry run pytest -q -m "unit and not slow and not quarantine" tests/unit -n auto
 
   contract-coverage:
     name: Contract coverage (pytest)
@@ -69,7 +69,7 @@ jobs:
         # tests/contract/test_workflow_coverage_redirect.py.
         env:
           COVERAGE_FILE: ${{ runner.temp }}/.coverage
-        run: poetry run pytest -q -m "unit or contract" -n auto --cov=dadaia_workspace --cov-report=term-missing --cov-fail-under=80 tests/unit tests/contract
+        run: poetry run pytest -q -m "(unit or contract) and not quarantine" -n auto --cov=dadaia_workspace --cov-report=term-missing --cov-fail-under=80 tests/unit tests/contract
 
   integration:
     name: Integration (pytest)
@@ -85,7 +85,7 @@ jobs:
       - run: pipx install poetry==1.8.3
       - run: poetry install --no-interaction --no-ansi --with dev
       - name: pytest integration
-        run: poetry run pytest -q -m integration tests/integration --durations=30
+        run: poetry run pytest -q -m "integration and not quarantine" tests/integration --durations=30
 
   e2e-python:
     name: E2E Python (pytest)
@@ -101,7 +101,7 @@ jobs:
       - run: pipx install poetry==1.8.3
       - run: poetry install --no-interaction --no-ansi --with dev
       - name: pytest e2e python
-        run: poetry run pytest -q -m e2e tests/e2e/features --durations=30
+        run: poetry run pytest -q -m "e2e and not quarantine" tests/e2e/features --durations=30
 
   e2e-panel:
     name: E2E panel (Playwright)

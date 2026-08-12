@@ -119,3 +119,55 @@ def test_preflight_pytest_excludes_quarantine_and_drops_dead_ignore() -> None:
     )
     joined = " ".join(command)
     assert "not quarantine" in joined, "the gating invocation must exclude quarantined tests"
+
+
+@pytest.mark.timeout(120)
+def test_naked_quarantine_refusal_is_actionable_serial_and_xdist() -> None:
+    """T-070-09 finding 2: the refusal must reach the operator readably in BOTH modes.
+
+    Real collection, real subprocesses: a probe file under tests/tmp/ carrying a naked
+    quarantine marker must refuse collection with the actionable message on stderr —
+    serial AND under -n 2 (where the UsageError alone would surface as an opaque
+    xdist INTERNALERROR; the conftest prints the actionable line first).
+
+    Explicit timeout (S-09/S-10): two full pytest subprocess boots, ~8 s each solo.
+    """
+    import os
+    import subprocess
+    import sys as _sys
+
+    probe = _REPO_ROOT / "tests" / "tmp" / f"_quarantine_probe_{os.getpid()}.py"
+    probe.write_text(
+        "import pytest\n\n\n"
+        "@pytest.mark.quarantine\n"
+        "def test_naked_quarantine() -> None:\n"
+        "    pass\n",
+        encoding="utf-8",
+    )
+    try:
+        for extra in ((), ("-n", "2")):
+            result = subprocess.run(
+                [
+                    _sys.executable,
+                    "-m",
+                    "pytest",
+                    "-q",
+                    "-p",
+                    "no:cacheprovider",
+                    str(probe),
+                    *extra,
+                ],
+                capture_output=True,
+                text=True,
+                cwd=_REPO_ROOT,
+                timeout=90,
+            )
+            combined = result.stdout + result.stderr
+            assert result.returncode != 0, (
+                f"naked quarantine collected clean ({extra}):\n{combined}"
+            )
+            assert "requires a registered bug id" in combined, (
+                f"actionable message missing in mode {extra}:\n{combined[-2000:]}"
+            )
+    finally:
+        probe.unlink(missing_ok=True)

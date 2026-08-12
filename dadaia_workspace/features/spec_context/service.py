@@ -395,8 +395,10 @@ class SpecContextService:
         # scoped law. Plain copy, byte-identical: no rendering at this seam.
         tests_agents_dst = repo_path / "tests" / "AGENTS.md"
         tests_agents_src = _PUBLIC_DIR / "templates" / "tests-AGENTS.md"
+        tests_dir = repo_path / "tests"
         if (
-            (repo_path / "tests").is_dir()
+            tests_dir.is_dir()
+            and not tests_dir.is_symlink()  # a symlinked tests/ escapes the repo tree
             and not tests_agents_dst.exists()
             and tests_agents_src.exists()
         ):

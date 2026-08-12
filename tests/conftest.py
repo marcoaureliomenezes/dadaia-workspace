@@ -148,11 +148,16 @@ def _validate_quarantine_markers(items: list[pytest.Item]) -> None:
             continue
         bug = marker.kwargs.get("bug")
         if not isinstance(bug, str) or not bug.strip():
-            raise pytest.UsageError(
+            message = (
                 f"{item.nodeid}: @pytest.mark.quarantine requires a registered bug id — "
                 "use @pytest.mark.quarantine(bug='<bug-slug>') and register the bug via "
                 "`dadaia bugs append` first (dadaia-test-stewardship, group F)."
             )
+            # Under xdist the UsageError kills the worker and surfaces as an opaque
+            # INTERNALERROR on the controller (T-070-09 finding 2) — print the
+            # actionable line to stderr FIRST so it reaches the operator either way.
+            print(f"\n[quarantine-discipline] {message}", file=sys.stderr, flush=True)
+            raise pytest.UsageError(message)
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:

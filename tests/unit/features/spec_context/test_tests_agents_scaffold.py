@@ -83,3 +83,18 @@ def test_repo_without_tests_dir_gets_no_directory_and_no_file(
     assert not (repo / "tests").exists(), (
         "alive() must never invent tests/ — the naive mkdir(parents=True) failure mode"
     )
+
+
+def test_symlinked_tests_dir_is_left_alone(
+    service: SpecContextService, workspace_root: Path, tmp_path: Path
+) -> None:
+    """T-070-09 finding 7: a symlinked tests/ escapes the repo tree — never write
+    through it (commit_all could not stage the result)."""
+    service.create("proj", "my-repo", "https://github.com/org/my-repo")
+    repo = workspace_root / "repos" / "my-repo"
+    repo.mkdir(parents=True, exist_ok=True)
+    outside = tmp_path / "outside-tests"
+    outside.mkdir()
+    (repo / "tests").symlink_to(outside, target_is_directory=True)
+    service.alive("proj")
+    assert not (outside / "AGENTS.md").exists()
