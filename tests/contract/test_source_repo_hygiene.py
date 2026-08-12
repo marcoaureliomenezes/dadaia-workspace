@@ -27,6 +27,13 @@ def test_sdd_gate_artifacts_visible_and_noncanonical_content_stays_gitignored() 
         "specs/releases/v9.9.9/PLAN.md",
         "specs/releases/v9.9.9/TASKS.md",
         "specs/releases/v9.9.9/CLOSURE.md",
+        # Each alpha-N closes with a qa-engineer review COMMITTED to the branch
+        # (DADAIA.md §5); bug gitignore-alpha-qa-review-untrackable: the blanket
+        # /specs/releases/*/* ignore had no negation for it, so the law was
+        # silently undefeatable without git add -f (v0.5.0's ALPHA-1-QA.md was
+        # force-added exactly that way).
+        "specs/releases/v9.9.9/ALPHA-1-QA.md",
+        "specs/releases/v9.9.9/ALPHA-12-QA.md",
         "specs/_archive/releases/v9.9.8/SPEC.md",
         "specs/_archive/releases/v9.9.8/PLAN.md",
         "specs/_archive/releases/v9.9.8/TASKS.md",

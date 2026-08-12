@@ -153,6 +153,11 @@ pip-wheel-metadata/
 !/specs/releases/ACTIVE.md
 !/specs/releases/*/
 /specs/releases/*/*
+# Bug gitignore-alpha-qa-review-untrackable: each alpha-N closes with a
+# qa-engineer review committed to the branch (DADAIA.md §5) — the whitelist
+# must include it or the law is silently defeated (v0.5.0's ALPHA-1-QA.md
+# needed git add -f).
+!/specs/releases/*/ALPHA-*-QA.md
 !/specs/releases/*/SPEC.md
 !/specs/releases/*/PLAN.md
 !/specs/releases/*/TASKS.md
