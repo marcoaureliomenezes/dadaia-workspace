@@ -86,7 +86,8 @@ none (`infrastructure/git_subprocess.py`), so containers and CI never die on it.
 Git chokepoints are installed from:
 
 - `public/scripts/pre-commit-presence-gate.sh` - concurrency warning only;
-- `public/scripts/pre-push-ci-gate.sh` - CI and exact-commit security verdict.
+- `public/scripts/pre-push-ci-gate.sh` - CI preflight, branch policy, and develop-diff
+  security verdict.
 
 ### Handoffs and reports
 

@@ -3,15 +3,15 @@ slug: public-asset-distribution
 title: public-asset-distribution
 category: product
 tldr: canonical public assets are staged to .dadaia/agentic and projected to Claude Code, Codex, Kimi Code, and shared .agents roots.
-summary: Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, harness-profile-aware install/doctor, render-at-install of core agents (staged generic body + resolved agent-model policy composed into both L1 projections) with a policy-aware doctor render-compare, provenance-gated consumer AGENTS fan-out (banner-canonical restored vs hand-authored left [foreign]) with lexical repo-slug containment + destination-file symlink refusal, scoped AGENTS projections, source-root hygiene guard, and runtime projection contract.
+summary: Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, universal skills projected to one canonical .agents/skills home with no registry entry, harness-profile-aware install/doctor, render-at-install of core agents (staged generic body + resolved agent-model policy composed into both L1 projections) with a policy-aware doctor render-compare, provenance-gated consumer AGENTS fan-out (banner-canonical restored vs hand-authored left [foreign]) with lexical repo-slug containment + destination-file symlink refusal, scoped AGENTS projections, source-root hygiene guard, and runtime projection contract.
 tags:
 - public
 - assets
 - distribution
 - projection
 - privacy
-token_estimate: 2524
-last_updated: '2026-07-08'
+token_estimate: 2640
+last_updated: '2026-08-12'
 release_origin: v0.1.65
 ---
 
@@ -56,6 +56,14 @@ re-renders to the render output (never raw staged bytes). No overlay ⇒ render 
 repeated installs. The staging **manifest keeps hashing staged (policy-free) bytes** — only the
 projection write/compare goes through the render seam. The new schema asset
 `schemas/agent-model-policy-v1.schema.json` stages like any other asset.
+
+**Universal skills have one canonical home and are never derived.** A universal skill is
+staged from `dadaia_workspace/public/skills/<name>/SKILL.md` and installed to
+`.agents/skills/<name>/` plus `.claude/skills/<name>/`; Codex and Kimi Code read it
+natively from the shared `.agents/skills/` root, so no per-harness copy is produced and no
+`public/entities/registry.json` entry exists for it (the registry describes derived,
+per-harness entities). `dadaia-gitflow` — the single operational home of the branch,
+commit, push and version contract — ships this way, alongside the other universal skills.
 
 `dadaia public doctor` performs three comparison passes: source vs staging, staging
 vs projected (one pass per runtime target). Any mismatch emits `[drift] <path>` and

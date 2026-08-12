@@ -414,7 +414,7 @@ PR is blocked from merging, not just failing.
 
 ---
 
-- [ ] **T-060-10 — Memory update → CLOSURE → archive (in that order)**
+- [x] **T-060-10 — Memory update → CLOSURE → archive (in that order)**
 
 **Owner role:** product-engineer · **Commit:** `docs(T-060-10): v0.6.0 closure, memory atoms, dispositions`
 

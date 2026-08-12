@@ -2,9 +2,10 @@
 slug: quality-assurance
 title: quality-assurance
 category: core
-tldr: Layered pytest/contract/browser validation, strict CI, consumer-side release gate, and zero repo-local test artifacts.
+tldr: Layered pytest/contract/browser validation, strict CI with a required PR-source guard on main, consumer-side release gate, and zero repo-local test artifacts.
 summary: >-
-  Defines test layers, safety fixtures, browser evidence, CI gates, coverage,
+  Defines test layers, safety fixtures, browser evidence, CI gates including the required
+  pr-source-guard on main and the main/develop-only push triggers, coverage,
   cross-platform checks, the consumer-side approval boundary, and anti-slop requirements.
 tags:
 - testing
@@ -12,7 +13,7 @@ tags:
 - ci
 - quality
 - test-architecture
-token_estimate: 580
+token_estimate: 690
 last_updated: '2026-08-12'
 release_origin: v0.3.0
 ---
@@ -83,6 +84,15 @@ CI runs importability, Ruff format/lint, import-linter, mypy strict, unit, contr
 repository hygiene, backlog doctor, branch/PR governance, security verdict, and a
 gitleaks secret-scan job on every push/PR. Release publication repeats the relevant
 quality ladder before build, approval, publish, and package smoke test.
+
+Push triggers are `main` and `develop` only, matching the branches that exist remotely;
+feature and hotfix branches are local-only and carry no trigger, so their coverage is the
+local pre-push preflight plus the `develop` push. `pr-source-guard` is a **required**
+check on `main`: it fires on any pull request targeting `main` and fails unless the head
+ref is exactly `develop`, making a PR from any other head mechanically unmergeable rather
+than merely red. The head ref reaches the job through `env:` and is compared as a quoted
+literal, never interpolated into a shell string, because it is attacker-influenceable on a
+fork PR.
 
 Internal gates never approve a deploy by themselves: every candidate wheel must pass the
 consumer-side validation matrix shipped in the package

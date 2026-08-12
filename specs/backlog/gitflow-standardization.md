@@ -1,7 +1,9 @@
 ---
 title: "Gitflow standardization — branch law, develop-only push, diff-based security gate, dadaia-gitflow skill"
-status: candidate
+status: delivered
 opened: 2026-08-12
+delivered: 2026-08-12
+delivered_by: v0.6.0
 description: >-
   Operator ruling (2026-08-12): standardize the entire git surface across the
   development cycle. Exactly four branch patterns (main, develop,
@@ -85,6 +87,25 @@ intents:
 ---
 
 # Gitflow standardization
+
+## Disposition — DELIVERED — v0.6.0
+
+Consumed in full by release `v0.6.0` (archived at
+`specs/_archive/releases/v0.6.0/`). Every intent maps to the FR that delivered it:
+
+| # | Intent subject | Delivered by | Where it lives now |
+|---|---|---|---|
+| 1 | `sdd-bug-backlog-governance` — `public/data/DADAIA.md` four-branch law | FR1 (T-060-02) | `public/data/DADAIA.md` §5/§6 + its four `0444` projections |
+| 2 | `public-asset-distribution` — new universal skill `dadaia-gitflow` | FR2 (T-060-01) | `public/skills/dadaia-gitflow/SKILL.md` (89 lines) |
+| 3 | `chokepoints/service.py#push_gate_decision` — mechanical enforcement | FR4 (T-060-04) | develop-only ref policy, four-pattern name validator, develop-diff verdict |
+| 4 | `consumer-agent-support` — tier-2 duplicates defer to the skill | FR3 (T-060-03) | 4 skills + 7 agents rewritten as references |
+| 5 | `quality-assurance.md#CI` — `pr-source-guard`, branch rules, retired triggers | FR5 (T-060-05, T-060-09) | `.github/workflows/ci.yml` + `main` required checks |
+| 6 | `quality-assurance.md#Anti-Slop` — stale citations, regex, false claim | FR6 (T-060-03, T-060-04) | `release-governance` citations, constitution §11/§13, README regex, scripts inventory |
+
+The one item this entry named that was **not** delivered as code is the removal of the
+now-dead hotfix-release surface (`dadaia specs hotfix open`, the two `.j2` templates,
+SPEC-DOC-023): the release revoked the *law*, and the surface removal is queued as
+`specs/backlog/retire-dead-hotfix-surface.md`.
 
 ## Description
 
