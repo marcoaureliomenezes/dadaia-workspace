@@ -225,12 +225,15 @@ def _run_backlog_doctor_gate(repo_root: Path) -> None:
 
 @app.command("push-gate-check")
 def push_gate_check() -> None:
-    """Pre-push security-verdict gate (FR-W1-02): require a security-reviewer APPROVE per sha.
+    """Pre-push gate (FR-W1-02 / v0.6.0 FR4): branch policy + diff-based security verdict.
 
     Reads the pre-push ref lines from stdin (``<local-ref> <local-sha> <remote-ref>
-    <remote-sha>``). For each non-zero, non-tag local sha a ``security-reviewer`` APPROVE
-    handoff (``metrics.commit_sha`` == sha) must exist under ``.dadaia/handoff/``. Branch
-    deletions and tag-only pushes pass. Commits are never review-blocked here.
+    <remote-sha>``). Refuses any non-deletion, non-tag ref that is not
+    ``refs/heads/develop`` (gitflow law: main via PR only; feature/hotfix local-only;
+    names outside the four patterns invalid). The pushed ``develop`` tip must carry a
+    ``security-reviewer`` APPROVED handoff (``metrics.commit_sha`` == tip sha) covering
+    the ``origin/develop..develop`` delta. Branch deletions and tag pushes pass.
+    Commits are never review-blocked here.
     """
     from dadaia_workspace.features.chokepoints import push_gate_decision
     from dadaia_workspace.features.chokepoints.service import parse_push_refs
