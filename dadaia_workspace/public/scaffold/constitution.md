@@ -41,7 +41,9 @@ specs_pattern_version: 4
 
 ## 5. Qualidade de Código
 
-- Cobertura mínima: **80%** para código novo.
+- O piso de **80%** de cobertura é um **gate de CI**, não uma meta de aceitação: cobertura
+  é métrica subproduto de testes reais, nunca motivo para fabricar um teste. Disciplina
+  completa de testes: §8.
 - Toda função pública deve ter type hints completos.
 - O código deve passar no linter e type-checker configurados antes de qualquer merge.
 
@@ -66,6 +68,24 @@ specs_pattern_version: 4
 - `specs/foundation/SPEC.md` é a fonte única da arquitetura de implementação.
 - `specs/SPEC.md` é a fonte única do comportamento do produto.
 - `specs/features/*/SPEC.md` possuem apenas contratos específicos de feature.
+
+---
+
+## 8. Disciplina de Testes
+
+- Todo teste declara **intenção** (CONTRACT/SENTINEL/SCAFFOLD/QUARANTINE) e **tamanho** ao
+  nascer; um teste sem intenção declarada é SCAFFOLD e expira.
+- Admissão na suíte permanente exige detecção real — cobrir comportamento não coberto ou
+  matar um mutante que nenhum teste atual mata.
+- Rebaixamento (substituir um teste grande por cobertura equivalente mais barata) é etapa
+  obrigatória do fechamento de release, nunca uma decisão avulsa.
+- Poda (deletar, pular ou desabilitar um teste) é veredito do steward de qualidade, nunca
+  iniciativa de quem implementou o teste.
+- Teste-lápide e SCAFFOLD expirado são lixo (slop), não histórico da suíte.
+- Artefatos de teste são capturados só em falha.
+
+Protocolo operacional completo: skill `dadaia-test-stewardship`. Os parâmetros numéricos
+(timeouts, tetos, prazos) são padrões ajustáveis por projeto, não regras fixas.
 
 ---
 

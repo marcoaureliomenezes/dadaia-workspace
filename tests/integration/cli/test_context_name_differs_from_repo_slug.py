@@ -119,8 +119,15 @@ def test_bugs_append_resolves_the_slug_and_closure_lands_in_scope(workspace: Pat
     )
 
 
+@pytest.mark.timeout(180)
 def test_create_refuses_a_name_no_other_verb_can_use(workspace: Path) -> None:
     """`create` must refuse exactly what the rest of the CLI refuses.
+
+    Explicit timeout (dadaia-test-stewardship S-09/S-10): this test builds several real
+    workspaces through the CliRunner and measured ~20 s solo / >60 s under full-suite
+    xdist load — above the 60 s integration ceiling. The justified bound stays; the
+    structural fix (splitting the workspace builds) is queued in the companion backlog
+    test-suite-remediation-stewardship.
 
     Bug a3-context-create-accepts-unusable-name: `create` accepted names with spaces or
     non-ASCII characters, and then `bind`, `bugs append` and every workflow rejected that

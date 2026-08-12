@@ -9,7 +9,7 @@ tags:
   - testing
   - anti-slop
 token_estimate: 0
-last_updated: "2026-01-01"
+last_updated: "2026-08-12"
 release_origin: v0.2.1
 ---
 
@@ -26,3 +26,10 @@ release_origin: v0.2.1
   de fora).
 - Revisões julgam o artefato apresentado pelos critérios acima; num contexto novo, a
   ausência de histórico não é motivo de rejeição — o SPEC vigente define a base.
+
+## Disciplina de testes
+
+Tamanho por diretório: SMALL = `tests/unit` + `tests/contract`; MEDIUM =
+`tests/integration`; LARGE = `tests/e2e`. Protocolo completo (intenção, admissão,
+rebaixamento, poda, flaky/quarentena): skill `dadaia-test-stewardship`. Lei de nível de
+projeto: constitution §8 ("Disciplina de Testes").

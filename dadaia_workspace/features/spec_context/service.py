@@ -389,6 +389,25 @@ class SpecContextService:
         if not repo_agents_dst.exists() and repo_agents_src.exists():
             shutil.copy2(repo_agents_src, repo_agents_dst)
 
+        # v0.7.0 FR3 (T-070-07): the scoped test law lands ONLY where a tests/ tree
+        # already exists — alive() never invents the directory (a stray tests/ would
+        # be planted in every non-Python consumer), and never overwrites a repo's own
+        # scoped law. Plain copy, byte-identical: no rendering at this seam.
+        tests_agents_dst = repo_path / "tests" / "AGENTS.md"
+        tests_agents_src = _PUBLIC_DIR / "templates" / "tests-AGENTS.md"
+        tests_dir = repo_path / "tests"
+        if (
+            tests_dir.is_dir()
+            and not tests_dir.is_symlink()  # a symlinked tests/ escapes the repo tree
+            and not tests_agents_dst.exists()
+            # A DANGLING destination symlink reports not-exists yet copy2 would write
+            # through it (workspace_guardrail refuses destination-file symlinks — the
+            # same posture holds at this seam).
+            and not tests_agents_dst.is_symlink()
+            and tests_agents_src.exists()
+        ):
+            shutil.copy2(tests_agents_src, tests_agents_dst)
+
         # Commit the scaffold alive() itself just wrote (bug alive-scaffold-blocks-dead,
         # validation-027 F-06): leaving tool-created files untracked made an immediate
         # dead() refuse via the untracked-consent guard, so create->alive->dead could

@@ -131,7 +131,9 @@ boundaries, not per task), and per the `DADAIA.md` §5 (Releases) and the
 | At `rc-N` ship (operator elects) | full **Review/QA Fan-Out** — `qa-engineer` + `code-reviewer` + `security-reviewer` must all `APPROVE` the **same implementation commit** | mark the task `[x]`; merge the release branch to local `develop` (milestone b), diff-review, push `develop`, open the `develop`→`main` PR, merge, deploy, or close the release, write `CLOSURE.md`/memory |
 
 The branch each stage runs on, its commit cadence, and the push trigger are the
-`dadaia-gitflow` skill's contract — this table states only the review/QA unlock.
+`dadaia-gitflow` skill's contract — this table states only the review/QA unlock. The
+curation step inside each closure (demote/prune verdicts, flake/quarantine handling) is
+the `dadaia-test-stewardship` skill's contract.
 
 Any `REQUEST_CHANGES`, CRITICAL/HIGH security finding, failed E2E, missing evidence, or
 stale report sends the work back to implementation; the rework loop continues until every

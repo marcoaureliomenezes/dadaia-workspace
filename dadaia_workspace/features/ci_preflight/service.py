@@ -254,7 +254,10 @@ def _pytest_check(
     fixtures, never shared global state).
     """
     pytest = _resolve_tool("pytest", python_executable=python_executable, dadaia_bin=dadaia_bin)
-    base = (*pytest, "-q", "-p", "no:cacheprovider", "--ignore=tests/performance", "-n", "auto")
+    # v0.7.0 FR5: the dead tests/performance ignore is retired (the directory no longer
+    # exists) and every gating invocation excludes the quarantine lane — a quarantined
+    # test runs only under an explicit `-m quarantine` diagnosis session, never in a gate.
+    base = (*pytest, "-q", "-p", "no:cacheprovider", "-m", "not quarantine", "-n", "auto")
     if quick:
         return Check("pytest (no e2e)", (*base, "--ignore=tests/e2e"))
     return Check("pytest", base)

@@ -48,7 +48,7 @@
 
 ---
 
-- [ ] **T-070-01 — `dadaia-test-stewardship`: the single operational home**
+- [x] **T-070-01 — `dadaia-test-stewardship`: the single operational home**
 
 **Owner role:** ai-engineer · **Commit:** `feat(T-070-01): add dadaia-test-stewardship universal skill`
 
@@ -91,7 +91,7 @@ Two things the skill must get exactly right:
 
 ---
 
-- [ ] **T-070-02 — `DADAIA.md` §6 increment + projection**
+- [x] **T-070-02 — `DADAIA.md` §6 increment + projection**
 
 **Owner role:** ai-engineer · **Commit:** `refactor(T-070-02): test-lifecycle law in DADAIA.md §6`
 
@@ -123,7 +123,7 @@ outcome. If the increment exceeds the cap, **cut law text** — never raise the 
 
 ---
 
-- [ ] **T-070-03 — Consumer surface: constitution §8, `tests-AGENTS.md` template, memory template**
+- [x] **T-070-03 — Consumer surface: constitution §8, `tests-AGENTS.md` template, memory template**
 
 **Owner role:** ai-engineer · **Commit:** `feat(T-070-03): consumer test doctrine — constitution §8 + tests/AGENTS.md template`
 
@@ -163,7 +163,7 @@ T-070-06 disjoint.
 
 ---
 
-- [ ] **T-070-04 — Tier-2 single-home edits (C1–C13)**
+- [x] **T-070-04 — Tier-2 single-home edits (C1–C13)**
 
 **Owner role:** ai-engineer · **Commit:** `refactor(T-070-04): single-home test doctrine; reconcile coverage stance`
 
@@ -231,7 +231,7 @@ Re-project at the end (same chain as T-070-02).
 
 ---
 
-- [ ] **T-070-05 — Markers, tiered timeouts, preflight (TDD: RED before GREEN)**
+- [x] **T-070-05 — Markers, tiered timeouts, preflight (TDD: RED before GREEN)**
 
 **Owner role:** software-engineer · **Commits:** `test(T-070-05): RED contracts for tier timeouts and quarantine markers` then `feat(T-070-05): pytest-timeout tiers, flaky/quarantine markers, preflight cleanup`
 
@@ -284,7 +284,7 @@ release.
 
 ---
 
-- [ ] **T-070-06 — CI: selectors, durations, ceilings, loud flake**
+- [x] **T-070-06 — CI: selectors, durations, ceilings, loud flake**
 
 **Owner role:** software-engineer · **Commit:** `ci(T-070-06): quarantine selectors, durations, budget ceilings, flake detection`
 
@@ -324,7 +324,7 @@ chain). No Python package file, no `public/` text file.
 
 ---
 
-- [ ] **T-070-07 — Scaffolder wiring: consumer repos receive `tests/AGENTS.md` (TDD)**
+- [x] **T-070-07 — Scaffolder wiring: consumer repos receive `tests/AGENTS.md` (TDD)**
 
 **Owner role:** software-engineer · **Commits:** `test(T-070-07): RED cases for tests/AGENTS.md scaffolding` then `feat(T-070-07): copy tests-AGENTS.md template on context alive`
 
@@ -353,7 +353,7 @@ created, no file written**. The third case is the one that catches a naive
 
 ---
 
-- [ ] **T-070-08 — QA `alpha-1`: validate the contract on the live instance**
+- [x] **T-070-08 — QA `alpha-1`: validate the contract on the live instance**
 
 **Owner role:** qa-engineer · **Commit:** `test(T-070-08): alpha-1 QA review committed to the branch`
 
@@ -392,7 +392,7 @@ to `[-]` and is preserved verbatim in the review file as the historical record.
 
 ---
 
-- [ ] **T-070-09 — Review + diff-based security verdict**
+- [x] **T-070-09 — Review + diff-based security verdict**
 
 **Owner role:** code-reviewer + security-reviewer (verdicts); software-engineer applies any
 required fix · **Commit:** fixes only, each returning its task to `[-]`
@@ -422,7 +422,7 @@ verdict covers the `origin/develop..develop` delta about to be pushed. Any
 
 ---
 
-- [ ] **T-070-10 — Milestone (b): merge to `develop`, push, PR to `main`, CI green**
+- [-] **T-070-10 — Milestone (b): merge to `develop`, push, PR to `main`, CI green**
 
 **Owner role:** software-engineer · **Commit:** merge commit + any CI fix
 

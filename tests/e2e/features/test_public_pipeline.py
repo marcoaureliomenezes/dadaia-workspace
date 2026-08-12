@@ -57,6 +57,7 @@ EXPECTED_SKILLS = {
     "dadaia-release-definition",
     "dadaia-step0-memory-bootstrap",
     "dadaia-task-manager",
+    "dadaia-test-stewardship",
     "dadaia-workspace-doctor",
     "dadaia-workspace-manager",
     "dadaia-workspace-spec-navigator",

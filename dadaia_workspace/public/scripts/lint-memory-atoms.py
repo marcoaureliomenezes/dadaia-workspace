@@ -229,6 +229,7 @@ _HEADING_GROUP_G: frozenset[str] = frozenset(
 _HEADING_GROUP_S: frozenset[str] = frozenset(
     [
         "Padrões de qualidade",
+        "Disciplina de testes",
     ]
 )
 

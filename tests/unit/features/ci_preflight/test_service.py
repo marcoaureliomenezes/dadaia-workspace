@@ -25,13 +25,13 @@ def _pass(argv: Sequence[str]) -> tuple[int, str]:
         pytest.param(
             False,
             "pytest",
-            ("--ignore=tests/performance",),
+            ("-m", "not quarantine"),
             id="full-has-lint-type-and-full-pytest",
         ),
         pytest.param(
             True,
             "pytest (no e2e)",
-            ("--ignore=tests/performance", "--ignore=tests/e2e"),
+            ("-m", "not quarantine", "--ignore=tests/e2e"),
             id="quick-swaps-in-no-e2e-pytest",
         ),
     ],
