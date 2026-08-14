@@ -1,7 +1,7 @@
 """In-memory fakes for all protocols — enable unit tests without I/O."""
 
 import sqlite3
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -48,6 +48,7 @@ class FakeGitClient:
     def __init__(self) -> None:
         self.cloned: list[tuple[str, Path]] = []
         self.committed: list[Path] = []
+        self.committed_paths: list[tuple[Path, tuple[str, ...]]] = []
         self.pushed: list[Path] = []
         self.checked_out: list[tuple[Path, str]] = []
         self._dirty: set[Path] = set()
@@ -75,6 +76,22 @@ class FakeGitClient:
 
     def commit_all(self, path: Path, msg: str) -> None:
         self.committed.append(path)
+        self._has_commits.add(path)
+        self._dirty.discard(path)
+        self._diff_names.pop(path, None)
+        self._untracked.pop(path, None)
+
+    def commit_paths(self, path: Path, msg: str, paths: Sequence[str]) -> None:
+        """Explicit-path staging counterpart of ``commit_all`` (never a blanket sweep).
+
+        Records the exact *paths* the caller staged in ``committed_paths`` so tests can
+        assert the scaffold commit never widened beyond what it authored. A no-op when
+        *paths* is empty, mirroring :class:`GitSubprocessClient`.
+        """
+        if not paths:
+            return
+        self.committed.append(path)
+        self.committed_paths.append((path, tuple(paths)))
         self._has_commits.add(path)
         self._dirty.discard(path)
         self._diff_names.pop(path, None)
