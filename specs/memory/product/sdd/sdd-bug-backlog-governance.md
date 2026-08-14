@@ -18,7 +18,7 @@ tags:
 - bugs
 - gitflow
 token_estimate: 620
-last_updated: '2026-08-12'
+last_updated: '2026-08-14'
 release_origin: v0.3.0
 ---
 
@@ -79,9 +79,16 @@ is one commit; a release defined and reviewed is a mandatory commit and push.
 
 Release definition records exactly which backlog and bug inputs are consumed; at pick
 time, open bugs and undispositioned audits outrank fresh backlog. Closure gives each
-consumed item a terminal disposition and evidence. Audit triage must dispose every
-finding as fixed, superseded, deferred, or rejected; it cannot silently drop findings,
-and an audit archives only once a named approved release has dispositioned it fully.
+consumed item a terminal disposition and evidence.
+
+One audit generates exactly one remediation release, and that release gives every finding
+an explicit disposition — fixed, superseded by a broader picked item, or deferred/rejected
+with a reason routed to the backlog. Audit triage cannot silently drop a finding, and an
+audit archives only once a named approved release has dispositioned it fully. The archived
+audit carries a disposing-release pointer naming that release; `specs doctor` warns on an
+archived audit that names none (SPEC-DOC-036) and on an audit directory still loose in
+`specs/audits/` (SPEC-DOC-038). The original audit record is immutable — a disposition is
+appended, never woven into the findings text.
 
 Bug, backlog, and audit paths are additive and writable without a bind or concurrency
 lock. Production release artifacts and code follow the ordinary path and phase rules.
@@ -96,7 +103,8 @@ is a quality boundary, not a concurrency mechanism.
 - `specs/bugs/*.jsonl`
 - `specs/backlog/*.md`
 - `specs/releases/<id>/consumed_backlog.json` or its archived equivalent
-- `specs/audits/<timestamp>-<session>/`
+- `specs/audits/<timestamp>-<session>/` and, once dispositioned,
+  `specs/audits/_archive/<audit>--dispositioned-<release-id>`
 - `pyproject.toml` and `CHANGELOG.md` at a hotfix merge into `develop`
 
 ## Dependencies
