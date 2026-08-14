@@ -110,7 +110,7 @@ covering both range forms, a binary blob, a deletion sha, and a git failure.
 
 ---
 
-- [ ] **T-090-04 — Pure denylist matcher**
+- [-] **T-090-04 — Pure denylist matcher**
 
 **Owner role:** software-engineer · **Commit:**
 `feat(T-090-04): pure push-range denylist matcher`
