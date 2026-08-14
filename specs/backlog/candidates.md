@@ -67,6 +67,8 @@ this whole table, and final priority is the operator's at pick time.
 
 ## Terminal at materialization (never-delete law — recorded, not pickable)
 
+All three archived to `_archive/` by `git mv` per SPEC-DOC-035.
+
 | Entry | Status | Evidence |
 |---|---|---|
 | `loud-flake-stats-key-residual` | delivered | Fixed at HEAD before materialization: `ci.yml:361-374` hard-errors on missing/malformed `stats` (commit `15cb12c4`, T-070-09). |
