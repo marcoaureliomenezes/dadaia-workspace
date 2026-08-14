@@ -1,8 +1,8 @@
 [tool.poetry]
 name = "dadaia-workspace"
-version = "0.5.2"
+version = "0.6.0"
 description = "AI-native workspace management CLI for multi-agent development with Claude Code, Codex and Kimi Code"
-authors = ["Marco Menezes <marcoaurelioreislima@gmail.com>"]
+authors = ["Marco Menezes <marcoaureliomenezes@users.noreply.github.com>"]
 readme = "README.md"
 packages = [{include = "dadaia_workspace"}]
 # Public-source hygiene (T-011-15 / FR-W5-01): never ship compiled bytecode in the

@@ -64,7 +64,7 @@ Set `ACTIVE.md` phase from `DEFINITION` to `IMPLEMENTATION` in the same commit.
 
 ---
 
-- [ ] **T-090-02 — [git] Milestone (a): merge, security review, push**
+- [x] **T-090-02 — [git] Milestone (a): merge, security review, push**
 
 **Owner role:** dispatcher + `security-reviewer` · **Commit:** merge commit on `develop`
 
@@ -84,7 +84,7 @@ to the pushed tip, plus the CI preflight.
 
 ---
 
-- [ ] **T-090-03 — Git object port and adapter**
+- [x] **T-090-03 — Git object port and adapter**
 
 **Owner role:** software-engineer · **Commit:**
 `feat(T-090-03): git object reader port + subprocess adapter`
@@ -110,7 +110,7 @@ covering both range forms, a binary blob, a deletion sha, and a git failure.
 
 ---
 
-- [ ] **T-090-04 — Pure denylist matcher**
+- [x] **T-090-04 — Pure denylist matcher**
 
 **Owner role:** software-engineer · **Commit:**
 `feat(T-090-04): pure push-range denylist matcher`
@@ -137,7 +137,7 @@ every returned string), A6.2 (skip counted); no `infrastructure` import in
 
 ---
 
-- [ ] **T-090-05 — Wire the scan into the push decision**
+- [x] **T-090-05 — Wire the scan into the push decision**
 
 **Owner role:** software-engineer · **Commit:**
 `feat(T-090-05): scan the pushed range at the push gate`
@@ -165,7 +165,7 @@ existing tag/deletion carve-out tests still pass unchanged.
 
 ---
 
-- [ ] **T-090-06 — CLI wiring and fail-closed boundary**
+- [x] **T-090-06 — CLI wiring and fail-closed boundary**
 
 **Owner role:** software-engineer · **Commit:**
 `feat(T-090-06): wire the range scan into ci push-gate-check`
@@ -191,7 +191,7 @@ decision. Git failure → refuse, naming the failure (FR6 row 2). No object sour
 
 ---
 
-- [ ] **T-090-07 — `--redact` output mode (FR8a)**
+- [x] **T-090-07 — `--redact` output mode (FR8a)**
 
 **Owner role:** software-engineer · **Commit:**
 `feat(T-090-07): --redact output mode for doctor and context verbs`
@@ -220,7 +220,7 @@ parallel with anything else.
 
 ---
 
-- [ ] **T-090-08 — Redaction doctrine and projection (FR8b)**
+- [x] **T-090-08 — Redaction doctrine and projection (FR8b)**
 
 **Owner role:** ai-engineer · **Commit:**
 `docs(T-090-08): redaction-at-authoring doctrine for QA evidence`
@@ -242,7 +242,7 @@ masked by hand; a foreign Spec Context name is never pasted verbatim. Re-project
 
 ---
 
-- [ ] **T-090-09 — End-to-end journey and timing measurement**
+- [x] **T-090-09 — End-to-end journey and timing measurement**
 
 **Owner role:** software-engineer · **Commit:**
 `test(T-090-09): e2e planted-term push refusal + scan timing`
@@ -264,7 +264,7 @@ its owner, per the LARGE-tier rules.
 
 ---
 
-- [ ] **T-090-10 — qa-engineer review of the increment (flat alpha-close)**
+- [x] **T-090-10 — qa-engineer review of the increment (flat alpha-close)**
 
 **Owner role:** qa-engineer · **Commit:** review artifact committed to the branch
 
@@ -285,7 +285,7 @@ returning named defects to the implementer.
 
 ---
 
-- [ ] **T-090-11 — Memory update (CLOSURE phase)**
+- [x] **T-090-11 — Memory update (CLOSURE phase)**
 
 **Owner role:** product-engineer · **Commit:**
 `docs(T-090-11): memory — push-range scan and redaction posture`
@@ -314,7 +314,7 @@ added; SPEC §5 satisfied file by file.
 
 ---
 
-- [ ] **T-090-12 — CLOSURE, dispositions, release archive, version bump**
+- [x] **T-090-12 — CLOSURE, dispositions, release archive, version bump**
 
 **Owner role:** product-engineer (text) + software-engineer/dispatcher (**[git]** steps)
 · **Commit:** `docs(T-090-12): close release v0.9.0`

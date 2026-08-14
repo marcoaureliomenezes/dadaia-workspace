@@ -1,7 +1,7 @@
 {
   "_header": {
     "name": "public-privacy baseline structural denylist",
-    "version": 1,
+    "version": 4,
     "description": "Versioned, fail-closed baseline of STRUCTURAL regex patterns scanned against public/ assets when no operator denylist is present. Operator terms (DADAIA_PRIVACY_DENYLIST / .dadaia/states/privacy_denylist.json) are ADDITIVE and merge on top of this baseline. Patterns are conservative to avoid false positives on SHA hashes in lockfiles, doc/loopback IP ranges, and example hostnames. Edit only via an approved release task; bump 'version' on change.",
     "released_in": "v0.1.10",
     "excludes": [
@@ -12,7 +12,10 @@
       "198.51.100.0/24 (RFC 5737 documentation)",
       "203.0.113.0/24 (RFC 5737 documentation)",
       "example.com / example.org / example.net hostnames",
-      "*.example email domains"
+      "*.example email domains",
+      "RFC-2606 reserved TLDs in email domains (.invalid/.test/.example/.localhost), any depth of subdomain — v0.9.0",
+      "workspace.local (the exact literal only, in both the internal-hostname pattern and as an email domain) — the product's own synthetic git commit identity host (git_subprocess.py's user.email=dadaia@workspace.local fallback); any OTHER *.local host, or *.workspace.local subdomain, still matches — v0.9.0 code-review remediation",
+      "Path.home / pathlib.Path.home (the exact literal only, case-sensitive) in internal-hostname — the stdlib dotted-attribute-chain idiom Path.home(), not a hostname; any OTHER *.home host (e.g. a real internal TLD) still matches — v0.9.0 code-review remediation, self-scan regression"
     ]
   },
   "patterns": [
@@ -32,7 +35,7 @@
       "id": "internal-hostname",
       "regex": "(?<![\\w.-])(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\.)+(?:local|internal|lan|intranet|corp|home)(?![\\w.-])",
       "reason": "non-public internal hostname (*.local/*.internal/*.lan/*.intranet/*.corp/*.home)",
-      "exclude_regex": null
+      "exclude_regex": "^(?:workspace\\.local|(?:pathlib\\.)?Path\\.home)$"
     },
     {
       "id": "home-abs-path",
@@ -44,7 +47,7 @@
       "id": "email-address",
       "regex": "(?<![\\w.+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}(?![\\w.-])",
       "reason": "email address",
-      "exclude_regex": "@(?:example\\.(?:com|org|net)|noreply\\.anthropic\\.com|users\\.noreply\\.github\\.com)$"
+      "exclude_regex": "@(?:example\\.(?:com|org|net)|noreply\\.anthropic\\.com|users\\.noreply\\.github\\.com|workspace\\.local|(?:[A-Za-z0-9-]+\\.)*(?:invalid|test|example|localhost))$"
     },
     {
       "id": "secret-token",

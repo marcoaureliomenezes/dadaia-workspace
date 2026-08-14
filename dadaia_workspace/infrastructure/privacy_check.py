@@ -162,6 +162,27 @@ def _load_privacy_denylist() -> tuple[tuple[str, str], ...]:
     return ()
 
 
+def load_privacy_terms() -> tuple[tuple[str, str], ...]:
+    """Public accessor over the operator denylist loader (SPEC v0.9.0 FR3, source 1).
+
+    Reused by the push-range denylist scan (``features.chokepoints.denylist_scan``) so
+    the CLI wires ONE operator term source, not a second denylist — same resolution
+    order as :func:`check_public_privacy` (``$DADAIA_PRIVACY_DENYLIST``, then
+    ``<workspace>/.dadaia/states/privacy_denylist.json``). Empty when neither resolves.
+    """
+    return _load_privacy_denylist()
+
+
+def load_baseline_patterns() -> tuple[_BaselinePattern, ...]:
+    """Public accessor over the packaged structural baseline (SPEC v0.9.0 FR3, source 2).
+
+    Same compiled patterns :func:`check_public_privacy` scans public assets with —
+    reused, not forked, so the push-range scan and the public-privacy doctor check stay
+    a single source of truth for what counts as a structural privacy match.
+    """
+    return _load_privacy_baseline()
+
+
 def _scan_text_for_baseline(
     text: str, patterns: Iterable[_BaselinePattern]
 ) -> list[tuple[str, str]]:
