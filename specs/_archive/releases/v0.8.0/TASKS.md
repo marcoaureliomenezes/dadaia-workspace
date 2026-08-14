@@ -168,7 +168,7 @@ before/after diff summarized in the handoff.
 
 ---
 
-- [ ] **T-080-06 — CLOSURE, memory record, release archive, version bump**
+- [x] **T-080-06 — CLOSURE, memory record, release archive, version bump**
 
 **Owner role:** product-engineer (text) + software-engineer/dispatcher (**[git]** steps)
 · **Commit:** `docs(T-080-06): close release v0.8.0`
