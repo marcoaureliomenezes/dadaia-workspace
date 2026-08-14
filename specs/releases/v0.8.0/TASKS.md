@@ -120,7 +120,7 @@ editable at this point).
 
 ---
 
-- [ ] **T-080-04 — [git] Archive both audits under the `--dispositioned-v0.8.0` name**
+- [-] **T-080-04 — [git] Archive both audits under the `--dispositioned-v0.8.0` name**
 
 **Owner role:** software-engineer (or dispatcher) · **Commit:**
 `docs(T-080-04): archive both audits dispositioned by v0.8.0`
