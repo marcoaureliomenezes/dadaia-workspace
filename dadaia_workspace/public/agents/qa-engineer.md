@@ -394,6 +394,10 @@ public asset privacy, secrets/tokens, auth/access control, dependency additions,
 generated files, and consumer-specific data leakage. Surface suspected leakage in your
 handoff to `project-manager`, who dispatches `security-reviewer`; keep the task blocked.
 
+**Redaction at authoring time.** Diagnostic output transcribed into any authored
+document — QA evidence, SPEC, CLOSURE, report, handoff — is captured with `--redact` or
+masked by hand; a foreign Spec Context name is never pasted verbatim.
+
 ---
 ## dadaia CLI
 

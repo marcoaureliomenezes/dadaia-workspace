@@ -362,6 +362,13 @@ class SpecContextService:
 
         backfilled_url = self._backfill_repo_url(repo_slug, ctx_latest.repo_url)
 
+        # Bug context-alive-sweeps-unrelated-worktree-changes (MEDIUM): the scaffold
+        # commit below must stage EXACTLY the paths this method creates/modifies below
+        # — never a blanket ``git add -A``/``-u`` sweep that would silently fold in
+        # pre-existing unrelated dirty tracked files (e.g. an operator's mid-edit
+        # docker-compose.yml). `touched` accumulates only those repo-relative paths.
+        touched: list[str] = []
+
         specs_dir = self._specs_dir(repo_slug)
         if not specs_dir.exists():
             if _SCAFFOLD_SRC.exists():
@@ -369,6 +376,8 @@ class SpecContextService:
             else:
                 for subdir in ("", "memory", "features"):
                     (specs_dir / subdir).mkdir(parents=True, exist_ok=True)
+            # Entirely new tree — every path under it is scaffold-authored.
+            touched.append("specs")
         elif _SCAFFOLD_SRC.exists():
             preserved = _backup.preserve_specs(specs_dir)
             added = _merge_scaffold_into(_SCAFFOLD_SRC, specs_dir)
@@ -380,6 +389,10 @@ class SpecContextService:
                     added,
                     preserved,
                 )
+                # Pre-existing specs/ may carry its own unrelated dirty files — stage
+                # only the individual files the merge actually added, never the whole
+                # directory.
+                touched.extend(Path("specs", rel).as_posix() for rel in added)
             else:
                 shutil.rmtree(preserved, ignore_errors=True)
                 _log.info("scaffold merge into pre-existing specs/: no missing files found")
@@ -388,6 +401,7 @@ class SpecContextService:
         repo_agents_src = _PUBLIC_DIR / "templates" / "repo-AGENTS.md"
         if not repo_agents_dst.exists() and repo_agents_src.exists():
             shutil.copy2(repo_agents_src, repo_agents_dst)
+            touched.append("AGENTS.md")
 
         # v0.7.0 FR3 (T-070-07): the scoped test law lands ONLY where a tests/ tree
         # already exists — alive() never invents the directory (a stray tests/ would
@@ -407,16 +421,22 @@ class SpecContextService:
             and tests_agents_src.exists()
         ):
             shutil.copy2(tests_agents_src, tests_agents_dst)
+            touched.append(Path("tests", "AGENTS.md").as_posix())
 
         # Commit the scaffold alive() itself just wrote (bug alive-scaffold-blocks-dead,
         # validation-027 F-06): leaving tool-created files untracked made an immediate
         # dead() refuse via the untracked-consent guard, so create->alive->dead could
         # never complete on a fresh context. Only tool-authored files are involved here;
         # operator-created untracked files still hit dead()'s guard as designed (F-5).
+        # commit_paths (never commit_all) keeps this scoped to `touched` alone — any
+        # pre-existing unrelated dirty tracked file stays untouched and uncommitted
+        # (bug context-alive-sweeps-unrelated-worktree-changes).
         with contextlib.suppress(Exception):
-            if self._git.is_git_root(repo_path) and self._git.is_dirty(repo_path):
-                self._git.commit_all(
-                    repo_path, "chore(scaffold): dadaia context alive specs baseline"
+            if touched and self._git.is_git_root(repo_path) and self._git.is_dirty(repo_path):
+                self._git.commit_paths(
+                    repo_path,
+                    "chore(scaffold): dadaia context alive specs baseline",
+                    tuple(touched),
                 )
 
         ctx_fresh = self._store.get(name)

@@ -15,15 +15,34 @@ not exist.
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from pathlib import Path
+from typing import Any
 
 import pytest
 
-from dadaia_workspace.features.chokepoints import push_gate_decision
+from dadaia_workspace.core.protocols.git_object_reader import ScannedObject
+from dadaia_workspace.features.chokepoints import Decision, push_gate_decision
 from dadaia_workspace.features.chokepoints.service import PushRef, parse_push_refs
 
 _SHA_A = "a" * 40
 _ZERO = "0" * 40
+
+
+class _EmptyObjectSource:
+    """No denylist configured for these tests — the scan step is a pure pass-through."""
+
+    def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
+        return ()
+
+
+def _decide(root: Path, refs: list[PushRef], **kwargs: Any) -> Decision:
+    """``push_gate_decision`` with a no-op object source unless a test overrides it —
+    these tests exercise branch-policy behavior, not the v0.9.0 denylist scan (covered
+    separately in ``test_push_denylist_scan.py``)."""
+    kwargs.setdefault("object_source", _EmptyObjectSource())
+    kwargs.setdefault("repo", root)
+    return push_gate_decision(root, refs, **kwargs)
 
 
 def _handoff(root: Path, name: str, *, commit_sha: str = _SHA_A) -> None:
@@ -52,9 +71,7 @@ def _refs(*lines: str) -> list[PushRef]:
 
 def test_push_of_main_is_refused_even_with_approved_verdict(tmp_path: Path) -> None:
     _handoff(tmp_path, "approve-a")
-    decision = push_gate_decision(
-        tmp_path, _refs(f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}")
-    )
+    decision = _decide(tmp_path, _refs(f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}"))
     assert not decision.allowed
     # A4.2: the message names the rule, the permitted value, and the corrective action.
     assert "main" in decision.message
@@ -64,7 +81,7 @@ def test_push_of_main_is_refused_even_with_approved_verdict(tmp_path: Path) -> N
 
 def test_push_of_feature_branch_is_refused_as_local_only(tmp_path: Path) -> None:
     _handoff(tmp_path, "approve-a")
-    decision = push_gate_decision(
+    decision = _decide(
         tmp_path, _refs(f"refs/heads/feature/v0.6.0 {_SHA_A} refs/heads/feature/v0.6.0 {_ZERO}")
     )
     assert not decision.allowed
@@ -80,18 +97,14 @@ def test_push_of_feature_branch_is_refused_as_local_only(tmp_path: Path) -> None
 
 def test_develop_push_with_covering_verdict_is_allowed(tmp_path: Path) -> None:
     _handoff(tmp_path, "approve-a", commit_sha=_SHA_A)
-    decision = push_gate_decision(
-        tmp_path, _refs(f"refs/heads/develop {_SHA_A} refs/heads/develop {_ZERO}")
-    )
+    decision = _decide(tmp_path, _refs(f"refs/heads/develop {_SHA_A} refs/heads/develop {_ZERO}"))
     assert decision.allowed
 
 
 def test_develop_push_without_covering_verdict_is_refused(tmp_path: Path) -> None:
     # An APPROVE exists but for a DIFFERENT sha — it does not cover this delta.
     _handoff(tmp_path, "approve-stale", commit_sha="b" * 40)
-    decision = push_gate_decision(
-        tmp_path, _refs(f"refs/heads/develop {_SHA_A} refs/heads/develop {_ZERO}")
-    )
+    decision = _decide(tmp_path, _refs(f"refs/heads/develop {_SHA_A} refs/heads/develop {_ZERO}"))
     assert not decision.allowed
     # The refusal teaches the diff-based contract.
     assert "origin/develop..develop" in decision.message
@@ -104,9 +117,7 @@ def test_develop_push_without_covering_verdict_is_refused(tmp_path: Path) -> Non
 
 
 def test_tag_push_still_passes_with_no_verdict(tmp_path: Path) -> None:
-    decision = push_gate_decision(
-        tmp_path, _refs(f"refs/tags/v9.9.9 {_SHA_A} refs/tags/v9.9.9 {_ZERO}")
-    )
+    decision = _decide(tmp_path, _refs(f"refs/tags/v9.9.9 {_SHA_A} refs/tags/v9.9.9 {_ZERO}"))
     assert decision.allowed
 
 
@@ -119,7 +130,7 @@ def test_push_of_unpatterned_branch_is_refused_naming_the_four_patterns(
     tmp_path: Path,
 ) -> None:
     _handoff(tmp_path, "approve-a")
-    decision = push_gate_decision(
+    decision = _decide(
         tmp_path, _refs(f"refs/heads/bugfix/whatever {_SHA_A} refs/heads/bugfix/whatever {_ZERO}")
     )
     assert not decision.allowed
@@ -178,13 +189,13 @@ def test_malformed_stdin_fails_closed_naming_the_sanctioned_bypass(tmp_path: Pat
     refs, malformed = parse_push_stdin("this line has three fields\n")
     assert refs == []
     assert malformed == 1
-    decision = push_gate_decision(tmp_path, refs, malformed_lines=malformed)
+    decision = _decide(tmp_path, refs, malformed_lines=malformed)
     assert not decision.allowed
     assert "--no-verify" in decision.message
 
     empty_refs, empty_malformed = parse_push_stdin("")
     assert empty_malformed == 0
-    assert push_gate_decision(tmp_path, empty_refs, malformed_lines=0).allowed
+    assert _decide(tmp_path, empty_refs, malformed_lines=0).allowed
 
 
 def test_pushing_develop_to_a_foreign_remote_ref_is_refused(tmp_path: Path) -> None:
@@ -194,9 +205,7 @@ def test_pushing_develop_to_a_foreign_remote_ref_is_refused(tmp_path: Path) -> N
     remote ref other than refs/heads/develop is a refusal.
     """
     _handoff(tmp_path, "approve-a", commit_sha=_SHA_A)
-    decision = push_gate_decision(
-        tmp_path, _refs(f"refs/heads/develop {_SHA_A} refs/heads/main {_ZERO}")
-    )
+    decision = _decide(tmp_path, _refs(f"refs/heads/develop {_SHA_A} refs/heads/main {_ZERO}"))
     assert not decision.allowed
     assert "refs/heads/main" in decision.message
     assert "develop" in decision.message
@@ -204,7 +213,7 @@ def test_pushing_develop_to_a_foreign_remote_ref_is_refused(tmp_path: Path) -> N
 
 def test_detached_head_ref_gets_a_pushable_branch_diagnosis(tmp_path: Path) -> None:
     """Finding 6: `git push origin HEAD:develop` — right outcome needs the right words."""
-    decision = push_gate_decision(tmp_path, _refs(f"HEAD {_SHA_A} refs/heads/develop {_ZERO}"))
+    decision = _decide(tmp_path, _refs(f"HEAD {_SHA_A} refs/heads/develop {_ZERO}"))
     assert not decision.allowed
     assert "refs/heads/develop" in decision.message
 

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-12T22:46:21Z",
+  "generated_at": "2026-08-14T19:48:53Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -347,16 +347,18 @@
       "category": "product",
       "area": "platform",
       "tldr": "ALIVE/DEAD context registry, one resolution authority (three law rungs), bind-driven injection, advisory presence.",
-      "summary": "Manages Spec Context Projects and their repositories. A single resolution function answers \"which context is this?\" for every verb, hook and gate; bind persists context and mode only for the caller and never acquires a lock. Concurrent work is allowed and surfaced through expiring presence records.",
+      "summary": "Manages Spec Context Projects and their repositories. A single resolution function answers \"which context is this?\" for every verb, hook and gate; bind persists context and mode only for the caller and never acquires a lock. Concurrent work is allowed and surfaced through expiring presence records. `list` and `show` accept `--redact` to mask foreign context names in table and JSON output.",
       "path": "specs/memory/product/platform/context-management.md",
       "tags": [
         "context",
         "lifecycle",
         "session",
-        "no-locks"
+        "no-locks",
+        "privacy"
       ],
-      "token_estimate": 400,
+      "token_estimate": 470,
       "depends_on": [
+        "quality-assurance",
         "spec-context-project",
         "sdd-gate-v3",
         "workspace-doctor",
@@ -461,16 +463,18 @@
       "category": "product",
       "area": "platform",
       "tldr": "Diagnoses root hygiene, venv health, context coherence, stale presence, and retired lock-state residue; repairs only deterministic state.",
-      "summary": "`dadaia doctor` checks workspace-root law, forbidden caches, required state layout, workspace venv health, context repository coherence, repo URLs, stale presence, and legacy lock/pointer residue. `--fix` performs bounded deterministic cleanup.",
+      "summary": "`dadaia doctor` checks workspace-root law, forbidden caches, required state layout, workspace venv health, context repository coherence, repo URLs, stale presence, and legacy lock/pointer residue. `--fix` performs bounded deterministic cleanup and `--redact` masks foreign Spec Context names in the reported issues.",
       "path": "specs/memory/product/platform/workspace-doctor.md",
       "tags": [
         "workspace",
         "doctor",
         "health",
-        "repair"
+        "repair",
+        "privacy"
       ],
-      "token_estimate": 184,
+      "token_estimate": 260,
       "depends_on": [
+        "quality-assurance",
         "context-management",
         "sdd-gate-v3",
         "workspace-init"
@@ -549,21 +553,22 @@
       "title": "sdd-gate-v3",
       "category": "product",
       "area": "sdd",
-      "tldr": "No-lock SDD enforcement: deterministic path/mode gates, advisory presence, warn-only concurrent commits, and a develop-only, security-gated push boundary.",
-      "summary": "The merged Python PreToolUse gate enforces root whitelist, workspace venv usage, path class, phase, and the caller's own mode. It never waits for or blocks on another session. Presence is advisory. Git pre-commit warns only; pre-push enforces the CI preflight, develop-only branch policy, and a security verdict covering the develop delta.",
+      "tldr": "No-lock SDD enforcement: path/mode gates, advisory presence, and a develop-only, denylist-scanned, security-gated push boundary.",
+      "summary": "The merged Python PreToolUse gate enforces root whitelist, workspace venv usage, path class, phase, and the caller's own mode. It never waits for or blocks on another session. Presence is advisory. Git pre-commit warns only; pre-push enforces the CI preflight, develop-only branch policy, a range-scoped denylist scan of the new objects the push would publish, and a security verdict covering the develop delta.",
       "path": "specs/memory/product/sdd/sdd-gate-v3.md",
       "tags": [
         "sdd",
         "gate",
         "hooks",
         "enforcement",
-        "no-locks"
+        "no-locks",
+        "privacy"
       ],
-      "token_estimate": 760,
+      "token_estimate": 1320,
       "depends_on": [
         "context-management",
-        "workspace-doctor",
-        "architecture"
+        "architecture",
+        "workspace-doctor"
       ]
     },
     {

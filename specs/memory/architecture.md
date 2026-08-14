@@ -13,8 +13,8 @@ tags:
 - dependency-rules
 - agents
 - sdd
-token_estimate: 1240
-last_updated: '2026-08-12'
+token_estimate: 1300
+last_updated: '2026-08-14'
 release_origin: v0.3.0
 ---
 
@@ -86,8 +86,17 @@ none (`infrastructure/git_subprocess.py`), so containers and CI never die on it.
 Git chokepoints are installed from:
 
 - `public/scripts/pre-commit-presence-gate.sh` - concurrency warning only;
-- `public/scripts/pre-push-ci-gate.sh` - CI preflight, branch policy, and develop-diff
-  security verdict.
+- `public/scripts/pre-push-ci-gate.sh` - CI preflight, branch policy, range-scoped
+  denylist scan, and develop-diff security verdict.
+
+`features/chokepoints/` is pure decision logic: it imports no `infrastructure` module and
+spawns no subprocess. The I/O its gates need arrives as core ports the CLI injects at the
+call site — `ProcessAncestry` for the pre-commit ancestry probe, and `GitObjectReader`
+(adapter `infrastructure/git_objects.GitSubprocessObjectReader`, built at the composition
+root) for listing the new objects of a pushed range ([[sdd-gate-v3]]). The object source
+is a required parameter of the push decision function, so an unwired production call site
+is a type error rather than a silently skipped gate; import-linter contracts pin the ring
+purity.
 
 ### Handoffs and reports
 

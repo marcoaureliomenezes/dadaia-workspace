@@ -18,11 +18,13 @@ from dadaia_workspace.core.exceptions import (
     NoActiveReleaseError,
     WorkspaceNotInitializedError,
 )
+from dadaia_workspace.core.protocols.git_object_reader import GitObjectReader
 from dadaia_workspace.core.protocols.process_ancestry import ProcessAncestry
 from dadaia_workspace.core.specs_resolver import repo_slug_for_context
 from dadaia_workspace.core.specs_resolver import resolve_context as _core_resolve_context
 from dadaia_workspace.features.academy.service import AcademyService
 from dadaia_workspace.features.agents.reader import FileSystemAgentsProvider
+from dadaia_workspace.features.chokepoints.denylist_scan import BaselinePatternLike
 from dadaia_workspace.features.export.service import ExportService
 from dadaia_workspace.features.panel.service import PanelService
 from dadaia_workspace.features.panel.views.academy import render_academy_lesson
@@ -188,6 +190,39 @@ def build_git_client() -> "GitClient":
     ``current_branch``) compose it here.
     """
     return GitSubprocessClient()
+
+
+def build_git_object_reader() -> GitObjectReader:
+    """Composition-root seam for the ``GitObjectReader`` adapter (v0.9.0 FR1/FR7).
+
+    The CLI layer must not import infrastructure directly (import-linter contract);
+    ``push-gate-check`` composes the subprocess-backed reader here, exactly as
+    :func:`build_git_client` does for the read-only git probe. A single concrete
+    adapter today (subprocess-backed, cross-platform via the ``git`` executable on
+    PATH) — no platform branching needed, unlike :func:`build_process_ancestry`.
+    """
+    from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
+
+    return GitSubprocessObjectReader()
+
+
+def load_denylist_terms() -> tuple[tuple[str, str], ...]:
+    """Composition-root seam over the operator privacy denylist (v0.9.0 FR3, source 1).
+
+    ``push-gate-check`` reads operator terms through here rather than importing
+    ``infrastructure.privacy_check`` directly (``cli-no-infrastructure``).
+    """
+    from dadaia_workspace.infrastructure.privacy_check import load_privacy_terms
+
+    return load_privacy_terms()
+
+
+def load_denylist_baseline_patterns() -> tuple[BaselinePatternLike, ...]:
+    """Composition-root seam over the packaged baseline privacy patterns (v0.9.0 FR3,
+    source 2) — same accessor :func:`load_denylist_terms` reuses the sibling of."""
+    from dadaia_workspace.infrastructure.privacy_check import load_baseline_patterns
+
+    return load_baseline_patterns()
 
 
 def build_process_ancestry() -> ProcessAncestry:

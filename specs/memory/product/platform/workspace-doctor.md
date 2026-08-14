@@ -6,14 +6,16 @@ tldr: Diagnoses root hygiene, venv health, context coherence, stale presence, an
 summary: >-
   `dadaia doctor` checks workspace-root law, forbidden caches, required state layout,
   workspace venv health, context repository coherence, repo URLs, stale presence, and
-  legacy lock/pointer residue. `--fix` performs bounded deterministic cleanup.
+  legacy lock/pointer residue. `--fix` performs bounded deterministic cleanup and
+  `--redact` masks foreign Spec Context names in the reported issues.
 tags:
 - workspace
 - doctor
 - health
 - repair
-token_estimate: 184
-last_updated: '2026-07-13'
+- privacy
+token_estimate: 260
+last_updated: '2026-08-14'
 release_origin: v0.2.3
 ---
 
@@ -33,6 +35,17 @@ cannot all be enforced by write hooks.
   `.dadaia/sessions/runtime/` residue.
 - `EFF-1`: overdue efficiency-audit signal.
 
+## Redacted Output
+
+`dadaia doctor --redact` renders every issue with each Spec Context name and repo slug
+other than the caller's resolved context replaced by a stable `[REDACTED-CONTEXT-<n>]`
+placeholder, ordinal by first appearance within the invocation. It exists because
+doctor's own diagnostics — stale-presence lines and the ALIVE/DEAD repository coherence
+checks — name foreign contexts, and that output gets transcribed into authored documents
+([[quality-assurance]]). The flag is opt-in and applies at the render boundary only:
+without it the output is unchanged, and the checks themselves always operate on true
+names.
+
 ## Repair
 
 `dadaia doctor --fix` removes stale presence and retired lock-state trees, repairs
@@ -47,4 +60,4 @@ confined to deterministic workspace-owned state.
 
 ## Dependencies
 
-[[context-management]], [[sdd-gate-v3]], [[workspace-init]].
+[[context-management]], [[sdd-gate-v3]], [[workspace-init]], [[quality-assurance]].

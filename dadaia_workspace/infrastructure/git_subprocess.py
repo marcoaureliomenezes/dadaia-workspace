@@ -2,6 +2,7 @@
 
 import logging
 import subprocess
+from collections.abc import Sequence
 from pathlib import Path
 
 from dadaia_workspace.core.exceptions import GitCloneError, GitSyncError
@@ -73,6 +74,42 @@ def _stage_files_safe(path: Path) -> None:
         _run(["git", "add", "--"] + safe, cwd=path)
 
 
+def _commit(path: Path, msg: str) -> None:
+    """Run ``git commit`` against whatever is currently staged in *path*.
+
+    Shared by ``commit_all`` (blanket staging) and ``commit_paths`` (explicit-path
+    staging) — the staging strategy differs, the commit/identity-fallback/no-op
+    handling does not.
+    """
+    # Tool-authored commits must not depend on an operator git identity being
+    # configured (validation-029 F-06: containers/CI runners without user.email made
+    # dead()'s auto-commit die with 'Please tell me who you are'). When no identity
+    # resolves, fall back to a deterministic tool identity via -c overrides; a
+    # configured identity always wins.
+    commit_cmd = ["git"]
+    identity = _run(["git", "config", "user.email"], cwd=path)
+    if identity.returncode != 0 or not identity.stdout.strip():
+        commit_cmd += [
+            "-c",
+            "user.name=dadaia-workspace",
+            "-c",
+            "user.email=dadaia@workspace.local",
+        ]
+    commit_cmd += ["commit", "-m", msg]
+    result = _run(commit_cmd, cwd=path)
+
+    # Bug 2 fix: treat empty stdout+stderr with non-zero exit as silent
+    # no-op (submodule edge case); include both streams in error message.
+    if result.returncode != 0:
+        stdout = result.stdout.strip()
+        stderr = result.stderr.strip()
+        if "nothing to commit" in stdout:
+            return  # normal no-op
+        if not stdout and not stderr:
+            return  # silent no-op (submodule edge case)
+        raise GitSyncError(f"git commit failed in {path}. stdout: {stdout!r} stderr: {stderr!r}")
+
+
 class GitSubprocessClient:
     def clone(self, url: str, dest: Path) -> None:
         # Block the two transports that turn a URL into code/option execution:
@@ -97,36 +134,21 @@ class GitSubprocessClient:
     def commit_all(self, path: Path, msg: str) -> None:
         # Bug 1 fix: use safe staging that excludes embedded git repos
         _stage_files_safe(path)
+        _commit(path, msg)
 
-        # Tool-authored commits must not depend on an operator git identity being
-        # configured (validation-029 F-06: containers/CI runners without user.email made
-        # dead()'s auto-commit die with 'Please tell me who you are'). When no identity
-        # resolves, fall back to a deterministic tool identity via -c overrides; a
-        # configured identity always wins.
-        commit_cmd = ["git"]
-        identity = _run(["git", "config", "user.email"], cwd=path)
-        if identity.returncode != 0 or not identity.stdout.strip():
-            commit_cmd += [
-                "-c",
-                "user.name=dadaia-workspace",
-                "-c",
-                "user.email=dadaia@workspace.local",
-            ]
-        commit_cmd += ["commit", "-m", msg]
-        result = _run(commit_cmd, cwd=path)
+    def commit_paths(self, path: Path, msg: str, paths: Sequence[str]) -> None:
+        """Stage and commit exactly *paths* — never a blanket ``-A``/``-u`` sweep.
 
-        # Bug 2 fix: treat empty stdout+stderr with non-zero exit as silent
-        # no-op (submodule edge case); include both streams in error message.
-        if result.returncode != 0:
-            stdout = result.stdout.strip()
-            stderr = result.stderr.strip()
-            if "nothing to commit" in stdout:
-                return  # normal no-op
-            if not stdout and not stderr:
-                return  # silent no-op (submodule edge case)
-            raise GitSyncError(
-                f"git commit failed in {path}. stdout: {stdout!r} stderr: {stderr!r}"
-            )
+        Bug context-alive-sweeps-unrelated-worktree-changes (MEDIUM): callers that
+        must commit only the files THEY themselves just wrote (e.g. the ``context
+        alive`` scaffold commit) use this instead of ``commit_all``, so pre-existing
+        unrelated worktree modifications stay untouched and uncommitted. A no-op
+        (nothing staged, nothing committed) when *paths* is empty.
+        """
+        if not paths:
+            return
+        _run(["git", "add", "--", *paths], cwd=path)
+        _commit(path, msg)
 
     def has_remote(self, path: Path) -> bool:
         result = _run(["git", "remote"], cwd=path)

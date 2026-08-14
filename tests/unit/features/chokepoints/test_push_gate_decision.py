@@ -8,16 +8,35 @@ single canonical field, no ``scope`` fallback) — per-sha re-key law.
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from pathlib import Path
+from typing import Any
 
 import pytest
 
-from dadaia_workspace.features.chokepoints import push_gate_decision
+from dadaia_workspace.core.protocols.git_object_reader import ScannedObject
+from dadaia_workspace.features.chokepoints import Decision, push_gate_decision
 from dadaia_workspace.features.chokepoints.service import PushRef, parse_push_refs
 
 _SHA_A = "a" * 40
 _SHA_B = "b" * 40
 _ZERO = "0" * 40
+
+
+class _EmptyObjectSource:
+    """No denylist configured for these tests — the scan step is a pure pass-through."""
+
+    def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
+        return ()
+
+
+def _decide(root: Path, refs: list[PushRef], **kwargs: Any) -> Decision:
+    """``push_gate_decision`` with a no-op object source unless a test overrides it —
+    these tests exercise the pre-existing verdict/branch-policy behavior, not the
+    v0.9.0 denylist scan (covered separately in ``test_push_denylist_scan.py``)."""
+    kwargs.setdefault("object_source", _EmptyObjectSource())
+    kwargs.setdefault("repo", root)
+    return push_gate_decision(root, refs, **kwargs)
 
 
 def _handoff(
@@ -60,9 +79,7 @@ def _refs(*lines: str) -> list[PushRef]:
 
 def test_approved_pushed_sha_passes(tmp_path: Path) -> None:
     _handoff(tmp_path, "sec-approve", commit_sha=_SHA_A)
-    d = push_gate_decision(
-        tmp_path, _refs(f"refs/heads/develop {_SHA_A} refs/heads/develop {_ZERO}")
-    )
+    d = _decide(tmp_path, _refs(f"refs/heads/develop {_SHA_A} refs/heads/develop {_ZERO}"))
     assert d.allowed, d.message
 
 
@@ -70,9 +87,7 @@ def test_stale_sha_approve_blocks(tmp_path: Path) -> None:
     """An APPROVE for a different (older) sha than the one being pushed never passes —
     stale approvals do not carry forward across commits (per-sha re-key law)."""
     _handoff(tmp_path, "sec-approve", commit_sha=_SHA_B)
-    d = push_gate_decision(
-        tmp_path, _refs(f"refs/heads/develop {_SHA_A} refs/heads/develop {_ZERO}")
-    )
+    d = _decide(tmp_path, _refs(f"refs/heads/develop {_SHA_A} refs/heads/develop {_ZERO}"))
     assert not d.allowed
     assert _SHA_A[:12] in d.message
 
@@ -102,7 +117,7 @@ def test_passes_without_verdict(tmp_path: Path, ref_line: str, setup: str | None
         ctx_dir.mkdir(parents=True)
         (ctx_dir / "broken.handoff.json").write_text("{ not json", encoding="utf-8")
         _handoff(tmp_path, "sec-good", commit_sha=_SHA_A)
-    d = push_gate_decision(tmp_path, _refs(ref_line))
+    d = _decide(tmp_path, _refs(ref_line))
     assert d.allowed
 
 
@@ -166,7 +181,7 @@ def test_non_counting_verdicts_block_matrix(
     expect_message_contains: str | None,
 ) -> None:
     setup(tmp_path)  # type: ignore[operator]
-    d = push_gate_decision(tmp_path, _refs(*ref_lines))
+    d = _decide(tmp_path, _refs(*ref_lines))
     assert not d.allowed
     if expect_message_contains is not None:
         assert expect_message_contains in d.message
