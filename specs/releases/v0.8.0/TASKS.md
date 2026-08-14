@@ -1,6 +1,6 @@
 # TASKS — Release v0.8.0 — Audit disposition
 
-**Status:** Draft
+**Status:** Aprovado
 **Release ID:** v0.8.0
 **Owner:** product-engineer
 **Source SPEC:** `specs/releases/v0.8.0/SPEC.md`
@@ -62,7 +62,7 @@ commit. Also set `ACTIVE.md` phase from `DEFINITION` to `IMPLEMENTATION` in the 
 
 ---
 
-- [ ] **T-080-02 — [git] Milestone (a): merge, security review, push**
+- [-] **T-080-02 — [git] Milestone (a): merge, security review, push**
 
 **Owner role:** dispatcher + `security-reviewer` · **Commit:** merge commit on `develop`
 

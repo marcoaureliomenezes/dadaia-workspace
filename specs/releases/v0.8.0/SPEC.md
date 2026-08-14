@@ -1,6 +1,6 @@
 # SPEC — Release v0.8.0 — Audit disposition
 
-**Status:** Draft
+**Status:** Aprovado
 **Release ID:** v0.8.0
 **Owner:** product-engineer
 **Opened:** 2026-08-14
