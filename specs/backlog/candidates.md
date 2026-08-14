@@ -2,7 +2,7 @@
 
 > **Reconciled 2026-08-14.** The previous consolidation (2026-07-10) is fully delivered
 > and retired to `_archive/` — see History. Every active claim below was re-verified
-> against HEAD (`bb78dc40`) on 2026-08-14.
+> against HEAD (`bb78dc40`) on 2026-08-14; entry #3 registered at `8a8f4f80`.
 
 ## Pick-precedence notice (DADAIA.md §5)
 
@@ -17,22 +17,29 @@ Dispositioning the audits is release work (`product-engineer`, release-definitio
 mandatory grill) — this index only makes the precedence visible; it does not
 disposition anything.
 
-## Active candidates (3)
+## Active candidates (4)
 
 | # | Entry | Status | PM priority | Verified at HEAD (2026-08-14) |
 |---|---|---|---|---|
 | 1 | `whole-tree-denylist-push-scan` | candidate | **P1** | Blind spot confirmed: `check_public_privacy` (`infrastructure/privacy_check.py:184`) scans `public/` only; anchor `push_gate_decision` (`features/chokepoints/service.py:309`) exists. Two identical leak incidents in consecutive releases (v0.6.0, v0.7.0) on record. **Operator decision pending** on scan scope + sanctioned-term exceptions — must be settled in the mandatory grill before SPEC. |
 | 2 | `test-suite-remediation-stewardship` | candidate | **P1** | **Unblocked.** Its declared blocker `test-stewardship-standardization` was DELIVERED in v0.7.0 (2026-08-12; entry in `_archive/`). Ready to pick. |
-| 3 | `retire-dead-hotfix-surface` | candidate | **P2** | Dead surface confirmed still in tree: `hotfix_app` (`cli/commands/specs.py:26,346`), SPEC-DOC-022/023 hotfix-section checks (`features/specs/doctor_governance.py`), `release_hotfix.md.j2` + `closure_hotfix.md.j2` still shipped. Small, riskless removal. |
+| 3 | `20260814-dd-lifecycle-skills-family` | candidate | **P2** | Registered at `8a8f4f80` from direct operator demand. Family gap confirmed at source: no `dd-*` skill exists under `dadaia_workspace/public/skills/`; `dadaia-release-definition` and `dadaia-release-closure` exist (revisit + rename targets), `drift-detection` partially covers project audit; backlog-definition, release-implement, bug-registration, and bug-fix stages have no skill. **Operator decision pending** for the grill: rename scope `dadaia-` → `dd-` (cycle family only vs ALL `dadaia-*` skills — impacts names cited textually in the law). A parallel `ai-engineer` rules/skills inventory + extraction map will be attached as release evidence. Implementer: `ai-engineer`. |
+| 4 | `retire-dead-hotfix-surface` | candidate | **P2** | Dead surface confirmed still in tree: `hotfix_app` (`cli/commands/specs.py:26,346`), SPEC-DOC-022/023 hotfix-section checks (`features/specs/doctor_governance.py`), `release_hotfix.md.j2` + `closure_hotfix.md.j2` still shipped. Small, riskless removal. |
 
 Priority rationale (evidence above, not preference): #1 is a recurring privacy-leak
 class that today survives only on manual review — the root-cause doctrine owes the
 structural fix; #2 became actionable the day v0.7.0 shipped its doctrine; #3 is
-confirmed dead-code removal, small and low-risk, no urgency driver.
+strategic surface restructuring with a token-economy driver that touches every session
+(rules dehydration) — high value, but no incident/root-cause driver, and its grill
+carries an unresolved naming decision plus a pending `ai-engineer` inventory as
+evidence, so it ranks below the two P1s; within P2 it outranks #4 because the
+dehydration payoff recurs per session while #4 has no urgency driver; #4 is confirmed
+dead-code removal, small and low-risk. Final priority is the operator's at pick time,
+and the §5 precedence notice (2 audits + 1 open bug) outranks this whole table.
 
 Known open inconsistency (not resolved here): the SPEC-DOC-022/023 governance checks
 still police a `## Hotfixes pendentes` intake section in this file that the v0.6.0 law
-revoked — this index intentionally does not carry that section; entry #3 is the queued
+revoked — this index intentionally does not carry that section; entry #4 is the queued
 removal of those checks.
 
 ## Rejected entries (retained per never-delete law)
