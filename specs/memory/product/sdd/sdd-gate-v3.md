@@ -108,8 +108,11 @@ branch, the **new objects the push would publish** are scanned before any networ
 The range is computed from the `remote_sha` git itself supplies on the pre-push stdin
 line: `git rev-list --objects <local-sha> --not <remote-sha>` when that sha resolves
 locally, and `--not --remotes` when it is zero or unresolvable, so a stale or ahead
-remote-tracking ref can neither over- nor under-scan. Only blob entries are read, each
-decoded as UTF-8 and de-duplicated by object sha across the whole push. A deletion ref
+remote-tracking ref can neither over- nor under-scan. Only blob entries are read — through a
+single batched `git cat-file` conversation per range rather than one subprocess per object,
+which is what keeps a full-history fallback range affordable — each decoded as UTF-8 and
+de-duplicated by object sha across the whole push, then streamed into the matcher rather than
+materialised as a list. A deletion ref
 publishes no object and is not scanned. The working tree and existing history are out of
 scope by design — whole-tree scanning stays in the audit lane.
 
@@ -118,14 +121,21 @@ Term sources are additive, and the scan is never a no-op:
 1. the **operator denylist** when present — literal, case-insensitive substrings loaded
    from `$DADAIA_PRIVACY_DENYLIST` or `.dadaia/states/privacy_denylist.json`, which are
    operator-private by design and never enter the repository;
-2. the **packaged structural baseline** (version 2) — IPv4/IPv6 literals, internal
+2. the **packaged structural baseline** (version 4) — IPv4/IPv6 literals, internal
    hostnames, absolute home paths, email addresses, and secret-looking tokens — with its
-   `exclude_regex` carve-outs honored, including loopback and documentation address
-   ranges, `example.*` hosts, and RFC-2606 reserved-TLD email domains at any subdomain
-   depth;
+   `exclude_regex` carve-outs honored. The carve-out set is: loopback and documentation
+   address ranges; `example.*` hosts and the noreply mail domains; RFC-2606 reserved-TLD
+   email domains at any subdomain depth; the product's **own synthetic git commit identity**
+   host `workspace.local`, as an exact literal in both the internal-hostname pattern and as
+   an email domain, because it is a fixture host the product itself injects rather than an
+   operator's network; and the stdlib `Path.home` / `pathlib.Path.home` call forms, which the
+   internal-hostname pattern would otherwise read as a `.home` hostname. Every carve-out is
+   anchored to an exact literal: any other `.local` host, any other subdomain of the
+   carved-out host, and any real `.home` hostname still match;
 3. the **foreign repo slugs** — the directory names under `repos/`, excluding the slug of
    the repository being pushed, matched on word boundaries so a short slug never fires
-   inside a longer word.
+   inside a longer word, and **case-insensitively**, so a slug written with different
+   capitalisation is still caught. The whole matcher is case-insensitive on every layer.
 
 With no operator denylist present, layers 2 and 3 still run; the gate names on stderr the
 mode it ran in — `operator denylist + baseline` or `baseline only (no operator
@@ -140,6 +150,7 @@ The boundary between fail-closed and fail-open is explicit:
 | A term matches | refuse |
 | `git rev-list` or an object read fails | refuse, naming the git failure |
 | A blob is not valid UTF-8 | skip that blob, count it, and report the count on the allow and refuse paths alike |
+| A blob exceeds the 5 MB per-object cap | skip it the same way — the size is known from the batch-check listing, so its content is never fetched at all |
 | No object source wired into the decision function | refuse at the CLI boundary — the source is a required parameter, so an unwired production path is a defect, not a bypass |
 
 There is no sanctioned-terms or amnesty list anywhere in the product: a new object
@@ -153,6 +164,14 @@ a term already published inside `specs/_archive/` — is void by construction:
 > rather than by exception list. The invariant holds exactly as long as `_archive/` stays
 > FROZEN; if a future release ever edits an archived file, the scan will — correctly —
 > refuse the push.
+
+That invariant covers **renames of existing blobs**, and only those. A document *authored*
+into `specs/_archive/` — a `CLOSURE.md` written at close time, a QA artifact created in
+place — is an ordinary new blob: its content has never been published, the archive path
+grants it nothing, and the scan reads it like any other new object. This is correct
+behaviour, and it is the reason archive-time documents follow the redaction-at-authoring
+doctrine the quality-assurance atom records: a closure that transcribes a diagnostic literal
+refuses its own push. The blob-reuse guarantee is a property of `git mv`, not of the directory.
 
 The refusal is satisfiable and masked. Per offending object it names the ref
 (`<local-ref> → <remote-ref>`), the blob path with the 1-based line number of the first
