@@ -7,14 +7,16 @@ summary: >-
   Manages Spec Context Projects and their repositories. A single resolution function
   answers "which context is this?" for every verb, hook and gate; bind persists context
   and mode only for the caller and never acquires a lock. Concurrent work is allowed and
-  surfaced through expiring presence records.
+  surfaced through expiring presence records. `list` and `show` accept `--redact` to mask
+  foreign context names in table and JSON output.
 tags:
 - context
 - lifecycle
 - session
 - no-locks
-token_estimate: 400
-last_updated: '2026-08-12'
+- privacy
+token_estimate: 470
+last_updated: '2026-08-14'
 release_origin: v0.2.3
 ---
 
@@ -85,6 +87,19 @@ to a live session.
 READ is opt-in self-protection: it blocks this session's mutating file-tool writes while
 leaving additive intake paths writable. It cannot impose READ mode on another session.
 
+## Redacted Output
+
+`context list` and `context show` accept `--redact` in both their table and `--json`
+forms, including the `presence` block. Every context name and repo slug other than the
+caller's resolved context is replaced by a stable `[REDACTED-CONTEXT-<n>]` placeholder,
+ordinal by first appearance within one invocation, so the same foreign context carries
+the same placeholder everywhere it appears in that output. The caller's own context stays
+visible. Redaction applies at the render boundary only — the registry and services keep
+returning true names, the default output is unchanged, and the redacted `--json` remains
+valid JSON with the same key set, so a machine consumer's parsing contract does not
+change. The purpose is authoring hygiene: output pasted into a document must not carry a
+foreign Spec Context name ([[quality-assurance]]).
+
 ## Presence
 
 Mutating file-tool activity best-effort records advisory presence under
@@ -104,4 +119,5 @@ No `.dadaia/` directory may exist inside a repository.
 
 ## Dependencies
 
-[[spec-context-project]], [[sdd-gate-v3]], [[workspace-doctor]], [[workspace-init]].
+[[spec-context-project]], [[sdd-gate-v3]], [[workspace-doctor]], [[workspace-init]],
+[[quality-assurance]].

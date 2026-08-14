@@ -8,8 +8,8 @@ summary: >-
   browser evidence, the flake/quarantine policy and its escalation ladder, the test-health
   metrics with tiered timeouts and ratcheted wall-clock ceilings, CI gates including the
   required pr-source-guard on main and the main/develop-only push triggers, coverage as a
-  by-product metric, cross-platform checks, the consumer-side approval boundary, and
-  anti-slop requirements.
+  by-product metric, cross-platform checks, the consumer-side approval boundary, the
+  redaction-at-authoring posture for diagnostic output, and anti-slop requirements.
 tags:
 - testing
 - pytest
@@ -18,8 +18,9 @@ tags:
 - test-architecture
 - flake
 - quarantine
-token_estimate: 1747
-last_updated: '2026-08-12'
+- privacy
+token_estimate: 1900
+last_updated: '2026-08-14'
 release_origin: v0.3.0
 ---
 
@@ -71,6 +72,22 @@ not acceptable outcomes. The recurrence evidence is unambiguous: structural fixe
 family within a day. Removal is the preferred remedy; an additive-only fix carries an
 explicit justification of why removal was impossible.
 
+## Redaction At Authoring
+
+Diagnostic output naming a Spec Context other than the caller's own is the entry path by
+which a private name reaches an authored document. It is captured with `--redact` or
+masked by hand before it enters QA evidence, a SPEC, a CLOSURE, a report, or a handoff; a
+foreign Spec Context name or repo slug is never pasted verbatim. The three operator verbs
+whose output can name a foreign context — `dadaia doctor`, `dadaia context list`,
+`dadaia context show` — all accept `--redact`, which replaces every context name and repo
+slug other than the caller's resolved context with a stable `[REDACTED-CONTEXT-<n>]`
+placeholder, ordinal by first appearance within one invocation. Redaction is opt-in and
+happens only at the render boundary: default output is unchanged, the services keep
+returning true names, and the `--json` form stays valid JSON with the same key set. The
+doctrine binds the `qa-engineer` persona, which carries it in its canonical source; the
+push-boundary denylist scan ([[sdd-gate-v3]]) is the mechanical backstop for the same
+class of leak on the exit path.
+
 ## Satisfiable Diagnostics
 
 A gate never demands what its own tooling refuses. Every diagnostic must be **healable by
@@ -87,6 +104,14 @@ construction — enforcement answers *may this next event be appended*, diagnosi
 *is this history healed*, and they agree precisely because the compensation is an event
 enforcement already accepts. Healing history never disables the check: a fresh,
 uncompensated violation still fails.
+
+The push-boundary denylist refusal ([[sdd-gate-v3]]) is the same contract outside an
+event-sourced store. It names the offending object, its line, and the term in masked
+form, and it names the single action that clears it: edit the file, then rewrite the
+offending commits before the push so no pushed object carries the term. Because the
+scan's scope is the objects the push would publish, that action is always available and a
+rewrite of already-published history is never demanded — a refusal clearable only by
+rewriting published history would be a defect in the check.
 
 ## Browser Validation
 
@@ -197,4 +222,4 @@ and Playwright outputs are redirected. Forbidden repo-local artifacts include
 
 ## Dependencies
 
-[[tech-stack]], [[architecture]], [[panel]], [[consumer-agent-support]].
+[[tech-stack]], [[architecture]], [[panel]], [[consumer-agent-support]], [[sdd-gate-v3]].
