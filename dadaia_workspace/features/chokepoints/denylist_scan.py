@@ -36,13 +36,23 @@ class BaselinePatternLike(Protocol):
 
     ``infrastructure.privacy_check.load_baseline_patterns()`` returns instances that
     already satisfy this shape (``id``, ``regex``, ``reason``, ``exclude``) — no import
-    of the concrete type is needed on either side.
+    of the concrete type is needed on either side. Declared as read-only properties
+    (not plain attributes) so a FROZEN dataclass — like the concrete
+    ``_BaselinePattern`` — structurally satisfies it: a Protocol with plain attribute
+    annotations implies read-write access, which a frozen dataclass cannot offer.
     """
 
-    id: str
-    regex: re.Pattern[str]
-    reason: str
-    exclude: re.Pattern[str] | None
+    @property
+    def id(self) -> str: ...
+
+    @property
+    def regex(self) -> re.Pattern[str]: ...
+
+    @property
+    def reason(self) -> str: ...
+
+    @property
+    def exclude(self) -> re.Pattern[str] | None: ...
 
 
 @dataclass(frozen=True)

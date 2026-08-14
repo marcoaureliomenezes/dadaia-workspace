@@ -223,28 +223,80 @@ def _run_backlog_doctor_gate(repo_root: Path) -> None:
         raise typer.Exit(1)
 
 
+def _foreign_repo_slugs(workspace: Path, own_slug: str | None) -> list[str]:
+    """Every directory under ``<workspace>/repos/`` except the pushed repo's own slug.
+
+    SPEC v0.9.0 FR3, term source 3 — the self-slug is excluded HERE, before it ever
+    reaches the matcher (A3.2's regression guard: matching the pushed repo's own slug
+    would block every push of this repository). Hidden entries (dotfiles) are skipped;
+    a missing ``repos/`` directory (e.g. the library repo run standalone) yields ``[]``.
+    """
+    repos_dir = workspace / "repos"
+    if not repos_dir.is_dir():
+        return []
+    return sorted(
+        entry.name
+        for entry in repos_dir.iterdir()
+        if entry.is_dir() and entry.name != own_slug and not entry.name.startswith(".")
+    )
+
+
 @app.command("push-gate-check")
 def push_gate_check() -> None:
-    """Pre-push gate (FR-W1-02 / v0.6.0 FR4): branch policy + diff-based security verdict.
+    """Pre-push gate (FR-W1-02 / v0.6.0 FR4 / v0.9.0 FR1-FR6): branch policy + the
+    range-scoped denylist scan + diff-based security verdict.
 
     Reads the pre-push ref lines from stdin (``<local-ref> <local-sha> <remote-ref>
     <remote-sha>``). Refuses any non-deletion, non-tag ref that is not
     ``refs/heads/develop`` (gitflow law: main via PR only; feature/hotfix local-only;
-    names outside the four patterns invalid). The pushed ``develop`` tip must carry a
-    ``security-reviewer`` APPROVED handoff (``metrics.commit_sha`` == tip sha) covering
-    the ``origin/develop..develop`` delta. Branch deletions and tag pushes pass.
-    Commits are never review-blocked here.
+    names outside the four patterns invalid). Every non-deletion ref (tags included) is
+    then scanned for new objects carrying a denylisted term (v0.9.0 FR1/FR2) — the
+    pushed ``develop`` tip must ALSO carry a ``security-reviewer`` APPROVED handoff
+    (``metrics.commit_sha`` == tip sha) covering the ``origin/develop..develop`` delta.
+    Branch deletions are never scanned and pass with no verdict; tag pushes are scanned
+    but keep their DP-5 verdict carve-out. Commits are never review-blocked here.
+
+    The object source, denylist terms, baseline patterns and foreign-slug set are ALL
+    built and passed here — the CLI is the sole composition point for the injected
+    ``GitObjectReader`` port (FR7); a production call site that failed to wire one
+    would be a defect, never a bypass (FR6 row 4).
     """
-    from dadaia_workspace.features.chokepoints import push_gate_decision
+    from dadaia_workspace.container import (
+        build_git_object_reader,
+        load_denylist_baseline_patterns,
+        load_denylist_terms,
+    )
+    from dadaia_workspace.features.chokepoints import context_slug_for_path, push_gate_decision
     from dadaia_workspace.features.chokepoints.service import parse_push_stdin
 
     repo_root = _repo_root()
     workspace = _resolve_workspace_root(repo_root)
     handoff_root = workspace / ".dadaia" / "handoff"
 
+    denylist_terms = load_denylist_terms()
+    baseline_patterns = load_denylist_baseline_patterns()
+    own_slug = context_slug_for_path(workspace, repo_root)
+    foreign_slugs = _foreign_repo_slugs(workspace, own_slug)
+
+    mode = (
+        "operator denylist + baseline" if denylist_terms else "baseline only (no operator denylist)"
+    )
+    typer.echo(f"[pre-push] denylist scan mode: {mode}", err=True)
+
     stdin_text = sys.stdin.read() if not sys.stdin.isatty() else ""
     refs, malformed = parse_push_stdin(stdin_text)
-    decision = push_gate_decision(handoff_root, refs, malformed_lines=malformed)
+    decision = push_gate_decision(
+        handoff_root,
+        refs,
+        object_source=build_git_object_reader(),
+        repo=repo_root,
+        malformed_lines=malformed,
+        denylist_terms=denylist_terms,
+        baseline_patterns=baseline_patterns,
+        foreign_slugs=foreign_slugs,
+    )
+    if decision.warn:
+        typer.echo(decision.warn, err=True)
     if not decision.allowed:
         typer.secho(decision.message, fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
