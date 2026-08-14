@@ -8,11 +8,26 @@ IDENTICAL output to their pre-FR8a behavior when the flag is absent. Every strin
 was captured from the verb's actual output before the ``--redact`` flag existed, so a
 byte-for-byte regression here means the new flag's plumbing leaked into the default
 path — not a decision this task is free to re-litigate.
+
+Byte-for-byte golden literals are inherently platform-specific wherever they embed a
+``rich.table.Table`` rendering: Rich substitutes its default HEAVY_HEAD box-drawing
+characters for the ASCII-safe SQUARE box whenever ``Console.legacy_windows`` resolves
+True (no Windows Virtual Terminal support detected — the case for CI runners without an
+attached VT-capable console), independent of ``sys.platform`` alone
+(`rich.console.detect_legacy_windows`, `rich.box.Box.substitute`). Plain-text and
+``--json`` output never goes through box substitution, so those golden literals hold on
+every platform. Only ``dadaia context list``'s default table output embeds box-drawing
+characters in this module (`dadaia doctor` and `dadaia context show` render plain
+``console.print(f"...")`` lines with no ``Table``); its byte-for-byte pin is therefore
+scoped to Linux (where it was captured), paired with a platform-independent assertion
+that runs everywhere and pins the semantic half of A8.2: the default table still carries
+the true, unredacted context name and never leaks a ``[REDACTED-CONTEXT-`` placeholder.
 """
 
 from __future__ import annotations
 
 import json
+import platform
 from pathlib import Path
 
 import pytest
@@ -144,6 +159,10 @@ def test_doctor_default_fix_output_unchanged(workspace: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skipif(
+    platform.system() != "Linux",
+    reason="golden output pinned on Linux Rich rendering; Windows renders ASCII-safe boxes",
+)
 def test_context_list_default_table_output_unchanged(workspace: Path) -> None:
     _register_alive_ctx(workspace)
     result = _runner.invoke(app, ["context", "list"])
@@ -156,6 +175,19 @@ def test_context_list_default_table_output_unchanged(workspace: Path) -> None:
         "│ caller-ctx │ alive │ caller-ctx │\n"
         "└────────────┴───────┴────────────┘\n"
     )
+
+
+def test_context_list_default_table_output_unredacted_on_every_platform(
+    workspace: Path,
+) -> None:
+    """Platform-free half of A8.2: regardless of which box-drawing style Rich picks
+    for the current platform, the default (no ``--redact``) table must still carry the
+    true context name and never a ``[REDACTED-CONTEXT-`` placeholder."""
+    _register_alive_ctx(workspace)
+    result = _runner.invoke(app, ["context", "list"])
+    assert result.exit_code == 0, result.output
+    assert "caller-ctx" in result.output
+    assert "[REDACTED-CONTEXT-" not in result.output
 
 
 def test_context_list_default_json_output_unchanged(workspace: Path) -> None:
