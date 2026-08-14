@@ -9,6 +9,10 @@
 > one routed note deliberately **not** materialized (see the decisions list at the
 > bottom).
 >
+> **Addendum 2026-08-14 (post-v0.5.2 hotfix).** Entry #18 registered from the
+> APPROVED v0.5.2 pre-push security review (LOW follow-up routing); pick-precedence
+> notice updated — the outranking bug was resolved by that hotfix.
+>
 > Per grill ADR #14 the backlog converges to a single `BACKLOG.md` (ACTIVE + LEDGER)
 > inside the dd-lifecycle-skills-family release. **Not anticipated here** — this index
 > and the per-file entries remain the format of record until that release lands.
@@ -16,21 +20,19 @@
 ## Pick-precedence notice (DADAIA.md §5)
 
 At release-pick time, open bugs and undispositioned audits **outrank** every fresh
-backlog entry in this index. Currently outranking:
-
-- **Open bug:** `context-alive-sweeps-unrelated-worktree-changes` (MEDIUM,
-  `bugs.jsonl`) — Arm B on `hotfix/{M.m.p}`, never release material.
-
-Both 2026-07 audits left this list on 2026-08-14: v0.8.0 dispositioned all 18
-findings and archived both files to `specs/audits/_archive/` naming it
-(`…--dispositioned-v0.8.0`).
+backlog entry in this index. Currently outranking: **none** — bug
+`context-alive-sweeps-unrelated-worktree-changes` (MEDIUM) was resolved by hotfix
+v0.5.2 (2026-08-14, merge `db753b1c`, `resolved` event in `bugs.jsonl`; `dadaia bugs
+status`: 0 open), and both 2026-07 audits left this list on 2026-08-14 when v0.8.0
+dispositioned all 18 findings and archived both files to `specs/audits/_archive/`
+naming it (`…--dispositioned-v0.8.0`).
 
 **Standing operator decision, pending (v0.8.0 CLOSURE return #3):** is `deferred`
 terminal for bug `panel-telemetry-sqlite-corrupts-under-concurrent-access`, or does
 it return to the queue? Undecided; will keep surfacing at every pick. The related
 dangling-pointer repair is entry #12 below and proceeds either way.
 
-## Active candidates (17)
+## Active candidates (18)
 
 | # | Entry | Status | PM priority | State at HEAD (2026-08-14) |
 |---|---|---|---|---|
@@ -51,6 +53,7 @@ dangling-pointer repair is entry #12 below and proceeds either way.
 | 15 | `gitflow-reconciliation-merge-mechanic` | candidate | P3 | v0.7.0 CLOSURE return. No "reconciliation" mention in the gitflow skill at HEAD; `ai-engineer` surface. |
 | 16 | `memory-path-class-dotfiles` | candidate | P3 | v0.7.0 CLOSURE return. Gate classifies all of `specs/memory/` MEMORY by prefix (`gate_policy.py:56,218-219`); dotfile question undecided. |
 | 17 | `redact-foreign-context-names-at-qa-authoring` | candidate | — (absorbed) | v0.7.0 CLOSURE return. **Absorvido como FR na release push-range-denylist-scan (grill ADR #5) — não pickável isoladamente.** |
+| 18 | `commit-paths-index-scope-hardening` | candidate | P2 | **New 2026-08-14** (post-v0.5.2 hotfix push) — materializes the single LOW of the APPROVED v0.5.2 security review (handoff `2026-08-14T172631Z-…-scaffold-commit-scope`): `commit_paths` discards its `git add -- <paths>` exit status and commits the WHOLE index (`git commit -m` with no pathspec), so a gitignored scaffold path or operator pre-staged content can land in the scaffold-titled commit — CWE-754 (+CWE-668), OWASP A08, same consent class as the v0.5.2-fixed bug narrowed to index-staged content. Fix: checked `git add` + path-scoped `git commit -m <msg> -- <paths>` + `:(literal)`/`--pathspec-from-file` defence. Residual of the v0.5.2 fix, orbits `git_subprocess`; Arm-B hardening lane with #9; `software-engineer`. |
 
 Priority rationale: #1 is a recurring privacy-leak class whose entire contract the
 grill just settled — the root-cause doctrine owes the structural fix; #2 is real,
@@ -58,12 +61,13 @@ large, and now truthfully measured, but the operator excluded it from the curren
 round (ADR #6); #3 is the operator's strategic priority with recurring token payoff
 (release 3); #4 remains small/riskless; #5–#7 are grill-mandated feeders of releases
 1–2 and the NO-LOCKS gap; #8 is the adopted Codex fidelity boundary (large but
-self-contained, pairs naturally with the #3 AI-surface release); #9 carries the only
-open security findings in the index and should ride the next hotfix/patch window;
-#10–#12 are v0.8.0 CLOSURE debt with concrete evidence but no incident driver;
-#13–#16 are materialized v0.7.0 CLOSURE debt; #17 is not independently pickable.
-The §5 precedence notice above outranks this whole table, and final priority is the
-operator's at pick time.
+self-contained, pairs naturally with the #3 AI-surface release); #9 and #18 carry
+the only open security-review residuals in the index and should ride the next
+hotfix/patch window (#18 additionally orbits the surface the v0.5.2 hotfix just
+touched, so the context is warm); #10–#12 are v0.8.0 CLOSURE debt with concrete
+evidence but no incident driver; #13–#16 are materialized v0.7.0 CLOSURE debt; #17
+is not independently pickable. The §5 precedence notice above outranks this whole
+table, and final priority is the operator's at pick time.
 
 ## Ideas (5)
 
