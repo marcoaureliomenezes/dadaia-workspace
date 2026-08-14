@@ -4,6 +4,26 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.2] — 2026-08-14
+
+Hotfix (Arm B, `hotfix/v0.5.2`). No release ceremony.
+
+### Fixed
+- **`dadaia context alive` no longer sweeps pre-existing unrelated dirty tracked files
+  into its scaffold commit** (bug `context-alive-sweeps-unrelated-worktree-changes`,
+  MEDIUM). The `chore(scaffold): dadaia context alive specs baseline` commit called
+  `GitClient.commit_all`, whose staging (`git add -u` + untracked sweep) is a blanket
+  operation over the whole working tree — any pre-existing operator WIP on tracked files
+  (e.g. a dirty `docker-compose.yml`/`supervisord.conf`) got silently folded into the
+  tool-authored commit with no consent, and `git status` came back clean afterwards.
+  `alive()` now tracks exactly which repo-relative paths the scaffold step itself
+  created/modified (`specs/**` newly written, the individual files a merge into a
+  pre-existing `specs/` actually added, `AGENTS.md`, `tests/AGENTS.md`) and stages only
+  those via a new explicit-path `GitClient.commit_paths` — never `-A`/`-u` over a shared
+  tree. Pre-existing unrelated worktree modifications now stay dirty and uncommitted.
+  Closes the `architecture-resilience` audit finding F-10 lineage (superseded by this
+  bug).
+
 ## [0.5.1] — 2026-08-14
 
 Hotfix (Arm B, `hotfix/v0.5.1`). No release ceremony.
