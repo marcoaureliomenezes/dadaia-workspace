@@ -45,7 +45,7 @@ def _init_repo(workspace: Path, slug: str) -> Path:
     repo = workspace / "repos" / slug
     repo.mkdir(parents=True)
     subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
-    subprocess.run(["git", "config", "user.email", "t@e.st"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.email", "t@example.com"], cwd=repo, check=True)
     subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True)
     (repo / "seed.txt").write_text("seed\n", encoding="utf-8")
     subprocess.run(["git", "add", "seed.txt"], cwd=repo, check=True)
