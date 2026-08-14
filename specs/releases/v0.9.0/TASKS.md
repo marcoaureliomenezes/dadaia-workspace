@@ -37,7 +37,7 @@
 
 ---
 
-- [-] **T-090-01 — [git] Commit the definition content on `feature/v0.9.0`**
+- [x] **T-090-01 — [git] Commit the definition content on `feature/v0.9.0`**
 
 **Owner role:** software-engineer (or dispatcher) · **Commit:**
 `docs(T-090-01): v0.9.0 definition — push-range denylist scan`
