@@ -4,6 +4,32 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] — 2026-08-14
+
+Release v0.9.0 (`push-range-denylist-scan`).
+
+### Added
+- **Push-range denylist scan at the pre-push gate**: every non-deletion ref (tags
+  included) has its newly published objects scanned against three additive term
+  layers — operator denylist (when present), packaged structural baseline
+  (now v4, with carve-outs for RFC-2606 reserved-TLD emails, the product's own
+  synthetic `workspace.local` identity, and stdlib `Path.home` call forms), and
+  foreign `repos/` slugs (word-boundary, case-insensitive, self-slug excluded).
+  Object reads run through a single batched `git cat-file` conversation with a
+  per-blob size cap. Fail-closed on git failure; binary/oversized blobs skipped
+  and counted; masked, satisfiable refusal that never echoes the matched term or
+  line; `git push --no-verify` remains the single traceable bypass.
+- **`--redact` output mode** on `dadaia doctor`, `dadaia context list` and
+  `dadaia context show` (table and `--json`): foreign context names and repo
+  slugs become stable ordinal placeholders; default output byte-for-byte
+  unchanged.
+- **Redaction-at-authoring doctrine** in the QA agent surface: diagnostic output
+  transcribed into authored documents is captured with `--redact` or masked.
+
+### Changed
+- Packaging author email switched to the GitHub noreply form (operator decision
+  during the release's own pre-PR review, whose scan refused the prior form).
+
 ## [0.5.2] — 2026-08-14
 
 Hotfix (Arm B, `hotfix/v0.5.2`). No release ceremony.

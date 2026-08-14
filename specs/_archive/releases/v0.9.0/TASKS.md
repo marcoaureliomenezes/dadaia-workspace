@@ -314,7 +314,7 @@ added; SPEC §5 satisfied file by file.
 
 ---
 
-- [-] **T-090-12 — CLOSURE, dispositions, release archive, version bump**
+- [x] **T-090-12 — CLOSURE, dispositions, release archive, version bump**
 
 **Owner role:** product-engineer (text) + software-engineer/dispatcher (**[git]** steps)
 · **Commit:** `docs(T-090-12): close release v0.9.0`
