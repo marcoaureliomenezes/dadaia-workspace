@@ -220,7 +220,7 @@ parallel with anything else.
 
 ---
 
-- [-] **T-090-08 — Redaction doctrine and projection (FR8b)**
+- [x] **T-090-08 — Redaction doctrine and projection (FR8b)**
 
 **Owner role:** ai-engineer · **Commit:**
 `docs(T-090-08): redaction-at-authoring doctrine for QA evidence`
