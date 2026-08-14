@@ -83,7 +83,7 @@ CI green.
 
 ---
 
-- [ ] **T-080-03 — Pre-archive verification (the irreversibility gate)**
+- [-] **T-080-03 — Pre-archive verification (the irreversibility gate)**
 
 **Owner role:** qa-engineer · **Commit:** none (evidence only; handoff/report)
 
