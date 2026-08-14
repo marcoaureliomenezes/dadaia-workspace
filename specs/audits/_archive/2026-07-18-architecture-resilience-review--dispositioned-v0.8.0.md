@@ -1,5 +1,10 @@
 # Architecture Resilience Review — the 21-bug retrospective (2026-07-18)
 
+> **Disposition:** v0.8.0 — all six findings (W1–W6) dispositioned; see
+> **[Disposition — release v0.8.0](#disposition--release-v080)** at the end of this file.
+> Everything between this line and that section is the original 2026-07-18 record,
+> unaltered.
+
 **Mandate (operator):** the Consumer validation cycle surfaced ~21 defects one after
 another. That pattern is architectural, not incidental. This review classifies every
 defect of the cycle by systemic root cause, names the structural weaknesses, states
@@ -100,3 +105,53 @@ the validator can no longer be satisfied by anything less than the real user flo
 - Proposed `normalize_zone()` single path canonicalizer (W5).
 - Proposed thin-wrapper projected scripts (W6).
 - Everything in W1–W3 is DONE and gate-enforced in this branch.
+
+---
+
+## Disposition — release v0.8.0
+
+**Disposing release:** v0.8.0 (`specs/_archive/releases/v0.8.0/`) — audit-disposition
+release of the 2026-08-14 grill.
+**Dispositioned:** 2026-08-14 · **Author:** product-engineer.
+**Basis:** operator grill of 2026-08-14, ADR #2
+(`.dadaia/reports/dadaia-workspace/product-engineer/2026-08-14T130830Z-refine-specs.html`),
+over the verification of
+`.dadaia/reports/dadaia-workspace/product-engineer/2026-08-14T041500Z-deep-triage.html`
+against HEAD `8a8f4f80`.
+
+**Unit of disposition.** This audit's findings are **W1–W6** — the five structural
+weaknesses of §2 plus W6. The 25-row dataset of §1 is the *evidence* that produced those
+weaknesses, not a list of findings, and is therefore not dispositioned row by row; each of
+those defects was already closed by its own bug ledger stream at the time of the review.
+The four requests of §4 map onto this table: the proposed `workflow-engine-unification`
+onto **W4**, the proposed `normalize_zone()` onto **W5**, the proposed thin-wrapper
+projected scripts onto **W6**, and "everything in W1–W3 is DONE" onto **W1–W3**.
+
+**The audited object no longer exists.** This review is entirely about the lifecycle
+workflow engine — its workers, gates, fragments, `run_store.py`, `AgentRunResult`,
+`domain_payload`, the durable ledger payload and the three parallel engines. Release
+v0.3.0 demolished all of it: "the engine core, its four workflow bodies, the
+`dadaia lifecycle` verb group, the Layer-2 worker adapters, the panel Workflows and
+Model-policy tabs, the fragment and persona asset trees, the workflow schemas, the
+container wiring, the import-linter contracts and every line of prose that described them
+are gone" (`specs/_archive/releases/v0.3.0/CLOSURE.md:10-17`; 348 files, +1 775 / −61 883,
+net **−60 108** at `:38`). Independent check at HEAD: `run_store|refuse_completed_rerun|
+AgentRunResult|domain_payload|emit_progress|fragment_gate|WorkflowEngine` returns **zero
+matches in production code** — every hit is historical text under `specs/`. The law
+ratified the outcome: "Arm A is agent-dispatched, not engine-run … No workflow engine
+assembles prompts or advances gates on your behalf" (§1).
+
+| # | Finding | Audit's own status | Disposition | Evidence |
+|---|---------|--------------------|-------------|----------|
+| W1 | Implicit worker↔gate contract | "Now enforced" | `rejected` — moot by removal | Declared DONE by the audit itself (§4, last bullet); the workers and the three-envelope translation it governed were deleted in v0.3.0. Nothing left to enforce or to fix |
+| W2 | Model steps held state-mutation power | "Now enforced" | `rejected` — moot by removal | DONE at review time, object removed afterwards. The surviving sentence — "workers produce artifacts; Python produces effects" — is an architecture principle carried in memory, not an open item |
+| W3 | Gates validated reports, not reality | "Now enforced" | `rejected` — moot by removal | DONE at review time, object removed afterwards. The living equivalent is the diff-based push gate (`features/chokepoints/service.py:309`), which validates the real pushed sha |
+| W4 | Three parallel engines → proposed `workflow-engine-unification` | "Remaining (proposed, next release) — the single highest-leverage simplification left" | `rejected` — superseded by demolition | The three engines were not unified, they were deleted (`specs/_archive/releases/v0.3.0/CLOSURE.md:10-17`, net −60 108 lines at `:38`, ≈ −25 419 LOC of production code). The delivered simplification is strictly larger than the proposed one; the proposal has no object |
+| W5 | No canonical path convention → proposed `normalize_zone()` | "Remaining (proposed)" | `rejected` — premise dead | The "zone" concept (an engine-side TASKS write-set) no longer exists: `normalize_zone|write_scope` under `dadaia_workspace/` → 0 matches; the only surviving `zone` is the unrelated `HygieneZone` (`core/models/hygiene.py:72`) |
+| W6 | Projected assets duplicate package logic → proposed thin wrappers | "Remaining (proposed)" | `superseded` by `specs/backlog/thin-wrapper-projected-scripts.md` | The **sole surviving concern**: the projected scripts outlived the demolition. `dadaia_workspace/public/scripts/lint-memory-atoms.py` is still a standalone re-implementation (own heading allowlist, own schema validation), and `features/specs/catalog.py:317-320` admits it "Mirrors `generate-memory-catalog.py:generate_index_md`". The direction is today **inverted** relative to the proposal — the package shells out to the script (`features/specs/doctor_memory.py:38-40,357`) rather than the script delegating inward. Extracted as a backlog entry written against HEAD with the corrected direction (grill ADR #2), so rejecting this audit does not lose it |
+
+**Score:** 5 `rejected` · 1 `superseded` — 6 of 6 dispositioned, none dropped (law §5).
+
+**Archive:** this file moves to
+`specs/audits/_archive/2026-07-18-architecture-resilience-review--dispositioned-v0.8.0.md`
+in release v0.8.0. Everything above this section is the original record, unaltered.

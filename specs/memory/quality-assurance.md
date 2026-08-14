@@ -2,18 +2,23 @@
 slug: quality-assurance
 title: quality-assurance
 category: core
-tldr: Layered pytest/contract/browser validation, strict CI with a required PR-source guard on main, consumer-side release gate, and zero repo-local test artifacts.
+tldr: Layered pytest/browser validation with declared intent, size tiers, per-tier timeouts, a bug-gated quarantine lane, and strict CI gates.
 summary: >-
-  Defines test layers, safety fixtures, browser evidence, CI gates including the required
-  pr-source-guard on main and the main/develop-only push triggers, coverage,
-  cross-platform checks, the consumer-side approval boundary, and anti-slop requirements.
+  Defines test layers and their size tiers, the intent taxonomy mapping, safety fixtures,
+  browser evidence, the flake/quarantine policy and its escalation ladder, the test-health
+  metrics with tiered timeouts and ratcheted wall-clock ceilings, CI gates including the
+  required pr-source-guard on main and the main/develop-only push triggers, coverage as a
+  by-product metric, cross-platform checks, the consumer-side approval boundary, and
+  anti-slop requirements.
 tags:
 - testing
 - pytest
 - ci
 - quality
 - test-architecture
-token_estimate: 690
+- flake
+- quarantine
+token_estimate: 1747
 last_updated: '2026-08-12'
 release_origin: v0.3.0
 ---
@@ -26,13 +31,25 @@ explicit opt-in.
 
 ## Layers
 
-| Layer | Scope |
-|---|---|
-| Unit | Pure behavior, validators, rendering, adapters with fakes. |
-| Contract | Public API/schema, architecture, security, projection, and invariant checks. |
-| Integration | CLI plus real temporary filesystem/state and composed services. |
-| E2E | Complete Python journeys and browser-backed panel behavior. |
-| Live opt-in | Explicit Codex binary validation outside default CI. |
+| Layer | Scope | Size tier |
+|---|---|---|
+| Unit | Pure behavior, validators, rendering, adapters with fakes. | SMALL |
+| Contract | Public API/schema, architecture, security, projection, and invariant checks. | SMALL |
+| Integration | CLI plus real temporary filesystem/state and composed services. | MEDIUM |
+| E2E | Complete Python journeys and browser-backed panel behavior. | LARGE |
+| Live opt-in | Explicit Codex binary validation outside default CI. | — |
+
+Every test declares its **intent** in the module docstring —
+`Intent: <KIND> — <AC id | bug-id | task-id>` — mapping to one of CONTRACT (permanent,
+asserts an acceptance criterion or a bug), SENTINEL (permanent, the single integration
+test of one seam), SCAFFOLD (temporary, expires at its task/release closure) or
+QUARANTINE (flaky, carries a registered bug id). An undeclared test is SCAFFOLD. Intent
+is never a pytest marker, because the marker namespace already binds `contract` to the
+layer directory `tests/contract/` and a same-named intent marker would silently re-tier
+tests and corrupt every `-m` selector. The taxonomy prose lives in `tests/AGENTS.md` and
+the operational protocol — admission, demotion, deletion, flake handling, health — lives
+in the universal skill `dadaia-test-stewardship`; memory records the state, not the
+protocol.
 
 `tests/conftest.py` carries two autouse safety backstops: it blocks accidental real
 Codex invocation unless the corresponding live flag is set
@@ -40,7 +57,10 @@ Codex invocation unless the corresponding live flag is set
 `DADAIA_CLAUDE_LIVE`), and it fakes `ensure_workspace_venv` so no test ever builds a
 real venv (disk/time protection). Temporary workspaces use pytest `tmp_path` or
 workspace `.dadaia/tmp/`; they never bootstrap the source repo as a consumer
-workspace. The suite is ~2,100 collected tests, green-serial in a few minutes.
+workspace. The gating set is ~2,123 collected tests, of which 55 are LARGE (e2e-tier
+pytest journeys; the wider LARGE census including the browser specs is ~84). A full
+local run passes ~2,120 with 3 environment-conditional skips (two Windows-only, one
+requiring a LAN IPv4) in 4:37 under `-n auto`.
 
 ## Root Cause, Always
 
@@ -77,6 +97,64 @@ nonblank-pixel-after-input journey is a normative requirement for new canvas wor
 yet enforced by an existing Playwright test. Screenshots and Playwright outputs go
 outside the repository.
 
+## Flake Policy
+
+Two markers carry flake state: `flaky` (observed pass and fail on identical code, under
+diagnosis) and `quarantine` (out of every gating selector). A `quarantine` mark requires
+a registered bug id as `bug="<bug-slug>"`; without it `tests/conftest.py` refuses
+collection with a `pytest.UsageError` whose actionable message is printed to stderr
+before the raise, so the reason survives an xdist worker crash. The marker set is closed
+and pinned: a contract test compares `pyproject.toml`'s markers against the known set in
+`tests/conftest.py`, so a typo cannot become a new exclusion lane.
+
+Quarantine is capped at 8 tests and, at cap, blocks admission of new LARGE tests.
+Escalation is time-bound: 30 days unresolved becomes `disabled`; 30 clean days restores
+the test; `disabled` plus one release with no registered plan is deleted. Diagnostic
+reruns are bounded at 3. The flake rate targets under 0.5 % of runs against a hard
+ceiling of 1 %.
+
+Quarantine is a carve-out of push-green, never a loosening of it. A green run with
+quarantined tests is green; an **unregistered pass-on-retry is a failure**. The panel E2E
+job keeps `retries: 1` and writes a Playwright JSON report outside the repository tree; a
+CI step fails the job on any `passed`-after-retry result unless that test is registered as
+quarantined, and names the offending spec. The step is fail-closed: a missing, empty,
+malformed or non-numeric report exits 1 rather than passing.
+
+## Test Health
+
+Three metrics stay continuously visible: flake rate, wall-clock trend, and the
+failure-to-defect ratio per test. The full structural audit fires on a trigger, never on a
+calendar — wall-clock growth over 25 % without equivalent new behavior, flake rate above
+the ceiling, LARGE count above the declared cap, or quarantine at cap.
+
+Per-test timeouts are applied by tier at collection and never override an explicit
+`@pytest.mark.timeout`:
+
+| Tier | Directory | Timeout |
+|---|---|---|
+| unit | `tests/unit/**` | 10 s |
+| contract | `tests/contract/**` | 30 s |
+| integration | `tests/integration/**` | 60 s |
+| e2e (LARGE) | `tests/e2e/**` | 120 s |
+
+A test that needs more time than its tier is mis-tiered: the tier is what gets fixed, never
+the default. Two tests carry a justified explicit ceiling above their tier — 180 s on a
+CLI-runner integration journey and 300 s on the full handoff emit-and-validate e2e
+pipeline — each citing a measured wall clock and a named remediation entry in the backlog.
+
+Every file under `tests/e2e/**` names an owner. The LARGE cap for this repository is 30,
+declared and measured as a WARN rather than a hard failure while the count is above it.
+
+Wall-clock baselines are frozen and ratcheted rather than open-ended: pre-push preflight
+quick 2:38, preflight full ~5:30, panel E2E 1:10, full local suite 4:37 under `-n auto`.
+Each CI pytest job carries a `timeout-minutes` ceiling set against those baselines, so
+raising a budget is a reviewable diff that requires a justification in the release CLOSURE.
+
+Mutation testing runs once per release, off the push path, as the judge of detection
+value; the cadence is declared and the tool is not yet selected. The protocol behind every
+value above — escalation, admission, demotion, deletion — is operated from
+`dadaia-test-stewardship`, the single operational home.
+
 ## CI
 
 CI runs importability, Ruff format/lint, import-linter, mypy strict, unit, contract with
@@ -84,6 +162,16 @@ CI runs importability, Ruff format/lint, import-linter, mypy strict, unit, contr
 repository hygiene, backlog doctor, branch/PR governance, security verdict, and a
 gitleaks secret-scan job on every push/PR. Release publication repeats the relevant
 quality ladder before build, approval, publish, and package smoke test.
+
+Every gating pytest selector excludes the quarantine lane — the six in `ci.yml`, the four
+in `release.yml`, and the base arguments of the local pre-push preflight — so a quarantined
+test runs only under an explicit `-m quarantine` diagnosis invocation and never inside a
+gate. The unit and unit-plus-contract coverage jobs report `--durations=25`; integration
+and E2E report `--durations=30`. Every pytest job carries a `timeout-minutes` ceiling
+(unit fast 2, contract coverage 5, cross-platform legs 8, integration 6, Python E2E 6,
+panel E2E 8). The 80 % floor on `unit or contract` is a CI gate and a by-product metric —
+never an acceptance target, never a reason to write a test, and never a score anchor for an
+audit.
 
 Push triggers are `main` and `develop` only, matching the branches that exist remotely;
 feature and hotfix branches are local-only and carry no trigger, so their coverage is the

@@ -422,7 +422,7 @@ verdict covers the `origin/develop..develop` delta about to be pushed. Any
 
 ---
 
-- [-] **T-070-10 — Milestone (b): merge to `develop`, push, PR to `main`, CI green**
+- [x] **T-070-10 — Milestone (b): merge to `develop`, push, PR to `main`, CI green**
 
 **Owner role:** software-engineer · **Commit:** merge commit + any CI fix
 
@@ -448,7 +448,7 @@ a fix CI demands (each returning its task to `[-]`).
 
 ---
 
-- [ ] **T-070-11 — Memory → CLOSURE → archive (in that order)**
+- [x] **T-070-11 — Memory → CLOSURE → archive (in that order)**
 
 **Owner role:** product-engineer · **Commit:** `docs(T-070-11): v0.7.0 closure, memory atoms, dispositions`
 

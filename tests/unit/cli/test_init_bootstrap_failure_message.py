@@ -6,7 +6,8 @@ CalledProcessError traceback when that version is not published, never naming th
 DADAIA_BOOTSTRAP_PACKAGE escape hatch that exists for exactly this case.
 
 The conftest anti-disk-exhaustion backstop fakes ensure_workspace_venv globally, so the
-seam is exercised directly (venv.create and pip both mocked) plus the CLI mapping.
+seam is exercised directly (subprocess.run mocked, pre-existing bare venv so
+interpreter resolution / creation are not in scope here) plus the CLI mapping.
 """
 
 from __future__ import annotations
@@ -28,7 +29,12 @@ _REAL_ENSURE = pe.VenvPythonEnvironmentManager.ensure_workspace_venv
 
 
 def test_ensure_workspace_venv_raises_actionable_error(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.setattr(pe.venv, "create", lambda *a, **k: None)
+    # Pre-existing bare venv (doctor VENV-1 repair shape): isolates this test to the
+    # install-failure path under test, independent of venv creation / interpreter
+    # resolution (each covered by their own dedicated tests in test_python_env.py).
+    from dadaia_workspace.core.platform import PLATFORM
+
+    (tmp_path / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir).mkdir(parents=True)
 
     def _boom(cmd, check=False, **kwargs):
         raise subprocess.CalledProcessError(1, cmd)

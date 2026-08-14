@@ -5,8 +5,8 @@ category: core
 tldr: Python 3.12 Typer CLI; stdlib services; three entry harnesses (Claude Code, Codex, Kimi Code); strict quality gates.
 summary: Current language, dependency, runtime, model, testing, packaging, and command contracts for dadaia-workspace.
 tags: [tech-stack, dependencies, toolchain, constraints]
-token_estimate: 420
-last_updated: '2026-08-07'
+token_estimate: 450
+last_updated: '2026-08-12'
 release_origin: v0.3.0
 ---
 
@@ -18,7 +18,7 @@ The session bootstrap injects only the top of this file — these bullets ARE th
 - Deps: Typer + Rich (CLI), PyYAML, Jinja2, jsonschema, Mistune, openpyxl; optional `claude-sdk` extra. Everything else is stdlib; SQLite backs local telemetry. Codex/Kimi Code are external operator-installed CLIs, never Python deps.
 - Entry harnesses (the whole roster, single-sourced as `L1_ENTRY_HARNESSES` in `core/harness_registry.py`): **Claude Code**, **Codex**, **Kimi Code**. Each gets its own projection (`.claude/`, `.codex/`, `.kimi-code/`) plus the shared `.agents/` skills root; Kimi registers hooks via a managed block in the user-level `$KIMI_CODE_HOME/config.toml` since it has no project-level config. The workspace runs no agent-execution runtime of its own.
 - Agent models: Layer-1 agent bodies are model-agnostic in source and receive `(model, effort)` at `public install` from the selected agent-policy template plus the operator overlay in `.dadaia/states/agent_model_policy.json`. Codex projections carry Codex-native `(model id × model_reasoning_effort)` tier identity, registry-derived.
-- Quality: pytest (markers unit/contract/integration/e2e/slow/tmp, `-p no:cacheprovider` in addopts), Ruff format/lint, mypy `--strict` (incremental disabled), import-linter, Hypothesis, Playwright (panel), gitleaks. Contract coverage ≥80% in CI; caches/artifacts always live outside repos.
+- Quality: pytest with the dev plugin set `pytest-cov`, `pytest-xdist` (CI and the local preflight run `-n auto`), `pytest-randomly` and `pytest-timeout` (per-tier defaults applied at collection); the closed marker set is eight — unit/contract/integration/e2e/slow/tmp/flaky/quarantine — and `-p no:cacheprovider` is in addopts. Ruff format/lint, mypy `--strict` (incremental disabled), import-linter, Hypothesis, Playwright (panel), gitleaks. Contract coverage ≥80% in CI as a gate, never an acceptance target; caches/artifacts always live outside repos.
 - Prohibitions: no system Python for workspace commands; no repo-local venv/`.dadaia`/cache/coverage trees; secrets only in the operator-managed root `.env` (or a runtime's external OAuth store); features reach infrastructure via ports + `container.py`, never directly.
 
 ## Canonical Commands

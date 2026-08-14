@@ -3,14 +3,14 @@ slug: public-asset-distribution
 title: public-asset-distribution
 category: product
 tldr: canonical public assets are staged to .dadaia/agentic and projected to Claude Code, Codex, Kimi Code, and shared .agents roots.
-summary: Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, universal skills projected to one canonical .agents/skills home with no registry entry, harness-profile-aware install/doctor, render-at-install of core agents (staged generic body + resolved agent-model policy composed into both L1 projections) with a policy-aware doctor render-compare, provenance-gated consumer AGENTS fan-out (banner-canonical restored vs hand-authored left [foreign]) with lexical repo-slug containment + destination-file symlink refusal, scoped AGENTS projections, source-root hygiene guard, and runtime projection contract.
+summary: Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, universal skills projected to one canonical .agents/skills home with no registry entry, repo templates copied at alive() (repo-AGENTS.md plus a conditional tests/AGENTS.md), harness-profile-aware install/doctor, render-at-install of core agents (staged generic body + resolved agent-model policy composed into both L1 projections) with a policy-aware doctor render-compare, provenance-gated consumer AGENTS fan-out (banner-canonical restored vs hand-authored left [foreign]) with lexical repo-slug containment + destination-file symlink refusal, scoped AGENTS projections, source-root hygiene guard, and runtime projection contract.
 tags:
 - public
 - assets
 - distribution
 - projection
 - privacy
-token_estimate: 2640
+token_estimate: 2720
 last_updated: '2026-08-12'
 release_origin: v0.1.65
 ---
@@ -63,7 +63,8 @@ staged from `dadaia_workspace/public/skills/<name>/SKILL.md` and installed to
 natively from the shared `.agents/skills/` root, so no per-harness copy is produced and no
 `public/entities/registry.json` entry exists for it (the registry describes derived,
 per-harness entities). `dadaia-gitflow` — the single operational home of the branch,
-commit, push and version contract — ships this way, alongside the other universal skills.
+commit, push and version contract — and `dadaia-test-stewardship` — the single operational
+home of the test lifecycle — ship this way, alongside the other universal skills.
 
 `dadaia public doctor` performs three comparison passes: source vs staging, staging
 vs projected (one pass per runtime target). Any mismatch emits `[drift] <path>` and
@@ -119,6 +120,15 @@ scoped AGENTS files:
 
 The installer and doctor manage only lib-originated projections. Operator-owned
 domain-scoped AGENTS files are not overwritten.
+
+**Repo templates land at `alive()`, not at install.** `features/spec_context` copies
+`public/templates/repo-AGENTS.md` to the Spec Context repo root and
+`public/templates/tests-AGENTS.md` to `<repo>/tests/AGENTS.md` — the second **only** when
+`<repo>/tests/` is a real directory (a symlinked `tests/` is refused, since it escapes the
+repo tree) and no `tests/AGENTS.md` already exists. The copy never creates the `tests/`
+directory and never overwrites an operator file; the installed bytes are identical to the
+template, which ships parameterized (`<ANGLE-BRACKET>` placeholders for tier timeouts, the
+LARGE cap and the wall-clock baseline) and carries no workspace-specific literal.
 
 **Consumer-repo `AGENTS.md` fan-out (registry-detected, provenance-gated).** The workspace-law
 pair (`data/AGENTS.md` → root `AGENTS.md` + a 1-line `CLAUDE.md` bridge) fans out to every Spec

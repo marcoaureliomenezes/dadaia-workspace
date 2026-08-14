@@ -4,6 +4,106 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] — 2026-08-14
+
+Hotfix (Arm B, `hotfix/v0.5.1`). No release ceremony.
+
+### Fixed
+- **`ensure_workspace_venv` no longer inherits a degraded base-interpreter resolution
+  for a freshly created workspace venv** (bug
+  `init-venv-bootstrap-inherits-degraded-base-python`, HIGH). stdlib `venv.create()`
+  resolved a NEW venv's base interpreter through `sys._base_executable` of the calling
+  process; on a `--copies` venv (this workspace's own `.dadaia/.venv`), CPython's
+  getpath.c re-derives that value via a landmark search for the OS-level *unversioned*
+  `python3` name inside the recorded `home` directory — not the version-pinned
+  `executable` its own `pyvenv.cfg` records. On a host where `/usr/bin/python3`
+  symlinks to an older interpreter than the one actually running, every child venv
+  silently degraded and `dadaia init` failed opaquely with "requires a different
+  Python". `ensure_workspace_venv` now resolves an interpreter explicitly (its own
+  `_base_executable` if it satisfies Requires-Python, else the running venv's own
+  `pyvenv.cfg` `executable`, else a version-pinned `pythonX.Y` on PATH), verifies it by
+  executing it, and creates the child venv via subprocess instead of the implicit
+  `venv.create()`. A new pre-install post-condition also rejects an
+  interpreter-mismatched venv (fresh or pre-existing/doctor-repaired) with an
+  actionable message naming both versions, before ever reaching pip's bare error.
+
+## [Unreleased] — spec release v0.7.0
+
+Test stewardship. Lands in the same unreleased `0.5.0` package version as the spec releases
+below — one dev-only dependency, no production dependency, no Python version and no
+packaging contract change.
+
+### Added
+- **`dadaia-test-stewardship`, the single operational home of the test lifecycle.** A new
+  universal skill carrying the intent taxonomy (CONTRACT / SENTINEL / SCAFFOLD /
+  QUARANTINE, declared in the module docstring — never as a pytest marker, since the marker
+  namespace already binds `contract` to a layer), the admission filter, the size tiers with
+  their timeout table and the LARGE owner rule, demotion-at-closure, the deletion criteria
+  with the tombstone ban and the separation of powers, the flake/quarantine pipeline,
+  artifact hygiene, the health metrics with a trigger-based audit, and a parameter table
+  carried as **declared adjustable defaults** so a consumer re-parameterizes without forking
+  the doctrine. Projected to the canonical `.agents/skills/` home plus `.claude/skills/`;
+  read natively by Codex and Kimi Code, so no per-harness derivation and no registry entry.
+- **`## 8. Disciplina de Testes` in the scaffold constitution** and the new public template
+  `templates/tests-AGENTS.md`, so the doctrine reaches a scaffolded workspace at law level
+  and as a scoped rule file. The template is parameterized (`<ANGLE-BRACKET>` placeholders
+  for the tier timeouts, the LARGE cap and the wall-clock baseline) and carries zero
+  workspace-specific literals. No existing constitution section was renumbered.
+- **Consumer repos receive `tests/AGENTS.md` at `alive()`** — copied only when `<repo>/tests/`
+  is a real directory (a symlinked `tests/` is refused) and no `tests/AGENTS.md` exists. The
+  copy never creates the directory and never overwrites an operator file.
+- **Per-test timeouts by tier** via the new dev dependency `pytest-timeout`: unit 10 s,
+  contract 30 s, integration 60 s, e2e 120 s, applied at collection and never overriding an
+  explicit `@pytest.mark.timeout`. A test that needs more time is mis-tiered — the tier is
+  what gets fixed.
+- **Two markers, `flaky` and `quarantine`**, moved across all six marker surfaces in one
+  change. A `quarantine` mark without `bug="<bug-slug>"` **refuses collection**, with the
+  actionable message printed to stderr before the raise so it survives an xdist worker
+  crash; a contract test pins `pyproject.toml`'s marker set against `conftest.py`'s so the
+  surfaces cannot drift apart silently.
+- **The panel E2E retry became loud.** A Playwright JSON reporter writes outside the repo
+  tree and a CI step fails the job on any `passed`-after-retry result unless the test is
+  registered as quarantined, naming the offending spec. The step is fail-closed: a missing,
+  empty, malformed or non-numeric report exits 1. Demonstrated once on the branch with a
+  deliberately flaky throwaway spec, removed in the same task.
+
+### Changed
+- **`DADAIA.md` §6 states the test lifecycle once**: intent and size declared at birth (an
+  undeclared test is SCAFFOLD and expires); demotion is a step of release closure; the
+  implementer never prunes to go green — pruning is a `qa-engineer` verdict with `file:line`
+  evidence, executed by `software-engineer`; tombstone tests and expired SCAFFOLD are slop;
+  test-artifact capture is failure-gated. Plus two sentences elsewhere: the never-delete law
+  is **scoped to bugs and backlog only** (tests are prunable under the criteria), and a
+  quarantine carve-out inside *Push green* — a green run with quarantined tests is green, an
+  **unregistered pass-on-retry is a failure**. The law names no number and no marker; those
+  live in the skill and in the repo. Always-on cost +221 tokens against a +400 cap.
+- **One coverage stance, four sites.** The 80 % floor on `unit or contract` is a CI gate and
+  a by-product metric — never an acceptance target, never a reason to write a test, never a
+  score anchor. `drift-detection`'s Dimension E is rewritten off line-coverage anchors onto
+  detection quality (intent declared, demotion performed, flake within ceiling, quarantine
+  within cap and unexpired, LARGE owned). The gate itself is byte-unchanged.
+- **Every gating selector excludes the quarantine lane** — six in `ci.yml`, four in
+  `release.yml`, and the pre-push preflight's base arguments — so a quarantined test runs
+  only under an explicit `-m quarantine` diagnosis invocation. `--durations=25` on the unit
+  and unit+contract coverage jobs, and every pytest job carries a `timeout-minutes` ceiling
+  ratcheted against the frozen baselines, so a budget change is a reviewable diff.
+- **`qa-engineer` is verdict-only on curation** and its `write_allowlist` narrows from
+  `tests/**` to `tests/e2e/**` plus the `alpha-N` review file, reports and handoffs, ending
+  a standing contradiction between its frontmatter and its body. `software-engineer`
+  **executes** curation verdicts, quoting the evidence in the commit message.
+  `dadaia-release-closure` gained the demotion + disposition block, so demotion-at-closure
+  finally has somewhere to land; `tests/README.md` collapsed to `## Commands` plus one
+  pointer, ending its duplication of `tests/AGENTS.md`.
+
+### Removed
+- The dead `--ignore=tests/performance` in the CI preflight and the unit assertion pinning
+  it — the directory no longer exists.
+
+### Fixed
+- Memory told the truth again: the stale "~2,100 collected tests" is now the measured
+  2,123 collected / 55 LARGE, and `pytest-xdist` / `pytest-randomly` are documented in the
+  tech stack, having been in use through `-n auto` without ever being listed.
+
 ## [Unreleased] — spec release v0.6.0
 
 Gitflow standardization. Lands in the same unreleased `0.5.0` package version as the spec
