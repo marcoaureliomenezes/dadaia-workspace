@@ -13,6 +13,18 @@
 > APPROVED v0.5.2 pre-push security review (LOW follow-up routing); pick-precedence
 > notice updated — the outranking bug was resolved by that hotfix.
 >
+> **Addendum 2026-08-14 (v0.9.0 pick — purge-on-pick executed).** Release v0.9.0
+> approved by the operator (SPEC/PLAN/TASKS `Aprovado`, branch `feature/v0.9.0`).
+> Per the operator-ratified purge-on-pick doctrine (grill ADR #14; provenance:
+> `specs/releases/v0.9.0/SPEC.md` §7), the two consumed live entry files were
+> removed by the PM — `push-range-denylist-scan.md` (#1, picked as the release
+> scope) and `redact-foreign-context-names-at-qa-authoring.md` (#17, absorbed as
+> FR8) — riding the T-090-01 definition commit. Their ledger rows below are
+> **retained forever** per the never-delete law (the law covers the record; the
+> purge removes only the live file). The absorbed idea
+> `tag-push-carve-out-reachability` (FR2) has its ledger row flipped; SPEC §7
+> delegates no file removal for it ("terminal at closure"), so its file stays.
+>
 > Per grill ADR #14 the backlog converges to a single `BACKLOG.md` (ACTIVE + LEDGER)
 > inside the dd-lifecycle-skills-family release. **Not anticipated here** — this index
 > and the per-file entries remain the format of record until that release lands.
@@ -32,11 +44,14 @@ terminal for bug `panel-telemetry-sqlite-corrupts-under-concurrent-access`, or d
 it return to the queue? Undecided; will keep surfacing at every pick. The related
 dangling-pointer repair is entry #12 below and proceeds either way.
 
-## Active candidates (18)
+## Active candidates (16 live + 2 terminal ledger rows)
+
+Numbering is stable (ledger rows are never renumbered — cross-references like
+"#9 and #18" and "blocked on #2" depend on it). Rows #1 and #17 are terminal.
 
 | # | Entry | Status | PM priority | State at HEAD (2026-08-14) |
 |---|---|---|---|---|
-| 1 | `push-range-denylist-scan` | candidate | **P1** | Renamed from `whole-tree-denylist-push-scan` (grill ADRs #3/#3b/#4/#5 — scope, no-amnesty invariant, tag coverage, absorbed redaction FR all settled). Grill requirement for the SPEC: **done** (2026-08-14 report). Release 2 in the grill sequence. |
+| 1 | `push-range-denylist-scan` | **picked — v0.9.0** | — (terminal) | **Purged from live backlog 2026-08-14** (purge-on-pick, grill ADR #14; rides T-090-01). Picked as the entire v0.9.0 release scope; provenance record: `specs/releases/v0.9.0/SPEC.md` §7. Flips to `DELIVERED — v0.9.0` at closure. Ledger row retained per never-delete law. |
 | 2 | `test-suite-remediation-stewardship` | candidate | **P1** | **Rewritten 2026-08-14** (grill ADR #6) on a live baseline: 55 e2e-tier pytest / 41 Playwright / 96 broad vs cap 30; dead dossier ref removed. Excluded from the current release round; strong candidate for its own follow-up release (release 4 in the grill sequence). |
 | 3 | `20260814-dd-lifecycle-skills-family` | candidate | **P2** | Intents fixed to canonical anchors; grill E-1…E-7 decisions folded in (ADRs #7–#13) plus the BACKLOG.md consolidation (ADR #14). Release 3 in the grill sequence; implementer `ai-engineer`. |
 | 4 | `retire-dead-hotfix-surface` | candidate | **P2** | Unchanged this pass. Dead surface confirmed still in tree at last verification (`cli/commands/specs.py:26,346`, SPEC-DOC-022/023 checks, hotfix templates). Small, riskless removal. |
@@ -52,31 +67,31 @@ dangling-pointer repair is entry #12 below and proceeds either way.
 | 14 | `intent-docstring-mechanical-enforcement` | candidate | P3 (blocked) | v0.7.0 CLOSURE return. Blocked on #2 — enforcing before remediation is an unsatisfiable diagnostic. |
 | 15 | `gitflow-reconciliation-merge-mechanic` | candidate | P3 | v0.7.0 CLOSURE return. No "reconciliation" mention in the gitflow skill at HEAD; `ai-engineer` surface. |
 | 16 | `memory-path-class-dotfiles` | candidate | P3 | v0.7.0 CLOSURE return. Gate classifies all of `specs/memory/` MEMORY by prefix (`gate_policy.py:56,218-219`); dotfile question undecided. |
-| 17 | `redact-foreign-context-names-at-qa-authoring` | candidate | — (absorbed) | v0.7.0 CLOSURE return. **Absorvido como FR na release push-range-denylist-scan (grill ADR #5) — não pickável isoladamente.** |
+| 17 | `redact-foreign-context-names-at-qa-authoring` | **absorbed — v0.9.0 FR8** | — (terminal) | **Purged from live backlog 2026-08-14** (purge-on-pick; rides T-090-01). Absorbed as v0.9.0 FR8 (grill ADR #5 — redaction at QA authoring time closes the entry path while the scan closes the exit path); provenance: `specs/releases/v0.9.0/SPEC.md` §7. Flips to `DELIVERED — v0.9.0` at closure. Ledger row retained per never-delete law. |
 | 18 | `commit-paths-index-scope-hardening` | candidate | P2 | **New 2026-08-14** (post-v0.5.2 hotfix push) — materializes the single LOW of the APPROVED v0.5.2 security review (handoff `2026-08-14T172631Z-…-scaffold-commit-scope`): `commit_paths` discards its `git add -- <paths>` exit status and commits the WHOLE index (`git commit -m` with no pathspec), so a gitignored scaffold path or operator pre-staged content can land in the scaffold-titled commit — CWE-754 (+CWE-668), OWASP A08, same consent class as the v0.5.2-fixed bug narrowed to index-staged content. Fix: checked `git add` + path-scoped `git commit -m <msg> -- <paths>` + `:(literal)`/`--pathspec-from-file` defence. Residual of the v0.5.2 fix, orbits `git_subprocess`; Arm-B hardening lane with #9; `software-engineer`. |
 
-Priority rationale: #1 is a recurring privacy-leak class whose entire contract the
-grill just settled — the root-cause doctrine owes the structural fix; #2 is real,
-large, and now truthfully measured, but the operator excluded it from the current
-round (ADR #6); #3 is the operator's strategic priority with recurring token payoff
-(release 3); #4 remains small/riskless; #5–#7 are grill-mandated feeders of releases
-1–2 and the NO-LOCKS gap; #8 is the adopted Codex fidelity boundary (large but
-self-contained, pairs naturally with the #3 AI-surface release); #9 and #18 carry
-the only open security-review residuals in the index and should ride the next
-hotfix/patch window (#18 additionally orbits the surface the v0.5.2 hotfix just
-touched, so the context is warm); #10–#12 are v0.8.0 CLOSURE debt with concrete
-evidence but no incident driver; #13–#16 are materialized v0.7.0 CLOSURE debt; #17
-is not independently pickable. The §5 precedence notice above outranks this whole
-table, and final priority is the operator's at pick time.
+Priority rationale: #1 was picked as the v0.9.0 release and #17 absorbed into it as
+FR8 (both terminal ledger rows above — the root-cause doctrine's structural fix for
+the recurring privacy-leak class is now in flight); #2 is real, large, and now
+truthfully measured, but the operator excluded it from the current round (ADR #6);
+#3 is the operator's strategic priority with recurring token payoff (release 3); #4
+remains small/riskless; #5–#7 are grill-mandated feeders of releases 1–2 and the
+NO-LOCKS gap; #8 is the adopted Codex fidelity boundary (large but self-contained,
+pairs naturally with the #3 AI-surface release); #9 and #18 carry the only open
+security-review residuals in the index and should ride the next hotfix/patch window
+(#18 additionally orbits the surface the v0.5.2 hotfix just touched, so the context
+is warm); #10–#12 are v0.8.0 CLOSURE debt with concrete evidence but no incident
+driver; #13–#16 are materialized v0.7.0 CLOSURE debt. The §5 precedence notice above
+outranks this whole table, and final priority is the operator's at pick time.
 
-## Ideas (5)
+## Ideas (4 live + 1 absorbed ledger row)
 
 | Entry | Note |
 |---|---|
 | `flat-release-ship-task-evidence` | **New 2026-08-14** (v0.8.0 CLOSURE return). Closure freezes the directory before the ship marker can flip (T-080-07 archived `[ ]`); template needs ship evidence outside the archived dir. |
 | `tests-agents-md-placeholder-doctor-warning` | v0.7.0 CLOSURE return; check still missing at HEAD (only MEM-PLACEHOLDER-1 exists). |
 | `stewardship-relocation-grep-homonym-note` | v0.7.0 CLOSURE return; note still absent from the stewardship skill. |
-| `tag-push-carve-out-reachability` | v0.7.0 CLOSURE return; **absorbed** into `push-range-denylist-scan` (grill ADR #4). Not pickable in isolation. |
+| `tag-push-carve-out-reachability` | **absorbed — v0.9.0 FR2** (grill ADR #4: tag pushes stay review-exempt but become scan-covered, closing the `service.py:344` bypass). Ledger row flipped 2026-08-14 at pick; entry file retained — `specs/releases/v0.9.0/SPEC.md` §7 delegates no removal for this idea ("terminal at closure"). |
 | `repo-agents-md-symlink-hardening` | v0.7.0 CLOSURE return; `public_assets.py` still has no symlink refusal. |
 
 ## Terminal at materialization (never-delete law — recorded, not pickable)
@@ -87,7 +102,7 @@ All three archived to `_archive/` by `git mv` per SPEC-DOC-035.
 |---|---|---|
 | `loud-flake-stats-key-residual` | delivered | Fixed at HEAD before materialization: `ci.yml:361-374` hard-errors on missing/malformed `stats` (commit `15cb12c4`, T-070-09). |
 | `frozen-wall-clock-baselines-in-repo-text` | delivered | Baselines embedded in `quality-assurance.md:147-151`; CI `timeout-minutes` set against them. |
-| `dispose-published-denylist-term` | rejected | Void by construction under the range-scoped scan (grill ADR #3b: FROZEN `_archive/` + `git mv` ⇒ no new blob). |
+| `dispose-published-denylist-term` | rejected | Void by construction under the range-scoped scan (grill ADR #3b: FROZEN `_archive/` + `git mv` ⇒ no new blob). v0.9.0 SPEC §7 records it untouched — FR4 documents why. |
 
 ## Rejected entries (retained per never-delete law)
 
