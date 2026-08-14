@@ -147,7 +147,7 @@ one commit.
 
 ---
 
-- [ ] **T-080-05 — Post-archive verification and evidence capture**
+- [-] **T-080-05 — Post-archive verification and evidence capture**
 
 **Owner role:** qa-engineer · **Commit:** none (evidence only; handoff)
 
