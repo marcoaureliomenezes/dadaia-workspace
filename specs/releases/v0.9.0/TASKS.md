@@ -165,7 +165,7 @@ existing tag/deletion carve-out tests still pass unchanged.
 
 ---
 
-- [ ] **T-090-06 — CLI wiring and fail-closed boundary**
+- [-] **T-090-06 — CLI wiring and fail-closed boundary**
 
 **Owner role:** software-engineer · **Commit:**
 `feat(T-090-06): wire the range scan into ci push-gate-check`
