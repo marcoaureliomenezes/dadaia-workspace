@@ -27,6 +27,11 @@ _SYNTHETIC_FOREIGN_SLUG = "zz-fake-context-name"
 # carries a string the push-range denylist scan would itself flag when this repo's own
 # range is scanned. Runtime semantics are unchanged: the assembled value still matches
 # the baseline pattern under test.
+# Positive baseline fixtures — deliberately built via concatenation (never a whole
+# matching literal in THIS file's own source) so this module's own git blob never
+# carries a string the push-range denylist scan would itself flag when this repo's own
+# range is scanned. Runtime semantics are unchanged: the assembled value still matches
+# the baseline pattern under test.
 _POSITIVE_IPV4 = "198.18" + ".0.5"  # RFC 2544 benchmarking range — not a real host
 _POSITIVE_HOME_PATH = "/hom" + "e/alice"
 
@@ -117,6 +122,24 @@ def test_baseline_excludes_loopback_and_documentation_values() -> None:
         _obj("a.md", "loopback at 127.0.0.1\n"),
         _obj("b.md", "docs live at example.com\n", sha="cafef00d"),
         _obj("c.md", "runner home is /home/runner/work\n", sha="feedface"),
+    ]
+
+    outcome = scan_objects(objects, terms=(), patterns=baseline, slugs=())
+
+    assert outcome.hits == ()
+
+
+def test_baseline_excludes_rfc2606_reserved_tld_emails() -> None:
+    """A3.4 family: RFC-2606 reserved TLDs (``.invalid``/``.test``/``.example``/
+    ``.localhost``) are synthetic by definition — same carve-out philosophy as the
+    ``example.com`` and RFC-5737 documentation-IP exclusions. Regression for the false
+    positive on ``container.py``'s ``definition@dadaia.invalid`` / ``closure@dadaia.invalid``
+    synthetic commit identities."""
+    baseline = load_baseline_patterns()
+    objects = [
+        _obj("a.md", "contact definition@dadaia.invalid for details\n"),
+        _obj("b.md", "reach closure@dadaia.invalid instead\n", sha="cafef00d"),
+        _obj("c.md", "or try someone@sub.example.test\n", sha="feedface"),
     ]
 
     outcome = scan_objects(objects, terms=(), patterns=baseline, slugs=())
