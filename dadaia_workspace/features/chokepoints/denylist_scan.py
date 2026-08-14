@@ -82,8 +82,13 @@ def _mask(term: str) -> str:
 
 
 def _compile_slug_patterns(slugs: Iterable[str]) -> list[tuple[str, re.Pattern[str]]]:
-    """Word-boundary regex per slug (A3.3) — a short slug never matches inside a longer word."""
-    return [(slug, re.compile(r"\b" + re.escape(slug) + r"\b")) for slug in slugs if slug]
+    """Word-boundary regex per slug (A3.3) — a short slug never matches inside a longer
+    word. Case-insensitive (``re.IGNORECASE``), matching the operator-term layer's
+    case-insensitive substring match — a foreign slug referenced with different casing
+    (``MyClient`` vs ``myclient``) is still caught (code-reviewer LOW finding)."""
+    return [
+        (slug, re.compile(r"\b" + re.escape(slug) + r"\b", re.IGNORECASE)) for slug in slugs if slug
+    ]
 
 
 def _first_match(
@@ -92,19 +97,28 @@ def _first_match(
     patterns: list[BaselinePatternLike],
     slug_patterns: list[tuple[str, re.Pattern[str]]],
 ) -> Hit | None:
-    """The earliest-line match across all three term sources, or ``None``."""
-    candidates: list[Hit] = []
+    """The earliest-line match across all three term sources, or ``None``.
+
+    Short-circuits at the first line that produces any candidate: lines are already
+    iterated in ascending order, so that line's own first candidate (insertion order —
+    operator terms, then baseline patterns, then foreign slugs) is the answer. Neither
+    the rest of the blob nor a global sort is needed to find it (code-reviewer LOW
+    performance finding: the previous version paid the full-blob cost plus an
+    O(n log n) sort for a result already known at the first hit)."""
     for lineno, line_text in enumerate(obj.text.splitlines(), start=1):
+        line_candidates: list[Hit] = []
         lowered = line_text.lower()
         for term, _reason in terms:
             if term and term.lower() in lowered:
-                candidates.append(Hit(obj.path, lineno, obj.sha, _mask(term), _SOURCE_OPERATOR))
+                line_candidates.append(
+                    Hit(obj.path, lineno, obj.sha, _mask(term), _SOURCE_OPERATOR)
+                )
         for pattern in patterns:
             for match in pattern.regex.finditer(line_text):
                 value = match.group(0)
                 if pattern.exclude is not None and pattern.exclude.search(value):
                     continue
-                candidates.append(
+                line_candidates.append(
                     Hit(
                         obj.path,
                         lineno,
@@ -115,11 +129,10 @@ def _first_match(
                 )
         for slug, compiled in slug_patterns:
             if compiled.search(line_text):
-                candidates.append(Hit(obj.path, lineno, obj.sha, _mask(slug), _SOURCE_SLUG))
-    if not candidates:
-        return None
-    candidates.sort(key=lambda hit: hit.line)
-    return candidates[0]
+                line_candidates.append(Hit(obj.path, lineno, obj.sha, _mask(slug), _SOURCE_SLUG))
+        if line_candidates:
+            return line_candidates[0]
+    return None
 
 
 def scan_objects(

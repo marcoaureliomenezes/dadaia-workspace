@@ -15,7 +15,7 @@ import re
 from pathlib import Path
 
 from dadaia_workspace.core.protocols.git_object_reader import ScannedObject
-from dadaia_workspace.features.chokepoints.denylist_scan import scan_objects
+from dadaia_workspace.features.chokepoints.denylist_scan import _first_match, scan_objects
 from dadaia_workspace.infrastructure.privacy_check import load_baseline_patterns
 
 _SYNTHETIC_TERM = "zz-secret-term"
@@ -27,13 +27,12 @@ _SYNTHETIC_FOREIGN_SLUG = "zz-fake-context-name"
 # carries a string the push-range denylist scan would itself flag when this repo's own
 # range is scanned. Runtime semantics are unchanged: the assembled value still matches
 # the baseline pattern under test.
-# Positive baseline fixtures — deliberately built via concatenation (never a whole
-# matching literal in THIS file's own source) so this module's own git blob never
-# carries a string the push-range denylist scan would itself flag when this repo's own
-# range is scanned. Runtime semantics are unchanged: the assembled value still matches
-# the baseline pattern under test.
 _POSITIVE_IPV4 = "198.18" + ".0.5"  # RFC 2544 benchmarking range — not a real host
 _POSITIVE_HOME_PATH = "/hom" + "e/alice"
+_POSITIVE_INTERNAL_HOST_1 = "bastion" + ".local"
+_POSITIVE_INTERNAL_HOST_2 = "hp-printer" + ".local"
+_POSITIVE_INTERNAL_HOST_3 = "prod.workspace" + ".local"  # NOT the exact carved-out literal
+_POSITIVE_INTERNAL_HOST_4 = "nas" + ".home"
 
 
 def _obj(path: str, text: str, *, sha: str = "deadbeef", decodable: bool = True) -> ScannedObject:
@@ -111,6 +110,21 @@ def test_foreign_slug_embedded_in_longer_word_does_not_match() -> None:
     assert outcome.hits == ()
 
 
+def test_foreign_slug_matches_case_insensitively() -> None:
+    """code-reviewer LOW finding: operator terms are case-insensitive (`.lower()` on
+    both sides) but the slug layer compiled its regex with no `re.IGNORECASE`, an
+    undocumented asymmetry in the same matcher. A foreign slug referenced with
+    different casing must still be caught."""
+    differently_cased = _SYNTHETIC_FOREIGN_SLUG.upper()
+    assert differently_cased != _SYNTHETIC_FOREIGN_SLUG
+    objects = [_obj("readme.md", f"see repos/{differently_cased}/README.md\n")]
+
+    outcome = scan_objects(objects, terms=(), patterns=(), slugs=(_SYNTHETIC_FOREIGN_SLUG,))
+
+    assert len(outcome.hits) == 1
+    assert outcome.hits[0].source_layer == "foreign repo slug"
+
+
 # ---------------------------------------------------------------------------
 # A3.4 — baseline `exclude_regex` carve-outs still apply.
 # ---------------------------------------------------------------------------
@@ -147,6 +161,59 @@ def test_baseline_excludes_rfc2606_reserved_tld_emails() -> None:
     assert outcome.hits == ()
 
 
+def test_baseline_excludes_the_products_own_synthetic_workspace_local_host() -> None:
+    """code-reviewer CRITICAL finding (v0.9.0 pre-PR review): the product's own
+    synthetic git identity host (``git_subprocess.py``'s ``user.email=dadaia@workspace.
+    local`` fallback, quoted verbatim in ``architecture.md``) is a synthetic literal, not
+    a real internal hostname — same carve-out family as the RFC-2606 email exclusion.
+    The carve-out is the specific literal ``workspace.local`` ONLY: a real internal
+    hostname (including one that merely ends in ``.local``) must still be refused."""
+    baseline = load_baseline_patterns()
+    carved_out = [
+        _obj("a.md", "the tool falls back to dadaia@workspace.local when unset\n"),
+        _obj("b.md", "identity: dadaia-workspace <dadaia@workspace.local>\n", sha="cafef00d"),
+    ]
+    still_flagged = [
+        _obj("c.md", f"internal host {_POSITIVE_INTERNAL_HOST_1} is reachable\n", sha="feedface"),
+        _obj("d.md", f"printer at {_POSITIVE_INTERNAL_HOST_2} on the LAN\n", sha="deadbeef"),
+        _obj("e.md", f"see {_POSITIVE_INTERNAL_HOST_3} for the real box\n", sha="0ff1ce00"),
+    ]
+
+    clean = scan_objects(carved_out, terms=(), patterns=baseline, slugs=())
+    dirty = scan_objects(still_flagged, terms=(), patterns=baseline, slugs=())
+
+    assert clean.hits == ()
+    assert len(dirty.hits) == len(still_flagged)
+
+
+def test_baseline_excludes_the_stdlib_pathlib_home_method_call() -> None:
+    """Discovered by the new self-scan regression test (T-090 code-review remediation):
+    ``internal-hostname``'s TLD alternation includes ``home``, so it false-positives on
+    the stdlib idiom ``Path.home()`` / ``pathlib.Path.home()`` — a dotted attribute
+    chain, not a hostname. This is a NARROW literal carve-out (exactly ``Path.home`` /
+    ``pathlib.Path.home``, case-sensitive), same family as the ``workspace.local``
+    carve-out above: a real internal hostname that happens to end in ``.home`` (a
+    company's internal TLD) must still be refused."""
+    baseline = load_baseline_patterns()
+    carved_out = [
+        _obj("a.py", '        sessions_dir = pathlib.Path.home() / ".claude" / "sessions"\n'),
+        _obj("b.py", '    return Path.home() / ".kimi-code"\n', sha="cafef00d"),
+    ]
+    still_flagged = [
+        _obj(
+            "c.md",
+            f"reach the fileserver at {_POSITIVE_INTERNAL_HOST_4} for backups\n",
+            sha="feedface",
+        ),
+    ]
+
+    clean = scan_objects(carved_out, terms=(), patterns=baseline, slugs=())
+    dirty = scan_objects(still_flagged, terms=(), patterns=baseline, slugs=())
+
+    assert clean.hits == ()
+    assert len(dirty.hits) == len(still_flagged)
+
+
 # ---------------------------------------------------------------------------
 # A4.1 — no amnesty/allowlist structure exists in the matcher's own source.
 # ---------------------------------------------------------------------------
@@ -164,6 +231,46 @@ def test_no_allowlist_or_sanctioned_terms_constant_in_matcher_source() -> None:
         r"(?im)^\s*_?[A-Za-z_]*\b(ALLOWLIST|SANCTIONED|AMNESTY|EXEMPT)\w*\s*[:=]"
     )
     assert not forbidden.search(source), "denylist_scan.py must carry no amnesty list (FR4/A4.1)"
+
+
+# ---------------------------------------------------------------------------
+# LOW performance finding — the matcher short-circuits at the first hit LINE; it never
+# scans the remainder of a large blob nor sorts a full candidate list to find a result
+# already known at the first match.
+# ---------------------------------------------------------------------------
+
+
+class _CountingSlugPattern:
+    """Duck-types the ``re.Pattern[str].search`` surface ``_first_match`` calls, and
+    counts invocations — a real ``re.Pattern`` cannot be subclassed to add counting."""
+
+    def __init__(self, inner: re.Pattern[str]) -> None:
+        self._inner = inner
+        self.calls = 0
+
+    def search(self, text: str) -> re.Match[str] | None:
+        self.calls += 1
+        return self._inner.search(text)
+
+
+def test_first_match_short_circuits_at_the_first_hit_line() -> None:
+    """The slug pattern's ``.search`` must never be invoked past the line carrying the
+    first hit — proof the matcher stops scanning rather than walking every remaining
+    line of a large blob and sorting a full candidate list (code-reviewer LOW finding)."""
+    counting = _CountingSlugPattern(re.compile(r"\b" + re.escape(_SYNTHETIC_FOREIGN_SLUG) + r"\b"))
+    text = f"line one has {_SYNTHETIC_FOREIGN_SLUG} right here\n" + "noise line\n" * 500
+    obj = _obj("big.md", text)
+
+    hit = _first_match(
+        obj,
+        terms=[],
+        patterns=[],
+        slug_patterns=[(_SYNTHETIC_FOREIGN_SLUG, counting)],  # type: ignore[list-item]
+    )
+
+    assert hit is not None
+    assert hit.line == 1
+    assert counting.calls == 1, "must not scan past the first hit line"
 
 
 # ---------------------------------------------------------------------------

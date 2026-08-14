@@ -21,14 +21,16 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
 from dadaia_workspace.core.protocols.git_object_reader import (
+    ZERO_SHA,
     GitObjectReader,
     GitObjectReadError,
+    ScannedObject,
 )
 from dadaia_workspace.core.protocols.process_ancestry import Ancestry
 from dadaia_workspace.features.chokepoints.denylist_scan import (
@@ -52,9 +54,6 @@ _APPROVED = "APPROVED"
 
 #: The handoff ``"agent"`` whose verdict the push gate honors.
 _SECURITY_REVIEWER = "security-reviewer"
-
-#: A zero sha in a pre-push stdin ref line — a branch deletion, never review-gated.
-_ZERO_SHA = "0" * 40
 
 
 @dataclass(frozen=True)
@@ -88,7 +87,7 @@ class PushRef:
     @property
     def is_deletion(self) -> bool:
         """True when this ref is being deleted (zero local sha) — passes with no verdict."""
-        return self.local_sha == _ZERO_SHA or not self.local_sha
+        return self.local_sha == ZERO_SHA or not self.local_sha
 
     @property
     def is_tag(self) -> bool:
@@ -367,6 +366,28 @@ def _compose_denylist_refusal(hits: list[tuple[PushRef, Hit]]) -> str:
     return "\n".join(lines)
 
 
+def _dedup_new_objects(
+    object_source: GitObjectReader,
+    repo: Path,
+    ref: PushRef,
+    seen_shas: set[str],
+) -> Iterator[ScannedObject]:
+    """Yield each object new to *ref*'s range that has not already been seen earlier in
+    this scan, recording it into *seen_shas* as it is yielded (A1.4 cross-ref dedupe).
+
+    Streamed straight into :func:`scan_objects` by the caller rather than materialized
+    into a list first (code-reviewer MEDIUM performance finding: building the full
+    ``fresh`` list before scanning measured ~129 MB resident over a large fallback
+    range) — ``scan_objects`` already consumes its ``objects`` argument lazily, one
+    object at a time, so nothing downstream needs the list shape.
+    """
+    for obj in object_source.new_objects(repo, ref.local_sha, ref.remote_sha):
+        if obj.sha in seen_shas:
+            continue
+        seen_shas.add(obj.sha)
+        yield obj
+
+
 def _run_denylist_scan(
     scan_refs: list[PushRef],
     object_source: GitObjectReader,
@@ -390,12 +411,7 @@ def _run_denylist_scan(
     skipped_total = 0
     try:
         for ref in scan_refs:
-            fresh = []
-            for obj in object_source.new_objects(repo, ref.local_sha, ref.remote_sha):
-                if obj.sha in seen_shas:
-                    continue
-                seen_shas.add(obj.sha)
-                fresh.append(obj)
+            fresh = _dedup_new_objects(object_source, repo, ref, seen_shas)
             outcome = scan_objects(fresh, term_list, pattern_list, slug_list)
             skipped_total += outcome.skipped_binary_count
             per_ref_hits.extend((ref, hit) for hit in outcome.hits)

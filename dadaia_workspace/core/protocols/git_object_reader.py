@@ -24,9 +24,10 @@ ZERO_SHA = "0" * 40
 class ScannedObject:
     """One blob newly reachable in a pushed range (SPEC v0.9.0 FR1).
 
-    ``decodable`` is False for a binary blob (FR6 row 3) — ``text`` is then the empty
-    string; undecodable bytes cannot be matched by a text denylist, so the matcher skips
-    and counts it instead of raising.
+    ``decodable`` is False for a binary blob (FR6 row 3) or a blob over the adapter's
+    size guard (SPEC R3 — a blob that large is never even fetched) — ``text`` is then
+    the empty string; undecodable/oversized bytes cannot be usefully matched by a text
+    denylist, so the matcher skips and counts it instead of raising.
     """
 
     path: str
