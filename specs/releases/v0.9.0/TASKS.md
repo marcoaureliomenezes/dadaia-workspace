@@ -264,7 +264,7 @@ its owner, per the LARGE-tier rules.
 
 ---
 
-- [ ] **T-090-10 — qa-engineer review of the increment (flat alpha-close)**
+- [-] **T-090-10 — qa-engineer review of the increment (flat alpha-close)**
 
 **Owner role:** qa-engineer · **Commit:** review artifact committed to the branch
 
