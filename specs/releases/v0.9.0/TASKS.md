@@ -137,7 +137,7 @@ every returned string), A6.2 (skip counted); no `infrastructure` import in
 
 ---
 
-- [-] **T-090-05 — Wire the scan into the push decision**
+- [x] **T-090-05 — Wire the scan into the push decision**
 
 **Owner role:** software-engineer · **Commit:**
 `feat(T-090-05): scan the pushed range at the push gate`

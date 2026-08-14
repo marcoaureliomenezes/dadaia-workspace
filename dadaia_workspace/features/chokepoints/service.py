@@ -10,19 +10,32 @@ Two gates, one shared shape (:class:`Decision`):
 * :func:`pre_commit_decision` — NO-LOCKS WARN-only: ALWAYS returns ``allowed=True`` and
   reads only advisory presence records.
 * :func:`push_gate_decision` — FR-W1-02 / DP-5 security-verdict-per-pushed-sha check
-  (UNCHANGED by v0.1.76 — quality gates are not concurrency locks and stay).
+  (UNCHANGED by v0.1.76 — quality gates are not concurrency locks and stay), PLUS the
+  v0.9.0 FR1/FR2 range-scoped denylist scan: every non-deletion ref (tags included) is
+  scanned for the objects the push would newly publish, via an injected
+  :class:`~dadaia_workspace.core.protocols.git_object_reader.GitObjectReader` — never a
+  direct subprocess call from this module (FR7/A7.1).
 """
 
 from __future__ import annotations
 
 import json
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+from dadaia_workspace.core.protocols.git_object_reader import (
+    GitObjectReader,
+    GitObjectReadError,
+)
 from dadaia_workspace.core.protocols.process_ancestry import Ancestry
+from dadaia_workspace.features.chokepoints.denylist_scan import (
+    BaselinePatternLike,
+    Hit,
+    scan_objects,
+)
 from dadaia_workspace.features.spec_context import presence
 
 __all__ = [
@@ -306,28 +319,143 @@ def iter_security_approvals(handoff_root: Path) -> list[_Approval]:
     return approvals
 
 
+#: The law this scan enforces (SPEC v0.9.0 FR5) — quoted verbatim in every refusal.
+_DENYLIST_LAW = "DADAIA.md §7 — private names never enter public/pushed material"
+
+#: FR5/A5.4 — at most this many offending objects are listed before a remainder count.
+_MAX_LISTED_HITS = 10
+
+
+def _annotate_skip(decision: Decision, skipped_binary_count: int) -> Decision:
+    """Attach the FR6 row-3 skip count to *decision* — reported either way (allow/refuse)."""
+    if skipped_binary_count <= 0:
+        return decision
+    note = (
+        f"[pre-push] {skipped_binary_count} binary blob(s) skipped by the denylist "
+        "scan (not text-decodable)."
+    )
+    warn = f"{decision.warn}\n{note}" if decision.warn else note
+    return Decision(allowed=decision.allowed, message=decision.message, warn=warn)
+
+
+def _compose_denylist_refusal(hits: list[tuple[PushRef, Hit]]) -> str:
+    """FR5: ref, path:line, short blob sha, masked term + source layer, the law, the
+    edit + rewrite-before-push remediation, ``--no-verify``, capped at 10 hits."""
+    lines = [
+        f"[pre-push] BLOCKED: the pushed range publishes {len(hits)} object(s) carrying "
+        f"a denylisted term ({_DENYLIST_LAW})."
+    ]
+    shown = hits[:_MAX_LISTED_HITS]
+    remainder = len(hits) - len(shown)
+    for ref, hit in shown:
+        lines.append(
+            f"  {ref.local_ref} -> {ref.remote_ref}: {hit.path}:{hit.line} "
+            f"(blob {hit.sha[:12]}) — masked term '{hit.masked_term}' ({hit.source_layer})"
+        )
+    if remainder > 0:
+        lines.append(f"  ... and {remainder} more offending object(s).")
+    lines.append(
+        "  Fix: edit the file(s) to remove the term, then rewrite the offending "
+        "commit(s) (--amend / interactive rebase / cherry-pick) so no pushed object "
+        "carries it, and push again — the range scope means already-published history "
+        "never needs a rewrite."
+    )
+    lines.append(
+        "  If this push is a genuine emergency, git's sanctioned, traceable bypass is "
+        "`git push --no-verify` (discouraged; leaves a reflog trace)."
+    )
+    return "\n".join(lines)
+
+
+def _run_denylist_scan(
+    scan_refs: list[PushRef],
+    object_source: GitObjectReader,
+    repo: Path,
+    terms: Iterable[tuple[str, str]],
+    patterns: Iterable[BaselinePatternLike],
+    slugs: Iterable[str],
+) -> tuple[Decision | None, int]:
+    """Run the FR1/FR2 scan over *scan_refs* — every non-deletion ref, tags included.
+
+    Returns ``(refusal_or_None, skipped_binary_count)``. A git object-read failure
+    refuses immediately, naming the failure (FR6 row 2) — never a silent empty scan.
+    """
+    if not scan_refs:
+        return None, 0
+    term_list = list(terms)
+    pattern_list = list(patterns)
+    slug_list = list(slugs)
+    seen_shas: set[str] = set()
+    per_ref_hits: list[tuple[PushRef, Hit]] = []
+    skipped_total = 0
+    try:
+        for ref in scan_refs:
+            fresh = []
+            for obj in object_source.new_objects(repo, ref.local_sha, ref.remote_sha):
+                if obj.sha in seen_shas:
+                    continue
+                seen_shas.add(obj.sha)
+                fresh.append(obj)
+            outcome = scan_objects(fresh, term_list, pattern_list, slug_list)
+            skipped_total += outcome.skipped_binary_count
+            per_ref_hits.extend((ref, hit) for hit in outcome.hits)
+    except GitObjectReadError as exc:
+        return (
+            Decision(
+                allowed=False,
+                message=(
+                    f"[pre-push] BLOCKED: reading the pushed-range git objects failed "
+                    f"({exc}) — a policy gate never skips what it cannot evaluate (fail "
+                    "closed).\n"
+                    "  If this push is a genuine emergency, git's sanctioned, traceable "
+                    "bypass is `git push --no-verify` (discouraged; leaves a reflog "
+                    "trace)."
+                ),
+            ),
+            0,
+        )
+    if not per_ref_hits:
+        return None, skipped_total
+    return Decision(allowed=False, message=_compose_denylist_refusal(per_ref_hits)), skipped_total
+
+
 def push_gate_decision(
     handoff_root: Path,
     refs: list[PushRef],
     *,
+    object_source: GitObjectReader,
+    repo: Path,
     malformed_lines: int = 0,
+    denylist_terms: Iterable[tuple[str, str]] = (),
+    baseline_patterns: Iterable[BaselinePatternLike] = (),
+    foreign_slugs: Iterable[str] = (),
 ) -> Decision:
-    """Decide whether a push may proceed (FR-W1-02 / DP-5 / v0.6.0 FR4).
+    """Decide whether a push may proceed (FR-W1-02 / DP-5 / v0.6.0 FR4 / v0.9.0 FR1-FR6).
 
     Policy order, first refusal wins:
 
     1. **Branch policy** — every non-deletion, non-tag ref must be
        ``refs/heads/develop``: ``main`` advances via PR only; feature/hotfix branches
        are local-only; names outside the four permitted patterns are refused outright.
-    2. **Diff-based security verdict** — the pushed ``develop`` tip must carry an
+    2. **Range-scoped denylist scan** (v0.9.0 FR1/FR2) — every non-deletion ref, tags
+       included, is scanned via *object_source* for new objects carrying a denylisted
+       term. Runs AFTER branch policy (free and pure) and BEFORE the security verdict —
+       a leaking push is refused for the leak, not for a missing handoff.
+    3. **Diff-based security verdict** — the pushed ``develop`` tip must carry an
        APPROVED security-reviewer handoff whose ``metrics.commit_sha`` equals it. The
        tip sha anchors the reviewed range ``origin/develop..develop``; a stale approval
        (different/older tip) does not cover the delta.
 
-    Deletions (zero sha) and tag pushes pass with no verdict (DP-5 carve-out —
-    publishing depends on tag pushes). Commits are never review-blocked — push only.
-    A malformed stdin line fails CLOSED (finding 1) and the REMOTE side of every
-    review ref must also be ``refs/heads/develop`` (finding 2: ``push develop:main``).
+    Deletions (zero sha) are never scanned and pass with no verdict. Tag pushes ARE
+    scanned but keep their DP-5 verdict carve-out (publishing depends on tag pushes).
+    Commits are never review-blocked — push only. A malformed stdin line fails CLOSED
+    (finding 1) and the REMOTE side of every review ref must also be
+    ``refs/heads/develop`` (finding 2: ``push develop:main``).
+
+    *object_source* and *repo* are REQUIRED — FR7/A7.2: the decision function always
+    takes the object source as a parameter; an unwired production call site is a CLI
+    defect, never a bypass (FR6 row 4), so there is no default that would silently skip
+    the scan.
     """
     if malformed_lines > 0:
         return Decision(
@@ -342,8 +470,6 @@ def push_gate_decision(
         )
 
     review_refs = [r for r in refs if not r.is_deletion and not r.is_tag]
-    if not review_refs:
-        return Decision(allowed=True, message="[pre-push] no review-gated refs; allow.")
 
     for ref in review_refs:
         if not ref.local_ref.startswith(_HEADS_PREFIX):
@@ -373,15 +499,34 @@ def push_gate_decision(
                 ),
             )
 
+    # v0.9.0 FR1/FR2: scan every non-deletion ref (tags included) — computed
+    # independently of `review_refs`, which excludes tags. Runs after branch policy
+    # (free and pure, already checked above) and before the security verdict below.
+    scan_refs = [r for r in refs if not r.is_deletion]
+    scan_refusal, skipped_binary_count = _run_denylist_scan(
+        scan_refs, object_source, repo, denylist_terms, baseline_patterns, foreign_slugs
+    )
+    if scan_refusal is not None:
+        return _annotate_skip(scan_refusal, skipped_binary_count)
+
+    if not review_refs:
+        return _annotate_skip(
+            Decision(allowed=True, message="[pre-push] no review-gated refs; allow."),
+            skipped_binary_count,
+        )
+
     approved_shas = {a.commit_sha for a in iter_security_approvals(handoff_root)}
     missing = [r for r in review_refs if r.local_sha not in approved_shas]
     if not missing:
-        return Decision(
-            allowed=True,
-            message=(
-                "[pre-push] develop push carries a security-reviewer APPROVE covering "
-                "its delta; allow."
+        return _annotate_skip(
+            Decision(
+                allowed=True,
+                message=(
+                    "[pre-push] develop push carries a security-reviewer APPROVE "
+                    "covering its delta; allow."
+                ),
             ),
+            skipped_binary_count,
         )
 
     found = (
@@ -390,14 +535,17 @@ def push_gate_decision(
         else "(no security-reviewer APPROVE found)"
     )
     wanted = ", ".join(f"{r.local_ref}@{r.local_sha[:12]}" for r in missing)
-    return Decision(
-        allowed=False,
-        message=(
-            "[pre-push] BLOCKED: no security-reviewer APPROVE covers the "
-            f"origin/develop..develop delta being pushed ({wanted}).\n"
-            f"  APPROVE shas on disk: {found}\n"
-            "  Fix: dispatch a security-reviewer DIFF review of origin/develop..develop "
-            "and emit an APPROVED handoff with metrics.commit_sha == the pushed develop "
-            "tip sha, then push again."
+    return _annotate_skip(
+        Decision(
+            allowed=False,
+            message=(
+                "[pre-push] BLOCKED: no security-reviewer APPROVE covers the "
+                f"origin/develop..develop delta being pushed ({wanted}).\n"
+                f"  APPROVE shas on disk: {found}\n"
+                "  Fix: dispatch a security-reviewer DIFF review of "
+                "origin/develop..develop and emit an APPROVED handoff with "
+                "metrics.commit_sha == the pushed develop tip sha, then push again."
+            ),
         ),
+        skipped_binary_count,
     )
