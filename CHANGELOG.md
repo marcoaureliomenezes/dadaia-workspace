@@ -4,6 +4,29 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] — 2026-08-14
+
+Hotfix (Arm B, `hotfix/v0.5.1`). No release ceremony.
+
+### Fixed
+- **`ensure_workspace_venv` no longer inherits a degraded base-interpreter resolution
+  for a freshly created workspace venv** (bug
+  `init-venv-bootstrap-inherits-degraded-base-python`, HIGH). stdlib `venv.create()`
+  resolved a NEW venv's base interpreter through `sys._base_executable` of the calling
+  process; on a `--copies` venv (this workspace's own `.dadaia/.venv`), CPython's
+  getpath.c re-derives that value via a landmark search for the OS-level *unversioned*
+  `python3` name inside the recorded `home` directory — not the version-pinned
+  `executable` its own `pyvenv.cfg` records. On a host where `/usr/bin/python3`
+  symlinks to an older interpreter than the one actually running, every child venv
+  silently degraded and `dadaia init` failed opaquely with "requires a different
+  Python". `ensure_workspace_venv` now resolves an interpreter explicitly (its own
+  `_base_executable` if it satisfies Requires-Python, else the running venv's own
+  `pyvenv.cfg` `executable`, else a version-pinned `pythonX.Y` on PATH), verifies it by
+  executing it, and creates the child venv via subprocess instead of the implicit
+  `venv.create()`. A new pre-install post-condition also rejects an
+  interpreter-mismatched venv (fresh or pre-existing/doctor-repaired) with an
+  actionable message naming both versions, before ever reaching pip's bare error.
+
 ## [Unreleased] — spec release v0.7.0
 
 Test stewardship. Lands in the same unreleased `0.5.0` package version as the spec releases
