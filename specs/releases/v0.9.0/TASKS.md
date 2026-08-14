@@ -242,7 +242,7 @@ masked by hand; a foreign Spec Context name is never pasted verbatim. Re-project
 
 ---
 
-- [-] **T-090-09 — End-to-end journey and timing measurement**
+- [x] **T-090-09 — End-to-end journey and timing measurement**
 
 **Owner role:** software-engineer · **Commit:**
 `test(T-090-09): e2e planted-term push refusal + scan timing`
