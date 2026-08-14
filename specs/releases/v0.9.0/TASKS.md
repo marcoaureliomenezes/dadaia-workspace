@@ -285,7 +285,7 @@ returning named defects to the implementer.
 
 ---
 
-- [ ] **T-090-11 — Memory update (CLOSURE phase)**
+- [-] **T-090-11 — Memory update (CLOSURE phase)**
 
 **Owner role:** product-engineer · **Commit:**
 `docs(T-090-11): memory — push-range scan and redaction posture`
