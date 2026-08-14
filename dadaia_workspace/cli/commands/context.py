@@ -15,6 +15,10 @@ from rich.table import Table
 
 from dadaia_workspace import container
 from dadaia_workspace.cli._specs_resolution import CONTEXT_NAME_RE as _CONTEXT_NAME_RE
+from dadaia_workspace.cli._specs_resolution import (
+    resolve_context_for_cli as _resolve_context_for_cli,
+)
+from dadaia_workspace.cli.redact import ContextRedactor
 from dadaia_workspace.core.exceptions import (
     ContextAlreadyExistsError,
     ContextNotFoundError,
@@ -79,6 +83,29 @@ def _ctx_to_dict(ctx: SpecContextProject) -> dict:  # type: ignore[type-arg]
         "current_branch": live_branch or ctx.current_branch,
         "stored_branch": ctx.current_branch,
     }
+
+
+def _resolve_caller_context_name() -> str | None:
+    """Best-effort resolution of the caller's own context name (SPEC v0.9.0 FR8a:
+    "other than the caller's resolved context"). Never raises — an unresolved caller
+    means nothing is excluded, so `--redact` masks every context/slug it encounters."""
+    try:
+        return _resolve_context_for_cli(None)
+    except ValueError:
+        return None
+
+
+def _build_context_redactor(contexts: list[SpecContextProject]) -> ContextRedactor:
+    """Candidates = every known context's name and repo slug; excludes the caller's
+    own resolved context name and its associated repo slug (render boundary ONLY —
+    `contexts` is data the service already returned with true names)."""
+    caller_name = _resolve_caller_context_name()
+    caller_slug = next((ctx.repo_slug for ctx in contexts if ctx.name == caller_name), None)
+    candidates: list[str] = []
+    for ctx in contexts:
+        candidates.append(ctx.name)
+        candidates.append(ctx.repo_slug)
+    return ContextRedactor(candidates, exclude=(caller_name, caller_slug))
 
 
 def _now_iso() -> str:
@@ -201,6 +228,14 @@ def create(
 @app.command(name="list")
 def list_all(
     json_output: bool = typer.Option(False, "--json", help="Output stable JSON contract"),
+    redact: bool = typer.Option(
+        False,
+        "--redact",
+        help=(
+            "Mask every context name and repo slug other than this caller's resolved "
+            "context (SPEC v0.9.0 FR8a). Default output is unchanged."
+        ),
+    ),
 ) -> None:
     """List all Spec Context Projects."""
     try:
@@ -208,25 +243,26 @@ def list_all(
     except SchemaVersionError as exc:
         print(str(exc), file=sys.stderr)
         raise typer.Exit(1) from None
+
+    redactor = _build_context_redactor(contexts) if redact else None
+
     if json_output:
-        print(
-            json.dumps(
-                [
-                    {
-                        "name": ctx.name,
-                        "state": ctx.state.value,
-                        "repo_slug": ctx.repo_slug,
-                        "repo_url": ctx.repo_url,
-                        "created_at": ctx.created_at,
-                        "alive_since": ctx.alive_since,
-                        "dead_since": ctx.dead_since,
-                        "current_branch": ctx.current_branch,
-                    }
-                    for ctx in contexts
-                ],
-                sort_keys=True,
-            )
-        )
+        payload = [
+            {
+                "name": ctx.name,
+                "state": ctx.state.value,
+                "repo_slug": ctx.repo_slug,
+                "repo_url": ctx.repo_url,
+                "created_at": ctx.created_at,
+                "alive_since": ctx.alive_since,
+                "dead_since": ctx.dead_since,
+                "current_branch": ctx.current_branch,
+            }
+            for ctx in contexts
+        ]
+        if redactor is not None:
+            payload = [redactor.json_value(row) for row in payload]
+        print(json.dumps(payload, sort_keys=True))
         return
     if not contexts:
         console.print("[dim]No contexts found. Use 'dadaia context create' to create one.[/dim]")
@@ -243,10 +279,12 @@ def list_all(
     }
 
     for ctx in contexts:
+        name = redactor.text(ctx.name) if redactor is not None else ctx.name
+        repo_slug = redactor.text(ctx.repo_slug) if redactor is not None else ctx.repo_slug
         table.add_row(
-            ctx.name,
+            name,
             state_style.get(ctx.state, ctx.state.value),
-            ctx.repo_slug,
+            repo_slug,
         )
     console.print(table)
 
@@ -275,6 +313,14 @@ def _resolve_default_context(svc: Any, workspace_root: Path) -> Any | None:
 def show(
     name: str | None = typer.Argument(None, help="Context name"),
     json_output: bool = typer.Option(False, "--json", help="Output stable JSON contract"),
+    redact: bool = typer.Option(
+        False,
+        "--redact",
+        help=(
+            "Mask every context name and repo slug other than this caller's resolved "
+            "context (SPEC v0.9.0 FR8a). Default output is unchanged."
+        ),
+    ),
 ) -> None:
     """Show details of a context."""
     svc = _ctx_service()
@@ -287,6 +333,14 @@ def show(
         except ContextNotFoundError as e:
             err_console.print(f"[red]Error:[/red] {e}")
             raise typer.Exit(1) from None
+
+    redactor: ContextRedactor | None = None
+    if redact:
+        try:
+            all_contexts = svc.list_all()
+        except SchemaVersionError:
+            all_contexts = [ctx] if ctx is not None else []
+        redactor = _build_context_redactor(all_contexts)
 
     if json_output:
         if ctx is None:
@@ -321,6 +375,8 @@ def show(
                 }
                 for rec in presence.others_alive(workspace_root, ctx.name, "")
             ]
+            if redactor is not None:
+                data = redactor.json_value(data)
             print(json.dumps(data, indent=2))
         return
 
@@ -329,10 +385,16 @@ def show(
         console.print(f"[dim]{msg}[/dim]")
         return
 
-    console.print(f"[bold]Name:[/bold]       {ctx.name}")
+    display_name = redactor.text(ctx.name) if redactor is not None else ctx.name
+    display_repo = redactor.text(ctx.repo_slug) if redactor is not None else ctx.repo_slug
+    repo_url_text = ctx.repo_url or "—"
+    if redactor is not None and ctx.repo_url:
+        repo_url_text = redactor.text(ctx.repo_url)
+
+    console.print(f"[bold]Name:[/bold]       {display_name}")
     console.print(f"[bold]State:[/bold]      {ctx.state.value}")
-    console.print(f"[bold]Repo:[/bold]       {ctx.repo_slug}")
-    console.print(f"[bold]Repo URL:[/bold]   {ctx.repo_url or '—'}")
+    console.print(f"[bold]Repo:[/bold]       {display_repo}")
+    console.print(f"[bold]Repo URL:[/bold]   {repo_url_text}")
     console.print(f"[bold]Created:[/bold]    {ctx.created_at}")
     console.print(f"[bold]Alive since:[/bold]  {ctx.alive_since or '—'}")
     console.print(f"[bold]Dead since:[/bold]   {ctx.dead_since or '—'}")

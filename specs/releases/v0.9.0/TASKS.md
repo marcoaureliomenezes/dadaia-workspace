@@ -191,7 +191,7 @@ decision. Git failure → refuse, naming the failure (FR6 row 2). No object sour
 
 ---
 
-- [-] **T-090-07 — `--redact` output mode (FR8a)**
+- [x] **T-090-07 — `--redact` output mode (FR8a)**
 
 **Owner role:** software-engineer · **Commit:**
 `feat(T-090-07): --redact output mode for doctor and context verbs`
