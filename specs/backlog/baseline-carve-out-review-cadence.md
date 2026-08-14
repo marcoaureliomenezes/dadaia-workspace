@@ -30,7 +30,11 @@ intents:
     change: >-
       Give the baseline a reviewable shape: each pattern carries a documented
       rationale for every exclude_regex carve-out, and a doctor/CI check flags
-      patterns lacking one; version history stays in the JSON.
+      patterns lacking one; version history stays in the JSON. Record the cadence
+      itself (what triggers a re-examination and a version bump, and the
+      single-line pattern constraint) as product truth in the gate atom at
+      delivery. If baseline v5 is ever opened, evaluate the reviewer suggestion of
+      a per-scan deadline that fails CLOSED.
   - subject:
       kind: code
       ref: dadaia_workspace/infrastructure/privacy_check.py#_scan_text_for_baseline
@@ -39,14 +43,6 @@ intents:
       class (require hostname-ish context, or exclude chains whose preceding label
       is a capitalised identifier), replacing the literal-by-literal treadmill;
       paired counter-fixtures keep proving narrowness.
-  - subject:
-      kind: catalog
-      ref: sdd-gate-v3
-    change: >-
-      Record the cadence as product truth: when the baseline is re-examined, what
-      triggers a version bump, and the single-line pattern constraint. If baseline
-      v5 is ever opened, evaluate the reviewer suggestion of a per-scan deadline
-      that fails CLOSED.
 ---
 
 # baseline pattern versioning + carve-out review cadence

@@ -22,7 +22,9 @@ description: >-
   Sequencing caution: the layer becomes strictly larger, so land it AFTER (or
   with) prior-published-term-amnesty, with a latent-blocker enumeration first —
   the reviewer's 2 wider-set hits are themselves prior-published content that
-  would become one-time blockers.
+  would become one-time blockers. At delivery, the gate atom's term-layers
+  description moves from directory-derived to registry-derived (a DEAD context
+  keeps protecting its name).
 intents:
   - subject:
       kind: code
@@ -41,12 +43,6 @@ intents:
       filter is unchanged by this entry), and run a one-off wider-set enumeration
       when landing the change to surface pre-existing latent blockers before they
       block a real push.
-  - subject:
-      kind: catalog
-      ref: sdd-gate-v3
-    change: >-
-      Update the term-layers description: source 3 is registry-derived, not
-      directory-derived; a DEAD context keeps protecting its name.
 ---
 
 # registry-derived foreign-name set

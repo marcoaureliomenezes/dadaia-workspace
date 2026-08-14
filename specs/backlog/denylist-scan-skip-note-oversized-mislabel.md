@@ -46,11 +46,11 @@ intents:
       never-fetch performance decision for the remainder.
   - subject:
       kind: code
-      ref: dadaia_workspace/features/chokepoints/service.py#push_gate_decision
+      ref: dadaia_workspace/features/chokepoints/service.py#_run_denylist_scan
     change: >-
-      QA-1 closure: unit tests asserting decision.warn carries the skip note (both
-      counters) on an allow case and a refuse case, so the operator-facing channel
-      is pinned by a test rather than by a manual check.
+      QA-1 closure: unit tests asserting the decision's warn channel carries the
+      skip note (both counters) on an allow case and a refuse case, so the
+      operator-facing channel is pinned by a test rather than by a manual check.
 ---
 
 # denylist-scan skip note: oversized fail-open mislabelled as binary

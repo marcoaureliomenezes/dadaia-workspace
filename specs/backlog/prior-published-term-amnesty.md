@@ -46,13 +46,6 @@ intents:
       sentinel to tests/** with an explicit, shrinking allowlist once amnesty
       lands, so the 29-file latent-blocker count can only go down and is pinned by
       a test rather than by a review figure.
-  - subject:
-      kind: catalog
-      ref: sdd-gate-v3
-    change: >-
-      Record the amnesty semantics as product truth in the push-range scan section:
-      same-path prior-published terms never refuse; the FROZEN/rename invariant and
-      the no-amnesty-list invariant both survive unchanged.
 ---
 
 # prior-published-term amnesty (whole-blob matching, structural tension)
@@ -80,6 +73,14 @@ See frontmatter. Sources, deduplicated into this single entry:
   preceding label is a capitalised identifier) over a fourth literal carve-out.
   Cross-reference: `baseline-carve-out-review-cadence` owns the cadence half of
   that finding.
+
+## Memory note
+
+At delivery, the `sdd-gate-v3` atom's push-range scan section records the amnesty
+semantics as product truth: same-path prior-published terms never refuse; the
+FROZEN/rename invariant and the no-amnesty-list invariant both survive unchanged.
+(Recorded here rather than as an intent — the doc anchor for that section is bound
+by `closure-v14-perf-figure-correction`; the PE lands both in one CLOSURE pass.)
 
 ## Motivation
 

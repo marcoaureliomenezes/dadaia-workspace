@@ -22,20 +22,15 @@ description: >-
 intents:
   - subject:
       kind: code
-      ref: dadaia_workspace/infrastructure/git_objects.py#_read_blobs
-    change: >-
-      Bound the resident set: either a Popen-driven incremental parse of the
-      length-prefixed batch protocol, or fixed-size sha chunks through the
-      existing code path. Preserve the single-conversation performance win (no
-      return to per-blob spawns), the 5 MB per-blob cap, and the typed-error
-      contract.
-  - subject:
-      kind: code
       ref: dadaia_workspace/infrastructure/git_objects.py#_run
     change: >-
-      If the Popen route is chosen: extend or bypass _run for the streaming case
-      without losing the timeout and typed GitObjectReadError conversion it
-      guarantees today.
+      Bound the resident set at the subprocess boundary: either a Popen-driven
+      incremental parse of the length-prefixed batch protocol (extending or
+      bypassing _run for the streaming case without losing the timeout and typed
+      GitObjectReadError conversion it guarantees today), or fixed-size sha chunks
+      through the existing capture_output path. Preserve the single-conversation
+      performance win (no return to per-blob spawns), the 5 MB per-blob cap, and
+      the typed-error contract.
 ---
 
 # git_objects streamed/chunked batch reads
@@ -49,6 +44,10 @@ bytes buffer" (`git_objects.py:152,156`), with the in-repo measurement
 (11,478 blobs / 276.7 MB under the cap, 0 over it). Routed to the PM in
 `decisions_required` (restated by the reconciliation handoff); this entry is that
 routing.
+
+The blob-consuming loop this bounds is `_read_blobs` — its anchor is bound by the
+sibling entry `git-objects-batch-parse-typed-error-boundary` (same surface, same
+hardening window; land them together and the parser changes compose).
 
 Related evidence from the round-2 code review
 (`2026-08-14T222609Z-code-reviewer-v0.9.0-prepr-round2.handoff.json`, MEDIUM on

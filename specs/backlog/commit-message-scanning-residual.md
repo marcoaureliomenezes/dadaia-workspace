@@ -22,12 +22,12 @@ description: >-
 intents:
   - subject:
       kind: code
-      ref: dadaia_workspace/infrastructure/git_objects.py#GitSubprocessObjectReader
+      ref: dadaia_workspace/container.py#build_git_object_reader
     change: >-
-      Extend the reader (or add a sibling seam) to yield the commit objects of the
-      pushed range — message bodies, and annotated tag bodies for tag refs —
-      through the same batched conversation and typed-error contract, so the
-      matcher can scan them like blobs.
+      Extend the reader seam (or build a sibling at the same composition root) to
+      yield the commit objects of the pushed range — message bodies, and annotated
+      tag bodies for tag refs — through the same batched conversation and
+      typed-error contract, so the matcher can scan them like blobs.
   - subject:
       kind: code
       ref: dadaia_workspace/features/chokepoints/service.py#push_gate_decision
@@ -37,12 +37,12 @@ intents:
       before push — for local unpublished commits this demands no published-history
       rewrite, same guarantee as the blob scope).
   - subject:
-      kind: catalog
-      ref: sdd-gate-v3
+      kind: doc
+      ref: memory/product/sdd/sdd-gate-v3.md#Non-Goals
     change: >-
-      Update the push-range scan section: the blob-only limitation is replaced by
-      blob + commit-object coverage; record the squash-merge sizing evidence as the
-      motivation.
+      Retire the blob-only limitation from the gate atom's stated non-goals:
+      coverage becomes blob + commit-object; record the squash-merge sizing
+      evidence as the motivation.
 ---
 
 # commit-message scanning — the residual channel

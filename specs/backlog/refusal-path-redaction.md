@@ -34,14 +34,14 @@ intents:
       renderer so gate output joins the three FR8a verbs; render-boundary only,
       default output unchanged where no redaction applies.
   - subject:
-      kind: catalog
-      ref: sdd-gate-v3
+      kind: doc
+      ref: memory/quality-assurance.md#Redaction At Authoring
     change: >-
-      If resolution B (doctrine-only) is chosen instead: record in the gate memory
-      atom and the qa-engineer doctrine that transcribed refusals must be
-      hand-masked including the path, so the by-hand branch is at least stated
-      rather than implicit. Either resolution closes the entry; pick one at grill
-      time.
+      If resolution B (doctrine-only) is chosen instead: record in the
+      redaction-at-authoring doctrine (memory atom + qa-engineer persona) that
+      transcribed gate refusals must be hand-masked including the path, so the
+      by-hand branch is at least stated rather than implicit. Either resolution
+      closes the entry; pick one at grill time.
 ---
 
 # refusal-path-redaction

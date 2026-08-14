@@ -23,8 +23,8 @@ description: >-
   conclusion V14 supports (A7.3 budget missed, mitigation routed) stays correct.
 intents:
   - subject:
-      kind: catalog
-      ref: sdd-gate-v3
+      kind: doc
+      ref: memory/product/sdd/sdd-gate-v3.md#Push-Range Denylist Scan
     change: >-
       Record the real-content performance posture as product truth in the
       push-range scan section: ordinary-range timing (seconds), fallback-shape
@@ -58,7 +58,8 @@ Cross-references: the A7.3 budget-miss mitigation is the idea
 `bugs-jsonl-whole-blob-per-append` (the data-side cost driver on ordinary
 ranges); the memory-peak half of the fallback shape is
 `git-objects-streamed-batch-reads` (CWE-400). This entry owns only the record
-correction and the match-throughput question.
+correction and the match-throughput question. The amnesty entry's memory note
+lands in the same atom section when both are delivered.
 
 ## Motivation
 
