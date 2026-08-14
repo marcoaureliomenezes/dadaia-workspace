@@ -84,7 +84,7 @@ to the pushed tip, plus the CI preflight.
 
 ---
 
-- [-] **T-090-03 — Git object port and adapter**
+- [x] **T-090-03 — Git object port and adapter**
 
 **Owner role:** software-engineer · **Commit:**
 `feat(T-090-03): git object reader port + subprocess adapter`
