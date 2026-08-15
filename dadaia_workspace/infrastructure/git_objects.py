@@ -213,7 +213,13 @@ def _resolve_prior_texts(repo: Path, base: str, paths: list[str]) -> dict[str, s
         parts = line.split()
         if len(parts) != 3:
             continue  # "<base>:<path> missing" (or any non-3-field line) -> absence
-        _sha, _obj_type, size_str = parts
+        _sha, obj_type, size_str = parts
+        # code-reviewer LOW finding (v0.11.0 pre-PR review): a path that was a
+        # DIRECTORY at the base resolves to its TREE object, not a blob — only
+        # objecttype "blob" may ever supply prior text; anything else (tree, or any
+        # future object kind) is treated exactly like a missing path, never fetched.
+        if obj_type != "blob":
+            continue
         try:
             size = int(size_str)
         except ValueError:
@@ -462,6 +468,14 @@ class GitSubprocessObjectReader:
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterator[ScannedObject]:
         if not local_sha or local_sha == ZERO_SHA:
             return
+        # code-reviewer LOW finding (v0.11.0 pre-PR review): the module's stated
+        # second-layer argv defence (module docstring above) must also cover
+        # `local_sha` — the SAME shape check `_is_resolvable_commit` already applies to
+        # `remote_sha`, here applied BEFORE `local_sha` ever reaches
+        # `_rev_list_candidates`'s `git rev-list` argv (CWE-88). An option-shaped value
+        # is rejected as a read failure rather than ever being interpolated.
+        if not _SHA_SHAPE_RE.match(local_sha):
+            raise GitObjectReadError(f"local_sha is not a valid sha shape: {local_sha!r}")
         # v0.11.0 FR2/ADR D7: base resolved ONCE per call — reused for the FR1 range
         # shape (_rev_list_candidates) AND the prior-side lookup (_read_blobs), rather
         # than re-derived. Unresolvable/zero remote_sha -> no base -> no object in this

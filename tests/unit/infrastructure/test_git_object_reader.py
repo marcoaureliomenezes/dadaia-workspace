@@ -355,6 +355,48 @@ def test_is_resolvable_commit_rejects_option_shaped_sha_before_interpolation(
 
 
 # ---------------------------------------------------------------------------
+# code-reviewer LOW finding (v0.11.0 pre-PR review) — the module's stated second-layer
+# argv defence (git_objects.py:37-42) must also cover `local_sha`: it is shape-checked
+# BEFORE `_rev_list_candidates` ever interpolates it into the `git rev-list` argv,
+# exactly as `_is_resolvable_commit` already does for `remote_sha`.
+# ---------------------------------------------------------------------------
+
+
+def test_new_objects_rejects_an_option_shaped_local_sha_before_interpolation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """LOW4: an option-shaped ``local_sha`` (e.g. ``--upload-pack=...``) must never
+    reach the ``git rev-list --objects <local_sha> ...`` argv — it is rejected by the
+    same sha-shape prefix check the module already applies to ``remote_sha``, raising
+    ``GitObjectReadError`` before any ``git rev-list`` subprocess is even spawned."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "a.txt").write_text("content\n")
+    _commit(repo, "c1")
+
+    from dadaia_workspace.infrastructure import git_objects as git_objects_module
+
+    real_run = git_objects_module._run
+    rev_list_calls: list[list[str]] = []
+
+    def _spy_run(
+        args: list[str], cwd: Path, *, input_bytes: bytes | None = None
+    ) -> subprocess.CompletedProcess[bytes]:
+        if args[:3] == ["git", "rev-list", "--objects"]:
+            rev_list_calls.append(args)
+        return real_run(args, cwd, input_bytes=input_bytes)
+
+    monkeypatch.setattr(git_objects_module, "_run", _spy_run)
+
+    malicious_local_sha = "--upload-pack=/bin/false"
+    reader = GitSubprocessObjectReader()
+    with pytest.raises(GitObjectReadError, match="local_sha"):
+        list(reader.new_objects(repo, malicious_local_sha, ZERO_SHA))
+
+    assert rev_list_calls == [], "an option-shaped local_sha must never reach the rev-list argv"
+
+
+# ---------------------------------------------------------------------------
 # FR8/A8.1-A8.2 — the batch header-parse boundary surfaces a truncated stream and a
 # non-numeric size field as GitObjectReadError instead of a raw ValueError, and a
 # desynchronised header shape aborts typed rather than yielding a fabricated object.
@@ -602,6 +644,95 @@ def test_new_objects_undecodable_prior_blob_carries_no_prior_text(tmp_path: Path
 
     notes = next(obj for obj in objects if obj.path == "notes.md")
     assert notes.prior_text is None
+
+
+# ---------------------------------------------------------------------------
+# code-reviewer LOW finding (v0.11.0 pre-PR review) — `_resolve_prior_texts` must
+# discard `%(objecttype)` for real: only a `blob` may ever yield prior text. A path
+# that was a DIRECTORY (tree) at the base must resolve to explicit absence even in the
+# pathological case where the tree's raw bytes happen to decode as valid UTF-8 (a real
+# tree's packed 20-byte shas virtually always fail to decode, which is why this defect
+# was otherwise invisible) — proven here by forcing a decodable 'tree'-typed response
+# onto the prior-side batch conversation.
+# ---------------------------------------------------------------------------
+
+
+def test_new_objects_path_that_was_a_directory_at_base_carries_no_prior_text(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """LOW5: a path that was a directory (tree) at the base and becomes a file at the
+    tip must never have the tree's bytes read as its prior text."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "foo").mkdir()
+    (repo / "foo" / "bar.txt").write_text("nested content\n")
+    base_sha = _commit(repo, "c1")
+
+    _git(["rm", "-r", "foo"], repo)
+    (repo / "foo").write_text("now a file, not a directory\n")
+    tip_sha = _commit(repo, "c2")
+
+    from dadaia_workspace.infrastructure import git_objects as git_objects_module
+
+    real_run = git_objects_module._run
+    marker = f"{base_sha}:foo".encode()
+    fake_tree_sha = "f" * 40
+    fake_content = b"decodable tree-shaped content"
+
+    def _spy_run(
+        args: list[str], cwd: Path, *, input_bytes: bytes | None = None
+    ) -> subprocess.CompletedProcess[bytes]:
+        if input_bytes is not None and marker in input_bytes:
+            if args[2].startswith("--batch-check"):
+                return subprocess.CompletedProcess(
+                    args,
+                    0,
+                    stdout=f"{fake_tree_sha} tree {len(fake_content)}\n".encode(),
+                    stderr=b"",
+                )
+            if args == ["git", "cat-file", "--batch"]:
+                header = f"{fake_tree_sha} tree {len(fake_content)}\n".encode()
+                return subprocess.CompletedProcess(
+                    args, 0, stdout=header + fake_content + b"\n", stderr=b""
+                )
+        return real_run(args, cwd, input_bytes=input_bytes)
+
+    monkeypatch.setattr(git_objects_module, "_run", _spy_run)
+
+    reader = GitSubprocessObjectReader()
+    objects = list(reader.new_objects(repo, tip_sha, base_sha))
+
+    foo_obj = next(obj for obj in objects if obj.path == "foo")
+    assert foo_obj.prior_text is None
+
+
+# ---------------------------------------------------------------------------
+# code-reviewer MEDIUM finding M3 support (v0.11.0 pre-PR review, CLOSURE drift
+# `oversized-never-amnestied-scope-boundary`) — pin the adapter-level guarantee that an
+# oversized CURRENT object never carries prior_text, even when the base IS resolvable
+# and the SAME path existed (under cap) at that base — the prior-side lookup rides only
+# the FR9 chunked content-read loop; oversized objects are yielded through the separate
+# `_read_oversized_blob` path, which never receives `prior_texts` at all.
+# ---------------------------------------------------------------------------
+
+
+def test_new_objects_oversized_current_object_never_carries_prior_text_even_with_resolvable_base(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "big.txt").write_text("small prior version\n")  # under cap at the base
+    base_sha = _commit(repo, "c1")
+
+    (repo / "big.txt").write_text("a" * (6 * 1024 * 1024))  # 6 MB now, over cap
+    tip_sha = _commit(repo, "c2")
+
+    reader = GitSubprocessObjectReader()
+    objects = list(reader.new_objects(repo, tip_sha, base_sha))
+
+    big = next(obj for obj in objects if obj.path == "big.txt")
+    assert big.oversized is True
+    assert big.prior_text is None
 
 
 def test_new_objects_prior_side_batch_check_failure_raises_typed_error(
