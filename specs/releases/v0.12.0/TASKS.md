@@ -177,7 +177,7 @@ live doctors unchanged and clean.
 
 ---
 
-- [ ] **T-120-05 — FR2: the four BL-* checks over the document model (unwired)**
+- [-] **T-120-05 — FR2: the four BL-* checks over the document model (unwired)**
 
 **Owner role:** software-engineer · **Commit:**
 `feat(T-120-05): run BL-SCHEMA/DUP/CONFLICT/STALE over the ACTIVE/LEDGER model`
