@@ -111,7 +111,7 @@ preflight.
 
 ---
 
-- [-] **T-120-03 — FR4: retire the dead removal/consumption write side and the dead fakes**
+- [x] **T-120-03 — FR4: retire the dead removal/consumption write side and the dead fakes**
 
 **Owner role:** software-engineer · **Commit:**
 `refactor(T-120-03): delete the uncalled backlog removal/consumption write side`

@@ -1,7 +1,6 @@
 """Composition root — builds services with concrete infrastructure."""
 
 import contextlib
-import re
 from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -9,9 +8,6 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from dadaia_workspace.core.protocols.git_client import GitClient
     from dadaia_workspace.features.agents.model_policy import AgentModelPolicyService
-    from dadaia_workspace.features.backlog.removal_lifecycle import (
-        BacklogRemovalLifecycle,
-    )
     from dadaia_workspace.features.certification import CertificationResult
 
 from dadaia_workspace.core.exceptions import (
@@ -711,128 +707,6 @@ def _memory_catalog_regenerator(specs_dir: Path) -> "Callable[[], None] | None":
         write_index(specs_dir, catalog)
 
     return _regenerate
-
-
-#: Matches an authored backlog item path in the injected authoritative-scope directive,
-#: e.g. ``- `specs/backlog/capability-one.md```.
-_SCOPE_ITEM_RE = re.compile(r"`(?:[^`]*/)?specs/backlog/(?P<slug>[a-z][a-z0-9-]*)\.md`")
-
-
-def _fake_spec_stub(prompt: str) -> str:
-    """The driving fake's SPEC, declaring ``**Consumes:**`` for its own declared scope.
-
-    The release-definition run injects an authoritative-scope directive naming the backlog
-    items the definition MUST pick. A stub that ignored it completed the release flow while
-    consuming nothing, so the half of the flow that matters — N authored items consumed by
-    one release — could not be driven deterministically
-    (bug release-definition-consumes-nothing-while-scope-declares-items). Reading its own
-    prompt is exactly how a *driving* fake drives.
-    """
-    slugs = list(dict.fromkeys(m.group("slug") for m in _SCOPE_ITEM_RE.finditer(prompt)))
-    consumes = f"\n**Consumes:** {', '.join(slugs)}\n" if slugs else ""
-    return (
-        "# SPEC: driving-fake stub\n\n> **Status:** Draft\n"
-        f"{consumes}"
-        "\n## Scope\n\nDeterministic driving-fake deliverable.\n"
-    )
-
-
-#: Slug prefix of the items the backlog driving fake upserts. The slug is scoped by RUN id:
-#: re-running one run EDITs that run's own item (idempotent, which is what the former single
-#: fixed slug was protecting), while distinct runs author DISTINCT items — without which the
-#: documented "author N items, then define one release consuming the set" flow is unreachable
-#: with the fake (bug fake-backlog-canary-fixed-slug-blocks-multi-item-release-flow).
-_FAKE_BACKLOG_CANARY_SLUG = "dadaia-fake-harness-canary"
-
-
-def _fake_backlog_canary_slug(run_id: str) -> str:
-    """Run-scoped canary slug, conforming to the backlog ``^[a-z][a-z0-9-]+$`` rule."""
-    suffix = re.sub(r"[^a-z0-9]+", "-", run_id.lower()).strip("-")
-    return f"{_FAKE_BACKLOG_CANARY_SLUG}-{suffix}" if suffix else _FAKE_BACKLOG_CANARY_SLUG
-
-
-def _fake_backlog_canary_ref(backlog_dir: Path, slug: str) -> str:
-    """Pick a live ``cli``-kind anchor for this run's canary item, unique per run.
-
-    Anchors come from the real CLI command tree at write time, so the canary always binds
-    through the R1 registry regardless of command renames.
-
-    Uniqueness is not cosmetic: two items sharing an anchor with differing ``change`` text
-    are a fail-closed ``DIVERGENT_CONFLICT``, so a set of same-anchor canaries could never
-    be consumed by one release. This run keeps the anchor already recorded in its own item
-    (idempotent re-run) and otherwise claims the first anchor no sibling canary holds.
-    """
-    from dadaia_workspace.cli.anchors import derive_cli_anchors
-
-    anchors = derive_cli_anchors()
-    preferred = ["backlog doctor", *sorted(anchors)]
-
-    own = backlog_dir / f"{slug}.md"
-    claimed: set[str] = set()
-    for item in sorted(backlog_dir.glob(f"{_FAKE_BACKLOG_CANARY_SLUG}*.md")):
-        for line in item.read_text(encoding="utf-8").splitlines():
-            if "ref:" in line:
-                ref = line.split("ref:", 1)[1].strip()
-                if item == own:
-                    return ref
-                claimed.add(ref)
-
-    for anchor in preferred:
-        if anchor in anchors and anchor not in claimed:
-            return anchor
-    # Every derived anchor is already claimed by a sibling canary: fall back to the stable
-    # first choice rather than inventing an anchor the registry cannot resolve. The
-    # resulting collision is visible to the classifier, not silent.
-    return preferred[0] if preferred[0] in anchors else min(anchors)
-
-
-def _backlog_context_roots(workspace_root: Path, context: str) -> tuple[Path, Path]:
-    """Resolve ``(specs_dir, source_root)`` for a context's backlog ops.
-
-    Mirrors the release/backlog-definition factories: a consumer context resolves to
-    ``repos/<ctx>/specs`` + ``repos/<ctx>``; the self-hosting library repo falls back to the
-    workspace-root tree. All roots are derived from ``workspace_root`` — never cwd.
-    """
-    context_name = _core_resolve_context(context) or context
-    specs_dir = (
-        workspace_root / "repos" / repo_slug_for_context(workspace_root, context_name) / "specs"
-    )
-    source_root = workspace_root / "repos" / context_name
-    if not specs_dir.is_dir():
-        specs_dir = workspace_root / "specs"
-        source_root = workspace_root
-    return specs_dir, source_root
-
-
-def build_backlog_removal_lifecycle(
-    workspace_root: Path,
-    *,
-    context: str,
-) -> "BacklogRemovalLifecycle":
-    """Compose the removal-on-release lifecycle (SPEC §3.6) over a context's backlog.
-
-    Binds the injected backlog/archive roots + the R1 canonical-subject registry so the
-    caller can write the ``consumed_backlog`` ledger at release-definition and apply the
-    residual-aware removal hook at closure. All roots are derived from ``workspace_root``.
-    """
-    from dadaia_workspace.cli.anchors import derive_cli_anchors
-    from dadaia_workspace.features.backlog.removal_lifecycle import BacklogRemovalLifecycle
-    from dadaia_workspace.features.backlog.subject_registry import build_registry
-
-    _guard_initialized(workspace_root)
-    specs_dir, source_root = _backlog_context_roots(workspace_root, context)
-    registry = build_registry(
-        source_root=source_root,
-        catalog_path=specs_dir / "memory" / "product" / "catalog.json",
-        alias_map_path=workspace_root / ".dadaia" / "states" / "backlog_subject_aliases.txt",
-        specs_dir=specs_dir,
-        cli_anchors=derive_cli_anchors(),
-    )
-    return BacklogRemovalLifecycle(
-        backlog_dir=specs_dir / "backlog",
-        archive_root=specs_dir / "_archive",
-        registry=registry,
-    )
 
 
 def build_panel_views(

@@ -21,10 +21,13 @@ The v0.9.0 sentinel excluded ``tests/**`` entirely (~30 deliberate synthetic fix
 literals it could not distinguish from a genuine new leak). That gap is closed here,
 not by whitelisting the directory again but by naming EVERY surviving fixture literal
 explicitly, as a literal, enumerated ``(path, pattern id)`` baseline
-(:data:`_TESTS_SCOPE_BASELINE`) measured directly against this commit — 29 rows (14
-``home-abs-path``, 9 ``email-address``, 5 ``ipv4-literal``, 1 ``secret-token``),
-matching the SPEC v0.11.0 §1 census exactly. Two properties make the baseline honest,
-asserted in the two directions below:
+(:data:`_TESTS_SCOPE_BASELINE`) measured directly against this commit — 29 rows at
+authoring time (14 ``home-abs-path``, 9 ``email-address``, 5 ``ipv4-literal``, 1
+``secret-token``), matching the SPEC v0.11.0 §1 census exactly. Shrunk to 28 rows (13
+``home-abs-path``) at v0.12.0 T-120-03: ``tests/unit/test_backlog_ledger_writer.py``
+was deleted as a recorded supersession (its subject, ``ledger_writer.py``, retired by
+FR4) and its row removed per this test's own shrink-only contract. Two properties make
+the baseline honest, asserted in the two directions below:
 
 1. **No hit outside the baseline** (:func:`test_no_hit_outside_the_shrink_only_baseline`)
    — a NEW matching literal anywhere in the scanned scope (``dadaia_workspace/`` and
@@ -65,7 +68,8 @@ will never re-flag.
 
 So the scope asserted here is ``dadaia_workspace/`` + ``specs/`` (excluding both archive
 trees) + ``tests/`` + ``pyproject.toml`` — every tracked file, with ``tests/**`` alone
-carrying the 29-row shrink-only exception. Measured at the time this test was written:
+carrying the shrink-only baseline exception (29 rows at authoring time, 28 after
+v0.12.0 T-120-03). Measured at the time this test was written:
 ~990 files / well under 5 MB, read through ONE ``git ls-files`` subprocess call plus
 in-process file reads (no per-file subprocess) — well under a second, far inside the
 integration tier's 60 s budget.
@@ -125,8 +129,10 @@ _NO_FOREIGN_SLUGS: tuple[str, ...] = ()
 #: row here is a pre-existing, deliberate synthetic-but-pattern-shaped fixture literal
 #: (fake IPv4s, ``t@example.com``-style addresses, ``/home/...`` fixture paths, a
 #: fixture-shaped token) that predates T-110-12 — NOT a scan suppression list (see the
-#: module docstring). 29 rows: 14 ``home-abs-path``, 9 ``email-address``,
-#: 5 ``ipv4-literal``, 1 ``secret-token`` — matches the SPEC v0.11.0 §1 census exactly.
+#: module docstring). 28 rows (shrunk from 29 at v0.12.0 T-120-03 — the
+#: ``test_backlog_ledger_writer.py`` row removed with its file, a recorded
+#: supersession): 13 ``home-abs-path``, 9 ``email-address``, 5 ``ipv4-literal``,
+#: 1 ``secret-token``. The v0.11.0 §1 census (29/14) is the authoring-time baseline.
 _TESTS_SCOPE_BASELINE: tuple[tuple[str, str], ...] = (
     ("tests/e2e/features/test_backlog_precommit.py", "email-address"),
     ("tests/e2e/test_pre_commit_presence_gate.py", "email-address"),
@@ -153,7 +159,6 @@ _TESTS_SCOPE_BASELINE: tuple[tuple[str, str], ...] = (
     ("tests/unit/infrastructure/test_git_subprocess_diff.py", "email-address"),
     ("tests/unit/infrastructure/test_git_subprocess_unit.py", "email-address"),
     ("tests/unit/infrastructure/test_runtime_config_kimi.py", "home-abs-path"),
-    ("tests/unit/test_backlog_ledger_writer.py", "home-abs-path"),
     ("tests/unit/test_backlog_models.py", "home-abs-path"),
     ("tests/unit/test_public_assets.py", "ipv4-literal"),
     ("tests/unit/test_spec_context_service.py", "secret-token"),
