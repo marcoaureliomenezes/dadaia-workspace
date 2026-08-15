@@ -8,21 +8,22 @@ strictly read-only — it never writes a backlog file or the alias map.
 * :func:`resolve_one` — given a proposed subject, show its bound canonical anchor, or
   ``UNRESOLVED``/``AMBIGUOUS`` with the candidate set + an actionable alias-map suggestion.
 
-It also hosts the shared **backlog-item loader** (:func:`load_backlog_items`,
-:func:`bound_anchor_changes`) that both the preview surface and the doctor consume to read
-``intents[]`` frontmatter from ``specs/backlog/*.md``.
+It also hosts :func:`bound_anchor_changes`, the intent binder the doctor (T-120-05/08)
+consumes to bind ``## ACTIVE`` subsection intents from the single-source
+``specs/backlog/BACKLOG.md`` (:mod:`dadaia_workspace.features.backlog.document`) against the
+registry. Kept here rather than in ``document.py`` so neither module imports the other's
+concrete type — :func:`bound_anchor_changes` is typed against the structural
+:class:`_IntentBearing` Protocol instead.
 """
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Protocol
 
 import yaml
 
-from dadaia_workspace.core.models.backlog import Intent, SubjectKind, parse_intents
+from dadaia_workspace.core.models.backlog import Intent, SubjectKind
 from dadaia_workspace.features.backlog.subject_registry import (
     Anchor,
     BindStatus,
@@ -30,18 +31,11 @@ from dadaia_workspace.features.backlog.subject_registry import (
 )
 
 __all__ = [
-    "BacklogItem",
     "PreviewResult",
     "bound_anchor_changes",
     "list_anchors",
-    "load_backlog_items",
     "resolve_one",
 ]
-
-#: Files under ``specs/backlog/`` that are NOT item files (no ``intents[]`` expected).
-_NON_ITEM_STEMS = frozenset({"ideas", "candidates", "README"})
-
-_FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
 
 
 @dataclass(frozen=True)
@@ -80,38 +74,15 @@ def list_anchors(registry: Registry, kind: SubjectKind | None = None) -> list[An
     return registry.list_anchors(kind)
 
 
-# ── shared backlog-item loader (consumed by preview + doctor) ────────────────────
-
-
-@dataclass(frozen=True)
-class BacklogItem:
-    """A backlog item file reduced to its slug + parsed ``intents[]`` + status.
-
-    ``intents_error`` is non-``None`` when the ``intents:`` frontmatter was structurally
-    invalid (BL-SCHEMA fodder); ``intents`` is then empty.
-
-    ``frontmatter_error`` (FR10, v0.1.65) is non-``None`` when the frontmatter block
-    itself failed to parse as YAML (e.g. an unquoted ``source: text (note: more text)``
-    value). The whole frontmatter is then unavailable — ``status`` is ``None`` and
-    ``intents`` is empty — so downstream no-intents/unresolved diagnostics are noise;
-    the doctor reports the parse error instead.
-    """
-
-    slug: str
-    path: Path
-    status: str | None
-    intents: tuple[Intent, ...]
-    intents_error: str | None = None
-    frontmatter_error: str | None = None
-
-
 def _format_yaml_error(exc: yaml.YAMLError, *, line_offset: int = 0) -> str:
     """Render a YAMLError as ``<msg> (line <L>, column <C>)`` when a mark is available.
 
     Prefers the short ``problem`` message over ``str(exc)`` (which embeds the mark in a
     multi-line snippet). Line/column are 1-based; ``line_offset`` shifts the mark's
-    block-relative line to the FILE line the human will open (the frontmatter block
-    starts after the opening ``---`` line).
+    block-relative line to the FILE line the human will open. Reused verbatim by
+    :mod:`dadaia_workspace.features.backlog.document` to format a malformed
+    ``**Intents:**`` fenced-YAML block diagnostic (SPEC v0.12.0 FR1) — kept here as the
+    one YAMLError-formatting home rather than duplicated.
     """
     problem = getattr(exc, "problem", None)
     message = str(problem) if problem else str(exc)
@@ -121,76 +92,15 @@ def _format_yaml_error(exc: yaml.YAMLError, *, line_offset: int = 0) -> str:
     return message
 
 
-def _parse_frontmatter(content: str) -> tuple[dict[str, object] | None, str | None]:
-    """Parse the frontmatter block; return ``(data, frontmatter_error)``.
-
-    A YAML parse failure is CAPTURED, not swallowed (FR10): the second element carries
-    the formatted YAMLError (message + problem-mark line/column when available) so the
-    doctor can emit a loud parse-error finding instead of misdiagnosing the item as
-    having no ``intents[]``.
-    """
-    match = _FRONTMATTER_RE.match(content)
-    if match is None:
-        return None, None
-    try:
-        data = yaml.safe_load(match.group(1))
-    except yaml.YAMLError as exc:
-        # +1: the frontmatter block starts on file line 2 (after the opening ``---``).
-        return None, _format_yaml_error(exc, line_offset=1)
-    return (data if isinstance(data, dict) else None), None
-
-
-def load_backlog_items(backlog_dir: Path) -> list[BacklogItem]:
-    """Load every backlog *item* file under ``backlog_dir`` (``specs/backlog/``).
-
-    Skips ``ideas.md``, ``candidates.md``, ``README.md``, and the epic file is NOT special-
-    cased here (it is an item with its own residual ``intents[]``). Returns an empty list when
-    the directory is absent. Each item's ``intents[]`` frontmatter is parsed; a structurally
-    invalid ``intents:`` value is captured as ``intents_error`` rather than raised, so the
-    doctor can report BL-SCHEMA instead of crashing.
-    """
-    items: list[BacklogItem] = []
-    if not backlog_dir.is_dir():
-        return items
-    for md in sorted(backlog_dir.glob("*.md")):
-        if md.stem in _NON_ITEM_STEMS:
-            continue
-        try:
-            content = md.read_text(encoding="utf-8")
-        except (OSError, ValueError):
-            continue
-        parsed, frontmatter_error = _parse_frontmatter(content)
-        fm = parsed or {}
-        status_raw = fm.get("status")
-        status = status_raw if isinstance(status_raw, str) else None
-        intents: tuple[Intent, ...] = ()
-        error: str | None = None
-        if frontmatter_error is None:
-            try:
-                intents = tuple(parse_intents(fm.get("intents")))
-            except ValueError as exc:
-                error = str(exc)
-        items.append(
-            BacklogItem(
-                slug=md.stem,
-                path=md,
-                status=status,
-                intents=intents,
-                intents_error=error,
-                frontmatter_error=frontmatter_error,
-            )
-        )
-    return items
-
-
 class _IntentBearing(Protocol):
-    """Structural shape :func:`bound_anchor_changes` needs — satisfied by both the
-    legacy per-entry :class:`BacklogItem` (until the T-120-08 cutover) and the new
-    single-source ``document.ActiveItem`` (SPEC v0.12.0 FR1/FR2, T-120-05, unwired
-    until the cutover), without either module importing the other's concrete type.
+    """Structural shape :func:`bound_anchor_changes` needs — satisfied by the
+    single-source ``document.ActiveItem`` (SPEC v0.12.0 FR1/FR2). A Protocol rather
+    than importing :class:`~dadaia_workspace.features.backlog.document.ActiveItem`
+    directly, so neither module imports the other's concrete type (``document.py``
+    already imports :func:`_format_yaml_error` from this module).
 
-    Declared as a read-only ``@property`` (not a plain annotated attribute): both
-    concrete types are FROZEN dataclasses, and mypy treats a frozen dataclass field as
+    Declared as a read-only ``@property`` (not a plain annotated attribute): the
+    concrete type is a FROZEN dataclass, and mypy treats a frozen dataclass field as
     read-only — a plain Protocol attribute annotation demands read+write access.
     """
 

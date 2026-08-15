@@ -1,19 +1,21 @@
 """Integration tests for the BL-SCHEMA/DUP/CONFLICT/STALE checks over the single-source
 ``BACKLOG.md`` document model (SPEC v0.12.0 FR2, ADR D8, PLAN §6, §8).
 
-Intent: CONTRACT — v0.12.0 A2.1-A2.8
+Intent: CONTRACT — v0.12.0 A2.1-A2.8, A2.9(-adjacent), A3.5, A5.6
 
 The four BL-* checks are exercised by a **single parameterized** test (one fixture
 matrix) — NOT four copy-pasted functions (SPEC §3.8 #8). A planted violation per check
 ERRORs; a clean tree passes (no findings). Roots injected over a ``tmp_path`` fixture.
 
-**T-120-05 — unwired.** These tests drive :func:`document.load_document` +
-:func:`doctor.run_checks` DIRECTLY over inline ``BACKLOG.md`` fixtures — never the live
-CLI-facing :func:`doctor.run_backlog_doctor`, which is unchanged by this task and still
-reads the legacy per-entry model (SPEC §3 standing green rule; the T-120-08 cutover is
-the only commit that repoints it). ``_CHECKS``, ``Finding``, ``Severity`` and the message
-texts are the SAME symbols :func:`run_backlog_doctor` already uses — this is the same
-engine, fed a different (fixture) item source.
+Most tests below drive :func:`document.load_document` + :func:`doctor.run_checks`
+DIRECTLY over inline ``BACKLOG.md`` fixtures — fine-grained control over the check
+engine, independent of the CLI wiring. ``_CHECKS``, ``Finding``, ``Severity`` and the
+message texts are the SAME symbols the CLI-facing :func:`doctor.run_backlog_doctor`
+uses — this is the same engine, fed the same (fixture-built) item source by hand. The
+final section proves the wiring itself: :func:`run_backlog_doctor` (wired to
+:func:`document.load_document` since the T-120-08 cutover) and ``specs doctor``'s
+backlog-surface checks agree on the same tree (A5.6), and a freshly authored
+``backlog_new`` subsection passes both out of the box (A3.5).
 """
 
 from __future__ import annotations
@@ -342,3 +344,100 @@ def test_absent_backlog_md_yields_zero_findings(tmp_path: Path) -> None:
     # No BACKLOG.md written at all.
     findings = _run(specs, src)
     assert findings == [], [f.to_dict() for f in findings]
+
+
+# ── T-120-08 cutover — run_backlog_doctor (CLI-facing) reads the document model ─────
+
+
+def _run_wired(specs: Path, src: Path) -> list[Finding]:
+    """Drive the CLI-facing :func:`run_backlog_doctor` directly — the live wiring
+    proven end to end, not the hand-built ``_run`` helper above."""
+    from dadaia_workspace.features.backlog.doctor import run_backlog_doctor
+
+    return run_backlog_doctor(
+        specs_dir=specs,
+        source_root=src,
+        catalog_path=specs / "memory" / "product" / "catalog.json",
+        alias_map_path=specs / "no-aliases.txt",
+        archive_root=specs / "_archive",
+        cli_anchors=frozenset(),
+    )
+
+
+def test_run_backlog_doctor_reads_the_single_source_document(tmp_path: Path) -> None:
+    """T-120-08 cutover: the CLI-facing ``run_backlog_doctor`` reads
+    ``specs/backlog/BACKLOG.md`` through :func:`document.load_document` — a clean
+    document yields zero findings through the wired entry point."""
+    specs, src = _build_roots(tmp_path)
+    active = _ACTIVE_SUBSECTION.format(
+        slug="wired-clean", title="Wired", status="idea", intents_block=""
+    )
+    _write_backlog_md(specs, active)
+    findings = _run_wired(specs, src)
+    assert findings == [], [f.to_dict() for f in findings]
+
+
+def test_run_backlog_doctor_absent_document_is_a_clean_noop(tmp_path: Path) -> None:
+    """A2.8 over the wired entry point: no BACKLOG.md ⇒ zero findings, not an error."""
+    specs, src = _build_roots(tmp_path)
+    findings = _run_wired(specs, src)
+    assert findings == [], [f.to_dict() for f in findings]
+
+
+# ── A3.5 — a freshly authored subsection is clean under BOTH doctors ────────────────
+
+
+def test_freshly_authored_subsection_is_clean_under_both_doctors(tmp_path: Path) -> None:
+    """A3.5 (R-13, the producer-passes-its-own-validator rule): ``backlog_new``'s
+    freshly appended ACTIVE subsection is ``backlog doctor``-clean AND ``specs
+    doctor``-clean out of the box — proven over the real writer + both live doctors,
+    not fixtures hand-built to match the parser."""
+    from dadaia_workspace.features.spec_artifacts.new_artifacts import backlog_new
+    from dadaia_workspace.features.specs import SpecsDoctor
+
+    specs, src = _build_roots(tmp_path)
+    backlog_new(specs, "fresh-entry")
+
+    findings = _run_wired(specs, src)
+    assert findings == [], [f.to_dict() for f in findings]
+
+    issues = SpecsDoctor(specs).check()
+    backlog_issues = [i for i in issues if i.code in {"SPEC-DOC-031", "SPEC-DOC-035"}]
+    assert backlog_issues == [], [i.to_dict() for i in backlog_issues]
+
+
+# ── A5.6 — the two doctors agree: never contradict on the same tree (R-13) ─────────
+
+
+def test_two_doctors_agree_on_clean_and_violation_trees(tmp_path: Path) -> None:
+    """A5.6: ``backlog doctor`` and ``specs doctor`` never contradict on the same tree.
+    (a) a clean ``BACKLOG.md`` is accepted by both. (b) a planted ACTIVE-schema
+    violation is rejected by ``backlog doctor`` (BL-SCHEMA ERROR) while ``specs
+    doctor``'s backlog-surface checks (SPEC-DOC-031/035) stay silent on it — nothing
+    consumed, no loose file — so neither doctor contradicts the other."""
+    from dadaia_workspace.features.specs import SpecsDoctor
+
+    def _backlog_surface_issues(specs: Path) -> list[object]:
+        return [i for i in SpecsDoctor(specs).check() if i.code in {"SPEC-DOC-031", "SPEC-DOC-035"}]
+
+    # (a) clean tree — both doctors accept.
+    specs_a, src_a = _build_roots(tmp_path / "clean")
+    active = _ACTIVE_SUBSECTION.format(
+        slug="agree-clean", title="Clean", status="idea", intents_block=""
+    )
+    _write_backlog_md(specs_a, active)
+    assert _run_wired(specs_a, src_a) == []
+    assert _backlog_surface_issues(specs_a) == []
+
+    # (b) a planted ACTIVE-schema violation — backlog doctor rejects (ERROR); specs
+    # doctor's backlog-surface checks stay silent.
+    specs_b, src_b = _build_roots(tmp_path / "violation")
+    (specs_b / "backlog" / "BACKLOG.md").write_text(
+        "## ACTIVE\n\n### broken\n- **Title:** Broken\n- **Opened:** 2026-08-10\n"
+        "- **Description:** missing Status and Provenance.\n\n## LEDGER\n",
+        encoding="utf-8",
+    )
+    findings_b = _run_wired(specs_b, src_b)
+    errors = [f for f in findings_b if f.severity is Severity.ERROR]
+    assert errors and errors[0].code is BacklogDoctorCode.BL_SCHEMA
+    assert _backlog_surface_issues(specs_b) == []

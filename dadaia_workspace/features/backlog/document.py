@@ -10,15 +10,16 @@ LEDGER`` holds one bullet line per closed item, the four-field ``·``-separated 
 
 Parsing is **diagnostic, never throwing**: a malformed subsection, an unparseable
 intents block, and an ungrammatical LEDGER line are each captured as a located
-:class:`DocumentError` (section, slug, line, message) on the returned model, exactly as
-``preview.BacklogItem`` captures ``intents_error``/``frontmatter_error`` today — the
-caller (the doctor, T-120-05) reports instead of crashing. An absent ``BACKLOG.md`` (or
-an absent ``backlog_dir`` itself) yields an EMPTY model, not an error (A1.2) — a context
-with no backlog is legitimate (the consumer-scaffold case).
+:class:`DocumentError` (section, slug, line, message) on the returned model — the caller
+(the doctor) reports instead of crashing. An absent ``BACKLOG.md`` (or an absent
+``backlog_dir`` itself) yields an EMPTY model, not an error (A1.2) — a context with no
+backlog is legitimate (the consumer-scaffold case).
 
 Pure module: the only root is the injected ``backlog_dir`` (SPEC §3.8 #6); no cwd reads,
-no subprocess. Not wired to anything yet (T-120-04) — the live CLI still reads per-entry
-files via ``features/backlog/preview.load_backlog_items`` until the T-120-08 cutover.
+no subprocess. The single reading path: ``features.backlog.doctor.run_backlog_doctor``
+(the CLI-facing live entry point, wired since the T-120-08 cutover) and
+``cli/commands/newartifacts.py``'s ``--explain`` both call :func:`load_document` — there
+is no per-entry fallback.
 """
 
 from __future__ import annotations

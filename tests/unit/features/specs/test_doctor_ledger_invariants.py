@@ -14,7 +14,8 @@ following the SPEC-DOC-NNN convention:
   lease<->session coherence backstop; retired along with the lease acquisition/CAS
   authority it diagnosed forgery against. See the retirement tests below.
 - SPEC-DOC-030 — specs/audits/ naming canon.
-- SPEC-DOC-031 — consumed-backlog disposition drift.
+- SPEC-DOC-031 — consumed-backlog disposition drift (re-targeted at BACKLOG.md's ACTIVE
+  subsections, SPEC v0.12.0 FR5/T-120-08 — the evidence source and severity are unchanged).
 - SPEC-DOC-032 — bug status-token canon.
 """
 
@@ -157,10 +158,24 @@ def _by_code(issues: list[SpecsDoctorIssue], code: str) -> list[SpecsDoctorIssue
 
 
 def _write_backlog_entry(specs: Path, slug: str, status_line: str) -> None:
+    """Write (or append to) ``specs/backlog/BACKLOG.md`` with one ``## ACTIVE``
+    subsection for *slug* at the given ``**Status:**`` line (SPEC v0.12.0 FR1/FR5 — the
+    single-source document, not a per-entry file). Multiple calls against the same
+    ``specs`` root accumulate subsections in one document."""
     (specs / "backlog").mkdir(parents=True, exist_ok=True)
-    (specs / "backlog" / f"{slug}.md").write_text(
-        f"# {slug}\n\n**Status:** {status_line}\n\nBody.\n", encoding="utf-8"
+    path = specs / "backlog" / "BACKLOG.md"
+    text = path.read_text(encoding="utf-8") if path.is_file() else "## ACTIVE\n\n## LEDGER\n"
+    block = (
+        f"### {slug}\n"
+        f"- **Title:** {slug}\n"
+        "- **Opened:** 2026-08-01\n"
+        f"- **Status:** {status_line}\n"
+        f"- **Description:** {slug} body.\n"
+        "- **Provenance:** operator request\n\n"
     )
+    marker = "## LEDGER"
+    insertion = text.index(marker)
+    path.write_text(text[:insertion] + block + text[insertion:], encoding="utf-8")
 
 
 def _write_archived_closure(specs: Path, release_id: str, body: str) -> None:
@@ -269,24 +284,30 @@ def test_sad_matrix(tmp_path: Path) -> None:
     doc030 = _by_code(SpecsDoctor(specs_g).check(), "SPEC-DOC-030")
     assert doc030 and all(i.severity == Severity.WARNING for i in doc030)
 
-    # DOC-031: non-terminal backlog referenced in an archived CLOSURE -> WARNING with
-    # the reconciled BL-SCHEMA remediation text (bare terminal token, not "TOKEN — vX.Y.Z").
+    # DOC-031: non-terminal ACTIVE backlog item referenced in an archived CLOSURE ->
+    # WARNING with the ACTIVE->LEDGER remediation text (SPEC v0.12.0 FR5/T-120-08).
     specs_h = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-031"))
     _write_backlog_entry(specs_h, "feat-consumed-thing", "PICKED — blocked on operator grill")
     _write_archived_closure(
         specs_h,
         "v0.0.9",
         "# Closure\n\n## Bug dispositions\n\n"
-        "Source: `specs/backlog/feat-consumed-thing.md` — delivered, accepted.\n",
+        "Source: `feat-consumed-thing` — delivered, accepted.\n",
     )
     doc031 = _by_code(SpecsDoctor(specs_h).check(), "SPEC-DOC-031")
     assert doc031 and all(i.severity == Severity.WARNING for i in doc031)
     text031 = " ".join(i.description for i in doc031)
     assert "feat-consumed-thing" in text031 and "v0.0.9" in text031
-    assert "status: delivered" in text031
-    assert "delivered_in" in text031
-    assert "_archive" in text031
-    assert "BL-SCHEMA" in text031 and "Do NOT" in text031
+    assert "LEDGER" in text031 and "DELIVERED" in text031
+    assert "ACTIVE" in text031 and "BL-STALE" in text031
+    assert "Do NOT" in text031
+    assert doc031[0].path is not None and doc031[0].path.endswith("BACKLOG.md")
+
+    # A5.2 regression: SPEC-DOC-031 never emits a finding with slug/path treated as the
+    # BACKLOG.md document itself (grill P4) — the document's own "BACKLOG" filename
+    # substring appears in many archived docs, but the slug universe is the parsed
+    # `### <slug>` subsections, never the literal document name.
+    assert not any(i.description.startswith("backlog ACTIVE item 'BACKLOG'") for i in doc031)
 
     # DOC-032: legacy non-canonical bug status -> WARNING.
     specs_i = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-032"))
@@ -388,7 +409,9 @@ def test_silent_matrix(tmp_path: Path) -> None:
     _write_archived_closure(specs_h3, "v0.0.9", "# Closure\n\nUnrelated content.\n")
     assert "SPEC-DOC-031" not in _codes(SpecsDoctor(specs_h3).check())
 
-    specs_h4 = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-031aggregate"))
+    # No BACKLOG.md at all (a stray candidates.md is not the document SPEC-DOC-031
+    # reads) -> document.active is empty -> silent, regardless of archived mentions.
+    specs_h4 = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-031absent-doc"))
     (specs_h4 / "backlog" / "candidates.md").write_text(
         "## Candidatas ativas\n\n- thing — x (owner: a, contexto: b)\n", encoding="utf-8"
     )
@@ -415,6 +438,45 @@ def test_silent_matrix(tmp_path: Path) -> None:
         extra="superseded_by: canonical-bug\nrejected_reason: marked duplicate\n",
     )
     assert "SPEC-DOC-032" not in _codes(SpecsDoctor(specs_i3).check())
+
+
+# ---------------------------------------------------------------------------
+# A5.2 regression (SPEC v0.12.0 T-120-08, grill P4) — SPEC-DOC-031 never treats
+# BACKLOG.md itself as an entry, even though the literal string "BACKLOG" is a
+# near-universal substring of archived SPEC/CLOSURE prose.
+# ---------------------------------------------------------------------------
+
+
+def test_doc031_never_emits_a_finding_for_a_phantom_backlog_slug(tmp_path: Path) -> None:
+    """Before the re-target (grill P4), SPEC-DOC-031 globbed ``specs/backlog/*.md``
+    including ``BACKLOG.md`` itself, read its first ``**Status:**`` line as if it were
+    one entry's status, and asked ``_archive_consumption_hits("BACKLOG")`` — a raw
+    substring scan that matches almost any archived document, because the word
+    "BACKLOG" appears throughout SPEC/CLOSURE prose (e.g. "the BACKLOG.md single
+    source"). That produced a spurious WARNING keyed to a slug that does not exist.
+
+    Post re-target: the slug universe is the parsed ``### <slug>`` subsections of the
+    document (:func:`document.load_document`), never the document's own filename —
+    proven here over a real ``BACKLOG.md`` (non-terminal ACTIVE item, so the check
+    genuinely runs) plus an archived CLOSURE saturated with the literal word "BACKLOG"."""
+    specs = _make_clean_specs_tree(tmp_path)
+    _write_backlog_entry(specs, "real-active-item", "CANDIDATE — not referenced anywhere")
+    _write_archived_closure(
+        specs,
+        "v0.0.9",
+        "# Closure\n\nThe BACKLOG.md single source (## ACTIVE + ## LEDGER) is BACKLOG "
+        "truth. BACKLOG BACKLOG BACKLOG — every mention of BACKLOG here is prose, not a "
+        "consumption record for any real slug.\n",
+    )
+    issues = SpecsDoctor(specs).check()
+    doc031 = _by_code(issues, "SPEC-DOC-031")
+    # The real item is never referenced by slug in the archived doc -> silent; the word
+    # "BACKLOG" alone must never resolve to a phantom slug/path.
+    assert doc031 == [], [i.to_dict() for i in doc031]
+    assert not any(i.slug == "BACKLOG" for i in issues if i.code == "SPEC-DOC-031")
+    assert not any(
+        (i.path or "").rstrip("/").endswith("/BACKLOG") for i in issues if i.code == "SPEC-DOC-031"
+    )
 
 
 # ---------------------------------------------------------------------------

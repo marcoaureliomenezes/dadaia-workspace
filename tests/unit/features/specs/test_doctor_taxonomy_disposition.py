@@ -2,7 +2,9 @@
 
 Four invariants:
   SPEC-DOC-034 — the three ``_archive`` dirs exist (WARN + auto-fix);
-  SPEC-DOC-035 — consumed-but-unarchived backlog (terminal status still loose → warns);
+  SPEC-DOC-035 — the single-source invariant (re-targeted, SPEC v0.12.0 FR5/T-120-08): a
+                 loose per-entry ``*.md`` directly under ``specs/backlog/`` — other than
+                 ``BACKLOG.md``/``README.md`` — warns, regardless of any status it carries;
   SPEC-DOC-036 — audit-without-disposition (archived audit naming its release → clean) —
                  the audit-disposition law's own doctor invariant, kept as a named pair;
   SPEC-DOC-037 — constitution must not enumerate AgentRuntimeKind members;
@@ -64,6 +66,8 @@ def _setup_doc034(specs) -> None:  # type: ignore[no-untyped-def]
 
 
 def _setup_doc035(specs) -> None:  # type: ignore[no-untyped-def]
+    """A loose per-entry file directly under specs/backlog/ is drift under the
+    single-source model (SPEC v0.12.0 FR5/T-120-08), regardless of its Status content."""
     _seed_archives(specs)
     _backlog_entry(specs, "shipped-item.md", "DELIVERED — v0.1.30")
 
@@ -91,7 +95,7 @@ def _setup_doc038_multiple(specs) -> None:  # type: ignore[no-untyped-def]
     [
         pytest.param("SPEC-DOC-034", _setup_doc034, 1, "backlog", id="doc034-missing-archive-dir"),
         pytest.param(
-            "SPEC-DOC-035", _setup_doc035, 1, "shipped-item.md", id="doc035-terminal-loose-backlog"
+            "SPEC-DOC-035", _setup_doc035, 1, "shipped-item.md", id="doc035-loose-per-entry-file"
         ),
         pytest.param(
             "SPEC-DOC-036",
@@ -149,14 +153,20 @@ def _silent_doc034_absent_parent(specs: Path) -> None:
     specs.mkdir()
 
 
-def _silent_doc035_terminal_archived(specs: Path) -> None:
+def _silent_doc035_archived(specs: Path) -> None:
+    """A superseded per-entry file already under _archive/ is clean — the check is a
+    non-recursive glob of specs/backlog/ itself; it never scans _archive/."""
     _seed_archives(specs)
     _backlog_entry(specs, "shipped-item.md", "DELIVERED — v0.1.30", archived=True)
 
 
-def _silent_doc035_nonterminal_loose(specs: Path) -> None:
+def _silent_doc035_only_single_source_files(specs: Path) -> None:
+    """BACKLOG.md and README.md are the only two filenames the single-source invariant
+    permits loose directly under specs/backlog/ (SPEC v0.12.0 FR5) — present together,
+    the tree is clean regardless of BACKLOG.md's content."""
     _seed_archives(specs)
-    _backlog_entry(specs, "open-idea.md", "OPEN")
+    (specs / "backlog" / "BACKLOG.md").write_text("## ACTIVE\n\n## LEDGER\n", encoding="utf-8")
+    (specs / "backlog" / "README.md").write_text("# Backlog\n", encoding="utf-8")
 
 
 def _silent_doc036_with_disposition(specs: Path) -> None:
@@ -186,13 +196,13 @@ def _silent_doc036_empty_archive(specs: Path) -> None:
         ),
         pytest.param(
             "SPEC-DOC-035",
-            _silent_doc035_terminal_archived,
-            id="doc035-terminal-under-archive-clean",
+            _silent_doc035_archived,
+            id="doc035-under-archive-not-scanned-clean",
         ),
         pytest.param(
             "SPEC-DOC-035",
-            _silent_doc035_nonterminal_loose,
-            id="doc035-nonterminal-loose-clean",
+            _silent_doc035_only_single_source_files,
+            id="doc035-backlog-and-readme-only-clean",
         ),
         pytest.param(
             "SPEC-DOC-036",

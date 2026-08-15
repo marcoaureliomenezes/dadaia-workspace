@@ -11,7 +11,7 @@ single-responsibility validator siblings plus two shared leaf modules:
                               ``infrastructure.subprocess_runner`` import)
   * ``doctor_release``      — ACTIVE.md, release artifacts, SemVer + ledger invariants
   * ``doctor_closure_audit``— archive closures, orphan specs, audit disposition; ``fix_archive_dir``
-  * ``doctor_governance``   — backlog schema, bug status/JSONL, consumed-backlog drift
+  * ``doctor_governance``   — single-source backlog invariants, bug status/JSONL
   * ``doctor_coherence``    — constitution and pattern-version coherence
 
 The coordinator owns ORDER: ``check()`` invokes the validators' public methods in the exact
@@ -125,7 +125,9 @@ class SpecsDoctor:
         issues.extend(self._memory.check_memory_atomicity())
         # 9: covered inside check_active_md (release id ↔ dir)
         # checks 10 and 11 (HTML image-links / mermaid-script) retired with HTML atoms
-        issues.extend(self._governance.check_backlog_schema())
+        # SPEC-DOC-012/022/023 RETIRED (v0.12.0 T-120-08, ADR D10) — the candidates.md
+        # bullet-schema validator retired with candidates.md itself, archived by the
+        # same cutover; see doctor_governance.py's module docstring.
         issues.extend(self._release.check_release_semver_naming())
         # TREE invariants (spec-context-tree-v2)
         issues.extend(self._structural.check_tree1_foundation())

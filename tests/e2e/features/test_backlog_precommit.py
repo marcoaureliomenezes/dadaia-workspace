@@ -12,6 +12,11 @@ lease exists, so the lease gate allows (zero-false-block) and the backlog doctor
 
 The four violations are exercised by a **single parameterized** test (one planter matrix) —
 NOT four copy-pasted functions (SPEC §3.8 #8 — no copy-paste fan-out).
+
+**T-120-08 migration (PLAN §8 — "adjusted in place... same gate, fixture shape only, no
+new e2e").** Every planter writes an ``## ACTIVE`` subsection into the single-source
+``specs/backlog/BACKLOG.md`` (SPEC v0.12.0 FR1/FR2, ADR #14) instead of a per-entry
+``<slug>.md`` file — the gate and the codes under test are unchanged.
 """
 
 from __future__ import annotations
@@ -32,10 +37,19 @@ _DEADLINE = 60.0
 
 _SOURCE = "class Widget:\n    pass\n"
 
-_CLEAN_INTENT = (
-    "intents:\n  - subject: {{ kind: code, ref: dadaia_workspace/m.py#Widget }}\n"
-    "    change: {change}\n"
-)
+
+def _active_subsection(slug: str, status: str, ref: str, change: str) -> str:
+    return (
+        f"### {slug}\n"
+        f"- **Title:** {slug}\n"
+        "- **Opened:** 2026-08-15\n"
+        f"- **Status:** {status}\n"
+        f"- **Description:** {slug} needs a change.\n"
+        "- **Provenance:** operator request\n"
+        "- **Intents:**\n```yaml\n"
+        f"- subject:\n    kind: code\n    ref: {ref}\n  change: {change}\n"
+        "```\n\n"
+    )
 
 
 def _init_repo(workspace: Path) -> Path:
@@ -72,11 +86,23 @@ def _env(workspace: Path) -> dict[str, str]:
     return env
 
 
-def _item(repo: Path, slug: str, change: str) -> None:
-    (repo / "specs" / "backlog" / f"{slug}.md").write_text(
-        f"---\nstatus: idea\n{_CLEAN_INTENT.format(change=change)}---\n\n# {slug}\n",
-        encoding="utf-8",
-    )
+def _item(
+    repo: Path,
+    slug: str,
+    change: str,
+    *,
+    status: str = "idea",
+    ref: str = "dadaia_workspace/m.py#Widget",
+) -> None:
+    """Append one ACTIVE subsection to specs/backlog/BACKLOG.md (creating it, with both
+    section headings, when absent) — the single-source authoring shape ``backlog_new``
+    itself writes (SPEC v0.12.0 FR3)."""
+    path = repo / "specs" / "backlog" / "BACKLOG.md"
+    text = path.read_text(encoding="utf-8") if path.is_file() else "## ACTIVE\n\n## LEDGER\n"
+    block = _active_subsection(slug, status, ref, change)
+    marker = "## LEDGER"
+    insertion = text.index(marker)
+    path.write_text(text[:insertion] + block + text[insertion:], encoding="utf-8")
 
 
 def _commit(repo: Path, env: dict[str, str], message: str) -> subprocess.CompletedProcess[str]:
@@ -105,12 +131,7 @@ def test_clean_backlog_commit_passes(tmp_path: Path) -> None:
 def _plant_schema(repo: Path) -> None:
     # An UNRESOLVED subject (no such symbol) → BL-SCHEMA. v0.1.55 FR5: status-gated, so the
     # unresolved-subject violation is planted at `candidate` (an `idea` is exempt).
-    (repo / "specs" / "backlog" / "bad.md").write_text(
-        "---\nstatus: candidate\nintents:\n"
-        "  - subject: { kind: code, ref: dadaia_workspace/m.py#Ghost }\n"
-        "    change: x\n---\n\n# bad\n",
-        encoding="utf-8",
-    )
+    _item(repo, "bad", "x", status="candidate", ref="dadaia_workspace/m.py#Ghost")
 
 
 def _plant_dup(repo: Path) -> None:

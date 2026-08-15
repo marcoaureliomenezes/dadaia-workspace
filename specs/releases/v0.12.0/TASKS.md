@@ -233,7 +233,7 @@ unchanged; `dadaia ci preflight` green.
 
 ---
 
-- [ ] **T-120-07 — FR7a: author `BACKLOG.md` from the live tree (content only, uncommitted)**
+- [x] **T-120-07 — FR7a: author `BACKLOG.md` from the live tree (content only, uncommitted)**
 
 **Owner role:** project-manager · **Commit:** none — the content is committed by T-120-08
 
@@ -268,7 +268,7 @@ would make the still-live per-entry loader parse it (grill P3/P4).
 
 ---
 
-- [ ] **T-120-08 — THE CUTOVER: wiring, loader deletion, governance re-target, document, `git mv`** (one commit)
+- [x] **T-120-08 — THE CUTOVER: wiring, loader deletion, governance re-target, document, `git mv`** (one commit)
 
 **Owner role:** project-manager + software-engineer (sequenced inside one commit) ·
 **Commit:** `feat(T-120-08): cut the backlog over to single-source BACKLOG.md`

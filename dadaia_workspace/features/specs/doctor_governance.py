@@ -1,32 +1,24 @@
-"""Governance validator (v0.1.55 FR1): backlog schema, bug status/JSONL, consumed-backlog.
+"""Governance validator: backlog single-source invariants, bug status/JSONL.
 
 Single-responsibility sibling of the SpecsDoctor coordinator. Owns the bug/backlog governance
-invariants: candidates.md bullet format (SPEC-DOC-012), consumed-but-unsanitized backlog
-(SPEC-DOC-031), bug-status canon (SPEC-DOC-032), the event-sourced JSONL bug-telemetry invariant
-(SPEC-DOC-033), and unarchived-terminal backlog (SPEC-DOC-035). Leaf-only: imports the shared
-leaves + core, never a sibling validator.
+invariants: consumed-but-unsanitized ACTIVE backlog item (SPEC-DOC-031, SPEC v0.12.0 FR5),
+bug-status canon (SPEC-DOC-032), the event-sourced JSONL bug-telemetry invariant
+(SPEC-DOC-033), and the single-source loose-file invariant (SPEC-DOC-035, SPEC v0.12.0 FR5).
+Leaf-only: imports the shared leaves + core, plus one documented cross-feature leaf edge
+(``features.backlog.document`` — SPEC v0.12.0 PLAN §6, ``setup.cfg``'s
+``features-no-cross-feature`` ``ignore_imports``), never a sibling validator.
 """
 
 from __future__ import annotations
 
 import json
 import re
-from datetime import UTC, datetime
 from pathlib import Path
 
 from dadaia_workspace.core.models.bugs import BugCoherenceRecord, diagnose_bug_coherence_history
+from dadaia_workspace.features.backlog.document import load_document
 from dadaia_workspace.features.specs.doctor_common import iter_archive_release_dirs
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
-
-BACKLOG_BULLET_RE = re.compile(r"^- \S.*? — .+? \(owner: [a-z-]+, contexto: .+?\)\s*$")
-# SPEC-DOC-022: format for ## Hotfixes pendentes bullets
-# Pattern: - <YYYY-MM-DDTHHMMSSZ> <severity> <component> — <one-liner> (post-mortem: <link>)
-BACKLOG_HOTFIX_RE = re.compile(
-    r"^- (\d{4}-\d{2}-\d{2}T\d{6}Z) (LOW|MEDIUM|HIGH|CRITICAL) ([\w\-/]+) — .+ \(post-mortem: .+\)$"
-)
-
-# SPEC-DOC-023: hotfix bullets older than 72 hours in ## Hotfixes pendentes get WARNING
-_HOTFIX_STALE_HOURS = 72
 
 # ADR-11 single-source status-token vocabulary.
 #
@@ -50,24 +42,14 @@ _BUGS_JSONL_ROW_CEILING = 1000
 # SPEC-DOC-033 canonical bug-log filename: ``<YYYYMMDDTHH>Z-<n>.jsonl``.
 _BUGS_JSONL_NAME_RE = re.compile(r"^\d{8}T\d{2}Z-\d+\.jsonl$")
 
-# SPEC-DOC-035 (v0.1.46 AC-4): terminal backlog status prefixes. A backlog entry whose
-# Status is terminal but still loose in ``specs/backlog/`` (not under ``_archive/``) WARNs —
-# a consumed/shipped item must be moved into ``specs/backlog/_archive/``.
-_BACKLOG_TERMINAL_PREFIXES: tuple[str, ...] = (
-    "delivered",
-    "consumed",
-    "superseded",
-    "resolved",
-)
-
-# Match a Status line in a backlog entry: ``Status: ...`` or ``**Status:** ...``.
-_BACKLOG_STATUS_RE = re.compile(r"^\s*(?:\*\*)?status\*?\*?\s*:?\*?\*?\s*(.+)$", re.IGNORECASE)
-
 # Match a bug frontmatter ``status:`` line (frontmatter is leading YAML-like lines).
 _BUG_STATUS_RE = re.compile(r"^status\s*:\s*(\S+)", re.IGNORECASE | re.MULTILINE)
 
-# Aggregate / free-form backlog files that are not per-slug backlog entries.
-_BACKLOG_AGGREGATE_FILES: frozenset[str] = frozenset({"candidates.md", "ideas.md", "README.md"})
+# SPEC-DOC-035 (SPEC v0.12.0 FR5, ADR D5/D9): the single-source invariant — the only two
+# filenames permitted loose directly under ``specs/backlog/``. Anything else (a per-entry
+# item that survived the v0.12.0 consolidation, or was hand-authored outside `dadaia
+# backlog new`) is drift.
+_BACKLOG_SINGLE_SOURCE_FILES: frozenset[str] = frozenset({"BACKLOG.md", "README.md"})
 
 # ADR-6: matches inside a ``## Backlog returns`` section of an archived CLOSURE are a
 # legitimate return (the slug is being ADDED for a future release, not consumed) and are
@@ -76,122 +58,11 @@ _BACKLOG_RETURNS_HEADING_RE = re.compile(r"^##\s+Backlog\s+returns\b", re.IGNORE
 
 
 class GovernanceValidator:
-    """Bug/backlog governance: candidates schema, bug status/JSONL, consumed-backlog drift."""
+    """Bug/backlog governance: single-source backlog invariants, bug status/JSONL."""
 
     def __init__(self, specs_dir: Path, public_dir: Path | None = None) -> None:
         self.specs_dir = specs_dir
         self.public_dir = public_dir
-
-    def check_backlog_schema(self) -> list[SpecsDoctorIssue]:
-        """Validate bullet format in specs/backlog/candidates.md (SPEC-DOC-012).
-
-        Validates two sections:
-        - ``## Candidatas ativas`` — format: ``- <name> — <one-liner> (owner: <agent>, contexto: <link>)``
-        - ``## Hotfixes pendentes`` — format (D22): ``- <ts> <severity> <component> — <one-liner> (post-mortem: <link>)``
-
-        Also emits WARNING for bullets in ``## Hotfixes pendentes`` whose timestamp is
-        older than 72 hours without being moved to ``## Histórico`` (D23).
-
-        Sections starting with ``## Histórico`` are skipped. Backlog file absent → noop.
-        Failures produce WARNING (not ERROR) during initial adoption period.
-
-        Note: only ``candidates.md`` is validated; other files under
-        ``specs/backlog/`` (e.g. ``dadaia-workspace-panel.md``) are free-form
-        and are not touched by this check.
-        """
-        issues: list[SpecsDoctorIssue] = []
-        candidates_path = self.specs_dir / "backlog" / "candidates.md"
-        if not candidates_path.exists():
-            return issues
-
-        text = candidates_path.read_text(encoding="utf-8")
-        in_candidatas_section = False
-        in_hotfixes_section = False
-        now_utc = datetime.now(tz=UTC)
-
-        for lineno, raw_line in enumerate(text.splitlines(), start=1):
-            line = raw_line.rstrip()
-            if line.startswith("## "):
-                in_candidatas_section = bool(re.match(r"^##\s+Candidatas", line))
-                in_hotfixes_section = bool(re.match(r"^##\s+Hotfixes\s+pendentes", line))
-                continue
-
-            # --- ## Candidatas ativas section ---
-            if in_candidatas_section:
-                if not line.startswith("- "):
-                    continue
-                if not BACKLOG_BULLET_RE.match(line):
-                    issues.append(
-                        SpecsDoctorIssue(
-                            code="SPEC-DOC-012",
-                            severity=Severity.WARNING,
-                            description=(
-                                f"candidates.md line {lineno}: bullet does not match "
-                                "expected format "
-                                "'- <name> — <one-liner> (owner: <agent>, contexto: <link>)': "
-                                f"{line!r}"
-                            ),
-                            path=str(candidates_path),
-                        )
-                    )
-                continue
-
-            # --- ## Hotfixes pendentes section ---
-            if in_hotfixes_section:
-                if not line.startswith("- "):
-                    continue
-                m = BACKLOG_HOTFIX_RE.match(line)
-                if not m:
-                    issues.append(
-                        SpecsDoctorIssue(
-                            code="SPEC-DOC-012",
-                            severity=Severity.WARNING,
-                            description=(
-                                f"candidates.md line {lineno}: hotfix bullet does not match "
-                                "expected format "
-                                "'- <YYYY-MM-DDTHHMMSSZ> <LOW|MEDIUM|HIGH|CRITICAL> <component>"
-                                " — <one-liner> (post-mortem: <link>)': "
-                                f"{line!r}"
-                            ),
-                            path=str(candidates_path),
-                        )
-                    )
-                else:
-                    # Check staleness (D23): timestamp older than _HOTFIX_STALE_HOURS
-                    ts_raw = m.group(1)  # e.g. 2026-05-14T120000Z
-                    try:
-                        ts = datetime.strptime(ts_raw, "%Y-%m-%dT%H%M%SZ").replace(tzinfo=UTC)
-                        age_hours = (now_utc - ts).total_seconds() / 3600
-                        if age_hours > _HOTFIX_STALE_HOURS:
-                            issues.append(
-                                SpecsDoctorIssue(
-                                    code="SPEC-DOC-012",
-                                    severity=Severity.WARNING,
-                                    description=(
-                                        f"candidates.md line {lineno}: hotfix bullet is stale "
-                                        f"({age_hours:.0f}h > {_HOTFIX_STALE_HOURS}h). "
-                                        "Consider promoting to a hotfix release or moving to "
-                                        "## Histórico (D23)."
-                                    ),
-                                    path=str(candidates_path),
-                                )
-                            )
-                    except ValueError:
-                        pass  # timestamp parse failure already flagged above
-
-        return issues
-
-    def _backlog_status_value(self, text: str) -> str | None:
-        """Extract the (first) Status line value from a backlog entry's body.
-
-        Accepts both ``Status: <value>`` and ``**Status:** <value>``. Returns the
-        stripped value, or ``None`` when no Status line is present.
-        """
-        for line in text.splitlines():
-            m = _BACKLOG_STATUS_RE.match(line)
-            if m:
-                return m.group(1).strip()
-        return None
 
     def _archive_consumption_hits(self, slug: str) -> list[str]:
         """Release ids of archived CLOSURE/SPEC that reference ``slug`` as consumed.
@@ -224,35 +95,38 @@ class GovernanceValidator:
         return sorted(hits)
 
     def check_consumed_backlog_disposition(self) -> list[SpecsDoctorIssue]:
-        """SPEC-DOC-031 (T-011-10, bug B1, ADR-6): WARN on consumed-but-unsanitized backlog.
+        """SPEC-DOC-031 (re-targeted, SPEC v0.12.0 FR5/ADR D9): WARN on a consumed-but-
+        unsanitized ``## ACTIVE`` item in ``specs/backlog/BACKLOG.md``.
 
-        A ``specs/backlog/<slug>.md`` entry whose Status line is an ADR-11 NON-TERMINAL
-        token ({OPEN, PICKED, CANDIDATE}, case-insensitive prefix match) AND whose slug is
-        referenced by an archived release CLOSURE/SPEC (outside ``## Backlog returns``
-        sections) ⇒ **WARNING**. The lifecycle contract is that a backlog item consumed
-        into a shipped+archived release must be flipped to a terminal disposition token
-        during CLOSURE; a non-terminal status on a referenced slug is the drift.
+        Iterates the document's ACTIVE subsections (:func:`~dadaia_workspace.features.
+        backlog.document.load_document`) instead of globbing per-entry files — the
+        physical shape changed, the evidence source and severity did not. An ACTIVE
+        item whose ``**Status:**`` is an ADR-11 NON-TERMINAL token ({OPEN, PICKED,
+        CANDIDATE}, case-insensitive prefix match) AND whose slug is referenced by an
+        archived release CLOSURE/SPEC (outside ``## Backlog returns`` sections) ⇒
+        **WARNING**. The lifecycle contract is that an item consumed into a
+        shipped+archived release must move ``ACTIVE`` → ``LEDGER`` at CLOSURE; a
+        non-terminal ACTIVE item whose slug is referenced is the drift.
 
         Severity is WARN, never ERR (ADR-6): a slug mention is necessary-but-not-sufficient
         evidence of consumption — the "Backlog returns" section (excluded here) and
         defer/supersede mentions in archived CLOSUREs are the known false-positive class.
-        Aggregate files (``candidates.md``/``ideas.md``/``README.md``) are skipped.
+        Never fires on the document itself (A5.2): the slug universe is the parsed
+        ``### <slug>`` subsections, never the literal ``BACKLOG`` filename/slug.
         """
         backlog_dir = self.specs_dir / "backlog"
-        if not backlog_dir.is_dir():
+        document = load_document(backlog_dir)
+        if not document.active:
             return []
+        backlog_md_path = backlog_dir / "BACKLOG.md"
         issues: list[SpecsDoctorIssue] = []
-        for entry in sorted(backlog_dir.glob("*.md")):
-            if entry.name in _BACKLOG_AGGREGATE_FILES:
+        for item in document.active:
+            if item.status is None:
                 continue
-            slug = entry.stem
-            status = self._backlog_status_value(entry.read_text(encoding="utf-8"))
-            if status is None:
-                continue
-            status_lower = status.lower()
+            status_lower = item.status.lower()
             if not status_lower.startswith(_BACKLOG_NONTERMINAL_PREFIXES):
                 continue
-            hits = self._archive_consumption_hits(slug)
+            hits = self._archive_consumption_hits(item.slug)
             if not hits:
                 continue
             releases = ", ".join(hits)
@@ -261,18 +135,20 @@ class GovernanceValidator:
                     code="SPEC-DOC-031",
                     severity=Severity.WARNING,
                     description=(
-                        f"backlog/{entry.name} has non-terminal status '{status}' but its "
-                        f"slug is referenced by archived release(s) {releases} (outside "
-                        "'Backlog returns' sections). If it was consumed/shipped, set a BARE "
-                        "terminal status token that BL-SCHEMA accepts (e.g. 'status: "
-                        "delivered'; also 'superseded'/'resolved'/'consumed'/'rejected'), "
-                        "record the release in an optional 'delivered_in: vX.Y.Z' field, and "
-                        "move the entry into specs/backlog/_archive/ (SPEC-DOC-035). Do NOT "
-                        "append '— vX.Y.Z' to the status token itself — BL-SCHEMA rejects a "
-                        "'TOKEN — vX.Y.Z' status. WARNING only — a slug mention is not proof "
-                        "of consumption (ADR-6 false-positive class)."
+                        f"backlog ACTIVE item {item.slug!r} has non-terminal status "
+                        f"'{item.status}' but its slug is referenced by archived "
+                        f"release(s) {releases} (outside 'Backlog returns' sections). "
+                        "If it was consumed/shipped, add a LEDGER line ('<slug> · "
+                        "DELIVERED · vX.Y.Z · <date>'; also SUPERSEDED/RESOLVED/"
+                        "CONSUMED/DEFERRED/REJECTED) and remove this ACTIVE subsection "
+                        "in the same edit — an item moves ACTIVE -> LEDGER, it is never "
+                        "left recorded in both (BL-STALE would then fire). Do NOT leave "
+                        "the item ACTIVE with a terminal-looking status suffix instead "
+                        "— BL-SCHEMA/BL-STALE key off the bare Status token and the "
+                        "LEDGER line, not free text. WARNING only — a slug mention is "
+                        "not proof of consumption (ADR-6 false-positive class)."
                     ),
-                    path=str(entry),
+                    path=str(backlog_md_path),
                 )
             )
         return issues
@@ -470,35 +346,34 @@ class GovernanceValidator:
         return issues
 
     def check_unarchived_terminal_backlog(self) -> list[SpecsDoctorIssue]:
-        """SPEC-DOC-035 (v0.1.46 AC-4): terminal-status backlog entry still loose → WARN.
+        """SPEC-DOC-035 (re-targeted, SPEC v0.12.0 FR5/ADR D5/D9): the single-source
+        invariant — any ``*.md`` loose directly under ``specs/backlog/`` other than
+        ``BACKLOG.md`` and ``README.md`` is drift → WARN.
 
-        A ``specs/backlog/<slug>.md`` whose Status line is a terminal token
-        ({DELIVERED, CONSUMED, SUPERSEDED, RESOLVED}, case-insensitive prefix match) but
-        which still lives directly in ``specs/backlog/`` (not under ``_archive/``) is
-        consumed-but-unarchived drift → WARNING (move it to ``specs/backlog/_archive/``).
-        An entry already under ``_archive/`` is clean (not scanned — non-recursive glob).
-        Aggregate files are skipped.
+        The physical model changed from "one file per backlog item" to "one document,
+        ``BACKLOG.md``, with ``## ACTIVE`` + ``## LEDGER``" (ADR #14); a loose per-entry
+        file is now itself the drift signal, regardless of any status text it carries —
+        either a stray survivor of the v0.12.0 consolidation, or a file hand-authored
+        outside ``dadaia backlog new``. ``specs/backlog/_archive/`` and
+        ``specs/backlog/remote-bugs/`` are excluded (non-recursive glob already skips
+        both — they are subdirectories, not ``*.md`` siblings).
         """
         backlog_dir = self.specs_dir / "backlog"
         if not backlog_dir.is_dir():
             return []
         issues: list[SpecsDoctorIssue] = []
         for entry in sorted(backlog_dir.glob("*.md")):
-            if entry.name in _BACKLOG_AGGREGATE_FILES:
-                continue
-            status = self._backlog_status_value(entry.read_text(encoding="utf-8"))
-            if status is None:
-                continue
-            if not status.lower().startswith(_BACKLOG_TERMINAL_PREFIXES):
+            if entry.name in _BACKLOG_SINGLE_SOURCE_FILES:
                 continue
             issues.append(
                 SpecsDoctorIssue(
                     code="SPEC-DOC-035",
                     severity=Severity.WARNING,
                     description=(
-                        f"backlog/{entry.name} has terminal status '{status}' but is still "
-                        "loose in specs/backlog/ — move it into specs/backlog/_archive/ "
-                        "(SPEC-DOC-035, WARNING)."
+                        f"backlog/{entry.name} is a loose per-entry file directly under "
+                        "specs/backlog/ — the single source is BACKLOG.md (## ACTIVE + "
+                        "## LEDGER); fold it into BACKLOG.md and move the superseded "
+                        "file into specs/backlog/_archive/ (SPEC-DOC-035, WARNING)."
                     ),
                     path=str(entry),
                 )

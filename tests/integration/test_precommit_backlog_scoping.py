@@ -46,16 +46,26 @@ def _init_repo(tmp_path: Path) -> Path:
 
 
 def _plant_bl_schema_violation(repo: Path) -> Path:
-    """Write a backlog item whose subject anchor resolves to no symbol (BL-SCHEMA ERROR).
+    """Write a BACKLOG.md ACTIVE subsection whose subject anchor resolves to no symbol
+    (BL-SCHEMA ERROR) — SPEC v0.12.0 FR1/FR2, the single-source document, not a per-entry
+    file.
 
     v0.1.55 FR5: the unresolved-subject error is status-gated (an `idea` is exempt), so the
     violation is planted at `candidate` for the check to fire.
     """
-    bad = repo / "specs" / "backlog" / "bad.md"
+    bad = repo / "specs" / "backlog" / "BACKLOG.md"
     bad.write_text(
-        "---\nstatus: candidate\nintents:\n"
-        "  - subject: { kind: code, ref: dadaia_workspace/m.py#Ghost }\n"
-        "    change: x\n---\n\n# bad\n",
+        "## ACTIVE\n\n"
+        "### bad-item\n"
+        "- **Title:** Bad\n"
+        "- **Opened:** 2026-08-15\n"
+        "- **Status:** candidate\n"
+        "- **Description:** references a phantom symbol.\n"
+        "- **Provenance:** operator request\n"
+        "- **Intents:**\n```yaml\n"
+        "- subject:\n    kind: code\n    ref: dadaia_workspace/m.py#Ghost\n  change: x\n"
+        "```\n\n"
+        "## LEDGER\n",
         encoding="utf-8",
     )
     return bad
@@ -88,7 +98,7 @@ def test_unrelated_commit_passes_despite_preexisting_debt_no_backlog_dir_noop_an
     # (b) a staged specs/backlog violation still blocks the commit, own repo.
     blocking_repo = _init_repo(tmp_path.parent / (tmp_path.name + "-blocking"))
     _plant_bl_schema_violation(blocking_repo)
-    _git(blocking_repo, "add", "specs/backlog/bad.md")
+    _git(blocking_repo, "add", "specs/backlog/BACKLOG.md")
 
     with pytest.raises(typer.Exit) as exc:
         _run_backlog_doctor_gate(blocking_repo)

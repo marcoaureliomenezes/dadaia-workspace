@@ -19,21 +19,10 @@ fan-out): each check is a ``BacklogCheck`` (a code + a callable over the shared
 
 Pure module: all roots are **injected** (SPEC §3.8 #6); no I/O outside the supplied paths and
 no subprocess. The CLI (``cli/commands/newartifacts.py``) and the pre-commit/CI chokepoint
-(``cli/commands/ci.py`` + ``public/scripts/``) are thin wirings over :func:`run_backlog_doctor`.
-
-**T-120-05 transition note.** The check engine (``_CHECKS``, ``DoctorContext`` and every
-``_check_*`` body below) is generic over :class:`_SchemaItem` — a structural
-:class:`~typing.Protocol` (``slug``/``status``/``intents``/``intents_error``) satisfied by
-BOTH the legacy per-entry :class:`~dadaia_workspace.features.backlog.preview.BacklogItem`
-and the new single-source :class:`~dadaia_workspace.features.backlog.document.ActiveItem` —
-so the SAME engine serves the still-live legacy reading path today and the new document
-model once T-120-08 wires it in, with no duplicated check logic and no dual-shape reader
-(SPEC §3 standing green rule). :func:`run_backlog_doctor`, the CLI-facing live entry point,
-is **unchanged in its reading behaviour** by this task: it still calls
-:func:`~dadaia_workspace.features.backlog.preview.load_backlog_items` over
-``specs/backlog/*.md`` and feeds an empty ``ledger`` (the old shape has no LEDGER section) —
-only the cutover commit (T-120-08) repoints it at
-:func:`~dadaia_workspace.features.backlog.document.load_document`.
+(``cli/commands/ci.py`` + ``public/scripts/``) are thin wirings over :func:`run_backlog_doctor`,
+which reads the single source ``specs/backlog/BACKLOG.md`` through
+:func:`~dadaia_workspace.features.backlog.document.load_document` (SPEC v0.12.0 FR1, ADR #14)
+— the T-120-08 cutover; there is no per-entry fallback.
 """
 
 from __future__ import annotations
@@ -42,22 +31,21 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
-from typing import Protocol
 
 from dadaia_workspace.core.models.backlog import (
     INTENTS_EXEMPT_STATUS,
-    Intent,
     is_intents_exempt,
     is_terminal_disposition,
 )
 from dadaia_workspace.features.backlog.classifier import BoundItem, Verdict, classify
-from dadaia_workspace.features.backlog.document import DocumentError, LedgerRow
-from dadaia_workspace.features.backlog.ledger import read_consumed
-from dadaia_workspace.features.backlog.preview import (
-    BacklogItem,
-    bound_anchor_changes,
-    load_backlog_items,
+from dadaia_workspace.features.backlog.document import (
+    ActiveItem,
+    DocumentError,
+    LedgerRow,
+    load_document,
 )
+from dadaia_workspace.features.backlog.ledger import read_consumed
+from dadaia_workspace.features.backlog.preview import bound_anchor_changes
 from dadaia_workspace.features.backlog.subject_registry import Registry, build_registry
 
 __all__ = [
@@ -135,41 +123,20 @@ class Finding:
         }
 
 
-class _SchemaItem(Protocol):
-    """Structural shape the four checks need — satisfied by both the legacy per-entry
-    :class:`~dadaia_workspace.features.backlog.preview.BacklogItem` (until T-120-08) and
-    the new single-source :class:`~dadaia_workspace.features.backlog.document.ActiveItem`
-    (fixture-tested from T-120-05, unwired until T-120-08).
-
-    Declared as read-only ``@property`` members (not plain annotated attributes):
-    both concrete types are FROZEN dataclasses, and mypy treats a frozen dataclass
-    field as read-only — a plain Protocol attribute annotation demands read+write.
-    """
-
-    @property
-    def slug(self) -> str: ...
-    @property
-    def status(self) -> str | None: ...
-    @property
-    def intents(self) -> tuple[Intent, ...]: ...
-    @property
-    def intents_error(self) -> str | None: ...
-
-
 @dataclass
 class DoctorContext:
     """Everything the check engine needs, computed once and shared across all checks."""
 
-    items: Sequence[_SchemaItem]
+    items: Sequence[ActiveItem]
     registry: Registry
     consumed: dict[str, set[str]]
     #: ``## LEDGER`` rows of the document model (ADR D8's BL-STALE condition (b) and
-    #: BL-DUP's cross-LEDGER duplicate-slug condition). Always empty for the legacy
-    #: per-entry reading path, which has no LEDGER section.
+    #: BL-DUP's cross-LEDGER duplicate-slug condition). Empty for a document with no
+    #: ``## LEDGER`` section, or a fixture-built context that supplies none.
     ledger: tuple[LedgerRow, ...] = ()
     #: Located :class:`~dadaia_workspace.features.backlog.document.DocumentError`
     #: diagnostics from the document parser (a missing required key, an off-grammar
-    #: LEDGER line). Always empty for the legacy per-entry reading path.
+    #: LEDGER line). Empty when the document parsed with no located errors.
     document_errors: tuple[DocumentError, ...] = ()
     #: slug -> (anchor_changes, unresolved-messages), bound once.
     bound: dict[str, tuple[dict[str, str], list[str]]] = field(default_factory=dict)
@@ -373,43 +340,14 @@ _CHECKS: tuple[_BacklogCheck, ...] = (
 def run_checks(ctx: DoctorContext) -> list[Finding]:
     """Run the four parameterized checks over an already-built :class:`DoctorContext`.
 
-    The shared engine both :func:`run_backlog_doctor` (the legacy-reading live path) and
-    the document-model fixture tests drive — never copy-pasted, never duplicated per
-    model. Findings are returned in check order then item order; an empty list ⇒ clean.
+    The shared engine both :func:`run_backlog_doctor` (the live CLI-facing path) and the
+    document-model fixture tests drive — never copy-pasted, never duplicated. Findings
+    are returned in check order then item order; an empty list ⇒ clean.
     """
     findings: list[Finding] = []
     for check in _CHECKS:
         findings.extend(check.run(ctx))
     return findings
-
-
-def _split_legacy_frontmatter_errors(
-    items: Sequence[BacklogItem],
-) -> tuple[list[Finding], list[BacklogItem]]:
-    """FR10 (v0.1.65), legacy per-entry model only: an item whose frontmatter failed to
-    parse as YAML is its own loud BL-SCHEMA ERROR, with every downstream diagnostic
-    (no-intents, unresolved subjects, status) suppressed for it — they would all be
-    artifacts of the parse failure, not independent findings. ``document.ActiveItem``
-    has no equivalent concept (there is no single YAML frontmatter blob to fail parsing
-    in the new shape — a malformed ``**Intents:**`` block is captured as ``intents_error``
-    instead, handled generically by :func:`_check_schema`), so this legacy-only split
-    stays here rather than in the shared, model-agnostic check engine.
-    """
-    findings: list[Finding] = []
-    clean: list[BacklogItem] = []
-    for item in items:
-        if item.frontmatter_error is not None:
-            findings.append(
-                Finding(
-                    BacklogDoctorCode.BL_SCHEMA,
-                    Severity.ERROR,
-                    f"frontmatter YAML parse error: {item.frontmatter_error}",
-                    slug=item.slug,
-                )
-            )
-            continue
-        clean.append(item)
-    return findings, clean
 
 
 def run_backlog_doctor(
@@ -421,19 +359,19 @@ def run_backlog_doctor(
     archive_root: Path,
     cli_anchors: frozenset[str],
 ) -> list[Finding]:
-    """Run BL-SCHEMA/DUP/CONFLICT/STALE over the live backlog and return all findings.
+    """Run BL-SCHEMA/DUP/CONFLICT/STALE over the single-source ``BACKLOG.md`` and return
+    all findings.
 
     All roots are injected (SPEC §3.8 #6), including ``cli_anchors`` — the pre-derived
     ``cli``-kind anchor set threaded in from the CLI composition boundary (FR1b), so this
     feature never imports ``cli.main``. The registry is recomputed from live truth; the ledger
     read is a no-op when absent.
 
-    **Unchanged reading behaviour (T-120-05).** Still reads the legacy per-entry model via
-    :func:`~dadaia_workspace.features.backlog.preview.load_backlog_items` over
-    ``specs/backlog/*.md`` — the T-120-08 cutover is the only commit that repoints this at
-    :func:`~dadaia_workspace.features.backlog.document.load_document` (SPEC §3 standing
-    green rule: the old shape stays validated by tooling reading the old shape until then).
-    Findings are returned in check order then item order; an empty list ⇒ a clean backlog.
+    Reads ``specs/backlog/BACKLOG.md`` through
+    :func:`~dadaia_workspace.features.backlog.document.load_document` (SPEC v0.12.0 FR1/FR2,
+    ADR #14 — T-120-08 cutover): an absent document yields an empty model, so a context with
+    no backlog is a clean no-op (A2.8). Findings are returned in check order then item order;
+    an empty list ⇒ a clean backlog.
     """
     registry = build_registry(
         source_root=source_root,
@@ -442,13 +380,17 @@ def run_backlog_doctor(
         specs_dir=specs_dir,
         cli_anchors=cli_anchors,
     )
-    raw_items = load_backlog_items(specs_dir / "backlog")
+    document = load_document(specs_dir / "backlog")
     consumed = read_consumed(archive_root)
 
-    frontmatter_findings, items = _split_legacy_frontmatter_errors(raw_items)
-
-    ctx = DoctorContext(items=items, registry=registry, consumed=consumed, ledger=())
-    for item in items:
+    ctx = DoctorContext(
+        items=list(document.active),
+        registry=registry,
+        consumed=consumed,
+        ledger=document.ledger,
+        document_errors=document.errors,
+    )
+    for item in document.active:
         ctx.bound[item.slug] = bound_anchor_changes(item, registry)
 
-    return frontmatter_findings + run_checks(ctx)
+    return run_checks(ctx)
