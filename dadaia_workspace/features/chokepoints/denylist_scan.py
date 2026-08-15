@@ -1,4 +1,4 @@
-"""Pure push-range denylist matcher (SPEC v0.9.0 FR3/FR5/FR6).
+"""Pure push-range denylist matcher (SPEC v0.9.0 FR3/FR5/FR6; SPEC v0.11.0 FR1).
 
 Zero I/O, exactly like the rest of ``features/chokepoints/**``: this module NEVER
 imports ``infrastructure`` and NEVER spawns a subprocess. Term sources — the operator
@@ -12,8 +12,14 @@ Masking (``first…last``) happens INSIDE this module so an unmasked term never 
 (FR5, CWE-532) — :attr:`Hit.masked_term` is the only term-shaped value this module ever
 returns; the source blob's raw text is never echoed anywhere.
 
-Per grill ADR #3b (SPEC FR4): there is no sanctioned-terms / amnesty list here or
-anywhere in this release — a matched term always produces a hit.
+**v0.11.0 FR1 amnesty (supersedes the v0.9.0-era "a matched term always produces a
+hit" absolute).** A candidate is now suppressed IFF the exact matched VALUE occurs
+case-insensitively in the SAME path's published prior text, carried on
+``ScannedObject.prior_text`` — never derived from a list, dict, set or constant of
+sanctioned terms. Grill ADR #3b's invariant survives in its narrower, still-load-bearing
+form: **no amnesty/allowlist LIST exists anywhere in this module** (A4.1's source-scan
+contract test pins exactly that, unmodified) — the amnesty derives entirely from
+published git state the adapter resolves, never from a static exception list.
 """
 
 from __future__ import annotations
@@ -120,12 +126,28 @@ def _first_match(
     operator terms, then baseline patterns, then foreign slugs) is the answer. Neither
     the rest of the blob nor a global sort is needed to find it (code-reviewer LOW
     performance finding: the previous version paid the full-blob cost plus an
-    O(n log n) sort for a result already known at the first hit)."""
+    O(n log n) sort for a result already known at the first hit).
+
+    SPEC v0.11.0 FR1 amnesty: a candidate is suppressed IFF its MATCHED VALUE — never
+    the pattern id or the layer — occurs case-insensitively in ``obj.prior_text`` (the
+    SAME path's published prior content; ``None`` -> no base, nothing is ever
+    suppressed, ADR D7). Keying on the value (not the source) is what stops the
+    amnesty from becoming a smuggling path: a prior email address must NOT amnesty a
+    brand-new one of the same baseline pattern id (grill R1/A1.3). The matched value is
+    used for this predicate and then discarded — only ``masked_term`` leaves this
+    module (A5.2 unaffected). Suppression is per-CANDIDATE, so a line whose every
+    candidate is suppressed simply continues to the next line — the short-circuit
+    property above is unchanged."""
+    prior_lower = obj.prior_text.lower() if obj.prior_text is not None else None
+
+    def _suppressed(matched_value: str) -> bool:
+        return prior_lower is not None and matched_value.lower() in prior_lower
+
     for lineno, line_text in enumerate(obj.text.splitlines(), start=1):
         line_candidates: list[Hit] = []
         lowered = line_text.lower()
         for term, _reason in terms:
-            if term and term.lower() in lowered:
+            if term and term.lower() in lowered and not _suppressed(term):
                 line_candidates.append(
                     Hit(obj.path, lineno, obj.sha, _mask(term), _SOURCE_OPERATOR)
                 )
@@ -133,6 +155,8 @@ def _first_match(
             for match in pattern.regex.finditer(line_text):
                 value = match.group(0)
                 if pattern.exclude is not None and pattern.exclude.search(value):
+                    continue
+                if _suppressed(value):
                     continue
                 line_candidates.append(
                     Hit(
@@ -144,7 +168,7 @@ def _first_match(
                     )
                 )
         for slug, compiled in slug_patterns:
-            if compiled.search(line_text):
+            if compiled.search(line_text) and not _suppressed(slug):
                 line_candidates.append(Hit(obj.path, lineno, obj.sha, _mask(slug), _SOURCE_SLUG))
         if line_candidates:
             return line_candidates[0]

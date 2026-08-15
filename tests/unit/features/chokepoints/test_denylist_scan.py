@@ -1,7 +1,7 @@
 """Pure push-range denylist matcher (SPEC v0.9.0 FR3/FR5/FR6).
 
 Intent: CONTRACT — v0.9.0 A3.1, A3.2, A3.3, A3.4, A4.1, A5.2, A6.2; v0.11.0 A4.1, A4.4,
-A4.6
+A4.6, A1.1, A1.2, A1.3, A1.4
 
 Term sources (operator denylist, packaged baseline, foreign repo slugs) x masking x the
 undecodable-blob skip+count — no real operator term or foreign slug ever appears here
@@ -38,6 +38,12 @@ _POSITIVE_INTERNAL_HOST_4 = "nas" + ".home"
 
 def _obj(path: str, text: str, *, sha: str = "deadbeef", decodable: bool = True) -> ScannedObject:
     return ScannedObject(path=path, sha=sha, text=text, decodable=decodable)
+
+
+def _obj_with_prior(
+    path: str, text: str, prior_text: str | None, *, sha: str = "deadbeef"
+) -> ScannedObject:
+    return ScannedObject(path=path, sha=sha, text=text, decodable=True, prior_text=prior_text)
 
 
 # ---------------------------------------------------------------------------
@@ -213,6 +219,135 @@ def test_baseline_excludes_the_stdlib_pathlib_home_method_call() -> None:
 
     assert clean.hits == ()
     assert len(dirty.hits) == len(still_flagged)
+
+
+# ---------------------------------------------------------------------------
+# v0.11.0 FR1/A1.1-A1.4 — the amnesty suppression predicate: a hit is suppressed iff
+# the candidate's MATCHED VALUE (never the pattern id or the layer) occurs
+# case-insensitively in the SAME path's published prior text.
+# ---------------------------------------------------------------------------
+
+
+def test_amnesty_suppresses_a_value_already_published_at_the_same_path() -> None:
+    """A1.1: same-path prior-published value never refuses."""
+    obj = _obj_with_prior(
+        "notes.md",
+        f"still here: {_SYNTHETIC_TERM}\n",
+        prior_text=f"had {_SYNTHETIC_TERM} before\n",
+    )
+
+    outcome = scan_objects([obj], terms=((_SYNTHETIC_TERM, "synthetic"),), patterns=(), slugs=())
+
+    assert outcome.hits == ()
+
+
+def test_amnesty_does_not_apply_to_a_new_path_carrying_the_same_value() -> None:
+    """A1.2: the same value in a path with NO prior content (a genuinely new path)
+    still refuses — the amnesty is bound to the path, not the value."""
+    obj = _obj_with_prior("new-path.md", f"here: {_SYNTHETIC_TERM}\n", prior_text=None)
+
+    outcome = scan_objects([obj], terms=((_SYNTHETIC_TERM, "synthetic"),), patterns=(), slugs=())
+
+    assert len(outcome.hits) == 1
+
+
+def test_amnesty_does_not_apply_to_a_new_value_in_an_edited_path() -> None:
+    """A1.3: a value ABSENT from the prior version of an edited path still refuses —
+    even though a DIFFERENT value of the same term source was present there. This is
+    the smuggling-path attack the security review is asked to attempt: a predicate
+    keyed on the pattern/source instead of the exact matched value would wrongly
+    amnesty this."""
+    other_term = "zz-other-published-term"
+    obj = _obj_with_prior(
+        "notes.md",
+        f"now has {_SYNTHETIC_TERM}\n",
+        prior_text=f"used to have {other_term}\n",
+    )
+
+    outcome = scan_objects(
+        [obj],
+        terms=((_SYNTHETIC_TERM, "synthetic"), (other_term, "synthetic")),
+        patterns=(),
+        slugs=(),
+    )
+
+    assert len(outcome.hits) == 1
+    assert _SYNTHETIC_TERM not in outcome.hits[0].masked_term  # A5.2 still holds.
+
+
+def test_amnesty_suppression_is_case_insensitive_on_both_sides() -> None:
+    """A1.4: suppression is case-insensitive on both sides, matching the matcher's
+    existing case-insensitivity on every layer."""
+    obj = _obj_with_prior(
+        "notes.md",
+        f"still: {_SYNTHETIC_TERM}\n",
+        prior_text=f"BEFORE: {_SYNTHETIC_TERM.upper()}\n",
+    )
+
+    outcome = scan_objects([obj], terms=((_SYNTHETIC_TERM, "synthetic"),), patterns=(), slugs=())
+
+    assert outcome.hits == ()
+
+
+def test_amnesty_applies_to_the_baseline_pattern_layer_too() -> None:
+    """FR1's suppression predicate is applied UNIFORMLY across all three term
+    layers — proven here for the baseline structural-pattern layer, not just the
+    operator-term layer the other A1.x cases exercise."""
+    baseline = load_baseline_patterns()
+    obj = _obj_with_prior(
+        "notes.md",
+        f"server at {_POSITIVE_IPV4} still\n",
+        prior_text=f"server at {_POSITIVE_IPV4} originally\n",
+    )
+
+    outcome = scan_objects([obj], terms=(), patterns=baseline, slugs=())
+
+    assert outcome.hits == ()
+
+
+def test_amnesty_applies_to_the_foreign_slug_layer_too() -> None:
+    """FR1's suppression predicate applied to the foreign-slug layer."""
+    obj = _obj_with_prior(
+        "readme.md",
+        f"see repos/{_SYNTHETIC_FOREIGN_SLUG}/README.md again\n",
+        prior_text=f"see repos/{_SYNTHETIC_FOREIGN_SLUG}/README.md\n",
+    )
+
+    outcome = scan_objects([obj], terms=(), patterns=(), slugs=(_SYNTHETIC_FOREIGN_SLUG,))
+
+    assert outcome.hits == ()
+
+
+def test_amnesty_short_circuit_continues_to_next_line_when_every_candidate_suppressed() -> None:
+    """A line whose every candidate is suppressed continues to the next line rather
+    than returning early — the short-circuit property survives the new guard."""
+    obj = _obj_with_prior(
+        "notes.md",
+        f"{_SYNTHETIC_TERM} on line one\nnew-here: {_SYNTHETIC_TERM}\n",
+        prior_text=f"{_SYNTHETIC_TERM} already published\n",
+    )
+
+    outcome = scan_objects([obj], terms=((_SYNTHETIC_TERM, "synthetic"),), patterns=(), slugs=())
+
+    # Line 1 is fully suppressed (its only candidate is amnestied); line 2 carries the
+    # SAME term but is amnestied too (same value, same prior text) -- both lines
+    # suppressed, zero hits. Rebuilt below with a genuinely NEW value on line 2 to
+    # prove the scan does not stop dead after the first suppressed line.
+    assert outcome.hits == ()
+
+    obj_with_new_value_on_line_two = _obj_with_prior(
+        "notes.md",
+        f"{_SYNTHETIC_TERM} on line one\nnew-here: zz-brand-new-value\n",
+        prior_text=f"{_SYNTHETIC_TERM} already published\n",
+    )
+    outcome_two = scan_objects(
+        [obj_with_new_value_on_line_two],
+        terms=((_SYNTHETIC_TERM, "synthetic"), ("zz-brand-new-value", "synthetic")),
+        patterns=(),
+        slugs=(),
+    )
+    assert len(outcome_two.hits) == 1
+    assert outcome_two.hits[0].line == 2
 
 
 # ---------------------------------------------------------------------------
