@@ -191,7 +191,7 @@ synthetic range under `.dadaia/tmp/software-engineer/<YYYYMMDD>/`.
 
 ---
 
-- [ ] **T-110-06 — FR4: oversized blobs partially scanned and honestly reported (#20)**
+- [-] **T-110-06 — FR4: oversized blobs partially scanned and honestly reported (#20)**
 
 **Owner role:** software-engineer · **Commit:**
 `fix(T-110-06): scan the first 5 MB of an oversized blob and stop calling it binary`
