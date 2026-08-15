@@ -13,8 +13,8 @@ tags:
 - dependency-rules
 - agents
 - sdd
-token_estimate: 1300
-last_updated: '2026-08-14'
+token_estimate: 1430
+last_updated: '2026-08-15'
 release_origin: v0.3.0
 ---
 
@@ -97,6 +97,25 @@ root) for listing the new objects of a pushed range ([[sdd-gate-v3]]). The objec
 is a required parameter of the push decision function, so an unwired production call site
 is a type error rather than a silently skipped gate; import-linter contracts pin the ring
 purity.
+
+`GitObjectReader`'s contract covers both sides of a scanned path: each object carries its
+own new content **and** the prior published text of the same path at the range's base, or
+an explicit absence when there is no resolvable base, no such path, or the prior blob is
+over the cap or undecodable. Absence is a distinct value, never an empty string, so the
+decision layer cannot mistake "nothing was published" for "nothing matched". Widening the
+port rather than giving the matcher a second input source is what keeps the decision
+function pure: it still takes only objects and term sources. The protocol module itself
+stays data-only and zero-I/O; the adapter owns every subprocess, chunks its batched
+conversation to a constant resident bound, and converts every parse failure into its own
+typed read error so nothing raw escapes the ring.
+
+`core/redaction.py` is the single stdlib-pure masking primitive — word-boundary
+alternation, longest-first ordering, stable first-appearance placeholder ordinals — with
+two consumers on opposite sides of the tree: `cli/redact.py`'s operator `--redact` surface
+and the gate's own render boundary in `features/chokepoints/`. It lives in `core` because
+`features` may import `core` and may never import `cli`, so a shared primitive is the only
+placement that lets both render boundaries mask identically. It performs no I/O and is
+outside the file-I/O authorized set below.
 
 ### Handoffs and reports
 

@@ -31,25 +31,25 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core import specs_resolver
+from tests.fixtures.harness_env import CONTEXT_RESOLUTION_ENV_VARS, scrub_context_resolution_env
 
-_ENV_VARS_TO_CLEAR = (
-    "DADAIA_CONTEXT",
-    "DADAIA_SESSION_ID",
-    "CLAUDE_CODE_SESSION_ID",
-    "CODEX_SESSION_ID",
-    "CODEX_THREAD_ID",
-)
+_ENV_VARS_TO_CLEAR = CONTEXT_RESOLUTION_ENV_VARS
 
 
 @pytest.fixture(autouse=True)
 def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Neutralize every rung-1/rung-2 env var so each test sets exactly what it needs.
+    """Neutralize every rung-0/1/2 env var so each test sets exactly what it needs.
 
     ``CLAUDE_CODE_SESSION_ID`` is inherited from the live Claude Code session running
     these tests and would otherwise silently satisfy rung 2 in every test.
+    ``WORKSPACE_ROOT`` (bug ``specs-resolver-context-tests-flaky-under-xdist-full-suite``):
+    ``_authority_workspace_root()`` honours it UNCONDITIONALLY, ahead of and regardless
+    of any ``monkeypatch.chdir()`` below -- an ambient value (inherited from the shell
+    that launched pytest, or left behind by a concurrent ``dadaia context bind``/
+    ``context show`` sharing the real ``.dadaia/sessions/`` tree) silently overrides
+    every synthetic ``tmp_path`` workspace these tests build, unless scrubbed here too.
     """
-    for var in _ENV_VARS_TO_CLEAR:
-        monkeypatch.delenv(var, raising=False)
+    scrub_context_resolution_env(monkeypatch)
 
 
 def _mk_ws(tmp_path: Path, *, slug: str = "proj", name: str | None = None) -> Path:
@@ -357,3 +357,49 @@ def test_context_name_for_repo_slug_accepts_legacy_repo_field(tmp_path: Path) ->
     )
 
     assert specs_resolver.context_name_for_repo_slug(tmp_path, "beta-repo") == "alpha-context"
+
+
+# --- ambient-isolation regression --------------------------------------------------
+#
+# Bug specs-resolver-context-tests-flaky-under-xdist-full-suite: a context/session
+# resolution unit test whose isolation fixture scrubs only the harness session-id vars
+# is not, in fact, isolated. ``_authority_workspace_root()`` honours ``WORKSPACE_ROOT``
+# UNCONDITIONALLY (hook-transport channel, by design) -- ahead of, and regardless of,
+# any ``monkeypatch.chdir()`` a test performs. Reproduced deterministically (no xdist,
+# no timing) by planting exactly the ambient condition the bug names: a real-looking
+# "concurrent session" workspace with its own live session record, standing in for
+# whatever a parallel ``dadaia context bind``/``context show`` invocation (or a
+# WORKSPACE_ROOT inherited from the shell that launched pytest) leaves on disk /  in
+# the environment while this suite runs -- then proving ``scrub_context_resolution_env``
+# (the fixture helper the fix wires into every context/session-resolution test file)
+# neutralizes it.
+
+
+def test_scrub_context_resolution_env_neutralizes_ambient_workspace_root_and_session_leak(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Intent: CONTRACT -- bug specs-resolver-context-tests-flaky-under-xdist-full-suite.
+
+    Direct reproduction (empirically confirmed before this fix landed): with
+    ``WORKSPACE_ROOT`` pointing at an unrelated, fully-live "ambient" workspace, a plain
+    rung-3 (cwd-only) scenario mis-resolves -- ``resolve_context()`` returns ``None``
+    instead of the test's own synthetic workspace's context, because the ambient
+    ``WORKSPACE_ROOT`` wins over ``Path.cwd()`` and the synthetic workspace's repo is
+    not reachable under it. ``scrub_context_resolution_env`` is the fix: call it after
+    planting the leak and rung 3 resolves correctly again.
+    """
+    # The "ambient" state: a real-looking workspace + a LIVE session record for a
+    # harness id, standing in for whatever a concurrent session/hook process left on
+    # disk (and in the environment) while this suite was running.
+    ambient_ws = _mk_ws(tmp_path / "ambient-concurrent-session", slug="ambient-ctx")
+    _write_harness_record(ambient_ws, _HARNESS_ID, "ambient-ctx", age_seconds=0)
+    monkeypatch.setenv("WORKSPACE_ROOT", str(ambient_ws))
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", _HARNESS_ID)
+    monkeypatch.setenv("DADAIA_CONTEXT", "ambient-ctx")
+
+    scrub_context_resolution_env(monkeypatch)
+
+    ws = _mk_ws(tmp_path / "isolated", slug="proj")
+    monkeypatch.chdir(ws / "repos" / "proj")
+
+    assert specs_resolver.resolve_context() == "proj"

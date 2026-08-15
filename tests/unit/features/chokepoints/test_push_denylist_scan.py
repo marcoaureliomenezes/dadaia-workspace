@@ -1,7 +1,7 @@
 """Wiring the push-range denylist scan into ``push_gate_decision`` (SPEC v0.9.0 FR1/FR2/FR5/FR6).
 
 Intent: CONTRACT — v0.9.0 A1.1, A1.2, A1.3, A1.4, A2.1, A2.2, A2.3, A2.4, A5.1, A5.2,
-A5.3, A5.4, A6.1
+A5.3, A5.4, A6.1; v0.11.0 A7.1, A7.2, A7.3, A4.5, A6.1, A6.2, A6.3, A6.6, A5.1
 
 Drives ``push_gate_decision`` with an injected fake :class:`GitObjectReader` — no real
 git, no filesystem (FR7/A7.2). Only synthetic terms/slugs ever appear here (TASKS
@@ -47,6 +47,18 @@ def _refs(*lines: str) -> list[PushRef]:
 
 def _obj(path: str, text: str, *, sha: str = "cafef00d") -> ScannedObject:
     return ScannedObject(path=path, sha=sha, text=text, decodable=True)
+
+
+def _oversized_obj(path: str, text: str, *, sha: str = "bigsha") -> ScannedObject:
+    return ScannedObject(
+        path=path,
+        sha=sha,
+        text=text,
+        decodable=True,
+        oversized=True,
+        size_bytes=6_000_000,
+        scanned_bytes=5_242_880,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -239,3 +251,279 @@ def test_git_object_read_failure_refuses_naming_the_failure(tmp_path: Path) -> N
     assert not decision.allowed
     assert "simulated git rev-list failure" in decision.message
     assert "--no-verify" in decision.message
+
+
+# ---------------------------------------------------------------------------
+# code-reviewer MEDIUM finding (v0.11.0 pre-PR review) — `_run_denylist_scan` must
+# consume each Iterable term source ONLY ONCE. A one-shot generator passed as
+# `denylist_terms` must still refuse a push carrying that term — consuming the same
+# generator twice (once to build the `_PathMasker`, again to build `term_list`) would
+# silently empty it on the second pass, producing a fail-open allow.
+# ---------------------------------------------------------------------------
+
+
+def test_generator_denylist_terms_still_refuses_not_silently_emptied(tmp_path: Path) -> None:
+    """Uses a TAG ref (DP-5 verdict carve-out) so the only possible refusal source is
+    the denylist scan itself — isolating this from the unrelated missing-security-verdict
+    refusal a ``refs/heads/develop`` push would also trigger."""
+    source = _FakeObjectSource(
+        by_range={(_SHA_A, _ZERO): [_obj("leak.md", f"contains {_SYNTHETIC_TERM} here\n")]}
+    )
+
+    def _term_generator() -> Iterable[tuple[str, str]]:
+        yield (_SYNTHETIC_TERM, "synthetic")
+
+    decision = push_gate_decision(
+        tmp_path,
+        _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
+        object_source=source,
+        repo=tmp_path,
+        denylist_terms=_term_generator(),
+    )
+    assert not decision.allowed
+    assert "denylisted term" in decision.message
+    assert _SYNTHETIC_TERM not in decision.message
+
+
+# ---------------------------------------------------------------------------
+# FR7/A7.1 — an option-shaped `local_sha` refuses as a malformed line instead of
+# silently producing a successful empty rev-list.
+# ---------------------------------------------------------------------------
+
+
+def test_option_shaped_local_sha_glob_form_is_malformed() -> None:
+    from dadaia_workspace.features.chokepoints.service import parse_push_stdin
+
+    refs, malformed = parse_push_stdin(
+        f"refs/heads/develop --glob=refs/nonexistent refs/heads/develop {_ZERO}\n"
+    )
+    assert refs == []
+    assert malformed == 1
+
+
+def test_option_shaped_local_sha_branches_form_is_malformed() -> None:
+    from dadaia_workspace.features.chokepoints.service import parse_push_stdin
+
+    refs, malformed = parse_push_stdin(
+        f"refs/heads/develop --branches=zzz refs/heads/develop {_ZERO}\n"
+    )
+    assert refs == []
+    assert malformed == 1
+
+
+def test_option_shaped_remote_sha_is_also_malformed() -> None:
+    """The same option-shaped hardening applies symmetrically to ``remote_sha``."""
+    from dadaia_workspace.features.chokepoints.service import parse_push_stdin
+
+    refs, malformed = parse_push_stdin(
+        f"refs/heads/develop {_SHA_A} refs/heads/develop --glob=refs/nonexistent\n"
+    )
+    assert refs == []
+    assert malformed == 1
+
+
+# ---------------------------------------------------------------------------
+# FR7/A7.2 — the all-zero deletion sentinel still parses and still passes with no
+# verdict (it is 40 hex characters, so it is a VALID sha shape, not a malformed one).
+# ---------------------------------------------------------------------------
+
+
+def test_all_zero_deletion_sentinel_still_parses() -> None:
+    from dadaia_workspace.features.chokepoints.service import parse_push_stdin
+
+    refs, malformed = parse_push_stdin(f"refs/heads/old {_ZERO} refs/heads/old {_SHA_A}\n")
+    assert malformed == 0
+    assert len(refs) == 1
+    assert refs[0].is_deletion
+
+
+# ---------------------------------------------------------------------------
+# FR7/A7.3 — a 64-char (SHA-256) sha parses; a 39- or 41-char hex string does not.
+# ---------------------------------------------------------------------------
+
+
+def test_sha256_length_local_sha_parses() -> None:
+    from dadaia_workspace.features.chokepoints.service import parse_push_stdin
+
+    sha256 = "f" * 64
+    refs, malformed = parse_push_stdin(f"refs/heads/develop {sha256} refs/heads/develop {_ZERO}\n")
+    assert malformed == 0
+    assert len(refs) == 1
+    assert refs[0].local_sha == sha256
+
+
+def test_39_and_41_char_hex_shas_are_malformed() -> None:
+    from dadaia_workspace.features.chokepoints.service import parse_push_stdin
+
+    too_short = "a" * 39
+    too_long = "a" * 41
+
+    _, malformed_short = parse_push_stdin(
+        f"refs/heads/develop {too_short} refs/heads/develop {_ZERO}\n"
+    )
+    _, malformed_long = parse_push_stdin(
+        f"refs/heads/develop {too_long} refs/heads/develop {_ZERO}\n"
+    )
+    assert malformed_short == 1
+    assert malformed_long == 1
+
+
+# ---------------------------------------------------------------------------
+# FR4/A4.5 (v0.11.0) — `decision.warn` carries the oversized-blob note on BOTH an
+# allow decision and a refuse decision (QA-1 closure).
+# ---------------------------------------------------------------------------
+
+
+def test_oversized_note_appears_in_decision_warn_on_allow(tmp_path: Path) -> None:
+    source = _FakeObjectSource(
+        by_range={(_SHA_A, _ZERO): [_oversized_obj("big.md", "clean content here\n")]}
+    )
+    decision = push_gate_decision(
+        tmp_path,
+        _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
+        object_source=source,
+        repo=tmp_path,
+    )
+    assert decision.allowed
+    assert decision.warn is not None
+    assert "big.md" in decision.warn
+    assert "6000000" in decision.warn
+    assert "NOT scanned" in decision.warn
+
+
+def test_oversized_note_appears_in_decision_warn_on_refuse(tmp_path: Path) -> None:
+    source = _FakeObjectSource(
+        by_range={
+            (_SHA_A, _ZERO): [
+                _obj("leak.md", f"{_SYNTHETIC_TERM} shows up here\n", sha="leaksha"),
+                _oversized_obj("big.md", "clean content here\n"),
+            ]
+        }
+    )
+    decision = push_gate_decision(
+        tmp_path,
+        _refs(f"refs/heads/develop {_SHA_A} refs/heads/develop {_ZERO}"),
+        object_source=source,
+        repo=tmp_path,
+        denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
+    )
+    assert not decision.allowed
+    assert decision.warn is not None
+    assert "big.md" in decision.warn
+    assert "NOT scanned" in decision.warn
+
+
+# ---------------------------------------------------------------------------
+# FR5/A5.1 (v0.11.0, entry #22) — decision-layer wiring readiness: push_gate_decision
+# refuses when its injected foreign_slugs set carries a registry context's NAME and
+# its repo_slug both -- the exact shape T-110-13's widened _foreign_repo_slugs
+# (cli/commands/ci.py, tested at the integration tier over a real registry fixture in
+# tests/integration/test_push_gate_denylist.py) now supplies.
+# ---------------------------------------------------------------------------
+
+
+def test_foreign_slugs_carrying_a_registry_name_and_slug_both_refuse(tmp_path: Path) -> None:
+    dead_name = "zz-dead-context-name"
+    dead_slug = "zz-dead-context-slug"
+    source = _FakeObjectSource(
+        by_range={(_SHA_A, _ZERO): [_obj("notes.md", f"mentions {dead_name} here\n")]}
+    )
+    decision = push_gate_decision(
+        tmp_path,
+        _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
+        object_source=source,
+        repo=tmp_path,
+        foreign_slugs=(dead_name, dead_slug),
+    )
+    assert not decision.allowed
+    assert dead_name not in decision.message
+
+
+# ---------------------------------------------------------------------------
+# FR6(b)/A6.1-A6.3/A6.6 (v0.11.0, entry #23 resolution A) — the blob path itself is
+# masked at its offending segments in BOTH the denylist refusal and the FR4 oversized
+# note; a path matching nothing renders byte-identical (regression fixture).
+# ---------------------------------------------------------------------------
+
+_FOREIGN_SLUG = "zz-fake-private-owner"
+
+
+def test_refusal_path_segment_matching_a_foreign_slug_is_masked(tmp_path: Path) -> None:
+    objects = [
+        _obj(f"repos/{_FOREIGN_SLUG}/notes.md", f"{_SYNTHETIC_TERM} appears\n", sha="pathsha01")
+    ]
+    source = _FakeObjectSource(by_range={(_SHA_A, _ZERO): objects})
+    decision = push_gate_decision(
+        tmp_path,
+        _refs(f"refs/heads/develop {_SHA_A} refs/heads/develop {_ZERO}"),
+        object_source=source,
+        repo=tmp_path,
+        denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
+        foreign_slugs=(_FOREIGN_SLUG,),
+    )
+    assert not decision.allowed
+    assert _FOREIGN_SLUG not in decision.message  # A6.6: never unmasked, anywhere.
+    assert "repos/[REDACTED-PATH-1]/notes.md:1" in decision.message
+    assert "pathsha01"[:12] in decision.message  # short sha untouched — still locatable.
+
+
+def test_refusal_path_with_no_matching_segment_is_byte_identical(tmp_path: Path) -> None:
+    """A6.2 regression fixture: a blob path matching none of the three term sources
+    renders exactly as it did before FR6(b) — no placeholder ever appears."""
+    objects = [_obj("notes/plain-file.md", f"{_SYNTHETIC_TERM} here\n", sha="cleanpath")]
+    source = _FakeObjectSource(by_range={(_SHA_A, _ZERO): objects})
+    decision = push_gate_decision(
+        tmp_path,
+        _refs(f"refs/heads/develop {_SHA_A} refs/heads/develop {_ZERO}"),
+        object_source=source,
+        repo=tmp_path,
+        denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
+    )
+    assert not decision.allowed
+    assert "notes/plain-file.md:1" in decision.message
+    assert "[REDACTED-PATH-" not in decision.message
+
+
+def test_oversized_note_path_segment_is_masked_too(tmp_path: Path) -> None:
+    """A6.3: the FR4 oversized note's path is masked by the SAME rule, asserted
+    separately from the refusal-message case above."""
+    objects = [_oversized_obj(f"repos/{_FOREIGN_SLUG}/big.md", "clean content here\n")]
+    source = _FakeObjectSource(by_range={(_SHA_A, _ZERO): objects})
+    decision = push_gate_decision(
+        tmp_path,
+        _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
+        object_source=source,
+        repo=tmp_path,
+        foreign_slugs=(_FOREIGN_SLUG,),
+    )
+    assert decision.allowed
+    assert decision.warn is not None
+    assert _FOREIGN_SLUG not in decision.warn  # A6.6.
+    assert "repos/[REDACTED-PATH-1]/big.md" in decision.warn
+
+
+def test_same_offending_segment_gets_the_same_ordinal_across_hit_and_note(
+    tmp_path: Path,
+) -> None:
+    """The path masker is constructed ONCE per push_gate_decision invocation and reused
+    for both the denylist refusal AND the oversized note, so the SAME offending segment
+    gets the SAME stable ordinal placeholder wherever it appears."""
+    objects = [
+        _obj(f"repos/{_FOREIGN_SLUG}/leak.md", f"{_SYNTHETIC_TERM} here\n", sha="leaksha02"),
+        _oversized_obj(f"repos/{_FOREIGN_SLUG}/big.md", "clean content here\n"),
+    ]
+    source = _FakeObjectSource(by_range={(_SHA_A, _ZERO): objects})
+    decision = push_gate_decision(
+        tmp_path,
+        _refs(f"refs/heads/develop {_SHA_A} refs/heads/develop {_ZERO}"),
+        object_source=source,
+        repo=tmp_path,
+        denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
+        foreign_slugs=(_FOREIGN_SLUG,),
+    )
+    assert not decision.allowed
+    assert _FOREIGN_SLUG not in decision.message
+    assert decision.warn is not None
+    assert _FOREIGN_SLUG not in decision.warn
+    assert "repos/[REDACTED-PATH-1]/leak.md" in decision.message
+    assert "repos/[REDACTED-PATH-1]/big.md" in decision.warn

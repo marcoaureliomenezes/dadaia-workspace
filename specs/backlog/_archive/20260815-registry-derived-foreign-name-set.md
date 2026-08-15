@@ -1,6 +1,6 @@
 ---
 title: "foreign-name scan layer derived from repos/ directories only: a DEAD or relocated context contributes no term"
-status: candidate
+status: DELIVERED — v0.11.0
 opened: 2026-08-14
 description: >-
   Materializes a LOW from the APPROVED v0.9.0 ship security review — a structural
@@ -84,3 +84,34 @@ one-time blockers.
 
 `software-engineer` implements; `security-reviewer` verifies the widened layer in
 the covering push review. Sequenced with `prior-published-term-amnesty`.
+
+## Intake adjudication (ADR #15 — report #1)
+
+**APPROVED** — operator-delegated adjudication, 2026-08-15 (goal directive), verdicts
+per PM recommendation. Adjudicated via intake report #1
+(`.dadaia/reports/dadaia-workspace/project-manager/2026-08-15T132600Z-intake.html`).
+The entry remains a live pickable candidate.
+
+## Pick provenance (v0.11.0)
+
+**picked — v0.11.0**, 2026-08-15. Delivered as **FR5** of release `v0.11.0` "scan-v2".
+Provenance record: `specs/releases/v0.11.0/SPEC.md` §7. Operator ruling **D4** fixes the
+in-release ordering: amnesty first, then this layer, with the one-off wider-set
+latent-blocker enumeration executed **before** it lands (task T-110-13, step 1; acceptance
+A5.5). Grill **P8** adds a required correction the entry did not carry: the subtraction must
+remove **both** the pushing repo's own context `name` and its own `repo_slug` — they are
+separate fields and may differ, and subtracting only the slug re-opens the A3.2 regression.
+Grill **P9**: the reviewer's two wider-set hits are same-path prior-published and are
+amnestied by FR1 rather than accepted by hand. Terminal disposition `DELIVERED — v0.11.0`
+lands at closure.
+
+## Delivery (v0.11.0 closure, 2026-08-15)
+
+**Terminal: `DELIVERED — v0.11.0`.** FR5 shipped and QA-verified on A5.1–A5.6
+(`specs/releases/v0.11.0/ALPHA-1-QA.md`, APPROVED). The layer is now
+`{registry names} ∪ {registry repo_slugs} ∪ {repos/ dir names} − {own name, own slug}`,
+read through a container seam that degrades a missing/empty/malformed registry to the
+directory-derived set instead of killing the push hook. The D4-mandated enumeration ran
+first: the widened set is 11 terms and produced 6 tree hits, every one dispositioned
+amnestied-by-FR1-by-construction and none inside this release's own push range. Evidence:
+`specs/_archive/releases/v0.11.0/CLOSURE.md` §Validations V3/V5/V10 and §Dispositions.

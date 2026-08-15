@@ -33,9 +33,11 @@ from dadaia_workspace.core.protocols.git_object_reader import (
     ScannedObject,
 )
 from dadaia_workspace.core.protocols.process_ancestry import Ancestry
+from dadaia_workspace.core.redaction import compile_candidates
 from dadaia_workspace.features.chokepoints.denylist_scan import (
     BaselinePatternLike,
     Hit,
+    OversizedNote,
     scan_objects,
 )
 from dadaia_workspace.features.spec_context import presence
@@ -161,6 +163,19 @@ def _refuse_branch(branch: str, local_ref: str) -> Decision:
     )
 
 
+#: FR7/A7.3 (v0.11.0) — a pre-push sha must be a 40-char (SHA-1) or 64-char (SHA-256)
+#: hex string. Anything else — including an option-shaped value such as
+#: ``--glob=refs/nonexistent`` or ``--branches=zzz`` — is counted as malformed rather
+#: than silently producing a successful, empty ``git rev-list`` (CWE-88/CWE-20: the
+#: measured silent-no-op class). The all-zero deletion sentinel is 40 hex characters
+#: and therefore already matches — no special case is needed.
+_SHA_SHAPE_RE = re.compile(r"^[0-9a-fA-F]{40}$|^[0-9a-fA-F]{64}$")
+
+
+def _is_sha_shaped(value: str) -> bool:
+    return bool(_SHA_SHAPE_RE.match(value))
+
+
 def parse_push_stdin(stdin_text: str) -> tuple[list[PushRef], int]:
     """Parse pre-push stdin into :class:`PushRef` rows plus a malformed-line count.
 
@@ -168,6 +183,12 @@ def parse_push_stdin(stdin_text: str) -> tuple[list[PushRef], int]:
     silently dropped — the gate FAILS CLOSED on any malformed line (T-060-07 finding 1:
     a policy gate that skips what it cannot parse is a policy gate that can be
     disabled without a trace; ``git push --no-verify`` is the sanctioned bypass).
+
+    v0.11.0 FR7/A7.1-A7.3: both shas are additionally validated against
+    :data:`_SHA_SHAPE_RE` — a violation reuses the SAME malformed-line counter and the
+    SAME fail-closed message (no new branch), so an option-shaped ``local_sha`` (the
+    measured silent-no-op class) refuses instead of producing a successful empty
+    ``git rev-list``.
     """
     refs: list[PushRef] = []
     malformed = 0
@@ -179,7 +200,11 @@ def parse_push_stdin(stdin_text: str) -> tuple[list[PushRef], int]:
         if len(parts) != 4:
             malformed += 1
             continue
-        refs.append(PushRef(parts[0], parts[1], parts[2], parts[3]))
+        local_ref, local_sha, remote_ref, remote_sha = parts
+        if not _is_sha_shaped(local_sha) or not _is_sha_shaped(remote_sha):
+            malformed += 1
+            continue
+        refs.append(PushRef(local_ref, local_sha, remote_ref, remote_sha))
     return refs, malformed
 
 
@@ -324,22 +349,121 @@ _DENYLIST_LAW = "DADAIA.md §7 — private names never enter public/pushed mater
 #: FR5/A5.4 — at most this many offending objects are listed before a remainder count.
 _MAX_LISTED_HITS = 10
 
+#: v0.11.0 FR6(b)/entry #23 resolution A — the path-segment masking placeholder shape.
+#: Deliberately distinct from the CLI's ``[REDACTED-CONTEXT-n]`` (``cli/redact.py``):
+#: this is a different channel (a blob PATH segment in a gate refusal/note, not a Spec
+#: Context name in a CLI render), even though both are built on the SAME
+#: ``core/redaction.py`` primitive.
+_PATH_PLACEHOLDER_FMT = "[REDACTED-PATH-{n}]"
 
-def _annotate_skip(decision: Decision, skipped_binary_count: int) -> Decision:
-    """Attach the FR6 row-3 skip count to *decision* — reported either way (allow/refuse)."""
-    if skipped_binary_count <= 0:
+
+class _PathMasker:
+    """v0.11.0 FR6(b) — masks only the blob-path segments that match one of the THREE
+    FR3 term sources the decision function already receives (operator denylist,
+    baseline structural patterns, foreign repo slugs) — entry #23 resolution A (ADR
+    D1/D1-a). Every operator-facing string the gate emits that names a blob path routes
+    through :meth:`mask_path` before rendering (FR6's class rule, not a single call
+    site) — today that is the denylist refusal (:func:`_compose_denylist_refusal`) and
+    the FR4 oversized-blob note (:func:`_annotate_skip`).
+
+    Construct ONE instance per :func:`push_gate_decision` invocation and reuse it
+    across every rendered string, so a repeated offending segment gets the SAME stable,
+    first-appearance ordinal placeholder (mirrors ``cli/redact.py#ContextRedactor``'s
+    per-invocation contract, built on the same ``core/redaction.py`` primitive).
+
+    Masking happens at PATH-SEGMENT granularity: the path is split on ``/``, each
+    segment is tested, and only a matching segment is replaced wholesale — the line
+    number, the short blob sha, and every non-matching segment stay untouched, so the
+    operator can still locate the offending file (satisfiable diagnostics,
+    ``quality-assurance.md``). Where no segment matches, the path is returned
+    byte-identical to the input (A6.2).
+    """
+
+    def __init__(
+        self,
+        denylist_terms: Iterable[tuple[str, str]],
+        baseline_patterns: Iterable[BaselinePatternLike],
+        foreign_slugs: Iterable[str],
+    ) -> None:
+        term_values = [term for term, _reason in denylist_terms]
+        self._literal_pattern = compile_candidates([*term_values, *foreign_slugs])
+        self._pattern_list = list(baseline_patterns)
+        self._map: dict[str, str] = {}
+
+    def _segment_is_offending(self, segment: str) -> bool:
+        if not segment:
+            return False
+        if self._literal_pattern is not None and self._literal_pattern.search(segment):
+            return True
+        for pattern in self._pattern_list:
+            for match in pattern.regex.finditer(segment):
+                value = match.group(0)
+                if pattern.exclude is not None and pattern.exclude.search(value):
+                    continue
+                return True
+        return False
+
+    def mask_path(self, path: str) -> str:
+        """Return *path* with every offending segment replaced; byte-identical to
+        *path* when no segment matches any of the three term sources (A6.2)."""
+        segments = path.split("/")
+        masked_segments: list[str] = []
+        for segment in segments:
+            if not self._segment_is_offending(segment):
+                masked_segments.append(segment)
+                continue
+            placeholder = self._map.get(segment)
+            if placeholder is None:
+                placeholder = _PATH_PLACEHOLDER_FMT.format(n=len(self._map) + 1)
+                self._map[segment] = placeholder
+            masked_segments.append(placeholder)
+        return "/".join(masked_segments)
+
+
+def _annotate_skip(
+    decision: Decision,
+    skipped_binary_count: int,
+    oversized_notes: tuple[OversizedNote, ...] = (),
+    path_masker: _PathMasker | None = None,
+) -> Decision:
+    """Attach the FR6 row-3 skip count AND the v0.11.0 FR4 oversized-blob notes to
+    *decision* — reported either way (allow/refuse), and kept honestly DISTINCT: the
+    binary count means "not text-decodable at all"; an oversized note means "the first
+    N bytes were scanned, the rest genuinely never was — verify it by hand" (grill P13).
+
+    v0.11.0 A6.3: the oversized note's path is masked through *path_masker* — the SAME
+    class-wide rule FR6 applies to the denylist refusal (:func:`_compose_denylist_refusal`),
+    since the note itself began naming a path in T-110-06 and is the second channel of
+    the same CWE-532 class entry #23 already found once.
+    """
+    lines: list[str] = []
+    if skipped_binary_count > 0:
+        lines.append(
+            f"[pre-push] {skipped_binary_count} binary blob(s) skipped by the denylist "
+            "scan (not text-decodable)."
+        )
+    for note in oversized_notes:
+        masked_path = path_masker.mask_path(note.path) if path_masker is not None else note.path
+        lines.append(
+            f"[pre-push] {masked_path} is {note.size_bytes} byte(s) — only its first "
+            f"{note.scanned_bytes} byte(s) were scanned by the denylist scan; the "
+            "remainder was NOT scanned. Verify the rest by hand."
+        )
+    if not lines:
         return decision
-    note = (
-        f"[pre-push] {skipped_binary_count} binary blob(s) skipped by the denylist "
-        "scan (not text-decodable)."
-    )
-    warn = f"{decision.warn}\n{note}" if decision.warn else note
+    note_text = "\n".join(lines)
+    warn = f"{decision.warn}\n{note_text}" if decision.warn else note_text
     return Decision(allowed=decision.allowed, message=decision.message, warn=warn)
 
 
-def _compose_denylist_refusal(hits: list[tuple[PushRef, Hit]]) -> str:
+def _compose_denylist_refusal(hits: list[tuple[PushRef, Hit]], path_masker: _PathMasker) -> str:
     """FR5: ref, path:line, short blob sha, masked term + source layer, the law, the
-    edit + rewrite-before-push remediation, ``--no-verify``, capped at 10 hits."""
+    edit + rewrite-before-push remediation, ``--no-verify``, capped at 10 hits.
+
+    v0.11.0 FR6(b): the blob path itself is masked through *path_masker* before
+    rendering (entry #23 resolution A) — only offending segments change; the line
+    number and short sha stay exactly as today.
+    """
     lines = [
         f"[pre-push] BLOCKED: the pushed range publishes {len(hits)} object(s) carrying "
         f"a denylisted term ({_DENYLIST_LAW})."
@@ -347,8 +471,9 @@ def _compose_denylist_refusal(hits: list[tuple[PushRef, Hit]]) -> str:
     shown = hits[:_MAX_LISTED_HITS]
     remainder = len(hits) - len(shown)
     for ref, hit in shown:
+        masked_path = path_masker.mask_path(hit.path)
         lines.append(
-            f"  {ref.local_ref} -> {ref.remote_ref}: {hit.path}:{hit.line} "
+            f"  {ref.local_ref} -> {ref.remote_ref}: {masked_path}:{hit.line} "
             f"(blob {hit.sha[:12]}) — masked term '{hit.masked_term}' ({hit.source_layer})"
         )
     if remainder > 0:
@@ -395,25 +520,43 @@ def _run_denylist_scan(
     terms: Iterable[tuple[str, str]],
     patterns: Iterable[BaselinePatternLike],
     slugs: Iterable[str],
-) -> tuple[Decision | None, int]:
+) -> tuple[Decision | None, int, tuple[OversizedNote, ...], _PathMasker]:
     """Run the FR1/FR2 scan over *scan_refs* — every non-deletion ref, tags included.
 
-    Returns ``(refusal_or_None, skipped_binary_count)``. A git object-read failure
-    refuses immediately, naming the failure (FR6 row 2) — never a silent empty scan.
+    Returns ``(refusal_or_None, skipped_binary_count, oversized_notes, path_masker)``.
+    A git object-read failure refuses immediately, naming the failure (FR6 row 2) —
+    never a silent empty scan. ``oversized_notes`` is deduplicated for free — it is
+    built from ``scan_objects`` runs over :func:`_dedup_new_objects`, which shares
+    ``seen_shas`` across every ref in this scan, so a blob reachable from two refs
+    contributes at most one note (mirrors the existing hit/skip dedup). The returned
+    ``path_masker`` (v0.11.0 FR6(b)) is built from the SAME three term sources and is
+    reused by the caller for every subsequently rendered oversized note, so a repeated
+    offending path segment gets one stable ordinal across the whole invocation.
+
+    code-reviewer MEDIUM finding (v0.11.0 pre-PR review): *terms*, *patterns* and
+    *slugs* are each materialized EXACTLY ONCE, right here, before either the
+    :class:`_PathMasker` or the scan loop below touches them. A one-shot Iterable
+    (e.g. a generator) consumed a second time yields nothing — building the masker from
+    the raw parameter and separately re-``list()``-ing it later silently emptied the
+    second consumption's term set, a latent fail-open. The materialized lists are the
+    ONLY thing passed onward from here.
     """
-    if not scan_refs:
-        return None, 0
     term_list = list(terms)
     pattern_list = list(patterns)
     slug_list = list(slugs)
+    path_masker = _PathMasker(term_list, pattern_list, slug_list)
+    if not scan_refs:
+        return None, 0, (), path_masker
     seen_shas: set[str] = set()
     per_ref_hits: list[tuple[PushRef, Hit]] = []
     skipped_total = 0
+    oversized_all: list[OversizedNote] = []
     try:
         for ref in scan_refs:
             fresh = _dedup_new_objects(object_source, repo, ref, seen_shas)
             outcome = scan_objects(fresh, term_list, pattern_list, slug_list)
             skipped_total += outcome.skipped_binary_count
+            oversized_all.extend(outcome.oversized_notes)
             per_ref_hits.extend((ref, hit) for hit in outcome.hits)
     except GitObjectReadError as exc:
         return (
@@ -429,10 +572,18 @@ def _run_denylist_scan(
                 ),
             ),
             0,
+            (),
+            path_masker,
         )
+    oversized_notes = tuple(oversized_all)
     if not per_ref_hits:
-        return None, skipped_total
-    return Decision(allowed=False, message=_compose_denylist_refusal(per_ref_hits)), skipped_total
+        return None, skipped_total, oversized_notes, path_masker
+    return (
+        Decision(allowed=False, message=_compose_denylist_refusal(per_ref_hits, path_masker)),
+        skipped_total,
+        oversized_notes,
+        path_masker,
+    )
 
 
 def push_gate_decision(
@@ -519,16 +670,18 @@ def push_gate_decision(
     # independently of `review_refs`, which excludes tags. Runs after branch policy
     # (free and pure, already checked above) and before the security verdict below.
     scan_refs = [r for r in refs if not r.is_deletion]
-    scan_refusal, skipped_binary_count = _run_denylist_scan(
+    scan_refusal, skipped_binary_count, oversized_notes, path_masker = _run_denylist_scan(
         scan_refs, object_source, repo, denylist_terms, baseline_patterns, foreign_slugs
     )
     if scan_refusal is not None:
-        return _annotate_skip(scan_refusal, skipped_binary_count)
+        return _annotate_skip(scan_refusal, skipped_binary_count, oversized_notes, path_masker)
 
     if not review_refs:
         return _annotate_skip(
             Decision(allowed=True, message="[pre-push] no review-gated refs; allow."),
             skipped_binary_count,
+            oversized_notes,
+            path_masker,
         )
 
     approved_shas = {a.commit_sha for a in iter_security_approvals(handoff_root)}
@@ -543,6 +696,8 @@ def push_gate_decision(
                 ),
             ),
             skipped_binary_count,
+            oversized_notes,
+            path_masker,
         )
 
     found = (
@@ -564,4 +719,6 @@ def push_gate_decision(
             ),
         ),
         skipped_binary_count,
+        oversized_notes,
+        path_masker,
     )

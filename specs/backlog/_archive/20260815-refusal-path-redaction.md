@@ -1,6 +1,6 @@
 ---
 title: "refusal-path-redaction: the push-gate refusal prints the offending blob path verbatim (CWE-532 residual)"
-status: candidate
+status: DELIVERED — v0.11.0
 opened: 2026-08-14
 description: >-
   v0.9.0 CLOSURE "Backlog returns" item (LOW, from the code-review round),
@@ -82,3 +82,38 @@ historical incidents used.
 
 `software-engineer` (resolution A) or `ai-engineer` (resolution B, doctrine
 surface); `security-reviewer` verifies closure.
+
+## Intake adjudication (ADR #15 — report #1)
+
+**APPROVED** — operator-delegated adjudication, 2026-08-15 (goal directive), verdicts
+per PM recommendation. Adjudicated via intake report #1
+(`.dadaia/reports/dadaia-workspace/project-manager/2026-08-15T132600Z-intake.html`).
+The entry remains a live pickable candidate.
+
+## Pick provenance (v0.11.0)
+
+**picked — v0.11.0**, 2026-08-15. Delivered as **FR6** of release `v0.11.0` "scan-v2".
+Provenance record: `specs/releases/v0.11.0/SPEC.md` §7. **The choice this entry demanded at
+pick time is made: resolution A** (renderer redaction), per operator ruling **D1** —
+root-cause over doctrine-only. Grill **P4** refines the mechanism (**ADR D1-a**): intent 2 as
+literally written would require `features/chokepoints` to import `cli`, which the ring purity
+forbids, so the masking primitive is extracted into a new stdlib-pure `core/redaction.py`
+that both `cli/redact.py#ContextRedactor` and the gate renderers consume — the machinery is
+genuinely extended, not duplicated. Scope is stated over a class rather than a call site:
+**every operator-facing gate string that names a blob path**, which today means the refusal
+*and* the FR4 oversized note (grill P5). The recorded secondary residual — the short blob sha
+lets a local holder recover the unmasked term via `git show` — remains **accepted**:
+local-only and inherent to naming the object at all. Terminal disposition
+`DELIVERED — v0.11.0` lands at closure.
+
+## Delivery (v0.11.0 closure, 2026-08-15)
+
+**Terminal: `DELIVERED — v0.11.0`.** FR6 shipped and QA-verified on A6.1–A6.6
+(`specs/releases/v0.11.0/ALPHA-1-QA.md`, APPROVED). Resolution A landed as ruled: the
+masking primitive lives in the new stdlib-pure `core/redaction.py`, `cli/redact.py` is a thin
+consumer whose test assertions were **not** touched, and both gate renderers — the refusal
+and the FR4 oversized note — mask the offending path's segments through it. A path matching
+nothing renders byte-identically to the pre-release output (regression fixture A6.2), so
+satisfiable diagnostics survive. The accepted secondary residual (a local holder can recover
+the term from the short sha via `git show`) remains accepted, unchanged. Evidence:
+`specs/_archive/releases/v0.11.0/CLOSURE.md` §Validations V3/V9 and §Dispositions.

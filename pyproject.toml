@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dadaia-workspace"
-version = "0.7.0"
+version = "0.8.0"
 description = "AI-native workspace management CLI for multi-agent development with Claude Code, Codex and Kimi Code"
 authors = ["Marco Menezes <marcoaureliomenezes@users.noreply.github.com>"]
 readme = "README.md"
@@ -113,10 +113,18 @@ python_version = "3.12"
 strict = true
 ignore_missing_imports = true
 incremental = false
-# No cache_dir: `incremental = false` already disables the mypy cache, so no
-# .mypy_cache/ is created in the repo tree, and there is no non-portable
-# hardcoded path (the previous "/dev/null" was Unix-only). CI redirects any
-# tool caches via env vars (MYPY_CACHE_DIR -> $RUNNER_TEMP); see ci.yml.
+# No cache_dir here (bug mypy-strict-cache-dir-created-without-cache-dir-env-override):
+# mypy 2.x writes .mypy_cache/ (CACHEDIR.TAG + a version dir) at cache_dir's default
+# regardless of `incremental = false` -- that claim was false. There is no cache_dir
+# value that is BOTH portable (no hardcoded absolute path; `$MYPY_CONFIG_FILE_DIR/..`
+# assumes this checkout's depth under a workspace root, and an unwritable resolved
+# target crashes mypy with an INTERNAL ERROR -- verified, not merely feared) AND
+# guaranteed outside the repo tree, so redirect via the MYPY_CACHE_DIR env var instead
+# (mypy's own supported override) -- exactly what CI does (ci.yml) and what
+# `dadaia ci preflight` does automatically (--cache-dir, see
+# features/ci_preflight/service.py:resolve_mypy_cache_dir). A bare local
+# `mypy --strict dadaia_workspace/` with no redirect WILL create .mypy_cache/ here;
+# run `dadaia ci preflight` instead, or set MYPY_CACHE_DIR yourself.
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,6 +1,6 @@
 ---
 title: "git_objects batch-parse loop: raw ValueError escapes the typed GitObjectReadError boundary; desync continues instead of aborting (CWE-755)"
-status: candidate
+status: DELIVERED — v0.11.0
 opened: 2026-08-14
 description: >-
   The SAME defect reported independently by both ship reviewers (LOW in each),
@@ -81,3 +81,32 @@ reviewers both asked for.
 `software-engineer` implements; `security-reviewer` verifies CWE-755 closed in the
 covering push review. Rides the same hotfix/hardening window as
 `push-ref-sha-validation-git-argv-hardening`.
+
+## Intake adjudication (ADR #15 — report #1)
+
+**APPROVED** — operator-delegated adjudication, 2026-08-15 (goal directive), verdicts
+per PM recommendation. Adjudicated via intake report #1
+(`.dadaia/reports/dadaia-workspace/project-manager/2026-08-15T132600Z-intake.html`).
+The entry remains a live pickable candidate.
+
+## Pick provenance (v0.11.0)
+
+**picked — v0.11.0**, 2026-08-15. Delivered as **FR8** of release `v0.11.0` "scan-v2".
+Provenance record: `specs/releases/v0.11.0/SPEC.md` §7. Sequenced **before**
+`git-objects-streamed-batch-reads` (PLAN §3): the chunking restructures the very loop this
+entry corrects, so landing it second would restructure code known to be wrong. Both halves
+are delivered as written — the typed wrap of the `out.index` / `int(size_str)` pair **and**
+the behaviour change on the desync branch, which now aborts typed instead of yielding
+fabricated undecodable objects that the skip counters would then report as fiction. Terminal
+disposition `DELIVERED — v0.11.0` lands at closure.
+
+## Delivery (v0.11.0 closure, 2026-08-15)
+
+**Terminal: `DELIVERED — v0.11.0`.** FR8 shipped and QA-verified on A8.1–A8.4
+(`specs/releases/v0.11.0/ALPHA-1-QA.md`, APPROVED). Both halves landed as written: the
+`out.index` / `int(size_str)` pair is wrapped and re-raised as the module's typed read error,
+so no raw `ValueError` escapes; and the desync branch now **aborts** instead of yielding a
+fabricated undecodable object, so nothing invented can reach a skip count. At the decision
+layer the failure renders as the ordinary refusal naming the git failure and `--no-verify`,
+never a traceback. Evidence: `specs/_archive/releases/v0.11.0/CLOSURE.md` §Validations V3/V4
+and §Dispositions.

@@ -4,6 +4,96 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] — 2026-08-15
+
+Release v0.11.0 "scan-v2" — prior-published-term amnesty and push-gate hardening.
+Nine backlog entries delivered (#19 #20 #22 #23 #25 #26 #27 #28 #29); archived at
+`specs/_archive/releases/v0.11.0/`. Pre-PR code review returned APPROVE with three
+MEDIUMs, all remediated before ship (amnesty predicate anchored to value equality;
+term sources materialized once; evidence claims pinned by test).
+
+### Added
+- **Prior-published-term amnesty** (`prior-published-term-amnesty`, P1): a term already
+  present in the remote-reachable version of the SAME path no longer refuses the push —
+  the blob is new, the term is not. The suppression predicate re-runs the same layer's
+  anchored matcher against the prior text and requires matched-value equality (never
+  substring containment — a prior superstring cannot amnesty a new shorter value). The
+  same term in a new path and a new term in an edited path still refuse. No
+  sanctioned-terms list exists anywhere (the A4.1-class contract test is unmodified);
+  the amnesty derives solely from published git state. No amnesty in the
+  `--not --remotes` fallback shape, and oversized blobs are never amnestied — both
+  deliberately fail-closed, both test-pinned.
+- **Self-scan sentinel extended to `tests/**`** behind a shrink-only 29-row baseline
+  (14 home-abs-path, 9 email-address, 5 ipv4-literal, 1 secret-token), plus the missing
+  `integration` marker on the sentinel module.
+- **`core/redaction.py`** — the masking primitive extracted stdlib-pure into `core`,
+  consumed by both `cli/redact.py` and the gate renderers.
+
+### Changed
+- **Oversized blobs (>5 MB) are now partially scanned** — first 5 MB, remainder never
+  fetched — and honestly reported: `skipped_binary_count` keeps only genuinely
+  undecodable blobs, while each oversized blob gets a structured note naming path and
+  size ("NOT fully scanned — verify by hand"). The old note mislabelled oversized text
+  as "binary … not text-decodable" (CWE-778).
+- **Foreign-name scan layer is registry-derived**: union of registry names, registry repo
+  slugs and `repos/` directory names, minus the pushing repo's own identities — a DEAD or
+  relocated context keeps protecting its name.
+- **Gate refusals and notes mask private-name-bearing path segments** (CWE-532 residual
+  closed; the redaction surface now covers the refusal renderer).
+- **`cat-file --batch` conversation is chunk-bounded** (500 shas per chunk, constant
+  resident set — 10× more blobs grows peak RSS ~22%); real-content measurement: fallback
+  9,095 blobs / 130.29 MB at 0.423 s/MB, 285.5 MiB peak RSS.
+
+### Fixed
+- **Pre-push stdin shas are validated** (40/64-hex + all-zero sentinel) and count as
+  malformed lines when option-shaped — closing the silent-no-op class
+  (`--glob=…` yielded a successful empty rev-list; CWE-88/CWE-20). `--` end-of-options
+  and a second-layer `local_sha` shape check added at every git argv interpolation site.
+- **Batch-stream desync and unparsable size fields abort as `GitObjectReadError`**
+  (typed, fail-closed) instead of escaping as raw `ValueError` or continuing into
+  garbage (CWE-755). A path that was a directory at the remote base yields no prior
+  text (non-blob prior objects are discarded, never decode-attempted).
+
+## [0.7.1] — 2026-08-15
+
+Hotfix (Arm B, `hotfix/0.7.1`). No release ceremony.
+
+### Fixed
+- **`pyproject.toml`'s `[tool.mypy]` comment no longer claims `incremental = false`
+  alone keeps `.mypy_cache/` out of the repo tree** (bug
+  `mypy-strict-cache-dir-created-without-cache-dir-env-override`, LOW). False under
+  mypy 2.1.0: the cache dir (`CACHEDIR.TAG` + a version subdir) is written at its
+  resolved `cache_dir` regardless of `incremental`, so a bare local
+  `mypy --strict dadaia_workspace/` polluted the checkout. No portable, crash-proof
+  `cache_dir` value exists (`$MYPY_CONFIG_FILE_DIR/..` assumes this checkout's depth
+  under a dadaia workspace root, and an unwritable resolved target crashes mypy with
+  an INTERNAL ERROR — verified). The comment and `.github/PULL_REQUEST_TEMPLATE.md`'s
+  mypy checklist line now require the `MYPY_CACHE_DIR` redirect mypy itself supports —
+  the same one `ci.yml` already uses, and what `dadaia ci preflight` already does
+  automatically. New integration/slow test
+  `tests/integration/test_mypy_local_invocation_hygiene.py` runs the PR template's
+  literal documented command against an isolated copy of the real `[tool.mypy]`
+  config and asserts no pollution.
+- **Context/session-resolution unit tests no longer depend on an ambient
+  `WORKSPACE_ROOT`** (bug `specs-resolver-context-tests-flaky-under-xdist-full-suite`,
+  LOW). `core.specs_resolver._authority_workspace_root()` honours `WORKSPACE_ROOT`
+  unconditionally (by design, the hook-transport channel) — ahead of, and regardless
+  of, any `monkeypatch.chdir()` a test performs. Every context-resolution test file's
+  isolation fixture scrubbed only the harness session-id and `DADAIA_CONTEXT`/
+  `DADAIA_SESSION_ID` vars, never `WORKSPACE_ROOT` (`tests/unit/test_container.py`'s
+  three `resolve_context` seam tests scrubbed nothing at all), so an ambient
+  `WORKSPACE_ROOT` — inherited from the shell that launched pytest, or left behind by
+  a concurrent `dadaia context bind`/`context show` sharing the real
+  `.dadaia/sessions/` tree during a full-suite `-n auto` run — silently overrode every
+  synthetic `tmp_path` workspace under test. Same flake class already fixed for
+  `panel-e2e-readiness-flaky-under-xdist-load` /
+  `panel-command-readiness-flaky-under-xdist-load`, this time isolation hardening at
+  the fixture level rather than a timing bound. Centralized the isolation set
+  (`CONTEXT_RESOLUTION_ENV_VARS` / `scrub_context_resolution_env`) in
+  `tests/fixtures/harness_env.py` and wired it into `test_specs_resolver_resolve_context.py`,
+  `test_specs_resolution.py`, `test_container.py`, `test_context_show_reflects_bind.py`,
+  and `test_codex_thread_id_bind.py`.
+
 ## [0.7.0] — 2026-08-15
 
 Release v0.10.0 (`dd-lifecycle-skills-family`).

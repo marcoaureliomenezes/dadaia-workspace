@@ -6,6 +6,7 @@ import os
 import shutil
 import subprocess
 import sys
+from collections.abc import Iterable
 from pathlib import Path
 
 import typer
@@ -223,28 +224,59 @@ def _run_backlog_doctor_gate(repo_root: Path) -> None:
         raise typer.Exit(1)
 
 
-def _foreign_repo_slugs(workspace: Path, own_slug: str | None) -> list[str]:
-    """Every directory under ``<workspace>/repos/`` except the pushed repo's own slug.
+def _foreign_repo_slugs(
+    workspace: Path,
+    own_slug: str | None,
+    registry_identities: Iterable[tuple[str, str]],
+) -> list[str]:
+    """The v0.11.0 FR5 registry-derived foreign-name set, union'd with the v0.9.0 FR3
+    directory-derived set, minus the pushed repo's own identities.
 
-    SPEC v0.9.0 FR3, term source 3 — the self-slug is excluded HERE, before it ever
-    reaches the matcher (A3.2's regression guard: matching the pushed repo's own slug
-    would block every push of this repository). Hidden entries (dotfiles) are skipped;
-    a missing ``repos/`` directory (e.g. the library repo run standalone) yields ``[]``.
+    ``{registry context names} UNION {registry repo_slugs} UNION {repos/ dir names} -
+    {own context name, own repo slug}`` (SPEC v0.11.0 FR5). *own_slug* is the pushed
+    repo's directory name under ``repos/`` (``context_slug_for_path``); *own_name* is
+    resolved from *registry_identities* as the ``name`` of whichever entry's
+    ``repo_slug`` equals *own_slug* — ``None`` when the pushed repo is not itself
+    registered (a fresh/unregistered checkout), in which case only the slug is
+    subtracted, exactly as v0.9.0 did.
+
+    **Both** self-identities are subtracted (A5.2): a context's ``name`` and its
+    ``repo_slug`` are separate fields (``core/models/spec_context.py``) and may
+    differ — subtracting only the slug would re-open the A3.2 regression (matching the
+    pushed repo's own slug would block every push of this repository) through the new
+    door the registry-derived NAME opens.
+
+    DEAD and relocated registry contexts contribute their terms just like ALIVE ones
+    (the whole point of FR5 — a context whose repo directory is absent no longer
+    silently loses its protection). Hidden directory entries (dotfiles) are skipped; a
+    missing ``repos/`` directory (e.g. the library repo run standalone) contributes no
+    directory-derived term, and a missing/empty/malformed registry (already swallowed
+    by :func:`container.load_registry_context_identities`, A5.4) contributes no
+    registry-derived term — the union degrades gracefully to whichever source is
+    healthy, never crashing the push hook.
     """
+    identities = list(registry_identities)
+    own_name = next((name for name, slug in identities if slug == own_slug), None)
+    own_identities = {value for value in (own_slug, own_name) if value}
+
+    registry_terms = {value for name, slug in identities for value in (name, slug) if value}
+
     repos_dir = workspace / "repos"
-    if not repos_dir.is_dir():
-        return []
-    return sorted(
-        entry.name
-        for entry in repos_dir.iterdir()
-        if entry.is_dir() and entry.name != own_slug and not entry.name.startswith(".")
-    )
+    dir_terms: set[str] = set()
+    if repos_dir.is_dir():
+        dir_terms = {
+            entry.name
+            for entry in repos_dir.iterdir()
+            if entry.is_dir() and not entry.name.startswith(".")
+        }
+
+    return sorted((registry_terms | dir_terms) - own_identities)
 
 
 @app.command("push-gate-check")
 def push_gate_check() -> None:
-    """Pre-push gate (FR-W1-02 / v0.6.0 FR4 / v0.9.0 FR1-FR6): branch policy + the
-    range-scoped denylist scan + diff-based security verdict.
+    """Pre-push gate (FR-W1-02 / v0.6.0 FR4 / v0.9.0 FR1-FR6 / v0.11.0 FR5): branch
+    policy + the range-scoped denylist scan + diff-based security verdict.
 
     Reads the pre-push ref lines from stdin (``<local-ref> <local-sha> <remote-ref>
     <remote-sha>``). Refuses any non-deletion, non-tag ref that is not
@@ -259,12 +291,16 @@ def push_gate_check() -> None:
     The object source, denylist terms, baseline patterns and foreign-slug set are ALL
     built and passed here — the CLI is the sole composition point for the injected
     ``GitObjectReader`` port (FR7); a production call site that failed to wire one
-    would be a defect, never a bypass (FR6 row 4).
+    would be a defect, never a bypass (FR6 row 4). The foreign-slug set is now
+    REGISTRY-DERIVED (v0.11.0 FR5): it reaches the registry through the
+    ``container.load_registry_context_identities`` seam, never through a direct
+    ``infrastructure`` import (``cli-no-infrastructure``).
     """
     from dadaia_workspace.container import (
         build_git_object_reader,
         load_denylist_baseline_patterns,
         load_denylist_terms,
+        load_registry_context_identities,
     )
     from dadaia_workspace.features.chokepoints import context_slug_for_path, push_gate_decision
     from dadaia_workspace.features.chokepoints.service import parse_push_stdin
@@ -276,7 +312,8 @@ def push_gate_check() -> None:
     denylist_terms = load_denylist_terms()
     baseline_patterns = load_denylist_baseline_patterns()
     own_slug = context_slug_for_path(workspace, repo_root)
-    foreign_slugs = _foreign_repo_slugs(workspace, own_slug)
+    registry_identities = load_registry_context_identities(workspace)
+    foreign_slugs = _foreign_repo_slugs(workspace, own_slug, registry_identities)
 
     mode = (
         "operator denylist + baseline" if denylist_terms else "baseline only (no operator denylist)"
