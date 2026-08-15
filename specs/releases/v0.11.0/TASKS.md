@@ -310,7 +310,7 @@ independent of blob count.
 
 ---
 
-- [ ] **T-110-10 — FR1: the amnesty suppression predicate (#19b)**
+- [-] **T-110-10 — FR1: the amnesty suppression predicate (#19b)**
 
 **Owner role:** software-engineer · **Commit:**
 `feat(T-110-10): suppress a hit whose matched value the same path already published`
