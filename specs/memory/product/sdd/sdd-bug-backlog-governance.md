@@ -19,7 +19,7 @@ tags:
 - backlog
 - bugs
 - gitflow
-token_estimate: 950
+token_estimate: 1300
 last_updated: '2026-08-15'
 release_origin: v0.3.0
 ---
@@ -69,12 +69,46 @@ entry schema, the intake protocol and the terminal disposition vocabulary have e
 home — the `dd-backlog-definition` skill — which closure and audit reference rather than
 restate.
 
-The doctrine is stated in the law and the skill; the physical backlog has not been
-consolidated yet. `specs/backlog/` still holds per-entry Markdown files, and the
-`dadaia backlog` verbs (`backlog new`, `backlog doctor`, `BL-SCHEMA`/`BL-STALE`) still
-read and write that per-entry model. Consolidating the files into `BACKLOG.md` is
-`project-manager` curation work; reconciling the tooling to the single-source schema is a
-`software-engineer` follow-up. Neither weakens the intake gate.
+The single source is physical. `specs/backlog/` holds exactly `BACKLOG.md`, `README.md`
+and `_archive/` — plus `remote-bugs/` where an intake subtree exists. There are no
+per-entry entry files anywhere in the live tree, and `specs/backlog/_archive/` is the
+historical store for every superseded entry file and for the retired `candidates.md`
+index.
+
+`features/backlog/document.py` parses that document into a typed ACTIVE/LEDGER model,
+with its roots injected and no I/O outside the supplied path. An `### <slug>` ACTIVE
+subsection carries five required keys — `Title`, `Opened` (`YYYY-MM-DD`), `Status`,
+`Description`, `Provenance` — plus the optional `Intents`, holding the typed `intents[]`
+YAML in a fenced span. A LEDGER line is the four-field grammar
+`<slug> · <disposition> · <release-or-reason> · <date>`. Parsing is diagnostic and never
+throws: a malformed subsection, an unparseable intents block and an ungrammatical LEDGER
+line are each captured as a located error naming section, slug and line, so the doctor
+reports instead of crashing; an absent document is an empty model, not a failure, so a
+context with no backlog is legitimate.
+
+`dadaia backlog doctor` validates that model with its four codes unchanged in identity
+and severity. **BL-SCHEMA** — a located parse error, an invalid status token, a slug
+outside `^[a-z][a-z0-9-]+$`, or an item at `candidate` or beyond with no bound or an
+unresolvable `intents[]` subject (`idea` stays exempt). **BL-DUP** — a slug repeated
+inside `ACTIVE` or inside `LEDGER`, or two ACTIVE items sharing anchor-set and change.
+**BL-CONFLICT** — two ACTIVE items sharing an anchor with an incompatible change.
+**BL-STALE** — an ACTIVE item that is already consumed or dispositioned: its slug is
+recorded in an archived `consumed_backlog.json`, or it also carries a LEDGER line, or its
+own status is one of the six terminal tokens. `dadaia backlog new <slug>` appends one
+conformant subsection at `status: idea` to `## ACTIVE`, creates the document with both
+section headings when it is absent, and refuses a slug already present in either section.
+The pre-commit staged-scope gate and the CI job run that same doctor over that same
+model. `specs doctor` backstops the surface from the other side: SPEC-DOC-031 iterates
+the ACTIVE subsections, and SPEC-DOC-035 is the single-source invariant — any item `*.md`
+loose directly under `specs/backlog/`, other than `BACKLOG.md` and `README.md` and
+excluding `_archive/` and `remote-bugs/`, is drift. Both are WARNING.
+
+The backlog has no removal or consumption write side. `**Consumes:**` in a release SPEC
+is provenance, not a call site: consumption is executed by the PM's purge-on-pick at
+definition and by the closure disposition sweep, which gives each consumed slug its
+LEDGER line and drops its ACTIVE subsection in the same commit.
+`features/backlog/ledger.py`'s `read_consumed` survives only as a pure reader over the
+archived sidecars and as one of BL-STALE's three inputs.
 
 ## Branches And Stage Placement
 
@@ -126,8 +160,10 @@ is a quality boundary, not a concurrency mechanism.
 ## Runtime State
 
 - `specs/bugs/*.jsonl`
-- `specs/backlog/BACKLOG.md` — the single-source target schema; the tree still carries the
-  per-entry `specs/backlog/*.md` files the current CLI reads and writes
+- `specs/backlog/BACKLOG.md` — the single source: `## ACTIVE` subsections and `## LEDGER`
+  lines, read and written by every backlog verb, gate and check
+- `specs/backlog/_archive/` — the historical store: superseded entry files and the retired
+  `candidates.md` index, moved in by `git mv` and never deleted
 - `.dadaia/reports/<context>/project-manager/<UTC>-intake.html` — the operator-facing
   intake report and its handoff
 - `specs/releases/<id>/consumed_backlog.json` or its archived equivalent
