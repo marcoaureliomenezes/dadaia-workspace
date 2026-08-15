@@ -4,6 +4,46 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.1] — 2026-08-15
+
+Hotfix (Arm B, `hotfix/0.7.1`). No release ceremony.
+
+### Fixed
+- **`pyproject.toml`'s `[tool.mypy]` comment no longer claims `incremental = false`
+  alone keeps `.mypy_cache/` out of the repo tree** (bug
+  `mypy-strict-cache-dir-created-without-cache-dir-env-override`, LOW). False under
+  mypy 2.1.0: the cache dir (`CACHEDIR.TAG` + a version subdir) is written at its
+  resolved `cache_dir` regardless of `incremental`, so a bare local
+  `mypy --strict dadaia_workspace/` polluted the checkout. No portable, crash-proof
+  `cache_dir` value exists (`$MYPY_CONFIG_FILE_DIR/..` assumes this checkout's depth
+  under a dadaia workspace root, and an unwritable resolved target crashes mypy with
+  an INTERNAL ERROR — verified). The comment and `.github/PULL_REQUEST_TEMPLATE.md`'s
+  mypy checklist line now require the `MYPY_CACHE_DIR` redirect mypy itself supports —
+  the same one `ci.yml` already uses, and what `dadaia ci preflight` already does
+  automatically. New integration/slow test
+  `tests/integration/test_mypy_local_invocation_hygiene.py` runs the PR template's
+  literal documented command against an isolated copy of the real `[tool.mypy]`
+  config and asserts no pollution.
+- **Context/session-resolution unit tests no longer depend on an ambient
+  `WORKSPACE_ROOT`** (bug `specs-resolver-context-tests-flaky-under-xdist-full-suite`,
+  LOW). `core.specs_resolver._authority_workspace_root()` honours `WORKSPACE_ROOT`
+  unconditionally (by design, the hook-transport channel) — ahead of, and regardless
+  of, any `monkeypatch.chdir()` a test performs. Every context-resolution test file's
+  isolation fixture scrubbed only the harness session-id and `DADAIA_CONTEXT`/
+  `DADAIA_SESSION_ID` vars, never `WORKSPACE_ROOT` (`tests/unit/test_container.py`'s
+  three `resolve_context` seam tests scrubbed nothing at all), so an ambient
+  `WORKSPACE_ROOT` — inherited from the shell that launched pytest, or left behind by
+  a concurrent `dadaia context bind`/`context show` sharing the real
+  `.dadaia/sessions/` tree during a full-suite `-n auto` run — silently overrode every
+  synthetic `tmp_path` workspace under test. Same flake class already fixed for
+  `panel-e2e-readiness-flaky-under-xdist-load` /
+  `panel-command-readiness-flaky-under-xdist-load`, this time isolation hardening at
+  the fixture level rather than a timing bound. Centralized the isolation set
+  (`CONTEXT_RESOLUTION_ENV_VARS` / `scrub_context_resolution_env`) in
+  `tests/fixtures/harness_env.py` and wired it into `test_specs_resolver_resolve_context.py`,
+  `test_specs_resolution.py`, `test_container.py`, `test_context_show_reflects_bind.py`,
+  and `test_codex_thread_id_bind.py`.
+
 ## [0.7.0] — 2026-08-15
 
 Release v0.10.0 (`dd-lifecycle-skills-family`).

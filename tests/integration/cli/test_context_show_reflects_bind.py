@@ -9,6 +9,7 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
+from tests.fixtures.harness_env import scrub_context_resolution_env
 
 pytestmark = [pytest.mark.integration]
 
@@ -44,14 +45,10 @@ def _make_workspace(root: Path) -> Path:
 
 @pytest.fixture(autouse=True)
 def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    for var in (
-        "DADAIA_CONTEXT",
-        "DADAIA_SESSION_ID",
-        "CLAUDE_CODE_SESSION_ID",
-        "CODEX_SESSION_ID",
-        "CODEX_THREAD_ID",
-    ):
-        monkeypatch.delenv(var, raising=False)
+    """Bug ``specs-resolver-context-tests-flaky-under-xdist-full-suite``: also scrubs
+    ``WORKSPACE_ROOT``, honoured unconditionally by the resolution authority ahead of
+    every ``monkeypatch.chdir()`` this module performs."""
+    scrub_context_resolution_env(monkeypatch)
 
 
 # --- v0.1.71 FR3: no-arg `context show` reflects the bound session -------------------

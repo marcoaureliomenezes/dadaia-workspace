@@ -14,6 +14,7 @@ import pytest
 from dadaia_workspace import container
 from dadaia_workspace.core import kernel_tunables
 from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
+from tests.fixtures.harness_env import scrub_context_resolution_env
 
 
 def _init_states(tmp_path: Path) -> Path:
@@ -161,7 +162,19 @@ def test_build_doctor_service_wires_pid_probe_dead_holder_reclaimed(tmp_path: Pa
 # T-50-02 (SPEC v0.5.0 FR1) — container.resolve_context, the hooks-side seam onto the
 # single context-resolution authority. Thin pass-through: pinned here as a direct
 # behavioral proof, exercised indirectly (harness-real) by sdd_gate/sdd_post_gate.
+#
+# Bug specs-resolver-context-tests-flaky-under-xdist-full-suite: these three tests used
+# to clear no ambient env at all. ``container.resolve_context`` delegates to the single
+# resolution authority, whose ``_authority_workspace_root()`` honours ``WORKSPACE_ROOT``
+# unconditionally (ahead of, and regardless of, ``monkeypatch.chdir()``) -- an inherited
+# or concurrently-leaked ``WORKSPACE_ROOT``/``DADAIA_CONTEXT``/harness session-id var
+# silently overrides these tests' own synthetic ``tmp_path`` scenarios.
 # ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _clean_context_resolution_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    scrub_context_resolution_env(monkeypatch)
 
 
 def test_resolve_context_seam_explicit_wins(tmp_path: Path) -> None:
