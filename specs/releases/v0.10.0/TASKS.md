@@ -260,7 +260,7 @@ this skill never reproduces and never fixes.
 
 ---
 
-- [-] **T-100-10 — `dd-bug-fix` (new) + `dadaia-gitflow` dehydration**
+- [x] **T-100-10 — `dd-bug-fix` (new) + `dadaia-gitflow` dehydration**
 
 **Owner role:** ai-engineer · **Commit:**
 `feat(T-100-10): dd-bug-fix owns Arm B end-to-end`

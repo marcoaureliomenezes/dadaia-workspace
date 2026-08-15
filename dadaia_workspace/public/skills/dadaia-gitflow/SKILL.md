@@ -54,17 +54,11 @@ A release defined and reviewed is therefore committed and pushed the moment
 milestone (a) clears — implementation never starts on an unreviewed, unpushed
 definition.
 
-## Hotfix: PATCH-mint, no ceremony
+## Hotfix procedure
 
-A bug fix stays Arm B in full — register, reproduce, RED, root-cause fix, GREEN,
-`resolved` event, commit — now run on `hotfix/{M.m.p}` where the version is the
-**next PATCH**. At merge into `develop`, in the **same commit**:
-
-- bump `pyproject.toml`'s version to the minted PATCH;
-- add the `CHANGELOG.md` entry.
-
-**No release ceremony.** No SPEC, no PLAN, no TASKS, no `specs/releases/<id>/`
-directory. The bug ledger plus the `CHANGELOG.md` entry are the record.
+Full Arm B procedure on `hotfix/{M.m.p}` — reproduce, RED, root-cause fix, GREEN,
+`resolved` event, PATCH mint, no ceremony: `dd-bug-fix`. This skill's stage-contract row
+above (`bug-fix/hotfix`) is the only fact restated there.
 
 ## Mechanical vs discipline
 
@@ -85,5 +79,6 @@ reads a commit message or a task marker.
 ## See also
 
 `DADAIA.md` §5/§6 states the law this skill operates; `dadaia-task-manager` for
-task-marker discipline; `dadaia-release-definition` and `dadaia-release-closure` for
-the definition/closure protocols that ride these branches.
+task-marker discipline; `dd-release-definition` and `dd-release-closure` for the
+definition/closure protocols, and `dd-bug-fix` for the hotfix protocol, that ride
+these branches.
