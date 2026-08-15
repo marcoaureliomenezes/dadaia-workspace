@@ -1,6 +1,6 @@
 ---
 title: "self-scan sentinel carries only pytest.mark.slow — add the integration marker so future selector changes cannot silently drop it"
-status: candidate
+status: picked
 opened: 2026-08-14
 description: >-
   Materializes a LOW from the round-2 code review of v0.9.0.
@@ -55,3 +55,13 @@ no stewardship verdict needed — nothing is deleted, skipped, or disabled).
 per PM recommendation. Adjudicated via intake report #1
 (`.dadaia/reports/dadaia-workspace/project-manager/2026-08-15T132600Z-intake.html`).
 The entry remains a live pickable candidate.
+
+## Pick provenance (v0.11.0)
+
+**picked — v0.11.0**, 2026-08-15. Delivered inside **FR3** of release `v0.11.0` "scan-v2"
+(acceptance A3.5). Provenance record: `specs/releases/v0.11.0/SPEC.md` §7. This is the
+"first window touching the surface" the entry was waiting for: task T-110-12 rewrites
+`tests/integration/test_repo_self_scan.py` to extend the sentinel's scope to `tests/**`, so
+the marker fix rides that exact write set rather than racing it from a second task.
+Deliberately **still not** folded into `test-suite-remediation-stewardship` (#2), which is
+not picked. Terminal disposition `DELIVERED — v0.11.0` lands at closure.

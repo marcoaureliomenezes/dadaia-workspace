@@ -1,6 +1,6 @@
 ---
 title: "foreign-name scan layer derived from repos/ directories only: a DEAD or relocated context contributes no term"
-status: candidate
+status: picked
 opened: 2026-08-14
 description: >-
   Materializes a LOW from the APPROVED v0.9.0 ship security review — a structural
@@ -91,3 +91,16 @@ the covering push review. Sequenced with `prior-published-term-amnesty`.
 per PM recommendation. Adjudicated via intake report #1
 (`.dadaia/reports/dadaia-workspace/project-manager/2026-08-15T132600Z-intake.html`).
 The entry remains a live pickable candidate.
+
+## Pick provenance (v0.11.0)
+
+**picked — v0.11.0**, 2026-08-15. Delivered as **FR5** of release `v0.11.0` "scan-v2".
+Provenance record: `specs/releases/v0.11.0/SPEC.md` §7. Operator ruling **D4** fixes the
+in-release ordering: amnesty first, then this layer, with the one-off wider-set
+latent-blocker enumeration executed **before** it lands (task T-110-13, step 1; acceptance
+A5.5). Grill **P8** adds a required correction the entry did not carry: the subtraction must
+remove **both** the pushing repo's own context `name` and its own `repo_slug` — they are
+separate fields and may differ, and subtracting only the slug re-opens the A3.2 regression.
+Grill **P9**: the reviewer's two wider-set hits are same-path prior-published and are
+amnestied by FR1 rather than accepted by hand. Terminal disposition `DELIVERED — v0.11.0`
+lands at closure.

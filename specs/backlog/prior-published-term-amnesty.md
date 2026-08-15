@@ -1,6 +1,6 @@
 ---
 title: "prior-published-term amnesty: a term already published in the remote-reachable version of the same path must not refuse the push"
-status: candidate
+status: picked
 opened: 2026-08-14
 description: >-
   Operator-ratified refinement from the v0.9.0 code-review round (CLOSURE, "Backlog
@@ -111,3 +111,19 @@ narrows the ruler).
 `software-engineer` implements (`software-architect` may need to rule on where the
 remote-side lookup seam lives); `security-reviewer` verifies the amnesty cannot be
 abused to smuggle a new term through an edited path.
+
+## Pick provenance (v0.11.0)
+
+**picked — v0.11.0**, 2026-08-15. Delivered as **FR1 (matcher suppression), FR2
+(prior-side lookup) and FR3 (sentinel extension)** of release `v0.11.0` "scan-v2";
+this entry is the release's P1 core. Provenance record:
+`specs/releases/v0.11.0/SPEC.md` §7. Grill refinements binding on the implementation:
+the predicate keys on the **matched value**, never the pattern (grill P1); the
+`--not --remotes` fallback shape grants no amnesty (ADR D7); the chunked reader
+(`git-objects-streamed-batch-reads`) is a **precondition**, not a sibling (ADR D8); the
+sentinel's `tests/**` baseline is a test assertion, never a scan suppression (grill P7).
+The D6 cross-reference on the `internal-hostname` false-positive class was evaluated and
+**declined** for this release (SPEC §4.3) — it stays with
+`baseline-carve-out-review-cadence`. Terminal disposition `DELIVERED — v0.11.0` lands at
+closure; the entry file is retained per the never-delete law, pending the single-source
+`BACKLOG.md` consolidation.

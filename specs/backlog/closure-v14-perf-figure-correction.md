@@ -1,6 +1,6 @@
 ---
 title: "v0.9.0 CLOSURE V14 fallback-range figure is synthetic and non-comparable: real-content matching costs ~1.3 s/MB (~147 s over 8.8k blobs) — record the real number as product truth"
-status: candidate
+status: picked
 opened: 2026-08-14
 description: >-
   Materializes the round-2 code-review MEDIUM (axis 3, evidence fidelity;
@@ -88,3 +88,16 @@ the memory correction in a DEFINITION/CLOSURE phase window.
 per PM recommendation. Adjudicated via intake report #1
 (`.dadaia/reports/dadaia-workspace/project-manager/2026-08-15T132600Z-intake.html`).
 The entry remains a live pickable candidate.
+
+## Pick provenance (v0.11.0)
+
+**picked — v0.11.0**, 2026-08-15, as a **CLOSURE-phase obligation — not an implementation
+FR**. Provenance record: `specs/releases/v0.11.0/SPEC.md` §5 ("Closure obligations") and §7.
+The measurement half is task T-110-14 (acceptance A9.4/A9.5), which measures the **shipped**
+code — ordinary range before/after, and the fallback shape with the read/match split, s/MB
+and peak RSS — and records the match-throughput decision in writing. The record half is task
+T-110-16: `product-engineer` lands the forward correction in the `sdd-gate-v3` atom's
+push-range scan section, explicitly superseding the archived V14 synthetic figure and citing
+this entry, in the **same CLOSURE pass** as `prior-published-term-amnesty`'s memory note —
+both bind the same atom section. `specs/_archive/**` stays untouched. Terminal disposition
+`DELIVERED — v0.11.0` lands at closure.
