@@ -4,6 +4,33 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] — 2026-08-15
+
+Release v0.10.0 (`dd-lifecycle-skills-family`).
+
+### Added
+- **The `dd-` lifecycle skill family** — seven skills, one per SDD stage, zero
+  overlap, measurable style budgets: `dd-backlog-definition` (backlog curation,
+  the BACKLOG.md ACTIVE/LEDGER schema, the disposition-token vocabulary, and the
+  operator-gated intake protocol), `dd-release-definition`, `dd-release-implement`
+  (owns the gate-cadence table), `dd-release-closure`, `dd-audit-project` (full
+  merge of drift-detection), `dd-bug-registration`, `dd-bug-fix` (Arm B
+  end-to-end). Three former skills renamed/merged in place; four net-new.
+- **Contract test for the Codex D-CX-7 skill-reference gate** proving the `dd-`
+  prefix family is validated (the rename would otherwise have degraded the check
+  to a silent no-op).
+
+### Changed
+- **Always-on law dehydrated**: stage protocol moved out of `DADAIA.md` into the
+  stage skills (backlog schema, hotfix flow, bug registration, watch-CI
+  checkpoint); the law keeps only always-on content and points at the family.
+- **Operator-gated backlog intake** (operator ADR, 2026-08-15): only the operator
+  creates demand; agents route residuals to a PM intake report for operator
+  adjudication; all personas and orchestration surfaces updated.
+- **`ai-engineer`'s declared write surface corrected** to the real law-source
+  paths (`public/data/*.md`, scaffold/template AGENTS files) — the previous
+  allowlist named a non-existent directory.
+
 ## [0.6.0] — 2026-08-14
 
 Release v0.9.0 (`push-range-denylist-scan`).

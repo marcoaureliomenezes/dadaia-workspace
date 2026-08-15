@@ -496,7 +496,7 @@ added; SPEC §5 satisfied file by file.
 
 ---
 
-- [-] **T-100-18 — CLOSURE, dispositions, archive, version bump**
+- [x] **T-100-18 — CLOSURE, dispositions, archive, version bump**
 
 **Owner role:** product-engineer (text) + software-engineer/dispatcher (**[git]** steps)
 · **Commit:** `docs(T-100-18): close release v0.10.0`
