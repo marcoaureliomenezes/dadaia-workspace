@@ -1,6 +1,6 @@
 ---
 title: "Backlog tooling reconciliation: point the per-entry-file tooling at single-source BACKLOG.md (incl. the Consumes checklist consumer)"
-status: candidate
+status: picked
 opened: 2026-08-15
 description: >-
   v0.10.0 shipped the ADR #14 doctrine (law + dd-backlog-definition schema): the backlog
@@ -108,3 +108,31 @@ directive), verdicts per PM recommendation — intake report #2
 `software-engineer` implements (its own release round per the D-A ratification);
 `product-engineer` authors the release SPEC; PM sequences
 `backlog-md-physical-consolidation` with/after this.
+
+## Pick provenance (v0.12.0)
+
+**picked — v0.12.0**, 2026-08-15. Delivered as **FR1–FR6 + FR8** of release `v0.12.0`
+"backlog-tooling-single-source", together with `backlog-md-physical-consolidation` (FR7) in
+**one** release and **one atomic cutover commit** (operator ruling **D1**). Provenance
+record: `specs/releases/v0.12.0/SPEC.md` §7; grill: `specs/releases/v0.12.0/GRILL.md`.
+
+**The 2-2 fold is resolved by RETIREMENT** (operator ruling **D2**, verdict from grill P1).
+Inspection at `feature/v0.12.0` found `removal_lifecycle.py`, `removal.py`,
+`ledger_writer.py`, `consumes.py` and `container.build_backlog_removal_lifecycle` with
+**zero** production callers — the former caller was the workflow engine deleted in v0.3.0,
+which explicitly kept the modules — and found `apply_removal`'s defined behaviour (rewrite
+down to residual, or archive-then-unlink) to **contradict** the never-delete law it was built
+to serve, since under the single-source model an item never leaves the file. The write side
+is deleted with its four test modules (recorded supersessions, not silent pruning);
+`ledger.py`'s `read_consumed` survives as a live BL-STALE input over the 18 historical
+sidecars. `dd-release-definition` §5 is rewritten to the mechanism that runs: `**Consumes:**`
+is SPEC provenance, executed by the PM's purge-on-pick and the `dd-release-closure`
+disposition sweep, backstopped by `backlog doctor` BL-STALE and `specs doctor` SPEC-DOC-031.
+
+Two grill decisions bind this entry beyond its own text: **D7** — `intents[]`/anchor binding
+is **preserved** (this entry's own `preview.py` intent asked for it, while the ratified
+`dd-backlog-definition` §2 schema has no intents key; the conservative option was taken and
+flagged as **OD-1**), carried as one optional `**Intents:**` subsection key; and **D8** —
+BL-STALE is re-defined as "an ACTIVE item already consumed or dispositioned". Terminal
+disposition `DELIVERED — v0.12.0` lands at closure, as a `LEDGER` line in the consolidated
+`BACKLOG.md`.
