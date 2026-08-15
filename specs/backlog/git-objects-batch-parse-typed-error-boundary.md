@@ -81,3 +81,10 @@ reviewers both asked for.
 `software-engineer` implements; `security-reviewer` verifies CWE-755 closed in the
 covering push review. Rides the same hotfix/hardening window as
 `push-ref-sha-validation-git-argv-hardening`.
+
+## Intake adjudication (ADR #15 — report #1)
+
+**APPROVED** — operator-delegated adjudication, 2026-08-15 (goal directive), verdicts
+per PM recommendation. Adjudicated via intake report #1
+(`.dadaia/reports/dadaia-workspace/project-manager/2026-08-15T132600Z-intake.html`).
+The entry remains a live pickable candidate.
