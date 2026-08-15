@@ -339,7 +339,7 @@ introduced** — A4.1's contract test must stay unmodified and green.
 
 ---
 
-- [ ] **T-110-11 — FR1: integration proof over a real range with a real remote (#19c)**
+- [-] **T-110-11 — FR1: integration proof over a real range with a real remote (#19c)**
 
 **Owner role:** software-engineer · **Commit:**
 `test(T-110-11): pin the amnesty over real git ranges`
