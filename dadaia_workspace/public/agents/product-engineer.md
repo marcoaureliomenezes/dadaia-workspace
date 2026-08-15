@@ -133,8 +133,10 @@ specs/
 │       ├── TASKS.md             ← task checklist — created after PLAN approval
 │       └── CLOSURE.md           ← release closure — created when all tasks [x] DONE
 ├── backlog/
-│   └── BACKLOG.md               ← single source: ACTIVE (live candidates) + LEDGER
-│                                   (closed items); operator-gated intake only
+│   ├── <slug>.md                ← per-entry candidates (live schema; operator-gated intake only)
+│   └── candidates.md            ← index of per-entry candidates
+│                                   (target: single-file BACKLOG.md ACTIVE/LEDGER —
+│                                   consolidating, see dd-backlog-definition)
 └── _archive/
     ├── releases/<release-id>/   ← archived releases (read-only)
     ├── legacy-features/<name>/  ← pre-release-model features that were never implemented
