@@ -465,7 +465,7 @@ returning named defects to the implementer.
 
 ---
 
-- [-] **T-100-17 — Memory update (CLOSURE phase)**
+- [x] **T-100-17 — Memory update (CLOSURE phase)**
 
 **Owner role:** product-engineer · **Commit:**
 `docs(T-100-17): memory — dd- family, backlog doctrine and intake gate`

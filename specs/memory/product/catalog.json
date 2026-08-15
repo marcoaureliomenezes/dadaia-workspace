@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-14T19:48:53Z",
+  "generated_at": "2026-08-15T14:44:43Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -49,7 +49,7 @@
       "category": "product",
       "area": "agents",
       "tldr": "Nine core Layer-1 roles, two dispatchers, document-governed ordered work, and advisory-only concurrency.",
-      "summary": "Defines role ownership, dispatch purity, memory bootstrap, task discipline, review checkpoints, and Layer-1 model governance. The ordered lifecycle is carried by SDD documents and agent dispatch, not by a runtime. No role acquires or coordinates a concurrency lock.",
+      "summary": "Defines role ownership, dispatch purity, memory bootstrap, task discipline, review checkpoints, and Layer-1 model governance. The ordered lifecycle is carried by SDD documents and agent dispatch, not by a runtime, and each stage's protocol has one owning dd- skill the law points at. No role acquires or coordinates a concurrency lock.",
       "path": "specs/memory/product/agents/agent-orchestration.md",
       "tags": [
         "orchestration",
@@ -57,7 +57,7 @@
         "dispatch",
         "sdd"
       ],
-      "token_estimate": 470,
+      "token_estimate": 570,
       "depends_on": [
         "sdd-gate-v3",
         "agent-comms",
@@ -81,7 +81,7 @@
         "derivation",
         "governance"
       ],
-      "token_estimate": 420,
+      "token_estimate": 475,
       "depends_on": [
         "agent-orchestration",
         "panel",
@@ -125,7 +125,7 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 2720,
+      "token_estimate": 2830,
       "depends_on": [
         "agent-orchestration",
         "workspace-init"
@@ -529,8 +529,8 @@
       "title": "sdd-bug-backlog-governance",
       "category": "product",
       "area": "sdd",
-      "tldr": "Event-sourced JSONL bugs, PM-curated backlog, release consumption, audit dispositions, and a four-branch git contract whose only pushable branch is develop.",
-      "summary": "Bugs are append-only events; the backlog is curated by project-manager and sanitized continuously; a release consumes an explicit picked set; closure and audit require terminal dispositions. Work is placed on four branch patterns with develop the only pushable one; a feature branch merges into develop at two milestones, each followed by a diff-based security review of the develop delta and a push. Intake is additive and never lock-gated.",
+      "tldr": "Event-sourced JSONL bugs, an operator-gated single-source backlog, release consumption, audit dispositions, and a develop-only four-branch git contract.",
+      "summary": "Bugs are append-only events; the backlog is the operator's demand queue, curated by project-manager in a single BACKLOG.md (ACTIVE + LEDGER) with purge-on-pick and continuous sanitizing — no agent materializes an entry, residuals reach the operator through a PM intake report. A release consumes an explicit picked set; closure and audit require terminal dispositions. Work is placed on four branch patterns with develop the only pushable one; a feature branch merges into develop at two milestones, each followed by a diff-based security review of the develop delta and a push. Bug, backlog and audit paths stay additive and never lock-gated.",
       "path": "specs/memory/product/sdd/sdd-bug-backlog-governance.md",
       "tags": [
         "sdd",
@@ -540,7 +540,7 @@
         "bugs",
         "gitflow"
       ],
-      "token_estimate": 620,
+      "token_estimate": 950,
       "depends_on": [
         "specs-doctor",
         "sdd-gate-v3",

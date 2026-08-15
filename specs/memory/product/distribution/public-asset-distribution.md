@@ -10,8 +10,8 @@ tags:
 - distribution
 - projection
 - privacy
-token_estimate: 2720
-last_updated: '2026-08-12'
+token_estimate: 2830
+last_updated: '2026-08-15'
 release_origin: v0.1.65
 ---
 
@@ -65,6 +65,13 @@ natively from the shared `.agents/skills/` root, so no per-harness copy is produ
 per-harness entities). `dadaia-gitflow` — the single operational home of the branch,
 commit, push and version contract — and `dadaia-test-stewardship` — the single operational
 home of the test lifecycle — ship this way, alongside the other universal skills.
+
+The **`dd-` lifecycle family** is distributed on that same universal path and is the
+development cycle's on-demand protocol surface: `dd-backlog-definition`,
+`dd-release-definition`, `dd-release-implement`, `dd-release-closure`, `dd-audit-project`,
+`dd-bug-registration` and `dd-bug-fix` — one skill per stage, each the single operational
+home of its stage's protocol. The always-on law carries the classification and points at
+the stage's skill; the stage procedure exists only in the skill.
 
 `dadaia public doctor` performs three comparison passes: source vs staging, staging
 vs projected (one pass per runtime target). Any mismatch emits `[drift] <path>` and
