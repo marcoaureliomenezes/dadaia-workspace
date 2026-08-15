@@ -254,6 +254,38 @@ def test_git_object_read_failure_refuses_naming_the_failure(tmp_path: Path) -> N
 
 
 # ---------------------------------------------------------------------------
+# code-reviewer MEDIUM finding (v0.11.0 pre-PR review) — `_run_denylist_scan` must
+# consume each Iterable term source ONLY ONCE. A one-shot generator passed as
+# `denylist_terms` must still refuse a push carrying that term — consuming the same
+# generator twice (once to build the `_PathMasker`, again to build `term_list`) would
+# silently empty it on the second pass, producing a fail-open allow.
+# ---------------------------------------------------------------------------
+
+
+def test_generator_denylist_terms_still_refuses_not_silently_emptied(tmp_path: Path) -> None:
+    """Uses a TAG ref (DP-5 verdict carve-out) so the only possible refusal source is
+    the denylist scan itself — isolating this from the unrelated missing-security-verdict
+    refusal a ``refs/heads/develop`` push would also trigger."""
+    source = _FakeObjectSource(
+        by_range={(_SHA_A, _ZERO): [_obj("leak.md", f"contains {_SYNTHETIC_TERM} here\n")]}
+    )
+
+    def _term_generator() -> Iterable[tuple[str, str]]:
+        yield (_SYNTHETIC_TERM, "synthetic")
+
+    decision = push_gate_decision(
+        tmp_path,
+        _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
+        object_source=source,
+        repo=tmp_path,
+        denylist_terms=_term_generator(),
+    )
+    assert not decision.allowed
+    assert "denylisted term" in decision.message
+    assert _SYNTHETIC_TERM not in decision.message
+
+
+# ---------------------------------------------------------------------------
 # FR7/A7.1 — an option-shaped `local_sha` refuses as a malformed line instead of
 # silently producing a successful empty rev-list.
 # ---------------------------------------------------------------------------

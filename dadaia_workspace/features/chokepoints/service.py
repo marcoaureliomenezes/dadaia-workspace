@@ -532,13 +532,21 @@ def _run_denylist_scan(
     ``path_masker`` (v0.11.0 FR6(b)) is built from the SAME three term sources and is
     reused by the caller for every subsequently rendered oversized note, so a repeated
     offending path segment gets one stable ordinal across the whole invocation.
+
+    code-reviewer MEDIUM finding (v0.11.0 pre-PR review): *terms*, *patterns* and
+    *slugs* are each materialized EXACTLY ONCE, right here, before either the
+    :class:`_PathMasker` or the scan loop below touches them. A one-shot Iterable
+    (e.g. a generator) consumed a second time yields nothing — building the masker from
+    the raw parameter and separately re-``list()``-ing it later silently emptied the
+    second consumption's term set, a latent fail-open. The materialized lists are the
+    ONLY thing passed onward from here.
     """
-    path_masker = _PathMasker(terms, patterns, slugs)
-    if not scan_refs:
-        return None, 0, (), path_masker
     term_list = list(terms)
     pattern_list = list(patterns)
     slug_list = list(slugs)
+    path_masker = _PathMasker(term_list, pattern_list, slug_list)
+    if not scan_refs:
+        return None, 0, (), path_masker
     seen_shas: set[str] = set()
     per_ref_hits: list[tuple[PushRef, Hit]] = []
     skipped_total = 0
