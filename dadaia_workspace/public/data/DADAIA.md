@@ -173,11 +173,17 @@ behavior. `product-engineer` writes `specs/memory/**` in the `DEFINITION` and `C
 phases; every other agent reads it. Changelog and history live in `CLOSURE.md` and
 `_archive/`.
 
-**Backlog.** `project-manager` curates `specs/backlog/**`; everyone reads it freely and
-routes additions through the PM. Entries are sanitized continuously — stale or invalid
-ones are marked `deferred` or `rejected` with a reason. Backlog entries and bugs are kept
-forever: mark them, never delete them. This never-delete law covers bugs and backlog
-only — tests are prunable under the stewardship criteria (§6).
+**Backlog.** The backlog is the **operator's demand queue**: only the operator creates
+demand. `project-manager` curates the single-source `specs/backlog/BACKLOG.md` — an
+ACTIVE section of live candidates and a LEDGER section of one line per closed item;
+everyone reads it freely. No agent materializes an entry: residuals from a closure,
+review or audit are compiled by the PM into an **intake report** the operator decides on
+first, and an operator-ratified deferral taken during a release is already approved
+intake. Nothing is deleted: an item leaves ACTIVE only by gaining a LEDGER line carrying
+its disposition and reason, and a picked item leaves ACTIVE in the same commit that
+creates the release SPEC, which records its provenance. This never-delete law covers
+bugs and backlog only — tests are prunable under the stewardship criteria (§6). Entry
+schema, intake protocol and the disposition vocabulary: `dd-backlog-definition`.
 
 **Branches.** Exactly four patterns, no fifth: `main` (remote+local, never committed or
 pushed to directly, advances only via a GitHub-enforced PR from `develop`); `develop`
@@ -196,10 +202,9 @@ committed to the branch. At pick time, open bugs and undispositioned audits outr
 backlog. Finalization order is **memory update → CLOSURE → archive**; a completed task
 group is one commit.
 
-**Hotfixes.** A bug fix stays Arm B (§1) in full, now run on `hotfix/{M.m.p}` at the next
-PATCH. At merge to `develop`, the same commit bumps `pyproject.toml`'s version and adds
-the `CHANGELOG.md` entry — **no release ceremony**: no SPEC, PLAN, TASKS, or
-`specs/releases/<id>/` directory.
+**Hotfixes.** A bug fix stays Arm B (§1) in full, run on `hotfix/{M.m.p}` at the next
+PATCH — **no release ceremony**: no SPEC, PLAN, TASKS, or `specs/releases/<id>/`
+directory. Procedure: `dd-bug-fix`.
 
 **Audits.** One audit generates exactly one remediation release, and that release gives
 **every** finding an explicit disposition — `fixed`, `superseded` by a broader picked
@@ -223,22 +228,12 @@ carrying evidence, executed by `software-engineer`. Tombstone tests and expired 
 are slop. Test-artifact capture is failure-gated, written where §4 already says. Full
 protocol: `dadaia-test-stewardship`.
 
-**Register every bug you hit** while operating this tooling — projection, doctor, upgrade,
-scaffolding, hooks, the gate, presence, context, panel, reports, the CLI, or any behavior
-that breaks its own contract. Append the `reported` event before the turn ends:
-
-```bash
-dadaia bugs append --bug-id <slug> --event reported --reported-by <agent> \
-  --title "…" --severity LOW|MEDIUM|HIGH|CRITICAL --surface "…" --component "…" \
-  --context <ctx> --tag <tag> --symptom "…" --repro "…" --expected "…" --notes "…"
-```
-
-Bug paths are ADDITIVE, so registration is always possible — there is no reason to defer
-it. Classify first: environment limits, invalid input and wrong usage are not product
-bugs, and neither is a validation the tool is designed to emit. Redact before writing —
-absolute local paths, IPs, hostnames, private names and secrets never enter an event
-field. In this self-hosting workspace bugs go to `repos/dadaia-workspace/specs/bugs/`; in
-a consumer workspace, to the active context's `specs/bugs/` plus an upstream report.
+**Register every bug you hit** while operating this tooling — any behavior that breaks
+its own contract. Classify first: environment limits, invalid input, wrong usage, and a
+validation the tool is designed to emit are not product bugs. Append the `reported`
+event before the turn ends; bug paths are ADDITIVE, so registration is always possible
+and there is no reason to defer it. Command, redaction rule and context routing:
+`dd-bug-registration`.
 
 Close a bug in the same session you prove the fix: append `resolved` with
 `--resolution-evidence` (reproducing test, fix, suite result), then **commit** — stage
@@ -252,10 +247,9 @@ requires an APPROVED `security-reviewer` handoff whose review covers the
 `origin/develop..develop` delta being pushed — diff-based only, with a full scan
 surviving solely in the audit lane (`project-auditor` dispatch). Run the tests locally
 before you push. Commits are never review-blocked — only pushes. After every push or PR,
-watch CI until every job is green; read the failing log, fix the cause, push again, and
-keep watching. A `quarantine`-marked test sits outside the gating selectors by design and
-requires a registered bug — a green run with quarantined tests is still green, but an
-unregistered pass-on-retry is a failure.
+watch CI to green (`dd-release-implement`). A `quarantine`-marked test sits outside the
+gating selectors by design and requires a registered bug — a green run with quarantined
+tests is still green, but an unregistered pass-on-retry is a failure.
 
 **Approval.** A candidate is approved when the operator and the consumer-side validation
 agent agree, after validating a real workspace. A green internal gate that diverges from
@@ -308,7 +302,7 @@ receives only the values it needs from that root `.env` and never writes a secon
 | Surface | Where |
 |---|---|
 | Scoped law | `specs/AGENTS.md`, `.dadaia/reports/AGENTS.md`, `.dadaia/handoff/AGENTS.md`, `repos/<slug>/AGENTS.md`, and any nested `AGENTS.md` |
-| Skills | `.claude/skills/`, `.agents/skills/` — `dadaia-cli` maps the CLI; `harness-primitives` covers harness literacy; `dadaia-gitflow` covers the branch contract |
+| Skills | `.claude/skills/`, `.agents/skills/` — `dadaia-cli` maps the CLI; `harness-primitives` covers harness literacy; `dadaia-gitflow` covers the branch contract; the `dd-*` family maps the development cycle, one skill per stage |
 | State | `dadaia context show --json`, `dadaia specs doctor`, `dadaia public doctor`, `dadaia server list`, `dadaia bugs status`, `dadaia panel` |
 
 Language: follow the operator's preference, defaulting to English. Tone: direct, concise,

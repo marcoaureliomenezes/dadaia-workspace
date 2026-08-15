@@ -285,7 +285,7 @@ not cut.
 
 ---
 
-- [-] **T-100-11 — Law dehydration at the source (`public/data/DADAIA.md`)**
+- [x] **T-100-11 — Law dehydration at the source (`public/data/DADAIA.md`)**
 
 **Owner role:** ai-engineer · **Commit:**
 `refactor(T-100-11): dehydrate stage protocol out of the always-on law`
