@@ -1,6 +1,6 @@
 ---
 title: "refusal-path-redaction: the push-gate refusal prints the offending blob path verbatim (CWE-532 residual)"
-status: picked
+status: DELIVERED — v0.11.0
 opened: 2026-08-14
 description: >-
   v0.9.0 CLOSURE "Backlog returns" item (LOW, from the code-review round),
@@ -105,3 +105,15 @@ genuinely extended, not duplicated. Scope is stated over a class rather than a c
 lets a local holder recover the unmasked term via `git show` — remains **accepted**:
 local-only and inherent to naming the object at all. Terminal disposition
 `DELIVERED — v0.11.0` lands at closure.
+
+## Delivery (v0.11.0 closure, 2026-08-15)
+
+**Terminal: `DELIVERED — v0.11.0`.** FR6 shipped and QA-verified on A6.1–A6.6
+(`specs/releases/v0.11.0/ALPHA-1-QA.md`, APPROVED). Resolution A landed as ruled: the
+masking primitive lives in the new stdlib-pure `core/redaction.py`, `cli/redact.py` is a thin
+consumer whose test assertions were **not** touched, and both gate renderers — the refusal
+and the FR4 oversized note — mask the offending path's segments through it. A path matching
+nothing renders byte-identically to the pre-release output (regression fixture A6.2), so
+satisfiable diagnostics survive. The accepted secondary residual (a local holder can recover
+the term from the short sha via `git show`) remains accepted, unchanged. Evidence:
+`specs/_archive/releases/v0.11.0/CLOSURE.md` §Validations V3/V9 and §Dispositions.

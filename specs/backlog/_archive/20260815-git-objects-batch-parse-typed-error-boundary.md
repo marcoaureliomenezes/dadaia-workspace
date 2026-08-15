@@ -1,6 +1,6 @@
 ---
 title: "git_objects batch-parse loop: raw ValueError escapes the typed GitObjectReadError boundary; desync continues instead of aborting (CWE-755)"
-status: picked
+status: DELIVERED — v0.11.0
 opened: 2026-08-14
 description: >-
   The SAME defect reported independently by both ship reviewers (LOW in each),
@@ -99,3 +99,14 @@ are delivered as written — the typed wrap of the `out.index` / `int(size_str)`
 the behaviour change on the desync branch, which now aborts typed instead of yielding
 fabricated undecodable objects that the skip counters would then report as fiction. Terminal
 disposition `DELIVERED — v0.11.0` lands at closure.
+
+## Delivery (v0.11.0 closure, 2026-08-15)
+
+**Terminal: `DELIVERED — v0.11.0`.** FR8 shipped and QA-verified on A8.1–A8.4
+(`specs/releases/v0.11.0/ALPHA-1-QA.md`, APPROVED). Both halves landed as written: the
+`out.index` / `int(size_str)` pair is wrapped and re-raised as the module's typed read error,
+so no raw `ValueError` escapes; and the desync branch now **aborts** instead of yielding a
+fabricated undecodable object, so nothing invented can reach a skip count. At the decision
+layer the failure renders as the ordinary refusal naming the git failure and `--no-verify`,
+never a traceback. Evidence: `specs/_archive/releases/v0.11.0/CLOSURE.md` §Validations V3/V4
+and §Dispositions.

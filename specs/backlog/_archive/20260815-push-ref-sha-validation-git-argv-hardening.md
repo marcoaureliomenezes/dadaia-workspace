@@ -1,6 +1,6 @@
 ---
 title: "push-gate stdin sha validation + `--` end-of-options at the git argv boundary (CWE-88/CWE-20)"
-status: picked
+status: DELIVERED — v0.11.0
 opened: 2026-08-14
 description: >-
   Materializes a LOW from the APPROVED v0.9.0 ship security review.
@@ -95,3 +95,15 @@ fix reuses the existing malformed-line refusal path, so no new message is author
 sibling hardening entries `python-env-interpreter-probe-hardening` (#9) and
 `commit-paths-index-scope-hardening` (#18) are **not** picked — different surface. Terminal
 disposition `DELIVERED — v0.11.0` lands at closure.
+
+## Delivery (v0.11.0 closure, 2026-08-15)
+
+**Terminal: `DELIVERED — v0.11.0`.** FR7 shipped and QA-verified on A7.1–A7.5
+(`specs/releases/v0.11.0/ALPHA-1-QA.md`, APPROVED). Both shas on a pre-push stdin line are
+shape-validated (40/64 hex or the all-zero deletion sentinel) through the **existing**
+malformed-line refusal — no new message authored — so the measured silent-no-op class
+(`--glob=`/`--branches=`-shaped `local_sha` producing a successful empty rev-list) now fails
+closed. Downstream, `_rev_list_candidates` carries `--` after the revisions and
+`_is_resolvable_commit` prefix-checks before interpolation. The two sibling hardening entries
+(#9, #18) stay unpicked and untouched. Evidence:
+`specs/_archive/releases/v0.11.0/CLOSURE.md` §Validations V3/V4 and §Dispositions.

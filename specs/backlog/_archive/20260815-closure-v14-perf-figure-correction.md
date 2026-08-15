@@ -1,6 +1,6 @@
 ---
 title: "v0.9.0 CLOSURE V14 fallback-range figure is synthetic and non-comparable: real-content matching costs ~1.3 s/MB (~147 s over 8.8k blobs) — record the real number as product truth"
-status: picked
+status: DELIVERED — v0.11.0
 opened: 2026-08-14
 description: >-
   Materializes the round-2 code-review MEDIUM (axis 3, evidence fidelity;
@@ -101,3 +101,18 @@ push-range scan section, explicitly superseding the archived V14 synthetic figur
 this entry, in the **same CLOSURE pass** as `prior-published-term-amnesty`'s memory note —
 both bind the same atom section. `specs/_archive/**` stays untouched. Terminal disposition
 `DELIVERED — v0.11.0` lands at closure.
+
+## Delivery (v0.11.0 closure, 2026-08-15)
+
+**Terminal: `DELIVERED — v0.11.0`.** The forward correction is written into the
+`sdd-gate-v3` atom's push-range scan section as product truth, measured on the shipped code:
+the fallback shape is 9,095 blobs / 130.29 MB, read 1.261 s + match 53.871 s = **0.423 s/MB**
+at a **285.5 MiB** peak RSS, with matching ~98% of the total; the ordinary range is ~48 ms for
+a 70-blob push. Both the archived v0.9.0 V14 synthetic 2.978 s figure and the intermediate
+~1.3 s/MB reading are named as superseded **in memory only** — `specs/_archive/**` was not
+edited, reopened or annotated. The match-throughput decision is recorded: **REJECTED** for
+this release, with the three-point reason (the fallback shape is rare and one-time per
+remote; a matcher-engine change is separate work with its own correctness surface; 55 s for a
+one-off 130 MB full-history scan is inside operator tolerance). Evidence:
+`specs/_archive/releases/v0.11.0/CLOSURE.md` §Validations V11/V12, §Memory updates and
+§Dispositions.

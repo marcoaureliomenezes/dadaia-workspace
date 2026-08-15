@@ -1,6 +1,6 @@
 ---
 title: "prior-published-term amnesty: a term already published in the remote-reachable version of the same path must not refuse the push"
-status: picked
+status: DELIVERED — v0.11.0
 opened: 2026-08-14
 description: >-
   Operator-ratified refinement from the v0.9.0 code-review round (CLOSURE, "Backlog
@@ -127,3 +127,13 @@ The D6 cross-reference on the `internal-hostname` false-positive class was evalu
 `baseline-carve-out-review-cadence`. Terminal disposition `DELIVERED — v0.11.0` lands at
 closure; the entry file is retained per the never-delete law, pending the single-source
 `BACKLOG.md` consolidation.
+
+## Delivery (v0.11.0 closure, 2026-08-15)
+
+**Terminal: `DELIVERED — v0.11.0`.** FR1, FR2 and FR3 shipped and QA-verified across
+acceptance ids A1.1–A1.6, A2.1–A2.6 and A3.1–A3.6 (`specs/releases/v0.11.0/ALPHA-1-QA.md`,
+APPROVED). The predicate is confirmed keyed on the matched value, not the pattern id — the
+smuggling-path attack test A1.3 passes — and the fallback shape grants no amnesty (D7). The
+sentinel's `tests/**` extension landed with a 29-row shrink-only baseline, so the census this
+entry was sized by is now test-pinned rather than review-pinned. Evidence:
+`specs/_archive/releases/v0.11.0/CLOSURE.md` §Validations V3/V4/V5/V6 and §Dispositions.

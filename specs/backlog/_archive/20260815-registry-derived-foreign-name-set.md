@@ -1,6 +1,6 @@
 ---
 title: "foreign-name scan layer derived from repos/ directories only: a DEAD or relocated context contributes no term"
-status: picked
+status: DELIVERED — v0.11.0
 opened: 2026-08-14
 description: >-
   Materializes a LOW from the APPROVED v0.9.0 ship security review — a structural
@@ -104,3 +104,14 @@ separate fields and may differ, and subtracting only the slug re-opens the A3.2 
 Grill **P9**: the reviewer's two wider-set hits are same-path prior-published and are
 amnestied by FR1 rather than accepted by hand. Terminal disposition `DELIVERED — v0.11.0`
 lands at closure.
+
+## Delivery (v0.11.0 closure, 2026-08-15)
+
+**Terminal: `DELIVERED — v0.11.0`.** FR5 shipped and QA-verified on A5.1–A5.6
+(`specs/releases/v0.11.0/ALPHA-1-QA.md`, APPROVED). The layer is now
+`{registry names} ∪ {registry repo_slugs} ∪ {repos/ dir names} − {own name, own slug}`,
+read through a container seam that degrades a missing/empty/malformed registry to the
+directory-derived set instead of killing the push hook. The D4-mandated enumeration ran
+first: the widened set is 11 terms and produced 6 tree hits, every one dispositioned
+amnestied-by-FR1-by-construction and none inside this release's own push range. Evidence:
+`specs/_archive/releases/v0.11.0/CLOSURE.md` §Validations V3/V5/V10 and §Dispositions.

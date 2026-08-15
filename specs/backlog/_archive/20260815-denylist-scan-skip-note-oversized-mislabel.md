@@ -1,6 +1,6 @@
 ---
 title: "denylist-scan skip note: 5 MB fail-open mislabelled as binary (CWE-778) + split counters + end-to-end coverage of the note"
-status: picked
+status: DELIVERED — v0.11.0
 opened: 2026-08-14
 description: >-
   Merges the SAME defect reported independently by both ship reviewers (MEDIUM in
@@ -120,3 +120,14 @@ early, so R3's *never fetched* survives literally; its expected non-zero exit / 
 not a `GitObjectReadError`. Grill **P5**: the new note names a path, so it is co-delivered
 with `refusal-path-redaction` (FR6) and its path is masked. Terminal disposition
 `DELIVERED — v0.11.0` lands at closure.
+
+## Delivery (v0.11.0 closure, 2026-08-15)
+
+**Terminal: `DELIVERED — v0.11.0`.** FR4 shipped and QA-verified on A4.1–A4.6
+(`specs/releases/v0.11.0/ALPHA-1-QA.md`, APPROVED). An oversized text blob's first 5 MB is
+now scanned and can refuse the push; the byte-count assertion proves the remainder is never
+fetched; the binary count covers only genuinely undecodable blobs; oversized blobs carry a
+structured note with path, size and scanned bytes, masked per FR6 and asserted present on
+`decision.warn` on the allow **and** refuse paths — which is the v0.9.0 QA-1 return closed by
+test rather than by manual check. Evidence:
+`specs/_archive/releases/v0.11.0/CLOSURE.md` §Validations V3/V4 and §Dispositions.

@@ -481,7 +481,7 @@ named defects to the implementer.
 
 ---
 
-- [ ] **T-110-16 — Memory update (CLOSURE phase)**
+- [x] **T-110-16 — Memory update (CLOSURE phase)** (commit `3195d84b` — four atoms + catalog/index ripple; survived the close reopen untouched)
 
 **Owner role:** product-engineer · **Commit:**
 `docs(T-110-16): memory — amnesty semantics, registry-derived layer, real-content perf`
@@ -516,7 +516,19 @@ SPEC §5 satisfied file by file.
 
 ---
 
-- [ ] **T-110-17 — CLOSURE, dispositions, archive, version bump**
+- [x] **T-110-17 — CLOSURE, dispositions, archive, version bump** (first close `ff922566` reset for review remediation `9648030a`/`697548aa`/`517a62bd`; this re-close commit: CLOSURE amended, nine entries `DELIVERED — v0.11.0` archived, `ACTIVE.md` → `release: none`, `0.8.0` mint + `[0.8.0]` CHANGELOG with the LOW6-corrected identifiers)
+
+> **Marker note — reopened close (2026-08-15).** T-110-16 and T-110-17 were completed once and
+> their `[x]` flips rode the archive commit `ff922566`, which was **reset** after the pre-PR
+> `code-reviewer` pass returned APPROVE with three MEDIUM findings. The markers above are
+> therefore `[ ]` again while the underlying work stands: T-110-16's memory writes landed at
+> `3195d84b` and were **not** reverted, and `CLOSURE.md` is restored to
+> `specs/releases/v0.11.0/` in its amended form. Three review-remediation commits ride between
+> the two tasks — `9648030a`, `697548aa`, `517a62bd` — with **no task id of their own** (they are
+> remediation on tasks already completed, inside T-110-03/T-110-06/T-110-09's write sets). Both
+> markers flip to `[x]` again in the re-close commit; deliberately **not** flipped here, since a
+> marker is flipped by the commit that does the work, not by a document amendment. Full account:
+> `CLOSURE.md` › `## Drifts` › `reopened-close-for-review-remediation`.
 
 **Owner role:** product-engineer (text) + software-engineer/dispatcher (**[git]** steps) ·
 **Commit:** `docs(T-110-17): close release v0.11.0`
