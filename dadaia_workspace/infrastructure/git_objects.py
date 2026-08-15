@@ -17,6 +17,7 @@ unhandled exception at the push boundary (code-reviewer MEDIUM finding).
 
 from __future__ import annotations
 
+import contextlib
 import queue
 import re
 import subprocess
@@ -97,16 +98,20 @@ def _is_resolvable_commit(repo: Path, sha: str) -> bool:
     return result.returncode == 0
 
 
-def _rev_list_candidates(repo: Path, local_sha: str, remote_sha: str) -> list[tuple[str, str]]:
+def _rev_list_candidates(repo: Path, local_sha: str, base: str | None) -> list[tuple[str, str]]:
     """Return ``(sha, path)`` pairs for every object with a path in the FR1 range —
     blobs AND trees (type filtering happens separately, in :func:`_blob_info`).
+
+    *base* is the ALREADY-RESOLVED base (SPEC v0.11.0 FR2 — ``None`` means the
+    fallback shape): resolution happens ONCE, in :meth:`GitSubprocessObjectReader.new_objects`,
+    and is reused here AND for the prior-side lookup, rather than being re-derived.
 
     v0.11.0 FR7/A7.4: the argv carries a trailing ``--`` end-of-options marker after
     the revision arguments on both range shapes, closing the git argv interpolation
     site (CWE-88/CWE-20).
     """
-    if _is_resolvable_commit(repo, remote_sha):
-        args = ["git", "rev-list", "--objects", local_sha, "--not", remote_sha, "--"]
+    if base is not None:
+        args = ["git", "rev-list", "--objects", local_sha, "--not", base, "--"]
     else:
         args = ["git", "rev-list", "--objects", local_sha, "--not", "--remotes", "--"]
     result = _run(args, repo)
@@ -161,8 +166,104 @@ def _blob_info(repo: Path, candidates: list[tuple[str, str]]) -> dict[str, tuple
     return info
 
 
+def _resolve_prior_texts(repo: Path, base: str, paths: list[str]) -> dict[str, str]:
+    """Resolve the published prior text of every DISTINCT path in *paths*, at *base*
+    (SPEC v0.11.0 FR2, rides the SAME chunk this is called from).
+
+    Two batched calls, on the SAME shape the content read already uses:
+
+    1. ``git cat-file --batch-check`` fed ``<base>:<path>`` lines — this both filters
+       non-existent paths (git answers ``<spec> missing``) and supplies the size, so
+       the cap is applied BEFORE any prior content is fetched. ``--batch-check``
+       preserves stdin ORDER in its output (one line per input line), which is how
+       each output line is correlated back to its requesting path — the returned
+       ``%(objectname)`` is the PRIOR BLOB's sha, not the ``<base>:<path>`` spec, so
+       content-based correlation is not available here (unlike :func:`_blob_info`,
+       which correlates by the requested blob sha itself).
+    2. ``git cat-file --batch`` for the under-cap survivors — full content, never
+       truncated (already filtered to under-cap sizes).
+
+    A path missing from the returned dict has NO prior content — never mapped to an
+    empty string, which would silently amnesty nothing but would also hide the
+    distinction (over-cap / undecodable / genuinely absent) from a future reader.
+    """
+    if not paths:
+        return {}
+    unique_paths = list(dict.fromkeys(paths))
+    check_stdin = ("\n".join(f"{base}:{path}" for path in unique_paths) + "\n").encode("utf-8")
+    check_result = _run(
+        ["git", "cat-file", "--batch-check=%(objectname) %(objecttype) %(objectsize)"],
+        repo,
+        input_bytes=check_stdin,
+    )
+    if check_result.returncode != 0:
+        raise GitObjectReadError(
+            "git cat-file --batch-check failed resolving prior content: "
+            f"{_decode(check_result.stderr).strip()}"
+        )
+    check_lines = _decode(check_result.stdout).splitlines()
+    if len(check_lines) != len(unique_paths):
+        raise GitObjectReadError(
+            "git cat-file --batch-check desynchronised resolving prior content "
+            f"(expected {len(unique_paths)} line(s), got {len(check_lines)})"
+        )
+
+    under_cap: dict[str, int] = {}
+    for path, line in zip(unique_paths, check_lines, strict=True):
+        parts = line.split()
+        if len(parts) != 3:
+            continue  # "<base>:<path> missing" (or any non-3-field line) -> absence
+        _sha, _obj_type, size_str = parts
+        try:
+            size = int(size_str)
+        except ValueError:
+            continue
+        if size <= _MAX_BLOB_BYTES:
+            under_cap[path] = size
+
+    if not under_cap:
+        return {}
+
+    fetch_paths = list(under_cap)
+    fetch_stdin = ("\n".join(f"{base}:{path}" for path in fetch_paths) + "\n").encode("utf-8")
+    batch_result = _run(["git", "cat-file", "--batch"], repo, input_bytes=fetch_stdin)
+    if batch_result.returncode != 0:
+        raise GitObjectReadError(
+            "git cat-file --batch failed resolving prior content: "
+            f"{_decode(batch_result.stderr).strip()}"
+        )
+
+    out = batch_result.stdout
+    pos = 0
+    prior_texts: dict[str, str] = {}
+    for path in fetch_paths:
+        try:
+            newline_idx = out.index(b"\n", pos)
+            header = out[pos:newline_idx].decode("utf-8", errors="replace")
+            pos = newline_idx + 1
+            parts = header.split()
+            if len(parts) != 3:
+                raise ValueError(f"unexpected header shape {header!r}")
+            _obj_sha, _obj_type, size_str = parts
+            content_size = int(size_str)
+        except ValueError as exc:
+            raise GitObjectReadError(
+                "git cat-file --batch stream desynchronised resolving prior content "
+                f"for path {path!r}: {exc}"
+            ) from exc
+        content = out[pos : pos + content_size]
+        pos += content_size + 1  # skip the trailing newline after the content block
+        # Undecodable prior blob -> absence, never a partial/garbled string.
+        with contextlib.suppress(UnicodeDecodeError):
+            prior_texts[path] = content.decode("utf-8")
+    return prior_texts
+
+
 def _read_blob_chunk(
-    repo: Path, chunk_shas: list[str], blob_info: dict[str, tuple[str, int]]
+    repo: Path,
+    chunk_shas: list[str],
+    blob_info: dict[str, tuple[str, int]],
+    prior_texts: dict[str, str],
 ) -> Iterator[ScannedObject]:
     """Yield one :class:`ScannedObject` per blob in *chunk_shas*, via a SINGLE batched
     ``git cat-file --batch`` conversation scoped to just this chunk.
@@ -176,6 +277,10 @@ def _read_blob_chunk(
     content bytes and every later header parse is garbage — a stream of fabricated
     objects silently counted as binary skips. A gate that has lost sync with git's
     stream aborts; it does not invent.
+
+    v0.11.0 FR2: *prior_texts* (already resolved for this chunk's distinct paths, or
+    empty in the fallback shape) supplies each yielded object's ``prior_text`` — a
+    lookup miss maps to the explicit absence ``None``, never an empty string.
     """
     stdin_payload = ("\n".join(chunk_shas) + "\n").encode("utf-8")
     result = _run(["git", "cat-file", "--batch"], repo, input_bytes=stdin_payload)
@@ -201,12 +306,17 @@ def _read_blob_chunk(
             ) from exc
         content = out[pos : pos + content_size]
         pos += content_size + 1  # skip the trailing newline after the content block
+        prior_text = prior_texts.get(path)
         try:
             text = content.decode("utf-8")
         except UnicodeDecodeError:
-            yield ScannedObject(path=path, sha=obj_sha, text="", decodable=False)
+            yield ScannedObject(
+                path=path, sha=obj_sha, text="", decodable=False, prior_text=prior_text
+            )
             continue
-        yield ScannedObject(path=path, sha=obj_sha, text=text, decodable=True)
+        yield ScannedObject(
+            path=path, sha=obj_sha, text=text, decodable=True, prior_text=prior_text
+        )
 
 
 def _read_oversized_blob_prefix(repo: Path, sha: str) -> bytes:
@@ -306,7 +416,9 @@ def _read_oversized_blob(repo: Path, sha: str, path: str, size: int) -> ScannedO
     )
 
 
-def _read_blobs(repo: Path, blob_info: dict[str, tuple[str, int]]) -> Iterator[ScannedObject]:
+def _read_blobs(
+    repo: Path, blob_info: dict[str, tuple[str, int]], base: str | None
+) -> Iterator[ScannedObject]:
     """Yield one :class:`ScannedObject` per blob in *blob_info*.
 
     Content is read via batched ``git cat-file --batch`` conversations, chunked to
@@ -321,6 +433,12 @@ def _read_blobs(repo: Path, blob_info: dict[str, tuple[str, int]]) -> Iterator[S
     bytes are scanned and it is reported ``decodable=True``/``oversized=True`` when
     that prefix is valid UTF-8, or ``decodable=False``/``oversized=True`` otherwise
     (A4.6) — the remainder past the cap is genuinely never fetched either way.
+
+    v0.11.0 FR2/ADR D8: with *base* resolved, each CHUNK's prior-side lookup
+    (:func:`_resolve_prior_texts`) rides the SAME loop as the content read — two extra
+    batched calls per chunk, never per blob — so the peak resident set stays
+    ``chunk_size x cap x 2`` rather than growing with the range. An oversized CURRENT
+    object never carries prior text (the prior-side lookup rides the chunk loop only).
     """
     fetch_shas = [sha for sha, (_, size) in blob_info.items() if size <= _MAX_BLOB_BYTES]
     oversized_shas = [sha for sha, (_, size) in blob_info.items() if size > _MAX_BLOB_BYTES]
@@ -331,7 +449,11 @@ def _read_blobs(repo: Path, blob_info: dict[str, tuple[str, int]]) -> Iterator[S
 
     for start in range(0, len(fetch_shas), _BATCH_CHUNK_SIZE):
         chunk = fetch_shas[start : start + _BATCH_CHUNK_SIZE]
-        yield from _read_blob_chunk(repo, chunk, blob_info)
+        prior_texts: dict[str, str] = {}
+        if base is not None:
+            chunk_paths = [blob_info[sha][0] for sha in chunk]
+            prior_texts = _resolve_prior_texts(repo, base, chunk_paths)
+        yield from _read_blob_chunk(repo, chunk, blob_info, prior_texts)
 
 
 class GitSubprocessObjectReader:
@@ -340,6 +462,12 @@ class GitSubprocessObjectReader:
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterator[ScannedObject]:
         if not local_sha or local_sha == ZERO_SHA:
             return
-        candidates = _rev_list_candidates(repo, local_sha, remote_sha)
+        # v0.11.0 FR2/ADR D7: base resolved ONCE per call — reused for the FR1 range
+        # shape (_rev_list_candidates) AND the prior-side lookup (_read_blobs), rather
+        # than re-derived. Unresolvable/zero remote_sha -> no base -> no object in this
+        # call carries prior content (the fallback shape stays byte-identical to
+        # v0.9.0).
+        base = remote_sha if _is_resolvable_commit(repo, remote_sha) else None
+        candidates = _rev_list_candidates(repo, local_sha, base)
         blob_info = _blob_info(repo, candidates)
-        yield from _read_blobs(repo, blob_info)
+        yield from _read_blobs(repo, blob_info, base)

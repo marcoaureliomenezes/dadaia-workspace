@@ -39,6 +39,19 @@ class ScannedObject:
     (partial coverage, not zero coverage). ``size_bytes`` (the blob's total size) and
     ``scanned_bytes`` (how many bytes were actually read) are populated only when
     ``oversized`` is True; both default to 0 for an ordinary, non-oversized object.
+
+    ``prior_text`` (SPEC v0.11.0 FR2, ADR D7) is the published prior text of this SAME
+    path, at the resolvable base — ``None`` is an EXPLICIT absence, never an empty
+    string. Absence covers four situations the adapter never distinguishes further (the
+    FR1 amnesty predicate treats all four identically): the range has no single
+    published base (the ``--not --remotes`` fallback shape — no object anywhere carries
+    prior content in that shape); the path did not exist at the base (a genuinely new
+    file); the prior blob at the base exceeds the adapter's size cap; or the prior blob
+    at the base is not valid UTF-8. A non-``None`` value is always the FULL prior
+    content at that path (never truncated) — the resolvable-base lookup only ever
+    fetches prior blobs already known to be under the cap. Not populated for an
+    oversized CURRENT object (stays ``None``) — the prior-side lookup rides the FR9
+    batched chunk loop only, never the oversized per-object path.
     """
 
     path: str
@@ -48,6 +61,7 @@ class ScannedObject:
     oversized: bool = False
     size_bytes: int = 0
     scanned_bytes: int = 0
+    prior_text: str | None = None
 
 
 class GitObjectReadError(Exception):
@@ -74,6 +88,16 @@ class GitObjectReader(Protocol):
     Only blob objects are yielded (commits and trees are never returned), deduplicated
     by object sha within one call. Any git failure raises :class:`GitObjectReadError`
     rather than returning a partial/empty result.
+
+    **Base resolution for :attr:`ScannedObject.prior_text` (SPEC v0.11.0 FR2, ADR D7).**
+    The SAME ``remote_sha`` resolvability check that decides the FR1 range shape ALSO
+    decides whether any object in this call carries prior content: resolvable
+    ``remote_sha`` -> that sha is the base every object's prior text is resolved
+    against; unresolvable/zero ``remote_sha`` (the fallback shape) -> there is no
+    single published base, so every object carries an explicit absence
+    (``prior_text=None``) and behaviour is byte-identical to v0.9.0. This is a
+    deliberate conservative boundary, not an oversight — widening it is a future
+    decision, not a defect of this release.
     """
 
     def new_objects(
