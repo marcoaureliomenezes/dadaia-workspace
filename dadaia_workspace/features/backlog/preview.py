@@ -18,6 +18,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol
 
 import yaml
 
@@ -182,7 +183,24 @@ def load_backlog_items(backlog_dir: Path) -> list[BacklogItem]:
     return items
 
 
-def bound_anchor_changes(item: BacklogItem, registry: Registry) -> tuple[dict[str, str], list[str]]:
+class _IntentBearing(Protocol):
+    """Structural shape :func:`bound_anchor_changes` needs — satisfied by both the
+    legacy per-entry :class:`BacklogItem` (until the T-120-08 cutover) and the new
+    single-source ``document.ActiveItem`` (SPEC v0.12.0 FR1/FR2, T-120-05, unwired
+    until the cutover), without either module importing the other's concrete type.
+
+    Declared as a read-only ``@property`` (not a plain annotated attribute): both
+    concrete types are FROZEN dataclasses, and mypy treats a frozen dataclass field as
+    read-only — a plain Protocol attribute annotation demands read+write access.
+    """
+
+    @property
+    def intents(self) -> tuple[Intent, ...]: ...
+
+
+def bound_anchor_changes(
+    item: _IntentBearing, registry: Registry
+) -> tuple[dict[str, str], list[str]]:
     """Bind each of ``item``'s intents to a canonical anchor.
 
     Returns ``(anchor_changes, unresolved)``: a map of anchor-id → change for every intent

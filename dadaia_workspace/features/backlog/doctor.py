@@ -1,31 +1,57 @@
-"""``backlog doctor`` — the ENFORCED backstop (SPEC §3.4, ADR-D).
+"""``backlog doctor`` — the ENFORCED backstop (SPEC v0.12.0 FR2, ADR-D, ADR D8).
 
 Four checks, run by **one parameterized check engine** (SPEC §3.8 #8 — no copy-paste
 fan-out): each check is a ``BacklogCheck`` (a code + a callable over the shared
 :class:`DoctorContext`), and the engine maps the same loop over all of them.
 
-* **BL-SCHEMA** — every item has bound ``intents[]`` (every subject resolves in the registry)
-  + a valid status; a structurally invalid ``intents:`` frontmatter is also BL-SCHEMA.
-* **BL-DUP** — two items share anchor-set + change → ERROR (via the classifier ``DUPLICATE``).
+* **BL-SCHEMA** — every non-``idea`` item has bound ``intents[]`` (every subject resolves
+  in the registry) + a valid status; a structurally invalid ``intents:``/``**Intents:**``
+  block is also BL-SCHEMA; a located :class:`~dadaia_workspace.features.backlog.document.DocumentError`
+  (a missing required key, an off-grammar LEDGER line) is one BL-SCHEMA per error.
+* **BL-DUP** — two items share anchor-set + change → ERROR (via the classifier
+  ``DUPLICATE``); a slug repeated in ``ACTIVE`` or in ``LEDGER`` → ERROR.
 * **BL-CONFLICT** — two items share an anchor with incompatible change → ERROR (the divergent
   twin, caught even when hand-written; classifier ``DIVERGENT_CONFLICT``).
-* **BL-STALE** — a slug listed in any archived release's ``consumed_backlog`` ledger
-  (mechanical exact-membership, not NLP) that still exists in ``specs/backlog/`` → ERROR.
+* **BL-STALE** (re-defined, ADR D8) — an ACTIVE item already consumed/dispositioned: its slug
+  is recorded in an archived ``consumed_backlog.json`` (``ledger.read_consumed``, unchanged),
+  OR it also carries a ``LEDGER`` line in the same document, OR its own ``Status`` is one of
+  the six canonical terminal disposition tokens.
 
 Pure module: all roots are **injected** (SPEC §3.8 #6); no I/O outside the supplied paths and
 no subprocess. The CLI (``cli/commands/newartifacts.py``) and the pre-commit/CI chokepoint
 (``cli/commands/ci.py`` + ``public/scripts/``) are thin wirings over :func:`run_backlog_doctor`.
+
+**T-120-05 transition note.** The check engine (``_CHECKS``, ``DoctorContext`` and every
+``_check_*`` body below) is generic over :class:`_SchemaItem` — a structural
+:class:`~typing.Protocol` (``slug``/``status``/``intents``/``intents_error``) satisfied by
+BOTH the legacy per-entry :class:`~dadaia_workspace.features.backlog.preview.BacklogItem`
+and the new single-source :class:`~dadaia_workspace.features.backlog.document.ActiveItem` —
+so the SAME engine serves the still-live legacy reading path today and the new document
+model once T-120-08 wires it in, with no duplicated check logic and no dual-shape reader
+(SPEC §3 standing green rule). :func:`run_backlog_doctor`, the CLI-facing live entry point,
+is **unchanged in its reading behaviour** by this task: it still calls
+:func:`~dadaia_workspace.features.backlog.preview.load_backlog_items` over
+``specs/backlog/*.md`` and feeds an empty ``ledger`` (the old shape has no LEDGER section) —
+only the cutover commit (T-120-08) repoints it at
+:func:`~dadaia_workspace.features.backlog.document.load_document`.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
+from typing import Protocol
 
-from dadaia_workspace.core.models.backlog import INTENTS_EXEMPT_STATUS, is_intents_exempt
+from dadaia_workspace.core.models.backlog import (
+    INTENTS_EXEMPT_STATUS,
+    Intent,
+    is_intents_exempt,
+    is_terminal_disposition,
+)
 from dadaia_workspace.features.backlog.classifier import BoundItem, Verdict, classify
+from dadaia_workspace.features.backlog.document import DocumentError, LedgerRow
 from dadaia_workspace.features.backlog.ledger import read_consumed
 from dadaia_workspace.features.backlog.preview import (
     BacklogItem,
@@ -41,8 +67,15 @@ __all__ = [
     "run_backlog_doctor",
 ]
 
-#: Backlog statuses that are terminal — a stale check only flags non-terminal survivors.
-_TERMINAL_STATUSES = frozenset({"delivered", "rejected", "done", "closed"})
+#: A located document-level error whose own message already IS the intents diagnostic
+#: surfaced (once, deduplicated) via the item's own ``intents_error`` in the per-item
+#: loop below — skipped here so a malformed ``**Intents:**``/``intents:`` block never
+#: produces two findings for the same item.
+_INTENTS_DOCUMENT_ERROR_PREFIXES = (
+    "malformed intents[] YAML:",
+    "malformed intents[] frontmatter:",
+    "**Intents:** key present",
+)
 
 #: The one status EXEMPT from the resolvable-typed-intents requirement (v0.1.55 FR5, bug
 #: ``backlog-new-stub-readme-lag-intents-schema``). An ``idea`` is an unbound brainstorm: it
@@ -102,13 +135,42 @@ class Finding:
         }
 
 
+class _SchemaItem(Protocol):
+    """Structural shape the four checks need — satisfied by both the legacy per-entry
+    :class:`~dadaia_workspace.features.backlog.preview.BacklogItem` (until T-120-08) and
+    the new single-source :class:`~dadaia_workspace.features.backlog.document.ActiveItem`
+    (fixture-tested from T-120-05, unwired until T-120-08).
+
+    Declared as read-only ``@property`` members (not plain annotated attributes):
+    both concrete types are FROZEN dataclasses, and mypy treats a frozen dataclass
+    field as read-only — a plain Protocol attribute annotation demands read+write.
+    """
+
+    @property
+    def slug(self) -> str: ...
+    @property
+    def status(self) -> str | None: ...
+    @property
+    def intents(self) -> tuple[Intent, ...]: ...
+    @property
+    def intents_error(self) -> str | None: ...
+
+
 @dataclass
 class DoctorContext:
     """Everything the check engine needs, computed once and shared across all checks."""
 
-    items: list[BacklogItem]
+    items: Sequence[_SchemaItem]
     registry: Registry
     consumed: dict[str, set[str]]
+    #: ``## LEDGER`` rows of the document model (ADR D8's BL-STALE condition (b) and
+    #: BL-DUP's cross-LEDGER duplicate-slug condition). Always empty for the legacy
+    #: per-entry reading path, which has no LEDGER section.
+    ledger: tuple[LedgerRow, ...] = ()
+    #: Located :class:`~dadaia_workspace.features.backlog.document.DocumentError`
+    #: diagnostics from the document parser (a missing required key, an off-grammar
+    #: LEDGER line). Always empty for the legacy per-entry reading path.
+    document_errors: tuple[DocumentError, ...] = ()
     #: slug -> (anchor_changes, unresolved-messages), bound once.
     bound: dict[str, tuple[dict[str, str], list[str]]] = field(default_factory=dict)
 
@@ -122,22 +184,30 @@ class DoctorContext:
 
 def _check_schema(ctx: DoctorContext) -> list[Finding]:
     findings: list[Finding] = []
-    for item in ctx.items:
-        # FR10 (v0.1.65): a frontmatter that failed to parse as YAML is its own loud
-        # BL-SCHEMA ERROR, and every downstream diagnostic (no-intents, unresolved
-        # subjects, status) is suppressed for that item — they are all artifacts of
-        # the parse failure, not independent findings.
-        if item.frontmatter_error is not None:
-            findings.append(
-                Finding(
-                    BacklogDoctorCode.BL_SCHEMA,
-                    Severity.ERROR,
-                    f"frontmatter YAML parse error: {item.frontmatter_error}",
-                    slug=item.slug,
-                )
-            )
+    # Items whose own intents_error already covers the diagnostic (below) — skip the
+    # matching DocumentError so a malformed **Intents:**/intents: block never produces
+    # two findings for the same item.
+    intents_error_slugs = {item.slug for item in ctx.items if item.intents_error is not None}
+    malformed_slugs: set[str] = set()
+    for error in ctx.document_errors:
+        if error.message.startswith(_INTENTS_DOCUMENT_ERROR_PREFIXES) and (
+            error.slug is None or error.slug in intents_error_slugs
+        ):
             continue
-        # A malformed ``intents:`` frontmatter is always BL-SCHEMA, at ANY status.
+        findings.append(
+            Finding(BacklogDoctorCode.BL_SCHEMA, Severity.ERROR, error.message, slug=error.slug)
+        )
+        if error.slug is not None:
+            malformed_slugs.add(error.slug)
+
+    for item in ctx.items:
+        if item.slug in malformed_slugs:
+            # A located document-level error (e.g. a missing required key) already
+            # covers this item — downstream schema noise for it is suppressed, exactly
+            # as a frontmatter/intents parse failure suppresses it below (FR10).
+            continue
+        # A malformed ``intents:``/``**Intents:**`` block is always BL-SCHEMA, at ANY
+        # status (FR10, v0.1.65 — preserved bit for bit over the new shape).
         if item.intents_error is not None:
             findings.append(
                 Finding(
@@ -207,8 +277,45 @@ def _pairwise(
     return findings
 
 
+def _check_duplicate_slugs(ctx: DoctorContext) -> list[Finding]:
+    """BL-DUP's second condition (SPEC FR2): the same slug appearing twice in ``ACTIVE``
+    or twice in ``LEDGER``. Never fires over the legacy per-entry model — the filesystem
+    (one file per slug) already guarantees ACTIVE-slug uniqueness there, and it has no
+    LEDGER section at all."""
+    findings: list[Finding] = []
+    seen_active: set[str] = set()
+    for item in ctx.items:
+        if item.slug in seen_active:
+            findings.append(
+                Finding(
+                    BacklogDoctorCode.BL_DUP,
+                    Severity.ERROR,
+                    f"slug {item.slug!r} appears more than once in ACTIVE",
+                    slug=item.slug,
+                )
+            )
+        else:
+            seen_active.add(item.slug)
+    seen_ledger: set[str] = set()
+    for row in ctx.ledger:
+        if row.slug in seen_ledger:
+            findings.append(
+                Finding(
+                    BacklogDoctorCode.BL_DUP,
+                    Severity.ERROR,
+                    f"slug {row.slug!r} appears more than once in LEDGER",
+                    slug=row.slug,
+                )
+            )
+        else:
+            seen_ledger.add(row.slug)
+    return findings
+
+
 def _check_dup(ctx: DoctorContext) -> list[Finding]:
-    return _pairwise(ctx, Verdict.DUPLICATE, BacklogDoctorCode.BL_DUP, "duplicate")
+    return _pairwise(
+        ctx, Verdict.DUPLICATE, BacklogDoctorCode.BL_DUP, "duplicate"
+    ) + _check_duplicate_slugs(ctx)
 
 
 def _check_conflict(ctx: DoctorContext) -> list[Finding]:
@@ -218,19 +325,30 @@ def _check_conflict(ctx: DoctorContext) -> list[Finding]:
 
 
 def _check_stale(ctx: DoctorContext) -> list[Finding]:
+    """BL-STALE, re-defined over the document model (ADR D8): an ACTIVE item already
+    consumed/dispositioned fires on ANY of three ORed conditions — (a) its slug is
+    recorded in an archived ``consumed_backlog.json`` (``ledger.read_consumed``,
+    unchanged, FR4-kept), (b) it also carries a ``LEDGER`` line in the same document, or
+    (c) its own ``Status`` is itself one of the six canonical terminal disposition
+    tokens. Condition (b)/(c) are inert over the legacy per-entry model (empty
+    ``ctx.ledger``; no live per-entry item carries a terminal-token ``Status`` today)."""
     findings: list[Finding] = []
-    if not ctx.consumed:  # no archived ledger → no-op (acceptance §3.7.6).
-        return findings
+    ledger_slugs = {row.slug for row in ctx.ledger}
     for item in ctx.items:
-        if item.slug in ctx.consumed and (
-            item.status is None or item.status.lower() not in _TERMINAL_STATUSES
-        ):
+        reasons: list[str] = []
+        if item.slug in ctx.consumed:
+            reasons.append("recorded as consumed in an archived release's consumed_backlog ledger")
+        if item.slug in ledger_slugs:
+            reasons.append("also carries a LEDGER line in the same document")
+        if item.status is not None and is_terminal_disposition(item.status):
+            reasons.append(f"its own Status {item.status!r} is a terminal disposition token")
+        if reasons:
             findings.append(
                 Finding(
                     BacklogDoctorCode.BL_STALE,
                     Severity.ERROR,
-                    "slug is recorded as consumed in an archived release's consumed_backlog "
-                    "ledger but still exists in specs/backlog/ (stale — should be removed in R2)",
+                    "ACTIVE item is already consumed/dispositioned (" + "; ".join(reasons) + ") "
+                    "— it should be a LEDGER line, not an ACTIVE subsection",
                     slug=item.slug,
                 )
             )
@@ -252,6 +370,48 @@ _CHECKS: tuple[_BacklogCheck, ...] = (
 )
 
 
+def run_checks(ctx: DoctorContext) -> list[Finding]:
+    """Run the four parameterized checks over an already-built :class:`DoctorContext`.
+
+    The shared engine both :func:`run_backlog_doctor` (the legacy-reading live path) and
+    the document-model fixture tests drive — never copy-pasted, never duplicated per
+    model. Findings are returned in check order then item order; an empty list ⇒ clean.
+    """
+    findings: list[Finding] = []
+    for check in _CHECKS:
+        findings.extend(check.run(ctx))
+    return findings
+
+
+def _split_legacy_frontmatter_errors(
+    items: Sequence[BacklogItem],
+) -> tuple[list[Finding], list[BacklogItem]]:
+    """FR10 (v0.1.65), legacy per-entry model only: an item whose frontmatter failed to
+    parse as YAML is its own loud BL-SCHEMA ERROR, with every downstream diagnostic
+    (no-intents, unresolved subjects, status) suppressed for it — they would all be
+    artifacts of the parse failure, not independent findings. ``document.ActiveItem``
+    has no equivalent concept (there is no single YAML frontmatter blob to fail parsing
+    in the new shape — a malformed ``**Intents:**`` block is captured as ``intents_error``
+    instead, handled generically by :func:`_check_schema`), so this legacy-only split
+    stays here rather than in the shared, model-agnostic check engine.
+    """
+    findings: list[Finding] = []
+    clean: list[BacklogItem] = []
+    for item in items:
+        if item.frontmatter_error is not None:
+            findings.append(
+                Finding(
+                    BacklogDoctorCode.BL_SCHEMA,
+                    Severity.ERROR,
+                    f"frontmatter YAML parse error: {item.frontmatter_error}",
+                    slug=item.slug,
+                )
+            )
+            continue
+        clean.append(item)
+    return findings, clean
+
+
 def run_backlog_doctor(
     *,
     specs_dir: Path,
@@ -266,9 +426,14 @@ def run_backlog_doctor(
     All roots are injected (SPEC §3.8 #6), including ``cli_anchors`` — the pre-derived
     ``cli``-kind anchor set threaded in from the CLI composition boundary (FR1b), so this
     feature never imports ``cli.main``. The registry is recomputed from live truth; the ledger
-    read is a no-op when absent. The four checks are driven by one parameterized engine
-    (``_CHECKS``) — the engine maps the same loop over each check, never copy-pasting bodies.
-    Findings are returned in check order then file order; an empty list ⇒ a clean backlog.
+    read is a no-op when absent.
+
+    **Unchanged reading behaviour (T-120-05).** Still reads the legacy per-entry model via
+    :func:`~dadaia_workspace.features.backlog.preview.load_backlog_items` over
+    ``specs/backlog/*.md`` — the T-120-08 cutover is the only commit that repoints this at
+    :func:`~dadaia_workspace.features.backlog.document.load_document` (SPEC §3 standing
+    green rule: the old shape stays validated by tooling reading the old shape until then).
+    Findings are returned in check order then item order; an empty list ⇒ a clean backlog.
     """
     registry = build_registry(
         source_root=source_root,
@@ -277,14 +442,13 @@ def run_backlog_doctor(
         specs_dir=specs_dir,
         cli_anchors=cli_anchors,
     )
-    items = load_backlog_items(specs_dir / "backlog")
+    raw_items = load_backlog_items(specs_dir / "backlog")
     consumed = read_consumed(archive_root)
 
-    ctx = DoctorContext(items=items, registry=registry, consumed=consumed)
+    frontmatter_findings, items = _split_legacy_frontmatter_errors(raw_items)
+
+    ctx = DoctorContext(items=items, registry=registry, consumed=consumed, ledger=())
     for item in items:
         ctx.bound[item.slug] = bound_anchor_changes(item, registry)
 
-    findings: list[Finding] = []
-    for check in _CHECKS:
-        findings.extend(check.run(ctx))
-    return findings
+    return frontmatter_findings + run_checks(ctx)
