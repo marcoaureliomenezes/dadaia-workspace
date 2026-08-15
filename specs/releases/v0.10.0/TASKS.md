@@ -386,7 +386,7 @@ candidate. Each is a one-line correction or reference — the full doctrine stay
 
 ---
 
-- [-] **T-100-14 — Codex D-CX-7 prefix gate, its contract test, and the test goldens**
+- [x] **T-100-14 — Codex D-CX-7 prefix gate, its contract test, and the test goldens**
 
 **Owner role:** software-engineer · **Commit:**
 `fix(T-100-14): keep the codex skill-reference check live for the dd- family`
