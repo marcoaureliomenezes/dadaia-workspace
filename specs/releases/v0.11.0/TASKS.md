@@ -427,7 +427,7 @@ carries a disposition.
 
 ---
 
-- [-] **T-110-14 — Real-content performance measurement (#28 evidence)**
+- [x] **T-110-14 — Real-content performance measurement (#28 evidence)** (ordinary-range: `.dadaia/tmp/software-engineer/20260815/t-110-14-ordinary-range-capture.txt` — no regression, ~+12ms budgeted FR2 cost; fallback-range: `.dadaia/tmp/software-engineer/20260815/t-110-14-fallback-range-capture.txt` — 9,095 blobs/130.29MB, read 1.261s + match 53.871s = 0.423 s/MB, peak RSS 285.5 MiB, supersedes archived v0.9.0 V14 figure; match-throughput optimisation REJECTED for this release, reason recorded)
 
 **Owner role:** software-engineer · **Commit:**
 `chore(T-110-14): measure the shipped scan on real content, ordinary and fallback ranges`
