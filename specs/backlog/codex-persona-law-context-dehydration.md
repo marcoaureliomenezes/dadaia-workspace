@@ -235,3 +235,14 @@ that authority.
   only changed projection/runtime behavior.
 - `dadaia public doctor` is green, including Codex projection checks and
   `[ok] public-privacy`, and the full test suite is green.
+
+## Baseline note (2026-08-15 — v0.10.0 pick)
+
+v0.10.0 (`dd-lifecycle-skills-family`, approved 2026-08-15) was explicitly ruled
+**not** to absorb this entry (its SPEC §4.2 + §6-D: different surface, different
+owner) — it stays `candidate`. However that release edits three personas that render
+into the Codex TOMLs, so this entry's **124,557-byte / nine-TOML byte baseline is
+invalidated at the v0.10.0 ship**. Per the release's SPEC §7 disposition, the PM
+re-measures and rewrites the baseline figures here after v0.10.0 ships; until then
+the byte numbers in this entry are historical (2026-08-14 adoption measurement), not
+current.
