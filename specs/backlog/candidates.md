@@ -52,6 +52,19 @@
 > deferrals** (#19, #21, #24, idea `bugs-jsonl-whole-blob-per-append`) are
 > **pre-approved intake** and are not re-adjudicated.
 >
+> **Addendum 2026-08-15 (fifth pass — both ADR #15 intake reports adjudicated,
+> operator-delegated).** The operator delegated the adjudication of intake reports #1
+> (`2026-08-15T132600Z-intake.html`) and #2 (`2026-08-15T152234Z-intake.html`) to the
+> dispatcher this session; verdicts follow the PM recommendations. Trace recorded on
+> every touched entry: "operator-delegated adjudication, 2026-08-15 (goal directive),
+> verdicts per PM recommendation". **Report #1:** all eight v0.9.0 technical residuals
+> (#20 #22 #23 #25 #26 #27 #28 #29) **APPROVED** — live pickable candidates. **Report
+> #2:** 2-1/2-3/2-4/2-5 APPROVED as new entries #32-#35; 2-2 APPROVED AS MERGE into
+> #30; 2-7 APPROVED AS MERGE into #8; 2-6 and 2-8 DISCARDED (terminal rows in the
+> intake-adjudication ledger section below). **Pre-approved queue executed:** P-1/P-2
+> materialized as #30/#31, P-3/P-4 as #36/#37, P-5 as the re-measured #8 baseline
+> (126,155 B, nine TOMLs). Index now 34 live candidates + 3 terminal rows.
+>
 > Per grill ADR #14 the backlog converges to a single `BACKLOG.md` (ACTIVE + LEDGER).
 > That doctrine now ships in v0.10.0 (law + schema); the **physical consolidation
 > follows the ship as delegated PM work** (v0.10.0 SPEC §4.4/D5). Not anticipated
@@ -72,7 +85,7 @@ terminal for bug `panel-telemetry-sqlite-corrupts-under-concurrent-access`, or d
 it return to the queue? Undecided; will keep surfacing at every pick. The related
 dangling-pointer repair is entry #12 below and proceeds either way.
 
-## Active candidates (26 live + 3 terminal ledger rows)
+## Active candidates (34 live + 3 terminal ledger rows)
 
 Numbering is stable (ledger rows are never renumbered — cross-references like
 "#9 and #18" and "blocked on #2" depend on it). Rows #1, #3 and #17 are terminal.
@@ -130,9 +143,10 @@ unscanned vs 0 B scanned) is the sharpest in the index; #22 is P2 as a real cove
 hole in the shipped privacy control, explicitly sequenced behind #19. #23/#24 are P3
 privacy-control refinements with named resolutions; #25–#27 are P3 hardening of a
 control whose failure modes are all fail-closed today; #28/#29 are P3
-record-fidelity and marker hygiene. The 8 technical residuals among #19–#29 sit in
-the first ADR #15 intake report and are pickable only after the operator's
-approve/reject/discard verdicts. The §5 precedence notice above (two open LOW bugs,
+record-fidelity and marker hygiene. The 8 technical residuals among #19–#29 were
+adjudicated **APPROVED** on 2026-08-15 (operator-delegated, report #1) and are
+pickable. #30-#37 are the 2026-08-15 intake round: #30/#31 are the P2 backlog
+tooling/consolidation pair (#31 sequenced after #30); #32-#37 are P3. The §5 precedence notice above (two open LOW bugs,
 Arm-B hotfix lane) outranks this whole table, and final priority is the operator's
 at pick time.
 
@@ -156,6 +170,18 @@ All three archived to `_archive/` by `git mv` per SPEC-DOC-035.
 | `loud-flake-stats-key-residual` | delivered | Fixed at HEAD before materialization: `ci.yml:361-374` hard-errors on missing/malformed `stats` (commit `15cb12c4`, T-070-09). |
 | `frozen-wall-clock-baselines-in-repo-text` | delivered | Baselines embedded in `quality-assurance.md:147-151`; CI `timeout-minutes` set against them. |
 | `dispose-published-denylist-term` | rejected | Void by construction under the range-scoped scan (grill ADR #3b: FROZEN `_archive/` + `git mv` ⇒ no new blob). v0.9.0 SPEC §7 records it untouched — FR4 documents why. |
+
+## Terminal at intake adjudication — 2026-08-15 (ADR #15 report #2; never-delete law)
+
+Discarded at the operator-gated intake before any entry file existed — the ledger row
+below is the entire record (never-delete covers the record; there is no live file).
+Trace: operator-delegated adjudication, 2026-08-15 (goal directive), verdicts per PM
+recommendation.
+
+| Item | Disposition | Reason |
+|---|---|---|
+| 2-6 `CONSUMER_VALIDATION_RECIPE.md` inside the ratified `public/data/*.md` glob | REJECTED — operator discard at intake (delegated) | Awareness served by intake report #2 itself; the D-C-ratified glob stands as ratified. |
+| 2-8 SPEC-drafting zero-hit-grep scoping lesson | REJECTED — operator discard at intake (delegated) | Traceability lives in the archived v0.10.0 CLOSURE (Drifts section carries the corrected criteria form). |
 
 ## Rejected entries (retained per never-delete law)
 
