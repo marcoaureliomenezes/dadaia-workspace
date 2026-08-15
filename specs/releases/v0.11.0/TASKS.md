@@ -110,7 +110,7 @@ the pushed tip plus the CI preflight.
 
 ---
 
-- [ ] **T-110-03 — FR7: pre-push sha validation and git argv hardening (#25)**
+- [-] **T-110-03 — FR7: pre-push sha validation and git argv hardening (#25)**
 
 **Owner role:** software-engineer · **Commit:**
 `fix(T-110-03): validate pre-push shas and close the git argv interpolation sites`
