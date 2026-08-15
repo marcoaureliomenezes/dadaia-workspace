@@ -1,7 +1,7 @@
 """Wiring the push-range denylist scan into ``push_gate_decision`` (SPEC v0.9.0 FR1/FR2/FR5/FR6).
 
 Intent: CONTRACT — v0.9.0 A1.1, A1.2, A1.3, A1.4, A2.1, A2.2, A2.3, A2.4, A5.1, A5.2,
-A5.3, A5.4, A6.1; v0.11.0 A7.1, A7.2, A7.3, A4.5
+A5.3, A5.4, A6.1; v0.11.0 A7.1, A7.2, A7.3, A4.5, A6.1, A6.2, A6.3, A6.6
 
 Drives ``push_gate_decision`` with an injected fake :class:`GitObjectReader` — no real
 git, no filesystem (FR7/A7.2). Only synthetic terms/slugs ever appear here (TASKS
@@ -379,3 +379,93 @@ def test_oversized_note_appears_in_decision_warn_on_refuse(tmp_path: Path) -> No
     assert decision.warn is not None
     assert "big.md" in decision.warn
     assert "NOT scanned" in decision.warn
+
+
+# ---------------------------------------------------------------------------
+# FR6(b)/A6.1-A6.3/A6.6 (v0.11.0, entry #23 resolution A) — the blob path itself is
+# masked at its offending segments in BOTH the denylist refusal and the FR4 oversized
+# note; a path matching nothing renders byte-identical (regression fixture).
+# ---------------------------------------------------------------------------
+
+_FOREIGN_SLUG = "zz-fake-private-owner"
+
+
+def test_refusal_path_segment_matching_a_foreign_slug_is_masked(tmp_path: Path) -> None:
+    objects = [
+        _obj(f"repos/{_FOREIGN_SLUG}/notes.md", f"{_SYNTHETIC_TERM} appears\n", sha="pathsha01")
+    ]
+    source = _FakeObjectSource(by_range={(_SHA_A, _ZERO): objects})
+    decision = push_gate_decision(
+        tmp_path,
+        _refs(f"refs/heads/develop {_SHA_A} refs/heads/develop {_ZERO}"),
+        object_source=source,
+        repo=tmp_path,
+        denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
+        foreign_slugs=(_FOREIGN_SLUG,),
+    )
+    assert not decision.allowed
+    assert _FOREIGN_SLUG not in decision.message  # A6.6: never unmasked, anywhere.
+    assert "repos/[REDACTED-PATH-1]/notes.md:1" in decision.message
+    assert "pathsha01"[:12] in decision.message  # short sha untouched — still locatable.
+
+
+def test_refusal_path_with_no_matching_segment_is_byte_identical(tmp_path: Path) -> None:
+    """A6.2 regression fixture: a blob path matching none of the three term sources
+    renders exactly as it did before FR6(b) — no placeholder ever appears."""
+    objects = [_obj("notes/plain-file.md", f"{_SYNTHETIC_TERM} here\n", sha="cleanpath")]
+    source = _FakeObjectSource(by_range={(_SHA_A, _ZERO): objects})
+    decision = push_gate_decision(
+        tmp_path,
+        _refs(f"refs/heads/develop {_SHA_A} refs/heads/develop {_ZERO}"),
+        object_source=source,
+        repo=tmp_path,
+        denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
+    )
+    assert not decision.allowed
+    assert "notes/plain-file.md:1" in decision.message
+    assert "[REDACTED-PATH-" not in decision.message
+
+
+def test_oversized_note_path_segment_is_masked_too(tmp_path: Path) -> None:
+    """A6.3: the FR4 oversized note's path is masked by the SAME rule, asserted
+    separately from the refusal-message case above."""
+    objects = [_oversized_obj(f"repos/{_FOREIGN_SLUG}/big.md", "clean content here\n")]
+    source = _FakeObjectSource(by_range={(_SHA_A, _ZERO): objects})
+    decision = push_gate_decision(
+        tmp_path,
+        _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
+        object_source=source,
+        repo=tmp_path,
+        foreign_slugs=(_FOREIGN_SLUG,),
+    )
+    assert decision.allowed
+    assert decision.warn is not None
+    assert _FOREIGN_SLUG not in decision.warn  # A6.6.
+    assert "repos/[REDACTED-PATH-1]/big.md" in decision.warn
+
+
+def test_same_offending_segment_gets_the_same_ordinal_across_hit_and_note(
+    tmp_path: Path,
+) -> None:
+    """The path masker is constructed ONCE per push_gate_decision invocation and reused
+    for both the denylist refusal AND the oversized note, so the SAME offending segment
+    gets the SAME stable ordinal placeholder wherever it appears."""
+    objects = [
+        _obj(f"repos/{_FOREIGN_SLUG}/leak.md", f"{_SYNTHETIC_TERM} here\n", sha="leaksha02"),
+        _oversized_obj(f"repos/{_FOREIGN_SLUG}/big.md", "clean content here\n"),
+    ]
+    source = _FakeObjectSource(by_range={(_SHA_A, _ZERO): objects})
+    decision = push_gate_decision(
+        tmp_path,
+        _refs(f"refs/heads/develop {_SHA_A} refs/heads/develop {_ZERO}"),
+        object_source=source,
+        repo=tmp_path,
+        denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
+        foreign_slugs=(_FOREIGN_SLUG,),
+    )
+    assert not decision.allowed
+    assert _FOREIGN_SLUG not in decision.message
+    assert decision.warn is not None
+    assert _FOREIGN_SLUG not in decision.warn
+    assert "repos/[REDACTED-PATH-1]/leak.md" in decision.message
+    assert "repos/[REDACTED-PATH-1]/big.md" in decision.warn
