@@ -112,7 +112,7 @@ every figure and the command that produced it, ready to be quoted in CLOSURE.
 
 ---
 
-- [-] **T-100-04 — `dd-backlog-definition` (new): vocabulary home, BACKLOG schema, intake gate**
+- [x] **T-100-04 — `dd-backlog-definition` (new): vocabulary home, BACKLOG schema, intake gate**
 
 **Owner role:** ai-engineer · **Commit:**
 `feat(T-100-04): dd-backlog-definition — curation, vocabulary and operator-gated intake`
