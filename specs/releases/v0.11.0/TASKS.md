@@ -427,7 +427,7 @@ carries a disposition.
 
 ---
 
-- [ ] **T-110-14 — Real-content performance measurement (#28 evidence)**
+- [-] **T-110-14 — Real-content performance measurement (#28 evidence)**
 
 **Owner role:** software-engineer · **Commit:**
 `chore(T-110-14): measure the shipped scan on real content, ordinary and fallback ranges`
