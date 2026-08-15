@@ -15,6 +15,14 @@ intents block, and an ungrammatical LEDGER line are each captured as a located
 ``backlog_dir`` itself) yields an EMPTY model, not an error (A1.2) — a context with no
 backlog is legitimate (the consumer-scaffold case).
 
+Section/subsection splitting is **fence-aware** (code-reviewer M1, v0.12.0 pre-PR): a
+``## ``/``### `` line that appears inside an open ``` ``` ``` or ``~~~`` fence (any
+length ≥ 3, CommonMark's same-character/at-least-as-long close rule — including a
+longer outer fence wrapping a nested fenced example) is fenced CONTENT, never real
+document structure. Zero silent truncation: an unclosed fence running to end-of-file is
+a structural anomaly this parser cannot attribute to any section, so it is always
+captured as a located :class:`DocumentError` rather than silently shrinking the model.
+
 Pure module: the only root is the injected ``backlog_dir`` (SPEC §3.8 #6); no cwd reads,
 no subprocess. The single reading path: ``features.backlog.doctor.run_backlog_doctor``
 (the CLI-facing live entry point, wired since the T-120-08 cutover) and
@@ -25,6 +33,7 @@ is no per-entry fallback.
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -65,10 +74,77 @@ _FENCE_RE = re.compile(r"```[^\n]*\n(?P<body>.*?)^```[ \t]*$", re.MULTILINE | re
 #: <release-or-reason> · <date>``.
 _LEDGER_LINE_RE = re.compile(r"^-[ \t]+(?P<rest>\S.*?)[ \t]*$", re.MULTILINE)
 
+#: A fence-marker line: three-or-more backticks or tildes (optionally indented up to
+#: 3 columns), plus whatever trailing text shares that line (an info string for an
+#: OPENING fence; must be blank for a line to count as a CLOSING fence — the CommonMark
+#: rule this module approximates). Both characters and any length ≥ 3 are tracked so a
+#: Description can safely quote a fenced example by wrapping it in a longer outer fence
+#: (M1's "4-backtick outer fence" case) without a nested shorter fence closing it early.
+_FENCE_MARKER_RE = re.compile(
+    r"^[ \t]{0,3}(?P<marker>`{3,}|~{3,})(?P<trailing>[^\n]*)$", re.MULTILINE
+)
+
 
 def _line_no(text: str, offset: int) -> int:
     """1-based file line number of *offset* within *text*."""
     return text.count("\n", 0, offset) + 1
+
+
+def _fenced_ranges(text: str) -> tuple[tuple[tuple[int, int], ...], tuple[DocumentError, ...]]:
+    """Scan the WHOLE document once for fenced code spans, pairing each opening fence
+    marker with the next marker of the SAME character and length ≥ its own that carries
+    no other content on its line (CommonMark's close rule).
+
+    Returns ``(ranges, errors)``. A range is a ``(start, end)`` offset pair spanning
+    from the opening marker line through the closing marker line inclusive; a heading
+    match starting inside one of these ranges is fenced content, not structure. An
+    unclosed fence — reaching end-of-file still inside one — is a structural anomaly
+    this pure parser cannot attribute to any section: it is captured as one located
+    :class:`DocumentError` (never raised, never silently dropped) and its range still
+    runs to end-of-text, so every heading from the opening marker onward stays
+    fence-shadowed rather than reappearing as phantom structure.
+    """
+    ranges: list[tuple[int, int]] = []
+    errors: list[DocumentError] = []
+    open_char: str | None = None
+    open_len = 0
+    open_start = 0
+    for match in _FENCE_MARKER_RE.finditer(text):
+        marker = match.group("marker")
+        char, length = marker[0], len(marker)
+        if open_char is None:
+            open_char, open_len, open_start = char, length, match.start()
+            continue
+        is_close = (
+            char == open_char and length >= open_len and match.group("trailing").strip() == ""
+        )
+        if is_close:
+            ranges.append((open_start, match.end()))
+            open_char = None
+    if open_char is not None:
+        ranges.append((open_start, len(text)))
+        errors.append(
+            DocumentError(
+                section="DOCUMENT",
+                slug=None,
+                line=_line_no(text, open_start),
+                message=(
+                    f"unclosed code fence (opened with {open_char * open_len!r} at "
+                    f"line {_line_no(text, open_start)}) — everything from there to "
+                    "end of file is treated as fenced content, not document structure"
+                ),
+            )
+        )
+    return tuple(ranges), tuple(errors)
+
+
+def _outside_fences(
+    matches: Iterable[re.Match[str]], fenced_ranges: Sequence[tuple[int, int]]
+) -> list[re.Match[str]]:
+    """Keep only the matches whose start offset falls OUTSIDE every fenced range."""
+    if not fenced_ranges:
+        return list(matches)
+    return [m for m in matches if not any(start <= m.start() < end for start, end in fenced_ranges)]
 
 
 @dataclass(frozen=True)
@@ -116,9 +192,15 @@ class BacklogDocument:
     errors: tuple[DocumentError, ...] = ()
 
 
-def _top_level_sections(text: str) -> dict[str, tuple[int, int]]:
-    """Map each top-level ``## <name>`` heading to its body's ``(start, end)`` offsets."""
-    headings = list(_TOP_HEADING_RE.finditer(text))
+def _top_level_sections(
+    text: str, fenced_ranges: Sequence[tuple[int, int]]
+) -> dict[str, tuple[int, int]]:
+    """Map each top-level ``## <name>`` heading to its body's ``(start, end)`` offsets.
+
+    A heading whose match starts inside a fenced span (*fenced_ranges*, M1) is fenced
+    content, not real structure, and is excluded before offsets are derived.
+    """
+    headings = _outside_fences(_TOP_HEADING_RE.finditer(text), fenced_ranges)
     sections: dict[str, tuple[int, int]] = {}
     for i, heading in enumerate(headings):
         name = heading.group("name").strip()
@@ -206,9 +288,11 @@ def _parse_active_subsection(
 
 
 def _parse_active(
-    text: str, start: int, end: int
+    text: str, start: int, end: int, fenced_ranges: Sequence[tuple[int, int]]
 ) -> tuple[tuple[ActiveItem, ...], tuple[DocumentError, ...]]:
-    subsections = list(_SUBSECTION_RE.finditer(text, start, end))
+    """A ``### <slug>`` match inside a fenced span (*fenced_ranges*, M1) is fenced
+    content, not a real subsection heading, and is excluded before splitting."""
+    subsections = _outside_fences(_SUBSECTION_RE.finditer(text, start, end), fenced_ranges)
     items: list[ActiveItem] = []
     errors: list[DocumentError] = []
     for i, sub in enumerate(subsections):
@@ -293,14 +377,15 @@ def load_document(backlog_dir: Path) -> BacklogDocument:
             )
         )
 
-    sections = _top_level_sections(text)
+    fenced_ranges, fence_errors = _fenced_ranges(text)
+    sections = _top_level_sections(text, fenced_ranges)
     active_items: tuple[ActiveItem, ...] = ()
     ledger_rows: tuple[LedgerRow, ...] = ()
-    errors: list[DocumentError] = []
+    errors: list[DocumentError] = list(fence_errors)
 
     if "ACTIVE" in sections:
         start, end = sections["ACTIVE"]
-        active_items, active_errors = _parse_active(text, start, end)
+        active_items, active_errors = _parse_active(text, start, end, fenced_ranges)
         errors.extend(active_errors)
 
     if "LEDGER" in sections:

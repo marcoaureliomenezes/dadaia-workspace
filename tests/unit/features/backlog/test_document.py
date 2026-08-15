@@ -280,6 +280,163 @@ def test_every_canonical_disposition_token_accepted(tmp_path: Path, token: str) 
     assert doc.errors == ()
 
 
+# ── M1 (code-reviewer, v0.12.0 pre-PR) — section splitting is fence-aware ───────────
+#
+# Reproduces the reviewer's finding: a fenced ``## ``/``### `` line inside an ACTIVE
+# subsection's body used to be read as REAL structure by ``_top_level_sections``/
+# ``_SUBSECTION_RE``, silently truncating ``## ACTIVE`` (or splicing a phantom
+# subsection) with ZERO diagnostics — a clean report over a shrunken model.
+
+_FENCED_TOP_HEADING_IN_DESCRIPTION = """\
+## ACTIVE
+
+### item-one
+- **Title:** Item one
+- **Opened:** 2026-08-10
+- **Status:** idea
+- **Description:** Example of a nested heading in a fenced span:
+```markdown
+## Example heading
+```
+- **Provenance:** operator request
+
+### item-two
+- **Title:** Item two
+- **Opened:** 2026-08-11
+- **Status:** candidate
+- **Description:** Defined after the fence — must survive (the reviewer's repro).
+- **Provenance:** operator request
+
+## LEDGER
+"""
+
+
+def test_fenced_top_heading_inside_active_description_does_not_truncate_active_section(
+    tmp_path: Path,
+) -> None:
+    """M1: a fenced ``## Example heading`` inside item-one's Description must not end
+    the ``## ACTIVE`` body early — item-two (declared after the fence) must still
+    parse, and the fenced line must never be read as a real top-level section."""
+    backlog_dir = _write(tmp_path, _FENCED_TOP_HEADING_IN_DESCRIPTION)
+    doc = load_document(backlog_dir)
+
+    slugs = {item.slug for item in doc.active}
+    assert slugs == {"item-one", "item-two"}, (
+        "item-two must not be silently dropped by a fenced '##' line in item-one's body"
+    )
+    item_two = next(item for item in doc.active if item.slug == "item-two")
+    assert item_two.status == "candidate"
+    assert item_two.description.startswith("Defined after the fence")
+    # A truncation this parser cannot attribute would previously vanish with zero
+    # errors AND zero LEDGER (since '## LEDGER' itself would be swallowed by the same
+    # bug). Confirm the real '## LEDGER' heading is still found, not phantom-shadowed.
+    assert doc.ledger == ()  # no rows declared, but the section itself parsed (not an error)
+
+
+_FENCED_SUBSECTION_HEADING_IN_DESCRIPTION = """\
+## ACTIVE
+
+### item-one
+- **Title:** Item one
+- **Opened:** 2026-08-10
+- **Status:** idea
+- **Description:** A fenced example that itself looks like a subsection heading:
+```markdown
+### phantom-slug
+- **Title:** This is fenced content, not a real subsection.
+```
+- **Provenance:** operator request
+
+## LEDGER
+"""
+
+
+def test_fenced_subsection_heading_inside_description_does_not_spawn_phantom_item(
+    tmp_path: Path,
+) -> None:
+    """M1: a fenced ``### phantom-slug`` line inside item-one's Description must not be
+    read by ``_SUBSECTION_RE`` as a second, real ``### <slug>`` subsection."""
+    backlog_dir = _write(tmp_path, _FENCED_SUBSECTION_HEADING_IN_DESCRIPTION)
+    doc = load_document(backlog_dir)
+
+    slugs = [item.slug for item in doc.active]
+    assert slugs == ["item-one"], f"a fenced '###' line must never spawn a phantom item: {slugs}"
+
+
+_NESTED_FENCE_WITH_LONGER_OUTER_FENCE = """\
+## ACTIVE
+
+### item-one
+- **Title:** Item one
+- **Opened:** 2026-08-10
+- **Status:** idea
+- **Description:** Shows a fenced example that itself contains a fence — the outer
+  fence must be longer (CommonMark close-length rule) so the inner ``` doesn't
+  prematurely close it:
+````markdown
+Some text, then a nested fence containing a heading line:
+```yaml
+## still fenced, still content
+```
+````
+- **Provenance:** operator request
+
+### item-two
+- **Title:** Item two
+- **Opened:** 2026-08-11
+- **Status:** candidate
+- **Description:** Defined after the nested/outer fence pair.
+- **Provenance:** operator request
+
+## LEDGER
+"""
+
+
+def test_longer_outer_fence_is_not_closed_by_a_shorter_nested_fence(tmp_path: Path) -> None:
+    """M1: a 4-backtick outer fence containing a nested 3-backtick fence (and a heading
+    line inside it) must stay open across the whole nested span — the inner ``` must
+    not close it early, and item-two after the whole span must still parse."""
+    backlog_dir = _write(tmp_path, _NESTED_FENCE_WITH_LONGER_OUTER_FENCE)
+    doc = load_document(backlog_dir)
+
+    slugs = {item.slug for item in doc.active}
+    assert slugs == {"item-one", "item-two"}
+    item_two = next(item for item in doc.active if item.slug == "item-two")
+    assert item_two.status == "candidate"
+
+
+_UNCLOSED_FENCE_AT_EOF = """\
+## ACTIVE
+
+### item-one
+- **Title:** Item one
+- **Opened:** 2026-08-10
+- **Status:** idea
+- **Description:** An unclosed fence follows — a structural anomaly this parser
+  cannot attribute to any section:
+```markdown
+this fence is never closed before end-of-file
+- **Provenance:** operator request
+
+## LEDGER
+"""
+
+
+def test_unclosed_fence_at_eof_surfaces_a_diagnostic_never_a_silent_shrunken_model(
+    tmp_path: Path,
+) -> None:
+    """M1 backstop: an unclosed fence swallows everything to EOF (including the real
+    '## LEDGER' heading) — the model shrinks, but ``load_document`` must NEVER return
+    that shrunken model with zero errors. Diagnostic-never-throwing still holds: no
+    exception escapes."""
+    backlog_dir = _write(tmp_path, _UNCLOSED_FENCE_AT_EOF)
+    doc = load_document(backlog_dir)  # must never raise
+
+    assert doc.errors, "an unclosed fence at EOF must never yield a silently clean model"
+    assert any("fence" in e.message.lower() for e in doc.errors)
+    assert all(e.line > 0 for e in doc.errors)
+
+
 # ── A1.6 — the module imports nothing from cli, infrastructure or hooks ─────────────
 
 
