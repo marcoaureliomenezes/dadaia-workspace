@@ -114,33 +114,12 @@ requires an APPROVED `security-reviewer` handoff whose `metrics.commit_sha` matc
 
 This skill carries the **orchestration judgment** a document alone cannot supply: who may
 dispatch (dispatcher purity), the persona inventory and routing, decision authority,
-mediation, escalation, and the forbidden actions. The gate cadence below is the
-human-readable contract every agent upholds by convention.
+mediation, escalation, and the forbidden actions.
 
-## Review/QA gate cadence (upheld by convention, backstopped by the push chokepoint)
+## Review/QA gate cadence
 
-`project-manager` owns orchestration discipline; `product-engineer` owns SDD artifact
-approval; implementers and reviewers own their evidence. Per ADR-3 (segment/ship
-boundaries, not per task), and per the `DADAIA.md` §5 (Releases) and the
-`dadaia-task-manager` skill (marker discipline):
-
-| Boundary | Who validates | What unlocks |
-|---|---|---|
-| Per task | implementer discipline only — TDD, unit/integration tests, pre-push CI gate, `implementation-complete` handoff; marker stays `[-]` | nothing; no per-task reviewer gate |
-| End of each `alpha-N` | `qa-engineer` only returns `APPROVE`/`REQUEST_CHANGES` (the **Review/QA Fan-Out**, qa-only) | a qa-gated commit on the release branch — no push/PR/merge/CLOSURE |
-| At `rc-N` ship (operator elects) | full **Review/QA Fan-Out** — `qa-engineer` + `code-reviewer` + `security-reviewer` must all `APPROVE` the **same implementation commit** | mark the task `[x]`; merge the release branch to local `develop` (milestone b), diff-review, push `develop`, open the `develop`→`main` PR, merge, deploy, or close the release, write `CLOSURE.md`/memory |
-
-The branch each stage runs on, its commit cadence, and the push trigger are the
-`dadaia-gitflow` skill's contract — this table states only the review/QA unlock. The
-curation step inside each closure (demote/prune verdicts, flake/quarantine handling) is
-the `dadaia-test-stewardship` skill's contract.
-
-Any `REQUEST_CHANGES`, CRITICAL/HIGH security finding, failed E2E, missing evidence, or
-stale report sends the work back to implementation; the rework loop continues until every
-required validator approves the **same implementation commit** or the operator stops the
-release. Before the applicable gate, the unlock actions above — mark the task `[x]`, push
-implementation commits, open or update a PR, and merge, deploy, or close the release — are
-forbidden; a local commit is workspace evidence, never release completion.
+The gate-cadence table and its per-(task, segment) decision procedure moved to
+`dd-release-implement` (ADR #9/E-3) — the implementers' skill, not the dispatcher's.
 
 **Pre-Implementation Agreement (settled at TASKS approval, not at implementation time).**
 The task definition must be agreed by the owning implementer set, `qa-engineer`,
