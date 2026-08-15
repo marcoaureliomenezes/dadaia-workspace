@@ -21,6 +21,9 @@ skills:
   - dadaia-handoff-emitter
   - dadaia-workspace-doctor
   - dadaia-step0-memory-bootstrap
+  - dd-backlog-definition
+  - dd-release-definition
+  - dd-bug-registration
 maxTurns: 60
 input_contract:
   requires_inputs:

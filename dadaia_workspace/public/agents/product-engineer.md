@@ -13,7 +13,9 @@ tools:
   - Edit
 skills:
   - dadaia-handoff-emitter
-  - dadaia-release-closure
+  - dd-release-closure
+  - dd-release-definition
+  - dd-bug-registration
   - dadaia-grill-me
   - dadaia-task-manager
   - dadaia-workspace-spec-navigator
@@ -153,7 +155,7 @@ A file is approved **only** when its header contains exactly:
 
 The release advances through these phases (`ACTIVE.md` `phase:` field). You own
 SPEC→CLOSURE; DISCOVERY/intake is `project-manager`. Full step detail is in the
-"Mandatory workflow" section below and the `dadaia-release-closure` skill.
+"Mandatory workflow" section below and the `dd-release-closure` skill.
 
 | Phase | Owner | Your action | Gate to next |
 |---|---|---|---|
@@ -162,7 +164,7 @@ SPEC→CLOSURE; DISCOVERY/intake is `project-manager`. Full step detail is in th
 | PLAN | product-engineer | write `PLAN.md` (≤300 lines) Draft → `Aprovado` | PLAN `**Status:** Aprovado` |
 | TASKS | product-engineer | write `TASKS.md` with `[ ]` markers → `Aprovado` | TASKS `**Status:** Aprovado` |
 | IMPLEMENTATION | implementers | no-write for you; answer questions, set ACTIVE.md phase | all tasks `[x]` + trio review |
-| CLOSURE | product-engineer | update memory atoms, then write `CLOSURE.md` (finalization order memory → CLOSURE → archive, per `dadaia-release-closure`; DEFINITION + CLOSURE are the memory-write phases, per §13) | CLOSURE evidence complete |
+| CLOSURE | product-engineer | update memory atoms, then write `CLOSURE.md` (finalization order memory → CLOSURE → archive, per `dd-release-closure`; DEFINITION + CLOSURE are the memory-write phases, per §13) | CLOSURE evidence complete |
 | ARCHIVED | product-engineer | set ACTIVE.md phase, request `git mv` to `_archive/` | release archived |
 
 ---
@@ -197,7 +199,7 @@ per-feature atoms `memory/product/<slug>.md` (depth, loaded on demand). Releases
 what is *changing*; memory never carries a changelog. Ground yourself with
 `dadaia-step0-memory-bootstrap` (catalog + tech-stack), navigate with
 `dadaia-workspace-spec-navigator` (active release + spec order), and close with
-`dadaia-release-closure` (CLOSURE template + atomic memory update). The depth below is the
+`dd-release-closure` (CLOSURE template + atomic memory update). The depth below is the
 contract; those skills carry the procedures — do not restate them.
 
 ## Memory atomicity contract
@@ -272,7 +274,7 @@ I do NOT do wide-codebase discovery. I do NOT dispatch specialists. I do NOT syn
 wide-ranging specialist reports — that is `project-manager`'s job during intake.
 
 **Release definition from bugs/backlog (the one discovery I own).** When PM dispatches me
-to define a release from bugs + backlog, I follow the `dadaia-release-definition` skill:
+to define a release from bugs + backlog, I follow the `dd-release-definition` skill:
 I discover **within** `specs/bugs/` + `specs/backlog/` (not the wider codebase), then:
 1. **Sanitize** stale/invalid bugs + backlog (`deferred`/`rejected` + reason; never delete);
 2. **Pick** the release's bug + backlog set;
@@ -357,7 +359,7 @@ implement** — only answers questions and updates specs if the operator approve
 
 ### Phase 8 — Closure (after all tasks [x] DONE)
 
-Update `ACTIVE.md` phase to `CLOSURE`. Invoke skill `dadaia-release-closure` for the
+Update `ACTIVE.md` phase to `CLOSURE`. Invoke skill `dd-release-closure` for the
 template. Write `specs/releases/<release-id>/CLOSURE.md` with:
 
 1. **Summary** — narrative of what shipped
@@ -371,7 +373,7 @@ template. Write `specs/releases/<release-id>/CLOSURE.md` with:
 7. **Archive decision** — usually `MOVE`
 
 In the same CLOSURE phase, **update memory Markdown first, then write `CLOSURE.md`**
-(finalization order memory → CLOSURE → archive, `dadaia-release-closure`). Memory
+(finalization order memory → CLOSURE → archive, `dd-release-closure`). Memory
 describes the product after this release atomically. The release contribution is
 captured in CLOSURE; memory has no changelog section.
 

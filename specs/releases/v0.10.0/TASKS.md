@@ -313,7 +313,7 @@ eyeball (A9.6).
 
 ---
 
-- [-] **T-100-12 — F-0 persona-scope fix and the rename ripple**
+- [x] **T-100-12 — F-0 persona-scope fix and the rename ripple**
 
 **Owner role:** ai-engineer · **Commit:**
 `fix(T-100-12): correct ai-engineer's declared rule surface and every renamed-skill reference`

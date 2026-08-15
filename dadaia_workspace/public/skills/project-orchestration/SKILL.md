@@ -211,14 +211,10 @@ steps, expected/actual behavior, suspected files, and validation command.
 Entry: `product-engineer` (dispatched by `project-manager`).
 
 Use when the operator wants a new release built from reported bugs + backlog.
-`project-manager` dispatches `product-engineer` with the
-`dadaia-release-definition` skill. Steps: (1) sanitize stale bugs/backlog
-(`deferred`/`rejected` + reason, never delete); (2) pick the bug + backlog set;
-(3) apply bug-always-solved — every picked bug is fixed in the release unless a
-picked backlog item supersedes it (`superseded_by: <slug>` on the bug + SPEC
-note); (4) a **MANDATORY** `dadaia-grill-me` session before the SPEC; (5) author
-the SPEC. `project-manager` owns the gate: a release-from-backlog must not reach
-SPEC without the grill report. See the `DADAIA.md` §5 (Releases).
+`project-manager` dispatches `product-engineer` with the `dd-release-definition`
+skill, which owns the full protocol (sanitize reference, pick, bug-always-solved,
+the mandatory `dadaia-grill-me` session, SPEC authoring). See the `DADAIA.md` §5
+(Releases).
 
 ### Playbook — security-patch
 

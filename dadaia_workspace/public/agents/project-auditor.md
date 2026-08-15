@@ -14,7 +14,8 @@ tools:
   - Agent
 skills:
   - dadaia-workspace-spec-reviewer
-  - drift-detection
+  - dd-audit-project
+  - dd-bug-registration
   - project-orchestration
   - dadaia-handoff-emitter
   - dadaia-workspace-spec-navigator
@@ -128,7 +129,7 @@ Scope defaults to all three unless `audit_scope` input restricts it.
 ## Skills consumed
 
 - `dadaia-workspace-spec-reviewer` — memory vs implementation diff protocol
-- `drift-detection` — memory-to-code diff algorithm; dead-code detection; 1–10 scoring rubric; dadaia CLI commands
+- `dd-audit-project` — memory-to-code diff algorithm; dead-code detection; 1–10 scoring rubric; dadaia CLI commands
 - `project-orchestration` — agent inventory; dispatch protocol; escalation ladder
 - `dadaia-handoff-emitter` — emit handoff JSON under `.dadaia/handoff/<ctx>/` after audit report
 
@@ -195,7 +196,7 @@ scale: **CRITICAL / HIGH / MEDIUM / LOW / INFO** (defined in the Severity model 
 Per-dimension score is **1–10**: 10 = fully conformant / zero drift; 7–9 = minor drift, no
 blockers; 4–6 = moderate drift, some blockers; 1–3 = critical drift, immediate action.
 Score each dimension independently, compute an overall weighted score, and record the
-rationale per score. The weighting algorithm lives in the `drift-detection` skill — apply
+rationale per score. The weighting algorithm lives in the `dd-audit-project` skill — apply
 it; do not restate it.
 
 ### Step 6 — Emit audit report

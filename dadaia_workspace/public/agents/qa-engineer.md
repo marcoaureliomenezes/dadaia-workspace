@@ -17,6 +17,8 @@ skills:
   - dadaia-workspace-spec-navigator
   - dadaia-task-manager
   - dadaia-step0-memory-bootstrap
+  - dd-release-implement
+  - dd-bug-registration
 maxTurns: 40
 input_contract:
   requires_inputs:
