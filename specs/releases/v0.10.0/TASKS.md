@@ -162,7 +162,7 @@ survive; the milestone-(a) mechanics at `:67-70` are untouched.
 
 ---
 
-- [ ] **T-100-06 — `dd-release-implement` (new) + E-3 cadence table move**
+- [-] **T-100-06 — `dd-release-implement` (new) + E-3 cadence table move**
 
 **Owner role:** ai-engineer · **Commit:**
 `feat(T-100-06): dd-release-implement and the gate-cadence table move`
