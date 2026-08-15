@@ -166,7 +166,6 @@ SPEC-DOC-032 WARNs on a bug `status:` outside the {`Open`, `Closed`} canon.
    ```mermaid
    flowchart LR
      A --> B
-   </pre>
    ```
    For screenshots, place PNGs under `specs/assets/<scope>/<id>.png` and reference via
    `<img src="../assets/<scope>/<id>.png" alt="<text>">`.
