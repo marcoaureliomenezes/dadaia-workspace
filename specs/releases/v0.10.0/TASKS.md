@@ -186,7 +186,7 @@ in `public/`.
 
 ---
 
-- [ ] **T-100-07 — `dd-release-closure` (rename + revisit)**
+- [-] **T-100-07 — `dd-release-closure` (rename + revisit)**
 
 **Owner role:** ai-engineer · **Commit:**
 `refactor(T-100-07): rename dadaia-release-closure and re-route release residuals`
