@@ -363,7 +363,7 @@ by the amnesty.
 
 ---
 
-- [ ] **T-110-12 — FR3: sentinel covers `tests/**` behind a shrink-only baseline, plus the marker (#19d, #29)**
+- [-] **T-110-12 — FR3: sentinel covers `tests/**` behind a shrink-only baseline, plus the marker (#19d, #29)**
 
 **Owner role:** software-engineer · **Commit:**
 `test(T-110-12): extend the self-scan sentinel to tests/ with a shrink-only baseline`
