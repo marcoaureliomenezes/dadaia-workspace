@@ -150,7 +150,7 @@ A4.6 hold; `dadaia ci preflight` green; both doctors still clean on the **old** 
 
 ---
 
-- [-] **T-120-04 — FR1: `features/backlog/document.py`, the single-source parser**
+- [x] **T-120-04 — FR1: `features/backlog/document.py`, the single-source parser**
 
 **Owner role:** software-engineer · **Commit:**
 `feat(T-120-04): parse BACKLOG.md into a typed ACTIVE/LEDGER model`
