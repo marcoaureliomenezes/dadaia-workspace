@@ -363,7 +363,7 @@ by the amnesty.
 
 ---
 
-- [-] **T-110-12 — FR3: sentinel covers `tests/**` behind a shrink-only baseline, plus the marker (#19d, #29)**
+- [x] **T-110-12 — FR3: sentinel covers `tests/**` behind a shrink-only baseline, plus the marker (#19d, #29)** (baseline size: 29 rows — 14 home-abs-path, 9 email-address, 5 ipv4-literal, 1 secret-token; enumeration: `.dadaia/tmp/software-engineer/20260815/t-110-12-baseline-enumeration.txt`)
 
 **Owner role:** software-engineer · **Commit:**
 `test(T-110-12): extend the self-scan sentinel to tests/ with a shrink-only baseline`
