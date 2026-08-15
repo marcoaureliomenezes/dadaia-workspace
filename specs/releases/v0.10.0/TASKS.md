@@ -70,7 +70,7 @@ Set `ACTIVE.md` phase from `DEFINITION` to `IMPLEMENTATION` in the same commit.
 
 ---
 
-- [ ] **T-100-02 — [git] Milestone (a): merge, security review, push**
+- [x] **T-100-02 — [git] Milestone (a): merge, security review, push**
 
 **Owner role:** dispatcher + `security-reviewer` · **Commit:** merge commit on `develop`
 
