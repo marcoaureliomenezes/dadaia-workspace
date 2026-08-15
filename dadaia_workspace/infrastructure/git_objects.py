@@ -158,6 +158,16 @@ def _read_blobs(repo: Path, blob_info: dict[str, tuple[str, int]]) -> Iterator[S
     finding; mirrors the batching pattern :func:`_blob_info` already uses). A blob over
     :data:`_MAX_BLOB_BYTES` is excluded from that conversation entirely — its content is
     never fetched — and is yielded directly as ``decodable=False`` (R3 size guard).
+
+    v0.11.0 FR8/A8.1-A8.2: the header-parse pair (the newline lookup and the size-field
+    conversion) is wrapped so a truncated stream or a non-numeric size field surfaces as
+    the module's typed :class:`GitObjectReadError` instead of a raw ``ValueError``
+    escaping past the module's contract. A desynchronised header shape (``len(parts) !=
+    3``) now raises the SAME typed error rather than yielding a fabricated
+    ``decodable=False`` object and continuing: after a desync, ``pos`` points into
+    content bytes and every later header parse is garbage — a stream of fabricated
+    objects silently counted as binary skips. A gate that has lost sync with git's
+    stream aborts; it does not invent.
     """
     fetch_shas = [sha for sha, (_, size) in blob_info.items() if size <= _MAX_BLOB_BYTES]
     oversized_shas = [sha for sha, (_, size) in blob_info.items() if size > _MAX_BLOB_BYTES]
@@ -178,18 +188,19 @@ def _read_blobs(repo: Path, blob_info: dict[str, tuple[str, int]]) -> Iterator[S
     pos = 0
     for sha in fetch_shas:
         path, size = blob_info[sha]
-        newline_idx = out.index(b"\n", pos)
-        header = out[pos:newline_idx].decode("utf-8", errors="replace")
-        pos = newline_idx + 1
-        parts = header.split()
-        if len(parts) != 3:
-            # Defensive: the batch stream lost sync with the requested id (should not
-            # happen — the batch-check pass just confirmed each id is a readable blob).
-            # A gate never crashes on a git-protocol surprise; count it undecodable.
-            yield ScannedObject(path=path, sha=sha, text="", decodable=False)
-            continue
-        obj_sha, _obj_type, size_str = parts
-        content_size = int(size_str)
+        try:
+            newline_idx = out.index(b"\n", pos)
+            header = out[pos:newline_idx].decode("utf-8", errors="replace")
+            pos = newline_idx + 1
+            parts = header.split()
+            if len(parts) != 3:
+                raise ValueError(f"unexpected header shape {header!r}")
+            obj_sha, _obj_type, size_str = parts
+            content_size = int(size_str)
+        except ValueError as exc:
+            raise GitObjectReadError(
+                f"git cat-file --batch stream desynchronised at object {sha}: {exc}"
+            ) from exc
         content = out[pos : pos + content_size]
         pos += content_size + 1  # skip the trailing newline after the content block
         try:

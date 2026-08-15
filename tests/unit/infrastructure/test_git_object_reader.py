@@ -1,6 +1,6 @@
 """GitSubprocessObjectReader — the GitObjectReader adapter (SPEC v0.9.0 FR1/FR6).
 
-Intent: CONTRACT — v0.9.0 A1.1, A1.2, A1.3, A1.4, A6.1, A6.2; v0.11.0 A7.4
+Intent: CONTRACT — v0.9.0 A1.1, A1.2, A1.3, A1.4, A6.1, A6.2; v0.11.0 A7.4, A8.1, A8.2
 
 Drives a real throwaway git repo under pytest ``tmp_path`` (never inside the source
 tree). Covers both FR1 range forms (resolvable ``remote_sha`` vs ``--not --remotes``),
@@ -321,3 +321,89 @@ def test_is_resolvable_commit_rejects_option_shaped_sha_before_interpolation(
     assert cat_file_e_calls == [], "an option-shaped sha must never be interpolated into argv"
     # Falls back to the --not --remotes shape (no remotes configured -> full range).
     assert {obj.path for obj in objects} == {"a.txt"}
+
+
+# ---------------------------------------------------------------------------
+# FR8/A8.1-A8.2 — the batch header-parse boundary surfaces a truncated stream and a
+# non-numeric size field as GitObjectReadError instead of a raw ValueError, and a
+# desynchronised header shape aborts typed rather than yielding a fabricated object.
+# ---------------------------------------------------------------------------
+
+
+def _patch_batch_stdout(monkeypatch: pytest.MonkeyPatch, corrupted_stdout: bytes) -> None:
+    """Force the ``git cat-file --batch`` (content-read) call to return
+    *corrupted_stdout* while every other call in the module runs for real."""
+    from dadaia_workspace.infrastructure import git_objects as git_objects_module
+
+    real_run = git_objects_module._run
+
+    def _spy_run(
+        args: list[str], cwd: Path, *, input_bytes: bytes | None = None
+    ) -> subprocess.CompletedProcess[bytes]:
+        if args == ["git", "cat-file", "--batch"]:
+            return subprocess.CompletedProcess(args, 0, stdout=corrupted_stdout, stderr=b"")
+        return real_run(args, cwd, input_bytes=input_bytes)
+
+    monkeypatch.setattr(git_objects_module, "_run", _spy_run)
+
+
+def test_truncated_batch_stream_raises_typed_error_not_raw_value_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A8.1: a batch stream with no trailing newline after the header (truncated mid
+    read) raises GitObjectReadError — never a raw ValueError from ``bytes.index``."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "a.txt").write_text("hello\n")
+    tip_sha = _commit(repo, "c1")
+    blob_sha = _blob_sha(repo, "a.txt")
+
+    # A well-formed header line with NO trailing newline anywhere in the buffer —
+    # `out.index(b"\n", pos)` finds nothing and raises ValueError.
+    _patch_batch_stdout(monkeypatch, f"{blob_sha} blob 6".encode())
+
+    reader = GitSubprocessObjectReader()
+    with pytest.raises(GitObjectReadError, match="desynchronised"):
+        list(reader.new_objects(repo, tip_sha, ZERO_SHA))
+
+
+def test_non_numeric_size_field_raises_typed_error_not_raw_value_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A8.1: a non-numeric size field raises GitObjectReadError — never a raw
+    ValueError from ``int(size_str)``."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "a.txt").write_text("hello\n")
+    tip_sha = _commit(repo, "c1")
+    blob_sha = _blob_sha(repo, "a.txt")
+
+    _patch_batch_stdout(monkeypatch, f"{blob_sha} blob abc\nhello\n".encode())
+
+    reader = GitSubprocessObjectReader()
+    with pytest.raises(GitObjectReadError, match="desynchronised"):
+        list(reader.new_objects(repo, tip_sha, ZERO_SHA))
+
+
+def test_desynchronised_header_shape_aborts_typed_never_yields_fabricated_object(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A8.2: a header that does not split into exactly 3 fields aborts with the typed
+    error — it must NEVER yield a fabricated ``decodable=False`` object and continue
+    (continuing would leave ``pos`` inside content bytes, corrupting every later parse
+    into a stream of fabricated "binary" skips)."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "a.txt").write_text("hello\n")
+    tip_sha = _commit(repo, "c1")
+    blob_sha = _blob_sha(repo, "a.txt")
+
+    # 4 fields instead of 3 — a desynchronised header shape.
+    _patch_batch_stdout(monkeypatch, f"{blob_sha} blob 6 extra\nhello\n".encode())
+
+    reader = GitSubprocessObjectReader()
+    collected: list[object] = []
+    with pytest.raises(GitObjectReadError, match="desynchronised"):
+        for obj in reader.new_objects(repo, tip_sha, ZERO_SHA):
+            collected.append(obj)
+    assert collected == [], "no object — fabricated or otherwise — may be yielded on desync"
