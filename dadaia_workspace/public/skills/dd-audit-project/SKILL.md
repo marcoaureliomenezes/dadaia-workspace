@@ -284,13 +284,13 @@ with `agent: "project-manager"` and a summary of the drift areas requiring a rel
 
 ## Lifecycle Wrapper
 
-One audit generates exactly **one** remediation release (`DADAIA.md` §5 Audits). That
-release gives **every** finding an explicit disposition: `fixed`, `superseded` by a
-broader picked item, or `deferred`/`rejected` with a reason routed through the compiled
-intake report (`dd-backlog-definition` §5 — an operator-ratified deferral taken at the
-remediation release's own approval is already pre-approved intake, not re-adjudicated
-later). The audit archives to `specs/audits/_archive/` only once **fully** dispositioned
-by an approved release, and names that release.
+This section implements the audit-lifecycle law (`DADAIA.md` §5 Audits) — consult it for
+the rule itself, not restated here. In practice: this audit's scorecard exists to seed
+**one** remediation release, and archiving waits on that release closing every finding
+out with a token, never on the scan alone. A `deferred`/`rejected` disposition routes
+through the compiled intake report (`dd-backlog-definition` §5 — an operator-ratified
+deferral taken at the remediation release's own approval is already pre-approved intake,
+not re-adjudicated later).
 
 **Finding → TASKS-row mapping.** Each `DRIFT-<n>` item maps 1:1 to a `TASKS.md` row citing
 its id, so `dd-release-closure`'s `## Dispositions` sweep can trace every finding to its

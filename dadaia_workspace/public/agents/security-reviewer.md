@@ -15,6 +15,7 @@ skills:
   - dadaia-handoff-emitter
   - dadaia-workspace-spec-navigator
   - dadaia-step0-memory-bootstrap
+  - dd-bug-registration
 maxTurns: 40
 input_contract:
   requires_inputs:

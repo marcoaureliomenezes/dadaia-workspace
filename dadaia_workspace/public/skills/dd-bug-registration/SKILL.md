@@ -14,8 +14,9 @@ applyTo: "specs/bugs/**"
 
 Any agent, the moment a tool breaks its own contract while operating this tooling —
 projection, doctor, upgrade, scaffolding, hooks, the gate, presence, context, panel,
-reports, or the CLI itself. Append the `reported` event before the turn ends; bug paths
-are ADDITIVE, so registration is always possible and there is no reason to defer it.
+reports, or the CLI itself. Append the `reported` event before the turn ends — the
+ADDITIVE path class (`DADAIA.md` §3) never blocks this write, so nothing is gained by
+waiting.
 
 ## 2. Classify-first decision table
 

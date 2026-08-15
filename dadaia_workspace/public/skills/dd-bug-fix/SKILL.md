@@ -46,9 +46,9 @@ restated). Workarounds and symptom patches are not acceptable outcomes.
 ## 6. GREEN + `resolved` event + evidence
 
 Prove the fix green, then append `resolved` with `--resolution-evidence` (reproducing
-test, fix, suite result). The close-in-same-session rule (`DADAIA.md` §6, lines 243-246)
-is referenced here, never restated: commit in the same session — stage exactly what the
-fix touched, never `-A` over a shared tree. A solved bug leaves a clean worktree.
+test, fix, suite result). What counts as closing the loop — the staging discipline for
+the commit that follows — is the law's close-in-same-session rule (`DADAIA.md` §6):
+consult it, do not restate it here.
 
 ## 7. PATCH mint + `CHANGELOG.md`, same commit, merge to `develop`
 
