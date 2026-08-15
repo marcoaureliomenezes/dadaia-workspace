@@ -1,13 +1,10 @@
 ---
-name: drift-detection
-description: >
-  Reference for project-auditor agent. Protocol for comparing specs/memory/*.md
-  to actual implementation, dead-code detection methodology, 1–10 compliance
-  scoring rubric across 6 dimensions, and dadaia CLI integration.
+name: dd-audit-project
+description: "Use when: project-auditor runs a drift/compliance audit of a Spec Context Project — memory-atom inventory, the drift-detection method, dead-code detection, the 6-dimension scoring rubric, evidence-agent dispatch, aggregation, CLI integration, or the audit→release lifecycle wrapper. Full merge + rename of drift-detection (ADR #8/E-2)."
 applyTo: ".dadaia/reports/**"
 ---
 
-# drift-detection — Memory ↔ Implementation Drift Audit
+# dd-audit-project — Memory ↔ Implementation Drift Audit
 
 > **Not a hook-enforced mechanism.** There is no workflow engine that runs the audit
 > stage or its gates. `project-auditor` drives this protocol directly, dispatched by
@@ -31,6 +28,26 @@ Rules for loading:
   that are in-scope for the current audit.
 - Never use `_archive/` atoms as the authoritative source.
 - If an atom is missing, that is itself a drift finding (severity HIGH).
+
+---
+
+## Evidence-Agent Dispatch
+
+`project-auditor` never gathers primary evidence itself — it dispatches specialists
+(parallel-capable where supported) and consolidates. One agent per dimension:
+
+| Dimension | Evidence agent | Supplies |
+|---|---|---|
+| A — Architecture | `software-architect` | layer-boundary / module-dependency drift vs `architecture.md` |
+| B — Product Features | `software-engineer` | code-surface drift vs each feature's acceptance criteria |
+| C — Tech Stack | `software-engineer` | dependency/version drift vs `tech-stack.md` and lockfiles |
+| D — Security | `security-reviewer` | OWASP scan, CVEs, secrets, IaC findings |
+| E — Test Detection Quality | `qa-engineer` | test-pyramid health, intent taxonomy, quarantine/SCAFFOLD state |
+| F — Design / UX | `software-engineer` | WCAG 2.2 AA + design-token conformance evidence |
+
+`code-reviewer` supplements A/E; `ai-engineer` supplies prompt-efficiency / persona-shape
+drift evidence when agent-topology memory diverges from personas/skills/rules —
+cross-cutting, filed under whichever dimension the finding lands in.
 
 ---
 
@@ -262,3 +279,21 @@ Proposed owner: <agent responsible for the fix>
 
 When recommending a release, emit a `next_handoff` in the `.handoff.json` handoff
 with `agent: "project-manager"` and a summary of the drift areas requiring a release.
+
+---
+
+## Lifecycle Wrapper
+
+This section implements the audit-lifecycle law (`DADAIA.md` §5 Audits) — consult it for
+the rule itself, not restated here. In practice: this audit's scorecard exists to seed
+**one** remediation release, and archiving waits on that release closing every finding
+out with a token, never on the scan alone. A `deferred`/`rejected` disposition routes
+through the compiled intake report (`dd-backlog-definition` §5 — an operator-ratified
+deferral taken at the remediation release's own approval is already pre-approved intake,
+not re-adjudicated later).
+
+**Finding → TASKS-row mapping.** Each `DRIFT-<n>` item maps 1:1 to a `TASKS.md` row citing
+its id, so `dd-release-closure`'s `## Dispositions` sweep can trace every finding to its
+terminal disposition token (`dd-backlog-definition` §2 — canonical vocabulary, not
+repeated here). A finding with no `TASKS.md` row at SPEC approval is unaddressed — the
+SPEC is not `Aprovado`-ready until every finding from this round is accounted for.

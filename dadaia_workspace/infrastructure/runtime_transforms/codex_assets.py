@@ -38,8 +38,8 @@ _CODEX_READ_ONLY_AGENTS = frozenset(
 _CODEX_DEFAULT_EFFORT = "medium"
 _CODEX_SKILL_REF_PREFIXES = (
     "ai-harness-",
+    "dd-",
     "dev-server-registry",
-    "drift-detection",
     "harness-primitives",
     "memory-ctx",
     "project-orchestration",

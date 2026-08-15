@@ -2,14 +2,16 @@
 slug: sdd-bug-backlog-governance
 title: sdd-bug-backlog-governance
 category: product
-tldr: Event-sourced JSONL bugs, PM-curated backlog, release consumption, audit dispositions, and a four-branch git contract whose only pushable branch is develop.
+tldr: Event-sourced JSONL bugs, an operator-gated single-source backlog, release consumption, audit dispositions, and a develop-only four-branch git contract.
 summary: >-
-  Bugs are append-only events; the backlog is curated by project-manager and sanitized
-  continuously; a release consumes an explicit picked set; closure and audit require
-  terminal dispositions. Work is placed on four branch patterns with develop the only
-  pushable one; a feature branch merges into develop at two milestones, each followed by a
-  diff-based security review of the develop delta and a push. Intake is additive and never
-  lock-gated.
+  Bugs are append-only events; the backlog is the operator's demand queue, curated by
+  project-manager in a single BACKLOG.md (ACTIVE + LEDGER) with purge-on-pick and
+  continuous sanitizing — no agent materializes an entry, residuals reach the operator
+  through a PM intake report. A release consumes an explicit picked set; closure and audit
+  require terminal dispositions. Work is placed on four branch patterns with develop the
+  only pushable one; a feature branch merges into develop at two milestones, each followed
+  by a diff-based security review of the develop delta and a push. Bug, backlog and audit
+  paths stay additive and never lock-gated.
 tags:
 - sdd
 - governance
@@ -17,8 +19,8 @@ tags:
 - backlog
 - bugs
 - gitflow
-token_estimate: 620
-last_updated: '2026-08-14'
+token_estimate: 950
+last_updated: '2026-08-15'
 release_origin: v0.3.0
 ---
 
@@ -44,12 +46,35 @@ CHANGELOG entry.
 
 ## Backlog
 
-`project-manager` curates `specs/backlog/**`; every other agent reads it and routes
-additions through the PM. Each candidate is compared against the existing set before it
-is authored: overlap forces an update or merge, divergent conflicts are resolved, and a
-new item is allowed only when every existing item is unrelated. Entries are sanitized
-continuously — stale or invalid ones are marked `deferred` or `rejected` with a reason.
-Backlog entries and bugs are kept forever: mark them, never delete them.
+The backlog is the operator's demand queue: only the operator creates demand.
+`project-manager` curates it as a single source, `specs/backlog/BACKLOG.md` — an `ACTIVE`
+section holding one full-prose subsection per live candidate and a `LEDGER` section
+holding one line per closed item (slug · disposition · release-or-reason · date). Every
+other agent reads it freely and none writes to it.
+
+Intake is operator-gated. No agent materializes an entry: a residual found at a closure,
+review or audit is only listed as an intake candidate, and `project-manager` compiles
+those residuals into an intake report — the ordinary handoff-first shape with a human
+target — that the operator approves, rejects or discards before anything reaches
+`ACTIVE`. The one carve-out is a deferral the operator ratified during a release: it is
+already-approved intake and is not re-adjudicated.
+
+Curation is continuous, not a release-boundary event. Every touch runs a staleness scan
+and a dedup scan of the whole file, so a near-duplicate subject is merged into the
+existing item instead of filed twice; confirmed-stale or invalid items are dispositioned
+`DEFERRED` or `REJECTED` with a one-line reason. Nothing is deleted: an item leaves
+`ACTIVE` only by gaining a LEDGER line, and a picked item leaves `ACTIVE` in the same
+commit that creates the release SPEC, which records its provenance (purge-on-pick). The
+entry schema, the intake protocol and the terminal disposition vocabulary have exactly one
+home — the `dd-backlog-definition` skill — which closure and audit reference rather than
+restate.
+
+The doctrine is stated in the law and the skill; the physical backlog has not been
+consolidated yet. `specs/backlog/` still holds per-entry Markdown files, and the
+`dadaia backlog` verbs (`backlog new`, `backlog doctor`, `BL-SCHEMA`/`BL-STALE`) still
+read and write that per-entry model. Consolidating the files into `BACKLOG.md` is
+`project-manager` curation work; reconciling the tooling to the single-source schema is a
+`software-engineer` follow-up. Neither weakens the intake gate.
 
 ## Branches And Stage Placement
 
@@ -101,7 +126,10 @@ is a quality boundary, not a concurrency mechanism.
 ## Runtime State
 
 - `specs/bugs/*.jsonl`
-- `specs/backlog/*.md`
+- `specs/backlog/BACKLOG.md` — the single-source target schema; the tree still carries the
+  per-entry `specs/backlog/*.md` files the current CLI reads and writes
+- `.dadaia/reports/<context>/project-manager/<UTC>-intake.html` — the operator-facing
+  intake report and its handoff
 - `specs/releases/<id>/consumed_backlog.json` or its archived equivalent
 - `specs/audits/<timestamp>-<session>/` and, once dispositioned,
   `specs/audits/_archive/<audit>--dispositioned-<release-id>`

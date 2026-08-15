@@ -16,8 +16,8 @@ tags:
 - entities
 - derivation
 - governance
-token_estimate: 420
-last_updated: '2026-08-10'
+token_estimate: 475
+last_updated: '2026-08-15'
 release_origin: v0.3.0
 ---
 
@@ -36,7 +36,11 @@ skills are defined agnostically, then implemented per entry harness. Constitutio
   harness, the Codex command policy) traces to an Abstract Rule.
 - **Universal surface.** Skills under `.agents/skills/` and the `AGENTS.md` guardrail
   files are harness-agnostic by construction — every entry harness reads them
-  natively, so they carry no per-harness derivation and no harness toggle.
+  natively, so they carry no per-harness derivation and no harness toggle. The
+  development cycle's seven `dd-` skills — one per stage: backlog definition, release
+  definition, release implementation, release closure, project audit, bug registration,
+  bug fix — are universal in exactly this sense: one canonical `.agents/skills/` home,
+  no registry entry, no per-harness copy.
 
 Operator-created sub-agents, skills, and rules are exempt: the law governs only what
 the library scaffolds.

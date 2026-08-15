@@ -6,15 +6,15 @@ tldr: Nine core Layer-1 roles, two dispatchers, document-governed ordered work, 
 summary: >-
   Defines role ownership, dispatch purity, memory bootstrap, task discipline, review
   checkpoints, and Layer-1 model governance. The ordered lifecycle is carried by SDD
-  documents and agent dispatch, not by a runtime. No role acquires or coordinates a
-  concurrency lock.
+  documents and agent dispatch, not by a runtime, and each stage's protocol has one owning
+  dd- skill the law points at. No role acquires or coordinates a concurrency lock.
 tags:
 - orchestration
 - agents
 - dispatch
 - sdd
-token_estimate: 470
-last_updated: '2026-08-07'
+token_estimate: 570
+last_updated: '2026-08-15'
 release_origin: v0.3.0
 ---
 
@@ -45,6 +45,14 @@ harness reads `DADAIA.md`, classifies the demand, and dispatches the owning agen
 each artifact class. Sequencing evidence is the SDD artifacts themselves: `ACTIVE.md`
 phase, `**Status:** Aprovado` markers on SPEC/PLAN/TASKS, task markers, handoffs, and
 CLOSURE. No runtime drives agents through steps.
+
+Each stage's protocol has exactly one owning skill, and the always-on law points at it
+rather than restating it: `dd-backlog-definition` (backlog definition, run continuously by
+`project-manager`), `dd-release-definition` (picking the set, the mandatory grill, SPEC),
+`dd-release-implement` (implementation and its review-gate cadence), `dd-release-closure`
+(memory update, CLOSURE, dispositions, archive), `dd-audit-project` (audit and its
+remediation release), `dd-bug-registration` and `dd-bug-fix` (the bug arm, end to end). A
+skill that needs another stage's rule names that skill instead of repeating it.
 
 ## Operating Rules
 
