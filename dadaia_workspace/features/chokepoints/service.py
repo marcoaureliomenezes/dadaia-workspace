@@ -161,6 +161,19 @@ def _refuse_branch(branch: str, local_ref: str) -> Decision:
     )
 
 
+#: FR7/A7.3 (v0.11.0) — a pre-push sha must be a 40-char (SHA-1) or 64-char (SHA-256)
+#: hex string. Anything else — including an option-shaped value such as
+#: ``--glob=refs/nonexistent`` or ``--branches=zzz`` — is counted as malformed rather
+#: than silently producing a successful, empty ``git rev-list`` (CWE-88/CWE-20: the
+#: measured silent-no-op class). The all-zero deletion sentinel is 40 hex characters
+#: and therefore already matches — no special case is needed.
+_SHA_SHAPE_RE = re.compile(r"^[0-9a-fA-F]{40}$|^[0-9a-fA-F]{64}$")
+
+
+def _is_sha_shaped(value: str) -> bool:
+    return bool(_SHA_SHAPE_RE.match(value))
+
+
 def parse_push_stdin(stdin_text: str) -> tuple[list[PushRef], int]:
     """Parse pre-push stdin into :class:`PushRef` rows plus a malformed-line count.
 
@@ -168,6 +181,12 @@ def parse_push_stdin(stdin_text: str) -> tuple[list[PushRef], int]:
     silently dropped — the gate FAILS CLOSED on any malformed line (T-060-07 finding 1:
     a policy gate that skips what it cannot parse is a policy gate that can be
     disabled without a trace; ``git push --no-verify`` is the sanctioned bypass).
+
+    v0.11.0 FR7/A7.1-A7.3: both shas are additionally validated against
+    :data:`_SHA_SHAPE_RE` — a violation reuses the SAME malformed-line counter and the
+    SAME fail-closed message (no new branch), so an option-shaped ``local_sha`` (the
+    measured silent-no-op class) refuses instead of producing a successful empty
+    ``git rev-list``.
     """
     refs: list[PushRef] = []
     malformed = 0
@@ -179,7 +198,11 @@ def parse_push_stdin(stdin_text: str) -> tuple[list[PushRef], int]:
         if len(parts) != 4:
             malformed += 1
             continue
-        refs.append(PushRef(parts[0], parts[1], parts[2], parts[3]))
+        local_ref, local_sha, remote_ref, remote_sha = parts
+        if not _is_sha_shaped(local_sha) or not _is_sha_shaped(remote_sha):
+            malformed += 1
+            continue
+        refs.append(PushRef(local_ref, local_sha, remote_ref, remote_sha))
     return refs, malformed
 
 

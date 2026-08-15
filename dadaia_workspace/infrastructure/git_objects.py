@@ -17,6 +17,7 @@ unhandled exception at the push boundary (code-reviewer MEDIUM finding).
 
 from __future__ import annotations
 
+import re
 import subprocess
 from collections.abc import Iterator
 from pathlib import Path
@@ -28,6 +29,13 @@ from dadaia_workspace.core.protocols.git_object_reader import (
 )
 
 _TIMEOUT_S = 30
+
+#: FR7/A7.4 (v0.11.0) — the same sha-shape check the service layer's
+#: ``parse_push_stdin`` applies (40-char SHA-1 or 64-char SHA-256 hex). Re-checked here
+#: as a second, independent layer: this adapter must never interpolate an
+#: option-shaped string into a git argv, regardless of what already validated the
+#: caller's input (CWE-88).
+_SHA_SHAPE_RE = re.compile(r"^[0-9a-fA-F]{40}$|^[0-9a-fA-F]{64}$")
 
 #: SPEC v0.9.0 R3 — a per-blob size guard so one pathological blob cannot dominate the
 #: scan's wall clock or memory: a blob at or under this cap is read and decoded; a blob
@@ -63,8 +71,16 @@ def _decode(raw: bytes) -> str:
 
 
 def _is_resolvable_commit(repo: Path, sha: str) -> bool:
-    """True when *sha* resolves to a commit object reachable locally (FR1 row 1/2)."""
-    if not sha or sha == ZERO_SHA:
+    """True when *sha* resolves to a commit object reachable locally (FR1 row 1/2).
+
+    v0.11.0 FR7/A7.4: *sha* is shape-checked against :data:`_SHA_SHAPE_RE` BEFORE it is
+    ever interpolated into the ``git cat-file -e <sha>^{commit}`` argv — an
+    option-shaped value (e.g. ``--upload-pack=...``) is rejected here, never
+    interpolated, and the caller treats it as unresolvable (falls back to the
+    ``--not --remotes`` range shape) rather than spawning git with that string
+    embedded (CWE-88).
+    """
+    if not sha or sha == ZERO_SHA or not _SHA_SHAPE_RE.match(sha):
         return False
     result = _run(["git", "cat-file", "-e", f"{sha}^{{commit}}"], repo)
     return result.returncode == 0
@@ -72,11 +88,16 @@ def _is_resolvable_commit(repo: Path, sha: str) -> bool:
 
 def _rev_list_candidates(repo: Path, local_sha: str, remote_sha: str) -> list[tuple[str, str]]:
     """Return ``(sha, path)`` pairs for every object with a path in the FR1 range —
-    blobs AND trees (type filtering happens separately, in :func:`_blob_info`)."""
+    blobs AND trees (type filtering happens separately, in :func:`_blob_info`).
+
+    v0.11.0 FR7/A7.4: the argv carries a trailing ``--`` end-of-options marker after
+    the revision arguments on both range shapes, closing the git argv interpolation
+    site (CWE-88/CWE-20).
+    """
     if _is_resolvable_commit(repo, remote_sha):
-        args = ["git", "rev-list", "--objects", local_sha, "--not", remote_sha]
+        args = ["git", "rev-list", "--objects", local_sha, "--not", remote_sha, "--"]
     else:
-        args = ["git", "rev-list", "--objects", local_sha, "--not", "--remotes"]
+        args = ["git", "rev-list", "--objects", local_sha, "--not", "--remotes", "--"]
     result = _run(args, repo)
     if result.returncode != 0:
         raise GitObjectReadError(f"git rev-list --objects failed: {_decode(result.stderr).strip()}")

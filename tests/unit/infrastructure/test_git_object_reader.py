@@ -1,6 +1,6 @@
 """GitSubprocessObjectReader — the GitObjectReader adapter (SPEC v0.9.0 FR1/FR6).
 
-Intent: CONTRACT — v0.9.0 A1.1, A1.2, A1.3, A1.4, A6.1, A6.2
+Intent: CONTRACT — v0.9.0 A1.1, A1.2, A1.3, A1.4, A6.1, A6.2; v0.11.0 A7.4
 
 Drives a real throwaway git repo under pytest ``tmp_path`` (never inside the source
 tree). Covers both FR1 range forms (resolvable ``remote_sha`` vs ``--not --remotes``),
@@ -225,3 +225,99 @@ def test_new_objects_batch_check_timeout_raises_typed_error(
     reader = GitSubprocessObjectReader()
     with pytest.raises(GitObjectReadError):
         list(reader.new_objects(repo, tip_sha, ZERO_SHA))
+
+
+# ---------------------------------------------------------------------------
+# FR7/A7.4 — `_rev_list_candidates` closes the argv interpolation site with a
+# trailing `--` end-of-options marker; `_is_resolvable_commit` rejects non-sha
+# input before it is ever interpolated into a git argv.
+# ---------------------------------------------------------------------------
+
+
+def _spy_on_rev_list(monkeypatch: pytest.MonkeyPatch) -> list[list[str]]:
+    from dadaia_workspace.infrastructure import git_objects as git_objects_module
+
+    real_run = git_objects_module._run
+    captured: list[list[str]] = []
+
+    def _spy_run(
+        args: list[str], cwd: Path, *, input_bytes: bytes | None = None
+    ) -> subprocess.CompletedProcess[bytes]:
+        if args[:3] == ["git", "rev-list", "--objects"]:
+            captured.append(args)
+        return real_run(args, cwd, input_bytes=input_bytes)
+
+    monkeypatch.setattr(git_objects_module, "_run", _spy_run)
+    return captured
+
+
+def test_rev_list_argv_carries_trailing_end_of_options_marker_resolvable_base(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Resolvable-``remote_sha`` shape (row 1): the ``--`` marker trails the revision
+    arguments so a crafted sha can never be parsed as a git option."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "a.txt").write_text("first\n")
+    base_sha = _commit(repo, "c1")
+    (repo / "b.txt").write_text("second\n")
+    tip_sha = _commit(repo, "c2")
+
+    captured = _spy_on_rev_list(monkeypatch)
+    reader = GitSubprocessObjectReader()
+    list(reader.new_objects(repo, tip_sha, base_sha))
+
+    assert captured, "rev-list --objects must have been invoked"
+    assert captured[0][-1] == "--"
+
+
+def test_rev_list_argv_carries_trailing_end_of_options_marker_fallback_shape(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Fallback (``--not --remotes``) shape (row 2): same trailing marker."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "a.txt").write_text("content\n")
+    tip_sha = _commit(repo, "c1")
+
+    captured = _spy_on_rev_list(monkeypatch)
+    reader = GitSubprocessObjectReader()
+    list(reader.new_objects(repo, tip_sha, ZERO_SHA))
+
+    assert captured, "rev-list --objects must have been invoked"
+    assert captured[0][-1] == "--"
+
+
+def test_is_resolvable_commit_rejects_option_shaped_sha_before_interpolation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An option-shaped ``remote_sha`` (e.g. ``--upload-pack=...``) must never reach
+    ``git cat-file -e <sha>^{commit}`` — it is rejected by a prefix/shape check before
+    interpolation, so the adapter treats it as unresolvable (falls back to
+    ``--not --remotes``) rather than ever spawning git with that string embedded."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "a.txt").write_text("content\n")
+    tip_sha = _commit(repo, "c1")
+
+    from dadaia_workspace.infrastructure import git_objects as git_objects_module
+
+    real_run = git_objects_module._run
+    cat_file_e_calls: list[list[str]] = []
+
+    def _spy_run(
+        args: list[str], cwd: Path, *, input_bytes: bytes | None = None
+    ) -> subprocess.CompletedProcess[bytes]:
+        if args[:3] == ["git", "cat-file", "-e"]:
+            cat_file_e_calls.append(args)
+        return real_run(args, cwd, input_bytes=input_bytes)
+
+    monkeypatch.setattr(git_objects_module, "_run", _spy_run)
+
+    malicious_remote_sha = "--upload-pack=/bin/false"
+    reader = GitSubprocessObjectReader()
+    objects = list(reader.new_objects(repo, tip_sha, malicious_remote_sha))
+
+    assert cat_file_e_calls == [], "an option-shaped sha must never be interpolated into argv"
+    # Falls back to the --not --remotes shape (no remotes configured -> full range).
+    assert {obj.path for obj in objects} == {"a.txt"}

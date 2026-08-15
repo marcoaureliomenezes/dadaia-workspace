@@ -1,7 +1,7 @@
 """Wiring the push-range denylist scan into ``push_gate_decision`` (SPEC v0.9.0 FR1/FR2/FR5/FR6).
 
 Intent: CONTRACT — v0.9.0 A1.1, A1.2, A1.3, A1.4, A2.1, A2.2, A2.3, A2.4, A5.1, A5.2,
-A5.3, A5.4, A6.1
+A5.3, A5.4, A6.1; v0.11.0 A7.1, A7.2, A7.3
 
 Drives ``push_gate_decision`` with an injected fake :class:`GitObjectReader` — no real
 git, no filesystem (FR7/A7.2). Only synthetic terms/slugs ever appear here (TASKS
@@ -239,3 +239,86 @@ def test_git_object_read_failure_refuses_naming_the_failure(tmp_path: Path) -> N
     assert not decision.allowed
     assert "simulated git rev-list failure" in decision.message
     assert "--no-verify" in decision.message
+
+
+# ---------------------------------------------------------------------------
+# FR7/A7.1 — an option-shaped `local_sha` refuses as a malformed line instead of
+# silently producing a successful empty rev-list.
+# ---------------------------------------------------------------------------
+
+
+def test_option_shaped_local_sha_glob_form_is_malformed() -> None:
+    from dadaia_workspace.features.chokepoints.service import parse_push_stdin
+
+    refs, malformed = parse_push_stdin(
+        f"refs/heads/develop --glob=refs/nonexistent refs/heads/develop {_ZERO}\n"
+    )
+    assert refs == []
+    assert malformed == 1
+
+
+def test_option_shaped_local_sha_branches_form_is_malformed() -> None:
+    from dadaia_workspace.features.chokepoints.service import parse_push_stdin
+
+    refs, malformed = parse_push_stdin(
+        f"refs/heads/develop --branches=zzz refs/heads/develop {_ZERO}\n"
+    )
+    assert refs == []
+    assert malformed == 1
+
+
+def test_option_shaped_remote_sha_is_also_malformed() -> None:
+    """The same option-shaped hardening applies symmetrically to ``remote_sha``."""
+    from dadaia_workspace.features.chokepoints.service import parse_push_stdin
+
+    refs, malformed = parse_push_stdin(
+        f"refs/heads/develop {_SHA_A} refs/heads/develop --glob=refs/nonexistent\n"
+    )
+    assert refs == []
+    assert malformed == 1
+
+
+# ---------------------------------------------------------------------------
+# FR7/A7.2 — the all-zero deletion sentinel still parses and still passes with no
+# verdict (it is 40 hex characters, so it is a VALID sha shape, not a malformed one).
+# ---------------------------------------------------------------------------
+
+
+def test_all_zero_deletion_sentinel_still_parses() -> None:
+    from dadaia_workspace.features.chokepoints.service import parse_push_stdin
+
+    refs, malformed = parse_push_stdin(f"refs/heads/old {_ZERO} refs/heads/old {_SHA_A}\n")
+    assert malformed == 0
+    assert len(refs) == 1
+    assert refs[0].is_deletion
+
+
+# ---------------------------------------------------------------------------
+# FR7/A7.3 — a 64-char (SHA-256) sha parses; a 39- or 41-char hex string does not.
+# ---------------------------------------------------------------------------
+
+
+def test_sha256_length_local_sha_parses() -> None:
+    from dadaia_workspace.features.chokepoints.service import parse_push_stdin
+
+    sha256 = "f" * 64
+    refs, malformed = parse_push_stdin(f"refs/heads/develop {sha256} refs/heads/develop {_ZERO}\n")
+    assert malformed == 0
+    assert len(refs) == 1
+    assert refs[0].local_sha == sha256
+
+
+def test_39_and_41_char_hex_shas_are_malformed() -> None:
+    from dadaia_workspace.features.chokepoints.service import parse_push_stdin
+
+    too_short = "a" * 39
+    too_long = "a" * 41
+
+    _, malformed_short = parse_push_stdin(
+        f"refs/heads/develop {too_short} refs/heads/develop {_ZERO}\n"
+    )
+    _, malformed_long = parse_push_stdin(
+        f"refs/heads/develop {too_long} refs/heads/develop {_ZERO}\n"
+    )
+    assert malformed_short == 1
+    assert malformed_long == 1
