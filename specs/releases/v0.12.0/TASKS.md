@@ -66,7 +66,7 @@
 
 ---
 
-- [ ] **T-120-01 — [git] Commit the definition content on `feature/v0.12.0`**
+- [x] **T-120-01 — [git] Commit the definition content on `feature/v0.12.0`**
 
 **Owner role:** software-engineer (or dispatcher) · **Commit:**
 `docs(T-120-01): v0.12.0 definition — backlog tooling single source`
@@ -91,7 +91,7 @@ commit. The pre-commit backlog gate fires (backlog paths are staged) and must pa
 
 ---
 
-- [ ] **T-120-02 — [git] Milestone (a): merge, security review, push**
+- [x] **T-120-02 — [git] Milestone (a): merge, security review, push**
 
 **Owner role:** dispatcher + `security-reviewer` · **Commit:** merge commit on `develop`
 
@@ -111,7 +111,7 @@ preflight.
 
 ---
 
-- [ ] **T-120-03 — FR4: retire the dead removal/consumption write side and the dead fakes**
+- [-] **T-120-03 — FR4: retire the dead removal/consumption write side and the dead fakes**
 
 **Owner role:** software-engineer · **Commit:**
 `refactor(T-120-03): delete the uncalled backlog removal/consumption write side`
