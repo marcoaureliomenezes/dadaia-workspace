@@ -23,9 +23,8 @@ steps 1–3 below are complete.
 ## Inputs
 
 - `specs/bugs/*.jsonl` — event-sourced bug records, inspected through `dadaia bugs`.
-- Sanitized, deduplicated candidates: target schema is `specs/backlog/BACKLOG.md`
-  `## ACTIVE` (see `dd-backlog-definition` §2); until the PM consolidation lands, the
-  live source is the per-entry `.md` files plus `candidates.md`.
+- Sanitized, deduplicated candidates: `specs/backlog/BACKLOG.md` `## ACTIVE`
+  (see `dd-backlog-definition` §2) — the single-source document, no per-entry files.
 - The operator's intent for the release (theme, urgency).
 
 Sanitizing and deduplicating those inputs is `dd-backlog-definition`'s job, run
@@ -81,19 +80,23 @@ machine-readable bold-key line in the SPEC, alongside `**Status:**` / `**Release
 **Consumes:** slug-a, slug-b
 ```
 
-This is the producer half of removal-on-release. `features/backlog/removal_lifecycle.py`
-still carries the library functions that bind each declared slug's `intents[]` through
-the canonical-subject registry into a verified **shipped-anchor set** and write
-`specs/_archive/<release-id>/consumed_backlog.json` — but no CLI verb currently invokes
-them (their former caller was the deleted workflow engine). Until a CLI wrapper ships,
-treat the `dd-release-closure` skill's manual **Disposition sweep** (flip each fully
-consumed item's status to its terminal disposition token — vocabulary: `dd-backlog-definition`
-§2) as the live mechanism that keeps `backlog doctor` at zero BL-STALE. Rules:
+`**Consumes:**` is SPEC provenance, not a producer call site — no library or CLI verb
+reads this line. Two mechanisms actually execute consumption, at two different points:
+
+| When | Executor | What it does |
+|---|---|---|
+| At definition, same commit as the SPEC | `project-manager`'s purge-on-pick (`dd-backlog-definition` §2) | Removes each declared slug from `## ACTIVE`, recording provenance in the SPEC |
+| At closure | `dd-release-closure`'s Disposition sweep | Flips each fully-consumed slug's `## LEDGER` line to its terminal disposition token (vocabulary: `dd-backlog-definition` §2) |
+
+Two mechanical backstops catch a slug that falls through either step: `backlog doctor`'s
+BL-STALE (an `ACTIVE` item already consumed/dispositioned) and `specs doctor`'s
+SPEC-DOC-031 (an archived SPEC/CLOSURE that still names a slug the ledger shows
+unconsumed). Rules that still describe something that runs:
 - **Full-slug granularity:** a declared slug is treated as *fully* consumed (all its bound
   anchors shipped). A partially-shipped item must NOT be declared — leave it in the
   backlog and rewrite it to its residual by hand.
-- **Fail-loud:** an unknown slug, or one whose intents do not bind in the registry, aborts
-  the define post-step (no silent skip) — fix the slug or the item's `intents[]`.
+- **Fail-loud:** an unknown slug aborts step 1 (purge-on-pick) — fix the slug before it
+  lands in the SPEC.
 - Omit the line entirely when a release consumes no backlog item.
 
 ## Authority & dispatch

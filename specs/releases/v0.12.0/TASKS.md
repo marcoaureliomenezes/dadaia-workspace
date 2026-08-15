@@ -342,7 +342,7 @@ opts the tree back in). Job name, verb and arguments unchanged. Then
 
 ---
 
-- [-] **T-120-10 — FR8: the two skills state the mechanism that runs**
+- [x] **T-120-10 — FR8: the two skills state the mechanism that runs**
 
 **Owner role:** ai-engineer · **Commit:**
 `docs(T-120-10): dd-backlog-definition schema and dd-release-definition Consumes mechanism`
