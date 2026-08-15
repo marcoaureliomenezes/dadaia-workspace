@@ -416,7 +416,7 @@ and regenerate both golden fixtures. Test intent at birth:
 
 ---
 
-- [ ] **T-100-15 — Re-projection, orphan sweep, byte verification**
+- [-] **T-100-15 — Re-projection, orphan sweep, byte verification**
 
 **Owner role:** ai-engineer · **Commit:**
 `chore(T-100-15): re-project the dd- family and sweep orphaned projections`
