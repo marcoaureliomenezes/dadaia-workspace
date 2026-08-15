@@ -252,7 +252,7 @@ assertions**. If they cannot stay green, narrow the extraction — never edit th
 
 ---
 
-- [ ] **T-110-08 — FR6(b): mask path segments in both gate renderers (#23, resolution A)**
+- [-] **T-110-08 — FR6(b): mask path segments in both gate renderers (#23, resolution A)**
 
 **Owner role:** software-engineer · **Commit:**
 `fix(T-110-08): mask private-name-bearing path segments in every gate refusal and note`
