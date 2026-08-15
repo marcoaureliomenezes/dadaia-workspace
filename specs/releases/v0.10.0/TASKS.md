@@ -139,7 +139,7 @@ mechanics. Do **not** restate picking (`dd-release-definition`) or the sweep
 
 ---
 
-- [-] **T-100-05 — `dd-release-definition` (rename + revisit)**
+- [x] **T-100-05 — `dd-release-definition` (rename + revisit)**
 
 **Owner role:** ai-engineer · **Commit:**
 `refactor(T-100-05): rename dadaia-release-definition to dd-release-definition`
