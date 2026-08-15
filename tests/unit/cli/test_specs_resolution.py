@@ -28,6 +28,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.cli._specs_resolution import resolve_context_for_cli
+from tests.fixtures.harness_env import scrub_context_resolution_env
 
 pytestmark = pytest.mark.unit
 
@@ -59,14 +60,10 @@ def _mk_workspace(root: Path, contexts: list[str]) -> None:
 
 @pytest.fixture
 def _clean_session_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    for var in (
-        "DADAIA_CONTEXT",
-        "DADAIA_SESSION_ID",
-        "CLAUDE_CODE_SESSION_ID",
-        "CODEX_SESSION_ID",
-        "CODEX_THREAD_ID",
-    ):
-        monkeypatch.delenv(var, raising=False)
+    """Bug ``specs-resolver-context-tests-flaky-under-xdist-full-suite``: also scrubs
+    ``WORKSPACE_ROOT``, which ``resolve_context_for_cli`` -> the resolution authority
+    honours ahead of every ``monkeypatch.chdir()`` these tests perform."""
+    scrub_context_resolution_env(monkeypatch)
 
 
 @pytest.mark.usefixtures("_clean_session_env")

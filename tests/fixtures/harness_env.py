@@ -68,6 +68,7 @@ __all__ = [
     "ALLOWLISTED_DADAIA_ENV",
     "CLAUDE_SESSION_ENV_VAR",
     "CODEX_SESSION_ENV_VAR",
+    "CONTEXT_RESOLUTION_ENV_VARS",
     "ENTRY_SIGNAL_ENV_VARS",
     "HARNESS_CONTROL_DADAIA_ENV",
     "HOOK_MODULES",
@@ -76,6 +77,7 @@ __all__ = [
     "codex_hook_env",
     "kimi_hook_env",
     "run_hook_subprocess",
+    "scrub_context_resolution_env",
     "scrub_entry_signal_env",
 ]
 
@@ -105,6 +107,45 @@ def scrub_entry_signal_env(monkeypatch: Any) -> None:
     vars explicitly AFTER the scrub via their own ``monkeypatch.setenv``.
     """
     for name in ENTRY_SIGNAL_ENV_VARS:
+        monkeypatch.delenv(name, raising=False)
+
+
+#: Every ambient var ``core.specs_resolver.resolve_context()`` (and therefore
+#: ``cli._specs_resolution.resolve_context_for_cli`` / ``container.resolve_context``)
+#: consults, directly or via :func:`~dadaia_workspace.core.session_env.harness_session_id`.
+#: Bug ``specs-resolver-context-tests-flaky-under-xdist-full-suite``:
+#: ``core.specs_resolver._authority_workspace_root()`` honours ``WORKSPACE_ROOT``
+#: UNCONDITIONALLY (by design -- the hook-transport channel; see its docstring) --
+#: ahead of, and regardless of, any ``monkeypatch.chdir()`` a test performs. A
+#: context/session-resolution unit test whose isolation fixture scrubs only the
+#: harness session-id vars (:data:`ENTRY_SIGNAL_ENV_VARS`) is therefore NOT actually
+#: isolated: an ambient ``WORKSPACE_ROOT`` inherited from the shell that launched
+#: pytest, or leaked from a concurrent ``dadaia context bind``/``context show``
+#: invocation sharing the same real ``.dadaia/sessions/`` tree, silently overrides the
+#: test's own synthetic ``tmp_path`` workspace -- confirmed by direct reproduction:
+#: with ``WORKSPACE_ROOT`` pointing at an unrelated real workspace, a cwd-only (rung 3)
+#: resolution scenario mis-resolves to ``None``/the ambient context instead of the
+#: test's own. ``DADAIA_CONTEXT``/``DADAIA_SESSION_ID`` are included too so a single
+#: helper is the one place a context-resolution test needs to isolate itself.
+CONTEXT_RESOLUTION_ENV_VARS: Final[tuple[str, ...]] = (
+    *ENTRY_SIGNAL_ENV_VARS,
+    "DADAIA_CONTEXT",
+    "DADAIA_SESSION_ID",
+    "WORKSPACE_ROOT",
+)
+
+
+def scrub_context_resolution_env(monkeypatch: Any) -> None:
+    """Delete every ambient var ``resolve_context()`` consults, for the current test.
+
+    Use this (instead of, or in addition to, :func:`scrub_entry_signal_env`) in any
+    fixture that isolates a ``core.specs_resolver.resolve_context`` /
+    ``cli._specs_resolution.resolve_context_for_cli`` / ``container.resolve_context``
+    scenario -- a test that clears only the harness session-id vars is still exposed
+    to an ambient ``WORKSPACE_ROOT`` (bug
+    ``specs-resolver-context-tests-flaky-under-xdist-full-suite``).
+    """
+    for name in CONTEXT_RESOLUTION_ENV_VARS:
         monkeypatch.delenv(name, raising=False)
 
 
