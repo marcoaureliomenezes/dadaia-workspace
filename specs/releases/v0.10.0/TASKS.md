@@ -237,7 +237,7 @@ evidence for which dimension). Route dispositions by reference to
 
 ---
 
-- [-] **T-100-09 — `dd-bug-registration` (new) + `dadaia-cli` dehydration**
+- [x] **T-100-09 — `dd-bug-registration` (new) + `dadaia-cli` dehydration**
 
 **Owner role:** ai-engineer · **Commit:**
 `feat(T-100-09): dd-bug-registration consolidates the duplicated registration blocks`

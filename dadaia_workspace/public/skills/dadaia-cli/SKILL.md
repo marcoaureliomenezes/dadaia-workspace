@@ -93,22 +93,9 @@ registry, and ALIVE/DEAD/delete teardown (checks: `capability-contract`,
 6. Use `dadaia panel` for the human view and the server registry for ports.
 7. Emit/validate the final handoff and register genuine provider bugs before workarounds.
 
-## Register a bug (any runtime, ADDITIVE)
+## Bug registration, and when a command fails
 
-```bash
-dadaia bugs append --bug-id <slug> --event reported --reported-by <agent> \
-  --title "…" --severity LOW|MEDIUM|HIGH|CRITICAL --surface "<cmd>" \
-  --component "<module>" --context <ctx> --tag <t> \
-  --symptom "…" --repro "…" --expected "…" --notes "… (redacted)"
-dadaia bugs status        # open bugs
-```
-
-## When a command fails
-
-Classify BEFORE registering anything (consumer deep-dive, v0.2.9): a failure is a
-**product bug of the library** only when the library's own contract is violated.
-Environment (quota/rate limits, network, sandbox), invalid input, and wrong usage are
-NOT product bugs — diagnose first, register with evidence second. When it IS a
-product bug, register it with `dadaia bugs append` before working around it. Never
-hand-edit a projected asset to fake a result; fix the source and re-project
-(`dadaia public stage && dadaia public install --target all && dadaia public doctor`).
+Classify-first, the `dadaia bugs append` command, redaction and context routing:
+`dd-bug-registration`. Never hand-edit a projected asset to fake a result; fix the
+source and re-project (`dadaia public stage && dadaia public install --target all
+&& dadaia public doctor`).
