@@ -392,7 +392,7 @@ sibling modules.
 
 ---
 
-- [ ] **T-110-13 — FR5: registry-derived foreign-name set, after the enumeration (#22)**
+- [-] **T-110-13 — FR5: registry-derived foreign-name set, after the enumeration (#22)**
 
 **Owner role:** software-engineer · **Commit:**
 `fix(T-110-13): derive the foreign-name layer from the registry so a DEAD context still protects its name`
