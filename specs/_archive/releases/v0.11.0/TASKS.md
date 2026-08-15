@@ -67,7 +67,7 @@
 
 ---
 
-- [ ] **T-110-01 — [git] Commit the definition content on `feature/v0.11.0`**
+- [x] **T-110-01 — [git] Commit the definition content on `feature/v0.11.0`** (commit `11aad989`; phase flip landed one commit later, `chore(tasks)` follow-up — drift recorded)
 
 **Owner role:** software-engineer (or dispatcher) · **Commit:**
 `docs(T-110-01): v0.11.0 definition — scan-v2 amnesty and push-gate hardening`
@@ -90,7 +90,7 @@ commit.
 
 ---
 
-- [ ] **T-110-02 — [git] Milestone (a): merge, security review, push**
+- [x] **T-110-02 — [git] Milestone (a): merge, security review, push** (merge `89a703b8`; APPROVED handoff `2026-08-15T173153Z-security-reviewer-v0.11.0-definition-push`; pushed, gate exit 0)
 
 **Owner role:** dispatcher + `security-reviewer` · **Commit:** merge commit on `develop`
 
@@ -110,7 +110,7 @@ the pushed tip plus the CI preflight.
 
 ---
 
-- [ ] **T-110-03 — FR7: pre-push sha validation and git argv hardening (#25)**
+- [x] **T-110-03 — FR7: pre-push sha validation and git argv hardening (#25)**
 
 **Owner role:** software-engineer · **Commit:**
 `fix(T-110-03): validate pre-push shas and close the git argv interpolation sites`
@@ -138,7 +138,7 @@ sha in `_is_resolvable_commit`.
 
 ---
 
-- [ ] **T-110-04 — FR8: typed parse boundary and desync abort (#26)**
+- [x] **T-110-04 — FR8: typed parse boundary and desync abort (#26)**
 
 **Owner role:** software-engineer · **Commit:**
 `fix(T-110-04): surface batch-stream desync as GitObjectReadError instead of fabricating`
@@ -165,7 +165,7 @@ fabricated object can reach a skip count.
 
 ---
 
-- [ ] **T-110-05 — FR9: bound the batch conversation's resident set (#27)**
+- [x] **T-110-05 — FR9: bound the batch conversation's resident set (#27)** (peak-bound capture: `.dadaia/tmp/software-engineer/20260815/t-110-05-peak-bound-measurement.txt`)
 
 **Owner role:** software-engineer · **Commit:**
 `perf(T-110-05): chunk the cat-file --batch conversation to a constant resident bound`
@@ -191,7 +191,7 @@ synthetic range under `.dadaia/tmp/software-engineer/<YYYYMMDD>/`.
 
 ---
 
-- [ ] **T-110-06 — FR4: oversized blobs partially scanned and honestly reported (#20)**
+- [x] **T-110-06 — FR4: oversized blobs partially scanned and honestly reported (#20)**
 
 **Owner role:** software-engineer · **Commit:**
 `fix(T-110-06): scan the first 5 MB of an oversized blob and stop calling it binary`
@@ -226,7 +226,7 @@ never read; the note's path is masked once T-110-08 lands (A6.3).
 
 ---
 
-- [ ] **T-110-07 — FR6(a): extract the masking primitive into `core/redaction.py`**
+- [x] **T-110-07 — FR6(a): extract the masking primitive into `core/redaction.py`**
 
 **Owner role:** software-engineer · **Commit:**
 `refactor(T-110-07): extract the redaction primitive into core for shared use`
@@ -252,7 +252,7 @@ assertions**. If they cannot stay green, narrow the extraction — never edit th
 
 ---
 
-- [ ] **T-110-08 — FR6(b): mask path segments in both gate renderers (#23, resolution A)**
+- [x] **T-110-08 — FR6(b): mask path segments in both gate renderers (#23, resolution A)**
 
 **Owner role:** software-engineer · **Commit:**
 `fix(T-110-08): mask private-name-bearing path segments in every gate refusal and note`
@@ -279,7 +279,7 @@ any emitted string.
 
 ---
 
-- [ ] **T-110-09 — FR2: prior-side same-path blob lookup inside the chunk loop (#19a)**
+- [x] **T-110-09 — FR2: prior-side same-path blob lookup inside the chunk loop (#19a)**
 
 **Owner role:** software-engineer · **Commit:**
 `feat(T-110-09): resolve each scanned path's published prior blob in the same conversation`
@@ -310,7 +310,7 @@ independent of blob count.
 
 ---
 
-- [ ] **T-110-10 — FR1: the amnesty suppression predicate (#19b)**
+- [x] **T-110-10 — FR1: the amnesty suppression predicate (#19b)**
 
 **Owner role:** software-engineer · **Commit:**
 `feat(T-110-10): suppress a hit whose matched value the same path already published`
@@ -339,7 +339,7 @@ introduced** — A4.1's contract test must stay unmodified and green.
 
 ---
 
-- [ ] **T-110-11 — FR1: integration proof over a real range with a real remote (#19c)**
+- [x] **T-110-11 — FR1: integration proof over a real range with a real remote (#19c)**
 
 **Owner role:** software-engineer · **Commit:**
 `test(T-110-11): pin the amnesty over real git ranges`
@@ -363,7 +363,7 @@ by the amnesty.
 
 ---
 
-- [ ] **T-110-12 — FR3: sentinel covers `tests/**` behind a shrink-only baseline, plus the marker (#19d, #29)**
+- [x] **T-110-12 — FR3: sentinel covers `tests/**` behind a shrink-only baseline, plus the marker (#19d, #29)** (baseline size: 29 rows — 14 home-abs-path, 9 email-address, 5 ipv4-literal, 1 secret-token; enumeration: `.dadaia/tmp/software-engineer/20260815/t-110-12-baseline-enumeration.txt`)
 
 **Owner role:** software-engineer · **Commit:**
 `test(T-110-12): extend the self-scan sentinel to tests/ with a shrink-only baseline`
@@ -392,7 +392,7 @@ sibling modules.
 
 ---
 
-- [ ] **T-110-13 — FR5: registry-derived foreign-name set, after the enumeration (#22)**
+- [x] **T-110-13 — FR5: registry-derived foreign-name set, after the enumeration (#22)** (enumeration: `.dadaia/tmp/software-engineer/20260815/t-110-13-enumeration-capture.txt` — 6 hits, all dispositioned amnestied-by-FR1-by-construction, none in this release's own push range)
 
 **Owner role:** software-engineer · **Commit:**
 `fix(T-110-13): derive the foreign-name layer from the registry so a DEAD context still protects its name`
@@ -427,7 +427,7 @@ carries a disposition.
 
 ---
 
-- [ ] **T-110-14 — Real-content performance measurement (#28 evidence)**
+- [x] **T-110-14 — Real-content performance measurement (#28 evidence)** (ordinary-range: `.dadaia/tmp/software-engineer/20260815/t-110-14-ordinary-range-capture.txt` — no regression, ~+12ms budgeted FR2 cost; fallback-range: `.dadaia/tmp/software-engineer/20260815/t-110-14-fallback-range-capture.txt` — 9,095 blobs/130.29MB, read 1.261s + match 53.871s = 0.423 s/MB, peak RSS 285.5 MiB, supersedes archived v0.9.0 V14 figure; match-throughput optimisation REJECTED for this release, reason recorded)
 
 **Owner role:** software-engineer · **Commit:**
 `chore(T-110-14): measure the shipped scan on real content, ordinary and fallback ranges`
@@ -453,7 +453,7 @@ recorded in writing.
 
 ---
 
-- [ ] **T-110-15 — `qa-engineer` review of the increment (alpha-1 close)**
+- [x] **T-110-15 — `qa-engineer` review of the increment (alpha-1 close)** (APPROVED — `specs/releases/v0.11.0/ALPHA-1-QA.md`; all 55 acceptance ids A1.1-A10.5 verified; QA-1 MEDIUM non-blocking finding routed to T-110-16/17)
 
 **Owner role:** qa-engineer · **Commit:** review artifact committed to the branch
 
@@ -481,7 +481,7 @@ named defects to the implementer.
 
 ---
 
-- [ ] **T-110-16 — Memory update (CLOSURE phase)**
+- [x] **T-110-16 — Memory update (CLOSURE phase)** (commit `3195d84b` — four atoms + catalog/index ripple; survived the close reopen untouched)
 
 **Owner role:** product-engineer · **Commit:**
 `docs(T-110-16): memory — amnesty semantics, registry-derived layer, real-content perf`
@@ -516,7 +516,19 @@ SPEC §5 satisfied file by file.
 
 ---
 
-- [ ] **T-110-17 — CLOSURE, dispositions, archive, version bump**
+- [x] **T-110-17 — CLOSURE, dispositions, archive, version bump** (first close `ff922566` reset for review remediation `9648030a`/`697548aa`/`517a62bd`; this re-close commit: CLOSURE amended, nine entries `DELIVERED — v0.11.0` archived, `ACTIVE.md` → `release: none`, `0.8.0` mint + `[0.8.0]` CHANGELOG with the LOW6-corrected identifiers)
+
+> **Marker note — reopened close (2026-08-15).** T-110-16 and T-110-17 were completed once and
+> their `[x]` flips rode the archive commit `ff922566`, which was **reset** after the pre-PR
+> `code-reviewer` pass returned APPROVE with three MEDIUM findings. The markers above are
+> therefore `[ ]` again while the underlying work stands: T-110-16's memory writes landed at
+> `3195d84b` and were **not** reverted, and `CLOSURE.md` is restored to
+> `specs/releases/v0.11.0/` in its amended form. Three review-remediation commits ride between
+> the two tasks — `9648030a`, `697548aa`, `517a62bd` — with **no task id of their own** (they are
+> remediation on tasks already completed, inside T-110-03/T-110-06/T-110-09's write sets). Both
+> markers flip to `[x]` again in the re-close commit; deliberately **not** flipped here, since a
+> marker is flipped by the commit that does the work, not by a document amendment. Full account:
+> `CLOSURE.md` › `## Drifts` › `reopened-close-for-review-remediation`.
 
 **Owner role:** product-engineer (text) + software-engineer/dispatcher (**[git]** steps) ·
 **Commit:** `docs(T-110-17): close release v0.11.0`

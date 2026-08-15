@@ -14,36 +14,26 @@ free by constructing ONE :class:`ContextRedactor` per invocation and feeding it 
 string/JSON value in the exact order they render it — the ordinal map grows lazily as
 new foreign terms are encountered, so it always matches the actual order of the
 rendered output.
+
+v0.11.0 FR6/ADR D1-a: the masking primitive itself (word-boundary alternation,
+longest-first ordering, stable first-appearance ordinal placeholders) now lives in
+``core/redaction.py`` — a stdlib-pure module the push-range denylist gate's own render
+boundary (``features/chokepoints/service.py``) can ALSO import, since
+``features/chokepoints/**`` may import ``core`` but never ``cli``. This module is a
+THIN CONSUMER of that primitive: its public behaviour is byte-identical to before the
+extraction (the regression proof is ``tests/unit/cli/test_redact_output.py`` passing
+with no change to its assertions).
 """
 
 from __future__ import annotations
 
-import re
 from collections.abc import Iterable
 from typing import Any
 
+from dadaia_workspace.core.redaction import Redactor
+
 #: SPEC FR8 placeholder shape.
 _PLACEHOLDER_FMT = "[REDACTED-CONTEXT-{n}]"
-
-#: Characters that make an adjacent match "not a whole word" — the same charset a
-#: context name / repo slug is restricted to (letters, digits, ``_``, ``-``). Hyphens
-#: are deliberately treated as WORD characters (not boundaries): repo slugs commonly
-#: contain them (``dadaia-workspace``), and a short candidate that is merely a
-#: substring/prefix of a longer, unrelated hyphenated string must never be partially
-#: redacted.
-_WORD_CHARS = "A-Za-z0-9_-"
-
-
-def _compile_candidates(terms: Iterable[str]) -> re.Pattern[str] | None:
-    """Word-boundary alternation over ``terms``, longest-first so a short candidate
-    that happens to be a prefix of a longer one never shadows the longer match."""
-    ordered = sorted({t for t in terms if t}, key=len, reverse=True)
-    if not ordered:
-        return None
-    body = "|".join(
-        rf"(?<![{_WORD_CHARS}]){re.escape(term)}(?![{_WORD_CHARS}])" for term in ordered
-    )
-    return re.compile(body)
 
 
 class ContextRedactor:
@@ -53,35 +43,23 @@ class ContextRedactor:
     known Spec Context name and repo slug), minus whatever must stay visible (the
     caller's own resolved context name and repo slug — SPEC FR8: "other than the
     caller's resolved context"). Reuse the same instance across every piece of output
-    the command renders, in rendering order, so :attr:`_map` accumulates ordinals in
-    the true first-appearance order of the invocation (A8.3).
+    the command renders, in rendering order, so the underlying :class:`Redactor`
+    accumulates ordinals in the true first-appearance order of the invocation (A8.3).
     """
 
     def __init__(self, candidates: Iterable[str], *, exclude: Iterable[str | None] = ()) -> None:
         excluded = {name for name in exclude if name}
         terms = [c for c in candidates if c and c not in excluded]
-        self._pattern = _compile_candidates(terms)
-        self._map: dict[str, str] = {}
+        self._redactor = Redactor(terms, placeholder_fmt=_PLACEHOLDER_FMT)
 
     @property
     def active(self) -> bool:
         """True when at least one foreign candidate exists to redact."""
-        return self._pattern is not None
+        return self._redactor.active
 
     def text(self, value: str) -> str:
         """Redact every foreign candidate substring found inside ``value``."""
-        if not value or self._pattern is None:
-            return value
-
-        def _sub(match: re.Match[str]) -> str:
-            term = match.group(0)
-            placeholder = self._map.get(term)
-            if placeholder is None:
-                placeholder = _PLACEHOLDER_FMT.format(n=len(self._map) + 1)
-                self._map[term] = placeholder
-            return placeholder
-
-        return self._pattern.sub(_sub, value)
+        return self._redactor.mask(value)
 
     def json_value(self, value: Any) -> Any:
         """Recursively redact string leaves of a JSON-shaped value.

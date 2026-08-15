@@ -1,6 +1,7 @@
 """GitSubprocessObjectReader — the GitObjectReader adapter (SPEC v0.9.0 FR1/FR6).
 
-Intent: CONTRACT — v0.9.0 A1.1, A1.2, A1.3, A1.4, A6.1, A6.2
+Intent: CONTRACT — v0.9.0 A1.1, A1.2, A1.3, A1.4, A6.1, A6.2; v0.11.0 A7.4, A8.1, A8.2,
+A9.2, A9.3, A2.1, A2.2, A2.3, A2.4, A2.5
 
 Drives a real throwaway git repo under pytest ``tmp_path`` (never inside the source
 tree). Covers both FR1 range forms (resolvable ``remote_sha`` vs ``--not --remotes``),
@@ -119,14 +120,17 @@ def test_new_objects_marks_binary_blob_undecodable(tmp_path: Path) -> None:
     assert binaries[0].text == ""
 
 
-def test_new_objects_marks_oversized_blob_undecodable_and_never_fetches_its_content(
+def test_new_objects_scans_the_first_cap_bytes_of_an_oversized_text_blob(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """SPEC v0.9.0 R3 blob-size guard (code-reviewer MEDIUM finding): a blob over the
-    adapter's size cap is reported ``decodable=False`` without ever being decoded — and,
-    stronger than that, its content is never even fetched: the oversized blob's sha is
-    proven absent from every ``git cat-file --batch`` (content-read) stdin payload, only
-    ever appearing in the cheaper ``--batch-check`` (size-check) call."""
+    """SPEC v0.11.0 FR4/A4.1-A4.2 (supersedes the v0.9.0 total-blind-spot skip): a blob
+    over the adapter's size cap is read through a SEPARATE, bounded per-object stream —
+    never the batch content-read conversation (the oversized sha is proven absent from
+    every ``git cat-file --batch`` stdin payload, only ever appearing in the cheaper
+    ``--batch-check`` size-check call) — and at most the cap's worth of its content is
+    ever read. When that prefix decodes as valid UTF-8 it is reported
+    ``decodable=True``/``oversized=True`` with ``text`` carrying the DECODED PREFIX
+    (partial coverage, not zero coverage)."""
     repo = tmp_path / "repo"
     _init_repo(repo)
     big_content = "a" * (6 * 1024 * 1024)  # 6 MB, over the 5 MB cap; otherwise valid UTF-8
@@ -153,16 +157,43 @@ def test_new_objects_marks_oversized_blob_undecodable_and_never_fetches_its_cont
     objects = list(reader.new_objects(repo, tip_sha, ZERO_SHA))
 
     big = next(obj for obj in objects if obj.path == "big.txt")
-    assert big.decodable is False
-    assert big.text == ""
+    assert big.decodable is True
+    assert big.oversized is True
+    assert big.size_bytes == 6 * 1024 * 1024
+    assert big.scanned_bytes == git_objects_module._MAX_BLOB_BYTES
+    assert len(big.text.encode("utf-8")) == big.scanned_bytes  # A4.2: never over the cap.
     assert big.sha == big_sha
 
     small = next(obj for obj in objects if obj.path == "small.txt")
     assert small.decodable is True
+    assert small.oversized is False
     assert small.text == "tiny and clean\n"
 
     assert batch_stdins, "the content-read batch call must still run for the small blob"
     assert all(big_sha.encode() not in payload for payload in batch_stdins)
+
+
+def test_new_objects_oversized_blob_with_undecodable_prefix_falls_back_to_binary(
+    tmp_path: Path,
+) -> None:
+    """A4.6: an oversized blob whose scanned (first-cap-bytes) prefix is NOT valid
+    UTF-8 falls back to ``decodable=False`` — the same class an ordinary undecodable
+    blob reports — never raises, never fabricates text."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    # 6 MB of a byte that is never a valid UTF-8 lead or continuation byte.
+    (repo / "big.bin").write_bytes(b"\xff" * (6 * 1024 * 1024))
+    tip_sha = _commit(repo, "c1")
+    big_sha = _blob_sha(repo, "big.bin")
+
+    reader = GitSubprocessObjectReader()
+    objects = list(reader.new_objects(repo, tip_sha, ZERO_SHA))
+
+    big = next(obj for obj in objects if obj.path == "big.bin")
+    assert big.decodable is False
+    assert big.text == ""
+    assert big.oversized is True
+    assert big.sha == big_sha
 
 
 def test_new_objects_dedupes_a_blob_reachable_from_two_commits(tmp_path: Path) -> None:
@@ -225,3 +256,595 @@ def test_new_objects_batch_check_timeout_raises_typed_error(
     reader = GitSubprocessObjectReader()
     with pytest.raises(GitObjectReadError):
         list(reader.new_objects(repo, tip_sha, ZERO_SHA))
+
+
+# ---------------------------------------------------------------------------
+# FR7/A7.4 — `_rev_list_candidates` closes the argv interpolation site with a
+# trailing `--` end-of-options marker; `_is_resolvable_commit` rejects non-sha
+# input before it is ever interpolated into a git argv.
+# ---------------------------------------------------------------------------
+
+
+def _spy_on_rev_list(monkeypatch: pytest.MonkeyPatch) -> list[list[str]]:
+    from dadaia_workspace.infrastructure import git_objects as git_objects_module
+
+    real_run = git_objects_module._run
+    captured: list[list[str]] = []
+
+    def _spy_run(
+        args: list[str], cwd: Path, *, input_bytes: bytes | None = None
+    ) -> subprocess.CompletedProcess[bytes]:
+        if args[:3] == ["git", "rev-list", "--objects"]:
+            captured.append(args)
+        return real_run(args, cwd, input_bytes=input_bytes)
+
+    monkeypatch.setattr(git_objects_module, "_run", _spy_run)
+    return captured
+
+
+def test_rev_list_argv_carries_trailing_end_of_options_marker_resolvable_base(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Resolvable-``remote_sha`` shape (row 1): the ``--`` marker trails the revision
+    arguments so a crafted sha can never be parsed as a git option."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "a.txt").write_text("first\n")
+    base_sha = _commit(repo, "c1")
+    (repo / "b.txt").write_text("second\n")
+    tip_sha = _commit(repo, "c2")
+
+    captured = _spy_on_rev_list(monkeypatch)
+    reader = GitSubprocessObjectReader()
+    list(reader.new_objects(repo, tip_sha, base_sha))
+
+    assert captured, "rev-list --objects must have been invoked"
+    assert captured[0][-1] == "--"
+
+
+def test_rev_list_argv_carries_trailing_end_of_options_marker_fallback_shape(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Fallback (``--not --remotes``) shape (row 2): same trailing marker."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "a.txt").write_text("content\n")
+    tip_sha = _commit(repo, "c1")
+
+    captured = _spy_on_rev_list(monkeypatch)
+    reader = GitSubprocessObjectReader()
+    list(reader.new_objects(repo, tip_sha, ZERO_SHA))
+
+    assert captured, "rev-list --objects must have been invoked"
+    assert captured[0][-1] == "--"
+
+
+def test_is_resolvable_commit_rejects_option_shaped_sha_before_interpolation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An option-shaped ``remote_sha`` (e.g. ``--upload-pack=...``) must never reach
+    ``git cat-file -e <sha>^{commit}`` — it is rejected by a prefix/shape check before
+    interpolation, so the adapter treats it as unresolvable (falls back to
+    ``--not --remotes``) rather than ever spawning git with that string embedded."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "a.txt").write_text("content\n")
+    tip_sha = _commit(repo, "c1")
+
+    from dadaia_workspace.infrastructure import git_objects as git_objects_module
+
+    real_run = git_objects_module._run
+    cat_file_e_calls: list[list[str]] = []
+
+    def _spy_run(
+        args: list[str], cwd: Path, *, input_bytes: bytes | None = None
+    ) -> subprocess.CompletedProcess[bytes]:
+        if args[:3] == ["git", "cat-file", "-e"]:
+            cat_file_e_calls.append(args)
+        return real_run(args, cwd, input_bytes=input_bytes)
+
+    monkeypatch.setattr(git_objects_module, "_run", _spy_run)
+
+    malicious_remote_sha = "--upload-pack=/bin/false"
+    reader = GitSubprocessObjectReader()
+    objects = list(reader.new_objects(repo, tip_sha, malicious_remote_sha))
+
+    assert cat_file_e_calls == [], "an option-shaped sha must never be interpolated into argv"
+    # Falls back to the --not --remotes shape (no remotes configured -> full range).
+    assert {obj.path for obj in objects} == {"a.txt"}
+
+
+# ---------------------------------------------------------------------------
+# code-reviewer LOW finding (v0.11.0 pre-PR review) — the module's stated second-layer
+# argv defence (git_objects.py:37-42) must also cover `local_sha`: it is shape-checked
+# BEFORE `_rev_list_candidates` ever interpolates it into the `git rev-list` argv,
+# exactly as `_is_resolvable_commit` already does for `remote_sha`.
+# ---------------------------------------------------------------------------
+
+
+def test_new_objects_rejects_an_option_shaped_local_sha_before_interpolation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """LOW4: an option-shaped ``local_sha`` (e.g. ``--upload-pack=...``) must never
+    reach the ``git rev-list --objects <local_sha> ...`` argv — it is rejected by the
+    same sha-shape prefix check the module already applies to ``remote_sha``, raising
+    ``GitObjectReadError`` before any ``git rev-list`` subprocess is even spawned."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "a.txt").write_text("content\n")
+    _commit(repo, "c1")
+
+    from dadaia_workspace.infrastructure import git_objects as git_objects_module
+
+    real_run = git_objects_module._run
+    rev_list_calls: list[list[str]] = []
+
+    def _spy_run(
+        args: list[str], cwd: Path, *, input_bytes: bytes | None = None
+    ) -> subprocess.CompletedProcess[bytes]:
+        if args[:3] == ["git", "rev-list", "--objects"]:
+            rev_list_calls.append(args)
+        return real_run(args, cwd, input_bytes=input_bytes)
+
+    monkeypatch.setattr(git_objects_module, "_run", _spy_run)
+
+    malicious_local_sha = "--upload-pack=/bin/false"
+    reader = GitSubprocessObjectReader()
+    with pytest.raises(GitObjectReadError, match="local_sha"):
+        list(reader.new_objects(repo, malicious_local_sha, ZERO_SHA))
+
+    assert rev_list_calls == [], "an option-shaped local_sha must never reach the rev-list argv"
+
+
+# ---------------------------------------------------------------------------
+# FR8/A8.1-A8.2 — the batch header-parse boundary surfaces a truncated stream and a
+# non-numeric size field as GitObjectReadError instead of a raw ValueError, and a
+# desynchronised header shape aborts typed rather than yielding a fabricated object.
+# ---------------------------------------------------------------------------
+
+
+def _patch_batch_stdout(monkeypatch: pytest.MonkeyPatch, corrupted_stdout: bytes) -> None:
+    """Force the ``git cat-file --batch`` (content-read) call to return
+    *corrupted_stdout* while every other call in the module runs for real."""
+    from dadaia_workspace.infrastructure import git_objects as git_objects_module
+
+    real_run = git_objects_module._run
+
+    def _spy_run(
+        args: list[str], cwd: Path, *, input_bytes: bytes | None = None
+    ) -> subprocess.CompletedProcess[bytes]:
+        if args == ["git", "cat-file", "--batch"]:
+            return subprocess.CompletedProcess(args, 0, stdout=corrupted_stdout, stderr=b"")
+        return real_run(args, cwd, input_bytes=input_bytes)
+
+    monkeypatch.setattr(git_objects_module, "_run", _spy_run)
+
+
+def test_truncated_batch_stream_raises_typed_error_not_raw_value_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A8.1: a batch stream with no trailing newline after the header (truncated mid
+    read) raises GitObjectReadError — never a raw ValueError from ``bytes.index``."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "a.txt").write_text("hello\n")
+    tip_sha = _commit(repo, "c1")
+    blob_sha = _blob_sha(repo, "a.txt")
+
+    # A well-formed header line with NO trailing newline anywhere in the buffer —
+    # `out.index(b"\n", pos)` finds nothing and raises ValueError.
+    _patch_batch_stdout(monkeypatch, f"{blob_sha} blob 6".encode())
+
+    reader = GitSubprocessObjectReader()
+    with pytest.raises(GitObjectReadError, match="desynchronised"):
+        list(reader.new_objects(repo, tip_sha, ZERO_SHA))
+
+
+def test_non_numeric_size_field_raises_typed_error_not_raw_value_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A8.1: a non-numeric size field raises GitObjectReadError — never a raw
+    ValueError from ``int(size_str)``."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "a.txt").write_text("hello\n")
+    tip_sha = _commit(repo, "c1")
+    blob_sha = _blob_sha(repo, "a.txt")
+
+    _patch_batch_stdout(monkeypatch, f"{blob_sha} blob abc\nhello\n".encode())
+
+    reader = GitSubprocessObjectReader()
+    with pytest.raises(GitObjectReadError, match="desynchronised"):
+        list(reader.new_objects(repo, tip_sha, ZERO_SHA))
+
+
+def test_desynchronised_header_shape_aborts_typed_never_yields_fabricated_object(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A8.2: a header that does not split into exactly 3 fields aborts with the typed
+    error — it must NEVER yield a fabricated ``decodable=False`` object and continue
+    (continuing would leave ``pos`` inside content bytes, corrupting every later parse
+    into a stream of fabricated "binary" skips)."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "a.txt").write_text("hello\n")
+    tip_sha = _commit(repo, "c1")
+    blob_sha = _blob_sha(repo, "a.txt")
+
+    # 4 fields instead of 3 — a desynchronised header shape.
+    _patch_batch_stdout(monkeypatch, f"{blob_sha} blob 6 extra\nhello\n".encode())
+
+    reader = GitSubprocessObjectReader()
+    collected: list[object] = []
+    with pytest.raises(GitObjectReadError, match="desynchronised"):
+        for obj in reader.new_objects(repo, tip_sha, ZERO_SHA):
+            collected.append(obj)
+    assert collected == [], "no object — fabricated or otherwise — may be yielded on desync"
+
+
+# ---------------------------------------------------------------------------
+# FR9/A9.2 — the content-read `git cat-file --batch` conversation is CHUNKED: the
+# number of invocations grows with the number of chunks, not the number of blobs, and
+# an under-cap range spawns no per-object read.
+# ---------------------------------------------------------------------------
+
+
+def _spy_on_content_batch_calls(monkeypatch: pytest.MonkeyPatch) -> list[list[str]]:
+    from dadaia_workspace.infrastructure import git_objects as git_objects_module
+
+    real_run = git_objects_module._run
+    calls: list[list[str]] = []
+
+    def _spy_run(
+        args: list[str], cwd: Path, *, input_bytes: bytes | None = None
+    ) -> subprocess.CompletedProcess[bytes]:
+        if args == ["git", "cat-file", "--batch"]:
+            calls.append(args)
+        return real_run(args, cwd, input_bytes=input_bytes)
+
+    monkeypatch.setattr(git_objects_module, "_run", _spy_run)
+    return calls
+
+
+def test_under_cap_blob_count_spawns_a_single_batch_call_not_per_object(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """FR9/A9.2: a blob count well under the chunk size spawns exactly ONE content-read
+    batch call — never one subprocess per object (the single-conversation win FR9
+    preserves)."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "a.txt").write_text("a\n")
+    (repo / "b.txt").write_text("b\n")
+    tip_sha = _commit(repo, "c1")
+
+    batch_calls = _spy_on_content_batch_calls(monkeypatch)
+
+    reader = GitSubprocessObjectReader()
+    objects = list(reader.new_objects(repo, tip_sha, ZERO_SHA))
+
+    assert {obj.path for obj in objects} == {"a.txt", "b.txt"}
+    assert len(batch_calls) == 1
+
+
+def test_batch_conversation_invocations_grow_with_chunks_not_blob_count(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """FR9/A9.2: with the chunk size patched down to 3, a 7-blob range spawns exactly
+    ceil(7/3) == 3 content-read batch calls — the invocation count tracks the number of
+    CHUNKS, not the number of blobs."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    for i in range(7):
+        (repo / f"f{i}.txt").write_text(f"content {i}\n")
+    tip_sha = _commit(repo, "c1")
+
+    from dadaia_workspace.infrastructure import git_objects as git_objects_module
+
+    monkeypatch.setattr(git_objects_module, "_BATCH_CHUNK_SIZE", 3)
+    batch_calls = _spy_on_content_batch_calls(monkeypatch)
+
+    reader = GitSubprocessObjectReader()
+    objects = list(reader.new_objects(repo, tip_sha, ZERO_SHA))
+
+    assert len(objects) == 7
+    assert len(batch_calls) == 3
+
+
+# ---------------------------------------------------------------------------
+# FR2/A2.1-A2.5 (v0.11.0) — the prior-side same-path lookup: resolvable-base objects
+# carry the base's published text for their own path (or an explicit absence); the
+# fallback shape carries absence everywhere; a forced failure refuses typed; the
+# lookup costs a constant TWO extra batched calls per chunk, deduplicated by path.
+# ---------------------------------------------------------------------------
+
+
+def test_new_objects_resolvable_base_edited_path_carries_prior_text(tmp_path: Path) -> None:
+    """A2.1: with a resolvable ``remote_sha``, an object whose path already existed at
+    the base carries the base's FULL prior text for that SAME path."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "notes.md").write_text("original published content\n")
+    base_sha = _commit(repo, "c1")
+
+    (repo / "notes.md").write_text("edited content, different now\n")
+    tip_sha = _commit(repo, "c2")
+
+    reader = GitSubprocessObjectReader()
+    objects = list(reader.new_objects(repo, tip_sha, base_sha))
+
+    notes = next(obj for obj in objects if obj.path == "notes.md")
+    assert notes.prior_text == "original published content\n"
+
+
+def test_new_objects_resolvable_base_new_path_carries_no_prior_text(tmp_path: Path) -> None:
+    """A2.1/A2.4 (path absent at base): a genuinely NEW path — absent at the base —
+    carries an explicit absence, never an empty string."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "existing.md").write_text("unrelated\n")
+    base_sha = _commit(repo, "c1")
+
+    (repo / "brand-new.md").write_text("never published before\n")
+    tip_sha = _commit(repo, "c2")
+
+    reader = GitSubprocessObjectReader()
+    objects = list(reader.new_objects(repo, tip_sha, base_sha))
+
+    new_obj = next(obj for obj in objects if obj.path == "brand-new.md")
+    assert new_obj.prior_text is None
+
+
+def test_new_objects_fallback_shape_every_object_carries_no_prior_text(tmp_path: Path) -> None:
+    """A2.2: in the ``--not --remotes`` fallback shape (no resolvable base), EVERY
+    object carries an explicit absence — byte-identical to v0.9.0 for the same
+    inputs."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "only.txt").write_text("brand new branch content\n")
+    tip_sha = _commit(repo, "c1")
+
+    reader = GitSubprocessObjectReader()
+    objects = list(reader.new_objects(repo, tip_sha, ZERO_SHA))
+
+    assert objects
+    assert all(obj.prior_text is None for obj in objects)
+
+
+def test_new_objects_over_cap_prior_blob_carries_no_prior_text(tmp_path: Path) -> None:
+    """A2.4: a prior blob that exceeds the adapter's size cap yields no prior content
+    — the cap applies to the PRIOR side exactly as it does to the current side."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "big.txt").write_text("a" * (6 * 1024 * 1024))  # 6 MB prior version
+    base_sha = _commit(repo, "c1")
+
+    (repo / "big.txt").write_text("small now\n")
+    tip_sha = _commit(repo, "c2")
+
+    reader = GitSubprocessObjectReader()
+    objects = list(reader.new_objects(repo, tip_sha, base_sha))
+
+    big = next(obj for obj in objects if obj.path == "big.txt")
+    assert big.prior_text is None
+
+
+def test_new_objects_undecodable_prior_blob_carries_no_prior_text(tmp_path: Path) -> None:
+    """A2.4: a prior blob that is not valid UTF-8 yields no prior content."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "notes.md").write_bytes(b"\xff\xfe binary prior content")
+    base_sha = _commit(repo, "c1")
+
+    (repo / "notes.md").write_text("now it is clean text\n")
+    tip_sha = _commit(repo, "c2")
+
+    reader = GitSubprocessObjectReader()
+    objects = list(reader.new_objects(repo, tip_sha, base_sha))
+
+    notes = next(obj for obj in objects if obj.path == "notes.md")
+    assert notes.prior_text is None
+
+
+# ---------------------------------------------------------------------------
+# code-reviewer LOW finding (v0.11.0 pre-PR review) — `_resolve_prior_texts` must
+# discard `%(objecttype)` for real: only a `blob` may ever yield prior text. A path
+# that was a DIRECTORY (tree) at the base must resolve to explicit absence even in the
+# pathological case where the tree's raw bytes happen to decode as valid UTF-8 (a real
+# tree's packed 20-byte shas virtually always fail to decode, which is why this defect
+# was otherwise invisible) — proven here by forcing a decodable 'tree'-typed response
+# onto the prior-side batch conversation.
+# ---------------------------------------------------------------------------
+
+
+def test_new_objects_path_that_was_a_directory_at_base_carries_no_prior_text(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """LOW5: a path that was a directory (tree) at the base and becomes a file at the
+    tip must never have the tree's bytes read as its prior text."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "foo").mkdir()
+    (repo / "foo" / "bar.txt").write_text("nested content\n")
+    base_sha = _commit(repo, "c1")
+
+    _git(["rm", "-r", "foo"], repo)
+    (repo / "foo").write_text("now a file, not a directory\n")
+    tip_sha = _commit(repo, "c2")
+
+    from dadaia_workspace.infrastructure import git_objects as git_objects_module
+
+    real_run = git_objects_module._run
+    marker = f"{base_sha}:foo".encode()
+    fake_tree_sha = "f" * 40
+    fake_content = b"decodable tree-shaped content"
+
+    def _spy_run(
+        args: list[str], cwd: Path, *, input_bytes: bytes | None = None
+    ) -> subprocess.CompletedProcess[bytes]:
+        if input_bytes is not None and marker in input_bytes:
+            if args[2].startswith("--batch-check"):
+                return subprocess.CompletedProcess(
+                    args,
+                    0,
+                    stdout=f"{fake_tree_sha} tree {len(fake_content)}\n".encode(),
+                    stderr=b"",
+                )
+            if args == ["git", "cat-file", "--batch"]:
+                header = f"{fake_tree_sha} tree {len(fake_content)}\n".encode()
+                return subprocess.CompletedProcess(
+                    args, 0, stdout=header + fake_content + b"\n", stderr=b""
+                )
+        return real_run(args, cwd, input_bytes=input_bytes)
+
+    monkeypatch.setattr(git_objects_module, "_run", _spy_run)
+
+    reader = GitSubprocessObjectReader()
+    objects = list(reader.new_objects(repo, tip_sha, base_sha))
+
+    foo_obj = next(obj for obj in objects if obj.path == "foo")
+    assert foo_obj.prior_text is None
+
+
+# ---------------------------------------------------------------------------
+# code-reviewer MEDIUM finding M3 support (v0.11.0 pre-PR review, CLOSURE drift
+# `oversized-never-amnestied-scope-boundary`) — pin the adapter-level guarantee that an
+# oversized CURRENT object never carries prior_text, even when the base IS resolvable
+# and the SAME path existed (under cap) at that base — the prior-side lookup rides only
+# the FR9 chunked content-read loop; oversized objects are yielded through the separate
+# `_read_oversized_blob` path, which never receives `prior_texts` at all.
+# ---------------------------------------------------------------------------
+
+
+def test_new_objects_oversized_current_object_never_carries_prior_text_even_with_resolvable_base(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "big.txt").write_text("small prior version\n")  # under cap at the base
+    base_sha = _commit(repo, "c1")
+
+    (repo / "big.txt").write_text("a" * (6 * 1024 * 1024))  # 6 MB now, over cap
+    tip_sha = _commit(repo, "c2")
+
+    reader = GitSubprocessObjectReader()
+    objects = list(reader.new_objects(repo, tip_sha, base_sha))
+
+    big = next(obj for obj in objects if obj.path == "big.txt")
+    assert big.oversized is True
+    assert big.prior_text is None
+
+
+def test_new_objects_prior_side_batch_check_failure_raises_typed_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A2.3 (unit tier — ``tests/integration/test_push_gate_denylist.py`` re-proves
+    this over a real remote): a forced git failure on the prior-side ``--batch-check``
+    lookup raises ``GitObjectReadError`` — never a silent 'no prior content'."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "notes.md").write_text("published\n")
+    base_sha = _commit(repo, "c1")
+    (repo / "notes.md").write_text("edited\n")
+    tip_sha = _commit(repo, "c2")
+
+    from dadaia_workspace.infrastructure import git_objects as git_objects_module
+
+    real_run = git_objects_module._run
+    marker = f"{base_sha}:".encode()
+
+    def _flaky_run(
+        args: list[str], cwd: Path, *, input_bytes: bytes | None = None
+    ) -> subprocess.CompletedProcess[bytes]:
+        if input_bytes is not None and marker in input_bytes:
+            return subprocess.CompletedProcess(
+                args, 1, stdout=b"", stderr=b"simulated prior-lookup failure"
+            )
+        return real_run(args, cwd, input_bytes=input_bytes)
+
+    monkeypatch.setattr(git_objects_module, "_run", _flaky_run)
+
+    reader = GitSubprocessObjectReader()
+    with pytest.raises(GitObjectReadError, match="prior content"):
+        list(reader.new_objects(repo, tip_sha, base_sha))
+
+
+def test_prior_side_lookup_invocations_are_two_per_chunk_not_per_blob(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A2.5: the prior-side lookup costs exactly TWO extra batched calls per chunk
+    (``--batch-check`` + ``--batch``), independent of the number of blobs in that
+    chunk — never per-object."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    for i in range(7):
+        (repo / f"f{i}.txt").write_text(f"original {i}\n")
+    base_sha = _commit(repo, "c1")
+    for i in range(7):
+        (repo / f"f{i}.txt").write_text(f"edited {i}\n")
+    tip_sha = _commit(repo, "c2")
+
+    from dadaia_workspace.infrastructure import git_objects as git_objects_module
+
+    monkeypatch.setattr(git_objects_module, "_BATCH_CHUNK_SIZE", 3)
+
+    real_run = git_objects_module._run
+    marker = f"{base_sha}:".encode()
+    prior_calls: list[list[str]] = []
+
+    def _spy_run(
+        args: list[str], cwd: Path, *, input_bytes: bytes | None = None
+    ) -> subprocess.CompletedProcess[bytes]:
+        if input_bytes is not None and marker in input_bytes:
+            prior_calls.append(args)
+        return real_run(args, cwd, input_bytes=input_bytes)
+
+    monkeypatch.setattr(git_objects_module, "_run", _spy_run)
+
+    reader = GitSubprocessObjectReader()
+    objects = list(reader.new_objects(repo, tip_sha, base_sha))
+
+    assert len(objects) == 7
+    # 7 blobs / chunk size 3 -> 3 chunks -> 2 prior-side calls per chunk = 6 total.
+    assert len(prior_calls) == 6
+
+
+def test_prior_side_lookup_dedups_a_repeated_path_within_one_chunk(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A2.5 dedup clause: two DISTINCT blob shas at the SAME path within one chunk
+    cost exactly ONE prior-side lookup line, not two — 'a path appearing twice costs
+    one lookup' (PLAN §4)."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "file.txt").write_text("v1\n")
+    base_sha = _commit(repo, "c1")
+    (repo / "file.txt").write_text("v2\n")
+    _commit(repo, "c2")
+    (repo / "file.txt").write_text("v3\n")
+    tip_sha = _commit(repo, "c3")
+
+    from dadaia_workspace.infrastructure import git_objects as git_objects_module
+
+    real_run = git_objects_module._run
+    marker = f"{base_sha}:".encode()
+    check_stdins: list[bytes] = []
+
+    def _spy_run(
+        args: list[str], cwd: Path, *, input_bytes: bytes | None = None
+    ) -> subprocess.CompletedProcess[bytes]:
+        if input_bytes is not None and marker in input_bytes and "--batch-check" in args[2]:
+            check_stdins.append(input_bytes)
+        return real_run(args, cwd, input_bytes=input_bytes)
+
+    monkeypatch.setattr(git_objects_module, "_run", _spy_run)
+
+    reader = GitSubprocessObjectReader()
+    objects = list(reader.new_objects(repo, tip_sha, base_sha))
+
+    matching = [obj for obj in objects if obj.path == "file.txt"]
+    assert len(matching) == 2  # both the v2 and v3 blobs are new in this range.
+    assert all(obj.prior_text == "v1\n" for obj in matching)
+
+    assert len(check_stdins) == 1  # one chunk (well under 500) -> ONE batch-check call
+    assert check_stdins[0].decode().count(f"{base_sha}:file.txt") == 1

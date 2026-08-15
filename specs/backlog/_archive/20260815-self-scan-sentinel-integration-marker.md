@@ -1,6 +1,6 @@
 ---
 title: "self-scan sentinel carries only pytest.mark.slow — add the integration marker so future selector changes cannot silently drop it"
-status: picked
+status: DELIVERED — v0.11.0
 opened: 2026-08-14
 description: >-
   Materializes a LOW from the round-2 code review of v0.9.0.
@@ -65,3 +65,14 @@ The entry remains a live pickable candidate.
 the marker fix rides that exact write set rather than racing it from a second task.
 Deliberately **still not** folded into `test-suite-remediation-stewardship` (#2), which is
 not picked. Terminal disposition `DELIVERED — v0.11.0` lands at closure.
+
+## Delivery (v0.11.0 closure, 2026-08-15)
+
+**Terminal: `DELIVERED — v0.11.0`.** Delivered inside FR3 and QA-verified on A3.5
+(`specs/releases/v0.11.0/ALPHA-1-QA.md`, APPROVED): `pytestmark` now carries
+`[pytest.mark.integration, pytest.mark.slow]`, matching the six sibling modules, and the
+SENTINEL is collected under `-m integration`, `-m slow` and `-m "not quarantine"` alike — so
+a future `-m integration` adoption can no longer silently drop the one test that pins "this
+repository's own pushable tip scans clean". It rode T-110-12's write set exactly as intended
+and was **not** folded into `test-suite-remediation-stewardship` (#2), which stays unpicked.
+Evidence: `specs/_archive/releases/v0.11.0/CLOSURE.md` §Validations V6/V7 and §Dispositions.

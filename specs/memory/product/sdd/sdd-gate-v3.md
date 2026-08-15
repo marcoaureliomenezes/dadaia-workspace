@@ -2,13 +2,17 @@
 slug: sdd-gate-v3
 title: sdd-gate-v3
 category: product
-tldr: "No-lock SDD enforcement: path/mode gates, advisory presence, and a develop-only, denylist-scanned, security-gated push boundary."
+tldr: "No-lock SDD enforcement: path/mode gates, advisory presence, and a develop-only, denylist-scanned push boundary that never re-refuses a path's published value."
 summary: >-
   The merged Python PreToolUse gate enforces root whitelist, workspace venv usage,
   path class, phase, and the caller's own mode. It never waits for or blocks on another
   session. Presence is advisory. Git pre-commit warns only; pre-push enforces the CI
   preflight, develop-only branch policy, a range-scoped denylist scan of the new objects
-  the push would publish, and a security verdict covering the develop delta.
+  the push would publish, and a security verdict covering the develop delta. The scan
+  reads a chunk-bounded batched git conversation, suppresses a hit whose matched value
+  the same path already published, derives its foreign-name layer from the context
+  registry, partially scans and honestly reports oversized blobs, and masks private
+  path segments in everything it prints.
 tags:
 - sdd
 - gate
@@ -16,8 +20,8 @@ tags:
 - enforcement
 - no-locks
 - privacy
-token_estimate: 1320
-last_updated: '2026-08-14'
+token_estimate: 1600
+last_updated: '2026-08-15'
 release_origin: v0.3.0
 ---
 
@@ -89,7 +93,12 @@ remote side is policed too — a refspec aiming local `develop` at another remot
 refused, so only `refs/heads/develop → refs/heads/develop` passes. Parsing is fail-closed:
 any unparseable stdin line refuses the whole push and the message names `git push
 --no-verify` as the one traceable bypass, while empty stdin remains the distinct
-"nothing to gate" allow. Branch deletions are neither scanned nor verdict-checked. Tag
+"nothing to gate" allow. Both shas on a line are shape-validated — 40- or 64-character
+hex, or the all-zero deletion sentinel — before they can reach a git argv, so an
+option-shaped ref value is a malformed line rather than a successful empty range that
+silently skips the scan for that ref. Downstream, revision arguments carry an explicit
+`--` end-of-options marker and a sha is prefix-checked before interpolation, so no
+supplied value is parsed as a git option. Branch deletions are neither scanned nor verdict-checked. Tag
 pushes keep their carve-out from the *security verdict* — which is what release
 publication depends on — but they are covered by the denylist scan.
 
@@ -109,12 +118,39 @@ The range is computed from the `remote_sha` git itself supplies on the pre-push 
 line: `git rev-list --objects <local-sha> --not <remote-sha>` when that sha resolves
 locally, and `--not --remotes` when it is zero or unresolvable, so a stale or ahead
 remote-tracking ref can neither over- nor under-scan. Only blob entries are read — through a
-single batched `git cat-file` conversation per range rather than one subprocess per object,
-which is what keeps a full-history fallback range affordable — each decoded as UTF-8 and
-de-duplicated by object sha across the whole push, then streamed into the matcher rather than
-materialised as a list. A deletion ref
+batched `git cat-file` conversation rather than one subprocess per object, which is what
+keeps a full-history fallback range affordable, and run over **fixed-size chunks of shas**
+(500) rather than one buffer per range, so the peak resident set is a constant of the chunk
+size and the per-object cap instead of growing with the range. Each blob is decoded as UTF-8
+and de-duplicated by object sha across the whole push, then streamed into the matcher rather
+than materialised as a list. A deletion ref
 publishes no object and is not scanned. The working tree and existing history are out of
 scope by design — whole-tree scanning stays in the audit lane.
+
+#### Prior-published-term amnesty
+
+A new blob is not the same thing as a new publication. Where the range has a resolvable
+base, every scanned object also carries the **prior published text of its own path**,
+resolved at that base inside the same chunk loop through two extra batched calls per chunk —
+never one per blob — and the matcher suppresses a candidate hit **iff the exact matched value
+occurs, case-insensitively, in that prior text**. Three consequences define the semantics:
+
+- editing a file that already published the matched value at the same path never refuses, so
+  the gate never demands a rewrite of content the operator already published;
+- the same value introduced into a **new path** still refuses — the amnesty binds to the
+  path, not to the value;
+- a **new value** in an edited path still refuses, even when a different value of the same
+  pattern was already there, because the predicate keys on the matched value itself and never
+  on the pattern id or the term layer. That distinction is the whole difference between an
+  amnesty and a smuggling path.
+
+In the `--not --remotes` fallback shape there is no single published base, so no object
+carries prior text and **no hit is ever suppressed** — a deliberate conservative boundary.
+The prior text serves the predicate and is discarded; only the masked term ever leaves the
+matcher. The suppression rule is expressed once and applies uniformly to all three term
+layers, and the matcher gains no parameter and no new input source to obtain it: the prior
+side arrives on the scanned object itself, so the decision logic stays a pure function of the
+objects and terms it already receives.
 
 Term sources are additive, and the scan is never a no-op:
 
@@ -132,10 +168,18 @@ Term sources are additive, and the scan is never a no-op:
    internal-hostname pattern would otherwise read as a `.home` hostname. Every carve-out is
    anchored to an exact literal: any other `.local` host, any other subdomain of the
    carved-out host, and any real `.home` hostname still match;
-3. the **foreign repo slugs** — the directory names under `repos/`, excluding the slug of
-   the repository being pushed, matched on word boundaries so a short slug never fires
-   inside a longer word, and **case-insensitively**, so a slug written with different
-   capitalisation is still caught. The whole matcher is case-insensitive on every layer.
+3. the **foreign names** — every Spec Context identity the workspace knows: the registry's
+   context names unioned with its repo slugs unioned with the directory names under
+   `repos/`, minus **both** identities of the repository being pushed (its context name and
+   its repo slug are separate fields and may differ, so subtracting only one would make the
+   gate refuse every push of its own repository). Deriving the layer from the registry rather
+   than from directories alone is what keeps a DEAD or relocated context protecting its name
+   at exactly the lifecycle moment that name becomes more sensitive, not less. The registry
+   reaches the CLI through a container seam, and a missing, empty or malformed registry
+   degrades to the directory-derived set rather than killing the push hook. Terms match on
+   word boundaries so a short name never fires inside a longer word, and
+   **case-insensitively**, so a name written with different capitalisation is still caught.
+   The whole matcher is case-insensitive on every layer.
 
 With no operator denylist present, layers 2 and 3 still run; the gate names on stderr the
 mode it ran in — `operator denylist + baseline` or `baseline only (no operator
@@ -147,15 +191,30 @@ The boundary between fail-closed and fail-open is explicit:
 
 | Situation | Verdict |
 |---|---|
-| A term matches | refuse |
+| A term matches and the same path did not already publish that value | refuse |
 | `git rev-list` or an object read fails | refuse, naming the git failure |
+| The prior-side lookup fails | refuse — an amnesty is never granted from a base the adapter could not read |
+| The path is absent at the base, or its prior blob is over the cap or undecodable | no prior content, so every hit on it refuses; absence is explicit and is never an empty string |
+| The batch stream desynchronises, or a header field will not parse | abort with the reader's own typed error — no fabricated object is ever yielded, so nothing invented can reach a skip count |
 | A blob is not valid UTF-8 | skip that blob, count it, and report the count on the allow and refuse paths alike |
-| A blob exceeds the 5 MB per-object cap | skip it the same way — the size is known from the batch-check listing, so its content is never fetched at all |
+| A blob exceeds the 5 MB per-object cap | scan its first 5 MB and report it as an oversized note; the remainder is never fetched |
 | No object source wired into the decision function | refuse at the CLI boundary — the source is a required parameter, so an unwired production path is a defect, not a bypass |
 
-There is no sanctioned-terms or amnesty list anywhere in the product: a new object
-carrying a denylisted term always blocks. The edge case that would have demanded one —
-a term already published inside `specs/_archive/` — is void by construction:
+The cap is a partial-coverage fail-open, not a blind spot, and it is reported as one. An
+over-cap blob is read through a separate bounded per-object stream that is closed once the
+cap's worth of bytes is in hand, so git stops producing and the remainder is genuinely never
+fetched, and that prefix is matched like any other content — an oversized text blob whose
+first 5 MB carries a term refuses the push. The two skip classes stay separately counted and
+separately worded: the binary count covers genuinely undecodable blobs only, while oversized
+blobs are carried as structured notes bearing the path, the total size and the scanned bytes,
+and rendered as what they are — first 5 MB scanned, remainder **not** scanned, verify by
+hand — on the allow path and the refuse path alike. An oversized blob whose prefix is not
+valid UTF-8 falls back to the binary count and its wording.
+
+There is no sanctioned-terms or amnesty list anywhere in the product: the amnesty derives
+from published git state, and a value the same path never published always blocks. The edge
+case that would have demanded such a list — a term already published inside
+`specs/_archive/` — is void by construction:
 
 > **FROZEN↔scan invariant.** `specs/_archive/` is FROZEN (`DADAIA.md` §3): it is never
 > edited, and it is entered only by `git mv`. A rename creates no new blob — git reuses the
@@ -176,7 +235,7 @@ refuses its own push. The blob-reuse guarantee is a property of `git mv`, not of
 The refusal is satisfiable and masked. Per offending object it names the ref
 (`<local-ref> → <remote-ref>`), the blob path with the 1-based line number of the first
 match, the short object sha, the term masked to `first…last`, and the source layer
-(operator denylist, baseline pattern id, or foreign slug). It then names the law it
+(operator denylist, baseline pattern id, or foreign name). It then names the law it
 enforces and the remediation: edit the file, rewrite the offending commits (`--amend`,
 interactive rebase, cherry-pick) so no pushed object carries the term, and push again —
 the range scope means already-published history never needs a rewrite. The message never
@@ -184,8 +243,33 @@ prints the matched line and never prints the term unmasked; at most ten offendin
 are listed, followed by a count of the remainder. `git push --no-verify` remains the
 single traceable bypass and is named in the message.
 
-Decision logic stays pure: git object listing reaches it through a port the CLI injects,
-never a subprocess inside the decision module ([[architecture]]).
+The masking is stated over a class, not a call site: **every operator-facing string the gate
+emits that names a blob path masks that path's private-name-bearing segments** — today the
+denylist refusal and the oversized note, and any future channel by inheritance. The path is
+split on `/` and only the segments matching a term source are replaced, through the same
+stdlib-pure primitive in `core/redaction.py` that the `--redact` operator surface consumes
+([[architecture]]); the line number, the short sha and every non-matching segment are left
+alone, so the operator can still find the file, and a path that matches nothing renders
+byte-identically to an unmasked one.
+
+Measured cost on this repository's own content, on the shipped code. The fallback shape —
+the whole reachable history a fresh clone presents, 9,095 blobs and 130.29 MB — reads in
+1.26 s and matches in 53.87 s: **0.42 s/MB end to end at a 285.5 MiB peak resident set**,
+with matching accounting for ~98% of the total. The ordinary resolvable-base range is the
+one operators actually meet and is three orders of magnitude cheaper: a 70-blob push costs
+~48 ms, about 12 ms of which is the prior-side lookup's two extra batched calls per chunk.
+**These are the product's figures; the 2.978 s benchmark recorded in the archived v0.9.0
+closure was measured on a synthetic corpus roughly two orders of magnitude smaller than real
+content and is superseded, as is the ~1.3 s/MB reading taken before the chunked reader
+shipped.** Match throughput is the dominant term and is deliberately left unoptimised: the
+shape that pays it is rare and one-time per remote, and replacing the matching engine is its
+own engineering effort with its own correctness surface.
+
+Decision logic stays pure: git object listing and prior-side resolution reach it through a
+port the CLI injects, never a subprocess inside the decision module ([[architecture]]). The
+adapter's parse boundary is typed in both directions — a truncated stream, a non-numeric size
+field or a desynchronised header raises the reader's own error rather than letting a raw
+parse exception escape or, worse, letting the reader keep parsing content bytes as headers.
 
 ## Context Injection
 

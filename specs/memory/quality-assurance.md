@@ -19,8 +19,8 @@ tags:
 - flake
 - quarantine
 - privacy
-token_estimate: 1900
-last_updated: '2026-08-14'
+token_estimate: 1980
+last_updated: '2026-08-15'
 release_origin: v0.3.0
 ---
 
@@ -58,10 +58,10 @@ Codex invocation unless the corresponding live flag is set
 `DADAIA_CLAUDE_LIVE`), and it fakes `ensure_workspace_venv` so no test ever builds a
 real venv (disk/time protection). Temporary workspaces use pytest `tmp_path` or
 workspace `.dadaia/tmp/`; they never bootstrap the source repo as a consumer
-workspace. The gating set is ~2,123 collected tests, of which 55 are LARGE (e2e-tier
-pytest journeys; the wider LARGE census including the browser specs is ~84). A full
-local run passes ~2,120 with 3 environment-conditional skips (two Windows-only, one
-requiring a LAN IPv4) in 4:37 under `-n auto`.
+workspace. The gating set is ~2,253 collected tests, of which 56 are LARGE (e2e-tier
+pytest journeys; the wider LARGE census including the browser specs is ~85). A full
+local run passes 2,253 with 3 environment-conditional skips (two Windows-only, one
+requiring a LAN IPv4); the declared wall-clock baselines live in "Test Health" below.
 
 ## Root Cause, Always
 
@@ -88,6 +88,15 @@ doctrine binds the `qa-engineer` persona, which carries it in its canonical sour
 push-boundary denylist scan ([[sdd-gate-v3]]) is the mechanical backstop for the same
 class of leak on the exit path.
 
+By-hand masking is no longer the only branch. The gate's own render boundary masks the
+private-name-bearing segments of every blob path it prints — the denylist refusal and the
+oversized-blob note alike — through the same masking primitive the `--redact` verbs use, so
+a diagnostic that names a file cannot itself leak the name it is protecting. The by-hand
+rule still governs everything an agent transcribes into an authored document: a QA artifact,
+SPEC, CLOSURE, report or handoff quoting a captured diagnostic masks what it quotes, because
+a document authored into `specs/_archive/` is an ordinary new blob and a closure that
+transcribes a private literal refuses its own push.
+
 ## Satisfiable Diagnostics
 
 A gate never demands what its own tooling refuses. Every diagnostic must be **healable by
@@ -111,7 +120,11 @@ form, and it names the single action that clears it: edit the file, then rewrite
 offending commits before the push so no pushed object carries the term. Because the
 scan's scope is the objects the push would publish, that action is always available and a
 rewrite of already-published history is never demanded — a refusal clearable only by
-rewriting published history would be a defect in the check.
+rewriting published history would be a defect in the check. The same principle governs the
+one case where whole-blob matching would otherwise produce an unclearable refusal: a value
+the same path already published never refuses again, so editing a long-lived file that
+carries a matching line is never a demand to rewrite content the operator has already
+published, and the bypass the gate names as discouraged is never the only escape.
 
 ## Browser Validation
 

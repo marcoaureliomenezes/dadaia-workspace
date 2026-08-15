@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-15T14:44:43Z",
+  "generated_at": "2026-08-15T19:14:04Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -553,8 +553,8 @@
       "title": "sdd-gate-v3",
       "category": "product",
       "area": "sdd",
-      "tldr": "No-lock SDD enforcement: path/mode gates, advisory presence, and a develop-only, denylist-scanned, security-gated push boundary.",
-      "summary": "The merged Python PreToolUse gate enforces root whitelist, workspace venv usage, path class, phase, and the caller's own mode. It never waits for or blocks on another session. Presence is advisory. Git pre-commit warns only; pre-push enforces the CI preflight, develop-only branch policy, a range-scoped denylist scan of the new objects the push would publish, and a security verdict covering the develop delta.",
+      "tldr": "No-lock SDD enforcement: path/mode gates, advisory presence, and a develop-only, denylist-scanned push boundary that never re-refuses a path's published value.",
+      "summary": "The merged Python PreToolUse gate enforces root whitelist, workspace venv usage, path class, phase, and the caller's own mode. It never waits for or blocks on another session. Presence is advisory. Git pre-commit warns only; pre-push enforces the CI preflight, develop-only branch policy, a range-scoped denylist scan of the new objects the push would publish, and a security verdict covering the develop delta. The scan reads a chunk-bounded batched git conversation, suppresses a hit whose matched value the same path already published, derives its foreign-name layer from the context registry, partially scans and honestly reports oversized blobs, and masks private path segments in everything it prints.",
       "path": "specs/memory/product/sdd/sdd-gate-v3.md",
       "tags": [
         "sdd",
@@ -564,7 +564,7 @@
         "no-locks",
         "privacy"
       ],
-      "token_estimate": 1320,
+      "token_estimate": 1600,
       "depends_on": [
         "context-management",
         "architecture",
