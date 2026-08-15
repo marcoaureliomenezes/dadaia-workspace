@@ -44,7 +44,7 @@
 
 ---
 
-- [-] **T-100-01 — [git] Commit the definition content on `feature/v0.10.0`**
+- [x] **T-100-01 — [git] Commit the definition content on `feature/v0.10.0`**
 
 **Owner role:** software-engineer (or dispatcher) · **Commit:**
 `docs(T-100-01): v0.10.0 definition — dd- lifecycle skills family`
