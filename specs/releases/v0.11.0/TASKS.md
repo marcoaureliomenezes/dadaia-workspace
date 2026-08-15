@@ -453,7 +453,7 @@ recorded in writing.
 
 ---
 
-- [-] **T-110-15 — `qa-engineer` review of the increment (alpha-1 close)**
+- [x] **T-110-15 — `qa-engineer` review of the increment (alpha-1 close)** (APPROVED — `specs/releases/v0.11.0/ALPHA-1-QA.md`; all 55 acceptance ids A1.1-A10.5 verified; QA-1 MEDIUM non-blocking finding routed to T-110-16/17)
 
 **Owner role:** qa-engineer · **Commit:** review artifact committed to the branch
 
