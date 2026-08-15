@@ -128,26 +128,55 @@ def _first_match(
     performance finding: the previous version paid the full-blob cost plus an
     O(n log n) sort for a result already known at the first hit).
 
-    SPEC v0.11.0 FR1 amnesty: a candidate is suppressed IFF its MATCHED VALUE — never
-    the pattern id or the layer — occurs case-insensitively in ``obj.prior_text`` (the
-    SAME path's published prior content; ``None`` -> no base, nothing is ever
-    suppressed, ADR D7). Keying on the value (not the source) is what stops the
-    amnesty from becoming a smuggling path: a prior email address must NOT amnesty a
-    brand-new one of the same baseline pattern id (grill R1/A1.3). The matched value is
-    used for this predicate and then discarded — only ``masked_term`` leaves this
-    module (A5.2 unaffected). Suppression is per-CANDIDATE, so a line whose every
-    candidate is suppressed simply continues to the next line — the short-circuit
-    property above is unchanged."""
-    prior_lower = obj.prior_text.lower() if obj.prior_text is not None else None
+    SPEC v0.11.0 FR1 amnesty: a candidate is suppressed IFF the SAME layer's matcher,
+    RE-RUN against ``obj.prior_text`` (the SAME path's published prior content; ``None``
+    -> no base, nothing is ever suppressed, ADR D7), produces a matched occurrence whose
+    value EQUALS (case-normalized) the current matched value. Keying on the value (not
+    the source) is what stops the amnesty from becoming a smuggling path: a prior email
+    address must NOT amnesty a brand-new one of the same baseline pattern id (grill
+    R1/A1.3). Re-running the layer's own anchored matcher — rather than testing raw
+    substring containment — is what stops a DIFFERENT, longer prior-published home-path
+    value from amnestying an unrelated new value that merely happens to be one of its
+    substrings, or a prior superstring like ``acmecorp`` from amnestying a new
+    standalone ``acme`` that was never actually published at a word boundary
+    (code-reviewer MEDIUM finding, v0.11.0 pre-PR review). The matched value is used
+    for this predicate and then discarded — only ``masked_term`` leaves this module
+    (A5.2 unaffected). Suppression is per-CANDIDATE, so a line whose every candidate is
+    suppressed simply continues to the next line — the short-circuit property above is
+    unchanged."""
+    prior_text = obj.prior_text
+    prior_lower = prior_text.lower() if prior_text is not None else None
 
-    def _suppressed(matched_value: str) -> bool:
-        return prior_lower is not None and matched_value.lower() in prior_lower
+    def _term_suppressed(term: str) -> bool:
+        """Operator-term layer: FR3(1) defines "occurs" as a literal, case-insensitive
+        substring — the SAME notion detection itself uses (``term.lower() in
+        lowered``), so re-using it against the prior text is not an anchoring mismatch;
+        it is the layer's own defined semantics, applied identically on both sides."""
+        return prior_lower is not None and term.lower() in prior_lower
+
+    def _pattern_suppressed(value: str, pattern: BaselinePatternLike) -> bool:
+        """Baseline-pattern layer: suppressed only when the SAME anchored regex,
+        re-run against the prior text, matches an occurrence whose value equals
+        *value* case-insensitively — never a raw substring test."""
+        if prior_text is None:
+            return False
+        value_lower = value.lower()
+        return any(
+            match.group(0).lower() == value_lower for match in pattern.regex.finditer(prior_text)
+        )
+
+    def _slug_suppressed(compiled: re.Pattern[str]) -> bool:
+        """Foreign-slug layer: *compiled* is ``\\bslug\\b`` (case-insensitive) — a
+        match against the prior text is already an anchored, exact-value occurrence of
+        this SAME slug (the pattern IS the value), so a boolean search doubles as the
+        value-equality check."""
+        return prior_text is not None and compiled.search(prior_text) is not None
 
     for lineno, line_text in enumerate(obj.text.splitlines(), start=1):
         line_candidates: list[Hit] = []
         lowered = line_text.lower()
         for term, _reason in terms:
-            if term and term.lower() in lowered and not _suppressed(term):
+            if term and term.lower() in lowered and not _term_suppressed(term):
                 line_candidates.append(
                     Hit(obj.path, lineno, obj.sha, _mask(term), _SOURCE_OPERATOR)
                 )
@@ -156,7 +185,7 @@ def _first_match(
                 value = match.group(0)
                 if pattern.exclude is not None and pattern.exclude.search(value):
                     continue
-                if _suppressed(value):
+                if _pattern_suppressed(value, pattern):
                     continue
                 line_candidates.append(
                     Hit(
@@ -168,7 +197,7 @@ def _first_match(
                     )
                 )
         for slug, compiled in slug_patterns:
-            if compiled.search(line_text) and not _suppressed(slug):
+            if compiled.search(line_text) and not _slug_suppressed(compiled):
                 line_candidates.append(Hit(obj.path, lineno, obj.sha, _mask(slug), _SOURCE_SLUG))
         if line_candidates:
             return line_candidates[0]

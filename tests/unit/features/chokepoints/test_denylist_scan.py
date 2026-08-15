@@ -318,6 +318,75 @@ def test_amnesty_applies_to_the_foreign_slug_layer_too() -> None:
     assert outcome.hits == ()
 
 
+# ---------------------------------------------------------------------------
+# code-reviewer MEDIUM finding (v0.11.0 pre-PR review) — the amnesty predicate must
+# suppress a candidate ONLY when the SAME layer's matcher, re-run against prior_text,
+# produces a matched value EQUAL (case-normalized) to the current matched value — never
+# raw substring containment, which lets a DIFFERENT, longer prior-published value
+# amnesty an unrelated new value that happens to be one of its substrings.
+# ---------------------------------------------------------------------------
+
+_POSITIVE_HOME_PATH_SUPERSTRING = "/hom" + "e/synthxabcd"  # a DIFFERENT prior value
+_POSITIVE_HOME_PATH_SUBSTRING = "/hom" + "e/synthxa"  # substring of the value above
+_SYNTHETIC_SLUG_SUPERSTRING_PRIOR = "the zz-fake-context-namecorp bundle"  # no \b match
+_SYNTHETIC_SLUG_STANDALONE = "zz-fake-context-name"
+
+
+def test_amnesty_does_not_suppress_a_baseline_hit_via_a_different_superstring_prior_value() -> None:
+    """code-reviewer repro 1: a prior home-path value that is a SUPERSTRING of the new
+    one (``_POSITIVE_HOME_PATH_SUPERSTRING`` extends ``_POSITIVE_HOME_PATH_SUBSTRING``
+    by four characters) must NOT suppress the new, DIFFERENT, standalone value merely
+    because it is an unanchored substring of the old one — the SAME `home-abs-path`
+    pattern re-run against prior_text must produce a matched value EQUAL to the current
+    one, and here it does not (the pattern's own boundary makes the prior match the
+    FULL superstring, never the shorter substring)."""
+    baseline = load_baseline_patterns()
+    obj = _obj_with_prior(
+        "notes.md",
+        f"now at {_POSITIVE_HOME_PATH_SUBSTRING}/project\n",
+        prior_text=f"was at {_POSITIVE_HOME_PATH_SUPERSTRING}/project\n",
+    )
+
+    outcome = scan_objects([obj], terms=(), patterns=baseline, slugs=())
+
+    assert len(outcome.hits) == 1
+    assert _POSITIVE_HOME_PATH_SUBSTRING not in outcome.hits[0].masked_term  # A5.2 still holds.
+
+
+def test_amnesty_still_suppresses_the_exact_same_anchored_baseline_value() -> None:
+    """Contrast/legitimate case: when prior_text carries the EXACT SAME anchored value
+    (not merely a superstring), the hit is still suppressed — the fix narrows the
+    predicate to value-equality, it does not disable the amnesty."""
+    baseline = load_baseline_patterns()
+    obj = _obj_with_prior(
+        "notes.md",
+        f"still at {_POSITIVE_HOME_PATH_SUBSTRING}/project\n",
+        prior_text=f"was at {_POSITIVE_HOME_PATH_SUBSTRING}/project too\n",
+    )
+
+    outcome = scan_objects([obj], terms=(), patterns=baseline, slugs=())
+
+    assert outcome.hits == ()
+
+
+def test_amnesty_does_not_suppress_a_slug_hit_lacking_a_word_boundary_match_in_prior_text() -> None:
+    """code-reviewer repro 2: prior text carrying `zz-fake-context-namecorp` (the
+    synthetic slug glued to a longer word, so `\\bzz-fake-context-name\\b` never matches
+    it) must NOT suppress a new STANDALONE occurrence of the slug — the slug layer's own
+    word-boundary pattern, re-run against prior_text, finds no match at all, so there is
+    no equal matched value to amnesty against."""
+    obj = _obj_with_prior(
+        "readme.md",
+        f"see {_SYNTHETIC_SLUG_STANDALONE} here\n",
+        prior_text=f"{_SYNTHETIC_SLUG_SUPERSTRING_PRIOR}\n",
+    )
+
+    outcome = scan_objects([obj], terms=(), patterns=(), slugs=(_SYNTHETIC_SLUG_STANDALONE,))
+
+    assert len(outcome.hits) == 1
+    assert outcome.hits[0].source_layer == "foreign repo slug"
+
+
 def test_amnesty_short_circuit_continues_to_next_line_when_every_candidate_suppressed() -> None:
     """A line whose every candidate is suppressed continues to the next line rather
     than returning early — the short-circuit property survives the new guard."""
@@ -460,6 +529,7 @@ def _oversized_obj(
     decodable: bool = True,
     size_bytes: int = 6_000_000,
     scanned_bytes: int = 5_242_880,
+    prior_text: str | None = None,
 ) -> ScannedObject:
     return ScannedObject(
         path=path,
@@ -469,6 +539,7 @@ def _oversized_obj(
         oversized=True,
         size_bytes=size_bytes,
         scanned_bytes=scanned_bytes,
+        prior_text=prior_text,
     )
 
 
@@ -511,3 +582,31 @@ def test_oversized_object_with_undecodable_prefix_counts_as_binary_only() -> Non
     assert outcome.hits == ()
     assert outcome.skipped_binary_count == 1
     assert outcome.oversized_notes == ()
+
+
+# ---------------------------------------------------------------------------
+# code-reviewer MEDIUM finding M3 support (v0.11.0 pre-PR review) — pin the matcher
+# side of the "oversized-never-amnestied" boundary: the suppression predicate is
+# evaluated identically for an oversized object exactly as for any other — `oversized`
+# never special-cases it. The real product-level guarantee that an oversized CURRENT
+# object never carries prior_text is enforced at the ADAPTER
+# (git_objects.py, pinned by
+# test_new_objects_oversized_current_object_never_carries_prior_text_even_with_resolvable_base
+# in tests/unit/infrastructure/test_git_object_reader.py); this test composes an
+# oversized object WITH prior_text set (the shape the matcher-level tests were
+# previously missing) and proves a value absent from that prior text still refuses.
+# ---------------------------------------------------------------------------
+
+
+def test_oversized_object_carrying_prior_text_still_hits_when_value_not_amnestied() -> None:
+    obj = _oversized_obj(
+        "big.md",
+        f"leading noise {_SYNTHETIC_TERM} here\n",
+        prior_text="unrelated prior content\n",
+    )
+
+    outcome = scan_objects([obj], terms=((_SYNTHETIC_TERM, "synthetic"),), patterns=(), slugs=())
+
+    assert len(outcome.hits) == 1
+    assert outcome.hits[0].path == "big.md"
+    assert len(outcome.oversized_notes) == 1  # A4.4: the note is independent of the hit.
