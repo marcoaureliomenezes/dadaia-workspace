@@ -441,7 +441,7 @@ staging ↔ `.agents` ↔ `.claude`.
 
 ---
 
-- [-] **T-100-16 — `qa-engineer` review of the increment (flat alpha close)**
+- [x] **T-100-16 — `qa-engineer` review of the increment (flat alpha close)**
 
 **Owner role:** qa-engineer · **Commit:** review artifact committed to the branch
 
