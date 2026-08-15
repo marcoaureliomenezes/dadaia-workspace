@@ -90,8 +90,9 @@ and does not create a second source of workspace law. Canonical law remains `DAD
 
 ## Motivation
 
-The 2026-08-14 baseline has nine generated Codex agent TOMLs totaling 124,557 bytes:
-the smallest is 8,208 bytes and the largest is 22,836 bytes. Shared lifecycle, gate,
+The current baseline (re-measured 2026-08-15, post-v0.10.0 ship) has nine generated
+Codex agent TOMLs totaling 126,155 bytes: the smallest is 8,548 bytes
+(`project-manager.toml`) and the largest is 23,101 bytes (`product-engineer.toml`). Shared lifecycle, gate,
 handoff and workspace-law prose is repeated across roles, so every delegation pays for
 redundant context and each repeated statement can contradict or drift from `DADAIA.md`.
 Codex needs compact role overlays plus one demonstrably loaded common-law layer.
@@ -146,9 +147,9 @@ that authority.
 
 ## Acceptance criteria
 
-- For the same nine core agents, `wc -c .codex/agents/*.toml` totals at most 49,823
-  bytes (at least 60% below the 124,557-byte baseline), and no individual TOML exceeds
-  8,192 bytes.
+- For the same nine core agents, `wc -c .codex/agents/*.toml` totals at most 50,462
+  bytes (at least 60% below the 126,155-byte baseline re-measured 2026-08-15,
+  post-v0.10.0 ship), and no individual TOML exceeds 8,192 bytes.
 - Every generated Codex persona retains its `name`, `description`, resolved `model`,
   `model_reasoning_effort`, role identity, decision/authority boundaries, allowed writes
   and explicit refusals; contract tests cover all nine core roles.
@@ -236,13 +237,36 @@ that authority.
 - `dadaia public doctor` is green, including Codex projection checks and
   `[ok] public-privacy`, and the full test suite is green.
 
-## Baseline note (2026-08-15 — v0.10.0 pick)
+## Baseline note (2026-08-15 — re-measured post-v0.10.0 ship; P-5 executed)
 
-v0.10.0 (`dd-lifecycle-skills-family`, approved 2026-08-15) was explicitly ruled
-**not** to absorb this entry (its SPEC §4.2 + §6-D: different surface, different
-owner) — it stays `candidate`. However that release edits three personas that render
-into the Codex TOMLs, so this entry's **124,557-byte / nine-TOML byte baseline is
-invalidated at the v0.10.0 ship**. Per the release's SPEC §7 disposition, the PM
-re-measures and rewrites the baseline figures here after v0.10.0 ships; until then
-the byte numbers in this entry are historical (2026-08-14 adoption measurement), not
-current.
+v0.10.0 (`dd-lifecycle-skills-family`, shipped 2026-08-15, PR #191 squash `4c89d23f`,
+reconciled `57dc4937`) was explicitly ruled **not** to absorb this entry (its SPEC §4.2 +
+§6-D) — it stays `candidate`. That release edited three personas rendered into the Codex
+TOMLs, invalidating the 2026-08-14 adoption baseline. Per the release's SPEC §7
+disposition, the PM re-measured after the ship (projections installed 2026-08-15, HEAD
+`57dc4937`):
+
+- nine TOMLs; `wc -c .codex/agents/*.toml` total **126,155 bytes** (was 124,557 B at
+  the 2026-08-14 adoption measurement, range 8,208-22,836 B — now historical);
+- smallest `project-manager.toml` 8,548 B; largest `product-engineer.toml` 23,101 B;
+- 60%-reduction target derived from this baseline: total <= **50,462 bytes**.
+
+The byte figures in Motivation and Acceptance criteria above are rewritten to this
+baseline. Trace: operator-delegated adjudication, 2026-08-15 (goal directive), verdicts
+per PM recommendation — pre-approved queue item P-5 of intake report #2
+(`.dadaia/reports/dadaia-workspace/project-manager/2026-08-15T152234Z-intake.html`).
+
+## Merged scope (ADR #15 intake report #2, item 2-7)
+
+**APPROVED AS MERGE** — operator-delegated adjudication, 2026-08-15 (goal directive),
+verdicts per PM recommendation. Item 2-7 of intake report #2: a stale
+`public/rules/*.md` taxonomy row at `ai-harness-codex/SKILL.md:99` still describes an
+asset family retired by the law-file consolidation releases ago — `public/rules/**` is a
+dead path (confirmed by the v0.10.0 ship security review; verified live at HEAD
+`57dc4937`). Source: QA-2, v0.10.0 `ALPHA-1-QA.md` / CLOSURE `## Intake candidates`.
+Folded into this entry's existing "correct stale Codex documentation" scope rather than
+opening a second entry.
+
+Acceptance addendum (2-7): `ai-harness-codex/SKILL.md` carries no `public/rules/*.md`
+taxonomy row, and a repository scan finds zero live claims that a projected
+`public/rules/**` asset family exists.
