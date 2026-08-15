@@ -336,7 +336,7 @@ done — exactly the SDD shape. Map Codex workflow expectations onto dadaia's ga
 
 | SDD phase | Primary agent | Gate | Output |
 |---|---|---|---|
-| Intake | `project-manager` | clear scope | backlog candidate / bug |
+| Intake | `project-manager` | clear scope | intake-report item / bug |
 | Specs | `product-engineer` + specialists | SPEC/PLAN/TASKS **Aprovado** | release with test criteria, reviewers agreeing pre-impl |
 | Reserve | implementer | TASKS.md marker `[-]` | clear write set, reserved task |
 | Implementation | specialist by path family | unit/integration tests | implementation handoff (task NOT done if review pending) |

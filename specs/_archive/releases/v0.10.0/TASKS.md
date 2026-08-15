@@ -70,7 +70,7 @@ Set `ACTIVE.md` phase from `DEFINITION` to `IMPLEMENTATION` in the same commit.
 
 ---
 
-- [ ] **T-100-02 — [git] Milestone (a): merge, security review, push**
+- [x] **T-100-02 — [git] Milestone (a): merge, security review, push**
 
 **Owner role:** dispatcher + `security-reviewer` · **Commit:** merge commit on `develop`
 
@@ -90,7 +90,7 @@ to the pushed tip, plus the CI preflight.
 
 ---
 
-- [ ] **T-100-03 — Baseline census (the denominator for FR15)**
+- [x] **T-100-03 — Baseline census (the denominator for FR15)**
 
 **Owner role:** ai-engineer · **Commit:**
 `chore(T-100-03): capture pre-release always-on and skill-surface baseline`
@@ -112,7 +112,7 @@ every figure and the command that produced it, ready to be quoted in CLOSURE.
 
 ---
 
-- [ ] **T-100-04 — `dd-backlog-definition` (new): vocabulary home, BACKLOG schema, intake gate**
+- [x] **T-100-04 — `dd-backlog-definition` (new): vocabulary home, BACKLOG schema, intake gate**
 
 **Owner role:** ai-engineer · **Commit:**
 `feat(T-100-04): dd-backlog-definition — curation, vocabulary and operator-gated intake`
@@ -139,7 +139,7 @@ mechanics. Do **not** restate picking (`dd-release-definition`) or the sweep
 
 ---
 
-- [ ] **T-100-05 — `dd-release-definition` (rename + revisit)**
+- [x] **T-100-05 — `dd-release-definition` (rename + revisit)**
 
 **Owner role:** ai-engineer · **Commit:**
 `refactor(T-100-05): rename dadaia-release-definition to dd-release-definition`
@@ -162,7 +162,7 @@ survive; the milestone-(a) mechanics at `:67-70` are untouched.
 
 ---
 
-- [ ] **T-100-06 — `dd-release-implement` (new) + E-3 cadence table move**
+- [x] **T-100-06 — `dd-release-implement` (new) + E-3 cadence table move**
 
 **Owner role:** ai-engineer · **Commit:**
 `feat(T-100-06): dd-release-implement and the gate-cadence table move`
@@ -186,7 +186,7 @@ in `public/`.
 
 ---
 
-- [ ] **T-100-07 — `dd-release-closure` (rename + revisit)**
+- [x] **T-100-07 — `dd-release-closure` (rename + revisit)**
 
 **Owner role:** ai-engineer · **Commit:**
 `refactor(T-100-07): rename dadaia-release-closure and re-route release residuals`
@@ -211,7 +211,7 @@ the file.
 
 ---
 
-- [ ] **T-100-08 — `dd-audit-project` (full merge + rename of `drift-detection`)**
+- [x] **T-100-08 — `dd-audit-project` (full merge + rename of `drift-detection`)**
 
 **Owner role:** ai-engineer · **Commit:**
 `refactor(T-100-08): merge drift-detection into dd-audit-project with its lifecycle wrapper`
@@ -237,7 +237,7 @@ evidence for which dimension). Route dispositions by reference to
 
 ---
 
-- [ ] **T-100-09 — `dd-bug-registration` (new) + `dadaia-cli` dehydration**
+- [x] **T-100-09 — `dd-bug-registration` (new) + `dadaia-cli` dehydration**
 
 **Owner role:** ai-engineer · **Commit:**
 `feat(T-100-09): dd-bug-registration consolidates the duplicated registration blocks`
@@ -260,7 +260,7 @@ this skill never reproduces and never fixes.
 
 ---
 
-- [ ] **T-100-10 — `dd-bug-fix` (new) + `dadaia-gitflow` dehydration**
+- [x] **T-100-10 — `dd-bug-fix` (new) + `dadaia-gitflow` dehydration**
 
 **Owner role:** ai-engineer · **Commit:**
 `feat(T-100-10): dd-bug-fix owns Arm B end-to-end`
@@ -285,7 +285,7 @@ not cut.
 
 ---
 
-- [ ] **T-100-11 — Law dehydration at the source (`public/data/DADAIA.md`)**
+- [x] **T-100-11 — Law dehydration at the source (`public/data/DADAIA.md`)**
 
 **Owner role:** ai-engineer · **Commit:**
 `refactor(T-100-11): dehydrate stage protocol out of the always-on law`
@@ -313,7 +313,7 @@ eyeball (A9.6).
 
 ---
 
-- [ ] **T-100-12 — F-0 persona-scope fix and the rename ripple**
+- [x] **T-100-12 — F-0 persona-scope fix and the rename ripple**
 
 **Owner role:** ai-engineer · **Commit:**
 `fix(T-100-12): correct ai-engineer's declared rule surface and every renamed-skill reference`
@@ -354,7 +354,7 @@ zero hits.
 
 ---
 
-- [ ] **T-100-13 — ADR #15 external surfaces (I4–I8)**
+- [x] **T-100-13 — ADR #15 external surfaces (I4–I8)**
 
 **Owner role:** ai-engineer · **Commit:**
 `docs(T-100-13): operator-gated intake across the personas and orchestration surfaces`
@@ -386,7 +386,7 @@ candidate. Each is a one-line correction or reference — the full doctrine stay
 
 ---
 
-- [ ] **T-100-14 — Codex D-CX-7 prefix gate, its contract test, and the test goldens**
+- [x] **T-100-14 — Codex D-CX-7 prefix gate, its contract test, and the test goldens**
 
 **Owner role:** software-engineer · **Commit:**
 `fix(T-100-14): keep the codex skill-reference check live for the dd- family`
@@ -416,7 +416,7 @@ and regenerate both golden fixtures. Test intent at birth:
 
 ---
 
-- [ ] **T-100-15 — Re-projection, orphan sweep, byte verification**
+- [x] **T-100-15 — Re-projection, orphan sweep, byte verification**
 
 **Owner role:** ai-engineer · **Commit:**
 `chore(T-100-15): re-project the dd- family and sweep orphaned projections`
@@ -441,7 +441,7 @@ staging ↔ `.agents` ↔ `.claude`.
 
 ---
 
-- [ ] **T-100-16 — `qa-engineer` review of the increment (flat alpha close)**
+- [x] **T-100-16 — `qa-engineer` review of the increment (flat alpha close)**
 
 **Owner role:** qa-engineer · **Commit:** review artifact committed to the branch
 
@@ -465,7 +465,7 @@ returning named defects to the implementer.
 
 ---
 
-- [ ] **T-100-17 — Memory update (CLOSURE phase)**
+- [x] **T-100-17 — Memory update (CLOSURE phase)**
 
 **Owner role:** product-engineer · **Commit:**
 `docs(T-100-17): memory — dd- family, backlog doctrine and intake gate`
@@ -496,7 +496,7 @@ added; SPEC §5 satisfied file by file.
 
 ---
 
-- [ ] **T-100-18 — CLOSURE, dispositions, archive, version bump**
+- [x] **T-100-18 — CLOSURE, dispositions, archive, version bump**
 
 **Owner role:** product-engineer (text) + software-engineer/dispatcher (**[git]** steps)
 · **Commit:** `docs(T-100-18): close release v0.10.0`

@@ -20,6 +20,9 @@ skills:
   - ai-harness-claude-code
   - ai-harness-codex
   - ai-context-engineering
+  - dd-release-implement
+  - dd-bug-fix
+  - dd-bug-registration
 maxTurns: 60
 input_contract:
   requires_inputs:
@@ -51,7 +54,9 @@ input_contract:
 paths:
   write_allowlist:
     - dadaia_workspace/public/skills/**
-    - dadaia_workspace/public/rules/**
+    - dadaia_workspace/public/data/*.md
+    - dadaia_workspace/public/scaffold/**/*AGENTS.md
+    - dadaia_workspace/public/templates/*-AGENTS.md
     - dadaia_workspace/public/agents/**
     - dadaia_workspace/public/scripts/**
     - .dadaia/reports/<ctx>/ai-engineer/**
@@ -97,7 +102,9 @@ throttled advisory warning — it is never blocked. Gate role: AI-entity impleme
 - Agent persona files under `dadaia_workspace/public/agents/*.md`.
 - Skill files under `dadaia_workspace/public/skills/<name>/SKILL.md` and their
   supporting assets.
-- Rule files under `dadaia_workspace/public/rules/*.md`.
+- The law source `dadaia_workspace/public/data/*.md` (`DADAIA.md`, `AGENTS.md`) and the
+  scoped `*-AGENTS.md` rule files under `dadaia_workspace/public/scaffold/**/*AGENTS.md`
+  and `dadaia_workspace/public/templates/*-AGENTS.md`.
 - Assets under `dadaia_workspace/public/scripts/` (after the v0.1.10 bash-quartet
   retirement, the current inventory is 5 files, 3 shell: `certify-dadaia-workspace.sh`,
   `pre-commit-presence-gate.sh`, `pre-push-ci-gate.sh`, plus 2 memory-tooling Python
@@ -348,7 +355,8 @@ the impacted implementer can revisit its workflow.
 | Path | Permission |
 |------|------------|
 | `dadaia_workspace/public/skills/**` | Write |
-| `dadaia_workspace/public/rules/**` | Write |
+| `dadaia_workspace/public/data/*.md` (the law **source** — `DADAIA.md`, `AGENTS.md`) | Write |
+| `dadaia_workspace/public/scaffold/**/*AGENTS.md`, `dadaia_workspace/public/templates/*-AGENTS.md` | Write |
 | `dadaia_workspace/public/agents/**` | Write |
 | `dadaia_workspace/public/scripts/**` | Write (5 files, 3 shell — `certify-dadaia-workspace.sh`, `pre-commit-presence-gate.sh`, `pre-push-ci-gate.sh` — plus 2 memory-tooling Python scripts; runtime hooks are `dadaia_workspace/hooks/*.py`, software-engineer's) |
 | `.dadaia/reports/<ctx>/ai-engineer/**` | Write |
@@ -362,7 +370,10 @@ the impacted implementer can revisit its workflow.
 
 Note: `dadaia_workspace/public/` IS your territory (you author AI-entity sources);
 `.claude/`, `.agents/`, `.codex/`, `.kimi-code/` are the propagated projections (never
-hand-edit).
+hand-edit). `dadaia_workspace/public/data/DADAIA.md` is specifically the law **source** —
+you write it here. Its projections (the workspace-root `DADAIA.md` and every
+harness-directory copy) are PROTECTED and human-only (`DADAIA.md` §7): re-project via
+`dadaia public stage && dadaia public install`, never hand-edit a projected copy.
 
 ---
 

@@ -1,10 +1,10 @@
 ---
-name: dadaia-release-closure
-description: "Use when: closing a release that has all TASKS marked [x] DONE. Defines the CLOSURE.md template, the memory Markdown update protocol, the evidence-triple validation format, and the move-to-archive command. Only product-engineer invokes this skill, and only in the CLOSURE phase. (product-engineer also holds memory-write permission in the DEFINITION phase per constitution §13 — that authorization is separate from this closure skill.)"
+name: dd-release-closure
+description: "Use when: closing a release that has all TASKS marked [x] DONE. Defines the CLOSURE.md template, the memory Markdown update protocol, the evidence-triple validation format, the disposition sweep, and the move-to-archive command. Only product-engineer invokes this skill, and only in the CLOSURE phase."
 applyTo: "specs/releases/*/CLOSURE.md"
 ---
 
-# dadaia-release-closure
+# dd-release-closure
 
 > **Not a hook-enforced mechanism.** There is no workflow engine that runs the closure
 > sequence or its gates. `product-engineer` drives every step of this protocol directly.
@@ -89,7 +89,7 @@ backlog item and bug picked into (or superseded by) this release.
 
 | File | Kind | Terminal status | Evidence |
 |------|------|-----------------|----------|
-| `specs/bugs/<slug>.md` | bug | `Closed` | `<CLOSURE section \| commit sha>` |
+| `specs/bugs/*.jsonl` (bug-id `<slug>`) | bug | `Closed` | `<CLOSURE section \| commit sha>` |
 | `specs/backlog/<slug>.md` | backlog | `DELIVERED — <release-id>` | `<CLOSURE section \| commit sha>` |
 | ... | ... | ... | ... |
 
@@ -107,14 +107,19 @@ replacement test.
 | SCAFFOLD expiry | `tests/<path>::<test>` | `deleted` / `promoted to CONTRACT` | `<commit sha>` |
 | ... | ... | ... | ... |
 
-## Backlog returns
+## Intake candidates
 
-Items discovered during implementation that did not fit this release's scope. Each goes
-to either `specs/backlog/ideas.md` (informal) or `specs/backlog/candidates.md` (formal
-candidate for next planning round).
+Residuals discovered during implementation that did not fit this release's scope. The
+closer creates **no backlog entry** — ADR #15's operator-gated intake doctrine (full
+statement: `dd-backlog-definition` §5) means every residual is only ever **listed**
+here, for the PM to compile into its next operator-facing intake report. List each
+residual under one of two headings:
 
-- `backlog/candidates.md` ← <candidate>
-- `backlog/ideas.md` ← <idea>
+- **To be adjudicated** — a residual with no prior operator ruling; the PM's intake
+  report will present it for approval, rejection or discard.
+- **Pre-approved intake** — an operator-ratified deferral taken *during this release*
+  (recorded in its own SPEC or at approval); already-approved, not re-adjudicated by a
+  later intake report.
 
 ## Archive decision
 
@@ -128,16 +133,12 @@ by the operator. Should be rare.)
 ## Disposition sweep (mandatory)
 
 Before archive, flip every backlog item and bug picked into (or superseded by) the
-release to a terminal status token per the ADR-11 vocabulary, and record each flip as a
-row in the CLOSURE `## Dispositions` table with an evidence pointer (CLOSURE section or
-commit SHA). A release whose CLOSURE lacks the sweep is not closeable.
+release to a terminal status token — vocabulary and format: `dd-backlog-definition` §2
+(the canonical, single home of the terminal disposition-token table) — and record each
+flip as a row in the CLOSURE `## Dispositions` table with an evidence pointer (CLOSURE
+section or commit SHA). A release whose CLOSURE lacks the sweep is not closeable.
 
-| Kind | Terminal tokens | Format |
-|------|-----------------|--------|
-| Bug (`specs/bugs/**`) | `Closed` | frontmatter `status: Closed`; add `superseded_by: <backlog-slug>` when a picked backlog item superseded the fix |
-| Backlog (`specs/backlog/**`) | `DELIVERED`, `SUPERSEDED`, `RESOLVED`, `CONSUMED`, `DEFERRED`, `REJECTED` | Status line, case-insensitive prefix match; suffix allowed, e.g. `DELIVERED — vX.Y.Z`, `SUPERSEDED — <slug>` |
-
-Never-delete law (`DADAIA.md` §5 (Releases)): a bug or backlog file is **never deleted** —
+Never-delete law (`DADAIA.md` §5 (Backlog)): a bug or backlog file is **never deleted** —
 always marked with a terminal token and a reason. A bug is never silently dropped:
 either it is fixed (`Closed`) or a superseding backlog item covers its acceptance
 (`Closed` + `superseded_by: <slug>`). Stale or invalid items are dispositioned
@@ -165,7 +166,6 @@ SPEC-DOC-032 WARNs on a bug `status:` outside the {`Open`, `Closed`} canon.
    ```mermaid
    flowchart LR
      A --> B
-   </pre>
    ```
    For screenshots, place PNGs under `specs/assets/<scope>/<id>.png` and reference via
    `<img src="../assets/<scope>/<id>.png" alt="<text>">`.

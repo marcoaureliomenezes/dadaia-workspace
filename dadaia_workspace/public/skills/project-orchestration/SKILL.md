@@ -34,7 +34,7 @@ when it runs as the top-level session agent.
 
 | Agent | Phase (§7) | Primary mission | Routes next to (via PM) | Do not call when |
 |---|---|---|---|---|
-| `project-manager` | 1–2; coordinates all MUTATING phases | Backlog/bug intake, cross-agent dispatch, mediation, sole dispatch authority | any core agent (real dispatch — top-level only) | A single specialist can complete the task directly |
+| `project-manager` | 1–2; coordinates all MUTATING phases | Operator-gated intake report + bug intake, cross-agent dispatch, mediation, sole dispatch authority | any core agent (real dispatch — top-level only) | A single specialist can complete the task directly |
 | `project-auditor` | 4 (audit) | Memory/implementation drift, dead-code and compliance reports | project-manager | A release is still mid-implementation |
 | `product-engineer` | 5 + 8 (definition, closure) | SPEC, PLAN, TASKS, CLOSURE, ACTIVE.md, memory | software-architect, project-manager | Task is code-only and already approved |
 | `software-architect` | feeds 4/5 | Architecture decisions, ADRs, dependency contracts | software-engineer | No architectural trade-off exists |
@@ -52,7 +52,7 @@ SDD documents (`ACTIVE.md`, SPEC, PLAN, TASKS, CLOSURE):
 
 | Stage | Entry agent | Governing document(s) |
 |---|---|---|
-| Backlog definition | `project-manager` (curates), `product-engineer` (reads to author) | `specs/backlog/**` |
+| Backlog definition | `project-manager` (operator-gated intake + curates — `dd-backlog-definition`), `product-engineer` (reads to author) | `specs/backlog/**` |
 | Release definition | `product-engineer` | SPEC, PLAN, TASKS |
 | Implementation + reviews | surface implementer, then the review trio | TASKS, review handoffs |
 | Audit | `project-auditor` | `specs/audits/**` |
@@ -114,33 +114,12 @@ requires an APPROVED `security-reviewer` handoff whose `metrics.commit_sha` matc
 
 This skill carries the **orchestration judgment** a document alone cannot supply: who may
 dispatch (dispatcher purity), the persona inventory and routing, decision authority,
-mediation, escalation, and the forbidden actions. The gate cadence below is the
-human-readable contract every agent upholds by convention.
+mediation, escalation, and the forbidden actions.
 
-## Review/QA gate cadence (upheld by convention, backstopped by the push chokepoint)
+## Review/QA gate cadence
 
-`project-manager` owns orchestration discipline; `product-engineer` owns SDD artifact
-approval; implementers and reviewers own their evidence. Per ADR-3 (segment/ship
-boundaries, not per task), and per the `DADAIA.md` §5 (Releases) and the
-`dadaia-task-manager` skill (marker discipline):
-
-| Boundary | Who validates | What unlocks |
-|---|---|---|
-| Per task | implementer discipline only — TDD, unit/integration tests, pre-push CI gate, `implementation-complete` handoff; marker stays `[-]` | nothing; no per-task reviewer gate |
-| End of each `alpha-N` | `qa-engineer` only returns `APPROVE`/`REQUEST_CHANGES` (the **Review/QA Fan-Out**, qa-only) | a qa-gated commit on the release branch — no push/PR/merge/CLOSURE |
-| At `rc-N` ship (operator elects) | full **Review/QA Fan-Out** — `qa-engineer` + `code-reviewer` + `security-reviewer` must all `APPROVE` the **same implementation commit** | mark the task `[x]`; merge the release branch to local `develop` (milestone b), diff-review, push `develop`, open the `develop`→`main` PR, merge, deploy, or close the release, write `CLOSURE.md`/memory |
-
-The branch each stage runs on, its commit cadence, and the push trigger are the
-`dadaia-gitflow` skill's contract — this table states only the review/QA unlock. The
-curation step inside each closure (demote/prune verdicts, flake/quarantine handling) is
-the `dadaia-test-stewardship` skill's contract.
-
-Any `REQUEST_CHANGES`, CRITICAL/HIGH security finding, failed E2E, missing evidence, or
-stale report sends the work back to implementation; the rework loop continues until every
-required validator approves the **same implementation commit** or the operator stops the
-release. Before the applicable gate, the unlock actions above — mark the task `[x]`, push
-implementation commits, open or update a PR, and merge, deploy, or close the release — are
-forbidden; a local commit is workspace evidence, never release completion.
+The gate-cadence table and its per-(task, segment) decision procedure moved to
+`dd-release-implement` (ADR #9/E-3) — the implementers' skill, not the dispatcher's.
 
 **Pre-Implementation Agreement (settled at TASKS approval, not at implementation time).**
 The task definition must be agreed by the owning implementer set, `qa-engineer`,
@@ -232,14 +211,10 @@ steps, expected/actual behavior, suspected files, and validation command.
 Entry: `product-engineer` (dispatched by `project-manager`).
 
 Use when the operator wants a new release built from reported bugs + backlog.
-`project-manager` dispatches `product-engineer` with the
-`dadaia-release-definition` skill. Steps: (1) sanitize stale bugs/backlog
-(`deferred`/`rejected` + reason, never delete); (2) pick the bug + backlog set;
-(3) apply bug-always-solved — every picked bug is fixed in the release unless a
-picked backlog item supersedes it (`superseded_by: <slug>` on the bug + SPEC
-note); (4) a **MANDATORY** `dadaia-grill-me` session before the SPEC; (5) author
-the SPEC. `project-manager` owns the gate: a release-from-backlog must not reach
-SPEC without the grill report. See the `DADAIA.md` §5 (Releases).
+`project-manager` dispatches `product-engineer` with the `dd-release-definition`
+skill, which owns the full protocol (sanitize reference, pick, bug-always-solved,
+the mandatory `dadaia-grill-me` session, SPEC authoring). See the `DADAIA.md` §5
+(Releases).
 
 ### Playbook — security-patch
 
