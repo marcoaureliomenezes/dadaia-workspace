@@ -138,7 +138,7 @@ sha in `_is_resolvable_commit`.
 
 ---
 
-- [ ] **T-110-04 — FR8: typed parse boundary and desync abort (#26)**
+- [-] **T-110-04 — FR8: typed parse boundary and desync abort (#26)**
 
 **Owner role:** software-engineer · **Commit:**
 `fix(T-110-04): surface batch-stream desync as GitObjectReadError instead of fabricating`
