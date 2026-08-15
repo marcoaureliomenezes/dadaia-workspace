@@ -81,3 +81,10 @@ memory, exactly what the reviewer prescribed.
 
 `software-engineer` measures (and optionally optimizes); `product-engineer` lands
 the memory correction in a DEFINITION/CLOSURE phase window.
+
+## Intake adjudication (ADR #15 — report #1)
+
+**APPROVED** — operator-delegated adjudication, 2026-08-15 (goal directive), verdicts
+per PM recommendation. Adjudicated via intake report #1
+(`.dadaia/reports/dadaia-workspace/project-manager/2026-08-15T132600Z-intake.html`).
+The entry remains a live pickable candidate.
