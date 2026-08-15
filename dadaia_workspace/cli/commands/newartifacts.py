@@ -236,8 +236,10 @@ def backlog_doctor_cmd(
     """Run BL-SCHEMA/DUP/CONFLICT/STALE over the live backlog; exit non-zero on any ERROR.
 
     This is the ENFORCED backstop (ADR-D): wired into the pre-commit chokepoint + CI, it
-    rejects a hand-written divergent twin even though ``specs/backlog/`` is gitignored +
-    ADDITIVE. ``--explain`` additionally prints how each item's subjects resolved.
+    rejects a hand-written divergent twin even though ``specs/backlog/`` is ADDITIVE —
+    ``BACKLOG.md`` (the single source, SPEC v0.12.0 FR1/ADR #14) is committed repository
+    truth (``.gitignore:133-142`` opts ``*.md`` back in). ``--explain`` additionally
+    prints how each item's subjects resolved.
     """
     from dadaia_workspace.cli.anchors import derive_cli_anchors
     from dadaia_workspace.features.backlog.doctor import Severity, run_backlog_doctor

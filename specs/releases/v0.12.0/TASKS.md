@@ -313,7 +313,7 @@ A5.1–A5.6, A7.3, A7.5, A7.6, A9.1, A9.2 all hold.
 
 ---
 
-- [-] **T-120-09 — FR6: scaffold README, consumer recipe, CI job comment**
+- [x] **T-120-09 — FR6: scaffold README, consumer recipe, CI job comment**
 
 **Owner role:** software-engineer · **Commit:**
 `docs(T-120-09): describe the single-source backlog to consumers`
