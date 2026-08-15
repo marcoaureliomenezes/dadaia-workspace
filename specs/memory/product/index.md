@@ -64,6 +64,6 @@
 | slug | title | tldr |
 |------|-------|------|
 | `sdd-bug-backlog-governance` | sdd-bug-backlog-governance | Event-sourced JSONL bugs, an operator-gated single-source backlog, release consumption, audit dispositions, and a develop-only four-branch git contract. |
-| `sdd-gate-v3` | sdd-gate-v3 | No-lock SDD enforcement: path/mode gates, advisory presence, and a develop-only, denylist-scanned, security-gated push boundary. |
+| `sdd-gate-v3` | sdd-gate-v3 | No-lock SDD enforcement: path/mode gates, advisory presence, and a develop-only, denylist-scanned push boundary that never re-refuses a path's published value. |
 | `specs-doctor` | specs-doctor | Validates canonical specs structure, memory/catalog integrity, release markers, closure evidence, dispositions, bug ledgers, and audit coherence. |
 
