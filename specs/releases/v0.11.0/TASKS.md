@@ -453,7 +453,7 @@ recorded in writing.
 
 ---
 
-- [ ] **T-110-15 — `qa-engineer` review of the increment (alpha-1 close)**
+- [-] **T-110-15 — `qa-engineer` review of the increment (alpha-1 close)**
 
 **Owner role:** qa-engineer · **Commit:** review artifact committed to the branch
 
