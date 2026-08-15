@@ -211,7 +211,7 @@ the file.
 
 ---
 
-- [-] **T-100-08 — `dd-audit-project` (full merge + rename of `drift-detection`)**
+- [x] **T-100-08 — `dd-audit-project` (full merge + rename of `drift-detection`)**
 
 **Owner role:** ai-engineer · **Commit:**
 `refactor(T-100-08): merge drift-detection into dd-audit-project with its lifecycle wrapper`
