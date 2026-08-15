@@ -1,2 +1,2 @@
 release: v0.10.0
-phase: IMPLEMENTATION
+phase: CLOSURE
