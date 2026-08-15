@@ -18,7 +18,7 @@
 - [ ] Tests added or updated for new behaviour
 - [ ] `poetry run pytest` passes locally
 - [ ] `poetry run ruff check . && poetry run ruff format --check .` passes
-- [ ] `poetry run mypy --strict dadaia_workspace/` passes
+- [ ] `MYPY_CACHE_DIR=$(mktemp -d) poetry run mypy --strict dadaia_workspace/` passes (redirects the cache outside the repo -- omitting `MYPY_CACHE_DIR` leaves a `.mypy_cache/` in the checkout even with `incremental = false`; `dadaia ci preflight` redirects it automatically)
 - [ ] No secrets, absolute machine paths, or consumer-specific data introduced
 - [ ] `dadaia public stage && dadaia public install --target all` run if `public/` assets changed
 
