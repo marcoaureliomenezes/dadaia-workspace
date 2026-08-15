@@ -1,7 +1,7 @@
 """Wiring the push-range denylist scan into ``push_gate_decision`` (SPEC v0.9.0 FR1/FR2/FR5/FR6).
 
 Intent: CONTRACT — v0.9.0 A1.1, A1.2, A1.3, A1.4, A2.1, A2.2, A2.3, A2.4, A5.1, A5.2,
-A5.3, A5.4, A6.1; v0.11.0 A7.1, A7.2, A7.3, A4.5, A6.1, A6.2, A6.3, A6.6
+A5.3, A5.4, A6.1; v0.11.0 A7.1, A7.2, A7.3, A4.5, A6.1, A6.2, A6.3, A6.6, A5.1
 
 Drives ``push_gate_decision`` with an injected fake :class:`GitObjectReader` — no real
 git, no filesystem (FR7/A7.2). Only synthetic terms/slugs ever appear here (TASKS
@@ -379,6 +379,32 @@ def test_oversized_note_appears_in_decision_warn_on_refuse(tmp_path: Path) -> No
     assert decision.warn is not None
     assert "big.md" in decision.warn
     assert "NOT scanned" in decision.warn
+
+
+# ---------------------------------------------------------------------------
+# FR5/A5.1 (v0.11.0, entry #22) — decision-layer wiring readiness: push_gate_decision
+# refuses when its injected foreign_slugs set carries a registry context's NAME and
+# its repo_slug both -- the exact shape T-110-13's widened _foreign_repo_slugs
+# (cli/commands/ci.py, tested at the integration tier over a real registry fixture in
+# tests/integration/test_push_gate_denylist.py) now supplies.
+# ---------------------------------------------------------------------------
+
+
+def test_foreign_slugs_carrying_a_registry_name_and_slug_both_refuse(tmp_path: Path) -> None:
+    dead_name = "zz-dead-context-name"
+    dead_slug = "zz-dead-context-slug"
+    source = _FakeObjectSource(
+        by_range={(_SHA_A, _ZERO): [_obj("notes.md", f"mentions {dead_name} here\n")]}
+    )
+    decision = push_gate_decision(
+        tmp_path,
+        _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
+        object_source=source,
+        repo=tmp_path,
+        foreign_slugs=(dead_name, dead_slug),
+    )
+    assert not decision.allowed
+    assert dead_name not in decision.message
 
 
 # ---------------------------------------------------------------------------

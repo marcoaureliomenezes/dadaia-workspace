@@ -1,22 +1,29 @@
 """Push-range denylist scan over a REAL throwaway git repo (SPEC v0.9.0 FR4/FR6;
-SPEC v0.11.0 FR1/FR2).
+SPEC v0.11.0 FR1/FR2/FR5).
 
-Intent: CONTRACT — v0.9.0 A4.2, A6.1; v0.11.0 A1.6, A2.3, A10.2
+Intent: CONTRACT — v0.9.0 A4.2, A6.1; v0.11.0 A1.6, A2.3, A10.2, A5.1, A5.2, A5.4
 
 Exercises the real ``GitSubprocessObjectReader`` adapter (real ``git`` subprocess) wired
 into ``push_gate_decision`` — no CLI layer, so this stays a fast, direct integration
 proof of the FROZEN<->scan invariant (FR4), the fail-closed git-failure boundary
 (FR6 row 2), and — since v0.11.0 — the FR1 amnesty over a real range with a real
-remote. Only synthetic terms ever appear here (TASKS standing rule).
+remote. The FR5 registry-derived foreign-name tests below DO cross into the CLI/
+container layer (``container.load_registry_context_identities``,
+``cli.commands.ci._foreign_repo_slugs``) — the only way to exercise the real registry
+seam over a real fixture registry file, per this task's declared write set. Only
+synthetic terms ever appear here (TASKS standing rule).
 """
 
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 
 import pytest
 
+from dadaia_workspace import container
+from dadaia_workspace.cli.commands import ci
 from dadaia_workspace.core.protocols.git_object_reader import GitObjectReadError
 from dadaia_workspace.features.chokepoints import push_gate_decision
 from dadaia_workspace.features.chokepoints.service import PushRef
@@ -24,6 +31,27 @@ from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReade
 
 _SYNTHETIC_TERM = "zz-frozen-invariant-term"
 _ZERO = "0" * 40
+
+
+def _write_registry(workspace: Path, contexts: list[dict]) -> None:
+    states = workspace / ".dadaia" / "states"
+    states.mkdir(parents=True, exist_ok=True)
+    (states / "spec_contexts.json").write_text(
+        json.dumps({"schema_version": "2", "contexts": contexts})
+    )
+
+
+def _registry_ctx_row(name: str, *, repo_slug: str | None = None, state: str = "dead") -> dict:
+    return {
+        "name": name,
+        "state": state,
+        "repo_slug": repo_slug or name,
+        "repo_url": f"https://example.com/{repo_slug or name}.git",
+        "created_at": "2026-01-01T00:00:00Z",
+        "alive_since": "2026-01-01T00:00:00Z" if state == "alive" else None,
+        "dead_since": "2026-05-01T00:00:00Z" if state == "dead" else None,
+        "current_branch": None,
+    }
 
 
 def _git(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
@@ -200,6 +228,120 @@ def test_prior_side_lookup_failure_refuses_naming_the_failure_and_no_verify(
     assert not decision.allowed
     assert "prior content" in decision.message
     assert "--no-verify" in decision.message
+
+
+# ---------------------------------------------------------------------------
+# FR5/A5.1-A5.4 (v0.11.0, entry #22) — the registry-derived foreign-name layer, over a
+# REAL registry fixture file and the REAL container/CLI seam functions.
+# ---------------------------------------------------------------------------
+
+
+def test_dead_registry_context_name_and_slug_both_refuse_a_push_introducing_them(
+    tmp_path: Path,
+) -> None:
+    """SPEC v0.11.0 A5.1: a DEAD registry context's name AND its repo_slug both refuse
+    a push that introduces them in new content — the registry-derived layer protects a
+    context whose repo directory is absent, which the v0.9.0 directory-derived-only
+    set silently forgot."""
+    workspace = tmp_path / "workspace"
+    repo = workspace / "repos" / "pushing-repo"
+    _init_repo(repo)
+    (repo / "notes.md").write_text("first\n")
+    tip_sha = _commit(repo, "c1")
+
+    dead_name = "zz-dead-context-name"
+    dead_slug = "zz-dead-context-slug"
+    _write_registry(
+        workspace,
+        [
+            _registry_ctx_row("pushing-repo", state="alive"),
+            _registry_ctx_row(dead_name, repo_slug=dead_slug, state="dead"),
+        ],
+    )
+
+    registry_identities = container.load_registry_context_identities(workspace)
+    foreign_slugs = ci._foreign_repo_slugs(workspace, "pushing-repo", registry_identities)
+    assert dead_name in foreign_slugs
+    assert dead_slug in foreign_slugs
+    assert "pushing-repo" not in foreign_slugs
+
+    reader = GitSubprocessObjectReader()
+
+    (repo / "notes.md").write_text(f"mentions {dead_name} now\n")
+    name_sha = _commit(repo, "introduce the dead context's name")
+    name_decision = push_gate_decision(
+        tmp_path / "handoff-empty",
+        [_tag_push_ref(name_sha, remote_sha=tip_sha)],
+        object_source=reader,
+        repo=repo,
+        foreign_slugs=foreign_slugs,
+    )
+    assert not name_decision.allowed
+    assert dead_name not in name_decision.message
+
+    (repo / "notes.md").write_text(f"mentions {dead_slug} now\n")
+    slug_sha = _commit(repo, "introduce the dead context's slug")
+    slug_decision = push_gate_decision(
+        tmp_path / "handoff-empty",
+        [_tag_push_ref(slug_sha, remote_sha=name_sha)],
+        object_source=reader,
+        repo=repo,
+        foreign_slugs=foreign_slugs,
+    )
+    assert not slug_decision.allowed
+    assert dead_slug not in slug_decision.message
+
+
+def test_own_context_with_differing_name_and_slug_never_contributes_either_identity(
+    tmp_path: Path,
+) -> None:
+    """SPEC v0.11.0 A5.2: when the PUSHING repo's own registry entry has a ``name``
+    that differs from its ``repo_slug``, NEITHER identity is contributed as a foreign
+    term — subtracting only the slug would re-open the A3.2 regression (the pushed
+    repo blocking every push of itself) through the new door the registry name opens."""
+    workspace = tmp_path / "workspace"
+    (workspace / "repos" / "own-repo-slug").mkdir(parents=True)
+    _write_registry(
+        workspace,
+        [_registry_ctx_row("own-context-name", repo_slug="own-repo-slug", state="alive")],
+    )
+
+    registry_identities = container.load_registry_context_identities(workspace)
+    foreign_slugs = ci._foreign_repo_slugs(workspace, "own-repo-slug", registry_identities)
+
+    assert "own-context-name" not in foreign_slugs
+    assert "own-repo-slug" not in foreign_slugs
+
+
+def test_missing_registry_yields_empty_and_never_crashes(tmp_path: Path) -> None:
+    """SPEC v0.11.0 A5.4 (missing case): no registry file at all yields an empty
+    result — the push hook never dies on registry state."""
+    workspace = tmp_path / "workspace-with-no-dadaia-dir"
+    assert container.load_registry_context_identities(workspace) == ()
+
+
+def test_empty_registry_yields_empty_and_never_crashes(tmp_path: Path) -> None:
+    """SPEC v0.11.0 A5.4 (empty case)."""
+    workspace = tmp_path / "workspace"
+    _write_registry(workspace, [])
+    assert container.load_registry_context_identities(workspace) == ()
+
+
+def test_malformed_registry_yields_empty_and_never_crashes(tmp_path: Path) -> None:
+    """SPEC v0.11.0 A5.4 (malformed case): invalid JSON never raises — it degrades to
+    the empty result, and the widened foreign-slug set falls back to the
+    directory-derived-only set."""
+    workspace = tmp_path / "workspace"
+    states = workspace / ".dadaia" / "states"
+    states.mkdir(parents=True)
+    (states / "spec_contexts.json").write_text("{not-json")
+
+    assert container.load_registry_context_identities(workspace) == ()
+
+    (workspace / "repos" / "own-slug").mkdir(parents=True)
+    (workspace / "repos" / "sibling-dir").mkdir(parents=True)
+    foreign_slugs = ci._foreign_repo_slugs(workspace, "own-slug", ())
+    assert foreign_slugs == ["sibling-dir"]
 
 
 def test_real_git_failure_refuses_naming_the_failure(tmp_path: Path) -> None:
