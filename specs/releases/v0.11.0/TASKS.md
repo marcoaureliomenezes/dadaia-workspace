@@ -67,7 +67,7 @@
 
 ---
 
-- [ ] **T-110-01 — [git] Commit the definition content on `feature/v0.11.0`**
+- [x] **T-110-01 — [git] Commit the definition content on `feature/v0.11.0`** (commit `11aad989`; phase flip landed one commit later, `chore(tasks)` follow-up — drift recorded)
 
 **Owner role:** software-engineer (or dispatcher) · **Commit:**
 `docs(T-110-01): v0.11.0 definition — scan-v2 amnesty and push-gate hardening`
@@ -90,7 +90,7 @@ commit.
 
 ---
 
-- [ ] **T-110-02 — [git] Milestone (a): merge, security review, push**
+- [x] **T-110-02 — [git] Milestone (a): merge, security review, push** (merge `89a703b8`; APPROVED handoff `2026-08-15T173153Z-security-reviewer-v0.11.0-definition-push`; pushed, gate exit 0)
 
 **Owner role:** dispatcher + `security-reviewer` · **Commit:** merge commit on `develop`
 
