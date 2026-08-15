@@ -90,7 +90,7 @@ to the pushed tip, plus the CI preflight.
 
 ---
 
-- [ ] **T-100-03 — Baseline census (the denominator for FR15)**
+- [-] **T-100-03 — Baseline census (the denominator for FR15)**
 
 **Owner role:** ai-engineer · **Commit:**
 `chore(T-100-03): capture pre-release always-on and skill-surface baseline`
