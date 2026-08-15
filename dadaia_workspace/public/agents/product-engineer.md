@@ -133,8 +133,8 @@ specs/
 │       ├── TASKS.md             ← task checklist — created after PLAN approval
 │       └── CLOSURE.md           ← release closure — created when all tasks [x] DONE
 ├── backlog/
-│   ├── ideas.md                 ← informal ideas, not approved for any release
-│   └── candidates.md            ← features candidate for the next release
+│   └── BACKLOG.md               ← single source: ACTIVE (live candidates) + LEDGER
+│                                   (closed items); operator-gated intake only
 └── _archive/
     ├── releases/<release-id>/   ← archived releases (read-only)
     ├── legacy-features/<name>/  ← pre-release-model features that were never implemented
@@ -369,7 +369,9 @@ template. Write `specs/releases/<release-id>/CLOSURE.md` with:
 4. **Drifts** — for each drift: `### <slug>` with `Description:`, `Resolution:`, and
    `Memory updates:` (list of `specs/memory/*.md` files touched)
 5. **Memory updates** — exact list of memory files written
-6. **Backlog returns** — items pushed to `backlog/ideas.md` or `backlog/candidates.md`
+6. **Intake candidates** — residuals discovered during the release, listed for the PM's
+   operator-facing intake report (`DADAIA.md` §5 Backlog); product-engineer creates no
+   backlog entry itself
 7. **Archive decision** — usually `MOVE`
 
 In the same CLOSURE phase, **update memory Markdown first, then write `CLOSURE.md`**

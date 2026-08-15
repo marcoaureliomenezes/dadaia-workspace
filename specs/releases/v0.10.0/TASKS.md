@@ -354,7 +354,7 @@ zero hits.
 
 ---
 
-- [-] **T-100-13 — ADR #15 external surfaces (I4–I8)**
+- [x] **T-100-13 — ADR #15 external surfaces (I4–I8)**
 
 **Owner role:** ai-engineer · **Commit:**
 `docs(T-100-13): operator-gated intake across the personas and orchestration surfaces`

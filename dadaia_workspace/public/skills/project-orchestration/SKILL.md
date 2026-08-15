@@ -34,7 +34,7 @@ when it runs as the top-level session agent.
 
 | Agent | Phase (§7) | Primary mission | Routes next to (via PM) | Do not call when |
 |---|---|---|---|---|
-| `project-manager` | 1–2; coordinates all MUTATING phases | Backlog/bug intake, cross-agent dispatch, mediation, sole dispatch authority | any core agent (real dispatch — top-level only) | A single specialist can complete the task directly |
+| `project-manager` | 1–2; coordinates all MUTATING phases | Operator-gated intake report + bug intake, cross-agent dispatch, mediation, sole dispatch authority | any core agent (real dispatch — top-level only) | A single specialist can complete the task directly |
 | `project-auditor` | 4 (audit) | Memory/implementation drift, dead-code and compliance reports | project-manager | A release is still mid-implementation |
 | `product-engineer` | 5 + 8 (definition, closure) | SPEC, PLAN, TASKS, CLOSURE, ACTIVE.md, memory | software-architect, project-manager | Task is code-only and already approved |
 | `software-architect` | feeds 4/5 | Architecture decisions, ADRs, dependency contracts | software-engineer | No architectural trade-off exists |
@@ -52,7 +52,7 @@ SDD documents (`ACTIVE.md`, SPEC, PLAN, TASKS, CLOSURE):
 
 | Stage | Entry agent | Governing document(s) |
 |---|---|---|
-| Backlog definition | `project-manager` (curates), `product-engineer` (reads to author) | `specs/backlog/**` |
+| Backlog definition | `project-manager` (operator-gated intake + curates — `dd-backlog-definition`), `product-engineer` (reads to author) | `specs/backlog/**` |
 | Release definition | `product-engineer` | SPEC, PLAN, TASKS |
 | Implementation + reviews | surface implementer, then the review trio | TASKS, review handoffs |
 | Audit | `project-auditor` | `specs/audits/**` |

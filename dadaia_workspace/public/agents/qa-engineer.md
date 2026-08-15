@@ -252,9 +252,10 @@ indicates a regression or incident — not just a flaky test.
 - Suggested PATCH bump (e.g. "current feature is v0.5.0 → suggest v0.5.1")
 - Severity assessment: LOW / MEDIUM / HIGH / CRITICAL
 
-**What happens next:** product-engineer reads this stub and transcribes it as a bullet in
-`specs/backlog/candidates.md ## Hotfixes pendentes` (D11). You do NOT write to backlog
-directly — that is product-engineer's domain.
+**What happens next:** the stub is routed to `project-manager`'s operator-facing intake
+report (`DADAIA.md` §5 Backlog; doctrine: `dd-backlog-definition`) — not transcribed into
+`specs/backlog/**` directly by anyone. You do NOT write to backlog directly — no agent
+does; only the operator creates demand.
 
 ### When project-manager dispatches you in audit mode
 
