@@ -1,6 +1,7 @@
 """GitSubprocessObjectReader — the GitObjectReader adapter (SPEC v0.9.0 FR1/FR6).
 
-Intent: CONTRACT — v0.9.0 A1.1, A1.2, A1.3, A1.4, A6.1, A6.2; v0.11.0 A7.4, A8.1, A8.2
+Intent: CONTRACT — v0.9.0 A1.1, A1.2, A1.3, A1.4, A6.1, A6.2; v0.11.0 A7.4, A8.1, A8.2,
+A9.2, A9.3
 
 Drives a real throwaway git repo under pytest ``tmp_path`` (never inside the source
 tree). Covers both FR1 range forms (resolvable ``remote_sha`` vs ``--not --remotes``),
@@ -407,3 +408,72 @@ def test_desynchronised_header_shape_aborts_typed_never_yields_fabricated_object
         for obj in reader.new_objects(repo, tip_sha, ZERO_SHA):
             collected.append(obj)
     assert collected == [], "no object — fabricated or otherwise — may be yielded on desync"
+
+
+# ---------------------------------------------------------------------------
+# FR9/A9.2 — the content-read `git cat-file --batch` conversation is CHUNKED: the
+# number of invocations grows with the number of chunks, not the number of blobs, and
+# an under-cap range spawns no per-object read.
+# ---------------------------------------------------------------------------
+
+
+def _spy_on_content_batch_calls(monkeypatch: pytest.MonkeyPatch) -> list[list[str]]:
+    from dadaia_workspace.infrastructure import git_objects as git_objects_module
+
+    real_run = git_objects_module._run
+    calls: list[list[str]] = []
+
+    def _spy_run(
+        args: list[str], cwd: Path, *, input_bytes: bytes | None = None
+    ) -> subprocess.CompletedProcess[bytes]:
+        if args == ["git", "cat-file", "--batch"]:
+            calls.append(args)
+        return real_run(args, cwd, input_bytes=input_bytes)
+
+    monkeypatch.setattr(git_objects_module, "_run", _spy_run)
+    return calls
+
+
+def test_under_cap_blob_count_spawns_a_single_batch_call_not_per_object(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """FR9/A9.2: a blob count well under the chunk size spawns exactly ONE content-read
+    batch call — never one subprocess per object (the single-conversation win FR9
+    preserves)."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "a.txt").write_text("a\n")
+    (repo / "b.txt").write_text("b\n")
+    tip_sha = _commit(repo, "c1")
+
+    batch_calls = _spy_on_content_batch_calls(monkeypatch)
+
+    reader = GitSubprocessObjectReader()
+    objects = list(reader.new_objects(repo, tip_sha, ZERO_SHA))
+
+    assert {obj.path for obj in objects} == {"a.txt", "b.txt"}
+    assert len(batch_calls) == 1
+
+
+def test_batch_conversation_invocations_grow_with_chunks_not_blob_count(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """FR9/A9.2: with the chunk size patched down to 3, a 7-blob range spawns exactly
+    ceil(7/3) == 3 content-read batch calls — the invocation count tracks the number of
+    CHUNKS, not the number of blobs."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    for i in range(7):
+        (repo / f"f{i}.txt").write_text(f"content {i}\n")
+    tip_sha = _commit(repo, "c1")
+
+    from dadaia_workspace.infrastructure import git_objects as git_objects_module
+
+    monkeypatch.setattr(git_objects_module, "_BATCH_CHUNK_SIZE", 3)
+    batch_calls = _spy_on_content_batch_calls(monkeypatch)
+
+    reader = GitSubprocessObjectReader()
+    objects = list(reader.new_objects(repo, tip_sha, ZERO_SHA))
+
+    assert len(objects) == 7
+    assert len(batch_calls) == 3

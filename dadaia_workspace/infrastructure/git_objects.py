@@ -43,6 +43,15 @@ _SHA_SHAPE_RE = re.compile(r"^[0-9a-fA-F]{40}$|^[0-9a-fA-F]{64}$")
 #: way an undecodable binary blob is, FR6 row 3).
 _MAX_BLOB_BYTES = 5 * 1024 * 1024  # 5 MB
 
+#: SPEC v0.11.0 FR9/ADR D8 — the ``git cat-file --batch`` conversation is chunked so the
+#: peak resident set is bounded by a CONSTANT (``chunk_size x cap``) rather than growing
+#: with the size of the pushed range. 500 is the code-reviewer's suggested size and the
+#: PLAN's recorded default (PLAN §5) — a measured rationale, not a tunable a test may
+#: depend on the exact value of. FR2's prior-side lookup (T-110-09) rides the SAME chunk
+#: loop, doubling the bound to ``chunk_size x cap x 2`` rather than adding a second,
+#: unbounded pass.
+_BATCH_CHUNK_SIZE = 500
+
 
 def _run(
     args: list[str], cwd: Path, *, input_bytes: bytes | None = None
@@ -150,43 +159,30 @@ def _blob_info(repo: Path, candidates: list[tuple[str, str]]) -> dict[str, tuple
     return info
 
 
-def _read_blobs(repo: Path, blob_info: dict[str, tuple[str, int]]) -> Iterator[ScannedObject]:
-    """Yield one :class:`ScannedObject` per blob in *blob_info*.
-
-    Content is read via a SINGLE batched ``git cat-file --batch`` conversation — one
-    subprocess for every blob in the range, not one per blob (code-reviewer MEDIUM
-    finding; mirrors the batching pattern :func:`_blob_info` already uses). A blob over
-    :data:`_MAX_BLOB_BYTES` is excluded from that conversation entirely — its content is
-    never fetched — and is yielded directly as ``decodable=False`` (R3 size guard).
+def _read_blob_chunk(
+    repo: Path, chunk_shas: list[str], blob_info: dict[str, tuple[str, int]]
+) -> Iterator[ScannedObject]:
+    """Yield one :class:`ScannedObject` per blob in *chunk_shas*, via a SINGLE batched
+    ``git cat-file --batch`` conversation scoped to just this chunk.
 
     v0.11.0 FR8/A8.1-A8.2: the header-parse pair (the newline lookup and the size-field
     conversion) is wrapped so a truncated stream or a non-numeric size field surfaces as
     the module's typed :class:`GitObjectReadError` instead of a raw ``ValueError``
     escaping past the module's contract. A desynchronised header shape (``len(parts) !=
-    3``) now raises the SAME typed error rather than yielding a fabricated
+    3``) raises the SAME typed error rather than yielding a fabricated
     ``decodable=False`` object and continuing: after a desync, ``pos`` points into
     content bytes and every later header parse is garbage — a stream of fabricated
     objects silently counted as binary skips. A gate that has lost sync with git's
     stream aborts; it does not invent.
     """
-    fetch_shas = [sha for sha, (_, size) in blob_info.items() if size <= _MAX_BLOB_BYTES]
-    oversized_shas = [sha for sha, (_, size) in blob_info.items() if size > _MAX_BLOB_BYTES]
-
-    for sha in oversized_shas:
-        path, _size = blob_info[sha]
-        yield ScannedObject(path=path, sha=sha, text="", decodable=False)
-
-    if not fetch_shas:
-        return
-
-    stdin_payload = ("\n".join(fetch_shas) + "\n").encode("utf-8")
+    stdin_payload = ("\n".join(chunk_shas) + "\n").encode("utf-8")
     result = _run(["git", "cat-file", "--batch"], repo, input_bytes=stdin_payload)
     if result.returncode != 0:
         raise GitObjectReadError(f"git cat-file --batch failed: {_decode(result.stderr).strip()}")
 
     out = result.stdout
     pos = 0
-    for sha in fetch_shas:
+    for sha in chunk_shas:
         path, size = blob_info[sha]
         try:
             newline_idx = out.index(b"\n", pos)
@@ -209,6 +205,30 @@ def _read_blobs(repo: Path, blob_info: dict[str, tuple[str, int]]) -> Iterator[S
             yield ScannedObject(path=path, sha=obj_sha, text="", decodable=False)
             continue
         yield ScannedObject(path=path, sha=obj_sha, text=text, decodable=True)
+
+
+def _read_blobs(repo: Path, blob_info: dict[str, tuple[str, int]]) -> Iterator[ScannedObject]:
+    """Yield one :class:`ScannedObject` per blob in *blob_info*.
+
+    Content is read via batched ``git cat-file --batch`` conversations, chunked to
+    :data:`_BATCH_CHUNK_SIZE` blobs per call (SPEC v0.11.0 FR9/ADR D8) — one subprocess
+    per CHUNK, not one per blob (code-reviewer MEDIUM finding; mirrors the batching
+    pattern :func:`_blob_info` already uses) and NOT one whole-range subprocess whose
+    output buffer grows unbounded with the range size. A blob over
+    :data:`_MAX_BLOB_BYTES` is excluded from every batch conversation entirely — its
+    content is never fetched — and is yielded directly as ``decodable=False`` (R3 size
+    guard).
+    """
+    fetch_shas = [sha for sha, (_, size) in blob_info.items() if size <= _MAX_BLOB_BYTES]
+    oversized_shas = [sha for sha, (_, size) in blob_info.items() if size > _MAX_BLOB_BYTES]
+
+    for sha in oversized_shas:
+        path, _size = blob_info[sha]
+        yield ScannedObject(path=path, sha=sha, text="", decodable=False)
+
+    for start in range(0, len(fetch_shas), _BATCH_CHUNK_SIZE):
+        chunk = fetch_shas[start : start + _BATCH_CHUNK_SIZE]
+        yield from _read_blob_chunk(repo, chunk, blob_info)
 
 
 class GitSubprocessObjectReader:

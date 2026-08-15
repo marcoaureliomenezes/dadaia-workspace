@@ -165,7 +165,7 @@ fabricated object can reach a skip count.
 
 ---
 
-- [-] **T-110-05 — FR9: bound the batch conversation's resident set (#27)**
+- [x] **T-110-05 — FR9: bound the batch conversation's resident set (#27)** (peak-bound capture: `.dadaia/tmp/software-engineer/20260815/t-110-05-peak-bound-measurement.txt`)
 
 **Owner role:** software-engineer · **Commit:**
 `perf(T-110-05): chunk the cat-file --batch conversation to a constant resident bound`
