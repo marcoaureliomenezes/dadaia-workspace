@@ -17,8 +17,10 @@ unhandled exception at the push boundary (code-reviewer MEDIUM finding).
 
 from __future__ import annotations
 
+import queue
 import re
 import subprocess
+import threading
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -207,6 +209,103 @@ def _read_blob_chunk(
         yield ScannedObject(path=path, sha=obj_sha, text=text, decodable=True)
 
 
+def _read_oversized_blob_prefix(repo: Path, sha: str) -> bytes:
+    """Read at most :data:`_MAX_BLOB_BYTES` of *sha*'s content through a SEPARATE,
+    bounded per-object stream, then close it early (SPEC v0.11.0 FR4/ADR D2-a).
+
+    This call deliberately does NOT go through :func:`_run`: closing the pipe before
+    git has finished writing makes a non-zero exit / broken-pipe outcome EXPECTED on
+    THIS call only, and ``_run``'s contract is to convert every subprocess failure into
+    :class:`GitObjectReadError` — which would misreport this intentional early close as
+    a git failure. git genuinely never produces the remainder once the pipe is closed,
+    so v0.9.0's R3 "never fetched" property holds for the truncated tail exactly as
+    before; only the DECISION of what to do with the (now non-empty) prefix changed.
+
+    A missing ``git`` executable, or the read exceeding :data:`_TIMEOUT_S` with no
+    prefix delivered, still raises :class:`GitObjectReadError` — the bound is on the
+    NORMAL, expected-success path only, not on genuine git/environment failure.
+    """
+    try:
+        proc = subprocess.Popen(  # noqa: S603 — fixed argv, no shell
+            ["git", "cat-file", "blob", sha],
+            cwd=repo,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
+    except FileNotFoundError as exc:
+        raise GitObjectReadError(f"git is not available on PATH: {exc}") from exc
+
+    result_q: queue.Queue[bytes | Exception] = queue.Queue(maxsize=1)
+
+    def _reader() -> None:
+        try:
+            assert proc.stdout is not None
+            result_q.put(proc.stdout.read(_MAX_BLOB_BYTES))
+        except Exception as exc:  # noqa: BLE001 — surfaced via the queue, never re-raised bare
+            result_q.put(exc)
+
+    reader_thread = threading.Thread(target=_reader, daemon=True)
+    reader_thread.start()
+    try:
+        outcome: bytes | Exception | None
+        try:
+            outcome = result_q.get(timeout=_TIMEOUT_S)
+        except queue.Empty:
+            outcome = None
+    finally:
+        # Close the read end and terminate now — this is the deliberate EARLY CLOSE:
+        # git will see EPIPE/SIGPIPE on its next write and exit non-zero, which is
+        # EXPECTED here and is never inspected or converted into an error.
+        if proc.stdout is not None:
+            proc.stdout.close()
+        proc.terminate()
+        try:
+            proc.wait(timeout=_TIMEOUT_S)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
+
+    if outcome is None:
+        raise GitObjectReadError(f"git cat-file blob timed out reading oversized object {sha}")
+    if isinstance(outcome, Exception):
+        raise GitObjectReadError(
+            f"git cat-file blob failed reading oversized object {sha}: {outcome}"
+        ) from outcome
+    return outcome
+
+
+def _read_oversized_blob(repo: Path, sha: str, path: str, size: int) -> ScannedObject:
+    """Build the :class:`ScannedObject` for one oversized blob (SPEC v0.11.0 FR4).
+
+    The scanned prefix is decoded ``errors="strict"`` (PLAN §5): a truncation that
+    happens to land mid-multi-byte-character is honestly reported as undecodable
+    (A4.6) rather than silently repaired — the matcher then falls back to the SAME
+    binary skip class as any other undecodable blob (denylist_scan.scan_objects).
+    """
+    prefix = _read_oversized_blob_prefix(repo, sha)
+    try:
+        text = prefix.decode("utf-8", errors="strict")
+    except UnicodeDecodeError:
+        return ScannedObject(
+            path=path,
+            sha=sha,
+            text="",
+            decodable=False,
+            oversized=True,
+            size_bytes=size,
+            scanned_bytes=len(prefix),
+        )
+    return ScannedObject(
+        path=path,
+        sha=sha,
+        text=text,
+        decodable=True,
+        oversized=True,
+        size_bytes=size,
+        scanned_bytes=len(prefix),
+    )
+
+
 def _read_blobs(repo: Path, blob_info: dict[str, tuple[str, int]]) -> Iterator[ScannedObject]:
     """Yield one :class:`ScannedObject` per blob in *blob_info*.
 
@@ -215,16 +314,20 @@ def _read_blobs(repo: Path, blob_info: dict[str, tuple[str, int]]) -> Iterator[S
     per CHUNK, not one per blob (code-reviewer MEDIUM finding; mirrors the batching
     pattern :func:`_blob_info` already uses) and NOT one whole-range subprocess whose
     output buffer grows unbounded with the range size. A blob over
-    :data:`_MAX_BLOB_BYTES` is excluded from every batch conversation entirely — its
-    content is never fetched — and is yielded directly as ``decodable=False`` (R3 size
-    guard).
+    :data:`_MAX_BLOB_BYTES` is EXCLUDED from every batch conversation entirely — the
+    single-conversation win is preserved for the under-cap population — and is instead
+    read through :func:`_read_oversized_blob`'s separate, bounded per-object stream
+    (SPEC v0.11.0 FR4, supersedes the v0.9.0 total-blind-spot skip): its first cap
+    bytes are scanned and it is reported ``decodable=True``/``oversized=True`` when
+    that prefix is valid UTF-8, or ``decodable=False``/``oversized=True`` otherwise
+    (A4.6) — the remainder past the cap is genuinely never fetched either way.
     """
     fetch_shas = [sha for sha, (_, size) in blob_info.items() if size <= _MAX_BLOB_BYTES]
     oversized_shas = [sha for sha, (_, size) in blob_info.items() if size > _MAX_BLOB_BYTES]
 
     for sha in oversized_shas:
-        path, _size = blob_info[sha]
-        yield ScannedObject(path=path, sha=sha, text="", decodable=False)
+        path, size = blob_info[sha]
+        yield _read_oversized_blob(repo, sha, path, size)
 
     for start in range(0, len(fetch_shas), _BATCH_CHUNK_SIZE):
         chunk = fetch_shas[start : start + _BATCH_CHUNK_SIZE]

@@ -1,7 +1,7 @@
 """Wiring the push-range denylist scan into ``push_gate_decision`` (SPEC v0.9.0 FR1/FR2/FR5/FR6).
 
 Intent: CONTRACT — v0.9.0 A1.1, A1.2, A1.3, A1.4, A2.1, A2.2, A2.3, A2.4, A5.1, A5.2,
-A5.3, A5.4, A6.1; v0.11.0 A7.1, A7.2, A7.3
+A5.3, A5.4, A6.1; v0.11.0 A7.1, A7.2, A7.3, A4.5
 
 Drives ``push_gate_decision`` with an injected fake :class:`GitObjectReader` — no real
 git, no filesystem (FR7/A7.2). Only synthetic terms/slugs ever appear here (TASKS
@@ -47,6 +47,18 @@ def _refs(*lines: str) -> list[PushRef]:
 
 def _obj(path: str, text: str, *, sha: str = "cafef00d") -> ScannedObject:
     return ScannedObject(path=path, sha=sha, text=text, decodable=True)
+
+
+def _oversized_obj(path: str, text: str, *, sha: str = "bigsha") -> ScannedObject:
+    return ScannedObject(
+        path=path,
+        sha=sha,
+        text=text,
+        decodable=True,
+        oversized=True,
+        size_bytes=6_000_000,
+        scanned_bytes=5_242_880,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -322,3 +334,48 @@ def test_39_and_41_char_hex_shas_are_malformed() -> None:
     )
     assert malformed_short == 1
     assert malformed_long == 1
+
+
+# ---------------------------------------------------------------------------
+# FR4/A4.5 (v0.11.0) — `decision.warn` carries the oversized-blob note on BOTH an
+# allow decision and a refuse decision (QA-1 closure).
+# ---------------------------------------------------------------------------
+
+
+def test_oversized_note_appears_in_decision_warn_on_allow(tmp_path: Path) -> None:
+    source = _FakeObjectSource(
+        by_range={(_SHA_A, _ZERO): [_oversized_obj("big.md", "clean content here\n")]}
+    )
+    decision = push_gate_decision(
+        tmp_path,
+        _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
+        object_source=source,
+        repo=tmp_path,
+    )
+    assert decision.allowed
+    assert decision.warn is not None
+    assert "big.md" in decision.warn
+    assert "6000000" in decision.warn
+    assert "NOT scanned" in decision.warn
+
+
+def test_oversized_note_appears_in_decision_warn_on_refuse(tmp_path: Path) -> None:
+    source = _FakeObjectSource(
+        by_range={
+            (_SHA_A, _ZERO): [
+                _obj("leak.md", f"{_SYNTHETIC_TERM} shows up here\n", sha="leaksha"),
+                _oversized_obj("big.md", "clean content here\n"),
+            ]
+        }
+    )
+    decision = push_gate_decision(
+        tmp_path,
+        _refs(f"refs/heads/develop {_SHA_A} refs/heads/develop {_ZERO}"),
+        object_source=source,
+        repo=tmp_path,
+        denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
+    )
+    assert not decision.allowed
+    assert decision.warn is not None
+    assert "big.md" in decision.warn
+    assert "NOT scanned" in decision.warn

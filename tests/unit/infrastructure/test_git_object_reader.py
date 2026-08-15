@@ -120,14 +120,17 @@ def test_new_objects_marks_binary_blob_undecodable(tmp_path: Path) -> None:
     assert binaries[0].text == ""
 
 
-def test_new_objects_marks_oversized_blob_undecodable_and_never_fetches_its_content(
+def test_new_objects_scans_the_first_cap_bytes_of_an_oversized_text_blob(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """SPEC v0.9.0 R3 blob-size guard (code-reviewer MEDIUM finding): a blob over the
-    adapter's size cap is reported ``decodable=False`` without ever being decoded — and,
-    stronger than that, its content is never even fetched: the oversized blob's sha is
-    proven absent from every ``git cat-file --batch`` (content-read) stdin payload, only
-    ever appearing in the cheaper ``--batch-check`` (size-check) call."""
+    """SPEC v0.11.0 FR4/A4.1-A4.2 (supersedes the v0.9.0 total-blind-spot skip): a blob
+    over the adapter's size cap is read through a SEPARATE, bounded per-object stream —
+    never the batch content-read conversation (the oversized sha is proven absent from
+    every ``git cat-file --batch`` stdin payload, only ever appearing in the cheaper
+    ``--batch-check`` size-check call) — and at most the cap's worth of its content is
+    ever read. When that prefix decodes as valid UTF-8 it is reported
+    ``decodable=True``/``oversized=True`` with ``text`` carrying the DECODED PREFIX
+    (partial coverage, not zero coverage)."""
     repo = tmp_path / "repo"
     _init_repo(repo)
     big_content = "a" * (6 * 1024 * 1024)  # 6 MB, over the 5 MB cap; otherwise valid UTF-8
@@ -154,16 +157,43 @@ def test_new_objects_marks_oversized_blob_undecodable_and_never_fetches_its_cont
     objects = list(reader.new_objects(repo, tip_sha, ZERO_SHA))
 
     big = next(obj for obj in objects if obj.path == "big.txt")
-    assert big.decodable is False
-    assert big.text == ""
+    assert big.decodable is True
+    assert big.oversized is True
+    assert big.size_bytes == 6 * 1024 * 1024
+    assert big.scanned_bytes == git_objects_module._MAX_BLOB_BYTES
+    assert len(big.text.encode("utf-8")) == big.scanned_bytes  # A4.2: never over the cap.
     assert big.sha == big_sha
 
     small = next(obj for obj in objects if obj.path == "small.txt")
     assert small.decodable is True
+    assert small.oversized is False
     assert small.text == "tiny and clean\n"
 
     assert batch_stdins, "the content-read batch call must still run for the small blob"
     assert all(big_sha.encode() not in payload for payload in batch_stdins)
+
+
+def test_new_objects_oversized_blob_with_undecodable_prefix_falls_back_to_binary(
+    tmp_path: Path,
+) -> None:
+    """A4.6: an oversized blob whose scanned (first-cap-bytes) prefix is NOT valid
+    UTF-8 falls back to ``decodable=False`` — the same class an ordinary undecodable
+    blob reports — never raises, never fabricates text."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    # 6 MB of a byte that is never a valid UTF-8 lead or continuation byte.
+    (repo / "big.bin").write_bytes(b"\xff" * (6 * 1024 * 1024))
+    tip_sha = _commit(repo, "c1")
+    big_sha = _blob_sha(repo, "big.bin")
+
+    reader = GitSubprocessObjectReader()
+    objects = list(reader.new_objects(repo, tip_sha, ZERO_SHA))
+
+    big = next(obj for obj in objects if obj.path == "big.bin")
+    assert big.decodable is False
+    assert big.text == ""
+    assert big.oversized is True
+    assert big.sha == big_sha
 
 
 def test_new_objects_dedupes_a_blob_reachable_from_two_commits(tmp_path: Path) -> None:

@@ -1,6 +1,7 @@
 """Pure push-range denylist matcher (SPEC v0.9.0 FR3/FR5/FR6).
 
-Intent: CONTRACT — v0.9.0 A3.1, A3.2, A3.3, A3.4, A4.1, A5.2, A6.2
+Intent: CONTRACT — v0.9.0 A3.1, A3.2, A3.3, A3.4, A4.1, A5.2, A6.2; v0.11.0 A4.1, A4.4,
+A4.6
 
 Term sources (operator denylist, packaged baseline, foreign repo slugs) x masking x the
 undecodable-blob skip+count — no real operator term or foreign slug ever appears here
@@ -306,3 +307,72 @@ def test_undecodable_object_is_skipped_and_counted() -> None:
 
     assert outcome.hits == ()
     assert outcome.skipped_binary_count == 1
+
+
+# ---------------------------------------------------------------------------
+# v0.11.0 FR4 — an oversized (partially-scanned) object: its scanned prefix still
+# produces a hit (A4.1), it always contributes a structured note independent of a hit
+# (A4.4), and an oversized object whose prefix failed to decode falls back to the SAME
+# binary skip class rather than a separate note (A4.6).
+# ---------------------------------------------------------------------------
+
+
+def _oversized_obj(
+    path: str,
+    text: str,
+    *,
+    sha: str = "deadbeef",
+    decodable: bool = True,
+    size_bytes: int = 6_000_000,
+    scanned_bytes: int = 5_242_880,
+) -> ScannedObject:
+    return ScannedObject(
+        path=path,
+        sha=sha,
+        text=text,
+        decodable=decodable,
+        oversized=True,
+        size_bytes=size_bytes,
+        scanned_bytes=scanned_bytes,
+    )
+
+
+def test_oversized_object_produces_a_hit_when_its_scanned_prefix_matches() -> None:
+    """A4.1: an oversized (partially-scanned) TEXT object still produces a hit when its
+    scanned prefix carries a matching value — the fail-open is now partial coverage,
+    not zero coverage."""
+    obj = _oversized_obj("big.md", f"leading noise {_SYNTHETIC_TERM} here\n")
+
+    outcome = scan_objects([obj], terms=((_SYNTHETIC_TERM, "synthetic"),), patterns=(), slugs=())
+
+    assert len(outcome.hits) == 1
+    assert outcome.hits[0].path == "big.md"
+
+
+def test_oversized_object_always_produces_a_note_even_with_no_hit() -> None:
+    """A4.4: every oversized (decodable) object produces a structured note — path,
+    total size and scanned bytes — independent of whether a hit was found."""
+    obj = _oversized_obj("big.md", "nothing sensitive here\n")
+
+    outcome = scan_objects([obj], terms=(), patterns=(), slugs=())
+
+    assert outcome.hits == ()
+    assert len(outcome.oversized_notes) == 1
+    note = outcome.oversized_notes[0]
+    assert note.path == "big.md"
+    assert note.size_bytes == 6_000_000
+    assert note.scanned_bytes == 5_242_880
+
+
+def test_oversized_object_with_undecodable_prefix_counts_as_binary_only() -> None:
+    """A4.6: an oversized object whose prefix failed to decode (``decodable=False``)
+    falls back to the SAME binary skip class as any other undecodable blob — it does
+    NOT also produce an oversized note (there is nothing honest to report about a scan
+    that never ran)."""
+    obj = _oversized_obj("big.bin", "", decodable=False)
+
+    outcome = scan_objects([obj], terms=((_SYNTHETIC_TERM, "synthetic"),), patterns=(), slugs=())
+
+    assert outcome.hits == ()
+    assert outcome.skipped_binary_count == 1
+    assert outcome.oversized_notes == ()

@@ -24,16 +24,30 @@ ZERO_SHA = "0" * 40
 class ScannedObject:
     """One blob newly reachable in a pushed range (SPEC v0.9.0 FR1).
 
-    ``decodable`` is False for a binary blob (FR6 row 3) or a blob over the adapter's
-    size guard (SPEC R3 — a blob that large is never even fetched) — ``text`` is then
-    the empty string; undecodable/oversized bytes cannot be usefully matched by a text
-    denylist, so the matcher skips and counts it instead of raising.
+    ``decodable`` is False for a binary blob (FR6 row 3) or an oversized blob whose
+    scanned prefix failed to decode (SPEC v0.11.0 A4.6) — ``text`` is then the empty
+    string; undecodable bytes cannot be usefully matched by a text denylist, so the
+    matcher skips and counts it instead of raising.
+
+    ``oversized`` (SPEC v0.11.0 FR4, supersedes the v0.9.0 total-blind-spot R3 guard)
+    is True when the blob's GIT-REPORTED size exceeds the adapter's per-object cap. The
+    adapter never fetches the whole such blob: it reads at most the cap's worth of
+    bytes through a separate, bounded stream and closes it early, so the remainder is
+    genuinely never fetched. When that prefix IS valid UTF-8, ``decodable`` is True and
+    ``text`` carries the DECODED PREFIX (not the whole blob) — the matcher scans it like
+    any other object, so a match inside the first cap bytes still produces a hit
+    (partial coverage, not zero coverage). ``size_bytes`` (the blob's total size) and
+    ``scanned_bytes`` (how many bytes were actually read) are populated only when
+    ``oversized`` is True; both default to 0 for an ordinary, non-oversized object.
     """
 
     path: str
     sha: str
     text: str
     decodable: bool
+    oversized: bool = False
+    size_bytes: int = 0
+    scanned_bytes: int = 0
 
 
 class GitObjectReadError(Exception):

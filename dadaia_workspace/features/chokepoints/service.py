@@ -36,6 +36,7 @@ from dadaia_workspace.core.protocols.process_ancestry import Ancestry
 from dadaia_workspace.features.chokepoints.denylist_scan import (
     BaselinePatternLike,
     Hit,
+    OversizedNote,
     scan_objects,
 )
 from dadaia_workspace.features.spec_context import presence
@@ -348,15 +349,35 @@ _DENYLIST_LAW = "DADAIA.md §7 — private names never enter public/pushed mater
 _MAX_LISTED_HITS = 10
 
 
-def _annotate_skip(decision: Decision, skipped_binary_count: int) -> Decision:
-    """Attach the FR6 row-3 skip count to *decision* — reported either way (allow/refuse)."""
-    if skipped_binary_count <= 0:
+def _annotate_skip(
+    decision: Decision,
+    skipped_binary_count: int,
+    oversized_notes: tuple[OversizedNote, ...] = (),
+) -> Decision:
+    """Attach the FR6 row-3 skip count AND the v0.11.0 FR4 oversized-blob notes to
+    *decision* — reported either way (allow/refuse), and kept honestly DISTINCT: the
+    binary count means "not text-decodable at all"; an oversized note means "the first
+    N bytes were scanned, the rest genuinely never was — verify it by hand" (grill P13).
+
+    v0.11.0 A6.3: the oversized note's path is masked once T-110-08 (FR6) lands; this
+    task (T-110-06) reports it unmasked, per the release's own ordering (SPEC PLAN §3).
+    """
+    lines: list[str] = []
+    if skipped_binary_count > 0:
+        lines.append(
+            f"[pre-push] {skipped_binary_count} binary blob(s) skipped by the denylist "
+            "scan (not text-decodable)."
+        )
+    for note in oversized_notes:
+        lines.append(
+            f"[pre-push] {note.path} is {note.size_bytes} byte(s) — only its first "
+            f"{note.scanned_bytes} byte(s) were scanned by the denylist scan; the "
+            "remainder was NOT scanned. Verify the rest by hand."
+        )
+    if not lines:
         return decision
-    note = (
-        f"[pre-push] {skipped_binary_count} binary blob(s) skipped by the denylist "
-        "scan (not text-decodable)."
-    )
-    warn = f"{decision.warn}\n{note}" if decision.warn else note
+    note_text = "\n".join(lines)
+    warn = f"{decision.warn}\n{note_text}" if decision.warn else note_text
     return Decision(allowed=decision.allowed, message=decision.message, warn=warn)
 
 
@@ -418,25 +439,31 @@ def _run_denylist_scan(
     terms: Iterable[tuple[str, str]],
     patterns: Iterable[BaselinePatternLike],
     slugs: Iterable[str],
-) -> tuple[Decision | None, int]:
+) -> tuple[Decision | None, int, tuple[OversizedNote, ...]]:
     """Run the FR1/FR2 scan over *scan_refs* — every non-deletion ref, tags included.
 
-    Returns ``(refusal_or_None, skipped_binary_count)``. A git object-read failure
-    refuses immediately, naming the failure (FR6 row 2) — never a silent empty scan.
+    Returns ``(refusal_or_None, skipped_binary_count, oversized_notes)``. A git
+    object-read failure refuses immediately, naming the failure (FR6 row 2) — never a
+    silent empty scan. ``oversized_notes`` is deduplicated for free — it is built from
+    ``scan_objects`` runs over :func:`_dedup_new_objects`, which shares ``seen_shas``
+    across every ref in this scan, so a blob reachable from two refs contributes at
+    most one note (mirrors the existing hit/skip dedup).
     """
     if not scan_refs:
-        return None, 0
+        return None, 0, ()
     term_list = list(terms)
     pattern_list = list(patterns)
     slug_list = list(slugs)
     seen_shas: set[str] = set()
     per_ref_hits: list[tuple[PushRef, Hit]] = []
     skipped_total = 0
+    oversized_all: list[OversizedNote] = []
     try:
         for ref in scan_refs:
             fresh = _dedup_new_objects(object_source, repo, ref, seen_shas)
             outcome = scan_objects(fresh, term_list, pattern_list, slug_list)
             skipped_total += outcome.skipped_binary_count
+            oversized_all.extend(outcome.oversized_notes)
             per_ref_hits.extend((ref, hit) for hit in outcome.hits)
     except GitObjectReadError as exc:
         return (
@@ -452,10 +479,16 @@ def _run_denylist_scan(
                 ),
             ),
             0,
+            (),
         )
+    oversized_notes = tuple(oversized_all)
     if not per_ref_hits:
-        return None, skipped_total
-    return Decision(allowed=False, message=_compose_denylist_refusal(per_ref_hits)), skipped_total
+        return None, skipped_total, oversized_notes
+    return (
+        Decision(allowed=False, message=_compose_denylist_refusal(per_ref_hits)),
+        skipped_total,
+        oversized_notes,
+    )
 
 
 def push_gate_decision(
@@ -542,16 +575,17 @@ def push_gate_decision(
     # independently of `review_refs`, which excludes tags. Runs after branch policy
     # (free and pure, already checked above) and before the security verdict below.
     scan_refs = [r for r in refs if not r.is_deletion]
-    scan_refusal, skipped_binary_count = _run_denylist_scan(
+    scan_refusal, skipped_binary_count, oversized_notes = _run_denylist_scan(
         scan_refs, object_source, repo, denylist_terms, baseline_patterns, foreign_slugs
     )
     if scan_refusal is not None:
-        return _annotate_skip(scan_refusal, skipped_binary_count)
+        return _annotate_skip(scan_refusal, skipped_binary_count, oversized_notes)
 
     if not review_refs:
         return _annotate_skip(
             Decision(allowed=True, message="[pre-push] no review-gated refs; allow."),
             skipped_binary_count,
+            oversized_notes,
         )
 
     approved_shas = {a.commit_sha for a in iter_security_approvals(handoff_root)}
@@ -566,6 +600,7 @@ def push_gate_decision(
                 ),
             ),
             skipped_binary_count,
+            oversized_notes,
         )
 
     found = (
@@ -587,4 +622,5 @@ def push_gate_decision(
             ),
         ),
         skipped_binary_count,
+        oversized_notes,
     )

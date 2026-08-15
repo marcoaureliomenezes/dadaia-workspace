@@ -25,7 +25,7 @@ from typing import Protocol
 
 from dadaia_workspace.core.protocols.git_object_reader import ScannedObject
 
-__all__ = ["BaselinePatternLike", "Hit", "ScanOutcome", "scan_objects"]
+__all__ = ["BaselinePatternLike", "Hit", "OversizedNote", "ScanOutcome", "scan_objects"]
 
 _SOURCE_OPERATOR = "operator denylist"
 _SOURCE_SLUG = "foreign repo slug"
@@ -67,11 +67,27 @@ class Hit:
 
 
 @dataclass(frozen=True)
+class OversizedNote:
+    """One oversized blob's honest partial-coverage report (SPEC v0.11.0 FR4).
+
+    Distinct from the undecodable-binary skip count: an oversized blob whose scanned
+    prefix decoded fine (``ScannedObject.decodable`` True) is genuinely partially
+    scanned, not blindly skipped — this note is how that partial coverage is reported
+    to every consumer, never conflated with the binary-blob wording.
+    """
+
+    path: str
+    size_bytes: int
+    scanned_bytes: int
+
+
+@dataclass(frozen=True)
 class ScanOutcome:
     """The matcher's verdict over one batch of :class:`ScannedObject`."""
 
     hits: tuple[Hit, ...]
     skipped_binary_count: int
+    oversized_notes: tuple[OversizedNote, ...] = ()
 
 
 def _mask(term: str) -> str:
@@ -149,20 +165,38 @@ def scan_objects(
     * ``slugs`` — foreign repo slugs (the pushed repo's own slug is expected to already
       be excluded by the caller), word-boundary matched.
 
-    Undecodable (binary) objects are skipped and counted, never matched (FR6 row 3). At
-    most one :class:`Hit` is returned per object — its first match by ascending line
-    number — matching FR5's one-line-per-offending-object refusal shape.
+    Undecodable (binary) objects are skipped and counted, never matched (FR6 row 3).
+    This class now ALSO covers an oversized blob whose scanned prefix failed to decode
+    (SPEC v0.11.0 A4.6) — there is nothing honest to report about a scan that never
+    ran, so it falls back to the SAME binary skip class, never a separate note. An
+    oversized blob whose scanned prefix DID decode is genuinely, partially scanned like
+    any other decodable object (v0.11.0 A4.1 — a match inside the scanned prefix still
+    produces a hit) AND additionally contributes an :class:`OversizedNote` reporting
+    the partial coverage, independent of whether a hit was found (A4.4). At most one
+    :class:`Hit` is returned per object — its first match by ascending line number —
+    matching FR5's one-line-per-offending-object refusal shape.
     """
     term_list = list(terms)
     pattern_list = list(patterns)
     slug_patterns = _compile_slug_patterns(slugs)
     hits: list[Hit] = []
+    oversized_notes: list[OversizedNote] = []
     skipped = 0
     for obj in objects:
         if not obj.decodable:
             skipped += 1
             continue
+        if obj.oversized:
+            oversized_notes.append(
+                OversizedNote(
+                    path=obj.path, size_bytes=obj.size_bytes, scanned_bytes=obj.scanned_bytes
+                )
+            )
         hit = _first_match(obj, term_list, pattern_list, slug_patterns)
         if hit is not None:
             hits.append(hit)
-    return ScanOutcome(hits=tuple(hits), skipped_binary_count=skipped)
+    return ScanOutcome(
+        hits=tuple(hits),
+        skipped_binary_count=skipped,
+        oversized_notes=tuple(oversized_notes),
+    )
