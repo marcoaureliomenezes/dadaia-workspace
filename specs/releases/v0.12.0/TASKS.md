@@ -370,7 +370,7 @@ ticked truthfully against the rewritten §5.
 
 ---
 
-- [-] **T-120-11 — `qa-engineer` review of the increment (alpha-1 close)**
+- [x] **T-120-11 — `qa-engineer` review of the increment (alpha-1 close)**
 
 **Owner role:** qa-engineer · **Commit:** review artifact committed to the branch
 (`specs/releases/v0.12.0/ALPHA-1-QA.md`)
