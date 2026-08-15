@@ -226,7 +226,7 @@ never read; the note's path is masked once T-110-08 lands (A6.3).
 
 ---
 
-- [-] **T-110-07 — FR6(a): extract the masking primitive into `core/redaction.py`**
+- [x] **T-110-07 — FR6(a): extract the masking primitive into `core/redaction.py`**
 
 **Owner role:** software-engineer · **Commit:**
 `refactor(T-110-07): extract the redaction primitive into core for shared use`

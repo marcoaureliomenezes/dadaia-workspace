@@ -1,12 +1,18 @@
 """``--redact`` output mode (SPEC v0.9.0 FR8a, T-090-07).
 
-Intent: CONTRACT — v0.9.0 A8.1, A8.3, A8.4.
+Intent: CONTRACT — v0.9.0 A8.1, A8.3, A8.4; v0.11.0 A6.4, A6.5.
 
-Two layers are pinned here:
+Three layers are pinned here:
 
+0. ``dadaia_workspace.core.redaction`` — the stdlib-pure masking primitive extracted
+   from :class:`ContextRedactor` at v0.11.0 (FR6/ADR D1-a): word-boundary alternation,
+   longest-first ordering, stable first-appearance ordinal placeholders. Pinned
+   directly (not only through the CLI wrapper) since this is now the SAME primitive the
+   push-range denylist gate's own render boundary consumes.
 1. :class:`dadaia_workspace.cli.redact.ContextRedactor` in pure isolation (ordinal
    assignment by first appearance, exclusion of the caller's own context, word-boundary
-   matching, JSON key-set preservation).
+   matching, JSON key-set preservation). Its assertions are UNCHANGED by the v0.11.0
+   extraction (A6.4) — the regression proof that the extraction was mechanical.
 2. The three operator-facing verbs (``dadaia doctor``, ``dadaia context list``,
    ``dadaia context show``) wired to it, over a real ``CliRunner`` workspace: no foreign
    Spec Context name or repo slug survives ``--redact`` in either table or ``--json``
@@ -27,6 +33,7 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.cli.redact import ContextRedactor
+from dadaia_workspace.core.redaction import Redactor, compile_candidates
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
@@ -34,6 +41,53 @@ from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentMana
 pytestmark = pytest.mark.unit
 
 _runner = CliRunner()
+
+
+# ---------------------------------------------------------------------------
+# Layer 0 — core/redaction.py, the extracted primitive (v0.11.0 A6.4/A6.5), in pure
+# isolation: no CLI, no filesystem, no I/O of any kind.
+# ---------------------------------------------------------------------------
+
+
+def test_compile_candidates_returns_none_for_no_candidates() -> None:
+    assert compile_candidates([]) is None
+    assert compile_candidates(["", ""]) is None
+
+
+def test_compile_candidates_orders_longest_first() -> None:
+    pattern = compile_candidates(["ab", "abcdef", "abc"])
+    assert pattern is not None
+    match = pattern.match("abcdef")
+    assert match is not None
+    assert match.group(0) == "abcdef"
+
+
+def test_redactor_ordinal_by_first_appearance() -> None:
+    """The same property A8.3 pins through :class:`ContextRedactor`, asserted directly
+    against the extracted primitive."""
+    redactor = Redactor(["foo", "bar"], placeholder_fmt="[X-{n}]")
+    assert redactor.mask("bar foo bar") == "[X-1] [X-2] [X-1]"
+
+
+def test_redactor_inactive_with_no_candidates_returns_value_unchanged() -> None:
+    redactor = Redactor([], placeholder_fmt="[X-{n}]")
+    assert redactor.active is False
+    assert redactor.mask("nothing to mask here") == "nothing to mask here"
+
+
+def test_core_redactor_word_boundary_does_not_partially_match_longer_string() -> None:
+    redactor = Redactor(["dadaia"], placeholder_fmt="[X-{n}]")
+    assert redactor.mask("dadaia-workspace lives at dadaia.") == (
+        "dadaia-workspace lives at [X-1]."
+    )
+
+
+def test_redactor_placeholder_format_is_caller_controlled() -> None:
+    """Two independent :class:`Redactor` instances with different placeholder formats
+    (e.g. the CLI's ``[REDACTED-CONTEXT-n]`` vs a future gate-renderer format) never
+    collide — the format string is entirely the caller's own."""
+    redactor = Redactor(["term"], placeholder_fmt="<<masked-{n}>>")
+    assert redactor.mask("term appears") == "<<masked-1>> appears"
 
 
 # ---------------------------------------------------------------------------
