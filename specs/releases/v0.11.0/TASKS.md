@@ -279,7 +279,7 @@ any emitted string.
 
 ---
 
-- [ ] **T-110-09 — FR2: prior-side same-path blob lookup inside the chunk loop (#19a)**
+- [-] **T-110-09 — FR2: prior-side same-path blob lookup inside the chunk loop (#19a)**
 
 **Owner role:** software-engineer · **Commit:**
 `feat(T-110-09): resolve each scanned path's published prior blob in the same conversation`
