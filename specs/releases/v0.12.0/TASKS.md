@@ -206,7 +206,7 @@ pass **unmodified** (A9.4); `dadaia ci preflight` green.
 
 ---
 
-- [-] **T-120-06 — FR3: `backlog new` authors an ACTIVE subsection**
+- [x] **T-120-06 — FR3: `backlog new` authors an ACTIVE subsection**
 
 **Owner role:** software-engineer · **Commit:**
 `feat(T-120-06): backlog new appends an ACTIVE subsection to BACKLOG.md`

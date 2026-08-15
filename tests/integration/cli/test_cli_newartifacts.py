@@ -1,9 +1,11 @@
 """Integration tests for `dadaia release new` and `dadaia backlog new`.
 
-Merged per plan-integration.md (10 -> 1): `release new` (SPEC.md + Draft status +
-release-id in body + Owner/Opened fields + existing-dir exits non-zero) and
-`backlog new` (file + frontmatter). Deleted 4 invalid-slug/missing-specs-dir greps
-(unit-ownable) plus redundant field asserts.
+Intent: CONTRACT — v0.12.0 A3.1, A3.3 (CLI byte-diff coverage lives in the unit test)
+
+`release new` (SPEC.md + Draft status + release-id in body + Owner/Opened fields +
+existing-dir exits non-zero, unchanged by SPEC v0.12.0) and `backlog new` (now authors
+an ACTIVE subsection into BACKLOG.md — the `[ok] created:` / `[error]` CLI contract is
+preserved, SPEC FR3).
 
 (The legacy ``dadaia bug new`` command was retired in v0.1.53 — bugs are event-sourced
 JSONL via ``dadaia bugs append``.)
@@ -57,9 +59,23 @@ def test_release_new_and_backlog_new(specs: Path) -> None:
         ["backlog", "new", "cool-idea", "--specs-dir", str(specs)],
     )
     assert backlog_result.exit_code == 0, backlog_result.output
-    target = specs / "backlog" / "cool-idea.md"
+    assert "[ok] created:" in backlog_result.output
+
+    target = specs / "backlog" / "BACKLOG.md"
     assert target.is_file()
     backlog_content = target.read_text(encoding="utf-8")
-    assert "title:" in backlog_content
-    assert "status: idea" in backlog_content
-    assert "opened:" in backlog_content
+    assert "## ACTIVE" in backlog_content
+    assert "## LEDGER" in backlog_content
+    assert "### cool-idea" in backlog_content
+    assert "- **Title:** cool-idea" in backlog_content
+    assert "- **Status:** idea" in backlog_content
+    assert "- **Opened:**" in backlog_content
+
+    # A3.3: the slug-uniqueness refusal (not file-level no-clobber) — same CLI exit
+    # code class / `[error]` contract as the retired file-level check.
+    dup_result = _runner.invoke(
+        app,
+        ["backlog", "new", "cool-idea", "--specs-dir", str(specs)],
+    )
+    assert dup_result.exit_code != 0
+    assert "[error]" in (dup_result.output + (dup_result.stderr or ""))
