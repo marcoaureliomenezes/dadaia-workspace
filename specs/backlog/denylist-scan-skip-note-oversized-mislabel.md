@@ -1,6 +1,6 @@
 ---
 title: "denylist-scan skip note: 5 MB fail-open mislabelled as binary (CWE-778) + split counters + end-to-end coverage of the note"
-status: candidate
+status: picked
 opened: 2026-08-14
 description: >-
   Merges the SAME defect reported independently by both ship reviewers (MEDIUM in
@@ -109,3 +109,14 @@ review.
 per PM recommendation. Adjudicated via intake report #1
 (`.dadaia/reports/dadaia-workspace/project-manager/2026-08-15T132600Z-intake.html`).
 The entry remains a live pickable candidate.
+
+## Pick provenance (v0.11.0)
+
+**picked — v0.11.0**, 2026-08-15. Delivered as **FR4** of release `v0.11.0` "scan-v2".
+Provenance record: `specs/releases/v0.11.0/SPEC.md` §7. Operator ruling **D2** adopted the
+round-2 suggestion: scan the **first 5 MB** of an oversized blob instead of none. Grill
+refinement **D2-a**: the prefix is read through a separate bounded per-object stream closed
+early, so R3's *never fetched* survives literally; its expected non-zero exit / `EPIPE` is
+not a `GitObjectReadError`. Grill **P5**: the new note names a path, so it is co-delivered
+with `refusal-path-redaction` (FR6) and its path is masked. Terminal disposition
+`DELIVERED — v0.11.0` lands at closure.

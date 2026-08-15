@@ -1,6 +1,6 @@
 ---
 title: "git_objects: stream or chunk the cat-file --batch conversation — whole-range stdout buffer peaks at ~277 MB on the fallback shape (CWE-400)"
-status: candidate
+status: picked
 opened: 2026-08-14
 description: >-
   Materializes a LOW from the APPROVED v0.9.0 ship security review. The 3c3c6d4a
@@ -82,3 +82,15 @@ covering push review.
 per PM recommendation. Adjudicated via intake report #1
 (`.dadaia/reports/dadaia-workspace/project-manager/2026-08-15T132600Z-intake.html`).
 The entry remains a live pickable candidate.
+
+## Pick provenance (v0.11.0)
+
+**picked — v0.11.0**, 2026-08-15. Delivered as **FR9** of release `v0.11.0` "scan-v2".
+Provenance record: `specs/releases/v0.11.0/SPEC.md` §7. **Promoted from a P3 sibling to a
+precondition (ADR D8, grill P3):** `prior-published-term-amnesty` requires the prior content
+of each scanned path, which roughly **doubles** the resident set — so this bound must exist
+before the amnesty lands, and the prior-side lookup rides **inside** the same chunk loop
+(peak `chunk_size × cap × 2`, constant in the range size). Of the reviewer's two options the
+**chunking** one is adopted, as the smaller change that caps the peak deterministically; a
+`Popen` incremental parser stays available if a measurement ever demands it. Terminal
+disposition `DELIVERED — v0.11.0` lands at closure.

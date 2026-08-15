@@ -1,6 +1,6 @@
 ---
 title: "push-gate stdin sha validation + `--` end-of-options at the git argv boundary (CWE-88/CWE-20)"
-status: candidate
+status: picked
 opened: 2026-08-14
 description: >-
   Materializes a LOW from the APPROVED v0.9.0 ship security review.
@@ -84,3 +84,14 @@ the covering push review.
 per PM recommendation. Adjudicated via intake report #1
 (`.dadaia/reports/dadaia-workspace/project-manager/2026-08-15T132600Z-intake.html`).
 The entry remains a live pickable candidate.
+
+## Pick provenance (v0.11.0)
+
+**picked — v0.11.0**, 2026-08-15. Delivered as **FR7** of release `v0.11.0` "scan-v2".
+Provenance record: `specs/releases/v0.11.0/SPEC.md` §7. Sequenced **first** among the code
+tasks (PLAN §3): validating at the parse boundary means the parser rewritten by
+`git-objects-batch-parse-typed-error-boundary` never sees an option-shaped sha at all. The
+fix reuses the existing malformed-line refusal path, so no new message is authored. The two
+sibling hardening entries `python-env-interpreter-probe-hardening` (#9) and
+`commit-paths-index-scope-hardening` (#18) are **not** picked — different surface. Terminal
+disposition `DELIVERED — v0.11.0` lands at closure.

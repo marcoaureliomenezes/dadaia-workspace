@@ -1,6 +1,6 @@
 ---
 title: "git_objects batch-parse loop: raw ValueError escapes the typed GitObjectReadError boundary; desync continues instead of aborting (CWE-755)"
-status: candidate
+status: picked
 opened: 2026-08-14
 description: >-
   The SAME defect reported independently by both ship reviewers (LOW in each),
@@ -88,3 +88,14 @@ covering push review. Rides the same hotfix/hardening window as
 per PM recommendation. Adjudicated via intake report #1
 (`.dadaia/reports/dadaia-workspace/project-manager/2026-08-15T132600Z-intake.html`).
 The entry remains a live pickable candidate.
+
+## Pick provenance (v0.11.0)
+
+**picked — v0.11.0**, 2026-08-15. Delivered as **FR8** of release `v0.11.0` "scan-v2".
+Provenance record: `specs/releases/v0.11.0/SPEC.md` §7. Sequenced **before**
+`git-objects-streamed-batch-reads` (PLAN §3): the chunking restructures the very loop this
+entry corrects, so landing it second would restructure code known to be wrong. Both halves
+are delivered as written — the typed wrap of the `out.index` / `int(size_str)` pair **and**
+the behaviour change on the desync branch, which now aborts typed instead of yielding
+fabricated undecodable objects that the skip counters would then report as fiction. Terminal
+disposition `DELIVERED — v0.11.0` lands at closure.
