@@ -640,6 +640,35 @@ and proceeds either way.
     the prior-side desync error interpolates a raw exception string or raw blob path.'
 ```
 
+### amnesty-multi-path-blob-fail-closed
+- **Title:** Amnesty is per-path, blobs are content-addressed — no amnesty for a multi-path blob (fail-closed) (#40)
+- **Opened:** 2026-08-16
+- **Status:** candidate
+- **Description:** Intake #3 item 3-5 (security ship review 2026-08-15T200554Z, reproduced — case A4a), the report's one amnesty-SEMANTICS item, RESOLVED BY OPERATOR RULING 2026-08-16: fail-closed. Prior-published-term amnesty leaks ACROSS paths through a shared blob: `git rev-list --objects` names a blob once under its FIRST-seen path (git_objects.py#_blob_info maps sha → (first-seen path, size)), so an amnesty earned by that path silently covers identical content published at a second, never-amnestied path — and the outcome flips with tree sort order, which an author controls via naming. Bounded (only already-published values can relocate this way; the no-new-value invariant held under direct attack) but it deviates from the gate atom's normative "a new path still refuses". THE RULING: a blob reachable at more than one path in the range gets NO amnesty unless every such path amnesties the matched value — implement the reviewer-leaned conservative form (no-amnesty-for-multi-path-blobs) unless the SPEC grill finds the every-path form equally simple. Never weaken into a per-sha amnesty.
+- **Provenance:** intake-report #3 item 3-5 approved with semantics choice (b) fail-closed — operator adjudication, 2026-08-16 (resolva todos — class-level fixes, no workarounds)
+- **Intents:**
+```yaml
+- subject:
+    kind: code
+    ref: dadaia_workspace/infrastructure/git_objects.py#_blob_info
+  change: 'The reader surfaces EVERY path a blob is reachable at in the pushed range
+    (sha -> all paths), not first-seen-only, so amnesty semantics can see multi-path
+    reachability; tree-order independence proven by a paired fixture.'
+- subject:
+    kind: code
+    ref: dadaia_workspace/features/chokepoints/denylist_scan.py#scan_objects
+  change: 'Fail-closed multi-path amnesty per the operator ruling: a blob reachable at more
+    than one path in the range receives no amnesty (reviewer-leaned conservative form),
+    unless the SPEC grill finds suppress-only-if-every-path-amnesties equally simple;
+    never a per-sha amnesty.'
+- subject:
+    kind: doc
+    ref: memory/product/sdd/sdd-gate-v3.md#Push-Range Denylist Scan
+  change: 'The gate atom records the multi-path amnesty semantics (fail-closed) so the
+    normative sentence "a new path still refuses" is true again, including the shared-blob
+    relocation shape.'
+```
+
 ## LEDGER
 
 - push-range-denylist-scan · DELIVERED · v0.9.0 · 2026-08-14
