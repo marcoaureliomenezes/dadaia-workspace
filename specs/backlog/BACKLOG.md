@@ -548,9 +548,26 @@ and proceeds either way.
 ### flat-release-ship-task-evidence
 - **Title:** Flat release's ship task cannot record its own completion (TASKS template shape defect)
 - **Opened:** 2026-08-14
-- **Status:** idea
-- **Description:** v0.8.0 CLOSURE backlog return, materialized 2026-08-14. In a flat (no-segment) release, the closure/archive task freezes the release directory (git mv to specs/_archive/) before the ship task can flip its own marker: v0.8.0's T-080-07 (ship) archived as "[ ]" because T-080-06 (closure + archive) ran first and the archived TASKS.md is FROZEN — the ship marker can never be flipped afterwards. The release TASKS template needs a form of ship evidence that lives outside the archived directory: either make ship the last task BEFORE archive, or state in the template that the ship task's evidence is the merge/PR itself and that its marker is expected to archive open.
-- **Provenance:** v0.8.0 CLOSURE return (ideas lane); second occurrence routed by the v0.9.0 CLOSURE — operator-approved closures
+- **Status:** candidate
+- **Description:** v0.8.0 CLOSURE backlog return, materialized 2026-08-14. In a flat (no-segment) release, the closure/archive task freezes the release directory (git mv to specs/_archive/) before the ship task can flip its own marker: v0.8.0's T-080-07 (ship) archived as "[ ]" because T-080-06 (closure + archive) ran first and the archived TASKS.md is FROZEN — the ship marker can never be flipped afterwards. The release TASKS template needs a form of ship evidence that lives outside the archived directory: either make ship the last task BEFORE archive, or state in the template that the ship task's evidence is the merge/PR itself and that its marker is expected to archive open. EXTENDED AND PROMOTED idea→candidate 2026-08-16 (intake #3 item 3-4 — operator adjudication, 2026-08-16 (resolva todos — class-level fixes, no workarounds); three paid reopens is the strongest pick evidence in the report): (1) review-before-archive ordering — in v0.9.0, v0.11.0 and v0.12.0 the closure task archived the release BEFORE the ship task's pre-PR six-axis review ran, so the review's first reader hits a FROZEN closure and any finding costs a reopen/reset; the TASKS template orders the six-axis review of the delta before the `git mv` archive step, with only ship steps after. (2) The v0.12.0 dispatcher obligation, folded here per that CLOSURE: a dispatcher relaying work for shell-less sub-agents (e.g. product-engineer) commits their TASKS reservation flips before relaying the next work item, so the marker trace stays observable.
+- **Provenance:** v0.8.0 CLOSURE return (ideas lane); second occurrence routed by the v0.9.0 CLOSURE — operator-approved closures; intake-report #3 item 3-4 folded, promoted to candidate — operator adjudication, 2026-08-16 (resolva todos — class-level fixes, no workarounds)
+- **Intents:**
+```yaml
+- subject:
+    kind: code
+    ref: dadaia_workspace/features/spec_artifacts/new_artifacts.py#release_new
+  change: 'The release TASKS template orders ship evidence so it can be recorded: six-axis
+    pre-PR review of the delta BEFORE the archive git mv; only ship steps after; ship-task
+    evidence lives outside the archived directory, or the template states the marker is
+    expected to archive open with the merge/PR as its evidence.'
+- subject:
+    kind: doc
+    ref: memory/product/sdd/sdd-bug-backlog-governance.md#Merge Cadence
+  change: 'The release-finalization cadence records two obligations: the pre-PR six-axis
+    review runs before the archive move (any finding lands on a thawed tree), and a
+    dispatcher relaying work for shell-less sub-agents commits their TASKS reservation
+    flips before relaying the next work item, keeping the marker trace observable.'
+```
 
 ### repo-agents-md-symlink-hardening
 - **Title:** Destination-file symlink hardening for the adjacent repo-AGENTS.md copy
