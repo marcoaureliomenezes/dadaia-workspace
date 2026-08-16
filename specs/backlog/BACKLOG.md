@@ -805,6 +805,33 @@ is no longer archive-only.
     rename/relocation carve-out (byte-identical moved content) stays excluded.'
 ```
 
+### intake-signal-calibration
+- **Title:** Intake signal calibration — record-only observations terminate in CLOSURE; only actionable defects reach intake (P1)
+- **Opened:** 2026-08-16
+- **Status:** candidate
+- **Description:** Operator demand (verbatim ruling, 2026-08-16: "Resolva todos esses 3 problemas identificados na raiz ... Na proxima rodada não quero ver essa desgraça de erros e bugs residuais") — root-cause class 3: the review pipeline manufactures intake volume. Recalibrate the residual-routing doctrine so record-only observations stop becoming intake items: (a) reviews still find and record everything — never-silent holds; (b) INFO-grade / awareness-only / already-fixed-at-HEAD observations terminate in the release CLOSURE record (or the reviewer handoff) and do NOT enter intake reports; (c) only actionable defects (LOW+ with a concrete fix surface) flow to the PM intake report; (d) the surfaces to change: the dd-release-closure "Intake candidates" section contract, the dd-backlog-definition §5 intake protocol, and the reviewer personas' routing guidance — ai-engineer lane for all skill/persona edits. Acceptance: the NEXT release's intake report contains only actionable defects; record-only observations are countable in its CLOSURE instead; zero observations lost (never-delete/never-silent proven by the CLOSURE record). Priority P1 — lands before or with the next release cycle so the calibration governs that cycle's reviews.
+- **Provenance:** operator demand, 2026-08-16 — root-cause class 3: the review pipeline manufactures intake volume
+- **Intents:**
+```yaml
+- subject:
+    kind: doc
+    ref: memory/product/sdd/sdd-bug-backlog-governance.md#Release And Audit
+  change: 'The intake protocol distinguishes signal classes: reviews record every
+    observation (never-silent), record-only observations — INFO-grade, awareness-only,
+    already-fixed-at-HEAD — terminate in the release CLOSURE record or the reviewer
+    handoff and never enter the PM intake report; only actionable defects (LOW+ with a
+    concrete fix surface) are compiled for operator adjudication. The dd-release-closure
+    Intake-candidates section contract and the dd-backlog-definition section-5 intake
+    protocol state this routing identically.'
+- subject:
+    kind: catalog
+    ref: agent-comms
+  change: 'Reviewer personas and their handoff guidance route by signal class: findings
+    arrays keep every observation (zero observations lost), and the routing distinguishes
+    closure-terminating record-only observations from intake-bound actionable defects.
+    ai-engineer lane for every skill and persona edit.'
+```
+
 ## LEDGER
 
 - push-range-denylist-scan · DELIVERED · v0.9.0 · 2026-08-14
