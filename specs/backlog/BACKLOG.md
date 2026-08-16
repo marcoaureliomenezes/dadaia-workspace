@@ -719,6 +719,24 @@ and proceeds either way.
     backlog-touching commit stops double-paying the full YAML cost.'
 ```
 
+### derived-values-computed-not-stored
+- **Title:** token_estimate drift class — derived values are computed by the generator, never hand-maintained (#43)
+- **Opened:** 2026-08-16
+- **Status:** candidate
+- **Description:** Intake #3 item 3-16 (v0.12.0 CLOSURE §Intake code-review LOW, absorbing v0.11.0's INFO "token_estimate drift across ~12 atoms" — same class, same fix; the v0.12.0 INSTANCE is already normalized at HEAD, frontmatter declares the linter-computed 1845). The class: a hand-estimated token_estimate in atom frontmatter stays wrong until someone happens to run the linter, and the catalog generator COPIES frontmatter rather than recomputing, faithfully propagating the wrong number — two consecutive instances measured 37% (950→≈1301) and 42% (1300→≈1845) off. Class fix (operator adjudication 2026-08-16 — computed, not stored by hand): the generator computes and writes the estimate, making the linter's computation the single writer of the field, so no hand-maintained copy of a derivable value survives; alternatively specs doctor FAILS rather than warns on a measurably-wrong estimate. product-engineer is the beneficiary; software-engineer lane (generator/doctor).
+- **Provenance:** intake-report #3 item 3-16 approved — operator adjudication, 2026-08-16 (resolva todos — class-level fixes, no workarounds)
+- **Intents:**
+```yaml
+- subject:
+    kind: code
+    ref: dadaia_workspace/features/specs/catalog.py#generate_catalog
+  change: 'The catalog generator computes token_estimate from atom content instead of copying
+    frontmatter — the linter computation becomes the single writer of the field, written back
+    through the sanctioned normalizer so frontmatter and catalog agree by construction;
+    alternatively the doctor fails loud on a measurably-wrong hand-declared estimate. Either
+    way a derivable value has exactly one computing writer and zero hand-maintained copies.'
+```
+
 ## LEDGER
 
 - push-range-denylist-scan · DELIVERED · v0.9.0 · 2026-08-14
