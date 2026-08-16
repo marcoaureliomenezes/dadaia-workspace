@@ -617,6 +617,29 @@ and proceeds either way.
     regex — one grammar, one writer path.'
 ```
 
+### denylist-masking-predicate-parity
+- **Title:** FR6 masking parity — masker shares the detector predicate; no refusal renders a raw path (#39)
+- **Opened:** 2026-08-16
+- **Status:** candidate
+- **Description:** Intake #3 item 3-6 (security ship review 2026-08-15T200554Z, LOW ×2, both reproduced; CWE-532). Two masking gaps, one predicate-sharing class fix (operator adjudication 2026-08-16 — one seam, not per-site patches): (i) the path masker predicate is strictly NARROWER than the detector — core/redaction.py#compile_candidates compiles case-sensitive with hyphen-as-word-char (zero IGNORECASE in the module), so a path embedding a hyphenated or upper-cased form of a denylist term renders verbatim in the same refusal that masks the term itself; (ii) the git-failure refusal renders the adapter exception verbatim and the prior-side desync error embeds the raw blob path with no masking (git_objects.py:207,257). Fix: the gate-side masking predicate widens to a superset of the detector (case/word-boundary parity) while cli/redact.py stays byte-identical-by-design, and GitObjectReadError carries the path as a structured field masked at the single render boundary — detector-hit implies masker-hit, proven by paired fixtures. Rider: align the sdd-gate-v3 atom's FR6 class sentence with whichever predicate ships (PE, memory window).
+- **Provenance:** intake-report #3 item 3-6 approved — operator adjudication, 2026-08-16 (resolva todos — class-level fixes, no workarounds)
+- **Intents:**
+```yaml
+- subject:
+    kind: code
+    ref: dadaia_workspace/core/redaction.py#compile_candidates
+  change: 'The gate-side masking predicate becomes a superset of the detection predicate
+    (case-insensitivity and hyphen/word-boundary parity) for path masking in refusals;
+    cli/redact.py stays byte-identical by design; paired fixtures prove detector-hit
+    implies masker-hit.'
+- subject:
+    kind: code
+    ref: dadaia_workspace/core/protocols/git_object_reader.py#GitObjectReadError
+  change: 'GitObjectReadError carries the offending path as a structured field and every
+    refusal channel masks it at the render boundary — neither the git-failure refusal nor
+    the prior-side desync error interpolates a raw exception string or raw blob path.'
+```
+
 ## LEDGER
 
 - push-range-denylist-scan · DELIVERED · v0.9.0 · 2026-08-14
