@@ -2,13 +2,17 @@
 
 Implements:
 - release_new:  creates specs/releases/<id>/SPEC.md stub
-- backlog_new:  appends one ACTIVE subsection to specs/backlog/BACKLOG.md
-  (SPEC v0.12.0 FR3, ADR #14 — the single-source document, not a per-entry file)
 
-Both validate the slug/id; release_new refuses to clobber an existing release
-directory, backlog_new refuses a slug already present in ACTIVE or LEDGER (A3.3). The
+Validates the release id and refuses to clobber an existing release directory. The
 legacy ``bug_new`` Markdown scaffolder was retired in v0.1.53 — bugs are event-sourced
 JSONL via ``dadaia bugs append`` (the v0.1.46 canon).
+
+``backlog_new`` MOVED to ``features.backlog.document`` at SPEC v0.4.2 FR1 (GRILL D1):
+that module already owns the ``BACKLOG.md`` grammar for reading, and
+``features/spec_artifacts``/``features/backlog`` are independent sibling features under
+the ``features-no-cross-feature`` import-linter contract (no accepted edge exists for
+this pair) — moving the writer into the feature that owns the grammar needs no new
+edge at all, where importing it here would.
 """
 
 from __future__ import annotations
@@ -21,7 +25,7 @@ from pathlib import Path
 from dadaia_workspace.core.specs_version import RELEASE_SEMVER_RE
 
 # ── slug validation patterns ──────────────────────────────────────────────────
-# Shared pattern for backlog/bug slugs (and the legacy release-id form):
+# Shared pattern for the legacy release-id slug form:
 # must start with a lowercase letter, followed by lowercase letters, digits, or hyphens.
 _SLUG_RE = re.compile(r"^[a-z][a-z0-9-]+$")
 
@@ -100,101 +104,6 @@ _RELEASE_SPEC_STUB = """\
 (Upstream blockers, sequencing constraints, risk table.)
 """
 
-# ── backlog: single-source BACKLOG.md subsection writer (SPEC v0.12.0 FR3) ──────
-
-# ``backlog_new`` authors an ``## ACTIVE`` subsection into ``specs/backlog/BACKLOG.md``
-# instead of a per-entry file (ADR #14, ``dd-backlog-definition`` §2). Deliberately
-# NOT importing ``features.backlog.document`` here: ``features/spec_artifacts`` and
-# ``features/backlog`` are independent sibling features (``lint-imports``
-# ``features-no-cross-feature`` — no accepted edge exists for this pair), so the
-# writer re-derives the tiny slug-membership check it needs (below) rather than
-# taking on a new cross-feature coupling. The shape it emits is exactly the grammar
-# ``document.load_document`` parses (A3.5 — both go through the same schema even
-# though not the same code), so the round trip closes without a shared import.
-
-#: Every ACTIVE ``### <slug>`` heading in a ``BACKLOG.md`` text (module-level so a
-#: freshly-created skeleton and an existing document share one membership check).
-_ACTIVE_HEADING_RE = re.compile(r"^###[ \t]+(?P<slug>\S.*?)[ \t]*$", re.MULTILINE)
-
-#: Every LEDGER bullet line's leading slug (``<slug> · disposition · ...``).
-_LEDGER_LINE_RE = re.compile(r"^-[ \t]+(?P<slug>[^\s·]+)[ \t]*·", re.MULTILINE)
-
-#: The ``## LEDGER`` top-level heading — the append anchor point (insert immediately
-#: before it, preserving every other byte — A3.2).
-_LEDGER_HEADING_RE = re.compile(r"^##[ \t]+LEDGER[ \t]*$", re.MULTILINE)
-
-#: The skeleton a from-scratch document starts from — both section headings, nothing
-#: else (A3.1). The SAME insertion routine used for an existing document runs over
-#: this skeleton too, so there is exactly one append code path, not two.
-_BACKLOG_DOCUMENT_SKELETON = "## ACTIVE\n\n## LEDGER\n"
-
-# The subsection is born at ``status: idea`` — an unbound brainstorm. ``backlog doctor``
-# exempts ``idea`` from the typed-intents requirement (v0.1.55 FR5, preserved verbatim
-# over the new shape — SPEC v0.12.0 A2.3), so a fresh subsection is doctor-clean; the
-# commented template TEACHES the ``**Intents:**`` fenced-YAML shape a maturing entry
-# must adopt at `candidate` and beyond (a teaching template, NOT a live dummy subject
-# that would gate-game). No ``.format`` field braces appear inside it beyond ``{slug}``/
-# ``{today}``, so no escaping is needed.
-_ACTIVE_SUBSECTION_TEMPLATE = """\
-### {slug}
-- **Title:** {slug}
-- **Opened:** {today}
-- **Status:** idea
-- **Description:** (one-line description of the need)
-- **Provenance:** operator request
-
-<!--
-An `idea` needs no `**Intents:**` block. Before promoting this entry to
-`**Status:** candidate`, add one more bullet, ABOVE this comment: the bold key
-`Intents` (followed by a colon and a fenced ```yaml block, the same way `Title`/
-`Status` above are written) whose fenced content binds each change to a canonical
-subject anchor, shaped like the fenced example below (copy it above this comment,
-under its own `Intents` bullet, to make it live):
-
-```yaml
-- subject:
-    kind: code
-    ref: path/to/module.py#Symbol
-  change: what changes about this subject
-- subject:
-    kind: cli
-    ref: dadaia some-command
-  change: what changes about this command
-```
-
-Discover bindable anchors with `dadaia backlog subjects`. Subject kinds: code | cli |
-catalog | doc | invariant (code anchors are derived from Python sources only — in a
-non-Python repo bind catalog/doc/invariant anchors instead).
--->
-
-"""
-
-
-def _backlog_slug_exists(text: str, slug: str) -> bool:
-    """True iff *slug* already names an ACTIVE subsection or a LEDGER row (A3.3) —
-    the slug-uniqueness invariant across ``ACTIVE ∪ LEDGER`` that replaces the retired
-    per-file no-clobber check (grill P11: there is no longer a path to collide with)."""
-    active_slugs = {m.group("slug") for m in _ACTIVE_HEADING_RE.finditer(text)}
-    ledger_slugs = {m.group("slug") for m in _LEDGER_LINE_RE.finditer(text)}
-    return slug in active_slugs or slug in ledger_slugs
-
-
-def _append_active_subsection(text: str, block: str) -> str:
-    """Splice *block* in immediately before the ``## LEDGER`` heading.
-
-    A pure string-slice insertion: every byte before and after the insertion point is
-    untouched (A3.2's byte-diff guarantee). Falls back to appending at end-of-file only
-    if ``## LEDGER`` is somehow absent (a malformed document outside this writer's own
-    skeleton/append contract) — a defensive path, not the birth of a THIRD document
-    shape: the appended text still conforms to the schema ``document.load_document``
-    expects.
-    """
-    match = _LEDGER_HEADING_RE.search(text)
-    if match is None:
-        return text.rstrip("\n") + "\n\n" + block
-    insertion_point = match.start()
-    return text[:insertion_point] + block + text[insertion_point:]
-
 
 # ── public API ────────────────────────────────────────────────────────────────
 
@@ -237,48 +146,3 @@ def release_new(specs_dir: Path, release_id: str) -> NewArtifactResult:
         encoding="utf-8",
     )
     return NewArtifactResult(path=spec_path, created=True)
-
-
-def backlog_new(specs_dir: Path, slug: str) -> NewArtifactResult:
-    """Append one ``### <slug>`` ACTIVE subsection to ``specs/backlog/BACKLOG.md``
-    (SPEC v0.12.0 FR3, ADR #14) — creating the document with both ``## ACTIVE`` and
-    ``## LEDGER`` section headings first when it does not yet exist.
-
-    Args:
-        specs_dir: Absolute path to the ``specs/`` directory.
-        slug:      Backlog entry slug.  Must match ``^[a-z][a-z0-9-]+$``.
-
-    Returns:
-        :class:`NewArtifactResult` with the path to ``BACKLOG.md``.
-
-    Raises:
-        ValueError:      If ``slug`` does not match the slug pattern (A3.4, unchanged
-            message).
-        FileExistsError: If ``slug`` already names an ACTIVE subsection or a LEDGER
-            row (A3.3 — the slug-uniqueness invariant across ``ACTIVE ∪ LEDGER`` that
-            replaces the retired per-file no-clobber check; same exception class and
-            CLI exit-code class as the retired path, grill P11).
-    """
-    if not _SLUG_RE.match(slug):
-        raise ValueError(
-            f"Invalid slug {slug!r}. "
-            "Must match ^[a-z][a-z0-9-]+$ "
-            "(lowercase letters, digits, and hyphens; must start with a letter)."
-        )
-
-    backlog_dir = specs_dir / "backlog"
-    backlog_dir.mkdir(parents=True, exist_ok=True)
-    target = backlog_dir / "BACKLOG.md"
-    existing_text = (
-        target.read_text(encoding="utf-8") if target.is_file() else (_BACKLOG_DOCUMENT_SKELETON)
-    )
-
-    if _backlog_slug_exists(existing_text, slug):
-        raise FileExistsError(
-            f"Backlog slug already exists: {slug!r} is already present in ACTIVE or "
-            f"LEDGER of {target}. Use a different slug."
-        )
-
-    block = _ACTIVE_SUBSECTION_TEMPLATE.format(slug=slug, today=_today())
-    target.write_text(_append_active_subsection(existing_text, block), encoding="utf-8")
-    return NewArtifactResult(path=target, created=True)

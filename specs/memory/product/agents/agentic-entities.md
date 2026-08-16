@@ -16,7 +16,6 @@ tags:
 - entities
 - derivation
 - governance
-token_estimate: 475
 last_updated: '2026-08-15'
 release_origin: v0.3.0
 ---

@@ -16,7 +16,6 @@ tags:
 - agent-comms
 - handoff
 - schema
-token_estimate: 1500
 last_updated: '2026-08-07'
 release_origin: v0.3.0
 ---

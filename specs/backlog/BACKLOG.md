@@ -15,9 +15,13 @@ Entry numbering (`#N`) from the retired `candidates.md` index is carried in each
 rows are never renumbered, and LEDGER rows are never deleted.
 
 **Pick-precedence notice (DADAIA.md §5).** At release-pick time, open bugs and
-undispositioned audits outrank every fresh entry below. **Currently outranking: nothing**
-— the bug ledger carries zero open bugs (the two LOWs closed by `hotfix/0.7.1`, merged
-`d15bdf4e`); both 2026-07 audits are archived and fully dispositioned (v0.8.0).
+undispositioned audits outrank every fresh entry below. **Currently outranking: one open bug**
+— `memory-token-estimate-normalizer-dead-code` (LOW, registered 2026-08-16 during v0.4.2's
+memory window; Arm B, fixed on `hotfix/{M.m.p}`, never backlog demand). The two earlier LOWs
+closed by `hotfix/0.7.1` (merged `d15bdf4e`) and v0.4.2's own
+`gitignore-code-review-artifact-untrackable` are `Closed`; both 2026-07 audits are archived and
+fully dispositioned (v0.8.0). Count corrected at the v0.4.2 closure sweep, 2026-08-16 — the
+ledger (`dadaia bugs status`) remains the source of truth.
 
 **Purge-on-pick notice — release v0.4.2 "residual-convergence" (2026-08-16).** Thirteen
 ACTIVE subsections left this document in the same commit that created
@@ -28,9 +32,10 @@ ACTIVE subsections left this document in the same commit that created
 `amnesty-multi-path-blob-fail-closed` (#40), `git-batch-epipe-swallow-width` (#41),
 `self-scan-sentinel-archive-authored-blobs` (#45), `document-parser-fence-filter-complexity`
 (#42), `retire-dead-hotfix-surface` (#4), `changelog-version-axis-reconciliation` (#11) and
-`spec-doc-031-citation-classes` (#10). Their `LEDGER` lines are written by that release's
-closure disposition sweep — nothing is deleted. `baseline-carve-out-review-cadence` (#24) was
-a **partial** pick: it stays ACTIVE below, rewritten to its residual.
+`spec-doc-031-citation-classes` (#10). Their `LEDGER` lines were written by that release's
+closure disposition sweep on 2026-08-16 (`DELIVERED · v0.4.2`, at the end of `## LEDGER`) —
+nothing was deleted. `baseline-carve-out-review-cadence` (#24) was a **partial** pick: it stays
+ACTIVE below, rewritten to its residual and refreshed again at that closure.
 
 **Standing operator decision, pending (v0.8.0 CLOSURE return #3).** Is `deferred`
 terminal for bug `panel-telemetry-sqlite-corrupts-under-concurrent-access`, or does it
@@ -383,8 +388,8 @@ is no longer archive-only.
 - **Title:** privacy-baseline pattern versioning + carve-out review cadence (three reactive exclusions in one release) (#24)
 - **Opened:** 2026-08-14
 - **Status:** candidate
-- **Description:** REWRITTEN TO ITS RESIDUAL 2026-08-16 — **partially picked by release v0.4.2** (`specs/_archive/releases/v0.4.2/SPEC.md` FR10 delivered the cross-platform half: `/Users/<name>` and `C:\Users\<name>` patterns with paired fixtures, baseline bumped to v5, `/root` evaluated and deliberately excluded as carrying no user-identifying segment — grill D10). Per `dd-release-definition` §5's full-slug rule this entry is NOT declared consumed and stays ACTIVE carrying what remains. **The residual:** v0.9.0 CLOSURE "Backlog returns" item, included at the PE's judgement because the drift it generalizes is a class, not a one-off. The RFC-2606 reserved-TLD gap was found only by the baseline refusing legitimate synthetic content on its first real run — by accident of timing, not by review — and the release then added three carve-outs reactively (RFC-2606 emails, the product's own workspace.local identity in two patterns, the stdlib Path.home call forms), taking privacy_baseline.json from v1 to v4 in one cycle. There is still no defined moment at which the patterns and their exclude_regex carve-outs are re-examined against the reserved/synthetic-value RFCs — and v0.4.2 added two more patterns without one. The round-2 code review named the underlying treadmill: internal-hostname treats ANY dotted identifier chain ending in local|internal|lan|intranet|corp|home as a hostname, so `<name>.local`, `<attr>.internal`, `<x>.home` and every future equivalent will each demand another literal exclusion — the false-positive class is unbounded while carve-outs are literal-by-literal. Candidate shapes from the routing: a periodic review lane; a doctor check flagging baseline patterns lacking a documented carve-out rationale; and (from the review) a structural fix for the dotted-chain class instead of a fourth literal. Also inherited from v0.4.2 (grill D9): the gap-class itself — a declared-support platform with no covering pattern — should be something the cadence catches, and new patterns should not have to grow the self-scan sentinel's shrink-only fixture baseline by hand. A constraint to preserve, recorded in the CLOSURE accepted-without-action list: baseline patterns must stay single-line (the push scan matches line-by-line while the public-privacy doctor matches whole text).
-- **Provenance:** v0.9.0 CLOSURE return — pre-approved intake (ADR #15 retroactive ruling, operator deferral); intake-report #3 item 3-1 folded — operator adjudication, 2026-08-16; rewritten to its residual at the v0.4.2 partial pick, 2026-08-16
+- **Description:** REWRITTEN TO ITS RESIDUAL 2026-08-16, refreshed at that release's closure the same day — **partially picked, and partially DELIVERED, by release v0.4.2** (archived at `specs/_archive/releases/v0.4.2/SPEC.md`, which is the SPEC's home from the v0.4.2 archive move onward). What v0.4.2 SHIPPED, not promised: FR10's cross-platform half — `/Users/<name>` and `C:\Users\<name>` patterns with paired fixtures proving each fires, the baseline bumped to `version: 5` with its `_header.excludes` rationale extended, `/root` evaluated and deliberately excluded as carrying no user-identifying segment (grill D10), and the pre-PR code review's CR-2 fix giving `windows-users-path` trailing-lookahead parity with its two POSIX peers so it fires in prose form and not only before a path separator. Per `dd-release-definition` §5's full-slug rule this entry was NOT declared consumed and stays ACTIVE carrying what remains. **The residual:** v0.9.0 CLOSURE "Backlog returns" item, included at the PE's judgement because the drift it generalizes is a class, not a one-off. The RFC-2606 reserved-TLD gap was found only by the baseline refusing legitimate synthetic content on its first real run — by accident of timing, not by review — and the release then added three carve-outs reactively (RFC-2606 emails, the product's own workspace.local identity in two patterns, the stdlib Path.home call forms), taking privacy_baseline.json from v1 to v4 in one cycle. There is still no defined moment at which the patterns and their exclude_regex carve-outs are re-examined against the reserved/synthetic-value RFCs — and v0.4.2 added two more patterns without one. The round-2 code review named the underlying treadmill: internal-hostname treats ANY dotted identifier chain ending in local|internal|lan|intranet|corp|home as a hostname, so `<name>.local`, `<attr>.internal`, `<x>.home` and every future equivalent will each demand another literal exclusion — the false-positive class is unbounded while carve-outs are literal-by-literal. Candidate shapes from the routing: a periodic review lane; a doctor check flagging baseline patterns lacking a documented carve-out rationale; and (from the review) a structural fix for the dotted-chain class instead of a fourth literal. Also inherited from v0.4.2 (grill D9): the gap-class itself — a declared-support platform with no covering pattern — should be something the cadence catches, and new patterns should not have to grow the self-scan sentinel's shrink-only fixture baseline by hand. FOLDED IN at the v0.4.2 closure (code review CR-6, LOW, non-blocking, no new entry materialized per ADR #15): a narrow carve-out escape on the same surface — the Windows name charset `[A-Za-z0-9_.-]+` includes `.`, so a placeholder path ending a sentence swallows the trailing period into the match and the `^`-anchored `exclude_regex`, which expects `$` or a separator immediately after the name, then fails; the `/home` and `/Users` peers are immune because their charsets exclude `.`. Pre-existing (it dates from the v0.4.2 pattern's introduction, NOT from the CR-2 remediation — the reviewer verified the pre-fix form false-positives identically), and it errs toward OVER-firing on placeholder documentation, so it costs friction and never privacy; `public doctor` stays green. It is the same literal-by-literal treadmill this entry already names — candidate fix if picked: exclude a trailing `.` from the match, or give the carve-out a trailing-punctuation tolerance. A constraint to preserve, recorded in the CLOSURE accepted-without-action list: baseline patterns must stay single-line (the push scan matches line-by-line while the public-privacy doctor matches whole text).
+- **Provenance:** v0.9.0 CLOSURE return — pre-approved intake (ADR #15 retroactive ruling, operator deferral); intake-report #3 item 3-1 folded — operator adjudication, 2026-08-16; rewritten to its residual at the v0.4.2 partial pick, 2026-08-16; refreshed at the v0.4.2 closure sweep (CR-5 citation verification, CR-6 folded), 2026-08-16
 - **Intents:**
 ```yaml
 - subject:
@@ -588,3 +593,16 @@ is no longer archive-only.
 - workflow-model-governance-panel-control-plane · DELIVERED · v0.1.28 · 2026-07-02
 - workflow-step-handoff-data-plane-cleanup · DELIVERED · workflow-engine era, terminal frontmatter (engine removed v0.3.0) · 2026-07-02
 - intake-3-2-match-throughput-fallback · REJECTED · v0.11.0 measured rejection ratified at intake #3 (fallback is the rare shape; a matcher-engine change is its own correctness surface; 55 s one-time scan inside tolerance) · 2026-08-16
+- backlog-grammar-single-writer-seam · DELIVERED · v0.4.2 · 2026-08-16
+- denylist-masking-predicate-parity · DELIVERED · v0.4.2 · 2026-08-16
+- derived-values-computed-not-stored · DELIVERED · v0.4.2 · 2026-08-16
+- knowledge-duplication-doc-pass · DELIVERED · v0.4.2 · 2026-08-16
+- flat-release-ship-task-evidence · DELIVERED · v0.4.2 · 2026-08-16
+- intake-signal-calibration · DELIVERED · v0.4.2 · 2026-08-16
+- amnesty-multi-path-blob-fail-closed · DELIVERED · v0.4.2 · 2026-08-16
+- git-batch-epipe-swallow-width · DELIVERED · v0.4.2 · 2026-08-16
+- self-scan-sentinel-archive-authored-blobs · DELIVERED · v0.4.2 · 2026-08-16
+- document-parser-fence-filter-complexity · DELIVERED · v0.4.2 · 2026-08-16
+- retire-dead-hotfix-surface · DELIVERED · v0.4.2 · 2026-08-16
+- changelog-version-axis-reconciliation · DELIVERED · v0.4.2 · 2026-08-16
+- spec-doc-031-citation-classes · DELIVERED · v0.4.2 · 2026-08-16

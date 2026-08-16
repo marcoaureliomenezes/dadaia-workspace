@@ -15,7 +15,6 @@ tags:
 - session
 - no-locks
 - privacy
-token_estimate: 470
 last_updated: '2026-08-14'
 release_origin: v0.2.3
 ---

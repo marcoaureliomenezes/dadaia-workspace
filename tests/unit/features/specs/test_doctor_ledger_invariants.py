@@ -284,15 +284,19 @@ def test_sad_matrix(tmp_path: Path) -> None:
     doc030 = _by_code(SpecsDoctor(specs_g).check(), "SPEC-DOC-030")
     assert doc030 and all(i.severity == Severity.WARNING for i in doc030)
 
-    # DOC-031: non-terminal ACTIVE backlog item referenced in an archived CLOSURE ->
-    # WARNING with the ACTIVE->LEDGER remediation text (SPEC v0.12.0 FR5/T-120-08).
+    # DOC-031: non-terminal ACTIVE backlog item CONSUMPTION-ASSERTED by an archived
+    # CLOSURE's ## Dispositions table row (SPEC v0.4.2 FR14 — the evidence surface is
+    # narrower than free-text conversation, but the message shape is unchanged).
     specs_h = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-031"))
     _write_backlog_entry(specs_h, "feat-consumed-thing", "PICKED — blocked on operator grill")
     _write_archived_closure(
         specs_h,
         "v0.0.9",
-        "# Closure\n\n## Bug dispositions\n\n"
-        "Source: `feat-consumed-thing` — delivered, accepted.\n",
+        "# Closure\n\n## Dispositions\n\n"
+        "| File | Kind | Terminal status | Evidence |\n"
+        "|---|---|---|---|\n"
+        "| `specs/backlog/BACKLOG.md` › LEDGER line `feat-consumed-thing` | backlog "
+        "| `DELIVERED — v0.0.9` | delivered, accepted |\n",
     )
     doc031 = _by_code(SpecsDoctor(specs_h).check(), "SPEC-DOC-031")
     assert doc031 and all(i.severity == Severity.WARNING for i in doc031)
@@ -383,8 +387,11 @@ def test_silent_matrix(tmp_path: Path) -> None:
     assert not (specs_g3 / "audits").exists()
     assert "SPEC-DOC-030" not in _codes(SpecsDoctor(specs_g3).check())
 
-    # DOC-031: legitimate return (Backlog returns section), terminal-and-referenced,
-    # never-referenced-open, and aggregate files skipped -> all silent.
+    # DOC-031: legitimate return (a "## Backlog returns" section is not a
+    # "**Consumes:**"/"## Dispositions" declaration, so it is simply never read — D6
+    # deletes the old per-section exclusion special case as subsumed, not replaces it
+    # with a new one), terminal-and-referenced, never-referenced-open, and aggregate
+    # files skipped -> all silent.
     specs_h1 = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-031returns"))
     _write_backlog_entry(specs_h1, "newly-returned-item", "CANDIDATE — not picked")
     _write_archived_closure(

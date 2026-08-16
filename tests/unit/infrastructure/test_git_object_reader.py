@@ -196,6 +196,69 @@ def test_new_objects_oversized_blob_with_undecodable_prefix_falls_back_to_binary
     assert big.sha == big_sha
 
 
+# ═════════════════════════════════════════════════════════════════════════════════
+# FR8 (v0.4.2, GRILL P11-P13, anchor correction P12) — a scan-path degradation is never
+# silent. Sub-item (1): _read_oversized_blob_prefix inspects the process exit status
+# and raises when the process FAILED and fewer than cap bytes arrived; the intentional
+# early-close (EPIPE after the cap) stays the only swallowed shape.
+# ═════════════════════════════════════════════════════════════════════════════════
+
+# Intent: CONTRACT — v0.4.2 A8.1
+
+
+def test_read_oversized_blob_prefix_raises_on_nonexistent_oid(tmp_path: Path) -> None:
+    """A8.1: a nonexistent oid must raise the typed error, never silently return a
+    0-byte 'partially scanned' prefix — `git cat-file blob <oid>` exits 128 delivering
+    zero stdout bytes for an oid that resolves to nothing."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "a.txt").write_text("content\n")
+    _commit(repo, "c1")
+
+    from dadaia_workspace.infrastructure import git_objects as git_objects_module
+
+    nonexistent_oid = "f" * 40
+    with pytest.raises(GitObjectReadError):
+        git_objects_module._read_oversized_blob_prefix(repo, nonexistent_oid)
+
+
+def test_read_oversized_blob_prefix_raises_on_tree_sha(tmp_path: Path) -> None:
+    """A8.1: a tree sha (not a blob) passed to `git cat-file blob` must raise the typed
+    error rather than silently returning a 0-byte prefix — `git cat-file blob <tree>`
+    exits 128 ("bad file") delivering zero stdout bytes."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "a.txt").write_text("content\n")
+    tip_sha = _commit(repo, "c1")
+    tree_sha = _git(["rev-parse", f"{tip_sha}^{{tree}}"], repo).stdout.strip()
+
+    from dadaia_workspace.infrastructure import git_objects as git_objects_module
+
+    with pytest.raises(GitObjectReadError):
+        git_objects_module._read_oversized_blob_prefix(repo, tree_sha)
+
+
+# Intent: CONTRACT — v0.4.2 A8.2 (regression — the existing EPIPE/full-cap path is not
+# broken by the new returncode inspection)
+
+
+def test_read_oversized_blob_prefix_full_cap_read_still_succeeds(tmp_path: Path) -> None:
+    """A8.2: an oversized blob read that delivers the full cap still succeeds — the
+    intentional early-close EPIPE outcome stays the only swallowed shape, unaffected by
+    the new 'failed with fewer than cap bytes' check (len(prefix) == cap here, so the
+    new guard never fires)."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "big.txt").write_text("a" * (6 * 1024 * 1024))
+    _commit(repo, "c1")
+    big_sha = _blob_sha(repo, "big.txt")
+
+    from dadaia_workspace.infrastructure import git_objects as git_objects_module
+
+    prefix = git_objects_module._read_oversized_blob_prefix(repo, big_sha)
+    assert len(prefix) == git_objects_module._MAX_BLOB_BYTES
+
+
 def test_new_objects_dedupes_a_blob_reachable_from_two_commits(tmp_path: Path) -> None:
     """A1.4: the identical blob content committed on two separate files in the range is
     returned once per distinct blob sha, never once per path occurrence."""
@@ -480,6 +543,188 @@ def test_desynchronised_header_shape_aborts_typed_never_yields_fabricated_object
         for obj in reader.new_objects(repo, tip_sha, ZERO_SHA):
             collected.append(obj)
     assert collected == [], "no object — fabricated or otherwise — may be yielded on desync"
+
+
+# ═════════════════════════════════════════════════════════════════════════════════
+# FR8(3) (v0.4.2, GRILL P12 anchor correction) — an unparseable `--batch-check` row is
+# typed-or-counted, never invisible, at its REAL sites: `_blob_info`
+# (size-check for the candidate blob set) and `_resolve_prior_texts` (size-check
+# resolving prior content). A legitimately non-blob row (a tree) and a documented
+# `<spec> missing` row stay ordinary filtered outcomes, never errors.
+# ═════════════════════════════════════════════════════════════════════════════════
+
+
+def _patch_blob_info_batch_check(monkeypatch: pytest.MonkeyPatch, corrupted_stdout: bytes) -> None:
+    """Force `_blob_info`'s `git cat-file --batch-check` call to return
+    *corrupted_stdout* while every other call in the module runs for real."""
+    from dadaia_workspace.infrastructure import git_objects as git_objects_module
+
+    real_run = git_objects_module._run
+
+    def _spy_run(
+        args: list[str], cwd: Path, *, input_bytes: bytes | None = None
+    ) -> subprocess.CompletedProcess[bytes]:
+        if (
+            len(args) >= 3
+            and args[:2] == ["git", "cat-file"]
+            and args[2].startswith("--batch-check")
+        ):
+            return subprocess.CompletedProcess(args, 0, stdout=corrupted_stdout, stderr=b"")
+        return real_run(args, cwd, input_bytes=input_bytes)
+
+    monkeypatch.setattr(git_objects_module, "_run", _spy_run)
+
+
+# Intent: CONTRACT — v0.4.2 A8.4
+
+
+def test_blob_info_raises_on_a_batch_check_row_with_wrong_field_count(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A8.4: a --batch-check row that is not the documented 3-field shape raises the
+    typed error naming the row — silently skipping it would silently drop that blob
+    from the scanned set (a coverage hole invisible to every caller)."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "a.txt").write_text("content\n")
+    tip_sha = _commit(repo, "c1")
+
+    _patch_blob_info_batch_check(monkeypatch, b"garbled-row-not-three-fields\n")
+
+    reader = GitSubprocessObjectReader()
+    with pytest.raises(GitObjectReadError, match="batch-check"):
+        list(reader.new_objects(repo, tip_sha, ZERO_SHA))
+
+
+def test_blob_info_raises_on_a_batch_check_row_with_non_numeric_size(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A8.4: a --batch-check row whose size field is not numeric raises the typed error
+    rather than silently dropping the row (which would silently under-report the
+    scanned set, exactly like the wrong-field-count case above)."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "a.txt").write_text("content\n")
+    tip_sha = _commit(repo, "c1")
+    fake_sha = "e" * 40
+
+    _patch_blob_info_batch_check(monkeypatch, f"{fake_sha} blob not-a-number\n".encode())
+
+    reader = GitSubprocessObjectReader()
+    with pytest.raises(GitObjectReadError, match="batch-check"):
+        list(reader.new_objects(repo, tip_sha, ZERO_SHA))
+
+
+def test_blob_info_tree_row_is_an_ordinary_filtered_outcome_not_an_error(
+    tmp_path: Path,
+) -> None:
+    """A8.4 (negative case): a legitimate 'tree' objecttype row — the ordinary,
+    documented filter-out `_blob_info` performs for every non-blob candidate — is never
+    treated as an error; this is the REAL git repo path (no monkeypatch needed), so it
+    also proves the fix does not turn every normal push (which always includes at
+    least one tree) into a false-positive failure."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "dir").mkdir()
+    (repo / "dir" / "a.txt").write_text("content\n")
+    tip_sha = _commit(repo, "c1")
+
+    reader = GitSubprocessObjectReader()
+    objects = list(reader.new_objects(repo, tip_sha, ZERO_SHA))
+    assert any(obj.path == "dir/a.txt" for obj in objects)
+
+
+# Intent: CONTRACT — v0.4.2 A8.4 (`_resolve_prior_texts` side)
+
+
+def test_resolve_prior_texts_raises_on_a_malformed_batch_check_row(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A8.4: a --batch-check row resolving PRIOR content that is neither the documented
+    3-field blob/tree shape NOR the documented 2-field '<spec> missing' absence shape
+    raises the typed error — never silently treated as absence."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "notes.md").write_text("original content\n")
+    base_sha = _commit(repo, "c1")
+    (repo / "notes.md").write_text("edited content\n")
+    tip_sha = _commit(repo, "c2")
+
+    from dadaia_workspace.infrastructure import git_objects as git_objects_module
+
+    real_run = git_objects_module._run
+    marker = f"{base_sha}:notes.md".encode()
+
+    def _spy_run(
+        args: list[str], cwd: Path, *, input_bytes: bytes | None = None
+    ) -> subprocess.CompletedProcess[bytes]:
+        if (
+            input_bytes is not None
+            and marker in input_bytes
+            and len(args) >= 3
+            and args[2].startswith("--batch-check")
+        ):
+            return subprocess.CompletedProcess(
+                args, 0, stdout=b"totally-garbled-not-missing-not-three-fields\n", stderr=b""
+            )
+        return real_run(args, cwd, input_bytes=input_bytes)
+
+    monkeypatch.setattr(git_objects_module, "_run", _spy_run)
+
+    reader = GitSubprocessObjectReader()
+    with pytest.raises(GitObjectReadError, match="batch-check"):
+        list(reader.new_objects(repo, tip_sha, base_sha))
+
+
+def test_resolve_prior_texts_missing_row_still_treated_as_absence(tmp_path: Path) -> None:
+    """A8.4 (negative case, real repo): the documented '<spec> missing' row (a path
+    genuinely absent at the base) stays an ordinary absence — no monkeypatch needed,
+    git itself produces this row for a brand-new path. Regression guard for the SAME
+    scenario `test_new_objects_resolvable_base_new_path_carries_no_prior_text` already
+    covers — re-asserted here, next to the new raising behaviour, so the two outcomes
+    (raise vs absence) are pinned side by side."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "existing.md").write_text("unrelated\n")
+    base_sha = _commit(repo, "c1")
+    (repo / "brand-new.md").write_text("never published before\n")
+    tip_sha = _commit(repo, "c2")
+
+    reader = GitSubprocessObjectReader()
+    objects = list(reader.new_objects(repo, tip_sha, base_sha))
+
+    new_obj = next(obj for obj in objects if obj.path == "brand-new.md")
+    assert new_obj.prior_text is None
+
+
+# Intent: CONTRACT — v0.4.2 CR-1 (code-reviewer HIGH, regression vs 741f2294)
+
+
+def test_resolve_prior_texts_new_path_with_two_spaces_is_absence_not_a_raise(
+    tmp_path: Path,
+) -> None:
+    """CR-1: a brand-new path containing TWO OR MORE embedded spaces must resolve as
+    an ordinary absence, exactly like any other new path — never raise.
+
+    ``git cat-file --batch-check`` answers a missing lookup by echoing the WHOLE
+    ``<base>:<path>`` input followed by `` missing`` — a naive field-count classifier
+    (``len(parts) == 2``) misclassifies any path with one or more embedded spaces,
+    and RAISES for two or more (the exact regression this test pins). Real repo path
+    (no monkeypatch needed) — git itself produces the multi-space missing row."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "existing.md").write_text("unrelated\n")
+    base_sha = _commit(repo, "c1")
+
+    (repo / "docs").mkdir()
+    (repo / "docs" / "my other file.md").write_text("brand new content with spaces\n")
+    tip_sha = _commit(repo, "c2")
+
+    reader = GitSubprocessObjectReader()
+    objects = list(reader.new_objects(repo, tip_sha, base_sha))
+
+    new_obj = next(obj for obj in objects if obj.path == "docs/my other file.md")
+    assert new_obj.prior_text is None
 
 
 # ---------------------------------------------------------------------------
@@ -848,3 +1093,131 @@ def test_prior_side_lookup_dedups_a_repeated_path_within_one_chunk(
 
     assert len(check_stdins) == 1  # one chunk (well under 500) -> ONE batch-check call
     assert check_stdins[0].decode().count(f"{base_sha}:file.txt") == 1
+
+
+# ═════════════════════════════════════════════════════════════════════════════════
+# FR7 (v0.4.2, GRILL P10, ADR R1, D4) — no amnesty for a multi-path blob (fail-closed).
+# A blob reachable at MORE THAN ONE path in the pushed range receives NO prior text at
+# all, regardless of whether one of its paths individually has amnesty-eligible prior
+# content at the base. Pre-fix, `_blob_info`'s "first-seen path wins" (GRILL P10) meant
+# the surviving path — and therefore whether prior_text was attached at all — depended
+# on `git rev-list`'s enumeration order, which is not a security-relevant property.
+# ═════════════════════════════════════════════════════════════════════════════════
+
+# Intent: CONTRACT — v0.4.2 A7.1
+
+
+def test_new_objects_multi_path_blob_gets_no_prior_text_fail_closed(tmp_path: Path) -> None:
+    """A7.1: a blob newly reachable at TWO paths in the range receives NO prior text —
+    even though one of its two paths ('existing.md') individually has prior content at
+    the base, which a pre-fix, path-keyed lookup could have attached to this blob."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "existing.md").write_text("old existing content\n")
+    base_sha = _commit(repo, "c1")
+
+    shared_new_content = "brand new shared content, reachable at two paths now\n"
+    (repo / "existing.md").write_text(shared_new_content)
+    (repo / "second.md").write_text(shared_new_content)
+    tip_sha = _commit(repo, "c2")
+
+    reader = GitSubprocessObjectReader()
+    objects = list(reader.new_objects(repo, tip_sha, base_sha))
+
+    multi_path_objs = [obj for obj in objects if obj.path in {"existing.md", "second.md"}]
+    assert len(multi_path_objs) == 1, (
+        "the shared blob must still be deduped by sha across its two paths (unchanged "
+        "cross-path dedupe behaviour)"
+    )
+    assert multi_path_objs[0].prior_text is None, (
+        "a blob reachable at more than one path must receive NO prior text at all, "
+        "fail-closed (R1/D4) — even though 'existing.md' individually has prior "
+        "content ('old existing content') at the base"
+    )
+
+
+# Intent: CONTRACT — v0.4.2 A7.1 (tree-order-independence fixture)
+
+
+@pytest.mark.parametrize(
+    ("existing_name", "new_name"),
+    [
+        pytest.param("aaa-existing.md", "zzz-second.md", id="existing-path-sorts-first"),
+        pytest.param("zzz-existing.md", "aaa-second.md", id="existing-path-sorts-last"),
+    ],
+)
+def test_new_objects_multi_path_amnesty_refusal_is_tree_order_independent(
+    tmp_path: Path, existing_name: str, new_name: str
+) -> None:
+    """A7.1: the outcome (no prior text -> the matcher would refuse a denylisted value
+    unconditionally) is IDENTICAL whether the existing-content path sorts before or
+    after the brand-new path — proving the fix does not merely relocate the
+    order-dependence (GRILL P10) rather than removing it. Pre-fix, ``_blob_info``'s
+    first-seen-path-wins meant the 'existing-path-sorts-first' case could attach the
+    existing path's prior text (amnesty-eligible) while the 'sorts-last' case could
+    not — two different outcomes for the SAME semantic scenario, differing only by
+    path name. Post-fix both parametrizations yield prior_text=None uniformly."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / existing_name).write_text("old existing content\n")
+    base_sha = _commit(repo, "c1")
+
+    shared_new_content = "brand new shared content, reachable at two paths now\n"
+    (repo / existing_name).write_text(shared_new_content)
+    (repo / new_name).write_text(shared_new_content)
+    tip_sha = _commit(repo, "c2")
+
+    reader = GitSubprocessObjectReader()
+    objects = list(reader.new_objects(repo, tip_sha, base_sha))
+
+    multi_path_objs = [obj for obj in objects if obj.path in {existing_name, new_name}]
+    assert len(multi_path_objs) == 1
+    assert multi_path_objs[0].prior_text is None
+
+
+# ═════════════════════════════════════════════════════════════════════════════════
+# CR-3 (v0.4.2 code-review MEDIUM; operator ruling: SPEC wins, widen to the range) —
+# ``_multi_path_shas`` pre-remediation scoped detection to the pushed TIP's tree only.
+# SPEC FR7/A7.1 say "reachable at more than one path in the RANGE": a blob multi-pathed
+# in an INTERMEDIATE commit — but single-pathed (or absent) at the tip — must still be
+# denied amnesty, fail-closed. The matcher and its amnesty predicate stay untouched
+# (D4) — this is the ONLY place the decision widens.
+# ═════════════════════════════════════════════════════════════════════════════════
+
+# Intent: CONTRACT — v0.4.2 CR-3
+
+
+def test_new_objects_multi_path_in_an_intermediate_commit_denies_amnesty_even_when_tip_is_single_path(
+    tmp_path: Path,
+) -> None:
+    """CR-3: a blob reachable at TWO paths in an INTERMEDIATE commit of the pushed
+    range, but at only ONE path in the pushed TIP's tree, must still receive NO prior
+    text — the pre-remediation tip-tree-only scope would miss this (the second path
+    was deleted again before the tip), silently granting amnesty for a blob that WAS
+    published at two paths somewhere in the range."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "existing.md").write_text("old existing content\n")
+    base_sha = _commit(repo, "c1")
+
+    shared_new_content = "brand new shared content, reachable at two paths mid-range\n"
+    (repo / "existing.md").write_text(shared_new_content)
+    (repo / "second.md").write_text(shared_new_content)
+    _commit(repo, "c2 (intermediate — multi-path here)")
+
+    # c3 (tip): second.md's path is gone again — the blob survives ONLY at
+    # existing.md, so the tip's own tree is single-path for this blob.
+    _git(["rm", "second.md"], repo)
+    tip_sha = _commit(repo, "c3 (tip — single-path here)")
+
+    reader = GitSubprocessObjectReader()
+    objects = list(reader.new_objects(repo, tip_sha, base_sha))
+
+    shared_sha = _blob_sha(repo, "existing.md")
+    surviving = next(obj for obj in objects if obj.sha == shared_sha)
+    assert surviving.path == "existing.md"
+    assert surviving.prior_text is None, (
+        "the blob was reachable at two paths in the pushed RANGE (intermediate commit "
+        "c2) — the tip's single-path tree must not grant amnesty just because the "
+        "second path was deleted again before the tip"
+    )

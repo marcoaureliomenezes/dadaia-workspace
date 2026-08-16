@@ -392,7 +392,7 @@ def test_freshly_authored_subsection_is_clean_under_both_doctors(tmp_path: Path)
     freshly appended ACTIVE subsection is ``backlog doctor``-clean AND ``specs
     doctor``-clean out of the box — proven over the real writer + both live doctors,
     not fixtures hand-built to match the parser."""
-    from dadaia_workspace.features.spec_artifacts.new_artifacts import backlog_new
+    from dadaia_workspace.features.backlog.document import backlog_new
     from dadaia_workspace.features.specs import SpecsDoctor
 
     specs, src = _build_roots(tmp_path)

@@ -2,6 +2,7 @@
 
 import contextlib
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -221,7 +222,23 @@ def load_denylist_baseline_patterns() -> tuple[BaselinePatternLike, ...]:
     return load_baseline_patterns()
 
 
-def load_registry_context_identities(workspace_root: Path) -> tuple[tuple[str, str], ...]:
+@dataclass(frozen=True)
+class RegistryContextIdentities:
+    """Result of :func:`load_registry_context_identities` (SPEC v0.4.2 FR8(2)/GRILL P13).
+
+    ``degraded`` is True only when the registry was present but genuinely malformed or
+    otherwise unreadable and this seam fell back to an empty identity set — the caller
+    (``cli/commands/ci.py#push_gate_check``) surfaces exactly one stderr note naming
+    the degradation and the scan still proceeds (A8.3). ``degraded`` stays False for
+    the legitimate "no registry file"/"empty registry" cases (A5.4) — those are not a
+    failure, so they must never be reported as one.
+    """
+
+    identities: tuple[tuple[str, str], ...]
+    degraded: bool = False
+
+
+def load_registry_context_identities(workspace_root: Path) -> RegistryContextIdentities:
     """Composition-root seam over the Spec Context registry (v0.11.0 FR5, T-110-13).
 
     ``cli/commands/ci.py#_foreign_repo_slugs`` reads every registered context's
@@ -231,11 +248,15 @@ def load_registry_context_identities(workspace_root: Path) -> tuple[tuple[str, s
 
     A5.4: a missing registry file already yields an empty result from
     :class:`JsonContextStore` itself (no exception); an EMPTY registry likewise yields
-    an empty list. A MALFORMED registry — invalid JSON, an unsupported schema version,
-    or a context row missing/mistyped a required field — is swallowed here into an
-    empty tuple too: the push hook (``push-gate-check``) must never crash on registry
-    state, only ever degrade to the ``repos/`` directory-derived set
-    (``cli.commands.ci._foreign_repo_slugs``'s fallback union member).
+    an empty list — neither is a degradation. A MALFORMED registry — invalid JSON, an
+    unsupported schema version, or a context row missing/mistyped a required field — IS
+    a degradation (SPEC v0.4.2 FR8(2)): the push hook (``push-gate-check``) must never
+    crash on registry state, but a malformed registry no longer shrinks the
+    foreign-name layer SILENTLY either — the fallback to an empty identity tuple is
+    reported via :attr:`RegistryContextIdentities.degraded`, and the caller surfaces
+    exactly one stderr note naming it before falling back to the ``repos/``
+    directory-derived set (``cli.commands.ci._foreign_repo_slugs``'s fallback union
+    member).
     """
     from dadaia_workspace.core.exceptions import SchemaVersionError
 
@@ -243,8 +264,10 @@ def load_registry_context_identities(workspace_root: Path) -> tuple[tuple[str, s
     try:
         contexts = JsonContextStore(states).list_all()
     except (OSError, ValueError, KeyError, TypeError, SchemaVersionError):
-        return ()
-    return tuple((c.name, c.repo_slug) for c in contexts)
+        return RegistryContextIdentities(identities=(), degraded=True)
+    return RegistryContextIdentities(
+        identities=tuple((c.name, c.repo_slug) for c in contexts), degraded=False
+    )
 
 
 def build_process_ancestry() -> ProcessAncestry:

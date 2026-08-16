@@ -13,7 +13,6 @@ tags:
 - monitoring
 - telemetry
 - sessions
-token_estimate: 1500
 last_updated: '2026-07-16'
 release_origin: v0.1.61
 ---

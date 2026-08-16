@@ -13,7 +13,6 @@ tags:
 - kimi
 - parity
 - multi-platform
-token_estimate: 271
 last_updated: '2026-07-13'
 release_origin: v0.2.3
 ---

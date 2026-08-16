@@ -1,7 +1,7 @@
 """Governance validator: backlog single-source invariants, bug status/JSONL.
 
 Single-responsibility sibling of the SpecsDoctor coordinator. Owns the bug/backlog governance
-invariants: consumed-but-unsanitized ACTIVE backlog item (SPEC-DOC-031, SPEC v0.12.0 FR5),
+invariants: consumed-but-unsanitized ACTIVE backlog item (SPEC-DOC-031, SPEC v0.4.2 FR14),
 bug-status canon (SPEC-DOC-032), the event-sourced JSONL bug-telemetry invariant
 (SPEC-DOC-033), and the single-source loose-file invariant (SPEC-DOC-035, SPEC v0.12.0 FR5).
 Leaf-only: imports the shared leaves + core, plus one documented cross-feature leaf edge
@@ -51,10 +51,65 @@ _BUG_STATUS_RE = re.compile(r"^status\s*:\s*(\S+)", re.IGNORECASE | re.MULTILINE
 # backlog new`) is drift.
 _BACKLOG_SINGLE_SOURCE_FILES: frozenset[str] = frozenset({"BACKLOG.md", "README.md"})
 
-# ADR-6: matches inside a ``## Backlog returns`` section of an archived CLOSURE are a
-# legitimate return (the slug is being ADDED for a future release, not consumed) and are
-# the documented false-positive class. SPEC-DOC-031 stays WARN (never ERR) for this reason.
-_BACKLOG_RETURNS_HEADING_RE = re.compile(r"^##\s+Backlog\s+returns\b", re.IGNORECASE)
+# SPEC-DOC-031 evidence surface (SPEC v0.4.2 FR14/GRILL D6): a mention counts as
+# consumption evidence only when it ASSERTS consumption, never on free-text prose —
+# "non-goal", "inheritance", "provenance", "Backlog returns" and every other prose
+# mention are ignored by construction, with no per-section exclusion list to maintain
+# (D6 deletes the ``## Backlog returns`` special case as subsumed: a returns section is
+# not a ``**Consumes:**`` declaration, so it was never actually evidence).
+#
+# An archived SPEC's own ``**Consumes:**`` declaration (P19: its value continues onto
+# subsequent lines until a blank line or the next ``**Key:**`` line — 27 archived
+# SPEC/CLOSURE files carry this line, several wrapped across two lines).
+_CONSUMES_LINE_RE = re.compile(r"^[ \t]*\*\*Consumes:\*\*[ \t]*(?P<rest>.*)$")
+
+# Any other bold-key line (``**Key:** value``) — the continuation-stop boundary. Matches
+# the SPEC frontmatter shape (``**Status:**``, ``**Picked set:**``, ``**Branch:**``, …).
+_BOLD_KEY_LINE_RE = re.compile(r"^[ \t]*\*\*[^*\n]+:\*\*")
+
+# An archived CLOSURE's ``## Dispositions`` section — only its table ROWS (lines starting
+# with ``|``, a Markdown table cell boundary) are evidence; the surrounding prose
+# (rationale paragraphs, "Explicit non-flips" notes) is never scanned.
+_DISPOSITIONS_HEADING_RE = re.compile(r"^##[ \t]+Dispositions\b")
+
+# Slug-shaped tokens (P19): backlog slugs are always ``^[a-z][a-z0-9-]+$`` — splitting
+# consumption-evidence text on anything OUTSIDE that charset isolates candidate tokens
+# (from backtick-quoted, comma-separated, or path-shaped mentions alike) without matching
+# a slug that is merely a SUBSTRING of a longer word or a different slug (D6).
+_SLUG_TOKEN_RE = re.compile(r"[a-z0-9-]+")
+
+
+def _consumes_tokens(spec_text: str) -> frozenset[str]:
+    """Whole-token slug candidates from every ``**Consumes:**`` declaration in an
+    archived SPEC.md, continuation lines included (P19)."""
+    lines = spec_text.splitlines()
+    span: list[str] = []
+    i, n = 0, len(lines)
+    while i < n:
+        m = _CONSUMES_LINE_RE.match(lines[i])
+        if m is None:
+            i += 1
+            continue
+        span.append(m.group("rest"))
+        i += 1
+        while i < n and lines[i].strip() != "" and not _BOLD_KEY_LINE_RE.match(lines[i]):
+            span.append(lines[i])
+            i += 1
+    return frozenset(_SLUG_TOKEN_RE.findall(" ".join(span)))
+
+
+def _dispositions_tokens(closure_text: str) -> frozenset[str]:
+    """Whole-token slug candidates from every table row under an archived CLOSURE's
+    ``## Dispositions`` heading — never its rationale prose, never any other section."""
+    tokens: list[str] = []
+    in_section = False
+    for line in closure_text.splitlines():
+        if line.startswith("## "):
+            in_section = bool(_DISPOSITIONS_HEADING_RE.match(line))
+            continue
+        if in_section and line.lstrip().startswith("|"):
+            tokens.extend(_SLUG_TOKEN_RE.findall(line))
+    return frozenset(tokens)
 
 
 class GovernanceValidator:
@@ -65,54 +120,64 @@ class GovernanceValidator:
         self.public_dir = public_dir
 
     def _archive_consumption_hits(self, slug: str) -> list[str]:
-        """Release ids of archived CLOSURE/SPEC that reference ``slug`` as consumed.
+        """Release ids of archived releases that ASSERT ``slug`` was consumed (SPEC
+        v0.4.2 FR14/GRILL D6) — never a raw line-substring scan of the whole document.
 
-        Scans every ``specs/_archive/releases/*/CLOSURE.md`` and ``.../SPEC.md`` for a
-        line containing ``slug``. Lines inside a ``## Backlog returns`` section are
-        EXCLUDED (ADR-6: the slug is being ADDED for a future release, not consumed — the
-        documented false-positive class). Returns the sorted, de-duplicated set of
-        archived release ids that reference the slug outside Backlog-returns sections.
+        A mention counts as consumption evidence in exactly two shapes:
+
+        - an archived SPEC's ``**Consumes:**`` declaration (its value plus continuation
+          lines, P19), tokenized on non-slug characters and matched as a WHOLE token; or
+        - an archived CLOSURE's ``## Dispositions`` table ROWS, tokenized the same way.
+
+        Everything else in either document — prose, non-goals, provenance notes, a
+        ``## Backlog returns`` section — is never read here; it never asserted
+        consumption in the first place, so there is no special case to carve it out
+        (D6 deletes the old ``## Backlog returns`` exclusion as subsumed). Returns the
+        sorted, de-duplicated set of archived release ids with matching evidence.
         """
         arch = self.specs_dir / "_archive" / "releases"
         if not arch.is_dir():
             return []
         hits: set[str] = set()
         for release_dir in iter_archive_release_dirs(arch):
-            release_id = release_dir.name
-            for doc_name in ("CLOSURE.md", "SPEC.md"):
-                doc = release_dir / doc_name
-                if not doc.is_file():
-                    continue
-                in_backlog_returns = False
-                for raw_line in doc.read_text(encoding="utf-8").splitlines():
-                    if raw_line.startswith("## "):
-                        in_backlog_returns = bool(_BACKLOG_RETURNS_HEADING_RE.match(raw_line))
-                    if in_backlog_returns:
-                        continue
-                    if slug in raw_line:
-                        hits.add(release_id)
-                        break
+            spec_doc = release_dir / "SPEC.md"
+            if spec_doc.is_file() and slug in _consumes_tokens(
+                spec_doc.read_text(encoding="utf-8")
+            ):
+                hits.add(release_dir.name)
+                continue
+            closure_doc = release_dir / "CLOSURE.md"
+            if closure_doc.is_file() and slug in _dispositions_tokens(
+                closure_doc.read_text(encoding="utf-8")
+            ):
+                hits.add(release_dir.name)
         return sorted(hits)
 
     def check_consumed_backlog_disposition(self) -> list[SpecsDoctorIssue]:
-        """SPEC-DOC-031 (re-targeted, SPEC v0.12.0 FR5/ADR D9): WARN on a consumed-but-
+        """SPEC-DOC-031 (re-targeted, SPEC v0.4.2 FR14/GRILL D6): WARN on a consumed-but-
         unsanitized ``## ACTIVE`` item in ``specs/backlog/BACKLOG.md``.
 
         Iterates the document's ACTIVE subsections (:func:`~dadaia_workspace.features.
-        backlog.document.load_document`) instead of globbing per-entry files — the
-        physical shape changed, the evidence source and severity did not. An ACTIVE
+        backlog.document.load_document`) instead of globbing per-entry files. An ACTIVE
         item whose ``**Status:**`` is an ADR-11 NON-TERMINAL token ({OPEN, PICKED,
-        CANDIDATE}, case-insensitive prefix match) AND whose slug is referenced by an
-        archived release CLOSURE/SPEC (outside ``## Backlog returns`` sections) ⇒
-        **WARNING**. The lifecycle contract is that an item consumed into a
-        shipped+archived release must move ``ACTIVE`` → ``LEDGER`` at CLOSURE; a
-        non-terminal ACTIVE item whose slug is referenced is the drift.
+        CANDIDATE}, case-insensitive prefix match) AND whose slug is a whole-token match
+        inside an archived release's CONSUMPTION-ASSERTING evidence — an archived SPEC's
+        ``**Consumes:**`` declaration or an archived CLOSURE's ``## Dispositions`` table
+        rows (:func:`_archive_consumption_hits`, FR14) — ⇒ **WARNING**. The lifecycle
+        contract is that an item consumed into a shipped+archived release must move
+        ``ACTIVE`` → ``LEDGER`` at CLOSURE; a non-terminal ACTIVE item whose slug is
+        consumption-asserted is the drift.
 
-        Severity is WARN, never ERR (ADR-6): a slug mention is necessary-but-not-sufficient
-        evidence of consumption — the "Backlog returns" section (excluded here) and
-        defer/supersede mentions in archived CLOSUREs are the known false-positive class.
-        Never fires on the document itself (A5.2): the slug universe is the parsed
-        ``### <slug>`` subsections, never the literal ``BACKLOG`` filename/slug.
+        Severity is WARN, never ERR (ADR-6, R3): the evidence surface is narrower than
+        before FR14 (conversation no longer counts, only consumption), but it is still
+        necessary-but-not-sufficient — a genuinely consumed slug whose SPEC never
+        declared it in ``**Consumes:**`` is an accepted false NEGATIVE (R3), not a false
+        positive; the twelve documented false positives free-text matching produced are
+        gone by construction, with no per-section exclusion list to maintain (D6 deletes
+        the old ``## Backlog returns`` special case as subsumed — a returns section was
+        never a ``**Consumes:**`` declaration, so it was never actually evidence). Never
+        fires on the document itself (A5.2): the slug universe is the parsed ``###
+        <slug>`` subsections, never the literal ``BACKLOG`` filename/slug.
         """
         backlog_dir = self.specs_dir / "backlog"
         document = load_document(backlog_dir)

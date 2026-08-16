@@ -219,6 +219,11 @@ Severity model:
 - LOW — defence-in-depth improvement; acceptable risk for a sprint
 - INFO — observation; no action required
 
+**Intake routing (FR6/R4).** Every finding is recorded — never-silent, zero findings
+lost. Only **actionable** findings (LOW+ with a concrete fix surface) belong in
+`project-manager`'s intake report; **record-only** findings (INFO-grade, awareness-only,
+already-fixed-at-HEAD) terminate in this report and never enter intake.
+
 ---
 
 ## Hard rules

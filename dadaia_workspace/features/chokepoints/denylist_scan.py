@@ -31,7 +31,15 @@ from typing import Protocol
 
 from dadaia_workspace.core.protocols.git_object_reader import ScannedObject
 
-__all__ = ["BaselinePatternLike", "Hit", "OversizedNote", "ScanOutcome", "scan_objects"]
+__all__ = [
+    "BaselinePatternLike",
+    "Hit",
+    "OversizedNote",
+    "ScanOutcome",
+    "compile_slug_patterns",
+    "operator_terms_match",
+    "scan_objects",
+]
 
 _SOURCE_OPERATOR = "operator denylist"
 _SOURCE_SLUG = "foreign repo slug"
@@ -103,14 +111,41 @@ def _mask(term: str) -> str:
     return f"{term[0]}…{term[-1]}"
 
 
-def _compile_slug_patterns(slugs: Iterable[str]) -> list[tuple[str, re.Pattern[str]]]:
+def compile_slug_patterns(slugs: Iterable[str]) -> list[tuple[str, re.Pattern[str]]]:
     """Word-boundary regex per slug (A3.3) — a short slug never matches inside a longer
     word. Case-insensitive (``re.IGNORECASE``), matching the operator-term layer's
     case-insensitive substring match — a foreign slug referenced with different casing
-    (``MyClient`` vs ``myclient``) is still caught (code-reviewer LOW finding)."""
+    (``MyClient`` vs ``myclient``) is still caught (code-reviewer LOW finding).
+
+    Public (SPEC v0.4.2 FR4/GRILL D3): the SAME compiled matcher the gate-side path
+    masker (``features.chokepoints.service._PathMasker``) consumes for
+    ``_segment_is_offending`` — parity with the detector becomes structural rather than
+    a second, narrower predicate promised to stay in sync by convention.
+    """
     return [
         (slug, re.compile(r"\b" + re.escape(slug) + r"\b", re.IGNORECASE)) for slug in slugs if slug
     ]
+
+
+def _term_occurs(term: str, lowered_text: str) -> bool:
+    """FR3(1)'s definition of "occurs": a literal, case-insensitive substring — no
+    word-boundary restriction. The ONE predicate both :func:`_first_match`'s per-line
+    loop and the public :func:`operator_terms_match` route through."""
+    return bool(term) and term.lower() in lowered_text
+
+
+def operator_terms_match(term_values: Iterable[str], text: str) -> bool:
+    """True iff any of *term_values* occurs in *text* (FR3(1) semantics, case-
+    insensitive substring).
+
+    Public (SPEC v0.4.2 FR4/GRILL D3): the gate-side path masker's operator-term check
+    routes through this SAME predicate — never a second, case-sensitive, hyphen-as-
+    word-char copy (the pre-v0.4.2 defect, GRILL P8: ``core.redaction.compile_candidates``
+    never set ``re.IGNORECASE`` and treated ``-`` as a word character, so it silently
+    under-matched relative to the detector's own layers).
+    """
+    lowered = text.lower()
+    return any(_term_occurs(term, lowered) for term in term_values)
 
 
 def _first_match(
@@ -176,7 +211,7 @@ def _first_match(
         line_candidates: list[Hit] = []
         lowered = line_text.lower()
         for term, _reason in terms:
-            if term and term.lower() in lowered and not _term_suppressed(term):
+            if _term_occurs(term, lowered) and not _term_suppressed(term):
                 line_candidates.append(
                     Hit(obj.path, lineno, obj.sha, _mask(term), _SOURCE_OPERATOR)
                 )
@@ -231,7 +266,7 @@ def scan_objects(
     """
     term_list = list(terms)
     pattern_list = list(patterns)
-    slug_patterns = _compile_slug_patterns(slugs)
+    slug_patterns = compile_slug_patterns(slugs)
     hits: list[Hit] = []
     oversized_notes: list[OversizedNote] = []
     skipped = 0

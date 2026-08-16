@@ -6,13 +6,20 @@ Coverage:
   - Forbidden headings ('## Changelog', '## Histórico', etc.) → ERROR
   - Broken / valid / product-subdir [[wikilink]] resolution
   - Duplicate ## heading → ERROR; unknown heading → WARN
-  - Token estimate drift > 20% → WARN; within tolerance → OK
   - lint_directory scan scope + main() exit codes
   - Allowlist content pins (curated + workspace-extension) and the widening-does-not-
     disable-check negative guard
 
 CRIT-adjacent: allowlist-content pins are giant string tables — one param fn keeps them
 auditable without 4 bodies.
+
+Recorded supersession (SPEC v0.4.2 FR2/GRILL D5, T-042-07): the token_estimate drift
+check (WARN at >20% drift between frontmatter and computed body length) and its
+``_estimate_tokens`` duplicate estimator were DELETED from lint-memory-atoms.py — the
+catalog now computes token_estimate from the body directly, so a stored copy no longer
+exists to drift against. The former ``test_token_estimate_drift_and_tolerance`` test
+(covering the deleted check) is removed with its subject; no replacement is needed —
+behaviour retired, not moved.
 """
 
 from __future__ import annotations
@@ -74,8 +81,9 @@ def _valid_frontmatter(
         "tldr": "A short description under 160 characters.",
         "summary": "One to two sentence summary.",
         "tags": ["test", "unit"],
-        # token_estimate=0 skips drift warning (actual == 0 guard in lint_atom)
-        "token_estimate": 0,
+        # token_estimate is schema-dropped at CLOSURE (SPEC v0.4.2 FR2/GRILL D5,
+        # T-042-19): the catalog computes it from the body; the frontmatter key is
+        # no longer a valid property (additionalProperties: false rejects it).
         "last_updated": "2026-06-01",
         "release_origin": "memory-markdown-source-v1",
     }
@@ -197,7 +205,6 @@ def _missing_title_content() -> str:
         "tldr: Short description.\n"
         "summary: Two sentence summary.\n"
         "tags:\n  - foo\n"
-        "token_estimate: 50\n"
         "last_updated: '2026-06-01'\n"
         "release_origin: memory-markdown-source-v1\n"
         "---\n"
@@ -384,37 +391,6 @@ def test_duplicate_errors_and_unknown_warns(tmp_path: Path) -> None:
     ), (
         f"Warning should mention the allowlist / the unknown heading. Got: {widening_result.warnings}"
     )
-
-
-# ---------------------------------------------------------------------------
-# Test: token_estimate drift (warn) vs within tolerance (ok)
-# ---------------------------------------------------------------------------
-
-
-def test_token_estimate_drift_and_tolerance(tmp_path: Path) -> None:
-    schema = _load_schema_real()
-
-    # Body with ~100 words; token_estimate set to 1 (huge drift).
-    drift_body = "## Propósito\n\n" + " ".join(["word"] * 100) + "\n"
-    drift_atom = _make_atom(
-        tmp_path,
-        slug="test-atom",
-        frontmatter_overrides={"token_estimate": 1},
-        body=drift_body,
-    )
-    drift_result = lint_atom(drift_atom, tmp_path, schema)
-    assert drift_result.has_warnings, "Expected WARN for large token_estimate drift"
-    assert any("drift" in w.lower() or "token" in w.lower() for w in drift_result.warnings)
-
-    # ~100 words → estimated tokens ~135; set token_estimate to 135 (0% drift).
-    ok_dir = tmp_path / "ok"
-    ok_dir.mkdir()
-    ok_body = "## Propósito\n\n" + " ".join(["word"] * 100) + "\n"
-    ok_atom = _make_atom(
-        ok_dir, slug="test-atom", frontmatter_overrides={"token_estimate": 135}, body=ok_body
-    )
-    ok_result = lint_atom(ok_atom, ok_dir, schema)
-    assert not ok_result.has_warnings, f"Expected no token drift warning. Got: {ok_result.warnings}"
 
 
 # ---------------------------------------------------------------------------

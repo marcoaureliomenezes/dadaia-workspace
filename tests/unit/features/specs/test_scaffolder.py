@@ -7,13 +7,12 @@ from pathlib import Path
 import jinja2
 import pytest
 
+from dadaia_workspace.features.backlog import document
 from dadaia_workspace.features.backlog.document import load_document
-from dadaia_workspace.features.spec_artifacts import new_artifacts
 from dadaia_workspace.features.specs import scaffolder
 from dadaia_workspace.features.specs.scaffolder import (
     _render_template,
     scaffold,
-    scaffold_hotfix_release,
 )
 
 _REPO_ROOT = Path(__file__).parent.parent.parent.parent.parent
@@ -91,9 +90,10 @@ def test_scaffolded_backlog_skeleton_pins_writer_and_round_trips_load_document(
 ) -> None:
     """LOW (code-reviewer, v0.12.0 pre-PR): the BACKLOG.md grammar is written by THREE
     modules (``scaffolder._BACKLOG_STUB`` for a fresh ``specs init``,
-    ``new_artifacts._BACKLOG_DOCUMENT_SKELETON`` for ``backlog new`` on an absent
-    document, and the live subsection-append template) and parsed by a FOURTH,
-    ``document.load_document`` — with no test pinning their agreement. Pin two things:
+    ``document._BACKLOG_DOCUMENT_SKELETON`` for ``backlog new`` on an absent document
+    — moved here from ``new_artifacts`` at SPEC v0.4.2 FR1/GRILL D1 — and the live
+    subsection-append template) and parsed by a FOURTH, ``document.load_document`` —
+    with no test pinning their agreement. Pin two things:
 
     (a) the two from-scratch skeleton literals stay byte-identical (a grammar change in
         one writer can no longer silently desync the other), and
@@ -103,10 +103,10 @@ def test_scaffolded_backlog_skeleton_pins_writer_and_round_trips_load_document(
 
     ``backlog_new``'s own round-trip — a WRITTEN subsection, not just the empty
     skeleton, through ``load_document`` — is already covered by
-    ``test_new_artifacts.test_backlog_new_on_absent_document_creates_both_sections_and_one_subsection``;
+    ``test_document.test_backlog_new_on_absent_document_creates_both_sections_and_one_subsection``;
     this test extends the pin to the scaffolder producer rather than duplicating that
     coverage."""
-    assert scaffolder._BACKLOG_STUB == new_artifacts._BACKLOG_DOCUMENT_SKELETON, (
+    assert scaffolder._BACKLOG_STUB == document._BACKLOG_DOCUMENT_SKELETON, (
         "the scaffolder's fresh-tree BACKLOG.md skeleton must stay byte-identical to "
         "backlog_new's from-scratch skeleton — both are parsed by the SAME grammar "
         "document.load_document owns, and a drift here would desync them silently"
@@ -128,8 +128,8 @@ def test_scaffolded_backlog_skeleton_pins_writer_and_round_trips_load_document(
 
 
 def test_scaffold_idempotent_force_and_template_render(tmp_path: Path) -> None:
-    """Idempotence (second run all-skipped), --force overwrite (mutated content
-    replaced), and the remaining (hotfix) templates render without UndefinedError."""
+    """Idempotence (second run all-skipped) and --force overwrite (mutated content
+    replaced)."""
     specs_dir = tmp_path / "specs"
 
     first = scaffold(
@@ -166,100 +166,6 @@ def test_scaffold_idempotent_force_and_template_render(tmp_path: Path) -> None:
     new_content = arch_path.read_text(encoding="utf-8")
     assert "MUTATED" not in new_content
     assert new_content.startswith("---")
-
-    # Remaining (hotfix) template renders without UndefinedError given empty-ish context.
-    env = jinja2.Environment(
-        loader=jinja2.FileSystemLoader(str(_TEMPLATES_DIR)),
-        undefined=jinja2.StrictUndefined,
-        autoescape=False,
-    )
-    template = env.get_template("release_hotfix.md.j2")
-    try:
-        rendered = template.render(
-            {
-                "version_id": "v0.0.1",
-                "patches_release_id": "v0.0.0",
-                "severity": "LOW",
-                "today": "2026-01-01",
-            }
-        )
-        assert len(rendered) > 10
-    except jinja2.UndefinedError as exc:
-        pytest.fail(f"release_hotfix.md.j2 raised UndefinedError: {exc}")
-
-
-# ---- scaffold_hotfix_release ----
-
-
-def _make_specs_with_patches_release(tmp_path: Path, patches_id: str = "v0.5.0") -> Path:
-    specs_dir = tmp_path / "specs"
-    patches_dir = specs_dir / "releases" / patches_id
-    patches_dir.mkdir(parents=True)
-    (patches_dir / "SPEC.md").write_text("# Spec\n\n> **Status:** Aprovado\n", encoding="utf-8")
-    (specs_dir / "_archive" / "releases").mkdir(parents=True)
-    return specs_dir
-
-
-def test_hotfix_scaffold_happy_path_and_idempotent(tmp_path: Path) -> None:
-    """scaffold_hotfix_release creates SPEC.md + TASKS.md (never PLAN.md — D24 hotfix
-    PLAN is optional), renders template variables, and is idempotent without --force."""
-    specs_dir = _make_specs_with_patches_release(tmp_path)
-    first = scaffold_hotfix_release(
-        specs_dir=specs_dir,
-        version_id="v0.5.1",
-        patches_release_id="v0.5.0",
-        severity="HIGH",
-        templates_dir=_TEMPLATES_DIR,
-    )
-    assert first.errors == []
-    assert first.skipped == []
-    release_dir = specs_dir / "releases" / "v0.5.1"
-    assert (release_dir / "SPEC.md").exists()
-    assert (release_dir / "TASKS.md").exists()
-    assert not (release_dir / "PLAN.md").exists()
-    assert len(first.created) == 2  # SPEC.md + TASKS.md
-    spec_text = (release_dir / "SPEC.md").read_text(encoding="utf-8")
-    assert "v0.5.1" in spec_text
-    assert "v0.5.0" in spec_text
-    assert "HIGH" in spec_text
-
-    second = scaffold_hotfix_release(
-        specs_dir=specs_dir,
-        version_id="v0.5.1",
-        patches_release_id="v0.5.0",
-        severity="LOW",
-        templates_dir=_TEMPLATES_DIR,
-    )
-    assert second.errors == []
-    assert second.created == [], "Second run should not overwrite without --force"
-    assert len(second.skipped) == 2
-
-
-@pytest.mark.parametrize(
-    ("version_id", "patches_release_id", "match"),
-    [
-        pytest.param("v0.6.0", "v0.5.0", "PATCH=0", id="rejects-patch-zero"),
-        pytest.param("my-hotfix-v1", "v0.5.0", "SemVer", id="rejects-invalid-semver"),
-        pytest.param(
-            "v0.5.1",
-            "nonexistent-release-id",
-            "does not resolve",
-            id="rejects-invalid-patches-release",
-        ),
-    ],
-)
-def test_hotfix_scaffold_rejections(
-    tmp_path: Path, version_id: str, patches_release_id: str, match: str
-) -> None:
-    specs_dir = _make_specs_with_patches_release(tmp_path)
-    with pytest.raises(ValueError, match=match):
-        scaffold_hotfix_release(
-            specs_dir=specs_dir,
-            version_id=version_id,
-            patches_release_id=patches_release_id,
-            severity="LOW",
-            templates_dir=_TEMPLATES_DIR,
-        )
 
 
 def test_render_template_sandbox_blocks_python_internals(tmp_path: Path) -> None:

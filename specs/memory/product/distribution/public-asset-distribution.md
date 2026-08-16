@@ -10,7 +10,6 @@ tags:
 - distribution
 - projection
 - privacy
-token_estimate: 2830
 last_updated: '2026-08-15'
 release_origin: v0.1.65
 ---

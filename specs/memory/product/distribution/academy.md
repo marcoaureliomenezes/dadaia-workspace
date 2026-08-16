@@ -12,7 +12,6 @@ tags:
 - academy
 - onboarding
 - courses
-token_estimate: 775
 last_updated: '2026-07-02'
 release_origin: v0.1.48
 ---

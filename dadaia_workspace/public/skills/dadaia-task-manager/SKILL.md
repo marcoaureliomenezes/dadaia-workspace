@@ -59,6 +59,13 @@ approvals it is forbidden to mark
 `[x]`, open a PR, request merge, deploy, close the release, write `CLOSURE.md`, or update
 memory. If any reviewer requests changes, return to step 2 and keep `[-]`.
 
+## Dispatcher relaying for a shell-less sub-agent (FR5)
+
+`product-engineer` has no shell (D-1). When a dispatcher relays work items to a
+shell-less sub-agent, it commits that sub-agent's `[ ]`→`[-]` reservation flip **before**
+relaying the next work item — never batched at the end — so the marker trace stays
+observable in git history at every step.
+
 ## Recovery — when something goes wrong
 
 ### I found an old `[-]` from another session

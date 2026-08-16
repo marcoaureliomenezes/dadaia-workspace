@@ -502,6 +502,87 @@ def test_oversized_note_path_segment_is_masked_too(tmp_path: Path) -> None:
     assert "repos/[REDACTED-PATH-1]/big.md" in decision.warn
 
 
+# ═════════════════════════════════════════════════════════════════════════════════
+# FR4 (v0.4.2, GRILL P8/P9, D3) — the masker consumes the detector's OWN compiled
+# matchers, so case-insensitivity and word-boundary treatment become identical by
+# construction: detector-hit implies masker-hit.
+# ═════════════════════════════════════════════════════════════════════════════════
+
+_UPPERCASE_HYPHENATED_TERM = "zz-acme"
+
+# ── A4.1 — paired fixture: an upper-cased, hyphenated path-segment VARIANT of a
+# lowercase denylist term, which the detector's own case-insensitive substring
+# matching already flags inside file content, must ALSO be masked as a path segment.
+# Intent: CONTRACT — v0.4.2 A4.1 ─────────────────────────────────────────────────────
+
+
+def test_refusal_path_segment_uppercase_hyphenated_variant_of_term_is_masked(
+    tmp_path: Path,
+) -> None:
+    """A4.1: pre-fix, the masker's own ``core.redaction.compile_candidates`` primitive
+    is case-SENSITIVE and treats ``-`` as a word character (so a candidate is only
+    matched as a whole hyphenated token) — it would never flag the path segment
+    'Zz-Acme-Corp' for the lowercase term 'zz-acme', even though the detector's own
+    operator-term layer (FR3(1): a literal, case-insensitive SUBSTRING — no
+    word-boundary restriction at all) already flags 'zz-acme' inside file content case-
+    insensitively. Detector-hit must imply masker-hit: the path segment must be masked
+    too, by construction, once the masker shares the detector's own matchers."""
+    objects = [
+        _obj(
+            "repos/Zz-Acme-Corp/notes.md",
+            f"contains {_UPPERCASE_HYPHENATED_TERM} here\n",
+            sha="acmesha01",
+        )
+    ]
+    source = _FakeObjectSource(by_range={(_SHA_A, _ZERO): objects})
+    decision = push_gate_decision(
+        tmp_path,
+        _refs(f"refs/heads/develop {_SHA_A} refs/heads/develop {_ZERO}"),
+        object_source=source,
+        repo=tmp_path,
+        denylist_terms=((_UPPERCASE_HYPHENATED_TERM, "synthetic"),),
+    )
+    assert not decision.allowed
+    assert "Zz-Acme-Corp" not in decision.message, (
+        "the masker must flag this segment case-insensitively, exactly as the "
+        "detector's own operator-term layer already does"
+    )
+    assert "[REDACTED-PATH-1]" in decision.message
+    assert "repos/[REDACTED-PATH-1]/notes.md:1" in decision.message
+
+
+# ── A4.2 — a GitObjectReadError raised while reading a blob at a denylisted path
+# produces a refusal in which that path is masked; no raw path, no raw repr(exception).
+# Intent: CONTRACT — v0.4.2 A4.2 ─────────────────────────────────────────────────────
+
+
+class _FailingObjectSourceWithPath:
+    """Simulates a git-read failure that names the offending blob's PATH structurally
+    (GitObjectReadError.path, FR4) rather than embedding it in the message string."""
+
+    def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
+        raise GitObjectReadError(
+            "git cat-file --batch stream desynchronised resolving prior content",
+            path=f"repos/{_FOREIGN_SLUG}/leak.md",
+        )
+
+
+def test_git_object_read_failure_at_a_denylisted_path_masks_the_path(tmp_path: Path) -> None:
+    decision = push_gate_decision(
+        tmp_path,
+        _refs(f"refs/heads/develop {_SHA_A} refs/heads/develop {_ZERO}"),
+        object_source=_FailingObjectSourceWithPath(),
+        repo=tmp_path,
+        foreign_slugs=(_FOREIGN_SLUG,),
+    )
+    assert not decision.allowed
+    assert _FOREIGN_SLUG not in decision.message
+    assert "repos/[REDACTED-PATH-1]/leak.md" in decision.message
+    assert "--no-verify" in decision.message
+    # No raw repr(exception) — the standard repr shape is "GitObjectReadError(...)".
+    assert "GitObjectReadError(" not in decision.message
+
+
 def test_same_offending_segment_gets_the_same_ordinal_across_hit_and_note(
     tmp_path: Path,
 ) -> None:

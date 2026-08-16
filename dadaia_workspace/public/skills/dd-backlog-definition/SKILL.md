@@ -108,6 +108,14 @@ backlog", recorded in the SPEC or at approval) is already-approved intake and is
 re-adjudicated through a later intake report. `dd-audit-project` and `dd-release-closure`
 apply this carve-out when they route a disposition — this is its one full statement.
 
+**Record-only vs actionable (FR6/R4).** Reviews record everything — never-silent holds,
+zero observations lost. But not every recorded observation is a residual: **record-only**
+observations (INFO-grade, awareness-only, already-fixed-at-HEAD) terminate in the
+release CLOSURE record or the reviewer's own handoff and **never** enter an intake
+report. Only **actionable defects** (LOW+ with a concrete fix surface) are compiled into
+the operator-facing intake report — "each item" above means each actionable defect, not
+every observation a reviewer recorded.
+
 **The intake report artifact.** No new artifact class: it is the existing handoff-first
 shape (`DADAIA.md` §4) — a JSON handoff with `next_handoff.agent: "human"`, plus the HTML
 report it points at, at `.dadaia/reports/<context>/project-manager/<UTC>-intake.html`.

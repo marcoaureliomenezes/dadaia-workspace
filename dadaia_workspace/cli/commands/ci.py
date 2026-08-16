@@ -312,8 +312,18 @@ def push_gate_check() -> None:
     denylist_terms = load_denylist_terms()
     baseline_patterns = load_denylist_baseline_patterns()
     own_slug = context_slug_for_path(workspace, repo_root)
-    registry_identities = load_registry_context_identities(workspace)
-    foreign_slugs = _foreign_repo_slugs(workspace, own_slug, registry_identities)
+    registry_result = load_registry_context_identities(workspace)
+    if registry_result.degraded:
+        # SPEC v0.4.2 FR8(2)/GRILL P13/A8.3: a malformed registry no longer shrinks the
+        # foreign-name layer silently — exactly one stderr note names the degradation,
+        # and the scan still proceeds against the repos/ directory-derived fallback.
+        typer.echo(
+            "[pre-push] context registry is malformed or unreadable — the "
+            "registry-derived foreign-name layer falls back to the repos/ "
+            "directory-derived set only; the scan still proceeds.",
+            err=True,
+        )
+    foreign_slugs = _foreign_repo_slugs(workspace, own_slug, registry_result.identities)
 
     mode = (
         "operator denylist + baseline" if denylist_terms else "baseline only (no operator denylist)"

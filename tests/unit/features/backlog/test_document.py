@@ -473,3 +473,346 @@ def test_ledger_row_and_active_item_dataclass_shapes() -> None:
     assert item.intents == ()
     assert item.intents_error is None
     assert item.line == 0
+
+
+# ═════════════════════════════════════════════════════════════════════════════════
+# FR1 (v0.4.2, D1) — backlog_new MOVES here: one feature owns the grammar for both
+# reading and writing. The A3.1-A3.4 coverage below is relocated UNMODIFIED from
+# tests/unit/features/spec_artifacts/test_new_artifacts.py (its pre-move home); the new
+# A1.1/A1.2 seams (fence-aware insertion point, write-then-verify) are new tests.
+# ═════════════════════════════════════════════════════════════════════════════════
+
+from dadaia_workspace.features.backlog.document import backlog_new  # noqa: E402
+
+# Intent: CONTRACT — v0.4.2 A3.1 (relocated from test_new_artifacts.py, v0.12.0 origin)
+
+
+def test_backlog_new_on_absent_document_creates_both_sections_and_one_subsection(
+    tmp_path: Path,
+) -> None:
+    specs = tmp_path / "specs"
+    specs.mkdir()
+    # backlog/ deliberately NOT pre-created — auto-creation facet.
+
+    result = backlog_new(specs, "cool-idea")
+
+    target = specs / "backlog" / "BACKLOG.md"
+    assert target.is_file(), "BACKLOG.md must be created (A3.1)"
+    assert result.path == target
+    assert result.created is True
+
+    content = target.read_text(encoding="utf-8")
+    assert content.count("## ACTIVE") == 1
+    assert content.count("## LEDGER") == 1
+    assert content.index("## ACTIVE") < content.index("## LEDGER")
+    assert "### cool-idea" in content
+    assert content.index("### cool-idea") > content.index("## ACTIVE")
+    assert content.index("### cool-idea") < content.index("## LEDGER")
+
+    assert "- **Title:** cool-idea" in content
+    assert "- **Status:** idea" in content
+    assert "- **Provenance:**" in content
+    from datetime import UTC, datetime
+
+    today = datetime.now(tz=UTC).strftime("%Y-%m-%d")
+    assert f"- **Opened:** {today}" in content
+
+    # The intents teaching comment is preserved (SPEC FR3), as a commented block, not
+    # a live `**Intents:**` binding — an `idea` stays doctor-clean with none.
+    assert "<!--" in content and "-->" in content
+    assert "**Intents:**" in content  # named inside the teaching comment
+    for kind in ("code", "cli", "catalog", "doc", "invariant"):
+        assert kind in content
+
+    # The fresh subsection parses clean under the single-source document model.
+    doc = load_document(specs / "backlog")
+    assert doc.errors == ()
+    assert len(doc.active) == 1
+    assert doc.active[0].slug == "cool-idea"
+    assert doc.active[0].status == "idea"
+    assert doc.active[0].intents == ()
+
+
+# Intent: CONTRACT — v0.4.2 A3.2/A1.7 (relocated from test_new_artifacts.py, v0.12.0 origin)
+
+
+def test_backlog_new_append_leaves_every_other_byte_unchanged(tmp_path: Path) -> None:
+    specs = tmp_path / "specs"
+    specs.mkdir()
+    backlog_new(specs, "first-idea")
+
+    target = specs / "backlog" / "BACKLOG.md"
+    before = target.read_text(encoding="utf-8")
+
+    backlog_new(specs, "second-idea")
+    after = target.read_text(encoding="utf-8")
+
+    assert after != before
+    assert after.startswith(before[: before.index("## LEDGER")]), (
+        "everything before the LEDGER heading in the original file must survive "
+        "byte-for-byte, with the new subsection appended just ahead of it"
+    )
+    assert after.endswith(before[before.index("## LEDGER") :]), (
+        "the LEDGER heading and everything after it must survive byte-for-byte"
+    )
+    assert "### second-idea" in after
+    assert "### first-idea" in after
+
+
+# Intent: CONTRACT — v0.4.2 A3.3/A1.7 (relocated from test_new_artifacts.py, v0.12.0 origin)
+
+
+def test_backlog_new_refuses_slug_already_in_active(tmp_path: Path) -> None:
+    specs = tmp_path / "specs"
+    specs.mkdir()
+    backlog_new(specs, "cool-idea")
+
+    with pytest.raises(FileExistsError, match=r"already exists"):
+        backlog_new(specs, "cool-idea")
+
+
+def test_backlog_new_refuses_slug_already_in_ledger(tmp_path: Path) -> None:
+    specs = tmp_path / "specs"
+    specs.mkdir()
+    backlog_dir = specs / "backlog"
+    backlog_dir.mkdir()
+    (backlog_dir / "BACKLOG.md").write_text(
+        "## ACTIVE\n\n## LEDGER\n\n- delivered-slug · DELIVERED · v0.9.0 · 2026-06-01\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(FileExistsError, match=r"already exists"):
+        backlog_new(specs, "delivered-slug")
+
+
+# Intent: CONTRACT — v0.4.2 A3.4/A1.7 (relocated from test_new_artifacts.py, v0.12.0 origin)
+
+
+def test_backlog_new_invalid_slug_refused_with_unchanged_message(tmp_path: Path) -> None:
+    specs = tmp_path / "specs"
+    specs.mkdir()
+    with pytest.raises(ValueError, match=r"Invalid slug"):
+        backlog_new(specs, "Not-A-Valid-Slug")
+
+
+# ── A1.1 — RED: a Description quoting a fenced ``## LEDGER`` example must not steer the
+# insertion point. Intent: CONTRACT — v0.4.2 A1.1 ─────────────────────────────────────
+
+_QUOTES_A_FENCED_LEDGER_EXAMPLE = """\
+## ACTIVE
+
+### existing-item
+- **Title:** Existing item
+- **Opened:** 2026-08-10
+- **Status:** idea
+- **Description:** Example BACKLOG.md snippet quoting the grammar it documents:
+```markdown
+## LEDGER
+
+- some-old-slug · DELIVERED · v0.1.0 · 2026-01-01
+```
+- **Provenance:** operator request
+
+## LEDGER
+"""
+
+
+def test_backlog_new_inserts_before_the_real_ledger_heading_not_a_fenced_example(
+    tmp_path: Path,
+) -> None:
+    """A1.1: a fence-blind insertion point (the pre-fix private ``_LEDGER_HEADING_RE``
+    regex search) finds the FENCED ``## LEDGER`` example first — it appears earlier in
+    the file than the real heading — and splices the new subsection inside the fenced
+    span, corrupting the document. The fence-aware insertion point promoted from the
+    parser's own machinery must find the REAL, unfenced ``## LEDGER`` heading instead,
+    landing the fresh subsection inside ``## ACTIVE`` where ``load_document`` parses
+    it."""
+    specs = tmp_path / "specs"
+    specs.mkdir()
+    backlog_dir = specs / "backlog"
+    backlog_dir.mkdir()
+    (backlog_dir / "BACKLOG.md").write_text(_QUOTES_A_FENCED_LEDGER_EXAMPLE, encoding="utf-8")
+
+    backlog_new(specs, "fresh-slug")
+
+    doc = load_document(backlog_dir)
+    assert doc.errors == ()
+    slugs = {item.slug for item in doc.active}
+    assert slugs == {"existing-item", "fresh-slug"}, (
+        "a fence-blind writer would splice 'fresh-slug' inside the fenced LEDGER "
+        f"example, where it never parses as a real ACTIVE subsection — got {slugs}"
+    )
+
+    text = (backlog_dir / "BACKLOG.md").read_text(encoding="utf-8")
+    # Exactly one REAL '## LEDGER' heading exists; the fenced example's line still
+    # reads '## LEDGER' too (2 raw occurrences total), but only the unfenced one is
+    # structure — proven by 'fresh-slug' parsing into doc.active above.
+    assert text.count("## LEDGER") == 2
+    assert text.index("### fresh-slug") > text.index("### existing-item")
+    assert text.index("### fresh-slug") < text.rindex("## LEDGER")
+
+
+# ── A1.2 — write-then-verify: raise when a re-parse of the fresh write is missing the
+# slug. Intent: SENTINEL — write-then-verify ────────────────────────────────────────
+
+
+def test_backlog_new_raises_when_reparse_of_own_write_lacks_the_fresh_slug(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A1.2: every write verifies itself by re-parsing its own output. This defensive
+    seam has no organic trigger under a correct implementation (a validated slug always
+    round-trips), so it is exercised by making the re-parse itself lie — the same
+    technique a silent-corruption bug would need to slip past undetected."""
+    import dadaia_workspace.features.backlog.document as document_module
+
+    specs = tmp_path / "specs"
+    specs.mkdir()
+
+    real_load_document = document_module.load_document
+    calls = {"n": 0}
+
+    def _lying_load_document(backlog_dir: Path) -> BacklogDocument:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            # The pre-write slug-membership check: behave normally (empty tree).
+            return real_load_document(backlog_dir)
+        # The post-write verify re-parse: lie — report no ACTIVE items at all, as a
+        # silent-write-loss bug would look from the caller's side.
+        return BacklogDocument()
+
+    monkeypatch.setattr(document_module, "load_document", _lying_load_document)
+
+    with pytest.raises(RuntimeError, match=r"re-parse"):
+        document_module.backlog_new(specs, "verify-me")
+
+
+# ── A1.4 — ``_SLUG_RE.fullmatch``: a trailing newline is refused. Intent: CONTRACT —
+# v0.4.2 A1.4 ────────────────────────────────────────────────────────────────────────
+
+
+def test_backlog_new_rejects_slug_with_trailing_newline(tmp_path: Path) -> None:
+    specs = tmp_path / "specs"
+    specs.mkdir()
+    with pytest.raises(ValueError, match=r"Invalid slug"):
+        backlog_new(specs, "valid-slug\n")
+
+
+# ── A1.5 — an unreadable BACKLOG.md diagnostic carries no absolute filesystem path.
+# Intent: CONTRACT — v0.4.2 A1.5 ─────────────────────────────────────────────────────
+
+
+def test_unreadable_backlog_md_diagnostic_carries_no_absolute_path(tmp_path: Path) -> None:
+    backlog_dir = tmp_path / "backlog"
+    backlog_dir.mkdir()
+    target = backlog_dir / "BACKLOG.md"
+    target.write_text("## ACTIVE\n\n## LEDGER\n", encoding="utf-8")
+    target.chmod(0o000)
+    try:
+        doc = load_document(backlog_dir)
+    finally:
+        target.chmod(0o644)  # restore so tmp_path cleanup can remove it
+
+    assert doc.errors, "an unreadable file must surface a diagnostic, never raise"
+    message = doc.errors[0].message
+    assert str(backlog_dir) not in message, f"diagnostic leaked an absolute path: {message!r}"
+    assert str(target) not in message, f"diagnostic leaked an absolute path: {message!r}"
+    assert "BACKLOG.md" in message
+
+
+# ═════════════════════════════════════════════════════════════════════════════════
+# FR11 (v0.4.2, GRILL P5/P6, D7) — the fence filter is bisect-based (not the
+# O(headings × fences) rescan), and load_document pays PyYAML once through
+# yaml.CSafeLoader-when-available (falling back to the pure-Python loader otherwise).
+# No second parse mode is added (D7) — exactly one parse path exists (A11.4, covered by
+# T-042-04's A1.6 zero-hit grep test, which already asserts no module outside this one
+# compiles the backlog grammar).
+# ═════════════════════════════════════════════════════════════════════════════════
+
+# ── A11.1 — budget regression: a ~140 KB synthetic document parses well under one
+# second. Intent: CONTRACT — v0.4.2 A11.1 ───────────────────────────────────────────
+
+
+def _synthetic_backlog_document(n_items: int) -> str:
+    """Build an N-subsection ``BACKLOG.md`` where every subsection's Description also
+    quotes a small fenced example — the exact shape GRILL P5 measured as
+    O(headings × fences): every ``### <slug>`` heading (a match) coexists with an
+    unrelated fenced span (a range) it must be checked against."""
+    parts = ["## ACTIVE\n\n"]
+    for i in range(n_items):
+        parts.append(
+            f"### synthetic-item-{i}\n"
+            f"- **Title:** Synthetic item {i}\n"
+            f"- **Opened:** 2026-08-10\n"
+            f"- **Status:** idea\n"
+            f"- **Description:** budget-regression fixture with a fenced example:\n"
+            f"```markdown\nsynthetic fenced content {i}\n```\n"
+            f"- **Provenance:** operator request\n\n"
+        )
+    parts.append("## LEDGER\n")
+    return "".join(parts)
+
+
+def test_backlog_document_budget_140kb_parses_well_under_one_second(tmp_path: Path) -> None:
+    import time
+
+    text = _synthetic_backlog_document(565)  # ~140 KB
+    size = len(text.encode("utf-8"))
+    assert 120_000 < size < 160_000, f"fixture drifted outside the ~140 KB budget: {size} bytes"
+
+    backlog_dir = _write(tmp_path, text)
+
+    start = time.perf_counter()
+    doc = load_document(backlog_dir)
+    elapsed = time.perf_counter() - start
+
+    assert doc.errors == ()
+    assert len(doc.active) == 565
+    # A budget, not a stopwatch (D7): generous headroom so this is not a flake
+    # generator, while still catching a real algorithmic regression.
+    assert elapsed < 1.0, f"140 KB document took {elapsed:.3f}s — budget is 1.0s"
+
+
+# ── A11.3 — CSafeLoader absence is exercised (forced fallback) and yields identical
+# results. Intent: CONTRACT — v0.4.2 A11.3 ──────────────────────────────────────────
+
+_WITH_INTENTS = """\
+## ACTIVE
+
+### fallback-item
+- **Title:** Fallback item
+- **Opened:** 2026-08-10
+- **Status:** candidate
+- **Description:** Exercises the Intents YAML parse path under both loaders.
+- **Provenance:** operator request
+- **Intents:**
+```yaml
+- subject:
+    kind: code
+    ref: pkg/mod.py#Widget
+  change: extend Widget
+```
+
+## LEDGER
+"""
+
+
+def test_forced_safeloader_fallback_produces_identical_results(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A11.3: force the fallback (as if the C-accelerated ``CSafeLoader`` were
+    unavailable) and assert the parse is identical to the default (``CSafeLoader``,
+    when the environment has libyaml) path."""
+    import dadaia_workspace.features.backlog.document as document_module
+
+    backlog_dir = _write(tmp_path, _WITH_INTENTS)
+
+    default_doc = load_document(backlog_dir)
+
+    monkeypatch.setattr(document_module, "_YAML_LOADER", document_module.yaml.SafeLoader)
+    fallback_doc = load_document(backlog_dir)
+
+    assert fallback_doc == default_doc
+    assert fallback_doc.errors == ()
+    assert len(fallback_doc.active) == 1
+    assert fallback_doc.active[0].intents[0].subject.ref == "pkg/mod.py#Widget"
+    assert fallback_doc.active[0].intents[0].change == "extend Widget"

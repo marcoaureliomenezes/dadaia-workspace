@@ -142,7 +142,13 @@ def test_empty_dir_single_atom_shape_and_top_level_keys(tmp_path: Path) -> None:
     assert feat["tldr"] == "Short description under 160 chars."
     assert feat["summary"] == "One-sentence summary."
     assert feat["tags"] == ["test"]
-    assert feat["token_estimate"] == 50
+    # SPEC v0.4.2 FR2/GRILL D5: token_estimate is COMPUTED from the body, never read
+    # from frontmatter — the fixture atom's frontmatter says 50 (_REQUIRED_FM), but the
+    # default body ("## Propósito\n\nBody.\n" — 3 words) computes to round(3 * 1.35) = 4.
+    assert feat["token_estimate"] == 4, (
+        "token_estimate must be COMPUTED from the body (4), never the stale "
+        f"frontmatter value (50) — got {feat['token_estimate']}"
+    )
     # agent_tier is dropped from catalog output in v0.1.53 (FR3): the input frontmatter
     # still carries it (schema-tolerated), but the renderer must not surface it.
     assert "agent_tier" not in feat

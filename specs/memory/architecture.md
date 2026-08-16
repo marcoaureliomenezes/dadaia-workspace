@@ -13,9 +13,8 @@ tags:
 - dependency-rules
 - agents
 - sdd
-token_estimate: 1430
-last_updated: '2026-08-15'
-release_origin: v0.3.0
+last_updated: '2026-08-16'
+release_origin: v0.4.2
 ---
 
 ## Overview
@@ -109,13 +108,15 @@ stays data-only and zero-I/O; the adapter owns every subprocess, chunks its batc
 conversation to a constant resident bound, and converts every parse failure into its own
 typed read error so nothing raw escapes the ring.
 
-`core/redaction.py` is the single stdlib-pure masking primitive — word-boundary
-alternation, longest-first ordering, stable first-appearance placeholder ordinals — with
-two consumers on opposite sides of the tree: `cli/redact.py`'s operator `--redact` surface
-and the gate's own render boundary in `features/chokepoints/`. It lives in `core` because
-`features` may import `core` and may never import `cli`, so a shared primitive is the only
-placement that lets both render boundaries mask identically. It performs no I/O and is
-outside the file-I/O authorized set below.
+`core/redaction.py` is the stdlib-pure masking primitive — word-boundary alternation,
+longest-first ordering, stable first-appearance placeholder ordinals — behind the operator
+`--redact` surface in `cli/redact.py`. It lives in `core` because `core` is importable from
+every ring and imports none, it performs no I/O, and it is outside the file-I/O authorized
+set below. The push gate does **not** consume it: its render boundary masks path segments
+with the **detector's own compiled matchers**, so what the scan detects and what the refusal
+masks cannot diverge ([[sdd-gate-v3]]). Two render boundaries, each with the predicate its
+own channel is judged by, is the deliberate shape — a shared predicate here would be a
+second, weaker copy of one of them.
 
 ### Handoffs and reports
 
@@ -158,13 +159,31 @@ by every entry harness. Underived core surface is forbidden (constitution §12.5
 
 `features/specs/` owns structural validators and memory catalog generation. Markdown
 atoms are the memory source; `catalog.json` and `product/index.md` are generated from
-frontmatter. Memory is current truth and is writable only by product-engineer during
-DEFINITION or CLOSURE. The retired `agent_tier` field is rejected by the frontmatter
-schema; all nine current fields are required and unknown fields are invalid.
+frontmatter, and a catalog value that can be derived from an atom's body is **computed at
+generation time, never stored** in that atom. Memory is current truth and is writable only
+by product-engineer during DEFINITION or CLOSURE. Every field the frontmatter schema
+declares is required, and an undeclared field is invalid — the schema rejects the retired
+`agent_tier` and the dropped per-atom size field alike.
+
+`SpecsDoctor` is a thin coordinator that owns `check()`/`fix()` ORDER and delegates every
+family's logic to six single-responsibility validator siblings over two shared leaf
+modules; the class-level picture and its regeneration law are
+[`specs/assets/architecture/doctor-decomposition.md`](../assets/architecture/doctor-decomposition.md),
+kept honest by an introspection drift-guard that imports the live modules. Release
+scaffolding is `features/spec_artifacts/new_artifacts.py`, which creates a release SPEC and
+nothing else — the workspace scaffolds no hotfix release, because a bug fix carries no
+release ceremony ([[sdd-bug-backlog-governance]]).
 
 ### Other feature domains
 
-Backlog and bugs own intake consistency and event-sourced bug state. Certification runs
+Backlog and bugs own intake consistency and event-sourced bug state. The ACTIVE/LEDGER
+grammar has exactly one owner: `features/backlog/` both parses and writes it, so
+`backlog new` lives beside the parser it shares a grammar with, finds its insertion point
+through the parsed fence-aware structure rather than a private heading regex, checks slug
+membership through the parsed document, and re-parses its own output before reporting
+success. No module outside that package compiles the grammar, and inside it a sibling is
+imported only through a public name — the YAML-error formatter `preview.py` supplies to
+`document.py` is exported API, not a reached-into private symbol. Certification runs
 the deterministic capability checks behind `dadaia certify`. Capabilities publishes the
 `dadaia-capabilities-v2` payload. Telemetry owns allowlisted local metadata and its
 separate refresh serialization primitive. Server registry owns collision-free dev-port

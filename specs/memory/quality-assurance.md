@@ -19,7 +19,6 @@ tags:
 - flake
 - quarantine
 - privacy
-token_estimate: 1980
 last_updated: '2026-08-15'
 release_origin: v0.3.0
 ---

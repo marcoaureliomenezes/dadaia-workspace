@@ -83,7 +83,7 @@ into the skills; this release is its first executor.
 
 ---
 
-- [ ] **T-042-01 — [git] Commit the definition content on `feature/0.4.2`**
+- [x] **T-042-01 — [git] Commit the definition content on `feature/0.4.2`** (commit `01a938dd`, phase flip included)
 
 **Owner role:** software-engineer (or dispatcher) · **Commit:**
 `docs(T-042-01): v0.4.2 definition — residual-convergence`
@@ -108,7 +108,7 @@ clean.
 
 ---
 
-- [ ] **T-042-02 — [git] Milestone (a): confirm the pick, merge, security review, push**
+- [x] **T-042-02 — [git] Milestone (a): confirm the pick, merge, security review, push** (merge `741f2294`; PyPI 0.4.1 confirmed live by the reviewer; APPROVED handoff `2026-08-16T155627Z-security-reviewer-v0.4.2-definition-push`; hooks armed via `dadaia ci install-hook` after the reviewer's HIGH; pushed, gate exit 0)
 
 **Owner role:** dispatcher + `security-reviewer` · **Commit:** merge commit on `develop`
 
@@ -131,7 +131,7 @@ APPROVED handoff covering the pushed delta; CI green.
 
 ---
 
-- [ ] **T-042-03 — FR12: delete the dead hotfix-release surface**
+- [x] **T-042-03 — FR12: delete the dead hotfix-release surface**
 
 **Owner role:** software-engineer · **Commit:**
 `refactor(T-042-03): delete the revoked hotfix-release scaffolding surface`
@@ -163,7 +163,7 @@ hotfixes only in comments about branch names — leave them; that law is live.
 
 ---
 
-- [ ] **T-042-04 — FR1: one backlog grammar seam, write-then-verify**
+- [x] **T-042-04 — FR1: one backlog grammar seam, write-then-verify**
 
 **Owner role:** software-engineer · **Commit:**
 `refactor(T-042-04): the backlog writer shares the parser's grammar and verifies its own write`
@@ -191,7 +191,7 @@ tests pass unmodified in their new location.
 
 ---
 
-- [ ] **T-042-05 — FR11: bisect fence filter + CSafeLoader**
+- [x] **T-042-05 — FR11: bisect fence filter + CSafeLoader**
 
 **Owner role:** software-engineer · **Commit:**
 `perf(T-042-05): bisect the fence filter and use CSafeLoader when available`
@@ -211,7 +211,7 @@ the 140 KB budget regression with generous headroom and a fallback-loader test.
 
 ---
 
-- [ ] **T-042-06 — FR14: SPEC-DOC-031 counts consumption, not conversation**
+- [x] **T-042-06 — FR14: SPEC-DOC-031 counts consumption, not conversation**
 
 **Owner role:** software-engineer · **Commit:**
 `fix(T-042-06): SPEC-DOC-031 keys on consumption-asserting evidence`
@@ -234,7 +234,7 @@ before/after counts are captured for CLOSURE.
 
 ---
 
-- [ ] **T-042-07 — FR2 (code half): the catalog computes `token_estimate`**
+- [x] **T-042-07 — FR2 (code half): the catalog computes `token_estimate`**
 
 **Owner role:** software-engineer · **Commit:**
 `refactor(T-042-07): compute token_estimate in the catalog; retire the drift check`
@@ -261,7 +261,7 @@ closure half, so the tree is green in between (A2.5).
 
 ---
 
-- [ ] **T-042-08 — FR4: the masker shares the detector's matchers**
+- [x] **T-042-08 — FR4: the masker shares the detector's matchers**
 
 **Owner role:** software-engineer · **Commit:**
 `fix(T-042-08): gate masking predicate is the detector's own; refusals carry no raw path`
@@ -285,7 +285,7 @@ V11 green.
 
 ---
 
-- [ ] **T-042-09 — FR7: no amnesty for a multi-path blob (fail-closed)**
+- [x] **T-042-09 — FR7: no amnesty for a multi-path blob (fail-closed)**
 
 **Owner role:** software-engineer · **Commit:**
 `fix(T-042-09): a blob reachable at more than one path receives no amnesty`
@@ -305,7 +305,7 @@ diff. Add the tree-order-independence fixture (same content at two paths, both n
 
 ---
 
-- [ ] **T-042-10 — FR8: narrow the fail-soft width**
+- [x] **T-042-10 — FR8: narrow the fail-soft width**
 
 **Owner role:** software-engineer · **Commit:**
 `fix(T-042-10): a scan-path degradation is typed or counted, never silent`
@@ -327,7 +327,7 @@ emits exactly one note and the scan proceeds.
 
 ---
 
-- [ ] **T-042-11 — FR10: privacy baseline v5 — the declared-support platforms**
+- [x] **T-042-11 — FR10: privacy baseline v5 — the declared-support platforms**
 
 **Owner role:** software-engineer · **Commit:**
 `fix(T-042-11): baseline v5 covers macOS and Windows home paths`
@@ -351,7 +351,7 @@ is enumerated in the commit message so QA can verify the delta exactly.
 
 ---
 
-- [ ] **T-042-12 — FR9: the self-scan sentinel sees archive-authored blobs**
+- [x] **T-042-12 — FR9: the self-scan sentinel sees archive-authored blobs**
 
 **Owner role:** software-engineer · **Commit:**
 `test(T-042-12): scan archive paths whose blob is new at HEAD`
@@ -371,7 +371,7 @@ whose blob sha is absent from `HEAD^`'s tree (one `git ls-tree -r HEAD^`). `HEAD
 
 ---
 
-- [ ] **T-042-13 — FR3 (code half): leaf import and DEAD markers**
+- [x] **T-042-13 — FR3 (code half): leaf import and DEAD markers**
 
 **Owner role:** software-engineer · **Commit:**
 `refactor(T-042-13): export the YAML error formatter; repoint the DEAD markers`
@@ -392,7 +392,7 @@ two telemetry DEAD markers stop pointing at the archived `backlog/candidates.md`
 
 ---
 
-- [ ] **T-042-14 — FR3 (skills) + FR5: the shipped mechanism and the review-before-archive canon**
+- [x] **T-042-14 — FR3 (skills) + FR5: the shipped mechanism and the review-before-archive canon**
 
 **Owner role:** ai-engineer · **Commit:**
 `docs(T-042-14): skills state the shipped sweep and the review-before-archive order`
@@ -421,7 +421,7 @@ in `public/**`.
 
 ---
 
-- [ ] **T-042-15 — FR6: intake signal calibration**
+- [x] **T-042-15 — FR6: intake signal calibration**
 
 **Owner role:** ai-engineer · **Commit:**
 `docs(T-042-15): record-only observations terminate in CLOSURE; only defects reach intake`
@@ -445,7 +445,7 @@ compiled for operator adjudication. The personas keep their never-silent obligat
 
 ---
 
-- [ ] **T-042-16 — FR13: the CHANGELOG version-axis preamble**
+- [x] **T-042-16 — FR13: the CHANGELOG version-axis preamble**
 
 **Owner role:** software-engineer · **Commit:**
 `docs(T-042-16): reconcile the CHANGELOG to the single published version axis`
@@ -467,7 +467,7 @@ at T-042-20.
 
 ---
 
-- [ ] **T-042-17 — `qa-engineer` review of the increment (alpha-1 close)**
+- [x] **T-042-17 — `qa-engineer` review of the increment (alpha-1 close)** (APPROVED — original REQUEST_CHANGES `a42c4514` on A12.1/QA-2; remediated `978bb850`/`34e71ca7`; re-verified and closed APPROVED)
 
 **Owner role:** qa-engineer · **Commit:** review artifact committed to the branch
 (`specs/releases/v0.4.2/ALPHA-1-QA.md`)
@@ -495,7 +495,7 @@ named defects to the implementer.
 
 ---
 
-- [ ] **T-042-18 — `code-reviewer` six-axis review of the delta (BEFORE archive — R3)**
+- [x] **T-042-18 — `code-reviewer` six-axis review of the delta (BEFORE archive — R3)** (APPROVED on `85ac7ab7` — round-1 REQUEST-CHANGES `934e6cf3` on CR-0…CR-5; remediated `7e2ac0b4`/`759eb598`/`85ac7ab7`; re-verified against the reviewer's own repros and closed APPROVE)
 
 **Owner role:** code-reviewer · **Commit:** review artifact committed to the branch
 (`specs/releases/v0.4.2/PRE-PR-REVIEW.md`)
@@ -519,7 +519,7 @@ commit, re-approved by both).
 
 ---
 
-- [ ] **T-042-19 — Memory window: atoms, diagram, and FR2's memory half (CLOSURE phase)**
+- [x] **T-042-19 — Memory window: atoms, diagram, and FR2's memory half (CLOSURE phase)**
 
 **Owner role:** product-engineer (memory + assets) + software-engineer (schema/code half),
 sequenced inside **one** commit · **Commit:**
@@ -551,7 +551,7 @@ no forbidden section added; SPEC §5 satisfied file by file.
 
 ---
 
-- [ ] **T-042-20 — CLOSURE, calibrated dispositions, archive, version confirmation**
+- [x] **T-042-20 — CLOSURE, calibrated dispositions, archive, version confirmation** (text half by PE, handoff 2026-08-16T204000Z; [git] half this commit: [0.4.2] CHANGELOG, 0.4.2 confirmed, archive git mv, ACTIVE none; CR-5 path verified post-move)
 
 **Owner role:** product-engineer (text) + software-engineer/dispatcher (**[git]** steps) ·
 **Commit:** `docs(T-042-20): close release v0.4.2`

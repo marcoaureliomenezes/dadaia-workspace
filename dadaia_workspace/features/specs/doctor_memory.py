@@ -402,14 +402,12 @@ class MemoryValidator:
                 )
             )
         elif proc_result.returncode == 2:
-            # Warnings only (e.g. token_estimate drift)
+            # Warnings only (e.g. an unknown ## heading outside the curated allowlist)
             issues.append(
                 SpecsDoctorIssue(
                     code="LINT-1",
                     severity=Severity.WARNING,
-                    description=(
-                        f"LINT-1: memory atom lint warnings (token_estimate drift etc.):\n{output}"
-                    ),
+                    description=(f"LINT-1: memory atom lint warnings:\n{output}"),
                     path=str(mem_dir),
                 )
             )

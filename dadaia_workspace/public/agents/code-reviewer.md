@@ -201,6 +201,11 @@ Required sections:
 
 Severity badges: CRITICAL / HIGH / MEDIUM / LOW / INFO
 
+**Intake routing (FR6/R4).** Every finding is recorded in `## Findings` — never-silent,
+zero findings lost. Only **actionable** findings (LOW+ with a concrete fix surface)
+belong in `project-manager`'s intake report; **record-only** findings (INFO-grade,
+awareness-only, already-fixed-at-HEAD) terminate in this report and never enter intake.
+
 ---
 
 ## Hard rules

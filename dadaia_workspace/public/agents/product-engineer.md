@@ -133,10 +133,9 @@ specs/
 │       ├── TASKS.md             ← task checklist — created after PLAN approval
 │       └── CLOSURE.md           ← release closure — created when all tasks [x] DONE
 ├── backlog/
-│   ├── <slug>.md                ← per-entry candidates (live schema; operator-gated intake only)
-│   └── candidates.md            ← index of per-entry candidates
-│                                   (target: single-file BACKLOG.md ACTIVE/LEDGER —
-│                                   consolidating, see dd-backlog-definition)
+│   ├── BACKLOG.md                ← single source: ## ACTIVE (candidates) + ## LEDGER (closed)
+│   ├── README.md
+│   └── _archive/                 ← superseded entry files, historical (git mv only)
 └── _archive/
     ├── releases/<release-id>/   ← archived releases (read-only)
     ├── legacy-features/<name>/  ← pre-release-model features that were never implemented
@@ -166,7 +165,7 @@ SPEC→CLOSURE; DISCOVERY/intake is `project-manager`. Full step detail is in th
 | PLAN | product-engineer | write `PLAN.md` (≤300 lines) Draft → `Aprovado` | PLAN `**Status:** Aprovado` |
 | TASKS | product-engineer | write `TASKS.md` with `[ ]` markers → `Aprovado` | TASKS `**Status:** Aprovado` |
 | IMPLEMENTATION | implementers | no-write for you; answer questions, set ACTIVE.md phase | all tasks `[x]` + trio review |
-| CLOSURE | product-engineer | update memory atoms, then write `CLOSURE.md` (finalization order memory → CLOSURE → archive, per `dd-release-closure`; DEFINITION + CLOSURE are the memory-write phases, per §13) | CLOSURE evidence complete |
+| CLOSURE | product-engineer | update memory atoms, then write `CLOSURE.md` (order: review → closure → archive, per D8/FR5 — the trio review already cleared entering this phase; then memory → CLOSURE → archive, per `dd-release-closure`; DEFINITION + CLOSURE are the memory-write phases, per §13) | CLOSURE evidence complete |
 | ARCHIVED | product-engineer | set ACTIVE.md phase, request `git mv` to `_archive/` | release archived |
 
 ---
@@ -377,9 +376,10 @@ template. Write `specs/releases/<release-id>/CLOSURE.md` with:
 7. **Archive decision** — usually `MOVE`
 
 In the same CLOSURE phase, **update memory Markdown first, then write `CLOSURE.md`**
-(finalization order memory → CLOSURE → archive, `dd-release-closure`). Memory
-describes the product after this release atomically. The release contribution is
-captured in CLOSURE; memory has no changelog section.
+(order: review → closure → archive, D8/FR5 — the trio review already cleared before
+this phase; finalization order within closure is memory → CLOSURE → archive,
+`dd-release-closure`). Memory describes the product after this release atomically. The
+release contribution is captured in CLOSURE; memory has no changelog section.
 
 After memory is updated and CLOSURE is written, set `ACTIVE.md` phase to `ARCHIVED` and
 move the release directory using the Write tool to update ACTIVE.md and request
@@ -402,9 +402,9 @@ active).
 
 **The entire hotfix-*release* lifecycle described in earlier revisions of this file is
 revoked.** The PATCH≥1-means-hotfix-release rule, the condensed 7-step flow and the
-hotfix-specific status ladder are dead law; the `release_hotfix.md.j2` /
-`closure_hotfix.md.j2` templates and the `dadaia specs hotfix open` CLI verb are dead
-surface — never invoked, their removal queued in the backlog. A bug fix
+hotfix-specific status ladder are dead law; the hotfix-release scaffold templates and
+the `dadaia specs hotfix open` CLI verb were dead surface — never invoked — and were
+deleted (FR12, v0.4.2). A bug fix
 is Arm B in full (`DADAIA.md` §1) — register, reproduce, RED, root-cause fix, GREEN,
 `resolved` event, commit — run on `hotfix/{M.m.p}` (branch contract: `dadaia-gitflow`).
 `product-engineer` authors **no** hotfix SPEC/PLAN/TASKS and creates **no**
