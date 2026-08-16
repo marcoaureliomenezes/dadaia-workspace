@@ -698,6 +698,27 @@ and proceeds either way.
     count in the scan summary — never silently dropped.'
 ```
 
+### document-parser-fence-filter-complexity
+- **Title:** Backlog parser performance — quadratic fence filter (bisect fix) + PyYAML dominance on the pre-commit path (#42)
+- **Opened:** 2026-08-16
+- **Status:** candidate
+- **Description:** Intake #3 item 3-18 (security ship review 2026-08-16T002221Z LOW-1 with scaling table + v0.12.0 CLOSURE §Intake code-review LOW; the ship review states the two findings confirm rather than contradict each other — one entry, one lane). (i) _outside_fences is O(headings × fences) via a linear any() rescan per marker (document.py:147); measured scaling: 17.5 KB→0.355 s, 35 KB→1.629 s, 70 KB→8.080 s, 140 KB→27.439 s (live 56.7 KB doc: 0.131 s; PM-authored input only — CWE-1050/407); fix: bisect over sorted fenced-range starts plus a budget regression test. (ii) load_document ≈145 ms is ~99% PyYAML (yaml.safe_load ×23 per parse), double-paid per backlog-touching commit because SPEC-DOC-031 re-parses through the sanctioned edge; fixes: CSafeLoader when available, and/or a slug/status-only parse mode for the governance caller.
+- **Provenance:** intake-report #3 item 3-18 approved as one merged entry — operator adjudication, 2026-08-16 (resolva todos — class-level fixes, no workarounds)
+- **Intents:**
+```yaml
+- subject:
+    kind: code
+    ref: dadaia_workspace/features/backlog/document.py#_outside_fences
+  change: 'Replace the per-marker linear any() rescan with bisect over sorted fenced-range
+    starts, and pin the 140 KB shape well under a second with a budget regression test.'
+- subject:
+    kind: code
+    ref: dadaia_workspace/features/backlog/document.py#load_document
+  change: 'Cut the PyYAML dominance on the pre-commit path: CSafeLoader when available
+    and/or a slug/status-only parse mode for the SPEC-DOC-031 governance caller, so a
+    backlog-touching commit stops double-paying the full YAML cost.'
+```
+
 ## LEDGER
 
 - push-range-denylist-scan · DELIVERED · v0.9.0 · 2026-08-14
