@@ -10,7 +10,7 @@ visible:
 | memory | missing `memory/` atoms → `SPEC-DOC-002` |
 | release | `ACTIVE.md` → missing `v9.9.9` dir → `SPEC-DOC-009`; non-SemVer `badname-release` (Created 2026-07-10) → `SPEC-DOC-016`/`SPEC-DOC-027` (date-gated) |
 | closure_audit | loose `audits/bad-audit-name/` → `SPEC-DOC-030`/`SPEC-DOC-038`; missing `_archive/` → `SPEC-DOC-034` |
-| governance | malformed `backlog/candidates.md` bullet + stale hotfix → `SPEC-DOC-012` (staleness is `datetime.now`-gated) |
+| governance | loose `backlog/candidates.md` (not `BACKLOG.md`/`README.md`) → `SPEC-DOC-035` (single-source invariant, SPEC v0.12.0 FR5) |
 | structural | missing dirs/atoms → `TREE-3`/`TREE-4`/`TREE-5`/`TREE-5M` |
 
 `doctor_golden_v0155.json` is the byte-identical capture (see `../test_doctor_golden.py`):

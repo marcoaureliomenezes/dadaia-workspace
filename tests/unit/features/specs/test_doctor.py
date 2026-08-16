@@ -9,7 +9,7 @@ a genuinely valid tree, a property no single-code row can prove.
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime
 from pathlib import Path
 from unittest.mock import patch
 
@@ -725,90 +725,23 @@ def test_doc005_plan_line_limit_cutoff_boundary(
     assert doc5 and doc5[0].severity == expected_severity
 
 
-@pytest.mark.parametrize(
-    ("body", "expect_doc012"),
-    [
-        pytest.param(
-            "# Backlog\n\n## Candidatas ativas\n\n"
-            "- bad-feature — Missing the owner field entirely\n",
-            True,
-            id="malformed-candidate-bullet",
-        ),
-        pytest.param(
-            "# Backlog\n\n## Hotfixes pendentes\n\n- fix this bug (no proper format at all)\n",
-            True,
-            id="malformed-hotfix-bullet",
-        ),
-        pytest.param(
-            "# Backlog\n\n## Candidatas ativas\n\n"
-            "- my-feature — Does something useful (owner: software-engineer, "
-            "contexto: `_archive/legacy-features/my-feature/SPEC.md`)\n",
-            False,
-            id="well-formed-candidate",
-        ),
-        pytest.param(
-            "# Backlog\n\n## Candidatas ativas\n\n"
-            "- good-feature — Does something (owner: devops-engineer, "
-            "contexto: `_archive/legacy-features/good-feature/SPEC.md`)\n\n"
-            "## Histórico (candidatas promovidas a release)\n\n"
-            "- this bullet has free-form text without the expected schema\n"
-            "- another free-form line (released on 2026-01-01)\n",
-            False,
-            id="free-form-historico-not-checked",
-        ),
-        pytest.param(
-            "# Backlog\n\n## Candidatas ativas\n\n(Sem candidatas)\n\n"
-            "## Hotfixes pendentes\n\n"
-            "- __FRESH_TS__ HIGH specs/doctor — Check fails on empty backlog "
-            "(post-mortem: https://example.com/pm-1)\n",
-            False,
-            id="well-formed-fresh-hotfix",
-        ),
-        pytest.param(
-            "# Backlog\n\n## Candidatas ativas\n\n"
-            "- good-feature — Does something (owner: devops-engineer, "
-            "contexto: `_archive/legacy-features/good-feature/SPEC.md`)\n\n"
-            "## Hotfixes pendentes\n\n(Nenhum hotfix pendente.)\n\n"
-            "## Histórico\n\n- this free-form line should not trigger SPEC-DOC-012\n",
-            False,
-            id="well-formed-plus-free-form-historico",
-        ),
-        pytest.param("__HOTFIX_STALE_75H__", True, id="hotfix-stale-75h-warns"),
-        pytest.param("__HOTFIX_FRESH_10H__", False, id="hotfix-fresh-10h-no-warning"),
-    ],
-)
-def test_doc012_bullet_format_matrix(tmp_path: Path, body: str, expect_doc012: bool) -> None:
-    """Malformed bullets in either '## Candidatas ativas' or '## Hotfixes pendentes'
-    raise SPEC-DOC-012 WARNING; well-formed bullets (both sections, plus free-form
-    '## Histórico') produce zero. Also covers the 72h hotfix-staleness boundary (D23)."""
-    if "__FRESH_TS__" in body:
-        fresh_ts = (datetime.now(tz=UTC) - timedelta(hours=1)).strftime("%Y-%m-%dT%H%M%SZ")
-        body = body.replace("__FRESH_TS__", fresh_ts)
-    if body in ("__HOTFIX_STALE_75H__", "__HOTFIX_FRESH_10H__"):
-        hours_ago = 75 if body == "__HOTFIX_STALE_75H__" else 10
-        ts = (datetime.now(tz=UTC) - timedelta(hours=hours_ago)).strftime("%Y-%m-%dT%H%M%SZ")
-        body = (
-            "# Backlog\n\n"
-            "## Hotfixes pendentes\n\n"
-            f"- {ts} LOW specs/doctor — Bug (post-mortem: https://example.com/pm)\n"
-        )
-        specs = _make_clean_specs_tree(tmp_path)
-        (specs / "backlog" / "candidates.md").write_text(body, encoding="utf-8")
-        issues = SpecsDoctor(specs).check()
-        stale_issues = [i for i in issues if i.code == "SPEC-DOC-012" and "stale" in i.description]
-        if expect_doc012:
-            assert stale_issues and stale_issues[0].severity == Severity.WARNING
-        else:
-            assert stale_issues == []
-        return
-
+def test_doc012_retired_never_fires_on_a_planted_candidates_md(tmp_path: Path) -> None:
+    """SPEC v0.12.0 T-120-08 (ADR D10): SPEC-DOC-012 (candidates.md bullet-format check)
+    is retired with candidates.md itself. A malformed candidates.md left on disk (e.g. a
+    stray, not-yet-archived leftover) never fires SPEC-DOC-012 again — the archived-only
+    single-source doctor has no check left that reads that file's bullet grammar. It is
+    still flagged, but as SPEC-DOC-035 (the loose-file single-source invariant): a
+    recorded supersession, replacing the deleted `test_doc012_bullet_format_matrix`
+    (11 parametrized cases; subject retired, TASKS T-120-08, A5.4)."""
     specs = _make_clean_specs_tree(tmp_path)
-    (specs / "backlog" / "candidates.md").write_text(body, encoding="utf-8")
-    doc12 = [i for i in SpecsDoctor(specs).check() if i.code == "SPEC-DOC-012"]
-    if expect_doc012:
-        assert doc12 and doc12[0].severity == Severity.WARNING
-    else:
-        assert doc12 == [], [i.to_dict() for i in doc12]
+    (specs / "backlog" / "candidates.md").write_text(
+        "# Backlog\n\n## Candidatas ativas\n\n- bad-feature — Missing the owner field\n",
+        encoding="utf-8",
+    )
+    issues = SpecsDoctor(specs).check()
+    assert "SPEC-DOC-012" not in {i.code for i in issues}
+    doc035 = [i for i in issues if i.code == "SPEC-DOC-035"]
+    assert any("candidates.md" in (i.path or "") for i in doc035)
 
 
 @pytest.mark.parametrize(

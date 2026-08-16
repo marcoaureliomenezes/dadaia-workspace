@@ -22,16 +22,40 @@ from enum import StrEnum
 
 __all__ = [
     "INTENTS_EXEMPT_STATUS",
+    "TERMINAL_DISPOSITION_TOKENS",
     "Intent",
     "Subject",
     "SubjectKind",
     "is_intents_exempt",
+    "is_terminal_disposition",
     "parse_intents",
     "serialize_intents",
 ]
 
 #: The one backlog stage exempt from the resolvable-typed-intents requirement.
 INTENTS_EXEMPT_STATUS = "idea"
+
+#: The six canonical LEDGER disposition tokens (SPEC v0.12.0 FR1/FR2,
+#: ``dd-backlog-definition`` §2 — the single canonical home for this vocabulary;
+#: defined once here so the document parser (LEDGER-line grammar, A1.5) and the doctor
+#: (BL-STALE's "own Status is terminal" condition, ADR D8) share one source of truth.
+TERMINAL_DISPOSITION_TOKENS: tuple[str, ...] = (
+    "DELIVERED",
+    "SUPERSEDED",
+    "RESOLVED",
+    "CONSUMED",
+    "DEFERRED",
+    "REJECTED",
+)
+_TERMINAL_DISPOSITION_TOKEN_SET = frozenset(TERMINAL_DISPOSITION_TOKENS)
+
+
+def is_terminal_disposition(token: str | None) -> bool:
+    """True iff *token* is (case-insensitively) one of the six canonical terminal
+    LEDGER disposition tokens: ``DELIVERED``, ``SUPERSEDED``, ``RESOLVED``, ``CONSUMED``,
+    ``DEFERRED``, ``REJECTED`` (``dd-backlog-definition`` §2).
+    """
+    return token is not None and token.strip().upper() in _TERMINAL_DISPOSITION_TOKEN_SET
 
 
 def is_intents_exempt(status: str | None) -> bool:

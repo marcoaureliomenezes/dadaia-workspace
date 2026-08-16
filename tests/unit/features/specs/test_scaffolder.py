@@ -7,6 +7,9 @@ from pathlib import Path
 import jinja2
 import pytest
 
+from dadaia_workspace.features.backlog.document import load_document
+from dadaia_workspace.features.spec_artifacts import new_artifacts
+from dadaia_workspace.features.specs import scaffolder
 from dadaia_workspace.features.specs.scaffolder import (
     _render_template,
     scaffold,
@@ -32,8 +35,7 @@ _EXPECTED_FILES = [
     "memory/product/index.md",
     "memory/product/catalog.json",
     "releases/ACTIVE.md",
-    "backlog/candidates.md",
-    "backlog/ideas.md",
+    "backlog/BACKLOG.md",
     "_archive/releases/.gitkeep",
     "_archive/legacy-features/.gitkeep",
     "assets/.gitkeep",
@@ -82,6 +84,47 @@ def test_scaffold_happy_path_creates_all_artifacts(tmp_path: Path) -> None:
     assert (specs_dir / "AGENTS.md").read_text(encoding="utf-8") == (
         _TEMPLATES_DIR / "specs-AGENTS.md"
     ).read_text(encoding="utf-8")
+
+
+def test_scaffolded_backlog_skeleton_pins_writer_and_round_trips_load_document(
+    tmp_path: Path,
+) -> None:
+    """LOW (code-reviewer, v0.12.0 pre-PR): the BACKLOG.md grammar is written by THREE
+    modules (``scaffolder._BACKLOG_STUB`` for a fresh ``specs init``,
+    ``new_artifacts._BACKLOG_DOCUMENT_SKELETON`` for ``backlog new`` on an absent
+    document, and the live subsection-append template) and parsed by a FOURTH,
+    ``document.load_document`` — with no test pinning their agreement. Pin two things:
+
+    (a) the two from-scratch skeleton literals stay byte-identical (a grammar change in
+        one writer can no longer silently desync the other), and
+    (b) a fresh ``specs init`` scaffold's ``BACKLOG.md`` round-trips through
+        ``load_document`` with zero errors (an empty ACTIVE/LEDGER skeleton is a
+        legitimate empty model, A1.2).
+
+    ``backlog_new``'s own round-trip — a WRITTEN subsection, not just the empty
+    skeleton, through ``load_document`` — is already covered by
+    ``test_new_artifacts.test_backlog_new_on_absent_document_creates_both_sections_and_one_subsection``;
+    this test extends the pin to the scaffolder producer rather than duplicating that
+    coverage."""
+    assert scaffolder._BACKLOG_STUB == new_artifacts._BACKLOG_DOCUMENT_SKELETON, (
+        "the scaffolder's fresh-tree BACKLOG.md skeleton must stay byte-identical to "
+        "backlog_new's from-scratch skeleton — both are parsed by the SAME grammar "
+        "document.load_document owns, and a drift here would desync them silently"
+    )
+
+    specs_dir = tmp_path / "specs"
+    result = scaffold(
+        specs_dir=specs_dir,
+        project_name="pin-project",
+        force=False,
+        templates_dir=_TEMPLATES_DIR,
+    )
+    assert result.errors == []
+
+    doc = load_document(specs_dir / "backlog")
+    assert doc.errors == ()
+    assert doc.active == ()
+    assert doc.ledger == ()
 
 
 def test_scaffold_idempotent_force_and_template_render(tmp_path: Path) -> None:

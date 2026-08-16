@@ -66,7 +66,7 @@
 
 ---
 
-- [ ] **T-120-01 — [git] Commit the definition content on `feature/v0.12.0`**
+- [x] **T-120-01 — [git] Commit the definition content on `feature/v0.12.0`**
 
 **Owner role:** software-engineer (or dispatcher) · **Commit:**
 `docs(T-120-01): v0.12.0 definition — backlog tooling single source`
@@ -91,7 +91,7 @@ commit. The pre-commit backlog gate fires (backlog paths are staged) and must pa
 
 ---
 
-- [ ] **T-120-02 — [git] Milestone (a): merge, security review, push**
+- [x] **T-120-02 — [git] Milestone (a): merge, security review, push**
 
 **Owner role:** dispatcher + `security-reviewer` · **Commit:** merge commit on `develop`
 
@@ -111,7 +111,7 @@ preflight.
 
 ---
 
-- [ ] **T-120-03 — FR4: retire the dead removal/consumption write side and the dead fakes**
+- [x] **T-120-03 — FR4: retire the dead removal/consumption write side and the dead fakes**
 
 **Owner role:** software-engineer · **Commit:**
 `refactor(T-120-03): delete the uncalled backlog removal/consumption write side`
@@ -150,7 +150,7 @@ A4.6 hold; `dadaia ci preflight` green; both doctors still clean on the **old** 
 
 ---
 
-- [ ] **T-120-04 — FR1: `features/backlog/document.py`, the single-source parser**
+- [x] **T-120-04 — FR1: `features/backlog/document.py`, the single-source parser**
 
 **Owner role:** software-engineer · **Commit:**
 `feat(T-120-04): parse BACKLOG.md into a typed ACTIVE/LEDGER model`
@@ -177,7 +177,7 @@ live doctors unchanged and clean.
 
 ---
 
-- [ ] **T-120-05 — FR2: the four BL-* checks over the document model (unwired)**
+- [x] **T-120-05 — FR2: the four BL-* checks over the document model (unwired)**
 
 **Owner role:** software-engineer · **Commit:**
 `feat(T-120-05): run BL-SCHEMA/DUP/CONFLICT/STALE over the ACTIVE/LEDGER model`
@@ -206,7 +206,7 @@ pass **unmodified** (A9.4); `dadaia ci preflight` green.
 
 ---
 
-- [ ] **T-120-06 — FR3: `backlog new` authors an ACTIVE subsection**
+- [x] **T-120-06 — FR3: `backlog new` authors an ACTIVE subsection**
 
 **Owner role:** software-engineer · **Commit:**
 `feat(T-120-06): backlog new appends an ACTIVE subsection to BACKLOG.md`
@@ -233,7 +233,7 @@ unchanged; `dadaia ci preflight` green.
 
 ---
 
-- [ ] **T-120-07 — FR7a: author `BACKLOG.md` from the live tree (content only, uncommitted)**
+- [x] **T-120-07 — FR7a: author `BACKLOG.md` from the live tree (content only, uncommitted)**
 
 **Owner role:** project-manager · **Commit:** none — the content is committed by T-120-08
 
@@ -268,7 +268,7 @@ would make the still-live per-entry loader parse it (grill P3/P4).
 
 ---
 
-- [ ] **T-120-08 — THE CUTOVER: wiring, loader deletion, governance re-target, document, `git mv`** (one commit)
+- [x] **T-120-08 — THE CUTOVER: wiring, loader deletion, governance re-target, document, `git mv`** (one commit)
 
 **Owner role:** project-manager + software-engineer (sequenced inside one commit) ·
 **Commit:** `feat(T-120-08): cut the backlog over to single-source BACKLOG.md`
@@ -313,7 +313,7 @@ A5.1–A5.6, A7.3, A7.5, A7.6, A9.1, A9.2 all hold.
 
 ---
 
-- [ ] **T-120-09 — FR6: scaffold README, consumer recipe, CI job comment**
+- [x] **T-120-09 — FR6: scaffold README, consumer recipe, CI job comment**
 
 **Owner role:** software-engineer · **Commit:**
 `docs(T-120-09): describe the single-source backlog to consumers`
@@ -342,7 +342,7 @@ opts the tree back in). Job name, verb and arguments unchanged. Then
 
 ---
 
-- [ ] **T-120-10 — FR8: the two skills state the mechanism that runs**
+- [x] **T-120-10 — FR8: the two skills state the mechanism that runs**
 
 **Owner role:** ai-engineer · **Commit:**
 `docs(T-120-10): dd-backlog-definition schema and dd-release-definition Consumes mechanism`
@@ -370,7 +370,7 @@ ticked truthfully against the rewritten §5.
 
 ---
 
-- [ ] **T-120-11 — `qa-engineer` review of the increment (alpha-1 close)**
+- [x] **T-120-11 — `qa-engineer` review of the increment (alpha-1 close)**
 
 **Owner role:** qa-engineer · **Commit:** review artifact committed to the branch
 (`specs/releases/v0.12.0/ALPHA-1-QA.md`)
@@ -431,7 +431,18 @@ added; SPEC §5 satisfied file by file.
 
 ---
 
-- [ ] **T-120-13 — CLOSURE, dispositions, archive, version bump**
+- [x] **T-120-13 — CLOSURE, dispositions, archive, version bump** (first close `9d079389` reset for M1 review remediation `a76d55bf`; re-close = this commit: CLOSURE amended with corrected figures, sweep re-executed 28/54, token_estimate normalized 1300→1845, `0.9.0` mint, archive)
+
+**Marker note.** No `chore(tasks): start` reservation commit preceded **T-120-12 or T-120-13** —
+`product-engineer` was dispatched straight into the work, so the flip and the artifact collapse
+into one commit. The markers themselves are correct; the observable trace is absent. Disclosed in
+`CLOSURE.md` `## Drifts › missing-reservation-trace-for-t-120-12-13` — a drift that now exists
+(an earlier revision of this note asserted a disclosure that had not been written; the pre-PR
+review caught the forward reference).
+
+**Re-close note.** The first execution of this task committed at `9d079389` and was **reset** for
+pre-ship code-review remediation (M1 fixed at `a76d55bf`). The task is re-executed on the
+re-close commit; see `CLOSURE.md` `## Drifts › reopened-close-for-review-remediation`.
 
 **Owner role:** product-engineer (text) + software-engineer/dispatcher (**[git]** steps) ·
 **Commit:** `docs(T-120-13): close release v0.12.0`

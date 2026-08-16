@@ -124,7 +124,12 @@ def backlog_new_cmd(
         help="Path to specs/ directory. Default: resolve from bound context session.",
     ),
 ) -> None:
-    """Create specs/backlog/<slug>.md with canonical frontmatter stub."""
+    """Append one ``## ACTIVE`` subsection for <slug> to specs/backlog/BACKLOG.md.
+
+    Creates the document (with both ``## ACTIVE`` and ``## LEDGER`` section headings)
+    first when it does not yet exist (SPEC v0.12.0 FR3, ADR #14 — the single-source
+    document, not a per-entry file).
+    """
     target = _resolve_specs_dir(specs_dir)
 
     if not target.is_dir():
@@ -231,8 +236,10 @@ def backlog_doctor_cmd(
     """Run BL-SCHEMA/DUP/CONFLICT/STALE over the live backlog; exit non-zero on any ERROR.
 
     This is the ENFORCED backstop (ADR-D): wired into the pre-commit chokepoint + CI, it
-    rejects a hand-written divergent twin even though ``specs/backlog/`` is gitignored +
-    ADDITIVE. ``--explain`` additionally prints how each item's subjects resolved.
+    rejects a hand-written divergent twin even though ``specs/backlog/`` is ADDITIVE —
+    ``BACKLOG.md`` (the single source, SPEC v0.12.0 FR1/ADR #14) is committed repository
+    truth (``.gitignore:133-142`` opts ``*.md`` back in). ``--explain`` additionally
+    prints how each item's subjects resolved.
     """
     from dadaia_workspace.cli.anchors import derive_cli_anchors
     from dadaia_workspace.features.backlog.doctor import Severity, run_backlog_doctor
@@ -272,12 +279,15 @@ def backlog_doctor_cmd(
 
 
 def _explain_backlog(specs_dir: Path, src: Path, catalog_path: Path, alias_map_path: Path) -> None:
-    """Print how each backlog item's subjects bind to canonical anchors (read-only)."""
+    """Print how each ACTIVE backlog item's subjects bind to canonical anchors (read-only).
+
+    Reads the single source ``specs/backlog/BACKLOG.md`` through
+    :func:`~dadaia_workspace.features.backlog.document.load_document` (SPEC v0.12.0
+    FR1/FR2, ADR #14 — T-120-08 cutover).
+    """
     from dadaia_workspace.cli.anchors import derive_cli_anchors
-    from dadaia_workspace.features.backlog.preview import (
-        bound_anchor_changes,
-        load_backlog_items,
-    )
+    from dadaia_workspace.features.backlog.document import load_document
+    from dadaia_workspace.features.backlog.preview import bound_anchor_changes
     from dadaia_workspace.features.backlog.subject_registry import build_registry
 
     registry = build_registry(
@@ -287,7 +297,8 @@ def _explain_backlog(specs_dir: Path, src: Path, catalog_path: Path, alias_map_p
         specs_dir=specs_dir,
         cli_anchors=derive_cli_anchors(),
     )
-    for item in load_backlog_items(specs_dir / "backlog"):
+    document = load_document(specs_dir / "backlog")
+    for item in document.active:
         anchor_changes, unresolved = bound_anchor_changes(item, registry)
         typer.echo(f"# {item.slug}")
         for anchor_id, change in sorted(anchor_changes.items()):

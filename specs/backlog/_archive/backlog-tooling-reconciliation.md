@@ -33,14 +33,6 @@ intents:
       provenance) instead of scaffolding a per-entry file.
   - subject:
       kind: code
-      ref: dadaia_workspace/features/backlog/removal_lifecycle.py#BacklogRemovalLifecycle
-    change: >-
-      2-2 fold: give consume_at_release_definition/remove_at_closure a live CLI consumer
-      (or retire them in favor of the documented manual disposition sweep) so the
-      dd-release-definition §5 `**Consumes:**` checklist item is executable again;
-      reconcile purge-on-pick and LEDGER writing with the BACKLOG.md shape.
-  - subject:
-      kind: code
       ref: dadaia_workspace/features/backlog/preview.py#load_backlog_items
     change: >-
       Load items from BACKLOG.md ACTIVE subsections (one item per subsection) instead of
@@ -136,3 +128,14 @@ flagged as **OD-1**), carried as one optional `**Intents:**` subsection key; and
 BL-STALE is re-defined as "an ACTIVE item already consumed or dispositioned". Terminal
 disposition `DELIVERED — v0.12.0` lands at closure, as a `LEDGER` line in the consolidated
 `BACKLOG.md`.
+
+**T-120-03 dangling-intent cleanup.** The `removal_lifecycle.py#BacklogRemovalLifecycle`
+intent bullet is removed from the frontmatter above (T-120-03 commit): its subject was
+deleted by this task's own FR4 retirement (the change it described — "2-2 fold... or
+retire them" — is exactly the retirement this Pick-provenance section already narrates
+as delivered), so the `code` anchor can never resolve again and `backlog doctor`'s
+BL-SCHEMA would ERROR permanently on this picked, non-exempt-status item otherwise
+(SPEC §3 standing green rule: both doctors clean at every commit). This is a mechanical
+dangling-reference removal, not a curation/disposition judgment — the entry's title,
+status, description, acceptance criteria, and every other intent are untouched. Flagged
+for `project-manager`/operator visibility as a T-120-03 scope note.

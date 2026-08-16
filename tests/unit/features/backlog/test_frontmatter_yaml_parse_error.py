@@ -1,130 +1,55 @@
-"""FR10 (v0.1.65) — backlog doctor YAML parse misdiagnosis fix.
+"""SPEC v0.12.0 FR2/A2.4 — the generic ``intents_error`` path fires at ANY status.
 
-Bug ``backlog-doctor-yaml-parse-misdiagnosis``: an unquoted frontmatter value like
-``source: text (note: more text)`` raises a ``yaml.ScannerError`` that
-``_parse_frontmatter`` used to swallow — the whole frontmatter (including a perfectly
-valid ``intents[]``) evaporated, and the doctor misdiagnosed the item as
-``no intents[] declared``.
+Intent: CONTRACT — v0.12.0 A2.4
 
-Contract fixed here:
+Bug ``backlog-doctor-yaml-parse-misdiagnosis`` (v0.1.65, FR10): historically, an unquoted
+frontmatter value like ``source: text (note: more text)`` raised a ``yaml.ScannerError``
+that the legacy per-entry loader (``preview._parse_frontmatter``) used to swallow — the
+whole frontmatter (including a perfectly valid ``intents[]``) evaporated, and the doctor
+misdiagnosed the item as ``no intents[] declared``.
 
-- the loader captures the parse failure in ``BacklogItem.frontmatter_error``
-  (YAMLError message + problem-mark line/column when available);
-- ``_check_schema`` emits a dedicated BL-SCHEMA ERROR
-  ``frontmatter YAML parse error: <msg> (line <L>, column <C>)`` and SUPPRESSES the
-  downstream no-intents / unresolved-subject findings for that item;
-- well-formed files keep byte-identical findings (no regression).
+**T-120-08 supersession (recorded).** The legacy per-entry loader
+(``preview.load_backlog_items``/``BacklogItem``/``_parse_frontmatter``) and the doctor's
+legacy-only split (``doctor._split_legacy_frontmatter_errors``) were retired at the
+T-120-08 cutover — the single-source ``BACKLOG.md`` model has no monolithic YAML
+frontmatter blob to fail parsing; a malformed ``**Intents:**`` fenced block is captured
+generically as ``ActiveItem.intents_error`` instead, by :func:`doctor._check_schema` (A2.4).
+This module's three legacy-loader-specific tests
+(``test_loader_captures_frontmatter_parse_error_with_line_and_column``,
+``test_legacy_split_emits_parse_error_finding_and_excludes_item_from_engine``,
+``test_legacy_split_leaves_well_formed_items_unaffected``) are deleted as a recorded
+supersession — their subject (the legacy loader + legacy split) no longer exists.
+Replacement coverage: A2.4 (malformed ``**Intents:**`` fires at ANY status, including
+``idea``) is covered end-to-end over the real document model by
+``tests/integration/test_backlog_doctor.py::test_malformed_intents_yaml_fires_at_any_status_including_idea``;
+this module keeps the one test below, which drives ``doctor._check_schema`` directly over
+a synthetic ``ActiveItem`` — narrower, faster coverage of the same contract.
 """
 
 from __future__ import annotations
 
-from pathlib import Path
-
-from dadaia_workspace.features.backlog.doctor import (
-    BacklogDoctorCode,
-    DoctorContext,
-    _check_schema,
-)
-from dadaia_workspace.features.backlog.preview import load_backlog_items
-
-#: The bug's repro frontmatter: the unquoted ``(note: ...)`` value is a YAML
-#: ScannerError ("mapping values are not allowed here"), while ``intents[]`` is valid.
-_REPRO_CONTENT = """---
-status: candidate
-source: text (note: more text)
-intents:
-  - subject:
-      kind: code
-      ref: pkg/mod.py#some_symbol
-    change: extend
----
-
-# Repro item
-"""
-
-_WELL_FORMED_CONTENT = """---
-status: candidate
-source: "text (note: more text)"
-intents:
-  - subject:
-      kind: code
-      ref: pkg/mod.py#some_symbol
-    change: extend
----
-
-# Well-formed item
-"""
+from dadaia_workspace.features.backlog.doctor import DoctorContext, _check_schema
+from dadaia_workspace.features.backlog.document import ActiveItem
 
 
-def _write_backlog(tmp_path: Path, name: str, content: str) -> Path:
-    backlog = tmp_path / "backlog"
-    backlog.mkdir(exist_ok=True)
-    (backlog / name).write_text(content, encoding="utf-8")
-    return backlog
-
-
-def _ctx(items: list) -> DoctorContext:  # type: ignore[type-arg]
-    ctx = DoctorContext(items=items, registry=None, consumed={})  # type: ignore[arg-type]
-    for item in items:
-        # Simulate the doctor's binding step without a live registry: parse failure or
-        # empty intents bind to nothing; seed a synthetic unresolved message so the
-        # suppression behavior is observable.
-        ctx.bound[item.slug] = ({}, ["unresolved: pkg/mod.py#some_symbol"] if item.intents else [])
-    return ctx
-
-
-# ---------------------------------------------------------------------------
-# Loader: frontmatter_error capture
-# ---------------------------------------------------------------------------
-
-
-def test_loader_captures_frontmatter_parse_error_with_line_and_column(tmp_path: Path) -> None:
-    backlog = _write_backlog(tmp_path, "repro.md", _REPRO_CONTENT)
-    items = load_backlog_items(backlog)
-    assert len(items) == 1
-    item = items[0]
-    assert item.frontmatter_error is not None
-    assert "(line 3, column" in item.frontmatter_error
-    # The parse failure zeroes the frontmatter — no intents, no intents_error.
-    assert item.intents == ()
-    assert item.intents_error is None
-    assert item.status is None
-
-
-# ---------------------------------------------------------------------------
-# Doctor: dedicated finding + downstream suppression vs well-formed still flagged
-# ---------------------------------------------------------------------------
-
-
-def test_doctor_emits_parse_error_finding_not_no_intents(tmp_path: Path) -> None:
-    backlog = _write_backlog(tmp_path, "repro.md", _REPRO_CONTENT)
-    items = load_backlog_items(backlog)
-    findings = _check_schema(_ctx(items))
-    messages = [f.message for f in findings]
-    parse_errors = [m for m in messages if m.startswith("frontmatter YAML parse error: ")]
-    assert len(parse_errors) == 1, messages
-    assert "(line 3, column" in parse_errors[0]
-    assert all(f.code is BacklogDoctorCode.BL_SCHEMA for f in findings)
-    # The misdiagnosis is gone: no downstream findings for the broken item.
-    assert not any("no intents[] declared" in m for m in messages)
-    assert not any("unresolved" in m for m in messages)
-    assert not any("invalid status" in m for m in messages)
-
-
-def test_doctor_still_flags_well_formed_items_unaffected(tmp_path: Path) -> None:
-    """A parse-error item's suppression must not bleed into other items: a well-formed
-    item with no intents still gets 'no intents[]', and a well-formed item with an
-    unresolved subject still surfaces it."""
-    backlog = _write_backlog(
-        tmp_path, "no-intents.md", "---\nstatus: candidate\n---\n\n# No intents\n"
+def test_generic_intents_error_fires_at_idea_status_document_model() -> None:
+    """A2.4: the malformed-``**Intents:**``-block diagnostic fires at ANY status,
+    including ``idea`` — proven directly over ``document.ActiveItem``, the single
+    reading model, confirming :func:`doctor._check_schema` never re-gates it by status."""
+    item = ActiveItem(
+        slug="bad-structure-item",
+        title="Bad structure",
+        opened="2026-08-10",
+        status="idea",
+        description="d",
+        provenance="operator request",
+        intents=(),
+        intents_error="malformed intents[] frontmatter: intents must be a list, got str",
     )
-    items = load_backlog_items(backlog)
-    findings = _check_schema(_ctx(items))
-    assert any("no intents[] declared" in f.message for f in findings)
-    assert not any("frontmatter YAML parse error" in f.message for f in findings)
-
-    backlog2 = _write_backlog(tmp_path, "good.md", _WELL_FORMED_CONTENT)
-    items2 = load_backlog_items(backlog2)
-    findings2 = _check_schema(_ctx(items2))
-    assert any("unresolved: pkg/mod.py#some_symbol" in f.message for f in findings2)
-    assert not any("frontmatter YAML parse error" in f.message for f in findings2)
+    ctx = DoctorContext(items=[item], registry=None, consumed={})  # type: ignore[arg-type]
+    ctx.bound[item.slug] = ({}, [])
+    findings = _check_schema(ctx)
+    messages = [f.message for f in findings]
+    assert any(m.startswith("malformed intents[] frontmatter: ") for m in messages)
+    assert not any("no intents[] declared" in m for m in messages)
+    assert not any("invalid status" in m for m in messages)
