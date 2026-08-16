@@ -82,8 +82,8 @@ and proceeds either way.
 - **Title:** Consumer-side validation round — prove the assembled consumer journey on a real workspace (#5)
 - **Opened:** 2026-08-14
 - **Status:** candidate
-- **Description:** Created by grill ADR #1 (2026-08-14 refinement report) as the inheritor of the two external findings of the consumer audit (2026-07-15) that this repo cannot close from the provider side alone. Both findings were dispositioned `deferred` — `rejected` would contradict the §6 approval law ("a candidate is approved when the operator and the consumer-side validation agent agree, after validating a real workspace"), and leaving them pending would block every future pick under §5 precedence. The audit archives citing this entry. The work: run a full consumer-side validation round on a real (disposable) consumer workspace against the current provider surface, with the two inherited findings as its acceptance criteria.
-- **Provenance:** v0.8.0 grill ADR #1 — operator-ratified materialization 2026-08-14
+- **Description:** Created by grill ADR #1 (2026-08-14 refinement report) as the inheritor of the two external findings of the consumer audit (2026-07-15) that this repo cannot close from the provider side alone. Both findings were dispositioned `deferred` — `rejected` would contradict the §6 approval law ("a candidate is approved when the operator and the consumer-side validation agent agree, after validating a real workspace"), and leaving them pending would block every future pick under §5 precedence. The audit archives citing this entry. The work: run a full consumer-side validation round on a real (disposable) consumer workspace against the current provider surface, with the two inherited findings as its acceptance criteria. ACCEPTANCE CRITERION ADDED 2026-08-16 (intake #3 item 3-20 — operator adjudication, 2026-08-16 (resolva todos — class-level fixes, no workarounds)): a pre-v0.12.0 consumer workspace upgraded in place must SURFACE its un-migrated backlog state rather than pass silently — `backlog doctor` reports clean on an absent BACKLOG.md while legacy per-entry files sit unvalidated; the round asserts the SPEC-DOC-035 WARN count equals the loose-file count and that following the migration guidance folds the workspace to a clean two-doctor state.
+- **Provenance:** v0.8.0 grill ADR #1 — operator-ratified materialization 2026-08-14; intake-report #3 item 3-20 folded — operator adjudication, 2026-08-16 (resolva todos — class-level fixes, no workarounds)
 - **Intents:**
 ```yaml
 - subject:
@@ -94,7 +94,10 @@ and proceeds either way.
     (1) the consumer prompt/tests must consume the installed version-matched skill/capability
     surface and exercise canonical workflow verbs — no preserved references to removed lifecycle
     commands; (2) the consumer owning repository must be governance-coherent — one-task-at-a-time
-    markers, valid memory/schema state, immutable release evidence.'
+    markers, valid memory/schema state, immutable release evidence; (3) an upgraded-in-place
+    pre-v0.12.0 workspace surfaces its un-migrated backlog state — SPEC-DOC-035 WARNs once
+    per loose per-entry file (WARN count == loose files) while backlog doctor is clean on
+    the absent BACKLOG.md — and folds to a clean two-doctor state after migration.'
 ```
 
 ### thin-wrapper-projected-scripts
