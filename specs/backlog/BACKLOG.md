@@ -59,26 +59,23 @@ and proceeds either way.
 - **Title:** Retire the dead hotfix-release surface (verb, templates, doctor nag) (#4)
 - **Opened:** 2026-08-12
 - **Status:** candidate
-- **Description:** v0.6.0 revoked the hotfix-release lifecycle (operator ruling D4): bug fixes run on hotfix branches with a PATCH mint and no ceremony. The revoked lifecycle's surface still ships as dead code and must be removed: the CLI verb, the two Jinja templates, and the specs-doctor check that nags for the revoked backlog intake section. OD-2 (v0.12.0): SPEC-DOC-022/023 retire with check_backlog_schema at the v0.12.0 cutover, so this entry's residual is the CLI hotfix verb + templates + doctor nag only — the rewrite-down to that residual is a recorded v0.12.0 closure obligation.
-- **Provenance:** operator request — v0.6.0 law revocation residual, curated 2026-08-12; OD-2 residual rewrite recorded at v0.12.0 (closure obligation)
+- **Description:** v0.6.0 revoked the hotfix-release lifecycle (operator ruling D4): bug fixes run on hotfix branches with a PATCH mint and no ceremony. REWRITTEN DOWN TO ITS RESIDUAL 2026-08-16 (OD-2, a recorded v0.12.0 closure obligation, executed at intake #3 item 3-12 — operator adjudication): SPEC-DOC-022/023 and check_backlog_schema already retired at the v0.12.0 cutover, so the dead surface that remains is (1) the `dadaia specs hotfix open` CLI verb (hotfix_app) and its tests, (2) the two hotfix Jinja templates (release_hotfix.md.j2, closure_hotfix.md.j2), and (3) the verb's candidates.md pre-condition block — AGGRAVATED at v0.12.0: cli/commands/specs.py:391-413 now prints the `candidates.md not found` WARNING unconditionally in every workspace (the file class no longer exists) with self-contradicting advice (creating it trips SPEC-DOC-035). The unconditional consumer-facing warning argues for picking this entry soon; the cheapest interim if it stays unpicked is dropping the pre-condition block alone.
+- **Provenance:** operator request — v0.6.0 law revocation residual, curated 2026-08-12; OD-2 residual rewrite executed at intake #3 — operator adjudication, 2026-08-16 (resolva todos — class-level fixes, no workarounds)
 - **Intents:**
 ```yaml
 - subject:
     kind: code
     ref: dadaia_workspace/cli/commands/specs.py#hotfix_app
-  change: Remove the `dadaia specs hotfix open` verb (the hotfix_app sub-app) and its tests —
-    never invoked under the v0.6.0 law; product-engineer.md names it dead surface.
-- subject:
-    kind: code
-    ref: dadaia_workspace/features/specs/doctor_governance.py#GovernanceValidator
-  change: Retire the SPEC-DOC-023 check that requires a '## Hotfixes pendentes' intake section
-    in specs/backlog/candidates.md — the intake it polices was revoked with the hotfix-release
-    lifecycle.
+  change: 'Remove the dadaia specs hotfix open verb (the hotfix_app sub-app) and its tests —
+    never invoked under the v0.6.0 law — including its candidates.md pre-condition block,
+    which since the v0.12.0 cutover prints the candidates.md-not-found WARNING unconditionally
+    in every workspace and advises creating a file class that trips SPEC-DOC-035. Cheapest
+    interim if the entry stays unpicked: drop the pre-condition block alone.'
 - subject:
     kind: catalog
     ref: specs-doctor
-  change: Remove public/templates/release_hotfix.md.j2 and closure_hotfix.md.j2 from the shipped
-    template set (manifest + goldens follow); the doctor's template-facing checks drop with SPEC-DOC-023.
+  change: 'Remove public/templates/release_hotfix.md.j2 and closure_hotfix.md.j2 from the
+    shipped template set (manifest + goldens follow).'
 ```
 
 ### consumer-side-validation-round
