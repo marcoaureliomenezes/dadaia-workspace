@@ -593,6 +593,30 @@ and proceeds either way.
 - **Description:** v0.7.0 CLOSURE backlog return, materialized 2026-08-14 (grill ADR #5 — the CLOSURE claimed this routing but it never happened). CLOSURE text: "A doctor/lint warning for an installed tests/AGENTS.md that still contains <[A-Z_]+> placeholders (code review r1 finding 8, half-implemented: the fill-me banner shipped, the check did not)." Verified at HEAD 2026-08-14: placeholder checks exist only for memory atoms (MEM-PLACEHOLDER-1, features/specs/doctor.py:119) — no check covers an installed tests/AGENTS.md.
 - **Provenance:** v0.7.0 CLOSURE return (ideas lane) — materialized 2026-08-14
 
+### backlog-grammar-single-writer-seam
+- **Title:** Backlog grammar single-writer seam — one grammar, write-through-parser, write-then-verify (#38)
+- **Opened:** 2026-08-16
+- **Status:** candidate
+- **Description:** Intake #3 item 3-19 (security ship review 2026-08-16T002221Z, LOW + INFO riders; CWE-436). The ACTIVE/LEDGER grammar is read fence-aware in exactly one place (features/backlog/document.py, hardened by the M1 fix) but WRITTEN elsewhere with private regexes: `backlog new` splices a new ACTIVE subsection before the FIRST literal `## LEDGER` line fence-blindly (spec_artifacts/new_artifacts.py:192, _LEDGER_HEADING_RE.search), so a fenced example quoting `## LEDGER` would swallow a newly created entry silently — success reported, doctor clean, item invisible: the same silent-loss class M1 fixed on the read side. Unreachable on today's tree (zero fenced spans contain such a line — reviewer-checked) but structurally latent. Class fix, no workaround (operator adjudication 2026-08-16): the grammar gets ONE writer seam sharing the parser's fence-awareness, and every writer verifies by re-parsing its own output (write-then-verify: reload the document after the write, raise if the fresh slug is absent). Riders from the same review: _SLUG_RE match → fullmatch (trailing-newline acceptance), redact the absolute path in the unreadable-document diagnostic, atomic_write_text for the whole-file rewrite.
+- **Provenance:** intake-report #3 item 3-19 approved — operator adjudication, 2026-08-16 (resolva todos — class-level fixes, no workarounds)
+- **Intents:**
+```yaml
+- subject:
+    kind: code
+    ref: dadaia_workspace/features/spec_artifacts/new_artifacts.py#backlog_new
+  change: 'backlog new stops splicing with a private fence-blind regex: the insertion point
+    comes from the shared fence-aware grammar seam, and the writer verifies by re-parsing
+    its own output — reload the document after the write and raise if the fresh slug is
+    absent (write-then-verify). Riders: _SLUG_RE fullmatch, redacted unreadable-document
+    diagnostic, atomic_write_text for the whole-file rewrite.'
+- subject:
+    kind: code
+    ref: dadaia_workspace/features/backlog/document.py#_fenced_ranges
+  change: 'The parser exposes its fence-awareness as the single grammar seam writers use to
+    locate sections, so no second module re-derives ACTIVE/LEDGER structure with a private
+    regex — one grammar, one writer path.'
+```
+
 ## LEDGER
 
 - push-range-denylist-scan · DELIVERED · v0.9.0 · 2026-08-14
