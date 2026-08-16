@@ -19,6 +19,19 @@ undispositioned audits outrank every fresh entry below. **Currently outranking: 
 — the bug ledger carries zero open bugs (the two LOWs closed by `hotfix/0.7.1`, merged
 `d15bdf4e`); both 2026-07 audits are archived and fully dispositioned (v0.8.0).
 
+**Purge-on-pick notice — release v0.4.2 "residual-convergence" (2026-08-16).** Thirteen
+ACTIVE subsections left this document in the same commit that created
+`specs/releases/v0.4.2/SPEC.md`, whose §7 is their provenance record:
+`backlog-grammar-single-writer-seam` (#38), `denylist-masking-predicate-parity` (#39),
+`derived-values-computed-not-stored` (#43), `knowledge-duplication-doc-pass` (#44),
+`flat-release-ship-task-evidence`, `intake-signal-calibration`,
+`amnesty-multi-path-blob-fail-closed` (#40), `git-batch-epipe-swallow-width` (#41),
+`self-scan-sentinel-archive-authored-blobs` (#45), `document-parser-fence-filter-complexity`
+(#42), `retire-dead-hotfix-surface` (#4), `changelog-version-axis-reconciliation` (#11) and
+`spec-doc-031-citation-classes` (#10). Their `LEDGER` lines are written by that release's
+closure disposition sweep — nothing is deleted. `baseline-carve-out-review-cadence` (#24) was
+a **partial** pick: it stays ACTIVE below, rewritten to its residual.
+
 **Standing operator decision, pending (v0.8.0 CLOSURE return #3).** Is `deferred`
 terminal for bug `panel-telemetry-sqlite-corrupts-under-concurrent-access`, or does it
 return to the queue? Undecided; keeps surfacing at every pick. The related
@@ -63,29 +76,6 @@ is no longer archive-only.
     by pinning externally-held expectations; wire-or-delete tests/scripts/check_skill_orphans.py
     (still unwired at HEAD); carry every env-gate skip with a plan ref or delete it; sweep artifact
     residue. Every deletion/demotion is a qa-engineer verdict with evidence, executed by software-engineer.'
-```
-
-### retire-dead-hotfix-surface
-- **Title:** Retire the dead hotfix-release surface (verb, templates, doctor nag) (#4)
-- **Opened:** 2026-08-12
-- **Status:** candidate
-- **Description:** v0.6.0 revoked the hotfix-release lifecycle (operator ruling D4): bug fixes run on hotfix branches with a PATCH mint and no ceremony. REWRITTEN DOWN TO ITS RESIDUAL 2026-08-16 (OD-2, a recorded v0.12.0 closure obligation, executed at intake #3 item 3-12 — operator adjudication): SPEC-DOC-022/023 and check_backlog_schema already retired at the v0.12.0 cutover, so the dead surface that remains is (1) the `dadaia specs hotfix open` CLI verb (hotfix_app) and its tests, (2) the two hotfix Jinja templates (release_hotfix.md.j2, closure_hotfix.md.j2), and (3) the verb's candidates.md pre-condition block — AGGRAVATED at v0.12.0: cli/commands/specs.py:391-413 now prints the `candidates.md not found` WARNING unconditionally in every workspace (the file class no longer exists) with self-contradicting advice (creating it trips SPEC-DOC-035). The unconditional consumer-facing warning argues for picking this entry soon; the cheapest interim if it stays unpicked is dropping the pre-condition block alone.
-- **Provenance:** operator request — v0.6.0 law revocation residual, curated 2026-08-12; OD-2 residual rewrite executed at intake #3 — operator adjudication, 2026-08-16 (resolva todos — class-level fixes, no workarounds)
-- **Intents:**
-```yaml
-- subject:
-    kind: code
-    ref: dadaia_workspace/cli/commands/specs.py#hotfix_app
-  change: 'Remove the dadaia specs hotfix open verb (the hotfix_app sub-app) and its tests —
-    never invoked under the v0.6.0 law — including its candidates.md pre-condition block,
-    which since the v0.12.0 cutover prints the candidates.md-not-found WARNING unconditionally
-    in every workspace and advises creating a file class that trips SPEC-DOC-035. Cheapest
-    interim if the entry stays unpicked: drop the pre-condition block alone.'
-- subject:
-    kind: catalog
-    ref: specs-doctor
-  change: 'Remove public/templates/release_hotfix.md.j2 and closure_hotfix.md.j2 from the
-    shipped template set (manifest + goldens follow).'
 ```
 
 ### consumer-side-validation-round
@@ -246,44 +236,6 @@ is no longer archive-only.
     mode so inherited PYTHONPATH/sitecustomize cannot perturb the probe's stdout.
 ```
 
-### spec-doc-031-citation-classes
-- **Title:** SPEC-DOC-031: distinguish consumption citations from reference citations in archived SPEC/CLOSURE (#10)
-- **Opened:** 2026-08-14
-- **Status:** candidate
-- **Description:** v0.8.0 CLOSURE backlog return, materialized 2026-08-14. SPEC-DOC-031 scans every archived release's SPEC.md and CLOSURE.md line by line for backlog slugs and WARNs when a matched slug's entry is non-terminal, excluding only lines inside a "## Backlog returns" section (doctor_governance.py:196-224). Any other mention — a legitimate inheritance citation (an entry named as inheritor of deferred/ superseded findings) or an explicit non-goal/out-of-scope citation — raises a WARN asserting consumption that demonstrably did not happen. Concrete case: archiving v0.8.0 raised exactly 3 such WARNs (consumer-side-validation-round, thin-wrapper-projected-scripts, push-range-denylist-scan), all predicted as false positives by that CLOSURE (V9). Proposed refinement: also exclude out-of-scope/non-goal sections, or key the check on a machine-readable consumed set (consumed_backlog.json) instead of free-text slug matching. FOLDED 2026-08-16 (intake #3 item 3-10, QA-1 — operator adjudication, 2026-08-16 (resolva todos — class-level fixes, no workarounds)): the twelve-slug SPEC-DOC-031 curation debt is adjudicated jointly with this entry, which fixes the class — at HEAD 3bb929bc `dadaia specs doctor` reports 0 errors / 17 warnings with exactly 12 SPEC-DOC-031: eleven pre-existing ACTIVE items named by archived releases plus the twelfth added by v0.12.0's own archive move — this very entry, so the check now warns about itself. Pick priority RAISED: a separate 12-slug disposition round would mostly re-assert 'still ACTIVE, correctly'; the semantic refinement here retires the debt. Acceptance: after the refinement an archived SPEC/CLOSURE citing a still-ACTIVE entry as reference/inheritance/non-goal raises no WARN, and the SPEC-DOC-031 count at HEAD drops to the genuinely-unconsumed set.
-- **Provenance:** v0.8.0 CLOSURE return (operator-approved closure) — materialized 2026-08-14; intake-report #3 item 3-10 folded — operator adjudication, 2026-08-16 (resolva todos — class-level fixes, no workarounds)
-- **Intents:**
-```yaml
-- subject:
-    kind: doc
-    ref: memory/product/sdd/specs-doctor.md#Validator Families
-  change: 'Refine _archive_consumption_hits / check_consumed_backlog_disposition so a slug mention
-    only counts as consumption evidence when it is one: either restrict matching to consumption-asserting
-    contexts (and exclude non-goal / out-of-scope / inheritance sections the way "## Backlog returns"
-    is already excluded), or key SPEC-DOC-031 on a machine-readable consumed set (consumed_backlog.json)
-    instead of free-text slug matching. The v0.8.0 archive must stop producing its 3 documented
-    false-positive WARNs without flipping the three cited entries and without editing the FROZEN
-    archive.'
-```
-
-### changelog-version-axis-reconciliation
-- **Title:** CHANGELOG version-axis incoherence: dated [0.5.1] atop stacked Unreleased spec-release sections (#11)
-- **Opened:** 2026-08-14
-- **Status:** candidate
-- **Description:** v0.8.0 CLOSURE backlog return, materialized 2026-08-14 (CLOSURE destined it to ideas; promoted to candidate by operator mandate with owners software-engineer + product-engineer). CHANGELOG.md at HEAD carries "## [0.5.1] — 2026-08-14" (line 7) above three stacked "## [Unreleased] — spec release vX" sections (v0.7.0 line 30, v0.6.0 line 107, v0.5.0 line 177) and "## [0.5.0] — Unreleased (spec release v0.3.0)" (line 236): the hotfix minted a dated PATCH on top of a package version whose own section still reads Unreleased, so the file no longer states truthfully what a given package version contains. The two version axes are distinct by design (ADR-2: SDD release ids version the SDD process; the 0.x package version versions the shipped library) — the ask is a reconciled CHANGELOG convention honoring that split, not a renumbering.
-- **Provenance:** v0.8.0 CLOSURE return — promoted from ideas lane by operator mandate, materialized 2026-08-14
-- **Intents:**
-```yaml
-- subject:
-    kind: doc
-    ref: memory/product/distribution/pypi-distribution.md#Differentiator
-  change: 'Define and record the CHANGELOG convention that reconciles the two axes: how spec-release
-    sections nest under (or annotate) package-version sections, what happens to accumulated "[Unreleased]
-    — spec release vX" sections when a package version is finally dated, and how a hotfix PATCH
-    is placed relative to a still-Unreleased base version. Restructure CHANGELOG.md once to that
-    convention so each package version''s section states exactly what it ships.'
-```
-
 ### panel-runtime-reliability-dangling-ledger-pointer
 - **Title:** Dangling panel-runtime-reliability deferral pointer in the bug ledger (#12)
 - **Opened:** 2026-08-14
@@ -431,8 +383,8 @@ is no longer archive-only.
 - **Title:** privacy-baseline pattern versioning + carve-out review cadence (three reactive exclusions in one release) (#24)
 - **Opened:** 2026-08-14
 - **Status:** candidate
-- **Description:** v0.9.0 CLOSURE "Backlog returns" item, included at the PE's judgement because the drift it generalizes is a class, not a one-off. The RFC-2606 reserved-TLD gap was found only by the baseline refusing legitimate synthetic content on its first real run — by accident of timing, not by review — and the release then added three carve-outs reactively (RFC-2606 emails, the product's own workspace.local identity in two patterns, the stdlib Path.home call forms), taking privacy_baseline.json from v1 to v4 in one cycle. There is no defined moment at which the six patterns and their exclude_regex carve-outs are re-examined against the reserved/synthetic-value RFCs. The round-2 code review named the underlying treadmill: internal-hostname treats ANY dotted identifier chain ending in local|internal|lan|intranet|corp|home as a hostname, so `<name>.local`, `<attr>.internal`, `<x>.home` and every future equivalent will each demand another literal exclusion — the false-positive class is unbounded while carve-outs are literal-by-literal. Candidate shapes from the routing: a periodic review lane; a doctor check flagging baseline patterns lacking a documented carve-out rationale; and (from the review) a structural fix for the dotted-chain class instead of a fourth literal. A constraint to preserve, recorded in the CLOSURE accepted-without-action list: baseline patterns must stay single-line (the push scan matches line-by-line while the public-privacy doctor matches whole text). FOLDED 2026-08-16 (intake #3 item 3-1 — operator adjudication, 2026-08-16 (resolva todos — class-level fixes, no workarounds)): the `home-abs-path` structural pattern covers one OS's home layout only — it matches /home/<user> while /Users/<name>, C:\Users\<name> and /root fall outside EVERY structural pattern (zero 'Users' occurrences in the baseline), although the product declares cross-platform support; on macOS/Windows the layer that should catch an operator's local path never fires. The class fix belongs to this entry's cadence work: add the missing platform variants with paired fixtures, and make the gap-class (a declared-support platform with no covering pattern) something the review cadence catches going forward.
-- **Provenance:** v0.9.0 CLOSURE return — pre-approved intake (ADR #15 retroactive ruling, operator deferral); intake-report #3 item 3-1 folded — operator adjudication, 2026-08-16 (resolva todos — class-level fixes, no workarounds)
+- **Description:** REWRITTEN TO ITS RESIDUAL 2026-08-16 — **partially picked by release v0.4.2** (`specs/_archive/releases/v0.4.2/SPEC.md` FR10 delivered the cross-platform half: `/Users/<name>` and `C:\Users\<name>` patterns with paired fixtures, baseline bumped to v5, `/root` evaluated and deliberately excluded as carrying no user-identifying segment — grill D10). Per `dd-release-definition` §5's full-slug rule this entry is NOT declared consumed and stays ACTIVE carrying what remains. **The residual:** v0.9.0 CLOSURE "Backlog returns" item, included at the PE's judgement because the drift it generalizes is a class, not a one-off. The RFC-2606 reserved-TLD gap was found only by the baseline refusing legitimate synthetic content on its first real run — by accident of timing, not by review — and the release then added three carve-outs reactively (RFC-2606 emails, the product's own workspace.local identity in two patterns, the stdlib Path.home call forms), taking privacy_baseline.json from v1 to v4 in one cycle. There is still no defined moment at which the patterns and their exclude_regex carve-outs are re-examined against the reserved/synthetic-value RFCs — and v0.4.2 added two more patterns without one. The round-2 code review named the underlying treadmill: internal-hostname treats ANY dotted identifier chain ending in local|internal|lan|intranet|corp|home as a hostname, so `<name>.local`, `<attr>.internal`, `<x>.home` and every future equivalent will each demand another literal exclusion — the false-positive class is unbounded while carve-outs are literal-by-literal. Candidate shapes from the routing: a periodic review lane; a doctor check flagging baseline patterns lacking a documented carve-out rationale; and (from the review) a structural fix for the dotted-chain class instead of a fourth literal. Also inherited from v0.4.2 (grill D9): the gap-class itself — a declared-support platform with no covering pattern — should be something the cadence catches, and new patterns should not have to grow the self-scan sentinel's shrink-only fixture baseline by hand. A constraint to preserve, recorded in the CLOSURE accepted-without-action list: baseline patterns must stay single-line (the push scan matches line-by-line while the public-privacy doctor matches whole text).
+- **Provenance:** v0.9.0 CLOSURE return — pre-approved intake (ADR #15 retroactive ruling, operator deferral); intake-report #3 item 3-1 folded — operator adjudication, 2026-08-16; rewritten to its residual at the v0.4.2 partial pick, 2026-08-16
 - **Intents:**
 ```yaml
 - subject:
@@ -442,10 +394,10 @@ is no longer archive-only.
     every exclude_regex carve-out, and a doctor/CI check flags patterns lacking one; version history
     stays in the JSON. Record the cadence itself (what triggers a re-examination and a version
     bump, and the single-line pattern constraint) as product truth in the gate atom at delivery.
-    If baseline v5 is ever opened, evaluate the reviewer suggestion of a per-scan deadline that
-    fails CLOSED. First execution closes the home-abs-path cross-platform gap (intake #3 item
-    3-1): pattern variants for /Users/<name>, C:\Users\<name> and /root land with paired
-    fixtures proving each fires.'
+    Evaluate the reviewer suggestion of a per-scan deadline that fails CLOSED. The gap-class — a
+    declared-support platform with no covering pattern — becomes something the cadence catches,
+    rather than being found one platform at a time (the /Users and C:\Users variants landed
+    reactively in v0.4.2 FR10).'
 - subject:
     kind: code
     ref: dadaia_workspace/infrastructure/privacy_check.py#_scan_text_for_baseline
@@ -558,30 +510,6 @@ is no longer archive-only.
 - **Description:** v0.9.0 CLOSURE "Backlog returns" idea (routed to the ideas lane at the PE's judgement), reinforced twice by the ship security review. Because git stores a whole blob per file version, every `dadaia bugs append` republishes the entire ~900 KB specs/bugs/bugs.jsonl as a NEW blob in the pushed range. Two measured costs: (1) performance — one such blob appended twice inside v0.9.0's local range dominated the push-range scan (~2.7-3.4 s wall over 247 objects / 66 blobs) and is the reason the A7.3 2 s budget was recorded as partially missed (V14: cause is data, not mechanism); (2) content resurfacing — every append makes ALL long-published lines of the file "new" range content again, which is how the security review's wider-set probe surfaced two historical hits on bugs.jsonl:353 (a since-DEAD context name resident since v0.1.x). Candidate shapes to weigh at grill time: per-bug or per-period sharding of the ledger (e.g. bugs/<year>/ or bugs/<bug-id>.jsonl), an append-only segment scheme, or accepting the cost and letting prior-published-term-amnesty neutralize the resurfacing half. Constraints: the never-delete law (events are kept forever), the ADDITIVE gate classification of specs/bugs/**, the jsonl append contract used by dadaia bugs append/status/stats, and existing bugs.jsonl consumers (panel, doctor, release pick precedence).
 - **Provenance:** v0.9.0 CLOSURE return (ideas lane) — pre-approved intake (ADR #15 retroactive ruling, operator deferral)
 
-### flat-release-ship-task-evidence
-- **Title:** Flat release's ship task cannot record its own completion (TASKS template shape defect)
-- **Opened:** 2026-08-14
-- **Status:** candidate
-- **Description:** v0.8.0 CLOSURE backlog return, materialized 2026-08-14. In a flat (no-segment) release, the closure/archive task freezes the release directory (git mv to specs/_archive/) before the ship task can flip its own marker: v0.8.0's T-080-07 (ship) archived as "[ ]" because T-080-06 (closure + archive) ran first and the archived TASKS.md is FROZEN — the ship marker can never be flipped afterwards. The release TASKS template needs a form of ship evidence that lives outside the archived directory: either make ship the last task BEFORE archive, or state in the template that the ship task's evidence is the merge/PR itself and that its marker is expected to archive open. EXTENDED AND PROMOTED idea→candidate 2026-08-16 (intake #3 item 3-4 — operator adjudication, 2026-08-16 (resolva todos — class-level fixes, no workarounds); three paid reopens is the strongest pick evidence in the report): (1) review-before-archive ordering — in v0.9.0, v0.11.0 and v0.12.0 the closure task archived the release BEFORE the ship task's pre-PR six-axis review ran, so the review's first reader hits a FROZEN closure and any finding costs a reopen/reset; the TASKS template orders the six-axis review of the delta before the `git mv` archive step, with only ship steps after. (2) The v0.12.0 dispatcher obligation, folded here per that CLOSURE: a dispatcher relaying work for shell-less sub-agents (e.g. product-engineer) commits their TASKS reservation flips before relaying the next work item, so the marker trace stays observable.
-- **Provenance:** v0.8.0 CLOSURE return (ideas lane); second occurrence routed by the v0.9.0 CLOSURE — operator-approved closures; intake-report #3 item 3-4 folded, promoted to candidate — operator adjudication, 2026-08-16 (resolva todos — class-level fixes, no workarounds)
-- **Intents:**
-```yaml
-- subject:
-    kind: code
-    ref: dadaia_workspace/features/spec_artifacts/new_artifacts.py#release_new
-  change: 'The release TASKS template orders ship evidence so it can be recorded: six-axis
-    pre-PR review of the delta BEFORE the archive git mv; only ship steps after; ship-task
-    evidence lives outside the archived directory, or the template states the marker is
-    expected to archive open with the merge/PR as its evidence.'
-- subject:
-    kind: doc
-    ref: memory/product/sdd/sdd-bug-backlog-governance.md#Merge Cadence
-  change: 'The release-finalization cadence records two obligations: the pre-PR six-axis
-    review runs before the archive move (any finding lands on a thawed tree), and a
-    dispatcher relaying work for shell-less sub-agents commits their TASKS reservation
-    flips before relaying the next work item, keeping the marker trace observable.'
-```
-
 ### repo-agents-md-symlink-hardening
 - **Title:** Destination-file symlink hardening for the adjacent repo-AGENTS.md copy
 - **Opened:** 2026-08-14
@@ -602,235 +530,6 @@ is no longer archive-only.
 - **Status:** idea
 - **Description:** v0.7.0 CLOSURE backlog return, materialized 2026-08-14 (grill ADR #5 — the CLOSURE claimed this routing but it never happened). CLOSURE text: "A doctor/lint warning for an installed tests/AGENTS.md that still contains <[A-Z_]+> placeholders (code review r1 finding 8, half-implemented: the fill-me banner shipped, the check did not)." Verified at HEAD 2026-08-14: placeholder checks exist only for memory atoms (MEM-PLACEHOLDER-1, features/specs/doctor.py:119) — no check covers an installed tests/AGENTS.md.
 - **Provenance:** v0.7.0 CLOSURE return (ideas lane) — materialized 2026-08-14
-
-### backlog-grammar-single-writer-seam
-- **Title:** Backlog grammar single-writer seam — one grammar, write-through-parser, write-then-verify (#38)
-- **Opened:** 2026-08-16
-- **Status:** candidate
-- **Description:** Intake #3 item 3-19 (security ship review 2026-08-16T002221Z, LOW + INFO riders; CWE-436). The ACTIVE/LEDGER grammar is read fence-aware in exactly one place (features/backlog/document.py, hardened by the M1 fix) but WRITTEN elsewhere with private regexes: `backlog new` splices a new ACTIVE subsection before the FIRST literal `## LEDGER` line fence-blindly (spec_artifacts/new_artifacts.py:192, _LEDGER_HEADING_RE.search), so a fenced example quoting `## LEDGER` would swallow a newly created entry silently — success reported, doctor clean, item invisible: the same silent-loss class M1 fixed on the read side. Unreachable on today's tree (zero fenced spans contain such a line — reviewer-checked) but structurally latent. Class fix, no workaround (operator adjudication 2026-08-16): the grammar gets ONE writer seam sharing the parser's fence-awareness, and every writer verifies by re-parsing its own output (write-then-verify: reload the document after the write, raise if the fresh slug is absent). Riders from the same review: _SLUG_RE match → fullmatch (trailing-newline acceptance), redact the absolute path in the unreadable-document diagnostic, atomic_write_text for the whole-file rewrite.
-- **Provenance:** intake-report #3 item 3-19 approved — operator adjudication, 2026-08-16 (resolva todos — class-level fixes, no workarounds)
-- **Intents:**
-```yaml
-- subject:
-    kind: code
-    ref: dadaia_workspace/features/spec_artifacts/new_artifacts.py#backlog_new
-  change: 'backlog new stops splicing with a private fence-blind regex: the insertion point
-    comes from the shared fence-aware grammar seam, and the writer verifies by re-parsing
-    its own output — reload the document after the write and raise if the fresh slug is
-    absent (write-then-verify). Riders: _SLUG_RE fullmatch, redacted unreadable-document
-    diagnostic, atomic_write_text for the whole-file rewrite.'
-- subject:
-    kind: code
-    ref: dadaia_workspace/features/backlog/document.py#_fenced_ranges
-  change: 'The parser exposes its fence-awareness as the single grammar seam writers use to
-    locate sections, so no second module re-derives ACTIVE/LEDGER structure with a private
-    regex — one grammar, one writer path.'
-```
-
-### denylist-masking-predicate-parity
-- **Title:** FR6 masking parity — masker shares the detector predicate; no refusal renders a raw path (#39)
-- **Opened:** 2026-08-16
-- **Status:** candidate
-- **Description:** Intake #3 item 3-6 (security ship review 2026-08-15T200554Z, LOW ×2, both reproduced; CWE-532). Two masking gaps, one predicate-sharing class fix (operator adjudication 2026-08-16 — one seam, not per-site patches): (i) the path masker predicate is strictly NARROWER than the detector — core/redaction.py#compile_candidates compiles case-sensitive with hyphen-as-word-char (zero IGNORECASE in the module), so a path embedding a hyphenated or upper-cased form of a denylist term renders verbatim in the same refusal that masks the term itself; (ii) the git-failure refusal renders the adapter exception verbatim and the prior-side desync error embeds the raw blob path with no masking (git_objects.py:207,257). Fix: the gate-side masking predicate widens to a superset of the detector (case/word-boundary parity) while cli/redact.py stays byte-identical-by-design, and GitObjectReadError carries the path as a structured field masked at the single render boundary — detector-hit implies masker-hit, proven by paired fixtures. Rider: align the sdd-gate-v3 atom's FR6 class sentence with whichever predicate ships (PE, memory window).
-- **Provenance:** intake-report #3 item 3-6 approved — operator adjudication, 2026-08-16 (resolva todos — class-level fixes, no workarounds)
-- **Intents:**
-```yaml
-- subject:
-    kind: code
-    ref: dadaia_workspace/core/redaction.py#compile_candidates
-  change: 'The gate-side masking predicate becomes a superset of the detection predicate
-    (case-insensitivity and hyphen/word-boundary parity) for path masking in refusals;
-    cli/redact.py stays byte-identical by design; paired fixtures prove detector-hit
-    implies masker-hit.'
-- subject:
-    kind: code
-    ref: dadaia_workspace/core/protocols/git_object_reader.py#GitObjectReadError
-  change: 'GitObjectReadError carries the offending path as a structured field and every
-    refusal channel masks it at the render boundary — neither the git-failure refusal nor
-    the prior-side desync error interpolates a raw exception string or raw blob path.'
-```
-
-### amnesty-multi-path-blob-fail-closed
-- **Title:** Amnesty is per-path, blobs are content-addressed — no amnesty for a multi-path blob (fail-closed) (#40)
-- **Opened:** 2026-08-16
-- **Status:** candidate
-- **Description:** Intake #3 item 3-5 (security ship review 2026-08-15T200554Z, reproduced — case A4a), the report's one amnesty-SEMANTICS item, RESOLVED BY OPERATOR RULING 2026-08-16: fail-closed. Prior-published-term amnesty leaks ACROSS paths through a shared blob: `git rev-list --objects` names a blob once under its FIRST-seen path (git_objects.py#_blob_info maps sha → (first-seen path, size)), so an amnesty earned by that path silently covers identical content published at a second, never-amnestied path — and the outcome flips with tree sort order, which an author controls via naming. Bounded (only already-published values can relocate this way; the no-new-value invariant held under direct attack) but it deviates from the gate atom's normative "a new path still refuses". THE RULING: a blob reachable at more than one path in the range gets NO amnesty unless every such path amnesties the matched value — implement the reviewer-leaned conservative form (no-amnesty-for-multi-path-blobs) unless the SPEC grill finds the every-path form equally simple. Never weaken into a per-sha amnesty.
-- **Provenance:** intake-report #3 item 3-5 approved with semantics choice (b) fail-closed — operator adjudication, 2026-08-16 (resolva todos — class-level fixes, no workarounds)
-- **Intents:**
-```yaml
-- subject:
-    kind: code
-    ref: dadaia_workspace/infrastructure/git_objects.py#_blob_info
-  change: 'The reader surfaces EVERY path a blob is reachable at in the pushed range
-    (sha -> all paths), not first-seen-only, so amnesty semantics can see multi-path
-    reachability; tree-order independence proven by a paired fixture.'
-- subject:
-    kind: code
-    ref: dadaia_workspace/features/chokepoints/denylist_scan.py#scan_objects
-  change: 'Fail-closed multi-path amnesty per the operator ruling: a blob reachable at more
-    than one path in the range receives no amnesty (reviewer-leaned conservative form),
-    unless the SPEC grill finds suppress-only-if-every-path-amnesties equally simple;
-    never a per-sha amnesty.'
-- subject:
-    kind: doc
-    ref: memory/product/sdd/sdd-gate-v3.md#Push-Range Denylist Scan
-  change: 'The gate atom records the multi-path amnesty semantics (fail-closed) so the
-    normative sentence "a new path still refuses" is true again, including the shared-blob
-    relocation shape.'
-```
-
-### git-batch-epipe-swallow-width
-- **Title:** Scan-path fail-soft width — narrow the FR4 swallow to the intentional EPIPE; no silent degradation (#41)
-- **Opened:** 2026-08-16
-- **Status:** candidate
-- **Description:** Intake #3 items 3-7 + 3-8 (security ship review 2026-08-15T200554Z; 3-7 reproduced on a nonexistent oid and a tree sha). One observability class — a scan-path degradation is never silent: (1) _read_oversized_blob_prefix never inspects the `git cat-file blob` process exit status (only proc.wait() calls, no returncode check in the function), so a genuine object-read failure returns a 0-byte prefix with NO error, degrading a failure the gate atom's table promises fail-closed into a "partially scanned" note; fix: raise the typed read error when the process failed AND fewer than cap bytes arrived, keeping ADR D2-a's intentional early close (EPIPE after the cap) as the ONLY swallowed shape. (2) A malformed context registry silently shrinks the foreign-name layer to the directory-derived set — accepted design, but no stderr note names the degradation. (3) An unparseable --batch-check row is silently dropped — neither scanned nor counted — inconsistent with the FR8 abort-on-desync philosophy shipped in the same release; fix: typed-or-counted, never invisible. Items (2) and (3) ride (1)'s pass per the reviewer's routing.
-- **Provenance:** intake-report #3 items 3-7 + 3-8 approved as one entry — operator adjudication, 2026-08-16 (resolva todos — class-level fixes, no workarounds)
-- **Intents:**
-```yaml
-- subject:
-    kind: code
-    ref: dadaia_workspace/infrastructure/git_objects.py#_read_oversized_blob_prefix
-  change: 'Check the cat-file process exit status: raise the typed read error when the
-    process failed and fewer than cap bytes arrived; the intentional early close (EPIPE
-    after the cap) remains the only swallowed shape; RED tests on a nonexistent oid and a
-    tree sha.'
-- subject:
-    kind: code
-    ref: dadaia_workspace/cli/commands/ci.py#_foreign_repo_slugs
-  change: 'A malformed context registry no longer degrades silently: the shrink of the
-    foreign-name layer to the directory-derived set emits one stderr note naming the
-    degradation.'
-- subject:
-    kind: code
-    ref: dadaia_workspace/infrastructure/git_objects.py#_read_blobs
-  change: 'An unparseable --batch-check row in either batched conversation is typed-or-counted:
-    a located parse refusal (FR8 abort-on-desync consistency) or an explicit skipped-row
-    count in the scan summary — never silently dropped.'
-```
-
-### document-parser-fence-filter-complexity
-- **Title:** Backlog parser performance — quadratic fence filter (bisect fix) + PyYAML dominance on the pre-commit path (#42)
-- **Opened:** 2026-08-16
-- **Status:** candidate
-- **Description:** Intake #3 item 3-18 (security ship review 2026-08-16T002221Z LOW-1 with scaling table + v0.12.0 CLOSURE §Intake code-review LOW; the ship review states the two findings confirm rather than contradict each other — one entry, one lane). (i) _outside_fences is O(headings × fences) via a linear any() rescan per marker (document.py:147); measured scaling: 17.5 KB→0.355 s, 35 KB→1.629 s, 70 KB→8.080 s, 140 KB→27.439 s (live 56.7 KB doc: 0.131 s; PM-authored input only — CWE-1050/407); fix: bisect over sorted fenced-range starts plus a budget regression test. (ii) load_document ≈145 ms is ~99% PyYAML (yaml.safe_load ×23 per parse), double-paid per backlog-touching commit because SPEC-DOC-031 re-parses through the sanctioned edge; fixes: CSafeLoader when available, and/or a slug/status-only parse mode for the governance caller.
-- **Provenance:** intake-report #3 item 3-18 approved as one merged entry — operator adjudication, 2026-08-16 (resolva todos — class-level fixes, no workarounds)
-- **Intents:**
-```yaml
-- subject:
-    kind: code
-    ref: dadaia_workspace/features/backlog/document.py#_outside_fences
-  change: 'Replace the per-marker linear any() rescan with bisect over sorted fenced-range
-    starts, and pin the 140 KB shape well under a second with a budget regression test.'
-- subject:
-    kind: code
-    ref: dadaia_workspace/features/backlog/document.py#load_document
-  change: 'Cut the PyYAML dominance on the pre-commit path: CSafeLoader when available
-    and/or a slug/status-only parse mode for the SPEC-DOC-031 governance caller, so a
-    backlog-touching commit stops double-paying the full YAML cost.'
-```
-
-### derived-values-computed-not-stored
-- **Title:** token_estimate drift class — derived values are computed by the generator, never hand-maintained (#43)
-- **Opened:** 2026-08-16
-- **Status:** candidate
-- **Description:** Intake #3 item 3-16 (v0.12.0 CLOSURE §Intake code-review LOW, absorbing v0.11.0's INFO "token_estimate drift across ~12 atoms" — same class, same fix; the v0.12.0 INSTANCE is already normalized at HEAD, frontmatter declares the linter-computed 1845). The class: a hand-estimated token_estimate in atom frontmatter stays wrong until someone happens to run the linter, and the catalog generator COPIES frontmatter rather than recomputing, faithfully propagating the wrong number — two consecutive instances measured 37% (950→≈1301) and 42% (1300→≈1845) off. Class fix (operator adjudication 2026-08-16 — computed, not stored by hand): the generator computes and writes the estimate, making the linter's computation the single writer of the field, so no hand-maintained copy of a derivable value survives; alternatively specs doctor FAILS rather than warns on a measurably-wrong estimate. product-engineer is the beneficiary; software-engineer lane (generator/doctor).
-- **Provenance:** intake-report #3 item 3-16 approved — operator adjudication, 2026-08-16 (resolva todos — class-level fixes, no workarounds)
-- **Intents:**
-```yaml
-- subject:
-    kind: code
-    ref: dadaia_workspace/features/specs/catalog.py#generate_catalog
-  change: 'The catalog generator computes token_estimate from atom content instead of copying
-    frontmatter — the linter computation becomes the single writer of the field, written back
-    through the sanctioned normalizer so frontmatter and catalog agree by construction;
-    alternatively the doctor fails loud on a measurably-wrong hand-declared estimate. Either
-    way a derivable value has exactly one computing writer and zero hand-maintained copies.'
-```
-
-### knowledge-duplication-doc-pass
-- **Title:** Knowledge-duplication doc pass — skill wording, gate-atom wording, DEAD markers, stale diagram, leaf-import inversion (#44)
-- **Opened:** 2026-08-16
-- **Status:** candidate
-- **Description:** Intake #3 items 3-11 + 3-3 + 3-14 + 3-15 + 3-17 (v0.11.0 + v0.12.0 CLOSURE §Intake, QA-2 MEDIUM + LOW/INFO; all five verified live at HEAD 3bb929bc). One consolidated pass — every finding is the same class: knowledge stated twice drifting apart; the fix restores one authoritative statement per fact. (1) QA-2, ai-engineer lane, BEFORE the next release closes: three skill surfaces must state the ACTIVE→LEDGER mechanism identically — dd-release-closure/SKILL.md:93 still templates the retired per-entry disposition row (specs/backlog/<slug>.md); fold the standing note that a closure's archive move adds one SPEC-DOC-031 per non-terminal slug named (the next closer measures AFTER the move); dd-release-definition/SKILL.md:89 says the sweep "Flips each fully-consumed slug's ## LEDGER line" while the shipped mechanism ADDS a LEDGER line and REMOVES the ACTIVE subsection, and its SPEC-DOC-031 paraphrase keys the check wrong — the next sweep follows these files literally. (2) sdd-gate-v3 atom wording, PE lane at the next memory window: the suppression sentence (atom line 135) is true-but-inexact post-M1 (pattern/slug layers require the value as that layer's own anchored matcher finds it); state that an oversized CURRENT object is never amnestied (test-pinned twice, memory-silent); generalize the FROZEN↔rename invariant to content-addressed byte-identical copies and qualify "new path still refuses" accordingly. (3) specs/assets/architecture/doctor-decomposition.md:44 still shows check_backlog_schema() — retired at the v0.12.0 cutover (diagram also stale on SPEC-DOC-029 / spec_context.lease). (4) document.py:43 imports the underscore-private _format_yaml_error from preview.py while preview.py deliberately declares a Protocol to avoid importing back — lift the formatter into a shared leaf or export it. (5) features/telemetry/store/schema.py:93,102 DEAD markers still point readers at the archived backlog/candidates.md — repoint at specs/backlog/BACKLOG.md or drop.
-- **Provenance:** intake-report #3 items 3-11, 3-3, 3-14, 3-15, 3-17 approved as one pass — operator adjudication, 2026-08-16 (resolva todos — class-level fixes, no workarounds)
-- **Intents:**
-```yaml
-- subject:
-    kind: doc
-    ref: memory/product/sdd/sdd-bug-backlog-governance.md#Backlog
-  change: 'The skill surfaces naming the disposition sweep (dd-release-closure,
-    dd-release-definition) state the shipped ACTIVE->LEDGER mechanism exactly as this
-    section does: a disposition ADDS a LEDGER line and REMOVES the ACTIVE subsection; the
-    retired per-entry row template is dropped and the archive-move SPEC-DOC-031 note is
-    folded in (measure after the move).'
-- subject:
-    kind: doc
-    ref: memory/product/sdd/sdd-gate-v3.md#Git Chokepoints
-  change: 'Three wording refinements at the next memory window (PE lane): the post-M1
-    per-layer suppression sentence made exact; the oversized-CURRENT-object never-amnestied
-    boundary stated; the FROZEN-rename invariant generalized to content-addressed
-    byte-identical copies with the amnesty consequence qualified.'
-- subject:
-    kind: code
-    ref: dadaia_workspace/features/backlog/preview.py#_format_yaml_error
-  change: 'Retire the leaf-to-leaf private import: lift _format_yaml_error into a shared
-    leaf or export it as API; document.py stops importing an underscore symbol from a
-    sibling leaf.'
-- subject:
-    kind: code
-    ref: dadaia_workspace/features/telemetry/store/schema.py#apply_migrations
-  change: 'The two DEAD-marker comments stop pointing at the archived backlog/candidates.md:
-    repoint at specs/backlog/BACKLOG.md or drop the pointer when the module is next touched.'
-- subject:
-    kind: doc
-    ref: memory/architecture.md#Primary Subsystems
-  change: 'The doctor-decomposition architecture diagram is refreshed: the retired
-    check_backlog_schema() box removed and the SPEC-DOC-029 / lease staleness corrected in
-    the same touch.'
-```
-
-### self-scan-sentinel-archive-authored-blobs
-- **Title:** Self-scan sentinel — include archive paths whose blob is NEW at HEAD (#45)
-- **Opened:** 2026-08-16
-- **Status:** candidate
-- **Description:** Intake #3 item 3-9 (security ship review 2026-08-15T200554Z, INFO — approved as live demand at adjudication). The repo self-scan sentinel (tests/integration/test_repo_self_scan.py) excludes specs/_archive/** — correct for renamed/moved blobs (a FROZEN move republishes no object), but a CLOSURE/QA doc AUTHORED directly into the archive is an ordinary new blob the sentinel structurally cannot vet; each ship's real range scan covers it (both v0.11.0 V-proofs did), so this is defence-in-depth. Cheap increment: include archive paths whose blob is NEW at HEAD (content-addressed check), keeping the rename/relocation carve-out excluded.
-- **Provenance:** intake-report #3 item 3-9 approved — operator adjudication, 2026-08-16 (resolva todos — class-level fixes, no workarounds)
-- **Intents:**
-```yaml
-- subject:
-    kind: catalog
-    ref: sdd-gate-v3
-  change: 'The self-scan sentinel extends to archive-AUTHORED new blobs: a path under
-    specs/_archive/ whose blob is NEW at HEAD is scanned like any other new blob, while the
-    rename/relocation carve-out (byte-identical moved content) stays excluded.'
-```
-
-### intake-signal-calibration
-- **Title:** Intake signal calibration — record-only observations terminate in CLOSURE; only actionable defects reach intake (P1)
-- **Opened:** 2026-08-16
-- **Status:** candidate
-- **Description:** Operator demand (verbatim ruling, 2026-08-16: "Resolva todos esses 3 problemas identificados na raiz ... Na proxima rodada não quero ver essa desgraça de erros e bugs residuais") — root-cause class 3: the review pipeline manufactures intake volume. Recalibrate the residual-routing doctrine so record-only observations stop becoming intake items: (a) reviews still find and record everything — never-silent holds; (b) INFO-grade / awareness-only / already-fixed-at-HEAD observations terminate in the release CLOSURE record (or the reviewer handoff) and do NOT enter intake reports; (c) only actionable defects (LOW+ with a concrete fix surface) flow to the PM intake report; (d) the surfaces to change: the dd-release-closure "Intake candidates" section contract, the dd-backlog-definition §5 intake protocol, and the reviewer personas' routing guidance — ai-engineer lane for all skill/persona edits. Acceptance: the NEXT release's intake report contains only actionable defects; record-only observations are countable in its CLOSURE instead; zero observations lost (never-delete/never-silent proven by the CLOSURE record). Priority P1 — lands before or with the next release cycle so the calibration governs that cycle's reviews.
-- **Provenance:** operator demand, 2026-08-16 — root-cause class 3: the review pipeline manufactures intake volume
-- **Intents:**
-```yaml
-- subject:
-    kind: doc
-    ref: memory/product/sdd/sdd-bug-backlog-governance.md#Release And Audit
-  change: 'The intake protocol distinguishes signal classes: reviews record every
-    observation (never-silent), record-only observations — INFO-grade, awareness-only,
-    already-fixed-at-HEAD — terminate in the release CLOSURE record or the reviewer
-    handoff and never enter the PM intake report; only actionable defects (LOW+ with a
-    concrete fix surface) are compiled for operator adjudication. The dd-release-closure
-    Intake-candidates section contract and the dd-backlog-definition section-5 intake
-    protocol state this routing identically.'
-- subject:
-    kind: catalog
-    ref: agent-comms
-  change: 'Reviewer personas and their handoff guidance route by signal class: findings
-    arrays keep every observation (zero observations lost), and the routing distinguishes
-    closure-terminating record-only observations from intake-bound actionable defects.
-    ai-engineer lane for every skill and persona edit.'
-```
 
 ## LEDGER
 
