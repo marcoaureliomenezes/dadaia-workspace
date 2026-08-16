@@ -669,6 +669,35 @@ and proceeds either way.
     relocation shape.'
 ```
 
+### git-batch-epipe-swallow-width
+- **Title:** Scan-path fail-soft width — narrow the FR4 swallow to the intentional EPIPE; no silent degradation (#41)
+- **Opened:** 2026-08-16
+- **Status:** candidate
+- **Description:** Intake #3 items 3-7 + 3-8 (security ship review 2026-08-15T200554Z; 3-7 reproduced on a nonexistent oid and a tree sha). One observability class — a scan-path degradation is never silent: (1) _read_oversized_blob_prefix never inspects the `git cat-file blob` process exit status (only proc.wait() calls, no returncode check in the function), so a genuine object-read failure returns a 0-byte prefix with NO error, degrading a failure the gate atom's table promises fail-closed into a "partially scanned" note; fix: raise the typed read error when the process failed AND fewer than cap bytes arrived, keeping ADR D2-a's intentional early close (EPIPE after the cap) as the ONLY swallowed shape. (2) A malformed context registry silently shrinks the foreign-name layer to the directory-derived set — accepted design, but no stderr note names the degradation. (3) An unparseable --batch-check row is silently dropped — neither scanned nor counted — inconsistent with the FR8 abort-on-desync philosophy shipped in the same release; fix: typed-or-counted, never invisible. Items (2) and (3) ride (1)'s pass per the reviewer's routing.
+- **Provenance:** intake-report #3 items 3-7 + 3-8 approved as one entry — operator adjudication, 2026-08-16 (resolva todos — class-level fixes, no workarounds)
+- **Intents:**
+```yaml
+- subject:
+    kind: code
+    ref: dadaia_workspace/infrastructure/git_objects.py#_read_oversized_blob_prefix
+  change: 'Check the cat-file process exit status: raise the typed read error when the
+    process failed and fewer than cap bytes arrived; the intentional early close (EPIPE
+    after the cap) remains the only swallowed shape; RED tests on a nonexistent oid and a
+    tree sha.'
+- subject:
+    kind: code
+    ref: dadaia_workspace/cli/commands/ci.py#_foreign_repo_slugs
+  change: 'A malformed context registry no longer degrades silently: the shrink of the
+    foreign-name layer to the directory-derived set emits one stderr note naming the
+    degradation.'
+- subject:
+    kind: code
+    ref: dadaia_workspace/infrastructure/git_objects.py#_read_blobs
+  change: 'An unparseable --batch-check row in either batched conversation is typed-or-counted:
+    a located parse refusal (FR8 abort-on-desync consistency) or an explicit skipped-row
+    count in the scan summary — never silently dropped.'
+```
+
 ## LEDGER
 
 - push-range-denylist-scan · DELIVERED · v0.9.0 · 2026-08-14
