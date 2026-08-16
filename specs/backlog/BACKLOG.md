@@ -8,7 +8,9 @@ cutover, never deleted). Schema: `dd-backlog-definition` §2 — five required k
 28 ACTIVE subsections + 54 LEDGER rows carry every pre-consolidation record — the
 consolidation landed at 30 + 52 and v0.12.0's own closure sweep moved its two picked
 entries across, the same 82 slugs; the set-equality evidence is captured under
-`.dadaia/tmp/project-manager/20260815/`.
+`.dadaia/tmp/project-manager/20260815/`. Counts are as of the 2026-08-15 consolidation;
+later curation (operator-adjudicated intake) appends entries and LEDGER lines on top,
+never renumbering.
 Entry numbering (`#N`) from the retired `candidates.md` index is carried in each Title —
 rows are never renumbered, and LEDGER rows are never deleted.
 
@@ -22,6 +24,14 @@ terminal for bug `panel-telemetry-sqlite-corrupts-under-concurrent-access`, or d
 return to the queue? Undecided; keeps surfacing at every pick. The related
 dangling-pointer repair is `panel-runtime-reliability-dangling-ledger-pointer` (#12)
 and proceeds either way.
+
+**Standing operator question, pending (PM decision record 3 — restated at intake #3,
+operator adjudication 2026-08-16).** Should the git commit identity used in this
+workspace be de-personalised going forward? Both v0.12.0 security reviews dispositioned
+the existing identity as pre-existing published metadata (1,063 of 1,203 commits) — not
+a leak; it is an operator policy call and stands open until ruled. The question
+travelled to `specs/backlog/_archive/candidates.md` at the cutover; restated here so it
+is no longer archive-only.
 
 ## ACTIVE
 
