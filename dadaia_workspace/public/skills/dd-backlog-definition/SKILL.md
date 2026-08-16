@@ -21,19 +21,38 @@ Single source: `specs/backlog/BACKLOG.md` (ADR #14) — two sections, no per-ent
 no JSONL (JSONL stays bugs-only; backlog is a re-consolidated document, not an
 append log).
 
-**`## ACTIVE`** — one subsection per live candidate, full prose, strict schema:
+**`## ACTIVE`** — one subsection per live candidate, full prose, strict schema — five
+required keys plus one optional key:
 
-```markdown
+````markdown
 ### <slug>
 - **Title:** <short name>
 - **Opened:** YYYY-MM-DD
 - **Status:** idea | candidate | deferred
 - **Description:** <one paragraph — the need>
 - **Provenance:** operator request | intake-report item <id> (approved <date>)
+- **Intents:**
+```yaml
+<typed intents[] block — see core.models.backlog.parse_intents>
 ```
+````
+
+**`**Intents:**` status gate (ADR D7, OD-1).** Optional at `status: idea`
+(`core.models.backlog.INTENTS_EXEMPT_STATUS`) — an idea is an unbound brainstorm.
+**Required** at `candidate` and beyond: the anchor-set binding through
+`subject_registry.py`/`classifier.py` is how BL-DUP and BL-CONFLICT resolve pairwise
+overlap, so a `candidate`+ item with no resolvable `intents[]` is a BL-SCHEMA error, not
+a warning.
 
 **`## LEDGER`** — one line per closed item: `<slug> · <disposition> · <release-or-reason>
 · <date>`.
+
+`dadaia backlog new <slug>` authors the `## ACTIVE` subsection directly into
+`BACKLOG.md` (creating the document with both section headings on first use);
+`dadaia backlog doctor` validates the whole file against this schema —
+`BL-SCHEMA`/`BL-DUP`/`BL-CONFLICT`/`BL-STALE` (the disposition tokens below are
+BL-STALE's terminal-state input). There is no per-entry file and no other schema
+authority.
 
 **Terminal disposition tokens** (canonical home — appears nowhere else in `public/`):
 
@@ -50,11 +69,6 @@ is not repeated in either.
 **Purge-on-pick (mandatory).** A picked entry leaves `ACTIVE` in the same commit that
 creates the release SPEC; the SPEC's provenance section records which entries it
 consumed. Leaving a picked entry in `ACTIVE` after its SPEC exists is a defect.
-
-**Tooling note.** The live CLI (`dadaia backlog new`, `backlog doctor`) still reads and
-writes per-entry files, not `BACKLOG.md` — this section states the target schema; the
-physical consolidation and the tooling reconciliation are `project-manager`/
-`software-engineer` follow-up work, not delivered by authoring this skill.
 
 ## 3. Continuous sanitize protocol
 
@@ -111,9 +125,8 @@ further triage needed on the release-definition side. Purge-on-pick (§2) is the
 ## 7. CLI reference
 
 ```bash
+dadaia backlog new <slug>          # appends an ## ACTIVE subsection to BACKLOG.md
+dadaia backlog doctor              # validates BACKLOG.md — BL-SCHEMA/DUP/CONFLICT/STALE
 dadaia bugs status                 # open/closed bug counts
 dadaia bugs stats                  # bug-ledger aggregate view
 ```
-
-`backlog`-group verbs still operate on the pre-`BACKLOG.md` per-entry model (§2
-tooling note) — do not treat their presence as schema authority over this skill.

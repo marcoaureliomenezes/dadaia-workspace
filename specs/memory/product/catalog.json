@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-15T19:14:04Z",
+  "generated_at": "2026-08-16T00:09:53Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -540,7 +540,7 @@
         "bugs",
         "gitflow"
       ],
-      "token_estimate": 950,
+      "token_estimate": 1845,
       "depends_on": [
         "specs-doctor",
         "sdd-gate-v3",
@@ -586,7 +586,7 @@
         "validation",
         "sdd"
       ],
-      "token_estimate": 212,
+      "token_estimate": 355,
       "depends_on": [
         "sdd-bug-backlog-governance",
         "workspace-doctor",

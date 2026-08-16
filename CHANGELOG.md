@@ -4,6 +4,50 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] — 2026-08-15
+
+Release v0.12.0 "backlog-tooling-single-source". Two pre-approved entries delivered
+(`backlog-tooling-reconciliation`, `backlog-md-physical-consolidation`); archived at
+`specs/_archive/releases/v0.12.0/`. Pre-PR code review returned APPROVE with two
+MEDIUMs, both resolved before ship (fence-aware parsing; corrected closure evidence).
+
+### Added
+- **`specs/backlog/BACKLOG.md` is now the physical single source of the backlog**:
+  an `## ACTIVE` section (one strict-schema subsection per live item — Title, Opened,
+  Status, Description, Provenance, optional Intents) and an `## LEDGER` section (one
+  line per closed item with its terminal disposition token). Consolidated from 31 live
+  per-entry files + `candidates.md` with a countable never-delete proof: 82 slugs in,
+  82 slugs out, both set differences empty.
+- **`features/backlog/document.py`** — the pure single-source parser (`load_document`,
+  `ActiveItem`, `LedgerRow`); diagnostic, never-throwing; absent document = empty
+  model; **fence-aware section splitting** (a fenced `##` heading inside a subsection
+  is content, never structure; an unclosed fence at EOF surfaces a diagnostic, never a
+  silently shrunken model).
+- **`backlog new` authors an ACTIVE subsection** into BACKLOG.md (byte-diff-safe
+  insertion, slug uniqueness across ACTIVE ∪ LEDGER) instead of scaffolding a file.
+
+### Changed
+- **`backlog doctor` validates BACKLOG.md** — the four BL-* codes ride the document
+  model: BL-SCHEMA, BL-DUP (plus ACTIVE/LEDGER duplicate slugs), BL-CONFLICT, and a
+  re-defined BL-STALE (three ORed staleness conditions).
+- **Governance re-target**: SPEC-DOC-031 now walks ACTIVE subsections; SPEC-DOC-035 is
+  the loose-file single-source invariant (nothing loose in `specs/backlog/` beyond
+  BACKLOG.md and README.md, excluding `_archive/` and `remote-bugs/`).
+- **The `dd-backlog-definition` and `dd-release-definition` skills state the mechanism
+  that runs**: `**Consumes:**` is SPEC provenance; consumption = purge-on-pick at the
+  SPEC commit + the closure disposition sweep, backstopped by BL-STALE and SPEC-DOC-031.
+- Fresh-scaffold backlog stubs author a BACKLOG.md skeleton (the old
+  `candidates.md`/`ideas.md` stubs tripped the new single-source invariant); the
+  skeleton is test-pinned to the `backlog new` writer and round-trips `load_document`.
+
+### Removed
+- **The dead removal/consumption write side**: `removal_lifecycle.py`, `removal.py`,
+  `ledger_writer.py`, `consumes.py` and their container builder — zero production
+  callers since the workflow engine's removal, and a rewrite-down contract that
+  contradicted the never-delete law. `ledger.py`'s `read_consumed` survives as the
+  live BL-STALE input. `check_backlog_schema` (SPEC-DOC-012, and with it
+  SPEC-DOC-022/023) retired with the per-entry shape.
+
 ## [0.8.0] — 2026-08-15
 
 Release v0.11.0 "scan-v2" — prior-published-term amnesty and push-gate hardening.

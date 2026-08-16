@@ -424,9 +424,10 @@ jobs:
       - name: Install package
         run: pip install -e .
       # Runs backlog doctor over the checked-out tree (v0.1.25 R1, ADR-D). A clean backlog
-      # exits 0; a planted BL-SCHEMA/DUP/CONFLICT/STALE violation fails the job. specs/backlog/
-      # is gitignored in this source repo, so the check runs over whatever survivors are
-      # tracked — an empty backlog is trivially clean.
+      # exits 0; a planted BL-SCHEMA/DUP/CONFLICT/STALE violation fails the job.
+      # specs/backlog/BACKLOG.md (the single source, SPEC v0.12.0 FR1/ADR #14) is
+      # committed repository truth (.gitignore:133-142 opts *.md back in) — the check
+      # runs over the real tracked document; an absent one is trivially clean.
       - name: dadaia backlog doctor
         run: dadaia backlog doctor --specs-dir specs --source-root .
 

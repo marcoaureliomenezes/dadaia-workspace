@@ -84,6 +84,29 @@
 > `internal-hostname` hits), **#21**, **#2**, and the idea
 > `bugs-jsonl-whole-blob-per-append`. No bug and no audit outranked at pick time.
 >
+> **Addendum 2026-08-15 (v0.12.0 pick — the two backlog-tooling entries; files retained).**
+> Release `v0.12.0` "backlog-tooling-single-source" approved by the operator 2026-08-15
+> (SPEC/PLAN/TASKS `Aprovado`, branch `feature/v0.12.0`). Picked set: **#30 #31** — the
+> pre-approved P-1/P-2 pair, taken as ONE release with an **atomic cutover** (operator ruling
+> D1). Provenance: `specs/releases/v0.12.0/SPEC.md` §7; grill:
+> `specs/releases/v0.12.0/GRILL.md` (15 problems, ADRs D1–D10, two open decisions OD-1/OD-2).
+> **Purge-on-pick is again executed in its provenance form, not its deletion form**: both
+> entry files are flipped to `status: picked` with a `## Pick provenance (v0.12.0)` section
+> and **no file is removed** — because FR7 of this very release consolidates the whole
+> directory into `BACKLOG.md`, and deleting the two files at definition would destroy source
+> material the consolidation is written from. Both become ACTIVE subsections at
+> `status: picked` at the cutover commit and gain `DELIVERED — v0.12.0` LEDGER lines at
+> closure. **This index is itself consumed by the release**: at the cutover, `candidates.md`
+> and the 31 live per-entry files leave `specs/backlog/` by `git mv` into `_archive/`, with
+> never-delete proven by a countable set equality (operator ruling D4). Two decisions touch
+> unpicked entries and are recorded, not executed, by `product-engineer`: **OD-2** — #4
+> `retire-dead-hotfix-surface` is partially delivered as a side effect (SPEC-DOC-022/023
+> disappear with `check_backlog_schema`; the CLI hotfix verb and templates remain), so the PM
+> must rewrite #4 down to that residual; and the **`tag-push-carve-out-reachability` drift**
+> (grill P6) — the file is still loose in `specs/backlog/` at `status: idea` although this
+> index records it archived at `03ddd0b2` and DELIVERED in v0.9.0; it resolves to **LEDGER
+> only** at the consolidation.
+>
 > Per grill ADR #14 the backlog converges to a single `BACKLOG.md` (ACTIVE + LEDGER).
 > That doctrine now ships in v0.10.0 (law + schema); the **physical consolidation
 > follows the ship as delegated PM work** (v0.10.0 SPEC §4.4/D5). Not anticipated
@@ -108,11 +131,12 @@ terminal for bug `panel-telemetry-sqlite-corrupts-under-concurrent-access`, or d
 it return to the queue? Undecided; will keep surfacing at every pick. The related
 dangling-pointer repair is entry #12 below and proceeds either way.
 
-## Active candidates (25 live + 12 terminal ledger rows)
+## Active candidates (23 live + 2 picked + 12 terminal ledger rows)
 
 Numbering is stable (ledger rows are never renumbered — cross-references like
 "#9 and #18" and "blocked on #2" depend on it). Rows #1, #3 and #17 are terminal from
-earlier releases. Rows **#19 #20 #22 #23 #25 #26 #27 #28 #29** went terminal
+earlier releases. Rows **#30** and **#31** are **picked — v0.12.0** (non-terminal until that
+release's closure sweep). Rows **#19 #20 #22 #23 #25 #26 #27 #28 #29** went terminal
 **`DELIVERED — v0.11.0`** at that release's closure on 2026-08-15 (disposition sweep,
 `dd-release-closure`); their one-line ledger entries are in `## Ledger` below and their
 entry files are retained forever per the never-delete law.
@@ -148,8 +172,8 @@ entry files are retained forever per the never-delete law.
 | 27 | `git-objects-streamed-batch-reads` | **DELIVERED — v0.11.0** | — (terminal) | **New 2026-08-14** — materializes the ship security review LOW (CWE-400): `capture_output=True` materializes the whole `cat-file --batch` output in one buffer before the first object yields; measured fallback-shape bound in this repo **11,478 blobs / ~277 MB**. Fail-closed (MemoryError refuses); fix = Popen streaming or fixed-size sha chunks (smaller change, deterministic cap). **ADR #15: APPROVED at intake (report #1) — operator-delegated adjudication, 2026-08-15 (goal directive), verdicts per PM recommendation. Live pickable.** |
 | 28 | `closure-v14-perf-figure-correction` | **DELIVERED — v0.11.0** | — (terminal, closure obligation) | **New 2026-08-14** — materializes the round-2 code-review MEDIUM (evidence fidelity) via the reviewer's own routing: CLOSURE.md is FROZEN, no third reopen — correct forward in memory. V14's 2.978 s "same benchmark" was synthetic (~2 MB vs 133 MB real); real fallback range ≈ **147 s** (read 4.29 s + match 142.9 s, ~1.3 s/MB regex throughput; the read-path ~3.7× win is real and reproduced). Record the real figure in the `sdd-gate-v3` atom; optional match-throughput decision. **ADR #15: APPROVED at intake (report #1) — operator-delegated adjudication, 2026-08-15 (goal directive), verdicts per PM recommendation. Live pickable.** |
 | 29 | `self-scan-sentinel-integration-marker` | **DELIVERED — v0.11.0** | — (terminal) | **New 2026-08-14** — round-2 code-review LOW: `test_repo_self_scan.py:85` carries only `pytest.mark.slow`, not the `[integration, slow]` pair of its siblings; today's `-m "not quarantine"` selector runs it, but any future `-m integration` adoption silently drops the SENTINEL. One-line fix; rides the first window touching the surface. **ADR #15: APPROVED at intake (report #1) — operator-delegated adjudication, 2026-08-15 (goal directive), verdicts per PM recommendation. Live pickable.** |
-| 30 | `backlog-tooling-reconciliation` | candidate | **P2** | **New 2026-08-15** — pre-approved intake P-1 (D-A ratification at v0.10.0 approval, SPEC §4.5/§4.10): reconcile the per-entry-file tooling (five `features/backlog/*` modules, `backlog new`/`backlog doctor`, SPEC-DOC-031, scaffold README, consumer recipe) with the single-source `BACKLOG.md` schema v0.10.0 shipped as doctrine. **Folds in intake report #2 item 2-2 (APPROVED AS MERGE)**: the `**Consumes:**` checklist item has no consumer — `removal_lifecycle.py`'s former caller was the deleted workflow engine. `software-engineer` surface, own release round. Trace: operator-delegated adjudication, 2026-08-15 (goal directive), verdicts per PM recommendation. |
-| 31 | `backlog-md-physical-consolidation` | candidate | **P2** | **New 2026-08-15** — pre-approved intake P-2 (D-A ratification at v0.10.0 approval, SPEC §4.4/D5): fold the per-entry files + this candidates.md into single-source `BACKLOG.md` (ACTIVE + LEDGER), never-delete preserved end to end. PM curation surface; **sequences with/after #30** — consolidating before the tooling ships would break `backlog new`/`doctor`/SPEC-DOC-031 (SPEC R6). Trace: operator-delegated adjudication, 2026-08-15 (goal directive), verdicts per PM recommendation. |
+| 30 | `backlog-tooling-reconciliation` | **picked — v0.12.0** | — (picked) | **Picked 2026-08-15** into `v0.12.0` "backlog-tooling-single-source" as **FR1–FR6 + FR8**; the 2-2 fold resolved by **retirement** (ruling D2 + grill P1: zero production callers, and `apply_removal`'s behaviour contradicts never-delete). Provenance: `specs/releases/v0.12.0/SPEC.md` §7. Flips to `DELIVERED — v0.12.0` at closure, as a LEDGER line in the consolidated `BACKLOG.md`. **New 2026-08-15** — pre-approved intake P-1 (D-A ratification at v0.10.0 approval, SPEC §4.5/§4.10): reconcile the per-entry-file tooling (five `features/backlog/*` modules, `backlog new`/`backlog doctor`, SPEC-DOC-031, scaffold README, consumer recipe) with the single-source `BACKLOG.md` schema v0.10.0 shipped as doctrine. **Folds in intake report #2 item 2-2 (APPROVED AS MERGE)**: the `**Consumes:**` checklist item has no consumer — `removal_lifecycle.py`'s former caller was the deleted workflow engine. `software-engineer` surface, own release round. Trace: operator-delegated adjudication, 2026-08-15 (goal directive), verdicts per PM recommendation. |
+| 31 | `backlog-md-physical-consolidation` | **picked — v0.12.0** | — (picked) | **Picked 2026-08-15** into `v0.12.0` as **FR7**, in the same release as #30; the sequencing question settled by an **atomic cutover** (ruling D1 + grill P3) and never-delete made countable (ruling D4). Provenance: `specs/releases/v0.12.0/SPEC.md` §7. Flips to `DELIVERED — v0.12.0` at closure. **New 2026-08-15** — pre-approved intake P-2 (D-A ratification at v0.10.0 approval, SPEC §4.4/D5): fold the per-entry files + this candidates.md into single-source `BACKLOG.md` (ACTIVE + LEDGER), never-delete preserved end to end. PM curation surface; **sequences with/after #30** — consolidating before the tooling ships would break `backlog new`/`doctor`/SPEC-DOC-031 (SPEC R6). Trace: operator-delegated adjudication, 2026-08-15 (goal directive), verdicts per PM recommendation. |
 | 32 | `dd-skills-applyto-glob-collisions` | candidate | P3 | **New 2026-08-15** — intake report #2 item 2-1 APPROVED (code-review pre-PR `2026-08-15T145731Z`, LOW, un-absorbed): the seven `dd-*` skills' `applyTo` globs collide pairwise (two skills claim `specs/backlog/**`) — the one-skill-per-stage boundary is absent from the activation surface; partition the globs + mechanical collision check. `ai-engineer` lane, rides the next AI-surface window with #33. Trace: operator-delegated adjudication, 2026-08-15 (goal directive), verdicts per PM recommendation. |
 | 33 | `dd-release-definition-orchestration-pointer-loop` | candidate | P3 | **New 2026-08-15** — intake report #2 item 2-3 APPROVED (code-review pre-PR `2026-08-15T145731Z`, LOW; surfaced by PM verification — a review residual is never dropped silently): `dd-release-definition:103` and the `project-orchestration` release-definition playbook point at each other with no content at either end. One-line fix; rides with #32. Trace: operator-delegated adjudication, 2026-08-15 (goal directive), verdicts per PM recommendation. |
 | 34 | `bug-event-redaction-always-on-reinforcement` | candidate | P3 | **New 2026-08-15** — intake report #2 item 2-4 APPROVED (security ship review `2026-08-15T151005Z`, LOW): the dehydration left the bug-event redaction rule on-demand only (`dd-bug-registration` §3); add ONE always-on reinforcement line in law §6. Distinct from #23 (refusal renderer path — different surface; dedupe record in the report). Trace: operator-delegated adjudication, 2026-08-15 (goal directive), verdicts per PM recommendation. |
@@ -178,8 +202,11 @@ windows, which is what the shared surface (`features/chokepoints/**`,
 `infrastructure/git_objects.py`) makes cheapest. **#24 stays P3 and unpicked** and now owns
 the `internal-hostname` structural-fix question alone (v0.11.0 SPEC §4.3 records the D6
 evaluation and its negative outcome). **#21 stays P2** and is, after v0.11.0, still the only
-unscanned channel on the push path. #30-#37 are the 2026-08-15 intake round: #30/#31 are the
-P2 backlog tooling/consolidation pair (#31 sequenced after #30); #32-#37 are P3. The §5
+unscanned channel on the push path. #30-#37 are the 2026-08-15 intake round: #30/#31 were the
+P2 backlog tooling/consolidation pair and are **picked together into `v0.12.0`** the same day
+— the sequencing constraint that made #31 wait for #30 is dissolved by taking both in one
+release with an atomic cutover, which is the only shape in which both doctors stay green at
+every commit; #32-#37 remain P3. The §5
 precedence notice above (two open LOW bugs, Arm-B hotfix lane) outranks this whole table, and
 final priority is the operator's at pick time.
 

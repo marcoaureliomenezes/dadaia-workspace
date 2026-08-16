@@ -167,11 +167,15 @@ an initialized workspace, create it:
 
 ### F-10 — Backlog governance
 - Run against the IN-REPO specs tree from F-04: `$D specs doctor --json --specs-dir
-  repos/valproj/specs` (must be valid JSON); add a backlog item missing `intents[]` at
-  status `candidate` under `repos/valproj/specs/backlog/`, then run the backlog-specific
-  doctor — `$D backlog doctor --specs-dir repos/valproj/specs` (NOT `specs doctor`, which
-  validates candidates.md format; BL-SCHEMA is the `backlog doctor` path). Assert its exit
-  code directly, not through a pipe.
+  repos/valproj/specs` (must be valid JSON); plant the malformed item as an `## ACTIVE`
+  subsection directly in `repos/valproj/specs/backlog/BACKLOG.md` (the single source —
+  `dadaia backlog new <slug> --specs-dir repos/valproj/specs` creates the document with
+  both section headings if it does not exist yet; then edit the new subsection's
+  `**Status:**` to `candidate` and leave it with no `**Intents:**` block), then run the
+  backlog-specific doctor — `$D backlog doctor --specs-dir repos/valproj/specs` (NOT
+  `specs doctor`, which validates the single-source loose-file/consumption invariants
+  SPEC-DOC-031/035, not the ACTIVE-subsection schema; BL-SCHEMA is the `backlog doctor`
+  path). Assert its exit code directly, not through a pipe.
 - **PASS if:** `specs doctor --json` emits parseable JSON exit 0; and `backlog doctor`
   flags the malformed item `[ERROR] BL-SCHEMA` and exits non-zero.
 
@@ -333,12 +337,13 @@ never exercised the live backlog path was false confidence).
 ### R-02 — Real-demand backlog is canonical and consumable
 
 - Author a B3/CVM-style real capture item as `project-manager`/`product-engineer` would
-  (`dadaia backlog new <slug>` then fill it in), then `dadaia backlog subjects
+  (`dadaia backlog new <slug>` then fill in its `**Intents:**` block, the single-source
+  ACTIVE subsection — SPEC v0.12.0 FR3, ADR #14), then `dadaia backlog subjects
   --specs-dir <ctx>/specs`.
 - **PASS if:** every emitted `intents[].ref` resolves against the live registry (no
   unresolved subjects) AND a release SPEC naming the item under `**Consumes:**` is
-  accepted by `specs doctor`, with the consumed-backlog ledger recording the item's
-  canonical `specs/backlog/<slug>.md` path.
+  accepted by `specs doctor`, with the declared slug resolving to an `## ACTIVE`
+  subsection in `specs/backlog/BACKLOG.md`.
 
 ### R-03 — Fresh specs tree is doctor-clean with no manual edits
 
@@ -388,8 +393,9 @@ never exercised the live backlog path was false confidence).
   `context create` → `alive` → `specs init` → `context baseline`.
 - **PASS if ALL of:** both doctors report 0 errors AND 0 warnings on the fresh
   scaffold (Draft + phase SPEC is the legitimate authoring state — bug
-  fresh-release-scaffold-emits-spec-doctor-warnings-042); the freshly-created backlog
-  stub is BL-SCHEMA-valid out of the box; and baseline COMPLETES after the official
+  fresh-release-scaffold-emits-spec-doctor-warnings-042); the freshly-created ACTIVE
+  subsection in `specs/backlog/BACKLOG.md` (the single source, SPEC v0.12.0 FR3, ADR #14)
+  is BL-SCHEMA-valid out of the box; and baseline COMPLETES after the official
   scaffold follow-up while still refusing a tree carrying operator files (bug
   context-baseline-rejects-official-scaffold-followup).
 - **A GATE is a validator too** (bug r4g-backlog-surface-new-existing-accepted): take

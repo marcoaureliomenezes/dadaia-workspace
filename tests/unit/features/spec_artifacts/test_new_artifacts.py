@@ -1,11 +1,19 @@
 """Unit tests for dadaia_workspace.features.spec_artifacts.new_artifacts.
 
+Intent: CONTRACT — v0.12.0 A3.1-A3.4 (backlog_new); legacy release_new coverage kept
+unchanged (release_new is not touched by SPEC v0.12.0 FR3).
+
 Covers:
 - AC-T7-1: release_new creates SPEC.md with Draft frontmatter
 - AC-T7-2: release_new exits non-zero (raises FileExistsError) when dir exists
-- AC-T7-3: backlog_new creates slug.md with canonical frontmatter
 - AC-T7-5: release_new raises ValueError for invalid slug
-- AC-C-1..AC-C-5: per acceptance criteria
+- A3.1: backlog_new on a tree with no BACKLOG.md creates the document with both
+  section headings and one conformant ACTIVE subsection.
+- A3.2: backlog_new on an existing document appends one subsection and leaves every
+  other byte of the file unchanged (byte-diff assertion).
+- A3.3: a slug already present in ACTIVE or LEDGER is refused (FileExistsError, the
+  slug-uniqueness invariant replacing file-level no-clobber — grill P11).
+- A3.4: an invalid slug is refused with the unchanged ``^[a-z][a-z0-9-]+$`` message.
 
 (The legacy ``bug_new`` scaffolder was retired in v0.1.53 — bugs are event-sourced JSONL
 via ``dadaia bugs append``.)
@@ -16,7 +24,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-import yaml
 
 from dadaia_workspace.features.spec_artifacts.new_artifacts import (
     backlog_new,
@@ -25,7 +32,7 @@ from dadaia_workspace.features.spec_artifacts.new_artifacts import (
 
 
 def test_existing_dir_raises_file_exists_error(tmp_path: Path) -> None:
-    """AC-T7-2 / AC-C-2: raises FileExistsError when dir already exists."""
+    """AC-T7-2: raises FileExistsError when dir already exists."""
     specs = tmp_path / "specs"
     specs.mkdir()
     (specs / "releases" / "my-feature-v1").mkdir(parents=True)
@@ -63,6 +70,7 @@ def test_accepts_semver_release_id(tmp_path: Path) -> None:
             release_new, "v0.1.2.3", r"Invalid release ID", id="release-dotted-4-segments"
         ),
         pytest.param(release_new, "v1.2.x", r"Invalid release ID", id="release-dotted-non-numeric"),
+        # A3.4 — backlog_new's slug validation message is unchanged.
         pytest.param(backlog_new, "UPPERCASE SLUG", r"Invalid slug", id="backlog-uppercase"),
     ],
 )
@@ -79,9 +87,10 @@ def test_invalid_id_matrix(tmp_path: Path, fn, slug: str, match: str) -> None:  
 
 
 def test_release_new_creation_content(tmp_path: Path) -> None:
-    """AC-T7-1/AC-C-1: SPEC.md is created with Draft status, the release id, every
-    required frontmatter field, and releases/ is auto-created when absent. Also
-    covers other valid-slug shapes (hyphenated, digits-after-first-letter)."""
+    """AC-T7-1: SPEC.md is created with Draft status, the release id, every required
+    frontmatter field, and releases/ is auto-created when absent. Also covers other
+    valid-slug shapes (hyphenated, digits-after-first-letter). release_new is
+    untouched by SPEC v0.12.0 (FR3 scopes backlog_new only)."""
     specs = tmp_path / "specs"
     specs.mkdir()
     # releases/ deliberately NOT pre-created — auto-creation facet.
@@ -106,40 +115,121 @@ def test_release_new_creation_content(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# backlog_new creation-content facets — 1 test
+# backlog_new — A3.1: authors BACKLOG.md (both headings + one conformant subsection)
 # ---------------------------------------------------------------------------
 
 
-def test_backlog_new_creation_content(tmp_path: Path) -> None:
-    """AC-T7-3/AC-C-3: backlog stub is created with frontmatter, the v0.1.55 FR5
-    description + commented intents[] teaching template, and backlog/ auto-creates.
-    A pre-existing file raises FileExistsError."""
+def test_backlog_new_on_absent_document_creates_both_sections_and_one_subsection(
+    tmp_path: Path,
+) -> None:
     specs = tmp_path / "specs"
     specs.mkdir()
     # backlog/ deliberately NOT pre-created — auto-creation facet.
 
     result = backlog_new(specs, "cool-idea")
 
-    target = specs / "backlog" / "cool-idea.md"
-    assert target.is_file(), "cool-idea.md must be created (AC-T7-3)"
+    target = specs / "backlog" / "BACKLOG.md"
+    assert target.is_file(), "BACKLOG.md must be created (A3.1)"
     assert result.path == target
     assert result.created is True
 
     content = target.read_text(encoding="utf-8")
-    assert "title:" in content
-    assert "status: idea" in content
-    assert "opened:" in content
+    assert content.count("## ACTIVE") == 1
+    assert content.count("## LEDGER") == 1
+    assert content.index("## ACTIVE") < content.index("## LEDGER")
+    assert "### cool-idea" in content
+    assert content.index("### cool-idea") > content.index("## ACTIVE")
+    assert content.index("### cool-idea") < content.index("## LEDGER")
 
-    frontmatter = content.split("---", 2)[1]
-    parsed = yaml.safe_load(frontmatter)
-    assert parsed.get("status") == "idea"
-    assert "description" in parsed
-    # The intents template is a COMMENTED teaching block, not a live frontmatter binding.
-    assert "intents:" in content  # inside the HTML comment
+    assert "- **Title:** cool-idea" in content
+    assert "- **Status:** idea" in content
+    assert "- **Provenance:**" in content
+    from datetime import UTC, datetime
+
+    today = datetime.now(tz=UTC).strftime("%Y-%m-%d")
+    assert f"- **Opened:** {today}" in content
+
+    # The intents teaching comment is preserved (SPEC FR3), as a commented block, not
+    # a live `**Intents:**` binding — an `idea` stays doctor-clean with none.
     assert "<!--" in content and "-->" in content
-    assert parsed.get("intents") is None  # no live intents ⇒ idea stays doctor-clean
+    assert "**Intents:**" in content  # named inside the teaching comment
     for kind in ("code", "cli", "catalog", "doc", "invariant"):
         assert kind in content
 
+    # The fresh subsection parses clean under the single-source document model.
+    from dadaia_workspace.features.backlog.document import load_document
+
+    doc = load_document(specs / "backlog")
+    assert doc.errors == ()
+    assert len(doc.active) == 1
+    assert doc.active[0].slug == "cool-idea"
+    assert doc.active[0].status == "idea"
+    assert doc.active[0].intents == ()
+
+
+# ---------------------------------------------------------------------------
+# backlog_new — A3.2: append leaves every other byte unchanged (byte-diff assertion)
+# ---------------------------------------------------------------------------
+
+
+def test_backlog_new_append_leaves_every_other_byte_unchanged(tmp_path: Path) -> None:
+    specs = tmp_path / "specs"
+    specs.mkdir()
+    backlog_new(specs, "first-idea")
+
+    target = specs / "backlog" / "BACKLOG.md"
+    before = target.read_text(encoding="utf-8")
+
+    backlog_new(specs, "second-idea")
+    after = target.read_text(encoding="utf-8")
+
+    assert after != before
+    assert after.startswith(before[: before.index("## LEDGER")]), (
+        "everything before the LEDGER heading in the original file must survive "
+        "byte-for-byte, with the new subsection appended just ahead of it"
+    )
+    assert after.endswith(before[before.index("## LEDGER") :]), (
+        "the LEDGER heading and everything after it must survive byte-for-byte"
+    )
+    assert "### second-idea" in after
+    assert "### first-idea" in after
+
+
+# ---------------------------------------------------------------------------
+# backlog_new — A3.3: slug uniqueness across ACTIVE ∪ LEDGER (not file-level no-clobber)
+# ---------------------------------------------------------------------------
+
+
+def test_backlog_new_refuses_slug_already_in_active(tmp_path: Path) -> None:
+    specs = tmp_path / "specs"
+    specs.mkdir()
+    backlog_new(specs, "cool-idea")
+
     with pytest.raises(FileExistsError, match=r"already exists"):
         backlog_new(specs, "cool-idea")
+
+
+def test_backlog_new_refuses_slug_already_in_ledger(tmp_path: Path) -> None:
+    specs = tmp_path / "specs"
+    specs.mkdir()
+    backlog_dir = specs / "backlog"
+    backlog_dir.mkdir()
+    (backlog_dir / "BACKLOG.md").write_text(
+        "## ACTIVE\n\n## LEDGER\n\n- delivered-slug · DELIVERED · v0.9.0 · 2026-06-01\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(FileExistsError, match=r"already exists"):
+        backlog_new(specs, "delivered-slug")
+
+
+# ---------------------------------------------------------------------------
+# backlog_new — A3.4: invalid slug refused, message unchanged
+# ---------------------------------------------------------------------------
+
+
+def test_backlog_new_invalid_slug_refused_with_unchanged_message(tmp_path: Path) -> None:
+    specs = tmp_path / "specs"
+    specs.mkdir()
+    with pytest.raises(ValueError, match=r"Invalid slug"):
+        backlog_new(specs, "Not-A-Valid-Slug")

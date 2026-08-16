@@ -16,10 +16,13 @@ This lock is captured DETERMINISTICALLY (AC-2 / R-4):
   each issue ``path``) is replaced with the literal token ``<SPECS>`` so the golden is
   machine-independent.
 * **Clock freeze** — ``date.today`` and ``datetime.now(tz=UTC)`` are pinned to 2026-07-15 so the
-  two date-gated checks (release-SemVer severity flip; candidates hotfix staleness) are
-  deterministic. The freeze is applied to every specs submodule that binds ``date``/``datetime``
-  (the coordinator pre-split, and ``doctor_release``/``doctor_governance`` post-split), so this
-  lock survives the decomposition without edits.
+  date-gated check (release-SemVer severity flip) is deterministic. The freeze is applied to
+  every specs submodule that binds ``date``/``datetime`` (the coordinator pre-split, and
+  ``doctor_release`` post-split). ``doctor_governance`` bound ``datetime`` for its own
+  date-gated check (candidates hotfix staleness / SPEC-DOC-012/023), retired at v0.12.0
+  T-120-08 along with the import — the fixture's ``hasattr`` guard makes this freeze loop a
+  no-op for that module now, harmlessly, so this lock survives the decomposition without
+  edits.
 
 Regenerate the golden (ONLY when a deliberate behavior change is approved) with:
 ``UPDATE_DOCTOR_GOLDEN=1 pytest tests/unit/features/specs/test_doctor_golden.py``.
@@ -84,7 +87,6 @@ _FAMILY_OF_CODE: dict[str, str] = {
     "SPEC-DOC-034": "closure_audit",
     "SPEC-DOC-036": "closure_audit",
     "SPEC-DOC-038": "closure_audit",
-    "SPEC-DOC-012": "governance",
     "SPEC-DOC-031": "governance",
     "SPEC-DOC-032": "governance",
     "SPEC-DOC-033": "governance",

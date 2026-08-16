@@ -11,8 +11,8 @@ tags:
 - doctor
 - validation
 - sdd
-token_estimate: 212
-last_updated: '2026-08-07'
+token_estimate: 355
+last_updated: '2026-08-15'
 release_origin: v0.3.0
 ---
 
@@ -30,8 +30,17 @@ before release advancement or closure.
   ledgers, audit naming, and release references.
 - memory checks: Markdown/frontmatter/atomicity, forbidden history sections, image and
   Mermaid references, generated catalog/index agreement.
-- governance checks: event-sourced bug JSONL vocabulary and terminal state; backlog
-  status vocabulary and archive consumption.
+- governance checks: event-sourced bug JSONL vocabulary and terminal state; the backlog
+  single source. Two checks cover the backlog, both **WARNING**: SPEC-DOC-031 iterates the
+  `## ACTIVE` subsections of `specs/backlog/BACKLOG.md` and flags an item left at a
+  non-terminal status while an archived SPEC or CLOSURE names its slug outside a
+  `## Backlog returns` section; SPEC-DOC-035 is the single-source invariant — any item
+  `*.md` loose directly under `specs/backlog/`, other than `BACKLOG.md` and `README.md`
+  and excluding `_archive/` and `remote-bugs/`, is drift. No check reads `BACKLOG.md` as
+  if it were a per-slug entry, so no finding is ever keyed to a phantom `BACKLOG` slug.
+  There is no per-entry frontmatter schema check: the entry schema is validated by
+  `backlog doctor`'s BL-* codes over the document model, and specs doctor does not hold a
+  second opinion on it.
 - constitution/version checks: required invariant references and pattern-version
   compatibility.
 

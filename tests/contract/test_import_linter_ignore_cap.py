@@ -74,14 +74,20 @@ _SETUP_CFG = _REPO_ROOT / "setup.cfg"
 # `lifecycle-no-workflows` contract and 13 ignored edges (panel->lifecycle x4,
 # panel->workflows x1, workflows->lifecycle x1, lifecycle->reports x1,
 # lifecycle->backlog x5, cli.lifecycle->fake_runtime x1). Cap ratcheted 29 -> 16.
-_RECORDED_IGNORE_EDGE_CAP = 15
+#
+# v0.12.0 T-120-08 NOTE: `features.specs.doctor_governance -> features.backlog.document`
+# added (SPEC PLAN §6) — the governance validator's SPEC-DOC-031/035 re-target reads the
+# single-source `BACKLOG.md` through the pure `document.py` parser (leaf -> leaf) instead
+# of duplicating a second parser inside `features/specs/`. Cap raised 15 -> 16
+# (+1 features-no-cross-feature).
+_RECORDED_IGNORE_EDGE_CAP = 16
 
 # Per-family recorded breakdown, pinned per contract section so a wrong 13-edge cross-feature
 # set (or a silent shift between families) fails loudly, not just the grand total.
 _RECORDED_PER_FAMILY_CAP: dict[str, int] = {
     "features-no-infrastructure": 7,
     "features-no-subprocess": 4,
-    "features-no-cross-feature": 1,
+    "features-no-cross-feature": 2,
     "cli-no-infrastructure": 3,
 }
 

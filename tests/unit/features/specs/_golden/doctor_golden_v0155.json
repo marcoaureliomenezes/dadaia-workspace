@@ -37,18 +37,6 @@
       "severity": "error"
     },
     {
-      "code": "SPEC-DOC-012",
-      "description": "candidates.md line 5: bullet does not match expected format '- <name> — <one-liner> (owner: <agent>, contexto: <link>)': '- this bullet does not match the required backlog format'",
-      "path": "<SPECS>/backlog/candidates.md",
-      "severity": "warning"
-    },
-    {
-      "code": "SPEC-DOC-012",
-      "description": "candidates.md line 9: hotfix bullet is stale (4680h > 72h). Consider promoting to a hotfix release or moving to ## Histórico (D23).",
-      "path": "<SPECS>/backlog/candidates.md",
-      "severity": "warning"
-    },
-    {
       "code": "SPEC-DOC-016",
       "description": "Release folder 'badname-release' does not follow SemVer naming (^v\\d+\\.\\d+\\.\\d+$). Created: 2026-07-10. Rename to v<MAJOR>.<MINOR>.<PATCH> (D3, SPEC-DOC-016).",
       "path": "<SPECS>/releases/badname-release",
@@ -127,6 +115,12 @@
       "severity": "warning"
     },
     {
+      "code": "SPEC-DOC-035",
+      "description": "backlog/candidates.md is a loose per-entry file directly under specs/backlog/ — the single source is BACKLOG.md (## ACTIVE + ## LEDGER); fold it into BACKLOG.md and move the superseded file into specs/backlog/_archive/ (SPEC-DOC-035, WARNING).",
+      "path": "<SPECS>/backlog/candidates.md",
+      "severity": "warning"
+    },
+    {
       "code": "SPEC-DOC-038",
       "description": "audits/bad-audit-name is loose in specs/audits/ — a dispositioned audit must be archived to specs/audits/_archive/ (one remediation release dispositions every finding, then archives; audit-disposition law). SPEC-DOC-038, WARNING.",
       "path": "<SPECS>/audits/bad-audit-name",
@@ -136,6 +130,6 @@
   "specs_dir": "<SPECS>",
   "summary": {
     "errors": 8,
-    "warnings": 14
+    "warnings": 13
   }
 }

@@ -1,6 +1,6 @@
 ---
 title: "Physical BACKLOG.md consolidation: per-entry files + candidates.md → single-source ACTIVE + LEDGER"
-status: candidate
+status: picked
 opened: 2026-08-15
 description: >-
   Execute the physical half of the ADR #14 convergence that v0.10.0 shipped as doctrine
@@ -68,3 +68,30 @@ recommendation — intake report #2
 `project-manager` executes (backlog curation surface); depends on
 `backlog-tooling-reconciliation` (`software-engineer`) for the tooling that validates
 the consolidated file.
+
+## Pick provenance (v0.12.0)
+
+**picked — v0.12.0**, 2026-08-15. Delivered as **FR7** of release `v0.12.0`
+"backlog-tooling-single-source", in the **same** release as
+`backlog-tooling-reconciliation` (operator ruling **D1**). Provenance record:
+`specs/releases/v0.12.0/SPEC.md` §7; grill: `specs/releases/v0.12.0/GRILL.md`.
+
+**The sequencing question this entry raised is settled by an atomic cutover, not by
+ordering.** Grill P3 established that neither order is green: consolidating first makes the
+per-entry loader parse `BACKLOG.md` as an item with slug `BACKLOG` (a BL-SCHEMA ERROR in the
+pre-commit gate and CI), and shipping the tooling first leaves 31 live files unvalidated for
+a window. The document, the tooling wiring, the loader deletion and the governance re-target
+therefore ride **one commit** (T-120-08), with every pure module landing before it against
+fixtures.
+
+**Never-delete becomes countable** (operator ruling **D4**, form fixed by grill P15): the
+slug set discoverable before the consolidation — live entry files ∪ `candidates.md`
+candidate/idea rows ∪ `_archive/` files ∪ LEDGER lines ∪ terminal-table rows — must equal the
+slug set in `BACKLOG.md` after it, each slug exactly once and in exactly one section, with
+both set differences captured as evidence. Measured baseline: 31 live files, 30 live rows,
+46 archived files, 20 LEDGER lines. Per **D5**, the superseded per-entry files **and**
+`candidates.md` leave by `git mv` into `specs/backlog/_archive/` — archived, never deleted —
+and SPEC-DOC-035 is re-pointed at the single-source invariant (no per-entry item file loose
+under `specs/backlog/`). One live drift is reconciled here rather than absorbed silently:
+`tag-push-carve-out-reachability` (grill P6) resolves to **LEDGER only**. Terminal
+disposition `DELIVERED — v0.12.0` lands at closure.

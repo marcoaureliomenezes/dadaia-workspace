@@ -48,29 +48,10 @@ Declaração atômica do propósito do projeto e suas invariantes fundamentais.
 - (Definir o que este projeto não é)
 """
 
-_CANDIDATES_STUB = """\
-# Backlog — Candidatas
+_BACKLOG_STUB = """\
+## ACTIVE
 
-> Formato canônico: `- <name> — <one-liner> (owner: <agent>, contexto: <link>)`
-
-## Candidatas ativas
-
-(Sem candidatas ainda.)
-
-## Histórico de promoções
-
-(Vazio — nenhuma candidata promovida ainda.)
-"""
-
-_IDEAS_STUB = """\
-# Backlog — Ideias
-
-> Ideias brutas, sem comprometimento de escopo. Mover para `candidates.md`
-> quando refinadas.
-
-## Ideias
-
-(Sem ideias registradas ainda.)
+## LEDGER
 """
 
 
@@ -205,18 +186,18 @@ def scaffold(
         "release: none\nphase: none\n",
     )
 
-    # 6 — backlog/candidates.md
-    _write(specs_dir / "backlog" / "candidates.md", _CANDIDATES_STUB)
+    # 6 — backlog/BACKLOG.md (SPEC v0.12.0 FR1/FR3, ADR #14): the single-source
+    # document skeleton — both section headings, nothing else. Matches exactly what
+    # `features.spec_artifacts.new_artifacts.backlog_new` creates when it finds no
+    # document; a fresh scaffold and a fresh `backlog new` share one skeleton shape.
+    _write(specs_dir / "backlog" / "BACKLOG.md", _BACKLOG_STUB)
 
-    # 7 — backlog/ideas.md
-    _write(specs_dir / "backlog" / "ideas.md", _IDEAS_STUB)
-
-    # 8, 9, 10 — .gitkeep files
+    # 7, 8, 9 — .gitkeep files
     _touch(specs_dir / "_archive" / "releases" / ".gitkeep")
     _touch(specs_dir / "_archive" / "legacy-features" / ".gitkeep")
     _touch(specs_dir / "assets" / ".gitkeep")
 
-    # 11, 12, 13 — per-artifact _archive dirs (v0.1.46 AC-4, FROZEN gate-class landing
+    # 10, 11, 12 — per-artifact _archive dirs (v0.1.46 AC-4, FROZEN gate-class landing
     # zone). Each additive artifact family (backlog/audits/bugs) gets its own _archive/
     # subdir where terminal/dispositioned entries are git-mv'd. The gate classifies these
     # three subdirs FROZEN (features/spec_context/gate_policy.py); creating them here
