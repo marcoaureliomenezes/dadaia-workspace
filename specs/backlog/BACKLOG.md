@@ -5,8 +5,10 @@ per-entry files and `candidates.md` (both `git mv`-archived to `_archive/` at th
 cutover, never deleted). Schema: `dd-backlog-definition` §2 — five required keys per
 `ACTIVE` subsection plus the optional `Intents` key (OD-1); `LEDGER` grammar
 `slug · DISPOSITION · release-or-reason · date`. Never-delete proven by count (ADR D4):
-30 ACTIVE subsections + 52 LEDGER rows carry every pre-consolidation record; the
-set-equality evidence is captured under `.dadaia/tmp/project-manager/20260815/`.
+28 ACTIVE subsections + 54 LEDGER rows carry every pre-consolidation record — the
+consolidation landed at 30 + 52 and v0.12.0's own closure sweep moved its two picked
+entries across, the same 82 slugs; the set-equality evidence is captured under
+`.dadaia/tmp/project-manager/20260815/`.
 Entry numbering (`#N`) from the retired `candidates.md` index is carried in each Title —
 rows are never renumbered, and LEDGER rows are never deleted.
 
@@ -440,61 +442,6 @@ and proceeds either way.
     replacing the literal-by-literal treadmill; paired counter-fixtures keep proving narrowness.
 ```
 
-### backlog-tooling-reconciliation
-- **Title:** Backlog tooling reconciliation: point the per-entry-file tooling at single-source BACKLOG.md (incl. the Consumes checklist consumer) (#30)
-- **Opened:** 2026-08-15
-- **Status:** picked
-- **Description:** v0.10.0 shipped the ADR #14 doctrine (law + dd-backlog-definition schema): the backlog converges to one specs/backlog/BACKLOG.md with an ACTIVE section and a LEDGER section. The tooling still implements the per-entry-file model end to end (v0.10.0 SPEC §4.5, operator-ratified deferral): features/backlog/{doctor,ledger,ledger_writer,preview, removal_lifecycle}.py, the `dadaia backlog new`/`backlog doctor` CLI verbs (new_artifacts.py + newartifacts.py), SPEC-DOC-031 in doctor_governance.py, the BL-SCHEMA/BL-STALE codes, public/scaffold/backlog/README.md, and public/data/CONSUMER_VALIDATION_RECIPE.md. Reconcile all of it with the single-source schema. FOLDED IN (intake report #2 item 2-2, approved as merge): dd-release-definition §5 keeps the `**Consumes:**` protocol as a checklist requirement while no CLI verb invokes removal_lifecycle.py — its former caller was the deleted workflow engine — so a required release-definition step has no executor; this release must either ship the CLI consumer for the removal lifecycle or rewrite the checklist to the mechanism that actually runs.
-- **Provenance:** pre-approved intake P-1 (operator ratification at the v0.10.0 approval, SPEC §4.5/§4.10), materialized 2026-08-15; intake-report #2 item 2-2 approved as merge 2026-08-15 (operator-delegated); picked — v0.12.0 (SPEC §7)
-- **Intents:**
-```yaml
-- subject:
-    kind: code
-    ref: dadaia_workspace/features/backlog/doctor.py#run_backlog_doctor
-  change: Validate the single-source BACKLOG.md (ACTIVE subsection schema, LEDGER line grammar,
-    terminal disposition tokens) instead of per-entry files; keep BL-SCHEMA/BL-STALE/BL-CONFLICT
-    semantics over the new physical shape.
-- subject:
-    kind: cli
-    ref: backlog new
-  change: Author a new ACTIVE subsection in BACKLOG.md (title/opened/status/description/ provenance)
-    instead of scaffolding a per-entry file.
-- subject:
-    kind: code
-    ref: dadaia_workspace/features/backlog/document.py#load_document
-  change: Load items from BACKLOG.md ACTIVE subsections (one item per subsection) instead of globbing
-    per-entry files; intents/anchor binding preserved. T-120-08 cutover note (grill/PLAN §5) — the
-    per-entry loader `preview.load_backlog_items` this intent originally named is DELETED by this
-    same cutover, its replacement being exactly this anchor; the ref is repointed post-cutover so
-    the entry stays BL-SCHEMA-resolvable across the whole picked window, per the standing green
-    rule (ADR D1).
-- subject:
-    kind: code
-    ref: dadaia_workspace/features/specs/doctor_governance.py#_BACKLOG_SINGLE_SOURCE_FILES
-  change: Re-target SPEC-DOC-031 (and any sibling backlog-governance checks) at BACKLOG.md; drop
-    checks that only make sense for per-entry files. T-120-08 cutover note (grill/PLAN §6) — this
-    intent originally named `_BACKLOG_AGGREGATE_FILES`, DELETED by this same cutover and replaced
-    by `_BACKLOG_SINGLE_SOURCE_FILES`; the ref is repointed post-cutover for the same reason as
-    above.
-```
-
-### backlog-md-physical-consolidation
-- **Title:** Physical BACKLOG.md consolidation: per-entry files + candidates.md → single-source ACTIVE + LEDGER (#31)
-- **Opened:** 2026-08-15
-- **Status:** picked
-- **Description:** Execute the physical half of the ADR #14 convergence that v0.10.0 shipped as doctrine (law §5 Backlog + dd-backlog-definition §2): fold every live per-entry file under specs/backlog/*.md plus the candidates.md index into ONE specs/backlog/BACKLOG.md with an ACTIVE section (one strict-schema subsection per live candidate: Title, Opened, Status, Description, Provenance) and a LEDGER section (one line per closed item carrying its terminal disposition token). Never-delete law holds throughout: every terminal row from candidates.md and _archive/ frontmatter gets a LEDGER line; no record is lost. PM curation surface (specs/backlog/** is project-manager-owned). Sequences WITH/AFTER backlog-tooling-reconciliation — consolidating before the tooling ships would break `backlog new`/`backlog doctor`/SPEC-DOC-031, which still read and validate per-entry files (v0.10.0 SPEC §4.4/D5 + §4.5, R6).
-- **Provenance:** pre-approved intake P-2 (operator ratification at the v0.10.0 approval, SPEC §4.4/D5), materialized 2026-08-15; picked — v0.12.0 (SPEC §7)
-- **Intents:**
-```yaml
-- subject:
-    kind: doc
-    ref: memory/product/sdd/sdd-bug-backlog-governance.md#Backlog
-  change: 'The runtime-state reality matches the atom''s single-source BACKLOG.md doctrine: specs/backlog/
-    carries BACKLOG.md (ACTIVE + LEDGER) as the format of record; the per-entry files and candidates.md
-    are consolidated in, with provenance lines preserved per entry; the atom''s pending-consolidation
-    note is retired at the consolidating release''s CLOSURE.'
-```
-
 ### dd-skills-applyto-glob-collisions
 - **Title:** dd- skill family: applyTo glob collisions blur the one-skill-per-stage activation boundary (#32)
 - **Opened:** 2026-08-15
@@ -642,6 +589,8 @@ and proceeds either way.
 - git-objects-streamed-batch-reads · DELIVERED · v0.11.0 · 2026-08-15
 - closure-v14-perf-figure-correction · DELIVERED · v0.11.0 · 2026-08-15
 - self-scan-sentinel-integration-marker · DELIVERED · v0.11.0 · 2026-08-15
+- backlog-tooling-reconciliation · DELIVERED · v0.12.0 · 2026-08-15
+- backlog-md-physical-consolidation · DELIVERED · v0.12.0 · 2026-08-15
 - loud-flake-stats-key-residual · DELIVERED · fixed before materialization · 2026-08-14
 - frozen-wall-clock-baselines-in-repo-text · DELIVERED · baselines embedded in memory · 2026-08-14
 - dispose-published-denylist-term · REJECTED · void by construction under the range-scoped scan · 2026-08-14

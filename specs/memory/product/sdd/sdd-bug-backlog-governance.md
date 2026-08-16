@@ -19,7 +19,7 @@ tags:
 - backlog
 - bugs
 - gitflow
-token_estimate: 1300
+token_estimate: 1845
 last_updated: '2026-08-15'
 release_origin: v0.3.0
 ---

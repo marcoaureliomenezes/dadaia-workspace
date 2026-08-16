@@ -431,7 +431,18 @@ added; SPEC §5 satisfied file by file.
 
 ---
 
-- [ ] **T-120-13 — CLOSURE, dispositions, archive, version bump**
+- [x] **T-120-13 — CLOSURE, dispositions, archive, version bump** (first close `9d079389` reset for M1 review remediation `a76d55bf`; re-close = this commit: CLOSURE amended with corrected figures, sweep re-executed 28/54, token_estimate normalized 1300→1845, `0.9.0` mint, archive)
+
+**Marker note.** No `chore(tasks): start` reservation commit preceded **T-120-12 or T-120-13** —
+`product-engineer` was dispatched straight into the work, so the flip and the artifact collapse
+into one commit. The markers themselves are correct; the observable trace is absent. Disclosed in
+`CLOSURE.md` `## Drifts › missing-reservation-trace-for-t-120-12-13` — a drift that now exists
+(an earlier revision of this note asserted a disclosure that had not been written; the pre-PR
+review caught the forward reference).
+
+**Re-close note.** The first execution of this task committed at `9d079389` and was **reset** for
+pre-ship code-review remediation (M1 fixed at `a76d55bf`). The task is re-executed on the
+re-close commit; see `CLOSURE.md` `## Drifts › reopened-close-for-review-remediation`.
 
 **Owner role:** product-engineer (text) + software-engineer/dispatcher (**[git]** steps) ·
 **Commit:** `docs(T-120-13): close release v0.12.0`
