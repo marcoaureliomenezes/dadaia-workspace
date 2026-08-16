@@ -779,6 +779,22 @@ and proceeds either way.
     the same touch.'
 ```
 
+### self-scan-sentinel-archive-authored-blobs
+- **Title:** Self-scan sentinel — include archive paths whose blob is NEW at HEAD (#45)
+- **Opened:** 2026-08-16
+- **Status:** candidate
+- **Description:** Intake #3 item 3-9 (security ship review 2026-08-15T200554Z, INFO — approved as live demand at adjudication). The repo self-scan sentinel (tests/integration/test_repo_self_scan.py) excludes specs/_archive/** — correct for renamed/moved blobs (a FROZEN move republishes no object), but a CLOSURE/QA doc AUTHORED directly into the archive is an ordinary new blob the sentinel structurally cannot vet; each ship's real range scan covers it (both v0.11.0 V-proofs did), so this is defence-in-depth. Cheap increment: include archive paths whose blob is NEW at HEAD (content-addressed check), keeping the rename/relocation carve-out excluded.
+- **Provenance:** intake-report #3 item 3-9 approved — operator adjudication, 2026-08-16 (resolva todos — class-level fixes, no workarounds)
+- **Intents:**
+```yaml
+- subject:
+    kind: catalog
+    ref: sdd-gate-v3
+  change: 'The self-scan sentinel extends to archive-AUTHORED new blobs: a path under
+    specs/_archive/ whose blob is NEW at HEAD is scanned like any other new blob, while the
+    rename/relocation carve-out (byte-identical moved content) stays excluded.'
+```
+
 ## LEDGER
 
 - push-range-denylist-scan · DELIVERED · v0.9.0 · 2026-08-14
