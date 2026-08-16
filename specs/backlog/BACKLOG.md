@@ -737,6 +737,48 @@ and proceeds either way.
     way a derivable value has exactly one computing writer and zero hand-maintained copies.'
 ```
 
+### knowledge-duplication-doc-pass
+- **Title:** Knowledge-duplication doc pass — skill wording, gate-atom wording, DEAD markers, stale diagram, leaf-import inversion (#44)
+- **Opened:** 2026-08-16
+- **Status:** candidate
+- **Description:** Intake #3 items 3-11 + 3-3 + 3-14 + 3-15 + 3-17 (v0.11.0 + v0.12.0 CLOSURE §Intake, QA-2 MEDIUM + LOW/INFO; all five verified live at HEAD 3bb929bc). One consolidated pass — every finding is the same class: knowledge stated twice drifting apart; the fix restores one authoritative statement per fact. (1) QA-2, ai-engineer lane, BEFORE the next release closes: three skill surfaces must state the ACTIVE→LEDGER mechanism identically — dd-release-closure/SKILL.md:93 still templates the retired per-entry disposition row (specs/backlog/<slug>.md); fold the standing note that a closure's archive move adds one SPEC-DOC-031 per non-terminal slug named (the next closer measures AFTER the move); dd-release-definition/SKILL.md:89 says the sweep "Flips each fully-consumed slug's ## LEDGER line" while the shipped mechanism ADDS a LEDGER line and REMOVES the ACTIVE subsection, and its SPEC-DOC-031 paraphrase keys the check wrong — the next sweep follows these files literally. (2) sdd-gate-v3 atom wording, PE lane at the next memory window: the suppression sentence (atom line 135) is true-but-inexact post-M1 (pattern/slug layers require the value as that layer's own anchored matcher finds it); state that an oversized CURRENT object is never amnestied (test-pinned twice, memory-silent); generalize the FROZEN↔rename invariant to content-addressed byte-identical copies and qualify "new path still refuses" accordingly. (3) specs/assets/architecture/doctor-decomposition.md:44 still shows check_backlog_schema() — retired at the v0.12.0 cutover (diagram also stale on SPEC-DOC-029 / spec_context.lease). (4) document.py:43 imports the underscore-private _format_yaml_error from preview.py while preview.py deliberately declares a Protocol to avoid importing back — lift the formatter into a shared leaf or export it. (5) features/telemetry/store/schema.py:93,102 DEAD markers still point readers at the archived backlog/candidates.md — repoint at specs/backlog/BACKLOG.md or drop.
+- **Provenance:** intake-report #3 items 3-11, 3-3, 3-14, 3-15, 3-17 approved as one pass — operator adjudication, 2026-08-16 (resolva todos — class-level fixes, no workarounds)
+- **Intents:**
+```yaml
+- subject:
+    kind: doc
+    ref: memory/product/sdd/sdd-bug-backlog-governance.md#Backlog
+  change: 'The skill surfaces naming the disposition sweep (dd-release-closure,
+    dd-release-definition) state the shipped ACTIVE->LEDGER mechanism exactly as this
+    section does: a disposition ADDS a LEDGER line and REMOVES the ACTIVE subsection; the
+    retired per-entry row template is dropped and the archive-move SPEC-DOC-031 note is
+    folded in (measure after the move).'
+- subject:
+    kind: doc
+    ref: memory/product/sdd/sdd-gate-v3.md#Git Chokepoints
+  change: 'Three wording refinements at the next memory window (PE lane): the post-M1
+    per-layer suppression sentence made exact; the oversized-CURRENT-object never-amnestied
+    boundary stated; the FROZEN-rename invariant generalized to content-addressed
+    byte-identical copies with the amnesty consequence qualified.'
+- subject:
+    kind: code
+    ref: dadaia_workspace/features/backlog/preview.py#_format_yaml_error
+  change: 'Retire the leaf-to-leaf private import: lift _format_yaml_error into a shared
+    leaf or export it as API; document.py stops importing an underscore symbol from a
+    sibling leaf.'
+- subject:
+    kind: code
+    ref: dadaia_workspace/features/telemetry/store/schema.py#apply_migrations
+  change: 'The two DEAD-marker comments stop pointing at the archived backlog/candidates.md:
+    repoint at specs/backlog/BACKLOG.md or drop the pointer when the module is next touched.'
+- subject:
+    kind: doc
+    ref: memory/architecture.md#Primary Subsystems
+  change: 'The doctor-decomposition architecture diagram is refreshed: the retired
+    check_backlog_schema() box removed and the SPEC-DOC-029 / lease staleness corrected in
+    the same touch.'
+```
+
 ## LEDGER
 
 - push-range-denylist-scan · DELIVERED · v0.9.0 · 2026-08-14
