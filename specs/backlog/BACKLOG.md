@@ -508,6 +508,65 @@ is no longer archive-only.
     from the inventory so drift fails loud.
 ```
 
+### dadaia-artifact-event-driven-gc
+- **Title:** Event-driven GC for .dadaia artifact lifecycle (anti-slop)
+- **Opened:** 2026-08-17
+- **Status:** candidate
+- **Description:** Operator-approved 2026-08-17 from the TTL-strategy investigation: every `.dadaia` artifact class gets its deletion coupled to its natural death EVENT, with calendar TTL surviving only as an orphan backstop — artifacts should die when the thing they exist for dies, not when a clock says so. Six capabilities: (A) ack-on-consume — consumer skills delete the coordination handoff they read; artifact-bearing handoffs (those pointing at a report via `artifact.path`) follow their report's retention instead; (B) the pre-push git hook deletes security-reviewer verdict handoffs covered by the successfully pushed delta — a consumed push verdict has no further consumer; (C) dd-release-closure sweep — closing a release deletes/archives its reports, handoffs and lifecycle run records; (D) reconciler reaper — sessions/presence records stale beyond N×TTL are deleted along with their tmp markers (`reconciler-last-*`, `ctx-inject-fired-*`) and empty context dirs, and zombie states/lifecycle runs are reaped (measured 2026-08-17: 29 "running" zombies from closed releases + 38 dead "completed" records); (E) writer-side log rotation for `.dadaia/logs/*.jsonl` (cap ~1 MB, keep current+1); (F) venv-guard extension blocking mypy/pytest/ruff invocations with caching enabled — the cache must not be born (evidence: 6 duplicate mypy caches ~68 MB cleaned 2026-08-17, and a concurrent session recreated 5 new mypy cache dirs ~35 MB within 40 minutes of the cleanup) — plus a `dadaia tmp gc` backstop command (dated scratch >3 days, any *cache* dir, orphaned session markers) runnable from SessionStart. Evidence and full strategy: report `.dadaia/reports/dadaia-workspace/claude/2026-08-17T132142Z-dadaia-ttl-strategy.html` + handoff `.dadaia/handoff/dadaia-workspace/2026-08-17T132142Z-claude-dadaia-ttl-strategy.handoff.json` (validated VALID).
+- **Provenance:** operator request — approved in-session 2026-08-17 (operator-ratified intake, ADR #15; enters ACTIVE directly, no re-adjudication)
+- **Intents:**
+```yaml
+- subject:
+    kind: catalog
+    ref: agent-comms
+  change: 'Ack-on-consume for coordination handoffs: every consumer skill that reads a handoff
+    as its input contract deletes that handoff once consumed; handoffs carrying an artifact.path
+    are exempt from ack-deletion and follow their report''s retention instead. The rule lands
+    once in the handoff-consumer discipline (skills surface), not per-skill ad hoc.'
+- subject:
+    kind: code
+    ref: dadaia_workspace/features/chokepoints/service.py#iter_security_approvals
+  change: 'After a successful push, the pre-push chokepoint deletes the APPROVED security-reviewer
+    verdict handoff(s) whose review covered the delta just pushed — the verdict''s sole consumer
+    (the push gate) has consumed it; a verdict for an unpushed delta is never touched.'
+- subject:
+    kind: catalog
+    ref: agent-monitoring
+  change: 'dd-release-closure gains a GC sweep step: closing a release deletes or archives that
+    release''s reports, handoffs and lifecycle run records — the release''s death event is their
+    death event; nothing of a closed release lingers as live .dadaia state.'
+- subject:
+    kind: code
+    ref: dadaia_workspace/hooks/sdd_post_gate.py#_reconcile_working_tree
+  change: 'Reconciler reaper: session/presence records stale beyond N×TTL are deleted together
+    with their tmp markers (reconciler-last-*, ctx-inject-fired-*) and any empty context dirs
+    left behind; zombie lifecycle/state run records are reaped (29 "running" zombies from closed
+    releases + 38 dead "completed" measured 2026-08-17). Reaping stays best-effort/fail-open,
+    same posture as the reconciler it extends.'
+- subject:
+    kind: code
+    ref: dadaia_workspace/hooks/pre_gate.py#_append_latency
+  change: 'Writer-side rotation for .dadaia/logs/*.jsonl appenders: each writer caps its log at
+    ~1 MB and keeps current+1 rotated file — rotation happens at write time by the owner of the
+    file, never by an external cron; telemetry stays fail-open (rotation errors never change
+    a gate verdict).'
+- subject:
+    kind: code
+    ref: dadaia_workspace/hooks/venv_guard.py#evaluate_payload
+  change: 'Venv-guard extension: block mypy/pytest/ruff Bash invocations that would run with
+    caching enabled (missing -p no:cacheprovider / incremental / --no-cache posture) — the cache
+    must not be born. Block message carries the corrected command, matching the existing venv-guard
+    contract. Evidence: 6 duplicate mypy caches (~68 MB) cleaned 2026-08-17; a concurrent session
+    recreated 5 new cache dirs (~35 MB) within 40 minutes.'
+- subject:
+    kind: cli
+    ref: tmp gc
+    surface: new
+  change: '`dadaia tmp gc` orphan backstop: sweeps dated scratch older than 3 days, any *cache*
+    directory under .dadaia, and orphaned session markers; idempotent and safe to run from
+    SessionStart. Calendar-based deletion exists ONLY here — every other capability is event-driven.'
+```
+
 ### bugs-jsonl-whole-blob-per-append
 - **Title:** bugs.jsonl republishes its whole file as a new blob on every append — the dominant scan-cost and content-resurfacing driver
 - **Opened:** 2026-08-14
