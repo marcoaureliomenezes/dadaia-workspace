@@ -701,16 +701,32 @@ def test_backlog_new_rejects_slug_with_trailing_newline(tmp_path: Path) -> None:
 # Intent: CONTRACT — v0.4.2 A1.5 ─────────────────────────────────────────────────────
 
 
-def test_unreadable_backlog_md_diagnostic_carries_no_absolute_path(tmp_path: Path) -> None:
+def test_unreadable_backlog_md_diagnostic_carries_no_absolute_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     backlog_dir = tmp_path / "backlog"
     backlog_dir.mkdir()
     target = backlog_dir / "BACKLOG.md"
     target.write_text("## ACTIVE\n\n## LEDGER\n", encoding="utf-8")
-    target.chmod(0o000)
-    try:
-        doc = load_document(backlog_dir)
-    finally:
-        target.chmod(0o644)  # restore so tmp_path cleanup can remove it
+
+    # Portable unreadability simulation (not `target.chmod(0o000)`): POSIX permission
+    # bits are a platform no-op on Windows, so the chmod-based simulation never denies
+    # the read there and the OSError-handling path in load_document goes unexercised
+    # (bug: Windows CI green-lit a diagnostic path it never ran). Monkeypatching
+    # ``Path.read_text`` to raise for this exact target exercises the same
+    # `except OSError` branch identically on every platform. Matched by value equality
+    # (`self == target`), not identity, because ``load_document`` builds its own
+    # ``Path`` instance for the same file.
+    real_read_text = Path.read_text
+
+    def _read_text_denied(self: Path, *args: object, **kwargs: object) -> str:
+        if self == target:
+            raise PermissionError(13, "Permission denied", str(self))
+        return real_read_text(self, *args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(Path, "read_text", _read_text_denied)
+
+    doc = load_document(backlog_dir)
 
     assert doc.errors, "an unreadable file must surface a diagnostic, never raise"
     message = doc.errors[0].message

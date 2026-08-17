@@ -58,7 +58,13 @@ from dadaia_workspace.features.backlog.preview import format_yaml_error
 #: ``yaml.load`` call in this module (today: the ``**Intents:**`` fenced block) benefits
 #: uniformly, with no behavioural difference between the two (A11.3).
 try:
-    _YAML_LOADER: type[yaml.SafeLoader] = yaml.CSafeLoader
+    # ``CSafeLoader`` is not a subclass of ``SafeLoader`` under types-PyYAML's stubs
+    # (CSafeLoader mixes in the C-extension ``CParser``; SafeLoader mixes in the
+    # pure-Python ``Reader``/``Scanner``/``Parser``/``Composer`` — the two share only
+    # ``SafeConstructor``/``Resolver``, not a common Loader base), so the module-level
+    # constant must be typed as the union of both concrete loader types, never narrowed
+    # to either alone.
+    _YAML_LOADER: type[yaml.SafeLoader] | type[yaml.CSafeLoader] = yaml.CSafeLoader
 except AttributeError:  # pragma: no cover — exercised via the forced-fallback test
     _YAML_LOADER = yaml.SafeLoader
 
