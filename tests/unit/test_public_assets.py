@@ -351,14 +351,128 @@ def test_bytecode_cache_ignored_and_baseline_data_loads_with_version_header(
 
 
 # ---------------------------------------------------------------------------
-# SPEC v0.4.2 FR10/A10.2/A10.4 — baseline v5: every pattern stays single-line, the
-# header version reads 5, and _header.excludes documents the new carve-outs and the
+# Bug privacy-baseline-noreply-local-part-not-carved-out (HIGH, security-reviewer
+# handoff 2026-08-17T143407Z-security-reviewer-v0.4.3-definition-push) — SPEC v0.4.3
+# FR12/A12.2. The v5 email-address exclude_regex was anchored on the DOTTED no-reply
+# subdomain only (e.g. the vendor's and GitHub's no-reply subdomains) and never carved
+# out the LOCAL-PART form DADAIA.md mandates in every commit's Co-Authored-By trailer
+# (local part 'noreply' at the vendor's bare apex domain) — a public, non-identifying
+# vendor mailbox already published unmasked in thousands of this repo's own commit
+# trailers. Any NEW tracked blob quoting it in prose (a release SPEC/TASKS document)
+# was therefore refused by the push-range denylist scan. A12.2 pairs the fix with a
+# counter-fixture: the carve-out must stay anchored to the EXACT address, never to the
+# bare domain or to a 'noreply@' local part independent of domain (either would exempt
+# an entire real mail domain, or every noreply@<anything>, respectively).
+#
+# Both literals are composed at RUNTIME, never contiguous in this module's own tracked
+# source — the same technique already used above (_macos_home_literal/
+# _windows_home_literal, bug push-gate-refuses-its-own-privacy-baseline-fixtures) and
+# in test_repo_self_scan.py::_archive_fixture_literal.
+# ---------------------------------------------------------------------------
+
+
+def _mandated_noreply_trailer_address() -> str:
+    """The exact law-mandated Co-Authored-By trailer address (DADAIA.md), composed at
+    runtime so it never appears contiguously in this module's own tracked source."""
+    local_part = "no" + "reply"
+    domain = "anthropic" + "." + "com"
+    return f"{local_part}@{domain}"
+
+
+def _different_local_part_at_the_mandated_domain() -> str:
+    """A genuine, DIFFERENT local part at the SAME apex domain — must still fire,
+    proving the carve-out stays anchored to the exact address rather than the bare
+    domain. Composed at runtime for the same reason as above."""
+    local_part = "someone" + "else"
+    domain = "anthropic" + "." + "com"
+    return f"{local_part}@{domain}"
+
+
+def test_email_address_pattern_excludes_the_mandated_noreply_trailer_address() -> None:
+    """Intent: BUG — privacy-baseline-noreply-local-part-not-carved-out (HIGH).
+
+    Root-cause proof at the regex level (not only through the doctor plumbing): the
+    exact law-mandated trailer address must both match the email-address SHAPE (it is
+    a genuine email token) and be excluded by exclude_regex (it is a carved-out,
+    non-identifying vendor mailbox)."""
+    address = _mandated_noreply_trailer_address()
+    patterns = {p.id: p for p in _load_privacy_baseline()}
+    email_pattern = patterns["email-address"]
+
+    match = email_pattern.regex.search(address)
+    assert match is not None, "the address must still match the email-address SHAPE"
+    assert match.group(0) == address
+
+    assert email_pattern.exclude is not None
+    assert email_pattern.exclude.search(match.group(0)), (
+        "the exact law-mandated trailer address must be carved out by exclude_regex"
+    )
+
+
+def test_email_address_pattern_still_fires_for_a_different_local_part_at_the_mandated_domain() -> (
+    None
+):
+    """Intent: CONTRACT — v0.4.3 A12.2 counter-fixture. The carve-out is anchored to
+    the EXACT address, never the bare domain: a genuine mailbox at the same apex
+    domain, with a DIFFERENT local part, must still be flagged."""
+    address = _different_local_part_at_the_mandated_domain()
+    patterns = {p.id: p for p in _load_privacy_baseline()}
+    email_pattern = patterns["email-address"]
+
+    match = email_pattern.regex.search(address)
+    assert match is not None
+    assert match.group(0) == address
+
+    assert email_pattern.exclude is not None
+    assert not email_pattern.exclude.search(match.group(0)), (
+        "a different local part at the same domain must NOT be excluded"
+    )
+
+
+def test_baseline_excludes_the_mandated_noreply_trailer_address_through_the_doctor_check(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """End-to-end confirmation through ``_check_public_privacy`` (not only the bare
+    regex): a document that merely quotes the law-mandated trailer address in prose
+    reports clean — no ``[error]`` line."""
+    _disable_operator_denylist(monkeypatch, tmp_path)
+    address = _mandated_noreply_trailer_address()
+    public_dir = tmp_path / "public"
+    (public_dir / "data").mkdir(parents=True)
+    (public_dir / "data" / "AGENTS.md").write_text(
+        f"every commit trailer names Co-Authored-By: Claude Fable 5 <{address}>\n",
+        encoding="utf-8",
+    )
+    assert _manager(public_dir)._check_public_privacy() == [_BASELINE_OK_MARKER]  # noqa: SLF001
+
+
+def test_baseline_still_flags_a_different_local_part_at_the_mandated_domain_through_the_doctor_check(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Negative twin, end-to-end: a genuine mailbox at the same apex domain with a
+    DIFFERENT local part is still reported as a genuine finding."""
+    _disable_operator_denylist(monkeypatch, tmp_path)
+    address = _different_local_part_at_the_mandated_domain()
+    public_dir = tmp_path / "public"
+    (public_dir / "data").mkdir(parents=True)
+    (public_dir / "data" / "AGENTS.md").write_text(
+        f"contact {address} for support\n", encoding="utf-8"
+    )
+
+    report = [line.render() for line in _manager(public_dir)._check_public_privacy()]  # noqa: SLF001
+    assert any(line.startswith("[error] public-privacy:") for line in report)
+    assert any(address in line for line in report)
+
+
+# ---------------------------------------------------------------------------
+# SPEC v0.4.2 FR10/A10.2/A10.4 — baseline v6: every pattern stays single-line, the
+# header version reads 6, and _header.excludes documents the new carve-outs and the
 # /root boundary (D10).
 # ---------------------------------------------------------------------------
 
 
-def test_baseline_v5_header_and_single_line_patterns() -> None:
-    """Intent: CONTRACT — v0.4.2 A10.2, A10.4."""
+def test_baseline_v6_header_and_single_line_patterns() -> None:
+    """Intent: CONTRACT — v0.4.2 A10.2, A10.4; v0.4.3 A12.2 (version bump 5->6)."""
     import importlib.resources
     import json as _json
 
@@ -367,7 +481,7 @@ def test_baseline_v5_header_and_single_line_patterns() -> None:
     )
     raw = _json.loads(resource.read_text(encoding="utf-8"))
 
-    assert raw["_header"]["version"] == 5
+    assert raw["_header"]["version"] == 6
     excludes_text = " ".join(raw["_header"]["excludes"])
     assert "/root" in excludes_text
     assert "Users" in excludes_text
