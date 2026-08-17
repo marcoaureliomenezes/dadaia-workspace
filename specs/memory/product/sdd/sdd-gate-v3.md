@@ -2,17 +2,20 @@
 slug: sdd-gate-v3
 title: sdd-gate-v3
 category: product
-tldr: "No-lock SDD enforcement: path/mode gates, advisory presence, and a develop-only, denylist-scanned push boundary that never re-refuses a path's published value."
+tldr: "No-lock SDD enforcement: path/mode gates, advisory presence, and a develop-only, denylist-scanned push boundary with fail-closed single-path amnesty."
 summary: >-
   The merged Python PreToolUse gate enforces root whitelist, workspace venv usage,
   path class, phase, and the caller's own mode. It never waits for or blocks on another
   session. Presence is advisory. Git pre-commit warns only; pre-push enforces the CI
   preflight, develop-only branch policy, a range-scoped denylist scan of the new objects
   the push would publish, and a security verdict covering the develop delta. The scan
-  reads a chunk-bounded batched git conversation, suppresses a hit whose matched value
-  the same path already published, derives its foreign-name layer from the context
-  registry, partially scans and honestly reports oversized blobs, and masks private
-  path segments in everything it prints.
+  reads a chunk-bounded batched git conversation, suppresses a hit only when the same
+  single path already published that exact value, derives its foreign-name layer from
+  the context registry and names it when that layer degrades, partially scans and
+  honestly reports oversized blobs, raises a typed error rather than reporting coverage
+  it did not achieve, and masks private path segments through the detector's own
+  matchers in everything it prints. The packaged baseline covers the home-path layout
+  of all three declared platforms.
 tags:
 - sdd
 - gate
@@ -20,9 +23,8 @@ tags:
 - enforcement
 - no-locks
 - privacy
-token_estimate: 1600
-last_updated: '2026-08-15'
-release_origin: v0.3.0
+last_updated: '2026-08-16'
+release_origin: v0.4.2
 ---
 
 ## Purpose
@@ -133,7 +135,7 @@ A new blob is not the same thing as a new publication. Where the range has a res
 base, every scanned object also carries the **prior published text of its own path**,
 resolved at that base inside the same chunk loop through two extra batched calls per chunk —
 never one per blob — and the matcher suppresses a candidate hit **iff the exact matched value
-occurs, case-insensitively, in that prior text**. Three consequences define the semantics:
+was already published at that same path**. Three consequences define the semantics:
 
 - editing a file that already published the matched value at the same path never refuses, so
   the gate never demands a rewrite of content the operator already published;
@@ -144,12 +146,32 @@ occurs, case-insensitively, in that prior text**. Three consequences define the 
   on the pattern id or the term layer. That distinction is the whole difference between an
   amnesty and a smuggling path.
 
+"Already published that value" is decided per layer, in each layer's own defined semantics,
+so the two sides of the comparison are never anchored differently:
+
+| Layer | Suppressed when the prior text |
+|---|---|
+| operator denylist | contains the term as a literal, case-insensitive substring — the same notion detection itself uses |
+| baseline pattern | yields, under that same anchored pattern re-run over it, an occurrence whose value equals the current matched value case-insensitively — never a raw substring test, so a longer published path value cannot amnesty an unrelated new value it merely contains |
+| foreign name | matches that name's own anchored `\bname\b` search, where the pattern *is* the value |
+
+A blob reachable at **more than one path anywhere in the pushed range** receives no prior
+text at all and is therefore never amnestied — fail-closed, because a blob is content-
+addressed and one shared object cannot be attributed to the single path whose publication
+history the predicate keys on. Reachability is unioned over every commit in the range, not
+only the tip tree, so a second path that exists in an intermediate commit and is gone by the
+tip still denies the amnesty; the outcome is independent of both tree order and commit
+order. The denial lives entirely in the object adapter — the matcher and its amnesty
+predicate take no multi-path parameter — and it is never a per-sha amnesty in either
+direction. An **oversized current object** likewise never carries prior text: the prior-side
+lookup rides the under-cap chunk loop only, so a blob scanned as a capped prefix is judged
+with no amnesty at all.
+
 In the `--not --remotes` fallback shape there is no single published base, so no object
 carries prior text and **no hit is ever suppressed** — a deliberate conservative boundary.
 The prior text serves the predicate and is discarded; only the masked term ever leaves the
-matcher. The suppression rule is expressed once and applies uniformly to all three term
-layers, and the matcher gains no parameter and no new input source to obtain it: the prior
-side arrives on the scanned object itself, so the decision logic stays a pure function of the
+matcher. The matcher gains no parameter and no new input source to obtain it: the prior side
+arrives on the scanned object itself, so the decision logic stays a pure function of the
 objects and terms it already receives.
 
 Term sources are additive, and the scan is never a no-op:
@@ -157,17 +179,27 @@ Term sources are additive, and the scan is never a no-op:
 1. the **operator denylist** when present — literal, case-insensitive substrings loaded
    from `$DADAIA_PRIVACY_DENYLIST` or `.dadaia/states/privacy_denylist.json`, which are
    operator-private by design and never enter the repository;
-2. the **packaged structural baseline** (version 4) — IPv4/IPv6 literals, internal
+2. the **packaged structural baseline** (version 5) — IPv4/IPv6 literals, internal
    hostnames, absolute home paths, email addresses, and secret-looking tokens — with its
-   `exclude_regex` carve-outs honored. The carve-out set is: loopback and documentation
-   address ranges; `example.*` hosts and the noreply mail domains; RFC-2606 reserved-TLD
-   email domains at any subdomain depth; the product's **own synthetic git commit identity**
-   host `workspace.local`, as an exact literal in both the internal-hostname pattern and as
-   an email domain, because it is a fixture host the product itself injects rather than an
-   operator's network; and the stdlib `Path.home` / `pathlib.Path.home` call forms, which the
-   internal-hostname pattern would otherwise read as a `.home` hostname. Every carve-out is
-   anchored to an exact literal: any other `.local` host, any other subdomain of the
-   carved-out host, and any real `.home` hostname still match;
+   `exclude_regex` carve-outs honored. The home-path layer covers the home layout of **every
+   platform the product declares support for**, one single-line pattern each (the scan
+   matches line by line): POSIX `/home/<user>`, macOS `/Users/<name>`, and Windows
+   `<drive>:\Users\<name>` at any drive letter. `/root` is deliberately **not** covered — it
+   carries no user-identifying segment and appears routinely in container documentation, so
+   including it would buy false positives and no privacy. The carve-out set is: loopback and
+   documentation address ranges; `example.*` hosts and the noreply mail domains; RFC-2606
+   reserved-TLD email domains at any subdomain depth; the product's **own synthetic git
+   commit identity** host `workspace.local`, as an exact literal in both the
+   internal-hostname pattern and as an email domain, because it is a fixture host the product
+   itself injects rather than an operator's network; the stdlib `Path.home` /
+   `pathlib.Path.home` call forms, which the internal-hostname pattern would otherwise read as
+   a `.home` hostname; and, per home-path pattern, its documentation placeholders plus that
+   platform's real non-personal system directories (`/Users/Shared`, `\Users\Public`,
+   `\Users\Default`). Every carve-out is anchored to an exact literal: any other `.local`
+   host, any other subdomain of the carved-out host, any real `.home` hostname, and any other
+   user name under any of the three home roots still match. The baseline file carries its own
+   version and an `excludes` rationale naming each carve-out and the `/root` boundary; a
+   change to the pattern set bumps that version;
 3. the **foreign names** — every Spec Context identity the workspace knows: the registry's
    context names unioned with its repo slugs unioned with the directory names under
    `repos/`, minus **both** identities of the repository being pushed (its context name and
@@ -176,7 +208,8 @@ Term sources are additive, and the scan is never a no-op:
    than from directories alone is what keeps a DEAD or relocated context protecting its name
    at exactly the lifecycle moment that name becomes more sensitive, not less. The registry
    reaches the CLI through a container seam, and a missing, empty or malformed registry
-   degrades to the directory-derived set rather than killing the push hook. Terms match on
+   degrades to the directory-derived set rather than killing the push hook — a degradation
+   that is never silent: exactly one stderr note names it and the scan proceeds. Terms match on
    word boundaries so a short name never fires inside a longer word, and
    **case-insensitively**, so a name written with different capitalisation is still caught.
    The whole matcher is case-insensitive on every layer.
@@ -187,7 +220,8 @@ denylist)`. The scan runs after branch policy and before the security-verdict lo
 a leaking push is refused for the leak rather than for a missing handoff; on a tag ref it
 is the only policy that runs.
 
-The boundary between fail-closed and fail-open is explicit:
+The boundary between fail-closed and fail-open is explicit, and one rule decides every row:
+**the gate never reports coverage it did not achieve.**
 
 | Situation | Verdict |
 |---|---|
@@ -195,16 +229,23 @@ The boundary between fail-closed and fail-open is explicit:
 | `git rev-list` or an object read fails | refuse, naming the git failure |
 | The prior-side lookup fails | refuse — an amnesty is never granted from a base the adapter could not read |
 | The path is absent at the base, or its prior blob is over the cap or undecodable | no prior content, so every hit on it refuses; absence is explicit and is never an empty string |
+| git answers the documented `<base>:<path> missing` for a prior-side lookup | ordinary absence — a genuinely new path is the common case, not a failure. The row is recognised by its `missing` **suffix**, so a path carrying embedded spaces is absence rather than a false desync |
 | The batch stream desynchronises, or a header field will not parse | abort with the reader's own typed error — no fabricated object is ever yielded, so nothing invented can reach a skip count |
 | A blob is not valid UTF-8 | skip that blob, count it, and report the count on the allow and refuse paths alike |
 | A blob exceeds the 5 MB per-object cap | scan its first 5 MB and report it as an oversized note; the remainder is never fetched |
+| A blob is reachable at more than one path in the range | no prior text at all, so every hit on it refuses |
+| The bounded oversized read fails and delivers fewer than the cap's bytes | raise the typed read error — a failed read is never reported as a successfully (if trivially) scanned prefix |
 | No object source wired into the decision function | refuse at the CLI boundary — the source is a required parameter, so an unwired production path is a defect, not a bypass |
 
 The cap is a partial-coverage fail-open, not a blind spot, and it is reported as one. An
 over-cap blob is read through a separate bounded per-object stream that is closed once the
 cap's worth of bytes is in hand, so git stops producing and the remainder is genuinely never
 fetched, and that prefix is matched like any other content — an oversized text blob whose
-first 5 MB carries a term refuses the push. The two skip classes stay separately counted and
+first 5 MB carries a term refuses the push. Closing that stream early makes git exit non-zero
+on the *success* path, and that one intentional early close is the **only** failure shape the
+read swallows: a read that failed while delivering fewer than the cap's worth of bytes — a
+nonexistent oid, a non-blob sha — raises the typed error instead of returning a zero-byte
+"partially scanned" prefix. The two skip classes stay separately counted and
 separately worded: the binary count covers genuinely undecodable blobs only, while oversized
 blobs are carried as structured notes bearing the path, the total size and the scanned bytes,
 and rendered as what they are — first 5 MB scanned, remainder **not** scanned, verify by
@@ -217,20 +258,28 @@ case that would have demanded such a list — a term already published inside
 `specs/_archive/` — is void by construction:
 
 > **FROZEN↔scan invariant.** `specs/_archive/` is FROZEN (`DADAIA.md` §3): it is never
-> edited, and it is entered only by `git mv`. A rename creates no new blob — git reuses the
-> existing blob object. A tainted archived file therefore can never appear as a *new* object
-> of any future pushed range, and the already-published term is amnestied by construction
-> rather than by exception list. The invariant holds exactly as long as `_archive/` stays
-> FROZEN; if a future release ever edits an archived file, the scan will — correctly —
-> refuse the push.
+> edited, and it is entered only by `git mv`. Git is content-addressed, so relocating a file
+> whose bytes are unchanged publishes no new object — the existing blob is reused. A tainted
+> archived file therefore can never appear as a *new* object of any future pushed range, and
+> the already-published term is amnestied by construction rather than by exception list. The
+> invariant holds exactly as long as `_archive/` stays FROZEN; if a future release ever edits
+> an archived file, the scan will — correctly — refuse the push.
 
-That invariant covers **renames of existing blobs**, and only those. A document *authored*
-into `specs/_archive/` — a `CLOSURE.md` written at close time, a QA artifact created in
-place — is an ordinary new blob: its content has never been published, the archive path
-grants it nothing, and the scan reads it like any other new object. This is correct
-behaviour, and it is the reason archive-time documents follow the redaction-at-authoring
-doctrine the quality-assurance atom records: a closure that transcribes a diagnostic literal
-refuses its own push. The blob-reuse guarantee is a property of `git mv`, not of the directory.
+The guarantee is content-addressing, not the directory: it covers **any byte-identical copy
+or relocation of an already-published blob**, and only those. A document *authored* into
+`specs/_archive/` — a `CLOSURE.md` written at close time, a QA artifact created in place — is
+an ordinary new blob: its content has never been published, the archive path grants it
+nothing, and the scan reads it like any other new object. This is correct behaviour, and it
+is the reason archive-time documents follow the redaction-at-authoring doctrine the
+quality-assurance atom records: a closure that transcribes a diagnostic literal refuses its
+own push.
+
+The repository's own self-scan sentinel draws the same line from the other side. It does not
+exclude `specs/_archive/**` wholesale: an archive-prefixed path is scanned **iff its blob is
+new at HEAD** — precisely, its blob sha is absent from `HEAD^`'s tree. An archive-authored
+document is therefore covered, a relocation into the archive republishes an existing sha and
+stays excluded, and an unavailable `HEAD^` (a shallow clone, an initial commit) degrades to
+plain exclusion rather than to a failure.
 
 The refusal is satisfiable and masked. Per offending object it names the ref
 (`<local-ref> → <remote-ref>`), the blob path with the 1-based line number of the first
@@ -244,13 +293,22 @@ are listed, followed by a count of the remainder. `git push --no-verify` remains
 single traceable bypass and is named in the message.
 
 The masking is stated over a class, not a call site: **every operator-facing string the gate
-emits that names a blob path masks that path's private-name-bearing segments** — today the
-denylist refusal and the oversized note, and any future channel by inheritance. The path is
-split on `/` and only the segments matching a term source are replaced, through the same
-stdlib-pure primitive in `core/redaction.py` that the `--redact` operator surface consumes
-([[architecture]]); the line number, the short sha and every non-matching segment are left
-alone, so the operator can still find the file, and a path that matches nothing renders
-byte-identically to an unmasked one.
+emits that names a blob path masks that path's private-name-bearing segments** — the denylist
+refusal, the oversized note, the git-failure refusal, and any future channel by inheritance.
+The path is split on `/` and only the segments matching a term source are replaced; the line
+number, the short sha and every non-matching segment are left alone, so the operator can
+still find the file, and a path that matches nothing renders byte-identically to an unmasked
+one.
+
+What decides "offending segment" is the **detector's own compiled matchers**, not a second
+predicate: the masker consumes the very case-insensitive, hyphen-aware matchers the scan
+detects with, so detector-hit implies masker-hit by construction and a segment like
+`Acme-Corp` can never render unmasked for a term the scan already flagged. The operator-facing
+`--redact` CLI surface keeps its own placeholder shape and its own stdlib-pure primitive in
+`core/redaction.py` ([[architecture]]) — a different channel, deliberately not merged with
+this one. A failed object read is masked at the same boundary: the typed read error carries
+the offending path as a **structured field** rather than embedded in its message, so no
+refusal ever interpolates a raw path or a raw exception string.
 
 Measured cost on this repository's own content, on the shipped code. The fallback shape —
 the whole reachable history a fresh clone presents, 9,095 blobs and 130.29 MB — reads in
@@ -258,6 +316,10 @@ the whole reachable history a fresh clone presents, 9,095 blobs and 130.29 MB �
 with matching accounting for ~98% of the total. The ordinary resolvable-base range is the
 one operators actually meet and is three orders of magnitude cheaper: a 70-blob push costs
 ~48 ms, about 12 ms of which is the prior-side lookup's two extra batched calls per chunk.
+The multi-path enumeration that denies amnesty to a shared blob costs one tree listing **per
+commit in the range**, never per object — a handful of calls for an ordinary push, and
+proportionally more only in the fallback shape that walks a whole history, where nothing
+degrades to a partial scan either way.
 **These are the product's figures; the 2.978 s benchmark recorded in the archived v0.9.0
 closure was measured on a synthetic corpus roughly two orders of magnitude smaller than real
 content and is superseded, as is the ~1.3 s/MB reading taken before the chunked reader
@@ -270,6 +332,9 @@ port the CLI injects, never a subprocess inside the decision module ([[architect
 adapter's parse boundary is typed in both directions — a truncated stream, a non-numeric size
 field or a desynchronised header raises the reader's own error rather than letting a raw
 parse exception escape or, worse, letting the reader keep parsing content bytes as headers.
+An unparseable batch row is typed or counted at every site that reads one, never invisible;
+what stays an ordinary filtered outcome is only what git documents as one — a non-blob entry
+and the `missing` absence row.
 
 ## Context Injection
 

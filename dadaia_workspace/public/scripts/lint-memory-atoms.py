@@ -350,11 +350,6 @@ def _extract_wikilinks(body: str) -> list[str]:
     return _WIKILINK_RE.findall(body)
 
 
-def _estimate_tokens(body: str) -> int:
-    """Approximate body token count: word_count * 1.35 (stdlib only, no tiktoken)."""
-    return round(len(body.split()) * 1.35)
-
-
 # ---------------------------------------------------------------------------
 # Per-atom lint
 # ---------------------------------------------------------------------------
@@ -459,18 +454,10 @@ def lint_atom(
                 f"Wikilink [[{wikilink_slug}]] does not resolve to any .md file under {memory_dir}."
             )
 
-    # --- (g) token_estimate drift warning ---
-    token_estimate = fm.get("token_estimate")
-    if isinstance(token_estimate, int) and token_estimate > 0:
-        actual = _estimate_tokens(body)
-        if actual > 0:
-            drift = abs(actual - token_estimate) / token_estimate
-            if drift > 0.20:
-                result.warn(
-                    f"'token_estimate' drift: frontmatter says {token_estimate}, "
-                    f"computed ≈{actual} (drift {drift:.0%} > 20%). "
-                    "Update the frontmatter value."
-                )
+    # (g) the per-atom cost-signal drift warning: DELETED at SPEC v0.4.2 FR2/GRILL D5 —
+    # the catalog now COMPUTES that value from the body (features/specs/catalog.py and
+    # this script's own sibling generate-memory-catalog.py); with no stored frontmatter
+    # copy, there is nothing left to drift against.
 
     return result
 
@@ -611,7 +598,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"{errors} atom(s) have errors — fix before proceeding.", file=sys.stderr)
     else:
         print(
-            f"{warns} atom(s) have warnings (token_estimate drift or unknown headings).",
+            f"{warns} atom(s) have warnings (unknown headings).",
             file=sys.stderr,
         )
     return code

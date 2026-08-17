@@ -14,7 +14,6 @@ tags:
 - identity
 - lifecycle
 - anti-slop
-token_estimate: 340
 last_updated: '2026-08-07'
 release_origin: v0.3.0
 ---

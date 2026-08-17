@@ -2,35 +2,33 @@
 slug: pypi-distribution
 title: pypi-distribution
 category: product
-tldr: The published dadaia-workspace 0.2.x PyPI package, the release.yml OIDC publish pipeline, the wheel content contract, and the SDD-vs-package version split.
+tldr: The published dadaia-workspace PyPI package on a single version axis, the release.yml OIDC publish pipeline, and the wheel content contract.
 summary: >-
-  Owns PyPI distribution as product behavior — the live `dadaia-workspace` 0.2.x
-  package (PyPI since PRs #112/#113, ratified v0.1.61), the `.github/workflows/release.yml`
-  pipeline (version-vs-tag check → five test legs → build → release-gate approval →
-  OIDC trusted publishing + tag → post-publish smoke), the wheel content contract
-  (public assets ship in-package), and the documented version-scheme
-  split: SDD releases `v0.1.x` version the SDD process while the package `0.2.x`
-  versions the shipped library (ADR-2 — documented, never renumbered).
+  Owns PyPI distribution as product behavior — the live `dadaia-workspace` package, the
+  `.github/workflows/release.yml` pipeline (version-vs-tag check → five test legs → build →
+  release-gate approval → OIDC trusted publishing + tag → post-publish smoke), the wheel
+  content contract (public assets ship in-package), and the single version axis: the
+  `pyproject.toml` version tracks the published PyPI lineage and a release id is that same
+  minted number, `v`-prefixed.
 tags:
 - distribution
 - pypi
 - release
 - packaging
-token_estimate: 800
-last_updated: '2026-07-16'
-release_origin: v0.2.5
+last_updated: '2026-08-16'
+release_origin: v0.4.2
 ---
 
 ## Purpose
 
 `dadaia-workspace` is a published PyPI package: `pip install dadaia-workspace`
-installs the library and its `dadaia` CLI. The last PUBLISHED version is
-`0.2.2`; the next deploy version is `0.3.0` (`pyproject.toml` `version` is the single
-source). Consumer-validation candidates are throwaway wheels — they NEVER mint
-intermediate published versions; version numbers advance only at deploy time, on the
-operator's order. PyPI descriptions are immutable per release: a
-documentation-only fix to the project page requires a version bump, never an
-in-place edit.
+installs the library and its `dadaia` CLI. `pyproject.toml` `version` is the single source
+of the number, and it tracks one lineage: what PyPI has published. The latest published
+version is `0.4.1`; `0.4.2` is minted and stays unpublished until it is deployed.
+Consumer-validation candidates are throwaway wheels — they NEVER mint intermediate
+published versions; version numbers advance only at deploy time, on the operator's order.
+PyPI descriptions are immutable per release: a documentation-only fix to the project page
+requires a version bump, never an in-place edit.
 
 Publication is fully automated by `.github/workflows/release.yml` with **OIDC
 trusted publishing** — no long-lived PyPI token exists in the repository or its
@@ -38,7 +36,7 @@ secrets; the `pypi` GitHub environment carries the trust binding.
 
 ## Usage flow
 
-1. A version bump lands on `main` (`pyproject.toml` `version = "0.2.x"` — an
+1. A version bump lands on `main` (`pyproject.toml` `version = "<major.minor.patch>"` — an
    operational-change-lane commit or a release merge).
 2. `release.yml` fires on the `main` push. The `check` job compares the pyproject
    version against existing `v*` tags: tag exists ⇒ every downstream job skips
@@ -62,18 +60,23 @@ secrets; the `pypi` GitHub environment carries the trust binding.
 ## Typical trigger
 
 The operator orders a package release (version bump on `main`), or an agent needs
-to know how the shipped library reaches consumers and which version scheme a
-number refers to.
+to know how the shipped library reaches consumers and what a version number refers
+to.
 
 ## Differentiator
 
-**Version-scheme split (ADR-2, documented — never renumbered):** SDD release ids
-`v0.1.x` version the **SDD process** of this repository (specs, releases,
-archive continuity); the package version `0.2.x` versions the **shipped
-library** on PyPI. The two advance independently and both are correct in their
-own domain. Renumbering SDD releases to match the package would falsify archived
-history and break tag/PR continuity for zero information gain. When reading any
-`v`-prefixed id in `specs/`, it is an SDD release; a bare `0.2.x` is the package.
+**One version axis — the published PyPI lineage.** There is a single number, and it means
+what PyPI shows: a release id **is** the version that release mints, `v`-prefixed
+(`v0.4.2` ⇔ package `0.4.2`), so `pyproject.toml`, the git tag, the release directory and
+the CHANGELOG section for a shipped release all carry the same digits. No number is minted
+on an internal axis, and a release never renumbers itself to reconcile with the package.
+Reading any `v`-prefixed id in `specs/` and the bare number on PyPI, one resolves the other.
+
+`CHANGELOG.md` carries the reconciling preamble this implies: it states which of its
+historical headings were minted internally and never reached PyPI, maps them to the
+internal ids they documented, and declares the forward rule — from `0.4.2` onward, one
+`## [x.y.z]` section corresponds to exactly one published package version. Existing
+sections are never renamed or renumbered; the preamble carries the meaning instead.
 
 **Wheel content contract:** the wheel ships the complete runtime product —
 `dadaia_workspace/` with the full `public/` asset tree (agents, skills, rules,
@@ -93,6 +96,8 @@ workspace-venv bootstraps install the candidate itself instead of pinning the
 
 - `pyproject.toml` — `version` (single source of the package version) and the
   PyPI classifiers (`POSIX :: Linux + MacOS + Microsoft :: Windows`).
+- `CHANGELOG.md` — one section per published version, plus the preamble that reconciles
+  the headings predating that rule.
 - `.github/workflows/release.yml` — the release pipeline (inventoried in
   [[quality-assurance]]).
 - GitHub environments `release-gate` (human approval) and `pypi` (OIDC trusted

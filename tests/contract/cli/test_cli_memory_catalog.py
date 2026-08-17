@@ -108,6 +108,52 @@ def test_catalog_generate_success_shape(runner: CliRunner, tmp_path: Path) -> No
 
 
 # ---------------------------------------------------------------------------
+# A2.1 (SPEC v0.4.2 FR2/GRILL D5): token_estimate is COMPUTED from the atom body,
+# never read from frontmatter — proven over a fixture atom whose frontmatter declares
+# a deliberately WRONG number.
+# ---------------------------------------------------------------------------
+
+
+def test_catalog_generate_computes_token_estimate_ignoring_wrong_frontmatter(
+    runner: CliRunner, tmp_path: Path
+) -> None:
+    """Intent: CONTRACT — v0.4.2 A2.1."""
+    specs = tmp_path / "specs"
+    product_dir = specs / "memory" / "product"
+    product_dir.mkdir(parents=True)
+    body = "## Propósito\n\n" + " ".join(["word"] * 40) + "\n"  # 41 whitespace-split tokens
+    (product_dir / "computed-not-stored.md").write_text(
+        "---\n"
+        "slug: computed-not-stored\n"
+        "title: computed-not-stored\n"
+        "category: product\n"
+        "tldr: 'proves token_estimate is computed.'\n"
+        "summary: 'proves token_estimate is computed.'\n"
+        "tags: []\n"
+        "agent_tier: self-pull\n"
+        "token_estimate: 999999\n"  # deliberately wrong — must be ignored
+        "last_updated: '2026-06-01'\n"
+        "release_origin: test-release\n"
+        "---\n\n" + body,
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(app, ["catalog", "generate", "--specs-dir", str(specs)])
+    assert result.exit_code == 0, result.output
+
+    catalog_path = specs / "memory" / "product" / "catalog.json"
+    parsed = json.loads(catalog_path.read_text(encoding="utf-8"))
+    feature = next(f for f in parsed["features"] if f["slug"] == "computed-not-stored")
+
+    expected = round(len(body.split()) * 1.35)  # the ONE formula, features/specs/catalog.py
+    assert feature["token_estimate"] == expected, (
+        f"token_estimate must be computed from the body ({expected}), never the "
+        f"stale frontmatter value (999999) — got {feature['token_estimate']}"
+    )
+    assert feature["token_estimate"] != 999999
+
+
+# ---------------------------------------------------------------------------
 # T-MCE-03-2: Missing specs_dir → clear error
 # ---------------------------------------------------------------------------
 

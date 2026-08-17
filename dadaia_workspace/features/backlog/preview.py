@@ -33,6 +33,7 @@ from dadaia_workspace.features.backlog.subject_registry import (
 __all__ = [
     "PreviewResult",
     "bound_anchor_changes",
+    "format_yaml_error",
     "list_anchors",
     "resolve_one",
 ]
@@ -74,13 +75,14 @@ def list_anchors(registry: Registry, kind: SubjectKind | None = None) -> list[An
     return registry.list_anchors(kind)
 
 
-def _format_yaml_error(exc: yaml.YAMLError, *, line_offset: int = 0) -> str:
+def format_yaml_error(exc: yaml.YAMLError, *, line_offset: int = 0) -> str:
     """Render a YAMLError as ``<msg> (line <L>, column <C>)`` when a mark is available.
 
     Prefers the short ``problem`` message over ``str(exc)`` (which embeds the mark in a
     multi-line snippet). Line/column are 1-based; ``line_offset`` shifts the mark's
-    block-relative line to the FILE line the human will open. Reused verbatim by
-    :mod:`dadaia_workspace.features.backlog.document` to format a malformed
+    block-relative line to the FILE line the human will open. Public API (SPEC v0.4.2
+    FR3, GRILL P7 — no leaf imports a sibling leaf's underscore-private symbol), reused
+    verbatim by :mod:`dadaia_workspace.features.backlog.document` to format a malformed
     ``**Intents:**`` fenced-YAML block diagnostic (SPEC v0.12.0 FR1) — kept here as the
     one YAMLError-formatting home rather than duplicated.
     """
@@ -97,7 +99,7 @@ class _IntentBearing(Protocol):
     single-source ``document.ActiveItem`` (SPEC v0.12.0 FR1/FR2). A Protocol rather
     than importing :class:`~dadaia_workspace.features.backlog.document.ActiveItem`
     directly, so neither module imports the other's concrete type (``document.py``
-    already imports :func:`_format_yaml_error` from this module).
+    already imports :func:`format_yaml_error` from this module).
 
     Declared as a read-only ``@property`` (not a plain annotated attribute): the
     concrete type is a FROZEN dataclass, and mypy treats a frozen dataclass field as

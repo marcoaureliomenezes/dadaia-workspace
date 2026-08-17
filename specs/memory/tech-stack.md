@@ -5,7 +5,6 @@ category: core
 tldr: Python 3.12 Typer CLI; stdlib services; three entry harnesses (Claude Code, Codex, Kimi Code); strict quality gates.
 summary: Current language, dependency, runtime, model, testing, packaging, and command contracts for dadaia-workspace.
 tags: [tech-stack, dependencies, toolchain, constraints]
-token_estimate: 450
 last_updated: '2026-08-12'
 release_origin: v0.3.0
 ---

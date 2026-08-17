@@ -4,6 +4,102 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Versioning note (SPEC v0.4.2 FR13 — the PyPI lineage is the only version axis)
+
+ADR R2 (v0.4.2) retires the two-axis split between "package version" and "internal
+spec-release id": the **published PyPI lineage is the only axis this project tracks**,
+and the release id *is* the minted version (this release is `v0.4.2`, minting package
+version `0.4.2`). Measured directly against the package index at implementation time
+(`https://pypi.org/pypi/dadaia-workspace/json`, captured
+2026-08-16T17:32:59Z — evidence:
+`.dadaia/tmp/software-engineer/20260816/t-042-16-pypi-versions.json`): **13 versions are
+published**, `0.1.0` through `0.4.1`; `0.4.2` is not yet published — it is minted at this
+release's ship.
+
+The headings below from **`[0.9.0]` down through `[0.5.0]`** (inclusive of the three
+`[Unreleased] — spec release vX` sections nested among them) were **minted internally
+and never published to PyPI** — kept exactly as written, never renamed, renumbered or
+removed, mapped here to the internal spec-release id each one documents:
+
+| CHANGELOG heading | Internal spec-release id |
+|---|---|
+| `[0.9.0]` — 2026-08-15 | `v0.12.0` ("backlog-tooling-single-source") |
+| `[0.8.0]` — 2026-08-15 | `v0.11.0` ("scan-v2") |
+| `[0.7.1]` — 2026-08-15 | hotfix (Arm B, `hotfix/0.7.1`) — hotfixes mint no spec-release id, by design |
+| `[0.7.0]` — 2026-08-15 | `v0.10.0` (`dd-lifecycle-skills-family`) |
+| `[0.6.0]` — 2026-08-14 | `v0.9.0` (`push-range-denylist-scan`) |
+| `[0.5.2]` — 2026-08-14 | hotfix (Arm B, `hotfix/v0.5.2`) — hotfixes mint no spec-release id, by design |
+| `[0.5.1]` — 2026-08-14 | hotfix (Arm B, `hotfix/v0.5.1`) — hotfixes mint no spec-release id, by design |
+| `[Unreleased] — spec release v0.7.0` | `v0.7.0` (self-named in its own heading) |
+| `[Unreleased] — spec release v0.6.0` | `v0.6.0` (self-named in its own heading) |
+| `[Unreleased] — spec release v0.5.0` | `v0.5.0` (self-named in its own heading) |
+| `[0.5.0]` — Unreleased | `v0.3.0` (self-named in its own heading, "spec release v0.3.0") |
+
+**From `0.4.2` onward, one `## [x.y.z]` section corresponds to exactly one published
+package version** — no further internal spec-release id is minted under a
+package-version-shaped heading; the `[0.4.2]` section for this release is added at ship.
+
+**Known, separate gap — observed here, not reconciled by this preamble.** The same
+package-index measurement shows further pre-existing discrepancies between the
+CHANGELOG's `[0.1.x]` section headings and the real PyPI lineage — out of SPEC v0.4.2
+FR13's scope (reconciling them would add/rename/backfill headings, which A13.2 forbids
+for this task, so none is touched here):
+
+- Three existing headings do not match any published version: `[0.1.24] — Unreleased`,
+  `[0.1.7]` — 2026-06-13, and `[0.1.3]` — 2026-06-03 (PyPI's `0.1.x` lineage runs
+  `0.1.0`, `0.1.1`, `0.1.2`, `0.1.4`, `0.1.5`, `0.1.6` — there is no published `0.1.3`,
+  `0.1.7` or `0.1.24`).
+- Ten published versions have no CHANGELOG section at all: `0.1.2`, `0.1.5`, `0.1.6`,
+  `0.2.0`, `0.2.1`, `0.2.2`, `0.2.3`, `0.3.0`, `0.4.0`, `0.4.1`.
+
+Left exactly as written; a future task can pick this up.
+
+## [0.4.2] — 2026-08-16
+
+Release v0.4.2 "residual-convergence" — the first section under the one-axis rule
+(release id = minted package version, PyPI lineage; latest published 0.4.1). Fixes the
+three root causes behind the recurring per-release residual spray, at class level.
+Archived at `specs/_archive/releases/v0.4.2/`.
+
+### Added
+- **Range-wide multi-path amnesty denial (fail-closed)**: a blob reachable at more than
+  one path anywhere in the pushed range gets no prior-published-term amnesty — adapter
+  side only, matcher untouched.
+- **Privacy baseline v5**: structural home-path coverage for every declared platform —
+  POSIX `/home`, macOS `/Users`, Windows `C:\Users` — with literal-anchored carve-outs
+  and prose-form parity across the three patterns.
+- **Self-scan sentinel covers archive-authored blobs**: a NEW blob authored directly
+  into `specs/_archive/**` is scanned; `git mv` renames stay excluded (blob reuse).
+- **Review-before-archive canon**: the six-axis code review runs on the thawed tree
+  before close/archive (order: implementation → QA → code review → remediation →
+  memory/CLOSURE/archive → ship). Proven on its own first run: two HIGH findings fixed
+  and re-reviewed with zero reopened artifacts.
+- **Calibrated intake routing**: reviews record everything; record-only observations
+  terminate in the release CLOSURE or reviewer handoff; only actionable defects reach
+  the operator's intake report.
+
+### Changed
+- **One backlog grammar seam**: `backlog new` moved into `features/backlog/` and writes
+  through the same fence-aware parser that validates the document (write-then-verify).
+- **The refusal masker consumes the detector's own matchers** — one predicate for
+  "what is a private name"; `GitObjectReadError` carries a structured, maskable path.
+- **`token_estimate` is computed by the catalog generator** — the hand-maintained
+  frontmatter key is deleted from every memory atom and from the schema; derived
+  values are computed, never stored.
+- **SPEC-DOC-031 counts consumption, not conversation** (an archived SPEC's
+  `**Consumes:**` and CLOSURE `## Dispositions` rows) — the citation false-positive
+  class died (12 → 0 warnings) instead of being annotated item by item.
+- **Fence filter is O((H+F)·logF)** via bisect over ascending ranges; YAML loads via
+  CSafeLoader.
+- **Batch `missing` rows are classified by suffix**, so new paths containing spaces
+  are absence, not a desync refusal; the git-read fail-soft is narrowed to the
+  intentional early close only.
+
+### Removed
+- **The dead hotfix-release scaffold surface**: `dadaia specs hotfix open`, both
+  hotfix templates, and the unconditional `candidates.md` warning it emitted — Arm B
+  needs no release ceremony by law, so the tooling for one was pure bug surface.
+
 ## [0.9.0] — 2026-08-15
 
 Release v0.12.0 "backlog-tooling-single-source". Two pre-approved entries delivered

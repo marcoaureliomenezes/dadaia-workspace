@@ -74,6 +74,10 @@ _WIKILINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
 # catalog neither requires it as input (tolerate) nor emits it in output (drop). Kept in
 # lockstep with the production twin ``features/specs/catalog.py`` (pinned by
 # tests/contract/test_memory_catalog_render_contract.py).
+# ``token_estimate`` was removed here at SPEC v0.4.2 FR2/GRILL D5: COMPUTED from the
+# atom body (:func:`estimate_tokens`), never read from frontmatter — no longer required
+# as input, and forward-compatible with the CLOSURE-phase memory half that strips the
+# key from every atom entirely.
 _REQUIRED_FIELDS: tuple[str, ...] = (
     "slug",
     "title",
@@ -81,7 +85,6 @@ _REQUIRED_FIELDS: tuple[str, ...] = (
     "tldr",
     "summary",
     "tags",
-    "token_estimate",
 )
 
 
@@ -129,6 +132,17 @@ def _extract_depends_on(body: str) -> list[str]:
             seen.add(slug)
             result.append(slug)
     return result
+
+
+def estimate_tokens(body: str) -> int:
+    """Approximate an atom body's token count: ``word_count * 1.35`` (stdlib only).
+
+    SPEC v0.4.2 FR2/GRILL D5: MUST stay byte-identical to
+    ``features/specs/catalog.py:estimate_tokens`` — this standalone, importless
+    script cannot import that module, so the formula is duplicated by necessity and
+    kept aligned by ``tests/contract/test_memory_catalog_render_contract.py`` (A2.2).
+    """
+    return round(len(body.split()) * 1.35)
 
 
 def _validate_required(fm: dict[str, Any], path: Path) -> list[str]:
@@ -185,7 +199,7 @@ def _build_feature_entry(
         "summary": str(fm.get("summary", "")),
         "path": rel_path,
         "tags": list(fm.get("tags") or []),
-        "token_estimate": int(fm.get("token_estimate", 0)),
+        "token_estimate": estimate_tokens(body),
         "depends_on": depends_on,
     }
 

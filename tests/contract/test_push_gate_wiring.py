@@ -111,3 +111,65 @@ def test_mode_line_distinguishes_operator_denylist_from_baseline_only(
         input=f"refs/tags/v2 {tip_sha} refs/tags/v2 {_ZERO}\n",
     )
     assert "operator denylist + baseline" in with_operator.output
+
+
+# ---------------------------------------------------------------------------
+# SPEC v0.4.2 FR8(2)/GRILL P13/A8.3 — a malformed context registry no longer shrinks
+# the foreign-name layer silently: exactly one stderr note names the degradation, and
+# the scan still proceeds.
+# ---------------------------------------------------------------------------
+
+
+def test_malformed_registry_produces_exactly_one_stderr_note(monkeypatch, tmp_path: Path) -> None:
+    """Intent: CONTRACT — v0.4.2 A8.3.
+
+    A malformed registry file produces exactly one stderr note naming the
+    degradation, and the scan still proceeds (exit 0 — no denylist terms configured, so
+    nothing else refuses this push)."""
+    repo = tmp_path / "repo"
+    tip_sha = _init_repo(repo)
+
+    states = tmp_path / ".dadaia" / "states"
+    states.mkdir(parents=True)
+    (states / "spec_contexts.json").write_text("{not-json", encoding="utf-8")
+
+    monkeypatch.setattr(ci, "_repo_root", lambda: repo)
+    monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
+    monkeypatch.setattr(container, "build_git_object_reader", lambda: _SpyObjectSource())
+    monkeypatch.setattr(container, "load_denylist_terms", lambda: ())
+
+    result = _runner.invoke(
+        app,
+        ["ci", "push-gate-check"],
+        input=f"refs/tags/v1 {tip_sha} refs/tags/v1 {_ZERO}\n",
+    )
+
+    assert result.exit_code == 0, result.output
+    degradation_lines = [line for line in result.output.splitlines() if "registry" in line.lower()]
+    assert len(degradation_lines) == 1, (
+        f"expected exactly one degradation note, got {len(degradation_lines)}: {degradation_lines}"
+    )
+    assert degradation_lines[0].startswith("[pre-push]")
+
+
+def test_healthy_registry_produces_no_degradation_note(monkeypatch, tmp_path: Path) -> None:
+    """Intent: CONTRACT — v0.4.2 A8.3.
+
+    A healthy (absent) registry produces NO degradation note — only a
+    genuinely malformed registry does."""
+    repo = tmp_path / "repo"
+    tip_sha = _init_repo(repo)
+
+    monkeypatch.setattr(ci, "_repo_root", lambda: repo)
+    monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
+    monkeypatch.setattr(container, "build_git_object_reader", lambda: _SpyObjectSource())
+    monkeypatch.setattr(container, "load_denylist_terms", lambda: ())
+
+    result = _runner.invoke(
+        app,
+        ["ci", "push-gate-check"],
+        input=f"refs/tags/v1 {tip_sha} refs/tags/v1 {_ZERO}\n",
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "registry" not in result.output.lower()

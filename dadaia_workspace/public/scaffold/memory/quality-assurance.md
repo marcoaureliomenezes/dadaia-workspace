@@ -8,7 +8,6 @@ tags:
   - quality-assurance
   - testing
   - anti-slop
-token_estimate: 0
 last_updated: "2026-08-12"
 release_origin: v0.2.1
 ---

@@ -12,7 +12,6 @@ tags:
 - registry
 - ports
 - ttl
-token_estimate: 750
 last_updated: '2026-07-16'
 release_origin: v0.1.61
 ---

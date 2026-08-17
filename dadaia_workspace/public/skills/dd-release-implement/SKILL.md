@@ -30,6 +30,11 @@ reasons: `dadaia-task-manager` — referenced here, not restated.
 
 ## 4. Which review boundary applies now
 
+**Order (D8/FR5): review → closure → archive → ship.** The pre-PR six-axis code review
+of the delta runs on the thawed tree, before the `git mv` archive step — never after;
+only ship steps (merge to `develop`, diff security review, push, PR to `main`) follow
+archive. `dd-release-closure`'s finalization paragraph states the same order.
+
 Given "I am inside task T-N of `<segment>`", resolve top-to-bottom — the first matching
 row is the answer:
 
@@ -39,7 +44,7 @@ row is the answer:
 | All of `alpha-N`'s tasks review-ready, `qa-engineer` not yet `APPROVE` | Request the qa-engineer review | Push `develop`; merge; CLOSURE; `[x]` on any task in this alpha |
 | `qa-engineer` `APPROVE`d this `alpha-N` | Mark `[x]`; commit the qa artifact on the branch | Push `develop`, PR, merge, deploy, close — only `rc-N` ship unlocks those |
 | `rc-N` ship elected, not all three of qa/code/security `APPROVE`d the **same** commit | Rework loop; resubmit | Merge to `develop`; push; open PR; deploy; close |
-| `rc-N` ship, all three `APPROVE`d the same commit | Merge to `develop` (milestone b); diff security review; push; open PR `develop`→`main`; merge; close | — |
+| `rc-N` ship, all three `APPROVE`d the same commit (review cleared) | Mark `[x]`; memory update + `CLOSURE.md` + archive (`dd-release-closure`); merge to `develop` (milestone b); diff security review; push; open PR `develop`→`main`; merge | — |
 
 The **Review/QA gate cadence** (source of the table above, canonical home — this table
 exists nowhere else in `public/`):

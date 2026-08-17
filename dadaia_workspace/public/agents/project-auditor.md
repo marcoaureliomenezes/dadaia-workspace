@@ -259,6 +259,12 @@ Required sections:
 | LOW | Minor labelling mismatch or cosmetic inconsistency |
 | INFO | Observation with no action required |
 
+**Intake routing (FR6/R4).** Every drift item is recorded in `## Drift inventory` —
+never-silent, zero observations lost. Only **actionable** items (LOW+ with a concrete
+fix surface) belong in the PM's intake report; **record-only** items (INFO-grade,
+awareness-only, already-fixed-at-HEAD) terminate in this audit report and never enter
+intake.
+
 ---
 
 ## Hard rules

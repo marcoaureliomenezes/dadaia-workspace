@@ -13,7 +13,6 @@ tags:
 - agents
 - dispatch
 - sdd
-token_estimate: 570
 last_updated: '2026-08-15'
 release_origin: v0.3.0
 ---

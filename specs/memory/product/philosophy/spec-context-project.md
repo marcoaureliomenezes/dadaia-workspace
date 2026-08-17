@@ -12,7 +12,6 @@ tags:
 - sdd
 - lifecycle
 - concurrency
-token_estimate: 200
 last_updated: '2026-08-12'
 release_origin: v0.3.0
 ---

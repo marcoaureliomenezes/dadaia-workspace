@@ -33,11 +33,12 @@ from dadaia_workspace.core.protocols.git_object_reader import (
     ScannedObject,
 )
 from dadaia_workspace.core.protocols.process_ancestry import Ancestry
-from dadaia_workspace.core.redaction import compile_candidates
 from dadaia_workspace.features.chokepoints.denylist_scan import (
     BaselinePatternLike,
     Hit,
     OversizedNote,
+    compile_slug_patterns,
+    operator_terms_match,
     scan_objects,
 )
 from dadaia_workspace.features.spec_context import presence
@@ -368,8 +369,17 @@ class _PathMasker:
 
     Construct ONE instance per :func:`push_gate_decision` invocation and reuse it
     across every rendered string, so a repeated offending segment gets the SAME stable,
-    first-appearance ordinal placeholder (mirrors ``cli/redact.py#ContextRedactor``'s
-    per-invocation contract, built on the same ``core/redaction.py`` primitive).
+    first-appearance ordinal placeholder.
+
+    SPEC v0.4.2 FR4/GRILL D3: the offending-segment TEST consumes the detector's OWN
+    compiled matchers (``denylist_scan.operator_terms_match`` +
+    ``denylist_scan.compile_slug_patterns`` — the SAME predicates :func:`_first_match`
+    uses, case-insensitive, hyphen-aware word boundaries) instead of a second, narrower
+    predicate built from ``core.redaction.compile_candidates`` (case-SENSITIVE, and
+    treats ``-`` as a word character rather than a boundary — GRILL P8: a path segment
+    like ``Acme-Corp`` that the detector already flags for the lowercase term ``acme``
+    used to render UNMASKED). Case-insensitivity and word-boundary treatment are now
+    identical by construction: detector-hit implies masker-hit.
 
     Masking happens at PATH-SEGMENT granularity: the path is split on ``/``, each
     segment is tested, and only a matching segment is replaced wholesale — the line
@@ -385,15 +395,17 @@ class _PathMasker:
         baseline_patterns: Iterable[BaselinePatternLike],
         foreign_slugs: Iterable[str],
     ) -> None:
-        term_values = [term for term, _reason in denylist_terms]
-        self._literal_pattern = compile_candidates([*term_values, *foreign_slugs])
+        self._term_values = [term for term, _reason in denylist_terms if term]
+        self._slug_patterns = compile_slug_patterns(foreign_slugs)
         self._pattern_list = list(baseline_patterns)
         self._map: dict[str, str] = {}
 
     def _segment_is_offending(self, segment: str) -> bool:
         if not segment:
             return False
-        if self._literal_pattern is not None and self._literal_pattern.search(segment):
+        if operator_terms_match(self._term_values, segment):
+            return True
+        if any(compiled.search(segment) for _slug, compiled in self._slug_patterns):
             return True
         for pattern in self._pattern_list:
             for match in pattern.regex.finditer(segment):
@@ -491,6 +503,20 @@ def _compose_denylist_refusal(hits: list[tuple[PushRef, Hit]], path_masker: _Pat
     return "\n".join(lines)
 
 
+def _render_git_read_error(exc: GitObjectReadError, path_masker: _PathMasker) -> str:
+    """SPEC v0.4.2 FR4/A4.2: render a caught :class:`GitObjectReadError`'s detail with
+    its structured ``path`` (if any) masked through *path_masker* — the single render
+    boundary for this failure channel. Never ``repr(exc)``, and the path never reaches
+    the message unmasked: ``str(exc)`` is the message text the raise site composed
+    (already path-free — the path lives on ``exc.path``, not embedded in the string),
+    and the masked path is appended structurally here, once.
+    """
+    detail = str(exc)
+    if exc.path is not None:
+        detail = f"{detail} (path: {path_masker.mask_path(exc.path)})"
+    return detail
+
+
 def _dedup_new_objects(
     object_source: GitObjectReader,
     repo: Path,
@@ -564,8 +590,8 @@ def _run_denylist_scan(
                 allowed=False,
                 message=(
                     f"[pre-push] BLOCKED: reading the pushed-range git objects failed "
-                    f"({exc}) — a policy gate never skips what it cannot evaluate (fail "
-                    "closed).\n"
+                    f"({_render_git_read_error(exc, path_masker)}) — a policy gate never "
+                    "skips what it cannot evaluate (fail closed).\n"
                     "  If this push is a genuine emergency, git's sanctioned, traceable "
                     "bypass is `git push --no-verify` (discouraged; leaves a reflog "
                     "trace)."

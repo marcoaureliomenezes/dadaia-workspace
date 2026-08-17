@@ -12,6 +12,9 @@ Public API
 generate_catalog(specs_dir: Path) -> dict
     Read ``specs_dir/memory/product/<area>/*.md`` frontmatter and return the
     catalog dict.
+estimate_tokens(body: str) -> int
+    Compute an atom's ``token_estimate`` from its body (SPEC v0.4.2 FR2) — the value
+    is never read from frontmatter.
 
 Schema of the returned dict
 ---------------------------
@@ -69,6 +72,13 @@ _WIKILINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
 # renderers move in lockstep — the byte-identical twin is
 # ``public/scripts/generate-memory-catalog.py`` (pinned by
 # tests/contract/test_memory_catalog_render_contract.py).
+# ``token_estimate`` was removed here at SPEC v0.4.2 FR2/GRILL D5: the catalog COMPUTES
+# it from the atom body (:func:`estimate_tokens`) rather than reading a stored,
+# hand-maintained frontmatter copy — a value that is stored AND derivable drifts (two
+# instances measured 37% and 42% off across consecutive releases). It is no longer
+# required as INPUT; forward-compatible with the CLOSURE-phase memory half, which strips
+# the key from every atom's frontmatter entirely (A2.5 — this generator must keep
+# working with the key present-but-ignored today and absent tomorrow).
 _REQUIRED_FIELDS: tuple[str, ...] = (
     "slug",
     "title",
@@ -76,7 +86,6 @@ _REQUIRED_FIELDS: tuple[str, ...] = (
     "tldr",
     "summary",
     "tags",
-    "token_estimate",
 )
 
 
@@ -124,6 +133,21 @@ def _extract_depends_on(body: str) -> list[str]:
             seen.add(slug)
             result.append(slug)
     return result
+
+
+def estimate_tokens(body: str) -> int:
+    """Approximate an atom body's token count: ``word_count * 1.35`` (stdlib only, no
+    tiktoken dependency).
+
+    SPEC v0.4.2 FR2/GRILL D5: the ONE formula this release computes
+    ``token_estimate`` from — moved here from the (now-deleted)
+    ``public/scripts/lint-memory-atoms.py:_estimate_tokens`` drift-check duplicate, not
+    copied. ``public/scripts/generate-memory-catalog.py`` (the importless projected
+    twin, A2.2) carries an identical copy of this exact formula — the two are pinned to
+    byte-identical catalog output by
+    ``tests/contract/test_memory_catalog_render_contract.py``.
+    """
+    return round(len(body.split()) * 1.35)
 
 
 # ---------------------------------------------------------------------------
@@ -203,7 +227,7 @@ def generate_catalog(specs_dir: Path) -> dict[str, Any]:
                 "summary": str(fm.get("summary", "")),
                 "path": rel_path,
                 "tags": list(fm.get("tags") or []),
-                "token_estimate": int(fm.get("token_estimate", 0)),
+                "token_estimate": estimate_tokens(body),
                 "depends_on": depends_on,
             }
         )

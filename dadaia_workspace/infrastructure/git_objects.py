@@ -127,6 +127,90 @@ def _rev_list_candidates(repo: Path, local_sha: str, base: str | None) -> list[t
     return entries
 
 
+def _range_commit_shas(repo: Path, local_sha: str, base: str | None) -> list[str]:
+    """Return every COMMIT sha in the FR1 range (never ``--objects`` — commits only),
+    the SAME range shape :func:`_rev_list_candidates` walks, reused here so the two
+    callers agree on what "the range" means without either re-deriving it.
+
+    Commit count is bounded by the number of commits actually being pushed (an
+    ordinary push is a handful; this module's own ``commits_in_range`` metric on this
+    repository's v0.4.2 delta was 34) — orders of magnitude fewer than the object count
+    the SAME range's ``--objects`` walk produces, which is what keeps
+    :func:`_multi_path_shas`'s per-commit ``git ls-tree`` loop below affordable.
+    """
+    if base is not None:
+        args = ["git", "rev-list", local_sha, "--not", base, "--"]
+    else:
+        args = ["git", "rev-list", local_sha, "--not", "--remotes", "--"]
+    result = _run(args, repo)
+    if result.returncode != 0:
+        raise GitObjectReadError(f"git rev-list failed: {_decode(result.stderr).strip()}")
+    return [line for line in _decode(result.stdout).splitlines() if line]
+
+
+def _multi_path_shas(
+    repo: Path, local_sha: str, base: str | None, candidate_shas: set[str]
+) -> set[str]:
+    """The subset of *candidate_shas* reachable at MORE THAN ONE distinct path ANYWHERE
+    in the pushed RANGE (SPEC v0.4.2 FR7/A7.1/GRILL P10, ADR R1, D4; CR-3 remediation —
+    v0.4.2 code-review MEDIUM, operator ruling: SPEC wins over the cheaper tip-tree-only
+    form the release originally shipped).
+
+    ``git rev-list --objects`` (:func:`_rev_list_candidates`) cannot answer this
+    question by itself: git's own object walk visits each OBJECT once and reports only
+    the first tree ENTRY that references it, so a blob reachable at two paths in the
+    same tree is reported at only one of them regardless — the very thing that made
+    :func:`_blob_info`'s "first-seen path wins" choice tree-order-dependent in the
+    first place (GRILL P10), one layer further up than that function's own docstring
+    suggests. ``git ls-tree -r``, by contrast, enumerates every tree ENTRY (not every
+    distinct object) of the ONE commit it is pointed at, so a blob at two paths within
+    that commit's tree shows up twice — the primitive this detection actually needs.
+
+    CR-3: FR7/A7.1 say "reachable at more than one path in the RANGE", not only the
+    pushed tip's tree — a blob may be multi-pathed in an INTERMEDIATE commit (e.g. a
+    transient copy that is removed again before the tip) and single-pathed, or absent,
+    at the tip; the pre-remediation tip-tree-only call could not see that and silently
+    granted amnesty. The fix widens the enumeration to EVERY commit in the range
+    (:func:`_range_commit_shas`), unions each commit's ``(sha -> paths)`` mapping, and
+    flags a candidate multi-path the moment its UNIONED path set exceeds one entry —
+    tree-order-independent within each commit (unchanged from the pre-fix single-tree
+    call) AND commit-order-independent across the range (the new property).
+
+    **Bounded-cost note.** This costs one ``git ls-tree -r`` subprocess call PER COMMIT
+    in the range (never per object), each proportional to that commit's tree size — see
+    :func:`_range_commit_shas`'s docstring for why that count stays small for an
+    ordinary push. A pathological range with very many commits (e.g. a first push of an
+    entire deep history in the ``--not --remotes`` fallback shape) pays proportionally
+    more calls; nothing here silently degrades to a partial scan in that case (a fail-
+    open amnesty is a worse outcome than a slower push). If this ever becomes a
+    measured bottleneck, the calls can be CHUNKED (batched in groups via a single
+    ``git cat-file --batch`` conversation over ``<commit>^{tree}`` objects, mirroring
+    the FR9 chunking this module already applies to blob content) rather than the
+    current one-call-per-commit form — deferred until real cost data justifies it.
+    """
+    if not candidate_shas:
+        return set()
+    # local_sha is always included even when the range walk would already report it
+    # (the ordinary case) — a defensive guarantee that the tip's own tree is NEVER
+    # skipped, matching the pre-fix call's coverage exactly as a floor.
+    commit_shas = {local_sha, *_range_commit_shas(repo, local_sha, base)}
+    paths_by_sha: dict[str, set[str]] = {}
+    for commit_sha in commit_shas:
+        result = _run(["git", "ls-tree", "-r", "--full-tree", commit_sha, "--"], repo)
+        if result.returncode != 0:
+            raise GitObjectReadError(f"git ls-tree -r failed: {_decode(result.stderr).strip()}")
+        for line in _decode(result.stdout).splitlines():
+            meta, _, path = line.partition("\t")
+            parts = meta.split()
+            if len(parts) != 3 or parts[1] != "blob":
+                continue
+            sha = parts[2]
+            if sha not in candidate_shas:
+                continue
+            paths_by_sha.setdefault(sha, set()).add(path)
+    return {sha for sha, paths in paths_by_sha.items() if len(paths) > 1}
+
+
 def _blob_info(repo: Path, candidates: list[tuple[str, str]]) -> dict[str, tuple[str, int]]:
     """Return ``{sha: (first-seen path, size)}`` restricted to the candidates that are
     blobs.
@@ -136,6 +220,15 @@ def _blob_info(repo: Path, candidates: list[tuple[str, str]]) -> dict[str, tuple
     batched ``git cat-file --batch-check`` call rather than one subprocess per
     candidate. The size is what lets :func:`_read_blobs` apply the oversized-blob guard
     (R3) BEFORE ever fetching an oversized blob's content.
+
+    SPEC v0.4.2 FR8(3)/GRILL P12: a row that is NOT the documented 3-field
+    ``<sha> <type> <size>`` shape, or whose size field is non-numeric, RAISES the typed
+    error naming the row — every ``candidates`` entry is a sha :func:`_rev_list_candidates`
+    already confirmed reachable, so an unparseable response row here is a real
+    read-desync, never an ordinary outcome to silently drop (which would silently
+    shrink the scanned set with no signal anywhere). A ``blob``-type filter MISS (the
+    row parses fine but names a tree) stays the ordinary, expected, silent skip it
+    always was — that is not a parse failure.
     """
     if not candidates:
         return {}
@@ -152,13 +245,17 @@ def _blob_info(repo: Path, candidates: list[tuple[str, str]]) -> dict[str, tuple
     blob_sizes: dict[str, int] = {}
     for line in _decode(result.stdout).splitlines():
         parts = line.split()
-        if len(parts) != 3 or parts[1] != "blob":
-            continue
+        if len(parts) != 3:
+            raise GitObjectReadError(f"git cat-file --batch-check: unexpected row shape {line!r}")
+        if parts[1] != "blob":
+            continue  # an ordinary, expected filtered outcome (a tree) — never an error.
         sha, size_str = parts[0], parts[2]
         try:
             blob_sizes[sha] = int(size_str)
         except ValueError:
-            continue
+            raise GitObjectReadError(
+                f"git cat-file --batch-check: non-numeric size in row {line!r}"
+            ) from None
     info: dict[str, tuple[str, int]] = {}
     for sha, path in candidates:
         if sha in blob_sizes and sha not in info:
@@ -186,6 +283,27 @@ def _resolve_prior_texts(repo: Path, base: str, paths: list[str]) -> dict[str, s
     A path missing from the returned dict has NO prior content — never mapped to an
     empty string, which would silently amnesty nothing but would also hide the
     distinction (over-cap / undecodable / genuinely absent) from a future reader.
+
+    SPEC v0.4.2 FR8(3)/GRILL P12: the documented ``<spec> missing`` row (git's own
+    shape for "this path does not exist at this base") stays an ORDINARY absence,
+    exactly as before — a genuinely new path is the common case, not a failure. Any
+    OTHER row shape that is not the documented 3-field ``<sha> <type> <size>``
+    blob/tree response, or whose size field is non-numeric, RAISES the typed error
+    instead of silently falling into the same "absence" bucket — an unparseable row
+    here is a real read-desync (git answering something git-only ever answers on
+    internal inconsistency), never routine "this path never existed."
+
+    CR-1 (v0.4.2 code review HIGH, regression vs 741f2294): a *missing* row is git
+    ECHOING THE WHOLE ``<base>:<path>`` INPUT back, followed by `` missing`` — i.e.
+    ``<base>:<path> missing``. A path with embedded spaces (routine on macOS/Windows,
+    e.g. a screenshot filename) therefore does NOT split into a fixed 2-field row; a
+    field-COUNT classifier misreads the extra fields as a desynchronised row and
+    raises, blocking a legitimate push. The row is classified by SUFFIX instead —
+    ``line.endswith(" missing")`` identifies the absence row for ANY path, regardless
+    of how many spaces it contains — before ever looking at field count. This does not
+    affect :func:`_blob_info`'s own ``--batch-check`` classifier: that call is fed
+    SHAS, never paths, so its rows never carry a path's embedded whitespace and the
+    field-count classifier there stays exact for its own input shape.
     """
     if not paths:
         return {}
@@ -210,9 +328,18 @@ def _resolve_prior_texts(repo: Path, base: str, paths: list[str]) -> dict[str, s
 
     under_cap: dict[str, int] = {}
     for path, line in zip(unique_paths, check_lines, strict=True):
+        # CR-1: classify the documented "<base>:<path> missing" absence row by SUFFIX,
+        # not by field count — git echoes the WHOLE input line, so a path with one or
+        # more embedded spaces (e.g. "docs/my other file.md") never has a fixed field
+        # count. Checked BEFORE any `line.split()` field-count reasoning below.
+        if line.endswith(" missing"):
+            continue
         parts = line.split()
         if len(parts) != 3:
-            continue  # "<base>:<path> missing" (or any non-3-field line) -> absence
+            raise GitObjectReadError(
+                "git cat-file --batch-check: unexpected row shape resolving prior content",
+                path=path,
+            )
         _sha, obj_type, size_str = parts
         # code-reviewer LOW finding (v0.11.0 pre-PR review): a path that was a
         # DIRECTORY at the base resolves to its TREE object, not a blob — only
@@ -223,7 +350,10 @@ def _resolve_prior_texts(repo: Path, base: str, paths: list[str]) -> dict[str, s
         try:
             size = int(size_str)
         except ValueError:
-            continue
+            raise GitObjectReadError(
+                "git cat-file --batch-check: non-numeric size resolving prior content",
+                path=path,
+            ) from None
         if size <= _MAX_BLOB_BYTES:
             under_cap[path] = size
 
@@ -253,9 +383,14 @@ def _resolve_prior_texts(repo: Path, base: str, paths: list[str]) -> dict[str, s
             _obj_sha, _obj_type, size_str = parts
             content_size = int(size_str)
         except ValueError as exc:
+            # v0.4.2 FR4/GRILL P9: the offending PATH is a structured field, never
+            # embedded in the message string — the single render boundary
+            # (features.chokepoints.service) masks it before it reaches any
+            # operator-facing string. `exc` (the ValueError) still names the parse
+            # detail (an internal shape description, never a path) in the message.
             raise GitObjectReadError(
-                "git cat-file --batch stream desynchronised resolving prior content "
-                f"for path {path!r}: {exc}"
+                f"git cat-file --batch stream desynchronised resolving prior content: {exc}",
+                path=path,
             ) from exc
         content = out[pos : pos + content_size]
         pos += content_size + 1  # skip the trailing newline after the content block
@@ -270,6 +405,7 @@ def _read_blob_chunk(
     chunk_shas: list[str],
     blob_info: dict[str, tuple[str, int]],
     prior_texts: dict[str, str],
+    multi_path_shas: set[str],
 ) -> Iterator[ScannedObject]:
     """Yield one :class:`ScannedObject` per blob in *chunk_shas*, via a SINGLE batched
     ``git cat-file --batch`` conversation scoped to just this chunk.
@@ -287,6 +423,12 @@ def _read_blob_chunk(
     v0.11.0 FR2: *prior_texts* (already resolved for this chunk's distinct paths, or
     empty in the fallback shape) supplies each yielded object's ``prior_text`` — a
     lookup miss maps to the explicit absence ``None``, never an empty string.
+
+    SPEC v0.4.2 FR7/GRILL P10/ADR R1/D4: a sha in *multi_path_shas* — reachable at more
+    than one path in this range — ALWAYS gets ``prior_text=None``, fail-closed,
+    regardless of what :func:`_resolve_prior_texts` resolved for its (arbitrarily
+    "first-seen") reporting path. The matcher itself is untouched: this is the ONLY
+    place the multi-path decision is made.
     """
     stdin_payload = ("\n".join(chunk_shas) + "\n").encode("utf-8")
     result = _run(["git", "cat-file", "--batch"], repo, input_bytes=stdin_payload)
@@ -312,7 +454,7 @@ def _read_blob_chunk(
             ) from exc
         content = out[pos : pos + content_size]
         pos += content_size + 1  # skip the trailing newline after the content block
-        prior_text = prior_texts.get(path)
+        prior_text = None if sha in multi_path_shas else prior_texts.get(path)
         try:
             text = content.decode("utf-8")
         except UnicodeDecodeError:
@@ -340,6 +482,17 @@ def _read_oversized_blob_prefix(repo: Path, sha: str) -> bytes:
     A missing ``git`` executable, or the read exceeding :data:`_TIMEOUT_S` with no
     prefix delivered, still raises :class:`GitObjectReadError` — the bound is on the
     NORMAL, expected-success path only, not on genuine git/environment failure.
+
+    SPEC v0.4.2 FR8(1)/GRILL P11/A8.1-A8.2: *after* the early-close ``wait()``, the
+    process's own exit status is inspected — a nonexistent oid or a non-blob object
+    (e.g. a tree sha) makes ``git cat-file blob`` fail immediately and deliver ZERO
+    bytes on stdout; pre-fix, that 0-byte outcome was indistinguishable from "genuinely
+    empty content" and was reported as a successfully (if trivially) scanned prefix. A
+    process that FAILED (``returncode not in (0,)``) and delivered FEWER than the cap's
+    worth of bytes now raises. A full-cap read keeps swallowing the terminate/EPIPE
+    outcome unconditionally (A8.2) — our own early close intentionally makes git exit
+    non-zero on the SUCCESS path too, so a full cap's worth of bytes never triggers
+    this check regardless of the exit status.
     """
     try:
         proc = subprocess.Popen(  # noqa: S603 — fixed argv, no shell
@@ -387,6 +540,11 @@ def _read_oversized_blob_prefix(repo: Path, sha: str) -> bytes:
         raise GitObjectReadError(
             f"git cat-file blob failed reading oversized object {sha}: {outcome}"
         ) from outcome
+    if len(outcome) < _MAX_BLOB_BYTES and proc.returncode not in (0,):
+        raise GitObjectReadError(
+            f"git cat-file blob failed reading oversized object {sha} "
+            f"(exit {proc.returncode}, {len(outcome)} byte(s) delivered before failure)"
+        )
     return outcome
 
 
@@ -423,7 +581,10 @@ def _read_oversized_blob(repo: Path, sha: str, path: str, size: int) -> ScannedO
 
 
 def _read_blobs(
-    repo: Path, blob_info: dict[str, tuple[str, int]], base: str | None
+    repo: Path,
+    blob_info: dict[str, tuple[str, int]],
+    base: str | None,
+    multi_path_shas: set[str],
 ) -> Iterator[ScannedObject]:
     """Yield one :class:`ScannedObject` per blob in *blob_info*.
 
@@ -459,7 +620,7 @@ def _read_blobs(
         if base is not None:
             chunk_paths = [blob_info[sha][0] for sha in chunk]
             prior_texts = _resolve_prior_texts(repo, base, chunk_paths)
-        yield from _read_blob_chunk(repo, chunk, blob_info, prior_texts)
+        yield from _read_blob_chunk(repo, chunk, blob_info, prior_texts, multi_path_shas)
 
 
 class GitSubprocessObjectReader:
@@ -484,4 +645,5 @@ class GitSubprocessObjectReader:
         base = remote_sha if _is_resolvable_commit(repo, remote_sha) else None
         candidates = _rev_list_candidates(repo, local_sha, base)
         blob_info = _blob_info(repo, candidates)
-        yield from _read_blobs(repo, blob_info, base)
+        multi_path_shas = _multi_path_shas(repo, local_sha, base, set(blob_info))
+        yield from _read_blobs(repo, blob_info, base, multi_path_shas)

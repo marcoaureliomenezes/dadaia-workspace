@@ -259,8 +259,9 @@ def test_dead_registry_context_name_and_slug_both_refuse_a_push_introducing_them
         ],
     )
 
-    registry_identities = container.load_registry_context_identities(workspace)
-    foreign_slugs = ci._foreign_repo_slugs(workspace, "pushing-repo", registry_identities)
+    registry_result = container.load_registry_context_identities(workspace)
+    assert registry_result.degraded is False
+    foreign_slugs = ci._foreign_repo_slugs(workspace, "pushing-repo", registry_result.identities)
     assert dead_name in foreign_slugs
     assert dead_slug in foreign_slugs
     assert "pushing-repo" not in foreign_slugs
@@ -306,8 +307,9 @@ def test_own_context_with_differing_name_and_slug_never_contributes_either_ident
         [_registry_ctx_row("own-context-name", repo_slug="own-repo-slug", state="alive")],
     )
 
-    registry_identities = container.load_registry_context_identities(workspace)
-    foreign_slugs = ci._foreign_repo_slugs(workspace, "own-repo-slug", registry_identities)
+    registry_result = container.load_registry_context_identities(workspace)
+    assert registry_result.degraded is False
+    foreign_slugs = ci._foreign_repo_slugs(workspace, "own-repo-slug", registry_result.identities)
 
     assert "own-context-name" not in foreign_slugs
     assert "own-repo-slug" not in foreign_slugs
@@ -315,32 +317,45 @@ def test_own_context_with_differing_name_and_slug_never_contributes_either_ident
 
 def test_missing_registry_yields_empty_and_never_crashes(tmp_path: Path) -> None:
     """SPEC v0.11.0 A5.4 (missing case): no registry file at all yields an empty
-    result — the push hook never dies on registry state."""
+    result — the push hook never dies on registry state. SPEC v0.4.2 A8.3: a missing
+    registry is a LEGITIMATE absence, not a degradation — `degraded` stays False (only
+    a genuinely malformed/unreadable registry sets it)."""
     workspace = tmp_path / "workspace-with-no-dadaia-dir"
-    assert container.load_registry_context_identities(workspace) == ()
+    result = container.load_registry_context_identities(workspace)
+    assert result.identities == ()
+    assert result.degraded is False
 
 
 def test_empty_registry_yields_empty_and_never_crashes(tmp_path: Path) -> None:
-    """SPEC v0.11.0 A5.4 (empty case)."""
+    """SPEC v0.11.0 A5.4 (empty case). SPEC v0.4.2 A8.3: an empty registry is not a
+    degradation either."""
     workspace = tmp_path / "workspace"
     _write_registry(workspace, [])
-    assert container.load_registry_context_identities(workspace) == ()
+    result = container.load_registry_context_identities(workspace)
+    assert result.identities == ()
+    assert result.degraded is False
 
 
 def test_malformed_registry_yields_empty_and_never_crashes(tmp_path: Path) -> None:
     """SPEC v0.11.0 A5.4 (malformed case): invalid JSON never raises — it degrades to
     the empty result, and the widened foreign-slug set falls back to the
-    directory-derived-only set."""
+    directory-derived-only set. SPEC v0.4.2 FR8(2)/A8.3: this IS a degradation —
+    `degraded` is True, unlike the missing/empty cases above — so the caller
+    (cli/commands/ci.py#push_gate_check) can surface exactly one stderr note naming it
+    (pinned at the CLI tier by
+    tests/contract/test_push_gate_wiring.py::test_malformed_registry_produces_exactly_one_stderr_note)."""
     workspace = tmp_path / "workspace"
     states = workspace / ".dadaia" / "states"
     states.mkdir(parents=True)
     (states / "spec_contexts.json").write_text("{not-json")
 
-    assert container.load_registry_context_identities(workspace) == ()
+    result = container.load_registry_context_identities(workspace)
+    assert result.identities == ()
+    assert result.degraded is True
 
     (workspace / "repos" / "own-slug").mkdir(parents=True)
     (workspace / "repos" / "sibling-dir").mkdir(parents=True)
-    foreign_slugs = ci._foreign_repo_slugs(workspace, "own-slug", ())
+    foreign_slugs = ci._foreign_repo_slugs(workspace, "own-slug", result.identities)
     assert foreign_slugs == ["sibling-dir"]
 
 

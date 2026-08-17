@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-16T00:09:53Z",
+  "generated_at": "2026-08-16T19:21:57Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -16,7 +16,7 @@
         "handoff",
         "schema"
       ],
-      "token_estimate": 1500,
+      "token_estimate": 1658,
       "depends_on": [
         "public-asset-distribution"
       ]
@@ -35,7 +35,7 @@
         "telemetry",
         "sessions"
       ],
-      "token_estimate": 1500,
+      "token_estimate": 1473,
       "depends_on": [
         "panel",
         "context-management",
@@ -57,7 +57,7 @@
         "dispatch",
         "sdd"
       ],
-      "token_estimate": 570,
+      "token_estimate": 597,
       "depends_on": [
         "sdd-gate-v3",
         "agent-comms",
@@ -81,7 +81,7 @@
         "derivation",
         "governance"
       ],
-      "token_estimate": 475,
+      "token_estimate": 404,
       "depends_on": [
         "agent-orchestration",
         "panel",
@@ -103,7 +103,7 @@
         "onboarding",
         "courses"
       ],
-      "token_estimate": 775,
+      "token_estimate": 671,
       "depends_on": [
         "workspace-init",
         "panel"
@@ -125,7 +125,7 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 2830,
+      "token_estimate": 2421,
       "depends_on": [
         "agent-orchestration",
         "workspace-init"
@@ -137,8 +137,8 @@
       "title": "pypi-distribution",
       "category": "product",
       "area": "distribution",
-      "tldr": "The published dadaia-workspace 0.2.x PyPI package, the release.yml OIDC publish pipeline, the wheel content contract, and the SDD-vs-package version split.",
-      "summary": "Owns PyPI distribution as product behavior — the live `dadaia-workspace` 0.2.x package (PyPI since PRs #112/#113, ratified v0.1.61), the `.github/workflows/release.yml` pipeline (version-vs-tag check → five test legs → build → release-gate approval → OIDC trusted publishing + tag → post-publish smoke), the wheel content contract (public assets ship in-package), and the documented version-scheme split: SDD releases `v0.1.x` version the SDD process while the package `0.2.x` versions the shipped library (ADR-2 — documented, never renumbered).",
+      "tldr": "The published dadaia-workspace PyPI package on a single version axis, the release.yml OIDC publish pipeline, and the wheel content contract.",
+      "summary": "Owns PyPI distribution as product behavior — the live `dadaia-workspace` package, the `.github/workflows/release.yml` pipeline (version-vs-tag check → five test legs → build → release-gate approval → OIDC trusted publishing + tag → post-publish smoke), the wheel content contract (public assets ship in-package), and the single version axis: the `pyproject.toml` version tracks the published PyPI lineage and a release id is that same minted number, `v`-prefixed.",
       "path": "specs/memory/product/distribution/pypi-distribution.md",
       "tags": [
         "distribution",
@@ -146,7 +146,7 @@
         "release",
         "packaging"
       ],
-      "token_estimate": 800,
+      "token_estimate": 973,
       "depends_on": [
         "quality-assurance",
         "public-asset-distribution",
@@ -168,7 +168,7 @@
         "projection",
         "dispatch"
       ],
-      "token_estimate": 480,
+      "token_estimate": 608,
       "depends_on": [
         "workspace-init",
         "tech-stack",
@@ -192,7 +192,7 @@
         "projection",
         "enforcement"
       ],
-      "token_estimate": 620,
+      "token_estimate": 481,
       "depends_on": [
         "workspace-init",
         "tech-stack",
@@ -217,7 +217,7 @@
         "projection",
         "binding"
       ],
-      "token_estimate": 481,
+      "token_estimate": 518,
       "depends_on": [
         "context-management",
         "workspace-init",
@@ -242,7 +242,7 @@
         "css",
         "tokens"
       ],
-      "token_estimate": 375,
+      "token_estimate": 319,
       "depends_on": [
         "panel"
       ]
@@ -262,7 +262,7 @@
         "http",
         "dashboard"
       ],
-      "token_estimate": 430,
+      "token_estimate": 296,
       "depends_on": [
         "agentic-entities",
         "agent-orchestration",
@@ -287,7 +287,7 @@
         "lifecycle",
         "anti-slop"
       ],
-      "token_estimate": 340,
+      "token_estimate": 394,
       "depends_on": [
         "spec-context-project",
         "sdd-gate-v3",
@@ -310,7 +310,7 @@
         "lifecycle",
         "concurrency"
       ],
-      "token_estimate": 200,
+      "token_estimate": 243,
       "depends_on": [
         "context-management",
         "sdd-gate-v3",
@@ -331,7 +331,7 @@
         "release-gate",
         "sdd"
       ],
-      "token_estimate": 300,
+      "token_estimate": 400,
       "depends_on": [
         "workspace-init",
         "tech-stack",
@@ -356,7 +356,7 @@
         "no-locks",
         "privacy"
       ],
-      "token_estimate": 470,
+      "token_estimate": 1021,
       "depends_on": [
         "quality-assurance",
         "spec-context-project",
@@ -406,7 +406,7 @@
         "parity",
         "multi-platform"
       ],
-      "token_estimate": 271,
+      "token_estimate": 212,
       "depends_on": [
         "public-asset-distribution",
         "harness-claude-code",
@@ -429,7 +429,7 @@
         "catalog",
         "discovery"
       ],
-      "token_estimate": 325,
+      "token_estimate": 281,
       "depends_on": [
         "public-asset-distribution",
         "context-management"
@@ -450,7 +450,7 @@
         "ports",
         "ttl"
       ],
-      "token_estimate": 750,
+      "token_estimate": 694,
       "depends_on": [
         "workspace-init",
         "panel"
@@ -472,7 +472,7 @@
         "repair",
         "privacy"
       ],
-      "token_estimate": 260,
+      "token_estimate": 306,
       "depends_on": [
         "quality-assurance",
         "context-management",
@@ -495,7 +495,7 @@
         "setup",
         "idempotent"
       ],
-      "token_estimate": 208,
+      "token_estimate": 266,
       "depends_on": [
         "public-asset-distribution",
         "multi-platform-parity",
@@ -517,7 +517,7 @@
         "import",
         "backup"
       ],
-      "token_estimate": 400,
+      "token_estimate": 335,
       "depends_on": [
         "context-management",
         "workspace-init"
@@ -530,7 +530,7 @@
       "category": "product",
       "area": "sdd",
       "tldr": "Event-sourced JSONL bugs, an operator-gated single-source backlog, release consumption, audit dispositions, and a develop-only four-branch git contract.",
-      "summary": "Bugs are append-only events; the backlog is the operator's demand queue, curated by project-manager in a single BACKLOG.md (ACTIVE + LEDGER) with purge-on-pick and continuous sanitizing — no agent materializes an entry, residuals reach the operator through a PM intake report. A release consumes an explicit picked set; closure and audit require terminal dispositions. Work is placed on four branch patterns with develop the only pushable one; a feature branch merges into develop at two milestones, each followed by a diff-based security review of the develop delta and a push. Bug, backlog and audit paths stay additive and never lock-gated.",
+      "summary": "Bugs are append-only events; the backlog is the operator's demand queue, curated by project-manager in a single BACKLOG.md (ACTIVE + LEDGER) with purge-on-pick and continuous sanitizing — no agent materializes an entry, residuals reach the operator through a PM intake report, and only actionable defects do — record-only observations terminate in the closure record. A release consumes an explicit picked set, ends in the fixed order review → closure → archive → ship, and requires terminal dispositions at closure and audit. Work is placed on four branch patterns with develop the only pushable one; a feature branch merges into develop at two milestones, each followed by a diff-based security review of the develop delta and a push. Bug, backlog and audit paths stay additive and never lock-gated.",
       "path": "specs/memory/product/sdd/sdd-bug-backlog-governance.md",
       "tags": [
         "sdd",
@@ -540,7 +540,7 @@
         "bugs",
         "gitflow"
       ],
-      "token_estimate": 1845,
+      "token_estimate": 2163,
       "depends_on": [
         "specs-doctor",
         "sdd-gate-v3",
@@ -553,8 +553,8 @@
       "title": "sdd-gate-v3",
       "category": "product",
       "area": "sdd",
-      "tldr": "No-lock SDD enforcement: path/mode gates, advisory presence, and a develop-only, denylist-scanned push boundary that never re-refuses a path's published value.",
-      "summary": "The merged Python PreToolUse gate enforces root whitelist, workspace venv usage, path class, phase, and the caller's own mode. It never waits for or blocks on another session. Presence is advisory. Git pre-commit warns only; pre-push enforces the CI preflight, develop-only branch policy, a range-scoped denylist scan of the new objects the push would publish, and a security verdict covering the develop delta. The scan reads a chunk-bounded batched git conversation, suppresses a hit whose matched value the same path already published, derives its foreign-name layer from the context registry, partially scans and honestly reports oversized blobs, and masks private path segments in everything it prints.",
+      "tldr": "No-lock SDD enforcement: path/mode gates, advisory presence, and a develop-only, denylist-scanned push boundary with fail-closed single-path amnesty.",
+      "summary": "The merged Python PreToolUse gate enforces root whitelist, workspace venv usage, path class, phase, and the caller's own mode. It never waits for or blocks on another session. Presence is advisory. Git pre-commit warns only; pre-push enforces the CI preflight, develop-only branch policy, a range-scoped denylist scan of the new objects the push would publish, and a security verdict covering the develop delta. The scan reads a chunk-bounded batched git conversation, suppresses a hit only when the same single path already published that exact value, derives its foreign-name layer from the context registry and names it when that layer degrades, partially scans and honestly reports oversized blobs, raises a typed error rather than reporting coverage it did not achieve, and masks private path segments through the detector's own matchers in everything it prints. The packaged baseline covers the home-path layout of all three declared platforms.",
       "path": "specs/memory/product/sdd/sdd-gate-v3.md",
       "tags": [
         "sdd",
@@ -564,7 +564,7 @@
         "no-locks",
         "privacy"
       ],
-      "token_estimate": 1600,
+      "token_estimate": 4971,
       "depends_on": [
         "context-management",
         "architecture",
@@ -586,7 +586,7 @@
         "validation",
         "sdd"
       ],
-      "token_estimate": 355,
+      "token_estimate": 606,
       "depends_on": [
         "sdd-bug-backlog-governance",
         "workspace-doctor",

@@ -11,9 +11,8 @@ tags:
 - doctor
 - validation
 - sdd
-token_estimate: 355
-last_updated: '2026-08-15'
-release_origin: v0.3.0
+last_updated: '2026-08-16'
+release_origin: v0.4.2
 ---
 
 ## Purpose
@@ -33,8 +32,8 @@ before release advancement or closure.
 - governance checks: event-sourced bug JSONL vocabulary and terminal state; the backlog
   single source. Two checks cover the backlog, both **WARNING**: SPEC-DOC-031 iterates the
   `## ACTIVE` subsections of `specs/backlog/BACKLOG.md` and flags an item left at a
-  non-terminal status while an archived SPEC or CLOSURE names its slug outside a
-  `## Backlog returns` section; SPEC-DOC-035 is the single-source invariant — any item
+  non-terminal status while an archived release **asserts** it was consumed; SPEC-DOC-035
+  is the single-source invariant — any item
   `*.md` loose directly under `specs/backlog/`, other than `BACKLOG.md` and `README.md`
   and excluding `_archive/` and `remote-bugs/`, is drift. No check reads `BACKLOG.md` as
   if it were a per-slug entry, so no finding is ever keyed to a phantom `BACKLOG` slug.
@@ -43,6 +42,22 @@ before release advancement or closure.
   second opinion on it.
 - constitution/version checks: required invariant references and pattern-version
   compatibility.
+
+SPEC-DOC-031 counts **consumption, not conversation**. Exactly two shapes assert that a
+release consumed a slug, and only they are read: an archived SPEC's `**Consumes:**`
+declaration, continuation lines included, and an archived CLOSURE's `## Dispositions` table
+rows. Candidate slugs are isolated as whole tokens, so a slug that is merely a substring of a
+longer word or of another slug never matches. Every other mention — a non-goal, a provenance
+note, an inheritance remark, a returns section, any prose at all — asserts nothing and is
+never evidence, which is why the check carries no section-exclusion list to maintain. The
+consequence is deliberate: the check under-detects a genuinely consumed slug whose SPEC never
+declared it, and that accepted false negative costs less than the false positives any
+free-text match over the same documents would produce. Severity stays WARNING, backstopped
+from the ledger side by `backlog doctor`'s BL-STALE.
+
+Because only archived documents assert consumption, a closure's own archive move is what
+makes its assertions countable: a release that archives while naming a still-non-terminal
+`ACTIVE` slug adds one warning per such slug, measured **after** the move.
 
 There is no lease/session-coherence validator. Workspace concurrency state is advisory
 presence and belongs to `dadaia doctor`, not specs doctor.

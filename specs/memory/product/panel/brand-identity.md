@@ -9,7 +9,6 @@ tags:
 - design
 - css
 - tokens
-token_estimate: 375
 last_updated: '2026-07-07'
 release_origin: v0.1.61
 ---

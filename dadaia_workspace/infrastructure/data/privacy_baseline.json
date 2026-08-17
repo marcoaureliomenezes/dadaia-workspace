@@ -1,7 +1,7 @@
 {
   "_header": {
     "name": "public-privacy baseline structural denylist",
-    "version": 4,
+    "version": 5,
     "description": "Versioned, fail-closed baseline of STRUCTURAL regex patterns scanned against public/ assets when no operator denylist is present. Operator terms (DADAIA_PRIVACY_DENYLIST / .dadaia/states/privacy_denylist.json) are ADDITIVE and merge on top of this baseline. Patterns are conservative to avoid false positives on SHA hashes in lockfiles, doc/loopback IP ranges, and example hostnames. Edit only via an approved release task; bump 'version' on change.",
     "released_in": "v0.1.10",
     "excludes": [
@@ -15,7 +15,10 @@
       "*.example email domains",
       "RFC-2606 reserved TLDs in email domains (.invalid/.test/.example/.localhost), any depth of subdomain — v0.9.0",
       "workspace.local (the exact literal only, in both the internal-hostname pattern and as an email domain) — the product's own synthetic git commit identity host (git_subprocess.py's user.email=dadaia@workspace.local fallback); any OTHER *.local host, or *.workspace.local subdomain, still matches — v0.9.0 code-review remediation",
-      "Path.home / pathlib.Path.home (the exact literal only, case-sensitive) in internal-hostname — the stdlib dotted-attribute-chain idiom Path.home(), not a hostname; any OTHER *.home host (e.g. a real internal TLD) still matches — v0.9.0 code-review remediation, self-scan regression"
+      "Path.home / pathlib.Path.home (the exact literal only, case-sensitive) in internal-hostname — the stdlib dotted-attribute-chain idiom Path.home(), not a hostname; any OTHER *.home host (e.g. a real internal TLD) still matches — v0.9.0 code-review remediation, self-scan regression",
+      "/Users/(user|username|youruser|<user>|runner|ci|Shared) placeholder/system forms in users-abs-path (macOS) — Shared is the real, non-personal /Users/Shared system directory present on every macOS install; any OTHER /Users/<name> still matches — v0.4.2 FR10/GRILL P15, cross-platform home-path parity with home-abs-path",
+      "[A-Za-z]:\\\\Users\\\\(user|username|youruser|<user>|Public|Default) placeholder/system forms in windows-users-path (Windows) — Public and Default are the real, non-personal C:\\\\Users\\\\Public and C:\\\\Users\\\\Default system directories present on every Windows install; any OTHER C:\\\\Users\\\\<name> still matches, any drive letter case — v0.4.2 FR10/GRILL P15",
+      "/root — DELIBERATELY EXCLUDED (evaluated, not covered): unlike /home, /Users and C:\\\\Users, a bare /root carries no user-identifying segment and appears routinely in container documentation; adding it would buy false positives and no privacy — v0.4.2 FR10/GRILL P15/D10"
     ]
   },
   "patterns": [
@@ -42,6 +45,18 @@
       "regex": "(?<![\\w/])/home/[a-z_][a-z0-9_-]*(?=/|\\b)",
       "reason": "absolute /home/<user> filesystem path",
       "exclude_regex": "^/home/(?:user|username|youruser|<user>|runner|ci|ubuntu)(?:$|/)"
+    },
+    {
+      "id": "users-abs-path",
+      "regex": "(?<![\\w/])/Users/[A-Za-z_][A-Za-z0-9_-]*(?=/|\\b)",
+      "reason": "absolute /Users/<name> filesystem path (macOS)",
+      "exclude_regex": "^/Users/(?:user|username|youruser|<user>|runner|ci|Shared)(?:$|/)"
+    },
+    {
+      "id": "windows-users-path",
+      "regex": "(?<![A-Za-z0-9_])[A-Za-z]:\\\\Users\\\\[A-Za-z0-9_.-]+(?=\\\\|\\b|$)",
+      "reason": "absolute C:\\\\Users\\\\<name> filesystem path (Windows)",
+      "exclude_regex": "^[A-Za-z]:\\\\Users\\\\(?:user|username|youruser|<user>|Public|Default)(?:$|\\\\)"
     },
     {
       "id": "email-address",

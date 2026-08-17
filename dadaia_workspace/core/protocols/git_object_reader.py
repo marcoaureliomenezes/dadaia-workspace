@@ -71,7 +71,19 @@ class GitObjectReadError(Exception):
     executable (SPEC v0.9.0 FR6 row 2: a policy gate never skips what it cannot
     evaluate). The pure decision function catches this and refuses, naming the failure
     — it never falls through to a silent "no objects" scan.
+
+    ``path`` (SPEC v0.4.2 FR4/GRILL P9) carries the offending blob's path as a
+    STRUCTURED field, never embedded in the message string: a raise site that knows
+    which path it failed on (e.g. the prior-content resolution desync in
+    ``infrastructure.git_objects._resolve_prior_texts``) passes it here, and the single
+    render boundary that catches this error (``features.chokepoints.service``) masks it
+    through the SAME ``_PathMasker`` every other channel uses before it ever reaches an
+    operator-facing string — the message itself never carries a raw path.
     """
+
+    def __init__(self, message: str, *, path: str | None = None) -> None:
+        super().__init__(message)
+        self.path = path
 
 
 class GitObjectReader(Protocol):

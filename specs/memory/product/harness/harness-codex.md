@@ -12,7 +12,6 @@ tags:
 - codex
 - projection
 - enforcement
-token_estimate: 620
 last_updated: '2026-08-07'
 release_origin: v0.3.0
 ---

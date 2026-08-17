@@ -19,10 +19,8 @@ import typer
 
 from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
 from dadaia_workspace.core.models.backlog import SubjectKind
-from dadaia_workspace.features.spec_artifacts.new_artifacts import (
-    backlog_new,
-    release_new,
-)
+from dadaia_workspace.features.backlog.document import backlog_new
+from dadaia_workspace.features.spec_artifacts.new_artifacts import release_new
 
 
 def _resolve_backlog_roots(
@@ -142,6 +140,11 @@ def backlog_new_cmd(
         typer.echo(f"[error] {exc}", err=True)
         sys.exit(1)
     except FileExistsError as exc:
+        typer.echo(f"[error] {exc}", err=True)
+        sys.exit(1)
+    except RuntimeError as exc:
+        # A1.2 (v0.4.2) — write-then-verify: the writer raises rather than reporting
+        # success when a re-parse of its own fresh write does not show the slug.
         typer.echo(f"[error] {exc}", err=True)
         sys.exit(1)
 

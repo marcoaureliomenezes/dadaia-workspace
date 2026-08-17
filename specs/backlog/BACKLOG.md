@@ -8,20 +8,48 @@ cutover, never deleted). Schema: `dd-backlog-definition` §2 — five required k
 28 ACTIVE subsections + 54 LEDGER rows carry every pre-consolidation record — the
 consolidation landed at 30 + 52 and v0.12.0's own closure sweep moved its two picked
 entries across, the same 82 slugs; the set-equality evidence is captured under
-`.dadaia/tmp/project-manager/20260815/`.
+`.dadaia/tmp/project-manager/20260815/`. Counts are as of the 2026-08-15 consolidation;
+later curation (operator-adjudicated intake) appends entries and LEDGER lines on top,
+never renumbering.
 Entry numbering (`#N`) from the retired `candidates.md` index is carried in each Title —
 rows are never renumbered, and LEDGER rows are never deleted.
 
 **Pick-precedence notice (DADAIA.md §5).** At release-pick time, open bugs and
-undispositioned audits outrank every fresh entry below. **Currently outranking: nothing**
-— the bug ledger carries zero open bugs (the two LOWs closed by `hotfix/0.7.1`, merged
-`d15bdf4e`); both 2026-07 audits are archived and fully dispositioned (v0.8.0).
+undispositioned audits outrank every fresh entry below. **Currently outranking: one open bug**
+— `memory-token-estimate-normalizer-dead-code` (LOW, registered 2026-08-16 during v0.4.2's
+memory window; Arm B, fixed on `hotfix/{M.m.p}`, never backlog demand). The two earlier LOWs
+closed by `hotfix/0.7.1` (merged `d15bdf4e`) and v0.4.2's own
+`gitignore-code-review-artifact-untrackable` are `Closed`; both 2026-07 audits are archived and
+fully dispositioned (v0.8.0). Count corrected at the v0.4.2 closure sweep, 2026-08-16 — the
+ledger (`dadaia bugs status`) remains the source of truth.
+
+**Purge-on-pick notice — release v0.4.2 "residual-convergence" (2026-08-16).** Thirteen
+ACTIVE subsections left this document in the same commit that created
+`specs/releases/v0.4.2/SPEC.md`, whose §7 is their provenance record:
+`backlog-grammar-single-writer-seam` (#38), `denylist-masking-predicate-parity` (#39),
+`derived-values-computed-not-stored` (#43), `knowledge-duplication-doc-pass` (#44),
+`flat-release-ship-task-evidence`, `intake-signal-calibration`,
+`amnesty-multi-path-blob-fail-closed` (#40), `git-batch-epipe-swallow-width` (#41),
+`self-scan-sentinel-archive-authored-blobs` (#45), `document-parser-fence-filter-complexity`
+(#42), `retire-dead-hotfix-surface` (#4), `changelog-version-axis-reconciliation` (#11) and
+`spec-doc-031-citation-classes` (#10). Their `LEDGER` lines were written by that release's
+closure disposition sweep on 2026-08-16 (`DELIVERED · v0.4.2`, at the end of `## LEDGER`) —
+nothing was deleted. `baseline-carve-out-review-cadence` (#24) was a **partial** pick: it stays
+ACTIVE below, rewritten to its residual and refreshed again at that closure.
 
 **Standing operator decision, pending (v0.8.0 CLOSURE return #3).** Is `deferred`
 terminal for bug `panel-telemetry-sqlite-corrupts-under-concurrent-access`, or does it
 return to the queue? Undecided; keeps surfacing at every pick. The related
 dangling-pointer repair is `panel-runtime-reliability-dangling-ledger-pointer` (#12)
 and proceeds either way.
+
+**Standing operator question, pending (PM decision record 3 — restated at intake #3,
+operator adjudication 2026-08-16).** Should the git commit identity used in this
+workspace be de-personalised going forward? Both v0.12.0 security reviews dispositioned
+the existing identity as pre-existing published metadata (1,063 of 1,203 commits) — not
+a leak; it is an operator policy call and stands open until ruled. The question
+travelled to `specs/backlog/_archive/candidates.md` at the cutover; restated here so it
+is no longer archive-only.
 
 ## ACTIVE
 
@@ -55,38 +83,12 @@ and proceeds either way.
     residue. Every deletion/demotion is a qa-engineer verdict with evidence, executed by software-engineer.'
 ```
 
-### retire-dead-hotfix-surface
-- **Title:** Retire the dead hotfix-release surface (verb, templates, doctor nag) (#4)
-- **Opened:** 2026-08-12
-- **Status:** candidate
-- **Description:** v0.6.0 revoked the hotfix-release lifecycle (operator ruling D4): bug fixes run on hotfix branches with a PATCH mint and no ceremony. The revoked lifecycle's surface still ships as dead code and must be removed: the CLI verb, the two Jinja templates, and the specs-doctor check that nags for the revoked backlog intake section. OD-2 (v0.12.0): SPEC-DOC-022/023 retire with check_backlog_schema at the v0.12.0 cutover, so this entry's residual is the CLI hotfix verb + templates + doctor nag only — the rewrite-down to that residual is a recorded v0.12.0 closure obligation.
-- **Provenance:** operator request — v0.6.0 law revocation residual, curated 2026-08-12; OD-2 residual rewrite recorded at v0.12.0 (closure obligation)
-- **Intents:**
-```yaml
-- subject:
-    kind: code
-    ref: dadaia_workspace/cli/commands/specs.py#hotfix_app
-  change: Remove the `dadaia specs hotfix open` verb (the hotfix_app sub-app) and its tests —
-    never invoked under the v0.6.0 law; product-engineer.md names it dead surface.
-- subject:
-    kind: code
-    ref: dadaia_workspace/features/specs/doctor_governance.py#GovernanceValidator
-  change: Retire the SPEC-DOC-023 check that requires a '## Hotfixes pendentes' intake section
-    in specs/backlog/candidates.md — the intake it polices was revoked with the hotfix-release
-    lifecycle.
-- subject:
-    kind: catalog
-    ref: specs-doctor
-  change: Remove public/templates/release_hotfix.md.j2 and closure_hotfix.md.j2 from the shipped
-    template set (manifest + goldens follow); the doctor's template-facing checks drop with SPEC-DOC-023.
-```
-
 ### consumer-side-validation-round
 - **Title:** Consumer-side validation round — prove the assembled consumer journey on a real workspace (#5)
 - **Opened:** 2026-08-14
 - **Status:** candidate
-- **Description:** Created by grill ADR #1 (2026-08-14 refinement report) as the inheritor of the two external findings of the consumer audit (2026-07-15) that this repo cannot close from the provider side alone. Both findings were dispositioned `deferred` — `rejected` would contradict the §6 approval law ("a candidate is approved when the operator and the consumer-side validation agent agree, after validating a real workspace"), and leaving them pending would block every future pick under §5 precedence. The audit archives citing this entry. The work: run a full consumer-side validation round on a real (disposable) consumer workspace against the current provider surface, with the two inherited findings as its acceptance criteria.
-- **Provenance:** v0.8.0 grill ADR #1 — operator-ratified materialization 2026-08-14
+- **Description:** Created by grill ADR #1 (2026-08-14 refinement report) as the inheritor of the two external findings of the consumer audit (2026-07-15) that this repo cannot close from the provider side alone. Both findings were dispositioned `deferred` — `rejected` would contradict the §6 approval law ("a candidate is approved when the operator and the consumer-side validation agent agree, after validating a real workspace"), and leaving them pending would block every future pick under §5 precedence. The audit archives citing this entry. The work: run a full consumer-side validation round on a real (disposable) consumer workspace against the current provider surface, with the two inherited findings as its acceptance criteria. ACCEPTANCE CRITERION ADDED 2026-08-16 (intake #3 item 3-20 — operator adjudication, 2026-08-16 (resolva todos — class-level fixes, no workarounds)): a pre-v0.12.0 consumer workspace upgraded in place must SURFACE its un-migrated backlog state rather than pass silently — `backlog doctor` reports clean on an absent BACKLOG.md while legacy per-entry files sit unvalidated; the round asserts the SPEC-DOC-035 WARN count equals the loose-file count and that following the migration guidance folds the workspace to a clean two-doctor state.
+- **Provenance:** v0.8.0 grill ADR #1 — operator-ratified materialization 2026-08-14; intake-report #3 item 3-20 folded — operator adjudication, 2026-08-16 (resolva todos — class-level fixes, no workarounds)
 - **Intents:**
 ```yaml
 - subject:
@@ -97,7 +99,10 @@ and proceeds either way.
     (1) the consumer prompt/tests must consume the installed version-matched skill/capability
     surface and exercise canonical workflow verbs — no preserved references to removed lifecycle
     commands; (2) the consumer owning repository must be governance-coherent — one-task-at-a-time
-    markers, valid memory/schema state, immutable release evidence.'
+    markers, valid memory/schema state, immutable release evidence; (3) an upgraded-in-place
+    pre-v0.12.0 workspace surfaces its un-migrated backlog state — SPEC-DOC-035 WARNs once
+    per loose per-entry file (WARN count == loose files) while backlog doctor is clean on
+    the absent BACKLOG.md — and folds to a clean two-doctor state after migration.'
 ```
 
 ### thin-wrapper-projected-scripts
@@ -234,44 +239,6 @@ and proceeds either way.
     candidate degrades to None and is skipped (TimeoutExpired is already a SubprocessError subclass,
     so the existing except clause suffices once timeout= is supplied). Consider python -I isolated
     mode so inherited PYTHONPATH/sitecustomize cannot perturb the probe's stdout.
-```
-
-### spec-doc-031-citation-classes
-- **Title:** SPEC-DOC-031: distinguish consumption citations from reference citations in archived SPEC/CLOSURE (#10)
-- **Opened:** 2026-08-14
-- **Status:** candidate
-- **Description:** v0.8.0 CLOSURE backlog return, materialized 2026-08-14. SPEC-DOC-031 scans every archived release's SPEC.md and CLOSURE.md line by line for backlog slugs and WARNs when a matched slug's entry is non-terminal, excluding only lines inside a "## Backlog returns" section (doctor_governance.py:196-224). Any other mention — a legitimate inheritance citation (an entry named as inheritor of deferred/ superseded findings) or an explicit non-goal/out-of-scope citation — raises a WARN asserting consumption that demonstrably did not happen. Concrete case: archiving v0.8.0 raised exactly 3 such WARNs (consumer-side-validation-round, thin-wrapper-projected-scripts, push-range-denylist-scan), all predicted as false positives by that CLOSURE (V9). Proposed refinement: also exclude out-of-scope/non-goal sections, or key the check on a machine-readable consumed set (consumed_backlog.json) instead of free-text slug matching.
-- **Provenance:** v0.8.0 CLOSURE return (operator-approved closure) — materialized 2026-08-14
-- **Intents:**
-```yaml
-- subject:
-    kind: doc
-    ref: memory/product/sdd/specs-doctor.md#Validator Families
-  change: 'Refine _archive_consumption_hits / check_consumed_backlog_disposition so a slug mention
-    only counts as consumption evidence when it is one: either restrict matching to consumption-asserting
-    contexts (and exclude non-goal / out-of-scope / inheritance sections the way "## Backlog returns"
-    is already excluded), or key SPEC-DOC-031 on a machine-readable consumed set (consumed_backlog.json)
-    instead of free-text slug matching. The v0.8.0 archive must stop producing its 3 documented
-    false-positive WARNs without flipping the three cited entries and without editing the FROZEN
-    archive.'
-```
-
-### changelog-version-axis-reconciliation
-- **Title:** CHANGELOG version-axis incoherence: dated [0.5.1] atop stacked Unreleased spec-release sections (#11)
-- **Opened:** 2026-08-14
-- **Status:** candidate
-- **Description:** v0.8.0 CLOSURE backlog return, materialized 2026-08-14 (CLOSURE destined it to ideas; promoted to candidate by operator mandate with owners software-engineer + product-engineer). CHANGELOG.md at HEAD carries "## [0.5.1] — 2026-08-14" (line 7) above three stacked "## [Unreleased] — spec release vX" sections (v0.7.0 line 30, v0.6.0 line 107, v0.5.0 line 177) and "## [0.5.0] — Unreleased (spec release v0.3.0)" (line 236): the hotfix minted a dated PATCH on top of a package version whose own section still reads Unreleased, so the file no longer states truthfully what a given package version contains. The two version axes are distinct by design (ADR-2: SDD release ids version the SDD process; the 0.x package version versions the shipped library) — the ask is a reconciled CHANGELOG convention honoring that split, not a renumbering.
-- **Provenance:** v0.8.0 CLOSURE return — promoted from ideas lane by operator mandate, materialized 2026-08-14
-- **Intents:**
-```yaml
-- subject:
-    kind: doc
-    ref: memory/product/distribution/pypi-distribution.md#Differentiator
-  change: 'Define and record the CHANGELOG convention that reconciles the two axes: how spec-release
-    sections nest under (or annotate) package-version sections, what happens to accumulated "[Unreleased]
-    — spec release vX" sections when a package version is finally dated, and how a hotfix PATCH
-    is placed relative to a still-Unreleased base version. Restructure CHANGELOG.md once to that
-    convention so each package version''s section states exactly what it ships.'
 ```
 
 ### panel-runtime-reliability-dangling-ledger-pointer
@@ -421,8 +388,8 @@ and proceeds either way.
 - **Title:** privacy-baseline pattern versioning + carve-out review cadence (three reactive exclusions in one release) (#24)
 - **Opened:** 2026-08-14
 - **Status:** candidate
-- **Description:** v0.9.0 CLOSURE "Backlog returns" item, included at the PE's judgement because the drift it generalizes is a class, not a one-off. The RFC-2606 reserved-TLD gap was found only by the baseline refusing legitimate synthetic content on its first real run — by accident of timing, not by review — and the release then added three carve-outs reactively (RFC-2606 emails, the product's own workspace.local identity in two patterns, the stdlib Path.home call forms), taking privacy_baseline.json from v1 to v4 in one cycle. There is no defined moment at which the six patterns and their exclude_regex carve-outs are re-examined against the reserved/synthetic-value RFCs. The round-2 code review named the underlying treadmill: internal-hostname treats ANY dotted identifier chain ending in local|internal|lan|intranet|corp|home as a hostname, so `<name>.local`, `<attr>.internal`, `<x>.home` and every future equivalent will each demand another literal exclusion — the false-positive class is unbounded while carve-outs are literal-by-literal. Candidate shapes from the routing: a periodic review lane; a doctor check flagging baseline patterns lacking a documented carve-out rationale; and (from the review) a structural fix for the dotted-chain class instead of a fourth literal. A constraint to preserve, recorded in the CLOSURE accepted-without-action list: baseline patterns must stay single-line (the push scan matches line-by-line while the public-privacy doctor matches whole text).
-- **Provenance:** v0.9.0 CLOSURE return — pre-approved intake (ADR #15 retroactive ruling, operator deferral)
+- **Description:** REWRITTEN TO ITS RESIDUAL 2026-08-16, refreshed at that release's closure the same day — **partially picked, and partially DELIVERED, by release v0.4.2** (archived at `specs/_archive/releases/v0.4.2/SPEC.md`, which is the SPEC's home from the v0.4.2 archive move onward). What v0.4.2 SHIPPED, not promised: FR10's cross-platform half — `/Users/<name>` and `C:\Users\<name>` patterns with paired fixtures proving each fires, the baseline bumped to `version: 5` with its `_header.excludes` rationale extended, `/root` evaluated and deliberately excluded as carrying no user-identifying segment (grill D10), and the pre-PR code review's CR-2 fix giving `windows-users-path` trailing-lookahead parity with its two POSIX peers so it fires in prose form and not only before a path separator. Per `dd-release-definition` §5's full-slug rule this entry was NOT declared consumed and stays ACTIVE carrying what remains. **The residual:** v0.9.0 CLOSURE "Backlog returns" item, included at the PE's judgement because the drift it generalizes is a class, not a one-off. The RFC-2606 reserved-TLD gap was found only by the baseline refusing legitimate synthetic content on its first real run — by accident of timing, not by review — and the release then added three carve-outs reactively (RFC-2606 emails, the product's own workspace.local identity in two patterns, the stdlib Path.home call forms), taking privacy_baseline.json from v1 to v4 in one cycle. There is still no defined moment at which the patterns and their exclude_regex carve-outs are re-examined against the reserved/synthetic-value RFCs — and v0.4.2 added two more patterns without one. The round-2 code review named the underlying treadmill: internal-hostname treats ANY dotted identifier chain ending in local|internal|lan|intranet|corp|home as a hostname, so `<name>.local`, `<attr>.internal`, `<x>.home` and every future equivalent will each demand another literal exclusion — the false-positive class is unbounded while carve-outs are literal-by-literal. Candidate shapes from the routing: a periodic review lane; a doctor check flagging baseline patterns lacking a documented carve-out rationale; and (from the review) a structural fix for the dotted-chain class instead of a fourth literal. Also inherited from v0.4.2 (grill D9): the gap-class itself — a declared-support platform with no covering pattern — should be something the cadence catches, and new patterns should not have to grow the self-scan sentinel's shrink-only fixture baseline by hand. FOLDED IN at the v0.4.2 closure (code review CR-6, LOW, non-blocking, no new entry materialized per ADR #15): a narrow carve-out escape on the same surface — the Windows name charset `[A-Za-z0-9_.-]+` includes `.`, so a placeholder path ending a sentence swallows the trailing period into the match and the `^`-anchored `exclude_regex`, which expects `$` or a separator immediately after the name, then fails; the `/home` and `/Users` peers are immune because their charsets exclude `.`. Pre-existing (it dates from the v0.4.2 pattern's introduction, NOT from the CR-2 remediation — the reviewer verified the pre-fix form false-positives identically), and it errs toward OVER-firing on placeholder documentation, so it costs friction and never privacy; `public doctor` stays green. It is the same literal-by-literal treadmill this entry already names — candidate fix if picked: exclude a trailing `.` from the match, or give the carve-out a trailing-punctuation tolerance. A constraint to preserve, recorded in the CLOSURE accepted-without-action list: baseline patterns must stay single-line (the push scan matches line-by-line while the public-privacy doctor matches whole text).
+- **Provenance:** v0.9.0 CLOSURE return — pre-approved intake (ADR #15 retroactive ruling, operator deferral); intake-report #3 item 3-1 folded — operator adjudication, 2026-08-16; rewritten to its residual at the v0.4.2 partial pick, 2026-08-16; refreshed at the v0.4.2 closure sweep (CR-5 citation verification, CR-6 folded), 2026-08-16
 - **Intents:**
 ```yaml
 - subject:
@@ -432,8 +399,10 @@ and proceeds either way.
     every exclude_regex carve-out, and a doctor/CI check flags patterns lacking one; version history
     stays in the JSON. Record the cadence itself (what triggers a re-examination and a version
     bump, and the single-line pattern constraint) as product truth in the gate atom at delivery.
-    If baseline v5 is ever opened, evaluate the reviewer suggestion of a per-scan deadline that
-    fails CLOSED.'
+    Evaluate the reviewer suggestion of a per-scan deadline that fails CLOSED. The gap-class — a
+    declared-support platform with no covering pattern — becomes something the cadence catches,
+    rather than being found one platform at a time (the /Users and C:\Users variants landed
+    reactively in v0.4.2 FR10).'
 - subject:
     kind: code
     ref: dadaia_workspace/infrastructure/privacy_check.py#_scan_text_for_baseline
@@ -546,13 +515,6 @@ and proceeds either way.
 - **Description:** v0.9.0 CLOSURE "Backlog returns" idea (routed to the ideas lane at the PE's judgement), reinforced twice by the ship security review. Because git stores a whole blob per file version, every `dadaia bugs append` republishes the entire ~900 KB specs/bugs/bugs.jsonl as a NEW blob in the pushed range. Two measured costs: (1) performance — one such blob appended twice inside v0.9.0's local range dominated the push-range scan (~2.7-3.4 s wall over 247 objects / 66 blobs) and is the reason the A7.3 2 s budget was recorded as partially missed (V14: cause is data, not mechanism); (2) content resurfacing — every append makes ALL long-published lines of the file "new" range content again, which is how the security review's wider-set probe surfaced two historical hits on bugs.jsonl:353 (a since-DEAD context name resident since v0.1.x). Candidate shapes to weigh at grill time: per-bug or per-period sharding of the ledger (e.g. bugs/<year>/ or bugs/<bug-id>.jsonl), an append-only segment scheme, or accepting the cost and letting prior-published-term-amnesty neutralize the resurfacing half. Constraints: the never-delete law (events are kept forever), the ADDITIVE gate classification of specs/bugs/**, the jsonl append contract used by dadaia bugs append/status/stats, and existing bugs.jsonl consumers (panel, doctor, release pick precedence).
 - **Provenance:** v0.9.0 CLOSURE return (ideas lane) — pre-approved intake (ADR #15 retroactive ruling, operator deferral)
 
-### flat-release-ship-task-evidence
-- **Title:** Flat release's ship task cannot record its own completion (TASKS template shape defect)
-- **Opened:** 2026-08-14
-- **Status:** idea
-- **Description:** v0.8.0 CLOSURE backlog return, materialized 2026-08-14. In a flat (no-segment) release, the closure/archive task freezes the release directory (git mv to specs/_archive/) before the ship task can flip its own marker: v0.8.0's T-080-07 (ship) archived as "[ ]" because T-080-06 (closure + archive) ran first and the archived TASKS.md is FROZEN — the ship marker can never be flipped afterwards. The release TASKS template needs a form of ship evidence that lives outside the archived directory: either make ship the last task BEFORE archive, or state in the template that the ship task's evidence is the merge/PR itself and that its marker is expected to archive open.
-- **Provenance:** v0.8.0 CLOSURE return (ideas lane); second occurrence routed by the v0.9.0 CLOSURE — operator-approved closures
-
 ### repo-agents-md-symlink-hardening
 - **Title:** Destination-file symlink hardening for the adjacent repo-AGENTS.md copy
 - **Opened:** 2026-08-14
@@ -630,3 +592,17 @@ and proceeds either way.
 - workflow-model-governance-operator-profiles-and-context-overlays · DELIVERED · workflow-engine era, terminal frontmatter (engine removed v0.3.0) · 2026-07-02
 - workflow-model-governance-panel-control-plane · DELIVERED · v0.1.28 · 2026-07-02
 - workflow-step-handoff-data-plane-cleanup · DELIVERED · workflow-engine era, terminal frontmatter (engine removed v0.3.0) · 2026-07-02
+- intake-3-2-match-throughput-fallback · REJECTED · v0.11.0 measured rejection ratified at intake #3 (fallback is the rare shape; a matcher-engine change is its own correctness surface; 55 s one-time scan inside tolerance) · 2026-08-16
+- backlog-grammar-single-writer-seam · DELIVERED · v0.4.2 · 2026-08-16
+- denylist-masking-predicate-parity · DELIVERED · v0.4.2 · 2026-08-16
+- derived-values-computed-not-stored · DELIVERED · v0.4.2 · 2026-08-16
+- knowledge-duplication-doc-pass · DELIVERED · v0.4.2 · 2026-08-16
+- flat-release-ship-task-evidence · DELIVERED · v0.4.2 · 2026-08-16
+- intake-signal-calibration · DELIVERED · v0.4.2 · 2026-08-16
+- amnesty-multi-path-blob-fail-closed · DELIVERED · v0.4.2 · 2026-08-16
+- git-batch-epipe-swallow-width · DELIVERED · v0.4.2 · 2026-08-16
+- self-scan-sentinel-archive-authored-blobs · DELIVERED · v0.4.2 · 2026-08-16
+- document-parser-fence-filter-complexity · DELIVERED · v0.4.2 · 2026-08-16
+- retire-dead-hotfix-surface · DELIVERED · v0.4.2 · 2026-08-16
+- changelog-version-axis-reconciliation · DELIVERED · v0.4.2 · 2026-08-16
+- spec-doc-031-citation-classes · DELIVERED · v0.4.2 · 2026-08-16

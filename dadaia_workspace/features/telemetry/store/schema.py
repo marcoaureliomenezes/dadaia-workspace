@@ -90,7 +90,7 @@ CREATE INDEX IF NOT EXISTS idx_events_occurred
 """
 
 _MIGRATION_5 = (
-    # DEAD: replaced by canonical workflow reader in panel-r3; do not extend; see backlog/candidates.md
+    # DEAD: replaced by canonical workflow reader in panel-r3; do not extend.
     "CREATE TABLE IF NOT EXISTS workflows ("
     "    name           TEXT PRIMARY KEY,"
     "    source_path    TEXT NOT NULL,"
@@ -99,7 +99,7 @@ _MIGRATION_5 = (
     "    discovered_at  TEXT NOT NULL,"
     "    last_seen_at   TEXT NOT NULL"
     ");\n"
-    # DEAD: replaced by canonical workflow reader in panel-r3; do not extend; see backlog/candidates.md
+    # DEAD: replaced by canonical workflow reader in panel-r3; do not extend.
     "CREATE TABLE IF NOT EXISTS workflow_agents ("
     "    workflow_name  TEXT NOT NULL,"
     "    agent_name     TEXT NOT NULL,"

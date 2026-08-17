@@ -257,6 +257,12 @@ report (`DADAIA.md` §5 Backlog; doctrine: `dd-backlog-definition`) — not tran
 `specs/backlog/**` directly by anyone. You do NOT write to backlog directly — no agent
 does; only the operator creates demand.
 
+**Intake routing (FR6/R4).** Every observation you record — never-silent, zero
+observations lost. Only **actionable** ones (LOW+ with a concrete fix surface, including
+every FAIL above) belong in the intake report; **record-only** observations (INFO-grade,
+awareness-only, already-fixed-at-HEAD) terminate in your own report and never enter
+intake.
+
 ### When project-manager dispatches you in audit mode
 
 `project-manager` (the dispatcher) may dispatch you in audit mode — typically on behalf of

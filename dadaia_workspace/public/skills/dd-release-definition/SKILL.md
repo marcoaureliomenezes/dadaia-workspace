@@ -86,12 +86,12 @@ reads this line. Two mechanisms actually execute consumption, at two different p
 | When | Executor | What it does |
 |---|---|---|
 | At definition, same commit as the SPEC | `project-manager`'s purge-on-pick (`dd-backlog-definition` §2) | Removes each declared slug from `## ACTIVE`, recording provenance in the SPEC |
-| At closure | `dd-release-closure`'s Disposition sweep | Flips each fully-consumed slug's `## LEDGER` line to its terminal disposition token (vocabulary: `dd-backlog-definition` §2) |
+| At closure | `dd-release-closure`'s Disposition sweep | Adds a `## LEDGER` line and drops the `## ACTIVE` subsection for each fully-consumed slug (terminal disposition token vocabulary: `dd-backlog-definition` §2) |
 
 Two mechanical backstops catch a slug that falls through either step: `backlog doctor`'s
 BL-STALE (an `ACTIVE` item already consumed/dispositioned) and `specs doctor`'s
-SPEC-DOC-031 (an archived SPEC/CLOSURE that still names a slug the ledger shows
-unconsumed). Rules that still describe something that runs:
+SPEC-DOC-031 (FR14 semantics — an archived SPEC's `**Consumes:**` declaration or an
+archived CLOSURE's `## Dispositions` rows naming a still-non-terminal `ACTIVE` slug). Rules that still describe something that runs:
 - **Full-slug granularity:** a declared slug is treated as *fully* consumed (all its bound
   anchors shipped). A partially-shipped item must NOT be declared — leave it in the
   backlog and rewrite it to its residual by hand.

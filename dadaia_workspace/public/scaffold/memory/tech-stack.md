@@ -8,7 +8,6 @@ tags:
   - tech-stack
   - dependencies
   - languages
-token_estimate: 0
 last_updated: "2026-01-01"
 release_origin: memory-markdown-source-v1
 ---

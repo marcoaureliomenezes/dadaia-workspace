@@ -6,7 +6,6 @@ tldr: Document the user-visible purpose of TITLE_PLACEHOLDER.
 summary: Describe the current behavior, boundaries, and operational contract.
 tags:
   - SLUG_PLACEHOLDER
-token_estimate: 0
 last_updated: "2026-01-01"
 release_origin: RELEASE_PLACEHOLDER
 ---

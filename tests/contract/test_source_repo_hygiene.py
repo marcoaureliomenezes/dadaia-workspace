@@ -34,6 +34,13 @@ def test_sdd_gate_artifacts_visible_and_noncanonical_content_stays_gitignored() 
         # force-added exactly that way).
         "specs/releases/v9.9.9/ALPHA-1-QA.md",
         "specs/releases/v9.9.9/ALPHA-12-QA.md",
+        # The pre-PR six-axis code-reviewer review runs BEFORE the archive move,
+        # committed to the branch (FR5/ADR R3, v0.4.2); bug
+        # gitignore-code-review-artifact-untrackable: same class as the ALPHA-N-QA
+        # gap above — the blanket /specs/releases/*/* ignore had no negation for it
+        # either, so this law-mandated artifact needed git add -f on its first
+        # execution (T-042-18). PRE-PR-REVIEW.md is the TASKS-declared canonical name.
+        "specs/releases/v9.9.9/PRE-PR-REVIEW.md",
         "specs/_archive/releases/v9.9.8/SPEC.md",
         "specs/_archive/releases/v9.9.8/PLAN.md",
         "specs/_archive/releases/v9.9.8/TASKS.md",

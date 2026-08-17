@@ -14,7 +14,6 @@ tags:
 - health
 - repair
 - privacy
-token_estimate: 260
 last_updated: '2026-08-14'
 release_origin: v0.2.3
 ---

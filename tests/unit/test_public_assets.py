@@ -64,11 +64,75 @@ def _manager(public_dir: Path) -> FileSystemPublicAssetManager:
 # ---------------------------------------------------------------------------
 
 
+#: SPEC v0.4.2 FR10/GRILL P15/D9, bug push-gate-refuses-its-own-privacy-baseline-
+#: fixtures — the two cross-platform home-path positive fixtures were originally
+#: dedicated, tracked fixture files under tests/fixtures/privacy_baseline/. A
+#: positive fixture must carry a value its own pattern matches, which means a NEW
+#: blob at a NEW path on first publication — the prior-published-term amnesty grants
+#: it nothing, so the real push-range denylist scan refused them (registered bug
+#: push-gate-refuses-its-own-privacy-baseline-fixtures, HIGH). Root-cause fix:
+#: compose each literal at RUNTIME so it is never contiguous in this module's own
+#: tracked source — the same technique test_repo_self_scan.py::_archive_fixture_literal
+#: already uses for its own archive fixture. This also removes the earlier reason for
+#: separate files (denylist_scan.scan_objects reports at most one hit per scanned
+#: object, so a literal inlined here could be masked by the pre-existing
+#: ipv4-literal hit from _TEST_TERM above) — a runtime-composed literal never
+#: reaches the tracked blob at all, so there is nothing left to mask or to hit.
+def _macos_home_literal() -> str:
+    """The bare ``users-abs-path`` positive literal, composed at runtime (never
+    contiguous in this module's own tracked source)."""
+    return "/Users/" + "zz-fixture-user"
+
+
+def _windows_home_literal() -> str:
+    """The bare ``windows-users-path`` positive literal, composed at runtime (never
+    contiguous in this module's own tracked source)."""
+    return "C:\\Users\\" + "zz-fixture-user"
+
+
+def _macos_home_path_fixture() -> str:
+    """Synthetic positive fixture for the ``users-abs-path`` baseline pattern
+    (macOS) — content identical to the retired ``macos_home_path.txt`` fixture."""
+    home = _macos_home_literal()
+    return (
+        "SPEC v0.4.2 FR10/GRILL P15/D9 -- synthetic positive fixture for the users-abs-path\n"
+        "baseline pattern (macOS). The name below is synthetic and non-identifying.\n"
+        f"backup at {home}/Documents\n"
+    )
+
+
+def _windows_home_path_fixture() -> str:
+    """Synthetic positive fixture for the ``windows-users-path`` baseline pattern
+    (Windows) — content identical to the retired ``windows_home_path.txt`` fixture,
+    including the CR-2 mid-sentence prose form (a hit not only at a trailing path
+    separator/end-of-line, proven again in isolation by
+    :func:`test_windows_users_path_pattern_fires_in_prose_form_parity_with_posix_patterns`)."""
+    home = _windows_home_literal()
+    return (
+        "SPEC v0.4.2 FR10/GRILL P15/D9 -- synthetic positive fixture for the windows-users-path\n"
+        "baseline pattern (Windows). The name below is synthetic and non-identifying.\n"
+        f"backup at {home}\\Documents\n"
+        "CR-2 remediation (v0.4.2 code review) -- the same path also fires in prose, not only\n"
+        f"when followed by a path separator or end of line: seen at {home} in\n"
+        "running text with more words after it.\n"
+    )
+
+
 @pytest.mark.parametrize(
     ("name", "content", "expect_fragment"),
     [
         ("planted_ip", "Endpoint: 10.99.99.99\n", "10.99.99.99"),
         ("internal_hostname", "host: bastion.internal\n", "bastion.internal"),
+        (
+            "macos_users_path",
+            _macos_home_path_fixture(),
+            _macos_home_literal(),
+        ),
+        (
+            "windows_users_path",
+            _windows_home_path_fixture(),
+            _windows_home_literal(),
+        ),
     ],
 )
 def test_baseline_fires_with_no_operator_denylist(
@@ -84,6 +148,92 @@ def test_baseline_fires_with_no_operator_denylist(
     report = [line.render() for line in _manager(public_dir)._check_public_privacy()]  # noqa: SLF001
     assert any(line.startswith("[error] public-privacy:") for line in report)
     assert any(expect_fragment in line for line in report)
+
+
+# ---------------------------------------------------------------------------
+# SPEC v0.4.2 FR10/GRILL P15/A10.1 — the cross-platform home-path patterns never flag
+# their own documented placeholder forms, on any of the three declared-support
+# platforms (Linux /home, macOS /Users, Windows C:\Users).
+# ---------------------------------------------------------------------------
+
+
+def test_baseline_never_flags_placeholder_home_paths_on_any_declared_platform(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Intent: CONTRACT — v0.4.2 A10.1.
+
+    (negative case): /home/username (existing), /Users/username (macOS, new),
+    and C:\\Users\\username (Windows, new) are all documented placeholder forms and
+    must never fire — a clean fixture reports only the baseline OK marker. CR-2
+    remediation (v0.4.2 code review MEDIUM) strengthens this fixture with the BARE
+    prose form (no trailing path separator) for the Windows placeholder, so the
+    negative case is proven in the same mid-sentence shape CR-2's positive case
+    exercises — not only the trailing-`\\AppData` form the widened lookahead was
+    never at risk of over-matching."""
+    _disable_operator_denylist(monkeypatch, tmp_path)
+    public_dir = tmp_path / "public"
+    (public_dir / "data").mkdir(parents=True)
+    (public_dir / "data" / "AGENTS.md").write_text(
+        "see /home/username/.config, /Users/username/Library, and C:\\Users\\username\\AppData\n"
+        "the same directory is also written in prose as C:\\Users\\username here.\n",
+        encoding="utf-8",
+    )
+    assert _manager(public_dir)._check_public_privacy() == [_BASELINE_OK_MARKER]  # noqa: SLF001
+
+
+# ---------------------------------------------------------------------------
+# SPEC v0.4.2 CR-2 (code-reviewer MEDIUM) — the windows-users-path pattern must share
+# the SAME trailing-lookahead parity home-abs-path/users-abs-path already have: a hit
+# followed by a path separator, a word boundary (mid-sentence prose), OR end of line.
+# Pre-fix, the pattern's `(?=\\|$)` lookahead fired ONLY on a trailing backslash or
+# end-of-line — missing the most common leak shape, an operator-local Windows path
+# written inline in a sentence.
+# ---------------------------------------------------------------------------
+
+# Intent: CONTRACT — v0.4.2 CR-2
+
+
+def test_windows_users_path_pattern_fires_in_prose_form_parity_with_posix_patterns() -> None:
+    """Root-cause proof at the regex level (not only through the doctor plumbing):
+    the `windows-users-path` pattern must fire on the prose (mid-sentence) form the
+    same way `home-abs-path`/`users-abs-path` already do, and the documented
+    placeholder form must still be excluded in that SAME prose shape."""
+    patterns = {p.id: p for p in _load_privacy_baseline()}
+    windows_pattern = patterns["windows-users-path"]
+
+    prose = "backup lives at C:\\Users\\zz-fixture-user and more prose follows"
+    match = windows_pattern.regex.search(prose)
+    assert match is not None, (
+        "the pattern must fire on the prose (mid-sentence) form, not only when "
+        "followed by a path separator or end of line"
+    )
+    assert match.group(0) == "C:\\Users\\zz-fixture-user"
+
+    placeholder_prose = "backup lives at C:\\Users\\username and more prose follows"
+    placeholder_match = windows_pattern.regex.search(placeholder_prose)
+    assert placeholder_match is not None
+    assert windows_pattern.exclude is not None
+    assert windows_pattern.exclude.search(placeholder_match.group(0)), (
+        "the documented placeholder form must still be excluded even in prose"
+    )
+
+
+def test_windows_users_path_prose_form_fires_through_the_doctor_check(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """End-to-end confirmation through ``_check_public_privacy`` (not only the bare
+    regex): the prose form is reported as a genuine finding, same as the trailing-
+    separator form already was."""
+    _disable_operator_denylist(monkeypatch, tmp_path)
+    public_dir = tmp_path / "public"
+    (public_dir / "data").mkdir(parents=True)
+    (public_dir / "data" / "AGENTS.md").write_text(
+        "backup lives at C:\\Users\\zz-fixture-user and more prose follows in the line\n",
+        encoding="utf-8",
+    )
+    report = [line.render() for line in _manager(public_dir)._check_public_privacy()]  # noqa: SLF001
+    assert any(line.startswith("[error] public-privacy:") for line in report)
+    assert any("C:\\Users\\zz-fixture-user" in line for line in report)
 
 
 # ---------------------------------------------------------------------------
@@ -190,7 +340,44 @@ def test_bytecode_cache_ignored_and_baseline_data_loads_with_version_header(
     patterns = _load_privacy_baseline()
     assert patterns, "baseline must ship at least one structural pattern"
     ids = {p.id for p in patterns}
-    assert {"ipv4-literal", "internal-hostname", "home-abs-path", "email-address"} <= ids
+    assert {
+        "ipv4-literal",
+        "internal-hostname",
+        "home-abs-path",
+        "users-abs-path",
+        "windows-users-path",
+        "email-address",
+    } <= ids
+
+
+# ---------------------------------------------------------------------------
+# SPEC v0.4.2 FR10/A10.2/A10.4 — baseline v5: every pattern stays single-line, the
+# header version reads 5, and _header.excludes documents the new carve-outs and the
+# /root boundary (D10).
+# ---------------------------------------------------------------------------
+
+
+def test_baseline_v5_header_and_single_line_patterns() -> None:
+    """Intent: CONTRACT — v0.4.2 A10.2, A10.4."""
+    import importlib.resources
+    import json as _json
+
+    resource = (
+        importlib.resources.files("dadaia_workspace.infrastructure.data") / "privacy_baseline.json"
+    )
+    raw = _json.loads(resource.read_text(encoding="utf-8"))
+
+    assert raw["_header"]["version"] == 5
+    excludes_text = " ".join(raw["_header"]["excludes"])
+    assert "/root" in excludes_text
+    assert "Users" in excludes_text
+
+    for pattern in raw["patterns"]:
+        assert "\n" not in pattern["regex"], f"{pattern['id']}: regex must be single-line"
+        if pattern.get("exclude_regex"):
+            assert "\n" not in pattern["exclude_regex"], (
+                f"{pattern['id']}: exclude_regex must be single-line"
+            )
 
 
 # --- _load_privacy_denylist loader contract -------------------------------

@@ -14,7 +14,6 @@ tags:
 - windows
 - macos
 - linux
-token_estimate: 213
 last_updated: '2026-07-13'
 release_origin: v0.2.3
 ---

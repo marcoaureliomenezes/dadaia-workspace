@@ -12,7 +12,6 @@ tags:
 - consumer-validation
 - release-gate
 - sdd
-token_estimate: 300
 last_updated: '2026-08-06'
 release_origin: v0.2.9
 ---

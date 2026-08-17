@@ -7,11 +7,13 @@ summary: >-
   Bugs are append-only events; the backlog is the operator's demand queue, curated by
   project-manager in a single BACKLOG.md (ACTIVE + LEDGER) with purge-on-pick and
   continuous sanitizing — no agent materializes an entry, residuals reach the operator
-  through a PM intake report. A release consumes an explicit picked set; closure and audit
-  require terminal dispositions. Work is placed on four branch patterns with develop the
-  only pushable one; a feature branch merges into develop at two milestones, each followed
-  by a diff-based security review of the develop delta and a push. Bug, backlog and audit
-  paths stay additive and never lock-gated.
+  through a PM intake report, and only actionable defects do — record-only observations
+  terminate in the closure record. A release consumes an explicit picked set, ends in the
+  fixed order review → closure → archive → ship, and requires terminal dispositions at
+  closure and audit. Work is placed on four branch patterns with develop the only pushable
+  one; a feature branch merges into develop at two milestones, each followed by a diff-based
+  security review of the develop delta and a push. Bug, backlog and audit paths stay additive
+  and never lock-gated.
 tags:
 - sdd
 - governance
@@ -19,9 +21,8 @@ tags:
 - backlog
 - bugs
 - gitflow
-token_estimate: 1845
-last_updated: '2026-08-15'
-release_origin: v0.3.0
+last_updated: '2026-08-16'
+release_origin: v0.4.2
 ---
 
 ## Bugs
@@ -131,14 +132,33 @@ definition trio SPEC/PLAN/TASKS is `Aprovado`, and (b) at ship. Each merge is fo
 that order, by a diff-based security review of `origin/develop..develop` and a push of
 `develop`. Ship continues from there: PR `develop` → `main`, every CI job green, merge.
 
-Release finalization order is memory update → CLOSURE → archive. A group of completed tasks
-is one commit; a release defined and reviewed is a mandatory commit and push.
+A release ends in one fixed order: **review → closure → archive → ship**. The pre-PR six-axis
+code review of the delta runs on the **thawed** tree, before the `git mv` that freezes the
+release directory, so a finding lands on a file its author can still edit; only ship steps
+follow the archive. Inside closure the order is memory update → CLOSURE → archive. A group of
+completed tasks is one commit; a release defined and reviewed is a mandatory commit and push.
+
+Task reservations stay observable even when the worker cannot commit. A dispatcher relaying
+work for a **shell-less sub-agent** commits that sub-agent's `[ ]`→`[-]` flip **before**
+relaying the next work item, never batched at the end, so the marker trace records who took
+what at the moment they took it.
 
 ## Release And Audit
 
 Release definition records exactly which backlog and bug inputs are consumed; at pick
 time, open bugs and undispositioned audits outrank fresh backlog. Closure gives each
 consumed item a terminal disposition and evidence.
+
+Residual routing is calibrated by signal class, so the operator's demand queue receives
+demand and nothing else. Reviews still find and record **everything** — never-silent holds,
+and every observation stays in its reviewer's findings array. What differs is where an
+observation terminates. A **record-only** observation — INFO-grade, awareness-only, or
+already fixed at HEAD — carries no actionable fix surface: it is written into the release
+CLOSURE record (its own section) or the reviewer handoff and stops there, never reaching an
+intake report. Only an **actionable defect** — LOW or above with a concrete fix surface — is
+listed as an intake candidate for the PM to compile and the operator to adjudicate. Zero
+observations are lost either way: the two closure sections plus the reviewer handoffs
+reconcile against the finding counts.
 
 One audit generates exactly one remediation release, and that release gives every finding
 an explicit disposition — fixed, superseded by a broader picked item, or deferred/rejected

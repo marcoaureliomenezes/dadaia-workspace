@@ -16,10 +16,16 @@ After every task in `specs/releases/<release-id>/TASKS.md` is marked `[x] DONE` 
 implementation is verified. Set `specs/releases/ACTIVE.md` phase to `CLOSURE` **before**
 writing CLOSURE.md or memory Markdown — gate v3 allows memory writes in the DEFINITION and CLOSURE phases (this skill operates in CLOSURE).
 
+**Order (D8/FR5): review → closure → archive → ship.** The pre-PR six-axis code review
+of the delta runs on the thawed tree, before the `git mv` archive step — never after;
+only ship steps (merge to `develop`, diff security review, push, PR to `main`) follow
+archive. `dd-release-implement` §4 states the same order.
+
 **Finalization order: memory → CLOSURE → archive**, in one commit on `develop` that rides
 the next push (the branch/commit mechanics are the `dadaia-gitflow` skill's contract):
-update the memory atoms first, write `CLOSURE.md` next (it records which atoms changed),
-then move the release directory to `_archive/` last.
+with the code review already `APPROVE`d, update the memory atoms first, write
+`CLOSURE.md` next (it records which atoms changed), then move the release directory to
+`_archive/` last.
 
 ## CLOSURE.md template
 
@@ -85,12 +91,14 @@ touch dependencies").
 ## Dispositions
 
 Disposition-sweep ledger (mandatory — see "Disposition sweep" below). One row per
-backlog item and bug picked into (or superseded by) this release.
+backlog item and bug picked into (or superseded by) this release. A backlog disposition
+is **never** a per-entry file — it adds a `## LEDGER` line to `BACKLOG.md` and drops the
+slug's `## ACTIVE` subsection, in the same commit (`sdd-bug-backlog-governance`).
 
-| File | Kind | Terminal status | Evidence |
-|------|------|-----------------|----------|
+| Record | Kind | Terminal disposition | Evidence |
+|--------|------|-----------------------|----------|
 | `specs/bugs/*.jsonl` (bug-id `<slug>`) | bug | `Closed` | `<CLOSURE section \| commit sha>` |
-| `specs/backlog/<slug>.md` | backlog | `DELIVERED — <release-id>` | `<CLOSURE section \| commit sha>` |
+| `specs/backlog/BACKLOG.md` (`<slug>` — adds a `## LEDGER` line, drops the `## ACTIVE` subsection) | backlog | `<terminal token — dd-backlog-definition §2>` | `<CLOSURE section \| commit sha>` |
 | ... | ... | ... | ... |
 
 ## Test dispositions
@@ -107,10 +115,24 @@ replacement test.
 | SCAFFOLD expiry | `tests/<path>::<test>` | `deleted` / `promoted to CONTRACT` | `<commit sha>` |
 | ... | ... | ... | ... |
 
+## Record-only observations
+
+INFO-grade, awareness-only, or already-fixed-at-HEAD observations from this release's
+reviews and audits. Never-silent still held — each was recorded in its reviewer's own
+findings array or handoff — but a record-only observation carries no actionable fix
+surface, so it **terminates here** and never enters the PM's intake report (FR6/R4).
+
+| Source (reviewer/handoff) | Observation | Why record-only |
+|---|---|---|
+| `<agent>` `<ts>` handoff | <one-liner> | INFO-grade / awareness-only / already-fixed-at-HEAD |
+| ... | ... | ... |
+
 ## Intake candidates
 
-Residuals discovered during implementation that did not fit this release's scope. The
-closer creates **no backlog entry** — ADR #15's operator-gated intake doctrine (full
+Residuals discovered during implementation that did not fit this release's scope, plus
+every **actionable defect** (LOW+ with a concrete fix surface) surfaced by this
+release's reviews — never a record-only observation (those stop in the section above).
+The closer creates **no backlog entry** — ADR #15's operator-gated intake doctrine (full
 statement: `dd-backlog-definition` §5) means every residual is only ever **listed**
 here, for the PM to compile into its next operator-facing intake report. List each
 residual under one of two headings:
@@ -144,9 +166,15 @@ either it is fixed (`Closed`) or a superseding backlog item covers its acceptanc
 (`Closed` + `superseded_by: <slug>`). Stale or invalid items are dispositioned
 `DEFERRED` or `REJECTED` with a reason, never removed.
 
-`dadaia specs doctor` backstops the sweep: SPEC-DOC-031 WARNs on a backlog entry left
-non-terminal (`OPEN`/`PICKED`/`CANDIDATE`) while referenced by an archived release;
-SPEC-DOC-032 WARNs on a bug `status:` outside the {`Open`, `Closed`} canon.
+`dadaia specs doctor` backstops the sweep: SPEC-DOC-031 (FR14 semantics) WARNs when an
+**archived** SPEC's `**Consumes:**` declaration or an **archived** CLOSURE's
+`## Dispositions` rows name a still-non-terminal `ACTIVE` slug; SPEC-DOC-032 WARNs on a
+bug `status:` outside the {`Open`, `Closed`} canon.
+
+**Standing note.** Because SPEC-DOC-031 only counts archived-document assertions, this
+closure's own `git mv` archive step adds one such WARN per non-terminal slug the
+just-archived SPEC/CLOSURE names — the next closer captures the SPEC-DOC-031 count
+**after** this closure's archive move, never before.
 
 ## Memory Markdown update protocol
 

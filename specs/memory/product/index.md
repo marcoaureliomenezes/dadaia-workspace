@@ -21,7 +21,7 @@
 |------|-------|------|
 | `academy` | academy | browsable knowledge_basis in the panel's Academy tab + copy-from-template management via CLI. |
 | `public-asset-distribution` | public-asset-distribution | canonical public assets are staged to .dadaia/agentic and projected to Claude Code, Codex, Kimi Code, and shared .agents roots. |
-| `pypi-distribution` | pypi-distribution | The published dadaia-workspace 0.2.x PyPI package, the release.yml OIDC publish pipeline, the wheel content contract, and the SDD-vs-package version split. |
+| `pypi-distribution` | pypi-distribution | The published dadaia-workspace PyPI package on a single version axis, the release.yml OIDC publish pipeline, and the wheel content contract. |
 
 ### harness
 
@@ -64,6 +64,6 @@
 | slug | title | tldr |
 |------|-------|------|
 | `sdd-bug-backlog-governance` | sdd-bug-backlog-governance | Event-sourced JSONL bugs, an operator-gated single-source backlog, release consumption, audit dispositions, and a develop-only four-branch git contract. |
-| `sdd-gate-v3` | sdd-gate-v3 | No-lock SDD enforcement: path/mode gates, advisory presence, and a develop-only, denylist-scanned push boundary that never re-refuses a path's published value. |
+| `sdd-gate-v3` | sdd-gate-v3 | No-lock SDD enforcement: path/mode gates, advisory presence, and a develop-only, denylist-scanned push boundary with fail-closed single-path amnesty. |
 | `specs-doctor` | specs-doctor | Validates canonical specs structure, memory/catalog integrity, release markers, closure evidence, dispositions, bug ledgers, and audit coherence. |
 
