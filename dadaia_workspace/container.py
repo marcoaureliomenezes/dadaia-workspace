@@ -672,28 +672,6 @@ def _memory_lint_gate(specs_dir: Path) -> "Callable[[], tuple[bool, str]] | None
     return _gate
 
 
-def _memory_catalog_regenerator(specs_dir: Path) -> "Callable[[], None] | None":
-    """Build the closure-time derived-catalog refresh for one context specs dir.
-
-    Returns ``None`` when the context has no product-memory zone (nothing to derive).
-    """
-    if not (specs_dir / "memory" / "product").is_dir():
-        return None
-
-    def _regenerate() -> None:
-        from dadaia_workspace.features.specs.catalog import (
-            generate_catalog,
-            write_catalog,
-            write_index,
-        )
-
-        catalog = generate_catalog(specs_dir)
-        write_catalog(specs_dir, catalog)
-        write_index(specs_dir, catalog)
-
-    return _regenerate
-
-
 def build_panel_views(
     workspace_root: Path,
     telemetry: object | None = None,
