@@ -81,7 +81,7 @@ six-axis review is its own task and runs on a **thawed** tree, before the archiv
 | T-043-12 | all `alpha-1` | A1–A8 ids | `qa-engineer` artifact |
 | T-043-13 | #9 / FR9 | A9.1–A9.3 | RED-then-GREEN output |
 | T-043-14 | #18 / FR10 | A10.1–A10.3 | RED-then-GREEN output |
-| T-043-15 | #21 / FR11 | A11.1–A11.5 | reconciliation fixture output |
+| T-043-15 | #21 / FR11 | A11.1–A11.7 | reconciliation fixture output + header/body boundary fixture |
 | T-043-16 | #24 + trailer / FR12 | A12.1–A12.6 | fixture + baseline diff + `public-privacy` |
 | T-043-17 | #16 / FR13 | A13.1–A13.3 | V3 capture + gate fixtures |
 | T-043-18 | #7 / FR14 | A14.1–A14.4 | schema + CLI output |
@@ -104,14 +104,14 @@ six-axis review is its own task and runs on a **thawed** tree, before the archiv
 | T-043-35 | #8 + #37 / FR22 | A22.5–A22.6 | mutation fixtures + inventory test |
 | T-043-36 | #8 / FR22 | A22.7–A22.8 | V8 byte-diff |
 | T-043-37 | all `alpha-4` | A22.x | `qa-engineer` artifact + certify evidence |
-| T-043-38 | GC / FR23 | A23.1–A23.3 | skills diff + fixtures |
-| T-043-39 | GC / FR24 | A24.1–A24.3 | push fixtures |
-| T-043-40 | GC / FR25 | A25.1–A25.3 | skill template diff |
-| T-043-41 | GC / FR26 | A26.1–A26.3 | V10 capture |
+| T-043-38 | GC / FR23 | A23.1–A23.3, **AG.1** | skills diff + fixtures + lane-guard fixture |
+| T-043-39 | GC / FR24 | A24.1–A24.4, **AG.1** | push fixtures + audit-ledger line + lane-guard fixture |
+| T-043-40 | GC / FR25 | A25.1–A25.3, **AG.1** | skill template diff |
+| T-043-41 | GC / FR26 | A26.1–A26.3, **AG.1** | V10 capture + lane-guard fixture |
 | T-043-42 | GC / FR27 | A27.1–A27.3 | rotation fixtures |
 | T-043-43 | GC / FR28 | A28.1–A28.3 | block-message fixtures |
-| T-043-44 | GC / FR29 | A29.1–A29.4 | dry-run + idempotency output |
-| T-043-45 | all `alpha-5` | A23–A29 ids | `qa-engineer` artifact |
+| T-043-44 | GC / FR29 | A29.1–A29.4, **AG.1** | dry-run + idempotency output + lane-guard fixture |
+| T-043-45 | all `alpha-5` | A23–A29 ids, **AG.1** | `qa-engineer` artifact |
 | T-043-46 | #5 / FR30 | A30.1–A30.4, A30.6 | round artifact incl. recorded limits + GC coverage |
 | T-043-47 | #5 / FR30 | A30.5 | remediation commits or "unused" statement |
 | T-043-48 | CHANGELOG / FR31 | A31.1–A31.4 | `CHANGELOG.md` diff + range citations |
@@ -400,9 +400,14 @@ decline the pathspec-magic defence with a recorded reason.
 bodies through the same batched conversation and typed-error contract; feed them through
 the same three term layers with the same masked, satisfiable refusal (healing action:
 reword/amend). The v0.4.2 reconciliation shape — two commits, **zero blobs** — is an
-acceptance fixture. RED first.
+acceptance fixture. **The boundary is the commit object's header/body split**: scan the
+message body and an annotated tag's body only; never the `author`/`committer` headers (a
+header hit is unamnestiable and would be a permanent self-refusal). RED first.
 
-**Done criterion:** A11.1–A11.4 hold; A11.5's memory edit is deferred to T-043-51.
+**Done criterion:** A11.1–A11.4 hold, **plus A11.6 (the header/body boundary: body and tag
+body scanned, `author`/`committer` headers out of scope by design) and A11.7 (path-less
+objects carry no prior text, so a body hit is never amnestied — fail-closed)**; A11.5's
+memory edit is deferred to T-043-51.
 
 **Parallelism:** none.
 
@@ -420,11 +425,14 @@ acceptance fixture. RED first.
 
 **Description:** Three parts plus two folded escapes: the rationale check; the cadence and
 single-line constraint (recorded as memory truth at T-043-51); the structural rule for the
-`internal-hostname` dotted-chain class; the Windows trailing-period escape (CR-6); and the
-`noreply@anthropic.com` **local-part** carve-out with a counter-fixture proving a genuine
-address at the same domain still fires.
+`internal-hostname` dotted-chain class; the Windows trailing-period escape (CR-6). The
+`noreply@anthropic.com` **local-part** carve-out (A12.2) **already shipped as the Arm-B
+rider** on bug `privacy-baseline-noreply-local-part-not-carved-out` (SPEC §6 D-10) — this
+task **verifies** it at HEAD, with its counter-fixture proving a genuine address at the same
+domain still fires, and never re-implements it.
 
-**Done criterion:** A12.1–A12.6 hold; `public doctor` `[ok] public-privacy`; sentinel green.
+**Done criterion:** A12.1, A12.3–A12.6 hold and A12.2 is **verified** as delivered by the
+rider; `public doctor` `[ok] public-privacy`; sentinel green.
 
 **Parallelism:** none.
 
@@ -836,7 +844,9 @@ skills surface (one location) + projections.
 it consumed; a handoff carrying `artifact.path` is exempt and follows its report's
 retention. No per-skill restatement.
 
-**Done criterion:** A23.1–A23.3 hold.
+**Done criterion:** A23.1–A23.3 hold, **and AG.1 holds for this deletion lane** (target
+resolved, refused outside `.dadaia/`, symlinked directory never followed — FR17's doctrine
+by reference).
 
 **Parallelism:** none.
 
@@ -846,13 +856,17 @@ retention. No per-skill restatement.
 
 **Owner role:** software-engineer · **Commit:** `feat(T-043-39): delete the security verdict consumed by a successful push`
 
-**Preconditions:** T-043-38 `[x]`. **Write set:** `features/chokepoints/service.py` + tests.
+**Preconditions:** T-043-38 `[x]`. **Write set:** `features/chokepoints/service.py`, the
+append-only verdict ledger under `.dadaia/` + tests.
 
 **Description:** After a successful push, delete the APPROVED verdict handoff(s) covering the
 pushed delta. A verdict for an unpushed delta is never touched; deletion is best-effort and
-never changes a push verdict.
+never changes a push verdict. **The record outlives the handoff**: append one line (agent,
+verdict, covered tip sha, timestamp) to the append-only ledger **before** deleting — a
+failed append leaves the handoff in place.
 
-**Done criterion:** A24.1–A24.3 hold.
+**Done criterion:** A24.1–A24.4 hold — including the append-before-delete audit line
+(A24.4) — **and AG.1 holds for this deletion lane**.
 
 **Parallelism:** none.
 
@@ -868,7 +882,9 @@ never changes a push verdict.
 Nothing referenced by a surviving CLOSURE evidence pointer may be deleted. Lands in the same
 skill T-043-30 edited — re-read it before writing.
 
-**Done criterion:** A25.1, A25.3 hold; T-043-52 executes it (A25.2).
+**Done criterion:** A25.1, A25.3 hold; T-043-52 executes it (A25.2); **the sweep step states
+AG.1's lane guard** (resolve the target, refuse anything outside `.dadaia/`, never follow a
+symlinked directory) as part of its keep/delete rule.
 
 **Parallelism:** none.
 
@@ -884,7 +900,9 @@ skill T-043-30 edited — re-read it before writing.
 markers and empty context dirs; reap zombie lifecycle/state run records. Best-effort and
 fail-open, matching the reconciler it extends. A live session's records are never touched.
 
-**Done criterion:** A26.1–A26.3 hold; V10 captured before/after.
+**Done criterion:** A26.1–A26.3 hold; V10 captured before/after; **AG.1 holds for this
+deletion lane** (records, markers and empty context dirs are resolved and refused outside
+`.dadaia/`; a symlinked directory is never followed).
 
 **Parallelism:** none.
 
@@ -932,7 +950,9 @@ contract. Token-matched on fixed leading tokens — **no shell parsing**.
 than 3 days, any `*cache*` directory under `.dadaia`, orphaned session markers. Idempotent,
 `SessionStart`-safe, with a dry-run mode.
 
-**Done criterion:** A29.1–A29.4 hold.
+**Done criterion:** A29.1–A29.4 hold, **and AG.1 holds for this deletion lane** — the
+calendar backstop resolves every target, refuses anything outside `.dadaia/`, and never
+follows a symlinked directory.
 
 **Parallelism:** none.
 
@@ -945,8 +965,9 @@ than 3 days, any `*cache*` directory under `.dadaia`, orphaned session markers. 
 **Preconditions:** T-043-38 … T-043-44 all `[x]`. **Write set:** the QA artifact + handoff.
 
 **Description:** Verify every `alpha-5` acceptance id and the fail-open posture of each
-capability that rides a hook. The artifact names the GC surface `alpha-6`'s consumer round
-must exercise (feeds A30.6).
+capability that rides a hook. **AG.1 is verified per deletion lane** (FR23, FR24, FR25,
+FR26, FR29) — one lane-guard fixture each, none accepted by inspection. The artifact names
+the GC surface `alpha-6`'s consumer round must exercise (feeds A30.6).
 
 **Done criterion:** PLAN §5 `alpha-5` exit criteria met; V10 recorded.
 

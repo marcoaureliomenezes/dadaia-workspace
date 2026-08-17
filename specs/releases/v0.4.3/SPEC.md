@@ -334,6 +334,16 @@ reword/amend before push).
 - A11.4 Typed-error and degradation behaviour matches the blob path exactly — no silent skip;
   a commit-object read failure is reported, never rationalized.
 - A11.5 The `sdd-gate-v3` atom's blob-only non-goal is retired at CLOSURE (§5).
+- A11.6 The scanned surface is pinned at the commit object's **header/body boundary**: the
+  message **body** (and an annotated tag's body) is scanned; the `author`/`committer`
+  **headers are out of scope by design** — they carry the repo's standing mail identity on
+  **every** commit and a commit object has no path, so no amnesty could ever suppress a
+  header hit and the gate would self-refuse permanently. A fixture proves an identity
+  present only in the headers does not refuse.
+- A11.7 The amnesty semantics for **path-less objects** are stated explicitly and pinned by
+  fixture: a body hit carries no prior published text (there is no path to key the amnesty
+  on), so it is **never amnestied** — fail-closed, exactly as a multi-path blob is; headers
+  raise no amnesty question at all, because they are never scanned.
 
 #### FR12 — The privacy baseline stops growing literal by literal
 
@@ -605,6 +615,13 @@ The doctrine: **an artifact dies when the thing it exists for dies**, not when a
 says so. Calendar-based deletion survives **only** in FR29's backstop. Every capability
 below is fail-open where it rides a hook — a GC error never changes a gate verdict.
 
+**Segment-wide acceptance — the deletion lanes (cross-cutting over FR23–FR26 and FR29).**
+
+- AG.1 Every GC deletion path **resolves** its target before removing it, **refuses** any
+  resolved target outside `.dadaia/`, and **never follows a symlinked directory** —
+  inheriting FR17's symlink doctrine by reference (A17.1), not restating it — with a
+  fixture per deletion lane (FR23, FR24, FR25, FR26, FR29).
+
 #### FR23 — Ack-on-consume for coordination handoffs
 
 Every consumer skill that reads a handoff as its input contract deletes that handoff once
@@ -625,6 +642,11 @@ delta is never touched.
   unrelated verdict survives.
 - A24.2 A failed or refused push deletes nothing.
 - A24.3 Deletion is best-effort: an I/O error never changes the push verdict.
+- A24.4 The verdict **outlives its handoff as a record**: before a consumed verdict handoff is
+  deleted, one line is appended to an append-only ledger under `.dadaia/` carrying the
+  reviewing agent, the verdict, the covered tip sha and the timestamp — mirroring A25.3's
+  evidence-pointer protection, so no deletion ever erases the only trace that the push was
+  covered. The append precedes the delete; a failed append leaves the handoff in place.
 
 #### FR25 — Closing a release ends its artifacts' lives
 
@@ -772,7 +794,7 @@ as unpublished-internal. **Nothing is deleted or renamed.**
 | `specs/memory/tech-stack.md` | **PE-2:** the false "currently `0.5.0`" parenthetical is dropped (not restated with a new number — the one-axis rule makes the literal redundant); the pinning doctrine line from FR1/A1.3 lands here or in `quality-assurance.md` | **CLOSURE** |
 | `specs/memory/quality-assurance.md` | the census sentence and the two justified-timeout citations rewritten (A18.6); the mutation tool + invocation recorded (A20.2); the new **Complexity And Size** governance section (A21.6); the intent-declaration shape (A19.3) | **CLOSURE** |
 | `specs/memory/.heading-allowlist` | the 12 enumerated `LINT-1` headings (A13.3) and the new governance heading (A21.6) | **CLOSURE** |
-| `specs/memory/product/sdd/sdd-gate-v3.md` | blob-only non-goal retired, coverage becomes blob + commit-object (A11.5); the baseline cadence, version and single-line constraint as product truth (FR12); the MEMORY path-class decision (FR13); the venv-guard cache rule (FR28) — **one authoring pass, one task** | **CLOSURE** |
+| `specs/memory/product/sdd/sdd-gate-v3.md` | blob-only non-goal retired, coverage becomes blob + commit-object (A11.5), **with the header/body boundary and the path-less amnesty semantics stated as product truth** (A11.6–A11.7); the baseline cadence, version and single-line constraint as product truth (FR12); the MEMORY path-class decision (FR13); the venv-guard cache rule (FR28); the push-verdict GC audit record (A24.4) — **one authoring pass, one task** | **CLOSURE** |
 | `specs/memory/product/sdd/sdd-bug-backlog-governance.md` | the `picked` reservation event and its coherence rules (FR14) | **CLOSURE** |
 | `specs/memory/product/agents/agent-comms.md` | ack-on-consume retention for coordination vs artifact-bearing handoffs (FR23) | **CLOSURE** |
 | `specs/memory/product/agents/agent-monitoring.md` | release-closure GC of run records; reconciler reaping; log rotation (FR25, FR26, FR27) | **CLOSURE** |
@@ -827,6 +849,7 @@ memory write set in three places by editing an atom in pieces).
 | D-7 | **FR9 ∥ FR10** are the only sanctioned parallel pair (disjoint write sets: `python_env.py` vs `git_subprocess.py`) | declared in TASKS; everything else is one `[-]` at a time |
 | D-8 | **`ACTIVE.md` `segment:` stays `none`** (D1, ratified) — because a non-`none` value pointing at a missing directory silently disables `SPEC-DOC-004` and `TREE-6` | that silent skip is **registered** as bug `specs-doctor-segment-router-silent-skip` (MEDIUM) and fixed as the `alpha-2` Arm-B rider (T-043-22, AB.1–AB.5); D1 stands regardless of the fix, because the document-set shape is a knowledge-duplication decision, not a doctor workaround |
 | D-9 | **`alpha-5` (GC) before `alpha-6` (consumer)** per R10 | the consumer round certifies the assembled surface including GC (A30.6); no delta re-check exists or is needed |
+| D-10 | **FR12's carve-out half was pulled forward** — the `noreply@anthropic.com` local-part gap (A12.2) refused a real push, so it was fixed in this same definition window by `software-engineer` as an **Arm-B rider** on bug `privacy-baseline-noreply-local-part-not-carved-out`, not as release scope (`DADAIA.md` §1 Arm B) | FR12's remaining scope = **the cadence half, unchanged** (A12.1 rationale check, A12.3–A12.6); A12.2 is satisfied by the rider and is verified, not re-implemented, by T-043-16 |
 | R1 | **Release size.** 25 records + 2 folded items + 1 Arm-B rider, 32 FRs — ~1.9× v0.4.2, the largest ever shipped here | segmentation (R1) + the declared residual budget + FR6 routing + review-before-archive. Three of those four mechanisms shipped days ago and are unproven at this scale |
 | R2 | **WS-G is L-sized** (7 FRs across hooks, CLI, skills and the chokepoint) and now lands second-to-last | capability-level task split, fail-open posture as acceptance, each capability independently revertible; and — the R10 gain — the consumer round runs **after** it, so a GC regression is caught inside the release rather than after ship |
 | R3 | **The consumer round is now the last gate before `rc-1`** — a late failure has less runway | one remediation cycle budgeted inside `alpha-6` (A30.5); R7 fixed the environment question before the segment opens; a finding too large to absorb goes to the operator at the moment of discovery |
