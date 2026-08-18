@@ -34,6 +34,9 @@ NEVER builds a real venv: the workspace is a minimal hand-built tree (the
 ``.dadaia/states/spec_contexts.json`` sentinel + per-context ``specs/memory`` only), the
 same shape the ctx_inject unit fixtures use. ``WorkspaceService.init`` is deliberately
 avoided.
+
+Intent: CONTRACT — v0.1.14 FR-W2 (T-50-03)
+Owner: software-engineer
 """
 
 from __future__ import annotations

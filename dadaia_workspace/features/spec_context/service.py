@@ -2,6 +2,7 @@
 
 import contextlib
 import logging
+import os
 import re
 import shutil
 import sys
@@ -397,11 +398,33 @@ class SpecContextService:
                 shutil.rmtree(preserved, ignore_errors=True)
                 _log.info("scaffold merge into pre-existing specs/: no missing files found")
 
+        # v0.4.3 T-043-21/FR17: mirror the tests/AGENTS.md sibling seam's hardened
+        # posture (below) onto this write too — it previously carried ZERO symlink
+        # refusals. The containing repo DIRECTORY must not itself be a symlink (it
+        # would escape the repos/ tree, same posture as `workspace_guardrail`'s
+        # consumer-repo containment).
+        #
+        # v0.4.3 T-043-23 security-review rework (FR17 LOW, CWE-367 TOCTOU/CWE-59 link
+        # following, handoff 2026-08-17T173112Z-security-reviewer-v0.4.3-alpha-2-delta):
+        # the destination-file check used to be a SEPARATE `is_symlink()`/`.exists()`
+        # probe followed by a DISTINCT `shutil.copy2` call — two syscalls with a window
+        # between them where a same-user process could swap the destination for a
+        # symlink and have the template written straight through it. Replaced with a
+        # SINGLE atomic `os.open()` carrying `O_CREAT|O_EXCL|O_NOFOLLOW`: "already
+        # exists", "is a symlink" (dangling or not) and "was swapped mid-window" are now
+        # ONE indivisible refusal, never three separately-timed checks.
         repo_agents_dst = repo_path / "AGENTS.md"
         repo_agents_src = _PUBLIC_DIR / "templates" / "repo-AGENTS.md"
-        if not repo_agents_dst.exists() and repo_agents_src.exists():
-            shutil.copy2(repo_agents_src, repo_agents_dst)
-            touched.append("AGENTS.md")
+        if not repo_path.is_symlink() and repo_agents_src.exists():
+            open_flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY | getattr(os, "O_NOFOLLOW", 0)
+            try:
+                fd = os.open(repo_agents_dst, open_flags, 0o644)
+            except OSError:
+                pass  # exists, is a symlink, or was raced mid-window — refused, no-op.
+            else:
+                with os.fdopen(fd, "wb") as fh:
+                    fh.write(repo_agents_src.read_bytes())
+                touched.append("AGENTS.md")
 
         # v0.7.0 FR3 (T-070-07): the scoped test law lands ONLY where a tests/ tree
         # already exists — alive() never invents the directory (a stray tests/ would

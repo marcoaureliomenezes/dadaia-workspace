@@ -12,14 +12,22 @@ Coverage map:
   T-5.3  → AC-10, NFR-2 (memory .md atom rendered + served end-to-end; D-4)
   T-5.4  → AC-6 (dashboard deprecation warning on stderr)
   T-5.5  → AC-9, NFR-4 (clean shutdown within 2 s; port freed)
+
+Intent: CONTRACT — T-5.1..T-5.5 (panel AC-1, AC-2, AC-3, AC-9, AC-10, NFR-2, NFR-4)
+Owner: software-engineer
+
+v0.4.3 T-043-25 (FR18b, Verdict 1): the ``_drain_stderr_nonblocking``-focused pair
+that tested the stderr-drain helper itself (not observable panel behavior) was
+demoted out of this e2e file to
+``tests/integration/features/test_panel_stderr_drain.py``; the helper itself moved
+to the shared ``tests.helpers.subprocess_diag`` module so both this file's
+diagnostic usage and the demoted pair's own coverage read from one source.
 """
 
 from __future__ import annotations
 
-import fcntl
 import http.client
 import json
-import os
 import queue
 import signal
 import socket
@@ -36,6 +44,7 @@ import pytest
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
+from tests.helpers.subprocess_diag import drain_stderr_nonblocking as _drain_stderr_nonblocking
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -122,37 +131,6 @@ def _wait_for_ready(proc: subprocess.Popen[str], port: int, timeout: float = 30.
 
     stderr = _drain_stderr_nonblocking(proc)
     raise TimeoutError(f"Panel did not print the ready line within {timeout}s. stderr:\n{stderr}")
-
-
-def _drain_stderr_nonblocking(proc: subprocess.Popen[str], wait: float = 0.3) -> str:
-    """Best-effort, NON-blocking read of whatever is currently on stderr.
-
-    The panel runs ``serve_forever`` and never closes its pipes, so a plain
-    ``proc.stderr.read()`` on a live process blocks forever.  We mark the fd
-    non-blocking and read what is buffered so diagnostics never hang the suite.
-
-    Bug panel-e2e-readiness-flaky-under-xdist-load: reading through the TEXT-mode
-    wrapper here is unsound — on an empty non-blocking pipe the raw layer returns
-    ``None`` and the codec crashes with ``TypeError: can't concat NoneType to
-    bytes``, turning this diagnostic path into the test failure itself whenever a
-    panel was merely slow to start. Read the fd directly and decode.
-    """
-    if proc.stderr is None:
-        return ""
-    time.sleep(wait)
-    fd = proc.stderr.fileno()
-    flags = fcntl.fcntl(fd, fcntl.F_GETFL)
-    fcntl.fcntl(fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
-    chunks: list[bytes] = []
-    try:
-        while True:
-            chunk = os.read(fd, 65536)
-            if not chunk:
-                break
-            chunks.append(chunk)
-    except (BlockingIOError, OSError):
-        pass
-    return b"".join(chunks).decode("utf-8", errors="replace")
 
 
 def _get(url: str, timeout: float = 5.0) -> http.client.HTTPResponse:
@@ -445,44 +423,3 @@ def test_panel_clean_shutdown_within_2s(tmp_path: Path) -> None:
                 f"Port {port} still bound after panel shutdown: {exc}. "
                 "NFR-4 requires port to be freed within 2s."
             )
-
-
-# ---------------------------------------------------------------------------
-# Bug panel-e2e-readiness-flaky-under-xdist-load — regression locks for the
-# stderr drain. Under full-suite xdist load a slow panel start routed every
-# failure through _drain_stderr_nonblocking, which crashed with
-# ``TypeError: can't concat NoneType to bytes`` (non-blocking read through the
-# text-mode wrapper) and replaced the real diagnostic with a codec traceback.
-# ---------------------------------------------------------------------------
-
-
-def test_drain_stderr_nonblocking_returns_empty_on_quiet_live_process() -> None:
-    """The drain must never raise on a live process whose stderr has nothing buffered."""
-    proc = subprocess.Popen(
-        [sys.executable, "-c", "import time; time.sleep(30)"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-    )
-    try:
-        assert _drain_stderr_nonblocking(proc, wait=0.0) == ""
-    finally:
-        _kill_proc(proc)
-
-
-def test_drain_stderr_nonblocking_returns_buffered_content() -> None:
-    """Whatever the child already wrote to stderr must come back as text."""
-    proc = subprocess.Popen(
-        [
-            sys.executable,
-            "-c",
-            "import sys, time; print('boom-diagnostic', file=sys.stderr, flush=True); time.sleep(30)",
-        ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-    )
-    try:
-        assert "boom-diagnostic" in _drain_stderr_nonblocking(proc, wait=0.5)
-    finally:
-        _kill_proc(proc)

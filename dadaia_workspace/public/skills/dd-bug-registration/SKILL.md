@@ -1,7 +1,7 @@
 ---
 name: dd-bug-registration
 description: "Use when: registering a genuine product bug you hit while operating this tooling — classify-first, redact, append the `reported` event. The opening move of Arm B only, never the fix (that's `dd-bug-fix`). Any agent may invoke it."
-applyTo: "specs/bugs/**"
+applyTo: "specs/bugs/*.jsonl"
 ---
 
 # dd-bug-registration
@@ -9,6 +9,10 @@ applyTo: "specs/bugs/**"
 > **Not a hook-enforced mechanism.** ADDITIVE paths (`specs/bugs/**`) are always
 > writable, in any mode — this is discipline, not gate enforcement. Any agent runs this
 > protocol; it is not owned by one role.
+
+The narrower glob names the exact write target — the `reported` event append. It is a
+declared subset of `dd-bug-fix`'s broader `specs/bugs/**` (activation precedence:
+`dd-backlog-definition` §7, canonical home).
 
 ## 1. When to invoke
 

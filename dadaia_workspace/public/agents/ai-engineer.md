@@ -13,6 +13,7 @@ tools:
   - Glob
   - Grep
 skills:
+  - dadaia-cli
   - dadaia-handoff-emitter
   - dadaia-task-manager
   - dadaia-workspace-spec-navigator
@@ -23,6 +24,7 @@ skills:
   - dd-release-implement
   - dd-bug-fix
   - dd-bug-registration
+  - dadaia-gitflow
 maxTurns: 60
 input_contract:
   requires_inputs:

@@ -18,6 +18,9 @@ Scenarios (seed 2):
 
 The CLI is invoked harness-free (no PreToolUse/PostToolUse payload), with only
 ``WORKSPACE_ROOT`` set, so this also covers the headless runtime the chokepoint protects.
+
+Intent: CONTRACT — FR-W1-02 (push-gate verdict chokepoint)
+Owner: software-engineer
 """
 
 from __future__ import annotations

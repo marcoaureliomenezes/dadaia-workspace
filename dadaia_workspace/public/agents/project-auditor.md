@@ -13,6 +13,7 @@ tools:
   - Write
   - Agent
 skills:
+  - dadaia-cli
   - dadaia-workspace-spec-reviewer
   - dd-audit-project
   - dd-bug-registration
@@ -20,6 +21,7 @@ skills:
   - dadaia-handoff-emitter
   - dadaia-workspace-spec-navigator
   - dadaia-step0-memory-bootstrap
+  - harness-primitives
 maxTurns: 60
 input_contract:
   requires_inputs:

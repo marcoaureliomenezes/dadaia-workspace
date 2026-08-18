@@ -6,14 +6,16 @@ tldr: Three-ring Python architecture, document-governed SDD lifecycle, no-lock b
 summary: >-
   Defines the CLI/features/infrastructure dependency structure, core ports and models,
   composition root, Spec Context boundary, handoff data plane, panel, public asset
-  projections, concurrency posture, and canonical runtime state.
+  projections, concurrency posture, and canonical runtime state. Accepted ignore edges
+  ratchet only downward and are justified per edge; a projected script is a thin wrapper
+  over a package implementation, never the implementation itself.
 tags:
 - architecture
 - layers
 - dependency-rules
 - agents
 - sdd
-last_updated: '2026-08-16'
+last_updated: '2026-08-18'
 release_origin: v0.4.2
 ---
 
@@ -39,7 +41,14 @@ flowchart LR
 - `container.py` is the only general composition root.
 
 Import-linter and AST contract tests enforce the intended direction and cap deliberate
-legacy exceptions. New feature code depends on ports, not concrete adapters.
+legacy exceptions. New feature code depends on ports, not concrete adapters. The
+accepted-ignore-edge **cap ratchets only downward**: an edge is added only with a rationale
+recorded on the edge itself and the cap adjusted in the same commit, and the net direction
+across a release is a reviewable number in that release's CLOSURE — the same
+measure-then-pin-then-ratchet-down law that governs the complexity ceilings and the LARGE
+census ([[quality-assurance]]). Where an edge is unavoidable, a **function-scoped lazy
+import** keeps the module's load-time posture intact, so the ring's static shape stays
+what it claims to be.
 
 **The workspace ships no agent-execution runtime.** It provides context, law,
 deterministic boundaries, evidence validation, and diagnostics; the agents themselves
@@ -157,9 +166,12 @@ by every entry harness. Underived core surface is forbidden (constitution §12.5
 
 ### Specs and memory
 
-`features/specs/` owns structural validators and memory catalog generation. Markdown
-atoms are the memory source; `catalog.json` and `product/index.md` are generated from
-frontmatter, and a catalog value that can be derived from an atom's body is **computed at
+`features/specs/` owns structural validators, the memory-atom lint, and memory catalog
+generation. **The lint's one canonical implementation is a package module**, imported
+directly by the doctor — no feature module shells out to a projected script for logic it
+owns, and the projected copy under `public/scripts/` is a thin entry-point wrapper over it
+([[public-asset-distribution]]). Markdown atoms are the memory source; `catalog.json` and
+`product/index.md` are generated from frontmatter, and a catalog value that can be derived from an atom's body is **computed at
 generation time, never stored** in that atom. Memory is current truth and is writable only
 by product-engineer during DEFINITION or CLOSURE. Every field the frontmatter schema
 declares is required, and an undeclared field is invalid — the schema rejects the retired

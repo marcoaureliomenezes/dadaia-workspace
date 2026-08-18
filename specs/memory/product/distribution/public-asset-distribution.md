@@ -3,14 +3,14 @@ slug: public-asset-distribution
 title: public-asset-distribution
 category: product
 tldr: canonical public assets are staged to .dadaia/agentic and projected to Claude Code, Codex, Kimi Code, and shared .agents roots.
-summary: Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, universal skills projected to one canonical .agents/skills home with no registry entry, repo templates copied at alive() (repo-AGENTS.md plus a conditional tests/AGENTS.md), harness-profile-aware install/doctor, render-at-install of core agents (staged generic body + resolved agent-model policy composed into both L1 projections) with a policy-aware doctor render-compare, provenance-gated consumer AGENTS fan-out (banner-canonical restored vs hand-authored left [foreign]) with lexical repo-slug containment + destination-file symlink refusal, scoped AGENTS projections, source-root hygiene guard, and runtime projection contract.
+summary: Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, universal skills projected to one canonical .agents/skills home with no registry entry, the thin-wrapper contract that keeps every public/scripts file an entry point over the package implementation, repo templates copied at alive() (repo-AGENTS.md, with destination-file symlink refusal at every write site, plus a conditional tests/AGENTS.md), harness-profile-aware install/doctor, render-at-install of core agents (staged generic body + resolved agent-model policy composed into both L1 projections) with a policy-aware doctor render-compare, provenance-gated consumer AGENTS fan-out (banner-canonical restored vs hand-authored left [foreign]) with lexical repo-slug containment + destination-file symlink refusal, scoped AGENTS projections, source-root hygiene guard, and runtime projection contract.
 tags:
 - public
 - assets
 - distribution
 - projection
 - privacy
-last_updated: '2026-08-15'
+last_updated: '2026-08-18'
 release_origin: v0.1.65
 ---
 
@@ -71,6 +71,17 @@ development cycle's on-demand protocol surface: `dd-backlog-definition`,
 `dd-bug-registration` and `dd-bug-fix` — one skill per stage, each the single operational
 home of its stage's protocol. The always-on law carries the classification and points at
 the stage's skill; the stage procedure exists only in the skill.
+
+**One logic, one source: a projected script is a thin wrapper, never the implementation.**
+Every file under `public/scripts/` is a CLI entry point that imports the package's own
+implementation and forwards its exit code — it holds no logic of its own, so the package
+and the projection cannot drift. The memory-atom lint is the worked example: the whole
+check set lives in the package and is imported directly by the doctor, with **no subprocess
+call to a projected script anywhere**, while the projected script survives only as a
+standalone invocation surface preserving its flags and exit codes. The relationship is
+asserted by a contract test, so script↔package drift is structurally impossible rather than
+merely discouraged, and the shell-out's former "architectural exception" note was deleted
+with the exception itself.
 
 `dadaia public doctor` performs three comparison passes: source vs staging, staging
 vs projected (one pass per runtime target). Any mismatch emits `[drift] <path>` and
@@ -134,7 +145,18 @@ domain-scoped AGENTS files are not overwritten.
 repo tree) and no `tests/AGENTS.md` already exists. The copy never creates the `tests/`
 directory and never overwrites an operator file; the installed bytes are identical to the
 template, which ships parameterized (`<ANGLE-BRACKET>` placeholders for tier timeouts, the
-LARGE cap and the wall-clock baseline) and carries no workspace-specific literal.
+LARGE cap and the wall-clock baseline) and carries no workspace-specific literal. Because
+the template ships with placeholders **by design**, an *installed* `tests/AGENTS.md` still
+carrying `<PLACEHOLDER>` tokens is the drift worth reporting — and `specs doctor` reports
+exactly that, against the installed consumer file and never against the canonical template
+([[specs-doctor]]).
+
+**The repo-`AGENTS.md` destination refuses a symlink, at every write site.** The same
+doctrine the consumer fan-out applies below now holds on the repo-template write: a
+destination **file** that is a symlink — dangling included — is never written through,
+neither by the copy nor by the atomic writer, and a dangling link is refused rather than
+treated as "absent → create". This closes the gap between what this atom claimed and what
+the seam did: the claim is now true at the seam, not only at its neighbour.
 
 **Consumer-repo `AGENTS.md` fan-out (registry-detected, provenance-gated).** The workspace-law
 pair (`data/AGENTS.md` → root `AGENTS.md` + a 1-line `CLAUDE.md` bridge) fans out to every Spec

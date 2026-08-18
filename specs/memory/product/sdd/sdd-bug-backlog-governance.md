@@ -2,9 +2,10 @@
 slug: sdd-bug-backlog-governance
 title: sdd-bug-backlog-governance
 category: product
-tldr: Event-sourced JSONL bugs, an operator-gated single-source backlog, release consumption, audit dispositions, and a develop-only four-branch git contract.
+tldr: Event-sourced JSONL bugs with a non-blocking picked marker, an operator-gated backlog, release consumption, audit dispositions, and a four-branch git contract.
 summary: >-
-  Bugs are append-only events; the backlog is the operator's demand queue, curated by
+  Bugs are append-only events, including a non-terminal repeatable `picked` reservation
+  marker that surfaces contention without ever blocking it; the backlog is the operator's demand queue, curated by
   project-manager in a single BACKLOG.md (ACTIVE + LEDGER) with purge-on-pick and
   continuous sanitizing — no agent materializes an entry, residuals reach the operator
   through a PM intake report, and only actionable defects do — record-only observations
@@ -21,7 +22,7 @@ tags:
 - backlog
 - bugs
 - gitflow
-last_updated: '2026-08-16'
+last_updated: '2026-08-18'
 release_origin: v0.4.2
 ---
 
@@ -31,6 +32,21 @@ release_origin: v0.4.2
 `reported` establishes the bug; terminal events such as `resolved` or `rejected` close
 it. `bugs status` and `bugs stats` fold the ledger. Agents never hand-author one-file
 Markdown bug records and never delete bug history.
+
+The schema carries **seven** event kinds. Four are terminal — at most one per bug id —
+while `archived` is a non-terminal annotation and **`picked` is a non-terminal, repeatable
+observable reservation marker**. `picked` records that an actor took the bug: `bugs append
+--event picked` writes the reservation with its actor and `bugs status` surfaces
+picked-by. It is emphatically **not** a lease — it grants nothing, expires never, blocks
+nothing. A **second pick on the same open stream is accepted and made visible, never
+refused**: under the no-locks doctrine two visible picks is the sanctioned race outcome,
+and hiding one would be the lock the design refuses. The only refusals are
+stream-integrity refusals, never concurrency ones — a pick after a terminal event (the
+stream is closed) or before any `reported` (the stream was never opened) is incoherent. A
+pick mutates no state: it never terminates a bug and a picked-only tail leaves `status`
+exactly where it was, and `reported` reopening a stream resets the pick list with it.
+Schema, fold and CLI are one authority and evolve in one change, so the enforced gate and
+the folded view can never diverge; ledgers written before the kind existed still fold.
 
 Every dadaia-workspace production defect encountered while using the tool is registered
 before the turn ends. Expected validation failures and mistakes in throwaway scripts are

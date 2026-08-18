@@ -5,6 +5,9 @@
  * Surface: Servers tab smoke test.
  *
  * Priority: P2 (smoke only; servers tab is low priority in R3)
+ *
+ * Intent: CONTRACT — v0.4.3 A18.2 (E2E-SRV-01 servers tab smoke)
+ * Owner: software-engineer
  */
 
 import { test, expect } from '@playwright/test';

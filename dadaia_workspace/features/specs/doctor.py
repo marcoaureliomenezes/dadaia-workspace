@@ -117,6 +117,7 @@ class SpecsDoctor:
         issues.extend(self._coherence.check_constitution())
         issues.extend(self._memory.check_memory_files())
         issues.extend(self._memory.check_placeholder_atoms())  # MEM-PLACEHOLDER-1
+        issues.extend(self._memory.check_tests_agents_placeholder())  # AGENTS-PLACEHOLDER-1
         issues.extend(self._release.check_active_md())
         issues.extend(self._release.check_active_release_artifacts())
         issues.extend(self._release.check_plan_line_limit())

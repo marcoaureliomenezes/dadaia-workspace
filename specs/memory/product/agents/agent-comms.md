@@ -2,7 +2,7 @@
 slug: agent-comms
 title: agent-comms — Handoff Contract v1
 category: product
-tldr: 'handoff-v1.2 separates HTML reports from JSON handoffs and carries the self_pull Layer-1 read-proof line.'
+tldr: 'handoff-v1.2 separates HTML reports from JSON handoffs, carries the self_pull Layer-1 read-proof line, and dies on consumption unless it is artifact-bearing.'
 summary: 'the handoff-v1 family contract separates human evidence from agent-to-agent
   coordination: HTML reports in .dadaia/reports/<context>/<agent>/ and JSON handoffs
   in .dadaia/handoff/<context>/. Current version handoff-v1.2 requires self_pull.refs
@@ -11,12 +11,14 @@ summary: 'the handoff-v1 family contract separates human evidence from agent-to-
   posture). The CLI validates schema, the v1.2 self_pull conditional, and artifact.path
   hash inside the workspace — any existing relative path under the root resolves
   workspace-rooted (incl. repos/<slug>/specs/audits), with a legacy handoff-dir
-  fallback; reports next and the QA/security gate consume the canonical root.'
+  fallback; reports next and the QA/security gate consume the canonical root. A consumed
+  coordination handoff is deleted by its consumer (ack-on-consume); an artifact-bearing
+  handoff is exempt and follows its report''s retention.'
 tags:
 - agent-comms
 - handoff
 - schema
-last_updated: '2026-08-07'
+last_updated: '2026-08-18'
 release_origin: v0.3.0
 ---
 
@@ -77,10 +79,26 @@ Standalone skill at `dadaia_workspace/public/skills/dadaia-handoff-emitter/SKILL
 
 Minimal handoff: ~500 bytes (required fields only); typical: <2 KB; warning if >4 KB. For an average 50–70 KB HTML report, overhead is ~3% worst case (NFR5).
 
-## Adoption (15 instruction surfaces)
+## Lifecycle
+
+A handoff's life ends when the thing it exists for ends — **ack-on-consume**. Once a
+consuming skill has read and acted on a **coordination** handoff, it deletes that file;
+the rule is stated exactly once, in the handoff-consumer discipline
+(`dadaia-handoff-emitter`), and no consumer skill restates it. A handoff carrying
+`artifact.path` is **exempt**: it is artifact-bearing rather than purely coordination, and
+its retention follows the report it references. Deletion is scoped to precisely the one
+consumed file — never a directory sweep — so `dadaia reports validate` on every surviving
+handoff keeps passing.
+
+Every deletion lane obeys the same guard: resolve the target, refuse any resolved target
+outside `.dadaia/`, and never follow a symlinked directory. What per-consume deletion
+misses is caught later by the release-closure GC sweep, which keeps anything a surviving
+CLOSURE evidence pointer references and deletes only the rest ([[agent-monitoring]]).
+
+## Adoption (12 instruction surfaces)
 
 Every emission-instruction surface carries the v1.2/`self_pull` instruction, pinned by a
-file-enumerated contract test (`tests/contract/test_handoff_instruction_adoption.py`, 15
+file-enumerated contract test (`tests/contract/test_handoff_instruction_adoption.py`, 12
 surfaces): the 10 whole files — the 9 core agent bodies (`public/agents/*.md`)
 plus `public/data/handoff-AGENTS.md` — and the
 `dadaia-handoff-emitter` skill's two JSON examples. The 9 core public agents declare

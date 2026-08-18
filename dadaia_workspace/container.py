@@ -1,6 +1,5 @@
 """Composition root — builds services with concrete infrastructure."""
 
-import contextlib
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -197,6 +196,12 @@ def build_git_object_reader() -> GitObjectReader:
     :func:`build_git_client` does for the read-only git probe. A single concrete
     adapter today (subprocess-backed, cross-platform via the ``git`` executable on
     PATH) — no platform branching needed, unlike :func:`build_process_ancestry`.
+
+    As of v0.4.3 T-043-15/FR11, the adapter this seam returns yields commit-object
+    message bodies and (for a tag-ref push) annotated tag bodies IN ADDITION to blob
+    content — see ``GitObjectReader.new_objects``'s own docstring for the full
+    contract. This seam's own return type/wiring is unchanged; only the adapter's
+    internal yield widened.
     """
     from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
 
@@ -671,65 +676,6 @@ def _memory_lint_gate(specs_dir: Path) -> "Callable[[], tuple[bool, str]] | None
         return ok, tail
 
     return _gate
-
-
-def _normalize_memory_token_estimates(specs_dir: Path) -> None:
-    """Recompute drifting ``token_estimate`` frontmatter values (derived data).
-
-    Same formula as the packaged linter (``round(word_count * 1.35)``, contract-pinned
-    by the render/lint suites). Only rewrites when the declared value drifts >20% —
-    the linter's own warning threshold — so hand-tuned close values stay untouched.
-    """
-    import re as _re
-
-    memory_dir = specs_dir / "memory"
-    if not memory_dir.is_dir():
-        return
-    fm_re = _re.compile(r"^---\n(.*?)\n---\n", _re.DOTALL)
-    for md in memory_dir.rglob("*.md"):
-        try:
-            content = md.read_text(encoding="utf-8")
-        except OSError:
-            continue
-        match = fm_re.match(content)
-        if match is None:
-            continue
-        body = content[match.end() :]
-        declared_match = _re.search(r"^token_estimate:\s*(\d+)\s*$", match.group(1), _re.MULTILINE)
-        if declared_match is None:
-            continue
-        declared = int(declared_match.group(1))
-        actual = round(len(body.split()) * 1.35)
-        if declared <= 0 or actual <= 0:
-            continue
-        if abs(actual - declared) / declared <= 0.20:
-            continue
-        updated = content.replace(f"token_estimate: {declared}", f"token_estimate: {actual}", 1)
-        with contextlib.suppress(OSError):
-            md.write_text(updated, encoding="utf-8")
-
-
-def _memory_catalog_regenerator(specs_dir: Path) -> "Callable[[], None] | None":
-    """Build the closure-time derived-catalog refresh for one context specs dir.
-
-    Returns ``None`` when the context has no product-memory zone (nothing to derive).
-    """
-    if not (specs_dir / "memory" / "product").is_dir():
-        return None
-
-    def _regenerate() -> None:
-        from dadaia_workspace.features.specs.catalog import (
-            generate_catalog,
-            write_catalog,
-            write_index,
-        )
-
-        _normalize_memory_token_estimates(specs_dir)
-        catalog = generate_catalog(specs_dir)
-        write_catalog(specs_dir, catalog)
-        write_index(specs_dir, catalog)
-
-    return _regenerate
 
 
 def build_panel_views(

@@ -160,6 +160,18 @@ def bugs_append_cmd(
         )
         raise typer.Exit(code=1)
 
+    # v0.4.3 T-043-18/FR14 (mirrors the resolved/--resolution-evidence precedent
+    # above): a picked event without --release is refused BEFORE anything is
+    # written — schema and CLI both require it in the SAME change, safe only because
+    # zero historical picked events exist (architect ruling, 2026-08-17T16:15:00Z).
+    if event is BugEventKind.PICKED and not release:
+        typer.echo(
+            "[error] picked requires --release (the M.m.p release or hotfix id the "
+            "bug is reserved under — bug-reservation law).",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
     model = BugEvent(
         bug_id=bug_id,
         event=event.value,
@@ -218,7 +230,12 @@ def bugs_status_cmd(
     states = service.status(include_closed=include_closed)
     for state in states:
         severity = state.severity or "-"
-        typer.echo(f"{state.bug_id}\t{state.status}\t{severity}")
+        line = f"{state.bug_id}\t{state.status}\t{severity}"
+        # v0.4.3 T-043-18/FR14: surfaces picked-by ONLY when non-empty — a never-picked
+        # bug's line stays byte-identical to before (backward-compatible output shape).
+        if state.picked_by:
+            line += f"\tpicked-by:{','.join(state.picked_by)}"
+        typer.echo(line)
     scope = "all" if include_closed else "open"
     typer.echo(f"[ok] {len(states)} {scope} bug(s).")
 

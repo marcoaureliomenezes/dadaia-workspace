@@ -2,18 +2,23 @@
 slug: agent-monitoring
 title: agent-monitoring
 category: product
-tldr: stdlib-only local telemetry (Claude/Codex/Kimi sessions) → panel Sessions tab
-  + /api/agents; allowlist gate preserves privacy.
+tldr: stdlib-only local telemetry → panel Sessions tab + /api/agents; allowlist gate
+  preserves privacy; artifacts die event-driven, logs self-rotate.
 summary: stdlib-only local telemetry consuming Claude Code jsonl + Codex sqlite
   (~/.codex/state_5.sqlite) + Kimi session index (~/.kimi-code/session_index.jsonl); feeds the
   panel's Sessions tab and the /api/agents and /api/sessions endpoints; a hardcoded
   allowlist gate preserves privacy by construction; endpoints served with no
-  credential behind the panel's loopback bind + Host allowlist.
+  credential behind the panel's loopback bind + Host allowlist. Also owns the runtime
+  artifact lifecycle under .dadaia/ — release-closure GC of a release's own reports,
+  handoffs, tmp captures and run records; reconciler reaping of stale session/presence
+  records, their markers and zombie run records; write-time 1 MB rotation with current+1
+  retention for every logs/*.jsonl writer; and dadaia tmp gc as the only calendar-based
+  backstop.
 tags:
 - monitoring
 - telemetry
 - sessions
-last_updated: '2026-07-16'
+last_updated: '2026-08-18'
 release_origin: v0.1.61
 ---
 
@@ -75,6 +80,48 @@ Without this module, `ccusage` (npm) was the only alternative: an external Node 
   * **Guard**: `os.getuid() == 0` refuses to start the TelemetryService (devops T6 — does not read other users' `~/.claude/projects/`).
 
 
+
+## Lifecycle
+
+Runtime artifacts under `.dadaia/` are governed by one doctrine: **an artifact dies when
+the thing it exists for dies**, not when a clock says so. Four event-driven capabilities
+implement it, and every one of them is fail-open where it rides a hook — a GC error never
+changes a gate verdict — and every one obeys the same deletion-lane guard: resolve the
+target, refuse any resolved target outside `.dadaia/`, never follow a symlinked directory.
+
+  * **Closing a release ends its artifacts' lives.** Release closure runs a GC sweep over
+    that release's own reports, handoffs, `tmp/<agent>/` captures and lifecycle run
+    records, after its CLOSURE evidence pointers are final and before the archive move.
+    The rule is inviolable in one direction: anything a surviving `## Validations` or
+    `## Dispositions` pointer references is **kept** — when in doubt, kept — and only the
+    unreferenced remainder is deleted. Another release's artifacts are never in scope.
+  * **The reconciler reaps what it already walks.** Session and presence records stale
+    beyond 3× their TTL are deleted together with their tmp markers (`reconciler-last-*`,
+    `ctx-inject-fired-*`) and any context directories they leave empty, and zombie
+    lifecycle/state run records are reaped with them. A live session's records are never
+    touched. The reap runs in the PostToolUse pass — off the blocking path — behind the
+    same 30-second throttle the reconciler already uses, isolated so a reap failure cannot
+    break the reconciler around it.
+  * **Every `.dadaia/logs/*.jsonl` writer rotates its own file.** Rotation happens at
+    write time, by the file's owner, through one shared helper every appender funnels
+    through: at a 1 MB cap the file is rotated and exactly **current + 1** generation is
+    retained. There is no external cron and no separate rotation process. The size is
+    re-checked under a lock before the replace, so two near-simultaneous crossers cannot
+    destroy each other's generation, and the lock is taken only when the file is at or over
+    the cap — the overwhelming majority of appends are lock-free. A contended timeout
+    appends without rotating rather than dropping the line, and telemetry stays fail-open
+    throughout.
+  * **The cache must not be born.** Rather than deleting tool caches after the fact, the
+    venv guard refuses the invocation that would create one in a repo tree
+    ([[sdd-gate-v3]]).
+
+**Calendar-based deletion survives in exactly one place**, as the orphan backstop:
+`dadaia tmp gc` removes dated scratch older than 3 days, any `*cache*` directory under
+`.dadaia/` (excluding the venv and session records), and orphaned session markers. It
+takes **no path argument** — there is no operator-supplied deletion target — offers a
+dry-run that reports without touching anything, is idempotent (a second run reports and
+changes nothing), never removes a live session's markers or a non-dated path, and is safe
+to run from `SessionStart`. Everything else above is event-driven by design.
 
 ## Dependencies
 

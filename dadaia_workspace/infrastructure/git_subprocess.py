@@ -39,9 +39,25 @@ def _stage_files_safe(path: Path) -> None:
     4. Add the remaining untracked entries individually.
 
     This is equivalent to ``git add -A`` but respects embedded repos.
+
+    v0.4.3 T-043-23 security-review rework (FR10 sibling hardening — this seam
+    carried NEITHER of A10.1/A10.3, the two `commit_paths`/`_commit` already
+    applies): a non-zero exit from EITHER ``git add`` call now raises
+    :class:`GitSyncError` (a stage that did not happen must never silently become
+    part of a commit, matching A10.1), and every untracked path is wrapped in the
+    ``:(literal)`` pathspec-magic escape before it reaches ``git add`` (matching
+    A10.3) — an untracked file literally named e.g. ``:(exclude)specs`` is staged
+    as the literal file it names, never reinterpreted as pathspec magic. The
+    commit itself (``_commit(path, msg)``, no *pathspec*) is UNAFFECTED by the
+    commit-vs-staged-worktree-content note documented on :func:`_commit` below —
+    that note only applies when a *pathspec* is passed (``commit_paths``); a bare
+    ``git commit -m <msg>`` (what `commit_all` issues) commits whatever the index
+    holds at commit time, exactly what the two ``git add`` calls above just staged.
     """
     # Stage tracked-file changes (modifications + deletions)
-    _run(["git", "add", "-u"], cwd=path)
+    add_tracked = _run(["git", "add", "-u"], cwd=path)
+    if add_tracked.returncode != 0:
+        raise GitSyncError(f"git add -u failed in {path}: {add_tracked.stderr.strip()}")
 
     # Discover untracked items (files and dirs)
     result = _run(
@@ -71,15 +87,42 @@ def _stage_files_safe(path: Path) -> None:
     if safe:
         # git add accepts multiple paths; chunk to avoid ARG_MAX issues on
         # very large trees (practical repos are fine with a single call)
-        _run(["git", "add", "--"] + safe, cwd=path)
+        literal_safe = [f":(literal){p}" for p in safe]
+        add_untracked = _run(["git", "add", "--", *literal_safe], cwd=path)
+        if add_untracked.returncode != 0:
+            raise GitSyncError(
+                f"git add failed in {path} for paths {safe!r}: {add_untracked.stderr.strip()}"
+            )
 
 
-def _commit(path: Path, msg: str) -> None:
+def _commit(path: Path, msg: str, pathspec: Sequence[str] | None = None) -> None:
     """Run ``git commit`` against whatever is currently staged in *path*.
 
     Shared by ``commit_all`` (blanket staging) and ``commit_paths`` (explicit-path
     staging) — the staging strategy differs, the commit/identity-fallback/no-op
-    handling does not.
+    handling does not. When *pathspec* is given (``commit_paths``, v0.4.3
+    T-043-14/FR10/A10.2), the commit itself is scoped with a trailing ``-- <pathspec>``
+    — this is what makes it honest even when the index carries OTHER staged content
+    (operator pre-staged, or a concurrent caller): ``git commit -- <pathspec>`` commits
+    only the changes matching *pathspec*, leaving everything else staged and untouched.
+
+    CWE-367 (v0.4.3 T-043-23 security-review rework, LOW residual, documented rather
+    than redesigned — see the handoff's own alternative resolution): ``git commit --
+    <pathspec>`` is documented git behaviour (``git commit --help``, ``-o``/``--only``,
+    "the DEFAULT mode of operation ... if any paths are given on the command line") to
+    commit the UPDATED WORKING-TREE CONTENTS of the named paths at commit time, NOT
+    necessarily the exact bytes ``git add`` staged a moment earlier in ``commit_paths``.
+    Under the NO-LOCKS DOCTRINE a concurrent agent could, in principle, mutate one of
+    *pathspec*'s files in the window between ``commit_paths``'s ``git add`` and this
+    call, and the newer worktree content — not the reviewed/staged content — would be
+    committed. Every current caller passes paths it JUST wrote itself, with no
+    intervening yield point, so this is a theoretical race, not an observed defect; a
+    fix that eliminated it entirely (a temporary index via ``GIT_INDEX_FILE`` or
+    ``write-tree``/``commit-tree``) is a bigger design change than this hardening pass
+    covers, and is deliberately left as a follow-up rather than half-landed here (the
+    same commit-vs-staged distinction does NOT apply to a bare, no-*pathspec* call —
+    ``commit_all``'s — which commits exactly what its own ``git add`` calls in
+    :func:`_stage_files_safe` just staged).
     """
     # Tool-authored commits must not depend on an operator git identity being
     # configured (validation-029 F-06: containers/CI runners without user.email made
@@ -96,6 +139,8 @@ def _commit(path: Path, msg: str) -> None:
             "user.email=dadaia@workspace.local",
         ]
     commit_cmd += ["commit", "-m", msg]
+    if pathspec:
+        commit_cmd += ["--", *pathspec]
     result = _run(commit_cmd, cwd=path)
 
     # Bug 2 fix: treat empty stdout+stderr with non-zero exit as silent
@@ -144,11 +189,33 @@ class GitSubprocessClient:
         alive`` scaffold commit) use this instead of ``commit_all``, so pre-existing
         unrelated worktree modifications stay untouched and uncommitted. A no-op
         (nothing staged, nothing committed) when *paths* is empty.
+
+        v0.4.3 T-043-14/FR10 hardening — honest by construction:
+
+        - **A10.1** — a non-zero ``git add`` exit raises :class:`GitSyncError`; a stage
+          that did not happen must never silently become (part of) a commit.
+        - **A10.2** — the commit itself is path-scoped (``git commit -m <msg> --
+          <paths>``, via ``_commit``'s *pathspec*), not a bare ``git commit``, so
+          content the OPERATOR pre-staged (or any other already-staged content) is
+          never swept into this commit even though it stays in the index.
+        - **A10.3** — every path is wrapped in the literal pathspec-magic escape
+          (``:(literal)<path>``, git's own defence per gitglossary(7) ``pathspec``):
+          every *paths* entry this seam ever receives is a concrete repo-relative
+          filename the caller itself just wrote (template names, scaffold files) —
+          never an operator- or attacker-influenced glob — so a path that happens to
+          contain a pathspec-magic character (``:``/``*``/``!``/``?``/…) is still
+          staged and committed as the literal file it names, never reinterpreted as a
+          glob or an exclude pattern.
         """
         if not paths:
             return
-        _run(["git", "add", "--", *paths], cwd=path)
-        _commit(path, msg)
+        literal_paths = [f":(literal){p}" for p in paths]
+        add_result = _run(["git", "add", "--", *literal_paths], cwd=path)
+        if add_result.returncode != 0:
+            raise GitSyncError(
+                f"git add failed in {path} for paths {list(paths)!r}: {add_result.stderr.strip()}"
+            )
+        _commit(path, msg, pathspec=literal_paths)
 
     def has_remote(self, path: Path) -> bool:
         result = _run(["git", "remote"], cwd=path)

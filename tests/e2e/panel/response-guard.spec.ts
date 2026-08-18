@@ -36,6 +36,9 @@
  *   tabpanel, so the tab tour below drives `#tab-subagents` (which loads both
  *   the agent-policy roster AND the relocated Sessions dashboard) in place of
  *   the deleted `#tab-sessions`.
+ *
+ * Intent: CONTRACT — E2E-GUARD-01, E2E-GUARD-02 (global response/console guard)
+ * Owner: software-engineer
  */
 
 import { test, expect } from '@playwright/test';

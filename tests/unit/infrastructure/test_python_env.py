@@ -10,6 +10,8 @@ fires — and exercised here with ``subprocess.run`` stubbed (child-venv creatio
 subprocess-based — see bug init-venv-bootstrap-inherits-degraded-base-python below).
 """
 
+import os
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -499,8 +501,15 @@ def test_resolve_child_venv_interpreter_skips_degraded_base_and_uses_pyvenv_exec
     exact host class), while the running venv's OWN ``pyvenv.cfg`` ``executable`` field
     names one that does. Resolution must skip the degraded candidate and select the
     compliant one — never hand the degraded resolution to venv creation implicitly.
+
+    Pins the POSIX path flavor (``os.name``) explicitly, symmetric with the nt-flavor
+    FR9 tests below: ``_is_fully_qualified`` — which ``_resolve_child_venv_interpreter``
+    calls on every candidate — branches on the REAL host ``os.name``, so a POSIX-shaped
+    candidate like ``/usr/bin/python3.12`` is only fully-qualified when the fixture
+    itself pins a POSIX host, never left to whatever OS happens to run the suite.
     """
     mgr = VenvPythonEnvironmentManager()
+    monkeypatch.setattr(python_env_module.os, "name", "posix")
     monkeypatch.setattr(mgr, "_running_requires_python", lambda: ">=3.12,<4.0")
     monkeypatch.setattr(
         python_env_module.sys, "_base_executable", "/usr/bin/python3", raising=False
@@ -526,8 +535,12 @@ def test_resolve_child_venv_interpreter_falls_back_to_path_search(
 ) -> None:
     """Neither ``_base_executable`` nor the current ``pyvenv.cfg`` satisfy: PATH search
     for a version-pinned pythonX.Y is the last resolution strategy before giving up.
+
+    Pins the POSIX path flavor (``os.name``) explicitly — see the sibling
+    ``..._skips_degraded_base_...`` test's docstring for why.
     """
     mgr = VenvPythonEnvironmentManager()
+    monkeypatch.setattr(python_env_module.os, "name", "posix")
     monkeypatch.setattr(mgr, "_running_requires_python", lambda: ">=3.12,<4.0")
     monkeypatch.setattr(
         python_env_module.sys, "_base_executable", "/usr/bin/python3", raising=False
@@ -548,7 +561,11 @@ def test_resolve_child_venv_interpreter_falls_back_to_path_search(
 def test_resolve_child_venv_interpreter_raises_actionable_error_when_nothing_satisfies(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Pins the POSIX path flavor explicitly so the candidate is rejected for the
+    intended reason (version mismatch, not "relative path rejected" on an nt host) —
+    same class as the sibling ``_resolve_child_venv_interpreter`` tests above."""
     mgr = VenvPythonEnvironmentManager()
+    monkeypatch.setattr(python_env_module.os, "name", "posix")
     monkeypatch.setattr(mgr, "_running_requires_python", lambda: ">=3.12,<4.0")
     monkeypatch.setattr(
         python_env_module.sys, "_base_executable", "/usr/bin/python3", raising=False
@@ -627,3 +644,206 @@ def test_fresh_bootstrap_uses_resolved_interpreter_for_venv_creation(
     assert create_cmd[0] == "/opt/python3.12"
     assert create_cmd[1:3] == ["-m", "venv"]
     assert create_cmd[-1] == str(tmp_path / ".dadaia" / ".venv")
+
+
+# ── v0.4.3 T-043-13/FR9 — interpreter-probe hardening (CWE-426 + timeout/stdin) ──────
+#
+# Size: SMALL — pure-function unit tests plus one instance-method wiring test with
+# ``subprocess.run`` stubbed. Intent: CONTRACT — v0.4.3 A9.1-A9.3.
+#
+# ``_path_candidates`` (``shutil.which`` results) and ``_current_venv_pyvenv_executable``
+# (the raw ``pyvenv.cfg`` ``executable`` value) both fed an UNVALIDATED candidate straight
+# into ``_interpreter_version``, which spawns it via ``subprocess.run`` (CWE-426: untrusted
+# search path). A bare/relative candidate (e.g. a malicious ``pyvenv.cfg`` naming a
+# relative ``python3`` that resolves against whatever CWD the probe happens to run from)
+# must never reach ``subprocess.run`` at all. Separately, the probe itself ran with no
+# ``timeout=`` and inherited stdin — a hanging or interactive candidate could wedge the
+# whole bootstrap.
+
+
+def test_path_candidates_rejects_a_relative_which_result(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A9.1: ``shutil.which`` returning a bare/relative name is rejected before it can
+    reach ``_interpreter_version``/``subprocess.run`` — ``_path_candidates`` filters on
+    ``os.path.isabs()`` itself."""
+    monkeypatch.setattr(
+        python_env_module.shutil, "which", lambda name: "python3.12"
+    )  # bare name — not absolute
+
+    assert python_env_module._path_candidates(12) == []
+
+
+def test_path_candidates_keeps_an_absolute_which_result(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        python_env_module.shutil,
+        "which",
+        lambda name: f"/usr/bin/{name}" if name == "python3.13" else None,
+    )
+
+    assert python_env_module._path_candidates(12) == ["/usr/bin/python3.13"]
+
+
+def test_current_venv_pyvenv_executable_rejects_a_relative_value(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A9.1: a ``pyvenv.cfg`` whose ``executable`` value is bare/relative (untrusted —
+    it can be hand-edited or written by a compromised prior bootstrap) is rejected by
+    ``_current_venv_pyvenv_executable`` itself, never returned for a caller to probe."""
+    cfg = tmp_path / "pyvenv.cfg"
+    cfg.write_text("executable = python3\n", encoding="utf-8")
+    monkeypatch.setattr(python_env_module.sys, "prefix", str(tmp_path))
+
+    assert python_env_module._current_venv_pyvenv_executable() is None
+
+
+def test_current_venv_pyvenv_executable_keeps_an_absolute_value(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cfg = tmp_path / "pyvenv.cfg"
+    cfg.write_text("executable = /usr/bin/python3.12\n", encoding="utf-8")
+    monkeypatch.setattr(python_env_module.sys, "prefix", str(tmp_path))
+
+    assert python_env_module._current_venv_pyvenv_executable() == "/usr/bin/python3.12"
+
+
+def test_resolve_child_venv_interpreter_never_probes_a_relative_pyvenv_value(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """End-to-end wiring proof (A9.1): even if a relative candidate slipped through to
+    ``_resolve_child_venv_interpreter``'s ordering, the filtering at the source means
+    ``_interpreter_version`` (and therefore ``subprocess.run``) is never called with it."""
+    mgr = VenvPythonEnvironmentManager()
+    monkeypatch.setattr(mgr, "_running_requires_python", lambda: ">=3.12,<4.0")
+    monkeypatch.setattr(python_env_module.sys, "_base_executable", "", raising=False)
+    # A directly-malicious pyvenv.cfg value: bare name only.
+    monkeypatch.setattr(python_env_module, "_current_venv_pyvenv_executable", lambda: "python3")
+    monkeypatch.setattr(python_env_module, "_path_candidates", lambda min_minor: [])
+
+    probed: list[str] = []
+
+    def recording_version(exe: str) -> tuple[int, int, int] | None:
+        probed.append(exe)
+        return (3, 12, 3) if os.path.isabs(exe) else None
+
+    monkeypatch.setattr(python_env_module, "_interpreter_version", recording_version)
+
+    with pytest.raises(python_env_module.WorkspaceVenvBootstrapError):
+        mgr._resolve_child_venv_interpreter()
+
+    assert "python3" not in probed
+
+
+# ── v0.4.3 T-043-23 security-review rework — Windows drive-relative rejection ────────
+#
+# Size: SMALL — pure-function unit tests plus one instance-method wiring test.
+# Intent: CONTRACT. CWE-426 residual (security-reviewer LOW finding FR9, handoff
+# 2026-08-17T173112Z-security-reviewer-v0.4.3-alpha-2-delta): on Python 3.12,
+# ``os.path.isabs`` alone does not reject a Windows DRIVE-RELATIVE path (exactly one
+# leading separator, no drive letter, e.g. ``\tools\python.exe``) — it resolves
+# against the CURRENT DRIVE, not a fully qualified location. Routed through ``ntpath``
+# directly (never the host-bound ``os.path``) so the Windows-specific gap is provable
+# on any host OS by monkeypatching ``os.name``.
+
+
+def test_is_fully_qualified_rejects_a_windows_drive_relative_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A drive-relative candidate (passes ``ntpath.isabs`` on 3.12, but resolves
+    against whatever drive happens to be current) must be rejected."""
+    monkeypatch.setattr(python_env_module.os, "name", "nt")
+
+    assert python_env_module._is_fully_qualified("\\tools\\python.exe") is False
+
+
+def test_is_fully_qualified_accepts_a_windows_drive_qualified_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A genuine drive-qualified Windows path is unaffected."""
+    monkeypatch.setattr(python_env_module.os, "name", "nt")
+
+    assert python_env_module._is_fully_qualified("C:\\tools\\python.exe") is True
+
+
+def test_is_fully_qualified_accepts_a_posix_absolute_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Pins the POSIX path flavor explicitly — ``_is_fully_qualified`` branches on the
+    REAL host ``os.name``, so a leading-slash candidate is only unambiguous on a POSIX
+    host; symmetric with the nt-flavor tests above."""
+    monkeypatch.setattr(python_env_module.os, "name", "posix")
+
+    assert python_env_module._is_fully_qualified("/usr/bin/python3.12") is True
+
+
+def test_is_fully_qualified_rejects_a_posix_relative_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(python_env_module.os, "name", "posix")
+
+    assert python_env_module._is_fully_qualified("python3.12") is False
+
+
+def test_resolve_child_venv_interpreter_never_probes_a_windows_drive_relative_pyvenv_value(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """End-to-end wiring proof: a drive-relative ``pyvenv.cfg`` ``executable`` value
+    (the exact CWE-426 residual shape — passes ``ntpath.isabs`` on 3.12) must never
+    reach ``_interpreter_version``/``subprocess.run``."""
+    mgr = VenvPythonEnvironmentManager()
+    monkeypatch.setattr(mgr, "_running_requires_python", lambda: ">=3.12,<4.0")
+    monkeypatch.setattr(python_env_module.sys, "_base_executable", "", raising=False)
+    monkeypatch.setattr(python_env_module.os, "name", "nt")
+    # A directly-malicious pyvenv.cfg value: drive-relative, not drive-qualified.
+    monkeypatch.setattr(
+        python_env_module, "_current_venv_pyvenv_executable", lambda: "\\tools\\python.exe"
+    )
+    monkeypatch.setattr(python_env_module, "_path_candidates", lambda min_minor: [])
+
+    probed: list[str] = []
+
+    def recording_version(exe: str) -> tuple[int, int, int] | None:
+        probed.append(exe)
+        return (3, 12, 3)
+
+    monkeypatch.setattr(python_env_module, "_interpreter_version", recording_version)
+
+    with pytest.raises(python_env_module.WorkspaceVenvBootstrapError):
+        mgr._resolve_child_venv_interpreter()
+
+    assert "\\tools\\python.exe" not in probed
+
+
+def test_interpreter_version_probe_passes_a_bounded_timeout_and_devnull_stdin(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A9.2: the probe subprocess must be bounded (``timeout=``) and never inherit the
+    caller's stdin (``stdin=subprocess.DEVNULL``) — an interactive or hanging candidate
+    must not wedge the bootstrap."""
+    seen: dict[str, object] = {}
+
+    def fake_run(cmd: list[str], **kwargs: object) -> "subprocess.CompletedProcess[str]":
+        seen.update(kwargs)
+        return subprocess.CompletedProcess(cmd, 0, stdout="3 12 3\n", stderr="")
+
+    monkeypatch.setattr(python_env_module.subprocess, "run", fake_run)
+
+    result = python_env_module._interpreter_version("/usr/bin/python3.12")
+
+    assert result == (3, 12, 3)
+    assert seen.get("stdin") is python_env_module.subprocess.DEVNULL
+    timeout = seen.get("timeout")
+    assert isinstance(timeout, int | float) and 0 < timeout <= 30
+
+
+def test_interpreter_version_probe_degrades_to_none_on_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A9.2: a candidate that would otherwise hang (``subprocess.run`` raising
+    ``TimeoutExpired`` once the bound is enforced) degrades to ``None`` and is skipped —
+    never propagates and never hangs the caller."""
+
+    def hanging_run(cmd: list[str], **kwargs: object) -> "subprocess.CompletedProcess[str]":
+        raise subprocess.TimeoutExpired(cmd=cmd, timeout=kwargs.get("timeout", 5))
+
+    monkeypatch.setattr(python_env_module.subprocess, "run", hanging_run)
+
+    assert python_env_module._interpreter_version("/usr/bin/python-that-hangs") is None

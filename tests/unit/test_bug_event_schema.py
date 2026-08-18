@@ -91,13 +91,24 @@ def _archived() -> dict[str, object]:
     }
 
 
+def _picked() -> dict[str, object]:
+    """v0.4.3 FR14: the non-terminal, repeatable reservation marker."""
+    return {
+        "bug_id": "commit-paths-index-scope-hardening",
+        "event": "picked",
+        "ts": "2026-08-17T14:00:00Z",
+        "reported_by": "software-engineer",
+        "release": "v0.4.3",
+    }
+
+
 # --- one valid document per event kind --------------------------------------------
 
 
 @pytest.mark.parametrize(
     "doc",
-    [_reported(), _resolved(), _superseded(), _deferred(), _rejected(), _archived()],
-    ids=["reported", "resolved", "superseded", "deferred", "rejected", "archived"],
+    [_reported(), _resolved(), _superseded(), _deferred(), _rejected(), _archived(), _picked()],
+    ids=["reported", "resolved", "superseded", "deferred", "rejected", "archived", "picked"],
 )
 def test_each_event_kind_validates(doc: dict[str, object]) -> None:
     Draft202012Validator(_schema()).validate(doc)
@@ -161,6 +172,7 @@ def test_reported_missing_payload_field_fails(field: str) -> None:
         ("resolved_missing_release", _resolved, "release"),
         ("superseded_missing_superseded_by", _superseded, "superseded_by"),
         ("deferred_missing_reason", _deferred, "reason"),
+        ("picked_missing_release", _picked, "release"),
     ],
 )
 def test_terminal_event_missing_required_field_fails(

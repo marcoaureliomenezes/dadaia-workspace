@@ -9,14 +9,18 @@ summary: >-
   skills/AGENTS.md surface. Every scaffolded core sub-agent, hook, and rule file is a
   per-harness derivation of one of these entities (constitution §12.5); the derivation
   contract test and the `public doctor` `entities-derivation` check enforce the
-  prohibition. The panel renders the registry in the Agentic Entities tab and as the
-  Personas section of the Agents tab.
+  prohibition, the latter at behavioral-fidelity depth with a mutation fixture per drift
+  class. Two derivation-surface facts are derived mechanically rather than asserted: the
+  reasoned seven-agent `dadaia-cli` reachability (shell-less agents excluded explicitly)
+  and the undeclared-overlap check over non-universal skill activation globs. The panel
+  renders the registry in the Agentic Entities tab and as the Personas section of the
+  Agents tab.
 tags:
 - agents
 - entities
 - derivation
 - governance
-last_updated: '2026-08-15'
+last_updated: '2026-08-18'
 release_origin: v0.3.0
 ---
 
@@ -57,7 +61,29 @@ Read path: `features/panel/entities.py` (`load_registry`, `persona_ids`,
 - `tests/contract/test_agentic_entities_derivation.py` — pins the bijection, the
   wired-hook coverage, harness coverage, and the universal surface at source.
 - `public doctor` `entities-derivation` check (`ENT-DERIVE-1`, blocking) — independent
-  verifier read in `infrastructure/codex_doctor.py`; attests the installed package.
+  verifier read in `infrastructure/codex_doctor.py`; attests the installed package. It
+  proves **behavioral** fidelity, not name bijection alone: a stub persona body, an
+  identity swap between two personas, and a broken behavior module reference are each their
+  own drift class, each blocking, each pinned by a mutation fixture that proves the check
+  fires when that class is introduced.
+
+Two derivation-surface facts are mechanically derived rather than asserted, so a
+description can never drift from what the frontmatters actually grant:
+
+- **`dadaia-cli` reachability is a reasoned per-agent selection, never a blanket grant.**
+  Seven agents carry it — `ai-engineer`, `code-reviewer`, `project-auditor`,
+  `project-manager`, `qa-engineer`, `security-reviewer`, `software-engineer`. The two
+  shell-less agents are excluded **explicitly**, because a CLI-literacy grant to an agent
+  that cannot run a command is inert. The skill's own description states that actual
+  reachability, and a check derives the expectation from the agent frontmatters so a
+  grant/description disagreement fails loud.
+- **Skill activation overlap is checked where it can mean something.** Universal skills —
+  those claiming `**` — are always-on by design, never compete, and are out of scope by
+  construction; no check may assert disjointness about them. Stage skills resolve by
+  most-specific glob, an intended overlap is **declared**, and the projection-time check
+  flags only an *undeclared* overlap between two non-universal skills. It is green on the
+  real inventory, and its self-test proves both directions: silent for a `**` skill, firing
+  for a newly introduced undeclared duplicate.
 
 ## Panel surface
 

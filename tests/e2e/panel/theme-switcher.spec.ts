@@ -7,6 +7,9 @@
  *          keyboard Escape, axe-core audit per theme.
  *
  * Priority: P1 (E2E-THM-05, E2E-THM-06, E2E-THM-07) / P2 (E2E-THM-08)
+ *
+ * Intent: CONTRACT — E2E-THM-01..10 (T-016-P07 theme switcher)
+ * Owner: software-engineer
  */
 
 import { test, expect, Page } from '@playwright/test';

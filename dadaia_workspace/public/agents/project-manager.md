@@ -13,6 +13,7 @@ tools:
   - Write
   - Agent
 skills:
+  - dadaia-cli
   - dadaia-grill-me
   - dadaia-workspace-manager
   - dadaia-workspace-spec-navigator
@@ -21,9 +22,11 @@ skills:
   - dadaia-handoff-emitter
   - dadaia-workspace-doctor
   - dadaia-step0-memory-bootstrap
+  - harness-primitives
   - dd-backlog-definition
   - dd-release-definition
   - dd-bug-registration
+  - dadaia-gitflow
 maxTurns: 60
 input_contract:
   requires_inputs:

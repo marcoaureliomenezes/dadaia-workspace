@@ -24,6 +24,9 @@
  * default (the checkout root, which never carries `.dadaia/states/
  * spec_contexts.json` — hygiene law), so the spec deterministically skips rather
  * than ever touching live state. AC-4's evidence is the `e2e-panel` CI run.
+ *
+ * Intent: CONTRACT — v0.1.51 FR4 / AC-4 (E2E-SCP-OP-01)
+ * Owner: software-engineer
  */
 
 import { test, expect } from '@playwright/test';
@@ -45,7 +48,8 @@ test.describe('E2E-SCP-OP-01 — context operation journey (store mutation → D
   test.skip(
     !fs.existsSync(REGISTRY),
     'CI-seeded checkout workspace not present — a local run resolves the live ' +
-      'workspace, which is never mutated by tests'
+      'workspace, which is never mutated by tests (AC-4 / E2E-SCP-OP-01, evidence: ' +
+      'the e2e-panel CI run)'
   );
 
   let original: string;

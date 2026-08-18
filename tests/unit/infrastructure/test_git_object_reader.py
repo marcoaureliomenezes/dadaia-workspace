@@ -16,7 +16,11 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.protocols.git_object_reader import ZERO_SHA, GitObjectReadError
+from dadaia_workspace.core.protocols.git_object_reader import (
+    ZERO_SHA,
+    GitObjectReadError,
+    ScannedObject,
+)
 from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
 
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
@@ -43,6 +47,16 @@ def _blob_sha(path: Path, relative: str) -> str:
     return _git(["rev-parse", f"HEAD:{relative}"], path).stdout.strip()
 
 
+def _blob_paths(objects: list[ScannedObject]) -> set[str]:
+    """v0.4.3 T-043-15/FR11: every pre-FR11 test below asserts an exact set of BLOB
+    paths — ``new_objects`` now additionally yields one ``kind="commit"`` object per
+    range commit (and, for a tag push, one ``kind="tag"`` object), so the blob-only
+    assertions filter to ``kind == "blob"`` here rather than re-deriving the filter at
+    each call site. The new commit/tag objects are covered by their own dedicated FR11
+    tests below."""
+    return {obj.path for obj in objects if obj.kind == "blob"}
+
+
 def test_new_objects_resolvable_remote_sha_scopes_to_the_delta(tmp_path: Path) -> None:
     """Row 1 of FR1: a resolvable ``remote_sha`` scopes the scan to objects new since it."""
     repo = tmp_path / "repo"
@@ -56,8 +70,7 @@ def test_new_objects_resolvable_remote_sha_scopes_to_the_delta(tmp_path: Path) -
     reader = GitSubprocessObjectReader()
     objects = list(reader.new_objects(repo, tip_sha, base_sha))
 
-    paths = {obj.path for obj in objects}
-    assert paths == {"b.txt"}
+    assert _blob_paths(objects) == {"b.txt"}
     assert all(obj.decodable for obj in objects)
     assert all(obj.text for obj in objects)
 
@@ -73,7 +86,7 @@ def test_new_objects_zero_remote_sha_falls_back_to_not_remotes(tmp_path: Path) -
     reader = GitSubprocessObjectReader()
     objects = list(reader.new_objects(repo, tip_sha, ZERO_SHA))
 
-    assert {obj.path for obj in objects} == {"only.txt"}
+    assert _blob_paths(objects) == {"only.txt"}
 
 
 def test_new_objects_unresolvable_remote_sha_falls_back_to_not_remotes(tmp_path: Path) -> None:
@@ -87,7 +100,7 @@ def test_new_objects_unresolvable_remote_sha_falls_back_to_not_remotes(tmp_path:
     reader = GitSubprocessObjectReader()
     objects = list(reader.new_objects(repo, tip_sha, "f" * 40))
 
-    assert {obj.path for obj in objects} == {"a.txt"}
+    assert _blob_paths(objects) == {"a.txt"}
 
 
 def test_new_objects_deletion_sha_is_an_empty_range(tmp_path: Path) -> None:
@@ -414,7 +427,7 @@ def test_is_resolvable_commit_rejects_option_shaped_sha_before_interpolation(
 
     assert cat_file_e_calls == [], "an option-shaped sha must never be interpolated into argv"
     # Falls back to the --not --remotes shape (no remotes configured -> full range).
-    assert {obj.path for obj in objects} == {"a.txt"}
+    assert _blob_paths(objects) == {"a.txt"}
 
 
 # ---------------------------------------------------------------------------
@@ -756,7 +769,8 @@ def test_under_cap_blob_count_spawns_a_single_batch_call_not_per_object(
 ) -> None:
     """FR9/A9.2: a blob count well under the chunk size spawns exactly ONE content-read
     batch call — never one subprocess per object (the single-conversation win FR9
-    preserves)."""
+    preserves). v0.4.3 T-043-15/FR11: the range's ONE commit body rides its own,
+    equally single, batch call — 2 total, never one call per blob+commit."""
     repo = tmp_path / "repo"
     _init_repo(repo)
     (repo / "a.txt").write_text("a\n")
@@ -768,8 +782,9 @@ def test_under_cap_blob_count_spawns_a_single_batch_call_not_per_object(
     reader = GitSubprocessObjectReader()
     objects = list(reader.new_objects(repo, tip_sha, ZERO_SHA))
 
-    assert {obj.path for obj in objects} == {"a.txt", "b.txt"}
-    assert len(batch_calls) == 1
+    assert _blob_paths(objects) == {"a.txt", "b.txt"}
+    # 1 blob-content chunk + 1 commit-body chunk (one range commit) = 2.
+    assert len(batch_calls) == 2
 
 
 def test_batch_conversation_invocations_grow_with_chunks_not_blob_count(
@@ -777,7 +792,8 @@ def test_batch_conversation_invocations_grow_with_chunks_not_blob_count(
 ) -> None:
     """FR9/A9.2: with the chunk size patched down to 3, a 7-blob range spawns exactly
     ceil(7/3) == 3 content-read batch calls — the invocation count tracks the number of
-    CHUNKS, not the number of blobs."""
+    CHUNKS, not the number of blobs. v0.4.3 T-043-15/FR11: the range's ONE commit body
+    rides the SAME chunk size, contributing one more chunk (ceil(1/3) == 1) — 4 total."""
     repo = tmp_path / "repo"
     _init_repo(repo)
     for i in range(7):
@@ -792,8 +808,8 @@ def test_batch_conversation_invocations_grow_with_chunks_not_blob_count(
     reader = GitSubprocessObjectReader()
     objects = list(reader.new_objects(repo, tip_sha, ZERO_SHA))
 
-    assert len(objects) == 7
-    assert len(batch_calls) == 3
+    assert len(_blob_paths(objects)) == 7
+    assert len(batch_calls) == 4
 
 
 # ---------------------------------------------------------------------------
@@ -1049,7 +1065,10 @@ def test_prior_side_lookup_invocations_are_two_per_chunk_not_per_blob(
     reader = GitSubprocessObjectReader()
     objects = list(reader.new_objects(repo, tip_sha, base_sha))
 
-    assert len(objects) == 7
+    # v0.4.3 T-043-15/FR11: +1 for the range's one commit-message-body object — the
+    # prior-side lookup below is keyed on `base_sha:<path>` and a commit body has no
+    # path, so it never contributes a prior-side call regardless.
+    assert len(_blob_paths(objects)) == 7
     # 7 blobs / chunk size 3 -> 3 chunks -> 2 prior-side calls per chunk = 6 total.
     assert len(prior_calls) == 6
 
@@ -1221,3 +1240,291 @@ def test_new_objects_multi_path_in_an_intermediate_commit_denies_amnesty_even_wh
         "c2) — the tip's single-path tree must not grant amnesty just because the "
         "second path was deleted again before the tip"
     )
+
+
+# ═════════════════════════════════════════════════════════════════════════════════
+# v0.4.3 T-043-15/FR11 — the push scan reads the commit objects it publishes.
+# Intent: CONTRACT — v0.4.3 A11.1-A11.4, A11.6, A11.7 (A11.2's own reconciliation
+# shape, A11.3's tag-body shape, A11.6's header/body boundary, A11.7's path-less
+# fail-closed amnesty — every acceptance id this reader owns).
+# ═════════════════════════════════════════════════════════════════════════════════
+
+
+def _commit_body_objects(objects: list[ScannedObject]) -> list[ScannedObject]:
+    return [obj for obj in objects if obj.kind == "commit"]
+
+
+def _tag_body_objects(objects: list[ScannedObject]) -> list[ScannedObject]:
+    return [obj for obj in objects if obj.kind == "tag"]
+
+
+def test_new_objects_yields_one_commit_body_object_per_range_commit(tmp_path: Path) -> None:
+    """A11.1: the range's commit message BODY is yielded as a scanned object, path-
+    labelled distinctly from every real blob path, decodable, and carrying the exact
+    message text."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "a.txt").write_text("content\n")
+    tip_sha = _commit(repo, "add a.txt\n\nthis commit message has a secret in the body\n")
+
+    reader = GitSubprocessObjectReader()
+    objects = list(reader.new_objects(repo, tip_sha, ZERO_SHA))
+
+    commit_objs = _commit_body_objects(objects)
+    assert len(commit_objs) == 1
+    commit_obj = commit_objs[0]
+    assert commit_obj.sha == tip_sha
+    assert commit_obj.decodable is True
+    assert "this commit message has a secret in the body" in commit_obj.text
+    assert commit_obj.path != "a.txt"  # never mistaken for a real blob path
+    assert commit_obj.prior_text is None
+
+
+def test_reconciliation_shape_two_commits_zero_blobs_still_yields_commit_bodies(
+    tmp_path: Path,
+) -> None:
+    """A11.2: the v0.4.2 reconciliation shape — two commits publishing NO new blob
+    content (both files were already tracked; only the commit messages carry new
+    text) — is the acceptance fixture, not a hypothesis: pre-FR11 this range produced
+    ZERO scanned objects; post-FR11 it produces the two commits' message bodies."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "a.txt").write_text("unchanged content\n")
+    base_sha = _commit(repo, "base commit")
+
+    # Two commits that touch NOTHING in the tree (empty commits) — the exact
+    # "zero blobs" reconciliation shape.
+    _git(["commit", "--allow-empty", "-m", "empty commit one with SECRETONE"], repo)
+    _git(["commit", "--allow-empty", "-m", "empty commit two with SECRETTWO"], repo)
+    tip_sha = _git(["rev-parse", "HEAD"], repo).stdout.strip()
+
+    reader = GitSubprocessObjectReader()
+    objects = list(reader.new_objects(repo, tip_sha, base_sha))
+
+    assert _blob_paths(objects) == set(), "the reconciliation shape publishes zero blobs"
+    commit_objs = _commit_body_objects(objects)
+    assert len(commit_objs) == 2
+    bodies = {obj.text for obj in commit_objs}
+    assert any("SECRETONE" in body for body in bodies)
+    assert any("SECRETTWO" in body for body in bodies)
+
+
+def test_annotated_tag_push_yields_the_tag_bodys_own_object(tmp_path: Path) -> None:
+    """A11.3: an annotated tag-ref push additionally yields the TAG object's own body
+    (distinct from, and in addition to, the commit body its tag points at)."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "a.txt").write_text("content\n")
+    _commit(repo, "release commit")
+    _git(
+        ["tag", "-a", "v9.9.9", "-m", "release notes with a secret in the tag body"],
+        repo,
+    )
+    tag_sha = _git(["rev-parse", "v9.9.9"], repo).stdout.strip()
+
+    reader = GitSubprocessObjectReader()
+    objects = list(reader.new_objects(repo, tag_sha, ZERO_SHA))
+
+    tag_objs = _tag_body_objects(objects)
+    assert len(tag_objs) == 1
+    assert tag_objs[0].sha == tag_sha
+    assert "release notes with a secret in the tag body" in tag_objs[0].text
+    assert tag_objs[0].prior_text is None
+
+    # The underlying commit's OWN body is separately yielded too (A11.1, unaffected).
+    commit_objs = _commit_body_objects(objects)
+    assert len(commit_objs) == 1
+    assert "release commit" in commit_objs[0].text
+
+
+def test_lightweight_tag_push_yields_no_tag_body_object(tmp_path: Path) -> None:
+    """A11.3 negative twin: a LIGHTWEIGHT tag is not its own object — ``local_sha``
+    already names the commit directly — so no ``kind="tag"`` object is ever produced
+    for it (only the commit body, exactly like an ordinary branch push)."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "a.txt").write_text("content\n")
+    _commit(repo, "release commit")
+    _git(["tag", "v9.9.8"], repo)  # lightweight — no -a/-m
+    tag_sha = _git(["rev-parse", "v9.9.8"], repo).stdout.strip()
+
+    reader = GitSubprocessObjectReader()
+    objects = list(reader.new_objects(repo, tag_sha, ZERO_SHA))
+
+    assert _tag_body_objects(objects) == []
+    assert len(_commit_body_objects(objects)) == 1
+
+
+def test_commit_body_object_never_carries_the_author_or_committer_identity(
+    tmp_path: Path,
+) -> None:
+    """A11.6: the header/body boundary is structural — a term present ONLY in the
+    ``author``/``committer`` identity lines (never in the free-form message) must
+    NEVER appear in the yielded body text, proving the header lines are excluded by
+    construction, not merely by convention."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    _git(["config", "user.name", "HeaderOnlySecretName"], repo)
+    (repo / "a.txt").write_text("content\n")
+    tip_sha = _commit(repo, "an ordinary message with no secret in it")
+
+    # Sanity: the raw commit object DOES carry the identity in its header.
+    raw = _git(["cat-file", "-p", tip_sha], repo).stdout
+    assert "HeaderOnlySecretName" in raw
+
+    reader = GitSubprocessObjectReader()
+    objects = list(reader.new_objects(repo, tip_sha, ZERO_SHA))
+
+    commit_objs = _commit_body_objects(objects)
+    assert len(commit_objs) == 1
+    assert "HeaderOnlySecretName" not in commit_objs[0].text
+
+
+def test_commit_body_repeating_a_previously_published_commit_message_is_never_amnestied(
+    tmp_path: Path,
+) -> None:
+    """A11.7: even though the EXACT same text was already published in the base
+    commit's own message (the shape that WOULD amnesty a blob at the same path), a
+    commit body carries no path to key any amnesty lookup on — ``prior_text`` stays
+    ``None`` unconditionally, fail-closed exactly like a multi-path blob."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "a.txt").write_text("content\n")
+    base_sha = _commit(repo, "base commit already publishing REPEATEDSECRET in its body")
+
+    (repo / "b.txt").write_text("more content\n")
+    tip_sha = _commit(repo, "tip commit also publishing REPEATEDSECRET in its body")
+
+    reader = GitSubprocessObjectReader()
+    objects = list(reader.new_objects(repo, tip_sha, base_sha))
+
+    commit_objs = _commit_body_objects(objects)
+    assert len(commit_objs) == 1  # only the TIP commit is new to the range
+    assert "REPEATEDSECRET" in commit_objs[0].text
+    assert commit_objs[0].prior_text is None
+
+
+def test_commit_body_batch_failure_raises_the_typed_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A11.4: a git failure reading commit bodies degrades exactly like the blob path
+    — the typed :class:`GitObjectReadError`, never a silent empty/partial result."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "a.txt").write_text("content\n")
+    tip_sha = _commit(repo, "c1")
+
+    from dadaia_workspace.infrastructure import git_objects as git_objects_module
+
+    real_run = git_objects_module._run
+    commit_sha_marker = tip_sha.encode()
+
+    def _spy_run(
+        args: list[str], cwd: Path, *, input_bytes: bytes | None = None
+    ) -> subprocess.CompletedProcess[bytes]:
+        # Let the blob-content batch call (no blobs here — the payload would be empty)
+        # and every other call through; fail only the commit-body batch call, whose
+        # stdin payload is exactly the commit sha(s).
+        if (
+            args == ["git", "cat-file", "--batch"]
+            and input_bytes is not None
+            and input_bytes.strip() == commit_sha_marker
+        ):
+            return subprocess.CompletedProcess(args, 1, stdout=b"", stderr=b"simulated failure")
+        return real_run(args, cwd, input_bytes=input_bytes)
+
+    monkeypatch.setattr(git_objects_module, "_run", _spy_run)
+
+    reader = GitSubprocessObjectReader()
+    with pytest.raises(GitObjectReadError):
+        list(reader.new_objects(repo, tip_sha, ZERO_SHA))
+
+
+# ═════════════════════════════════════════════════════════════════════════════════
+# v0.4.3 T-043-23 security-review rework — FR11 LOW residual (CWE-184), handoff
+# 2026-08-17T173112Z-security-reviewer-v0.4.3-alpha-2-delta. Merging a GPG-signed
+# annotated tag embeds the WHOLE tag object — its own header lines AND its own
+# message body — into the merge commit's HEADER region (a `mergetag <sha>` line
+# followed by single-space-folded continuation lines), entirely inside the region
+# ``_split_object_body`` excludes from scanning. Verified against a REAL git
+# merge-of-a-signed-tag (git 2.34.1) before writing this fixture; the byte shape is
+# reproduced synthetically below (splicing a real tag's raw header block onto a real,
+# already-committed commit's tree/parent lines) so the test needs no GPG key.
+# ═════════════════════════════════════════════════════════════════════════════════
+
+
+def _synthetic_commit_with_mergetag_block(
+    repo: Path, base_commit_sha: str, mergetag_lines: bytes
+) -> str:
+    """Build a REAL, reachable commit object whose raw HEADER region embeds an
+    arbitrary ``mergetag `` block — reuses *base_commit_sha*'s own tree/parent lines
+    UNCHANGED (a valid, already-existing tree — no dangling object references), so
+    ``git rev-list --objects`` walks it exactly like any ordinary commit. The
+    mergetag block is spliced in right after the header's last line and before the
+    blank-line body separator, exactly where a real signed-tag merge embeds one —
+    without needing a GPG key (slow, environment-dependent) to reproduce the
+    real trigger."""
+    raw_bytes = subprocess.run(
+        ["git", "cat-file", "commit", base_commit_sha], cwd=repo, capture_output=True, check=True
+    ).stdout
+    header, _, rest = raw_bytes.partition(b"\n\n")
+    new_raw = header + b"\n" + mergetag_lines + b"\n\n" + rest
+    result = subprocess.run(
+        ["git", "hash-object", "-t", "commit", "-w", "--stdin"],
+        cwd=repo,
+        input=new_raw,
+        capture_output=True,
+        check=True,
+    )
+    return result.stdout.decode().strip()
+
+
+def test_mergetag_embedded_tag_body_reaches_the_matcher(tmp_path: Path) -> None:
+    """FR11 rework: a signed-tag merge embeds the WHOLE tag object — header AND
+    message body — into the outer commit's HEADER region, folded with a leading-space
+    continuation per line (the same RFC 2822-style folding ``gpgsig`` already uses).
+    Pre-fix, ``_split_object_body`` excludes the entire header region, so a secret
+    embedded ONLY in a merged tag's own message never reached the matcher."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "a.txt").write_text("content\n")
+    base_sha = _commit(repo, "base commit")
+
+    mergetag_block = (
+        b"mergetag object " + base_sha.encode() + b"\n"
+        b" type commit\n"
+        b" tag v9.9.9\n"
+        b" tagger T <t@example.com> 1700000000 +0000\n"
+        b" \n"
+        b" SECRET-IN-MERGETAG-BODY probe\n"
+    )
+    synthetic_sha = _synthetic_commit_with_mergetag_block(repo, base_sha, mergetag_block)
+    # Point a branch straight at the synthetic commit so it is reachable as the range
+    # tip — `_range_commit_shas`/`_read_object_bodies` need nothing more than that.
+    _git(["update-ref", "refs/heads/synthetic-tip", synthetic_sha], repo)
+
+    reader = GitSubprocessObjectReader()
+    objects = list(reader.new_objects(repo, synthetic_sha, ZERO_SHA))
+
+    commit_objs = _commit_body_objects(objects)
+    assert len(commit_objs) == 1
+    assert "SECRET-IN-MERGETAG-BODY probe" in commit_objs[0].text
+    # The embedded tag's OWN header line (tagger) never leaks into the scanned text —
+    # A11.6's header/body exclusion applies recursively to the unfolded block too.
+    assert "tagger T <t@example.com>" not in commit_objs[0].text
+
+
+def test_mergetag_absent_is_unaffected(tmp_path: Path) -> None:
+    """Negative twin: an ORDINARY commit (no mergetag block at all) is scanned exactly
+    as before — the new extraction is a no-op when there is nothing to unfold."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "a.txt").write_text("content\n")
+    tip_sha = _commit(repo, "an ordinary commit message, no mergetag here")
+
+    reader = GitSubprocessObjectReader()
+    objects = list(reader.new_objects(repo, tip_sha, ZERO_SHA))
+
+    commit_objs = _commit_body_objects(objects)
+    assert len(commit_objs) == 1
+    assert commit_objs[0].text == "an ordinary commit message, no mergetag here\n"

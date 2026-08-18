@@ -1,7 +1,7 @@
 ---
 name: dd-release-definition
 description: "Use when: turning bugs and/or backlog items into a release. product-engineer (dispatched by project-manager) picks a pre-sanitized set and refines it into a SPEC. Enforces bug-always-solved (unless subsumed) and a MANDATORY dadaia-grill-me session before the SPEC is written. Invoke at the start of release definition."
-applyTo: "specs/backlog/**"
+applyTo: "specs/releases/*/SPEC.md"
 ---
 
 # dd-release-definition
@@ -26,6 +26,11 @@ steps 1–3 below are complete.
 - Sanitized, deduplicated candidates: `specs/backlog/BACKLOG.md` `## ACTIVE`
   (see `dd-backlog-definition` §2) — the single-source document, no per-entry files.
 - The operator's intent for the release (theme, urgency).
+
+This skill **reads** `specs/backlog/**` but never writes it (purge-on-pick is executed
+by `project-manager` via `dd-backlog-definition` §2, step 5 table) — the activation
+glob above names what this skill actually authors: the release `SPEC.md`. Activation
+precedence for the fleet: `dd-backlog-definition` §7 (canonical home).
 
 Sanitizing and deduplicating those inputs is `dd-backlog-definition`'s job, run
 continuously by `project-manager` — this skill consumes an already-clean set and does
@@ -103,8 +108,7 @@ archived CLOSURE's `## Dispositions` rows naming a still-non-terminal `ACTIVE` s
 
 `product-engineer` owns picking and SPEC authorship; `project-manager` dispatches
 this work and owns the mandatory-grill gate (it must not let a release-from-backlog
-proceed to SPEC without the grill). See the `project-orchestration` skill's
-release-definition playbook and the `DADAIA.md` §5 (Releases).
+proceed to SPEC without the grill). See the `DADAIA.md` §5 (Releases).
 
 ## Checklist
 

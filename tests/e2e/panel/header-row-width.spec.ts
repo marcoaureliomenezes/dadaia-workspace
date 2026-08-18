@@ -29,6 +29,9 @@
  * `#section-sessions` and its `.section-header` survive unchanged as the nested
  * mount, so this guard still applies at its original selector, now scoped under
  * `#section-subagents`.
+ *
+ * Intent: CONTRACT — v0.1.59 FR3 / AC-4 (single-line header/control-row width guard)
+ * Owner: software-engineer
  */
 
 import { test, expect, Page } from '@playwright/test';

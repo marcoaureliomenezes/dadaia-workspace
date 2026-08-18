@@ -11,9 +11,10 @@ import contextlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import tomllib
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -570,6 +571,14 @@ def check_codex_rule_corpus_reachable(workspace_root: Path) -> list[DoctorLine]:
     file ``.claude/rules/<name>.md`` must exist. A missing file means a Codex artifact
     cites a law surface Codex cannot reach.
 
+    **STATIC reference integrity only (A22.3).** This check answers "does the cited
+    file exist on disk" — nothing here proves a live Codex session actually LOADS that
+    file into its effective prompt. That is a different claim (effective prompt
+    visibility), answered by ``codex_trust_boundary_info`` below for the hook-fire
+    boundary, and by ``features/certification/service.py``'s live ``codex exec`` probe
+    (A22.4) for genuine runtime behavior. Do not read an ``[ok]`` here as proof of
+    anything beyond on-disk reachability.
+
     Returns ``[ok] codex:rule-corpus-reachable`` when every citation resolves, or one
     ``[error]`` line per unreachable citation.
     """
@@ -621,22 +630,191 @@ def check_codex_rule_corpus_reachable(workspace_root: Path) -> list[DoctorLine]:
     return out
 
 
-def codex_trust_boundary_info() -> list[DoctorLine]:
-    """WS-CDX-HYGIENE (A7): surface the Codex interactive-vs-headless trust boundary.
+# The exact codex-cli version for which "projected command hooks fire and block in
+# BOTH the interactive TUI and headless `codex exec`" was live-verified (executed-path
+# probe, cited in the `ai-harness-codex` skill §9 and the T-043-32 scoping note). A
+# stale, unqualified claim carried forward by assumption past a CLI upgrade is exactly
+# what FR22c (A22.3) fixes: `codex_trust_boundary_info` asserts this positive fact
+# ONLY when the runtime-probed version matches this constant exactly; any other
+# observed version — or no observed version at all — degrades honestly instead.
+# Update this constant only after a fresh, reviewed live probe (`dadaia certify`'s
+# codex-live-probe check, A22.4) reconfirms the fact for a newer version.
+_CODEX_HOOKS_LIVE_CERTIFIED_VERSION = "codex-cli 0.144.4"
 
-    Codex governance hooks fire and block only in **interactive** sessions; under
-    headless ``codex exec`` they never fire, so the headless posture is protected by
-    the git chokepoints (pre-commit presence advisory + pre-push security-verdict gate) only.
-    This INFO line states that boundary honestly in ``dadaia public doctor`` output.
+
+def _probe_installed_codex_version(timeout: float = 5.0) -> str | None:
+    """Best-effort ``codex --version`` runtime probe (A22.3).
+
+    Returns the raw stdout (stripped) of an installed ``codex`` binary reachable on
+    ``PATH``, or ``None`` when the binary is absent, fails to launch, exits non-zero,
+    or does not answer within *timeout* seconds. Never raises — a probe failure IS the
+    "codex absent" observation, not a doctor crash (same discipline as the D-CX-9 hook
+    wrapper probe above).
     """
+    codex_bin = shutil.which("codex")
+    if codex_bin is None:
+        return None
+    try:
+        proc = subprocess.run(  # noqa: S603
+            [codex_bin, "--version"],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if proc.returncode != 0:
+        return None
+    version = proc.stdout.strip()
+    return version or None
+
+
+def codex_trust_boundary_info(
+    *, version_probe: Callable[[], str | None] = _probe_installed_codex_version
+) -> list[DoctorLine]:
+    """WS-CDX-HYGIENE (A7/A22.3): version-qualified Codex hook-fire trust boundary.
+
+    This reports EFFECTIVE PROMPT VISIBILITY — does an actually-running Codex session
+    honor the projected hooks at all — a different claim from
+    ``check_codex_rule_corpus_reachable``'s STATIC reference integrity (do the cited
+    files merely exist on disk). The reported text is always version-qualified against
+    a runtime ``codex --version`` probe (``version_probe``, injectable for tests;
+    production wiring always uses ``_probe_installed_codex_version``) and never
+    asserts hook-fire behavior for a version this probe did not itself observe: absent
+    Codex, and any version other than ``_CODEX_HOOKS_LIVE_CERTIFIED_VERSION``, both
+    degrade to an explicit UNVERIFIED line pointing at `dadaia certify`'s live probe
+    (A22.4) instead of guessing.
+    """
+    raw_version = version_probe()
+    if raw_version is None:
+        return [
+            DoctorLine(
+                DoctorStatus.INFO,
+                "codex:trust-boundary — no installed Codex CLI observed on PATH "
+                "('codex --version' unreachable); the interactive-vs-headless "
+                "hook-fire boundary is UNVERIFIED for this environment (the git "
+                "chokepoints — pre-commit presence advisory + pre-push "
+                "security-verdict gate — remain independent defense-in-depth "
+                "regardless). (WS-CDX-HYGIENE)",
+            )
+        ]
+    if raw_version == _CODEX_HOOKS_LIVE_CERTIFIED_VERSION:
+        return [
+            DoctorLine(
+                DoctorStatus.INFO,
+                f"codex:trust-boundary — installed {raw_version} matches the last "
+                "live-certified version: projected command hooks fire and block in "
+                "BOTH the interactive TUI and headless `codex exec` (the git "
+                "chokepoints remain independent defense-in-depth). (WS-CDX-HYGIENE)",
+            )
+        ]
     return [
         DoctorLine(
             DoctorStatus.INFO,
-            "codex:trust-boundary — Codex interactive hooks fire and block; "
-            "`codex exec` headless does not (headless is protected by the git "
-            "chokepoints only). (WS-CDX-HYGIENE)",
+            f"codex:trust-boundary — installed {raw_version} has not been "
+            "live-certified for hook-fire behavior (last certified: "
+            f"{_CODEX_HOOKS_LIVE_CERTIFIED_VERSION}); the interactive-vs-headless "
+            "claim is UNVERIFIED for this version — rerun `dadaia certify`'s "
+            "codex-live-probe check to reconfirm before relying on it (the git "
+            "chokepoints remain independent defense-in-depth regardless). "
+            "(WS-CDX-HYGIENE)",
         )
     ]
+
+
+# A `dadaia_workspace.<dotted.tail>` module reference embedded in a Deterministic
+# Behavior's free-text implementation description (e.g. "PreToolUse hook via
+# dadaia_workspace.hooks.pre_gate"). ENT-DERIVE-1 (A22.5) resolves every such
+# reference against the real source tree, so a behavior whose enforcing module
+# silently disappears — the concrete "a hook stops enforcing" drift — is DRIFT, not a
+# quiet pass through harness-key-only coverage.
+_ENT_DERIVE_MODULE_REF_RE: re.Pattern[str] = re.compile(
+    r"\bdadaia_workspace\.([a-zA-Z_][a-zA-Z0-9_.]*)"
+)
+
+
+def _behavior_module_ref_missing(dotted_tail: str, package_root: Path) -> bool:
+    """True when ``dadaia_workspace.<dotted_tail>`` resolves to no source file.
+
+    *package_root* is ``public_dir.parent`` — the ``dadaia_workspace`` package
+    directory itself in production, or an isolated scratch root in a mutation
+    fixture. Neither a bare module file (``hooks/pre_gate.py``) nor a package
+    (``hooks/pre_gate/__init__.py``) existing means the reference is broken.
+    """
+    rel = Path(*dotted_tail.split("."))
+    module_file = package_root / rel.with_suffix(".py")
+    package_init = package_root / rel / "__init__.py"
+    return not module_file.is_file() and not package_init.is_file()
+
+
+def _behavior_content_drift(behavior: dict[str, Any], package_root: Path) -> list[DoctorLine]:
+    """Behavioral-fidelity DRIFT lines for one Deterministic Behavior (A22.5).
+
+    Beyond harness-key coverage (checked by the caller), every
+    ``dadaia_workspace.<module>`` reference embedded in any of this behavior's
+    implementation descriptions must still resolve to a real source file.
+    """
+    out: list[DoctorLine] = []
+    implementations = behavior.get("implementations", {})
+    if not isinstance(implementations, Mapping):
+        return out
+    for harness_name, impl_text in implementations.items():
+        if not isinstance(impl_text, str):
+            continue
+        for match in _ENT_DERIVE_MODULE_REF_RE.finditer(impl_text):
+            dotted_tail = match.group(1)
+            if _behavior_module_ref_missing(dotted_tail, package_root):
+                out.append(
+                    DoctorLine(
+                        DoctorStatus.DRIFT,
+                        f"entities-derivation: behavior '{behavior.get('id')}' "
+                        f"implementation for '{harness_name}' references module "
+                        f"'dadaia_workspace.{dotted_tail}' which no longer exists "
+                        f"(ENT-DERIVE-1)",
+                    )
+                )
+    return out
+
+
+def _persona_content_drift(agent_id: str, agents_dir: Path) -> list[DoctorLine]:
+    """Behavioral-fidelity DRIFT lines for one correctly-bijected sub-agent (A22.5).
+
+    Filename-stem bijection alone cannot see a stub file at the right path, or an
+    internal identity swap (frontmatter ``name:`` diverging from its own filename)
+    — both are content-level drift a name-only check is blind to.
+    """
+    agent_file = agents_dir / f"{agent_id}.md"
+    try:
+        text = agent_file.read_text(encoding="utf-8")
+    except OSError as exc:
+        return [
+            DoctorLine(
+                DoctorStatus.ERROR,
+                f"entities-derivation: core sub-agent '{agent_id}' unreadable "
+                f"({exc.__class__.__name__}) (ENT-DERIVE-1)",
+            )
+        ]
+    fm = _parse_agent_frontmatter(text)
+    declared_name = fm.get("name") if fm else None
+    if not declared_name:
+        return [
+            DoctorLine(
+                DoctorStatus.DRIFT,
+                f"entities-derivation: core sub-agent '{agent_id}' has no parseable "
+                f"frontmatter identity — stub or malformed (ENT-DERIVE-1)",
+            )
+        ]
+    if declared_name != agent_id:
+        return [
+            DoctorLine(
+                DoctorStatus.DRIFT,
+                f"entities-derivation: core sub-agent '{agent_id}' frontmatter name "
+                f"'{declared_name}' does not match its filename — identity drift "
+                f"(ENT-DERIVE-1)",
+            )
+        ]
+    return []
 
 
 def _entities_registry_shape_problem(raw: Any) -> str | None:
@@ -678,8 +856,17 @@ def check_entities_derivation(public_dir: Path) -> list[DoctorLine]:
 
     1. ``public/entities/registry.json`` exists, parses, and carries the expected schema.
     2. Persona ↔ core sub-agent bijection: every ``public/agents/*.md`` derives from a
-       Persona and every Persona has its derived sub-agent.
-    3. Every Deterministic Behavior is derived for exactly the entry harnesses.
+       Persona and every Persona has its derived sub-agent — BY NAME, plus, for every
+       correctly-bijected pair, the sub-agent's own frontmatter is parseable and its
+       ``name:`` matches its filename (:func:`_persona_content_drift`, A22.5). A stub
+       file or a copy-paste identity swap at the right filename is DRIFT even though
+       filename-only bijection would pass it.
+    3. Every Deterministic Behavior is derived for exactly the entry harnesses, AND
+       every ``dadaia_workspace.<module>`` reference embedded in an implementation's
+       free-text description still resolves to a real source file
+       (:func:`_behavior_content_drift`, A22.5) — a hook (or any other enforcing
+       module) that silently disappears while its registry entry is left untouched is
+       DRIFT, not a quiet pass through harness-key-only coverage.
 
     Any violation is DRIFT/ERROR (blocking): a scaffolded core implementation without
     its abstract entity is forbidden, not advisory.
@@ -741,8 +928,13 @@ def check_entities_derivation(public_dir: Path) -> list[DoctorLine]:
                 f"sub-agent under public/agents/ (ENT-DERIVE-1)",
             )
         )
+    # Behavioral fidelity (A22.5): every correctly-bijected pair also gets its
+    # content opened — a name-only pass cannot see a stub file or an identity swap.
+    for matched_id in sorted(personas & scaffolded):
+        out.extend(_persona_content_drift(matched_id, agents_dir))
 
     harnesses = set(L1_ENTRY_HARNESSES)
+    package_root = public_dir.parent
     for behavior in registry.get("behaviors", []):
         implemented = set(behavior.get("implementations", {}))
         if implemented != harnesses:
@@ -754,6 +946,9 @@ def check_entities_derivation(public_dir: Path) -> list[DoctorLine]:
                     f"{sorted(harnesses)} (ENT-DERIVE-1)",
                 )
             )
+        # Behavioral fidelity (A22.5): harness-key coverage is necessary, never
+        # sufficient — also follow every module reference back to a real file.
+        out.extend(_behavior_content_drift(behavior, package_root))
 
     if not out:
         out.append(

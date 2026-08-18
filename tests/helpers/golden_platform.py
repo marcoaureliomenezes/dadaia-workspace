@@ -18,6 +18,12 @@ failures after two local-green runs):
    marker while a fresh CI checkout emits the ``(baseline structural scan, no operator
    denylist)`` variant. → :func:`norm_path_line` canonicalizes both to the bare marker;
    :func:`is_env_doctor_line` excludes live source-repo ``git-dirty`` lines entirely.
+   ``codex_trust_boundary_info`` (v0.4.3 A22.3) probes the REAL installed ``codex``
+   binary's version at runtime, so its whole line is host-state too — a dev sandbox
+   with Codex installed reports a different line than a CI runner without it. →
+   :func:`canon_env_line` canonicalizes the whole line to one fixed marker (leak class
+   3's mechanism, not class 1's exclusion, since the attesting-check governance test
+   requires the ``codex:trust-boundary`` substring to keep appearing in the golden).
 2. **iteration-order** — directory-iteration order differs across OSes (Windows yielded
    ``pi/extensions/*`` before ``pi/SYSTEM.md`` where Linux sorted the reverse) and is
    not a product contract. → :func:`sort_line_lists` locks the exact MULTISET of lines
@@ -70,6 +76,17 @@ _TS_RE = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2
 _DCX9_WRAPPER_RE = re.compile(
     r"^\[(?:error|unsupported)\] codex hook wrapper .*? (\.dadaia/hooks/\S+?):.*\(D-CX-9\)$"
 )
+
+# codex_trust_boundary_info (A22.3, v0.4.3 T-043-34) probes the REAL installed `codex`
+# binary's version at runtime — host-state, leak class 1 (whether/which Codex CLI is on
+# PATH varies host to host, e.g. a dev sandbox with Codex installed vs a CI runner
+# without it). Canonicalize the whole line to one fixed marker regardless of which of
+# the three branches (absent / certified-version-match / uncertified-version) the
+# capturing host produced — the doctor golden's job is to prove a trust-boundary line
+# still appears at all (test_golden_never_buries_an_attesting_check), not to pin its
+# host-dependent wording; the exact per-branch wording is unit-tested directly against
+# an injected fake probe in test_codex_rule_corpus_reachable.py.
+_CODEX_TRUST_BOUNDARY_RE = re.compile(r"^\[info\] codex:trust-boundary — .*\(WS-CDX-HYGIENE\)$")
 
 # ANSI colour escapes emitted by Rich when it detects (or is forced into) a colour tty.
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
@@ -137,8 +154,13 @@ def canon_env_line(line: object) -> str:
     for that wrapper — not the OS's words. Keep the wrapper path, canonicalize the
     reason.
     """
-    return _DCX9_WRAPPER_RE.sub(
+    text = _DCX9_WRAPPER_RE.sub(
         r"[unsupported] codex hook wrapper probe failed \1 (D-CX-9)", _as_text(line)
+    )
+    return _CODEX_TRUST_BOUNDARY_RE.sub(
+        "[info] codex:trust-boundary — <host-dependent live Codex CLI version "
+        "observation> (WS-CDX-HYGIENE)",
+        text,
     )
 
 

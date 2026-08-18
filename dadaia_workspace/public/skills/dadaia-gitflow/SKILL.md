@@ -54,6 +54,14 @@ A release defined and reviewed is therefore committed and pushed the moment
 milestone (a) clears — implementation never starts on an unreviewed, unpushed
 definition.
 
+## Reconciliation merge (after every squash-merge to `main`)
+
+Every squash-merge of a PR into `main` is followed by a reconciliation merge of `main`
+into `develop`, resolving any resurrected loose copies (files `main`'s squash
+reintroduced outside the archive) in favour of `develop`'s archives. Worked example:
+v0.4.2's ship, merge `84a66d13` (two parents — `5fac3c93` and the `main` squash
+`3fe8f8cd` — tree-identical after resolution).
+
 ## Hotfix procedure
 
 Full Arm B procedure on `hotfix/{M.m.p}` — reproduce, RED, root-cause fix, GREEN,

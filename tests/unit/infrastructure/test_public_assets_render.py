@@ -29,6 +29,9 @@ from dadaia_workspace.infrastructure.public_assets import (
     _sha256,
     _toml_escape,
 )
+from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
+    _compact_codex_developer_instructions,
+)
 
 
 def _make_agent_md(
@@ -188,6 +191,147 @@ def test_render_codex_agent_toml_fields_escaping_and_reasoning_effort_tiers(
         for bad_name, message in [("bad]name", "invalid character"), ("bad\nname", "newline")]:
             with pytest.raises(ValueError, match=message):
                 _render_agent_toml_block(bad_name, {"name": bad_name})
+
+
+# ---------------------------------------------------------------------------
+# FR22 / A22.1 (T-043-33) — Codex persona compaction contract
+# ---------------------------------------------------------------------------
+
+
+def test_compact_codex_developer_instructions_strips_shared_law_keeps_role_content() -> None:
+    """Each boilerplate pattern is removed in isolation; role-specific content around
+    it (identity prose, a project-manager-style mixed blockquote, a persona's OWN
+    scope/authority text) survives untouched."""
+    body = (
+        "# AI Engineer\n\n"
+        "> Reports follow the `DADAIA.md` (the workspace law) §4 (handoff-first): "
+        "emit a JSON handoff by default; write an HTML report (template + required "
+        "sections in `.dadaia/reports/AGENTS.md`) only when the operator requests one "
+        "or the next handoff target is human.\n\n"
+        "> This agent follows the shared workspace protocol: `AGENTS.md` and the "
+        "projected workspace protocol.\n\n"
+        "You are the AI-entity engineer. Role-specific identity prose survives.\n\n"
+        "---\n\n"
+        "## Step 0 — Memory bootstrap (mandatory, before any work)\n\n"
+        "Execute the `dadaia-step0-memory-bootstrap` skill before any implementation, "
+        "review, or report.\n\n"
+        "---\n\n"
+        "## Workflow protocol\n\n"
+        "1. Role-specific step that must survive.\n\n"
+        "---\n\n"
+        "Sections required: Summary, Rationale.\n\n"
+        "### Artifact emission\n\n"
+        "After finalizing any HTML report under `.dadaia/reports/`, invoke the\n"
+        "`dadaia-handoff-emitter` skill to emit handoff JSON under "
+        "`.dadaia/handoff/<context>/`.\n\n"
+        "> Report/handoff emission follows the `DADAIA.md` (the workspace law) §4 "
+        "(handoff-first; HTML only on `--with-report` or "
+        '`next_handoff.agent == "human"`; schema handoff-v1.2, with '
+        "`self_pull.refs` = the memory atoms this session actually self-pulled/read "
+        "— `specs/`-prefixed, context-relative; never list an atom you did not "
+        "read).\n\n"
+        "---\n"
+        "## Implementation review gate\n\n"
+        "Your completed AI-entity implementation is a handoff, not task completion. "
+        "The task stays `[-]` until reviewers approve the same commit. Do not mark "
+        "`[x]` before approval.\n\n"
+        "---\n"
+        "## dadaia CLI\n\n"
+        "```bash\n"
+        "dadaia context show --json    # discover active context and specs_dir\n"
+        "```\n"
+    )
+    out = _compact_codex_developer_instructions(body)
+
+    # Shared-law patterns removed.
+    assert "Reports follow the `DADAIA.md`" not in out
+    assert "shared workspace protocol" not in out
+    assert "Step 0 — Memory bootstrap" not in out
+    assert "dadaia-step0-memory-bootstrap" not in out
+    assert "### Artifact emission" not in out
+    assert "invoke the\n`dadaia-handoff-emitter`" not in out
+    assert "Report/handoff emission follows the `DADAIA.md`" not in out
+    assert "## Implementation review gate" not in out
+    assert "## dadaia CLI" not in out
+    assert "dadaia context show --json" not in out
+
+    # Role-specific content survives untouched.
+    assert "You are the AI-entity engineer. Role-specific identity prose survives." in out
+    assert "## Workflow protocol" in out
+    assert "1. Role-specific step that must survive." in out
+    assert "Sections required: Summary, Rationale." in out
+
+    # Idempotent — a second pass changes nothing further.
+    assert _compact_codex_developer_instructions(out) == out
+
+
+def test_compact_codex_developer_instructions_preserves_mixed_blockquote_and_trailing_content() -> (
+    None
+):
+    """A persona (e.g. project-manager) that weaves role-specific prose into the SAME
+    blockquote as the generic protocol pointer keeps its own sentence; a generic
+    section (`## dadaia CLI`) followed by unrelated trailing content (e.g.
+    project-auditor's appended scope rule) keeps that trailing content intact."""
+    body = (
+        "# Project Manager\n\n"
+        "> Reports follow the `DADAIA.md` (the workspace law) §4 (handoff-first): "
+        "JSON handoff by default.\n"
+        "> Shared protocol: `AGENTS.md` and the projected workspace protocol. You "
+        "never do the work — you\n"
+        "direct who does it, and enforce the review checkpoint.\n\n"
+        "## dadaia CLI\n\n"
+        "```bash\n"
+        "dadaia context show --json    # active context + specs_dir\n"
+        "```\n\n"
+        "---\n\n"
+        "## Scope and forbidden actions\n\n"
+        "Trailing role-specific content that must survive.\n"
+    )
+    out = _compact_codex_developer_instructions(body)
+
+    assert "Reports follow the `DADAIA.md`" not in out
+    assert "## dadaia CLI\n" not in out
+    assert "dadaia context show --json" not in out
+
+    # Mixed blockquote's role-specific continuation survives.
+    assert "You never do the work — you" in out
+    assert "direct who does it, and enforce the review checkpoint." in out
+
+    # Trailing content past the stripped section survives, cleanly joined.
+    assert "## Scope and forbidden actions" in out
+    assert "Trailing role-specific content that must survive." in out
+
+
+def test_compact_codex_developer_instructions_leaves_cli_reference_untouched() -> None:
+    """`## dadaia CLI reference` (product-engineer's D-1 shell-less routing table) is a
+    distinct heading from `## dadaia CLI` and is never matched by the CLI-section
+    pattern."""
+    body = (
+        "## dadaia CLI reference\n\n"
+        "PE does not run shell commands. The following CLI commands are run by "
+        "project-manager.\n"
+    )
+    out = _compact_codex_developer_instructions(body)
+    assert out == body
+
+
+def test_render_codex_agent_toml_applies_compaction_to_developer_instructions() -> None:
+    """The renderer seam (`_render_codex_agent_toml`) compacts `developer_instructions`
+    before serialization — the TOML file never carries the stripped boilerplate."""
+    body = (
+        "# X\n\n"
+        "You are X.\n\n"
+        "---\n\n"
+        "## Step 0 — Memory bootstrap (mandatory, before any work)\n\n"
+        "Execute the `dadaia-step0-memory-bootstrap` skill before any implementation.\n\n"
+        "---\n\n"
+        "## dadaia CLI\n\n"
+        "```bash\ndadaia context show --json\n```\n"
+    )
+    out = _render_codex_agent_toml("x", "gpt-5.5", body)
+    assert "You are X." in out
+    assert "Step 0 — Memory bootstrap" not in out
+    assert "## dadaia CLI" not in out
 
 
 def test_render_agents_into_codex_config_and_config_file_blocks(tmp_path: Path) -> None:

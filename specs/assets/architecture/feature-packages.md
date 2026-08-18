@@ -39,6 +39,7 @@ flowchart TB
         spec_context["spec_context"]
         specs["specs"]
         telemetry["telemetry"]
+        tmp_gc["tmp_gc"]
         workflows["workflows"]
         workspace["workspace"]
         workspace_clean["workspace_clean"]

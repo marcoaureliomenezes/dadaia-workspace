@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dadaia-workspace"
-version = "0.4.2"
+version = "0.4.3"
 description = "AI-native workspace management CLI for multi-agent development with Claude Code, Codex and Kimi Code"
 authors = ["Marco Menezes <marcoaureliomenezes@users.noreply.github.com>"]
 readme = "README.md"
@@ -89,6 +89,17 @@ hypothesis = ">=6.165.2"
 pytest-xdist = "^3.8.0"
 pytest-timeout = "^2.3.1"
 
+# Optional, non-default dependency group — mutation testing (FR20, T-043-28). A plain
+# `poetry install` (what CI, the push preflight, and every consumer install already run)
+# never pulls this group: it requires an explicit `poetry install --with mutation`.
+# Selection verdict: qa-engineer, .dadaia/tmp/qa-engineer/20260817/
+# v0.4.3-T-043-28-mutation-tool-verdict.md. Exact pin per FR1 (T-043-03's pin rule).
+[tool.poetry.group.mutation]
+optional = true
+
+[tool.poetry.group.mutation.dependencies]
+mutmut = "3.7.0"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
@@ -97,9 +108,52 @@ build-backend = "poetry.core.masonry.api"
 line-length = 100
 target-version = "py312"
 
+# Complexity/size governance (FR21a, T-043-29, R8): a MEASURED RATCHET, never an
+# aspiration. `C90` (McCabe cyclomatic complexity) and `PLR1702` (nesting depth) are
+# selected with ceilings pinned AT the maxima observed by ruff's own V6 measurement
+# capture (`.dadaia/tmp/software-engineer/20260817/v0.4.3-T-043-29-v6-complexity-maxima.md`),
+# over the same scope this repo's `ruff check .` gate already covers (production +
+# tests + scripts) — never a smaller, aspirational number. The worst offender at
+# measurement time was `dadaia_workspace/features/panel/handler.py:make_handler_class`
+# (complexity 63) and `dadaia_workspace/features/telemetry/reader/allowlist.py` (nesting
+# depth 6); both already sit inside `dadaia_workspace/`, so no tests-only per-file-ignore
+# was needed to keep `ruff check` green at HEAD by construction (A21.2).
+#
+# RATCHET DIRECTION — read before touching either ceiling below:
+# `max-complexity` and `max-nested-blocks` may only DECREASE, never increase. A future
+# release lowering either number re-measures first (same two-step rule: measure, then
+# pin) and justifies the decrease in that release's CLOSURE.md `## Size accounting`
+# table (A21.3/A21.5, wired by T-043-30's mandatory closure section). Raising a ceiling
+# to make a check pass is exactly the aspirational-number failure R8 forbids — refuse
+# it; refactor the offending function or split the file instead.
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM"]
-ignore = ["E501", "B008"]
+select = ["E", "F", "I", "UP", "B", "SIM", "C90", "PLR1702"]
+ignore = ["E501", "B008", "B903"]
+# `preview = true` is required only because PLR1702 (too-many-nested-blocks) is still a
+# preview-status Pylint rule in ruff 0.16.2 (`ruff rule PLR1702` prints "The --preview
+# flag is required for use") — selecting its exact code with no CLI/config preview flag
+# is silently inert (ruff emits "has no effect because preview is not enabled" and skips
+# it entirely). Enabling preview mode also activates every OTHER preview-status rule
+# nested under an already-selected prefix; measured side effect at v0.16.2: exactly one,
+# `B903` (class-as-data-structure, flake8-bugbear preview), 4 hits in
+# `tests/{integration/panel,unit/features/telemetry}/**` — added to `ignore` above
+# rather than silently widening this task's declared write set (pyproject.toml select +
+# mccabe config only) into unrelated test-file edits. `preview` is scoped to
+# `[tool.ruff.lint]` only (never `[tool.ruff]`/`[tool.ruff.format]`), so it never
+# changes `ruff format --check .`'s result — verified identical (same 5
+# pre-existing, unrelated, bug-registered `specs/_archive/**` findings; see
+# `ruff-0-16-2-markdown-python-fence-format-drift`) with and without this diff.
+preview = true
+
+[tool.ruff.lint.mccabe]
+# Ceiling pinned at the measured maximum (V6). Ratchets DOWN ONLY — see the doctrine
+# comment above `[tool.ruff.lint]`.
+max-complexity = 63
+
+[tool.ruff.lint.pylint]
+# Ceiling pinned at the measured maximum (V6). Ratchets DOWN ONLY — see the doctrine
+# comment above `[tool.ruff.lint]`.
+max-nested-blocks = 6
 
 [tool.ruff.lint.per-file-ignores]
 "dadaia_workspace/cli/commands/*.py" = ["B904"]
@@ -107,6 +161,30 @@ ignore = ["E501", "B008"]
 # Test files that place pytestmark before platform-gated imports (E402 is intentional).
 "tests/unit/infrastructure/test_telemetry_lock_posix.py" = ["E402", "I001"]
 "tests/unit/infrastructure/test_telemetry_lock_windows.py" = ["E402", "I001"]
+
+# Bug ruff-0-16-2-markdown-python-fence-format-drift: ruff 0.16.2 started reformatting
+# fenced Python code blocks embedded in Markdown by default, which reached 5
+# pre-existing files under specs/_archive/releases/**. Those paths are FROZEN
+# (DADAIA.md section 3 / gate_policy.py's four `_archive/` prefixes) -- archive by
+# `git mv`, NEVER edit -- so the root-cause fix is to put every FROZEN archive prefix
+# outside the formatter's reach BY CONFIGURATION rather than reformatting archived
+# content. Scoped to `[tool.ruff.format]` only (never the shared `[tool.ruff]`
+# exclude): `ruff check` does not process `.md` files at all (verified empirically --
+# "No Python files found" on any of the 5 affected files), so widening the lint-visible
+# exclude would weaken nothing but is avoided anyway to keep this fix minimal. Scoped
+# to archive prefixes only, not all Markdown: verified no non-archive `.md` file is
+# reformatted by 0.16.2 (the pre-fix `ruff format --check --no-cache .` run reported
+# exactly these 5 archive paths and no others). The trailing `/**` is load-bearing:
+# a bare `specs/_archive` (or `specs/_archive/`) only matches that literal path
+# segment and does not prune the recursive subtree -- verified empirically (still 5
+# failures without `/**`; 0 with it).
+[tool.ruff.format]
+exclude = [
+    "specs/_archive/**",
+    "specs/backlog/_archive/**",
+    "specs/audits/_archive/**",
+    "specs/bugs/_archive/**",
+]
 
 [tool.mypy]
 python_version = "3.12"
@@ -166,3 +244,26 @@ exclude_lines = [
   "raise NotImplementedError",
   "if __name__ == .__main__.:",
 ]
+
+# Mutation-testing config (FR20, T-043-28). This table is INERT here — mutmut's own
+# `mutants/` sandbox directory is hardcoded relative to its invocation cwd with no
+# config key to redirect it (mutmut configuration.py:107), which collides with this
+# repo's "no caches in the repo tree" law (DADAIA.md §4) if invoked with cwd = repo
+# root. mutmut is therefore never invoked against THIS file: the actual execution cwd
+# is a staged copy under `.dadaia/tmp/software-engineer/<date>/mutation-run/` (see
+# `tests/scripts/run_mutation_baseline.sh`), which carries its own generated
+# `pyproject.toml` with these same keys. This copy is the single documented source of
+# truth for what those keys should be, kept in sync by hand at each release's run.
+#
+# Scope is `core/models/` (the verdict's own already-validated smoke-trial sub-slice),
+# not the wider `core/` the verdict recommended for the first baseline: mutmut's
+# `mutants/` sandbox mirrors ONLY `source_paths` on disk, and `tests/unit/core/` (flat)
+# contains real cross-layer architecture tests (e.g. test_kernel_tunables.py imports
+# `dadaia_workspace.hooks.*`) that cannot run inside any sandbox narrower than the whole
+# package. Widening this scope is real follow-up work, not done here — see the runner
+# script's header for the full narrowing rationale.
+[tool.mutmut]
+source_paths = ["dadaia_workspace/core/models"]
+pytest_add_cli_args_test_selection = ["tests/unit/core/models"]
+mutate_only_covered_lines = true
+use_git_change_detection = false

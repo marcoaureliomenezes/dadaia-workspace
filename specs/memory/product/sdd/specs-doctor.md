@@ -2,16 +2,19 @@
 slug: specs-doctor
 title: specs-doctor
 category: product
-tldr: Validates canonical specs structure, memory/catalog integrity, release markers, closure evidence, dispositions, bug ledgers, and audit coherence.
+tldr: Validates canonical specs structure, memory/catalog and placeholder integrity, release/segment markers, closure evidence, dispositions, bugs, and audits.
 summary: >-
   `dadaia specs doctor` coordinates structural, memory, release, closure/audit,
-  governance, and coherence validators. `--fix` performs only deterministic repairs.
+  governance, and coherence validators. Placeholder detection covers memory atoms (ERROR)
+  and an installed tests/AGENTS.md (WARN, never the canonical template). A live segment
+  pointer at a missing segment directory is an explicit ERROR, never a silent skip.
+  `--fix` performs only deterministic repairs.
 tags:
 - specs
 - doctor
 - validation
 - sdd
-last_updated: '2026-08-16'
+last_updated: '2026-08-18'
 release_origin: v0.4.2
 ---
 
@@ -28,7 +31,12 @@ before release advancement or closure.
   closure evidence triples, archive shape, backlog and bug dispositions, consumed
   ledgers, audit naming, and release references.
 - memory checks: Markdown/frontmatter/atomicity, forbidden history sections, image and
-  Mermaid references, generated catalog/index agreement.
+  Mermaid references, generated catalog/index agreement, and unfilled `<PLACEHOLDER>`
+  tokens. Placeholder detection covers two document families with one validator shape:
+  memory atoms (ERROR), and an **installed** `tests/AGENTS.md` still carrying angle-bracket
+  tokens (WARN, naming the file). The second is scoped to the installed consumer file and
+  **never** to the canonical template, which ships parameterized by design — a check that
+  fired on the template could not be satisfied by any legal action.
 - governance checks: event-sourced bug JSONL vocabulary and terminal state; the backlog
   single source. Two checks cover the backlog, both **WARNING**: SPEC-DOC-031 iterates the
   `## ACTIVE` subsections of `specs/backlog/BACKLOG.md` and flags an item left at a
@@ -58,6 +66,21 @@ from the ledger side by `backlog doctor`'s BL-STALE.
 Because only archived documents assert consumption, a closure's own archive move is what
 makes its assertions countable: a release that archives while naming a still-non-terminal
 `ACTIVE` slug adds one warning per such slug, measured **after** the move.
+
+**A missing segment directory is an ERROR, never a silent skip.** When `ACTIVE.md` carries
+a non-`none` `segment:`, both the release-artifact check (`SPEC-DOC-004`) and the tree
+check (`TREE-6`) route into `releases/<release>/<segment>/`. If that directory does not
+exist, each raises an explicit ERROR naming the missing segment directory. It is not
+covered elsewhere: the ACTIVE.md check validates only the **release** directory and never
+the segment subdirectory, so returning quietly there disabled artifact-presence and
+`**Status:** Aprovado` validation for the whole release at once. A doctor that goes blind
+is worse than one that goes loud. The refusal is scoped to a live segment pointer: a flat
+release is genuinely covered by the release-directory check and fires nothing here.
+
+The doctor is not the only checker in this family. `dadaia public doctor` carries the
+privacy-baseline **carve-out rationale** check: an `exclude_regex` with no
+`exclude_rationale` is reported on every run, so a carve-out nobody can explain cannot sit
+in the baseline unnoticed ([[sdd-gate-v3]]).
 
 There is no lease/session-coherence validator. Workspace concurrency state is advisory
 presence and belongs to `dadaia doctor`, not specs doctor.

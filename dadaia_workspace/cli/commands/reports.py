@@ -336,6 +336,17 @@ def validate(
     json_output: bool = typer.Option(
         False, "--json", help="Emit machine-readable JSON output instead of human-readable text."
     ),
+    workspace: Path | None = typer.Option(
+        None,
+        "--workspace",
+        "-w",
+        help=(
+            "Explicit workspace root to validate against, bypassing cwd-based "
+            "ancestor-walk resolution. Use when the target handoff/artifact lives in a "
+            "workspace other than the one containing cwd (e.g. a throwaway/nested "
+            "workspace) — otherwise artifact.path resolves against the wrong root."
+        ),
+    ),
 ) -> None:
     """Validate one or more agent handoff JSON files.
 
@@ -352,6 +363,7 @@ def validate(
       dadaia reports validate --all
       dadaia reports validate --all --strict
       dadaia reports validate --all --json
+      dadaia reports validate path/to/report.handoff.json --workspace /path/to/other/ws
     """
     # Invocation guard: must have paths or --all
     if not paths and not all_:
@@ -360,7 +372,7 @@ def validate(
 
     # Build service — schema must be staged
     try:
-        workspace_root = resolve_workspace_root()
+        workspace_root = workspace.resolve() if workspace is not None else resolve_workspace_root()
         service = container.build_reports_validation_service(workspace_root)
     except HandoffSchemaError as exc:
         err_console.print(
@@ -373,6 +385,13 @@ def validate(
             "[red]Error:[/red] Workspace not initialized. Run [bold]dadaia init[/bold] first."
         )
         raise typer.Exit(3) from None
+
+    # Bug ancestor-walk-workspace-root-silent-mistarget (T-043-47/A30.5): always name
+    # the resolved workspace root (stderr — never pollutes --json's stdout list shape)
+    # so a false INVALID/missing_artifact caused by resolving against the wrong
+    # ancestor is never silently misread. --workspace above is the primary fix; this
+    # diagnostic covers every invocation, including the cwd-default path.
+    err_console.print(f"[dim]Resolved workspace root: {workspace_root}[/dim]")
 
     # Collect paths to validate
     target_paths: list[Path] = []

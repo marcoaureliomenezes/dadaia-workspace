@@ -170,3 +170,56 @@ def test_explicit_workspace_is_authoritative(tmp_path: Path) -> None:
     deep = sub_repo / "src"
     deep.mkdir(parents=True)
     assert resolve_workspace_root_for_init(deep, explicit=False) == existing_ws
+
+
+# ---------------------------------------------------------------------------
+# Bug ancestor-walk-workspace-root-silent-mistarget (T-043-47/A30.5) —
+# a bare (non-explicit) `dadaia init` invoked from inside an ANCESTOR
+# workspace's own .dadaia/ tree (the R7-sanctioned throwaway-workspace
+# pattern, e.g. .dadaia/tmp/<agent>/<date>/<nested-ws>/) must never silently
+# walk past that boundary and re-project the ancestor's assets — it must
+# target the nested cwd itself.
+# ---------------------------------------------------------------------------
+
+
+def test_bare_init_nested_inside_ancestor_dotdadaia_targets_cwd_not_ancestor(
+    tmp_path: Path,
+) -> None:
+    existing_ws = _make_full_workspace(tmp_path / "existing_ws")
+
+    # The R7-sanctioned throwaway-workspace shape: nested several levels deep
+    # under the ANCESTOR workspace's own .dadaia/tmp/ tree.
+    nested = existing_ws / ".dadaia" / "tmp" / "qa-engineer" / "20260818" / "throwaway-ws"
+    nested.mkdir(parents=True)
+
+    result = resolve_workspace_root_for_init(nested, explicit=False)
+
+    # MUST target the nested cwd itself — never the ancestor workspace found by
+    # walking past the .dadaia/ boundary.
+    assert result == nested.resolve()
+    assert result != existing_ws
+
+
+def test_bare_init_nested_one_level_inside_dotdadaia_targets_cwd(tmp_path: Path) -> None:
+    existing_ws = _make_full_workspace(tmp_path / "existing_ws")
+
+    # Even a single level of nesting directly under .dadaia/ (not just deep
+    # under .dadaia/tmp/...) must hit the same boundary.
+    nested = existing_ws / ".dadaia" / "scratch"
+    nested.mkdir(parents=True)
+
+    result = resolve_workspace_root_for_init(nested, explicit=False)
+    assert result == nested.resolve()
+    assert result != existing_ws
+
+
+def test_bare_init_sub_repo_not_inside_dotdadaia_still_walks_up(tmp_path: Path) -> None:
+    """Non-regression: the sub-repo case (cwd is a sibling of, never nested
+    inside, an ancestor's .dadaia/) must keep resolving to the real
+    workspace root — only the .dadaia/-nesting boundary changes behavior."""
+    existing_ws = _make_full_workspace(tmp_path / "existing_ws")
+    sub_repo = _make_partial_dadaia(existing_ws / "repos", "my-service")
+    deep = sub_repo / "src"
+    deep.mkdir(parents=True)
+
+    assert resolve_workspace_root_for_init(deep, explicit=False) == existing_ws

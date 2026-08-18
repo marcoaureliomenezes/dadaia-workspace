@@ -20,6 +20,7 @@ Two gates, one shared shape (:class:`Decision`):
 from __future__ import annotations
 
 import json
+import os
 import re
 from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass
@@ -45,8 +46,11 @@ from dadaia_workspace.features.spec_context import presence
 
 __all__ = [
     "Decision",
+    "GcOutcome",
+    "LEDGER_RELPATH",
     "PushRef",
     "context_slug_for_path",
+    "gc_consumed_push_verdicts",
     "iter_security_approvals",
     "pre_commit_decision",
     "push_gate_decision",
@@ -747,4 +751,237 @@ def push_gate_decision(
         skipped_binary_count,
         oversized_notes,
         path_masker,
+    )
+
+
+# ---------------------------------------------------------------------------------------
+# Verdict GC — a consumed push verdict dies with the push (FR24 / v0.4.3 T-043-39).
+#
+# ``push_gate_decision`` above is the PRE-push half of the verdict lifecycle: it runs,
+# and returns, entirely BEFORE git transfers a single object. By the time its caller (the
+# ``pre-push`` git hook) exits 0, git has not yet attempted the network push, so "the push
+# succeeded" is categorically unknowable at that point — a remote rejection
+# (non-fast-forward, dropped connection, revoked credential) can still fail the push
+# AFTER the hook already returned allow. Consequently :func:`gc_consumed_push_verdicts`
+# below must NEVER be invoked from the pre-push path (``push_gate_decision`` / the
+# ``ci push-gate-check`` CLI verb) — doing so would delete the only evidence for a push
+# that has not actually landed.
+#
+# Stock git has no client-side "post-push" hook. The two sanctioned observation points
+# for "this push actually landed" are: (a) a ``reference-transaction`` git hook, which
+# fires when git updates a LOCAL ref as part of a transaction — including the
+# remote-tracking ref (``refs/remotes/origin/<branch>``) git updates ONLY after a push
+# the remote genuinely accepted — or (b) a wrapper that runs ``git push`` itself as a
+# subprocess and inspects its exit code before calling this function. Wiring either
+# observation point into a live chokepoint is deliberately OUT OF SCOPE for T-043-39 (not
+# in its declared write set: ``features/chokepoints/service.py`` + the ledger + tests,
+# no hook script, no CLI). This function is the pure, fully fixture-proven ACTION the
+# eventual caller invokes once — and only once — it already holds that independent,
+# out-of-band confirmation.
+#
+# M-1 rider (v0.4.3 T-043-50 six-axis review): observation point (b) is now realized as
+# ``dadaia ci gc-push-verdicts`` (``cli/commands/ci.py``) — a thin CLI wrapper the ship
+# flow runs immediately AFTER a successful ``git push`` of ``develop``, passing the
+# already-confirmed pushed tip sha(s) as ``--sha``. That is the documented, executable
+# caller this function was written to eventually receive; it is still never invoked from
+# the pre-push path itself.
+# ---------------------------------------------------------------------------------------
+
+#: FR24/A24.4 — the audit-ledger event name for one consumed-verdict line.
+_LEDGER_EVENT = "PUSH_VERDICT_CONSUMED"
+
+#: The append-only ledger under ``.dadaia/`` (A24.4) — same directory family as the
+#: existing ``.dadaia/logs/reconciler-events.jsonl`` (``hooks/sdd_post_gate.py``), so
+#: FR27 (T-043-42: every ``.dadaia/logs/*.jsonl`` writer rotates its own file) covers
+#: this ledger too, with no separate carve-out — rotation never contradicts A24.4's
+#: "append-only" property (never mutated/edited in place); it is simply this file's
+#: FR27 current+1 retention, identical to every other appender.
+#:
+#: Exported (M-1 rider, v0.4.3 T-043-50 six-axis review): the ``dadaia ci
+#: gc-push-verdicts`` CLI verb (``cli/commands/ci.py``) renders this same relative path's
+#: basename in its output — the ONE source, never a second literal copy.
+LEDGER_RELPATH = ("logs", "push-verdict-gc-ledger.jsonl")
+
+
+@dataclass(frozen=True)
+class GcOutcome:
+    """Result of one :func:`gc_consumed_push_verdicts` sweep.
+
+    Every field is a tuple of handoff FILENAMES (``path.name``, matching
+    :class:`_Approval`'s existing ``source`` convention) — never full paths, and never
+    ordered by anything other than the deterministic sorted-path walk order.
+    """
+
+    deleted: tuple[str, ...] = ()
+    ledgered: tuple[str, ...] = ()
+    append_failed: tuple[str, ...] = ()
+    lane_guard_refused: tuple[str, ...] = ()
+
+
+def _iter_handoff_paths(handoff_root: Path) -> Iterator[Path]:
+    """Yield every ``*.handoff.json`` path under *handoff_root*, sorted for determinism.
+
+    AG.1 ("never follow a symlinked directory"): walked with ``os.walk(...,
+    followlinks=False)`` — an EXPLICIT, version-stable choice. (``Path.rglob`` happens to
+    already skip symlinked directories on the CPython versions this repo targets, but
+    this walker does not lean on that as an incidental stdlib default — see
+    ``test_lane_guard_never_follows_a_symlinked_directory``.)
+    """
+    if not handoff_root.is_dir():
+        return
+    found: list[Path] = []
+    for dirpath, _dirnames, filenames in os.walk(handoff_root, followlinks=False):
+        for filename in filenames:
+            if filename.endswith(".handoff.json"):
+                found.append(Path(dirpath) / filename)
+    yield from sorted(found)
+
+
+def _load_handoff_dict(path: Path) -> dict[str, object] | None:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, ValueError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _resolved_within(path: Path, boundary: Path) -> bool:
+    """AG.1: True iff *path*, fully resolved (symlinks included), falls under *boundary*
+    (already resolved). Mirrors ``ReportRetentionService._is_under`` — the codebase's
+    other deletion-lane guard — resolve, then ``relative_to`` inside ``try/except``,
+    never a string-prefix check (CWE-22 class: ``.dadaia-evil`` string-prefixes
+    ``.dadaia``)."""
+    try:
+        path.resolve().relative_to(boundary)
+    except (ValueError, OSError):
+        return False
+    return True
+
+
+def _ledger_line(*, sha: str, source: str, now: datetime) -> str:
+    """One A24.4 audit-ledger line: agent, verdict, covered tip sha, timestamp."""
+    payload = {
+        "ts": now.astimezone(UTC).isoformat(),
+        "event": _LEDGER_EVENT,
+        "agent": _SECURITY_REVIEWER,
+        "verdict": _APPROVED,
+        "commit_sha": sha,
+        "source": source,
+    }
+    return json.dumps(payload, sort_keys=True)
+
+
+def _append_ledger_line(ledger_path: Path, line: str) -> bool:
+    """Append *line* to *ledger_path* (rotating it first if needed). Returns whether it
+    succeeded.
+
+    A24.4: this MUST succeed before the handoff it documents is deleted — the record
+    outlives the handoff. Any failure (permission denied, *ledger_path* colliding with
+    an existing directory, disk full, a lock-acquisition timeout, …) returns ``False``
+    and the caller leaves the handoff untouched — fail-open toward keeping the evidence
+    trail intact, never toward silently losing it.
+
+    FR27 (T-043-42): funneled through the single shared rotation helper
+    (``infrastructure/jsonl_log_rotation.append_rotating_jsonl``) so this ledger caps at
+    ~1 MB and keeps current+1 like every other ``.dadaia/logs/*.jsonl`` writer — see the
+    module-level comment above ``LEDGER_RELPATH`` for why that is not a violation of
+    this file's "append-only" ledger property. The import is function-scoped (this
+    module's own docstring: "NEVER imports infrastructure" — a module-load-time
+    promise; deferring the import here mirrors the codebase's existing
+    ``features -> infrastructure`` DI-pending idiom, e.g.
+    ``features.telemetry.service``'s lazy lock-adapter selection).
+    """
+    from dadaia_workspace.infrastructure.jsonl_log_rotation import append_rotating_jsonl
+
+    return append_rotating_jsonl(ledger_path, line)
+
+
+def gc_consumed_push_verdicts(
+    workspace_root: Path,
+    pushed_shas: Iterable[str],
+    *,
+    now: datetime | None = None,
+) -> GcOutcome:
+    """FR24/A24.1-A24.4/AG.1 — delete the APPROVED security-verdict handoff(s) that a
+    push, ALREADY CONFIRMED successful by the caller, consumed.
+
+    *pushed_shas* is exactly that confirmation, expressed as data: the set of local shas
+    the caller has already verified landed on the remote (see the module-level design
+    note above this section for WHERE that confirmation is observable — never inside
+    ``push_gate_decision`` itself). This function trusts the set without re-deriving it;
+    an empty set (A24.2 — the push failed or was refused, so the caller never confirms
+    anything) is a pure no-op: nothing on disk is touched, no ledger is created.
+
+    Only a ``security-reviewer`` handoff carrying ``verdict == "APPROVED"`` and a string
+    ``metrics.commit_sha`` that appears in *pushed_shas* is a candidate — the SAME
+    qualification :func:`iter_security_approvals` already applies to the pre-push read
+    side. A candidate not covering any pushed sha (an unrelated verdict) is left
+    completely untouched (A24.1).
+
+    Per qualifying candidate, in order: (1) AG.1 lane guard — the handoff path is
+    resolved and refused if it falls outside ``<workspace_root>/.dadaia/``; the
+    directory walk itself never follows a symlinked directory (:func:`_iter_handoff_paths`).
+    (2) The A24.4 ledger line (agent, verdict, covered tip sha, timestamp) is appended to
+    the append-only ``.dadaia/logs/push-verdict-gc-ledger.jsonl`` — a FAILED append
+    leaves the handoff in place, untouched. (3) Only once the ledger append succeeded is
+    the handoff file unlinked, best-effort (A24.3): an ``OSError`` there is swallowed —
+    the ledger line (durable evidence) already survives regardless, and one file's
+    failure never aborts the sweep of the rest.
+
+    Reconciliation-shape pushes (a ``develop`` tip that is a reconciliation-merge commit,
+    ``dadaia-gitflow``) are swept identically to any other tip sha — this function only
+    ever sees an opaque sha string and never branches on how it was produced.
+
+    Every failure mode here is fail-open by design: this is a GC sweep running strictly
+    AFTER the push it cleans up after has already completed, so nothing it does can ever
+    change that push's outcome (A24.3). Any caller wires this the same way
+    ``sdd_post_gate.py`` wires its own advisory work — its own try/except, never
+    surfaced to (or capable of blocking) the operation it follows.
+    """
+    shas = {sha for sha in pushed_shas if sha}
+    if not shas:
+        return GcOutcome()
+
+    dadaia_root = (workspace_root / ".dadaia").resolve()
+    handoff_root = dadaia_root / "handoff"
+    ledger_path = dadaia_root.joinpath(*LEDGER_RELPATH)
+    clock = now or datetime.now(tz=UTC)
+
+    deleted: list[str] = []
+    ledgered: list[str] = []
+    append_failed: list[str] = []
+    lane_guard_refused: list[str] = []
+
+    for path in _iter_handoff_paths(handoff_root):
+        data = _load_handoff_dict(path)
+        if data is None:
+            continue
+        if data.get("agent") != _SECURITY_REVIEWER or data.get("verdict") != _APPROVED:
+            continue
+        metrics = data.get("metrics")
+        sha = metrics.get("commit_sha") if isinstance(metrics, dict) else None
+        if not isinstance(sha, str) or sha not in shas:
+            continue
+
+        if not _resolved_within(path, dadaia_root):
+            lane_guard_refused.append(path.name)
+            continue
+
+        line = _ledger_line(sha=sha, source=path.name, now=clock)
+        if not _append_ledger_line(ledger_path, line):
+            append_failed.append(path.name)
+            continue
+        ledgered.append(path.name)
+
+        try:
+            path.unlink()
+        except OSError:
+            continue
+        deleted.append(path.name)
+
+    return GcOutcome(
+        deleted=tuple(deleted),
+        ledgered=tuple(ledgered),
+        append_failed=tuple(append_failed),
+        lane_guard_refused=tuple(lane_guard_refused),
     )

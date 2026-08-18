@@ -22,6 +22,7 @@ from dadaia_workspace.cli.commands import (
     repos,
     server,
     specs,
+    tmp,
 )
 from dadaia_workspace.cli.commands.bugs import bugs_app
 from dadaia_workspace.cli.commands.export import export
@@ -95,6 +96,7 @@ app.add_typer(academy.app, name="academy")
 app.add_typer(reports.app, name="reports")
 app.add_typer(specs.app, name="specs")
 app.add_typer(server.app, name="server")
+app.add_typer(tmp.app, name="tmp")
 app.add_typer(migrate.app, name="migrate")
 app.add_typer(panel.app, name="panel")
 app.add_typer(memory_app, name="memory")

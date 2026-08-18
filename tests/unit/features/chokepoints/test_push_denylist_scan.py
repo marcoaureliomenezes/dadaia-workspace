@@ -608,3 +608,40 @@ def test_same_offending_segment_gets_the_same_ordinal_across_hit_and_note(
     assert _FOREIGN_SLUG not in decision.warn
     assert "repos/[REDACTED-PATH-1]/leak.md" in decision.message
     assert "repos/[REDACTED-PATH-1]/big.md" in decision.warn
+
+
+# ═════════════════════════════════════════════════════════════════════════════════
+# v0.4.3 T-043-15/FR11 — a commit-body-shaped ScannedObject (kind="commit") is fed
+# through push_gate_decision EXACTLY like a blob — same three term layers, same
+# masked refusal shape. No service.py code changes were needed for this: scan_objects
+# is already generic over ScannedObject.kind. Intent: CONTRACT — v0.4.3 A11.1.
+# ═════════════════════════════════════════════════════════════════════════════════
+
+
+def _commit_obj(text: str, *, sha: str = "c0mm17sha") -> ScannedObject:
+    """A commit-message-body-shaped object (v0.4.3 T-043-15/FR11): synthetic non-path
+    label, no prior_text — mirrors what ``GitSubprocessObjectReader`` now yields."""
+    return ScannedObject(path="(commit message)", sha=sha, text=text, decodable=True, kind="commit")
+
+
+def test_push_with_denylisted_term_only_in_a_commit_message_body_is_refused(
+    tmp_path: Path,
+) -> None:
+    """A11.1: a range whose ONLY private-term exposure is in a commit message (zero
+    blobs carry it) is refused — masked, with the reword/amend healing action."""
+    source = _FakeObjectSource(
+        by_range={
+            (_SHA_A, _ZERO): [_commit_obj(f"fixed a bug, mentions {_SYNTHETIC_TERM} here\n")],
+        }
+    )
+    decision = push_gate_decision(
+        tmp_path,
+        _refs(f"refs/heads/develop {_SHA_A} refs/heads/develop {_ZERO}"),
+        object_source=source,
+        repo=tmp_path,
+        denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
+    )
+    assert not decision.allowed
+    assert _SYNTHETIC_TERM not in decision.message  # never unmasked
+    assert "rewrite the offending commit" in decision.message  # reword/amend healing
+    assert "--no-verify" in decision.message

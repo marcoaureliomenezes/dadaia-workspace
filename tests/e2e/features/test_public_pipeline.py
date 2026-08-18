@@ -3,6 +3,9 @@
 These tests use FileSystemPublicAssetManager with real I/O (tmp_path) to validate
 the full pipeline: canonical source → staging → Claude / Codex / Pi / .agents.
 They catch content-level bugs that unit tests with fakes cannot detect.
+
+Intent: CONTRACT — v0.1.65 FR1/AC-1, FR5/AC-8 (public asset pipeline)
+Owner: software-engineer
 """
 
 from __future__ import annotations

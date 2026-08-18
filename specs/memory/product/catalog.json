@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-16T19:21:57Z",
+  "generated_at": "2026-08-18T02:34:20Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -8,17 +8,18 @@
       "title": "agent-comms — Handoff Contract v1",
       "category": "product",
       "area": "agents",
-      "tldr": "handoff-v1.2 separates HTML reports from JSON handoffs and carries the self_pull Layer-1 read-proof line.",
-      "summary": "the handoff-v1 family contract separates human evidence from agent-to-agent coordination: HTML reports in .dadaia/reports/<context>/<agent>/ and JSON handoffs in .dadaia/handoff/<context>/. Current version handoff-v1.2 requires self_pull.refs — the Layer-1 memory atoms the session actually read (specs/-prefixed, existence-checked, role-map coverage) — with historical v1/v1.1 documents valid forever (transition posture). The CLI validates schema, the v1.2 self_pull conditional, and artifact.path hash inside the workspace — any existing relative path under the root resolves workspace-rooted (incl. repos/<slug>/specs/audits), with a legacy handoff-dir fallback; reports next and the QA/security gate consume the canonical root.",
+      "tldr": "handoff-v1.2 separates HTML reports from JSON handoffs, carries the self_pull Layer-1 read-proof line, and dies on consumption unless it is artifact-bearing.",
+      "summary": "the handoff-v1 family contract separates human evidence from agent-to-agent coordination: HTML reports in .dadaia/reports/<context>/<agent>/ and JSON handoffs in .dadaia/handoff/<context>/. Current version handoff-v1.2 requires self_pull.refs — the Layer-1 memory atoms the session actually read (specs/-prefixed, existence-checked, role-map coverage) — with historical v1/v1.1 documents valid forever (transition posture). The CLI validates schema, the v1.2 self_pull conditional, and artifact.path hash inside the workspace — any existing relative path under the root resolves workspace-rooted (incl. repos/<slug>/specs/audits), with a legacy handoff-dir fallback; reports next and the QA/security gate consume the canonical root. A consumed coordination handoff is deleted by its consumer (ack-on-consume); an artifact-bearing handoff is exempt and follows its report's retention.",
       "path": "specs/memory/product/agents/agent-comms.md",
       "tags": [
         "agent-comms",
         "handoff",
         "schema"
       ],
-      "token_estimate": 1658,
+      "token_estimate": 1851,
       "depends_on": [
-        "public-asset-distribution"
+        "public-asset-distribution",
+        "agent-monitoring"
       ]
     },
     {
@@ -27,17 +28,18 @@
       "title": "agent-monitoring",
       "category": "product",
       "area": "agents",
-      "tldr": "stdlib-only local telemetry (Claude/Codex/Kimi sessions) → panel Sessions tab + /api/agents; allowlist gate preserves privacy.",
-      "summary": "stdlib-only local telemetry consuming Claude Code jsonl + Codex sqlite (~/.codex/state_5.sqlite) + Kimi session index (~/.kimi-code/session_index.jsonl); feeds the panel's Sessions tab and the /api/agents and /api/sessions endpoints; a hardcoded allowlist gate preserves privacy by construction; endpoints served with no credential behind the panel's loopback bind + Host allowlist.",
+      "tldr": "stdlib-only local telemetry → panel Sessions tab + /api/agents; allowlist gate preserves privacy; artifacts die event-driven, logs self-rotate.",
+      "summary": "stdlib-only local telemetry consuming Claude Code jsonl + Codex sqlite (~/.codex/state_5.sqlite) + Kimi session index (~/.kimi-code/session_index.jsonl); feeds the panel's Sessions tab and the /api/agents and /api/sessions endpoints; a hardcoded allowlist gate preserves privacy by construction; endpoints served with no credential behind the panel's loopback bind + Host allowlist. Also owns the runtime artifact lifecycle under .dadaia/ — release-closure GC of a release's own reports, handoffs, tmp captures and run records; reconciler reaping of stale session/presence records, their markers and zombie run records; write-time 1 MB rotation with current+1 retention for every logs/*.jsonl writer; and dadaia tmp gc as the only calendar-based backstop.",
       "path": "specs/memory/product/agents/agent-monitoring.md",
       "tags": [
         "monitoring",
         "telemetry",
         "sessions"
       ],
-      "token_estimate": 1473,
+      "token_estimate": 2101,
       "depends_on": [
         "panel",
+        "sdd-gate-v3",
         "context-management",
         "brand-identity"
       ]
@@ -73,7 +75,7 @@
       "category": "product",
       "area": "agents",
       "tldr": "Abstract-entity registry — Personas, Deterministic Behaviors, Abstract Rules, universal surface — that every scaffolded core implementation derives from.",
-      "summary": "The workspace method is defined abstractly first: `public/entities/registry.json` holds the Personas, Deterministic Behaviors, Abstract Rules, and universal skills/AGENTS.md surface. Every scaffolded core sub-agent, hook, and rule file is a per-harness derivation of one of these entities (constitution §12.5); the derivation contract test and the `public doctor` `entities-derivation` check enforce the prohibition. The panel renders the registry in the Agentic Entities tab and as the Personas section of the Agents tab.",
+      "summary": "The workspace method is defined abstractly first: `public/entities/registry.json` holds the Personas, Deterministic Behaviors, Abstract Rules, and universal skills/AGENTS.md surface. Every scaffolded core sub-agent, hook, and rule file is a per-harness derivation of one of these entities (constitution §12.5); the derivation contract test and the `public doctor` `entities-derivation` check enforce the prohibition, the latter at behavioral-fidelity depth with a mutation fixture per drift class. Two derivation-surface facts are derived mechanically rather than asserted: the reasoned seven-agent `dadaia-cli` reachability (shell-less agents excluded explicitly) and the undeclared-overlap check over non-universal skill activation globs. The panel renders the registry in the Agentic Entities tab and as the Personas section of the Agents tab.",
       "path": "specs/memory/product/agents/agentic-entities.md",
       "tags": [
         "agents",
@@ -81,7 +83,7 @@
         "derivation",
         "governance"
       ],
-      "token_estimate": 404,
+      "token_estimate": 707,
       "depends_on": [
         "agent-orchestration",
         "panel",
@@ -116,7 +118,7 @@
       "category": "product",
       "area": "distribution",
       "tldr": "canonical public assets are staged to .dadaia/agentic and projected to Claude Code, Codex, Kimi Code, and shared .agents roots.",
-      "summary": "Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, universal skills projected to one canonical .agents/skills home with no registry entry, repo templates copied at alive() (repo-AGENTS.md plus a conditional tests/AGENTS.md), harness-profile-aware install/doctor, render-at-install of core agents (staged generic body + resolved agent-model policy composed into both L1 projections) with a policy-aware doctor render-compare, provenance-gated consumer AGENTS fan-out (banner-canonical restored vs hand-authored left [foreign]) with lexical repo-slug containment + destination-file symlink refusal, scoped AGENTS projections, source-root hygiene guard, and runtime projection contract.",
+      "summary": "Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, universal skills projected to one canonical .agents/skills home with no registry entry, the thin-wrapper contract that keeps every public/scripts file an entry point over the package implementation, repo templates copied at alive() (repo-AGENTS.md, with destination-file symlink refusal at every write site, plus a conditional tests/AGENTS.md), harness-profile-aware install/doctor, render-at-install of core agents (staged generic body + resolved agent-model policy composed into both L1 projections) with a policy-aware doctor render-compare, provenance-gated consumer AGENTS fan-out (banner-canonical restored vs hand-authored left [foreign]) with lexical repo-slug containment + destination-file symlink refusal, scoped AGENTS projections, source-root hygiene guard, and runtime projection contract.",
       "path": "specs/memory/product/distribution/public-asset-distribution.md",
       "tags": [
         "public",
@@ -125,10 +127,11 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 2421,
+      "token_estimate": 2766,
       "depends_on": [
         "agent-orchestration",
-        "workspace-init"
+        "workspace-init",
+        "specs-doctor"
       ]
     },
     {
@@ -138,7 +141,7 @@
       "category": "product",
       "area": "distribution",
       "tldr": "The published dadaia-workspace PyPI package on a single version axis, the release.yml OIDC publish pipeline, and the wheel content contract.",
-      "summary": "Owns PyPI distribution as product behavior — the live `dadaia-workspace` package, the `.github/workflows/release.yml` pipeline (version-vs-tag check → five test legs → build → release-gate approval → OIDC trusted publishing + tag → post-publish smoke), the wheel content contract (public assets ship in-package), and the single version axis: the `pyproject.toml` version tracks the published PyPI lineage and a release id is that same minted number, `v`-prefixed.",
+      "summary": "Owns PyPI distribution as product behavior — the live `dadaia-workspace` package, the `.github/workflows/release.yml` pipeline (version-vs-tag check → five test legs → build → release-gate approval → OIDC trusted publishing + tag → post-publish smoke), the wheel content contract (public assets ship in-package), and the single version axis: the `pyproject.toml` version tracks the published PyPI lineage and a release id is that same minted number, `v`-prefixed. The CHANGELOG records that lineage completely — a git-derived, range-cited section for every published version, and an unpublished-internal annotation for every heading matching none; nothing is deleted or renamed.",
       "path": "specs/memory/product/distribution/pypi-distribution.md",
       "tags": [
         "distribution",
@@ -146,7 +149,7 @@
         "release",
         "packaging"
       ],
-      "token_estimate": 973,
+      "token_estimate": 1152,
       "depends_on": [
         "quality-assurance",
         "public-asset-distribution",
@@ -183,8 +186,8 @@
       "title": "Harness — Codex",
       "category": "product",
       "area": "harness",
-      "tldr": "Entry harness on the operator's Codex subscription: TUI with deterministic hooks, Starlark command policy, and a .codex/ projection of agents, skills and rules.",
-      "summary": "Capability and scaffold truth for the Codex harness — the interactive TUI enforcement posture, the native AGENTS.md read path, the Starlark command policy, the Codex-native tier identity of projected agents, and what a Codex-only workspace installation contains.",
+      "tldr": "Entry harness on the operator's Codex subscription: TUI and headless exec, version-qualified live-certified hook fire, Starlark policy, .codex/ projection.",
+      "summary": "Capability and scaffold truth for the Codex harness — the version-qualified enforcement posture (hooks live-certified at codex-cli 0.144.4 for both TUI and headless exec, every other version probe-driven through dadaia certify's codex-live-probe against the installed binary), the native AGENTS.md read path that carries the law once to parent and delegated agents alike, the compacted role-only persona TOMLs, the behavioral-fidelity derivation check, the Starlark command policy, the Codex-native tier identity of projected agents, and what a Codex-only workspace installation contains.",
       "path": "specs/memory/product/harness/harness-codex.md",
       "tags": [
         "harness",
@@ -192,11 +195,12 @@
         "projection",
         "enforcement"
       ],
-      "token_estimate": 481,
+      "token_estimate": 846,
       "depends_on": [
         "workspace-init",
         "tech-stack",
         "sdd-gate-v3",
+        "agentic-entities",
         "public-asset-distribution",
         "agent-orchestration"
       ]
@@ -324,14 +328,14 @@
       "category": "product",
       "area": "platform",
       "tldr": "A consumer-side validation agent running the shipped recipe is the release gate: no wheel is published without its CERTIFIED_100 verdict.",
-      "summary": "A consumer-side validation agent running the shipped consumer validation recipe on a real workspace is the canonical release gate of dadaia-workspace. A consumer environment is declared SUPPORTED only after a full real-use round reports zero failures. Deterministic certification alone never approves a release.",
+      "summary": "A consumer-side validation agent running the shipped consumer validation recipe on a real workspace is the canonical release gate of dadaia-workspace. A consumer environment is declared SUPPORTED only after a full real-use round reports zero failures. Deterministic certification alone never approves a release. A round may also run against a throwaway real workspace created with dadaia init; whatever such an environment cannot exercise is recorded as a named limit and reported as not exercised, never as passed, and one remediation cycle is budgeted inside the round itself.",
       "path": "specs/memory/product/platform/consumer-agent-support.md",
       "tags": [
         "consumer-validation",
         "release-gate",
         "sdd"
       ],
-      "token_estimate": 400,
+      "token_estimate": 726,
       "depends_on": [
         "workspace-init",
         "tech-stack",
@@ -529,8 +533,8 @@
       "title": "sdd-bug-backlog-governance",
       "category": "product",
       "area": "sdd",
-      "tldr": "Event-sourced JSONL bugs, an operator-gated single-source backlog, release consumption, audit dispositions, and a develop-only four-branch git contract.",
-      "summary": "Bugs are append-only events; the backlog is the operator's demand queue, curated by project-manager in a single BACKLOG.md (ACTIVE + LEDGER) with purge-on-pick and continuous sanitizing — no agent materializes an entry, residuals reach the operator through a PM intake report, and only actionable defects do — record-only observations terminate in the closure record. A release consumes an explicit picked set, ends in the fixed order review → closure → archive → ship, and requires terminal dispositions at closure and audit. Work is placed on four branch patterns with develop the only pushable one; a feature branch merges into develop at two milestones, each followed by a diff-based security review of the develop delta and a push. Bug, backlog and audit paths stay additive and never lock-gated.",
+      "tldr": "Event-sourced JSONL bugs with a non-blocking picked marker, an operator-gated backlog, release consumption, audit dispositions, and a four-branch git contract.",
+      "summary": "Bugs are append-only events, including a non-terminal repeatable `picked` reservation marker that surfaces contention without ever blocking it; the backlog is the operator's demand queue, curated by project-manager in a single BACKLOG.md (ACTIVE + LEDGER) with purge-on-pick and continuous sanitizing — no agent materializes an entry, residuals reach the operator through a PM intake report, and only actionable defects do — record-only observations terminate in the closure record. A release consumes an explicit picked set, ends in the fixed order review → closure → archive → ship, and requires terminal dispositions at closure and audit. Work is placed on four branch patterns with develop the only pushable one; a feature branch merges into develop at two milestones, each followed by a diff-based security review of the develop delta and a push. Bug, backlog and audit paths stay additive and never lock-gated.",
       "path": "specs/memory/product/sdd/sdd-bug-backlog-governance.md",
       "tags": [
         "sdd",
@@ -540,7 +544,7 @@
         "bugs",
         "gitflow"
       ],
-      "token_estimate": 2163,
+      "token_estimate": 2431,
       "depends_on": [
         "specs-doctor",
         "sdd-gate-v3",
@@ -553,8 +557,8 @@
       "title": "sdd-gate-v3",
       "category": "product",
       "area": "sdd",
-      "tldr": "No-lock SDD enforcement: path/mode gates, advisory presence, and a develop-only, denylist-scanned push boundary with fail-closed single-path amnesty.",
-      "summary": "The merged Python PreToolUse gate enforces root whitelist, workspace venv usage, path class, phase, and the caller's own mode. It never waits for or blocks on another session. Presence is advisory. Git pre-commit warns only; pre-push enforces the CI preflight, develop-only branch policy, a range-scoped denylist scan of the new objects the push would publish, and a security verdict covering the develop delta. The scan reads a chunk-bounded batched git conversation, suppresses a hit only when the same single path already published that exact value, derives its foreign-name layer from the context registry and names it when that layer degrades, partially scans and honestly reports oversized blobs, raises a typed error rather than reporting coverage it did not achieve, and masks private path segments through the detector's own matchers in everything it prints. The packaged baseline covers the home-path layout of all three declared platforms.",
+      "tldr": "No-lock SDD enforcement: path/mode/cache gates, advisory presence, and a develop-only push boundary scanning blobs and commit bodies, amnesty fail-closed.",
+      "summary": "The merged Python PreToolUse gate enforces root whitelist, workspace venv usage, a cache-off posture for pytest/ruff/mypy, path class, phase, and the caller's own mode. It never waits for or blocks on another session. Presence is advisory. Git pre-commit warns only; pre-push enforces the CI preflight, develop-only branch policy, a range-scoped denylist scan of the new objects the push would publish — blobs AND commit/annotated-tag message bodies, with author/committer headers out of scope by design — and a security verdict covering the develop delta. The scan reads a chunk-bounded batched git conversation, suppresses a hit only when the same single path already published that exact value and never for a path-less object, derives its foreign-name layer from the context registry and names it when that layer degrades, partially scans and honestly reports oversized blobs, raises a typed error rather than reporting coverage it did not achieve, and masks private path segments through the detector's own matchers in everything it prints. The packaged baseline is version 8: single-line patterns only, every carve-out carrying a rationale a doctor check enforces, covering the home-path layout of all three declared platforms.",
       "path": "specs/memory/product/sdd/sdd-gate-v3.md",
       "tags": [
         "sdd",
@@ -564,10 +568,11 @@
         "no-locks",
         "privacy"
       ],
-      "token_estimate": 4971,
+      "token_estimate": 6381,
       "depends_on": [
         "context-management",
         "architecture",
+        "agent-monitoring",
         "workspace-doctor"
       ]
     },
@@ -577,8 +582,8 @@
       "title": "specs-doctor",
       "category": "product",
       "area": "sdd",
-      "tldr": "Validates canonical specs structure, memory/catalog integrity, release markers, closure evidence, dispositions, bug ledgers, and audit coherence.",
-      "summary": "`dadaia specs doctor` coordinates structural, memory, release, closure/audit, governance, and coherence validators. `--fix` performs only deterministic repairs.",
+      "tldr": "Validates canonical specs structure, memory/catalog and placeholder integrity, release/segment markers, closure evidence, dispositions, bugs, and audits.",
+      "summary": "`dadaia specs doctor` coordinates structural, memory, release, closure/audit, governance, and coherence validators. Placeholder detection covers memory atoms (ERROR) and an installed tests/AGENTS.md (WARN, never the canonical template). A live segment pointer at a missing segment directory is an explicit ERROR, never a silent skip. `--fix` performs only deterministic repairs.",
       "path": "specs/memory/product/sdd/specs-doctor.md",
       "tags": [
         "specs",
@@ -586,11 +591,11 @@
         "validation",
         "sdd"
       ],
-      "token_estimate": 606,
+      "token_estimate": 906,
       "depends_on": [
+        "sdd-gate-v3",
         "sdd-bug-backlog-governance",
-        "workspace-doctor",
-        "sdd-gate-v3"
+        "workspace-doctor"
       ]
     }
   ]

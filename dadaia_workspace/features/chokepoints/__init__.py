@@ -10,11 +10,17 @@ where hooks are absent, disabled, bypassed, or changed by a future harness relea
   FR1-FR6) — a push is blocked unless a ``security-reviewer`` APPROVE handoff covers
   every pushed commit sha, AND the range-scoped denylist scan (v0.9.0) finds no new
   object carrying a denylisted term across every non-deletion ref (tags included).
+* **push-verdict GC** (:func:`gc_consumed_push_verdicts`, FR24 / v0.4.3 T-043-39) — the
+  POST-push half of the verdict lifecycle: once a caller has independently confirmed a
+  push actually landed (never inside ``push_gate_decision`` itself — see that function's
+  neighboring module docstring), the APPROVED verdict(s) it consumed are deleted, with
+  an append-only audit-ledger line recorded first (A24.4) and the AG.1 symlink/boundary
+  lane guard applied to every deletion.
 
-Both are pure decision functions: every I/O and process seam is injected, so the CLI wires
-the real container adapters and the tests drive synthetic facts. Zero subprocess, zero
-``os.kill`` — the ancestry probe is the injected read-only ``ProcessAncestry`` port, and the
-push-gate's git object reads arrive via the injected
+All three are pure decision/action functions: every I/O and process seam is injected, so
+the CLI wires the real container adapters and the tests drive synthetic facts. Zero
+subprocess, zero ``os.kill`` — the ancestry probe is the injected read-only
+``ProcessAncestry`` port, and the push-gate's git object reads arrive via the injected
 :class:`~dadaia_workspace.core.protocols.git_object_reader.GitObjectReader` port.
 """
 
@@ -22,8 +28,10 @@ from __future__ import annotations
 
 from dadaia_workspace.features.chokepoints.service import (
     Decision,
+    GcOutcome,
     PushRef,
     context_slug_for_path,
+    gc_consumed_push_verdicts,
     iter_security_approvals,
     pre_commit_decision,
     push_gate_decision,
@@ -31,8 +39,10 @@ from dadaia_workspace.features.chokepoints.service import (
 
 __all__ = [
     "Decision",
+    "GcOutcome",
     "PushRef",
     "context_slug_for_path",
+    "gc_consumed_push_verdicts",
     "iter_security_approvals",
     "pre_commit_decision",
     "push_gate_decision",

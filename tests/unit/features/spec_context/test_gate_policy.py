@@ -285,3 +285,116 @@ def test_evaluate_anon_session_emits_no_presence_events(tmp_path: Path) -> None:
     assert decision == Decision.ALLOW
     presence_dir = tmp_path / ".dadaia" / "states" / "presence" / "dadaia-workspace"
     assert not presence_dir.exists()
+
+
+# ═════════════════════════════════════════════════════════════════════════════════
+# v0.4.3 T-043-17/FR13 — the MEMORY path class covers dotfiles, by decision.
+#
+# Size: SMALL — pure classify_path/evaluate calls, tmp_path-scoped. Intent: SENTINEL —
+# v0.4.3 A13.2 (memory-dotfile phase-gate parity). The software-architect ruling
+# (handoff 2026-08-17T161500Z-software-architect-v0.4.3-fr13-fr14, HIGH finding #1) is
+# ZERO-behavioral-change by design: gate_policy.py's bare-prefix match at
+# ``_MEMORY_PREFIX``/``classify_path`` ALREADY classifies every path under
+# ``specs/memory/`` — dotfiles included — as MEMORY; no carve-out exists and none is
+# added (see the module docstring and the ``_MEMORY_PREFIX`` comment for the stated
+# rule this ruling ratifies). These fixtures PIN that decision against future
+# regression — they are not fixing a defect, they are formalizing doctrine that
+# already held in code.
+# ═════════════════════════════════════════════════════════════════════════════════
+
+_MEMORY_DOTFILE_PATHS: tuple[str, ...] = (
+    "specs/memory/.heading-allowlist",
+    f"repos/{_DEFAULT_SLUG}/specs/memory/.heading-allowlist",
+)
+#: A non-dot sibling atom, in BOTH root and in-repo form, pinned for parity (the
+#: ruling's fixture requirement) — same MEMORY class, same phase gate, no distinction.
+_MEMORY_SIBLING_ATOM_PATHS: tuple[str, ...] = (
+    "specs/memory/architecture.md",
+    f"repos/{_DEFAULT_SLUG}/specs/memory/architecture.md",
+)
+_MEMORY_PHASES_ALLOWED: tuple[str, ...] = ("DEFINITION", "CLOSURE")
+_MEMORY_PHASES_BLOCKED: tuple[str, ...] = (
+    "IMPLEMENTATION",
+    "DISCOVERY",
+    "SPEC",
+    "PLAN",
+    "TASKS",
+    "ARCHIVED",
+)
+
+
+@pytest.mark.parametrize("rel_path", _MEMORY_DOTFILE_PATHS)
+def test_memory_dotfile_classifies_as_memory(rel_path: str) -> None:
+    """A13.2: both the root and in-repo dotfile form classify MEMORY — no dotfile
+    carve-out, bare-prefix match by decision."""
+    assert classify_path(rel_path) == PathClass.MEMORY
+
+
+@pytest.mark.parametrize("rel_path", _MEMORY_DOTFILE_PATHS)
+@pytest.mark.parametrize("phase", _MEMORY_PHASES_ALLOWED)
+def test_memory_dotfile_evaluate_allows_in_definition_and_closure(
+    tmp_path: Path, rel_path: str, phase: str
+) -> None:
+    decision, _ = evaluate(
+        tmp_path,
+        rel_path,
+        ctx="dadaia-workspace",
+        phase=phase,
+        session_id="sess-fr13",
+        release="v0.4.3",
+        mode="IMPLEMENTATION",
+    )
+    assert decision == Decision.ALLOW
+
+
+@pytest.mark.parametrize("rel_path", _MEMORY_DOTFILE_PATHS)
+@pytest.mark.parametrize("phase", _MEMORY_PHASES_BLOCKED)
+def test_memory_dotfile_evaluate_blocks_rule_a_outside_definition_and_closure(
+    tmp_path: Path, rel_path: str, phase: str
+) -> None:
+    """A13.2: IMPLEMENTATION and every other non-DEFINITION/CLOSURE phase — including
+    the doctrine question the ruling's finding 1(b) answers ('no SPEC override of the
+    phase rule', RULE A keeps blocking unconditionally by phase) — BLOCK [RULE A]."""
+    decision, message = evaluate(
+        tmp_path,
+        rel_path,
+        ctx="dadaia-workspace",
+        phase=phase,
+        session_id="sess-fr13",
+        release="v0.4.3",
+        mode="IMPLEMENTATION",
+    )
+    assert decision == Decision.BLOCK
+    assert "[RULE A]" in message
+
+
+def test_memory_dotfile_evaluate_matches_a_non_dot_sibling_atom_across_every_phase(
+    tmp_path: Path,
+) -> None:
+    """A13.2 parity fixture: the dotfile and a normal (non-dot) sibling atom, root and
+    in-repo, get an IDENTICAL decision at every phase in this matrix — no special-
+    casing distinguishes a dotfile from an ordinary memory atom."""
+    for dotfile, sibling in zip(_MEMORY_DOTFILE_PATHS, _MEMORY_SIBLING_ATOM_PATHS, strict=True):
+        assert classify_path(dotfile) == classify_path(sibling)
+        for phase in (*_MEMORY_PHASES_ALLOWED, *_MEMORY_PHASES_BLOCKED):
+            dot_decision, _ = evaluate(
+                tmp_path,
+                dotfile,
+                ctx="dadaia-workspace",
+                phase=phase,
+                session_id="sess-fr13-dot",
+                release="v0.4.3",
+                mode="IMPLEMENTATION",
+            )
+            sibling_decision, _ = evaluate(
+                tmp_path,
+                sibling,
+                ctx="dadaia-workspace",
+                phase=phase,
+                session_id="sess-fr13-sibling",
+                release="v0.4.3",
+                mode="IMPLEMENTATION",
+            )
+            assert dot_decision == sibling_decision, (
+                f"phase={phase}: dotfile and sibling atom must get the SAME decision"
+            )

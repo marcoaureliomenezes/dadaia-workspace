@@ -4,6 +4,9 @@ US-REG-007 (skill file presence + content asserts) is folded into
 ``test_public_pipeline.TestContentConsistency`` — presence is pinned by EXPECTED_SKILLS
 and the content asserts (dadaia server list/next/register/release) are folded into the
 merged content-consistency check there.
+
+Intent: CONTRACT — US-REG-001..007 (dev server port registry)
+Owner: software-engineer
 """
 
 from pathlib import Path

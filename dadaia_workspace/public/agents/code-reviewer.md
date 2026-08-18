@@ -12,10 +12,13 @@ tools:
   - Grep
   - Write
 skills:
+  - dadaia-cli
   - dadaia-handoff-emitter
   - dadaia-workspace-spec-navigator
   - dadaia-step0-memory-bootstrap
+  - harness-primitives
   - dd-bug-registration
+  - dadaia-gitflow
 maxTurns: 40
 input_contract:
   requires_inputs:

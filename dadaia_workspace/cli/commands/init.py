@@ -33,7 +33,25 @@ def init(
     except ValueError as exc:
         raise typer.BadParameter(str(exc), param_hint="--harness") from exc
 
-    root = resolve_workspace_root_for_init(workspace, explicit=workspace is not None)
+    explicit = workspace is not None
+    root = resolve_workspace_root_for_init(workspace, explicit=explicit)
+
+    # Bug ancestor-walk-workspace-root-silent-mistarget (T-043-47/A30.5): the
+    # .dadaia/-nesting boundary in resolve_workspace_root_for_init already stops the
+    # dangerous case (a throwaway workspace nested under an ancestor's own .dadaia/
+    # tree) from silently mistargeting that ancestor. The one remaining shape where a
+    # bare invocation still walks to a directory OTHER than cwd is the legitimate
+    # sub-repo case (cwd nested under a sub-repo lacking its own sentinel) — still
+    # loudly named here, on stderr, so it is never mistaken for "init happened at cwd".
+    if not explicit and root != Path.cwd().resolve():
+        typer.secho(
+            f"Ancestor workspace detected: resolved root differs from cwd "
+            f"(cwd={Path.cwd().resolve()}, resolved_root={root}). "
+            "Pass --workspace to target a different directory explicitly.",
+            err=True,
+            fg=typer.colors.YELLOW,
+        )
+
     console.print(f"[bold]Initializing workspace:[/bold] {root}")
     console.print(f"[dim]Harness set:[/dim] {', '.join(harnesses)}")
 

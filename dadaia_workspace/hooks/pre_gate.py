@@ -34,6 +34,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from dadaia_workspace.hooks import _common, root_whitelist, sdd_gate, venv_guard
+from dadaia_workspace.infrastructure.jsonl_log_rotation import append_rotating_jsonl
 
 
 def _venv_guard_reason(payload: dict[str, object]) -> str | None:
@@ -100,6 +101,12 @@ def _append_latency(workspace: Path | None, event: str, duration_ms: float) -> N
     dir, or any OS error is swallowed — telemetry must NEVER change the gate verdict or the
     exit code. ``duration_ms`` is clamped to ``>= 0`` (a monotonic clock never goes backward,
     but the clamp makes the contract explicit for consumers).
+
+    FR27 (T-043-42): the append is funneled through the single shared rotation helper
+    (``infrastructure/jsonl_log_rotation.append_rotating_jsonl``) so this file caps at
+    ~1 MB and keeps current+1 like every other ``.dadaia/logs/*.jsonl`` writer — this
+    function stays the OWNER (it decides what/when to write), the helper only owns the
+    write-and-rotate mechanics.
     """
     if workspace is None:
         return
@@ -110,12 +117,7 @@ def _append_latency(workspace: Path | None, event: str, duration_ms: float) -> N
         "duration_ms": round(max(0.0, duration_ms), 3),
     }
     path = workspace / ".dadaia" / "logs" / "hook-latency.jsonl"
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps(record) + "\n")
-    except OSError:
-        return
+    append_rotating_jsonl(path, json.dumps(record))
 
 
 def main() -> int:

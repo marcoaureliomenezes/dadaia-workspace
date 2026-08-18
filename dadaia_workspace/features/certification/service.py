@@ -10,7 +10,7 @@ import sys
 import time
 import urllib.request
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -50,6 +50,85 @@ def _free_loopback_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.bind(("127.0.0.1", 0))
         return int(sock.getsockname()[1])
+
+
+class _CertificationSkip(Exception):
+    """An honest, non-failing degrade for one certification check (A22.4).
+
+    Raised when the runtime dependency a check would exercise (e.g. an installed
+    Codex CLI binary) is genuinely absent from this environment — never for a real
+    failure. ``certify``'s ``check`` wrapper records this as ``SKIP``, never ``FAIL``.
+    """
+
+
+# A22.4 — codex-live-probe: exercises the INSTALLED Codex CLI with a real `codex exec`
+# call, bounded and read-only. Static Codex projection tests (TOML shape, frontmatter
+# parsing) never attest this — they cannot prove a live session actually answers.
+_CODEX_LIVE_PROBE_PROMPT = (
+    "Reply with exactly the single line: DADAIA-LIVE-PROBE-OK. No tool calls, no other text."
+)
+_CODEX_LIVE_PROBE_MARKER = "DADAIA-LIVE-PROBE-OK"
+_CODEX_VERSION_PROBE_TIMEOUT = 15.0
+_CODEX_LIVE_PROBE_TIMEOUT = 60.0
+
+
+def _codex_live_probe_detail(process: CertificationProcess, cwd: Path) -> str:
+    """A22.4: prove the installed Codex CLI actually answers, not just that its files exist.
+
+    Runs ``codex --version`` then a bounded, read-only, non-interactive ``codex exec``
+    that must echo back a fixed marker. Raises :class:`_CertificationSkip` (never
+    fails) when no ``codex`` binary is reachable on ``PATH`` — an absent OPTIONAL local
+    dependency is an honest degrade, not a certification failure. Raises
+    ``RuntimeError`` for any genuine probe failure (nonzero exit, missing marker).
+    """
+    codex_bin = shutil.which("codex")
+    if codex_bin is None:
+        raise _CertificationSkip(
+            "codex CLI not found on PATH — live probe skipped (A22.4 honest degrade; "
+            "static Codex projection tests validate shape only, never runtime behavior)"
+        )
+    version_proc = process.run(
+        [codex_bin, "--version"], cwd=cwd, timeout=_CODEX_VERSION_PROBE_TIMEOUT
+    )
+    if version_proc.returncode != 0:
+        raise RuntimeError(
+            f"codex --version exited {version_proc.returncode}: "
+            f"{(version_proc.stderr or version_proc.stdout).strip()}"
+        )
+    version = version_proc.stdout.strip()
+    exec_proc = process.run(
+        [
+            codex_bin,
+            "exec",
+            "--sandbox",
+            "read-only",
+            "--skip-git-repo-check",
+            _CODEX_LIVE_PROBE_PROMPT,
+        ],
+        cwd=cwd,
+        timeout=_CODEX_LIVE_PROBE_TIMEOUT,
+    )
+    if exec_proc.returncode != 0:
+        raise RuntimeError(
+            f"codex exec exited {exec_proc.returncode}: "
+            f"{(exec_proc.stderr or exec_proc.stdout).strip()}"
+        )
+    if _CODEX_LIVE_PROBE_MARKER not in exec_proc.stdout:
+        raise RuntimeError(
+            "codex exec did not echo the expected marker on stdout; "
+            f"stdout={exec_proc.stdout[:200]!r}"
+        )
+    return f"{version}: live exec probe observed {_CODEX_LIVE_PROBE_MARKER!r}"
+
+
+def _all_checks_ok(checks: Iterable[CertificationCheck]) -> bool:
+    """PASS and SKIP are both acceptable certification outcomes (A22.4).
+
+    An honest degrade for an absent OPTIONAL runtime dependency (e.g. no installed
+    Codex CLI on this host) must never turn a certification run RED — only a genuine
+    FAIL does.
+    """
+    return all(item.status in ("PASS", "SKIP") for item in checks)
 
 
 def certify(
@@ -109,6 +188,8 @@ def certify(
         try:
             detail = action() or "passed"
             checks.append(CertificationCheck(name=name, status="PASS", detail=detail))
+        except _CertificationSkip as exc:
+            checks.append(CertificationCheck(name=name, status="SKIP", detail=str(exc)))
         except Exception as exc:  # noqa: BLE001 - complete ledger, not fail-fast prose.
             checks.append(CertificationCheck(name=name, status="FAIL", detail=str(exc)))
 
@@ -298,7 +379,12 @@ def certify(
 
     check("context-dead-alive-delete-roundtrip", context_round_trip)
 
-    ok = all(item.status == "PASS" for item in checks)
+    # A22.4: exercise the INSTALLED Codex CLI live — never rely on static Codex
+    # projection tests (TOML shape only) to attest runtime behavior. Honest SKIP
+    # (never FAIL) when no `codex` binary is reachable on this host.
+    check("codex-live-probe", lambda: _codex_live_probe_detail(process, target))
+
+    ok = _all_checks_ok(checks)
     result = CertificationResult(
         schema_version="dadaia-certification-v1",
         ok=ok,

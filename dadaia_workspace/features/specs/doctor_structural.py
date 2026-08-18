@@ -339,7 +339,34 @@ class StructuralValidator:
         if segment:  # schema v2: artifacts live in the active segment dir
             rdir = rdir / segment
         if not rdir.exists():
-            return issues  # already reported by SPEC-DOC-009
+            # v0.4.3 T-043-22 [Arm-B rider] bug specs-doctor-segment-router-silent-skip:
+            # a live segment: pointer at a missing segment directory used to `return
+            # issues` here silently, UNCONDITIONALLY. SPEC-DOC-009 (check_active_md,
+            # doctor_release.py) only validates the RELEASE directory
+            # (releases/<release>/) — it NEVER checks the segment SUBdirectory
+            # (releases/<release>/<segment>/), so a segmented ACTIVE.md pointing at a
+            # missing segment dir was invisible to every downstream check (this one AND
+            # SPEC-DOC-004 in doctor_release.py). Scoped to `segment` truthy only: the
+            # FLAT-release case (no segment:) is genuinely, correctly covered already
+            # by check 9's own release-dir check (rdir IS the release dir there) —
+            # firing here too would duplicate that finding.
+            if segment:
+                issues.append(
+                    SpecsDoctorIssue(
+                        code="TREE-6",
+                        severity=Severity.ERROR,
+                        description=(
+                            f"Active release '{release}' (phase={phase}) segment="
+                            f"'{segment}' but no directory at {rdir} — the segment "
+                            "directory itself is missing; SPEC-DOC-009 validates "
+                            "only the release directory, never the segment "
+                            "subdirectory."
+                        ),
+                        path=str(rdir),
+                        fixable=False,
+                    )
+                )
+            return issues
         for fname in _TREE6_IMPL_ARTIFACTS:
             fpath = rdir / fname
             if not fpath.exists():

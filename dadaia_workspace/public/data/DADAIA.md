@@ -232,7 +232,8 @@ protocol: `dadaia-test-stewardship`.
 its own contract. Classify first: environment limits, invalid input, wrong usage, and a
 validation the tool is designed to emit are not product bugs. Append the `reported`
 event before the turn ends; bug paths are ADDITIVE, so registration is always possible
-and there is no reason to defer it. Command, redaction rule and context routing:
+and there is no reason to defer it. Absolute local paths, IPs, hostnames, private names
+and secrets never enter an event field. Command, redaction rule and context routing:
 `dd-bug-registration`.
 
 Close a bug in the same session you prove the fix: append `resolved` with

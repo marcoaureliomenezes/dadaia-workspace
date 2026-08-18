@@ -162,7 +162,32 @@ class ReleaseValidator:
         if segment:
             rdir = rdir / segment
         if not rdir.exists():
-            return issues  # already reported by check 9
+            # v0.4.3 T-043-22 [Arm-B rider] bug specs-doctor-segment-router-silent-skip:
+            # a live segment: pointer at a missing segment directory used to `return
+            # issues` here silently, UNCONDITIONALLY. Check 9 (SPEC-DOC-009,
+            # check_active_md above) only validates the RELEASE directory
+            # (releases/<release>/) — it NEVER checks the segment SUBdirectory
+            # (releases/<release>/<segment>/), so a segmented ACTIVE.md pointing at a
+            # missing segment dir was invisible to every downstream check (this one AND
+            # TREE-6 in doctor_structural.py). Scoped to `segment` truthy only: the
+            # FLAT-release case (no segment:) is genuinely, correctly covered already
+            # by check 9's own release-dir check (rdir IS the release dir there) —
+            # firing here too would duplicate that finding.
+            if segment:
+                issues.append(
+                    SpecsDoctorIssue(
+                        code="SPEC-DOC-004",
+                        severity=Severity.ERROR,
+                        description=(
+                            f"ACTIVE.md segment='{segment}' but no directory at {rdir} "
+                            f"(release='{release}') — the segment directory itself is "
+                            "missing; SPEC-DOC-009 validates only the release "
+                            "directory, never the segment subdirectory."
+                        ),
+                        path=str(rdir),
+                    )
+                )
+            return issues
         for fname in ("SPEC.md", "PLAN.md", "TASKS.md"):
             fpath = rdir / fname
             if not fpath.exists():

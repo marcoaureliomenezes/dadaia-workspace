@@ -23,6 +23,16 @@ Agents creating or editing tests must follow them. Full protocol: skill
   bug-id | task-id>` — **never** as a pytest marker (the marker namespace already
   binds `contract` to the layer `tests/contract/`). An undeclared test is
   **SCAFFOLD** — it expires at its originating task/release closure.
+- **Mechanical enforcement (v0.4.3 T-043-27, FR19).** `tests/scripts/
+  check_test_intent_declared.py`, wired into the gating pytest run via
+  `tests/integration/scripts/test_check_test_intent_declared.py`, refuses any
+  `tests/e2e/**` test file (Python `test_*.py` or Playwright `*.spec.ts`) with no
+  `Intent:` line — the shape accepted is exactly this section's: a module docstring
+  (Python) or a header block comment (TypeScript) containing `Intent: <KIND> — <ref>`.
+  Size is declared by directory placement (the table below), never a per-file field.
+  Scope is `tests/e2e/**` only — the LARGE tier the v0.4.3 census (T-043-24..26) fully
+  backfilled; the wider suite carries no mechanical gate yet. Non-test support modules
+  (`__init__.py`, `rendezvous.py`, `conftest.py`) are excluded — zero collected items.
 - CONTRACT (permanent, asserts an AC or a bug) / SENTINEL (permanent, the single
   integration test of one seam) / SCAFFOLD (temporary) / QUARANTINE (flaky, carries
   a registered bug id).

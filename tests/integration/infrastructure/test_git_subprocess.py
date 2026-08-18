@@ -171,3 +171,38 @@ def test_push_first_push_sets_upstream_and_mismatched_branch_uses_explicit_refsp
         ["git", "rev-parse", "HEAD"], cwd=local, capture_output=True, text=True
     ).stdout.strip()
     assert remote_tip == local_tip
+
+
+# ---------------------------------------------------------------------------
+# v0.4.3 T-043-14/FR10 — commit_paths is honest by construction (A10.2, real index)
+# ---------------------------------------------------------------------------
+
+
+def test_commit_paths_ignores_operator_pre_staged_unrelated_content(tmp_path: Path) -> None:
+    """A10.2: the commit is path-scoped (``git commit -- <paths>``) — content the
+    operator staged BEFORE the call (e.g. a concurrent ``git add`` elsewhere in the
+    tree) must be ignored, never swept into the tool-authored commit."""
+    repo = tmp_path / "repo"
+    _init_git_repo(repo)
+
+    # Operator pre-stages something unrelated to the tool's own write.
+    (repo / "operator-staged.txt").write_text("operator content")
+    subprocess.run(["git", "add", "operator-staged.txt"], cwd=repo, capture_output=True, check=True)
+
+    # The tool's own scoped write.
+    (repo / "tool-written.txt").write_text("tool content")
+
+    client = GitSubprocessClient()
+    client.commit_paths(repo, "chore(scaffold): tool write", ["tool-written.txt"])
+
+    log_result = subprocess.run(
+        ["git", "show", "--stat", "--oneline", "-1"], cwd=repo, capture_output=True, text=True
+    )
+    assert "tool-written.txt" in log_result.stdout
+    assert "operator-staged.txt" not in log_result.stdout
+
+    # The operator's pre-staged file is still staged, untouched, not rolled back.
+    status = subprocess.run(
+        ["git", "status", "--porcelain"], cwd=repo, capture_output=True, text=True
+    )
+    assert "A  operator-staged.txt" in status.stdout
