@@ -76,6 +76,28 @@ step now delegates to it — one scanner, two callers. `CANONICAL_SPECS_VERSION`
 the scaffold constitution stamp follows it.
 
 **Consumer action:** run `dadaia specs upgrade` per context to reach pattern version 5.
+
+---
+
+Second hotfix folded into this same unpublished mint (no separate PATCH number is minted
+for a version that never reached the index — the `[0.4.2]` publish-number collapse above
+is the precedent): bug `upgrade-never-refreshes-uncustomised-scoped-law-projection`
+(MEDIUM).
+
+`specs/AGENTS.md` is projected once and never refreshed: TREE-5 reports drift and
+`--fix` declines, because overwriting could destroy operator customisation. With no way
+to recognise our own earlier output, a file nobody had ever edited was frozen exactly like
+a hand-written one — so instances kept scoped law ordering agents to run
+`dadaia lifecycle`, a command the CLI no longer exposes.
+
+The tool now ships the evidence it was missing: `public/templates/shipped-hashes.json`
+records the sha256 of every published version of a template. When the on-disk bytes match
+one of them the file is provably untouched, TREE-5 becomes **fixable**, and
+`dadaia specs doctor --fix` refreshes it losslessly. Bytes we never shipped are operator
+content and remain warn-only — re-verified inside the repair itself — and an instance with
+no history file keeps the old conservative behaviour. The history is append-only by
+contract, pinned by a test that fails if a template is edited without recording its new
+digest.
 Trees already at 4 are repaired by the new step; the migration is byte-preserving,
 idempotent and dry-run-capable, and prose mentions of retired keys in document bodies are
 never touched.
