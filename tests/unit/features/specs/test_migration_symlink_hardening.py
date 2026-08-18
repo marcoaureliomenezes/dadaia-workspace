@@ -163,3 +163,75 @@ def test_symlinked_projection_is_not_advertised_as_fixable(tmp_path: Path) -> No
     tree5 = [i for i in doctor.check() if i.code == "TREE-5"]
     assert tree5 and not tree5[0].fixable
     assert doctor.fix(doctor.check()) == [] or all(i.code != "TREE-5" for i in doctor.fix())
+
+
+def test_repair_preserves_file_mode_and_newlines(tmp_path: Path) -> None:
+    """Atomic replacement must not leak mkstemp's 0600 onto the target, nor let Windows
+    text mode rewrite LF as CRLF — the write is byte-exact by contract."""
+    import os
+    import stat
+
+    specs = _specs_with_memory(tmp_path / "mode")
+    atom = specs / "memory" / "a.md"
+    atom.write_text(_ATOM_WITH_RETIRED_KEYS, encoding="utf-8")
+    os.chmod(atom, 0o644)
+
+    migrate_retired_frontmatter_keys(specs, dry_run=False)
+
+    assert stat.S_IMODE(atom.stat().st_mode) == 0o644, "repair narrowed the atom's mode"
+    assert b"\r\n" not in atom.read_bytes(), "repair introduced CRLF"
+
+
+def test_symlinked_memory_directory_is_refused(tmp_path: Path) -> None:
+    """The walk ROOT can itself be a link out of the tree: the per-file guard cannot see
+    it, because every atom inside is a regular file."""
+    outside = tmp_path / "outside-memory"
+    outside.mkdir()
+    victim = outside / "c.md"
+    victim.write_text(_ATOM_WITH_RETIRED_KEYS, encoding="utf-8")
+
+    specs = tmp_path / "rootlink" / "specs"
+    specs.mkdir(parents=True)
+    (specs / "memory").symlink_to(outside, target_is_directory=True)
+
+    result = migrate_retired_frontmatter_keys(specs, dry_run=False)
+
+    assert victim.read_text(encoding="utf-8") == _ATOM_WITH_RETIRED_KEYS
+    assert result.moved == []
+    assert any("symlink" in note for note in result.skipped)
+
+
+def test_read_only_atom_is_left_alone(tmp_path: Path) -> None:
+    """Replacement needs only directory permission, so a read-only atom would be rewritten
+    silently; the operator's flag is honoured instead."""
+    import os
+
+    specs = _specs_with_memory(tmp_path / "readonly")
+    atom = specs / "memory" / "ro.md"
+    atom.write_text(_ATOM_WITH_RETIRED_KEYS, encoding="utf-8")
+    os.chmod(atom, 0o444)
+    try:
+        result = migrate_retired_frontmatter_keys(specs, dry_run=False)
+        assert atom.read_text(encoding="utf-8") == _ATOM_WITH_RETIRED_KEYS
+        assert any("read-only" in note for note in result.skipped)
+    finally:
+        os.chmod(atom, 0o644)
+
+
+def test_the_two_atomic_writers_do_not_drift(tmp_path: Path) -> None:
+    """Two copies of a security primitive exist by architecture (features are independent).
+    Nothing stops them diverging, so pin that they behave identically."""
+    import inspect
+
+    from dadaia_workspace.features.migrate.frontmatter_keys import write_text_atomic
+    from dadaia_workspace.features.specs.doctor_structural import _write_text_atomic
+
+    def statements(fn: object) -> list[str]:
+        body = inspect.getsource(fn)  # type: ignore[arg-type]
+        code = body.split('"""')[2]  # drop signature + docstring
+        return [line.strip() for line in code.splitlines() if line.strip()]
+
+    assert statements(write_text_atomic) == statements(_write_text_atomic), (
+        "the duplicated atomic writers have drifted — a divergence between two copies of a "
+        "security primitive is exactly the failure this test exists to catch"
+    )
