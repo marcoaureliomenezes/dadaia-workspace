@@ -115,3 +115,51 @@ def test_corrupt_history_degrades_instead_of_killing_the_doctor(tmp_path: Path) 
     (templates / SHIPPED_HASHES_FILENAME).write_text("[" * 200_000, encoding="utf-8")
 
     assert load_shipped_hashes(templates) == {}
+
+
+def test_migrations_never_write_through_a_hardlink(tmp_path: Path) -> None:
+    """A hard link is not a symlink, so the link guard alone misses it: writing must
+    rebind the name (temp file + os.replace) instead of writing through the inode."""
+    import os
+
+    outside = tmp_path / "hardlink-outside.md"
+    outside.write_text(_ATOM_WITH_RETIRED_KEYS, encoding="utf-8")
+    specs = _specs_with_memory(tmp_path / "hardlink")
+    os.link(outside, specs / "memory" / "linked.md")
+
+    migrate_retired_frontmatter_keys(specs, dry_run=False)
+
+    assert outside.read_text(encoding="utf-8") == _ATOM_WITH_RETIRED_KEYS, (
+        "migration wrote through a hard link into a file outside the tree"
+    )
+    assert "token_estimate" not in (specs / "memory" / "linked.md").read_text(encoding="utf-8")
+
+
+def test_symlinked_projection_is_not_advertised_as_fixable(tmp_path: Path) -> None:
+    """The repair refuses a symlinked projection, so the check must not promise it —
+    a reported fix that never happens is its own defect."""
+    import hashlib
+
+    stale = "# stale\n"
+    templates = tmp_path / "templates"
+    templates.mkdir()
+    (templates / "specs-AGENTS.md").write_text(_CANONICAL_TEXT, encoding="utf-8")
+    (templates / SHIPPED_HASHES_FILENAME).write_text(
+        json.dumps(
+            {
+                "specs-AGENTS.md": [
+                    hashlib.sha256(t.encode("utf-8")).hexdigest() for t in (_CANONICAL_TEXT, stale)
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    outside = tmp_path / "outside.md"
+    outside.write_text(stale, encoding="utf-8")
+    specs = _specs_with_memory(tmp_path / "advertise")
+    (specs / "AGENTS.md").symlink_to(outside)
+
+    doctor = SpecsDoctor(specs, templates_dir=templates)
+    tree5 = [i for i in doctor.check() if i.code == "TREE-5"]
+    assert tree5 and not tree5[0].fixable
+    assert doctor.fix(doctor.check()) == [] or all(i.code != "TREE-5" for i in doctor.fix())

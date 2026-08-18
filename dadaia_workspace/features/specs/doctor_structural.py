@@ -8,9 +8,12 @@ imports the shared leaves, never a sibling validator.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
+import os
 import re
 import shutil
+import tempfile
 from pathlib import Path
 
 from dadaia_workspace.features.specs.doctor_common import read_active_md
@@ -268,7 +271,12 @@ class StructuralValidator:
         # refreshing it is lossless (bug
         # upgrade-never-refreshes-uncustomised-scoped-law-projection). Anything else may
         # hold operator content and stays warn-only.
-        if was_shipped(current_text, "specs-AGENTS.md", self._templates_dir):
+        # A symlinked projection is never repaired (the write would land outside the
+        # tree), so it must not be advertised as fixable either — reporting a fix that
+        # never happens is its own defect (CWE-393).
+        if was_shipped(current_text, "specs-AGENTS.md", self._templates_dir) and not (
+            agents_md.is_symlink()
+        ):
             return [
                 SpecsDoctorIssue(
                     code="TREE-5",
@@ -323,7 +331,7 @@ class StructuralValidator:
         current_text = agents_md.read_text(encoding="utf-8")
         if not was_shipped(current_text, "specs-AGENTS.md", self._templates_dir):
             return
-        agents_md.write_text(canonical_path.read_text(encoding="utf-8"), encoding="utf-8")
+        _write_text_atomic(agents_md, canonical_path.read_text(encoding="utf-8"))
 
     def check_memory_agents_md(self) -> list[SpecsDoctorIssue]:
         """Check: specs/memory/AGENTS.md must exist (WARNING only).
@@ -468,3 +476,22 @@ class StructuralValidator:
                     )
                 )
         return issues
+
+
+def _write_text_atomic(path: Path, text: str) -> None:
+    """Write *text* by atomic replacement, never THROUGH the existing file.
+
+    A hard link is not a symlink and a checked-then-opened path is a TOCTOU window, so the
+    symlink refusal alone cannot keep the write inside the tree; ``os.replace`` rebinds the
+    name instead. Feature-local by architecture: features are mutually independent, may not
+    import infrastructure, and core/ file I/O is a closed ratchet.
+    """
+    fd, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(text)
+        os.replace(tmp_name, path)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.unlink(tmp_name)
+        raise
