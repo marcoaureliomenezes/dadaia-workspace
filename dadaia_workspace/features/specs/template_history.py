@@ -41,7 +41,9 @@ def load_shipped_hashes(templates_dir: Path) -> dict[str, set[str]]:
     history_path = templates_dir / SHIPPED_HASHES_FILENAME
     try:
         raw = json.loads(history_path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+    except (OSError, ValueError, RecursionError):
+        # RecursionError: a deeply nested document blows the JSON parser's stack; a corrupt
+        # history must degrade to "nothing is provably ours", never take the doctor down.
         return {}
     if not isinstance(raw, dict):
         return {}

@@ -56,12 +56,32 @@ def migrate_retired_frontmatter_keys(specs_dir: Path, *, dry_run: bool = False) 
         return result
 
     for md_path in sorted(memory_dir.rglob("*.md")):
-        original = md_path.read_text(encoding="utf-8")
+        # Never write through a link: the target may live outside the tree being migrated
+        # (CWE-59). The repo already paid for this once — the tests/AGENTS.md dangling
+        # symlink bug — so both migration write sites refuse links outright.
+        if md_path.is_symlink():
+            result.skipped.append(
+                f"{md_path.name}: symlink — left untouched (never write through a link)."
+            )
+            continue
+        try:
+            original = md_path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as exc:
+            # One unreadable atom must not abort the chain and strand the tree half
+            # migrated (CWE-703); record it and keep going.
+            result.skipped.append(f"{md_path.name}: unreadable ({type(exc).__name__}) — skipped.")
+            continue
         rewritten = strip_frontmatter_keys(original, drop=lambda key: key not in allowed)
         if rewritten is None:
             continue
         if not dry_run:
-            md_path.write_text(rewritten, encoding="utf-8")
+            try:
+                md_path.write_text(rewritten, encoding="utf-8")
+            except OSError as exc:
+                result.skipped.append(
+                    f"{md_path.name}: unwritable ({type(exc).__name__}) — skipped."
+                )
+                continue
         result.moved.append((md_path, md_path))
 
     if not result.moved:

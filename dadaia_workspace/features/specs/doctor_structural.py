@@ -310,7 +310,13 @@ class StructuralValidator:
         """
         if self._templates_dir is None:
             return
-        agents_md = Path(issue.path) if issue.path else self.specs_dir / "AGENTS.md"
+        # The repair target is derived, never taken from the issue: an externally supplied
+        # path would let a caller aim the write anywhere (CWE-73). A link is refused
+        # outright so the canonical text cannot be written through it to a file outside
+        # the tree (CWE-59).
+        agents_md = self.specs_dir / "AGENTS.md"
+        if agents_md.is_symlink():
+            return
         canonical_path = self._templates_dir / "specs-AGENTS.md"
         if not canonical_path.exists() or not agents_md.exists():
             return

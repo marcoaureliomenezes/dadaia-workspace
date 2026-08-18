@@ -45,12 +45,27 @@ def migrate_agent_tier_frontmatter(specs_dir: Path, *, dry_run: bool = False) ->
         return result
 
     for md_path in sorted(memory_dir.rglob("*.md")):
-        original = md_path.read_text(encoding="utf-8")
+        if md_path.is_symlink():
+            result.skipped.append(
+                f"{md_path.name}: symlink — left untouched (never write through a link)."
+            )
+            continue
+        try:
+            original = md_path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as exc:
+            result.skipped.append(f"{md_path.name}: unreadable ({type(exc).__name__}) — skipped.")
+            continue
         rewritten = _strip_agent_tier(original)
         if rewritten is None:
             continue
         if not dry_run:
-            md_path.write_text(rewritten, encoding="utf-8")
+            try:
+                md_path.write_text(rewritten, encoding="utf-8")
+            except OSError as exc:
+                result.skipped.append(
+                    f"{md_path.name}: unwritable ({type(exc).__name__}) — skipped."
+                )
+                continue
         result.moved.append((md_path, md_path))
 
     if not result.moved:
