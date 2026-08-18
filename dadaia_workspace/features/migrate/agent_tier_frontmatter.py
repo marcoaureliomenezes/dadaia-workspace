@@ -19,6 +19,7 @@ nothing). ``MigrateResult.moved`` records ``(path, path)`` per migrated atom.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from dadaia_workspace.features.migrate.frontmatter_keys import (
@@ -47,11 +48,25 @@ def migrate_agent_tier_frontmatter(specs_dir: Path, *, dry_run: bool = False) ->
         result.skipped.append("memory/ not found — nothing to migrate.")
         return result
 
+    if memory_dir.is_symlink():
+        # The walk ROOT itself may be a link out of the tree: the per-file guard cannot see
+        # it (the atoms inside are regular files) and rglob happily walks its target
+        # (CWE-59). Same doctrine the tests/AGENTS.md symlink bug established.
+        result.skipped.append(
+            "memory/ is a symlink — left untouched (never migrate through a link)."
+        )
+        return result
+
     for md_path in sorted(memory_dir.rglob("*.md")):
         if md_path.is_symlink():
             result.skipped.append(
                 f"{md_path.name}: symlink — left untouched (never write through a link)."
             )
+            continue
+        if not os.access(md_path, os.W_OK):
+            # Replacement only needs directory permission, so a read-only atom would be
+            # rewritten silently. Honour the flag the operator set on the file.
+            result.skipped.append(f"{md_path.name}: read-only — skipped.")
             continue
         try:
             original = md_path.read_text(encoding="utf-8")
