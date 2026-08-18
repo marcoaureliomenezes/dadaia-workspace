@@ -54,6 +54,32 @@ for this task, so none is touched here):
 
 Left exactly as written; a future task can pick this up.
 
+## [0.4.3] — 2026-08-18
+
+Hotfix (Arm B, `hotfix/0.4.3`) — bug
+`specs-upgrade-emits-atoms-violating-frontmatter-schema` (HIGH).
+
+`memory-frontmatter-v1` is a closed schema (`additionalProperties: false`), so every key
+dropped from it turns existing consumer atoms into doctor errors. v0.1.72 shipped that
+migration for `agent_tier` as a hard-coded single-key step; when `token_estimate` was
+dropped later, no migration followed. `dadaia specs upgrade` therefore rewrote consumer
+atoms and then failed its own post-upgrade doctor with LINT-1 `Additional properties are
+not allowed ('token_estimate' was unexpected)`, pointing the operator at a backup and
+leaving the tree stuck at its old pattern version — reproduced on three independent
+consumer trees.
+
+Fixed as a class, not an instance: the new `retired-frontmatter-keys` step (pattern
+version **4 → 5**) derives the retired set from the shipped schema's `properties` at run
+time, so a future schema-drop is migrated by construction. The frontmatter fence scanner
+moved to `features/migrate/frontmatter_keys.py` and the historical `agent-tier-frontmatter`
+step now delegates to it — one scanner, two callers. `CANONICAL_SPECS_VERSION` is 5 and
+the scaffold constitution stamp follows it.
+
+**Consumer action:** run `dadaia specs upgrade` per context to reach pattern version 5.
+Trees already at 4 are repaired by the new step; the migration is byte-preserving,
+idempotent and dry-run-capable, and prose mentions of retired keys in document bodies are
+never touched.
+
 ## [0.4.2] — 2026-08-18
 
 One published version carrying the two merged, previously-unpublished internal releases

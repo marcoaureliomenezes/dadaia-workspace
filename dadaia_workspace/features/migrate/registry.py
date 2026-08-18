@@ -23,6 +23,9 @@ from dadaia_workspace.features.migrate.agent_tier_frontmatter import (
 )
 from dadaia_workspace.features.migrate.bugs_jsonl import migrate_bugs_jsonl
 from dadaia_workspace.features.migrate.bugs_single_file import migrate_bugs_single_file
+from dadaia_workspace.features.migrate.retired_frontmatter_keys import (
+    migrate_retired_frontmatter_keys,
+)
 from dadaia_workspace.features.migrate.tree_v2 import MigrateResult, migrate_tree_v2
 
 
@@ -60,6 +63,15 @@ REGISTRY: tuple[MigrationStep, ...] = (
         to_version=4,
         key="bugs-single-file",
         apply=migrate_bugs_single_file,
+    ),
+    # Bug specs-upgrade-emits-atoms-violating-frontmatter-schema: the agent_tier step
+    # above repaired ONE dropped key; a closed schema needs the class repaired. This step
+    # derives the retired set from the shipped schema, so later drops need no new step.
+    MigrationStep(
+        from_version=4,
+        to_version=5,
+        key="retired-frontmatter-keys",
+        apply=migrate_retired_frontmatter_keys,
     ),
 )
 

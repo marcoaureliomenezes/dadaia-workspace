@@ -21,7 +21,7 @@ from pathlib import Path
 #: Bump this when a new migration step is added to the registry (see ``registry.py``).
 #: v3 = agent-tier-frontmatter (v0.1.72 FR1); v4 = bugs-single-file (v0.1.73 FR1 —
 #: the operator's ONE-append-only-ledger contract).
-CANONICAL_SPECS_VERSION = 4
+CANONICAL_SPECS_VERSION = 5
 
 #: Version assigned to a tree with no stamp (pre-framework flat layout).
 UNSTAMPED_VERSION = 0
