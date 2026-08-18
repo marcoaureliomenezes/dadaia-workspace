@@ -181,6 +181,7 @@
   "[ok] stage:skills/project-orchestration/SKILL.md",
   "[ok] stage:templates/memory-feature.md",
   "[ok] stage:templates/repo-AGENTS.md",
+  "[ok] stage:templates/shipped-hashes.json",
   "[ok] stage:templates/specs-AGENTS.md",
   "[ok] stage:templates/tests-AGENTS.md",
   "[unsupported] codex hook wrapper probe failed .dadaia/hooks/codex-ctx-inject (D-CX-9)",

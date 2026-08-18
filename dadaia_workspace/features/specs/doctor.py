@@ -196,6 +196,9 @@ class SpecsDoctor:
                 if issue.code == "TREE-4":
                     self._structural.fix_tree4(issue)
                     fixed.append(issue)
+                elif issue.code == "TREE-5":
+                    self._structural.fix_tree5(issue)
+                    fixed.append(issue)
                 elif issue.code == "REPO-DADAIA-1":
                     self._structural.fix_repo_dadaia1(issue)
                     fixed.append(issue)
