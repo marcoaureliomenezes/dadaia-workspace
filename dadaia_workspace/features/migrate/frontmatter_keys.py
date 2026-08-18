@@ -12,10 +12,16 @@ unrelated keys. Prose mentions in the body are never touched.
 
 from __future__ import annotations
 
+import contextlib
+import json
+import os
 import re
+import tempfile
 from collections.abc import Callable
+from pathlib import Path
+from typing import Any, cast
 
-__all__ = ["strip_frontmatter_keys"]
+__all__ = ["load_frontmatter_schema", "strip_frontmatter_keys", "write_text_atomic"]
 
 #: Opening/closing frontmatter fence line (whole line, optional trailing whitespace).
 _FENCE_RE = re.compile(r"^---\s*$")
@@ -75,3 +81,45 @@ def strip_frontmatter_keys(text: str, *, drop: Callable[[str], bool]) -> str | N
         return None
 
     return lines[0] + "".join(kept) + "".join(lines[close_idx:])
+
+
+# --- packaged data + safe writing -------------------------------------------------
+# Both live here rather than in a shared layer: features are mutually independent by
+# contract (setup.cfg, features-no-cross-feature), features may not import infrastructure,
+# and core/ file I/O is a closed ratchet (architect A9). The repo already resolves this the
+# same way — hooks/_common.py and infrastructure/public_assets_common.py each keep their
+# own atomic writer.
+
+_PACKAGE_ROOT = Path(__file__).resolve().parents[2]  # dadaia_workspace/
+_SCHEMA_REL = Path("public") / "schemas" / "memory" / "memory-frontmatter-v1.schema.json"
+
+
+def load_frontmatter_schema() -> dict[str, Any]:
+    """Load the packaged memory-atom frontmatter schema (``public/`` ships as package data)."""
+    schema_path = _PACKAGE_ROOT / _SCHEMA_REL
+    if not schema_path.exists():
+        raise FileNotFoundError(
+            f"memory-frontmatter-v1.schema.json not found at {schema_path} "
+            "— the installed dadaia-workspace package is incomplete."
+        )
+    return cast(dict[str, Any], json.loads(schema_path.read_text(encoding="utf-8")))
+
+
+def write_text_atomic(path: Path, text: str) -> None:
+    """Write *text* to *path* by atomic replacement, never THROUGH the existing file.
+
+    Refusing symlinks closes CWE-59 for the obvious case, but a hard link is not a symlink
+    and a path checked then opened is a TOCTOU window (CWE-367) — both let a write land
+    outside the tree being migrated. Rendering to a temp file in the same directory and
+    ``os.replace``-ing it rebinds the name instead of writing through whatever it points
+    at, and the swap is atomic, so no reader sees a half-written atom.
+    """
+    fd, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(text)
+        os.replace(tmp_name, path)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.unlink(tmp_name)
+        raise

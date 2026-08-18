@@ -23,9 +23,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dadaia_workspace.features.migrate.frontmatter_keys import strip_frontmatter_keys
+from dadaia_workspace.features.migrate.frontmatter_keys import (
+    load_frontmatter_schema,
+    strip_frontmatter_keys,
+    write_text_atomic,
+)
 from dadaia_workspace.features.migrate.tree_v2 import MigrateResult
-from dadaia_workspace.features.specs.memory_lint import load_frontmatter_schema
 
 __all__ = ["migrate_retired_frontmatter_keys"]
 
@@ -76,7 +79,7 @@ def migrate_retired_frontmatter_keys(specs_dir: Path, *, dry_run: bool = False) 
             continue
         if not dry_run:
             try:
-                md_path.write_text(rewritten, encoding="utf-8")
+                write_text_atomic(md_path, rewritten)
             except OSError as exc:
                 result.skipped.append(
                     f"{md_path.name}: unwritable ({type(exc).__name__}) — skipped."

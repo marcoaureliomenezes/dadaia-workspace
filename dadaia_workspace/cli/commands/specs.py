@@ -13,6 +13,7 @@ from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.specs import Severity, SpecsDoctor
 from dadaia_workspace.features.specs.doctor_common import read_active_md
+from dadaia_workspace.features.specs.doctor_types import SpecsDoctorIssue
 from dadaia_workspace.features.specs.scaffolder import (
     scaffold,
     scaffold_release_segment,
@@ -170,6 +171,24 @@ def doctor(
     sys.exit(1 if has_errors else 0)
 
 
+def _error_identities(issue: SpecsDoctorIssue) -> set[tuple[str, str]]:
+    """Stable identities for a doctor error — one per underlying violation.
+
+    An aggregating issue cannot be compared as a whole: LINT-1 joins one line per
+    violating memory atom into a single description, so repairing some atoms shrinks that
+    string and an untouched pre-existing violation reads as newly introduced. The operator
+    is then told to restore the backup, discarding a good version bump while leaving the
+    very error in place — precisely the harm the pre/post comparison exists to prevent
+    (bug specs-upgrade-blames-itself-for-a-preexisting-error-when-a-migration-legitimately
+    -skips-an-atom). Comparing line by line gives every violation its own identity, so a
+    genuinely new one is still caught.
+    """
+    lines = [line.strip() for line in (issue.description or "").splitlines() if line.strip()]
+    if len(lines) <= 1:
+        return {(issue.code, issue.description or "")}
+    return {(issue.code, line) for line in lines}
+
+
 @app.command("upgrade")
 def upgrade(
     specs_dir: str | None = typer.Option(
@@ -234,7 +253,10 @@ def upgrade(
         resolved, public_dir=_resolve_public_dir(resolved), templates_dir=_TEMPLATES_DIR
     )
     pre_errors = {
-        (i.code, i.description) for i in pre_doctor.check() if i.severity == Severity.ERROR
+        identity
+        for i in pre_doctor.check()
+        if i.severity == Severity.ERROR
+        for identity in _error_identities(i)
     }
 
     result = _upgrade_feat.upgrade(resolved, target=target)
@@ -251,8 +273,8 @@ def upgrade(
         resolved, public_dir=_resolve_public_dir(resolved), templates_dir=_TEMPLATES_DIR
     )
     post_errors = [i for i in doctor_svc.check() if i.severity == Severity.ERROR]
-    new_errors = [i for i in post_errors if (i.code, i.description) not in pre_errors]
-    pre_existing = [i for i in post_errors if (i.code, i.description) in pre_errors]
+    new_errors = [i for i in post_errors if _error_identities(i) - pre_errors]
+    pre_existing = [i for i in post_errors if not (_error_identities(i) - pre_errors)]
     if new_errors:
         typer.echo(
             f"[fail] upgrade introduced {len(new_errors)} new doctor error(s). "
