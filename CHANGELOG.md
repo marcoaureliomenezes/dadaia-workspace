@@ -54,14 +54,22 @@ for this task, so none is touched here):
 
 Left exactly as written; a future task can pick this up.
 
-## [0.4.3] — 2026-08-18
+## [0.4.2] — 2026-08-18
 
-Release v0.4.3 "claims-made-true / backlog-zero" — the operator's standing order (the
-entire `## ACTIVE` backlog queue in one release, residuals minimised to zero) shipped as
-one segmented release: 6 `alpha-N` increments plus a shipping candidate, 32 FRs, 53 tasks,
-24 backlog slugs delivered. Archived at `specs/_archive/releases/v0.4.3/`.
+One published version carrying the two merged, previously-unpublished internal releases
+below (operator lineage ruling, 2026-08-18: the registry's latest published version is
+0.4.1, so the next mint is 0.4.2; the internally-minted 0.4.3 number is retired
+unpublished — internal provenance ids in code comments, task ids and `specs/_archive/`
+directory names keep their historical spelling, mapped by the subheadings below).
 
-### Added
+### v0.4.3 "claims-made-true / backlog-zero" (2026-08-18)
+
+The operator's standing order (the entire `## ACTIVE` backlog queue in one release,
+residuals minimised to zero) shipped as one segmented release: 6 `alpha-N` increments
+plus a shipping candidate, 32 FRs, 53 tasks, 24 backlog slugs delivered. Archived at
+`specs/_archive/releases/v0.4.3/`.
+
+#### Added
 - **The push gate reads commit objects, not just blobs**: the header/body boundary is
   respected and a term is never amnestied path-less (fail-closed) — closes the
   commit/tag-body scanning gap.
@@ -85,21 +93,20 @@ one segmented release: 6 `alpha-N` increments plus a shipping candidate, 32 FRs,
   sweep, a reconciler that reaps what it already walks, write-time log rotation, and
   `dadaia tmp gc` as the sole calendar-based backstop.
 
-### Changed
+#### Changed
 - **Workspace-root resolution fixed** — the ancestor walk no longer silently mistargets
   from a nested working directory (found live by this release's own consumer round).
 - **The whole assembled surface, GC included, validated on a throwaway real consumer
   workspace**, and the published CHANGELOG lineage backfilled from git history with no
   invention (this section's own predecessors, below).
 
-## [0.4.2] — 2026-08-16
+### v0.4.2 "residual-convergence" (2026-08-16)
 
-Release v0.4.2 "residual-convergence" — the first section under the one-axis rule
-(release id = minted package version, PyPI lineage; latest published 0.4.1). Fixes the
-three root causes behind the recurring per-release residual spray, at class level.
-Archived at `specs/_archive/releases/v0.4.2/`.
+The first internal release under the one-axis rule (release id = minted package version,
+PyPI lineage; latest published 0.4.1). Fixes the three root causes behind the recurring
+per-release residual spray, at class level. Archived at `specs/_archive/releases/v0.4.2/`.
 
-### Added
+#### Added
 - **Range-wide multi-path amnesty denial (fail-closed)**: a blob reachable at more than
   one path anywhere in the pushed range gets no prior-published-term amnesty — adapter
   side only, matcher untouched.
@@ -116,7 +123,7 @@ Archived at `specs/_archive/releases/v0.4.2/`.
   terminate in the release CLOSURE or reviewer handoff; only actionable defects reach
   the operator's intake report.
 
-### Changed
+#### Changed
 - **One backlog grammar seam**: `backlog new` moved into `features/backlog/` and writes
   through the same fence-aware parser that validates the document (write-then-verify).
 - **The refusal masker consumes the detector's own matchers** — one predicate for
@@ -133,7 +140,7 @@ Archived at `specs/_archive/releases/v0.4.2/`.
   are absence, not a desync refusal; the git-read fail-soft is narrowed to the
   intentional early close only.
 
-### Removed
+#### Removed
 - **The dead hotfix-release scaffold surface**: `dadaia specs hotfix open`, both
   hotfix templates, and the unconditional `candidates.md` warning it emitted — Arm B
   needs no release ceremony by law, so the tooling for one was pure bug surface.

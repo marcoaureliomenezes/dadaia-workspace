@@ -465,6 +465,140 @@ def test_baseline_still_flags_a_different_local_part_at_the_mandated_domain_thro
 
 
 # ---------------------------------------------------------------------------
+# Bug reconciliation-merge-body-scan-unamendable-main-squash (HIGH, security-reviewer
+# handoff 2026-08-18T041422Z-security-reviewer-v0.4.3-ship-push-r4). The FR6
+# reconciliation merge of origin/main into develop, mandatory after every squash-merge
+# to main, publishes ZERO blobs and TWO path-less commit objects; the v0.4.3 commit-body
+# scan layer refused main's already-published GitHub squash-merge commit because its
+# 115 KB body quotes two synthetic /home/<name> literals from code-reviewer's own
+# v0.11.0 pre-PR review prose (describing the FR1 substring-amnesty repro) — literals
+# that were, AT THE TIME OF THAT REVIEW, the exact values
+# tests/unit/features/chokepoints/test_denylist_scan.py's
+# _POSITIVE_HOME_PATH_SUPERSTRING/_POSITIVE_HOME_PATH_SUBSTRING fixtures used
+# ("synthxabcd"/"synthxa"). A body hit on an already-published, GitHub-authored commit
+# has no applicable remedy (amend would rewrite published main history; a body match
+# carries no path, so the path-based amnesty can never suppress it) — the only
+# root-cause fix is to carve the exact historical literals out of the home-abs-path
+# exclude_regex. Both literals must be carved out: scan_objects reports at most one Hit
+# per object (first match by ascending line), so excluding only the longer literal
+# would merely shift the refusal to the shorter one quoted one line later in the same
+# body. Note: test_denylist_scan.py's fixtures have SINCE been renamed to a different
+# synthetic pair precisely so this new carve-out does not silently suppress THEIR
+# regression coverage (its own module docstring explains why) — the two variables
+# below hold the frozen, historical literal VALUES, not a live cross-reference to that
+# file's current fixture values.
+# ---------------------------------------------------------------------------
+
+
+def _reconciliation_fixture_home_literal() -> str:
+    """The longer of the two synthetic fixture literals quoted in main's already-
+    published squash-commit body (code-reviewer's v0.11.0 pre-PR review prose) —
+    composed at runtime so it never appears contiguously in this module's own tracked
+    source. This is the frozen historical value
+    test_denylist_scan.py's ``_POSITIVE_HOME_PATH_SUPERSTRING`` held at review time —
+    that file has since been renamed to a different pair (see its module comment)."""
+    return "/hom" + "e/synth" + "xabcd"
+
+
+def _reconciliation_fixture_home_substring_literal() -> str:
+    """The shorter, substring sibling literal quoted one line later in the SAME
+    squash-commit body prose. This is the frozen historical value
+    test_denylist_scan.py's ``_POSITIVE_HOME_PATH_SUBSTRING`` held at review time.
+    Composed at runtime for the same reason as above."""
+    return "/hom" + "e/synth" + "xa"
+
+
+def _different_realistic_home_path_literal() -> str:
+    """A realistic-shaped ``/home/<name>`` that is NOT one of the carved-out synthetic
+    fixture literals — must still fire, proving the carve-out stays anchored to the
+    exact synthetic names rather than a broad ``/home/*`` relaxation. Composed at
+    runtime for convention parity with the rest of this file (this particular literal
+    is not on any carve-out list, so the composition is not load-bearing here, only
+    consistent)."""
+    return "/hom" + "e/jdoe42"
+
+
+def test_home_abs_path_pattern_excludes_the_reconciliation_bug_synthetic_fixture_literals() -> None:
+    """Intent: BUG — reconciliation-merge-body-scan-unamendable-main-squash (HIGH).
+
+    Root-cause proof at the regex level (not only through the doctor plumbing): BOTH
+    synthetic fixture literals quoted in main's already-published squash-commit body
+    must match the home-abs-path SHAPE (they are genuine /home/<name> tokens) AND be
+    excluded by exclude_regex — carving out only the longer literal would leave
+    scan_objects' first-hit-per-object semantics reporting the substring sibling on the
+    very next line instead."""
+    patterns = {p.id: p for p in _load_privacy_baseline()}
+    home_pattern = patterns["home-abs-path"]
+
+    for literal in (
+        _reconciliation_fixture_home_literal(),
+        _reconciliation_fixture_home_substring_literal(),
+    ):
+        match = home_pattern.regex.search(literal)
+        assert match is not None, f"{literal!r} must still match the home-abs-path SHAPE"
+        assert match.group(0) == literal
+        assert home_pattern.exclude is not None
+        assert home_pattern.exclude.search(match.group(0)), (
+            f"{literal!r} is a synthetic, non-identifying fixture literal and must be "
+            "carved out by exclude_regex"
+        )
+
+
+def test_home_abs_path_pattern_still_fires_for_a_different_realistic_name() -> None:
+    """Intent: CONTRACT — regression counter-fixture for the bug above. The carve-out is
+    anchored to the exact synthetic fixture names, never a broader /home/* relaxation: a
+    realistic, non-carved-out /home/<name> must still be flagged."""
+    literal = _different_realistic_home_path_literal()
+    patterns = {p.id: p for p in _load_privacy_baseline()}
+    home_pattern = patterns["home-abs-path"]
+
+    match = home_pattern.regex.search(literal)
+    assert match is not None
+    assert match.group(0) == literal
+    assert home_pattern.exclude is not None
+    assert not home_pattern.exclude.search(match.group(0)), (
+        "a realistic, non-carved-out /home/<name> must NOT be excluded"
+    )
+
+
+def test_baseline_excludes_the_reconciliation_bug_synthetic_fixtures_through_the_doctor_check(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """End-to-end confirmation through ``_check_public_privacy`` (not only the bare
+    regex): a document quoting both synthetic fixture literals in the SAME prose shape
+    as main's squash-commit body reports clean — no ``[error]`` line."""
+    _disable_operator_denylist(monkeypatch, tmp_path)
+    literal_a = _reconciliation_fixture_home_literal()
+    literal_b = _reconciliation_fixture_home_substring_literal()
+    public_dir = tmp_path / "public"
+    (public_dir / "data").mkdir(parents=True)
+    (public_dir / "data" / "AGENTS.md").write_text(
+        f'substrings (repro: prior "{literal_a}" suppressed a new standalone\n'
+        f'"{literal_b}"; prior superstring amnesty test prose continues here).\n',
+        encoding="utf-8",
+    )
+    assert _manager(public_dir)._check_public_privacy() == [_BASELINE_OK_MARKER]  # noqa: SLF001
+
+
+def test_baseline_still_flags_a_different_realistic_home_path_through_the_doctor_check(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Negative twin, end-to-end: a realistic, non-carved-out /home/<name> is still
+    reported as a genuine finding — the carve-out did not relax the pattern broadly."""
+    _disable_operator_denylist(monkeypatch, tmp_path)
+    literal = _different_realistic_home_path_literal()
+    public_dir = tmp_path / "public"
+    (public_dir / "data").mkdir(parents=True)
+    (public_dir / "data" / "AGENTS.md").write_text(
+        f"backup lives at {literal}/data\n", encoding="utf-8"
+    )
+
+    report = [line.render() for line in _manager(public_dir)._check_public_privacy()]  # noqa: SLF001
+    assert any(line.startswith("[error] public-privacy:") for line in report)
+    assert any(literal in line for line in report)
+
+
+# ---------------------------------------------------------------------------
 # SPEC v0.4.2 FR10/A10.2/A10.4 — baseline v6: every pattern stays single-line, the
 # header version reads 6, and _header.excludes documents the new carve-outs and the
 # /root boundary (D10).
@@ -475,7 +609,9 @@ def test_baseline_v7_header_and_single_line_patterns() -> None:
     """Intent: CONTRACT — v0.4.2 A10.2, A10.4; v0.4.3 A12.2 (version bump 5->6),
     A12.5 (version bump 6->7, single-line patterns, extended _header rationale);
     T-043-23 security-review rework (version bump 7->8, internal-hostname carve-out
-    narrowed to the .home label class)."""
+    narrowed to the .home label class); bug
+    reconciliation-merge-body-scan-unamendable-main-squash (version bump 8->9,
+    home-abs-path carve-out for the product's own synthetic fixture usernames)."""
     import importlib.resources
     import json as _json
 
@@ -484,12 +620,13 @@ def test_baseline_v7_header_and_single_line_patterns() -> None:
     )
     raw = _json.loads(resource.read_text(encoding="utf-8"))
 
-    assert raw["_header"]["version"] == 8
+    assert raw["_header"]["version"] == 9
     excludes_text = " ".join(raw["_header"]["excludes"])
     assert "/root" in excludes_text
     assert "Users" in excludes_text
     assert "FR12/A12.3" in excludes_text  # the trailing-period rationale, extended
     assert "FR12/A12.4" in excludes_text  # the dotted-chain structural rule, extended
+    assert "reconciliation-merge-body-scan-unamendable-main-squash" in excludes_text
 
     for pattern in raw["patterns"]:
         assert "\n" not in pattern["regex"], f"{pattern['id']}: regex must be single-line"

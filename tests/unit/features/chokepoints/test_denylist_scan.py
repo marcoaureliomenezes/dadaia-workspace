@@ -326,8 +326,15 @@ def test_amnesty_applies_to_the_foreign_slug_layer_too() -> None:
 # amnesty an unrelated new value that happens to be one of its substrings.
 # ---------------------------------------------------------------------------
 
-_POSITIVE_HOME_PATH_SUPERSTRING = "/hom" + "e/synthxabcd"  # a DIFFERENT prior value
-_POSITIVE_HOME_PATH_SUBSTRING = "/hom" + "e/synthxa"  # substring of the value above
+#: Bug reconciliation-merge-body-scan-unamendable-main-squash (HIGH): these two
+#: literals were originally "synthxabcd"/"synthxa" (still quoted verbatim, unamendable,
+#: in main's already-published v0.11.0 squash-merge commit body, which is WHY those two
+#: exact strings are now carved out of the home-abs-path baseline exclude_regex).
+#: Renamed here to a fresh synthetic pair that the carve-out does NOT cover, so this
+#: regression test keeps exercising a hit that actually fires (the carve-out would
+#: otherwise silently suppress it before the amnesty predicate is ever reached).
+_POSITIVE_HOME_PATH_SUPERSTRING = "/hom" + "e/synthzqwxyz"  # a DIFFERENT prior value
+_POSITIVE_HOME_PATH_SUBSTRING = "/hom" + "e/synthzq"  # substring of the value above
 _SYNTHETIC_SLUG_SUPERSTRING_PRIOR = "the zz-fake-context-namecorp bundle"  # no \b match
 _SYNTHETIC_SLUG_STANDALONE = "zz-fake-context-name"
 

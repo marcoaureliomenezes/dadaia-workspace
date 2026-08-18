@@ -1,7 +1,7 @@
 {
   "_header": {
     "name": "public-privacy baseline structural denylist",
-    "version": 8,
+    "version": 9,
     "description": "Versioned, fail-closed baseline of STRUCTURAL regex patterns scanned against public/ assets when no operator denylist is present. Operator terms (DADAIA_PRIVACY_DENYLIST / .dadaia/states/privacy_denylist.json) are ADDITIVE and merge on top of this baseline. Patterns are conservative to avoid false positives on SHA hashes in lockfiles, doc/loopback IP ranges, and example hostnames. Edit only via an approved release task; bump 'version' on change. Every pattern carrying an 'exclude_regex' carve-out MUST also carry an 'exclude_rationale' string (v0.4.3 FR12/A12.1) — a doctor/CI check (privacy_check._check_baseline_exclude_rationale) flags any carve-out missing one, on every 'dadaia public doctor' run.",
     "released_in": "v0.1.10",
     "excludes": [
@@ -19,7 +19,8 @@
       "/Users/(user|username|youruser|<user>|runner|ci|Shared) placeholder/system forms in users-abs-path (macOS) — Shared is the real, non-personal /Users/Shared system directory present on every macOS install; any OTHER /Users/<name> still matches — v0.4.2 FR10/GRILL P15, cross-platform home-path parity with home-abs-path",
       "[A-Za-z]:\\\\Users\\\\(user|username|youruser|<user>|Public|Default) placeholder/system forms in windows-users-path (Windows) — Public and Default are the real, non-personal C:\\\\Users\\\\Public and C:\\\\Users\\\\Default system directories present on every Windows install; any OTHER C:\\\\Users\\\\<name> still matches, any drive letter case — v0.4.2 FR10/GRILL P15. A single trailing period immediately after the placeholder is ALSO tolerated (Windows itself treats a trailing period in a path component as insignificant), so ordinary prose ending a sentence right after the placeholder is not defeated — v0.4.3 FR12/A12.3, CR-6",
       "/root — DELIBERATELY EXCLUDED (evaluated, not covered): unlike /home, /Users and C:\\\\Users, a bare /root carries no user-identifying segment and appears routinely in container documentation; adding it would buy false positives and no privacy — v0.4.2 FR10/GRILL P15/D10",
-      "noreply@anthropic.com (the exact full-address literal only, local-part-anchored) — the law-mandated Co-Authored-By trailer address DADAIA.md requires on every commit, a public vendor no-reply mailbox already published unmasked in thousands of this repo's own commit trailers; any OTHER local part at the same apex domain, or the bare apex domain by itself, still matches — v0.4.3 FR12/A12.2, Arm-B rider on bug privacy-baseline-noreply-local-part-not-carved-out"
+      "noreply@anthropic.com (the exact full-address literal only, local-part-anchored) — the law-mandated Co-Authored-By trailer address DADAIA.md requires on every commit, a public vendor no-reply mailbox already published unmasked in thousands of this repo's own commit trailers; any OTHER local part at the same apex domain, or the bare apex domain by itself, still matches — v0.4.3 FR12/A12.2, Arm-B rider on bug privacy-baseline-noreply-local-part-not-carved-out",
+      "/home/synthxabcd and /home/synthxa (the exact two synthetic fixture literals only) in home-abs-path — the product's OWN synthetic test-fixture usernames (tests/unit/features/chokepoints/test_denylist_scan.py's _POSITIVE_HOME_PATH_SUPERSTRING/_POSITIVE_HOME_PATH_SUBSTRING), quoted in code-reviewer's v0.11.0 pre-PR review prose describing the FR1 substring-amnesty repro, which GitHub's squash-merge carried into main's already-published, unamendable commit body; a body match carries no path, so the path-based amnesty can never suppress it, and amending a published GitHub squash commit would destroy the FR6 reconciliation merge's lineage identity — the only root-cause fix is this narrow, literal carve-out. Both literals are required: the scan reports at most one hit per object (first match by ascending line), so carving only the longer literal would merely shift the refusal to the shorter one quoted one line later in the same body. Any OTHER /home/<name> still matches — v0.4.3 Arm-B rider on bug reconciliation-merge-body-scan-unamendable-main-squash"
     ]
   },
   "patterns": [
@@ -48,8 +49,8 @@
       "id": "home-abs-path",
       "regex": "(?<![\\w/])/home/[a-z_][a-z0-9_-]*(?=/|\\b)",
       "reason": "absolute /home/<user> filesystem path",
-      "exclude_regex": "^/home/(?:user|username|youruser|<user>|runner|ci|ubuntu)(?:$|/)",
-      "exclude_rationale": "placeholder/system /home/<user> forms (user, username, youruser, <user>, runner, ci, ubuntu) that appear routinely in generic docs/CI examples — never a real operator home directory."
+      "exclude_regex": "^/home/(?:user|username|youruser|<user>|runner|ci|ubuntu|synthxabcd|synthxa)(?:$|/)",
+      "exclude_rationale": "placeholder/system /home/<user> forms (user, username, youruser, <user>, runner, ci, ubuntu) that appear routinely in generic docs/CI examples — never a real operator home directory; plus the two exact synthetic test-fixture literals synthxabcd/synthxa (this product's own tests/unit/features/chokepoints/test_denylist_scan.py fixture names) quoted in code-reviewer's v0.11.0 pre-PR review prose, which GitHub's squash-merge carried into main's already-published, unamendable commit body — v0.4.3 Arm-B rider on bug reconciliation-merge-body-scan-unamendable-main-squash. Both are required together: synthxa is a strict prefix of synthxabcd, but this pattern's anchored exclude_regex requires the WHOLE matched value to equal one alternative followed by end-of-string or a path separator, so excluding only the longer literal would not also exclude the shorter one (or vice versa)."
     },
     {
       "id": "users-abs-path",
