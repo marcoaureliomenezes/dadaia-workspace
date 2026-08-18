@@ -20,10 +20,12 @@ from __future__ import annotations
 
 import json
 import os
-import stat
+import shutil
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+
+import pytest
 
 from dadaia_workspace.features.tmp_gc.service import TmpGcOutcome, run_tmp_gc
 
@@ -287,7 +289,9 @@ def test_lane_guard_never_follows_a_symlinked_agent_directory(tmp_path: Path) ->
     assert outcome.lane_guard_refused == ()
 
 
-def test_lane_guard_refuses_an_orphan_marker_resolving_outside_dadaia(tmp_path: Path) -> None:
+def test_lane_guard_refuses_an_orphan_marker_resolving_outside_dadaia(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     dadaia_root = tmp_path / ".dadaia"
     outside = tmp_path / "outside-dadaia"
     outside.mkdir()
@@ -296,8 +300,46 @@ def test_lane_guard_refuses_an_orphan_marker_resolving_outside_dadaia(tmp_path: 
     escape = dadaia_root / "tmp" / "reconciler-last-escapee"
     escape.parent.mkdir(parents=True, exist_ok=True)
     escape.symlink_to(real)
+
+    # Portable "age the symlink itself, not its target" simulation (not
+    # ``os.utime(..., follow_symlinks=False)``): setting a symlink's OWN mtime without
+    # following it requires OS write support this platform lacks (Windows raises
+    # ``NotImplementedError: utime: follow_symlinks unavailable on this platform`` —
+    # Linux/BSD ``utimensat`` supports it, Windows does not). Production code reads the
+    # marker's age via ``path.lstat().st_mtime`` (never ``stat()``, precisely so a
+    # symlink's own timestamp — not its target's — decides candidacy); READING a
+    # symlink's own stat (``os.stat(path, follow_symlinks=False)``, what ``Path.lstat``
+    # calls) is universally supported, only the WRITE side is platform-limited.
+    # Monkeypatching ``Path.lstat`` to report an aged mtime for this exact symlink
+    # exercises the identical age-comparison branch on every platform — same idiom as
+    # the v0.4.2 unreadable-file precedent (monkeypatched ``Path.read_text``) — matched
+    # by value equality, because ``run_tmp_gc`` builds its own ``Path`` instance for the
+    # same file via ``iterdir()``.
     old_mtime = time.time() - (10 * 86400)
-    os.utime(escape, (old_mtime, old_mtime), follow_symlinks=False)
+    real_lstat_result = os.lstat(escape)
+    aged_stat = os.stat_result(
+        (
+            real_lstat_result.st_mode,
+            real_lstat_result.st_ino,
+            real_lstat_result.st_dev,
+            real_lstat_result.st_nlink,
+            real_lstat_result.st_uid,
+            real_lstat_result.st_gid,
+            real_lstat_result.st_size,
+            int(old_mtime),
+            int(old_mtime),
+            int(old_mtime),
+        ),
+        {"st_atime": old_mtime, "st_mtime": old_mtime, "st_ctime": old_mtime},
+    )
+    real_lstat = Path.lstat
+
+    def _lstat_aged(self: Path) -> os.stat_result:
+        if self == escape:
+            return aged_stat
+        return real_lstat(self)
+
+    monkeypatch.setattr(Path, "lstat", _lstat_aged)
 
     outcome = run_tmp_gc(tmp_path, dry_run=False, now=_NOW)
 
@@ -330,21 +372,36 @@ def test_lane_guard_never_matches_a_symlinked_cache_directory(tmp_path: Path) ->
 # ---------------------------------------------------------------------------
 
 
-def test_unlink_failure_is_best_effort_and_does_not_abort_other_lanes(tmp_path: Path) -> None:
+def test_unlink_failure_is_best_effort_and_does_not_abort_other_lanes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     dadaia_root = tmp_path / ".dadaia"
     protected_parent = dadaia_root / "tmp" / "software-engineer"
     stale_dir = protected_parent / _dated_dir_name(days_ago=4)
     _write_file(stale_dir / "note.md")
     _write_marker(dadaia_root, "reconciler-last-ghost", age_seconds=4 * 86400)
 
-    original_mode = protected_parent.stat().st_mode
-    os.chmod(protected_parent, stat.S_IRUSR | stat.S_IXUSR)
-    try:
-        outcome = run_tmp_gc(tmp_path, dry_run=False, now=_NOW)
-    finally:
-        os.chmod(protected_parent, original_mode)
+    # Portable removal-failure simulation (not ``os.chmod`` on the containing
+    # directory): the POSIX read-only-directory permission model is a platform no-op
+    # for ``shutil.rmtree`` on Windows (the read-only attribute NTFS exposes there does
+    # not block content deletion the way a POSIX write-permission bit does), so the
+    # chmod-based simulation never actually denies the removal and the best-effort
+    # branch goes unexercised. Monkeypatching ``shutil.rmtree`` to raise for this exact
+    # target — same idiom as the v0.4.2 unreadable-file precedent (monkeypatched
+    # ``Path.read_text``) — exercises the identical ``except OSError`` branch
+    # identically on every platform.
+    real_rmtree = shutil.rmtree
 
-    # The stale dated dir could not be removed (read-only containing dir) — best-effort,
+    def _rmtree_denied(path: str | os.PathLike[str]) -> None:
+        if Path(path) == stale_dir:
+            raise PermissionError(13, "Permission denied", str(path))
+        real_rmtree(path)
+
+    monkeypatch.setattr(shutil, "rmtree", _rmtree_denied)
+
+    outcome = run_tmp_gc(tmp_path, dry_run=False, now=_NOW)
+
+    # The stale dated dir could not be removed (rmtree denied) — best-effort,
     # never raises — but the UNRELATED marker lane still completed its own sweep.
     assert stale_dir.exists()
     assert outcome.scratch_dirs == ()

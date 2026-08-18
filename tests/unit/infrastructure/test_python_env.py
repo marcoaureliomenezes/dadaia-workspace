@@ -501,8 +501,15 @@ def test_resolve_child_venv_interpreter_skips_degraded_base_and_uses_pyvenv_exec
     exact host class), while the running venv's OWN ``pyvenv.cfg`` ``executable`` field
     names one that does. Resolution must skip the degraded candidate and select the
     compliant one — never hand the degraded resolution to venv creation implicitly.
+
+    Pins the POSIX path flavor (``os.name``) explicitly, symmetric with the nt-flavor
+    FR9 tests below: ``_is_fully_qualified`` — which ``_resolve_child_venv_interpreter``
+    calls on every candidate — branches on the REAL host ``os.name``, so a POSIX-shaped
+    candidate like ``/usr/bin/python3.12`` is only fully-qualified when the fixture
+    itself pins a POSIX host, never left to whatever OS happens to run the suite.
     """
     mgr = VenvPythonEnvironmentManager()
+    monkeypatch.setattr(python_env_module.os, "name", "posix")
     monkeypatch.setattr(mgr, "_running_requires_python", lambda: ">=3.12,<4.0")
     monkeypatch.setattr(
         python_env_module.sys, "_base_executable", "/usr/bin/python3", raising=False
@@ -528,8 +535,12 @@ def test_resolve_child_venv_interpreter_falls_back_to_path_search(
 ) -> None:
     """Neither ``_base_executable`` nor the current ``pyvenv.cfg`` satisfy: PATH search
     for a version-pinned pythonX.Y is the last resolution strategy before giving up.
+
+    Pins the POSIX path flavor (``os.name``) explicitly — see the sibling
+    ``..._skips_degraded_base_...`` test's docstring for why.
     """
     mgr = VenvPythonEnvironmentManager()
+    monkeypatch.setattr(python_env_module.os, "name", "posix")
     monkeypatch.setattr(mgr, "_running_requires_python", lambda: ">=3.12,<4.0")
     monkeypatch.setattr(
         python_env_module.sys, "_base_executable", "/usr/bin/python3", raising=False
@@ -550,7 +561,11 @@ def test_resolve_child_venv_interpreter_falls_back_to_path_search(
 def test_resolve_child_venv_interpreter_raises_actionable_error_when_nothing_satisfies(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Pins the POSIX path flavor explicitly so the candidate is rejected for the
+    intended reason (version mismatch, not "relative path rejected" on an nt host) —
+    same class as the sibling ``_resolve_child_venv_interpreter`` tests above."""
     mgr = VenvPythonEnvironmentManager()
+    monkeypatch.setattr(python_env_module.os, "name", "posix")
     monkeypatch.setattr(mgr, "_running_requires_python", lambda: ">=3.12,<4.0")
     monkeypatch.setattr(
         python_env_module.sys, "_base_executable", "/usr/bin/python3", raising=False
@@ -748,11 +763,22 @@ def test_is_fully_qualified_accepts_a_windows_drive_qualified_path(
     assert python_env_module._is_fully_qualified("C:\\tools\\python.exe") is True
 
 
-def test_is_fully_qualified_accepts_a_posix_absolute_path() -> None:
+def test_is_fully_qualified_accepts_a_posix_absolute_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Pins the POSIX path flavor explicitly — ``_is_fully_qualified`` branches on the
+    REAL host ``os.name``, so a leading-slash candidate is only unambiguous on a POSIX
+    host; symmetric with the nt-flavor tests above."""
+    monkeypatch.setattr(python_env_module.os, "name", "posix")
+
     assert python_env_module._is_fully_qualified("/usr/bin/python3.12") is True
 
 
-def test_is_fully_qualified_rejects_a_posix_relative_path() -> None:
+def test_is_fully_qualified_rejects_a_posix_relative_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(python_env_module.os, "name", "posix")
+
     assert python_env_module._is_fully_qualified("python3.12") is False
 
 

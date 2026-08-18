@@ -14,8 +14,6 @@ function trusts without re-deriving (mirrors the module's existing
 from __future__ import annotations
 
 import json
-import os
-import stat
 from pathlib import Path
 
 import pytest
@@ -156,21 +154,36 @@ def test_no_confirmed_shas_deletes_nothing(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_unlink_failure_is_best_effort_and_does_not_abort_sweep(tmp_path: Path) -> None:
+def test_unlink_failure_is_best_effort_and_does_not_abort_sweep(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     ctx_dir = _handoff_dir(tmp_path)
     protected = ctx_dir / "sec-protected.handoff.json"
     other = ctx_dir / "sec-other.handoff.json"
     _write_handoff(protected, commit_sha=_SHA_A)
     _write_handoff(other, commit_sha=_SHA_B)
 
-    original_mode = ctx_dir.stat().st_mode
-    # Removing write permission on the CONTAINING directory makes unlink() of any file
-    # inside it raise PermissionError — the file itself needs no special mode.
-    os.chmod(ctx_dir, stat.S_IRUSR | stat.S_IXUSR)
-    try:
-        outcome = gc_consumed_push_verdicts(tmp_path, [_SHA_A, _SHA_B])
-    finally:
-        os.chmod(ctx_dir, original_mode)
+    # Portable removal-failure simulation (not ``os.chmod`` on the containing
+    # directory): the POSIX read-only-directory permission model is a platform no-op
+    # for file deletion on Windows (the read-only attribute NTFS exposes there does not
+    # block content deletion the way a POSIX write-permission bit does), so the
+    # chmod-based simulation never actually denies the unlink and the best-effort
+    # branch goes unexercised. Monkeypatching ``Path.unlink`` to raise for these exact
+    # targets — same idiom as the v0.4.2 unreadable-file precedent (monkeypatched
+    # ``Path.read_text``) — exercises the identical ``except OSError`` branch
+    # identically on every platform; matched by value equality (the production code
+    # builds its own ``Path`` instances via ``iterdir()``).
+    denied = {protected, other}
+    real_unlink = Path.unlink
+
+    def _unlink_denied(self: Path, *args: object, **kwargs: object) -> None:
+        if self in denied:
+            raise PermissionError(13, "Permission denied", str(self))
+        real_unlink(self, *args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(Path, "unlink", _unlink_denied)
+
+    outcome = gc_consumed_push_verdicts(tmp_path, [_SHA_A, _SHA_B])
 
     # The ledger line was appended (durable evidence survives even when the
     # best-effort unlink fails) but the file itself could not be removed.

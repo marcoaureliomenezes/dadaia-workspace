@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import json
 import os
-import stat
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -380,23 +379,41 @@ def test_lane_guard_refuses_a_target_resolving_outside_dadaia(tmp_path: Path) ->
 # ---------------------------------------------------------------------------
 
 
-def test_unlink_failure_is_best_effort_and_does_not_abort_sweep(tmp_path: Path) -> None:
+def test_unlink_failure_is_best_effort_and_does_not_abort_sweep(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     now = datetime.now(tz=UTC)
     ctx_dir = tmp_path / ".dadaia" / "states" / "lifecycle"
-    _write_lifecycle_run(tmp_path, "protected", status="completed")
-    _write_lifecycle_run(tmp_path, "other", status="running")
+    protected = _write_lifecycle_run(tmp_path, "protected", status="completed")
+    other = _write_lifecycle_run(tmp_path, "other", status="running")
     # Also seed an unrelated, independently-reapable stale session to prove one lane's
     # failure never prevents a DIFFERENT lane from completing its own sweep.
     session_path = _write_session(tmp_path, _OTHER_STALE, now=now, age_seconds=_STALE_SESSION_AGE)
 
-    original_mode = ctx_dir.stat().st_mode
-    os.chmod(ctx_dir, stat.S_IRUSR | stat.S_IXUSR)
-    try:
-        outcome = sdd_post_gate._reap_stale_records(tmp_path, _SELF)
-    finally:
-        os.chmod(ctx_dir, original_mode)
+    # Portable removal-failure simulation (not ``os.chmod`` on the containing
+    # directory): the POSIX read-only-directory permission model is a platform no-op
+    # for file deletion on Windows (the read-only attribute NTFS exposes there does not
+    # block content deletion the way a POSIX write-permission bit does), so the
+    # chmod-based simulation never actually denies the unlink and the best-effort
+    # branch goes unexercised. Monkeypatching ``Path.unlink`` to raise for these exact
+    # targets — same idiom as the v0.4.2 unreadable-file precedent (monkeypatched
+    # ``Path.read_text``) — exercises the identical ``except OSError`` branch
+    # identically on every platform; matched by value equality (the production code
+    # builds its own ``Path`` instances via ``iterdir()``), so the unrelated session
+    # lane's own unlink is untouched.
+    denied = {protected, other}
+    real_unlink = Path.unlink
 
-    # Neither lifecycle record could be unlinked (read-only containing dir) — best-effort,
+    def _unlink_denied(self: Path, *args: object, **kwargs: object) -> None:
+        if self in denied:
+            raise PermissionError(13, "Permission denied", str(self))
+        real_unlink(self, *args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(Path, "unlink", _unlink_denied)
+
+    outcome = sdd_post_gate._reap_stale_records(tmp_path, _SELF)
+
+    # Neither lifecycle record could be unlinked (denied) — best-effort,
     # no raise — but the unrelated session lane still completed its own sweep.
     assert (ctx_dir / "protected.json").exists()
     assert (ctx_dir / "other.json").exists()
