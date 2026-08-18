@@ -13,6 +13,12 @@ import typer
 
 from dadaia_workspace.container import is_source_repo_root as _is_source_repo_root
 from dadaia_workspace.core.exceptions import CiPreflightScopeError
+from dadaia_workspace.features.chokepoints import (
+    GcOutcome,
+    gc_consumed_push_verdicts,
+    iter_security_approvals,
+)
+from dadaia_workspace.features.chokepoints.service import LEDGER_RELPATH
 from dadaia_workspace.features.ci_preflight import (
     all_passed,
     checks_for,
@@ -347,6 +353,73 @@ def push_gate_check() -> None:
     if not decision.allowed:
         typer.secho(decision.message, fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
+
+
+_LEDGER_BASENAME = Path(*LEDGER_RELPATH).name
+
+
+@app.command("gc-push-verdicts")
+def gc_push_verdicts(
+    sha: list[str] = typer.Option(
+        ...,
+        "--sha",
+        help=(
+            "A develop tip sha the caller has ALREADY confirmed landed on the remote "
+            "(repeatable — pass one --sha per newly-landed tip). Never pass a sha before "
+            "the push it names is confirmed."
+        ),
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Report what would be consumed without touching the filesystem.",
+    ),
+) -> None:
+    """FR24 (v0.4.3 T-043-39 / M-1 six-axis-review rider): delete the APPROVED
+    security-verdict handoff(s) a successful push just consumed.
+
+    Cadence contract: the ship flow runs this verb IMMEDIATELY AFTER a successful
+    ``git push`` of ``develop`` — never before, and never from the pre-push path itself
+    (a pre-push hook cannot yet know the push will succeed; see
+    ``features/chokepoints/service.py``'s module docstring for the two sanctioned
+    observation points — this verb realizes observation point (b), the
+    ``git push``-wrapping caller). Each ``--sha`` is a pushed ``develop`` tip sha the
+    caller has already confirmed landed on the remote.
+
+    Idempotent and best-effort by design: exits 0 even when nothing matches (no verdict
+    handoff covers the given sha(s)), even when the AG.1 lane guard refuses a candidate,
+    and even when the audit-ledger append fails for one handoff — a GC sweep run
+    strictly AFTER the push it cleans up after has already landed can never change that
+    push's outcome, so a non-zero exit here would be a failure signal a caller could
+    misread as a push problem, and this verb never emits one.
+    """
+    repo_root = _repo_root()
+    workspace = _resolve_workspace_root(repo_root)
+    shas = {value for value in sha if value}
+
+    if dry_run:
+        handoff_root = workspace / ".dadaia" / "handoff"
+        matches = [a for a in iter_security_approvals(handoff_root) if a.commit_sha in shas]
+        typer.echo(
+            f"dadaia ci gc-push-verdicts (dry-run): would consume {len(matches)} "
+            f"verdict(s); ledger {_LEDGER_BASENAME}."
+        )
+        for approval in matches:
+            typer.echo(f"  would consume: {approval.source}")
+        return
+
+    outcome: GcOutcome = gc_consumed_push_verdicts(workspace, shas)
+    skipped = len(outcome.append_failed) + len(outcome.lane_guard_refused)
+    typer.echo(
+        f"dadaia ci gc-push-verdicts: consumed {len(outcome.deleted)} verdict(s), "
+        f"skipped {skipped}; ledger {_LEDGER_BASENAME}."
+    )
+    for name in outcome.deleted:
+        typer.echo(f"  consumed: {name}")
+    for name in outcome.append_failed:
+        typer.echo(f"  skipped (ledger append failed): {name}")
+    for name in outcome.lane_guard_refused:
+        typer.echo(f"  skipped (lane guard refused): {name}")
 
 
 def _install_one(source: Path, target: Path, *, label: str, force: bool) -> None:

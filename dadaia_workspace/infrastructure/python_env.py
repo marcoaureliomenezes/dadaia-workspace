@@ -7,6 +7,7 @@ Executable paths are constructed using ``PLATFORM.venv_scripts_dir`` and
 
 import base64
 import hashlib
+import ntpath
 import os
 import re
 import shutil
@@ -166,12 +167,22 @@ def _version_satisfies(version: tuple[int, ...], spec: str | None) -> bool:
     return True
 
 
+#: Bound on the interpreter-probe subprocess (v0.4.3 T-043-13/A9.2, CWE-426 sibling
+#: hardening): a hung or interactive candidate must degrade to ``None``, never wedge
+#: the bootstrap indefinitely.
+_INTERPRETER_PROBE_TIMEOUT_SECONDS = 10
+
+
 def _interpreter_version(executable: str) -> tuple[int, int, int] | None:
     """Best-effort: ask *executable* for its OWN ``sys.version_info`` by RUNNING it —
     never trust a name or a recorded config value without executing it. Any failure to
-    do so (missing binary, not executable, unexpected output, or the process itself
-    misbehaving) yields ``None`` — the candidate is simply skipped, never a hard
-    failure.
+    do so (missing binary, not executable, unexpected output, a hang past the bound,
+    or the process itself misbehaving) yields ``None`` — the candidate is simply
+    skipped, never a hard failure.
+
+    The probe is bounded (``timeout=``) and never inherits the caller's stdin
+    (``stdin=subprocess.DEVNULL``, v0.4.3 T-043-13/A9.2) — an interactive or hanging
+    candidate on an untrusted PATH must not wedge the whole bootstrap.
     """
     try:
         proc = subprocess.run(
@@ -179,6 +190,8 @@ def _interpreter_version(executable: str) -> tuple[int, int, int] | None:
             capture_output=True,
             text=True,
             check=False,
+            timeout=_INTERPRETER_PROBE_TIMEOUT_SECONDS,
+            stdin=subprocess.DEVNULL,
         )
     except (OSError, subprocess.SubprocessError):
         return None
@@ -199,6 +212,11 @@ def _current_venv_pyvenv_executable() -> str | None:
     value ``venv.create()`` fails to honor for a NEW child venv (see module note
     above) — it was written by the interpreter that actually built THIS venv, so it
     is authoritative regardless of any later OS-level symlink drift.
+
+    CWE-426 (untrusted search path, v0.4.3 T-043-13/A9.1): ``pyvenv.cfg`` is a plain
+    text file a caller could hand-edit or a compromised prior bootstrap could have
+    written; its ``executable`` value is REJECTED here — before any caller can hand it
+    to :func:`_interpreter_version`/``subprocess.run`` — unless it is an absolute path.
     """
     cfg = Path(sys.prefix) / "pyvenv.cfg"
     if not cfg.is_file():
@@ -210,7 +228,8 @@ def _current_venv_pyvenv_executable() -> str | None:
     for line in text.splitlines():
         key, sep, value = line.partition("=")
         if sep and key.strip() == "executable":
-            return value.strip()
+            candidate = value.strip()
+            return candidate if os.path.isabs(candidate) else None
     return None
 
 
@@ -232,13 +251,42 @@ def _path_candidates(min_minor: int) -> list[str]:
     whose unversioned ``python3`` is degraded but a version-pinned interpreter sits
     alongside it (e.g. ``/usr/bin/python3.12`` next to a ``python3 -> python3.10``
     symlink).
+
+    CWE-426 (untrusted search path, v0.4.3 T-043-13/A9.1): on POSIX, ``shutil.which``
+    can return a RELATIVE path when PATH itself carries a relative entry (e.g. a
+    leading ``.`` — an untrusted or misconfigured PATH). A relative result is rejected
+    here, before it can reach :func:`_interpreter_version`/``subprocess.run``.
     """
     found: list[str] = []
     for minor in (min_minor + 1, min_minor):
         exe = shutil.which(f"python3.{minor}")
-        if exe:
+        if exe and os.path.isabs(exe):
             found.append(exe)
     return found
+
+
+def _is_fully_qualified(candidate: str) -> bool:
+    """True iff *candidate* is unambiguously rooted regardless of the current working
+    directory OR (on Windows) the current drive (v0.4.3 T-043-23 security-review
+    rework, LOW residual, CWE-426).
+
+    ``os.path.isabs`` alone is not enough at the probe boundary: on Python 3.12,
+    ``ntpath.isabs`` treats a DRIVE-RELATIVE path — exactly one leading separator, no
+    drive letter, e.g. ``\\tools\\python.exe`` — as absolute, even though it resolves
+    against whatever drive happens to be current, not a fully qualified location.
+    (Python 3.13 tightened ``ntpath.isabs`` to require a drive too; this project pins
+    ``python = \"^3.12\"``, so the probe cannot rely on that yet.)
+
+    Routed through the ``ntpath`` module explicitly — never the host-bound ``os.path``
+    — when ``os.name == \"nt\"``: this makes the Windows-specific check provable on any
+    host OS (``ntpath`` is a pure-Python module, always importable regardless of the
+    running platform), and is exactly what real Windows already does (there,
+    ``os.path`` IS ``ntpath``). POSIX (``os.name != \"nt\"``) is unaffected — plain
+    ``os.path.isabs`` has no such gap there.
+    """
+    if os.name == "nt":
+        return ntpath.isabs(candidate) and ntpath.splitdrive(candidate)[0] != ""
+    return os.path.isabs(candidate)
 
 
 class VenvPythonEnvironmentManager:
@@ -438,6 +486,19 @@ class VenvPythonEnvironmentManager:
             if not candidate or candidate in seen:
                 continue
             seen.add(candidate)
+            # Defense in depth (CWE-426, v0.4.3 T-043-13/A9.1): both source functions
+            # above already reject a relative candidate, but the probe boundary itself
+            # never spawns a non-absolute path either, regardless of how it got here.
+            # v0.4.3 T-043-23 security-review rework: :func:`_is_fully_qualified`,
+            # not bare ``os.path.isabs`` — see its own docstring for the Windows
+            # drive-relative gap this closes. The two source-function filters above
+            # are left as their original ``os.path.isabs`` form (per the handoff's
+            # own recommendation) — this probe boundary is the one call site that
+            # must never spawn a non-fully-qualified path, regardless of how a
+            # candidate reached ``ordered``.
+            if not _is_fully_qualified(candidate):
+                diagnostics.append(f"{candidate}: relative path rejected")
+                continue
             version = _interpreter_version(candidate)
             if version is None:
                 diagnostics.append(f"{candidate}: not runnable")

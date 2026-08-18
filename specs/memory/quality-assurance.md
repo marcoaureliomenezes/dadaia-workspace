@@ -2,14 +2,18 @@
 slug: quality-assurance
 title: quality-assurance
 category: core
-tldr: Layered pytest/browser validation with declared intent, size tiers, per-tier timeouts, a bug-gated quarantine lane, and strict CI gates.
+tldr: Layered pytest/browser validation; intent declared and enforced over tests/e2e only; measured ratcheted complexity and census ceilings; quarantine; CI gates.
 summary: >-
-  Defines test layers and their size tiers, the intent taxonomy mapping, safety fixtures,
-  browser evidence, the flake/quarantine policy and its escalation ladder, the test-health
-  metrics with tiered timeouts and ratcheted wall-clock ceilings, CI gates including the
-  required pr-source-guard on main and the main/develop-only push triggers, coverage as a
-  by-product metric, cross-platform checks, the consumer-side approval boundary, the
-  redaction-at-authoring posture for diagnostic output, and anti-slop requirements.
+  Defines test layers and their size tiers, the intent taxonomy and its e2e-scoped
+  mechanical enforcement, safety fixtures, browser evidence, the flake/quarantine policy
+  and its escalation ladder, the test-health metrics with tiered timeouts, ratcheted
+  wall-clock ceilings and the LARGE census re-pinned at its measured value, the pinned
+  mutation tool and its runnable cadence, the exact-pin rule for all third-party audit and
+  quality tooling, the measured complexity/size ratchet and the mandatory CLOSURE size
+  accounting, CI gates including the required pr-source-guard on main and the
+  main/develop-only push triggers, coverage as a by-product metric, cross-platform checks,
+  the consumer-side approval boundary, the redaction-at-authoring posture for diagnostic
+  output, and anti-slop requirements.
 tags:
 - testing
 - pytest
@@ -19,7 +23,7 @@ tags:
 - flake
 - quarantine
 - privacy
-last_updated: '2026-08-15'
+last_updated: '2026-08-18'
 release_origin: v0.3.0
 ---
 
@@ -51,16 +55,29 @@ the operational protocol — admission, demotion, deletion, flake handling, heal
 in the universal skill `dadaia-test-stewardship`; memory records the state, not the
 protocol.
 
+**The declaration is mechanically enforced over `tests/e2e/**` and nowhere else.**
+`tests/scripts/check_test_intent_declared.py` refuses an e2e file carrying no module
+`Intent:` header, excluding the support modules `__init__.py`, `rendezvous.py` and
+`conftest.py`; it is wired into the gating suite through
+`tests/integration/scripts/test_check_test_intent_declared.py`. The accepted declaration
+shape is size-by-directory-placement plus the module `Intent:` header, documented in
+`tests/AGENTS.md`. Outside `tests/e2e/**` the declaration is discipline that reviewers
+uphold — **there is no suite-wide mechanical gate**, and the check's own docstring says
+so. The narrow scope is deliberate: the rule became satisfiable by construction only once
+the LARGE curation below had given every e2e file an intent and an owner, and a check no
+legal action can satisfy is a defect in the check.
+
 `tests/conftest.py` carries two autouse safety backstops: it blocks accidental real
 Codex invocation unless the corresponding live flag is set
 (`DADAIA_E2E_REAL_WORKER` / `DADAIA_PI_LIVE` / `DADAIA_CODEX_LIVE` /
 `DADAIA_CLAUDE_LIVE`), and it fakes `ensure_workspace_venv` so no test ever builds a
 real venv (disk/time protection). Temporary workspaces use pytest `tmp_path` or
 workspace `.dadaia/tmp/`; they never bootstrap the source repo as a consumer
-workspace. The gating set is ~2,253 collected tests, of which 56 are LARGE (e2e-tier
-pytest journeys; the wider LARGE census including the browser specs is ~85). A full
-local run passes 2,253 with 3 environment-conditional skips (two Windows-only, one
-requiring a LAN IPv4); the declared wall-clock baselines live in "Test Health" below.
+workspace. The gating set collects 2,585 tests — unit 2,172, integration 190, contract
+169, e2e 54 — and a full local run passes 2,582 with 3 environment-conditional skips
+(two Windows-only, one requiring a LAN IPv4). The broad LARGE census is **100**: the 54
+e2e-tier pytest journeys plus 46 Playwright specs across 11 files. The declared
+wall-clock baselines live in "Test Health" below.
 
 ## Root Cause, Always
 
@@ -177,10 +194,19 @@ Per-test timeouts are applied by tier at collection and never override an explic
 A test that needs more time than its tier is mis-tiered: the tier is what gets fixed, never
 the default. Two tests carry a justified explicit ceiling above their tier — 180 s on a
 CLI-runner integration journey and 300 s on the full handoff emit-and-validate e2e
-pipeline — each citing a measured wall clock and a named remediation entry in the backlog.
+pipeline. Each cites its own measured wall clock and names the structural split that would
+retire it, tracked in the release record that curated it — never in a backlog slug, because
+a memory pointer into the demand queue dangles the moment that item is consumed.
 
-Every file under `tests/e2e/**` names an owner. The LARGE cap for this repository is 30,
-declared and measured as a WARN rather than a hard failure while the count is above it.
+Every file under `tests/e2e/**` names an owner, and every LARGE test carries either a
+demotion with a named replacement, a recorded "behaviour removed" supersession, or a
+written keep-justification. The **census is 100** — 54 e2e-tier pytest journeys plus 46
+Playwright specs — and that measured number **is** the ceiling: the cap is re-pinned at the
+census and ratchets **only downward**, on the same measure-then-pin law the complexity
+ceilings follow. A cap nothing meets is an aspiration, not a governance number; a
+reduction is a reviewable diff justified in the reducing release's CLOSURE. The full
+curation is verdict-driven — `qa-engineer` rules, `software-engineer` executes, and no
+test is deleted, skipped or disabled without a verdict carrying evidence.
 
 Wall-clock baselines are frozen and ratcheted rather than open-ended: pre-push preflight
 quick 2:38, preflight full ~5:30, panel E2E 1:10, full local suite 4:37 under `-n auto`.
@@ -188,9 +214,19 @@ Each CI pytest job carries a `timeout-minutes` ceiling set against those baselin
 raising a budget is a reviewable diff that requires a justification in the release CLOSURE.
 
 Mutation testing runs once per release, off the push path, as the judge of detection
-value; the cadence is declared and the tool is not yet selected. The protocol behind every
-value above — escalation, admission, demotion, deletion — is operated from
-`dadaia-test-stewardship`, the single operational home.
+value. The tool is **`mutmut==3.7.0`**, pinned in the optional Poetry group
+`[tool.poetry.group.mutation]` ([[tech-stack]]), and the cadence is backed by a runnable
+command — `tests/scripts/run_mutation_baseline.sh`, which stages a scoped copy and never
+writes inside the repo tree. It is absent from every push-path selector, pinned there by a
+contract test, so CI push timing is unaffected; its score is evidence, never a gate.
+
+Every third-party tool this project prescribes — **audit tooling and quality tooling
+alike** — is installed at an exact version or hash pin, never a floating `pip install
+<name>` or `npx <name>`. The rule is stated once on the audit surface so a newly added
+tool inherits it by reading it, and the mutation tool above is the first arrival under it.
+
+The protocol behind every value above — escalation, admission, demotion, deletion — is
+operated from `dadaia-test-stewardship`, the single operational home.
 
 ## CI
 
@@ -224,6 +260,28 @@ consumer-side validation matrix shipped in the package
 (`public/data/CONSUMER_VALIDATION_RECIPE.md`) with an APPROVED verdict from the
 operator's consumer-side validator. A green internal gate that diverges from real
 consumer behavior is itself a bug.
+
+## Complexity And Size
+
+Complexity and size are governed by a **measured ratchet**, never by an aspiration. Ruff
+selects `C90` (`C901`) and `PLR1702` with their ceilings pinned at the observed maxima of
+this codebase: `max-complexity = 63` and `max-nested-blocks = 6`, scoped to
+`dadaia_workspace/`. Both were measured first at a permissive ceiling and pinned in the
+same change, so `ruff check` is green by construction the moment the rules land — a
+ceiling that fires on day one would be a target masquerading as a gate.
+
+The direction is one-way: **a ceiling may only decrease**. An increase is refused; a
+decrease is a reviewable diff justified in the reducing release's `CLOSURE.md`. The
+ratchet direction is written beside the ceilings in `pyproject.toml`, so the reader of the
+rule and the reader of the number see the same law.
+
+Every release accounts for what it added. `CLOSURE.md` carries a mandatory
+`## Size accounting` table — production LOC added, deleted and net; the three largest
+additions and the three largest deletions by file; the `C90` and `PLR1702` ceilings before
+and after with a justification for any decrease; and the nesting-violation count against
+the pinned ceiling. Every figure is measured, never estimated. The same
+measure-then-pin-then-ratchet-down law governs the LARGE census ceiling in "Test Health"
+and the accepted import-linter ignore-edge cap ([[architecture]]).
 
 ## Anti-Slop
 

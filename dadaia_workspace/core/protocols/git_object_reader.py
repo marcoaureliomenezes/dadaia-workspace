@@ -52,6 +52,15 @@ class ScannedObject:
     fetches prior blobs already known to be under the cap. Not populated for an
     oversized CURRENT object (stays ``None``) — the prior-side lookup rides the FR9
     batched chunk loop only, never the oversized per-object path.
+
+    ``kind`` (v0.4.3 T-043-15/FR11) discriminates what this object actually is:
+    ``"blob"`` (the default — every pre-v0.4.3 object, unchanged) is a real blob at a
+    real repo-relative ``path``; ``"commit"`` is one commit's message BODY (never its
+    ``author``/``committer`` headers, A11.6) with a synthetic, non-path ``path`` label;
+    ``"tag"`` is an annotated tag's own body, same shape, yielded only for a tag-ref
+    push. A ``"commit"``/``"tag"`` object NEVER carries a real path — there is nothing
+    to key a prior-text amnesty lookup on, so ``prior_text`` is always ``None`` for it,
+    fail-closed by construction (A11.7).
     """
 
     path: str
@@ -62,6 +71,7 @@ class ScannedObject:
     size_bytes: int = 0
     scanned_bytes: int = 0
     prior_text: str | None = None
+    kind: str = "blob"
 
 
 class GitObjectReadError(Exception):
@@ -97,9 +107,15 @@ class GitObjectReader(Protocol):
     * ``remote_sha`` zero (new ref) or unresolvable locally -> ``git rev-list --objects
       local_sha --not --remotes``.
 
-    Only blob objects are yielded (commits and trees are never returned), deduplicated
-    by object sha within one call. Any git failure raises :class:`GitObjectReadError`
-    rather than returning a partial/empty result.
+    Blob objects are yielded exactly as before (trees are never returned), deduplicated
+    by object sha within one call. As of v0.4.3 T-043-15/FR11, the range's commit
+    objects are ALSO yielded — each commit's message BODY only, never its
+    ``author``/``committer`` headers (the header/body boundary, A11.6) — through the
+    SAME batched conversation and typed-error contract as the blob read; a tag-ref push
+    additionally yields the annotated tag's own body (A11.3). These carry
+    ``kind="commit"``/``kind="tag"`` (see :class:`ScannedObject`) and a synthetic,
+    non-path ``path`` label rather than a real repo path. Any git failure raises
+    :class:`GitObjectReadError` rather than returning a partial/empty result.
 
     **Base resolution for :attr:`ScannedObject.prior_text` (SPEC v0.11.0 FR2, ADR D7).**
     The SAME ``remote_sha`` resolvability check that decides the FR1 range shape ALSO

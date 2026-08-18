@@ -16,6 +16,9 @@ composition is exactly what this journey proves doctor-green.
 
 Sandboxed: the tree lives in ``tmp_path``; every command is a bounded real subprocess.
 Test-only release: a failure here is a product bug to register, never an inline fix.
+
+Intent: CONTRACT — v0.1.51 FR2 / AC-2 (specs upgrade path)
+Owner: software-engineer
 """
 
 from __future__ import annotations

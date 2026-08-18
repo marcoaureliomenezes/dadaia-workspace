@@ -55,6 +55,11 @@ _MAX_BLOB_BYTES = 5 * 1024 * 1024  # 5 MB
 #: unbounded pass.
 _BATCH_CHUNK_SIZE = 500
 
+#: v0.4.3 T-043-15/FR11 — synthetic, non-path labels for a commit/tag BODY object
+#: (never a real repo-relative path — there is nothing to key an amnesty lookup on).
+_COMMIT_BODY_PATH = "(commit message)"
+_TAG_BODY_PATH = "(tag message)"
+
 
 def _run(
     args: list[str], cwd: Path, *, input_bytes: bytes | None = None
@@ -146,6 +151,158 @@ def _range_commit_shas(repo: Path, local_sha: str, base: str | None) -> list[str
     if result.returncode != 0:
         raise GitObjectReadError(f"git rev-list failed: {_decode(result.stderr).strip()}")
     return [line for line in _decode(result.stdout).splitlines() if line]
+
+
+def _is_annotated_tag(repo: Path, sha: str) -> bool:
+    """True iff *sha* names an ANNOTATED tag object (v0.4.3 T-043-15/FR11/A11.3).
+
+    A lightweight tag is not an object at all — its ref points directly at a commit, so
+    ``local_sha`` would already BE that commit sha and this correctly returns False (no
+    separate tag body exists to scan). Shape-checked BEFORE interpolation into the
+    ``git cat-file -t`` argv, mirroring :func:`_is_resolvable_commit` (CWE-88).
+    """
+    if not sha or sha == ZERO_SHA or not _SHA_SHAPE_RE.match(sha):
+        return False
+    result = _run(["git", "cat-file", "-t", sha], repo)
+    return result.returncode == 0 and _decode(result.stdout).strip() == "tag"
+
+
+def _split_object_body(raw: bytes) -> bytes:
+    """Return *raw*'s message BODY only — everything after the first blank-line
+    header/body separator of a raw commit or annotated-tag object (v0.4.3
+    T-043-15/FR11/A11.6).
+
+    A commit object is ``tree/parent/author/committer[/gpgsig]`` header lines, a blank
+    line, then the free-form message; an annotated tag object is
+    ``object/type/tag/tagger`` header lines, a blank line, then the free-form message.
+    Both shapes share the SAME blank-line boundary, so one splitter serves both. A
+    ``gpgsig`` header's own body is multi-line but every continuation line is prefixed
+    with a single space (never blank), so the FIRST ``b"\\n\\n"`` is always the true
+    header/body boundary — the ``author``/``committer``/``tagger`` header lines (and any
+    ``gpgsig``) are structurally excluded from the returned body, never scanned (A11.6).
+    Returns ``b""`` (never raises) for a malformed object with no blank-line boundary at
+    all — an honest empty message, not a fabricated one.
+    """
+    idx = raw.find(b"\n\n")
+    if idx == -1:
+        return b""
+    return raw[idx + 2 :]
+
+
+#: v0.4.3 T-043-23 security-review rework (FR11 LOW, CWE-184) — the exact folded
+#: header key a merge-of-a-signed-tag embeds (see :func:`_mergetag_bodies`).
+_MERGETAG_PREFIX = b"mergetag "
+
+
+def _unfold_mergetag_blocks(raw: bytes) -> list[bytes]:
+    """Extract and unfold every ``mergetag `` header block from *raw*'s HEADER region
+    (everything before the first blank-line body separator) — v0.4.3 T-043-23
+    security-review rework, FR11 LOW residual (CWE-184, handoff
+    2026-08-17T173112Z-security-reviewer-v0.4.3-alpha-2-delta).
+
+    Merging a GPG-signed annotated tag embeds the WHOLE tag object — its own
+    ``object``/``type``/``tag``/``tagger`` header lines AND its own free-form message
+    body — into the outer commit's header as a ``mergetag <object-sha>`` line followed
+    by CONTINUATION lines, each prefixed with exactly one space (the identical
+    RFC-2822-style folding ``gpgsig`` already uses, per :func:`_split_object_body`'s
+    own docstring) — entirely inside the region ``_split_object_body`` excludes from
+    scanning, so a secret published ONLY inside a merged tag's own message never
+    reached the matcher.
+
+    Returns one UNFOLDED block per ``mergetag `` line found (leading continuation
+    space stripped from every line, ``mergetag `` prefix stripped from the first) —
+    each block carries the identical header-lines/blank-line/body shape a standalone
+    tag object does, ready for :func:`_split_object_body` to split again. Empty when
+    *raw* embeds no mergetag block (the ordinary case).
+    """
+    header_region = raw.split(b"\n\n", 1)[0]
+    lines = header_region.split(b"\n")
+    blocks: list[bytes] = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if line.startswith(_MERGETAG_PREFIX):
+            unfolded = [line[len(_MERGETAG_PREFIX) :]]
+            i += 1
+            while i < len(lines) and lines[i].startswith(b" "):
+                unfolded.append(lines[i][1:])  # strip the single folding space
+                i += 1
+            blocks.append(b"\n".join(unfolded))
+            continue
+        i += 1
+    return blocks
+
+
+def _mergetag_bodies(raw: bytes) -> bytes:
+    """The scannable MESSAGE-BODY text of every mergetag-embedded tag in *raw*,
+    joined with a newline — reuses :func:`_split_object_body`'s own header/body split
+    on each unfolded block (an embedded tag carries the identical shape a standalone
+    tag object does), so the embedded tag's OWN header lines (its ``tagger``, etc.)
+    stay excluded from the scanned text exactly like the outer commit's headers
+    already are (A11.6). Returns ``b""`` when *raw* embeds no mergetag block."""
+    return b"\n".join(_split_object_body(block) for block in _unfold_mergetag_blocks(raw))
+
+
+def _read_object_bodies(
+    repo: Path, shas: list[str], *, kind: str, path_label: str
+) -> Iterator[ScannedObject]:
+    """Yield one :class:`ScannedObject` per sha in *shas*, scanning ONLY the message
+    BODY of each commit/tag object (v0.4.3 T-043-15/FR11).
+
+    Reuses the exact SAME primitives the blob content read already uses: a batched
+    ``git cat-file --batch`` conversation, chunked to :data:`_BATCH_CHUNK_SIZE` (FR9's
+    bounded-memory property extends unchanged to this population), routed through
+    :func:`_run` so a timeout or missing ``git`` always raises the typed
+    :class:`GitObjectReadError` (A11.4 — no silent skip, matching the blob path
+    exactly). ``prior_text`` is never set (stays ``None``): a commit/tag object carries
+    no real path to key a prior-text amnesty lookup on, so every hit here is
+    unconditionally fail-closed (A11.7) — never a special case in the matcher, which
+    already treats ``prior_text=None`` as "never suppress".
+    """
+    for start in range(0, len(shas), _BATCH_CHUNK_SIZE):
+        chunk = shas[start : start + _BATCH_CHUNK_SIZE]
+        stdin_payload = ("\n".join(chunk) + "\n").encode("utf-8")
+        result = _run(["git", "cat-file", "--batch"], repo, input_bytes=stdin_payload)
+        if result.returncode != 0:
+            raise GitObjectReadError(
+                f"git cat-file --batch failed reading {kind} bodies: "
+                f"{_decode(result.stderr).strip()}"
+            )
+        out = result.stdout
+        pos = 0
+        for sha in chunk:
+            try:
+                newline_idx = out.index(b"\n", pos)
+                header = out[pos:newline_idx].decode("utf-8", errors="replace")
+                pos = newline_idx + 1
+                parts = header.split()
+                if len(parts) != 3:
+                    raise ValueError(f"unexpected header shape {header!r}")
+                obj_sha, _obj_type, size_str = parts
+                content_size = int(size_str)
+            except ValueError as exc:
+                raise GitObjectReadError(
+                    f"git cat-file --batch stream desynchronised reading {kind} body "
+                    f"at {sha}: {exc}"
+                ) from exc
+            content = out[pos : pos + content_size]
+            pos += content_size + 1  # skip the trailing newline after the content block
+            body = _split_object_body(content)
+            # v0.4.3 T-043-23 security-review rework (FR11): a merge-of-a-signed-tag
+            # embeds the WHOLE tag object in the HEADER region _split_object_body
+            # excludes — fold any mergetag-embedded tag message body in alongside the
+            # commit's own message so BOTH reach the matcher on this SAME object.
+            mergetag_body = _mergetag_bodies(content)
+            if mergetag_body:
+                body = body + b"\n" + mergetag_body if body else mergetag_body
+            try:
+                text = body.decode("utf-8")
+            except UnicodeDecodeError:
+                yield ScannedObject(
+                    path=path_label, sha=obj_sha, text="", decodable=False, kind=kind
+                )
+                continue
+            yield ScannedObject(path=path_label, sha=obj_sha, text=text, decodable=True, kind=kind)
 
 
 def _multi_path_shas(
@@ -647,3 +804,18 @@ class GitSubprocessObjectReader:
         blob_info = _blob_info(repo, candidates)
         multi_path_shas = _multi_path_shas(repo, local_sha, base, set(blob_info))
         yield from _read_blobs(repo, blob_info, base, multi_path_shas)
+        # v0.4.3 T-043-15/FR11: the range's commit message BODIES (never their
+        # author/committer headers, A11.6) — the SAME range :func:`_range_commit_shas`
+        # already walks for the multi-path detection above, re-derived here rather than
+        # threaded through (keeps this call's own signature and every existing caller
+        # of the functions above untouched). `prior_text` is never set for these (A11.7,
+        # fail-closed by construction — see `_read_object_bodies`).
+        commit_shas = _range_commit_shas(repo, local_sha, base)
+        yield from _read_object_bodies(
+            repo, commit_shas, kind="commit", path_label=_COMMIT_BODY_PATH
+        )
+        # A11.3: a tag-ref push additionally yields the annotated tag's OWN body — a
+        # lightweight tag has no such object (local_sha already names the commit
+        # directly), so `_is_annotated_tag` correctly yields nothing for it.
+        if _is_annotated_tag(repo, local_sha):
+            yield from _read_object_bodies(repo, [local_sha], kind="tag", path_label=_TAG_BODY_PATH)

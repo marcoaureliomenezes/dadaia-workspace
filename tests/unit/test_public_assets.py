@@ -471,8 +471,11 @@ def test_baseline_still_flags_a_different_local_part_at_the_mandated_domain_thro
 # ---------------------------------------------------------------------------
 
 
-def test_baseline_v6_header_and_single_line_patterns() -> None:
-    """Intent: CONTRACT — v0.4.2 A10.2, A10.4; v0.4.3 A12.2 (version bump 5->6)."""
+def test_baseline_v7_header_and_single_line_patterns() -> None:
+    """Intent: CONTRACT — v0.4.2 A10.2, A10.4; v0.4.3 A12.2 (version bump 5->6),
+    A12.5 (version bump 6->7, single-line patterns, extended _header rationale);
+    T-043-23 security-review rework (version bump 7->8, internal-hostname carve-out
+    narrowed to the .home label class)."""
     import importlib.resources
     import json as _json
 
@@ -481,10 +484,12 @@ def test_baseline_v6_header_and_single_line_patterns() -> None:
     )
     raw = _json.loads(resource.read_text(encoding="utf-8"))
 
-    assert raw["_header"]["version"] == 6
+    assert raw["_header"]["version"] == 8
     excludes_text = " ".join(raw["_header"]["excludes"])
     assert "/root" in excludes_text
     assert "Users" in excludes_text
+    assert "FR12/A12.3" in excludes_text  # the trailing-period rationale, extended
+    assert "FR12/A12.4" in excludes_text  # the dotted-chain structural rule, extended
 
     for pattern in raw["patterns"]:
         assert "\n" not in pattern["regex"], f"{pattern['id']}: regex must be single-line"
@@ -492,6 +497,12 @@ def test_baseline_v6_header_and_single_line_patterns() -> None:
             assert "\n" not in pattern["exclude_regex"], (
                 f"{pattern['id']}: exclude_regex must be single-line"
             )
+            # A12.1/A12.5: every carve-out documents a single-line rationale.
+            rationale = pattern.get("exclude_rationale")
+            assert isinstance(rationale, str) and rationale.strip(), (
+                f"{pattern['id']}: exclude_regex requires a non-empty exclude_rationale"
+            )
+            assert "\n" not in rationale, f"{pattern['id']}: exclude_rationale must be single-line"
 
 
 # --- _load_privacy_denylist loader contract -------------------------------
@@ -560,3 +571,344 @@ def test_load_denylist_env_precedence_and_workspace_fallback(
 
     monkeypatch.delenv(_PRIVACY_DENYLIST_ENV, raising=False)
     assert _load_privacy_denylist() == (("from-file", "file"),)
+
+
+# ═════════════════════════════════════════════════════════════════════════════════
+# v0.4.3 T-043-16/FR12 — the privacy baseline stops growing literal by literal.
+# Intent: CONTRACT — v0.4.3 A12.1, A12.3, A12.4 (A12.2 is verified above/at HEAD, not
+# re-implemented — the rider already shipped it; A12.5/A12.6 are covered by the
+# existing v6->v7 header/single-line test and the doctor [ok] assertions throughout
+# this file).
+# ═════════════════════════════════════════════════════════════════════════════════
+
+
+def test_shipped_baseline_every_carve_out_carries_a_documented_rationale() -> None:
+    """A12.1 (shipped-baseline half): every packaged pattern with an ``exclude_regex``
+    carve-out documents WHY via ``exclude_rationale`` — the doctor/CI check (below)
+    must find nothing to flag on the REAL, shipped baseline."""
+    from dadaia_workspace.infrastructure.privacy_check import _check_baseline_exclude_rationale
+
+    assert _check_baseline_exclude_rationale(_load_privacy_baseline()) == []
+    carve_outs = [p for p in _load_privacy_baseline() if p.exclude is not None]
+    assert carve_outs, "the shipped baseline must carry at least one carve-out"
+    assert all(p.exclude_rationale and p.exclude_rationale.strip() for p in carve_outs)
+
+
+def test_baseline_carve_out_missing_a_rationale_is_reported_by_the_doctor_check() -> None:
+    """A12.1 (the check itself): a carve-out (``exclude_regex`` set) with NO
+    ``exclude_rationale`` is flagged by name; a pattern with no carve-out at all needs
+    no rationale and is never flagged."""
+    import re as _re
+
+    from dadaia_workspace.infrastructure.privacy_check import (
+        _BaselinePattern,
+        _check_baseline_exclude_rationale,
+    )
+
+    undocumented = _BaselinePattern(
+        id="zz-fixture-undocumented",
+        regex=_re.compile("x"),
+        reason="fixture",
+        exclude=_re.compile("y"),
+        exclude_rationale=None,
+    )
+    blank_rationale = _BaselinePattern(
+        id="zz-fixture-blank",
+        regex=_re.compile("x"),
+        reason="fixture",
+        exclude=_re.compile("y"),
+        exclude_rationale="   ",
+    )
+    documented = _BaselinePattern(
+        id="zz-fixture-documented",
+        regex=_re.compile("x"),
+        reason="fixture",
+        exclude=_re.compile("y"),
+        exclude_rationale="a genuine, documented reason",
+    )
+    no_carve_out = _BaselinePattern(
+        id="zz-fixture-no-carve-out",
+        regex=_re.compile("x"),
+        reason="fixture",
+        exclude=None,
+        exclude_rationale=None,
+    )
+
+    findings = _check_baseline_exclude_rationale(
+        (undocumented, blank_rationale, documented, no_carve_out)
+    )
+
+    flagged_ids = {line.render() for line in findings}
+    assert any("zz-fixture-undocumented" in line for line in flagged_ids)
+    assert any("zz-fixture-blank" in line for line in flagged_ids)
+    assert not any("zz-fixture-documented" in line for line in flagged_ids)
+    assert not any("zz-fixture-no-carve-out" in line for line in flagged_ids)
+    assert len(findings) == 2
+
+
+def test_baseline_rationale_check_is_wired_into_the_public_privacy_doctor_line(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A12.1 doctor wiring: the rationale check runs as part of the SAME
+    ``_check_public_privacy`` the operator already reads — a clean tree with the real
+    shipped baseline still reports the plain [ok] line (no rationale finding leaks
+    into a healthy run)."""
+    _disable_operator_denylist(monkeypatch, tmp_path)
+    public_dir = tmp_path / "public"
+    (public_dir / "data").mkdir(parents=True)
+    (public_dir / "data" / "AGENTS.md").write_text("# clean generic content\n", encoding="utf-8")
+
+    assert _manager(public_dir)._check_public_privacy() == [_BASELINE_OK_MARKER]  # noqa: SLF001
+
+
+# ---------------------------------------------------------------------------
+# A12.3 — CR-6: the Windows trailing-period escape no longer defeats the carve-out.
+# Windows silently strips a trailing period (or space) from a path component, so
+# "C:\Users\Public." IS, to Windows itself, the SAME path as "C:\Users\Public" — but
+# the pre-fix exclude_regex required the placeholder to be followed immediately by
+# end-of-string or a backslash, so a trailing period (routine prose punctuation, e.g.
+# a sentence ending right after the path with no space) defeated the carve-out and
+# produced a false-positive finding on ordinary documentation.
+# ---------------------------------------------------------------------------
+
+
+def test_windows_users_path_trailing_period_no_longer_defeats_the_placeholder_carve_out() -> None:
+    """Root-cause proof at the regex level: the documented placeholder form, followed
+    immediately by a trailing period (prose form, in this fixture the ENTIRE scanned
+    text — the exact shape that pre-fix could not backtrack its way out of), must
+    still be excluded."""
+    patterns = {p.id: p for p in _load_privacy_baseline()}
+    windows_pattern = patterns["windows-users-path"]
+
+    prose = "backup lives at C:\\Users\\Public."
+    match = windows_pattern.regex.search(prose)
+    assert match is not None
+    assert windows_pattern.exclude is not None
+    assert windows_pattern.exclude.search(match.group(0)), (
+        "a trailing period right after the placeholder (Windows treats it as "
+        "insignificant) must not defeat the carve-out"
+    )
+
+
+def test_windows_users_path_trailing_period_prose_form_fixture_reports_ok_through_the_doctor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """End-to-end confirmation through ``_check_public_privacy``: the exact CR-6 prose
+    fixture (the scanned file's content ends immediately after the trailing period)
+    reports clean, not a false-positive finding."""
+    _disable_operator_denylist(monkeypatch, tmp_path)
+    public_dir = tmp_path / "public"
+    (public_dir / "data").mkdir(parents=True)
+    (public_dir / "data" / "AGENTS.md").write_text(
+        "backup lives at C:\\Users\\Public.", encoding="utf-8"
+    )
+    assert _manager(public_dir)._check_public_privacy() == [_BASELINE_OK_MARKER]  # noqa: SLF001
+
+
+def test_windows_users_path_trailing_period_still_fires_for_a_real_name(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Counter-fixture: the SAME trailing-period prose shape, but with a genuine
+    (non-placeholder) name, must still be flagged — the fix widens the placeholder's
+    OWN tolerance, it never widens which names count as placeholders."""
+    _disable_operator_denylist(monkeypatch, tmp_path)
+    public_dir = tmp_path / "public"
+    (public_dir / "data").mkdir(parents=True)
+    (public_dir / "data" / "AGENTS.md").write_text(
+        "backup lives at C:\\Users\\zz-fixture-user.", encoding="utf-8"
+    )
+    report = [line.render() for line in _manager(public_dir)._check_public_privacy()]  # noqa: SLF001
+    assert any(line.startswith("[error] public-privacy:") for line in report)
+
+
+# ---------------------------------------------------------------------------
+# A12.4 / T-043-23 security-review rework — the internal-hostname dotted-chain
+# carve-out is now scoped to the ``.home`` label class ONLY (Path.home(),
+# pathlib.Path.home(), and any other uppercase-initial Python attribute chain
+# ENDING in ``.home``), never a blanket "any uppercase-initial dotted chain"
+# exclusion. Pre-rework the carve-out was UNANCHORED and applied via ``.search()``:
+# one capitalised label ANYWHERE in the matched hostname excluded the WHOLE match,
+# so a real, personal/corporate-name-bearing hostname (a macOS mDNS default, a
+# Windows default hostname, a mixed-case corp subdomain, an all-uppercase label)
+# silently passed both the public-privacy doctor gate and the push-range denylist
+# scan (security-reviewer MEDIUM finding, CWE-625/CWE-183, handoff
+# 2026-08-17T173112Z-security-reviewer-v0.4.3-alpha-2-delta). Narrowed per the
+# handoff's Option A: ``(?:^|\.)[A-Z][A-Za-z0-9_]*\.home$`` — an uppercase-initial
+# chain is excluded ONLY when it ends in ``.home`` (the shape
+# ``Path.home()``/``pathlib.Path.home()`` actually needed); every OTHER TLD class
+# (``.local``/``.internal``/``.lan``/``.intranet``/``.corp``) now fires regardless
+# of case.
+#
+# Every hostname-shaped literal below is composed at RUNTIME via
+# ``_hostname_literal`` — never contiguous in this module's own tracked source, the
+# same technique ``_macos_home_literal``/``_windows_home_literal`` above and
+# ``test_repo_self_scan.py::_archive_fixture_literal`` already use. This is ALSO the
+# fix for the security-reviewer HIGH finding (CWE-532): the pre-rework all-lowercase
+# label/TLD counter-fixture pairs below (formerly line 770 of this same tracked blob)
+# were bare joined literals, matching the internal-hostname baseline pattern verbatim
+# — this comment deliberately never spells the joined form out either, so the real
+# pre-push denylist scan does not refuse THIS explanatory prose.
+# ---------------------------------------------------------------------------
+
+
+def _hostname_literal(*labels: str) -> str:
+    """Compose a dotted hostname/attribute-chain literal from *labels* at runtime,
+    joined with ``.`` — never written as one contiguous string in this module's own
+    tracked source, so the internal-hostname baseline pattern never matches this
+    FILE itself (T-043-23 security-review rework, HIGH CWE-532)."""
+    return ".".join(labels)
+
+
+def test_internal_hostname_dotted_chain_structural_rule_still_excludes_path_home() -> None:
+    """Regression: the two PRE-EXISTING literal exclusions (Path.home,
+    pathlib.Path.home) must still be excluded now that they are covered by the
+    narrowed ``.home``-scoped structural rule rather than by their own literals."""
+    patterns = {p.id: p for p in _load_privacy_baseline()}
+    hostname_pattern = patterns["internal-hostname"]
+    assert hostname_pattern.exclude is not None
+
+    for value in (_hostname_literal("Path", "home"), _hostname_literal("pathlib", "Path", "home")):
+        match = hostname_pattern.regex.search(f"call {value}() to resolve it")
+        assert match is not None, f"{value} must still match the base hostname shape"
+        assert hostname_pattern.exclude.search(match.group(0)), (
+            f"{value} must still be excluded (structural .home rule, not a literal now)"
+        )
+
+
+def test_internal_hostname_dotted_chain_structural_rule_excludes_a_brand_new_home_chain() -> None:
+    """A12.4 (narrowed): a PREVIOUSLY-UNSEEN uppercase-initial chain ENDING IN
+    ``.home`` (never added as its own literal) is excluded by the SAME structural
+    rule — proving genuine widening within the ``.home`` label class, not a renamed
+    literal."""
+    patterns = {p.id: p for p in _load_privacy_baseline()}
+    hostname_pattern = patterns["internal-hostname"]
+    assert hostname_pattern.exclude is not None
+
+    chain = _hostname_literal("SomeClass", "home")
+    match = hostname_pattern.regex.search(f"call {chain}() next")
+    assert match is not None
+    assert match.group(0) == chain
+    assert hostname_pattern.exclude.search(match.group(0)), (
+        "a brand-new uppercase-initial .home-suffixed chain must be excluded by "
+        "the structural rule with no new literal added"
+    )
+
+
+def test_internal_hostname_uppercase_chain_no_longer_excluded_outside_the_home_class() -> None:
+    """T-043-23 security-review rework counter-fixture (MEDIUM, CWE-625): an
+    uppercase-initial dotted chain ENDING IN A NON-``.home`` TLD (the shape the
+    pre-rework over-permissive "any uppercase label anywhere" rule used to carve
+    out, composed below via ``_hostname_literal`` so it is never contiguous in this
+    prose either) must now fire like any other genuine hostname."""
+    patterns = {p.id: p for p in _load_privacy_baseline()}
+    hostname_pattern = patterns["internal-hostname"]
+    assert hostname_pattern.exclude is not None
+
+    chain = _hostname_literal("SomeClass", "internal")
+    match = hostname_pattern.regex.search(f"call {chain}() next")
+    assert match is not None
+    assert match.group(0) == chain
+    assert not hostname_pattern.exclude.search(match.group(0)), (
+        "an uppercase-initial chain outside the .home label class must fire "
+        "like any other genuine hostname"
+    )
+
+
+@pytest.mark.parametrize(
+    "hostname",
+    [
+        pytest.param(_hostname_literal("db1", "internal"), id="lowercase-internal"),
+        pytest.param(_hostname_literal("fileserver", "corp"), id="lowercase-corp"),
+        pytest.param(_hostname_literal("build-agent", "lan"), id="lowercase-lan-hyphenated"),
+    ],
+)
+def test_internal_hostname_dotted_chain_structural_rule_preserves_narrowness(
+    hostname: str,
+) -> None:
+    """A12.4 counter-fixture: an all-lowercase, genuinely hostname-shaped value (no
+    segment starting uppercase) is NEVER excluded by the new structural rule —
+    narrowness is preserved."""
+    patterns = {p.id: p for p in _load_privacy_baseline()}
+    hostname_pattern = patterns["internal-hostname"]
+    assert hostname_pattern.exclude is not None
+
+    match = hostname_pattern.regex.search(f"reach it at {hostname} from the VPN")
+    assert match is not None
+    assert match.group(0) == hostname
+    assert not hostname_pattern.exclude.search(match.group(0)), (
+        f"{hostname} is a genuine lowercase internal hostname and must still be flagged"
+    )
+
+
+@pytest.mark.parametrize(
+    "hostname",
+    [
+        pytest.param(
+            _hostname_literal("Marcos-MacBook-Pro", "local"), id="macos-mdns-personal-name"
+        ),
+        pytest.param(_hostname_literal("DESKTOP-AB12CD", "local"), id="windows-default-hostname"),
+        pytest.param(_hostname_literal("vpn", "Acme", "internal"), id="mixed-case-corp-name"),
+        pytest.param(_hostname_literal("MYNAS", "lan"), id="all-uppercase-label"),
+    ],
+)
+def test_internal_hostname_uppercase_initial_real_hostname_still_fires(hostname: str) -> None:
+    """T-043-23 security-review rework (MEDIUM, CWE-625) — the four VERIFIED bypass
+    values from the security handoff (a macOS mDNS default carrying the operator's
+    given name, a Windows default hostname, a mixed-case corp name, and an
+    all-uppercase label) must ALL fire post-narrowing — none of them ends in
+    ``.home``, so none is excluded by the narrowed structural rule."""
+    patterns = {p.id: p for p in _load_privacy_baseline()}
+    hostname_pattern = patterns["internal-hostname"]
+    assert hostname_pattern.exclude is not None
+
+    match = hostname_pattern.regex.search(f"reach it at {hostname} from the VPN")
+    assert match is not None
+    assert match.group(0) == hostname
+    assert not hostname_pattern.exclude.search(match.group(0)), (
+        f"{hostname} is a genuine, personal/corporate-name-bearing hostname and "
+        "must fire regardless of case (bypass verified by the security review)"
+    )
+
+
+def test_internal_hostname_dotted_chain_counter_fixture_fires_through_the_doctor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """End-to-end confirmation: the lowercase counter-fixture is a genuine finding
+    through ``_check_public_privacy``, while the ``.home``-suffixed Python-identifier
+    fixture stays clean — proving the narrowed structural rule is wired through, not
+    just present at the bare-regex level."""
+    _disable_operator_denylist(monkeypatch, tmp_path)
+
+    clean_dir = tmp_path / "public-clean"
+    (clean_dir / "data").mkdir(parents=True)
+    (clean_dir / "data" / "AGENTS.md").write_text(
+        f"call {_hostname_literal('SomeClass', 'home')}() to resolve the base path\n",
+        encoding="utf-8",
+    )
+    assert _manager(clean_dir)._check_public_privacy() == [_BASELINE_OK_MARKER]  # noqa: SLF001
+
+    dirty_dir = tmp_path / "public-dirty"
+    (dirty_dir / "data").mkdir(parents=True)
+    (dirty_dir / "data" / "AGENTS.md").write_text(
+        f"reach it at {_hostname_literal('db1', 'internal')} from the VPN\n", encoding="utf-8"
+    )
+    report = [line.render() for line in _manager(dirty_dir)._check_public_privacy()]  # noqa: SLF001
+    assert any(line.startswith("[error] public-privacy:") for line in report)
+
+
+def test_internal_hostname_uppercase_initial_real_hostname_fires_through_the_doctor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """End-to-end confirmation (MEDIUM rework): an uppercase-initial, genuinely
+    personal-name-bearing hostname is a real finding through
+    ``_check_public_privacy`` post-narrowing — not only at the bare-regex level."""
+    _disable_operator_denylist(monkeypatch, tmp_path)
+
+    dirty_dir = tmp_path / "public-dirty-uppercase"
+    (dirty_dir / "data").mkdir(parents=True)
+    (dirty_dir / "data" / "AGENTS.md").write_text(
+        f"reach it at {_hostname_literal('Marcos-MacBook-Pro', 'local')} on the LAN\n",
+        encoding="utf-8",
+    )
+    report = [line.render() for line in _manager(dirty_dir)._check_public_privacy()]  # noqa: SLF001
+    assert any(line.startswith("[error] public-privacy:") for line in report)

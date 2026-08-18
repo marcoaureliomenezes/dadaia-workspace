@@ -6,8 +6,9 @@ authoring-contract surfaces must state that truth accurately, not the
 opposite ("the schema tolerates it" / "the schema retains a deprecated
 optional agent_tier property"). This is an executed-path test over the real
 on-disk files (not a schema test — see
-``test_lint_memory_atoms.py::test_agent_tier_property_absent_from_schema``
-for the schema-side pin).
+``tests/unit/features/specs/test_memory_lint.py::test_agent_tier_property_absent_from_schema``
+for the schema-side pin; relocated there from the deleted
+``test_lint_memory_atoms.py`` at v0.4.3 T-043-20/FR16).
 """
 
 from __future__ import annotations

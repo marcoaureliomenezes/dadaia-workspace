@@ -18,6 +18,9 @@
  * back to the browser default re-reds this spec (captured on the T-59-60 task line).
  * A browser-default button has paddingTop≈1px, paddingLeft≈6px, borderRadius 0px —
  * every threshold below sits strictly above that default.
+ *
+ * Intent: CONTRACT — v0.1.59 FR7 / AC-8 (restyled-control smoke)
+ * Owner: software-engineer
  */
 
 import { test, expect, Page } from '@playwright/test';

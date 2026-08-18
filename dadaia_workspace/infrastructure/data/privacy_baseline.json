@@ -1,8 +1,8 @@
 {
   "_header": {
     "name": "public-privacy baseline structural denylist",
-    "version": 6,
-    "description": "Versioned, fail-closed baseline of STRUCTURAL regex patterns scanned against public/ assets when no operator denylist is present. Operator terms (DADAIA_PRIVACY_DENYLIST / .dadaia/states/privacy_denylist.json) are ADDITIVE and merge on top of this baseline. Patterns are conservative to avoid false positives on SHA hashes in lockfiles, doc/loopback IP ranges, and example hostnames. Edit only via an approved release task; bump 'version' on change.",
+    "version": 8,
+    "description": "Versioned, fail-closed baseline of STRUCTURAL regex patterns scanned against public/ assets when no operator denylist is present. Operator terms (DADAIA_PRIVACY_DENYLIST / .dadaia/states/privacy_denylist.json) are ADDITIVE and merge on top of this baseline. Patterns are conservative to avoid false positives on SHA hashes in lockfiles, doc/loopback IP ranges, and example hostnames. Edit only via an approved release task; bump 'version' on change. Every pattern carrying an 'exclude_regex' carve-out MUST also carry an 'exclude_rationale' string (v0.4.3 FR12/A12.1) — a doctor/CI check (privacy_check._check_baseline_exclude_rationale) flags any carve-out missing one, on every 'dadaia public doctor' run.",
     "released_in": "v0.1.10",
     "excludes": [
       "127.0.0.0/8 (loopback)",
@@ -15,9 +15,9 @@
       "*.example email domains",
       "RFC-2606 reserved TLDs in email domains (.invalid/.test/.example/.localhost), any depth of subdomain — v0.9.0",
       "workspace.local (the exact literal only, in both the internal-hostname pattern and as an email domain) — the product's own synthetic git commit identity host (git_subprocess.py's user.email=dadaia@workspace.local fallback); any OTHER *.local host, or *.workspace.local subdomain, still matches — v0.9.0 code-review remediation",
-      "Path.home / pathlib.Path.home (the exact literal only, case-sensitive) in internal-hostname — the stdlib dotted-attribute-chain idiom Path.home(), not a hostname; any OTHER *.home host (e.g. a real internal TLD) still matches — v0.9.0 code-review remediation, self-scan regression",
+      "internal-hostname's dotted-chain class carve-out is STRUCTURAL, not literal (v0.4.3 FR12/A12.4), and NARROWED to the .home label class only (v0.4.3 T-043-23 security-review rework, CWE-625/CWE-183): an uppercase-initial dotted-chain segment is treated as a Python identifier/attribute chain ONLY when it ends in .home (e.g. Path.home(), pathlib.Path.home(), SomeClass.home()) -- DNS labels are conventionally all-lowercase in this codebase's own usage, and .home is the one label class the Path.home()/pathlib.Path.home() false-positive treadmill actually lived in. The prior unanchored form (any uppercase-initial chain, any TLD) silently excluded real, personal/corporate-name-bearing hostnames case-insensitively across EVERY TLD class (verified bypasses: a macOS mDNS default carrying the operator's given name, a Windows default hostname, a mixed-case corp subdomain, an all-uppercase label) in both the public-privacy doctor gate and the push-range denylist scan -- security-reviewer MEDIUM finding, handoff 2026-08-17T173112Z-security-reviewer-v0.4.3-alpha-2-delta. A genuine dotted hostname NOT ending in .home (any case, any of .local/.internal/.lan/.intranet/.corp) is unaffected and still matches — v0.9.0 code-review remediation, self-scan regression, widened v0.4.3, narrowed T-043-23",
       "/Users/(user|username|youruser|<user>|runner|ci|Shared) placeholder/system forms in users-abs-path (macOS) — Shared is the real, non-personal /Users/Shared system directory present on every macOS install; any OTHER /Users/<name> still matches — v0.4.2 FR10/GRILL P15, cross-platform home-path parity with home-abs-path",
-      "[A-Za-z]:\\\\Users\\\\(user|username|youruser|<user>|Public|Default) placeholder/system forms in windows-users-path (Windows) — Public and Default are the real, non-personal C:\\\\Users\\\\Public and C:\\\\Users\\\\Default system directories present on every Windows install; any OTHER C:\\\\Users\\\\<name> still matches, any drive letter case — v0.4.2 FR10/GRILL P15",
+      "[A-Za-z]:\\\\Users\\\\(user|username|youruser|<user>|Public|Default) placeholder/system forms in windows-users-path (Windows) — Public and Default are the real, non-personal C:\\\\Users\\\\Public and C:\\\\Users\\\\Default system directories present on every Windows install; any OTHER C:\\\\Users\\\\<name> still matches, any drive letter case — v0.4.2 FR10/GRILL P15. A single trailing period immediately after the placeholder is ALSO tolerated (Windows itself treats a trailing period in a path component as insignificant), so ordinary prose ending a sentence right after the placeholder is not defeated — v0.4.3 FR12/A12.3, CR-6",
       "/root — DELIBERATELY EXCLUDED (evaluated, not covered): unlike /home, /Users and C:\\\\Users, a bare /root carries no user-identifying segment and appears routinely in container documentation; adding it would buy false positives and no privacy — v0.4.2 FR10/GRILL P15/D10",
       "noreply@anthropic.com (the exact full-address literal only, local-part-anchored) — the law-mandated Co-Authored-By trailer address DADAIA.md requires on every commit, a public vendor no-reply mailbox already published unmasked in thousands of this repo's own commit trailers; any OTHER local part at the same apex domain, or the bare apex domain by itself, still matches — v0.4.3 FR12/A12.2, Arm-B rider on bug privacy-baseline-noreply-local-part-not-carved-out"
     ]
@@ -27,43 +27,50 @@
       "id": "ipv4-literal",
       "regex": "(?<![\\w.])(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)(?:\\.(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)){3}(?![\\w.])",
       "reason": "IPv4 address literal",
-      "exclude_regex": "^(?:127\\.|0\\.0\\.0\\.0$|192\\.0\\.2\\.|198\\.51\\.100\\.|203\\.0\\.113\\.|255\\.255\\.255\\.255$|0\\.0\\.0\\.0)"
+      "exclude_regex": "^(?:127\\.|0\\.0\\.0\\.0$|192\\.0\\.2\\.|198\\.51\\.100\\.|203\\.0\\.113\\.|255\\.255\\.255\\.255$|0\\.0\\.0\\.0)",
+      "exclude_rationale": "loopback (127.0.0.0/8), the null route 0.0.0.0, RFC 5737 documentation ranges (192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24), and the broadcast address 255.255.255.255 are conventional non-identifying examples, never a real operator host."
     },
     {
       "id": "ipv6-literal",
       "regex": "(?<![\\w:])(?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}(?![\\w:])",
       "reason": "IPv6 address literal",
-      "exclude_regex": "^(?:0{1,4}:){7}0{0,4}1$"
+      "exclude_regex": "^(?:0{1,4}:){7}0{0,4}1$",
+      "exclude_rationale": "the IPv6 loopback address ::1 (RFC 4291) — never a real host."
     },
     {
       "id": "internal-hostname",
       "regex": "(?<![\\w.-])(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\.)+(?:local|internal|lan|intranet|corp|home)(?![\\w.-])",
       "reason": "non-public internal hostname (*.local/*.internal/*.lan/*.intranet/*.corp/*.home)",
-      "exclude_regex": "^(?:workspace\\.local|(?:pathlib\\.)?Path\\.home)$"
+      "exclude_regex": "^workspace\\.local$|(?:^|\\.)[A-Z][A-Za-z0-9_]*\\.home$",
+      "exclude_rationale": "workspace.local (this product's own synthetic git commit identity host, exact literal only) plus a STRUCTURAL rule NARROWED to the .home label class (v0.4.3 T-043-23 security-review rework, CWE-625): an uppercase-initial dotted-chain segment ENDING IN .home is a Python identifier/attribute chain (Path.home(), pathlib.Path.home(), SomeClass.home()), never a DNS hostname — DNS labels are conventionally all-lowercase in this codebase's own usage, and .home is the one label class the Path.home()/pathlib.Path.home() false-positive treadmill actually lived in. A genuine internal hostname NOT ending in .home still fires REGARDLESS OF CASE (the pre-rework unanchored form silently excluded any uppercase-initial hostname across every TLD class — a real bypass for personal/corporate-name-bearing hosts); replaces the two-literal Path.home/pathlib.Path.home treadmill — v0.4.3 FR12/A12.4, narrowed T-043-23."
     },
     {
       "id": "home-abs-path",
       "regex": "(?<![\\w/])/home/[a-z_][a-z0-9_-]*(?=/|\\b)",
       "reason": "absolute /home/<user> filesystem path",
-      "exclude_regex": "^/home/(?:user|username|youruser|<user>|runner|ci|ubuntu)(?:$|/)"
+      "exclude_regex": "^/home/(?:user|username|youruser|<user>|runner|ci|ubuntu)(?:$|/)",
+      "exclude_rationale": "placeholder/system /home/<user> forms (user, username, youruser, <user>, runner, ci, ubuntu) that appear routinely in generic docs/CI examples — never a real operator home directory."
     },
     {
       "id": "users-abs-path",
       "regex": "(?<![\\w/])/Users/[A-Za-z_][A-Za-z0-9_-]*(?=/|\\b)",
       "reason": "absolute /Users/<name> filesystem path (macOS)",
-      "exclude_regex": "^/Users/(?:user|username|youruser|<user>|runner|ci|Shared)(?:$|/)"
+      "exclude_regex": "^/Users/(?:user|username|youruser|<user>|runner|ci|Shared)(?:$|/)",
+      "exclude_rationale": "placeholder/system /Users/<name> forms (user, username, youruser, <user>, runner, ci, Shared) — Shared is the real, non-personal /Users/Shared macOS system directory present on every install."
     },
     {
       "id": "windows-users-path",
       "regex": "(?<![A-Za-z0-9_])[A-Za-z]:\\\\Users\\\\[A-Za-z0-9_.-]+(?=\\\\|\\b|$)",
       "reason": "absolute C:\\\\Users\\\\<name> filesystem path (Windows)",
-      "exclude_regex": "^[A-Za-z]:\\\\Users\\\\(?:user|username|youruser|<user>|Public|Default)(?:$|\\\\)"
+      "exclude_regex": "^[A-Za-z]:\\\\Users\\\\(?:user|username|youruser|<user>|Public|Default)\\.?(?:$|\\\\)",
+      "exclude_rationale": "placeholder/system C:\\\\Users\\\\<name> forms (user, username, youruser, <user>, Public, Default) — Public and Default are the real, non-personal Windows system directories. A single trailing period immediately after the placeholder is also tolerated: Windows itself treats a trailing period in a path component as insignificant, so ordinary prose ending a sentence right after the placeholder is not defeated — v0.4.3 FR12/A12.3, CR-6."
     },
     {
       "id": "email-address",
       "regex": "(?<![\\w.+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}(?![\\w.-])",
       "reason": "email address",
-      "exclude_regex": "^noreply@anthropic\\.com$|@(?:example\\.(?:com|org|net)|noreply\\.anthropic\\.com|users\\.noreply\\.github\\.com|workspace\\.local|(?:[A-Za-z0-9-]+\\.)*(?:invalid|test|example|localhost))$"
+      "exclude_regex": "^noreply@anthropic\\.com$|@(?:example\\.(?:com|org|net)|noreply\\.anthropic\\.com|users\\.noreply\\.github\\.com|workspace\\.local|(?:[A-Za-z0-9-]+\\.)*(?:invalid|test|example|localhost))$",
+      "exclude_rationale": "example.com/.org/.net, *.example, RFC-2606 reserved TLDs (.invalid/.test/.example/.localhost), workspace.local, GitHub's users.noreply.github.com, and the law-mandated noreply@anthropic.com Co-Authored-By trailer address (local-part-anchored, exact literal only) — all conventional non-identifying addresses, never a real operator mailbox."
     },
     {
       "id": "secret-token",

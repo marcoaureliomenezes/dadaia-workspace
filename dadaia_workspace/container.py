@@ -196,6 +196,12 @@ def build_git_object_reader() -> GitObjectReader:
     :func:`build_git_client` does for the read-only git probe. A single concrete
     adapter today (subprocess-backed, cross-platform via the ``git`` executable on
     PATH) — no platform branching needed, unlike :func:`build_process_ancestry`.
+
+    As of v0.4.3 T-043-15/FR11, the adapter this seam returns yields commit-object
+    message bodies and (for a tag-ref push) annotated tag bodies IN ADDITION to blob
+    content — see ``GitObjectReader.new_objects``'s own docstring for the full
+    contract. This seam's own return type/wiring is unchanged; only the adapter's
+    internal yield widened.
     """
     from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
 

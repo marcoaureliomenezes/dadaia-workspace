@@ -1,3 +1,14 @@
+/**
+ * api-contracts.spec.ts — panel API contracts: agents catalog, prompt endpoint.
+ *
+ * Tests: 3
+ * Surface: /api/agents (catalog), /api/agents/<name>/prompt (unknown-name 404,
+ *          path-traversal rejection), the retired /api/workflow-catalog stays 404.
+ *
+ * Intent: CONTRACT — v0.4.3 A18.2 (panel API contracts: agents catalog, prompt endpoint)
+ * Owner: software-engineer
+ */
+
 import { test, expect } from '@playwright/test';
 import { authHeaders, BASE_URL } from './helpers';
 

@@ -10,8 +10,8 @@
 
 | slug | title | tldr |
 |------|-------|------|
-| `agent-comms` | agent-comms — Handoff Contract v1 | handoff-v1.2 separates HTML reports from JSON handoffs and carries the self_pull Layer-1 read-proof line. |
-| `agent-monitoring` | agent-monitoring | stdlib-only local telemetry (Claude/Codex/Kimi sessions) → panel Sessions tab + /api/agents; allowlist gate preserves privacy. |
+| `agent-comms` | agent-comms — Handoff Contract v1 | handoff-v1.2 separates HTML reports from JSON handoffs, carries the self_pull Layer-1 read-proof line, and dies on consumption unless it is artifact-bearing. |
+| `agent-monitoring` | agent-monitoring | stdlib-only local telemetry → panel Sessions tab + /api/agents; allowlist gate preserves privacy; artifacts die event-driven, logs self-rotate. |
 | `agent-orchestration` | agent-orchestration | Nine core Layer-1 roles, two dispatchers, document-governed ordered work, and advisory-only concurrency. |
 | `agentic-entities` | agentic-entities | Abstract-entity registry — Personas, Deterministic Behaviors, Abstract Rules, universal surface — that every scaffolded core implementation derives from. |
 
@@ -28,7 +28,7 @@
 | slug | title | tldr |
 |------|-------|------|
 | `harness-claude-code` | Harness — Claude Code | Entry harness with native sub-agent dispatch; scaffold = CLAUDE.md bridge + .claude/ projection. |
-| `harness-codex` | Harness — Codex | Entry harness on the operator's Codex subscription: TUI with deterministic hooks, Starlark command policy, and a .codex/ projection of agents, skills and rules. |
+| `harness-codex` | Harness — Codex | Entry harness on the operator's Codex subscription: TUI and headless exec, version-qualified live-certified hook fire, Starlark policy, .codex/ projection. |
 | `harness-kimi-code` | Harness — Kimi Code | Layer-1-only harness: `.kimi-code/` projection + user-level TOML hook shims; binds through `DADAIA_CONTEXT` at launch. |
 
 ### panel
@@ -63,7 +63,7 @@
 
 | slug | title | tldr |
 |------|-------|------|
-| `sdd-bug-backlog-governance` | sdd-bug-backlog-governance | Event-sourced JSONL bugs, an operator-gated single-source backlog, release consumption, audit dispositions, and a develop-only four-branch git contract. |
-| `sdd-gate-v3` | sdd-gate-v3 | No-lock SDD enforcement: path/mode gates, advisory presence, and a develop-only, denylist-scanned push boundary with fail-closed single-path amnesty. |
-| `specs-doctor` | specs-doctor | Validates canonical specs structure, memory/catalog integrity, release markers, closure evidence, dispositions, bug ledgers, and audit coherence. |
+| `sdd-bug-backlog-governance` | sdd-bug-backlog-governance | Event-sourced JSONL bugs with a non-blocking picked marker, an operator-gated backlog, release consumption, audit dispositions, and a four-branch git contract. |
+| `sdd-gate-v3` | sdd-gate-v3 | No-lock SDD enforcement: path/mode/cache gates, advisory presence, and a develop-only push boundary scanning blobs and commit bodies, amnesty fail-closed. |
+| `specs-doctor` | specs-doctor | Validates canonical specs structure, memory/catalog and placeholder integrity, release/segment markers, closure evidence, dispositions, bugs, and audits. |
 

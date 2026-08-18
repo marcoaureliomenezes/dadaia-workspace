@@ -105,7 +105,10 @@ def test_valid_handoff_exits_0_with_valid_count_and_json_shape(tmp_path: Path, m
 
     json_result = _runner.invoke(app, ["reports", "validate", str(handoff_path), "--json"])
     assert json_result.exit_code == 0, json_result.output
-    data = json.loads(json_result.output)
+    # `.stdout` (pure stdout), not `.output` (stdout+stderr mixed, per Click 8.2's own
+    # docstring): the resolved-workspace-root diagnostic (T-043-47/A30.5) writes to
+    # stderr precisely so it never pollutes the --json stdout payload's list shape.
+    data = json.loads(json_result.stdout)
     assert isinstance(data, list)
     assert len(data) == 1
     entry = data[0]
@@ -208,3 +211,59 @@ def test_schema_staged_after_install_and_not_in_claude_schemas_dir(
     assert not claude_schemas.exists(), (
         f".claude/schemas/ must not exist after workspace init, but found {claude_schemas}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Bug ancestor-walk-workspace-root-silent-mistarget (T-043-47/A30.5) — a bare
+# `dadaia reports validate <path>` run from a cwd outside the handoff's own workspace
+# silently resolves artifact.path against the WRONG ancestor root and reports a false
+# INVALID/missing_artifact. `--workspace` is the escape hatch, and the resolved root is
+# always named in the command's output so a false negative is never misread.
+# ---------------------------------------------------------------------------
+
+
+def test_reports_validate_workspace_override_fixes_false_invalid(
+    tmp_path: Path, monkeypatch
+) -> None:
+    other_ws = tmp_path / "other-workspace"
+    _init_workspace(other_ws)
+
+    target_ws = tmp_path / "target-workspace"
+    _init_workspace(target_ws)
+    handoff_path = _make_valid_handoff(target_ws, stem="report")
+
+    # cwd is OUTSIDE target_ws (inside an unrelated initialized workspace) — the
+    # ancestor-walk resolves the wrong root and must not silently return VALID.
+    monkeypatch.chdir(other_ws)
+    wrong = _runner.invoke(app, ["reports", "validate", str(handoff_path)])
+    assert wrong.exit_code == 1, wrong.output
+    assert "INVALID" in wrong.output
+    assert "missing_artifact" in wrong.output
+
+    # The wrong-root diagnostic names the (wrong) resolved workspace root so the false
+    # INVALID above is traceable, not silently misread. (Path may wrap across lines.)
+    assert str(other_ws.resolve()) in (wrong.stderr or "").replace("\n", "")
+
+    # --workspace targets the handoff's own workspace explicitly — VALID.
+    fixed = _runner.invoke(
+        app, ["reports", "validate", str(handoff_path), "--workspace", str(target_ws)]
+    )
+    assert fixed.exit_code == 0, fixed.output
+    assert "1 valid" in fixed.output
+    assert str(target_ws.resolve()) in (fixed.stderr or "").replace("\n", "")
+
+
+def test_reports_validate_always_emits_resolved_workspace_root_json_mode(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """The resolved-root diagnostic goes to stderr, never polluting the --json stdout
+    payload's list shape."""
+    _init_workspace(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    handoff_path = _make_valid_handoff(tmp_path)
+
+    result = _runner.invoke(app, ["reports", "validate", str(handoff_path), "--json"])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.stdout)
+    assert isinstance(data, list)
+    assert str(tmp_path.resolve()) in (result.stderr or "").replace("\n", "")

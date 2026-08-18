@@ -159,3 +159,27 @@ is no longer archive-only.
 - changelog-version-axis-reconciliation · DELIVERED · v0.4.2 · 2026-08-16
 - spec-doc-031-citation-classes · DELIVERED · v0.4.2 · 2026-08-16
 - bugs-jsonl-whole-blob-per-append · REJECTED · v0.4.3 operator ruling (ADR R4) — complexity exceeds value: three divergent candidate shapes, four consumers (panel, doctor, pick precedence, closure sweep) and two laws (never-delete, ADDITIVE class) in the blast radius, while the content-resurfacing half is already neutralized by the shipped prior-published-term amnesty and the measured scan cost stayed inside tolerance; revisit only on a measured problem · 2026-08-17
+- test-suite-remediation-stewardship · DELIVERED · v0.4.3 · 2026-08-18
+- consumer-side-validation-round · DELIVERED · v0.4.3 · 2026-08-18
+- thin-wrapper-projected-scripts · DELIVERED · v0.4.3 · 2026-08-18
+- bug-picked-ledger-event · DELIVERED · v0.4.3 · 2026-08-18
+- codex-persona-law-context-dehydration · DELIVERED · v0.4.3 · 2026-08-18
+- python-env-interpreter-probe-hardening · DELIVERED · v0.4.3 · 2026-08-18
+- panel-runtime-reliability-dangling-ledger-pointer · DELIVERED · v0.4.3 · 2026-08-18
+- mutation-testing-tool-selection-and-wiring · DELIVERED · v0.4.3 · 2026-08-18
+- intent-docstring-mechanical-enforcement · DELIVERED · v0.4.3 · 2026-08-18
+- gitflow-reconciliation-merge-mechanic · DELIVERED · v0.4.3 · 2026-08-18
+- memory-path-class-dotfiles · DELIVERED · v0.4.3 · 2026-08-18
+- commit-paths-index-scope-hardening · DELIVERED · v0.4.3 · 2026-08-18
+- commit-message-scanning-residual · DELIVERED · v0.4.3 · 2026-08-18
+- baseline-carve-out-review-cadence · DELIVERED · v0.4.3 (picked in full; absorbed the co-author-trailer carve-out gap and the CR-6 Windows escape) · 2026-08-18
+- dd-skills-applyto-glob-collisions · DELIVERED · v0.4.3 · 2026-08-18
+- dd-release-definition-orchestration-pointer-loop · DELIVERED · v0.4.3 · 2026-08-18
+- bug-event-redaction-always-on-reinforcement · DELIVERED · v0.4.3 · 2026-08-18
+- dd-audit-project-pinned-tool-installs · DELIVERED · v0.4.3 · 2026-08-18
+- dadaia-cli-skill-agent-grant · DELIVERED · v0.4.3 · 2026-08-18
+- codex-skill-ref-phantom-memory-ctx-prefix · SUPERSEDED · v0.4.3 — merged into codex-persona-law-context-dehydration at pick and shipped inside FR22/A22.6; the prefix proved real (a documented Codex runtime adapter), bound to the on-disk inventory by test · 2026-08-18
+- dadaia-artifact-event-driven-gc · DELIVERED · v0.4.3 · 2026-08-18
+- repo-agents-md-symlink-hardening · DELIVERED · v0.4.3 · 2026-08-18
+- stewardship-relocation-grep-homonym-note · DELIVERED · v0.4.3 · 2026-08-18
+- tests-agents-md-placeholder-doctor-warning · DELIVERED · v0.4.3 · 2026-08-18

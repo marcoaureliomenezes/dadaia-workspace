@@ -27,6 +27,7 @@ from dadaia_workspace.features.specs.scaffolder import scaffold
 pytestmark = pytest.mark.unit
 
 _TEMPLATES_DIR = Path(__file__).resolve().parents[4] / "dadaia_workspace" / "public" / "templates"
+_TESTS_AGENTS_TEMPLATE = _TEMPLATES_DIR / "tests-AGENTS.md"
 
 _PLACEHOLDER_ATOM = """---
 slug: SLUG_PLACEHOLDER
@@ -155,6 +156,120 @@ def test_catalog_stays_valid_json_after_repair(tmp_path: Path) -> None:
     remove_placeholder_atoms(specs)
     catalog = json.loads((specs / "memory" / "product" / "catalog.json").read_text())
     assert catalog["features"] == []
+
+
+# ---------------------------------------------------------------------------
+# T-043-10 (FR8, idea tests-agents-md-placeholder-doctor-warning): AGENTS-PLACEHOLDER-1
+# — an INSTALLED tests/AGENTS.md still carrying unfilled <TOKEN> placeholders.
+# Intent: CONTRACT — asserts SPEC.md FR8 / A8.1-A8.3. Same validator family/shape as
+# MEM-PLACEHOLDER-1 above; reuses this module rather than a new sibling file.
+# ---------------------------------------------------------------------------
+
+
+def _specs_with_installed_tests_agents(tmp_path: Path, content: str | None) -> Path:
+    """A repo-shaped tree: <repo>/specs/ + <repo>/tests/AGENTS.md (or no tests/ at all)."""
+    repo = tmp_path / "repo"
+    specs = _fresh_specs_at(repo)
+    if content is not None:
+        tests_dir = repo / "tests"
+        tests_dir.mkdir(parents=True, exist_ok=True)
+        (tests_dir / "AGENTS.md").write_text(content, encoding="utf-8")
+    return specs
+
+
+def _fresh_specs_at(repo: Path) -> Path:
+    specs = repo / "specs"
+    result = scaffold(
+        specs_dir=specs,
+        project_name="testproj",
+        force=False,
+        templates_dir=_TEMPLATES_DIR,
+    )
+    assert not result.errors, result.errors
+    return specs
+
+
+def test_agents_placeholder1_warns_on_unfilled_installed_tests_agents_md(tmp_path: Path) -> None:
+    """A8.1: an installed tests/AGENTS.md with a raw `<TOKEN>` placeholder → one WARN
+    naming the file."""
+    specs = _specs_with_installed_tests_agents(
+        tmp_path,
+        "# Test Rules\n\nPer-test timeout: `<UNIT_TIMEOUT_S>`s.\n",
+    )
+    issues = _doctor(specs).check()
+    flagged = [i for i in issues if i.code == "AGENTS-PLACEHOLDER-1"]
+    assert len(flagged) == 1, [i.to_dict() for i in issues]
+    assert flagged[0].severity.value == "warning"
+    assert str(specs.parent / "tests" / "AGENTS.md") == flagged[0].path
+
+
+def test_agents_placeholder1_silent_on_filled_installed_tests_agents_md(tmp_path: Path) -> None:
+    """A8.3: a filled installed tests/AGENTS.md (no leftover `<TOKEN>`) → no finding."""
+    specs = _specs_with_installed_tests_agents(
+        tmp_path,
+        "# Test Rules\n\nPer-test timeout: 30s.\n",
+    )
+    issues = _doctor(specs).check()
+    assert [i for i in issues if i.code == "AGENTS-PLACEHOLDER-1"] == []
+
+
+def test_agents_placeholder1_ignores_a_token_shape_inside_a_longer_code_span(
+    tmp_path: Path,
+) -> None:
+    """A false positive this check must never produce: the template's own
+    `` `Intent: <KIND> — <AC id | bug-id | task-id>` `` line illustrates a DIFFERENT
+    file's docstring syntax and ships verbatim in a correctly-filled installed copy
+    (this repo's own tests/AGENTS.md carries it at HEAD). Only a TIGHT single-backtick
+    span wrapping nothing but the bracketed token counts as an unfilled placeholder."""
+    specs = _specs_with_installed_tests_agents(
+        tmp_path,
+        "# Test Rules\n\n"
+        "Every test declares intent — `Intent: <KIND> — <AC id | bug-id | task-id>`.\n",
+    )
+    issues = _doctor(specs).check()
+    assert [i for i in issues if i.code == "AGENTS-PLACEHOLDER-1"] == []
+
+
+def test_agents_placeholder1_silent_when_tests_agents_md_absent(tmp_path: Path) -> None:
+    """No installed tests/AGENTS.md at all (repo hasn't run `context alive` yet) →
+    silent; this check's job is placeholder content, never the file's existence."""
+    specs = _specs_with_installed_tests_agents(tmp_path, None)
+    issues = _doctor(specs).check()
+    assert [i for i in issues if i.code == "AGENTS-PLACEHOLDER-1"] == []
+
+
+def test_agents_placeholder1_never_flags_the_canonical_template(tmp_path: Path) -> None:
+    """A8.2: the canonical template legitimately carries placeholders (verified here so
+    the regex is proven live), yet the check never fires on it — it inspects the
+    installed consumer copy only, never dadaia_workspace/public/templates/tests-AGENTS.md."""
+    from dadaia_workspace.core.specs_repair import has_unfilled_angle_placeholders
+
+    assert _TESTS_AGENTS_TEMPLATE.exists()
+    assert has_unfilled_angle_placeholders(_TESTS_AGENTS_TEMPLATE) is True
+
+    # A tree with no installed tests/AGENTS.md never resolves to the template's own
+    # path — the check stays silent even though the template itself would trip the regex.
+    specs = _specs_with_installed_tests_agents(tmp_path, None)
+    issues = _doctor(specs).check()
+    assert [i for i in issues if i.code == "AGENTS-PLACEHOLDER-1"] == []
+
+
+def test_agents_placeholder1_silent_on_this_workspaces_own_tests_agents_md() -> None:
+    """A8.3 (Done criterion): `specs doctor` stays green on THIS workspace at HEAD —
+    dadaia-workspace's own installed tests/AGENTS.md is already filled in. Exercises the
+    MemoryValidator method directly (never the full SpecsDoctor.check()) so this stays
+    a pure unit test — LINT-1 shells a real subprocess and is out of scope here."""
+    from dadaia_workspace.core.specs_repair import has_unfilled_angle_placeholders
+    from dadaia_workspace.features.specs.doctor_memory import MemoryValidator
+
+    repo_root = Path(__file__).resolve().parents[4]
+    installed = repo_root / "tests" / "AGENTS.md"
+    assert installed.exists()
+    assert has_unfilled_angle_placeholders(installed) is False
+
+    validator = MemoryValidator(repo_root / "specs")
+    issues = validator.check_tests_agents_placeholder()
+    assert issues == []
 
 
 def test_reconcile_ownership_preflight_names_owner_and_repair(tmp_path: Path) -> None:

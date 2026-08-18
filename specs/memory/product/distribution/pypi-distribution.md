@@ -9,13 +9,16 @@ summary: >-
   release-gate approval → OIDC trusted publishing + tag → post-publish smoke), the wheel
   content contract (public assets ship in-package), and the single version axis: the
   `pyproject.toml` version tracks the published PyPI lineage and a release id is that same
-  minted number, `v`-prefixed.
+  minted number, `v`-prefixed. The CHANGELOG records that lineage completely — a
+  git-derived, range-cited section for every published version, and an
+  unpublished-internal annotation for every heading matching none; nothing is deleted or
+  renamed.
 tags:
 - distribution
 - pypi
 - release
 - packaging
-last_updated: '2026-08-16'
+last_updated: '2026-08-18'
 release_origin: v0.4.2
 ---
 
@@ -23,8 +26,8 @@ release_origin: v0.4.2
 
 `dadaia-workspace` is a published PyPI package: `pip install dadaia-workspace`
 installs the library and its `dadaia` CLI. `pyproject.toml` `version` is the single source
-of the number, and it tracks one lineage: what PyPI has published. The latest published
-version is `0.4.1`; `0.4.2` is minted and stays unpublished until it is deployed.
+of the number, and it tracks one lineage: what PyPI has published. A minted version stays
+unpublished until it is deployed, and no other file restates the number.
 Consumer-validation candidates are throwaway wheels — they NEVER mint intermediate
 published versions; version numbers advance only at deploy time, on the operator's order.
 PyPI descriptions are immutable per release: a documentation-only fix to the project page
@@ -74,9 +77,19 @@ Reading any `v`-prefixed id in `specs/` and the bare number on PyPI, one resolve
 
 `CHANGELOG.md` carries the reconciling preamble this implies: it states which of its
 historical headings were minted internally and never reached PyPI, maps them to the
-internal ids they documented, and declares the forward rule — from `0.4.2` onward, one
-`## [x.y.z]` section corresponds to exactly one published package version. Existing
-sections are never renamed or renumbered; the preamble carries the meaning instead.
+internal ids they documented, and declares the forward rule — one `## [x.y.z]` section
+corresponds to exactly one published package version. Existing sections are never renamed
+or renumbered; the preamble carries the meaning instead.
+
+**The lineage's record is complete and derived, never invented.** Every published version
+carries a section, including the ten that previously had none: each is a compact
+retroactive section **derived from git history**, stating inline the exact `git log` range
+and commit count it was built from, so any reviewer can re-run the identical command and
+check it line by line. Nothing is embellished — a version whose history yields little gets
+a short factual entry rather than a manufactured feature list. In the other direction, the
+three headings matching no published version are **annotated** as unpublished-internal
+rather than deleted: nothing in the file is ever removed or renamed, because a changelog
+that rewrites itself is no longer evidence.
 
 **Wheel content contract:** the wheel ships the complete runtime product —
 `dadaia_workspace/` with the full `public/` asset tree (agents, skills, rules,
@@ -96,8 +109,9 @@ workspace-venv bootstraps install the candidate itself instead of pinning the
 
 - `pyproject.toml` — `version` (single source of the package version) and the
   PyPI classifiers (`POSIX :: Linux + MacOS + Microsoft :: Windows`).
-- `CHANGELOG.md` — one section per published version, plus the preamble that reconciles
-  the headings predating that rule.
+- `CHANGELOG.md` — one section per published version, each traceable to a commit range,
+  plus the preamble that reconciles the headings predating that rule and the
+  unpublished-internal annotations on the headings matching no published version.
 - `.github/workflows/release.yml` — the release pipeline (inventoried in
   [[quality-assurance]]).
 - GitHub environments `release-gate` (human approval) and `pypi` (OIDC trusted

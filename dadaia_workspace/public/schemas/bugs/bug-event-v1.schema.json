@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "bug-event-v1",
   "title": "Bug Event v1",
-  "description": "One append-only event in the event-sourced JSONL bug telemetry (v0.1.46 AC-1). Each line of a specs/bugs/<YYYYMMDDTHH>Z-<n>.jsonl file is one object validating this schema. A bug_id's stream opens with a `reported` event and carries at most one terminal event {resolved, superseded, deferred, rejected}; `archived` is a NON-terminal annotation (defined-but-unemitted this release).",
+  "description": "One append-only event in the event-sourced JSONL bug telemetry (v0.1.46 AC-1). Each line of a specs/bugs/<YYYYMMDDTHH>Z-<n>.jsonl file is one object validating this schema. A bug_id's stream opens with a `reported` event and carries at most one terminal event {resolved, superseded, deferred, rejected}; `archived` is a NON-terminal annotation (defined-but-unemitted this release); `picked` (v0.4.3 FR14) is a NON-terminal, repeatable observable reservation marker (NO-LOCKS DOCTRINE) valid only on an open stream.",
   "type": "object",
   "required": [
     "bug_id",
@@ -25,9 +25,10 @@
         "superseded",
         "deferred",
         "rejected",
-        "archived"
+        "archived",
+        "picked"
       ],
-      "description": "Event kind. `reported` opens the stream; {resolved, superseded, deferred, rejected} are terminal (at most one per bug_id); `archived` is a non-terminal annotation."
+      "description": "Event kind. `reported` opens the stream; {resolved, superseded, deferred, rejected} are terminal (at most one per bug_id); `archived` is a non-terminal annotation; `picked` (v0.4.3 FR14) is a non-terminal, repeatable reservation marker valid only on an open stream."
     },
     "ts": {
       "type": "string",
@@ -90,7 +91,7 @@
     },
     "release": {
       "type": "string",
-      "description": "resolved: the release that fixed the bug ('unknown' sentinel when the source did not record it)."
+      "description": "resolved: the release that fixed the bug ('unknown' sentinel when the source did not record it). picked (v0.4.3 FR14): the M.m.p release or hotfix id the bug is reserved under."
     },
     "superseded_by": {
       "type": "string",
@@ -198,6 +199,23 @@
       "then": {
         "required": [
           "reason"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "picked"
+          }
+        },
+        "required": [
+          "event"
+        ]
+      },
+      "then": {
+        "required": [
+          "release"
         ]
       }
     }

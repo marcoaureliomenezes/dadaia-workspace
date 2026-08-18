@@ -4,12 +4,36 @@ description: >
   Use this skill whenever you need to operate the dadaia-workspace CLI — open the
   panel, bind a Spec Context, author backlog/release artifacts, check state, register
   a bug, or discover any command. The CLI is self-documenting; this is the map plus the
-  few non-obvious idioms. All agents may use it.
+  few non-obvious idioms. Granted to every shell-capable agent (any agent whose tools
+  include `Bash`); the two shell-less roles (`product-engineer`, `software-architect`)
+  carry no grant — see §Reachability below.
 ---
 
 # Skill: dadaia-cli
 
 The `dadaia` CLI is the single control surface for the workspace. It is **self-documenting** — discover, don't guess.
+
+## Reachability (FR5, per-agent decision — derivation surface)
+
+A CLI-literacy grant to an agent with no `Bash` tool is inert: it can never run a
+command. The rule is mechanical, not a blanket grant: **grant iff `Bash` is in the
+agent's `tools:` list.**
+
+| Agent | `Bash`? | Grant `dadaia-cli`? |
+|---|---|---|
+| `ai-engineer` | yes | yes |
+| `code-reviewer` | yes | yes |
+| `project-auditor` | yes | yes |
+| `project-manager` | yes | yes |
+| `qa-engineer` | yes | yes |
+| `security-reviewer` | yes | yes |
+| `software-engineer` | yes | yes |
+| `product-engineer` | no (D-1, shell-less) | no — inert |
+| `software-architect` | no | no — inert |
+
+`dadaia_workspace/public/scripts/lint-dadaia-cli-reachability.py` derives this same
+table from each agent frontmatter's `tools:`/`skills:` lists at projection time and
+fails loud on drift (`--self-test` proves both directions).
 
 ## Discover
 

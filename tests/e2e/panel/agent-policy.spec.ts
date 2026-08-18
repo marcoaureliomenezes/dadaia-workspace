@@ -21,6 +21,9 @@
  * State hygiene: the overlay is restored to a clean `balanced` baseline (no
  * overrides) before AND after every test, with asserted 200s, so the suite never
  * depends on — or leaks — live workspace policy state.
+ *
+ * Intent: CONTRACT — v0.1.65 FR8 / AC-6 (agent model governance)
+ * Owner: software-engineer
  */
 import { test, expect, Page, APIRequestContext } from '@playwright/test';
 import { gotoPanel, authHeaders, clickAndAwaitPut, BASE_URL } from './helpers';

@@ -2,25 +2,26 @@
 
 Single-responsibility sibling of the SpecsDoctor coordinator. Owns the memory-markdown-source
 invariants: required atoms present with a heading (SPEC-DOC-002/002L), no changelog/history
-headings (SPEC-DOC-008), catalog↔atom sync (CAT-1), and the LINT-1 memory-atom lint. This module
-HOLDS the single lazy ``infrastructure.subprocess_runner`` import edge (LINT-1 shell-out) — the
-coordinator imports no subprocess adapter. Leaf-only: imports the shared leaves + core, never a
-sibling validator.
+headings (SPEC-DOC-008), catalog↔atom sync (CAT-1), and the LINT-1 memory-atom lint. LINT-1
+imports ``features.specs.memory_lint`` directly (v0.4.3 T-043-20/FR16 — no subprocess, no
+dependency on the projected ``public/scripts/lint-memory-atoms.py`` copy existing or being
+current). Leaf-only: imports the shared leaves + core, never a sibling validator.
 """
 
 from __future__ import annotations
 
 import re
-import sys
 from pathlib import Path
 
 import yaml
 
-from dadaia_workspace.core.protocols.process_runner import ProcessResult, ProcessRunner
+from dadaia_workspace.core.protocols.process_runner import ProcessRunner
 from dadaia_workspace.core.specs_repair import (  # noqa: F401
+    has_unfilled_angle_placeholders,
     is_placeholder_atom,
     remove_placeholder_atoms,
 )
+from dadaia_workspace.features.specs import memory_lint
 from dadaia_workspace.features.specs.doctor_types import (
     Severity,
     SpecsDoctorIssue,
@@ -32,12 +33,6 @@ FORBIDDEN_MEMORY_H2_RE = re.compile(r"^(Changelog|History|Hist[óo]rico|Versions
 TOPLEVEL_MEMORY_FILES = ("architecture.md", "tech-stack.md", "quality-assurance.md")
 # Product memory is a folder catalog: index.md is required + 0..N feature .md atoms.
 PRODUCT_INDEX_REL = "product/index.md"
-
-# LINT-1: path to the lint-memory-atoms.py script, resolved from this file's location.
-# dadaia_workspace/features/specs/doctor_memory.py → dadaia_workspace/public/scripts/
-_LINT_SCRIPT: Path = (
-    Path(__file__).resolve().parent.parent.parent / "public" / "scripts" / "lint-memory-atoms.py"
-)
 
 # ---------------------------------------------------------------------------
 # Markdown memory atom helpers
@@ -115,8 +110,12 @@ class MemoryValidator:
 
     def __init__(self, specs_dir: Path, process_runner: ProcessRunner | None = None) -> None:
         self.specs_dir = specs_dir
-        # ProcessRunner: injected for tests/DI; lazily resolved to the infra adapter in
-        # production when not provided.
+        # v0.4.3 T-043-20/FR16: LINT-1 no longer shells out (memory_lint is imported
+        # directly, below), so process_runner is UNUSED here now. The parameter is
+        # kept — never removed — purely for SpecsDoctor.__init__'s call-site
+        # compatibility (`MemoryValidator(self.specs_dir, self._process_runner)`,
+        # doctor.py:100, outside this task's write set); a future cleanup pass may
+        # retire the parameter from SpecsDoctor itself once nothing threads it here.
         self._process_runner: ProcessRunner | None = process_runner
 
     def check_placeholder_atoms(self) -> list[SpecsDoctorIssue]:
@@ -148,6 +147,38 @@ class MemoryValidator:
                     )
                 )
         return issues
+
+    def check_tests_agents_placeholder(self) -> list[SpecsDoctorIssue]:
+        """AGENTS-PLACEHOLDER-1: an installed ``tests/AGENTS.md`` still carries an
+        unfilled ``<TOKEN>`` placeholder (FR8, idea
+        ``tests-agents-md-placeholder-doctor-warning``).
+
+        Reuses the MEM-PLACEHOLDER-1 validator shape (same family, WARN not ERROR since
+        no verb can auto-fill project-specific numbers). Runs ONLY against the
+        **installed** consumer copy at ``<repo-root>/tests/AGENTS.md`` —
+        ``specs_dir.parent`` is the repo-root idiom this module's ``REPO-DADAIA-1``
+        sibling already uses — never against the canonical template
+        (``dadaia_workspace/public/templates/tests-AGENTS.md``), which legitimately
+        ships placeholders for the operator to fill in. Silent when the file is absent
+        (its presence is not this check's concern) or already filled.
+        """
+        installed = self.specs_dir.parent / "tests" / "AGENTS.md"
+        if not installed.is_file():
+            return []
+        if not has_unfilled_angle_placeholders(installed):
+            return []
+        return [
+            SpecsDoctorIssue(
+                code="AGENTS-PLACEHOLDER-1",
+                severity=Severity.WARNING,
+                description=(
+                    f"{installed} still carries an unfilled `<TOKEN>` placeholder — "
+                    "replace every project-specific value before relying on it (see "
+                    "the file's own banner)."
+                ),
+                path=str(installed),
+            )
+        ]
 
     def fix_placeholder_atom(self, issue: SpecsDoctorIssue) -> None:
         """Remove an unfilled placeholder atom — re-verified before any delete."""
@@ -320,107 +351,61 @@ class MemoryValidator:
         return issues
 
     def check_lint1_memory_atoms(self) -> list[SpecsDoctorIssue]:
-        """LINT-1: invoke lint-memory-atoms.py over specs/memory/.
+        """LINT-1: lint every memory atom under specs/memory/ via ``memory_lint``.
 
         ERROR on frontmatter/schema violations + forbidden headings.
-        WARNING on token-estimate drift.
+        WARNING on unknown (non-allowlisted) headings.
 
-        The lint script is invoked as a subprocess using the same Python interpreter.
-        If the script is not found, LINT-1 is skipped with a WARNING.
+        v0.4.3 T-043-20/FR16: ``memory_lint`` is imported directly — no subprocess,
+        no dependency on the projected ``public/scripts/lint-memory-atoms.py`` copy
+        existing, being current, or matching this package's version at all.
         """
         mem_dir = self.specs_dir / "memory"
         if not mem_dir.is_dir():
             return []
-        if not _LINT_SCRIPT.exists():
-            return [
-                SpecsDoctorIssue(
-                    code="LINT-1",
-                    severity=Severity.WARNING,
-                    description=(
-                        "LINT-1: lint-memory-atoms.py not found at expected path "
-                        f"({_LINT_SCRIPT}). Install or update dadaia_workspace package."
-                    ),
-                    path=str(_LINT_SCRIPT),
-                )
-            ]
-
-        runner = self._process_runner
-        if runner is None:
-            from dadaia_workspace.infrastructure.subprocess_runner import SubprocessProcessRunner
-
-            runner = SubprocessProcessRunner()
-
         try:
-            # `-B` disables bytecode writing so no __pycache__/*.pyc is created under
-            # dadaia_workspace/public/scripts/ when LINT-1 runs (T-011-15 / FR-W5-01).
-            proc_result: ProcessResult = runner.run(
-                [sys.executable, "-B", str(_LINT_SCRIPT), "--memory-dir", str(mem_dir)],
-                timeout=30,
-            )
-        except TimeoutError:
+            schema = memory_lint.load_frontmatter_schema()
+        except FileNotFoundError as exc:
             return [
                 SpecsDoctorIssue(
                     code="LINT-1",
                     severity=Severity.WARNING,
-                    description="LINT-1: lint-memory-atoms.py timed out (>30s).",
+                    description=f"LINT-1: {exc}",
                     path=str(mem_dir),
                 )
             ]
-        except Exception as exc:
-            return [
-                SpecsDoctorIssue(
-                    code="LINT-1",
-                    severity=Severity.WARNING,
-                    description=f"LINT-1: failed to invoke lint-memory-atoms.py: {exc}",
-                    path=str(mem_dir),
-                )
-            ]
-        # Exit codes: 0 = clean, 1 = at least one ERROR, 2 = warnings only
-        output = (proc_result.stdout + proc_result.stderr).strip()
-        # Drop the lint script's own "Summary: N OK, M WARN, K ERROR" line — it is scoped to
-        # memory atoms only and, embedded in this issue's text, was mistaken for the doctor's
-        # OVERALL verdict (bug: specs-doctor-dual-error-counter-confusing-output). The doctor
-        # CLI now prints one authoritative overall verdict line instead.
-        output = "\n".join(
-            ln for ln in output.splitlines() if not ln.strip().startswith("Summary:")
-        ).strip()
-        issues: list[SpecsDoctorIssue] = []
 
-        if proc_result.returncode == 0:
+        results = memory_lint.lint_directory(mem_dir, schema)
+        if not results:
             return []
-        if proc_result.returncode == 1:
-            # ERRORs present
+
+        error_lines: list[str] = []
+        warn_lines: list[str] = []
+        for result in results:
+            for err in result.errors:
+                error_lines.append(f"  [{result.path}] ERROR: {err}")
+            for warn in result.warnings:
+                warn_lines.append(f"  [{result.path}] WARN: {warn}")
+
+        issues: list[SpecsDoctorIssue] = []
+        if error_lines:
             issues.append(
                 SpecsDoctorIssue(
                     code="LINT-1",
                     severity=Severity.ERROR,
                     description=(
                         "LINT-1: memory atom lint found frontmatter/schema violations "
-                        f"or forbidden headings:\n{output}"
+                        "or forbidden headings:\n" + "\n".join(error_lines)
                     ),
                     path=str(mem_dir),
                 )
             )
-        elif proc_result.returncode == 2:
-            # Warnings only (e.g. an unknown ## heading outside the curated allowlist)
+        elif warn_lines:
             issues.append(
                 SpecsDoctorIssue(
                     code="LINT-1",
                     severity=Severity.WARNING,
-                    description=(f"LINT-1: memory atom lint warnings:\n{output}"),
-                    path=str(mem_dir),
-                )
-            )
-        else:
-            # Unexpected exit code
-            issues.append(
-                SpecsDoctorIssue(
-                    code="LINT-1",
-                    severity=Severity.WARNING,
-                    description=(
-                        f"LINT-1: lint-memory-atoms.py exited with unexpected code "
-                        f"{proc_result.returncode}:\n{output}"
-                    ),
+                    description=("LINT-1: memory atom lint warnings:\n" + "\n".join(warn_lines)),
                     path=str(mem_dir),
                 )
             )

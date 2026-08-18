@@ -28,9 +28,14 @@ __all__ = [
 
 
 class BugEventKind(StrEnum):
-    """The six event kinds. ``reported`` opens a stream; the four in
+    """The seven event kinds. ``reported`` opens a stream; the four in
     :data:`TERMINAL_EVENTS` are terminal (at most one per ``bug_id``); ``archived`` is a
-    NON-terminal annotation (defined-but-unemitted in v0.1.46)."""
+    NON-terminal annotation (defined-but-unemitted in v0.1.46); ``picked`` (v0.4.3
+    T-043-18/FR14) is a NON-terminal, repeatable OBSERVABLE RESERVATION MARKER — never
+    a lease (NO-LOCKS DOCTRINE): it grants nothing, expires never, blocks nothing. A
+    repeated pick on the same open stream is allowed and surfaced, never refused; the
+    only refusals are stream-integrity refusals (pick-after-terminal, pick before any
+    ``reported``), never concurrency refusals — see :func:`advance_coherence`."""
 
     REPORTED = "reported"
     RESOLVED = "resolved"
@@ -38,6 +43,7 @@ class BugEventKind(StrEnum):
     DEFERRED = "deferred"
     REJECTED = "rejected"
     ARCHIVED = "archived"
+    PICKED = "picked"
 
 
 #: The terminal set for event coherence (AC-1 decision). ``archived`` is deliberately NOT
@@ -69,10 +75,30 @@ def advance_coherence(
     Mutates the fold state (*seen_reported*/*terminated*) in place; returns the
     violation clause for THIS event, or ``None`` when it is coherent. ``archived`` and
     any other non-terminal annotation always advance cleanly.
+
+    ``picked`` (v0.4.3 T-043-18/FR14) is checked BEFORE the generic non-terminal
+    early-return: it is a STREAM-INTEGRITY check, never a concurrency lock — a pick
+    after a terminal event (the stream is closed) or before any ``reported`` (the
+    stream was never opened) is incoherent, exactly like a terminal event would be.
+    Coherent picks (including a REPEATED pick on the same open stream — NO-LOCKS: two
+    visible picks is the sanctioned race outcome, never refused) mutate NEITHER
+    *seen_reported* nor *terminated* — a pick is a marker, not a state transition.
     """
     if event == BugEventKind.REPORTED.value:
         seen_reported.add(bug_id)
         terminated.discard(bug_id)  # a reopen clears the prior terminal state
+        return None
+    if event == BugEventKind.PICKED.value:
+        if bug_id in terminated:
+            return (
+                f"bug '{bug_id}' has a 'picked' event after an existing terminal — a "
+                "pick is only valid on an open stream"
+            )
+        if bug_id not in seen_reported:
+            return (
+                f"'picked' event for bug '{bug_id}' with no prior 'reported' event — "
+                "every stream must open with 'reported'"
+            )
         return None
     if event not in TERMINAL_EVENTS:
         return None
@@ -254,10 +280,22 @@ class BugEvent:
     def redact(self) -> BugEvent:
         """Return a copy with every free-text field scrubbed of operator-local paths/IPs.
 
-        ``title``, ``symptom``, ``repro``, ``expected``, ``notes`` and ``evidence`` are all operator-authored
-        free text that can carry a home path or IP (CWE-532). Each is passed through
-        :func:`redact_text`; unset fields are left as ``None``. Structured/enumerated fields
-        (severity, component, release, …) are not free text and are left untouched.
+        ``title``, ``symptom``, ``repro``, ``expected``, ``notes``, ``evidence``,
+        ``release`` and ``reason`` are all operator/agent-authored free text that can
+        carry a home path or IP (CWE-532). Each is passed through :func:`redact_text`;
+        unset fields are left as ``None``. Structured/enumerated fields (severity,
+        component, context, …) are not free text and are left untouched.
+
+        v0.4.3 T-043-23 security-review rework (FR14 LOW finding, handoff
+        2026-08-17T173112Z-security-reviewer-v0.4.3-alpha-2-delta): ``release`` (a
+        grammar-DESCRIBED but only CLI-checked-non-empty id — the schema carries no
+        ``pattern``) and ``reason`` (the schema's own description names it "the
+        disposition rationale" — free prose by design) previously passed through this
+        method UNTOUCHED, so a home path or IP placed in either field survived the
+        SAME redaction every other prose field gets, straight into the tracked,
+        committed and pushed ``specs/bugs/bugs.jsonl``. :func:`redact_text` is a no-op
+        on a value that carries no IP/home-path shape (e.g. an ordinary release id like
+        ``v0.4.3``), so this widening is safe for the common structured-looking value.
         """
 
         def _scrub(value: str | None) -> str | None:
@@ -271,6 +309,8 @@ class BugEvent:
             expected=_scrub(self.expected),
             notes=_scrub(self.notes),
             evidence=_scrub(self.evidence),
+            release=_scrub(self.release),
+            reason=_scrub(self.reason),
         )
 
     def to_dict(self) -> dict[str, object]:

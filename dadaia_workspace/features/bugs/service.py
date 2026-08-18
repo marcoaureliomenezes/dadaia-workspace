@@ -37,6 +37,15 @@ class BugState:
     severity: str | None = None
     title: str | None = None
     component: str | None = None
+    #: v0.4.3 T-043-18/FR14 — every actor that has ``picked`` this bug's CURRENT
+    #: (post-latest-``reported``) stream, in event order, duplicates preserved (a
+    #: repeated pick is the sanctioned NO-LOCKS race outcome, surfaced not deduped).
+    #: Reset to ``()`` on every ``reported`` (including a reopen) — never carries a
+    #: prior stream's picks forward. Never terminal-gated: a picked-only tail leaves
+    #: ``status`` at ``"open"`` (I6); a pick after a terminal event still folds here
+    #: (the STATE fold is tolerant of on-disk history — see :meth:`_fold`'s docstring
+    #: — coherence is `core.models.bugs.advance_coherence`'s job, enforced at append).
+    picked_by: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -77,8 +86,17 @@ class BugService:
     def _fold(self) -> dict[str, BugState]:
         """Reduce the event stream to current per-``bug_id`` state.
 
-        ``reported`` (re)opens with metadata; a terminal event sets the status to that
-        terminal kind; ``archived`` is a non-terminal annotation and never changes state.
+        ``reported`` (re)opens with metadata AND resets ``picked_by`` to ``()`` — a
+        reopen never carries a prior stream's picks forward (v0.4.3 T-043-18/FR14,
+        I5); a terminal event sets the status to that terminal kind; ``archived`` is a
+        non-terminal annotation and never changes state; ``picked`` (v0.4.3 FR14)
+        APPENDS the actor to ``picked_by`` (order and duplicates preserved — a
+        repeated pick is the sanctioned NO-LOCKS race outcome, surfaced not deduped,
+        I2) and never otherwise changes state — a picked-only tail leaves ``status``
+        at ``"open"`` (I6). This fold is tolerant of on-disk history exactly like the
+        terminal-event branch already is: coherence (pick-after-terminal,
+        pick-before-reported) is enforced once, at append time, by
+        ``core.models.bugs.advance_coherence`` — never re-checked here.
         """
         states: dict[str, BugState] = {}
         for event in self._store.iter_events():
@@ -93,6 +111,11 @@ class BugService:
             elif event.event in TERMINAL_EVENTS:
                 current = states.get(event.bug_id) or BugState(event.bug_id, _OPEN)
                 states[event.bug_id] = replace(current, status=event.event)
+            elif event.event == BugEventKind.PICKED.value:
+                current = states.get(event.bug_id) or BugState(event.bug_id, _OPEN)
+                states[event.bug_id] = replace(
+                    current, picked_by=(*current.picked_by, event.reported_by)
+                )
             # BugEventKind.ARCHIVED: annotation only — leaves folded state untouched.
         return states
 

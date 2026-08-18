@@ -16,6 +16,10 @@ The bug already carries a `reported` event — `dd-bug-registration`'s only outp
 skill never registers a bug and never classifies one; it starts from an already-open bug
 and runs Arm B through to close.
 
+The broader `specs/bugs/**` glob is deliberate: this skill owns the whole bug lifecycle
+(including the `resolved` event on the same ledger file `dd-bug-registration` narrows
+to). Declared subset, activation precedence: `dd-backlog-definition` §7 (canonical home).
+
 ## 2. Branch and concurrency
 
 Run on `hotfix/{M.m.p}` at the next PATCH, cut from `develop` — full stage-contract row:

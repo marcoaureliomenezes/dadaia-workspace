@@ -19,6 +19,9 @@ shape), then assert:
    generic stub reason (AC3.1), regardless of whether the check ultimately blocks
    (a fresh checkout with no git history correctly blocks — that is success, not
    failure, per AC3.1's parenthetical).
+
+Intent: CONTRACT — v0.1.69 FR1-FR4 (T-69-10)
+Owner: software-engineer
 """
 
 from __future__ import annotations

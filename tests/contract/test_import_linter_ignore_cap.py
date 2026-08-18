@@ -80,13 +80,23 @@ _SETUP_CFG = _REPO_ROOT / "setup.cfg"
 # single-source `BACKLOG.md` through the pure `document.py` parser (leaf -> leaf) instead
 # of duplicating a second parser inside `features/specs/`. Cap raised 15 -> 16
 # (+1 features-no-cross-feature).
-_RECORDED_IGNORE_EDGE_CAP = 16
+#
+# v0.4.3 T-043-20/FR16 NOTE: `doctor_memory -> subprocess_runner` REMOVED from BOTH
+# `features-no-infrastructure` and `features-no-subprocess` — LINT-1 no longer shells
+# out at all (imports `features.specs.memory_lint` directly instead of subprocess-ing
+# the projected `public/scripts/lint-memory-atoms.py`). Cap lowered 16 -> 14 (-2).
+#
+# v0.4.3 T-043-42/FR27 NOTE: `chokepoints.service -> infrastructure.jsonl_log_rotation`
+# ADDED — the push-verdict-gc ledger appender funnels through the single shared
+# rotation helper (a function-scoped lazy import, same ADR-1-style DI-pending idiom as
+# the telemetry-lock edges already in this family). Cap raised 14 -> 15 (+1).
+_RECORDED_IGNORE_EDGE_CAP = 15
 
 # Per-family recorded breakdown, pinned per contract section so a wrong 13-edge cross-feature
 # set (or a silent shift between families) fails loudly, not just the grand total.
 _RECORDED_PER_FAMILY_CAP: dict[str, int] = {
     "features-no-infrastructure": 7,
-    "features-no-subprocess": 4,
+    "features-no-subprocess": 3,
     "features-no-cross-feature": 2,
     "cli-no-infrastructure": 3,
 }

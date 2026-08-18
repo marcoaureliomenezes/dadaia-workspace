@@ -60,6 +60,13 @@ def _flags(workspace: Path) -> list[dict[str, Any]]:
 def test_dirty_mutating_emits_flag_advisory_only(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    # This suite runs inside the dadaia-workspace SOURCE checkout, itself nested under a
+    # REAL registered "dadaia-workspace" context; an ambient DADAIA_CONTEXT (rung 1, the
+    # normal way an agent binds a plain shell) would otherwise outrank this test's own
+    # session record (rung 2) and misresolve _bound_context to a context this tmp_path
+    # fixture never created a repo for (bug
+    # post-gate-reconciler-tests-order-dependent-flake).
+    monkeypatch.delenv("DADAIA_CONTEXT", raising=False)
     ws = _make_workspace(tmp_path)
     _bind_session(ws)
 
@@ -201,6 +208,11 @@ def test_fail_open_table(
 
 
 def test_throttle_skip_and_expiry(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    # See test_dirty_mutating_emits_flag_advisory_only's comment: an ambient
+    # DADAIA_CONTEXT would outrank this test's own session record and misresolve the
+    # bound context, short-circuiting _reconcile_working_tree before it ever spawns the
+    # (mocked) git child (bug post-gate-reconciler-tests-order-dependent-flake).
+    monkeypatch.delenv("DADAIA_CONTEXT", raising=False)
     ws = _make_workspace(tmp_path)
     _bind_session(ws)
     spawn_count = {"n": 0}
@@ -225,3 +237,29 @@ def test_throttle_skip_and_expiry(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
     sdd_post_gate._reconcile_working_tree(ws, _SID)
 
     assert len(_flags(ws)) == 2, "after the window the reconciler runs again"
+
+
+# ---------------------------------------------------------------------------
+# FR27/A27.1 (T-043-42): reconciler-events.jsonl rotates like every other
+# .dadaia/logs/*.jsonl writer, funneled through the shared rotation helper.
+# ---------------------------------------------------------------------------
+
+
+def test_reconciler_flag_rotates_the_shared_events_log(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import dadaia_workspace.infrastructure.jsonl_log_rotation as rotation
+
+    log = tmp_path / ".dadaia" / "logs" / "reconciler-events.jsonl"
+    log.parent.mkdir(parents=True)
+    log.write_text('{"seed": true}\n', encoding="utf-8")
+    monkeypatch.setattr(rotation, "LOG_ROTATION_MAX_BYTES", 8)
+
+    sdd_post_gate._append_reconciler_flag(tmp_path, _SID, _CTX, 1)  # noqa: SLF001
+
+    rotated = log.with_name(log.name + ".1")
+    assert rotated.exists()
+    assert json.loads(rotated.read_text(encoding="utf-8").strip()) == {"seed": True}
+    new_events = _events(tmp_path)
+    assert len(new_events) == 1
+    assert new_events[0]["event"] == "RECONCILER_FLAG"

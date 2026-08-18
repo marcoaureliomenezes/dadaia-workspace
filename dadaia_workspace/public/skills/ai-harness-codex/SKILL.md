@@ -96,22 +96,23 @@ in this workspace. The word "rule" means two unrelated things.
 | You see / hear | What it actually is | Executable? | Enforces? |
 |---|---|---|---|
 | Codex **"Rules"** | Starlark `.rules` files under `.codex/rules/*.rules` | Yes (Starlark) | Command approval / prompt policy |
-| dadaia **"rules"** (`public/rules/*.md`) | Markdown workspace-protocol / agent-guidance docs | No | Nothing automatically — advisory text the model reads through projected guidance surfaces |
+| dadaia's rule-law corpus | The single consolidated Markdown law file `DADAIA.md` (source `public/data/DADAIA.md`), projected byte-identically to `.claude/rules/DADAIA.md` and every harness directory — see §1's "Rule-law corpus reachability" | No | Nothing automatically — advisory text a session reads through native `AGENTS.md`/rule discovery |
 
 Disambiguation heuristics when reading:
 
 - **File extension is the ground truth.** `.rules` = official Codex command policy.
-  `.md` = dadaia advisory protocol. Current dadaia projection must not install Markdown
-  protocols into `.codex/rules/`.
+  `.md` = dadaia's advisory law. Current dadaia projection must not install Markdown
+  law content into `.codex/rules/`.
 - A `.codex/rules/foo.md` file is projection drift. Report it and fix the source
   installer/doctor rather than treating it as enforcement.
 - In logs: an `allow`/`prompt`/`forbidden` decision on a command = a real Starlark
-  Rule fired. Plain instruction-following with no approval gate = a Markdown doc was
-  merely in context.
+  Rule fired. Plain instruction-following with no approval gate = the Markdown law
+  was merely in context.
 
-dadaia audit reading: the Markdown-in-`rules/` naming scored low (5/10) precisely
-because it misleads operators into believing enforcement exists. When you author,
-do not deepen that confusion.
+**There is no `public/rules/` directory in this workspace.** The former per-topic
+Markdown rule files were consolidated into the single `DADAIA.md` law file; do not
+document or project a `public/rules/*.md` taxonomy against a directory that does not
+exist on disk.
 
 ---
 
@@ -388,20 +389,26 @@ From the payload fact: the gate's header parser classifies EVERY
 verdict wins (fixed in v0.1.14 — bug
 `sdd-gate-apply-patch-multi-file-first-header-only` closed).
 
-### Enforcement reality — interactive-only (live-verified 0.139.0)
+### Enforcement reality — version-qualified (never carried forward by assumption)
 
-| Path | Hooks fire? | Consequence |
-|---|---|---|
-| Interactive `codex` TUI | **YES** — all four wired events (SessionStart, UserPromptSubmit, PreToolUse, PostToolUse); the block envelope is honored (FROZEN write blocked live) | deterministic gate enforcement EXISTS interactively |
-| Headless `codex exec` | **NO** — across all four config forms (project `.codex/hooks.json`, inline `[hooks]` in trusted project config, user-layer `hooks.json`, match-all), with trusted project + `--dangerously-bypass-hook-trust` + hooks feature flag on | the merged pre_gate, ctx-inject, and heartbeat DO NOT run; harness-hook enforcement is absent on this path |
+| Codex CLI version | Interactive `codex` TUI | Headless `codex exec` | Status |
+|---|---|---|---|
+| 0.139.0 | **YES** — all four wired events (SessionStart, UserPromptSubmit, PreToolUse, PostToolUse); block envelope honored (FROZEN write blocked live) | **NO** — zero hook executions across every documented config form tried (project `.codex/hooks.json`, inline `[hooks]` in trusted project config, user-layer `hooks.json`, match-all), with trusted project + `--dangerously-bypass-hook-trust` + hooks feature flag on | **SUPERSEDED** — do not cite the headless "NO" row as current |
+| 0.144.4 (`_CODEX_HOOKS_LIVE_CERTIFIED_VERSION`) | **YES** | **YES** — projected command hooks fire and block in both paths | **current live-certified fact** (T-043-34, executed-path probe) |
 
-**Treat hook behavior as a live-tested harness contract, not timeless prose.** Codex CLI
-0.144.4 fires the projected hooks in both TUI and headless exec. The **git chokepoints**
-remain independent: pre-commit (WARN-only presence detection, NO-LOCKS DOCTRINE) and
-the pre-push security-verdict gate run as git hooks regardless of harness hook behavior.
+**Treat hook behavior as a live-tested harness contract, not timeless prose.** The
+live-certified fact as of `codex-cli 0.144.4` is that the merged pre_gate, ctx-inject,
+and heartbeat hooks fire in BOTH the interactive TUI and headless `codex exec` — the
+0.139.0 headless-never-fires row above is historical evidence, not current behavior.
+The **git chokepoints** remain independent regardless: pre-commit (WARN-only presence
+detection, NO-LOCKS DOCTRINE) and the pre-push security-verdict gate run as git hooks
+either way.
 
-`dadaia public doctor` reports the current live-certified parity and tells the operator
-to rerun the live contract after a Codex CLI upgrade (WS-CDX-HYGIENE).
+`dadaia public doctor`'s `codex:trust-boundary` line (`codex_trust_boundary_info`,
+A22.3) reports this version-qualified fact live against the installed Codex — consult
+it rather than hand-copying either row above, and rerun the live contract
+(`dadaia certify`'s codex-live-probe check, A22.4) after any Codex CLI upgrade instead
+of carrying a version-specific fact forward by assumption.
 
 > **Inject full context once per session, not every prompt.** Wire the full static
 > context bootstrap on `SessionStart` (matcher `startup|resume`), keyed on the
@@ -438,9 +445,11 @@ re-injection only when the session record's bind timestamp is newer than the ses
 sentinel; no first-ALIVE fallback). The anchored matcher is documented-valid and NOT to be changed
 (live-verified; see the contract table above). The legacy bash hook quartet was retired
 in v0.1.10 (Decision D-1) — the hooks are production Python owned by software-engineer.
-This wiring enforces only in interactive sessions; headless commits/pushes are covered
-by the git chokepoints (see Enforcement reality above). Risk to guard against: absolute
-paths and local projections leaking into public packages.
+This wiring enforces in both interactive and headless sessions on a live-certified
+Codex CLI (see Enforcement reality above); the git chokepoints remain independent
+defense-in-depth regardless, and are the sole backstop on an uncertified CLI version.
+Risk to guard against: absolute paths and local projections leaking into public
+packages.
 
 ---
 

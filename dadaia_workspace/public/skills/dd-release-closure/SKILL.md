@@ -21,11 +21,12 @@ of the delta runs on the thawed tree, before the `git mv` archive step — never
 only ship steps (merge to `develop`, diff security review, push, PR to `main`) follow
 archive. `dd-release-implement` §4 states the same order.
 
-**Finalization order: memory → CLOSURE → archive**, in one commit on `develop` that rides
-the next push (the branch/commit mechanics are the `dadaia-gitflow` skill's contract):
-with the code review already `APPROVE`d, update the memory atoms first, write
-`CLOSURE.md` next (it records which atoms changed), then move the release directory to
-`_archive/` last.
+**Finalization order: memory → CLOSURE → sweep → archive**, in one commit on `develop`
+that rides the next push (the branch/commit mechanics are the `dadaia-gitflow` skill's
+contract): with the code review already `APPROVE`d, update the memory atoms first, write
+`CLOSURE.md` next (it records which atoms changed and finalizes its evidence pointers),
+run the artifact GC sweep (below) once those pointers are final, then move the release
+directory to `_archive/` last.
 
 ## CLOSURE.md template
 
@@ -59,6 +60,42 @@ commit SHA, stdout snippet (in fenced code), or path to a report HTML under
 |-------------|---------|----------|
 | <what was validated> | `<command>` | `<sha\|snippet\|path>` |
 | ...                  | ...         | ...                  |
+
+## Size accounting
+
+**Mandatory** (FR21b/A21.4). Production-code size and complexity delta for this release,
+measured — never estimated. Ceilings ratchet only downward; a decrease is justified here.
+
+| Metric | Value |
+|--------|-------|
+| Production LOC added | `<n>` |
+| Production LOC deleted | `<n>` |
+| Production LOC net | `<+n \| -n>` |
+
+**Three largest additions by file:**
+
+| File | LOC added |
+|------|-----------|
+| `<path>` | `<n>` |
+| `<path>` | `<n>` |
+| `<path>` | `<n>` |
+
+**Three largest deletions by file:**
+
+| File | LOC deleted |
+|------|-------------|
+| `<path>` | `<n>` |
+| `<path>` | `<n>` |
+| `<path>` | `<n>` |
+
+| Ceiling | Before | After | Justification (only if decreased) |
+|---------|--------|-------|------------------------------------|
+| `C90` (`max-complexity`) | `<n>` | `<n>` | `<reason \| n/a — unchanged or increased-refused>` |
+| `PLR1702` (`max-nested-blocks`) | `<n>` | `<n>` | `<reason \| n/a — unchanged or increased-refused>` |
+
+**Nesting-violation count:** `<n>` (against the pinned `PLR1702` ceiling).
+
+Law: ceilings ratchet only downward; a decrease is justified in CLOSURE.
 
 ## Drifts
 
@@ -143,6 +180,20 @@ residual under one of two headings:
   (recorded in its own SPEC or at approval); already-approved, not re-adjudicated by a
   later intake report.
 
+## Artifact GC sweep
+
+**Mandatory** (FR25/A25.1). Run after this CLOSURE's `## Validations`/`## Dispositions`
+evidence pointers are final, before the archive move. Keep/delete rule: `dd-release-closure`'s
+"Artifact GC sweep" section below — referenced, not restated. Nothing a surviving row
+above references may appear in the deleted column.
+
+| Artifact class | Kept (still referenced) | Deleted/archived | Evidence |
+|----------------|--------------------------|-------------------|----------|
+| `.dadaia/handoff/<context>/*.handoff.json` (this release) | `<n>` | `<n>` | `<CLOSURE section \| commit sha>` |
+| `.dadaia/reports/<context>/**` (this release) | `<n>` | `<n>` | `<CLOSURE section \| commit sha>` |
+| `.dadaia/tmp/<agent>/**` (this release's captures) | `<n>` | `<n>` | `<CLOSURE section \| commit sha>` |
+| lifecycle run records (this release) | `<n>` | `<n>` | `<CLOSURE section \| commit sha>` |
+
 ## Archive decision
 
 **MOVE** — release directory will be moved to `specs/_archive/releases/<release-id>/` via
@@ -207,6 +258,33 @@ just-archived SPEC/CLOSURE names — the next closer captures the SPEC-DOC-031 c
 
 6. **Validate** with `dadaia specs doctor` before moving to archive. Doctor checks
    atomicity, broken `<img>` references, and Mermaid script presence.
+
+## Artifact GC sweep (FR25, mandatory)
+
+Run once CLOSURE.md's `## Validations`/`## Dispositions` evidence pointers are final —
+before the archive move, never before. The sweep needs the finished evidence list to
+know what survives.
+
+**Scope:** this release's own working artifacts under `.dadaia/` — its coordination
+handoffs, its HTML reports, its `.dadaia/tmp/<agent>/` captures, and its lifecycle run
+records. Never another release's artifacts, and never anything outside `.dadaia/`.
+
+**Keep/delete rule (inviolable):**
+
+- KEEP anything a surviving CLOSURE evidence pointer references — `## Validations` or
+  `## Dispositions`, no exception. Cross-check every candidate path against those
+  pointers before deleting; when in doubt, keep.
+- DELETE the rest, once unreferenced: this release's consumed coordination handoffs
+  (ack-on-consume already deletes most as they are read — the rule is canonical at
+  `dadaia-handoff-emitter`, not restated here; this sweep catches only what per-consume
+  deletion missed), report/handoff artifacts superseded by CLOSURE.md itself, tmp
+  captures, and lifecycle run records scoped to this release.
+- **Lane guard (AG.1, stated verbatim — inherited by every deletion lane in this
+  release):** resolve the target, refuse any resolved target outside `.dadaia/`, never
+  follow a symlinked directory.
+
+Record what was swept in CLOSURE's `## Artifact GC sweep` table (kept/deleted counts per
+artifact class, with evidence).
 
 ## Move-to-archive command
 

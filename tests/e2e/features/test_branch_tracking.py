@@ -1,4 +1,8 @@
-"""E2E: branch tracking through export → import + artifact trim (Fase 8D)."""
+"""E2E: branch tracking through export → import + artifact trim (Fase 8D).
+
+Intent: CONTRACT — Fase 8D (branch export/import tracking)
+Owner: software-engineer
+"""
 
 import json
 import subprocess

@@ -78,6 +78,10 @@ class _BaselinePattern:
     regex: re.Pattern[str]
     reason: str
     exclude: re.Pattern[str] | None
+    #: v0.4.3 T-043-16/FR12/A12.1 — WHY this pattern's carve-out exists. Required
+    #: (checked by :func:`_check_baseline_exclude_rationale`) whenever ``exclude`` is
+    #: set; ``None`` for a pattern with no carve-out at all.
+    exclude_rationale: str | None = None
 
 
 @lru_cache(maxsize=1)
@@ -111,12 +115,14 @@ def _load_privacy_baseline() -> tuple[_BaselinePattern, ...]:
             )
         except re.error:
             continue
+        rationale_src = entry.get("exclude_rationale")
         patterns.append(
             _BaselinePattern(
                 id=pattern_id,
                 regex=compiled,
                 reason=str(entry.get("reason", "structural privacy match")),
                 exclude=exclude,
+                exclude_rationale=rationale_src if isinstance(rationale_src, str) else None,
             )
         )
     return tuple(patterns)
@@ -183,6 +189,35 @@ def load_baseline_patterns() -> tuple[_BaselinePattern, ...]:
     return _load_privacy_baseline()
 
 
+def _check_baseline_exclude_rationale(
+    baseline: Iterable[_BaselinePattern],
+) -> list[DoctorLine]:
+    """A12.1: every baseline pattern carrying an ``exclude_regex`` carve-out must
+    document WHY via ``exclude_rationale`` — flags, by pattern id, any that don't.
+
+    A pattern with NO carve-out (``exclude is None``) needs no rationale and is never
+    flagged — this check is about carve-outs specifically, the exact thing the SPEC
+    calls out as having grown "literal by literal" with no attached justification.
+    Wired into :func:`check_public_privacy` so it runs on every ``dadaia public
+    doctor`` invocation, on the SAME ``public-privacy`` doctor line the operator
+    already reads — never a second, easy-to-miss check surface.
+    """
+    findings: list[DoctorLine] = []
+    for pattern in baseline:
+        if pattern.exclude is None:
+            continue
+        if pattern.exclude_rationale is None or not pattern.exclude_rationale.strip():
+            findings.append(
+                DoctorLine(
+                    DoctorStatus.ERROR,
+                    f"public-privacy: baseline pattern '{pattern.id}' has an "
+                    "exclude_regex carve-out with no documented exclude_rationale "
+                    "(v0.4.3 FR12/A12.1)",
+                )
+            )
+    return findings
+
+
 def _scan_text_for_baseline(
     text: str, patterns: Iterable[_BaselinePattern]
 ) -> list[tuple[str, str]]:
@@ -229,6 +264,7 @@ def check_public_privacy(
         roots.append(root_agents)
 
     findings: list[DoctorLine] = []
+    findings.extend(_check_baseline_exclude_rationale(baseline))
     for root in roots:
         files: list[Path] = [root] if root.is_file() else list(iter_files_fn(root))
         for path in files:

@@ -805,6 +805,89 @@ def test_segmented_active_release_artifacts_matrix(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
+# v0.4.3 T-043-22 [Arm-B rider] bug specs-doctor-segment-router-silent-skip —
+# AB.1-AB.4. Intent: BUG — a live segment pointer at a MISSING directory must
+# produce an explicit ERROR from BOTH SPEC-DOC-004 and TREE-6, never a silent
+# early return. The stale "already reported by check 9" comment was wrong:
+# check 9 (SPEC-DOC-009) validates only the RELEASE directory
+# (releases/<release>/), never the SEGMENT subdirectory
+# (releases/<release>/<segment>/) — so a live segment pointer at a missing
+# segment dir was invisible to every downstream check.
+# ---------------------------------------------------------------------------
+
+
+def test_missing_segment_directory_is_an_explicit_error_not_a_silent_skip(
+    tmp_path: Path,
+) -> None:
+    """AB.1: an ACTIVE.md whose segment: names a non-existent directory produces an
+    explicit ERROR (from BOTH SPEC-DOC-004 and TREE-6) naming the missing segment
+    directory — never a silent pass. Pre-fix, this fixture produced ZERO findings
+    from either check."""
+    specs = _make_clean_specs_tree(tmp_path, "v0.1.6")
+    _segment_active(specs, "v0.1.6", "alpha-1")
+    # The segment directory existed after _segment_active; now remove it entirely —
+    # the EXACT repro: a live segment pointer at a directory that does not exist.
+    import shutil as _shutil
+
+    _shutil.rmtree(specs / "releases" / "v0.1.6" / "alpha-1")
+
+    issues = SpecsDoctor(specs).check()
+
+    doc004 = [i for i in issues if i.code == "SPEC-DOC-004"]
+    tree6 = [i for i in issues if i.code == "TREE-6"]
+    assert doc004, "SPEC-DOC-004 must report the missing segment directory, never stay silent"
+    assert tree6, "TREE-6 must report the missing segment directory, never stay silent"
+    missing_segment_dir = str(specs / "releases" / "v0.1.6" / "alpha-1")
+    assert any(
+        missing_segment_dir in i.description or missing_segment_dir in (i.path or "")
+        for i in doc004
+    )
+    assert any(
+        missing_segment_dir in i.description or missing_segment_dir in (i.path or "") for i in tree6
+    )
+
+
+def test_healthy_segmented_release_is_unaffected_by_the_missing_segment_check(
+    tmp_path: Path,
+) -> None:
+    """AB.2: a segmented release WITH its directory keeps validating exactly as
+    today — no behaviour change on the healthy path."""
+    specs = _make_clean_specs_tree(tmp_path, "v0.1.6")
+    _segment_active(specs, "v0.1.6", "alpha-1")
+
+    issues = SpecsDoctor(specs).check()
+
+    assert "SPEC-DOC-004" not in _codes(issues)
+    assert "TREE-6" not in _codes(issues)
+
+
+def test_flat_release_is_unaffected_by_the_missing_segment_check(tmp_path: Path) -> None:
+    """AB.3: a flat release (segment: none / no segment line) is unaffected — the
+    missing-segment-directory check only ever activates when ACTIVE.md actually
+    carries a live segment: value."""
+    specs = _make_clean_specs_tree(tmp_path, "v0.1.6")
+
+    issues = SpecsDoctor(specs).check()
+
+    assert "SPEC-DOC-004" not in _codes(issues)
+    assert "TREE-6" not in _codes(issues)
+
+
+def test_stale_check_9_comment_no_longer_claims_coverage_it_does_not_provide() -> None:
+    """AB.4: the stale 'already reported by check 9' comment (SPEC-DOC-009 only
+    validates the RELEASE directory, never the segment subdirectory) is corrected
+    or deleted from both source files."""
+    import inspect
+
+    from dadaia_workspace.features.specs import doctor_release, doctor_structural
+
+    release_src = inspect.getsource(doctor_release)
+    structural_src = inspect.getsource(doctor_structural)
+    assert "already reported by check 9" not in release_src
+    assert "already reported by SPEC-DOC-009" not in structural_src
+
+
+# ---------------------------------------------------------------------------
 # CAT-1: catalog.json <-> feature atom sync — merged sad+silent matrix
 # ---------------------------------------------------------------------------
 

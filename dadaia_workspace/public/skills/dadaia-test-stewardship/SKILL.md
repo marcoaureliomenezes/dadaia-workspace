@@ -14,6 +14,17 @@ description: >
 > Numeric values below are this workspace's declared defaults (§I); a consumer
 > workspace re-parameterizes them without forking this protocol.
 
+**Vocabulary homonyms (FR7 — read before grepping).** "Scaffold", "sentinel" and
+"quarantine" each have a pre-existing, unrelated use elsewhere in this codebase:
+`scaffold` also names `public/scaffold/` (the consumer-workspace template tree) and
+`scaffolder.py` (the tool that writes it); `sentinel` also names the self-scan sentinel
+family (`dadaia_workspace/hooks/ctx_inject.py`, `core/workspace_resolver.py`, and
+peers — a session-keyed re-injection guard, unrelated to test state); `quarantine` here
+is exclusively this skill's §F flake state (a registered-bug-required test mark) — no
+other subsystem overloads that one. A grep for these terms across the tree returns
+both meanings; filter by the file paths above before treating a hit as test-lifecycle
+signal.
+
 ## A — Intent taxonomy
 
 Every test declares intent in its **module docstring** — `Intent: <KIND> — <AC id |

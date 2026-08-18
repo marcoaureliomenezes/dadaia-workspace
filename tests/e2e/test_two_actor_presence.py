@@ -13,6 +13,9 @@ lease record).
 Every wait uses file rendezvous with a bounded deadline (never a blind sleep of the
 whole duration, never an infinite poll). No holder/foreign asymmetry is modeled here —
 there is nothing to hold, so both actors are symmetric.
+
+Intent: CONTRACT — v0.1.76 T-3 (two-actor presence, NO-LOCKS DOCTRINE)
+Owner: software-engineer
 """
 
 from __future__ import annotations

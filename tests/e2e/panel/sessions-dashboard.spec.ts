@@ -19,6 +19,9 @@
  * tabpanel. `activateSessionsSubsection()` opens that tab and waits for the
  * relocated `#section-sessions` mount; `sessions.js` and the `/api/sessions`
  * contract are otherwise unchanged.
+ *
+ * Intent: CONTRACT — v0.1.52 FR2 / AC-2, AC-7a (sessions dashboard)
+ * Owner: software-engineer
  */
 
 import { test, expect, type Page, type Route } from '@playwright/test';

@@ -42,6 +42,15 @@ identical here by tests/contract/test_memory_catalog_render_contract.py):
 stable enumeration aid, NOT a priority signal.
 Sourced ENTIRELY from frontmatter — no HTML scraping.
 'depends_on' is derived from [[slug]] wikilinks in the body.
+
+v0.4.3 T-043-20/FR16, A16.3: this script is a THIN WRAPPER over
+``features/specs/catalog.py`` for token estimation — ``estimate_tokens`` is imported
+from the package, not duplicated (RO-5, resolved). Its ``generate_catalog``/
+``generate_index_md``/CLI-parsing logic stays local because those function
+signatures and this exact CLI surface (``--memory-dir``/``--out``/``--index-out``/
+``--context``) are pinned by ``tests/contract/test_memory_catalog_render_contract.py``
+(F-84), which differ from the package's ``specs_dir``-rooted, context-derived API —
+see the import comment below for the full rationale.
 """
 
 from __future__ import annotations
@@ -59,8 +68,21 @@ import yaml
 # Public-source hygiene (T-011-15 / FR-W5-01): never write a __pycache__/*.pyc under
 # dadaia_workspace/public/. This guard fires no matter how the script is invoked
 # (direct `python <script>`, subprocess, or import), complementing the `-B` flag at
-# the subprocess call site in features/specs/doctor.py.
+# the subprocess call site in features/specs/doctor.py. Must run BEFORE the
+# dadaia_workspace import below so the package's own imports inherit the guard.
 sys.dont_write_bytecode = True
+
+# v0.4.3 T-043-20/FR16, A16.3: `estimate_tokens` used to be duplicated verbatim here
+# (RO-5) because this script was fully importless. It now requires the
+# `dadaia-workspace` package to be installed in the running interpreter (the same
+# requirement `lint-memory-atoms.py`'s thin wrapper carries, T-043-20's other half),
+# so the duplicate formula is deleted in favour of importing the one canonical
+# implementation. The rest of this script's catalog-building and index-rendering
+# logic stays local: its exact `--memory-dir`/`--out`/`--index-out`/`--context` CLI
+# surface and `generate_catalog`/`generate_index_md` function signatures are pinned
+# by tests/contract/test_memory_catalog_render_contract.py (F-84), which differ from
+# `features/specs/catalog.py`'s `specs_dir`-rooted, context-derived public API.
+from dadaia_workspace.features.specs.catalog import estimate_tokens  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Regexes
@@ -132,17 +154,6 @@ def _extract_depends_on(body: str) -> list[str]:
             seen.add(slug)
             result.append(slug)
     return result
-
-
-def estimate_tokens(body: str) -> int:
-    """Approximate an atom body's token count: ``word_count * 1.35`` (stdlib only).
-
-    SPEC v0.4.2 FR2/GRILL D5: MUST stay byte-identical to
-    ``features/specs/catalog.py:estimate_tokens`` — this standalone, importless
-    script cannot import that module, so the formula is duplicated by necessity and
-    kept aligned by ``tests/contract/test_memory_catalog_render_contract.py`` (A2.2).
-    """
-    return round(len(body.split()) * 1.35)
 
 
 def _validate_required(fm: dict[str, Any], path: Path) -> list[str]:

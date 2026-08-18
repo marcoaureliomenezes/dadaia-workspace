@@ -20,6 +20,8 @@ skills:
   - dadaia-task-manager
   - dadaia-workspace-spec-navigator
   - dadaia-step0-memory-bootstrap
+  - harness-primitives
+  - dadaia-gitflow
 maxTurns: 50
 input_contract:
   requires_inputs:

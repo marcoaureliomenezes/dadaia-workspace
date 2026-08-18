@@ -7,12 +7,15 @@ summary: >-
   A consumer-side validation agent running the shipped consumer validation recipe on
   a real workspace is the canonical release gate of dadaia-workspace. A consumer
   environment is declared SUPPORTED only after a full real-use round reports zero
-  failures. Deterministic certification alone never approves a release.
+  failures. Deterministic certification alone never approves a release. A round may also
+  run against a throwaway real workspace created with dadaia init; whatever such an
+  environment cannot exercise is recorded as a named limit and reported as not exercised,
+  never as passed, and one remediation cycle is budgeted inside the round itself.
 tags:
 - consumer-validation
 - release-gate
 - sdd
-last_updated: '2026-08-06'
+last_updated: '2026-08-18'
 release_origin: v0.2.9
 ---
 
@@ -42,22 +45,41 @@ zero failures, not by point checks.
   fake-chain honesty, and the kimi-code harness surface. Every release candidate
   must pass ALL of it.
 
-## Convergence posture (v0.2.9)
+## Convergence posture
 
-The v0.2.9 loop worked by root-cause classes, never instance patches:
-materialization delta gating, placeholder-atom repair, bounded retry digests, and
-observable bounded revisions (`revision_note` on the run record, both retry
-mechanisms). The 0.4.1 candidate reached CERTIFIED_100 — 35 PASS / 0 FAIL /
-0 EXCEPTION.
+The loop converges by **root-cause classes, never instance patches**: materialization
+delta gating, placeholder-atom repair, bounded retry digests, and observable bounded
+revisions (`revision_note` on the run record, on both retry mechanisms). A candidate is
+certified only at `CERTIFIED_100` — every statement of both matrices PASS, none excepted.
+
+Alongside the operator's own consumer environment, a release round may run against a
+**throwaway real workspace** created with `dadaia init` under the workspace tmp and
+exercised through supported interfaces only. Real, not simulated: the installed
+version-matched skill surface is what the round consumes, every `dadaia` verb it references
+is cross-checked against the live `--help`, and the throwaway repo's own projected hooks
+are invoked directly to confirm the FROZEN-block and ADDITIVE-allow behavior in the
+consumer's own tree. Governance coherence is proven in that workspace rather than asserted:
+the full `[ ] → [-] → [x]` marker cycle with a clean worktree at each commit, valid
+memory/schema state, immutable release evidence. The in-place upgrade path is proven from
+both ends — a pre-single-source workspace **surfaces** its un-migrated backlog as a warning
+count equal to its loose per-entry-file count while the backlog doctor is legitimately
+clean on an absent document, then folds to a clean two-doctor state after migration.
+
+The round budgets **one remediation cycle inside itself**: a finding is root-caused and
+fixed there, not deferred out. What the environment could not exercise is recorded as a
+limit and reported as **not exercised** — never as passed. That distinction is the whole
+value of the round: an unexercised criterion silently reported green would make the gate
+itself the bug it exists to catch.
 
 ## How to validate
 
 The operator hands the candidate wheel to the consumer-side validation agent and
 requires a full sweep in one batch: structural gate + deterministic matrix + the
-whole Real-use matrix, never stopping at the first FAIL. How that agent is
-deployed, triggered, and hosted is the **operator's private environment** and is
-deliberately not described here — this library documents the gate's contract, not
-any consumer's infrastructure.
+whole Real-use matrix, never stopping at the first FAIL. A round that reaches into new
+runtime behavior states which capabilities it actually exercised and which it could not,
+by name. How that agent is deployed, triggered, and hosted is the **operator's private
+environment** and is deliberately not described here — this library documents the gate's
+contract, not any consumer's infrastructure.
 
 ## Dependencies
 

@@ -130,7 +130,36 @@ Release-definition step 2 ("pick the set") reads `BACKLOG.md`'s `ACTIVE` section
 `specs/bugs/*.jsonl` directly — this skill supplies a sanitized, deduplicated set with no
 further triage needed on the release-definition side. Purge-on-pick (§2) is the receipt.
 
-## 7. CLI reference
+## 7. Activation-glob precedence (canonical home — appears nowhere else in `public/`)
+
+FR2/R2 scope: the collision check below governs only **non-universal** skills.
+`applyTo: "**"` skills (`architect-core-workflow`, `dadaia-step0-memory-bootstrap`,
+`harness-primitives`) and `dadaia-grill-me`'s `specs/**` are always-on by design — no
+disjointness is ever asserted about them, and no check may assert it.
+
+**Precedence rule.**
+1. A universal (`**`) skill is always-on and never competes with any stage skill.
+2. Among stage (non-universal) skills, the **most-specific glob** resolves an
+   activation ambiguity — a narrower path wins over a broader one that also matches.
+3. Any overlap between two non-universal, non-`**` skills must be **declared** below
+   (rationale + which side is more specific) or it is an FR2 defect.
+
+**Declared overlaps (subset relationships, all intentional):**
+
+| Narrower (wins) | Broader | Rationale |
+|---|---|---|
+| `dd-release-implement` (`specs/releases/*/TASKS.md`) | `dadaia-task-manager` (`specs/**/TASKS.md`) | task-marker mechanics specialize the general TASKS.md contract |
+| `dd-audit-project` (`.dadaia/reports/**`) | `dadaia-workspace-doctor` (`.dadaia/**`) | audit reporting specializes the general `.dadaia/` doctor surface |
+| `dd-bug-registration` (`specs/bugs/*.jsonl`) | `dd-bug-fix` (`specs/bugs/**`) | registration writes only the ledger file; fix owns the whole bug lifecycle including that file |
+| `ai-context-engineering`, `ai-harness-claude-code`, `ai-harness-codex` (identical `dadaia_workspace/public/**`) | — (three-way identical, no narrower/broader side) | one cohesive `ai-engineer`-only harness-mastery family, always loaded together for AI-surface authoring; narrowing is out of R2 scope |
+| `dadaia-handoff-emitter` (`.dadaia/handoff/**/*.handoff.json`), `project-orchestration` (`.dadaia/handoff/**`) | `dadaia-workspace-doctor` (`.dadaia/**`) | a three-tier specialization chain over `.dadaia/`: doctor is the general surface, handoff dispatch narrows to `.dadaia/handoff/**`, the emitter narrows further to the JSON artifact itself — pre-existing, out of R2 scope |
+
+A collision check (`dadaia_workspace/public/scripts/lint-skill-collisions.py`,
+`--self-test` proves A2.4) run at projection time flags **undeclared** overlap between
+two non-universal skills only — this table is its `DECLARED_OVERLAPS` allowlist; keep
+both in sync.
+
+## 8. CLI reference
 
 ```bash
 dadaia backlog new <slug>          # appends an ## ACTIVE subsection to BACKLOG.md

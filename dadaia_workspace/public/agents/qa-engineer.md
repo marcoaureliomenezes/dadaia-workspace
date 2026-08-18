@@ -13,12 +13,16 @@ tools:
   - Glob
   - Grep
 skills:
+  - dadaia-cli
   - dadaia-handoff-emitter
   - dadaia-workspace-spec-navigator
   - dadaia-task-manager
   - dadaia-step0-memory-bootstrap
+  - harness-primitives
   - dd-release-implement
   - dd-bug-registration
+  - dadaia-gitflow
+  - dadaia-test-stewardship
 maxTurns: 40
 input_contract:
   requires_inputs:

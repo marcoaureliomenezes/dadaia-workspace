@@ -66,3 +66,28 @@ Flake Policy
 Test Health
 Root Cause, Always
 Satisfiable Diagnostics
+# v0.4.3 FR13/A13.3 — the 20 standing LINT-1 headings enumerated by the T-043-17 V3
+# capture (19 unique strings: `Redacted Output` covers its two source atoms), plus the
+# FR21/A21.6 governance heading and the two corrected headings this memory window landed.
+Core file-I/O authorized set
+Agent Surface
+Redaction At Authoring
+Adoption (15 instruction surfaces)
+Adoption (12 instruction surfaces)
+How Ordered Work Happens
+The derivation law
+Registry
+Enforcement
+Panel surface
+Post-compaction
+Model Governance Surface
+The support contract
+Convergence posture (v0.2.9)
+Convergence posture
+How to validate
+Resolution
+Redacted Output
+Branches And Stage Placement
+Merge Cadence
+Context Attribution
+Complexity And Size

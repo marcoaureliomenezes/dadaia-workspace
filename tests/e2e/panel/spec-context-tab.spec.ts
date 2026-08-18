@@ -6,6 +6,9 @@
  *
  * Priority: P2 (E2E-SCP-01 functional, E2E-SCP-02 back-compat)
  *           P0 (E2E-SCP-03/04/05/06 regression guard — T-016-P03)
+ *
+ * Intent: CONTRACT — E2E-SCP-01..06 (T-016-P03 regression guard)
+ * Owner: software-engineer
  */
 
 import { test, expect } from '@playwright/test';

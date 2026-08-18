@@ -1,23 +1,15 @@
-release: v0.4.3
-segment: none
-phase: IMPLEMENTATION
+release: none
+phase: none
 
-Release v0.4.3 — "claims-made-true / backlog-zero".
+No release is active. **v0.4.3 "claims-made-true / backlog-zero"** closed on 2026-08-18 and
+is archived at `specs/_archive/releases/v0.4.3/` (CLOSURE `**Status:** Aprovado`); its ship
+task, T-043-53, runs after this archive per the release order review → closure → archive →
+ship (D8/FR5).
 
-Segment tracking (ADR D1 — **ratified** by the dispatcher, 2026-08-17). This release is
-**segmented** (ADR R1: `alpha-1` … `alpha-6` → `rc-1`, order amended by ADR R10), but it
-keeps **one** authoritative document set at `specs/releases/v0.4.3/` and expresses the
-segment cadence as per-segment blocks inside `TASKS.md`. The `segment:` pointer therefore
-stays `none`: the shipped schema-v2 routing binds a non-`none` `segment:` value to a
-per-segment document directory (`releases/<id>/<segment>/{SPEC,PLAN,TASKS}.md`), and this
-release deliberately does not duplicate its document set six times. The live segment is
-named in `TASKS.md` §Segment map and advanced by the QA gate tasks
-(`T-043-12/23/31/37/45/49`).
+`specs/backlog/BACKLOG.md` `## ACTIVE` is **empty**: v0.4.3 picked the entire queue in one
+release under the operator's standing order, and all 25 records carry a terminal `LEDGER`
+line. The next release is defined when the operator creates demand — `project-manager`
+curates it into the backlog, `product-engineer` defines the release from the picked set.
 
-Segment order (R10): `alpha-1` AI surface · `alpha-2` gate + primitives (+ the Arm-B
-rider) · `alpha-3` suite + complexity · `alpha-4` Codex · `alpha-5` event-driven GC ·
-`alpha-6` consumer round + CHANGELOG (**last**, so it certifies the assembled surface
-including GC) · `rc-1` review → memory → closure → archive → ship.
-
-Phase ladder for this release:
-DEFINITION (now) → IMPLEMENTATION (from T-043-01) → CLOSURE (T-043-50/51) → ARCHIVED.
+Phase ladder for the next release, when one opens:
+DEFINITION → SPEC → PLAN → TASKS → IMPLEMENTATION → CLOSURE → ARCHIVED.

@@ -243,6 +243,35 @@ def test_main_appends_one_latency_record(
     assert "ts" in rec
 
 
+def test_latency_log_rotates_at_the_shared_cap(tmp_path: Path) -> None:
+    """FR27/A27.1 — ``_append_latency`` funnels through the shared rotation helper, so
+    ``hook-latency.jsonl`` rotates exactly like every other ``.dadaia/logs/*.jsonl``
+    writer once it crosses the cap. Driven in-process (no subprocess) against the
+    production function directly — the shared helper's own cap-crossing/retention
+    behavior is proven once in ``tests/unit/infrastructure/test_jsonl_log_rotation.py``;
+    this test only proves THIS writer is actually wired through it.
+    """
+    log = tmp_path / ".dadaia" / "logs" / "hook-latency.jsonl"
+    log.parent.mkdir(parents=True)
+    log.write_text('{"seed": true}\n', encoding="utf-8")
+
+    import dadaia_workspace.infrastructure.jsonl_log_rotation as rotation
+
+    original_cap = rotation.LOG_ROTATION_MAX_BYTES
+    rotation.LOG_ROTATION_MAX_BYTES = 8
+    try:
+        pre_gate._append_latency(tmp_path, "PreToolUse", 1.5)  # noqa: SLF001
+    finally:
+        rotation.LOG_ROTATION_MAX_BYTES = original_cap
+
+    rotated = log.with_name(log.name + ".1")
+    assert rotated.exists()
+    assert json.loads(rotated.read_text(encoding="utf-8").strip()) == {"seed": True}
+    new_rec = json.loads(log.read_text(encoding="utf-8").strip())
+    assert new_rec["hook"] == "pre_gate"
+    assert new_rec["event"] == "PreToolUse"
+
+
 def test_telemetry_failure_does_not_change_verdict(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

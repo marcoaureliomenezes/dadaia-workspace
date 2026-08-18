@@ -6,6 +6,8 @@ description: >
   handoff alone. Only when an HTML report exists (operator asked, or the next handoff
   target is human) does the handoff also carry artifact.path + content_hash. Conforms to
   .dadaia/agentic/schemas/handoff-v1.schema.json; validated via `dadaia reports validate`.
+  Also the single canonical location for the consumer-side rule: a consuming skill
+  deletes the coordination handoff it consumed (ack-on-consume).
 applyTo: ".dadaia/handoff/**/*.handoff.json"
 ---
 
@@ -208,6 +210,32 @@ dadaia reports validate <path-to-handoff.handoff.json>
 
 Exit 0 confirms the handoff is structurally valid; in report mode it also confirms the
 referenced report exists and its hash matches. Fix any non-zero exit before proceeding.
+
+---
+
+## Consuming a handoff (ack-on-consume — FR23)
+
+This is the **one** place this rule is stated. Every skill whose input contract is "read
+a handoff" (a dispatcher relaying a sub-agent's result, a reviewer picking up an
+implementer's handoff, any consumer reading `.dadaia/handoff/<context>/…`) follows this
+rule and never restates it — reference this section instead.
+
+**The rule.** Once a consuming skill has read and acted on a coordination handoff, it
+deletes that handoff file. A handoff carrying `artifact.path` is **exempt** — it is
+artifact-bearing, not purely coordination, and its retention instead follows its
+referenced report's retention (`DADAIA.md` §4). Never delete an artifact-bearing handoff
+under this rule.
+
+**The deletion lane guard (AG.1 — inherits FR17's symlink doctrine (A17.1) by
+reference, not restated here).** Before deleting a consumed coordination handoff:
+
+1. Resolve the handoff's real target path.
+2. Refuse the deletion if the resolved target falls outside `.dadaia/`.
+3. Never follow a symlinked directory while resolving or walking to the target.
+
+**Never break a surviving handoff.** Deleting a consumed coordination handoff must never
+break `dadaia reports validate` on any other handoff still on disk — deletion is scoped
+to exactly the one consumed file, never a directory sweep.
 
 ---
 

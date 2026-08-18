@@ -54,6 +54,44 @@ for this task, so none is touched here):
 
 Left exactly as written; a future task can pick this up.
 
+## [0.4.3] — 2026-08-18
+
+Release v0.4.3 "claims-made-true / backlog-zero" — the operator's standing order (the
+entire `## ACTIVE` backlog queue in one release, residuals minimised to zero) shipped as
+one segmented release: 6 `alpha-N` increments plus a shipping candidate, 32 FRs, 53 tasks,
+24 backlog slugs delivered. Archived at `specs/_archive/releases/v0.4.3/`.
+
+### Added
+- **The push gate reads commit objects, not just blobs**: the header/body boundary is
+  respected and a term is never amnestied path-less (fail-closed) — closes the
+  commit/tag-body scanning gap.
+- **Privacy baseline v8**: carve-outs now carry a stated rationale, the dotted-chain class
+  has a structural rule, and the law-mandated co-author trailer no longer refuses its own
+  push.
+- **Cache guard**: the venv-guard layer refuses to let a pytest/ruff/mypy cache be born
+  inside a repo working tree.
+- **Governance primitives**: a non-terminal `picked` bug-ledger event; `specs/memory/`
+  dotfiles ratified into the MEMORY path class; a repo-`AGENTS.md` destination write
+  refuses a symlink target.
+- **Suite curation + a first complexity ratchet**: the LARGE (E2E) census measured and
+  curated (102 → 100); `C901`/`PLR1702` pinned at their measured maxima (63 / 6,
+  downward-only ratchet); a first mutation-testing baseline (`mutmut==3.7.0`, 90.4% kill
+  rate, off the push path).
+- **Codex fidelity**: personas compacted −8.3% (law loaded once, never restated per
+  session), a version-qualified trust boundary, and a live `codex exec` certification
+  probe.
+- **Event-driven artifact GC**: ack-on-consume for coordination handoffs, a push-verdict
+  collector wired into the ship flow (`dadaia ci gc-push-verdicts`), a release-closure
+  sweep, a reconciler that reaps what it already walks, write-time log rotation, and
+  `dadaia tmp gc` as the sole calendar-based backstop.
+
+### Changed
+- **Workspace-root resolution fixed** — the ancestor walk no longer silently mistargets
+  from a nested working directory (found live by this release's own consumer round).
+- **The whole assembled surface, GC included, validated on a throwaway real consumer
+  workspace**, and the published CHANGELOG lineage backfilled from git history with no
+  invention (this section's own predecessors, below).
+
 ## [0.4.2] — 2026-08-16
 
 Release v0.4.2 "residual-convergence" — the first section under the one-axis rule
@@ -99,6 +137,127 @@ Archived at `specs/_archive/releases/v0.4.2/`.
 - **The dead hotfix-release scaffold surface**: `dadaia specs hotfix open`, both
   hotfix templates, and the unconditional `candidates.md` warning it emitted — Arm B
   needs no release ceremony by law, so the tooling for one was pure bug surface.
+
+## [0.4.1] — 2026-07-20
+
+*Retroactive section (T-043-48/FR31, SPEC R5) — derived strictly from `git log
+v0.4.0..v0.4.1` (1 commit, `bd6c9f2a`); no invention, no category guessed from an
+unread diff — the commit subject is quoted with any private name masked (`H…s` style,
+DADAIA.md §7; the sha keeps every line reviewer-checkable) and the range is
+reviewer-checkable.*
+
+- `bd6c9f2a` feat: v0.2.9 — H…s real-use convergence (0.4.1) (#173)
+
+## [0.4.0] — 2026-07-19
+
+*Retroactive section (T-043-48/FR31, SPEC R5) — `git log v0.3.0..v0.4.0` (2 commits,
+`987e76d4`..`a94f112a`); no invention.*
+
+- `987e76d4` fix: H…s batch-4 - fake chains complete, index-free bootstrap repack,
+  chain-proving certify (candidate 0.3.1) (#171)
+- `a94f112a` feat: v0.2.8 — Kimi Code as Layer-1 entry harness (0.4.0) (#172)
+
+## [0.3.0] — 2026-07-16
+
+*Retroactive section (T-043-48/FR31, SPEC R5) — `git log v0.2.3..v0.3.0` (2 commits,
+`86f4cd99`..`f20e4492`); no invention.*
+
+- `86f4cd99` fix: 0.3.0 — consumer-validated hotfix line reconciled with v0.2.3 (#168)
+- `f20e4492` fix: 0.3.0 H…s-validated fixes (slug help regex render, recipe
+  precision, lifecycle help clarity) (#169)
+
+## [0.2.3] — 2026-07-14
+
+*Retroactive section (T-043-48/FR31, SPEC R5) — `git log v0.2.2..v0.2.3` (2 commits,
+`2d7d93da`..`49f9940c`); no invention.*
+
+- `2d7d93da` fix(lifecycle): gate-integrity overhaul from ALL-WORKFLOWS stress test —
+  25 bugs root-caused (#162)
+- `49f9940c` feat: v0.2.3 — simplified dadaia-workflows, release-folder handoffs,
+  spark-only Layer-2 (#167)
+
+## [0.2.2] — 2026-07-11
+
+*Retroactive section (T-043-48/FR31, SPEC R5) — `git log v0.2.1..v0.2.2` (47 commits,
+`4a433063`..`fa6e742d`, 2026-07-05 to 2026-07-11). Representative subjects below, not
+exhaustive — the full range is git-checkable; no category breakdown invented from an
+unread diff.*
+
+- `11cfd37c` feat(v0.1.81)!: deprecation strips & doctor cleanup — tier: window closed
+  (operator-waived date gate) (#159)
+- `e002e7d9` feat(v0.1.77): central bind-resolution seam — one resolution path for
+  every verb (#151)
+- `5dbe209c` feat(v0.1.76): lock liberation — advisory presence replaces the blocking
+  lease (#149)
+- `3965df4c` feat: v0.1.61 Audit Remediation & Memory Truth — 41 dispositions,
+  PluginStore wired, cli-no-infra cap (#116)
+- `fa6e742d` chore: bump package version to 0.2.2 for PyPI release (#161) (tag commit)
+
+## [0.2.1] — 2026-07-05
+
+*Retroactive section (T-043-48/FR31, SPEC R5) — `git log v0.2.0..v0.2.1` (1 commit,
+`b1cb28dc`); no invention.*
+
+- `b1cb28dc` docs(readme): document current capabilities; release 0.2.1 to refresh
+  PyPI page (#113)
+
+## [0.2.0] — 2026-07-04
+
+*Retroactive section (T-043-48/FR31, SPEC R5) — `git log v0.1.6..v0.2.0` (41 commits,
+`a83589b1`..`13c85eea`, 2026-06-12 to 2026-07-04). Representative subjects below, not
+exhaustive — the full range is git-checkable; no category breakdown invented from an
+unread diff.*
+
+- `4ccc6a21` feat: v0.1.60 Capability Tail — plugin packs + install command,
+  efficiency-audit trigger, provenance-gated consumer fan-out (#110)
+- `b0bd8217` feat: v0.1.58 Harness & Projection Distribution — typed registry, init
+  profiles, profile-aware doctor, consumer fan-out (#106)
+- `fc10dae7` feat: real Layer-2 workflows + coherent worker-output contract
+  (v0.1.30–v0.1.32) (#69)
+- `a83589b1` feat: PI fourth harness, two-layer model, drift elimination + Layer-1
+  Ring-1 (v0.1.15→v0.1.21) (#66)
+- `13c85eea` chore(release): bump version 0.1.7 -> 0.2.0 for PyPI deploy (#112) (tag
+  commit)
+
+## [0.1.6] — 2026-06-12
+
+*Retroactive section (T-043-48/FR31, SPEC R5) — `git log v0.1.5..v0.1.6` (5 commits,
+`8b80090e`..`6b637427`); no invention, all 5 commits listed.*
+
+- `8b80090e` chore(release): 0.1.7 — Audit Remediation + Unlock the Workflow (#48)
+- `db7aecbe` feat(release): 0.1.8 — Cross-Platform OS Compatibility
+  (Linux/macOS/Windows) (#49)
+- `9693121b` chore(release): bump version 0.1.7 -> 0.1.8 + CHANGELOG (#50)
+- `91bbaeb9` fix(platform): 0.1.8 rc-2 — Windows graduation (hard-gated tri-platform
+  CI) (#51)
+- `6b637427` feat(release): v0.1.14 — Deterministic Lifecycle Kernel (chokepoints,
+  bind-driven injection, zero-false-block) (#56) (tag commit)
+
+## [0.1.5] — 2026-06-07
+
+*Retroactive section (T-043-48/FR31, SPEC R5) — `git log v0.1.4..v0.1.5` (189
+commits, `218d8303`..`29f8e3ed`, 2026-06-06 to 2026-06-07). Representative subjects
+below, not exhaustive — the full range is git-checkable. The range includes commits
+self-labelled with internal spec-release numbers ("v0.2.0", "0.2.1") that predate the
+real published `0.2.x` versions below — the same internal-vs-published numbering split
+this project later retired (v0.4.2 ADR R2); no category breakdown invented from an
+unread diff.*
+
+- `44757d83` feat: v0.2.0 agentic development lifecycle + soul & correctness fold
+  (#39)
+- `361019a7` feat(v0.2.1): open release + WS-1 vision canonization + WS-4 doctor
+  fidelity
+- `3e5ea863` feat(gate): T-R1-01 runtime→session ptr file env-free resolution
+- `792052ae` feat(cli): reconcile hotfix flow with the alpha/rc model (T-ENG-07)
+- `29f8e3ed` fix(codex): harden runtime projection compatibility (tag commit)
+
+## [0.1.2] — 2026-05-28
+
+*Retroactive section (T-043-48/FR31, SPEC R5) — `git log v0.1.1..v0.1.2` (1 commit,
+`1f0687bd`); no invention.*
+
+- `1f0687bd` chore(release): 0.1.2 — ad blocker fix, /health endpoint, context-gate
+  fix, agent-friendly README (#15)
 
 ## [0.9.0] — 2026-08-15
 
@@ -563,6 +722,11 @@ Lands in the same unreleased `0.5.0` package version as spec release v0.3.0 belo
 
 ## [0.1.24] — Unreleased
 
+*Unpublished-internal (T-043-48/FR31, SPEC A31.3): no `0.1.24` was ever published to
+PyPI — verified against `https://pypi.org/pypi/dadaia-workspace/json` (13 published
+versions, `0.1.0` through `0.4.1`). Kept exactly as written; heading neither removed
+nor renamed.*
+
 ### Removed
 - **Removed OpenCode support entirely (both agentic layers).** The OpenCode entry
   harness, the `OPENCODE_RUN` Layer-2 worker kind and its adapter, the `.opencode/`
@@ -571,6 +735,14 @@ Lands in the same unreleased `0.5.0` package version as spec release v0.3.0 belo
   harness set is now exactly **Claude Code, Codex, and PI**.
 
 ## [0.1.7] — 2026-06-13
+
+*Unpublished-internal (T-043-48/FR31, SPEC A31.3): no `0.1.7` was ever published to
+PyPI — verified against `https://pypi.org/pypi/dadaia-workspace/json` (13 published
+versions, `0.1.0` through `0.4.1`; the real published lineage runs `0.1.6` directly to
+`0.2.0`). A `v0.1.7` git tag exists (`fb03d1ad`, 2026-06-13) but no corresponding
+PyPI upload was ever made. The prose below's "the single published version after
+`0.1.5`" claim is therefore superseded by this annotation, not corrected in place —
+kept exactly as written; heading neither removed nor renamed.*
 
 Consolidated release: the single published version after `0.1.5`. It folds in all
 work from the never-tagged `0.1.6`–`0.1.10` development line — cross-platform
@@ -686,6 +858,11 @@ per-fix releases.
 - Purged residual private identifiers from the full git history and genericized changelog entries that previously enumerated them.
 
 ## [0.1.3] — 2026-06-03
+
+*Unpublished-internal (T-043-48/FR31, SPEC A31.3): no `0.1.3` was ever published to
+PyPI — verified against `https://pypi.org/pypi/dadaia-workspace/json` (13 published
+versions, `0.1.0` through `0.4.1`). Kept exactly as written; heading neither removed
+nor renamed.*
 
 ### Security
 - Removed two private academy modules (12 files) from the published wheel — they contained private-infrastructure operational docs.

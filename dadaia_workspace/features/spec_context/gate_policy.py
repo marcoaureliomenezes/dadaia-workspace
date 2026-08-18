@@ -3,6 +3,20 @@
 Races between sessions are surfaced through advisory presence and never prevented.
 The only mutating-mode denial is the caller's own explicit READ mode. Protected CLI
 session records remain fail-closed against file-tool writes.
+
+**The MEMORY path class covers dotfiles, by decision (v0.4.3 FR13, software-architect
+ruling, handoff 2026-08-17T161500Z-software-architect-v0.4.3-fr13-fr14).**
+``_MEMORY_PREFIX``'s bare-prefix match classifies EVERY path under ``specs/memory/`` —
+dotfiles included (e.g. ``specs/memory/.heading-allowlist``, curated lint canon, not
+runtime config) — as MEMORY. No dotfile carve-out exists and none is added: a
+carve-out would open an always-writable hole under the MEMORY prefix through which
+lint canon could mutate mid-implementation, the exact stale-layer pattern the gate
+exists to prevent. Second, a SPEC may NOT assign a memory-class write to a
+non-``DEFINITION``/``CLOSURE`` task: the gate reads no SDD artifacts by design and
+gains no SPEC-override channel — ``[RULE A]`` (``evaluate``, below) keeps blocking
+unconditionally by phase regardless of what any SPEC schedules; a SPEC that needs a
+memory-class write outside a ``DEFINITION``/``CLOSURE`` window is an
+architecture-fidelity defect caught at review, not something this gate accommodates.
 """
 
 from __future__ import annotations
@@ -53,6 +67,8 @@ _ARCHIVE_SUBDIR_PREFIXES: tuple[str, ...] = (
 # Single authority in core (also consumed by the public doctor's foreign scan) —
 # the local name is kept for the module's existing readers.
 _DADAIA_ADDITIVE_PREFIXES: tuple[str, ...] = workspace_layout.DADAIA_ADDITIVE_PREFIXES
+#: v0.4.3 FR13 (ratified): bare-prefix match — dotfiles included, by decision; no
+#: carve-out; no SPEC override of the phase rule (see the module docstring above).
 _MEMORY_PREFIX = "specs/memory/"
 _FROZEN_PREFIX = "specs/_archive/"
 #: A path under ``repos/<slug>/`` whose context-relative remainder matches one of these

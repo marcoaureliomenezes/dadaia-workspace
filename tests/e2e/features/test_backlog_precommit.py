@@ -17,6 +17,9 @@ NOT four copy-pasted functions (SPEC §3.8 #8 — no copy-paste fan-out).
 new e2e").** Every planter writes an ``## ACTIVE`` subsection into the single-source
 ``specs/backlog/BACKLOG.md`` (SPEC v0.12.0 FR1/FR2, ADR #14) instead of a per-entry
 ``<slug>.md`` file — the gate and the codes under test are unchanged.
+
+Intent: CONTRACT — T-25-06 SPEC §3.7.9 (backlog pre-commit chokepoint)
+Owner: software-engineer
 """
 
 from __future__ import annotations

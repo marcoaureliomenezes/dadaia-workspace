@@ -43,11 +43,15 @@ Codex reads many text surfaces, but only some are mechanical enforcement:
 - Sandbox and approval policy are runtime controls. They are stronger than text.
 
 In dadaia terms, the SDD gate is a hook, so it can mechanically block file-write
-tools — but only in interactive sessions. On codex-cli 0.139.0, command hooks do
-not fire under headless `codex exec`, so on that automation path the gate is
-discipline-only. The rule "reserve a TASKS.md marker before implementation" is a
-discipline contract unless a hook checks it. Treat that distinction as a design
-constraint, not a weakness.
+tools. Whether that block reaches a headless `codex exec` run is version-qualified:
+on codex-cli 0.139.0 command hooks fired only in the interactive TUI; on the current
+live-certified version (0.144.4) they fire and block in both the interactive TUI and
+headless `codex exec`. Never carry a hook-fire claim forward across a Codex CLI
+upgrade by assumption — `dadaia public doctor`'s `codex:trust-boundary` line reports
+the current, version-qualified fact against the installed binary. The rule "reserve a
+TASKS.md marker before implementation" stays a discipline contract regardless — no
+hook checks the marker itself. Treat the version boundary as a design constraint to
+re-verify, not a fixed weakness.
 
 ## The Correct Build Order
 

@@ -6,6 +6,9 @@
  *           CDN/Mermaid script guard.
  *
  * Priority: P0 (E2E-TAB-01, E2E-TAB-02, E2E-TAB-04) / P1 (E2E-TAB-05, E2E-TAB-06) / P2 (E2E-TAB-03)
+ *
+ * Intent: CONTRACT — E2E-TAB-01..07 (tab bar navigation/CSP/HTTP guard)
+ * Owner: software-engineer
  */
 
 import { test, expect } from '@playwright/test';

@@ -16,6 +16,9 @@ Scenarios (seed 1):
 
 The live sibling is a real long-lived child process. No fixed sleeps: it signals readiness
 via a flag file with a bounded deadline.
+
+Intent: CONTRACT — bug codex-exec-hooks-do-not-fire-headless (pre-commit presence gate)
+Owner: software-engineer
 """
 
 from __future__ import annotations

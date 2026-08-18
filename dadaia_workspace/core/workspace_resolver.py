@@ -80,6 +80,20 @@ def resolve_workspace_root(cwd: Path | None = None) -> Path:
     )
 
 
+def _is_nested_inside_dotdadaia(start: Path) -> bool:
+    """``True`` when *start* sits inside some ancestor's own ``.dadaia/`` tree.
+
+    A directory literally nested under a path component named ``.dadaia``
+    (e.g. ``<root>/.dadaia/tmp/<agent>/<date>/<nested-ws>/`` — the R7-sanctioned
+    throwaway-workspace pattern, `DADAIA.md` §4) is workspace-INTERNAL scratch
+    space, never a sub-repo. This is a different shape than a sub-repo directory
+    that merely happens to carry its own sibling ``.dadaia/`` (e.g.
+    ``repos/<slug>/.dadaia/`` next to ``repos/<slug>/src/``) — that case is
+    unaffected and keeps ancestor-walking normally.
+    """
+    return any(parent.name == ".dadaia" for parent in start.resolve().parents)
+
+
 def resolve_workspace_root_for_init(
     cwd: Path | None = None,
     *,
@@ -93,11 +107,23 @@ def resolve_workspace_root_for_init(
     ``dadaia init --workspace <dir>`` — the caller has told us exactly where
     to initialize, so we must not silently write into an ancestor workspace.
 
-    When *explicit* is ``False`` (the default) the old semantics are
+    When *explicit* is ``False`` (the default) the old semantics are mostly
     preserved: walk up from *cwd* looking for ``.dadaia/states/
-    spec_contexts.json``, and fall back to *cwd* when nothing is found.
-    This supports the no-argument invocation (``dadaia init`` with no
-    ``--workspace`` flag).
+    spec_contexts.json``, and fall back to *cwd* when nothing is found. This
+    supports the no-argument invocation (``dadaia init`` with no
+    ``--workspace`` flag) re-projecting assets from anywhere inside an
+    existing workspace's own tree (including a sub-repo directory that has
+    not yet been sentinel-initialized).
+
+    **One boundary the walk never crosses (bug
+    ``ancestor-walk-workspace-root-silent-mistarget``):** when *cwd* is itself
+    nested inside an ANCESTOR workspace's own ``.dadaia/`` directory (the
+    R7-sanctioned pattern for a throwaway/nested workspace created under
+    ``.dadaia/tmp/<agent>/<date>/``), the ancestor-walk is skipped entirely and
+    *cwd* is returned directly — exactly like "no sentinel found anywhere".
+    Walking past that boundary is precisely how a naive nested-throwaway
+    invocation used to silently re-project an unrelated ancestor workspace's
+    harness assets instead of creating a new workspace at *cwd*.
 
     Parameters
     ----------
@@ -107,7 +133,8 @@ def resolve_workspace_root_for_init(
     explicit:
         When ``True``, treat *cwd* as the authoritative workspace root and
         return it immediately.  When ``False``, perform the ancestor-walk
-        with sentinel detection.
+        with sentinel detection (subject to the ``.dadaia/``-nesting boundary
+        above).
 
     Returns
     -------
@@ -120,8 +147,15 @@ def resolve_workspace_root_for_init(
         target = cwd if cwd is not None else Path.cwd()
         return target.resolve()
 
+    start = cwd if cwd is not None else Path.cwd()
+
+    if _is_nested_inside_dotdadaia(start):
+        # Workspace-internal scratch space of an ancestor workspace — never
+        # silently walk past this boundary to re-project the ancestor's assets.
+        return start.resolve()
+
     # Legacy / default behavior: ancestor-walk with safe fallback.
     try:
-        return resolve_workspace_root(cwd)
+        return resolve_workspace_root(start)
     except WorkspaceNotInitializedError:
         return cwd or Path.cwd()
