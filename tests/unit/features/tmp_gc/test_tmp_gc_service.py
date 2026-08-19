@@ -21,7 +21,6 @@ from __future__ import annotations
 import json
 import os
 import shutil
-import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -46,7 +45,12 @@ def _write_marker(dadaia_root: Path, name: str, *, age_seconds: float) -> Path:
     path = dadaia_root / "tmp" / name
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("marker", encoding="utf-8")
-    mtime = time.time() - age_seconds
+    # Age against the SAME clock the service is given, never time.time(): mixing the
+    # real clock with the frozen _NOW makes the effective age drift by the distance
+    # between them, which turned a 4-day marker into a 2.99-day one at the first UTC
+    # midnight after these tests were written (bug
+    # tmp-gc-tests-age-files-by-the-real-clock-against-a-frozen-now).
+    mtime = _NOW.timestamp() - age_seconds
     os.utime(path, (mtime, mtime))
     return path
 
@@ -106,7 +110,7 @@ def test_non_dated_path_under_tmp_never_touched(tmp_path: Path) -> None:
     dadaia_root = tmp_path / ".dadaia"
     doc = _write_file(dadaia_root / "tmp" / "AGENTS.md")
     ancient = _write_file(dadaia_root / "tmp" / "mypy-check" / "notes.txt")
-    old_mtime = time.time() - (30 * 86400)
+    old_mtime = _NOW.timestamp() - (30 * 86400)
     os.utime(ancient, (old_mtime, old_mtime))
 
     outcome = run_tmp_gc(tmp_path, dry_run=False, now=_NOW)
@@ -315,7 +319,7 @@ def test_lane_guard_refuses_an_orphan_marker_resolving_outside_dadaia(
     # the v0.4.2 unreadable-file precedent (monkeypatched ``Path.read_text``) — matched
     # by value equality, because ``run_tmp_gc`` builds its own ``Path`` instance for the
     # same file via ``iterdir()``.
-    old_mtime = time.time() - (10 * 86400)
+    old_mtime = _NOW.timestamp() - (10 * 86400)
     real_lstat_result = os.lstat(escape)
     aged_stat = os.stat_result(
         (
