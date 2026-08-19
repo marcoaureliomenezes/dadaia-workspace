@@ -175,10 +175,15 @@ def test_repair_preserves_file_mode_and_newlines(tmp_path: Path) -> None:
     atom = specs / "memory" / "a.md"
     atom.write_text(_ATOM_WITH_RETIRED_KEYS, encoding="utf-8")
     os.chmod(atom, 0o644)
+    # Assert PRESERVATION against the mode actually on disk, never a hard-coded 0o644:
+    # Windows has no POSIX mode bits (chmod only toggles the read-only attribute, so every
+    # file reads back 0o666) and the contract under test is "the repair does not change the
+    # mode", which is exactly what this comparison states on every platform.
+    before = stat.S_IMODE(atom.stat().st_mode)
 
     migrate_retired_frontmatter_keys(specs, dry_run=False)
 
-    assert stat.S_IMODE(atom.stat().st_mode) == 0o644, "repair narrowed the atom's mode"
+    assert stat.S_IMODE(atom.stat().st_mode) == before, "repair changed the atom's mode"
     assert b"\r\n" not in atom.read_bytes(), "repair introduced CRLF"
 
 
