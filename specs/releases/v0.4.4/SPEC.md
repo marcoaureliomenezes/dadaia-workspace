@@ -1,6 +1,6 @@
 # SPEC — Release v0.4.4 — organize the core
 
-**Status:** Draft
+**Status:** Aprovado
 **Release ID:** v0.4.4
 **Owner:** product-engineer
 **Opened:** 2026-08-23
@@ -708,5 +708,5 @@ the **version lineage** of §7, the **supersession** of
 `context-list-current-branch-stale-for-alive-repo`, and — explicitly, per D-8 — the
 **edit to `specs/constitution.md`** that FR8 requires.
 
-**Status:** Draft — awaiting the operator. SPEC, PLAN and TASKS must all carry
-`**Status:** Aprovado` before milestone (a) fires.
+**Status:** Aprovado — operator, 2026-08-23 ("Aprovado, segue com o milestone (a)"), after the
+`dd-grill-me` session of the same day; SPEC, PLAN and TASKS all carry `**Status:** Aprovado`.

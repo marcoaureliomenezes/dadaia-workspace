@@ -1,6 +1,6 @@
 # PLAN — Release v0.4.4 — organize the core
 
-**Status:** Draft
+**Status:** Aprovado
 **Release ID:** v0.4.4
 **Owner:** product-engineer
 **Source SPEC:** `specs/releases/v0.4.4/SPEC.md`

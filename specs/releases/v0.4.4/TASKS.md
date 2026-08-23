@@ -1,6 +1,6 @@
 # TASKS — Release v0.4.4 — organize the core
 
-**Status:** Draft
+**Status:** Aprovado
 **Release ID:** v0.4.4
 **Owner:** product-engineer
 **Source SPEC:** `specs/releases/v0.4.4/SPEC.md`
@@ -140,7 +140,7 @@ delta — always before the archive move.
 
 ## W0 — definition
 
-- [ ] **T-044-01 — [git] Definition commit**
+- [x] **T-044-01 — [git] Definition commit**
 
 **Owner role:** dispatcher (+ `project-manager` for the backlog mechanics) · **Commit:**
 `docs(T-044-01): v0.4.4 definition — organize the core`
@@ -165,7 +165,7 @@ and `specs doctor` clean.
 
 ---
 
-- [ ] **T-044-02 — [git] Milestone (a): merge, security review, push (v1 mechanic, once)**
+- [-] **T-044-02 — [git] Milestone (a): merge, security review, push (v1 mechanic, once)**
 
 **Owner role:** dispatcher + `security-reviewer` · **Commit:** merge commit on `develop`
 (plus the `ACTIVE.md` phase flip)
