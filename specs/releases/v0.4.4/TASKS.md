@@ -508,7 +508,7 @@ manifest, registry, projections, map row. Capture **V5**.
 
 ---
 
-- [-] **T-044-20 — FR12: four renames, one commit each, plus `dd-grill-me` ratified**
+- [x] **T-044-20 — FR12: four renames, one commit each, plus `dd-grill-me` ratified** (033bc6f7 dd-grill-me, 14746d8d dd-cli-library incl. dead-verb `hotfix` fix, 7c608ea9 dd-manager-orchestration, e563ab2a dd-workspace-doctor; map enforcer 15/15 green after every commit; V6 captured)
 
 **Owner role:** ai-engineer · **Commits:** one per skill,
 `docs(T-044-20): rename <old> to <new>`
