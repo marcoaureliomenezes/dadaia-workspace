@@ -278,7 +278,7 @@ long is disclosed to a sibling file in the same folder.
 
 ---
 
-- [-] **T-044-06 — FR3: invert the chokepoint to v2**
+- [x] **T-044-06 — FR3: invert the chokepoint to v2**
 
 **Owner role:** software-engineer · **Commit:**
 `fix(T-044-06): feature branches are pushable, develop and main are PR-only`
@@ -300,7 +300,7 @@ deleted, not flagged off.
 
 ---
 
-- [ ] **T-044-07 — FR4: CI sees the feature branch; the verdict becomes a PR gate**
+- [-] **T-044-07 — FR4: CI sees the feature branch; the verdict becomes a PR gate**
 
 **Owner role:** software-engineer · **Commit:**
 `ci(T-044-07): trigger on feature pushes and gate the security verdict at the PR`
