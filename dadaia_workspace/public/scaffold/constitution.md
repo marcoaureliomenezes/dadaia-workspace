@@ -128,3 +128,25 @@ adiciona — bugs, backlog, relatórios, auditorias) ou **MUTATING** (edita spec
 memória, código de produção ou a superfície de agentes de IA). Um agente MUTATING só
 escreve dentro do seu conjunto de caminhos declarado; nenhum agente escreve fora do
 domínio descrito em sua própria persona.
+
+---
+
+## 15. O Mapa Regras→Skills é Lei Central
+
+- Toda regra sempre-ativa deste projeto é uma seção da lei da workspace (`DADAIA.md`), e
+  toda seção sempre-ativa está mapeada para a(s) skill(s) que a operam.
+- Essa relação é declarada em uma única fonte controlada — o mapa JSON de
+  regras→skills (convenção de nome: `entities/rules-skills-map.json`), linhas de
+  `{topic, section, skills[], justification}`, chaveadas pelo tópico em negrito da lei.
+  Nenhuma skill, persona, arquivo de regra, hook ou doctor pode declarar essa relação em
+  outro lugar; uma segunda declaração é lixo (slop, §8) e deve ser removida.
+- Um teste determinístico lê o mapa, a fonte da lei e o inventário de skills em disco, e
+  bloqueia todo deploy sem um mapa válido — o enforcer é sempre esse teste, nunca uma
+  checagem manual.
+- Regra e skill nunca se sobrepõem: a regra é a afirmação concisa do que sempre vale; a
+  skill é seu complemento — o procedimento que a opera. Profundidade pertence à skill,
+  lei pertence à regra, e nenhuma restate a outra.
+- Um tópico tem uma skill; duas ou mais exigem justificativa registrada na própria linha
+  do mapa.
+- Uma skill sem tópico é fundida ou aposentada por padrão; a lei só ganha um tópico novo
+  para comportamento genuinamente sempre-ativo.

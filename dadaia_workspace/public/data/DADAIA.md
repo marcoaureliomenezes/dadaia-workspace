@@ -320,7 +320,7 @@ receives only the values it needs from that root `.env` and never writes a secon
 | Surface | Where |
 |---|---|
 | Scoped law | `specs/AGENTS.md`, `.dadaia/reports/AGENTS.md`, `.dadaia/handoff/AGENTS.md`, `repos/<slug>/AGENTS.md`, and any nested `AGENTS.md` |
-| Skills | `.claude/skills/`, `.agents/skills/` — `dadaia-cli` maps the CLI; `harness-primitives` covers harness literacy; `dd-gitflow-default` operates §4's branch contract; the `dd-*` family maps the development cycle, one skill per stage |
+| Skills | `.claude/skills/`, `.agents/skills/` — which skill operates which rule is declared once, in `public/entities/rules-skills-map.json`, never listed ad hoc here |
 | State | `dadaia context show --json`, `dadaia specs doctor`, `dadaia public doctor`, `dadaia server list`, `dadaia bugs status`, `dadaia panel` |
 
 Language: follow the operator's preference, defaulting to English. Tone: direct, concise,
