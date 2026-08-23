@@ -1,7 +1,7 @@
 # TASKS — Release v0.4.4 — organize the core
 
 **Status:** Aprovado
-**Amendment 1:** Draft (2026-08-23, the skills audit folded in — SPEC §2/§8).
+**Amendment 1:** Aprovado (operator, 2026-08-23) (2026-08-23, the skills audit folded in — SPEC §2/§8).
 **T-044-54 … T-044-62 are Draft and not implementable** until the operator approves the
 amendment delta; every original task id, the five segments and the `rc` lane are unchanged.
 **Release ID:** v0.4.4
@@ -529,7 +529,7 @@ a named verb that no longer exists is a defect fixed here),
 
 ---
 
-> **T-044-54 … T-044-60 — Amendment 1 (Draft).** The audit's sections **B** and **C**, in
+> **T-044-54 … T-044-60 — Amendment 1 (Aprovado, operator 2026-08-23).** The audit's sections **B** and **C**, in
 > the only satisfiable order: trims → disclosures → invocation model → the persona pass →
 > the sediment sweep (whose citation check lands **last**, green at HEAD) → the double-load
 > bug → `ctx_inject`. All of it **before T-044-21**, so the projected inventory is

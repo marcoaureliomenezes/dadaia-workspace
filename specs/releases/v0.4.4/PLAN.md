@@ -1,7 +1,7 @@
 # PLAN — Release v0.4.4 — organize the core
 
 **Status:** Aprovado
-**Amendment 1:** Draft (2026-08-23, the skills audit folded in — SPEC §2/§8). FR22–FR31,
+**Amendment 1:** Aprovado (operator, 2026-08-23) (2026-08-23, the skills audit folded in — SPEC §2/§8). FR22–FR31,
 tasks T-044-54 … T-044-62 and the plan lines marked *(A1)* await the operator's approval of
 the delta; segments `S1 … S5` and the `rc` lane are unchanged in structure.
 **Release ID:** v0.4.4

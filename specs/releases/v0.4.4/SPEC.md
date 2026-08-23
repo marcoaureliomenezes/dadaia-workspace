@@ -1,7 +1,7 @@
 # SPEC — Release v0.4.4 — organize the core
 
 **Status:** Aprovado
-**Amendment 1:** Draft — the Aprovado above covers the original scope (G1–G13, D1–D8, FR1–FR21, T-044-01…53) only. FR22–FR31, the acceptance ids appended to FR10/FR11/FR14/FR21,
+**Amendment 1:** Aprovado (operator, 2026-08-23) — the Aprovado above covers the original scope (G1–G13, D1–D8, FR1–FR21, T-044-01…53) only. FR22–FR31, the acceptance ids appended to FR10/FR11/FR14/FR21,
 tasks T-044-54 … T-044-62 and the two bugs picked on 2026-08-23 are **Draft until the
 operator approves the delta** (§2 "Amendment 1", §8). The trio's header `**Status:** Aprovado`
 covers the original scope and is unchanged.
@@ -1134,7 +1134,7 @@ the **version lineage** of §7, the **supersession** of
 **This approval covers the original scope only** — G1–G13, D1–D8, FR1–FR21, tasks
 T-044-01 … T-044-53.
 
-### Amendment 1 — 2026-08-23 — **Status: Draft** (awaiting operator approval of the delta)
+### Amendment 1 — 2026-08-23 — **Status: Aprovado** (operator, 2026-08-23 — "aprovado")
 
 **What changed.** The operator ordered the 2026-08-23 skills audit folded into this release.
 Added, all Draft until approved:
@@ -1167,4 +1167,4 @@ the release is wrong*), and the exclusion of the audit's section D to the backlo
 implementable.** The original scope is unaffected and continues: `S1`'s tasks are approved
 work and proceed under the header `**Status:** Aprovado`.
 
-**Amendment 1 status:** Draft — awaiting operator.
+**Amendment 1 status:** Aprovado — operator, 2026-08-23.
