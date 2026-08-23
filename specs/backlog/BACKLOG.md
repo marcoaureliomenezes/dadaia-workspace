@@ -225,6 +225,58 @@ is no longer archive-only.
   change: "DADAIA.md section 9 and the public-assets architecture note point to the JSON map as the authority for which skill operates which rule section"
 ```
 
+### core-skills-consolidation
+- **Title:** core-skills-consolidation — fewer, representative core skills: dd-release-closure folded into dd-release-implement; the four AI-harness skills collapsed into one well-built skill with attachments; every core skill re-authored to the writing-for-agents pattern (short steps + disclosed reference)
+- **Opened:** 2026-08-23
+- **Status:** candidate
+- **Description:** The official development-lifecycle skills of dadaia-workspace are **six**: `dd-backlog-definition` (how to register backlog, `specs/backlog`), `dd-release-definition` (pure SDD: SPEC/PLAN/TASKS), `dd-release-implement` (how to implement the release: implement, tests, gates, git, and — now — closure), `dd-bug-registration` (register bugs, `specs/bugs`), `dd-bug-fix` (fix registered bugs), `dd-audit-project` (audit a project and write the audit report, `specs/audits`). `dd-release-closure` is without doubt part of `dd-release-implement` and must be folded into it: implement defines how to implement a release, the gates for commit/push/PR, and the closing of the release. The AI skills `ai-harness-codex`, `ai-harness-claude-code`, `ai-context-engineering` and `harness-primitives` must become **ONE** well-made skill — a skill is a folder and may carry attachment files and reference links; optimize the content; do NOT rewrite Codex/Claude Code documentation inside it, link to it. Operator phrasing (2026-08-23): "we don't need this much skill slop." **Prerequisite done by the session:** cloned https://github.com/mattpocock/skills as spec context `mattpocock/skills` (the skills reference clone (`mattpocock/skills`)) to learn how a skill is built properly. **Learned pattern — acceptance guidance for every re-authored core skill:** `SKILL.md` is short (repo median 74 lines, max 140) — ordered steps each ending on a checkable completion criterion, plus in-file reference only when every branch needs it; everything else is disclosed to sibling files behind pointers (`REPORT-FORMAT.md`, `SKILL-MECHANICS.md`-style attachments); model-invoked vs user-invoked is an explicit choice (`disable-model-invocation: true` strips the description from agent reach); dependencies are operative "Call the Skill tool with \"<name>\"" instructions, never cross-folder links; single source of truth per meaning, no caching of what the environment answers; positive phrasing over prohibitions; leading words; prune no-ops and sediment. Reference: `mattpocock/skills/skills/productivity/writing-for-agents/SKILL.md` + `SKILL-MECHANICS.md`, `mattpocock/skills/.agents/invocation.md`. `dadaia-grill-me` is being uplifted right now by `ai-engineer` to that pattern (rounds over a design tree / frontier; facts are the agent's job, decisions the operator's) as the first worked example — the release must ratify/land it. Relates to `rules-skills-governance-map` (the consolidated skill set is what the map governs) and to `gitflow-contract-v2-consolidation` (`dd-release-implement` absorbs the git/gate rows by pointer to `dadaia-gitflow`). **Scope boundary:** core skills under `dadaia_workspace/public/skills/`; instance-private skills (godot-*, etc.) are out of scope. **Operator addendum (2026-08-23): same strategy as gitflow — this is now CORE of dadaia-workspace.** Every always-on rule lives as a section of `DADAIA.md` and is mapped to the skill that operates it. The consolidated skill set must therefore land with its map rows: each of the six lifecycle skills and the single AI-harness skill maps to exactly one `DADAIA.md` section (e.g. §1 Arm A/B ↔ the `dd-*` family rows; §2 "ai-engineer alone invokes…" ↔ the one AI skill), and no skill exists without a section nor a section without its skill. The map itself is `rules-skills-governance-map`; **this entry depends on it.** Open for the mandatory grill-me: the name of the consolidated AI skill folder; the exact SKILL.md length ceiling the lint enforces; whether `harness-primitives`' agent-wide literacy survives as the short top layer of the one skill or as a pointer from each agent.
+- **Provenance:** operator request, 2026-08-23, same session as `spec-context-associated-repos`, `gitflow-contract-v2-consolidation` and `rules-skills-governance-map`; reference context `mattpocock/skills` (cloned this session as the worked pattern source); depends-on `rules-skills-governance-map` (the consolidated set lands with its section→skill map rows)
+- **Intents:**
+```yaml
+- subject:
+    kind: doc
+    ref: dadaia_workspace/public/skills/dd-release-implement/SKILL.md
+    surface: new
+  change: "absorb dd-release-closure in full (CLOSURE template, memory-update protocol, evidence triples, disposition sweep, archive move) and re-author to the writing-for-agents pattern: short ordered steps ending on checkable criteria, closure/gitflow detail disclosed to sibling attachment files, git/gate rows by pointer to dadaia-gitflow"
+- subject:
+    kind: doc
+    ref: dadaia_workspace/public/skills/dd-release-closure/SKILL.md
+    surface: new
+  change: "retire — delete the folder; every pointer (DADAIA.md, dd-backlog-definition, dd-release-definition, dd-audit-project, dadaia-gitflow, agents, memory atoms) repointed to dd-release-implement"
+- subject:
+    kind: doc
+    ref: dadaia_workspace/public/skills/ai-harness/SKILL.md
+    surface: new
+  change: "new single consolidated AI-harness skill folder (name to settle in grill-me) replacing ai-harness-codex, ai-harness-claude-code, ai-context-engineering and harness-primitives: one short SKILL.md plus attachment files and links to the official Codex / Claude Code documentation, never a rewrite of it; the four source folders are retired"
+- subject:
+    kind: doc
+    ref: dadaia_workspace/public/skills/dadaia-grill-me/SKILL.md
+    surface: new
+  change: "ratify and land the ai-engineer uplift to the writing-for-agents pattern (rounds over a design tree / frontier, facts are the agent's job, decisions the operator's) as the first worked example; every remaining core skill under dadaia_workspace/public/skills/ is re-authored to the same pattern"
+- subject:
+    kind: code
+    ref: dadaia_workspace/public/scripts/lint-skill-collisions.py#main
+  change: "enforce the pattern at projection time: a maximum SKILL.md line count per core skill and no duplicated meaning across two skills; --self-test proves both directions; DECLARED_OVERLAPS loses the retired ai-harness-* family row"
+- subject:
+    kind: doc
+    ref: memory/product/agents/agentic-entities.md#Registry
+  change: "entities registry (dadaia_workspace/public/entities/registry.json) skill inventory and the projection manifest reflect the consolidated set: six dd-* lifecycle skills, one AI-harness skill, no dd-release-closure"
+- subject:
+    kind: doc
+    ref: memory/product/distribution/public-asset-distribution.md#Usage flow
+  change: "stage/install/doctor project the consolidated skill folders with their attachment files to every harness target (.claude/, .agents/, .codex/, .kimi-code/) and stop projecting the retired folders"
+- subject:
+    kind: doc
+    ref: memory/product/agents/agent-orchestration.md#Operating Rules
+  change: "DADAIA.md §2 line 'ai-engineer alone invokes the ai-harness-* and ai-context-engineering skills — every other agent uses harness-primitives' rewritten to name the one consolidated skill; DADAIA.md §9 skills row lists the six dd-* lifecycle skills and points to the consolidated set"
+- subject:
+    kind: doc
+    ref: dadaia_workspace/public/data/DADAIA.md#§9 Where to look next
+    surface: new
+  change: "skills row rewritten as the map: declare the section->skill rows for the six lifecycle skills + the AI skill (each maps to exactly one DADAIA.md section; no skill without a section, no section without its skill), as governed by rules-skills-governance-map"
+```
+
+
 ## LEDGER
 
 - push-range-denylist-scan · DELIVERED · v0.9.0 · 2026-08-14
