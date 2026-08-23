@@ -183,6 +183,88 @@ def test_same_value_introduced_into_a_new_path_still_refuses(tmp_path: Path) -> 
     assert _SYNTHETIC_TERM not in decision.message
 
 
+# ---------------------------------------------------------------------------
+# bug new-branch-push-loses-prior-published-denylist-amnesty (v0.4.4) — the FIRST
+# push of a `feature/{M.m.p}` branch (gitflow v2's only pushable ref, DADAIA.md §4)
+# is a NEW remote ref: git's own pre-push line reports `remote_sha` as the all-zero
+# sentinel. Every fixture above configures NO remote at all, so it never exercised
+# "a real origin already published this branch's own past" — exactly the gap that
+# let a new-branch push of already-published content be refused as if it were
+# novel. These fixtures configure a REAL bare `origin` and fetch it, then push a
+# genuine `refs/heads/feature/M.m.p` branch line (the bug's own repro shape), not a
+# tag.
+# ---------------------------------------------------------------------------
+
+
+def _publish_to_bare_origin(repo: Path, tmp_path: Path, *, branch: str = "develop") -> None:
+    remote = tmp_path / "origin.git"
+    subprocess.run(["git", "init", "--bare", str(remote)], capture_output=True, check=True)
+    _git(["remote", "add", "origin", str(remote)], repo)
+    _git(["push", "origin", f"HEAD:refs/heads/{branch}"], repo)
+    _git(["fetch", "origin"], repo)
+
+
+def _feature_push_ref(local_sha: str, *, branch: str = "feature/1.0.0") -> PushRef:
+    return PushRef(
+        local_ref=f"refs/heads/{branch}",
+        local_sha=local_sha,
+        remote_ref=f"refs/heads/{branch}",
+        remote_sha=_ZERO,
+    )
+
+
+def test_new_branch_push_of_an_already_published_term_passes(tmp_path: Path) -> None:
+    """(a) The first push of a brand-new `feature/M.m.p` branch (`remote_sha` is the
+    all-zero sentinel) that only carries a term ALREADY published on `origin` must
+    pass — DADAIA.md §7's range scope: already-published history never needs a
+    rewrite, regardless of whether THIS ref existed on origin before."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "notes.md").write_text(f"already published: {_SYNTHETIC_TERM}\n")
+    _commit(repo, "publish")
+    _publish_to_bare_origin(repo, tmp_path)
+
+    _git(["checkout", "-b", "feature/1.0.0"], repo)
+    (repo / "notes.md").write_text(
+        f"already published: {_SYNTHETIC_TERM}\nplus a genuinely new, unrelated line\n"
+    )
+    tip_sha = _commit(repo, "append an unrelated line")
+
+    reader = GitSubprocessObjectReader()
+    decision = push_gate_decision(
+        [_feature_push_ref(tip_sha)],
+        object_source=reader,
+        repo=repo,
+        denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
+    )
+    assert decision.allowed, decision.message
+
+
+def test_new_branch_push_of_a_novel_term_still_refuses(tmp_path: Path) -> None:
+    """(b) Negative twin: a brand-new `feature/M.m.p` branch introducing a term never
+    published anywhere on `origin` is still refused — the amnesty stays scoped to
+    what is genuinely already published."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "notes.md").write_text("unrelated\n")
+    _commit(repo, "publish")
+    _publish_to_bare_origin(repo, tmp_path)
+
+    _git(["checkout", "-b", "feature/1.0.0"], repo)
+    (repo / "notes.md").write_text(f"unrelated\nintroducing {_SYNTHETIC_TERM} for the first time\n")
+    tip_sha = _commit(repo, "introduce a novel term")
+
+    reader = GitSubprocessObjectReader()
+    decision = push_gate_decision(
+        [_feature_push_ref(tip_sha)],
+        object_source=reader,
+        repo=repo,
+        denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
+    )
+    assert not decision.allowed
+    assert _SYNTHETIC_TERM not in decision.message
+
+
 def test_prior_side_lookup_failure_refuses_naming_the_failure_and_no_verify(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

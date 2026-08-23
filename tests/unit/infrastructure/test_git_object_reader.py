@@ -1528,3 +1528,112 @@ def test_mergetag_absent_is_unaffected(tmp_path: Path) -> None:
     commit_objs = _commit_body_objects(objects)
     assert len(commit_objs) == 1
     assert commit_objs[0].text == "an ordinary commit message, no mergetag here\n"
+
+
+# ═════════════════════════════════════════════════════════════════════════════════
+# bug new-branch-push-loses-prior-published-denylist-amnesty (v0.4.4) — the FR2
+# prior-text base derivation must not depend on `remote_sha`'s resolvability. A
+# brand-new ref (`remote_sha == ZERO_SHA`) still has a perfectly good publication
+# boundary — the commit this branch was cut from — resolvable via the SAME
+# `--not --remotes` exclusion the range walk already uses. Every fixture here
+# configures a REAL bare `origin` remote and fetches it, unlike every test above
+# (which never configures a remote at all) — that is exactly the coverage gap that
+# let the bug through: the old fallback tests proved "no remotes -> nothing
+# excluded", never "a real remote already published this branch's own past".
+# ═════════════════════════════════════════════════════════════════════════════════
+
+# Intent: CONTRACT — bug new-branch-push-loses-prior-published-denylist-amnesty
+
+
+def _publish_to_bare_origin(repo: Path, tmp_path: Path, *, branch: str = "develop") -> None:
+    """Create a throwaway bare ``origin`` remote, push *repo*'s current HEAD to
+    ``refs/heads/<branch>``, and fetch — populating ``refs/remotes/origin/<branch>``
+    locally exactly as a real pre-push hook would already see it (the hook runs
+    after the local repo's own remote-tracking state, per this module's docstring
+    disclosure of that limitation)."""
+    remote = tmp_path / "origin.git"
+    subprocess.run(["git", "init", "-q", "--bare", str(remote)], check=True)
+    _git(["remote", "add", "origin", str(remote)], repo)
+    _git(["push", "-q", "origin", f"HEAD:refs/heads/{branch}"], repo)
+    _git(["fetch", "-q", "origin"], repo)
+
+
+def test_new_branch_push_amnesties_a_path_already_published_on_a_remote_branch(
+    tmp_path: Path,
+) -> None:
+    """(a) A brand-new feature branch (``remote_sha == ZERO_SHA``, the git pre-push
+    shape for a ref absent on the remote) cut from an ALREADY-PUBLISHED branch and
+    carrying an appended line still resolves ``prior_text`` for the unchanged
+    portion of that SAME path — the path's own content published on origin BEFORE
+    this branch was ever cut. Root cause: the old
+    ``remote_sha if resolvable else None`` derivation dropped the FR2 prior-text
+    anchor entirely the moment ``remote_sha`` stopped being resolvable, even though
+    a real, resolvable publication boundary (the commit this branch diverged from)
+    already existed."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "ledger.jsonl").write_text('{"already": "published"}\n')
+    _commit(repo, "publish ledger")
+    _publish_to_bare_origin(repo, tmp_path)
+
+    _git(["checkout", "-q", "-b", "feature/1.0.0"], repo)
+    (repo / "ledger.jsonl").write_text('{"already": "published"}\n{"brand": "new entry"}\n')
+    tip_sha = _commit(repo, "append a new ledger entry")
+
+    reader = GitSubprocessObjectReader()
+    objects = list(reader.new_objects(repo, tip_sha, ZERO_SHA))
+
+    ledger_obj = next(obj for obj in objects if obj.path == "ledger.jsonl")
+    assert ledger_obj.prior_text == '{"already": "published"}\n'
+
+
+def test_new_branch_push_still_carries_no_prior_text_for_a_genuinely_new_path(
+    tmp_path: Path,
+) -> None:
+    """(b) Negative twin, same new-branch shape: a path that never existed on the
+    published branch at all still carries NO prior text — the amnesty stays scoped
+    to what was actually already published, never a blanket 'no old sha means
+    anything goes'."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "existing.md").write_text("unrelated\n")
+    _commit(repo, "publish existing.md")
+    _publish_to_bare_origin(repo, tmp_path)
+
+    _git(["checkout", "-q", "-b", "feature/1.0.0"], repo)
+    (repo / "brand-new.md").write_text("never published before\n")
+    tip_sha = _commit(repo, "add a brand-new path")
+
+    reader = GitSubprocessObjectReader()
+    objects = list(reader.new_objects(repo, tip_sha, ZERO_SHA))
+
+    new_obj = next(obj for obj in objects if obj.path == "brand-new.md")
+    assert new_obj.prior_text is None
+
+
+def test_resolvable_remote_sha_and_new_branch_fallback_agree_on_the_same_final_state(
+    tmp_path: Path,
+) -> None:
+    """(c) 'One range derivation for all pushes': pushing the SAME final tip via a
+    normal develop-style ref (a real, resolvable ``remote_sha``) and via a brand-new
+    ref (``remote_sha == ZERO_SHA``, relying purely on ``--remotes``) yields
+    byte-identical scan-relevant output — same blob path/sha set, same
+    ``prior_text`` per path — proving the fix does not special-case either shape;
+    it is one formula, asked twice."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "ledger.jsonl").write_text("first\n")
+    base_sha = _commit(repo, "c1")
+    _publish_to_bare_origin(repo, tmp_path, branch="feature/1.0.0")
+
+    (repo / "ledger.jsonl").write_text("first\nsecond\n")
+    tip_sha = _commit(repo, "c2")
+
+    reader = GitSubprocessObjectReader()
+    via_resolvable_remote_sha = list(reader.new_objects(repo, tip_sha, base_sha))
+    via_new_branch_fallback = list(reader.new_objects(repo, tip_sha, ZERO_SHA))
+
+    def _shape(objs: list[ScannedObject]) -> list[tuple[str, str, str | None]]:
+        return sorted((obj.path, obj.sha, obj.prior_text) for obj in objs if obj.kind == "blob")
+
+    assert _shape(via_resolvable_remote_sha) == _shape(via_new_branch_fallback)
