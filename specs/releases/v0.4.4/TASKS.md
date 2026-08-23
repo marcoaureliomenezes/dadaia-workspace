@@ -477,7 +477,7 @@ statement. No merge, no PR.
 
 ## Segment `S3` — core skills consolidation
 
-- [ ] **T-044-18 — FR10: fold `dd-release-closure` into `dd-release-implement`**
+- [-] **T-044-18 — FR10: fold `dd-release-closure` into `dd-release-implement`**
 
 **Owner role:** ai-engineer · **Commit:**
 `docs(T-044-18): fold release closure into release implement`
