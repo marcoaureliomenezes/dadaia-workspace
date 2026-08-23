@@ -228,6 +228,21 @@ is no longer archive-only.
   change: "TASKS authoring step references the tracer-bullet rule (operative pointer or inline section) so product-engineer authors blocked-by/delivers on every task and expand–contract on every demolition"
 ```
 
+### dadaia-wizard
+- **Title:** dadaia-wizard — model-invoked: human-only runbooks (cutovers, secret rotation, OIDC role wiring) emitted as a guided, idempotent bash script instead of a numbered prose procedure
+- **Opened:** 2026-08-23
+- **Status:** candidate
+- **Description:** Some steps are human-only by law (DADAIA.md §8 credentials; projected law files; GitHub branch-protection edits; cloud-side role cutovers) — today they are handed to the operator as 10–14 numbered prose steps in a report, which the operator re-reads, re-types and gets partly wrong. Remedy: a model-invoked skill `dadaia-wizard` that turns any human-only runbook into a **guided bash script** from a template: each step prints what it is about to do and why, asks for confirmation (or a value, never a secret echoed back), runs one idempotent command, verifies the post-condition, and stops loud on failure with the exact resume point. Scripts are written under `.dadaia/tmp/<agent>/<YYYYMMDD>/` (§4) and referenced from the handoff; secrets are read from the operator's root `.env` or prompted silently, never embedded (§8). Reference: `mattpocock/skills/skills/engineering/wizard/` (`SKILL.md` + `template.sh` + `agents/`). Governance: maps to the DADAIA.md §8 bold topic "Credentials" (the human-only lane) or §4 "Where things are written" — single topic settled in grill-me. **Audit roadmap hint (not a disposition):** unplaced in the audit's R1–R3 roadmap; picked on value when a human-only runbook is next produced.
+- **Provenance:** operator ratification (2026-08-23) of the research report `.dadaia/reports/dadaia-workspace/claude-code/2026-08-23T183323Z-skills-audit-vs-reference/` (handoff `.dadaia/handoff/dadaia-workspace/2026-08-23T183323Z-claude-code-skills-audit-vs-reference.handoff.json`), section D "new skills proposed" — ruled to the backlog while sections A–C fold into release v0.4.4; relates-to `core-skills-consolidation` and `rules-skills-governance-map` (both CONSUMED by v0.4.4) and to the governance rule "every skill maps to one DADAIA.md bold topic"; roadmap placement: unplaced (hint)
+- **Intents:**
+```yaml
+- subject:
+    kind: doc
+    ref: dadaia_workspace/public/skills/dadaia-wizard/SKILL.md
+    surface: new
+  change: "new model-invoked core skill: human-only runbook → guided idempotent bash script from a disclosed template.sh (explain → confirm → run one command → verify → loud stop with resume point); written under .dadaia/tmp/<agent>/<date>/ and referenced from the handoff; secrets never embedded or echoed; adapted from mattpocock/skills/skills/engineering/wizard"
+```
+
 
 ## LEDGER
 
