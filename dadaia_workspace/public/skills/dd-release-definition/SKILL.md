@@ -40,7 +40,7 @@ not re-triage it.
 
 ### 1. Pick the set
 
-> **Pick-time priority** (`DADAIA.md` §5 Releases): "At pick time, open bugs and
+> **Pick-time priority** (`DADAIA.md` §6 Releases): "At pick time, open bugs and
 > undispositioned audits outrank fresh backlog."
 
 Select the bugs + backlog items this release will address. This is discovery
@@ -107,7 +107,7 @@ archived CLOSURE's `## Dispositions` rows naming a still-non-terminal `ACTIVE` s
 
 `product-engineer` owns picking and SPEC authorship; `project-manager` dispatches
 this work and owns the mandatory-grill gate (it must not let a release-from-backlog
-proceed to SPEC without the grill). See the `DADAIA.md` §5 (Releases).
+proceed to SPEC without the grill). See the `DADAIA.md` §6 (Releases).
 
 ## Checklist
 

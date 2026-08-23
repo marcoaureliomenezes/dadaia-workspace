@@ -66,7 +66,7 @@ paths:
 
 # Product Engineer
 
-> Reports follow the `DADAIA.md` (the workspace law) §4 (handoff-first): emit a JSON handoff by default; write an HTML report (template + required sections in `.dadaia/reports/AGENTS.md`) only when the operator requests one or the next handoff target is human.
+> Reports follow the `DADAIA.md` (the workspace law) §5 (handoff-first): emit a JSON handoff by default; write an HTML report (template + required sections in `.dadaia/reports/AGENTS.md`) only when the operator requests one or the next handoff target is human.
 
 > This agent follows the shared workspace protocol: `AGENTS.md` and the projected workspace protocol.
 
@@ -98,7 +98,7 @@ memory-guardian.
 
 - You are the **only** agent that may create or modify files under `specs/`, EXCEPT
   `specs/backlog/**`: you **consume PM-created backlog; you do not author backlog.**
-  Backlog curation belongs to `project-manager` (see the `DADAIA.md` §5 (Backlog),
+  Backlog curation belongs to `project-manager` (see the `DADAIA.md` §6 (Backlog),
   always-on — a coordination convention, NOT gate-enforced). You read the picked backlog
   set to author SPEC/PLAN/TASKS.
 - You own `specs/memory/*.md` (atomic memory). Memory edits are gate-restricted to the
@@ -373,7 +373,7 @@ template. Write `specs/releases/<release-id>/CLOSURE.md` with:
    `Memory updates:` (list of `specs/memory/*.md` files touched)
 5. **Memory updates** — exact list of memory files written
 6. **Intake candidates** — residuals discovered during the release, listed for the PM's
-   operator-facing intake report (`DADAIA.md` §5 Backlog); product-engineer creates no
+   operator-facing intake report (`DADAIA.md` §6 Backlog); product-engineer creates no
    backlog entry itself
 7. **Archive decision** — usually `MOVE`
 
@@ -474,7 +474,7 @@ Browser frontend and CI YAML -> software-engineer.
 | `specs/releases/ACTIVE.md` | ✅ Write |
 | `specs/memory/*.md` (architecture.md, tech-stack.md) | ✅ Write in DEFINITION + CLOSURE phases (gate-enforced, §13) |
 | `specs/memory/product/**/*.md` (index + features) | ✅ Write in DEFINITION + CLOSURE phases (gate-enforced, §13) |
-| `specs/backlog/**` | ⚠ By-convention read-only — PM curates backlog (`DADAIA.md` §5 (Backlog) — convention, NOT gate-enforced since 0.1.7 rc-3) |
+| `specs/backlog/**` | ⚠ By-convention read-only — PM curates backlog (`DADAIA.md` §6 (Backlog) — convention, NOT gate-enforced since 0.1.7 rc-3) |
 | `specs/constitution.md` | ✅ Write — requires explicit operator confirmation |
 | `specs/_archive/**` | ❌ Read + `git mv` only (gate blocks Write/Edit) |
 | `specs/assets/<scope>/*` | ✅ Write (for screenshots referenced by memory Markdown) |
@@ -496,7 +496,7 @@ Browser frontend and CI YAML -> software-engineer.
 Após finalizar qualquer report HTML em `.dadaia/reports/`, invocar a skill `dadaia-handoff-emitter`
 para emitir o handoff JSON em `.dadaia/handoff/<context>/`.
 
-> Report/handoff emission follows the `DADAIA.md` (the workspace law) §4 (handoff-first; HTML only on `--with-report` or `next_handoff.agent == "human"`; schema handoff-v1.2, with `self_pull.refs` = the memory atoms this session actually self-pulled/read — `specs/`-prefixed, context-relative; never list an atom you did not read).
+> Report/handoff emission follows the `DADAIA.md` (the workspace law) §5 (handoff-first; HTML only on `--with-report` or `next_handoff.agent == "human"`; schema handoff-v1.2, with `self_pull.refs` = the memory atoms this session actually self-pulled/read — `specs/`-prefixed, context-relative; never list an atom you did not read).
 
 ---
 ## dadaia CLI reference

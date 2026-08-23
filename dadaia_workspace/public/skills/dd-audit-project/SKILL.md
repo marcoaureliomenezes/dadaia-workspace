@@ -208,8 +208,8 @@ Line coverage measures execution, not detection — it never anchors this score.
 | 4 | Intent sparsely declared; LARGE tests accumulate without demotion; quarantine over cap or an expired entry |
 | 1 | No intent taxonomy in use; tombstone tests present; flake above the ceiling with no quarantine |
 
-The CI coverage floor (`DADAIA.md` §6) is checked separately as a pass/fail gate, never
-scored here.
+The CI coverage floor (`DADAIA.md` §7 (Quality)) is checked separately as a pass/fail
+gate, never scored here.
 
 ### Dimension F — Design / UX
 
@@ -291,7 +291,7 @@ with `agent: "project-manager"` and a summary of the drift areas requiring a rel
 
 ## Lifecycle Wrapper
 
-This section implements the audit-lifecycle law (`DADAIA.md` §5 Audits) — consult it for
+This section implements the audit-lifecycle law (`DADAIA.md` §6 Audits) — consult it for
 the rule itself, not restated here. In practice: this audit's scorecard exists to seed
 **one** remediation release, and archiving waits on that release closing every finding
 out with a token, never on the scan alone. A `deferred`/`rejected` disposition routes

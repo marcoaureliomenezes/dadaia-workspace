@@ -107,7 +107,7 @@ Revisão de código, QA e segurança são checkpoints — disciplina mediada por
 real é o gate de push descrito na `DADAIA.md` §3). Uma tarefa só é marcada `[x]` após
 os revisores aplicáveis aprovarem o mesmo commit; qualquer `REQUEST_CHANGES` reabre a
 tarefa (`[-]` → volta ao trabalho). A cadência exata (qual revisor, em qual etapa do
-release) segue a `DADAIA.md` §5.
+release) segue a `DADAIA.md` §6.
 
 ---
 

@@ -5,7 +5,8 @@ description: >
   (the demotion step), a test is reported flaky, or a test is a deletion candidate.
   The single operational home of the test lifecycle — intent taxonomy, admission,
   size tiers, demotion, deletion, flake/quarantine, artifact hygiene, health. The
-  law (`DADAIA.md` §6) states five points once; this skill is where they operate.
+  law (`DADAIA.md` §7 (Quality)) states five points once; this skill is where they
+  operate.
 ---
 
 # dadaia-test-stewardship
@@ -122,8 +123,9 @@ pass, per criterion (f) above.
 
 Capture is failure-gated by default (screenshot only-on-failure; trace/video
 retain-on-failure or on-first-retry) — never unconditional. Where artifacts are
-written, retention, and repo-cleanliness are governed by `DADAIA.md` §4 — this skill
-adds nothing there, it only marks capture as failure-gated. Probes, one-off generators
+written, retention, and repo-cleanliness are governed by `DADAIA.md` §5 (Where things
+are written) — this skill adds nothing there, it only marks capture as failure-gated.
+Probes, one-off generators
 and release scripts with no referenced invoker are SCAFFOLD: delete at curation if
 nothing calls them.
 

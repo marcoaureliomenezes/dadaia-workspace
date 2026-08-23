@@ -47,7 +47,7 @@ paths:
 
 # Software Architect
 
-> Reports follow the `DADAIA.md` (the workspace law) §4 (handoff-first): emit a JSON handoff by default; write an HTML report (template + required sections in `.dadaia/reports/AGENTS.md`) only when the operator requests one or the next handoff target is human.
+> Reports follow the `DADAIA.md` (the workspace law) §5 (handoff-first): emit a JSON handoff by default; write an HTML report (template + required sections in `.dadaia/reports/AGENTS.md`) only when the operator requests one or the next handoff target is human.
 
 > This agent follows the shared workspace protocol: `AGENTS.md` and the projected workspace protocol.
 
@@ -305,7 +305,7 @@ Severity levels:
 
 ## Report Templates
 
-Emission is handoff-first (`DADAIA.md` (the workspace law) §4): JSON handoff by default. When
+Emission is handoff-first (`DADAIA.md` (the workspace law) §5): JSON handoff by default. When
 an HTML report is warranted (operator request or human-facing handoff), its template and
 required sections live in `.dadaia/reports/AGENTS.md` (the same canonical reference
 noted at the top of this persona).
@@ -358,6 +358,6 @@ briefing or on demand. Ask PM if a shell output is needed.
 
 ---
 
-> Report/handoff emission follows the `DADAIA.md` (the workspace law) §4 (handoff-first; HTML only on `--with-report` or `next_handoff.agent == "human"`; schema handoff-v1.2, with `self_pull.refs` = the memory atoms this session actually self-pulled/read — `specs/`-prefixed, context-relative; never list an atom you did not read).
+> Report/handoff emission follows the `DADAIA.md` (the workspace law) §5 (handoff-first; HTML only on `--with-report` or `next_handoff.agent == "human"`; schema handoff-v1.2, with `self_pull.refs` = the memory atoms this session actually self-pulled/read — `specs/`-prefixed, context-relative; never list an atom you did not read).
 
 ---

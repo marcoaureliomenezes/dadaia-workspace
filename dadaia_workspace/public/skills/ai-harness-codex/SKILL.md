@@ -76,7 +76,7 @@ Current-doc corrections to keep active:
 ### Rule-law corpus reachability (WS-CDX-PROTOCOL — onboarding)
 
 Codex agent instructions cite governance rules **by name** (e.g. "the
-`DADAIA.md` §4 (Emission is handoff-first)", "the `DADAIA.md` §5 (Releases)"). Codex has no native
+`DADAIA.md` §5 (Emission is handoff-first)", "the `DADAIA.md` §6 (Releases)"). Codex has no native
 rule-loading for that corpus the way Claude Code loads `.claude/rules/*.md`, but the
 corpus **is reachable**: every by-name rule is a real on-disk file at
 `.claude/rules/<rule-name>.md` (workspace root, identical across harnesses). When an

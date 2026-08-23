@@ -211,7 +211,7 @@ release to a terminal status token — vocabulary and format: `dd-backlog-defini
 flip as a row in the CLOSURE `## Dispositions` table with an evidence pointer (CLOSURE
 section or commit SHA). A release whose CLOSURE lacks the sweep is not closeable.
 
-Never-delete law (`DADAIA.md` §5 (Backlog)): a bug or backlog file is **never deleted** —
+Never-delete law (`DADAIA.md` §6 (Backlog)): a bug or backlog file is **never deleted** —
 always marked with a terminal token and a reason. A bug is never silently dropped:
 either it is fixed (`Closed`) or a superseding backlog item covers its acceptance
 (`Closed` + `superseded_by: <slug>`). Stale or invalid items are dispositioned

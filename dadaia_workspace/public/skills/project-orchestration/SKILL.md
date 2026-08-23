@@ -213,7 +213,7 @@ Entry: `product-engineer` (dispatched by `project-manager`).
 Use when the operator wants a new release built from reported bugs + backlog.
 `project-manager` dispatches `product-engineer` with the `dd-release-definition`
 skill, which owns the full protocol (sanitize reference, pick, bug-always-solved,
-the mandatory `dadaia-grill-me` session, SPEC authoring). See the `DADAIA.md` §5
+the mandatory `dadaia-grill-me` session, SPEC authoring). See the `DADAIA.md` §6
 (Releases).
 
 ### Playbook — security-patch

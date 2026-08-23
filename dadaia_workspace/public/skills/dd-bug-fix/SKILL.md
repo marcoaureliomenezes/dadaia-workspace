@@ -44,15 +44,15 @@ Write the test that fails for the real reason. Intent and size classification at
 
 ## 5. Root-cause fix
 
-Fix the cause, not the symptom (`DADAIA.md` §6 "Root cause, always" — referenced, not
-restated). Workarounds and symptom patches are not acceptable outcomes.
+Fix the cause, not the symptom (`DADAIA.md` §7 (Quality) "Root cause, always" —
+referenced, not restated). Workarounds and symptom patches are not acceptable outcomes.
 
 ## 6. GREEN + `resolved` event + evidence
 
 Prove the fix green, then append `resolved` with `--resolution-evidence` (reproducing
 test, fix, suite result). What counts as closing the loop — the staging discipline for
-the commit that follows — is the law's close-in-same-session rule (`DADAIA.md` §6):
-consult it, do not restate it here.
+the commit that follows — is the law's close-in-same-session rule (`DADAIA.md` §7
+(Quality)): consult it, do not restate it here.
 
 ## 7. No separate release ceremony
 

@@ -19,7 +19,7 @@ Every completed agent task ends with a structured JSON handoff under
 `.dadaia/handoff/<context>/` so downstream agents, the panel, and
 `dadaia reports validate` can consume the result as a machine contract.
 
-Emission is **handoff-first** (`DADAIA.md` §4 (Emission is handoff-first)):
+Emission is **handoff-first** (`DADAIA.md` §5 (Emission is handoff-first)):
 
 | Mode | When | What the handoff carries |
 |---|---|---|
@@ -223,7 +223,8 @@ rule and never restates it — reference this section instead.
 **The rule.** Once a consuming skill has read and acted on a coordination handoff, it
 deletes that handoff file. A handoff carrying `artifact.path` is **exempt** — it is
 artifact-bearing, not purely coordination, and its retention instead follows its
-referenced report's retention (`DADAIA.md` §4). Never delete an artifact-bearing handoff
+referenced report's retention (`DADAIA.md` §5 (Where things are written)). Never delete
+an artifact-bearing handoff
 under this rule.
 
 **The deletion lane guard (AG.1 — inherits FR17's symlink doctrine (A17.1) by

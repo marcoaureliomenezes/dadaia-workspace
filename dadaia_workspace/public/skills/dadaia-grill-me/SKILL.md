@@ -73,7 +73,8 @@ Record every inspection-resolved item as "answered via inspection: <value>" and 
 operator decision as an ADR line (`<decision> — reason: <justification>`). Emit the
 session as a handoff via `dadaia-handoff-emitter` — handoff-only by default. Write the
 HTML report (shape: `EMISSION-FORMAT.md`, disclosed — read it only in report mode)
-when the operator asked for one or the next handoff target is human (`DADAIA.md` §4).
+when the operator asked for one or the next handoff target is human (`DADAIA.md` §5
+(handoff-first)).
 **Done when:** the handoff is emitted and passes `dadaia reports validate`.
 
 ---

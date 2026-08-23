@@ -91,7 +91,7 @@ restating this scan.
 
 ## 4. Never-delete (cited, not restated)
 
-No backlog file or bug is ever deleted — `DADAIA.md` §5 Backlog. A dead item moves
+No backlog file or bug is ever deleted — `DADAIA.md` §6 Backlog. A dead item moves
 `ACTIVE` → `LEDGER`; it never leaves the tree.
 
 ## 5. Operator-gated intake (ADR #15 — the only path to a new entry)
@@ -117,7 +117,8 @@ the operator-facing intake report — "each item" above means each actionable de
 every observation a reviewer recorded.
 
 **The intake report artifact.** No new artifact class: it is the existing handoff-first
-shape (`DADAIA.md` §4) — a JSON handoff with `next_handoff.agent: "human"`, plus the HTML
+shape (`DADAIA.md` §5 (handoff-first)) — a JSON handoff with `next_handoff.agent:
+"human"`, plus the HTML
 report it points at, at `.dadaia/reports/<context>/project-manager/<UTC>-intake.html`.
 
 An agent reading only this section knows: it may not create a backlog entry itself; a
