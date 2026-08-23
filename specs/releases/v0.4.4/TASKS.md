@@ -322,7 +322,7 @@ clobbers).
 
 ---
 
-- [-] **T-044-08 — FR5: collapse 14 surfaces to pointers**
+- [x] **T-044-08 — FR5: collapse 14 surfaces to pointers**
 
 **Owner role:** ai-engineer (personas, skills, registry) + `software-engineer` (the shell
 script header and the CLI docstring) · **Commit:**
@@ -347,7 +347,7 @@ disjoint from the personas/skills half. If the same script is touched by both, s
 
 ---
 
-- [-] **T-044-09 — FR6 / bug: the preflight stops lying about CI equivalence**
+- [x] **T-044-09 — FR6 / bug: the preflight stops lying about CI equivalence**
 
 **Owner role:** software-engineer · **Commit:**
 `fix(T-044-09): lint-imports joins the preflight so local and CI gate the same set`
@@ -367,7 +367,7 @@ gains a check the other lacks.
 
 ---
 
-- [ ] **T-044-10 — [git] Make v2 live: reinstall the workspace venv and probe both edges**
+- [-] **T-044-10 — [git] Make v2 live: reinstall the workspace venv and probe both edges**
 
 **Owner role:** dispatcher / software-engineer · **Commit:** none (environment + capture)
 
