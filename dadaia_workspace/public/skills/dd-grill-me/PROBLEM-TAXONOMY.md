@@ -1,4 +1,4 @@
-# PROBLEM-TAXONOMY — dadaia-grill-me
+# PROBLEM-TAXONOMY — dd-grill-me
 
 Disclosed reference reached during Step 1 (inspect before asking): the problem shapes
 that destroy specs, named so a gap can be classified before deciding whether it

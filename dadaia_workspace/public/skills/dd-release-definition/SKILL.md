@@ -1,6 +1,6 @@
 ---
 name: dd-release-definition
-description: "Use when: turning bugs and/or backlog items into a release. product-engineer (dispatched by project-manager) picks a pre-sanitized set and refines it into a SPEC. Enforces bug-always-solved (unless subsumed) and a MANDATORY dadaia-grill-me session before the SPEC is written. Invoke at the start of release definition."
+description: "Use when: turning bugs and/or backlog items into a release. product-engineer (dispatched by project-manager) picks a pre-sanitized set and refines it into a SPEC. Enforces bug-always-solved (unless subsumed) and a MANDATORY dd-grill-me session before the SPEC is written. Invoke at the start of release definition."
 applyTo: "specs/releases/*/SPEC.md"
 ---
 
@@ -60,7 +60,7 @@ Every **picked bug must be solved in the release**, with exactly one exception:
   not "picked" — leave it open (`dd-backlog-definition` sanitizes it on its own cadence).
 
 ### 3. MANDATORY grill
-Run a `dadaia-grill-me` session on the picked set. This is **obligatory** — it
+Run a `dd-grill-me` session on the picked set. This is **obligatory** — it
 resolves inconsistencies, scope gaps, ambiguous acceptance, and stale assumptions
 **before** the SPEC exists. Do not skip it even when the scope "looks obvious".
 
@@ -113,6 +113,6 @@ proceed to SPEC without the grill). See the `DADAIA.md` §6 (Releases).
 
 - [ ] Picked set recorded (from `dd-backlog-definition`'s already-sanitized `ACTIVE`).
 - [ ] Every picked bug fixed-in-release OR `superseded_by` a picked backlog item.
-- [ ] `dadaia-grill-me` session completed (report emitted).
+- [ ] `dd-grill-me` session completed (report emitted).
 - [ ] SPEC authored from the refined, picked set.
 - [ ] `**Consumes:**` line declared for any fully-consumed backlog item (or omitted if none).

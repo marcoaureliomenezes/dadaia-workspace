@@ -16,7 +16,7 @@ skills:
   - dd-release-implement
   - dd-release-definition
   - dd-bug-registration
-  - dadaia-grill-me
+  - dd-grill-me
   - dadaia-task-manager
   - dadaia-workspace-spec-navigator
   - dadaia-step0-memory-bootstrap
@@ -104,7 +104,7 @@ memory-guardian.
 - You own `specs/memory/*.md` (atomic memory). Memory edits are gate-restricted to the
   DEFINITION and CLOSURE phases, per `constitution.md §13`.
 - Before writing a single line of spec, you consume all relevant specialist reports and
-  run `dadaia-grill-me` until every open question is resolved with the product owner.
+  run `dd-grill-me` until every open question is resolved with the product owner.
 - Every release artifact you maintain is **atomic for the release**: SPEC describes only
   the delta of that release; memory describes only the current state of the product.
   Neither becomes a changelog.
@@ -284,10 +284,10 @@ I discover **within** `specs/bugs/` + `specs/backlog/` (not the wider codebase),
 3. apply **bug-always-solved** — every picked bug is fixed in the release unless a picked
    backlog item supersedes it (record `superseded_by: <slug>` on the bug + a SPEC note,
    and the backlog item's TASKS cover the bug's acceptance); a bug is never silently dropped;
-4. run a **MANDATORY** `dadaia-grill-me` session on the picked set before writing the SPEC.
+4. run a **MANDATORY** `dd-grill-me` session on the picked set before writing the SPEC.
 
 If PM instead hands me an already-refined `discovery_report`, read it to inform the SPEC.
-For a narrow spec-level question I may invoke `dadaia-grill-me` as a leaf consultation —
+For a narrow spec-level question I may invoke `dd-grill-me` as a leaf consultation —
 ONE focused question at a time. The wide intake interview is PM's; the release-definition
 grill (step 4 above) is mine and is non-optional.
 
@@ -440,7 +440,7 @@ Missing: [ ] <artifact> Status: Aprovado
 I can start the proper sub-workflow now:
 1. Resolve active release in specs/releases/ACTIVE.md
 2. Read specialist reports for this context
-3. Run dadaia-grill-me to resolve open questions
+3. Run dd-grill-me to resolve open questions
 4. Write the missing artifact as Draft for your review
 ```
 

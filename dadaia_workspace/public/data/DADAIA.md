@@ -220,7 +220,7 @@ schema, intake protocol and the disposition vocabulary: `dd-backlog-definition`.
 **Branches.** Branch model, stage placement and merge/push mechanics: §4 (Gitflow).
 
 **Releases.** A release is `major.minor.patch` and matures through the `rc-N` lane
-(branch mechanics: §4 Gitflow). A `dadaia-grill-me` session on the picked set precedes
+(branch mechanics: §4 Gitflow). A `dd-grill-me` session on the picked set precedes
 the SPEC. At pick time, open bugs and undispositioned audits outrank fresh backlog.
 Finalization order is **memory update → CLOSURE → archive**; a completed task group is
 one commit.

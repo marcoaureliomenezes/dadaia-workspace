@@ -1,4 +1,4 @@
-# EMISSION-FORMAT — dadaia-grill-me (report mode only)
+# EMISSION-FORMAT — dd-grill-me (report mode only)
 
 Disclosed reference reached only when Step 5 writes the optional HTML report (the
 operator asked for one, or the next handoff target is human). The document follows

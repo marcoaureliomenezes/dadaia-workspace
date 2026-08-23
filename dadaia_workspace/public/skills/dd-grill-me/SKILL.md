@@ -1,5 +1,5 @@
 ---
-name: dadaia-grill-me
+name: dd-grill-me
 description: >
   Interview the operator to reach shared understanding on a demand, spec, or backlog
   item, resolving every question the repo/CLI/a subagent can already answer before it
@@ -11,7 +11,7 @@ description: >
 applyTo: "specs/**"
 ---
 
-# dadaia-grill-me — SDD Spec Refinement
+# dd-grill-me — SDD Spec Refinement
 
 Reach shared understanding with the operator by mapping every open branch of the
 demand as a **design tree**, then working it in **rounds** until the tree is fully

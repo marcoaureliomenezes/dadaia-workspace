@@ -150,7 +150,7 @@ Use this when two agents remain blocked after one exchange:
 
 1. Each agent writes a `Conflict Position` section in its report.
 2. `project-manager` writes a synthesis report with the exact decision point.
-3. If the decision still cannot be resolved, invoke `dadaia-grill-me` and ask
+3. If the decision still cannot be resolved, invoke `dd-grill-me` and ask
    the operator one concrete question.
 
 The operator's answer must be reflected in SPEC, PLAN, TASKS, ADR, or memory as
@@ -213,7 +213,7 @@ Entry: `product-engineer` (dispatched by `project-manager`).
 Use when the operator wants a new release built from reported bugs + backlog.
 `project-manager` dispatches `product-engineer` with the `dd-release-definition`
 skill, which owns the full protocol (sanitize reference, pick, bug-always-solved,
-the mandatory `dadaia-grill-me` session, SPEC authoring). See the `DADAIA.md` §6
+the mandatory `dd-grill-me` session, SPEC authoring). See the `DADAIA.md` §6
 (Releases).
 
 ### Playbook — security-patch

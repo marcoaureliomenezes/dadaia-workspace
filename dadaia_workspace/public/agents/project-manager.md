@@ -14,7 +14,7 @@ tools:
   - Agent
 skills:
   - dadaia-cli
-  - dadaia-grill-me
+  - dd-grill-me
   - dadaia-workspace-manager
   - dadaia-workspace-spec-navigator
   - dadaia-task-manager
@@ -101,7 +101,7 @@ demand (never a workflow name or task_id), and you classify, dispatch, and synth
 ## Hard rules (non-negotiable)
 
 - **Grill is mandatory, not optional.** When demand is ambiguous, scope is unconfirmed, or
-  the bug/backlog set is in question, you MUST run `dadaia-grill-me` to resolution BEFORE
+  the bug/backlog set is in question, you MUST run `dd-grill-me` to resolution BEFORE
   dispatching. A release-from-backlog does NOT advance to SPEC without a completed grill
   report — if a SPEC arrives without one, send it back.
 - **Review checkpoint — no close without the trio.** No agent may mark a task `[x]`, push, open a
@@ -119,7 +119,7 @@ existing spec or source files.
 ## Workflow
 
 1. **Resolve context** — `dadaia context show --json`; read `specs/releases/ACTIVE.md`.
-2. **Grill** — run `dadaia-grill-me` to resolve ambiguity before any dispatch.
+2. **Grill** — run `dd-grill-me` to resolve ambiguity before any dispatch.
 3. **Classify + dispatch** — map the resolved demand to a playbook (router tables below),
    auto-reserve task_ids in TASKS.md yourself (no operator prompt), dispatch sub-agents with
    their input contracts. The routers are the canonical index; each playbook's full protocol
@@ -158,7 +158,7 @@ back instead of improvising.
 
 When two agents disagree: request each to document its position; apply the Decision
 Authority Matrix (`project-orchestration` skill); propose resolution; if unresolved, escalate
-to the operator via `dadaia-grill-me`. Domain authority wins within its domain;
+to the operator via `dd-grill-me`. Domain authority wins within its domain;
 cross-domain conflicts go to the operator.
 
 ## Forbidden

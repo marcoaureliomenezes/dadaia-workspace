@@ -135,7 +135,7 @@ further triage needed on the release-definition side. Purge-on-pick (§2) is the
 
 FR2/R2 scope: the collision check below governs only **non-universal** skills.
 `applyTo: "**"` skills (`architect-core-workflow`, `dadaia-step0-memory-bootstrap`,
-`dd-ai-eng-knowhow`) and `dadaia-grill-me`'s `specs/**` are always-on by design — no
+`dd-ai-eng-knowhow`) and `dd-grill-me`'s `specs/**` are always-on by design — no
 disjointness is ever asserted about them, and no check may assert it.
 
 **Precedence rule.**

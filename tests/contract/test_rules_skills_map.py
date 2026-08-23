@@ -62,7 +62,7 @@ _APPLYTO_RE = re.compile(r'^applyTo:\s*"?([^"\n]*)"?\s*$', re.MULTILINE)
 # Ported verbatim from the retired lint-skill-collisions.py: skills whose activation
 # surface is intentionally universal/near-universal — never asserted disjoint.
 _UNIVERSAL_GLOBS: frozenset[str] = frozenset({"**"})
-_UNIVERSAL_NAMES: frozenset[str] = frozenset({"dadaia-grill-me"})
+_UNIVERSAL_NAMES: frozenset[str] = frozenset({"dd-grill-me"})
 
 
 # --------------------------------------------------------------------------- #

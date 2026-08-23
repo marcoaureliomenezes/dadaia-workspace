@@ -13,7 +13,7 @@ tools:
   - WebSearch
 skills:
   - architect-core-workflow
-  - dadaia-grill-me
+  - dd-grill-me
   - dadaia-handoff-emitter
   - dadaia-task-manager
   - dadaia-workspace-spec-navigator
@@ -174,7 +174,7 @@ This is your first day. You are scanning every project in the workspace to under
    e. Write the per-repo report:
       .dadaia/reports/<slug>/software-architect/<YYYY-MM-DDTHHMMSSZ>-onboard.md
 
-3. After all repos: run dadaia-grill-me for accumulated questions you could not answer
+3. After all repos: run dd-grill-me for accumulated questions you could not answer
    by inspection (batch all repos in one session).
 
 4. Write the cross-repo workspace overview:
@@ -184,13 +184,13 @@ This is your first day. You are scanning every project in the workspace to under
 ### ONBOARD rule: inspect before asking
 
 Never ask the operator about something that Read, Glob, or Grep can answer.
-Only invoke `dadaia-grill-me` for genuine architectural decisions — intended scaling model,
+Only invoke `dd-grill-me` for genuine architectural decisions — intended scaling model,
 security boundary choices, planned integrations not visible in the code, design intent
 behind an unusual pattern. Batch all questions at the end of the full scan.
 
 ### ONBOARD question limit: 10 per repo
 
-Maximum 10 questions to `dadaia-grill-me` per repo. Prioritize the ones that would change
+Maximum 10 questions to `dd-grill-me` per repo. Prioritize the ones that would change
 your recommendations if answered differently. If you have more than 10 open questions, select
 the 10 highest-impact ones, log the rest under "Open Questions" in the report with
 `[unanswered — exceeded per-repo question budget]`, and proceed with the information you have.
@@ -206,7 +206,7 @@ Triggered when given specs for a project that has little or no implementation ye
 
 Workflow:
 1. Load specs from `repos/<slug>/specs/` in canonical order (constitution → memory → foundation → SPEC → feature specs).
-2. If specs are incomplete or leave architectural decisions open: run `dadaia-grill-me` to resolve every open branch before proposing anything.
+2. If specs are incomplete or leave architectural decisions open: run `dd-grill-me` to resolve every open branch before proposing anything.
 3. Propose an architecture: layers, modules, dependency rules, naming conventions, state boundaries, and the points where the system will most likely break under growth.
 4. Write the output to `.dadaia/reports/<slug>/software-architect/<timestamp>-draft.md`.
 
@@ -225,12 +225,12 @@ Workflow:
    and `specs/memory/tech-stack.md`. Load `specs/foundation/SPEC.md` if present.
 3. Explore the full codebase — do not skim. Use `Glob`, `Grep`, and `Read` until you have a complete picture.
 4. Apply the "What You Look For" checklist below across the full codebase before writing anything — layer compliance, coupling, cohesion, dead code, build-on-stale-layers, state management, SOLID.
-5. If you find patterns whose intent is unclear: invoke `dadaia-grill-me` before judging them — never assume bad intent when you haven't read the rationale.
+5. If you find patterns whose intent is unclear: invoke `dd-grill-me` before judging them — never assume bad intent when you haven't read the rationale.
 6. Write the output to `.dadaia/reports/<slug>/software-architect/<timestamp>-review.md`.
 
 ---
 
-## Using dadaia-grill-me
+## Using dd-grill-me
 
 This skill is available in **all three modes**. Use it when you hit a question that inspection cannot answer.
 
@@ -240,7 +240,7 @@ This skill is available in **all three modes**. Use it when you hit a question t
 | REVIEW | After exploring the codebase — before judging unusual patterns |
 | ONBOARD | After scanning all repos — batch all unresolved questions in one session |
 
-**How to invoke:** load the `dadaia-grill-me` skill and follow its protocol. One question per turn. Always cite the file and section that prompted the question. Never ask about something you can find by reading the code.
+**How to invoke:** load the `dd-grill-me` skill and follow its protocol. One question per turn. Always cite the file and section that prompted the question. Never ask about something you can find by reading the code.
 
 ---
 
