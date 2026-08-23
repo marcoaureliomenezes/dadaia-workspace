@@ -580,7 +580,7 @@ pointer from `SKILL.md`. Capture **V17**.
 
 ---
 
-- [ ] **T-044-56 — FR28: the invocation model**
+- [-] **T-044-56 — FR28: the invocation model**
 
 **Owner role:** ai-engineer (frontmatter) + software-engineer (the enforcer check) ·
 **Commit:** `docs(T-044-56): user-invoked skills and operative dependency form`
