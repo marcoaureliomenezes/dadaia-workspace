@@ -128,6 +128,26 @@ is no longer archive-only.
   change: "retire — delete the folder; software-architect, software-engineer, code-reviewer and qa-engineer personas point to dadaia-codebase-design; the WebSearch-for-existing-solutions step is replaced by the deletion test"
 ```
 
+### dd-architecture-survey
+- **Title:** dd-architecture-survey — user-invoked (PM/operator) or at alpha/release close: bug-ledger stats per surface + git churn in, ranked architecture cards + one top candidate out, then grill
+- **Opened:** 2026-08-23
+- **Status:** candidate
+- **Description:** Operationalize the operator's standing order **"permanent architecture review oriented by bug history"** as a procedure with a defined input and output instead of an exhortation. New skill `dd-architecture-survey`, user-invoked (by the operator or `project-manager`; `disable-model-invocation: true`) or run at the close of each `alpha-N`/release. **Input:** `dadaia bugs stats` aggregated per surface/component (re-bug rate, time-to-re-bug, resolved-without-evidence count) joined with `git log` churn per path. **Output:** architecture cards — *files · problem · deepening (what deep module would absorb it) · before/after sketch · confidence tag Strong / Worth exploring / Speculative* — plus exactly **one top candidate**, which then goes to a `dadaia-grill-me` session before anything is picked. The survey writes a report/handoff only (ADDITIVE); it never edits code and never materializes backlog — its top candidate reaches `BACKLOG.md` only through the operator-gated intake (ADR #15). Reference: `mattpocock/skills/skills/engineering/improve-codebase-architecture/` (`SKILL.md` + `HTML-REPORT.md` + `agents/`). Depends on the vocabulary of `dadaia-codebase-design` (cards use seam/deep-module/deletion-test terms). Governance: maps to the DADAIA.md §5 bold topic "Releases" (close of each alpha) or §6 — single topic to settle in grill-me. Success metric proposed by the audit: every alpha closes with one survey and one dispositioned top candidate. **Audit roadmap hint (not a disposition):** R3.
+- **Provenance:** operator ratification (2026-08-23) of the research report `.dadaia/reports/dadaia-workspace/claude-code/2026-08-23T183323Z-skills-audit-vs-reference/` (handoff `.dadaia/handoff/dadaia-workspace/2026-08-23T183323Z-claude-code-skills-audit-vs-reference.handoff.json`), section D "new skills proposed" — ruled to the backlog while sections A–C fold into release v0.4.4; relates-to `core-skills-consolidation` and `rules-skills-governance-map` (both CONSUMED by v0.4.4) and to the governance rule "every skill maps to one DADAIA.md bold topic"; roadmap placement R3 (hint)
+- **Intents:**
+```yaml
+- subject:
+    kind: doc
+    ref: dadaia_workspace/public/skills/dd-architecture-survey/SKILL.md
+    surface: new
+  change: "new user-invoked core skill (disable-model-invocation): input = dadaia bugs stats per surface + git churn; output = architecture cards (files · problem · deepening · before/after · Strong/Worth exploring/Speculative) and one top candidate routed to dadaia-grill-me; report/handoff only, never code or backlog writes; adapted from mattpocock/skills/skills/engineering/improve-codebase-architecture"
+- subject:
+    kind: doc
+    ref: dadaia_workspace/public/skills/dd-release-implement/SKILL.md
+    surface: new
+  change: "alpha-N / release close step names the survey as an operative dependency — Call the Skill tool with \"dd-architecture-survey\" — so each segment closes with a survey and a dispositioned top candidate"
+```
+
 
 ## LEDGER
 
