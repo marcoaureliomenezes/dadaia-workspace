@@ -464,7 +464,7 @@ so coverage never gaps; the script's `--self-test` fixtures are ported.
 
 ---
 
-- [-] **T-044-16 — `S2` QA close**
+- [x] **T-044-16 — `S2` QA close**
 
 **Owner role:** qa-engineer · **Commit:** `chore(T-044-16): S2 qa review`
 
