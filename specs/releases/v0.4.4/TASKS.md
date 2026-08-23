@@ -256,7 +256,7 @@ before and after.
 
 ---
 
-- [ ] **T-044-05 — FR2: `dd-gitflow-default`, renamed and rewritten in one touch**
+- [-] **T-044-05 — FR2: `dd-gitflow-default`, renamed and rewritten in one touch**
 
 **Owner role:** ai-engineer · **Commit:**
 `docs(T-044-05): rename dadaia-gitflow to dd-gitflow-default and rewrite to v2`
