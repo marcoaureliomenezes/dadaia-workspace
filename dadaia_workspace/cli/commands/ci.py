@@ -281,18 +281,17 @@ def _foreign_repo_slugs(
 
 @app.command("push-gate-check")
 def push_gate_check() -> None:
-    """Pre-push gate (v0.4.4 FR3 — the gitflow v2 inversion / v0.9.0 FR1-FR6 /
-    v0.11.0 FR5): branch policy + the range-scoped denylist scan.
+    """Pre-push gate: branch-name validation + the range-scoped denylist scan.
+
+    Branch model: `DADAIA.md` §4 (Gitflow) + `dd-gitflow-default` — this docstring
+    states it nowhere else.
 
     Reads the pre-push ref lines from stdin (``<local-ref> <local-sha> <remote-ref>
-    <remote-sha>``). Refuses any non-deletion, non-tag ref that is not a
-    ``refs/heads/feature/M.m.p`` branch pushed to the SAME remote name (gitflow law,
-    DADAIA.md §4: ``develop``/``main`` advance via PR only; names outside the three
-    patterns invalid). Every non-deletion ref (tags included) is then scanned for new
+    <remote-sha>``). Every non-deletion ref (tags included) is then scanned for new
     objects carrying a denylisted term (v0.9.0 FR1/FR2) — under v2 this feature push is
     the first publication to ``origin``. Branch deletions are never scanned; tag pushes
     are scanned but were never gated on branch policy. There is no security-verdict
-    check on this path anymore (v0.4.4 A3.4) — it relocates to a PR gate (FR4).
+    check on this path (v0.4.4 A3.4) — it runs as a PR gate instead (FR4).
 
     The object source, denylist terms, baseline patterns and foreign-slug set are ALL
     built and passed here — the CLI is the sole composition point for the injected

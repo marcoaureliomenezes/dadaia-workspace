@@ -1,7 +1,8 @@
 """Unit tests for ReportsValidationService.
 
-Content-hash integrity feeds the pre-push security-verdict chokepoint — the
-artifact-path-outside-workspace rejection is CRIT and kept standalone.
+Content-hash integrity feeds the security-verdict PR gate (DADAIA.md §4;
+`dd-gitflow-default`) — the artifact-path-outside-workspace rejection is CRIT and
+kept standalone.
 """
 
 from __future__ import annotations
