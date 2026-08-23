@@ -51,11 +51,9 @@ trace is:
 **Implementation complete is not DONE (judgment, not mechanic).** After the implementer
 finishes code, unit tests, and integration tests, the task remains `[-]` until
 `qa-engineer`, `code-reviewer`, and `security-reviewer` return green approval for the
-same commit (per the `DADAIA.md` §6 (Releases) cadence: alpha-N boundaries are qa-only;
-reviews mature the release, and the ship PR is mechanically gated — the security-verdict
-PR gate requires an APPROVED `security-reviewer` handoff covering the PR head sha; branch
-contract: `DADAIA.md` §4 Gitflow, operations: `dd-gitflow-default`). Before those
-approvals it is forbidden to mark
+same commit — boundary-by-boundary cadence: `dd-release-implement`'s gate-cadence table,
+canonical home (branch contract: `DADAIA.md` §4 Gitflow, operations: `dd-gitflow-default`).
+Before those approvals it is forbidden to mark
 `[x]`, open a PR, request merge, deploy, close the release, write `CLOSURE.md`, or update
 memory. If any reviewer requests changes, return to step 2 and keep `[-]`.
 

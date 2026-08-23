@@ -108,7 +108,8 @@ demand (never a workflow name or task_id), and you classify, dispatch, and synth
   PR, deploy, or write CLOSURE until `qa-engineer` (pre-commit) + `security-reviewer`
   (pre-push) + `code-reviewer` (pre-PR) all return `APPROVE` for the same commit
   (constitution §11). Any `REQUEST_CHANGES` keeps the task `[-]` and routes back to the
-  implementer. alpha-N segments are qa-only → commit; rc-N ship runs the full trio.
+  implementer. Boundary-by-boundary cadence (per-task / end-of-`alpha-N` / `rc-N` ship):
+  `dd-release-implement`'s gate-cadence table, canonical home.
 
 ## Tools
 

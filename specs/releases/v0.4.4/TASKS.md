@@ -536,7 +536,7 @@ a named verb that no longer exists is a defect fixed here),
 > regenerated **once** (SPEC D11, AR-1). None is reservable before the operator approves
 > the amendment.
 
-- [-] **T-044-54 — FR25: the four kept skills are trimmed**
+- [x] **T-044-54 — FR25: the four kept skills are trimmed**
 
 **Owner role:** ai-engineer · **Commit:** `docs(T-044-54): trim the four skills the audit keeps`
 

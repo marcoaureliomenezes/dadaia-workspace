@@ -54,17 +54,6 @@ In this self-hosting workspace, bugs go to `repos/dadaia-workspace/specs/bugs/`.
 consumer workspace, bugs go to the active context's `specs/bugs/` plus an upstream
 report.
 
-## 6. Handoff to `dd-bug-fix` (non-goal, stated explicitly)
-
-This skill's only output is the `reported` event. It never reproduces the failure,
-never writes a RED test, never fixes the cause — that is entirely `dd-bug-fix`'s job,
-picked up once a bug carries a `reported` event: reproduce on the executed path → RED →
-root-cause fix → GREEN → `resolved` event → commit, on the live `feature/{M.m.p}`
-branch (branch contract: `DADAIA.md` §4 Gitflow; operations: `dd-gitflow-default`).
-
-## 7. CLI reference
-
-```bash
-dadaia bugs status        # open bugs
-dadaia bugs stats         # bug-ledger aggregate view
-```
+This skill's only output is the `reported` event — never the fix. Hand-off to the fix:
+`dd-bug-fix` (picked up once a bug carries `reported`). Further CLI reference:
+`dadaia bugs append --help` / `dd-cli-library`.

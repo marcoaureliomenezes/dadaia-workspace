@@ -24,7 +24,7 @@ Read `specs/releases/ACTIVE.md` (schema v2): `release:`, optional `segment:`
 `releases/<release-id>/<segment>/TASKS.md`; otherwise at `releases/<release-id>/TASKS.md`.
 Full navigation protocol: `dadaia-workspace-spec-navigator`.
 
-## Review/QA gate cadence (canonical home — this table exists nowhere else in `public/`)
+## Review/QA gate cadence (canonical home)
 
 | Boundary | Who validates | What unlocks |
 |---|---|---|

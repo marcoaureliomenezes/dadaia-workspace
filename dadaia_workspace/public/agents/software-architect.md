@@ -240,7 +240,9 @@ This skill is available in **all three modes**. Use it when you hit a question t
 | REVIEW | After exploring the codebase — before judging unusual patterns |
 | ONBOARD | After scanning all repos — batch all unresolved questions in one session |
 
-**How to invoke:** load the `dd-grill-me` skill and follow its protocol. One question per turn. Always cite the file and section that prompted the question. Never ask about something you can find by reading the code.
+**How to invoke:** load the `dd-grill-me` skill and follow its frontier-per-round cadence
+(that skill's §3, canonical home). Always cite the file and section that prompted the
+question. Never ask about something you can find by reading the code.
 
 ---
 
