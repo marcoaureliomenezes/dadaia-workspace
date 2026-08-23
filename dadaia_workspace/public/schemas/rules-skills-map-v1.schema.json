@@ -12,6 +12,21 @@
       "const": "rules-skills-map-v1",
       "description": "Schema version identifier. Must equal 'rules-skills-map-v1'."
     },
+    "skill_md_line_ceiling": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "FR9/G12 — the declared line-count ceiling a SKILL.md's own content (not its disclosed sibling files) must stay within. Additive optional field (schema stays v1); the retired lint-skill-collisions.py-adjacent magic number now lives here as the one canonical declaration the FR9 enforcer test reads."
+    },
+    "declared_overlaps": {
+      "type": "array",
+      "description": "FR9/D4 — pre-cleared applyTo activation-glob overlap groups among non-universal skills, ported from the retired lint-skill-collisions.py's DECLARED_OVERLAPS. Any pairwise overlap among the members of the same group is intentional and never flagged; an overlap between two non-universal skills that share no group here is an FR9 defect.",
+      "items": {
+        "type": "array",
+        "minItems": 2,
+        "items": { "type": "string", "minLength": 1 },
+        "uniqueItems": true
+      }
+    },
     "rows": {
       "type": "array",
       "minItems": 1,

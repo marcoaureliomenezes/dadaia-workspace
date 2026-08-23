@@ -155,10 +155,12 @@ disjointness is ever asserted about them, and no check may assert it.
 | `ai-context-engineering`, `ai-harness-claude-code`, `ai-harness-codex` (identical `dadaia_workspace/public/**`) | — (three-way identical, no narrower/broader side) | one cohesive `ai-engineer`-only harness-mastery family, always loaded together for AI-surface authoring; narrowing is out of R2 scope |
 | `dadaia-handoff-emitter` (`.dadaia/handoff/**/*.handoff.json`), `project-orchestration` (`.dadaia/handoff/**`) | `dadaia-workspace-doctor` (`.dadaia/**`) | a three-tier specialization chain over `.dadaia/`: doctor is the general surface, handoff dispatch narrows to `.dadaia/handoff/**`, the emitter narrows further to the JSON artifact itself — pre-existing, out of R2 scope |
 
-A collision check (`dadaia_workspace/public/scripts/lint-skill-collisions.py`,
-`--self-test` proves A2.4) run at projection time flags **undeclared** overlap between
-two non-universal skills only — this table is its `DECLARED_OVERLAPS` allowlist; keep
-both in sync.
+A collision check (`tests/contract/test_rules_skills_map.py`, FR9/T-044-15 — the
+retired `lint-skill-collisions.py`'s replacement, gating every deploy) flags
+**undeclared** overlap between two non-universal skills only, reading the
+`declared_overlaps` list at the top of `entities/rules-skills-map.json`. This table is
+the human-readable rationale for that JSON list; the JSON is the one authoritative
+source (D4) — update it when this table changes.
 
 ## 8. CLI reference
 

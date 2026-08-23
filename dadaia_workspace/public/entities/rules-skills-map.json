@@ -1,5 +1,13 @@
 {
   "schema_version": "rules-skills-map-v1",
+  "skill_md_line_ceiling": 500,
+  "declared_overlaps": [
+    ["dd-release-implement", "dadaia-task-manager"],
+    ["dd-audit-project", "dadaia-workspace-doctor"],
+    ["dd-bug-registration", "dd-bug-fix"],
+    ["ai-context-engineering", "ai-harness-claude-code", "ai-harness-codex"],
+    ["dadaia-handoff-emitter", "project-orchestration", "dadaia-workspace-doctor"]
+  ],
   "rows": [
     {
       "topic": "Gitflow",

@@ -442,7 +442,7 @@ edit (approval of the SPEC, per D-8/§8).
 
 ---
 
-- [-] **T-044-15 — FR9: one enforcer, and one retirement**
+- [x] **T-044-15 — FR9: one enforcer, and one retirement**
 
 **Owner role:** software-engineer (the test) + ai-engineer (the script retirement) ·
 **Commit:** `feat(T-044-15): one map enforcer replaces the skill-collision lint`
