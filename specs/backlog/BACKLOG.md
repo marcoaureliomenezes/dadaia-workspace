@@ -208,6 +208,26 @@ is no longer archive-only.
   change: "skills row names dadaia-router as the single entry name for the flow; no other law text changes"
 ```
 
+### dd-tasks-as-tracer-bullets
+- **Title:** dd-tasks-as-tracer-bullets — TASKS authored as tracer bullets: each task declares "blocked by" and "what it delivers", demolitions use expand–contract; reference skill or a section of dd-release-definition
+- **Opened:** 2026-08-23
+- **Status:** candidate
+- **Description:** TASKS.md today lists tasks with a write set and acceptance; it does not force the author to state the **dependency edge** ("blocked by T-x") nor the **end-to-end slice delivered** ("after this task the operator can …"). The result is task groups that are internally consistent but cannot be verified as a vertical slice, and demolitions (deleting a subsystem — the dominant shape of this repo's releases: v0.3.0 engine, v0.5.0 marker subsystem, v0.4.4 skill consolidation) that land as a single big-bang commit. Remedy: author TASKS as **tracer bullets** — every task carries `blocked by:` (explicit, may be none) and `delivers:` (the observable slice), ordered so the first tasks cut a thin end-to-end path; demolitions follow **expand–contract** (add the new path, switch consumers, then contract by deleting the old path — three tasks, each independently green). Delivered either as a small reference skill `dd-tasks-as-tracer-bullets` invoked from `dd-release-definition`, or as a section of `dd-release-definition` itself — the audit leaves both open; grill-me decides (governance leans to a section: one skill ↔ one DADAIA.md topic, and "Task lifecycle" in §5 already has `dadaia-task-manager`). Reference: `mattpocock/skills/skills/engineering/to-tickets/` (`SKILL.md` + `agents/`). `specs doctor` may later lint the two keys (out of scope here). **Audit roadmap hint (not a disposition):** R3.
+- **Provenance:** operator ratification (2026-08-23) of the research report `.dadaia/reports/dadaia-workspace/claude-code/2026-08-23T183323Z-skills-audit-vs-reference/` (handoff `.dadaia/handoff/dadaia-workspace/2026-08-23T183323Z-claude-code-skills-audit-vs-reference.handoff.json`), section D "new skills proposed" — ruled to the backlog while sections A–C fold into release v0.4.4; relates-to `core-skills-consolidation` and `rules-skills-governance-map` (both CONSUMED by v0.4.4) and to the governance rule "every skill maps to one DADAIA.md bold topic"; roadmap placement R3 (hint)
+- **Intents:**
+```yaml
+- subject:
+    kind: doc
+    ref: dadaia_workspace/public/skills/dd-tasks-as-tracer-bullets/SKILL.md
+    surface: new
+  change: "new reference content (standalone skill or a section of dd-release-definition — settled in grill-me): every TASKS entry carries blocked-by and delivers keys, tasks ordered as tracer bullets (thin end-to-end slice first), demolitions decomposed expand → switch → contract; adapted from mattpocock/skills/skills/engineering/to-tickets"
+- subject:
+    kind: doc
+    ref: dadaia_workspace/public/skills/dd-release-definition/SKILL.md
+    surface: new
+  change: "TASKS authoring step references the tracer-bullet rule (operative pointer or inline section) so product-engineer authors blocked-by/delivers on every task and expand–contract on every demolition"
+```
+
 
 ## LEDGER
 
