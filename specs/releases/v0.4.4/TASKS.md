@@ -406,7 +406,7 @@ explicit refusal of any dual path (a hook remnant plus a CI job).
 
 ## Segment `S2` — the rules→skills governance map
 
-- [ ] **T-044-13 — FR7: the JSON map and its schema**
+- [-] **T-044-13 — FR7: the JSON map and its schema**
 
 **Owner role:** ai-engineer · **Commit:** `feat(T-044-13): the rules-to-skills map`
 
