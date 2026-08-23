@@ -96,7 +96,6 @@ def test_git_mv_into_archive_produces_no_new_blob_and_a_clean_scan(tmp_path: Pat
 
     reader = GitSubprocessObjectReader()
     decision = push_gate_decision(
-        tmp_path / "handoff-empty",
         [_tag_push_ref(renamed_sha, remote_sha=already_published_sha)],
         object_source=reader,
         repo=repo,
@@ -124,7 +123,6 @@ def test_editing_a_path_that_already_published_the_value_no_longer_refuses(
 
     reader = GitSubprocessObjectReader()
     decision = push_gate_decision(
-        tmp_path / "handoff-empty",
         [_tag_push_ref(edited_sha, remote_sha=already_published_sha)],
         object_source=reader,
         repo=repo,
@@ -153,7 +151,6 @@ def test_editing_a_tests_fixture_that_already_published_the_literal_no_longer_re
 
     reader = GitSubprocessObjectReader()
     decision = push_gate_decision(
-        tmp_path / "handoff-empty",
         [_tag_push_ref(edited_sha, remote_sha=already_published_sha)],
         object_source=reader,
         repo=repo,
@@ -177,7 +174,6 @@ def test_same_value_introduced_into_a_new_path_still_refuses(tmp_path: Path) -> 
 
     reader = GitSubprocessObjectReader()
     decision = push_gate_decision(
-        tmp_path / "handoff-empty",
         [_tag_push_ref(tip_sha, remote_sha=already_published_sha)],
         object_source=reader,
         repo=repo,
@@ -219,7 +215,6 @@ def test_prior_side_lookup_failure_refuses_naming_the_failure_and_no_verify(
 
     reader = GitSubprocessObjectReader()
     decision = push_gate_decision(
-        tmp_path / "handoff-empty",
         [_tag_push_ref(tip_sha, remote_sha=already_published_sha)],
         object_source=reader,
         repo=repo,
@@ -271,7 +266,6 @@ def test_dead_registry_context_name_and_slug_both_refuse_a_push_introducing_them
     (repo / "notes.md").write_text(f"mentions {dead_name} now\n")
     name_sha = _commit(repo, "introduce the dead context's name")
     name_decision = push_gate_decision(
-        tmp_path / "handoff-empty",
         [_tag_push_ref(name_sha, remote_sha=tip_sha)],
         object_source=reader,
         repo=repo,
@@ -283,7 +277,6 @@ def test_dead_registry_context_name_and_slug_both_refuse_a_push_introducing_them
     (repo / "notes.md").write_text(f"mentions {dead_slug} now\n")
     slug_sha = _commit(repo, "introduce the dead context's slug")
     slug_decision = push_gate_decision(
-        tmp_path / "handoff-empty",
         [_tag_push_ref(slug_sha, remote_sha=name_sha)],
         object_source=reader,
         repo=repo,
@@ -367,7 +360,6 @@ def test_real_git_failure_refuses_naming_the_failure(tmp_path: Path) -> None:
     reader = GitSubprocessObjectReader()
 
     decision = push_gate_decision(
-        tmp_path / "handoff-empty",
         [_tag_push_ref("a" * 40)],
         object_source=reader,
         repo=not_a_repo,

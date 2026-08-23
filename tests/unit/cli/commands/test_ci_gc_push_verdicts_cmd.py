@@ -74,15 +74,18 @@ def test_missing_sha_is_a_usage_error(tmp_path: Path, monkeypatch: pytest.Monkey
 
 
 def test_help_documents_the_cadence_contract() -> None:
-    """The reviewer-required documented caller: --help states WHEN this runs."""
+    """The reviewer-required documented caller: --help states WHEN this runs.
+
+    v0.4.4 D5: re-keyed from the pushed ``develop`` tip to the merged PR head sha —
+    the cadence contract now names a PR merge, not a raw ``git push``."""
     result = runner.invoke(main_app, ["ci", "gc-push-verdicts", "--help"])
 
     assert result.exit_code == 0
     lowered = result.stdout.lower()
     assert "ship flow" in lowered
-    assert "git push" in lowered
+    assert "merged pr head sha" in lowered
+    assert "merge" in lowered
     assert "develop" in lowered
-    assert "tip" in lowered
 
 
 # ---------------------------------------------------------------------------
