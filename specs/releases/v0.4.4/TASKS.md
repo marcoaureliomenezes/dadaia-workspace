@@ -425,7 +425,7 @@ topic; two only with a justification; every skill on disk placed.
 
 ---
 
-- [-] **T-044-14 — FR8: the map is core law**
+- [x] **T-044-14 — FR8: the map is core law**
 
 **Owner role:** ai-engineer (scaffold) + product-engineer (`specs/constitution.md`) ·
 **Commit:** `docs(T-044-14): declare the rules-to-skills map as core law`
@@ -442,7 +442,7 @@ edit (approval of the SPEC, per D-8/§8).
 
 ---
 
-- [ ] **T-044-15 — FR9: one enforcer, and one retirement**
+- [-] **T-044-15 — FR9: one enforcer, and one retirement**
 
 **Owner role:** software-engineer (the test) + ai-engineer (the script retirement) ·
 **Commit:** `feat(T-044-15): one map enforcer replaces the skill-collision lint`
