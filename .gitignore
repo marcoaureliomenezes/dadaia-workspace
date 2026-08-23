@@ -164,6 +164,13 @@ pip-wheel-metadata/
 # it is silently defeated" class as ALPHA-*-QA.md above (found on T-042-18, the
 # canon's first execution; PRE-PR-REVIEW.md is the TASKS-declared canonical name).
 !/specs/releases/*/PRE-PR-REVIEW.md
+# Bug v0.4.4-reviews-dir-untrackable-gitignore-recurrence: third recurrence of the same
+# "law-mandated artifact needs its own whitelist line, or it is silently defeated" class
+# — v0.4.4's TASKS.md introduces a reviews/ subdirectory per release for the per-segment
+# qa-engineer close and software-architect AR-N rulings (S1-qa-close.md, S1-AR2-ruling.md,
+# ...), which the broad /specs/releases/*/* ignore above silently swallowed.
+!/specs/releases/*/reviews/
+!/specs/releases/*/reviews/*.md
 !/specs/releases/*/SPEC.md
 !/specs/releases/*/PLAN.md
 !/specs/releases/*/TASKS.md
