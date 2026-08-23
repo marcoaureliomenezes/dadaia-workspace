@@ -384,7 +384,7 @@ each refusal naming the PR route.
 
 ---
 
-- [-] **T-044-11 — `S1` QA close + AR-2 architecture ruling**
+- [x] **T-044-11 — `S1` QA close + AR-2 architecture ruling**
 
 **Owner role:** qa-engineer + software-architect · **Commit:**
 `chore(T-044-11): S1 qa review`
