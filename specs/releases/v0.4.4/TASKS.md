@@ -212,7 +212,7 @@ APPROVED handoff covering the pushed delta; CI green; `ACTIVE.md` reads `IMPLEME
 
 ## Segment `S1` — the gitflow contract, v2
 
-- [-] **T-044-03 — Bug (Arm B): `sdd-artifact-linter-mutates-task-markers` (HIGH)**
+- [x] **T-044-03 — Bug (Arm B): `sdd-artifact-linter-mutates-task-markers` (HIGH)**
 
 **Owner role:** software-engineer · **Commit:** `fix(T-044-03): <root cause>` ·
 **Lands first in the release** (D7).
