@@ -367,7 +367,7 @@ gains a check the other lacks.
 
 ---
 
-- [-] **T-044-10 — [git] Make v2 live: reinstall the workspace venv and probe both edges**
+- [x] **T-044-10 — [git] Make v2 live: reinstall the workspace venv and probe both edges**
 
 **Owner role:** dispatcher / software-engineer · **Commit:** none (environment + capture)
 
@@ -384,7 +384,7 @@ each refusal naming the PR route.
 
 ---
 
-- [ ] **T-044-11 — `S1` QA close + AR-2 architecture ruling**
+- [-] **T-044-11 — `S1` QA close + AR-2 architecture ruling**
 
 **Owner role:** qa-engineer + software-architect · **Commit:**
 `chore(T-044-11): S1 qa review`
