@@ -150,9 +150,9 @@ disjointness is ever asserted about them, and no check may assert it.
 | Narrower (wins) | Broader | Rationale |
 |---|---|---|
 | `dd-release-implement` (`specs/releases/*/TASKS.md`) | `dadaia-task-manager` (`specs/**/TASKS.md`) | task-marker mechanics specialize the general TASKS.md contract |
-| `dd-audit-project` (`.dadaia/reports/**`) | `dadaia-workspace-doctor` (`.dadaia/**`) | audit reporting specializes the general `.dadaia/` doctor surface |
+| `dd-audit-project` (`.dadaia/reports/**`) | `dd-workspace-doctor` (`.dadaia/**`) | audit reporting specializes the general `.dadaia/` doctor surface |
 | `dd-bug-registration` (`specs/bugs/*.jsonl`) | `dd-bug-fix` (`specs/bugs/**`) | registration writes only the ledger file; fix owns the whole bug lifecycle including that file |
-| `dadaia-handoff-emitter` (`.dadaia/handoff/**/*.handoff.json`), `dd-manager-orchestration` (`.dadaia/handoff/**`) | `dadaia-workspace-doctor` (`.dadaia/**`) | a three-tier specialization chain over `.dadaia/`: doctor is the general surface, handoff dispatch narrows to `.dadaia/handoff/**`, the emitter narrows further to the JSON artifact itself — pre-existing, out of R2 scope |
+| `dadaia-handoff-emitter` (`.dadaia/handoff/**/*.handoff.json`), `dd-manager-orchestration` (`.dadaia/handoff/**`) | `dd-workspace-doctor` (`.dadaia/**`) | a three-tier specialization chain over `.dadaia/`: doctor is the general surface, handoff dispatch narrows to `.dadaia/handoff/**`, the emitter narrows further to the JSON artifact itself — pre-existing, out of R2 scope |
 
 A collision check (`tests/contract/test_rules_skills_map.py`, FR9/T-044-15 — the
 retired `lint-skill-collisions.py`'s replacement, gating every deploy) flags

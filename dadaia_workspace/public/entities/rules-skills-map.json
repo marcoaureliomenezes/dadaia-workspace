@@ -3,9 +3,9 @@
   "skill_md_line_ceiling": 500,
   "declared_overlaps": [
     ["dd-release-implement", "dadaia-task-manager"],
-    ["dd-audit-project", "dadaia-workspace-doctor"],
+    ["dd-audit-project", "dd-workspace-doctor"],
     ["dd-bug-registration", "dd-bug-fix"],
-    ["dadaia-handoff-emitter", "dd-manager-orchestration", "dadaia-workspace-doctor"]
+    ["dadaia-handoff-emitter", "dd-manager-orchestration", "dd-workspace-doctor"]
   ],
   "rows": [
     {
@@ -59,7 +59,7 @@
     {
       "topic": "The library surface",
       "section": "§8 The library surface",
-      "skills": ["dadaia-workspace-doctor"],
+      "skills": ["dd-workspace-doctor"],
       "justification": null
     },
     {
