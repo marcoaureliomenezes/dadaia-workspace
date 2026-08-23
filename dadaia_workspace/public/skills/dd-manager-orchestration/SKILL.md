@@ -1,5 +1,5 @@
 ---
-name: project-orchestration
+name: dd-manager-orchestration
 description: >
   Generic dispatch reference for project-manager and project-auditor agents.
   Defines the default public agent inventory, SDD stage inventory, dispatch
@@ -7,7 +7,7 @@ description: >
 applyTo: ".dadaia/handoff/**"
 ---
 
-# project-orchestration
+# dd-manager-orchestration
 
 > **Not an enforcement mechanism.** There is no workflow engine: the ordered SDD flow
 > (`DADAIA.md` §1) is agent-dispatched — carried out by dispatching the owning agent for

@@ -17,7 +17,7 @@ skills:
   - dadaia-workspace-spec-reviewer
   - dd-audit-project
   - dd-bug-registration
-  - project-orchestration
+  - dd-manager-orchestration
   - dadaia-handoff-emitter
   - dadaia-workspace-spec-navigator
   - dadaia-step0-memory-bootstrap
@@ -132,7 +132,7 @@ Scope defaults to all three unless `audit_scope` input restricts it.
 
 - `dadaia-workspace-spec-reviewer` — memory vs implementation diff protocol
 - `dd-audit-project` — memory-to-code diff algorithm; dead-code detection; 1–10 scoring rubric; dadaia CLI commands
-- `project-orchestration` — agent inventory; dispatch protocol; escalation ladder
+- `dd-manager-orchestration` — agent inventory; dispatch protocol; escalation ladder
 - `dadaia-handoff-emitter` — emit handoff JSON under `.dadaia/handoff/<ctx>/` after audit report
 
 Code structure inspection heuristics (layering rules, module boundary analysis) are embedded

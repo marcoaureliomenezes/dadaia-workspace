@@ -5,7 +5,7 @@
     ["dd-release-implement", "dadaia-task-manager"],
     ["dd-audit-project", "dadaia-workspace-doctor"],
     ["dd-bug-registration", "dd-bug-fix"],
-    ["dadaia-handoff-emitter", "project-orchestration", "dadaia-workspace-doctor"]
+    ["dadaia-handoff-emitter", "dd-manager-orchestration", "dadaia-workspace-doctor"]
   ],
   "rows": [
     {
@@ -95,7 +95,7 @@
     {
       "topic": "Who does what (dispatch)",
       "section": "§2 Who does what",
-      "skills": ["project-orchestration"],
+      "skills": ["dd-manager-orchestration"],
       "justification": null
     },
     {
