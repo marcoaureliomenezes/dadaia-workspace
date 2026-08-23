@@ -188,6 +188,26 @@ is no longer archive-only.
   change: "first CONTEXT.md for dadaia-workspace seeded with the five known homonyms (scaffold, sentinel, quarantine, context, workflow) resolved to one canonical sense each; the inline homonym notes in dadaia-test-stewardship and the stewardship-relocation note are replaced by pointers to it (placement root vs specs/memory settled in grill-me)"
 ```
 
+### dadaia-router
+- **Title:** dadaia-router — user-invoked entry point: one name to remember instead of nineteen; maps the main flow (Arm A), the on-ramps (Arm B, audit) and the standalone skills, and decides at phase boundaries
+- **Opened:** 2026-08-23
+- **Status:** candidate
+- **Description:** An operator (or a PM session) should need to remember **one** skill name. `dadaia-router` is user-invoked (`disable-model-invocation: true` — its description is not loaded into every agent's catalogue) and, given a plain-language demand, answers *where am I in the flow and which skill operates the next step*: the **main flow** — Arm A: `dd-backlog-definition → dd-release-definition → dd-release-implement (incl. closure) → dd-audit-project`; the **on-ramps** — Arm B: `dd-bug-registration → dd-bug-fix (→ dd-diagnose)`; audit: `dd-audit-project`; and the **standalone** skills (`dadaia-grill-me`, `dadaia-gitflow`, `dadaia-cli`, `dadaia-test-stewardship`, the AI-harness skill, `dd-architecture-survey`). It carries a disclosed `PHASE-BOUNDARIES.md`: the exact decision to make at each boundary (backlog→release: grill done?; definition→implementation: trio Aprovado + milestone (a) pushed?; alpha→rc: qa review committed?; ship→closure: trio APPROVE + memory→CLOSURE→archive order). The router replaces nothing and restates no law — it points, using the `rules-skills-governance-map` rows as its table, so it can never drift from DADAIA.md. Reference: `mattpocock/skills/skills/engineering/ask-matt/` (`SKILL.md` + `PHASE-BOUNDARIES.md`). Governance: maps to the DADAIA.md §1 bold topic "The flow — the mandatory default" — the one skill for that topic (the `dd-*` family maps to §1's stages individually; the router is the §1 index). **Audit roadmap hint (not a disposition):** R3.
+- **Provenance:** operator ratification (2026-08-23) of the research report `.dadaia/reports/dadaia-workspace/claude-code/2026-08-23T183323Z-skills-audit-vs-reference/` (handoff `.dadaia/handoff/dadaia-workspace/2026-08-23T183323Z-claude-code-skills-audit-vs-reference.handoff.json`), section D "new skills proposed" — ruled to the backlog while sections A–C fold into release v0.4.4; relates-to `core-skills-consolidation` and `rules-skills-governance-map` (both CONSUMED by v0.4.4) and to the governance rule "every skill maps to one DADAIA.md bold topic"; roadmap placement R3 (hint)
+- **Intents:**
+```yaml
+- subject:
+    kind: doc
+    ref: dadaia_workspace/public/skills/dadaia-router/SKILL.md
+    surface: new
+  change: "new user-invoked core skill (disable-model-invocation): demand → current arm/stage → next skill to call; main flow (Arm A), on-ramps (Arm B, audit), standalone list; table generated from / checked against the rules-skills-governance-map rows; PHASE-BOUNDARIES.md disclosed with the decision at each boundary; adapted from mattpocock/skills/skills/engineering/ask-matt"
+- subject:
+    kind: doc
+    ref: dadaia_workspace/public/data/DADAIA.md#§9 Where to look next
+    surface: new
+  change: "skills row names dadaia-router as the single entry name for the flow; no other law text changes"
+```
+
 
 ## LEDGER
 
