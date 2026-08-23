@@ -108,6 +108,26 @@ is no longer archive-only.
   change: "reproduce/RED/root-cause steps become an operative dependency — Call the Skill tool with \"dd-diagnose\" — instead of restating the method; dd-bug-fix keeps only the hotfix lifecycle (branch, resolved event, commit)"
 ```
 
+### dadaia-codebase-design
+- **Title:** dadaia-codebase-design — model-invoked reference vocabulary (seam, deep module, deletion test, adapter, locality, replace-don't-layer) shared by engineer, architect, reviewer and QA; replaces architect-core-workflow
+- **Opened:** 2026-08-23
+- **Status:** candidate
+- **Description:** Give every agent that touches code the **same design vocabulary** so reviews, fixes and architecture findings speak one language: *seam* (where a test or a replacement can be inserted without editing the module), *deep module* (small interface, large implementation), *deletion test* ("if this module vanished, what would break and would anyone notice?" — apply it to the module you are about to grow), *adapter* (translate at the boundary, never leak the foreign shape inward), *locality* (what changes together lives together), *replace-don't-layer* (a fix that wraps the old path instead of replacing it is a layer, and layers are how the bug loop grows). Delivered as a new model-invoked reference skill `dadaia-codebase-design` with disclosed companion files (deepening procedure; design-it-twice: sketch two shapes before committing to one). It **replaces** `architect-core-workflow` (retired): the old "WebSearch for existing solutions" step becomes "apply the deletion test to the module you are about to grow". Users: `software-engineer`, `software-architect`, `code-reviewer`, `qa-engineer` — each persona points to the skill instead of carrying its own partial vocabulary. Reference: `mattpocock/skills/skills/engineering/codebase-design/` (`SKILL.md` + `DEEPENING.md` + `DESIGN-IT-TWICE.md`). Governance: maps to the DADAIA.md §6 bold topic "Root cause, always" jointly with the quality bar, or to a §2 architecture row — the exact single topic is a grill-me question. **Audit roadmap hint (not a disposition):** R3 — "vocabulary and survey".
+- **Provenance:** operator ratification (2026-08-23) of the research report `.dadaia/reports/dadaia-workspace/claude-code/2026-08-23T183323Z-skills-audit-vs-reference/` (handoff `.dadaia/handoff/dadaia-workspace/2026-08-23T183323Z-claude-code-skills-audit-vs-reference.handoff.json`), section D "new skills proposed" — ruled to the backlog while sections A–C fold into release v0.4.4; relates-to `core-skills-consolidation` and `rules-skills-governance-map` (both CONSUMED by v0.4.4) and to the governance rule "every skill maps to one DADAIA.md bold topic"; roadmap placement R3 (hint)
+- **Intents:**
+```yaml
+- subject:
+    kind: doc
+    ref: dadaia_workspace/public/skills/dadaia-codebase-design/SKILL.md
+    surface: new
+  change: "new model-invoked reference skill: the shared vocabulary (seam, deep module, deletion test, adapter, locality, replace-don't-layer) in a short SKILL.md, with DEEPENING and DESIGN-IT-TWICE disclosed as sibling files; adapted from mattpocock/skills/skills/engineering/codebase-design"
+- subject:
+    kind: doc
+    ref: dadaia_workspace/public/skills/architect-core-workflow/SKILL.md
+    surface: new
+  change: "retire — delete the folder; software-architect, software-engineer, code-reviewer and qa-engineer personas point to dadaia-codebase-design; the WebSearch-for-existing-solutions step is replaced by the deletion test"
+```
+
 
 ## LEDGER
 
