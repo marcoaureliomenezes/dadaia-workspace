@@ -278,7 +278,7 @@ long is disclosed to a sibling file in the same folder.
 
 ---
 
-- [ ] **T-044-06 — FR3: invert the chokepoint to v2**
+- [-] **T-044-06 — FR3: invert the chokepoint to v2**
 
 **Owner role:** software-engineer · **Commit:**
 `fix(T-044-06): feature branches are pushable, develop and main are PR-only`
