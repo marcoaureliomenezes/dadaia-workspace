@@ -12,7 +12,7 @@ tools:
   - Grep
   - Write
 skills:
-  - dadaia-cli
+  - dd-cli-library
   - dadaia-handoff-emitter
   - dadaia-workspace-spec-navigator
   - dadaia-step0-memory-bootstrap

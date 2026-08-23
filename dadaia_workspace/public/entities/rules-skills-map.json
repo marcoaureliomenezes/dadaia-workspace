@@ -77,7 +77,7 @@
     {
       "topic": "Use the workspace venv (CLI)",
       "section": "§8 The library surface",
-      "skills": ["dadaia-cli"],
+      "skills": ["dd-cli-library"],
       "justification": null
     },
     {

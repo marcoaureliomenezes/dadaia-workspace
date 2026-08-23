@@ -13,7 +13,7 @@ tools:
   - Write
   - Agent
 skills:
-  - dadaia-cli
+  - dd-cli-library
   - dd-grill-me
   - dadaia-workspace-manager
   - dadaia-workspace-spec-navigator

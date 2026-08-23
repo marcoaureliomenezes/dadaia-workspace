@@ -13,7 +13,7 @@ tools:
   - Write
   - Agent
 skills:
-  - dadaia-cli
+  - dd-cli-library
   - dadaia-workspace-spec-reviewer
   - dd-audit-project
   - dd-bug-registration

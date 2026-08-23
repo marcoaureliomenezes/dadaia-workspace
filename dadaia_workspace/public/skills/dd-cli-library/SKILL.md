@@ -1,5 +1,5 @@
 ---
-name: dadaia-cli
+name: dd-cli-library
 description: >
   Use this skill whenever you need to operate the dadaia-workspace CLI — open the
   panel, bind a Spec Context, author backlog/release artifacts, check state, register
@@ -9,9 +9,9 @@ description: >
   carry no grant — see §Reachability below.
 ---
 
-# Skill: dadaia-cli
+# Skill: dd-cli-library
 
-The `dadaia` CLI is the single control surface for the workspace. It is **self-documenting** — discover, don't guess.
+The `dadaia` CLI is the single control surface for the workspace. It is **self-documenting** — discover, don't guess. Everything below is a **cache of expensive lookups**, not a transcription of the live command tree: when the table and `--help` disagree, `--help` wins — treat a stale cache entry as a defect to fix at the source, not to work around.
 
 ## Reachability (FR5, per-agent decision — derivation surface)
 
@@ -19,7 +19,7 @@ A CLI-literacy grant to an agent with no `Bash` tool is inert: it can never run 
 command. The rule is mechanical, not a blanket grant: **grant iff `Bash` is in the
 agent's `tools:` list.**
 
-| Agent | `Bash`? | Grant `dadaia-cli`? |
+| Agent | `Bash`? | Grant `dd-cli-library`? |
 |---|---|---|
 | `ai-engineer` | yes | yes |
 | `code-reviewer` | yes | yes |
@@ -50,17 +50,21 @@ fails loud on drift (`--self-test` proves both directions).
 
 ## Command groups (`dadaia <group> --help` for detail)
 
+Verified against the live command tree, not transcribed from memory — a verb this
+table names is a verb `dadaia <group> --help` still shows; a verb the table omits
+still exists, discoverable the same way.
+
 | Group | What |
 |---|---|
 | `context` | Spec Context Projects: `list show create alive dead bind release heartbeat delete` |
-| `specs` | SDD structure: `doctor upgrade init hotfix release segment` |
+| `specs` | SDD structure: `doctor upgrade init release segment` |
 | `capabilities` / `certify` / `reconcile` | Discover, prove, and converge the installed provider |
 | `bugs` | Event-sourced bug telemetry: `append status stats` |
 | `backlog` / `release` | Backlog + release entry management |
 | `reports` | Handoff/report inspection: `validate lint doctor status …` |
 | `server` | Dev-server port registry: `list next register release …` |
 | `ci` | Local CI-equivalent preflight + git-hook chokepoints |
-| `public` | Lib-asset projection: `stage install doctor` |
+| `public` | Lib-asset projection: `stage install list doctor` |
 | `doctor` / `migrate` | Diagnose+repair / migration helpers |
 | `init export import clean` | Workspace bootstrap + portability |
 

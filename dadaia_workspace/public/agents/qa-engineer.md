@@ -13,7 +13,7 @@ tools:
   - Glob
   - Grep
 skills:
-  - dadaia-cli
+  - dd-cli-library
   - dadaia-handoff-emitter
   - dadaia-workspace-spec-navigator
   - dadaia-task-manager
