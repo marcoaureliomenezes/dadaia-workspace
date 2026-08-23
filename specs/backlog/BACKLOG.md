@@ -189,6 +189,42 @@ is no longer archive-only.
   change: "the eight agents' branch/push rows (ai-engineer, project-manager, qa-engineer, software-engineer, code-reviewer, security-reviewer, product-engineer + registry.json mandates) collapse to one pointer line each into the DADAIA.md gitflow section / dadaia-gitflow skill"
 ```
 
+### rules-skills-governance-map
+- **Title:** rules-skills-governance-map — a JSON-controlled map from DADAIA.md rule sections to the skill(s) that operate them, declared in constitution.md, linted for duplication
+- **Opened:** 2026-08-23
+- **Status:** candidate
+- **Description:** We force agent behaviors with a set of rules (always-on, concentrated in `DADAIA.md`) and a set of skills (on-demand operational protocols). To keep that set manageable and governed there must be an explicit **map of rule sections → skills**. Gitflow is the first example (the `DADAIA.md` gitflow section ↔ `dadaia-gitflow`, backlog `gitflow-contract-v2-consolidation`), but the map applies to every behavior the workspace enforces. This is core/architectural and must live in `constitution.md` of dadaia-workspace (the scaffold `dadaia_workspace/public/scaffold/constitution.md`, as a new core-law section). The map itself is controlled through a JSON owned by dadaia-workspace (location to decide in definition — e.g. under `dadaia_workspace/public/entities/` next to `registry.json`, or `dadaia_workspace/public/schemas/` with a versioned schema). Goal: harmony between what is a rule and what is a skill, no duplication, no two skills repeating the same content, governance over the core rules and skills. Each `DADAIA.md` section maps to exactly 1 skill (2 only if mapped and justified in the map itself). Candidate initial rows from the 2026-08-23 scan (`.dadaia/tmp/claude/20260823/gitflow-inventory.md` §F): §gitflow ↔ `dadaia-gitflow`; §6 tests ↔ `dadaia-test-stewardship`; §5 tasks ↔ `dadaia-task-manager`; §5 backlog ↔ `dd-backlog-definition`; §4 emission ↔ `dadaia-handoff-emitter`; §7 library surface ↔ `dadaia-workspace-doctor`; CLI ↔ `dadaia-cli`; §1 Arm B ↔ `dd-bug-registration` / `dd-bug-fix`; §5 releases ↔ `dd-release-definition` / `dd-release-implement` / `dd-release-closure`. A lint (extending `dadaia_workspace/public/scripts/lint-skill-collisions.py` or a new sibling script run at projection time, `--self-test` proving both directions) must fail when a `DADAIA.md` section has no mapped skill, a skill is mapped to no section, or two skills restate the same section's content. `DADAIA.md` §9 ("where to look next") points to the map rather than listing skills ad hoc.
+- **Provenance:** operator request, 2026-08-23, same session as `gitflow-contract-v2-consolidation`; depends-on / relates-to `gitflow-contract-v2-consolidation` (first consumer of the map)
+- **Intents:**
+```yaml
+- subject:
+    kind: doc
+    ref: dadaia_workspace/public/scaffold/constitution.md#rules-to-skills-governance-map
+    surface: new
+  change: "new constitution section declaring the rules->skills map as core law: every DADAIA.md section maps to exactly one operating skill (two only when the map row justifies it), the JSON map is the single controlled source, and the lint is the enforcer"
+- subject:
+    kind: doc
+    ref: dadaia_workspace/public/entities/rules-skills-map.json
+    surface: new
+  change: "new JSON map owned by dadaia-workspace (path settled in definition: entities/ or schemas/) — rows of {dadaia_section, skills[], justification}, versioned, with its JSON schema; seeded with the candidate rows from the 2026-08-23 scan"
+- subject:
+    kind: code
+    ref: dadaia_workspace/public/scripts/lint-skill-collisions.py#DECLARED_OVERLAPS
+  change: "extend this projection-time lint (or add a sibling run alongside it) to read the JSON map and fail when a DADAIA.md section has no mapped skill, a skill maps to no section, or two skills restate the same section's content; --self-test proves both directions"
+- subject:
+    kind: catalog
+    ref: agentic-entities
+  change: "the rules->skills map becomes a governed entity set next to personas/behaviors/rules: registry and panel Entities surface expose which skill operates which DADAIA.md section"
+- subject:
+    kind: doc
+    ref: memory/product/agents/agentic-entities.md#The derivation law
+  change: "derivation law gains the rule->skill mapping invariant (each DADAIA.md section -> one operating skill, duplication forbidden, lint-enforced)"
+- subject:
+    kind: doc
+    ref: memory/architecture.md#Public assets
+  change: "DADAIA.md section 9 and the public-assets architecture note point to the JSON map as the authority for which skill operates which rule section"
+```
+
 ## LEDGER
 
 - push-range-denylist-scan · DELIVERED · v0.9.0 · 2026-08-14
