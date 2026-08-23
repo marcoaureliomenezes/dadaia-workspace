@@ -23,7 +23,7 @@ to). Declared subset, activation precedence: `dd-backlog-definition` §7 (canoni
 ## 2. Branch and concurrency
 
 Run on `hotfix/{M.m.p}` at the next PATCH, cut from `develop` — full stage-contract row:
-`dadaia-gitflow` (`bug-fix/hotfix`), referenced here, not restated.
+`dd-gitflow-default` (`bug-fix/hotfix`), referenced here, not restated.
 
 **Concurrency (ADR #10/E-4 — advisory presence only).** No reservation marker exists for
 bugs. Races are surfaced, never blocked (NO-LOCKS DOCTRINE): the SDD gate's presence

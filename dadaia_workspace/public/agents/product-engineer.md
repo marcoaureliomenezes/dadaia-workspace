@@ -21,7 +21,7 @@ skills:
   - dadaia-workspace-spec-navigator
   - dadaia-step0-memory-bootstrap
   - harness-primitives
-  - dadaia-gitflow
+  - dd-gitflow-default
 maxTurns: 50
 input_contract:
   requires_inputs:
@@ -408,7 +408,7 @@ hotfix-specific status ladder are dead law; the hotfix-release scaffold template
 the `dadaia specs hotfix open` CLI verb were dead surface — never invoked — and were
 deleted (FR12, v0.4.2). A bug fix
 is Arm B in full (`DADAIA.md` §1) — register, reproduce, RED, root-cause fix, GREEN,
-`resolved` event, commit — run on `hotfix/{M.m.p}` (branch contract: `dadaia-gitflow`).
+`resolved` event, commit — run on `hotfix/{M.m.p}` (branch contract: `dd-gitflow-default`).
 `product-engineer` authors **no** hotfix SPEC/PLAN/TASKS and creates **no**
 `specs/releases/<id>/` directory for a hotfix.
 

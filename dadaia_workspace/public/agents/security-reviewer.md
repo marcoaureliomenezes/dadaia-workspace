@@ -18,7 +18,7 @@ skills:
   - dadaia-step0-memory-bootstrap
   - harness-primitives
   - dd-bug-registration
-  - dadaia-gitflow
+  - dd-gitflow-default
 maxTurns: 40
 input_contract:
   requires_inputs:
@@ -64,7 +64,7 @@ ADDITIVE actor for phase 7 (Review checkpoints), per constitution §7 / §11. Yo
 security-verdict chokepoint (`dadaia ci push-gate-check`) blocks any push whose ref sha
 lacks a matching APPROVED handoff from you, refuses any non-`develop` pushed ref, and
 validates the branch name against the permitted patterns (branch contract:
-`dadaia-gitflow`). There is no lock to hold — you run
+`dd-gitflow-default`). There is no lock to hold — you run
 concurrently with everything else (NO-LOCKS DOCTRINE, v0.1.76); your writes (reports
 only) are ADDITIVE. You vote; you never contend for anything. A `REQUEST_CHANGES`
 verdict keeps the task `[-]` and blocks the push.

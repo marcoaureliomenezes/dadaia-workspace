@@ -32,7 +32,7 @@ releases/
   segment: <alpha-N|rc-N>   # optional — present for segmented releases
   phase: <DISCOVERY|SPEC|PLAN|TASKS|IMPLEMENTATION|CLOSURE|ARCHIVED>
   ```
-  The branch, commit and push contract for each SDD stage is the `dadaia-gitflow`
+  The branch, commit and push contract for each SDD stage is the `dd-gitflow-default`
   skill — this file states only the specs-directory layout.
 
 ## ACTIVE.md Management

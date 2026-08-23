@@ -61,7 +61,7 @@ the same commit or the operator stops the release.
 
 ## 5. Push checkpoint (reference)
 
-Branch, merge-milestone and push mechanics: `dadaia-gitflow`. After every push or PR,
+Branch, merge-milestone and push mechanics: `dd-gitflow-default`. After every push or PR,
 watch CI to green — read the failing log, fix the cause, push again, keep watching.
 
 ## 6. Test-stewardship touchpoints (reference)

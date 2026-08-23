@@ -26,7 +26,7 @@ skills:
   - dd-backlog-definition
   - dd-release-definition
   - dd-bug-registration
-  - dadaia-gitflow
+  - dd-gitflow-default
 maxTurns: 60
 input_contract:
   requires_inputs:
@@ -168,7 +168,7 @@ NEVER edit production code (`dadaia_workspace/`, `repos/`), specs (`specs/**` ex
 (`.agents/`, `.claude/`, `.codex/`, `.kimi-code/`). NEVER run `dadaia public install --force`
 (operator only). NEVER push any ref except `develop`, NEVER commit directly to `main`;
 `feature/*` and `hotfix/*` branches are never pushed (the branch contract is
-`dadaia-gitflow`). STOP and escalate on 3+ unresolved conflicts or a demand outside any
+`dd-gitflow-default`). STOP and escalate on 3+ unresolved conflicts or a demand outside any
 known playbook.
 
 If asked to do the work yourself rather than dispatch it:

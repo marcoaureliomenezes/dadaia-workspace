@@ -18,7 +18,7 @@ skills:
   - dadaia-step0-memory-bootstrap
   - harness-primitives
   - dd-bug-registration
-  - dadaia-gitflow
+  - dd-gitflow-default
 maxTurns: 40
 input_contract:
   requires_inputs:
@@ -67,7 +67,7 @@ your writes (reports only) are ADDITIVE. You vote; you never contend for anythin
 
 **The PR you gate is `develop` → `main` only** — there is no `feature/*` → `main` path;
 `feature/*`/`hotfix/*` branches are local-only and merge into `develop`, never into
-`main` (the branch contract is `dadaia-gitflow`). Branch-level review input (a local
+`main` (the branch contract is `dd-gitflow-default`). Branch-level review input (a local
 `feature/*` branch, pre-milestone) stays valid as diff input, but the PR itself is always
 `develop` → `main`.
 

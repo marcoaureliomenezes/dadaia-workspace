@@ -72,7 +72,7 @@ Only now write the release SPEC (Draft), with:
 Definition runs on `feature/{M.m.p}`. Once SPEC + PLAN + TASKS are all `Aprovado`, that
 is **milestone (a)**: merge `feature/{M.m.p}` into local `develop`, run the diff-based
 security review, and push `develop` — a mandatory obligation, not optional cleanup (the
-branch/commit/push mechanics are the `dadaia-gitflow` skill's contract).
+branch/commit/push mechanics are the `dd-gitflow-default` skill's contract).
 
 Then continue the normal SDD flow (PLAN → TASKS → implementation), with reviews
 per the segment/release cadence (alpha = qa-only; rc-ship = qa + code + security).

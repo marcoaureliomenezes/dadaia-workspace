@@ -23,7 +23,7 @@ skills:
   - dd-release-implement
   - dd-bug-fix
   - dd-bug-registration
-  - dadaia-gitflow
+  - dd-gitflow-default
   - dadaia-test-stewardship
 maxTurns: 60
 input_contract:
@@ -249,7 +249,7 @@ guess and never widen scope.
 | `specs/**` | Never (product-engineer) |
 | E2E test directories | Never (qa-engineer) |
 | `.claude/`, `.agents/`, `.codex/`, `.kimi-code/` (lib-originated) | Never |
-| Any ref except `develop` | Never push it — `feature/*`/`hotfix/*` branches are local-only, `main` is never committed or pushed to directly (the branch contract is `dadaia-gitflow`) |
+| Any ref except `develop` | Never push it — `feature/*`/`hotfix/*` branches are local-only, `main` is never committed or pushed to directly (the branch contract is `dd-gitflow-default`) |
 
 ---
 

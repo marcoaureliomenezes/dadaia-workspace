@@ -134,7 +134,7 @@ squash on PR merge per-repo policy.
 > closing: only flip to `[x]` after QA/code/security approve the implementation
 > handoff. No exception.
 
-Which branch a reservation and its commits land on is the `dadaia-gitflow` skill's
+Which branch a reservation and its commits land on is the `dd-gitflow-default` skill's
 contract, not this one — a task is reserved and worked on whichever branch the active
 SDD stage runs on.
 

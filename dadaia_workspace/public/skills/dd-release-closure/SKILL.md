@@ -22,7 +22,7 @@ only ship steps (merge to `develop`, diff security review, push, PR to `main`) f
 archive. `dd-release-implement` §4 states the same order.
 
 **Finalization order: memory → CLOSURE → sweep → archive**, in one commit on `develop`
-that rides the next push (the branch/commit mechanics are the `dadaia-gitflow` skill's
+that rides the next push (the branch/commit mechanics are the `dd-gitflow-default` skill's
 contract): with the code review already `APPROVE`d, update the memory atoms first, write
 `CLOSURE.md` next (it records which atoms changed and finalizes its evidence pointers),
 run the artifact GC sweep (below) once those pointers are final, then move the release
