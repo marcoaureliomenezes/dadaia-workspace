@@ -244,6 +244,47 @@ is no longer archive-only.
 ```
 
 
+### cli-help-architecture-and-session-injection
+- **Title:** cli-help-architecture-and-session-injection — help docker-style como fonte única da superfície da CLI + injeção do digest de help por hook em toda sessão (startup/resume/compact), aposentando a skill dadaia-cli
+- **Opened:** 2026-08-23
+- **Status:** candidate
+- **Description:** A skill `dadaia-cli` transcreve manualmente a superfície da CLI e está estruturalmente condenada a envelhecer — medição 2026-08-23 (CLI v0.4.3, 68 leaf commands reais): a skill cobre 36/68 verbos (53%), documenta 1 verbo fantasma (`specs hotfix` — hard-fail para quem segue o mapa), lista `specs release`/`specs segment` como leaves quando são grupos, omite 4 grupos inteiros (`repos`, `academy`, `memory`, `tmp`) e custa ~1.700 tokens por load; o problema é maior que ela — ~120 transcrições `dadaia <verbo>` espalhadas por 15 das 21 skills públicas (pior: `dadaia-workspace-manager`, 48 menções, incluindo invocação comprovadamente errada de `academy create`). Proposta do operador (modelo docker/cobra — help gerado da própria árvore de comandos, fonte única, nunca transcrito): (A) **help forte na CLI** — a árvore Typer já existe (23 apps) mas usa 0× `rich_help_panel`, 0× `epilog`, e 27/68 leaves têm docstring de uma linha; adotar agrupamento Common/Management no help raiz, `Examples:` via epilog nos leaves de alto tráfego, `rich_markup_mode` e `no_args_is_help` em todo grupo, e um guard de qualidade de help no CI; (B) **digest derivado, nunca escrito à mão** — novo verbo (ex. `dadaia help tree --digest`) que introspecta a árvore Click/Typer e emite um digest compacto (~root+groups; dump completo mede ~33.5k tokens — inviável; alvo do digest ≤4k) gravado version-stamped em `.dadaia/agentic/`; regenerado por install/reconcile/doctor — NUNCA no fire do hook (lei de latência: hook não importa o container); (C) **injeção por hook** — `ctx_inject` (autoridade única já provada, cross-harness, sentinel exactly-once, fail-open) passa a anexar o digest como payload bind-independent; Claude ganha os matchers SessionStart `startup|resume` que hoje só o Codex tem (Claude tem só `compact|clear`; sessão nova recebe zero até o 1º prompt); Kimi segue via UserPromptSubmit/marker de compact; Codex headless permanece AGENTS.md-only (fallback documentado); (D) **descomissionar** a skill `dadaia-cli` preservando o que o --help não deriva (semântica de bind/DADAIA_CONTEXT, sequência capabilities→reconcile→certify, "não há workflow engine", lei do venv) nos epilogs dos próprios comandos e/ou no DADAIA.md, e varrer as ~105 transcrições restantes das outras skills para "consulte `dadaia <grupo> --help`".
+- **Provenance:** operator request 2026-08-23 ("skill constantemente desatualizada; estratégia de --help robusta tipo docker + hook que injeta o help na sessão nova e pós-compact") — pesquisa quantitativa desta data em `.dadaia/tmp` da sessão; números-chave conferidos ao vivo contra a CLI instalada
+- **Intents:**
+```yaml
+- subject:
+    kind: code
+    ref: dadaia_workspace/cli/main.py#app
+  change: "docker-style help architecture - rich_help_panel grouping (Common vs Management) no help raiz, rich_markup_mode configurado, no_args_is_help em todos os grupos"
+- subject:
+    kind: cli
+    ref: capabilities
+  change: "novo verbo de dump derivado da arvore Typer/Click (ex. dadaia help tree --digest) emitindo digest compacto version-stamped em .dadaia/agentic/ (alvo <=4k tokens; capabilities --json hoje cobre so 14/68 leaves e nao substitui)"
+- subject:
+    kind: code
+    ref: dadaia_workspace/hooks/ctx_inject.py#_emit_bootstrap
+  change: "anexar o digest de help como payload bind-independent do bootstrap (rides _generic_preflight tambem em sessao sem bind); hook apenas LE o artefato pre-gerado, nunca gera"
+- subject:
+    kind: code
+    ref: dadaia_workspace/hooks/ctx_inject.py#main
+  change: "reinjetar o digest nos eventos SessionStart (startup, resume, compact, clear) com o mesmo sentinel exactly-once; fallback quando o digest esta ausente ou com stamp de versao divergente - instruir dadaia doctor"
+- subject:
+    kind: code
+    ref: dadaia_workspace/infrastructure/runtime_config.py#_CLAUDE_MATCH_ALL
+  change: "claude_settings ganha matchers SessionStart startup|resume (paridade com codex_hooks, que ja os tem); kimi mantem canal UserPromptSubmit/compact-marker"
+- subject:
+    kind: code
+    ref: dadaia_workspace/features/capabilities/service.py#build_capabilities
+  change: "regeneracao do digest acoplada a install/reconcile/doctor --fix quando distribution_version != stamp do digest"
+- subject:
+    kind: catalog
+    ref: public-asset-distribution
+  change: "aposentar a skill dadaia-cli (dadaia_workspace/public/skills/dadaia-cli/); idioms nao-derivaveis do help (bind/DADAIA_CONTEXT, capabilities->reconcile->certify, no-workflow-engine, lei do venv) migram para epilogs dos comandos e/ou DADAIA.md; varrer ~105 transcricoes de verbos nas outras 14 skills (pior ofensor dadaia-workspace-manager, 48 mencoes)"
+- subject:
+    kind: cli
+    ref: ci preflight
+  change: "guard de qualidade de help no preflight - falha quando um leaf command nasce sem docstring multi-linha/exemplo ou quando o digest esta stale vs a arvore de comandos (equivalente estrutural do lint de reachability que a skill carregava)"
+```
 ## LEDGER
 
 - push-range-denylist-scan · DELIVERED · v0.9.0 · 2026-08-14
