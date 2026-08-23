@@ -134,6 +134,61 @@ is no longer archive-only.
   change: "panel card lists main + associated repos per context"
 ```
 
+### gitflow-contract-v2-consolidation
+- **Title:** gitflow-contract-v2-consolidation — one DADAIA.md section + one skill (`dadaia-gitflow`) as the sole home of the git/gitflow contract; feature/{M.m.p} cut from main, develop and main advance only via PR, one live feature branch at a time, deleted after deploy
+- **Opened:** 2026-08-23
+- **Status:** candidate
+- **Description:** The git/gitflow contract is restated today in at least fourteen places and contradicts itself in at least two; the operator's v2 contract (2026-08-23) replaces it and collapses every restatement into exactly one always-on law section plus one operational skill. **The v2 contract, faithful in substance:** (1) the `dadaia-gitflow` skill is KEPT and becomes the operational home — it governs clearly how gitflow works, avoids ambiguity, stale-branch starts and merge conflicts, teaches how to start work by checking the remote branches, and carries one clear branch-creation rule. (2) Branch name `feature/{version}`, version = `major.minor.patch` with no prefix (e.g. `feature/1.0.0`). (3) The `main` / `develop` / `feature/{version}` strategy is kept; work always merges into `develop`. (4) An agent NEVER creates or works on any branch other than `feature/{version}`; it may pull, merge, open PRs, and check out `develop` and `main`; any other branch kind exists only on an explicit operator request. (5) Explicit instructions against stale branches and slop branches (many branches without a pattern); naming and flow consistency. (6) `main` is updated only by a PR coming from `develop`; `develop` is updated by the agent only via PR (from `feature/{version}`). (7) `feature/{version}` is ALWAYS created from `main` — which forces the previous version to be released on `main` before a new feature branch can exist. (8) Start-of-work protocol: fetch; check and diff `main` vs `develop`; identify which `feature/{version}` is being worked; detect whether a `feature/{version}` already exists that was created after `develop` was last updated. (9) Strong explicit rules: never two branches with the same `feature/{version}` at the same time; a `feature/{version}` is created only for a version incremented from `main` — the deploy of `{version}` on `main` is mandatory before `feature/{version+1}` (or `hotfix/{version+1}`) may be created; after the deploy of `{version}` on `main`, `feature/{version}` MUST be deleted. (10) The rules are agentic (a DADAIA.md section + the skill) and always suggest to the operator that they be implemented in CI/CD, so the process is deterministic and does not depend on agent or operator memory. **Scope includes the consolidation.** The 2026-08-23 scan (`.dadaia/tmp/claude/20260823/gitflow-inventory.md`) found the branch model restated in ≥14 places — DADAIA.md §3/§5/§6, the `dadaia-gitflow` skill, two memory atoms (`sdd-gate-v3`, `sdd-bug-backlog-governance`), the `pre-push-ci-gate.sh` header comments, eight agents (ai-engineer, project-manager, qa-engineer, software-engineer, code-reviewer, security-reviewer, product-engineer, plus `entities/registry.json` mandates), `dd-release-definition`, `dd-release-implement`, `dd-release-closure`, `dd-bug-fix`, `dd-bug-registration` — and these inconsistencies: the code regex in `features/chokepoints/service.py` requires `feature/v…` while the law, the skill and every real branch use no `v`; `dd-release-implement` L43 says "push implementation commits to `feature/{M.m.p}`", contradicting the local-only rule; remote slop branches survive on origin (`chore/*` ×7, `feature/pi-fourth-harness-v1`, `feature/v0.1.10`, six old `feature/*` never deleted); local `hotfix/0.4.3` was never deleted. Target state: **1 DADAIA.md section + 1 skill** (a second skill later only if mapped and justified through the rules→skills governance map, backlog `rules-skills-governance-map`); every other surface becomes a one-line pointer. Enforcement surface impacted: `features/chokepoints/service.py` (`_PERMITTED_BRANCH_RES` loses the `v`; the develop-only push policy inverts — allow `feature/{M.m.p}` pushes, refuse direct `develop`/`main` pushes), `.github/workflows/ci.yml` `pr-source-guard` (+ a develop-accepts-feature-only guard), the `sdd-gate-v3` and `sdd-bug-backlog-governance` memory atoms, the agents' branch/push rows, and the dd-* skills. **Open questions for the mandatory grill-me (not decided here):** (Q1) does `hotfix/{v+1}` survive as an operator-requested branch kind, or does Arm B also run on `feature/{v+1}`? (Q2) with `develop` PR-only, does milestone (a) (definition `Aprovado`) also become a PR feature→develop, or only ship? (Q3) security-review delta: does the PR diff feature→develop replace `origin/develop..develop`? (Q4) is the feature branch pushed continuously (for its PR), and does CI run on `feature/*` pushes?
+- **Provenance:** operator request, 2026-08-23 (session transcript; scan evidence at workspace-relative `.dadaia/tmp/claude/20260823/gitflow-inventory.md`), triggered by the standing order of permanent architecture review oriented by bug history
+- **Intents:**
+```yaml
+- subject:
+    kind: doc
+    ref: dadaia_workspace/public/data/DADAIA.md#gitflow
+    surface: new
+  change: "rewrite DADAIA.md §3 git chokepoints + §5 Branches/Hotfixes + §6 Push green into ONE gitflow section carrying the v2 contract (feature/{M.m.p} from main, develop and main via PR only, one live feature branch, delete after deploy, start-of-work protocol, CI/CD automation suggestion); every other DADAIA.md mention becomes a cross-reference"
+- subject:
+    kind: catalog
+    ref: public-asset-distribution
+  change: "rewrite dadaia_workspace/public/skills/dadaia-gitflow/SKILL.md to the v2 contract (start-of-work protocol, branch-creation rule, uniqueness + deletion rules, slop/stale-branch avoidance, always-suggest-CI/CD section); collapse dd-release-definition/implement/closure, dd-bug-fix, dd-bug-registration and the pre-push-ci-gate.sh header to pointers into that skill (fix dd-release-implement L43 push-to-feature contradiction)"
+- subject:
+    kind: code
+    ref: dadaia_workspace/features/chokepoints/service.py#_PERMITTED_BRANCH_RES
+  change: "drop the `v` prefix so the regex matches feature/{M.m.p} and hotfix/{M.m.p} exactly as the law, the skill and the real branches spell them"
+- subject:
+    kind: code
+    ref: dadaia_workspace/features/chokepoints/service.py#_PUSHABLE_BRANCH
+  change: "invert the push policy: feature/{M.m.p} becomes the pushable ref (to open its PR); direct pushes to develop and main are refused"
+- subject:
+    kind: code
+    ref: dadaia_workspace/features/chokepoints/service.py#push_gate_decision
+  change: "branch policy step refuses develop/main direct pushes and any ref outside feature/{M.m.p} (plus operator-requested kinds per grill-me Q1); the security-verdict delta follows the grill-me Q3 decision (PR diff feature->develop)"
+- subject:
+    kind: cli
+    ref: ci push-gate-check
+  change: "help text and decision messages state the v2 push policy; the corrected-command hint names the PR path instead of a develop push"
+- subject:
+    kind: doc
+    ref: memory/quality-assurance.md#CI
+  change: "ci.yml pr-source-guard kept for main<-develop; add a develop-accepts-feature-only guard (PR to develop must come from feature/{M.m.p}); CI triggers extend to feature/* pushes per grill-me Q4; atom rewritten to the v2 branch model"
+- subject:
+    kind: doc
+    ref: memory/product/sdd/sdd-gate-v3.md#Git Chokepoints
+  change: "push-boundary policy rewritten to v2 (feature pushable, develop/main PR-only, no `v` prefix); atom points to the DADAIA.md gitflow section instead of restating it"
+- subject:
+    kind: doc
+    ref: memory/product/sdd/sdd-bug-backlog-governance.md#Branches And Stage Placement
+  change: "branch model restatement collapses to a pointer to the DADAIA.md gitflow section; stage placement rows updated to feature-from-main and PR-only develop"
+- subject:
+    kind: doc
+    ref: memory/product/sdd/sdd-bug-backlog-governance.md#Merge Cadence
+  change: "two milestones re-expressed under PR-only develop per grill-me Q2 (PR at (a) and (b), or only at ship)"
+- subject:
+    kind: doc
+    ref: memory/architecture.md#Agent Surface
+  change: "the eight agents' branch/push rows (ai-engineer, project-manager, qa-engineer, software-engineer, code-reviewer, security-reviewer, product-engineer + registry.json mandates) collapse to one pointer line each into the DADAIA.md gitflow section / dadaia-gitflow skill"
+```
+
 ## LEDGER
 
 - push-range-denylist-scan · DELIVERED · v0.9.0 · 2026-08-14
