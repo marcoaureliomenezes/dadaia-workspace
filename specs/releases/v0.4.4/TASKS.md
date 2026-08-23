@@ -236,7 +236,7 @@ contract test pinning that none of them mutates a marker or a status token.
 
 ---
 
-- [-] **T-044-04 — FR1: one gitflow law section**
+- [x] **T-044-04 — FR1: one gitflow law section**
 
 **Owner role:** ai-engineer · **Commit:** `docs(T-044-04): one gitflow section in the law`
 
