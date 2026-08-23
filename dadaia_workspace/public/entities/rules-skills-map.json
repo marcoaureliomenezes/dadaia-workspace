@@ -30,8 +30,8 @@
     {
       "topic": "Releases",
       "section": "§6 Specs, tasks and memory",
-      "skills": ["dd-release-definition", "dd-release-implement", "dd-release-closure"],
-      "justification": "The law states Releases as one bold topic spanning pick, the mandatory grill, SPEC/PLAN/TASKS, implementation, and finalization (memory update -> CLOSURE -> archive) as a single continuous flow, not three separate bold topics. Definition, implementation, and closure are three lifecycle stages of that one topic, each with its own operational skill."
+      "skills": ["dd-release-definition", "dd-release-implement"],
+      "justification": "The law states Releases as one bold topic spanning pick, the mandatory grill, SPEC/PLAN/TASKS, implementation, and finalization (memory update -> CLOSURE -> archive) as a single continuous flow, not two separate bold topics. Definition is one lifecycle stage; dd-release-implement (FR10/G12) absorbs both implementation and finalization (memory update, CLOSURE, disposition sweep, artifact GC, archive) as one skill spanning the second stage."
     },
     {
       "topic": "Root cause, always",

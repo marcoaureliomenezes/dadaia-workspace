@@ -62,7 +62,7 @@ authority.
 | Bug (`specs/bugs/**`) | `Closed` |
 
 `DELIVERED`/`SUPERSEDED`/`RESOLVED`/`CONSUMED` carry the release id (`DELIVERED —
-v0.10.0`); `DEFERRED`/`REJECTED` carry a one-line reason. `dd-release-closure` and
+v0.10.0`); `DEFERRED`/`REJECTED` carry a one-line reason. `dd-release-implement` and
 `dd-audit-project` route their dispositions to these tokens by reference — this table
 is not repeated in either.
 
@@ -105,7 +105,7 @@ or discarded **before** it can become an `ACTIVE` entry.
 
 **Pre-approved intake.** An operator-ratified deferral taken during a release ("defer to
 backlog", recorded in the SPEC or at approval) is already-approved intake and is **not**
-re-adjudicated through a later intake report. `dd-audit-project` and `dd-release-closure`
+re-adjudicated through a later intake report. `dd-audit-project` and `dd-release-implement`
 apply this carve-out when they route a disposition — this is its one full statement.
 
 **Record-only vs actionable (FR6/R4).** Reviews record everything — never-silent holds,

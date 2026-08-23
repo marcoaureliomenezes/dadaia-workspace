@@ -90,7 +90,7 @@ reads this line. Two mechanisms actually execute consumption, at two different p
 | When | Executor | What it does |
 |---|---|---|
 | At definition, same commit as the SPEC | `project-manager`'s purge-on-pick (`dd-backlog-definition` §2) | Removes each declared slug from `## ACTIVE`, recording provenance in the SPEC |
-| At closure | `dd-release-closure`'s Disposition sweep | Adds a `## LEDGER` line and drops the `## ACTIVE` subsection for each fully-consumed slug (terminal disposition token vocabulary: `dd-backlog-definition` §2) |
+| At closure | `dd-release-implement`'s Disposition sweep | Updates the slug's `## LEDGER` line to its terminal token and drops the `## ACTIVE` subsection for each fully-consumed slug (terminal disposition token vocabulary: `dd-backlog-definition` §2) |
 
 Two mechanical backstops catch a slug that falls through either step: `backlog doctor`'s
 BL-STALE (an `ACTIVE` item already consumed/dispositioned) and `specs doctor`'s

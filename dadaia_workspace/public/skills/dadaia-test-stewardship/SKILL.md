@@ -76,7 +76,7 @@ Each LARGE that validated a feature either (a) yields file:line of the equivalen
 SMALL/MEDIUM coverage that now carries the assertion, or (b) is kept as the seam's
 single SENTINEL. Deleting coverage without the map is cheating; deleting it with the
 map is engineering. The demotion map — deleted LARGE → replacement file:line — is
-recorded in `CLOSURE.md` (`dd-release-closure` owns the exact block).
+recorded in `CLOSURE.md` (`dd-release-implement`'s closure steps own the exact block).
 
 ## E — Deletion criteria and the tombstone ban
 
@@ -178,7 +178,7 @@ workspace re-parameterizes without forking this doctrine.
 
 - Reservation and commit discipline for the agent executing a curation verdict: the
   `dadaia-task-manager` skill.
-- Where the demotion map lands at closure: `dd-release-closure` (the disposition
-  block).
+- Where the demotion map lands at closure: `dd-release-implement` (the closure steps'
+  disposition block).
 - Detection-quality scoring for drift audits: `dd-audit-project` Dimension E.
 - Handoff emission for a steward verdict: `dadaia-handoff-emitter`.

@@ -300,7 +300,7 @@ deferral taken at the remediation release's own approval is already pre-approved
 not re-adjudicated later).
 
 **Finding → TASKS-row mapping.** Each `DRIFT-<n>` item maps 1:1 to a `TASKS.md` row citing
-its id, so `dd-release-closure`'s `## Dispositions` sweep can trace every finding to its
+its id, so `dd-release-implement`'s `## Dispositions` sweep can trace every finding to its
 terminal disposition token (`dd-backlog-definition` §2 — canonical vocabulary, not
 repeated here). A finding with no `TASKS.md` row at SPEC approval is unaddressed — the
 SPEC is not `Aprovado`-ready until every finding from this round is accounted for.

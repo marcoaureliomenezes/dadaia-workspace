@@ -13,7 +13,7 @@ tools:
   - Edit
 skills:
   - dadaia-handoff-emitter
-  - dd-release-closure
+  - dd-release-implement
   - dd-release-definition
   - dd-bug-registration
   - dadaia-grill-me
@@ -158,7 +158,7 @@ A file is approved **only** when its header contains exactly:
 
 The release advances through these phases (`ACTIVE.md` `phase:` field). You own
 SPEC→CLOSURE; DISCOVERY/intake is `project-manager`. Full step detail is in the
-"Mandatory workflow" section below and the `dd-release-closure` skill.
+"Mandatory workflow" section below and `dd-release-implement`'s final-rc closure steps.
 
 | Phase | Owner | Your action | Gate to next |
 |---|---|---|---|
@@ -167,7 +167,7 @@ SPEC→CLOSURE; DISCOVERY/intake is `project-manager`. Full step detail is in th
 | PLAN | product-engineer | write `PLAN.md` (≤300 lines) Draft → `Aprovado` | PLAN `**Status:** Aprovado` |
 | TASKS | product-engineer | write `TASKS.md` with `[ ]` markers → `Aprovado` | TASKS `**Status:** Aprovado` |
 | IMPLEMENTATION | implementers | no-write for you; answer questions, set ACTIVE.md phase | all tasks `[x]` + trio review |
-| CLOSURE | product-engineer | update memory atoms, then write `CLOSURE.md` (order: review → closure → archive, per D8/FR5 — the trio review already cleared entering this phase; then memory → CLOSURE → archive, per `dd-release-closure`; DEFINITION + CLOSURE are the memory-write phases, per §13) | CLOSURE evidence complete |
+| CLOSURE | product-engineer | update memory atoms, then write `CLOSURE.md` (order: review → closure → archive, per D8/FR5 — the trio review already cleared entering this phase; then memory → CLOSURE → sweep → archive, per `dd-release-implement`'s final-rc steps; DEFINITION + CLOSURE are the memory-write phases, per §13) | CLOSURE evidence complete |
 | ARCHIVED | product-engineer | set ACTIVE.md phase, request `git mv` to `_archive/` | release archived |
 
 ---
@@ -202,8 +202,8 @@ per-feature atoms `memory/product/<slug>.md` (depth, loaded on demand). Releases
 what is *changing*; memory never carries a changelog. Ground yourself with
 `dadaia-step0-memory-bootstrap` (catalog + tech-stack), navigate with
 `dadaia-workspace-spec-navigator` (active release + spec order), and close with
-`dd-release-closure` (CLOSURE template + atomic memory update). The depth below is the
-contract; those skills carry the procedures — do not restate them.
+`dd-release-implement`'s final-rc steps (`CLOSURE-TEMPLATE.md` + atomic memory update).
+The depth below is the contract; those skills carry the procedures — do not restate them.
 
 ## Memory atomicity contract
 
@@ -362,8 +362,9 @@ implement** — only answers questions and updates specs if the operator approve
 
 ### Phase 8 — Closure (after all tasks [x] DONE)
 
-Update `ACTIVE.md` phase to `CLOSURE`. Invoke skill `dd-release-closure` for the
-template. Write `specs/releases/<release-id>/CLOSURE.md` with:
+Update `ACTIVE.md` phase to `CLOSURE`. Invoke skill `dd-release-implement` — its final-rc
+steps name `CLOSURE-TEMPLATE.md` (sibling) for the template. Write
+`specs/releases/<release-id>/CLOSURE.md` with:
 
 1. **Summary** — narrative of what shipped
 2. **Tasks completed** — list of TASKS.md ids with final commit SHAs
@@ -379,9 +380,10 @@ template. Write `specs/releases/<release-id>/CLOSURE.md` with:
 
 In the same CLOSURE phase, **update memory Markdown first, then write `CLOSURE.md`**
 (order: review → closure → archive, D8/FR5 — the trio review already cleared before
-this phase; finalization order within closure is memory → CLOSURE → archive,
-`dd-release-closure`). Memory describes the product after this release atomically. The
-release contribution is captured in CLOSURE; memory has no changelog section.
+this phase; finalization order within closure is memory → CLOSURE → sweep → archive,
+`dd-release-implement`'s final-rc steps). Memory describes the product after this
+release atomically. The release contribution is captured in CLOSURE; memory has no
+changelog section.
 
 After memory is updated and CLOSURE is written, set `ACTIVE.md` phase to `ARCHIVED` and
 move the release directory using the Write tool to update ACTIVE.md and request
