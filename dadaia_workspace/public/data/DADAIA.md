@@ -62,9 +62,9 @@ stay inside it.
 | Drift audits; dispatches evidence agents; scores compliance | `project-auditor` |
 
 `product-engineer` reads the PM-curated backlog to author a release; it does not curate
-the backlog. `ai-engineer` alone invokes the `ai-harness-*` and `ai-context-engineering`
-skills — every other agent uses `harness-primitives` for harness literacy and dispatches
-`ai-engineer` for depth.
+the backlog. Every agent invokes `dd-ai-eng-knowhow` for harness literacy; only
+`ai-engineer` reads its depth siblings to author or audit the AI-entity surface — every
+other agent dispatches `ai-engineer` for that depth.
 
 ---
 

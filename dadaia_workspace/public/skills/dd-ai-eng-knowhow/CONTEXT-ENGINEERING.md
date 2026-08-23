@@ -1,21 +1,11 @@
----
-name: ai-context-engineering
-description: >
-  Harness-agnostic context-engineering craft for ai-engineer. Compiled decision
-  protocols for token economy, instruction hierarchy and attention ordering,
-  persona-consistency invariants, model-tier selection, and recursive
-  scope-drift detection. Use when authoring or auditing any AI-entity surface
-  file (agent persona, skill, rule, workflow, command, hook).
-applyTo: "dadaia_workspace/public/**"
----
+# CONTEXT-ENGINEERING.md — Authoring and Auditing the AI-Entity Surface
 
-# ai-context-engineering — Authoring and Auditing the AI-Entity Surface
-
-Persona files, skills, and rules are themselves prompts. Every line you ship is paid
-for in tokens by every downstream invocation that loads the file. The craft is not
-"write good instructions" — it is **maximize behavior-change-per-token under a hard
-context budget, while keeping every persona structurally identical so the fleet stays
-auditable.** This skill is the protocol layer: rubrics, decision tables, and audit
+Sibling of [`SKILL.md`](SKILL.md) (`dd-ai-eng-knowhow`, `ai-engineer`-only depth).
+Persona files, skills, and rules are themselves prompts. Every line you ship is paid for
+in tokens by every downstream invocation that loads the file. The craft is not "write
+good instructions" — it is **maximize behavior-change-per-token under a hard context
+budget, while keeping every persona structurally identical so the fleet stays
+auditable.** This file is the protocol layer: rubrics, decision tables, and audit
 procedures, not platitudes.
 
 The five disciplines below are ordered by how often you reach for them: token economy
@@ -31,7 +21,7 @@ reviewing someone else's change (safety first).
 ### The core identity
 
 ```
-cost(file) = tokens(file) × invocations(file) × unit_price(tier)
+cost(file) = tokens(file) x invocations(file) x unit_price(tier)
 ```
 
 A persona body is re-read by the model on **every invocation**. A skill body is read
@@ -48,24 +38,23 @@ behavior often enough to justify its lifetime token cost in this layer?"
 | `always_on` rule | Every turn, every in-scope agent | Reserve for invariants that must never be forgotten. Keep it terse. |
 | Agent persona body | Every invocation of that one agent | The agent's behavioral contract. Lean on frontmatter for hard rules. |
 | Skill body | Only when the skill is loaded | The right home for deep protocols, tables, and procedures consulted occasionally. |
-| Frontmatter (any) | Parsed by tooling, not re-reasoned each turn | Put machine-enforced hard rules here (allowlists, tools, tier). |
+| Frontmatter (any) | Parsed by tooling, not re-reasoned each turn | Put machine-enforced hard rules here (allowlists, tools, gate role). |
 
 **Corollary:** depth belongs in skills, not personas. A persona that inlines a 40-line
 protocol pays for those 40 lines on every dispatch; the same protocol as a referenced
-skill is paid for only when actually needed. This is exactly why the context-engineering
-content was lifted out of the ai-engineer persona into this skill.
+skill is paid for only when actually needed.
 
 ### Tables-vs-prose compression
 
-For any **enumerable** content (paths, OWASP items, collaboration handshakes,
-decision branches), a table compresses roughly **3–5×** versus prose carrying the same
+For any **enumerable** content (paths, OWASP items, collaboration handshakes, decision
+branches), a table compresses roughly **3-5x** versus prose carrying the same
 machine-readable signal, because prose repeats connective tokens ("when X then Y, but if
 Z then...") that a table encodes positionally.
 
 | Content shape | Use | Reason |
 |---|---|---|
 | Enumerable rules with fixed columns | Table | Positional encoding; no connective tokens; scannable |
-| One-off rationale / a "why" | Prose (1–3 sentences) | Tables can't carry causal nuance economically |
+| One-off rationale / a "why" | Prose (1-3 sentences) | Tables can't carry causal nuance economically |
 | Branching decision logic | Decision table or tree | Each row is a complete rule; no narrative threading |
 | A single hard constraint | Frontmatter field | Machine-enforced; zero body cost |
 
@@ -76,7 +65,7 @@ always describing a table in disguise. Convert it.
 
 ```
 Inline the content IFF:
-  (a) it is short (≤ ~3 lines), AND
+  (a) it is short (<= ~3 lines), AND
   (b) the reader needs it on essentially every invocation, AND
   (c) it changes behavior at the point of reading.
 
@@ -99,8 +88,8 @@ That is a missing link or a missing skill. See §5 skill-extraction trigger.
 When you must quantify (efficiency audit), approximate:
 
 ```
-tokens ≈ words × 1.33   (English)
-tokens ≈ words × 1.20   (Portuguese)
+tokens ~= words x 1.33   (English)
+tokens ~= words x 1.20   (Portuguese)
 ```
 
 `wc -w` on the file body, multiply, then multiply again by the invocation frequency from
@@ -137,11 +126,11 @@ Every agent persona body MUST present these sections in this exact order:
 | 9 | Report contract | What does it emit at the end? | Steps / template ref |
 | 10 | CLI reference | What tools does it drive? | Command list |
 
-Rationale for the ordering: **who → what → how-it-refuses → what-it-knows →
-how-it-works → what-it-must-not → who-it-talks-to → where-it-writes → what-it-emits →
-how-it-operates.** Refusal (3) precedes capability (4) deliberately: an agent that knows
-its limits before its powers is harder to talk out of scope. Do not reorder without a
-documented reason; if you reorder, you are changing behavior.
+Rationale for the ordering: **who -> what -> how-it-refuses -> what-it-knows ->
+how-it-works -> what-it-must-not -> who-it-talks-to -> where-it-writes -> what-it-emits
+-> how-it-operates.** Refusal (3) precedes capability (4) deliberately: an agent that
+knows its limits before its powers is harder to talk out of scope. Do not reorder
+without a documented reason; if you reorder, you are changing behavior.
 
 ### Audit protocol — detecting order drift in a persona
 
@@ -185,10 +174,10 @@ protocol. Inconsistencies are bugs — file them in a refactor report.
 
 | # | Invariant | What must match |
 |---|---|---|
-| I1 | Frontmatter schema | Same keys, same order: `name`, `description`, `tier`, `model`, `activity_class`, `concurrency_relationship`, `gate_role`, `tools`, `skills`, `maxTurns`, `input_contract` (`requires_inputs` + `produces_outputs`), `paths.write_allowlist` |
+| I1 | Frontmatter schema | Same keys, same order — the real schema on disk today: `name`, `description`, `dispatch_band`, `activity_class`, `concurrency_relationship`, `gate_role`, `tools`, `skills`, `maxTurns`, `input_contract` (`requires_inputs` + `produces_outputs`), `paths.write_allowlist`. There is no `tier`/`model` frontmatter key — model resolution is a separate policy-overlay mechanism, never asserted here. |
 | I2 | Body section order | The canonical 10-section spine of §2 |
 | I3 | `[SCOPE ERROR]` block format | Same shape: `[SCOPE ERROR]` opener, one-line identity, explicit redirect per foreign domain to the owning agent |
-| I4 | TDD / task-manager reservation flow | Implementer agents follow the identical `[ ]`→`[-]`→`[x]` reservation + commit flow, referenced (not restated) |
+| I4 | TDD / task-manager reservation flow | Implementer agents follow the identical `[ ]`->`[-]`->`[x]` reservation + commit flow, referenced (not restated) |
 | I5 | Handoff JSON contract | All agents emit via the same `dadaia-handoff-emitter` skill against the same schema version |
 
 ### Detection method
@@ -196,7 +185,9 @@ protocol. Inconsistencies are bugs — file them in a refactor report.
 ```
 I1 — Frontmatter schema
   For each persona, extract the frontmatter key list in order and diff against
-  the reference key list. A missing/extra/reordered key is a finding.
+  the real reference key list above (derived from the on-disk personas, not
+  from memory — re-derive it if the schema ever changes). A missing/extra/
+  reordered key is a finding.
     grep -n '^[a-z_]*:' <persona>.md   # top-level frontmatter keys (pre-body)
 
 I2 — Body order
@@ -247,21 +238,20 @@ from "make it smarter."
 
 Score the agent's dominant task on these axes:
 
-| Axis | Low → High |
+| Axis | Low -> High |
 |---|---|
-| Reasoning depth | Mechanical transform → multi-step synthesis / recursive analysis |
-| Context breadth | Single file → whole-fleet / cross-layer reasoning |
-| Error cost | Easily reverted → ships to all consumers / hard to undo |
-| Output novelty | Reformat existing → author new structure from a brief |
-| Volume | Occasional → high-frequency / bulk |
+| Reasoning depth | Mechanical transform -> multi-step synthesis / recursive analysis |
+| Context breadth | Single file -> whole-fleet / cross-layer reasoning |
+| Error cost | Easily reverted -> ships to all consumers / hard to undo |
+| Output novelty | Reformat existing -> author new structure from a brief |
+| Volume | Occasional -> high-frequency / bulk |
 
 The **dominant** task drives the tier — not the easiest or the rarest.
 
 ### Step 2 — Apply the decision table
 
-Tier names are **derived from `core/model_registry.py`** (the single
-source of truth for model identity, pricing, and tier — never hand-maintain a copy
-that can drift):
+Tier names are **derived from `core/model_registry.py`** (the single source of truth
+for model identity, pricing, and tier — never hand-maintain a copy that can drift):
 
 | Registry tier | Workload character |
 |---|---|
@@ -271,15 +261,15 @@ that can drift):
 | `fast` | High-volume mechanical reformatting, bulk renames, deterministic transforms |
 
 Current per-runtime model ids and (for Codex) reasoning-effort come from
-`core/model_registry.py` via the per-runtime tier view — never hand-copied. On Codex
-the tiering axis is (model id × model_reasoning_effort); on Claude it is the model id.
+`core/model_registry.py` via the per-runtime tier view — never hand-copied. On Codex the
+tiering axis is (model id x model_reasoning_effort); on Claude it is the model id.
 
-When recommending a tier move, quote the registry entry (id + latest pricing row) so
-the cost delta comes from live data, not a stale table. Move **up** a tier only when
+When recommending a tier move, quote the registry entry (id + latest pricing row) so the
+cost delta comes from live data, not a stale table. Move **up** a tier only when
 depth/breadth/error-cost are all high. Move **down** only when the task is genuinely
 mechanical and high-volume.
 
-### Step 3 — Justify a tier BUMP (down → up)
+### Step 3 — Justify a tier BUMP (down -> up)
 
 A bump must be backed by **measured-cost evidence**, not intuition:
 
@@ -288,22 +278,22 @@ A bump must be backed by **measured-cost evidence**, not intuition:
    incorrect, shallow, or rework-triggering output.
 2. Show the failure correlates with the workload axes (depth/breadth/error-cost),
    not with a fixable prompt defect — a bad prompt is cheaper to fix than a tier.
-3. State the cost delta: bump price × invocation frequency. Bump only if the
+3. State the cost delta: bump price x invocation frequency. Bump only if the
    rework/quality cost of the lower tier exceeds the per-dispatch price delta.
-4. Record the justification one-liner in the release task (e.g. "ai-engineer →
+4. Record the justification one-liner in the release task (e.g. "ai-engineer ->
    deep tier: heavy synthesis + fleet-wide authoring; per-dispatch not per-session").
 ```
 
 Tier bumps in personas require an **operator-approved release task** — never a silent
-edit. (See §5: a self-edit that bumps your own tier is the highest-risk drift.)
+edit (a self-edit that bumps your own tier is the highest-risk drift — see §5).
 
-### Step 4 — Justify a tier DOWNGRADE (up → down)
+### Step 4 — Justify a tier DOWNGRADE (up -> down)
 
 ```
 1. Sample recent outputs at the current tier; confirm none required the depth
    the tier provides (no recursive analysis, no novel structure authored).
 2. Confirm error-cost is low or the work is reviewed downstream anyway.
-3. Estimate the saving: price delta × invocation frequency.
+3. Estimate the saving: price delta x invocation frequency.
 4. Downgrade, then watch the next few dispatches for quality regression; revert
    if rework appears (rework cost can erase the saving).
 ```
@@ -319,17 +309,17 @@ release flow for personas so the change is observable.
 
 The AI-entity surface is recursive: an agent can edit another agent's file, and
 `ai-engineer` can edit `ai-engineer`. The signature failure is **recursive scope
-drift**: agent A edits agent B's persona to "fix" a perceived bug → B's behavior shifts
-→ agent C, which dispatches to B, breaks → the break surfaces far from the edit. Because
-the edit and the failure are decoupled in time and location, drift is expensive to
-diagnose after the fact. The defense is three detection rules applied **before** the edit
-lands, plus a topology guard for the self-edit case.
+drift**: agent A edits agent B's persona to "fix" a perceived bug -> B's behavior shifts
+-> agent C, which dispatches to B, breaks -> the break surfaces far from the edit.
+Because the edit and the failure are decoupled in time and location, drift is expensive
+to diagnose after the fact. The defense is three detection rules applied **before** the
+edit lands, plus a topology guard for the self-edit case.
 
 ### Detection rule 1 — write_allowlist agreement (frontmatter vs body)
 
 Every persona declares its writable paths in **two** places: the frontmatter
-`paths.write_allowlist` (an agent-instruction convention — NOT gate-enforced as of 0.1.7 rc-3) and the body "Write
-permissions" table (human-readable). They must agree.
+`paths.write_allowlist` (an agent-instruction convention — not gate-enforced) and the
+body "Write permissions" table (human-readable). They must agree.
 
 ```
 DETECT:
@@ -340,10 +330,11 @@ DETECT:
     path the frontmatter grants but the body omits is a SILENT-PRIVILEGE drift
     (a capability with no documented rationale).
 RESOLVE:
-  - The frontmatter is authoritative by convention (the gate does NOT enforce write_allowlist). Fix BOTH so they
-    match, and confirm the intersection is exactly what the SPEC authorizes —
-    never wider. Widening an allowlist requires an operator-approved release
-    task that justifies the widening (privilege-escalation control).
+  - The frontmatter is authoritative by convention (the gate does not enforce
+    write_allowlist). Fix BOTH so they match, and confirm the intersection is
+    exactly what the SPEC authorizes — never wider. Widening an allowlist
+    requires an operator-approved release task that justifies the widening
+    (privilege-escalation control).
 ```
 
 ### Detection rule 2 — forbidden-actions table propagates via release, not spot-edit
@@ -380,10 +371,10 @@ that alters the dispatch graph / allowlists / tool grants across personas):
      (tier bump, allowlist edit, tool grant). No self-granted privileges.
   2. Make the edit minimal and single-purpose.
   3. Re-verify the topology invariants by hand: persona count matches the
-     canonical roster; every persona has the required frontmatter keys
-     (name/description/tier/model/tools/paths.write_allowlist, non-empty); and
-     project-manager + project-auditor each still name every leaf agent. This
-     catches a self-edit that broke another agent's expectations.
+     canonical roster; every persona has the required frontmatter keys (§3 I1),
+     non-empty; and project-manager + project-auditor each still name every
+     leaf agent. This catches a self-edit that broke another agent's
+     expectations.
   4. Pair with security-reviewer for any change that adds a powerful tool
      (Agent/dispatch, broad WebSearch, network) or widens an allowlist; hooks
      (executable surface) always require security-reviewer.
@@ -402,36 +393,25 @@ RE-VERIFY THE TOPOLOGY INVARIANTS WHENEVER:
 
 The structural cure for repeated drift is to stop duplicating. When **two or more
 personas restate the same protocol** (the TDD reservation flow, a shared review gate, a
-common refusal preamble), extract it into a skill under
-`public/skills/<name>/SKILL.md` and replace every inline copy with a one-line reference.
-A skill is loaded once and referenced; inline content is loaded N times and drifts N
-ways. Extraction simultaneously cuts lifetime token cost (§1) and removes the surface
-where rules 1 and 2 drift — it is the highest-leverage move when an efficiency audit
-finds repeated context across personas.
+common refusal preamble), extract it into a skill under `public/skills/<name>/SKILL.md`
+and replace every inline copy with a one-line reference. A skill is loaded once and
+referenced; inline content is loaded N times and drifts N ways. Extraction simultaneously
+cuts lifetime token cost (§1) and removes the surface where rules 1 and 2 drift — it is
+the highest-leverage move when an efficiency audit finds repeated context across
+personas.
 
 ---
 
-## Applying this skill
+## Applying this file
 
 - **Authoring** a new persona/skill/rule: walk §1 (place each line in the cheapest
-  correct layer) → §2 (lay out the canonical spine) → §3 (match the fleet invariants) →
-  §4 (pick the tier from workload + evidence) → §5 (confirm no allowlist/refusal drift).
+  correct layer) -> §2 (lay out the canonical spine) -> §3 (match the fleet invariants)
+  -> §4 (pick the tier from workload + evidence) -> §5 (confirm no allowlist/refusal
+  drift).
 - **Reviewing** someone else's AI-entity change: walk in reverse — §5 first (did this
   edit drift scope, allowlists, or refusals?), then §3 (do invariants still hold?), §2
   (is the spine intact?), §1 (did it add expensive duplication?), §4 (is the tier still
   justified?).
-- **Auditing** the fleet (efficiency report): use §1 estimation to rank files by lifetime
-  cost, §2/§3 detection protocols to find structural drift, §4 to recommend tier moves,
-  and the §5 skill-extraction trigger to recommend deduplication.
-
----
-
-## Authoring guardrails (apply every time)
-
-- This skill is restricted to `ai-engineer` (`DADAIA.md` §2 (skill scope)). General
-  agents use `harness-primitives`. Phase mapping: ai-engineer / harness literacy.
-- All authoring targets are `dadaia_workspace/public/...` source. Never hand-edit
-  `.claude/`, `.codex/`, `.agents/` projections; propagate via
-  `dadaia public stage && dadaia public install`.
-- No consumer-specific names, hostnames, IPs, private repo slugs, secrets, or
-  operator-private data in any authored asset.
+- **Auditing** the fleet (efficiency report): use §1 estimation to rank files by
+  lifetime cost, §2/§3 detection protocols to find structural drift, §4 to recommend
+  tier moves, and the §5 skill-extraction trigger to recommend deduplication.

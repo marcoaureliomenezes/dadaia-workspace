@@ -18,7 +18,7 @@ skills:
   - dadaia-workspace-spec-navigator
   - dadaia-task-manager
   - dadaia-step0-memory-bootstrap
-  - harness-primitives
+  - dd-ai-eng-knowhow
   - dd-release-implement
   - dd-bug-registration
   - dd-gitflow-default

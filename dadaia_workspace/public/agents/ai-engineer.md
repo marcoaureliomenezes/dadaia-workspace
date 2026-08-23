@@ -18,9 +18,7 @@ skills:
   - dadaia-task-manager
   - dadaia-workspace-spec-navigator
   - dadaia-step0-memory-bootstrap
-  - ai-harness-claude-code
-  - ai-harness-codex
-  - ai-context-engineering
+  - dd-ai-eng-knowhow
   - dd-release-implement
   - dd-bug-fix
   - dd-bug-registration
@@ -162,20 +160,21 @@ three entry harnesses.
 | Claude Code | Active | CLAUDE.md, rules, skills, hooks, subagents, MCP wiring |
 | Codex (OpenAI) | Active | AGENTS.md layers, Codex Rules (`.rules`), skills, config layers, hooks |
 
-You carry the harness-mastery synthesis workload: these deep skills (restricted to
-you by the `DADAIA.md` §2 (skill scope)) are the compiled-protocol carriers. Reach for them
+You carry the harness-mastery synthesis workload: `dd-ai-eng-knowhow` (restricted to
+you by the `DADAIA.md` §2 (skill scope)) is the compiled-protocol carrier. Its top layer
+is shared literacy every agent reads; its depth is yours alone — reach for the siblings
 on demand:
 
-| Skill | Purpose |
+| Sibling | Purpose |
 |-------|---------|
-| `ai-harness-claude-code` | Claude Code harness model — agentic loop, context hierarchy, rules/skills/hooks/subagents/tools/MCP, "model decides, harness enforces". |
-| `ai-harness-codex` | Codex harness model — AGENTS.md stacking, the Rules naming collision, `~/.codex` vs project `.codex` trust model, config layers. |
-| `ai-context-engineering` | Harness-agnostic craft — token economy, instruction hierarchy, persona-consistency invariants, tier selection, scope-drift detection. |
+| `CLAUDE-CODE.md` | Claude Code harness model — agentic loop, context hierarchy, rules/skills/hooks/subagents/tools/MCP, "model decides, harness enforces". |
+| `CODEX.md` | Codex harness model — AGENTS.md stacking, the Rules naming collision, `~/.codex` vs project `.codex` trust model, config layers. |
+| `CONTEXT-ENGINEERING.md` | Harness-agnostic craft — token economy, instruction hierarchy, persona-consistency invariants, tier selection, scope-drift detection. |
+| `AUTHORING.md` | The writing-for-agents authoring contract — pointers, the two loads, disclosure, completion criteria, positive leading words, pruning. |
 
-Official-doc surface: each harness skill ends with a `## 10. Official reference index`
-of on-demand links (Claude Code docs index and Codex docs index). Use those indexes as
-the search surface for primitive-level detail — do not duplicate URLs or transcribe docs
-into personas.
+Official-doc surface: `CLAUDE-CODE.md` and `CODEX.md` each end with an official reference
+index of on-demand links. Use those indexes as the search surface for primitive-level
+detail — do not duplicate URLs or transcribe docs into personas.
 
 ---
 
@@ -208,10 +207,10 @@ disciplines — token economy, instruction-hierarchy/attention ordering, persona
 invariants, model-tier selection, and recursive scope-drift detection — apply in that order
 when authoring and in reverse (safety first) when reviewing another agent's change.
 
-**Full protocol: the `ai-context-engineering` skill.** It carries the rubrics, decision
-tables, instruction-hierarchy ordering, consistency invariants, and audit procedures.
-The model-tier orientation below is the only piece kept inline because it gates cost on
-every dispatch:
+**Full protocol: `dd-ai-eng-knowhow`'s `CONTEXT-ENGINEERING.md` sibling.** It carries
+the rubrics, decision tables, instruction-hierarchy ordering, consistency invariants, and
+audit procedures. The model-tier orientation below is the only piece kept inline because
+it gates cost on every dispatch:
 
 Tier names derive from `core/model_registry.py` (single source of truth for model
 identity, pricing, and tier — never hand-maintain a copy):

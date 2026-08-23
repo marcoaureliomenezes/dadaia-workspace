@@ -16,7 +16,7 @@ skills:
   - dadaia-handoff-emitter
   - dadaia-workspace-spec-navigator
   - dadaia-step0-memory-bootstrap
-  - harness-primitives
+  - dd-ai-eng-knowhow
   - dd-bug-registration
   - dd-gitflow-default
 maxTurns: 40

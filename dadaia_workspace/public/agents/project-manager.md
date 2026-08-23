@@ -22,7 +22,7 @@ skills:
   - dadaia-handoff-emitter
   - dadaia-workspace-doctor
   - dadaia-step0-memory-bootstrap
-  - harness-primitives
+  - dd-ai-eng-knowhow
   - dd-backlog-definition
   - dd-release-definition
   - dd-bug-registration

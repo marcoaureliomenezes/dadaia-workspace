@@ -135,7 +135,7 @@ further triage needed on the release-definition side. Purge-on-pick (§2) is the
 
 FR2/R2 scope: the collision check below governs only **non-universal** skills.
 `applyTo: "**"` skills (`architect-core-workflow`, `dadaia-step0-memory-bootstrap`,
-`harness-primitives`) and `dadaia-grill-me`'s `specs/**` are always-on by design — no
+`dd-ai-eng-knowhow`) and `dadaia-grill-me`'s `specs/**` are always-on by design — no
 disjointness is ever asserted about them, and no check may assert it.
 
 **Precedence rule.**
@@ -152,7 +152,6 @@ disjointness is ever asserted about them, and no check may assert it.
 | `dd-release-implement` (`specs/releases/*/TASKS.md`) | `dadaia-task-manager` (`specs/**/TASKS.md`) | task-marker mechanics specialize the general TASKS.md contract |
 | `dd-audit-project` (`.dadaia/reports/**`) | `dadaia-workspace-doctor` (`.dadaia/**`) | audit reporting specializes the general `.dadaia/` doctor surface |
 | `dd-bug-registration` (`specs/bugs/*.jsonl`) | `dd-bug-fix` (`specs/bugs/**`) | registration writes only the ledger file; fix owns the whole bug lifecycle including that file |
-| `ai-context-engineering`, `ai-harness-claude-code`, `ai-harness-codex` (identical `dadaia_workspace/public/**`) | — (three-way identical, no narrower/broader side) | one cohesive `ai-engineer`-only harness-mastery family, always loaded together for AI-surface authoring; narrowing is out of R2 scope |
 | `dadaia-handoff-emitter` (`.dadaia/handoff/**/*.handoff.json`), `project-orchestration` (`.dadaia/handoff/**`) | `dadaia-workspace-doctor` (`.dadaia/**`) | a three-tier specialization chain over `.dadaia/`: doctor is the general surface, handoff dispatch narrows to `.dadaia/handoff/**`, the emitter narrows further to the JSON artifact itself — pre-existing, out of R2 scope |
 
 A collision check (`tests/contract/test_rules_skills_map.py`, FR9/T-044-15 — the

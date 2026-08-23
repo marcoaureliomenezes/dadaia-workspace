@@ -493,7 +493,7 @@ agents), manifest, registry, projections, map row.
 
 ---
 
-- [-] **T-044-19 — FR11: `dd-ai-eng-knowhow` replaces four skills**
+- [x] **T-044-19 — FR11: `dd-ai-eng-knowhow` replaces four skills**
 
 **Owner role:** ai-engineer · **Commit:**
 `docs(T-044-19): one AI-harness skill replaces four`

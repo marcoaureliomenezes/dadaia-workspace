@@ -21,7 +21,7 @@ skills:
   - dadaia-handoff-emitter
   - dadaia-workspace-spec-navigator
   - dadaia-step0-memory-bootstrap
-  - harness-primitives
+  - dd-ai-eng-knowhow
 maxTurns: 60
 input_contract:
   requires_inputs:
