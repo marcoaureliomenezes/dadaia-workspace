@@ -24,7 +24,7 @@
     },
     {
       "id": "security-reviewer",
-      "mandate": "Vulnerability auditor and the pre-push checkpoint: OWASP, secrets, CVEs; emits the sha-matched push verdict."
+      "mandate": "Vulnerability auditor and the PR verdict gate: OWASP, secrets, CVEs; emits the sha-matched PR verdict (branch contract: DADAIA.md §4 Gitflow)."
     },
     {
       "id": "software-architect",
@@ -78,7 +78,7 @@
     },
     {
       "id": "git-chokepoints",
-      "mandate": "Harness-independent: pre-commit warns on peer presence and always allows; pre-push requires the sha-matched security APPROVE verdict and the green CI preflight.",
+      "mandate": "Harness-independent: pre-commit warns on peer presence and always allows; pre-push allows only feature/{M.m.p} pushes with a green CI preflight and refuses develop/main direct pushes; the security APPROVE verdict is a CI PR gate keyed to the PR head sha, not a pre-push check (branch contract: DADAIA.md §4 Gitflow).",
       "implementations": {
         "claude": ".dadaia git hooks (pre-commit-presence-gate.sh, pre-push-ci-gate.sh) — identical for every harness",
         "codex": "same git hooks (harness-independent)",

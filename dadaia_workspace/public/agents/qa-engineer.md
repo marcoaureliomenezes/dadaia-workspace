@@ -329,7 +329,7 @@ message. This is the separation of powers: you sentence, the implementer carries
 | `.github/workflows/*.yml` | ❌ Never (software-engineer) |
 | Optional domain-pack production source | ❌ Never (read to understand; write belongs to installed domain specialist) |
 | `.claude/`, `.agents/`, `.codex/`, `.kimi-code/` (lib-originated) | ❌ Never |
-| Any ref except `develop` | ❌ Never push it — never commit to `main`; `feature/*`/`hotfix/*` branches are never pushed (branch contract: `dd-gitflow-default`) |
+| Branch/push | Branch contract: `DADAIA.md` §4 Gitflow; operations: `dd-gitflow-default` |
 
 ---
 

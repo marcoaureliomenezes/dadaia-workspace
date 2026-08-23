@@ -1,6 +1,6 @@
 ---
 name: dd-bug-fix
-description: "Use when: executing Arm B end-to-end on an already-registered bug — reproduce, RED, root-cause fix, GREEN, resolved event, commit, PATCH mint — on hotfix/{M.m.p}. The single procedural source of the hotfix flow. Any agent may invoke it once a bug carries a reported event."
+description: "Use when: executing Arm B end-to-end on an already-registered bug — reproduce, RED, root-cause fix, GREEN, resolved event, commit — on the live feature branch. The single procedural source of the bug-fix flow. Any agent may invoke it once a bug carries a reported event."
 applyTo: "specs/bugs/**"
 ---
 
@@ -22,8 +22,8 @@ to). Declared subset, activation precedence: `dd-backlog-definition` §7 (canoni
 
 ## 2. Branch and concurrency
 
-Run on `hotfix/{M.m.p}` at the next PATCH, cut from `develop` — full stage-contract row:
-`dd-gitflow-default` (`bug-fix/hotfix`), referenced here, not restated.
+Run on the live `feature/{M.m.p}` branch — no separate branch, no ceremony. Branch
+contract: `DADAIA.md` §4 Gitflow; operations: `dd-gitflow-default`.
 
 **Concurrency (ADR #10/E-4 — advisory presence only).** No reservation marker exists for
 bugs. Races are surfaced, never blocked (NO-LOCKS DOCTRINE): the SDD gate's presence
@@ -54,19 +54,20 @@ test, fix, suite result). What counts as closing the loop — the staging discip
 the commit that follows — is the law's close-in-same-session rule (`DADAIA.md` §6):
 consult it, do not restate it here.
 
-## 7. PATCH mint + `CHANGELOG.md`, same commit, merge to `develop`
+## 7. No separate release ceremony
 
-At merge into `develop`, in the **same commit**: bump `pyproject.toml`'s version to the
-minted PATCH, and add the `CHANGELOG.md` entry. **No release ceremony** — no SPEC, no
-PLAN, no TASKS, no `specs/releases/<id>/` directory. The bug ledger plus the
-`CHANGELOG.md` entry are the record.
+The bug fix lands on the live `feature/{M.m.p}` branch with the rest of the release —
+no separate SPEC, PLAN, TASKS, or `specs/releases/<id>/` directory, and no standalone
+version mint for the bug alone (that ceremony belonged to the now-retired `hotfix/*`
+path; branch contract: `DADAIA.md` §4 Gitflow; operations: `dd-gitflow-default`). The
+bug ledger's `resolved` event is the durable record.
 
 ## 8. Checklist
 
 - [ ] Bug carries a `reported` event before this skill starts.
-- [ ] Branch is `hotfix/{M.m.p}` at the next PATCH, cut from `develop`.
+- [ ] Branch is the live `feature/{M.m.p}` — no separate branch.
 - [ ] Failure reproduced on the executed path.
 - [ ] RED test written, intent/size declared (`dadaia-test-stewardship` §A).
 - [ ] Root cause fixed — no workaround, no symptom patch.
 - [ ] GREEN proven; `resolved` event appended with evidence; committed same session.
-- [ ] `pyproject.toml` PATCH bump + `CHANGELOG.md` entry, same commit, merged to `develop`.
+- [ ] No separate release ceremony opened for the bug; `resolved` event is the record.

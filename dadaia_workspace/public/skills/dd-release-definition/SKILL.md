@@ -69,10 +69,9 @@ Only now write the release SPEC (Draft), with:
 - the picked bug + backlog set and their acceptance,
 - every `superseded_by` link from step 2.
 
-Definition runs on `feature/{M.m.p}`. Once SPEC + PLAN + TASKS are all `Aprovado`, that
-is **milestone (a)**: merge `feature/{M.m.p}` into local `develop`, run the diff-based
-security review, and push `develop` — a mandatory obligation, not optional cleanup (the
-branch/commit/push mechanics are the `dd-gitflow-default` skill's contract).
+Definition runs on `feature/{M.m.p}`. Once SPEC + PLAN + TASKS are all `Aprovado`, open
+the definition PR — a mandatory obligation, not optional cleanup (branch contract:
+`DADAIA.md` §4 Gitflow; operations: `dd-gitflow-default`).
 
 Then continue the normal SDD flow (PLAN → TASKS → implementation), with reviews
 per the segment/release cadence (alpha = qa-only; rc-ship = qa + code + security).

@@ -322,7 +322,7 @@ Execute the `dadaia-step0-memory-bootstrap` skill before any implementation, rev
 | Model tier | Never silently bump a persona to a heavier registry tier to "make it smarter" without a measured-cost justification. |
 | Cross-persona edits | Treat edits to another persona as code review: verify scope, run topology guard, validate via reader test. |
 | Hooks | Runtime hooks are production Python (`dadaia_workspace/hooks/`, owned by software-engineer) executing with the workspace's permission. Any hook change you review or any wiring change you author is a privileged-code review — pair with security-reviewer. |
-| Branch/push | Never push any ref except `develop`; never commit directly to `main`; `feature/*`/`hotfix/*` branches are local-only and never pushed (the branch contract is `dd-gitflow-default`). |
+| Branch/push | Branch contract: `DADAIA.md` §4 Gitflow; operations: `dd-gitflow-default`. |
 
 ---
 

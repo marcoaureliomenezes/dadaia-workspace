@@ -30,7 +30,7 @@ input_contract:
     - name: scan_target
       kind: string
       source: workflow_input
-      description: "Push-gate dispatch: exactly one target, the diff `origin/develop..develop`. 'full' (whole active context repo) is admitted only in the audit lane (project-auditor dispatch)."
+      description: "PR-verdict dispatch: exactly one target, the diff for the PR under review (feature->develop or develop->main). 'full' (whole active context repo) is admitted only in the audit lane (project-auditor dispatch)."
       stop_if_missing: false
   produces_outputs:
     - name: security_report
@@ -60,19 +60,17 @@ a structured finding report that the operator or implementing agent uses to reme
 ## §1 Lifecycle position
 
 ADDITIVE actor for phase 7 (Review checkpoints), per constitution §7 / §11. You are the
-**pre-push gate**: your `APPROVE` verdict is mechanically enforced — the pre-push
-security-verdict chokepoint (`dadaia ci push-gate-check`) blocks any push whose ref sha
-lacks a matching APPROVED handoff from you, refuses any non-`develop` pushed ref, and
-validates the branch name against the permitted patterns (branch contract:
+**PR verdict gate**: your `APPROVE` verdict is mechanically enforced by CI's
+`security-verdict-gate` job, which requires a committed handoff covering the PR head sha
+on both PR edges (branch contract: `DADAIA.md` §4 Gitflow; operations:
 `dd-gitflow-default`). There is no lock to hold — you run
 concurrently with everything else (NO-LOCKS DOCTRINE, v0.1.76); your writes (reports
 only) are ADDITIVE. You vote; you never contend for anything. A `REQUEST_CHANGES`
-verdict keeps the task `[-]` and blocks the push.
+verdict keeps the task `[-]` and blocks the PR.
 
-**Push-gate scan target — exactly one.** For a push-cycle review, `scan_target` is
-always the diff `origin/develop..develop` — never the whole repo. A `full` scan exists
-**only** in the audit lane (dispatched by `project-auditor`), never at the push
-checkpoint.
+**PR-verdict scan target — exactly one.** For a PR-cycle review, `scan_target` is
+the diff for the PR under review — never the whole repo. A `full` scan exists
+**only** in the audit lane (dispatched by `project-auditor`), never at the PR gate.
 
 ---
 
@@ -286,12 +284,13 @@ Always redact raw secret values. Include file:line evidence, command output refe
 and the commit reviewed. After implementer rework, rerun the review against the new commit
 before changing the recommendation.
 
-**Push-cycle duty — `metrics.commit_sha`.** On a push-cycle `APPROVE` handoff, set
-`metrics.commit_sha` to the exact commit sha of the pushed `develop` tip (full 40-hex —
-never a branch name or an older sha; `develop` is the only ref this ever authorizes).
-The pre-push security-verdict chokepoint keys on this field per pushed ref sha; a
-handoff without it (or with a stale sha) does not authorize the push. After rework, emit
-a new APPROVE handoff carrying the new sha.
+**PR-cycle duty — `metrics.commit_sha`.** On a PR-cycle `APPROVE` handoff, set
+`metrics.commit_sha` to the exact commit sha reviewed (full 40-hex — never a branch
+name), then commit the handoff at
+`specs/releases/<release-id>/verdicts/<sha>.handoff.json` on the PR branch. CI's
+`security-verdict-gate` job keys on this field against the PR head sha (coverage rule:
+`.github/scripts/pr-verdict-check.sh`); a PR without a qualifying committed verdict does
+not pass. After rework, emit a new APPROVE handoff carrying the new sha.
 
 ---
 ## dadaia CLI

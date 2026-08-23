@@ -408,15 +408,15 @@ hotfix-specific status ladder are dead law; the hotfix-release scaffold template
 the `dadaia specs hotfix open` CLI verb were dead surface — never invoked — and were
 deleted (FR12, v0.4.2). A bug fix
 is Arm B in full (`DADAIA.md` §1) — register, reproduce, RED, root-cause fix, GREEN,
-`resolved` event, commit — run on `hotfix/{M.m.p}` (branch contract: `dd-gitflow-default`).
+`resolved` event, commit — run on the live `feature/{M.m.p}` branch, no separate branch
+(branch contract: `DADAIA.md` §4 Gitflow; operations: `dd-gitflow-default`).
 `product-engineer` authors **no** hotfix SPEC/PLAN/TASKS and creates **no**
-`specs/releases/<id>/` directory for a hotfix.
+`specs/releases/<id>/` directory for a bug fix.
 
-**Where the record now lives.** At merge into `develop`, in the same commit: the
-append-only bug ledger's `resolved` event, a `pyproject.toml` version bump to the minted
-PATCH, and a `CHANGELOG.md` entry — no release ceremony. The release-naming canon
-`^v\d+\.\d+\.\d+$` (D3) still governs **release** directories (PATCH = 0 for a feature
-release); it no longer implies a hotfix creates one.
+**Where the record now lives.** The append-only bug ledger's `resolved` event is the
+durable record — no separate version mint for the bug alone; that ceremony belonged to
+the now-retired `hotfix/*` path. The release-naming canon `^v\d+\.\d+\.\d+$` (D3) still
+governs **release** directories.
 
 Do not restore any part of this lifecycle as a perceived regression fix — it is
 deliberately gone.

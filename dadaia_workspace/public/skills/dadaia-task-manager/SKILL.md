@@ -52,9 +52,9 @@ trace is:
 finishes code, unit tests, and integration tests, the task remains `[-]` until
 `qa-engineer`, `code-reviewer`, and `security-reviewer` return green approval for the
 same commit (per the `DADAIA.md` §5 (Releases) cadence: alpha-N boundaries are qa-only;
-reviews mature the release, and the push boundary itself is mechanically gated — the
-pre-push security-verdict chokepoint requires an APPROVED `security-reviewer` handoff
-whose `metrics.commit_sha` equals each pushed ref sha, per push-cycle). Before those
+reviews mature the release, and the ship PR is mechanically gated — the security-verdict
+PR gate requires an APPROVED `security-reviewer` handoff covering the PR head sha; branch
+contract: `DADAIA.md` §4 Gitflow, operations: `dd-gitflow-default`). Before those
 approvals it is forbidden to mark
 `[x]`, open a PR, request merge, deploy, close the release, write `CLOSURE.md`, or update
 memory. If any reviewer requests changes, return to step 2 and keep `[-]`.

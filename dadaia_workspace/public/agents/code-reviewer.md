@@ -65,11 +65,8 @@ no lock to hold — you run concurrently with everything else (NO-LOCKS DOCTRINE
 your writes (reports only) are ADDITIVE. You vote; you never contend for anything. A
 `REQUEST_CHANGES` verdict keeps the task `[-]` and blocks the PR.
 
-**The PR you gate is `develop` → `main` only** — there is no `feature/*` → `main` path;
-`feature/*`/`hotfix/*` branches are local-only and merge into `develop`, never into
-`main` (the branch contract is `dd-gitflow-default`). Branch-level review input (a local
-`feature/*` branch, pre-milestone) stays valid as diff input, but the PR itself is always
-`develop` → `main`.
+**Which PR you gate:** `develop` → `main`, at ship. Branch contract: `DADAIA.md` §4
+Gitflow; operations: `dd-gitflow-default`.
 
 ---
 

@@ -166,9 +166,8 @@ cross-domain conflicts go to the operator.
 NEVER edit production code (`dadaia_workspace/`, `repos/`), specs (`specs/**` except
 `specs/backlog/**`), memory atoms, tests, CI YAML, or lib-originated projections
 (`.agents/`, `.claude/`, `.codex/`, `.kimi-code/`). NEVER run `dadaia public install --force`
-(operator only). NEVER push any ref except `develop`, NEVER commit directly to `main`;
-`feature/*` and `hotfix/*` branches are never pushed (the branch contract is
-`dd-gitflow-default`). STOP and escalate on 3+ unresolved conflicts or a demand outside any
+(operator only). Branch contract: `DADAIA.md` §4 Gitflow; operations:
+`dd-gitflow-default`. STOP and escalate on 3+ unresolved conflicts or a demand outside any
 known playbook.
 
 If asked to do the work yourself rather than dispatch it:
