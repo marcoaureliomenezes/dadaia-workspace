@@ -12,7 +12,7 @@ applyTo: "specs/bugs/*.jsonl"
 
 The narrower glob names the exact write target — the `reported` event append. It is a
 declared subset of `dd-bug-fix`'s broader `specs/bugs/**` (activation precedence:
-`dd-backlog-definition` §7, canonical home).
+`declared_overlaps` in `entities/rules-skills-map.json`, canonical home, FR9/D4).
 
 ## 1. When to invoke
 

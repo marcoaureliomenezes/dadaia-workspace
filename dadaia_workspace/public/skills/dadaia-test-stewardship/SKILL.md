@@ -12,19 +12,8 @@ description: >
 # dadaia-test-stewardship
 
 > Universal skill — read natively by every entry harness, no per-harness derivation.
-> Numeric values below are this workspace's declared defaults (§I); a consumer
-> workspace re-parameterizes them without forking this protocol.
-
-**Vocabulary homonyms (FR7 — read before grepping).** "Scaffold", "sentinel" and
-"quarantine" each have a pre-existing, unrelated use elsewhere in this codebase:
-`scaffold` also names `public/scaffold/` (the consumer-workspace template tree) and
-`scaffolder.py` (the tool that writes it); `sentinel` also names the self-scan sentinel
-family (`dadaia_workspace/hooks/ctx_inject.py`, `core/workspace_resolver.py`, and
-peers — a session-keyed re-injection guard, unrelated to test state); `quarantine` here
-is exclusively this skill's §F flake state (a registered-bug-required test mark) — no
-other subsystem overloads that one. A grep for these terms across the tree returns
-both meanings; filter by the file paths above before treating a hit as test-lifecycle
-signal.
+> Numeric values below are this workspace's declared defaults, in `PARAMETERS.md`
+> (sibling); a consumer workspace re-parameterizes them without forking this protocol.
 
 ## A — Intent taxonomy
 
@@ -67,7 +56,7 @@ requires a written justification inline in the test.
 | `e2e` (LARGE) | 120 s | every file names an owner |
 
 A test that needs more time than its tier's timeout is **mis-tiered** — fix the tier,
-never raise the default. LARGE cap is declared in §I as a WARN, not a hard failure,
+never raise the default. LARGE cap is declared in PARAMETERS.md as a WARN, not a hard failure,
 until the count is achievable (companion release's job).
 
 ## D — Demotion (at closure, never mid-task)
@@ -139,9 +128,9 @@ trend, failure→defect ratio per test.
 | Trigger | Threshold |
 |---|---|
 | Wall-clock growth without equivalent new behavior | > 25 % |
-| Flake rate | above the ceiling (§I) |
-| LARGE count | above the project's declared cap (§I) |
-| Quarantine | at cap (§I) |
+| Flake rate | above the ceiling (PARAMETERS.md) |
+| LARGE count | above the project's declared cap (PARAMETERS.md) |
+| Quarantine | at cap (PARAMETERS.md) |
 
 Mutation testing runs 1×/release, off the push path, as the judge of detection value —
 a test that kills no mutant and is not a SENTINEL enters the next curation pass under
@@ -149,20 +138,10 @@ criterion E(c)/(e). Tool selection is deferred (companion release).
 
 ## I — Parameter package (declared adjustable defaults)
 
-Every value below is a workspace default, not a universal constant. A consumer
-workspace re-parameterizes without forking this doctrine.
-
-| Parameter | This repo's value | Abstract default |
-|---|---|---|
-| LARGE (E2E) cap | 30 (current ~84 — companion-release remediation target) | 12–15 per module |
-| Flake rate | target < 0.5 % of runs | hard ceiling 1 % |
-| Quarantine cap | max 8 tests | — |
-| Quarantine escalation | 30 d unresolved → `disabled`; 30 clean days → restored | — |
-| Deletion after disable | `disabled` + 1 release with no plan → deleted | — |
-| Per-test timeout | unit 10 s / contract 30 s / integration 60 s / e2e 120 s | tier ratio holds |
-| Wall-clock budget | frozen at the current baseline per job | freeze-then-ratchet |
-| Mutation cadence | 1×/release, off the push path | same |
-| Skip/disabled expiry | > 1 release, no registered plan → deleted | same |
+The numeric values (LARGE cap, flake ceiling, quarantine cap/escalation, per-test
+timeouts, wall-clock budget, mutation cadence) live in `PARAMETERS.md` (sibling) — this
+workspace's declared defaults, not universal constants. A consumer workspace
+re-parameterizes there without forking this doctrine.
 
 ## Curation decision table (create / curate / flaky-event)
 

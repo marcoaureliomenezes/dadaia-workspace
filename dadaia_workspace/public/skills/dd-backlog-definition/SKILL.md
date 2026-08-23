@@ -131,37 +131,7 @@ Release-definition step 2 ("pick the set") reads `BACKLOG.md`'s `ACTIVE` section
 `specs/bugs/*.jsonl` directly — this skill supplies a sanitized, deduplicated set with no
 further triage needed on the release-definition side. Purge-on-pick (§2) is the receipt.
 
-## 7. Activation-glob precedence (canonical home — appears nowhere else in `public/`)
-
-FR2/R2 scope: the collision check below governs only **non-universal** skills.
-`applyTo: "**"` skills (`architect-core-workflow`, `dadaia-step0-memory-bootstrap`,
-`dd-ai-eng-knowhow`) and `dd-grill-me`'s `specs/**` are always-on by design — no
-disjointness is ever asserted about them, and no check may assert it.
-
-**Precedence rule.**
-1. A universal (`**`) skill is always-on and never competes with any stage skill.
-2. Among stage (non-universal) skills, the **most-specific glob** resolves an
-   activation ambiguity — a narrower path wins over a broader one that also matches.
-3. Any overlap between two non-universal, non-`**` skills must be **declared** below
-   (rationale + which side is more specific) or it is an FR2 defect.
-
-**Declared overlaps (subset relationships, all intentional):**
-
-| Narrower (wins) | Broader | Rationale |
-|---|---|---|
-| `dd-release-implement` (`specs/releases/*/TASKS.md`) | `dadaia-task-manager` (`specs/**/TASKS.md`) | task-marker mechanics specialize the general TASKS.md contract |
-| `dd-audit-project` (`.dadaia/reports/**`) | `dd-workspace-doctor` (`.dadaia/**`) | audit reporting specializes the general `.dadaia/` doctor surface |
-| `dd-bug-registration` (`specs/bugs/*.jsonl`) | `dd-bug-fix` (`specs/bugs/**`) | registration writes only the ledger file; fix owns the whole bug lifecycle including that file |
-| `dadaia-handoff-emitter` (`.dadaia/handoff/**/*.handoff.json`), `dd-manager-orchestration` (`.dadaia/handoff/**`) | `dd-workspace-doctor` (`.dadaia/**`) | a three-tier specialization chain over `.dadaia/`: doctor is the general surface, handoff dispatch narrows to `.dadaia/handoff/**`, the emitter narrows further to the JSON artifact itself — pre-existing, out of R2 scope |
-
-A collision check (`tests/contract/test_rules_skills_map.py`, FR9/T-044-15 — the
-retired `lint-skill-collisions.py`'s replacement, gating every deploy) flags
-**undeclared** overlap between two non-universal skills only, reading the
-`declared_overlaps` list at the top of `entities/rules-skills-map.json`. This table is
-the human-readable rationale for that JSON list; the JSON is the one authoritative
-source (D4) — update it when this table changes.
-
-## 8. CLI reference
+## 7. CLI reference
 
 ```bash
 dadaia backlog new <slug>          # appends an ## ACTIVE subsection to BACKLOG.md

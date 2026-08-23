@@ -18,7 +18,8 @@ and runs Arm B through to close.
 
 The broader `specs/bugs/**` glob is deliberate: this skill owns the whole bug lifecycle
 (including the `resolved` event on the same ledger file `dd-bug-registration` narrows
-to). Declared subset, activation precedence: `dd-backlog-definition` §7 (canonical home).
+to). Declared subset, activation precedence: `declared_overlaps` in
+`entities/rules-skills-map.json` (canonical home, FR9/D4).
 
 ## 2. Branch and concurrency
 

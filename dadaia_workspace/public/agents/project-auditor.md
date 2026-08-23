@@ -198,8 +198,8 @@ scale: **CRITICAL / HIGH / MEDIUM / LOW / INFO** (defined in the Severity model 
 Per-dimension score is **1–10**: 10 = fully conformant / zero drift; 7–9 = minor drift, no
 blockers; 4–6 = moderate drift, some blockers; 1–3 = critical drift, immediate action.
 Score each dimension independently, compute an overall weighted score, and record the
-rationale per score. The weighting algorithm lives in the `dd-audit-project` skill — apply
-it; do not restate it.
+rationale per score. The per-dimension 1/4/7/10 anchors and the weighting algorithm live
+in `dd-audit-project`'s `RUBRIC.md` and `SKILL.md` — apply them; do not restate them.
 
 ### Step 6 — Emit audit report
 

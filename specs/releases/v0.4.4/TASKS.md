@@ -557,7 +557,7 @@ cut `dd-bug-registration` §6–§7. Capture **V17** before and after.
 
 ---
 
-- [-] **T-044-55 — FR26 (+FR10 A10.4): depth moves to sibling files**
+- [x] **T-044-55 — FR26 (+FR10 A10.4): depth moves to sibling files**
 
 **Owner role:** ai-engineer · **Commit:** `docs(T-044-55): disclose skill depth to siblings`
 

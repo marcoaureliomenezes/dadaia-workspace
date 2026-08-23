@@ -30,7 +30,8 @@ steps 1–3 below are complete.
 This skill **reads** `specs/backlog/**` but never writes it (purge-on-pick is executed
 by `project-manager` via `dd-backlog-definition` §2, step 5 table) — the activation
 glob above names what this skill actually authors: the release `SPEC.md`. Activation
-precedence for the fleet: `dd-backlog-definition` §7 (canonical home).
+precedence for the fleet: `declared_overlaps` in `entities/rules-skills-map.json`
+(canonical home, FR9/D4).
 
 Sanitizing and deduplicating those inputs is `dd-backlog-definition`'s job, run
 continuously by `project-manager` — this skill consumes an already-clean set and does
