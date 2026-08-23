@@ -168,6 +168,26 @@ is no longer archive-only.
   change: "persona invokes the skill — Call the Skill tool with \"dd-code-review\" — and drops its inline six-axis description; qa-engineer and software-architect verdicts cite the bug-surface axis"
 ```
 
+### dadaia-glossary
+- **Title:** dadaia-glossary — model-invoked domain glossary plus a CONTEXT.md per repo: sharpen terms inline, kill homonyms (scaffold / sentinel / quarantine / context / workflow), one-paragraph ADRs with the triple test
+- **Opened:** 2026-08-23
+- **Status:** candidate
+- **Description:** The audit found the same word carrying several meanings across skills, personas and code — *scaffold* (test tier vs spec scaffold), *sentinel* (ctx-inject file vs self-scan marker), *quarantine* (test mark vs bug state), *context* (spec context vs harness context window vs ctx-inject), *workflow* (retired engine vs GitHub Actions vs "the flow") — and the notes that patched them (`stewardship-relocation-grep-homonym-note`, `dadaia-test-stewardship` FR7) are symptoms. Remedy: a model-invoked skill `dadaia-glossary` whose job is to **sharpen inline** — when an agent writes or reads a term that has a glossary entry, it uses the canonical sense and names the other sense explicitly — backed by a **`CONTEXT.md` per repo** (the bounded-context file: ubiquitous language, each term with one definition and its non-meanings) and a **one-paragraph ADR format** with the triple test (what we decided · what we rejected · what would make us revisit). For this self-hosting repo, `CONTEXT.md` lives under `specs/memory/` (product-engineer-owned, DEFINITION/CLOSURE writable) or at the repo root — placement is a grill-me question, as is whether the glossary file is memory or a skill attachment. Reference: `mattpocock/skills/skills/engineering/domain-modeling/` (`SKILL.md` + `CONTEXT-FORMAT.md` + `ADR-FORMAT.md`). Governance: maps to the DADAIA.md §5 bold topic "Memory is current product truth" — one skill, one topic. **Audit roadmap hint (not a disposition):** R3.
+- **Provenance:** operator ratification (2026-08-23) of the research report `.dadaia/reports/dadaia-workspace/claude-code/2026-08-23T183323Z-skills-audit-vs-reference/` (handoff `.dadaia/handoff/dadaia-workspace/2026-08-23T183323Z-claude-code-skills-audit-vs-reference.handoff.json`), section D "new skills proposed" — ruled to the backlog while sections A–C fold into release v0.4.4; relates-to `core-skills-consolidation` and `rules-skills-governance-map` (both CONSUMED by v0.4.4) and to the governance rule "every skill maps to one DADAIA.md bold topic"; roadmap placement R3 (hint)
+- **Intents:**
+```yaml
+- subject:
+    kind: doc
+    ref: dadaia_workspace/public/skills/dadaia-glossary/SKILL.md
+    surface: new
+  change: "new model-invoked core skill: sharpen-inline procedure over a per-repo CONTEXT.md (one definition per term, explicit non-meanings) and a one-paragraph ADR format with the triple test (decided · rejected · revisit-when); CONTEXT-FORMAT and ADR-FORMAT disclosed as sibling files; adapted from mattpocock/skills/skills/engineering/domain-modeling"
+- subject:
+    kind: doc
+    ref: specs/memory/CONTEXT.md
+    surface: new
+  change: "first CONTEXT.md for dadaia-workspace seeded with the five known homonyms (scaffold, sentinel, quarantine, context, workflow) resolved to one canonical sense each; the inline homonym notes in dadaia-test-stewardship and the stewardship-relocation note are replaced by pointers to it (placement root vs specs/memory settled in grill-me)"
+```
+
 
 ## LEDGER
 
