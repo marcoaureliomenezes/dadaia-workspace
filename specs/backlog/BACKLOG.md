@@ -88,6 +88,52 @@ is no longer archive-only.
 
 ## ACTIVE
 
+### spec-context-associated-repos
+- **Title:** spec-context-associated-repos — a Spec Context Project owns ONE main repo (where `specs/` lives) plus N associated repos that follow its ALIVE/DEAD lifecycle
+- **Opened:** 2026-08-23
+- **Status:** candidate
+- **Description:** Today `SpecContextProject` carries a single `repo_slug`/`repo_url`, so a product that spans several repositories (one specs-bearing repo plus sibling service repos) cannot be modelled as one context — the operator must either create disjoint contexts (splitting the specs) or fall back to submodules the tool does not see. Demand: keep exactly one **main** repo per context as the home of `specs/` and the bind/memory target, and allow any number of **associated** repos registered against the same context; `context alive` clones/keeps every repo (main + associated) on disk and `context dead` syncs and removes every one of them, so the set of repos on disk always mirrors the context's state. New verbs (names to settle in grill-me): `context repo add <ctx> <slug> [--url]` / `context repo remove <ctx> <slug>` / `context repo list <ctx>`; `context show`/`list`/panel expose main + associated; export/import, the state migration (v2 → v3 registry schema) and `ci` foreign-slug derivation follow. Operator phrasing (2026-08-23): "cada spec context project tem um repo main — onde vivem as Specs; só 1 é possível como main, mas é possível adicionar outros, o que faz com que os repos sejam mantidos em disco ou não ao alternar o spec context project de ALIVE para DEAD e vice-versa."
+- **Provenance:** operator request, 2026-08-23 — surfaced while trying to attach two sibling capture repos to an existing consumer context (the tool offered no verb for it)
+- **Intents:**
+```yaml
+- subject:
+    kind: code
+    ref: dadaia_workspace/core/models/spec_context.py#SpecContextProject
+  change: "add an ordered associated_repos collection (slug + url each) next to the single main repo_slug/repo_url; main stays unique and is the only specs/bind target"
+- subject:
+    kind: code
+    ref: dadaia_workspace/features/migrate/state_v2.py#plan_migration
+  change: "ship the registry schema bump (v2 -> v3) that introduces associated_repos with a backup-first, idempotent migration (schema-drop law - a schema change ships its migration)"
+- subject:
+    kind: cli
+    ref: context alive
+  change: "clone/keep the main repo AND every associated repo under repos/; idempotent when already ALIVE, reporting each repo"
+- subject:
+    kind: cli
+    ref: context dead
+  change: "git-sync and remove the main repo AND every associated repo from disk, refusing as today when any of them is dirty or unpushed"
+- subject:
+    kind: cli
+    ref: context create
+  change: "accept optional repeatable --associated <slug>[=<url>] at creation, in addition to the new context repo add/remove/list subcommands"
+- subject:
+    kind: cli
+    ref: context show
+  change: "render main repo plus the associated-repo list (slug, url, on-disk, live branch) in table and --json"
+- subject:
+    kind: cli
+    ref: context list
+  change: "show an associated-repo count (or list in --json) per context; keep current_branch semantics consistent with show (bug context-list-current-branch-stale-for-alive-repo)"
+- subject:
+    kind: code
+    ref: dadaia_workspace/features/export/service.py#ExportService
+  change: "export/import carry associated repos (url + branch) so a workspace round-trips with its full repo set"
+- subject:
+    kind: code
+    ref: dadaia_workspace/features/panel/service.py#PanelContext
+  change: "panel card lists main + associated repos per context"
+```
+
 ## LEDGER
 
 - push-range-denylist-scan · DELIVERED · v0.9.0 · 2026-08-14
