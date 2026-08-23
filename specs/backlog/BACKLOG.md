@@ -148,6 +148,26 @@ is no longer archive-only.
   change: "alpha-N / release close step names the survey as an operative dependency — Call the Skill tool with \"dd-architecture-survey\" — so each segment closes with a survey and a dispositioned top candidate"
 ```
 
+### dd-code-review
+- **Title:** dd-code-review — three-axis review used by code-reviewer: Standards (+12 smells) × Spec × Bug-surface, each axis a subagent, findings merged without rerank
+- **Opened:** 2026-08-23
+- **Status:** candidate
+- **Description:** Replace the reviewer's single monolithic pass with **three independent axes** run as separate subagents whose findings are reported side by side, **never reranked against each other**: (1) **Standards** — the codebase's own conventions plus the reference's fixed baseline of twelve Fowler smells (Mysterious Name, Duplicated Code, Feature Envy, Data Clumps, Primitive Obsession, Repeated Switches, Shotgun Surgery, Divergent Change, Speculative Generality, Message Chains, Middle Man, Refused Bequest — each a labelled judgement call, the repo's documented standard always overriding the baseline, anything tooling already enforces skipped); (2) **Spec** — does the diff do what the approved SPEC/TASKS say, nothing more, nothing less; (3) **Bug-surface** — the subagent receives the bug ledger of the feature touched (`dadaia bugs stats` filtered to its surface) and answers, with evidence, "did this diff reduce or increase the bug surface of this feature?" — the operator's rule "a diff that grows the feature is a stop" applied as a review axis. The skill is model-invoked, owned by `code-reviewer` (its six-axis review collapses onto these three; security/perf stay with `security-reviewer` and the gates); `qa-engineer` and `software-architect` verdicts reuse the bug-surface axis. Reference: `mattpocock/skills/skills/engineering/code-review/` (`SKILL.md` + `agents/`). Note: this workspace's sub-agents cannot dispatch further sub-agents — the "three subagents" run as three sequential passes or as PM-dispatched siblings; grill-me settles which. Governance: maps to the DADAIA.md §2 row "Six-axis review before a PR" (rewritten to name the three axes) — one skill, one topic. **Audit roadmap hint (not a disposition):** R1.
+- **Provenance:** operator ratification (2026-08-23) of the research report `.dadaia/reports/dadaia-workspace/claude-code/2026-08-23T183323Z-skills-audit-vs-reference/` (handoff `.dadaia/handoff/dadaia-workspace/2026-08-23T183323Z-claude-code-skills-audit-vs-reference.handoff.json`), section D "new skills proposed" — ruled to the backlog while sections A–C fold into release v0.4.4; relates-to `core-skills-consolidation` and `rules-skills-governance-map` (both CONSUMED by v0.4.4) and to the governance rule "every skill maps to one DADAIA.md bold topic"; roadmap placement R1 (hint)
+- **Intents:**
+```yaml
+- subject:
+    kind: doc
+    ref: dadaia_workspace/public/skills/dd-code-review/SKILL.md
+    surface: new
+  change: "new model-invoked core skill: three axes (Standards with the fixed 12-Fowler-smell baseline, repo standards overriding × Spec conformance × Bug-surface reduced-or-increased with ledger evidence), each an independent pass, findings reported side by side without rerank; adapted from mattpocock/skills/skills/engineering/code-review"
+- subject:
+    kind: doc
+    ref: dadaia_workspace/public/agents/code-reviewer.md
+    surface: new
+  change: "persona invokes the skill — Call the Skill tool with \"dd-code-review\" — and drops its inline six-axis description; qa-engineer and software-architect verdicts cite the bug-surface axis"
+```
+
 
 ## LEDGER
 
