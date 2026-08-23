@@ -508,7 +508,7 @@ manifest, registry, projections, map row. Capture **V5**.
 
 ---
 
-- [ ] **T-044-20 — FR12: four renames, one commit each, plus `dd-grill-me` ratified**
+- [-] **T-044-20 — FR12: four renames, one commit each, plus `dd-grill-me` ratified**
 
 **Owner role:** ai-engineer · **Commits:** one per skill,
 `docs(T-044-20): rename <old> to <new>`
