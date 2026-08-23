@@ -406,7 +406,7 @@ explicit refusal of any dual path (a hook remnant plus a CI job).
 
 ## Segment `S2` — the rules→skills governance map
 
-- [-] **T-044-13 — FR7: the JSON map and its schema**
+- [x] **T-044-13 — FR7: the JSON map and its schema**
 
 **Owner role:** ai-engineer · **Commit:** `feat(T-044-13): the rules-to-skills map`
 
@@ -425,7 +425,7 @@ topic; two only with a justification; every skill on disk placed.
 
 ---
 
-- [ ] **T-044-14 — FR8: the map is core law**
+- [-] **T-044-14 — FR8: the map is core law**
 
 **Owner role:** ai-engineer (scaffold) + product-engineer (`specs/constitution.md`) ·
 **Commit:** `docs(T-044-14): declare the rules-to-skills map as core law`
