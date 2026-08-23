@@ -300,7 +300,7 @@ deleted, not flagged off.
 
 ---
 
-- [-] **T-044-07 — FR4: CI sees the feature branch; the verdict becomes a PR gate**
+- [x] **T-044-07 — FR4: CI sees the feature branch; the verdict becomes a PR gate**
 
 **Owner role:** software-engineer · **Commit:**
 `ci(T-044-07): trigger on feature pushes and gate the security verdict at the PR`
