@@ -1,6 +1,9 @@
 # PLAN — Release v0.4.4 — organize the core
 
 **Status:** Aprovado
+**Amendment 1:** Aprovado (operator, 2026-08-23) (2026-08-23, the skills audit folded in — SPEC §2/§8). FR22–FR31,
+tasks T-044-54 … T-044-62 and the plan lines marked *(A1)* await the operator's approval of
+the delta; segments `S1 … S5` and the `rc` lane are unchanged in structure.
 **Release ID:** v0.4.4
 **Owner:** product-engineer
 **Source SPEC:** `specs/releases/v0.4.4/SPEC.md`
@@ -25,25 +28,27 @@ ladder so its LOC is accounted for on its own.
 
 The order is not a preference — each boundary is a constraint:
 
-- **`S1` first** because it changes the mechanism this release integrates itself with
-  (G4/G6): once it is live, every merge into `develop` is a PR from `feature/0.4.4`. It
-  also carries the HIGH marker bug (D7), because every later segment depends on the
-  `[ ]/[-]/[x]` contract being trustworthy.
-- **`S2` second** because the map must exist *before* any rename, or `S3` would land
-  skills the enforcer cannot place (D-6).
-- **`S3` third** because the consolidation consumes both: it collapses gitflow pointers
-  written in `S1` and registers each renamed skill in the map from `S2`.
-- **`S4` fourth** because it is orthogonal and additive; it must not be entangled with
-  the governance work whose measure is deletion.
-- **`S5` fifth** — the residual bug sweep and the branch hygiene that G8 mandates, both
-  of which want a stable tree.
+- **`S1` first** — it changes the mechanism this release integrates itself with (G4/G6);
+  it also carries the HIGH marker bug (D7), on which every later segment's `[ ]/[-]/[x]`
+  contract depends.
+- **`S2` second** — the map must exist *before* any rename (D-6).
+- **`S3` third** — the consolidation consumes both: `S1`'s pointers, `S2`'s map rows.
+- **`S4` fourth** — orthogonal and additive; never entangled with work measured by deletion.
+- **`S5` fifth** — bug sweep and branch hygiene (G8), both wanting a stable tree.
 
 **Then, and only then, the `rc` lane.** A segment never reaches `develop` on its own: the
 five close on the branch, and the release integrates **once**, whole, as `rc-1`. What comes
 after `rc-1` is not more scope — it is what testing the merged `develop` finds about the
 scope already merged.
 
-Three properties are non-negotiable throughout:
+*(A1)* **Amendment 1 does not reorder anything — it fills two segments.** `S3` grows from
+"skills" to the whole AI surface (trims, disclosures, sediments, invocation model, personas,
+per-prompt injection, and the double-load bug), all of it landing **before** the single
+projection cycle so the golden regen is still regenerated once. `S5` **opens** with the
+anti-loop pair (FR22 method, FR23 gate) so its own eight fixes are their first users. The
+same principle governs both: **delete before you add**, and the measure is the diff.
+
+Four properties are non-negotiable throughout:
 
 1. **RED before GREEN**, on the executed path.
 2. **Green at every commit** — `dadaia ci preflight`, `backlog doctor`, `specs doctor`,
@@ -51,6 +56,8 @@ Three properties are non-negotiable throughout:
 3. **The standing order is an acceptance.** No puxadinho: no new branch, flag, second code
    path or cross-feature reach-in to make something pass. Every review verdict states the
    bug-surface delta of the feature it touched.
+4. *(A1)* **The AI surface only shrinks** (A21.8): a task that grows
+   `public/{agents,skills,data,entities}/**` justifies it in its commit message or is wrong.
 
 ---
 
@@ -68,7 +75,11 @@ Three properties are non-negotiable throughout:
 | `features/migrate` | `state_v2.py` → registry v2→v3 migration | FR15 |
 | `features/export`, `features/panel` | `ExportService`, `PanelContext` | FR18 |
 | `core` | `models/spec_context.py` (`SpecContextProject`) | FR15 |
-| `cli` | `commands/context.py` (repo add/remove/list, create, show, list), `commands/ci.py` (help text, `gc-push-verdicts` re-key) | FR3, FR17, FR18 |
+| `cli` | `commands/context.py` (repo add/remove/list, create, show, list), `commands/ci.py` (help text, `gc-push-verdicts` re-key); *(A1)* `commands/bugs.py` — the `resolved`-evidence refusal | FR3, FR17, FR18, FR23 |
+| *(A1)* `core` + `features/bugs` | `bug-event-v1` schema: the three evidence fields, historical events unchanged | FR23 |
+| *(A1)* `hooks` | `ctx_inject` — the dispatcher preflight deleted, the ALIVE list only when unbound | FR30 |
+| *(A1)* `public/agents` + `public/skills` (2nd pass) | the nine personas cut to 120–220 lines with the bug-surface axis, one pass per file; `dd-bug-fix` as method; the four trims; the five disclosures + siblings; the sediment sweep; the invocation model | FR22, FR24–FR29 |
+| *(A1)* `infrastructure/public_assets` | one decision at the projection seam: which harness receives the rules-dir law mirror | FR31 |
 | `.github/workflows` | `ci.yml` triggers, `pr-source-guard`, verdict PR gate | FR4 |
 | `scripts`/preflight | `lint-imports` joins the preflight sequence | FR6 |
 | `tests` | unit / contract / integration only — **zero new e2e** without a named qa exception | all |
@@ -96,12 +107,15 @@ S2   FR7 map JSON+schema → FR8 constitution (operator-confirmed) → FR9 enfor
        (+ retire lint-skill-collisions) → QA close
        ↓
 S3   FR10 fold closure → FR11 dd-ai-eng-knowhow → FR12 renames (one commit each)
-       → FR13 projection + goldens (+AR-1 ruling) → FR14 study handoff → QA close
+       → (A1) FR25 trims → FR26 disclose → FR28 invocation → FR24+FR29 persona pass
+       → FR27 sediments + citation check → FR31 double-load bug → FR30 ctx_inject
+       → FR13 projection + goldens, ONCE (+AR-1 ruling) → FR14 study handoff → QA close
        ↓
 S4   FR15 model+migration → FR16 alive/dead → FR17 verbs → FR18 surfaces (+superseded bug)
        → FR19 one control point → QA close
        ↓
-S5   8 bug tasks (Arm B) → FR20 branch hygiene → QA close
+S5   (A1) FR22 dd-bug-fix method → FR23 resolved-evidence gate
+       → 8 bug tasks (Arm B, first users of both) → FR20 branch hygiene → QA close
        ↓
      scope complete: full gates → code review (thawed) → security review → QA closes
      the release
@@ -118,12 +132,10 @@ final rc  memory window → CLOSURE → archive → version bump → PR → deve
 **Sanctioned parallelism.** At most one pair per segment, declared in TASKS with disjoint
 write sets. Everywhere else: **one `[-]` at a time**.
 
-**A segment close is a commit, not a merge.** `S1 … S5` each end with a `qa-engineer`
-review **committed to `feature/0.4.4`** — no PR, no `rc` burned, nothing reaching
-`develop`. The release integrates once, whole, at `rc-1` (G4 milestone (b)). The order
-**review → closure → archive → ship** holds across the lane: the six-axis review runs on
-the thawed tree before `rc-1`, every later `rc` delta gets its own delta review, and only
-the final `rc` carries the memory window, CLOSURE, the archive move and the ship.
+**A segment close is a commit, not a merge** (SPEC D8): `S1 … S5` each end with a
+`qa-engineer` review committed to `feature/0.4.4`. The order **review → closure → archive
+→ ship** holds across the lane — the six-axis review on the thawed tree before `rc-1`, a
+delta review per later `rc`, and only the final `rc` carrying memory, CLOSURE and archive.
 
 ---
 
@@ -146,14 +158,9 @@ This is the delta **`S1`** installs. It is stated here once; TASKS references it
 burns one `rc-N` (G4) — the first is `rc-1`, after `S5`. `rc-N` never appears in a branch
 name (G5), and a segment never burns one (SPEC D8).
 
-**Two recorded mechanical limits** (both in SPEC A4.4 / D-3):
-1. a CI job added on a branch does not run on the PR that introduces it — the `rc-1` PR is
-   the PR that brings the verdict gate to `develop`, so the gate is advisory there and
-   required from `rc-2`; making it *required* is a repo setting, and
-   `gh api PATCH required_status_checks` clobbers the list, so it is re-supplied whole;
-2. the workspace venv is not an editable install — `S1`'s chokepoint is not live until
-   `.dadaia/.venv` is reinstalled, which is a step of `S1`'s close, verified by an
-   executed-path refusal probe on both edges.
+**Two recorded mechanical limits** — the CI job that cannot run on its own PR, and the
+non-editable workspace venv — are stated once in SPEC A4.4 and D-3 and carried by tasks
+T-044-07 and T-044-10. Not restated here.
 
 ---
 
@@ -161,10 +168,9 @@ name (G5), and a segment never burns one (SPEC D8).
 
 **`S1` — gitflow v2.** Law first (one section, cross-references everywhere else), then the
 skill (rename + rewrite in one touch, D3), then the code, then CI, then the pointer sweep —
-so that at no point does a pointer name a home that does not yet exist. The pointer sweep is
-mechanical and measured: the scan lists 14 surfaces, and A5.1's grep is the completion
-proof. FR6 rides here because it edits the same preflight script the header of which FR5
-trims.
+so no pointer ever names a home that does not yet exist. The sweep is mechanical and
+measured: 14 surfaces, A5.1's grep the completion proof. FR6 rides here because it edits
+the same preflight script whose header FR5 trims.
 
 **`S2` — the map.** The JSON is authored first and seeded from the scan's §F rows; the
 schema pins its shape; the constitution states the law; the enforcer lands last and must be
@@ -172,32 +178,35 @@ green at HEAD the moment it lands. `lint-skill-collisions.py` dies in the **same
 as the enforcer, with its `--self-test` fixtures ported, so coverage never has a gap
 (D4/A9.4).
 
-**`S3` — skills.** Order inside the segment matters: fold (`dd-release-closure` →
+**`S3` — the AI surface.** Order inside the segment matters: fold (`dd-release-closure` →
 `dd-release-implement`) before the AI fusion, because the fold's pointers are rewritten by
 the fusion's pass over agents; renames after both, one commit per skill, each carrying its
-map row so the `S2` enforcer is never red; then one projection cycle with the golden
-regen; then the study, which reads the *final* inventory. The study produces proposals
-only — nothing in the nine is touched.
+map row so the `S2` enforcer is never red. *(A1)* Then the audit's content work, in the only
+order that is satisfiable: **trims → disclosures → invocation model → the persona pass →
+the sediment sweep, whose citation check lands last and green at HEAD** (D-10) — a check
+that runs `test -e`/`--help` over every citation can only be green once the personas have
+been cut, because seven of the sediments live in them. The double-load bug and the
+`ctx_inject` reduction follow, both before the **single** projection cycle: the bug changes
+the projected inventory, and one regen is the whole point (D11/AR-1). The study reads the
+*final* inventory and produces proposals only; the audit's dispositions enter it as evidence
+(A14.5), never as decisions.
 
 **`S4` — associated repos.** Model and migration first (schema v3, backup-first,
-idempotent), then lifecycle, then verbs, then surfaces. One accessor for "the context's
-repos" (A15.3) is the structural requirement: every consumer — alive, dead, show, list,
-export, panel, ci — reads the same collection, so the `list`/`show` divergence the
-superseded bug reports cannot re-form (A18.3).
+idempotent), then lifecycle, verbs, surfaces. One accessor for "the context's repos"
+(A15.3) is the structural requirement: alive, dead, show, list, export, panel and ci read
+the same collection, so the `list`/`show` divergence cannot re-form (A18.3).
 
-**`S5` — bugs and branches.** Eight Arm-B tasks (the HIGH marker bug landed in `S1`, D7).
-Four of them
-(`atomic-writer-drift-guard`, `crlf-fixture`, `no-ratchet-against-frozen-clock`,
-`read-only-atom-honouring`) are test-quality or advisory-guard defects whose correct fix is
-**smaller** code, not a new guard: the drift guard is replaced by a behavioural battery, the
-CRLF fixture gains an explicit `newline=`, the frozen-clock ratchet is one source-scan
-contract test in a shape the repo already uses, and the read-only guard is either documented
-as advisory or moved after the no-change determination. Two
-(`migration-normalises-crlf-atoms`, `symlinked-specs-root`) are decide-then-state defects:
-choose the behaviour, state it once, pin it with a test. Two are doctor defects with a
-shared root — `backlog-doctor` under-validating its own document schema — and are fixed
-**together**, in the document parser, not with two independent checks. The branch hygiene
-runs last: tag, verify reachability per branch, then delete.
+**`S5` — the loop, then the bugs, then the branches.** *(A1)* The segment **opens** with
+FR22 (the diagnosing method) and FR23 (the `resolved`-evidence gate), so its own eight fixes
+are the first work run under both — the audit's numbers (132/438 evidence-free resolutions,
+24-minute median, 84–95 % re-bug) describe exactly the cadence a sweep would otherwise
+repeat. The gate must be **satisfiable on the first real fix** (A23.6); if it is not, that
+is a defect fixed here — no bypass flag exists. Then the eight
+Arm-B tasks, whose per-bug approach TASKS carries in full: four are test-quality or
+advisory-guard defects whose correct fix is **smaller** code, two are decide-then-state
+defects, and two are one root — `backlog-doctor` under-validating its own document schema —
+fixed **once**, in the parser. The branch hygiene runs last: tag, verify reachability per
+branch, then delete.
 
 **The `rc` lane — integrate, then mature, then ship.** Scope-complete first: full gates →
 `code-reviewer` (six axes, thawed tree) → `security-reviewer` (the delta) → `qa-engineer`
@@ -234,6 +243,12 @@ under `.dadaia/tmp/<agent>/<YYYYMMDD>/`, and cited as CLOSURE evidence.
 | V11 | production LOC added/deleted per segment | A21.4, `## Size accounting` |
 | V12 | `dadaia bugs status` at closure (expect zero open from the picked set) | disposition sweep |
 | V13 | `SPEC-DOC-031` count **after** the archive move | closure standing note |
+| **V14** *(A1)* | **always-on tokens per session** — the law as each harness loads it + the 9 persona bodies + every always-loaded skill description; before (~8.4k) and after | A21.9 (≤ 3.5k), FR29, FR31 |
+| **V15** *(A1)* | **negation census** (`never`/`do not`/`don't`/`forbidden`/`prohibited`) over `public/**`; before (160) and after | A21.9 (≤ 60), A29.4 |
+| **V16** *(A1)* | **always-loaded description bytes**, before/after `disable-model-invocation` | A28.4 |
+| **V17** *(A1)* | **per-skill and per-persona line counts**, before/after — the four trims, the five disclosures, the nine personas, the AI fusion | A25.5, A26.2, A29.1, A11.8 |
+| **V18** *(A1)* | **injected-prefix tokens per prompt**, bound and unbound, on a **real** session | A30.1–A30.2 |
+| **V19** *(A1)* | **AI-surface LOC added/deleted** over `public/{agents,skills,data,entities}/**` for the whole release | A21.8 (net-negative), CLOSURE's AI-surface accounting |
 
 ---
 
@@ -251,16 +266,21 @@ under `.dadaia/tmp/<agent>/<YYYYMMDD>/`, and cited as CLOSURE evidence.
 | `rc` legitimacy | every `rc-N ≥ 2` names the defect on this scope it answers | CLOSURE `rc` ledger (A21.7) |
 | Memory atomicity | `dadaia specs doctor` after the memory window | before CLOSURE commit |
 | Consumer truth | `dadaia public doctor` + projection byte-diff | every segment with a `public/**` edit |
+| *(A1)* Nothing lost in the pruning | the FR29 coverage table (per removed block, its surviving home) + A26.5's pointer check | the `S3` QA close and the six-axis review |
+| *(A1)* Citations are real | FR9's citation check (`test -e` / `--help`) — machine, not inspection | `S3` close, then every commit |
+| *(A1)* The Arm-B gate is satisfiable | `S5`'s first bug appends a well-formed `resolved` event on the first try (A23.6) | `S5` proceeds |
+| *(A1)* The measured targets | V14–V19 at scope-complete, against SPEC A21.8–A21.11 | T-044-44 |
 
 ---
 
 ## 8. Technical risks
 
-Carried in SPEC §6 (D-1 … D-9, AR-1, AR-2, R-1 … R-8) and not restated here. Three shape
+Carried in SPEC §6 (D-1 … D-10, AR-1, AR-2, R-1 … R-11) and not restated here. Four shape
 the plan's order rather than a single task: **R-1** (`S1` changes the integration mechanism
 itself, so it lands first and is proven by an executed-path probe), **R-2** (`S4` is the
-only additive segment, so it is isolated and separately accounted) and **R-8** (the `rc`
-lane must not become a second pick).
+only additive segment, so it is isolated and separately accounted), **R-8** (the `rc`
+lane must not become a second pick) and *(A1)* **D-10** (`S3`'s citation check is green only
+after the persona pass, which fixes seven of the sediments it checks).
 
 ---
 
@@ -276,3 +296,5 @@ lane must not become a second pick).
    sweep, the `rc` ledger and the AR-1/AR-2 rulings.
 6. The release directory is archived, `0.4.4` is published, `feature/0.4.4` is deleted and
    `feature/0.4.5` is cut from `main` in the same step.
+7. *(A1)* The measured targets hold: AI surface **net-negative** (V19), always-on ≤ 3.5k
+   (V14), negations ≤ 60 (V15), prefix ≤ 0.7k (V18), zero dead citations by check (A21.10).

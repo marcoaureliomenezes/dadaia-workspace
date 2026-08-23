@@ -92,6 +92,66 @@ def test_codex_live_probe_fails_on_nonzero_exec_exit(
         _codex_live_probe_detail(fake, tmp_path)
 
 
+# codex-live-probe-gate-checks-presence-not-usability (MEDIUM, reported 2026-08-23):
+# an installed-but-unentitled Codex account rejects `codex exec` with an upstream
+# invalid_request_error/4xx — that is the SAME "installed Codex is unusable" condition
+# `_CertificationSkip` already exists for (see the absent-binary test above), not a new
+# state. This fixture is the real stderr captured on the reporting machine (`codex
+# login status` -> "Logged in using ChatGPT", no Codex entitlement) — it carries no
+# account identifiers; only the operator-local `workdir:` absolute path is redacted
+# (never a tracked-file literal, per DADAIA.md §8), which is inert to the classifier
+# under test (it parses the trailing `ERROR: {...}` JSON payload, not this line).
+_REAL_ENTITLEMENT_REJECTION_STDERR = (
+    "Reading additional input from stdin...\n"
+    "OpenAI Codex v0.145.0\n"
+    "--------\n"
+    "workdir: [REDACTED-LOCAL-PATH]\n"
+    "model: gpt-5.6-sol\n"
+    "provider: openai\n"
+    "approval: never\n"
+    "sandbox: read-only\n"
+    "reasoning effort: high\n"
+    "reasoning summaries: none\n"
+    "session id: 01a0300f-ae62-7383-8bcf-7b1ddfb70ece\n"
+    "--------\n"
+    "user\n"
+    "Reply with exactly the single line: DADAIA-LIVE-PROBE-OK. No tool calls, no other "
+    "text.\n"
+    "warning: Model metadata for `gpt-5.6-sol` not found. Defaulting to fallback "
+    "metadata; this can degrade performance and cause issues.\n"
+    'ERROR: {"type":"error","status":400,"error":{"type":"invalid_request_error",'
+    '"message":"The \'gpt-5.6-sol\' model is not supported when using Codex with a '
+    'ChatGPT account."}}\n'
+    'ERROR: {"type":"error","status":400,"error":{"type":"invalid_request_error",'
+    '"message":"The \'gpt-5.6-sol\' model is not supported when using Codex with a '
+    'ChatGPT account."}}\n'
+)
+
+
+def test_codex_live_probe_skips_honestly_when_installed_codex_lacks_entitlement(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """codex-live-probe-gate-checks-presence-not-usability: installed-but-unusable
+    Codex (upstream 4xx invalid_request_error, e.g. no model entitlement on the signed
+    -in account) is an honest environment degrade, not a probe defect — same
+    ``_CertificationSkip`` classification as an absent binary, consumed identically by
+    both ``certify()``'s ``check()`` wrapper and the live integration test's dynamic
+    skip."""
+    monkeypatch.setattr(
+        "dadaia_workspace.features.certification.service.shutil.which",
+        lambda name: "/usr/bin/codex",
+    )
+    fake = _FakeCertificationProcess(
+        {
+            "--version": CertificationProcessResult(0, "codex-cli 0.145.0\n", ""),
+            "exec": CertificationProcessResult(1, "", _REAL_ENTITLEMENT_REJECTION_STDERR),
+        }
+    )
+    with pytest.raises(_CertificationSkip, match="installed but unusable") as excinfo:
+        _codex_live_probe_detail(fake, tmp_path)
+    assert "not supported when using Codex with a ChatGPT account" in str(excinfo.value)
+
+
 def test_codex_live_probe_fails_when_marker_absent_from_stdout(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

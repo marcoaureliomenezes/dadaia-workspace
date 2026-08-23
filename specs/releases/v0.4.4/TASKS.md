@@ -1,6 +1,9 @@
 # TASKS — Release v0.4.4 — organize the core
 
 **Status:** Aprovado
+**Amendment 1:** Aprovado (operator, 2026-08-23) (2026-08-23, the skills audit folded in — SPEC §2/§8).
+**T-044-54 … T-044-62 are Draft and not implementable** until the operator approves the
+amendment delta; every original task id, the five segments and the `rc` lane are unchanged.
 **Release ID:** v0.4.4
 **Owner:** product-engineer
 **Source SPEC:** `specs/releases/v0.4.4/SPEC.md`
@@ -25,16 +28,17 @@ segments and the lane. `ACTIVE.md` carries no `segment:` line.
 
 **Execution order is the block order below, not numeric id order.** Ids are stable
 identifiers: T-044-52 and T-044-53 execute *before* T-044-47 … 51, because the closure
-artifacts ride the **final** `rc`.
+artifacts ride the **final** `rc`; and *(A1)* T-044-54 … 60 execute **inside `S3`, before
+T-044-21**, while T-044-61 … 62 execute **at the head of `S5`, before T-044-33**.
 
 | Block | Tasks | Contents | Gate |
 |---|---|---|---|
 | W0 | T-044-01 … 02 | definition commit + milestone (a), **v1 mechanic once** (E-1/D2) | APPROVED security verdict on the pushed `develop` delta |
 | `S1` | T-044-03 … 11 | HIGH marker bug + gitflow v2 (FR1–FR6) | `qa-engineer` review **committed** + `software-architect` **AR-2** ruling |
 | `S2` | T-044-13 … 16 | rules→skills governance map (FR7–FR9) | `qa-engineer` review committed |
-| `S3` | T-044-18 … 24 | core skills consolidation (FR10–FR14) | `qa-engineer` review committed + `software-architect` **AR-1** ruling |
+| `S3` | T-044-18 … 20, **T-044-54 … 60** *(A1)*, T-044-21 … 24 | core skills consolidation (FR10–FR14) **+ the audit's B/C work (FR24–FR31)** — all content before the single projection cycle | `qa-engineer` review committed + `software-architect` **AR-1** ruling |
 | `S4` | T-044-26 … 31 | spec-context associated repos (FR15–FR19) | `qa-engineer` review committed |
-| `S5` | T-044-33 … 42 | bug sweep (8 tasks) + branch hygiene (FR20) | `qa-engineer` review committed |
+| `S5` | **T-044-61 … 62** *(A1)*, T-044-33 … 42 | the anti-loop pair (FR22–FR23) **first**, then the bug sweep (8 tasks) + branch hygiene (FR20) | `qa-engineer` review committed |
 | scope complete | T-044-44 … 46 | full gates → six-axis review → security review → QA closes the release | the trio APPROVED |
 | `rc-1` | T-044-52 | PR `feature/0.4.4` → `develop` — **milestone (b)**, the first v2 merge | merged, CI green |
 | `rc-2 … rc-N` | T-044-53 | adjustment rounds on this scope, found by testing the merged `develop` | one QA close + one merge per round |
@@ -83,7 +87,16 @@ delta — always before the archive move.
   improvements **on this release's scope**, found by testing the merged `develop`. A demand
   outside this scope is backlog for a later release (SPEC A21.7, R-8).
 - **A completed task group is one commit** — stage exactly the task's write set, never `-A`.
-- **Measurements** (V1–V13, PLAN §6) are captured under `.dadaia/tmp/<agent>/<YYYYMMDD>/`.
+- **Measurements** (V1–V19, PLAN §6) are captured under `.dadaia/tmp/<agent>/<YYYYMMDD>/`.
+- *(A1)* **The AI surface only shrinks.** Every task touching
+  `public/{agents,skills,data,entities}/**` is net-negative in lines, or its commit message
+  says why not (SPEC A21.8). A pointer replaces a restatement; never the reverse.
+- *(A1)* **Amendment gate.** No task in T-044-54 … T-044-62 is reserved (`[ ]`→`[-]`) before
+  the operator writes `Aprovado` in SPEC §8's Amendment 1 block. Reserving one earlier is a
+  discipline violation, not a gate block — the gate reads no marker.
+- *(A1)* **From T-044-62 onward, every `resolved` event carries the three evidence fields**
+  (red-loop command, test seam, diff direction). Earlier bug tasks in this release restate
+  them as CLOSURE validations; no past event is rewritten (A23.2/A23.4).
 
 ## Acceptance and evidence map
 
@@ -109,6 +122,13 @@ delta — always before the archive move.
 | T-044-18 | FR10 | A10.1–A10.3 | grep; section-by-section coverage table |
 | T-044-19 | FR11 | A11.1–A11.4 | V5 capture; folder diff; link-not-copy proof |
 | T-044-20 | FR12 | A12.1–A12.4 | per-skill commits; V6 capture; CLI verb check |
+| **T-044-54** *(A1)* | FR25 | A25.1–A25.5 | per-skill diffs; V17 capture; grep for the private worked example and "one question per turn" |
+| **T-044-55** *(A1)* | FR26 + FR10 | A26.1–A26.5, A10.4 | sibling files on disk; V17 body-size capture; the one surviving audit-dimension list |
+| **T-044-56** *(A1)* | FR28 | A28.1–A28.4 | frontmatter diffs; V16 capture; enforcer equivalence in both directions |
+| **T-044-57** *(A1)* | FR24 + FR29 | A24.1–A24.4, A29.1–A29.6 | per-persona line counts (V17); the **coverage table** (removed block → surviving home); V15 negation capture |
+| **T-044-58** *(A1)* | FR27 | A27.1–A27.20 | one grep per sediment line; the citation check green at HEAD |
+| **T-044-59** *(A1)* | FR31 / bug `dadaia-md-projected-twice-into-claude-code-context` | A31.1–A31.6 | RED-then-GREEN on the injected context; per-harness single-load evidence; `resolved` event |
+| **T-044-60** *(A1)* | FR30 | A30.1–A30.4 | V18 capture (bound + unbound), on a real session |
 | T-044-21 | FR13 | A13.1–A13.4 | V7 multiset diff; V9 capture; sibling-file byte check |
 | T-044-22 | FR13 / AR-1 | A13.5 | `software-architect` ruling |
 | T-044-23 | FR14 | A14.1–A14.4 | study handoff, validated |
@@ -121,7 +141,9 @@ delta — always before the archive move.
 | T-044-30 | FR19 | A19.1–A19.2 | bind + doctor fixtures with a specs-bearing associated repo |
 | T-044-31 | all `S4` | A15–A19 ids | `qa-engineer` artifact committed |
 | ~~T-044-32~~ | — | — | **retired** at the D8 restructure |
-| T-044-33 … 40 | the 8 remaining bugs | per task | RED-then-GREEN + `resolved` event each |
+| **T-044-61** *(A1)* | FR22 | A22.1–A22.5 | skill diff (net-negative); "Done when" per phase; the no-seam clause grep |
+| **T-044-62** *(A1)* | FR23 | A23.1–A23.6 | RED-then-GREEN refusal fixtures; `bug-event-v1` diff; law + skill wording; historical events still readable |
+| T-044-33 … 40 | the 8 remaining bugs | per task | RED-then-GREEN + `resolved` event **carrying the three fields** (A23.4) each |
 | T-044-41 | FR20 | A20.1–A20.4 | V10 capture before/after; per-branch tag proof |
 | T-044-42 | all `S5` | bug ids + A20 | `qa-engineer` artifact committed |
 | ~~T-044-43~~ | — | — | **retired** at the D8 restructure |
@@ -507,12 +529,170 @@ a named verb that no longer exists is a defect fixed here),
 
 ---
 
+> **T-044-54 … T-044-60 — Amendment 1 (Aprovado, operator 2026-08-23).** The audit's sections **B** and **C**, in
+> the only satisfiable order: trims → disclosures → invocation model → the persona pass →
+> the sediment sweep (whose citation check lands **last**, green at HEAD) → the double-load
+> bug → `ctx_inject`. All of it **before T-044-21**, so the projected inventory is
+> regenerated **once** (SPEC D11, AR-1). None is reservable before the operator approves
+> the amendment.
+
+- [ ] **T-044-54 — FR25: the four kept skills are trimmed**
+
+**Owner role:** ai-engineer · **Commit:** `docs(T-044-54): trim the four skills the audit keeps`
+
+**Preconditions:** T-044-20 `[x]`; Amendment 1 `Aprovado`.
+
+**Write set:** `public/skills/{dd-grill-me,dd-gitflow-default,dd-release-implement,dd-bug-registration}/**`,
+`public/agents/software-architect.md` (the grill-cadence alignment only), projections.
+
+**Description:** Align the architect persona to the skill's frontier-per-round cadence
+(delete "One question per turn"); remove the private worked example (a `v0.4.2` merge sha)
+from `dd-gitflow-default` and give each milestone a checkable "done"; delete
+`dd-release-implement`'s false "exists nowhere else" claim and leave the cadence one home;
+cut `dd-bug-registration` §6–§7. Capture **V17** before and after.
+
+**Done criterion:** A25.1–A25.5 hold; the four skills are net-negative in lines.
+
+**Parallelism:** none.
+
+---
+
+- [ ] **T-044-55 — FR26 (+FR10 A10.4): depth moves to sibling files**
+
+**Owner role:** ai-engineer · **Commit:** `docs(T-044-55): disclose skill depth to siblings`
+
+**Preconditions:** T-044-54 `[x]`.
+
+**Write set:** `public/skills/dd-release-implement/CLOSURE-TEMPLATE.md` (new sibling),
+`public/skills/{dadaia-handoff-emitter,dd-backlog-definition,dd-audit-project,dadaia-test-stewardship}/**`
+(+ their new siblings), `public/agents/project-auditor.md` (the dimension list), manifest,
+projections, map rows.
+
+**Description:** Five moves, each a **move**, not a copy: the CLOSURE template out of the
+folded skill's body; the handoff field tables and both JSON examples replaced by a pointer
+at `.dadaia/agentic/schemas/handoff-v1.schema.json`; `dd-backlog-definition` §7 deleted (its
+declaration lives in `rules-skills-map.json`, enforced once — D4/D10); the audit rubric to
+`RUBRIC.md` with **one** dimension list reconciled against the `project-auditor` persona;
+the stewardship numeric parameters to a file. Every moved block stays reachable by a named
+pointer from `SKILL.md`. Capture **V17**.
+
+**Done criterion:** A26.1–A26.5 and A10.4 hold; nothing disclosed is unreachable.
+
+---
+
+- [ ] **T-044-56 — FR28: the invocation model**
+
+**Owner role:** ai-engineer (frontmatter) + software-engineer (the enforcer check) ·
+**Commit:** `docs(T-044-56): user-invoked skills and operative dependency form`
+
+**Preconditions:** T-044-55 `[x]`.
+
+**Write set:** every `SKILL.md` frontmatter, the FR9 contract test, projections.
+
+**Description:** A skill no persona's `skills:` allowlist grants to a model carries
+`disable-model-invocation: true` and a human-summary description (`dd-audit-project` first).
+Operative dependencies become **"Call the Skill tool with `<name>`"**; a pure reference
+pointer stays prose. The equivalence is checked **in both directions** inside FR9's test —
+no hand-kept list. Capture **V16**.
+
+**Done criterion:** A28.1–A28.4 hold.
+
+---
+
+- [ ] **T-044-57 — FR24 + FR29: the persona pass, in one touch per file**
+
+**Owner role:** ai-engineer · **Commit:**
+`docs(T-044-57): personas carry only what the law does not, and state the bug-surface delta`
+
+**Preconditions:** T-044-56 `[x]`.
+
+**Write set:** all nine `public/agents/*.md`, `public/entities/registry.json` if a mandate
+line moves, projections.
+
+**Description:** **One pass per persona file** (A29.6): cut what `DADAIA.md` already states
+(Step 0 → one pointer, handoff-first, NO-LOCKS, the `[SCOPE ERROR]`/"workflows" blocks, the
+push rule already pointered by FR5, the four "Intake routing" copies, the `constitution §N`
+citations), rewrite "Hard rules" as **positive targets**, and add the **bug-surface axis**
+as a required verdict field to `code-reviewer`, `qa-engineer` and `software-architect`.
+Produce the **coverage table** — per removed block, its surviving home — as the commit's
+evidence; a fact with no other home stays. Capture **V17** (lines) and **V15** (negations).
+
+**Done criterion:** A24.1–A24.4 and A29.1–A29.6 hold; every persona is 120–220 lines and
+the coverage table is complete.
+
+**Parallelism:** none — nine files, one pass.
+
+---
+
+- [ ] **T-044-58 — FR27: the 25 sediments, and the citation check**
+
+**Owner role:** ai-engineer (content) + software-engineer (the check) · **Commit:**
+`fix(T-044-58): every cited path and command exists, and a check keeps it that way`
+
+**Preconditions:** T-044-57 `[x]` — seven of the sediments live in the personas.
+
+**Write set:** the remaining skill/persona texts carrying a sediment, the FR9 contract test
+(the citation check), fixtures, projections.
+
+**Description:** Work A27.1–A27.19 as a checklist, one grep per line; where FR10/FR11
+already deleted the file that carried an item, **state that** rather than assume it. Then
+land the citation check **inside FR9's test** (D4/D10): resolve every cited path (`test -e`)
+and every cited `dadaia` verb (`--help`), failing on the first that does not exist. It must
+be **green at HEAD the moment it lands** — which is why it is last.
+
+**Done criterion:** A27.1–A27.20 hold; a planted dead citation turns the check red.
+
+---
+
+- [ ] **T-044-59 — FR31 / bug (Arm B): the law is loaded once per harness**
+
+**Owner role:** software-engineer · **Commit:**
+`fix(T-044-59): project the law once per harness`
+
+**Preconditions:** T-044-58 `[x]`; **before** T-044-21 (D11 — this changes the projected
+inventory).
+
+**Write set:** `dadaia_workspace/features/public/**` and/or
+`infrastructure/public_assets/**`, tests, `specs/bugs/bugs.jsonl`.
+
+**Description:** Bug `dadaia-md-projected-twice-into-claude-code-context` (MEDIUM). The
+whole law is in a Claude Code session twice — root import chain **and**
+`.claude/rules/DADAIA.md`, ~3.3k duplicated tokens per turn. Reproduce first, then fix at
+the **projection seam** with one decision (which harness receives the rules-dir mirror) —
+never a per-file exclusion inside the installer. **Verify `.codex/` and `.kimi-code/`** for
+the same double load and record the result per harness, including "was already single". No
+harness may end with zero copies.
+
+**Done criterion:** A31.1–A31.6 hold; `resolved` event appended; bug `Closed`.
+
+---
+
+- [ ] **T-044-60 — FR30: `ctx_inject` stops restating the law**
+
+**Owner role:** software-engineer · **Commit:**
+`fix(T-044-60): the per-prompt injection carries state, not restatement`
+
+**Preconditions:** T-044-59 `[x]`.
+
+**Write set:** `dadaia_workspace/hooks/ctx_inject.py`, its tests.
+
+**Description:** Delete the four-point dispatcher preflight (a restatement of `DADAIA.md`
+§1/§2) and print the ALIVE context list **only when the session is unbound**. The lean
+memory prefix (tech-stack verbatim + `catalog.json`) is untouched — this removes
+restatement, never memory. Capture **V18** for a bound and an unbound session, on a real
+session.
+
+**Done criterion:** A30.1–A30.4 hold; ≤ 0.7k tokens for a bound session; net LOC ≤ 0.
+
+---
+
 - [ ] **T-044-21 — FR13: one projection cycle and a deliberate golden regen**
 
 **Owner role:** software-engineer (goldens) + ai-engineer (projection) · **Commit:**
 `test(T-044-21): regenerate the install goldens for the consolidated skill set`
 
-**Preconditions:** T-044-20 `[x]`.
+**Preconditions:** T-044-20 `[x]` — *(A1)* and T-044-54 … T-044-60 `[x]`, so **every**
+content and inventory change of this segment is absorbed by **one** regen (D11).
 
 **Write set:** `tests/unit/infrastructure/_golden/*.json`, any inventory-coupled test,
 manifest, projections.
@@ -662,9 +842,60 @@ found.
 
 ## Segment `S5` — the bug sweep and branch hygiene
 
-Every task in this block is Arm B on `feature/0.4.4`: reproduce → RED → root-cause fix →
+Every bug task in this block is Arm B on `feature/0.4.4`: reproduce → RED → root-cause fix →
 GREEN → `resolved` event with `--resolution-evidence` → commit. **Owner role:**
 software-engineer, unless stated. Each diff must leave its feature **smaller or equal**.
+
+> *(A1)* **T-044-61 and T-044-62 open the segment**, so the eight fixes below are the first
+> work run under the method and the gate. Both are Draft until Amendment 1 is approved; if
+> the operator approves the amendment after the sweep has started, the remaining fixes still
+> adopt them from that point, and the ones already closed are restated in CLOSURE (A23.4).
+
+- [ ] **T-044-61 — FR22: `dd-bug-fix` §3–§5 becomes a method**
+
+**Owner role:** ai-engineer · **Commit:**
+`docs(T-044-61): root cause becomes a method with a Done when per phase`
+
+**Preconditions:** T-044-31 `[x]` (`S4` closed); Amendment 1 `Aprovado`.
+
+**Write set:** `public/skills/dd-bug-fix/**` (+ a sibling if depth is disclosed), map row,
+projections.
+
+**Description:** Rewrite §3–§5 as the six phases, each ending in a checkable **"Done when"**
+(SPEC FR22): red loop before any hypothesis → minimise until load-bearing → 3–5 falsifiable
+hypotheses → instrument, never read code for a theory → regression test **at the correct
+seam** → cleanup. State once: *"no correct seam exists → register an architecture finding
+and dispatch `software-architect` before fixing"*. Delete the stale "still being designed"
+line and fix the description's grant claim. **No new skill** — the method lives here
+(SPEC §4.10).
+
+**Done criterion:** A22.1–A22.5 hold; the skill is net-negative in lines.
+
+---
+
+- [ ] **T-044-62 — FR23: the `resolved` event refuses evidence that cannot be checked**
+
+**Owner role:** software-engineer (CLI + schema) + ai-engineer (skill + law wording) ·
+**Commit:** `feat(T-044-62): resolved evidence carries the loop, the seam and the diff direction`
+
+**Preconditions:** T-044-61 `[x]`.
+
+**Write set:** `dadaia_workspace/cli/commands/bugs.py`, the `bug-event-v1` schema and its
+feature module, tests, `public/data/DADAIA.md` §6 (source only) + projections,
+`public/skills/dd-bug-fix/**`.
+
+**Description:** RED first: today an evidence-free `resolved` is accepted (132 of 438 on
+disk are exactly that). Then the refusal — **one validation inside the existing append
+path**, no second command and no bypass flag — for the three fields: the red-loop command,
+the test seam, and the **diff direction** (lines/branches/flags added vs removed on the
+touched feature). A net-positive diff routes to `software-architect` **before** the commit;
+the law says it once (§6), `dd-bug-fix` operates it. Historical events stay readable and are
+never rewritten.
+
+**Done criterion:** A23.1–A23.6 hold; `S5`'s first bug appends a well-formed event on the
+first try.
+
+---
 
 - [ ] **T-044-33 — bug `backlog-doctor-silent-on-duplicate-top-level-sections` (MEDIUM)**
 
@@ -788,9 +1019,13 @@ bug-surface delta per bug. No merge, no PR.
 
 **Description:** Run every gate; capture **V11** (production LOC per segment) and **V12**
 (`dadaia bugs status`). A21.4's negative net is measured here, or its justification is
-drafted for CLOSURE.
+drafted for CLOSURE. *(A1)* Also capture **V14** (always-on tokens), **V15** (negations),
+**V16** (description bytes), **V17** (per-skill/per-persona lines), **V18** (injected prefix,
+bound and unbound) and **V19** (AI-surface LOC) — the evidence for A21.8–A21.11. A positive
+AI-surface net is a **defect**, not a CLOSURE note: it is fixed here or ruled on by the
+operator before ship.
 
-**Done criterion:** A21.1–A21.6 hold, with evidence.
+**Done criterion:** A21.1–A21.6 hold, with evidence; *(A1)* A21.8–A21.11 hold, measured.
 
 ---
 
@@ -883,8 +1118,11 @@ doctor` 0 errors.
 **Preconditions:** T-044-47 `[x]`.
 
 **Description:** Per the folded `dd-release-implement` (FR10/A10.3): summary, tasks +
-commits, validations, size accounting, drifts, memory updates, **dispositions** (4 backlog
-`DELIVERED · v0.4.4`; 10 bugs `Closed`; 1 `Closed` + `superseded_by`), test dispositions,
+commits, validations, size accounting, *(A1)* **AI-surface accounting** (V19 + the measured
+targets with their V-ids) and the **audit-fold record** (per audit item, the FR that carried
+it; per refused item, the reason and where it went), drifts, memory updates,
+**dispositions** (4 backlog `DELIVERED · v0.4.4`; **12** bugs `Closed`; 1 `Closed` +
+`superseded_by`), test dispositions,
 record-only vs intake, the artifact GC sweep, the **`rc` ledger** (every `rc` burned, what
 was found on `develop`, by whom, and its fix — A21.7), the AR-1/AR-2 rulings, the
 standing-order verdict record, the restated v0.4.3 git-identity question, archive decision

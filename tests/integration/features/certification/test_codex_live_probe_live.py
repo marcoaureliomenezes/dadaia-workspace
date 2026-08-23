@@ -5,9 +5,13 @@ codex-live-probe seam; declared plan ref T-043-34)
 
 Genuinely exercises the INSTALLED Codex binary through the production
 ``SubprocessCertificationProcess`` adapter — no fake, no mock; a real ``codex exec``
-call leaves this process. Skips honestly (never fails) when no ``codex`` CLI is
-reachable on PATH — true for every CI runner today, since Codex is a manually
-installed local dev tool, not a repo/CI dependency. This is the env-gated,
+call leaves this process. Skips honestly (never fails) when Codex is unavailable to
+this environment: absent from PATH (checked statically below — true for every CI
+runner today, since Codex is a manually installed local dev tool, not a repo/CI
+dependency), or installed but unusable — a signed-in account the upstream API rejects
+with an entitlement/plan 4xx (checked dynamically in the test body, via the same
+``_CertificationSkip`` classification ``certify()`` itself relies on; see
+codex-live-probe-gate-checks-presence-not-usability). This is the env-gated,
 plan-referenced skip dadaia-test-stewardship §I requires ("give every env-gated skip a
 plan ref or delete it") — the plan ref is T-043-34/A22.4 above.
 """
@@ -19,7 +23,10 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.features.certification.service import _codex_live_probe_detail
+from dadaia_workspace.features.certification.service import (
+    _CertificationSkip,
+    _codex_live_probe_detail,
+)
 from dadaia_workspace.infrastructure.certification_process import SubprocessCertificationProcess
 
 pytestmark = pytest.mark.skipif(
@@ -41,8 +48,17 @@ def test_codex_live_probe_exercises_the_real_installed_codex(tmp_path: Path) -> 
     worst case; the default integration-tier ceiling (60s) would truncate a
     legitimately slow-but-successful run before the function's own bounded-timeout
     logic gets to report cleanly.
+
+    codex-live-probe-gate-checks-presence-not-usability: a Codex binary on PATH that
+    the signed-in account cannot actually use (no plan/model entitlement) is the same
+    honest environment degrade as an absent binary — dynamically skip here too, rather
+    than failing the gating selector on an environment condition the test's own
+    docstring already promises to skip.
     """
     process = SubprocessCertificationProcess()
-    detail = _codex_live_probe_detail(process, tmp_path)
+    try:
+        detail = _codex_live_probe_detail(process, tmp_path)
+    except _CertificationSkip as exc:
+        pytest.skip(reason=f"{exc} — plan ref T-043-34 (v0.4.3 A22.4)")
     assert "live exec probe observed" in detail
     assert "DADAIA-LIVE-PROBE-OK" in detail
