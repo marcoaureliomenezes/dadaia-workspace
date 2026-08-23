@@ -88,6 +88,27 @@ is no longer archive-only.
 
 ## ACTIVE
 
+### dd-diagnose
+- **Title:** dd-diagnose — model-invoked diagnosing-bugs method called by dd-bug-fix: loop red before any hypothesis, minimise, falsifiable hypotheses, instrument, regression test at the right seam, "no correct seam → architecture finding"
+- **Opened:** 2026-08-23
+- **Status:** candidate
+- **Description:** Turn "root cause, always" (DADAIA.md §6) from a law into a **method with checkable "Done when" per phase**. A new core skill `dd-diagnose`, model-invoked and called by `dd-bug-fix` ("Call the Skill tool with \"dd-diagnose\""), carries the diagnosing-bugs phases: (1) a reproduction loop that is already red-capable and has actually been run red **before** any hypothesis is written; (2) minimise the failing input/path; (3) hypotheses stated so they can be falsified, one at a time; (4) instrument (logs/asserts/probes) rather than guess; (5) a regression test at the **correct seam** — the boundary the bug actually crossed, not the nearest convenient unit; (6) cleanup of instrumentation. **Key clause:** when no correct seam exists for the regression test, the fix does not proceed — the agent registers an architecture finding and the dispatcher routes `software-architect` before the fix. This is the audit's answer to the bug loop (464 registered bugs, 132/438 `resolved` events with empty evidence, re-bug within 72 h per surface): `dd-bug-fix` §3–§5 today states the outcome but not the procedure. Reference: `mattpocock/skills/skills/engineering/diagnosing-bugs/` (`SKILL.md` + `agents/` + `scripts/`). Scope boundary: this entry creates the skill and the operative pointer from `dd-bug-fix`; the three mandatory `--resolution-evidence` fields and the CLI refusal of empty `resolved` evidence are section A material folded into v0.4.4, not re-registered here. Governance: the new skill maps to the DADAIA.md §6 bold topic "Root cause, always" (one skill ↔ one topic). **Audit roadmap hint (not a disposition):** R1 — "anti-loop in Arm B".
+- **Provenance:** operator ratification (2026-08-23) of the research report `.dadaia/reports/dadaia-workspace/claude-code/2026-08-23T183323Z-skills-audit-vs-reference/` (handoff `.dadaia/handoff/dadaia-workspace/2026-08-23T183323Z-claude-code-skills-audit-vs-reference.handoff.json`), section D "new skills proposed" — ruled to the backlog while sections A–C fold into release v0.4.4; relates-to `core-skills-consolidation` and `rules-skills-governance-map` (both CONSUMED by v0.4.4) and to the governance rule "every skill maps to one DADAIA.md bold topic"; roadmap placement R1 (hint)
+- **Intents:**
+```yaml
+- subject:
+    kind: doc
+    ref: dadaia_workspace/public/skills/dd-diagnose/SKILL.md
+    surface: new
+  change: "new model-invoked core skill, writing-for-agents pattern: six ordered phases (loop red → minimise → falsifiable hypotheses → instrument → regression test at the right seam → cleanup) each ending on a checkable Done-when; the no-correct-seam clause registers an architecture finding and yields to software-architect before any fix; adapted from mattpocock/skills/skills/engineering/diagnosing-bugs"
+- subject:
+    kind: doc
+    ref: dadaia_workspace/public/skills/dd-bug-fix/SKILL.md
+    surface: new
+  change: "reproduce/RED/root-cause steps become an operative dependency — Call the Skill tool with \"dd-diagnose\" — instead of restating the method; dd-bug-fix keeps only the hotfix lifecycle (branch, resolved event, commit)"
+```
+
+
 ## LEDGER
 
 - push-range-denylist-scan · DELIVERED · v0.9.0 · 2026-08-14
