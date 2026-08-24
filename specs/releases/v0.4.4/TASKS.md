@@ -1113,7 +1113,7 @@ Never duplicated into each write site.
 
 ---
 
-- [ ] **T-044-41 — [git] FR20: branch hygiene on `origin` and locally**
+- [-] **T-044-41 — [git] FR20: branch hygiene on `origin` and locally**
 
 **Owner role:** dispatcher · **Commit:** none (git refs) — capture **V10** before and after.
 
