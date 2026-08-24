@@ -40,11 +40,63 @@ carries ``disable-model-invocation: true``:
 7a. A skill in NO allowlist (and not universally granted) must carry
     ``disable-model-invocation: true``.
 7b. A skill carrying ``disable-model-invocation: true`` must be in NO allowlist.
+
+FR27 (T-044-58, A27.20) adds the **citation check** to this SAME enforcer — "no second
+enforcer" (D4/D10) applies here too: every public asset under ``dadaia_workspace/public/
+**/*.md`` (skills AND agents — the same ``_PUBLIC`` tree the six failure modes already
+read) is scanned for two kinds of backticked citation, each resolved with real ``test -e``
+/ command-tree semantics — never a hand-kept per-file allowlist of "this one is fine":
+
+**(a) Path citations.** A backticked token is *path-shaped* only if it starts with one of
+three prefixes that are real, checked-in directories of THIS repo — ``specs/``,
+``dadaia_workspace/``, ``.github/`` — resolved against the repo root; or it is a *bare*
+filename (``<name>.md|json|rules|txt``, no ``/``) immediately annotated ``(sibling)`` /
+``sibling`` in the surrounding prose — an annotation convention already used in this
+corpus (e.g. ``` `RUBRIC.md` (sibling) ```) — resolved first against the citing file's own
+folder, falling back to anywhere under ``dadaia_workspace/public/`` (a small number of
+sibling mentions are cross-folder, e.g. a persona pointing at a skill's own template).
+
+Exclusions are structural RULES, never a per-citation allowlist:
+
+1. Any token containing a placeholder character ``< > { } *`` or ``|`` (alternation) is
+   skipped — covers ``<slug>``, ``{M.m.p}``, ``<id>``, globs like ``**``, and compact
+   multi-directory notation like ``specs/bugs|backlog|audits/``.
+2. Any token containing an ellipsis (``...`` / ``…``) is skipped — an illustrative
+   elision, never a real path.
+3. Any ``.dadaia/``-prefixed token is skipped — ``.dadaia/`` is the workspace-level
+   runtime directory this very law (``DADAIA.md`` §4) forbids from ever living inside a
+   repo tree, so no repo-relative ``test -e`` could legitimately resolve it; checking it
+   would either always fail (breaking A9.1's "green at HEAD") or reach outside the repo
+   (breaking CI hermeticity — the checkout has no ambient ``.dadaia/`` at all).
+4. Any prefix other than the three checked ones (``repos/<slug>``, ``.claude/``,
+   ``.codex/``, ``.agents/``, ``.kimi-code/``, ``mattpocock/skills/...``) is simply not
+   *path-shaped* under this pattern — a narrow allow-prefix by construction, not a
+   denylist, so external/example refs are excluded without ever naming them.
+5. A bare filename with **no** ``(sibling)``/``sibling`` annotation is generic SDD/
+   workspace vocabulary (``SPEC.md``, ``TASKS.md``, ``AGENTS.md``, … naming a document
+   *type*, not a specific file relative to anything) — never checked, since there is no
+   structural signal it names a real citable file.
+
+**(b) Command citations.** A backticked span containing the standalone word ``dadaia``
+(never matched inside a path like ``.dadaia/.venv/bin/dadaia`` or the identifier
+``dadaia_workspace`` — a negative lookbehind/lookahead enforces the word boundary) followed
+by up to two further lowercase-hyphen words is the acceptance line's own
+``dadaia <verb> [<sub>]`` shape; trailing flags/args/placeholders are ignored (arguments,
+not the citation's own resolvable verb path). The live command tree is derived by
+**importing** ``dadaia_workspace.cli.main:app`` and walking it with
+``typer.main.get_command`` — never a subprocess ``--help`` parse — because it is hermetic
+(no PATH/venv indirection inside the test process), fast (no process spawn per group), and
+always exactly the code under test (never a stale transcription); it is computed once per
+run (``functools.lru_cache``).
+
+Both checks fail naming ``file:line`` and the dead path/verb (A27.20). Two mutation
+fixtures (dead path, dead verb) prove each red on a ``tmp_path`` copy — never a repo file.
 """
 
 from __future__ import annotations
 
 import copy
+import functools
 import json
 import re
 from itertools import combinations
@@ -53,6 +105,7 @@ from typing import Any
 
 import jsonschema
 import pytest
+from typer.main import get_command
 
 pytestmark = pytest.mark.contract
 
@@ -77,6 +130,31 @@ _APPLYTO_RE = re.compile(r'^applyTo:\s*"?([^"\n]*)"?\s*$', re.MULTILINE)
 # surface is intentionally universal/near-universal — never asserted disjoint.
 _UNIVERSAL_GLOBS: frozenset[str] = frozenset({"**"})
 _UNIVERSAL_NAMES: frozenset[str] = frozenset({"dd-grill-me"})
+
+# --------------------------------------------------------------------------- #
+# FR27/A27.20 — the citation check. See the module docstring for the full
+# citable-pattern definition and exclusion rules; the constants/regexes below
+# implement exactly what is documented there, nothing more.
+# --------------------------------------------------------------------------- #
+
+_REPO_ROOT = _PKG_ROOT.parent
+
+_CITATION_BACKTICK_RE = re.compile(r"`([^`\n]+)`")
+_PLACEHOLDER_CHARS = frozenset("<>{}*|")
+_ELLIPSIS_MARKERS = ("...", "…")
+_WORKSPACE_RUNTIME_PREFIX = ".dadaia/"
+_CITABLE_PATH_PREFIXES = ("specs/", "dadaia_workspace/", ".github/")
+_SIBLING_FILENAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*\.(?:md|json|rules|txt)$")
+_SIBLING_MARKER_RE = re.compile(r"^\(?\s*sibling\b")
+_BLOCKQUOTE_PREFIX_RE = re.compile(r"^>\s*")
+
+# `dadaia` as a standalone word only — never inside `.dadaia/.venv/bin/dadaia` (preceded
+# by a path char) or `dadaia_workspace` (followed by a word char) — then up to two
+# further lowercase-hyphen words (the `dadaia <verb> [<sub>]` shape; trailing flags/args
+# are simply not captured by the pattern and are ignored).
+_DADAIA_VERB_RE = re.compile(
+    r"(?<![\w./-])dadaia(?!\w)(?:\s+([a-z][a-z0-9-]*))?(?:\s+([a-z][a-z0-9-]*))?"
+)
 
 
 # --------------------------------------------------------------------------- #
@@ -568,3 +646,168 @@ def test_mutation_fixture_8_flagged_skill_still_granted_turns_red() -> None:
 
     violations = _find_flagged_but_granted(granted, mutated_flagged)
     assert violations == [target]
+
+
+# --------------------------------------------------------------------------- #
+# FR27/A27.20 (T-044-58) — the citation check. Citable-pattern definition and
+# exclusion rules: module docstring. Command-tree derivation choice (import, never
+# subprocess) and its justification: module docstring.
+# --------------------------------------------------------------------------- #
+
+
+@functools.lru_cache(maxsize=1)
+def _derive_command_tree() -> frozenset[tuple[str, ...]]:
+    """Walk the REAL Typer app (never a subprocess ``--help`` parse — see module
+    docstring for the hermetic/fast/always-in-sync justification), once per run.
+
+    Walked by duck-typing (``hasattr(cmd, "commands")``), never
+    ``isinstance(cmd, click.Group)``: the installed ``typer`` (``>=0.27.1``) vendors its
+    own click-compatible core (``typer._click.core``), so ``typer.core.TyperGroup`` does
+    NOT subclass the external ``click.Group`` — an ``isinstance`` check silently walks
+    zero children. Duck-typing is the version-robust choice across typer/click pairings.
+    """
+    from dadaia_workspace.cli.main import app as _app
+
+    root = get_command(_app)
+    paths: set[tuple[str, ...]] = {()}
+
+    def _walk(cmd: object, prefix: tuple[str, ...]) -> None:
+        commands = getattr(cmd, "commands", None)
+        if not isinstance(commands, dict):
+            return
+        for name, sub in commands.items():
+            child = prefix + (name,)
+            paths.add(child)
+            _walk(sub, child)
+
+    _walk(root, ())
+    return frozenset(paths)
+
+
+def _is_placeholder_or_ellipsis(token: str) -> bool:
+    if any(ch in _PLACEHOLDER_CHARS for ch in token):
+        return True
+    return any(marker in token for marker in _ELLIPSIS_MARKERS)
+
+
+def _sibling_marked(same_line_remainder: str, next_line: str) -> bool:
+    """True if the ``(sibling)``/``sibling`` annotation follows the citation, either on
+    the same line or (the one corpus case that needs it) on the very next line — a
+    blockquote continuation, whose leading ``>`` marker is stripped first."""
+    if _SIBLING_MARKER_RE.match(same_line_remainder.lstrip()):
+        return True
+    stripped_next = _BLOCKQUOTE_PREFIX_RE.sub("", next_line).lstrip()
+    return bool(_SIBLING_MARKER_RE.match(stripped_next))
+
+
+def _find_dead_path_citations(public_dir: Path, repo_root: Path) -> list[str]:
+    """Failure mode (a) — every ``specs/``/``dadaia_workspace/``/``.github/``-prefixed
+    or ``(sibling)``-annotated bare-filename citation in every ``*.md`` under
+    ``public_dir`` must resolve on disk. Returns ``file:line: dead ... `token` `` strings
+    (A27.20 — fails naming the file:line and the dead path)."""
+    violations: list[str] = []
+    for md_path in sorted(public_dir.glob("**/*.md")):
+        lines = md_path.read_text(encoding="utf-8").splitlines()
+        rel = md_path.relative_to(repo_root)
+        for idx, line in enumerate(lines):
+            for m in _CITATION_BACKTICK_RE.finditer(line):
+                token = m.group(1).strip()
+                if not token or _is_placeholder_or_ellipsis(token):
+                    continue
+                if token.startswith(_WORKSPACE_RUNTIME_PREFIX):
+                    continue
+                if token.startswith(_CITABLE_PATH_PREFIXES):
+                    if not (repo_root / token).exists():
+                        violations.append(f"{rel}:{idx + 1}: dead path `{token}`")
+                    continue
+                if "/" in token or not _SIBLING_FILENAME_RE.match(token):
+                    continue
+                next_line = lines[idx + 1] if idx + 1 < len(lines) else ""
+                if not _sibling_marked(line[m.end() :], next_line):
+                    continue
+                if (md_path.parent / token).exists():
+                    continue
+                if any(public_dir.glob(f"**/{token}")):
+                    continue
+                violations.append(f"{rel}:{idx + 1}: dead sibling citation `{token}`")
+    return violations
+
+
+def _find_dead_verb_citations(
+    public_dir: Path, repo_root: Path, tree: frozenset[tuple[str, ...]]
+) -> list[str]:
+    """Failure mode (b) — every ``dadaia <verb> [<sub>]`` citation in every ``*.md``
+    under ``public_dir`` must resolve in the live command tree. Returns
+    ``file:line: dead verb ... `` strings (A27.20 — fails naming the file:line and the
+    dead verb)."""
+    violations: list[str] = []
+    for md_path in sorted(public_dir.glob("**/*.md")):
+        lines = md_path.read_text(encoding="utf-8").splitlines()
+        rel = md_path.relative_to(repo_root)
+        for idx, line in enumerate(lines):
+            for m in _CITATION_BACKTICK_RE.finditer(line):
+                token = m.group(1)
+                for cm in _DADAIA_VERB_RE.finditer(token):
+                    v1, v2 = cm.group(1), cm.group(2)
+                    if v1 is None:
+                        verb_path: tuple[str, ...] = ()
+                    elif v2 is None:
+                        verb_path = (v1,)
+                    else:
+                        verb_path = (v1, v2)
+                    if not verb_path or verb_path in tree:
+                        continue
+                    violations.append(
+                        f"{rel}:{idx + 1}: dead verb `dadaia {' '.join(verb_path)}` "
+                        f"(cited as `{token.strip()}`)"
+                    )
+    return violations
+
+
+def test_every_cited_path_exists() -> None:
+    violations = _find_dead_path_citations(_PUBLIC, _REPO_ROOT)
+    assert violations == [], "dead path citation(s):\n" + "\n".join(violations)
+
+
+def test_every_cited_dadaia_verb_exists() -> None:
+    tree = _derive_command_tree()
+    violations = _find_dead_verb_citations(_PUBLIC, _REPO_ROOT, tree)
+    assert violations == [], "dead dadaia verb citation(s):\n" + "\n".join(violations)
+
+
+def test_mutation_fixture_9_dead_path_citation_turns_red(tmp_path: Path) -> None:
+    """A27.20 mutation fixture — dead path. A fixture asset citing a `specs/`-prefixed
+    path that does not exist under a fixture repo root must be flagged. Never touches a
+    real repo file: `repo_root` and `public_dir` are both under `tmp_path`."""
+    fixture_repo_root = tmp_path / "fixture-repo"
+    fixture_public = fixture_repo_root / "dadaia_workspace" / "public" / "skills" / "fixture-skill"
+    fixture_public.mkdir(parents=True)
+    (fixture_public / "SKILL.md").write_text(
+        "See `specs/this-path-does-not-exist-fixture.md` for detail.\n", encoding="utf-8"
+    )
+
+    violations = _find_dead_path_citations(
+        fixture_repo_root / "dadaia_workspace" / "public", fixture_repo_root
+    )
+    assert len(violations) == 1
+    assert "specs/this-path-does-not-exist-fixture.md" in violations[0]
+    assert violations[0].startswith("dadaia_workspace/public/skills/fixture-skill/SKILL.md:1:")
+
+
+def test_mutation_fixture_10_dead_verb_citation_turns_red(tmp_path: Path) -> None:
+    """A27.20 mutation fixture — dead verb. A fixture asset citing a `dadaia` verb pair
+    absent from the real command tree must be flagged. Never touches a real repo file."""
+    fixture_repo_root = tmp_path / "fixture-repo"
+    fixture_public = fixture_repo_root / "dadaia_workspace" / "public" / "skills" / "fixture-skill"
+    fixture_public.mkdir(parents=True)
+    (fixture_public / "SKILL.md").write_text(
+        "Run `dadaia fixture-nonexistent-verb now`.\n", encoding="utf-8"
+    )
+
+    tree = _derive_command_tree()
+    violations = _find_dead_verb_citations(
+        fixture_repo_root / "dadaia_workspace" / "public", fixture_repo_root, tree
+    )
+    assert len(violations) == 1
+    assert "dadaia fixture-nonexistent-verb now" in violations[0]
+    assert violations[0].startswith("dadaia_workspace/public/skills/fixture-skill/SKILL.md:1:")
