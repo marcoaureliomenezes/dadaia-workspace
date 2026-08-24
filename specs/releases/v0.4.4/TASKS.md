@@ -789,7 +789,7 @@ consumer (A15.3) — no second repo-resolution path is created. Capture **V8**.
 
 ---
 
-- [ ] **T-044-28 — FR17: `context repo add/remove/list` and `create --associated`**
+- [-] **T-044-28 — FR17: `context repo add/remove/list` and `create --associated`**
 
 **Owner role:** software-engineer · **Commit:** `feat(T-044-28): context repo verbs`
 
