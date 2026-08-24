@@ -265,6 +265,31 @@ def test_create_associated_refuses_slug_owned_by_another_context(workspace: Path
     assert "bar" in result.output.lower()
 
 
+def test_create_refuses_main_repo_slug_owned_by_another_context(workspace: Path) -> None:
+    """context-create-accepts-slug-owned-by-another-context (S5-FR23 Firing 5
+    finding, mirror of F-1): `create`'s own `--repo` (main) slug checked only
+    context-name collision, never slug ownership — `context create foo --repo
+    <bar's main slug>` sailed through and armed `dead()` of either context
+    against the other's checkout. Pins the CLI seam for the MAIN slug, the
+    counterpart of `test_create_associated_refuses_slug_owned_by_another_context`
+    above (unit-level coverage: `test_repo_verbs.py`)."""
+    _runner.invoke(app, ["context", "create", "bar", "--repo", "bar-repo"])
+
+    result = _runner.invoke(
+        app,
+        ["context", "create", "foo", "--repo", "bar-repo"],
+    )
+    assert result.exit_code == 1
+    assert "bar" in result.output.lower()
+    # No context left behind by a refused create.
+    data = json.loads(
+        (workspace / ".dadaia" / "states" / "spec_contexts.json").read_text(encoding="utf-8")
+    )
+    contexts = data.get("contexts", data)
+    names = [c["name"] for c in contexts] if isinstance(contexts, list) else list(contexts)
+    assert "foo" not in names
+
+
 def test_create_associated_refuses_duplicate_slug_in_same_call(workspace: Path) -> None:
     result = _runner.invoke(
         app,

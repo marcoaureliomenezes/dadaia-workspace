@@ -1,11 +1,15 @@
-"""FR17 (v0.4.4, T-044-28) — the `SpecContextService` add/remove-repo methods.
+"""FR17 (v0.4.4, T-044-28) — the `SpecContextService` create/add/remove-repo methods.
 
 Intent: CONTRACT — A17.1 (idempotent, fails loudly on unknown context/slug), A17.3
 (refuses the main repo's own slug as associated), context-repo-add-accepts-foreign-
 context-slug (T-044-45 F-1: refuses a slug already owned by ANOTHER context, as its
-main repo or an associated repo). FakeContextStore-driven (SMALL/unit tier): a pure
-registry-mutation concern, no real git/disk behavior under test — the CLI-level
-surface (argument parsing, on-disk-left-untouched messaging for A17.2) is proven in
+main repo or an associated repo) and its `create`-seam mirror
+context-create-accepts-slug-owned-by-another-context (S5-FR23 Firing 5 finding: the
+same `_foreign_slug_owner` predicate applied at `create`'s own `--repo` slug, the
+second registry seam that writes into the shared `repos/<slug>` namespace).
+FakeContextStore-driven (SMALL/unit tier): a pure registry-mutation concern, no real
+git/disk behavior under test — the CLI-level surface (argument parsing,
+on-disk-left-untouched messaging for A17.2) is proven in
 ``tests/integration/test_cli_context_repo_verbs.py``.
 """
 
@@ -227,6 +231,63 @@ def test_add_repo_unknown_slug_with_no_owner_is_still_accepted(
     assert ctx.associated_repos == (
         AssociatedRepo(slug="brand-new-repo", url="https://github.com/org/new"),
     )
+
+
+# --------------------------------------------------------------------- create (mirror)
+
+
+def test_create_refuses_slug_owned_by_another_context_as_main_repo(
+    service: SpecContextService, store: FakeContextStore
+) -> None:
+    """context-create-accepts-slug-owned-by-another-context: `create` checked only
+    context-name collision (`self._store.get(name)`), never slug ownership — a
+    `--repo` slug that is ANOTHER context's main repo slug sailed through,
+    arming `dead()` of either context to commit/push/rmtree the other's working
+    tree the moment one of them is later made dead. Same predicate, same
+    exception, as `add_repo`'s F-1 fix (T-044-45), applied at the second registry
+    seam that writes slug ownership (S5-FR23 Firing 5 finding)."""
+    _seed_other(store, "other-proj", "other-repo")
+
+    with pytest.raises(AssociatedRepoConflictError, match="other-proj"):
+        service.create("new-proj", "other-repo", "https://github.com/org/other-repo")
+
+    # Refused cleanly: no context was registered under the refused name.
+    assert store.get("new-proj") is None
+
+
+def test_create_refuses_slug_owned_by_another_context_as_associated_repo(
+    service: SpecContextService, store: FakeContextStore
+) -> None:
+    """Same class, the other ownership shape: the `--repo` slug is already
+    registered as an ASSOCIATED repo of another context, not that context's main
+    repo — mirrors `test_add_repo_refuses_slug_owned_by_another_context_as_associated_repo`."""
+    _seed_other(
+        store,
+        "other-proj",
+        "other-main",
+        associated_repos=(
+            AssociatedRepo(slug="other-assoc", url="https://github.com/org/other-assoc"),
+        ),
+    )
+
+    with pytest.raises(AssociatedRepoConflictError, match="other-proj"):
+        service.create("new-proj", "other-assoc", "https://github.com/org/other-assoc")
+
+    assert store.get("new-proj") is None
+
+
+def test_create_unowned_slug_is_still_accepted_no_regression(
+    service: SpecContextService, store: FakeContextStore
+) -> None:
+    """No regression: an entirely unowned slug — not any other context's main or
+    associated slug — is still accepted at `create` (the predicate refuses
+    ownership conflicts, never slugs in general)."""
+    _seed_other(store, "other-proj", "other-repo")
+
+    ctx = service.create("new-proj", "brand-new-repo", "https://github.com/org/new")
+
+    assert ctx.repo_slug == "brand-new-repo"
+    assert store.get("new-proj") is not None
 
 
 # --------------------------------------------------------------------- remove_repo

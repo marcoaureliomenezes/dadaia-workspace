@@ -287,9 +287,31 @@ class SpecContextService:
     # ------------------------------------------------------------------ create
 
     def create(self, name: str, repo_slug: str, repo_url: str) -> SpecContextProject:
+        """Register a new Spec Context Project in state ``DEAD``.
+
+        Refuses a *name* already registered (``ContextAlreadyExistsError``) and a
+        *repo_slug* already owned by ANOTHER context — as its own main repo or one
+        of its associated repos (``AssociatedRepoConflictError``,
+        context-create-accepts-slug-owned-by-another-context): the second registry
+        seam that writes into the shared ``repos/<slug>`` namespace, mirroring
+        ``add_repo``'s F-1 guard (see ``_foreign_slug_owner``). Without it, two
+        contexts could register the same ``repos/<slug>`` checkout and arm
+        ``dead()`` of either one to commit, push and delete the other's working
+        tree.
+        """
         if self._store.get(name) is not None:
             raise ContextAlreadyExistsError(
                 f"Context '{name}' already exists. Use a different name."
+            )
+        owner = self._foreign_slug_owner(name, repo_slug)
+        if owner is not None:
+            raise AssociatedRepoConflictError(
+                f"'{repo_slug}' is already registered by context '{owner}' (as its "
+                "own main repo or one of its associated repos). 'repos/<slug>' "
+                "is a namespace every context shares — creating context "
+                f"'{name}' with it too would let 'dadaia context dead {name}' "
+                f"commit, push and delete '{owner}''s working tree. Choose a "
+                "different slug, or coordinate with the owning context first."
             )
         ctx = SpecContextProject(
             name=name,
@@ -339,13 +361,15 @@ class SpecContextService:
         its registered associated repos. Every context's ``repos/<slug>`` checkout
         lives in the ONE namespace every context shares (A15.3/FR17) — the same
         assumption ``dead()`` makes when it walks ``all_repos()`` and
-        commit_all()s/push()es/rmtree()s every entry it finds. ``add_repo`` is the
-        one seam that writes into that shared namespace, so it is the one seam
-        that must keep the assumption true (T-044-45 F-1 / bug
-        context-repo-add-accepts-foreign-context-slug) — never a second guard
-        added inside ``dead()`` itself, which would be checking the destructive
-        side of a boundary that should never have been crossable in the first
-        place.
+        commit_all()s/push()es/rmtree()s every entry it finds. ``create`` (the
+        main ``--repo`` slug) and ``add_repo`` (associated slugs) are the TWO
+        seams that write into that shared namespace, so both consult this
+        predicate to keep the assumption true (T-044-45 F-1 / bug
+        context-repo-add-accepts-foreign-context-slug at ``add_repo``, mirrored
+        at ``create`` by bug context-create-accepts-slug-owned-by-another-context)
+        — never a second guard added inside ``dead()`` itself, which would be
+        checking the destructive side of a boundary that should never have been
+        crossable in the first place.
         """
         for other in self._store.list_all():
             if other.name == name:
