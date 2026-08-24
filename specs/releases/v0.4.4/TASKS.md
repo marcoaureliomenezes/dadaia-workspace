@@ -644,7 +644,7 @@ be **green at HEAD the moment it lands** — which is why it is last.
 
 ---
 
-- [-] **T-044-59 — FR31 / bug (Arm B): the law is loaded once per harness**
+- [x] **T-044-59 — FR31 / bug (Arm B): the law is loaded once per harness**
 
 **Owner role:** software-engineer · **Commit:**
 `fix(T-044-59): project the law once per harness`

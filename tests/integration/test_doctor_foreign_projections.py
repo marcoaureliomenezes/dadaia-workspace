@@ -30,10 +30,14 @@ def _foreign(lines: list[DoctorLine]) -> list[str]:
 
 def test_extra_rule_in_managed_dir_reads_foreign_and_never_blocks(tmp_path: Path) -> None:
     ws, mgr = _installed_ws(tmp_path)
-    (ws / ".claude" / "rules" / "my-own-rule.md").write_text("# operator rule\n", "utf-8")
+    # T-044-59 stopped projecting .claude/rules/DADAIA.md (the law now reaches Claude
+    # Code once, through the root import chain only), so .claude/rules/ is no longer a
+    # ledger-managed dir at all — .claude/agents/ is the still-managed flat-.md dir this
+    # scenario needs.
+    (ws / ".claude" / "agents" / "my-own-rule.md").write_text("# operator rule\n", "utf-8")
 
     lines = list(mgr.doctor(ws))
-    hits = [t for t in _foreign(lines) if ".claude/rules/my-own-rule.md" in t]
+    hits = [t for t in _foreign(lines) if ".claude/agents/my-own-rule.md" in t]
     assert hits, "an unmanaged file in a lib-managed dir must surface as [foreign]"
     # Ruling 16 — operator authorship is legitimate: foreign never blocks.
     assert DoctorStatus.FOREIGN.blocking is False
