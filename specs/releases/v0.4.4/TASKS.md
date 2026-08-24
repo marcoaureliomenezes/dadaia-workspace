@@ -599,7 +599,7 @@ no hand-kept list. Capture **V16**.
 
 ---
 
-- [-] **T-044-57 — FR24 + FR29: the persona pass, in one touch per file**
+- [x] **T-044-57 — FR24 + FR29: the persona pass, in one touch per file**
 
 **Owner role:** ai-engineer · **Commit:**
 `docs(T-044-57): personas carry only what the law does not, and state the bug-surface delta`
