@@ -1,0 +1,82 @@
+{
+  "schema_version": "handoff-v1.2",
+  "self_pull": {
+    "refs": [
+      "specs/memory/product/catalog.json",
+      "specs/memory/product/sdd/sdd-gate-v3.md"
+    ]
+  },
+  "agent": "security-reviewer",
+  "context": "dadaia-workspace",
+  "produced_at": "2026-08-24T18:17:22Z",
+  "release_id": "v0.4.4",
+  "scope": "T-044-52 - committed security verdict evidence for the rc-1 PR head (CI security-verdict-gate)",
+  "artifact": {
+    "type": "report"
+  },
+  "metrics": {
+    "commit_sha": "58f9bdc8f2ec87c1e2a76fbbeeaec68c6aaaf45b",
+    "previous_covered_sha": "6bdf15d0cee26cde913c3b7de715f867182daf88",
+    "base_sha": "f5cce371",
+    "delta_commits": 3,
+    "delta_files": 4,
+    "delta_lines_added": 315,
+    "delta_lines_removed": 0,
+    "delta_production_files": 0,
+    "delta_ci_files": 0,
+    "findings_critical": 0,
+    "findings_high": 0,
+    "findings_medium": 1,
+    "findings_low": 1,
+    "findings_info": 3,
+    "push_gate_exit": 0,
+    "push_gate_offenders": 0,
+    "secrets_detected": 0,
+    "cve_findings": 0,
+    "new_dependencies": 0,
+    "tests_passed": 31
+  },
+  "findings": [
+    {
+      "severity": "INFO",
+      "message": "Delta review 6bdf15d0..58f9bdc8 (3 commits, 4 files, +315/-0): zero production files, zero CI files, zero deletions, zero secret-shape hits.",
+      "detail_md": "The delta is `ed3e00eb` (this reviewer's previous verdict evidence), `a7a67541` (the citation-enforcer fix — **`tests/contract/test_rules_skills_map.py` +135/-0 and two ledger events, nothing else**) and `58f9bdc8` (the Firing 7 ruling doc). `git diff --numstat` over the range shows **0 deletions in every file**, so nothing existing was removed, relaxed or re-scoped; the change is purely additive test coverage plus documentation.\n\nEvidence at this head: secret-shape sweep over added lines **0 hits**; pre-push denylist gate on the real new-branch refspec, run without a pipe, **exit 0 with zero offenders**; `pytest tests/contract/test_rules_skills_map.py tests/integration/test_repo_self_scan.py tests/contract/test_source_repo_hygiene.py` → **31 passed**; working tree clean.",
+      "fix_recommendation": "None."
+    },
+    {
+      "severity": "INFO",
+      "message": "The enforcer change strengthens the citation gate rather than relaxing it — the usual failure mode for a 'fix the red CI' commit.",
+      "detail_md": "The risk in any fix that turns a red enforcer green is that the enforcer is weakened into a no-op. Read directly, this one goes the other way: it adds `test_projected_specs_agents_md_citation_survives_bare_checkout` (the bare-checkout condition CI actually failed on) and `test_mutation_fixture_11_lookalike_projected_path_still_turns_red`, a mutation fixture asserting the enforcer still produces exactly one violation, pointing at the generating asset (`public/skills/<skill>/SKILL.md:<line>`), for a lookalike projected path. No `skip`, no `xfail`, no assertion deleted, no tolerance widened — the enforcer now proves instance paths by their generating asset instead of by whatever the checkout happens to contain.\n\nThe ledger carries both halves: `reported` (HIGH, project-manager) and `resolved` (software-engineer) with all three FR23 evidence fields populated and a correctly-declared `net-positive:` direction that names the test-only growth rather than hiding it.",
+      "fix_recommendation": "None."
+    },
+    {
+      "severity": "MEDIUM",
+      "message": "S-3 carried unchanged: the verdict gate is advisory at rc-1 (A4.4) and must be a required check on develop and main before rc-2.",
+      "detail_md": "develop's branch protection still carries no `required_status_checks` object; main's required contexts still omit 'Security verdict gate (PR head sha)'. Sanctioned for the rc-1 PR by A4.4 and already in the PM intake report. Configuration outside the branch: it does not gate this verdict, it gates rc-2.",
+      "fix_recommendation": "Before rc-2, re-supply the required-checks list whole (PATCH clobbers) on both edges including the verdict gate, and verify by reading branch protection back rather than by observing a green PR."
+    },
+    {
+      "severity": "LOW",
+      "message": "Carried from the previous round, unchanged: the .gitignore inversion leaves sensitive file classes trackable inside the release trees (no instance present; content-based backstops in force).",
+      "detail_md": "Recorded for PM intake, not actioned here. The remedy is one trailing re-ignore block after the release-tree negation plus hygiene-test probes — never a per-artifact line, which would undo the inversion this release just earned.",
+      "fix_recommendation": "PM intake, as recorded in the previous verdict."
+    },
+    {
+      "severity": "INFO",
+      "message": "Full-release posture unchanged: zero CRITICAL, zero HIGH; both original blockers remain closed and the privacy baseline remains unrelaxed.",
+      "detail_md": "The verdict gate still refuses `HEAD`, `@`, an abbreviated sha and an option-shaped value while passing an exact sha and an only-verdict-drift ancestor, and still refuses a commit mixing verdict evidence with production. The push range publishes no private material. `infrastructure/data/privacy_baseline.json` is still byte-identical to develop, main and the review base — no pattern has been relaxed at any point across four rounds. F-11 stays registered (MEDIUM, open) as the only reachable ledger corruption, forgery structurally unreachable.",
+      "fix_recommendation": "None."
+    }
+  ],
+  "decisions_required": [
+    "Operator: make 'Security verdict gate (PR head sha)' a required check on develop and main before rc-2 (A4.4).",
+    "PM intake (carried): re-assert the sensitive-file classes in one trailing .gitignore block after the release-tree negation, with hygiene-test probes."
+  ],
+  "next_handoff": {
+    "agent": "project-manager",
+    "context": "dadaia-workspace",
+    "expected_artifact_type": "other"
+  },
+  "verdict": "APPROVED",
+  "verdict_reason": "APPROVED covering 58f9bdc8. The delta since the previously covered sha is three commits and four files — this reviewer's own prior verdict evidence, the citation-enforcer fix and the Firing 7 ruling — totalling +315/-0 with **zero production files, zero CI files and zero deletions in every file**, so nothing existing could have been weakened. The enforcer change was read for the failure mode that matters in a 'turn CI green' commit and does the opposite of it: two tests added (the bare-checkout condition CI failed on, and a mutation fixture pinning that a lookalike projected path still yields exactly one violation attributed to its generating asset), with no skip, no xfail and no assertion removed. Secret-shape sweep 0 hits; pre-push gate exit 0 with zero offenders; 31 tests green across the changed contract file, the repo self-scan and the hygiene contract; tree clean. Two items carry unchanged and neither gates this verdict: S-3 (the gate is advisory at rc-1 per A4.4, required from rc-2) and the LOW gitignore defence-in-depth note already routed to PM intake. Bug-surface axis: REDUCED — a CI-only failure was closed by making the enforcer prove instance paths by their generating asset, which removes the checkout-dependence that caused it, rather than by loosening the check."
+}
