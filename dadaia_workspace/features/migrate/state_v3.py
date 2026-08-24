@@ -13,8 +13,10 @@ On unknown schema versions it raises ValueError.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -76,6 +78,24 @@ def plan_migration(states_dir: Path) -> MigrationPlan:
     )
 
 
+def _atomic_write_json(path: Path, data: dict[str, object]) -> None:
+    """Atomic write via unique temp file + ``os.replace`` (POSIX + Windows safe).
+
+    Mirrors ``dadaia_workspace.features.spec_context.presence._atomic_write_json``
+    (T-044-45 F-4): a fixed, predictable ``.tmp`` sibling name is symlink-followable
+    (CWE-59) — a ``uuid4``-suffixed name closes that window, matching the idiom the
+    package's other internal-state writers already use.
+    """
+    tmp = path.parent / f"{path.name}.{uuid.uuid4().hex}.tmp"
+    tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    try:
+        os.replace(tmp, path)
+    except OSError:
+        with contextlib.suppress(OSError):
+            tmp.unlink(missing_ok=True)
+        raise
+
+
 def execute_migration(states_dir: Path) -> None:
     """Execute the v2 -> v3 migration atomically, backup-first.
 
@@ -87,7 +107,7 @@ def execute_migration(states_dir: Path) -> None:
         any mutation (A15.1).
     5.  Add ``associated_repos: []`` to every context row that lacks it.
     6.  Set ``schema_version = "3"``.
-    7.  Write atomically (tmp -> os.replace()).
+    7.  Write atomically via a unique-named temp file + ``os.replace()``.
     """
     ctx_file = states_dir / "spec_contexts.json"
 
@@ -121,6 +141,4 @@ def execute_migration(states_dir: Path) -> None:
         "contexts": new_contexts,
     }
 
-    tmp = ctx_file.with_suffix(".tmp")
-    tmp.write_text(json.dumps(migrated, indent=2), encoding="utf-8")
-    os.replace(tmp, ctx_file)
+    _atomic_write_json(ctx_file, migrated)

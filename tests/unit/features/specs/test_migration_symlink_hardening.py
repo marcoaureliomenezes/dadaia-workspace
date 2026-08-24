@@ -13,17 +13,25 @@ or touched by the retired-frontmatter-keys work, so the third recurrence cannot 
 quietly.
 
 The ``AtomicWriterCase`` battery below pins BEHAVIOUR, not source text, across every one
-of the package's 8 atomic-writer primitives (mkstemp/uuid tmp-file + ``os.replace``) —
+of the package's 9 atomic-writer primitives (mkstemp/uuid tmp-file + ``os.replace``) —
 replacing a prior guard that sliced two of them on triple-quote boundaries and compared
 stripped lines (broke on a reworded comment, mis-sliced on an embedded triple-quoted
 literal, raised ``IndexError`` instead of asserting on a missing docstring, and never
 looked at the other 6 writers at all).
+
+A ninth writer (``state_v3._atomic_write_json``) was added by S4, after the original
+8-writer census, with a fixed symlink-followable tmp name — invisible to a census scoped
+to named helpers that already existed. T-044-45 F-4 fixed the writer (unique ``uuid4``
+name, matching the idiom below) and added it here as the 9th entry, plus a self-enforcing
+scan test (``test_census_covers_every_atomic_writer_def_in_the_package``) so the *next*
+new writer cannot silently escape the same way.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import re
 import stat
 import sys
 from collections.abc import Callable
@@ -38,6 +46,9 @@ from dadaia_workspace.features.migrate.agent_tier_frontmatter import (
 from dadaia_workspace.features.migrate.frontmatter_keys import write_text_atomic
 from dadaia_workspace.features.migrate.retired_frontmatter_keys import (
     migrate_retired_frontmatter_keys,
+)
+from dadaia_workspace.features.migrate.state_v3 import (
+    _atomic_write_json as _state_v3_atomic_write_json,
 )
 from dadaia_workspace.features.spec_context.presence import (
     _atomic_write_json as _presence_atomic_write_json,
@@ -258,7 +269,7 @@ def test_read_only_atom_is_left_alone(tmp_path: Path) -> None:
 
 @dataclass(frozen=True)
 class AtomicWriterCase:
-    """One of the package's 8 atomic-writer primitives, called at its real entry point.
+    """One of the package's 9 atomic-writer primitives, called at its real entry point.
 
     ``preserves_mode``/``cleans_up_on_failure`` are the ACTUAL, empirically-verified
     contract of the writer named by ``id`` — not an aspiration. Where a writer's real
@@ -308,11 +319,19 @@ def _write_policy_store_bytes(path: Path, marker: str) -> None:
     JsonAgentModelPolicyStore(path.parent)._atomic_write_bytes(path, f"{marker}\n".encode())
 
 
-# The 8 atomic-writer primitives in the package (grep ``^def _*atomic\b`` /
-# ``^def _*write.*atomic`` over dadaia_workspace/, tests excluded — exactly 8 hits,
-# matching the bug's count). Behaviour verified empirically before being pinned here,
-# never assumed from reading the source (dd-bug-fix phase 4's discipline, applied to
-# characterizing existing behaviour rather than a production hypothesis).
+def _write_state_v3(path: Path, marker: str) -> None:
+    _state_v3_atomic_write_json(path, {"marker": marker})
+
+
+# The 9 atomic-writer primitives in the package: every ``def`` (module- or class-level)
+# whose name contains "atomic" as a whole snake_case token — see
+# ``_atomic_writer_def_names`` below, which is this same criterion made executable
+# (T-044-45 F-4: the original grep-by-hand census missed ``state_v3``'s writer because
+# it had no named helper at all; giving it one, matching the package's own naming idiom,
+# both fixes the writer AND makes it fall out of this same criterion automatically).
+# Behaviour verified empirically before being pinned here, never assumed from reading the
+# source (dd-bug-fix phase 4's discipline, applied to characterizing existing behaviour
+# rather than a production hypothesis).
 _ATOMIC_WRITER_CASES: list[AtomicWriterCase] = [
     AtomicWriterCase(
         id="frontmatter_keys.write_text_atomic",
@@ -380,6 +399,14 @@ _ATOMIC_WRITER_CASES: list[AtomicWriterCase] = [
         preserves_mode=False,
         cleans_up_on_failure=True,
         lf_bytes_guaranteed=True,  # os.fdopen(fd, "wb") — binary mode, no translation
+    ),
+    AtomicWriterCase(
+        id="state_v3._atomic_write_json",
+        write=_write_state_v3,
+        replace_target="dadaia_workspace.features.migrate.state_v3.os.replace",
+        preserves_mode=False,
+        cleans_up_on_failure=True,
+        lf_bytes_guaranteed=False,  # Path.write_text(json.dumps(...)) with no newline=
     ),
 ]
 
@@ -477,7 +504,7 @@ def test_atomic_writer_temp_file_on_injected_replace_failure(
 ) -> None:
     """When ``os.replace`` itself fails, the temp file must not survive — a leaked
     ``.tmp`` sibling next to a real atom/state file is exactly the drift class this
-    guard exists to catch. 6 of 8 writers clean up; 2 currently do not (documented gap,
+    guard exists to catch. 7 of 9 writers clean up; 2 currently do not (documented gap,
     bug `two-atomic-writers-leak-temp-file-on-injected-os-replace-failure` — pinned here
     as CURRENT behaviour, not silently accepted as correct)."""
     target = tmp_path / "atom.md"
@@ -504,3 +531,44 @@ def test_atomic_writer_temp_file_on_injected_replace_failure(
             "now passes, the bug is fixed — flip cleans_up_on_failure=True above and "
             "close it with this test as the regression evidence."
         )
+
+
+_DEF_LINE = re.compile(r"^[ \t]*def\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(", re.MULTILINE)
+
+
+def _atomic_writer_def_names(package_root: Path) -> set[str]:
+    """The census, made executable (T-044-45 F-4).
+
+    Every ``def`` (module- or class-level — indentation is not part of the match, so a
+    method like ``JsonAgentModelPolicyStore._atomic_write`` is found the same way a
+    module-level function is) whose name contains ``atomic`` as a whole snake_case
+    token. "Whole token" is the load-bearing part: it is what tells
+    ``check_memory_atomicity`` (token ``atomicity``) apart from an actual atomic writer
+    — a plain substring grep (``*atomic*``) would wrongly pull that doctor check in.
+    """
+    hits: set[str] = set()
+    for path in sorted(package_root.rglob("*.py")):
+        if "tests" in path.parts:
+            continue
+        text = path.read_text(encoding="utf-8")
+        for match in _DEF_LINE.finditer(text):
+            name = match.group(1)
+            if "atomic" in name.strip("_").split("_"):
+                line_no = text.count("\n", 0, match.start()) + 1
+                hits.add(f"{path.relative_to(package_root)}:{line_no}:{name}")
+    return hits
+
+
+def test_census_covers_every_atomic_writer_def_in_the_package() -> None:
+    """Self-enforcing census: the NEXT atomic-writer def added anywhere in the package
+    must either join ``_ATOMIC_WRITER_CASES`` or this test fails loudly — the exact
+    silent-escape state_v3's writer pulled off against the hand-maintained 8-writer
+    census (T-044-45 F-4)."""
+    discovered = _atomic_writer_def_names(_REPO_ROOT / "dadaia_workspace")
+
+    assert len(discovered) == len(_ATOMIC_WRITER_CASES), (
+        "atomic-writer def census drifted from the behavioural battery: found "
+        f"{len(discovered)} def(s) whose name contains the 'atomic' token, but "
+        f"{len(_ATOMIC_WRITER_CASES)} case(s) are pinned above — add the missing "
+        f"writer(s) to _ATOMIC_WRITER_CASES: {sorted(discovered)}"
+    )

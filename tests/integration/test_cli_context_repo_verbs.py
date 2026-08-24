@@ -1,6 +1,8 @@
 """CLI integration tests for `dadaia context repo add/remove/list` and
 `context create --associated` (v0.4.4 FR17, T-044-28).
 
+Intent: CONTRACT — A17.1, A17.2, A17.3.
+
 Covers:
 - A17.1 each verb is idempotent and fails loudly on an unknown context or slug.
 - A17.2 `remove` never deletes an on-disk repo silently — it states what it leaves
