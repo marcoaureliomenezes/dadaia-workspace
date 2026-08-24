@@ -206,3 +206,156 @@ day by review, and now deleted at root — one generation, no repetition, no sta
 patch. No puxadinho detected: the production tree is untouched, and the one growth
 artifact (the case table) carries its own retirement path via the consolidation
 candidate above.
+
+---
+
+## Firing 3 — T-044-38 (commit `7d9e8382`, correction `d3346382`): frozen-clock aging ratchet
+
+**Date:** 2026-08-24 · **Trigger:** FR23 evidence gate (`evidence_diff` net-positive
++294/-0, new file `tests/contract/test_frozen_clock_aging_ratchet.py`, `bugs.jsonl`
+`resolved` event for
+`no-ratchet-against-frozen-clock-tests-that-age-fixtures-by-the-real-clock`)
+
+### Verdict: SOUND — mechanism growth, a THIRD exception category, earned on four conditions
+
+The diff is pure addition and zero production code: one contract test whose AST scan
+fails any `tests/**` file that declares a module-level frozen datetime constant AND
+calls the real clock (`time.time()` / `datetime.now()`), plus two in-memory mutation
+fixtures proving the detector bites on both incident shapes and two negative controls
+proving the AND-not-OR precision. Root-cause gate: **PASS** — the underlying defect was
+already root-cause-fixed in v0.4.3 (`tmp-gc-tests-age-files-by-the-real-clock-against-
+a-frozen-now`: every `os.utime` mtime now derives from the same frozen `_NOW` the
+service is given); THIS bug's registered contract is explicitly the guard, not a fix
+("Guard, not a fix … Recorded so the next date boundary does not have to teach this
+twice" — `reported` event, 2026-08-19, security-reviewer), and the deliverable matches
+the `expected` field verbatim. Architecture-fidelity gate: **PASS** — the ratchet lives
+in `tests/contract/` beside the repo's established ratchet population; its scope is
+`tests/**` only (production clock injection is a different contract, correctly out of
+scope, and the retention-fixture boundary is reasoned explicitly in the docstring); the
+AST-over-regex choice is structural, not stylistic, and was proven load-bearing before
+commit (`evidence_seam`: the naive regex used during the site audit false-hit the tmp_gc
+fix's own explanatory comment — a raw-text scan would refuse the very comment that
+documents the fix, and refuse its own module docstring).
+
+### Check (a) — same test-growth exception as Firing 2, or different?
+
+**Different — and the ledger should name the difference so neither exception stretches
+to cover the other.** Firing 2's exception was *coverage growth*: more test items
+pinning contracts that production code already carries. This diff is *mechanism
+growth*: the test IS a new enforcement mechanism — a lint in test clothing — guarding a
+defect **class** across the whole `tests/**` tree, with its own detector logic (~90
+lines of scanner: `_frozen_constants`, `_is_real_clock_call`, name-marker heuristics).
+Pure addition is intrinsic to the category: a ratchet has nothing to delete, because
+the defect it guards against was already deleted at its root one release earlier; its
+`-0` is honest, not evasive. Under the prefer-deletion standing order an all-adding
+diff must justify itself explicitly; this one does, on four conditions that together
+define when mechanism growth is earned:
+
+1. **The guarded class caused a real incident** — four tests red at a UTC midnight
+   boundary with zero code change in between (the v0.4.3 time bomb), not a
+   hypothetical.
+2. **The class is behaviorally undetectable at test time** — the drift only crosses the
+   assertion threshold at a future wall-clock instant, so Firing 2's own rule
+   ("behavioural equivalence supersedes source equivalence") cannot apply: no
+   behavioural test running today observes a failure scheduled for next month. A
+   source scan is the *only* seam that catches the shape at authoring time. This is
+   the inverse of Firing 2, where a source-text guard was deleted precisely because
+   behaviour WAS observable — the two rulings compose into one doctrine: *pin
+   behaviour when behaviour is observable; scan source only when it is not*.
+3. **Precision is pinned by the test itself** — two mutation fixtures (both incident
+   shapes, `time.time()` and `dt.datetime.now()`) prove RED; two negative controls
+   prove a frozen constant alone and a real-clock call alone each stay green, so the
+   false-positive direction (`_TIMEOUT_S = 60` beside an unrelated deadline poll) is
+   structurally excluded, not hoped for.
+4. **The recall boundary is documented, and every known site was hand-verified against
+   it** — all 10 `os.utime` aging sites at HEAD enumerated in the docstring with the
+   reason each stays green (`evidence_loop` cross-check).
+
+**Is the scanner itself now a maintenance surface? Yes — bounded, and the bound should
+be stated.** Precision drift is pinned (condition 3). Recall drift is the live residue:
+the rule sees only module-level constants (a function-local frozen constant aging
+fixtures by the real clock evades it), and `_trailing_name` misses an aliased import of
+the class itself (`from datetime import datetime as d; d.now()` — trailing name `d`).
+Both gaps are acceptable *today* because the docstring scopes the rule to this
+codebase's actual conventions ("this codebase exposes no other `.time()` zero-arg call
+convention") — a ratchet with a declared boundary beats no ratchet, and widening recall
+speculatively would trade toward the false-positive failure mode the negative controls
+exist to forbid. The maintenance contract this ruling sets: when a future frozen-clock
+incident evades this scan, the fix is to *extend this detector* (with a new mutation
+fixture pinning the evasion shape), never to author a second parallel scanner —
+one class, one ratchet. Non-blocking stewardship nit: the docstring declares
+`Intent: CONTRACT` but no `Size:`; 3 of ~30 `tests/contract/` modules carry `Size:`
+while the tier is otherwise implied by `pytestmark = pytest.mark.contract` — an
+inconsistency of the *population*, not this file; no individual action.
+
+### Check (b) — scan-test proliferation: harness intake candidate, or premature abstraction?
+
+**Counted: the population is real — 15 source-scan tests at HEAD.** Tree- or
+package-walking scans: `test_frozen_clock_aging_ratchet.py`,
+`test_harness_env_contract.py`, `test_no_local_helper_copies.py` (all over `tests/**`);
+`test_core_file_io_purity.py` (core/), `test_release_semver_canon.py`,
+`test_telemetry_connection_factory_allowlist.py`, `test_session_store_ownership.py`,
+`test_no_gpt_only_claim.py` (package tree); `test_no_bearer_in_url.py` (panel).
+Single-module source scans: `test_denylist_scan.py` (no-allowlist raw-text),
+`test_rules_skills_map.py` (citation scan), `test_telemetry_chmod_source_guard.py`,
+`test_public_scripts_thin_wrapper.py`, `test_bind_resolution_seam_dynamic_walk.py`,
+`test_kernel_tunables.py` (AST).
+
+**"One scan harness, N rules" — REJECTED as premature abstraction, on evidence.** The
+shared surface across the 15 is only the walker: ~10–15 lines each of
+`Path(__file__).resolve().parents[N]` + `rglob("*.py")` + `__pycache__` exclusion. The
+detectors — the actual value — are rule-specific by nature (raw-text where prose can
+never spell the forbidden construct, AST where it can; different scopes, different node
+shapes, different violation grammars). A harness would save ~150 trivial lines at the
+cost of coupling N independent ratchets to one framework, whose every change then
+touches all rules — precisely the cross-cutting-helper coupling the standing order
+forbids and the A9 keep-helpers-inside precedent already adjudicated. The bug ledger
+seals it: zero registered bugs trace to walker duplication across these 15 tests (no
+repetition, no fix chain, no drift incident), and Firing 2's rule — duplication that
+*requires a drift guard* is the duplication that must die — does not fire here, because
+the parallel walkers require no guard against each other. No harness candidate.
+
+**One narrow candidate IS evidence-supported: vacuous-pass exposure.** Verified live in
+three files this session — `test_frozen_clock_aging_ratchet.py`,
+`test_harness_env_contract.py`, `test_core_file_io_purity.py` — none asserts its
+enumerated population is non-empty. Each roots itself by parent-count arithmetic
+(`parents[2]`, `parents[N]`); a file move one directory deeper mis-roots the walker,
+`rglob` over the nonexistent path yields zero files, and the ratchet passes **vacuously
+green forever** — the exact false-confidence class Firing 2 ruled is itself bug surface
+(a green guard pinning nothing). The frozen-clock test's in-memory mutation fixtures do
+NOT cover this: they prove the detector bites, not that the walker enumerates the live
+tree. Proposed backlog entry, for PM intake (operator decides — severity LOW, effort
+LOW, class-wide):
+
+> **scan-test-vacuity-guard** — Every tree-walking source-scan test asserts its
+> enumerated population is sane before scanning: non-empty, and containing one named
+> sentinel file known to exist (e.g., the scan test itself for `tests/**` scans). A
+> mis-rooted walker then fails loudly instead of passing vacuously. Applied per test as
+> a two-line assertion inside each walker function — a convention, NOT a shared
+> harness (see the rejection above); ~9 tree-walking scan files touched, no framework
+> introduced.
+
+Per §6 (Backlog) this is a residual for the PM's intake report — this ruling
+materializes no backlog entry.
+
+### Bug-surface delta
+
+**REDUCED.** Ledger evidence, full chain: the incident — tmp_gc suite dead at a UTC
+date boundary, four tests red with zero code change, frozen `_NOW` injected while
+fixtures aged by `time.time()` — was root-cause-fixed in v0.4.3 (same-clock derivation,
+bug `tmp-gc-tests-age-files-by-the-real-clock-against-a-frozen-now`); the
+security-reviewer's audit of all 9-then-10 aging sites established the shape was a
+singleton with two self-healing relatives (fixed-past-date and epoch-0.0 margins GROW
+with time rather than erode) and registered THIS bug as the class guard (`reported`
+2026-08-19). The `resolved` event (2026-08-24) closes it with the ratchet GREEN at HEAD
+over 0 live violations, hand-cross-checked against every `os.utime` site. Surface
+delta: the class of latent test time bombs moves from *unguarded* (failure surfaces
+months later, at midnight, deterministically unrelated to any diff — the
+hardest-to-diagnose failure mode a suite can carry) to *guarded at authoring time*
+(deterministic RED on the commit that introduces the shape, with file, constant name,
+and call line in the message). Fix-chain audit: incident → root fix (v0.4.3) → class
+ratchet (this diff); no repetition of the symptom since the root fix; no stacked patch;
+no production growth; no puxadinho. Residual surface, named honestly: the scanner's
+documented recall gaps (check (a)) and the vacuity exposure it shares with its 8
+tree-walking siblings (check (b)) — the latter routed to intake, the former to the
+one-class-one-ratchet maintenance contract above.
