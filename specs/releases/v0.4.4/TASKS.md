@@ -760,7 +760,7 @@ branch; no merge, no PR.
 
 ## Segment `S4` — spec-context associated repos
 
-- [ ] **T-044-26 — FR15: the model and its v2→v3 migration**
+- [-] **T-044-26 — FR15: the model and its v2→v3 migration**
 
 **Owner role:** software-engineer · **Commit:**
 `feat(T-044-26): a context owns one main repo and N associated repos`
