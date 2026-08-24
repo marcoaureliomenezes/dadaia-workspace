@@ -114,7 +114,7 @@ import json
 import re
 import tempfile
 from itertools import combinations
-from pathlib import Path
+from pathlib import Path, PurePath, PureWindowsPath
 from typing import Any
 
 import jsonschema
@@ -769,6 +769,16 @@ def _sibling_marked(same_line_remainder: str, next_line: str) -> bool:
     return bool(_SIBLING_MARKER_RE.match(stripped_next))
 
 
+def _posix_relpath(path: PurePath, root: PurePath) -> str:
+    """Render ``path`` relative to ``root`` in POSIX form — separator-agnostic, so a
+    violation's ``file:line`` citation is byte-identical whether the check runs on
+    Windows or POSIX (bug ``citation-mutation-fixtures-never-turn-red-on-windows``).
+    ``relative_to``/``as_posix`` are pure path arithmetic (no I/O), so this seam takes
+    any ``PurePath`` — including a ``PureWindowsPath`` on a non-Windows host, which is
+    exactly how the regression test below drives it without needing Windows CI."""
+    return path.relative_to(root).as_posix()
+
+
 def _find_dead_path_citations(public_dir: Path, repo_root: Path) -> list[str]:
     """Failure mode (a) — every ``specs/``/``dadaia_workspace/``/``.github/``-prefixed
     or ``(sibling)``-annotated bare-filename citation in every ``*.md`` under
@@ -777,7 +787,7 @@ def _find_dead_path_citations(public_dir: Path, repo_root: Path) -> list[str]:
     violations: list[str] = []
     for md_path in sorted(public_dir.glob("**/*.md")):
         lines = md_path.read_text(encoding="utf-8").splitlines()
-        rel = md_path.relative_to(repo_root)
+        rel = _posix_relpath(md_path, repo_root)
         for idx, line in enumerate(lines):
             for m in _CITATION_BACKTICK_RE.finditer(line):
                 token = m.group(1).strip()
@@ -819,7 +829,7 @@ def _find_dead_verb_citations(
     violations: list[str] = []
     for md_path in sorted(public_dir.glob("**/*.md")):
         lines = md_path.read_text(encoding="utf-8").splitlines()
-        rel = md_path.relative_to(repo_root)
+        rel = _posix_relpath(md_path, repo_root)
         for idx, line in enumerate(lines):
             for m in _CITATION_BACKTICK_RE.finditer(line):
                 token = m.group(1)
@@ -946,3 +956,37 @@ def test_mutation_fixture_10_dead_verb_citation_turns_red(tmp_path: Path) -> Non
     assert len(violations) == 1
     assert "dadaia fixture-nonexistent-verb now" in violations[0]
     assert violations[0].startswith("dadaia_workspace/public/skills/fixture-skill/SKILL.md:1:")
+
+
+# --------------------------------------------------------------------------- #
+# Bug `citation-mutation-fixtures-never-turn-red-on-windows` (HIGH, rc-1 CI runs
+# 32761749438/32761754813) — regression at the shared seam both citation checkers use
+# to render a violation's `file:line` prefix. `_posix_relpath` is pure path arithmetic
+# (`Path.relative_to`/`as_posix`, no I/O), so it is driven directly with
+# `PureWindowsPath`-shaped (backslash) inputs here — the Windows-path-semantics class
+# is locally observable on any host OS, never only provable post-hoc by a Windows CI
+# run, mirroring the bare-checkout simulation pattern in
+# `test_projected_specs_agents_md_citation_survives_bare_checkout` (a7a67541).
+# --------------------------------------------------------------------------- #
+
+
+def test_posix_relpath_is_separator_agnostic_under_windows_path_semantics() -> None:
+    """Regression — bug `citation-mutation-fixtures-never-turn-red-on-windows` (HIGH).
+    On windows-latest CI, `_find_dead_path_citations`/`_find_dead_verb_citations`
+    correctly DETECTED the planted violation (`len(violations) == 1`, correct token) —
+    the bug was never a vacuous no-op. It was the violation's `file:line` prefix
+    rendering with the OS-native separator (backslash on Windows) instead of the
+    POSIX form every consumer of a `file:line` citation expects — confirmed verbatim
+    against the CI trace: `'dadaia_workspace\\public\\...\\SKILL.md:1: ...'` where
+    `'dadaia_workspace/public/.../SKILL.md:1:'` was expected. `PureWindowsPath` proves
+    the fixed seam produces POSIX output even when built from genuine Windows path
+    semantics, on any host OS."""
+    windows_root = PureWindowsPath(r"D:\pytest-fixture-repo")
+    windows_md_path = (
+        windows_root / "dadaia_workspace" / "public" / "skills" / "fixture-skill" / "SKILL.md"
+    )
+
+    rel = _posix_relpath(windows_md_path, windows_root)
+
+    assert rel == "dadaia_workspace/public/skills/fixture-skill/SKILL.md"
+    assert "\\" not in rel
