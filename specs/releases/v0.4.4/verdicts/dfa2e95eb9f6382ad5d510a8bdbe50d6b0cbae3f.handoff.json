@@ -1,0 +1,83 @@
+{
+  "schema_version": "handoff-v1.2",
+  "self_pull": {
+    "refs": [
+      "specs/memory/product/catalog.json",
+      "specs/memory/product/sdd/sdd-gate-v3.md"
+    ]
+  },
+  "agent": "security-reviewer",
+  "context": "dadaia-workspace",
+  "produced_at": "2026-08-24T19:42:05Z",
+  "release_id": "v0.4.4",
+  "scope": "T-044-50 - committed security verdict evidence for the closure PR head (CI security-verdict-gate); live-tree placement because specs/_archive is FROZEN - the next release's archive sweep git-mv's it to join its siblings",
+  "artifact": {
+    "type": "report"
+  },
+  "metrics": {
+    "commit_sha": "dfa2e95eb9f6382ad5d510a8bdbe50d6b0cbae3f",
+    "previous_covered_sha": "8ca3ea3c9ff5c88b8d0ec9839248f77c0dd86335",
+    "base_sha": "f5cce371",
+    "delta_commits": 2,
+    "delta_files": 3,
+    "delta_lines_added": 246,
+    "delta_lines_removed": 61,
+    "delta_dadaia_workspace_files": 0,
+    "gate_matrix_cases": 9,
+    "gate_matrix_correct": 9,
+    "findings_critical": 0,
+    "findings_high": 0,
+    "findings_medium": 1,
+    "findings_low": 1,
+    "findings_info": 3,
+    "push_gate_exit": 0,
+    "push_gate_offenders": 0,
+    "secrets_detected": 0,
+    "cve_findings": 0,
+    "new_dependencies": 0,
+    "tests_passed": 33
+  },
+  "findings": [
+    {
+      "severity": "INFO",
+      "message": "The prescription was followed without drift, and the fix is a deletion: the ACTIVE.md read is gone, evidence resolves by artifact over both trees, RELEASE_ID is an optional narrowing that can no longer error the gate.",
+      "detail_md": "Point-by-point against the prescription I filed with the HIGH finding:\n\n| prescribed | delivered |\n|---|---|\n| delete the ACTIVE.md read | the whole `sed … ACTIVE.md` resolution block is removed |\n| glob both trees | `shopt -s nullglob` around a `CANDIDATES=(specs/releases/${RELEASE_GLOB}/verdicts/*.handoff.json specs/_archive/releases/${RELEASE_GLOB}/verdicts/*.handoff.json)` array, `shopt -u` immediately after |\n| RELEASE_ID optional narrowing, never an error | `RELEASE_GLOB='*'` by default; an id is canon-checked only when supplied and non-`none`, and `none` degrades to the glob instead of failing |\n| widen the drift exemption | `specs/releases/*/verdicts/*|specs/_archive/releases/*/verdicts/*` — **narrowly**, not `specs/_archive/**`, so an archived non-verdict change still disqualifies |\n| keep fail-closed | empty candidate array → `::error::` + exit 1, naming both expected shapes |\n\nNo drift in either direction: nothing extra was added, and the release-id canon (the F-2 hardening) still guards the one place an id reaches a path.",
+      "fix_recommendation": "None."
+    },
+    {
+      "severity": "INFO",
+      "message": "Nine-case matrix re-run against the fixed script: 9/9 correct, including all prior hardening unregressed.",
+      "detail_md": "| # | case | result |\n|---|---|---|\n| 1 | live tree, exact sha | PASS |\n| 2 | live tree, ancestor + verdict-only drift | PASS |\n| 3 | **archive tree**, ancestor + verdict-only drift | PASS (the new capability) |\n| 4 | no evidence anywhere | exit 1 — fail closed |\n| 5 | only a `commit_sha: \"HEAD\"` handoff + unreviewed production | exit 1, SKIP names the shape — **S-1 unregressed** |\n| 5b | abbreviated sha | exit 1 |\n| 6 | unreviewed production commit after the reviewed sha | exit 1 |\n| 7 | `RELEASE_ID=none` supplied with evidence present | PASS — no longer an error path |\n| 8 | `RELEASE_ID='../../../etc'` | exit 1 — canon still enforced before any path use |\n| 9 | archived **non-verdict** path in the drift | exit 1 — exemption is not over-wide |\n\nSource-level survivors confirmed at named lines: the 40-hex predicate (`:130`), `--` end-of-options on all three git calls (`:135`, `:140`, `:154`), and the F-2 diff exit-status capture (`:154`). `nullglob` is scoped to the array build only.",
+      "fix_recommendation": "None."
+    },
+    {
+      "severity": "INFO",
+      "message": "Delta 21bdf213..dfa2e95e (2 commits, 3 files): one CI script, its wiring tests (+8 test functions), and the two ledger events. Sweep clean.",
+      "detail_md": "`.github/scripts/pr-verdict-check.sh` +63/-38, `tests/integration/scripts/test_pr_verdict_check_wiring.py` +181/-23, `specs/bugs/bugs.jsonl` +2. No file under `dadaia_workspace/`. Sweep over added lines: **0** secret shapes, **0** home-absolute paths, **0** `skip`/`xfail`/`skipif`. Suites: `test_pr_verdict_check_wiring.py` + self-scan + repo hygiene + the v2 gitflow PR-gate contract → **33 passed**. Pre-push denylist gate on the real new-branch refspec, no pipe: **exit 0, zero offenders**. Working tree clean.\n\nThe ledger closes my own HIGH with all three FR23 fields and a `net-negative:` direction — the conditional-branch count for evidence-path resolution drops, which matches what I read in the diff: a whole resolution path removed, not a second one added.",
+      "fix_recommendation": "None."
+    },
+    {
+      "severity": "MEDIUM",
+      "message": "S-3, now unblocked: with the gate fixed, making it a required check on both edges is safe to schedule — and it is the last open item from this review arc.",
+      "detail_md": "develop's branch protection still carries no `required_status_checks`; main's required contexts still omit 'Security verdict gate (PR head sha)'. The ordering caveat I filed last round is discharged: the gate now resolves evidence in the closed-release state, so requiring it no longer hard-blocks a deploy PR.",
+      "fix_recommendation": "At the rc-2/next-release boundary, re-supply the required-checks list whole (PATCH clobbers) on develop and main including the verdict gate, and verify by reading branch protection back."
+    },
+    {
+      "severity": "LOW",
+      "message": "Carried unchanged: the .gitignore inversion leaves sensitive file classes trackable inside the release trees (no instance present; content-based backstops in force).",
+      "detail_md": "PM intake, unchanged; one trailing re-ignore block after the release-tree negation, plus hygiene-test probes.",
+      "fix_recommendation": "PM intake, unchanged."
+    }
+  ],
+  "decisions_required": [
+    "Operator: with the gate fixed, schedule 'Security verdict gate (PR head sha)' as a required check on develop and main - the ordering caveat from the previous round is discharged.",
+    "PM intake (carried): one trailing .gitignore re-ignore block for sensitive file classes after the release-tree negation."
+  ],
+  "next_handoff": {
+    "agent": "project-manager",
+    "context": "dadaia-workspace",
+    "expected_artifact_type": "other"
+  },
+  "verdict": "APPROVED",
+  "verdict_reason": "APPROVED covering dfa2e95e. The delta is two commits and three files — the verdict-gate script, its wiring tests and the two ledger events — with no file under dadaia_workspace/ and a clean sweep (0 secret shapes, 0 home paths, 0 skip/xfail; 33 tests green; push-gate exit 0 with zero offenders). The fix is my own prescription without drift, and it is a deletion rather than an addition: the ACTIVE.md read is gone, evidence is resolved by artifact over the live AND archived verdicts trees, RELEASE_ID survives only as an optional narrowing that can no longer error the gate, and the drift exemption is widened narrowly enough that an archived NON-verdict change still disqualifies. Nine-case matrix against the fixed script: 9/9 correct, including the archived-evidence PASS that motivated the fix and the S-1 refname/abbreviated-sha refusals, which are unregressed at named lines. Placement of this verdict: the live tree, because _archive is FROZEN. Bug-surface axis: REDUCED — a security decision stopped depending on a lifecycle pointer, and one resolution path was removed rather than a second added."
+}

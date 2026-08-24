@@ -9,7 +9,7 @@ tags:
 - repos
 - catalog
 - discovery
-last_updated: '2026-07-16'
+last_updated: '2026-08-24'
 release_origin: v0.1.48
 ---
 
@@ -22,7 +22,7 @@ Queries the static catalog of known repos at `.dadaia/agentic/data/repos.xlsx` (
 ## Usage flow
 
   1. `dadaia repos list` — shows a table with all catalog repos.
-  2. The operator identifies the desired slug and uses it in `dadaia context create <name> --repo <slug>`.
+  2. The operator identifies the desired slug and uses it in `dadaia context create <name> --repo <slug>`, or as an associated repo of an existing context (`--associated <slug>[=<url>]` at create time, `dadaia context repo add` later).
   3. **Programmatic consumer:** `dadaia context create` without `--url` queries the catalog via `ReposService.list_known()` (`cli/commands/context.py` → `container.build_repos_service()`) to back-fill `repo_url`, failing gracefully when the catalog is absent; an explicit `--url` wins over the lookup.
   4. To update the catalog: edit the XLSX manually (or regenerate it via a dedicated release).
 
@@ -39,6 +39,7 @@ Without the catalog, creating a context required pasting the full URL every time
 ## Runtime state touched
 
   * Read-only: `.dadaia/agentic/data/repos.xlsx`
+  * The `repos/` directory on disk mirrors the active contexts' **full** repo set — each ALIVE context's main repo plus every associated repo it declares, one checkout per slug, and a slug is owned by exactly one context ([[context-management]]).
 
 
 

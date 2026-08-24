@@ -140,9 +140,10 @@ memory window and the closure.
 
 ### Amendment 1 — 2026-08-23 — the skills audit, folded in
 
-**Status of this amendment: Draft.** It adds **FR22–FR31**, acceptance ids on **FR10,
-FR11, FR14 and FR21**, tasks **T-044-54 … T-044-62** and **two picked bugs**. Every existing
-task id, FR id, segment (`S1 … S5`) and the `rc` lane are unchanged.
+**Status of this amendment: Aprovado** (operator, 2026-08-23 — see §8; this line was
+stale-Draft until the v0.4.4 closure corrected it). It adds **FR22–FR31**, acceptance ids
+on **FR10, FR11, FR14 and FR21**, tasks **T-044-54 … T-044-62** and **two picked bugs**.
+Every existing task id, FR id, segment (`S1 … S5`) and the `rc` lane are unchanged.
 
 **Provenance.** Research report
 `.dadaia/reports/dadaia-workspace/claude-code/2026-08-23T183323Z-skills-audit-vs-reference/`

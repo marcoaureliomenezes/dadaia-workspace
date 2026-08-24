@@ -15,7 +15,7 @@ tags:
 - codex
 - projection
 - enforcement
-last_updated: '2026-08-18'
+last_updated: '2026-08-24'
 release_origin: v0.3.0
 ---
 
@@ -28,8 +28,10 @@ work is document-governed, not runtime-driven.
 
 ## Usage flow
 
-1. Operator launches `codex` at the workspace root; `AGENTS.md` loads natively;
-   `SessionStart` ctx-inject loads the bound context once per session.
+1. Operator launches `codex` at the workspace root; `AGENTS.md` loads natively —
+   verified to deliver the law exactly **once** per session, since this harness resolves
+   no import chain that would deliver a second copy — and `SessionStart` ctx-inject loads
+   the bound context once per session.
 2. Sessions get the deterministic gate: PreToolUse `pre_gate` (matcher
    `^(apply_patch|Edit|Write|Bash)$`) + matcher-less PostToolUse heartbeat, registered
    in `.codex/hooks.json` via self-locating wrappers under `.dadaia/hooks/codex-*`.

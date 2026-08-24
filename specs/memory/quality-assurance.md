@@ -10,10 +10,11 @@ summary: >-
   wall-clock ceilings and the LARGE census re-pinned at its measured value, the pinned
   mutation tool and its runnable cadence, the exact-pin rule for all third-party audit and
   quality tooling, the measured complexity/size ratchet and the mandatory CLOSURE size
-  accounting, CI gates including the required pr-source-guard on main and the
-  main/develop-only push triggers, coverage as a by-product metric, cross-platform checks,
-  the consumer-side approval boundary, the redaction-at-authoring posture for diagnostic
-  output, and anti-slop requirements.
+  accounting, CI gates including the two-edge pr-source-guard, the security-verdict PR
+  gate and the feature-branch push trigger, the preflight/CI check parity, the bug-surface
+  delta as a required field of every review verdict, coverage as a by-product metric,
+  cross-platform checks, the consumer-side approval boundary, the redaction-at-authoring
+  posture for diagnostic output, and anti-slop requirements.
 tags:
 - testing
 - pytest
@@ -23,7 +24,7 @@ tags:
 - flake
 - quarantine
 - privacy
-last_updated: '2026-08-18'
+last_updated: '2026-08-24'
 release_origin: v0.3.0
 ---
 
@@ -73,9 +74,9 @@ Codex invocation unless the corresponding live flag is set
 `DADAIA_CLAUDE_LIVE`), and it fakes `ensure_workspace_venv` so no test ever builds a
 real venv (disk/time protection). Temporary workspaces use pytest `tmp_path` or
 workspace `.dadaia/tmp/`; they never bootstrap the source repo as a consumer
-workspace. The gating set collects 2,585 tests — unit 2,172, integration 190, contract
-169, e2e 54 — and a full local run passes 2,582 with 3 environment-conditional skips
-(two Windows-only, one requiring a LAN IPv4). The broad LARGE census is **100**: the 54
+workspace. A full local run passes **2,822** with 4 environment-conditional skips — two
+Windows-only, one requiring a LAN IPv4, and one honest degrade when the installed Codex
+binary is present but unusable. The broad LARGE census is **100**: the 54
 e2e-tier pytest journeys plus 46 Playwright specs across 11 files. The declared
 wall-clock baselines live in "Test Health" below.
 
@@ -83,7 +84,11 @@ wall-clock baselines live in "Test Health" below.
 
 A defect is reproduced on the executed path, pinned by a test that fails for the real
 reason, fixed at the causal site, and proven green. Workarounds and symptom patches are
-not acceptable outcomes. The recurrence evidence is unambiguous: structural fixes that
+not acceptable outcomes. This is mechanically enforced where the bugs are: a `resolved`
+event is refused unless it carries the red-loop command, the test seam and the diff
+direction, and a net-positive diff on the touched feature routes through
+`software-architect` before the commit ([[sdd-bug-backlog-governance]]).
+The recurrence evidence is unambiguous: structural fixes that
 **delete** surface stay quiet, while additive fixes reproduce the next defect in the same
 family within a day. Removal is the preferred remedy; an additive-only fix carries an
 explicit justification of why removal was impossible.
@@ -232,7 +237,8 @@ operated from `dadaia-test-stewardship`, the single operational home.
 
 CI runs importability, Ruff format/lint, import-linter, mypy strict, unit, contract with
 80% coverage, Windows/macOS cross-platform subsets, integration, Python E2E, panel E2E,
-repository hygiene, backlog doctor, branch/PR governance, security verdict, and a
+repository hygiene, backlog doctor, branch/PR governance, the security-verdict PR gate,
+the older dual qa-plus-security closure gate, and a
 gitleaks secret-scan job on every push/PR. Release publication repeats the relevant
 quality ladder before build, approval, publish, and package smoke test.
 
@@ -246,14 +252,37 @@ panel E2E 8). The 80 % floor on `unit or contract` is a CI gate and a by-product
 never an acceptance target, never a reason to write a test, and never a score anchor for an
 audit.
 
-Push triggers are `main` and `develop` only, matching the branches that exist remotely;
-feature and hotfix branches are local-only and carry no trigger, so their coverage is the
-local pre-push preflight plus the `develop` push. `pr-source-guard` is a **required**
-check on `main`: it fires on any pull request targeting `main` and fails unless the head
-ref is exactly `develop`, making a PR from any other head mechanically unmergeable rather
-than merely red. The head ref reaches the job through `env:` and is compared as a quoted
-literal, never interpolated into a shell string, because it is attacker-influenceable on a
-fork PR.
+Push triggers are `main`, `develop` and `feature/**`, and pull requests targeting
+`develop` or `main` trigger the same matrix. The feature-branch trigger is what makes the
+branch contract's first publication a fully gated one: the work is exercised by CI on the
+push that opens its pull request, not first seen at a merge.
+
+`pr-source-guard` is **one job carrying two rules**: `main` accepts a pull request only
+from `develop`, and `develop` accepts one only from `feature/{M.m.p}`, the pattern
+translated into POSIX ERE from the package's single pattern source with a cross-reference
+at the site. A PR from any other head is mechanically unmergeable rather than merely red.
+The head ref reaches the job through `env:` and is compared as a quoted literal, never
+interpolated into a shell string, because it is attacker-influenceable on a fork PR.
+
+The **security-verdict gate** is a CI job on both PR edges rather than a step of the push
+hook: it requires an APPROVED `security-reviewer` handoff covering the PR head sha, read
+from committed evidence under `specs/releases/<id>/verdicts/` ([[sdd-gate-v3]]). It fails
+closed — an unreadable coverage diff refuses rather than assumes, and the release id is
+constrained to the release-id canon before it reaches a path. Making it a **required**
+check is a repository setting the operator applies; a job introduced on a feature branch
+cannot run on the pull request that introduces it, so its first PR is advisory by
+construction and it is required from the next one onward.
+
+The local preflight and CI gate the **same check set** — format, lint, `mypy --strict`,
+the import-boundary contracts and the test suite — pinned by a parity contract test that
+fails when either side gains a check the other lacks. A local green that CI turns red is
+the loop the root-cause law forbids, so the parity is a test rather than a convention.
+
+Every review verdict — `code-reviewer`, `qa-engineer`, `software-architect` — carries the
+**bug-surface delta** of each feature it touched as a required field: reduced or
+increased, with evidence read from the bug ledger (`dadaia bugs stats`), not from the test
+result. A verdict without it is incomplete, and "tests green" is stated as insufficient
+once per persona.
 
 Internal gates never approve a deploy by themselves: every candidate wheel must pass the
 consumer-side validation matrix shipped in the package

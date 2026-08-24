@@ -2,19 +2,22 @@
 slug: sdd-bug-backlog-governance
 title: sdd-bug-backlog-governance
 category: product
-tldr: Event-sourced JSONL bugs with a non-blocking picked marker, an operator-gated backlog, release consumption, audit dispositions, and a four-branch git contract.
+tldr: Event-sourced JSONL bugs closed by a three-field evidence gate, an operator-gated backlog, an rc release ladder, and a three-branch git contract.
 summary: >-
   Bugs are append-only events, including a non-terminal repeatable `picked` reservation
-  marker that surfaces contention without ever blocking it; the backlog is the operator's demand queue, curated by
+  marker that surfaces contention without ever blocking it; a `resolved` event is refused
+  unless it carries three checkable fields — the red-loop command, the test seam and the
+  diff direction on the touched feature — and a net-positive diff routes the fix through
+  software-architect before the commit. The backlog is the operator's demand queue, curated by
   project-manager in a single BACKLOG.md (ACTIVE + LEDGER) with purge-on-pick and
   continuous sanitizing — no agent materializes an entry, residuals reach the operator
   through a PM intake report, and only actionable defects do — record-only observations
-  terminate in the closure record. A release consumes an explicit picked set, ends in the
+  terminate in the closure record. A release consumes an explicit picked set, matures
+  through an rc ladder with no alpha or beta stage, ends in the
   fixed order review → closure → archive → ship, and requires terminal dispositions at
-  closure and audit. Work is placed on four branch patterns with develop the only pushable
-  one; a feature branch merges into develop at two milestones, each followed by a diff-based
-  security review of the develop delta and a push. Bug, backlog and audit paths stay additive
-  and never lock-gated.
+  closure and audit. Work is placed on three branch patterns; every agent stage runs on the
+  one live feature branch, and develop and main advance only by pull request. Bug, backlog
+  and audit paths stay additive and never lock-gated.
 tags:
 - sdd
 - governance
@@ -22,7 +25,7 @@ tags:
 - backlog
 - bugs
 - gitflow
-last_updated: '2026-08-18'
+last_updated: '2026-08-24'
 release_origin: v0.4.2
 ---
 
@@ -52,14 +55,40 @@ Every dadaia-workspace production defect encountered while using the tool is reg
 before the turn ends. Expected validation failures and mistakes in throwaway scripts are
 not product bugs.
 
-**Bug-hotfix doctrine:** a bug is fixed ON THE SPOT — register → root-cause → RED
+**Bug-fix doctrine:** a bug is fixed ON THE SPOT — register → root-cause → RED
 reproducing test → fix → GREEN → `resolved` event with evidence → commit. Releases are
-never created to fix bugs; they exist for backlog feature work. The fix runs on
-`hotfix/{M.m.p}` at the next PATCH, merged into `develop`; that merge commit also bumps
-`pyproject.toml` `version` to the minted PATCH and adds the `CHANGELOG.md` entry. A hotfix
-carries no ceremony: no SPEC, PLAN, TASKS or CLOSURE, and no `specs/releases/<id>/`
-directory. The record of what shipped is the bug ledger's `resolved` event plus that
-CHANGELOG entry.
+never created to fix bugs; they exist for backlog feature work. The fix runs on the **one
+live feature branch**, in whatever phase that branch is in, with no ceremony: no SPEC,
+PLAN, TASKS or CLOSURE, and no `specs/releases/<id>/` directory. The record of what shipped
+is the bug ledger's `resolved` event plus, at the release that carries it, the
+`CHANGELOG.md` entry. Diagnosis itself is a **method, not an exhortation**: the skill that
+operates Arm B carries six ordered phases — a feedback loop observed red before any
+hypothesis, minimisation until every remaining element is load-bearing, falsifiable
+hypotheses each with the observation that would kill it, instrumentation of the executed
+path rather than reading code for a theory, a regression test at the correct seam, and
+cleanup — each ending in a criterion a reader can check without judgement. When **no
+correct seam exists**, the absence *is* the finding: an architecture finding is registered
+and `software-architect` is dispatched before the fix proceeds.
+
+### Resolution
+
+`resolved` is a gated event. `dadaia bugs append --event resolved` **refuses** evidence
+that lacks any of three independently checkable fields, naming exactly the missing one and
+writing nothing:
+
+| Field | What it must carry |
+|---|---|
+| red-loop command | the command that failed for the real reason, before any fix existed |
+| test seam | the regression test, at the boundary the bug actually crossed |
+| diff direction | `net-negative` / `net-neutral` / `net-positive` on the touched feature — lines, branches and flags added versus removed |
+
+A fix whose diff is **net-positive on the touched feature** routes to `software-architect`
+for a ruling **before the commit**: the growth must be the missing enforcement at the seam
+that owns it, never a branch, a flag, a second code path or a cross-feature reach-in. The
+refusal is one validation inside the existing append path — no second command, no bypass
+flag, no environment escape — and all three fields pass through the same redaction the rest
+of the event does. The ledger stays append-only and no past event is rewritten: the reader,
+`specs doctor` and `bugs status` keep folding historical events that predate the gate.
 
 ## Backlog
 
@@ -129,24 +158,39 @@ archived sidecars and as one of BL-STALE's three inputs.
 
 ## Branches And Stage Placement
 
-Four branch patterns exist and no fifth: `main`, `develop`, `feature/{M.m.p}`, and
-`hotfix/{M.m.p}` with PATCH ≥ 1. `develop` is the only pushable branch; `feature/*` and
-`hotfix/*` live local-only; `main` takes no direct commit and no direct push and advances
-only through a pull request from `develop`. The operational contract — the per-stage table
-and the mechanical-versus-discipline split — lives in the universal skill `dadaia-gitflow`;
-the law states it once in `DADAIA.md` §5/§6 and every other surface references it.
+The branch contract has exactly two homes: one section of the law states it, and the
+universal skill `dd-gitflow-default` operates it. This atom restates neither — it records
+only where work is placed. Three branch patterns exist and no fourth (`hotfix/*` is
+retired, reachable only on an explicit operator request), and exactly one feature branch is
+live at a time.
 
-Stage placement follows the branch a stage belongs to. Backlog definition, research, and
-bug registration happen on `develop`, with a commit after every registration. Release
-definition and release implementation both happen on `feature/{M.m.p}` cut from `develop`.
-Bug fixes happen on `hotfix/{M.m.p}`.
+Stage placement is therefore trivial: **every agent stage runs on the one live feature
+branch** — backlog definition, research, bug registration, release definition and release
+implementation alike, with a commit after every registration. `develop` and `main` are
+pull-request targets only; neither is ever a working branch, and a local commit on either
+could never be published.
 
 ## Merge Cadence
 
-A feature branch merges into local `develop` at exactly two milestones: (a) when the
-definition trio SPEC/PLAN/TASKS is `Aprovado`, and (b) at ship. Each merge is followed, in
-that order, by a diff-based security review of `origin/develop..develop` and a push of
-`develop`. Ship continues from there: PR `develop` → `main`, every CI job green, merge.
+`develop` advances only by pull request from the live feature branch, at two kinds of
+moment: once when the definition trio SPEC/PLAN/TASKS is `Aprovado`, and once per **release
+candidate** thereafter. `main` advances only by pull request from `develop`, at the final
+candidate. Both edges are gated by a CI check requiring an APPROVED security-reviewer
+verdict covering the PR head sha, read from committed evidence ([[sdd-gate-v3]]).
+
+There is **no alpha and no beta**. A release matures through `rc-N` only, and `rc-N` is a
+state of the specs — it lives in the release's phase and its TASKS, never in a branch name.
+`rc-1` burns when the whole implemented scope is validated, gate-green and closed by QA and
+is merged into `develop`. Each later `rc` is an adjustment round over that same scope,
+discovered by exercising the merged `develop`, worked on the same feature branch and merged
+again: one candidate per merge. **No new backlog ever enters a candidate** — a demand
+outside the release's declared scope is backlog for a later release. If nothing is found,
+the final candidate is `rc-1`. The final candidate carries the memory window, the closure
+record and the archive move, then ships `develop` → `main`; at that deploy the shipped
+feature branch is deleted and the next one is cut from `main` in the same step.
+
+An internal work boundary inside a release — a segment closed by a committed QA review — is
+not a candidate: it never merges, never opens a PR and burns no `rc`.
 
 A release ends in one fixed order: **review → closure → archive → ship**. The pre-PR six-axis
 code review of the delta runs on the **thawed** tree, before the `git mv` that freezes the
@@ -188,10 +232,10 @@ appended, never woven into the findings text.
 Bug, backlog, and audit paths are additive and writable without a bind or concurrency
 lock. Production release artifacts and code follow the ordinary path and phase rules.
 
-Push is blocked until an APPROVED security-reviewer handoff covers the
-`origin/develop..develop` delta being pushed, keyed to the pushed `develop` tip. The
-push-gate review is that diff only; a full-tree scan exists solely in the audit lane. This
-is a quality boundary, not a concurrency mechanism.
+A **merge** is blocked until an APPROVED security-reviewer handoff covers the pull
+request's head sha; a push is blocked only by the local preflight, the branch policy and
+the content scan. The gating review is diff-based only; a full-tree scan exists solely in
+the audit lane. This is a quality boundary, not a concurrency mechanism.
 
 ## Runtime State
 
@@ -205,7 +249,9 @@ is a quality boundary, not a concurrency mechanism.
 - `specs/releases/<id>/consumed_backlog.json` or its archived equivalent
 - `specs/audits/<timestamp>-<session>/` and, once dispositioned,
   `specs/audits/_archive/<audit>--dispositioned-<release-id>`
-- `pyproject.toml` and `CHANGELOG.md` at a hotfix merge into `develop`
+- `specs/releases/<id>/verdicts/<sha>.handoff.json` — the committed review evidence the PR
+  gate reads
+- `pyproject.toml` and `CHANGELOG.md` at the release's final-candidate merge
 
 ## Dependencies
 

@@ -12,7 +12,7 @@ tags:
 - ui
 - http
 - dashboard
-last_updated: '2026-08-07'
+last_updated: '2026-08-24'
 release_origin: v0.3.0
 ---
 
@@ -24,7 +24,10 @@ There is no panel token, cookie, or credential store.
 
 ## Tabs
 
-1. **Projects** - active Spec Context Projects and current memory.
+1. **Projects** - active Spec Context Projects and current memory. A context card lists
+   its main repository and, when it has any, its associated repositories; a context with
+   none renders exactly as it always did, and the JSON contract carries the same list
+   ([[context-management]]).
 2. **Agents** - Persona definition cards, agent model templates/overrides, plus
    the aggregate Sessions telemetry dashboard.
 3. **Agentic Entities** - the abstract-entity registry rendered server-side:

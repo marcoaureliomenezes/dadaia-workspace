@@ -15,7 +15,7 @@ tags:
 - dependency-rules
 - agents
 - sdd
-last_updated: '2026-08-18'
+last_updated: '2026-08-24'
 release_origin: v0.4.2
 ---
 
@@ -95,7 +95,8 @@ Git chokepoints are installed from:
 
 - `public/scripts/pre-commit-presence-gate.sh` - concurrency warning only;
 - `public/scripts/pre-push-ci-gate.sh` - CI preflight, branch policy, range-scoped
-  denylist scan, and develop-diff security verdict.
+  denylist scan; the security verdict lives at the PR boundary, not here
+  ([[sdd-gate-v3]]).
 
 `features/chokepoints/` is pure decision logic: it imports no `infrastructure` module and
 spawns no subprocess. The I/O its gates need arrives as core ports the CLI injects at the
@@ -268,7 +269,24 @@ Nine core agent roles with two dispatchers run inside the entry harness. Their b
 canonical Markdown under `public/agents/`, rendered at install with the resolved
 model/effort policy and projected per harness. The ordered release ritual is owned by the
 SDD documents — `ACTIVE.md`, SPEC, PLAN, TASKS, CLOSURE — and by the agents that write
-them. Hooks enforce mechanical file/Git boundaries only.
+them. Hooks enforce mechanical file/Git boundaries only. Branch placement, pushability and
+merge milestones are stated once in the law's gitflow section and operated by
+`dd-gitflow-default`; a persona carries a pointer to those two homes and restates neither.
+
+**A persona carries only what the law does not.** Its body targets 120–220 lines, states
+its rules as positive targets rather than a prohibition list, and drops anything the law
+already says — the memory-bootstrap ritual, handoff-first, the concurrency posture, the
+scope-error inventory. Where a fact genuinely has no other home it stays, and the persona
+says why. Which skill operates which law topic is declared in exactly one machine-readable
+place, `public/entities/rules-skills-map.json`, enforced by one contract test that is also
+the citation check: every path and every CLI verb a public asset cites must exist
+([[agentic-entities]]).
+
+**The law reaches each harness exactly once.** The projection seam decides, per harness,
+which surface carries it — a harness that resolves an import chain from its own
+constitution needs no rules-directory mirror, and one that reads `AGENTS.md` natively
+keeps its own path. The decision lives at the seam, never as a per-file exclusion, and no
+harness ends with zero copies ([[public-asset-distribution]]).
 
 ## Dependencies
 
