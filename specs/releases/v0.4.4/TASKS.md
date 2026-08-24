@@ -1113,7 +1113,7 @@ Never duplicated into each write site.
 
 ---
 
-- [-] **T-044-41 — [git] FR20: branch hygiene on `origin` and locally**
+- [x] **T-044-41 — [git] FR20: branch hygiene on `origin` and locally**
 
 **Owner role:** dispatcher · **Commit:** none (git refs) — capture **V10** before and after.
 
@@ -1130,7 +1130,7 @@ carve-out; no `--no-verify`.
 
 ---
 
-- [ ] **T-044-42 — `S5` QA close** · **Owner role:** qa-engineer ·
+- [-] **T-044-42 — `S5` QA close** · **Owner role:** qa-engineer ·
 **Commit:** `chore(T-044-42): S5 qa review` — committed on the branch; verdict states the
 bug-surface delta per bug. No merge, no PR.
 
