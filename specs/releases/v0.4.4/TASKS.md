@@ -1219,7 +1219,7 @@ whole scope.
 
 ## `rc-2 … rc-N` — adjustment rounds on the merged scope
 
-- [-] **T-044-53 — Adjustment rounds: test `develop`, fix on the branch, merge again**
+- [x] **T-044-53 — Adjustment rounds: test `develop`, fix on the branch, merge again**
 
 **Owner role:** qa-engineer + operator (finding) · software-engineer / ai-engineer (fixing) ·
 dispatcher + security-reviewer (merging) · **Preconditions:** T-044-52 `[x]`.
