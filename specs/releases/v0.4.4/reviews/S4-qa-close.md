@@ -179,7 +179,7 @@ stats`/`dadaia bugs status`, not asserted:
    landed — the correct terminal state per this release's own supersession model, not
    a silent drop.
 2. `self-scan-baseline-drift-t04427-test-fixture-email` (LOW) — a test fixture's own
-   `redacted-example-email` email literal tripped the privacy denylist's shrink-only baseline
+   `test@` literal on a real registered domain tripped the privacy denylist's shrink-only baseline
    (a real, registered domain, not on the RFC-2606 exclusion list). Fixed at the
    fixture value (`test@example.com`, matching every sibling fixture's convention),
    never added to the baseline — same recurring bug **class** as three prior
