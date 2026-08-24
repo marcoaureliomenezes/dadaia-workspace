@@ -977,7 +977,7 @@ Done criterion — no production code touched); `bugs.jsonl` carries the evidenc
 
 ---
 
-- [ ] **T-044-36 — bug `crlf-fixture-makes-a-windows-assertion-pass-for-the-wrong-reason` (LOW)**
+- [-] **T-044-36 — bug `crlf-fixture-makes-a-windows-assertion-pass-for-the-wrong-reason` (LOW)**
 
 **Write set:** the same test module.
 **Description:** Write the fixture with an explicit `newline=` so its bytes are known on
@@ -986,7 +986,7 @@ every platform and the assertion can only fail for the reason it names.
 
 ---
 
-- [ ] **T-044-37 — bug `migration-normalises-crlf-atoms-to-lf-contradicting-its-byte-preserve-wording` (LOW)**
+- [-] **T-044-37 — bug `migration-normalises-crlf-atoms-to-lf-contradicting-its-byte-preserve-wording` (LOW)**
 
 **Write set:** `dadaia_workspace/features/migrate/frontmatter_keys.py`, tests.
 **Description:** Decide-then-state: either the migration is LF-canonical (consistent with
