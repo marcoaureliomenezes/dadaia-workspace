@@ -452,7 +452,7 @@ is no longer archive-only.
 - repo-agents-md-symlink-hardening · DELIVERED · v0.4.3 · 2026-08-18
 - stewardship-relocation-grep-homonym-note · DELIVERED · v0.4.3 · 2026-08-18
 - tests-agents-md-placeholder-doctor-warning · DELIVERED · v0.4.3 · 2026-08-18
-- spec-context-associated-repos · CONSUMED · v0.4.4 — picked into release v0.4.4 (provenance: specs/releases/v0.4.4/SPEC.md `**Consumes:**`) · 2026-08-23
-- gitflow-contract-v2-consolidation · CONSUMED · v0.4.4 — picked into release v0.4.4 (provenance: specs/releases/v0.4.4/SPEC.md `**Consumes:**`) · 2026-08-23
-- rules-skills-governance-map · CONSUMED · v0.4.4 — picked into release v0.4.4 (provenance: specs/releases/v0.4.4/SPEC.md `**Consumes:**`) · 2026-08-23
-- core-skills-consolidation · CONSUMED · v0.4.4 — picked into release v0.4.4 (provenance: specs/releases/v0.4.4/SPEC.md `**Consumes:**`) · 2026-08-23
+- spec-context-associated-repos · DELIVERED · v0.4.4 — FR15–FR19 shipped; closure sweep, specs/_archive/releases/v0.4.4/CLOSURE.md `## Dispositions` · 2026-08-24
+- gitflow-contract-v2-consolidation · DELIVERED · v0.4.4 — FR1–FR6 shipped; closure sweep, specs/_archive/releases/v0.4.4/CLOSURE.md `## Dispositions` · 2026-08-24
+- rules-skills-governance-map · DELIVERED · v0.4.4 — FR7–FR9 shipped; closure sweep, specs/_archive/releases/v0.4.4/CLOSURE.md `## Dispositions` · 2026-08-24
+- core-skills-consolidation · DELIVERED · v0.4.4 — FR10–FR14 + FR24–FR31 shipped; closure sweep, specs/_archive/releases/v0.4.4/CLOSURE.md `## Dispositions` · 2026-08-24
