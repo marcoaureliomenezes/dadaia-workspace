@@ -667,7 +667,7 @@ harness may end with zero copies.
 
 ---
 
-- [-] **T-044-60 — FR30: `ctx_inject` stops restating the law**
+- [x] **T-044-60 — FR30: `ctx_inject` stops restating the law**
 
 **Owner role:** software-engineer · **Commit:**
 `fix(T-044-60): the per-prompt injection carries state, not restatement`
