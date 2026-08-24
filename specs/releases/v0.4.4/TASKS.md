@@ -749,7 +749,7 @@ the ceiling) and a blast radius. **Nothing is executed** (SPEC §4.3).
 
 ---
 
-- [-] **T-044-24 — `S3` QA close**
+- [x] **T-044-24 — `S3` QA close**
 
 **Owner role:** qa-engineer · **Commit:** `chore(T-044-24): S3 qa review` — committed on the
 branch; no merge, no PR.
