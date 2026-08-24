@@ -140,9 +140,29 @@ def _live_session_context(workspace_root: Path) -> str | None:
 
 def resolve_specs_dir(specs_dir: str | None) -> Path:
     """Resolve a specs/ dir: explicit input, else :func:`resolve_context` (no ``cwd/specs``
-    fallback — ``DADAIA.md`` §3 grants no such rung); unresolved reaches the error below."""
+    fallback — ``DADAIA.md`` §3 grants no such rung); unresolved reaches the error below.
+
+    T-044-40 (bug ``symlinked-specs-root-is-followed-by-migration-and-repair``): a
+    symlinked *explicit* root is refused HERE, once, at the one seam every
+    resolver-driven verb (``specs upgrade``, ``specs doctor --fix``, and every other
+    consumer of this function) shares — never re-decided per write site. This mirrors
+    the doctrine the inner walk roots already enforce (the migration's ``memory/``
+    walk root, the doctor's TREE-5 projection target — both refuse a symlinked root
+    with a skip note rather than follow it): the uniform rule is smaller than a
+    documented asymmetry, and this package has already paid for blind ``.resolve()``
+    once (a symlinked venv escaping its sandbox).
+    """
     if specs_dir:
-        return Path(specs_dir).resolve()
+        path = Path(specs_dir)
+        if path.is_symlink():
+            # Deferred import — see the terminal error below for why.
+            import typer
+
+            raise typer.BadParameter(
+                f"Refusing a symlinked specs root: {path} is a symlink. Point "
+                "--specs-dir at the real directory instead of a link to it."
+            )
+        return path.resolve()
 
     cwd = Path.cwd()
     try:
