@@ -404,3 +404,222 @@ close already routed.
 literal, no IP and no hostname — every path in it is repo-relative — so
 `pytest tests/integration/test_repo_self_scan.py` stays green on the `specs/` strict-zero
 scope. Checked by inspection before commit.
+
+---
+
+# Re-review — 2026-08-24
+
+Re-run after the four fix commits `1f50dbdf`, `f0a1ac0b`, `76d9db9b`, `beb7bc8c` (plus
+`8ff359ee`, the F-1 bug registration). Each fix was verified against its finding by
+reading the diff and re-executing the original repro, not by reading the commit message.
+
+## Verdict: REQUEST_CHANGES
+
+**Five of six findings are closed, several better than the fix direction I gave.** The
+sixth, F-1, is closed **at the seam I named and not as a class** — and the release's own
+architect proved that during the FR23 fifth firing, registering
+`context-create-accepts-slug-owned-by-another-context` (**HIGH, open**). I reproduced it
+at `HEAD`. The destructive invariant F-1 exists to protect is still violable by a
+one-command path, so the verdict cannot be APPROVED.
+
+This is not a new goalpost. It is F-1's own structural claim, unmet: `repos/<slug>` is a
+namespace every context shares, `dead()` destroys every entry in `all_repos()` with no
+ownership check, and **two** methods write into that namespace, not one.
+
+## Per-finding disposition
+
+| # | Severity | Disposition | Verification |
+|---|---|---|---|
+| **F-1** | HIGH | **PARTIALLY CLOSED — still blocking** | `add_repo` seam fixed and proven; mirror seam `create` still open (F-12 below) |
+| **F-2** | MEDIUM | **CLOSED** | Both halves independently proven, incl. a pre-fix/post-fix differential |
+| **F-3** | MEDIUM | **CLOSED** | 5 sites title-anchored (one more than I found) |
+| **F-4** | MEDIUM | **CLOSED** | Writer normalised onto the sibling idiom; 9th battery case; census self-enforcing |
+| **F-5** | MEDIUM | **CLOSED** | Swept wider than the finding — 2 files, 8 retired names |
+| **F-6** | MEDIUM | **CLOSED** (blocking half) | FR17 file now declares `Intent: CONTRACT — A17.1, A17.2, A17.3` |
+| F-7 / F-8 / F-10 | LOW | Unchanged, correctly deferred | Non-blocking by design |
+| F-9 / F-11 / INFO-11 | LOW / INFO | Unchanged; F-11 registered as a bug | Record-only |
+
+### F-1 — the seam closed, the class did not
+
+`1f50dbdf` implements exactly the direction I gave: one predicate, `_foreign_slug_owner`,
+consulting `store.list_all()` at the existing `add_repo` seam, raising the existing
+`AssociatedRepoConflictError`, with the message naming the owning context; `create
+--associated` inherits it verbatim; no guard added inside `dead()`. Re-running my
+original repro against `HEAD`:
+
+| Case | Result |
+|---|---|
+| Another context's **main** slug (my original repro) | **REFUSED** — `AssociatedRepoConflictError`, names the owner |
+| Another context's **associated** slug | **REFUSED** — same error, names the owner |
+| Own main slug (A17.3 no-regression) | **REFUSED** — original message intact |
+| Genuinely unowned slug | **ACCEPTED** — no over-refusal |
+| Idempotent re-add of own associated slug | `added=False` — A17.1 intact |
+
+That is a clean, correctly-scoped fix. The problem is the claim it rests on. The new
+docstring states that `add_repo` "is the one seam that writes into that shared namespace,
+so it is the one seam that must keep the assumption true". `create` is the other one, and
+it checks only for a context-**name** collision (`service.py:289-304`). Reproduced at
+`HEAD` against a throwaway states dir:
+
+```
+create ctx-a --repo repo-shared          -> ok
+add_repo(ctx-b, "repo-shared")           -> REFUSED   (F-1 fixed)
+create ctx-c --repo repo-shared          -> ACCEPTED  (mirror seam open)
+   ctx-a.all_repos() -> [repo-shared]
+   ctx-c.all_repos() -> [repo-shared]
+```
+
+`dead("ctx-c")` then walks `all_repos()` and runs `commit_all` → `push` → `shutil.rmtree`
+on `repos/repo-shared`, which is **ctx-a's main working tree**. Identical blast radius to
+the original F-1, reached by a shorter path — a single `context create`, no associated
+repo involved at all.
+
+### F-12 · Architecture · **HIGH** · `dadaia_workspace/features/spec_context/service.py:289`
+
+**`create` admits a main repo slug already owned by another context.** The release's own
+architect found this during the FR23 fifth-firing mirror-gap check and registered it as
+`context-create-accepts-slug-owned-by-another-context` (HIGH, open). Confirmed
+independently above.
+
+**Fix direction:** call the predicate that already exists —
+`self._foreign_slug_owner(name, repo_slug)` — in `create`, before `self._store.save(ctx)`,
+raising the same error type with the same owner-naming message. `_foreign_slug_owner`
+skips `other.name == name`, and no context named `name` exists yet at that point, so it is
+correct at this seam with no change. Then correct the docstring: there are two write seams
+into the shared namespace, and both hold the invariant.
+
+That is one call at one seam, and it makes the invariant true rather than locally
+enforced — which is what F-1 asked for the first time. The bug's own `notes` also raise
+the historical-collision question (a registry that already contains a duplicate, imported
+verbatim by the v2→v3 migration); that is a doctor-lane decision and correctly **intake**,
+not part of this fix.
+
+### F-2 — closed, with a demonstrated exploit shape
+
+`f0a1ac0b` captures the diff into a variable and checks its exit status before
+interpreting it, and pins `RELEASE_ID` to the release-id canon before path interpolation.
+I proved both, and proved the first was a **real** fail-open rather than a theoretical one,
+by running the pre-fix and post-fix scripts against the identical scenario — a genuine
+unreviewed commit between the reviewed sha and the PR head, with a shim making `git diff`
+exit non-zero:
+
+| Script | Outcome |
+|---|---|
+| pre-fix (`f0a1ac0b^`) | `PASS: … APPROVED … covers PR head` — **exit 0**, gate satisfied |
+| post-fix (`HEAD`) | `SKIP: … cannot prove nothing unreviewed landed` — **exit 1** |
+
+`RELEASE_ID='../../../etc'` is now refused before it reaches a path; `RELEASE_ID='v0.4.4'`
+still flows through to the ordinary refusal. The bash pattern is a faithful restatement of
+`core/specs_version.py::RELEASE_SEMVER_RE` (`\d` → `[0-9]`), with the reason for restating
+rather than re-deriving written at the site.
+
+### F-3 — closed; one LOW residual elsewhere
+
+All five `.github/` citations now read `DADAIA.md §4 (Gitflow)`, including a fifth site at
+`ci.yml:488` I had missed. Title-anchoring means the next renumbering breaks loudly.
+
+Record-only residual, **not** blocking and outside F-3's stated scope: `public/agents/ai-engineer.md:239`
+cites `§5` for "its projections are PROTECTED and human-only" — PROTECTED is `§3` and the
+re-projection contract is `§8` (The library surface). Same class, different section, in a
+file this release touched. Routed to PM intake alongside the other citation residuals.
+
+### F-4 — closed, and closed structurally
+
+`76d9db9b` extracts `state_v3._atomic_write_json`, mirroring `presence._atomic_write_json`
+(uuid4-suffixed tmp name, `os.replace`, cleanup on `OSError`). This does three things at
+once: it removes the fixed, symlink-followable tmp name (CWE-59); it makes the writer fall
+into the name-based census **by construction** rather than by hand-maintenance; and it
+collapses two divergent shapes onto one sibling idiom. It is characterised honestly as the
+battery's 9th case on all four dimensions rather than asserted clean.
+`test_census_covers_every_atomic_writer_def_in_the_package` closes the escape route itself.
+Battery re-run: **46 passed**, 9 cases.
+
+Record-only residual: three *inline* `with_suffix(".tmp")` writers remain outside a
+name-based census — `state_v2.py:166`, `import_/service.py:135` and `:167`. **None was
+added by v0.4.4**, and they belong to the atomic-writer consolidation the S5 close already
+routed to intake.
+
+### F-5 — closed, wider than asked
+
+`beb7bc8c` swept `features/academy/knowledge_basis/` for all eight retired/renamed names
+and fixed two files (`07_codex/03_skills_plugins_and_mcp.md` plus `EXERCISES.md`, which I
+had not found). Zero hits remain for any of the eight.
+
+### F-6 — closed on the blocking half; LOW residual
+
+`tests/integration/test_cli_context_repo_verbs.py` now declares
+`Intent: CONTRACT — A17.1, A17.2, A17.3`, so FR17's only CLI coverage is no longer
+SCAFFOLD-by-default and will not expire at closure. That was the defect.
+
+Record-only residual: the three new `Intent: REGRESSION` declarations are unchanged
+(repo-wide: 129 CONTRACT, 8 REGRESSION, 6 SENTINEL, 3 BUG). Nothing keys off the string —
+the tests run and stay — and five of the eight `REGRESSION` labels predate this release.
+This is a vocabulary decision for the stewardship skill's owner (absorb `REGRESSION`/`BUG`
+as declared kinds, or relabel the eleven files), not a code fix, and it does not block.
+
+## Regression check at HEAD
+
+| Gate | Result |
+|---|---|
+| `dadaia ci preflight` (**full**, incl. e2e) | **PASS** — `ruff format --check`, `ruff check`, `mypy --strict`, `lint-imports`, `pytest`, 5/5 |
+| `dadaia specs doctor` | **0 errors**, 4 warnings (the same 4 pre-existing legacy rows) |
+| `dadaia backlog doctor` | **clean** |
+| `dadaia public doctor` | 207 `[ok]`; only `[foreign]` operator-owned files, expected |
+| `pytest tests/integration/test_repo_self_scan.py` | **5 passed** |
+| Working tree | clean; `T-044-45` marker `[-]`, unflipped |
+
+Nothing regressed. The two behavioural fixes were each proven against their own pre-fix
+state, not merely observed green.
+
+## Bug-surface delta of the fix round
+
+Open bugs **6 → 8**: `bug-event-field-with-unicode-line-separator-silently-drops-the-event`
+(F-11, MEDIUM, registered by this review) and
+`context-create-accepts-slug-owned-by-another-context` (F-12, HIGH). A rising open count is
+the correct signal here, not a regression — both are pre-existing defects that were
+invisible before, and the second was found by the release's own architect ruling applying
+a mirror-gap check to the first fix. That is the standing order working.
+
+Per-feature, the fix round moves two rows of the round-one table:
+
+| Feature | Round 1 | Now | Why |
+|---|---|---|---|
+| CI verdict gate | UNCHANGED, new edge | **REDUCED** | The relocated gate now fails **closed** on both shapes it previously failed open on, with the fail-open proven against the pre-fix script. It is strictly stronger than the pre-push check it replaced. |
+| spec-context model + alive/dead + CLI | INCREASED | **INCREASED (unchanged)** | One of the two write seams into the shared `repos/<slug>` namespace now holds the invariant; the other does not. The surface shrinks only when F-12 lands. |
+
+`atomic writers / migration` improves within its REDUCED row: the ninth writer joined the
+battery and the census became self-enforcing, so the specific escape mechanism is closed
+rather than the specific escapee.
+
+The release's overall direction is unchanged and good — production and AI-surface both net
+negative, one enforcer where there were two, one branch-resolution seam where there were
+two, and now one atomic-writer idiom where there were two. F-12 is the last structural
+hole, and it is one call to a predicate that already exists.
+
+## Recommendation: **REQUEST_CHANGES**
+
+`T-044-45` stays `[-]`. One HIGH open: **F-12**. Re-run this review after it lands; every
+other finding is closed and will not need re-verifying.
+
+**Self-scan:** this section carries no home-absolute path, no email literal, no IP and no
+hostname — every path is repo-relative. Checked by inspection, and
+`pytest tests/integration/test_repo_self_scan.py` re-run green with the file staged.
+
+### Addendum — the F-12 fix is in flight, uncommitted
+
+While this re-review was being written, an F-12 fix appeared **uncommitted** in the
+working tree (`features/spec_context/service.py`, `tests/unit/features/spec_context/test_repo_verbs.py`,
+`tests/integration/test_cli_context_repo_verbs.py`). It is exactly the direction given
+above: `_foreign_slug_owner(name, repo_slug)` called in `create` before `save`, the same
+error type carrying the same owner-naming message, and `_foreign_slug_owner`'s docstring
+corrected from "`add_repo` is the one seam" to "`create` and `add_repo` are the TWO seams".
+
+Verified against the working tree: `create` with another context's **main** slug and with
+another context's **associated** slug are both refused; a free slug is still accepted (no
+over-refusal); the targeted suite (`tests/unit/features/spec_context/` +
+`tests/integration/test_cli_context_repo_verbs.py`) is **183 passed**.
+
+This does **not** change the verdict. An approval cites the commit it reviewed, and this
+work is not committed. Recorded here so the next round is a formality: once it lands with
+its bug `resolved` event, re-running F-12's repro and the full preflight is the whole of
+the remaining verification.
