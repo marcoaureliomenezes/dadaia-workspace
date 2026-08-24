@@ -1200,7 +1200,7 @@ verdict recorded.
 
 ## `rc-1` — milestone (b), the release integrates
 
-- [-] **T-044-52 — [git] `rc-1`: PR `feature/0.4.4` → `develop` (first v2 merge)**
+- [x] **T-044-52 — [git] `rc-1`: PR `feature/0.4.4` → `develop` (first v2 merge)**
 
 **Owner role:** dispatcher + security-reviewer · **Preconditions:** T-044-46 `[x]`.
 
