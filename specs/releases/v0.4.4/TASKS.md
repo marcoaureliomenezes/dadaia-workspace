@@ -1092,7 +1092,7 @@ blocking (same posture as T-044-33/T-044-35). Full suite:
 
 ---
 
-- [-] **T-044-39 — bug `read-only-atom-honouring-is-advisory-and-root-bypasses-it` (LOW)**
+- [x] **T-044-39 — bug `read-only-atom-honouring-is-advisory-and-root-bypasses-it` (LOW)**
 
 **Write set:** `features/migrate/**` (the guard's site), tests.
 **Description:** Either document the guard as advisory/best-effort, or move the check after

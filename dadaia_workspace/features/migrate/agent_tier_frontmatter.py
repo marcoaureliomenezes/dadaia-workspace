@@ -63,11 +63,6 @@ def migrate_agent_tier_frontmatter(specs_dir: Path, *, dry_run: bool = False) ->
                 f"{md_path.name}: symlink — left untouched (never write through a link)."
             )
             continue
-        if not os.access(md_path, os.W_OK):
-            # Replacement only needs directory permission, so a read-only atom would be
-            # rewritten silently. Honour the flag the operator set on the file.
-            result.skipped.append(f"{md_path.name}: read-only — skipped.")
-            continue
         try:
             original = md_path.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError) as exc:
@@ -75,6 +70,15 @@ def migrate_agent_tier_frontmatter(specs_dir: Path, *, dry_run: bool = False) ->
             continue
         rewritten = _strip_agent_tier(original)
         if rewritten is None:
+            continue
+        if not os.access(md_path, os.W_OK):
+            # Checked AFTER the no-change determination above (bug
+            # read-only-atom-honouring-is-advisory-and-root-bypasses-it, LOW): a clean
+            # read-only atom now stays silent instead of emitting a note it never earned.
+            # Best-effort by construction, not a hard boundary — os.access lets root
+            # through and os.replace only needs directory permission — but it still
+            # honours the flag for the common case where a real change was refused.
+            result.skipped.append(f"{md_path.name}: read-only — skipped.")
             continue
         if not dry_run:
             try:

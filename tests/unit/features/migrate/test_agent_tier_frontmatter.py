@@ -15,7 +15,10 @@ everything else. Fixture = a REAL sample-consumer atom pulled from the reporting
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
+
+import pytest
 
 from dadaia_workspace.features.migrate.agent_tier_frontmatter import (
     migrate_agent_tier_frontmatter,
@@ -117,3 +120,64 @@ def test_dry_run_idempotent_no_frontmatter_missing_dir_and_registered(tmp_path: 
     assert step is not None, "agent-tier-frontmatter step not registered"
     assert (step.from_version, step.to_version) == (2, 3)
     assert latest_version() >= 3  # v0.1.73 added bugs-single-file (3→4)
+
+
+def _deny_access_to(monkeypatch: pytest.MonkeyPatch, atom: Path) -> None:
+    """Pin the read-only decision at the ``os.access`` seam — never a real chmod, which
+    cannot distinguish "denied" from "root bypasses it" (the bug's own point)."""
+    real_access = os.access
+
+    def fake_access(path: object, mode: int, **kwargs: object) -> bool:
+        if Path(str(path)) == atom:
+            return False
+        return real_access(path, mode, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(
+        "dadaia_workspace.features.migrate.agent_tier_frontmatter.os.access", fake_access
+    )
+
+
+def test_read_only_atom_needing_no_change_stays_silent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Intent: REGRESSION (bug read-only-atom-honouring-is-advisory-and-root-bypasses-it).
+    Size: SMALL.
+
+    DECIDED (T-044-39): the read-only check runs AFTER the no-change determination, so a
+    read-only atom that needs no rewrite produces no note at all — matching every other
+    no-op atom instead of the noise it used to emit because the check preceded the read.
+    """
+    body = "---\nslug: a\n---\nbody text, no agent_tier key.\n"
+    specs = _specs(tmp_path, ("a.md", body))
+    atom = specs / "memory" / "a.md"
+    _deny_access_to(monkeypatch, atom)
+
+    result = migrate_agent_tier_frontmatter(specs, dry_run=False)
+
+    assert result.moved == []
+    # No PER-ATOM note — the tree-level "nothing to migrate" summary is the only entry,
+    # the same summary every completely no-op run produces.
+    assert result.skipped == ["no memory atom carries agent_tier — nothing to migrate."]
+    assert atom.read_text(encoding="utf-8") == body
+
+
+def test_read_only_atom_needing_change_is_skipped_with_note(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Companion pin: a read-only atom that DOES carry ``agent_tier`` still produces the
+    documented refusal note and is left untouched — the guard stays best-effort (it
+    cannot close the root-bypass case, per the bug's own notes) but honours the common
+    case instead of staying silent about a change it is refusing to make."""
+    body = "---\nslug: a\nagent_tier: self-pull\n---\nbody text.\n"
+    specs = _specs(tmp_path, ("a.md", body))
+    atom = specs / "memory" / "a.md"
+    _deny_access_to(monkeypatch, atom)
+
+    result = migrate_agent_tier_frontmatter(specs, dry_run=False)
+
+    assert result.moved == []
+    assert result.skipped == [
+        "a.md: read-only — skipped.",
+        "no memory atom carries agent_tier — nothing to migrate.",
+    ]
+    assert atom.read_text(encoding="utf-8") == body  # untouched
