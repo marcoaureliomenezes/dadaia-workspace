@@ -247,6 +247,22 @@ def test_create_associated_refuses_when_slug_equals_main_repo(workspace: Path) -
     assert "foo" not in names
 
 
+def test_create_associated_refuses_slug_owned_by_another_context(workspace: Path) -> None:
+    """T-044-45 F-1 / bug context-repo-add-accepts-foreign-context-slug: `create
+    --associated` (`cli/commands/context.py`) reuses `SpecContextService.add_repo`
+    verbatim for each `--associated` entry, so it must inherit the cross-context
+    guard with no second code path. Pins that inheritance at the CLI seam, not a
+    re-derivation of the rule (unit-level coverage: `test_repo_verbs.py`)."""
+    _runner.invoke(app, ["context", "create", "bar", "--repo", "bar-repo"])
+
+    result = _runner.invoke(
+        app,
+        ["context", "create", "foo", "--repo", "foo-repo", "--associated", "bar-repo"],
+    )
+    assert result.exit_code == 1
+    assert "bar" in result.output.lower()
+
+
 def test_create_associated_refuses_duplicate_slug_in_same_call(workspace: Path) -> None:
     result = _runner.invoke(
         app,

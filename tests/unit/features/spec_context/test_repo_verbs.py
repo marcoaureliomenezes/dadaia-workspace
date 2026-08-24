@@ -1,10 +1,12 @@
 """FR17 (v0.4.4, T-044-28) — the `SpecContextService` add/remove-repo methods.
 
 Intent: CONTRACT — A17.1 (idempotent, fails loudly on unknown context/slug), A17.3
-(refuses the main repo's own slug as associated). FakeContextStore-driven (SMALL/unit
-tier): a pure registry-mutation concern, no real git/disk behavior under test — the
-CLI-level surface (argument parsing, on-disk-left-untouched messaging for A17.2) is
-proven in ``tests/integration/test_cli_context_repo_verbs.py``.
+(refuses the main repo's own slug as associated), context-repo-add-accepts-foreign-
+context-slug (T-044-45 F-1: refuses a slug already owned by ANOTHER context, as its
+main repo or an associated repo). FakeContextStore-driven (SMALL/unit tier): a pure
+registry-mutation concern, no real git/disk behavior under test — the CLI-level
+surface (argument parsing, on-disk-left-untouched messaging for A17.2) is proven in
+``tests/integration/test_cli_context_repo_verbs.py``.
 """
 
 from __future__ import annotations
@@ -66,6 +68,24 @@ def _seed(store: FakeContextStore) -> None:
     )
 
 
+def _seed_other(
+    store: FakeContextStore,
+    name: str,
+    repo_slug: str,
+    associated_repos: tuple[AssociatedRepo, ...] = (),
+) -> None:
+    store.save(
+        SpecContextProject(
+            name=name,
+            state=ContextState.DEAD,
+            repo_slug=repo_slug,
+            repo_url=f"https://github.com/org/{repo_slug}",
+            created_at="2026-08-23T00:00:00+00:00",
+            associated_repos=associated_repos,
+        )
+    )
+
+
 # --------------------------------------------------------------------- add_repo
 
 
@@ -123,6 +143,90 @@ def test_add_repo_refuses_main_repo_slug(
 def test_add_repo_unknown_context_raises(service: SpecContextService) -> None:
     with pytest.raises(ContextNotFoundError):
         service.add_repo("does-not-exist", "assoc-repo", "https://github.com/org/assoc-repo")
+
+
+def test_add_repo_refuses_slug_owned_by_another_context_as_main_repo(
+    service: SpecContextService, store: FakeContextStore
+) -> None:
+    """T-044-45 F-1 / bug context-repo-add-accepts-foreign-context-slug: `add_repo`
+    refused only ``slug == ctx.repo_slug`` (this context's own main slug) — a slug
+    that is ANOTHER context's main repo slug sailed through, arming that other
+    context's `dead()` to commit/push/rmtree a foreign working tree the moment this
+    context is later made dead. Same repro shape as the review's own reproduction
+    (throwaway store, two contexts, `add_repo(ctx-a, slug=ctx-b's main slug)`)."""
+    _seed(store)
+    _seed_other(store, "other-proj", "other-repo")
+
+    with pytest.raises(AssociatedRepoConflictError, match="other-proj"):
+        service.add_repo("proj", "other-repo", "https://github.com/org/other-repo")
+
+    # Refused cleanly: nothing was registered on either context.
+    stored = store.get("proj")
+    assert stored is not None
+    assert stored.associated_repos == ()
+
+
+def test_add_repo_refuses_slug_owned_by_another_context_as_associated_repo(
+    service: SpecContextService, store: FakeContextStore
+) -> None:
+    """Same class (T-044-45 F-1), the other ownership shape: the slug is already
+    registered as an ASSOCIATED repo of another context, not that context's main
+    repo. The review's fix direction is one predicate consulting `store.list_all()`
+    against both `repo_slug` AND `associated_repos` — this pins the second half."""
+    _seed(store)
+    _seed_other(
+        store,
+        "other-proj",
+        "other-main",
+        associated_repos=(
+            AssociatedRepo(slug="other-assoc", url="https://github.com/org/other-assoc"),
+        ),
+    )
+
+    with pytest.raises(AssociatedRepoConflictError, match="other-proj"):
+        service.add_repo("proj", "other-assoc", "https://github.com/org/other-assoc")
+
+    stored = store.get("proj")
+    assert stored is not None
+    assert stored.associated_repos == ()
+
+
+def test_add_repo_same_slug_own_context_stays_idempotent_no_regression(
+    service: SpecContextService, store: FakeContextStore
+) -> None:
+    """No regression on A17.1: the new cross-context predicate must never fire for
+    THIS context's own already-registered slug — re-adding it stays the existing
+    idempotent no-op (same behavior as
+    ``test_add_repo_is_idempotent_same_slug_same_url``, exercised again here
+    alongside a foreign context in the registry, to prove the new predicate skips
+    ``other.name == name``)."""
+    _seed(store)
+    _seed_other(store, "other-proj", "other-repo")
+    service.add_repo("proj", "assoc-repo", "https://github.com/org/assoc-repo")
+
+    ctx2, was_added2 = service.add_repo("proj", "assoc-repo", "https://github.com/org/assoc-repo")
+
+    assert was_added2 is False
+    assert ctx2.associated_repos == (
+        AssociatedRepo(slug="assoc-repo", url="https://github.com/org/assoc-repo"),
+    )
+
+
+def test_add_repo_unknown_slug_with_no_owner_is_still_accepted(
+    service: SpecContextService, store: FakeContextStore
+) -> None:
+    """An entirely unowned slug — not this context's main slug, not any other
+    context's main or associated slug — is still accepted (the predicate refuses
+    ownership conflicts, never slugs in general)."""
+    _seed(store)
+    _seed_other(store, "other-proj", "other-repo")
+
+    ctx, was_added = service.add_repo("proj", "brand-new-repo", "https://github.com/org/new")
+
+    assert was_added is True
+    assert ctx.associated_repos == (
+        AssociatedRepo(slug="brand-new-repo", url="https://github.com/org/new"),
+    )
 
 
 # --------------------------------------------------------------------- remove_repo

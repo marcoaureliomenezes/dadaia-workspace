@@ -332,6 +332,28 @@ class SpecContextService:
 
     # ------------------------------------------------------------------ associated repos (FR17)
 
+    def _foreign_slug_owner(self, name: str, slug: str) -> str | None:
+        """Return the name of another context that already owns *slug*, or ``None``.
+
+        "Owns" means *slug* is that other context's own main repo slug, or one of
+        its registered associated repos. Every context's ``repos/<slug>`` checkout
+        lives in the ONE namespace every context shares (A15.3/FR17) — the same
+        assumption ``dead()`` makes when it walks ``all_repos()`` and
+        commit_all()s/push()es/rmtree()s every entry it finds. ``add_repo`` is the
+        one seam that writes into that shared namespace, so it is the one seam
+        that must keep the assumption true (T-044-45 F-1 / bug
+        context-repo-add-accepts-foreign-context-slug) — never a second guard
+        added inside ``dead()`` itself, which would be checking the destructive
+        side of a boundary that should never have been crossable in the first
+        place.
+        """
+        for other in self._store.list_all():
+            if other.name == name:
+                continue
+            if other.repo_slug == slug or any(r.slug == slug for r in other.associated_repos):
+                return other.name
+        return None
+
     def add_repo(self, name: str, slug: str, repo_url: str = "") -> tuple[SpecContextProject, bool]:
         """Register an associated repo on a context (A17.1/A17.3).
 
@@ -344,7 +366,14 @@ class SpecContextService:
         one-accessor discipline extended to writes), so the recovery path is
         remove-then-add, never a second divergent "update" verb. The context's own
         main repo slug can never be added as an associated repo (A17.3) — it is
-        already included via ``all_repos()``.
+        already included via ``all_repos()``. Nor can a slug already owned by
+        ANOTHER context — as that context's main repo or one of its associated
+        repos — be registered here (T-044-45 F-1): ``repos/<slug>`` is a namespace
+        every context shares, and ``dead()`` destroys every repo in
+        ``all_repos()`` with no further ownership check, so a slug collision here
+        is a live path to destroying a foreign working tree. ``create
+        --associated`` (``cli/commands/context.py``) reuses this method verbatim,
+        so it inherits both refusals with no second code path.
         """
         ctx = self._store.get(name)
         if ctx is None:
@@ -354,6 +383,16 @@ class SpecContextService:
                 f"'{slug}' is context '{name}''s own main repo slug (--repo at "
                 "create time) — it is always included via all_repos() and can "
                 "never also be registered as an associated repo."
+            )
+        owner = self._foreign_slug_owner(name, slug)
+        if owner is not None:
+            raise AssociatedRepoConflictError(
+                f"'{slug}' is already registered by context '{owner}' (as its "
+                "own main repo or one of its associated repos). 'repos/<slug>' "
+                "is a namespace every context shares — registering it on "
+                f"'{name}' too would let 'dadaia context dead {name}' commit, "
+                f"push and delete '{owner}''s working tree. Choose a different "
+                "slug, or coordinate with the owning context first."
             )
         existing = next((r for r in ctx.associated_repos if r.slug == slug), None)
         if existing is not None:
