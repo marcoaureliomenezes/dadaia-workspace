@@ -833,7 +833,7 @@ found.
 
 ---
 
-- [ ] **T-044-31 — `S4` QA close** · **Owner role:** qa-engineer ·
+- [-] **T-044-31 — `S4` QA close** · **Owner role:** qa-engineer ·
 **Commit:** `chore(T-044-31): S4 qa review` — committed on the branch; no merge, no PR.
 
 *(T-044-32 retired at the D8 restructure.)*
