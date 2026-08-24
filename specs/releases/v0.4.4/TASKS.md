@@ -624,7 +624,7 @@ the coverage table is complete.
 
 ---
 
-- [-] **T-044-58 — FR27: the 25 sediments, and the citation check**
+- [x] **T-044-58 — FR27: the 25 sediments, and the citation check**
 
 **Owner role:** ai-engineer (content) + software-engineer (the check) · **Commit:**
 `fix(T-044-58): every cited path and command exists, and a check keeps it that way`
@@ -644,7 +644,7 @@ be **green at HEAD the moment it lands** — which is why it is last.
 
 ---
 
-- [ ] **T-044-59 — FR31 / bug (Arm B): the law is loaded once per harness**
+- [-] **T-044-59 — FR31 / bug (Arm B): the law is loaded once per harness**
 
 **Owner role:** software-engineer · **Commit:**
 `fix(T-044-59): project the law once per harness`
@@ -667,7 +667,7 @@ harness may end with zero copies.
 
 ---
 
-- [ ] **T-044-60 — FR30: `ctx_inject` stops restating the law**
+- [-] **T-044-60 — FR30: `ctx_inject` stops restating the law**
 
 **Owner role:** software-engineer · **Commit:**
 `fix(T-044-60): the per-prompt injection carries state, not restatement`
