@@ -80,10 +80,25 @@ def repo_slug_for_context(workspace_root: Path, name: str) -> str:
 
 
 def context_name_for_repo_slug(workspace_root: Path, slug: str) -> str:
-    """Inverse of :func:`repo_slug_for_context`: the NAME whose repo is *slug*."""
+    """Inverse of :func:`repo_slug_for_context`: the NAME whose repo is *slug*.
+
+    A16.4 (v0.4.4 FR16): *slug* also matches an **associated** repo's slug, resolving
+    the same OWNING context's name a match on the main ``repo_slug`` would — a
+    resolution walk starting inside ``repos/<associated-slug>/`` must land on the
+    context, never treat the associated repo as a second context of its own (an
+    associated repo carries no ``specs/`` bind, FR19/G13). This is the same inverse
+    lookup extended to the registry's ``associated_repos`` list, not a second
+    repo-resolution path (A15.3).
+    """
     for entry in _registry_contexts(workspace_root):
         entry_slug = entry.get("repo_slug") or entry.get("repo")
         if entry_slug == slug:
+            name = entry.get("name")
+            return name if isinstance(name, str) and name else slug
+        associated = entry.get("associated_repos")
+        if isinstance(associated, list) and any(
+            isinstance(assoc, dict) and assoc.get("slug") == slug for assoc in associated
+        ):
             name = entry.get("name")
             return name if isinstance(name, str) and name else slug
     return slug

@@ -49,6 +49,28 @@ class DeadSecretFoundError(DadaiaError):
     """
 
 
+class DeadUnpushedCommitsError(DadaiaError):
+    """Raised when a repo in the set has local commits and NO remote to receive them
+    (A16.2).
+
+    FR16: ``dead()`` refuses when **any** repo — main or associated — is dirty or
+    unpushed, naming which one, and checks every repo in the set BEFORE acting on any
+    (no partial dead: a later repo's refusal must never follow an earlier repo already
+    being synced and removed).
+
+    ``unpushed`` is deliberately narrow: ``has_commits() and not has_remote()`` —
+    commits that can genuinely never reach anywhere, not merely "ahead of the last
+    push". dead()'s own Phase 2 (below) already auto-syncs and pushes pending commits
+    whenever a remote exists — including the scaffold commit alive() itself just made
+    (always locally unpushed by design, on every fresh repo). Refusing on
+    ``GitClient.unpushed_commit_count() > 0`` regardless of ``has_remote()`` would
+    therefore make dead() refuse right after every ordinary alive()-then-dead() call —
+    a false-positive landmine, not a safety net. Only the truly unrecoverable case
+    (commits with no remote at all) refuses; a remote-backed repo is left to Phase 2's
+    existing auto-push.
+    """
+
+
 def _rmtree_chmod_retry(func: object, path: str, _exc: BaseException) -> None:
     """`shutil.rmtree` onexc handler: chmod-and-retry (v0.1.50 FR3).
 
@@ -281,6 +303,7 @@ class SpecContextService:
             alive_since=ctx.alive_since,
             dead_since=ctx.dead_since,
             current_branch=ctx.current_branch,
+            associated_repos=ctx.associated_repos,
         )
         self._store.update(updated)
         return updated
@@ -322,15 +345,34 @@ class SpecContextService:
     # ------------------------------------------------------------------ alive (T-10b / T-11)
 
     def alive(self, name: str) -> SpecContextProject:
-        """Transition a context from DEAD to ALIVE; clone repo if absent.
+        """Transition a context from DEAD to ALIVE; clone every repo in the set if absent.
 
-        Idempotent: calling alive() on an already-ALIVE context is a no-op (no error).
-        Sets alive_since=now and clears dead_since. Concurrent races are accepted and
-        surfaced by advisory presence; this operation never acquires a lock.
+        Idempotent: calling alive() on an already-ALIVE context is a no-op beyond
+        re-confirming every repo is present (no error, no re-clone of anything already
+        on disk). Sets alive_since=now and clears dead_since. Concurrent races are
+        accepted and surfaced by advisory presence; this operation never acquires a lock.
+
+        FR16/A16.1/A16.3: every repo in the set — the main repo first, then each
+        associated repo in order (``SpecContextProject.all_repos()``, the one accessor,
+        A15.3) — is cloned if missing. Only the MAIN repo (below) receives the specs/
+        scaffold, ``AGENTS.md`` and ``tests/AGENTS.md``, checkout, and branch tracking:
+        an associated repo is cloned CLEAN, with no scaffold and no ``specs/`` bind of
+        its own — specs/bind/memory/releases/backlog resolve from the main repo only
+        (FR19/G13). This loop replaces the prior main-repo-only clone check; it is not
+        a second path beside it.
         """
         ctx = self._store.get(name)
         if ctx is None:
             raise ContextNotFoundError(f"Context '{name}' not found.")
+
+        ctx_latest = self._store.get(name)
+        if ctx_latest is None:
+            raise ContextNotFoundError(f"Context '{name}' not found.")
+
+        for repo in ctx_latest.all_repos():
+            repo_dest = self._repo_path(repo.slug)
+            if not repo_dest.exists():
+                self._git.clone(repo.url, repo_dest)
 
         if ctx.state == ContextState.ALIVE:
             return ctx
@@ -340,12 +382,6 @@ class SpecContextService:
 
         actual_branch: str | None = None
         backfilled_url: str = ctx.repo_url
-        ctx_latest = self._store.get(name)
-        if ctx_latest is None:
-            raise ContextNotFoundError(f"Context '{name}' not found.")
-
-        if not repo_path.exists():
-            self._git.clone(ctx_latest.repo_url, repo_path)
 
         if ctx_latest.current_branch:
             try:
@@ -476,6 +512,7 @@ class SpecContextService:
             alive_since=_now(),
             dead_since=None,
             current_branch=actual_branch,
+            associated_repos=ctx_fresh.associated_repos,
         )
         self._store.update(alive_ctx)
 
@@ -570,14 +607,19 @@ class SpecContextService:
 
     # ------------------------------------------------------------------ dead (T-10b / T-11)
 
-    def _enforce_dead_review_gate(self, name: str, repo_path: Path, *, commit: bool) -> None:
-        """Gate dead() on untracked content (F-5 / AC-R7-01).
+    def _enforce_dead_review_gate(
+        self, name: str, repo_path: Path, *, commit: bool, repo_slug: str
+    ) -> None:
+        """Gate dead() on untracked content (F-5 / AC-R7-01), one repo of the set.
 
         No untracked files ⇒ no-op (clean-tree / tracked-only path unchanged).
         Untracked files + not *commit* ⇒ raise DeadReviewRequiredError (refuse).
         Untracked files + *commit* ⇒ secret-scan their content; any match raises
         DeadSecretFoundError. This runs before any commit/push/rmtree so a refusal
-        leaves the repo untouched.
+        leaves every repo untouched (A16.2: called from dead()'s preflight sweep over
+        the whole set — main and every associated repo alike — before any of them is
+        acted on). *repo_slug* is folded into every raised message so a multi-repo
+        refusal names which repo of the set it is (A16.2).
         """
         try:
             untracked = self._git.list_untracked(repo_path)
@@ -587,9 +629,9 @@ class SpecContextService:
             if commit:
                 return
             raise DeadReviewRequiredError(
-                f"Context '{name}': could not verify the working tree of '{repo_path}'. "
-                "Re-run with --commit to consent to committing+pushing any changes, "
-                "or clean the tree first."
+                f"Context '{name}': could not verify the working tree of repo "
+                f"'{repo_slug}' at '{repo_path}'. Re-run with --commit to consent to "
+                "committing+pushing any changes, or clean the tree first."
             ) from None
 
         if not untracked:
@@ -600,8 +642,8 @@ class SpecContextService:
             more = "" if len(untracked) <= 20 else f"\n  ... and {len(untracked) - 20} more"
             listing = "\n".join(f"  {f}" for f in shown)
             raise DeadReviewRequiredError(
-                f"Context '{name}' has {len(untracked)} untracked file(s) that dead() "
-                f"would otherwise commit and push WITHOUT review:\n"
+                f"Context '{name}': repo '{repo_slug}' has {len(untracked)} untracked "
+                f"file(s) that dead() would otherwise commit and push WITHOUT review:\n"
                 f"{listing}{more}\n"
                 "Review them, then either delete/gitignore them, or re-run with "
                 "'dadaia context dead "
@@ -620,25 +662,34 @@ class SpecContextService:
         if flagged:
             report = "\n".join(flagged)
             raise DeadSecretFoundError(
-                f"Context '{name}': secret scan blocked dead() --commit. "
-                f"{len(flagged)} untracked file(s) match a secret/identifier rule "
-                "(values redacted):\n"
+                f"Context '{name}': repo '{repo_slug}' secret scan blocked dead() "
+                f"--commit. {len(flagged)} untracked file(s) match a secret/identifier "
+                "rule (values redacted):\n"
                 f"{report}\n"
                 "Remove or redact the flagged content, then re-run. Nothing was pushed."
             )
 
     def dead(self, name: str, *, commit: bool = False) -> SpecContextProject:
-        """Transition a context from ALIVE to DEAD; sets dead_since, removes repo.
+        """Transition a context from ALIVE to DEAD; sets dead_since, removes every repo.
 
-        Review gate (F-5 / AC-R7-01): if the repo has untracked non-gitignored
-        files and *commit* is False, dead() REFUSES — it raises
-        ``DeadReviewRequiredError`` listing the files, pushes nothing, and leaves
-        the repo on disk untouched. Passing ``commit=True`` is explicit operator
-        consent to commit+push those files; before pushing, their content is run
-        through the structural secret scan and any match raises
-        ``DeadSecretFoundError`` (push blocked, repo untouched). Tracked-but-dirty
-        modifications keep the existing auto-sync behaviour (FR-R7: only untracked
-        content is gated). A clean tree behaves exactly as before.
+        FR16/A16.2: covers the whole set — the main repo, then every associated repo
+        (``SpecContextProject.all_repos()``, the one accessor, A15.3) — in **two**
+        passes over the same loop, never a second resolution path:
+
+        1. **Preflight** every repo in the set, mutating nothing. Untracked
+           non-gitignored files and *commit* is False ⇒ ``DeadReviewRequiredError``,
+           naming the repo (F-5 / AC-R7-01). ``commit=True`` runs the secret scan over
+           those files' content; any match ⇒ ``DeadSecretFoundError``, naming the repo.
+           A repo carrying local commits with **no remote at all** to receive them
+           (``has_commits() and not has_remote()``) ⇒ ``DeadUnpushedCommitsError``,
+           naming the repo — removing it would destroy those commits irrecoverably (see
+           ``DeadUnpushedCommitsError`` for why this check stays narrower than "any
+           commit ahead of the last push"). Any refusal here leaves **every** repo in
+           the set untouched (no partial dead).
+        2. **Act** on every repo only once every repo has cleared the preflight:
+           tracked-but-dirty modifications auto-sync (commit + push, FR-R7 — only
+           untracked content is gated), then the repo is removed. A clean tree behaves
+           exactly as before.
 
         Concurrent races are accepted and surfaced by advisory presence; this operation
         never waits for or refuses another session.
@@ -649,38 +700,50 @@ class SpecContextService:
         if ctx.state != ContextState.ALIVE:
             raise ContextStateError(f"Context '{name}' is not ALIVE. It cannot be made DEAD.")
 
-        repo_path = self._repo_path(ctx.repo_slug)
-        branch_before_sync: str | None = None
         # Back-fill repo_url from the on-disk origin remote while the repo still
         # exists (FR-W2-03 b / T-011-08), BEFORE the rmtree below removes it — a
         # DEAD record with a known URL stays portable for a future alive clone.
         backfilled_url: str = self._backfill_repo_url(ctx.repo_slug, ctx.repo_url)
 
-        # Review gate (F-5): evaluate untracked content before any commit,
-        # push, or rmtree, so a refusal leaves the repo entirely untouched on disk.
-        if repo_path.exists() and self._git.is_git_root(repo_path):
-            self._enforce_dead_review_gate(name, repo_path, commit=commit)
+        repo_paths = [(repo.slug, self._repo_path(repo.slug)) for repo in ctx.all_repos()]
 
-        # Git sync + rmtree. Races are accepted by the NO-LOCKS doctrine.
-        if repo_path.exists():
-            with contextlib.suppress(Exception):
-                branch_before_sync = self._git.current_branch(repo_path)
+        # Phase 1 — preflight EVERY repo before mutating ANY (A16.2: no partial dead).
+        for slug, repo_path in repo_paths:
+            if repo_path.exists() and self._git.is_git_root(repo_path):
+                self._enforce_dead_review_gate(name, repo_path, commit=commit, repo_slug=slug)
+                if self._git.has_commits(repo_path) and not self._git.has_remote(repo_path):
+                    raise DeadUnpushedCommitsError(
+                        f"Context '{name}': repo '{slug}' at '{repo_path}' has local "
+                        "commits and no remote configured to receive them. dead() "
+                        "refuses to remove it — configure a remote and push first, "
+                        "then retry. Nothing was touched."
+                    )
+
+        # Phase 2 — git sync + rmtree for every repo. Races are accepted by the
+        # NO-LOCKS doctrine.
+        branch_before_sync: str | None = None
+        for slug, repo_path in repo_paths:
+            if not repo_path.exists():
+                continue
+            if slug == ctx.repo_slug:
+                with contextlib.suppress(Exception):
+                    branch_before_sync = self._git.current_branch(repo_path)
             if self._git.is_git_root(repo_path):
                 if self._git.is_dirty(repo_path):
                     try:
                         self._git.commit_all(repo_path, "chore: auto-sync before dead")
                     except GitSyncError as exc:
                         raise GitSyncError(
-                            f"Git sync failed for context '{name}' at '{repo_path}'. "
-                            "Resolve the issue and retry dead()."
+                            f"Git sync failed for context '{name}' repo '{slug}' at "
+                            f"'{repo_path}'. Resolve the issue and retry dead()."
                         ) from exc
                 if self._git.has_remote(repo_path):
                     try:
                         self._git.push(repo_path)
                     except GitSyncError as exc:
                         raise GitSyncError(
-                            f"Git push failed for context '{name}' at '{repo_path}'. "
-                            "Resolve the issue and retry dead()."
+                            f"Git push failed for context '{name}' repo '{slug}' at "
+                            f"'{repo_path}'. Resolve the issue and retry dead()."
                         ) from exc
             shutil.rmtree(repo_path, onexc=_rmtree_chmod_retry)
 
@@ -693,6 +756,7 @@ class SpecContextService:
             alive_since=None,
             dead_since=_now(),
             current_branch=branch_before_sync,
+            associated_repos=ctx.associated_repos,
         )
         self._store.update(dead_ctx)
 
