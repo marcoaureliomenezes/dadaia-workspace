@@ -686,7 +686,7 @@ session.
 
 ---
 
-- [-] **T-044-21 — FR13: one projection cycle and a deliberate golden regen**
+- [x] **T-044-21 — FR13: one projection cycle and a deliberate golden regen**
 
 **Owner role:** software-engineer (goldens) + ai-engineer (projection) · **Commit:**
 `test(T-044-21): regenerate the install goldens for the consolidated skill set`
