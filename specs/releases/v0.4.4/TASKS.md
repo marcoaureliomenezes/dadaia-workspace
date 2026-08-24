@@ -897,7 +897,7 @@ first try.
 
 ---
 
-- [ ] **T-044-33 — bug `backlog-doctor-silent-on-duplicate-top-level-sections` (MEDIUM)**
+- [-] **T-044-33 — bug `backlog-doctor-silent-on-duplicate-top-level-sections` (MEDIUM)**
 
 **Write set:** `dadaia_workspace/features/backlog/document.py`, `doctor.py`, tests.
 **Description:** `_top_level_sections()` uses `dict.setdefault`, so a duplicated `## ACTIVE`
@@ -921,7 +921,7 @@ skill states; `Closed`.
 
 ---
 
-- [ ] **T-044-35 — bug `atomic-writer-drift-guard-is-brittle-and-covers-only-two-of-eight-writers` (LOW)**
+- [-] **T-044-35 — bug `atomic-writer-drift-guard-is-brittle-and-covers-only-two-of-eight-writers` (LOW)**
 
 **Write set:** `tests/unit/features/specs/test_migration_symlink_hardening.py` (and/or its
 replacement), tests only.
