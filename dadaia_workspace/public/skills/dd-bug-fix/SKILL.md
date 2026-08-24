@@ -51,7 +51,10 @@ status; it never blocks a concurrent picker, it only makes the pick observable.
 
 ## 4. GREEN, `resolved` event, commit
 
-Append `resolved` with `--resolution-evidence` (reproducing test, fix, suite result).
+Append `resolved` carrying three independently-checked fields (FR23): `--evidence-loop`
+(phase 1's red-loop command), `--evidence-seam` (phase 5's regression-test seam), and
+`--evidence-diff` (phase 6's diff direction, prefixed `net-negative:`/`net-positive:`/
+`net-neutral:` — `net-positive:` routes to `software-architect` before the commit).
 Closing the loop — the staging discipline for the commit that follows — is the law's
 close-in-same-session rule (`DADAIA.md` §7 (Quality)): consult it, do not restate it.
 

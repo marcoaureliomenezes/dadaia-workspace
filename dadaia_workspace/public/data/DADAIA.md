@@ -257,10 +257,11 @@ and there is no reason to defer it. Absolute local paths, IPs, hostnames, privat
 and secrets never enter an event field. Command, redaction rule and context routing:
 `dd-bug-registration`.
 
-Close a bug in the same session you prove the fix: append `resolved` with
-`--resolution-evidence` (reproducing test, fix, suite result), then **commit** — stage
-exactly what the fix touched, never `-A` over a shared tree. A solved bug leaves a clean
-worktree.
+Close a bug in the same session you prove the fix: append `resolved` with evidence that
+is checkable — the red-loop command, the regression-test seam, and the diff direction on
+the touched feature — then **commit**, staging exactly what the fix touched, never `-A`
+over a shared tree; a net-positive diff routes to `software-architect` before the commit.
+A solved bug leaves a clean worktree.
 
 **Push green.** Every `feature/{M.m.p}` push runs the local CI preflight —
 `ruff format --check`, `ruff check`, `mypy --strict` and `pytest` — before the branch
