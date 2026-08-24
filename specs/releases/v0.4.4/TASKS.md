@@ -1013,7 +1013,7 @@ whichever is chosen with a test. No third behaviour.
 
 ---
 
-- [ ] **T-044-38 — bug `no-ratchet-against-frozen-clock-tests-that-age-fixtures-by-the-real-clock` (LOW)**
+- [-] **T-044-38 — bug `no-ratchet-against-frozen-clock-tests-that-age-fixtures-by-the-real-clock` (LOW)**
 
 **Write set:** one source-scan contract test, in the shape the repo already uses for the
 denylist no-allowlist contract.
@@ -1033,7 +1033,7 @@ diff; do not add a second permission probe.
 
 ---
 
-- [ ] **T-044-40 — bug `symlinked-specs-root-is-followed-by-migration-and-repair` (LOW)**
+- [-] **T-044-40 — bug `symlinked-specs-root-is-followed-by-migration-and-repair` (LOW)**
 
 **Write set:** the context-resolution seam, tests.
 **Description:** One deliberate decision applied **once at the resolution seam** — resolve
