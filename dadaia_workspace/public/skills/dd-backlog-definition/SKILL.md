@@ -28,7 +28,7 @@ required keys plus one optional key:
 ### <slug>
 - **Title:** <short name>
 - **Opened:** YYYY-MM-DD
-- **Status:** idea | candidate | deferred
+- **Status:** idea | candidate
 - **Description:** <one paragraph — the need>
 - **Provenance:** operator request | intake-report item <id> (approved <date>)
 - **Intents:**

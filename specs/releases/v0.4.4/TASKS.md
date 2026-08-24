@@ -921,7 +921,9 @@ past this commit; `bugs.jsonl` carries the evidence.
 
 ---
 
-- [-] **T-044-34 — bug `backlog-doctor-rejects-deferred-status-documented-by-skill` (LOW)**
+- [x] **T-044-34 — bug `backlog-doctor-rejects-deferred-status-documented-by-skill` (LOW)**
+
+**Commit:** `fix(T-044-34): one statement owns the deferred status`
 
 **Preconditions:** T-044-33 `[x]` (same file; shared root — the doctor's ACTIVE-status
 vocabulary). **Write set:** `features/backlog/doctor.py` or
@@ -931,6 +933,21 @@ BL-STALE. **One** of the two is wrong — decide, state it once, and delete the 
 statement. Do **not** add a compatibility branch.
 **Done criterion:** a `deferred` ACTIVE entry either validates or is refused by a rule the
 skill states; `Closed`.
+
+**Resolution:** `deferred` is one of `core.models.backlog.TERMINAL_DISPOSITION_TOKENS` —
+`dd-backlog-definition` SKILL.md's own §2 "Terminal disposition tokens" table already
+lists `DEFERRED` as LEDGER-only, and the real `BACKLOG.md` never carries an ACTIVE
+`deferred` entry today. The skill's ACTIVE `- **Status:**` enumeration line contradicted
+its own table; `doctor.py`'s BL-STALE check was already correct — untouched. Fixed at the
+skill only: `- **Status:** idea | candidate | deferred` → `idea | candidate` (1 line
+changed, net-negative — no branch/flag added, `doctor.py` and its behaviour unchanged).
+RED-to-GREEN seam: `tests/contract/test_backlog_status_vocabulary_contract.py::test_skill_active_status_enumeration_excludes_terminal_disposition_tokens`
+(reads the real shipped SKILL.md against the real `TERMINAL_DISPOSITION_TOKENS`); the
+literal bug repro is pinned by
+`tests/integration/test_backlog_doctor.py::test_deferred_active_status_fires_bl_stale`.
+Projection cycle run (`public stage` + `install --target all` + `public doctor` exit 0);
+contract tier green (209 passed). Full suite: 2789 passed, 4 pre-existing environment
+skips, 0 failures. `bugs.jsonl` carries the FR23 evidence.
 
 ---
 

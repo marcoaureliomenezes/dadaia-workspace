@@ -296,6 +296,27 @@ def test_active_item_with_own_terminal_status_fires_bl_stale(tmp_path: Path) -> 
     assert any(f.slug == "mis-statused" for f in stale), [f.to_dict() for f in findings]
 
 
+def test_deferred_active_status_fires_bl_stale(tmp_path: Path) -> None:
+    """Bug ``backlog-doctor-rejects-deferred-status-documented-by-skill`` (T-044-34) —
+    the literal repro from the report: an ACTIVE entry with ``Status: deferred``.
+    ``deferred`` IS one of the six canonical terminal disposition tokens
+    (``core.models.backlog.TERMINAL_DISPOSITION_TOKENS``), so BL-STALE firing here is the
+    correct, decided behaviour — not the bug. The statement that was actually wrong was
+    ``dd-backlog-definition`` SKILL.md listing ``deferred`` as a live ACTIVE status; see
+    ``tests/contract/test_backlog_status_vocabulary_contract.py`` for that half."""
+    specs, src = _build_roots(tmp_path)
+    active = _ACTIVE_SUBSECTION.format(
+        slug="prematurely-deferred",
+        title="Prematurely deferred",
+        status="deferred",
+        intents_block=_intents_block("pkg/m.py#Widget", "still needs a home"),
+    )
+    _write_backlog_md(specs, active)
+    findings = _run(specs, src)
+    stale = [f for f in findings if f.code is BacklogDoctorCode.BL_STALE]
+    assert any(f.slug == "prematurely-deferred" for f in stale), [f.to_dict() for f in findings]
+
+
 # ── A2.7 — an ACTIVE item whose slug appears in an archived consumed_backlog.json ───
 
 
