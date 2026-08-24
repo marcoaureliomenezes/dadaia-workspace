@@ -92,7 +92,7 @@ is no longer archive-only.
 - **Title:** dd-diagnose — model-invoked diagnosing-bugs method called by dd-bug-fix: loop red before any hypothesis, minimise, falsifiable hypotheses, instrument, regression test at the right seam, "no correct seam → architecture finding"
 - **Opened:** 2026-08-23
 - **Status:** candidate
-- **Description:** Turn "root cause, always" (DADAIA.md §6) from a law into a **method with checkable "Done when" per phase**. A new core skill `dd-diagnose`, model-invoked and called by `dd-bug-fix` ("Call the Skill tool with \"dd-diagnose\""), carries the diagnosing-bugs phases: (1) a reproduction loop that is already red-capable and has actually been run red **before** any hypothesis is written; (2) minimise the failing input/path; (3) hypotheses stated so they can be falsified, one at a time; (4) instrument (logs/asserts/probes) rather than guess; (5) a regression test at the **correct seam** — the boundary the bug actually crossed, not the nearest convenient unit; (6) cleanup of instrumentation. **Key clause:** when no correct seam exists for the regression test, the fix does not proceed — the agent registers an architecture finding and the dispatcher routes `software-architect` before the fix. This is the audit's answer to the bug loop (464 registered bugs, 132/438 `resolved` events with empty evidence, re-bug within 72 h per surface): `dd-bug-fix` §3–§5 today states the outcome but not the procedure. Reference: `mattpocock/skills/skills/engineering/diagnosing-bugs/` (`SKILL.md` + `agents/` + `scripts/`). Scope boundary: this entry creates the skill and the operative pointer from `dd-bug-fix`; the three mandatory `--resolution-evidence` fields and the CLI refusal of empty `resolved` evidence are section A material folded into v0.4.4, not re-registered here. Governance: the new skill maps to the DADAIA.md §6 bold topic "Root cause, always" (one skill ↔ one topic). **Audit roadmap hint (not a disposition):** R1 — "anti-loop in Arm B".
+- **Description:** Turn "root cause, always" (DADAIA.md §6) from a law into a **method with checkable "Done when" per phase**. A new core skill `dd-diagnose`, model-invoked and called by `dd-bug-fix` ("Call the Skill tool with \"dd-diagnose\""), carries the diagnosing-bugs phases: (1) a reproduction loop that is already red-capable and has actually been run red **before** any hypothesis is written; (2) minimise the failing input/path; (3) hypotheses stated so they can be falsified, one at a time; (4) instrument (logs/asserts/probes) rather than guess; (5) a regression test at the **correct seam** — the boundary the bug actually crossed, not the nearest convenient unit; (6) cleanup of instrumentation. **Key clause:** when no correct seam exists for the regression test, the fix does not proceed — the agent registers an architecture finding and the dispatcher routes `software-architect` before the fix. This is the audit's answer to the bug loop (464 registered bugs, 132/438 `resolved` events with empty evidence, re-bug within 72 h per surface): `dd-bug-fix` §3–§5 today states the outcome but not the procedure. Reference: `mattpocock/skills/skills/engineering/diagnosing-bugs/` (`SKILL.md` + `agents/` + `scripts/`). Scope boundary: this entry creates the skill and the operative pointer from `dd-bug-fix`; the three mandatory `--resolution-evidence` fields and the CLI refusal of empty `resolved` evidence are section A material folded into v0.4.4, not re-registered here. Governance: the new skill maps to the DADAIA.md §6 bold topic "Root cause, always" (one skill ↔ one topic). **Audit roadmap hint (not a disposition):** R1 — "anti-loop in Arm B". **Surface ownership (BL-CONFLICT adjudication 2026-08-23):** the edit of `dd-bug-fix`/`dd-bug-resolution` SKILL.md — including the operative pointer "Call the Skill tool with \"dd-diagnose\"" — is owned by `entity-behavior-map`; this entry creates only the new skill.
 - **Provenance:** operator ratification (2026-08-23) of the research report `.dadaia/reports/dadaia-workspace/claude-code/2026-08-23T183323Z-skills-audit-vs-reference/` (handoff `.dadaia/handoff/dadaia-workspace/2026-08-23T183323Z-claude-code-skills-audit-vs-reference.handoff.json`), section D "new skills proposed" — ruled to the backlog while sections A–C fold into release v0.4.4; relates-to `core-skills-consolidation` and `rules-skills-governance-map` (both CONSUMED by v0.4.4) and to the governance rule "every skill maps to one DADAIA.md bold topic"; roadmap placement R1 (hint)
 - **Intents:**
 ```yaml
@@ -101,11 +101,6 @@ is no longer archive-only.
     ref: dadaia_workspace/public/skills/dd-diagnose/SKILL.md
     surface: new
   change: "new model-invoked core skill, writing-for-agents pattern: six ordered phases (loop red → minimise → falsifiable hypotheses → instrument → regression test at the right seam → cleanup) each ending on a checkable Done-when; the no-correct-seam clause registers an architecture finding and yields to software-architect before any fix; adapted from mattpocock/skills/skills/engineering/diagnosing-bugs"
-- subject:
-    kind: doc
-    ref: dadaia_workspace/public/skills/dd-bug-fix/SKILL.md
-    surface: new
-  change: "reproduce/RED/root-cause steps become an operative dependency — Call the Skill tool with \"dd-diagnose\" — instead of restating the method; dd-bug-fix keeps only the hotfix lifecycle (branch, resolved event, commit)"
 ```
 
 ### dadaia-codebase-design
@@ -132,7 +127,7 @@ is no longer archive-only.
 - **Title:** dd-architecture-survey — user-invoked (PM/operator) or at alpha/release close: bug-ledger stats per surface + git churn in, ranked architecture cards + one top candidate out, then grill
 - **Opened:** 2026-08-23
 - **Status:** candidate
-- **Description:** Operationalize the operator's standing order **"permanent architecture review oriented by bug history"** as a procedure with a defined input and output instead of an exhortation. New skill `dd-architecture-survey`, user-invoked (by the operator or `project-manager`; `disable-model-invocation: true`) or run at the close of each `alpha-N`/release. **Input:** `dadaia bugs stats` aggregated per surface/component (re-bug rate, time-to-re-bug, resolved-without-evidence count) joined with `git log` churn per path. **Output:** architecture cards — *files · problem · deepening (what deep module would absorb it) · before/after sketch · confidence tag Strong / Worth exploring / Speculative* — plus exactly **one top candidate**, which then goes to a `dadaia-grill-me` session before anything is picked. The survey writes a report/handoff only (ADDITIVE); it never edits code and never materializes backlog — its top candidate reaches `BACKLOG.md` only through the operator-gated intake (ADR #15). Reference: `mattpocock/skills/skills/engineering/improve-codebase-architecture/` (`SKILL.md` + `HTML-REPORT.md` + `agents/`). Depends on the vocabulary of `dadaia-codebase-design` (cards use seam/deep-module/deletion-test terms). Governance: maps to the DADAIA.md §5 bold topic "Releases" (close of each alpha) or §6 — single topic to settle in grill-me. Success metric proposed by the audit: every alpha closes with one survey and one dispositioned top candidate. **Audit roadmap hint (not a disposition):** R3.
+- **Description:** Operationalize the operator's standing order **"permanent architecture review oriented by bug history"** as a procedure with a defined input and output instead of an exhortation. New skill `dd-architecture-survey`, user-invoked (by the operator or `project-manager`; `disable-model-invocation: true`) or run at the close of each `alpha-N`/release. **Input:** `dadaia bugs stats` aggregated per surface/component (re-bug rate, time-to-re-bug, resolved-without-evidence count) joined with `git log` churn per path. **Output:** architecture cards — *files · problem · deepening (what deep module would absorb it) · before/after sketch · confidence tag Strong / Worth exploring / Speculative* — plus exactly **one top candidate**, which then goes to a `dadaia-grill-me` session before anything is picked. The survey writes a report/handoff only (ADDITIVE); it never edits code and never materializes backlog — its top candidate reaches `BACKLOG.md` only through the operator-gated intake (ADR #15). Reference: `mattpocock/skills/skills/engineering/improve-codebase-architecture/` (`SKILL.md` + `HTML-REPORT.md` + `agents/`). Depends on the vocabulary of `dadaia-codebase-design` (cards use seam/deep-module/deletion-test terms). Governance: maps to the DADAIA.md §5 bold topic "Releases" (close of each alpha) or §6 — single topic to settle in grill-me. Success metric proposed by the audit: every alpha closes with one survey and one dispositioned top candidate. **Audit roadmap hint (not a disposition):** R3. **Surface ownership (BL-CONFLICT adjudication 2026-08-23):** the segment-close step that names this survey as an operative dependency lands inside `entity-behavior-map`’s rebuild of `dd-release-implement` (its `RC-FLOW.md`); this entry creates only the new skill.
 - **Provenance:** operator ratification (2026-08-23) of the research report `.dadaia/reports/dadaia-workspace/claude-code/2026-08-23T183323Z-skills-audit-vs-reference/` (handoff `.dadaia/handoff/dadaia-workspace/2026-08-23T183323Z-claude-code-skills-audit-vs-reference.handoff.json`), section D "new skills proposed" — ruled to the backlog while sections A–C fold into release v0.4.4; relates-to `core-skills-consolidation` and `rules-skills-governance-map` (both CONSUMED by v0.4.4) and to the governance rule "every skill maps to one DADAIA.md bold topic"; roadmap placement R3 (hint)
 - **Intents:**
 ```yaml
@@ -141,11 +136,6 @@ is no longer archive-only.
     ref: dadaia_workspace/public/skills/dd-architecture-survey/SKILL.md
     surface: new
   change: "new user-invoked core skill (disable-model-invocation): input = dadaia bugs stats per surface + git churn; output = architecture cards (files · problem · deepening · before/after · Strong/Worth exploring/Speculative) and one top candidate routed to dadaia-grill-me; report/handoff only, never code or backlog writes; adapted from mattpocock/skills/skills/engineering/improve-codebase-architecture"
-- subject:
-    kind: doc
-    ref: dadaia_workspace/public/skills/dd-release-implement/SKILL.md
-    surface: new
-  change: "alpha-N / release close step names the survey as an operative dependency — Call the Skill tool with \"dd-architecture-survey\" — so each segment closes with a survey and a dispositioned top candidate"
 ```
 
 ### dd-code-review
@@ -310,7 +300,7 @@ is no longer archive-only.
   change: "BUGS.jsonl path; required fields (reported: symptom+repro+severity; resolved: release+cause+test); idempotent `dadaia bugs archive` (>90-day resolved chains to _archive/bugs_histo.jsonl); reopen = reported with same bug_id"
 - subject:
     kind: code
-    ref: dadaia_workspace/hooks/sdd_gate.py#SddGate
+    ref: dadaia_workspace/hooks/sdd_gate.py#evaluate_payload
     surface: existing
   change: "MEMORY phase resolution folds the last phase event from the live release RELEASE.jsonl (ACTIVE.md retired); FROZEN class repoints to per-area */_archive/"
 - subject:
@@ -347,22 +337,22 @@ is no longer archive-only.
 - subject:
     kind: doc
     ref: dadaia_workspace/public/data/DADAIA.md
-    surface: existing
+    surface: new
   change: "stable per-behavior anchors (named subsections) for Backlog/Bugs/Releases/Memory behaviors; no content duplication with skills or scoped AGENTS.md"
 - subject:
     kind: doc
     ref: dadaia_workspace/public/skills/dd-release-implement/SKILL.md
-    surface: existing
-  change: "robust shape: short SKILL.md with Done-when steps + disclosed siblings RC-FLOW.md / RELEASE-EVENTS.md / MEMORY-UPDATE.md; CLOSURE-TEMPLATE.md and CLOSURE-CHECKS.md retire"
+    surface: new
+  change: "robust shape: short SKILL.md with Done-when steps + disclosed siblings RC-FLOW.md / RELEASE-EVENTS.md / MEMORY-UPDATE.md; CLOSURE-TEMPLATE.md and CLOSURE-CHECKS.md retire; RC-FLOW.md segment-close step names the survey as an operative dependency — Call the Skill tool with \"dd-architecture-survey\" [absorbed from dd-architecture-survey, adjudication 2026-08-23]"
 - subject:
     kind: doc
     ref: dadaia_workspace/public/skills/dd-bug-fix/SKILL.md
-    surface: existing
-  change: "renamed to dd-bug-resolution; all references updated; content aligned to BUGS.jsonl required fields"
+    surface: new
+  change: "renamed to dd-bug-resolution; all references updated; content aligned to BUGS.jsonl required fields; reproduce/RED/root-cause steps become an operative dependency — Call the Skill tool with \"dd-diagnose\" — the skill keeps only the bug lifecycle (branch, resolved event, commit) [absorbed from dd-diagnose, adjudication 2026-08-23]"
 - subject:
     kind: doc
     ref: dadaia_workspace/public/skills/dd-backlog-definition/SKILL.md
-    surface: existing
+    surface: new
   change: "live-photo BACKLOG.md + backlog_histo.jsonl snapshot records; intake must confront existing ACTIVE (annulment only with operator ratification); LEDGER-in-file clause retires"
 ```
 
