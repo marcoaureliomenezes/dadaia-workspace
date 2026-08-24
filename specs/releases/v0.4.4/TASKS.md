@@ -1092,7 +1092,7 @@ blocking (same posture as T-044-33/T-044-35). Full suite:
 
 ---
 
-- [ ] **T-044-39 — bug `read-only-atom-honouring-is-advisory-and-root-bypasses-it` (LOW)**
+- [-] **T-044-39 — bug `read-only-atom-honouring-is-advisory-and-root-bypasses-it` (LOW)**
 
 **Write set:** `features/migrate/**` (the guard's site), tests.
 **Description:** Either document the guard as advisory/best-effort, or move the check after
@@ -1102,7 +1102,7 @@ diff; do not add a second permission probe.
 
 ---
 
-- [-] **T-044-40 — bug `symlinked-specs-root-is-followed-by-migration-and-repair` (LOW)**
+- [x] **T-044-40 — bug `symlinked-specs-root-is-followed-by-migration-and-repair` (LOW)**
 
 **Write set:** the context-resolution seam, tests.
 **Description:** One deliberate decision applied **once at the resolution seam** — resolve
