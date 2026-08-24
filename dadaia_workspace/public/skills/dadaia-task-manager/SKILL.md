@@ -51,11 +51,9 @@ trace is:
 **Implementation complete is not DONE (judgment, not mechanic).** After the implementer
 finishes code, unit tests, and integration tests, the task remains `[-]` until
 `qa-engineer`, `code-reviewer`, and `security-reviewer` return green approval for the
-same commit (per the `DADAIA.md` §5 (Releases) cadence: alpha-N boundaries are qa-only;
-reviews mature the release, and the push boundary itself is mechanically gated — the
-pre-push security-verdict chokepoint requires an APPROVED `security-reviewer` handoff
-whose `metrics.commit_sha` equals each pushed ref sha, per push-cycle). Before those
-approvals it is forbidden to mark
+same commit — boundary-by-boundary cadence: `dd-release-implement`'s gate-cadence table,
+canonical home (branch contract: `DADAIA.md` §4 Gitflow, operations: `dd-gitflow-default`).
+Before those approvals it is forbidden to mark
 `[x]`, open a PR, request merge, deploy, close the release, write `CLOSURE.md`, or update
 memory. If any reviewer requests changes, return to step 2 and keep `[-]`.
 
@@ -134,7 +132,7 @@ squash on PR merge per-repo policy.
 > closing: only flip to `[x]` after QA/code/security approve the implementation
 > handoff. No exception.
 
-Which branch a reservation and its commits land on is the `dadaia-gitflow` skill's
+Which branch a reservation and its commits land on is the `dd-gitflow-default` skill's
 contract, not this one — a task is reserved and worked on whichever branch the active
 SDD stage runs on.
 

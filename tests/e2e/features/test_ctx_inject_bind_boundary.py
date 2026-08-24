@@ -145,10 +145,12 @@ def test_seed3_bind_drives_injection_across_real_process_boundary(tmp_path: Path
 
     sid = "s-e2e"
 
-    # 1) Fresh unbound session → generic preflight, NO context memory, ALIVE list present.
+    # 1) Fresh unbound session → generic preflight: ALIVE list only, NO dispatcher
+    #    preflight restatement (FR30/T-044-60 deleted it from every emission path) and NO
+    #    context memory.
     first = _inject(tmp_path, sid)
     assert "[no bound context]" in first
-    assert "dispatcher preflight" in first
+    assert "dispatcher preflight" not in first
     assert "end memory bootstrap" not in first
     assert "ALPHA-MARKER" not in first
     assert "BETA-MARKER" not in first
@@ -157,7 +159,9 @@ def test_seed3_bind_drives_injection_across_real_process_boundary(tmp_path: Path
     assert "- beta" in first
 
     # 2) Real `dadaia context bind alpha`, SAME session id → next prompt for the live hook
-    #    session injects ALPHA's memory (self-keyed session record, T-50-03).
+    #    session injects ALPHA's memory (self-keyed session record, T-50-03) — the memory
+    #    prefix ONLY: no dispatcher preflight, no ALIVE-context list (FR30/T-044-60 — the
+    #    list is useful only in the unbound case).
     bind_alpha = _real_bind(tmp_path, "alpha", session_id=sid)
     assert bind_alpha.returncode == 0, bind_alpha.stderr or bind_alpha.stdout
 
@@ -166,9 +170,12 @@ def test_seed3_bind_drives_injection_across_real_process_boundary(tmp_path: Path
     assert "end memory bootstrap" in after_alpha
     assert "ALPHA-MARKER" in after_alpha
     assert "BETA-MARKER" not in after_alpha
+    assert "dispatcher preflight" not in after_alpha
+    assert "ALIVE contexts" not in after_alpha
 
     # 3) Re-bind to beta (distinct real bind process, same session id) → next prompt
-    #    re-injects BETA (the resolved context name changed).
+    #    re-injects BETA (the resolved context name changed) — same bound-boundary shape:
+    #    memory prefix only.
     bind_beta = _real_bind(tmp_path, "beta", session_id=sid)
     assert bind_beta.returncode == 0, bind_beta.stderr or bind_beta.stdout
 
@@ -176,6 +183,8 @@ def test_seed3_bind_drives_injection_across_real_process_boundary(tmp_path: Path
     assert "[beta]" in after_beta
     assert "BETA-MARKER" in after_beta
     assert "ALPHA-MARKER" not in after_beta
+    assert "dispatcher preflight" not in after_beta
+    assert "ALIVE contexts" not in after_beta
 
     # 4) Repeat prompt with no new bind → silent.
     repeat = _inject(tmp_path, sid)
@@ -190,6 +199,8 @@ def test_seed3_bind_drives_injection_across_real_process_boundary(tmp_path: Path
     after_rebind = _inject(tmp_path, sid)
     assert "[beta]" in after_rebind
     assert "end memory bootstrap" in after_rebind
+    assert "dispatcher preflight" not in after_rebind
+    assert "ALIVE contexts" not in after_rebind
 
     # 6) Repeat prompt again, no new bind → silent.
     assert _inject(tmp_path, sid).strip() == ""

@@ -13,7 +13,7 @@ tags:
 - agents
 - dispatch
 - sdd
-last_updated: '2026-08-15'
+last_updated: '2026-08-24'
 release_origin: v0.3.0
 ---
 
@@ -30,7 +30,7 @@ worker.
 | `product-engineer` | SPEC/PLAN/TASKS/CLOSURE and memory ownership. |
 | `software-engineer` | Production implementation and tests. |
 | `qa-engineer` | Acceptance and executable-quality review. |
-| `security-reviewer` | Security review and pre-push approval evidence. |
+| `security-reviewer` | Security review and the committed PR-gate approval evidence. |
 | `code-reviewer` | Diff/API/maintainability review. |
 | `ai-engineer` | Agent, skill, rule, hook, and harness surface. |
 | `software-architect` | Architecture analysis and release-definition review. |
@@ -48,10 +48,20 @@ CLOSURE. No runtime drives agents through steps.
 Each stage's protocol has exactly one owning skill, and the always-on law points at it
 rather than restating it: `dd-backlog-definition` (backlog definition, run continuously by
 `project-manager`), `dd-release-definition` (picking the set, the mandatory grill, SPEC),
-`dd-release-implement` (implementation and its review-gate cadence), `dd-release-closure`
-(memory update, CLOSURE, dispositions, archive), `dd-audit-project` (audit and its
-remediation release), `dd-bug-registration` and `dd-bug-fix` (the bug arm, end to end). A
-skill that needs another stage's rule names that skill instead of repeating it.
+`dd-release-implement` (implementation, its review-gate cadence **and** the closure —
+memory update, CLOSURE, dispositions, artifact GC, archive — disclosed to its own sibling
+files), `dd-audit-project` (audit and its remediation release), `dd-bug-registration` and
+`dd-bug-fix` (the bug arm, end to end). A skill that needs another stage's rule names that
+skill instead of repeating it, and which skill owns which law topic is declared once, in
+the rules-skills map ([[agentic-entities]]).
+
+The bug arm is ordered too, and its order is checkable. `dd-bug-fix` carries six
+diagnosing phases — red loop before any hypothesis, minimise, falsifiable hypotheses,
+instrument the executed path, regression test at the correct seam, cleanup — each ending
+in a criterion a reader can verify, and it yields to `software-architect` when no correct
+seam exists. Closing the bug is gated rather than narrated: the `resolved` event is refused
+without its three checkable fields, and a net-positive diff on the touched feature is
+ruled on by `software-architect` before the commit ([[sdd-bug-backlog-governance]]).
 
 ## Operating Rules
 
@@ -71,8 +81,12 @@ task markers reduce conflicting intent; Git conflicts remain visible when races 
 
 Release definition requires architectural, QA, and implementability review before the
 definition is approved. Implementation requires QA, security, and code review before a
-task is marked done; a rejection returns the task to implementation. Push requires an
-approved security handoff for the exact commit SHA.
+task is marked done; a rejection returns the task to implementation. A **merge** requires
+an approved security handoff covering the pull request's head sha ([[sdd-gate-v3]]).
+
+Every verdict states the **bug-surface delta** of each feature it touched, with evidence
+read from the bug ledger rather than from the test result; "tests green" is not a verdict
+([[quality-assurance]]).
 
 ## Model Governance
 

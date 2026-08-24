@@ -1,0 +1,82 @@
+{
+  "schema_version": "handoff-v1.2",
+  "self_pull": {
+    "refs": [
+      "specs/memory/product/catalog.json",
+      "specs/memory/product/sdd/sdd-gate-v3.md"
+    ]
+  },
+  "agent": "security-reviewer",
+  "context": "dadaia-workspace",
+  "produced_at": "2026-08-24T18:38:49Z",
+  "release_id": "v0.4.4",
+  "scope": "T-044-52 - committed security verdict evidence for the rc-1 PR head (CI security-verdict-gate)",
+  "artifact": {
+    "type": "report"
+  },
+  "metrics": {
+    "commit_sha": "8ca3ea3c9ff5c88b8d0ec9839248f77c0dd86335",
+    "previous_covered_sha": "58f9bdc8f2ec87c1e2a76fbbeeaec68c6aaaf45b",
+    "base_sha": "f5cce371",
+    "delta_commits": 3,
+    "delta_files": 3,
+    "delta_lines_added": 131,
+    "delta_lines_removed": 3,
+    "delta_production_files": 0,
+    "delta_ci_files": 0,
+    "findings_critical": 0,
+    "findings_high": 0,
+    "findings_medium": 1,
+    "findings_low": 1,
+    "findings_info": 3,
+    "push_gate_exit": 0,
+    "push_gate_offenders": 0,
+    "secrets_detected": 0,
+    "cve_findings": 0,
+    "new_dependencies": 0,
+    "tests_passed": 32
+  },
+  "findings": [
+    {
+      "severity": "INFO",
+      "message": "Delta review 58f9bdc8..8ca3ea3c (3 commits, 3 files, +131/-3): zero production files, zero CI files, zero secret-shape hits, no skip/xfail introduced.",
+      "detail_md": "The delta is `7a877728` (this reviewer's previous verdict evidence), `bf443c59` (the `reported` event) and `8ca3ea3c` (the fix — **`tests/contract/test_rules_skills_map.py` +47/-3 and the `resolved` event, nothing else**). `git diff --name-only` matches no path under `dadaia_workspace/` or `.github/`.\n\nEvidence at this head: secret-shape sweep over added lines **0 hits**; grep for `pytest.mark.skip|xfail|skipif` in the added lines **0 hits**; pre-push denylist gate on the real new-branch refspec, no pipe, **exit 0 with zero offenders**; `pytest tests/contract/test_rules_skills_map.py tests/integration/test_repo_self_scan.py tests/contract/test_source_repo_hygiene.py` → **32 passed** (one more than the previous round, the new regression test); working tree clean.",
+      "fix_recommendation": "None."
+    },
+    {
+      "severity": "INFO",
+      "message": "The three deleted lines are the defect itself, not coverage: an import widened and two duplicated os-native renderings replaced by one seam. No assertion, fixture or platform guard was removed.",
+      "detail_md": "Deletions, read in full: `from pathlib import Path` (widened to `Path, PurePath, PureWindowsPath`) and the same statement twice, `rel = md_path.relative_to(repo_root)` — the two divergent call sites that rendered a violation's `file:line` prefix with the host's native separator. Both now call one `_posix_relpath` seam returning `relative_to(...).as_posix()`, so the enforcer compares one canonical form instead of two host-dependent ones. Two call sites collapsed into one is the shape the standing order asks for: the Windows red was a duplication defect, and the fix removes the duplication rather than special-casing the platform.\n\nThe new `test_posix_relpath_is_separator_agnostic_under_windows_path_semantics` drives the seam with `PureWindowsPath(r\"D:\\\\...\")` inputs and asserts the rendered path is POSIX-shaped with no backslash. Because `relative_to`/`as_posix` are pure path arithmetic with no I/O, that test exercises Windows semantics **on every host** — no `skipif`, so the regression cannot hide until the next Windows CI run.\n\nSecurity-relevant check: `as_posix()` on a `relative_to` result is separator normalisation only — it neither collapses `..` segments nor resolves symlinks, so the enforcer's path matching is not loosened. The ledger carries `reported` (HIGH, project-manager) and `resolved` (software-engineer) with all three FR23 fields and an honestly-argued `net-neutral:` direction that distinguishes raw LOC from defect-bearing logic.",
+      "fix_recommendation": "None."
+    },
+    {
+      "severity": "MEDIUM",
+      "message": "S-3 carried unchanged: the verdict gate is advisory at rc-1 (A4.4) and must be a required check on develop and main before rc-2.",
+      "detail_md": "develop's branch protection still carries no `required_status_checks` object; main's required contexts still omit 'Security verdict gate (PR head sha)'. Sanctioned for the rc-1 PR by A4.4 and already in the PM intake report. It does not gate this verdict; it gates rc-2.",
+      "fix_recommendation": "Before rc-2, re-supply the required-checks list whole (PATCH clobbers) on both edges including the verdict gate, and verify by reading branch protection back rather than by observing a green PR."
+    },
+    {
+      "severity": "LOW",
+      "message": "Carried unchanged: the .gitignore inversion leaves sensitive file classes trackable inside the release trees (no instance present; content-based backstops in force).",
+      "detail_md": "PM intake, as recorded two rounds ago. The remedy is one trailing re-ignore block after the release-tree negation plus hygiene-test probes — never a per-artifact line.",
+      "fix_recommendation": "PM intake, unchanged."
+    },
+    {
+      "severity": "INFO",
+      "message": "Full-release posture unchanged: zero CRITICAL, zero HIGH; both original blockers closed, the privacy baseline still unrelaxed across five rounds.",
+      "detail_md": "The verdict gate still refuses `HEAD`, `@`, an abbreviated sha and an option-shaped value while passing an exact sha and an only-verdict-drift ancestor, and still refuses a commit mixing verdict evidence with production. The push range publishes no private material. `infrastructure/data/privacy_baseline.json` remains byte-identical to develop, main and the review base. F-11 stays registered (MEDIUM, open) as the only reachable ledger corruption, forgery structurally unreachable.",
+      "fix_recommendation": "None."
+    }
+  ],
+  "decisions_required": [
+    "Operator: make 'Security verdict gate (PR head sha)' a required check on develop and main before rc-2 (A4.4).",
+    "PM intake (carried): re-assert the sensitive-file classes in one trailing .gitignore block after the release-tree negation, with hygiene-test probes."
+  ],
+  "next_handoff": {
+    "agent": "project-manager",
+    "context": "dadaia-workspace",
+    "expected_artifact_type": "other"
+  },
+  "verdict": "APPROVED",
+  "verdict_reason": "APPROVED covering 8ca3ea3c. The delta since the previously covered sha is three commits and three files — this reviewer's prior verdict evidence, the bug registration and the platform-agnostic citation-enforcer fix — with **zero production files and zero CI files**. The only deletions in the range are the defect itself: one widened import and the same os-native rendering statement twice, replaced by a single `_posix_relpath` seam, so two divergent call sites collapse into one canonical form. No assertion, fixture or platform guard was removed and no skip/xfail was added; the new `PureWindowsPath`-driven regression runs on every host because the seam is pure path arithmetic, so the class cannot hide until the next Windows CI run. `as_posix()` normalises separators only — it neither collapses `..` nor resolves symlinks — so the enforcer's matching is not loosened. Secret sweep 0 hits, push-gate exit 0 with zero offenders, 32 tests green, tree clean. S-3 (advisory at rc-1 per A4.4) and the LOW gitignore note carry unchanged to intake. Bug-surface axis: REDUCED — a cross-platform red closed by deleting a duplication rather than by adding a platform branch."
+}

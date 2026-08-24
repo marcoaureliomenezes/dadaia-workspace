@@ -71,9 +71,9 @@ If the file is absent, record `[tech-stack.md not found]` and continue.
 Check whether `<specs_dir>/memory/product/catalog.json` exists.
 
 - **If present:** read it directly (JSON — no stripping needed). It contains all
-  features with `slug`, `title`, `summary`, `path`, `tags`, and `depends_on` fields.
-  Use `summary` and `tags` to identify the 1-3 features relevant to your task, then
-  self-pull the corresponding `product/<slug>.md` files.
+  features with `slug`, `title`, `summary`, `area`, `path`, `tags`, and `depends_on`
+  fields. Use `summary` and `tags` to identify the 1-3 features relevant to your task,
+  then self-pull each entry's `path` field (`product/<area>/<slug>.md`).
 - **If absent:** fall back to reading `<specs_dir>/memory/product/index.md`
   for the human-readable catalog.
 
@@ -121,7 +121,7 @@ not at session start.
 | No persona duplication | This adapter supplements the canonical agent persona — it does not replace or restate it. |
 | Graceful degradation | If a memory file is missing, record the absence and continue — do not block the session. |
 | Architecture is self-pull | Never inject architecture.md as part of bootstrap. Self-pull it only when making architectural or cross-layer decisions. |
-| Self-pull responsibility | Use the catalog to identify relevant features; self-pull only 1-3 `product/<slug>.md` files for your specific task to avoid context overload. |
+| Self-pull responsibility | Use the catalog to identify relevant features; self-pull only 1-3 `product/<area>/<slug>.md` files (per each entry's `path` field) for your specific task to avoid context overload. |
 
 ---
 

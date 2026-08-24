@@ -281,18 +281,17 @@ def _foreign_repo_slugs(
 
 @app.command("push-gate-check")
 def push_gate_check() -> None:
-    """Pre-push gate (FR-W1-02 / v0.6.0 FR4 / v0.9.0 FR1-FR6 / v0.11.0 FR5): branch
-    policy + the range-scoped denylist scan + diff-based security verdict.
+    """Pre-push gate: branch-name validation + the range-scoped denylist scan.
+
+    Branch model: `DADAIA.md` §4 (Gitflow) + `dd-gitflow-default` — this docstring
+    states it nowhere else.
 
     Reads the pre-push ref lines from stdin (``<local-ref> <local-sha> <remote-ref>
-    <remote-sha>``). Refuses any non-deletion, non-tag ref that is not
-    ``refs/heads/develop`` (gitflow law: main via PR only; feature/hotfix local-only;
-    names outside the four patterns invalid). Every non-deletion ref (tags included) is
-    then scanned for new objects carrying a denylisted term (v0.9.0 FR1/FR2) — the
-    pushed ``develop`` tip must ALSO carry a ``security-reviewer`` APPROVED handoff
-    (``metrics.commit_sha`` == tip sha) covering the ``origin/develop..develop`` delta.
-    Branch deletions are never scanned and pass with no verdict; tag pushes are scanned
-    but keep their DP-5 verdict carve-out. Commits are never review-blocked here.
+    <remote-sha>``). Every non-deletion ref (tags included) is then scanned for new
+    objects carrying a denylisted term (v0.9.0 FR1/FR2) — under v2 this feature push is
+    the first publication to ``origin``. Branch deletions are never scanned; tag pushes
+    are scanned but were never gated on branch policy. There is no security-verdict
+    check on this path (v0.4.4 A3.4) — it runs as a PR gate instead (FR4).
 
     The object source, denylist terms, baseline patterns and foreign-slug set are ALL
     built and passed here — the CLI is the sole composition point for the injected
@@ -313,7 +312,6 @@ def push_gate_check() -> None:
 
     repo_root = _repo_root()
     workspace = _resolve_workspace_root(repo_root)
-    handoff_root = workspace / ".dadaia" / "handoff"
 
     denylist_terms = load_denylist_terms()
     baseline_patterns = load_denylist_baseline_patterns()
@@ -339,7 +337,6 @@ def push_gate_check() -> None:
     stdin_text = sys.stdin.read() if not sys.stdin.isatty() else ""
     refs, malformed = parse_push_stdin(stdin_text)
     decision = push_gate_decision(
-        handoff_root,
         refs,
         object_source=build_git_object_reader(),
         repo=repo_root,
@@ -364,9 +361,9 @@ def gc_push_verdicts(
         ...,
         "--sha",
         help=(
-            "A develop tip sha the caller has ALREADY confirmed landed on the remote "
-            "(repeatable — pass one --sha per newly-landed tip). Never pass a sha before "
-            "the push it names is confirmed."
+            "A merged PR head sha the caller has ALREADY confirmed landed (repeatable "
+            "— pass one --sha per newly-merged PR head). Never pass a sha before the "
+            "PR merge it names is confirmed."
         ),
     ),
     dry_run: bool = typer.Option(
@@ -375,23 +372,23 @@ def gc_push_verdicts(
         help="Report what would be consumed without touching the filesystem.",
     ),
 ) -> None:
-    """FR24 (v0.4.3 T-043-39 / M-1 six-axis-review rider): delete the APPROVED
-    security-verdict handoff(s) a successful push just consumed.
+    """FR24 (v0.4.3 T-043-39 / M-1 six-axis-review rider / v0.4.4 D5): delete the
+    APPROVED security-verdict handoff(s) a merged PR just consumed.
 
-    Cadence contract: the ship flow runs this verb IMMEDIATELY AFTER a successful
-    ``git push`` of ``develop`` — never before, and never from the pre-push path itself
-    (a pre-push hook cannot yet know the push will succeed; see
-    ``features/chokepoints/service.py``'s module docstring for the two sanctioned
-    observation points — this verb realizes observation point (b), the
-    ``git push``-wrapping caller). Each ``--sha`` is a pushed ``develop`` tip sha the
-    caller has already confirmed landed on the remote.
+    Cadence contract (v0.4.4 D5 — re-keyed from the pushed ``develop`` tip to the
+    merged PR head sha; the security verdict itself is now a PR gate, not a push gate,
+    per FR3/FR4 — see ``features/chokepoints/service.py``'s module docstring for the
+    two sanctioned observation points this verb realizes, observation point (b)): the
+    ship flow runs this verb IMMEDIATELY AFTER a PR merges into ``develop`` or
+    ``main`` — never before. Each ``--sha`` is a merged PR head sha the caller has
+    already confirmed landed.
 
     Idempotent and best-effort by design: exits 0 even when nothing matches (no verdict
     handoff covers the given sha(s)), even when the AG.1 lane guard refuses a candidate,
     and even when the audit-ledger append fails for one handoff — a GC sweep run
-    strictly AFTER the push it cleans up after has already landed can never change that
-    push's outcome, so a non-zero exit here would be a failure signal a caller could
-    misread as a push problem, and this verb never emits one.
+    strictly AFTER the merge it cleans up after has already landed can never change
+    that merge's outcome, so a non-zero exit here would be a failure signal a caller
+    could misread as a merge problem, and this verb never emits one.
     """
     repo_root = _repo_root()
     workspace = _resolve_workspace_root(repo_root)

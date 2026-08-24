@@ -54,6 +54,94 @@ for this task, so none is touched here):
 
 Left exactly as written; a future task can pick this up.
 
+## [0.4.4] — 2026-08-24
+
+Internal spec-release id: `v0.4.4` ("organize the core"). Note: `0.4.3` was minted
+locally and never published to PyPI — the published lineage jumps `0.4.2 → 0.4.4`.
+
+### Added
+- Spec-context **associated repos** (model v3, backup-first migration, one accessor,
+  `context repo add/remove/list`, `create --associated`, alive/dead over the whole set,
+  export/import + panel coverage, ownership predicate at both registry write seams).
+- **Rules→skills governance map** (`rules-skills-map.json` + schema) enforced by one
+  contract test — including dead-path/dead-verb citation checks and mutation fixtures.
+- **FR23 resolved-evidence gate**: `dadaia bugs append --event resolved` requires
+  `--evidence-loop`, `--evidence-seam`, `--evidence-diff` (direction-prefixed); a
+  net-positive diff routes to `software-architect`.
+- CI: `feature/**` push triggers, PR source guard, **security verdict gate** reading
+  committed evidence at `specs/releases/<id>/verdicts/<sha>.handoff.json` (fail-closed).
+
+### Changed
+- **Gitflow v2**: three branch patterns only (`feature/{M.m.p}`, `develop`, `main`),
+  feature cut from `main`, `develop`/`main` PR-only; the pre-push chokepoint inverted
+  (feature pushable after local CI preflight; direct develop/main pushes refused).
+- **Skills surface consolidated 25 → 21**: four AI skills fused into `dd-ai-eng-knowhow`;
+  `dd-release-closure` folded into `dd-release-implement`; five renames to the `dd-*`
+  lifecycle family; `dd-bug-fix` rewritten as a six-phase method with per-phase Done-when.
+- The workspace law loads **once per harness** (root import chain for Claude Code;
+  `.claude/rules/DADAIA.md` mirror retired); `ctx_inject` carries state, not restatement.
+- Release-tree `.gitignore` inverted: release artifacts tracked by default, only
+  `local-notes.md` and `tmp/` ignored (closes a four-recurrence class structurally).
+
+### Fixed
+- 24 bugs closed with three-field evidence (full list: the archived release CLOSURE);
+  highlights: `context list`/`show` one branch-resolution seam; foreign-slug ownership
+  refusal at `create` and `repo add`; symlinked specs root refused at the resolution
+  seam; backlog parser refuses duplicate top-level sections; atomic-writer behavioural
+  battery over all 9 writers; platform-agnostic citation rendering (Windows).
+
+### Removed
+- 50 slop branches archive-tagged (`archive/*`) and deleted on origin; local
+  `hotfix/0.4.3` deleted. Production net **−130 LOC**; AI-surface net **−943 lines**.
+
+## [0.4.3] — 2026-08-18
+
+Hotfix (Arm B, `hotfix/0.4.3`) — bug
+`specs-upgrade-emits-atoms-violating-frontmatter-schema` (HIGH).
+
+`memory-frontmatter-v1` is a closed schema (`additionalProperties: false`), so every key
+dropped from it turns existing consumer atoms into doctor errors. v0.1.72 shipped that
+migration for `agent_tier` as a hard-coded single-key step; when `token_estimate` was
+dropped later, no migration followed. `dadaia specs upgrade` therefore rewrote consumer
+atoms and then failed its own post-upgrade doctor with LINT-1 `Additional properties are
+not allowed ('token_estimate' was unexpected)`, pointing the operator at a backup and
+leaving the tree stuck at its old pattern version — reproduced on three independent
+consumer trees.
+
+Fixed as a class, not an instance: the new `retired-frontmatter-keys` step (pattern
+version **4 → 5**) derives the retired set from the shipped schema's `properties` at run
+time, so a future schema-drop is migrated by construction. The frontmatter fence scanner
+moved to `features/migrate/frontmatter_keys.py` and the historical `agent-tier-frontmatter`
+step now delegates to it — one scanner, two callers. `CANONICAL_SPECS_VERSION` is 5 and
+the scaffold constitution stamp follows it.
+
+**Consumer action:** run `dadaia specs upgrade` per context to reach pattern version 5.
+
+---
+
+Second hotfix folded into this same unpublished mint (no separate PATCH number is minted
+for a version that never reached the index — the `[0.4.2]` publish-number collapse above
+is the precedent): bug `upgrade-never-refreshes-uncustomised-scoped-law-projection`
+(MEDIUM).
+
+`specs/AGENTS.md` is projected once and never refreshed: TREE-5 reports drift and
+`--fix` declines, because overwriting could destroy operator customisation. With no way
+to recognise our own earlier output, a file nobody had ever edited was frozen exactly like
+a hand-written one — so instances kept scoped law ordering agents to run
+`dadaia lifecycle`, a command the CLI no longer exposes.
+
+The tool now ships the evidence it was missing: `public/templates/shipped-hashes.json`
+records the sha256 of every published version of a template. When the on-disk bytes match
+one of them the file is provably untouched, TREE-5 becomes **fixable**, and
+`dadaia specs doctor --fix` refreshes it losslessly. Bytes we never shipped are operator
+content and remain warn-only — re-verified inside the repair itself — and an instance with
+no history file keeps the old conservative behaviour. The history is append-only by
+contract, pinned by a test that fails if a template is edited without recording its new
+digest.
+Trees already at 4 are repaired by the new step; the migration is byte-preserving,
+idempotent and dry-run-capable, and prose mentions of retired keys in document bodies are
+never touched.
+
 ## [0.4.2] — 2026-08-18
 
 One published version carrying the two merged, previously-unpublished internal releases

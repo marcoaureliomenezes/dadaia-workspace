@@ -68,7 +68,20 @@ def test_append_refuses_second_terminal_with_exit_1(tmp_path: Path) -> None:
     specs.mkdir()
     _report(specs, "b1")
     code, out = _append(
-        specs, "b1", "resolved", "--release", "v0.5.0", "--resolution-evidence", "x" * 30
+        specs,
+        "b1",
+        "resolved",
+        "--release",
+        "v0.5.0",
+        "--resolution-evidence",
+        "x" * 30,
+        "--evidence-loop",
+        "pytest tests/integration/cli/test_bugs_append_coherence.py -q",
+        "--evidence-seam",
+        "tests/integration/cli/test_bugs_append_coherence.py::"
+        "test_append_refuses_second_terminal_with_exit_1",
+        "--evidence-diff",
+        "net-negative: -1/+0 lines on the coherence check",
     )
     assert code == 0, out
     code, out = _append(specs, "b1", "rejected", "--reason", "why")

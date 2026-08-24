@@ -52,10 +52,9 @@ LAW_BASENAMES: frozenset[str] = frozenset({"DADAIA.md", "AGENTS.md", "CLAUDE.md"
 #: ``DADAIA.md`` into the subset in :data:`DADAIA_MD_HARNESS_TARGETS`.
 LAW_HARNESS_DIRS: frozenset[str] = frozenset({".claude/rules", ".codex", ".kimi-code", ".agents"})
 
-#: Where the workspace system prompt is projected, per Layer-1 harness. The workspace
-#: root copy (``DADAIA.md``) is canonical and always written.
+#: Where the law is projected per harness whose root-import chain does not already
+#: deliver it — Claude Code's does, so no entry here (bug FR31, see workspace-law rule).
 DADAIA_MD_HARNESS_TARGETS: dict[str, str] = {
-    "claude": ".claude/rules/DADAIA.md",
     "codex": ".codex/DADAIA.md",
     "kimi-code": ".kimi-code/DADAIA.md",
 }

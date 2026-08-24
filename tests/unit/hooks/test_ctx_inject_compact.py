@@ -104,7 +104,8 @@ def test_bound_session_reinjects_once_after_compact(tmp_path: Path) -> None:
     # Compaction: marker + observable re-emission of the bound context's bootstrap…
     out = _run(tmp_path, sid, event="PostCompact")
     assert "[ctx]" in out
-    assert "dispatcher preflight" in out
+    # FR30 (T-044-60, A30.1): the dispatcher preflight restatement is deleted.
+    assert "dispatcher preflight" not in out
     # …but the sentinel was NOT restamped: the NEXT prompt re-injects (the deterministic
     # path — Kimi discards PostCompact stdout, so the model really gets it here).
     out = _run(tmp_path, sid)
@@ -151,7 +152,8 @@ def test_post_compact_resolves_bound_context_from_session_record(tmp_path: Path)
     )
     out = _run(tmp_path, sid, event="PostCompact")
     assert "[ctx]" in out
-    assert "dispatcher preflight" in out
+    # FR30 (T-044-60, A30.1): the dispatcher preflight restatement is deleted.
+    assert "dispatcher preflight" not in out
     assert _compact_marker(tmp_path, sid).is_file()
     # And the next prompt (first real prompt) resolves the same context and injects.
     assert "[ctx]" in _run(tmp_path, sid)
@@ -195,7 +197,8 @@ def test_claude_session_start_compact_reinjects_and_restamps(tmp_path: Path) -> 
 
     out = _run_session_start(tmp_path, sid, "compact")
     assert "[ctx]" in out
-    assert "dispatcher preflight" in out
+    # FR30 (T-044-60, A30.1): the dispatcher preflight restatement is deleted.
+    assert "dispatcher preflight" not in out
     assert not _compact_marker(tmp_path, sid).exists()
     # Sentinel restamped at the event: the following prompt is silent again.
     assert _run(tmp_path, sid) == ""

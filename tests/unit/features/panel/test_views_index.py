@@ -19,7 +19,11 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.models.server_registry import PortEntry, PortStatus
-from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
+from dadaia_workspace.core.models.spec_context import (
+    AssociatedRepo,
+    ContextState,
+    SpecContextProject,
+)
 from dadaia_workspace.features.panel.service import PanelService
 from dadaia_workspace.features.panel.views.index import render_index
 
@@ -51,6 +55,7 @@ def _make_context(
     repo_slug: str,
     state: ContextState = ContextState.ALIVE,
     current_branch: str | None = "main",
+    associated_repos: tuple[AssociatedRepo, ...] = (),
 ) -> SpecContextProject:
     return SpecContextProject(
         name=name,
@@ -61,6 +66,7 @@ def _make_context(
         alive_since="2026-01-01T00:00:00+00:00" if state == ContextState.ALIVE else None,
         dead_since=None if state == ContextState.ALIVE else "2026-01-01T00:00:00+00:00",
         current_branch=current_branch,
+        associated_repos=associated_repos,
     )
 
 
@@ -181,3 +187,33 @@ def test_card_contract_chip_hrefs_order_and_context_order() -> None:
     assert 'href="/memory-view/first-slug/architecture.html"' not in card
     assert 'href="/memory-view/first-slug/tech-stack.html"' not in card
     assert 'href="/memory-view/first-slug/product/index.html"' not in card
+
+
+# ---------------------------------------------------------------------------
+# 3. FR18/A18.5 — the context card renders associated repos, with and without
+# ---------------------------------------------------------------------------
+
+
+def test_context_card_renders_associated_repos_with_and_without() -> None:
+    """Intent: CONTRACT — FR18/A18.5. Card zone-b carries an "associated:" row only
+    for a context that has associated repos; a context with none keeps the
+    pre-FR18 card shape (no stray "associated:" text)."""
+    with_assoc = _make_context(
+        "With Associated",
+        "with-associated",
+        associated_repos=(AssociatedRepo(slug="infra", url="https://example.com/infra.git"),),
+    )
+    without_assoc = _make_context("No Associated", "no-associated")
+
+    html = _render(_build_service(contexts=[with_assoc, without_assoc]))
+
+    # Anchor on each card's name text (zone-a, before zone-b/c) so the fragment
+    # captures the whole card body, not just whatever follows a mid-card marker.
+    with_start = html.find(">With Associated<")
+    with_card = html[with_start : html.find("</article>", with_start)]
+    assert "associated:" in with_card
+    assert "infra" in with_card
+
+    without_start = html.find(">No Associated<")
+    without_card = html[without_start : html.find("</article>", without_start)]
+    assert "associated:" not in without_card

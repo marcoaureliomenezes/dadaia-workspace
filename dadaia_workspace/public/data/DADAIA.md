@@ -2,8 +2,10 @@
 
 You are operating inside a dadaia-workspace. This file is the **complete always-on law**
 of the workspace: one file, every rule, no second source. It is generated from
-`dadaia_workspace/public/data/DADAIA.md` and projected to the workspace root and to every
-harness directory. Sections cross-reference by name; no fact is stated twice.
+`dadaia_workspace/public/data/DADAIA.md` and projected to the workspace root and to
+`.codex/`/`.kimi-code/`; Claude Code reaches it through the root import chain
+(`CLAUDE.md` -> `AGENTS.md` -> `DADAIA.md`) rather than a second projected copy.
+Sections cross-reference by name; no fact is stated twice.
 
 Scoped `AGENTS.md` files govern their own subtree and take precedence there. Anything
 else you find is the operator's own — this library ships exactly two kinds of rule file:
@@ -37,7 +39,7 @@ Bugs are never release material and never wait for one. Features never skip the 
 Arm A is agent-dispatched, not engine-run: each stage — backlog-definition,
 release-definition, implementation with its reviews and gates, and audit — is carried out
 by dispatching the owning agent for that stage (§2) against the SDD documents
-(`ACTIVE.md`, SPEC, PLAN, TASKS, CLOSURE, per §5). No workflow engine assembles prompts or
+(`ACTIVE.md`, SPEC, PLAN, TASKS, CLOSURE, per §6). No workflow engine assembles prompts or
 advances gates on your behalf; you fan out explicitly and the documents themselves are
 the record of progress.
 
@@ -55,16 +57,16 @@ stay inside it.
 | SPEC / PLAN / TASKS / CLOSURE, and `specs/memory/**` | `product-engineer` |
 | Architecture: DRAFT, REVIEW, ONBOARD; root-cause and fidelity gates | `software-architect` |
 | Production code and its tests, in any language | `software-engineer` |
-| E2E, test pyramid, deploy validation; closes each `alpha-N` | `qa-engineer` |
+| E2E, test pyramid, deploy validation; closes each `rc-N` | `qa-engineer` |
 | Six-axis review before a PR | `code-reviewer` |
-| Vulnerabilities, secrets, CVEs; the push verdict (§6) | `security-reviewer` |
+| Vulnerabilities, secrets, CVEs; the push verdict (§7) | `security-reviewer` |
 | Agents, skills, rules, workflows, commands, hooks — the AI surface | `ai-engineer` |
 | Drift audits; dispatches evidence agents; scores compliance | `project-auditor` |
 
 `product-engineer` reads the PM-curated backlog to author a release; it does not curate
-the backlog. `ai-engineer` alone invokes the `ai-harness-*` and `ai-context-engineering`
-skills — every other agent uses `harness-primitives` for harness literacy and dispatches
-`ai-engineer` for depth.
+the backlog. Every agent invokes `dd-ai-eng-knowhow` for harness literacy; only
+`ai-engineer` reads its depth siblings to author or audit the AI-entity surface — every
+other agent dispatches `ai-engineer` for that depth.
 
 ---
 
@@ -74,7 +76,7 @@ One PreToolUse entrypoint — `dadaia_workspace.hooks.pre_gate` — reads each t
 once and evaluates three policies in fixed order, **first block wins**:
 
 1. **Root whitelist** — file-tool writes that would create a new top-level workspace-root
-   entry (§4).
+   entry (§5).
 2. **Venv guard** — `Bash` only, matched on fixed leading tokens: `dadaia`, `pip`, and
    `python -m dadaia_workspace` run from `.dadaia/.venv/bin/`. The block message carries
    the corrected command.
@@ -89,7 +91,7 @@ root and inside every `repos/<slug>/`.
 | MEMORY | `specs/memory/` | Writable in `DEFINITION` and `CLOSURE` phase |
 | MUTATING | everything else in-repo | Writable; records advisory presence |
 | FROZEN | `specs/_archive/` | Blocked — archive by `git mv`, never edit |
-| PROTECTED | `.dadaia/sessions/`, projected law files (§7) | Blocked |
+| PROTECTED | `.dadaia/sessions/`, projected law files (§8) | Blocked |
 
 **Races are surfaced, never prevented.** There is no lock, lease, or ownership block. A
 MUTATING write records an advisory presence record and proceeds; when another live
@@ -113,17 +115,49 @@ none. Keep working; tell the operator only when the workspace has no ALIVE conte
 as git hooks and do not depend on any harness hook firing:
 
 - **pre-commit** warns and always allows — commits flow, presence is surfaced.
-- **pre-push** refuses any pushed ref other than `refs/heads/develop` (tag pushes carve
-  out), validates the branch name against the four permitted patterns (§5), and requires
-  an APPROVED `security-reviewer` verdict covering the delta being pushed, plus the CI
-  preflight (§6).
+- **pre-push** allows a `feature/*` push after the local CI preflight and a valid branch
+  name; refuses any direct push of `develop` or `main` — those advance only by PR (full
+  contract: §4 Gitflow).
 
 The gate reads no SDD artifacts: it constrains **what** may be written, never **how** the
-change was produced. Everything in §5 you uphold yourself.
+change was produced. Everything in §6 you uphold yourself.
 
 ---
 
-## 4. Where things are written
+## 4. Gitflow — the branch contract
+
+One law states the branch model; every other mention in this file is a cross-reference.
+Start-of-work protocol, uniqueness and deletion discipline, and the CI/CD automation
+suggestion for consumers: `dd-gitflow-default`.
+
+| Branch | Pushable | Cut from | Advances by |
+|---|---|---|---|
+| `feature/{M.m.p}` | Yes — local CI preflight + valid name | `main` | opens the PR below |
+| `develop` | No — never a direct push | `main` (bootstrap only) | PR from `feature/{M.m.p}`, at definition `Aprovado` and at each `rc` merge |
+| `main` | No — never a direct push | — | PR from `develop`, at the final `rc` |
+
+No `v` prefix, no suffix, no fifth pattern. `hotfix/*` is retired: reachable only on an
+explicit operator request — no stage, no cadence, no PATCH-mint rule.
+
+Exactly one live `feature/{M.m.p}` branch at a time. At deploy of `{M.m.p}`, delete
+`feature/{M.m.p}` and cut `feature/{next}` in the same step. Bugs are fixed on the live
+feature branch in any phase — no ceremony, no separate branch.
+
+`rc-N` is a state of the specs, never a branch name: it lives in `ACTIVE.md`'s phase and
+in `TASKS.md`, and each `rc` burns exactly one `feature/{M.m.p}` → `develop` merge. `rc`
+scope is fixes and adjustments to the current release only — never new backlog.
+
+Both PRs — `feature/{M.m.p}` → `develop` and `develop` → `main` — are gated by a required
+CI check demanding an APPROVED `security-reviewer` verdict covering the PR head sha.
+Every stage of the flow — backlog definition, research, bug registration, release
+definition and implementation — runs on `feature/{M.m.p}`; `develop` and `main` are PR
+targets only, never a working branch.
+
+Suggest the operator automate this contract in CI/CD whenever the topic comes up.
+
+---
+
+## 5. Where things are written
 
 **Workspace root** holds only: `.agents/` `.claude/` `.codex/` `.dadaia/` `.kimi-code/`
 `repos/` `AGENTS.md` `CLAUDE.md` `DADAIA.md` `prompt.md`. Anything the operator
@@ -156,7 +190,7 @@ HTML's integrity rides on the handoff's `content_hash`.
 
 ---
 
-## 5. Specs, tasks and memory
+## 6. Specs, tasks and memory
 
 `Aprovado`, `Em revisão` and `Draft` are the canonical status tokens — keep them as they
 are, in any language.
@@ -182,29 +216,16 @@ first, and an operator-ratified deferral taken during a release is already appro
 intake. Nothing is deleted: an item leaves ACTIVE only by gaining a LEDGER line carrying
 its disposition and reason, and a picked item leaves ACTIVE in the same commit that
 creates the release SPEC, which records its provenance. This never-delete law covers
-bugs and backlog only — tests are prunable under the stewardship criteria (§6). Entry
+bugs and backlog only — tests are prunable under the stewardship criteria (§7). Entry
 schema, intake protocol and the disposition vocabulary: `dd-backlog-definition`.
 
-**Branches.** Exactly four patterns, no fifth: `main` (remote+local, never committed or
-pushed to directly, advances only via a GitHub-enforced PR from `develop`); `develop`
-(remote+local, **the only pushable branch**); `feature/{M.m.p}` and `hotfix/{M.m.p}`
-(both local-only, cut from `develop`). Backlog-definition, research and bug registration
-run directly on `develop`, one commit per entry. Stage contract, mechanical enforcers,
-and the mechanical-vs-discipline split: the `dadaia-gitflow` skill.
+**Branches.** Branch model, stage placement and merge/push mechanics: §4 (Gitflow).
 
-**Releases.** A release is `major.minor.patch`, matures through `alpha-N → rc-N`.
-Definition and implementation both run on `feature/{M.m.p}`, which merges into local
-`develop` at two milestones — (a) when SPEC+PLAN+TASKS are `Aprovado`, (b) at ship — each
-followed, in order, by a diff-based security review of `origin/develop..develop` and a
-push of `develop`; ship then opens a PR `develop` → `main`. A `dadaia-grill-me` session
-on the picked set precedes the SPEC. Each `alpha-N` closes with a `qa-engineer` review
-committed to the branch. At pick time, open bugs and undispositioned audits outrank fresh
-backlog. Finalization order is **memory update → CLOSURE → archive**; a completed task
-group is one commit.
-
-**Hotfixes.** A bug fix stays Arm B (§1) in full, run on `hotfix/{M.m.p}` at the next
-PATCH — **no release ceremony**: no SPEC, PLAN, TASKS, or `specs/releases/<id>/`
-directory. Procedure: `dd-bug-fix`.
+**Releases.** A release is `major.minor.patch` and matures through the `rc-N` lane
+(branch mechanics: §4 Gitflow). A `dd-grill-me` session on the picked set precedes
+the SPEC. At pick time, open bugs and undispositioned audits outrank fresh backlog.
+Finalization order is **memory update → CLOSURE → archive**; a completed task group is
+one commit.
 
 **Audits.** One audit generates exactly one remediation release, and that release gives
 **every** finding an explicit disposition — `fixed`, `superseded` by a broader picked
@@ -214,7 +235,7 @@ that release.
 
 ---
 
-## 6. Quality
+## 7. Quality
 
 **Root cause, always.** Reproduce the failure on the executed path, write the test that
 fails for the real reason, fix the cause, prove it green. Workarounds and symptom patches
@@ -225,7 +246,7 @@ test is SCAFFOLD and expires. Demotion — replacing a LARGE test with equivalen
 coverage — is a step of release closure, never an afterthought. The implementer never
 prunes to go green: deleting, skipping or disabling a test is a `qa-engineer` verdict
 carrying evidence, executed by `software-engineer`. Tombstone tests and expired SCAFFOLD
-are slop. Test-artifact capture is failure-gated, written where §4 already says. Full
+are slop. Test-artifact capture is failure-gated, written where §5 already says. Full
 protocol: `dadaia-test-stewardship`.
 
 **Register every bug you hit** while operating this tooling — any behavior that breaks
@@ -236,21 +257,20 @@ and there is no reason to defer it. Absolute local paths, IPs, hostnames, privat
 and secrets never enter an event field. Command, redaction rule and context routing:
 `dd-bug-registration`.
 
-Close a bug in the same session you prove the fix: append `resolved` with
-`--resolution-evidence` (reproducing test, fix, suite result), then **commit** — stage
-exactly what the fix touched, never `-A` over a shared tree. A solved bug leaves a clean
-worktree.
+Close a bug in the same session you prove the fix: append `resolved` with evidence that
+is checkable — the red-loop command, the regression-test seam, and the diff direction on
+the touched feature — then **commit**, staging exactly what the fix touched, never `-A`
+over a shared tree; a net-positive diff routes to `software-architect` before the commit.
+A solved bug leaves a clean worktree.
 
-**Push green.** The pre-push hook refuses any pushed ref other than `refs/heads/develop`
-(tag pushes carve out) and validates the branch name against the four permitted patterns
-(§5); it runs `ruff format --check`, `ruff check`, `mypy --strict` and `pytest`; and it
-requires an APPROVED `security-reviewer` handoff whose review covers the
-`origin/develop..develop` delta being pushed — diff-based only, with a full scan
-surviving solely in the audit lane (`project-auditor` dispatch). Run the tests locally
-before you push. Commits are never review-blocked — only pushes. After every push or PR,
-watch CI to green (`dd-release-implement`). A `quarantine`-marked test sits outside the
-gating selectors by design and requires a registered bug — a green run with quarantined
-tests is still green, but an unregistered pass-on-retry is a failure.
+**Push green.** Every `feature/{M.m.p}` push runs the local CI preflight —
+`ruff format --check`, `ruff check`, `mypy --strict` and `pytest` — before the branch
+contract (§4 Gitflow) even considers it; run the tests locally before you push. A full
+scan survives solely in the audit lane (`project-auditor` dispatch); the PR-gate security
+review is diff-based only. Commits are never review-blocked — only pushes. After every
+push or PR, watch CI to green (`dd-release-implement`). A `quarantine`-marked test sits
+outside the gating selectors by design and requires a registered bug — a green run with
+quarantined tests is still green, but an unregistered pass-on-retry is a failure.
 
 **Approval.** A candidate is approved when the operator and the consumer-side validation
 agent agree, after validating a real workspace. A green internal gate that diverges from
@@ -258,7 +278,7 @@ real consumer behavior is itself a bug.
 
 ---
 
-## 7. The library surface
+## 8. The library surface
 
 Files listed in `.dadaia/agentic/manifest.json` are lib-originated projections. Change
 them at the source, then re-project:
@@ -288,7 +308,7 @@ registry before opening a port.
 
 ---
 
-## 8. Credentials
+## 9. Credentials
 
 Credential material lives in exactly one place: the operator-managed `.env` at the
 workspace root. Never create, copy, persist, commit, print, or report tokens, passwords,
@@ -298,12 +318,12 @@ receives only the values it needs from that root `.env` and never writes a secon
 
 ---
 
-## 9. Where to look next
+## 10. Where to look next
 
 | Surface | Where |
 |---|---|
 | Scoped law | `specs/AGENTS.md`, `.dadaia/reports/AGENTS.md`, `.dadaia/handoff/AGENTS.md`, `repos/<slug>/AGENTS.md`, and any nested `AGENTS.md` |
-| Skills | `.claude/skills/`, `.agents/skills/` — `dadaia-cli` maps the CLI; `harness-primitives` covers harness literacy; `dadaia-gitflow` covers the branch contract; the `dd-*` family maps the development cycle, one skill per stage |
+| Skills | `.claude/skills/`, `.agents/skills/` — which skill operates which rule is declared once, in `public/entities/rules-skills-map.json`, never listed ad hoc here |
 | State | `dadaia context show --json`, `dadaia specs doctor`, `dadaia public doctor`, `dadaia server list`, `dadaia bugs status`, `dadaia panel` |
 
 Language: follow the operator's preference, defaulting to English. Tone: direct, concise,

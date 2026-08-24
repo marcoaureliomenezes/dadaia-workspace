@@ -7,6 +7,7 @@ from pathlib import Path
 import jinja2
 import pytest
 
+from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
 from dadaia_workspace.features.backlog import document
 from dadaia_workspace.features.backlog.document import load_document
 from dadaia_workspace.features.specs import scaffolder
@@ -79,7 +80,9 @@ def test_scaffold_happy_path_creates_all_artifacts(tmp_path: Path) -> None:
         content = (specs_dir / rel).read_text(encoding="utf-8")
         assert content.startswith("---"), f"{rel} must start with YAML frontmatter"
 
-    assert "specs_pattern_version: 4" in (specs_dir / "constitution.md").read_text(encoding="utf-8")
+    assert f"specs_pattern_version: {CANONICAL_SPECS_VERSION}" in (
+        specs_dir / "constitution.md"
+    ).read_text(encoding="utf-8")
     assert (specs_dir / "AGENTS.md").read_text(encoding="utf-8") == (
         _TEMPLATES_DIR / "specs-AGENTS.md"
     ).read_text(encoding="utf-8")

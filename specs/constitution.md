@@ -1,6 +1,6 @@
 ---
-specs_pattern_version: 4
-constitution_version: 4.0.0
+specs_pattern_version: 5
+constitution_version: 4.1.0
 ---
 
 # Constitution — dadaia-workspace
@@ -239,3 +239,23 @@ changed/removed article, MINOR for a new article or substantive clarification, P
 for wording. Amendment history lives in the amending releases' CLOSURE files and
 `_archive/` — never inline. The `specs doctor` invariants (including SPEC-DOC-037, the
 no-roster-enumeration guard) hold this law consistent with code and memory.
+
+## 16. Rules Map to Skills
+
+Every always-on rule of this workspace is a section of `DADAIA.md`, and every such
+section is mapped to exactly the skill(s) that operate it. That relation is declared in
+exactly one controlled source — `public/entities/rules-skills-map.json` (schema
+`rules-skills-map-v1`), rows of `{topic, section, skills[], justification}`, keyed by the
+law's bold topic. No skill, persona, rule file, hook, or doctor check may declare a
+section↔skill relation elsewhere; a second declaration is slop (§12.3) and is deleted.
+A deterministic test reads the map, the law source, and the on-disk skills inventory, and
+gates every deploy: no deploy without a valid map.
+
+Rule and skill divide, never overlap. The rule is the concise statement of what always
+holds; the skill is its complement — the procedure that operates it. Depth belongs to the
+skill, law belongs to the rule, and neither restates the other. One topic has one skill;
+two or more require a justification recorded in the row itself. A skill no topic claims
+is fused or retired by default, and the law gains a topic only for behavior that is
+genuinely always-on.
+
+Provenance: v0.4.4 FR8, operator ruling 2026-08-23.

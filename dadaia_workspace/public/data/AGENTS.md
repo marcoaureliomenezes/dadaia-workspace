@@ -6,8 +6,9 @@
 # dadaia-workspace — read `DADAIA.md`
 
 The complete always-on law of this workspace lives in **one file**: `DADAIA.md`, at the
-workspace root and mirrored byte-identically into each harness directory
-(`.claude/rules/`, `.codex/`, `.kimi-code/`). It is the workspace system prompt: the flow
+workspace root and mirrored byte-identically into `.codex/` and `.kimi-code/`; Claude
+Code reaches it through the import chain below (`CLAUDE.md` -> `@AGENTS.md` ->
+`@DADAIA.md`) rather than a second copy. It is the workspace system prompt: the flow
 every demand follows, who owns what, what the gate enforces, where output is written,
 how specs, tasks and memory work, the quality bar, the library surface, and the
 credential boundary.

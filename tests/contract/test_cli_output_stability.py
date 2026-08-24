@@ -167,13 +167,16 @@ def test_context_list_default_table_output_unchanged(workspace: Path) -> None:
     _register_alive_ctx(workspace)
     result = _runner.invoke(app, ["context", "list"])
     assert result.exit_code == 0, result.output
+    # FR18 (T-044-29): the table gains an "Associated" column (repo count) — the
+    # deliberate golden change. Regenerated with the same fixture, unrelated bytes
+    # unchanged.
     assert result.output == (
-        "       Spec Context Projects       \n"
-        "┏━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━┓\n"
-        "┃ Name       ┃ State ┃ Repo       ┃\n"
-        "┡━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━┩\n"
-        "│ caller-ctx │ alive │ caller-ctx │\n"
-        "└────────────┴───────┴────────────┘\n"
+        "             Spec Context Projects              \n"
+        "┏━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━┓\n"
+        "┃ Name       ┃ State ┃ Repo       ┃ Associated ┃\n"
+        "┡━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━┩\n"
+        "│ caller-ctx │ alive │ caller-ctx │ 0          │\n"
+        "└────────────┴───────┴────────────┴────────────┘\n"
     )
 
 
@@ -194,9 +197,16 @@ def test_context_list_default_json_output_unchanged(workspace: Path) -> None:
     _register_alive_ctx(workspace)
     result = _runner.invoke(app, ["context", "list", "--json"])
     assert result.exit_code == 0, result.output
+    # FR18 (T-044-29): `list --json` gains `stored_branch` (the distinct name for the
+    # cached snapshot, A18.1) and `associated_repos` (full list, A18.4/A18.5) —
+    # `current_branch` is now the SAME live-resolved value `show --json` reports for
+    # this context (A18.3), unchanged here since the repo is on disk with no `.git`
+    # (the fixture never runs `git init`), so live resolution falls back to the
+    # stored snapshot "main".
     assert json.loads(result.stdout) == [
         {
             "alive_since": "2026-01-01T00:00:00Z",
+            "associated_repos": [],
             "created_at": "2026-01-01T00:00:00Z",
             "current_branch": "main",
             "dead_since": None,
@@ -204,13 +214,15 @@ def test_context_list_default_json_output_unchanged(workspace: Path) -> None:
             "repo_slug": "caller-ctx",
             "repo_url": "https://example.com/caller-ctx.git",
             "state": "alive",
+            "stored_branch": "main",
         }
     ]
     assert result.output == (
-        '[{"alive_since": "2026-01-01T00:00:00Z", "created_at": "2026-01-01T00:00:00Z", '
+        '[{"alive_since": "2026-01-01T00:00:00Z", "associated_repos": [], '
+        '"created_at": "2026-01-01T00:00:00Z", '
         '"current_branch": "main", "dead_since": null, "name": "caller-ctx", '
         '"repo_slug": "caller-ctx", "repo_url": "https://example.com/caller-ctx.git", '
-        '"state": "alive"}]\n'
+        '"state": "alive", "stored_branch": "main"}]\n'
     )
 
 
@@ -223,11 +235,15 @@ def test_context_show_default_table_output_unchanged(workspace: Path) -> None:
     _register_alive_ctx(workspace)
     result = _runner.invoke(app, ["context", "show", "caller-ctx"])
     assert result.exit_code == 0, result.output
+    # FR18 (T-044-29): `show` gains a "Branch:" line (previously the table rendered
+    # NO branch at all — a real gap this task closes) — the deliberate golden
+    # change; every other line is byte-identical.
     assert result.output == (
         "Name:       caller-ctx\n"
         "State:      alive\n"
         "Repo:       caller-ctx\n"
         "Repo URL:   https://example.com/caller-ctx.git\n"
+        "Branch:     main\n"
         "Created:    2026-01-01T00:00:00Z\n"
         "Alive since:  2026-01-01T00:00:00Z\n"
         "Dead since:   —\n"
@@ -239,6 +255,8 @@ def test_context_show_default_json_output_unchanged(workspace: Path) -> None:
     _register_alive_ctx(workspace)
     result = _runner.invoke(app, ["context", "show", "caller-ctx", "--json"])
     assert result.exit_code == 0, result.output
+    # FR18 (T-044-29): `show --json` gains `associated_repos` (A18.1/A18.4/A18.5) —
+    # the deliberate golden change; every other field is byte-identical.
     assert result.output == (
         "{\n"
         '  "name": "caller-ctx",\n'
@@ -250,6 +268,7 @@ def test_context_show_default_json_output_unchanged(workspace: Path) -> None:
         '  "dead_since": null,\n'
         '  "current_branch": "main",\n'
         '  "stored_branch": "main",\n'
+        '  "associated_repos": [],\n'
         '  "session": null,\n'
         '  "presence": []\n'
         "}\n"

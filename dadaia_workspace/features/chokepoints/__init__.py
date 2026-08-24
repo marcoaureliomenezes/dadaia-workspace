@@ -6,16 +6,20 @@ where hooks are absent, disabled, bypassed, or changed by a future harness relea
 
 * **pre-commit presence check** (:func:`pre_commit_decision`) — warns when another live
   session is present and always allows the commit on concurrency grounds.
-* **push-gate verdict check** (:func:`push_gate_decision`, FR-W1-02 / DP-5 / v0.9.0
-  FR1-FR6) — a push is blocked unless a ``security-reviewer`` APPROVE handoff covers
-  every pushed commit sha, AND the range-scoped denylist scan (v0.9.0) finds no new
-  object carrying a denylisted term across every non-deletion ref (tags included).
-* **push-verdict GC** (:func:`gc_consumed_push_verdicts`, FR24 / v0.4.3 T-043-39) — the
-  POST-push half of the verdict lifecycle: once a caller has independently confirmed a
-  push actually landed (never inside ``push_gate_decision`` itself — see that function's
-  neighboring module docstring), the APPROVED verdict(s) it consumed are deleted, with
-  an append-only audit-ledger line recorded first (A24.4) and the AG.1 symlink/boundary
-  lane guard applied to every deletion.
+* **push-gate branch + denylist check** (:func:`push_gate_decision`, v0.4.4 FR3 — the
+  gitflow v2 inversion / v0.9.0 FR1-FR6) — a push is blocked unless it is a
+  ``feature/{M.m.p}`` branch pushed to its own name (``develop``/``main`` advance by PR
+  only), AND the range-scoped denylist scan (v0.9.0) finds no new object carrying a
+  denylisted term across every non-deletion ref (tags included). The former
+  security-reviewer-verdict check is DELETED from this path (v0.4.4 A3.4) — it
+  relocates to a PR gate (FR4).
+* **push-verdict GC** (:func:`gc_consumed_push_verdicts`, FR24 / v0.4.3 T-043-39 /
+  v0.4.4 D5) — the POST-merge half of the verdict lifecycle: once a caller has
+  independently confirmed a PR merge actually landed (never inside
+  ``push_gate_decision`` itself — see that function's neighboring module docstring),
+  the APPROVED verdict(s) it consumed are deleted, with an append-only audit-ledger
+  line recorded first (A24.4) and the AG.1 symlink/boundary lane guard applied to
+  every deletion.
 
 All three are pure decision/action functions: every I/O and process seam is injected, so
 the CLI wires the real container adapters and the tests drive synthetic facts. Zero

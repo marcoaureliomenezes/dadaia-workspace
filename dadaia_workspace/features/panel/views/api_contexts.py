@@ -8,7 +8,8 @@
         "name":          str,
         "repo_path":     str,
         "branch":        str | null,
-        "status":        "alive"
+        "status":        "alive",
+        "associated":    [{"slug": str, "url": str}, ...]
       }
     ]
   }
@@ -40,6 +41,7 @@ def render_api_contexts(
                     "repo_path": str(c.repo_path),
                     "branch": c.branch,
                     "status": c.status,
+                    "associated": [{"slug": r.slug, "url": r.url} for r in c.associated],
                 }
                 for c in contexts
             ]

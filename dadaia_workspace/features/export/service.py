@@ -10,7 +10,7 @@ from pathlib import Path
 
 from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.models.export import ExportManifest, ExportOptions, ExportResult
-from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
+from dadaia_workspace.core.models.spec_context import ContextState
 from dadaia_workspace.core.protocols.context_store import ContextStore
 from dadaia_workspace.core.protocols.git_client import GitClient
 
@@ -85,6 +85,17 @@ class ExportService:
         return includes
 
     def _refresh_branches(self) -> None:
+        """Refresh the stored `current_branch` snapshot for every ALIVE context
+        before an export runs.
+
+        Uses ``dataclasses.replace`` (never a hand-copied field-by-field
+        reconstruction) so this write-through can NEVER silently drop a field it
+        does not know about — the root cause of a real data-loss bug (T-044-29,
+        FR18): the prior manual ``SpecContextProject(...)`` call omitted
+        ``associated_repos``, so every ``dadaia export`` on an ALIVE context with
+        associated repos wiped that context's associated-repo registry in the LIVE
+        ``spec_contexts.json`` store, not merely in the export archive.
+        """
         for ctx in self._store.list_all():
             if ctx.state != ContextState.ALIVE:
                 continue
@@ -93,17 +104,7 @@ class ExportService:
                 continue
             try:
                 branch = self._git.current_branch(repo_path)
-                updated = SpecContextProject(
-                    name=ctx.name,
-                    state=ctx.state,
-                    repo_slug=ctx.repo_slug,
-                    repo_url=ctx.repo_url,
-                    created_at=ctx.created_at,
-                    alive_since=ctx.alive_since,
-                    dead_since=ctx.dead_since,
-                    current_branch=branch,
-                )
-                self._store.update(updated)
+                self._store.update(replace(ctx, current_branch=branch))
             except Exception:
                 pass
 
@@ -117,6 +118,13 @@ class ExportService:
                     "repo_url": ctx.repo_url,
                     "state": ctx.state,
                     "current_branch": ctx.current_branch,
+                    # FR18/A18.4: the manifest surfaces associated repos too (url per
+                    # repo; branch is tracked on the main repo only, per the model) —
+                    # the actual round-trip authority is the `.dadaia/states` archive
+                    # member (patched wholesale on import), this is the visible record.
+                    "associated_repos": [
+                        {"slug": r.slug, "url": r.url} for r in ctx.associated_repos
+                    ],
                 }
                 for ctx in self._store.list_all()
             )

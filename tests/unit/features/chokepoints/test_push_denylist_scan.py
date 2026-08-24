@@ -73,8 +73,7 @@ def test_branch_push_with_denylisted_blob_in_range_is_refused(tmp_path: Path) ->
         }
     )
     decision = push_gate_decision(
-        tmp_path,
-        _refs(f"refs/heads/develop {_SHA_A} refs/heads/develop {_ZERO}"),
+        _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         object_source=source,
         repo=tmp_path,
         denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
@@ -97,7 +96,6 @@ def test_term_outside_the_range_does_not_refuse(tmp_path: Path) -> None:
 
     source = _FakeObjectSource(by_range={})
     decision = push_gate_decision(
-        tmp_path,
         _refs(f"refs/tags/v9.9.9 {_SHA_A} refs/tags/v9.9.9 {_ZERO}"),
         object_source=source,
         repo=tmp_path,
@@ -114,7 +112,6 @@ def test_term_outside_the_range_does_not_refuse(tmp_path: Path) -> None:
 def test_deletion_ref_is_never_scanned(tmp_path: Path) -> None:
     source = _FakeObjectSource()
     decision = push_gate_decision(
-        tmp_path,
         _refs(f"refs/heads/old {_ZERO} refs/heads/old {_SHA_A}"),
         object_source=source,
         repo=tmp_path,
@@ -138,7 +135,6 @@ def test_shared_blob_across_two_refs_is_deduped(tmp_path: Path) -> None:
         }
     )
     decision = push_gate_decision(
-        tmp_path,
         _refs(
             f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}",
             f"refs/tags/v2 {_SHA_B} refs/tags/v2 {_ZERO}",
@@ -161,7 +157,6 @@ def test_tainted_tag_push_is_refused(tmp_path: Path) -> None:
         by_range={(_SHA_A, _ZERO): [_obj("tag-blob.md", f"{_SYNTHETIC_TERM}\n")]}
     )
     decision = push_gate_decision(
-        tmp_path,
         _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
         object_source=source,
         repo=tmp_path,
@@ -178,7 +173,6 @@ def test_tainted_tag_push_is_refused(tmp_path: Path) -> None:
 def test_clean_tag_push_is_allowed_with_no_verdict_required(tmp_path: Path) -> None:
     source = _FakeObjectSource(by_range={(_SHA_A, _ZERO): [_obj("clean.md", "nothing here\n")]})
     decision = push_gate_decision(
-        tmp_path,
         _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
         object_source=source,
         repo=tmp_path,
@@ -196,7 +190,6 @@ def test_clean_tag_push_is_allowed_with_no_verdict_required(tmp_path: Path) -> N
 def test_branch_policy_refusal_precedes_the_scan(tmp_path: Path) -> None:
     source = _FailingObjectSource()  # would raise if ever called.
     decision = push_gate_decision(
-        tmp_path,
         _refs(f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}"),
         object_source=source,
         repo=tmp_path,
@@ -217,15 +210,14 @@ def test_refusal_message_shape_and_ten_item_cap(tmp_path: Path) -> None:
     ]
     source = _FakeObjectSource(by_range={(_SHA_A, _ZERO): objects})
     decision = push_gate_decision(
-        tmp_path,
-        _refs(f"refs/heads/develop {_SHA_A} refs/heads/develop {_ZERO}"),
+        _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         object_source=source,
         repo=tmp_path,
         denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
     )
     assert not decision.allowed
     message = decision.message
-    assert "refs/heads/develop" in message
+    assert "refs/heads/feature/0.0.1" in message
     assert "file0.md:1" in message
     assert "z…m" in message  # masked form of the synthetic term.
     assert "operator denylist" in message
@@ -243,8 +235,7 @@ def test_refusal_message_shape_and_ten_item_cap(tmp_path: Path) -> None:
 
 def test_git_object_read_failure_refuses_naming_the_failure(tmp_path: Path) -> None:
     decision = push_gate_decision(
-        tmp_path,
-        _refs(f"refs/heads/develop {_SHA_A} refs/heads/develop {_ZERO}"),
+        _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         object_source=_FailingObjectSource(),
         repo=tmp_path,
     )
@@ -263,9 +254,10 @@ def test_git_object_read_failure_refuses_naming_the_failure(tmp_path: Path) -> N
 
 
 def test_generator_denylist_terms_still_refuses_not_silently_emptied(tmp_path: Path) -> None:
-    """Uses a TAG ref (DP-5 verdict carve-out) so the only possible refusal source is
-    the denylist scan itself — isolating this from the unrelated missing-security-verdict
-    refusal a ``refs/heads/develop`` push would also trigger."""
+    """Uses a TAG ref (scanned but never branch-policy-gated) so the only possible
+    refusal source is the denylist scan itself — isolating this from the branch-policy
+    refusal a ``refs/heads/develop`` push would now trigger outright (develop is never
+    pushable under v2; DADAIA.md §4)."""
     source = _FakeObjectSource(
         by_range={(_SHA_A, _ZERO): [_obj("leak.md", f"contains {_SYNTHETIC_TERM} here\n")]}
     )
@@ -274,7 +266,6 @@ def test_generator_denylist_terms_still_refuses_not_silently_emptied(tmp_path: P
         yield (_SYNTHETIC_TERM, "synthetic")
 
     decision = push_gate_decision(
-        tmp_path,
         _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
         object_source=source,
         repo=tmp_path,
@@ -379,7 +370,6 @@ def test_oversized_note_appears_in_decision_warn_on_allow(tmp_path: Path) -> Non
         by_range={(_SHA_A, _ZERO): [_oversized_obj("big.md", "clean content here\n")]}
     )
     decision = push_gate_decision(
-        tmp_path,
         _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
         object_source=source,
         repo=tmp_path,
@@ -401,8 +391,7 @@ def test_oversized_note_appears_in_decision_warn_on_refuse(tmp_path: Path) -> No
         }
     )
     decision = push_gate_decision(
-        tmp_path,
-        _refs(f"refs/heads/develop {_SHA_A} refs/heads/develop {_ZERO}"),
+        _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         object_source=source,
         repo=tmp_path,
         denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
@@ -429,7 +418,6 @@ def test_foreign_slugs_carrying_a_registry_name_and_slug_both_refuse(tmp_path: P
         by_range={(_SHA_A, _ZERO): [_obj("notes.md", f"mentions {dead_name} here\n")]}
     )
     decision = push_gate_decision(
-        tmp_path,
         _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
         object_source=source,
         repo=tmp_path,
@@ -454,8 +442,7 @@ def test_refusal_path_segment_matching_a_foreign_slug_is_masked(tmp_path: Path) 
     ]
     source = _FakeObjectSource(by_range={(_SHA_A, _ZERO): objects})
     decision = push_gate_decision(
-        tmp_path,
-        _refs(f"refs/heads/develop {_SHA_A} refs/heads/develop {_ZERO}"),
+        _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         object_source=source,
         repo=tmp_path,
         denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
@@ -473,8 +460,7 @@ def test_refusal_path_with_no_matching_segment_is_byte_identical(tmp_path: Path)
     objects = [_obj("notes/plain-file.md", f"{_SYNTHETIC_TERM} here\n", sha="cleanpath")]
     source = _FakeObjectSource(by_range={(_SHA_A, _ZERO): objects})
     decision = push_gate_decision(
-        tmp_path,
-        _refs(f"refs/heads/develop {_SHA_A} refs/heads/develop {_ZERO}"),
+        _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         object_source=source,
         repo=tmp_path,
         denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
@@ -490,7 +476,6 @@ def test_oversized_note_path_segment_is_masked_too(tmp_path: Path) -> None:
     objects = [_oversized_obj(f"repos/{_FOREIGN_SLUG}/big.md", "clean content here\n")]
     source = _FakeObjectSource(by_range={(_SHA_A, _ZERO): objects})
     decision = push_gate_decision(
-        tmp_path,
         _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
         object_source=source,
         repo=tmp_path,
@@ -536,8 +521,7 @@ def test_refusal_path_segment_uppercase_hyphenated_variant_of_term_is_masked(
     ]
     source = _FakeObjectSource(by_range={(_SHA_A, _ZERO): objects})
     decision = push_gate_decision(
-        tmp_path,
-        _refs(f"refs/heads/develop {_SHA_A} refs/heads/develop {_ZERO}"),
+        _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         object_source=source,
         repo=tmp_path,
         denylist_terms=((_UPPERCASE_HYPHENATED_TERM, "synthetic"),),
@@ -569,8 +553,7 @@ class _FailingObjectSourceWithPath:
 
 def test_git_object_read_failure_at_a_denylisted_path_masks_the_path(tmp_path: Path) -> None:
     decision = push_gate_decision(
-        tmp_path,
-        _refs(f"refs/heads/develop {_SHA_A} refs/heads/develop {_ZERO}"),
+        _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         object_source=_FailingObjectSourceWithPath(),
         repo=tmp_path,
         foreign_slugs=(_FOREIGN_SLUG,),
@@ -595,8 +578,7 @@ def test_same_offending_segment_gets_the_same_ordinal_across_hit_and_note(
     ]
     source = _FakeObjectSource(by_range={(_SHA_A, _ZERO): objects})
     decision = push_gate_decision(
-        tmp_path,
-        _refs(f"refs/heads/develop {_SHA_A} refs/heads/develop {_ZERO}"),
+        _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         object_source=source,
         repo=tmp_path,
         denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
@@ -635,8 +617,7 @@ def test_push_with_denylisted_term_only_in_a_commit_message_body_is_refused(
         }
     )
     decision = push_gate_decision(
-        tmp_path,
-        _refs(f"refs/heads/develop {_SHA_A} refs/heads/develop {_ZERO}"),
+        _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         object_source=source,
         repo=tmp_path,
         denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),

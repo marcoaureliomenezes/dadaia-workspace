@@ -42,8 +42,9 @@ the task actually needs, and reading them before deciding, is yours.
    `specs/memory/product/catalog.json` (in your context via the prefix; self-pull it if
    running standalone with no ctx-inject), use each entry's `tldr`/`summary` to identify
    the **1 to 3 features** most relevant to your current task. Self-pull each chosen
-   atom: `specs/memory/product/<slug>.md`. Atoms are plain Markdown — read directly,
-   no stripping. `[[slug]]` wikilinks resolve to `specs/memory/<slug>.md`. If
+   atom: `specs/memory/product/<area>/<slug>.md`. Atoms are plain Markdown — read
+   directly, no stripping. `[[slug]]` wikilinks resolve to any `<slug>.md` file found
+   under `specs/memory/` (recursive lookup). If
    `catalog.json` is absent (migration), fall back to `specs/memory/product/index.md`.
 2. **Self-pull architecture only when the decision needs it.** `architecture.md` is NOT
    in the prefix (it is large). Read `specs/memory/architecture.md` before any decision
@@ -68,4 +69,4 @@ missing context.
 - `architecture.md` is large. Self-pull it only when needed (Step 2 criteria
   above), not for every task.
 - Never edit memory atoms. They are write-locked for all agents except
-  `product-engineer` during the DEFINITION and CLOSURE phases (constitution §13).
+  `product-engineer` during the DEFINITION and CLOSURE phases (constitution, Memory Canon).

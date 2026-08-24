@@ -250,23 +250,49 @@ class BacklogDocument:
     errors: tuple[DocumentError, ...] = ()
 
 
-def _top_level_sections(text: str, ranges: Sequence[tuple[int, int]]) -> dict[str, tuple[int, int]]:
-    """Map each top-level ``## <name>`` heading to its body's ``(start, end)`` offsets.
+def _top_level_sections(
+    text: str, ranges: Sequence[tuple[int, int]]
+) -> tuple[dict[str, list[tuple[int, int]]], tuple[DocumentError, ...]]:
+    """Map each top-level ``## <name>`` heading to EVERY occurrence's body ``(start,
+    end)`` offsets — one range per occurrence, never dropped.
+
+    The document schema states exactly two top-level sections (one ``## ACTIVE``, one
+    ``## LEDGER``, module docstring); a heading name occurring more than once is
+    therefore a structural violation, captured here as a located :class:`DocumentError`
+    (bug ``backlog-doctor-silent-on-duplicate-top-level-sections``: the pre-fix
+    ``dict.setdefault`` kept only the FIRST occurrence's range and silently discarded
+    every later one, so a duplicated ``## ACTIVE``/``## LEDGER`` block — and any
+    duplicate slug inside it — was never even handed to the caller, let alone
+    compared). Every occurrence's range is still returned so the caller parses ALL of
+    them: duplicate content is compared (and flagged by the doctor's own BL-DUP check),
+    never silently dropped.
 
     A heading whose match starts inside a fenced span (*ranges*, M1) is fenced
     content, not real structure, and is excluded before offsets are derived.
     """
     headings = _outside_fences(_TOP_HEADING_RE.finditer(text), ranges)
-    sections: dict[str, tuple[int, int]] = {}
+    sections: dict[str, list[tuple[int, int]]] = {}
+    errors: list[DocumentError] = []
     for i, heading in enumerate(headings):
         name = heading.group("name").strip()
         start = heading.end()
         end = headings[i + 1].start() if i + 1 < len(headings) else len(text)
-        # First occurrence wins if a heading name repeats — not a case this parser
-        # otherwise validates; downstream (BL-DUP-style) duplicate detection is the
-        # doctor's job, not this pure parser's.
-        sections.setdefault(name, (start, end))
-    return sections
+        if name in sections:
+            errors.append(
+                DocumentError(
+                    section="DOCUMENT",
+                    slug=None,
+                    line=_line_no(text, heading.start()),
+                    message=(
+                        f"duplicate top-level section heading {name!r} — the document "
+                        "schema states exactly two top-level sections (one "
+                        "'## ACTIVE', one '## LEDGER'); merge this section's content "
+                        f"into the single existing {name!r} section"
+                    ),
+                )
+            )
+        sections.setdefault(name, []).append((start, end))
+    return sections, tuple(errors)
 
 
 def top_level_heading_starts(text: str, ranges: Sequence[tuple[int, int]]) -> dict[str, int]:
@@ -456,22 +482,28 @@ def load_document(backlog_dir: Path) -> BacklogDocument:
         )
 
     ranges, fence_errors = fenced_ranges(text)
-    sections = _top_level_sections(text, ranges)
-    active_items: tuple[ActiveItem, ...] = ()
-    ledger_rows: tuple[LedgerRow, ...] = ()
-    errors: list[DocumentError] = list(fence_errors)
+    sections, section_errors = _top_level_sections(text, ranges)
+    active_items: list[ActiveItem] = []
+    ledger_rows: list[LedgerRow] = []
+    errors: list[DocumentError] = [*fence_errors, *section_errors]
 
-    if "ACTIVE" in sections:
-        start, end = sections["ACTIVE"]
-        active_items, active_errors = _parse_active(text, start, end, ranges)
+    # Every occurrence of a repeated top-level heading is still parsed (never just the
+    # first) so duplicate content — a duplicated slug above all — reaches the caller
+    # and can be compared, not silently dropped (bug
+    # backlog-doctor-silent-on-duplicate-top-level-sections).
+    for start, end in sections.get("ACTIVE", []):
+        items, active_errors = _parse_active(text, start, end, ranges)
+        active_items.extend(items)
         errors.extend(active_errors)
 
-    if "LEDGER" in sections:
-        start, end = sections["LEDGER"]
-        ledger_rows, ledger_errors = _parse_ledger(text, start, end)
+    for start, end in sections.get("LEDGER", []):
+        rows, ledger_errors = _parse_ledger(text, start, end)
+        ledger_rows.extend(rows)
         errors.extend(ledger_errors)
 
-    return BacklogDocument(active=active_items, ledger=ledger_rows, errors=tuple(errors))
+    return BacklogDocument(
+        active=tuple(active_items), ledger=tuple(ledger_rows), errors=tuple(errors)
+    )
 
 
 # ═════════════════════════════════════════════════════════════════════════════════

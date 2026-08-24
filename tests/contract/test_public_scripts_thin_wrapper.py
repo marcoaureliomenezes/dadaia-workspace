@@ -29,9 +29,12 @@ Scope is deliberately narrow — do NOT read "every script under public/scripts/
   ``tests/contract/test_memory_catalog_render_contract.py`` (F-84) with a signature
   that differs from ``features/specs/catalog.py``'s own ``specs_dir``-rooted,
   context-derived public API. It is intentionally NOT in the thin-wrapper registry.
-* ``lint-skill-collisions.py`` / ``lint-dadaia-cli-reachability.py`` — standalone by
-  design (their own ``--self-test``); they have no package canonical to mirror at
-  all, so they are outside this contract's scope entirely, not merely excluded.
+* ``lint-dadaia-cli-reachability.py`` — standalone by design (its own ``--self-test``);
+  it has no package canonical to mirror at all, so it is outside this contract's scope
+  entirely, not merely excluded. ``lint-skill-collisions.py`` was the same shape and is
+  RETIRED (FR9/T-044-15, v0.4.4): its logic is ported into
+  ``tests/contract/test_rules_skills_map.py``, the one deterministic enforcer that
+  replaces it — no projected script mirrors it any more.
 """
 
 from __future__ import annotations
@@ -58,7 +61,6 @@ _THIN_WRAPPER_SCRIPTS: dict[str, int] = {
 #: verified against the real directory listing, not just asserted in prose.
 _STANDALONE_BY_DESIGN: frozenset[str] = frozenset(
     {
-        "lint-skill-collisions.py",
         "lint-dadaia-cli-reachability.py",
     }
 )

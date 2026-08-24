@@ -296,6 +296,27 @@ def test_active_item_with_own_terminal_status_fires_bl_stale(tmp_path: Path) -> 
     assert any(f.slug == "mis-statused" for f in stale), [f.to_dict() for f in findings]
 
 
+def test_deferred_active_status_fires_bl_stale(tmp_path: Path) -> None:
+    """Bug ``backlog-doctor-rejects-deferred-status-documented-by-skill`` (T-044-34) —
+    the literal repro from the report: an ACTIVE entry with ``Status: deferred``.
+    ``deferred`` IS one of the six canonical terminal disposition tokens
+    (``core.models.backlog.TERMINAL_DISPOSITION_TOKENS``), so BL-STALE firing here is the
+    correct, decided behaviour — not the bug. The statement that was actually wrong was
+    ``dd-backlog-definition`` SKILL.md listing ``deferred`` as a live ACTIVE status; see
+    ``tests/contract/test_backlog_status_vocabulary_contract.py`` for that half."""
+    specs, src = _build_roots(tmp_path)
+    active = _ACTIVE_SUBSECTION.format(
+        slug="prematurely-deferred",
+        title="Prematurely deferred",
+        status="deferred",
+        intents_block=_intents_block("pkg/m.py#Widget", "still needs a home"),
+    )
+    _write_backlog_md(specs, active)
+    findings = _run(specs, src)
+    stale = [f for f in findings if f.code is BacklogDoctorCode.BL_STALE]
+    assert any(f.slug == "prematurely-deferred" for f in stale), [f.to_dict() for f in findings]
+
+
 # ── A2.7 — an ACTIVE item whose slug appears in an archived consumed_backlog.json ───
 
 
@@ -382,6 +403,59 @@ def test_run_backlog_doctor_absent_document_is_a_clean_noop(tmp_path: Path) -> N
     specs, src = _build_roots(tmp_path)
     findings = _run_wired(specs, src)
     assert findings == [], [f.to_dict() for f in findings]
+
+
+# ── bug backlog-doctor-silent-on-duplicate-top-level-sections — end-to-end through the
+# wired CLI-facing entry point ───────────────────────────────────────────────────────
+
+
+def test_duplicated_active_and_ledger_sections_fire_bl_schema_and_bl_dup_and_are_never_clean(
+    tmp_path: Path,
+) -> None:
+    """Intent: CONTRACT — bug backlog-doctor-silent-on-duplicate-top-level-sections.
+
+    The exact reported repro through the wired, CLI-facing entry point: a BACKLOG.md
+    whose preamble+ACTIVE block was accidentally duplicated (two '## ACTIVE' headings,
+    two '## LEDGER' headings, the same slug present in both ACTIVE copies and the same
+    slug present in both LEDGER copies). Expected (bug ticket, verbatim): a BL-SCHEMA
+    error for each repeated top-level section heading, and a BL-DUP error for the slug
+    duplicated in ACTIVE (and in LEDGER) — never a clean report."""
+    specs, src = _build_roots(tmp_path)
+    text = (
+        "## ACTIVE\n\n"
+        + _ACTIVE_SUBSECTION.format(slug="dup-item", title="First", status="idea", intents_block="")
+        + "\n## LEDGER\n\n"
+        + "- old-one · DELIVERED · v0.9.0 · 2026-06-01\n\n"
+        + "## ACTIVE\n\n"
+        + _ACTIVE_SUBSECTION.format(
+            slug="dup-item", title="Second", status="idea", intents_block=""
+        )
+        + "\n## LEDGER\n\n"
+        + "- old-one · DELIVERED · v0.9.0 · 2026-06-01\n"
+    )
+    (specs / "backlog" / "BACKLOG.md").write_text(text, encoding="utf-8")
+
+    findings = _run_wired(specs, src)
+    errors = [f for f in findings if f.severity is Severity.ERROR]
+    assert errors, "a duplicated-section BACKLOG.md must never report clean"
+
+    schema_findings = [
+        f
+        for f in findings
+        if f.code is BacklogDoctorCode.BL_SCHEMA
+        and "duplicate top-level section heading" in f.message
+    ]
+    assert len(schema_findings) == 2, [f.to_dict() for f in findings]
+    assert any("'ACTIVE'" in f.message for f in schema_findings), [f.to_dict() for f in findings]
+    assert any("'LEDGER'" in f.message for f in schema_findings), [f.to_dict() for f in findings]
+
+    dup_findings = [f for f in findings if f.code is BacklogDoctorCode.BL_DUP]
+    assert any(
+        f.slug == "dup-item" and "more than once in ACTIVE" in f.message for f in dup_findings
+    ), [f.to_dict() for f in findings]
+    assert any(
+        f.slug == "old-one" and "more than once in LEDGER" in f.message for f in dup_findings
+    ), [f.to_dict() for f in findings]
 
 
 # ── A3.5 — a freshly authored subsection is clean under BOTH doctors ────────────────

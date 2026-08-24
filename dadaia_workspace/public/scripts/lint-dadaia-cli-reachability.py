@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Derive the `dadaia-cli` skill grant from each agent's `Bash` tool and fail loud on drift.
+"""Derive the `dd-cli-library` skill grant from each agent's `Bash` tool and fail loud on drift.
 
 FR5 (v0.4.3, entry `dadaia-cli-skill-agent-grant` #36). The rule is mechanical: an
 agent whose `tools:` frontmatter includes `Bash` is shell-capable and must carry the
-`dadaia-cli` skill grant; an agent with no `Bash` (`product-engineer`,
+`dd-cli-library` skill grant; an agent with no `Bash` (`product-engineer`,
 `software-architect`) would find the grant inert and must NOT carry it. This mirrors
-`public/skills/dadaia-cli/SKILL.md`'s "Reachability" table — keep both in sync.
+`public/skills/dd-cli-library/SKILL.md`'s "Reachability" table — keep both in sync.
 
 Usage:
     lint-dadaia-cli-reachability.py [--agents-dir <path>] [--self-test]
@@ -48,7 +48,7 @@ def _parse_agent(md_path: Path) -> tuple[str, bool, bool] | None:
     tools = _LIST_ITEM_RE.findall(tools_m.group(1)) if tools_m else []
     skills_m = _SKILLS_BLOCK_RE.search(raw)
     skills = _LIST_ITEM_RE.findall(skills_m.group(1)) if skills_m else []
-    return name_m.group(1), "Bash" in tools, "dadaia-cli" in skills
+    return name_m.group(1), "Bash" in tools, "dd-cli-library" in skills
 
 
 def find_drift(agents: list[tuple[str, bool, bool]]) -> list[tuple[str, bool, bool]]:
@@ -106,7 +106,7 @@ def _self_test() -> int:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Derive the dadaia-cli skill grant from each agent's Bash tool; fail loud on drift."
+        description="Derive the dd-cli-library skill grant from each agent's Bash tool; fail loud on drift."
     )
     parser.add_argument("--agents-dir", type=Path, default=None)
     parser.add_argument(
@@ -139,15 +139,15 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"lint-dadaia-cli-reachability: scanned {len(agents)} agent(s) in {agents_dir}")
     if not findings:
-        print("Every agent's dadaia-cli grant agrees with its Bash-capability.")
+        print("Every agent's dd-cli-library grant agrees with its Bash-capability.")
         return 0
 
     for name, has_bash, has_grant in findings:
         if has_bash and not has_grant:
-            print(f"  [ERROR] '{name}' has Bash but no dadaia-cli grant.", file=sys.stderr)
+            print(f"  [ERROR] '{name}' has Bash but no dd-cli-library grant.", file=sys.stderr)
         else:
             print(
-                f"  [ERROR] '{name}' has no Bash but carries an inert dadaia-cli grant.",
+                f"  [ERROR] '{name}' has no Bash but carries an inert dd-cli-library grant.",
                 file=sys.stderr,
             )
     print(

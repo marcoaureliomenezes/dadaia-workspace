@@ -96,7 +96,6 @@ def test_git_mv_into_archive_produces_no_new_blob_and_a_clean_scan(tmp_path: Pat
 
     reader = GitSubprocessObjectReader()
     decision = push_gate_decision(
-        tmp_path / "handoff-empty",
         [_tag_push_ref(renamed_sha, remote_sha=already_published_sha)],
         object_source=reader,
         repo=repo,
@@ -124,7 +123,6 @@ def test_editing_a_path_that_already_published_the_value_no_longer_refuses(
 
     reader = GitSubprocessObjectReader()
     decision = push_gate_decision(
-        tmp_path / "handoff-empty",
         [_tag_push_ref(edited_sha, remote_sha=already_published_sha)],
         object_source=reader,
         repo=repo,
@@ -153,7 +151,6 @@ def test_editing_a_tests_fixture_that_already_published_the_literal_no_longer_re
 
     reader = GitSubprocessObjectReader()
     decision = push_gate_decision(
-        tmp_path / "handoff-empty",
         [_tag_push_ref(edited_sha, remote_sha=already_published_sha)],
         object_source=reader,
         repo=repo,
@@ -177,8 +174,89 @@ def test_same_value_introduced_into_a_new_path_still_refuses(tmp_path: Path) -> 
 
     reader = GitSubprocessObjectReader()
     decision = push_gate_decision(
-        tmp_path / "handoff-empty",
         [_tag_push_ref(tip_sha, remote_sha=already_published_sha)],
+        object_source=reader,
+        repo=repo,
+        denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
+    )
+    assert not decision.allowed
+    assert _SYNTHETIC_TERM not in decision.message
+
+
+# ---------------------------------------------------------------------------
+# bug new-branch-push-loses-prior-published-denylist-amnesty (v0.4.4) — the FIRST
+# push of a `feature/{M.m.p}` branch (gitflow v2's only pushable ref, DADAIA.md §4)
+# is a NEW remote ref: git's own pre-push line reports `remote_sha` as the all-zero
+# sentinel. Every fixture above configures NO remote at all, so it never exercised
+# "a real origin already published this branch's own past" — exactly the gap that
+# let a new-branch push of already-published content be refused as if it were
+# novel. These fixtures configure a REAL bare `origin` and fetch it, then push a
+# genuine `refs/heads/feature/M.m.p` branch line (the bug's own repro shape), not a
+# tag.
+# ---------------------------------------------------------------------------
+
+
+def _publish_to_bare_origin(repo: Path, tmp_path: Path, *, branch: str = "develop") -> None:
+    remote = tmp_path / "origin.git"
+    subprocess.run(["git", "init", "--bare", str(remote)], capture_output=True, check=True)
+    _git(["remote", "add", "origin", str(remote)], repo)
+    _git(["push", "origin", f"HEAD:refs/heads/{branch}"], repo)
+    _git(["fetch", "origin"], repo)
+
+
+def _feature_push_ref(local_sha: str, *, branch: str = "feature/1.0.0") -> PushRef:
+    return PushRef(
+        local_ref=f"refs/heads/{branch}",
+        local_sha=local_sha,
+        remote_ref=f"refs/heads/{branch}",
+        remote_sha=_ZERO,
+    )
+
+
+def test_new_branch_push_of_an_already_published_term_passes(tmp_path: Path) -> None:
+    """(a) The first push of a brand-new `feature/M.m.p` branch (`remote_sha` is the
+    all-zero sentinel) that only carries a term ALREADY published on `origin` must
+    pass — DADAIA.md §7's range scope: already-published history never needs a
+    rewrite, regardless of whether THIS ref existed on origin before."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "notes.md").write_text(f"already published: {_SYNTHETIC_TERM}\n")
+    _commit(repo, "publish")
+    _publish_to_bare_origin(repo, tmp_path)
+
+    _git(["checkout", "-b", "feature/1.0.0"], repo)
+    (repo / "notes.md").write_text(
+        f"already published: {_SYNTHETIC_TERM}\nplus a genuinely new, unrelated line\n"
+    )
+    tip_sha = _commit(repo, "append an unrelated line")
+
+    reader = GitSubprocessObjectReader()
+    decision = push_gate_decision(
+        [_feature_push_ref(tip_sha)],
+        object_source=reader,
+        repo=repo,
+        denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
+    )
+    assert decision.allowed, decision.message
+
+
+def test_new_branch_push_of_a_novel_term_still_refuses(tmp_path: Path) -> None:
+    """(b) Negative twin: a brand-new `feature/M.m.p` branch introducing a term never
+    published anywhere on `origin` is still refused — the amnesty stays scoped to
+    what is genuinely already published."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "notes.md").write_text("unrelated\n")
+    _commit(repo, "publish")
+    _publish_to_bare_origin(repo, tmp_path)
+
+    _git(["checkout", "-b", "feature/1.0.0"], repo)
+    (repo / "notes.md").write_text(f"unrelated\nintroducing {_SYNTHETIC_TERM} for the first time\n")
+    tip_sha = _commit(repo, "introduce a novel term")
+
+    reader = GitSubprocessObjectReader()
+    decision = push_gate_decision(
+        [_feature_push_ref(tip_sha)],
         object_source=reader,
         repo=repo,
         denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
@@ -219,7 +297,6 @@ def test_prior_side_lookup_failure_refuses_naming_the_failure_and_no_verify(
 
     reader = GitSubprocessObjectReader()
     decision = push_gate_decision(
-        tmp_path / "handoff-empty",
         [_tag_push_ref(tip_sha, remote_sha=already_published_sha)],
         object_source=reader,
         repo=repo,
@@ -271,7 +348,6 @@ def test_dead_registry_context_name_and_slug_both_refuse_a_push_introducing_them
     (repo / "notes.md").write_text(f"mentions {dead_name} now\n")
     name_sha = _commit(repo, "introduce the dead context's name")
     name_decision = push_gate_decision(
-        tmp_path / "handoff-empty",
         [_tag_push_ref(name_sha, remote_sha=tip_sha)],
         object_source=reader,
         repo=repo,
@@ -283,7 +359,6 @@ def test_dead_registry_context_name_and_slug_both_refuse_a_push_introducing_them
     (repo / "notes.md").write_text(f"mentions {dead_slug} now\n")
     slug_sha = _commit(repo, "introduce the dead context's slug")
     slug_decision = push_gate_decision(
-        tmp_path / "handoff-empty",
         [_tag_push_ref(slug_sha, remote_sha=name_sha)],
         object_source=reader,
         repo=repo,
@@ -367,7 +442,6 @@ def test_real_git_failure_refuses_naming_the_failure(tmp_path: Path) -> None:
     reader = GitSubprocessObjectReader()
 
     decision = push_gate_decision(
-        tmp_path / "handoff-empty",
         [_tag_push_ref("a" * 40)],
         object_source=reader,
         repo=not_a_repo,
@@ -381,3 +455,25 @@ def test_git_object_read_error_is_importable_from_core_protocols() -> None:
     """Sentinel-level sanity: the typed failure the adapter raises stays importable
     from `core.protocols` without pulling in infrastructure (purity boundary)."""
     assert issubclass(GitObjectReadError, Exception)
+
+
+def test_foreign_slugs_cover_associated_repos_not_just_the_main_slug(
+    tmp_path: Path,
+) -> None:
+    """FR18/T-044-29: the registry-derived foreign-name layer routes through
+    `SpecContextProject.all_repos()` (main + FR15 associated repos), not the main
+    `repo_slug` alone — an associated repo is exactly as private as a main one, and
+    a push must be protected against leaking its name too."""
+    workspace = tmp_path / "workspace"
+    (workspace / "repos" / "pushing-repo").mkdir(parents=True)
+    row = _registry_ctx_row("other-context", repo_slug="other-main-slug", state="alive")
+    row["associated_repos"] = [{"slug": "zz-private-associated-repo", "url": ""}]
+    _write_registry(workspace, [_registry_ctx_row("pushing-repo", state="alive"), row])
+
+    registry_result = container.load_registry_context_identities(workspace)
+    assert registry_result.degraded is False
+    foreign_slugs = ci._foreign_repo_slugs(workspace, "pushing-repo", registry_result.identities)
+
+    assert "zz-private-associated-repo" in foreign_slugs
+    assert "other-main-slug" in foreign_slugs
+    assert "pushing-repo" not in foreign_slugs

@@ -48,31 +48,27 @@ STALE_AGENTS = {
 }
 
 EXPECTED_SKILLS = {
-    "ai-context-engineering",
-    "ai-harness-claude-code",
-    "ai-harness-codex",
     "architect-core-workflow",
-    "dadaia-cli",
-    "dadaia-gitflow",
-    "dadaia-grill-me",
     "dadaia-handoff-emitter",
     "dadaia-step0-memory-bootstrap",
     "dadaia-task-manager",
     "dadaia-test-stewardship",
-    "dadaia-workspace-doctor",
     "dadaia-workspace-manager",
     "dadaia-workspace-spec-navigator",
     "dadaia-workspace-spec-reviewer",
+    "dd-ai-eng-knowhow",
     "dd-audit-project",
     "dd-backlog-definition",
     "dd-bug-fix",
     "dd-bug-registration",
-    "dd-release-closure",
+    "dd-cli-library",
+    "dd-gitflow-default",
+    "dd-grill-me",
+    "dd-manager-orchestration",
     "dd-release-definition",
     "dd-release-implement",
+    "dd-workspace-doctor",
     "dev-server-registry",
-    "harness-primitives",
-    "project-orchestration",
 }
 
 # Required YAML fields in every STAGED agent's frontmatter. v0.1.65 FR1: staged core
@@ -437,17 +433,29 @@ def _assert_profile_doctor_green(workspace: Path, monkeypatch: pytest.MonkeyPatc
 
 class TestPerProfileInit:
     def test_claude_only_profile(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """AC-8 claude-only: `.claude/` (agents/skills/rules) + ctx-inject hook; NO .codex/ NO .kimi-code/."""
+        """AC-8 claude-only: `.claude/` (agents/skills) + ctx-inject hook; NO .codex/ NO .kimi-code/.
+
+        FR31/T-044-59 (bug dadaia-md-projected-twice-into-claude-code-context): Claude
+        Code's own root-import chain (CLAUDE.md -> @AGENTS.md -> @DADAIA.md) already
+        resolves the law, so `.claude/rules/DADAIA.md` was the only thing that ever
+        landed under `.claude/rules/` and its projection was retired — the directory is
+        now never created for a claude profile at all.
+        """
         ws = tmp_path / "claude_only"
         monkeypatch.chdir(tmp_path)
         result = _run_init(ws, "claude")
         assert result.exit_code == 0, result.output
 
-        # EXACT structure — claude present with the agents/skills/rules projection subdirs.
-        for sub in ("agents", "skills", "rules"):
+        # EXACT structure — claude present with the agents/skills projection subdirs.
+        for sub in ("agents", "skills"):
             assert (ws / ".claude" / sub).is_dir(), f".claude/{sub}/ missing for a claude profile"
         assert _ctx_inject_registered(ws / ".claude"), (
             "ctx-inject hook not registered in settings.json"
+        )
+        # FR31 discriminating anchor: no per-harness law mirror for claude (A31.4/D11).
+        assert not (ws / ".claude" / "rules").exists(), (
+            ".claude/rules/ must NOT be scaffolded for a claude profile — the law reaches "
+            "Claude Code through its own root-import chain, never a rules-dir mirror"
         )
         # AC-9(f) discriminating anchor: the two un-chosen harnesses get NO projection dir.
         assert not (ws / ".codex").exists(), "codex must NOT be scaffolded for a claude profile"

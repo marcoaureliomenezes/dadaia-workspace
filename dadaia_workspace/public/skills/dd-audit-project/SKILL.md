@@ -1,7 +1,8 @@
 ---
 name: dd-audit-project
-description: "Use when: project-auditor runs a drift/compliance audit of a Spec Context Project — memory-atom inventory, the drift-detection method, dead-code detection, the 6-dimension scoring rubric, evidence-agent dispatch, aggregation, CLI integration, or the audit→release lifecycle wrapper. Full merge + rename of drift-detection (ADR #8/E-2)."
+description: "project-auditor's audit protocol: memory-atom inventory, the drift-detection method, dead-code detection, the 6-dimension scoring rubric, and evidence-agent dispatch through the audit-to-release lifecycle."
 applyTo: ".dadaia/reports/**"
+disable-model-invocation: true
 ---
 
 # dd-audit-project — Memory ↔ Implementation Drift Audit
@@ -15,12 +16,12 @@ applyTo: ".dadaia/reports/**"
 All spec memory is stored as atomic Markdown files (`*.md`, with YAML frontmatter)
 under `<specs-dir>/memory/`. Load each atom in order; read the Markdown directly.
 
-| Atom | Path | What it declares | Sections of interest |
+| Atom | Path | What it declares | Headings of interest |
 |---|---|---|---|
-| Architecture | `memory/architecture.md` | Layers, module boundaries, ADRs, data-flow topology | `#layers`, `#adr-log`, `#module-map` |
-| Product catalog | `memory/product/index.md` | Feature catalog (one entry per shipped feature) | `#catalog` |
-| Feature detail | `memory/product/<slug>.md` | Acceptance criteria, behavior spec, edge cases per feature | `#criteria`, `#behavior` |
-| Tech stack | `memory/tech-stack.md` | Languages, frameworks, versions, tooling, rationale | `#stack`, `#tooling` |
+| Architecture | `memory/architecture.md` | Layers, module boundaries, subsystems, runtime state, dependencies | `Primary Subsystems`, `Concurrency`, `Runtime State` |
+| Product catalog | `memory/product/index.md` | Feature catalog (one entry per shipped feature) | catalog listing (Markdown headings, no `<section>` wrapper) |
+| Feature detail | `memory/product/<area>/<slug>.md` | Purpose, usage flow, trigger, differentiator, runtime state, dependencies per feature | `Purpose`, `Usage flow`, `Differentiator`, `Dependencies` |
+| Tech stack | `memory/tech-stack.md` | Languages, frameworks, versions, tooling, rationale | `Snapshot`, `Canonical Commands`, `Packaging Notes` |
 
 Rules for loading:
 - Load `architecture.md` and `tech-stack.md` on every audit.
@@ -43,11 +44,9 @@ Rules for loading:
 | C — Tech Stack | `software-engineer` | dependency/version drift vs `tech-stack.md` and lockfiles |
 | D — Security | `security-reviewer` | OWASP scan, CVEs, secrets, IaC findings |
 | E — Test Detection Quality | `qa-engineer` | test-pyramid health, intent taxonomy, quarantine/SCAFFOLD state |
-| F — Design / UX | `software-engineer` | WCAG 2.2 AA + design-token conformance evidence |
+| F — Agent-surface | `ai-engineer` | prompt-efficiency / persona-shape drift vs `public/agents`, `public/skills`, `public/data` |
 
-`code-reviewer` supplements A/E; `ai-engineer` supplies prompt-efficiency / persona-shape
-drift evidence when agent-topology memory diverges from personas/skills/rules —
-cross-cutting, filed under whichever dimension the finding lands in.
+`code-reviewer` supplements A/E.
 
 ---
 
@@ -68,7 +67,7 @@ Record each mismatch as a drift item with evidence on both sides (spec:line + co
 
 For each feature in `memory/product/index.md`:
 
-1. Extract the acceptance criteria from `memory/product/<slug>.md`.
+1. Extract the feature detail from `memory/product/<area>/<slug>.md`.
 2. Locate the corresponding implementation file(s) via:
    ```bash
    grep -rn "<feature-keyword>" <repo-root>/src --include="*.py" -l
@@ -87,8 +86,9 @@ For each declared dependency in `tech-stack.md`:
 3. Check for dependencies in lockfiles that are not declared in the memory atom.
 
 ```bash
-# Python — compare declared vs installed
-cat pyproject.toml | grep -A50 "\[tool.poetry.dependencies\]"
+# Python — compare declared vs installed (dependency table name varies by build
+# backend: [project.dependencies] PEP 621, [tool.poetry.dependencies] Poetry, etc.)
+cat pyproject.toml
 pip show <package> | grep Version
 
 # Node
@@ -100,125 +100,18 @@ cat package-lock.json | jq '.packages["node_modules/<pkg>"].version'
 
 ## Dead-Code Detection
 
-**Pinning rule (inherited by every third-party install this skill or any quality
-tooling prescribes):** every install command names an exact version or hash — never a
-floating `latest`, an unpinned `pip install <name>`, or an unpinned `npx <name>` — the
-same supply-chain discipline production dependencies already follow. A future tool
-addition (audit or quality) pins on introduction by reading this rule; it never needs
-restating.
-
-### Unused Python Symbols
-
-```bash
-# vulture: find unused code
-pip install vulture==2.14
-vulture <src-dir> --min-confidence 80
-
-# or with ruff
-ruff check <src-dir> --select F401,F811,F841
-```
-
-### Unused TypeScript/JavaScript Exports
-
-```bash
-# ts-prune: find unused exports
-npx ts-prune@0.10.3 --project tsconfig.json
-
-# or knip
-npx knip@5.36.3
-```
-
-### Dangling Imports
-
-```bash
-# Python
-grep -rn "^import \|^from " <src-dir> | sort | uniq
-# Cross-reference against actual usage; an import with no usage in the file is drift
-
-# Node
-npx depcheck@1.4.7 --json
-```
-
-### Unreachable Layers
-
-A layer is "unreachable" if no other layer imports from it AND it is not an
-entry point. Detect with:
-
-```bash
-# Python import graph
-pip install pydeps==3.0.1
-pydeps <src-dir> --max-bacon 3 --show-deps
-```
-
-Flag any module with zero importers and no declared entry-point role as a
-dead-layer candidate.
+Flag unused symbols, dangling imports and unreachable layers. Concrete tool
+invocations (vulture/ruff, ts-prune/knip, depcheck, pydeps) and the version-pinning
+rule they inherit: `TOOLING.md` (sibling).
 
 ---
 
 ## Compliance Scoring Rubric (1–10)
 
-Score each dimension independently. Use the anchors at 1 / 4 / 7 / 10 as
-calibration points; interpolate for intermediate values.
-
-### Dimension A — Architecture
-
-| Score | Anchor |
-|---|---|
-| 10 | Every module in code maps exactly to a declared layer; no cross-layer violations; all ADRs reflected |
-| 7 | Minor violations (1–2 files in wrong layer); ADRs mostly reflected; no undeclared external deps |
-| 4 | Significant layer mixing; 1–2 ADRs ignored; architecture docs lagging by 1 release |
-| 1 | Architecture memory does not reflect code; layers not enforced; no ADR log maintained |
-
-### Dimension B — Product Features
-
-| Score | Anchor |
-|---|---|
-| 10 | Every criterion in every feature slug file has a passing test and matching implementation |
-| 7 | 90%+ criteria covered; 1–2 minor behaviors undocumented |
-| 4 | 70–89% criteria covered; several edge cases missing from impl or from memory |
-| 1 | < 50% criteria covered; feature memory significantly outdated |
-
-### Dimension C — Tech Stack
-
-| Score | Anchor |
-|---|---|
-| 10 | All deps declared in memory; versions match lockfile exactly |
-| 7 | 1–2 minor version discrepancies; no undeclared prod deps |
-| 4 | Several undeclared deps in lockfile; versions drifted |
-| 1 | Tech-stack memory does not reflect actual tooling |
-
-### Dimension D — Security
-
-| Score | Anchor |
-|---|---|
-| 10 | OWASP checklist green; no secrets in repo; all auth patterns correct |
-| 7 | No CRITICAL/HIGH findings; 1–2 MEDIUMs with mitigations planned |
-| 4 | 1 HIGH finding open; or 3+ MEDIUMs unmitigated |
-| 1 | CRITICAL open; secrets in repo; auth bypasses present |
-
-### Dimension E — Test Detection Quality
-
-Line coverage measures execution, not detection — it never anchors this score. See
-`dadaia-test-stewardship`.
-
-| Score | Anchor |
-|---|---|
-| 10 | Every test declares intent; every LARGE demoted or SENTINEL-justified at closure; flake within ceiling; quarantine within cap and not expired; every LARGE has a named owner |
-| 7 | Intent mostly declared; 1–2 undemoted LARGE with a tracked plan; flake and quarantine within limits |
-| 4 | Intent sparsely declared; LARGE tests accumulate without demotion; quarantine over cap or an expired entry |
-| 1 | No intent taxonomy in use; tombstone tests present; flake above the ceiling with no quarantine |
-
-The CI coverage floor (`DADAIA.md` §6) is checked separately as a pass/fail gate, never
-scored here.
-
-### Dimension F — Design / UX
-
-| Score | Anchor |
-|---|---|
-| 10 | WCAG 2.2 AA fully compliant; design system tokens used consistently; no one-off values |
-| 7 | WCAG AA met; 1–2 minor token deviations |
-| 4 | Several WCAG failures; inconsistent token usage |
-| 1 | No accessibility audit performed; design system not followed |
+Six dimensions — A Architecture, B Product Features, C Tech Stack, D Security, E Test
+Detection Quality, F Agent-surface. Score each independently against the 1/4/7/10
+anchors declared in `RUBRIC.md` (sibling) — the one dimension list, reconciled with
+`public/agents/project-auditor.md` (A26.3); neither file restates the anchor tables.
 
 ---
 
@@ -239,23 +132,9 @@ hidden by high scores elsewhere. A floor of 3 caps the final score at 5.
 
 ## dadaia CLI Integration
 
-```bash
-# Validate 11 SDD structural invariants (memory atomicity, CLOSURE evidence, etc.)
-dadaia specs doctor
-
-# Verify all public lib projections are installed and hash-matched
-dadaia public doctor
-
-# Resolve active context and specs_dir
-dadaia context show --json
-
-# Example: extract specs_dir from context show
-SPECS_DIR=$(dadaia context show --json | python3 -c "import sys,json; print(json.load(sys.stdin)['specs_dir'])")
-```
-
-Run `dadaia specs doctor` and `dadaia public doctor` at the start of every audit.
-Any `[ERROR]` output is a drift finding in its own right (dimension depends on
-which invariant failed).
+Command syntax is `dd-cli-library`'s (never restated here). Run `dadaia specs doctor`
+and `dadaia public doctor` at the start of every audit; any `[ERROR]` output is a drift
+finding in its own right (dimension depends on which invariant failed).
 
 ---
 
@@ -263,7 +142,7 @@ which invariant failed).
 
 ```
 ID: DRIFT-<n>
-Dimension: A (Architecture) | B (Product) | C (Tech-Stack) | D (Security) | E (Tests) | F (Design)
+Dimension: A (Architecture) | B (Product) | C (Tech-Stack) | D (Security) | E (Tests) | F (Agent-surface)
 Severity: CRITICAL | HIGH | MEDIUM | LOW
 Description: <what is drifted and why it matters>
 Spec evidence: <specs-dir>/memory/<atom>.md#<section> — "<quoted text>"
@@ -291,7 +170,7 @@ with `agent: "project-manager"` and a summary of the drift areas requiring a rel
 
 ## Lifecycle Wrapper
 
-This section implements the audit-lifecycle law (`DADAIA.md` §5 Audits) — consult it for
+This section implements the audit-lifecycle law (`DADAIA.md` §6 Audits) — consult it for
 the rule itself, not restated here. In practice: this audit's scorecard exists to seed
 **one** remediation release, and archiving waits on that release closing every finding
 out with a token, never on the scan alone. A `deferred`/`rejected` disposition routes
@@ -300,7 +179,7 @@ deferral taken at the remediation release's own approval is already pre-approved
 not re-adjudicated later).
 
 **Finding → TASKS-row mapping.** Each `DRIFT-<n>` item maps 1:1 to a `TASKS.md` row citing
-its id, so `dd-release-closure`'s `## Dispositions` sweep can trace every finding to its
+its id, so `dd-release-implement`'s `## Dispositions` sweep can trace every finding to its
 terminal disposition token (`dd-backlog-definition` §2 — canonical vocabulary, not
 repeated here). A finding with no `TASKS.md` row at SPEC approval is unaddressed — the
 SPEC is not `Aprovado`-ready until every finding from this round is accounted for.

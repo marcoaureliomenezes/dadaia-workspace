@@ -7,6 +7,16 @@ shortcut was a workaround, not a rung. Resolution now goes through
 :func:`~dadaia_workspace.core.specs_resolver.resolve_context` only (see
 ``tests/unit/core/test_specs_resolver_resolve_context.py`` for that law's own tests);
 anywhere it cannot resolve a context reaches the one terminal, actionable error.
+
+T-044-40 (bug ``symlinked-specs-root-is-followed-by-migration-and-repair``):
+``resolve_specs_dir`` is the ONE seam every resolver-driven verb (``specs upgrade``,
+``specs doctor --fix``, and every other consumer of this function) shares — the
+explicit-input branch used to call ``Path(specs_dir).resolve()`` unconditionally,
+silently following a symlinked root the same way the inner walk roots (memory/,
+TREE-5's projection target — ``tests/unit/features/specs/test_migration_symlink_hardening.py``)
+already refuse to. The decision — refuse, uniformly, once, here — is pinned below;
+CLI-level pins for both named entry points live in
+``tests/integration/cli/test_cli_specs_symlinked_root_refused.py``.
 """
 
 from __future__ import annotations
@@ -89,3 +99,21 @@ def test_resolve_specs_dir_no_context_raises_generic_and_explicit_still_wins(
     explicit = ws2 / "elsewhere"
     explicit.mkdir()
     assert specs_resolver.resolve_specs_dir(str(explicit)) == explicit.resolve()
+
+
+def test_resolve_specs_dir_refuses_a_symlinked_explicit_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """T-044-40: the ONE seam every resolver-driven verb shares refuses a symlinked
+    explicit root instead of following it — matching the doctrine the inner walk
+    roots already enforce, decided here once rather than duplicated at each write
+    site (the migration's ``memory/`` walk, the doctor's TREE-5 repair)."""
+    _clean_env(monkeypatch)
+    real = tmp_path / "real-specs"
+    real.mkdir()
+    linked = tmp_path / "proj" / "specs"
+    linked.parent.mkdir()
+    linked.symlink_to(real, target_is_directory=True)
+
+    with pytest.raises(typer.BadParameter, match="symlink"):
+        specs_resolver.resolve_specs_dir(str(linked))

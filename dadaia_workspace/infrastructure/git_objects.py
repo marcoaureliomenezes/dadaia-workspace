@@ -13,6 +13,21 @@ always surfaces as :class:`GitObjectReadError` (SPEC v0.9.0 FR6 row 2 / the port
 contract, ``core/protocols/git_object_reader.py``: "Any git failure raises
 GitObjectReadError rather than returning a partial/empty result") — never a raw,
 unhandled exception at the push boundary (code-reviewer MEDIUM finding).
+
+**One exclusion formula for every push (bug
+new-branch-push-loses-prior-published-denylist-amnesty, v0.4.4).** Pre-fix, this
+module derived the "already published" baseline two DIFFERENT ways depending on
+whether ``remote_sha`` happened to resolve locally: a resolvable ``remote_sha`` used
+``--not <remote_sha>`` alone; an unresolvable/zero one (the shape of a brand-new
+``feature/{M.m.p}`` ref's FIRST push) fell back to ``--not --remotes`` for the range
+walk, but the FR2 prior-text anchor had no such fallback at all and simply went
+without a base — silently losing amnesty for every already-published path the new
+branch happened to touch. :func:`_base_exclusions` now returns ONE exclusion set for
+every call — ``--remotes`` unconditionally, plus ``remote_sha`` when it resolves —
+and every range/base derivation in this module (:func:`_rev_list_candidates`,
+:func:`_range_commit_shas`, :func:`_multi_path_shas`, :func:`_publication_boundaries`)
+consumes that SAME set. There is no branch left choosing between "the old sha" and
+"``--remotes``"; they are always asked for together.
 """
 
 from __future__ import annotations
@@ -88,14 +103,15 @@ def _decode(raw: bytes) -> str:
 
 
 def _is_resolvable_commit(repo: Path, sha: str) -> bool:
-    """True when *sha* resolves to a commit object reachable locally (FR1 row 1/2).
+    """True when *sha* resolves to a commit object reachable locally.
 
     v0.11.0 FR7/A7.4: *sha* is shape-checked against :data:`_SHA_SHAPE_RE` BEFORE it is
     ever interpolated into the ``git cat-file -e <sha>^{commit}`` argv — an
     option-shaped value (e.g. ``--upload-pack=...``) is rejected here, never
-    interpolated, and the caller treats it as unresolvable (falls back to the
-    ``--not --remotes`` range shape) rather than spawning git with that string
-    embedded (CWE-88).
+    interpolated (CWE-88). Used by :func:`_base_exclusions` to decide whether
+    *remote_sha* is worth adding as an EXTRA ``--not`` exclusion target — never to
+    choose between two different range shapes (bug
+    new-branch-push-loses-prior-published-denylist-amnesty deleted that choice).
     """
     if not sha or sha == ZERO_SHA or not _SHA_SHAPE_RE.match(sha):
         return False
@@ -103,22 +119,50 @@ def _is_resolvable_commit(repo: Path, sha: str) -> bool:
     return result.returncode == 0
 
 
-def _rev_list_candidates(repo: Path, local_sha: str, base: str | None) -> list[tuple[str, str]]:
-    """Return ``(sha, path)`` pairs for every object with a path in the FR1 range —
-    blobs AND trees (type filtering happens separately, in :func:`_blob_info`).
+def _base_exclusions(repo: Path, remote_sha: str) -> list[str]:
+    """The ``--not`` exclusion targets shared by EVERY range/base derivation below —
+    the ONE formula every push in :meth:`GitSubprocessObjectReader.new_objects` uses
+    (bug new-branch-push-loses-prior-published-denylist-amnesty).
 
-    *base* is the ALREADY-RESOLVED base (SPEC v0.11.0 FR2 — ``None`` means the
-    fallback shape): resolution happens ONCE, in :meth:`GitSubprocessObjectReader.new_objects`,
-    and is reused here AND for the prior-side lookup, rather than being re-derived.
+    ``--remotes`` (everything reachable from any locally-known remote-tracking ref)
+    is ALWAYS present — the only honest meaning of "already published" (DADAIA.md
+    §7's range scope). *remote_sha* is added too, but only when it resolves to a
+    real local commit (:func:`_is_resolvable_commit`) — the caller's claimed prior
+    tip of the ref being pushed. In a real git-hook invocation this is normally
+    REDUNDANT with ``--remotes`` (the local ``refs/remotes/origin/<branch>`` already
+    reflects it — see this module's own docstring for the "stale local view"
+    limitation), but harmless to include, and it is the only anchor a repo with no
+    configured remote at all (every pre-v0.4.4 unit fixture in this module's test
+    file) has to offer.
+
+    Pre-fix, the adapter BRANCHED: ``base = remote_sha if resolvable else None``,
+    and the ``None`` half silently dropped ``--remotes`` from the FR2 prior-text
+    anchor entirely (see :func:`_publication_boundaries`) — the exact defect a
+    first ``feature/{M.m.p}`` push hits, since a brand-new ref's ``remote_sha`` is
+    the all-zero sentinel and is therefore never resolvable. There is no branch
+    here: every call gets ``--remotes``, optionally extended by *remote_sha* — one
+    exclusion set, asked for identically on every push.
+    """
+    exclusions = ["--remotes"]
+    if _is_resolvable_commit(repo, remote_sha):
+        exclusions.insert(0, remote_sha)
+    return exclusions
+
+
+def _rev_list_candidates(
+    repo: Path, local_sha: str, exclusions: list[str]
+) -> list[tuple[str, str]]:
+    """Return ``(sha, path)`` pairs for every object with a path newly reachable from
+    *local_sha* — blobs AND trees (type filtering happens separately, in
+    :func:`_blob_info`) — after subtracting *exclusions* (:func:`_base_exclusions`,
+    resolved ONCE in :meth:`GitSubprocessObjectReader.new_objects` and reused here,
+    for the commit-only walk (:func:`_range_commit_shas`), and for the publication
+    boundary (:func:`_publication_boundaries`), rather than being re-derived).
 
     v0.11.0 FR7/A7.4: the argv carries a trailing ``--`` end-of-options marker after
-    the revision arguments on both range shapes, closing the git argv interpolation
-    site (CWE-88/CWE-20).
+    the revision arguments, closing the git argv interpolation site (CWE-88/CWE-20).
     """
-    if base is not None:
-        args = ["git", "rev-list", "--objects", local_sha, "--not", base, "--"]
-    else:
-        args = ["git", "rev-list", "--objects", local_sha, "--not", "--remotes", "--"]
+    args = ["git", "rev-list", "--objects", local_sha, "--not", *exclusions, "--"]
     result = _run(args, repo)
     if result.returncode != 0:
         raise GitObjectReadError(f"git rev-list --objects failed: {_decode(result.stderr).strip()}")
@@ -132,10 +176,11 @@ def _rev_list_candidates(repo: Path, local_sha: str, base: str | None) -> list[t
     return entries
 
 
-def _range_commit_shas(repo: Path, local_sha: str, base: str | None) -> list[str]:
-    """Return every COMMIT sha in the FR1 range (never ``--objects`` — commits only),
-    the SAME range shape :func:`_rev_list_candidates` walks, reused here so the two
-    callers agree on what "the range" means without either re-deriving it.
+def _range_commit_shas(repo: Path, local_sha: str, exclusions: list[str]) -> list[str]:
+    """Return every COMMIT sha in the range (never ``--objects`` — commits only), the
+    SAME range shape :func:`_rev_list_candidates` walks (the SAME *exclusions*,
+    :func:`_base_exclusions`), reused here so the two callers agree on what "the
+    range" means without either re-deriving it.
 
     Commit count is bounded by the number of commits actually being pushed (an
     ordinary push is a handful; this module's own ``commits_in_range`` metric on this
@@ -143,14 +188,47 @@ def _range_commit_shas(repo: Path, local_sha: str, base: str | None) -> list[str
     the SAME range's ``--objects`` walk produces, which is what keeps
     :func:`_multi_path_shas`'s per-commit ``git ls-tree`` loop below affordable.
     """
-    if base is not None:
-        args = ["git", "rev-list", local_sha, "--not", base, "--"]
-    else:
-        args = ["git", "rev-list", local_sha, "--not", "--remotes", "--"]
+    args = ["git", "rev-list", local_sha, "--not", *exclusions, "--"]
     result = _run(args, repo)
     if result.returncode != 0:
         raise GitObjectReadError(f"git rev-list failed: {_decode(result.stderr).strip()}")
     return [line for line in _decode(result.stdout).splitlines() if line]
+
+
+def _publication_boundaries(repo: Path, local_sha: str, exclusions: list[str]) -> tuple[str, ...]:
+    """The FR2 prior-text anchor(s): every commit where *local_sha*'s own ancestry
+    first re-joins history already excluded by *exclusions* (``git rev-list
+    --boundary <local_sha> --not <exclusions> --``, keeping only the ``-``-prefixed
+    boundary lines) — bug new-branch-push-loses-prior-published-denylist-amnesty.
+
+    Reuses the EXACT SAME exclusion set :func:`_rev_list_candidates` and
+    :func:`_range_commit_shas` already walk — this call only asks WHERE that
+    exclusion cuts *local_sha*'s history off, not WHICH objects it excludes. A
+    develop-style continuing push (the branch already has a resolvable
+    ``remote_sha``) and a brand-new ``feature/{M.m.p}`` push (``remote_sha`` is the
+    all-zero sentinel, contributing nothing to *exclusions* — :func:`_base_exclusions`)
+    both derive their prior-text base from this SAME call: no branch on
+    ``remote_sha``'s resolvability survives here, closing the bug's root cause — the
+    old ``remote_sha if resolvable else None`` derivation dropped ALL prior-text
+    amnesty the instant ``remote_sha`` stopped resolving, even though a perfectly
+    good publication boundary (the commit the branch was cut from) was already
+    resolvable via the exact same ``--not --remotes`` the range walk uses.
+
+    Ordinarily exactly one boundary exists — a ``feature/{M.m.p}`` branch is cut
+    once, linear (``dd-gitflow-default``). When more than one exists (unusual
+    ancestry), every one is returned; :func:`_resolve_prior_texts` tries each in
+    turn per path. Empty when *local_sha* shares no ancestry with anything already
+    excluded at all (bootstrapping a genuinely empty remote, or a fixture with no
+    remote and no resolvable ``remote_sha`` either) — the one honest "no baseline
+    exists" case, unchanged from the old ``base=None`` fallback for that scenario.
+    """
+    args = ["git", "rev-list", "--boundary", local_sha, "--not", *exclusions, "--"]
+    result = _run(args, repo)
+    if result.returncode != 0:
+        raise GitObjectReadError(
+            f"git rev-list --boundary failed: {_decode(result.stderr).strip()}"
+        )
+    return tuple(line[1:] for line in _decode(result.stdout).splitlines() if line.startswith("-"))
 
 
 def _is_annotated_tag(repo: Path, sha: str) -> bool:
@@ -306,7 +384,7 @@ def _read_object_bodies(
 
 
 def _multi_path_shas(
-    repo: Path, local_sha: str, base: str | None, candidate_shas: set[str]
+    repo: Path, local_sha: str, exclusions: list[str], candidate_shas: set[str]
 ) -> set[str]:
     """The subset of *candidate_shas* reachable at MORE THAN ONE distinct path ANYWHERE
     in the pushed RANGE (SPEC v0.4.2 FR7/A7.1/GRILL P10, ADR R1, D4; CR-3 remediation —
@@ -350,7 +428,7 @@ def _multi_path_shas(
     # local_sha is always included even when the range walk would already report it
     # (the ordinary case) — a defensive guarantee that the tip's own tree is NEVER
     # skipped, matching the pre-fix call's coverage exactly as a floor.
-    commit_shas = {local_sha, *_range_commit_shas(repo, local_sha, base)}
+    commit_shas = {local_sha, *_range_commit_shas(repo, local_sha, exclusions)}
     paths_by_sha: dict[str, set[str]] = {}
     for commit_sha in commit_shas:
         result = _run(["git", "ls-tree", "-r", "--full-tree", commit_sha, "--"], repo)
@@ -420,9 +498,9 @@ def _blob_info(repo: Path, candidates: list[tuple[str, str]]) -> dict[str, tuple
     return info
 
 
-def _resolve_prior_texts(repo: Path, base: str, paths: list[str]) -> dict[str, str]:
-    """Resolve the published prior text of every DISTINCT path in *paths*, at *base*
-    (SPEC v0.11.0 FR2, rides the SAME chunk this is called from).
+def _resolve_prior_texts_at_base(repo: Path, base: str, paths: list[str]) -> dict[str, str]:
+    """Resolve the published prior text of every DISTINCT path in *paths*, at ONE
+    *base* (SPEC v0.11.0 FR2, rides the SAME chunk this is called from).
 
     Two batched calls, on the SAME shape the content read already uses:
 
@@ -555,6 +633,33 @@ def _resolve_prior_texts(repo: Path, base: str, paths: list[str]) -> dict[str, s
         with contextlib.suppress(UnicodeDecodeError):
             prior_texts[path] = content.decode("utf-8")
     return prior_texts
+
+
+def _resolve_prior_texts(repo: Path, bases: tuple[str, ...], paths: list[str]) -> dict[str, str]:
+    """Resolve the published prior text of every DISTINCT path in *paths* across ALL
+    of *bases* (:func:`_publication_boundaries`) — bug
+    new-branch-push-loses-prior-published-denylist-amnesty.
+
+    Tries *bases* in order: each pass resolves :func:`_resolve_prior_texts_at_base`
+    for whichever paths the PREVIOUS passes left unresolved, and stops once every
+    path has an answer or every base has been tried. In the overwhelmingly common
+    case — exactly one boundary (a ``feature/{M.m.p}`` branch is cut once, linear
+    ancestry) — this is a single pass, byte-identical in cost and shape to the
+    pre-fix single-base call. A path absent at every base stays absent from the
+    returned dict (never a synthesized empty string), exactly as the single-base
+    case already documented.
+    """
+    if not paths or not bases:
+        return {}
+    remaining = list(dict.fromkeys(paths))
+    resolved: dict[str, str] = {}
+    for base in bases:
+        if not remaining:
+            break
+        found = _resolve_prior_texts_at_base(repo, base, remaining)
+        resolved.update(found)
+        remaining = [path for path in remaining if path not in found]
+    return resolved
 
 
 def _read_blob_chunk(
@@ -740,7 +845,7 @@ def _read_oversized_blob(repo: Path, sha: str, path: str, size: int) -> ScannedO
 def _read_blobs(
     repo: Path,
     blob_info: dict[str, tuple[str, int]],
-    base: str | None,
+    bases: tuple[str, ...],
     multi_path_shas: set[str],
 ) -> Iterator[ScannedObject]:
     """Yield one :class:`ScannedObject` per blob in *blob_info*.
@@ -758,11 +863,13 @@ def _read_blobs(
     that prefix is valid UTF-8, or ``decodable=False``/``oversized=True`` otherwise
     (A4.6) — the remainder past the cap is genuinely never fetched either way.
 
-    v0.11.0 FR2/ADR D8: with *base* resolved, each CHUNK's prior-side lookup
-    (:func:`_resolve_prior_texts`) rides the SAME loop as the content read — two extra
-    batched calls per chunk, never per blob — so the peak resident set stays
-    ``chunk_size x cap x 2`` rather than growing with the range. An oversized CURRENT
-    object never carries prior text (the prior-side lookup rides the chunk loop only).
+    v0.11.0 FR2/ADR D8, widened by bug new-branch-push-loses-prior-published-denylist-amnesty
+    to *bases* (plural, :func:`_publication_boundaries`): with *bases* non-empty, each
+    CHUNK's prior-side lookup (:func:`_resolve_prior_texts`) rides the SAME loop as the
+    content read — normally two extra batched calls per chunk (one base, the common
+    case), never per blob — so the peak resident set stays ``chunk_size x cap x 2``
+    rather than growing with the range. An oversized CURRENT object never carries
+    prior text (the prior-side lookup rides the chunk loop only).
     """
     fetch_shas = [sha for sha, (_, size) in blob_info.items() if size <= _MAX_BLOB_BYTES]
     oversized_shas = [sha for sha, (_, size) in blob_info.items() if size > _MAX_BLOB_BYTES]
@@ -774,9 +881,9 @@ def _read_blobs(
     for start in range(0, len(fetch_shas), _BATCH_CHUNK_SIZE):
         chunk = fetch_shas[start : start + _BATCH_CHUNK_SIZE]
         prior_texts: dict[str, str] = {}
-        if base is not None:
+        if bases:
             chunk_paths = [blob_info[sha][0] for sha in chunk]
-            prior_texts = _resolve_prior_texts(repo, base, chunk_paths)
+            prior_texts = _resolve_prior_texts(repo, bases, chunk_paths)
         yield from _read_blob_chunk(repo, chunk, blob_info, prior_texts, multi_path_shas)
 
 
@@ -794,23 +901,26 @@ class GitSubprocessObjectReader:
         # is rejected as a read failure rather than ever being interpolated.
         if not _SHA_SHAPE_RE.match(local_sha):
             raise GitObjectReadError(f"local_sha is not a valid sha shape: {local_sha!r}")
-        # v0.11.0 FR2/ADR D7: base resolved ONCE per call — reused for the FR1 range
-        # shape (_rev_list_candidates) AND the prior-side lookup (_read_blobs), rather
-        # than re-derived. Unresolvable/zero remote_sha -> no base -> no object in this
-        # call carries prior content (the fallback shape stays byte-identical to
-        # v0.9.0).
-        base = remote_sha if _is_resolvable_commit(repo, remote_sha) else None
-        candidates = _rev_list_candidates(repo, local_sha, base)
+        # bug new-branch-push-loses-prior-published-denylist-amnesty: exclusions
+        # resolved ONCE per call (_base_exclusions — ALWAYS `--remotes`, optionally
+        # widened by a resolvable remote_sha) — reused for the range walk
+        # (_rev_list_candidates, _range_commit_shas, _multi_path_shas) AND the FR2
+        # prior-text anchor set (_publication_boundaries, _read_blobs). One formula,
+        # asked identically whether remote_sha is a resolvable "develop-style" tip or
+        # the all-zero sentinel of a brand-new feature/{M.m.p} ref.
+        exclusions = _base_exclusions(repo, remote_sha)
+        candidates = _rev_list_candidates(repo, local_sha, exclusions)
         blob_info = _blob_info(repo, candidates)
-        multi_path_shas = _multi_path_shas(repo, local_sha, base, set(blob_info))
-        yield from _read_blobs(repo, blob_info, base, multi_path_shas)
+        bases = _publication_boundaries(repo, local_sha, exclusions)
+        multi_path_shas = _multi_path_shas(repo, local_sha, exclusions, set(blob_info))
+        yield from _read_blobs(repo, blob_info, bases, multi_path_shas)
         # v0.4.3 T-043-15/FR11: the range's commit message BODIES (never their
         # author/committer headers, A11.6) — the SAME range :func:`_range_commit_shas`
         # already walks for the multi-path detection above, re-derived here rather than
         # threaded through (keeps this call's own signature and every existing caller
         # of the functions above untouched). `prior_text` is never set for these (A11.7,
         # fail-closed by construction — see `_read_object_bodies`).
-        commit_shas = _range_commit_shas(repo, local_sha, base)
+        commit_shas = _range_commit_shas(repo, local_sha, exclusions)
         yield from _read_object_bodies(
             repo, commit_shas, kind="commit", path_label=_COMMIT_BODY_PATH
         )

@@ -1,6 +1,6 @@
 {
   "schema_version": "agentic-entities-v1",
-  "doc": "The abstract, harness-agnostic entity registry — THE source the scaffolded core surface derives from. dadaia-workspace defines behaviors, personas, rules and skills agnostically; each harness receives an IMPLEMENTATION of them. A scaffolded core sub-agent without a Persona here, a core hook without a Deterministic Behavior here, or a core rule without an Abstract Rule here is forbidden (constitution §12.5). Operator-created entities are out of scope.",
+  "doc": "The abstract, harness-agnostic entity registry — THE source the scaffolded core surface derives from. dadaia-workspace defines behaviors, personas, rules and skills agnostically; each harness receives an IMPLEMENTATION of them. A scaffolded core sub-agent without a Persona here, a core hook without a Deterministic Behavior here, or a core rule without an Abstract Rule here is forbidden (constitution, Anti-Slop Law, Derivation law). Operator-created entities are out of scope.",
   "personas": [
     {
       "id": "project-manager",
@@ -24,7 +24,7 @@
     },
     {
       "id": "security-reviewer",
-      "mandate": "Vulnerability auditor and the pre-push checkpoint: OWASP, secrets, CVEs; emits the sha-matched push verdict."
+      "mandate": "Vulnerability auditor and the PR verdict gate: OWASP, secrets, CVEs; emits the sha-matched PR verdict (branch contract: DADAIA.md §4 Gitflow)."
     },
     {
       "id": "software-architect",
@@ -78,7 +78,7 @@
     },
     {
       "id": "git-chokepoints",
-      "mandate": "Harness-independent: pre-commit warns on peer presence and always allows; pre-push requires the sha-matched security APPROVE verdict and the green CI preflight.",
+      "mandate": "Harness-independent: pre-commit warns on peer presence and always allows; pre-push allows only feature/{M.m.p} pushes with a green CI preflight and refuses develop/main direct pushes; the security APPROVE verdict is a CI PR gate keyed to the PR head sha, not a pre-push check (branch contract: DADAIA.md §4 Gitflow).",
       "implementations": {
         "claude": ".dadaia git hooks (pre-commit-presence-gate.sh, pre-push-ci-gate.sh) — identical for every harness",
         "codex": "same git hooks (harness-independent)",
@@ -91,7 +91,7 @@
       "id": "workspace-law",
       "mandate": "DADAIA.md — the one always-on law file (the workspace system prompt), projected read-only per harness; human-only in an instantiated workspace.",
       "implementations": {
-        "claude": ".claude/rules/DADAIA.md",
+        "claude": "CLAUDE.md -> @AGENTS.md -> @DADAIA.md (root import chain)",
         "codex": ".codex/DADAIA.md",
         "kimi-code": ".kimi-code/DADAIA.md"
       }

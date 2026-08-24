@@ -1,4 +1,5 @@
-"""Pure decision logic for the W1 chokepoint git-hook gates (v0.1.14; v0.1.76 FR3).
+"""Pure decision logic for the W1 chokepoint git-hook gates (v0.1.14; v0.4.4 FR3 — the
+gitflow v2 inversion).
 
 This module is business logic: it imports ``core`` and reads presence/handoff files, but
 NEVER imports ``infrastructure`` and NEVER spawns a subprocess or calls ``os.kill``. The CLI
@@ -9,12 +10,15 @@ Two gates, one shared shape (:class:`Decision`):
 
 * :func:`pre_commit_decision` — NO-LOCKS WARN-only: ALWAYS returns ``allowed=True`` and
   reads only advisory presence records.
-* :func:`push_gate_decision` — FR-W1-02 / DP-5 security-verdict-per-pushed-sha check
-  (UNCHANGED by v0.1.76 — quality gates are not concurrency locks and stay), PLUS the
-  v0.9.0 FR1/FR2 range-scoped denylist scan: every non-deletion ref (tags included) is
-  scanned for the objects the push would newly publish, via an injected
+* :func:`push_gate_decision` — branch policy (DADAIA.md §4: ``feature/{M.m.p}`` is the
+  only pushable branch; ``develop``/``main`` advance by PR only) PLUS the v0.9.0 FR1/FR2
+  range-scoped denylist scan: every non-deletion ref (tags included) is scanned for the
+  objects the push would newly publish, via an injected
   :class:`~dadaia_workspace.core.protocols.git_object_reader.GitObjectReader` — never a
-  direct subprocess call from this module (FR7/A7.1).
+  direct subprocess call from this module (FR7/A7.1). The former FR-W1-02/DP-5
+  security-verdict-per-pushed-sha check is DELETED from this path (v0.4.4 A3.4) — it
+  relocates to a PR gate (FR4); :func:`iter_security_approvals` survives only as the
+  read side ``dadaia ci gc-push-verdicts`` still uses.
 """
 
 from __future__ import annotations
@@ -102,68 +106,64 @@ class PushRef:
         return self.local_ref.startswith("refs/tags/")
 
 
-# ── Branch policy (v0.6.0 FR4 / T-060-04) ───────────────────────────────────────
+# ── Branch policy (v0.4.4 FR3 / T-044-06 — the gitflow v2 inversion) ────────────
 #
-# The gitflow law (DADAIA.md §5, operator ruling 2026-08-12): exactly four branch
-# patterns exist, and ``develop`` is the ONLY pushable branch. This tuple is the ONE
-# pattern source — the pre-push hook and the CI pr-source-guard both encode the model,
-# and any second regex copy is drift.
-_PERMITTED_BRANCH_RES: tuple[re.Pattern[str], ...] = (
-    re.compile(r"^main$"),
-    re.compile(r"^develop$"),
-    re.compile(r"^feature/v\d+\.\d+\.\d+$"),
-    # PATCH >= 1: patch 0 is feature-release territory (the retired CI
-    # hotfix-branch-name job's knowledge, relocated per SPEC FR5.2).
-    re.compile(r"^hotfix/v\d+\.\d+\.[1-9]\d*$"),
-)
+# The gitflow law (DADAIA.md §4, operator ruling 2026-08-23): exactly three branch
+# patterns exist — no ``v`` prefix, no ``hotfix`` row (G2 retires it outright) — and
+# ``feature/{M.m.p}`` is the ONLY pushable one; ``develop`` and ``main`` advance by PR
+# only. This tuple is the ONE pattern source — the pre-push hook and the CI
+# pr-source-guard both encode the model, and any second regex copy is drift (A3.2).
+# ``_FEATURE_RE`` is reused, not re-literalled, by the pushability check below.
+_MAIN_RE = re.compile(r"^main$")
+_DEVELOP_RE = re.compile(r"^develop$")
+_FEATURE_RE = re.compile(r"^feature/\d+\.\d+\.\d+$")
 
-_PUSHABLE_BRANCH = "develop"
+_PERMITTED_BRANCH_RES: tuple[re.Pattern[str], ...] = (_MAIN_RE, _DEVELOP_RE, _FEATURE_RE)
+
 _HEADS_PREFIX = "refs/heads/"
 
 
 def branch_name_is_permitted(branch: str) -> bool:
-    """True when *branch* matches one of the four permitted patterns.
+    """True when *branch* matches one of the three permitted patterns.
 
-    ``main`` | ``develop`` | ``feature/vM.m.p`` | ``hotfix/vM.m.p`` — the version part
-    follows the release-id canon (leading ``v``, three numeric fields, no suffix:
-    pre-release suffixes are release-id territory, never branch names).
+    ``main`` | ``develop`` | ``feature/M.m.p`` — no leading ``v``, no suffix, no
+    ``hotfix`` row (G2). Matching one of these patterns does not by itself mean
+    *branch* is pushable — only ``feature/M.m.p`` is (see :func:`push_gate_decision`).
     """
     return any(pattern.match(branch) for pattern in _PERMITTED_BRANCH_RES)
 
 
 def _refuse_branch(branch: str, local_ref: str) -> Decision:
-    """Actionable refusal for a non-``develop`` ref (A4.2: rule + permitted + fix)."""
+    """Actionable refusal for a non-pushable ref (A4.2 shape: rule + permitted + fix)."""
     if branch == "main":
         return Decision(
             allowed=False,
             message=(
                 "[pre-push] BLOCKED: 'main' is never pushed directly — it advances only "
-                "via a PR from 'develop' (gitflow law, DADAIA.md §5).\n"
-                "  Fix: merge your work into 'develop', push 'develop', then open the "
+                "via a PR from 'develop' (gitflow law, DADAIA.md §4).\n"
+                "  Fix: push your work to 'develop' (via the PR below), then open the "
                 "PR develop → main."
             ),
         )
-    if branch_name_is_permitted(branch):
-        kind = "feature" if branch.startswith("feature/") else "hotfix"
+    if branch == "develop":
         return Decision(
             allowed=False,
             message=(
-                f"[pre-push] BLOCKED: '{branch}' is a {kind} branch — {kind} branches "
-                "are local-only and are never pushed (gitflow law, DADAIA.md §5). Only "
-                "'develop' is pushable.\n"
-                "  Fix: merge the branch into local 'develop', obtain the diff-based "
-                "security APPROVE, then push 'develop'."
+                "[pre-push] BLOCKED: 'develop' is never pushed directly — it advances "
+                "only via a PR from 'feature/{M.m.p}' (gitflow law, DADAIA.md §4).\n"
+                "  Fix: push your work on 'feature/{M.m.p}' instead, then open the PR "
+                "feature/{M.m.p} → develop."
             ),
         )
     return Decision(
         allowed=False,
         message=(
-            f"[pre-push] BLOCKED: ref '{local_ref}' is outside the four permitted branch "
-            "patterns — main, develop, feature/vM.m.p, hotfix/vM.m.p (gitflow law, "
-            "DADAIA.md §5).\n"
+            f"[pre-push] BLOCKED: ref '{local_ref}' is outside the three permitted "
+            "branch patterns — main, develop, feature/M.m.p (gitflow law, "
+            "DADAIA.md §4). Only 'feature/M.m.p' is pushable.\n"
             "  Fix: rebuild the work on a permitted branch (git checkout -b "
-            "feature/vM.m.p or hotfix/vM.m.p from develop), merge it into 'develop', "
-            "and push 'develop'."
+            "feature/M.m.p from main), push it, then open the PR "
+            "feature/M.m.p → develop."
         ),
     )
 
@@ -307,7 +307,9 @@ def pre_commit_decision(
 
 
 # ---------------------------------------------------------------------------------------
-# Push gate — security-reviewer verdict per pushed sha (FR-W1-02 / DP-5).
+# Security-reviewer verdict readers (originally FR-W1-02 / DP-5's push-time check;
+# v0.4.4 A3.4 deletes that check from push_gate_decision — this section survives only
+# as the READ side ``dadaia ci gc-push-verdicts`` still consumes, per-sha keyed).
 # ---------------------------------------------------------------------------------------
 @dataclass(frozen=True)
 class _Approval:
@@ -617,7 +619,6 @@ def _run_denylist_scan(
 
 
 def push_gate_decision(
-    handoff_root: Path,
     refs: list[PushRef],
     *,
     object_source: GitObjectReader,
@@ -627,27 +628,27 @@ def push_gate_decision(
     baseline_patterns: Iterable[BaselinePatternLike] = (),
     foreign_slugs: Iterable[str] = (),
 ) -> Decision:
-    """Decide whether a push may proceed (FR-W1-02 / DP-5 / v0.6.0 FR4 / v0.9.0 FR1-FR6).
+    """Decide whether a push may proceed (v0.4.4 FR3 — the gitflow v2 inversion).
 
     Policy order, first refusal wins:
 
-    1. **Branch policy** — every non-deletion, non-tag ref must be
-       ``refs/heads/develop``: ``main`` advances via PR only; feature/hotfix branches
-       are local-only; names outside the four permitted patterns are refused outright.
+    1. **Branch policy** (DADAIA.md §4) — every non-deletion, non-tag ref must be
+       ``refs/heads/feature/{M.m.p}``, pushed to the SAME remote name: ``develop`` and
+       ``main`` are refused outright (they advance by PR only); names outside the three
+       permitted patterns are refused as invalid.
     2. **Range-scoped denylist scan** (v0.9.0 FR1/FR2) — every non-deletion ref, tags
        included, is scanned via *object_source* for new objects carrying a denylisted
-       term. Runs AFTER branch policy (free and pure) and BEFORE the security verdict —
-       a leaking push is refused for the leak, not for a missing handoff.
-    3. **Diff-based security verdict** — the pushed ``develop`` tip must carry an
-       APPROVED security-reviewer handoff whose ``metrics.commit_sha`` equals it. The
-       tip sha anchors the reviewed range ``origin/develop..develop``; a stale approval
-       (different/older tip) does not cover the delta.
+       term. Runs AFTER branch policy (free and pure) — under v2 this feature push is
+       the first publication to ``origin`` (A3.3).
 
-    Deletions (zero sha) are never scanned and pass with no verdict. Tag pushes ARE
-    scanned but keep their DP-5 verdict carve-out (publishing depends on tag pushes).
-    Commits are never review-blocked — push only. A malformed stdin line fails CLOSED
-    (finding 1) and the REMOTE side of every review ref must also be
-    ``refs/heads/develop`` (finding 2: ``push develop:main``).
+    There is no third step: the former diff-based security-verdict check is DELETED
+    from this path (v0.4.4 A3.4) — it relocates to a PR gate covering
+    ``feature/{M.m.p}`` → ``develop`` and ``develop`` → ``main`` (FR4).
+
+    Deletions (zero sha) are never scanned. Tag pushes ARE scanned but were never
+    branch-policy-gated (publishing depends on tag pushes). A malformed stdin line
+    fails CLOSED (finding 1) and the REMOTE side of every review ref must match its
+    LOCAL branch name (finding 2: ``push feature/0.0.1:develop``).
 
     *object_source* and *repo* are REQUIRED — FR7/A7.2: the decision function always
     takes the object source as a parameter; an unwired production call site is a CLI
@@ -674,31 +675,33 @@ def push_gate_decision(
                 allowed=False,
                 message=(
                     f"[pre-push] BLOCKED: local ref '{ref.local_ref}' is not a branch "
-                    "head — only 'refs/heads/develop' may be pushed (gitflow law, "
-                    "DADAIA.md §5).\n"
-                    "  Fix: check out 'develop' (git checkout develop) and push it "
-                    "directly instead of pushing a detached or symbolic ref."
+                    "head — only a 'refs/heads/feature/M.m.p' branch may be pushed "
+                    "(gitflow law, DADAIA.md §4).\n"
+                    "  Fix: check out your feature/M.m.p branch (git checkout "
+                    "feature/M.m.p) and push it directly instead of pushing a "
+                    "detached or symbolic ref."
                 ),
             )
         branch = ref.local_ref[len(_HEADS_PREFIX) :]
-        if branch != _PUSHABLE_BRANCH:
+        if not _FEATURE_RE.match(branch):
             return _refuse_branch(branch, ref.local_ref)
-        if ref.remote_ref != f"{_HEADS_PREFIX}{_PUSHABLE_BRANCH}":
+        if ref.remote_ref != f"{_HEADS_PREFIX}{branch}":
             return Decision(
                 allowed=False,
                 message=(
-                    f"[pre-push] BLOCKED: refspec aims local 'develop' at remote "
-                    f"'{ref.remote_ref}' — only refs/heads/develop → refs/heads/develop "
-                    "is pushable (gitflow law, DADAIA.md §5; 'main' advances via PR "
-                    "from develop only).\n"
-                    "  Fix: push develop to develop (git push origin develop) and open "
-                    "the PR develop → main for anything aimed at main."
+                    f"[pre-push] BLOCKED: refspec aims local '{branch}' at remote "
+                    f"'{ref.remote_ref}' — only refs/heads/{branch} → "
+                    f"refs/heads/{branch} is pushable (gitflow law, DADAIA.md §4; "
+                    "'develop' and 'main' advance via PR only).\n"
+                    f"  Fix: push {branch} to {branch} (git push origin {branch}) "
+                    "and open the PR feature/M.m.p → develop for anything meant to "
+                    "land there."
                 ),
             )
 
     # v0.9.0 FR1/FR2: scan every non-deletion ref (tags included) — computed
     # independently of `review_refs`, which excludes tags. Runs after branch policy
-    # (free and pure, already checked above) and before the security verdict below.
+    # (free and pure, already checked above); this is now the LAST policy step (A3.4).
     scan_refs = [r for r in refs if not r.is_deletion]
     scan_refusal, skipped_binary_count, oversized_notes, path_masker = _run_denylist_scan(
         scan_refs, object_source, repo, denylist_terms, baseline_patterns, foreign_slugs
@@ -706,48 +709,8 @@ def push_gate_decision(
     if scan_refusal is not None:
         return _annotate_skip(scan_refusal, skipped_binary_count, oversized_notes, path_masker)
 
-    if not review_refs:
-        return _annotate_skip(
-            Decision(allowed=True, message="[pre-push] no review-gated refs; allow."),
-            skipped_binary_count,
-            oversized_notes,
-            path_masker,
-        )
-
-    approved_shas = {a.commit_sha for a in iter_security_approvals(handoff_root)}
-    missing = [r for r in review_refs if r.local_sha not in approved_shas]
-    if not missing:
-        return _annotate_skip(
-            Decision(
-                allowed=True,
-                message=(
-                    "[pre-push] develop push carries a security-reviewer APPROVE "
-                    "covering its delta; allow."
-                ),
-            ),
-            skipped_binary_count,
-            oversized_notes,
-            path_masker,
-        )
-
-    found = (
-        ", ".join(sorted(approved_shas))
-        if approved_shas
-        else "(no security-reviewer APPROVE found)"
-    )
-    wanted = ", ".join(f"{r.local_ref}@{r.local_sha[:12]}" for r in missing)
     return _annotate_skip(
-        Decision(
-            allowed=False,
-            message=(
-                "[pre-push] BLOCKED: no security-reviewer APPROVE covers the "
-                f"origin/develop..develop delta being pushed ({wanted}).\n"
-                f"  APPROVE shas on disk: {found}\n"
-                "  Fix: dispatch a security-reviewer DIFF review of "
-                "origin/develop..develop and emit an APPROVED handoff with "
-                "metrics.commit_sha == the pushed develop tip sha, then push again."
-            ),
-        ),
+        Decision(allowed=True, message="[pre-push] branch policy + denylist scan passed; allow."),
         skipped_binary_count,
         oversized_notes,
         path_masker,
@@ -929,7 +892,7 @@ def gc_consumed_push_verdicts(
     failure never aborts the sweep of the rest.
 
     Reconciliation-shape pushes (a ``develop`` tip that is a reconciliation-merge commit,
-    ``dadaia-gitflow``) are swept identically to any other tip sha — this function only
+    ``dd-gitflow-default``) are swept identically to any other tip sha — this function only
     ever sees an opaque sha string and never branches on how it was produced.
 
     Every failure mode here is fail-open by design: this is a GC sweep running strictly

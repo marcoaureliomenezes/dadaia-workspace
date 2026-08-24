@@ -8,13 +8,17 @@ imports the shared leaves, never a sibling validator.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
+import os
 import re
 import shutil
+import tempfile
 from pathlib import Path
 
 from dadaia_workspace.features.specs.doctor_common import read_active_md
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
+from dadaia_workspace.features.specs.template_history import was_shipped
 
 # TREE-3: memory .md files that must exist.  No Jinja templates — .md is canonical source.
 _TREE3_MEMORY_FILES: tuple[str, ...] = (
@@ -263,6 +267,31 @@ class StructuralValidator:
         current_hash = hashlib.sha256(current_text.encode("utf-8")).hexdigest()
         if canonical_hash == current_hash:
             return []
+        # A file whose bytes we published earlier carries no operator customisation, so
+        # refreshing it is lossless (bug
+        # upgrade-never-refreshes-uncustomised-scoped-law-projection). Anything else may
+        # hold operator content and stays warn-only.
+        # A symlinked projection is never repaired (the write would land outside the
+        # tree), so it must not be advertised as fixable either — reporting a fix that
+        # never happens is its own defect (CWE-393).
+        if was_shipped(current_text, "specs-AGENTS.md", self._templates_dir) and not (
+            agents_md.is_symlink()
+        ):
+            return [
+                SpecsDoctorIssue(
+                    code="TREE-5",
+                    severity=Severity.WARNING,
+                    description=(
+                        f"specs/AGENTS.md is a superseded version of the canonical "
+                        f"template (current sha256:{current_hash[:12]}… is a previously "
+                        f"shipped release; canonical sha256:{canonical_hash[:12]}…). "
+                        "It carries no operator customisation, so it can be refreshed "
+                        "losslessly — run `dadaia specs doctor --fix`."
+                    ),
+                    path=str(agents_md),
+                    fixable=True,
+                )
+            ]
         return [
             SpecsDoctorIssue(
                 code="TREE-5",
@@ -279,6 +308,30 @@ class StructuralValidator:
                 fixable=False,
             )
         ]
+
+    def fix_tree5(self, issue: SpecsDoctorIssue) -> None:
+        """Refresh a superseded projection from the canonical template.
+
+        Only ever reached for issues this validator marked ``fixable`` — i.e. the on-disk
+        bytes are a version we shipped ourselves. Re-verified here so a future caller
+        cannot turn the repair into an overwrite of operator content.
+        """
+        if self._templates_dir is None:
+            return
+        # The repair target is derived, never taken from the issue: an externally supplied
+        # path would let a caller aim the write anywhere (CWE-73). A link is refused
+        # outright so the canonical text cannot be written through it to a file outside
+        # the tree (CWE-59).
+        agents_md = self.specs_dir / "AGENTS.md"
+        if agents_md.is_symlink():
+            return
+        canonical_path = self._templates_dir / "specs-AGENTS.md"
+        if not canonical_path.exists() or not agents_md.exists():
+            return
+        current_text = agents_md.read_text(encoding="utf-8")
+        if not was_shipped(current_text, "specs-AGENTS.md", self._templates_dir):
+            return
+        _write_text_atomic(agents_md, canonical_path.read_text(encoding="utf-8"))
 
     def check_memory_agents_md(self) -> list[SpecsDoctorIssue]:
         """Check: specs/memory/AGENTS.md must exist (WARNING only).
@@ -423,3 +476,38 @@ class StructuralValidator:
                     )
                 )
         return issues
+
+
+def _write_text_atomic(path: Path, text: str) -> None:
+    """Write *text* to *path* by atomic replacement, never THROUGH the existing file.
+
+    Feature-local by architecture: features are mutually independent, may not import
+    infrastructure, and core/ file I/O is a closed ratchet.
+
+    A hard link is not a symlink and a checked-then-opened path is a TOCTOU window
+    (CWE-59/CWE-367), so refusing links alone cannot keep a write inside the tree.
+    Rendering to a temp file in the same directory and ``os.replace``-ing it rebinds the
+    name instead of writing through whatever it points at, and the swap is atomic.
+
+    ``newline=""`` disables universal-newline translation, so the bytes on disk are exactly
+    ``text.encode("utf-8")`` — without it Windows text mode rewrites LF to CRLF and the
+    byte-preserving guarantee dies on that platform (the same reason
+    ``public_assets_common`` passes it, FR-RC2-2).
+
+    ``mkstemp`` creates the temp file 0600 and ``os.replace`` carries that mode onto the
+    target, which would silently narrow a 0644 atom in a shared or CI-checked-out tree
+    (CWE-732 in the fail-safe direction, invisible to git). The original mode is copied
+    back before the swap.
+    """
+    fd, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
+    tmp_path = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="") as handle:
+            handle.write(text)
+        with contextlib.suppress(OSError):
+            shutil.copymode(path, tmp_path)  # keep the target's mode, not mkstemp's 0600
+        os.replace(tmp_path, path)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.unlink(tmp_path)
+        raise

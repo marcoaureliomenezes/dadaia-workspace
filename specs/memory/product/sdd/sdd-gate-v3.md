@@ -2,15 +2,18 @@
 slug: sdd-gate-v3
 title: sdd-gate-v3
 category: product
-tldr: "No-lock SDD enforcement: path/mode/cache gates, advisory presence, and a develop-only push boundary scanning blobs and commit bodies, amnesty fail-closed."
+tldr: "No-lock SDD enforcement: path/mode/cache gates, advisory presence, a feature-only push boundary with content scan, and the security verdict as a PR gate."
 summary: >-
   The merged Python PreToolUse gate enforces root whitelist, workspace venv usage, a
   cache-off posture for pytest/ruff/mypy, path class, phase, and the caller's own mode.
   It never waits for or blocks on another session. Presence is advisory. Git pre-commit
-  warns only; pre-push enforces the CI preflight, develop-only branch policy, a
-  range-scoped denylist scan of the new objects the push would publish — blobs AND
-  commit/annotated-tag message bodies, with author/committer headers out of scope by
-  design — and a security verdict covering the develop delta. The scan reads a
+  warns only; pre-push enforces the CI preflight, an inverted branch policy in which
+  `feature/{M.m.p}` is the only pushable ref while `develop` and `main` are refused as
+  PR-only, and a range-scoped denylist scan of the new objects the push would publish —
+  blobs AND commit/annotated-tag message bodies, with author/committer headers out of
+  scope by design. The security verdict left the hook: it is a CI job on both PR edges
+  requiring an APPROVED security-reviewer handoff covering the PR head sha, read from
+  committed evidence. The scan reads a
   chunk-bounded batched git conversation, suppresses a hit only when the same single path
   already published that exact value and never for a path-less object, derives its
   foreign-name layer from the context registry and names it when that layer degrades,
@@ -26,7 +29,7 @@ tags:
 - enforcement
 - no-locks
 - privacy
-last_updated: '2026-08-18'
+last_updated: '2026-08-24'
 release_origin: v0.4.2
 ---
 
@@ -108,16 +111,28 @@ presence. It never blocks.
 
 - `pre-commit-presence-gate.sh` may warn about another live session but always permits
   the commit on concurrency grounds.
-- `pre-push-ci-gate.sh` runs the local CI preflight and then applies branch policy, the
-  range-scoped denylist scan, and the security verdict, in that order.
+- `pre-push-ci-gate.sh` runs the local CI preflight and then applies branch policy and the
+  range-scoped denylist scan, in that order. **There is no third step** — the push
+  boundary reads no security handoff. The preflight's advertised check list and CI's
+  gating list are the **same set** — format, lint, `mypy --strict`, the import-boundary
+  contracts and the test suite — pinned by a parity test that fails when either side gains
+  a check the other lacks, so a boundary violation can no longer pass locally and fail in
+  CI.
 
-Branch policy at the push boundary: `refs/heads/develop` is the only pushable ref. A push
-of `main` is refused and named as PR-only from `develop`; a push of a `feature/*` or
-`hotfix/*` ref is refused as local-only; a ref outside the four permitted patterns
-(`main`, `develop`, `feature/vM.m.p`, `hotfix/vM.m.p` with PATCH ≥ 1) is refused by the
-branch-name validator; a local ref that is not a branch head gets its own diagnosis. The
-remote side is policed too — a refspec aiming local `develop` at another remote ref is
-refused, so only `refs/heads/develop → refs/heads/develop` passes. Parsing is fail-closed:
+The branch model itself is stated once in the law's gitflow section and operated by the
+`dd-gitflow-default` skill; this atom describes only what the chokepoint mechanically
+enforces of it.
+
+Branch policy at the push boundary is **inverted**: `refs/heads/feature/{M.m.p}` is the
+only pushable ref, because under the branch contract that push is the act that opens a
+pull request. A push of `develop` or `main` is refused, the message naming the PR path
+that advances it instead. Three branch-name patterns exist and no fourth — `^main$`,
+`^develop$`, `^feature/\d+\.\d+\.\d+$` — with **no `v` prefix and no `hotfix` row**; a ref
+outside them is refused by the branch-name validator, and a local ref that is not a branch
+head gets its own diagnosis. The pattern has one source in the package; CI carries its
+POSIX-ERE translation at the PR boundary with a cross-reference, because no literal share
+is possible across that runtime boundary. The remote side is policed too — a refspec
+aiming a local ref at a different remote ref is refused. Parsing is fail-closed:
 any unparseable stdin line refuses the whole push and the message names `git push
 --no-verify` as the one traceable bypass, while empty stdin remains the distinct
 "nothing to gate" allow. Both shas on a line are shape-validated — 40- or 64-character
@@ -125,36 +140,49 @@ hex, or the all-zero deletion sentinel — before they can reach a git argv, so 
 option-shaped ref value is a malformed line rather than a successful empty range that
 silently skips the scan for that ref. Downstream, revision arguments carry an explicit
 `--` end-of-options marker and a sha is prefix-checked before interpolation, so no
-supplied value is parsed as a git option. Branch deletions are neither scanned nor verdict-checked. Tag
-pushes keep their carve-out from the *security verdict* — which is what release
-publication depends on — but they are covered by the denylist scan.
+supplied value is parsed as a git option. Branch deletions publish no object and are not
+scanned. Tag pushes are covered by the denylist scan and by nothing else, which is what
+keeps release publication reachable.
 
-Security verdict: an APPROVED `security-reviewer` handoff whose `metrics.commit_sha`
-equals the pushed `develop` tip, i.e. a verdict covering the `origin/develop..develop`
-delta. Every refusal names the rule that fired, the permitted value, and the corrective
-action, so each one is clearable by an action the product accepts.
+**The security verdict is a pull-request gate, not a push-time check.** A CI job on both
+PR edges — `feature/{M.m.p}` → `develop` and `develop` → `main` — requires an APPROVED
+`security-reviewer` handoff whose `metrics.commit_sha` is the **PR head sha**, or an
+ancestor of it whose only intervening diff is committed verdict evidence, since a verdict
+can never live inside the commit it reviews. That exemption is scoped to the evidence
+class itself. The evidence channel is committed rather than local:
+`specs/releases/<release-id>/verdicts/<sha>.handoff.json`, with the release id constrained
+to the release-id canon before it reaches a path, and the coverage diff read through an
+explicitly checked exit status so an unreadable diff fails **closed**. A second, older
+job — the dual qa-plus-security closure gate — reads a different key set (`release_id` and
+context, no sha) at a different moment, and is deliberately kept distinct rather than
+folded in: it is the only mechanical check of the qa-engineer verdict. Every refusal on
+either boundary names the rule that fired, the permitted value, and the corrective action,
+so each one is clearable by an action the product accepts.
 
-**A consumed verdict is collected after the push, and it outlives its handoff.** The
-pre-push hook cannot do this collection: it runs *before* git transfers anything, so from
-inside it "the push succeeded" is unknowable. The sanctioned observation point is the
-`git push`-wrapping caller, realized as `dadaia ci gc-push-verdicts --sha <landed-tip>`,
-which the ship flow runs immediately after a confirmed successful push of `develop` — the
-cadence contract lives in the verb's own `--help`. It deletes exactly the verdict
-handoff(s) covering the given tip(s) and leaves every other verdict untouched, and it is
+**A consumed verdict is collected after the merge, and it outlives its handoff.** The
+pre-push hook could never do this collection: it runs *before* git transfers anything, so
+from inside it "the push succeeded" is unknowable. The sanctioned observation point is the
+caller that wraps the merge, realized as
+`dadaia ci gc-push-verdicts --sha <merged-pr-head-sha>`, which the ship flow runs
+immediately after a confirmed merge — the cadence contract lives in the verb's own
+`--help`. It deletes exactly the verdict handoff(s) covering the given sha(s) and leaves
+every other verdict untouched, and it is
 idempotent and best-effort by construction: it exits 0 when nothing matches, when the lane
 guard refuses a candidate, and when an append fails, because a sweep that runs strictly
-after the push it cleans up after can never change that push's outcome.
+after the merge it cleans up after can never change that merge's outcome.
 
-Deletion never erases the evidence that the push was covered. Before a consumed verdict
-handoff is removed, one line — reviewing agent, verdict, covered tip sha, timestamp — is
+Deletion never erases the evidence that the merge was covered. Before a consumed verdict
+handoff is removed, one line — reviewing agent, verdict, covered sha, timestamp — is
 appended to the append-only `.dadaia/logs/push-verdict-gc-ledger.jsonl`. The **append
 precedes the delete**, and a failed append leaves the handoff in place, so the durable
 record either exists or the handoff still does — never neither. The ledger caps and rotates
 like every other `.dadaia/logs/*.jsonl` writer, which its append-only property is defined
 against: rotation retires a generation, it never rewrites a line.
 
-The push rules are a quality gate, not a concurrency lock. Commits are never blocked for
-missing review evidence; pushes are.
+The push and PR rules are a quality gate, not a concurrency lock. Commits are never
+blocked — not for missing review evidence, not for another session's presence. A push is
+blocked for a failing preflight, a refused ref or a leaking object; a merge is blocked for
+missing review evidence.
 
 ### Push-Range Denylist Scan
 
@@ -301,9 +329,10 @@ governance exists to end.
 
 With no operator denylist present, layers 2 and 3 still run; the gate names on stderr the
 mode it ran in — `operator denylist + baseline` or `baseline only (no operator
-denylist)`. The scan runs after branch policy and before the security-verdict lookup, so
-a leaking push is refused for the leak rather than for a missing handoff; on a tag ref it
-is the only policy that runs.
+denylist)`. The scan runs after branch policy and is the **last** policy step at the push
+boundary; on a tag ref it is the only policy that runs. Under the inverted branch policy
+the `feature/{M.m.p}` push is the first publication of that work to `origin`, which is
+exactly why the content scan sits there.
 
 The boundary between fail-closed and fail-open is explicit, and one rule decides every row:
 **the gate never reports coverage it did not achieve.**

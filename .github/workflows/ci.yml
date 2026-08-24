@@ -1,16 +1,19 @@
 name: CI
 
-# Gitflow law (v0.6.0 / DADAIA.md §5): develop is the only pushable branch and main
-# advances via PR from develop only — feature/** and hotfix/v* are local-only, so
-# their push triggers were retired (dead configuration that advertised a forbidden
-# workflow).
+# Gitflow law v2 (v0.4.4 FR3/FR4 / DADAIA.md §4 (Gitflow)): feature/{M.m.p} is the ONLY pushable
+# branch (its push triggers the full matrix below); develop and main advance by PR
+# only. Every PR is gated by pr-source-guard (both edges, one job) and by
+# security-verdict-gate (the diff-based security review, relocated here from the
+# pre-push hook — v0.4.4 A3.4/FR4). hotfix/* was retired outright (G2) and carries no
+# trigger.
 on:
   push:
     branches:
       - main
       - develop
+      - 'feature/**'
   pull_request:
-    branches: [main]
+    branches: [main, develop]
   workflow_dispatch:
     # Optional: supply handoff paths when invoking from a CLOSURE workflow.
     # Leave blank on regular manual runs — the gate auto-discovers or no-ops.
@@ -432,23 +435,89 @@ jobs:
         run: dadaia backlog doctor --specs-dir specs --source-root .
 
   pr-source-guard:
-    name: PR source guard (main accepts develop only)
+    name: PR source guard (both gitflow v2 edges, one job)
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    if: github.event_name == 'pull_request' && (github.base_ref == 'main' || github.base_ref == 'develop')
     timeout-minutes: 1
     steps:
-      - name: Refuse PRs to main from any head but develop
+      - name: Refuse a PR whose head does not match its base's permitted source
         env:
-          # head.ref is fork-influenceable input: never interpolate it into the
-          # shell command string — read it from the environment and compare.
+          # head.ref/base_ref are fork-influenceable input: never interpolate them
+          # into the shell command string — read from the environment and compare.
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          if [ "$HEAD_REF" != "develop" ]; then
-            echo "::error::Gitflow law (DADAIA.md §5): main accepts PRs from 'develop' only. Got head '$HEAD_REF'."
-            echo "::error::Fix: merge your branch into develop, push develop, and open the PR develop -> main."
-            exit 1
+          if [ "$BASE_REF" = "main" ]; then
+            # Rule 1 (unchanged): main accepts a PR only from develop.
+            if [ "$HEAD_REF" != "develop" ]; then
+              echo "::error::Gitflow law (DADAIA.md §4 (Gitflow)): main accepts PRs from 'develop' only. Got head '$HEAD_REF'."
+              echo "::error::Fix: merge your branch into develop, push develop, and open the PR develop -> main."
+              exit 1
+            fi
+            echo "PR head is develop - gitflow source rule satisfied (main)."
+          elif [ "$BASE_REF" = "develop" ]; then
+            # Rule 2 (v0.4.4 FR4): develop accepts a PR only from feature/{M.m.p} — no
+            # 'v' prefix, M.m.p numeric. Derived from the SAME pattern as
+            # features/chokepoints/service.py::_FEATURE_RE
+            # (r"^feature/\d+\.\d+\.\d+$") — the ONE pattern source (A3.2); POSIX ERE
+            # has no \d, so [0-9]+ is its exact translation, never a second, drifted
+            # regex literal.
+            if ! echo "$HEAD_REF" | grep -Eq '^feature/[0-9]+\.[0-9]+\.[0-9]+$'; then
+              echo "::error::Gitflow law (DADAIA.md §4 (Gitflow)): develop accepts PRs from 'feature/{M.m.p}' only (no 'v' prefix). Got head '$HEAD_REF'."
+              echo "::error::Fix: rebuild your work on a feature/M.m.p branch and open the PR feature/M.m.p -> develop."
+              exit 1
+            fi
+            echo "PR head matches feature/M.m.p - gitflow source rule satisfied (develop)."
           fi
-          echo "PR head is develop - gitflow source rule satisfied."
+
+  # ---------------------------------------------------------------------------------
+  # Security-verdict PR gate (v0.4.4 FR4 / T-044-07) — DISTINCT from `verdict-gate`
+  # below: this job is auto-triggered by every PR (feature -> develop, develop ->
+  # main) and checks the SECURITY verdict only, keyed on the PR head sha; the
+  # `verdict-gate` job below is a manually `workflow_dispatch`-ed, DUAL (qa +
+  # security) gate for release CLOSURE. Two different constitutional moments, not a
+  # duplicated enforcement surface (AR-2).
+  #
+  # The diff-based security review that used to gate every push (pre-push hook,
+  # per-pushed-sha, DP-5) is DELETED from that path (A3.4, T-044-06) and relocates
+  # here. `.dadaia/handoff/` is a workspace-local, gitignored directory a GitHub
+  # Actions checkout never sees (features/chokepoints/service.py's module docstring;
+  # `dadaia ci gc-push-verdicts` only ever reads a local clone) — so the evidence
+  # this job reads is a COMMITTED copy of the security-reviewer's APPROVED handoff
+  # at `specs/releases/<release-id>/verdicts/<reviewed-sha>.handoff.json` (the same
+  # "review artifact committed on the branch" cadence DADAIA.md §4 (Gitflow) already
+  # uses for a qa-engineer segment-close review). See
+  # .github/scripts/pr-verdict-check.sh for exactly what "covers the PR head sha"
+  # means and why literal sha equality is not always achievable.
+  #
+  # A4.4 (recorded limit): a workflow job added on a feature branch does not run on
+  # the PR that introduces it AS A REQUIRED status check — it still runs and
+  # reports (the workflow file is read from the PR head), but branch protection
+  # cannot require a check GitHub has never observed against the base branch yet.
+  # rc-1's PR is the PR that *brings* this job to develop (milestone (a) still used
+  # the v1 mechanic, D2) — so this gate is ADVISORY on rc-1's PR and REQUIRED from
+  # rc-2 onward. Making it required is an operator/dispatcher repository-settings
+  # action (`gh api repos/<owner>/<repo>/branches/<branch>/protection/required_status_checks
+  # -X PATCH`) — that call CLOBBERS the whole required-checks list, so the full list
+  # must always be re-supplied whole, never as a delta.
+  security-verdict-gate:
+    name: Security verdict gate (PR head sha)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && (github.base_ref == 'develop' || github.base_ref == 'main')
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          # The literal PR head — never the synthetic refs/pull/N/merge commit
+          # actions/checkout defaults to for pull_request events — and full history
+          # (fetch-depth: 0) so the script's `git merge-base --is-ancestor` and
+          # `git diff` can reach back to whatever sha the committed verdict names.
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - name: Require an APPROVED security-reviewer verdict covering this PR head
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: bash .github/scripts/pr-verdict-check.sh
 
   # ---------------------------------------------------------------------------
   # Dual-approval verdict gate (panel-kanban-v1 §3 K-3 / §9)

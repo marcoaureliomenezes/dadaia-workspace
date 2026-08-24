@@ -15,7 +15,7 @@ tags:
 - layer-1
 - projection
 - binding
-last_updated: '2026-08-12'
+last_updated: '2026-08-24'
 release_origin: v0.2.8
 ---
 
@@ -27,7 +27,9 @@ operator-installed external CLI (`kimi`), not a Python package dependency.
 ## Layer 1
 
 `.kimi-code/` is a generated projection whose workspace tree is inert Markdown
-(`AGENTS.md` orientation). Kimi Code has no project-level config file, so the hook
+(`AGENTS.md` orientation, plus its own copy of the law — verified to be reached exactly
+**once** per session, since this harness resolves no import chain that would deliver a
+second one). Kimi Code has no project-level config file, so the hook
 registration lives in the user-level `$KIMI_CODE_HOME/config.toml` inside a managed,
 marker-delimited block of TOML hook rules written by `dadaia public install --target
 kimi-code`. Four shims under `$KIMI_CODE_HOME/hooks/dadaia-kimi-*.sh` resolve the

@@ -247,9 +247,14 @@ def load_registry_context_identities(workspace_root: Path) -> RegistryContextIde
     """Composition-root seam over the Spec Context registry (v0.11.0 FR5, T-110-13).
 
     ``cli/commands/ci.py#_foreign_repo_slugs`` reads every registered context's
-    ``(name, repo_slug)`` pair through here — mirroring :func:`load_denylist_terms` /
+    ``(name, repo_slug)`` pair — one pair per repo in that context's ``all_repos()``
+    (FR18/T-044-29: main + every FR15 associated repo, not the main repo alone) —
+    through here, mirroring :func:`load_denylist_terms` /
     :func:`load_denylist_baseline_patterns` — rather than importing
-    ``infrastructure.json_context_store`` directly (``cli-no-infrastructure``).
+    ``infrastructure.json_context_store`` directly (``cli-no-infrastructure``). Before
+    FR18 an associated repo's slug never entered the foreign-name denylist layer, so a
+    context's main-repo push was never protected against leaking a private associated
+    repo's name.
 
     A5.4: a missing registry file already yields an empty result from
     :class:`JsonContextStore` itself (no exception); an EMPTY registry likewise yields
@@ -271,7 +276,8 @@ def load_registry_context_identities(workspace_root: Path) -> RegistryContextIde
     except (OSError, ValueError, KeyError, TypeError, SchemaVersionError):
         return RegistryContextIdentities(identities=(), degraded=True)
     return RegistryContextIdentities(
-        identities=tuple((c.name, c.repo_slug) for c in contexts), degraded=False
+        identities=tuple((c.name, repo.slug) for c in contexts for repo in c.all_repos()),
+        degraded=False,
     )
 
 

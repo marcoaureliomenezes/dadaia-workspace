@@ -7,7 +7,9 @@ Responsibilities
   best-effort case-insensitive matching (D1.A from architect report).
 - Expose alive Spec Context Projects as PanelContext dataclasses, including the
   cached current_branch field from SpecContextService (R4: no git subprocess per
-  request — potential staleness is accepted for Release-1; see PLAN risks R4).
+  request — potential staleness is accepted for Release-1; see PLAN risks R4). FR18
+  (T-044-29) extends this to also carry each context's associated repos (slug + url,
+  the FR15 registry data — no live git status, keeping the R4 no-subprocess posture).
 - Expose the canonical agent catalog via list_canonical_agents() (PR3-08).
 
 Dataclasses
@@ -17,7 +19,8 @@ Dataclasses
 - ServerGroup — a named group of ServerRows (group_label, context_name | None,
                 rows).
 - PanelContext — one alive Spec Context Project (slug, name, repo_path, branch,
-                 status).
+                 status, associated).
+- PanelAssociatedRepo — one associated repo on a PanelContext (slug, url).
 """
 
 from __future__ import annotations
@@ -61,6 +64,18 @@ class ServerGroup:
     rows: list[ServerRow] = field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class PanelAssociatedRepo:
+    """One FR15 associated repo on a :class:`PanelContext` card (FR18/T-044-29).
+
+    slug/url only — no live on-disk/branch status, matching the R4 no-git-subprocess
+    posture the main repo's ``branch`` field already carries.
+    """
+
+    slug: str
+    url: str
+
+
 @dataclass
 class PanelContext:
     """One active Spec Context Project as seen by the panel.
@@ -68,6 +83,8 @@ class PanelContext:
     branch — consumed as-is from SpecContextService (cached at last activate/show).
              No git subprocess is invoked per request (R4 trade-off).
              The rendering layer displays "(unknown)" when branch is None.
+    associated — this context's FR15 associated repos (main repo excluded, matching
+                 FR19's "one place of control" boundary); empty tuple when none.
     """
 
     slug: str
@@ -75,6 +92,7 @@ class PanelContext:
     repo_path: Path
     branch: str | None
     status: str
+    associated: tuple[PanelAssociatedRepo, ...] = ()
 
 
 class PanelService:
@@ -230,6 +248,10 @@ class PanelService:
                 repo_path=self._workspace_root / "repos" / ctx.repo_slug,
                 branch=ctx.current_branch,
                 status="alive",
+                associated=tuple(
+                    PanelAssociatedRepo(slug=repo.slug, url=repo.url)
+                    for repo in ctx.associated_repos
+                ),
             )
             for ctx in self._active_contexts()
         ]

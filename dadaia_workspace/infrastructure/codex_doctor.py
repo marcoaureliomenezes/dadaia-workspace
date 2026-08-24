@@ -694,9 +694,9 @@ def codex_trust_boundary_info(
                 "codex:trust-boundary — no installed Codex CLI observed on PATH "
                 "('codex --version' unreachable); the interactive-vs-headless "
                 "hook-fire boundary is UNVERIFIED for this environment (the git "
-                "chokepoints — pre-commit presence advisory + pre-push "
-                "security-verdict gate — remain independent defense-in-depth "
-                "regardless). (WS-CDX-HYGIENE)",
+                "chokepoints — pre-commit presence advisory + pre-push CI/branch "
+                "gate + the PR security-verdict gate — remain independent "
+                "defense-in-depth regardless). (WS-CDX-HYGIENE)",
             )
         ]
     if raw_version == _CODEX_HOOKS_LIVE_CERTIFIED_VERSION:
