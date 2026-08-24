@@ -851,7 +851,7 @@ software-engineer, unless stated. Each diff must leave its feature **smaller or 
 > the operator approves the amendment after the sweep has started, the remaining fixes still
 > adopt them from that point, and the ones already closed are restated in CLOSURE (A23.4).
 
-- [ ] **T-044-61 — FR22: `dd-bug-fix` §3–§5 becomes a method**
+- [-] **T-044-61 — FR22: `dd-bug-fix` §3–§5 becomes a method**
 
 **Owner role:** ai-engineer · **Commit:**
 `docs(T-044-61): root cause becomes a method with a Done when per phase`
