@@ -623,3 +623,147 @@ This does **not** change the verdict. An approval cites the commit it reviewed, 
 work is not committed. Recorded here so the next round is a formality: once it lands with
 its bug `resolved` event, re-running F-12's repro and the full preflight is the whole of
 the remaining verification.
+
+---
+
+# Final verdict — 2026-08-24
+
+Third and last pass, against `ed5d64cd` (`fix(bugs): create applies the ownership
+predicate at the second registry seam`), the tree clean.
+
+## Verdict: APPROVED
+
+Zero CRITICAL, zero HIGH. Every finding of this review is closed; the residuals are LOW
+or record-only and are named below so nothing rides to closure unstated.
+
+`ed5d64cd` is byte-for-byte the fix I verified in the working tree during the re-review,
+plus the docstring correction: `_foreign_slug_owner` now reads "`create` (the main
+`--repo` slug) and `add_repo` (associated slugs) are the **TWO** seams that write into
+that shared namespace, so both consult this predicate". The claim and the code finally
+agree.
+
+### F-12 — closed at both seams
+
+Re-ran the repro against the committed tree:
+
+| Seam | Case | Result |
+|---|---|---|
+| `create` | another context's **main** slug (the F-12 repro) | **REFUSED** |
+| `create` | another context's **associated** slug | **REFUSED** |
+| `create` | a free slug | ACCEPTED — no over-refusal |
+| `add_repo` | another context's main slug | **REFUSED** — F-1 unregressed |
+| `add_repo` | own main slug (A17.3) | **REFUSED** |
+| `add_repo` | a free slug, then re-added | ACCEPTED, then `added=False` — A17.1 intact |
+
+Final registry state carries no slug owned twice.
+
+### Why this closes the *class*, not another surface
+
+The whole arc of F-1 → F-12 was a fix that closed the seam it was pointed at while its
+own docstring asserted a completeness it did not have. So the closing check is
+completeness, not another repro. Every store write in `SpecContextService`:
+
+| Line | Write | Can it introduce a slug? |
+|---|---|---|
+| 325 | `create` → `save` | **Yes** (`repo_slug=repo_slug`, line 319) — **guarded** |
+| 443 | `add_repo` → `update` | **Yes** (`AssociatedRepo(slug=slug, …)`, line 441) — **guarded** |
+| 352 | `update_url` → `update` | No — copies `ctx.repo_slug` / `ctx.associated_repos` |
+| 474 | `remove_repo` → `update` | No — filters the tuple only |
+| 716 | `alive` → `update` | No — copies `ctx_fresh.*` |
+| 960 | `dead` → `update` | No — copies `ctx.*` |
+
+Exactly two sites can introduce a slug from an argument, and both now consult the one
+predicate. The other four carry an existing slug forward and are structurally incapable
+of violating the invariant. There is no third seam to find — the invariant is enforced
+where it can be broken and nowhere else, which is the shape the standing order asks for:
+one predicate, at the seams that own the write, never a guard bolted onto `dead()`'s
+destructive side.
+
+## Gate state at `ed5d64cd`
+
+| Gate | Result |
+|---|---|
+| `dadaia ci preflight` (**full**, incl. e2e) | **PASS** — `ruff format --check`, `ruff check`, `mypy --strict`, `lint-imports`, `pytest`, 5/5 |
+| `dadaia specs doctor` | **0 errors**, 4 warnings (the same 4 pre-existing legacy rows) |
+| `dadaia backlog doctor` | **clean** |
+| `dadaia public doctor` | 207 `[ok]`; only `[foreign]` operator-owned files |
+| `pytest tests/integration/test_repo_self_scan.py` | **5 passed** |
+| Open bugs | **7** — zero HIGH, zero CRITICAL |
+| Working tree | clean |
+
+`context-create-accepts-slug-owned-by-another-context` carries a `resolved` event with all
+three FR23 fields populated and checkable (red-loop command, `service.py:create` seam,
+`net-positive: +31/-7` — routed to the architect as FR23 requires).
+
+## Findings ledger — final state
+
+| # | Severity | Final disposition |
+|---|---|---|
+| F-1 | HIGH | **CLOSED** (`1f50dbdf` + `ed5d64cd`) — closed as a class, per the seam census above |
+| F-2 | MEDIUM | **CLOSED** (`f0a1ac0b`) — fail-open proven real against the pre-fix script, then closed |
+| F-3 | MEDIUM | **CLOSED** (`f0a1ac0b`) — 5 sites title-anchored |
+| F-4 | MEDIUM | **CLOSED** (`76d9db9b`) — writer normalised, 9th battery case, census self-enforcing |
+| F-5 | MEDIUM | **CLOSED** (`beb7bc8c`) — 2 files, 8 retired names, zero hits |
+| F-6 | MEDIUM | **CLOSED** (`76d9db9b`) — FR17 coverage no longer SCAFFOLD-by-default |
+| F-12 | HIGH | **CLOSED** (`ed5d64cd`) — verified above |
+| F-7, F-8, F-10 | LOW | Open, non-blocking — cosmetic naming/wording, no behaviour |
+| F-9 | LOW | Open, record-only — measured inside CLI-startup noise |
+| F-11 | MEDIUM | Registered as a bug — pre-existing, not a defect of this diff |
+| INFO-11 | INFO | Pre-push hook not installed in this working copy — see below |
+
+### Carried to PM intake (record-only, none blocking)
+
+- `public/agents/ai-engineer.md:239` cites `§5` for content in `§8` — the F-3 class, a
+  different section, in `public/**`.
+- Three inline `.tmp` writers outside the name-based census (`state_v2.py:166`,
+  `import_/service.py:135` and `:167`) — none added by v0.4.4; belongs to the
+  atomic-writer consolidation the `S5` close already routed.
+- Eleven off-taxonomy `Intent:` declarations repo-wide (8 `REGRESSION`, 3 `BUG`) — a
+  vocabulary decision for the stewardship skill's owner, not a code fix.
+- F-7 / F-8 / F-10's naming and wording residuals.
+
+### One operational item before `rc-1`
+
+`INFO-11` stands: this working copy has **no pre-push hook installed** (`.git/hooks/`
+holds only `.sample` files, `core.hooksPath` unset). FR3's inverted chokepoint is the
+release's headline mechanism and T-044-52's push is the first chance to exercise it on
+its own executed path. Run `dadaia ci install-hook` before that push.
+
+## Bug-surface delta — final
+
+Open bugs across the three passes: **6 → 8 → 7**. Two pre-existing defects were made
+visible (F-11's ledger corruption, F-12's mirror seam), one of which was found by the
+release's own architect applying a mirror-gap check to the first fix, and closed within
+the release. That is the standing order working end to end: a fix was challenged for
+completeness, the challenge found a real hole, and the hole was closed at the owning seam
+rather than papered over.
+
+Two rows of the round-one per-feature table move, and neither moves by accident:
+
+| Feature | Round 1 | Final | Why |
+|---|---|---|---|
+| CI verdict gate | UNCHANGED, new edge | **REDUCED** | Fails closed on both shapes it previously failed open on, with the fail-open demonstrated against the pre-fix script. Strictly stronger than the pre-push check it replaced. |
+| spec-context model + alive/dead + CLI | INCREASED | **INCREASED (sanctioned only)** | The destructive cross-context path is gone at every seam that can create it. What remains is the `S4` additive budget R-2/A21.4 already sanctions — no unaccounted growth. |
+
+Final tally across the eleven touched features: **REDUCED on 10**, sanctioned-INCREASED
+on 1 (`S4`). Production net **−130** (−813 excluding `S4`), AI-surface net **−943**, skills
+25 → 21. One enforcer where there were two, one branch-resolution seam where there were
+two, one atomic-writer idiom where there were two, one resolution-evidence gate where
+there was a floor that 132 events cleared by saying nothing — and one ownership predicate
+guarding both writes into the shared repo namespace.
+
+The release does what it set out to do, and the diff is smaller than what it replaced.
+
+## Recommendation: **APPROVED**
+
+Commit reviewed: **`ed5d64cd`**, on `feature/0.4.4`, base `f5cce371`.
+Evidence: this artifact (`specs/releases/v0.4.4/reviews/T-044-45-code-review.md`), the
+five `qa-engineer` segment closes and the `software-architect` rulings alongside it, and
+the gate output recorded above.
+
+`T-044-45` → `[x]`. T-044-46 (security review + the QA release verdict) is unblocked;
+F-2's closed fail-open shapes and F-11 are named inputs for it.
+
+**Self-scan:** no home-absolute path, no email literal, no IP, no hostname — every path
+repo-relative. Verified by inspection and by re-running
+`pytest tests/integration/test_repo_self_scan.py` with the file staged.

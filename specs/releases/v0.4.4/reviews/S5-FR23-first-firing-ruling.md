@@ -632,3 +632,64 @@ foreign hunks left for their owners). Residual surface, named honestly: the HIGH
 mirror lane at `create` (check (a) — the class's last unguarded registration seam),
 plus the migration import lane for historical registries; both routed above. No
 puxadinho detected in the diff under review.
+
+---
+
+## Firing 6 — mirror-seam fix (commit `ed5d64cd`): `_foreign_slug_owner` applied at the `create` seam
+
+**Date:** 2026-08-24 · **Trigger:** FR23 fast confirm (`evidence_diff` net-positive,
+service.py +31/-7 + tests +90/-4, `bugs.jsonl` `resolved` event for
+`context-create-accepts-slug-owned-by-another-context`, HIGH — the mirror gap Firing 5
+check (a) named, with its exact remedy)
+
+### Verdict: CONFIRMED — Firing 5's prescription executed verbatim, no drift, no extra shapes
+
+**(a) Remedy matches the prescription exactly.** Firing 5 prescribed: same predicate at
+`create`'s main `repo_slug`, same conflict error, one unit mirror test plus one CLI
+integration pin, one predicate / two call sites / zero new shapes, plus the two
+ride-along corrections. Delivered, item for item: `create` (service.py:289) now calls
+`self._foreign_slug_owner(name, repo_slug)` (service.py:306) before `self._store.save`,
+raising the pre-existing `AssociatedRepoConflictError` with the owning context named —
+same message shape as `add_repo`'s (service.py:411-420); the vacuous owner-exclusion by
+`name` is accepted exactly as the prescription anticipated (one signature, no special
+case). Correction (1) landed: the `_foreign_slug_owner` docstring (now service.py:357;
+line drift from the grown `create` docstring, not a second copy) names `create` and
+`add_repo` as "the TWO seams that write into that shared namespace" — the false
+one-seam claim is gone, and both bug slugs are cited. Correction (2) landed as routing,
+not code: the doctor-lane uniqueness decision for migration-imported historical
+collisions is explicitly NOT built and deferred to PM intake, per this ledger's own
+routing instruction (`resolved` event notes). Test surface: the prescribed unit mirror
+(`test_create_refuses_slug_owned_by_another_context_as_main_repo`,
+test_repo_verbs.py:239, asserting refusal AND no context registered) and CLI pin
+(`test_create_refuses_main_repo_slug_owned_by_another_context`,
+test_cli_context_repo_verbs.py:268), plus two extra pins — the associated-ownership
+shape (:258) and the unowned-slug no-regression (:279). The extras are coverage of the
+same contract, not new shapes (Firing 2's exception, trivially earned: they mirror the
+F-1 battery one-for-one). RED evidence precedes the fix on both levels
+(`evidence_loop`: `pytest.raises` failed and CLI exit_code 0 at HEAD).
+
+**(b) The invariant now holds at BOTH registry write seams with ONE predicate.** Grep
+over the package: `_foreign_slug_owner` is defined once (service.py:357) and called
+exactly twice — `create` (service.py:306) and `add_repo` (service.py:411). No copy
+exists in `cli/commands/` or anywhere else; `create --associated` still funnels through
+`add_repo` verbatim (pinned, test_cli_context_repo_verbs.py:252), so the third CLI lane
+inherits rather than duplicates. Firing 5's closing condition — "the invariant holds
+only if every registry seam that writes slug ownership enforces the same predicate" —
+is now satisfied by construction at every registration seam, and `dead()` remains
+untouched (zero growth in the destructive lane). Root-cause gate: **PASS**.
+Architecture-fidelity gate: **PASS** — including the docstring, which now states the
+true seam topology.
+
+### Bug-surface delta
+
+**REDUCED — the destroy-foreign-work class is now closed at its registration seams.**
+Ledger chain: Firing 5's finding → `reported` (2026-08-24T16:26:10Z,
+software-architect) → `resolved` (16:32:01Z, same session, per doctrine) — first
+generation, no repetition, no symptom patch. Suite 2820 passed, +4 over baseline =
+exactly the four new pins. Diff shape honors the standing order: the +31 on service.py
+is the missing enforcement plus a documentation *correction* (a falsehood deleted); no
+branch, flag, or second path added. Residual surface, named honestly and already
+routed: historical collisions imported verbatim by the v2→v3 migration — the
+doctor-lane healing decision sits at PM intake, and until the operator disposes of it,
+a pre-v3 registry that already carried a collision remains armed despite both seam
+guards. No puxadinho.

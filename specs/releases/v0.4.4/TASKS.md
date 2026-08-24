@@ -1174,7 +1174,7 @@ operator before ship.
 
 ---
 
-- [-] **T-044-45 — Six-axis code review on the thawed tree**
+- [x] **T-044-45 — Six-axis code review on the thawed tree**
 
 **Owner role:** code-reviewer · **Preconditions:** T-044-44 `[x]`. Runs on the **thawed**
 tree, before `rc-1` and before any archive move (D8/FR5 order).
