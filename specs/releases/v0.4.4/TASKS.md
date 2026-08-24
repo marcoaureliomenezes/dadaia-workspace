@@ -873,7 +873,7 @@ line and fix the description's grant claim. **No new skill** — the method live
 
 ---
 
-- [ ] **T-044-62 — FR23: the `resolved` event refuses evidence that cannot be checked**
+- [-] **T-044-62 — FR23: the `resolved` event refuses evidence that cannot be checked**
 
 **Owner role:** software-engineer (CLI + schema) + ai-engineer (skill + law wording) ·
 **Commit:** `feat(T-044-62): resolved evidence carries the loop, the seam and the diff direction`
