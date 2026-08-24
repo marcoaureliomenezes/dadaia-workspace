@@ -80,10 +80,25 @@ def repo_slug_for_context(workspace_root: Path, name: str) -> str:
 
 
 def context_name_for_repo_slug(workspace_root: Path, slug: str) -> str:
-    """Inverse of :func:`repo_slug_for_context`: the NAME whose repo is *slug*."""
+    """Inverse of :func:`repo_slug_for_context`: the NAME whose repo is *slug*.
+
+    A16.4 (v0.4.4 FR16): *slug* also matches an **associated** repo's slug, resolving
+    the same OWNING context's name a match on the main ``repo_slug`` would — a
+    resolution walk starting inside ``repos/<associated-slug>/`` must land on the
+    context, never treat the associated repo as a second context of its own (an
+    associated repo carries no ``specs/`` bind, FR19/G13). This is the same inverse
+    lookup extended to the registry's ``associated_repos`` list, not a second
+    repo-resolution path (A15.3).
+    """
     for entry in _registry_contexts(workspace_root):
         entry_slug = entry.get("repo_slug") or entry.get("repo")
         if entry_slug == slug:
+            name = entry.get("name")
+            return name if isinstance(name, str) and name else slug
+        associated = entry.get("associated_repos")
+        if isinstance(associated, list) and any(
+            isinstance(assoc, dict) and assoc.get("slug") == slug for assoc in associated
+        ):
             name = entry.get("name")
             return name if isinstance(name, str) and name else slug
     return slug
@@ -125,9 +140,29 @@ def _live_session_context(workspace_root: Path) -> str | None:
 
 def resolve_specs_dir(specs_dir: str | None) -> Path:
     """Resolve a specs/ dir: explicit input, else :func:`resolve_context` (no ``cwd/specs``
-    fallback — ``DADAIA.md`` §3 grants no such rung); unresolved reaches the error below."""
+    fallback — ``DADAIA.md`` §3 grants no such rung); unresolved reaches the error below.
+
+    T-044-40 (bug ``symlinked-specs-root-is-followed-by-migration-and-repair``): a
+    symlinked *explicit* root is refused HERE, once, at the one seam every
+    resolver-driven verb (``specs upgrade``, ``specs doctor --fix``, and every other
+    consumer of this function) shares — never re-decided per write site. This mirrors
+    the doctrine the inner walk roots already enforce (the migration's ``memory/``
+    walk root, the doctor's TREE-5 projection target — both refuse a symlinked root
+    with a skip note rather than follow it): the uniform rule is smaller than a
+    documented asymmetry, and this package has already paid for blind ``.resolve()``
+    once (a symlinked venv escaping its sandbox).
+    """
     if specs_dir:
-        return Path(specs_dir).resolve()
+        path = Path(specs_dir)
+        if path.is_symlink():
+            # Deferred import — see the terminal error below for why.
+            import typer
+
+            raise typer.BadParameter(
+                f"Refusing a symlinked specs root: {path} is a symlink. Point "
+                "--specs-dir at the real directory instead of a link to it."
+            )
+        return path.resolve()
 
     cwd = Path.cwd()
     try:

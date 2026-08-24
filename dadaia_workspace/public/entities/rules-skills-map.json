@@ -1,0 +1,132 @@
+{
+  "schema_version": "rules-skills-map-v1",
+  "skill_md_line_ceiling": 500,
+  "declared_overlaps": [
+    ["dd-release-implement", "dadaia-task-manager"],
+    ["dd-audit-project", "dd-workspace-doctor"],
+    ["dd-bug-registration", "dd-bug-fix"],
+    ["dadaia-handoff-emitter", "dd-manager-orchestration", "dd-workspace-doctor"]
+  ],
+  "rows": [
+    {
+      "topic": "Gitflow",
+      "section": "§4 Gitflow — the branch contract",
+      "skills": ["dd-gitflow-default"],
+      "justification": null
+    },
+    {
+      "topic": "Task lifecycle",
+      "section": "§6 Specs, tasks and memory",
+      "skills": ["dadaia-task-manager"],
+      "justification": null
+    },
+    {
+      "topic": "Backlog",
+      "section": "§6 Specs, tasks and memory",
+      "skills": ["dd-backlog-definition"],
+      "justification": null
+    },
+    {
+      "topic": "Releases",
+      "section": "§6 Specs, tasks and memory",
+      "skills": ["dd-release-definition", "dd-release-implement"],
+      "justification": "The law states Releases as one bold topic spanning pick, the mandatory grill, SPEC/PLAN/TASKS, implementation, and finalization (memory update -> CLOSURE -> archive) as a single continuous flow, not two separate bold topics. Definition is one lifecycle stage; dd-release-implement (FR10/G12) absorbs both implementation and finalization (memory update, CLOSURE, disposition sweep, artifact GC, archive) as one skill spanning the second stage."
+    },
+    {
+      "topic": "Root cause, always",
+      "section": "§7 Quality",
+      "skills": ["dd-bug-fix"],
+      "justification": null
+    },
+    {
+      "topic": "Register every bug you hit",
+      "section": "§7 Quality",
+      "skills": ["dd-bug-registration"],
+      "justification": null
+    },
+    {
+      "topic": "Test lifecycle",
+      "section": "§7 Quality",
+      "skills": ["dadaia-test-stewardship"],
+      "justification": null
+    },
+    {
+      "topic": "Emission is handoff-first",
+      "section": "§5 Where things are written",
+      "skills": ["dadaia-handoff-emitter"],
+      "justification": null
+    },
+    {
+      "topic": "The library surface",
+      "section": "§8 The library surface",
+      "skills": ["dd-workspace-doctor"],
+      "justification": null
+    },
+    {
+      "topic": "Audits",
+      "section": "§6 Specs, tasks and memory",
+      "skills": ["dd-audit-project"],
+      "justification": null
+    },
+    {
+      "topic": "Grill / intake",
+      "section": "§6 Specs, tasks and memory",
+      "skills": ["dd-grill-me"],
+      "justification": null
+    },
+    {
+      "topic": "Use the workspace venv (CLI)",
+      "section": "§8 The library surface",
+      "skills": ["dd-cli-library"],
+      "justification": null
+    },
+    {
+      "topic": "Context and memory",
+      "section": "§3 What is enforced deterministically",
+      "skills": ["dadaia-workspace-manager"],
+      "justification": null
+    },
+    {
+      "topic": "Register every dev server",
+      "section": "§8 The library surface",
+      "skills": ["dev-server-registry"],
+      "justification": null
+    },
+    {
+      "topic": "Who does what (dispatch)",
+      "section": "§2 Who does what",
+      "skills": ["dd-manager-orchestration"],
+      "justification": null
+    },
+    {
+      "topic": "Architecture: DRAFT, REVIEW, ONBOARD",
+      "section": "§2 Who does what",
+      "skills": ["architect-core-workflow"],
+      "justification": null
+    },
+    {
+      "topic": "Spec reading (SDD navigation)",
+      "section": "§6 Specs, tasks and memory",
+      "skills": ["dadaia-workspace-spec-navigator"],
+      "justification": null
+    },
+    {
+      "topic": "Spec review (approval gate)",
+      "section": "§6 Specs, tasks and memory",
+      "skills": ["dadaia-workspace-spec-reviewer"],
+      "justification": null
+    },
+    {
+      "topic": "Memory is current product truth",
+      "section": "§6 Specs, tasks and memory",
+      "skills": ["dadaia-step0-memory-bootstrap"],
+      "justification": null
+    },
+    {
+      "topic": "AI surface",
+      "section": "§2 Who does what",
+      "skills": ["dd-ai-eng-knowhow"],
+      "justification": null
+    }
+  ]
+}

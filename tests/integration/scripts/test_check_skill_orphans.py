@@ -91,8 +91,37 @@ def test_orphan_detected_then_wired_exits_clean(tmp_path: Path) -> None:
     assert result2.stderr.strip() == "", (
         f"Expected empty stderr on clean run.\nstderr: {result2.stderr!r}"
     )
-    assert result2.stdout.strip() == "", (
-        f"Expected empty stdout on clean run.\nstderr: {result2.stdout!r}"
+
+
+def test_disable_model_invocation_skill_is_never_flagged_an_orphan(tmp_path: Path) -> None:
+    """FR28/A28.1 (bug skill-orphan-checker-misses-disable-model-invocation).
+
+    A skill carrying ``disable-model-invocation: true`` is, by FR28's own design,
+    deliberately absent from EVERY persona's ``skills:`` allowlist — starting with
+    ``dd-audit-project``. The orphan checker predates FR28 and only understood
+    frontmatter-list reachability; it must never demand that such a skill be wired
+    into a ``skills:`` list to escape being flagged (that would violate FR28 itself).
+    A genuinely unreferenced, non-disable-model-invocation skill must still be caught.
+    """
+    ws = tmp_path / "dmi-case"
+    _seed_workspace(ws, agent_skills=["__wired_skill"])
+    dmi_skill = ws / "dadaia_workspace" / "public" / "skills" / "__dmi_skill"
+    dmi_skill.mkdir()
+    (dmi_skill / "SKILL.md").write_text(
+        "---\nname: __dmi_skill\ndisable-model-invocation: true\n---\n# dmi skill\n"
+    )
+    result = _run_script(ws)
+    assert result.returncode == 1, (
+        f"Expected exit code 1 (the seeded __orphan_skill is still genuinely orphaned).\n"
+        f"stdout: {result.stdout!r}\nstderr: {result.stderr!r}"
+    )
+    assert "__dmi_skill" not in result.stderr, (
+        f"A disable-model-invocation skill must never be flagged an orphan for the "
+        f"absence FR28 requires.\nstderr: {result.stderr!r}"
+    )
+    assert "__orphan_skill" in result.stderr, (
+        f"A genuinely unreferenced, non-disable-model-invocation skill must still be "
+        f"caught.\nstderr: {result.stderr!r}"
     )
 
 

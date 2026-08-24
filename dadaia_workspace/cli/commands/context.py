@@ -33,12 +33,18 @@ from dadaia_workspace.core.session_env import harness_session_id, sanitize_sessi
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.spec_context import presence, session_identity
 from dadaia_workspace.features.spec_context.service import (
+    AssociatedRepoConflictError,
+    AssociatedRepoNotFoundError,
     DeadReviewRequiredError,
     DeadSecretFoundError,
     SpecContextService,
 )
 
 app = typer.Typer(help="Manage Spec Context Projects.")
+# FR17 (v0.4.4, T-044-28): associated-repo registry verbs, nested under `context repo`
+# — same `app.add_typer` pattern as `specs release`/`specs segment`.
+repo_app = typer.Typer(help="Manage a context's associated repos (main repo excluded).")
+app.add_typer(repo_app, name="repo")
 console = Console()
 err_console = Console(stderr=True)
 
@@ -57,21 +63,16 @@ def _ctx_service() -> SpecContextService:
         raise typer.Exit(1) from None
 
 
-def _ctx_to_dict(ctx: SpecContextProject) -> dict:  # type: ignore[type-arg]
-    # v0.1.72 FR4 (bug `context-current-branch-stale-for-alive-repo`): the store's
-    # current_branch is a snapshot written only at alive()/dead() transitions — for an
-    # ALIVE repo on disk, report the ACTUAL checked-out branch (the stored snapshot is
-    # still exposed as `stored_branch`, the dead/alive restore metadata).
-    live_branch: str | None = None
-    if ctx.state == ContextState.ALIVE:
-        repo_path = resolve_workspace_root() / "repos" / ctx.repo_slug
-        if (repo_path / ".git").exists():
-            try:
-                from dadaia_workspace import container
-
-                live_branch = container.build_git_client().current_branch(repo_path) or None
-            except Exception:  # noqa: BLE001 — display fallback, never break `show`
-                live_branch = None
+def _ctx_to_dict(svc: SpecContextService, ctx: SpecContextProject) -> dict:  # type: ignore[type-arg]
+    # v0.1.72 FR4 (bug `context-current-branch-stale-for-alive-repo`) / v0.4.4 FR18
+    # (bug `context-list-current-branch-stale-for-alive-repo`, A18.3): `current_branch`
+    # is resolved through SpecContextService.repos_live_status — the ONE
+    # branch-resolution implementation `show` AND `list` both call, so the two verbs
+    # can no longer disagree on this field the way they used to (list previously read
+    # the stored snapshot directly while show queried git live). The stored snapshot
+    # remains available under the distinct name `stored_branch` (A18.1).
+    statuses = svc.repos_live_status(ctx)
+    main_status, associated_statuses = statuses[0], statuses[1:]
     return {
         "name": ctx.name,
         "state": ctx.state.value,
@@ -80,8 +81,17 @@ def _ctx_to_dict(ctx: SpecContextProject) -> dict:  # type: ignore[type-arg]
         "created_at": ctx.created_at,
         "alive_since": ctx.alive_since,
         "dead_since": ctx.dead_since,
-        "current_branch": live_branch or ctx.current_branch,
+        "current_branch": main_status.current_branch or ctx.current_branch,
         "stored_branch": ctx.current_branch,
+        "associated_repos": [
+            {
+                "slug": status.slug,
+                "url": status.url,
+                "on_disk": status.on_disk,
+                "current_branch": status.current_branch,
+            }
+            for status in associated_statuses
+        ],
     }
 
 
@@ -96,16 +106,23 @@ def _resolve_caller_context_name() -> str | None:
 
 
 def _build_context_redactor(contexts: list[SpecContextProject]) -> ContextRedactor:
-    """Candidates = every known context's name and repo slug; excludes the caller's
-    own resolved context name and its associated repo slug (render boundary ONLY —
-    `contexts` is data the service already returned with true names)."""
+    """Candidates = every known context's name and every repo slug (main + FR15
+    associated repos, via `all_repos()`); excludes the caller's own resolved context
+    name and its own full repo set (render boundary ONLY — `contexts` is data the
+    service already returned with true names). FR18 widened this from "main slug
+    only" — an associated repo can be exactly as private as a main one, so it must
+    redact the same way."""
     caller_name = _resolve_caller_context_name()
-    caller_slug = next((ctx.repo_slug for ctx in contexts if ctx.name == caller_name), None)
+    caller_ctx = next((ctx for ctx in contexts if ctx.name == caller_name), None)
+    caller_repo_slugs = (
+        {r.slug for r in caller_ctx.all_repos()} if caller_ctx is not None else set()
+    )
     candidates: list[str] = []
     for ctx in contexts:
         candidates.append(ctx.name)
-        candidates.append(ctx.repo_slug)
-    return ContextRedactor(candidates, exclude=(caller_name, caller_slug))
+        for repo in ctx.all_repos():
+            candidates.append(repo.slug)
+    return ContextRedactor(candidates, exclude=(caller_name, *caller_repo_slugs))
 
 
 def _now_iso() -> str:
@@ -181,6 +198,15 @@ def create(
             "for a repo not in the catalog or to pin an explicit remote."
         ),
     ),
+    associated: list[str] = typer.Option(
+        [],
+        "--associated",
+        help=(
+            "Register an associated repo at creation time (FR17). Repeatable. Each "
+            "value is SLUG or SLUG=URL — a bare slug registers with an empty URL, "
+            "settable later via 'context repo add' with --url."
+        ),
+    ),
 ) -> None:
     """Create a new Spec Context Project in state 'dead'."""
     # Refuse at CREATE what every downstream verb refuses. `create` accepted names with
@@ -197,6 +223,38 @@ def create(
                 "that is created is always usable."
             )
             raise typer.Exit(1) from None
+
+    # Parse + validate every --associated entry BEFORE creating anything (A17.3 and
+    # slug-format checks apply here too — a refused --associated must never leave a
+    # half-created context behind). `repo add` (below) is reused verbatim for the
+    # actual registration — this is not a second repo-registration path.
+    parsed_associated: list[tuple[str, str]] = []
+    seen_associated_slugs: set[str] = set()
+    for raw in associated:
+        assoc_slug, _, assoc_url = raw.partition("=")
+        assoc_slug = assoc_slug.strip()
+        assoc_url = assoc_url.strip()
+        if not _CONTEXT_NAME_RE.fullmatch(assoc_slug):
+            err_console.print(
+                f"[red]Error:[/red] invalid --associated repo slug {assoc_slug!r} in "
+                f"{raw!r}. Use only letters, digits, '-' and '_'."
+            )
+            raise typer.Exit(1) from None
+        if assoc_slug == repo:
+            err_console.print(
+                f"[red]Error:[/red] --associated {raw!r}: '{assoc_slug}' is this "
+                "context's own main repo slug (--repo) — it cannot also be an "
+                "associated repo."
+            )
+            raise typer.Exit(1) from None
+        if assoc_slug in seen_associated_slugs:
+            err_console.print(
+                f"[red]Error:[/red] --associated repo slug {assoc_slug!r} given more than once."
+            )
+            raise typer.Exit(1) from None
+        seen_associated_slugs.add(assoc_slug)
+        parsed_associated.append((assoc_slug, assoc_url))
+
     workspace_root = resolve_workspace_root()
     # An explicit --url overrides the catalog lookup (FR-W2-03 a / T-011-08); otherwise
     # look up repo_url from the repos catalog, failing gracefully if unavailable.
@@ -215,12 +273,16 @@ def create(
             pass
 
     try:
-        ctx = _ctx_service().create(name, repo, repo_url)
+        svc = _ctx_service()
+        ctx = svc.create(name, repo, repo_url)
+        for assoc_slug, assoc_url in parsed_associated:
+            ctx, _ = svc.add_repo(name, assoc_slug, assoc_url)
+        suffix = f", {len(parsed_associated)} associated repo(s)" if parsed_associated else ""
         console.print(
             f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' created "
-            f"(repo: {ctx.repo_slug}, state: {ctx.state})"
+            f"(repo: {ctx.repo_slug}, state: {ctx.state}{suffix})"
         )
-    except (ContextAlreadyExistsError, ContextNotFoundError) as e:
+    except (ContextAlreadyExistsError, ContextNotFoundError, AssociatedRepoConflictError) as e:
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
 
@@ -238,8 +300,9 @@ def list_all(
     ),
 ) -> None:
     """List all Spec Context Projects."""
+    svc = _ctx_service()
     try:
-        contexts = _ctx_service().list_all()
+        contexts = svc.list_all()
     except SchemaVersionError as exc:
         print(str(exc), file=sys.stderr)
         raise typer.Exit(1) from None
@@ -247,19 +310,35 @@ def list_all(
     redactor = _build_context_redactor(contexts) if redact else None
 
     if json_output:
-        payload = [
-            {
-                "name": ctx.name,
-                "state": ctx.state.value,
-                "repo_slug": ctx.repo_slug,
-                "repo_url": ctx.repo_url,
-                "created_at": ctx.created_at,
-                "alive_since": ctx.alive_since,
-                "dead_since": ctx.dead_since,
-                "current_branch": ctx.current_branch,
-            }
-            for ctx in contexts
-        ]
+        payload = []
+        for ctx in contexts:
+            # FR18/A18.1-A18.3: the SAME branch-resolution seam `show` uses
+            # (SpecContextService.repos_live_status) — list can no longer report a
+            # stale `current_branch` snapshot show would disagree with.
+            statuses = svc.repos_live_status(ctx)
+            main_status, associated_statuses = statuses[0], statuses[1:]
+            payload.append(
+                {
+                    "name": ctx.name,
+                    "state": ctx.state.value,
+                    "repo_slug": ctx.repo_slug,
+                    "repo_url": ctx.repo_url,
+                    "created_at": ctx.created_at,
+                    "alive_since": ctx.alive_since,
+                    "dead_since": ctx.dead_since,
+                    "current_branch": main_status.current_branch or ctx.current_branch,
+                    "stored_branch": ctx.current_branch,
+                    "associated_repos": [
+                        {
+                            "slug": status.slug,
+                            "url": status.url,
+                            "on_disk": status.on_disk,
+                            "current_branch": status.current_branch,
+                        }
+                        for status in associated_statuses
+                    ],
+                }
+            )
         if redactor is not None:
             payload = [redactor.json_value(row) for row in payload]
         print(json.dumps(payload, sort_keys=True))
@@ -272,6 +351,7 @@ def list_all(
     table.add_column("Name", style="bold")
     table.add_column("State")
     table.add_column("Repo")
+    table.add_column("Associated")
 
     state_style = {
         ContextState.ALIVE: "[green]alive[/green]",
@@ -285,6 +365,7 @@ def list_all(
             name,
             state_style.get(ctx.state, ctx.state.value),
             repo_slug,
+            str(len(ctx.associated_repos)),
         )
     console.print(table)
 
@@ -346,7 +427,7 @@ def show(
         if ctx is None:
             print(json.dumps({"context": None}, indent=2))
         else:
-            data = _ctx_to_dict(ctx)
+            data = _ctx_to_dict(svc, ctx)
             # Show only this caller's session. A context-wide "last binder" fallback would
             # expose foreign state as the caller's own and can never be authoritative.
             workspace_root = resolve_workspace_root()
@@ -391,10 +472,18 @@ def show(
     if redactor is not None and ctx.repo_url:
         repo_url_text = redactor.text(ctx.repo_url)
 
+    # FR18: table and --json share the SAME branch-resolution seam
+    # (SpecContextService.repos_live_status, A18.3) — main repo's live branch here
+    # is the identical value `list`'s --json output reports for this context.
+    statuses = svc.repos_live_status(ctx)
+    main_status, associated_statuses = statuses[0], statuses[1:]
+    branch_text = main_status.current_branch or ctx.current_branch or "—"
+
     console.print(f"[bold]Name:[/bold]       {display_name}")
     console.print(f"[bold]State:[/bold]      {ctx.state.value}")
     console.print(f"[bold]Repo:[/bold]       {display_repo}")
     console.print(f"[bold]Repo URL:[/bold]   {repo_url_text}")
+    console.print(f"[bold]Branch:[/bold]     {branch_text}")
     console.print(f"[bold]Created:[/bold]    {ctx.created_at}")
     console.print(f"[bold]Alive since:[/bold]  {ctx.alive_since or '—'}")
     console.print(f"[bold]Dead since:[/bold]   {ctx.dead_since or '—'}")
@@ -405,6 +494,21 @@ def show(
         console.print(f"[bold]Presence:[/bold]   {names}")
     else:
         console.print("[bold]Presence:[/bold]   —")
+
+    if associated_statuses:
+        assoc_table = Table(title="Associated repos")
+        assoc_table.add_column("Slug", style="bold")
+        assoc_table.add_column("URL")
+        assoc_table.add_column("On disk")
+        assoc_table.add_column("Branch")
+        for status in associated_statuses:
+            assoc_table.add_row(
+                status.slug,
+                status.url or "—",
+                "yes" if status.on_disk else "no",
+                status.current_branch or "—",
+            )
+        console.print(assoc_table)
 
 
 @app.command()
@@ -771,6 +875,129 @@ def update(
     except ContextNotFoundError as e:
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
+
+
+# ------------------------------------------------------------------ context repo (FR17)
+
+
+@repo_app.command(name="add")
+def repo_add(
+    ctx_name: str = typer.Argument(..., help="Context name"),
+    slug: str = typer.Argument(..., help="Repo slug to associate (directory name under repos/)"),
+    url: str = typer.Option("", "--url", help="Repo clone URL (optional; empty until set)"),
+) -> None:
+    """Register an associated repo on a context.
+
+    Run: dadaia context repo add <ctx> <slug> [--url <url>]
+
+    Idempotent: re-adding the same slug with the same URL is a no-op success. The
+    same slug with a DIFFERENT URL is refused — this verb is the one place an
+    associated repo's URL is set, so the recovery path is 'context repo remove'
+    then 'context repo add' again, never a second divergent URL-update verb
+    (compare 'context update --url', which repairs the MAIN repo's URL only).
+    Adding the context's own main repo slug is refused (it is already covered).
+    """
+    for label, value in (("context name", ctx_name), ("repo slug", slug)):
+        if not _CONTEXT_NAME_RE.fullmatch(value):
+            err_console.print(
+                f"[red]Error:[/red] invalid {label} {value!r}. Use only letters, digits, "
+                "'-' and '_'."
+            )
+            raise typer.Exit(1) from None
+    try:
+        ctx, was_added = _ctx_service().add_repo(ctx_name, slug, url)
+    except ContextNotFoundError as e:
+        err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+    except AssociatedRepoConflictError as e:
+        err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+
+    if was_added:
+        console.print(
+            f"[green]✓[/green] Associated repo '[bold]{slug}[/bold]' added to context "
+            f"'[bold]{ctx_name}[/bold]' ({len(ctx.associated_repos)} associated repo(s) total)."
+        )
+    else:
+        console.print(
+            f"[green]✓[/green] Associated repo '[bold]{slug}[/bold]' is already registered "
+            f"on context '[bold]{ctx_name}[/bold]' with this URL — no change."
+        )
+
+
+@repo_app.command(name="remove")
+def repo_remove(
+    ctx_name: str = typer.Argument(..., help="Context name"),
+    slug: str = typer.Argument(..., help="Associated repo slug to remove from the registry"),
+) -> None:
+    """Remove an associated repo from a context's registry.
+
+    Run: dadaia context repo remove <ctx> <slug>
+
+    Registry-only (A17.2): this NEVER deletes the on-disk checkout at
+    'repos/<slug>' — it only drops the registry entry, and always states
+    explicitly what it leaves behind on disk. To also remove the checkout, delete
+    it yourself, or run 'dadaia context dead <ctx>' first (which git-syncs and
+    removes every repo in the set, including this one, before you unregister it).
+    """
+    try:
+        ctx = _ctx_service().remove_repo(ctx_name, slug)
+    except ContextNotFoundError as e:
+        err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+    except AssociatedRepoNotFoundError as e:
+        err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+
+    console.print(
+        f"[green]✓[/green] Associated repo '[bold]{slug}[/bold]' removed from context "
+        f"'[bold]{ctx_name}[/bold]' registry ({len(ctx.associated_repos)} associated "
+        "repo(s) remain)."
+    )
+    on_disk = resolve_workspace_root() / "repos" / slug
+    if on_disk.exists():
+        console.print(
+            f"[yellow]![/yellow] The on-disk checkout at 'repos/{slug}' was left "
+            "untouched — this only removes the registry entry, it never deletes "
+            "files. Remove it yourself if it is no longer needed."
+        )
+    else:
+        console.print(f"[dim]No on-disk checkout found at 'repos/{slug}'.[/dim]")
+
+
+@repo_app.command(name="list")
+def repo_list(
+    ctx_name: str = typer.Argument(..., help="Context name"),
+    json_output: bool = typer.Option(False, "--json", help="Output stable JSON contract"),
+) -> None:
+    """List a context's associated repos.
+
+    Run: dadaia context repo list <ctx>
+
+    The main repo is never listed here (FR19: it stays the sole specs/bind/memory
+    target, resolved via 'context show') — this is the associated set only.
+    """
+    try:
+        ctx = _ctx_service().show(ctx_name)
+    except ContextNotFoundError as e:
+        err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+
+    if json_output:
+        payload = [{"slug": r.slug, "url": r.url} for r in ctx.associated_repos]
+        print(json.dumps(payload, sort_keys=True))
+        return
+
+    if not ctx.associated_repos:
+        console.print(f"[dim]Context '{ctx_name}' has no associated repos.[/dim]")
+        return
+
+    table = Table(title=f"Associated repos — {ctx_name}")
+    table.add_column("Slug", style="bold")
+    table.add_column("URL")
+    for repo in ctx.associated_repos:
+        table.add_row(repo.slug, repo.url or "—")
+    console.print(table)
 
 
 @app.command()

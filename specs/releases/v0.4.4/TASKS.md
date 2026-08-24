@@ -187,7 +187,7 @@ and `specs doctor` clean.
 
 ---
 
-- [-] **T-044-02 — [git] Milestone (a): merge, security review, push (v1 mechanic, once)**
+- [x] **T-044-02 — [git] Milestone (a): merge, security review, push (v1 mechanic, once)**
 
 **Owner role:** dispatcher + `security-reviewer` · **Commit:** merge commit on `develop`
 (plus the `ACTIVE.md` phase flip)
@@ -212,7 +212,7 @@ APPROVED handoff covering the pushed delta; CI green; `ACTIVE.md` reads `IMPLEME
 
 ## Segment `S1` — the gitflow contract, v2
 
-- [ ] **T-044-03 — Bug (Arm B): `sdd-artifact-linter-mutates-task-markers` (HIGH)**
+- [x] **T-044-03 — Bug (Arm B): `sdd-artifact-linter-mutates-task-markers` (HIGH)**
 
 **Owner role:** software-engineer · **Commit:** `fix(T-044-03): <root cause>` ·
 **Lands first in the release** (D7).
@@ -236,7 +236,7 @@ contract test pinning that none of them mutates a marker or a status token.
 
 ---
 
-- [ ] **T-044-04 — FR1: one gitflow law section**
+- [x] **T-044-04 — FR1: one gitflow law section**
 
 **Owner role:** ai-engineer · **Commit:** `docs(T-044-04): one gitflow section in the law`
 
@@ -256,7 +256,7 @@ before and after.
 
 ---
 
-- [ ] **T-044-05 — FR2: `dd-gitflow-default`, renamed and rewritten in one touch**
+- [x] **T-044-05 — FR2: `dd-gitflow-default`, renamed and rewritten in one touch**
 
 **Owner role:** ai-engineer · **Commit:**
 `docs(T-044-05): rename dadaia-gitflow to dd-gitflow-default and rewrite to v2`
@@ -278,7 +278,7 @@ long is disclosed to a sibling file in the same folder.
 
 ---
 
-- [ ] **T-044-06 — FR3: invert the chokepoint to v2**
+- [x] **T-044-06 — FR3: invert the chokepoint to v2**
 
 **Owner role:** software-engineer · **Commit:**
 `fix(T-044-06): feature branches are pushable, develop and main are PR-only`
@@ -300,7 +300,7 @@ deleted, not flagged off.
 
 ---
 
-- [ ] **T-044-07 — FR4: CI sees the feature branch; the verdict becomes a PR gate**
+- [x] **T-044-07 — FR4: CI sees the feature branch; the verdict becomes a PR gate**
 
 **Owner role:** software-engineer · **Commit:**
 `ci(T-044-07): trigger on feature pushes and gate the security verdict at the PR`
@@ -322,7 +322,7 @@ clobbers).
 
 ---
 
-- [ ] **T-044-08 — FR5: collapse 14 surfaces to pointers**
+- [x] **T-044-08 — FR5: collapse 14 surfaces to pointers**
 
 **Owner role:** ai-engineer (personas, skills, registry) + `software-engineer` (the shell
 script header and the CLI docstring) · **Commit:**
@@ -347,7 +347,7 @@ disjoint from the personas/skills half. If the same script is touched by both, s
 
 ---
 
-- [ ] **T-044-09 — FR6 / bug: the preflight stops lying about CI equivalence**
+- [x] **T-044-09 — FR6 / bug: the preflight stops lying about CI equivalence**
 
 **Owner role:** software-engineer · **Commit:**
 `fix(T-044-09): lint-imports joins the preflight so local and CI gate the same set`
@@ -367,7 +367,7 @@ gains a check the other lacks.
 
 ---
 
-- [ ] **T-044-10 — [git] Make v2 live: reinstall the workspace venv and probe both edges**
+- [x] **T-044-10 — [git] Make v2 live: reinstall the workspace venv and probe both edges**
 
 **Owner role:** dispatcher / software-engineer · **Commit:** none (environment + capture)
 
@@ -384,7 +384,7 @@ each refusal naming the PR route.
 
 ---
 
-- [ ] **T-044-11 — `S1` QA close + AR-2 architecture ruling**
+- [x] **T-044-11 — `S1` QA close + AR-2 architecture ruling**
 
 **Owner role:** qa-engineer + software-architect · **Commit:**
 `chore(T-044-11): S1 qa review`
@@ -406,7 +406,7 @@ explicit refusal of any dual path (a hook remnant plus a CI job).
 
 ## Segment `S2` — the rules→skills governance map
 
-- [ ] **T-044-13 — FR7: the JSON map and its schema**
+- [x] **T-044-13 — FR7: the JSON map and its schema**
 
 **Owner role:** ai-engineer · **Commit:** `feat(T-044-13): the rules-to-skills map`
 
@@ -425,7 +425,7 @@ topic; two only with a justification; every skill on disk placed.
 
 ---
 
-- [ ] **T-044-14 — FR8: the map is core law**
+- [x] **T-044-14 — FR8: the map is core law**
 
 **Owner role:** ai-engineer (scaffold) + product-engineer (`specs/constitution.md`) ·
 **Commit:** `docs(T-044-14): declare the rules-to-skills map as core law`
@@ -442,7 +442,7 @@ edit (approval of the SPEC, per D-8/§8).
 
 ---
 
-- [ ] **T-044-15 — FR9: one enforcer, and one retirement**
+- [x] **T-044-15 — FR9: one enforcer, and one retirement**
 
 **Owner role:** software-engineer (the test) + ai-engineer (the script retirement) ·
 **Commit:** `feat(T-044-15): one map enforcer replaces the skill-collision lint`
@@ -464,7 +464,7 @@ so coverage never gaps; the script's `--self-test` fixtures are ported.
 
 ---
 
-- [ ] **T-044-16 — `S2` QA close**
+- [x] **T-044-16 — `S2` QA close**
 
 **Owner role:** qa-engineer · **Commit:** `chore(T-044-16): S2 qa review`
 
@@ -477,7 +477,7 @@ statement. No merge, no PR.
 
 ## Segment `S3` — core skills consolidation
 
-- [ ] **T-044-18 — FR10: fold `dd-release-closure` into `dd-release-implement`**
+- [x] **T-044-18 — FR10: fold `dd-release-closure` into `dd-release-implement`**
 
 **Owner role:** ai-engineer · **Commit:**
 `docs(T-044-18): fold release closure into release implement`
@@ -493,7 +493,7 @@ agents), manifest, registry, projections, map row.
 
 ---
 
-- [ ] **T-044-19 — FR11: `dd-ai-eng-knowhow` replaces four skills**
+- [x] **T-044-19 — FR11: `dd-ai-eng-knowhow` replaces four skills**
 
 **Owner role:** ai-engineer · **Commit:**
 `docs(T-044-19): one AI-harness skill replaces four`
@@ -508,7 +508,7 @@ manifest, registry, projections, map row. Capture **V5**.
 
 ---
 
-- [ ] **T-044-20 — FR12: four renames, one commit each, plus `dd-grill-me` ratified**
+- [x] **T-044-20 — FR12: four renames, one commit each, plus `dd-grill-me` ratified** (033bc6f7 dd-grill-me, 14746d8d dd-cli-library incl. dead-verb `hotfix` fix, 7c608ea9 dd-manager-orchestration, e563ab2a dd-workspace-doctor; map enforcer 15/15 green after every commit; V6 captured)
 
 **Owner role:** ai-engineer · **Commits:** one per skill,
 `docs(T-044-20): rename <old> to <new>`
@@ -536,7 +536,7 @@ a named verb that no longer exists is a defect fixed here),
 > regenerated **once** (SPEC D11, AR-1). None is reservable before the operator approves
 > the amendment.
 
-- [ ] **T-044-54 — FR25: the four kept skills are trimmed**
+- [x] **T-044-54 — FR25: the four kept skills are trimmed**
 
 **Owner role:** ai-engineer · **Commit:** `docs(T-044-54): trim the four skills the audit keeps`
 
@@ -557,7 +557,7 @@ cut `dd-bug-registration` §6–§7. Capture **V17** before and after.
 
 ---
 
-- [ ] **T-044-55 — FR26 (+FR10 A10.4): depth moves to sibling files**
+- [x] **T-044-55 — FR26 (+FR10 A10.4): depth moves to sibling files**
 
 **Owner role:** ai-engineer · **Commit:** `docs(T-044-55): disclose skill depth to siblings`
 
@@ -580,7 +580,7 @@ pointer from `SKILL.md`. Capture **V17**.
 
 ---
 
-- [ ] **T-044-56 — FR28: the invocation model**
+- [x] **T-044-56 — FR28: the invocation model**
 
 **Owner role:** ai-engineer (frontmatter) + software-engineer (the enforcer check) ·
 **Commit:** `docs(T-044-56): user-invoked skills and operative dependency form`
@@ -599,7 +599,7 @@ no hand-kept list. Capture **V16**.
 
 ---
 
-- [ ] **T-044-57 — FR24 + FR29: the persona pass, in one touch per file**
+- [x] **T-044-57 — FR24 + FR29: the persona pass, in one touch per file**
 
 **Owner role:** ai-engineer · **Commit:**
 `docs(T-044-57): personas carry only what the law does not, and state the bug-surface delta`
@@ -624,7 +624,7 @@ the coverage table is complete.
 
 ---
 
-- [ ] **T-044-58 — FR27: the 25 sediments, and the citation check**
+- [x] **T-044-58 — FR27: the 25 sediments, and the citation check**
 
 **Owner role:** ai-engineer (content) + software-engineer (the check) · **Commit:**
 `fix(T-044-58): every cited path and command exists, and a check keeps it that way`
@@ -644,7 +644,7 @@ be **green at HEAD the moment it lands** — which is why it is last.
 
 ---
 
-- [ ] **T-044-59 — FR31 / bug (Arm B): the law is loaded once per harness**
+- [x] **T-044-59 — FR31 / bug (Arm B): the law is loaded once per harness**
 
 **Owner role:** software-engineer · **Commit:**
 `fix(T-044-59): project the law once per harness`
@@ -667,7 +667,7 @@ harness may end with zero copies.
 
 ---
 
-- [ ] **T-044-60 — FR30: `ctx_inject` stops restating the law**
+- [x] **T-044-60 — FR30: `ctx_inject` stops restating the law**
 
 **Owner role:** software-engineer · **Commit:**
 `fix(T-044-60): the per-prompt injection carries state, not restatement`
@@ -686,7 +686,7 @@ session.
 
 ---
 
-- [ ] **T-044-21 — FR13: one projection cycle and a deliberate golden regen**
+- [x] **T-044-21 — FR13: one projection cycle and a deliberate golden regen**
 
 **Owner role:** software-engineer (goldens) + ai-engineer (projection) · **Commit:**
 `test(T-044-21): regenerate the install goldens for the consolidated skill set`
@@ -712,7 +712,7 @@ Capture **V7** and **V9**.
 
 ---
 
-- [ ] **T-044-22 — AR-1: architecture ruling on byte-goldens-over-inventory**
+- [x] **T-044-22 — AR-1: architecture ruling on byte-goldens-over-inventory**
 
 **Owner role:** software-architect · **Commit:** ruling recorded in the QA/architecture
 artifact
@@ -729,7 +729,7 @@ byte golden — with the bug-surface argument. Work beyond the regen is **intake
 
 ---
 
-- [ ] **T-044-23 — FR14: the nine-skill study**
+- [x] **T-044-23 — FR14: the nine-skill study**
 
 **Owner role:** ai-engineer · **Commit:** `docs(T-044-23): nine-skill disposition study`
 
@@ -749,7 +749,7 @@ the ceiling) and a blast radius. **Nothing is executed** (SPEC §4.3).
 
 ---
 
-- [ ] **T-044-24 — `S3` QA close**
+- [x] **T-044-24 — `S3` QA close**
 
 **Owner role:** qa-engineer · **Commit:** `chore(T-044-24): S3 qa review` — committed on the
 branch; no merge, no PR.
@@ -760,7 +760,7 @@ branch; no merge, no PR.
 
 ## Segment `S4` — spec-context associated repos
 
-- [ ] **T-044-26 — FR15: the model and its v2→v3 migration**
+- [x] **T-044-26 — FR15: the model and its v2→v3 migration**
 
 **Owner role:** software-engineer · **Commit:**
 `feat(T-044-26): a context owns one main repo and N associated repos`
@@ -778,7 +778,7 @@ consumer (A15.3) — no second repo-resolution path is created. Capture **V8**.
 
 ---
 
-- [ ] **T-044-27 — FR16: ALIVE/DEAD covers every repo**
+- [x] **T-044-27 — FR16: ALIVE/DEAD covers every repo**
 
 **Owner role:** software-engineer · **Commit:**
 `feat(T-044-27): alive and dead cover the whole repo set`
@@ -789,7 +789,7 @@ consumer (A15.3) — no second repo-resolution path is created. Capture **V8**.
 
 ---
 
-- [ ] **T-044-28 — FR17: `context repo add/remove/list` and `create --associated`**
+- [x] **T-044-28 — FR17: `context repo add/remove/list` and `create --associated`**
 
 **Owner role:** software-engineer · **Commit:** `feat(T-044-28): context repo verbs`
 
@@ -799,7 +799,7 @@ consumer (A15.3) — no second repo-resolution path is created. Capture **V8**.
 
 ---
 
-- [ ] **T-044-29 — FR18: `show`, `list`, export/import, panel — and the superseded bug**
+- [x] **T-044-29 — FR18: `show`, `list`, export/import, panel — and the superseded bug**
 
 **Owner role:** software-engineer · **Commit:**
 `fix(T-044-29): one branch resolution for context list and show, plus the associated repo surfaces`
@@ -820,7 +820,7 @@ and the panel card.
 
 ---
 
-- [ ] **T-044-30 — FR19: one place of control**
+- [x] **T-044-30 — FR19: one place of control**
 
 **Owner role:** software-engineer · **Commit:**
 `test(T-044-30): only the main repo carries specs, bind and memory`
@@ -833,7 +833,7 @@ found.
 
 ---
 
-- [ ] **T-044-31 — `S4` QA close** · **Owner role:** qa-engineer ·
+- [x] **T-044-31 — `S4` QA close** · **Owner role:** qa-engineer ·
 **Commit:** `chore(T-044-31): S4 qa review` — committed on the branch; no merge, no PR.
 
 *(T-044-32 retired at the D8 restructure.)*
@@ -851,7 +851,7 @@ software-engineer, unless stated. Each diff must leave its feature **smaller or 
 > the operator approves the amendment after the sweep has started, the remaining fixes still
 > adopt them from that point, and the ones already closed are restated in CLOSURE (A23.4).
 
-- [ ] **T-044-61 — FR22: `dd-bug-fix` §3–§5 becomes a method**
+- [x] **T-044-61 — FR22: `dd-bug-fix` §3–§5 becomes a method**
 
 **Owner role:** ai-engineer · **Commit:**
 `docs(T-044-61): root cause becomes a method with a Done when per phase`
@@ -873,7 +873,7 @@ line and fix the description's grant claim. **No new skill** — the method live
 
 ---
 
-- [ ] **T-044-62 — FR23: the `resolved` event refuses evidence that cannot be checked**
+- [x] **T-044-62 — FR23: the `resolved` event refuses evidence that cannot be checked**
 
 **Owner role:** software-engineer (CLI + schema) + ai-engineer (skill + law wording) ·
 **Commit:** `feat(T-044-62): resolved evidence carries the loop, the seam and the diff direction`
@@ -897,7 +897,9 @@ first try.
 
 ---
 
-- [ ] **T-044-33 — bug `backlog-doctor-silent-on-duplicate-top-level-sections` (MEDIUM)**
+- [x] **T-044-33 — bug `backlog-doctor-silent-on-duplicate-top-level-sections` (MEDIUM)**
+
+**Commit:** `fix(T-044-33): the backlog parser refuses duplicate top-level sections`
 
 **Write set:** `dadaia_workspace/features/backlog/document.py`, `doctor.py`, tests.
 **Description:** `_top_level_sections()` uses `dict.setdefault`, so a duplicated `## ACTIVE`
@@ -906,9 +908,22 @@ the document schema says exactly two top-level sections — make the parser say 
 than adding a second validation pass.
 **Done criterion:** the duplicated-document repro is a RED test that goes GREEN; `Closed`.
 
+**Resolution:** Fixed at the parser only (`document.py`), `doctor.py` untouched —
+`_top_level_sections` now returns EVERY occurrence's body range per heading name (was
+`dict.setdefault`, first-wins) plus a located `DocumentError` for a repeated top-level
+heading; `load_document` parses all of them, so a duplicated slug reaches the doctor's
+existing (already-correct) BL-DUP check instead of the second copy vanishing. RED-to-GREEN
+seam: `tests/unit/features/backlog/test_document.py::test_duplicate_top_level_active_heading_yields_document_error_and_parses_both_bodies`
+(+ LEDGER sibling; end-to-end integration test in `test_backlog_doctor.py`). Full suite:
+2756 passed, 4 pre-existing skips. Diff is net-positive (+52/-20, one file) — flagged in the
+`resolved` event per FR23/`dd-bug-fix` for a `software-architect` review before this lands
+past this commit; `bugs.jsonl` carries the evidence.
+
 ---
 
-- [ ] **T-044-34 — bug `backlog-doctor-rejects-deferred-status-documented-by-skill` (LOW)**
+- [x] **T-044-34 — bug `backlog-doctor-rejects-deferred-status-documented-by-skill` (LOW)**
+
+**Commit:** `fix(T-044-34): one statement owns the deferred status`
 
 **Preconditions:** T-044-33 `[x]` (same file; shared root — the doctor's ACTIVE-status
 vocabulary). **Write set:** `features/backlog/doctor.py` or
@@ -919,30 +934,93 @@ statement. Do **not** add a compatibility branch.
 **Done criterion:** a `deferred` ACTIVE entry either validates or is refused by a rule the
 skill states; `Closed`.
 
+**Resolution:** `deferred` is one of `core.models.backlog.TERMINAL_DISPOSITION_TOKENS` —
+`dd-backlog-definition` SKILL.md's own §2 "Terminal disposition tokens" table already
+lists `DEFERRED` as LEDGER-only, and the real `BACKLOG.md` never carries an ACTIVE
+`deferred` entry today. The skill's ACTIVE `- **Status:**` enumeration line contradicted
+its own table; `doctor.py`'s BL-STALE check was already correct — untouched. Fixed at the
+skill only: `- **Status:** idea | candidate | deferred` → `idea | candidate` (1 line
+changed, net-negative — no branch/flag added, `doctor.py` and its behaviour unchanged).
+RED-to-GREEN seam: `tests/contract/test_backlog_status_vocabulary_contract.py::test_skill_active_status_enumeration_excludes_terminal_disposition_tokens`
+(reads the real shipped SKILL.md against the real `TERMINAL_DISPOSITION_TOKENS`); the
+literal bug repro is pinned by
+`tests/integration/test_backlog_doctor.py::test_deferred_active_status_fires_bl_stale`.
+Projection cycle run (`public stage` + `install --target all` + `public doctor` exit 0);
+contract tier green (209 passed). Full suite: 2789 passed, 4 pre-existing environment
+skips, 0 failures. `bugs.jsonl` carries the FR23 evidence.
+
 ---
 
-- [ ] **T-044-35 — bug `atomic-writer-drift-guard-is-brittle-and-covers-only-two-of-eight-writers` (LOW)**
+- [x] **T-044-35 — bug `atomic-writer-drift-guard-is-brittle-and-covers-only-two-of-eight-writers` (LOW)**
+
+**Commit:** `test(T-044-35): a behavioural battery over every atomic writer`
 
 **Write set:** `tests/unit/features/specs/test_migration_symlink_hardening.py` (and/or its
 replacement), tests only.
 **Description:** Replace the text-slicing guard with a **behavioural** battery parametrized
 over every atomic writer: mode preservation, LF bytes on disk, no leftover temp file on an
 injected failure, hardlink rebinding. The text comparison is deleted, not extended.
+
+**Resolution:** Deleted `test_the_two_atomic_writers_do_not_drift` (the `inspect.getsource`
++ triple-quote-split comparison, 2 of 8 writers). Enumerated the package's 8 atomic-writer
+primitives by grepping the `^def _*atomic\b` / `^def _*write.*atomic` naming pattern
+(`write_text_atomic`, `_write_text_atomic`, `atomic_write_text`, `_atomic_write_text` x2,
+`_atomic_write_json`, `_atomic_write`, `_atomic_write_bytes`) — matches the bug's stated
+count exactly. Replaced with an `AtomicWriterCase` registry calling each writer at its real
+entry point, parametrized over 4 behavioural dimensions (hardlink rebinding, CRLF-free
+bytes, mode preservation, no leftover temp on an injected `os.replace` failure) — 32 test
+items. Every per-writer expectation (`preserves_mode`/`cleans_up_on_failure`/
+`lf_bytes_guaranteed`) was verified empirically (scratch probe script, not committed)
+before being pinned, not assumed from reading source. That probing surfaced 2 genuine
+production gaps, out of this task's tests-only write set: `hooks/_common.py:
+atomic_write_text` and `infrastructure/public_assets_common.py:_atomic_write_text` leak
+their `.tmp` sibling on an injected `os.replace` failure (6 of 8 writers wrap the swap in
+try/except-cleanup; these 2 do not) — registered as bug
+`two-atomic-writers-leak-temp-file-on-injected-os-replace-failure` (LOW) and pinned as
+CURRENT (leaking) behaviour in the new battery rather than silently asserted away. Mode
+preservation and CRLF-freedom assertions are Windows-aware (self-referential before/after
+comparison + `sys.platform` skip, mirroring `test_repair_preserves_file_mode_and_newlines`)
+— this repo's CI runs unit tests on windows-latest/macos-latest, so a POSIX-only assertion
+would have reproduced the `mode-preservation-test-asserts-posix-only` gotcha class.
+Red-loop evidence: replayed the OLD comparison algorithm against `write_text_atomic`'s real
+source with only a comment reworded — identical behaviour, OLD guard reported a spurious
+mismatch (bug repro step 1). Full suite: 2787 passed, 4 pre-existing skips. Diff is
+net-positive (+279/-15, one file, tests-only) — flagged in the `resolved` event per
+FR23/`dd-bug-fix` for a `software-architect` review before this lands past this commit
+(growth is coverage expansion, 2→8 writers / 0→4 dimensions, mandated by this task's own
+Done criterion — no production code touched); `bugs.jsonl` carries the evidence.
 **Done criterion:** the battery covers all 8 writers; the brittle comparison is gone;
 `Closed`.
 
 ---
 
-- [ ] **T-044-36 — bug `crlf-fixture-makes-a-windows-assertion-pass-for-the-wrong-reason` (LOW)**
+- [x] **T-044-36 — bug `crlf-fixture-makes-a-windows-assertion-pass-for-the-wrong-reason` (LOW)**
 
 **Write set:** the same test module.
 **Description:** Write the fixture with an explicit `newline=` so its bytes are known on
 every platform and the assertion can only fail for the reason it names.
 **Done criterion:** the assertion is platform-independent; `Closed`.
 
+**Resolution:** Swept all 16 `write_text()` call sites in
+`test_migration_symlink_hardening.py` for the class (fixture write with no `newline=`
+feeding a byte-sensitive downstream assertion) — found exactly one instance, unchanged
+by T-044-35: `test_repair_preserves_file_mode_and_newlines`'s fixture write at the line
+feeding `assert b"\r\n" not in atom.read_bytes()`. Fixed by adding explicit `newline=""`
+(1 line modified, net-neutral), matching the same idiom this module's own
+`AtomicWriterCase` registry already uses for its `lf_bytes_guaranteed=True` writers. The
+other byte-sensitive assertion in the module
+(`test_atomic_writer_never_leaves_crlf_bytes`) writes to a fresh un-fixtured path and is
+already platform-guarded — not in class. A literal Windows red repro is unreproducible on
+this Linux runner (confirmed empirically: monkeypatching `os.linesep` has no effect on
+CPython's `Path.write_text` newline translation); root cause instead fully specified by
+the documented `newline=None` contract. Full suite: 2792 passed, 4 pre-existing
+environment skips, 0 failures. `bugs.jsonl` carries the FR23 evidence.
+
 ---
 
-- [ ] **T-044-37 — bug `migration-normalises-crlf-atoms-to-lf-contradicting-its-byte-preserve-wording` (LOW)**
+- [x] **T-044-37 — bug `migration-normalises-crlf-atoms-to-lf-contradicting-its-byte-preserve-wording` (LOW)**
+
+**Commit:** `docs(T-044-37): the migration states its newline contract`
 
 **Write set:** `dadaia_workspace/features/migrate/frontmatter_keys.py`, tests.
 **Description:** Decide-then-state: either the migration is LF-canonical (consistent with
@@ -950,9 +1028,32 @@ the projection contract) and says so, or it byte-preserves and the writer change
 whichever is chosen with a test. No third behaviour.
 **Done criterion:** docstring and behaviour agree, pinned by a test; `Closed`.
 
+**Resolution:** DECIDED (a) — LF-canonical, wording changes; behaviour is unchanged.
+Evidence: `write_text_atomic` already guarantees LF bytes on disk on every platform
+(`newline=""`, pinned `lf_bytes_guaranteed=True` for this exact writer in T-044-35's
+battery); `infrastructure/public_assets_common`'s writer makes the identical guarantee for
+projected assets (FR-RC2-2) — LF-canonical is this repo's platform-wide write contract for
+managed files, not a one-off. Reproduced the repro verbatim against unmodified HEAD (CRLF
+atom + retired key through `migrate_retired_frontmatter_keys`): output was already LF-only
+— the composition was correct, only the module docstring's "byte-preserve everything else"
+wording contradicted it. Root cause, precisely: `strip_frontmatter_keys` and
+`write_text_atomic` are themselves line-ending AGNOSTIC (fed CRLF directly, both reproduce
+it verbatim — pinned by
+`test_strip_frontmatter_keys_preserves_crlf_given_directly`/`test_write_text_atomic_preserves_crlf_given_directly`);
+the LF-canonicalisation is entirely a side effect of the caller's `Path.read_text()`
+(universal-newline translation) composed ahead of this module, in every registered step.
+Fixed the module docstring in `frontmatter_keys.py` to state the newline contract
+explicitly and name the mechanism (0 executable lines touched, docstring-only,
+net-neutral). Pinned end-to-end by
+`test_migration_normalises_a_crlf_atom_to_lf_on_disk` (new file
+`tests/unit/features/migrate/test_frontmatter_keys.py`, 3 tests, 79 lines) via the real
+`migrate_retired_frontmatter_keys` pipeline. Full suite: 2792 passed, 4 pre-existing skips.
+
 ---
 
-- [ ] **T-044-38 — bug `no-ratchet-against-frozen-clock-tests-that-age-fixtures-by-the-real-clock` (LOW)**
+- [x] **T-044-38 — bug `no-ratchet-against-frozen-clock-tests-that-age-fixtures-by-the-real-clock` (LOW)**
+
+**Commit:** `test(T-044-38): a ratchet against frozen-clock aging`
 
 **Write set:** one source-scan contract test, in the shape the repo already uses for the
 denylist no-allowlist contract.
@@ -960,9 +1061,38 @@ denylist no-allowlist contract.
 calls `time.time()`/`datetime.now()`. Green at HEAD against all 9 aging sites.
 **Done criterion:** the ratchet is green at HEAD and red on a planted violation; `Closed`.
 
+**Resolution:** New AST-based contract test
+`tests/contract/test_frozen_clock_aging_ratchet.py` (4 tests) — a raw-text/regex scan
+(the denylist no-allowlist test's own shape) would false-positive on this very module's
+docstring and on `test_tmp_gc_service.py`'s own explanatory comment, both of which
+contain the literal text `time.time()` in prose, so detection is AST-based instead
+(mirrors `test_core_file_io_purity.py`'s file-I/O ratchet for the identical reason).
+Rule: a `tests/**` file fails iff it declares, at module level, BOTH a frozen
+datetime/date constant (a constant-case name assigned a `datetime(...)`/`date(...)`
+literal, or — only when the name itself carries a clock marker — a bare numeric/ISO-date
+literal) AND a real-clock call (`time.time()` or a `.now()` call chaining to
+`datetime`). Verified GREEN at HEAD: cross-referenced all 10 `tests/**` files performing
+fixture ageing via `os.utime` — `test_tmp_gc_service.py` and the two retention test
+modules derive every mtime from their OWN frozen constant (self-consistent, the tmp_gc
+fix already landed); the other 7 derive from a real-clock call with no frozen constant
+in the same file (both sides move together); `test_jsonl_log_rotation.py` ages to the
+literal Unix epoch (a local var, not a module constant) — self-healing by construction.
+0 violations across the entire `tests/**` tree (2803 tests collected). Mutation-sanity
+fixture (in-memory, never a repo file — the `test_rules_skills_map.py` mutation pattern)
+reproduces the tmp_gc shape (both a `time.time()` and a `datetime.now()` variant) and
+proves both detectors turn RED; two negative controls prove the AND-not-OR precision
+(a frozen constant alone, or a real-clock call alone, must each stay green). No
+production code touched — guard-only, per the bug's own notes: the underlying tmp_gc
+bug is already resolved. `evidence_diff` is `net-positive` (pure addition, no deletion)
+— flagged per `dd-bug-fix` for a `software-architect` check, route-before-commit not
+blocking (same posture as T-044-33/T-044-35). Full suite:
+`pytest -p no:cacheprovider -q -m "not quarantine and not e2e" -n auto` → 2747 passed,
+3 skipped (environment-gated), 0 failed; `ruff format --check`/`ruff check --no-cache`/
+`mypy --strict` clean on the new file. `bugs.jsonl` carries the FR23 evidence.
+
 ---
 
-- [ ] **T-044-39 — bug `read-only-atom-honouring-is-advisory-and-root-bypasses-it` (LOW)**
+- [x] **T-044-39 — bug `read-only-atom-honouring-is-advisory-and-root-bypasses-it` (LOW)**
 
 **Write set:** `features/migrate/**` (the guard's site), tests.
 **Description:** Either document the guard as advisory/best-effort, or move the check after
@@ -972,7 +1102,7 @@ diff; do not add a second permission probe.
 
 ---
 
-- [ ] **T-044-40 — bug `symlinked-specs-root-is-followed-by-migration-and-repair` (LOW)**
+- [x] **T-044-40 — bug `symlinked-specs-root-is-followed-by-migration-and-repair` (LOW)**
 
 **Write set:** the context-resolution seam, tests.
 **Description:** One deliberate decision applied **once at the resolution seam** — resolve
@@ -983,7 +1113,7 @@ Never duplicated into each write site.
 
 ---
 
-- [ ] **T-044-41 — [git] FR20: branch hygiene on `origin` and locally**
+- [x] **T-044-41 — [git] FR20: branch hygiene on `origin` and locally**
 
 **Owner role:** dispatcher · **Commit:** none (git refs) — capture **V10** before and after.
 
@@ -1000,9 +1130,24 @@ carve-out; no `--no-verify`.
 
 ---
 
-- [ ] **T-044-42 — `S5` QA close** · **Owner role:** qa-engineer ·
+- [x] **T-044-42 — `S5` QA close** · **Owner role:** qa-engineer ·
 **Commit:** `chore(T-044-42): S5 qa review` — committed on the branch; verdict states the
 bug-surface delta per bug. No merge, no PR.
+
+**Resolution:** APPROVE. All 8 sweep bugs independently re-confirmed `resolved` with
+complete FR23 evidence; every named pinning test re-run GREEN by name this session; all
+4 architect firings re-read, SOUND, no puxadinho. FR23 gate re-proven live (A23.6):
+missing-field `resolved` append refused by field name, well-formed accepted first try,
+against a throwaway tmp specs dir, live ledger untouched. T-044-41/A20 independently
+re-verified: origin heads = main+develop only, 50 archive tags, 3 spot-checked tags
+resolve to real commits, local branches = the 3 permitted patterns, local `hotfix/0.4.3`
+confirmed absent. Full gates green: ruff format/check clean, mypy --strict clean (273
+files), full suite 2803 passed / 4 skipped (environment-gated) / 0 failed. Self-scan
+(`tests/integration/test_repo_self_scan.py`) green against the close artifact itself
+before commit. 6 bugs open at close (2 S5-adjacent by architect design, 4 foreign,
+outside every S5 write set) — none blocking; full record + 7 accumulated intake
+candidates in `specs/releases/v0.4.4/reviews/S5-qa-close.md` §4 for the PM's intake
+feed.
 
 *(T-044-43 retired at the D8 restructure.)*
 
@@ -1010,7 +1155,7 @@ bug-surface delta per bug. No merge, no PR.
 
 ## Scope complete — the release is closed by QA
 
-- [ ] **T-044-44 — FR21: the invariants, measured**
+- [x] **T-044-44 — FR21: the invariants, measured**
 
 **Owner role:** software-engineer + qa-engineer · **Commit:**
 `chore(T-044-44): scope-complete gate capture`
@@ -1029,7 +1174,7 @@ operator before ship.
 
 ---
 
-- [ ] **T-044-45 — Six-axis code review on the thawed tree**
+- [x] **T-044-45 — Six-axis code review on the thawed tree**
 
 **Owner role:** code-reviewer · **Preconditions:** T-044-44 `[x]`. Runs on the **thawed**
 tree, before `rc-1` and before any archive move (D8/FR5 order).
@@ -1038,7 +1183,7 @@ tree, before `rc-1` and before any archive move (D8/FR5 order).
 
 ---
 
-- [ ] **T-044-46 — Security review + the QA release verdict ("closed by QA")**
+- [x] **T-044-46 — Security review + the QA release verdict ("closed by QA")**
 
 **Owner role:** security-reviewer + qa-engineer · **Preconditions:** T-044-45 `[x]`.
 
@@ -1055,7 +1200,7 @@ verdict recorded.
 
 ## `rc-1` — milestone (b), the release integrates
 
-- [ ] **T-044-52 — [git] `rc-1`: PR `feature/0.4.4` → `develop` (first v2 merge)**
+- [-] **T-044-52 — [git] `rc-1`: PR `feature/0.4.4` → `develop` (first v2 merge)**
 
 **Owner role:** dispatcher + security-reviewer · **Preconditions:** T-044-46 `[x]`.
 
@@ -1074,7 +1219,7 @@ whole scope.
 
 ## `rc-2 … rc-N` — adjustment rounds on the merged scope
 
-- [ ] **T-044-53 — Adjustment rounds: test `develop`, fix on the branch, merge again**
+- [-] **T-044-53 — Adjustment rounds: test `develop`, fix on the branch, merge again**
 
 **Owner role:** qa-engineer + operator (finding) · software-engineer / ai-engineer (fixing) ·
 dispatcher + security-reviewer (merging) · **Preconditions:** T-044-52 `[x]`.
@@ -1096,7 +1241,7 @@ rounds**, in which case the final `rc` **is** `rc-1`.
 
 ## The final `rc` — closure, archive, ship
 
-- [ ] **T-044-47 — Memory window (SPEC §5)**
+- [-] **T-044-47 — Memory window (SPEC §5)**
 
 **Owner role:** product-engineer · **Commit:** `docs(T-044-47): memory after v0.4.4`
 
@@ -1111,7 +1256,7 @@ doctor` 0 errors.
 
 ---
 
-- [ ] **T-044-48 — `CLOSURE.md` with every sweep**
+- [-] **T-044-48 — `CLOSURE.md` with every sweep**
 
 **Owner role:** product-engineer · **Commit:** `docs(T-044-48): v0.4.4 closure`
 
@@ -1132,7 +1277,7 @@ standing-order verdict record, the restated v0.4.3 git-identity question, archiv
 
 ---
 
-- [ ] **T-044-49 — [git] Archive the release**
+- [-] **T-044-49 — [git] Archive the release**
 
 **Owner role:** dispatcher · **Commit:** `chore(T-044-49): archive v0.4.4`
 
@@ -1141,7 +1286,7 @@ standing-order verdict record, the restated v0.4.3 git-identity question, archiv
 
 ---
 
-- [ ] **T-044-50 — [git] Final-`rc` merge: version bump and PR → `develop`**
+- [-] **T-044-50 — [git] Final-`rc` merge: version bump and PR → `develop`**
 
 **Owner role:** dispatcher + software-engineer + security-reviewer
 
@@ -1156,7 +1301,7 @@ the PR head sha, PR to `develop`, CI green, merge — this burns the **final `rc
 
 ---
 
-- [ ] **T-044-51 — [git] Ship**
+- [-] **T-044-51 — [git] Ship**
 
 **Owner role:** dispatcher + security-reviewer · **Preconditions:** T-044-50 `[x]`.
 

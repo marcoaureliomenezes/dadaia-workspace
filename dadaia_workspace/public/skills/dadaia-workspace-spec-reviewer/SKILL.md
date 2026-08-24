@@ -22,18 +22,17 @@ TASKS → CLOSURE) and the atomic memory contract.
    phase ∈ {CLOSURE, ARCHIVED}.
 5. Load `specs/backlog/BACKLOG.md` (`ACTIVE` section) if present — the single-source
    backlog (`dd-backlog-definition`).
-6. Load `report-specs-review.md` only if the operator explicitly asks for historical
-   context.
-7. Compare the spec set across these dimensions:
+6. Compare the spec set across these dimensions:
    - **Memory atomicity** — no `Changelog|History|Histórico|Versions?` sections; no
      narrative of past versions; product described as it is *now*. Applies to every
      Markdown atom under `memory/` and `memory/product/`.
    - **Product memory catalog** — `memory/product/` is a folder; `index.md` exists and
      links every production feature atom in daily-relevance order. `catalog.json`, when
      present, must match the Markdown frontmatter.
-   - **Feature atom structure** — each `memory/product/<slug>.md` contains the required
-     feature sections: `Propósito`, `Fluxo de uso`, `Trigger típico`, `Diferencial`,
-     `Estado runtime tocado`, and `Dependências`. Missing any of these is a finding.
+   - **Feature atom structure** — each `memory/product/<area>/<slug>.md` contains the required
+     feature sections: `Purpose`, `Usage flow`, `Typical trigger`, `Differentiator`,
+     `Runtime state touched`, and `Dependencies` (English canon, `.heading-allowlist`).
+     Missing any of these is a finding.
    - **Broken image references** — every image reference in any memory Markdown resolves
      to a real file under `specs/assets/…`.
    - **Mermaid syntax** — fenced Mermaid blocks must be syntactically readable by the
@@ -56,8 +55,8 @@ TASKS → CLOSURE) and the atomic memory contract.
      archived release as the source of authority.
    - **Traceability** — every approved requirement maps into PLAN strategy and at least
      one TASKS entry.
-8. Report findings ordered by severity.
-9. If unresolved issues remain, list them for the PM's operator-facing intake report —
+7. Report findings ordered by severity.
+8. If unresolved issues remain, list them for the PM's operator-facing intake report —
    never append them to the backlog directly (`dd-backlog-definition` §5).
 
 ## Output rules

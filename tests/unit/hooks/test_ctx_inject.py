@@ -147,7 +147,7 @@ def _setup_no_alive_context_still_generic(tp: Path) -> None:
 def _assert_unbound_no_memory(out: str) -> bool:
     return (
         "[no bound context]" in out
-        and "dispatcher preflight" in out
+        and "dispatcher preflight" not in out
         and "end memory bootstrap" not in out
         and "Python 3.12" not in out
     )
@@ -348,6 +348,42 @@ def test_output_contract_envelopes(
     assert env["hookSpecificOutput"]["hookEventName"] == expect_event
     if name == "codex_json_envelope":
         assert "[no bound context]" in env["hookSpecificOutput"]["additionalContext"]
+
+
+# --- FR30 (T-044-60, A30.1): dispatcher preflight restatement is deleted ------
+
+
+def test_bound_session_carries_no_dispatcher_preflight_and_no_context_list(
+    tmp_path: Path,
+) -> None:
+    """A30.1: a BOUND session's injected prefix restates neither the dispatcher
+    preflight (a restatement of ``DADAIA.md`` §1/§2) nor the ALIVE-context list —
+    only the context header and the lean memory prefix (A30.3, untouched) survive."""
+    _ws(tmp_path)
+    sid = "fr30-bound"
+    _bind_session(tmp_path, sid, "ctx")
+    out = _run(tmp_path, sid)
+    assert "[ctx]" in out
+    assert "end memory bootstrap" in out
+    assert "Python 3.12" in out
+    assert "dispatcher preflight" not in out
+    assert "ALIVE contexts" not in out
+
+
+def test_unbound_session_still_lists_alive_contexts_no_dispatcher_preflight(
+    tmp_path: Path,
+) -> None:
+    """A30.1: an UNBOUND session still names the ALIVE contexts (unchanged — the
+    ALIVE list is useful only when unbound), even though the dispatcher preflight
+    text is gone from every emission path, bound or not."""
+    _ws(tmp_path, slug="alpha")
+    _add_context(tmp_path, "beta")
+    out = _run(tmp_path, "fr30-unbound")
+    assert "[no bound context]" in out
+    assert "ALIVE contexts" in out
+    assert "- alpha" in out
+    assert "- beta" in out
+    assert "dispatcher preflight" not in out
 
 
 def test_env_context_beats_own_session_record(tmp_path: Path) -> None:

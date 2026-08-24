@@ -104,7 +104,22 @@
     "evidence": {
       "type": "string",
       "minLength": 20,
-      "description": "resolved: the resolution law's evidence (v0.1.73 FR3) \u2014 reporter-artifact reproduction + every surface the bug names. REQUIRED at the CLI append path (blocking); optional in the schema so historical pre-law events remain valid."
+      "description": "resolved: legacy free-text narrative (v0.1.73 FR3, superseded as the CLI's blocking check by FR23/v0.4.4 \u2014 the three evidence_* fields below carry the checkable evidence now). Optional, kept for backward-compatible historical events."
+    },
+    "evidence_loop": {
+      "type": "string",
+      "minLength": 5,
+      "description": "resolved (FR23, v0.4.4): the red-loop command that reproduced the bug on the executed path, before any hypothesis. REQUIRED at the CLI append path (blocking); optional in the schema so historical pre-FR23 resolved events remain valid \u2014 never rewritten (A23.2)."
+    },
+    "evidence_seam": {
+      "type": "string",
+      "minLength": 5,
+      "description": "resolved (FR23, v0.4.4): the test file/node (the regression seam) that pins the fix. REQUIRED at the CLI append path (blocking); optional in the schema so historical pre-FR23 resolved events remain valid \u2014 never rewritten (A23.2)."
+    },
+    "evidence_diff": {
+      "type": "string",
+      "pattern": "^(net-negative|net-positive|net-neutral):\\s*\\S.*$",
+      "description": "resolved (FR23, v0.4.4): the diff direction on the touched feature \u2014 lines/branches/flags added vs removed, prefixed 'net-negative:'/'net-positive:'/'net-neutral:' so it is machine-checkable. A net-positive value routes to a software-architect review before the commit (DADAIA.md \u00a76); does not hard-block the append. REQUIRED at the CLI append path (blocking); optional in the schema so historical pre-FR23 resolved events remain valid \u2014 never rewritten (A23.2)."
     }
   },
   "allOf": [

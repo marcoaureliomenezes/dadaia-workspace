@@ -99,13 +99,32 @@ class GitObjectReadError(Exception):
 class GitObjectReader(Protocol):
     """Read-only port over the new objects one pushed ref would publish.
 
-    Implementors resolve the FR1 range table from ``local_sha``/``remote_sha`` alone:
+    Implementors resolve the range from ``local_sha``/``remote_sha`` with ONE formula,
+    used identically for every push (bug
+    new-branch-push-loses-prior-published-denylist-amnesty, v0.4.4 — supersedes the
+    v0.9.0/v0.11.0-era two-shape "FR1 range table" this docstring used to describe):
 
     * ``local_sha`` zero (deletion) -> empty range, no objects.
-    * ``remote_sha`` non-zero and resolvable locally -> ``git rev-list --objects
-      local_sha --not remote_sha``.
-    * ``remote_sha`` zero (new ref) or unresolvable locally -> ``git rev-list --objects
-      local_sha --not --remotes``.
+    * Otherwise -> ``git rev-list --objects local_sha --not --remotes``, ADDITIONALLY
+      excluding ``remote_sha`` itself when it happens to resolve to a real local
+      commit (harmless when — as in the ordinary git-hook case — the local
+      remote-tracking ref already covers it; load-bearing when no remote is
+      configured at all, e.g. a synthetic test fixture).
+
+    A brand-new ref's ``remote_sha`` (the git pre-push all-zero sentinel, e.g. a
+    ``feature/{M.m.p}`` branch's FIRST push under the gitflow v2 model) therefore
+    excludes exactly the same "everything already published to this remote" baseline
+    as an ordinary continuing push — there is no separate, weaker fallback shape.
+
+    **Limitation, stated honestly.** ``--remotes`` walks whatever
+    ``refs/remotes/<remote>/*`` this repo ALREADY has locally at call time. The
+    pre-push hook runs after git has resolved the push's own ref-update lines, but
+    that says nothing about how recently this repo last ran ``git fetch`` — a local
+    view that is stale relative to the true remote state can under-exclude (treating
+    something the remote already has, that this repo has not fetched yet, as novel).
+    This implementation deliberately does not fetch inside the hook (a network call
+    on every push is its own cost/latency/failure-mode tradeoff); it trusts the
+    caller's already-resolved local remote-tracking state, exactly as it always has.
 
     Blob objects are yielded exactly as before (trees are never returned), deduplicated
     by object sha within one call. As of v0.4.3 T-043-15/FR11, the range's commit
@@ -117,15 +136,16 @@ class GitObjectReader(Protocol):
     non-path ``path`` label rather than a real repo path. Any git failure raises
     :class:`GitObjectReadError` rather than returning a partial/empty result.
 
-    **Base resolution for :attr:`ScannedObject.prior_text` (SPEC v0.11.0 FR2, ADR D7).**
-    The SAME ``remote_sha`` resolvability check that decides the FR1 range shape ALSO
-    decides whether any object in this call carries prior content: resolvable
-    ``remote_sha`` -> that sha is the base every object's prior text is resolved
-    against; unresolvable/zero ``remote_sha`` (the fallback shape) -> there is no
-    single published base, so every object carries an explicit absence
-    (``prior_text=None``) and behaviour is byte-identical to v0.9.0. This is a
-    deliberate conservative boundary, not an oversight — widening it is a future
-    decision, not a defect of this release.
+    **Base resolution for :attr:`ScannedObject.prior_text` (SPEC v0.11.0 FR2, ADR D7;
+    widened by bug new-branch-push-loses-prior-published-denylist-amnesty).** The
+    SAME exclusion set the range walk uses ALSO decides which commit(s) anchor prior
+    content: every object's ``prior_text`` is resolved against the publication
+    boundary/boundaries — the commit(s) where ``local_sha``'s own ancestry first
+    re-joins that excluded, already-published history — which the adapter derives
+    from the exclusion set itself, never from ``remote_sha``'s resolvability alone.
+    ``prior_text`` stays an explicit absence (``None``) only when NO such boundary
+    exists at all (a genuinely empty/unconfigured remote) — the one honest case with
+    no published state to anchor against.
     """
 
     def new_objects(

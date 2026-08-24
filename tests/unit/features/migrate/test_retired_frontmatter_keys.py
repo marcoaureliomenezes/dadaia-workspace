@@ -21,10 +21,12 @@ to strip, so the next schema-drop cannot silently reopen this bug.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
 import jsonschema
+import pytest
 import yaml
 
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
@@ -127,3 +129,70 @@ def test_registered_after_the_agent_tier_step(tmp_path: Path) -> None:
     run_chain(specs, 4, CANONICAL_SPECS_VERSION)  # a tree ALREADY at the old canonical
     migrated = (specs / "memory" / "product" / "s3-delivery.md").read_text(encoding="utf-8")
     jsonschema.validate(instance=_frontmatter(migrated), schema=load_frontmatter_schema())
+
+
+def _tree_with_atom(tmp_path: Path, body: str) -> tuple[Path, Path]:
+    specs = tmp_path / "specs"
+    (specs / "memory").mkdir(parents=True)
+    atom = specs / "memory" / "a.md"
+    atom.write_text(body, encoding="utf-8")
+    return specs, atom
+
+
+def _deny_access_to(monkeypatch: pytest.MonkeyPatch, atom: Path) -> None:
+    """Pin the read-only decision at the ``os.access`` seam — never a real chmod, which
+    cannot distinguish "denied" from "root bypasses it" (the bug's own point)."""
+    real_access = os.access
+
+    def fake_access(path: object, mode: int, **kwargs: object) -> bool:
+        if Path(str(path)) == atom:
+            return False
+        return real_access(path, mode, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(
+        "dadaia_workspace.features.migrate.retired_frontmatter_keys.os.access", fake_access
+    )
+
+
+def test_read_only_atom_needing_no_change_stays_silent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Intent: REGRESSION (bug read-only-atom-honouring-is-advisory-and-root-bypasses-it).
+    Size: SMALL.
+
+    DECIDED (T-044-39): the read-only check runs AFTER the no-change determination, so a
+    read-only atom that needs no rewrite produces no note at all — matching every other
+    no-op atom instead of the noise it used to emit because the check preceded the read.
+    """
+    body = "---\nslug: a\n---\nbody text, no retired key.\n"
+    specs, atom = _tree_with_atom(tmp_path, body)
+    _deny_access_to(monkeypatch, atom)
+
+    result = migrate_retired_frontmatter_keys(specs, dry_run=False)
+
+    assert result.moved == []
+    # No PER-ATOM note — the tree-level "nothing to do" summary is the only entry, the
+    # same summary every completely no-op run produces (test_dry_run_idempotent_...).
+    assert result.skipped == ["no memory atom carries a retired frontmatter key — nothing to do."]
+    assert atom.read_text(encoding="utf-8") == body
+
+
+def test_read_only_atom_needing_change_is_skipped_with_note(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Companion pin: a read-only atom that DOES need a rewrite still produces the
+    documented refusal note and is left untouched — the guard stays best-effort (it
+    cannot close the root-bypass case, per the bug's own notes) but honours the common
+    case instead of staying silent about a change it is refusing to make."""
+    body = "---\nslug: a\ntoken_estimate: 650\n---\nbody text.\n"
+    specs, atom = _tree_with_atom(tmp_path, body)
+    _deny_access_to(monkeypatch, atom)
+
+    result = migrate_retired_frontmatter_keys(specs, dry_run=False)
+
+    assert result.moved == []
+    assert result.skipped == [
+        "a.md: read-only — skipped.",
+        "no memory atom carries a retired frontmatter key — nothing to do.",
+    ]
+    assert atom.read_text(encoding="utf-8") == body  # untouched

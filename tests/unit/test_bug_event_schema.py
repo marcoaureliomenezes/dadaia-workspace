@@ -52,6 +52,22 @@ def _resolved() -> dict[str, object]:
     }
 
 
+def _resolved_fr23() -> dict[str, object]:
+    """v0.4.4 FR23 (T-044-62): a `resolved` event carrying the three new evidence
+    fields — well-formed shape (see also ``test_resolved_fr23_evidence_fields_validate``
+    and the CLI-level tests in ``test_bugs_resolution_evidence_fr23.py``)."""
+    return {
+        "bug_id": "gate-swallows-archive",
+        "event": "resolved",
+        "ts": "2026-07-01T14:00:00Z",
+        "reported_by": "software-engineer",
+        "release": "v0.1.46",
+        "evidence_loop": "pytest tests/unit/test_bug_event_schema.py -q",
+        "evidence_seam": "tests/unit/test_bug_event_schema.py::test_each_event_kind_validates",
+        "evidence_diff": "net-negative: -3/+1 lines on the schema fixtures",
+    }
+
+
 def _superseded() -> dict[str, object]:
     return {
         "bug_id": "old-defect",
@@ -180,5 +196,48 @@ def test_terminal_event_missing_required_field_fails(
 ) -> None:
     bad = doc_fn()  # type: ignore[operator]
     del bad[missing_field]
+    with pytest.raises(ValidationError):
+        Draft202012Validator(_schema()).validate(bad)
+
+
+# --- v0.4.4 FR23 (T-044-62): the resolved-evidence gate's schema half -------------
+
+
+def test_resolved_fr23_evidence_fields_validate() -> None:
+    """A well-formed `resolved` event carrying the three new evidence fields validates
+    (A23.2: `bug-event-v1` declares the fields)."""
+    Draft202012Validator(_schema()).validate(_resolved_fr23())
+
+
+def test_historical_resolved_event_without_fr23_fields_still_validates() -> None:
+    """A23.2/A23.6 (R-10): the ledger is append-only and no past event is rewritten —
+    a `resolved` event from BEFORE FR23 (no `evidence_loop`/`evidence_seam`/
+    `evidence_diff` at all, mirroring the 132/438 on-disk events with zero evidence)
+    stays schema-valid untouched, exactly like ``_resolved()`` above."""
+    historical = _resolved()
+    assert "evidence_loop" not in historical
+    assert "evidence_seam" not in historical
+    assert "evidence_diff" not in historical
+    Draft202012Validator(_schema()).validate(historical)
+
+
+@pytest.mark.parametrize(
+    ("name", "mutate_fn"),
+    [
+        ("evidence_loop_too_short", lambda d: d.__setitem__("evidence_loop", "hi")),
+        ("evidence_seam_too_short", lambda d: d.__setitem__("evidence_seam", "hi")),
+        (
+            "evidence_diff_missing_direction_token",
+            lambda d: d.__setitem__("evidence_diff", "removed a branch"),
+        ),
+        (
+            "evidence_diff_bad_direction_token",
+            lambda d: d.__setitem__("evidence_diff", "sideways: unclear"),
+        ),
+    ],
+)
+def test_resolved_fr23_evidence_field_rejection_table(name: str, mutate_fn: object) -> None:
+    bad = _resolved_fr23()
+    mutate_fn(bad)  # type: ignore[operator]
     with pytest.raises(ValidationError):
         Draft202012Validator(_schema()).validate(bad)

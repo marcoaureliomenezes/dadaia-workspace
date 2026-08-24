@@ -149,64 +149,23 @@ pip-wheel-metadata/
 !/specs/backlog/remote-bugs/_archive/
 /specs/backlog/remote-bugs/_archive/*
 !/specs/backlog/remote-bugs/_archive/*.md
+# Bug gitignore-verdict-evidence-untrackable-fourth-recurrence: four recurrences of
+# "a law-mandated release artifact needs its own whitelist line, or it is silently
+# defeated" (ALPHA-*-QA.md, PRE-PR-REVIEW.md, reviews/, now verdicts/) proved the
+# catch-all-plus-per-artifact-opt-in shape was itself the defect, not any missing
+# line. Inverted once: the release tree is TRACKED BY DEFAULT below; only the
+# narrow scratch/private-notes class the original catch-all ever actually hid
+# (local-notes.md, tmp/ working dirs — see test_source_repo_hygiene.py) stays
+# ignored. No future canonical artifact class (verdicts/, reviews/, alpha-N/rc-N
+# segments, or anything else TASKS.md declares) ever needs a fifth whitelist line.
 !/specs/releases/
-!/specs/releases/ACTIVE.md
-!/specs/releases/*/
-/specs/releases/*/*
-# Bug gitignore-alpha-qa-review-untrackable: each alpha-N closes with a
-# qa-engineer review committed to the branch (DADAIA.md §5) — the whitelist
-# must include it or the law is silently defeated (v0.5.0's ALPHA-1-QA.md
-# needed git add -f).
-!/specs/releases/*/ALPHA-*-QA.md
-# Bug gitignore-code-review-artifact-untrackable: FR5/ADR R3 (v0.4.2) makes the
-# pre-PR six-axis code-reviewer review run BEFORE the archive move, committed to
-# the branch — the same "law-mandated artifact needs its own whitelist line, or
-# it is silently defeated" class as ALPHA-*-QA.md above (found on T-042-18, the
-# canon's first execution; PRE-PR-REVIEW.md is the TASKS-declared canonical name).
-!/specs/releases/*/PRE-PR-REVIEW.md
-!/specs/releases/*/SPEC.md
-!/specs/releases/*/PLAN.md
-!/specs/releases/*/TASKS.md
-!/specs/releases/*/CLOSURE.md
-!/specs/releases/*/GRILL.md
-!/specs/releases/*/OQ-DECISIONS.md
-# alpha/rc segment files (ADR-1/ADR-5): track the 4 canonical files per segment.
-!/specs/releases/*/alpha-*/
-/specs/releases/*/alpha-*/*
-!/specs/releases/*/alpha-*/SPEC.md
-!/specs/releases/*/alpha-*/PLAN.md
-!/specs/releases/*/alpha-*/TASKS.md
-!/specs/releases/*/alpha-*/CLOSURE.md
-!/specs/releases/*/alpha-*/GRILL.md
-!/specs/releases/*/alpha-*/OQ-DECISIONS.md
-!/specs/releases/*/rc-*/
-/specs/releases/*/rc-*/*
-!/specs/releases/*/rc-*/SPEC.md
-!/specs/releases/*/rc-*/PLAN.md
-!/specs/releases/*/rc-*/TASKS.md
-!/specs/releases/*/rc-*/CLOSURE.md
-!/specs/releases/*/rc-*/GRILL.md
-!/specs/releases/*/rc-*/OQ-DECISIONS.md
+!/specs/releases/**
+/specs/releases/**/local-notes.md
+/specs/releases/**/tmp/
 !/specs/_archive/
 !/specs/_archive/releases/
-!/specs/_archive/releases/*/
-/specs/_archive/releases/*/*
-!/specs/_archive/releases/*/SPEC.md
-!/specs/_archive/releases/*/PLAN.md
-!/specs/_archive/releases/*/TASKS.md
-!/specs/_archive/releases/*/CLOSURE.md
-!/specs/_archive/releases/*/alpha-*/
-/specs/_archive/releases/*/alpha-*/*
-!/specs/_archive/releases/*/alpha-*/SPEC.md
-!/specs/_archive/releases/*/alpha-*/PLAN.md
-!/specs/_archive/releases/*/alpha-*/TASKS.md
-!/specs/_archive/releases/*/alpha-*/CLOSURE.md
-!/specs/_archive/releases/*/rc-*/
-/specs/_archive/releases/*/rc-*/*
-!/specs/_archive/releases/*/rc-*/SPEC.md
-!/specs/_archive/releases/*/rc-*/PLAN.md
-!/specs/_archive/releases/*/rc-*/TASKS.md
-!/specs/_archive/releases/*/rc-*/CLOSURE.md
+!/specs/_archive/releases/**
+/specs/_archive/releases/**/local-notes.md
 
 # Operator private working draft — never commit
 docs/00_medium_mine.md

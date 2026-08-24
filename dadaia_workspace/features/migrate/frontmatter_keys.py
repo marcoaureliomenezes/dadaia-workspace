@@ -6,8 +6,24 @@ scanner, two callers, no duplicated fence parsing.
 
 Mechanics: operate on the LEADING frontmatter block only, remove whole key lines the
 caller's predicate selects (plus any indented continuation lines belonging to them), and
-byte-preserve everything else — no YAML round-trip, which would reorder and reformat
-unrelated keys. Prose mentions in the body are never touched.
+preserve everything else — no YAML round-trip, which would reorder and reformat unrelated
+keys. Prose mentions in the body are never touched.
+
+Newline contract — LF-canonical, not byte-preserving of line endings (bug
+``migration-normalises-crlf-atoms-to-lf-contradicting-its-byte-preserve-wording``,
+T-044-37, DECIDED): ``strip_frontmatter_keys`` and ``write_text_atomic`` are themselves
+line-ending AGNOSTIC — fed CRLF directly, ``strip_frontmatter_keys`` reproduces CRLF on
+every surviving line, and ``write_text_atomic``'s ``newline=""`` writes back exactly the
+bytes it is handed. The migration as every registered step actually runs it (real
+``Path.read_text()`` -> ``strip_frontmatter_keys`` -> ``write_text_atomic``) is LF-canonical
+end to end, because ``Path.read_text()``'s universal-newline translation already collapses
+CRLF/CR to LF before this module ever sees the text — a CRLF atom therefore leaves with LF
+on every line, not only the ones the key removal touched. This matches the platform-wide
+LF-canonical write contract for managed files (``write_text_atomic``'s own ``newline=""``
+guarantee; the same guarantee ``infrastructure/public_assets_common`` makes for projected
+assets, FR-RC2-2) rather than reproducing whatever line endings the atom arrived with.
+"Preserve everything else" above is a claim about CONTENT — unrelated key lines, key
+order, the body — never about line-ending bytes.
 """
 
 from __future__ import annotations

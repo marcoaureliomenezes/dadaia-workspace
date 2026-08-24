@@ -1,72 +1,77 @@
 ---
 name: dd-bug-fix
-description: "Use when: executing Arm B end-to-end on an already-registered bug — reproduce, RED, root-cause fix, GREEN, resolved event, commit, PATCH mint — on hotfix/{M.m.p}. The single procedural source of the hotfix flow. Any agent may invoke it once a bug carries a reported event."
+description: "Use when: executing Arm B end-to-end on an already-registered bug — red loop, minimise, hypotheses, instrument, seam test, cleanup, resolved event, commit — on the live feature branch. The single procedural source of the bug-fix flow, granted to `software-engineer` and `ai-engineer` once a bug carries a `reported` event."
 applyTo: "specs/bugs/**"
 ---
 
 # dd-bug-fix — Arm B End-to-End
 
 > **Not a hook-enforced mechanism.** No engine advances Arm B or reads bug state.
-> Any agent runs this protocol directly once a bug is `reported`; the git chokepoints
-> (`DADAIA.md` §3) are the only mechanical backstop.
+> `software-engineer` and `ai-engineer` run this protocol directly once a bug is
+> `reported`; the git chokepoints (`DADAIA.md` §3) are the only mechanical backstop.
 
 ## 1. When to invoke
 
-The bug already carries a `reported` event — `dd-bug-registration`'s only output. This
-skill never registers a bug and never classifies one; it starts from an already-open bug
-and runs Arm B through to close.
-
-The broader `specs/bugs/**` glob is deliberate: this skill owns the whole bug lifecycle
-(including the `resolved` event on the same ledger file `dd-bug-registration` narrows
-to). Declared subset, activation precedence: `dd-backlog-definition` §7 (canonical home).
+The bug already carries a `reported` event — `dd-bug-registration`'s only output; this
+skill never registers or classifies one, it runs Arm B through on an already-open bug.
+The broader `specs/bugs/**` glob is deliberate: this skill owns the whole lifecycle,
+including `resolved` on the same ledger `dd-bug-registration` narrows to — declared
+subset, `declared_overlaps` in `entities/rules-skills-map.json` (FR9/D4).
 
 ## 2. Branch and concurrency
 
-Run on `hotfix/{M.m.p}` at the next PATCH, cut from `develop` — full stage-contract row:
-`dadaia-gitflow` (`bug-fix/hotfix`), referenced here, not restated.
+Run on the live `feature/{M.m.p}` branch — no separate branch, no ceremony. Branch
+contract: `DADAIA.md` §4 Gitflow; operations: `dd-gitflow-default`.
 
-**Concurrency (ADR #10/E-4 — advisory presence only).** No reservation marker exists for
-bugs. Races are surfaced, never blocked (NO-LOCKS DOCTRINE): the SDD gate's presence
-heartbeat only names a live session working the same context. The reservation primitive
-is still being designed: `specs/backlog/bug-picked-ledger-event.md`. Invent no marker,
-no lock, no lease here.
+**Concurrency (ADR #10/E-4 — advisory presence only).** Races are surfaced, never
+blocked (NO-LOCKS DOCTRINE). Announce intent with `dadaia bugs append --bug-id <slug>
+--event picked` (v0.4.3, FR14) — appends your agent to `picked_by` without changing
+status; it never blocks a concurrent picker, it only makes the pick observable.
 
-## 3. Reproduce on the executed path
+## 3. The six-phase method
 
-Reproduce the failure exactly as it occurred — the real command, the real environment,
-the real path. A failure you cannot reproduce on the executed path is not yet ready for
-a RED test.
+1. **Red loop before any hypothesis.** Reproduce the failure exactly as it occurred —
+   real command, real environment, real path. *Done when:* the command and its red
+   output are captured.
+2. **Minimise until load-bearing.** Shrink the reproduction until every remaining
+   element is necessary. *Done when:* removing any element makes it stop failing.
+3. **3–5 falsifiable hypotheses.** Write them before touching code, each paired with
+   the observation that would kill it. *Done when:* every hypothesis is killed by an
+   observation or is the last one standing.
+4. **Instrument, never read code for a theory.** Add probes/logs/asserts on the
+   executed path that discriminate between the surviving hypotheses. *Done when:* the
+   surviving hypothesis is confirmed by an observation, not by inference.
+5. **Regression test at the correct seam.** Intent/size declared at birth:
+   `dadaia-test-stewardship` §A. **No correct seam exists → register an architecture
+   finding and dispatch `software-architect` before fixing** — the absence of a seam is
+   itself the finding. *Done when:* the test fails at HEAD, passes after the fix.
+6. **Cleanup.** Remove every probe from phase 4; the diff must leave the touched
+   feature smaller or equal, never bigger (`DADAIA.md` §7 (Quality) "Root cause,
+   always"). *Done when:* instrumentation is gone, worktree clean and GREEN.
 
-## 4. RED test
+## 4. GREEN, `resolved` event, commit
 
-Write the test that fails for the real reason. Intent and size classification at birth:
-`dadaia-test-stewardship` §A — referenced, not restated.
+Append `resolved` carrying three independently-checked fields (FR23): `--evidence-loop`
+(phase 1's red-loop command), `--evidence-seam` (phase 5's regression-test seam), and
+`--evidence-diff` (phase 6's diff direction, prefixed `net-negative:`/`net-positive:`/
+`net-neutral:` — `net-positive:` routes to `software-architect` before the commit).
+Closing the loop — the staging discipline for the commit that follows — is the law's
+close-in-same-session rule (`DADAIA.md` §7 (Quality)): consult it, do not restate it.
 
-## 5. Root-cause fix
+## 5. No separate release ceremony
 
-Fix the cause, not the symptom (`DADAIA.md` §6 "Root cause, always" — referenced, not
-restated). Workarounds and symptom patches are not acceptable outcomes.
+The bug fix lands on the live `feature/{M.m.p}` branch with the rest of the release —
+no separate SPEC/PLAN/TASKS, no `specs/releases/<id>/`, no standalone version mint
+(retired `hotfix/*` path; `DADAIA.md` §4 Gitflow / `dd-gitflow-default`). The `resolved`
+event is the durable record.
 
-## 6. GREEN + `resolved` event + evidence
+## 6. Checklist
 
-Prove the fix green, then append `resolved` with `--resolution-evidence` (reproducing
-test, fix, suite result). What counts as closing the loop — the staging discipline for
-the commit that follows — is the law's close-in-same-session rule (`DADAIA.md` §6):
-consult it, do not restate it here.
-
-## 7. PATCH mint + `CHANGELOG.md`, same commit, merge to `develop`
-
-At merge into `develop`, in the **same commit**: bump `pyproject.toml`'s version to the
-minted PATCH, and add the `CHANGELOG.md` entry. **No release ceremony** — no SPEC, no
-PLAN, no TASKS, no `specs/releases/<id>/` directory. The bug ledger plus the
-`CHANGELOG.md` entry are the record.
-
-## 8. Checklist
-
-- [ ] Bug carries a `reported` event before this skill starts.
-- [ ] Branch is `hotfix/{M.m.p}` at the next PATCH, cut from `develop`.
-- [ ] Failure reproduced on the executed path.
-- [ ] RED test written, intent/size declared (`dadaia-test-stewardship` §A).
-- [ ] Root cause fixed — no workaround, no symptom patch.
-- [ ] GREEN proven; `resolved` event appended with evidence; committed same session.
-- [ ] `pyproject.toml` PATCH bump + `CHANGELOG.md` entry, same commit, merged to `develop`.
+- [ ] Bug carries a `reported` event; branch is the live `feature/{M.m.p}`.
+- [ ] Red loop captured before any hypothesis; repro minimised to load-bearing.
+- [ ] 3–5 falsifiable hypotheses written before touching code.
+- [ ] Surviving hypothesis confirmed by instrumentation, not by reading code.
+- [ ] Test lands at the correct seam, or an architecture finding is registered and
+      `software-architect` dispatched first.
+- [ ] Cleanup done (probes gone, diff smaller or equal); GREEN; `resolved` event
+      carries evidence, committed same session; no separate ceremony opened.

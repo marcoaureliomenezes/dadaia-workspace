@@ -1,31 +1,34 @@
-"""Seed-2 e2e: push-gate verdict chokepoint across the REAL CLI boundary (FR-W1-02).
+"""v0.4.4 T-044-06 (FR3): the v2 branch contract across the REAL CLI boundary.
 
 The pre-push hook forwards git's pre-push stdin ref lines (``<local-ref> <local-sha>
 <remote-ref> <remote-sha>``) into ``dadaia ci push-gate-check``. Rather than stand up a
 real remote and a real ``git push`` (slow, networked, nondeterministic), this drives the
 SAME boundary the hook drives: it spawns ``ci push-gate-check`` through THIS interpreter
-with the ref lines on stdin and a synthetic ``.dadaia/handoff/`` tree on disk — exactly
-the contract ``pre-push-ci-gate.sh`` line 106 invokes.
+with the ref lines on stdin and no ``.dadaia/handoff/`` tree on disk at all — exactly the
+contract ``pre-push-ci-gate.sh`` line 106 invokes.
 
-Scenarios (seed 2):
+Scenarios (v2):
 
-* (a) push-cycle commit WITHOUT a security-reviewer APPROVE → BLOCKED, actionable message.
-* (b) WITH an APPROVE whose ``metrics.commit_sha`` == the pushed sha → flows.
-* (c) branch deletion (zero sha) and tag push → pass with no verdict on disk.
-* (d) predicate keys on the STDIN ref sha, never ``git rev-parse HEAD``: the repo HEAD is a
-      DIFFERENT sha than the pushed ref sha, an APPROVE covers only the pushed sha, and the
-      push still flows — proving HEAD is never consulted.
+* (a) a ``feature/{M.m.p}`` push flows — no security-reviewer handoff needed anywhere on
+  disk (A3.4: the verdict is no longer checked on this path at all; it is a PR gate now,
+  FR4).
+* (b) a ``develop`` push is BLOCKED, naming the PR path (``feature/{M.m.p}`` → develop).
+* (c) branch deletion (zero local sha) and a tag push both pass — never review-gated.
+
+Supersedes v0.6.0's verdict-keyed scenarios (a covering security-reviewer APPROVE
+required for ``develop`` to flow, and the "keys on the stdin sha, never HEAD" regression,
+which only had meaning while a verdict lookup existed on this path) — deleted per A3.4,
+not disabled.
 
 The CLI is invoked harness-free (no PreToolUse/PostToolUse payload), with only
 ``WORKSPACE_ROOT`` set, so this also covers the headless runtime the chokepoint protects.
 
-Intent: CONTRACT — FR-W1-02 (push-gate verdict chokepoint)
+Intent: CONTRACT — v0.4.4 A3.1
 Owner: software-engineer
 """
 
 from __future__ import annotations
 
-import json
 import os
 import subprocess
 import sys
@@ -41,14 +44,11 @@ _ZERO = "0" * 40
 
 
 def _init_repo(workspace: Path, slug: str) -> tuple[Path, str]:
-    """A real git repo at ``<workspace>/repos/<slug>`` with TWO real commits.
+    """A real git repo at ``<workspace>/repos/<slug>`` with one real commit.
 
-    Returns ``(repo, first_commit_sha)``. v0.9.0's push-range denylist scan needs a
-    resolvable git object for the pushed ``local_sha`` — a synthetic literal sha (the
-    pre-v0.9.0 fixture) now fails closed as a genuine git-read failure (FR6 row 2), so
-    tests use a REAL commit sha instead. The repo's actual HEAD ends up at a SECOND,
-    later commit so ``test_predicate_keys_on_stdin_sha_not_head`` still proves the
-    predicate never consults ``git rev-parse HEAD``.
+    Returns ``(repo, commit_sha)``. The v0.9.0 push-range denylist scan needs a
+    resolvable git object for the pushed ``local_sha`` — a synthetic literal sha fails
+    closed as a genuine git-read failure (FR6 row 2), so tests use a REAL commit sha.
     """
     (workspace / ".dadaia" / "states").mkdir(parents=True, exist_ok=True)
     (workspace / ".dadaia" / "states" / "spec_contexts.json").write_text("{}", encoding="utf-8")
@@ -60,13 +60,10 @@ def _init_repo(workspace: Path, slug: str) -> tuple[Path, str]:
     (repo / "seed.txt").write_text("seed\n", encoding="utf-8")
     subprocess.run(["git", "add", "seed.txt"], cwd=repo, check=True)
     subprocess.run(["git", "commit", "-q", "-m", "seed"], cwd=repo, check=True)
-    first_sha = subprocess.run(
+    sha = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=repo, capture_output=True, text=True, check=True
     ).stdout.strip()
-    (repo / "later.txt").write_text("later\n", encoding="utf-8")
-    subprocess.run(["git", "add", "later.txt"], cwd=repo, check=True)
-    subprocess.run(["git", "commit", "-q", "-m", "later"], cwd=repo, check=True)
-    return repo, first_sha
+    return repo, sha
 
 
 def _hook_env(workspace: Path) -> dict[str, str]:
@@ -76,23 +73,6 @@ def _hook_env(workspace: Path) -> dict[str, str]:
         env.pop(bad, None)
     env["WORKSPACE_ROOT"] = str(workspace)
     return env
-
-
-def _write_security_approve(workspace: Path, *, commit_sha: str, name: str = "sec") -> None:
-    handoff_dir = workspace / ".dadaia" / "handoff" / _SLUG
-    handoff_dir.mkdir(parents=True, exist_ok=True)
-    payload = {
-        "schema_version": "handoff-v1.1",
-        "agent": "security-reviewer",
-        "context": _SLUG,
-        "produced_at": "2026-06-12T12:00:00Z",
-        "scope": "push-gate e2e",
-        "metrics": {"commit_sha": commit_sha},
-        "artifact": {"type": "other"},
-        "verdict": "APPROVED",
-        "verdict_reason": "ok",
-    }
-    (handoff_dir / f"{name}.handoff.json").write_text(json.dumps(payload), encoding="utf-8")
 
 
 def _run_push_gate(
@@ -110,68 +90,43 @@ def _run_push_gate(
     )
 
 
-def test_push_without_security_approve_is_blocked(tmp_path: Path) -> None:
+def test_feature_branch_push_flows_with_no_verdict_anywhere(tmp_path: Path) -> None:
     workspace = tmp_path
-    repo, pushed_sha = _init_repo(workspace, _SLUG)
-    # No handoff on disk at all → no APPROVE → blocked with an actionable message.
+    repo, sha = _init_repo(workspace, _SLUG)
+    # No handoff on disk at all — the verdict is no longer checked on this path (A3.4).
     result = _run_push_gate(
-        repo, workspace, f"refs/heads/develop {pushed_sha} refs/heads/develop {_ZERO}\n"
+        repo, workspace, f"refs/heads/feature/0.0.1 {sha} refs/heads/feature/0.0.1 {_ZERO}\n"
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_develop_push_is_blocked_naming_the_pr_path(tmp_path: Path) -> None:
+    workspace = tmp_path
+    repo, sha = _init_repo(workspace, _SLUG)
+    result = _run_push_gate(
+        repo, workspace, f"refs/heads/develop {sha} refs/heads/develop {_ZERO}\n"
     )
     out = result.stdout + result.stderr
     assert result.returncode != 0, out
     assert "BLOCKED" in out, out
-    assert "security-reviewer APPROVE" in out, out
-    assert "origin/develop..develop" in out, out
+    assert "PR" in out, out
+    assert "feature/" in out, out
 
 
 @pytest.mark.parametrize(
     "variant",
-    ["matching-approve", "branch-deletion", "tag-push"],
-    ids=["approve-flows", "branch-deletion-passes", "tag-push-passes"],
+    ["branch-deletion", "tag-push"],
+    ids=["branch-deletion-passes", "tag-push-passes"],
 )
 def test_pass_matrix(tmp_path: Path, variant: str) -> None:
-    """(b) a matching security-reviewer APPROVE flows; (c) branch deletion (zero
-    local sha) and a tag push both pass with NO verdict on disk — never review-gated."""
+    """Branch deletion (zero local sha) and a tag push both pass with NO verdict on
+    disk — never review-gated, exactly as before A3.4 (the check simply does not exist
+    anywhere on this path now)."""
     workspace = tmp_path
-    repo, pushed_sha = _init_repo(workspace, _SLUG)
+    repo, sha = _init_repo(workspace, _SLUG)
 
-    if variant == "matching-approve":
-        _write_security_approve(workspace, commit_sha=pushed_sha)
-        result = _run_push_gate(
-            repo, workspace, f"refs/heads/develop {pushed_sha} refs/heads/develop {_ZERO}\n"
-        )
-    elif variant == "branch-deletion":
-        # Zero local sha = branch deletion; never review-gated, even with no handoff on disk.
-        result = _run_push_gate(
-            repo, workspace, f"refs/heads/old {_ZERO} refs/heads/old {pushed_sha}\n"
-        )
+    if variant == "branch-deletion":
+        result = _run_push_gate(repo, workspace, f"refs/heads/old {_ZERO} refs/heads/old {sha}\n")
     else:
-        result = _run_push_gate(
-            repo, workspace, f"refs/tags/v1 {pushed_sha} refs/tags/v1 {_ZERO}\n"
-        )
+        result = _run_push_gate(repo, workspace, f"refs/tags/v1 {sha} refs/tags/v1 {_ZERO}\n")
     assert result.returncode == 0, result.stdout + result.stderr
-
-
-def test_predicate_keys_on_stdin_sha_not_head(tmp_path: Path) -> None:
-    """Regression: the gate keys on the STDIN ref sha, never ``git rev-parse HEAD``.
-
-    The repo's real HEAD is a LATER commit; the pushed ref sha is the repo's FIRST
-    commit (a real, resolvable object — required now that v0.9.0 scans it — but
-    deliberately not HEAD). An APPROVE covers ONLY the first commit's sha. If the gate
-    wrongly consulted HEAD it would block (no APPROVE for HEAD); keyed on the pushed
-    sha it must flow.
-    """
-    workspace = tmp_path
-    repo, pushed_sha = _init_repo(workspace, _SLUG)
-    head = subprocess.run(
-        ["git", "rev-parse", "HEAD"], cwd=repo, capture_output=True, text=True, check=True
-    ).stdout.strip()
-    assert head != pushed_sha  # the pushed sha is deliberately not the repo HEAD.
-
-    _write_security_approve(workspace, commit_sha=pushed_sha)
-    result = _run_push_gate(
-        repo, workspace, f"refs/heads/develop {pushed_sha} refs/heads/develop {_ZERO}\n"
-    )
-    assert result.returncode == 0, (
-        "gate must key on the pushed sha, not HEAD: " + result.stdout + result.stderr
-    )

@@ -33,8 +33,8 @@ the missing context:
 - Expected scale (now, and at growth)?
 - Must-haves vs nice-to-haves?
 
-Use `dadaia-grill-me` for operator-facing clarification. Never ask what `Read`/`Glob`/`Grep`
-can answer.
+Call the Skill tool with `dd-grill-me` for operator-facing clarification. Never ask what
+`Read`/`Glob`/`Grep` can answer.
 
 ## Step 2 — Research Existing Solutions
 

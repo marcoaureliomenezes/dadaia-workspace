@@ -280,6 +280,103 @@ def test_every_canonical_disposition_token_accepted(tmp_path: Path, token: str) 
     assert doc.errors == ()
 
 
+# ── bug backlog-doctor-silent-on-duplicate-top-level-sections — a repeated top-level
+# heading is a located DocumentError, and EVERY occurrence still parses (never just
+# the first) ─────────────────────────────────────────────────────────────────────────
+#
+# Root cause (dd-bug-fix H1, confirmed by instrumentation): ``_top_level_sections()``
+# used ``dict.setdefault`` to map a heading NAME to its body range — the first
+# occurrence won and every later occurrence's body was silently discarded, so a
+# duplicated ``## ACTIVE`` block (and any duplicate slug inside it) never reached
+# ``load_document``'s caller at all. The document schema states exactly two top-level
+# sections (module docstring); the parser now says so itself.
+
+_DUPLICATE_ACTIVE_HEADING_SAME_SLUG = """\
+## ACTIVE
+
+### dup-item
+- **Title:** First
+- **Opened:** 2026-08-10
+- **Status:** idea
+- **Description:** first copy.
+- **Provenance:** operator request
+
+## ACTIVE
+
+### dup-item
+- **Title:** Second
+- **Opened:** 2026-08-10
+- **Status:** idea
+- **Description:** second copy, same slug.
+- **Provenance:** operator request
+
+## LEDGER
+"""
+
+
+def test_duplicate_top_level_active_heading_yields_document_error_and_parses_both_bodies(
+    tmp_path: Path,
+) -> None:
+    """Intent: CONTRACT — bug backlog-doctor-silent-on-duplicate-top-level-sections.
+
+    A second ``## ACTIVE`` heading is a located :class:`DocumentError` (the document
+    schema states exactly two top-level sections) AND its body is still parsed — both
+    ``dup-item`` subsections reach ``doc.active``, so a downstream duplicate-slug check
+    (BL-DUP) can compare them instead of one being silently dropped."""
+    backlog_dir = _write(tmp_path, _DUPLICATE_ACTIVE_HEADING_SAME_SLUG)
+    doc = load_document(backlog_dir)
+
+    duplicate_heading_errors = [
+        e for e in doc.errors if "duplicate top-level section heading" in e.message
+    ]
+    assert len(duplicate_heading_errors) == 1, doc.errors
+    assert "'ACTIVE'" in duplicate_heading_errors[0].message
+    assert duplicate_heading_errors[0].line > 0
+
+    dup_items = [item for item in doc.active if item.slug == "dup-item"]
+    assert len(dup_items) == 2, (
+        "both occurrences of the duplicated '## ACTIVE' block must parse — the second "
+        f"must never be silently dropped: got {[i.title for i in doc.active]}"
+    )
+    titles = {item.title for item in dup_items}
+    assert titles == {"First", "Second"}
+
+
+_DUPLICATE_LEDGER_HEADING_SAME_SLUG = """\
+## ACTIVE
+
+## LEDGER
+
+- dup-row · DELIVERED · v0.9.0 · 2026-06-01
+
+## LEDGER
+
+- dup-row · DELIVERED · v0.9.0 · 2026-06-01
+"""
+
+
+def test_duplicate_top_level_ledger_heading_yields_document_error_and_parses_both_bodies(
+    tmp_path: Path,
+) -> None:
+    """Symmetric coverage: a repeated ``## LEDGER`` heading is also a located
+    DocumentError, and both LEDGER bodies still parse — a duplicated row reaches
+    ``doc.ledger`` twice rather than the second copy vanishing."""
+    backlog_dir = _write(tmp_path, _DUPLICATE_LEDGER_HEADING_SAME_SLUG)
+    doc = load_document(backlog_dir)
+
+    duplicate_heading_errors = [
+        e for e in doc.errors if "duplicate top-level section heading" in e.message
+    ]
+    assert len(duplicate_heading_errors) == 1, doc.errors
+    assert "'LEDGER'" in duplicate_heading_errors[0].message
+
+    dup_rows = [row for row in doc.ledger if row.slug == "dup-row"]
+    assert len(dup_rows) == 2, (
+        "both occurrences of the duplicated '## LEDGER' block must parse — the second "
+        f"must never be silently dropped: got {doc.ledger}"
+    )
+
+
 # ── M1 (code-reviewer, v0.12.0 pre-PR) — section splitting is fence-aware ───────────
 #
 # Reproduces the reviewer's finding: a fenced ``## ``/``### `` line inside an ACTIVE

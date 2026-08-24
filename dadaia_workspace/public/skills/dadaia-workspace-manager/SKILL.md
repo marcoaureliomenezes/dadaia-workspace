@@ -121,8 +121,8 @@ relaunch, or steal anything — there is nothing to steal. Behaviour on write:
   a blocked user.
 
 There is no per-session "implementation lock" vs "review lock" pair, no exclusivity
-invariant, and no lease to steal. `dadaia lock steal` is **deleted** — there is nothing
-left for it to do.
+invariant, and no lease to steal — the lock-stealing command from the pre-NO-LOCKS
+model has been removed entirely, with nothing left for it to do.
 
 ### Supporting commands
 
@@ -132,8 +132,8 @@ dadaia public stage                  # project lib assets into .dadaia/agentic/
 dadaia public install --target all   # deploy assets to .agents/, .claude/, .codex/, .kimi-code/
 dadaia public install --target claude # deploy to .claude/ only
 dadaia public doctor                 # audit asset drift
-dadaia academy list                  # list courses
-dadaia academy create <slug> <name>  # create course
+dadaia academy list                       # list courses
+dadaia academy create {name} --module N   # create course from a knowledge base module
 ```
 
 ## Import Flow
@@ -154,7 +154,8 @@ scp workspace-<ts>.tar.gz <local-user>@<local-host>:~/
 ```bash
 # Prerequisites: Python 3.12+, git
 git clone <dadaia-workspace-repo-url>
-pip install -e dadaia-workspace/ --break-system-packages
+python3 -m venv .dadaia/.venv
+.dadaia/.venv/bin/pip install -e dadaia-workspace/
 
 mkdir -p ~/workspace && cd ~/workspace
 dadaia import ~/workspace-<ts>.tar.gz --skip-mnt

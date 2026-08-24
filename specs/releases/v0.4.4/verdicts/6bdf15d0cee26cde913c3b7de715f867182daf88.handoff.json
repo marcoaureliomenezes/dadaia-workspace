@@ -1,0 +1,80 @@
+{
+  "schema_version": "handoff-v1.2",
+  "self_pull": {
+    "refs": [
+      "specs/memory/product/catalog.json",
+      "specs/memory/product/sdd/sdd-gate-v3.md"
+    ]
+  },
+  "agent": "security-reviewer",
+  "context": "dadaia-workspace",
+  "produced_at": "2026-08-24T17:50:58Z",
+  "release_id": "v0.4.4",
+  "scope": "T-044-52 - committed security verdict evidence for the rc-1 PR head (CI security-verdict-gate)",
+  "artifact": {
+    "type": "report"
+  },
+  "metrics": {
+    "commit_sha": "6bdf15d0cee26cde913c3b7de715f867182daf88",
+    "previous_covered_sha": "f83cfb724d1c8534605138c6c1d8f45d23b21e70",
+    "base_sha": "f5cce371",
+    "delta_commits": 3,
+    "delta_files": 6,
+    "delta_lines_added": 300,
+    "delta_lines_removed": 66,
+    "findings_critical": 0,
+    "findings_high": 0,
+    "findings_medium": 1,
+    "findings_low": 1,
+    "findings_info": 3,
+    "push_gate_exit": 0,
+    "push_gate_offenders": 0,
+    "secrets_detected": 0,
+    "cve_findings": 0,
+    "new_dependencies": 0,
+    "tests_passed": 6
+  },
+  "findings": [
+    {
+      "severity": "INFO",
+      "message": "Delta review f83cfb72..6bdf15d0 (3 commits, 6 files): no security-relevant regression; no production code, no CI YAML, no dependency, no secret shape.",
+      "detail_md": "The delta is `1bc9a5ea` (this reviewer's own verdict evidence), `c7cc8d04` (the .gitignore inversion plus a contract-test pin and the `resolved` event) and `6bdf15d0` (the QA release verdict artifact and the `T-044-46` marker flip). Secret-shape sweep over the added lines: **0 hits**. The pre-push denylist gate at this head, run without a pipe on the real new-branch refspec: **exit 0, zero offenders**. `pytest tests/integration/test_repo_self_scan.py tests/contract/test_source_repo_hygiene.py`: **6 passed**. Working tree clean.\n\nThe `resolved` event closes the bug this reviewer registered last round, with all three FR23 evidence fields populated and checkable and a `net-negative:` diff direction (.gitignore +14/-62).",
+      "fix_recommendation": "None."
+    },
+    {
+      "severity": "INFO",
+      "message": "The gitignore inversion exposes nothing that exists: zero newly-visible untracked files under either inverted tree, and the two scratch classes the old catch-all actually protected stay hidden.",
+      "detail_md": "Verified by probe rather than by reading the claim. `git status --porcelain --untracked-files=all -- specs/releases specs/_archive` is empty, and `git check-ignore` confirms the surviving narrow ignores still fire at any depth:\n\n| probe | result |\n|---|---|\n| `specs/releases/<id>/local-notes.md` | IGNORED |\n| `specs/releases/<id>/tmp/scratch.txt` | IGNORED |\n| `specs/_archive/releases/<id>/local-notes.md` | IGNORED |\n| `specs/releases/<id>/verdicts/<sha>.handoff.json` | TRACKABLE (the point of the fix) |\n\nStructurally this is the right shape: one negation replaces a catch-all plus ~20 per-artifact opt-ins, so no future canonical artifact class needs a fifth whitelist line. The contract test pins both directions, including this bug's own regression seam.",
+      "fix_recommendation": "None."
+    },
+    {
+      "severity": "LOW",
+      "message": "Defence-in-depth note on the inversion: inside specs/releases/** and specs/_archive/releases/**, sensitive file classes that the old catch-all incidentally hid (.env, *.pem, *.key, caches, a nested .dadaia/) are now trackable, because a later negation wins over the earlier global ignores.",
+      "detail_md": "Probed: under a release directory, `.env`, `.env.local`, `server.pem`, `creds.key`, `.coverage`, `__pycache__/x.pyc` and `.dadaia/state.json` all report TRACKABLE, where the pre-inversion catch-all would have ignored them. Root-level `.env`, `.env.local`, `secrets.pem` and `.coverage` are unaffected and remain IGNORED.\n\nNo instance exists: nothing of that shape is present anywhere under either tree, credentials live in the workspace-root `.env` by law (never inside a repo's specs tree), and three content-based backstops remain in force — the pre-push denylist scan (which reads every new object's content, including a `secret-token` baseline pattern), the gitleaks CI job, and the repo self-scan. So this is a prospective reduction in defence in depth, not an exposure, and it does not gate the release.\n\nRecorded for the fix owner rather than actioned here because the remedy must not undo the inversion: gitignore is last-match-wins, so re-asserting the sensitive classes in one trailing block after the negation restores the protection without reintroducing the per-artifact opt-in shape the inversion exists to kill.",
+      "fix_recommendation": "PM intake, not an rc-1 fix: append one trailing block re-ignoring the sensitive classes (`**/.env*`, `**/*.pem`, `**/*.key`, `**/__pycache__/`, `**/.coverage`, `**/.dadaia/`) after the release-tree negation, and extend the existing hygiene contract test with those probes. One block, one test - never a per-artifact line."
+    },
+    {
+      "severity": "MEDIUM",
+      "message": "S-3 carried unchanged: the verdict gate is advisory at rc-1 (A4.4) and must be a required check on develop and main before rc-2.",
+      "detail_md": "develop's branch protection still carries no `required_status_checks` object; main's required contexts still omit 'Security verdict gate (PR head sha)'. Sanctioned for the rc-1 PR by A4.4 and already in the PM intake report. Configuration outside the branch: it does not gate this verdict, it gates rc-2.",
+      "fix_recommendation": "Before rc-2, re-supply the required-checks list whole (PATCH clobbers) on both edges including the verdict gate, and verify by reading branch protection back rather than by observing a green PR."
+    },
+    {
+      "severity": "INFO",
+      "message": "Full-delta findings carried forward from the three review rounds: zero CRITICAL, zero HIGH, both original blockers closed and re-proven.",
+      "detail_md": "The verdict gate refuses `HEAD`, `@`, an abbreviated sha and an option-shaped value while still passing an exact sha and an only-verdict-drift ancestor, and still refuses a commit mixing verdict evidence with production. The push range publishes no private material. The privacy baseline data file remains byte-identical to develop, main and the review base - no pattern was relaxed at any point. Hooks are installed and firing. F-11 stays registered (MEDIUM, open) as the only reachable ledger corruption, with forgery structurally unreachable. Branch sweep 50/50 against archive tags. No new dependencies, no shell=True, actions pinned by sha, no generated-file leakage.",
+      "fix_recommendation": "None."
+    }
+  ],
+  "decisions_required": [
+    "Operator: make 'Security verdict gate (PR head sha)' a required check on develop and main before rc-2 (A4.4).",
+    "PM intake: re-assert the sensitive-file classes in one trailing .gitignore block after the release-tree negation, with hygiene-test probes - never a per-artifact line."
+  ],
+  "next_handoff": {
+    "agent": "project-manager",
+    "context": "dadaia-workspace",
+    "expected_artifact_type": "other"
+  },
+  "verdict": "APPROVED",
+  "verdict_reason": "APPROVED covering 6bdf15d0. The delta since the previously covered sha is three commits and six files - this reviewer's own verdict evidence, the .gitignore inversion that structurally closes the fourth-recurrence bug registered last round (net -48 lines, one negation replacing a catch-all plus ~20 per-artifact opt-ins, with a contract-test pin and a fully-evidenced resolved event), and the QA release verdict artifact with the T-044-46 marker flip. No production code, no CI YAML, no dependency change, zero secret-shape hits, push-gate exit 0 with zero offenders, self-scan and repo hygiene contract 6 passed, tree clean. The inversion was verified by probe, not by claim: zero newly-visible untracked files under either inverted tree and the two scratch classes the old catch-all actually protected still fire at any depth. One LOW is recorded - the inversion also makes sensitive file classes trackable inside the release trees, with no instance present and three content-based backstops still in force - and it is intake, not a blocker, because the remedy is one trailing re-ignore block and must not undo the inversion. S-3 carries unchanged: advisory at rc-1 per A4.4, required before rc-2. Bug-surface axis: this delta REDUCES it - a defect class that recurred four times is closed by deleting the shape that caused it rather than by adding the fifth instance of the workaround."
+}

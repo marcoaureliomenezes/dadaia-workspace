@@ -11,8 +11,12 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.models.server_registry import PortEntry, PortStatus
-from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
-from dadaia_workspace.features.panel.service import PanelService
+from dadaia_workspace.core.models.spec_context import (
+    AssociatedRepo,
+    ContextState,
+    SpecContextProject,
+)
+from dadaia_workspace.features.panel.service import PanelAssociatedRepo, PanelService
 
 pytestmark = pytest.mark.unit
 
@@ -59,6 +63,7 @@ def _make_context(
     repo_slug: str,
     state: ContextState = ContextState.ALIVE,
     current_branch: str | None = "main",
+    associated_repos: tuple[AssociatedRepo, ...] = (),
 ) -> SpecContextProject:
     return SpecContextProject(
         name=name,
@@ -69,6 +74,7 @@ def _make_context(
         alive_since="2026-01-01T00:00:00+00:00" if state == ContextState.ALIVE else None,
         dead_since=None if state == ContextState.ALIVE else "2026-01-01T00:00:00+00:00",
         current_branch=current_branch,
+        associated_repos=associated_repos,
     )
 
 
@@ -141,3 +147,28 @@ def test_dead_context_filtered_and_empty_inputs_yield_empty_results() -> None:
     # All-DEAD contexts -> list_active_contexts() returns [].
     only_dead_service = _build_service([], [dead_ctx])
     assert only_dead_service.list_active_contexts() == []
+
+
+# ---------------------------------------------------------------------------
+# 3. FR18/A18.5 — list_active_contexts() carries associated repos on the card
+# ---------------------------------------------------------------------------
+
+
+def test_panel_context_carries_associated_repos_with_and_without() -> None:
+    """Intent: CONTRACT — FR18/A18.5. A context WITH associated repos surfaces them
+    (slug + url, no live git status — R4); a context WITHOUT them keeps the empty
+    default, so the pre-FR18 shape is unchanged for the common case."""
+    with_assoc = _make_context(
+        name="With Associated",
+        repo_slug="with-associated",
+        associated_repos=(AssociatedRepo(slug="infra", url="https://example.com/infra.git"),),
+    )
+    without_assoc = _make_context(name="No Associated", repo_slug="no-associated")
+
+    service = _build_service([], [with_assoc, without_assoc])
+    panel_contexts = {ctx.slug: ctx for ctx in service.list_active_contexts()}
+
+    assert panel_contexts["with-associated"].associated == (
+        PanelAssociatedRepo(slug="infra", url="https://example.com/infra.git"),
+    )
+    assert panel_contexts["no-associated"].associated == ()

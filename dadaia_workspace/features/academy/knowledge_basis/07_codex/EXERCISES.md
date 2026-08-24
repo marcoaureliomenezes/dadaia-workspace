@@ -42,7 +42,7 @@ You inspect a Codex projection and find:
 
 ```text
 .codex/agents/project-auditor.toml
-.codex/skills/dadaia-cli/SKILL.md
+.codex/skills/dd-cli-library/SKILL.md
 ```
 
 The operator says: "Why did the audit not fan out automatically?"

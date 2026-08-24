@@ -1,6 +1,6 @@
 ---
 name: dd-release-definition
-description: "Use when: turning bugs and/or backlog items into a release. product-engineer (dispatched by project-manager) picks a pre-sanitized set and refines it into a SPEC. Enforces bug-always-solved (unless subsumed) and a MANDATORY dadaia-grill-me session before the SPEC is written. Invoke at the start of release definition."
+description: "Use when: turning bugs and/or backlog items into a release. product-engineer (dispatched by project-manager) picks a pre-sanitized set and refines it into a SPEC. Enforces bug-always-solved (unless subsumed) and a MANDATORY dd-grill-me session before the SPEC is written. Invoke at the start of release definition."
 applyTo: "specs/releases/*/SPEC.md"
 ---
 
@@ -30,7 +30,8 @@ steps 1–3 below are complete.
 This skill **reads** `specs/backlog/**` but never writes it (purge-on-pick is executed
 by `project-manager` via `dd-backlog-definition` §2, step 5 table) — the activation
 glob above names what this skill actually authors: the release `SPEC.md`. Activation
-precedence for the fleet: `dd-backlog-definition` §7 (canonical home).
+precedence for the fleet: `declared_overlaps` in `entities/rules-skills-map.json`
+(canonical home, FR9/D4).
 
 Sanitizing and deduplicating those inputs is `dd-backlog-definition`'s job, run
 continuously by `project-manager` — this skill consumes an already-clean set and does
@@ -40,7 +41,7 @@ not re-triage it.
 
 ### 1. Pick the set
 
-> **Pick-time priority** (`DADAIA.md` §5 Releases): "At pick time, open bugs and
+> **Pick-time priority** (`DADAIA.md` §6 Releases): "At pick time, open bugs and
 > undispositioned audits outrank fresh backlog."
 
 Select the bugs + backlog items this release will address. This is discovery
@@ -60,7 +61,7 @@ Every **picked bug must be solved in the release**, with exactly one exception:
   not "picked" — leave it open (`dd-backlog-definition` sanitizes it on its own cadence).
 
 ### 3. MANDATORY grill
-Run a `dadaia-grill-me` session on the picked set. This is **obligatory** — it
+Call the Skill tool with `dd-grill-me` on the picked set. This is **obligatory** — it
 resolves inconsistencies, scope gaps, ambiguous acceptance, and stale assumptions
 **before** the SPEC exists. Do not skip it even when the scope "looks obvious".
 
@@ -69,10 +70,9 @@ Only now write the release SPEC (Draft), with:
 - the picked bug + backlog set and their acceptance,
 - every `superseded_by` link from step 2.
 
-Definition runs on `feature/{M.m.p}`. Once SPEC + PLAN + TASKS are all `Aprovado`, that
-is **milestone (a)**: merge `feature/{M.m.p}` into local `develop`, run the diff-based
-security review, and push `develop` — a mandatory obligation, not optional cleanup (the
-branch/commit/push mechanics are the `dadaia-gitflow` skill's contract).
+Definition runs on `feature/{M.m.p}`. Once SPEC + PLAN + TASKS are all `Aprovado`, open
+the definition PR — a mandatory obligation, not optional cleanup (branch contract:
+`DADAIA.md` §4 Gitflow; operations: `dd-gitflow-default`).
 
 Then continue the normal SDD flow (PLAN → TASKS → implementation), with reviews
 per the segment/release cadence (alpha = qa-only; rc-ship = qa + code + security).
@@ -91,7 +91,7 @@ reads this line. Two mechanisms actually execute consumption, at two different p
 | When | Executor | What it does |
 |---|---|---|
 | At definition, same commit as the SPEC | `project-manager`'s purge-on-pick (`dd-backlog-definition` §2) | Removes each declared slug from `## ACTIVE`, recording provenance in the SPEC |
-| At closure | `dd-release-closure`'s Disposition sweep | Adds a `## LEDGER` line and drops the `## ACTIVE` subsection for each fully-consumed slug (terminal disposition token vocabulary: `dd-backlog-definition` §2) |
+| At closure | `dd-release-implement`'s Disposition sweep | Updates the slug's `## LEDGER` line to its terminal token and drops the `## ACTIVE` subsection for each fully-consumed slug (terminal disposition token vocabulary: `dd-backlog-definition` §2) |
 
 Two mechanical backstops catch a slug that falls through either step: `backlog doctor`'s
 BL-STALE (an `ACTIVE` item already consumed/dispositioned) and `specs doctor`'s
@@ -108,12 +108,12 @@ archived CLOSURE's `## Dispositions` rows naming a still-non-terminal `ACTIVE` s
 
 `product-engineer` owns picking and SPEC authorship; `project-manager` dispatches
 this work and owns the mandatory-grill gate (it must not let a release-from-backlog
-proceed to SPEC without the grill). See the `DADAIA.md` §5 (Releases).
+proceed to SPEC without the grill). See the `DADAIA.md` §6 (Releases).
 
 ## Checklist
 
 - [ ] Picked set recorded (from `dd-backlog-definition`'s already-sanitized `ACTIVE`).
 - [ ] Every picked bug fixed-in-release OR `superseded_by` a picked backlog item.
-- [ ] `dadaia-grill-me` session completed (report emitted).
+- [ ] `dd-grill-me` session completed (report emitted).
 - [ ] SPEC authored from the refined, picked set.
 - [ ] `**Consumes:**` line declared for any fully-consumed backlog item (or omitted if none).
