@@ -1,7 +1,8 @@
 ---
 name: dd-audit-project
-description: "Use when: project-auditor runs a drift/compliance audit of a Spec Context Project — memory-atom inventory, the drift-detection method, dead-code detection, the 6-dimension scoring rubric, evidence-agent dispatch, aggregation, CLI integration, or the audit→release lifecycle wrapper. Full merge + rename of drift-detection (ADR #8/E-2)."
+description: "project-auditor's audit protocol: memory-atom inventory, the drift-detection method, dead-code detection, the 6-dimension scoring rubric, and evidence-agent dispatch through the audit-to-release lifecycle."
 applyTo: ".dadaia/reports/**"
+disable-model-invocation: true
 ---
 
 # dd-audit-project — Memory ↔ Implementation Drift Audit

@@ -15,7 +15,6 @@ tools:
 skills:
   - dd-cli-library
   - dadaia-workspace-spec-reviewer
-  - dd-audit-project
   - dd-bug-registration
   - dd-manager-orchestration
   - dadaia-handoff-emitter

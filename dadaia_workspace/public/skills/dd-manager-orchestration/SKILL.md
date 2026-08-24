@@ -150,8 +150,8 @@ Use this when two agents remain blocked after one exchange:
 
 1. Each agent writes a `Conflict Position` section in its report.
 2. `project-manager` writes a synthesis report with the exact decision point.
-3. If the decision still cannot be resolved, invoke `dd-grill-me` and ask
-   the operator one concrete question.
+3. If the decision still cannot be resolved, call the Skill tool with `dd-grill-me`
+   and ask the operator one concrete question.
 
 The operator's answer must be reflected in SPEC, PLAN, TASKS, ADR, or memory as
 appropriate for the current phase.

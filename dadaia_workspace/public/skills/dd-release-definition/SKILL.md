@@ -61,7 +61,7 @@ Every **picked bug must be solved in the release**, with exactly one exception:
   not "picked" — leave it open (`dd-backlog-definition` sanitizes it on its own cadence).
 
 ### 3. MANDATORY grill
-Run a `dd-grill-me` session on the picked set. This is **obligatory** — it
+Call the Skill tool with `dd-grill-me` on the picked set. This is **obligatory** — it
 resolves inconsistencies, scope gaps, ambiguous acceptance, and stale assumptions
 **before** the SPEC exists. Do not skip it even when the scope "looks obvious".
 
