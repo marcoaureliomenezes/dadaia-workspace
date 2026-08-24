@@ -1183,7 +1183,7 @@ tree, before `rc-1` and before any archive move (D8/FR5 order).
 
 ---
 
-- [ ] **T-044-46 — Security review + the QA release verdict ("closed by QA")**
+- [-] **T-044-46 — Security review + the QA release verdict ("closed by QA")**
 
 **Owner role:** security-reviewer + qa-engineer · **Preconditions:** T-044-45 `[x]`.
 
@@ -1200,7 +1200,7 @@ verdict recorded.
 
 ## `rc-1` — milestone (b), the release integrates
 
-- [ ] **T-044-52 — [git] `rc-1`: PR `feature/0.4.4` → `develop` (first v2 merge)**
+- [-] **T-044-52 — [git] `rc-1`: PR `feature/0.4.4` → `develop` (first v2 merge)**
 
 **Owner role:** dispatcher + security-reviewer · **Preconditions:** T-044-46 `[x]`.
 
@@ -1219,7 +1219,7 @@ whole scope.
 
 ## `rc-2 … rc-N` — adjustment rounds on the merged scope
 
-- [ ] **T-044-53 — Adjustment rounds: test `develop`, fix on the branch, merge again**
+- [-] **T-044-53 — Adjustment rounds: test `develop`, fix on the branch, merge again**
 
 **Owner role:** qa-engineer + operator (finding) · software-engineer / ai-engineer (fixing) ·
 dispatcher + security-reviewer (merging) · **Preconditions:** T-044-52 `[x]`.
@@ -1241,7 +1241,7 @@ rounds**, in which case the final `rc` **is** `rc-1`.
 
 ## The final `rc` — closure, archive, ship
 
-- [ ] **T-044-47 — Memory window (SPEC §5)**
+- [-] **T-044-47 — Memory window (SPEC §5)**
 
 **Owner role:** product-engineer · **Commit:** `docs(T-044-47): memory after v0.4.4`
 
@@ -1256,7 +1256,7 @@ doctor` 0 errors.
 
 ---
 
-- [ ] **T-044-48 — `CLOSURE.md` with every sweep**
+- [-] **T-044-48 — `CLOSURE.md` with every sweep**
 
 **Owner role:** product-engineer · **Commit:** `docs(T-044-48): v0.4.4 closure`
 
@@ -1277,7 +1277,7 @@ standing-order verdict record, the restated v0.4.3 git-identity question, archiv
 
 ---
 
-- [ ] **T-044-49 — [git] Archive the release**
+- [-] **T-044-49 — [git] Archive the release**
 
 **Owner role:** dispatcher · **Commit:** `chore(T-044-49): archive v0.4.4`
 
@@ -1286,7 +1286,7 @@ standing-order verdict record, the restated v0.4.3 git-identity question, archiv
 
 ---
 
-- [ ] **T-044-50 — [git] Final-`rc` merge: version bump and PR → `develop`**
+- [-] **T-044-50 — [git] Final-`rc` merge: version bump and PR → `develop`**
 
 **Owner role:** dispatcher + software-engineer + security-reviewer
 
@@ -1301,7 +1301,7 @@ the PR head sha, PR to `develop`, CI green, merge — this burns the **final `rc
 
 ---
 
-- [ ] **T-044-51 — [git] Ship**
+- [-] **T-044-51 — [git] Ship**
 
 **Owner role:** dispatcher + security-reviewer · **Preconditions:** T-044-50 `[x]`.
 
