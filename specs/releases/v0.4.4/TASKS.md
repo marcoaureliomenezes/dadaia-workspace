@@ -897,7 +897,9 @@ first try.
 
 ---
 
-- [-] **T-044-33 — bug `backlog-doctor-silent-on-duplicate-top-level-sections` (MEDIUM)**
+- [x] **T-044-33 — bug `backlog-doctor-silent-on-duplicate-top-level-sections` (MEDIUM)**
+
+**Commit:** `fix(T-044-33): the backlog parser refuses duplicate top-level sections`
 
 **Write set:** `dadaia_workspace/features/backlog/document.py`, `doctor.py`, tests.
 **Description:** `_top_level_sections()` uses `dict.setdefault`, so a duplicated `## ACTIVE`
@@ -905,6 +907,17 @@ first try.
 the document schema says exactly two top-level sections — make the parser say so too, rather
 than adding a second validation pass.
 **Done criterion:** the duplicated-document repro is a RED test that goes GREEN; `Closed`.
+
+**Resolution:** Fixed at the parser only (`document.py`), `doctor.py` untouched —
+`_top_level_sections` now returns EVERY occurrence's body range per heading name (was
+`dict.setdefault`, first-wins) plus a located `DocumentError` for a repeated top-level
+heading; `load_document` parses all of them, so a duplicated slug reaches the doctor's
+existing (already-correct) BL-DUP check instead of the second copy vanishing. RED-to-GREEN
+seam: `tests/unit/features/backlog/test_document.py::test_duplicate_top_level_active_heading_yields_document_error_and_parses_both_bodies`
+(+ LEDGER sibling; end-to-end integration test in `test_backlog_doctor.py`). Full suite:
+2756 passed, 4 pre-existing skips. Diff is net-positive (+52/-20, one file) — flagged in the
+`resolved` event per FR23/`dd-bug-fix` for a `software-architect` review before this lands
+past this commit; `bugs.jsonl` carries the evidence.
 
 ---
 
