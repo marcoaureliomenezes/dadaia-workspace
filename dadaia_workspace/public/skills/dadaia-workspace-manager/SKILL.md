@@ -121,8 +121,8 @@ relaunch, or steal anything — there is nothing to steal. Behaviour on write:
   a blocked user.
 
 There is no per-session "implementation lock" vs "review lock" pair, no exclusivity
-invariant, and no lease to steal. `dadaia lock steal` is **deleted** — there is nothing
-left for it to do.
+invariant, and no lease to steal — the lock-stealing command from the pre-NO-LOCKS
+model has been removed entirely, with nothing left for it to do.
 
 ### Supporting commands
 
