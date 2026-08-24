@@ -778,7 +778,7 @@ consumer (A15.3) — no second repo-resolution path is created. Capture **V8**.
 
 ---
 
-- [ ] **T-044-27 — FR16: ALIVE/DEAD covers every repo**
+- [-] **T-044-27 — FR16: ALIVE/DEAD covers every repo**
 
 **Owner role:** software-engineer · **Commit:**
 `feat(T-044-27): alive and dead cover the whole repo set`
