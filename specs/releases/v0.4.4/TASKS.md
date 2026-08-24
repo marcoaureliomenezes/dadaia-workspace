@@ -1003,13 +1003,36 @@ every platform and the assertion can only fail for the reason it names.
 
 ---
 
-- [-] **T-044-37 — bug `migration-normalises-crlf-atoms-to-lf-contradicting-its-byte-preserve-wording` (LOW)**
+- [x] **T-044-37 — bug `migration-normalises-crlf-atoms-to-lf-contradicting-its-byte-preserve-wording` (LOW)**
+
+**Commit:** `docs(T-044-37): the migration states its newline contract`
 
 **Write set:** `dadaia_workspace/features/migrate/frontmatter_keys.py`, tests.
 **Description:** Decide-then-state: either the migration is LF-canonical (consistent with
 the projection contract) and says so, or it byte-preserves and the writer changes. Pin
 whichever is chosen with a test. No third behaviour.
 **Done criterion:** docstring and behaviour agree, pinned by a test; `Closed`.
+
+**Resolution:** DECIDED (a) — LF-canonical, wording changes; behaviour is unchanged.
+Evidence: `write_text_atomic` already guarantees LF bytes on disk on every platform
+(`newline=""`, pinned `lf_bytes_guaranteed=True` for this exact writer in T-044-35's
+battery); `infrastructure/public_assets_common`'s writer makes the identical guarantee for
+projected assets (FR-RC2-2) — LF-canonical is this repo's platform-wide write contract for
+managed files, not a one-off. Reproduced the repro verbatim against unmodified HEAD (CRLF
+atom + retired key through `migrate_retired_frontmatter_keys`): output was already LF-only
+— the composition was correct, only the module docstring's "byte-preserve everything else"
+wording contradicted it. Root cause, precisely: `strip_frontmatter_keys` and
+`write_text_atomic` are themselves line-ending AGNOSTIC (fed CRLF directly, both reproduce
+it verbatim — pinned by
+`test_strip_frontmatter_keys_preserves_crlf_given_directly`/`test_write_text_atomic_preserves_crlf_given_directly`);
+the LF-canonicalisation is entirely a side effect of the caller's `Path.read_text()`
+(universal-newline translation) composed ahead of this module, in every registered step.
+Fixed the module docstring in `frontmatter_keys.py` to state the newline contract
+explicitly and name the mechanism (0 executable lines touched, docstring-only,
+net-neutral). Pinned end-to-end by
+`test_migration_normalises_a_crlf_atom_to_lf_on_disk` (new file
+`tests/unit/features/migrate/test_frontmatter_keys.py`, 3 tests, 79 lines) via the real
+`migrate_retired_frontmatter_keys` pipeline. Full suite: 2792 passed, 4 pre-existing skips.
 
 ---
 
