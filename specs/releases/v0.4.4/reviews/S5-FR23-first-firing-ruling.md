@@ -693,3 +693,101 @@ routed: historical collisions imported verbatim by the v2→v3 migration — the
 doctor-lane healing decision sits at PM intake, and until the operator disposes of it,
 a pre-v3 registry that already carried a collision remains armed despite both seam
 guards. No puxadinho.
+
+---
+
+## Firing 7 — bug fix (commit `a7a67541`): citation enforcer proves the projected instance path by executing its generator
+
+**Date:** 2026-08-24 · **Trigger:** FR23 evidence gate (`evidence_diff` net-positive
++135/-0, `tests/contract/test_rules_skills_map.py` only, `bugs.jsonl` `resolved` event
+for `citation-enforcer-resolves-projected-instance-paths-against-the-checkout`, HIGH —
+found by the rc-1 PR's first bare-checkout CI run)
+
+### Verdict: SOUND — mechanism-precision correction inside the ONE enforcer, executed exactly as Firing 3's maintenance contract prescribed
+
+The defect was the detector's own classification model: `_find_dead_path_citations`
+treated checkout presence as the definition of citability, but `specs/AGENTS.md` is an
+INSTANCE reality — projected by `scaffold()` from
+`dadaia_workspace/public/templates/specs-AGENTS.md`, deliberately never tracked
+(gitignore carve-out + repo-hygiene CI job) — so six correct citations were green only
+via an untracked local projection leftover and red on a bare clone. The fix corrects
+the enforcer's world-model at its seam (+7/-1 in the classification branch); the rest
+is the derivation helper plus two pins. The workaround lanes were both explicitly
+rejected in the ledger (`reported` notes: do not track the projection, do not delete
+the citations) — the diff takes neither. Root-cause gate: **PASS** (cause = presence
+as proxy for citability of a projected path; eliminated, not allowlisted around).
+Architecture-fidelity gate: **PASS** — fix lives in the enforcer, not the installer;
+zero production files touched; D4/D10's "no second enforcer, no hand-kept allowlist"
+upheld (see (b)); the source-vs-instance boundary the fix encodes is exactly the
+workspace's own doctrine.
+
+### Check (a) — category fit
+
+**Firing 3's mechanism-growth category, via its own maintenance contract — not a new
+shape.** Firing 3 set the rule: when an incident evades (or, here, falsely fires) the
+one ratchet for a class, *extend THIS detector, with a mutation fixture pinning the
+new shape, never a second scanner*. That is this diff, literally: the citation check
+gains one classification branch inside the same `_find_dead_path_citations`; mutation
+fixture 11 pins the precision boundary (a lookalike `specs/nested/AGENTS.md` still
+RED — exact-token match, never basename/suffix, and the classification deactivates
+entirely on a fixture root with no source template, so fixture 9 is untouched); the
+bare-checkout regression test pins the recall direction by simulating CI's condition
+locally (hide-and-restore of the real leftover, restore unconditional in `finally`).
+Firing 2's coverage-growth exception covers the two new tests trivially. `-0` is
+honest for the same reason as Firing 3's: nothing existed to delete — the six
+citations are correct and the enforcer's other branches are correct. One non-blocking
+ledger nit (Firing 2 precedent): the `resolved` event states "+135/-0" while itself
+reporting the classification branch as "+7/-1" — the headline should have read +135/-1;
+no action beyond this note.
+
+### Check (b) — execute-the-real-generator vs a pinned constant: sound derivation, honestly a *proven pin*
+
+**SOUND — but name it precisely: this is a pin kept honest by execution, not a pure
+derivation.** `_PROJECTED_SPECS_TARGET_RELPATH` hand-names the ONE token; what
+`_projected_specs_agents_relpath` derives is the pin's *validity* — it runs the real
+`scaffold()` (the actual installer mapping, imported like `_derive_command_tree`
+imports the real Typer app — same established pattern, same hermetic/never-stale
+rationale) against a throwaway scratch dir and byte-diffs the produced `AGENTS.md`
+against its generating public asset, returning `None` (→ citation falls back to
+checkout presence → RED) if the template vanishes, the scaffold errors, or the bytes
+diverge. That is self-invalidating in the right direction — Firing 2's
+anti-hiding-by-construction shape — and categorically better than the alternative the
+module's own docstring forbids (a hand-kept "this one is fine" allowlist, which rots
+silently). Cost/flakiness for a contract tier: acceptable — `scaffold()` is a pure
+module (no I/O outside the supplied dirs, sandboxed Jinja2, no subprocess, no
+network), executed once per run (`functools.cache`), inside
+`tempfile.TemporaryDirectory`; well inside the file's declared `Size: SMALL`.
+Boundary this ruling sets so the pin never regrows into an allowlist: at ONE projected
+citation, pin-plus-proof is the simplest honest shape; the moment a **second**
+projected path needs the same treatment, derive the exemption set from `scaffold()`'s
+own `result.created` instead of adding a second constant — two pins is an allowlist by
+accretion. Two non-blocking nits: (1) the bare-checkout test renames a real (untracked,
+regenerable) file — restore is unconditional, but a hard-killed run leaves it hidden,
+and the rename is a spirit-level exception to the docstring's "never mutates a repo
+file"; the test documents this honestly; (2) `functools.cache` keyed on `repo_root`
+is correct for the fixture-root reuse the tests depend on.
+
+### Check (c) — bug-surface delta: one instance of the local-green/CI-red class, honestly
+
+**REDUCED — the instance is closed and THIS enforcer is now bare-checkout-honest; the
+class is not closed, and no ratchet for it is proposed.** Memory records three prior
+CI-only-red classes (import-boundary lint that only CI ran; the frozen-clock UTC time
+bomb; a POSIX-only assertion red on Windows), and the `reported` event correctly
+self-classifies this bug as the fourth: green-via-untracked-local-state. What this
+diff closes: (i) the specific false-red (six sites, reproduced RED locally in the
+`evidence_loop` before the fix — exact CI failure list); (ii) the enforcer's structural
+dependence on instantiated-workspace leftovers, because the regression test now
+*simulates the bare checkout on every local run* — the blind spot is locally
+observable forever, which is the property the other three classes each gained only
+after their first CI firing. What it does not close: the general class. Any test
+anywhere may still pass via untracked local state, and the deterministic detector for
+that class remains CI's bare clone itself — late but real. Per Firing 3's doctrine
+(declared boundary beats speculative widening), no generic
+"no-test-depends-on-gitignored-paths" scanner is proposed: the shape is not
+structurally recognizable at authoring time the way frozen-clock constants are, and a
+speculative ratchet would trade toward false positives. Fix-chain audit: `reported`
+(2026-08-24T17:57:05Z, project-manager, from the rc-1 CI red) → `resolved`
+(18:09:39Z, same day) — first generation, no repetition, no prior symptom patch;
+suite 2824 passed, +2 over baseline = exactly the two new tests. No puxadinho: zero
+production growth, one detector branch corrected inside the one enforcer, both
+workaround lanes refused.
