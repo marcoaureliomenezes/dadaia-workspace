@@ -2,11 +2,17 @@
 slug: context-management
 title: context-management
 category: product
-tldr: ALIVE/DEAD context registry, one resolution authority (three law rungs), bind-driven injection, advisory presence.
+tldr: ALIVE/DEAD registry of one main repo plus N associated repos, one resolution authority, one repo accessor, lean bind-driven injection, advisory presence.
 summary: >-
-  Manages Spec Context Projects and their repositories. A single resolution function
+  Manages Spec Context Projects and their repositories — one unique main repo plus an
+  ordered collection of associated repos, resolved everywhere through a single accessor,
+  with a backup-first idempotent registry migration to schema v3. ALIVE/DEAD, the surface
+  verbs, export/import and the panel all cover the full set; a single branch-resolution
+  implementation serves both `list` and `show`, so they cannot disagree. A single
+  resolution function
   answers "which context is this?" for every verb, hook and gate; bind persists context
-  and mode only for the caller and never acquires a lock. Concurrent work is allowed and
+  and mode only for the caller, never acquires a lock, and drives an injection that
+  carries memory rather than a restatement of the law. Concurrent work is allowed and
   surfaced through expiring presence records. `list` and `show` accept `--redact` to mask
   foreign context names in table and JSON output.
 tags:
@@ -15,28 +21,67 @@ tags:
 - session
 - no-locks
 - privacy
-last_updated: '2026-08-14'
+last_updated: '2026-08-24'
 release_origin: v0.2.3
 ---
 
 ## Purpose
 
-A Spec Context Project binds one canonical `specs/` tree to one repository. The
-workspace registry stores name, repo slug, repo URL, state, branch, and lifecycle
-timestamps. There is no global primary context.
+A Spec Context Project binds one canonical `specs/` tree to **one main repository, plus
+any number of associated repositories**. The workspace registry stores name, main repo
+slug, main repo URL, the ordered associated-repo collection (slug + url each), state,
+branch, and lifecycle timestamps. The main repo is unique and is the only specs, bind,
+memory, release and backlog target; an associated repo is a working checkout the context
+owns and nothing more. There is no global primary context.
+
+Every consumer that needs "this context's repos" resolves through **one accessor** —
+main first, then the associated repos in order. The lifecycle verbs, the display verbs,
+export and the panel all use it; no second repo-resolution path exists. The registry
+schema is v3, reached by a backup-first, idempotent migration that writes the v2 file
+verbatim beside it before touching anything and is a proven no-op on re-run; a v3 record
+with an empty associated collection behaves exactly as its v2 form did, and the read path
+tolerates a v2 file rather than gating on a version it could not repair.
 
 ## Lifecycle
 
-- `context create` registers a DEAD context.
-- `context alive` clones when necessary, restores the recorded branch, merges missing
-  scaffold files without overwriting existing files, and marks the context ALIVE.
-- `context dead` requires a reviewable clean transition, scans newly committed material
-  for secrets when `--commit` is used, records the branch, and removes the local repo.
+- `context create` registers a DEAD context, optionally with associated repos declared
+  up front.
+- `context alive` clones or keeps **every** repo of the set under `repos/`, idempotently,
+  restores the recorded branch, merges missing scaffold files without overwriting existing
+  files, and marks the context ALIVE. An associated repo is cloned **clean**: it receives
+  no scaffold, no bind, and its own `specs/` — if it has one — is never read by the
+  context.
+- `context dead` requires a reviewable clean transition across the whole set, refusing
+  and naming the offending repo when **any** of them is dirty or unpushed, scans newly
+  committed material for secrets when `--commit` is used, records the branch, and removes
+  the local repos.
+- `context repo add|remove|list` manages the associated collection. Each verb is
+  idempotent and fails loudly on an unknown context or slug; `remove` mutates the registry
+  only and states what it leaves on disk rather than deleting a checkout silently.
 - `context update --url` repairs the remote URL. Alive/dead also backfill an absent URL
   from the repository origin when available.
 
+**A repo slug is owned by exactly one context.** `repos/<slug>` is a namespace every
+context shares and `dead` destroys every entry of the set it walks, so both seams that can
+introduce a slug from an argument — `create` for the main repo and `repo add` for an
+associated one — consult one ownership predicate and refuse a slug another context already
+owns, naming the owner. The four other registry writes carry an existing slug forward and
+cannot break the invariant.
+
 Concurrent alive/dead races are not serialized. Operations are idempotent where
 possible and surface ordinary filesystem/Git conflicts instead of waiting on a lock.
+
+## Usage
+
+`context show` renders main and associated repos — slug, url, on-disk, live branch — in
+both table and `--json` form; `context list` carries the associated count in the table and
+the full list in `--json`. **`list` and `show` can never disagree on `current_branch`**:
+one live branch-resolution implementation serves both, and the stored snapshot, where it
+is still meaningful, is exposed under its own distinct field name rather than as
+`current_branch`. Export and import round-trip the associated repos (url and branch)
+through a structural record copy that cannot silently drop a field it does not know about,
+and import's own `alive` re-clones the whole set. The panel's context card lists main and
+associated alike, and the CI foreign-slug derivation covers the full set.
 
 ## Resolution
 
@@ -55,7 +100,9 @@ Rungs 1–3 are the law's three rungs in the law's order. Rung 0 is the caller's
 input, which is why a write into `repos/x/` is attributed to `x` even while
 `DADAIA_CONTEXT=y` — the gate keeps path-first attribution by passing the write target.
 Rungs 0 and 3 resolve a repo slug and then recover the context NAME through the
-registry, falling back to the slug when it is unregistered. Every rung fails soft;
+registry — the same inverse lookup covers an **associated** slug, so a walk from inside an
+associated checkout resolves the owning context rather than inventing a second one.
+The lookup falls back to the slug when it is unregistered. Every rung fails soft;
 resolution returns nothing only when all four are exhausted, and `resolve_specs_dir`
 then raises rather than guessing from the cwd.
 
@@ -82,6 +129,18 @@ The record's `bound_at` is also the sole context-memory injection trigger: ctx-i
 re-injects when this session's own `bound_at` is newer than its injection sentinel, so a
 re-bind — including a re-bind to the same context — delivers the changed mode or release
 to a live session.
+
+**The injection carries state, never a restatement of the law.** A bound session's prefix
+is the lean memory bootstrap — the tech-stack digest plus the product catalog digest — and
+nothing else: no dispatcher preflight (the law states the flow once, and a session already
+carrying the law does not need it a second time per prompt) and no ALIVE-context list,
+which is useful only to a session that is **unbound** and is therefore emitted only there.
+The memory half of the prefix is untouched by that trim.
+
+**One place of control.** Specs, bind, memory, releases and backlog resolve only from the
+main repo. A bind to a context with associated repos injects the **main** repo's memory
+alone, and `specs doctor`, `backlog doctor` and the SDD gate each see exactly one `specs/`
+tree per context even when an associated repo carries a `specs/` directory of its own.
 
 READ is opt-in self-protection: it blocks this session's mutating file-tool writes while
 leaving additive intake paths writable. It cannot impose READ mode on another session.
@@ -112,7 +171,10 @@ the gate and workspace doctor.
 - `.dadaia/sessions/` - caller-owned binding records (context, mode, `bound_at`).
 - `.dadaia/states/presence/` - advisory live-session records.
 - `.dadaia/tmp/ctx-inject-fired-<session-id>` - per-session injection sentinel.
-- `repos/<slug>/` - ALIVE repository checkout and canonical specs.
+- `repos/<slug>/` - ALIVE repository checkout; the main repo's tree carries the canonical
+  specs, an associated repo's does not.
+- `.dadaia/states/spec_contexts.v2.bak.json` - the pre-migration registry, written
+  verbatim before the v3 stamp.
 
 No `.dadaia/` directory may exist inside a repository.
 

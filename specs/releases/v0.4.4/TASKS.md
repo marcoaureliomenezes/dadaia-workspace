@@ -1241,7 +1241,7 @@ rounds**, in which case the final `rc` **is** `rc-1`.
 
 ## The final `rc` — closure, archive, ship
 
-- [-] **T-044-47 — Memory window (SPEC §5)**
+- [x] **T-044-47 — Memory window (SPEC §5)**
 
 **Owner role:** product-engineer · **Commit:** `docs(T-044-47): memory after v0.4.4`
 
@@ -1256,7 +1256,7 @@ doctor` 0 errors.
 
 ---
 
-- [-] **T-044-48 — `CLOSURE.md` with every sweep**
+- [x] **T-044-48 — `CLOSURE.md` with every sweep**
 
 **Owner role:** product-engineer · **Commit:** `docs(T-044-48): v0.4.4 closure`
 

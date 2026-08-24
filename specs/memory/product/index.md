@@ -13,14 +13,14 @@
 | `agent-comms` | agent-comms — Handoff Contract v1 | handoff-v1.2 separates HTML reports from JSON handoffs, carries the self_pull Layer-1 read-proof line, and dies on consumption unless it is artifact-bearing. |
 | `agent-monitoring` | agent-monitoring | stdlib-only local telemetry → panel Sessions tab + /api/agents; allowlist gate preserves privacy; artifacts die event-driven, logs self-rotate. |
 | `agent-orchestration` | agent-orchestration | Nine core Layer-1 roles, two dispatchers, document-governed ordered work, and advisory-only concurrency. |
-| `agentic-entities` | agentic-entities | Abstract-entity registry — Personas, Deterministic Behaviors, Abstract Rules, universal surface — that every scaffolded core implementation derives from. |
+| `agentic-entities` | agentic-entities | Abstract-entity registry — Personas, Behaviors, Rules, universal surface — plus the one rules-skills map and its single deterministic enforcer. |
 
 ### distribution
 
 | slug | title | tldr |
 |------|-------|------|
 | `academy` | academy | browsable knowledge_basis in the panel's Academy tab + copy-from-template management via CLI. |
-| `public-asset-distribution` | public-asset-distribution | canonical public assets are staged to .dadaia/agentic and projected to Claude Code, Codex, Kimi Code, and shared .agents roots. |
+| `public-asset-distribution` | public-asset-distribution | canonical public assets, whole skill folders included, staged to .dadaia/agentic and projected to Claude Code, Codex, Kimi Code and .agents roots. |
 | `pypi-distribution` | pypi-distribution | The published dadaia-workspace PyPI package on a single version axis, the release.yml OIDC publish pipeline, and the wheel content contract. |
 
 ### harness
@@ -43,14 +43,14 @@
 | slug | title | tldr |
 |------|-------|------|
 | `product-vision` | product-vision | A strict, portable SDD workspace that gives agents current context, a document-governed lifecycle, visible concurrency, and strong anti-slop boundaries. |
-| `spec-context-project` | spec-context-project | One canonical specs tree plus one repository, explicitly bindable by each session and safe for visible concurrent work. |
+| `spec-context-project` | spec-context-project | One canonical specs tree owned by one main repository, optionally spanning associated repos, bindable per session and safe for visible concurrent work. |
 
 ### platform
 
 | slug | title | tldr |
 |------|-------|------|
 | `consumer-agent-support` | Consumer validation gate — supported consumer environments | A consumer-side validation agent running the shipped recipe is the release gate: no wheel is published without its CERTIFIED_100 verdict. |
-| `context-management` | context-management | ALIVE/DEAD context registry, one resolution authority (three law rungs), bind-driven injection, advisory presence. |
+| `context-management` | context-management | ALIVE/DEAD registry of one main repo plus N associated repos, one resolution authority, one repo accessor, lean bind-driven injection, advisory presence. |
 | `cross-platform-portability` | cross-platform-portability | Linux, macOS, and Windows support through a single platform capability seam, injected adapters, Python hooks, and hard-gated cross-OS tests. |
 | `multi-platform-parity` | multi-platform-parity | Claude Code, Codex, and Kimi Code receive truthful runtime-specific projections from one canonical public source. |
 | `repos-catalog` | repos-catalog | repos.xlsx lookup for fast discovery of known repos with slug + URL. |
@@ -63,7 +63,7 @@
 
 | slug | title | tldr |
 |------|-------|------|
-| `sdd-bug-backlog-governance` | sdd-bug-backlog-governance | Event-sourced JSONL bugs with a non-blocking picked marker, an operator-gated backlog, release consumption, audit dispositions, and a four-branch git contract. |
-| `sdd-gate-v3` | sdd-gate-v3 | No-lock SDD enforcement: path/mode/cache gates, advisory presence, and a develop-only push boundary scanning blobs and commit bodies, amnesty fail-closed. |
+| `sdd-bug-backlog-governance` | sdd-bug-backlog-governance | Event-sourced JSONL bugs closed by a three-field evidence gate, an operator-gated backlog, an rc release ladder, and a three-branch git contract. |
+| `sdd-gate-v3` | sdd-gate-v3 | No-lock SDD enforcement: path/mode/cache gates, advisory presence, a feature-only push boundary with content scan, and the security verdict as a PR gate. |
 | `specs-doctor` | specs-doctor | Validates canonical specs structure, memory/catalog and placeholder integrity, release/segment markers, closure evidence, dispositions, bugs, and audits. |
 

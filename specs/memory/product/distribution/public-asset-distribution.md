@@ -2,15 +2,15 @@
 slug: public-asset-distribution
 title: public-asset-distribution
 category: product
-tldr: canonical public assets are staged to .dadaia/agentic and projected to Claude Code, Codex, Kimi Code, and shared .agents roots.
-summary: Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, universal skills projected to one canonical .agents/skills home with no registry entry, the thin-wrapper contract that keeps every public/scripts file an entry point over the package implementation, repo templates copied at alive() (repo-AGENTS.md, with destination-file symlink refusal at every write site, plus a conditional tests/AGENTS.md), harness-profile-aware install/doctor, render-at-install of core agents (staged generic body + resolved agent-model policy composed into both L1 projections) with a policy-aware doctor render-compare, provenance-gated consumer AGENTS fan-out (banner-canonical restored vs hand-authored left [foreign]) with lexical repo-slug containment + destination-file symlink refusal, scoped AGENTS projections, source-root hygiene guard, and runtime projection contract.
+tldr: canonical public assets, whole skill folders included, staged to .dadaia/agentic and projected to Claude Code, Codex, Kimi Code and .agents roots.
+summary: Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, universal skills projected as whole folders (SKILL.md plus every disclosed sibling) to one canonical .agents/skills home with no registry entry, the one-load-per-harness law projection, the thin-wrapper contract that keeps every public/scripts file an entry point over the package implementation, repo templates copied at alive() (repo-AGENTS.md, with destination-file symlink refusal at every write site, plus a conditional tests/AGENTS.md), harness-profile-aware install/doctor, render-at-install of core agents (staged generic body + resolved agent-model policy composed into both L1 projections) with a policy-aware doctor render-compare, provenance-gated consumer AGENTS fan-out (banner-canonical restored vs hand-authored left [foreign]) with lexical repo-slug containment + destination-file symlink refusal, scoped AGENTS projections, source-root hygiene guard, and runtime projection contract.
 tags:
 - public
 - assets
 - distribution
 - projection
 - privacy
-last_updated: '2026-08-18'
+last_updated: '2026-08-24'
 release_origin: v0.1.65
 ---
 
@@ -57,20 +57,37 @@ projection write/compare goes through the render seam. The new schema asset
 `schemas/agent-model-policy-v1.schema.json` stages like any other asset.
 
 **Universal skills have one canonical home and are never derived.** A universal skill is
-staged from `dadaia_workspace/public/skills/<name>/SKILL.md` and installed to
+staged from `dadaia_workspace/public/skills/<name>/` and installed to
 `.agents/skills/<name>/` plus `.claude/skills/<name>/`; Codex and Kimi Code read it
 natively from the shared `.agents/skills/` root, so no per-harness copy is produced and no
 `public/entities/registry.json` entry exists for it (the registry describes derived,
-per-harness entities). `dadaia-gitflow` — the single operational home of the branch,
-commit, push and version contract — and `dadaia-test-stewardship` — the single operational
+per-harness entities). `dd-gitflow-default` — the single operational home of the branch
+contract — and `dadaia-test-stewardship` — the single operational
 home of the test lifecycle — ship this way, alongside the other universal skills.
+
+**A skill is a folder, and every file in it is projected.** A short `SKILL.md` carries the
+ordered protocol; its depth lives in sibling files inside the same folder, named from
+`SKILL.md` so nothing disclosed becomes unreachable. Staging, install and doctor cover
+**every** sibling, not the `SKILL.md` alone, and the manifest tracks each one, so a
+disclosed reference is byte-identical across all four projection targets or doctor says so.
+The surface is 21 skills.
 
 The **`dd-` lifecycle family** is distributed on that same universal path and is the
 development cycle's on-demand protocol surface: `dd-backlog-definition`,
-`dd-release-definition`, `dd-release-implement`, `dd-release-closure`, `dd-audit-project`,
-`dd-bug-registration` and `dd-bug-fix` — one skill per stage, each the single operational
-home of its stage's protocol. The always-on law carries the classification and points at
-the stage's skill; the stage procedure exists only in the skill.
+`dd-release-definition`, `dd-release-implement` (implementation **and** closure, the
+closure detail disclosed to its `CLOSURE-TEMPLATE.md` and `CLOSURE-CHECKS.md` siblings),
+`dd-audit-project`, `dd-bug-registration` and `dd-bug-fix` — one skill per stage, each the
+single operational home of its stage's protocol. The always-on law carries the
+classification and points at the stage's skill; the stage procedure exists only in the
+skill. Harness literacy has one home too: `dd-ai-eng-knowhow`, a short literacy layer every
+agent may read plus `ai-engineer`-only depth siblings that **link** to vendor
+documentation rather than reproducing it.
+
+**The law reaches each harness exactly once.** Which surface carries `DADAIA.md` is one
+decision at the projection seam, not a per-file exclusion: a harness whose constitution
+resolves an import chain to the law needs no rules-directory mirror of it, and a harness
+that reads `AGENTS.md` natively keeps its own path. No harness ends with zero copies, and
+the law files stay PROTECTED and human-only wherever they land.
 
 **One logic, one source: a projected script is a thin wrapper, never the implementation.**
 Every file under `public/scripts/` is a CLI entry point that imports the package's own

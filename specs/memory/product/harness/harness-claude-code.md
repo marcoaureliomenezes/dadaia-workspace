@@ -11,7 +11,7 @@ tags:
 - claude-code
 - projection
 - dispatch
-last_updated: '2026-08-07'
+last_updated: '2026-08-24'
 release_origin: v0.3.0
 ---
 
@@ -26,7 +26,10 @@ and unit-tested for programmatic SDK use.
 ## Usage flow
 
 1. Operator launches `claude` at the workspace root; `CLAUDE.md` (`@AGENTS.md` bridge)
-   loads the workspace law — Claude Code does not read `AGENTS.md` natively.
+   loads the workspace law — Claude Code does not read `AGENTS.md` natively. That import
+   chain is the **single** load path: because the root chain already resolves to the law,
+   this harness receives no rules-directory mirror of it, so the whole law is in context
+   exactly once per session rather than twice ([[public-asset-distribution]]).
 2. `dadaia context bind <ctx>` → the ctx-inject hook (UserPromptSubmit) injects the
    bound context's tech-stack digest + feature catalog once per session. Claude Code
    exposes a native session id, so the bind record is this session's own (rung 2 of the
@@ -61,8 +64,8 @@ sub-agents, first-message context injection.
 
 Scaffold projected by `dadaia public install --target claude` (all lib-originated,
 manifest-tracked, never hand-edited): `.claude/agents/` (the 9 core personas),
-`.claude/skills/` (19), `.claude/rules/DADAIA.md` (the projected law file — read-only,
-PROTECTED), `.claude/settings.json` (hook registration). Root `CLAUDE.md` + `AGENTS.md` written by
+`.claude/skills/` (21 skill **folders** — each a `SKILL.md` plus every sibling it discloses
+its depth to), `.claude/settings.json` (hook registration). Root `CLAUDE.md` + `AGENTS.md` written by
 the guardrail pair. A Claude-only workspace = `--target claude` (+ the shared
 `--target agents` tree); no `.codex/` or `.kimi-code/` is required. This isolation is now
 **enforced mechanically at init** — `dadaia init --harness claude` scaffolds only the

@@ -2,24 +2,33 @@
 slug: spec-context-project
 title: spec-context-project
 category: product
-tldr: One canonical specs tree plus one repository, explicitly bindable by each session and safe for visible concurrent work.
+tldr: One canonical specs tree owned by one main repository, optionally spanning associated repos, bindable per session and safe for visible concurrent work.
 summary: >-
-  The central unit of dadaia-workspace. Binding selects the project and injects its
-  current memory for the caller; the SDD gate constrains writes while advisory presence
-  surfaces concurrent sessions without locking them out.
+  The central unit of dadaia-workspace. One main repository is the sole source of specs,
+  bind, memory, releases and backlog; associated repositories extend the project across
+  several checkouts without ever adding a second specs tree. Binding selects the project
+  and injects its current memory for the caller; the SDD gate constrains writes while
+  advisory presence surfaces concurrent sessions without locking them out.
 tags:
 - spec-context
 - sdd
 - lifecycle
 - concurrency
-last_updated: '2026-08-12'
+last_updated: '2026-08-24'
 release_origin: v0.3.0
 ---
 
 ## Purpose
 
-A Spec Context Project is one canonical `specs/` tree bound to one repository. It is
-the unit used for memory, backlog, bugs, releases, reports, and handoffs.
+A Spec Context Project is one canonical `specs/` tree owned by one **main** repository. It
+is the unit used for memory, backlog, bugs, releases, reports, and handoffs.
+
+A product that spans several repositories is still one project: the context may carry
+**associated repositories** alongside its main one, and they live and die with it. The
+main repo stays unique and remains the single place of control — specs, bind, memory,
+releases and backlog resolve only from it, and an associated repo's own `specs/` tree, if
+it has one, is never read by this context. That asymmetry is the design: one project, one
+truth, however many checkouts.
 
 ## Operating Chain
 
@@ -34,7 +43,8 @@ the unit used for memory, backlog, bugs, releases, reports, and handoffs.
 4. **Work concurrently** - other sessions may use the same or different contexts;
    presence warnings expose overlap but never block progress.
 
-The repository owns production source and `specs/`. Workspace runtime state remains at
+The main repository owns production source and `specs/`; an associated repository owns
+production source only. Workspace runtime state remains at
 the workspace root under `.dadaia/`; a repo-local `.dadaia/` is always invalid.
 
 ## Runtime State

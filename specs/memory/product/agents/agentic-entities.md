@@ -2,7 +2,7 @@
 slug: agentic-entities
 title: agentic-entities
 category: product
-tldr: Abstract-entity registry — Personas, Deterministic Behaviors, Abstract Rules, universal surface — that every scaffolded core implementation derives from.
+tldr: Abstract-entity registry — Personas, Behaviors, Rules, universal surface — plus the one rules-skills map and its single deterministic enforcer.
 summary: >-
   The workspace method is defined abstractly first: `public/entities/registry.json`
   holds the Personas, Deterministic Behaviors, Abstract Rules, and universal
@@ -10,9 +10,10 @@ summary: >-
   per-harness derivation of one of these entities (constitution §12.5); the derivation
   contract test and the `public doctor` `entities-derivation` check enforce the
   prohibition, the latter at behavioral-fidelity depth with a mutation fixture per drift
-  class. Two derivation-surface facts are derived mechanically rather than asserted: the
-  reasoned seven-agent `dadaia-cli` reachability (shell-less agents excluded explicitly)
-  and the undeclared-overlap check over non-universal skill activation globs. The panel
+  class. A 21-skill surface maps to the law through one machine-readable
+  rules-skills map with one deterministic enforcer, which also carries the citation check
+  and the invocation-model equivalence; the retired collision lint left with its
+  hard-coded table. The panel
   renders the registry in the Agentic Entities tab and as the Personas section of the
   Agents tab.
 tags:
@@ -20,7 +21,7 @@ tags:
 - entities
 - derivation
 - governance
-last_updated: '2026-08-18'
+last_updated: '2026-08-24'
 release_origin: v0.3.0
 ---
 
@@ -40,10 +41,12 @@ skills are defined agnostically, then implemented per entry harness. Constitutio
 - **Universal surface.** Skills under `.agents/skills/` and the `AGENTS.md` guardrail
   files are harness-agnostic by construction — every entry harness reads them
   natively, so they carry no per-harness derivation and no harness toggle. The
-  development cycle's seven `dd-` skills — one per stage: backlog definition, release
-  definition, release implementation, release closure, project audit, bug registration,
+  development cycle's `dd-` skills — one per stage: backlog definition, release
+  definition, release implementation (closure included), project audit, bug registration,
   bug fix — are universal in exactly this sense: one canonical `.agents/skills/` home,
-  no registry entry, no per-harness copy.
+  no registry entry, no per-harness copy. A skill is a **folder**: a short `SKILL.md`
+  plus the sibling files it discloses its depth to, and every sibling is projected
+  wherever the skill is.
 
 Operator-created sub-agents, skills, and rules are exempt: the law governs only what
 the library scaffolds.
@@ -70,7 +73,7 @@ Read path: `features/panel/entities.py` (`load_registry`, `persona_ids`,
 Two derivation-surface facts are mechanically derived rather than asserted, so a
 description can never drift from what the frontmatters actually grant:
 
-- **`dadaia-cli` reachability is a reasoned per-agent selection, never a blanket grant.**
+- **`dd-cli-library` reachability is a reasoned per-agent selection, never a blanket grant.**
   Seven agents carry it — `ai-engineer`, `code-reviewer`, `project-auditor`,
   `project-manager`, `qa-engineer`, `security-reviewer`, `software-engineer`. The two
   shell-less agents are excluded **explicitly**, because a CLI-literacy grant to an agent
@@ -83,7 +86,37 @@ description can never drift from what the frontmatters actually grant:
   most-specific glob, an intended overlap is **declared**, and the projection-time check
   flags only an *undeclared* overlap between two non-universal skills. It is green on the
   real inventory, and its self-test proves both directions: silent for a `**` skill, firing
-  for a newly introduced undeclared duplicate.
+  for a newly introduced undeclared duplicate. The declaration of an intended overlap lives
+  in the map below, never in a script's own table and never in a skill's prose.
+
+### The rules-skills map
+
+`public/entities/rules-skills-map.json`, beside the registry and versioned by its own
+schema, is the **single** declaration of which skill operates which law topic. A row is
+`{topic, section, skills[], justification}`, keyed by the law's own bold topic. Every
+skill on disk appears in exactly one row and every named skill exists; a row naming more
+than one skill carries a non-empty justification. Not every topic has a skill — but every
+skill has a topic, and an orphan is fused or retired rather than kept.
+
+**One enforcer, not two.** A single contract test in the gating tier reads the map, the
+law and the on-disk inventory, and fails when a mapped topic is absent from the law, a
+skill maps to nothing, a topic names a skill that does not exist, two skills share a topic
+with no justification, a `SKILL.md` exceeds the declared line ceiling, or two non-universal
+skills overlap undeclared. Two further checks ride the same test rather than earning a
+second script:
+
+- **The citation check.** Every path a public asset cites must exist and every `dadaia`
+  verb it cites must resolve, and the test names the first that does not. A projected
+  instance path is proven by executing the asset that generates it, so the check is honest
+  on a fresh checkout and platform-agnostic in how it compares paths.
+- **The invocation-model equivalence.** A skill no persona grants to a model carries
+  `disable-model-invocation: true`, and the equivalence is checked in **both** directions,
+  so neither a human-entry skill costing always-on description tokens nor a granted skill
+  hidden from the model can survive. An operative dependency between skills is written as
+  the imperative "Call the Skill tool with `<name>`", never as prose.
+
+The predecessor collision lint is **retired**, with its hard-coded overlap table; its
+self-test fixtures were ported onto the new test, so coverage moved rather than dropped.
 
 ## Panel surface
 

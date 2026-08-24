@@ -18,7 +18,7 @@ tags:
 - pypi
 - release
 - packaging
-last_updated: '2026-08-18'
+last_updated: '2026-08-24'
 release_origin: v0.4.2
 ---
 
@@ -74,6 +74,11 @@ what PyPI shows: a release id **is** the version that release mints, `v`-prefixe
 the CHANGELOG section for a shipped release all carry the same digits. No number is minted
 on an internal axis, and a release never renumbers itself to reconcile with the package.
 Reading any `v`-prefixed id in `specs/` and the bare number on PyPI, one resolves the other.
+
+The published lineage runs `0.4.2 → 0.4.4`. **`0.4.3` was minted locally and never
+published**: it keeps its CHANGELOG section as a local-only mint and its archived release
+directory, and the number is retired rather than reused — reusing it would have collided
+with both. The gap is the honest record of that, not a missing entry.
 
 `CHANGELOG.md` carries the reconciling preamble this implies: it states which of its
 historical headings were minted internally and never reached PyPI, maps them to the
