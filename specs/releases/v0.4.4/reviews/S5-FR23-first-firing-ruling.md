@@ -482,3 +482,153 @@ incident ever materializes, extend THIS guard at THIS seam, never a second check
 elsewhere; (3) a theoretical TOCTOU window between `is_symlink()` and `resolve()` —
 acceptable under the workspace's advisory, races-surfaced-not-prevented posture, and
 strictly smaller than the prior surface (no check at all). No puxadinho detected.
+
+---
+
+## Firing 5 — F-1 fix (commit `1f50dbdf`): foreign-slug ownership predicate at the `add_repo` seam
+
+**Date:** 2026-08-24 · **Trigger:** FR23 evidence gate (`evidence_diff` net-positive
++40/-1, `dadaia_workspace/features/spec_context/service.py` only, `bugs.jsonl`
+`resolved` event for `context-repo-add-accepts-foreign-context-slug`, HIGH, from the
+T-044-45 six-axis review's blocking F-1)
+
+### Verdict: SOUND — Firing 1's category (missing enforcement at the owning seam), with one HIGH mirror gap named for follow-up
+
+The +39 is one private predicate, `_foreign_slug_owner(name, slug)`
+(service.py:335), consulted exactly once in `add_repo` (service.py:387), raising the
+**pre-existing** `AssociatedRepoConflictError` with the owning context named — no new
+exception type, no flag, no second code path, no per-verb copy. `create --associated`
+inherits the refusal through its verbatim reuse of `add_repo`
+(`cli/commands/context.py:279`), pinned by the integration test
+`test_create_associated_refuses_slug_owned_by_another_context`
+(tests/integration/test_cli_context_repo_verbs.py:252) — verified: no ownership check
+is duplicated into the CLI layer. Root-cause gate: **PASS** — the `evidence_loop`
+reproduced the review's exact repro RED at HEAD `8ff359ee`
+(`test_add_repo_refuses_slug_owned_by_another_context_as_main_repo` → DID NOT RAISE)
+before the predicate existed; the cause (the registry never consulted at registration
+time) is fixed where ownership is written, not where destruction happens.
+Architecture-fidelity gate: **PASS on the fix, with a docstring misstatement to
+correct** — see (a). The delivered contract matches the bug's `expected` field
+verbatim ("at the existing add_repo seam … never a second guard inside dead").
+
+### Check (a) — is `add_repo` the right seam vs guarding `dead()`? Verified independently: YES on the seam family, but the "one seam" claim is FALSE — `create` is the second writer
+
+**The review's pre-ruling against guarding `dead()` is correct, verified from the
+destructive side.** `dead()` (service.py:847) resolves `ctx.all_repos()` into
+`repos/<slug>` paths and, per repo, preflights then `commit_all` + `push` + rmtree
+(service.py:883-919). A guard placed there would be a check on the destructive side of
+an invariant already broken: it would need a disposition policy for a collision found
+mid-teardown (skip the repo? abort the whole dead, leaving the registry corrupt
+forever?), i.e. a new branch and a new partial-failure mode inside the most dangerous
+loop in the package — the exact puxadinho shape the standing order forbids. Enforcing
+at registration keeps the invariant true *by construction* and leaves `dead()`'s
+"every entry in `all_repos()` is mine" assumption intact and simple. Correct call, and
+correctly NOT duplicated into `dead()`.
+
+**But the mirror question answers YES: a slug CAN become foreign after a clean add.**
+Ownership of `repos/<slug>` is written into the registry at **two** seams, and only
+one now enforces the predicate:
+
+1. `add_repo` — guarded (this fix).
+2. `create` (service.py:289) — **unguarded**. It checks only name collision
+   (`self._store.get(name)`); the `repo_slug` argument is never compared against any
+   other context's main or associated slugs. The CLI `create` path
+   (cli/commands/context.py:190-286) validates name format, A17.3 self-collision and
+   `--associated` duplicates, then calls `svc.create(name, repo, repo_url)` — no
+   registry ownership check on the **main** `--repo` slug anywhere.
+
+Executed-path sequence defeating the just-landed guard: (i) `context repo add A x`
+succeeds legitimately — `x` has no owner, and the fix's own no-regression pin
+(`test_add_repo_unknown_slug_with_no_owner_is_still_accepted`,
+tests/unit/features/spec_context/test_repo_verbs.py:215) guarantees that acceptance;
+(ii) `context create B --repo x` succeeds — `create` never consults ownership; (iii)
+`repos/x` now has two registered owners, and `dead(A)` commits, pushes and rmtrees B's
+main checkout — or `dead(B)` destroys A's associated checkout. The same lane also
+admits the older shape `create B --repo <A's main slug>` (two contexts sharing one
+main slug — a gap that predates FR17 entirely, but whose blast radius FR17's
+`dead()`-covers-`all_repos()` teardown now shares). Therefore the add-time check alone
+is **insufficient**: the invariant "each `repos/<slug>` has at most one owning
+context" holds only if every registry seam that writes slug ownership enforces the
+same predicate.
+
+**FINDING (follow-up, not fixed here) — [HIGH] `context create` accepts a main repo
+slug already owned by another context, arming `dead()` against a foreign checkout.**
+Location: `dadaia_workspace/features/spec_context/service.py:289` (`create`);
+CLI lane `dadaia_workspace/cli/commands/context.py:190`. Issue: the mirror of the
+resolved bug — same destroy-foreign-work class, same blast radius
+(`commit_all`+`push`+rmtree of a tree another context owns), single-command
+reachability, and it silently invalidates a previously *valid* association (the
+temporal inverse of F-1). Why HIGH and not lower: severity tracks blast radius and
+reachability, both identical to F-1's; only the triggering verb differs. Why it does
+not flip this firing to REJECT: the resolved bug's registered contract (`expected`
+field) scopes the fix to the `add_repo` seam explicitly, and this ruling honors
+Firing 4's precedent — a residual lane outside the registered contract is a named
+finding, not a breach of the fix under review. Recommendation: `create` runs the
+**same** `_foreign_slug_owner` predicate against its main `repo_slug` (owner exclusion
+by name is vacuous there — the context does not exist yet), raising the same
+conflict error; one unit test mirroring
+`test_add_repo_refuses_slug_owned_by_another_context_as_main_repo` plus one CLI
+integration pin. One predicate, two call sites, zero new shapes. Two corrections ride
+along: (1) `_foreign_slug_owner`'s docstring claim that `add_repo` "is the one seam
+that writes into that shared namespace" (service.py:342-344) is corrected to name both
+seams — a fix whose own documentation misstates the seam topology will misdirect the
+next reader toward exactly this gap; (2) enforcement at write seams never heals
+historical state: the v2→v3 migration (`features/migrate/state_v3.py`) is purely
+additive and imports whatever the v2 registry says, so a pre-existing colliding
+registry migrates its collision in — the follow-up should decide whether a
+`context`/`specs doctor` invariant check (registry-wide slug-ownership uniqueness) is
+warranted as the healing lane, or explicitly rule it out. Routed as a **bug**
+(`register → fix on the live feature branch`, Arm B — it is the same contract
+violation class as the bug just closed, not backlog material); this ruling registers
+nothing itself, per the dispatch instruction.
+
+### Check (b) — the O(N) registry scan per add: acceptable, and structurally the right shape
+
+**ACCEPTABLE — not hidden coupling.** Three readings, all converging:
+
+- **Dependency shape:** `_foreign_slug_owner` reads through `self._store.list_all()` —
+  the same store port `add_repo` already holds; no new import, no cross-feature
+  reach-in, no second data source, no disk or subprocess I/O. The predicate is private
+  to the service that owns both the registry and the verb. Coupling to the store's
+  *whole* registry is not hidden — it is the definition of the check: "ownership" is a
+  registry-global property, so a registry-global read is the minimum honest
+  implementation.
+- **Cost profile:** one JSON registry read + O(contexts × associated_repos) string
+  comparisons, on a **cold, operator-initiated write path** (repo registration — a
+  rare ceremony, not a hot read). At this registry's measured scale (11 contexts,
+  F-9's own measurement) this is microseconds against a ~1.3 s CLI startup baseline.
+  Contrast with F-9, which recorded O(contexts × repos) *git subprocesses* on the hot
+  `context list` read path — the concern class F-9 flagged does not apply here: no
+  subprocess, no per-repo disk walk.
+- **The alternative loses:** a reverse index (slug → owner) would be a second mutable
+  representation of ownership requiring write-through consistency at every
+  create/add/remove/dead — a new invariant to defend, for a lookup the linear scan
+  answers correctly at any plausible scale. Premature, per the simplest-thing
+  doctrine and Firing 3's rejection of speculative abstraction. If registries ever
+  grow to thousands of contexts, index *then*, inside this same service.
+
+### Check (c) — bug-surface delta with ledger evidence: the destroy-foreign-work lineage
+
+**REDUCED — one of two arming lanes closed; the class narrowed, not closed (the
+Firing 4 pattern: the surface closed; the class did not).** The lineage, read in
+order from the ledger: `context-alive-sweeps-unrelated-worktree-changes` (2026-08-12
+— first registered incident of the destroy/absorb-foreign-work class: a lifecycle verb
+touching a tree whose changes it did not own; named as precedent in this bug's
+`reported` event); the standing dead()-auto-commits-and-pushes security posture
+(dead() is the package's highest-blast-radius verb — it publishes and then deletes);
+FR17's A17.1 symlink doctrine (deletion lanes never follow symlinked dirs — the same
+verb, guarded against a different foreign-tree vector); and now this bug — FR17's new
+registration verb arming that same verb against a foreign checkout via the shared
+`repos/<slug>` namespace. Fix-chain audit for the `add_repo` seam itself: the seam was
+born in this release (FR17), the review caught the gap before the release shipped,
+and the fix is first-generation — `reported` (2026-08-24T16:11:58Z) → `resolved`
+(16:19:58Z) — no repetition, no prior symptom patch, no stacked branch. Surface
+accounting: one silent-acceptance path deleted at the registration seam;
+`dead()` untouched (zero growth in the destructive lane); two RED→GREEN pins (main
+and associated ownership), two no-regression pins (idempotency, unowned-slug
+acceptance), one CLI inheritance pin; full suite 2808 passed. The `resolved` event's
+staging note shows scope discipline under concurrent sessions (surgical staging,
+foreign hunks left for their owners). Residual surface, named honestly: the HIGH
+mirror lane at `create` (check (a) — the class's last unguarded registration seam),
+plus the migration import lane for historical registries; both routed above. No
+puxadinho detected in the diff under review.
