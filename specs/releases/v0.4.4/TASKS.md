@@ -580,7 +580,7 @@ pointer from `SKILL.md`. Capture **V17**.
 
 ---
 
-- [-] **T-044-56 — FR28: the invocation model**
+- [x] **T-044-56 — FR28: the invocation model**
 
 **Owner role:** ai-engineer (frontmatter) + software-engineer (the enforcer check) ·
 **Commit:** `docs(T-044-56): user-invoked skills and operative dependency form`
@@ -599,7 +599,7 @@ no hand-kept list. Capture **V16**.
 
 ---
 
-- [ ] **T-044-57 — FR24 + FR29: the persona pass, in one touch per file**
+- [-] **T-044-57 — FR24 + FR29: the persona pass, in one touch per file**
 
 **Owner role:** ai-engineer · **Commit:**
 `docs(T-044-57): personas carry only what the law does not, and state the bug-surface delta`
