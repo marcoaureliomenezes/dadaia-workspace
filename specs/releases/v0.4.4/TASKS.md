@@ -624,7 +624,7 @@ the coverage table is complete.
 
 ---
 
-- [ ] **T-044-58 — FR27: the 25 sediments, and the citation check**
+- [-] **T-044-58 — FR27: the 25 sediments, and the citation check**
 
 **Owner role:** ai-engineer (content) + software-engineer (the check) · **Commit:**
 `fix(T-044-58): every cited path and command exists, and a check keeps it that way`
