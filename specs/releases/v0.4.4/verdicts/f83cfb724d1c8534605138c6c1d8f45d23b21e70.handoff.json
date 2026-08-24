@@ -1,0 +1,93 @@
+{
+  "schema_version": "handoff-v1.2",
+  "self_pull": {
+    "refs": [
+      "specs/memory/product/catalog.json",
+      "specs/memory/product/sdd/sdd-gate-v3.md"
+    ]
+  },
+  "agent": "security-reviewer",
+  "context": "dadaia-workspace",
+  "produced_at": "2026-08-24T17:31:45Z",
+  "release_id": "v0.4.4",
+  "scope": "T-044-46 - committed security verdict evidence for the rc-1 PR head (CI security-verdict-gate)",
+  "artifact": {
+    "type": "report"
+  },
+  "metrics": {
+    "commit_sha": "f83cfb724d1c8534605138c6c1d8f45d23b21e70",
+    "reviewed_sha": "25632ef5",
+    "base_sha": "f5cce371",
+    "commits_reviewed": 133,
+    "files_changed": 165,
+    "lines_added": 15058,
+    "lines_removed": 5466,
+    "findings_critical": 0,
+    "findings_high": 0,
+    "findings_medium": 2,
+    "findings_low": 0,
+    "findings_info": 5,
+    "blockers_closed": 2,
+    "push_gate_exit": 0,
+    "push_gate_offenders": 0,
+    "secrets_detected": 0,
+    "cve_findings": 0,
+    "new_dependencies": 0,
+    "tests_passed": 10
+  },
+  "findings": [
+    {
+      "severity": "INFO",
+      "message": "S-1 CLOSED and re-proven: the verdict gate validates the covered sha shape before any git argv.",
+      "detail_md": "Seven-case matrix re-run against the script as it stands at this head (its blob is identical to the reviewed commit's, so the matrix carries):\n\n| commit_sha in the handoff | gate |\n|---|---|\n| `HEAD` (the original bypass) | exit 1 |\n| `@` | exit 1 |\n| abbreviated sha | exit 1 |\n| option-shaped `--glob=refs/heads/*` | exit 1 |\n| 40-hex, exact PR head | exit 0 |\n| 40-hex ancestor + only-verdict-drift | exit 0 |\n| 40-hex ancestor + a commit mixing verdict evidence AND production | exit 1, naming the production path |\n\nOne predicate at the existing seam, `--` end-of-options on all three git calls, the 40-hex narrowing argued at the site from the repository's object format, two pinning tests, no second code path, no over-refusal.",
+      "fix_recommendation": "None - closed."
+    },
+    {
+      "severity": "INFO",
+      "message": "S-2 CLOSED: the push range publishes no private material - gate exit 0, zero offenders, under both refspec shapes and again after the ledger append.",
+      "detail_md": "`dadaia ci push-gate-check` fed the real new-branch refspec on stdin, run without a pipe: **exit 0, zero offenders**; same with the remote sha set to the develop tip; and again at this head after the bug-registration commit. Per-term `git log -S` over the range: empty. Masked scan of every tracked file: only the two `specs/backlog/_archive/` files that are byte-identical blobs on develop and main - already published, out of scope. The three surviving address-shaped literals are all on the RFC-2606 reserved `example.com` domain.\n\n**The remediation did not weaken the gate.** The privacy baseline data file is byte-identical to origin/develop, origin/main and the review base: no pattern relaxed, no carve-out added to make the scan pass. The fix was redaction of the offending historical blobs and commit messages only.",
+      "fix_recommendation": "None - closed."
+    },
+    {
+      "severity": "INFO",
+      "message": "Rewrite integrity verified: nothing but the redactions travelled with the history rewrite.",
+      "detail_md": "The prior heads are unreachable and `refs/original` is empty, so both rewrites are real and their backup refs are gone; the review base still resolves. The cumulative range against that base measures **165 files, +15058 / -5466** - identical, to the line, to the pre-rewrite measurement of the same range. A rewrite that changed anything beyond in-place redaction would have moved at least one of those three numbers.",
+      "fix_recommendation": "None."
+    },
+    {
+      "severity": "INFO",
+      "message": "INFO-11 CLOSED: pre-commit and pre-push hooks are installed and the pre-push hook routes to the preflight and the denylist gate.",
+      "detail_md": "`.git/hooks/` carries executable `pre-commit` and `pre-push`, `core.hooksPath` is unset so the repo-local hooks are the live ones, and the pre-push script references `push-gate-check` three times - the pre-commit hook fired on this session's own commit, which is direct evidence it runs. FR3's inverted chokepoint will execute on its own path at the rc-1 push.",
+      "fix_recommendation": "None - closed."
+    },
+    {
+      "severity": "MEDIUM",
+      "message": "FR4's committed verdict evidence is gitignored: specs/releases/*/verdicts/*.handoff.json is swallowed by the /specs/releases/*/* catch-all, so a plain `git add` stages nothing and `git status` stays clean.",
+      "detail_md": "Found while executing this task's own verdict commit; `git check-ignore -v` names the catch-all rule. This verdict file is therefore committed with `git add -f`, which works, but the documented cadence does not: an agent following it with a plain `git add` gets a clean tree and believes the evidence is committed while nothing is tracked. The gate then fails closed on the PR - safe, but the transport is unreliable.\n\n**Fourth recurrence of a class the ignore file itself already documents three times** - `ALPHA-*-QA.md`, `PRE-PR-REVIEW.md` and the `reviews/` subdirectory each got one more per-artifact whitelist line, fixing the instance and leaving the class alive. Registered as `gitignore-verdict-evidence-untrackable-fourth-recurrence` (MEDIUM). Not a defect of the reviewed diff's security posture and not a blocker for this verdict; it is a repo-config defect that will bite the next verdict.",
+      "fix_recommendation": "Structural, for the fix owner: invert the rule for the release tree once - whitelist the content types under `specs/releases/**` - instead of adding a fifth per-artifact line. A fifth line would be the same puxadinho the ledger already records three times."
+    },
+    {
+      "severity": "MEDIUM",
+      "message": "S-3 stands as the named configuration item: the verdict gate is advisory at rc-1 (A4.4) and must be a required check on both edges before rc-2.",
+      "detail_md": "develop's branch protection carries no `required_status_checks` object at all; main's 17 required contexts do not include 'Security verdict gate (PR head sha)'. Sanctioned for the rc-1 PR by A4.4 - a job added on a branch does not run on its own PR - and already carried in the PM intake report. Configuration outside the branch, so it does not gate this verdict; it does gate rc-2.",
+      "fix_recommendation": "Before rc-2, re-supply the required-checks list whole (PATCH clobbers) on develop and main including the verdict gate, and verify by reading branch protection back rather than by observing a green PR."
+    },
+    {
+      "severity": "INFO",
+      "message": "Round-1 scope verified and unchanged: only-verdict-drift is not gameable, the branch sweep is 1:1 with its archive tags, FR23 evidence fields cannot forge a ledger event, and the standard diff sweep is clean.",
+      "detail_md": "No secrets in the range, zero new dependencies, no shell=True and no os.system, every added subprocess call argv-form and test-only, actions pinned by 40-hex sha, no `${{ }}` interpolation in the new job's run block, no generated-file leakage, no specs/_archive file touched. FR17's symlink hardening is sound (O_NOFOLLOW|O_EXCL create, refusal at the one resolution seam, state_v3's tmp name no longer predictable); the ownership predicate is consulted at both registry write seams; dead()'s secret preflight still runs before any commit/push/rmtree. The 50 pre-sweep branches map 1:1 onto 50 archive tags with nothing unreachable. A 10-payload probe against the real writer/reader shows only U+2028/U+2029/U+0085 corrupt a record - registered as F-11, MEDIUM, open - with forgery structurally unreachable. Tests at this head: self-scan **5 passed**; with the associated-repos integration file, **10 passed**.",
+      "fix_recommendation": "None."
+    }
+  ],
+  "decisions_required": [
+    "Operator: make 'Security verdict gate (PR head sha)' a required check on develop and main before rc-2 (A4.4).",
+    "Fix owner: whitelist the release tree's content once in .gitignore so FR4's verdict evidence is trackable without -f (registered bug, fourth recurrence of the class)."
+  ],
+  "next_handoff": {
+    "agent": "qa-engineer",
+    "context": "dadaia-workspace",
+    "expected_artifact_type": "other"
+  },
+  "verdict": "APPROVED",
+  "verdict_reason": "APPROVED covering f83cfb72 (the security review was performed at 25632ef5; the only delta since is this session's own ADDITIVE bug-ledger append, re-verified at the named head). Both blocking findings are closed and independently re-proven: the verdict gate refuses HEAD, @, an abbreviated sha and an option-shaped value while still passing an exact sha and an only-verdict-drift ancestor, and still refusing a commit that mixes verdict evidence with production; and the push range publishes no private material - gate exit 0 with zero offenders under both refspec shapes, per-term history scans empty, worktree clean apart from two already-published archive blobs. The remediation was redaction, not relaxation: the privacy baseline is byte-identical to develop, main and the review base. Rewrite integrity holds - the range measures identically to the pre-rewrite reading, so only the redactions travelled. Hooks are installed and demonstrably firing. Two MEDIUMs stay open and neither is a defect of the reviewed diff's security posture: the verdict gate is advisory at rc-1 per A4.4 and must be required before rc-2, and FR4's evidence path is gitignored (registered; this file needed `git add -f`). Bug-surface axis: the CI-verdict-gate row is now genuinely REDUCED - one enforcement point, relocated without duplication, finally enforcing the same sha-shape invariant the surviving pre-push path keeps, so the property no longer depends on which of the two readers you hit."
+}
