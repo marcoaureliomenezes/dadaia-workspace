@@ -1277,7 +1277,7 @@ standing-order verdict record, the restated v0.4.3 git-identity question, archiv
 
 ---
 
-- [-] **T-044-49 — [git] Archive the release**
+- [x] **T-044-49 — [git] Archive the release**
 
 **Owner role:** dispatcher · **Commit:** `chore(T-044-49): archive v0.4.4`
 
@@ -1286,7 +1286,7 @@ standing-order verdict record, the restated v0.4.3 git-identity question, archiv
 
 ---
 
-- [-] **T-044-50 — [git] Final-`rc` merge: version bump and PR → `develop`**
+- [x] **T-044-50 — [git] Final-`rc` merge: version bump and PR → `develop`**
 
 **Owner role:** dispatcher + software-engineer + security-reviewer
 
@@ -1301,7 +1301,7 @@ the PR head sha, PR to `develop`, CI green, merge — this burns the **final `rc
 
 ---
 
-- [-] **T-044-51 — [git] Ship**
+- [x] **T-044-51 — [git] Ship**
 
 **Owner role:** dispatcher + security-reviewer · **Preconditions:** T-044-50 `[x]`.
 
