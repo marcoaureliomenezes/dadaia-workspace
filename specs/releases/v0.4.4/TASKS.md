@@ -1130,9 +1130,24 @@ carve-out; no `--no-verify`.
 
 ---
 
-- [-] **T-044-42 — `S5` QA close** · **Owner role:** qa-engineer ·
+- [x] **T-044-42 — `S5` QA close** · **Owner role:** qa-engineer ·
 **Commit:** `chore(T-044-42): S5 qa review` — committed on the branch; verdict states the
 bug-surface delta per bug. No merge, no PR.
+
+**Resolution:** APPROVE. All 8 sweep bugs independently re-confirmed `resolved` with
+complete FR23 evidence; every named pinning test re-run GREEN by name this session; all
+4 architect firings re-read, SOUND, no puxadinho. FR23 gate re-proven live (A23.6):
+missing-field `resolved` append refused by field name, well-formed accepted first try,
+against a throwaway tmp specs dir, live ledger untouched. T-044-41/A20 independently
+re-verified: origin heads = main+develop only, 50 archive tags, 3 spot-checked tags
+resolve to real commits, local branches = the 3 permitted patterns, local `hotfix/0.4.3`
+confirmed absent. Full gates green: ruff format/check clean, mypy --strict clean (273
+files), full suite 2803 passed / 4 skipped (environment-gated) / 0 failed. Self-scan
+(`tests/integration/test_repo_self_scan.py`) green against the close artifact itself
+before commit. 6 bugs open at close (2 S5-adjacent by architect design, 4 foreign,
+outside every S5 write set) — none blocking; full record + 7 accumulated intake
+candidates in `specs/releases/v0.4.4/reviews/S5-qa-close.md` §4 for the PM's intake
+feed.
 
 *(T-044-43 retired at the D8 restructure.)*
 
