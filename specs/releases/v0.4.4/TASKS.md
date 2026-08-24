@@ -921,7 +921,7 @@ past this commit; `bugs.jsonl` carries the evidence.
 
 ---
 
-- [ ] **T-044-34 — bug `backlog-doctor-rejects-deferred-status-documented-by-skill` (LOW)**
+- [-] **T-044-34 — bug `backlog-doctor-rejects-deferred-status-documented-by-skill` (LOW)**
 
 **Preconditions:** T-044-33 `[x]` (same file; shared root — the doctor's ACTIVE-status
 vocabulary). **Write set:** `features/backlog/doctor.py` or
