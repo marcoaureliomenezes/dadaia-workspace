@@ -1183,7 +1183,7 @@ tree, before `rc-1` and before any archive move (D8/FR5 order).
 
 ---
 
-- [-] **T-044-46 — Security review + the QA release verdict ("closed by QA")**
+- [x] **T-044-46 — Security review + the QA release verdict ("closed by QA")**
 
 **Owner role:** security-reviewer + qa-engineer · **Preconditions:** T-044-45 `[x]`.
 
