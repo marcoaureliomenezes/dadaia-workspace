@@ -8,11 +8,19 @@ ADDITIVE path (never concurrency-blocked).
 ``append`` validates the event against the packaged ``bug-event-v1`` JSON Schema before it
 touches the store; ``status`` folds the stream to list open bugs; ``stats`` aggregates by
 status and severity. All three print observable STDOUT for scripting.
+
+v0.4.4 FR23 (T-044-62): ``append --event resolved`` additionally refuses evidence that
+cannot be checked — ``--evidence-loop``, ``--evidence-seam`` and ``--evidence-diff`` are
+each REQUIRED and independently validated, the refusal naming exactly the missing one.
+A ``net-positive:``-prefixed ``--evidence-diff`` does not block the append; it prints an
+advisory to dispatch ``software-architect`` before the commit. Historical ``resolved``
+events without these fields stay schema-valid and are never rewritten.
 """
 
 from __future__ import annotations
 
 import json
+import re
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -37,6 +45,14 @@ bugs_app = typer.Typer(help="Event-sourced JSONL bug telemetry (append/status/st
 
 #: The packaged schema id (file lives at ``public/schemas/bugs/<id>.schema.json``).
 _SCHEMA_ID = "bug-event-v1"
+
+#: v0.4.4 FR23 (T-044-62) — the resolved-evidence gate. The three fields must each be
+#: independently checkable; a bare non-empty string is not enough (that was exactly
+#: the v0.1.73 FR3 gap: 132/438 on-disk `resolved` events carried no evidence at all,
+#: and 70 more were closed with one template string that cleared the old >=20-char
+#: floor without saying anything checkable).
+_EVIDENCE_MIN_LEN = 5
+_DIFF_DIRECTION_RE = re.compile(r"^(net-negative|net-positive|net-neutral):\s*\S.*$", re.IGNORECASE)
 
 
 def _resolve_specs_dir(specs_dir: str | None) -> Path:
@@ -125,8 +141,30 @@ def bugs_append_cmd(
     resolution_evidence: str | None = typer.Option(
         None,
         "--resolution-evidence",
-        help="resolved (REQUIRED, v0.1.73 resolution law): reporter-artifact repro + "
-        "every surface the bug names (or the explicit re-scope). Min 20 chars.",
+        help="resolved (legacy free-text narrative, v0.1.73 FR3 — superseded as the "
+        "blocking check by FR23/v0.4.4; optional). See --evidence-loop/--evidence-seam/"
+        "--evidence-diff for the checkable evidence FR23 requires.",
+    ),
+    evidence_loop: str | None = typer.Option(
+        None,
+        "--evidence-loop",
+        help="resolved (FR23, REQUIRED, v0.4.4): the red-loop command that reproduced "
+        "the bug on the executed path, before any hypothesis.",
+    ),
+    evidence_seam: str | None = typer.Option(
+        None,
+        "--evidence-seam",
+        help="resolved (FR23, REQUIRED, v0.4.4): the test file/node (the regression "
+        "seam) that pins the fix.",
+    ),
+    evidence_diff: str | None = typer.Option(
+        None,
+        "--evidence-diff",
+        help="resolved (FR23, REQUIRED, v0.4.4): the diff direction on the touched "
+        "feature — lines/branches/flags added vs removed. Prefix with "
+        "'net-negative:'/'net-positive:'/'net-neutral:'. A net-positive value routes "
+        "to a software-architect review before the commit; it does not block the "
+        "append.",
     ),
     superseded_by: str | None = typer.Option(
         None, "--superseded-by", help="superseded: superseding slug."
@@ -146,19 +184,31 @@ def bugs_append_cmd(
         typer.echo(f"[error] specs_dir not found: {target}", err=True)
         raise typer.Exit(code=1)
 
-    # v0.1.73 FR3 (resolution law, BLOCKING form): a resolved event without evidence is
-    # refused BEFORE anything is written — the recurrence audit showed ~40% of the
-    # v0.1.66-71 arc's resolutions were need-unmet; evidence = reporter-artifact repro
-    # + every surface the bug names (or the explicit re-scope).
-    if event is BugEventKind.RESOLVED and (
-        resolution_evidence is None or len(resolution_evidence.strip()) < 20
-    ):
-        typer.echo(
-            "[error] resolved requires --resolution-evidence (>=20 chars): "
-            "reporter-artifact repro + every surface the bug names (resolution law).",
-            err=True,
-        )
-        raise typer.Exit(code=1)
+    # v0.4.4 FR23 (T-044-62, replaces v0.1.73 FR3's blanket >=20-char free-text floor):
+    # a `resolved` event is refused BEFORE anything is written unless it carries three
+    # INDEPENDENTLY checkable fields — the red-loop command, the test seam, and the
+    # diff direction on the touched feature. Each is checked on its own so the message
+    # always names exactly what is missing (A23.1); this is the ONE validation on the
+    # existing append path — no second command, no bypass flag (A23.5).
+    if event is BugEventKind.RESOLVED:
+        missing: list[str] = []
+        if evidence_loop is None or len(evidence_loop.strip()) < _EVIDENCE_MIN_LEN:
+            missing.append("--evidence-loop (the red-loop command that reproduced the bug)")
+        if evidence_seam is None or len(evidence_seam.strip()) < _EVIDENCE_MIN_LEN:
+            missing.append("--evidence-seam (the test file/node that pins the regression)")
+        if evidence_diff is None or not _DIFF_DIRECTION_RE.match(evidence_diff.strip()):
+            missing.append(
+                "--evidence-diff (the diff direction on the touched feature: prefix "
+                "'net-negative:'/'net-positive:'/'net-neutral:', lines/branches/flags "
+                "added vs removed)"
+            )
+        if missing:
+            typer.echo(
+                "[error] resolved requires three checkable evidence fields (FR23 "
+                "resolution law); missing: " + "; ".join(missing),
+                err=True,
+            )
+            raise typer.Exit(code=1)
 
     # v0.4.3 T-043-18/FR14 (mirrors the resolved/--resolution-evidence precedent
     # above): a picked event without --release is refused BEFORE anything is
@@ -191,6 +241,9 @@ def bugs_append_cmd(
         superseded_by=superseded_by,
         reason=reason,
         evidence=resolution_evidence,
+        evidence_loop=evidence_loop,
+        evidence_seam=evidence_seam,
+        evidence_diff=evidence_diff,
     ).redact()
 
     payload = model.to_dict()
@@ -209,6 +262,15 @@ def bugs_append_cmd(
         typer.echo(f"[error] bug event incoherent: {exc}", err=True)
         raise typer.Exit(code=1) from exc
     typer.echo(f"[ok] appended {event.value} for {bug_id} -> {path}")
+    # FR23: a net-positive diff on the touched feature does not hard-block the append
+    # — it routes. The route is a printed advisory, not a second refusal: the append
+    # already succeeded above.
+    if (
+        event is BugEventKind.RESOLVED
+        and evidence_diff is not None
+        and evidence_diff.strip().lower().startswith("net-positive:")
+    ):
+        typer.echo("[notice] net-positive diff -> dispatch software-architect before the commit")
 
 
 @bugs_app.command("status")

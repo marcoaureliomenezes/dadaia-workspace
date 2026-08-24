@@ -214,6 +214,9 @@ _OPTIONAL_STR_FIELDS: tuple[str, ...] = (
     "superseded_by",
     "reason",
     "evidence",
+    "evidence_loop",
+    "evidence_seam",
+    "evidence_diff",
 )
 
 # Redaction patterns for `notes` (privacy rules): operator-local home paths + IPs never
@@ -271,6 +274,9 @@ class BugEvent:
     superseded_by: str | None = None
     reason: str | None = None
     evidence: str | None = None
+    evidence_loop: str | None = None
+    evidence_seam: str | None = None
+    evidence_diff: str | None = None
 
     @property
     def is_terminal(self) -> bool:
@@ -296,6 +302,13 @@ class BugEvent:
         committed and pushed ``specs/bugs/bugs.jsonl``. :func:`redact_text` is a no-op
         on a value that carries no IP/home-path shape (e.g. an ordinary release id like
         ``v0.4.3``), so this widening is safe for the common structured-looking value.
+
+        v0.4.4 FR23 (T-044-62): ``evidence_loop`` (a real reproducing command) and
+        ``evidence_seam`` (a real test file/node) are exactly the free-text shape that
+        can carry an operator-local path — scrubbed the same way. ``evidence_diff``
+        starts with a fixed enum token (``net-negative:``/``net-positive:``/
+        ``net-neutral:``) but its trailing detail is free text too, so it is scrubbed
+        for the same reason.
         """
 
         def _scrub(value: str | None) -> str | None:
@@ -311,6 +324,9 @@ class BugEvent:
             evidence=_scrub(self.evidence),
             release=_scrub(self.release),
             reason=_scrub(self.reason),
+            evidence_loop=_scrub(self.evidence_loop),
+            evidence_seam=_scrub(self.evidence_seam),
+            evidence_diff=_scrub(self.evidence_diff),
         )
 
     def to_dict(self) -> dict[str, object]:
@@ -359,4 +375,7 @@ class BugEvent:
             superseded_by=_opt_str(raw, "superseded_by"),
             reason=_opt_str(raw, "reason"),
             evidence=_opt_str(raw, "evidence"),
+            evidence_loop=_opt_str(raw, "evidence_loop"),
+            evidence_seam=_opt_str(raw, "evidence_seam"),
+            evidence_diff=_opt_str(raw, "evidence_diff"),
         )
