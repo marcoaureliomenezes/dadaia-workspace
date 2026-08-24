@@ -799,7 +799,7 @@ consumer (A15.3) — no second repo-resolution path is created. Capture **V8**.
 
 ---
 
-- [ ] **T-044-29 — FR18: `show`, `list`, export/import, panel — and the superseded bug**
+- [-] **T-044-29 — FR18: `show`, `list`, export/import, panel — and the superseded bug**
 
 **Owner role:** software-engineer · **Commit:**
 `fix(T-044-29): one branch resolution for context list and show, plus the associated repo surfaces`
