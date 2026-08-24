@@ -820,7 +820,7 @@ and the panel card.
 
 ---
 
-- [-] **T-044-30 — FR19: one place of control**
+- [x] **T-044-30 — FR19: one place of control**
 
 **Owner role:** software-engineer · **Commit:**
 `test(T-044-30): only the main repo carries specs, bind and memory`
