@@ -26,11 +26,12 @@ to). Declared subset, activation precedence: `declared_overlaps` in
 Run on the live `feature/{M.m.p}` branch — no separate branch, no ceremony. Branch
 contract: `DADAIA.md` §4 Gitflow; operations: `dd-gitflow-default`.
 
-**Concurrency (ADR #10/E-4 — advisory presence only).** No reservation marker exists for
-bugs. Races are surfaced, never blocked (NO-LOCKS DOCTRINE): the SDD gate's presence
-heartbeat only names a live session working the same context. The reservation primitive
-is still being designed: `specs/backlog/bug-picked-ledger-event.md`. Invent no marker,
-no lock, no lease here.
+**Concurrency (ADR #10/E-4 — advisory presence only).** Races are surfaced, never blocked
+(NO-LOCKS DOCTRINE): the SDD gate's presence heartbeat only names a live session working
+the same context. Announce intent with `dadaia bugs append --bug-id <slug> --event
+picked` (v0.4.3, FR14) — a non-terminal annotation that appends your agent to the bug's
+`picked_by` list without changing its status; it never blocks a concurrent picker, it
+only makes the pick observable.
 
 ## 3. Reproduce on the executed path
 

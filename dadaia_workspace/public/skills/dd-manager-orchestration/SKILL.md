@@ -20,7 +20,7 @@ slugs, or optional domain-pack assumptions.
 
 ## Agent Inventory
 
-Default topology: 9 core agents (constitution §14 roster). Roles and phases are
+Default topology: 9 core agents (constitution, Agent Roster). Roles and phases are
 normative in the §7/§14 matrices; this table is the dispatch view. There is no
 concurrency lock between agents (NO-LOCKS DOCTRINE, v0.1.76) — dispatch purity below is
 an orchestration convention, not a session primitive.

@@ -31,4 +31,4 @@ release_origin: v0.2.1
 Tamanho por diretório: SMALL = `tests/unit` + `tests/contract`; MEDIUM =
 `tests/integration`; LARGE = `tests/e2e`. Protocolo completo (intenção, admissão,
 rebaixamento, poda, flaky/quarentena): skill `dadaia-test-stewardship`. Lei de nível de
-projeto: constitution §8 ("Disciplina de Testes").
+projeto: constitution, seção "Disciplina de Testes".

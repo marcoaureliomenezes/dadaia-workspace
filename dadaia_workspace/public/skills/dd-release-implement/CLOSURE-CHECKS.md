@@ -81,8 +81,8 @@ records. Never another release's artifacts, and never anything outside `.dadaia/
 - DELETE the rest, once unreferenced: this release's consumed coordination handoffs
   (ack-on-consume already deletes most as they are read — the rule is canonical at
   `dadaia-handoff-emitter`, not restated here; this sweep catches only what per-consume
-  deletion missed), report/handoff artifacts superseded by `CLOSURE.md` itself, tmp
-  captures, and lifecycle run records scoped to this release.
+  deletion missed), report/handoff artifacts superseded by `CLOSURE.md` itself, and tmp
+  captures scoped to this release.
 - **Lane guard (AG.1, stated verbatim — inherited by every deletion lane in this
   release):** resolve the target, refuse any resolved target outside `.dadaia/`, never
   follow a symlinked directory.

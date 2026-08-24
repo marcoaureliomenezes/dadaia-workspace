@@ -98,7 +98,7 @@ updated, state the reason here (e.g. "memory/tech-stack.md: no change — releas
 touch dependencies").
 
 - `specs/memory/product/index.md` — <one-liner of what changed in the catalog>
-- `specs/memory/product/<slug>.md` — <one-liner per feature page updated>
+- `specs/memory/product/<area>/<slug>.md` — <one-liner per feature page updated>
 - `specs/memory/architecture.md` — <one-liner>
 - `specs/memory/tech-stack.md` — <one-liner or "no change: reason">
 
@@ -108,7 +108,7 @@ Disposition-sweep ledger (mandatory — rule and CONSUMED→DELIVERED update dis
 `CLOSURE-CHECKS.md` §2). One row per backlog item and bug picked into (or superseded by)
 this release. A backlog disposition is **never** a per-entry file — it adds a
 `## LEDGER` line to `BACKLOG.md` and drops the slug's `## ACTIVE` subsection, in the
-same commit (`sdd-bug-backlog-governance`).
+same commit (`dd-backlog-definition`).
 
 | Record | Kind | Terminal disposition | Evidence |
 |--------|------|-----------------------|----------|
@@ -170,7 +170,6 @@ references may appear in the deleted column.
 | `.dadaia/handoff/<context>/*.handoff.json` (this release) | `<n>` | `<n>` | `<CLOSURE section \| commit sha>` |
 | `.dadaia/reports/<context>/**` (this release) | `<n>` | `<n>` | `<CLOSURE section \| commit sha>` |
 | `.dadaia/tmp/<agent>/**` (this release's captures) | `<n>` | `<n>` | `<CLOSURE section \| commit sha>` |
-| lifecycle run records (this release) | `<n>` | `<n>` | `<CLOSURE section \| commit sha>` |
 
 ## Archive decision
 

@@ -114,7 +114,7 @@ doubt, ask one direct question first.
 
 1. `ls repos/` to discover every repo.
 2. Per repo: read specs where present (`constitution.md`, `memory/architecture.md`,
-   `memory/product/index.md` — load `memory/product/<slug>.md` on demand for a feature's
+   `memory/product/index.md` — load `memory/product/<area>/<slug>.md` on demand for a feature's
    depth, `memory/tech-stack.md`, `foundation/SPEC.md`), skipping gracefully if absent;
    scan implementation (`find` for `.py`/`.js`/`.ts`, excluding `node_modules`/`.venv`)
    until the modules, dependencies, and structure are clear; classify architecture status

@@ -154,7 +154,7 @@ CLI commands (`dadaia public stage/install/doctor`) to the operator or to PM for
 
 `specs/constitution.md` + `specs/memory/` ARE the product's soul: the constitution holds
 its absolute laws; memory holds what the product *is now*. `memory/product/catalog.json`
-is the machine index for a first-pass scan; `memory/product/<slug>.md` atoms hold depth,
+is the machine index for a first-pass scan; `memory/product/<area>/<slug>.md` atoms hold depth,
 loaded on demand. Releases describe what is *changing*; memory never carries a
 changelog. Ground yourself with `dadaia-step0-memory-bootstrap`, navigate with
 `dadaia-workspace-spec-navigator`, close with `dd-release-implement`'s final-rc steps
@@ -184,10 +184,11 @@ agents that need only one feature's depth.
   Users, the feature catalog in daily-relevance order (each entry links to
   `<feature-slug>.md`), a capability-map Mermaid diagram, and explicit non-goals (Limits).
   Plain Markdown headings — no HTML `<section>` wrapper.
-- `specs/memory/product/<feature-slug>.md` — one Markdown atom per production feature,
-  with sections: Propósito (2–3 paragraphs, functionally), Fluxo de uso (3–5 numbered
-  steps, optional Mermaid diagram), Trigger típico (1 sentence), Diferencial (the problem
-  it solves), Estado runtime tocado (files/dirs touched), Dependências (run order).
+- `specs/memory/product/<area>/<feature-slug>.md` — one Markdown atom per production
+  feature, with sections: Purpose (2–3 paragraphs, functionally), Usage flow (3–5
+  numbered steps, optional Mermaid diagram), Typical trigger (1 sentence),
+  Differentiator (the problem it solves), Runtime state touched (files/dirs touched),
+  Dependencies (run order) — English canon, `.heading-allowlist`.
 - Templates: `public/templates/memory-architecture.md.j2`,
   `public/templates/memory-tech-stack.md.j2`; product atoms are authored directly as
   Markdown during release closure.

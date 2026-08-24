@@ -16,12 +16,12 @@ disable-model-invocation: true
 All spec memory is stored as atomic Markdown files (`*.md`, with YAML frontmatter)
 under `<specs-dir>/memory/`. Load each atom in order; read the Markdown directly.
 
-| Atom | Path | What it declares | Sections of interest |
+| Atom | Path | What it declares | Headings of interest |
 |---|---|---|---|
-| Architecture | `memory/architecture.md` | Layers, module boundaries, ADRs, data-flow topology | `#layers`, `#adr-log`, `#module-map` |
-| Product catalog | `memory/product/index.md` | Feature catalog (one entry per shipped feature) | `#catalog` |
-| Feature detail | `memory/product/<slug>.md` | Acceptance criteria, behavior spec, edge cases per feature | `#criteria`, `#behavior` |
-| Tech stack | `memory/tech-stack.md` | Languages, frameworks, versions, tooling, rationale | `#stack`, `#tooling` |
+| Architecture | `memory/architecture.md` | Layers, module boundaries, subsystems, runtime state, dependencies | `Primary Subsystems`, `Concurrency`, `Runtime State` |
+| Product catalog | `memory/product/index.md` | Feature catalog (one entry per shipped feature) | catalog listing (Markdown headings, no `<section>` wrapper) |
+| Feature detail | `memory/product/<area>/<slug>.md` | Purpose, usage flow, trigger, differentiator, runtime state, dependencies per feature | `Purpose`, `Usage flow`, `Differentiator`, `Dependencies` |
+| Tech stack | `memory/tech-stack.md` | Languages, frameworks, versions, tooling, rationale | `Snapshot`, `Canonical Commands`, `Packaging Notes` |
 
 Rules for loading:
 - Load `architecture.md` and `tech-stack.md` on every audit.
@@ -67,7 +67,7 @@ Record each mismatch as a drift item with evidence on both sides (spec:line + co
 
 For each feature in `memory/product/index.md`:
 
-1. Extract the acceptance criteria from `memory/product/<slug>.md`.
+1. Extract the feature detail from `memory/product/<area>/<slug>.md`.
 2. Locate the corresponding implementation file(s) via:
    ```bash
    grep -rn "<feature-keyword>" <repo-root>/src --include="*.py" -l
@@ -86,8 +86,9 @@ For each declared dependency in `tech-stack.md`:
 3. Check for dependencies in lockfiles that are not declared in the memory atom.
 
 ```bash
-# Python — compare declared vs installed
-cat pyproject.toml | grep -A50 "\[tool.poetry.dependencies\]"
+# Python — compare declared vs installed (dependency table name varies by build
+# backend: [project.dependencies] PEP 621, [tool.poetry.dependencies] Poetry, etc.)
+cat pyproject.toml
 pip show <package> | grep Version
 
 # Node

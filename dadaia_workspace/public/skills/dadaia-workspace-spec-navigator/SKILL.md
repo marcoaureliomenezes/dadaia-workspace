@@ -31,7 +31,8 @@ canonical order for the current task.
    - `<specs-dir>/memory/architecture.md`
    - `<specs-dir>/memory/product/catalog.json` — preferred machine-readable feature catalog when present.
    - `<specs-dir>/memory/product/index.md` — entry point for product catalog. Load
-     specific `<specs-dir>/memory/product/<feature-slug>.md` files on demand when the
+     specific `<specs-dir>/memory/product/<area>/<feature-slug>.md` files (per
+     `catalog.json`'s `path` field) on demand when the
      task requires functional depth on a particular feature (avoids overloading context
      with all features at once).
    - `<specs-dir>/memory/tech-stack.md`
@@ -44,7 +45,7 @@ canonical order for the current task.
      ```
      release: <release-id>
      segment: <alpha-N|rc-N>   # optional — present for segmented releases
-     phase: <DISCOVERY|SPEC|PLAN|TASKS|IMPLEMENTATION|CLOSURE|ARCHIVED>
+     phase: <DISCOVERY|DEFINITION|SPEC|PLAN|TASKS|IMPLEMENTATION|CLOSURE|ARCHIVED>
      ```
    - If file is missing or `release: none`: no active release. Inform the operator and
      stop before implementation.
@@ -80,4 +81,4 @@ canonical order for the current task.
 - Never reference `standby`, `context_dir`, `select`, or `is_selected` — these concepts do
   not exist in v3.0.
 - Markdown memory files are read-only for every agent except `product-engineer` during the
-  DEFINITION and CLOSURE phases (constitution §13). Reading is always allowed.
+  DEFINITION and CLOSURE phases (constitution, Memory Canon). Reading is always allowed.

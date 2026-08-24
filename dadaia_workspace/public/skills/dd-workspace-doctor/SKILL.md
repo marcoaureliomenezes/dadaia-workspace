@@ -63,7 +63,8 @@ When `spec_contexts.json` or `academy.json` has a stale schema:
    - `dadaia_workspace/core/models/spec_context.py`
    - `dadaia_workspace/core/models/course.py`
 
-2. Read the current JSON file content from `.dadaia/states/`
+2. Read the current JSON file content — `spec_contexts.json` lives under
+   `.dadaia/states/`, `academy.json` under `.dadaia/academy/`
 
 3. Map old fields to new fields:
    - Fields that disappeared: drop them
@@ -80,7 +81,7 @@ When `spec_contexts.json` or `academy.json` has a stale schema:
 
 ## Phase 3 — Report
 
-Write a summary to `.dadaia/reports/<context-name>/dd-workspace-doctor/<YYYY-MM-DDTHHMMSSZ>.md` covering:
+Write a summary to `.dadaia/reports/<context-name>/dd-workspace-doctor/<YYYY-MM-DDTHHMMSSZ>.html` covering:
 - Issues found (per category)
 - Actions taken (per file)
 - Items requiring operator decision
