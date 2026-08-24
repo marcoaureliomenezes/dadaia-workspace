@@ -14,8 +14,8 @@
 #
 #   specs/releases/<release-id>/verdicts/<reviewed-sha>.handoff.json
 #
-# — the same "review artifact committed on the branch" cadence DADAIA.md §5 already
-# uses for a qa-engineer segment-close review.
+# — the same "review artifact committed on the branch" cadence DADAIA.md §4 (Gitflow)
+# already uses for a qa-engineer segment-close review.
 #
 # "Covers the PR head sha" (A4.3) cannot mean literal sha equality in the general
 # case: committing the verdict file changes the tree, and therefore the sha, of
@@ -57,6 +57,20 @@ if [ -z "$RELEASE_ID" ]; then
   exit 1
 fi
 
+# RELEASE_ID is interpolated straight into a filesystem path below (VERDICTS_DIR) and,
+# absent an override, is read from the PR head's OWN specs/releases/ACTIVE.md — so a
+# PR that carries a crafted ACTIVE.md controls this value. Pin it to the release-id
+# canon before it ever reaches a path, and fail closed on mismatch (no traversal
+# shape, no unexpected characters). This mirrors, in bash, the ONE canonical pattern
+# every other public entry point validates against
+# (dadaia_workspace/core/specs_version.py::RELEASE_SEMVER_RE) — a bash script cannot
+# import that Python object, so the pattern is restated here, not re-derived.
+_RELEASE_ID_RE='^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.]*)?$'
+if ! [[ "$RELEASE_ID" =~ $_RELEASE_ID_RE ]]; then
+  echo "::error::pr-verdict-check: RELEASE_ID '${RELEASE_ID}' does not match the canonical release-id pattern vMAJOR.MINOR.PATCH[-suffix] — refusing to interpolate it into a path."
+  exit 1
+fi
+
 VERDICTS_DIR="specs/releases/${RELEASE_ID}/verdicts"
 EXPECTED_SHAPE="${VERDICTS_DIR}/<reviewed-sha>.handoff.json (agent=\"security-reviewer\", verdict=\"APPROVED\", metrics.commit_sha=\"<reviewed-sha>\")"
 
@@ -90,15 +104,24 @@ for handoff in "$VERDICTS_DIR"/*.handoff.json; do
 
   offenders=""
   if [ "$sha" != "$PR_HEAD_SHA" ]; then
+    # A command substitution used only to build a heredoc's body does NOT trip
+    # `set -e` on failure — the heredoc is simply empty and the loop below sees no
+    # offenders, silently converting "prove nothing unreviewed landed" into "assume
+    # nothing did" (a real fail-open, reproduced against this exact shape). Capture
+    # the output into a variable first and check its exit status explicitly, BEFORE
+    # any of it is interpreted, so a git failure fails closed (SKIP this handoff)
+    # instead of passing.
+    if ! diff_output="$(git diff --name-only "$sha" "$PR_HEAD_SHA")"; then
+      echo "[pr-verdict-check] SKIP: ${handoff} — 'git diff --name-only ${sha} ${PR_HEAD_SHA}' failed; cannot prove nothing unreviewed landed since the review, treating as non-qualifying."
+      continue
+    fi
     while IFS= read -r changed_path; do
       [ -z "$changed_path" ] && continue
       case "$changed_path" in
         specs/releases/*/verdicts/*) ;; # pure evidence — never disqualifies coverage.
         *) offenders="${offenders}${changed_path}"$'\n' ;;
       esac
-    done <<EOF
-$(git diff --name-only "$sha" "$PR_HEAD_SHA")
-EOF
+    done <<< "$diff_output"
   fi
 
   if [ -n "$offenders" ]; then

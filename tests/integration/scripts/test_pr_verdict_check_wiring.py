@@ -8,8 +8,8 @@ docstring; ``dadaia ci gc-push-verdicts`` only ever reads it from a local clone)
 the evidence this gate reads is a COMMITTED copy of the security-reviewer's APPROVED
 handoff, placed on the branch at
 ``specs/releases/<release-id>/verdicts/<reviewed-sha>.handoff.json`` (the same
-"review artifact committed on the branch" cadence DADAIA.md §5 already uses for a
-qa-engineer segment close).
+"review artifact committed on the branch" cadence DADAIA.md §4 (Gitflow) already uses
+for a qa-engineer segment close).
 
 Because the verdict evidence file cannot be part of the very commit whose sha it
 names (committing the file changes the tree, hence the sha — a real chicken-and-egg
@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import stat
 import subprocess
 from pathlib import Path
@@ -211,3 +212,83 @@ def test_missing_active_md_and_no_override_fails_with_clear_message(tmp_path: Pa
     result = _run_script(repo, head)
     assert result.returncode != 0
     assert "ACTIVE.md" in result.stdout + result.stderr
+
+
+def test_git_diff_failure_fails_closed_not_open(tmp_path: Path) -> None:
+    """T-044-45 F-2 (1/2): a git failure while proving 'nothing unreviewed landed
+    since the review' must never be silently read as an empty (i.e. clean) diff.
+
+    ``$(git diff --name-only "$sha" "$PR_HEAD_SHA")`` used to be expanded straight
+    into a heredoc body — a shape whose failure does NOT trip ``set -euo pipefail``,
+    so a failing ``git diff`` degraded the check to "assume nothing unreviewed
+    landed" and the verdict passed. A ``git`` shim that fails only the ``diff``
+    subcommand (every other git call the script and its fixtures make — init,
+    commit, cat-file, merge-base — is forwarded to the real binary) proves the
+    fix-closed behaviour: the script must exit non-zero, never PASS.
+    """
+    repo = _init_repo(tmp_path)
+    reviewed = _commit_code_change(repo, "print('v2')\n")
+    evidence_head = _commit_verdict(repo, covers_sha=reviewed)
+    assert evidence_head != reviewed
+
+    real_git = shutil.which("git")
+    assert real_git is not None, "the ambient test environment must provide a real git"
+    shim_dir = tmp_path / "shim"
+    shim_dir.mkdir()
+    shim = shim_dir / "git"
+    shim.write_text(
+        "#!/usr/bin/env bash\n"
+        'if [ "$1" = "diff" ]; then\n'
+        "  echo 'fatal: simulated git diff failure for T-044-45 F-2' >&2\n"
+        "  exit 128\n"
+        "fi\n"
+        f'exec "{real_git}" "$@"\n',
+        encoding="utf-8",
+    )
+    shim.chmod(0o755)
+
+    result = _run_script(repo, evidence_head, {"PATH": f"{shim_dir}:{_TEST_PATH}"})
+    assert result.returncode != 0, (
+        "a failing 'git diff' must fail the gate closed, never PASS on an "
+        f"unproven diff: {result.stdout + result.stderr}"
+    )
+    assert "PASS" not in result.stdout
+
+
+def test_malicious_release_id_is_rejected_before_path_interpolation(tmp_path: Path) -> None:
+    """T-044-45 F-2 (2/2): RELEASE_ID is read unvalidated from the PR head's own
+    ACTIVE.md (or an override) straight into ``VERDICTS_DIR="specs/releases/${RELEASE_ID}/verdicts"``.
+
+    A path-traversal-shaped value must be refused before it ever reaches a path,
+    with a clear diagnostic — not silently normalised, not allowed through.
+    """
+    repo = _init_repo(tmp_path)
+    head = _head(repo)
+
+    result = _run_script(repo, head, {"RELEASE_ID": "../../etc"})
+    assert result.returncode != 0, result.stdout + result.stderr
+    assert "RELEASE_ID" in result.stdout + result.stderr
+
+
+def test_release_id_with_traversal_from_active_md_is_rejected(tmp_path: Path) -> None:
+    """Same as above, but the malicious value arrives via ACTIVE.md itself — the
+    PR-controlled path F-2 names explicitly, not just the env-override channel.
+    """
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git("init", "-q", "-b", "main", cwd=repo)
+    _git("config", "user.email", "test@example.invalid", cwd=repo)
+    _git("config", "user.name", "Test", cwd=repo)
+    releases_dir = repo / "specs" / "releases"
+    releases_dir.mkdir(parents=True)
+    (releases_dir / "ACTIVE.md").write_text(
+        "release: ../../etc\nphase: IMPLEMENTATION\n", encoding="utf-8"
+    )
+    (repo / "app.py").write_text("print('v1')\n", encoding="utf-8")
+    _git("add", "-A", cwd=repo)
+    _git("commit", "-q", "-m", "chore: bootstrap", cwd=repo)
+    head = _head(repo)
+
+    result = _run_script(repo, head)
+    assert result.returncode != 0, result.stdout + result.stderr
+    assert "RELEASE_ID" in result.stdout + result.stderr

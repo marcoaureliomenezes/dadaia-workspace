@@ -1,6 +1,6 @@
 name: CI
 
-# Gitflow law v2 (v0.4.4 FR3/FR4 / DADAIA.md §5): feature/{M.m.p} is the ONLY pushable
+# Gitflow law v2 (v0.4.4 FR3/FR4 / DADAIA.md §4 (Gitflow)): feature/{M.m.p} is the ONLY pushable
 # branch (its push triggers the full matrix below); develop and main advance by PR
 # only. Every PR is gated by pr-source-guard (both edges, one job) and by
 # security-verdict-gate (the diff-based security review, relocated here from the
@@ -450,7 +450,7 @@ jobs:
           if [ "$BASE_REF" = "main" ]; then
             # Rule 1 (unchanged): main accepts a PR only from develop.
             if [ "$HEAD_REF" != "develop" ]; then
-              echo "::error::Gitflow law (DADAIA.md §5): main accepts PRs from 'develop' only. Got head '$HEAD_REF'."
+              echo "::error::Gitflow law (DADAIA.md §4 (Gitflow)): main accepts PRs from 'develop' only. Got head '$HEAD_REF'."
               echo "::error::Fix: merge your branch into develop, push develop, and open the PR develop -> main."
               exit 1
             fi
@@ -463,7 +463,7 @@ jobs:
             # has no \d, so [0-9]+ is its exact translation, never a second, drifted
             # regex literal.
             if ! echo "$HEAD_REF" | grep -Eq '^feature/[0-9]+\.[0-9]+\.[0-9]+$'; then
-              echo "::error::Gitflow law (DADAIA.md §5): develop accepts PRs from 'feature/{M.m.p}' only (no 'v' prefix). Got head '$HEAD_REF'."
+              echo "::error::Gitflow law (DADAIA.md §4 (Gitflow)): develop accepts PRs from 'feature/{M.m.p}' only (no 'v' prefix). Got head '$HEAD_REF'."
               echo "::error::Fix: rebuild your work on a feature/M.m.p branch and open the PR feature/M.m.p -> develop."
               exit 1
             fi
@@ -485,8 +485,8 @@ jobs:
   # `dadaia ci gc-push-verdicts` only ever reads a local clone) — so the evidence
   # this job reads is a COMMITTED copy of the security-reviewer's APPROVED handoff
   # at `specs/releases/<release-id>/verdicts/<reviewed-sha>.handoff.json` (the same
-  # "review artifact committed on the branch" cadence DADAIA.md §5 already uses for
-  # a qa-engineer segment-close review). See
+  # "review artifact committed on the branch" cadence DADAIA.md §4 (Gitflow) already
+  # uses for a qa-engineer segment-close review). See
   # .github/scripts/pr-verdict-check.sh for exactly what "covers the PR head sha"
   # means and why literal sha equality is not always achievable.
   #
