@@ -3,29 +3,62 @@ bad atom must never strand a half-migrated tree.
 
 Intent: REGRESSION (security-reviewer findings on the 0.4.3 develop delta: CWE-59/CWE-61
 link following, CWE-73 externally supplied path, CWE-703 unchecked exceptional condition,
-CWE-674 uncontrolled recursion). Size: SMALL.
+CWE-674 uncontrolled recursion; bug
+``atomic-writer-drift-guard-is-brittle-and-covers-only-two-of-eight-writers`` — T-044-35).
+Size: SMALL.
 
 This repo has already paid for the link-following class once (the dangling
 ``tests/AGENTS.md`` symlink). These tests pin the doctrine at every write site introduced
 or touched by the retired-frontmatter-keys work, so the third recurrence cannot happen
 quietly.
+
+The ``AtomicWriterCase`` battery below pins BEHAVIOUR, not source text, across every one
+of the package's 8 atomic-writer primitives (mkstemp/uuid tmp-file + ``os.replace``) —
+replacing a prior guard that sliced two of them on triple-quote boundaries and compared
+stripped lines (broke on a reworded comment, mis-sliced on an embedded triple-quoted
+literal, raised ``IndexError`` instead of asserting on a missing docstring, and never
+looked at the other 6 writers at all).
 """
 
 from __future__ import annotations
 
 import json
+import os
+import stat
+import sys
+from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
+
+import pytest
 
 from dadaia_workspace.features.migrate.agent_tier_frontmatter import (
     migrate_agent_tier_frontmatter,
 )
+from dadaia_workspace.features.migrate.frontmatter_keys import write_text_atomic
 from dadaia_workspace.features.migrate.retired_frontmatter_keys import (
     migrate_retired_frontmatter_keys,
 )
+from dadaia_workspace.features.spec_context.presence import (
+    _atomic_write_json as _presence_atomic_write_json,
+)
+from dadaia_workspace.features.spec_context.session_identity import (
+    _atomic_write_text as _session_identity_atomic_write_text,
+)
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
+from dadaia_workspace.features.specs.doctor_structural import (
+    _write_text_atomic as _doctor_structural_write_text_atomic,
+)
 from dadaia_workspace.features.specs.template_history import (
     SHIPPED_HASHES_FILENAME,
     load_shipped_hashes,
+)
+from dadaia_workspace.hooks._common import atomic_write_text as _hooks_common_atomic_write_text
+from dadaia_workspace.infrastructure.json_agent_model_policy_store import (
+    JsonAgentModelPolicyStore,
+)
+from dadaia_workspace.infrastructure.public_assets_common import (
+    _atomic_write_text as _public_assets_atomic_write_text,
 )
 
 _REPO_ROOT = Path(__file__).parents[4]
@@ -223,20 +256,251 @@ def test_read_only_atom_is_left_alone(tmp_path: Path) -> None:
         os.chmod(atom, 0o644)
 
 
-def test_the_two_atomic_writers_do_not_drift(tmp_path: Path) -> None:
-    """Two copies of a security primitive exist by architecture (features are independent).
-    Nothing stops them diverging, so pin that they behave identically."""
-    import inspect
+@dataclass(frozen=True)
+class AtomicWriterCase:
+    """One of the package's 8 atomic-writer primitives, called at its real entry point.
 
-    from dadaia_workspace.features.migrate.frontmatter_keys import write_text_atomic
-    from dadaia_workspace.features.specs.doctor_structural import _write_text_atomic
+    ``preserves_mode``/``cleans_up_on_failure`` are the ACTUAL, empirically-verified
+    contract of the writer named by ``id`` — not an aspiration. Where a writer's real
+    behaviour is a known gap, the field says so and the test below pins that gap
+    (with a bug reference) rather than asserting something false.
+    """
 
-    def statements(fn: object) -> list[str]:
-        body = inspect.getsource(fn)  # type: ignore[arg-type]
-        code = body.split('"""')[2]  # drop signature + docstring
-        return [line.strip() for line in code.splitlines() if line.strip()]
+    id: str
+    write: Callable[[Path, str], None]
+    replace_target: str
+    preserves_mode: bool
+    cleans_up_on_failure: bool
+    lf_bytes_guaranteed: bool  # newline="" or binary mode — CRLF-proof on every platform
 
-    assert statements(write_text_atomic) == statements(_write_text_atomic), (
-        "the duplicated atomic writers have drifted — a divergence between two copies of a "
-        "security primitive is exactly the failure this test exists to catch"
+
+def _write_frontmatter_keys(path: Path, marker: str) -> None:
+    write_text_atomic(path, f"{marker}\n")
+
+
+def _write_doctor_structural(path: Path, marker: str) -> None:
+    _doctor_structural_write_text_atomic(path, f"{marker}\n")
+
+
+def _write_hooks_common(path: Path, marker: str) -> None:
+    _hooks_common_atomic_write_text(path, f"{marker}\n")
+
+
+def _write_public_assets_common(path: Path, marker: str) -> None:
+    _public_assets_atomic_write_text(path, f"{marker}\n")
+
+
+def _write_session_identity(path: Path, marker: str) -> None:
+    _session_identity_atomic_write_text(path, f"{marker}\n")
+
+
+def _write_presence_json(path: Path, marker: str) -> None:
+    _presence_atomic_write_json(path, {"marker": marker})
+
+
+def _write_policy_store_text(path: Path, marker: str) -> None:
+    # workspace_root is irrelevant here — _atomic_write takes the target path
+    # explicitly; the store instance only supplies the method (the real entry point).
+    JsonAgentModelPolicyStore(path.parent)._atomic_write(path, marker)
+
+
+def _write_policy_store_bytes(path: Path, marker: str) -> None:
+    JsonAgentModelPolicyStore(path.parent)._atomic_write_bytes(path, f"{marker}\n".encode())
+
+
+# The 8 atomic-writer primitives in the package (grep ``^def _*atomic\b`` /
+# ``^def _*write.*atomic`` over dadaia_workspace/, tests excluded — exactly 8 hits,
+# matching the bug's count). Behaviour verified empirically before being pinned here,
+# never assumed from reading the source (dd-bug-fix phase 4's discipline, applied to
+# characterizing existing behaviour rather than a production hypothesis).
+_ATOMIC_WRITER_CASES: list[AtomicWriterCase] = [
+    AtomicWriterCase(
+        id="frontmatter_keys.write_text_atomic",
+        write=_write_frontmatter_keys,
+        replace_target="dadaia_workspace.features.migrate.frontmatter_keys.os.replace",
+        preserves_mode=True,
+        cleans_up_on_failure=True,
+        lf_bytes_guaranteed=True,  # os.fdopen(..., newline="")
+    ),
+    AtomicWriterCase(
+        id="doctor_structural._write_text_atomic",
+        write=_write_doctor_structural,
+        replace_target="dadaia_workspace.features.specs.doctor_structural.os.replace",
+        preserves_mode=True,
+        cleans_up_on_failure=True,
+        lf_bytes_guaranteed=True,  # os.fdopen(..., newline="")
+    ),
+    AtomicWriterCase(
+        id="hooks._common.atomic_write_text",
+        write=_write_hooks_common,
+        replace_target="dadaia_workspace.hooks._common.os.replace",
+        preserves_mode=False,
+        # Known gap — bug `two-atomic-writers-leak-temp-file-on-injected-os-replace-failure`
+        # (registered alongside this battery): no cleanup wrapper around os.replace.
+        cleans_up_on_failure=False,
+        lf_bytes_guaranteed=False,  # Path.write_text(...) with no newline= override
+    ),
+    AtomicWriterCase(
+        id="public_assets_common._atomic_write_text",
+        write=_write_public_assets_common,
+        replace_target="dadaia_workspace.infrastructure.public_assets_common.os.replace",
+        preserves_mode=False,
+        # Same known gap as hooks._common.atomic_write_text — see bug above.
+        cleans_up_on_failure=False,
+        lf_bytes_guaranteed=True,  # Path.write_text(..., newline="")
+    ),
+    AtomicWriterCase(
+        id="session_identity._atomic_write_text",
+        write=_write_session_identity,
+        replace_target="dadaia_workspace.features.spec_context.session_identity.os.replace",
+        preserves_mode=False,
+        cleans_up_on_failure=True,
+        lf_bytes_guaranteed=False,  # Path.write_text(...) with no newline= override
+    ),
+    AtomicWriterCase(
+        id="presence._atomic_write_json",
+        write=_write_presence_json,
+        replace_target="dadaia_workspace.features.spec_context.presence.os.replace",
+        preserves_mode=False,
+        cleans_up_on_failure=True,
+        lf_bytes_guaranteed=False,  # Path.write_text(json.dumps(...)) with no newline=
+    ),
+    AtomicWriterCase(
+        id="json_agent_model_policy_store._atomic_write",
+        write=_write_policy_store_text,
+        replace_target=("dadaia_workspace.infrastructure.json_agent_model_policy_store.os.replace"),
+        preserves_mode=False,
+        cleans_up_on_failure=True,
+        lf_bytes_guaranteed=True,  # os.fdopen(fd, "wb") — binary mode, no translation
+    ),
+    AtomicWriterCase(
+        id="json_agent_model_policy_store._atomic_write_bytes",
+        write=_write_policy_store_bytes,
+        replace_target=("dadaia_workspace.infrastructure.json_agent_model_policy_store.os.replace"),
+        preserves_mode=False,
+        cleans_up_on_failure=True,
+        lf_bytes_guaranteed=True,  # os.fdopen(fd, "wb") — binary mode, no translation
+    ),
+]
+
+
+@pytest.mark.parametrize("case", _ATOMIC_WRITER_CASES, ids=[c.id for c in _ATOMIC_WRITER_CASES])
+def test_atomic_writer_rebinds_a_hardlinked_target(case: AtomicWriterCase, tmp_path: Path) -> None:
+    """A hard link is not a symlink, so refusing links alone cannot keep a write inside
+    the tree (CWE-59/CWE-367 TOCTOU): every writer must rebind the target NAME to a new
+    inode via tmp-file + ``os.replace`` rather than write through whatever it points at."""
+    outside = tmp_path / "outside.md"
+    original = "original outside content\n"
+    outside.write_text(original, encoding="utf-8")
+    target = tmp_path / "linked.md"
+    os.link(outside, target)
+    before_ino = target.stat().st_ino
+
+    case.write(target, "REBOUND")
+
+    assert outside.read_text(encoding="utf-8") == original, (
+        f"{case.id} wrote through a hard link into a file outside the write target"
     )
+    assert target.stat().st_ino != before_ino, f"{case.id} did not rebind the name to a new inode"
+    assert "REBOUND" in target.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("case", _ATOMIC_WRITER_CASES, ids=[c.id for c in _ATOMIC_WRITER_CASES])
+def test_atomic_writer_never_leaves_crlf_bytes(case: AtomicWriterCase, tmp_path: Path) -> None:
+    """The bytes landing on disk never carry CRLF — universal-newline translation must be
+    disabled (``newline=""``) or bypassed (binary mode) at every write site, the same
+    byte-preserving guarantee ``test_repair_preserves_file_mode_and_newlines`` pins for
+    the doctor's repair path.
+
+    Platform-aware by construction (companion bug T-044-36 is about a fixture asserting
+    this for the wrong reason — this dimension avoids that trap directly): 3 of the 8
+    writers pass no ``newline=""`` and are not byte-exact on Windows, where Python's text
+    mode rewrites LF to CRLF. That is a real, harmless divergence for those 3 (internal
+    `.dadaia/` runtime state, never git-diffed) — this test skips rather than asserting a
+    false platform-independent claim for them."""
+    if not case.lf_bytes_guaranteed and sys.platform.startswith("win"):
+        pytest.skip(
+            f'{case.id} has no newline=""/binary-mode guarantee; Windows text-mode '
+            "CRLF translation is a known, harmless gap for this internal-state writer."
+        )
+    target = tmp_path / "atom.md"
+
+    case.write(target, "line-one")
+
+    assert b"\r\n" not in target.read_bytes(), f"{case.id} wrote CRLF bytes"
+
+
+@pytest.mark.parametrize("case", _ATOMIC_WRITER_CASES, ids=[c.id for c in _ATOMIC_WRITER_CASES])
+def test_atomic_writer_mode_preservation_matches_its_contract(
+    case: AtomicWriterCase, tmp_path: Path
+) -> None:
+    """Pin each writer's REAL mode-preservation contract against the mode actually on
+    disk, never a hard-coded POSIX value — mirrors
+    ``test_repair_preserves_file_mode_and_newlines``'s before/after comparison, which is
+    exactly right on every platform (Windows has no POSIX mode bits: ``os.chmod`` only
+    toggles the read-only attribute there, so every file reads back the same value
+    regardless of ``shutil.copymode``, and a before==after comparison still states
+    precisely what it means)."""
+    target = tmp_path / "atom.md"
+    target.write_text("orig\n", encoding="utf-8")
+    # Deliberately NOT 0o600 (mkstemp's own creation mode) — 0o640 makes the two
+    # non-preserving json_agent_model_policy_store writers fail this dimension for the
+    # real reason instead of coincidentally matching mkstemp's default.
+    os.chmod(target, 0o640)
+    before = stat.S_IMODE(target.stat().st_mode)
+
+    case.write(target, "new")
+
+    after = stat.S_IMODE(target.stat().st_mode)
+    if case.preserves_mode:
+        assert after == before, f"{case.id} was expected to preserve the target's mode"
+        return
+    if sys.platform.startswith("win"):
+        pytest.skip(
+            "os.chmod only toggles the read-only attribute on Windows — every file "
+            "reads back the same mode regardless of copymode, so non-preservation "
+            "cannot be observed on this platform."
+        )
+    # Documented, not a bug: only the 2 writers with an explicit shutil.copymode call
+    # (frontmatter_keys / doctor_structural — the git-tracked memory-atom writers)
+    # preserve mode. The other 6 write internal `.dadaia/` runtime state that is
+    # always created fresh, so no CWE-732 mode-narrowing concern applies to them.
+    assert after != before, (
+        f"{case.id} was expected NOT to preserve mode (documented); it did — if this "
+        "is now intentional, flip preserves_mode=True above."
+    )
+
+
+@pytest.mark.parametrize("case", _ATOMIC_WRITER_CASES, ids=[c.id for c in _ATOMIC_WRITER_CASES])
+def test_atomic_writer_temp_file_on_injected_replace_failure(
+    case: AtomicWriterCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """When ``os.replace`` itself fails, the temp file must not survive — a leaked
+    ``.tmp`` sibling next to a real atom/state file is exactly the drift class this
+    guard exists to catch. 6 of 8 writers clean up; 2 currently do not (documented gap,
+    bug `two-atomic-writers-leak-temp-file-on-injected-os-replace-failure` — pinned here
+    as CURRENT behaviour, not silently accepted as correct)."""
+    target = tmp_path / "atom.md"
+    target.write_text("orig\n", encoding="utf-8")
+    before = set(tmp_path.iterdir())
+
+    def _boom(*_args: object, **_kwargs: object) -> None:
+        raise OSError("injected os.replace failure")
+
+    monkeypatch.setattr(case.replace_target, _boom)
+
+    with pytest.raises(OSError, match="injected os.replace failure"):
+        case.write(target, "new")
+
+    leftover = set(tmp_path.iterdir()) - before
+    if case.cleans_up_on_failure:
+        assert leftover == set(), (
+            f"{case.id} leaked a temp file on injected os.replace failure: {leftover}"
+        )
+    else:
+        assert leftover, (
+            f"{case.id} was expected to leak (documented gap, bug "
+            "`two-atomic-writers-leak-temp-file-on-injected-os-replace-failure`); if this "
+            "now passes, the bug is fixed — flip cleans_up_on_failure=True above and "
+            "close it with this test as the regression evidence."
+        )

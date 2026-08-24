@@ -934,13 +934,44 @@ skill states; `Closed`.
 
 ---
 
-- [-] **T-044-35 — bug `atomic-writer-drift-guard-is-brittle-and-covers-only-two-of-eight-writers` (LOW)**
+- [x] **T-044-35 — bug `atomic-writer-drift-guard-is-brittle-and-covers-only-two-of-eight-writers` (LOW)**
+
+**Commit:** `test(T-044-35): a behavioural battery over every atomic writer`
 
 **Write set:** `tests/unit/features/specs/test_migration_symlink_hardening.py` (and/or its
 replacement), tests only.
 **Description:** Replace the text-slicing guard with a **behavioural** battery parametrized
 over every atomic writer: mode preservation, LF bytes on disk, no leftover temp file on an
 injected failure, hardlink rebinding. The text comparison is deleted, not extended.
+
+**Resolution:** Deleted `test_the_two_atomic_writers_do_not_drift` (the `inspect.getsource`
++ triple-quote-split comparison, 2 of 8 writers). Enumerated the package's 8 atomic-writer
+primitives by grepping the `^def _*atomic\b` / `^def _*write.*atomic` naming pattern
+(`write_text_atomic`, `_write_text_atomic`, `atomic_write_text`, `_atomic_write_text` x2,
+`_atomic_write_json`, `_atomic_write`, `_atomic_write_bytes`) — matches the bug's stated
+count exactly. Replaced with an `AtomicWriterCase` registry calling each writer at its real
+entry point, parametrized over 4 behavioural dimensions (hardlink rebinding, CRLF-free
+bytes, mode preservation, no leftover temp on an injected `os.replace` failure) — 32 test
+items. Every per-writer expectation (`preserves_mode`/`cleans_up_on_failure`/
+`lf_bytes_guaranteed`) was verified empirically (scratch probe script, not committed)
+before being pinned, not assumed from reading source. That probing surfaced 2 genuine
+production gaps, out of this task's tests-only write set: `hooks/_common.py:
+atomic_write_text` and `infrastructure/public_assets_common.py:_atomic_write_text` leak
+their `.tmp` sibling on an injected `os.replace` failure (6 of 8 writers wrap the swap in
+try/except-cleanup; these 2 do not) — registered as bug
+`two-atomic-writers-leak-temp-file-on-injected-os-replace-failure` (LOW) and pinned as
+CURRENT (leaking) behaviour in the new battery rather than silently asserted away. Mode
+preservation and CRLF-freedom assertions are Windows-aware (self-referential before/after
+comparison + `sys.platform` skip, mirroring `test_repair_preserves_file_mode_and_newlines`)
+— this repo's CI runs unit tests on windows-latest/macos-latest, so a POSIX-only assertion
+would have reproduced the `mode-preservation-test-asserts-posix-only` gotcha class.
+Red-loop evidence: replayed the OLD comparison algorithm against `write_text_atomic`'s real
+source with only a comment reworded — identical behaviour, OLD guard reported a spurious
+mismatch (bug repro step 1). Full suite: 2787 passed, 4 pre-existing skips. Diff is
+net-positive (+279/-15, one file, tests-only) — flagged in the `resolved` event per
+FR23/`dd-bug-fix` for a `software-architect` review before this lands past this commit
+(growth is coverage expansion, 2→8 writers / 0→4 dimensions, mandated by this task's own
+Done criterion — no production code touched); `bugs.jsonl` carries the evidence.
 **Done criterion:** the battery covers all 8 writers; the brittle comparison is gone;
 `Closed`.
 
