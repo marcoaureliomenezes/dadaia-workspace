@@ -33,12 +33,18 @@ from dadaia_workspace.core.session_env import harness_session_id, sanitize_sessi
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.spec_context import presence, session_identity
 from dadaia_workspace.features.spec_context.service import (
+    AssociatedRepoConflictError,
+    AssociatedRepoNotFoundError,
     DeadReviewRequiredError,
     DeadSecretFoundError,
     SpecContextService,
 )
 
 app = typer.Typer(help="Manage Spec Context Projects.")
+# FR17 (v0.4.4, T-044-28): associated-repo registry verbs, nested under `context repo`
+# — same `app.add_typer` pattern as `specs release`/`specs segment`.
+repo_app = typer.Typer(help="Manage a context's associated repos (main repo excluded).")
+app.add_typer(repo_app, name="repo")
 console = Console()
 err_console = Console(stderr=True)
 
@@ -181,6 +187,15 @@ def create(
             "for a repo not in the catalog or to pin an explicit remote."
         ),
     ),
+    associated: list[str] = typer.Option(
+        [],
+        "--associated",
+        help=(
+            "Register an associated repo at creation time (FR17). Repeatable. Each "
+            "value is SLUG or SLUG=URL — a bare slug registers with an empty URL, "
+            "settable later via 'context repo add' with --url."
+        ),
+    ),
 ) -> None:
     """Create a new Spec Context Project in state 'dead'."""
     # Refuse at CREATE what every downstream verb refuses. `create` accepted names with
@@ -197,6 +212,38 @@ def create(
                 "that is created is always usable."
             )
             raise typer.Exit(1) from None
+
+    # Parse + validate every --associated entry BEFORE creating anything (A17.3 and
+    # slug-format checks apply here too — a refused --associated must never leave a
+    # half-created context behind). `repo add` (below) is reused verbatim for the
+    # actual registration — this is not a second repo-registration path.
+    parsed_associated: list[tuple[str, str]] = []
+    seen_associated_slugs: set[str] = set()
+    for raw in associated:
+        assoc_slug, _, assoc_url = raw.partition("=")
+        assoc_slug = assoc_slug.strip()
+        assoc_url = assoc_url.strip()
+        if not _CONTEXT_NAME_RE.fullmatch(assoc_slug):
+            err_console.print(
+                f"[red]Error:[/red] invalid --associated repo slug {assoc_slug!r} in "
+                f"{raw!r}. Use only letters, digits, '-' and '_'."
+            )
+            raise typer.Exit(1) from None
+        if assoc_slug == repo:
+            err_console.print(
+                f"[red]Error:[/red] --associated {raw!r}: '{assoc_slug}' is this "
+                "context's own main repo slug (--repo) — it cannot also be an "
+                "associated repo."
+            )
+            raise typer.Exit(1) from None
+        if assoc_slug in seen_associated_slugs:
+            err_console.print(
+                f"[red]Error:[/red] --associated repo slug {assoc_slug!r} given more than once."
+            )
+            raise typer.Exit(1) from None
+        seen_associated_slugs.add(assoc_slug)
+        parsed_associated.append((assoc_slug, assoc_url))
+
     workspace_root = resolve_workspace_root()
     # An explicit --url overrides the catalog lookup (FR-W2-03 a / T-011-08); otherwise
     # look up repo_url from the repos catalog, failing gracefully if unavailable.
@@ -215,12 +262,16 @@ def create(
             pass
 
     try:
-        ctx = _ctx_service().create(name, repo, repo_url)
+        svc = _ctx_service()
+        ctx = svc.create(name, repo, repo_url)
+        for assoc_slug, assoc_url in parsed_associated:
+            ctx, _ = svc.add_repo(name, assoc_slug, assoc_url)
+        suffix = f", {len(parsed_associated)} associated repo(s)" if parsed_associated else ""
         console.print(
             f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' created "
-            f"(repo: {ctx.repo_slug}, state: {ctx.state})"
+            f"(repo: {ctx.repo_slug}, state: {ctx.state}{suffix})"
         )
-    except (ContextAlreadyExistsError, ContextNotFoundError) as e:
+    except (ContextAlreadyExistsError, ContextNotFoundError, AssociatedRepoConflictError) as e:
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
 
@@ -771,6 +822,129 @@ def update(
     except ContextNotFoundError as e:
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
+
+
+# ------------------------------------------------------------------ context repo (FR17)
+
+
+@repo_app.command(name="add")
+def repo_add(
+    ctx_name: str = typer.Argument(..., help="Context name"),
+    slug: str = typer.Argument(..., help="Repo slug to associate (directory name under repos/)"),
+    url: str = typer.Option("", "--url", help="Repo clone URL (optional; empty until set)"),
+) -> None:
+    """Register an associated repo on a context.
+
+    Run: dadaia context repo add <ctx> <slug> [--url <url>]
+
+    Idempotent: re-adding the same slug with the same URL is a no-op success. The
+    same slug with a DIFFERENT URL is refused — this verb is the one place an
+    associated repo's URL is set, so the recovery path is 'context repo remove'
+    then 'context repo add' again, never a second divergent URL-update verb
+    (compare 'context update --url', which repairs the MAIN repo's URL only).
+    Adding the context's own main repo slug is refused (it is already covered).
+    """
+    for label, value in (("context name", ctx_name), ("repo slug", slug)):
+        if not _CONTEXT_NAME_RE.fullmatch(value):
+            err_console.print(
+                f"[red]Error:[/red] invalid {label} {value!r}. Use only letters, digits, "
+                "'-' and '_'."
+            )
+            raise typer.Exit(1) from None
+    try:
+        ctx, was_added = _ctx_service().add_repo(ctx_name, slug, url)
+    except ContextNotFoundError as e:
+        err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+    except AssociatedRepoConflictError as e:
+        err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+
+    if was_added:
+        console.print(
+            f"[green]✓[/green] Associated repo '[bold]{slug}[/bold]' added to context "
+            f"'[bold]{ctx_name}[/bold]' ({len(ctx.associated_repos)} associated repo(s) total)."
+        )
+    else:
+        console.print(
+            f"[green]✓[/green] Associated repo '[bold]{slug}[/bold]' is already registered "
+            f"on context '[bold]{ctx_name}[/bold]' with this URL — no change."
+        )
+
+
+@repo_app.command(name="remove")
+def repo_remove(
+    ctx_name: str = typer.Argument(..., help="Context name"),
+    slug: str = typer.Argument(..., help="Associated repo slug to remove from the registry"),
+) -> None:
+    """Remove an associated repo from a context's registry.
+
+    Run: dadaia context repo remove <ctx> <slug>
+
+    Registry-only (A17.2): this NEVER deletes the on-disk checkout at
+    'repos/<slug>' — it only drops the registry entry, and always states
+    explicitly what it leaves behind on disk. To also remove the checkout, delete
+    it yourself, or run 'dadaia context dead <ctx>' first (which git-syncs and
+    removes every repo in the set, including this one, before you unregister it).
+    """
+    try:
+        ctx = _ctx_service().remove_repo(ctx_name, slug)
+    except ContextNotFoundError as e:
+        err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+    except AssociatedRepoNotFoundError as e:
+        err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+
+    console.print(
+        f"[green]✓[/green] Associated repo '[bold]{slug}[/bold]' removed from context "
+        f"'[bold]{ctx_name}[/bold]' registry ({len(ctx.associated_repos)} associated "
+        "repo(s) remain)."
+    )
+    on_disk = resolve_workspace_root() / "repos" / slug
+    if on_disk.exists():
+        console.print(
+            f"[yellow]![/yellow] The on-disk checkout at 'repos/{slug}' was left "
+            "untouched — this only removes the registry entry, it never deletes "
+            "files. Remove it yourself if it is no longer needed."
+        )
+    else:
+        console.print(f"[dim]No on-disk checkout found at 'repos/{slug}'.[/dim]")
+
+
+@repo_app.command(name="list")
+def repo_list(
+    ctx_name: str = typer.Argument(..., help="Context name"),
+    json_output: bool = typer.Option(False, "--json", help="Output stable JSON contract"),
+) -> None:
+    """List a context's associated repos.
+
+    Run: dadaia context repo list <ctx>
+
+    The main repo is never listed here (FR19: it stays the sole specs/bind/memory
+    target, resolved via 'context show') — this is the associated set only.
+    """
+    try:
+        ctx = _ctx_service().show(ctx_name)
+    except ContextNotFoundError as e:
+        err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+
+    if json_output:
+        payload = [{"slug": r.slug, "url": r.url} for r in ctx.associated_repos]
+        print(json.dumps(payload, sort_keys=True))
+        return
+
+    if not ctx.associated_repos:
+        console.print(f"[dim]Context '{ctx_name}' has no associated repos.[/dim]")
+        return
+
+    table = Table(title=f"Associated repos — {ctx_name}")
+    table.add_column("Slug", style="bold")
+    table.add_column("URL")
+    for repo in ctx.associated_repos:
+        table.add_row(repo.slug, repo.url or "—")
+    console.print(table)
 
 
 @app.command()

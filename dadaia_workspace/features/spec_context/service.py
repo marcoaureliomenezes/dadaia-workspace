@@ -17,7 +17,11 @@ from dadaia_workspace.core.exceptions import (
     DadaiaError,
     GitSyncError,
 )
-from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
+from dadaia_workspace.core.models.spec_context import (
+    AssociatedRepo,
+    ContextState,
+    SpecContextProject,
+)
 from dadaia_workspace.core.protocols.context_store import ContextStore
 from dadaia_workspace.core.protocols.git_client import GitClient
 
@@ -46,6 +50,23 @@ class DeadSecretFoundError(DadaiaError):
     ``--commit`` would newly commit. Any match blocks the push (repo left on disk,
     nothing committed or pushed). The message is redacted: it names the file and
     the rule that fired, never the secret value itself.
+    """
+
+
+class AssociatedRepoConflictError(DadaiaError):
+    """Raised by ``add_repo`` when the slug cannot be registered as given (A17.3).
+
+    Two distinct causes share this one error type (both are "the registry already
+    has an opinion about this slug that `add` will not silently override"):
+    the slug IS the context's own main repo slug, or the slug is already an
+    associated repo registered with a *different* URL. Same-slug-same-url is NOT
+    an error — see ``add_repo``'s idempotent no-op.
+    """
+
+
+class AssociatedRepoNotFoundError(DadaiaError):
+    """Raised by ``remove_repo`` when the slug is not a registered associated repo
+    of the context (A17.1: fails loudly on an unknown slug, never a silent no-op).
     """
 
 
@@ -304,6 +325,87 @@ class SpecContextService:
             dead_since=ctx.dead_since,
             current_branch=ctx.current_branch,
             associated_repos=ctx.associated_repos,
+        )
+        self._store.update(updated)
+        return updated
+
+    # ------------------------------------------------------------------ associated repos (FR17)
+
+    def add_repo(self, name: str, slug: str, repo_url: str = "") -> tuple[SpecContextProject, bool]:
+        """Register an associated repo on a context (A17.1/A17.3).
+
+        Returns ``(context, was_added)``. Idempotent: re-adding the exact same
+        ``slug``/``repo_url`` pair is a no-op success (``was_added=False``, the
+        stored context is returned unchanged) — never a duplicate entry. The same
+        slug already registered with a *different* URL raises
+        ``AssociatedRepoConflictError`` rather than silently overwriting it: this
+        method is the ONE way to register an associated repo's URL (FR15/A15.3's
+        one-accessor discipline extended to writes), so the recovery path is
+        remove-then-add, never a second divergent "update" verb. The context's own
+        main repo slug can never be added as an associated repo (A17.3) — it is
+        already included via ``all_repos()``.
+        """
+        ctx = self._store.get(name)
+        if ctx is None:
+            raise ContextNotFoundError(f"Context '{name}' not found.")
+        if slug == ctx.repo_slug:
+            raise AssociatedRepoConflictError(
+                f"'{slug}' is context '{name}''s own main repo slug (--repo at "
+                "create time) — it is always included via all_repos() and can "
+                "never also be registered as an associated repo."
+            )
+        existing = next((r for r in ctx.associated_repos if r.slug == slug), None)
+        if existing is not None:
+            if existing.url == repo_url:
+                return ctx, False
+            raise AssociatedRepoConflictError(
+                f"Associated repo '{slug}' is already registered on context "
+                f"'{name}' with a different URL ({existing.url!r} != "
+                f"{repo_url!r}). 'repo add' never overwrites a URL silently — "
+                f"run 'dadaia context repo remove {name} {slug}' first, then "
+                "re-add with the intended URL."
+            )
+        updated = SpecContextProject(
+            name=ctx.name,
+            state=ctx.state,
+            repo_slug=ctx.repo_slug,
+            repo_url=ctx.repo_url,
+            created_at=ctx.created_at,
+            alive_since=ctx.alive_since,
+            dead_since=ctx.dead_since,
+            current_branch=ctx.current_branch,
+            associated_repos=(*ctx.associated_repos, AssociatedRepo(slug=slug, url=repo_url)),
+        )
+        self._store.update(updated)
+        return updated, True
+
+    def remove_repo(self, name: str, slug: str) -> SpecContextProject:
+        """Remove an associated repo from a context's registry (A17.1/A17.2).
+
+        Registry-only: never touches disk or the git port — an on-disk checkout at
+        ``repos/<slug>`` (if any) is left exactly as it was; the CLI layer states
+        what it leaves behind (A17.2). Raises ``ContextNotFoundError`` for an
+        unknown context and ``AssociatedRepoNotFoundError`` for a slug that is not
+        currently registered — including a second ``remove`` of the same slug,
+        which is the loud-failure half of A17.1's idempotency, not a silent no-op.
+        """
+        ctx = self._store.get(name)
+        if ctx is None:
+            raise ContextNotFoundError(f"Context '{name}' not found.")
+        if not any(r.slug == slug for r in ctx.associated_repos):
+            raise AssociatedRepoNotFoundError(
+                f"Associated repo '{slug}' is not registered on context '{name}'."
+            )
+        updated = SpecContextProject(
+            name=ctx.name,
+            state=ctx.state,
+            repo_slug=ctx.repo_slug,
+            repo_url=ctx.repo_url,
+            created_at=ctx.created_at,
+            alive_since=ctx.alive_since,
+            dead_since=ctx.dead_since,
+            current_branch=ctx.current_branch,
+            associated_repos=tuple(r for r in ctx.associated_repos if r.slug != slug),
         )
         self._store.update(updated)
         return updated
