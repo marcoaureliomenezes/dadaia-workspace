@@ -285,6 +285,47 @@ is no longer archive-only.
     ref: ci preflight
   change: "guard de qualidade de help no preflight - falha quando um leaf command nasce sem docstring multi-linha/exemplo ou quando o digest esta stale vs a arvore de comandos (equivalente estrutural do lint de reachability que a skill carregava)"
 ```
+### specs-canon-v6
+- **Title:** specs-canon-v6 — canonical SDD specs pattern v6: per-area layout, event-sourced RELEASE.jsonl, live-photo BACKLOG.md, doctor "nothing beyond canon" + --recipe
+- **Opened:** 2026-08-23
+- **Status:** candidate
+- **Description:** Reshape the canonical `specs/` pattern (specs_pattern_version 5 → 6) and make `dadaia specs doctor` measure it. **Canon root (context-relative, nothing else is conformant):** `backlog/`, `bugs/`, `memory/`, `releases/`, `audits/`, `constitution.md`, `AGENTS.md`. Per area: **backlog/** = `BACKLOG.md` (live photo — ACTIVE entries only; the in-file LEDGER section retires) + `AGENTS.md` + `_archive/backlog_histo.jsonl` (every exit appends `{ts, slug, disposition, reason, release?, by, entry_md}` with the full entry snapshot; disposition vocabulary unchanged; legacy `_archive/*.md` stay frozen, no retro-conversion); **bugs/** = `BUGS.jsonl` (rename of `bugs.jsonl`; event-sourced append-only kept, NO recurrence counter — reopen is a new `reported` with the same `bug_id`; `reported` requires `symptom`+`repro`+`severity`; `resolved` requires `release`+`cause`+`test`) + `AGENTS.md` + `_archive/bugs_histo.jsonl` (idempotent `dadaia bugs archive` moves event chains resolved >90 days; run at release close; doctor warns when overdue); **memory/** = `ARCHITECTURE.md`, `TECHSTACK.md`, `QUALITY.md` (renames of the lowercase trio), `AGENTS.md`, `product/` (+`catalog.json`, `index.md`; dotfiles tolerated; only rendered `*.html` gitignored — every spec is committed); **releases/** = `AGENTS.md` + at most ONE live `{version}/` (bare semver, no `v` prefix) holding `RELEASE.jsonl` + `SPEC.md` + `PLAN.md` + `TASKS.md`, plus `_ideas/{version}/` (N future releases allowed, `SPEC.md` Draft only; renumbered and promoted by `git mv` when the live release archives) and `_archive/{version}/` (future archives); **`ACTIVE.md` and `CLOSURE.md` retire** — `RELEASE.jsonl` is the event-sourced source (`release-event-v1`: `{ts, event, agent, session_id, data}` with kinds `created`, `spec_status` (Draft/Em revisão/Aprovado), `phase` (DEFINITION/IMPLEMENTATION/CLOSURE — the SDD gate folds the last `phase` for the MEMORY class), `rc_open`/`rc_close`, `review`, `push`/`pr`, `ship`, `archive`, `note`; individual commits stay out — git is that ledger); **audits/** = minimal structural now (`AGENTS.md`, one live audit at a time; redesign deferred to its own entry). `specs/assets/` retires — `memory/ARCHITECTURE.md` is the canonical home (fold what is still referenced, fix `memory/architecture.md`’s `../assets/` links). **Root `specs/_archive/` is deleted in the migration (operator ruling 2026-08-23: git history is the archive)** — destructive step, executed only with the operator present; FROZEN gate class repoints to per-area `*/_archive/`. `specs/backlog/remote-bugs/` dies (content adjudicated at intake). Doctor gains TREE-8 "nothing beyond canon" and `--recipe` (ordered concrete steps for whatever `specs upgrade` cannot do alone); `specs upgrade` automates the safe renames; compliance stays WARN-only — agent + user decide, never a block. Scaffold (`public/scaffold/`) reshaped to emit the v6 tree with scoped `AGENTS.md` (READMEs die). Migration of this repo’s own `specs/` included.
+- **Provenance:** operator request (2026-08-23 dd-grill-me session, 2 rounds, 20 questions — handoff `.dadaia/handoff/dadaia-workspace/2026-08-23-claude-code-specs-canon-grill.handoff.json`); relates-to `gitflow-contract-v2-consolidation` (CONSUMED v0.4.4 — RELEASE.jsonl records the same push/pr/ship milestones that contract defines)
+- **Intents:**
+```yaml
+- subject:
+    kind: code
+    ref: dadaia_workspace/features/specs/doctor.py#SpecsDoctor
+    surface: existing
+  change: "pattern v6: TREE-8 nothing-beyond-canon check, per-area _archive, BUGS.jsonl/ARCHITECTURE.md/TECHSTACK.md/QUALITY.md names, bare-semver live release dir, RELEASE.jsonl presence, _ideas/ rules, --recipe output; WARN-only"
+- subject:
+    kind: code
+    ref: dadaia_workspace/features/specs/scaffolder.py#ScaffoldResult
+    surface: existing
+  change: "scaffold emits the v6 tree: scoped AGENTS.md per area (hash-projected), BUGS.jsonl, RELEASE.jsonl-ready releases/, _ideas/, no READMEs, no assets/, specs_pattern_version 6"
+- subject:
+    kind: code
+    ref: dadaia_workspace/features/bugs/service.py#BugService
+    surface: existing
+  change: "BUGS.jsonl path; required fields (reported: symptom+repro+severity; resolved: release+cause+test); idempotent `dadaia bugs archive` (>90-day resolved chains to _archive/bugs_histo.jsonl); reopen = reported with same bug_id"
+- subject:
+    kind: code
+    ref: dadaia_workspace/hooks/sdd_gate.py#SddGate
+    surface: existing
+  change: "MEMORY phase resolution folds the last phase event from the live release RELEASE.jsonl (ACTIVE.md retired); FROZEN class repoints to per-area */_archive/"
+- subject:
+    kind: doc
+    ref: specs/releases/RELEASE.jsonl
+    surface: new
+  change: "release-event-v1 schema: {ts,event,agent,session_id,data}; kinds created/spec_status/phase/rc_open/rc_close/review/push/pr/ship/archive/note; commits excluded"
+- subject:
+    kind: doc
+    ref: specs/backlog/_archive/backlog_histo.jsonl
+    surface: new
+  change: "never-delete moves here: full-snapshot JSONL record per entry exit; BACKLOG.md becomes the live photo (ACTIVE only)"
+```
+
+
 ## LEDGER
 
 - push-range-denylist-scan · DELIVERED · v0.9.0 · 2026-08-14
