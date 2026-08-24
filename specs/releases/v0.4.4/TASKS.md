@@ -1062,7 +1062,7 @@ calls `time.time()`/`datetime.now()`. Green at HEAD against all 9 aging sites.
 **Done criterion:** the ratchet is green at HEAD and red on a planted violation; `Closed`.
 
 **Resolution:** New AST-based contract test
-`tests/contract/test_frozen_clock_aging_ratchet.py` (5 tests) — a raw-text/regex scan
+`tests/contract/test_frozen_clock_aging_ratchet.py` (4 tests) — a raw-text/regex scan
 (the denylist no-allowlist test's own shape) would false-positive on this very module's
 docstring and on `test_tmp_gc_service.py`'s own explanatory comment, both of which
 contain the literal text `time.time()` in prose, so detection is AST-based instead
