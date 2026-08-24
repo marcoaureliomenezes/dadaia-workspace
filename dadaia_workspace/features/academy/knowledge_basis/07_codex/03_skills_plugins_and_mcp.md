@@ -16,7 +16,7 @@ The description is the trigger. Write it as an operational signal:
 
 ```yaml
 ---
-name: ai-harness-codex
+name: dd-ai-eng-knowhow
 description: Use when authoring or auditing Codex-facing AGENTS.md, Rules, skills, hooks, custom agents, or workflow integration.
 ---
 ```
@@ -30,12 +30,13 @@ dadaia uses skills for protocols that multiple agents need:
 
 - `dadaia-workspace-spec-navigator` loads active release context.
 - `dadaia-task-manager` defines task marker discipline.
-- `ai-harness-codex` teaches Codex-specific AI-surface decisions.
-- `harness-primitives` gives all agents a lighter shared vocabulary.
+- `dd-ai-eng-knowhow` gives every agent shared harness literacy (Part 1) and gives
+  `ai-engineer` alone the authoring/auditing depth (Part 2), including Codex-specific
+  AI-surface decisions.
 
-`ai-engineer` should use `ai-harness-codex` when changing Codex-facing agents,
-skills, hooks, rules, config, or workflow projection. Other agents usually use the
-lighter shared skill unless they are explicitly auditing AI entities.
+`ai-engineer` should read `dd-ai-eng-knowhow`'s Part 2 when changing Codex-facing
+agents, skills, hooks, rules, config, or workflow projection. Other agents rely on
+Part 1's shared literacy unless they are explicitly auditing AI entities.
 
 ## Plugins
 
