@@ -20,6 +20,7 @@ from dadaia_workspace.core.exceptions import (
 from dadaia_workspace.core.models.spec_context import (
     AssociatedRepo,
     ContextState,
+    RepoLiveStatus,
     SpecContextProject,
 )
 from dadaia_workspace.core.protocols.context_store import ContextStore
@@ -443,6 +444,39 @@ class SpecContextService:
         if ctx is None:
             raise ContextNotFoundError(f"Context '{name}' not found.")
         return ctx
+
+    # ------------------------------------------------------------------ branch resolution (FR18)
+
+    def repo_live_status(self, repo: AssociatedRepo) -> RepoLiveStatus:
+        """THE single branch-resolution implementation (A18.3).
+
+        `context show`, `context list --json`, the export branch refresh and the
+        panel card all resolve a repo's on-disk presence and live checked-out
+        branch through this ONE method — never a second ad hoc git-subprocess call
+        at a CLI or feature boundary. That duplication is exactly what produced bug
+        `context-list-current-branch-stale-for-alive-repo`: ``show`` queried git
+        live while ``list`` read only the stored snapshot, so the two verbs could
+        disagree on the same field name. Collapsing both onto this one seam makes
+        that disagreement structurally impossible rather than patched by adding a
+        refresh call to the divergent path.
+
+        A repo that is not cloned, or whose live git query fails, degrades to
+        ``on_disk=False`` / ``current_branch=None`` rather than raising — every
+        caller here is a best-effort display/export surface.
+        """
+        repo_path = self._repo_path(repo.slug)
+        on_disk = repo_path.exists() and self._git.is_git_root(repo_path)
+        branch: str | None = None
+        if on_disk:
+            with contextlib.suppress(Exception):
+                branch = self._git.current_branch(repo_path) or None
+        return RepoLiveStatus(slug=repo.slug, url=repo.url, on_disk=on_disk, current_branch=branch)
+
+    def repos_live_status(self, ctx: SpecContextProject) -> list[RepoLiveStatus]:
+        """Live status for every repo in ``ctx.all_repos()`` (main first, then every
+        associated repo in registration order) — the ONE set ``show``/``list``/
+        export/panel render for "this context's repos" (FR18)."""
+        return [self.repo_live_status(repo) for repo in ctx.all_repos()]
 
     # ------------------------------------------------------------------ alive (T-10b / T-11)
 

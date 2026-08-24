@@ -119,9 +119,13 @@ def test_context_create_show_list_happy_lifecycle(workspace: Path) -> None:
 
     list_json = _runner.invoke(app, ["context", "list", "--json"])
     assert list_json.exit_code == 0, list_json.output
+    # FR18 (T-044-29): `list --json` also carries `stored_branch` (the stored
+    # snapshot, distinct from the live-resolved `current_branch`, A18.1) and
+    # `associated_repos` (full list, A18.4/A18.5).
     assert json.loads(list_json.stdout) == [
         {
             "alive_since": None,
+            "associated_repos": [],
             "created_at": json.loads(show.stdout)["created_at"],
             "current_branch": None,
             "dead_since": None,
@@ -129,6 +133,7 @@ def test_context_create_show_list_happy_lifecycle(workspace: Path) -> None:
             "repo_slug": "alpha",
             "repo_url": "",
             "state": "dead",
+            "stored_branch": None,
         }
     ]
 

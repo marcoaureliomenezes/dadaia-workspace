@@ -47,3 +47,20 @@ class SpecContextProject:
         for it.
         """
         return (AssociatedRepo(slug=self.repo_slug, url=self.repo_url), *self.associated_repos)
+
+
+@dataclass(frozen=True)
+class RepoLiveStatus:
+    """One repo's on-disk presence and live checked-out branch (FR18/A18.3).
+
+    The ONE result shape every consumer of "is this repo on disk, and what branch
+    is it actually on" reads — ``SpecContextService.repo_live_status``/
+    ``repos_live_status`` is the single implementation that produces it; `context
+    show`, `context list --json`, the export branch refresh and the panel card all
+    render from this shape rather than re-deriving it at a second seam.
+    """
+
+    slug: str
+    url: str
+    on_disk: bool
+    current_branch: str | None

@@ -455,3 +455,25 @@ def test_git_object_read_error_is_importable_from_core_protocols() -> None:
     """Sentinel-level sanity: the typed failure the adapter raises stays importable
     from `core.protocols` without pulling in infrastructure (purity boundary)."""
     assert issubclass(GitObjectReadError, Exception)
+
+
+def test_foreign_slugs_cover_associated_repos_not_just_the_main_slug(
+    tmp_path: Path,
+) -> None:
+    """FR18/T-044-29: the registry-derived foreign-name layer routes through
+    `SpecContextProject.all_repos()` (main + FR15 associated repos), not the main
+    `repo_slug` alone — an associated repo is exactly as private as a main one, and
+    a push must be protected against leaking its name too."""
+    workspace = tmp_path / "workspace"
+    (workspace / "repos" / "pushing-repo").mkdir(parents=True)
+    row = _registry_ctx_row("other-context", repo_slug="other-main-slug", state="alive")
+    row["associated_repos"] = [{"slug": "zz-private-associated-repo", "url": ""}]
+    _write_registry(workspace, [_registry_ctx_row("pushing-repo", state="alive"), row])
+
+    registry_result = container.load_registry_context_identities(workspace)
+    assert registry_result.degraded is False
+    foreign_slugs = ci._foreign_repo_slugs(workspace, "pushing-repo", registry_result.identities)
+
+    assert "zz-private-associated-repo" in foreign_slugs
+    assert "other-main-slug" in foreign_slugs
+    assert "pushing-repo" not in foreign_slugs

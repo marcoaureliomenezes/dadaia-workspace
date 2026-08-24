@@ -6,12 +6,21 @@
 from pathlib import Path
 
 from dadaia_workspace.core.models.export import ExportOptions
-from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
+from dadaia_workspace.core.models.spec_context import (
+    AssociatedRepo,
+    ContextState,
+    SpecContextProject,
+)
 from dadaia_workspace.features.export.service import ExportService
 from tests.fakes import FakeContextStore, FakeGitClient
 
 
-def _ctx(name: str = "demo", *, branch: str | None = None) -> SpecContextProject:
+def _ctx(
+    name: str = "demo",
+    *,
+    branch: str | None = None,
+    associated_repos: tuple[AssociatedRepo, ...] = (),
+) -> SpecContextProject:
     return SpecContextProject(
         name=name,
         state=ContextState.ALIVE,
@@ -21,6 +30,7 @@ def _ctx(name: str = "demo", *, branch: str | None = None) -> SpecContextProject
         alive_since="2026-01-02T00:00:00Z",
         dead_since=None,
         current_branch=branch,
+        associated_repos=associated_repos,
     )
 
 
@@ -64,6 +74,54 @@ def test_build_manifest_records_branch_and_refresh_updates_it(tmp_path: Path) ->
     updated = store.get("alpha")
     assert updated is not None
     assert updated.current_branch == "feature/test"
+
+
+def test_refresh_branches_preserves_associated_repos(tmp_path: Path) -> None:
+    """FR18/A18.4 (T-044-29): `_refresh_branches` must never drop a context's
+    `associated_repos` registry — the root-cause bug this replaces (a hand-copied
+    field-by-field `SpecContextProject` reconstruction that omitted the field, so
+    every `dadaia export` on an ALIVE context silently wiped its associated repos
+    from the LIVE store, not merely the export archive)."""
+    svc, store, git = _service(tmp_path)
+    store.save(
+        _ctx(
+            "alpha",
+            branch="main",
+            associated_repos=(AssociatedRepo(slug="infra", url="https://example.com/infra.git"),),
+        )
+    )
+
+    repo_path = tmp_path / "repos" / "alpha"
+    repo_path.mkdir(parents=True)
+    git.checkout(repo_path, "feature/test")
+
+    svc._refresh_branches()  # noqa: SLF001
+
+    updated = store.get("alpha")
+    assert updated is not None
+    assert updated.current_branch == "feature/test"
+    assert updated.associated_repos == (
+        AssociatedRepo(slug="infra", url="https://example.com/infra.git"),
+    )
+
+
+def test_build_manifest_carries_associated_repos(tmp_path: Path) -> None:
+    """A18.4: the export manifest surfaces each context's associated repos."""
+    svc, store, _ = _service(tmp_path)
+    store.save(
+        _ctx(
+            "alpha",
+            branch="main",
+            associated_repos=(AssociatedRepo(slug="infra", url="https://example.com/infra.git"),),
+        )
+    )
+    store.save(_ctx("beta", branch="dev"))
+
+    manifest = svc.build_manifest([], ExportOptions(exclude_mnt=True))
+    alpha = next(c for c in manifest.contexts if c["name"] == "alpha")
+    beta = next(c for c in manifest.contexts if c["name"] == "beta")
+    assert alpha["associated_repos"] == [{"slug": "infra", "url": "https://example.com/infra.git"}]
+    assert beta["associated_repos"] == []
 
 
 def test_resolve_includes_skips_missing_run_and_archive_include_manifest(

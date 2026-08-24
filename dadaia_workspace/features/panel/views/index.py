@@ -274,12 +274,23 @@ def _render_context_card(ctx: PanelContext) -> str:
     name = html.escape(ctx.name)
     slug = html.escape(ctx.slug)
     zone_c = f'<div class="card-zone-c" data-slug="{slug}" aria-live="polite"></div>'
+    # FR18 (T-044-29): the card lists main + associated repos — the associated row
+    # renders only when the context has at least one (A18.5's "with and without"
+    # pair), so a context with no associated repos keeps the pre-FR18 card shape.
+    associated_row = ""
+    if ctx.associated:
+        associated_slugs = html.escape(", ".join(repo.slug for repo in ctx.associated))
+        associated_row = (
+            f'<span class="card-meta-row">associated: '
+            f'<code class="card-mono">{associated_slugs}</code></span>'
+        )
     return (
         f'<article class="context-card" role="listitem">'
         f'<div class="card-zone-a"><span class="card-name">{name}</span></div>'
         f'<div class="card-zone-b">'
         f'<span class="card-meta-row">repo: <code class="card-mono">{slug}</code></span>'
         f'<span class="card-meta-row">branch: <code class="card-mono">{branch}</code></span>'
+        f"{associated_row}"
         f"</div>"
         f"{zone_c}"
         f'<nav class="card-zone-d card-chips" aria-label="Memory links">'
