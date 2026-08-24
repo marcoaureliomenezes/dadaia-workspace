@@ -91,6 +91,19 @@ run (``functools.lru_cache``).
 
 Both checks fail naming ``file:line`` and the dead path/verb (A27.20). Two mutation
 fixtures (dead path, dead verb) prove each red on a ``tmp_path`` copy — never a repo file.
+
+Bug fix (``citation-enforcer-resolves-projected-instance-paths-against-the-checkout``,
+HIGH): failure mode (a) resolved every ``specs/``-prefixed citation against checkout
+presence, including ``specs/AGENTS.md`` — an INSTANCE reality that
+``dadaia_workspace.features.specs.scaffolder.scaffold`` projects from
+``dadaia_workspace/public/templates/specs-AGENTS.md`` and this repo's own
+``.gitignore``/repo-hygiene job together forbid ever tracking, so the six sites citing
+it were green only via an untracked local lib-projection leftover and red on a bare CI
+clone. The one literal citation of that ONE projected path is now classified by
+**executing** the real installer mapping (``scaffold()``, never a second hand-kept
+allowlist, D4/D10) against a throwaway scratch directory and confirming the produced
+``AGENTS.md`` is byte-identical to its generating public asset — proof by generating
+asset, never by checkout presence. See ``_projected_specs_agents_relpath``.
 """
 
 from __future__ import annotations
@@ -99,6 +112,7 @@ import copy
 import functools
 import json
 import re
+import tempfile
 from itertools import combinations
 from pathlib import Path
 from typing import Any
@@ -684,6 +698,61 @@ def _derive_command_tree() -> frozenset[tuple[str, ...]]:
     return frozenset(paths)
 
 
+# Pinned, derived-with-a-pin (module docstring's fix note): the ONE specs_dir-relative
+# path this corpus cites that is a projected INSTANCE reality, never a checkout reality
+# (bug citation-enforcer-resolves-projected-instance-paths-against-the-checkout). The
+# name is pinned here; the companion assertion inside _projected_specs_agents_relpath —
+# executing the REAL installer mapping and diffing byte-for-byte against its generating
+# public asset — is what keeps this constant honest, never a second hand-kept allowlist.
+_PROJECTED_SPECS_TARGET_RELPATH = "AGENTS.md"
+_SPECS_AGENTS_SOURCE_TEMPLATE = "specs-AGENTS.md"
+
+
+@functools.cache
+def _projected_specs_agents_relpath(repo_root: Path) -> str | None:
+    """Prove — by actually EXECUTING the real installer mapping, never a second
+    hand-kept allowlist (D4/D10) — that ``specs/AGENTS.md`` is a projected INSTANCE
+    path: ``dadaia_workspace.features.specs.scaffolder.scaffold`` writes it from
+    ``dadaia_workspace/public/templates/specs-AGENTS.md`` (the generating public asset)
+    into any ``<specs_dir>/AGENTS.md`` — at the workspace root and inside every
+    ``repos/<slug>/`` alike. It is deliberately never tracked in ANY checkout of this
+    library repo (``.gitignore``'s ``/specs/*`` carve-out has no opt-in for it; the "repo
+    hygiene" CI job forbids tracking it), so a bare clone never has it on disk even
+    though a locally-instantiated workspace carries it as an untracked lib-projection
+    leftover.
+
+    Runs ``scaffold()`` against a throwaway scratch directory and confirms the produced
+    ``AGENTS.md`` is byte-identical to the real source template — proof by generating
+    asset, never by checkout presence. Returns ``None`` (never special-cased) when the
+    source template itself is absent under *repo_root*, so a fixture ``repo_root`` under
+    ``tmp_path`` — which never carries
+    ``dadaia_workspace/public/templates/specs-AGENTS.md`` — is untouched by this
+    classification and keeps resolving every ``specs/``-prefixed citation against
+    checkout presence exactly as before (mutation fixture 9 and its lookalike follow-up
+    depend on this)."""
+    templates_dir = repo_root / "dadaia_workspace" / "public" / "templates"
+    source = templates_dir / _SPECS_AGENTS_SOURCE_TEMPLATE
+    if not source.exists():
+        return None
+
+    from dadaia_workspace.features.specs.scaffolder import scaffold
+
+    with tempfile.TemporaryDirectory() as scratch:
+        scratch_specs_dir = Path(scratch) / "specs"
+        result = scaffold(
+            specs_dir=scratch_specs_dir,
+            project_name="citation-enforcer-projection-probe",
+            force=True,
+            templates_dir=templates_dir,
+        )
+        target = scratch_specs_dir / _PROJECTED_SPECS_TARGET_RELPATH
+        if result.errors or target not in result.created:
+            return None
+        if target.read_text(encoding="utf-8") != source.read_text(encoding="utf-8"):
+            return None
+    return _PROJECTED_SPECS_TARGET_RELPATH
+
+
 def _is_placeholder_or_ellipsis(token: str) -> bool:
     if any(ch in _PLACEHOLDER_CHARS for ch in token):
         return True
@@ -717,6 +786,13 @@ def _find_dead_path_citations(public_dir: Path, repo_root: Path) -> list[str]:
                 if token.startswith(_WORKSPACE_RUNTIME_PREFIX):
                     continue
                 if token.startswith(_CITABLE_PATH_PREFIXES):
+                    projected_relpath = _projected_specs_agents_relpath(repo_root)
+                    if projected_relpath is not None and token == f"specs/{projected_relpath}":
+                        # Projected INSTANCE path — already proven above by its
+                        # generating public asset, never by checkout presence (bug
+                        # citation-enforcer-resolves-projected-instance-paths-
+                        # against-the-checkout).
+                        continue
                     if not (repo_root / token).exists():
                         violations.append(f"{rel}:{idx + 1}: dead path `{token}`")
                     continue
@@ -769,6 +845,39 @@ def test_every_cited_path_exists() -> None:
     assert violations == [], "dead path citation(s):\n" + "\n".join(violations)
 
 
+def test_projected_specs_agents_md_citation_survives_bare_checkout() -> None:
+    """Regression — bug ``citation-enforcer-resolves-projected-instance-paths-
+    against-the-checkout`` (HIGH). ``specs/AGENTS.md`` is cited by six public docs; it
+    is an INSTANCE reality (``dadaia_workspace.features.specs.scaffolder.scaffold``
+    projects it from ``dadaia_workspace/public/templates/specs-AGENTS.md``) that this
+    repo's own ``.gitignore`` (``/specs/*`` with no opt-in for ``AGENTS.md``) and the
+    "repo hygiene" CI job both forbid ever tracking — so a bare CI clone never has it
+    on disk even though a locally-instantiated workspace does (it exists here only as
+    an untracked lib-projection leftover). This test proves the check no longer
+    depends on that presence difference: it hides the real local leftover (if any) —
+    never deletes it — before scanning, and restores it unconditionally, so the
+    exact bare-checkout condition CI hits is exercised locally too."""
+    real_path = _REPO_ROOT / "specs" / "AGENTS.md"
+    hidden_path = real_path.with_name("AGENTS.md.hidden-for-bare-checkout-test")
+    moved = False
+    if real_path.exists():
+        real_path.rename(hidden_path)
+        moved = True
+    try:
+        assert not (_REPO_ROOT / "specs" / "AGENTS.md").exists(), (
+            "fixture precondition: specs/AGENTS.md must be absent to simulate a bare checkout"
+        )
+        violations = _find_dead_path_citations(_PUBLIC, _REPO_ROOT)
+    finally:
+        if moved:
+            hidden_path.rename(real_path)
+    dead_specs_agents = [v for v in violations if "specs/AGENTS.md" in v]
+    assert dead_specs_agents == [], (
+        "citation(s) of the projected instance path `specs/AGENTS.md` resolved against "
+        "checkout presence instead of its generating public asset:\n" + "\n".join(dead_specs_agents)
+    )
+
+
 def test_every_cited_dadaia_verb_exists() -> None:
     tree = _derive_command_tree()
     violations = _find_dead_verb_citations(_PUBLIC, _REPO_ROOT, tree)
@@ -791,6 +900,32 @@ def test_mutation_fixture_9_dead_path_citation_turns_red(tmp_path: Path) -> None
     )
     assert len(violations) == 1
     assert "specs/this-path-does-not-exist-fixture.md" in violations[0]
+    assert violations[0].startswith("dadaia_workspace/public/skills/fixture-skill/SKILL.md:1:")
+
+
+def test_mutation_fixture_11_lookalike_projected_path_still_turns_red(tmp_path: Path) -> None:
+    """Bug ``citation-enforcer-resolves-projected-instance-paths-against-the-checkout``
+    follow-up mutation fixture — both directions (a cited path absent from the checkout
+    AND absent from the known projection target still fails). A `specs/`-prefixed
+    citation that merely resembles the ONE projected target this fix special-cases
+    (``specs/AGENTS.md`` — wrong nesting here) must still be flagged: the projection
+    classification matches the EXACT token, never a basename/suffix match, and never
+    activates at all when the fixture carries no
+    ``dadaia_workspace/public/templates/specs-AGENTS.md`` source to prove it against.
+    Never touches a real repo file: `repo_root` and `public_dir` are both under
+    `tmp_path`."""
+    fixture_repo_root = tmp_path / "fixture-repo"
+    fixture_public = fixture_repo_root / "dadaia_workspace" / "public" / "skills" / "fixture-skill"
+    fixture_public.mkdir(parents=True)
+    (fixture_public / "SKILL.md").write_text(
+        "See `specs/nested/AGENTS.md` for detail.\n", encoding="utf-8"
+    )
+
+    violations = _find_dead_path_citations(
+        fixture_repo_root / "dadaia_workspace" / "public", fixture_repo_root
+    )
+    assert len(violations) == 1
+    assert "specs/nested/AGENTS.md" in violations[0]
     assert violations[0].startswith("dadaia_workspace/public/skills/fixture-skill/SKILL.md:1:")
 
 
