@@ -82,7 +82,7 @@ def test_stage_manifest_codex_adapters_and_install_all(
     assert (workspace / ".dadaia" / "AGENTS.md").exists()
     assert (workspace / ".dadaia" / "tmp" / "AGENTS.md").exists()
     assert (workspace / ".dadaia" / "states" / "AGENTS.md").exists()
-    assert (workspace / ".agents" / "skills" / "dadaia-grill-me" / "SKILL.md").exists()
+    assert (workspace / ".agents" / "skills" / "dd-grill-me" / "SKILL.md").exists()
     assert (workspace / ".claude" / "agents" / "software-architect.md").exists()
     assert (workspace / ".codex" / "hooks.json").exists()
     assert (workspace / ".codex" / "config.toml").exists()
