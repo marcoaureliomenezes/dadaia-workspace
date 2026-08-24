@@ -206,7 +206,7 @@ def test_repair_preserves_file_mode_and_newlines(tmp_path: Path) -> None:
 
     specs = _specs_with_memory(tmp_path / "mode")
     atom = specs / "memory" / "a.md"
-    atom.write_text(_ATOM_WITH_RETIRED_KEYS, encoding="utf-8")
+    atom.write_text(_ATOM_WITH_RETIRED_KEYS, encoding="utf-8", newline="")  # T-044-36
     os.chmod(atom, 0o644)
     # Assert PRESERVATION against the mode actually on disk, never a hard-coded 0o644:
     # Windows has no POSIX mode bits (chmod only toggles the read-only attribute, so every

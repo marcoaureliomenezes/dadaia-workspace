@@ -994,12 +994,27 @@ Done criterion — no production code touched); `bugs.jsonl` carries the evidenc
 
 ---
 
-- [-] **T-044-36 — bug `crlf-fixture-makes-a-windows-assertion-pass-for-the-wrong-reason` (LOW)**
+- [x] **T-044-36 — bug `crlf-fixture-makes-a-windows-assertion-pass-for-the-wrong-reason` (LOW)**
 
 **Write set:** the same test module.
 **Description:** Write the fixture with an explicit `newline=` so its bytes are known on
 every platform and the assertion can only fail for the reason it names.
 **Done criterion:** the assertion is platform-independent; `Closed`.
+
+**Resolution:** Swept all 16 `write_text()` call sites in
+`test_migration_symlink_hardening.py` for the class (fixture write with no `newline=`
+feeding a byte-sensitive downstream assertion) — found exactly one instance, unchanged
+by T-044-35: `test_repair_preserves_file_mode_and_newlines`'s fixture write at the line
+feeding `assert b"\r\n" not in atom.read_bytes()`. Fixed by adding explicit `newline=""`
+(1 line modified, net-neutral), matching the same idiom this module's own
+`AtomicWriterCase` registry already uses for its `lf_bytes_guaranteed=True` writers. The
+other byte-sensitive assertion in the module
+(`test_atomic_writer_never_leaves_crlf_bytes`) writes to a fresh un-fixtured path and is
+already platform-guarded — not in class. A literal Windows red repro is unreproducible on
+this Linux runner (confirmed empirically: monkeypatching `os.linesep` has no effect on
+CPython's `Path.write_text` newline translation); root cause instead fully specified by
+the documented `newline=None` contract. Full suite: 2792 passed, 4 pre-existing
+environment skips, 0 failures. `bugs.jsonl` carries the FR23 evidence.
 
 ---
 
