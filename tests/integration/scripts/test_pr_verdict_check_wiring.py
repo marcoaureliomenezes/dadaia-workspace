@@ -270,6 +270,59 @@ def test_malicious_release_id_is_rejected_before_path_interpolation(tmp_path: Pa
     assert "RELEASE_ID" in result.stdout + result.stderr
 
 
+def test_commit_sha_head_literal_does_not_qualify_the_gate(tmp_path: Path) -> None:
+    """T-044-46 S-1 — RED against the pre-fix script, GREEN after the shape check.
+
+    Reviewer's exact repro: the only handoff on the branch "reviews" via the literal
+    ref name ``HEAD`` rather than a real 40-hex sha, and an unreviewed production
+    change lands on the same branch. A GitHub Actions checkout puts the job's
+    ``HEAD`` at the PR head sha, so this test commits the verdict handoff (naming
+    ``HEAD``) as the PR head itself — the same state the CI job would see: the
+    repo's actual ``HEAD`` ref and ``PR_HEAD_SHA`` name the identical commit.
+
+    Unfixed, the script accepts ``sha="HEAD"``: ``git cat-file -e HEAD^{commit}``
+    resolves against the checkout's real HEAD, ``git merge-base --is-ancestor HEAD
+    "$PR_HEAD_SHA"`` is trivially true (a commit is its own ancestor), and
+    ``git diff --name-only HEAD "$PR_HEAD_SHA"`` is empty (same commit) — both halves
+    of the coverage proof collapse into tautologies and the gate PASSes on a commit
+    that was never reviewed by any real sha. Fixed, the 40-hex shape check SKIPs the
+    handoff before it ever reaches a git argv, no qualifying handoff remains, and the
+    gate FAILs.
+    """
+    repo = _init_repo(tmp_path)
+    # Unreviewed production change landing on the PR branch — no verdict ever names
+    # this commit's own sha.
+    _commit_code_change(repo, "print('v2 - never actually reviewed by a real sha')\n")
+    # The only handoff on the branch claims coverage via the literal ref "HEAD".
+    pr_head = _commit_verdict(repo, covers_sha="HEAD")
+
+    result = _run_script(repo, pr_head)
+    assert result.returncode != 0, result.stdout + result.stderr
+    assert "PASS" not in result.stdout
+
+
+def test_well_formed_ancestor_sha_with_only_verdict_drift_still_passes(tmp_path: Path) -> None:
+    """No regression: the T-044-46 S-1 shape check must not reject a real, well-formed
+    40-hex ancestor sha whose only trailing drift is more verdict evidence.
+
+    Distinct from ``test_ancestor_with_pure_evidence_trailing_commit_passes`` in what
+    it pins: that a genuine git-object-id sha (40 lowercase hex chars, sanity-checked
+    below) survives the new ``^[0-9a-fA-F]{40}$`` predicate and still reaches PASS —
+    the boundary condition the S-1 fix must not break.
+    """
+    repo = _init_repo(tmp_path)
+    reviewed = _commit_code_change(repo, "print('v2')\n")
+    assert len(reviewed) == 40 and all(c in "0123456789abcdef" for c in reviewed), (
+        "sanity: the reviewed sha must be a real 40-hex git object id, not a symbolic ref"
+    )
+    evidence_head = _commit_verdict(repo, covers_sha=reviewed)
+    assert evidence_head != reviewed
+
+    result = _run_script(repo, evidence_head)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "PASS" in result.stdout
+
+
 def test_release_id_with_traversal_from_active_md_is_rejected(tmp_path: Path) -> None:
     """Same as above, but the malicious value arrives via ACTIVE.md itself — the
     PR-controlled path F-2 names explicitly, not just the env-override channel.

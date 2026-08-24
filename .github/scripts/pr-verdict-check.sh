@@ -92,12 +92,28 @@ for handoff in "$VERDICTS_DIR"/*.handoff.json; do
     continue
   fi
 
-  if ! git cat-file -e "${sha}^{commit}" 2>/dev/null; then
+  # T-044-46 S-1: metrics.commit_sha must be a 40-hex SHA-1 object id before it
+  # reaches any git argv. Without this, a symbolic or option-shaped value —
+  # "HEAD", "@", "--glob=..." — resolves dynamically against whatever the CI job's
+  # checkout happens to have at HEAD. Inside the job the checkout puts HEAD at the
+  # PR head sha, so an unvalidated "HEAD" IS the PR head: both the ancestor check
+  # and the diff-emptiness check below collapse into tautologies (a commit is
+  # trivially its own ancestor, and the diff against itself is empty), letting an
+  # unreviewed PR head PASS. Mirrors features/chokepoints/service.py's
+  # _SHA_SHAPE_RE — the 40-hex arm only: `git rev-parse --show-object-format`
+  # confirms this repository is sha1, so the chokepoint's 64-hex/SHA-256 arm could
+  # never resolve a real commit here and is deliberately not mirrored.
+  if ! [[ "$sha" =~ ^[0-9a-fA-F]{40}$ ]]; then
+    echo "[pr-verdict-check] SKIP: ${handoff} names commit_sha '${sha}', which is not a 40-hex sha — refusing to pass it to git."
+    continue
+  fi
+
+  if ! git cat-file -e -- "${sha}^{commit}" 2>/dev/null; then
     echo "[pr-verdict-check] SKIP: ${handoff} names sha ${sha}, which is not a known commit in this checkout."
     continue
   fi
 
-  if [ "$sha" != "$PR_HEAD_SHA" ] && ! git merge-base --is-ancestor "$sha" "$PR_HEAD_SHA" 2>/dev/null; then
+  if [ "$sha" != "$PR_HEAD_SHA" ] && ! git merge-base --is-ancestor -- "$sha" "$PR_HEAD_SHA" 2>/dev/null; then
     echo "[pr-verdict-check] SKIP: ${handoff}'s reviewed sha ${sha} is not an ancestor of PR head ${PR_HEAD_SHA}."
     continue
   fi
@@ -111,7 +127,7 @@ for handoff in "$VERDICTS_DIR"/*.handoff.json; do
     # the output into a variable first and check its exit status explicitly, BEFORE
     # any of it is interpreted, so a git failure fails closed (SKIP this handoff)
     # instead of passing.
-    if ! diff_output="$(git diff --name-only "$sha" "$PR_HEAD_SHA")"; then
+    if ! diff_output="$(git diff --name-only "$sha" "$PR_HEAD_SHA" --)"; then
       echo "[pr-verdict-check] SKIP: ${handoff} — 'git diff --name-only ${sha} ${PR_HEAD_SHA}' failed; cannot prove nothing unreviewed landed since the review, treating as non-qualifying."
       continue
     fi
