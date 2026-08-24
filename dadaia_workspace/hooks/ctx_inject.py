@@ -1,7 +1,9 @@
 """Context-injection hook (the canonical, cross-platform gate surface).
 
 Invoked on SessionStart and UserPromptSubmit. It injects the lean workspace bootstrap
-(context line + dispatcher preflight + tech-stack.md + catalog). A session-keyed sentinel
+(context line + tech-stack.md + catalog — FR30, T-044-60: the four-point dispatcher
+preflight restatement of ``DADAIA.md`` §1/§2 is deleted; it is law, not state). A
+session-keyed sentinel
 guards re-injection: subsequent prompts emit nothing UNLESS this session's own bind is
 newer than the sentinel (T-50-03, SPEC v0.5.0 FR1 coupling 1) — bind is the SOLE trigger
 for context-memory injection.
@@ -98,27 +100,6 @@ _COMPACT_PREFIX = "ctx-compact-"
 #: write-set overlap (T-011-14 write set: the doctor leg is conditional and unused).
 #: DP-1 (v0.1.14): the value is sourced from ``core.kernel_tunables`` (single tunables home).
 _SENTINEL_GC_TTL_SECONDS = kernel_tunables.SENTINEL_GC_TTL_SECONDS
-
-_DISPATCHER_PREFLIGHT = """=== dispatcher preflight (SDD routing) ===
-Before acting on a request in this workspace:
-1. Resolve the active context (above) and the OWNING role for the
-   artifact class you are about to touch: backlog -> project-manager;
-   SPEC/PLAN/TASKS -> product-engineer; hooks/agents/skills/rules/
-   workflows (the AI surface) -> ai-engineer audit; production code ->
-   software-engineer; reviews -> code/security/qa reviewers.
-2. The ordered SDD flow has exactly four stages -- backlog-definition,
-   release-definition, implementation-reviews, and audit -- each carried
-   out by dispatching the owning agent against the SDD documents; there
-   is no workflow engine. Ownership is a coordination convention;
-   concurrent sessions are surfaced through advisory presence and never
-   blocked.
-3. If the operator asks for multi-agent / deep / AI-surface work and a
-   subagent or dispatch tool is not in your active tool set, DISCOVER it
-   first (e.g. tool_search for the agent/dispatch tool) BEFORE starting
-   the main task -- do not silently proceed as a generic single agent.
-4. Limitation (truthful): this harness does NOT auto-spawn subagents on
-   its own. Explicit dispatcher/operator fan-out is always required.
-=== end dispatcher preflight ==="""
 
 
 def _resolve_workspace() -> Path:
@@ -382,12 +363,14 @@ def _stamp_sentinel(tmp_dir: Path, sentinel: Path, slug: str) -> None:
 
 
 def _generic_preflight(workspace: Path) -> str:
-    """Generic preflight payload: ``[no bound context]`` + dispatcher preflight + ALIVE list.
+    """Generic preflight payload: ``[no bound context]`` + the ALIVE-context list.
 
     Emitted for an unbound session — NEVER any context memory (FR-W2-01). The ALIVE list is
-    advisory (names from the registry) so the operator can bind one.
+    advisory (names from the registry) so the operator can bind one — it stays because it is
+    useful only in this unbound case (FR30, T-044-60: the dispatcher preflight restatement of
+    ``DADAIA.md`` §1/§2 is deleted from every emission path, bound or not).
     """
-    sections = ["[no bound context]", "", _DISPATCHER_PREFLIGHT]
+    sections = ["[no bound context]"]
     alive = _alive_context_names(workspace)
     if alive:
         sections.append("")
@@ -398,8 +381,12 @@ def _generic_preflight(workspace: Path) -> str:
 
 
 def _emit_bootstrap(workspace: Path, context: str) -> None:
-    """Emit the bound context's bootstrap (dispatcher preflight + memory bootstrap)."""
-    sections = [f"[{context}]", "", _DISPATCHER_PREFLIGHT]
+    """Emit the bound context's bootstrap: the context header + the lean memory prefix.
+
+    FR30 (T-044-60): no dispatcher preflight — it restates ``DADAIA.md`` §1/§2, which the
+    agent already carries as law, not per-prompt state.
+    """
+    sections = [f"[{context}]"]
     memory = _build_memory(workspace / "repos" / context / "specs")
     if memory:
         sections.append(memory)
@@ -536,7 +523,7 @@ def main() -> int:
     if sentinel_exists and recorded_slug == context and not compacted and not rebound:
         return 0
 
-    sections = [f"[{context}]", "", _DISPATCHER_PREFLIGHT]
+    sections = [f"[{context}]"]
     memory = _build_memory(specs_dir)
     if memory:
         sections.append(memory)
