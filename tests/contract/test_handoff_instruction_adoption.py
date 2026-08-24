@@ -1,26 +1,37 @@
-"""AC-6 positive handoff-v1.2 + self_pull instruction adoption (v0.1.62 FR4 / QA62-3).
+"""AC-6 handoff-v1.2 + self_pull instruction adoption — repinned to the FR26 pointer
+contract (v0.4.4 SPEC Amendment 1, T-044-55, commit f4ab1779).
 
-Enumerates the **12 emission-instruction surfaces** and asserts each carries BOTH the
-``handoff-v1.2`` and the ``self_pull`` instruction tokens — a surface missing either
-token FAILS, naming the surface. The 12 surfaces (file-enumerated, never glob-only):
+FR26 moved ``dadaia-handoff-emitter``'s field tables and its TWO full JSON examples out
+of ``SKILL.md``: the skill now POINTS at
+``.dadaia/agentic/schemas/handoff-v1.schema.json`` as the single source of field
+semantics and never restates it (A26.1/A26.5). The v0.1.62 contract this file used to
+pin — "the emitter skill carries exactly two fenced ```json examples, each schema-valid,
+each carrying the handoff-v1.2/self_pull tokens" — is RETIRED by that Amendment and went
+RED as fallout (flagged by T-044-55, T-044-56 dispatch note): ``_skill_json_examples()``
+now finds zero blocks where it used to require two.
 
-* the 9 core agent bodies (``public/agents/*.md``);
-* the ``dadaia-handoff-emitter`` skill's TWO JSON examples (each counted as its own
-  surface — both must model the v1.2 + ``self_pull`` shape);
-* ``public/data/handoff-AGENTS.md``;
+This file is repinned here, in place, to the surviving contract. Coverage is never
+dropped, only re-aimed at what's true post-FR26:
 
-A roster-completeness assert backs the enumeration: a renamed/removed agent body or a
-new agent body not added here fails loudly instead of silently shrinking the
-contract. Sequencing per Ruling 62-A: these body-prose edits land BEFORE v0.1.63's
-agent frontmatter and v0.1.64's ``tier:`` rename on the same files; v0.1.64
-re-verifies this contract post-rename.
+* the 9 core agent bodies + ``handoff-AGENTS.md`` are UNCHANGED by FR26 and still
+  instruct ``handoff-v1.2`` emission with ``self_pull.refs`` — roster completeness and
+  the whole-file token check both survive verbatim (``test_roster_completeness_and_...``);
+* the emitter skill NAMES the schema path instead of duplicating its content, and
+  carries ZERO fenced ```json handoff examples — the two examples are GONE, not merely
+  rewritten (A26.2's >=40% per-invocation body drop across the five disclosed skills
+  depends on this being a hard zero);
+* the schema file the skill points at actually EXISTS on disk and is load-bearing: the
+  REAL ``StdlibHandoffValidator`` (the same validator ``dadaia reports validate`` runs in
+  production) loads it without hitting an unsupported keyword, accepts a minimal
+  conformant handoff-v1.2 instance, and rejects one missing a required field, naming it
+  — proving the pointer target is a working contract, not a broken link.
 """
 
 from __future__ import annotations
 
-import json
 import re
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -51,11 +62,16 @@ _DOC_SURFACES: tuple[str, ...] = ("data/handoff-AGENTS.md",)
 
 _EMITTER_SKILL = "skills/dadaia-handoff-emitter/SKILL.md"
 
-#: The 10 whole-file surfaces (the emitter skill's two examples add the other 2 = 12).
+#: The 10 whole-file surfaces FR26 left untouched.
 _FILE_SURFACES: tuple[str, ...] = (
     *_CORE_AGENT_BODIES,
     *_DOC_SURFACES,
 )
+
+#: FR26's pointer text — the schema is named, never re-transcribed (A26.1/A26.5).
+_SCHEMA_POINTER_TEXT = ".dadaia/agentic/schemas/handoff-v1.schema.json"
+
+_SCHEMA_PATH = _PUBLIC / "schemas" / "handoff-v1.schema.json"
 
 
 def _read(rel: str) -> str:
@@ -64,31 +80,26 @@ def _read(rel: str) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def _skill_json_examples() -> list[str]:
-    text = _read(_EMITTER_SKILL)
+def _skill_json_examples(text: str) -> list[str]:
     return re.findall(r"```json\n(.*?)```", text, flags=re.DOTALL)
 
 
 # ---------------------------------------------------------------------------
-# Roster completeness — a missing/renamed/unenumerated file fails loudly.
+# Roster completeness — unchanged by FR26; the whole-file surfaces still instruct
+# handoff-v1.2 + self_pull emission verbatim.
 # ---------------------------------------------------------------------------
 
 
 def test_roster_completeness_and_surface_v12_self_pull_adoption() -> None:
-    """Roster completeness (the 9 core agent bodies) backs the surface enumeration,
-    and every surface — the whole files + the emitter skill's 2 JSON examples —
-    carries both the handoff-v1.2 and self_pull tokens."""
+    """Roster completeness (the 9 core agent bodies) backs the surface enumeration, and
+    every whole-file surface — the 9 agent bodies + handoff-AGENTS.md — still carries
+    both the handoff-v1.2 and self_pull tokens. FR26 touched only the emitter skill's
+    JSON examples (see the second test below), never this surface."""
     on_disk_core = {f"agents/{p.name}" for p in (_PUBLIC / "agents").glob("*.md")}
     assert on_disk_core == set(_CORE_AGENT_BODIES), (
         "public/agents/*.md roster drifted — update the surface enumeration: "
         f"{sorted(on_disk_core.symmetric_difference(set(_CORE_AGENT_BODIES)))}"
     )
-
-    examples = _skill_json_examples()
-    assert len(examples) == 2, (
-        f"the emitter skill must carry exactly TWO JSON examples, found {len(examples)}"
-    )
-    assert len(_FILE_SURFACES) + len(examples) == 12
 
     for surface in _FILE_SURFACES:
         text = _read(surface)
@@ -99,59 +110,73 @@ def test_roster_completeness_and_surface_v12_self_pull_adoption() -> None:
             "(the atoms actually self-pulled/read; never an unread atom)"
         )
 
-    for index, example in enumerate(examples):
-        missing = [t for t in (_TOKEN_V12, _TOKEN_SELF_PULL) if t not in example]
-        assert not missing, (
-            f"dadaia-handoff-emitter SKILL.md example #{index + 1} lacks token(s) "
-            f"{missing} — both examples must model schema_version handoff-v1.2 with a "
-            "self_pull.refs block"
-        )
-
 
 # ---------------------------------------------------------------------------
-# Schema-validity guard (bug: handoff-emitter-example-omits-required-artifact).
+# FR26 repin — the emitter skill points at the schema instead of duplicating it, and
+# the schema it points at is a real, working contract.
 #
-# Token presence (above) does not prove the example is schema-valid — a doc
-# regressing to omit the required `artifact` object still carries both tokens
-# and would pass the roster test above silently. Regex-extract the SAME two
-# JSON blocks straight from SKILL.md (no hand-transcription) and run them
-# through the REAL StdlibHandoffValidator + the REAL public schema.
-#
-# The default "handoff-only" example (#1) MUST be fully schema-valid as
-# written — that is the exact shape an agent copies verbatim. The "with HTML
-# report" example (#2) documents illustrative `artifact.path`/`content_hash`
-# placeholders that point at no real file (see the skill's warning directly
-# above that example) — schema shape validation still holds (only the
-# artifact-hash filesystem check, which the schema-only validator below does
-# not perform, would reject it).
+# Regression guard, unchanged in purpose from the retired
+# handoff-emitter-example-omits-required-artifact bug this file used to guard: a doc
+# edit that quietly re-adds a stale/broken inline JSON example, or a pointer to a
+# schema path that does not exist, must fail here.
 # ---------------------------------------------------------------------------
 
-_SCHEMA_PATH = _PUBLIC / "schemas" / "handoff-v1.schema.json"
 
+def test_emitter_skill_points_at_schema_with_no_inline_json_example() -> None:
+    """FR26/A26.1/A26.5: the emitter skill NAMES the schema path as the single source
+    of field semantics instead of duplicating it, and carries ZERO fenced ```json
+    handoff examples — the two v0.1.62 examples are gone, not merely rewritten."""
+    text = _read(_EMITTER_SKILL)
 
-def test_skill_examples_are_schema_valid_as_written() -> None:
-    """Both SKILL.md JSON examples parse and pass the real handoff-v1.2 schema.
-
-    Regression guard for handoff-emitter-example-omits-required-artifact: a
-    doc edit that drops the required top-level `artifact` object (or any
-    other required field) fails here even though it would still carry the
-    handoff-v1.2 / self_pull tokens checked above.
-    """
-    examples = _skill_json_examples()
-    assert len(examples) == 2
-
-    validator = StdlibHandoffValidator(_SCHEMA_PATH)
-
-    handoff_only = json.loads(examples[0])
-    errors = list(validator.validate(handoff_only))
-    assert not errors, (
-        "SKILL.md 'Example — handoff-only (the default)' must validate as written "
-        f"against the real handoff-v1.2 schema — errors: {errors}"
+    assert _SCHEMA_POINTER_TEXT in text, (
+        f"{_EMITTER_SKILL} must name the schema path {_SCHEMA_POINTER_TEXT!r} as the "
+        "single source of field semantics (FR26/A26.1) — pointer text not found"
     )
 
-    with_report = json.loads(examples[1])
-    errors = list(validator.validate(with_report))
+    json_examples = _skill_json_examples(text)
+    assert json_examples == [], (
+        f"{_EMITTER_SKILL} must carry ZERO fenced ```json handoff examples post-FR26 "
+        f"(A26.2's per-invocation body-size drop depends on this); found "
+        f"{len(json_examples)} — field tables and both examples belong only in "
+        f"{_SCHEMA_POINTER_TEXT}"
+    )
+
+
+def test_schema_the_skill_points_at_exists_and_validates() -> None:
+    """The schema FR26's pointer names is not a broken link: it exists on disk, the
+    REAL StdlibHandoffValidator (the one `dadaia reports validate` runs in production)
+    loads it cleanly, accepts a minimal conformant handoff-v1.2 instance, and rejects
+    one missing a required field, naming it."""
+    assert _SCHEMA_PATH.is_file(), (
+        f"the schema the emitter skill points at does not exist on disk: {_SCHEMA_PATH}"
+    )
+
+    # Construction alone proves the schema is valid JSON using only supported
+    # keywords (StdlibHandoffValidator.__init__ raises HandoffSchemaError otherwise).
+    validator = StdlibHandoffValidator(_SCHEMA_PATH)
+
+    conformant: dict[str, Any] = {
+        "schema_version": "handoff-v1.2",
+        "agent": "software-engineer",
+        "context": "dadaia-workspace",
+        "produced_at": "2026-08-23T00:00:00Z",
+        "scope": "tests/contract/test_handoff_instruction_adoption.py",
+        "metrics": {},
+        "artifact": {"type": "other"},
+        "self_pull": {"refs": ["specs/memory/architecture.md"]},
+    }
+    errors = list(validator.validate(conformant))
     assert not errors, (
-        "SKILL.md 'Example — with HTML report' must satisfy the schema SHAPE as "
-        f"written (artifact object present with a valid type) — errors: {errors}"
+        f"a minimal conformant handoff-v1.2 instance must validate cleanly against the "
+        f"schema the emitter skill points at — errors: {errors}"
+    )
+
+    missing_artifact = {k: v for k, v in conformant.items() if k != "artifact"}
+    errors = list(validator.validate(missing_artifact))
+    assert errors, (
+        "an instance missing the required 'artifact' object must fail validation — the "
+        "schema is not vacuously permissive"
+    )
+    assert any("artifact" in str(err) for err in errors), (
+        f"the validation error(s) must name the missing 'artifact' field: {errors}"
     )

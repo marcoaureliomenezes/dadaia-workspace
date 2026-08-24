@@ -26,6 +26,20 @@ skill inventory data — never a repo file.
 4. Two skills share a topic without a non-empty justification.
 5. A ``SKILL.md`` exceeds the declared line ceiling (``skill_md_line_ceiling``, G12).
 6. Two non-universal skills have an undeclared ``applyTo`` activation-glob overlap.
+
+FR28 (T-044-56, A28.1) adds a seventh, two-directional check to this SAME enforcer — "no
+second enforcer" (D4/D10) applies here too. A skill's model-invocation grant is derived,
+never hand-kept: the union of every persona frontmatter's ``skills:`` allowlist
+(``dadaia_workspace/public/agents/*.md``), plus the universal-grant mechanism failure
+mode 6 already treats specially (``_UNIVERSAL_NAMES`` / an ``applyTo`` in
+``_UNIVERSAL_GLOBS``) — a universal skill is implicitly granted to every model and must
+never be forced into an explicit per-persona allowlist. Against that derived grant set,
+the equivalence holds in BOTH directions with the set of skills whose frontmatter
+carries ``disable-model-invocation: true``:
+
+7a. A skill in NO allowlist (and not universally granted) must carry
+    ``disable-model-invocation: true``.
+7b. A skill carrying ``disable-model-invocation: true`` must be in NO allowlist.
 """
 
 from __future__ import annotations
@@ -408,3 +422,149 @@ def test_ported_self_test_b_undeclared_duplicate_glob_fires() -> None:
     ]
     violations = _find_overlap_pairs(duplicate_case, [])
     assert violations == [("fixture-skill-one", "fixture-skill-two")]
+
+
+# --------------------------------------------------------------------------- #
+# FR28 (T-044-56, A28.1) — the invocation model, checked in BOTH directions,
+# no hand-kept list. The grant set is DERIVED: the union of every persona
+# frontmatter's `skills:` allowlist, plus the same universal-grant mechanism
+# failure mode 6 already special-cases (`_UNIVERSAL_NAMES` / an `applyTo` in
+# `_UNIVERSAL_GLOBS`) — a universal skill is implicitly granted to every model
+# and must never be forced into an explicit per-persona allowlist to avoid a
+# false "no allowlist" finding.
+# --------------------------------------------------------------------------- #
+
+_AGENTS_DIR = _PUBLIC / "agents"
+
+_SKILLS_LIST_RE = re.compile(r"^skills:\s*\n((?:  - .+\n)+)", re.MULTILINE)
+_DISABLE_MODEL_INVOCATION_RE = re.compile(
+    r"^disable-model-invocation:\s*true\s*$", re.MULTILINE | re.IGNORECASE
+)
+
+
+def _agent_skill_allowlist(agent_md: Path) -> set[str]:
+    """Parse one persona frontmatter's `skills:` allowlist — empty set if absent."""
+    text = agent_md.read_text(encoding="utf-8")
+    fm = _FRONTMATTER_RE.match(text)
+    raw = fm.group(1) if fm else ""
+    m = _SKILLS_LIST_RE.search(raw)
+    if not m:
+        return set()
+    return {line.strip()[2:].strip() for line in m.group(1).splitlines() if line.strip()}
+
+
+def _persona_skill_grants(agents_dir: Path) -> set[str]:
+    """Union of every persona's `skills:` allowlist — derived, never hand-kept."""
+    granted: set[str] = set()
+    for agent_md in sorted(agents_dir.glob("*.md")):
+        granted |= _agent_skill_allowlist(agent_md)
+    return granted
+
+
+def _universal_grant_skills(skills_dir: Path) -> set[str]:
+    """Skills failure-mode-6's own filter already treats as universally available —
+    `_UNIVERSAL_NAMES`, or any skill whose `applyTo` is a universal glob
+    (`_UNIVERSAL_GLOBS`, ported verbatim from the retired lint script). These are
+    implicitly granted to every model without appearing in any explicit allowlist."""
+    universal: set[str] = set()
+    for skill_md in sorted(skills_dir.glob("*/SKILL.md")):
+        parsed = _parse_skill_frontmatter(skill_md)
+        if parsed is None:
+            continue
+        name, apply_to = parsed
+        if name in _UNIVERSAL_NAMES or apply_to in _UNIVERSAL_GLOBS:
+            universal.add(name)
+    return universal
+
+
+def _granted_to_any_model(agents_dir: Path, skills_dir: Path) -> set[str]:
+    """The complete model-invocation grant surface (A28.1): explicit allowlists plus
+    the universal-grant mechanism."""
+    return _persona_skill_grants(agents_dir) | _universal_grant_skills(skills_dir)
+
+
+def _disable_model_invocation_flagged(skills_dir: Path) -> set[str]:
+    """Skills whose frontmatter carries `disable-model-invocation: true`."""
+    flagged: set[str] = set()
+    for skill_md in sorted(skills_dir.glob("*/SKILL.md")):
+        text = skill_md.read_text(encoding="utf-8")
+        fm = _FRONTMATTER_RE.match(text)
+        raw = fm.group(1) if fm else ""
+        if _DISABLE_MODEL_INVOCATION_RE.search(raw):
+            flagged.add(skill_md.parent.name)
+    return flagged
+
+
+def _find_ungranted_not_flagged(
+    skills: set[str], granted: set[str], flagged: set[str]
+) -> list[str]:
+    """Direction 7a — a skill in NO allowlist (and not universally granted) must carry
+    `disable-model-invocation: true`."""
+    return sorted(s for s in skills if s not in granted and s not in flagged)
+
+
+def _find_flagged_but_granted(granted: set[str], flagged: set[str]) -> list[str]:
+    """Direction 7b — a skill carrying `disable-model-invocation: true` must be in NO
+    allowlist — a model-granted skill can never also claim to be user-invoked-only."""
+    return sorted(s for s in flagged if s in granted)
+
+
+def test_ungranted_skills_carry_disable_model_invocation() -> None:
+    """Direction 7a (A28.1) — a skill no persona's `skills:` allowlist grants to a
+    model, and that is not universally granted (failure mode 6's own exemption), must
+    carry `disable-model-invocation: true`."""
+    granted = _granted_to_any_model(_AGENTS_DIR, _SKILLS_DIR)
+    flagged = _disable_model_invocation_flagged(_SKILLS_DIR)
+    violations = _find_ungranted_not_flagged(_skills_on_disk(), granted, flagged)
+    assert violations == [], (
+        f"skill(s) granted by no persona allowlist and not universally granted, but "
+        f"missing disable-model-invocation: true: {violations}"
+    )
+
+
+def test_disable_model_invocation_skills_are_in_no_allowlist() -> None:
+    """Direction 7b (A28.1) — a skill flagged `disable-model-invocation: true` must be
+    in NO persona's `skills:` allowlist — the equivalence holds both ways, not as a
+    one-way rule."""
+    granted = _granted_to_any_model(_AGENTS_DIR, _SKILLS_DIR)
+    flagged = _disable_model_invocation_flagged(_SKILLS_DIR)
+    violations = _find_flagged_but_granted(granted, flagged)
+    assert violations == [], (
+        f"skill(s) flagged disable-model-invocation: true but still granted by a "
+        f"persona allowlist (contradicts A28.1's user-invoked-only meaning): {violations}"
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Two mutation fixtures — one per direction (7a/7b), each proven RED against an
+# in-memory mutated grant/flag set built from the real skill/agent inventory.
+# Never mutates a repo file.
+# --------------------------------------------------------------------------- #
+
+
+def test_mutation_fixture_7_ungranted_skill_without_flag_turns_red() -> None:
+    """Direction 7a mutation fixture: drop a real, explicitly-allowlisted (non-
+    universal) skill out of the granted set without flagging it — the finder must
+    catch it."""
+    target = "dd-cli-library"
+    granted = _granted_to_any_model(_AGENTS_DIR, _SKILLS_DIR)
+    assert target in granted, "fixture precondition: target must start out granted"
+    mutated_granted = granted - {target}
+    flagged = _disable_model_invocation_flagged(_SKILLS_DIR)
+    assert target not in flagged, "fixture precondition: target must start out unflagged"
+
+    violations = _find_ungranted_not_flagged(_skills_on_disk(), mutated_granted, flagged)
+    assert violations == [target]
+
+
+def test_mutation_fixture_8_flagged_skill_still_granted_turns_red() -> None:
+    """Direction 7b mutation fixture: flag a real, currently-granted skill as
+    disable-model-invocation without removing it from any allowlist — the finder must
+    catch the contradiction."""
+    target = "dev-server-registry"
+    granted = _granted_to_any_model(_AGENTS_DIR, _SKILLS_DIR)
+    assert target in granted, "fixture precondition: target must start out granted"
+    mutated_flagged = {target}
+
+    violations = _find_flagged_but_granted(granted, mutated_flagged)
+    assert violations == [target]
