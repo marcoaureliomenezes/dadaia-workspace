@@ -1155,7 +1155,7 @@ feed.
 
 ## Scope complete — the release is closed by QA
 
-- [ ] **T-044-44 — FR21: the invariants, measured**
+- [-] **T-044-44 — FR21: the invariants, measured**
 
 **Owner role:** software-engineer + qa-engineer · **Commit:**
 `chore(T-044-44): scope-complete gate capture`
