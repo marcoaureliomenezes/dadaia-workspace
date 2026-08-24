@@ -21,7 +21,19 @@ the reviewed commit. Each test below proves one branch of that rule against a re
 disposable git repository (dadaia-test-stewardship: "No real venvs built in tests" —
 this is a plain git repo, not a venv, and costs a few kilobytes on tmp_path).
 
-Intent: CONTRACT — v0.4.4 A4.3, A4.5 (T-044-07)
+Extended for bug ``verdict-gate-cannot-resolve-evidence-after-release-archive`` (HIGH,
+T-044-50): the gate used to resolve ``RELEASE_ID`` by reading
+``specs/releases/ACTIVE.md``'s ``release:`` line — a LIFECYCLE POINTER that legitimately
+reads ``none`` once a release closes, failing the release-id canon before any directory
+was ever read, and leaving the evidence unreachable even when supplied explicitly
+because the verdicts directory built from it never looked in
+``specs/_archive/releases/<id>/verdicts/`` (where closure ``git mv``s it). The fix
+deletes the ACTIVE.md read entirely and resolves evidence BY THE ARTIFACT: a glob over
+every release's verdicts directory, live and archived, optionally narrowed (never
+required, never an error on ``none``/unset) by ``RELEASE_ID``.
+
+Intent: CONTRACT — v0.4.4 A4.3, A4.5 (T-044-07); HIGH bug
+verdict-gate-cannot-resolve-evidence-after-release-archive (T-044-50)
 Owner: software-engineer
 """
 
@@ -101,6 +113,46 @@ def _commit_verdict(
     return _head(repo)
 
 
+def _commit_verdict_archived(
+    repo: Path,
+    *,
+    covers_sha: str,
+    verdict: str = "APPROVED",
+    agent: str = "security-reviewer",
+    release_id: str = _RELEASE_ID,
+) -> str:
+    """Places the verdict directly under ``specs/_archive/releases/<id>/verdicts/`` —
+    the shape release closure produces by ``git mv``-ing the whole release directory
+    (verdicts included) out of the live tree, per T-044-50's fix scope.
+    """
+    payload = {
+        "schema_version": "handoff-v1.2",
+        "agent": agent,
+        "context": "dadaia-workspace",
+        "release_id": release_id,
+        "verdict": verdict,
+        "metrics": {"commit_sha": covers_sha},
+    }
+    verdicts_dir = repo / "specs" / "_archive" / "releases" / release_id / "verdicts"
+    verdicts_dir.mkdir(parents=True, exist_ok=True)
+    (verdicts_dir / f"{covers_sha}.handoff.json").write_text(json.dumps(payload), encoding="utf-8")
+    _git("add", "-A", cwd=repo)
+    _git("commit", "-q", "-m", "chore: archive security verdict", cwd=repo)
+    return _head(repo)
+
+
+def _set_active_release_none(repo: Path) -> str:
+    """Mirrors the real closure step (``dd-release-implement`` step 12): once a
+    release archives, ``ACTIVE.md`` legitimately reads ``release: none``.
+    """
+    (repo / "specs" / "releases" / "ACTIVE.md").write_text(
+        "release: none\nphase: ARCHIVED\n", encoding="utf-8"
+    )
+    _git("add", "-A", cwd=repo)
+    _git("commit", "-q", "-m", "chore: close release (ACTIVE.md -> none)", cwd=repo)
+    return _head(repo)
+
+
 def _run_script(
     repo: Path, head_sha: str, extra_env: dict[str, str] | None = None
 ) -> subprocess.CompletedProcess[str]:
@@ -122,12 +174,17 @@ def test_script_has_valid_bash_syntax() -> None:
     assert result.returncode == 0, f"bash -n failed: {result.stderr}"
 
 
-def test_no_verdicts_directory_fails_naming_the_expected_path(tmp_path: Path) -> None:
+def test_no_qualifying_evidence_anywhere_fails_closed_naming_expected_shape(
+    tmp_path: Path,
+) -> None:
+    """T-044-50 item 5: with no verdict file in either tree (live or archived), the
+    gate must fail closed and name the expected shape — no longer "directory not
+    found" (there is no single directory any more, only a glob across two trees).
+    """
     repo = _init_repo(tmp_path)
     head = _head(repo)
     result = _run_script(repo, head)
     assert result.returncode != 0, result.stdout + result.stderr
-    assert _RELEASE_ID in result.stdout + result.stderr
     assert "verdicts" in result.stdout + result.stderr
 
 
@@ -186,19 +243,52 @@ def test_sha_not_ancestor_of_head_fails(tmp_path: Path) -> None:
     assert result.returncode != 0, result.stdout + result.stderr
 
 
-def test_release_id_env_override_is_honored(tmp_path: Path) -> None:
-    repo = _init_repo(tmp_path)
+def test_release_id_env_override_narrows_the_glob(tmp_path: Path) -> None:
+    """T-044-50: RELEASE_ID is optional NARROWING only, post-fix — never a required
+    pointer. Evidence committed under a release id ACTIVE.md does not name (v8.8.8,
+    while ACTIVE.md still names v9.9.9) qualifies with no override at all, because
+    resolution is by artifact glob (``*``) rather than by ACTIVE.md's value. Supplying
+    RELEASE_ID matching the evidence's own release id still qualifies. Supplying a
+    DIFFERENT, canonical release id narrows the glob and excludes that evidence —
+    proving the override is a real narrowing, not a no-op.
+    """
+    repo = _init_repo(tmp_path)  # ACTIVE.md names v9.9.9, never read by the fixed script
     reviewed = _commit_code_change(repo, "print('v2')\n")
     evidence_head = _commit_verdict(repo, covers_sha=reviewed, release_id="v8.8.8")
-    # ACTIVE.md still names v9.9.9 — without the override the v8.8.8 verdict is invisible.
-    no_override = _run_script(repo, evidence_head)
-    assert no_override.returncode != 0, no_override.stdout + no_override.stderr
 
-    overridden = _run_script(repo, evidence_head, {"RELEASE_ID": "v8.8.8"})
-    assert overridden.returncode == 0, overridden.stdout + overridden.stderr
+    unnarrowed = _run_script(repo, evidence_head)
+    assert unnarrowed.returncode == 0, unnarrowed.stdout + unnarrowed.stderr
+
+    matching_override = _run_script(repo, evidence_head, {"RELEASE_ID": "v8.8.8"})
+    assert matching_override.returncode == 0, matching_override.stdout + matching_override.stderr
+
+    excluding_override = _run_script(repo, evidence_head, {"RELEASE_ID": "v9.9.9"})
+    assert excluding_override.returncode != 0, excluding_override.stdout + excluding_override.stderr
 
 
-def test_missing_active_md_and_no_override_fails_with_clear_message(tmp_path: Path) -> None:
+def test_release_id_none_literal_behaves_as_no_narrowing_never_an_error(
+    tmp_path: Path,
+) -> None:
+    """T-044-50: RELEASE_ID="none" — the exact literal ACTIVE.md carries at closure,
+    were some future caller to forward it — must behave identically to unset: no
+    narrowing, never a canon-pattern error. This is the explicit boundary the fix
+    prescription calls out: 'none'/unset = no narrowing, never an error.
+    """
+    repo = _init_repo(tmp_path)
+    reviewed = _commit_code_change(repo, "print('v2')\n")
+    evidence_head = _commit_verdict(repo, covers_sha=reviewed)
+
+    result = _run_script(repo, evidence_head, {"RELEASE_ID": "none"})
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "does not match the canonical release-id pattern" not in (result.stdout + result.stderr)
+
+
+def test_active_md_absence_has_no_effect_since_it_is_no_longer_read(tmp_path: Path) -> None:
+    """T-044-50: ACTIVE.md is deleted as a read entirely (the structural fix), so its
+    absence must have ZERO effect — the failure (still fail-closed, no evidence
+    anywhere) must never mention ACTIVE.md, proving the pointer read is gone rather
+    than merely made lenient.
+    """
     repo = tmp_path / "bare-repo"
     repo.mkdir()
     _git("init", "-q", "-b", "main", cwd=repo)
@@ -211,7 +301,7 @@ def test_missing_active_md_and_no_override_fails_with_clear_message(tmp_path: Pa
 
     result = _run_script(repo, head)
     assert result.returncode != 0
-    assert "ACTIVE.md" in result.stdout + result.stderr
+    assert "ACTIVE.md" not in (result.stdout + result.stderr)
 
 
 def test_git_diff_failure_fails_closed_not_open(tmp_path: Path) -> None:
@@ -256,11 +346,13 @@ def test_git_diff_failure_fails_closed_not_open(tmp_path: Path) -> None:
 
 
 def test_malicious_release_id_is_rejected_before_path_interpolation(tmp_path: Path) -> None:
-    """T-044-45 F-2 (2/2): RELEASE_ID is read unvalidated from the PR head's own
-    ACTIVE.md (or an override) straight into ``VERDICTS_DIR="specs/releases/${RELEASE_ID}/verdicts"``.
-
-    A path-traversal-shaped value must be refused before it ever reaches a path,
-    with a clear diagnostic — not silently normalised, not allowed through.
+    """T-044-45 F-2 (2/2), carried through T-044-50: RELEASE_ID, when explicitly
+    supplied as an override, is interpolated straight into the verdicts glob. A
+    path-traversal-shaped value must be refused before it ever reaches a path, with a
+    clear diagnostic — not silently normalised, not allowed through. (Post T-044-50,
+    ACTIVE.md is no longer a channel for this value at all — see
+    ``test_release_id_traversal_in_active_md_has_no_effect_since_active_md_is_ignored``
+    — so only the explicit-override channel remains to prove closed here.)
     """
     repo = _init_repo(tmp_path)
     head = _head(repo)
@@ -323,9 +415,17 @@ def test_well_formed_ancestor_sha_with_only_verdict_drift_still_passes(tmp_path:
     assert "PASS" in result.stdout
 
 
-def test_release_id_with_traversal_from_active_md_is_rejected(tmp_path: Path) -> None:
-    """Same as above, but the malicious value arrives via ACTIVE.md itself — the
-    PR-controlled path F-2 names explicitly, not just the env-override channel.
+def test_release_id_traversal_in_active_md_has_no_effect_since_active_md_is_ignored(
+    tmp_path: Path,
+) -> None:
+    """T-044-50: the F-2 attack this test used to pin (a PR-controlled ACTIVE.md
+    feeding a traversal-shaped value into RELEASE_ID) is eliminated by deletion, not
+    merely defended: ACTIVE.md is not read at all post-fix, so even a malicious
+    ``release:`` line sits inert. Proven two ways in one test: (1) legitimate
+    evidence committed under a real release id is still found via the unnarrowed
+    glob, regardless of the malicious ACTIVE.md content sitting alongside it; (2) no
+    error ever mentions RELEASE_ID, because the malicious value is never read, let
+    alone validated.
     """
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -340,8 +440,66 @@ def test_release_id_with_traversal_from_active_md_is_rejected(tmp_path: Path) ->
     (repo / "app.py").write_text("print('v1')\n", encoding="utf-8")
     _git("add", "-A", cwd=repo)
     _git("commit", "-q", "-m", "chore: bootstrap", cwd=repo)
-    head = _head(repo)
+    reviewed = _commit_code_change(repo, "print('v2')\n")
+    evidence_head = _commit_verdict(repo, covers_sha=reviewed, release_id="v9.9.9")
 
-    result = _run_script(repo, head)
+    result = _run_script(repo, evidence_head)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "RELEASE_ID" not in (result.stdout + result.stderr)
+
+
+def test_archived_release_tree_evidence_with_active_release_none_passes(tmp_path: Path) -> None:
+    """T-044-50 item 1 — the bug's exact repro, RED against the pre-fix script,
+    GREEN after: at a closed release (ACTIVE.md 'release: none', mirroring
+    ``dd-release-implement`` step 12's archive) the security-reviewer's APPROVED
+    verdict has already been ``git mv``'d into
+    ``specs/_archive/releases/<id>/verdicts/`` by the closure that just ran. The gate
+    must still PASS — resolving evidence by the artifact, never the ACTIVE.md
+    pointer that legitimately (and, pre-fix, fatally) reads 'none' here.
+    """
+    repo = _init_repo(tmp_path)
+    _commit_code_change(repo, "print('v2')\n")
+    closure_head = _set_active_release_none(repo)
+    evidence_head = _commit_verdict_archived(repo, covers_sha=closure_head)
+    assert evidence_head != closure_head
+
+    result = _run_script(repo, evidence_head)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "PASS" in result.stdout
+
+
+def test_live_tree_evidence_passes_regardless_of_active_md_release_id(tmp_path: Path) -> None:
+    """T-044-50 item 2 — no regression: live-tree evidence
+    (``specs/releases/<id>/verdicts/``) still PASSES after the fix, even when
+    ACTIVE.md names a DIFFERENT, mismatched release than the evidence's own
+    directory — proving resolution is now by artifact, never by a pointer that has
+    to agree with it.
+    """
+    repo = _init_repo(tmp_path)  # ACTIVE.md names v9.9.9
+    reviewed = _commit_code_change(repo, "print('v2')\n")
+    evidence_head = _commit_verdict(repo, covers_sha=reviewed, release_id="v7.7.7")
+
+    result = _run_script(repo, evidence_head)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "PASS" in result.stdout
+
+
+def test_archived_evidence_with_trailing_unreviewed_production_change_fails(
+    tmp_path: Path,
+) -> None:
+    """T-044-50 item 3: mixing archived-tree verdict evidence with a genuinely
+    unreviewed production change landing AFTER the review must still FAIL — the
+    widened only-verdict-drift exemption (now matching both
+    ``specs/releases/*/verdicts/*`` and ``specs/_archive/releases/*/verdicts/*``)
+    must not swallow a real production diff just because it happens to land near
+    archived evidence.
+    """
+    repo = _init_repo(tmp_path)
+    _commit_code_change(repo, "print('v2')\n")
+    closure_head = _set_active_release_none(repo)
+    _commit_verdict_archived(repo, covers_sha=closure_head)
+    drifted_head = _commit_code_change(repo, "print('v3 - unreviewed after archive')\n")
+
+    result = _run_script(repo, drifted_head)
     assert result.returncode != 0, result.stdout + result.stderr
-    assert "RELEASE_ID" in result.stdout + result.stderr
+    assert "app.py" in result.stdout + result.stderr
