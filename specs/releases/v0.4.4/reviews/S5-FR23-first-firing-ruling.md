@@ -359,3 +359,126 @@ no production growth; no puxadinho. Residual surface, named honestly: the scanne
 documented recall gaps (check (a)) and the vacuity exposure it shares with its 8
 tree-walking siblings (check (b)) — the latter routed to intake, the former to the
 one-class-one-ratchet maintenance contract above.
+
+---
+
+## Firing 4 — T-044-40 (commit `d9bb8004`): symlinked explicit specs root refused at the resolver seam
+
+**Date:** 2026-08-24 · **Trigger:** FR23 evidence gate (`evidence_diff` net-positive
++22/-2, `dadaia_workspace/core/specs_resolver.py` only, `bugs.jsonl` `resolved` event
+for `symlinked-specs-root-is-followed-by-migration-and-repair`)
+
+### Verdict: SOUND — Firing 1's category (missing enforcement at the owning seam), production growth earned by behavior deletion
+
+The +20 is one `is_symlink()` guard in `resolve_specs_dir`'s explicit-input branch,
+raising `typer.BadParameter` before the pre-existing `.resolve()` dereferences the
+link. This is Firing 1's exception, exactly: the bug's `reported` event registered an
+**undecided contract** ("either resolve knowingly, or refuse the way the inner walk
+roots are refused — decided once, at the resolution seam, not duplicated in each write
+site"), and the diff is that decision made enforceable at the seam that owns it. Like
+Firing 1, it is net-positive in lines and **net-negative in behaviors**: the
+silent-follow path — migration rewriting atoms behind a link, TREE-5 repair refreshing
+a projection behind it, both with no note — is eliminated. No flag, no second code
+path, no per-verb special case; refusal was chosen over resolve-knowingly, which is the
+*smaller* doctrine (one uniform rule shared with the inner walk roots, versus a
+documented asymmetry plus a warning surface per consumer), and the correct side of the
+ledger's own precedent: blind `.resolve()` has already produced one incident in this
+codebase (the symlinked-venv escape, v0.1.11). Root-cause gate: **PASS** — the
+`evidence_loop` reproduced the silent follow on the executed path (upgrade dry-run
+reporting the real tree's backup parent; doctor JSON echoing the dereferenced root),
+then killed the per-layer hypothesis by instrumentation: `SpecsDoctor` stores whatever
+path it is given unresolved, so the dereference happens at the resolver seam and
+nowhere else — proving the seam is the cause's home, not merely a convenient
+chokepoint. Architecture-fidelity gate: **PASS** — see (a) and (b).
+
+### Check (a) — the one-seam claim, verified by enumeration
+
+**HOLDS for the resolver lane — with one residual second path, named below.** Grep over
+the package: every CLI module exposing `--specs-dir` for a *resolution* verb —
+`cli/commands/specs.py:41`, `migrate.py:48`, `memory.py:34`, `bugs.py:60/73/95`,
+`newartifacts.py:69` — funnels through `cli/_specs_resolution.py:112
+resolve_specs_dir_for_cli`, which is a pure delegation (`return
+_core_resolve_specs_dir(specs_dir)`) to the guarded core function. The bug's named
+surfaces (`specs upgrade`, `specs doctor --fix`) and every sibling verb therefore share
+the one guard; the CLI integration tests
+(`tests/integration/cli/test_cli_specs_symlinked_root_refused.py`, both entry points)
+plus the unit seam test (`tests/unit/core/test_specs_resolver.py:104`) pin exactly
+that topology — no guard duplicated into any command module, confirmed by grep:
+`is_symlink` appears in no `cli/commands/*` file. `specs doctor --context`
+(specs.py:108) is not a second *explicit-path* lane: `--context` is a NAME resolved via
+`container.resolve_context_specs_dir`, mutually exclusive with `--specs-dir`, and the
+bug's contract is scoped to the root the operator *names as a path*.
+
+**Residual — one second explicit-resolution site exists, outside the resolver lane:**
+`specs init` (specs.py:324) resolves its explicit `--specs-dir` directly
+(`Path(specs_dir).resolve()`), bypassing the seam by design — init *creates* a tree
+rather than resolving a context, and its default is `cwd/specs`, not the resolution
+authority. Consequence: `dadaia specs init --specs-dir <symlink>` still scaffolds
+behind the link, silently — same CWE-59 class, different verb class (creation, not
+migration/repair; blast radius is a fresh scaffold misplaced, never an existing tree
+rewritten). This does NOT break the resolved bug's contract (its `expected` field
+scopes the decision to "the context-resolution seam", which init never enters), so it
+is not a REJECT — but under the uniform-refusal doctrine this diff just established,
+init's divergence is now a *documented asymmetry*, the very shape the fix argued
+against. Residual for PM intake (severity LOW, effort LOW):
+
+> **specs-init-symlinked-target-refusal** — `specs init`'s explicit-path branch
+> (cli/commands/specs.py:324) applies the same symlinked-root refusal the resolver
+> seam now enforces, either by calling one shared predicate or by routing its explicit
+> branch through it; one unit test mirroring
+> `test_resolve_specs_dir_refuses_a_symlinked_explicit_root`. Closes the last
+> explicit-path lane that follows a symlinked root silently.
+
+Per §6 (Backlog) this is a residual for the PM's intake report — this ruling
+materializes no backlog entry.
+
+### Check (b) — the A9 core-purity ratchet: within the exemption, twice over
+
+**NO VIOLATION — the new call is inside the authorized boundary by two independent
+readings of the ratchet.** `tests/contract/test_core_file_io_purity.py` (the A9
+disposition: GUARD, not relocation) authorizes exactly five core stems for file I/O,
+and `specs_resolver` is one of them (`_AUTHORIZED_STEMS`, line 52-54, pinned in
+`architecture.md`) — the boundary was crossed deliberately at the module's birth, not
+by this diff: the module already stats the filesystem (`is_file` at lines 34/47,
+`.resolve()` throughout), because walking the tree IS its architecture-sanctioned job.
+Independently, `is_symlink` is not even in the ratchet's flagged attribute set
+(`_PATH_IO_ATTRS` = read_text/write_text/mkdir/exists/glob/iterdir/rglob) — so the new
+call is doubly within bounds: an unflagged read-only stat, in an authorized module.
+The ratchet stays GREEN with zero exemption widening; no `_AUTHORIZED_STEMS` edit, no
+architecture.md edit, was needed or made. One pre-existing debt noted for the record,
+untouched by this diff and out of its scope: `core/specs_resolver.py` raising
+`typer.BadParameter` couples a core module to the CLI framework's exception type. That
+coupling predates T-044-40 (the terminal unresolved-specs error, lines 179-186, with
+its documented hooks-hot-path deferred import, F-01 v0.5.0); the new guard reuses the
+established pattern rather than inventing a second error shape — consistency was the
+right call inside this diff, and re-homing the error type is an architecture question
+for a release, not a fix. Non-blocking.
+
+### Check (c) — bug-surface delta with ledger evidence
+
+**REDUCED.** The CWE-59 fix chain across the ledger, read in order: the symlinked-venv
+`.resolve()` escape (v0.1.11 — first incident of the class, taught "blind resolve is a
+hazard"); the migration's symlinked `memory/` walk-root refusal and the TREE-5
+projection-target refusal (inner roots, guarded); FR17's symlink doctrine A17.1
+(deletion lanes never follow symlinked dirs); the T-044-35 battery pinning
+symlink-adjacent writer behavior (CWE-59 tag). Against that chain, the *outer* named
+root was the one unguarded rung — the security-reviewer's `reported` event
+(2026-08-19) names precisely that gap and demands a single-seam decision. This diff
+closes the last unguarded rung of the class with the same doctrine the inner rungs
+already carry: uniform refusal, one rule, zero per-site copies. Surface accounting:
+one silent-acceptance path deleted (containment breach — writes landing outside the
+tree the operator believes is being modified, the same misplaced-write class as the
+venv incident); zero behavior change for every non-symlinked root (the pre-existing
+explicit-wins test unmodified and green, per the `resolved` event); three pinning
+tests at two levels of the topology. Fix-chain audit for this surface: `reported` →
+`picked` (v0.4.4) → `resolved`, first fix, no repetition, no prior symptom patch to
+undo, no stacked branch. Residual surface, named honestly: (1) the `specs init` lane
+(check (a), routed to intake); (2) the guard checks the named root itself, not a
+symlinked *ancestor* component (`--specs-dir /real-dir-via-linked-parent/specs` still
+dereferences via `.resolve()` silently) — consistent with the bug's declared contract
+("the root the caller named") and with Firing 3's declared-recall-boundary doctrine:
+a guard with a stated boundary beats speculative widening; if an ancestor-link
+incident ever materializes, extend THIS guard at THIS seam, never a second check
+elsewhere; (3) a theoretical TOCTOU window between `is_symlink()` and `resolve()` —
+acceptable under the workspace's advisory, races-surfaced-not-prevented posture, and
+strictly smaller than the prior surface (no check at all). No puxadinho detected.
