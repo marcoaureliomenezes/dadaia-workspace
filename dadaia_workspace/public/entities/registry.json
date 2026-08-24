@@ -91,7 +91,7 @@
       "id": "workspace-law",
       "mandate": "DADAIA.md — the one always-on law file (the workspace system prompt), projected read-only per harness; human-only in an instantiated workspace.",
       "implementations": {
-        "claude": ".claude/rules/DADAIA.md",
+        "claude": "CLAUDE.md -> @AGENTS.md -> @DADAIA.md (root import chain)",
         "codex": ".codex/DADAIA.md",
         "kimi-code": ".kimi-code/DADAIA.md"
       }

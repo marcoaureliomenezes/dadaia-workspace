@@ -2,8 +2,10 @@
 
 You are operating inside a dadaia-workspace. This file is the **complete always-on law**
 of the workspace: one file, every rule, no second source. It is generated from
-`dadaia_workspace/public/data/DADAIA.md` and projected to the workspace root and to every
-harness directory. Sections cross-reference by name; no fact is stated twice.
+`dadaia_workspace/public/data/DADAIA.md` and projected to the workspace root and to
+`.codex/`/`.kimi-code/`; Claude Code reaches it through the root import chain
+(`CLAUDE.md` -> `AGENTS.md` -> `DADAIA.md`) rather than a second projected copy.
+Sections cross-reference by name; no fact is stated twice.
 
 Scoped `AGENTS.md` files govern their own subtree and take precedence there. Anything
 else you find is the operator's own — this library ships exactly two kinds of rule file:
