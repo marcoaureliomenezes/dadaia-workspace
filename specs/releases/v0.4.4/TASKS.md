@@ -1051,13 +1051,44 @@ net-neutral). Pinned end-to-end by
 
 ---
 
-- [-] **T-044-38 — bug `no-ratchet-against-frozen-clock-tests-that-age-fixtures-by-the-real-clock` (LOW)**
+- [x] **T-044-38 — bug `no-ratchet-against-frozen-clock-tests-that-age-fixtures-by-the-real-clock` (LOW)**
+
+**Commit:** `test(T-044-38): a ratchet against frozen-clock aging`
 
 **Write set:** one source-scan contract test, in the shape the repo already uses for the
 denylist no-allowlist contract.
 **Description:** Fail any `tests/**` file that declares a frozen datetime constant **and**
 calls `time.time()`/`datetime.now()`. Green at HEAD against all 9 aging sites.
 **Done criterion:** the ratchet is green at HEAD and red on a planted violation; `Closed`.
+
+**Resolution:** New AST-based contract test
+`tests/contract/test_frozen_clock_aging_ratchet.py` (5 tests) — a raw-text/regex scan
+(the denylist no-allowlist test's own shape) would false-positive on this very module's
+docstring and on `test_tmp_gc_service.py`'s own explanatory comment, both of which
+contain the literal text `time.time()` in prose, so detection is AST-based instead
+(mirrors `test_core_file_io_purity.py`'s file-I/O ratchet for the identical reason).
+Rule: a `tests/**` file fails iff it declares, at module level, BOTH a frozen
+datetime/date constant (a constant-case name assigned a `datetime(...)`/`date(...)`
+literal, or — only when the name itself carries a clock marker — a bare numeric/ISO-date
+literal) AND a real-clock call (`time.time()` or a `.now()` call chaining to
+`datetime`). Verified GREEN at HEAD: cross-referenced all 10 `tests/**` files performing
+fixture ageing via `os.utime` — `test_tmp_gc_service.py` and the two retention test
+modules derive every mtime from their OWN frozen constant (self-consistent, the tmp_gc
+fix already landed); the other 7 derive from a real-clock call with no frozen constant
+in the same file (both sides move together); `test_jsonl_log_rotation.py` ages to the
+literal Unix epoch (a local var, not a module constant) — self-healing by construction.
+0 violations across the entire `tests/**` tree (2803 tests collected). Mutation-sanity
+fixture (in-memory, never a repo file — the `test_rules_skills_map.py` mutation pattern)
+reproduces the tmp_gc shape (both a `time.time()` and a `datetime.now()` variant) and
+proves both detectors turn RED; two negative controls prove the AND-not-OR precision
+(a frozen constant alone, or a real-clock call alone, must each stay green). No
+production code touched — guard-only, per the bug's own notes: the underlying tmp_gc
+bug is already resolved. `evidence_diff` is `net-positive` (pure addition, no deletion)
+— flagged per `dd-bug-fix` for a `software-architect` check, route-before-commit not
+blocking (same posture as T-044-33/T-044-35). Full suite:
+`pytest -p no:cacheprovider -q -m "not quarantine and not e2e" -n auto` → 2747 passed,
+3 skipped (environment-gated), 0 failed; `ruff format --check`/`ruff check --no-cache`/
+`mypy --strict` clean on the new file. `bugs.jsonl` carries the FR23 evidence.
 
 ---
 
