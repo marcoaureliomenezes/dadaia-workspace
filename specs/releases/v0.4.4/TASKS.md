@@ -712,7 +712,7 @@ Capture **V7** and **V9**.
 
 ---
 
-- [-] **T-044-22 — AR-1: architecture ruling on byte-goldens-over-inventory**
+- [x] **T-044-22 — AR-1: architecture ruling on byte-goldens-over-inventory**
 
 **Owner role:** software-architect · **Commit:** ruling recorded in the QA/architecture
 artifact
