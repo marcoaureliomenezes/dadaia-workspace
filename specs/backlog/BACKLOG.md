@@ -326,6 +326,47 @@ is no longer archive-only.
 ```
 
 
+### entity-behavior-map
+- **Title:** entity-behavior-map — behavior manifest (DADAIA.md anchor ↔ skill ↔ scoped AGENTS.md) with hash-tuple contract tests, plus the skill surface that rides the v6 canon
+- **Opened:** 2026-08-23
+- **Status:** candidate
+- **Description:** Make the rules→skills→scoped-AGENTS.md trios a **validated map instead of a convention**, so the three layers complement each other and never restate or contradict (the repetition/contradiction pattern the 2026-08-23 audit measured). (1) Manifest `dadaia_workspace/public/entities/behavior-map.json` with 5 rows: Backlog Definition → `dd-backlog-definition` → `backlog/AGENTS.md`; Bug Registration → `dd-bug-registration` → `bugs/AGENTS.md`; Bug Resolution → `dd-bug-resolution` → `bugs/AGENTS.md`; Release Definition → `dd-release-definition` → `releases/AGENTS.md`; Release Implement (includes memory update + closure) → `dd-release-implement` → `releases/AGENTS.md` + `memory/AGENTS.md`. Audit row deferred until audits are redesigned. (2) **Contract tests in the lib**: every member exists; each member carries the pointers to its row companions; a recorded hash tuple per row goes RED when any member changes without the tuple being re-recorded — forcing the joint review; the semantic equalization (scopes complement, nothing contradicts) is the `ai-engineer`’s act when re-recording the tuple, and any inconsistency found is asked, never silently patched. (3) `DADAIA.md` gains stable per-behavior anchors (named subsections) for the map to point at. (4) Skill surface riding the canon: rename `dd-bug-fix` → `dd-bug-resolution` (all references updated); `dd-release-implement` rebuilt in the robust skills-examples shape — short SKILL.md with per-step "Done when" + 3 disclosed siblings `RC-FLOW.md` (state ladder, absorbs CLOSURE-CHECKS.md), `RELEASE-EVENTS.md` (RELEASE.jsonl append recipes per milestone), `MEMORY-UPDATE.md` (memory protocol; no separate dd-memory-update skill — operator ruling Q11a); `CLOSURE-TEMPLATE.md` dies with CLOSURE.md; `dd-backlog-definition` rewritten for the live-photo BACKLOG.md + histo JSONL (its §2 "no JSONL for backlog" clause retires); `dd-bug-registration`/`dd-release-definition` updated to the v6 required fields and RELEASE.jsonl flow; the four scoped `AGENTS.md` authored short and direct, hash-projected under the TREE-5 regime. Depends-on `specs-canon-v6` (the layout the map validates). Relates-to ACTIVE `dd-diagnose` (touches the same `dd-bug-fix` file — the rename lands here, the method extraction lands there; whichever release picks second rebases on the first).
+- **Provenance:** operator request (2026-08-23 dd-grill-me session, 2 rounds — same handoff as `specs-canon-v6`); depends-on `specs-canon-v6`
+- **Intents:**
+```yaml
+- subject:
+    kind: doc
+    ref: dadaia_workspace/public/entities/behavior-map.json
+    surface: new
+  change: "behavior manifest: 5 rows of DADAIA.md-anchor/skill/scoped-AGENTS.md members with a recorded hash tuple per row"
+- subject:
+    kind: code
+    ref: tests/contract/test_behavior_map.py#test_behavior_map_rows
+    surface: new
+  change: "contract tests: members exist, cross-pointers present, hash tuple matches — RED on any member change without joint re-record"
+- subject:
+    kind: doc
+    ref: dadaia_workspace/public/data/DADAIA.md
+    surface: existing
+  change: "stable per-behavior anchors (named subsections) for Backlog/Bugs/Releases/Memory behaviors; no content duplication with skills or scoped AGENTS.md"
+- subject:
+    kind: doc
+    ref: dadaia_workspace/public/skills/dd-release-implement/SKILL.md
+    surface: existing
+  change: "robust shape: short SKILL.md with Done-when steps + disclosed siblings RC-FLOW.md / RELEASE-EVENTS.md / MEMORY-UPDATE.md; CLOSURE-TEMPLATE.md and CLOSURE-CHECKS.md retire"
+- subject:
+    kind: doc
+    ref: dadaia_workspace/public/skills/dd-bug-fix/SKILL.md
+    surface: existing
+  change: "renamed to dd-bug-resolution; all references updated; content aligned to BUGS.jsonl required fields"
+- subject:
+    kind: doc
+    ref: dadaia_workspace/public/skills/dd-backlog-definition/SKILL.md
+    surface: existing
+  change: "live-photo BACKLOG.md + backlog_histo.jsonl snapshot records; intake must confront existing ACTIVE (annulment only with operator ratification); LEDGER-in-file clause retires"
+```
+
+
 ## LEDGER
 
 - push-range-denylist-scan · DELIVERED · v0.9.0 · 2026-08-14
