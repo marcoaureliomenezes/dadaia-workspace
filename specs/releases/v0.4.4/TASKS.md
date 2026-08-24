@@ -729,7 +729,7 @@ byte golden — with the bug-surface argument. Work beyond the regen is **intake
 
 ---
 
-- [-] **T-044-23 — FR14: the nine-skill study**
+- [x] **T-044-23 — FR14: the nine-skill study**
 
 **Owner role:** ai-engineer · **Commit:** `docs(T-044-23): nine-skill disposition study`
 
