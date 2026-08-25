@@ -339,7 +339,7 @@ verdict plus the CLOSURE record of the still-open bug.
 
 ---
 
-- [-] **T-045-10 — `S1` close: `qa-engineer` review committed on the branch**
+- [x] **T-045-10 — `S1` close: `qa-engineer` review committed on the branch**
 
 **Owner role:** qa-engineer · **Commit:** `docs(T-045-10): S1 QA close`
 
@@ -360,7 +360,7 @@ term in the artifact.
 
 ## Segment `S2` — structural consolidation
 
-- [ ] **T-045-11 — AR-1: the atomic-write primitive's home, ruled**
+- [-] **T-045-11 — AR-1: the atomic-write primitive's home, ruled**
 
 **Owner role:** software-architect · **Commit:** `docs(T-045-11): AR-1 ruling — atomic-write
 home`
