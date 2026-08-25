@@ -28,15 +28,13 @@ order, the body — never about line-ending bytes.
 
 from __future__ import annotations
 
-import contextlib
 import json
-import os
 import re
-import shutil
-import tempfile
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, cast
+
+from dadaia_workspace.core.atomic_write import atomic_write
 
 __all__ = ["load_frontmatter_schema", "strip_frontmatter_keys", "write_text_atomic"]
 
@@ -101,11 +99,10 @@ def strip_frontmatter_keys(text: str, *, drop: Callable[[str], bool]) -> str | N
 
 
 # --- packaged data + safe writing -------------------------------------------------
-# Both live here rather than in a shared layer: features are mutually independent by
-# contract (setup.cfg, features-no-cross-feature), features may not import infrastructure,
-# and core/ file I/O is a closed ratchet (architect A9). The repo already resolves this the
-# same way — hooks/_common.py and infrastructure/public_assets_common.py each keep their
-# own atomic writer.
+# write_text_atomic is a thin call-through shim (T-045-13) onto the package's one
+# atomic-write primitive, core.atomic_write.atomic_write — ruled the shared home for
+# this idiom on the core/specs_repair precedent (AR-1, T-045-11): a pure core leaf,
+# stdlib-only, legally importable from every layer including features.
 
 _PACKAGE_ROOT = Path(__file__).resolve().parents[2]  # dadaia_workspace/
 _SCHEMA_REL = Path("public") / "schemas" / "memory" / "memory-frontmatter-v1.schema.json"
@@ -127,28 +124,14 @@ def write_text_atomic(path: Path, text: str) -> None:
 
     A hard link is not a symlink and a checked-then-opened path is a TOCTOU window
     (CWE-59/CWE-367), so refusing links alone cannot keep a write inside the tree.
-    Rendering to a temp file in the same directory and ``os.replace``-ing it rebinds the
-    name instead of writing through whatever it points at, and the swap is atomic.
+    Delegating to ``core.atomic_write.atomic_write`` (T-045-13) rebinds the name via a
+    temp file + ``os.replace`` instead of writing through whatever the target points at.
 
-    ``newline=""`` disables universal-newline translation, so the bytes on disk are exactly
-    ``text.encode("utf-8")`` — without it Windows text mode rewrites LF to CRLF and the
-    byte-preserving guarantee dies on that platform (the same reason
-    ``public_assets_common`` passes it, FR-RC2-2).
-
-    ``mkstemp`` creates the temp file 0600 and ``os.replace`` carries that mode onto the
-    target, which would silently narrow a 0644 atom in a shared or CI-checked-out tree
-    (CWE-732 in the fail-safe direction, invisible to git). The original mode is copied
-    back before the swap.
+    ``preserve_mode=True`` matches this writer's original ``shutil.copymode`` call — a
+    freshly created temp file would otherwise narrow a 0644 atom to mkstemp's own 0600
+    (CWE-732 in the fail-safe direction, invisible to git). The primitive's default
+    ``newline=""`` matches this writer's original explicit ``newline=""`` — the bytes on
+    disk are exactly ``text.encode("utf-8")``, LF-preserving on every platform
+    (the same reason ``public_assets_common`` passes it, FR-RC2-2).
     """
-    fd, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
-    tmp_path = Path(tmp_name)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8", newline="") as handle:
-            handle.write(text)
-        with contextlib.suppress(OSError):
-            shutil.copymode(path, tmp_path)  # keep the target's mode, not mkstemp's 0600
-        os.replace(tmp_path, path)
-    except BaseException:
-        with contextlib.suppress(OSError):
-            os.unlink(tmp_path)
-        raise
+    atomic_write(path, text, preserve_mode=True)

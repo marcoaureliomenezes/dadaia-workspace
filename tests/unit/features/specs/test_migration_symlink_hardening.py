@@ -356,7 +356,7 @@ _ATOMIC_WRITER_CASES: list[AtomicWriterCase] = [
     AtomicWriterCase(
         id="frontmatter_keys.write_text_atomic",
         write=_write_frontmatter_keys,
-        replace_target="dadaia_workspace.features.migrate.frontmatter_keys.os.replace",
+        replace_target="dadaia_workspace.core.atomic_write.os.replace",  # T-045-13: delegates
         preserves_mode=True,
         cleans_up_on_failure=True,
         lf_bytes_guaranteed=True,  # os.fdopen(..., newline="")
