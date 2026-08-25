@@ -200,7 +200,7 @@ secret, token or org-internal identifier is recorded anywhere.
 
 ## Segment `S1` — the open-bug sweep
 
-- [-] **T-045-04 — FR1: the LAW path class decides by origin, not by basename**
+- [x] **T-045-04 — FR1: the LAW path class decides by origin, not by basename**
 
 **Owner role:** software-engineer · **Commit:** `fix(T-045-04): classify AGENTS.md as LAW by
 origin, not by name` · **Lands first in the release** (SPEC D-2).
@@ -231,7 +231,7 @@ decision — no per-repo exception list, no flag, no second classification path.
 
 ---
 
-- [ ] **T-045-05 — [shell] Install the gate fix and probe it on the executed path**
+- [-] **T-045-05 — [shell] Install the gate fix and probe it on the executed path**
 
 **Owner role:** software-engineer · **Commit:** the V3 capture reference only
 
