@@ -86,6 +86,70 @@ open until ruled. v0.4.3 restates it in its CLOSURE rather than deciding it. The
 travelled to `specs/backlog/_archive/candidates.md` at the cutover; restated here so it
 is no longer archive-only.
 
+**Operator-approved intake materialization — v0.4.4 intake (2026-08-24).** The v0.4.4
+intake report (handoff
+`.dadaia/handoff/dadaia-workspace/2026-08-24T172302Z-project-manager-v044-intake-report.handoff.json`)
+was adjudicated by the operator on 2026-08-24: **all 15 candidates approved** ("De
+preferência todos — veja, classifique, mapeie"). They enter `ACTIVE` below, themed:
+**A** structural-consolidation (4), **B** security-gate-hardening (4 as entries),
+**C** token-economy / AI-surface (6), **E** operator-ruling (1). Item **B1 is deliberately
+NOT an entry** — it is a time-boxed, operator-only GitHub-settings action (the intake
+itself marks it "not backlog material in the ordinary sense"): add the context
+"Security verdict gate (PR head sha)" to required checks on **both** the `develop` and
+`main` PR edges, **due before the rc-2 PR**; recorded here so it is scheduled, not lost.
+Rulings recorded with the intake: **R1** — v0.4.5 direction is hardening & consolidação
+(bugs sweep + themes A/B + the token-economy program); **R2** — the nine-skill study
+dispositions are RATIFIED (Update×5, Merge×3, Fuse×1, zero Retire; the 2 CLI-help merges
+adjudicated jointly with `cli-help-architecture-and-session-injection`); **R3** —
+`.dadaia/references/` is the sanctioned home for operator-placed reference material
+(entry `dadaia-references-doctor-sanction`). Nothing was picked in this commit — picking
+happens at release definition.
+
+**Pick-precedence update (2026-08-24) — supersedes the 2026-08-17 notice above.**
+"Currently outranking" is no longer "nothing": **7 open bugs** (zero HIGH/CRITICAL, per
+`dadaia bugs status` at intake compile time) outrank every fresh entry at pick time
+(DADAIA.md §6). Lead order: the two MEDIUM AGENTS.md-vs-gate bugs
+(`sdd-gate-blocks-fresh-repo-root-agents-md` + `repo-agents-md-law-gate-contradicts-template`
+— one structural root-cause investigation, not two patches, per the standing
+architecture-review order) and the MEDIUM
+`bug-event-field-with-unicode-line-separator-silently-drops-the-event` (bundle with entry
+`bug-event-control-character-sanitation`). The LOW
+`two-atomic-writers-leak-temp-file-on-injected-os-replace-failure` is superseded-in-spirit
+by entry `atomic-write-primitive-consolidation` — formalize with a `superseded` event when
+that entry is picked. The ledger remains the source of truth.
+
+**Purge-on-pick notice — release v0.4.5 "hardening and consolidation" (2026-08-24).**
+**Fourteen** `ACTIVE` subsections left this document in the same commit that created
+`specs/releases/v0.4.5/SPEC.md`, whose §7 is their provenance record: the four theme-**A**
+entries (`atomic-write-primitive-consolidation`,
+`byte-golden-test-inventory-roster-split`, `coupled-inventory-shared-oracle`,
+`scan-test-vacuity-guard`), the four theme-**B** entries
+(`doctor-slug-ownership-uniqueness`, `bug-append-write-time-denylist-redaction`,
+`specs-init-symlinked-target-refusal`, `bug-event-control-character-sanitation`), five of
+the six theme-**C** entries (`always-on-token-diet`, `memory-catalog-digest-trimming`,
+`persona-line-ceiling-trim`, `ai-surface-hygiene-residuals`,
+`intent-taxonomy-vocabulary-ruling`) and the theme-**E** entry
+(`dadaia-references-doctor-sanction`). All fourteen are declared in that SPEC's
+`**Consumes:**` line and each receives a `CONSUMED · v0.4.5` `LEDGER` line **in this same
+commit**, to be **updated in place** to its terminal token (`DELIVERED`/`SUPERSEDED`/
+`DEFERRED`) at the closure disposition sweep — never a second line (BL-DUP). Nothing was
+deleted. **Twelve entries stay `ACTIVE` by operator ruling O1 (2026-08-24):**
+`nine-skill-study-execution` (its dispositions ratified as provenance, execution deferred),
+`cli-help-architecture-and-session-injection`, `specs-canon-v6`, `entity-behavior-map`, and
+the eight skills proposed by the 2026-08-23 skills audit. One item rides the release without
+ever becoming an entry: the operator-only GitHub-settings action B1 (the verdict-gate
+required check on both PR edges), scheduled as a v0.4.5 task, due before the `rc-2` PR.
+
+**Bug pick — release v0.4.5 (2026-08-24).** All **8** open bugs were picked; the ledger
+(`dadaia bugs status`) remains the source of truth for their state.
+`two-atomic-writers-leak-temp-file-on-injected-os-replace-failure` carries a `superseded`
+event appended in the definition commit, naming `atomic-write-primitive-consolidation`.
+`bug-event-field-with-unicode-line-separator-silently-drops-the-event` is bundled into the
+same fix as `bug-event-control-character-sanitation`. The two MEDIUM AGENTS.md-vs-gate bugs
+are one structural investigation, not two patches, per the standing architecture-review
+order. `windows-xdist-workers-crash-on-unit-fast-tier` may end the release **still open** —
+its SPEC assumption AS-5 states that a quarantine is never a resolution.
+
 ## ACTIVE
 
 ### dd-diagnose
@@ -357,6 +421,22 @@ is no longer archive-only.
 ```
 
 
+
+### nine-skill-study-execution
+- **Title:** nine-skill-study-execution — execute the operator-ratified nine-skill dispositions: Update×5, Merge×3, Fuse×1, zero Retire
+- **Opened:** 2026-08-24
+- **Status:** candidate
+- **Description:** Theme **C** (token-economy / AI-surface) · priority **HIGH** · size **MEDIUM** (execution spread over one release). The T-044-23/FR14 nine-skill study (ai-engineer handoff 2026-08-24T015304Z; nine remaining public skills, 1,046 lines, audit scores 4.3–7.5) produced per-skill proposals; **operator ruling R2 (2026-08-24) RATIFIES the dispositions — Update×5, Merge×3, Fuse×1, zero Retire — as recorded provenance; execution still needs a release pick.** Dependencies: (1) the 2 CLI-help-related merges were adjudicated **jointly with ACTIVE `cli-help-architecture-and-session-injection`** — whichever release picks either entry rebases its scope on the other; (2) the single Fuse (architect-core-workflow → dadaia-codebase-design) is two-stage: ACTIVE `dadaia-codebase-design` must land first, only then is the source absorbed and retired; (3) open bug `dadaia-task-manager-stale-workspace-protocol-citation` (LOW) is named inside the dadaia-task-manager Update — fixing the bug via Arm B does not pre-empt the disposition. Sequence after/with `coupled-inventory-shared-oracle` (the shared roster oracle cheapens every skill-surface change). Shaves the same always-on budget as the C2–C4 token-economy program.
+- **Provenance:** intake-report item C1 (v0.4.4 intake, approved 2026-08-24) + operator ruling R2 (2026-08-24) ratifying the study handoff dispositions
+- **Intents:**
+```yaml
+- subject:
+    kind: doc
+    ref: dadaia_workspace/public/skills/dadaia-task-manager/SKILL.md
+    surface: new
+  change: "representative anchor for the ratified execution set: apply the nine per-skill dispositions (Update x5, Merge x3, Fuse x1, zero Retire) exactly as recorded in the study handoff; every merge/fuse updates all cross-references and the projection roster in the same change"
+```
+
 ## LEDGER
 
 - push-range-denylist-scan · DELIVERED · v0.9.0 · 2026-08-14
@@ -456,3 +536,17 @@ is no longer archive-only.
 - gitflow-contract-v2-consolidation · DELIVERED · v0.4.4 — FR1–FR6 shipped; closure sweep, specs/_archive/releases/v0.4.4/CLOSURE.md `## Dispositions` · 2026-08-24
 - rules-skills-governance-map · DELIVERED · v0.4.4 — FR7–FR9 shipped; closure sweep, specs/_archive/releases/v0.4.4/CLOSURE.md `## Dispositions` · 2026-08-24
 - core-skills-consolidation · DELIVERED · v0.4.4 — FR10–FR14 + FR24–FR31 shipped; closure sweep, specs/_archive/releases/v0.4.4/CLOSURE.md `## Dispositions` · 2026-08-24
+- atomic-write-primitive-consolidation · CONSUMED · v0.4.5 — picked at definition, FR2; updated in place at the closure sweep · 2026-08-24
+- byte-golden-test-inventory-roster-split · CONSUMED · v0.4.5 — picked at definition, FR3; updated in place at the closure sweep · 2026-08-24
+- coupled-inventory-shared-oracle · CONSUMED · v0.4.5 — picked at definition, FR4; updated in place at the closure sweep · 2026-08-24
+- scan-test-vacuity-guard · CONSUMED · v0.4.5 — picked at definition, FR5; updated in place at the closure sweep · 2026-08-24
+- doctor-slug-ownership-uniqueness · CONSUMED · v0.4.5 — picked at definition, FR9 (invariant or recorded rule-out, AS-4); updated in place at the closure sweep · 2026-08-24
+- bug-append-write-time-denylist-redaction · CONSUMED · v0.4.5 — picked at definition, FR6; updated in place at the closure sweep · 2026-08-24
+- specs-init-symlinked-target-refusal · CONSUMED · v0.4.5 — picked at definition, FR8; updated in place at the closure sweep · 2026-08-24
+- bug-event-control-character-sanitation · CONSUMED · v0.4.5 — picked at definition, FR7, bundling the open MEDIUM unicode-line-separator bug; updated in place at the closure sweep · 2026-08-24
+- always-on-token-diet · CONSUMED · v0.4.5 — picked at definition, FR11 (consumed by executing and measuring the pass, AS-3); updated in place at the closure sweep · 2026-08-24
+- memory-catalog-digest-trimming · CONSUMED · v0.4.5 — picked at definition, FR12; updated in place at the closure sweep · 2026-08-24
+- persona-line-ceiling-trim · CONSUMED · v0.4.5 — picked at definition, FR13 (bounded to existing sibling mechanisms, AS-1); updated in place at the closure sweep · 2026-08-24
+- ai-surface-hygiene-residuals · CONSUMED · v0.4.5 — picked at definition, FR14; updated in place at the closure sweep · 2026-08-24
+- intent-taxonomy-vocabulary-ruling · CONSUMED · v0.4.5 — picked at definition, FR15 (executed directly on the stewardship taxonomy, AS-2); updated in place at the closure sweep · 2026-08-24
+- dadaia-references-doctor-sanction · CONSUMED · v0.4.5 — picked at definition, FR10, operator ruling O4; updated in place at the closure sweep · 2026-08-24

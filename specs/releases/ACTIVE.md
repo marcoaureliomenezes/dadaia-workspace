@@ -1,2 +1,2 @@
-release: none
-phase: ARCHIVED
+release: v0.4.5
+phase: DEFINITION
