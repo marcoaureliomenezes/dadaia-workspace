@@ -207,10 +207,15 @@ lib-originated"*. The gate and the template state opposite contracts about one f
 agent can neither maintain it nor route the change through `public/`.
 
 The structural cause is that the classifier decides **by name** what the law defines **by
-origin**. The fix is one predicate: a path is LAW when it is the workspace-root law family
-(`DADAIA.md`, `AGENTS.md`, `CLAUDE.md` at the root) **or** it is listed in
-`.dadaia/agentic/manifest.json` as a lib-originated projection. A repo's own
-domain-scoped `AGENTS.md` — fresh or existing, tracked or not — classifies MUTATING.
+origin**. The fix is one predicate built as **additive-only over a static fail-closed
+floor**: the floor — `LAW_BASENAMES` at the workspace root and at `LAW_HARNESS_DIRS`, per
+`core/workspace_layout.py` — matches LAW unconditionally, and the
+`.dadaia/agentic/manifest.json` lookup only **extends** LAW to further lib-originated
+projections; it can never remove a path from LAW. `.dadaia/agentic/manifest.json`
+classifies UNGATED on the executed path, so a security decision must not be demotable by
+editing it (CWE-284; the security-reviewer's MEDIUM finding on the definition PR). A
+repo's own domain-scoped `AGENTS.md` — fresh or existing, tracked or not — classifies
+MUTATING.
 
 **Acceptance**
 - A1.1 RED first, on the executed path: a `Write` of `repos/<fresh-slug>/AGENTS.md` in a
@@ -225,6 +230,9 @@ domain-scoped `AGENTS.md` — fresh or existing, tracked or not — classifies M
 - A1.5 The scaffold template's "edit this file directly" wording and the gate now state the
   **same** contract, proven by grep of both surfaces.
 - A1.6 Both bug ids receive a `resolved` event naming the one shared root cause.
+- A1.7 Removing an entry from `.dadaia/agentic/manifest.json` does not demote any
+  statically-floored law path out of LAW — proven on the executed path (`classify_path`
+  called directly). The manifest arm only **extends** LAW; it never shrinks it.
 
 #### The five remaining sweep items (no FR — Arm B, `dd-bug-fix` + the FR23 evidence gate)
 
@@ -371,6 +379,10 @@ the round-trip and `bugs status` renders titles raw (**CWE-117**, spoofed CLI ou
 - A7.4 Every historical event in `specs/bugs/bugs.jsonl` still parses after the change —
   proven by a full read of the live ledger, and no historical event is rewritten.
 - A7.5 The bug receives a `resolved` event carrying the three FR23 evidence fields.
+- A7.6 At the write seam, sanitation runs **before** redaction, so the redaction pass sees
+  normalized text — proven by two fixtures: a field carrying a denylisted term interrupted
+  by U+2028, and one carrying it interrupted by ESC, both masked in the written record.
+  One ordering line at the one seam — no second guard.
 
 #### FR8 — `specs init --specs-dir` refuses a symlinked target · **size S**
 
