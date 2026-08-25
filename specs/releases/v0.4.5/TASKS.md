@@ -231,7 +231,7 @@ decision — no per-repo exception list, no flag, no second classification path.
 
 ---
 
-- [-] **T-045-05 — [shell] Install the gate fix and probe it on the executed path**
+- [x] **T-045-05 — [shell] Install the gate fix and probe it on the executed path**
 
 **Owner role:** software-engineer · **Commit:** the V3 capture reference only
 
@@ -250,7 +250,7 @@ repo `AGENTS.md` write is allowed, and a manifest-tracked projection is still re
 
 ---
 
-- [ ] **T-045-06 — Bug (Arm B): `dadaia-task-manager-stale-workspace-protocol-citation`**
+- [-] **T-045-06 — Bug (Arm B): `dadaia-task-manager-stale-workspace-protocol-citation`**
 
 **Owner role:** ai-engineer · **Commit:** `fix(T-045-06): cite DADAIA.md §3 for the gate
 description in dadaia-task-manager`
