@@ -517,7 +517,7 @@ least three sampled tests RED.
 
 ---
 
-- [-] **T-045-18 — `S2` close: `qa-engineer` review committed on the branch**
+- [x] **T-045-18 — `S2` close: `qa-engineer` review committed on the branch**
 
 **Owner role:** qa-engineer · **Commit:** `docs(T-045-18): S2 QA close`
 
