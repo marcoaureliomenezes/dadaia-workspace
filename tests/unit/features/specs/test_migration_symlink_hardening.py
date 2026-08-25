@@ -13,7 +13,7 @@ or touched by the retired-frontmatter-keys work, so the third recurrence cannot 
 quietly.
 
 The ``AtomicWriterCase`` battery below pins BEHAVIOUR, not source text, across every one
-of the package's 9 atomic-writer primitives (mkstemp/uuid tmp-file + ``os.replace``) —
+of the package's 10 atomic-writer primitives (mkstemp/uuid tmp-file + ``os.replace``) —
 replacing a prior guard that sliced two of them on triple-quote boundaries and compared
 stripped lines (broke on a reworded comment, mis-sliced on an embedded triple-quoted
 literal, raised ``IndexError`` instead of asserting on a missing docstring, and never
@@ -25,6 +25,13 @@ to named helpers that already existed. T-044-45 F-4 fixed the writer (unique ``u
 name, matching the idiom below) and added it here as the 9th entry, plus a self-enforcing
 scan test (``test_census_covers_every_atomic_writer_def_in_the_package``) so the *next*
 new writer cannot silently escape the same way.
+
+A 10th, ``core.atomic_write.atomic_write`` (v0.4.5 FR2/T-045-12, architect ruling AR-1),
+is the eleven writers' eventual single replacement — pinned here at its default
+configuration only, so this census stays green; the full preserve-mode x content-kind x
+failure-point matrix it actually supports lives in
+``tests/unit/core/test_atomic_write.py``. EXPAND phase (D7): no call site below moves or
+is deleted by this addition.
 """
 
 from __future__ import annotations
@@ -40,6 +47,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.atomic_write import atomic_write as _core_atomic_write
 from dadaia_workspace.features.migrate.agent_tier_frontmatter import (
     migrate_agent_tier_frontmatter,
 )
@@ -269,7 +277,7 @@ def test_read_only_atom_is_left_alone(tmp_path: Path) -> None:
 
 @dataclass(frozen=True)
 class AtomicWriterCase:
-    """One of the package's 9 atomic-writer primitives, called at its real entry point.
+    """One of the package's 10 atomic-writer primitives, called at its real entry point.
 
     ``preserves_mode``/``cleans_up_on_failure`` are the ACTUAL, empirically-verified
     contract of the writer named by ``id`` — not an aspiration. Where a writer's real
@@ -323,7 +331,19 @@ def _write_state_v3(path: Path, marker: str) -> None:
     _state_v3_atomic_write_json(path, {"marker": marker})
 
 
-# The 9 atomic-writer primitives in the package: every ``def`` (module- or class-level)
+def _write_core_primitive(path: Path, marker: str) -> None:
+    # Default-configured call (preserve_mode=False, newline="" LF-forced) — the ONE
+    # combination this shared battery characterizes. The full preserve-mode x
+    # content-kind x failure-point parameter matrix (v0.4.5 FR2/T-045-12) is the
+    # dedicated subject of tests/unit/core/test_atomic_write.py; this entry exists only
+    # so the primitive's own def does not silently escape this census (T-044-45's
+    # documented purpose), now that core/atomic_write.py is the eleven writers'
+    # eventual replacement (T-045-13/14 switch the call sites; none moved here — EXPAND
+    # only, D7).
+    _core_atomic_write(path, f"{marker}\n")
+
+
+# The 10 atomic-writer primitives in the package: every ``def`` (module- or class-level)
 # whose name contains "atomic" as a whole snake_case token — see
 # ``_atomic_writer_def_names`` below, which is this same criterion made executable
 # (T-044-45 F-4: the original grep-by-hand census missed ``state_v3``'s writer because
@@ -407,6 +427,14 @@ _ATOMIC_WRITER_CASES: list[AtomicWriterCase] = [
         preserves_mode=False,
         cleans_up_on_failure=True,
         lf_bytes_guaranteed=False,  # Path.write_text(json.dumps(...)) with no newline=
+    ),
+    AtomicWriterCase(
+        id="core.atomic_write.atomic_write",
+        write=_write_core_primitive,
+        replace_target="dadaia_workspace.core.atomic_write.os.replace",
+        preserves_mode=False,  # default preserve_mode=False at this call site
+        cleans_up_on_failure=True,  # unconditional, by design (AR-1 condition 5)
+        lf_bytes_guaranteed=True,  # default newline="" — LF-preserving on every platform
     ),
 ]
 

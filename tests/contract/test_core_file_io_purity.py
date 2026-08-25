@@ -48,9 +48,19 @@ _CORE_DIR = _REPO_ROOT / "dadaia_workspace" / "core"
 # placeholder atoms from old-scaffold trees (v0.2.9 — the one home both repair surfaces,
 # features.specs and features.migrate, may import without a forbidden sibling edge);
 # specs_resolver + workspace_resolver walk
-# the filesystem). architecture.md pins this exact set.
+# the filesystem; atomic_write (v0.4.5 FR2/T-045-12, architect ruling AR-1: UPHOLD D5) is
+# the single atomic tmp-file + os.replace primitive for hooks/infrastructure/features —
+# same precedent as specs_repair, exercised deliberately per this ratchet's own
+# prescribed path, not re-opened by accident). architecture.md pins this exact set.
 _AUTHORIZED_STEMS: frozenset[str] = frozenset(
-    {"specs_backup", "specs_repair", "specs_version", "specs_resolver", "workspace_resolver"}
+    {
+        "specs_backup",
+        "specs_repair",
+        "specs_version",
+        "specs_resolver",
+        "workspace_resolver",
+        "atomic_write",
+    }
 )
 
 # pathlib.Path (and os.PathLike) write/read/traversal helpers flagged by attribute name.
