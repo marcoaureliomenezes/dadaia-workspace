@@ -3,7 +3,7 @@
 Reads/writes the operator-editable overlay at
 ``.dadaia/states/agent_model_policy.json`` (schema ``agent-model-policy-v1`` —
 ``public/schemas/agent-model-policy-v1.schema.json``):
-atomic temp+rename write (``tempfile.mkstemp`` in the target dir → ``os.replace``) and a
+atomic temp+rename write (``core.atomic_write.atomic_write``, T-045-13) and a
 ``.last-good.json`` backup of the prior valid file.
 
 Two load paths, deliberately distinct (NFR-4, "missing != invalid"):
