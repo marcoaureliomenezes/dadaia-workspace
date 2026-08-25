@@ -272,7 +272,7 @@ ratified nine-skill `dadaia-task-manager` Update (O3) — that release rebases o
 
 ---
 
-- [-] **T-045-07 — Bug (Arm B): `certify-skip-detail-leaks-full-codex-output` (CWE-532)**
+- [x] **T-045-07 — Bug (Arm B): `certify-skip-detail-leaks-full-codex-output` (CWE-532)**
 
 **Owner role:** software-engineer · **Commit:** `fix(T-045-07): certify detail carries only
 the parsed error message, redacted and capped`
@@ -294,7 +294,7 @@ event with the three fields.
 
 ---
 
-- [ ] **T-045-08 — Bug (Arm B): `codex-probe-unit-fixture-carries-real-session-uuid`**
+- [-] **T-045-08 — Bug (Arm B): `codex-probe-unit-fixture-carries-real-session-uuid`**
 
 **Owner role:** software-engineer · **Commit:** `fix(T-045-08): synthetic session UUID in
 the codex probe fixture`
