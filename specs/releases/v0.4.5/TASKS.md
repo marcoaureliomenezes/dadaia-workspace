@@ -430,7 +430,7 @@ posture unchanged, measured.
 
 ---
 
-- [-] **T-045-14 — FR2 (contract): delete the writers, land the derived census**
+- [x] **T-045-14 — FR2 (contract): delete the writers, land the derived census**
 
 **Owner role:** software-engineer · **Commit:** `refactor(T-045-14): delete the eight named
 and three inline atomic writers`
@@ -453,7 +453,7 @@ net-negative, measured.
 
 ---
 
-- [ ] **T-045-15 — FR3: split the inventory out of the two byte goldens**
+- [-] **T-045-15 — FR3: split the inventory out of the two byte goldens**
 
 **Owner role:** software-engineer · **Commit:** `test(T-045-15): policy-only byte goldens,
 derived roster for the inventory`
