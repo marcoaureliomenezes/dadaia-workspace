@@ -374,10 +374,14 @@ _ATOMIC_WRITER_CASES: list[AtomicWriterCase] = [
         write=_write_hooks_common,
         replace_target="dadaia_workspace.hooks._common.os.replace",
         preserves_mode=False,
-        # Known gap — bug `two-atomic-writers-leak-temp-file-on-injected-os-replace-failure`
-        # (registered alongside this battery): no cleanup wrapper around os.replace.
-        cleans_up_on_failure=False,
-        lf_bytes_guaranteed=False,  # Path.write_text(...) with no newline= override
+        # T-045-13: now a thin shim delegating to core.atomic_write.atomic_write (AR-1),
+        # whose temp cleanup is unconditional on every failure path (T-045-12 condition
+        # 5). Fixes bug `two-atomic-writers-leak-temp-file-on-injected-os-replace-failure`
+        # by construction, not by a patch at this call site — this test is the regression
+        # evidence for THIS writer; public_assets_common._atomic_write_text carries the
+        # same fix in the next commit (T-045-13 infrastructure family).
+        cleans_up_on_failure=True,
+        lf_bytes_guaranteed=False,  # newline=None — platform-default translation preserved
     ),
     AtomicWriterCase(
         id="public_assets_common._atomic_write_text",
@@ -532,9 +536,11 @@ def test_atomic_writer_temp_file_on_injected_replace_failure(
 ) -> None:
     """When ``os.replace`` itself fails, the temp file must not survive — a leaked
     ``.tmp`` sibling next to a real atom/state file is exactly the drift class this
-    guard exists to catch. 7 of 9 writers clean up; 2 currently do not (documented gap,
-    bug `two-atomic-writers-leak-temp-file-on-injected-os-replace-failure` — pinned here
-    as CURRENT behaviour, not silently accepted as correct)."""
+    guard exists to catch. T-045-13 (hooks family): hooks._common.atomic_write_text now
+    cleans up, closing its half of bug
+    `two-atomic-writers-leak-temp-file-on-injected-os-replace-failure`; 8 of 9 writers
+    clean up, 1 (public_assets_common._atomic_write_text) still carries the documented
+    gap, closed in the very next commit (T-045-13 infrastructure family)."""
     target = tmp_path / "atom.md"
     target.write_text("orig\n", encoding="utf-8")
     before = set(tmp_path.iterdir())

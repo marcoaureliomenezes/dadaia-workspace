@@ -20,10 +20,10 @@ import json
 import os
 import re
 import sys
-import uuid
 from pathlib import Path
 from typing import Any
 
+from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.core.session_env import HARNESS_SESSION_ID_ENV_VARS
 
@@ -231,8 +231,12 @@ def default_python_bin(workspace: Path) -> str:
 def atomic_write_text(path: Path, text: str) -> None:
     """Write ``text`` to ``path`` atomically via a temp file + ``os.replace`` (UTF-8).
 
-    ``os.replace`` is atomic-over-existing on both POSIX and Windows, unlike ``os.rename``.
+    Thin call-through shim (T-045-13) onto the package's one atomic-write primitive
+    (``core.atomic_write.atomic_write``, AR-1). ``newline=None`` matches this writer's
+    original behaviour — platform-default newline translation, no ``newline=""``
+    override — and, as a side effect of delegating, closes the temp-leak-on-injected-
+    ``os.replace``-failure gap this writer used to carry (bug
+    ``two-atomic-writers-leak-temp-file-on-injected-os-replace-failure``): the primitive
+    cleans up its temp sibling on every failure path, unconditionally.
     """
-    tmp = path.with_suffix(f".{uuid.uuid4().hex}.tmp")
-    tmp.write_text(text, encoding="utf-8")
-    os.replace(tmp, path)
+    atomic_write(path, text, newline=None)
