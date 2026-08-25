@@ -382,7 +382,7 @@ D5, state the alternative home **and** whether one sanctioned import-light dupli
 
 ---
 
-- [-] **T-045-12 — FR2 (expand): the primitive and its injected-failure battery**
+- [x] **T-045-12 — FR2 (expand): the primitive and its injected-failure battery**
 
 **Owner role:** software-engineer · **Commit:** `feat(T-045-12): one atomic-write primitive
 with temp cleanup on every failure path`
@@ -404,7 +404,7 @@ task** — the net exists before anything is cut (D7).
 
 ---
 
-- [ ] **T-045-13 — FR2 (switch): eleven call sites move to the primitive**
+- [-] **T-045-13 — FR2 (switch): eleven call sites move to the primitive**
 
 **Owner role:** software-engineer · **Commit:** one coherent commit per module family,
 `refactor(T-045-13): route <module> through the atomic-write primitive`
