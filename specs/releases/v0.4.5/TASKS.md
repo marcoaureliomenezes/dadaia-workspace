@@ -453,7 +453,7 @@ net-negative, measured.
 
 ---
 
-- [-] **T-045-15 — FR3: split the inventory out of the two byte goldens**
+- [x] **T-045-15 — FR3: split the inventory out of the two byte goldens**
 
 **Owner role:** software-engineer · **Commit:** `test(T-045-15): policy-only byte goldens,
 derived roster for the inventory`
@@ -474,7 +474,7 @@ keep policy-only assertions. Prove by an executed fixture: adding a throwaway as
 
 ---
 
-- [ ] **T-045-16 — FR4: one shared skill-inventory oracle**
+- [-] **T-045-16 — FR4: one shared skill-inventory oracle**
 
 **Owner role:** software-engineer · **Commit:** `test(T-045-16): one derived skill-inventory
 oracle replaces three hand-kept lists`
