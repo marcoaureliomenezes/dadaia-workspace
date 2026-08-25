@@ -360,7 +360,7 @@ term in the artifact.
 
 ## Segment `S2` — structural consolidation
 
-- [-] **T-045-11 — AR-1: the atomic-write primitive's home, ruled**
+- [x] **T-045-11 — AR-1: the atomic-write primitive's home, ruled**
 
 **Owner role:** software-architect · **Commit:** `docs(T-045-11): AR-1 ruling — atomic-write
 home`
@@ -382,7 +382,7 @@ D5, state the alternative home **and** whether one sanctioned import-light dupli
 
 ---
 
-- [ ] **T-045-12 — FR2 (expand): the primitive and its injected-failure battery**
+- [-] **T-045-12 — FR2 (expand): the primitive and its injected-failure battery**
 
 **Owner role:** software-engineer · **Commit:** `feat(T-045-12): one atomic-write primitive
 with temp cleanup on every failure path`
