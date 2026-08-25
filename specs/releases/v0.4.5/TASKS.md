@@ -250,7 +250,7 @@ repo `AGENTS.md` write is allowed, and a manifest-tracked projection is still re
 
 ---
 
-- [-] **T-045-06 — Bug (Arm B): `dadaia-task-manager-stale-workspace-protocol-citation`**
+- [x] **T-045-06 — Bug (Arm B): `dadaia-task-manager-stale-workspace-protocol-citation`**
 
 **Owner role:** ai-engineer · **Commit:** `fix(T-045-06): cite DADAIA.md §3 for the gate
 description in dadaia-task-manager`
@@ -272,7 +272,7 @@ ratified nine-skill `dadaia-task-manager` Update (O3) — that release rebases o
 
 ---
 
-- [ ] **T-045-07 — Bug (Arm B): `certify-skip-detail-leaks-full-codex-output` (CWE-532)**
+- [-] **T-045-07 — Bug (Arm B): `certify-skip-detail-leaks-full-codex-output` (CWE-532)**
 
 **Owner role:** software-engineer · **Commit:** `fix(T-045-07): certify detail carries only
 the parsed error message, redacted and capped`
