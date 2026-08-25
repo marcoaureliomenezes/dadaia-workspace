@@ -314,7 +314,7 @@ fixture retires in the same commit.
 
 ---
 
-- [-] **T-045-09 — Bug (Arm B, time-boxed): `windows-xdist-workers-crash-on-unit-fast-tier`**
+- [x] **T-045-09 — Bug (Arm B, time-boxed): `windows-xdist-workers-crash-on-unit-fast-tier`**
 
 **Owner role:** software-engineer (attempt) + `qa-engineer` (verdict) · **Commit:**
 `fix(T-045-09): <root cause>` **or** `test(T-045-09): quarantine <selector> per QA verdict`
@@ -339,7 +339,7 @@ verdict plus the CLOSURE record of the still-open bug.
 
 ---
 
-- [ ] **T-045-10 — `S1` close: `qa-engineer` review committed on the branch**
+- [-] **T-045-10 — `S1` close: `qa-engineer` review committed on the branch**
 
 **Owner role:** qa-engineer · **Commit:** `docs(T-045-10): S1 QA close`
 
