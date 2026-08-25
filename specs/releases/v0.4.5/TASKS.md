@@ -496,7 +496,7 @@ v0.4.4 bugs — the reviewer's bug-surface verdict must say so.
 
 ---
 
-- [-] **T-045-17 — FR5: the scan-test vacuity convention**
+- [x] **T-045-17 — FR5: the scan-test vacuity convention**
 
 **Owner role:** software-engineer · **Commit:** `test(T-045-17): non-empty population +
 sentinel on the tree-walking scan tests`
@@ -517,7 +517,7 @@ least three sampled tests RED.
 
 ---
 
-- [ ] **T-045-18 — `S2` close: `qa-engineer` review committed on the branch**
+- [-] **T-045-18 — `S2` close: `qa-engineer` review committed on the branch**
 
 **Owner role:** qa-engineer · **Commit:** `docs(T-045-18): S2 QA close`
 
