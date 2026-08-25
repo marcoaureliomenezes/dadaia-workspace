@@ -21,6 +21,9 @@ no fs/subprocess needed there.
 from __future__ import annotations
 
 import json
+import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -31,6 +34,8 @@ from dadaia_workspace.infrastructure.public_assets import (
     _PRIVACY_DENYLIST_ENV,
     FileSystemPublicAssetManager,
 )
+from tests.helpers import public_asset_roster
+from tests.helpers.skill_inventory_oracle import skill_names
 
 
 def _rendered(result: object) -> list[str]:
@@ -82,7 +87,12 @@ def test_stage_manifest_codex_adapters_and_install_all(
     assert (workspace / ".dadaia" / "AGENTS.md").exists()
     assert (workspace / ".dadaia" / "tmp" / "AGENTS.md").exists()
     assert (workspace / ".dadaia" / "states" / "AGENTS.md").exists()
-    assert (workspace / ".agents" / "skills" / "dd-grill-me" / "SKILL.md").exists()
+    # Every skill installed carries its SKILL.md — derived from the one shared
+    # oracle (v0.4.5 FR4), never one hand-picked skill name.
+    for skill in skill_names():
+        assert (workspace / ".agents" / "skills" / skill / "SKILL.md").exists(), (
+            f".agents/skills/{skill}/SKILL.md not installed"
+        )
     assert (workspace / ".claude" / "agents" / "software-architect.md").exists()
     assert (workspace / ".codex" / "hooks.json").exists()
     assert (workspace / ".codex" / "config.toml").exists()
@@ -481,3 +491,99 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
     assert any(r.startswith("[drift]") and "agent-model-policy" in r for r in reports3), [
         r for r in reports3 if "policy" in r
     ]
+
+
+# ---------------------------------------------------------------------------
+# FR4 — one derived skill-inventory oracle replaces three hand-kept lists.
+# ---------------------------------------------------------------------------
+
+_ORPHAN_SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "check_skill_orphans.py"
+
+
+def test_a_single_skill_rename_is_green_everywhere_after_one_place(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Intent: CONTRACT — v0.4.5 A4.1, A4.2, A4.3
+
+    Executed proof (not reasoning) that ``tests.helpers.skill_inventory_oracle`` is the
+    ONE shared source every former hand-kept inventory now reads. This seam produced
+    two v0.4.4 bugs: a skill added/renamed/removed under
+    ``dadaia_workspace/public/skills/`` and forgotten in one of three independently
+    kept lists — ``test_public_pipeline.py``'s ``EXPECTED_SKILLS`` literal, this file's
+    single hand-picked skill path assertion, and ``check_skill_orphans.py``'s own
+    ``skills_dir.iterdir()`` roster. All three are gone (A4.1); each now reads
+    :func:`tests.helpers.skill_inventory_oracle.skill_names`.
+
+    A mirror tree (the T-045-15 pattern in
+    ``tests/unit/infrastructure/test_install_target_goldens.py``) is built — the real
+    ``dadaia_workspace/public/`` tree is never mutated — and ONE skill directory is
+    renamed inside it, plus the same skill's references in the three agent frontmatter
+    files that list it (the edit a real rename requires; the ORACLE ITSELF needs no
+    edit — A4.3, derived from the tree, never a literal list). What is asserted is that
+    the pipeline expectation (the former ``EXPECTED_SKILLS`` comparison), the
+    installed-asset assertion (the former hand-picked path), and the orphan checker's
+    roster (run for real, as a subprocess, against the mirror) all agree with the
+    renamed name with ZERO further edits to any of the three former lists.
+    """
+    real_public_dir = public_asset_roster.default_public_dir()
+    old_name, new_name = "dd-grill-me", "dd-grill-me-renamed-t045-16"
+    real_roster = skill_names()
+    assert old_name in real_roster
+    assert new_name not in real_roster
+
+    mirror_public = tmp_path / "mirror" / "dadaia_workspace" / "public"
+    mirror_public.parent.mkdir(parents=True)
+    shutil.copytree(real_public_dir, mirror_public)
+
+    (mirror_public / "skills" / old_name).rename(mirror_public / "skills" / new_name)
+    old_ref, new_ref = f"  - {old_name}\n", f"  - {new_name}\n"
+    rewritten_agents = 0
+    for agent_file in (mirror_public / "agents").glob("*.md"):
+        text = agent_file.read_text(encoding="utf-8")
+        if old_ref in text:
+            agent_file.write_text(text.replace(old_ref, new_ref), encoding="utf-8")
+            rewritten_agents += 1
+    assert rewritten_agents == 3, "expected exactly 3 agent frontmatter files to reference it"
+
+    mutated_roster = skill_names(mirror_public)
+    assert new_name in mutated_roster
+    assert old_name not in mutated_roster
+    assert mutated_roster == (real_roster - {old_name}) | {new_name}
+
+    # Consumer 1 — the pipeline expectation (test_public_pipeline.py's staged/installed
+    # skill-set comparison): `installed_skills == skill_names()`, now a live call, not a
+    # hardcoded literal — so it needs zero edit to reflect the rename.
+    mgr = FileSystemPublicAssetManager()
+    mgr._public_dir = mirror_public  # noqa: SLF001 — exercise the mirror only
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    mgr.install(ws, target="all")
+    installed_skills = {p.name for p in (ws / ".agents" / "skills").iterdir() if p.is_dir()}
+    assert installed_skills == mutated_roster
+
+    # Consumer 2 — the installed-asset assertion (this file's
+    # test_stage_manifest_codex_adapters_and_install_all): every oracle-listed skill
+    # has its SKILL.md installed — again zero edit needed for the rename.
+    for skill in mutated_roster:
+        assert (ws / ".agents" / "skills" / skill / "SKILL.md").exists()
+    assert not (ws / ".agents" / "skills" / old_name).exists()
+
+    # Consumer 3 — the orphan checker's roster, run for real via subprocess against the
+    # mirror (DADAIA_WORKSPACE_ROOT points at the mirror's fake workspace root): the
+    # renamed skill is wired (its reference moved with it) so the checker exits clean,
+    # proving `_all_skills()` picked up the rename with zero edit to the script.
+    monkeypatch.delenv("DADAIA_WORKSPACE_ROOT", raising=False)
+    result = subprocess.run(
+        [sys.executable, str(_ORPHAN_SCRIPT)],
+        capture_output=True,
+        text=True,
+        env={
+            "DADAIA_WORKSPACE_ROOT": str(tmp_path / "mirror"),
+            "PATH": str(Path(sys.executable).parent),
+        },
+    )
+    assert result.returncode == 0, (
+        f"orphan checker unexpectedly non-zero against the renamed mirror: "
+        f"stdout={result.stdout!r} stderr={result.stderr!r}"
+    )
+    assert result.stderr.strip() == "", result.stderr

@@ -19,6 +19,7 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app as cli_app
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+from tests.helpers.skill_inventory_oracle import skill_names
 
 # NEVER pass mix_stderr (removed in Click 8.2; the installed 8.4.1 TypeErrors on it) —
 # QA-atom law (v0.1.57). stdout/stderr are read as separate channels.
@@ -47,29 +48,9 @@ STALE_AGENTS = {
     "architect-agent",
 }
 
-EXPECTED_SKILLS = {
-    "architect-core-workflow",
-    "dadaia-handoff-emitter",
-    "dadaia-step0-memory-bootstrap",
-    "dadaia-task-manager",
-    "dadaia-test-stewardship",
-    "dadaia-workspace-manager",
-    "dadaia-workspace-spec-navigator",
-    "dadaia-workspace-spec-reviewer",
-    "dd-ai-eng-knowhow",
-    "dd-audit-project",
-    "dd-backlog-definition",
-    "dd-bug-fix",
-    "dd-bug-registration",
-    "dd-cli-library",
-    "dd-gitflow-default",
-    "dd-grill-me",
-    "dd-manager-orchestration",
-    "dd-release-definition",
-    "dd-release-implement",
-    "dd-workspace-doctor",
-    "dev-server-registry",
-}
+# The skill roster is NOT hand-kept here (v0.4.5 FR4, coupled-inventory-shared-oracle):
+# it is derived at assertion time by tests.helpers.skill_inventory_oracle.skill_names(),
+# the one oracle every skill-roster consumer in this repo now reads.
 
 # Required YAML fields in every STAGED agent's frontmatter. v0.1.65 FR1: staged core
 # bodies are model-agnostic (`model:`/`effort:` are injected at install-time by the
@@ -188,10 +169,11 @@ class TestStage:
 
         skills_dir = agentic / "skills"
         staged_skills = {p.name for p in skills_dir.iterdir() if p.is_dir()}
-        assert staged_skills == EXPECTED_SKILLS, (
+        expected_skills = skill_names()
+        assert staged_skills == expected_skills, (
             f"Staged skills mismatch.\n"
-            f"  Missing: {sorted(EXPECTED_SKILLS - staged_skills)}\n"
-            f"  Extra:   {sorted(staged_skills - EXPECTED_SKILLS)}"
+            f"  Missing: {sorted(expected_skills - staged_skills)}\n"
+            f"  Extra:   {sorted(staged_skills - expected_skills)}"
         )
 
 
@@ -216,10 +198,11 @@ class TestInstallAll:
 
         skills_dir = workspace / ".agents" / "skills"
         installed_skills = {p.name for p in skills_dir.iterdir() if p.is_dir()}
-        assert installed_skills == EXPECTED_SKILLS, (
+        expected_skills = skill_names()
+        assert installed_skills == expected_skills, (
             f".agents/skills/ mismatch.\n"
-            f"  Missing: {sorted(EXPECTED_SKILLS - installed_skills)}\n"
-            f"  Extra:   {sorted(installed_skills - EXPECTED_SKILLS)}"
+            f"  Missing: {sorted(expected_skills - installed_skills)}\n"
+            f"  Extra:   {sorted(installed_skills - expected_skills)}"
         )
 
     def test_install_all_creates_codex_config_files(self, tmp_path: Path) -> None:
@@ -247,7 +230,8 @@ class TestContentConsistency:
         installed Claude agents retain `tools:`, and every staged skill dir has a
         SKILL.md. Also folds the retired `us7_skill_file_exists` content asserts
         (`dadaia server list/next/register/release` mentioned in the dev-server-registry
-        skill) since skill presence is already pinned by EXPECTED_SKILLS."""
+        skill) since skill presence is already pinned by the one derived skill-inventory
+        oracle (`tests.helpers.skill_inventory_oracle.skill_names`)."""
         workspace = tmp_path / "ws"
         _staged_install(workspace)
 
