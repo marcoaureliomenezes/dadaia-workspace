@@ -22,6 +22,8 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
+from tests.helpers.scan_population import assert_populated
+
 # Repo root = three parents up from tests/contract/<this file>.
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _PKG_ROOT = _REPO_ROOT / "dadaia_workspace"
@@ -52,8 +54,12 @@ def _is_sqlite3_connect(node: ast.AST) -> bool:
 
 def _connect_sites() -> dict[str, list[int]]:
     """Map repo-relative POSIX path → sorted line numbers of sqlite3.connect calls."""
+    py_files = sorted(_PKG_ROOT.rglob("*.py"))
+    # v0.4.5 FR5 (scan-test-vacuity-guard): a mis-rooted _PKG_ROOT would degrade this
+    # walk to zero files, under which `assert not violations` below passes vacuously.
+    assert_populated(py_files, sentinel=_PKG_ROOT / _FACTORY_INTERNAL.split("/", 1)[1])
     sites: dict[str, list[int]] = {}
-    for py_file in sorted(_PKG_ROOT.rglob("*.py")):
+    for py_file in py_files:
         try:
             tree = ast.parse(py_file.read_text(encoding="utf-8"), filename=str(py_file))
         except (SyntaxError, UnicodeDecodeError) as exc:  # pragma: no cover - defensive

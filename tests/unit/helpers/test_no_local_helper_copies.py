@@ -12,6 +12,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.helpers.scan_population import assert_populated
+
 pytestmark = pytest.mark.unit
 
 _TESTS_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -46,7 +48,10 @@ _BESPOKE_EXEMPT = frozenset(
 
 def _test_files() -> list[Path]:
     files = [p for p in _TESTS_ROOT.rglob("*.py") if "_golden" not in p.parts]
-    assert files, "test tree not found"
+    # v0.4.5 FR5 (scan-test-vacuity-guard): non-empty alone still leaves a partially
+    # mis-rooted walk undetected; the sentinel half pins this file as a member of its
+    # own scanned population.
+    assert_populated(files, sentinel=Path(__file__))
     return files
 
 

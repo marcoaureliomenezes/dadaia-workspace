@@ -53,6 +53,7 @@ from tests.helpers.golden_platform import (
     norm_path_line,
     sort_line_lists,
 )
+from tests.helpers.scan_population import assert_populated
 
 
 def _rendered(result: object) -> list[str]:
@@ -354,6 +355,10 @@ def test_absent_profile_doctor_stage_lines_match_the_public_asset_roster(
     (``public_asset_roster.scan()``), never a second hand-kept list.
     """
     roster = set(public_asset_roster.scan())
+    # v0.4.5 FR5 (scan-test-vacuity-guard): a mis-rooted public/ scan would degrade
+    # `roster` to empty, mirroring the same risk this file's counterpart in
+    # test_install_target_goldens.py closes.
+    assert_populated(roster, sentinel="skills/dd-cli-library/SKILL.md")
     ws = tmp_path / "doctor_all_four_roster"
     ws.mkdir()
     mgr = FileSystemPublicAssetManager()

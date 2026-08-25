@@ -30,6 +30,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.helpers.scan_population import assert_populated
+
 pytestmark = pytest.mark.contract
 
 # The canonical release-SemVer pattern string. Held as a literal here (not imported) so
@@ -70,8 +72,13 @@ def _find_semver_compile_sites() -> list[str]:
     constant equal to :data:`_SEMVER_PATTERN` counts — comments, docstrings, and help
     text that merely mention ``vX.Y.Z`` never match.
     """
+    py_paths = sorted(_PKG_ROOT.rglob("*.py"))
+    # v0.4.5 FR5 (scan-test-vacuity-guard): a mis-rooted _PKG_ROOT would degrade this
+    # walk to zero files, under which `offenders == []` below passes vacuously (the
+    # IDENTITY checks above import the canon directly and would not catch it).
+    assert_populated(py_paths, sentinel=_PKG_ROOT / _CANON_REL)
     offenders: list[str] = []
-    for py_path in sorted(_PKG_ROOT.rglob("*.py")):
+    for py_path in py_paths:
         rel = py_path.relative_to(_PKG_ROOT)
         if rel == _CANON_REL:
             continue

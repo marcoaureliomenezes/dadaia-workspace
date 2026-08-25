@@ -96,6 +96,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.helpers.scan_population import assert_populated
+
 pytestmark = pytest.mark.contract
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -226,8 +228,10 @@ def test_no_file_combines_a_frozen_datetime_constant_with_a_real_clock_call() ->
     """No ``tests/**`` file declares a frozen datetime constant AND calls
     ``time.time()``/``datetime.now()`` in the same file — see the module docstring for the
     precise rule and why every currently-known aging site stays green under it."""
+    files = _test_files()
+    assert_populated(files, sentinel=Path(__file__))
     violations: list[str] = []
-    for path in _test_files():
+    for path in files:
         constants, clock_calls = _offenses(path.read_text(encoding="utf-8"))
         if constants and clock_calls:
             rel = path.relative_to(_REPO_ROOT)

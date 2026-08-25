@@ -44,6 +44,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.helpers.scan_population import assert_populated
+
 pytestmark = pytest.mark.contract
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -133,6 +135,9 @@ def test_thin_wrapper_registry_stays_data_driven_and_correctly_scoped() -> None:
     # Every *.py under public/scripts/ is accounted for by exactly one bucket, so a
     # brand-new script cannot silently sit outside this contract's reasoning.
     all_scripts = {p.name for p in _SCRIPTS_DIR.glob("*.py")}
+    # v0.4.5 FR5 (scan-test-vacuity-guard): a mis-rooted _SCRIPTS_DIR would degrade
+    # this to an empty set, under which `unaccounted` below is trivially empty too.
+    assert_populated(all_scripts, sentinel="lint-memory-atoms.py")
     known = set(_THIN_WRAPPER_SCRIPTS) | _STANDALONE_BY_DESIGN | _PARTIALLY_ONE_SOURCED
     unaccounted = all_scripts - known
     assert not unaccounted, (

@@ -38,6 +38,8 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
+from tests.helpers.scan_population import assert_populated
+
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _PACKAGE_ROOT = _REPO_ROOT / "dadaia_workspace"
 
@@ -88,8 +90,14 @@ def _writes_then_replaces(func: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
 def _temp_then_replace_writer_defs(package_root: Path) -> list[str]:
     """Every module- or class-level ``def`` anywhere under *package_root* matching the
     temp-then-replace content-write idiom, as ``<relative-path>:<line>:<name>``."""
+    files = sorted(package_root.rglob("*.py"))
+    # v0.4.5 FR5 (scan-test-vacuity-guard): belt-and-suspenders — the sole-definition
+    # assertion below is already non-vacuous (an empty scan yields `hits == []`, which
+    # fails the `== [_EXPECTED_SOLE_DEFINITION]` check), but this guard keeps the
+    # convention uniform and catches the mis-root loudly, at the walk itself.
+    assert_populated(files, sentinel=package_root / "core" / "atomic_write.py")
     hits: list[str] = []
-    for path in sorted(package_root.rglob("*.py")):
+    for path in files:
         if "__pycache__" in path.parts:
             continue
         try:
@@ -131,8 +139,13 @@ def test_no_named_shim_or_inline_tmp_writer_survives_by_name() -> None:
         "_atomic_write_json",
         "_atomic_write_bytes",
     }
+    files = sorted(_PACKAGE_ROOT.rglob("*.py"))
+    # v0.4.5 FR5 (scan-test-vacuity-guard): a mis-rooted _PACKAGE_ROOT would degrade
+    # this walk to zero files, under which `hits == []` below passes vacuously —
+    # the exact companion check this belt-and-suspenders test exists to strengthen.
+    assert_populated(files, sentinel=_PACKAGE_ROOT / "core" / "atomic_write.py")
     hits: list[str] = []
-    for path in sorted(_PACKAGE_ROOT.rglob("*.py")):
+    for path in files:
         if "__pycache__" in path.parts:
             continue
         try:

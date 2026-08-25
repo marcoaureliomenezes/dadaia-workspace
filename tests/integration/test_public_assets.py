@@ -35,6 +35,7 @@ from dadaia_workspace.infrastructure.public_assets import (
     FileSystemPublicAssetManager,
 )
 from tests.helpers import public_asset_roster
+from tests.helpers.scan_population import assert_populated
 from tests.helpers.skill_inventory_oracle import skill_names
 
 
@@ -89,7 +90,11 @@ def test_stage_manifest_codex_adapters_and_install_all(
     assert (workspace / ".dadaia" / "states" / "AGENTS.md").exists()
     # Every skill installed carries its SKILL.md — derived from the one shared
     # oracle (v0.4.5 FR4), never one hand-picked skill name.
-    for skill in skill_names():
+    oracle_skills = skill_names()
+    # v0.4.5 FR5 (scan-test-vacuity-guard): a mis-rooted oracle scan would degrade
+    # `oracle_skills` to empty, under which this loop asserts nothing at all.
+    assert_populated(oracle_skills, sentinel="dd-cli-library")
+    for skill in oracle_skills:
         assert (workspace / ".agents" / "skills" / skill / "SKILL.md").exists(), (
             f".agents/skills/{skill}/SKILL.md not installed"
         )

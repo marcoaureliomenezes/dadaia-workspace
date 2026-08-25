@@ -38,6 +38,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.helpers.scan_population import assert_populated
+
 pytestmark = pytest.mark.contract
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -110,8 +112,12 @@ def test_core_file_io_purity_ratchet_and_authorized_set_grounded() -> None:
     """No unauthorized ``core/`` module performs file I/O (the ratchet is GREEN), and
     every authorized stem names a real ``core/`` module (no stale exception — a stem
     that no longer maps to a file would silently widen the exception surface)."""
+    modules = _core_modules()
+    # v0.4.5 FR5 (scan-test-vacuity-guard): a mis-rooted _CORE_DIR would degrade this
+    # walk to zero modules, under which `assert not violations` below passes vacuously.
+    assert_populated(modules, sentinel=_CORE_DIR / "atomic_write.py")
     violations: list[str] = []
-    for module in _core_modules():
+    for module in modules:
         if module.stem in _AUTHORIZED_STEMS:
             continue
         for lineno, description in _file_io_offenses(module.read_text(encoding="utf-8")):

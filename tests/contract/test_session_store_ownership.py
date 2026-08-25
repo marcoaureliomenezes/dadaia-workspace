@@ -26,6 +26,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from tests.helpers.scan_population import assert_populated
+
 OWNER_RELPATH = "dadaia_workspace/features/spec_context/session_identity.py"
 
 #: Idiom for the retired pointer namespace ``sessions/runtime/*.ptr``.
@@ -84,10 +86,15 @@ def test_pointer_and_record_namespace_residue_is_owner_or_allowlisted_only() -> 
     outside the owner), and session-record paths are built only by the owner or an
     allowlisted consumer."""
     repo = _repo_root()
+    py_files = list(_iter_py_files(repo / ACTIVE_PRODUCT_ROOT))
+    # v0.4.5 FR5 (scan-test-vacuity-guard): a mis-rooted ACTIVE_PRODUCT_ROOT would
+    # degrade this walk to zero files, under which both `== []` assertions below pass
+    # vacuously green.
+    assert_populated(py_files, sentinel=repo / OWNER_RELPATH)
     allowed = {c.relpath for c in ALLOWED_RECORD_CONSUMERS}
     pointer_failures: list[str] = []
     record_failures: list[str] = []
-    for path in _iter_py_files(repo / ACTIVE_PRODUCT_ROOT):
+    for path in py_files:
         relpath = path.relative_to(repo).as_posix()
         text = path.read_text(encoding="utf-8")
         for idiom in POINTER_IDIOMS:

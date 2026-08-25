@@ -19,6 +19,7 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app as cli_app
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+from tests.helpers.scan_population import assert_populated
 from tests.helpers.skill_inventory_oracle import skill_names
 
 # NEVER pass mix_stderr (removed in Click 8.2; the installed 8.4.1 TypeErrors on it) —
@@ -170,6 +171,11 @@ class TestStage:
         skills_dir = agentic / "skills"
         staged_skills = {p.name for p in skills_dir.iterdir() if p.is_dir()}
         expected_skills = skill_names()
+        # v0.4.5 FR5 (scan-test-vacuity-guard): a mis-rooted oracle scan would degrade
+        # `expected_skills` to empty, mirroring the same systemic-mis-root risk a
+        # simultaneously-empty `staged_skills` (derived from the SAME production
+        # public_dir) would leave uncaught.
+        assert_populated(expected_skills, sentinel="dd-cli-library")
         assert staged_skills == expected_skills, (
             f"Staged skills mismatch.\n"
             f"  Missing: {sorted(expected_skills - staged_skills)}\n"
@@ -199,6 +205,8 @@ class TestInstallAll:
         skills_dir = workspace / ".agents" / "skills"
         installed_skills = {p.name for p in skills_dir.iterdir() if p.is_dir()}
         expected_skills = skill_names()
+        # v0.4.5 FR5 (scan-test-vacuity-guard): same reasoning as TestStage above.
+        assert_populated(expected_skills, sentinel="dd-cli-library")
         assert installed_skills == expected_skills, (
             f".agents/skills/ mismatch.\n"
             f"  Missing: {sorted(expected_skills - installed_skills)}\n"

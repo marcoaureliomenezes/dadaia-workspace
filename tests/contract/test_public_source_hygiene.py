@@ -26,6 +26,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.helpers.scan_population import assert_populated
+
 pytestmark = pytest.mark.contract
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -54,7 +56,9 @@ def test_pre_push_ci_gate_ships_pyproject_excludes_bytecode_and_scripts_leave_no
     under test (the call-site ``-B`` would mask a missing guard).
     """
     listing = {p.name for p in _SCRIPTS_DIR.iterdir()}
-    assert "pre-push-ci-gate.sh" in listing
+    # v0.4.5 FR5 (scan-test-vacuity-guard): the two membership asserts already imply
+    # non-emptiness; expressed via the shared convention for grep-ability.
+    assert_populated(listing, sentinel="pre-push-ci-gate.sh")
     assert "certify-dadaia-workspace.sh" in listing
 
     pyproject = _REPO_ROOT / "pyproject.toml"

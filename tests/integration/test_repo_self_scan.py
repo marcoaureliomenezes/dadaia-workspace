@@ -118,6 +118,7 @@ import pytest
 from dadaia_workspace.core.protocols.git_object_reader import ScannedObject
 from dadaia_workspace.features.chokepoints.denylist_scan import Hit, scan_objects
 from dadaia_workspace.infrastructure.privacy_check import load_baseline_patterns
+from tests.helpers.scan_population import assert_populated
 
 # v0.11.0 entry #29: matches the six sibling integration modules that also drive real
 # subprocess/filesystem work (e.g. test_git_object_reader.py) — carrying BOTH marks
@@ -299,7 +300,10 @@ def test_no_hit_outside_the_shrink_only_baseline() -> None:
     paths = _tracked_paths(
         _REPO_ROOT, _SCAN_SCOPE + _EXTRA_PATHS, excluded_prefixes=_EXCLUDED_PREFIXES
     )
-    assert paths, "scope must resolve at least one tracked file — an empty scan proves nothing"
+    # v0.4.5 FR5 (scan-test-vacuity-guard): the non-empty half already existed; this
+    # task adds the sentinel half — `pyproject.toml` is unconditionally in-scope
+    # (_EXTRA_PATHS) and pins that `git ls-files` actually walked the real repo root.
+    assert_populated(paths, sentinel="pyproject.toml")
 
     objects = [_scan_object_for(_REPO_ROOT, path) for path in paths]
     baseline_patterns = load_baseline_patterns()

@@ -68,6 +68,7 @@ from tests.helpers.golden_platform import (
     norm_panel_body,
     norm_path_line,
 )
+from tests.helpers.scan_population import assert_populated
 
 
 def _rendered(result: object) -> list[str]:
@@ -315,6 +316,11 @@ def test_doctor_stage_lines_match_the_public_asset_roster(
     silently inside a golden diff someone regenerates without looking.
     """
     roster = set(public_asset_roster.scan())
+    # v0.4.5 FR5 (scan-test-vacuity-guard): a mis-rooted public/ scan would degrade
+    # `roster` to empty; if `doctor_lines` degraded identically (a systemic mis-root of
+    # the SAME production public_dir), `stage_paths == roster` below would pass
+    # vacuously on two empty sets.
+    assert_populated(roster, sentinel="skills/dd-cli-library/SKILL.md")
     doctor_lines = _capture_doctor(tmp_path, monkeypatch)
     stage_paths = public_asset_roster.stage_asset_paths(doctor_lines)
     assert stage_paths == roster

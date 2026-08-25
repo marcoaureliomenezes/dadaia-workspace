@@ -55,6 +55,7 @@ import pytest
 import typer
 
 from dadaia_workspace.cli.main import app
+from tests.helpers.scan_population import assert_populated
 
 pytestmark = pytest.mark.contract
 
@@ -350,8 +351,12 @@ def test_no_resolver_driven_verb_hardcodes_the_dadaia_workspace_default() -> Non
     Structural — no name list to maintain: ANY future context/specs_dir option ever
     authored with this literal default fails here, by construction (FR4 — no further
     per-command patches accepted for family F2)."""
+    commands = _walk_leaf_commands()
+    # v0.4.5 FR5 (scan-test-vacuity-guard): a broken Typer app tree could dynamically
+    # walk to zero leaf commands, under which `offenders` below stays empty vacuously.
+    assert_populated([path for path, _cmd in commands], sentinel=("bugs", "append"))
     offenders: list[str] = []
-    for path, cmd in _walk_leaf_commands():
+    for path, cmd in commands:
         for param in _resolution_params(cmd):
             if param.default == _HARDCODED_DEFAULT:
                 offenders.append(_verb_label(path, param))
