@@ -120,6 +120,58 @@ def test_allow_parity(
         assert block is None
 
 
+# ---------------------------------------------------------------------------
+# v0.4.5 FR1 (T-045-04) — a repo's own domain-scoped root AGENTS.md, fresh or
+# existing, tracked by the manifest or not, is never LAW: only the workspace root
+# and the fixed harness projection dirs (LAW_HARNESS_DIRS) are. Bugs:
+# sdd-gate-blocks-fresh-repo-root-agents-md +
+# repo-agents-md-law-gate-contradicts-template.
+# ---------------------------------------------------------------------------
+
+
+def test_fresh_repo_agents_md_write_allowed_on_executed_path(tmp_path: Path) -> None:
+    """Intent: CONTRACT — v0.4.5 A1.1 (real PreToolUse subprocess spawn).
+
+    A `Write` of repos/<fresh-slug>/AGENTS.md in a brand-new repo — the repo
+    directory exists (scaffolded by ``_mk_workspace``), the file does not — must
+    ALLOW. Before the fix this BLOCKed with the projected-law-file message.
+    """
+    ws = _mk_workspace(tmp_path, "fresh-repo")
+    target = ws / "repos" / "fresh-repo" / "AGENTS.md"
+    assert not target.exists()
+    block = _run(tmp_path, {"tool_name": "Write", "tool_input": {"file_path": str(target)}})
+    assert block is None
+
+
+def test_existing_nonmanifest_repo_agents_md_edit_allowed_on_executed_path(
+    tmp_path: Path,
+) -> None:
+    """Intent: CONTRACT — v0.4.5 A1.2 (real PreToolUse subprocess spawn, Edit tool).
+
+    An EXISTING repos/<slug>/AGENTS.md scaffolded from templates/repo-AGENTS.md
+    (carries no canonical `data/AGENTS.md` provenance banner — repo-owned content)
+    must ALLOW an `Edit`. Before the fix this BLOCKed with the projected-law-file
+    message.
+    """
+    ws = _mk_workspace(tmp_path, "existing-repo")
+    target = ws / "repos" / "existing-repo" / "AGENTS.md"
+    target.write_text(
+        "# existing-repo — Repo Rules\n\nEdit this file directly.\n", encoding="utf-8"
+    )
+    block = _run(
+        tmp_path,
+        {
+            "tool_name": "Edit",
+            "tool_input": {
+                "file_path": str(target),
+                "old_string": "Edit this file directly.",
+                "new_string": "Edit this file directly for repo-specific behavior.",
+            },
+        },
+    )
+    assert block is None
+
+
 @pytest.mark.parametrize(
     ("name", "second_header", "second_body", "expect_block", "reason_fragment"),
     [
