@@ -474,7 +474,7 @@ keep policy-only assertions. Prove by an executed fixture: adding a throwaway as
 
 ---
 
-- [-] **T-045-16 — FR4: one shared skill-inventory oracle**
+- [x] **T-045-16 — FR4: one shared skill-inventory oracle**
 
 **Owner role:** software-engineer · **Commit:** `test(T-045-16): one derived skill-inventory
 oracle replaces three hand-kept lists`
@@ -496,7 +496,7 @@ v0.4.4 bugs — the reviewer's bug-surface verdict must say so.
 
 ---
 
-- [ ] **T-045-17 — FR5: the scan-test vacuity convention**
+- [-] **T-045-17 — FR5: the scan-test vacuity convention**
 
 **Owner role:** software-engineer · **Commit:** `test(T-045-17): non-empty population +
 sentinel on the tree-walking scan tests`
