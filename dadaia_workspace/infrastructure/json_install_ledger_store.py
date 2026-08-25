@@ -19,8 +19,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.models.install_ledger import InstallLedger
-from dadaia_workspace.infrastructure.public_assets_common import _atomic_write_text
 
 _FILENAME = "install_ledger.json"
 
@@ -54,4 +54,4 @@ class JsonInstallLedgerStore:
                     return
             except OSError:
                 pass
-        _atomic_write_text(path, new_text)
+        atomic_write(path, new_text)

@@ -91,16 +91,6 @@ def _utcnow_iso() -> str:
     return datetime.now(tz=UTC).isoformat()
 
 
-def _atomic_write_json(path: Path, data: dict[str, object]) -> None:
-    """Thin call-through shim (T-045-13) onto core.atomic_write.atomic_write (AR-1).
-
-    ``ensure_parent=True`` matches this writer's original ``path.parent.mkdir(...)``
-    call; ``newline=None`` matches its original ``Path.write_text(...)`` with no
-    ``newline=""`` override (platform-default translation).
-    """
-    atomic_write(path, json.dumps(data, indent=2), ensure_parent=True, newline=None)
-
-
 def _read_json(path: Path) -> dict[str, object] | None:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -153,7 +143,7 @@ def upsert(workspace: Path, ctx: str, session_id: str, *, runtime: str, pid: int
             "started_at": started_at or now,
             "last_seen_at": now,
         }
-        _atomic_write_json(path, record)
+        atomic_write(path, json.dumps(record, indent=2), ensure_parent=True, newline=None)
     except Exception:  # noqa: BLE001 — presence must never fail a write (FR2).
         return
 
@@ -228,7 +218,7 @@ def renew(workspace: Path, session_id: str) -> int:
                 continue
             data["last_seen_at"] = _utcnow_iso()
             with contextlib.suppress(OSError):
-                _atomic_write_json(path, data)
+                atomic_write(path, json.dumps(data, indent=2), ensure_parent=True, newline=None)
                 renewed += 1
         return renewed
     except Exception:  # noqa: BLE001 — heartbeat renewal must never raise.

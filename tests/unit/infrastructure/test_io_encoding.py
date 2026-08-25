@@ -1,86 +1,21 @@
-"""Tests for UTF-8 encoding correctness in JSON store I/O and atomic write semantics.
+"""Tests for UTF-8 encoding correctness in JSON store I/O.
 
-Ensures that:
-- ``_atomic_write_text`` round-trips non-ASCII content (e.g. accented chars,
-  CJK characters) correctly via explicit UTF-8 encoding, including a rewrite over
-  an already-existing destination (atomic overwrite).
-- ``_atomic_write_text`` is atomic: it uses ``os.replace`` under the hood (never
-  ``os.rename``), and the ``.tmp`` sibling is cleaned up after a successful write.
-- JSON stores (JsonContextStore, JsonServerRegistryStore) round-trip non-ASCII
-  data (paths, project names) correctly and the files on disk are valid UTF-8.
+Non-ASCII round-trip and cleanup-on-success coverage for the package's one atomic-write
+primitive itself (``core.atomic_write.atomic_write``) lives in
+``tests/unit/core/test_atomic_write.py`` (v0.4.5 FR2/T-045-14: the eleven named/inline
+writers this file used to exercise via ``_atomic_write_text`` are gone — every call site
+now delegates directly to the primitive, so this file's remaining job is proving the
+higher-level JSON store abstraction round-trips non-ASCII data end to end, not the
+primitive's own byte-level contract).
 
-This is the SOLE owner of ``_atomic_write_text`` coverage in the suite (the
-duplicate atomic-write tests formerly in ``test_public_assets.py`` were merged
-here).
+Ensures that JSON stores (JsonContextStore, JsonServerRegistryStore) round-trip
+non-ASCII data (paths, project names) correctly and the files on disk are valid UTF-8.
 """
 
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
-from unittest.mock import patch
-
-import pytest
-
-from dadaia_workspace.infrastructure.public_assets_common import _atomic_write_text
-
-
-@pytest.mark.parametrize(
-    "content",
-    [
-        pytest.param('{"key": "value"}', id="ascii"),
-        pytest.param('{"name": "café résumé"}', id="accented"),
-        pytest.param('{"label": "日本語テスト"}', id="cjk"),
-        pytest.param('{"path": "café/日本語", "desc": "résumé — テスト"}', id="mixed-non-ascii"),
-        pytest.param("café/日本語", id="raw-utf8-bytes-no-bom"),
-    ],
-)
-def test_atomic_write_text_roundtrips_utf8(tmp_path: Path, content: str) -> None:
-    dst = tmp_path / "out.json"
-    _atomic_write_text(dst, content)
-    assert dst.read_text(encoding="utf-8") == content
-    raw = dst.read_bytes()
-    assert raw.decode("utf-8") == content
-    assert not raw.startswith(b"\xef\xbb\xbf"), "must not write a UTF-8 BOM"
-
-    # Atomic overwrite: rewriting an already-existing destination succeeds cleanly.
-    _atomic_write_text(dst, content + " ")
-    assert dst.read_text(encoding="utf-8") == content + " "
-
-
-def test_uses_os_replace_not_os_rename_and_cleans_up_tmp_sibling(tmp_path: Path) -> None:
-    """_atomic_write_text calls os.replace (not os.rename) for the swap step, and
-    the .tmp sibling file is gone after a successful write.
-
-    T-045-13: ``_atomic_write_text`` is now a thin shim onto
-    ``core.atomic_write.atomic_write`` (AR-1) — the real ``os.replace`` call happens
-    there, so the patch target follows the delegation rather than this module's own
-    (now-removed) ``os`` import.
-    """
-    dst = tmp_path / "out.json"
-    replace_calls: list[tuple[str, str]] = []
-
-    original_replace = os.replace
-
-    def tracking_replace(src: str, dst_: str) -> None:  # type: ignore[misc]
-        replace_calls.append((str(src), str(dst_)))
-        original_replace(src, dst_)
-
-    with patch(
-        "dadaia_workspace.core.atomic_write.os.replace",
-        tracking_replace,
-    ):
-        _atomic_write_text(dst, '{"x": 1}')
-
-    assert len(replace_calls) == 1, "os.replace should be called exactly once"
-    _src, _dst = replace_calls[0]
-    assert _dst == str(dst), "os.replace destination should be the target path"
-    assert _src.endswith(".tmp"), "os.replace source should be the .tmp sibling"
-
-    leftovers = [p for p in tmp_path.iterdir() if p.name.endswith(".tmp")]
-    assert leftovers == [], f".tmp sibling should be cleaned up by os.replace: {leftovers}"
-
 
 # ---------------------------------------------------------------------------
 # JSON store round-trip with non-ASCII data

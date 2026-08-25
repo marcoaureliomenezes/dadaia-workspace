@@ -24,10 +24,10 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.features.migrate.frontmatter_keys import (
     load_frontmatter_schema,
     strip_frontmatter_keys,
-    write_text_atomic,
 )
 from dadaia_workspace.features.migrate.tree_v2 import MigrateResult
 
@@ -98,7 +98,7 @@ def migrate_retired_frontmatter_keys(specs_dir: Path, *, dry_run: bool = False) 
             continue
         if not dry_run:
             try:
-                write_text_atomic(md_path, rewritten)
+                atomic_write(md_path, rewritten, preserve_mode=True)
             except OSError as exc:
                 result.skipped.append(
                     f"{md_path.name}: unwritable ({type(exc).__name__}) — skipped."

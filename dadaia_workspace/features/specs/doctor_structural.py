@@ -329,7 +329,7 @@ class StructuralValidator:
         current_text = agents_md.read_text(encoding="utf-8")
         if not was_shipped(current_text, "specs-AGENTS.md", self._templates_dir):
             return
-        _write_text_atomic(agents_md, canonical_path.read_text(encoding="utf-8"))
+        atomic_write(agents_md, canonical_path.read_text(encoding="utf-8"), preserve_mode=True)
 
     def check_memory_agents_md(self) -> list[SpecsDoctorIssue]:
         """Check: specs/memory/AGENTS.md must exist (WARNING only).
@@ -474,21 +474,3 @@ class StructuralValidator:
                     )
                 )
         return issues
-
-
-def _write_text_atomic(path: Path, text: str) -> None:
-    """Write *text* to *path* by atomic replacement, never THROUGH the existing file.
-
-    Thin call-through shim (T-045-13) onto the package's one atomic-write primitive,
-    core.atomic_write.atomic_write — ruled the shared home for this idiom on the
-    core/specs_repair precedent (AR-1, T-045-11): a pure core leaf, stdlib-only,
-    legally importable from every layer including features.
-
-    ``preserve_mode=True`` matches this writer's original ``shutil.copymode`` call — a
-    freshly created temp file would otherwise narrow a 0644 atom to mkstemp's own 0600
-    (CWE-732 in the fail-safe direction, invisible to git). The primitive's default
-    ``newline=""`` matches this writer's original explicit ``newline=""`` — the bytes on
-    disk are exactly ``text.encode("utf-8")``, LF-preserving on every platform
-    (the same reason ``public_assets_common`` passes it, FR-RC2-2).
-    """
-    atomic_write(path, text, preserve_mode=True)

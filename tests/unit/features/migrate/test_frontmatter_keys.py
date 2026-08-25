@@ -8,30 +8,28 @@ SMALL.
 
 DECIDED (per the module docstring, this task): the migration is LF-canonical, not
 byte-preserving of line endings — consistent with the platform-wide LF-canonical write
-contract (``write_text_atomic``'s own ``newline=""`` guarantee, matched by
+contract (``core.atomic_write.atomic_write``'s own ``newline=""`` default, matched by
 ``infrastructure/public_assets_common``'s writer for projected assets, FR-RC2-2). This
 module pins both halves of that decision so the composition cannot silently regress
 either way:
 
-1. ``strip_frontmatter_keys``/``write_text_atomic`` are themselves line-ending AGNOSTIC —
-   fed CRLF text directly (bypassing ``Path.read_text``), they reproduce CRLF verbatim.
-   A future change that makes either function itself rewrite line endings would be a new,
-   undecided third behaviour and must fail this test.
+1. ``strip_frontmatter_keys``/``core.atomic_write.atomic_write`` are themselves
+   line-ending AGNOSTIC — fed CRLF text directly (bypassing ``Path.read_text``), they
+   reproduce CRLF verbatim. A future change that makes either function itself rewrite
+   line endings would be a new, undecided third behaviour and must fail this test.
 2. The composed migration — every registered step's real
-   ``Path.read_text()`` -> ``strip_frontmatter_keys`` -> ``write_text_atomic`` pipeline —
-   normalises a CRLF atom to LF on disk, because ``Path.read_text()``'s universal-newline
-   translation runs before this module ever sees the text. This is the DECIDED, pinned
-   end-to-end contract.
+   ``Path.read_text()`` -> ``strip_frontmatter_keys`` -> ``atomic_write(..., preserve_mode=True)``
+   pipeline — normalises a CRLF atom to LF on disk, because ``Path.read_text()``'s
+   universal-newline translation runs before this module ever sees the text. This is the
+   DECIDED, pinned end-to-end contract.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from dadaia_workspace.features.migrate.frontmatter_keys import (
-    strip_frontmatter_keys,
-    write_text_atomic,
-)
+from dadaia_workspace.core.atomic_write import atomic_write
+from dadaia_workspace.features.migrate.frontmatter_keys import strip_frontmatter_keys
 from dadaia_workspace.features.migrate.retired_frontmatter_keys import (
     migrate_retired_frontmatter_keys,
 )
@@ -47,12 +45,12 @@ def test_strip_frontmatter_keys_preserves_crlf_given_directly() -> None:
     assert result == "---\r\nslug: x\r\n---\r\n\r\nBody.\r\n"
 
 
-def test_write_text_atomic_preserves_crlf_given_directly(tmp_path: Path) -> None:
+def test_atomic_write_preserves_crlf_given_directly(tmp_path: Path) -> None:
     """``newline=""`` only stops LF being expanded to CRLF on Windows; it does not
     collapse a CRLF the caller already put in ``text``."""
     target = tmp_path / "atom.md"
 
-    write_text_atomic(target, "line one\r\nline two\r\n")
+    atomic_write(target, "line one\r\nline two\r\n", preserve_mode=True)
 
     assert target.read_bytes() == b"line one\r\nline two\r\n"
 

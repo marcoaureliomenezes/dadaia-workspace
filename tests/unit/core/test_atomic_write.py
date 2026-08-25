@@ -1,15 +1,17 @@
-"""The atomic-write primitive's own battery (release v0.4.5, FR2 / T-045-12).
+"""The atomic-write primitive's own battery (release v0.4.5, FR2 / T-045-12..14).
 
 Intent: CONTRACT — v0.4.5 A2.3 (temp cleanup on every failure path, every parameter
 combination) and A2.5 (core stays stdlib-pure). Size: SMALL.
 
-This is EXPAND only (D7): no call site below is touched, nothing named in the table is
-deleted or switched. It authors the primitive's OWN characterization ahead of T-045-13
-(switch) and T-045-14 (contract, deletes the eleven writers below).
-
-Behaviour matrix derived from the eleven writers ``core.atomic_write.atomic_write``
-replaces (read at their real entry points before this primitive's parameter surface was
-chosen, per dd-bug-fix phase 4's discipline — characterize first, never assume):
+Authored EXPAND-phase (D7), ahead of T-045-13 (switch) and T-045-14 (contract): every
+call site below is now GONE — T-045-14 deleted all eleven named/inline writers and their
+T-045-13 shims, so ``core.atomic_write.atomic_write`` (this module) is the package's
+SOLE remaining definition of the temp-then-replace idiom, proven by the derived scan in
+``tests/unit/core/test_atomic_write_census.py`` (A2.2). The table below is the
+behaviour matrix this primitive's parameter surface was derived from — read at each
+writer's real (now-historical) entry point before the primitive existed, per dd-bug-fix
+phase 4's discipline (characterize first, never assume) — kept as the record of what was
+consolidated, not as a list of live call sites:
 
 ======================================================================================
 Writer (file:line)                                       content   preserve  mkdir   cleans
@@ -74,6 +76,30 @@ def test_text_content_round_trips(tmp_path: Path) -> None:
     target = tmp_path / "a.md"
     atomic_write(target, "hello\n")
     assert target.read_text(encoding="utf-8") == "hello\n"
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        pytest.param('{"key": "value"}', id="ascii"),
+        pytest.param('{"name": "café résumé"}', id="accented"),
+        pytest.param('{"label": "日本語テスト"}', id="cjk"),
+        pytest.param('{"path": "café/日本語", "desc": "résumé — テスト"}', id="mixed-non-ascii"),
+    ],
+)
+def test_text_content_round_trips_non_ascii_no_bom(tmp_path: Path, content: str) -> None:
+    """Every writer this primitive replaces (hooks/_common, public_assets_common,
+    session_identity, ...) fed it non-ASCII JSON/prose; explicit UTF-8 (never a locale
+    codepage, never a BOM) must survive both a fresh write and an atomic overwrite of an
+    already-existing destination."""
+    target = tmp_path / "out.json"
+    atomic_write(target, content)
+    raw = target.read_bytes()
+    assert raw.decode("utf-8") == content
+    assert not raw.startswith(b"\xef\xbb\xbf"), "must not write a UTF-8 BOM"
+
+    atomic_write(target, content + " ")
+    assert target.read_text(encoding="utf-8") == content + " "
 
 
 def test_binary_content_round_trips_byte_exact(tmp_path: Path) -> None:

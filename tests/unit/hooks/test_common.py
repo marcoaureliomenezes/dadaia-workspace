@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import io
 import json
-import os
 from pathlib import Path
 from typing import Any
 
@@ -111,27 +110,3 @@ def test_default_python_bin_prefers_venv_else_never_empty(tmp_path: Path) -> Non
     other = tmp_path / "no-venv-here"
     other.mkdir()
     assert _common.default_python_bin(other)
-
-
-def test_atomic_write_text_roundtrip(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    target = tmp_path / "out.txt"
-    _common.atomic_write_text(target, "café — ação 日本語")
-    assert target.read_text(encoding="utf-8") == "café — ação 日本語"
-    # No leftover temp files.
-    assert list(tmp_path.glob("*.tmp")) == []
-
-    # Overwrites cleanly.
-    _common.atomic_write_text(target, "new")
-    assert target.read_text(encoding="utf-8") == "new"
-
-    # os.replace is the atomic primitive (atomic on Windows too, unlike os.rename).
-    calls: list[tuple[str, str]] = []
-    real_replace = os.replace
-
-    def spy(src: str | os.PathLike[str], dst: str | os.PathLike[str]) -> None:
-        calls.append((str(src), str(dst)))
-        real_replace(src, dst)
-
-    monkeypatch.setattr(os, "replace", spy)
-    _common.atomic_write_text(tmp_path / "x.txt", "data")
-    assert len(calls) == 1

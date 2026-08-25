@@ -105,21 +105,6 @@ def sessions_dir(workspace: Path, *, create: bool = False) -> Path:
 
 
 # ---------------------------------------------------------------------------
-# Atomic write primitive (temp + os.replace) — POSIX + Windows safe.
-# ---------------------------------------------------------------------------
-
-
-def _atomic_write_text(path: Path, text: str) -> None:
-    """Thin call-through shim (T-045-13) onto core.atomic_write.atomic_write (AR-1).
-
-    ``ensure_parent=True`` matches this writer's original ``path.parent.mkdir(...)``
-    call; ``newline=None`` matches its original ``Path.write_text(...)`` with no
-    ``newline=""`` override (platform-default translation).
-    """
-    atomic_write(path, text, ensure_parent=True, newline=None)
-
-
-# ---------------------------------------------------------------------------
 # Session record — <id>.json
 # ---------------------------------------------------------------------------
 
@@ -152,7 +137,7 @@ def write_session(
     """
     _validate(session_id, field="session_id")
     path = session_record_path(workspace, session_id, create=True)
-    _atomic_write_text(path, json.dumps(record, indent=2))
+    atomic_write(path, json.dumps(record, indent=2), ensure_parent=True, newline=None)
 
 
 # ---------------------------------------------------------------------------

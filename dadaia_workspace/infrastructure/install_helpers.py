@@ -16,6 +16,7 @@ from pathlib import Path
 
 from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.agent_model_templates import CORE_AGENTS
+from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.core.models.agent_model_policy import (
     ResolvedAgentModel,
@@ -23,7 +24,6 @@ from dadaia_workspace.core.models.agent_model_policy import (
 )
 from dadaia_workspace.infrastructure.public_assets_common import (
     _SCHEMA_VERSION,
-    _atomic_write_text,
     _package_version,
     _sha256,
 )
@@ -395,7 +395,7 @@ def write_generated(dst: Path, content: str, force: bool, installed: list[str]) 
         if src_sha == dst_sha:
             installed.append(f"[skip] {dst}")
             return
-    _atomic_write_text(dst, content)
+    atomic_write(dst, content)
     installed.append(f"[ok]   {dst}")
 
 
@@ -612,13 +612,13 @@ def install_codex_agents(
             if dst_sha == src_sha:
                 installed.append(f"[skip] {dst}")
             else:
-                # _atomic_write_text writes LF-exact (newline="") so the bytes on
+                # atomic_write writes LF-exact (newline="") so the bytes on
                 # disk match the LF hash above; a plain write_text would emit CRLF
                 # on Windows and the skip would never fire. See FR-RC2-2.
-                _atomic_write_text(dst, toml_content)
+                atomic_write(dst, toml_content)
                 installed.append(f"[ok]   {dst}")
         else:
-            _atomic_write_text(dst, toml_content)
+            atomic_write(dst, toml_content)
             installed.append(f"[ok]   {dst}")
 
 

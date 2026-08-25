@@ -17,13 +17,13 @@ v0.1.72). The formal backup-first, idempotent upgrade to an explicit v3 file liv
 import json
 from pathlib import Path
 
+from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.exceptions import SchemaVersionError
 from dadaia_workspace.core.models.spec_context import (
     AssociatedRepo,
     ContextState,
     SpecContextProject,
 )
-from dadaia_workspace.infrastructure.public_assets_common import _atomic_write_text
 
 _VERSION = "3"
 
@@ -111,12 +111,12 @@ class JsonContextStore:
     def save(self, ctx: SpecContextProject) -> None:
         data = _load(self._path)
         data["contexts"].append(_to_dict(ctx))
-        _atomic_write_text(self._path, json.dumps(data, indent=2))
+        atomic_write(self._path, json.dumps(data, indent=2))
 
     def update(self, ctx: SpecContextProject) -> None:
         data = _load(self._path)
         data["contexts"] = [_to_dict(ctx) if c["name"] == ctx.name else c for c in data["contexts"]]
-        _atomic_write_text(self._path, json.dumps(data, indent=2))
+        atomic_write(self._path, json.dumps(data, indent=2))
 
     def get(self, name: str) -> SpecContextProject | None:
         data = _load(self._path)
@@ -132,4 +132,4 @@ class JsonContextStore:
     def delete(self, name: str) -> None:
         data = _load(self._path)
         data["contexts"] = [c for c in data["contexts"] if c["name"] != name]
-        _atomic_write_text(self._path, json.dumps(data, indent=2))
+        atomic_write(self._path, json.dumps(data, indent=2))

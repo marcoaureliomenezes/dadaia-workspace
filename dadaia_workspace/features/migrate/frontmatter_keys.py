@@ -11,19 +11,19 @@ keys. Prose mentions in the body are never touched.
 
 Newline contract — LF-canonical, not byte-preserving of line endings (bug
 ``migration-normalises-crlf-atoms-to-lf-contradicting-its-byte-preserve-wording``,
-T-044-37, DECIDED): ``strip_frontmatter_keys`` and ``write_text_atomic`` are themselves
-line-ending AGNOSTIC — fed CRLF directly, ``strip_frontmatter_keys`` reproduces CRLF on
-every surviving line, and ``write_text_atomic``'s ``newline=""`` writes back exactly the
+T-044-37, DECIDED): ``strip_frontmatter_keys`` and ``core.atomic_write.atomic_write`` are
+themselves line-ending AGNOSTIC — fed CRLF directly, ``strip_frontmatter_keys`` reproduces
+CRLF on every surviving line, and the primitive's ``newline=""`` writes back exactly the
 bytes it is handed. The migration as every registered step actually runs it (real
-``Path.read_text()`` -> ``strip_frontmatter_keys`` -> ``write_text_atomic``) is LF-canonical
-end to end, because ``Path.read_text()``'s universal-newline translation already collapses
-CRLF/CR to LF before this module ever sees the text — a CRLF atom therefore leaves with LF
-on every line, not only the ones the key removal touched. This matches the platform-wide
-LF-canonical write contract for managed files (``write_text_atomic``'s own ``newline=""``
-guarantee; the same guarantee ``infrastructure/public_assets_common`` makes for projected
-assets, FR-RC2-2) rather than reproducing whatever line endings the atom arrived with.
-"Preserve everything else" above is a claim about CONTENT — unrelated key lines, key
-order, the body — never about line-ending bytes.
+``Path.read_text()`` -> ``strip_frontmatter_keys`` -> ``atomic_write(..., preserve_mode=True)``)
+is LF-canonical end to end, because ``Path.read_text()``'s universal-newline translation
+already collapses CRLF/CR to LF before this module ever sees the text — a CRLF atom
+therefore leaves with LF on every line, not only the ones the key removal touched. This
+matches the platform-wide LF-canonical write contract for managed files (the primitive's
+own ``newline=""`` default; the same guarantee ``infrastructure/public_assets_common``
+relied on for projected assets, FR-RC2-2) rather than reproducing whatever line endings
+the atom arrived with. "Preserve everything else" above is a claim about CONTENT —
+unrelated key lines, key order, the body — never about line-ending bytes.
 """
 
 from __future__ import annotations
@@ -34,9 +34,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, cast
 
-from dadaia_workspace.core.atomic_write import atomic_write
-
-__all__ = ["load_frontmatter_schema", "strip_frontmatter_keys", "write_text_atomic"]
+__all__ = ["load_frontmatter_schema", "strip_frontmatter_keys"]
 
 #: Opening/closing frontmatter fence line (whole line, optional trailing whitespace).
 _FENCE_RE = re.compile(r"^---\s*$")
@@ -98,11 +96,12 @@ def strip_frontmatter_keys(text: str, *, drop: Callable[[str], bool]) -> str | N
     return lines[0] + "".join(kept) + "".join(lines[close_idx:])
 
 
-# --- packaged data + safe writing -------------------------------------------------
-# write_text_atomic is a thin call-through shim (T-045-13) onto the package's one
-# atomic-write primitive, core.atomic_write.atomic_write — ruled the shared home for
-# this idiom on the core/specs_repair precedent (AR-1, T-045-11): a pure core leaf,
-# stdlib-only, legally importable from every layer including features.
+# --- packaged data -----------------------------------------------------------------
+# The atomic write of the stripped text back to disk is the caller's job (T-045-14):
+# every migration step here calls core.atomic_write.atomic_write(..., preserve_mode=True)
+# directly — ruled the shared home for this idiom on the core/specs_repair precedent
+# (AR-1, T-045-11): a pure core leaf, stdlib-only, legally importable from every layer
+# including features.
 
 _PACKAGE_ROOT = Path(__file__).resolve().parents[2]  # dadaia_workspace/
 _SCHEMA_REL = Path("public") / "schemas" / "memory" / "memory-frontmatter-v1.schema.json"
@@ -117,21 +116,3 @@ def load_frontmatter_schema() -> dict[str, Any]:
             "— the installed dadaia-workspace package is incomplete."
         )
     return cast(dict[str, Any], json.loads(schema_path.read_text(encoding="utf-8")))
-
-
-def write_text_atomic(path: Path, text: str) -> None:
-    """Write *text* to *path* by atomic replacement, never THROUGH the existing file.
-
-    A hard link is not a symlink and a checked-then-opened path is a TOCTOU window
-    (CWE-59/CWE-367), so refusing links alone cannot keep a write inside the tree.
-    Delegating to ``core.atomic_write.atomic_write`` (T-045-13) rebinds the name via a
-    temp file + ``os.replace`` instead of writing through whatever the target points at.
-
-    ``preserve_mode=True`` matches this writer's original ``shutil.copymode`` call — a
-    freshly created temp file would otherwise narrow a 0644 atom to mkstemp's own 0600
-    (CWE-732 in the fail-safe direction, invisible to git). The primitive's default
-    ``newline=""`` matches this writer's original explicit ``newline=""`` — the bytes on
-    disk are exactly ``text.encode("utf-8")``, LF-preserving on every platform
-    (the same reason ``public_assets_common`` passes it, FR-RC2-2).
-    """
-    atomic_write(path, text, preserve_mode=True)

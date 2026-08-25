@@ -19,7 +19,8 @@ chain (``resolve_session_id`` honors it first); the harness never sets it.
 
 Mandatory parity preserved from rc-4:
   (a) session-record renewal via os.replace (atomic on Windows too) — owned by
-      test_common.py's atomic_write_text roundtrip (shared primitive, single owner);
+      tests/unit/core/test_atomic_write.py's battery (the package's one atomic-write
+      primitive, single owner as of v0.4.5 FR2/T-045-14);
   (b) [A-Za-z0-9_-] session-id strip (CWE-22) — via resolve_session_id, CRIT;
   (c) fail-open: any error -> exit 0, never a crash/block.
 """

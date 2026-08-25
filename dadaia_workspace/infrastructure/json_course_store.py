@@ -3,8 +3,8 @@
 import json
 from pathlib import Path
 
+from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.models.course import Course
-from dadaia_workspace.infrastructure.public_assets_common import _atomic_write_text
 
 _VERSION = "1"
 
@@ -45,14 +45,14 @@ class JsonCourseStore:
     def save(self, course: Course) -> None:
         data = _load(self._path)
         data["courses"].append(_to_dict(course))
-        _atomic_write_text(self._path, json.dumps(data, indent=2))
+        atomic_write(self._path, json.dumps(data, indent=2))
 
     def update(self, course: Course) -> None:
         data = _load(self._path)
         data["courses"] = [
             _to_dict(course) if c["slug"] == course.slug else c for c in data["courses"]
         ]
-        _atomic_write_text(self._path, json.dumps(data, indent=2))
+        atomic_write(self._path, json.dumps(data, indent=2))
 
     def get(self, slug: str) -> Course | None:
         data = _load(self._path)
@@ -68,4 +68,4 @@ class JsonCourseStore:
     def delete(self, slug: str) -> None:
         data = _load(self._path)
         data["courses"] = [c for c in data["courses"] if c["slug"] != slug]
-        _atomic_write_text(self._path, json.dumps(data, indent=2))
+        atomic_write(self._path, json.dumps(data, indent=2))

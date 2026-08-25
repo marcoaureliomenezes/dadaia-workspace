@@ -3,7 +3,7 @@
 Reads/writes the operator-editable overlay at
 ``.dadaia/states/agent_model_policy.json`` (schema ``agent-model-policy-v1`` —
 ``public/schemas/agent-model-policy-v1.schema.json``):
-atomic temp+rename write (``core.atomic_write.atomic_write``, T-045-13) and a
+atomic temp+rename write (``core.atomic_write.atomic_write``) and a
 ``.last-good.json`` backup of the prior valid file.
 
 Two load paths, deliberately distinct (NFR-4, "missing != invalid"):
@@ -103,8 +103,12 @@ class JsonAgentModelPolicyStore:
         self._path.parent.mkdir(parents=True, exist_ok=True)
         if self._path.exists():
             # Snapshot the PRIOR valid file verbatim before overwriting (NFR-1).
-            self._atomic_write_bytes(self.last_good_path, self._path.read_bytes())
-        self._atomic_write(self._path, json.dumps(overlay.to_dict(), indent=2, sort_keys=True))
+            atomic_write(self.last_good_path, self._path.read_bytes(), ensure_parent=True)
+        atomic_write(
+            self._path,
+            json.dumps(overlay.to_dict(), indent=2, sort_keys=True) + "\n",
+            ensure_parent=True,
+        )
 
     # -- validation -------------------------------------------------------
 
@@ -229,19 +233,6 @@ class JsonAgentModelPolicyStore:
                 "Fable is never assigned to security-reviewer (operator ruling G-1)",
                 path,
             )
-
-    # -- atomic write -------------------------------------------------------
-
-    def _atomic_write(self, path: Path, content: str) -> None:
-        self._atomic_write_bytes(path, (content + "\n").encode("utf-8"))
-
-    def _atomic_write_bytes(self, path: Path, payload: bytes) -> None:
-        """Thin call-through shim (T-045-13) onto the package's one atomic-write
-        primitive (``core.atomic_write.atomic_write``, AR-1). ``ensure_parent=True``
-        matches this writer's original ``path.parent.mkdir(...)`` call; binary
-        ``payload`` matches its original ``os.fdopen(fd, "wb")`` mode (no newline
-        translation)."""
-        atomic_write(path, payload, ensure_parent=True)
 
 
 __all__ = [
