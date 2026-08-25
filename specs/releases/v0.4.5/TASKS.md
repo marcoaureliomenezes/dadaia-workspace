@@ -294,7 +294,7 @@ event with the three fields.
 
 ---
 
-- [-] **T-045-08 — Bug (Arm B): `codex-probe-unit-fixture-carries-real-session-uuid`**
+- [x] **T-045-08 — Bug (Arm B): `codex-probe-unit-fixture-carries-real-session-uuid`**
 
 **Owner role:** software-engineer · **Commit:** `fix(T-045-08): synthetic session UUID in
 the codex probe fixture`
@@ -314,7 +314,7 @@ fixture retires in the same commit.
 
 ---
 
-- [ ] **T-045-09 — Bug (Arm B, time-boxed): `windows-xdist-workers-crash-on-unit-fast-tier`**
+- [-] **T-045-09 — Bug (Arm B, time-boxed): `windows-xdist-workers-crash-on-unit-fast-tier`**
 
 **Owner role:** software-engineer (attempt) + `qa-engineer` (verdict) · **Commit:**
 `fix(T-045-09): <root cause>` **or** `test(T-045-09): quarantine <selector> per QA verdict`
