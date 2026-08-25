@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from dadaia_workspace.core.protocols.certification_process import CertificationProcess
+from dadaia_workspace.core.redaction import Redactor
 
 
 @dataclass(frozen=True)
@@ -80,33 +81,48 @@ _CODEX_ENV_UNAVAILABLE_STATUS_CODES = frozenset({400, 401, 403})
 _CODEX_ENV_UNAVAILABLE_PHRASES = ("not logged in", "not authenticated")
 
 
-def _codex_environment_unavailable_reason(output: str) -> str | None:
-    """Classify a nonzero ``codex exec`` exit: environment-unavailable, or genuine.
+_CODEX_DETAIL_MAX_LEN = 200  # certify --json detail cap, applied after masking (CWE-532).
 
-    Returns the upstream reason when ``output`` carries an honest environment-
-    unavailability signal — an ``invalid_request_error``-class 4xx JSON payload the
-    Codex CLI itself prints (auth/entitlement/plan rejection), or an explicit
-    "not logged in" refusal. Returns ``None`` for anything else (crash, timeout,
-    malformed output) — a genuine probe failure the caller must not silently skip.
+
+def _codex_capped_detail(text: str, cwd: Path) -> str:
+    """Cap + redact via the existing masking primitive (never a new one) — CWE-532.
+    *cwd* is the one candidate known sensitive here (the banner's ``workdir:``)."""
+    redactor = Redactor([str(cwd)], placeholder_fmt="[REDACTED-CODEX-DETAIL-{n}]")
+    masked = redactor.mask(text.strip())
+    return masked if len(masked) <= _CODEX_DETAIL_MAX_LEN else f"{masked[:_CODEX_DETAIL_MAX_LEN]}…"
+
+
+def _codex_probe_outcome(output: str, cwd: Path) -> tuple[bool, str]:
+    """Classify + bound the detail for a nonzero ``codex exec`` exit, one pass.
+
+    Returns ``(environment_unavailable, detail)`` — ``detail`` is never the raw blob
+    (CWE-532): the parsed ``error.message``, the matching refusal line, or a
+    byte-count marker, always through :func:`_codex_capped_detail`.
     """
     lowered = output.lower()
     for phrase in _CODEX_ENV_UNAVAILABLE_PHRASES:
         if phrase in lowered:
-            return output.strip() or phrase
+            line = next((ln for ln in output.splitlines() if phrase in ln.lower()), phrase)
+            return True, _codex_capped_detail(line, cwd)
     for match in re.finditer(r"\{.*?\}\}", output):
         try:
             payload = json.loads(match.group(0))
         except json.JSONDecodeError:
             continue
         error = payload.get("error") if isinstance(payload, dict) else None
+        if not isinstance(error, dict):
+            continue
         status = payload.get("status") if isinstance(payload, dict) else None
-        if (
-            isinstance(error, dict)
-            and error.get("type") == "invalid_request_error"
+        unavailable = (
+            error.get("type") == "invalid_request_error"
             and status in _CODEX_ENV_UNAVAILABLE_STATUS_CODES
-        ):
-            return str(error.get("message") or match.group(0))
-    return None
+        )
+        message = error.get("message")
+        if unavailable or message:
+            return unavailable, _codex_capped_detail(str(message or "invalid_request_error"), cwd)
+    return False, _codex_capped_detail(
+        f"non-JSON codex exec output ({len(output)} bytes captured)", cwd
+    )
 
 
 def _codex_live_probe_detail(process: CertificationProcess, cwd: Path) -> str:
@@ -117,9 +133,10 @@ def _codex_live_probe_detail(process: CertificationProcess, cwd: Path) -> str:
     fails) when the installed Codex is unavailable to this environment — no binary on
     ``PATH``, or a signed-in account the upstream API rejects with an
     ``invalid_request_error``-class 4xx (no plan/model entitlement; see
-    :func:`_codex_environment_unavailable_reason`) — an absent or unusable OPTIONAL
-    local dependency is an honest degrade, not a certification failure. Raises
-    ``RuntimeError`` for any genuine probe failure (crash, timeout, missing marker).
+    :func:`_codex_probe_outcome`) — an absent or unusable OPTIONAL local dependency
+    is an honest degrade, not a certification failure. Raises ``RuntimeError`` for
+    any genuine probe failure (crash, timeout, missing marker); both exceptions'
+    detail is bounded/redacted, never the raw blob (CWE-532).
     """
     codex_bin = shutil.which("codex")
     if codex_bin is None:
@@ -150,14 +167,14 @@ def _codex_live_probe_detail(process: CertificationProcess, cwd: Path) -> str:
     )
     if exec_proc.returncode != 0:
         combined = (exec_proc.stderr or exec_proc.stdout).strip()
-        env_reason = _codex_environment_unavailable_reason(combined)
-        if env_reason is not None:
+        unavailable, detail = _codex_probe_outcome(combined, cwd)
+        if unavailable:
             raise _CertificationSkip(
                 "codex CLI installed but unusable in this environment — "
-                f"{env_reason} (A22.4 honest degrade; upstream auth/entitlement "
+                f"{detail} (A22.4 honest degrade; upstream auth/entitlement "
                 "rejection, not a probe defect)"
             )
-        raise RuntimeError(f"codex exec exited {exec_proc.returncode}: {combined}")
+        raise RuntimeError(f"codex exec exited {exec_proc.returncode}: {detail}")
     if _CODEX_LIVE_PROBE_MARKER not in exec_proc.stdout:
         raise RuntimeError(
             "codex exec did not echo the expected marker on stdout; "
