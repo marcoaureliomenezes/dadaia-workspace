@@ -51,7 +51,13 @@ def test_atomic_write_text_roundtrips_utf8(tmp_path: Path, content: str) -> None
 
 def test_uses_os_replace_not_os_rename_and_cleans_up_tmp_sibling(tmp_path: Path) -> None:
     """_atomic_write_text calls os.replace (not os.rename) for the swap step, and
-    the .tmp sibling file is gone after a successful write."""
+    the .tmp sibling file is gone after a successful write.
+
+    T-045-13: ``_atomic_write_text`` is now a thin shim onto
+    ``core.atomic_write.atomic_write`` (AR-1) — the real ``os.replace`` call happens
+    there, so the patch target follows the delegation rather than this module's own
+    (now-removed) ``os`` import.
+    """
     dst = tmp_path / "out.json"
     replace_calls: list[tuple[str, str]] = []
 
@@ -62,7 +68,7 @@ def test_uses_os_replace_not_os_rename_and_cleans_up_tmp_sibling(tmp_path: Path)
         original_replace(src, dst_)
 
     with patch(
-        "dadaia_workspace.infrastructure.public_assets_common.os.replace",
+        "dadaia_workspace.core.atomic_write.os.replace",
         tracking_replace,
     ):
         _atomic_write_text(dst, '{"x": 1}')
@@ -72,8 +78,8 @@ def test_uses_os_replace_not_os_rename_and_cleans_up_tmp_sibling(tmp_path: Path)
     assert _dst == str(dst), "os.replace destination should be the target path"
     assert _src.endswith(".tmp"), "os.replace source should be the .tmp sibling"
 
-    tmp = dst.with_suffix(dst.suffix + ".tmp")
-    assert not tmp.exists(), ".tmp sibling should be cleaned up by os.replace"
+    leftovers = [p for p in tmp_path.iterdir() if p.name.endswith(".tmp")]
+    assert leftovers == [], f".tmp sibling should be cleaned up by os.replace: {leftovers}"
 
 
 # ---------------------------------------------------------------------------

@@ -386,11 +386,14 @@ _ATOMIC_WRITER_CASES: list[AtomicWriterCase] = [
     AtomicWriterCase(
         id="public_assets_common._atomic_write_text",
         write=_write_public_assets_common,
-        replace_target="dadaia_workspace.infrastructure.public_assets_common.os.replace",
+        replace_target="dadaia_workspace.core.atomic_write.os.replace",  # T-045-13: delegates
         preserves_mode=False,
-        # Same known gap as hooks._common.atomic_write_text — see bug above.
-        cleans_up_on_failure=False,
-        lf_bytes_guaranteed=True,  # Path.write_text(..., newline="")
+        # T-045-13: same delegation and same fix as hooks._common.atomic_write_text
+        # (previous commit) — this was the second and last of the 2 leaking writers;
+        # bug two-atomic-writers-leak-temp-file-on-injected-os-replace-failure is now
+        # fully closed by construction across the battery.
+        cleans_up_on_failure=True,
+        lf_bytes_guaranteed=True,  # newline="" (this primitive's default) — LF-preserving
     ),
     AtomicWriterCase(
         id="session_identity._atomic_write_text",
@@ -411,7 +414,7 @@ _ATOMIC_WRITER_CASES: list[AtomicWriterCase] = [
     AtomicWriterCase(
         id="json_agent_model_policy_store._atomic_write",
         write=_write_policy_store_text,
-        replace_target=("dadaia_workspace.infrastructure.json_agent_model_policy_store.os.replace"),
+        replace_target="dadaia_workspace.core.atomic_write.os.replace",  # T-045-13: delegates
         preserves_mode=False,
         cleans_up_on_failure=True,
         lf_bytes_guaranteed=True,  # os.fdopen(fd, "wb") — binary mode, no translation
@@ -419,7 +422,7 @@ _ATOMIC_WRITER_CASES: list[AtomicWriterCase] = [
     AtomicWriterCase(
         id="json_agent_model_policy_store._atomic_write_bytes",
         write=_write_policy_store_bytes,
-        replace_target=("dadaia_workspace.infrastructure.json_agent_model_policy_store.os.replace"),
+        replace_target="dadaia_workspace.core.atomic_write.os.replace",  # T-045-13: delegates
         preserves_mode=False,
         cleans_up_on_failure=True,
         lf_bytes_guaranteed=True,  # os.fdopen(fd, "wb") — binary mode, no translation
@@ -536,11 +539,12 @@ def test_atomic_writer_temp_file_on_injected_replace_failure(
 ) -> None:
     """When ``os.replace`` itself fails, the temp file must not survive — a leaked
     ``.tmp`` sibling next to a real atom/state file is exactly the drift class this
-    guard exists to catch. T-045-13 (hooks family): hooks._common.atomic_write_text now
-    cleans up, closing its half of bug
-    `two-atomic-writers-leak-temp-file-on-injected-os-replace-failure`; 8 of 9 writers
-    clean up, 1 (public_assets_common._atomic_write_text) still carries the documented
-    gap, closed in the very next commit (T-045-13 infrastructure family)."""
+    guard exists to catch. As of T-045-13 every named writer in this battery cleans up
+    (the former 2-writer gap, bug
+    `two-atomic-writers-leak-temp-file-on-injected-os-replace-failure`, closed by
+    delegating those 2 call sites onto ``core.atomic_write.atomic_write``, whose cleanup
+    is unconditional). The ``else`` branch below stays live for any future writer that
+    reintroduces the gap."""
     target = tmp_path / "atom.md"
     target.write_text("orig\n", encoding="utf-8")
     before = set(tmp_path.iterdir())

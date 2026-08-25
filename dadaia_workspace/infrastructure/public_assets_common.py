@@ -8,13 +8,13 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import sys
 from enum import StrEnum
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
 
+from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.harness_registry import INSTALL_TARGETS
 
 _SCHEMA_VERSION = "1"
@@ -121,15 +121,20 @@ def _atomic_write_text(dst: Path, content: str) -> None:
 
     Guarantees the destination either contains the full new content or is
     unchanged — prevents readers from observing a partially-written file.
+
+    Thin call-through shim (T-045-13) onto the package's one atomic-write primitive
+    (``core.atomic_write.atomic_write``, AR-1). ``newline=""`` (the primitive's default)
+    matches this writer's original behaviour — disables universal-newline translation so
+    the bytes on disk are exactly ``content.encode("utf-8")``. Without it, Windows text
+    mode rewrites "\\n" to "\\r\\n", which breaks write_generated's hash-compare skip (it
+    hashes the LF content against a binary read of the file) — every install would
+    rewrite every generated file. Keeps projected files LF on all platforms (FR-RC2-2).
+    As a side effect of delegating, closes the temp-leak-on-injected-``os.replace``-
+    failure gap this writer used to carry (bug
+    ``two-atomic-writers-leak-temp-file-on-injected-os-replace-failure``): the primitive
+    cleans up its temp sibling on every failure path, unconditionally.
     """
-    tmp = dst.with_suffix(dst.suffix + ".tmp")
-    # newline="" disables universal-newline translation so the bytes on disk are
-    # exactly content.encode("utf-8"). Without it, Windows text mode rewrites "\n"
-    # to "\r\n", which breaks write_generated's hash-compare skip (it hashes the
-    # LF content against a binary read of the file) — every install would rewrite
-    # every generated file. Keeps projected files LF on all platforms. See FR-RC2-2.
-    tmp.write_text(content, encoding="utf-8", newline="")
-    os.replace(tmp, dst)
+    atomic_write(dst, content)
 
 
 def _log_cleanup_error(

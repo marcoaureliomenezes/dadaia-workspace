@@ -25,8 +25,6 @@ panel validate endpoint in Wave 4).
 from __future__ import annotations
 
 import json
-import os
-import tempfile
 from pathlib import Path
 
 from dadaia_workspace.core.agent_model_templates import (
@@ -34,6 +32,7 @@ from dadaia_workspace.core.agent_model_templates import (
     resolve_agent_model,
     template_by_id,
 )
+from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.model_registry import registry_by_claude_id
 from dadaia_workspace.core.models.agent_model_policy import (
     _SCHEMA_VERSION,
@@ -237,20 +236,12 @@ class JsonAgentModelPolicyStore:
         self._atomic_write_bytes(path, (content + "\n").encode("utf-8"))
 
     def _atomic_write_bytes(self, path: Path, payload: bytes) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        fd, tmp_name = tempfile.mkstemp(
-            dir=path.parent,
-            prefix=f".{path.name}.",
-            suffix=".tmp",
-        )
-        tmp_path = Path(tmp_name)
-        try:
-            with os.fdopen(fd, "wb") as handle:
-                handle.write(payload)
-            os.replace(tmp_path, path)
-        except Exception:
-            tmp_path.unlink(missing_ok=True)
-            raise
+        """Thin call-through shim (T-045-13) onto the package's one atomic-write
+        primitive (``core.atomic_write.atomic_write``, AR-1). ``ensure_parent=True``
+        matches this writer's original ``path.parent.mkdir(...)`` call; binary
+        ``payload`` matches its original ``os.fdopen(fd, "wb")`` mode (no newline
+        translation)."""
+        atomic_write(path, payload, ensure_parent=True)
 
 
 __all__ = [
