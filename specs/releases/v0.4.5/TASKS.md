@@ -130,7 +130,7 @@ the archive move.
 
 ## W0 — definition
 
-- [ ] **T-045-01 — [git] Definition commit**
+- [x] **T-045-01 — [git] Definition commit**
 
 **Owner role:** dispatcher (+ `project-manager` for the backlog mechanics) · **Commit:**
 `docs(specs): v0.4.5 definition — hardening and consolidation (Aprovado)`
@@ -156,7 +156,7 @@ T-045-02, not here. Append the supersession before committing:
 
 ---
 
-- [ ] **T-045-02 — [git] Milestone (a): push and open the definition PR → `develop`**
+- [x] **T-045-02 — [git] Milestone (a): push and open the definition PR → `develop`**
 
 **Owner role:** dispatcher + `security-reviewer` · **Commit:** the `ACTIVE.md` phase flip,
 then git refs
