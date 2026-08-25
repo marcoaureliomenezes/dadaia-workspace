@@ -200,7 +200,7 @@ secret, token or org-internal identifier is recorded anywhere.
 
 ## Segment `S1` — the open-bug sweep
 
-- [ ] **T-045-04 — FR1: the LAW path class decides by origin, not by basename**
+- [-] **T-045-04 — FR1: the LAW path class decides by origin, not by basename**
 
 **Owner role:** software-engineer · **Commit:** `fix(T-045-04): classify AGENTS.md as LAW by
 origin, not by name` · **Lands first in the release** (SPEC D-2).
