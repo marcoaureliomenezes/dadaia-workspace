@@ -27,14 +27,13 @@ from __future__ import annotations
 
 import contextlib
 import json
-import os
 import re
-import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
 from dadaia_workspace.core import kernel_tunables
+from dadaia_workspace.core.atomic_write import atomic_write
 
 __all__ = [
     "PresenceRecord",
@@ -93,16 +92,13 @@ def _utcnow_iso() -> str:
 
 
 def _atomic_write_json(path: Path, data: dict[str, object]) -> None:
-    """Atomic write via unique temp file + ``os.replace`` (POSIX + Windows safe)."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.parent / f"{path.name}.{uuid.uuid4().hex}.tmp"
-    tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
-    try:
-        os.replace(tmp, path)
-    except OSError:
-        with contextlib.suppress(OSError):
-            tmp.unlink(missing_ok=True)
-        raise
+    """Thin call-through shim (T-045-13) onto core.atomic_write.atomic_write (AR-1).
+
+    ``ensure_parent=True`` matches this writer's original ``path.parent.mkdir(...)``
+    call; ``newline=None`` matches its original ``Path.write_text(...)`` with no
+    ``newline=""`` override (platform-default translation).
+    """
+    atomic_write(path, json.dumps(data, indent=2), ensure_parent=True, newline=None)
 
 
 def _read_json(path: Path) -> dict[str, object] | None:

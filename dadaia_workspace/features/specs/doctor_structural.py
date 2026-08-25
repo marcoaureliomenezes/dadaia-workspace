@@ -8,14 +8,12 @@ imports the shared leaves, never a sibling validator.
 
 from __future__ import annotations
 
-import contextlib
 import hashlib
-import os
 import re
 import shutil
-import tempfile
 from pathlib import Path
 
+from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.features.specs.doctor_common import read_active_md
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
 from dadaia_workspace.features.specs.template_history import was_shipped
@@ -481,33 +479,16 @@ class StructuralValidator:
 def _write_text_atomic(path: Path, text: str) -> None:
     """Write *text* to *path* by atomic replacement, never THROUGH the existing file.
 
-    Feature-local by architecture: features are mutually independent, may not import
-    infrastructure, and core/ file I/O is a closed ratchet.
+    Thin call-through shim (T-045-13) onto the package's one atomic-write primitive,
+    core.atomic_write.atomic_write — ruled the shared home for this idiom on the
+    core/specs_repair precedent (AR-1, T-045-11): a pure core leaf, stdlib-only,
+    legally importable from every layer including features.
 
-    A hard link is not a symlink and a checked-then-opened path is a TOCTOU window
-    (CWE-59/CWE-367), so refusing links alone cannot keep a write inside the tree.
-    Rendering to a temp file in the same directory and ``os.replace``-ing it rebinds the
-    name instead of writing through whatever it points at, and the swap is atomic.
-
-    ``newline=""`` disables universal-newline translation, so the bytes on disk are exactly
-    ``text.encode("utf-8")`` — without it Windows text mode rewrites LF to CRLF and the
-    byte-preserving guarantee dies on that platform (the same reason
-    ``public_assets_common`` passes it, FR-RC2-2).
-
-    ``mkstemp`` creates the temp file 0600 and ``os.replace`` carries that mode onto the
-    target, which would silently narrow a 0644 atom in a shared or CI-checked-out tree
-    (CWE-732 in the fail-safe direction, invisible to git). The original mode is copied
-    back before the swap.
+    ``preserve_mode=True`` matches this writer's original ``shutil.copymode`` call — a
+    freshly created temp file would otherwise narrow a 0644 atom to mkstemp's own 0600
+    (CWE-732 in the fail-safe direction, invisible to git). The primitive's default
+    ``newline=""`` matches this writer's original explicit ``newline=""`` — the bytes on
+    disk are exactly ``text.encode("utf-8")``, LF-preserving on every platform
+    (the same reason ``public_assets_common`` passes it, FR-RC2-2).
     """
-    fd, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
-    tmp_path = Path(tmp_name)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8", newline="") as handle:
-            handle.write(text)
-        with contextlib.suppress(OSError):
-            shutil.copymode(path, tmp_path)  # keep the target's mode, not mkstemp's 0600
-        os.replace(tmp_path, path)
-    except BaseException:
-        with contextlib.suppress(OSError):
-            os.unlink(tmp_path)
-        raise
+    atomic_write(path, text, preserve_mode=True)

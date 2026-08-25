@@ -36,10 +36,10 @@ so a pid-keyed bind GC would collect every legitimate READ bind (ADR-8 amended r
 from __future__ import annotations
 
 import json
-import os
 import re
-import uuid
 from pathlib import Path
+
+from dadaia_workspace.core.atomic_write import atomic_write
 
 __all__ = [
     "SESSION_CREATION_FIELDS",
@@ -110,14 +110,13 @@ def sessions_dir(workspace: Path, *, create: bool = False) -> Path:
 
 
 def _atomic_write_text(path: Path, text: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.parent / f"{path.name}.{uuid.uuid4().hex}.tmp"
-    tmp.write_text(text, encoding="utf-8")
-    try:
-        os.replace(tmp, path)
-    except OSError:
-        tmp.unlink(missing_ok=True)
-        raise
+    """Thin call-through shim (T-045-13) onto core.atomic_write.atomic_write (AR-1).
+
+    ``ensure_parent=True`` matches this writer's original ``path.parent.mkdir(...)``
+    call; ``newline=None`` matches its original ``Path.write_text(...)`` with no
+    ``newline=""`` override (platform-default translation).
+    """
+    atomic_write(path, text, ensure_parent=True, newline=None)
 
 
 # ---------------------------------------------------------------------------

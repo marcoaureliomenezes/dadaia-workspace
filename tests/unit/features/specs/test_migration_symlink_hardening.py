@@ -364,7 +364,7 @@ _ATOMIC_WRITER_CASES: list[AtomicWriterCase] = [
     AtomicWriterCase(
         id="doctor_structural._write_text_atomic",
         write=_write_doctor_structural,
-        replace_target="dadaia_workspace.features.specs.doctor_structural.os.replace",
+        replace_target="dadaia_workspace.core.atomic_write.os.replace",  # T-045-13: delegates
         preserves_mode=True,
         cleans_up_on_failure=True,
         lf_bytes_guaranteed=True,  # os.fdopen(..., newline="")
@@ -398,7 +398,7 @@ _ATOMIC_WRITER_CASES: list[AtomicWriterCase] = [
     AtomicWriterCase(
         id="session_identity._atomic_write_text",
         write=_write_session_identity,
-        replace_target="dadaia_workspace.features.spec_context.session_identity.os.replace",
+        replace_target="dadaia_workspace.core.atomic_write.os.replace",  # T-045-13: delegates
         preserves_mode=False,
         cleans_up_on_failure=True,
         lf_bytes_guaranteed=False,  # Path.write_text(...) with no newline= override
@@ -406,7 +406,7 @@ _ATOMIC_WRITER_CASES: list[AtomicWriterCase] = [
     AtomicWriterCase(
         id="presence._atomic_write_json",
         write=_write_presence_json,
-        replace_target="dadaia_workspace.features.spec_context.presence.os.replace",
+        replace_target="dadaia_workspace.core.atomic_write.os.replace",  # T-045-13: delegates
         preserves_mode=False,
         cleans_up_on_failure=True,
         lf_bytes_guaranteed=False,  # Path.write_text(json.dumps(...)) with no newline=
