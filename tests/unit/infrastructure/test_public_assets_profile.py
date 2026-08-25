@@ -19,6 +19,13 @@ RED-first: every new-behaviour test here FAILS against the pre-fix tree (install
 all-four; doctor unconditionally checks all-four, emitting ``[missing] codex:agents/*.toml
 (D-CX-1)`` ×12 for a claude-only tree). The absent-profile byte-equality and the
 explicit-override tests are invariants that hold both before and after the fix.
+
+Intent: CONTRACT — v0.4.5 A3.1, A3.2 (``byte-golden-test-inventory-roster-split``, FR3).
+The absent-profile doctor golden below shares ``doctor_all_four_v0158.json`` with
+``test_install_target_goldens.py`` and is filtered through the SAME derived roster
+(``tests/helpers/public_asset_roster.py``) before comparison, so it too no longer
+contains a per-public-asset file inventory (A3.2); the roster-derived inventory check
+(A3.1) is re-asserted here for this file's own capture path.
 """
 
 from __future__ import annotations
@@ -36,6 +43,7 @@ from dadaia_workspace.infrastructure.public_assets import (
     FileSystemPublicAssetManager,
     OverwritePolicy,
 )
+from tests.helpers import public_asset_roster
 
 # Reuse the EXACT W1 golden normalizer + committed golden (Q2/A4 byte-equality lock) — the
 # same path-normalization and git-dirty line exclusion the W1 doctor golden was captured
@@ -308,10 +316,16 @@ def test_out_of_profile_runtime_present_is_not_silent(
 
 
 def test_absent_profile_doctor_byte_equals_all_four_golden(tmp_path: Path) -> None:
-    """Q2/A4: the absent-profile doctor path reproduces the W1 all-four doctor golden byte-for-byte.
+    """Q2/A4 / v0.4.5 A3.2: the absent-profile doctor path reproduces the W1 all-four
+    doctor golden's POLICY byte-for-byte.
 
-    This is the FR3 back-compat lock every pre-v0.1.58 workspace rides on. It uses the SAME
-    normalizer (path-normalize + git-dirty exclusion) the W1 golden was captured with.
+    This is the FR3 (v0.1.58) back-compat lock every pre-v0.1.58 workspace rides on. It
+    uses the SAME normalizer (path-normalize + git-dirty exclusion) the W1 golden was
+    captured with, filtered through the SAME derived roster
+    (``tests/helpers/public_asset_roster.py``, v0.4.5 FR3) as
+    ``test_install_target_goldens.py`` — the per-asset inventory dimension moved to the
+    roster assertion (A3.1, ``test_absent_profile_doctor_stage_lines_match_the_public_asset_roster``
+    below); this golden no longer contains a file inventory.
     """
     ws = tmp_path / "doctor_all_four"
     ws.mkdir()
@@ -320,8 +334,31 @@ def test_absent_profile_doctor_byte_equals_all_four_golden(tmp_path: Path) -> No
 
     report = _rendered(mgr.doctor(ws))
     normalized = [norm_path_line(line, ws) for line in report if not is_env_doctor_line(line)]
+    roster = public_asset_roster.scan()
+    policy = public_asset_roster.policy_only_doctor_lines(normalized, roster)
 
     golden = sort_line_lists(json.loads(_DOCTOR_GOLDEN.read_text(encoding="utf-8")))
-    assert sort_line_lists(normalized) == golden, (
+    assert sort_line_lists(policy) == golden, (
         "absent-profile doctor diverged from the W1 all-four golden — FR3 broke back-compat."
     )
+
+
+def test_absent_profile_doctor_stage_lines_match_the_public_asset_roster(
+    tmp_path: Path,
+) -> None:
+    """Intent: CONTRACT — v0.4.5 A3.1
+
+    Mirrors ``test_install_target_goldens.py::test_doctor_stage_lines_match_the_public_asset_roster``
+    for this file's own capture path: the inventory dimension the golden above used to
+    pin lives here instead, DERIVED by an independent scan
+    (``public_asset_roster.scan()``), never a second hand-kept list.
+    """
+    roster = set(public_asset_roster.scan())
+    ws = tmp_path / "doctor_all_four_roster"
+    ws.mkdir()
+    mgr = FileSystemPublicAssetManager()
+    mgr.install(ws, target="all")
+    report = _rendered(mgr.doctor(ws))
+    normalized = [norm_path_line(line, ws) for line in report if not is_env_doctor_line(line)]
+    stage_paths = public_asset_roster.stage_asset_paths(normalized)
+    assert stage_paths == roster

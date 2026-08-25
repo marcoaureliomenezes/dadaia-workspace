@@ -35,10 +35,21 @@ Determinism / v0.1.55 platform-invariant normalization:
 Regenerate the goldens (ONLY when a deliberate, reviewed behaviour change lands) with:
 ``UPDATE_INSTALL_GOLDENS=1 pytest tests/unit/infrastructure/test_install_target_goldens.py``.
 A byte diff without that flag is a behaviour regression — fix the consumer, never the golden.
+
+Intent: CONTRACT — v0.4.5 A3.1, A3.2, A3.3 (``byte-golden-test-inventory-roster-split``,
+FR3). The install/doctor goldens above used to pin BOTH target-mapping policy AND the
+full per-public-asset inventory in one byte diff — adding or removing a single
+skill/agent/rule file forced a golden regen whose huge diff also hid whether a genuine
+policy change slipped in alongside it (v0.4.4 AR-1). The inventory dimension now lives
+in ``tests/helpers/public_asset_roster.py``, DERIVED by scanning
+``dadaia_workspace/public/**`` at test time; both goldens below are filtered through it
+before comparison and therefore no longer contain a file inventory (A3.2). Zero
+production-code line changed for this split (A3.3).
 """
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -50,6 +61,7 @@ from dadaia_workspace.core.models.telemetry import AgentSummary, TokenTotals
 from dadaia_workspace.features.panel.service import PanelService
 from dadaia_workspace.features.panel.views.api_agents import render_api_agents_canonical
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+from tests.helpers import public_asset_roster
 from tests.helpers.golden_platform import (
     assert_golden,
     is_env_doctor_line,
@@ -243,10 +255,19 @@ def _v0158_message(what: str) -> str:
 def test_install_target_resolution_is_byte_identical(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """AC-1: install() per-target ``installed`` lists reproduce byte-identically."""
+    """AC-1 / v0.4.5 A3.2: install() per-target target-mapping POLICY reproduces
+    byte-identically. The per-asset inventory dimension (the original AC-1 scope) moved
+    to the roster assertion (A3.1, ``test_doctor_stage_lines_match_the_public_asset_roster``
+    below) — this golden no longer contains a file inventory."""
+    roster = public_asset_roster.scan()
+    captured = _capture_install(tmp_path, monkeypatch)
+    policy = {
+        target: public_asset_roster.policy_only_install_lines(lines, roster)
+        for target, lines in captured.items()
+    }
     assert_golden(
         _INSTALL_GOLDEN,
-        _capture_install(tmp_path, monkeypatch),
+        policy,
         "install-target-resolution",
         message=_v0158_message("install-target-resolution"),
     )
@@ -265,13 +286,113 @@ def test_panel_runtime_validation_is_byte_identical(tmp_path: Path) -> None:
 def test_doctor_all_four_report_is_byte_identical(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """AC-1/Q2/A4: doctor()'s all-four (no-profile) report is the FR3 back-compat lock."""
+    """AC-1/Q2/A4 / v0.4.5 A3.2: doctor()'s all-four (no-profile) report is the FR3
+    (v0.1.58) back-compat lock, restricted to doctor POLICY. The per-asset inventory
+    dimension moved to the roster assertion (A3.1,
+    ``test_doctor_stage_lines_match_the_public_asset_roster`` below) — this golden no
+    longer contains a file inventory."""
+    roster = public_asset_roster.scan()
+    captured = _capture_doctor(tmp_path, monkeypatch)
+    policy = public_asset_roster.policy_only_doctor_lines(captured, roster)
     assert_golden(
         _DOCTOR_GOLDEN,
-        _capture_doctor(tmp_path, monkeypatch),
+        policy,
         "doctor-all-four",
         message=_v0158_message("doctor-all-four"),
     )
+
+
+def test_doctor_stage_lines_match_the_public_asset_roster(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Intent: CONTRACT — v0.4.5 A3.1
+
+    The inventory dimension FR3 moves OUT of the byte goldens: doctor()'s
+    ``stage:<relpath>`` loop mirrors ``_iter_files(public_dir)`` 1:1
+    (``dadaia_workspace/infrastructure/public_assets.py``), so its relpaths must equal
+    the roster derived by an INDEPENDENT scan (``public_asset_roster.scan()``) exactly.
+    A future mis-rooted or mis-scoped stage walk would show up here first — never
+    silently inside a golden diff someone regenerates without looking.
+    """
+    roster = set(public_asset_roster.scan())
+    doctor_lines = _capture_doctor(tmp_path, monkeypatch)
+    stage_paths = public_asset_roster.stage_asset_paths(doctor_lines)
+    assert stage_paths == roster
+
+
+def test_adding_a_throwaway_public_asset_fails_the_roster_leaves_goldens_green(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Intent: CONTRACT — v0.4.5 A3.1
+
+    Executed proof, not reasoning, that the split actually decoupled inventory from
+    policy. A throwaway skill file is added to a COPY of ``public/`` — the real
+    ``dadaia_workspace/public/`` tree is never written to (never mutated in place,
+    never even opened for writing). Installing/doctoring against that copy makes the
+    roster-derived inventory check go RED (the mutated tree's ``stage:`` lines diverge
+    from the real, unmutated roster), while BOTH byte goldens — now policy-only per
+    A3.2 — stay green: re-derived self-consistently against the mutated tree, each is
+    byte-identical to what the same policy filter produces from the real tree.
+    """
+    real_roster = public_asset_roster.scan()
+    real_public_dir = public_asset_roster.default_public_dir()
+
+    # Rebuild a package-shaped mirror (symlinked siblings + a COPIED, mutated
+    # ``public/``) rather than a bare copy of ``public/`` alone: ``doctor()``'s
+    # entities-derivation check resolves ``dadaia_workspace.<module>`` references
+    # relative to ``public_dir.parent`` (``codex_doctor.check_entities_derivation``),
+    # so a mirror with no package siblings would report an unrelated false DRIFT.
+    pkg_mirror = tmp_path / "dadaia_workspace"
+    pkg_mirror.mkdir()
+    for sibling in real_public_dir.parent.iterdir():
+        if sibling.name in {"public", "__pycache__"}:
+            continue
+        (pkg_mirror / sibling.name).symlink_to(sibling, target_is_directory=sibling.is_dir())
+    mirror = pkg_mirror / "public"
+    shutil.copytree(real_public_dir, mirror)
+    throwaway_rel = "skills/_throwaway-T045-15/SKILL.md"
+    throwaway_dir = mirror / "skills" / "_throwaway-T045-15"
+    throwaway_dir.mkdir()
+    throwaway_dir.joinpath("SKILL.md").write_text(
+        "# throwaway asset, never committed\n", encoding="utf-8"
+    )
+    mutated_roster = public_asset_roster.scan(mirror)
+    assert throwaway_rel in mutated_roster
+    assert throwaway_rel not in real_roster
+
+    mutated_mgr = FileSystemPublicAssetManager()
+    mutated_mgr._public_dir = mirror  # exercise the copy; the real tree stays untouched
+
+    ws = tmp_path / "ws_mutated"
+    ws.mkdir()
+    _redirect_kimi_home(monkeypatch, ws)
+    installed = mutated_mgr.install(ws, target="all")
+    report = _rendered(mutated_mgr.doctor(ws))
+    doctor_lines = [norm_path_line(line, ws) for line in report if not is_env_doctor_line(line)]
+
+    # RED: the roster assertion (this file's previous test, re-derived inline) catches
+    # the throwaway asset when compared against the REAL, unmutated roster.
+    stage_paths = public_asset_roster.stage_asset_paths(doctor_lines)
+    assert stage_paths != set(real_roster)
+    assert stage_paths - set(real_roster) == {throwaway_rel}
+
+    # GREEN: both byte goldens, now policy-only, are unaffected by the addition.
+    install_lines = [norm_path_line(line, ws) for line in installed]
+    mutated_install_policy = public_asset_roster.policy_only_install_lines(
+        install_lines, mutated_roster
+    )
+    real_install_policy = public_asset_roster.policy_only_install_lines(
+        _capture_install(tmp_path, monkeypatch)["all"], real_roster
+    )
+    assert sorted(mutated_install_policy) == sorted(real_install_policy)
+
+    mutated_doctor_policy = public_asset_roster.policy_only_doctor_lines(
+        doctor_lines, mutated_roster
+    )
+    real_doctor_policy = public_asset_roster.policy_only_doctor_lines(
+        _capture_doctor(tmp_path, monkeypatch), real_roster
+    )
+    assert sorted(mutated_doctor_policy) == sorted(real_doctor_policy)
 
 
 def test_panel_runtime_accept_reject_is_discriminating(tmp_path: Path) -> None:
