@@ -118,6 +118,38 @@ architecture-review order) and the MEDIUM
 by entry `atomic-write-primitive-consolidation` — formalize with a `superseded` event when
 that entry is picked. The ledger remains the source of truth.
 
+**Purge-on-pick notice — release v0.4.5 "hardening and consolidation" (2026-08-24).**
+**Fourteen** `ACTIVE` subsections left this document in the same commit that created
+`specs/releases/v0.4.5/SPEC.md`, whose §7 is their provenance record: the four theme-**A**
+entries (`atomic-write-primitive-consolidation`,
+`byte-golden-test-inventory-roster-split`, `coupled-inventory-shared-oracle`,
+`scan-test-vacuity-guard`), the four theme-**B** entries
+(`doctor-slug-ownership-uniqueness`, `bug-append-write-time-denylist-redaction`,
+`specs-init-symlinked-target-refusal`, `bug-event-control-character-sanitation`), five of
+the six theme-**C** entries (`always-on-token-diet`, `memory-catalog-digest-trimming`,
+`persona-line-ceiling-trim`, `ai-surface-hygiene-residuals`,
+`intent-taxonomy-vocabulary-ruling`) and the theme-**E** entry
+(`dadaia-references-doctor-sanction`). All fourteen are declared in that SPEC's
+`**Consumes:**` line and each receives a `CONSUMED · v0.4.5` `LEDGER` line **in this same
+commit**, to be **updated in place** to its terminal token (`DELIVERED`/`SUPERSEDED`/
+`DEFERRED`) at the closure disposition sweep — never a second line (BL-DUP). Nothing was
+deleted. **Twelve entries stay `ACTIVE` by operator ruling O1 (2026-08-24):**
+`nine-skill-study-execution` (its dispositions ratified as provenance, execution deferred),
+`cli-help-architecture-and-session-injection`, `specs-canon-v6`, `entity-behavior-map`, and
+the eight skills proposed by the 2026-08-23 skills audit. One item rides the release without
+ever becoming an entry: the operator-only GitHub-settings action B1 (the verdict-gate
+required check on both PR edges), scheduled as a v0.4.5 task, due before the `rc-2` PR.
+
+**Bug pick — release v0.4.5 (2026-08-24).** All **8** open bugs were picked; the ledger
+(`dadaia bugs status`) remains the source of truth for their state.
+`two-atomic-writers-leak-temp-file-on-injected-os-replace-failure` carries a `superseded`
+event appended in the definition commit, naming `atomic-write-primitive-consolidation`.
+`bug-event-field-with-unicode-line-separator-silently-drops-the-event` is bundled into the
+same fix as `bug-event-control-character-sanitation`. The two MEDIUM AGENTS.md-vs-gate bugs
+are one structural investigation, not two patches, per the standing architecture-review
+order. `windows-xdist-workers-crash-on-unit-fast-tier` may end the release **still open** —
+its SPEC assumption AS-5 states that a quarantine is never a resolution.
+
 ## ACTIVE
 
 ### dd-diagnose
@@ -390,128 +422,6 @@ that entry is picked. The ledger remains the source of truth.
 
 
 
-### atomic-write-primitive-consolidation
-- **Title:** atomic-write-primitive-consolidation — collapse the package's 8 near-identical atomic-writer primitives (plus 3 inline `.tmp` writers) into one shared parameterized primitive
-- **Opened:** 2026-08-24
-- **Status:** candidate
-- **Description:** Theme **A** (structural consolidation) · priority **HIGH** · size **MEDIUM**. Seven modules carry eight near-identical atomic writers, and the T-044-45 code review adds three inline `.tmp` writers outside the name-based census (`state_v2.py:166`, `import_/service.py:135` and `:167`) to the same consolidation. Collapse into one shared parameterized primitive — preserve-mode on/off, LF-bytes/binary, temp-cleanup-on-any-failure always — shrinking the T-044-35 injected-failure battery from 8 seams to 1 (net test deletion). **Structurally subsumes open bug `two-atomic-writers-leak-temp-file-on-injected-os-replace-failure`** (LOW, pinned as current behaviour by a self-destructing characterization test): the architect ruling recommends the consolidation absorb the bug rather than a two-call-site patch — when picked, record the subsumption with a `superseded` event per `dd-release-definition` step 2. Two constraints the SPEC must adjudicate explicitly: (1) features-no-cross-feature-import + the core/ I/O ratchet point at `infrastructure/` as the home; (2) the hooks-never-import-container latency law may require `hooks/_common` to keep one sanctioned import-light duplicate — if so, the SPEC says so in writing.
-- **Provenance:** intake-report item A1 (v0.4.4 intake, approved 2026-08-24) — S5-FR23 architect ruling Firing 2 Check(c); S5 qa-close §4.2 item 1; T-044-45 code review final section
-- **Intents:**
-```yaml
-- subject:
-    kind: code
-    ref: dadaia_workspace/infrastructure/atomic_write.py#atomic_write
-    surface: new
-  change: "one shared parameterized atomic-write primitive (preserve-mode on/off, LF-bytes/binary, temp cleanup on any failure path) replacing the 8 named writers and the 3 inline .tmp writers; final home adjudicated in the SPEC against the core-I/O ratchet and the hooks-latency law"
-```
-
-### byte-golden-test-inventory-roster-split
-- **Title:** byte-golden-test-inventory-roster-split — INTAKE-AR1-1: split the test-inventory assertion out of the two byte-golden tests into a derived roster oracle
-- **Opened:** 2026-08-24
-- **Status:** candidate
-- **Description:** Theme **A** (structural consolidation) · priority **MEDIUM** · size **LOW** (zero production-code change). `test_install_target_goldens.py` and `test_public_assets_profile.py` keep a policy-only byte golden; the inventory assertion moves to a roster derived by scanning `dadaia_workspace/public/**`, so an asset add/remove no longer breaks a byte golden that exists to pin policy. Pairs naturally with `coupled-inventory-shared-oracle` (same seam family; both pure test-architecture) — bundle at pick.
-- **Provenance:** intake-report item A2 (v0.4.4 intake, approved 2026-08-24) — S3-AR1-ruling §4 (architect); carried through S5 qa-close §4.2 item 4, re-confirmed unexecuted
-- **Intents:**
-```yaml
-- subject:
-    kind: code
-    ref: tests/helpers/public_asset_roster.py#derive_public_roster
-    surface: new
-  change: "derived roster oracle scanned from dadaia_workspace/public/**; the two byte-golden tests keep policy-only goldens and delegate the inventory assertion to the roster"
-```
-
-### coupled-inventory-shared-oracle
-- **Title:** coupled-inventory-shared-oracle — INTAKE-AR1-2: one shared oracle for the three coupled-inventory tests
-- **Opened:** 2026-08-24
-- **Status:** candidate
-- **Description:** Theme **A** (structural consolidation) · priority **MEDIUM** (this cross-write-scope drift seam produced two v0.4.4 bugs) · size **LOW**. Derive one shared oracle consumed by `test_public_pipeline.py` (EXPECTED_SKILLS), `test_public_assets.py` (path assertions) and `check_skill_orphans.py` (roster), so the three inventories can never drift apart again. Bundle with `byte-golden-test-inventory-roster-split`; sequence **before or with** `nine-skill-study-execution` — any skill merge/fuse changes the roster, so landing the shared oracle first cheapens every later skill-surface change.
-- **Provenance:** intake-report item A3 (v0.4.4 intake, approved 2026-08-24) — S3-AR1-ruling §4; carried through S5 qa-close §4.2 item 5, re-confirmed unexecuted
-- **Intents:**
-```yaml
-- subject:
-    kind: code
-    ref: tests/helpers/skill_inventory_oracle.py#skill_inventory
-    surface: new
-  change: "one shared skill-inventory oracle consumed by test_public_pipeline.py, test_public_assets.py and check_skill_orphans.py; the three hand-kept inventories retire"
-```
-
-### scan-test-vacuity-guard
-- **Title:** scan-test-vacuity-guard — non-empty-population + sentinel convention for the ~15 tree-walking source-scan tests
-- **Opened:** 2026-08-24
-- **Status:** candidate
-- **Description:** Theme **A** (structural consolidation) · priority **LOW** (class-wide false-confidence guard) · size **LOW**. A 2-line per-test convention — assert the enumerated population is non-empty + assert one known sentinel file is in it — so a future mis-rooted walker cannot pass vacuously green forever. Explicitly **NOT** a shared harness: the S5-FR23 ruling evaluated and rejected a harness; this is a convention applied test-by-test. No dependencies — smallest item in the slate, safe filler for any release.
-- **Provenance:** intake-report item A4 (v0.4.4 intake, approved 2026-08-24) — S5-FR23 ruling Firing 3 Check(b); S5 qa-close §4.2 item 2
-- **Intents:**
-```yaml
-- subject:
-    kind: code
-    ref: tests/helpers/scan_population.py#assert_scan_population
-    surface: new
-  change: "tiny helper backing the convention (population non-empty + named sentinel present), applied across the ~15 tree-walking scan tests; deliberately not a harness"
-```
-
-### doctor-slug-ownership-uniqueness
-- **Title:** doctor-slug-ownership-uniqueness — decide the healing lane for historical registry slug-ownership collisions
-- **Opened:** 2026-08-24
-- **Status:** candidate
-- **Description:** Theme **B** (security/gate hardening) · priority **MEDIUM** (same blast-radius class as the destroy-foreign-work lineage the release closed, reachable only via a pre-existing corrupt registry) · size **LOW-MEDIUM**. Enforcement at the two write seams (`add_repo` + `create`, both shipped in v0.4.4) never heals historical state — the v2→v3 migration imports whatever the v2 registry says, so a pre-existing colliding registry migrates its collision in. The S5-FR23 ruling asks for a follow-up decision: add a doctor invariant (registry-wide slug-ownership uniqueness, the healing lane) **or** explicitly rule it out in one recorded paragraph. Either outcome closes the last lane of the F-1/F-12 class.
-- **Provenance:** intake-report item B2 (v0.4.4 intake, approved 2026-08-24) — S5-FR23 ruling Firing 5 Check(a) tail
-- **Intents:**
-```yaml
-- subject:
-    kind: cli
-    ref: specs doctor
-  change: "registry-wide slug-ownership-uniqueness invariant check in the context/specs doctor lane (or an explicit recorded rule-out) — heals what the write-seam enforcement cannot: pre-existing collisions imported by the v2->v3 migration"
-```
-
-### bug-append-write-time-denylist-redaction
-- **Title:** bug-append-write-time-denylist-redaction — the write-time bug-append redaction seam cannot see what the push-time seam refuses
-- **Opened:** 2026-08-24
-- **Status:** candidate
-- **Description:** Theme **B** (security/gate hardening) · priority **MEDIUM** (third recurrence of the privacy-leak-into-committed-material class across releases) · size **SMALL-MEDIUM**. `redact_text` knows IPv4 + home-path patterns; the operator denylist is consulted only at push time (`load_privacy_terms`). Class evidence inside v0.4.4 alone: two committed leaks caught only at the push gate — an S2 review home-path, and the denylisted name in a bugs.jsonl notes field that forced the rc-1 history rewrite. Wire the denylist loader into the bug-append redaction seam so the leak never reaches a commit; the denylist itself stays operator-local and never enters public assets. Complements — does not replace — the push-time scan.
-- **Provenance:** intake-report item B3 (v0.4.4 intake, approved 2026-08-24) — security-reviewer T-044-46 round 1 (CWE-class recurrence finding)
-- **Intents:**
-```yaml
-- subject:
-    kind: code
-    ref: dadaia_workspace/core/models/bugs.py#redact_text
-    surface: existing
-  change: "write-time redaction additionally masks operator-denylist terms, not just IPv4 + home-path patterns"
-- subject:
-    kind: code
-    ref: dadaia_workspace/infrastructure/privacy_check.py#load_privacy_terms
-    surface: existing
-  change: "denylist loader consumed by the bug-append redaction seam as well as the push-time scan; single loading seam, operator-local data never projected"
-```
-
-### specs-init-symlinked-target-refusal
-- **Title:** specs-init-symlinked-target-refusal — the explicit --specs-dir branch of specs init still follows a symlinked target
-- **Opened:** 2026-08-24
-- **Status:** candidate
-- **Description:** Theme **B** (security/gate hardening) · priority **LOW** · size **LOW**. Same CWE-59 class as the resolver seam T-044-40 hardened, smaller blast radius (a fresh scaffold misplaced, not an existing tree rewritten). Refuse a symlinked target on the explicit `--specs-dir` branch, closing the last silently-followed explicit-path lane. No dependencies.
-- **Provenance:** intake-report item B4 (v0.4.4 intake, approved 2026-08-24) — S5-FR23 ruling Firing 4 Check(a); S5 qa-close §4.2 item 3
-- **Intents:**
-```yaml
-- subject:
-    kind: cli
-    ref: specs init
-  change: "the explicit --specs-dir branch refuses a symlinked target (same refusal posture as the T-044-40-hardened resolver seam)"
-```
-
-### bug-event-control-character-sanitation
-- **Title:** bug-event-control-character-sanitation — ESC survives the bug-event round-trip and bugs status renders titles raw (CWE-117)
-- **Opened:** 2026-08-24
-- **Status:** candidate
-- **Description:** Theme **B** (security/gate hardening) · priority **LOW** · size **SMALL**. rich strips BEL/BS/VT/FF/CR but not ESC; control characters survive the bug-event round-trip and `bugs status` renders the title raw — impact is spoofed CLI output only (panel unaffected, html.escape). Pre-existing on every free-text field. **Bundle with open bug `bug-event-field-with-unicode-line-separator-silently-drops-the-event` (MEDIUM)** — same free-text-field family; one control/format-character sanitation pass at the bug-event seam closes both. Record the bug linkage explicitly when picked.
-- **Provenance:** intake-report item B5 (v0.4.4 intake, approved 2026-08-24) — security-reviewer T-044-46 round 1 (LOW finding)
-- **Intents:**
-```yaml
-- subject:
-    kind: cli
-    ref: bugs status
-  change: "one control/format-character sanitation pass at the bug-event seam (ESC family plus the Unicode line/paragraph separators of the open MEDIUM bug); rendered titles never carry raw control characters"
-```
-
 ### nine-skill-study-execution
 - **Title:** nine-skill-study-execution — execute the operator-ratified nine-skill dispositions: Update×5, Merge×3, Fuse×1, zero Retire
 - **Opened:** 2026-08-24
@@ -526,97 +436,6 @@ that entry is picked. The ledger remains the source of truth.
     surface: new
   change: "representative anchor for the ratified execution set: apply the nine per-skill dispositions (Update x5, Merge x3, Fuse x1, zero Retire) exactly as recorded in the study handoff; every merge/fuse updates all cross-references and the projection roster in the same change"
 ```
-
-### always-on-token-diet
-- **Title:** always-on-token-diet — close the A21.9 miss: always-on load ~8.2k tokens vs the 3.5k target, negations still >60
-- **Opened:** 2026-08-24
-- **Status:** candidate
-- **Description:** Theme **C** (token-economy / AI-surface) · priority **MEDIUM-HIGH** · size **MEDIUM**. SPEC A21.9 set always-on ≤3.5k tokens and ≤60 negations; v0.4.4 landed ~8.2k and >60 (from the ~8.4k/160 baseline) — the miss was honestly recorded, not papered over (T-044-44, V14/V15 measurements). Remedy: a dedicated always-on-diet pass across DADAIA.md, personas and always-on rules. **C2–C4 form one token-economy program** — `memory-catalog-digest-trimming` is the dominant single contributor to the bound-session overage, `persona-line-ceiling-trim` and `nine-skill-study-execution` shave the same budget — adjudicate and pick as a set (operator ruling R1 names the token-economy program a v0.4.5 direction).
-- **Provenance:** intake-report item C2 (v0.4.4 intake, approved 2026-08-24) — T-044-44 FR21 gate capture vs SPEC A21.9
-- **Intents:**
-```yaml
-- subject:
-    kind: doc
-    ref: dadaia_workspace/public/data/DADAIA.md#always-on-token-budget
-    surface: new
-  change: "diet pass across the always-on surface (DADAIA.md, personas, always-on rules) toward the 3.5k-token / 60-negation A21.9 acceptance; measured before/after, no law dropped silently"
-```
-
-### memory-catalog-digest-trimming
-- **Title:** memory-catalog-digest-trimming — A30.3-adjacent: trim/page/tier the 28-entry catalog digest at the memory layer
-- **Opened:** 2026-08-24
-- **Status:** candidate
-- **Description:** Theme **C** (token-economy / AI-surface) · priority **MEDIUM** · size **MEDIUM**. S3 A30.2 measured FAIL, honestly: the bound-session injection prefix is ~2.78k tokens, ~4.0× over the ≤0.7k target; root cause is the 28-entry `catalog.json` digest. Remedy is **catalog curation policy** — trim, page or tier the digest — owned by whichever task takes catalog curation; explicitly **NOT** a `ctx_inject` rewrite (the hook's own digest logic was out of FR30's scope per A30.3 and stays out of this entry). Feeds `always-on-token-diet` directly — part of the C2–C4 token-economy program.
-- **Provenance:** intake-report item C3 (v0.4.4 intake, approved 2026-08-24) — S3 qa-close A30.2 (FAIL, measured); carried through S5 qa-close §4.2 item 6
-- **Intents:**
-```yaml
-- subject:
-    kind: doc
-    ref: specs/memory/product/catalog.json#digest-tiering
-    surface: new
-  change: "curation policy for the catalog digest (trim/page/tier the 28 entries) so the bound-session injection prefix approaches the 0.7k-token target; ctx_inject digest logic untouched"
-```
-
-### persona-line-ceiling-trim
-- **Title:** persona-line-ceiling-trim — A29.1-adjacent: 4 of 9 personas still exceed the 220-line ceiling
-- **Opened:** 2026-08-24
-- **Status:** candidate
-- **Description:** Theme **C** (token-economy / AI-surface) · priority **LOW** (optional trim pass, operator-wanted only) · size **SMALL-MEDIUM**. A29.1 closed PARTIAL, honestly disclosed: ai-engineer 273, product-engineer 334, qa-engineer 274, software-architect 252 lines — each overflow justified inline per A29.3 ("a fact with no other home stays"); the fleet is already net −31.5% vs pre-S3. A trim needs a **sibling mechanism** (skill or rule) to move the justified content into, which `nine-skill-study-execution` outcomes may create — **sequence after C1**. Part of the C2–C4 token-economy program.
-- **Provenance:** intake-report item C4 (v0.4.4 intake, approved 2026-08-24) — S3 qa-close A29.1 (PARTIAL); carried through S5 qa-close §4.2 item 7
-- **Intents:**
-```yaml
-- subject:
-    kind: doc
-    ref: dadaia_workspace/public/agents/product-engineer.md
-    surface: new
-  change: "representative anchor: trim the four over-ceiling personas (product-engineer 334, qa-engineer 274, ai-engineer 273, software-architect 252) under 220 lines by relocating justified content into the sibling mechanism the C1 outcomes provide; never silent deletion of a law"
-```
-
-### ai-surface-hygiene-residuals
-- **Title:** ai-surface-hygiene-residuals — stale section citation in ai-engineer.md + F-7/F-8/F-10 wording residuals
-- **Opened:** 2026-08-24
-- **Status:** candidate
-- **Description:** Theme **C** (token-economy / AI-surface) · priority **LOW** · size **TINY**. Two sub-items from the T-044-45 code review's "Carried to PM intake" section: (a) `public/agents/ai-engineer.md:239` cites section 5 for content that lives in section 8 — the F-3 stale-anchor class, inside `public/**`; (b) F-7/F-8/F-10 LOW naming/wording residuals, cosmetic, zero behaviour. One ai-engineer hygiene pass, source-side + re-project; rides along any C-theme execution.
-- **Provenance:** intake-report item C5 (v0.4.4 intake, approved 2026-08-24) — T-044-45 code review, "Carried to PM intake" final section
-- **Intents:**
-```yaml
-- subject:
-    kind: doc
-    ref: dadaia_workspace/public/agents/ai-engineer.md#stale-section-citation
-    surface: new
-  change: "fix the section-5-vs-8 stale citation at source and sweep the F-7/F-8/F-10 wording residuals in the same hygiene pass; re-project and dadaia public doctor green"
-```
-
-### intent-taxonomy-vocabulary-ruling
-- **Title:** intent-taxonomy-vocabulary-ruling — 11 off-taxonomy test-Intent declarations (8 REGRESSION + 3 BUG) repo-wide
-- **Opened:** 2026-08-24
-- **Status:** candidate
-- **Description:** Theme **C** (token-economy / AI-surface) · priority **LOW** · size **TINY-SMALL**. Eight `REGRESSION` and three `BUG` Intent declarations sit outside the test-stewardship taxonomy. The T-044-45 review frames this as a **vocabulary decision** for the stewardship skill's owner, not a code fix: either admit the two tokens into the taxonomy or sweep the 11 declarations onto existing tokens. Touches `dadaia-test-stewardship`, which is in the C1 Update set — **adjudicate together**; execution rides the C1 stewardship-skill update.
-- **Provenance:** intake-report item C6 (v0.4.4 intake, approved 2026-08-24) — T-044-45 code review, "Carried to PM intake" final section
-- **Intents:**
-```yaml
-- subject:
-    kind: doc
-    ref: dadaia_workspace/public/skills/dadaia-test-stewardship/SKILL.md
-    surface: new
-  change: "vocabulary ruling encoded in the stewardship taxonomy (admit REGRESSION/BUG or sweep the 11 declarations onto existing tokens); executed inside the C1 dadaia-test-stewardship Update"
-```
-
-### dadaia-references-doctor-sanction
-- **Title:** dadaia-references-doctor-sanction — encode operator ruling R3: .dadaia/references/ is the sanctioned home for reference material, recognized by the doctor
-- **Opened:** 2026-08-24
-- **Status:** candidate
-- **Description:** Theme **E** (operator ruling) · priority **MEDIUM** (decision already made; blocks any doctor tightening around `.dadaia/` subtree ownership) · size **TINY**. **Operator ruling R3 (2026-08-24): `.dadaia/references/` is the sanctioned home for operator-placed third-party reference material.** This entry encodes the ruling in the doctor contract instead of leaving it folklore: the workspace doctor recognizes `.dadaia/references/` as a legitimate owned subtree (allowlist line or the documented `.dadaia/`-level equivalent of a root exception). The encoding must state explicitly that **reference clones are outside context lifecycle** — never alive/dead material; no lifecycle verb may ever treat a reference clone as a managed context (prior history: lifecycle verbs acting on foreign trees destroyed work). Not covered by ACTIVE `specs-canon-v6`, which reshapes `specs/`, not `.dadaia/`.
-- **Provenance:** intake-report item E1 (v0.4.4 intake, approved 2026-08-24) + operator ruling R3 (2026-08-24) — T-044-44 gate-capture session, ROOT-4
-- **Intents:**
-```yaml
-- subject:
-    kind: code
-    ref: dadaia_workspace/features/spec_context/doctor.py#DoctorService
-    surface: existing
-  change: "doctor recognizes .dadaia/references/ as a sanctioned operator-owned subtree (never flagged, never GC'd, never a managed context); the outside-context-lifecycle clause is asserted by test"
-```
-
 
 ## LEDGER
 
@@ -717,3 +536,17 @@ that entry is picked. The ledger remains the source of truth.
 - gitflow-contract-v2-consolidation · DELIVERED · v0.4.4 — FR1–FR6 shipped; closure sweep, specs/_archive/releases/v0.4.4/CLOSURE.md `## Dispositions` · 2026-08-24
 - rules-skills-governance-map · DELIVERED · v0.4.4 — FR7–FR9 shipped; closure sweep, specs/_archive/releases/v0.4.4/CLOSURE.md `## Dispositions` · 2026-08-24
 - core-skills-consolidation · DELIVERED · v0.4.4 — FR10–FR14 + FR24–FR31 shipped; closure sweep, specs/_archive/releases/v0.4.4/CLOSURE.md `## Dispositions` · 2026-08-24
+- atomic-write-primitive-consolidation · CONSUMED · v0.4.5 — picked at definition, FR2; updated in place at the closure sweep · 2026-08-24
+- byte-golden-test-inventory-roster-split · CONSUMED · v0.4.5 — picked at definition, FR3; updated in place at the closure sweep · 2026-08-24
+- coupled-inventory-shared-oracle · CONSUMED · v0.4.5 — picked at definition, FR4; updated in place at the closure sweep · 2026-08-24
+- scan-test-vacuity-guard · CONSUMED · v0.4.5 — picked at definition, FR5; updated in place at the closure sweep · 2026-08-24
+- doctor-slug-ownership-uniqueness · CONSUMED · v0.4.5 — picked at definition, FR9 (invariant or recorded rule-out, AS-4); updated in place at the closure sweep · 2026-08-24
+- bug-append-write-time-denylist-redaction · CONSUMED · v0.4.5 — picked at definition, FR6; updated in place at the closure sweep · 2026-08-24
+- specs-init-symlinked-target-refusal · CONSUMED · v0.4.5 — picked at definition, FR8; updated in place at the closure sweep · 2026-08-24
+- bug-event-control-character-sanitation · CONSUMED · v0.4.5 — picked at definition, FR7, bundling the open MEDIUM unicode-line-separator bug; updated in place at the closure sweep · 2026-08-24
+- always-on-token-diet · CONSUMED · v0.4.5 — picked at definition, FR11 (consumed by executing and measuring the pass, AS-3); updated in place at the closure sweep · 2026-08-24
+- memory-catalog-digest-trimming · CONSUMED · v0.4.5 — picked at definition, FR12; updated in place at the closure sweep · 2026-08-24
+- persona-line-ceiling-trim · CONSUMED · v0.4.5 — picked at definition, FR13 (bounded to existing sibling mechanisms, AS-1); updated in place at the closure sweep · 2026-08-24
+- ai-surface-hygiene-residuals · CONSUMED · v0.4.5 — picked at definition, FR14; updated in place at the closure sweep · 2026-08-24
+- intent-taxonomy-vocabulary-ruling · CONSUMED · v0.4.5 — picked at definition, FR15 (executed directly on the stewardship taxonomy, AS-2); updated in place at the closure sweep · 2026-08-24
+- dadaia-references-doctor-sanction · CONSUMED · v0.4.5 — picked at definition, FR10, operator ruling O4; updated in place at the closure sweep · 2026-08-24
