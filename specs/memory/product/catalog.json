@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-24T19:20:05Z",
+  "generated_at": "2026-08-26T14:33:53Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -8,7 +8,6 @@
       "title": "agent-comms — Handoff Contract v1",
       "category": "product",
       "area": "agents",
-      "tldr": "handoff-v1.2 separates HTML reports from JSON handoffs, carries the self_pull Layer-1 read-proof line, and dies on consumption unless it is artifact-bearing.",
       "summary": "the handoff-v1 family contract separates human evidence from agent-to-agent coordination: HTML reports in .dadaia/reports/<context>/<agent>/ and JSON handoffs in .dadaia/handoff/<context>/. Current version handoff-v1.2 requires self_pull.refs — the Layer-1 memory atoms the session actually read (specs/-prefixed, existence-checked, role-map coverage) — with historical v1/v1.1 documents valid forever (transition posture). The CLI validates schema, the v1.2 self_pull conditional, and artifact.path hash inside the workspace — any existing relative path under the root resolves workspace-rooted (incl. repos/<slug>/specs/audits), with a legacy handoff-dir fallback; reports next and the QA/security gate consume the canonical root. A consumed coordination handoff is deleted by its consumer (ack-on-consume); an artifact-bearing handoff is exempt and follows its report's retention.",
       "path": "specs/memory/product/agents/agent-comms.md",
       "tags": [
@@ -28,7 +27,6 @@
       "title": "agent-monitoring",
       "category": "product",
       "area": "agents",
-      "tldr": "stdlib-only local telemetry → panel Sessions tab + /api/agents; allowlist gate preserves privacy; artifacts die event-driven, logs self-rotate.",
       "summary": "stdlib-only local telemetry consuming Claude Code jsonl + Codex sqlite (~/.codex/state_5.sqlite) + Kimi session index (~/.kimi-code/session_index.jsonl); feeds the panel's Sessions tab and the /api/agents and /api/sessions endpoints; a hardcoded allowlist gate preserves privacy by construction; endpoints served with no credential behind the panel's loopback bind + Host allowlist. Also owns the runtime artifact lifecycle under .dadaia/ — release-closure GC of a release's own reports, handoffs, tmp captures and run records; reconciler reaping of stale session/presence records, their markers and zombie run records; write-time 1 MB rotation with current+1 retention for every logs/*.jsonl writer; and dadaia tmp gc as the only calendar-based backstop.",
       "path": "specs/memory/product/agents/agent-monitoring.md",
       "tags": [
@@ -50,7 +48,6 @@
       "title": "agent-orchestration",
       "category": "product",
       "area": "agents",
-      "tldr": "Nine core Layer-1 roles, two dispatchers, document-governed ordered work, and advisory-only concurrency.",
       "summary": "Defines role ownership, dispatch purity, memory bootstrap, task discipline, review checkpoints, and Layer-1 model governance. The ordered lifecycle is carried by SDD documents and agent dispatch, not by a runtime, and each stage's protocol has one owning dd- skill the law points at. No role acquires or coordinates a concurrency lock.",
       "path": "specs/memory/product/agents/agent-orchestration.md",
       "tags": [
@@ -77,7 +74,6 @@
       "title": "agentic-entities",
       "category": "product",
       "area": "agents",
-      "tldr": "Abstract-entity registry — Personas, Behaviors, Rules, universal surface — plus the one rules-skills map and its single deterministic enforcer.",
       "summary": "The workspace method is defined abstractly first: `public/entities/registry.json` holds the Personas, Deterministic Behaviors, Abstract Rules, and universal skills/AGENTS.md surface. Every scaffolded core sub-agent, hook, and rule file is a per-harness derivation of one of these entities (constitution §12.5); the derivation contract test and the `public doctor` `entities-derivation` check enforce the prohibition, the latter at behavioral-fidelity depth with a mutation fixture per drift class. A 21-skill surface maps to the law through one machine-readable rules-skills map with one deterministic enforcer, which also carries the citation check and the invocation-model equivalence; the retired collision lint left with its hard-coded table. The panel renders the registry in the Agentic Entities tab and as the Personas section of the Agents tab.",
       "path": "specs/memory/product/agents/agentic-entities.md",
       "tags": [
@@ -100,7 +96,6 @@
       "title": "academy",
       "category": "product",
       "area": "distribution",
-      "tldr": "browsable knowledge_basis in the panel's Academy tab + copy-from-template management via CLI.",
       "summary": "the panel's Academy tab browses the knowledge_basis modules directly (GET /api/academy lists all modules with titles and lesson counts; the read-only traversal-guarded route GET /academy/<module>/<lesson> renders the lesson in Markdown). The copy-from-template CLI (dadaia academy create/update/delete) remains the management surface for derived courses.",
       "path": "specs/memory/product/distribution/academy.md",
       "tags": [
@@ -120,7 +115,6 @@
       "title": "public-asset-distribution",
       "category": "product",
       "area": "distribution",
-      "tldr": "canonical public assets, whole skill folders included, staged to .dadaia/agentic and projected to Claude Code, Codex, Kimi Code and .agents roots.",
       "summary": "Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, universal skills projected as whole folders (SKILL.md plus every disclosed sibling) to one canonical .agents/skills home with no registry entry, the one-load-per-harness law projection, the thin-wrapper contract that keeps every public/scripts file an entry point over the package implementation, repo templates copied at alive() (repo-AGENTS.md, with destination-file symlink refusal at every write site, plus a conditional tests/AGENTS.md), harness-profile-aware install/doctor, render-at-install of core agents (staged generic body + resolved agent-model policy composed into both L1 projections) with a policy-aware doctor render-compare, provenance-gated consumer AGENTS fan-out (banner-canonical restored vs hand-authored left [foreign]) with lexical repo-slug containment + destination-file symlink refusal, scoped AGENTS projections, source-root hygiene guard, and runtime projection contract.",
       "path": "specs/memory/product/distribution/public-asset-distribution.md",
       "tags": [
@@ -143,7 +137,6 @@
       "title": "pypi-distribution",
       "category": "product",
       "area": "distribution",
-      "tldr": "The published dadaia-workspace PyPI package on a single version axis, the release.yml OIDC publish pipeline, and the wheel content contract.",
       "summary": "Owns PyPI distribution as product behavior — the live `dadaia-workspace` package, the `.github/workflows/release.yml` pipeline (version-vs-tag check → five test legs → build → release-gate approval → OIDC trusted publishing + tag → post-publish smoke), the wheel content contract (public assets ship in-package), and the single version axis: the `pyproject.toml` version tracks the published PyPI lineage and a release id is that same minted number, `v`-prefixed. The CHANGELOG records that lineage completely — a git-derived, range-cited section for every published version, and an unpublished-internal annotation for every heading matching none; nothing is deleted or renamed.",
       "path": "specs/memory/product/distribution/pypi-distribution.md",
       "tags": [
@@ -165,7 +158,6 @@
       "title": "Harness — Claude Code",
       "category": "product",
       "area": "harness",
-      "tldr": "Entry harness with native sub-agent dispatch; scaffold = CLAUDE.md bridge + .claude/ projection.",
       "summary": "Capability and scaffold truth for the Claude Code harness — what it can do, what dadaia projects for it, its enforcement posture, and what a Claude-only workspace installation contains.",
       "path": "specs/memory/product/harness/harness-claude-code.md",
       "tags": [
@@ -189,7 +181,6 @@
       "title": "Harness — Codex",
       "category": "product",
       "area": "harness",
-      "tldr": "Entry harness on the operator's Codex subscription: TUI and headless exec, version-qualified live-certified hook fire, Starlark policy, .codex/ projection.",
       "summary": "Capability and scaffold truth for the Codex harness — the version-qualified enforcement posture (hooks live-certified at codex-cli 0.144.4 for both TUI and headless exec, every other version probe-driven through dadaia certify's codex-live-probe against the installed binary), the native AGENTS.md read path that carries the law once to parent and delegated agents alike, the compacted role-only persona TOMLs, the behavioral-fidelity derivation check, the Starlark command policy, the Codex-native tier identity of projected agents, and what a Codex-only workspace installation contains.",
       "path": "specs/memory/product/harness/harness-codex.md",
       "tags": [
@@ -214,7 +205,6 @@
       "title": "Harness — Kimi Code",
       "category": "product",
       "area": "harness",
-      "tldr": "Layer-1-only harness: `.kimi-code/` projection + user-level TOML hook shims; binds through `DADAIA_CONTEXT` at launch.",
       "summary": "Kimi Code enters the workspace as a first-class Layer-1 harness. The projection tree is inert Markdown; the live wiring is four POSIX shims registered via a marker-delimited managed block of TOML hook rules in `$KIMI_CODE_HOME/config.toml`, delegating to the shared Python hook modules. Kimi exposes no session-id environment variable, so its context binding is `DADAIA_CONTEXT` exported at harness launch.",
       "path": "specs/memory/product/harness/harness-kimi-code.md",
       "tags": [
@@ -240,7 +230,6 @@
       "title": "brand-identity",
       "category": "product",
       "area": "panel",
-      "tldr": "canonical 5-color palette and CSS tokens of the panel (release dadaia-workspace-brand-identity-v1).",
       "summary": "canonical 5-color palette and CSS tokens of the panel (release dadaia-workspace-brand-identity-v1).",
       "path": "specs/memory/product/panel/brand-identity.md",
       "tags": [
@@ -260,7 +249,6 @@
       "title": "panel",
       "category": "product",
       "area": "panel",
-      "tldr": "Local six-tab panel with agent model governance, agentic entities, telemetry, reports, academy, and servers.",
       "summary": "`dadaia panel` serves the local workspace UI. Its six tabs are Projects, Agents, Agentic Entities, Reports, Academy, and Servers. It is loopback-only, no-auth, Host-guarded, and CSP-constrained.",
       "path": "specs/memory/product/panel/panel.md",
       "tags": [
@@ -285,7 +273,6 @@
       "title": "product-vision",
       "category": "product",
       "area": "philosophy",
-      "tldr": "A strict, portable SDD workspace that gives agents current context, a document-governed lifecycle, visible concurrency, and strong anti-slop boundaries.",
       "summary": "Defines dadaia-workspace as a local-first environment for context-bound agent work. It combines canonical specs and memory, deterministic safety gates, a document-governed ordered lifecycle, cross-harness projections, auditable evidence, and explicit workspace/repository hygiene.",
       "path": "specs/memory/product/philosophy/product-vision.md",
       "tags": [
@@ -309,7 +296,6 @@
       "title": "spec-context-project",
       "category": "product",
       "area": "philosophy",
-      "tldr": "One canonical specs tree owned by one main repository, optionally spanning associated repos, bindable per session and safe for visible concurrent work.",
       "summary": "The central unit of dadaia-workspace. One main repository is the sole source of specs, bind, memory, releases and backlog; associated repositories extend the project across several checkouts without ever adding a second specs tree. Binding selects the project and injects its current memory for the caller; the SDD gate constrains writes while advisory presence surfaces concurrent sessions without locking them out.",
       "path": "specs/memory/product/philosophy/spec-context-project.md",
       "tags": [
@@ -331,7 +317,6 @@
       "title": "Consumer validation gate — supported consumer environments",
       "category": "product",
       "area": "platform",
-      "tldr": "A consumer-side validation agent running the shipped recipe is the release gate: no wheel is published without its CERTIFIED_100 verdict.",
       "summary": "A consumer-side validation agent running the shipped consumer validation recipe on a real workspace is the canonical release gate of dadaia-workspace. A consumer environment is declared SUPPORTED only after a full real-use round reports zero failures. Deterministic certification alone never approves a release. A round may also run against a throwaway real workspace created with dadaia init; whatever such an environment cannot exercise is recorded as a named limit and reported as not exercised, never as passed, and one remediation cycle is budgeted inside the round itself.",
       "path": "specs/memory/product/platform/consumer-agent-support.md",
       "tags": [
@@ -354,7 +339,6 @@
       "title": "context-management",
       "category": "product",
       "area": "platform",
-      "tldr": "ALIVE/DEAD registry of one main repo plus N associated repos, one resolution authority, one repo accessor, lean bind-driven injection, advisory presence.",
       "summary": "Manages Spec Context Projects and their repositories — one unique main repo plus an ordered collection of associated repos, resolved everywhere through a single accessor, with a backup-first idempotent registry migration to schema v3. ALIVE/DEAD, the surface verbs, export/import and the panel all cover the full set; a single branch-resolution implementation serves both `list` and `show`, so they cannot disagree. A single resolution function answers \"which context is this?\" for every verb, hook and gate; bind persists context and mode only for the caller, never acquires a lock, and drives an injection that carries memory rather than a restatement of the law. Concurrent work is allowed and surfaced through expiring presence records. `list` and `show` accept `--redact` to mask foreign context names in table and JSON output.",
       "path": "specs/memory/product/platform/context-management.md",
       "tags": [
@@ -379,7 +363,6 @@
       "title": "cross-platform-portability",
       "category": "product",
       "area": "platform",
-      "tldr": "Linux, macOS, and Windows support through a single platform capability seam, injected adapters, Python hooks, and hard-gated cross-OS tests.",
       "summary": "`core/platform.py` owns platform detection. OS-sensitive behavior is behind ports and infrastructure adapters; security failures are loud, non-security features degrade explicitly, and unsupported capabilities fail at construction.",
       "path": "specs/memory/product/platform/cross-platform-portability.md",
       "tags": [
@@ -404,7 +387,6 @@
       "title": "multi-platform-parity",
       "category": "product",
       "area": "platform",
-      "tldr": "Claude Code, Codex, and Kimi Code receive truthful runtime-specific projections from one canonical public source.",
       "summary": "Defines Layer-1 projection parity without pretending the harnesses have identical primitives; the workspace runs no agent-execution runtime. Claude remains Layer-1-only. Git chokepoints protect commit/push independently of harness hooks.",
       "path": "specs/memory/product/platform/multi-platform-parity.md",
       "tags": [
@@ -429,7 +411,6 @@
       "title": "repos-catalog",
       "category": "product",
       "area": "platform",
-      "tldr": "repos.xlsx lookup for fast discovery of known repos with slug + URL.",
       "summary": "repos.xlsx lookup for fast discovery of known repos with slug + URL.",
       "path": "specs/memory/product/platform/repos-catalog.md",
       "tags": [
@@ -449,7 +430,6 @@
       "title": "server-registry",
       "category": "product",
       "area": "platform",
-      "tldr": "internal port registry with TTL+PID to avoid conflicts between parallel agents' dev servers; the 3000-3999 range applies only to next_port allocation.",
       "summary": "internal port registry with TTL+PID to avoid conflicts between parallel agents' dev servers. The 3000-3999 range is enforced only by next_port allocation; register() accepts any port.",
       "path": "specs/memory/product/platform/server-registry.md",
       "tags": [
@@ -470,7 +450,6 @@
       "title": "workspace-doctor",
       "category": "product",
       "area": "platform",
-      "tldr": "Diagnoses root hygiene, venv health, context coherence, stale presence, and retired lock-state residue; repairs only deterministic state.",
       "summary": "`dadaia doctor` checks workspace-root law, forbidden caches, required state layout, workspace venv health, context repository coherence, repo URLs, stale presence, and legacy lock/pointer residue. `--fix` performs bounded deterministic cleanup and `--redact` masks foreign Spec Context names in the reported issues.",
       "path": "specs/memory/product/platform/workspace-doctor.md",
       "tags": [
@@ -494,7 +473,6 @@
       "title": "workspace-init",
       "category": "product",
       "area": "platform",
-      "tldr": "Idempotent bootstrap of workspace state, Python venv, selected harness projections, and governance hooks.",
       "summary": "`dadaia init` creates the canonical `.dadaia/` runtime, provisions `.dadaia/.venv`, records the harness profile, stages/installs public assets, and configures runtime hooks without creating repository-local state.",
       "path": "specs/memory/product/platform/workspace-init.md",
       "tags": [
@@ -516,7 +494,6 @@
       "title": "workspace-portability",
       "category": "product",
       "area": "platform",
-      "tldr": "export/import of the whole workspace as a tar.gz for backup or migration between machines.",
       "summary": "export/import of the whole workspace as a tar.gz for backup or migration between machines.",
       "path": "specs/memory/product/platform/workspace-portability.md",
       "tags": [
@@ -537,7 +514,6 @@
       "title": "sdd-bug-backlog-governance",
       "category": "product",
       "area": "sdd",
-      "tldr": "Event-sourced JSONL bugs closed by a three-field evidence gate, an operator-gated backlog, an rc release ladder, and a three-branch git contract.",
       "summary": "Bugs are append-only events, including a non-terminal repeatable `picked` reservation marker that surfaces contention without ever blocking it; a `resolved` event is refused unless it carries three checkable fields — the red-loop command, the test seam and the diff direction on the touched feature — and a net-positive diff routes the fix through software-architect before the commit. The backlog is the operator's demand queue, curated by project-manager in a single BACKLOG.md (ACTIVE + LEDGER) with purge-on-pick and continuous sanitizing — no agent materializes an entry, residuals reach the operator through a PM intake report, and only actionable defects do — record-only observations terminate in the closure record. A release consumes an explicit picked set, matures through an rc ladder with no alpha or beta stage, ends in the fixed order review → closure → archive → ship, and requires terminal dispositions at closure and audit. Work is placed on three branch patterns; every agent stage runs on the one live feature branch, and develop and main advance only by pull request. Bug, backlog and audit paths stay additive and never lock-gated.",
       "path": "specs/memory/product/sdd/sdd-bug-backlog-governance.md",
       "tags": [
@@ -561,7 +537,6 @@
       "title": "sdd-gate-v3",
       "category": "product",
       "area": "sdd",
-      "tldr": "No-lock SDD enforcement: path/mode/cache gates, advisory presence, a feature-only push boundary with content scan, and the security verdict as a PR gate.",
       "summary": "The merged Python PreToolUse gate enforces root whitelist, workspace venv usage, a cache-off posture for pytest/ruff/mypy, path class, phase, and the caller's own mode. It never waits for or blocks on another session. Presence is advisory. Git pre-commit warns only; pre-push enforces the CI preflight, an inverted branch policy in which `feature/{M.m.p}` is the only pushable ref while `develop` and `main` are refused as PR-only, and a range-scoped denylist scan of the new objects the push would publish — blobs AND commit/annotated-tag message bodies, with author/committer headers out of scope by design. The security verdict left the hook: it is a CI job on both PR edges requiring an APPROVED security-reviewer handoff covering the PR head sha, read from committed evidence. The scan reads a chunk-bounded batched git conversation, suppresses a hit only when the same single path already published that exact value and never for a path-less object, derives its foreign-name layer from the context registry and names it when that layer degrades, partially scans and honestly reports oversized blobs, raises a typed error rather than reporting coverage it did not achieve, and masks private path segments through the detector's own matchers in everything it prints. The packaged baseline is version 8: single-line patterns only, every carve-out carrying a rationale a doctor check enforces, covering the home-path layout of all three declared platforms.",
       "path": "specs/memory/product/sdd/sdd-gate-v3.md",
       "tags": [
@@ -586,7 +561,6 @@
       "title": "specs-doctor",
       "category": "product",
       "area": "sdd",
-      "tldr": "Validates canonical specs structure, memory/catalog and placeholder integrity, release/segment markers, closure evidence, dispositions, bugs, and audits.",
       "summary": "`dadaia specs doctor` coordinates structural, memory, release, closure/audit, governance, and coherence validators. Placeholder detection covers memory atoms (ERROR) and an installed tests/AGENTS.md (WARN, never the canonical template). A live segment pointer at a missing segment directory is an explicit ERROR, never a silent skip. `--fix` performs only deterministic repairs.",
       "path": "specs/memory/product/sdd/specs-doctor.md",
       "tags": [
