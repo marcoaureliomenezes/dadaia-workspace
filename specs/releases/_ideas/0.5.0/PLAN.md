@@ -1,6 +1,6 @@
 # PLAN — Release 0.5.0 — governance, lineage and audits
 
-**Status:** Draft
+**Status:** Em revisão
 **Release ID:** 0.5.0
 **Owner:** product-engineer
 **Source SPEC:** `specs/releases/_ideas/0.5.0/SPEC.md`
@@ -95,11 +95,11 @@ Five properties are non-negotiable throughout:
 | `dadaia_workspace/features/specs` | `doctor.py`, `doctor_common.py`, `doctor_structural.py`, `doctor_closure_audit.py`, `doctor_release.py`, `doctor_governance.py`, `scaffolder.py`, `memory_lint.py` | FR1, FR4, FR15 |
 | `dadaia_workspace/features/backlog` | `doctor.py` (BL-DUP deleted), `document.py` + `ledger.py` (the in-file `## LEDGER` retires; the 18 `consumed_backlog.json` sidecars relocate and BL-STALE keeps its feed) | FR5 |
 | `dadaia_workspace/features/bugs` | `service.py` — record model, archive verb, the resolver seam; `migrate_v5.py` (**new**, owns the v5 adapter and is deletable with the migration) | FR2, FR3 |
-| `dadaia_workspace/core` | `models/{bugs,findings,backlog}.py`; `release_events.py` (**new** — the stdlib-only `RELEASE.jsonl` fold, called by the hook, the container and the doctor); `protocols/` gains a record protocol and `GitHistoryReader`; `atomic_write.py` (reused, not re-implemented); `specs_version.py` (the canon the CI gate derives from) | FR1, FR2, FR3, FR4, FR13 |
+| `dadaia_workspace/core` | `models/{bugs,findings,backlog}.py`; `release_events.py` (**new** — the stdlib-only `RELEASE.jsonl` fold, called by the hook, the container and the doctor); `protocols/` gains a record protocol and `GitHistoryReader`; `atomic_write.py` (reused, not re-implemented; the record rewrite is **refuse-stale + retry**, one race semantics); `specs_version.py` (the canon the CI gate derives from — `RELEASE_SEMVER_RE` flips to **bare** semver with the `v` prefix optional for read-only archive lookups, moving its three production consumers `specs/scaffolder.py`, `specs/doctor_release.py` ×2, `spec_artifacts/new_artifacts.py` and its identity contract test in the same task); `protocols/bug_store.py` **retires** with `jsonl_bug_store.py` | FR1, FR2, FR3, FR4, FR13 |
 | `dadaia_workspace/infrastructure` | `jsonl_record_store.py` — a **generic** `JsonlRecordStore` keyed by `id`, parse/serialise injected; one instance per feature model, no module knowing two shapes. `git_subprocess.py` gains `log_added_lines(pathspec)` | FR2, FR3, FR5, FR13 |
 | `dadaia_workspace/features/spec_context` | `gate_policy.py` — FROZEN: one prefix deleted, `specs/releases/_archive/` added; `_ideas/` stays MUTATING | FR6 |
 | `dadaia_workspace/hooks` | `sdd_gate.py` — `_active_field` and its regex retire; the MEMORY phase comes from `core/release_events.py` (hooks never import the container) | FR4 |
-| `.github/` | `scripts/pr-verdict-check.sh` + `workflows/ci.yml` — evidence roots and the release-id pattern derived from the canon, still fail-closed | FR1 |
+| `.github/` | `scripts/pr-verdict-check.sh` + `workflows/ci.yml` — evidence roots and the release-id pattern derived from the canon by a stdlib-only `python3 -c` import on the bare checkout, over **two** roots (live + per-area archive; `_ideas/` refused); still fail-closed, and **any derivation failure exits non-zero — never a fallback glob** | FR1 |
 | repo root | `.gitignore` — the proven inversion applied to every new area; three orphaned stanzas deleted | FR1 |
 | `dadaia_workspace/cli/commands` | `bugs.py` (record rendering), `ci.py` (`pre_commit_check` loses the backlog-doctor gate), `specs.py` (`--recipe`) | FR1, FR2, FR9 |
 | `dadaia_workspace/public/schemas` | `bugs/bug-record-v1.schema.json` (replaces `bug-event-v1`; three field categories per property; the redaction field set derives from it), `audits/finding-record-v1.schema.json`, `releases/release-event-v1.schema.json` (7 kinds, no `session_id`) | FR2, FR4, FR13 |

@@ -1,6 +1,6 @@
 # TASKS — Release 0.5.0 — governance, lineage and audits
 
-**Status:** Draft
+**Status:** Em revisão
 **Release ID:** 0.5.0
 **Owner:** product-engineer
 **Source SPEC:** `specs/releases/_ideas/0.5.0/SPEC.md`
@@ -28,8 +28,10 @@ segments and the lane. The live release carries no `segment:` line.
 
 **Ids are in execution order** — nothing below runs out of numeric sequence. Tasks added by
 the 2026-08-26 review fold carry a **letter suffix** (`T-050-03A`) and run immediately after
-the numbered task they follow; existing ids are never renumbered, because five review
-documents, the SPEC's §9 fold table and the backlog entries all cite them by number.
+the numbered task they follow; existing ids are never renumbered, because seven review
+documents, the SPEC's §9 fold tables and the backlog entries all cite them by number. The
+**pass-2 fold (SPEC §9.2) added no task** — its ten items land as write-set lines, description
+clauses, validation arms and done criteria on tasks that already existed.
 
 | Block | Tasks | Contents | Gate |
 |---|---|---|---|
@@ -107,11 +109,11 @@ the archive move.
 | T-050-01 | — | — | promotion commit sha; six subsections purged from `## ACTIVE`; `RELEASE.jsonl`/`ACTIVE.md` set to DEFINITION |
 | T-050-02 | — | SPEC §7 | definition PR merged; APPROVED verdict on the head sha; the `defined` milestone |
 | T-050-03 | — | AS-9 | V1, V2, V6, V11, V12 baseline captures |
-| **T-050-03A** | — | AI-1 (§9.4) | four reviewer personas widened to `specs/releases/**/reviews/**`; one refusal fixture each |
+| **T-050-03A** | — | AI-1 (§9.1.4), SEC-R5 (§9.2) | four reviewer personas widened to `specs/releases/**/reviews/**` + `security-reviewer` to `specs/releases/**/verdicts/**`; one refusal fixture each |
 | T-050-04 | FR2/FR3 | A2.5, A3.10, A13.4 | the `software-architect` **AR-1** confirmation of §2 F6/AR-1, verbatim |
 | T-050-05 | FR1 | A1.1–A1.4 | scaffold fixture; TREE-8 WARN fixture + exit-code fixture; `--recipe` output; double-`upgrade` byte comparison |
 | T-050-06 | FR1 | A1.5, A1.6, A1.9 | this repo migrated; `specs doctor` 0 errors; V3; the `hooks/sdd_gate.py` diff |
-| **T-050-06A** | FR1 | A1.7, A1.8 | **V20**, **V21**; `.gitignore` inverted; the verdict gate proven against a v6 fixture tree |
+| **T-050-06A** | FR1 | A1.7, A1.8, **A1.10** | **V20** (seven arms, each with its expected outcome), **V21**; `.gitignore` inverted; the verdict gate derived from the canon and proven against a v6 fixture tree; `RELEASE_SEMVER_RE` flipped to bare semver with its three production consumers + two test files |
 | T-050-07 | FR2 | A2.1, A2.2, A2.6, A2.9 | `bug-record-v1.schema.json`; immutability + write-once + in-place-rewrite + redaction + atomic-write tests |
 | T-050-08 | FR2 | A2.3, A2.4, A2.7, A2.8 | WARN-with-unchanged-exit fixture; `bugs archive` idempotence; the doctor's core-vs-derived WARN; the event reader deleted after the switch |
 | T-050-09 | FR3 | A3.4, A3.10 (unit) | the pure derivation function over `GitHistoryReader` + its fixture tests, including the double-run |
@@ -126,9 +128,9 @@ the archive move.
 | T-050-17 | FR8 | A8.1–A8.4 | the duplicate scan; the resolver contract test on ≥ 20 records |
 | T-050-18 | FR9 | A9.1–A9.6 | V9, V10; the executed-path pre-commit fixture; the pre-push **runner-refusal** fixture; the two hook tests' stewardship verdict; zero-hit greps |
 | T-050-19 | FR10 | A10.1–A10.6 | V17; five mutation fixtures; **nine checks proven ported**; glob-based discovery; `rules-skills-map.json` retired |
-| T-050-20 | FR11 | A11.1–A11.4 | V12 with anchor cost separated per section; the §3 ADDITIVE-row rewrite; `public doctor` green |
+| T-050-20 | FR11 | A11.1–A11.4 | V12 with anchor cost separated per section; the §3 ADDITIVE-row rewrite; **the `ACTIVE.md` citation removed here — the file's only writer**; `public doctor` green |
 | T-050-21 | FR12 | A12.1–A12.5 | V11; zero-hit grep for `dd-bug-fix`; the coverage table incl. the `dd-architecture-survey` pointer |
-| **T-050-21A** | FR4 | A4.4 (partly), A4.5, A4.7 | `ACTIVE.md` **deleted**; all 28 consumers + 26 test files repointed; zero-hit grep; the no-`ACTIVE.md` gate fixture |
+| **T-050-21A** | FR4 | A4.4 (partly), A4.5, A4.7 | `ACTIVE.md` **deleted**; all 28 consumers + 26 test files repointed (**`DADAIA.md` excluded — repointed by T-050-20**); zero-hit grep; the no-`ACTIVE.md` gate fixture |
 | T-050-22 | all `S2` | A7–A12 ids, A4.5/A4.7 | `qa-engineer` artifact committed; zero new `tests/e2e/**` exceptions confirmed or named |
 | T-050-23 | FR13 | A13.1–A13.4 | the finding schema; the generic `JsonlRecordStore`; the FROZEN refusal fixture |
 | T-050-24 | FR14 | A14.1–A14.6 | the rewritten skill + 4 siblings; the executable window recipe; the one-rewrite pillar-1 fixture |
@@ -256,15 +258,25 @@ artifacts under `specs/releases/0.5.0/reviews/**`, but at HEAD `software-archite
 `code-reviewer` and `security-reviewer` carry **no** `specs/` allowlist and `qa-engineer`
 carries only `specs/releases/**/ALPHA-*-QA.md`. Add the single generic glob
 `specs/releases/**/reviews/**` to each — generic enough to survive future releases, far
-narrower than a blanket `specs/**`. **State the honest posture in the same edit:**
-`write_allowlist` is parsed at *projection* time and is persona documentation, not a
-write-time control (nothing refuses a persona's file-tool write to an ADDITIVE path). It is
-declared so the fleet's declared scope matches what the release actually asks of it — the
-drift class `ai-engineer` exists to prevent.
+narrower than a blanket `specs/**`.
+
+**`security-reviewer` additionally gains `specs/releases/**/verdicts/**` (SPEC §9.2 SEC-R5 /
+N-3).** Its allowlist at HEAD is `.dadaia/reports/<ctx>/security-reviewer/**` +
+`.dadaia/handoff/<ctx>/**`, yet `DADAIA.md` §4 and its own approval contract **require** it to
+commit `specs/releases/<id>/verdicts/<sha>.handoff.json` — the artifact the required PR gate
+reads. That is exactly the *"persona forbidden to write the artifact the law requires of
+it"* shape FR13 fixes for `project-auditor`, on the one persona whose omission can stop the
+release from shipping. One line, in a task that already exists.
+
+**State the honest posture in the same edit:** `write_allowlist` is parsed at *projection*
+time and is persona documentation, not a write-time control (nothing refuses a persona's
+file-tool write to an ADDITIVE path). It is declared so the fleet's declared scope matches
+what the release actually asks of it — the drift class `ai-engineer` exists to prevent.
 
 **Done criterion:** each of the four personas declares `specs/releases/**/reviews/**` and
-nothing wider; a fixture per persona asserts the parsed allowlist admits that glob and does
-not admit `specs/memory/**`; `dadaia public doctor` green.
+nothing wider, and `security-reviewer` additionally declares
+`specs/releases/**/verdicts/**`; a fixture per persona asserts the parsed allowlist admits
+its declared globs and does not admit `specs/memory/**`; `dadaia public doctor` green.
 
 **Parallelism:** none.
 
@@ -370,7 +382,12 @@ resolve verdict evidence from the canon`
 **Preconditions:** T-050-06 `[x]`.
 
 **Write set:** `.gitignore`, `.github/scripts/pr-verdict-check.sh`, `.github/workflows/ci.yml`,
-`dadaia_workspace/core/specs_version.py`, `tests/contract/**`.
+`dadaia_workspace/core/specs_version.py`, **its three production consumers —
+`dadaia_workspace/features/specs/scaffolder.py`,
+`dadaia_workspace/features/specs/doctor_release.py` (two call sites),
+`dadaia_workspace/features/spec_artifacts/new_artifacts.py` —**,
+`tests/contract/test_release_semver_canon.py`,
+`tests/unit/core/test_release_id_single_source.py`, `tests/contract/**`.
 
 **Description:** Two boundaries read the canon from outside `specs/`, and a canon change that
 leaves either behind is this workspace's most-repeated bug shape.
@@ -386,25 +403,63 @@ and `tmp/`), and delete the three stanzas T-050-06/FR6 orphan (`specs/assets/`,
 `specs/backlog/remote-bugs/`, root `specs/_archive/`). State the widening as the deliberate
 privacy decision it is in the file's own comment.
 
-**(b) The CI verdict-evidence contract (A1.8 / V20).** The gate globs
-`specs/releases/*/verdicts/` and `specs/_archive/releases/*/verdicts/`; after FR6 the evidence
-lives at `specs/releases/_archive/<id>/verdicts/` — one level deeper, matched by neither (`*`
-does not cross `/`) — and its `_RELEASE_ID_RE` demands a `v` prefix that bare-semver ids do
-not carry. Left alone, the final-`rc` PR and the ship PR both fail a **required** check and
-the release cannot ship. **Derive the evidence roots and the id pattern from
-`core/specs_version.py`** — the canon — instead of hard-coding globs, so the next canon move
-cannot break it again. Keep every refusal **fail-closed**: `_archive`, `_ideas` and any
-traversal shape still refused before interpolation; a missing qualifying handoff still fails.
+**(b) The CI verdict-evidence contract (A1.8 / A1.10 / V20).** The gate's **pathname** globs
+are `specs/releases/*/verdicts/` and `specs/_archive/releases/*/verdicts/`; after FR6 the
+evidence lives at `specs/releases/_archive/<id>/verdicts/` — one level deeper, matched by
+neither, because a pathname glob's `*` does not cross `/` — and its `_RELEASE_ID_RE` demands a
+`v` prefix that bare-semver ids do not carry. Left alone, the final-`rc` PR and the ship PR
+both fail a **required** check and the release cannot ship. **Record what is *not* broken so
+nobody "fixes" it:** the offender allowlist at the script's `case` uses a **bash `case`**
+pattern, where `*` *does* cross `/`, so it already matches
+`specs/releases/_archive/<id>/verdicts/*` — verified. Only the pathname glob and the id
+pattern are the defect.
+
+**Derive the evidence roots and the id pattern from `core/specs_version.py`** — the canon —
+instead of hard-coding globs, over **exactly two roots**: the live
+`specs/releases/<id>/verdicts/` and `specs/releases/_archive/<id>/verdicts/`.
+**`specs/releases/_ideas/` is REFUSED as an evidence root** (SPEC AS-15 / §9.2 SEC-R1):
+T-050-01 moved this trio out of `_ideas/` before any PR exists, and A6.3 keeps `_ideas/`
+deliberately MUTATING — a freely-writable directory is never a trust root of a required check.
+
+**The canon object flips with it (A1.10, SPEC FR1 boundary 2a).** `RELEASE_SEMVER_RE` is
+`^v\d+\.\d+\.\d+(-…)?$` today, identity-locked by
+`tests/contract/test_release_semver_canon.py` and read by three production modules. Flip it to
+**one anchored object** whose `v` prefix is **optional** — bare = the current axis,
+`v`-prefixed = the retired axis resolved for read-only archive lookups (AS-13) — keeping
+`is_release_semver` as the current-axis predicate so no `v`-prefixed id can be *minted*. No
+second pattern, no re-compiled copy. Update the three consumers and both test files in **this
+same task**; the identity assertion stays green and the behaviour assertions
+(`is_release_semver("1.2.3")`) **invert** under a recorded `qa-engineer` verdict — never
+deleted to go green.
+
+**Name the mechanism, do not leave "derive from" to an implementer.** `pr-verdict-check.sh`
+is bash and its own comment today says it *cannot* import the Python object and therefore
+restates the pattern — that is the shape being retired. Shell out instead: a one-line
+`python3 -c` importing `dadaia_workspace.core.specs_version` from the repo root and printing
+the roots + pattern for bash to read. Feasible on the bare checkout — `security-verdict-gate`
+runs with no `setup-python` and no install, and both `__init__.py` files are empty while
+`core/specs_version.py` imports only `re` and `pathlib`. A `python -m … --gate-json` export
+would be new CLI surface and is refused (D15).
+
+**Failure posture (SPEC §9.2 SEC-R2).** Interpreter absent, import error, missing symbol,
+empty or unparseable output ⇒ **the gate exits non-zero** with the reason. **No
+`|| <default glob>`, no fallback root, no "assume the old pattern".** Keep every existing
+refusal fail-closed: `_archive`, `_ideas` and any traversal shape refused before
+interpolation; a missing qualifying handoff still fails.
+
 This is the **third** firing of
 `verdict-gate-cannot-resolve-evidence-after-release-archive` (HIGH, T-044-50, after the
 `ACTIVE.md`-pointer variant); both prior fixes patched the resolution shape rather than
 deriving it. **Archiving after the ship PR is not the fix and is refused** — it contradicts
 `DADAIA.md` §6's finalization order (SPEC AS-15).
 
-**Done criterion:** A1.7, A1.8; **V21** (every canon path reports *not ignored*) and **V20**
-(the gate resolves and refuses correctly against a v6 fixture tree with live, `_ideas/` and
-`specs/releases/_archive/<id>/verdicts/` members) captured. Both run **now**, not at
-T-050-41.
+**Done criterion:** A1.7, A1.8, A1.10; **V21** (every canon path reports *not ignored*) and
+**V20** — all **seven** arms with their stated expected outcomes: live PASS · archived PASS ·
+`_ideas/` **fails closed** · bare id accepted and `v`-prefixed archived id resolved while
+traversal/non-canon tokens are refused · no handoff ⇒ exit non-zero · **a non-verdict path in
+the intervening diff (including the gate's own offender-allowlist line) still disqualifies
+coverage** · derivation failure ⇒ exit non-zero with no fallback glob. Both run **now**, not
+at T-050-41.
 
 **Parallelism:** none.
 
@@ -516,9 +571,9 @@ and the CI matrix is watched for any xdist recurrence during this task (reported
 
 ---
 
-- [ ] **T-050-10 — FR3 (run): migrate the 490 historical records**
+- [ ] **T-050-10 — FR3 (run): migrate every historical record present at branch cut**
 
-**Owner role:** software-engineer · **Commit:** `refactor(T-050-10): migrate 490 bug records
+**Owner role:** software-engineer · **Commit:** `refactor(T-050-10): migrate the bug ledger
 to BUGS.jsonl with derived commit provenance`
 
 **Preconditions:** T-050-09 `[x]`; V6 captured (T-050-03).
@@ -528,10 +583,17 @@ to BUGS.jsonl with derived commit provenance`
 `specs/bugs/AGENTS.md`, authored in T-050-16), the migration report under
 `.dadaia/tmp/software-engineer/<YYYYMMDD>/`.
 
-**Description:** **First verify the precondition (V23):** the `v0.4.5` T-045-20 fix for
+**Description:** **First verify the precondition (V23).** The `v0.4.5` T-045-20 fix for
 `bug-event-field-with-unicode-line-separator-silently-drops-the-event` is on this branch —
-a record carrying U+2028 round-trips byte-identically and `bugs status` reports `skipped: 0`.
-Migrating 490 records through a reader that silently drops lines is the build-on-a-stale-layer
+the bug is **resolved** (ledger line 1006, 2026-08-26T13:41Z) and the fix has two halves: the
+reader splits on `"\n"` only, and the write seam **strips** U+2028/U+2029/U+0085 and every C0
+byte. Verify the semantics the fix actually has: write a free-text field carrying U+2028 (and
+an ESC byte) **through the write seam**, prove the **stripped record round-trips** (the
+persisted line is byte-stable across a read/write cycle), the live ledger parses fully,
+`bugs status` reports `skipped: 0`, and **no historical record is rewritten**. *Do not assert
+a byte-identical round-trip of a U+2028-carrying field* — the strip makes that unsatisfiable
+and the assertion would go RED against the very fix it verifies (SPEC §9.2 SA-R2). Migrating
+the whole ledger through a reader that silently drops lines is the build-on-a-stale-layer
 shape this release exists to end (AS-14). Then run the migration.
 
 Populate `cause` **only** where the v5 `evidence_diff` / `notes` text literally states one;
@@ -548,7 +610,12 @@ re-flags every historical value: the first push is expected to be refused wholes
 `dadaia ci push-gate-check` over the migration range **before** pushing and remediate each hit
 **at the source record**. **Never `--no-verify`, never a scan exclusion.**
 
-Capture **V4**. A count below a `≥` **threshold** means the ref scope was wrong (re-check V6).
+Capture **V4** — whose acceptance is **"every record present at branch cut migrates"**: the
+migrated count equals the distinct `bug_id` count measured on the same tree in the same run,
+never a frozen constant. The ledger is live (490 ids / 1 005 events on 2026-08-26; 503
+`reported` / 474 `resolved` events at the pass-2 fold), so a hard-coded 490 would age into a
+false RED. The distinct-commit `≥` bars are 2026-08-26 **floors**: a count below one of them
+means the ref scope was wrong (re-check V6).
 A **marker distribution** that differs from §1.2's narrative numbers is **a fact to record,
 not a target to chase** — §1.2 counts different units (commit-message pattern, single-bug
 commits) than the structural markers the algorithm computes; expect roughly 400
@@ -910,7 +977,8 @@ zero-hit residue; zero-hit grep for `rules-skills-map.json` outside history.
 enforcement-posture section`
 
 **Preconditions:** T-050-19 `[x]`. **This is the only task in the release whose write set
-contains `DADAIA.md`** (SPEC D-B).
+contains `DADAIA.md`** (SPEC D-B Tier 1) — with no exception anywhere, which is what A11.1's
+grep asserts.
 
 **Write set:** `dadaia_workspace/public/data/DADAIA.md` (**source only** — the projected law is
 PROTECTED), then one projection cycle.
@@ -927,6 +995,15 @@ record contract — immutable core, write-once, mutable governance — is audite
 because a mutable-field record breaks the assumption the old wording encoded. No new path
 class, no second classifier.
 
+**Remove the `ACTIVE.md` citation from `DADAIA.md` in this same edit** (SPEC §9.2 SA-R3).
+FR4's contract step (T-050-21A) deletes `ACTIVE.md`, and the always-on law is one of its 28
+consumers — but `DADAIA.md` is a **Tier-1 single-writer file** and an "by exception" second
+writer would make **A11.1 RED by its own definition**. This task therefore lands the law's
+release-state text pointing at the `RELEASE.jsonl` fold, and T-050-21A touches the file not at
+all. Sequencing makes this safe and is stated in the commit body: T-050-11 has been writing
+`RELEASE.jsonl` in parallel since `S1`, so the fold the law now names already exists; the
+`ACTIVE.md` file itself survives until T-050-21A deletes it (expand → switch → contract, D-F).
+
 **Every section is a pointer, never a restatement** — the FR8 duplicate scan is re-run over
 the result, **including against the scoped `AGENTS.md` files** FR12 authors in this same
 segment. Re-capture **V12** with **anchor cost attributed separately from section-body cost**,
@@ -934,7 +1011,9 @@ so an anchor can never hide inside a section's number: a governance release is e
 shape that quietly spends the token budget the last two releases fought for.
 
 **Done criterion:** A11.1–A11.4; V12 re-captured with per-section attribution and anchors
-separated; the projected law byte-identical to source.
+separated; the projected law byte-identical to source; `DADAIA.md` carries **zero**
+`ACTIVE.md` citations and a grep over every write-set block proves **exactly one** task in
+`TASKS.md` names `dadaia_workspace/public/data/DADAIA.md` (A11.1).
 
 **Parallelism:** none.
 
@@ -993,15 +1072,18 @@ segment).
 `dadaia_workspace/public/agents/**` (the six personas citing it),
 `dadaia_workspace/public/skills/**` (the five skills citing it),
 `dadaia_workspace/public/scaffold/AGENTS.md`,
-`dadaia_workspace/public/templates/specs-AGENTS.md`,
-`dadaia_workspace/public/data/DADAIA.md` **— by exception, and only for the `ACTIVE.md`
-citation**: T-050-20 owns that file (D-B Tier 1), so this edit is sequenced strictly after it
-and states that in the commit body, `tests/**`, then one projection cycle.
+`dadaia_workspace/public/templates/specs-AGENTS.md`, `tests/**`, then one projection cycle.
+**`dadaia_workspace/public/data/DADAIA.md` is deliberately NOT in this write set** (SPEC §9.2
+SA-R3): it is a Tier-1 single-writer file owned by **T-050-20**, which removes the `ACTIVE.md`
+citation there as part of its own edit — an "by exception" second writer would make A11.1 RED
+by its own definition. T-050-20 is a precondition of this task, so the law is already
+repointed when the file is deleted here.
 
 **Description:** This is FR4's **contract** step, and it lands in `S2` rather than `S1` on
 purpose: 28 consumers in `dadaia_workspace/` read or write `ACTIVE.md`, and the personas,
-skills and law file among them are owned by FR11/FR12 in this segment. Deleting the file in
-`S1` would leave the always-on law naming a file that does not exist for a whole segment — an
+skills and law file among them are owned by FR11/FR12 in this segment — the law file by
+**T-050-20**, which has already repointed it when this task runs. Deleting the file in `S1`
+would leave the always-on law naming a file that does not exist for a whole segment — an
 `expand → switch → contract` violation by this release's own D-F.
 
 Repoint every consumer at `core/release_events.py`'s fold, then delete the file with **no
@@ -1576,7 +1658,7 @@ dispositions; the `rc` ledger; the artifact GC sweep; **intake candidates** — 
 and every residual, compiled for the PM's operator-facing report, with **no backlog entry
 created by any agent** — including FR9's stated secret-scan coverage limit (A9.6: gitleaks
 effectively runs once per release, on the ship PR, so `rc-1` carries the migrated ledger and
-the audit folder under the privacy denylist scan only) and any residual from the five
+the audit folder under the privacy denylist scan only) and any residual from the **seven**
 definition reviews; the restated git-identity standing question (which is also why A19.3
 claims the ADR **pairing** detection only, never attribution); archive decision `MOVE`.
 Six backlog slugs move to `DELIVERED · 0.5.0` through the FR5 mechanism — one record each,
