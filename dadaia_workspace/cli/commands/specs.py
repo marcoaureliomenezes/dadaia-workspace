@@ -320,8 +320,13 @@ def init(
     ),
 ) -> None:
     """Bootstrap a SDD release-lifecycle specs/ directory structure."""
-    # Resolve specs_dir
-    target = Path(specs_dir).resolve() if specs_dir else Path.cwd() / "specs"
+    # Resolve specs_dir. An explicit --specs-dir routes through the same resolver seam
+    # every other resolver-driven verb shares (T-044-40, `core.specs_resolver
+    # .resolve_specs_dir`) so a symlinked target is refused here too — reusing that
+    # seam's existing refusal, not adding a second one (T-045-21/FR8, A8.2). `None`
+    # keeps init's own default (cwd/specs, guarded by the Root Law check below) rather
+    # than falling into that seam's unrelated context-resolution fallback.
+    target = _resolve_specs_dir(specs_dir) if specs_dir else Path.cwd() / "specs"
 
     # Coherence with `specs doctor` (validation-027 F-04/F-10): the doctor refuses the
     # workspace-root specs/ fallback (Root Law), so init must refuse to CREATE it there.

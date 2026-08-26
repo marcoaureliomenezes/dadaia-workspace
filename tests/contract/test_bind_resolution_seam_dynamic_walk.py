@@ -413,9 +413,11 @@ def test_every_resolver_driven_verb_reaches_the_seam_family() -> None:
     # `dadaia.bugs.append --context` left this set in v0.1.82: the event's context is
     # now a ROUTING key resolved through the seam (bug
     # bugs-append-ledger-ignores-context-flag), no longer inert event metadata.
-    known_non_resolver = {
-        "dadaia.specs.init --specs-dir",
-    }
+    # `dadaia.specs.init --specs-dir` left this set in T-045-21/FR8: the explicit branch
+    # now routes through `_resolve_specs_dir` (the same seam every other resolver-driven
+    # verb shares) so a symlinked target is refused there too — reusing that seam's
+    # existing refusal instead of a second, independent symlink check (A8.2).
+    known_non_resolver: set[str] = set()
     unexpected_non_resolver = set(not_seam_reaching) - known_non_resolver
     assert not unexpected_non_resolver, (
         "context/specs_dir param(s) classified as NON-resolver-driven that are not in "
