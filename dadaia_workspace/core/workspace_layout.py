@@ -15,6 +15,7 @@ from __future__ import annotations
 
 __all__ = [
     "DADAIA_ADDITIVE_PREFIXES",
+    "DADAIA_ALLOWED_SUBDIRS",
     "DADAIA_MD_HARNESS_TARGETS",
     "LAW_BASENAMES",
     "LAW_HARNESS_DIRS",
@@ -32,6 +33,41 @@ ROOT_ALLOWED_DIRS: frozenset[str] = frozenset(
 #: ``CLAUDE.md`` the Claude Code import bridge; ``prompt.md`` the optional operator
 #: long-prompt file.
 ROOT_ALLOWED_FILES: frozenset[str] = frozenset({"AGENTS.md", "CLAUDE.md", "DADAIA.md", "prompt.md"})
+
+#: Canonical top-level subdirectories allowed inside ``.dadaia/`` (ROOT-4), documented in
+#: the projected ``.dadaia/AGENTS.md`` canonical-folder table — anything else is slop and
+#: flags ROOT-4. ONE fact, one place: ``doctor.py`` and ``legacy_dadaia_dirs.py`` derive
+#: from here — a hand-copied duplicate caused bug
+#: dadaia-reconcile-quarantines-sanctioned-references-clone.
+DADAIA_ALLOWED_SUBDIRS: frozenset[str] = frozenset(
+    {
+        # ── Projections (lib-originated; regen via `dadaia public install`) ──
+        "agentic",  # staged public assets + manifest.json (projection source-of-truth)
+        "hooks",  # projected Python governance hook entrypoints (v0.1.47 W1-9)
+        "scripts",  # projected runtime/git-hook scripts
+        # ── Runtime working areas ──
+        "mcps",  # per-MCP-server working dirs (mcps/<server>/)
+        "runtime",  # long-lived local runtime working area for tooling
+        # ── Operator-owned (never touched by any lifecycle verb, O4/T-045-23) ──
+        "references",  # operator-placed reference clones: .dadaia/references/<clone>/
+        # ── CLI/service-owned state ──
+        "states",  # machine-readable runtime state JSON
+        "sessions",  # per-session identity/bind records (PROTECTED)
+        # ── Outputs ──
+        "handoff",  # machine-readable agent handoffs (handoff/<context>/)
+        "reports",  # human-readable HTML reports (reports/<context>/<agent>/)
+        "academy",  # durable agent study/mastery notes + validation ledgers
+        # ── Ephemeral (disposable, GC'd) ──
+        "tmp",  # scratch + evidence, tmp/<agent>/<YYYYMMDD>/
+        "logs",  # telemetry/event logs
+        "runs",  # workflow run transcripts
+        "dev-report",  # generated developer diagnostic reports
+        # ── Artifacts / managed environments ──
+        "dist",  # built wheels + local exports
+        ".venv",  # managed workspace Python environment
+        ".cache",  # redirected tool caches (ruff/coverage), kept out of repos
+    }
+)
 
 #: The ``.dadaia/`` runtime zones that are operator/agent-writable by law (DADAIA.md §3
 #: ADDITIVE class) — always writable, expected to hold non-lib files. Consumers: the SDD

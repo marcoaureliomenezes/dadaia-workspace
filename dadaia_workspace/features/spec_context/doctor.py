@@ -66,50 +66,11 @@ _ROOT_FORBIDDEN_CACHES: frozenset[str] = frozenset(
 #: root-law-allowed (see ``_ROOT_ALLOWED_FILES``).
 _ROOT_TOOL_CONFIGS: frozenset[str] = frozenset({".mcp.json"})
 
-#: Canonical top-level subdirectories allowed inside `.dadaia/` (ROOT-4).
-# The canonical .dadaia/ subdirs. Each has ONE architectural purpose, documented in
-# the projected .dadaia/AGENTS.md canonical-folder table. This set is the enforcement
-# half of that law: anything else is slop and flags ROOT-4. Do NOT re-add a folder here
-# to silence the check — route the concern into the zone that owns it (bug
-# doctor-whitelist-legitimizes-slop-dirs, 2026-07-15; the retired junk-drawer entries
-# figma-bridge/imgs were removed — MCP state -> mcps/, evidence -> tmp/<agent>/<date>/.
-# ``references`` was retired in that same sweep for having no defined purpose, then
-# RE-SANCTIONED under a new, explicit, single purpose — operator ruling O4 (v0.4.5,
-# T-045-23, FR10): .dadaia/references/<clone>/ is the canonical home for an
-# operator-placed reference clone, outside the context lifecycle (never resolved,
-# bound, alived, deaded or GC'd — the single shared seam every lifecycle verb funnels
-# context resolution through, core.specs_resolver.resolve_context, is scoped to
-# <workspace_root>/repos/ only and structurally cannot reach it; T-045-23's tests
-# prove this on the executed path, not merely by this allowlist entry existing).
-_DADAIA_ALLOWED_SUBDIRS: frozenset[str] = frozenset(
-    {
-        # ── Projections (lib-originated; regen via `dadaia public install`) ──
-        "agentic",  # staged public assets + manifest.json (projection source-of-truth)
-        "hooks",  # projected Python governance hook entrypoints (v0.1.47 W1-9)
-        "scripts",  # projected runtime/git-hook scripts
-        # ── Runtime working areas ──
-        "mcps",  # per-MCP-server working dirs (mcps/<server>/)
-        "runtime",  # long-lived local runtime working area for tooling
-        # ── Operator-owned (never touched by any lifecycle verb, O4/T-045-23) ──
-        "references",  # operator-placed reference clones: .dadaia/references/<clone>/
-        # ── CLI/service-owned state ──
-        "states",  # machine-readable runtime state JSON
-        "sessions",  # per-session identity/bind records (PROTECTED)
-        # ── Outputs ──
-        "handoff",  # machine-readable agent handoffs (handoff/<context>/)
-        "reports",  # human-readable HTML reports (reports/<context>/<agent>/)
-        "academy",  # durable agent study/mastery notes + validation ledgers
-        # ── Ephemeral (disposable, GC'd) ──
-        "tmp",  # scratch + evidence, tmp/<agent>/<YYYYMMDD>/
-        "logs",  # telemetry/event logs
-        "runs",  # workflow run transcripts
-        "dev-report",  # generated developer diagnostic reports
-        # ── Artifacts / managed environments ──
-        "dist",  # built wheels + local exports
-        ".venv",  # managed workspace Python environment
-        ".cache",  # redirected tool caches (ruff/coverage), kept out of repos
-    }
-)
+#: Canonical top-level subdirectories allowed inside `.dadaia/` (ROOT-4) — DERIVED from
+#: the single authority ``core/workspace_layout.py`` (one fact, one place; see the hook's
+#: twin note). Never hand-copy a literal set here — that produced bug
+#: dadaia-reconcile-quarantines-sanctioned-references-clone.
+_DADAIA_ALLOWED_SUBDIRS: frozenset[str] = workspace_layout.DADAIA_ALLOWED_SUBDIRS
 
 # Sessions expired beyond this age are graveyard entries eligible for GC. The field names
 # are owned by ``session_identity`` (the single owner of the session-record schema); the
