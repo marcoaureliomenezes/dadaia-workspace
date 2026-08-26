@@ -561,6 +561,80 @@ A `caused_by` pointing at a prior fix is the trigger of the standing architectur
   change: "check_audit_disposition / SPEC-DOC-036/038 fold FINDINGS.jsonl instead of regex over prose: open record in an archived audit = error; live audit fully dispositioned with a named release = archive-due WARN"
 ```
 
+### memory-two-tier-principles
+- **Title:** memory-two-tier-principles — ARCHITECTURE/QUALITY/TECHSTACK split into Part 1 "Principles" (ADR-gated, every principle carries `Measured by:`) and Part 2 "Implementation" (evolves with releases); first inventory promotes the import-linter contracts, LOC/complexity ratchets, LARGE census and test pyramid/lifecycle laws; `specs/ADRs/` canon (Nygard + MADR fields, operator-only acceptance, one decision per file, commit rule); constitution references principles; product/ = functional descriptions
+- **Opened:** 2026-08-26
+- **Status:** candidate
+- **Description:** Make memory's fundamental rules **audit pillars instead of decoration** (rulings D13 and D12 of the 2026-08-26 grill; pillar 3 of `audit-canon-v1` measures them). Today `specs/memory/architecture.md` (294 lines), `tech-stack.md` (52), `quality-assurance.md` (324) and `specs/constitution.md` (261, outside memory/) carry no Principles/Implementation split and zero ADRs exist, while the measurable rules are scattered: the `[importlinter:contract…]` sections of `setup.cfg` (9 at HEAD — the grill counted 8; the inventory rule is "every contract", so the count is read from the file, never hard-coded), LOC ceilings, the complexity ratchet, the LARGE-test census (100), the diagram drift-guard tests; memory↔code drift is checked only documentarily (CLOSURE `## Drifts`). Enforcement posture (D15): skills + scoped `AGENTS.md` + a short `DADAIA.md` section instruct; pillar 3 measures; no CLI verb, no doctor rule, no hook for any of it. **(A) The split (D13).** Each of `ARCHITECTURE.md`, `QUALITY.md`, `TECHSTACK.md` (uppercase names owned by `specs-canon-v6`) is explicitly divided: **Part 1 — Principles**: fundamental, ADR-gated (a change to any Part-1 line lands in the commit that carries the `accepted` ADR, see (C)), numbered `P-NN`, each carrying a `Measured by:` line naming the existing mechanical check — **a principle without a measure is not admitted** (a rule nobody can measure is Part-2 prose or a proposed ADR, never a principle). **Part 2 — Implementation**: modules, diagrams, flows, dependencies, boundaries, tunables — the living description that `product-engineer` evolves at DEFINITION/CLOSURE with every release, no ADR needed. `product/<area>/<feature>.md` atoms stay **functional descriptions of features** (what the feature does, its contract and edge cases — never architecture principles, never implementation tours). `specs/constitution.md` stops restating rules and **references principles by id** (`see ARCHITECTURE.md P-04`); a constitution clause with no principle behind it is a candidate for an ADR or is deleted. Part-1 principle example (ARCHITECTURE.md):
+```markdown
+## Part 1 — Principles
+
+### P-04 · Features are mutually independent
+Features compose through the container, never through sibling imports; a helper two
+features need lives inside each feature (duplication over coupling).
+Measured by: `lint-imports` contract "features must be mutually independent (compose via
+container, not sibling imports)" (`setup.cfg`), run by `dadaia ci preflight` and CI.
+Accepted by: ADR 0002 (2026-09-02). Amended by: —
+```
+Example from QUALITY.md: `### P-12 · Every test declares intent and size at birth … Measured by: tests/contract/test_test_stewardship.py (undeclared test = SCAFFOLD, expires) + the LARGE census ceiling (100) in the same suite. Accepted by: ADR 0005`. **(B) First inventory (D13 — the first authoring is an inventory, not new rules):** one principle per import-linter contract in `setup.cfg` (layer direction core←infrastructure←features←cli/hooks; features never import infrastructure/subprocess directly; core imports no OS primitive except the platform seam; `kernel_tunables` imports no upper layer; features mutually independent; cli never imports infrastructure; `core.specs_resolver` single authority) — `Measured by:` the contract by name; the LOC ceilings and complexity ratchet (`Measured by:` the ratchet tests/`ruff` config that hold them); the LARGE-test census and the test pyramid/lifecycle laws of `dadaia-test-stewardship` (intent + size at birth, timeouts per tier, quarantine bug-gated, demotion at closure — `Measured by:` the stewardship contract tests); the diagram drift-guard (`Measured by:` its test). Each inventory principle is admitted through its own `accepted` ADR (one decision per ADR, so the inventory is ~a dozen ADRs 0001…, authored `proposed` by `product-engineer`/`software-architect`, accepted by the operator in one review sitting). **(C) `specs/ADRs/` canon (D12).** Folder in the canon root (layout/scaffold/doctor shape owned by `specs-canon-v6`; content rule here): `specs/ADRs/AGENTS.md` (the law + the index table `NNNN · title · status · date`) and one file per decision `NNNN-<slug>.md`, monotonic 4-digit numbering never reused; fields per Nygard (2011) + MADR 4: **Title**, **Status** (`proposed | accepted | rejected | superseded by NNNN`), **Date**, **Context**, **Decision** ("We will …"), **Consequences** (positive and negative), **Confirmation** (`Measured by:` — the import-linter contract / contract test / doctor check / audit pillar that proves the decision holds; an ADR with no confirmation cannot be accepted), and links **Supersedes** / **Amends** / **Amended by**. Rules: `accepted` is immutable — a reversal is a new ADR that supersedes (the old one's Status flips to `superseded by NNNN`, its only permitted edit); one decision per ADR, never a changelog; any agent may author `proposed`; **ONLY the operator flips Status to `accepted`, after reviewing** (an agent that writes `accepted` has violated the law — pillar 3 finding); commit rule: the ADR is an isolated commit `docs(adr): propose 0007-<slug>` at proposal, and the commit that changes a Part-1 principle **carries the accepted ADR** (`docs(adr): accept 0007-<slug>` stages the ADR file's status flip + the Part-1 hunk + the constitution reference in the same commit — that is what pillar 3's "Part 1 changed without accepted ADR" check reads). Skeleton:
+```markdown
+# ADR 0007 — Hooks validate only at the publication boundary
+
+Status: proposed
+Date: 2026-09-10
+Supersedes: — · Amends: — · Amended by: —
+
+## Context
+Pre-commit hooks grew a backlog-doctor block and a fail-closed runner that blocked human
+commits (bugs precommit-backlog-doctor-blocks-unrelated-commits, …).
+
+## Decision
+We will keep hooks and CLI validation at the push/PR boundary only; procedure lives in
+skills and scoped AGENTS.md; audits measure conformance from git history.
+
+## Consequences
++ humans are never blocked at commit; − discipline drift surfaces only at audit time.
+
+## Confirmation
+Measured by: tests/contract/test_hooks_publication_boundary.py (pre-commit exits 0 on any
+staged set) + audit pillar 2 commit-shape review.
+```
+Accepted form differs only in `Status: accepted` (+ `Accepted by: operator, 2026-09-12`). No CLI verb, no doctor rule: `specs doctor` only knows the folder shape (canon-v6). Relates-to `dd-architecture-survey` (its top candidate, once grilled, becomes a `proposed` ADR when it changes a principle), `dd-code-review` (reviews cite the principle id a diff touches), `dd-diagnose` ("no correct seam → architecture finding" is a `proposed` ADR trigger). Depends-on `specs-canon-v6` (uppercase trio, `ADRs/` folder, `audits/` for pillar 3); relates-to `audit-canon-v1` (pillar 3 measures `Measured by:` and the ADR rule), `entity-behavior-map` (ADRs and Memory rows; owns the `DADAIA.md` write for the short section this entry specifies: "memory Part 1 is ADR-gated and measured; only the operator accepts an ADR").
+- **Provenance:** operator ratification 2026-08-26 dd-grill-me (3 rounds, 18 questions — handoff `.dadaia/handoff/dadaia-workspace/2026-08-26T120000Z-claude-code-governance-lineage-audits-adr-grill.handoff.json`, rulings D12/D13 + D15); depends-on `specs-canon-v6`; relates-to `audit-canon-v1`, `entity-behavior-map`, `dd-architecture-survey`, `dd-code-review`, `dd-diagnose`
+- **Intents:**
+```yaml
+- subject:
+    kind: doc
+    ref: specs/memory/ARCHITECTURE.md
+    surface: new
+  change: "Part 1 Principles (P-NN, ADR-gated, each with Measured by: naming the import-linter contract / ratchet / drift-guard test) + Part 2 Implementation (modules, diagrams, flows, dependencies, boundaries); first inventory promotes every setup.cfg import-linter contract and the LOC/complexity ratchets"
+- subject:
+    kind: doc
+    ref: specs/memory/QUALITY.md
+    surface: new
+  change: "Part 1 Principles (test pyramid, intent+size at birth, timeouts per tier, quarantine bug-gated, demotion at closure, LARGE census ceiling — each Measured by: the stewardship contract tests) + Part 2 Implementation (suites, runners, evidence paths)"
+- subject:
+    kind: doc
+    ref: specs/memory/TECHSTACK.md
+    surface: new
+  change: "Part 1 Principles (pinned toolchain laws with Measured by: the preflight/CI job that proves them) + Part 2 Implementation (versions, dependencies, runtime seams)"
+- subject:
+    kind: doc
+    ref: specs/memory/AGENTS.md
+    surface: new
+  change: "scoped law: Part 1 changes only in the commit carrying an accepted ADR; a principle without Measured by: is not admitted; Part 2 evolves at DEFINITION/CLOSURE; product/ atoms are functional descriptions only"
+- subject:
+    kind: doc
+    ref: specs/ADRs/AGENTS.md
+    surface: new
+  change: "ADR law + index: NNNN-<slug>.md, monotonic numbering never reused, Nygard+MADR fields incl. Confirmation (Measured by:), status vocabulary proposed|accepted|rejected|superseded by NNNN, accepted immutable, one decision per file, any agent proposes, ONLY the operator accepts, isolated docs(adr) commits, the Part-1 change rides the accepting commit"
+- subject:
+    kind: doc
+    ref: specs/constitution.md
+    surface: new
+  change: "stops restating rules; references principles by id (ARCHITECTURE.md P-NN / QUALITY.md P-NN / TECHSTACK.md P-NN); clauses with no principle behind them become proposed ADRs or are deleted"
+```
+
 
 ## LEDGER
 
