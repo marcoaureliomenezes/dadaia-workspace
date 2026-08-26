@@ -736,7 +736,7 @@ target is never redefined to fit the result (AS-3).
 
 ---
 
-- [-] **T-045-28 — FR13: trim the four over-ceiling personas**
+- [x] **T-045-28 — FR13: trim the four over-ceiling personas**
 
 **Owner role:** ai-engineer · **Commit:** `refactor(T-045-28): relocate justified persona
 overflow into existing siblings`
@@ -759,7 +759,7 @@ or a hard-stop block. Any persona still above 220 lines afterwards is **named** 
 
 ---
 
-- [ ] **T-045-29 — FR14: the AI-surface hygiene residuals**
+- [-] **T-045-29 — FR14: the AI-surface hygiene residuals**
 
 **Owner role:** ai-engineer · **Commit:** `fix(T-045-29): ai-engineer citation + F-7/F-8/F-10
 wording residuals`
