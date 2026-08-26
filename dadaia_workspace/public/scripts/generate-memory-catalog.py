@@ -82,7 +82,10 @@ sys.dont_write_bytecode = True
 # surface and `generate_catalog`/`generate_index_md` function signatures are pinned
 # by tests/contract/test_memory_catalog_render_contract.py (F-84), which differ from
 # `features/specs/catalog.py`'s `specs_dir`-rooted, context-derived public API.
-from dadaia_workspace.features.specs.catalog import estimate_tokens  # noqa: E402
+from dadaia_workspace.features.specs.catalog import (  # noqa: E402
+    curate_catalog_for_persistence,
+    estimate_tokens,
+)
 
 # ---------------------------------------------------------------------------
 # Regexes
@@ -413,10 +416,13 @@ def main(argv: list[str] | None = None) -> int:
 
     assert catalog is not None
 
-    # Write catalog.json (trailing newline — canonical write_catalog shape, F-84)
+    # Write catalog.json, FR12-curated like the lib twin (trailing newline, F-84).
+    persisted = curate_catalog_for_persistence(catalog)
     out_path: Path = args.out.resolve()
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(json.dumps(catalog, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    out_path.write_text(
+        json.dumps(persisted, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
     print(f"catalog.json written to {out_path} ({len(catalog['features'])} feature(s))")
 
     # Optionally write index.md
