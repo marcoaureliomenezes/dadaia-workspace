@@ -84,8 +84,10 @@ def execute_migration(states_dir: Path) -> None:
     1.  Detect schema_version. No file -> nothing to do.
     2.  Already "3" -> idempotent no-op: no write, no backup.
     3.  Unknown version (not "2"/"3"/missing) -> raise ValueError.
-    4.  Backup: copy the v2 file verbatim to ``spec_contexts.v2.bak.json`` *before*
-        any mutation (A15.1).
+    4.  Backup: copy the v2 file's text contents to ``spec_contexts.v2.bak.json``
+        *before* any mutation (A15.1) — a UTF-8 text copy via ``read_text``/
+        ``write_text``, not a byte-for-byte copy (universal-newline translation
+        applies).
     5.  Add ``associated_repos: []`` to every context row that lacks it.
     6.  Set ``schema_version = "3"``.
     7.  Write atomically via ``core.atomic_write.atomic_write`` (T-045-14).
@@ -107,7 +109,9 @@ def execute_migration(states_dir: Path) -> None:
             "migration. Manual intervention required."
         )
 
-    # Backup-first: preserve the pre-migration v2 file byte-for-byte before any write.
+    # Backup-first: preserve the pre-migration v2 file's text contents before any
+    # write (UTF-8 text copy via read_text/write_text — universal-newline
+    # translation applies, not byte-for-byte).
     backup_file = states_dir / _BACKUP_NAME
     backup_file.write_text(ctx_file.read_text(encoding="utf-8"), encoding="utf-8")
 

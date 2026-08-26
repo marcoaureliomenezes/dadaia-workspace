@@ -647,8 +647,8 @@ def push_gate_decision(
 
     Deletions (zero sha) are never scanned. Tag pushes ARE scanned but were never
     branch-policy-gated (publishing depends on tag pushes). A malformed stdin line
-    fails CLOSED (finding 1) and the REMOTE side of every review ref must match its
-    LOCAL branch name (finding 2: ``push feature/0.0.1:develop``).
+    fails CLOSED (finding 1) and the REMOTE side of every branch-policy ref must
+    match its LOCAL branch name (finding 2: ``push feature/0.0.1:develop``).
 
     *object_source* and *repo* are REQUIRED — FR7/A7.2: the decision function always
     takes the object source as a parameter; an unwired production call site is a CLI
@@ -667,9 +667,9 @@ def push_gate_decision(
             ),
         )
 
-    review_refs = [r for r in refs if not r.is_deletion and not r.is_tag]
+    branch_policy_refs = [r for r in refs if not r.is_deletion and not r.is_tag]
 
-    for ref in review_refs:
+    for ref in branch_policy_refs:
         if not ref.local_ref.startswith(_HEADS_PREFIX):
             return Decision(
                 allowed=False,
@@ -700,8 +700,9 @@ def push_gate_decision(
             )
 
     # v0.9.0 FR1/FR2: scan every non-deletion ref (tags included) — computed
-    # independently of `review_refs`, which excludes tags. Runs after branch policy
-    # (free and pure, already checked above); this is now the LAST policy step (A3.4).
+    # independently of `branch_policy_refs`, which excludes tags. Runs after branch
+    # policy (free and pure, already checked above); this is now the LAST policy
+    # step (A3.4).
     scan_refs = [r for r in refs if not r.is_deletion]
     scan_refusal, skipped_binary_count, oversized_notes, path_masker = _run_denylist_scan(
         scan_refs, object_source, repo, denylist_terms, baseline_patterns, foreign_slugs
