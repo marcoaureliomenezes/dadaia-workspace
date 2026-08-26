@@ -713,7 +713,7 @@ unchanged** (v0.4.4 A30.3). Every catalog entry stays reachable: this changes wh
 
 ---
 
-- [-] **T-045-27 — FR11: the always-on diet pass**
+- [x] **T-045-27 — FR11: the always-on diet pass**
 
 **Owner role:** ai-engineer · **Commit:** `refactor(T-045-27): always-on diet pass —
 <before>→<after> tokens`
@@ -736,7 +736,7 @@ target is never redefined to fit the result (AS-3).
 
 ---
 
-- [ ] **T-045-28 — FR13: trim the four over-ceiling personas**
+- [-] **T-045-28 — FR13: trim the four over-ceiling personas**
 
 **Owner role:** ai-engineer · **Commit:** `refactor(T-045-28): relocate justified persona
 overflow into existing siblings`
