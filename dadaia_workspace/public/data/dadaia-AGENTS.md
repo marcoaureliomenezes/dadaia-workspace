@@ -23,6 +23,7 @@ existing purpose, it does not belong in `.dadaia/` at all.
 | `hooks/` | Projected Python governance hook entrypoints (`pre_gate`, `sdd_post_gate`, `ctx_inject`) the harness runs pre/post tool use. | projection | No — lib-originated |
 | `scripts/` | Projected runtime/git-hook scripts (pre-push CI + security gate, memory-atom lint). | projection | No — edit public source |
 | `mcps/` | Per-MCP-server working directories (`mcps/<server>/`). All MCP runtime state lives here — never at the root. | runtime | Server-managed |
+| `references/` | Operator-placed reference clones (`references/<clone>/`), outside the context lifecycle — never resolved, bound, alived, deaded or GC'd, and never flagged by the doctor. | operator-owned | Operator-managed |
 | `states/` | Machine-readable runtime state JSON: `spec_contexts`, `presence/`, `server_registry`, model policies, `root_exceptions.txt`. | state | No — change via `dadaia` CLI / service code |
 | `sessions/` | Per-session identity + bind records (one file per session id). PROTECTED path class — the gate fails closed here. | state | No — written by bind/gate |
 | `handoff/` | Machine-readable agent handoff JSON, `handoff/<context>/<UTC>-<agent>-<slug>.handoff.json`. See `handoff/AGENTS.md`. | output | Append-only, schema-validated |
@@ -37,9 +38,9 @@ existing purpose, it does not belong in `.dadaia/` at all.
 | `.venv/` | Managed workspace Python environment. | managed | No — re-bootstrap only |
 | `.cache/` | Redirected tool caches (ruff `cache-dir`, coverage `data_file`) — kept OUT of any repo. | managed | Yes — disposable |
 
-There is no "misc", "assets", "imgs", "references", or "bridge" folder. Those
-are junk drawers; put images/evidence under `tmp/<agent>/<date>/`, MCP working
-state under `mcps/<server>/`, and durable notes under `academy/`.
+There is no "misc", "assets", "imgs", or "bridge" folder. Those are junk
+drawers; put images/evidence under `tmp/<agent>/<date>/`, MCP working state
+under `mcps/<server>/`, and durable notes under `academy/`.
 
 ## Scoped subtree rules — follow the nearest first
 
