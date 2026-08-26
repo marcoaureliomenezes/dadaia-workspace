@@ -64,11 +64,8 @@ class BugService:
 
     def __init__(self, store: BugStore, denylist_terms: Sequence[tuple[str, str]] = ()) -> None:
         self._store = store
-        # v0.4.5 FR6 (T-045-19): the SAME operator-denylist source the push-time scan
-        # (`features.chokepoints.denylist_scan`) already refuses on — threaded in here
-        # by the CLI composition root (`container.load_denylist_terms`) since
-        # `features-no-infrastructure` forbids importing the loader directly. Defaults
-        # to `()` so every pre-FR6 caller/test is unaffected.
+        # v0.4.5 FR6: the SAME operator-denylist source the push scan already refuses
+        # on, DI'd in via the CLI/container seam (features-no-infrastructure).
         self._denylist_terms = tuple(denylist_terms)
 
     def append_event(self, event: BugEvent) -> object:
@@ -82,10 +79,9 @@ class BugService:
         tolerantly: an existing incoherent row is the doctor's finding, never an append
         blocker — only the NEW event is refused. Returns the store's append result.
 
-        v0.4.5 FR6 (T-045-19): this is the enforced write-time redaction seam — the
-        same role this method already plays for stream coherence. ``event.redact()``
-        now also carries ``self._denylist_terms``, so a leak the push-time gate would
-        refuse is masked here, before the raw term ever reaches the committed ledger.
+        v0.4.5 FR6: also the enforced write-time redaction seam — ``event.redact()``
+        carries ``self._denylist_terms`` so a leak the push scan would refuse is
+        masked here first.
         """
         seen_reported: set[str] = set()
         terminated: set[str] = set()

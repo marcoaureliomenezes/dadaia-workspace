@@ -9,8 +9,11 @@ denylisted term was written RAW by ``dadaia bugs append``, caught only later at 
 push gate (twice, inside v0.4.4 alone, one forcing an ``rc-1`` history rewrite). This
 pins the fix at the write-time seam: ``BugService.append_event`` (the SAME method
 already enforcing stream coherence) now also enforces denylist-term masking, reusing
-the SAME field-scrub call ``BugEvent.redact()`` already runs for IP/home-path leaks —
-no second, independently hand-kept field list (A6.2/A6.5).
+the SAME field-scrub call ``BugEvent.redact()`` already runs for IP/home-path leaks.
+Architect ruling SOUND-WITH-AMENDMENT (``specs/releases/v0.4.5/reviews/FR23-firings.md``
+"Firing 2") on commit eb03d01b: AM-1 deleted the CLI's superseded second ``.redact()``
+call, AM-2 made the scrubbed field set schema-DERIVED (``_OPTIONAL_STR_FIELDS``, no
+hand-kept list — A6.5).
 
 Size: SMALL (directory-tiered ``unit`` — real ``tmp_path`` file I/O only, no
 subprocess/network; matches the sibling redaction-matrix coverage already in
@@ -19,6 +22,7 @@ subprocess/network; matches the sibling redaction-matrix coverage already in
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from dadaia_workspace.core.models.bugs import BugEvent, redact_text
@@ -150,3 +154,48 @@ def test_bug_service_with_no_denylist_terms_stays_byte_identical_to_pre_fr6(
 
     persisted = list(store.iter_events())[-1]
     assert persisted.notes == "deployment landed at acme-corp's staging box"
+
+
+# ---------------------------------------------------------------------------
+# AM-2 (architect ruling, FR23-firings.md "Firing 2") — A6.5: the scrubbed field set
+# must be DERIVED from the schema file, never a hand-kept list either in production
+# (BugEvent.redact now iterates _OPTIONAL_STR_FIELDS) or in this test.
+# ---------------------------------------------------------------------------
+
+_SCHEMA_PATH = (
+    Path(__file__).resolve().parents[4]
+    / "dadaia_workspace"
+    / "public"
+    / "schemas"
+    / "bugs"
+    / "bug-event-v1.schema.json"
+)
+
+
+def _schema_optional_string_fields() -> set[str]:
+    schema = json.loads(_SCHEMA_PATH.read_text(encoding="utf-8"))
+    identity_fields = set(schema["required"])  # bug_id, event, ts, reported_by
+    return {
+        name
+        for name, prop in schema["properties"].items()
+        if prop.get("type") == "string" and name not in identity_fields
+    }
+
+
+def test_bug_event_redact_scrubs_every_schema_string_field_derived_from_schema() -> None:
+    """A6.5: regression guard for the T-043-23 -> T-044-62 chain (a hand-kept field
+    list twice missed a newly added free-text field). Reads the REAL schema file at
+    test time and proves ``BugEvent.redact()`` scrubs every optional string property
+    it names — title/severity/surface/component/context/superseded_by included, not
+    just the narrower pre-AM-2 set."""
+    schema_fields = _schema_optional_string_fields()
+    term = "acme-corp"
+    leaky = {name: f"leaked {term} here" for name in schema_fields}
+    event = BugEvent(bug_id="b1", event="reported", ts=_TS, reported_by="se", **leaky)
+
+    redacted = event.redact(denylist_terms=((term, "private client name"),))
+
+    for name in schema_fields:
+        value = getattr(redacted, name)
+        assert value is not None
+        assert term not in value, f"schema field {name!r} was not scrubbed"

@@ -14,6 +14,7 @@ import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from enum import StrEnum
+from typing import Any
 
 __all__ = [
     "TERMINAL_EVENTS",
@@ -299,62 +300,30 @@ class BugEvent:
         return self.event in TERMINAL_EVENTS
 
     def redact(self, denylist_terms: Sequence[tuple[str, str]] = ()) -> BugEvent:
-        """Return a copy with every free-text field scrubbed of operator-local paths/IPs
-        and, now, any operator denylist term.
+        """Return a copy with every optional string field scrubbed of operator-local
+        paths/IPs and any operator denylist term, via :func:`redact_text`.
 
-        ``title``, ``symptom``, ``repro``, ``expected``, ``notes``, ``evidence``,
-        ``release`` and ``reason`` are all operator/agent-authored free text that can
-        carry a home path or IP (CWE-532). Each is passed through :func:`redact_text`;
-        unset fields are left as ``None``. Structured/enumerated fields (severity,
-        component, context, …) are not free text and are left untouched.
-
-        v0.4.3 T-043-23 security-review rework (FR14 LOW finding, handoff
-        2026-08-17T173112Z-security-reviewer-v0.4.3-alpha-2-delta): ``release`` (a
-        grammar-DESCRIBED but only CLI-checked-non-empty id — the schema carries no
-        ``pattern``) and ``reason`` (the schema's own description names it "the
-        disposition rationale" — free prose by design) previously passed through this
-        method UNTOUCHED, so a home path or IP placed in either field survived the
-        SAME redaction every other prose field gets, straight into the tracked,
-        committed and pushed ``specs/bugs/bugs.jsonl``. :func:`redact_text` is a no-op
-        on a value that carries no IP/home-path shape (e.g. an ordinary release id like
-        ``v0.4.3``), so this widening is safe for the common structured-looking value.
-
-        v0.4.4 FR23 (T-044-62): ``evidence_loop`` (a real reproducing command) and
-        ``evidence_seam`` (a real test file/node) are exactly the free-text shape that
-        can carry an operator-local path — scrubbed the same way. ``evidence_diff``
-        starts with a fixed enum token (``net-negative:``/``net-positive:``/
-        ``net-neutral:``) but its trailing detail is free text too, so it is scrubbed
-        for the same reason.
-
-        v0.4.5 FR6 (T-045-19): ``denylist_terms`` is the SAME operator-term source the
-        push-time scan already refuses on
-        (``infrastructure.privacy_check.load_privacy_terms``), threaded here through
-        the CLI/container composition seam — this module is pure core and never
-        imports ``infrastructure`` (`core-no-upper-layers`). It rides through the SAME
-        :func:`redact_text` call every field above already goes through — one masking
-        pass per field, not a second independent one — so every field this method
-        already scrubs for IP/home-path leaks now also gets denylist-term masking, and
-        no new, separately hand-kept field list is introduced for it (A6.2/A6.5).
-        Defaults to ``()`` so every pre-FR6 caller is unaffected.
+        The field set is `_OPTIONAL_STR_FIELDS` — the SAME schema-mirror tuple
+        ``to_dict``/``from_dict`` already use — never an independently hand-kept list
+        (SPEC v0.4.5 FR6/A6.5; closes the T-043-23 -> T-044-62 chain, where a
+        hand-kept list twice missed a newly added free-text field). ``denylist_terms``
+        is the SAME operator-term source the push-time scan already refuses on,
+        threaded in via the CLI/container composition seam since this module never
+        imports ``infrastructure`` (`core-no-upper-layers`). Defaults to ``()`` so
+        IP/home-path masking alone still runs for every caller.
         """
 
         def _scrub(value: str | None) -> str | None:
             return None if value is None else redact_text(value, denylist_terms)
 
-        return replace(
-            self,
-            title=_scrub(self.title),
-            symptom=_scrub(self.symptom),
-            repro=_scrub(self.repro),
-            expected=_scrub(self.expected),
-            notes=_scrub(self.notes),
-            evidence=_scrub(self.evidence),
-            release=_scrub(self.release),
-            reason=_scrub(self.reason),
-            evidence_loop=_scrub(self.evidence_loop),
-            evidence_seam=_scrub(self.evidence_seam),
-            evidence_diff=_scrub(self.evidence_diff),
-        )
+        # `dataclasses.replace`'s mypy plugin cannot field-check a bare **dict
+        # comprehension (it unifies every remaining field's type against the dict's
+        # single inferred value type); an explicitly `Any`-typed local sidesteps that
+        # without weakening `_scrub`'s own `str | None` signature above.
+        updates: dict[str, Any] = {
+            name: _scrub(getattr(self, name)) for name in _OPTIONAL_STR_FIELDS
+        }
+        return replace(self, **updates)
 
     def to_dict(self) -> dict[str, object]:
         """Serialize to the JSONL object shape — only the set fields are emitted."""

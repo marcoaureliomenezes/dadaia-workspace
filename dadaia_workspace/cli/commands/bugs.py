@@ -245,7 +245,7 @@ def bugs_append_cmd(
         evidence_loop=evidence_loop,
         evidence_seam=evidence_seam,
         evidence_diff=evidence_diff,
-    ).redact()
+    )
 
     payload = model.to_dict()
     try:
@@ -254,13 +254,10 @@ def bugs_append_cmd(
         typer.echo(f"[error] bug event invalid: {exc.message}", err=True)
         raise typer.Exit(code=1) from exc
 
-    # The service is the enforced side of the stream-coherence authority — appending
-    # through the raw store here is what let incoherent events into the ledger. v0.4.5
-    # FR6 (T-045-19): it is now ALSO the enforced side of write-time denylist
-    # redaction — `load_denylist_terms` is the SAME loader the push-time scan
-    # consumes (`container.load_denylist_terms` -> `infrastructure.privacy_check.
-    # load_privacy_terms`), read here through the composition seam since this module
-    # must never import `infrastructure` directly (`cli-no-infrastructure`).
+    # The service is the enforced side of stream coherence AND (v0.4.5 FR6) write-time
+    # denylist redaction — one masking pass, not two (AM-1 dropped the CLI's own
+    # pre-validation .redact() call above). Terms come through the container seam
+    # since this module must never import infrastructure (cli-no-infrastructure).
     service = BugService(
         JsonlBugStore(target / "bugs"), denylist_terms=container.load_denylist_terms()
     )
