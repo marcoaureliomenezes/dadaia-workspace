@@ -1402,9 +1402,20 @@ enumerated with a per-file disposition — **every file whose whole subject is t
 artifact is DELETED, not rewritten**, starting with
 `tests/unit/features/specs/test_active_md_schema_v2.py` (5 references) and
 `tests/contract/cli/test_cli_specs_segments.py` (the verbs deleted here); the CLI leaf count
-re-recorded after the two deletions; `dadaia public doctor` green. **Tests: −N deleted /
-−M rewritten, both counted into V25** (the census is 26 + 4 files, 84 `ACTIVE.md` occurrences,
-re-measured before the edit).
+re-recorded after the two deletions; `dadaia public doctor` green.
+
+**Tests: floor −3 deleted, then −N more / −M rewritten, all counted into V25** (fold 4, SPEC
+§9.4 V-2). The floor is **inspected, not predicted**: of the 26 + 4 census files (84
+`ACTIVE.md` occurrences, re-measured before the edit), exactly **two** have the retired parser
+as their *whole* subject at HEAD —
+`tests/unit/features/specs/test_active_md_schema_v2.py` (**1** `def test_`, 5 collected items,
+importing only `read_active_md`) and `tests/contract/cli/test_cli_specs_segments.py` (**2**
+`def test_`, 4 collected items, exercising only `specs release open` / `specs segment open`) —
+so **≥ 3 test functions die here**, counted the way V25 counts. The remaining census files are
+mixed-subject: each carries a `qa-engineer` per-file verdict, and every deletion those verdicts
+add **raises** the floor. Report the realised number to T-050-34; the release's declared
+roll-up (**+61 / −35 = +26**, A22.9) is closed from here plus the closure demotion map, never
+by revising this floor upward on paper.
 
 **Parallelism:** none.
 
@@ -1955,6 +1966,13 @@ record "principle not yet written" as a gap — and no task re-ran it. Re-run pi
 the now-authored principles and **append** the resulting findings to the existing
 `FINDINGS.jsonl` (findings are appended once; new findings take new ids, nothing is rewritten).
 
+**Also report AS-17's live cost (fold 4, SPEC §9.4 V-3).** Report the count of bugs registered
+with `surface: public-assets` during `S1`–`S4`, grouped as FR16's metric 4 already groups them
+— the closed `surface` enum makes the number free, so the three deferred public-assets engines
+carry a *measured* exposure over the release window, not only the estimated one (10 projection
+cycles, 1 rename, 1 add, 5 scoped `AGENTS.md`). Reported, **not gated**: a nonzero count is a
+closure note routed to AS-17's named intake target, never a blocker on this release.
+
 **Also report the xdist observation.** `windows-xdist-workers-crash-on-unit-fast-tier` (LOW)
 is open and unpicked (AS-4), and this release adds a nontrivial number of new `unit`/
 `contract` tests. State whether any recurrence of that crash appeared on the **CI matrix**
@@ -1965,7 +1983,8 @@ appended to the open record, never a silent retry.
 **Done criterion:** A22.1–**A22.12** and **A16.4**; V18, V19, **V25, V30, V31, V32, V35**
 captured; the test-suite total **net non-positive** against T-050-03's baseline, or the
 operator's explicit numbered acceptance recorded; the ruff ceiling ratcheted; the pillar-3
-re-run appended; the xdist CI-matrix note recorded.
+re-run appended; the `surface: public-assets` bug count for `S1`–`S4` reported; the xdist
+CI-matrix note recorded.
 
 **Parallelism:** none.
 

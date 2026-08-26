@@ -1172,14 +1172,20 @@ commit rule makes an `_ideas/` release **SPEC-only**, so the window scan of FR14
 the **live** release, `releases/_archive/**` and `releases_histo.jsonl` — and nothing under
 `_ideas/`. The first Draft scanned `_ideas/**` for milestones that the canon forbids it to
 carry; the scan is narrowed, not the rule.
-**Tests: +5 added / −0 deleted here; −(26+4) census dispositioned at T-050-21A.** Added:
-milestone immutability (1), the no-`ACTIVE.md` gate fixture (1, at T-050-21A), the
-`release_events.py`-is-read-only contract test (1), the seven-kind schema fixture (1), V7's
-back-fill assertion (1). The **26 `ACTIVE.md` files** (re-verified at this fold: 26 files, 84
-occurrences) and **4 `CLOSURE.md`** files each carry a `qa-engineer` per-file verdict at
-T-050-21A; every file whose *whole subject* is the retired artifact — beginning with
-`tests/unit/features/specs/test_active_md_schema_v2.py` — is **deleted**, not rewritten, and
-the deletions are counted in V25.
+**Tests: +5 added / −0 deleted here; the (26+4) census is dispositioned at T-050-21A with a
+measured floor of −3 (fold 4, §9.4).** Added: milestone immutability (1), the no-`ACTIVE.md`
+gate fixture (1, at T-050-21A), the `release_events.py`-is-read-only contract test (1), the
+seven-kind schema fixture (1), V7's back-fill assertion (1). The **26 `ACTIVE.md` files**
+(re-verified at this fold: 26 files, 84 occurrences) and **4 `CLOSURE.md`** files each carry a
+`qa-engineer` per-file verdict at T-050-21A; every file whose *whole subject* is the retired
+artifact is **deleted**, not rewritten. **Two files meet that test by inspection today** —
+`tests/unit/features/specs/test_active_md_schema_v2.py` (**1** test function, 5 collected
+items, its only subject `read_active_md`) and `tests/contract/cli/test_cli_specs_segments.py`
+(**2** test functions, 4 collected items, their only subject the two verbs this task deletes)
+— so the census floor is **−3 test functions**, counted the way V25 counts (`^def test_`),
+inspected rather than predicted. The remaining census files are mixed-subject and are
+rewritten in place; every further deletion their per-file verdicts produce **raises** the
+floor and is counted in V25.
 **Bug-history evidence:** the release-state surface has produced repeated bugs of the
 "artifact says one thing, tree says another" shape — the v0.4.4 verdict gate resolving by
 artifact across two trees (`ACTIVE=none` broke it), and the gate's phase lookup depending on
@@ -2442,6 +2448,14 @@ agent on every session.
 
 #### FR22 — The invariants this release must not break · **size S**
 
+**Tests: +5 added / −0 deleted (T-050-18A).** The five suite ratchets — **V26** private-symbol
+imports, **V27** `Intent:` + size coverage, **V28** SCAFFOLD expiry, **V29**
+one-number-per-parameter, **V30** pyramid shape — land as five test functions in the one
+contract file `tests/contract/test_test_suite_ratchets.py`. They are counted **here** (fold 4,
+§9.4): the suite's own ratchets are FR22's invariants, and until this fold they were the
+release's only addition attributed to no FR, which made the per-FR roll-up understate itself
+by 5 against the same gate (A22.9) it is supposed to sum to.
+
 - A22.1 `dadaia ci preflight`, `dadaia doctor`, `dadaia specs doctor` (**0 errors**),
   `dadaia backlog doctor`, `dadaia public doctor` all green.
 - A22.2 Layer rules hold: `features/**` imports neither `cli`, `infrastructure` nor `hooks`;
@@ -2469,7 +2483,13 @@ agent on every session.
   (baseline **1 859** in 396 files, **2 873** collected items with parametrization; the
   T-050-03 re-measure is what binds). The per-FR `Tests: +N / −M` lines above sum to the
   claim; a divergence between the sum and the measurement is a defect of the accounting, not
-  of the measurement. **If the after-count exceeds the before-count, the release does not
+  of the measurement. **The roll-up, as written at fold 4, is `+61 / −35 = +26`** — i.e. a
+  paper after-count of **1 885 against a gate of 1 859**, with the **−26 shortfall named
+  rather than implied**: the per-FR lines carry only the deletions inspection can prove today
+  (including T-050-21A's **−3** census floor), and the remaining 26 come from the per-file
+  verdicts on the mixed-subject census files and `qa-engineer`'s closure demotion map. The
+  operator signs a declared overshoot with its number, never an arithmetic that hides one.
+  **If the after-count exceeds the before-count, the release does not
   close on that number** — `qa-engineer` produces the demotion/deletion map that closes the
   gap, or the operator accepts the overshoot **explicitly, with the number in the closure
   record**. Silence is not acceptance.
@@ -2743,7 +2763,10 @@ Flagged for the operator; each is reversible before approval and none contradict
     skill-invoked Python entry point (69 leaves). The seam itself is not optional.
 20. **AS-17** *(fold 3, OPERATOR-GATED)* — three of public-assets' four recurrence engines are
     deferred by name with their bug ids and one intake target; the fourth (the roster class) is
-    retired here as **FR10A**.
+    retired here as **FR10A**. **The deferral is also measured** (fold 4, §9.4 V-3): T-050-34
+    reports the count of bugs registered with `surface: public-assets` during `S1`–`S4`, which
+    the closed `surface` enum makes free at FR16's metric 4 — a deferral whose live cost is
+    counted, not only estimated.
 21. **The record model gains three measuring fields no entry named** — the restored **FR23
     evidence triple** (write-once), **`diff_direction`**, and a **closed `surface` enum**
     sharing the independence contract's package list as its single source. Without them,
@@ -2760,7 +2783,7 @@ Flagged for the operator; each is reversible before approval and none contradict
 
 ## 9. Review fold (2026-08-26)
 
-**Three** folds have run over this trio. **Every amendment every review raised carries a
+**Four** folds have run over this trio. **Every amendment every review raised carries a
 disposition below — none is silently dropped.**
 
 **Review-id namespaces, declared once (fold 3, `software-architect` §1).** The tables below —
@@ -2941,6 +2964,23 @@ fifth "missing" package `workspace_*` (both `workspace` and `workspace_clean` ar
 store (SA-Q10/§6) — plus the untrue independence contract (SA-Q8); **all four are closed
 above**, which is the condition the verdict names for the gate to pass.
 
+### 9.4 Verification (2026-08-26) — `software-architect` review 2, **APPROVE-DEFINITION**
+
+`reviews/software-architect-full-quantitative-review-2.md` re-checked every §9.3 claim against
+the tree and closed nine of the ten Q-items; **Q9 (test economy) stayed PARTIAL** on the
+accounting, not the architecture. Three dispositions, all textual, all carried here:
+
+| # | Amendment | Disposition | Where |
+|---|---|---|---|
+| **V-1** | FR22's `Tests:` line must read `+5 / −0 (T-050-18A)` — the ratchet file's five functions were attributed to no FR, so the roll-up understated itself | **applied** | FR22 `Tests:` line · **A22.9** |
+| **V-2** | T-050-21A states a **floor** for its `−N` from the 26+4 census, so the roll-up sums to a number the operator can compare with 1 859 | **applied-modified — the floor is honest, and it does not reach ≤ 0.** Inspected today, exactly **two** census files have the retired parser as their *whole* subject (`test_active_md_schema_v2.py` **1** function; `test_cli_specs_segments.py` **2**), so the floor is **−3**, not a number chosen to make the sum land. The roll-up therefore reads **+61 / −35 = +26** and is written into A22.9 as a declared overshoot with its shortfall named; the remaining −26 is what the mixed-subject per-file verdicts and the closure demotion map must produce, exactly as A22.9's protocol says. Inventing a larger floor to close the arithmetic on paper would be the accounting defect the review exists to remove | FR4 `Tests:` line · **A22.9** · T-050-21A done criterion |
+| **V-3** | AS-17's exposure is quantified but uncapped — ask **T-050-34** to report the bugs registered with `surface: public-assets` during `S1`–`S4` (free with FR16's metric 4) | **applied** | **AS-17** · T-050-34 report line |
+
+**What this fold does not change:** no requirement, no acceptance beyond A22.9's added
+sentence, no task write set, no ruling, no assumption, no validation, no number that describes
+the tree. Both of the review's gates (root-cause, architecture-fidelity) already read **PASS**;
+its verdict is **APPROVE-DEFINITION** with these amendments carried into the promotion commit.
+
 ---
 
 ## 10. Approval
@@ -2953,7 +2993,7 @@ U+2028 precondition, AS-15's ruling-preserving verdict-gate fix, **AS-16's one w
 **AS-17's named public-assets deferral**; the six-entry pick with **no bug picked**; the
 destructive deletion of root `specs/_archive/` under FR6 with the operator present; the honest
 net-additive accounting of §3 and A22.3 **against a net-non-positive test suite (A22.9)**; and
-**all three review folds (§9.1, §9.2, §9.3)** — including the single reviewer amendment fold 1
+**all four review folds (§9.1, §9.2, §9.3, §9.4)** — including the single reviewer amendment fold 1
 refuses (SA-11, `--recipe`, whose rejection pass 2 accepted on the merits, with A1.3's
 condition), the ten pass-2 items and the twenty-two pass-3 items, all applied or
 applied-modified with their deviation named.
@@ -2962,9 +3002,11 @@ applied-modified with their deviation named.
 fallback), **AS-16** (the write seam's exposure — `bugs update` recommended), **AS-17** (the
 three deferred public-assets engines) and **FR20** (no agent may accept an ADR).
 
-**Status:** Em revisão — authored 2026-08-26; folded **three times** the same day: five
+**Status:** Em revisão — authored 2026-08-26; folded **four times** the same day: five
 definition reviews (§9.1), the two blocking re-reviews (§9.2 — `software-architect`
 REWORK-targeted and `security-reviewer` **APPROVED**, ten textual items), and the two
 quantitative reviews (§9.3 — `software-architect` **REWORK** with ten ranked changes and
-`qa-engineer`'s twelve test-minimization amendments, **22 dispositions, none dropped**).
+`qa-engineer`'s twelve test-minimization amendments, **22 dispositions, none dropped**), and
+the **verification fold** (§9.4 — `software-architect` **APPROVE-DEFINITION**, three textual
+amendments, one applied-modified because the honest floor does not close the arithmetic).
 **Awaiting the operator**, who reviews next and flips this to `Aprovado` at promotion.

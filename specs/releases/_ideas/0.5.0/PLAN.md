@@ -269,18 +269,18 @@ folds; **87 amendments, every one with an explicit disposition** in SPEC §9, an
 refusal states its reason. A re-review of this revision is required before any `Aprovado`.
 
 **Test stewardship — the release does not grow the suite.** The earlier posture ("net-additive
-in tests by nature") is **withdrawn**: it disclaimed the operator's explicit goal and left no
-metric that would let a reviewer check it either way. In its place: intent and size at birth,
-every new test naming the acceptance id it pins, a per-FR `Tests: +N / −M` declaration, and
-**V25**'s `--collect-only` measurement gated at **net non-positive** (A22.9) against the 1 859
-baseline. No test is deleted, skipped or quarantined except by a `qa-engineer` verdict carrying
-the `file:line` map of the coverage that supersedes it — including the two hook tests FR9
-breaks (verdict pre-committed **DELETE**, replaced by three cheaper contract fixtures). Marker
-discipline stops being aspirational: `Intent:` coverage, private-symbol imports, SCAFFOLD
-expiry, one-number-per-parameter and the pyramid shape are pinned in **one** contract file
-(V26–V30), and the mutation floor over `core/` is recorded — or recorded as `null` with its
-reason, never fabricated (V31). The fixture-repo test stays in `tests/contract/` while
-`windows-xdist-workers-crash-on-unit-fast-tier` is open.
+in tests by nature") is **withdrawn**: it disclaimed the operator's goal and offered no metric.
+Now: intent and size at birth, each new test naming the acceptance id it pins, a per-FR
+`Tests: +N / −M` declaration, and **V25**'s `--collect-only` gate at **net non-positive**
+(A22.9) against the 1 859 baseline. The roll-up reads **+61 / −35 = +26** on paper at fold 4 —
+T-050-21A's **−3** census floor is inspected, not guessed — so A22.9 declares the −26 shortfall,
+closed at T-050-34 by the per-file census verdicts plus `qa-engineer`'s demotion map, or by the
+operator's numbered acceptance. No test dies except by a `qa-engineer` verdict carrying the
+`file:line` map of superseding coverage — FR9's two hook tests included (pre-committed
+**DELETE**, replaced by three contract fixtures). `Intent:` coverage, private-symbol imports,
+SCAFFOLD expiry, one number per parameter and the pyramid shape are pinned in **one** contract
+file (V26–V30); the `core/` mutation floor is recorded or `null` with its reason (V31); the
+fixture-repo test stays in `tests/contract/` while the open `unit-fast` xdist-crash bug stands.
 
 ---
 
