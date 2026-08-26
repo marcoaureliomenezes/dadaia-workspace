@@ -72,8 +72,15 @@ _ROOT_TOOL_CONFIGS: frozenset[str] = frozenset({".mcp.json"})
 # half of that law: anything else is slop and flags ROOT-4. Do NOT re-add a folder here
 # to silence the check — route the concern into the zone that owns it (bug
 # doctor-whitelist-legitimizes-slop-dirs, 2026-07-15; the retired junk-drawer entries
-# figma-bridge/imgs/references were removed — MCP state -> mcps/, evidence ->
-# tmp/<agent>/<date>/).
+# figma-bridge/imgs were removed — MCP state -> mcps/, evidence -> tmp/<agent>/<date>/.
+# ``references`` was retired in that same sweep for having no defined purpose, then
+# RE-SANCTIONED under a new, explicit, single purpose — operator ruling O4 (v0.4.5,
+# T-045-23, FR10): .dadaia/references/<clone>/ is the canonical home for an
+# operator-placed reference clone, outside the context lifecycle (never resolved,
+# bound, alived, deaded or GC'd — the single shared seam every lifecycle verb funnels
+# context resolution through, core.specs_resolver.resolve_context, is scoped to
+# <workspace_root>/repos/ only and structurally cannot reach it; T-045-23's tests
+# prove this on the executed path, not merely by this allowlist entry existing).
 _DADAIA_ALLOWED_SUBDIRS: frozenset[str] = frozenset(
     {
         # ── Projections (lib-originated; regen via `dadaia public install`) ──
@@ -83,6 +90,8 @@ _DADAIA_ALLOWED_SUBDIRS: frozenset[str] = frozenset(
         # ── Runtime working areas ──
         "mcps",  # per-MCP-server working dirs (mcps/<server>/)
         "runtime",  # long-lived local runtime working area for tooling
+        # ── Operator-owned (never touched by any lifecycle verb, O4/T-045-23) ──
+        "references",  # operator-placed reference clones: .dadaia/references/<clone>/
         # ── CLI/service-owned state ──
         "states",  # machine-readable runtime state JSON
         "sessions",  # per-session identity/bind records (PROTECTED)
