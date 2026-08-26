@@ -538,7 +538,7 @@ and state the bug-surface delta of the atomic-write and test-inventory surfaces.
 
 ## Segment `S3` — gate, doctor and seam hardening
 
-- [-] **T-045-19 — FR6: the denylist reaches the write-time redaction seam**
+- [x] **T-045-19 — FR6: the denylist reaches the write-time redaction seam**
 
 **Owner role:** software-engineer · **Commit:** `fix(T-045-19): one denylist loading seam,
 consumed by write-time redaction and the push scan`
@@ -560,7 +560,7 @@ event schema, never from a hand-kept list. The denylist data stays operator-loca
 
 ---
 
-- [ ] **T-045-20 — FR7: one control/format-character sanitation pass at the bug-event seam**
+- [-] **T-045-20 — FR7: one control/format-character sanitation pass at the bug-event seam**
 
 **Owner role:** software-engineer · **Commit:** `fix(T-045-20): sanitize control and format
 characters at the bug-event seam`
