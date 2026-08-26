@@ -10,7 +10,11 @@ pytest.importorskip("fcntl")
 import stat  # noqa: E402
 from pathlib import Path  # noqa: E402
 
-from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject  # noqa: E402
+from dadaia_workspace.core.models.spec_context import (  # noqa: E402
+    AssociatedRepo,
+    ContextState,
+    SpecContextProject,
+)
 from dadaia_workspace.core.platform import PLATFORM  # noqa: E402
 from dadaia_workspace.features.spec_context.doctor import DoctorService  # noqa: E402
 from tests.fakes import FakeContextStore, FakeGitClient  # noqa: E402
@@ -159,3 +163,37 @@ def test_inv5_detected_fixable_fix_removes_stale_repo_and_no_issues_returns_empt
     # No issues left ⇒ a second fix() pass returns an empty action list.
     second_actions = svc.fix()
     assert second_actions == []
+
+
+# ---------------------------------------------------------------------------
+# INV-6 (T-045-22): registry-wide slug-ownership uniqueness — report-only.
+# ---------------------------------------------------------------------------
+
+
+def test_inv6_main_repo_slug_collision_reported_not_fixable(tmp_path: Path) -> None:
+    """Intent: CONTRACT — T-045-22 (S3-FR9-ruling.md), main/main collision."""
+    a = _ctx("a", repo_slug="x")
+    b = _ctx("b", repo_slug="x")
+    svc, _ = _make_doctor(tmp_path, [a, b])
+    inv6 = [i for i in svc.check() if i.code == "INV-6"]
+    assert len(inv6) == 1
+    assert inv6[0].fixable is False
+    assert "a" in inv6[0].description and "b" in inv6[0].description
+
+
+def test_inv6_main_vs_associated_slug_collision_reported(tmp_path: Path) -> None:
+    """Intent: CONTRACT — T-045-22 (S3-FR9-ruling.md), main-vs-associated collision."""
+    a = _ctx("a", repo_slug="x")
+    b = SpecContextProject(
+        name="b",
+        state=ContextState.DEAD,
+        repo_slug="b",
+        repo_url="https://github.com/org/b",
+        created_at="2026-01-01T00:00:00",
+        associated_repos=(AssociatedRepo(slug="x", url="https://github.com/org/x"),),
+    )
+    svc, _ = _make_doctor(tmp_path, [a, b])
+    inv6 = [i for i in svc.check() if i.code == "INV-6"]
+    assert len(inv6) == 1
+    assert inv6[0].fixable is False
+    assert "a" in inv6[0].description and "b" in inv6[0].description

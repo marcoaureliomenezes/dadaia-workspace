@@ -489,6 +489,32 @@ class DoctorService:
                         )
                     )
 
+        # INV-6 (T-045-22): registry-wide slug-ownership uniqueness — report-only,
+        # heals nothing (S3-FR9-ruling.md); surfaces a pre-migration collision.
+        owners: dict[str, list[str]] = {}
+        for ctx in contexts:
+            owners.setdefault(ctx.repo_slug, []).append(ctx.name)
+            for r in ctx.associated_repos:
+                owners.setdefault(r.slug, []).append(ctx.name)
+        for slug in sorted(owners):
+            names = owners[slug]
+            if len(names) > 1:
+                issues.append(
+                    DoctorIssue(
+                        code="INV-6",
+                        fixable=False,
+                        description=(
+                            f"Repo slug '{slug}' is owned by more than one context "
+                            f"({', '.join(sorted(names))}). 'repos/<slug>' is a "
+                            "namespace every context shares — 'dadaia context dead' "
+                            "on any owner would commit, push and delete the others' "
+                            "working tree. Remove it from all but one owner "
+                            "('dadaia context repo remove') or re-create the context "
+                            "with a different slug."
+                        ),
+                    )
+                )
+
         # ---- ROOT invariants (T-SANI-05) ----
         exc_globs = self._root_exception_globs()
         issues.extend(self._check_root_1(exc_globs))
