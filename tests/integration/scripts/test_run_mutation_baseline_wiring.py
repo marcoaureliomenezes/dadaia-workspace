@@ -47,6 +47,32 @@ _CI_YML = _REPO_ROOT / ".github" / "workflows" / "ci.yml"
 _RELEASE_YML = _REPO_ROOT / ".github" / "workflows" / "release.yml"
 _CI_PREFLIGHT_SERVICE = _REPO_ROOT / "dadaia_workspace" / "features" / "ci_preflight" / "service.py"
 
+# ADDITIVE path classes (DADAIA.md Sec 3) — any live session may legitimately
+# write here concurrently under the NO-LOCKS DOCTRINE. The staging step under
+# test never touches them (it writes only into the redirected fake workspace),
+# so a concurrent ADDITIVE write is not evidence of a repo-tree side effect.
+_ADDITIVE_PATH_PREFIXES = (
+    "specs/bugs/",
+    "specs/backlog/",
+    "specs/audits/",
+    ".dadaia/reports/",
+    ".dadaia/handoff/",
+    ".dadaia/tmp/",
+)
+
+
+def _repo_porcelain_excluding_additive() -> str:
+    raw = subprocess.run(
+        ["git", "status", "--porcelain"],
+        cwd=str(_REPO_ROOT),
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    return "\n".join(
+        line for line in raw.splitlines() if not line[3:].startswith(_ADDITIVE_PATH_PREFIXES)
+    )
+
 
 def test_script_exists_and_is_executable() -> None:
     assert _SCRIPT.is_file(), f"expected runner script at {_SCRIPT}"
@@ -72,13 +98,7 @@ def test_staging_step_copies_scoped_subset_without_touching_repo_git_tree(
     fake_workspace = tmp_path / "fake-workspace"
     fake_workspace.mkdir()
 
-    before = subprocess.run(
-        ["git", "status", "--porcelain"],
-        cwd=str(_REPO_ROOT),
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout
+    before = _repo_porcelain_excluding_additive()
 
     result = subprocess.run(
         [str(_SCRIPT), "wiring-test-output.json"],
@@ -94,14 +114,11 @@ def test_staging_step_copies_scoped_subset_without_touching_repo_git_tree(
         f"stage-only run failed.\nstdout: {result.stdout!r}\nstderr: {result.stderr!r}"
     )
 
-    after = subprocess.run(
-        ["git", "status", "--porcelain"],
-        cwd=str(_REPO_ROOT),
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout
-    assert before == after, "staging must never modify the repo's own git-tracked tree"
+    after = _repo_porcelain_excluding_additive()
+    assert before == after, (
+        "staging must never modify the repo's own git-tracked tree "
+        "(excluding ADDITIVE paths any concurrent live session may legitimately write)"
+    )
 
     stage_dirs = list(
         (fake_workspace / ".dadaia" / "tmp" / "software-engineer").glob("*/mutation-run")
