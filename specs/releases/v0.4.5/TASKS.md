@@ -671,7 +671,7 @@ three times.
 
 ## Segment `S4` — the token-economy program
 
-- [ ] **T-045-25 — [shell] FR11 baseline: measure before any cut**
+- [-] **T-045-25 — [shell] FR11 baseline: measure before any cut**
 
 **Owner role:** ai-engineer · **Commit:** the capture reference only
 
