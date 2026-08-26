@@ -29,6 +29,25 @@ reads the section named at each step; no other agent needs this file for earlier
    If the operator asks for history, point to `CLOSURE.md` or `_archive/`.
 6. **Validate** with `dadaia specs doctor` before moving to archive. Doctor checks
    atomicity, broken `<img>` references, and Mermaid script presence.
+7. **Product memory is a folder catalog** at `specs/memory/product/`, not a single file —
+   a product has many features and bundling them overloads humans and wastes tokens for
+   agents that need only one feature's depth.
+   - `index.md` — entry point, read first: Vision (2–3 sentences), Users, the feature
+     catalog in daily-relevance order (each entry links to `<feature-slug>.md`), a
+     capability-map Mermaid diagram, and explicit non-goals (Limits). Plain Markdown
+     headings — no HTML `<section>` wrapper.
+   - `<area>/<feature-slug>.md` — one Markdown atom per production feature: Purpose (2–3
+     paragraphs, functionally), Usage flow (3–5 numbered steps, optional Mermaid),
+     Typical trigger (1 sentence), Differentiator (the problem it solves), Runtime state
+     touched (files/dirs touched), Dependencies (run order) — English canon,
+     `.heading-allowlist`.
+   - Templates: `public/templates/memory-architecture.md.j2`,
+     `public/templates/memory-tech-stack.md.j2`; product atoms are authored directly as
+     Markdown during release closure.
+   - Update `index.md` only if the catalog order changed or a feature was added/removed;
+     update affected feature atoms; leave the rest intact. A new feature gets its atom
+     created and linked from `index.md`; a deprecated feature's link is removed and its
+     atom moves to `_archive/legacy-memory/<timestamp>/`.
 
 ## §2 — Disposition sweep (step 10, mandatory)
 

@@ -102,30 +102,11 @@ role: spec-author / memory-guardian.
 
 ---
 
-## SDD file hierarchy (know this by heart)
+## SDD file hierarchy
 
-```
-specs/
-├── constitution.md              ← absolute laws of the product — read first, always
-├── memory/
-│   ├── architecture.md        ← layer rules, modules, dependency contracts
-│   ├── tech-stack.md          ← approved technologies and constraints
-│   └── product/                 ← FOLDER catalog (functional view)
-│       ├── index.md             ← entry point: vision, users, ordered feature catalog with links
-│       ├── catalog.json         ← generated machine-readable feature catalog
-│       └── <feature-slug>.md    ← one Markdown atom per feature in production
-├── assets/<scope>/<id>.png      ← screenshots referenced by memory Markdown
-├── releases/
-│   ├── ACTIVE.md                ← which release is active and in which phase
-│   └── <release-id>/{SPEC,PLAN,TASKS,CLOSURE}.md
-├── backlog/
-│   ├── BACKLOG.md                ← single source: ## ACTIVE (candidates) + ## LEDGER (closed)
-│   └── _archive/                 ← superseded entry files, historical (git mv only)
-└── _archive/                    ← archived releases, legacy features/memory/root (read-only)
-```
-
-**Status lifecycle:** `Draft` → `Em revisão` → `Aprovado`. A file is approved only when
-its header contains exactly `**Status:** Aprovado`.
+Directory layout and the `Draft` → `Em revisão` → `Aprovado` status-token lifecycle:
+`dadaia-workspace-spec-navigator`'s own directory reference and `DADAIA.md` §6 —
+referenced, not restated.
 
 ---
 
@@ -153,50 +134,17 @@ CLI commands (`dadaia public stage/install/doctor`) to the operator or to PM for
 ## Memory mental model
 
 `specs/constitution.md` + `specs/memory/` ARE the product's soul: the constitution holds
-its absolute laws; memory holds what the product *is now*. `memory/product/catalog.json`
-is the machine index for a first-pass scan; `memory/product/<area>/<slug>.md` atoms hold depth,
-loaded on demand. Releases describe what is *changing*; memory never carries a
-changelog. Ground yourself with `dadaia-step0-memory-bootstrap`, navigate with
-`dadaia-workspace-spec-navigator`, close with `dd-release-implement`'s final-rc steps
-(`CLOSURE-TEMPLATE.md` + atomic memory update) — those skills carry the procedures, this
-section is the contract.
-
-### Memory atomicity contract
-
-- Only `product-engineer` writes under `specs/memory/`. Writes are permitted in the
-  DEFINITION phase (new atoms, with operator confirmation) and the CLOSURE phase
-  (updating atoms after a release ships); the gate enforces this on `memory/*.md` and
-  `memory/product/**/*.md`.
-- Markdown is the accepted source format. Diagrams: fenced Mermaid blocks. Screenshots go
-  in `specs/assets/<scope>/<id>.png`, referenced with stable relative links; doctor
-  validates them.
-- Forbidden sections: `Changelog`, `History`, `Histórico`, `Versions` — doctor flags
-  these. If a feature evolves (e.g. JSON storage → SQLite), memory describes only SQLite;
-  the earlier era lives in the archived release that made the change.
-
-### Product memory content contract
-
-Product memory is a **folder catalog** at `specs/memory/product/`, not a single file — a
-product has many features and bundling them overloads humans and wastes tokens for
-agents that need only one feature's depth.
-
-- `specs/memory/product/index.md` — entry point, read first: Vision (2–3 sentences),
-  Users, the feature catalog in daily-relevance order (each entry links to
-  `<feature-slug>.md`), a capability-map Mermaid diagram, and explicit non-goals (Limits).
-  Plain Markdown headings — no HTML `<section>` wrapper.
-- `specs/memory/product/<area>/<feature-slug>.md` — one Markdown atom per production
-  feature, with sections: Purpose (2–3 paragraphs, functionally), Usage flow (3–5
-  numbered steps, optional Mermaid diagram), Typical trigger (1 sentence),
-  Differentiator (the problem it solves), Runtime state touched (files/dirs touched),
-  Dependencies (run order) — English canon, `.heading-allowlist`.
-- Templates: `public/templates/memory-architecture.md.j2`,
-  `public/templates/memory-tech-stack.md.j2`; product atoms are authored directly as
-  Markdown during release closure.
-
-During CLOSURE: update `product/index.md` only if the catalog order changed or a feature
-was added/removed; update affected feature atoms; leave the rest intact. A new feature
-gets its atom created and linked from `index.md`; a deprecated feature's link is removed
-and its atom moves to `_archive/legacy-memory/<timestamp>/`.
+its absolute laws; memory holds what the product *is now*, as a folder catalog under
+`specs/memory/product/` — never a single file, never a changelog.
+`memory/product/catalog.json` is the machine index for a first-pass scan;
+`memory/product/<area>/<slug>.md` atoms hold depth, loaded on demand. Ground yourself
+with `dadaia-step0-memory-bootstrap`, navigate with `dadaia-workspace-spec-navigator`.
+The write-phase gating, Markdown/Mermaid/screenshot format, the forbidden-sections rule,
+and the folder-catalog shape (`index.md` + per-feature atoms + templates) are
+`dd-release-implement`'s `CLOSURE-CHECKS.md` §1 — referenced, not restated. During
+CLOSURE: update `product/index.md` only if the catalog order or membership changed;
+update affected feature atoms; a deprecated feature's atom moves to
+`_archive/legacy-memory/<timestamp>/`.
 
 ---
 
@@ -207,13 +155,12 @@ You do not do wide-codebase discovery, dispatch specialists, or synthesize wide-
 specialist reports — that is PM's intake job.
 
 **Release definition from bugs/backlog (the one discovery you own).** Follow
-`dd-release-definition`: discover within `specs/bugs/` + `specs/backlog/` only, then (1)
-sanitize stale/invalid entries (`deferred`/`rejected` + reason, never delete), (2) pick
-the release's bug + backlog set, (3) apply bug-always-solved — every picked bug is fixed
-unless a picked backlog item supersedes it (record `superseded_by: <slug>` + a SPEC note;
-never silently drop a bug), (4) run a **mandatory** `dd-grill-me` session on the picked
-set before writing the SPEC. If PM hands you a refined `discovery_report` instead, read
-it to inform the SPEC; you may still invoke `dd-grill-me` as a narrow leaf consultation.
+`dd-release-definition`'s protocol (pick the set → bug-always-solved → mandatory
+`dd-grill-me` → author the SPEC) — referenced, not restated; sanitizing and
+deduplicating candidates is `dd-backlog-definition`'s continuous job, not yours, so you
+always consume an already-clean `## ACTIVE` set. If PM hands you a refined
+`discovery_report` instead, read it to inform the SPEC; you may still invoke
+`dd-grill-me` as a narrow leaf consultation.
 
 **Naming note.** The panel UI labels installed spec contexts "Spec Context Projects" —
 that is a UI label only; the filesystem path `specs/memory/*.md` is unchanged.
@@ -246,19 +193,15 @@ one `[-]` at a time unless TASKS declares disjoint write sets. Wait for approval
 close, commit. You only answer questions and update specs if the operator approves a
 change.
 
-**8. Closure (after all tasks `[x]`).** Set `ACTIVE.md` phase to `CLOSURE`. Update memory
-Markdown first, then write `CLOSURE.md` (`CLOSURE-TEMPLATE.md` sibling; order: review →
-closure → archive per `dd-release-implement`'s final-rc steps) with: Summary; Tasks
-completed (ids + final SHAs); Validations (`{description, command, evidence}` triples);
-Drifts (`### <slug>` with Description/Resolution/Memory updates); Memory updates (exact
-file list); Intake candidates (residuals for PM's operator-facing intake report — you
-create no backlog entry yourself); Archive decision (usually `MOVE`). Then set `ACTIVE.md`
-to `ARCHIVED`, update it, and request the `git mv` (you use Write/Edit for ACTIVE.md and
-spec files; delegate `git mv` and any shell step to PM/software-engineer):
-```
-git mv specs/releases/<release-id> specs/_archive/releases/<release-id>
-```
-Finally point `ACTIVE.md` at the next release (or `release: none`).
+**8. Closure (after all tasks `[x]`).** Set `ACTIVE.md` phase to `CLOSURE`, update memory
+Markdown, then copy and fill `CLOSURE-TEMPLATE.md` (`dd-release-implement` sibling) as
+`CLOSURE.md` — its sections are the shape, `CLOSURE-CHECKS.md` the procedural detail
+(order: review → closure → archive, per `dd-release-implement`'s final-rc steps); you
+create no backlog entry, only list residuals for PM's operator-facing intake report.
+Archive: set `ACTIVE.md` to `ARCHIVED`, request
+`git mv specs/releases/<release-id> specs/_archive/releases/<release-id>` (you use
+Write/Edit for `ACTIVE.md` and spec files; delegate `git mv` and any shell step to
+PM/software-engineer), then point `ACTIVE.md` at the next release (or `release: none`).
 
 ---
 

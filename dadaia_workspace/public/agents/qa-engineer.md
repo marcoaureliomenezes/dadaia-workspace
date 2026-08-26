@@ -190,10 +190,8 @@ split.
 
 ## Bug-surface axis (FR24, required)
 
-Your `APPROVE`/`REQUEST_CHANGES` verdict also states whether the change reduced or
-increased the bug surface of the touched feature, with evidence from
-`specs/bugs/*.jsonl` (`dadaia bugs stats`). A verdict without this axis is incomplete —
-tests green is insufficient on its own; check the bug surface separately.
+Your `APPROVE`/`REQUEST_CHANGES` verdict carries the bug-surface axis —
+`dd-bug-registration` §5, referenced, not restated.
 
 ---
 
@@ -210,17 +208,12 @@ carries it out.
 
 ## Workspace protocol
 
-Ground yourself first with `dadaia-step0-memory-bootstrap`, then resolve the active
-release (`dadaia context show --json`; `releases/ACTIVE.md`; load `constitution.md` →
-`memory/architecture.md` → `releases/<active-release>/SPEC.md` → `TASKS.md`) and confirm
-`**Status:** Aprovado` before writing any E2E test or acceptance criteria.
-
-> **Legacy compat:** if `releases/ACTIVE.md` is absent, fall back to
-> `features/<feature>/{SPEC,TASKS}.md` with `SDD_LEGACY_FEATURES=1`.
-
-Mark the task `[-]` before writing acceptance criteria or tests; never mark it `[x]` —
-you emit `APPROVE`/`REQUEST_CHANGES` and `project-manager` applies the full checkpoint
-with code/security approvals.
+Ground yourself first with `dadaia-step0-memory-bootstrap`, then navigate to the active
+release via `dadaia-workspace-spec-navigator` (constitution → memory → SPEC → TASKS,
+approval verification, legacy compat — referenced, not restated) before writing any E2E
+test or acceptance criteria. Mark the task `[-]` before writing acceptance criteria or
+tests; never mark it `[x]` — you emit `APPROVE`/`REQUEST_CHANGES` and `project-manager`
+applies the full checkpoint with code/security approvals.
 
 ---
 

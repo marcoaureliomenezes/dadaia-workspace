@@ -225,14 +225,12 @@ request or a human-facing next hop; required sections: Summary, Tests written
 Emit via `dadaia-handoff-emitter` — schema `handoff-v1.2`, `self_pull.refs` lists only
 atoms this session actually read.
 
-Your completed implementation is a handoff, not task completion: the task stays `[-]`
-until `qa-engineer` (pre-commit), `security-reviewer` (pre-push), and `code-reviewer`
-(pre-PR) approve the same commit. A `REQUEST_CHANGES` verdict sends you back to rework
-and a new handoff — reviewers rerun against the new commit. Include evidence paths for
+Your completed implementation is a handoff, not task completion: the review/QA gate
+cadence and the `[x]`/push/PR/merge/deploy/close hold are `dd-release-implement`'s
+"Review/QA gate cadence" section — referenced, not restated. Include evidence paths for
 changed files, unit/integration commands, and security/privacy checks (public-asset
 privacy, secrets/tokens, auth/access control, dependency additions, generated files,
-consumer-specific data). Do not mark `[x]`, push, open a PR, merge, deploy, close the
-release, or update memory before approval.
+consumer-specific data).
 
 ---
 

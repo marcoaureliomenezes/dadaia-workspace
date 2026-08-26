@@ -112,9 +112,8 @@ doubt, ask one direct question first.
 ### ONBOARD (workspace-wide first review)
 
 1. `ls repos/` to discover every repo.
-2. Per repo: read specs where present (`constitution.md`, `memory/architecture.md`,
-   `memory/product/index.md` — load `memory/product/<area>/<slug>.md` on demand for a feature's
-   depth, `memory/tech-stack.md`, `foundation/SPEC.md`), skipping gracefully if absent;
+2. Per repo: read specs per `dadaia-workspace-spec-navigator` (constitution → memory →
+   SPEC), plus `foundation/SPEC.md` if present — skipping gracefully whatever is absent;
    scan implementation (`find` for `.py`/`.js`/`.ts`, excluding `node_modules`/`.venv`)
    until the modules, dependencies, and structure are clear; classify architecture status
    as DEFINED (documented layers/rules), IMPLICIT (structure without a governing doc), or
@@ -136,8 +135,8 @@ and proceed rather than block the scan.
 ### DRAFT (new project)
 
 Understand the product well enough to define a solid initial architecture: load specs
-from `repos/<slug>/specs/` in canonical order (constitution → memory → foundation →
-SPEC → feature specs); if architectural decisions are left open, run `dd-grill-me` to
+from `repos/<slug>/specs/` per `dadaia-workspace-spec-navigator`, plus `foundation/SPEC.md`
+before feature specs; if architectural decisions are left open, run `dd-grill-me` to
 resolve every branch before proposing anything; propose layers, modules, dependency
 rules, naming conventions, state boundaries, and likely growth-breakpoints; write to
 `.dadaia/reports/<slug>/software-architect/<timestamp>-draft.html`.
@@ -146,9 +145,9 @@ rules, naming conventions, state boundaries, and likely growth-breakpoints; writ
 
 Measure how faithfully the architecture is followed and surface every violation with a
 direct, actionable recommendation: get the active context from the PM dispatch briefing
-(ask PM to run `dadaia context show --json` if omitted); load `constitution.md`,
-`memory/architecture.md`, `memory/product/index.md`, `memory/tech-stack.md`, and
-`foundation/SPEC.md` if present; explore the full codebase with `Glob`/`Grep`/`Read`
+(ask PM to run `dadaia context show --json` if omitted); load specs per
+`dadaia-workspace-spec-navigator`, plus `foundation/SPEC.md` if present; explore the full
+codebase with `Glob`/`Grep`/`Read`
 until the picture is complete; apply the checklist below before writing anything; invoke
 `dd-grill-me` for any pattern whose intent is unclear before judging it — never assume
 bad intent unread; write to
@@ -201,10 +200,8 @@ HIGH (measurable coupling/cohesion/testability degradation, compounds over time)
 
 ## Bug-surface axis (FR24, required)
 
-Every review verdict also states whether the change reduced or increased the bug surface
-of the touched feature, with evidence from `specs/bugs/*.jsonl` (`dadaia bugs stats`). A
-verdict without this axis is incomplete — tests green is insufficient on its own; check
-the bug surface separately.
+Every review verdict carries the bug-surface axis — `dd-bug-registration` §5, referenced,
+not restated.
 
 ---
 
