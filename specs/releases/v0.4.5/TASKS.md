@@ -802,7 +802,7 @@ than reverts (AS-2).
 
 ---
 
-- [-] **T-045-31 — `S4` close: `qa-engineer` review committed on the branch**
+- [x] **T-045-31 — `S4` close: `qa-engineer` review committed on the branch**
 
 **Owner role:** qa-engineer · **Commit:** `docs(T-045-31): S4 QA close`
 
