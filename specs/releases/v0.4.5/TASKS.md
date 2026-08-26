@@ -822,7 +822,7 @@ say plainly whether each target was met, missed or partially met.
 
 ## Scope complete — gates and the trio
 
-- [-] **T-045-32 — [shell] FR16: the invariants, measured**
+- [x] **T-045-32 — [shell] FR16: the invariants, measured**
 
 **Owner role:** software-engineer · **Commit:** the capture reference only
 
@@ -839,7 +839,7 @@ defect of the release, justified per contributing FR or refused.
 
 ---
 
-- [ ] **T-045-33 — Six-axis code review on the thawed tree**
+- [-] **T-045-33 — Six-axis code review on the thawed tree**
 
 **Owner role:** code-reviewer · **Commit:** `docs(T-045-33): release code review`
 
