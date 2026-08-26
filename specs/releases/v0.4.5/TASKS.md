@@ -759,7 +759,7 @@ or a hard-stop block. Any persona still above 220 lines afterwards is **named** 
 
 ---
 
-- [-] **T-045-29 — FR14: the AI-surface hygiene residuals**
+- [x] **T-045-29 — FR14: the AI-surface hygiene residuals**
 
 **Owner role:** ai-engineer · **Commit:** `fix(T-045-29): ai-engineer citation + F-7/F-8/F-10
 wording residuals`
@@ -780,7 +780,7 @@ green.
 
 ---
 
-- [ ] **T-045-30 — FR15: rule the test-Intent vocabulary**
+- [-] **T-045-30 — FR15: rule the test-Intent vocabulary**
 
 **Owner role:** ai-engineer (the skill text) + software-engineer (the sweep, if that is the
 ruling) · **Commit:** `docs(T-045-30): rule the test-Intent vocabulary`
