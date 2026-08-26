@@ -586,7 +586,7 @@ pass at one seam closes both — not two independent guards. Then prove the whol
 
 ---
 
-- [-] **T-045-21 — FR8: `specs init --specs-dir` refuses a symlinked target**
+- [x] **T-045-21 — FR8: `specs init --specs-dir` refuses a symlinked target**
 
 **Owner role:** software-engineer · **Commit:** `fix(T-045-21): refuse a symlinked target on
 the explicit --specs-dir branch`
@@ -605,7 +605,7 @@ new vocabulary, no second symlink check. The non-symlinked explicit branch is un
 
 ---
 
-- [ ] **T-045-22 — FR9: decide the healing lane for registry slug-ownership collisions**
+- [-] **T-045-22 — FR9: decide the healing lane for registry slug-ownership collisions**
 
 **Owner role:** software-architect (decision) + software-engineer (if implemented) ·
 **Commit:** `feat(T-045-22): registry-wide slug-ownership invariant` **or**
