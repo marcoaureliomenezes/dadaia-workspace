@@ -28,8 +28,14 @@ is found, the final `rc` **is** `rc-1`.
 | **Seam** | A place where a test or a replacement can be inserted without editing the module under test. "Fix at the seam" = change one boundary, not N call sites. |
 | **FR23** | Requirement 23 of release v0.4.4: the evidence gate on a bug's `resolved` record — the red-loop command, the regression-test seam, and the diff direction. Already law; cited here as history, not re-implemented. |
 | **The gate** | One PreToolUse hook (`dadaia_workspace.hooks.pre_gate`) that classifies each file write by path class × presence × phase × mode. It never reads task markers. |
-| **Provenance marker** | SPEC D-A: a closed-vocabulary field recording *how* a value was obtained — `commit_granularity` (`exact\|release-squash\|ledger-only`) on a derived sha, `lineage_source` (`declared\|text-reference\|null`) on `caused_by`. |
+| **Provenance marker** | SPEC D-A: a closed-vocabulary field recording *how* a value was obtained — `registration_granularity` and `resolution_granularity` (`exact\|release-squash\|ledger-only`), one per derived sha, and `lineage_source` (`declared\|text-reference\|null`) on `caused_by`. There is no field called `commit_granularity`. |
 | **Pillar 1 / 2 / 3** | The three halves-and-a-half of one audit: bug history, spec compliance, memory/constitution drift. They always run together (ruling D6). |
+| **Histo** · **live photo** | A *histo* is an append-only `*_histo.jsonl` beside an area's `_archive/` holding that area's exits (`bugs_histo`, `backlog_histo`, `releases_histo`). A *live photo* is the document that keeps only the current state — `BACKLOG.md` after FR5 carries `## ACTIVE` and nothing else; what left lives in the histo and in git. |
+| **Thawed tree** | The working tree before the release directory is `git mv`'d into `_archive/` (which makes it FROZEN). The six-axis review runs on the thawed tree because a reviewer must be able to request a change. |
+| **Presence** · **verdict gate** | Presence: the advisory record a MUTATING write leaves naming its session — it never blocks (NO-LOCKS), it surfaces a race. Verdict gate: the required CI job refusing a PR without an APPROVED `security-reviewer` handoff covering the PR head sha, on both edges. |
+| **Purge-on-pick** | Removing a picked backlog slug's `## ACTIVE` subsection in the **same commit** that creates the release SPEC — `project-manager`'s step, never `product-engineer`'s. |
+| **One-axis law** | The release id **is** the package version: one lineage, no second numbering. "Operator law O5" is the operator ruling that a version may be **minted without being published**. |
+| **TREE-5 / TREE-8** | `specs doctor` structural rules. TREE-5 is the existing scoped-`AGENTS.md` hash-projection regime; **TREE-8** is new in FR1 — "nothing beyond canon", WARN-only. |
 
 ---
 
@@ -37,9 +43,9 @@ is found, the final `rc` **is** `rc-1`.
 
 One ordering principle: **build the record, fill it from history, then teach the readers.**
 
-This release is the inverse of `v0.4.5`. That one was a demolition and its danger was
-deleting a net. This one **adds a canon**, and its danger is the opposite: a governance
-release is exactly the shape that grows the surface it governs. Three constraints hold it:
+This release is the inverse of `v0.4.5`: that one was a demolition whose danger was deleting a
+net; this one **adds a canon**, and a governance release is exactly the shape that grows the
+surface it governs. Three constraints hold it:
 
 1. **Nothing here becomes a blocker.** Ruling D15 is an acceptance criterion, not a
    preference: skills instruct, audits measure, hooks and the CLI act only at the publication
@@ -86,13 +92,17 @@ Five properties are non-negotiable throughout:
 
 | Layer | Modules / paths | FRs |
 |---|---|---|
-| `dadaia_workspace/features/specs` | `doctor.py`, `doctor_structural.py`, `doctor_closure_audit.py`, `scaffolder.py`, `catalog.py` | FR1, FR4, FR15 |
-| `dadaia_workspace/features/bugs` | `service.py` — record model, archive verb, migration entry point | FR2, FR3 |
-| `dadaia_workspace/core/models` | `bugs.py` — `BugEvent` → `BugRecord`, the immutable/mutable split, the coherence checker (WARN) | FR2 |
-| `dadaia_workspace/infrastructure` | `jsonl_bug_store.py` — one JSONL record-update seam serving bugs, findings and the backlog histo | FR2, FR5, FR13 |
-| `dadaia_workspace/features/spec_context` | `gate_policy.py` — MEMORY phase from `RELEASE.jsonl`, FROZEN repointed to per-area `_archive/` | FR4, FR6 |
+| `dadaia_workspace/features/specs` | `doctor.py`, `doctor_common.py`, `doctor_structural.py`, `doctor_closure_audit.py`, `doctor_release.py`, `doctor_governance.py`, `scaffolder.py`, `memory_lint.py` | FR1, FR4, FR15 |
+| `dadaia_workspace/features/backlog` | `doctor.py` (BL-DUP deleted), `document.py` + `ledger.py` (the in-file `## LEDGER` retires; the 18 `consumed_backlog.json` sidecars relocate and BL-STALE keeps its feed) | FR5 |
+| `dadaia_workspace/features/bugs` | `service.py` — record model, archive verb, the resolver seam; `migrate_v5.py` (**new**, owns the v5 adapter and is deletable with the migration) | FR2, FR3 |
+| `dadaia_workspace/core` | `models/{bugs,findings,backlog}.py`; `release_events.py` (**new** — the stdlib-only `RELEASE.jsonl` fold, called by the hook, the container and the doctor); `protocols/` gains a record protocol and `GitHistoryReader`; `atomic_write.py` (reused, not re-implemented); `specs_version.py` (the canon the CI gate derives from) | FR1, FR2, FR3, FR4, FR13 |
+| `dadaia_workspace/infrastructure` | `jsonl_record_store.py` — a **generic** `JsonlRecordStore` keyed by `id`, parse/serialise injected; one instance per feature model, no module knowing two shapes. `git_subprocess.py` gains `log_added_lines(pathspec)` | FR2, FR3, FR5, FR13 |
+| `dadaia_workspace/features/spec_context` | `gate_policy.py` — FROZEN: one prefix deleted, `specs/releases/_archive/` added; `_ideas/` stays MUTATING | FR6 |
+| `dadaia_workspace/hooks` | `sdd_gate.py` — `_active_field` and its regex retire; the MEMORY phase comes from `core/release_events.py` (hooks never import the container) | FR4 |
+| `.github/` | `scripts/pr-verdict-check.sh` + `workflows/ci.yml` — evidence roots and the release-id pattern derived from the canon, still fail-closed | FR1 |
+| repo root | `.gitignore` — the proven inversion applied to every new area; three orphaned stanzas deleted | FR1 |
 | `dadaia_workspace/cli/commands` | `bugs.py` (record rendering), `ci.py` (`pre_commit_check` loses the backlog-doctor gate), `specs.py` (`--recipe`) | FR1, FR2, FR9 |
-| `dadaia_workspace/public/schemas` | `bugs/bug-record-v1.schema.json` (replaces `bug-event-v1`), `audits/finding-record-v1.schema.json`, `releases/release-event-v1.schema.json` | FR2, FR4, FR13 |
+| `dadaia_workspace/public/schemas` | `bugs/bug-record-v1.schema.json` (replaces `bug-event-v1`; three field categories per property; the redaction field set derives from it), `audits/finding-record-v1.schema.json`, `releases/release-event-v1.schema.json` (7 kinds, no `session_id`) | FR2, FR4, FR13 |
 | `dadaia_workspace/public/scripts` | `pre-commit-presence-gate.sh` (advisory-only), `pre-push-ci-gate.sh` (publication boundary only) | FR9 |
 | `dadaia_workspace/public/scaffold` | the v6 tree: per-area `AGENTS.md`, `BUGS.jsonl`, `RELEASE.jsonl`-ready `releases/`, `_ideas/`, `audits/`, `ADRs/`; no `README.md`, no `assets/` | FR1, FR12, FR13, FR19 |
 | `dadaia_workspace/public/skills` | **new** `dd-diagnose/` (+`LINEAGE.md`); `dd-bug-fix` → `dd-bug-resolution`; `dd-release-implement` rebuilt (+`RC-FLOW.md`, `RELEASE-EVENTS.md`, `MEMORY-UPDATE.md`; `CLOSURE-TEMPLATE.md`/`CLOSURE-CHECKS.md` die); `dd-backlog-definition`, `dd-bug-registration`, `dd-release-definition`, `dd-gitflow-default`, `dd-audit-project` (rewritten + 4 siblings) | FR7, FR8, FR12, FR14 |
@@ -103,9 +113,9 @@ Five properties are non-negotiable throughout:
 | `specs/**` (this repo's own) | the v6 migration, `BUGS.jsonl`, `RELEASE.jsonl`, `releases_histo.jsonl`, `backlog_histo.jsonl`, `audits/`, `ADRs/`, the memory trio, `constitution.md` | FR1–FR6, FR13, FR16–FR21 |
 
 **Layer rules hold unchanged:** `features/**` imports neither `cli`, `infrastructure` nor
-`hooks`; `core/**` stays stdlib-pure; `lint-imports` green with **no new accepted edge**. The
-v5→v6 decoding lives in **one boundary adapter** used by the migration only (SPEC A2.5), so no
-historical shape leaks into the bugs feature.
+`hooks`; `core/**` stays stdlib-pure; `lint-imports` green with **no new accepted edge** — FR3
+reads git through a `GitHistoryReader` protocol, never `subprocess`. The v5→v6 decoding lives
+in one migration-owned adapter (A2.5), so no historical shape leaks into the bugs feature.
 
 ---
 
@@ -115,33 +125,38 @@ historical shape leaks into the bugs feature.
 W0   definition commit (SPEC+PLAN+TASKS at _ideas → promotion git mv → backlog purge)
        → push feature/0.5.0 → definition PR → develop   [milestone (a), burns no rc]
        → RELEASE.jsonl `defined` milestone appended with that PR's sha
+       → T-050-03A [ai-engineer] widen the four reviewer personas to
+         specs/releases/**/reviews/** — S1's very first task needs it
 
 S1   FR1 canon v6 (scaffold + doctor + this repo's migration)
-       → FR2 BUGS.jsonl record model (expand → switch → contract)
-       → FR3 historical rewrite: one pass over 295 ledger commits, all refs
-       → FR4 RELEASE.jsonl + milestone shas + releases_histo back-fill
-       → FR5 BACKLOG.md live photo + backlog_histo
-       → FR6 [operator] tag, then delete root specs/_archive/
+       → FR1 boundaries: .gitignore inversion + the CI verdict-evidence contract (V20/V21)
+       → FR2 BUGS.jsonl record model (expand → switch → contract) + bugs archive
+       → FR3 historical rewrite: one pass over 295 ledger commits, all refs (V22/V23)
+       → FR4 RELEASE.jsonl + milestone shas + releases_histo back-fill (both layouts)
+       → FR5 BACKLOG.md live photo + backlog_histo + the 18 sidecars relocated
+       → FR6 [operator] tag (proven from the remote), then delete root specs/_archive/
        → QA close S1 (committed on branch)
 
 S2   FR7 dd-diagnose with lineage as phase 0
        → FR8 commit shapes + the one resolver seam
        → FR9 hooks de-slop (the release's clearest deletion)
-       → FR10 behavior-map.json + contract tests (RED in five directions)
-       → FR11 DADAIA.md: anchors + D15 posture + three short sections
+       → FR10 behavior-map.json + contract tests (RED in five directions, 9 ported)
+       → FR11 DADAIA.md: anchors + D15 posture + three short sections + the §3 row
        → FR12 the skill surface rides the canon
+       → FR4 contract step: ACTIVE.md deleted, every one of its 28 consumers repointed
        → QA close S2
 
 S3   FR13 audits/ canon + FINDINGS.jsonl → FR14 dd-audit-project three pillars
-       → FR15 specs doctor folds FINDINGS.jsonl
+       → FR15 specs doctor folds FINDINGS.jsonl + retires every CLOSURE.md parser
        → FR16 [project-auditor] the first audit, dry run over this repo
        → QA close S3
 
-S4   FR17 memory Part 1 / Part 2 split → FR18 the principle inventory
+S4   [memory window opens — recorded in RELEASE.jsonl, AS-12]
+     FR17 memory Part 1 / Part 2 split → FR18 the principle inventory
        → FR19 specs/ADRs canon + the proposed ADRs
        → FR20 [operator] the ADR acceptance sitting
        → FR21 constitution references principles
-       → QA close S4
+       → QA close S4  [memory window closes — recorded]
 
 scope complete   FR22 invariants measured → six-axis code review (thawed tree)
                  → security review + QA release verdict (all three on one sha)
@@ -158,25 +173,30 @@ final rc         memory → closure record → archive → version bump + merge 
 
 ### `S1` — the canon and the ledger rewrite
 
-FR1 lands the shape; FR2 lands the model; **FR3 is the release's highest-stakes task**. Its
-approach is fixed by measurement, not preference: a per-bug `git log -S` pickaxe is
-O(bugs × history) and returns ambiguous multi-commit matches on this corpus, so the migration
-does **one chronological pass** over the 295 non-merge ledger commits reachable across all refs
-(`main` is squash-only and exposes 75; the 50 `archive/*` tags carry the rest), keys every
-added line by bug id through the v5/v6 boundary adapter, and takes the **first add**. First-add
-wins is what dissolves the ambiguity: a later ship or squash commit re-adding the same line
-can never outrank the commit that created it.
+FR1 lands the shape **and its two boundaries** — a canon change that leaves `.gitignore` and
+the CI verdict gate behind is how this workspace produced nine gitignore bugs and two
+verdict-gate bugs; both are in FR1's write set, and the gate now derives its evidence roots
+from `core/specs_version.py` instead of a hard-coded glob, so the *next* canon move cannot
+break it. FR2 lands the model; **FR3 is the release's highest-stakes task**. Its approach is
+fixed by measurement: a per-bug `git log -S` pickaxe is O(bugs × history) and returns
+ambiguous multi-commit matches, so the migration does **one chronological pass** over the 295
+non-merge ledger commits reachable across all refs (`main` exposes 75; the 50 `archive/*` tags
+carry the other 220), keys every added line by bug id through the migration-owned v5 adapter,
+and takes the **first add** — which a later ship or squash commit re-adding the same line can
+never outrank.
 
-The output is data plus a marker: each sha stored with `exact`, `release-squash` or
-`ledger-only`, because 155 of 470 resolutions land inside release squashes (the largest
-resolves 91 bugs at once) and only 78 of 117 resolution commits touch a non-`specs/` file. An
-audit that diffed those as if they were fixes would manufacture findings. Idempotence is
-proven by executing the migration twice and byte-comparing, not by reasoning about it.
+The output is data plus a marker, and the markers are **measured, not thresholded**: §1.2's
+79 and 155 count different units than the structural definitions the algorithm computes, so
+the migration reports the distribution and only the unit-matched `≥` counts gate. Every copied
+prose value is re-run through the schema-derived redaction seam, and because the rename voids
+the push-scan amnesty the range is scanned **before** the first push, remediated at the source
+record — never with `--no-verify`. Idempotence is proven by executing twice and byte-comparing.
 
-FR4's back-fill reads the archived `CLOSURE.md` tables **before** FR6 deletes them, and FR6 is
-gated on a pushed `archive/specs-archive-<date>` tag plus a demonstrated
-`git show <tag>:…/CLOSURE.md`. Only then is anything removed, and only with the operator
-present.
+FR4's back-fill reads **both** archive layouts before FR6 deletes them; FR5 relocates the 18
+`consumed_backlog.json` sidecars so BL-STALE keeps a data feed instead of going quiet. FR6 is
+gated on a tag pushed **and proven reachable from the remote**, on the historical `verdicts/**`
+being relocated, and on the FROZEN set being repointed in the same commit. Only then is
+anything removed, and only with the operator present.
 
 ### `S2` — procedure, deletion, and the map
 
@@ -188,37 +208,41 @@ and the contract test asserts the **executed path** (pre-commit exits 0 on a sta
 backlog doctor rejects), never the script's text.
 
 FR10 extends the existing enforcer instead of adding a second map — a second map would be the
-exact puxadinho this release is built to make visible — and each of its five RED conditions
-gets its own mutation fixture. FR11 is the only writer of `DADAIA.md` in the release
-(SPEC D-B): every section it adds is a pointer, and its always-on token delta is measured with
-per-section attribution, because a governance release is precisely the shape that quietly
-spends the token budget the previous two releases fought for.
+exact puxadinho this release is built to make visible — each of its five RED conditions gets a
+mutation fixture, **all nine existing checks are proven ported before the old file dies**, and
+its discovery **globs the generators** rather than trusting a hand list (the first Draft's own
+hand list already missed three shipped `AGENTS.md` sources). FR11 is the only writer of
+`DADAIA.md` (SPEC D-B): every section it adds is a pointer, its anchors are comment markup
+rather than headings, and its always-on token delta is measured with per-section attribution,
+because a governance release is precisely the shape that quietly spends the token budget the
+previous two releases fought for. `S2` ends with FR4's **contract step**: only once the
+personas, skills and law file have been repointed is `ACTIVE.md` deleted — deleting it in `S1`
+would leave the always-on law naming a missing file for a whole segment.
 
 ### `S3` — the audit canon, proven on this repository
 
-FR13 and FR14 are authoring; FR15 is a deletion (regex-over-prose out, JSONL fold in). **FR16
-is the acceptance.** The dry run must rediscover, with evidence, the four documented loop
-chains of SPEC §1.1 — the gitignore class (four recurrences), the certify probe re-bugged 37
-minutes after its own fix, the frozen-clock → guard(+294 LOC) → guard's-bug chain, and the
-bug-event ledger family. If it cannot, FR14 is reworked; the acceptance is not lowered. The
-dry run also reads this release's own commits and reports whether FR8's shapes were actually
-followed — the release grading itself on the discipline it installs.
+FR13 and FR14 are authoring; FR15 is a deletion (regex-over-prose out, JSONL fold in, and
+every surviving `CLOSURE.md` parser retired with its subject). **FR16 is the acceptance:** the
+dry run must rediscover, **by the bug ids SPEC §1.1 pins**, the gitignore class (nine
+instances), the certify chain, the frozen-clock chain and the bug-event ledger family — a
+finding that claims a chain without naming its ids does not count. If it cannot, FR14 is
+reworked; the acceptance is not lowered. It also grades this release's own commits against
+FR8's shapes.
 
 ### `S4` — principles, and the operator's sitting
 
-FR17 restructures; FR18 **only promotes what already has a check** and is explicitly forbidden
-from writing a new one — that constraint is what stops a principles inventory from becoming a
-second enforcement layer. The import-linter contract count is read from `setup.cfg` at
-implementation time (nine at HEAD, eight when the grill counted), and a contract test makes
-adding a tenth contract without a principle go RED. FR19 authors the ADR canon; FR20 is the
-operator's, and no agent may perform it; FR21 deletes the constitution's restatements last, so
-it references final principle ids.
+The segment opens a **recorded memory window** (AS-12), never a phase toggled around a task.
+FR17 restructures; FR18 **only promotes what already has a check** and may write none — the
+constraint that stops an inventory becoming a second enforcement layer. The import-linter
+count is read from `setup.cfg` at implementation time (nine at HEAD), and a contract test
+makes a tenth contract without a principle go RED. FR19 authors the ADR canon; FR20 is the
+operator's alone; FR21 deletes the constitution's restatements last, against final ids.
 
 ---
 
 ## 5. Technical risks
 
-Full register in SPEC §6/§8; the six that shape this plan's order and gates:
+Full register in SPEC §6/§8/§9; the seven that shape this plan's order and gates:
 
 | # | Risk | Mitigation |
 |---|---|---|
@@ -227,7 +251,8 @@ Full register in SPEC §6/§8; the six that shape this plan's order and gates:
 | **R-3** | **Concurrent `v0.4.5` work.** `v0.4.5` is live and touches `specs/bugs/bugs.jsonl`, `BACKLOG.md`, the personas and `DADAIA.md`. | This Draft writes only under `specs/releases/_ideas/0.5.0/`. Promotion is gated on `v0.4.5` being archived; the first task at promotion re-derives the commit map (its counts will have grown) and re-reads every write-set path before any edit. |
 | **R-4** | **Canon rename churn.** `bugs.jsonl` → `BUGS.jsonl`, the memory trio's case change, `dd-bug-fix` → `dd-bug-resolution`, `ACTIVE.md`/`CLOSURE.md`/`CLOSURE-TEMPLATE.md` retiring — every reference in 21 skills, 9 personas and the law file can go stale. | `expand → switch → contract` per rename; FR10's enforcer with hash tuples is landed **in the same segment** as FR12's renames, so a stale reference is RED rather than discovered by a human three releases later (the class has already fired twice). Case-only renames use an explicit two-step `git mv` so case-insensitive filesystems do not silently no-op. |
 | **R-5** | **A governance release grows the always-on budget.** FR11 adds sections to the law file that every session loads. | Every added section is a pointer; V12 measures the delta with per-section attribution; an increase is reported, never averaged into a total. |
-| **R-6** | **The destructive deletion (FR6).** Root `specs/_archive/` holds every archived release's CLOSURE evidence. | Ordered gates: back-fills complete → tag created **and pushed** → reachability demonstrated by `git show <tag>:…` → deletion, one commit, operator present, FROZEN repointed in the same commit. No `archive/*` tag is ever deleted by this release. |
+| **R-6** | **The destructive deletion (FR6).** Root `specs/_archive/` holds every archived release's CLOSURE evidence **and every past security verdict**, plus 18 `consumed_backlog.json` sidecars a live doctor rule reads. | Ordered gates: back-fills complete (both layouts) → sidecars relocated → historical `verdicts/**` relocated and the CI gate proven against them (V20) → tag created, pushed and proven reachable **from a throwaway clone** → deletion, one commit, operator present, FROZEN repointed in the same commit. No `archive/*` tag is ever deleted. |
+| **R-7** | **A canon change orphans the boundaries that read the canon.** The gitignore class fired nine times and the verdict gate twice on exactly this shape: the tree moved, and a hard-coded path elsewhere did not. | FR1 owns `.gitignore` **and** the CI evidence contract in its own write set, derives both from `core/specs_version.py`, and pins them with contract validations (V20, V21) that run **before** the archive move rather than at ship. |
 
 ---
 
@@ -235,43 +260,41 @@ Full register in SPEC §6/§8; the six that shape this plan's order and gates:
 
 | Boundary | Who | What must be true |
 |---|---|---|
-| Per task | implementer | RED observed for the real reason; suite green; local CI preflight green; `implementation-complete` handoff; the task marker stays `[-]` |
+| Per task | implementer | RED for the real reason; suite green; preflight green; handoff; marker stays `[-]` |
 | End of `S1 … S4` | `qa-engineer` only | every acceptance id of that segment evidenced; the review **committed on the branch**; no push, no PR, no closure |
 | `S1` head | `software-architect` | rules on the record model and the boundary adapter (one adapter, no v5 branch in the feature) before FR3 runs |
 | `S3` close | `project-auditor` | the FR16 dry-run artifact exists and satisfies A16.2 — the four loop chains, named with evidence |
 | `S4` | **operator** | FR20: every inventory ADR carries a terminal operator decision. No agent may flip a status to `accepted` |
-| Scope complete | `qa-engineer` + `code-reviewer` + `security-reviewer` | all three `APPROVE` the **same** commit, on a thawed tree; each verdict states the bug-surface delta with bug-history evidence |
+| Scope complete | `qa-engineer` + `code-reviewer` + `security-reviewer` | all three `APPROVE` the **same** commit, on a thawed tree; each states the bug-surface delta with evidence |
 | `rc-1` | CI + `security-reviewer` | APPROVED verdict covering the PR head sha; CI green; merged |
 | `rc-N ≥ 2` | `qa-engineer` + delta reviews | the finding is named, on this scope; one QA close and one merge per round |
 | Final `rc` | `product-engineer` + trio | memory → closure record → disposition sweep → artifact GC → archive, one commit, in that order, before the ship PR |
 
-**This trio is reviewed before implementation, by more than the usual fleet.** SPEC, PLAN and
-TASKS go to `software-architect` (the record model, the adapter boundary, the layer rules),
-`security-reviewer` (FR3's report and FR16's audit artifact must carry no path, IP, hostname or
-private name; FR9 removes two gates and must not weaken the publication boundary),
-`qa-engineer` (are the acceptances checkable by command? is A16.2 falsifiable?), `ai-engineer`
-(FR7/FR10/FR11/FR12/FR14 — the whole AI surface), `code-reviewer` (the six axes over the
-delta), **and to external reviewers, human and other-vendor**. That last audience is why §0
-defines every term at first use and why every claim in SPEC §1 carries its measurement and its
-capture path: a reader who has never opened this repository must be able to check the numbers.
+**This trio was reviewed before implementation, by more than the usual fleet — and the reviews
+are folded, not filed.** `software-architect` (REWORK), `security-reviewer` (REJECTED),
+`qa-engineer` (REWORK), `ai-engineer` (REWORK) and `code-reviewer` (REWORK) each returned an
+amendment list; all 55 amendments carry an explicit disposition in **SPEC §9**, and the one
+refusal states its reason. A re-review of this revision is required before any `Aprovado`.
+The external audience — human and other-vendor — is why §0 defines every term at first use and
+why every claim in SPEC §1 carries its measurement and its capture path: a reader who has never
+opened this repository must be able to check the numbers.
 
-**Test stewardship.** Intent and size declared at birth (`dadaia-test-stewardship`). This
-release is net-additive in tests by nature (contract tests are the enforcement mechanism D15
-allows); every new test declares which acceptance id it pins. No test is deleted, skipped or
-quarantined except by a `qa-engineer` verdict with evidence, executed by `software-engineer`.
+**Test stewardship.** Intent and size at birth (`dadaia-test-stewardship`); the release is
+net-additive in tests by nature (contract tests are the mechanism D15 allows) and every new
+test names the acceptance id it pins. No test is deleted, skipped or quarantined except by a
+`qa-engineer` verdict with evidence — including the two hook tests FR9's deletion breaks, and
+the new fixture-repo test, which is placed in `tests/contract/` rather than the crash-prone
+`unit-fast` tier while `windows-xdist-workers-crash-on-unit-fast-tier` stays open.
 
 ---
 
 ## 7. Definition of done
 
-- Every acceptance id in SPEC §3 evidenced, or explicitly dispositioned by an operator ruling
-  recorded in the closure record.
-- **V1–V19** captured, with V4/V5/V6 (migration), V16 (audit dry run) and V18 (no new blocker)
-  the four that may not be waived.
-- Six backlog slugs terminal in `backlog_histo.jsonl`; zero bugs closed by this release
-  (AS-4); FR16's findings compiled for the PM's intake report and materialized by nobody.
-- Every inventory ADR carries a terminal operator decision (FR20).
-- FR22's invariants hold, including **A22.6: zero new blocking exits, two removed**.
-- Memory updated in the new Part 1 / Part 2 shape, the closure record written, the release
-  archived into `specs/releases/_archive/0.5.0/`.
+- Every acceptance id in SPEC §3 evidenced, or dispositioned by an operator ruling in closure.
+- **V1–V24** captured; V4/V5/V6/V22/V23, V16, V18 and V20/V21 may not be waived.
+- Six backlog slugs terminal in `backlog_histo.jsonl`; zero bugs closed (AS-4); FR16's findings
+  compiled for the PM's intake and materialized by nobody; every ADR operator-decided (FR20).
+- FR22 holds, including **A22.6: zero new blocking exits, exactly two removed**.
+- Memory in the Part 1 / Part 2 shape; closure record written; release archived into
+  `specs/releases/_archive/0.5.0/` **after** the trio review and **before** the ship PR.
 - `feature/0.5.0` deleted and the next feature branch cut from `main` in the same step.

@@ -17,9 +17,17 @@ model: `DADAIA.md` §4, operations: `dd-gitflow-default`). See **AS-5** — this
 `memory-two-tier-principles`, `dd-diagnose`
 **Intended picked set:** the six `## ACTIVE` backlog entries above — the five entries the
 2026-08-26 grill produced or amended, plus `dd-diagnose`, whose diagnosing method becomes
-the home of the lineage check (**AS-11**). Bugs: **none picked**; the single open bug at the
-time of writing, `windows-xdist-workers-crash-on-unit-fast-tier` (LOW), is governed by
-**AS-4**.
+the home of the lineage check (**AS-11**). Bugs: **none picked**. Two bugs are open on this
+tree at the time of writing — `windows-xdist-workers-crash-on-unit-fast-tier` (LOW) and
+`bug-event-field-with-unicode-line-separator-silently-drops-the-event` (MEDIUM, component
+`infrastructure/jsonl_bug_store.py`) — both governed by **AS-4**, which now covers both.
+**Precondition, not scope:** the U+2028 line-splitting seam is fixed as Arm B inside
+`v0.4.5` (task **T-045-20**); FR2/FR3 **build on that fix and do not re-specify it**
+(**AS-14**, **V23**).
+**Review fold:** this Draft is the post-review revision. Five definition reviews
+(`software-architect` REWORK · `security-reviewer` REJECTED · `qa-engineer` REWORK ·
+`ai-engineer` REWORK · `code-reviewer` REWORK) live in `reviews/`; every amendment they
+raised carries an explicit disposition in **§9**.
 **Grill (mandatory, done):** the operator ratification session of **2026-08-26** — 3 rounds,
 18 questions, 20 decisions — handoff
 `.dadaia/handoff/dadaia-workspace/2026-08-26T120000Z-claude-code-governance-lineage-audits-adr-grill.handoff.json`.
@@ -47,14 +55,18 @@ Everything below is that sentence, decomposed into requirements.
 The 2026-08-23 skills audit and the 2026-08-26 grill's inspection pass measured it
 (handoff `findings[1]`):
 
-| Chain | Shape | What it proves |
-|---|---|---|
-| **gitignore class** | four recurrences — `backlog-candidates-md-tracked-violates-noncanonical-gitignore`, `grill-and-oq-decisions-records-gitignored-not-version-controlled`, `specs-bugs-jsonl-store-gitignored`, `backlog-gitignored-governance-vacuous`, `remote-bugs-gitignore-blocks-new-intake`, `gitignore-alpha-qa-review-untrackable`, `gitignore-code-review-artifact-untrackable`, `gitignore-verdict-evidence-untrackable-fourth-recurrence` — three of them fixed instance-by-instance | a symptom patch per instance; the class was never named, so the class kept firing |
-| **certify probe** | the bug was re-registered **37 minutes** after its own fix (named as firing 1 of the v0.4.4 FR23 evidence gate) | a fix landed with no evidence that the failure was reproduced on the executed path |
-| **frozen clock** | frozen-clock bug → a guard (**+294 LOC**) → the guard's own bug — three hops | the fix grew the feature; the growth was the next bug's cause |
-| **bug-event ledger** | `bug-event-field-with-unicode-line-separator-silently-drops-the-event` + the ESC/CWE-117 finding, one seam, two symptoms | one seam produced a family; nothing in the record said so |
+Each chain below is **pinned to explicit `bugs.jsonl` ids** — this list, verbatim, is the
+reference set FR16's dry run must rediscover (A16.2/V16). A chain named without one of these
+ids is not evidence.
 
-**132 of 471 resolutions carry zero evidence. 92 cross-bug references exist only as prose.**
+| Chain | Pinned bug ids (the reference set) | What it proves |
+|---|---|---|
+| **gitignore class** | **one class, nine registered instances**, three patched instance-by-instance: `backlog-candidates-md-tracked-violates-noncanonical-gitignore` · `grill-and-oq-decisions-records-gitignored-not-version-controlled` · `specs-bugs-jsonl-store-gitignored` · `backlog-gitignored-governance-vacuous` · `remote-bugs-gitignore-blocks-new-intake` · `gitignore-alpha-qa-review-untrackable` · `gitignore-code-review-artifact-untrackable` · `v0.4.4-reviews-dir-untrackable-gitignore-recurrence` · `gitignore-verdict-evidence-untrackable-fourth-recurrence` (the last self-labelled *fourth recurrence*) | a symptom patch per instance; the class was never named, so the class kept firing |
+| **certify probe** | `codex-live-probe-gate-checks-presence-not-usability` → `certify-skip-detail-leaks-full-codex-output`, re-registered **37 minutes** after the first one's fix (firing 1 of the v0.4.4 FR23 evidence gate). Same surface, same session. A cheap sibling signature: `certify-cannot-install-installed-provider` was reported 18:41:56Z and resolved 18:41:57Z — a one-second registration→resolution interval, i.e. a bulk flip of an already-"fixed" bug with no red loop | a fix landed with no evidence that the failure was reproduced on the executed path |
+| **frozen clock** | `no-ratchet-against-frozen-clock-tests-that-age-fixtures-by-the-real-clock` (`bugs.jsonl` line 933) → its guard (**+294 LOC**) → the guard's own bug `frozen-clock-ratchet-scans-tests-tmp-scratch-dir` (line 1004) — three hops, two ids | the fix grew the feature; the growth was the next bug's cause |
+| **bug-event ledger** | `bug-event-field-with-unicode-line-separator-silently-drops-the-event` (MEDIUM, **still open on this tree**, fixed as Arm B in `v0.4.5` T-045-20) plus the ESC/CWE-117 escaping finding on the same reader — one seam, two symptoms. The finding carries no `bugs.jsonl` id: it was raised in a v0.4.4 security review, and pillar 1 must name it by that review artifact, not by a bug id | one seam produced a family; nothing in the record said so |
+
+**132 of 470 resolutions carry zero evidence. 92 cross-bug references exist only as prose.**
 No record has ever carried a structured cause, a lineage pointer, or a commit sha.
 
 ### 1.2 The history itself is coarse — measured, not assumed
@@ -73,6 +85,20 @@ captured at `.dadaia/tmp/claude-code/20260826/bug-commit-map-all-refs.json`) say
 | …spread over distinct commits | **117**, of which **70** resolve exactly one bug; the largest resolves **91** |
 | Resolved bugs whose first resolving commit is a **release-level squash** (`chore: ship …`, `feat(v0.x) …`, `fix: 0.3.0 …`) | **155** |
 | Resolution commits that touch **any non-`specs/` file** (i.e. the fix is actually in that commit) | **78 / 117** |
+
+**These numbers are not the marker's numbers, and the acceptance must not pretend they are.**
+Row 5's **79** counts commits that register exactly one bug — it does **not** report how many
+of those also touch a file outside `specs/`, which the `exact` marker additionally requires,
+so the number of records marked `exact` is **≤ 79** and unknown until measured. Row 7's
+**155** counts *bugs* whose resolving commit matches a release-squash **commit-message
+pattern**, while the `release-squash` marker is purely **structural** ("the commit adds more
+than one bug's line") — under the structural definition roughly **400** resolved records fall
+in it (47 multi-bug commits carrying 470 − 70 = 400 bugs). Two different units, two different
+criteria. Therefore: **V4 pins only quantities the implemented algorithm actually computes**
+(A3.2/A3.3, re-derived from the marker definitions), and §1.2 stays what it is — the
+narrative ground truth that motivated the markers, never their acceptance threshold. The
+migration measures the marker distribution and **reports** it; a divergence from §1.2 is a
+fact to record in the migration report, not a failure to chase.
 
 Read plainly: **`main` is squash-only, so squash-to-main erased per-bug granularity for a
 large part of the history**, and for 39 of 117 resolution commits the ledger line moved
@@ -117,7 +143,52 @@ Every FR below is traced to these, and every review verdict must state them.
 3. **Enforcement posture — D15, verbatim in intent.** *Skills instruct procedure. Audits
    measure conformance from git and JSONL history. Hooks and the CLI validate only at the
    publication boundary (push / PR) and never block a human.* This release adds **no new
-   blocking CLI validation and no new hook block**; it *removes* one of each (FR9).
+   blocking CLI validation and no new hook block**; it *removes* **three** things in one
+   FR (FR9): the pre-commit `backlog doctor` block, the pre-commit fail-closed runner, and
+   the pre-push preflight invocation — of which **two are blocks**. Every count of "what
+   was removed" in this SPEC uses that split; A22.6 pins the block count at **two**.
+
+### 1.5 The loop, end to end, on real records — what "visible" means
+
+> **Worked example — the certify chain, using real ids from §1.1.** Read it as the story the
+> canon must be able to tell. Shas are written `<sha-A>` / `<sha-B>` because the pre-canon
+> history does not record them; deriving them is exactly FR3's job.
+>
+> 1. **Bug A's fix commit.** `codex-live-probe-gate-checks-presence-not-usability` is
+>    resolved. Under FR8 shape 3 the resolving commit `<sha-A>` carries the code, the
+>    regression test and the ledger line; FR3 derives `<sha-A>` for the historical record and
+>    stores it as `resolved_commit` with `resolution_granularity` saying how coarse it is.
+> 2. **Bug B's record declares the lineage.** Thirty-seven minutes later
+>    `certify-skip-detail-leaks-full-codex-output` is registered on the same surface. Under
+>    FR7 phase 0 its fixer reads every prior record on that `component`/`surface` inside the
+>    window, reads `git show <sha-A>`, and writes into B's record:
+>    `caused_by: "codex-live-probe-gate-checks-presence-not-usability"`,
+>    `lineage_source: "declared"`, plus the evidence block (the `git show` line, the prior
+>    diffs read) echoed in the fix commit body. Today B carries none of this: the link exists
+>    only as prose, which is why nothing ever saw it.
+> 3. **Pillar 1 turns it into a finding.** FR14's audit, over the window containing both
+>    shas, matches A's resolution diff against B's `component` and B's declared `caused_by`,
+>    and measures the registration→resolution interval on the chain's sibling
+>    `certify-cannot-install-installed-provider` (1 second — no red loop). It appends to
+>    `FINDINGS.jsonl` a record whose `refs` name **both bug ids and both shas**, whose
+>    `claim` is one sentence ("fix-induced: B rides the probe path A's fix introduced; A
+>    resolved with no reproduction evidence"), and whose `evidence` is the command plus its
+>    redacted output. In the same atomic in-place rewrite it fills `audited: <audit-slug>` on
+>    each reviewed record (FR14, one writer seam).
+> 4. **Disposition closes it.** The finding is born `disposition: "open"`, `release: null`.
+>    The **next** release picks it and rewrites those three governance fields in place —
+>    `fixed` · `<that release id>` · the reason. `specs doctor` (FR15) folds the file: an
+>    `open` record inside an archived audit is an error.
+>
+> **The falsifiable success statement of this release:** run the four steps above over this
+> repository's own history and rediscover, with evidence, the four pinned chains of §1.1
+> without a human pointing at them. That is A16.2/V16, and it is the only criterion by which
+> this release succeeds or fails.
+
+**Terms.** Every term of art used below — *seam*, *Arm A / Arm B*, *rc-N*, *puxadinho*,
+*provenance marker*, *histo*, *live photo*, *thawed tree*, *presence*, *verdict gate*,
+*purge-on-pick*, *one-axis law*, *TREE-5 / TREE-8*, *FR23* — is defined once in **PLAN §0**
+and used, never redefined, here.
 
 ---
 
@@ -128,7 +199,9 @@ provenance-marked commit shas for all 490 historical bugs; releases whose milest
 ranges; an audit that reads that history and names recurrences and fix-induced bugs; memory
 whose fundamental rules are numbered principles each naming the check that measures it, gated
 by ADRs only the operator accepts; a skill ↔ `AGENTS.md` ↔ `DADAIA.md` map that a test turns
-RED the moment it is incomplete; and **two fewer hook blocks than it started with**.
+RED the moment it is incomplete; and **exactly two fewer hook blocks than it started with**
+(the count is fixed once, here, and every other statement of it cites this one — see §1.4
+pillar 3 and A22.6).
 
 ### 2.1 Operator rulings, ratified as given (D1–D15)
 
@@ -157,23 +230,35 @@ to the FR that executes them. Nothing here is re-decided.
 
 - **D-A — The provenance-marker rule (a design law this release installs).** Every value this
   release *derives* or *infers* carries, in the same record, a closed-vocabulary marker
-  saying how it was obtained. Two markers exist: `commit_granularity`
-  (`exact | release-squash | ledger-only`) on each derived sha, and `lineage_source`
-  (`declared | text-reference | null`) on `caused_by`. **Rationale:** without them an audit
-  reads a 91-bug release squash as if it were a fix diff and manufactures false lineage
-  findings — fabricated evidence is worse than no evidence. They are *closed enumerations on
-  a record*, never branches in code: pillar 1 filters `commit_granularity == "exact"` instead
-  of sniffing commit messages heuristically, which makes the pillar **smaller**, not bigger.
+  saying how it was obtained. **Three field names, one vocabulary, stated here and nowhere
+  else:** `registration_granularity` and `resolution_granularity`
+  (`exact | release-squash | ledger-only`), one per derived sha, and `lineage_source`
+  (`declared | text-reference | null`) on `caused_by`. There is **no** field named
+  `commit_granularity` — the two sha markers are per-sha by construction, and every other
+  section of this SPEC, of PLAN §0 and of FR14's pillar-1 filter cites *these* two names.
+  **Rationale:** without them an audit reads a 91-bug release squash as if it were a fix diff
+  and manufactures false lineage findings — fabricated evidence is worse than no evidence.
+  They are *closed enumerations on a record*, never branches in code: pillar 1 filters
+  `resolution_granularity == "exact"` instead of sniffing commit messages heuristically,
+  which makes the pillar **smaller**, not bigger.
 - **D-B — One release, six entries, and the BL-CONFLICT adjudications collapse.** The five
   2026-08-26 entries and `dd-diagnose` carry cross-ownership adjudications ("this file's edit
   is owned by `entity-behavior-map`", "`LINEAGE.md` is owned by `bug-lineage-…`") written for
   the case where they land in *different* releases. They land in **one** release here, so the
-  conflicts dissolve: §3 assigns **exactly one owning FR to every file**, and that assignment
-  is the ownership of record for this release. A second FR may *touch* an owned file only
-  under the owner's stated contract, in a later task, never concurrently — and four files are
-  **single-writer, no exceptions**: `dadaia_workspace/public/data/DADAIA.md` (FR11),
-  `specs/constitution.md` (FR21), `dadaia_workspace/public/entities/behavior-map.json` (FR10)
-  and `dadaia_workspace/public/skills/dd-bug-resolution/SKILL.md` (FR12).
+  conflicts dissolve. The ownership rule is **sequencing, not exclusivity**, and it has two
+  tiers:
+  - **Tier 1 — four single-writer files, no exceptions.** Exactly one task in the release
+    may contain each in its write set: `dadaia_workspace/public/data/DADAIA.md` (FR11 /
+    T-050-20), `specs/constitution.md` (FR21 / T-050-32),
+    `dadaia_workspace/public/entities/behavior-map.json` (FR10 / T-050-19) and
+    `dadaia_workspace/public/skills/dd-bug-resolution/SKILL.md` (FR12 / T-050-21).
+  - **Tier 2 — everything else is sequenced.** Several files are legitimately touched by
+    more than one FR across the release (`infrastructure/jsonl_record_store.py`,
+    `features/bugs/service.py`, `features/spec_context/gate_policy.py`, `hooks/sdd_gate.py`,
+    `tests/**`). For those the rule is: **never concurrently, always in the task order this
+    file declares, and the later task states what the earlier one left.** The earlier claim
+    that "§3 assigns exactly one owning FR to every file" was false and is withdrawn; A11.1
+    proves the Tier-1 property only, which is the property that is actually checkable.
 - **D-C — The historical derivation is one algorithm, run once, over all refs.** §3/FR3
   states it in full. It replaces the per-bug `git log -S` pickaxe (which is O(bugs × history)
   and, on this repo, returns ambiguous multi-commit matches) with a **single chronological
@@ -221,17 +306,21 @@ to the FR that executes them. Nothing here is re-decided.
 
 | # | Assumption | Options considered, and why this one |
 |---|---|---|
-| **AS-1** | **`resolved_commit` fill: derive-on-read is the authority; a follow-up ledger-only commit is the cache write.** After the resolving commit exists, the same session appends `chore(bugs): <id> resolved @<sha>` staging only the ledger line. Audits and the CLI **never trust the field over git**: one resolver returns the stored value when present and derives it otherwise, and pillar 1 flags a stored value that disagrees with the derivation | **(i) follow-up ledger commit alone** — explicit, but a missed follow-up leaves a permanent hole; **(ii) derive-on-read alone** — zero extra commits, but every reader re-walks the history. **Chosen: both, with one authority.** A commit cannot contain its own sha (the handoff's open reconciliation, `findings[2]`), so the field is a cache by construction. This is **not** a second code path: there is one resolver seam, and the cache is verifiable against the authority. Nothing in the five entries argues against it; the entry itself declares the field nullable so both are admissible |
+| **AS-1** *(re-decided at review — `software-architect` change 3)* | **`resolved_commit` fill: derive-on-read is the sole authority; the field stays `null` at resolve time and is filled by the audit.** No follow-up ledger commit exists. One resolver function derives the sha from git; **pillar 1 (FR14) writes the derived value into `resolved_commit` in the *same* atomic in-place rewrite that sets `audited`** — one writer, one resolver, zero extra commits per bug | **(i) follow-up ledger commit alone** — a missed follow-up leaves a permanent hole; **(iii) derive-on-read *plus* a follow-up cache commit** (this SPEC's first answer) — two writers of one value kept equal by a contract test, i.e. a second path, and a second ledger commit per bug that pillar 2 must then learn to recognise, against D10's "the fix is contained in the commit that resolves". **Chosen: (ii), derive-on-read as authority with an audit-time cache write.** A commit cannot contain its own sha (the handoff's open reconciliation, `findings[2]`), so the field is a cache by construction; making the *audit* the only writer of that cache keeps the writer count at one. FR8 shape 3b is deleted; A8.2 becomes "audit-filled equals derived" |
 | **AS-2** | **Historical `caused_by` is `null`, not `"none"`.** `null` = never assessed; `"none"` = a fixer looked at the prior diffs in the window and found no causal link. The entry's rule *"`caused_by` never absent on a resolved record"* binds records **resolved from this release onward** | Writing `"none"` on 470 historical records would assert an assessment nobody made — fabricated evidence, the exact failure mode D-A exists to prevent |
 | **AS-3** | **`specs/bugs/_archive/archive.jsonl` (114 legacy `{file, content}` records) stays byte-frozen**, beside the new `bugs_histo.jsonl`; it is excluded from the record model and from every audit window | Converting free-form Markdown bodies into structured records means *inferring* `symptom`/`repro`/`cause` from prose, into a model whose whole purpose is measured truth. All 114 are terminal and predate every discipline here. Canon v6 already sets the precedent for the backlog (*"legacy `_archive/*.md` stay frozen, no retro-conversion"*); this applies it to bugs by symmetry |
-| **AS-4** | **`windows-xdist-workers-crash-on-unit-fast-tier` (LOW) is not picked.** If `v0.4.5` closes it, nothing to do; if `v0.4.5` ends with it open (its **AS-5**), it migrates into `BUGS.jsonl` as `status: open`, `cause: null`, `caused_by: null` and stays open | `dd-release-definition` §2: a bug that is neither fixed nor subsumed is not picked. A quarantine is never a resolution |
-| **AS-5** | **The branch is `feature/0.5.0`**, superseding the `feature/0.4.6` cut named in `specs/releases/v0.4.5/TASKS.md` T-045-41 | The number of the next branch is the number of the next release actually picked. This canon change is consumer-visible (the `specs/` pattern moves 5 → 6), so MINOR is the honest bump. **This Draft edits no file of the live `v0.4.5` release** — the substitution happens at promotion |
-| **AS-6** | **Publication is not assumed.** `pyproject.toml` bumps to `0.5.0` at the final `rc` per the one-axis law; whether the PyPI publish gate is approved is the operator's call at ship, and CLOSURE records the answer either way | `v0.4.5` was minted unpublished by operator law O5 and is the second such mint; the wording tension it recorded (`specs/memory/product/distribution/pypi-distribution.md`) is inherited, not resolved here |
-| **AS-7** | **This `_ideas/` Draft carries SPEC + PLAN + TASKS**, although canon v6's commit rule reads *"`_ideas` SPEC = SPEC only"* | That rule is a **commit-shape** rule that exists once canon v6 exists (FR1) and the audit measures it (FR14). This Draft predates both, and the operator's dispatch asked for all three. From FR1 onward the rule binds |
-| **AS-8** | **Every backlog entry is consumed in full** — no partial pick. `dd-release-definition` §5's full-slug granularity holds; six slugs, six full consumptions, declared at promotion | A partially-shipped entry may not be declared; the release is scoped so that no entry needs splitting |
-| **AS-9** | **The 50 `archive/*` tags are part of the source of truth** for FR3. The migration runs after `git fetch --all --tags`, records its ref scope and the reachable ledger-commit count in the migration report, and this release **deletes no `archive/*` tag** | 295 of the 295 ledger commits are reachable only with the tags; a `--single-branch` clone sees 75 and would silently produce a different map. The count is therefore a **validation**, not a footnote (V6) |
+| **AS-4** | **Neither open bug is picked, and both are named.** (a) `windows-xdist-workers-crash-on-unit-fast-tier` (LOW) — if `v0.4.5` closes it, nothing to do; if not, it migrates as `status: open`, `cause: null`, `caused_by: null` and stays open. (b) `bug-event-field-with-unicode-line-separator-silently-drops-the-event` (MEDIUM) — **resolved as Arm B inside `v0.4.5` (T-045-20)**, before this release opens; **AS-14** makes that a precondition, and this release neither picks nor supersedes it | `dd-release-definition` §2: a bug that is neither fixed nor subsumed is not picked. A quarantine is never a resolution. The earlier claim that the Windows bug was "the single open bug" was wrong on this tree and is corrected here and in every citation |
+| **AS-5** *(a ruling, not an assumption)* | **The branch is `feature/0.5.0`**, superseding the `feature/0.4.6` cut named in `specs/releases/v0.4.5/TASKS.md` T-045-41 | The number of the next branch is the number of the next release actually picked. This canon change is consumer-visible (the `specs/` pattern moves 5 → 6), so MINOR is the honest bump. **This Draft edits no file of the live `v0.4.5` release** — the substitution happens at promotion |
+| **AS-6** *(restates standing operator law)* | **Publication is not assumed.** `pyproject.toml` bumps to `0.5.0` at the final `rc` per the one-axis law; whether the PyPI publish gate is approved is the operator's call at ship, and closure records the answer either way | `v0.4.5` was minted unpublished by operator law O5 and is the second such mint; the wording tension it recorded (`specs/memory/product/distribution/pypi-distribution.md`) is inherited, not resolved here |
+| **AS-7** *(an exemption granted to this Draft)* | **This `_ideas/` Draft carries SPEC + PLAN + TASKS**, although canon v6's commit rule reads *"`_ideas` SPEC = SPEC only"* | That rule is a **commit-shape** rule that exists once canon v6 exists (FR1) and the audit measures it (FR14). This Draft predates both, and the operator's dispatch asked for all three. From FR1 onward the rule binds |
+| **AS-8** | **Every backlog entry is consumed in full** — no partial pick. `dd-release-definition` §5's full-slug granularity holds; six slugs, six full consumptions, declared at promotion. `specs-canon-v6`'s `dadaia bugs archive` clause is therefore **scoped into FR2 (A2.8)**, not deferred | A partially-shipped entry may not be declared; an entry clause left unimplemented would break AS-8 silently, so the clause is either in scope or the entry is not fully consumed. It is in scope |
+| **AS-9** *(a measured fact, not an assumption)* | **The 50 `archive/*` tags are part of the source of truth** for FR3. The migration runs after `git fetch --all --tags`, records its ref scope and the reachable ledger-commit count in the migration report, and this release **deletes no `archive/*` tag** | Measured on this tree: **295** ledger commits in total, **75** on `main`, **50** `archive/*` tags — **220 of the 295** are reachable only through those tags. A `--single-branch` clone sees 75 and would silently produce a different map. The count is therefore a **validation**, not a footnote (V6) |
 | **AS-10** | **FR16's first audit is a dry run.** It produces a real `AUDIT.md` + `FINDINGS.jsonl` and an `audited` milestone, and it opens **no remediation release**: its findings are compiled for the PM's operator-facing intake report | `DADAIA.md` §6 binds one audit to one remediation release; that release is the *next* pick, not this one. Running the audit inside this release is how the canon proves itself on a real corpus before it is shipped to consumers |
 | **AS-11** | **The lineage check is phase 0 of `dd-diagnose`**, in the disclosed sibling `dd-diagnose/LINEAGE.md`; `dd-bug-resolution/SKILL.md` points at `dd-diagnose` and keeps only the bug lifecycle | The `bug-lineage-and-commit-discipline` entry's intent ref names `dd-bug-resolution/LINEAGE.md`; D8 names no file. Lineage and diagnosis are **one procedure** — you read the prior fix diffs *before* you form a hypothesis — so splitting them across two skills would restate the window and the `git show` recipe twice. One home, one statement, and `dd-bug-resolution` gets smaller. Flagged in §8 |
+| **AS-12** *(new at review — `code-reviewer` 8)* | **`S4`'s memory writes run inside a declared, recorded memory window — never a phase toggled around a task.** `DADAIA.md` §3 makes `specs/memory/` writable in `DEFINITION` and `CLOSURE` only. `S4` is therefore opened by an explicit, ledger-recorded transition: one `RELEASE.jsonl` `phase: CLOSURE` record at the head of `S4` (T-050-28) and one `phase: IMPLEMENTATION` record at `S4`'s QA close (T-050-33), each with its agent and timestamp. The window is a **state of the release, visible in the ledger and readable by pillar 2** | The alternative in the first Draft — "the dispatcher sets the phase before relaying and flips it back afterwards", buried in a task precondition — is exactly the fabricated-evidence shape this release outlaws: an unrecorded ritual that makes the gate say yes. The operator must ratify this, because it is the one place the release opens a memory window outside the canonical closure. **If the operator refuses, the fallback is stated and costed:** FR17–FR21 move wholesale into the final `rc`'s closure window, at the price of the `S4` QA close and the ADR sitting (FR20) losing their own segment boundary |
+| **AS-13** *(new at review — `software-architect` F4)* | **The release id stays `0.5.0`; the collision with the archived `v0.5.0` is resolved by the existing prefix canon, not by a rename.** Bare semver (`0.5.0`) is the PyPI/one-axis lineage; a `v`-prefixed id (`v0.5.0`, shipped 2026-08-12) belongs to the retired spec-lineage axis. The **46 in-code citations reading `v0.5.0 FRn` in 28 files are not renamed** — they correctly name the archived release | Renaming either axis would rewrite correct history to avoid a reader's ambiguity. Stating the disambiguation rule once (§7) costs one paragraph and makes every citation unambiguous forever; pillar 2's window recipe excludes the `v`-prefixed id from this release's history |
+| **AS-14** *(new at review — `software-architect` change 1)* | **The U+2028 line-splitting seam is a precondition of this release, not a requirement of it.** `infrastructure/jsonl_bug_store.py`'s `text.splitlines()` splits on U+2028/U+2029/U+0085, so a record carrying one is read as two malformed lines and skipped. That is fixed as Arm B in `v0.4.5` **T-045-20**. This release **references the fix and verifies it (V23) before FR3 runs**; it does not re-specify it, re-implement it or re-test it | A bug is Arm B and is fixed on the spot — never carried into a release (`DADAIA.md` §1). But FR2/FR3 would otherwise build a new record model and a 490-record migration **on top of a live silent-loss defect in the very reader they use**, which is the build-on-a-stale-layer shape this release exists to end. Verifying the precondition costs one validation; re-specifying the fix here would duplicate a fix that already has an owner |
+| **AS-15** *(new at review — `security-reviewer` A-1)* | **Archive still precedes ship; the CI evidence contract is fixed at the gate, derived from the canon.** `dd-release-implement` and `DADAIA.md` §6 fix the finalization order as memory → CLOSURE → sweep → **archive** → ship. This release does **not** move the archive step after the ship PR. Instead FR1 owns `.github/scripts/pr-verdict-check.sh` + `ci.yml` + `core/specs_version.py` and makes the gate resolve its evidence roots **from the release-directory canon** (live `specs/releases/<id>/verdicts/`, `_ideas/`, and the new per-area `specs/releases/_archive/<id>/verdicts/`), with the bare-vs-`v` prefix rule of AS-13 | The reviewer offered two options; one of them contradicts a ruling and is refused on that ground alone. The other is also the structural one: `verdict-gate-cannot-resolve-evidence-after-release-archive` is now firing a **third** time (T-044-50 fixed the `ACTIVE.md`-pointer variant; an earlier fix patched the resolution shape) and every prior fix patched the glob instead of deriving it from the canon. The canon moved; a hard-coded glob broke. Deriving the roots from `core/specs_version.py` is the only shape that survives the *next* canon move |
 
 ---
 
@@ -287,13 +376,55 @@ lowercase trio) + `memory/AGENTS.md` + `product/`; `releases/` with at most **on
 concrete steps for what `specs upgrade` cannot do alone); `specs upgrade` automates the safe
 renames. **Compliance is WARN-only** — the agent and the operator decide, never a block (D15).
 
+**A release directory's conformant members are named by the canon, once** — `SPEC.md`,
+`PLAN.md`, `TASKS.md`, `RELEASE.jsonl`, **`reviews/`** and **`verdicts/`**. Both of the last
+two already exist at HEAD on live and archived releases and are law-mandated artifacts; a
+canon that omitted them would make TREE-8 WARN permanently on this release's own files, and
+would repeat the "a law-mandated artifact needs its own whitelist line" defect the
+`.gitignore` already records nine times.
+
+**FR1 owns two boundaries the canon change breaks, and they are in its write set:**
+
+1. **`.gitignore` (S-2).** The `/specs/*` catch-all plus per-artifact opt-in is the shape
+   that produced the nine-instance gitignore class, and it was already inverted once, for
+   `specs/releases/**`. FR1 applies **the same proven inversion** to every area this release
+   creates or moves: `!/specs/audits/**`, `!/specs/ADRs/**`, `!/specs/bugs/_archive/**`,
+   `!/specs/backlog/_archive/**`, `!/specs/releases/_archive/**`, with only the narrow
+   scratch class (`local-notes.md`, `tmp/`) denied. Verified today with `git check-ignore
+   -q`: `specs/audits/<slug>/FINDINGS.jsonl`, `specs/ADRs/0001-x.md`, `specs/ADRs/AGENTS.md`
+   and `specs/backlog/_archive/backlog_histo.jsonl` are all **IGNORED** — three of this
+   release's own governance artifacts would have been born untracked, never reviewed, and
+   never seen by the range-scoped denylist scan. The stanzas FR1/FR6 orphan
+   (`specs/assets/`, `specs/backlog/remote-bugs/`, root `specs/_archive/`) are deleted in the
+   same edit. The widening is a **deliberate privacy decision**, stated as such: the
+   catch-all backstop is replaced by explicit per-area opt-in plus the push-time denylist
+   scan, which is the boundary that actually holds.
+2. **The CI verdict-evidence contract (S-1, AS-15).** `.github/scripts/pr-verdict-check.sh`
+   resolves verdicts by globbing `specs/releases/*/verdicts/` and
+   `specs/_archive/releases/*/verdicts/`. After FR6 the first glob no longer matches the new
+   archive home (`specs/releases/_archive/<id>/verdicts/` is one level deeper and `*` does
+   not cross `/`) and the second path does not exist at all; `_RELEASE_ID_RE` additionally
+   requires a `v` prefix that bare-semver ids do not carry. Both remaining PRs — the final
+   `rc` and the ship PR — would fail a **required** check, and the release could not ship.
+   FR1 therefore derives the gate's evidence roots and its release-id pattern from
+   `dadaia_workspace/core/specs_version.py` (one source, the canon) instead of hard-coded
+   globs, and keeps every refusal **fail-closed**: `_archive`, `_ideas` and any traversal
+   shape are still refused before interpolation, and a missing qualifying handoff still
+   fails the gate.
+
 **Bug-surface direction:** *net-additive in production LOC, net-negative in surface count* —
 one canonical tree replaces "the tree plus the four legacy shapes doctor tolerated"; four
 `README.md` files retire; `specs/assets/` and `remote-bugs/` disappear.
-**Bug-history evidence:** the gitignore class (four recurrences, §1.1) is a *governance-path*
-class — every instance was "a spec artifact that was not where the canon said it was". TREE-8
-names the class instead of patching instances. `remote-bugs-gitignore-blocks-new-intake` is
-one of those four and dies with the folder.
+**Bug-history evidence:** the gitignore class (one class, **nine** registered instances,
+§1.1) is a *governance-path* class — every instance was "a spec artifact that was not where
+the canon said it was, or not where `.gitignore` allowed it to be". TREE-8 names the class
+instead of patching instances, and the `.gitignore` inversion above refuses to re-enter the
+shape that produced all nine. `remote-bugs-gitignore-blocks-new-intake` is one of the nine
+and dies with the folder. The CI evidence contract carries its own history:
+`verdict-gate-cannot-resolve-evidence-after-release-archive` (HIGH, T-044-50) is the
+**second** firing of "the gate cannot resolve evidence after a release moves"; letting the
+canon change land without it would be the **third**, and this time it would be discovered by
+the release being unable to ship.
 
 **Acceptance**
 - A1.1 A freshly scaffolded workspace emits the v6 tree, `specs_pattern_version: 6`, scoped
@@ -307,10 +438,29 @@ one of those four and dies with the folder.
   proven by a byte-comparison fixture.
 - A1.5 The SDD gate's MEMORY-phase resolution and FROZEN class are repointed (FR4 supplies
   the phase source; FR6 supplies the archive paths) with **no new path class** and no second
-  classifier — proven by the diff on `dadaia_workspace/features/spec_context/gate_policy.py`
-  being flat or net-negative.
+  classifier. The **phase read** lives in `dadaia_workspace/hooks/sdd_gate.py`
+  (`_active_field`, and its regex), not in `gate_policy.py` — the proof is the diff on
+  **`hooks/sdd_gate.py`** being net-negative, plus `gate_policy.py`'s FROZEN prefix list
+  changing by exactly one deletion and one addition (A6.3).
 - A1.6 This repo's own `specs/` is migrated to v6 and `dadaia specs doctor` reports **0
   errors** afterwards.
+- A1.7 **Every canon path is tracked.** A contract test asserts `git check-ignore` reports
+  "not ignored" for each of: `specs/audits/<slug>/FINDINGS.jsonl`,
+  `specs/audits/<slug>/AUDIT.md`, `specs/ADRs/0001-x.md`, `specs/ADRs/AGENTS.md`,
+  `specs/bugs/BUGS.jsonl`, `specs/bugs/_archive/bugs_histo.jsonl`,
+  `specs/backlog/_archive/backlog_histo.jsonl`,
+  `specs/releases/_archive/releases_histo.jsonl`,
+  `specs/releases/<id>/{RELEASE.jsonl,reviews/x.md,verdicts/<sha>.handoff.json}` (**V21**),
+  and that the three orphaned stanzas are gone.
+- A1.8 **The verdict gate resolves and refuses correctly against a v6 fixture tree** — a
+  live release, an `_ideas/` release and an archived one under
+  `specs/releases/_archive/<id>/verdicts/` — proving: a valid APPROVED handoff at the
+  archived path is found; a bare-semver id is accepted and a traversal shape refused; a
+  missing handoff still fails closed (**V20**). This runs **before T-050-41** (the archive
+  move), not after it.
+- A1.9 The release-directory canon names `SPEC.md`, `PLAN.md`, `TASKS.md`, `RELEASE.jsonl`,
+  `reviews/` and `verdicts/` as conformant, and TREE-8 emits **no** WARN on this release's
+  own directory — proven on this repo's tree.
 
 #### FR2 — `BUGS.jsonl`: one record per bug, immutable core, mutable governance · **size M**
 
@@ -318,30 +468,76 @@ one of those four and dies with the folder.
 
 `bug-event-v1.schema.json` is replaced by `bug-record-v1.schema.json`
 (`additionalProperties: false` kept). One record per bug, appended once — no event stream, no
-fold. **Immutable core:** `id`, `ts`, `reported_by`, `title`, `severity`, `surface`,
-`component`, `context`, `symptom`, `repro`, `expected`, and `root_cause` / `solution` once
-set. **Mutable governance:** `status` (`open|picked|resolved|superseded|deferred|rejected`),
-`cause`, `caused_by`, `lineage_source`, `registration_commit`, `registration_granularity`,
-`resolved_commit`, `resolution_granularity`, `resolved_release`, `superseded_by`, `audited`.
-A governance update rewrites that record's line in place — JSONL is a document keyed by `id`,
-the line is the unit, git history is the change log. A **reopen is a new record** with a new
-`id` declaring `caused_by: <prior-id>`. Registration requires `symptom` + `repro` +
-`severity` + `expected`; reaching `status: resolved` requires `cause` + `caused_by` +
-`resolved_release` + the regression seam in `solution`. Coherence is checked as **WARN**,
-surfaced by `dadaia bugs status` and the doctor — **never a block** (D15).
+fold. The schema declares **three** field categories per property, not two:
 
-The record as first appended — governance fields present and null, so the record's shape never
-changes:
+- **Immutable core** — `id`, `ts`, `reported_by`, `title`, `severity`, `surface`,
+  `component`, `context`, `symptom`, `repro`, `expected`.
+- **Write-once, absent until set** — `root_cause`, `solution`, `superseded_by`,
+  `migration_note`. They are legitimately missing from a freshly registered record and
+  become immutable the moment they are written. This third category is why the earlier claim
+  "the record's shape never changes" was false against this SPEC's own two examples, and it
+  is tested (A2.2).
+- **Mutable governance** — `status` (`open|resolved|superseded|deferred|rejected`), `cause`,
+  `caused_by`, `lineage_source`, `registration_commit`, `registration_granularity`,
+  `resolved_commit`, `resolution_granularity`, `resolved_release`, `audited`.
+
+**`picked` is not a status.** The pick is already recorded by the bundled definition commit
+(FR8 shape 5) and is readable by pillar 2, so the value, its transition and `picked_by` all
+disappear — one fewer enum member, one fewer branch in the fold, nothing lost.
+
+A governance update rewrites that record's line in place — JSONL is a document keyed by `id`,
+the line is the unit, git history is the change log. The rewrite is **read-modify-write**, so
+it goes through the existing `dadaia_workspace/core/atomic_write.py` (temp file +
+`os.replace`) and **re-reads the file immediately before rewriting**: the append-only stream's
+`O_APPEND` made concurrent writes race-benign, and nothing in a record model replaces that
+property for free. Under the NO-LOCKS doctrine two live sessions may still collide; the atomic
+replace makes the loser's write *lost*, never a corrupt file, and pillar 1 detects it.
+
+A **reopen is a new record** with a new `id` declaring `caused_by: <prior-id>`. Registration
+requires `symptom` + `repro` + `severity` + `expected`; reaching `status: resolved` requires
+`cause` + `caused_by` + `resolved_release` + the regression seam in `solution`. Coherence is
+checked as **WARN**, surfaced by `dadaia bugs status` and the doctor — **never a block** (D15).
+
+**Redaction rides the existing write-time seam (S-3).** `core/models/bugs.py` gained, one day
+before this Draft, a schema-derived redaction whose docstring records *why*: a hand-kept field
+list "twice missed a newly added free-text field" (T-043-23 → T-044-62), and commits
+`eb03d01b` / `0cb08157` (`v0.4.5` T-045-19) replaced it with a set derived from the schema.
+FR2 adds **four** free-text fields at once (`cause`, `root_cause`, `solution`,
+`migration_note`) and a **second** write path (the in-place rewrite). Both are routed through
+that same seam — `BugService.append_event → BugEvent.redact` becomes
+`BugService.write_record → BugRecord.redact`, with the field set still derived from
+`bug-record-v1.schema.json` and **no hand-kept list anywhere**. The in-place update seam
+redacts identically to the append seam; there is one redaction call site per write path and
+both take the same derived set.
+
+**`dadaia bugs archive` (A2.8, entry clause of `specs-canon-v6`).** The idempotent verb the
+entry requires is in scope here, not deferred: terminal records older than 90 days move from
+`BUGS.jsonl` to `specs/bugs/_archive/bugs_histo.jsonl`, one record per line, through the same
+record-store seam; re-running it is a no-op; `specs doctor` emits an **overdue WARN** (never
+an error, never a block) when terminal records past the threshold are still live.
+
+The record as first appended — mutable-governance fields present and null; the write-once
+fields absent until set:
 
 ```json
-{"id":"ci-preflight-quick-skips-lint-imports-048","ts":"2026-08-26T10:02:41Z","reported_by":"software-engineer","title":"ci preflight --quick skips lint-imports","severity":"MEDIUM","surface":"dadaia ci preflight","component":"cli/commands/ci.py","context":"dadaia-workspace","symptom":"--quick returns 0 while lint-imports fails in CI","repro":"1. break an import contract 2. dadaia ci preflight --quick 3. exit 0","expected":"--quick runs lint-imports (only e2e is skipped)","status":"open","cause":null,"caused_by":null,"lineage_source":null,"registration_commit":null,"registration_granularity":null,"resolved_commit":null,"resolution_granularity":null,"resolved_release":null,"audited":null}
+{"id":"certify-skip-detail-leaks-full-codex-output","ts":"2026-08-22T19:18:33Z","reported_by":"software-engineer","title":"certify skip detail leaks full codex output","severity":"MEDIUM","surface":"dadaia certify","component":"features/certification","context":"dadaia-workspace","symptom":"the skip detail line renders the whole probe output instead of a one-line reason","repro":"1. run certify with a provider that skips 2. read the skip detail","expected":"a one-line reason, output captured under .dadaia/tmp/","status":"open","cause":null,"caused_by":null,"lineage_source":null,"registration_commit":null,"registration_granularity":null,"resolved_commit":null,"resolution_granularity":null,"resolved_release":null,"audited":null}
 ```
 
-The **same line** after the fix — core fields byte-identical, `root_cause`/`solution` set once,
-governance fields filled:
+The **same line** after the fix — immutable core byte-identical, the write-once fields set for
+the first time, governance fields filled. Note what is **still `null`**: `resolved_commit` and
+`resolution_granularity`, because a commit cannot contain its own sha (**AS-1**); the audit
+fills them:
 
 ```json
-…"root_cause":"quick mode built its step list from a hard-coded tuple that never included lint-imports","solution":"single step registry consumed by both modes; regression test tests/integration/test_ci_preflight.py::test_quick_runs_lint_imports","status":"resolved","cause":"duplicated step list (two code paths)","caused_by":"frozen-clock-guard-tz-boundary-031","lineage_source":"declared","resolved_commit":"9d8e7f6","resolution_granularity":"exact","resolved_release":"0.5.0","audited":null…
+…"root_cause":"the skip path formatted the raw probe transcript into the detail field","solution":"one-line reason built from the probe's status; transcript written under .dadaia/tmp/; regression test at the formatter seam","status":"resolved","cause":"the probe's own fix introduced the second render path","caused_by":"codex-live-probe-gate-checks-presence-not-usability","lineage_source":"declared","resolved_commit":null,"resolution_granularity":null,"resolved_release":"0.5.0","audited":null…
+```
+
+And the **same line again** after the audit that reviewed it — the one place `resolved_commit`,
+`resolution_granularity` and `audited` are ever written, in a single atomic rewrite (FR14
+pillar 1). Every other byte is identical:
+
+```json
+…"resolved_commit":"<40-hex derived by FR3>","resolution_granularity":"exact","audited":"20261020-five-release-window"…
 ```
 
 **Bug-surface direction:** *net-negative* — the fold logic (`reported` + N events → a state
@@ -350,24 +546,56 @@ in the schema) is deleted and replaced by a flat record; `core/models/bugs.py#Bu
 becomes `BugRecord` with no state machine.
 **Bug-history evidence:** the event stream itself produced a bug family — the U+2028 record
 (`bug-event-field-with-unicode-line-separator-silently-drops-the-event`) is *silent event
-loss*, only possible because a bug's truth is spread across lines that must be re-folded on
-every read. One line per bug means a corrupt line loses one bug, loudly, instead of
-half-folding a state machine. The `picked`/`archived` non-terminal annotations, added to work
+loss*. **Stated precisely, because the first Draft overclaimed here:** the loss is caused by
+`text.splitlines()` in the reader, which is fixed in `v0.4.5` T-045-20 (**AS-14**) — the
+record model does **not** close it and must not claim to. What the record model does remove
+is the *amplification*: with one line per bug, a lost line loses one bug, loudly and
+countably (`bugs status` reports skipped lines), instead of half-folding a state machine
+across a bug's several lines. The `picked`/`archived` non-terminal annotations, added to work
 around the append-only model, disappear as `status` values.
 
 **Acceptance**
-- A2.1 The record schema is authored and `bug-event-v1.schema.json` retires; the mutable /
-  immutable split is documented **per property** in the schema, not in prose elsewhere.
-- A2.2 A contract test proves an immutable core field cannot be changed on an existing record
-  through the service seam, and that a governance update rewrites the line in place leaving
-  every other byte of the file identical.
+- A2.1 The record schema is authored and `bug-event-v1.schema.json` retires; the
+  **three-category** split (immutable core · write-once · mutable governance) is documented
+  **per property** in the schema, not in prose elsewhere.
+- A2.2 **Contract tests, stating what actually holds.** (a) An immutable core field cannot be
+  changed on an existing record **through the service seam**; (b) a write-once field can be
+  set from absent, and a second write to it is refused at the same seam; (c) a governance
+  update rewrites the line in place leaving every other byte of the file identical. The test
+  names, in its own docstring, the limit A2.7 measures: this is **seam-level** enforcement,
+  and any agent's file tool can still rewrite any field.
+- A2.6 **Redaction is schema-derived and covers both write paths.** A contract test adds a
+  new free-text property to the schema fixture and proves it is scrubbed on *both* the append
+  path and the in-place update path with **no code list edited** anywhere. The denylist terms
+  come from the operator's configured set, as they do today.
+- A2.7 **Immutability is detected, never prevented — and the detector exists.** `specs doctor`
+  emits a **WARN** comparing each record's immutable core against FR3's first-add derivation
+  (the derivation already exists; no new engine), and FR14 pillar 1 reports any in-window
+  core-field diff as a HIGH finding. Proven by a fixture that hand-edits a core field with a
+  file tool and shows the WARN and the finding, with the exit code unchanged.
+- A2.8 **`dadaia bugs archive` is idempotent and non-blocking:** a fixture runs it twice over
+  a corpus with terminal records older and newer than 90 days and proves byte-identical
+  output on the second run, the newer records untouched, and the doctor's overdue signal a
+  WARN with an unchanged exit code.
+- A2.9 The in-place rewrite goes through `dadaia_workspace/core/atomic_write.py` and re-reads
+  the file immediately before rewriting — proven by a test that mutates the file between read
+  and write and shows the writer refusing a stale rewrite rather than clobbering it.
 - A2.3 Coherence violations (resolved without `cause`/`caused_by`/`resolved_release`;
   superseded without `superseded_by`) are surfaced as **WARN** by `dadaia bugs status` and
   `specs doctor`, with **exit code unchanged** — proven by a fixture asserting the exit code.
 - A2.4 `expand → switch → contract` (D-F): the record reader lands and every consumer switches
   before the event reader is deleted; each step independently green.
-- A2.5 The v5 event shape is decoded by **one boundary adapter** used only by FR3's derivation
-  and the migration — no v5 branch survives inside the bugs feature after the contract step.
+- A2.5 The v5 event shape is decoded by **one boundary adapter that lives in the migration
+  module** (`dadaia_workspace/features/bugs/migrate_v5.py`), imported by nothing else and
+  deletable with it — no v5 branch survives inside the bugs feature after the contract step.
+  The record store itself is **model-agnostic**: `infrastructure/jsonl_record_store.py`
+  exposes a generic `JsonlRecordStore` keyed by `id`, with parse/serialise injected through a
+  `core.protocols` record protocol (sibling of the existing
+  `core/protocols/git_object_reader.py`). Each feature owns its own model
+  (`core/models/{bugs,findings,backlog}.py`) and receives its own store instance from the
+  container; **no module knows more than one record shape**. The legacy hourly-file reader
+  (`_BUG_LOG_RE`, `_sorted_files`, `ROWS_PER_FILE`, the v3→v4 consolidation) is deleted in
+  the same task — it is dead under canon v6.
 
 #### FR3 — Historical ledger rewrite: 490 bugs, commits derived from git · **size L**
 
@@ -396,12 +624,18 @@ in the FR2 record model, with `registration_commit` and `resolved_commit` popula
    re-adds the same line never wins. Ties inside one commit are impossible; ties across
    commits with identical dates break by topological order, then by sha, and the tie-break
    used is recorded in the report.
-4. **Granularity marker (D-A).** Each derived sha is stored with its marker:
+4. **Granularity marker (D-A).** Each derived sha is stored with its own marker —
+   `registration_granularity` on `registration_commit`, `resolution_granularity` on
+   `resolved_commit` — from one closed vocabulary:
    - `exact` — the commit adds exactly one bug's line **and** touches at least one file
      outside `specs/`;
    - `release-squash` — the commit adds more than one bug's line (release-level squash);
    - `ledger-only` — the commit adds exactly one bug's line and touches **no** file outside
      `specs/` (the code change is elsewhere or unknown).
+
+   These three are **structural** definitions computed from the diff, and the acceptance
+   thresholds below are derived from *them*, never from §1.2's differently-counted narrative
+   metrics.
 5. **Null only when nothing adds the line.** On the corpus measured today that is **0** cases;
    when it happens, the field is `null` and the record carries a `migration_note` naming the
    reason.
@@ -411,6 +645,24 @@ in the FR2 record model, with `registration_commit` and `resolved_commit` popula
    (92 such cross-references exist) — every such link is stored with
    `lineage_source: "text-reference"` so audits know it is inferred. Everything else is
    `caused_by: null` (**AS-2**), `lineage_source: null`.
+6b. **Every copied prose value is re-run through the redaction seam (S-4).** The migration
+   does **not** write `BUGS.jsonl` directly. Every free-text value it carries forward —
+   `symptom`, `repro`, `expected`, `notes`-derived `cause`, `migration_note` — goes through
+   FR2's schema-derived `redact` (A2.6) with the operator's denylist terms loaded. This is
+   not belt-and-braces: write-time denylist scrubbing only began on `eb03d01b`
+   (2026-08-25), so the **entire** 1 005-event history predates it and denylisted terms may
+   sit in `notes`/`evidence_diff` today. The migration report records **counts only** —
+   never a redacted value, never the term that matched.
+6c. **The rename voids the push-scan amnesty, and the procedure for that is stated, not
+   discovered.** `bugs.jsonl` → `BUGS.jsonl` is a rename, so the new path has **no prior
+   text**; `git_objects`' `prior_text` resolves per path and returns `None`, which means the
+   range-scoped denylist scan suppresses nothing and re-flags every historical value as new.
+   The first push after the migration is therefore **expected to be refused wholesale**, and
+   the response is fixed in advance: run `dadaia ci push-gate-check` over the migration range
+   **before** pushing (**V22**), remediate every hit **at the source record** through the
+   redaction seam, and re-run until clean. **Never `--no-verify`, never a scan exclusion,
+   never a suppression entry.** If a hit is a false positive, it is recorded in the migration
+   report with its reason and the denylist is corrected at its source.
 7. **Legacy archive.** `specs/bugs/_archive/archive.jsonl` (114 `{file, content}` records)
    stays **byte-frozen** and is not converted (**AS-3**); the new
    `specs/bugs/_archive/bugs_histo.jsonl` is created empty and receives future archived
@@ -435,11 +687,19 @@ untracked) is why the derivation must run over **all refs including tags** rathe
 **Acceptance**
 - A3.1 **490/490** records migrate; the record count in `BUGS.jsonl` equals the distinct
   `bug_id` count of the v5 ledger, proven by the report.
-- A3.2 `registration_commit` is non-null for **≥ 490** records; the report reproduces the
-  measured distribution — **≥ 124** distinct commits, **≥ 79** marked `exact`.
-- A3.3 `resolved_commit` is non-null for **≥ 470** resolved records; the report reproduces
-  **≥ 117** distinct commits, **≥ 70** single-bug commits, **≥ 155** marked `release-squash`,
-  and **≤ 39** marked `ledger-only`.
+- A3.2 `registration_commit` is non-null for **≥ 490** records, spread over **≥ 124** distinct
+  commits, of which **≥ 79** add exactly one bug's line. The **marker** distribution
+  (`exact` / `release-squash` / `ledger-only`) is **measured and reported**, not thresholded:
+  `exact` additionally requires a non-`specs/` file in the same commit, which §1.2 never
+  measured, so `exact ≤ 79` and its true value is whatever the algorithm computes. A count
+  below a `≥` threshold above means the **ref scope** is wrong (V6); a marker distribution
+  that surprises is a **fact to record**, and re-running with a different ref scope to chase
+  it is forbidden.
+- A3.3 `resolved_commit` is non-null for **≥ 470** resolved records, spread over **≥ 117**
+  distinct commits, of which **≥ 70** resolve exactly one bug. `release-squash` and
+  `ledger-only` counts are **measured and reported** against the structural definitions of
+  step 4 — expect roughly **400** `release-squash` under the structural rule against §1.2's
+  narrative **155**, because they count different things (§1.2). Neither number is a gate.
 - A3.4 **Idempotence:** running the migration twice produces a byte-identical `BUGS.jsonl`
   and a report whose counts are identical — proven by an executed fixture, not by reasoning.
 - A3.5 Every `caused_by` populated from prose carries `lineage_source: "text-reference"`;
@@ -449,36 +709,99 @@ untracked) is why the derivation must run over **all refs including tags** rathe
 - A3.6 `specs/bugs/_archive/archive.jsonl` is **byte-identical** before and after the release
   (`git diff --stat` empty for that path), and no audit window includes it.
 - A3.7 The full migrated ledger parses, and `dadaia bugs status` renders all 490 records with
-  no crash and no silent drop — the drop being the exact failure mode of
-  `bug-event-field-with-unicode-line-separator-silently-drops-the-event`.
+  no crash and **no silent drop**, reporting a skipped-line count of **0**. The fixture
+  includes a record carrying U+2028 in a free-text field, round-tripping byte-identically —
+  this **exercises** the T-045-20 fix (AS-14) rather than re-implementing it, and would go
+  RED if the release were ever rebased onto a tree without it.
 - A3.8 The migration is a **separate commit** from the FR2 schema change, and the report is
   referenced from it.
+- A3.9 **Zero unredacted prose reaches the new ledger.** `dadaia ci push-gate-check` over the
+  migration range returns clean **before** the first push (**V22**), and the migration report
+  contains counts only — a scan of the report for values, terms or absolute paths returns
+  zero hits.
+- A3.10 The derivation is a **pure core function** over an iterator of
+  `(sha, parents, date, touched_paths, added_lines)`. Git access is a
+  `core.protocols.GitHistoryReader` implemented in
+  `dadaia_workspace/infrastructure/git_subprocess.py` (`GitSubprocessClient` gains
+  `log_added_lines(pathspec)`) and injected via the container — so `features/**` imports
+  neither `infrastructure` nor `subprocess`, and `lint-imports` stays green with **no new
+  accepted edge**. Its unit tests run the pure function over an in-memory history fixture;
+  no synthetic git repository is required for them.
 
 #### FR4 — `RELEASE.jsonl`: milestone shas replace `ACTIVE.md` and `CLOSURE.md` · **size L**
 
 *Entry: `specs-canon-v6` (releases part) · rulings D3, D7, D11.*
 
-Each release directory gains `RELEASE.jsonl` (`release-event-v1`:
-`{ts, event, agent, session_id, data}`) with kinds `created`, `spec_status`
-(Draft/Em revisão/Aprovado), `phase` (DEFINITION/IMPLEMENTATION/CLOSURE — the SDD gate folds
-the **last** `phase` for the MEMORY path class), `rc_open`/`rc_close`, `review`, `push`/`pr`,
-`ship`, `archive`, `note`, `audited`. Individual commits stay out; **milestone records carry
-`sha` (+ `pr`) as immutable facts** at exactly three points, plus `audited` whenever an audit
-runs:
+Each release directory gains `RELEASE.jsonl` (`release-event-v1`: `{ts, event, agent, data}`)
+with exactly **seven** kinds — `phase`, `defined`, `implemented`, `shipped`, `audited`, `rc`
+(open/close carried as `data`), `note`. The first Draft listed fifteen; `created`,
+`spec_status`, `review`, `push`, `pr`, `ship` and `archive` are dropped because each is
+already recorded elsewhere and none is required by D3: the SPEC header is the source of
+status, `phase: ARCHIVED` *is* the archive record, `ship` duplicated `shipped`, and pushes
+and reviews are git and `reviews/` facts. Smaller schema, smaller fold, nothing lost.
+
+**No `session_id`.** A harness session id lives in `.dadaia/sessions/` (PROTECTED) and in
+allowlist-gated telemetry; committing it into `specs/` would link every governance milestone
+to a local session identifier permanently, for no governance value. The envelope is
+`{ts, event, agent, data}` and the schema forbids any additional property.
+
+The SDD gate folds the **last** `phase` record for the MEMORY path class. Individual commits
+stay out; **milestone records carry `sha` (+ `pr`) as immutable facts** at exactly three
+points, plus `audited` whenever an audit runs:
 
 ```json
-{"ts":"2026-08-28T14:02:11Z","event":"defined","agent":"product-engineer","session_id":"s-9f1c","data":{"sha":"4e5f6a7","pr":210}}
-{"ts":"2026-09-03T18:40:05Z","event":"implemented","agent":"qa-engineer","session_id":"s-77ab","data":{"sha":"b8c9d0e","rc":2}}
-{"ts":"2026-09-04T10:15:00Z","event":"shipped","agent":"project-manager","session_id":"s-77ab","data":{"sha":"f1a2b3c","pr":214,"tag":"0.5.0"}}
-{"ts":"2026-10-20T09:00:00Z","event":"audited","agent":"project-auditor","session_id":"s-3d4e","data":{"sha":"c0ffee1","audit":"audits/20261020-five-release-window"}}
+{"ts":"2026-08-28T14:02:11Z","event":"defined","agent":"product-engineer","data":{"sha":"4e5f6a7","pr":210}}
+{"ts":"2026-09-03T18:40:05Z","event":"implemented","agent":"qa-engineer","data":{"sha":"b8c9d0e","rc":2}}
+{"ts":"2026-09-04T10:15:00Z","event":"shipped","agent":"project-manager","data":{"sha":"f1a2b3c","pr":214,"tag":"0.5.0"}}
+{"ts":"2026-10-20T09:00:00Z","event":"audited","agent":"project-auditor","data":{"sha":"c0ffee1","audit":"audits/20261020-five-release-window"}}
 ```
+
+**`implemented` is written at the final-`rc` QA close, on that closed commit's sha** — D3's
+own wording — and **not** at the final-`rc` PR merge. The two differ by the merge commit, and
+picking the QA-close sha is what makes the `[defined, implemented]` window a range of *worked*
+commits rather than a range ending in an integration artifact. T-050-42 records it at that
+moment and merges afterwards.
+
+**The fold has one home: `dadaia_workspace/core/release_events.py`** — a stdlib-only,
+tri-state resolver in the same shape as today's `_active_field`. `hooks/sdd_gate.py` calls it
+directly (hooks never import the container, standing law), and so do `container.py` and the
+doctor. One reader, one fold, three callers.
 
 `ACTIVE.md` and `CLOSURE.md` **retire**: the active release and phase are the fold of the
 newest `RELEASE.jsonl`; the closure narrative moves into the final `rc`'s records plus the
-release's own `SPEC.md` provenance. Back-fill: `specs/releases/_archive/releases_histo.jsonl`
-(**D-G**) receives one milestone block per already-archived release, `sha` and `pr` taken from
-that release's `CLOSURE.md` tables where they are given, `null` where they are not — read
-**before** FR6 deletes the archive.
+release's own `SPEC.md` provenance. **`ACTIVE.md` has 28 consumers in `dadaia_workspace/`,
+and the retirement is not done until every one is repointed.** Enumerated from the tree:
+`container.py`; `core/exceptions.py`; `core/release_events.py` (the new fold);
+`features/specs/{doctor,doctor_common,doctor_release,doctor_structural,scaffolder}.py`;
+`features/reports/next.py`; `features/spec_context/gate_policy.py`; `hooks/sdd_gate.py`
+(`_active_field` and its regex); `cli/commands/specs.py` (the `specs release` / `specs
+segment` verbs); six personas under `public/agents/`; five skills under `public/skills/`;
+`public/scaffold/AGENTS.md`; `public/templates/specs-AGENTS.md`; and
+`public/data/DADAIA.md`. `CLOSURE.md` appears in seven further modules
+(`doctor_closure_audit.py`, `doctor_release.py`, `doctor_governance.py`,
+`doctor_structural.py`, `doctor_common.py` — `RELEASE_ARTIFACTS` —, `catalog.py`,
+`memory_lint.py`), and the parsers not covered by FR15 are retired by FR15's extended scope,
+never left as dead code behind a file that no longer exists. On the test side, **26 test
+files reference `ACTIVE.md` and 4 reference `CLOSURE.md`/`CLOSURE-TEMPLATE`**; each is
+rewritten or deleted under a named `qa-engineer` verdict, never silently orphaned.
+
+**Ordering (expand → switch → contract).** The `RELEASE.jsonl` writer/reader lands in `S1`
+(T-050-11) and runs **in parallel with `ACTIVE.md`**. The **contract step — deleting
+`ACTIVE.md` — moves to `S2`, immediately after T-050-21**, because the personas, skills and
+law file that cite it are owned by FR11/FR12 in `S2`. Deleting it in `S1` would leave the
+always-on law naming a file that does not exist for a whole segment: an expand→contract
+violation by this SPEC's own D-F. A4.5's "at least one commit" therefore reads honestly
+across the segment boundary.
+
+Back-fill: `specs/releases/_archive/releases_histo.jsonl` (**D-G**) receives one milestone
+block per already-archived release, `sha` and `pr` taken from that release's `CLOSURE.md`
+tables where they are given, `null` where they are not — read **before** FR6 deletes the
+archive. **Both archive layouts are scanned**, because the archive carries two:
+`specs/_archive/releases/<id>/` (93 directories, four of which are not versions —
+`ctx-inject-v2-drift-fix-v1`, `memory-markdown-source-v1`, `multiharness-engine-v0116`,
+`pi-fourth-harness-v1`) and `specs/_archive/<id>/` (30 entries, `v0.1.47` … `v0.2.3`). V7's
+denominator is defined as **the count of directories the scan actually visits across both
+layouts**, reported with the four non-version directories named and excluded.
 
 **Bug-surface direction:** *net-negative in surface, net-additive in LOC* — two hand-authored
 Markdown files with parsers (`ACTIVE.md`'s two-line schema; `CLOSURE.md`'s section-and-table
@@ -498,9 +821,19 @@ a file an agent hand-edits. A folded event stream has one writer and one reader.
 - A4.3 `releases_histo.jsonl` carries one block per archived release; every sha it claims is
   resolvable by `git cat-file -e <sha>`, and every unavailable value is `null`, never a
   guess. The count of releases back-filled and the found/null split are recorded (V7).
-- A4.4 `CLOSURE.md`'s validators (`doctor_closure_audit.py`) stop parsing prose — see FR15.
-- A4.5 `expand → switch → contract`: `RELEASE.jsonl` is written and read in parallel with
-  `ACTIVE.md` for at least one commit, then `ACTIVE.md` is deleted; each step green.
+- A4.4 **Every `CLOSURE.md` parser has a named fate.** `doctor_closure_audit.py`'s
+  disposition regexes retire under FR15; the remaining `CLOSURE.md` checks in
+  `doctor_closure_audit.py`, `doctor_release.py` and `doctor_governance.py`, plus
+  `RELEASE_ARTIFACTS` in `doctor_common.py`, are **deleted** under FR15's extended scope. A
+  zero-hit grep for `CLOSURE.md` across `dadaia_workspace/features/**` is recorded; no check
+  survives against a file that no longer exists.
+- A4.5 `expand → switch → contract`, **across the segment boundary**: `RELEASE.jsonl` is
+  written and read in parallel with `ACTIVE.md` from T-050-11 (`S1`) until the contract step
+  after T-050-21 (`S2`), by which point every one of the 28 consumers above is repointed;
+  each step independently green.
+- A4.7 The 28 `ACTIVE.md` consumers and the 26 + 4 test files are enumerated in the task that
+  repoints them, and a zero-hit grep for `ACTIVE.md` outside `_archive/` and git history is
+  recorded at the contract step.
 - A4.6 The audit window is computable: `audited` milestones across live, `_ideas/` and
   `_archive/` are scannable in one pass, and the newest one yields `[sha, HEAD]` (consumed by
   FR14).
@@ -514,6 +847,23 @@ section retires; every exit appends
 `{ts, slug, disposition, reason, release?, by, entry_md}` — the full entry snapshot — to
 `specs/backlog/_archive/backlog_histo.jsonl`. The disposition vocabulary is unchanged. Legacy
 `specs/backlog/_archive/*.md` stay frozen, no retro-conversion.
+
+**The code lives in `features/backlog/**`, not in the specs doctor.** BL-DUP is implemented in
+`dadaia_workspace/features/backlog/doctor.py` (and referenced across that module), and the
+in-file `## LEDGER` this FR retires is parsed by `features/backlog/document.py` and
+`features/backlog/ledger.py`. FR5's write set is those three modules plus the scaffold; the
+earlier attribution to `features/specs/doctor_governance.py` was wrong.
+
+**BL-STALE keeps its data feed (the cross-cutting catch).** `features/backlog/ledger.py`
+reads `specs/_archive/<release-id>/consumed_backlog.json` and documents that an absent ledger
+degrades to `{}` — "BL-STALE is a no-op, never a false ERROR". **18 such sidecar files exist
+under the root `specs/_archive/` that FR6 deletes.** Deleting the tree without relocating them
+would make a backlog-doctor rule go quiet without ever failing — the exact "documented
+convention with no data behind it" shape FR13 condemns. FR5 therefore **relocates all 18
+sidecars into `specs/backlog/_archive/consumed_backlog_histo.jsonl`** (one record per release,
+carrying the release id and its consumed slugs) and repoints `ledger.py` at it, **before** FR6
+runs. The degrade-to-`{}` behaviour is kept for a genuinely absent record; what is removed is
+the accidental permanent absence.
 
 **Bug-surface direction:** *net-negative* — the dual-section document (ACTIVE + LEDGER) whose
 invariants `backlog doctor` polices (BL-DUP, BL-STALE) becomes a single-section document plus
@@ -532,6 +882,9 @@ appended a second LEDGER line instead of updating the first.
 - A5.3 An entry exit (any disposition) appends exactly one histo record and removes exactly
   one `## ACTIVE` subsection, proven by an executed fixture.
 - A5.4 Legacy `_archive/*.md` are byte-identical before and after.
+- A5.5 **All 18 `consumed_backlog.json` sidecars are relocated and BL-STALE still fires.** A
+  fixture proves BL-STALE reports a stale `ACTIVE` item using a relocated record, and the
+  count of relocated records (18) is asserted. Relocation completes **before** FR6.
 
 #### FR6 — [operator] Root `specs/_archive/` is tagged, then deleted · **size S**
 
@@ -539,17 +892,35 @@ appended a second LEDGER line instead of updating the first.
 history is the archive"; executed **only with the operator present** (D-H).*
 
 **Acceptance**
-- A6.1 An `archive/specs-archive-<YYYYMMDD>` tag is created **and pushed** at the commit
-  immediately preceding the deletion; the tag is verified reachable before anything is
-  removed.
-- A6.2 FR3 (A3.x) and FR4 (A4.3) are complete and their outputs committed **before** the
-  deletion — nothing that the back-fills need is read after this point.
+- A6.1 An `archive/specs-archive-<YYYYMMDD>` tag is created **and pushed**, and its
+  reachability is proven **from the remote, not locally**: `git ls-remote --tags origin`
+  lists it, then a throwaway clone fetches it and `git show <tag>:…` succeeds **from that
+  clone**. A local `git show` proves nothing about a tag that never left the machine, and the
+  entire recovery story for an irreversible deletion rests on this one premise.
+- A6.2 FR3 (A3.x), FR4 (A4.3) and **FR5's sidecar relocation (A5.5)** are complete and
+  committed **before** the deletion, **and every historical `verdicts/**` directory under
+  root `specs/_archive/releases/*/` is relocated** to the per-area archive alongside its
+  release, with the CI gate proven against the relocated path (**A1.8 / V20**). The archive
+  is not read only by the back-fills: it holds every past security approval, and deleting it
+  without relocation is what breaks the required PR check.
 - A6.3 The deletion is one commit, executed with the operator present, and the FROZEN gate
-  class is repointed to the per-area `*/_archive/` paths in the **same** commit — never a
-  window where FROZEN points at nothing.
+  class is repointed in the **same** commit — never a window where FROZEN points at nothing.
+  The **post-v6 FROZEN set is enumerated exhaustively**, one fixture per path:
+  `specs/releases/_archive/`, `specs/bugs/_archive/`, `specs/backlog/_archive/`,
+  `specs/audits/_archive/`. Concretely this is *one deletion* (`_FROZEN_PREFIX =
+  "specs/_archive/"`) and *one addition* (`specs/releases/_archive/`) — the other three
+  prefixes already exist in `gate_policy.py`. Omitting the addition would leave every
+  archived release **MUTATING**, freely rewritable in IMPLEMENTATION mode: a net integrity
+  loss versus today. `specs/releases/_ideas/` stays **MUTATING deliberately** — a Draft is
+  meant to be edited — and that is stated, not left to inference.
 - A6.4 After the deletion, `git show <tag>:specs/_archive/releases/v0.4.4/CLOSURE.md`
-  succeeds — the archive is reachable, and this is demonstrated and captured, not asserted.
+  succeeds **from the throwaway clone of A6.1** — demonstrated and captured, not asserted.
 - A6.5 No `archive/*` tag is deleted by this release (AS-9).
+- A6.6 **The tag push has a stated refusal path.** Tags are scanned by the range-scoped
+  denylist scan and can be refused. If the push of `archive/specs-archive-<date>` is refused:
+  stop, redact at the source object, re-tag, push again. **Never `--no-verify`, never disable
+  the scan, never force past it.** The deletion does not proceed until the tag is on the
+  remote and proven reachable from it.
 
 ---
 
@@ -574,10 +945,14 @@ diagnosing method as ordered phases each ending on a checkable *Done when*:
   fix commit body:
 
 ```text
-caused_by: frozen-clock-guard-tz-boundary-031
-evidence: git show 4c1d2e3 added _quick_steps tuple in ci.py (+18) separate from STEPS; this bug is that second path drifting.
-prior diffs read: frozen-clock-guard-tz-boundary-031 (4c1d2e3), ci-preflight-runner-fail-closed-029 (7a7b7c7)
+caused_by: codex-live-probe-gate-checks-presence-not-usability
+evidence: git show <its resolution sha> added a second render path in the certify skip branch; this bug is that path emitting the raw transcript.
+prior diffs read: codex-live-probe-gate-checks-presence-not-usability (exact), certify-cannot-install-installed-provider (ledger-only — not diffed, coarse)
 ```
+
+Every bug id in this SPEC's examples is a **real record** in `specs/bugs/bugs.jsonl`; shas are
+written as placeholders only where FR3 derives them and the pre-canon history does not record
+them. No illustrative identifier is invented.
 
 - **Phase 1** reproduction loop, actually run **red** before any hypothesis is written;
   **Phase 2** minimise the failing input/path; **Phase 3** falsifiable hypotheses, one at a
@@ -630,20 +1005,27 @@ the scoped `AGENTS.md` files, **measured by the audit via `git log`, never by a 
    `chore(bugs): report <id>` — so `registration_commit` is derivable and `exact`.
 2. A backlog entry is an isolated commit `chore(backlog): add <slug>` staging only
    `specs/backlog/BACKLOG.md`; an ADR is an isolated `docs(adr): propose NNNN-<slug>`.
-3. **The fix is contained in the commit that resolves:**
+3. **The fix is contained in the commit that resolves — and there is no second commit.**
    `fix(<scope>): <what> (resolves <id>)` stages the code, the regression test and the
    `BUGS.jsonl` line carrying `status: resolved`, `cause`, `caused_by`, `resolved_release`.
-   Then, because a commit cannot contain its own sha, the same session appends
-   `chore(bugs): <id> resolved @<sha>` staging only that line (**AS-1**).
+   `resolved_commit` stays `null`: a commit cannot contain its own sha, git is the authority,
+   and the audit writes the cache (**AS-1**, re-decided). The follow-up
+   `chore(bugs): <id> resolved @<sha>` ledger commit of the first Draft — shape 3b — is
+   **deleted**: it was a second writer of one value and a second ledger commit per bug that
+   pillar 2 would have to learn to recognise, against D10's own "the fix is contained in the
+   commit that resolves".
 4. **No push on bug resolve** (D4) — commit only; a push happens when the operator asks, and
    then the agent runs `dadaia ci preflight` first because it is an always-on rule (FR9/FR11),
    not because a hook forces it.
-5. Release definition is **one bundled commit** (SPEC + PLAN + TASKS + purge-on-pick +
-   `status: picked` on the picked bug records); an `_ideas/` SPEC commit carries the SPEC only.
+5. Release definition is **one bundled commit** (SPEC + PLAN + TASKS + purge-on-pick + the
+   picked bugs' records); an `_ideas/` SPEC commit carries the SPEC only. There is no
+   `picked` status to write (FR2) — the pick is the commit.
 
-**One resolver seam.** `resolved_commit` has exactly one reader: a function that returns the
-stored value when present and derives it (FR3's algorithm, scoped to one id) otherwise. Git is
-the authority; the field is a cache; pillar 1 reports a disagreement as a finding.
+**One resolver seam, one writer.** `resolved_commit` has exactly one resolver: a function that
+returns the stored value when present and derives it (FR3's algorithm, scoped to one id)
+otherwise. Git is the authority; the field is a cache; and the **only writer of that cache is
+FR14's pillar 1**, in the same atomic in-place rewrite that sets `audited`. Pillar 1 reports a
+stored value that disagrees with the derivation as a finding.
 
 **Bug-surface direction:** *net-negative in code, net-additive in documented rule* — nothing
 is added to the CLI or the hooks; one resolver function replaces the ad-hoc
@@ -655,9 +1037,14 @@ makes the *next* 490 bugs diffable.
 **Acceptance**
 - A8.1 Every shape above appears exactly once across the AI surface, with the other homes
   pointing at it — proven by a duplicate-statement scan whose zero-hit result is recorded.
-- A8.2 The resolver seam is one function with one caller-facing signature; a contract test
-  proves stored-equals-derived on a sample of ≥ 20 historical records and on this release's
-  own bugs.
+  **The scan's stated scope covers three surfaces, not two:** `DADAIA.md`, every core skill,
+  **and every scoped `AGENTS.md`** (FR12 authors or rewrites seven of them in the same
+  segment, so a pair-wise scan that skipped them would miss the most likely duplication).
+- A8.2 The resolver seam is one function with one caller-facing signature, and the contract
+  test is **"audit-filled equals derived"**: on a sample of ≥ 20 historical records and on
+  this release's own bugs, the value pillar 1 wrote into `resolved_commit` equals what the
+  resolver derives from git. A record that has not been audited carries `null` and that is
+  correct, not a failure.
 - A8.3 **Zero** new blocking validation: `dadaia bugs append`/`resolve` exit codes are
   unchanged for every input that succeeds today, proven by the existing CLI-output-stability
   fixtures staying green untouched.
@@ -669,16 +1056,31 @@ makes the *next* 490 bugs diffable.
 *Entry: `bug-lineage-and-commit-discipline` (D) · ruling D9 · the clearest deletion in the
 release.*
 
-- `pre-commit-presence-gate.sh` becomes **advisory-only** (presence WARN, always exit 0). The
-  `backlog doctor` BLOCK and the fail-closed runner are deleted;
-  `cli/commands/ci.py#pre_commit_check` drops `_run_backlog_doctor_gate` and
-  `_staged_backlog_paths` (the CI `backlog-doctor` job already covers the sweep, unscoped).
+- `pre-commit-presence-gate.sh` becomes **advisory-only** (presence WARN, always exit 0).
+  **Only in this script** are the `backlog doctor` BLOCK and the fail-closed runner
+  resolution deleted; `cli/commands/ci.py#pre_commit_check` drops `_run_backlog_doctor_gate`
+  and `_staged_backlog_paths` (the CI `backlog-doctor` job already covers the sweep,
+  unscoped).
 - `pre-push-ci-gate.sh` keeps **only** the publication boundary: branch-name policy +
-  range-scoped denylist scan. The `dadaia ci preflight --quick` invocation **leaves the hook**
-  and becomes the always-on rule *"run `dadaia ci preflight` before you push"* in
-  `DADAIA.md` §7 + `dd-gitflow-default` + `dd-release-implement`; the audit measures pushes
-  whose CI went red for preflight-class failures.
+  range-scoped denylist scan — **and it keeps its fail-closed runner resolution** (exit 1
+  with its message when the runner cannot be resolved; never a silent skip). The two scripts
+  share the same `resolve_runner` text, and D9 attaches the deletion to the *pre-commit*
+  bullet; a fail-open pre-push runner would mean a machine without the venv pushing with **no
+  branch policy and no denylist scan**, silently — the exact boundary D9 preserves. Only
+  pre-commit may become unconditionally exit 0. The `dadaia ci preflight --quick` invocation
+  **leaves the hook** and becomes the always-on rule *"run `dadaia ci preflight` before you
+  push"* in `DADAIA.md` §7 + `dd-gitflow-default` + `dd-release-implement`; the audit
+  measures pushes whose CI went red for preflight-class failures.
 - The security-verdict CI gate on PRs is **untouched** — it *is* the publication boundary.
+- **The secret-scan lane's coverage is stated, not extended.** `.github/workflows/
+  secret-scan.yml` triggers on `push: main`/`hotfix/v*` and `pull_request: [main]`; `hotfix/*`
+  is retired and `main` is never pushed directly, so gitleaks effectively runs **once per
+  release, on the ship PR**. The 490 migrated records and the first audit folder therefore
+  reach `develop` at `rc-1` covered by the **privacy denylist scan only**, which is not a
+  secret scanner. FR9's acceptance records this limit explicitly so "publication boundary
+  intact" is never read as "secrets scanned at `rc-1`". Extending the trigger is **not** done
+  here: it is new CI surface on a LOW finding, and the honest statement is the cheaper and
+  more truthful fix. It is compiled as an intake candidate at closure.
 
 **Bug-surface direction:** **net-negative, unambiguously** — two blocking mechanisms and one
 fail-closed runner are deleted; nothing replaces them in code.
@@ -690,11 +1092,19 @@ prevent. It is also redundant: CI already runs `backlog doctor`.
 **Acceptance**
 - A9.1 A contract test asserts `pre-commit` exits **0 on any staged set**, including a staged
   set that `backlog doctor` would reject — the executed path, not the script's text.
-- A9.2 `pre-push` refuses exactly two things and nothing else — an invalid branch name and a
-  denylist hit — proven by fixtures for both, plus a fixture proving a *failing preflight no
-  longer blocks the push*.
+- A9.2 `pre-push` refuses exactly **three** things and nothing else — an invalid branch name,
+  a denylist hit, and **an unresolvable runner** — proven by a fixture for each, plus a
+  fixture proving a *failing preflight no longer blocks the push*. The runner fixture asserts
+  the push is **refused**, not skipped.
 - A9.3 `_run_backlog_doctor_gate` and `_staged_backlog_paths` are **deleted** (grep zero-hit
-  recorded), not left dead.
+  recorded), not left dead. Their two direct exercisers —
+  `tests/integration/test_precommit_backlog_scoping.py` (which imports
+  `_run_backlog_doctor_gate` and would fail to import) and its E2E companion
+  `tests/e2e/features/test_backlog_precommit.py` — carry a recorded **`qa-engineer` verdict**
+  naming, per file, delete or rewrite, with the evidence for that choice. The implementer
+  neither deletes nor skips them to go green.
+- A9.6 The secret-scan coverage limit above is recorded in the segment's QA artifact as a
+  known, accepted gap with its intake candidate, not as a passed check.
 - A9.4 The preflight rule exists in `DADAIA.md` §7 (landed by FR11) and in
   `dd-gitflow-default`; the CI job that would catch its absence is named in both.
 - A9.5 Net LOC for this FR is **negative**, measured (V10).
@@ -706,10 +1116,20 @@ prevent. It is also redundant: CI already runs `backlog doctor`.
 `dadaia_workspace/public/entities/behavior-map.json` is the **superset** of
 `rules-skills-map.json`, adding the scoped-`AGENTS.md` column and a completeness requirement.
 One row per **core skill** under `dadaia_workspace/public/skills/` and per **scoped
-`AGENTS.md`** — the scaffolded ones (`specs/AGENTS.md`, `backlog/`, `bugs/`, `releases/`,
-`memory/`, `audits/`, `ADRs/`) and the library's own (`.dadaia/reports/AGENTS.md`,
-`.dadaia/handoff/AGENTS.md`, `tests/AGENTS.md`, the `repos/<slug>/AGENTS.md` template) — each
-mapped to **exactly one** `DADAIA.md` section, with a recorded hash tuple:
+`AGENTS.md`**, each mapped to **exactly one** `DADAIA.md` section, with a recorded hash tuple.
+
+**Discovery is structural, never a hand-written roster.** The enforcer **globs the generators**
+— every `AGENTS.md` and `*-AGENTS.md` source under
+`dadaia_workspace/public/{data,scaffold,templates}/` — exactly as it already globs
+`public/skills/*/SKILL.md`. A hand list is the defect D14 exists to catch, and this SPEC's own
+first Draft proved it by omitting three sources that ship today:
+`public/data/dadaia-AGENTS.md` (→ `.dadaia/AGENTS.md`), `public/data/states-AGENTS.md` (→
+`.dadaia/states/AGENTS.md`) and `public/data/tmp-AGENTS.md` (→ `.dadaia/tmp/AGENTS.md`). For
+orientation only, the corpus at authoring time is: the scaffolded `specs/AGENTS.md`,
+`backlog/`, `bugs/`, `releases/`, `memory/`, `audits/`, `ADRs/`; the library's
+`public/data/{dadaia,states,tmp,reports,handoff,memory}-AGENTS.md`; `tests/AGENTS.md`; and the
+`repos/<slug>/AGENTS.md` template. **That list is illustrative; the glob is authoritative**,
+and a source added tomorrow goes RED without anyone editing this SPEC.
 
 ```json
 {"section":"§7 Quality — Register every bug you hit","skill":"dd-bug-registration","scoped_agents_md":["specs/bugs/AGENTS.md"],"hash_tuple":{"section":"sha256:…","skill":"sha256:…","scoped":["sha256:…"]},"recorded_by":"ai-engineer","recorded_at":"2026-09-01"}
@@ -736,8 +1156,12 @@ inside `public/**`. A hash tuple that goes RED when either end moves is the stru
 to a class that has now fired twice.
 
 **Acceptance**
-- A10.1 Every skill on disk and every scoped `AGENTS.md` on disk has exactly one row; every
-  `DADAIA.md` section has exactly one owner row; the enforcer proves both directions.
+- A10.1 **Cardinality, as D14 actually states it.** Every skill on disk and every scoped
+  `AGENTS.md` on disk has **exactly one** row (a member maps to one section); every
+  `DADAIA.md` section has **at least one** owner row. D14 goes RED when a section has *no*
+  owner — not when two skills share one. Demanding exactly one owner per section would go RED
+  on the map's own existing rows, where more than one skill legitimately owns §7 Quality. The
+  enforcer proves both directions with those two cardinalities.
 - A10.2 Five mutation fixtures, one per RED condition, each proven to fail before and pass
   after the corresponding correction.
 - A10.3 `rules-skills-map.json` retires; **one** map file exists at the end, proven by a
@@ -746,6 +1170,20 @@ to a class that has now fired twice.
   says what to re-read, not just that a hash changed.
 - A10.5 The map adds **no** runtime dependency: no CLI verb reads it, no hook loads it (D15) —
   it is consumed by the test suite and by agents.
+- A10.6 **No hard-won regression is lost on the retirement.** `test_rules_skills_map.py`
+  carries **nine** checks at HEAD — the schema check, the six original map modes, the FR27
+  citation checks and the FR28 bidirectional model-invocation grant check — two of which
+  carry their own registered bug histories
+  (`citation-enforcer-resolves-projected-instance-paths-against-the-checkout`,
+  `citation-mutation-fixtures-never-turn-red-on-windows`). Before the old file is deleted,
+  **every test function present in it at HEAD has a named counterpart in
+  `test_behavior_map.py`**, proven by a **name-diff with a zero-hit residue** plus a one-line
+  note per check recording the behaviour it still asserts. Byte-for-byte equality is not the
+  criterion and would be unachievable in an extended enforcer; *no behaviour dropped* is.
+  Three further files reference `rules_skills_map` / `rules-skills-map.json` and are repointed
+  in the same task, named explicitly: `tests/helpers/scan_population.py`,
+  `tests/contract/test_frozen_clock_aging_ratchet.py`,
+  `tests/contract/test_public_scripts_thin_wrapper.py`.
 
 #### FR11 — `DADAIA.md`: anchors, the D15 posture, and the three short sections · **size M**
 
@@ -753,8 +1191,12 @@ to a class that has now fired twice.
 2026-08-26) · ruling D15.*
 
 `dadaia_workspace/public/data/DADAIA.md` (source only — the projected law is PROTECTED) gains
-stable per-behavior anchors (named subsections for Backlog / Bugs / Releases / Memory /
-Audits / ADRs) for the map to point at, plus:
+stable per-behavior anchors for the map to point at (Backlog / Bugs / Releases / Memory /
+Audits / ADRs). **The anchors are zero-cost comment markup — `<!-- behavior: bugs -->` — never
+titled subsections.** Six to eight new headings would themselves read as prose to every agent
+that loads the file every session, and would materially change V12's delta; a comment marker
+is invisible to a reading agent and near-free in tokens while being exactly as greppable for
+the enforcer. On top of the anchors:
 
 - **the enforcement-posture section (D15), verbatim in intent:** *"Skills instruct procedure.
   Audits measure conformance from git and JSONL history. Hooks and the CLI validate only at
@@ -763,7 +1205,12 @@ Audits / ADRs) for the map to point at, plus:
 - **the short audits section** specified by FR13/FR14;
 - **the short memory two-tier + ADR section** specified by FR17/FR19 (*"memory Part 1 is
   ADR-gated and measured; only the operator accepts an ADR"*);
-- **the always-on preflight rule** from FR9.
+- **the always-on preflight rule** from FR9;
+- **one rewritten row in `DADAIA.md` §3's path-class table.** The ADDITIVE row today reads
+  "Always writable — register bugs freely, in any mode", which was written when every write
+  to `specs/bugs/` was an append. With a mutable-field record it becomes: *"Always writable;
+  the record contract — immutable core, write-once, mutable governance — is **audited, not
+  gated**."* No new path class, no second classifier, one row of text (SA-2/A-7).
 
 **Bug-surface direction:** *net-additive in always-on tokens* — and therefore governed by a
 hard rule: **every section added here is a pointer, never a restatement**, and the FR reports
@@ -774,8 +1221,12 @@ budget; this release must not silently spend its gains.
 grows the law file; naming the risk and measuring it is the mitigation.
 
 **Acceptance**
-- A11.1 One file writes `DADAIA.md` in this release: FR11. No other FR's write set contains it
-  (D-B), proven by inspection of §3 and by the TASKS write sets.
+- A11.1 **The Tier-1 single-writer property holds, and it is proven mechanically.** Exactly
+  one task in `TASKS.md` contains `dadaia_workspace/public/data/DADAIA.md` in its write set
+  (T-050-20), and the same holds for the other three Tier-1 files of D-B — proven by a grep
+  over the write-set blocks, not by "inspection of §3". Anchors are comment-form markers, and
+  **V12's attribution table separates anchor cost from section-body cost** so an anchor can
+  never hide inside a section's number.
 - A11.2 Each new section is ≤ the size the map row needs to point at it, and states no
   procedure that a skill already states — proven by the FR8/A8.1 duplicate scan.
 - A11.3 The always-on token count is measured before and after (V12); an increase is reported
@@ -793,9 +1244,12 @@ grows the law file; naming the risk and measuring it is the mitigation.
   `dd-diagnose`; the skill keeps only the bug lifecycle (branch, record update, commit, no
   push).
 - `dd-release-implement` rebuilt in the short-SKILL-plus-disclosed-siblings shape:
-  `RC-FLOW.md` (the state ladder, absorbing `CLOSURE-CHECKS.md`), `RELEASE-EVENTS.md` (the
-  `RELEASE.jsonl` append recipes per milestone, including the sha-bearing ones),
-  `MEMORY-UPDATE.md`. `CLOSURE-TEMPLATE.md` dies with `CLOSURE.md`.
+  `RC-FLOW.md` (the state ladder, absorbing `CLOSURE-CHECKS.md`, and **carrying forward the
+  operative `dd-architecture-survey` pointer** the `entity-behavior-map` entry requires — a
+  pointer dropped in a rebuild is a law relocated into nothing), `RELEASE-EVENTS.md` (the
+  `RELEASE.jsonl` append recipes per milestone, including the sha-bearing ones and the
+  `implemented`-at-QA-close rule), `MEMORY-UPDATE.md`. `CLOSURE-TEMPLATE.md` dies with
+  `CLOSURE.md`.
 - `dd-backlog-definition` rewritten for the live-photo `BACKLOG.md` + histo JSONL; its "no
   JSONL for backlog" clause retires.
 - `dd-bug-registration` and `dd-release-definition` updated to the v6 record fields and the
@@ -835,10 +1289,26 @@ Owner: `software-engineer` (doctor, schema) + `ai-engineer` (skill, persona) +
 `specs/audits/<YYYYMMDD>-<slug>/` holds `AUDIT.md` (scope; the window `[from-sha, to-sha]`
 and the releases inside it; method per pillar; the score; the operator-facing summary) and
 `FINDINGS.jsonl` (one record per finding, appended once). `specs/audits/AGENTS.md` replaces
-`README.md` (scoped law + the index of audits). `project-auditor`'s write allowlist gains
-`specs/audits/**` — it stays forbidden everywhere else under `specs/`, and it still never
-fixes. The HTML report/handoff remains the operator-facing emission (`DADAIA.md` §5) but is
-**derived from**, never a substitute for, the committed folder.
+`README.md` (scoped law + the index of audits). The HTML report/handoff remains the
+operator-facing emission (`DADAIA.md` §5) but is **derived from**, never a substitute for,
+the committed folder.
+
+**The `project-auditor` write allowlist, decided explicitly (S-8).** Pillar 1 must write
+`audited` (and, per AS-1, `resolved_commit`) onto bug records, which the first Draft
+simultaneously forbade — a contradiction that the gate would have resolved silently toward
+the wider access, since `specs/bugs/` is ADDITIVE and refuses nobody. The decision:
+
+- The allowlist is **`specs/audits/**` plus `specs/bugs/BUGS.jsonl`** — the latter for
+  **governance fields only**, written **through the FR2 record-store seam** so the write is
+  redacted (A2.6) and atomic (A2.9). One writer seam, one code path; the auditor still never
+  writes a core field, never writes a fix, and never writes anything else under `specs/`.
+- **A13.2 is retargeted at a property that actually holds.** "A write elsewhere under
+  `specs/` is refused" is unfulfillable as stated: `write_allowlist` is parsed at
+  **projection** time and is documentation, not a write-time control, and nothing refuses a
+  persona's write to an ADDITIVE path. What *is* mechanically true is that
+  `specs/audits/_archive/` is **FROZEN** (matched before ADDITIVE) and stays FROZEN for the
+  auditor — the archive move is a `git mv`, outside the file-tool envelope. The fixture
+  proves that.
 
 Immutable finding fields: `id` (`<audit-slug>-F<nnn>`), `pillar` (`bugs|specs|memory`),
 `severity`, `refs` (file:line, bug ids, commit shas, release ids), `claim` (one sentence),
@@ -847,8 +1317,15 @@ Immutable finding fields: `id` (`<audit-slug>-F<nnn>`), `pillar` (`bugs|specs|me
 then the same line after the remediation release:
 
 ```json
-{"id":"20261020-five-release-window-F003","pillar":"bugs","severity":"HIGH","refs":["ci-preflight-quick-skips-lint-imports-048","frozen-clock-guard-tz-boundary-031","4c1d2e3","9d8e7f6"],"claim":"fix-induced bug: 048 rides the second step list that the 031 fix introduced; 031 resolved without a structural cause","evidence":"git show 4c1d2e3 -- dadaia_workspace/cli/commands/ci.py (+18 _quick_steps); BUGS.jsonl 031 cause=null","disposition":"open","release":null,"reason":null}
-{"id":"20261020-five-release-window-F003", "…same immutable fields…":"…","disposition":"fixed","release":"0.5.0","reason":"single step registry (T-050-04)"}
+{"id":"20261020-five-release-window-F003","pillar":"bugs","severity":"HIGH","refs":["certify-skip-detail-leaks-full-codex-output","codex-live-probe-gate-checks-presence-not-usability","<sha-B>","<sha-A>"],"claim":"fix-induced bug: the skip-detail leak rides the second render path the probe-gate fix introduced, and the probe-gate bug resolved without a structural cause","evidence":"git show <sha-A> -- dadaia_workspace/features/certification (second render path added); BUGS.jsonl codex-live-probe-gate-checks-presence-not-usability cause=null","disposition":"open","release":null,"reason":null}
+```
+
+The **same record** after its remediation release — the three governance fields rewritten in
+place, every immutable field byte-identical (a valid JSON line, so it can seed a fixture for
+a schema with `additionalProperties: false`):
+
+```json
+{"id":"20261020-five-release-window-F003","pillar":"bugs","severity":"HIGH","refs":["certify-skip-detail-leaks-full-codex-output","codex-live-probe-gate-checks-presence-not-usability","<sha-B>","<sha-A>"],"claim":"fix-induced bug: the skip-detail leak rides the second render path the probe-gate fix introduced, and the probe-gate bug resolved without a structural cause","evidence":"git show <sha-A> -- dadaia_workspace/features/certification (second render path added); BUGS.jsonl codex-live-probe-gate-checks-presence-not-usability cause=null","disposition":"fixed","release":"<the remediation release id>","reason":"one render path; regression test at the formatter seam"}
 ```
 
 **Bug-surface direction:** *net-additive* (a schema and a folder), justified: it replaces an
@@ -861,12 +1338,26 @@ own README describes. A documented convention with no writer is how drift starts
 **Acceptance**
 - A13.1 The finding schema exists with `additionalProperties: false` and the
   immutable/mutable split documented per property.
-- A13.2 `project-auditor`'s allowlist gains `specs/audits/**` and **nothing else**; a fixture
-  proves a write elsewhere under `specs/` is still refused.
+- A13.2 `project-auditor`'s allowlist gains exactly `specs/audits/**` and
+  `specs/bugs/BUGS.jsonl` (governance fields, through the FR2 seam) and nothing else. The
+  **fixture proves what is mechanically true**: `specs/audits/_archive/` is FROZEN and a
+  file-tool write there is refused for this persona as for every other; the allowlist itself
+  is projection-time documentation, and the SPEC says so rather than implying a control that
+  does not exist.
 - A13.3 `specs/audits/README.md` is deleted and its content lives in `audits/AGENTS.md`.
 - A13.4 A finding's governance fields can be rewritten in place leaving every other byte
-  identical (the FR2 mechanic, reused — **not** re-implemented; one JSONL record-update seam
-  serves bugs, findings and the backlog histo, proven by the diff).
+  identical, through the **generic `JsonlRecordStore`** of A2.5 — bugs, findings and the
+  backlog histo each get their own store instance with their own model, and **no module knows
+  two record shapes**. Proven by the diff: one store module, three models, three container
+  registrations.
+- A13.5 **The audit folder is scanned by the push detector before it is trusted.** Before the
+  `S3` QA close, the folder is run through the same detector a push uses
+  (`dadaia ci push-gate-check` over the range, or a `specs doctor` WARN reusing
+  `features/chokepoints/denylist_scan`), zero hits recorded. `Measured by:` and `git show`
+  output is **captured under `.dadaia/tmp/**` and cited by path** in `evidence`, never pasted
+  — pillar-3 runs (`lint-imports`, `pytest`, ratchet checks) emit runner-absolute paths
+  routinely, and the auditor writes with file tools, so no seam can redact for it. The same
+  rule binds FR3's migration report.
 
 #### FR14 — `dd-audit-project`: three pillars over a sha window · **size L**
 
@@ -884,9 +1375,26 @@ All three pillars run **together**, always:
   `caused_by` must agree, and a `caused_by: none` contradicted by the diff is a finding),
   resolutions without `cause` or a regression seam, net-positive diffs that never routed to
   `software-architect`, and **commit-shape conformance** (FR8's five shapes, read from
-  `git log --format` + `--stat`). It consumes only `commit_granularity == "exact"` shas as
-  diff-able lineage and records the rest as coarse (D-A). On each record reviewed it sets
-  `audited: <audit-slug>`.
+  `git log --format` + `--stat`). It consumes only `resolution_granularity == "exact"` shas
+  as diff-able lineage and records the rest as coarse (D-A).
+
+  Three further measures, each cheap and each answering a documented chain:
+  - **Registration→resolution interval.** A resolution whose interval from registration is
+    implausibly short is the no-red-loop signature: the ledger shows
+    `certify-cannot-install-installed-provider` reported 18:41:56Z and resolved 18:41:57Z —
+    one second, a bulk flip of an already-"fixed" bug. Detecting the certify class becomes
+    arithmetic instead of judgement.
+  - **Core-field mutation.** A hunk in `git log -p -- specs/bugs/BUGS.jsonl` that changes an
+    **immutable core field** of an existing `id` is a **HIGH** finding. This is the detector
+    that makes A2.2's seam-level rule auditable, since nothing prevents a file-tool rewrite.
+  - **Cache disagreement.** A stored `resolved_commit` that disagrees with the derivation is
+    a finding (A8.2).
+
+  **Pillar 1 is the single writer of two cached fields.** On each record it reviews it writes
+  `audited: <audit-slug>` **and** the derived `resolved_commit` /`resolution_granularity`, in
+  **one atomic in-place rewrite**, through the FR2 record-store seam (redacted, atomic,
+  re-read before write). One writer, one seam, one commit — this is what AS-1(ii) buys, and
+  it is why FR8 has no shape 3b.
 - **Pillar 2 — spec compliance.** `dadaia specs doctor --json` across every release in the
   window, conformance to the v6 canon, `RELEASE.jsonl` milestone completeness (`defined` /
   `implemented` / `shipped`, each with a sha), SPEC provenance and `**Consumes:**`,
@@ -927,6 +1435,9 @@ is only worth shipping if the dry run (FR16) actually finds them. That is why FR
 - A14.4 `disable-model-invocation` is lifted and the skill appears in `project-auditor.md`'s
   skills list — the v0.4.4-class defect (a skill nobody can invoke) does not survive.
 - A14.5 **Zero** CLI verbs and **zero** hook changes in this FR's diff.
+- A14.6 Pillar 1's write of `audited` + `resolved_commit` + `resolution_granularity` is
+  **one** atomic in-place rewrite per record through the FR2 seam — proven by a fixture
+  asserting a single file replacement per record and every other byte unchanged.
 
 #### FR15 — `specs doctor` folds `FINDINGS.jsonl` instead of parsing prose · **size S**
 
@@ -936,6 +1447,14 @@ is only worth shipping if the dry run (FR16) actually finds them. That is why FR
 regexing prose: an `open` record inside an **archived** audit is an **error**; a live audit
 whose records are all terminal with a named release is an **archive-due WARN**.
 
+**Extended scope (A4.4): every `CLOSURE.md` parser retires here, not just the disposition
+regexes.** FR4 deletes the file; a checker that parses a file which no longer exists is dead
+code behind a dead artifact — the shape this release exists to stop. FR15 therefore also
+deletes the remaining `CLOSURE.md` checks in `doctor_closure_audit.py`, `doctor_release.py`
+and `doctor_governance.py`, plus `RELEASE_ARTIFACTS` in `doctor_common.py`, and the
+`AUDIT_DIR_NAME_RE` duplication (the `<YYYYMMDD>-<slug>` shape gets a **single** home, also
+replacing the comment that repeats it in `gate_policy.py`).
+
 **Bug-surface direction:** **net-negative** — regex-over-prose is deleted and replaced by a
 JSONL fold that reuses FR13's reader. Prose parsing is the largest false-positive source in
 the doctor.
@@ -944,7 +1463,9 @@ produced both false positives and silent misses (the v0.1.73-era "gate never dem
 tooling refuses" law came from this class). A structured fold cannot misread a sentence.
 
 **Acceptance**
-- A15.1 The regex path is **deleted**, not bypassed — zero-hit grep recorded.
+- A15.1 The regex path is **deleted**, not bypassed — zero-hit grep recorded, and a second
+  zero-hit grep for `CLOSURE.md` across `dadaia_workspace/features/**` proves no parser
+  survived its subject.
 - A15.2 Two fixtures: an archived audit with one `open` record errors; a live fully-terminal
   audit warns `archive due`.
 - A15.3 `dadaia specs doctor` reports **0 errors** on this repo after the migration.
@@ -966,10 +1487,18 @@ a green internal gate.
 
 **Acceptance**
 - A16.1 The folder exists, is committed, and carries all three pillars' sections.
-- A16.2 Pillar 1 **names, with evidence, at least the four documented chains of §1.1** —
-  the gitignore class, the certify 37-minute re-bug, the frozen-clock 3-hop chain, and the
-  bug-event ledger family. A canon that cannot rediscover the loop it was built for is not
-  accepted, and FR14 is reworked instead of the acceptance being lowered.
+- A16.2 Pillar 1 **names, with evidence, at least the four documented chains of §1.1, by the
+  bug ids §1.1 pins** — the nine-instance gitignore class (≥ 3 of its ids), the certify
+  chain (`codex-live-probe-gate-checks-presence-not-usability` →
+  `certify-skip-detail-leaks-full-codex-output`), the frozen-clock chain
+  (`no-ratchet-against-frozen-clock-tests-that-age-fixtures-by-the-real-clock` →
+  `frozen-clock-ratchet-scans-tests-tmp-scratch-dir`), and the bug-event ledger family
+  (`bug-event-field-with-unicode-line-separator-silently-drops-the-event` plus the ESC
+  escaping finding, cited by its review artifact since it carries no bug id). A finding that
+  claims a chain without naming its pinned ids does **not** satisfy this acceptance — that is
+  the whole point of pinning them. §1.5 is the worked shape each finding must take. A canon
+  that cannot rediscover the loop it was built for is not accepted, and FR14 is reworked
+  instead of the acceptance being lowered.
 - A16.3 Pillar 2 reads **this release's own commits** and reports FR8 conformance (A8.4).
 - A16.4 Pillar 3 executes every `Measured by:` check authored by FR18 and records each
   result; any principle whose check does not run is a finding against FR18, not a skipped row.
@@ -1116,8 +1645,12 @@ An ADR chain makes the reversal itself reviewable.
   test refuses a reused number.
 - A19.2 Every ADR authored by this release carries every field, including `Confirmation`.
 - A19.3 A fixture proves the "accepted is immutable" rule is stated where an agent reads it
-  before writing (the scoped `AGENTS.md`), and that pillar 3 detects an agent-written
-  `accepted` (FR14).
+  before writing (the scoped `AGENTS.md`), and that pillar 3 detects **the pairing rule** —
+  a Part-1 hunk in the window with no `accepted` ADR in the same commit is a HIGH finding.
+  **Stated as the limitation it is:** pillar 3 cannot detect an *agent-written* `accepted`,
+  because commit identity is shared across agents and the operator (the de-personalising
+  question is still open, §7). Attribution is discipline; the pairing is the detector.
+  Claiming otherwise would be exactly the fabricated-detection this release outlaws.
 - A19.4 Zero CLI verbs, zero doctor rules beyond the folder shape.
 
 #### FR20 — [operator] The ADR acceptance sitting · **size S**
@@ -1176,8 +1709,11 @@ agent on every session.
   reported with its per-FR attribution; the always-on token delta (V12) is reported.
 - A22.5 Complexity ceilings (`C90`, `PLR1702`) unchanged or **lowered** — never raised.
 - A22.6 **The D15 posture holds mechanically:** the diff adds **zero** new blocking CLI exits
-  and **zero** new hook blocks, and removes two (FR9) — proven by a contract test over the
-  hook scripts and by the CLI-output-stability fixtures.
+  and **zero** new hook blocks, and removes **exactly two blocks** — the pre-commit
+  `backlog doctor` block and the pre-commit fail-closed runner (FR9 additionally moves the
+  preflight invocation out of the pre-push hook, which is a third removal but not a third
+  block). The pre-push fail-closed runner **survives** and its refusal is asserted (A9.2).
+  Proven by a contract test over the hook scripts and by the CLI-output-stability fixtures.
 - A22.7 Every picked entry is dispositioned; residuals — including all of FR16's findings —
   are compiled into the PM's intake report, never materialized by an agent.
 - A22.8 **Every `rc` holds A22.1–A22.7**, and every `rc-N ≥ 2` traces to a defect or
@@ -1263,11 +1799,11 @@ Every item is checkable by a command; each is captured by a shell-holding agent 
 |---|---|---|---|
 | **V1** | Doctor suite clean | `dadaia specs doctor` (**0 errors**), `dadaia backlog doctor`, `dadaia public doctor`, `dadaia doctor` | every segment close |
 | **V2** | Local CI preflight | `dadaia ci preflight` | every commit |
-| **V3** | Canon conformance | `dadaia specs doctor --json` reports `specs_pattern_version: 6`, TREE-8 present and WARN-only | `S1` close |
-| **V4** | Record migration counts | the FR3 migration report: 490/490 records; registration ≥ 490 found / ≥ 124 distinct / ≥ 79 `exact`; resolution ≥ 470 found / ≥ 117 distinct / ≥ 155 `release-squash` / ≤ 39 `ledger-only` | `S1` (A3.1–A3.3) |
+| **V3** | Canon conformance | `dadaia specs doctor --json` reports `specs_pattern_version: 6`, TREE-8 present and WARN-only, and **no TREE-8 WARN on this release's own directory** (A1.9) | **T-050-06**, re-checked at `S1` close (T-050-15) |
+| **V4** | Record migration counts | the FR3 migration report: 490/490 records; registration ≥ 490 found / ≥ 124 distinct / ≥ 79 single-bug; resolution ≥ 470 found / ≥ 117 distinct / ≥ 70 single-bug. The **marker distribution** (`exact`/`release-squash`/`ledger-only`, per sha kind) is **measured and reported**, never thresholded (§1.2, A3.2/A3.3) | `S1` (A3.1–A3.3) |
 | **V5** | Migration idempotence | run the migration twice; `git diff --stat specs/bugs/BUGS.jsonl` empty on the second run | `S1` (A3.4) |
 | **V6** | Ref scope | `git log --all --no-merges --format=%H -- specs/bugs/ \| wc -l` ≥ **295**, with `git tag -l 'archive/*' \| wc -l` = **50** recorded beside it | before FR3 runs (AS-9) |
-| **V7** | Back-fill report | `releases_histo.jsonl` line count = archived-release count; every non-null sha passes `git cat-file -e` | `S1` (A4.3) |
+| **V7** | Back-fill report | `releases_histo.jsonl` block count = **the number of release directories the scan visited across both archive layouts** (`specs/_archive/releases/<id>/` and `specs/_archive/<id>/`), with the four non-version directories named and excluded; every non-null sha passes `git cat-file -e` | `S1` (A4.3) |
 | **V8** | Archive reachability | `git show <archive-tag>:specs/_archive/releases/v0.4.4/CLOSURE.md \| head` succeeds after FR6 | `S1` (A6.4) |
 | **V9** | Hook posture | `pre-commit` exits 0 on a staged set `backlog doctor` rejects; `pre-push` refuses only on branch name and denylist | `S2` (A9.1, A9.2) |
 | **V10** | FR9 LOC delta | `git diff --stat` over the hook scripts + `cli/commands/ci.py`, **negative** | `S2` (A9.5) |
@@ -1280,6 +1816,11 @@ Every item is checkable by a command; each is captured by a shell-holding agent 
 | **V17** | Behavior map completeness | `pytest tests/contract/test_behavior_map.py` green; five mutation fixtures each RED before their fix | `S2` (A10.2) |
 | **V18** | No new blocker | contract test: zero new non-zero exits in hooks; CLI-output-stability fixtures green untouched | scope complete (A22.6) |
 | **V19** | Release invariants | `lint-imports` green, no new accepted edge; complexity ceilings unchanged or lower; production LOC per FR reported | scope complete (A22.2, A22.3, A22.5) |
+| **V20** | CI verdict-evidence contract | run `.github/scripts/pr-verdict-check.sh` against a **v6 fixture tree** (live release, `_ideas/`, `specs/releases/_archive/<id>/verdicts/`): a valid APPROVED handoff at the archived path resolves; a bare-semver id is accepted; a traversal shape is refused; a missing handoff fails closed | **before T-050-41** (A1.8) |
+| **V21** | Every canon path is tracked | `git check-ignore` reports *not ignored* for each path of A1.7; the three orphaned stanzas are gone | `S1` (A1.7) |
+| **V22** | Migration range is clean | `dadaia ci push-gate-check` over the migration range, **before** the first push; zero hits, or every hit remediated at the source record | `S1`, before pushing T-050-10 (A3.9) |
+| **V23** | U+2028 precondition present | the migrated ledger round-trips a record carrying U+2028 byte-identically and `bugs status` reports `skipped: 0` — proving the `v0.4.5` T-045-20 fix is on the branch (AS-14) | before FR3 runs (A3.7) |
+| **V24** | Audit artifact is redaction-clean | the FR16 folder and the FR3 migration report scanned by the push detector; zero hits; every `Measured by:`/`git show` transcript cited by `.dadaia/tmp/**` path, never pasted | `S3` close (A13.5) |
 
 ---
 
@@ -1318,20 +1859,32 @@ machine-readable `**Consumes:**` key, so no tool acts on a Draft.
 to `0.5.0` at the final `rc`, per the one-axis law. MINOR, not PATCH: the `specs/` pattern
 moves 5 → 6, which is consumer-visible. Publication is the operator's call at ship (**AS-6**).
 
+**Release-id disambiguation — `0.5.0` is not `v0.5.0` (AS-13).** An archived release named
+**`v0.5.0`** shipped on 2026-08-12, before the version-axis collapse, on the retired
+**spec-lineage** axis. This release is **`0.5.0`** on the **PyPI/one-axis** lineage. The
+prefix is the disambiguator and it is canon: a `v`-prefixed id always names the retired axis;
+a bare semver id always names the current one. Consequently, the **46 in-code citations
+reading `v0.5.0 FRn` across 28 files** (`setup.cfg`, `core/models/bugs.py`,
+`hooks/sdd_gate.py` and others) refer to the **archived** release and are **not renamed** —
+renaming correct history to spare a reader one lookup is exactly the kind of churn this
+release exists to stop. Pillar 2's window recipe excludes the `v`-prefixed id from this
+release's history, and any citation of this release's requirements is written `0.5.0 FRn`.
+
 ---
 
 ## 8. Decisions this SPEC took that the grill did not settle
 
 Flagged for the operator; each is reversible before approval and none contradicts a ruling.
 
-1. **AS-1** — the `resolved_commit` fill mechanism (the handoff's explicit open
-   reconciliation): derive-on-read as authority **plus** a follow-up ledger-only commit as
-   cache, one resolver seam.
+1. **AS-1** *(re-decided at review)* — the `resolved_commit` fill mechanism (the handoff's
+   explicit open reconciliation): **derive-on-read is the sole authority; FR14 pillar 1 is
+   the only writer of the cache**, in the rewrite that sets `audited`. No follow-up ledger
+   commit; FR8 shape 3b deleted.
 2. **AS-11 / D-I** — the lineage check lives as **phase 0 of `dd-diagnose`**, not as
    `dd-bug-resolution/LINEAGE.md` as the entry's intent ref proposed.
-3. **D-A** — the provenance-marker rule, and with it two new record fields
-   (`commit_granularity` on each derived sha, `lineage_source` on `caused_by`) that no entry
-   named.
+3. **D-A** — the provenance-marker rule, and with it three new record fields
+   (`registration_granularity`, `resolution_granularity`, `lineage_source`) that no entry
+   named. The single-name variant `commit_granularity` is withdrawn everywhere.
 4. **D-G** — `specs/releases/_archive/releases_histo.jsonl` as the home of back-filled
    milestone shas for already-archived releases.
 5. **AS-2** — historical `caused_by` is `null` (unassessed), never `"none"`; the
@@ -1348,16 +1901,130 @@ Flagged for the operator; each is reversible before approval and none contradict
     rule will say `_ideas` = SPEC only.
 11. **§3 net-LOC accounting** — this release is net-additive in production code and says so;
     the standing order is honoured per FR, not by a total.
+12. **AS-12** — `S4`'s memory window is a **recorded release state**, not a phase toggled
+    around a task. The operator ratifies it or takes the stated fallback (FR17–FR21 move into
+    the closure window).
+13. **AS-13** — the release id stays `0.5.0`; the `v`-prefix rule disambiguates it from the
+    archived `v0.5.0`, and 46 in-code citations are deliberately **not** renamed.
+14. **AS-14** — the U+2028 seam is a **precondition** discharged by `v0.4.5` T-045-20 and
+    verified by V23, not a requirement of this release.
+15. **AS-15** — archive still precedes ship (ruling preserved); the verdict gate is fixed at
+    the gate by deriving its evidence roots from the canon, naming the **third** firing of
+    `verdict-gate-cannot-resolve-evidence-after-release-archive`.
+16. **`--recipe` is kept** against the `software-architect`'s S4 cut — see §9, the one
+    reviewer amendment this fold refuses, with its reason.
 
 ---
 
-## 9. Approval
+## 9. Review fold (2026-08-26)
+
+Five definition reviews were folded into this revision. **Every amendment each review raised
+carries a disposition below — none is silently dropped.** Counts, per reviewer, matching each
+review's own list: `software-architect` **14** · `security-reviewer` **14** · `qa-engineer`
+**7** · `ai-engineer` **5** · `code-reviewer` **15** — **55 total: 47 applied, 7
+applied-modified, 1 rejected.**
+
+**Where a review conflicts with a ratified ruling, the ruling stands and the conflict is
+named** (`DADAIA.md` §6 / `dd-release-implement`: finalization order is memory → CLOSURE →
+sweep → **archive** → ship). One such conflict arose — S-1's first option — and is resolved
+in favour of the ruling in AS-15.
+
+### 9.1 `software-architect` — REWORK (targeted)
+
+| id | Amendment | Disposition | Where |
+|---|---|---|---|
+| SA-1 | F1 — fix the U+2028 `splitlines()` seam as Arm B before/inside T-050-07; add A2.6; correct AS-4 | **applied-modified** — the fix belongs to `v0.4.5` T-045-20 (Arm B, already owned); this release references it as a **precondition** and verifies it, rather than re-specifying a fix with another owner | AS-14 · AS-4 · A3.7 · **V23** · FR2 bug-history paragraph (overclaim removed) |
+| SA-2 | F2 — FR2 states immutability is audited not gated; atomic replace + re-read; pillar-1 "core field changed" measure; rewrite the `DADAIA.md` §3 ADDITIVE row | **applied** | FR2 (three categories, atomic-write paragraph) · **A2.2**, **A2.7**, **A2.9** · FR14 pillar 1 (core-field mutation) · FR11 §3-row rewrite |
+| SA-3 | AS-1 → option (ii); delete FR8 shape 3b; A8.2 becomes "audit-filled equals derived" | **applied** | **AS-1** · FR8 shape 3 · **A8.2** · FR14 pillar 1 · §8.1 |
+| SA-4 | F3 — T-050-11 enumerates every `ACTIVE.md` consumer; the fold is `core/release_events.py`; the contract step moves after T-050-21 | **applied** | FR4 (28-consumer enumeration, fold home, ordering) · **A4.5**, **A4.7** · T-050-11, **T-050-21A** |
+| SA-5 | F6/AR-1 — generic `jsonl_record_store.py`; migration-owned v5 adapter; pure derivation over a `GitHistoryReader` protocol; T-050-04 becomes a confirmation | **applied** | **A2.5**, **A3.10**, **A13.4** · PLAN §2 · T-050-04 |
+| SA-6 | F4 — the release-id collision with the archived `v0.5.0` | **applied** | **AS-13** · §7 "Release-id disambiguation" |
+| SA-7 | F5 — §1.1 row 1 is "one class, nine instances, three patched" | **applied** | §1.1 · FR1 bug-history |
+| SA-8 | F8 — one marker name everywhere | **applied** | **D-A** · FR2 field list · FR3 step 4 · FR7 · FR14 pillar 1 · PLAN §0 · §8.3 |
+| SA-9 | S2 — drop `picked` from `status` | **applied** | FR2 vocabulary · FR8 shape 5 · T-050-01, T-050-08 |
+| SA-10 | S3 — `RELEASE.jsonl` kinds 15 → 7 | **applied** | FR4 |
+| SA-11 | S4 — do not add `specs doctor --recipe`; let `specs upgrade` print it | **rejected** — `doctor` reports and `upgrade` acts; folding the recipe into `upgrade`'s output would force an agent to run a **mutating** verb to learn what it must do by hand. `--recipe` is a read-only output flag on a read-only verb, adds no blocking exit, and does not touch D15. The `specs-canon-v6` entry asks for the recipe; this is the cheaper home for it | FR1 · A1.3 · V3 (unchanged) |
+| SA-12 | S5 — name the deletion list explicitly | **applied** | FR2 (`A2.5` legacy reader) · FR4/A4.4 · **FR15 extended scope** (`AUDIT_DIR_NAME_RE`, `RELEASE_ARTIFACTS`) · V19 |
+| SA-13 | S7 — pillar 1 gains the registration→resolution interval measure | **applied** | FR14 pillar 1 · §1.1 certify row |
+| SA-14 | Axis-5 drift — D3's `implemented` = final-rc **QA close** sha vs T-050-42's PR merge; pick one and state it | **applied** — QA-close sha | FR4 (`implemented` paragraph) · T-050-42 |
+
+### 9.2 `security-reviewer` — REJECTED (14 findings, A-1 … A-14)
+
+| id | Amendment | Disposition | Where |
+|---|---|---|---|
+| A-1 | S-1 CRITICAL — own the CI evidence contract; canon names `verdicts/`/`reviews/`; V20 before T-050-41 | **applied-modified** — the amendment's alternative "archive **after** the ship PR merges" contradicts `DADAIA.md` §6 / `dd-release-implement` (memory → CLOSURE → archive → ship) and is refused on that ground; the **structural** option is taken instead: the gate derives its evidence roots and id pattern from `core/specs_version.py`, so the next canon move cannot break it. Third firing of `verdict-gate-cannot-resolve-evidence-after-release-archive`, named as such | **AS-15** · FR1 boundary 2 · **A1.8**, **A1.9** · **V20** · T-050-06A |
+| A-2 | S-2 HIGH — own `.gitignore`; invert the shape per area; V21 `check-ignore` contract | **applied** | FR1 boundary 1 · **A1.7** · **V21** · T-050-06A |
+| A-3 | S-3 HIGH — schema-derived redaction for `BugRecord` on both write paths, with its test | **applied** | FR2 redaction paragraph (`eb03d01b` / `0cb08157`, T-045-19) · **A2.6** |
+| A-4 | S-4 HIGH — redact migrated prose through that seam; V22 scans the migration range pre-push | **applied** | FR3 steps **6b**/**6c** (rename amnesty + refusal procedure) · **A3.9** · **V22** |
+| A-5 | S-5 HIGH — pre-push keeps its fail-closed runner; third fixture proving refusal | **applied** | FR9 bullet 2 · **A9.2** · **A22.6** |
+| A-6 | S-6 MEDIUM — remote reachability proof, verdict relocation, scan-refusal path | **applied** | **A6.1**, **A6.2**, **A6.4**, **A6.6** |
+| A-7 | S-7 MEDIUM — A2.2 states detection not prevention; add the core-vs-first-add doctor WARN | **applied** | **A2.2**, **A2.7** · FR14 pillar 1 |
+| A-8 | S-8 MEDIUM — resolve the `audited`-write contradiction; retarget A13.2 at FROZEN | **applied** — resolved per `software-architect` AS-1(ii): pillar 1 writes `audited` **and** `resolved_commit` in one atomic rewrite through the FR2 seam; allowlist = `specs/audits/**` + `specs/bugs/BUGS.jsonl` (governance fields, via the seam) | FR13 allowlist paragraph · **A13.2** · FR14 pillar 1 · **A14.6** |
+| A-9 | S-9 MEDIUM — scan the audit folder and the migration report with the push detector | **applied** | **A13.5** · **V24** |
+| A-10 | S-10 MEDIUM — drop or constrain `session_id` | **applied** — dropped from the envelope entirely | FR4 (`{ts, event, agent, data}`) |
+| A-11 | S-11 MEDIUM — enumerate the post-v6 FROZEN set, one fixture per path | **applied** — including `specs/releases/_archive/` and the deliberate MUTATING status of `_ideas/` | **A6.3** |
+| A-12 | S-12 LOW — extend secret-scan to `develop` PRs, or state the limit | **applied-modified** — the limit is **stated** and carried as an intake candidate; the trigger is not extended (new CI surface on a LOW finding, and the honest statement is the truer fix) | FR9 last bullet · **A9.6** |
+| A-13 | S-13 LOW — name the exact verdict path and the 40-hex rule in every verdict task | **applied** | T-050-02, T-050-36, T-050-37, T-050-42, T-050-43 |
+| A-14 | Q6 — A19.3 claims the pairing detection only; record the attribution limit | **applied** | **A19.3** |
+
+### 9.3 `qa-engineer` — REWORK
+
+| id | Amendment | Disposition | Where |
+|---|---|---|---|
+| QA-1 | Cite real bug ids for the certify chain, the frozen-clock hops and the ledger family's second symptom | **applied** — all four chains pinned to real ids; the non-existent `frozen-clock-guard-tz-boundary-031` is **removed from every example** and replaced with real records | §1.1 · §1.5 · FR2 examples · FR7 evidence block · FR13 example · **A16.2** |
+| QA-2 | Reconcile FR3's structural `release-squash` marker against §1.2's narrative 155 | **applied** — the two units are named, the divergence (~400 vs 155) is stated, and V4 pins only what the algorithm computes | §1.2 · **A3.3** · **V4** |
+| QA-3 | Drop the "≥ 79 marked `exact`" equivalence or measure the code-touching subset | **applied** — the `≥` thresholds move onto the definitions actually measured; marker distribution is reported | **A3.2** · **V4** |
+| QA-4 | Add the two hook tests to T-050-18's write set with an explicit stewardship verdict | **applied** — both paths verified present at HEAD | **A9.3** · T-050-18 write set |
+| QA-5 | State T-050-09's tier placement given the open xdist crash | **applied** — `tests/contract/`, never `tests/unit/`, with a CI-matrix note | T-050-09 · T-050-34 |
+| QA-6 | Name the `ACTIVE.md`/`CLOSURE.md` test census (26 + 4) in T-050-11/T-050-21 | **applied** | FR4 · **A4.7** · T-050-11, T-050-21A |
+| QA-7 | The QA closes confirm **zero** new `tests/e2e/**` exceptions were granted, or name them | **applied** | T-050-15, T-050-22, T-050-27, T-050-33 |
+
+### 9.4 `ai-engineer` — REWORK
+
+| id | Amendment | Disposition | Where |
+|---|---|---|---|
+| AI-1 | **Blocking** — an `ai-engineer` task widening `software-architect`, `qa-engineer`, `code-reviewer`, `security-reviewer` to `specs/releases/**/reviews/**`, sequenced before T-050-04 | **applied** | **T-050-03A** |
+| AI-2 | **Blocking** — every test in `test_rules_skills_map.py` at HEAD has a proven counterpart in `test_behavior_map.py` before the old file is deleted | **applied-modified** — "byte-for-byte-equivalent" is unachievable in an extended enforcer and would be a false criterion; the acceptance is a **name-diff with zero-hit residue plus a behaviour note per check**, which is what "no regression lost" actually means | **A10.6** · T-050-19 |
+| AI-3 | Make scoped-`AGENTS.md` discovery structural (glob the generators); name the three unlisted `.dadaia/*-AGENTS.md` sources | **applied** — all three verified present in `public/data/` | FR10 discovery paragraph · T-050-19 |
+| AI-4 | Anchors as zero-cost comment markup; extend A8.1's duplicate scan to scoped-`AGENTS.md` pairs | **applied** | FR11 anchors paragraph · **A11.1** · **A8.1** |
+| AI-5 | Name the projection owner in T-050-23 (`ai-engineer`, the last write) | **applied** | T-050-23 |
+
+### 9.5 `code-reviewer` — REWORK (1 CRITICAL, 8 HIGH)
+
+| id | Amendment | Disposition | Where |
+|---|---|---|---|
+| CR-1 | Add the loop end to end in one place: A's fix commit → B's record with `caused_by` → the pillar-1 finding → its disposition | **applied-modified** — built with **real** ids from the certify chain, so the reviewer's "mark synthetic ids as synthetic" becomes unnecessary rather than unaddressed; A16.2 points at it | **§1.5** · **A16.2** |
+| CR-2 | Pin each of §1.1's four chains to an explicit bug-id list; fix the gitignore row | **applied** | §1.1 · **A16.2** · **V16** |
+| CR-3 | Resolve FR6 vs `consumed_backlog.json` — relocate the 18 sidecars or retire BL-STALE | **applied-modified** — **relocate**; the "retire BL-STALE" alternative is refused (deleting a rule to avoid moving its data is the symptom patch this release exists to stop) | FR5 BL-STALE paragraph · **A5.5** · **A6.2** · T-050-13A |
+| CR-4 | Disposition the U+2028 bug; correct "the single open bug" and its four citations | **applied-modified** — it is neither picked nor superseded here: it is **already owned as Arm B by `v0.4.5` T-045-20** and becomes this release's precondition. Every citation corrected | **AS-4**, **AS-14** · header · §1.1 · FR2 |
+| CR-5 | One name for the granularity marker across D-A, PLAN §0, FR2, FR3, FR7, FR14, §8 | **applied** | as SA-8 |
+| CR-6 | Re-derive A3.2/A3.3 from the marker definitions; drop T-050-10's "a low count means the ref scope was wrong" | **applied** — reworded: a **threshold** miss means the ref scope; a **marker distribution** surprise is a fact to record | **A3.2**, **A3.3** · T-050-10 |
+| CR-7 | Fix the FR4 write set; give the surviving `CLOSURE.md` parsers a retiring FR | **applied** | FR4 enumeration · **A4.4**, **A4.7** · **FR15 extended scope** · T-050-25A |
+| CR-8 | Resolve the `S4` memory-phase conflict by an operator ruling recorded as an assumption | **applied** | **AS-12** · T-050-28, T-050-33 |
+| CR-9 | Move FR5's write set to `features/backlog/**`; add its row to PLAN §2 | **applied** — `doctor.py`, `document.py`, `ledger.py` verified present | FR5 · PLAN §2 · T-050-13 |
+| CR-10 | Scope `dadaia bugs archive` with an acceptance, or relax AS-8 | **applied** — scoped into FR2 | FR2 archive paragraph · **A2.8** · **AS-8** · T-050-08 |
+| CR-11 | Commit the FR3/FR4 reports somewhere durable — `.dadaia/tmp/` is GC'd at 3 days | **applied** — headline counts live in the release's `RELEASE.jsonl` `note` records and the closure record; the raw captures stay under `.dadaia/tmp/**` and are cited only where they are still in the retention window | T-050-10, T-050-12, T-050-40 |
+| CR-12 | Name `reviews/` and `verdicts/` in FR1's release-directory canon, or accept a permanent self-WARN | **applied** — named | FR1 canon paragraph · **A1.9** · **V3** |
+| CR-13 | Define at first use in the SPEC: `seam`, `FR23`, Arm A/B, `histo`, "live photo", TREE-5, "thawed tree", "one-axis law", "operator law O5"; add a falsifiable success statement to §1 | **applied** — one pointer to PLAN §0 (which gains the missing rows) rather than a second glossary, and §1.5 carries the falsifiable statement | §1.5 "Terms" · **PLAN §0** |
+| CR-14 | Fix T-050-12's archive scan to cover both `_archive/` layouts; define V7's denominator | **applied** | FR4 back-fill paragraph · **V7** · T-050-12 |
+| CR-15 | Housekeeping (A10.1 cardinality · FR2 "shape never changes" + a write-once test · one blocker count · AS-9 "295 of 295" → 220 · 471 → 470 · A1.5's `gate_policy.py` → `hooks/sdd_gate.py` · the two spellings of the follow-up commit · re-label AS-5/6/7/9 · restore `RC-FLOW.md`'s `dd-architecture-survey` pointer · a named task for `specs/assets/` and `remote-bugs/` · valid-JSON FINDINGS example without its `T-050-04` back-reference) | **applied**, every sub-item | **A10.1** · FR2 three categories + **A2.2(b)** · §2 objective + **A22.6** · **AS-9** · §1.1 · **A1.5** · FR8 shape 3 (one spelling, then deleted) · **AS-5/6/7/9** re-labelled · FR12 `RC-FLOW.md` · T-050-06 write set · FR13 example |
+
+---
+
+## 10. Approval
 
 Approving this SPEC ratifies, as written: **D1–D15** as carried in §2.1; the authoring
-decisions **D-A … D-J**; the eleven stated assumptions **AS-1 … AS-11** (including AS-1's
-answer to the handoff's open reconciliation and AS-11's placement of the lineage check); the
-six-entry pick with **no bug picked**; the destructive deletion of root `specs/_archive/`
-under FR6 with the operator present; and the honest net-additive accounting of §3 and A22.3.
+decisions **D-A … D-J**; the fifteen stated assumptions **AS-1 … AS-15** — including AS-1's
+re-decided answer to the handoff's open reconciliation, AS-11's placement of the lineage
+check, **AS-12's recorded `S4` memory window**, AS-13's release-id disambiguation, AS-14's
+U+2028 precondition and AS-15's ruling-preserving verdict-gate fix; the six-entry pick with
+**no bug picked**; the destructive deletion of root `specs/_archive/` under FR6 with the
+operator present; the honest net-additive accounting of §3 and A22.3; and the **§9 review
+fold**, including the single reviewer amendment this revision refuses (SA-11, `--recipe`).
 
-**Status:** Draft — authored 2026-08-26, awaiting the operator's review and the reviewer trio
+Two items need the operator specifically: **AS-12** (the `S4` memory window, or its stated
+fallback) and **FR20** (no agent may accept an ADR).
+
+**Status:** Draft — authored 2026-08-26, revised 2026-08-26 after five definition reviews;
+awaiting the operator's review and the reviewers' re-review
 (`software-architect`, `security-reviewer`, `qa-engineer`, `ai-engineer`, `code-reviewer`).
