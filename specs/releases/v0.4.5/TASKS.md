@@ -690,7 +690,7 @@ all nine). Measured, never estimated — everything downstream is a delta agains
 
 ---
 
-- [-] **T-045-26 — FR12: trim, page or tier the catalog digest**
+- [x] **T-045-26 — FR12: trim, page or tier the catalog digest**
 
 **Owner role:** product-engineer (the curation policy) + ai-engineer (its mechanism) ·
 **Commit:** `feat(T-045-26): catalog digest curation policy`
@@ -713,7 +713,7 @@ unchanged** (v0.4.4 A30.3). Every catalog entry stays reachable: this changes wh
 
 ---
 
-- [ ] **T-045-27 — FR11: the always-on diet pass**
+- [-] **T-045-27 — FR11: the always-on diet pass**
 
 **Owner role:** ai-engineer · **Commit:** `refactor(T-045-27): always-on diet pass —
 <before>→<after> tokens`
