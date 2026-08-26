@@ -780,7 +780,7 @@ green.
 
 ---
 
-- [-] **T-045-30 — FR15: rule the test-Intent vocabulary**
+- [x] **T-045-30 — FR15: rule the test-Intent vocabulary**
 
 **Owner role:** ai-engineer (the skill text) + software-engineer (the sweep, if that is the
 ruling) · **Commit:** `docs(T-045-30): rule the test-Intent vocabulary`
@@ -802,7 +802,7 @@ than reverts (AS-2).
 
 ---
 
-- [ ] **T-045-31 — `S4` close: `qa-engineer` review committed on the branch**
+- [-] **T-045-31 — `S4` close: `qa-engineer` review committed on the branch**
 
 **Owner role:** qa-engineer · **Commit:** `docs(T-045-31): S4 QA close`
 
