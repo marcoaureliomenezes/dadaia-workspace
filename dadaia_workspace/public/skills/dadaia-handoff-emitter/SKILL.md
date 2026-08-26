@@ -2,9 +2,9 @@
 name: dadaia-handoff-emitter
 description: >
   Emit a machine-readable handoff JSON under .dadaia/handoff/<context>/ at the end of
-  any agent task. Handoff-first: the default emission carries no HTML report — emit the
-  handoff alone. Only when an HTML report exists (operator asked, or the next handoff
-  target is human) does the handoff also carry artifact.path + content_hash. Conforms to
+  any agent task. Handoff-first: the default emission is handoff-only — the HTML report
+  is added only when the operator asks or the next handoff target is human, and then the
+  handoff also carries artifact.path + content_hash. Conforms to
   .dadaia/agentic/schemas/handoff-v1.schema.json; validated via `dadaia reports validate`.
   Also the single canonical location for the consumer-side rule: a consuming skill
   deletes the coordination handoff it consumed (ack-on-consume).

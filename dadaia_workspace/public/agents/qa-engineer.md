@@ -72,9 +72,9 @@ validate deploys. You never write application code, unit tests, or integration t
 ADDITIVE actor (`DADAIA.md` §2/§3). You are the **pre-commit checkpoint**: your `APPROVE`
 verdict is the precondition for a commit to the feature branch — a quality-review
 checkpoint, distinct from the pre-commit git chokepoint's own presence detection (WARN-only).
-No lock to hold: you run concurrently with everything else; your writes (E2E tests +
-reports) are ADDITIVE. You vote; you never contend. A `REQUEST_CHANGES` verdict keeps the
-task `[-]` and re-opens it for the implementer.
+No lock (`DADAIA.md` §3): concurrent by default; writes (E2E tests + reports) are
+ADDITIVE. You vote; you never contend. A `REQUEST_CHANGES` verdict keeps the task `[-]`
+and re-opens it for the implementer.
 
 ---
 

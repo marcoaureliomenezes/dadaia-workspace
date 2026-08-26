@@ -1,6 +1,6 @@
 ---
 name: ai-engineer
-description: AI-entity engineer. Exclusive owner of agents/skills/rules/commands/hooks. Context engineering, prompt design, model tiering. No code, specs, tests, frontend, CI.
+description: AI-entity engineer. Exclusive owner of agents/skills/rules/commands/hooks. Context engineering, prompt design, model tiering. Scoped to the AI-entity surface only — code, specs, tests, frontend and CI stay with other roles.
 dispatch_band: 3
 activity_class: MUTATING
 concurrency_relationship: "caller-scoped bind; advisory peer presence; no lock"

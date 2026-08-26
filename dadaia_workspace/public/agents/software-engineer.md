@@ -1,6 +1,6 @@
 ---
 name: software-engineer
-description: Generic implementer. Python + Node + browser frontend + CI YAML + any context-language production code & tests. TDD-first, conventional commits, no architecture drift, no slop tests. PM sub-agent. No AI-entity/specs surfaces.
+description: Generic implementer. Python + Node + browser frontend + CI YAML + any context-language production code & tests. TDD-first, conventional commits, architecture-conformant, tests assert real behavior. PM sub-agent; AI-entity/specs surfaces stay with ai-engineer/product-engineer.
 dispatch_band: 3
 activity_class: MUTATING
 concurrency_relationship: "caller-scoped bind; advisory peer presence; no lock"

@@ -1,6 +1,6 @@
 ---
 name: dd-bug-registration
-description: "Use when: registering a genuine product bug you hit while operating this tooling — classify-first, redact, append the `reported` event. The opening move of Arm B only, never the fix (that's `dd-bug-fix`). Any agent may invoke it."
+description: "Use when: registering a genuine product bug you hit while operating this tooling — classify-first, redact, append the `reported` event. The opening move of Arm B only; the fix itself belongs to `dd-bug-fix`. Any agent may invoke it."
 applyTo: "specs/bugs/*.jsonl"
 ---
 
