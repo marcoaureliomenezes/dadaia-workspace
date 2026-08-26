@@ -451,6 +451,72 @@ After the fix the SAME line reads (only governance fields changed; every field a
   change: "representative anchor for the ratified execution set: apply the nine per-skill dispositions (Update x5, Merge x3, Fuse x1, zero Retire) exactly as recorded in the study handoff; every merge/fuse updates all cross-references and the projection roster in the same change"
 ```
 
+### bug-lineage-and-commit-discipline
+- **Title:** bug-lineage-and-commit-discipline — BUGS.jsonl record contract (immutable core / mutable governance), `caused_by` lineage check on every fix, isolated-commit shapes, no push on resolve, hooks de-slopped to the publication boundary — procedure in skills + scoped AGENTS.md + one short DADAIA.md section, conformance measured by audits, never by new CLI validation or hook blocks
+- **Opened:** 2026-08-26
+- **Status:** candidate
+- **Description:** Turn the bug loop the 2026-08-23 audit measured (490 bug_ids / 1005 events; 132 of 471 resolutions with zero evidence; 92 cross-bug references living only as prose; documented chains such as gitignore ×4 recurrences, the certify probe re-bugged 37 min after its fix, and frozen-clock → guard (+294 LOC) → guard's own bug) into a **recorded lineage with a measurable discipline**. Rulings D2, D4, D8, D9, D10, D11 (bug part) of the 2026-08-26 grill. Enforcement posture (D15, acceptance criterion of every item below): **skills instruct the procedure; scoped `AGENTS.md` and one short `DADAIA.md` section state it always-on; audits (`audit-canon-v1` pillar 1) measure conformance from git and JSONL history; NO new CLI validation and NO new hook block is added for any of it** — the only mechanical surface is the publication boundary (push/PR) and it never blocks a human. **(A) The record contract (D11).** `BUGS.jsonl` (path and migration owned by `specs-canon-v6`) holds one record per bug, appended once — no event stream, no fold. Immutable core fields: `id`, `ts`, `reported_by`, `title`, `severity`, `surface`, `component`, `context`, `symptom`, `repro`, `expected`, `root_cause` (immutable once set), `solution` (immutable once set — carries the regression-test seam). Mutable governance fields: `status` (`open|picked|resolved|superseded|deferred|rejected`), `cause` (one sentence, the structural cause), `caused_by` (`<bug-id>` | `none` — never absent on a resolved record), `resolved_commit` (sha, see the open question), `resolved_release`, `audited` (audit folder slug or null). `bug-event-v1.schema.json` is replaced by `bug-record-v1.schema.json` (`additionalProperties: false` kept; the mutable/immutable split is documented per property) and `core/models/bugs.py#BugEvent` + the coherence checker become the record model (coherence = a resolved record carries `cause`, `caused_by`, `resolved_release`; a `superseded` record carries `superseded_by` — checked by `dadaia bugs status`/doctor as WARN, not a block, and measured by the audit). Registration example — the line as first appended (governance fields present and null so the record shape never changes):
+```json
+{"id":"ci-preflight-quick-skips-lint-imports-048","ts":"2026-08-26T10:02:41Z","reported_by":"software-engineer","title":"ci preflight --quick skips lint-imports","severity":"MEDIUM","surface":"dadaia ci preflight","component":"cli/commands/ci.py","context":"dadaia-workspace","symptom":"--quick returns 0 while lint-imports fails in CI","repro":"1. break an import contract 2. dadaia ci preflight --quick 3. exit 0","expected":"--quick runs lint-imports (only e2e is skipped)","status":"open","cause":null,"caused_by":null,"resolved_commit":null,"resolved_release":null,"audited":null}
+```
+Resolution example — the SAME line after the fix (core fields byte-identical; `root_cause`/`solution` set once; governance fields filled): `…"root_cause":"quick mode built its step list from a hard-coded tuple that never included lint-imports","solution":"single step registry consumed by both modes; regression test tests/integration/test_ci_preflight.py::test_quick_runs_lint_imports","status":"resolved","cause":"duplicated step list (two code paths)","caused_by":"frozen-clock-guard-tz-boundary-031","resolved_commit":"9d8e7f6","resolved_release":"0.4.5","audited":null…`. **(B) Lineage check on every fix (D8).** Before writing the fix, the fixer (1) filters `BUGS.jsonl` for records with the same `component` or `surface` in the audit window (since the last `audited` milestone in RELEASE.jsonl, or the whole file when none), (2) reads each prior record's resolution diff — `git show <resolved_commit>`, or `git log -S<prior-id> --oneline` when `resolved_commit` is null — and (3) declares `caused_by` with evidence in `cause`: either `caused_by: <prior-id>` ("the prior fix introduced/left the structure this bug rides on") or `caused_by: none` ("prior diffs read: <ids>; no causal link"). Example declaration written into the record and echoed in the fix commit body:
+```text
+caused_by: frozen-clock-guard-tz-boundary-031
+evidence: git show 4c1d2e3 added _quick_steps tuple in ci.py (+18) separate from STEPS; this bug is that second path drifting.
+prior diffs read: frozen-clock-guard-tz-boundary-031 (4c1d2e3), ci-preflight-runner-fail-closed-029 (7a7b7c7)
+```
+A `caused_by` pointing at a prior fix is the trigger of the standing architecture-review order — the fixer must show the structural cause and a diff that does not grow the feature; a net-positive diff routes to `software-architect` before the commit (DADAIA.md §7, unchanged). Procedure home: disclosed sibling `dd-bug-resolution/LINEAGE.md` (this entry) pointed at from `dd-bug-resolution/SKILL.md` (pointer owned by `entity-behavior-map`; the reproduce/RED method is `dd-diagnose`'s — this entry never restates it), summarized in `specs/bugs/AGENTS.md` (this entry) and in a short `DADAIA.md` section whose text this entry specifies and `entity-behavior-map` lands (single owner of the DADAIA.md write). **(C) Commit shapes (D10, D2, D4)** — rules in `dd-gitflow-default` §3 + `dd-bug-registration` + `dd-backlog-definition` + scoped AGENTS.md, measured by the audit's bug and spec pillars via `git log`, never by hooks: (1) bug registration is an **isolated commit** staging only `specs/bugs/BUGS.jsonl` — `chore(bugs): report ci-preflight-quick-skips-lint-imports-048` — so the registration sha is **derivable from git** (`git log -S'"id":"ci-preflight-quick-skips-lint-imports-048"' --diff-filter=A` finds it; nothing is hand-written); (2) backlog entry = isolated commit `chore(backlog): add <slug>` staging only `specs/backlog/BACKLOG.md`; ADR = isolated commit `docs(adr): propose 0007-<slug>` (rule owned by `memory-two-tier-principles`); (3) the fix is **contained in the commit that resolves**: `fix(ci): quick preflight runs lint-imports (resolves ci-preflight-quick-skips-lint-imports-048)` stages the code, the regression test, and the `BUGS.jsonl` line with `status: resolved`, `cause`, `caused_by`, `resolved_release` — then, because a commit cannot contain its own sha, `resolved_commit` is written in an immediately following ledger-only commit `chore(bugs): resolved_commit 9d8e7f6 for ci-preflight-quick-skips-lint-imports-048` (see the open question); (4) **no push on bug resolve** — commit only; a push happens when the operator asks (e.g. "deploy the bug fixes without a release") and then the agent runs `dadaia ci preflight` first as an always-on rule (D9), not because a hook forces it; (5) release definition = one bundled commit (SPEC+PLAN+TASKS + purge-on-pick + `status: picked` on the picked bug records); `_ideas/` SPEC = SPEC only. **(D) Hooks de-slop (D9) — folded here, not a separate entry:** the three hook surfaces are exactly the commit/push chokepoints whose posture rules (C) replace; a separate entry would edit the same three files (BL-CONFLICT by construction) with no separable release value. Changes: `pre-commit-presence-gate.sh` becomes advisory-only (presence WARN, exit 0 always) or is removed outright — the `backlog doctor` BLOCK and the fail-closed runner are agent-created slop that blocked humans (`cli/commands/ci.py#pre_commit_check` drops `_run_backlog_doctor_gate`; the CI `backlog-doctor` job already covers it); `pre-push-ci-gate.sh` keeps ONLY the publication boundary — branch-name policy + range-scoped denylist scan (the `ci preflight --quick` call leaves the hook; the preflight becomes the always-on rule "run `dadaia ci preflight` before you push" in `DADAIA.md` §7 + `dd-gitflow-default` + `dd-release-implement`, and the audit measures pushes whose CI went red for preflight-class failures). The security-verdict CI gate on PRs is untouched (it is the publication boundary). **Open question for the definition grill (handoff findings[2] / decisions_required[1]):** D2 stores `resolved_commit` as a mutable field while the fix is contained in the commit that resolves, and a commit cannot carry its own sha. Both options honour D2/D11 — (i) the follow-up ledger-only commit in the same session (shown in (C)(3); costs one extra commit per bug, sha is explicit in the file), or (ii) leave `resolved_commit` null and derive it on read (`git log -S'"id":"<id>"' -- specs/bugs/BUGS.jsonl` — the commit that flipped `status` to `resolved`; zero extra commits, the field is an audit-filled cache written when pillar 1 reviews the bug). The `dd-release-definition` grill picks one before the SPEC; the record schema admits both (the field is nullable). Relates-to `dd-diagnose` (method, called by dd-bug-resolution — untouched here), `dd-architecture-survey` (consumes `caused_by` chains as its recurrence input), `dd-code-review` (bug-surface axis cites `caused_by`). Depends-on `specs-canon-v6` (BUGS.jsonl path + migration, RELEASE.jsonl `audited` milestone the window reads).
+- **Provenance:** operator ratification 2026-08-26 dd-grill-me (3 rounds, 18 questions — handoff `.dadaia/handoff/dadaia-workspace/2026-08-26T120000Z-claude-code-governance-lineage-audits-adr-grill.handoff.json`, rulings D2/D4/D8/D9/D10/D11; hooks-de-slop fold decided by project-manager per decisions_required[0]); depends-on `specs-canon-v6`; relates-to `entity-behavior-map` (owns `dd-bug-resolution/SKILL.md` and the `DADAIA.md` write), `audit-canon-v1` (measures this discipline), `dd-diagnose`, `dd-architecture-survey`, `dd-code-review`
+- **Intents:**
+```yaml
+- subject:
+    kind: doc
+    ref: dadaia_workspace/public/schemas/bugs/bug-event-v1.schema.json
+    surface: new
+  change: "replaced by bug-record-v1.schema.json: one record per bug; immutable core (id, ts, reported_by, title, severity, surface, component, context, symptom, repro, expected, root_cause/solution once set) + mutable governance (status, cause, caused_by, resolved_commit, resolved_release, audited); additionalProperties false"
+- subject:
+    kind: code
+    ref: dadaia_workspace/core/models/bugs.py#BugEvent
+    surface: existing
+  change: "becomes BugRecord with the immutable/mutable split; coherence checker validates the record (resolved => cause+caused_by+resolved_release; superseded => superseded_by) as WARN surfaced by `dadaia bugs status`/doctor — never a block"
+- subject:
+    kind: doc
+    ref: dadaia_workspace/public/skills/dd-bug-registration/SKILL.md
+    surface: new
+  change: "record-model registration (required symptom+repro+severity+expected, governance fields null); isolated commit `chore(bugs): report <id>` staging only BUGS.jsonl; registration sha derivable via git log -S, never hand-written"
+- subject:
+    kind: doc
+    ref: dadaia_workspace/public/skills/dd-bug-resolution/LINEAGE.md
+    surface: new
+  change: "disclosed sibling: the lineage check — same component/surface filter over the audit window, git show of prior resolution diffs (git log -S fallback), caused_by <id>|none with evidence, fix contained in the resolving commit, resolved_commit fill per the definition-grill answer, commit only / no push"
+- subject:
+    kind: doc
+    ref: specs/bugs/AGENTS.md
+    surface: new
+  change: "scoped law for bugs/: record model, isolated registration commit, lineage check before any fix, resolving-commit shape, no push on resolve; points at dd-bug-registration / dd-bug-resolution and the DADAIA.md section"
+- subject:
+    kind: doc
+    ref: dadaia_workspace/public/skills/dd-gitflow-default/SKILL.md
+    surface: new
+  change: "§3 gains the commit-shape rows (isolated chore(bugs)/chore(backlog)/docs(adr) commits, fix-in-resolving-commit, bundled definition commit, _ideas SPEC-only) and the always-on rule `dadaia ci preflight` before push; §5 row 2 re-worded: preflight is discipline measured by audit, the hook keeps only branch policy + denylist"
+- subject:
+    kind: doc
+    ref: dadaia_workspace/public/scripts/pre-commit-presence-gate.sh
+    surface: new
+  change: "advisory-only (presence WARN, always exit 0) or removed; backlog-doctor block and fail-closed runner deleted"
+- subject:
+    kind: doc
+    ref: dadaia_workspace/public/scripts/pre-push-ci-gate.sh
+    surface: new
+  change: "publication boundary only: branch-name policy + range-scoped denylist scan; the `ci preflight --quick` invocation leaves the hook"
+- subject:
+    kind: code
+    ref: dadaia_workspace/cli/commands/ci.py#pre_commit_check
+    surface: existing
+  change: "backlog-doctor gate removed from the pre-commit path (_run_backlog_doctor_gate and _staged_backlog_paths deleted); the CI backlog-doctor job keeps the unscoped sweep"
+```
+
+
 ## LEDGER
 
 - push-range-denylist-scan · DELIVERED · v0.9.0 · 2026-08-14
