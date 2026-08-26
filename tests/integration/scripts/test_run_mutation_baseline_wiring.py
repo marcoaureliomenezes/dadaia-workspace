@@ -39,6 +39,8 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.features.spec_context.gate_policy import PathClass, classify_path
+
 pytestmark = [pytest.mark.integration]
 
 _SCRIPT = Path(__file__).resolve().parent.parent.parent / "scripts" / "run_mutation_baseline.sh"
@@ -47,21 +49,13 @@ _CI_YML = _REPO_ROOT / ".github" / "workflows" / "ci.yml"
 _RELEASE_YML = _REPO_ROOT / ".github" / "workflows" / "release.yml"
 _CI_PREFLIGHT_SERVICE = _REPO_ROOT / "dadaia_workspace" / "features" / "ci_preflight" / "service.py"
 
-# ADDITIVE path classes (DADAIA.md Sec 3) — any live session may legitimately
-# write here concurrently under the NO-LOCKS DOCTRINE. The staging step under
-# test never touches them (it writes only into the redirected fake workspace),
-# so a concurrent ADDITIVE write is not evidence of a repo-tree side effect.
-_ADDITIVE_PATH_PREFIXES = (
-    "specs/bugs/",
-    "specs/backlog/",
-    "specs/audits/",
-    ".dadaia/reports/",
-    ".dadaia/handoff/",
-    ".dadaia/tmp/",
-)
-
 
 def _repo_porcelain_excluding_additive() -> str:
+    """`git status --porcelain`, filtered via the gate's own ``classify_path`` so this
+    test can never drift from the SDD gate's ADDITIVE class (DADAIA.md Sec 3): any live
+    session may legitimately write there concurrently under the NO-LOCKS DOCTRINE, and
+    the staging step under test never touches them (it writes only into the redirected
+    fake workspace)."""
     raw = subprocess.run(
         ["git", "status", "--porcelain"],
         cwd=str(_REPO_ROOT),
@@ -70,7 +64,7 @@ def _repo_porcelain_excluding_additive() -> str:
         check=True,
     ).stdout
     return "\n".join(
-        line for line in raw.splitlines() if not line[3:].startswith(_ADDITIVE_PATH_PREFIXES)
+        line for line in raw.splitlines() if classify_path(line[3:]) is not PathClass.ADDITIVE
     )
 
 
