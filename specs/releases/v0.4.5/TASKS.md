@@ -671,7 +671,7 @@ three times.
 
 ## Segment `S4` — the token-economy program
 
-- [-] **T-045-25 — [shell] FR11 baseline: measure before any cut**
+- [x] **T-045-25 — [shell] FR11 baseline: measure before any cut**
 
 **Owner role:** ai-engineer · **Commit:** the capture reference only
 
@@ -690,7 +690,7 @@ all nine). Measured, never estimated — everything downstream is a delta agains
 
 ---
 
-- [ ] **T-045-26 — FR12: trim, page or tier the catalog digest**
+- [-] **T-045-26 — FR12: trim, page or tier the catalog digest**
 
 **Owner role:** product-engineer (the curation policy) + ai-engineer (its mechanism) ·
 **Commit:** `feat(T-045-26): catalog digest curation policy`
