@@ -24,12 +24,22 @@ tree at the time of writing — `windows-xdist-workers-crash-on-unit-fast-tier` 
 **Precondition, not scope:** the U+2028 line-splitting seam **is fixed** — `v0.4.5`
 **T-045-20** is `[x]` and the bug carries `resolved` (ledger line 1006, 2026-08-26T13:41Z);
 FR2/FR3 **build on that fix and do not re-specify it** (**AS-14**, **V23**).
-**Review fold:** this Draft is the post-review revision. Two folds have run. Fold 1 folded
-five definition reviews (`software-architect` REWORK · `security-reviewer` REJECTED ·
+**Review fold:** this Draft is the post-review revision. **Three** folds have run. Fold 1
+folded five definition reviews (`software-architect` REWORK · `security-reviewer` REJECTED ·
 `qa-engineer` REWORK · `ai-engineer` REWORK · `code-reviewer` REWORK); fold 2 folded the two
 re-reviews (`software-architect` REWORK targeted · `security-reviewer` **APPROVED** with five
-residuals). All seven reviews live in `reviews/`; every amendment they raised carries an
-explicit disposition in **§9** (**§9.1 Pass 1**, **§9.2 Pass 2**).
+residuals); **fold 3 (2026-08-26, quantitative)** folds the two quantitative reviews —
+`software-architect`'s full quantitative review (REWORK; ten ranked changes) and
+`qa-engineer`'s test-minimization review (twelve amendments) — against three measured
+baselines (`reviews/bug-history-forensic-100.md`, `reviews/architecture-metrics-baseline.md`,
+`reviews/test-minimization-literature.md`). Nine reviews live in `reviews/`; every amendment
+they raised carries an explicit disposition in **§9** (**§9.1 Pass 1**, **§9.2 Pass 2**,
+**§9.3 Pass 3**).
+**Fold-3 mandate, in the operator's terms:** *no worsening of the architecture; a number for
+every claim; fewer tests while keeping the value; never again a temporary test without its
+marker.* Every "IMPROVES" claim below therefore carries `baseline → projected` with the
+mechanism that produces it (**§9.3**, K), the test suite gains a measured ceiling
+(**A22.9**, **V25**), and the marking rules become test-suite ratchets (**V26**–**V30**).
 **Grill (mandatory, done):** the operator ratification session of **2026-08-26** — 3 rounds,
 18 questions, 20 decisions — handoff
 `.dadaia/handoff/dadaia-workspace/2026-08-26T120000Z-claude-code-governance-lineage-audits-adr-grill.handoff.json`.
@@ -198,6 +208,26 @@ Every FR below is traced to these, and every review verdict must state them.
 > without a human pointing at them. That is A16.2/V16, and it is the only criterion by which
 > this release succeeds or fails.
 
+### 1.6 The three hot surfaces — what this release does to each, stated out loud
+
+The forensic measured where the loop actually lives: **41 of the last 100 bugs** sit on three
+surfaces, and **39 of those 41 re-bugged** the same surface within 14 days. "The loop made
+visible" must not be read as "the loop made smaller", so each surface gets an explicit
+statement here rather than an implication.
+
+| Surface | Bugs / re-bugged | Its recurrence engines | What 0.5.0 does |
+|---|---|---|---|
+| **public-assets** (install · doctor · projection · law text) | 18 / 18 | four hand-kept-truth engines: (1) skill rosters and manifests in tests (`EXPECTED_SKILLS`-style tuples), (2) doctor goldens, (3) `shipped-hashes.json`, (4) two projection authorities (install vs upgrade-refresh) | **one of four engines retired — FR10A**, the roster class, whose single-source replacement FR10's glob discovery already provides. The other **three are deferred by name — AS-17 (operator-gated)**. Exposure is stated, not hidden: this release runs **ten** projection cycles and adds one skill, renames one and adds five scoped `AGENTS.md`, every one a `test-public-pipeline-stale-skill-roster` / `install-target-doctor-goldens-stale-after-v043-skill-additions` trigger. FR10A is what turns that exposure into a *deletion* rather than a tenth chance to re-fire |
+| **specs-doctor** (doctor + migration/upgrade) | 13 / 12 | chain 1 of the forensic: `specs-upgrade-emits-atoms-violating-frontmatter-schema` → **four** followers in eight days. The engine is `cli/commands/specs.py#upgrade` (**CC 26**) and `#doctor` (**CC 30**) | **FR1 does not grow either function.** The `specs upgrade` rename automation of the first Draft is **cut** (`software-architect` change 3): the release ships `doctor --recipe` only, rendered by its **own** function so `#doctor`'s CC is unchanged, and the case-only renames are copy-paste steps executed by T-050-06. Measured acceptance: `#upgrade` **CC 26 → ≤ 26**, `#doctor` **CC 30 → ≤ 30** (A1.4, V19). The deferred automation is an intake candidate |
+| **spec-context** (create · alive · dead · gate policy) | 10 / 9 | the classifier and its two authorities (gate by name vs by origin) | **unchanged, and said so.** FR6 moves one FROZEN prefix out and one in (A6.3); no classifier is touched, no path class is added. This release does **not** reduce this surface |
+
+**Aggregate, honestly (`software-architect` §11).** Where this release acts — the bugs ledger,
+release state, hooks, closure parsers, the skill map — the surface **reduces**, measurably
+(§9.3 K's per-FR numbers). On the three surfaces above it reduces **one engine of four, none,
+and none** respectively. The release makes the loop measurable across ~100 % of the ledger and
+structurally smaller on ~40 % of the bug-producing surface. That is the claim; anything
+stronger is not supported by the numbers.
+
 **Terms.** Every term of art used below — *seam*, *Arm A / Arm B*, *rc-N*, *puxadinho*,
 *provenance marker*, *histo*, *live photo*, *thawed tree*, *presence*, *verdict gate*,
 *purge-on-pick*, *one-axis law*, *TREE-5 / TREE-8*, *FR23* — is defined once in **PLAN §0**
@@ -335,6 +365,8 @@ to the FR that executes them. Nothing here is re-decided.
 | **AS-13** *(new at review — `software-architect` F4)* | **The release id stays `0.5.0`; the collision with the archived `v0.5.0` is resolved by the existing prefix canon, not by a rename.** Bare semver (`0.5.0`) is the PyPI/one-axis lineage; a `v`-prefixed id (`v0.5.0`, shipped 2026-08-12) belongs to the retired spec-lineage axis. The **46 in-code citations reading `v0.5.0 FRn` in 28 files are not renamed** — they correctly name the archived release | Renaming either axis would rewrite correct history to avoid a reader's ambiguity. Stating the disambiguation rule once (§7) costs one paragraph and makes every citation unambiguous forever; pillar 2's window recipe excludes the `v`-prefixed id from this release's history |
 | **AS-14** *(new at review — `software-architect` change 1; **restated at pass 2** to the fix's real semantics)* | **The U+2028 line-splitting seam is a precondition of this release, not a requirement of it — and it is already discharged.** `infrastructure/jsonl_bug_store.py`'s `text.splitlines()` used to split on U+2028/U+2029/U+0085, so a record carrying one was read as two malformed lines and skipped. `v0.4.5` **T-045-20** fixed it at the seam, in two halves: the reader now splits on `"\n"` **only**, and the write seam **strips** those characters (plus every C0 byte, CWE-117) before a value is ever persisted. **The strip is why "byte-identical round-trip of a U+2028-carrying field" is unsatisfiable and is withdrawn** (it would go RED against the very fix it verifies): what V23 verifies is that the **stripped** record round-trips, the live ledger parses fully, `bugs status` reports `skipped: 0`, and **no historical record is rewritten** by the check. This release references the fix and verifies it **before FR3 runs**; it does not re-specify, re-implement or re-test it | A bug is Arm B and is fixed on the spot — never carried into a release (`DADAIA.md` §1). But FR2/FR3 would otherwise build a new record model and a 490-record migration **on top of a live silent-loss defect in the very reader they use**, which is the build-on-a-stale-layer shape this release exists to end. Verifying the precondition costs one validation; re-specifying the fix here would duplicate a fix that already has an owner |
 | **AS-15** *(new at review — `security-reviewer` A-1; **narrowed at pass 2**)* | **Archive still precedes ship; the CI evidence contract is fixed at the gate, derived from the canon — over exactly two roots.** `dd-release-implement` and `DADAIA.md` §6 fix the finalization order as memory → CLOSURE → sweep → **archive** → ship. This release does **not** move the archive step after the ship PR. Instead FR1 owns `.github/scripts/pr-verdict-check.sh` + `ci.yml` + `core/specs_version.py` and makes the gate resolve its evidence roots **from the release-directory canon**: **the live `specs/releases/<id>/verdicts/` and the new per-area `specs/releases/_archive/<id>/verdicts/`, and nothing else**. **`specs/releases/_ideas/` is REFUSED as an evidence root** — T-050-01 `git mv`s this trio out of `_ideas/` as the release's first task, so no verdict ever lives there, and A6.3 keeps `_ideas/` deliberately **MUTATING** because a Draft is meant to be edited: a freely-writable directory must never be a trust root of a **required** check. Admitting it would widen that trust root for zero coverage. The id token `_ideas`/`_archive` and every traversal shape stay refused before interpolation, and the bare-vs-`v` prefix rule of AS-13 is carried by the canon object, not restated in bash | The reviewer offered two options; one of them contradicts a ruling and is refused on that ground alone. The other is also the structural one: `verdict-gate-cannot-resolve-evidence-after-release-archive` is now firing a **third** time (T-044-50 fixed the `ACTIVE.md`-pointer variant; an earlier fix patched the resolution shape) and every prior fix patched the glob instead of deriving it from the canon. The canon moved; a hard-coded glob broke. Deriving the roots from `core/specs_version.py` is the only shape that survives the *next* canon move |
+| **AS-16** *(new at fold 3 — `software-architect` change 1; **OPERATOR-GATED**)* | **`BUGS.jsonl` has exactly one write seam on the executed path, and the operator chooses how it is exposed.** D11 gives every record a mutable-governance half; FR2/FR13/FR14 as written let **three** writers touch the file — `dadaia bugs append` (the registration, a real verb), the fixer's `status: resolved` rewrite (**no verb exists**: `cli/commands/bugs.py` registers `append`/`status`/`stats`, and `append --event resolved` dies with the event kinds) and the auditor's `audited`/`resolved_commit` rewrite (FR13 "writes with its file tools"). Two of the three would be **file-tool** writers, which makes A2.6 (redaction), A2.9 (refuse-stale) and A14.6 (one atomic rewrite) **unprovable on the executed path** — the release would add two unsealed writers to the one artifact it exists to make trustworthy. **The seam is fixed here** (FR2: `features/bugs`'s record store, atomic + refuse-stale + schema-derived redaction, governance fields only). **How it is exposed is the operator's call:** **(i)** one governance CLI verb `dadaia bugs update <id> --set <field>=<value>`, used by the fixer *and* the auditor — **recommended**; or **(ii)** a skill-invoked Python entry point (`python -m dadaia_workspace.features.bugs.update …`) with no CLI verb | **(i) is recommended, and the D8 reasoning is made explicit rather than assumed.** D8 forbids the lineage check becoming *new CLI validation*; D15 forbids *new blocking* CLI/hook surface. A **writer** is neither: it validates nothing, blocks nobody, and exits 0 on every input that succeeds today (A8.3). What D8 actually outlaws is growth **by reflex** — a verb added because a rule needed somewhere to live. This is the opposite: it **replaces three ad-hoc writers with one**, and it is leaf-neutral, which is the number that settles it. **Leaf arithmetic, exact:** 71 today **+ `bugs update` + `bugs archive` (A2.8) − `specs release open` − `specs segment open`** (both verified at `cli/commands/specs.py:26,28`; both write `ACTIVE.md` via `_write_active` and are **dead** the moment the phase is a `RELEASE.jsonl` fold — T-050-21A) = **71**. Option (ii) reaches the same one-seam property with 69 leaves, at the cost of a documented invocation an agent must not mistype and which no `--help` surface discloses; it is the honest fallback if the operator reads any new verb as growth. **Either way the seam is one**; only its door changes. If (ii) is chosen, T-050-08's write set drops `cli/commands/bugs.py` and the leaf count reads 69 |
+| **AS-17** *(new at fold 3 — `software-architect` change 7; **OPERATOR-GATED**)* | **Three of public-assets' four recurrence engines are deferred, by name, with their intake target.** Retired here: the **skill-roster / manifest** class (FR10A) — FR10's glob discovery is already its single-source replacement, so retiring the hand rosters is a **deletion**, size **S**, net-negative, zero new checks. Deferred: **(1) doctor goldens** (`install-target-doctor-goldens-stale-after-v043-skill-additions`), **(2) `shipped-hashes.json`** (`upgrade-never-refreshes-uncustomised-scoped-law-projection` — where a *new* hand-kept list **was** the fix), **(3) the two projection authorities** (`retired-lib-asset-leaves-orphan-projection`, `dadaia-md-projected-twice-into-claude-code-context`). **Intake target:** one entry, `public-assets-single-source-engines`, compiled into the PM's operator-facing intake report at closure — created by nobody here (`DADAIA.md` §6) | The operator's fold-3 instruction is "(a) a bounded FR if it is ≤ S size and net-negative, else (b) a gated deferral". Measured against the tree the answer **splits**, and saying so is more useful than forcing one verdict: engine 1 of 4 qualifies for (a) and is taken as **FR10A**; engines 2–4 do not. Each of the three lives inside `infrastructure/public_assets.py` (**1 048 LOC, the largest module in the tree**, `#doctor` at **CC 40**) or in the install/upgrade pair, and each replacement is a *new derivation*, not a deletion — the exact "grow the CC-40 function on the surface that re-bugs 18/18" shape the standing order refuses mid-release. Deferring them **with their bug ids and their intake target** is the honest form; deferring them silently is what produced four of the eighteen |
 
 ---
 
@@ -364,6 +396,21 @@ to the FR that executes them. Nothing here is re-decided.
   inferred value is marked inferred. A value nobody assessed is `null`, never a default.
 - **Test intent at birth**, per `dadaia-test-stewardship`. **Zero new `tests/e2e/**`** without
   a named `qa-engineer` exception recorded in that segment's QA artifact.
+- **The test suite does not grow (fold 3, operator mandate).** Baseline **1 859** test
+  functions in 396 files (`architecture-metrics-baseline.md` §6, measured at `974a045f`;
+  re-measured at T-050-03 and that re-measurement is the baseline that binds). The release's
+  target is **net non-positive**: every FR declares `Tests: +N added / −M deleted (named)`,
+  and **A22.9/V25** compute the total from `pytest --collect-only`. A deletion is never a
+  prune-to-green: it is a `qa-engineer` verdict carrying the `file:line` map of the coverage
+  that supersedes it, executed by `software-engineer` (`dadaia-test-stewardship` §E).
+- **Every added test carries its marker, and the markers are ratcheted (fold 3).**
+  `Intent:` + size at birth is doctrine already; what this release adds is the **measurement**
+  that makes it true — one contract file, `tests/contract/test_test_suite_ratchets.py`
+  (T-050-18A), pinning: private-symbol imports (**24 → 0**), `Intent:` header coverage
+  (**94/396 → 396/396**, or a per-segment ratchet carrying its number), `SCAFFOLD` carrying
+  `expires: <M.m.p>`, one number per parameter, and the pyramid shape reported from
+  `--collect-only`. **These are test-suite ratchets, not product checks** — see the A18.3
+  resolution in FR18.
 - **No home-absolute path, operator email literal, IP, hostname, private name or denylisted
   term** enters any authored file, including migration reports and audit artifacts.
 
@@ -387,8 +434,21 @@ lowercase trio) + `memory/AGENTS.md` + `product/`; `releases/` with at most **on
 `audits/` and `ADRs/` per FR13/FR19. `specs/assets/` retires into `memory/ARCHITECTURE.md`;
 `specs/backlog/remote-bugs/` dies; every `README.md` in the scaffold retires into the area's
 `AGENTS.md`. `specs doctor` gains **TREE-8 "nothing beyond canon"** and `--recipe` (ordered
-concrete steps for what `specs upgrade` cannot do alone); `specs upgrade` automates the safe
-renames. **Compliance is WARN-only** — the agent and the operator decide, never a block (D15).
+concrete steps for everything the canon move requires). **Compliance is WARN-only** — the agent
+and the operator decide, never a block (D15).
+
+**`specs upgrade` is not grown by this release (fold 3, `software-architect` change 3).** The
+first Draft had it "automate the safe renames". It is the engine of the forensic's **chain 1**
+— `specs-upgrade-emits-atoms-violating-frontmatter-schema` bred **four followers in eight
+days** — and `cli/commands/specs.py#upgrade` already sits at **CC 26** while `#doctor` sits at
+**CC 30**. Growing either is the puxadinho shape on the surface carrying 13 bugs and 12
+recurrences (§1.6). So: **`--recipe` only**, rendered by its **own** function (never inside
+`#doctor`), the case-only renames executed by hand as recipe steps in T-050-06, and the
+acceptance is measured rather than asserted — `#upgrade` **CC 26 → ≤ 26**, `#doctor`
+**CC 30 → ≤ 30** (A1.4, V19). The migration chain may register whatever declarative v6 entry
+keeps the version stamp reachable for a consumer sitting at v5, but **only** as a declarative
+entry: any change that raises either function's complexity is refused at review. The deferred
+rename automation is compiled as an intake candidate at closure.
 
 **A release directory's conformant members are named by the canon, once** — `SPEC.md`,
 `PLAN.md`, `TASKS.md`, `RELEASE.jsonl`, **`reviews/`** and **`verdicts/`**. Both of the last
@@ -476,9 +536,23 @@ would repeat the "a law-mandated artifact needs its own whitelist line" defect t
      with the reason. There is **no `|| <default glob>`**, no fallback root and no
      "assume the old pattern": a gate that cannot read the canon has not proved coverage.
 
-**Bug-surface direction:** *net-additive in production LOC, net-negative in surface count* —
-one canonical tree replaces "the tree plus the four legacy shapes doctor tolerated"; four
-`README.md` files retire; `specs/assets/` and `remote-bugs/` disappear.
+**Bug-surface direction, with numbers (fold 3, K):** *net-additive in production LOC,
+net-negative in surface count.* Production LOC **+≈200** (V19, per-FR). Scaffold `README.md`
+**4 → 0**; canon-root shapes tolerated by the doctor **5 → 1**; `specs/assets/` and
+`backlog/remote-bugs/` **1 → 0** each. Doctor check codes **47 → 48** here (+TREE-8), landing
+at **≤ 45** release-wide once FR5 and FR15 delete theirs. Hand-kept truth constants: **+2**
+(the canon-root tuple, the release-dir member tuple) against the release's **−13** (baseline
+264 → ≈258, §5 of the metrics baseline). Complexity: `#upgrade` **26 → ≤ 26**, `#doctor`
+**30 → ≤ 30**, functions with CC > 10 **131 → ≤ 133** release-wide with every new function
+above 10 named in V19.
+**Tests: +8 added / −2 deleted (named).** Added: TREE-8 WARN + exit-code fixtures (2), the
+`--recipe`-traces-to-a-finding-id contract test (1), the `--recipe`-zero-findings-zero-steps
+test (1), `#upgrade`/`#doctor` complexity assertions folded into the existing ratchet (0 new
+functions), V21 `check-ignore` (1), V20's seven arms (3 functions, parametrized). Deleted, and
+**named** (`qa-engineer` amendment 11): the scaffold `README.md` presence assertions in
+`tests/unit/features/specs/test_scaffolder.py` (they assert an artifact this FR retires) and
+the `assets/.gitkeep` scaffold assertion in the same file. The double-`upgrade` byte-comparison
+fixture **replaces** nothing and is **not** added — A1.4 becomes a zero-diff assertion instead.
 **Bug-history evidence:** the gitignore class (one class, **nine** registered instances,
 §1.1) is a *governance-path* class — every instance was "a spec artifact that was not where
 the canon said it was, or not where `.gitignore` allowed it to be". TREE-8 names the class
@@ -503,8 +577,12 @@ the release being unable to ship.
   drift from the findings (the `software-architect`'s accepted-with-condition on SA-11). A
   contract test asserts every `--recipe` step traces to a finding id present in the same
   run's `--json` output, and that a run with zero findings emits zero steps.
-- A1.4 `specs upgrade` performs the safe renames idempotently: running it twice is a no-op,
-  proven by a byte-comparison fixture.
+- A1.4 **`specs upgrade` is not grown** (fold 3). Its rename automation is cut; the acceptance
+  is a **measured complexity assertion**, not a behaviour addition: `radon cc` reports
+  `cli/commands/specs.py#upgrade` at **≤ 26** and `#doctor` at **≤ 30** after the release
+  (baseline 26 / 30, `architecture-metrics-baseline.md` §2), and `--recipe` renders in its own
+  function. Any declarative v6 entry added to the migration chain is proven not to raise either
+  number. A zero-diff assertion covers `features/migrate/upgrade.py`'s existing steps.
 - A1.5 The SDD gate's MEMORY-phase resolution and FROZEN class are repointed (FR4 supplies
   the phase source; FR6 supplies the archive paths) with **no new path class** and no second
   classifier. The **phase read** lives in `dadaia_workspace/hooks/sdd_gate.py`
@@ -563,16 +641,53 @@ the release being unable to ship.
 (`additionalProperties: false` kept). One record per bug, appended once — no event stream, no
 fold. The schema declares **three** field categories per property, not two:
 
-- **Immutable core** — `id`, `ts`, `reported_by`, `title`, `severity`, `surface`,
-  `component`, `context`, `symptom`, `repro`, `expected`.
-- **Write-once, absent until set** — `root_cause`, `solution`, `superseded_by`,
-  `migration_note`. They are legitimately missing from a freshly registered record and
-  become immutable the moment they are written. This third category is why the earlier claim
-  "the record's shape never changes" was false against this SPEC's own two examples, and it
-  is tested (A2.2).
+- **Immutable core** — `id`, `ts`, `reported_by`, `title`, `severity`, **`surface` (a closed
+  enum — see below)**, `component` (free text), `context`, `symptom`, `repro`, `expected`.
+- **Write-once, absent until set** — `root_cause`, `solution`, **`evidence_loop`,
+  `evidence_seam`, `evidence_diff`** (the v0.4.4 **FR23 evidence triple**, restored — fold 3,
+  `software-architect` change 2), **`diff_direction`** (`net-negative|net-neutral|net-positive`),
+  `superseded_by`, `migration_note`. They are legitimately missing from a freshly registered
+  record and become immutable the moment they are written. This third category is why the
+  earlier claim "the record's shape never changes" was false against this SPEC's own two
+  examples, and it is tested (A2.2).
 - **Mutable governance** — `status` (`open|resolved|superseded|deferred|rejected`), `cause`,
   `caused_by`, `lineage_source`, `registration_commit`, `registration_granularity`,
   `resolved_commit`, `resolution_granularity`, `resolved_release`, `audited`.
+
+**The FR23 evidence triple is restored, not re-invented (fold 3).** `evidence_loop` (the
+red-loop command actually run), `evidence_seam` (the regression test's seam) and
+`evidence_diff` (what the diff did) exist **today** in `bug-event-v1.schema.json`
+(lines 109/114/119) and are the **only structured evidence the ledger has ever carried** —
+present on **23 of 92** recent resolutions (25 %, forensic §3), all but four of them from
+v0.4.4 onward. The first Draft's record model dropped them, folding everything into a free-text
+`solution`: that would have deleted the one measurable evidence field **in the release built to
+make evidence measurable**, and FR3's migration could not have carried what the model no longer
+had. D11 lists `cause`/`solution` as immutable core because they *are* the solution's
+statement; the triple **is** that statement's evidence, so it takes the same write-once
+posture. Forensic metric 2 (**25 % → target 100 % on post-0.5.0 resolutions**) becomes a
+pillar-1 output (FR14).
+
+**`surface` becomes a closed enum; free text moves to `component` (fold 3,
+`software-architect` change 5, applied per the operator's single-source rule).** The forensic
+had to hand-normalise **86 distinct `component` strings across 100 bugs** into 18 buckets
+before recurrence could be counted at all — which means recurrence is not computable from the
+record today, and pillar 1's "same `component`/`surface`" filter would be a substring guess.
+The enum has **one source, the same one the independence contract uses (FR18/A18.5)**: the
+feature-package inventory on disk. Members are the **24** `dadaia_workspace/features/<name>/`
+packages (verified by glob at this fold), plus the non-feature layers `core`,
+`infrastructure`, `cli`, `hooks`, `tests`, `public-assets`, plus **`unknown`**. A contract test
+asserts the enum's feature arm **equals** the independence contract's `modules =` list, which
+A18.5 makes equal to the packages on disk — so a package added tomorrow goes RED in one place
+and is fixed in one place. `component` keeps the free-text `path#symbol` precision the fine-key
+analysis needs. FR3 maps every legacy string; what it cannot map becomes `surface: unknown`,
+**counted in the migration report** and never guessed.
+
+**A sweep closure is `superseded`, not `resolved` (fold 3, forensic metric 8).** Nine of 92
+recent resolutions were bulk "need met by shipped work" flips with no code-touching commit —
+they read as fixes and pollute every rate computed from the ledger. One sentence of rule, no
+mechanism: a record closed because another shipped item met the need takes
+`status: superseded` with `superseded_by` naming it; `resolved` requires the regression seam.
+Pillar 1 counts violations (baseline 9/92, target 0); nothing blocks.
 
 **`picked` is not a status.** The pick is already recorded by the bundled definition commit
 (FR8 shape 5) and is readable by pillar 2, so the value, its transition and `picked_by` all
@@ -609,6 +724,26 @@ that same seam — `BugService.append_event → BugEvent.redact` becomes
 redacts identically to the append seam; there is one redaction call site per write path and
 both take the same derived set.
 
+**"Derived" must become true — `_OPTIONAL_STR_FIELDS` is deleted, not re-mirrored (fold 3,
+`software-architect` §3).** At HEAD `core/models/bugs.py:204` still holds a **16-name
+module-level tuple** mirroring `bug-event-v1.schema.json`, and the redact docstring
+(line 333) calls it "the SAME schema-mirror tuple". A mirror is a hand-kept list wearing a
+derivation's name: it is the P1 class (16 of the last 100 bugs) sitting inside the very field
+set whose two prior misses (T-043-23 → T-044-62) motivated the seam. FR2 **reads the property
+names from the schema at load time**; the tuple is deleted, and **A2.10** asserts that
+`core/models/{bugs,findings,release_events}.py` carry **zero** module-level field tuples.
+
+**One write seam, three writers collapsed into it (fold 3, `software-architect` change 1 —
+AS-16).** `features/bugs`'s record store is the **only** code path that may write a governance
+field. It is the seam that already carries the atomic rewrite, the refuse-stale re-read and the
+schema-derived redaction, and it is what makes A2.6/A2.9/A14.6 provable **on the executed
+path** rather than only for whichever writer happens to be the CLI. Three writers exist in the
+first Draft — registration, the fixer's resolve, the auditor's `audited` — and **two of them
+would be file tools**. All three now go through this seam; core fields are refused at it
+(A2.2), and the *exposure* of the seam is **AS-16, operator-gated** — one CLI verb
+`dadaia bugs update` (recommended, leaf-neutral at **71**) or a skill-invoked Python entry
+point (69 leaves). The SPEC fixes the seam; the operator fixes the door.
+
 **`dadaia bugs archive` (A2.8, entry clause of `specs-canon-v6`).** The idempotent verb the
 entry requires is in scope here, not deferred: terminal records older than 90 days move from
 `BUGS.jsonl` to `specs/bugs/_archive/bugs_histo.jsonl`, one record per line, through the same
@@ -639,10 +774,34 @@ pillar 1). Every other byte is identical:
 …"resolved_commit":"<40-hex derived by FR3>","resolution_granularity":"exact","audited":"20261020-five-release-window"…
 ```
 
-**Bug-surface direction:** *net-negative* — the fold logic (`reported` + N events → a state
-machine with terminal/non-terminal/repeatable event kinds, seven `allOf` conditional blocks
-in the schema) is deleted and replaced by a flat record; `core/models/bugs.py#BugEvent`
-becomes `BugRecord` with no state machine.
+**Bug-surface direction, with numbers (fold 3, K):** *net-negative in surface, +≈50 LOC.* The
+fold logic (`reported` + N events → a state machine with terminal/non-terminal/repeatable
+event kinds, seven `allOf` conditional blocks in the schema) is deleted and replaced by a flat
+record; `core/models/bugs.py#BugEvent` becomes `BugRecord` with no state machine. Measured:
+**write seams on `BUGS.jsonl` 3 → 1** (AS-16 — the release's one architecture-fidelity
+regression, closed); **"two writers of one truth" 14 → 12** on the ledger (forensic P2 — the
+pair `bugs-append-accepts-second-terminal-event` + `bugs-append-allows-terminal-event-without-reported`
+collapses into one seam plus a WARN); **hand-kept truth constants −4** named
+(`_OPTIONAL_STR_FIELDS` 16 names, `_BUG_LOG_RE`, `ROWS_PER_FILE`, `_sorted_files`);
+**`ignore_imports` 15 → 14**, the retired edge named — `cli.commands.bugs ->
+infrastructure.jsonl_bug_store` (`setup.cfg:232`) dies when the store is container-injected,
+and the cap in `tests/contract/test_import_linter_ignore_cap.py` moves with it in the same
+commit; **modules −2 / +2** (`jsonl_bug_store.py` + `core/protocols/bug_store.py` out,
+`jsonl_record_store.py` + the record protocol in); **CLI leaves ±0** (AS-16 arithmetic).
+**Tests: +9 added / −11 deleted (named).** Added: A2.2 a/b/c (3), A2.6 redaction-on-both-paths
+(1), A2.9 stale-rewrite-refused (1), A2.8 archive idempotence (1), A2.10 no-field-tuple (1),
+A2.11 FR23-triple write-once (1), A2.12 surface-enum-equals-package-list (1). Deleted, by
+**file census** (`qa-engineer` amendment 2 — **9** files reference `BugEvent` at this fold, one
+more than the review's 8; the census is **re-measured at task time**, never trusted from this
+list): `tests/unit/features/bugs/test_service_picked_fold.py`,
+`tests/unit/core/models/test_bugs_picked_event.py`,
+`tests/unit/features/bugs/test_append_coherence.py`,
+`tests/unit/features/bugs/test_jsonl_bug_store.py` — deleted whole with their subject; the
+remaining five (`test_control_format_char_sanitation.py`,
+`test_write_time_denylist_redaction.py`, `test_bugs_write_time_denylist_redaction.py`,
+`test_live_bugs_ledger_still_parses.py`, `test_bind_resolution_seam_dynamic_walk.py`) are
+**rewritten in place** against `BugRecord`, not counted as deletions. Each of the four carries
+a `qa-engineer` verdict with the `file:line` of the coverage that supersedes it.
 **Bug-history evidence:** the event stream itself produced a bug family — the U+2028 record
 (`bug-event-field-with-unicode-line-separator-silently-drops-the-event`) is *silent event
 loss*. **Stated precisely, because the first Draft overclaimed here:** the loss is caused by
@@ -698,6 +857,28 @@ around the append-only model, disappear as `status` values.
   `infrastructure/jsonl_bug_store.py` **and** its event-store protocol
   `core/protocols/bug_store.py` retire together — a protocol whose only implementation is
   gone is dead code behind a dead artifact, the FR15 shape applied to `core/`.
+- A2.10 **Zero module-level field tuples survive.** `_OPTIONAL_STR_FIELDS`
+  (`core/models/bugs.py:204`, 16 names at HEAD) is **deleted**, and a contract test asserts
+  that `core/models/{bugs,findings,release_events}.py` declare no module-level tuple/list/set
+  of property names — the field set is read from the schema. A zero-hit grep is recorded.
+  Without this, A2.6 proves *scrub coverage* while a mirror quietly re-enters (fold 3, §3).
+- A2.11 **The FR23 evidence triple is write-once and carried.** `evidence_loop`,
+  `evidence_seam` and `evidence_diff` exist in `bug-record-v1.schema.json`, are settable once
+  from absent, are refused on a second write at the seam, and FR3 migrates every v5 value that
+  exists (baseline: present on 23 of 92 recent resolutions). `diff_direction` is a closed enum
+  with the same posture.
+- A2.12 **`surface` is an enum with one source.** A contract test asserts the schema enum's
+  feature arm **equals** the independence contract's `modules =` list in `setup.cfg`, which
+  A18.5 asserts equals the `dadaia_workspace/features/*/` packages on disk (**24** at this
+  fold). Adding a package without extending either goes RED once, in one place. `component`
+  remains free text; a fixture proves a legacy free-text surface is refused by the schema and
+  lands as `unknown` through FR3's mapper only.
+- A2.13 **One write seam on the executed path.** Every governance-field write — registration,
+  resolution, `audited`/`resolved_commit` — goes through `features/bugs`'s record store, proven
+  by a fixture that exercises **each** writer role and asserts redaction, atomic replacement
+  and refuse-stale for all three (A2.6/A2.9/A14.6 hold for every writer, not only the CLI). Its
+  exposure is **AS-16**, operator-gated; the acceptance is written so that either option
+  satisfies it.
 
 #### FR3 — Historical ledger rewrite: every record at branch cut, commits derived from git · **size L**
 
@@ -768,6 +949,17 @@ measurement note).
    redaction seam, and re-run until clean. **Never `--no-verify`, never a scan exclusion,
    never a suppression entry.** If a hit is a false positive, it is recorded in the migration
    report with its reason and the denylist is corrected at its source.
+6d. **The FR23 triple and `surface` are carried, never re-derived (fold 3).** Every v5
+   `evidence_loop` / `evidence_seam` / `evidence_diff` value present on a `resolved` event is
+   copied verbatim into the record's write-once fields (baseline: **23 of 92** recent
+   resolutions carry all three; the whole-corpus count is measured and reported). Absent stays
+   **absent**, never `""`. `diff_direction` is populated **only** where the v5 `evidence_diff`
+   text literally carries one of the three tokens — the forensic found the free text already
+   says "net-negative"/"net-neutral"/"net-positive" — else absent. Legacy `surface`/`component`
+   free text is mapped onto the FR2 enum by a **table in the migration module**, one row per
+   legacy string, and every unmapped string becomes **`surface: unknown`** with the original
+   preserved in `component`; the mapper's hit/miss counts and the full `unknown` list go in the
+   migration report. Nothing is guessed and nothing is dropped.
 7. **Legacy archive.** `specs/bugs/_archive/archive.jsonl` (114 `{file, content}` records)
    stays **byte-frozen** and is not converted (**AS-3**); the new
    `specs/bugs/_archive/bugs_histo.jsonl` is created empty and receives future archived
@@ -788,11 +980,23 @@ three days, so a reader coming back at closure — or a remediation release read
 months later — would follow a path that no longer exists. Headline counts additionally land
 in this release's `RELEASE.jsonl` `note` records and in the closure record (CR-11).
 
-**Bug-surface direction:** *net-additive* (a migration module and its report), **explicitly
-justified**: it is a one-shot conversion whose output is data, not a permanent branch. The
-migration module is *deletable* after the release — FR3 states the deletion criterion (once
-`BUGS.jsonl` is canon in every consumer, the v5 adapter and migration retire with a follow-up
-entry). Nothing in the running bugs feature grows.
+**Bug-surface direction, with numbers (fold 3, K):** *net-additive, +≈280 LOC, of which
+≈200 are deletable.* A one-shot conversion whose output is data, not a permanent branch. The
+split is now structural, not a promise: **`core/bug_provenance.py` ≈80 LOC permanent** (pure,
+consumed by FR8's resolver and FR14's pillar 1) and **`features/bugs/migrate_v5.py` ≈200 LOC
+deletable** (v5 adapter + legacy-surface table + runner), with a contract test proving no
+permanent consumer imports the deletable half (A3.10). Code modules **274 → 276** for this FR
+(+2), side-effect call sites **+4** (report writes and the one `log_added_lines`), accepted
+import edges **+0**. Nothing in the running bugs feature grows.
+**Tests: +7 added / −0 deleted.** Added: five in-memory-history cases for
+`core/bug_provenance.py` (single-bug registration · 3-bug squash · ledger-only resolution ·
+line re-added by a later squash · never-added line), one `log_added_lines` synthetic-repo test
+in `tests/contract/`, one idempotence double-run. **Marking (fold 3, `qa-engineer`
+amendment 10):** the `core/bug_provenance.py` tests are `Intent: CONTRACT — 0.5.0 A3.10`
+(permanent — the function outlives the migration); the `migrate_v5.py` adapter and runner tests
+are `Intent: SCAFFOLD — T-050-09 — expires: 0.6.0`, the release that deletes their subject. A
+slipped expiry is **renewed by an explicit `qa-engineer` verdict recorded at that release's
+closure**, never by silence — V28 turns an unrenewed expiry RED.
 **Bug-history evidence:** `specs-bugs-jsonl-store-gitignored` (the ledger itself was once
 untracked) is why the derivation must run over **all refs including tags** rather than trust
 `main`; the 155 release-squash resolutions and the 39/117 ledger-only resolution commits
@@ -845,14 +1049,26 @@ untracked) is why the derivation must run over **all refs including tags** rathe
   migration range returns clean **before** the first push (**V22**), and the migration report
   contains counts only — a scan of the report for values, terms or absolute paths returns
   zero hits.
-- A3.10 The derivation is a **pure core function** over an iterator of
-  `(sha, parents, date, touched_paths, added_lines)`. Git access is a
-  `core.protocols.GitHistoryReader` implemented in
+- A3.10 **The derivation is a pure function and it lives in `core/`** (fold 3,
+  `software-architect` change 4 — the first Draft called it "a pure core function" while
+  T-050-09 placed it in the deletable `features/bugs/migrate_v5.py`, which FR8's resolver and
+  FR14's pillar 1 then depended on: a permanent consumer importing a module declared
+  disposable). Its home is **`dadaia_workspace/core/bug_provenance.py`** — pure, stdlib-only,
+  over an iterator of `(sha, parents, date, touched_paths, added_lines)`. `migrate_v5.py` keeps
+  **only** the v5 line adapter, the legacy-`surface` mapping table and the one-shot runner, and
+  stays deletable **without touching a single permanent consumer**; a contract test asserts
+  `core/bug_provenance.py` imports nothing from `features/**` and that no permanent consumer
+  imports `migrate_v5`. Git access is a `core.protocols.GitHistoryReader` implemented in
   `dadaia_workspace/infrastructure/git_subprocess.py` (`GitSubprocessClient` gains
   `log_added_lines(pathspec)`) and injected via the container — so `features/**` imports
   neither `infrastructure` nor `subprocess`, and `lint-imports` stays green with **no new
   accepted edge**. Its unit tests run the pure function over an in-memory history fixture;
   no synthetic git repository is required for them.
+- A3.11 **Every carried value is counted.** The migration report states: FR23-triple values
+  carried (all-three / partial / none), `diff_direction` populated vs absent, `surface` mapped
+  vs `unknown` (with the `unknown` list), each as a count against the branch-cut corpus. A
+  `surface: unknown` share above **10 %** is a fact to record and a mapper row to add — never a
+  reason to widen the enum.
 
 #### FR4 — `RELEASE.jsonl`: milestone shas replace `ACTIVE.md` and `CLOSURE.md` · **size L**
 
@@ -893,6 +1109,17 @@ tri-state resolver in the same shape as today's `_active_field`. `hooks/sdd_gate
 directly (hooks never import the container, standing law), and so do `container.py` and the
 doctor. One reader, one fold, three callers.
 
+**`release_events.py` is read-only, and the append seam is named (fold 3,
+`software-architect` §2 — an `UNSPECIFIED` closed).** The module **reads and folds; it never
+writes**, so `core/`'s "modules mixing compute and write" count (53 of 77 writer modules at
+baseline) does not gain a member. Milestone and `phase` records are appended by **agents with
+file tools** — one writer class, stated plainly: T-050-11 (back-fill), T-050-26 (`audited`),
+T-050-28/33 (the memory window), T-050-37/38 (`rc`), T-050-42/43 (`implemented`, `shipped`).
+That is acceptable **because `RELEASE.jsonl` is append-only** — no in-place rewrite, no
+read-modify-write, so the `O_APPEND` race-benign property the bug ledger had to give up is
+kept here for free. A contract test asserts `core/release_events.py` contains no write call
+(`open(... "w"/"a")`, `write_text`, `atomic_write`).
+
 `ACTIVE.md` and `CLOSURE.md` **retire**: the active release and phase are the fold of the
 newest `RELEASE.jsonl`; the closure narrative moves into the final `rc`'s records plus the
 release's own `SPEC.md` provenance. **`ACTIVE.md` has 28 consumers in `dadaia_workspace/`,
@@ -929,10 +1156,30 @@ archive. **Both archive layouts are scanned**, because the archive carries two:
 denominator is defined as **the count of directories the scan actually visits across both
 layouts**, reported with the four non-version directories named and excluded.
 
-**Bug-surface direction:** *net-negative in surface, net-additive in LOC* — two hand-authored
-Markdown files with parsers (`ACTIVE.md`'s two-line schema; `CLOSURE.md`'s section-and-table
-regexes in `doctor_closure_audit.py`) collapse into one machine record read by one fold.
-Every regex that parses release prose is deleted.
+**Bug-surface direction, with numbers (fold 3, K):** *net-negative in surface, +≈50 LOC.* Two
+hand-authored Markdown files with parsers (`ACTIVE.md`'s two-line schema; `CLOSURE.md`'s
+section-and-table regexes in `doctor_closure_audit.py`) collapse into one machine record read
+by one fold. Measured: **release-phase authorities 28 → 1** (the 28 enumerated consumers →
+`core/release_events.py`); **modules reading `ACTIVE.md` 10 → 0**, reading `CLOSURE.md`
+**4 → 0** (metrics baseline §5); **regexes parsing release prose 22 → ≈9** together with FR15
+(**−59 %**), of which `_active_field`'s **2** die here; **hand-kept constants −2**
+(`_active_field`'s two regexes) **+1** (the seven event kinds); **CLI leaves −2** —
+`specs release open` and `specs segment open` (`cli/commands/specs.py:26,28`, both writing
+`ACTIVE.md` through `_write_active` at lines 390/428) are **dead** once the phase is a fold and
+are deleted in T-050-21A, which is the offset AS-16's arithmetic spends.
+**`_ideas/` release directories carry no `RELEASE.jsonl`** (fold 3, contradiction 4): D10's
+commit rule makes an `_ideas/` release **SPEC-only**, so the window scan of FR14 and A4.6 reads
+the **live** release, `releases/_archive/**` and `releases_histo.jsonl` — and nothing under
+`_ideas/`. The first Draft scanned `_ideas/**` for milestones that the canon forbids it to
+carry; the scan is narrowed, not the rule.
+**Tests: +5 added / −0 deleted here; −(26+4) census dispositioned at T-050-21A.** Added:
+milestone immutability (1), the no-`ACTIVE.md` gate fixture (1, at T-050-21A), the
+`release_events.py`-is-read-only contract test (1), the seven-kind schema fixture (1), V7's
+back-fill assertion (1). The **26 `ACTIVE.md` files** (re-verified at this fold: 26 files, 84
+occurrences) and **4 `CLOSURE.md`** files each carry a `qa-engineer` per-file verdict at
+T-050-21A; every file whose *whole subject* is the retired artifact — beginning with
+`tests/unit/features/specs/test_active_md_schema_v2.py` — is **deleted**, not rewritten, and
+the deletions are counted in V25.
 **Bug-history evidence:** the release-state surface has produced repeated bugs of the
 "artifact says one thing, tree says another" shape — the v0.4.4 verdict gate resolving by
 artifact across two trees (`ACTIVE=none` broke it), and the gate's phase lookup depending on
@@ -941,7 +1188,11 @@ a file an agent hand-edits. A folded event stream has one writer and one reader.
 **Acceptance**
 - A4.1 `RELEASE.jsonl` exists for the live release; the SDD gate resolves the MEMORY phase by
   folding it, with `ACTIVE.md` gone and **no fallback branch** left behind (proven by the
-  gate diff and a fixture with no `ACTIVE.md` present).
+  gate diff and a fixture with no `ACTIVE.md` present). **Owned by T-050-21A, not T-050-11**
+  (fold 3, traceability gap 1): T-050-11 is the *expand* half and its done criterion is
+  "`ACTIVE.md` still present", which cannot evidence an acceptance requiring it gone.
+  T-050-11 evidences **A4.1a** — both files live, read in parallel, agreeing — and A4.1
+  proper is evidenced at the contract step.
 - A4.2 The three sha-bearing milestones are appended at their defined moments during **this
   release's own** lifecycle, and are immutable — a contract test refuses a rewrite.
 - A4.3 `releases_histo.jsonl` carries one block per archived release; every sha it claims is
@@ -991,9 +1242,20 @@ carrying the release id and its consumed slugs) and repoints `ledger.py` at it, 
 runs. The degrade-to-`{}` behaviour is kept for a genuinely absent record; what is removed is
 the accidental permanent absence.
 
-**Bug-surface direction:** *net-negative* — the dual-section document (ACTIVE + LEDGER) whose
-invariants `backlog doctor` polices (BL-DUP, BL-STALE) becomes a single-section document plus
-an append-only file; the duplicate-ledger-line class (BL-DUP) becomes structurally impossible.
+**Bug-surface direction, with numbers (fold 3, K):** *net-negative, −≈60 LOC.* The
+dual-section document (ACTIVE + LEDGER) whose invariants `backlog doctor` polices (BL-DUP,
+BL-STALE) becomes a single-section document plus an append-only file; the duplicate-ledger-line
+class (BL-DUP) becomes structurally impossible. Measured: **BL check codes 4 → 3**;
+`features/backlog/document.py` **LEDGER regexes 7 → ≈4**; hand-kept constants **−3**. The
+backlog histo takes a **third instance** of the generic store — `core/models/backlog.py` exists
+at HEAD and gains its container registration **here** (fold 3, traceability gap 4: A13.4 claims
+"three registrations" and the third had no task write set).
+**Tests: +3 added / −4 deleted (named).** Added: the exit fixture (1), the 18-sidecar
+relocation + BL-STALE-still-fires fixture (2). Deleted with their subject, per `qa-engineer`
+§7's best-in-class model — BL-DUP's tests **die because the invariant became structurally
+impossible**, not because it stopped being watched: the BL-DUP cases in
+`tests/unit/features/specs/test_doctor_ledger_invariants.py` and the backlog-doctor duplicate
+cases, enumerated per-file at task time with the `file:line` of the structural argument.
 **Bug-history evidence:** `backlog-candidates-md-tracked-violates-noncanonical-gitignore` and
 `backlog-gitignored-governance-vacuous` are two of the four gitignore-class recurrences and
 both are about *where backlog state lives*; the BL-DUP rule exists because closure sweeps
@@ -1016,6 +1278,16 @@ appended a second LEDGER line instead of updating the first.
 
 *Entry: `specs-canon-v6` (destructive step) · operator ruling **D1 of 2026-08-23**: "git
 history is the archive"; executed **only with the operator present** (D-H).*
+
+**Bug-surface direction, with numbers (fold 3, K):** *neutral in LOC, neutral on the
+spec-context surface.* FROZEN prefixes **1 out / 1 in** (`gate_policy.py`); path classes
+**5 → 5**; classifier branches **unchanged**. §1.6 states the consequence plainly: this
+release does **not** reduce the spec-context surface (10 bugs, 9 re-bugged) — it moves one
+string and adds four fixtures.
+**Tests: +5 added / −1 deleted (named).** Added: one FROZEN fixture per enumerated post-v6
+path (4) and V8's throwaway-clone reachability (1). Deleted: the single-root FROZEN fixture
+whose subject (`_FROZEN_PREFIX = "specs/_archive/"`) this FR retires — named at task time from
+`tests/unit/hooks/` and `tests/integration/gate/`.
 
 **Acceptance**
 - A6.1 An `archive/specs-archive-<YYYYMMDD>` tag is created **and pushed**, and its
@@ -1062,9 +1334,16 @@ Owner: `ai-engineer` (skills, personas, `DADAIA.md`, `AGENTS.md`) + `software-en
 A new model-invoked core skill `dd-diagnose`, called by `dd-bug-resolution`, carrying the
 diagnosing method as ordered phases each ending on a checkable *Done when*:
 
-- **Phase 0 — lineage (D8).** Filter `BUGS.jsonl` for records with the same `component` or
-  `surface` inside the audit window (since the newest `audited` milestone in any
-  `RELEASE.jsonl`, or the whole file when none). Read each prior record's resolution diff —
+- **Phase 0 — lineage (D8), bounded.** Filter `BUGS.jsonl` for records with the same
+  **`surface` (now an exact enum match, FR2) or `component`** inside the audit window (since
+  the newest `audited` milestone in the live release, `releases/_archive/**` or
+  `releases_histo.jsonl` — never `_ideas/`, which carries no `RELEASE.jsonl`; or the whole file
+  when none). **The read is capped at the 20 most recent matching records, ordered by
+  resolution date, and only those with `resolution_granularity == "exact"` are diffed**
+  (fold 3, `software-architect` §5): at 3.2 bugs/day over a five-release window the uncapped
+  filter is 100–300 records per fix, which is how a procedure becomes a ritual nobody performs.
+  Twenty is the number; a fixer who wants more runs the audit. Read each prior record's
+  resolution diff —
   `git show <resolved_commit>` when `resolution_granularity == "exact"`, and, when it is
   `release-squash` or `ledger-only`, say so instead of pretending the diff is the fix. Declare
   `caused_by: <bug-id>` or `caused_by: none`, with evidence, in the record and echoed in the
@@ -1098,10 +1377,19 @@ Home: `dd-diagnose/SKILL.md` (short) + disclosed sibling `dd-diagnose/LINEAGE.md
 full) + `specs/bugs/AGENTS.md` (the scoped summary) + the short `DADAIA.md` section FR11 lands.
 `dd-bug-resolution/SKILL.md` points at it and keeps only the bug lifecycle.
 
-**Bug-surface direction:** *net-additive in AI-surface lines, net-negative in duplicated
-procedure* — `dd-bug-fix` §3–§5 today restates outcomes without procedure; that text is
-**moved**, not copied, and `dd-bug-resolution` gets shorter. A coverage table (every removed
-block → its surviving home) is mandatory.
+**Bug-surface direction, with numbers (fold 3, K):** *net-additive in AI-surface lines,
+net-negative in duplicated procedure; **zero** production LOC.* `dd-bug-fix` §3–§5 today
+restates outcomes without procedure; that text is **moved**, not copied, and
+`dd-bug-resolution` gets shorter. A coverage table (every removed block → its surviving home)
+is mandatory. Measured: skills **21 → 22**, skill siblings **+1** (`LINEAGE.md`); CLI leaves
+**+0**, hook files **+0** (A7.5). The governance cost is stated rather than hidden: **steps per
+bug 7 → 9** (an isolated registration commit, and phase 0's bounded lineage read) — a
+deliberate +2 whose payoff is forensic metric 1, **28 % → 100 %** attributable resolutions
+going forward. Phase 0's cost is bounded at **≤ 20 records / ≤ 20 `git show` calls** per fix.
+**Tests: +0 added / −0 deleted.** FR7 authors AI-surface text only; its acceptance is the
+coverage table, the citation check (A7.2) and the zero-diff grep over `cli/`+`hooks/` (A7.5) —
+none of which is a new test function. Stated explicitly so "AI work" never quietly imports a
+test-count increase.
 **Bug-history evidence:** the certify probe re-bugged 37 minutes after its fix (no red loop
 before the hypothesis — phases 1–3); the frozen-clock → guard → guard's-bug chain (no lineage
 read, and the fix grew the feature by 294 LOC — phase 0 plus the `caused_by` clause); 132/471
@@ -1153,9 +1441,21 @@ otherwise. Git is the authority; the field is a cache; and the **only writer of 
 FR14's pillar 1**, in the same atomic in-place rewrite that sets `audited`. Pillar 1 reports a
 stored value that disagrees with the derivation as a finding.
 
-**Bug-surface direction:** *net-negative in code, net-additive in documented rule* — nothing
-is added to the CLI or the hooks; one resolver function replaces the ad-hoc
-`git log --grep <slug>` recipes scattered through skills.
+**`registration_commit` has a named writer too (fold 3, traceability gap 5).** The first Draft
+named a writer for `resolved_commit` (pillar 1) and none for `registration_commit` on
+post-0.5.0 records, leaving a field with no filler. Same answer, same seam: **pillar 1 writes
+both derived shas and both granularity markers in the one atomic rewrite that sets `audited`**
+(A14.6 extended). Registration itself stays `dadaia bugs append` in an isolated commit
+(shape 1), which is what makes the derivation `exact`.
+
+**Bug-surface direction, with numbers (fold 3, K):** *net-negative in code, net-additive in
+documented rule.* Nothing is added to the CLI or the hooks by this FR; one resolver function
+replaces the ad-hoc `git log --grep <slug>` recipes scattered through skills. Measured:
+commits per bug **1–2 (often 0 attributable) → exactly 2, both attributable**; forensic
+metric 1 **28 % → 100 %** on post-0.5.0 resolutions; ad-hoc `git log --grep` recipes in skills
+**→ 0**, replaced by one resolver in `core/bug_provenance.py` (A3.10).
+**Tests: +2 added / −0 deleted.** The audit-filled-equals-derived contract test over ≥ 20
+historical records (1) and the duplicate-statement scan (1).
 **Bug-history evidence:** §1.2 — 155 resolutions inside release squashes and 39 ledger-only
 resolution commits mean the history cannot be diffed. These five shapes are the minimum that
 makes the *next* 490 bugs diffable.
@@ -1171,9 +1471,13 @@ makes the *next* 490 bugs diffable.
   this release's own bugs, the value pillar 1 wrote into `resolved_commit` equals what the
   resolver derives from git. A record that has not been audited carries `null` and that is
   correct, not a failure.
-- A8.3 **Zero** new blocking validation: `dadaia bugs append`/`resolve` exit codes are
-  unchanged for every input that succeeds today, proven by the existing CLI-output-stability
-  fixtures staying green untouched.
+- A8.3 **Zero** new blocking validation: **`dadaia bugs append`** exit codes are unchanged for
+  every input that succeeds today, proven by the existing CLI-output-stability fixtures staying
+  green untouched; the same holds for `bugs update`/`bugs archive` if AS-16(i) is chosen. *(Fold
+  3, contradiction 5: the first Draft named `dadaia bugs resolve`, **a verb that does not
+  exist** — `cli/commands/bugs.py` registers `append`, `status` and `stats`, and the
+  `--event resolved` route dies with the event kinds. That absence is exactly what AS-16
+  exists to close, so the corrected wording names the verbs that will exist.)*
 - A8.4 This release's own commits obey the shapes; FR16's pillar-2 dry run reads them and
   reports conformance (a self-check the release must pass on its own history).
 
@@ -1208,8 +1512,21 @@ release.*
   here: it is new CI surface on a LOW finding, and the honest statement is the cheaper and
   more truthful fix. It is compiled as an intake candidate at closure.
 
-**Bug-surface direction:** **net-negative, unambiguously** — two blocking mechanisms and one
-fail-closed runner are deleted; nothing replaces them in code.
+**Bug-surface direction, with numbers (fold 3, K):** **net-negative, unambiguously, −≈60
+LOC.** Two blocking mechanisms and one fail-closed runner invocation are deleted; nothing
+replaces them in code. Measured: **git-hook hard-exit scripts 2 → 1**; **hook blocks a human
+can hit 2 → 0**; `cli/commands/ci.py` **455 → ≈395 lines**; hand-kept constants **−1**
+(`_staged_backlog_paths`' path set); V10 negative.
+**Tests: +3 added / −2 deleted (named, verdict pre-committed).** Added: pre-commit-exits-0-on-a
+-rejected-stage (1), failing-preflight-no-longer-blocks (1), unresolvable-runner-still-refuses
+(1). **Deleted — `qa-engineer` amendment 4, verdict stated now rather than deferred:**
+`tests/integration/test_precommit_backlog_scoping.py` (imports `_run_backlog_doctor_gate`;
+would fail to import) **and** `tests/e2e/features/test_backlog_precommit.py` (**a LARGE-tier
+file whose entire premise — pre-commit *blocking* a bad stage — is deleted by this FR**).
+Rewriting either would be a change-detector test of the new advisory behaviour, the class
+`dadaia-test-stewardship` §B prohibits; the three new contract fixtures above **are** their
+replacement, at a cheaper tier, cited in the commit message per the stewardship separation of
+powers. This is the release's **one LARGE-tier removal with no replacement at that tier**.
 **Bug-history evidence:** `precommit-backlog-doctor-blocks-unrelated-commits` is registered in
 the ledger; the block stopped human commits on a shared tree and pushed agents into
 `--no-verify` and other worse workarounds — a gate that *causes* the behaviour it exists to
@@ -1226,9 +1543,13 @@ prevent. It is also redundant: CI already runs `backlog doctor`.
   recorded), not left dead. Their two direct exercisers —
   `tests/integration/test_precommit_backlog_scoping.py` (which imports
   `_run_backlog_doctor_gate` and would fail to import) and its E2E companion
-  `tests/e2e/features/test_backlog_precommit.py` — carry a recorded **`qa-engineer` verdict**
-  naming, per file, delete or rewrite, with the evidence for that choice. The implementer
-  neither deletes nor skips them to go green.
+  `tests/e2e/features/test_backlog_precommit.py` — are **DELETED**, under a recorded
+  `qa-engineer` verdict whose evidence is the three replacement contract fixtures at
+  `file:line` and the argument that the E2E's premise no longer exists. *(Fold 3, `qa-engineer`
+  amendment 4: the first Draft left "delete or rewrite" open at task time; an open verdict on a
+  test whose subject is deleted resolves toward "rewrite" by default, which is how a
+  change-detector enters a suite.)* The implementer neither deletes nor skips them to go green:
+  the verdict is `qa-engineer`'s and the execution is `software-engineer`'s, as always.
 - A9.6 The secret-scan coverage limit above is recorded in the segment's QA artifact as a
   known, accepted gap with its intake candidate, not as a passed check.
 - A9.4 The preflight rule exists in `DADAIA.md` §7 (landed by FR11) and in
@@ -1271,10 +1592,27 @@ no row; a `DADAIA.md` section has no owner row; a row names a member that does n
 member changed without its hash tuple being re-recorded. Mutation fixtures prove **each**
 direction.
 
-**Bug-surface direction:** *net-additive in tests, net-negative in unmapped surface* — the
-existing enforcer is **extended**, not duplicated: one map file, one enforcer module. A second
-map would be the puxadinho; `rules-skills-map.json` therefore retires into
-`behavior-map.json` rather than living beside it.
+**Bug-surface direction, with numbers (fold 3, K):** *net-neutral in tests, net-negative in
+unmapped surface.* The existing enforcer is **extended**, not duplicated: one map file, one
+enforcer module. A second map would be the puxadinho; `rules-skills-map.json` therefore retires
+into `behavior-map.json` rather than living beside it. Measured — **the release's cleanest
+gain**: map coverage **5 rows over 25 members (16 %) → 31 members (22 skills + 9 scoped
+`AGENTS.md`) at 100 %, RED in five directions**; entity map files **2 → 1**; entity schemas
+**1 → 1**.
+**Tests: +5 added / −9 deleted (named).** Added: the five mutation fixtures, one per RED
+condition. Deleted: `tests/contract/test_rules_skills_map.py` **whole-file, nine checks**,
+proven ported by A10.6's name-diff with a zero-hit residue — a **rename-and-extend, not a
+duplication**, which is why the count is roughly flat rather than additive.
+**The five new fixtures carry a cross-platform obligation (fold 3, `qa-engineer` amendment
+6).** The file being retired is the home of two registered bugs —
+`citation-enforcer-resolves-projected-instance-paths-against-the-checkout` and
+`citation-mutation-fixtures-never-turn-red-on-windows` — and the second is precisely *a
+mutation fixture that never turned RED on Windows*. Replacing that file with **five new
+mutation fixtures** re-creates the shape class unless the RED direction is proven on every
+platform: each of the five is therefore **run on the cross-platform CI matrix and observed RED
+before its correction and green after**, on the matrix, **before `S2` closes** — with both bug
+ids cited by id in T-050-19's done criterion, the same discipline A16.2 demands of the audit.
+"Watched" is not enough for a shape that has already fired.
 **Bug-history evidence:** the AI surface's recurring class is the **stale citation** —
 `dadaia-task-manager-stale-workspace-protocol-citation` (cites §1 for content at §3) and the
 v0.4.5 FR14 `ai-engineer.md` citation (cites §5 for content at §8), both found by humans, both
@@ -1311,6 +1649,56 @@ to a class that has now fired twice.
   `tests/contract/test_frozen_clock_aging_ratchet.py`,
   `tests/contract/test_public_scripts_thin_wrapper.py`.
 
+#### FR10A — public-assets: the hand rosters retire with the glob · **size S**
+
+*New at fold 3 — `software-architect` change 7, second half; the one public-assets recurrence
+engine that qualifies for a bounded FR (§1.6, AS-17).*
+
+FR10 makes skill and scoped-`AGENTS.md` discovery **structural** — the enforcer globs the
+generators. That single-sources the roster class **only if the hand rosters it makes redundant
+are actually deleted**; left in place they keep drifting, and this release gives them ten fresh
+chances to drift (ten projection cycles, one skill renamed, one added, five scoped `AGENTS.md`
+authored).
+
+**Scope, bounded and deletion-only:** every `EXPECTED_SKILLS`-style hand-kept roster or
+manifest tuple under `tests/` whose membership FR10's glob now derives is **deleted** and its
+assertion repointed at the glob. The exact file list is **produced by measurement at task
+time** — `grep -rn "EXPECTED_SKILLS\|SKILL_ROSTER\|frozenset({" tests/` restricted to
+skill/persona/`AGENTS.md` membership — and recorded in the task, because a hand list of hand
+lists is the same defect one level up. **Zero new checks** are written: the existing assertions
+keep their subject and lose their literal.
+
+**Explicitly out of scope, and deferred by name — AS-17:** the doctor goldens,
+`shipped-hashes.json`, and the two projection authorities. Each lives in
+`infrastructure/public_assets.py` (1 048 LOC, `#doctor` at CC 40) and each replacement is a new
+derivation rather than a deletion.
+
+**Bug-surface direction, with numbers:** **net-negative, deletion-only.** Hand-kept truth
+constants **−N** where N is the measured roster count (forensic P1: hand-kept lists are **16 of
+the last 100 bugs**; the roster sub-family is **4** —
+`skill-orphans-unwired-agent-frontmatter`, `test-public-assets-stale-grill-me-name`,
+`test-public-pipeline-stale-skill-roster`, `skill-orphan-checker-misses-disable-model-invocation`).
+Production LOC **±0** — this FR touches `tests/` only. public-assets recurrence engines retired
+**1 of 4**; the other three carry AS-17's stated deferral and intake target.
+**Bug-history evidence:** the four bugs above are one class — *"a roster a human must remember
+to extend"* — and three of them were fixed by extending the roster. FR10's glob is the
+structural replacement; this FR is the deletion that makes the replacement real.
+**Tests: +0 added / −0 deleted; N literals removed.** No test function is added or removed —
+assertions are repointed. Any assertion that cannot be repointed because its subject is genuinely
+hand-curated is **kept, with its reason recorded in the task**, never deleted to make a number.
+
+**Acceptance**
+- A10A.1 The roster inventory is **measured, listed in the task, and each entry dispositioned**
+  (repointed / kept-with-reason); zero entries are left undispositioned.
+- A10A.2 A zero-hit grep records that no deleted roster literal survives; the repointed
+  assertions are green and go RED when a skill is added without a `behavior-map.json` row
+  (proven by reusing one of FR10's five mutation fixtures — no sixth fixture is written).
+- A10A.3 `dadaia public doctor` green; the diff touches **no** file under
+  `dadaia_workspace/infrastructure/` (that is AS-17's territory, and staying out of it is the
+  bound).
+- A10A.4 The three deferred engines are named in the closure record's intake candidates with
+  their bug ids (AS-17) — a deferral without its target is how four of the eighteen happened.
+
 #### FR11 — `DADAIA.md`: anchors, the D15 posture, and the three short sections · **size M**
 
 *Entry: `entity-behavior-map` (single owner of the `DADAIA.md` write, BL-CONFLICT adjudication
@@ -1338,10 +1726,33 @@ the enforcer. On top of the anchors:
   the record contract — immutable core, write-once, mutable governance — is **audited, not
   gated**."* No new path class, no second classifier, one row of text (SA-2/A-7).
 
-**Bug-surface direction:** *net-additive in always-on tokens* — and therefore governed by a
-hard rule: **every section added here is a pointer, never a restatement**, and the FR reports
-the token delta of the always-on set (V12). The v0.4.5 token-economy program measured the
-budget; this release must not silently spend its gains.
+**Bug-surface direction, with numbers and a ceiling (fold 3, K + I):** *net-additive in
+always-on tokens, bounded.* Every section added here is a pointer, never a restatement, and the
+FR reports the token delta with per-section attribution (V12). **The measurement is no longer
+the whole control — there is a number.** Baseline **21 511** always-on tokens (law chain 3 692
+· 9 personas 16 344 · 21 skill descriptions 1 475, `architecture-metrics-baseline.md` §7).
+
+| Addition | Budget (tokens) |
+|---|---|
+| D15 enforcement-posture section | ≤ 90 |
+| bug-lineage + commit-shape section | ≤ 130 |
+| audits section | ≤ 110 |
+| memory two-tier + ADR section | ≤ 110 |
+| always-on preflight rule | ≤ 50 |
+| §3 ADDITIVE-row rewrite | ≤ 10 net |
+| behaviour anchors (comment markup, **counted separately**) | ≤ 60 |
+| removed — the `ACTIVE.md` sentence | ≈ −15 |
+| **Ceiling on the always-on set** | **+500 ⇒ ≤ 22 011 (+2.3 %)** |
+
+**A ceiling is not a target and an overshoot is not renegotiated.** If V12 measures above
+22 011, FR11 **cuts text** until it does not; re-measuring, averaging across the persona set,
+or moving a section into a skill that the law then has to cite are all refused. Anchors are
+comment markup (`<!-- behavior: bugs -->`) and are attributed on their own line so they can
+never hide inside a section's number (A11.1). The v0.4.4 always-on target (≤ 3.5 k) was missed
+by ~6× and v0.4.5 was still dieting the same file this month: a governance release is exactly
+the shape that spends those gains silently.
+**Tests: +0 added / −0 deleted.** FR11 is authored text plus a measurement; its acceptances are
+V12, the duplicate scan and `public doctor`.
 **Bug-history evidence:** the always-on budget missed its A21.9 target in v0.4.4 (~8.2k vs
 ≤3.5k) and was still being cut in v0.4.5 FR11. A governance release is exactly the kind that
 grows the law file; naming the risk and measuring it is the mitigation.
@@ -1356,7 +1767,9 @@ grows the law file; naming the risk and measuring it is the mitigation.
 - A11.2 Each new section is ≤ the size the map row needs to point at it, and states no
   procedure that a skill already states — proven by the FR8/A8.1 duplicate scan.
 - A11.3 The always-on token count is measured before and after (V12); an increase is reported
-  with its per-section attribution, never averaged away.
+  with its per-section attribution, never averaged away, and **stays at or under the +500
+  ceiling (≤ 22 011 total)**. An overshoot is closed by cutting text, in this task, before the
+  segment closes (fold 3, I).
 - A11.4 `dadaia public stage && dadaia public install --target all && dadaia public doctor`
   is green and the projected law is byte-identical to source.
 
@@ -1383,9 +1796,18 @@ grows the law file; naming the risk and measuring it is the mitigation.
 - The scoped `AGENTS.md` files (`specs/`, `backlog/`, `bugs/`, `releases/`, `memory/`,
   `audits/`, `ADRs/`) are authored short and direct, hash-projected under the TREE-5 regime.
 
-**Bug-surface direction:** **net-negative in AI-surface lines**, measured (V11) — two files
-die (`CLOSURE-TEMPLATE.md`, `CLOSURE-CHECKS.md` folded), one skill is renamed rather than
-duplicated, and procedure moves out of prose into pointers.
+**Bug-surface direction, with numbers (fold 3, K):** **net-negative in AI-surface lines**,
+measured (V11); **zero** production LOC. Two files die (`CLOSURE-TEMPLATE.md`,
+`CLOSURE-CHECKS.md` folded), one skill is renamed rather than duplicated, and procedure moves
+out of prose into pointers. Measured file counts, stated so V11's *line* claim is read against
+them rather than instead of them: skill siblings **+3 here** (`RC-FLOW.md`,
+`RELEASE-EVENTS.md`, `MEMORY-UPDATE.md`) **−2** (`CLOSURE-TEMPLATE.md`, `CLOSURE-CHECKS.md`);
+scoped `AGENTS.md` shipped by the library **4 → 9**; skills **22 → 22** (the rename is not an
+addition). **File count rises while line count falls — both are reported** (V11 + the file
+table), because a release that reports only the falling one is doing what this release exists
+to stop.
+**Tests: +0 added / −0 deleted.** Skill and scoped-law authoring; the enforcer that covers it
+is FR10's, already counted.
 **Bug-history evidence:** the stale-citation class again (A10's evidence) — every one of these
 renames breaks references, which is exactly what FR10's enforcer now catches; and
 `dadaia-task-manager-stale-workspace-protocol-citation` is the registered proof that a rename
@@ -1455,9 +1877,16 @@ a schema with `additionalProperties: false`):
 {"id":"20261020-five-release-window-F003","pillar":"bugs","severity":"HIGH","refs":["certify-skip-detail-leaks-full-codex-output","codex-live-probe-gate-checks-presence-not-usability","<sha-B>","<sha-A>"],"claim":"fix-induced bug: the skip-detail leak rides the second render path the probe-gate fix introduced, and the probe-gate bug resolved without a structural cause","evidence":"git show <sha-A> -- dadaia_workspace/features/certification (second render path added); BUGS.jsonl codex-live-probe-gate-checks-presence-not-usability cause=null","disposition":"fixed","release":"<the remediation release id>","reason":"one render path; regression test at the formatter seam"}
 ```
 
-**Bug-surface direction:** *net-additive* (a schema and a folder), justified: it replaces an
-HTML artifact outside `specs/` that no tool could read with a committed record that three
-tools read. `README.md` retires.
+**Bug-surface direction, with numbers (fold 3, K):** *net-additive, +≈80 LOC*, justified: it
+replaces an HTML artifact outside `specs/` that no tool could read with a committed record that
+three tools read. `README.md` retires. Measured: public schemas **6 → 8** across the release
+(−`bug-event-v1`, +`bug-record-v1`, +`finding-record-v1`, +`release-event-v1`); scaffold
+`README.md` **4 → 0** (one of them here); store **implementations 1**, instances **= callers**
+(A13.4).
+**Tests: +3 added / −0 deleted.** The finding-schema fixture seeded from the valid-JSON example
+(1), the FROZEN-for-auditor fixture (1), and A13.6's four persona-allowlist assertions folded
+into **one** parametrized function (1) — parametrization over four copies is the DAMP/count
+trade the literature names, and the count is the honest one.
 **Bug-history evidence:** the audit lane's own failure history — `specs/audits/README.md`
 documents a convention no tool honours, and the persona is *forbidden* to write the folder its
 own README describes. A documented convention with no writer is how drift starts.
@@ -1472,11 +1901,27 @@ own README describes. A documented convention with no writer is how drift starts
   is projection-time documentation, and the SPEC says so rather than implying a control that
   does not exist.
 - A13.3 `specs/audits/README.md` is deleted and its content lives in `audits/AGENTS.md`.
-- A13.4 A finding's governance fields can be rewritten in place leaving every other byte
-  identical, through the **generic `JsonlRecordStore`** of A2.5 — bugs, findings and the
-  backlog histo each get their own store instance with their own model, and **no module knows
-  two record shapes**. Proven by the diff: one store module, three models, three container
-  registrations.
+- A13.4 **A store instance exists only where a writer exists** (fold 3,
+  `software-architect` §6 — the third architecture-fidelity finding). A finding's governance
+  fields are rewritten in place leaving every other byte identical, and the **generic
+  `JsonlRecordStore`** of A2.5 is the seam **wherever code writes**. The first Draft mandated
+  "three models, three container registrations" while the auditor and the remediation closure
+  both write `FINDINGS.jsonl` with **file tools** (D15/A14.5: no CLI verb) — a registration
+  with no caller is dead code behind a protocol, the FR15 shape applied to
+  `infrastructure/`. The acceptance is therefore: **one store module, three models, and
+  exactly as many container registrations as have a caller — proven by a grep that shows a
+  call site for each**, with the findings model registered **only if** FR15's fold or another
+  consumer actually resolves it. `FINDINGS.jsonl`'s file-tool writer class is stated
+  explicitly (as `RELEASE.jsonl`'s is, FR4) rather than implied by a seam nobody calls, and
+  A13.5's hand-redaction rule is what covers it. **No module knows two record shapes.**
+- A13.6 **The reviewer personas may write the artifacts the law requires of them.** Four
+  reviewer personas gain `specs/releases/**/reviews/**` and `security-reviewer` additionally
+  `specs/releases/**/verdicts/**` (T-050-03A), each with a fixture proving the parsed allowlist
+  admits its declared globs and refuses `specs/memory/**`. *(Fold 3, traceability gap 3:
+  T-050-03A carried no FR or acceptance id. It belongs to FR13 — "a persona forbidden to write
+  the artifact its own law requires" is exactly the defect FR13 fixes for `project-auditor`,
+  and the same honest posture applies: `write_allowlist` is projection-time documentation, not
+  a write-time control.)*
 - A13.5 **The audit folder is scanned by the push detector before it is trusted, and every
   `evidence` value is self-contained.** Before the `S3` QA close, the folder is run through
   the same detector a push uses (`dadaia ci push-gate-check` over the range, or a
@@ -1523,11 +1968,36 @@ All three pillars run **together**, always:
   - **Cache disagreement.** A stored `resolved_commit` that disagrees with the derivation is
     a finding (A8.2).
 
-  **Pillar 1 is the single writer of two cached fields.** On each record it reviews it writes
-  `audited: <audit-slug>` **and** the derived `resolved_commit` /`resolution_granularity`, in
-  **one atomic in-place rewrite**, through the FR2 record-store seam (redacted, atomic,
-  re-read before write). One writer, one seam, one commit — this is what AS-1(ii) buys, and
-  it is why FR8 has no shape 3b.
+  **Pillar 1 measures all eight forensic metrics — the release's stated purpose, made
+  checkable (fold 3, `software-architect` change 6 / directive F).** The first Draft measured
+  six things the forensic did not ask for and **two of the eight** it did, both partially:
+  A16.2 would then have passed on the four pinned chains (findable by
+  `caused_by: "text-reference"` alone) while the loop's **aggregate rate stayed unmeasured**.
+  `PILLAR-BUGS.md` carries this table verbatim, and **each row is a validation (V33)**:
+
+  | # | Metric | Definition / command | Baseline | Carried by |
+  |---|---|---|---|---|
+  | 1 | **Per-bug diff attributability** | share of resolutions whose first-adding commit adds exactly one resolved record and touches a non-`specs/` path — i.e. `resolution_granularity == "exact"` | **26/92 = 28 %** | `resolution_granularity`; **target 100 % on post-0.5.0 resolutions** |
+  | 2 | **FR23 triple coverage** | resolved records with `evidence_loop` + `evidence_seam` + `evidence_diff` all present | **23/92 = 25 %** | the restored triple (FR2); target 100 % post-0.5.0 |
+  | 3 | **Fix-shape ratio** | `net-negative / (net-neutral + net-positive)` from the `diff_direction` enum | **21/31 = 0.68** | `diff_direction` (FR2) — the token the free text already carried |
+  | 4 | **Same-surface re-bug rate** at 3 d / 14 d | grouped on the **`surface` enum**, not free text (86 distinct strings per 100 bugs before) | **55 % / 73 %** | the `surface` enum (FR2) |
+  | 5 | **Hand-kept-list touch count** | resolving commits whose `git show --name-only` touches `.gitignore`, `privacy_baseline.json`, `shipped-hashes.json`, `*_golden/*.json`, a skill roster, or a `frozenset({…})` literal | **16/83** | a fixed path set in `PILLAR-BUGS.md`; FR10A moves it |
+  | 6 | **Test-layer bug share** | records whose `surface == "tests"` or whose `component` starts with `tests/` | **21/100** | the `surface` enum |
+  | 7 | **Scanner-vs-prose recurrence** | records whose `symptom` matches `self-scan\|denylist\|privacy` **and** whose fix touches only `specs/**/*.md` or `tests/` | **10/100**, **target 0** | reported honestly: this release **grows** scanned prose (4 QA closes, 3 reviews, `specs/audits/**`, the migration report, 5 `AGENTS.md`) and moves no prose out of the scanned tree — the metric exists so the growth is counted rather than discovered |
+  | 8 | **Sweep closures as `resolved`** | terminal records whose evidence matches `^Need met\|re-affirmation` with no code-touching commit | **9/92**, **target 0** | FR2's one-sentence rule: a sweep is `superseded`, never `resolved` |
+
+  Metrics 1–4 and 6 are computable **only because** FR2 restored the triple, added
+  `diff_direction` and closed the `surface` enum — which is why those three record changes are
+  not cosmetics but the release's measuring instrument.
+
+  **Pillar 1 is the single writer of the derived cache.** On each record it reviews it writes
+  `audited: <audit-slug>` **and** all four derived provenance fields —
+  `registration_commit`, `registration_granularity`, `resolved_commit`,
+  `resolution_granularity` — in **one atomic in-place rewrite**, through the FR2 record-store
+  seam (redacted, atomic, re-read before write). *(Fold 3, traceability gap 5: the first Draft
+  named a writer for the resolution sha and none for the registration sha on post-0.5.0
+  records.)* One writer, one seam, one commit — this is what AS-1(ii) buys, and it is why FR8
+  has no shape 3b.
 - **Pillar 2 — spec compliance.** `dadaia specs doctor --json` across every release in the
   window, conformance to the v6 canon, `RELEASE.jsonl` milestone completeness (`defined` /
   `implemented` / `shipped`, each with a sha), SPEC provenance and `**Consumes:**`,
@@ -1542,18 +2012,27 @@ All three pillars run **together**, always:
 **Cadence and window.** An audit is **SUGGESTED every 5 releases and never mandatory**; the
 operator triggers it (`project-manager` surfaces the suggestion at release close once ≥ 5
 `shipped` milestones have accrued since the last `audited`). The window runs from the last
-audited release to the current one — the auditor scans every `RELEASE.jsonl` (live, `_ideas/`,
-`_archive/`, plus `releases_histo.jsonl`) for the newest `audited` milestone, takes
-`[that sha, HEAD]`, and appends an `audited` milestone at the end so the chain never gaps.
+audited release to the current one — the auditor scans every `RELEASE.jsonl` (the **live**
+release and `releases/_archive/**`, plus `releases_histo.jsonl`) for the newest `audited`
+milestone, takes `[that sha, HEAD]`, and appends an `audited` milestone at the end so the chain
+never gaps. **`_ideas/` is not scanned** (fold 3, contradiction 4): D10/AS-7 make an `_ideas/`
+release **SPEC-only**, so it carries no `RELEASE.jsonl` to fold, and scanning for a milestone
+the canon forbids it to hold is a lookup that can only ever return nothing.
 
 **Lifecycle.** One audit → exactly one remediation release that gives **every** finding a
 disposition (`DADAIA.md` §6, unchanged); the release's closure rewrites each finding's
 governance fields; the folder moves to `specs/audits/_archive/` only when no record is `open`.
 **No new CLI verb**: the auditor writes the folder with its file tools (D15).
 
-**Bug-surface direction:** *net-additive in AI-surface lines, net-negative in code* — no CLI
-verb, no doctor rule is added by this FR; the six-dimension HEAD comparison is **absorbed**
-into pillar 3 rather than kept beside it.
+**Bug-surface direction, with numbers (fold 3, K):** *net-additive in AI-surface lines,
+**zero** production LOC.* No CLI verb, no doctor rule is added by this FR; the six-dimension
+HEAD comparison is **absorbed** into pillar 3 rather than kept beside it. Measured: skill
+siblings **+4 / −2** (`RUBRIC.md`, `TOOLING.md` folded); CLI leaves **+0**; hook changes
+**0**; forensic metrics measured **2 (partial) → 8**.
+**Tests: +1 added / −0 deleted.** The one-atomic-rewrite-per-record fixture (A14.6). The eight
+metrics are **procedure in a disclosed sibling**, executed by the auditor and evidenced by
+FR16's artifact — deliberately **not** eight new test functions, which is what "audits measure,
+hooks and the CLI do not" means in test-count terms (D15).
 **Bug-history evidence:** every chain in §1.1 is a pillar-1 detection target, and the release
 is only worth shipping if the dry run (FR16) actually finds them. That is why FR16 exists.
 
@@ -1568,9 +2047,17 @@ is only worth shipping if the dry run (FR16) actually finds them. That is why FR
 - A14.4 `disable-model-invocation` is lifted and the skill appears in `project-auditor.md`'s
   skills list — the v0.4.4-class defect (a skill nobody can invoke) does not survive.
 - A14.5 **Zero** CLI verbs and **zero** hook changes in this FR's diff.
-- A14.6 Pillar 1's write of `audited` + `resolved_commit` + `resolution_granularity` is
-  **one** atomic in-place rewrite per record through the FR2 seam — proven by a fixture
-  asserting a single file replacement per record and every other byte unchanged.
+- A14.6 Pillar 1's write of `audited` + **all four provenance fields**
+  (`registration_commit`, `registration_granularity`, `resolved_commit`,
+  `resolution_granularity`) is **one** atomic in-place rewrite per record through the FR2 seam
+  — proven by a fixture asserting a single file replacement per record and every other byte
+  unchanged.
+- A14.7 **Every one of the eight forensic metrics is computed, with its baseline and its
+  target, and each appears in `AUDIT.md`** (**V33**). A pillar-1 run that reports fewer than
+  eight is incomplete, not lenient — the release exists to make this loop measurable, and a
+  metric named in §1 but absent from the artifact is the fabricated-evidence shape one level
+  up. Metrics with target 0 (7, 8) report their measured value even when it is worse than
+  baseline; metric 7 is expected to be **worse** and saying so is the acceptance.
 
 #### FR15 — `specs doctor` folds `FINDINGS.jsonl` instead of parsing prose · **size S**
 
@@ -1588,9 +2075,25 @@ and `doctor_governance.py`, plus `RELEASE_ARTIFACTS` in `doctor_common.py`, and 
 `AUDIT_DIR_NAME_RE` duplication (the `<YYYYMMDD>-<slug>` shape gets a **single** home, also
 replacing the comment that repeats it in `gate_policy.py`).
 
-**Bug-surface direction:** **net-negative** — regex-over-prose is deleted and replaced by a
-JSONL fold that reuses FR13's reader. Prose parsing is the largest false-positive source in
-the doctor.
+**Bug-surface direction, with numbers (fold 3, K):** **net-negative, −≈200 LOC** together with
+T-050-25A. Regex-over-prose is deleted and replaced by a JSONL fold that reuses FR13's reader.
+Measured: **regexes parsing release prose 22 → ≈9** (**−59 %**; the survivors are
+`doctor_governance.py`'s six SPEC-DOC-031/032/033/035 SPEC/BACKLOG parsers and
+`memory_lint.py`'s three, both out of scope and named as such); **doctor check codes −BL-DUP
+and −4 CLOSURE-parsing SPEC-DOC codes**, landing the release at **≤ 45** from 47 — and V19
+records the **post-release code list**, not just the count, so a silently kept code cannot hide
+inside a total; hand-kept constants **−4** (`RELEASE_ARTIFACTS`, `AUDIT_DIR_NAME_RE`'s
+duplicate, two disposition regexes).
+**Tests: +2 added / −3 deleted (named).** Added: the archived-audit-with-an-`open`-record error
+fixture (1) and the fully-terminal archive-due WARN fixture (1). Deleted with their subject
+(fold 3, `qa-engineer` amendment 3 — the three files are named rather than hidden behind a
+generic `tests/**`): `tests/unit/features/specs/test_doctor_taxonomy_disposition.py`,
+`tests/unit/features/specs/test_doctor_golden.py`'s SPEC-DOC-036/038 cases and the
+corresponding entries of the golden fixture `tests/unit/features/specs/_golden/
+doctor_golden_v0155.json` — each with a per-file `qa-engineer` verdict. Regenerating the golden
+by reflex is prohibited (`dadaia-test-stewardship` §B); the entries whose subject is deleted are
+removed and the remainder is left untouched, which is the difference between curating a golden
+and re-baselining one.
 **Bug-history evidence:** SPEC-DOC-0xx rules that parse authored Markdown have repeatedly
 produced both false positives and silent misses (the v0.1.73-era "gate never demands what the
 tooling refuses" law came from this class). A structured fold cannot misread a sentence.
@@ -1612,8 +2115,11 @@ tooling refuses" law came from this class). A structured fold cannot misread a s
 appending the `audited` milestone. **It opens no remediation release**: the findings are
 compiled for the PM's operator-facing intake report.
 
-**Bug-surface direction:** *neutral in code* — it produces data. Its value is that it makes the
-canon fail *here* rather than at a consumer.
+**Bug-surface direction, with numbers (fold 3, K):** *neutral in code, **0** production LOC* —
+it produces data. Its value is that it makes the canon fail *here* rather than at a consumer.
+It is also where the eight metrics acquire their first measured values against the baselines
+in FR14's table.
+**Tests: +0 added / −0 deleted.** An audit run is not a test.
 **Bug-history evidence:** the workspace's own law — *"a green internal gate that diverges from
 real consumer behavior is itself a bug"* (`DADAIA.md` §7). A canon that has never been run is
 a green internal gate.
@@ -1635,6 +2141,12 @@ a green internal gate.
 - A16.3 Pillar 2 reads **this release's own commits** and reports FR8 conformance (A8.4).
 - A16.4 Pillar 3 executes every `Measured by:` check authored by FR18 and records each
   result; any principle whose check does not run is a finding against FR18, not a skipped row.
+  **Because FR18 lands in `S4` and FR16 runs in `S3`, the pillar-3 half is completed at
+  scope-complete** (fold 3, traceability gap 2): T-050-34 dispatches `project-auditor` to
+  re-run pillar 3 against the now-authored Part-1 principles and **append** the resulting
+  findings to the existing `FINDINGS.jsonl` (findings are appended once, so new findings take
+  new ids — nothing is rewritten). Without this, A16.4 was an acceptance no task could
+  discharge: the dry run recorded "principle not yet written" as a gap and nothing re-ran it.
 - A16.5 Every finding is `disposition: open` with `release: null`; **no** backlog entry is
   created by any agent (`DADAIA.md` §6 — intake is operator-gated).
 - A16.6 The `audited` milestone is appended to this release's `RELEASE.jsonl`.
@@ -1670,9 +2182,15 @@ container, not sibling imports)" (`setup.cfg`), run by `dadaia ci preflight` and
 Accepted by: ADR 0002 (2026-09-02). Amended by: —
 ```
 
-**Bug-surface direction:** *net-neutral in LOC, net-negative in ambiguity* — no new file; the
-existing three are restructured, and every rule that cannot name its measure is **deleted from
-memory** (it was never true, only asserted).
+**Bug-surface direction, with numbers (fold 3, K):** *net-neutral in LOC, net-negative in
+ambiguity.* No new file; the existing three are restructured, and every rule that cannot name
+its measure is **deleted from memory** (it was never true, only asserted). Measured: memory
+files **3 → 3**; `memory_lint.py`'s hand-listed headings **85 → 87** — the two new Part
+headings — and that **+2 is declared, not discovered**: `_HEADING_GROUP_*` is a P1 hand-kept
+list (25/25/22/13 entries at `memory_lint.py:180/126/97/77`) that this FR **feeds** rather than
+derives. Deriving the allowlist from the templates is out of scope here (it is a new
+derivation, not a deletion) and is compiled as an intake candidate beside AS-17's three.
+**Tests: +1 added / −0 deleted.** The two-top-level-parts file-shape contract test.
 **Bug-history evidence:** the whole loop. The standing order exists because a clean
 architecture was corrupted by fixes; memory described that architecture in prose that no
 check enforced, so nothing went red as it eroded.
@@ -1707,9 +2225,78 @@ Promote, one principle per existing mechanical check:
 
 Each inventory principle is admitted through its own `accepted` ADR (FR19/FR20).
 
-**Bug-surface direction:** *net-neutral in code, strictly documentary* — **zero** new check is
-written by this FR. If a rule has no existing check, it does not become a principle. This
-constraint is what keeps the inventory from becoming a second enforcement layer.
+**A principle must be TRUE when it is accepted — the independence contract is completed
+first (fold 3, `software-architect` change 8 / directive D).** The candidate principle *"features
+are mutually independent"* is **measurably false at birth** as the contract stands. Measured on
+this tree at this fold:
+
+| Fact | Number |
+|---|---|
+| `dadaia_workspace/features/*/` packages carrying `__init__.py` (glob) | **24** |
+| Packages listed in `[importlinter:contract:features-no-cross-feature]`'s `modules =` (`setup.cfg:177–197`) | **20** |
+| Missing, named | **4** — `capabilities`, `certification`, `reconcile`, `tmp_gc` |
+| Module-level cross-feature edges actually present | **5** |
+| …declared as `ignore_imports` today | **2** (`specs.doctor_governance → backlog.document`, `chokepoints.service → spec_context`) |
+| …**invisible** because their source package is unlisted | **3** — `features/reconcile/service.py:12,13,14` → `features.capabilities`, `features.migrate.legacy_dadaia_dirs`, `features.migrate.state_v2` |
+
+*Two reviewer figures are corrected against the tree rather than transcribed: the review's
+"20 of 25" and its fifth missing package `workspace_*` — `workspace` **and** `workspace_clean`
+are both listed, the true gap is **four**, and the package inventory reads **24** by glob (the
+metrics baseline's "25" counts one directory more than the importable packages). **The inventory
+task re-counts from disk**, and this table is evidence, not an input.*
+
+**The rule this FR follows:** T-050-29 **adds the four missing packages to `modules =`
+before** the principle is promoted, then reports the contract's measured edge count. The three
+reconcile edges are **declared `ignore_imports` with a reason line each**, and the cap moves by
+exactly that count: `_RECORDED_IGNORE_EDGE_CAP` **15 → 17** — `15 − 1` (FR2 retires
+`cli.commands.bugs → infrastructure.jsonl_bug_store`, `setup.cfg:232`) `+ 3` — with
+`tests/contract/test_import_linter_ignore_cap.py` updated in the **same commit**, as its own
+docstring requires. **Collapsing `reconcile`'s three edges is not attempted here** (it is a
+feature rewrite, not an inventory step) and is compiled as an intake candidate. What is
+refused is the third option: promoting *"features are mutually independent"* to an ADR-gated
+principle while three edges are invisible to the check that is supposed to measure it — a
+principle whose `Measured by:` line points at a contract that cannot see the violations is
+exactly the decoration this segment exists to abolish.
+
+**The `surface` enum shares this one source (FR2/A2.12).** The completed `modules =` list is
+the same list the record schema's enum derives from, so a package added tomorrow goes RED in
+one place.
+
+**The A18.3 conflict, resolved explicitly (fold 3, directive H).** A18.3 says FR18 writes
+**zero** new checks, and the test-suite ratchets of §3 (private-symbol imports, `Intent:`
+coverage, SCAFFOLD expiry, one-number-per-parameter, pyramid shape) are new checks. They do
+not collide, and the boundary is stated rather than assumed: **A18.3 governs *product* checks
+— doctor rules, CI jobs, hook exits, anything that can fail a consumer's tree or block a
+human.** The ratchets are **test-suite ratchets in `tests/contract/`**, one file
+(`test_test_suite_ratchets.py`, T-050-18A), measuring **the suite itself**; they run in the
+existing `pytest` job, add no CLI surface, no doctor code and no hook exit, and follow the
+measure-then-pin-then-ratchet law `tests/contract/test_module_size_ceiling.py` and
+`test_import_linter_ignore_cap.py` already use. FR18 still writes **none of them** — it
+**promotes** them, exactly as it promotes the ceilings that already exist. A22.6's "zero new
+blocking exits" is unaffected: a red contract test fails the suite, which is what every
+contract test does.
+
+**One number per parameter — the LARGE cap is reconciled here (fold 3, `qa-engineer`
+amendment 7).** The census ceiling has **three homes and three values**:
+`dadaia-test-stewardship/PARAMETERS.md:10` says **30** (with "current ~84"),
+`tests/AGENTS.md:69–71` says **30**, and `specs/memory/quality-assurance.md:79,208` says the
+census **is 100** and *that* is the ceiling. Promoting "the LARGE-test census ceiling" to a
+Part-1 principle without picking one would promote a Sensitive-Equality smell **into the
+constitution's own layer**. The decision: **`PARAMETERS.md`'s 30 is the number and its only
+home**; `tests/AGENTS.md` and `QUALITY.md` **reference** it and their competing statements are
+**deleted** (measured today: 42 functions under `tests/e2e/**`, 15 `e2e`-marked — so 30 is a
+target above the measured count either way, and the remediation stays where
+`PARAMETERS.md` already puts it). V29 scans for a second numeric cap and goes RED on one.
+
+**Bug-surface direction, with numbers (fold 3, K):** *net-neutral in code, strictly
+documentary* — **zero** new **product** check is written by this FR (the A18.3 boundary above).
+If a rule has no existing check, it does not become a principle. Measured: import-linter
+contracts **9 → 9**, their `modules =` coverage **20/24 → 24/24**, cross-feature edges visible
+to the check **2 → 5** (three were invisible), `_RECORDED_IGNORE_EDGE_CAP` **15 → 17**, doctor
+codes **+0**, CI jobs **+0**, CLI leaves **+0**.
+**Tests: +1 added / −0 deleted.** The contract-count test (a tenth import-linter contract
+without a principle goes RED), extended in the same file to assert `modules =` equals the
+packages on disk (A18.5) — one function, not two.
 **Bug-history evidence:** the frozen-clock chain shows what happens when a rule is enforced by
 a guard nobody described: the guard grew, drifted and produced its own bug. Naming the check
 in memory makes the guard's existence and purpose reviewable.
@@ -1720,8 +2307,23 @@ in memory makes the guard's existence and purpose reviewable.
   the counts agree, so adding a contract without a principle goes RED.
 - A18.2 Every promoted principle's `Measured by:` command is executed once during `S4` and its
   output captured — a `Measured by:` that does not run is not admitted (V14).
-- A18.3 **Zero** new checks, ratchets or CI jobs are created by this FR, proven by the diff.
+- A18.3 **Zero** new **product** checks, doctor codes, CI jobs or hook exits are created by
+  this FR, proven by the diff. The scope of this rule is stated above and is not open to
+  reading: the test-suite ratchets of T-050-18A are `tests/contract/` measurements of the suite
+  itself, promoted here and written there, and A22.6 is unaffected.
 - A18.4 Every principle is traceable to exactly one ADR, and vice versa.
+- A18.5 **The independence contract is true before it is promoted.** `modules =` lists **every**
+  `dadaia_workspace/features/*/` package (24 at this fold, re-counted from disk at task time —
+  the four missing ones named: `capabilities`, `certification`, `reconcile`, `tmp_gc`); the
+  contract's measured cross-feature edge count is **reported** (5 today, of which 3 become
+  declared ignores with a reason line each); `_RECORDED_IGNORE_EDGE_CAP` moves **15 → 17** in
+  the same commit as `setup.cfg`, and a contract test asserts `modules =` equals the packages
+  on disk so the next package cannot be silently unlisted (**V32**). Only then may
+  *"features are mutually independent"* be authored as a `P-NN` and proposed as an ADR.
+- A18.6 **One number per parameter.** The LARGE-test census cap lives **only** in
+  `dadaia-test-stewardship/PARAMETERS.md` (value **30**); `tests/AGENTS.md` and
+  `specs/memory/QUALITY.md` reference it and carry no competing number, proven by **V29**'s
+  scan. The 100-census statement in memory is deleted, not reconciled by prose.
 
 #### FR19 — `specs/ADRs/`: the decision record canon · **size M**
 
@@ -1767,7 +2369,13 @@ isolated `docs(adr): propose NNNN-<slug>`; the commit that changes a Part-1 prin
 Part-1 hunk and the constitution reference together — that is exactly what pillar 3 reads).
 **No CLI verb, no doctor rule** beyond FR1's folder shape.
 
-**Bug-surface direction:** *net-additive in documents, zero in code.*
+**Bug-surface direction, with numbers (fold 3, K):** *net-additive in documents, **0**
+production LOC.* Measured: new spec area **1** (`specs/ADRs/`, already tracked by FR1's
+`.gitignore` inversion — V21); doctor rules **+0**; CLI leaves **+0**; operator-only gates per
+release **2 → 5** (+FR6's presence, +FR20's sitting, +AS-12's ratification) **plus one per
+future ADR acceptance** — a governance cost imposed by D12/D-H/AS-12 and stated here rather
+than discovered at the sitting.
+**Tests: +1 added / −0 deleted.** The monotonic-numbering contract test.
 **Bug-history evidence:** this workspace has reversed its own rulings repeatedly without a
 record — the 2026-08-23 D5 "commits excluded" reversed by the 2026-08-26 D3; the 2026-08-23 D3
 "event-sourced" replaced by D11; `hotfix/*` retired. Each reversal lived only in a handoff.
@@ -1811,8 +2419,12 @@ The inventory ADRs (FR18/FR19) are authored `proposed` by `product-engineer` /
 (`see ARCHITECTURE.md P-04`). A constitution clause with no principle behind it becomes a
 `proposed` ADR or is deleted.
 
-**Bug-surface direction:** **net-negative, measured** — the restatement is deleted, not
-mirrored.
+**Bug-surface direction, with numbers (fold 3, K):** **net-negative, measured** — the
+restatement is deleted, not mirrored. Baseline `specs/constitution.md` **261 lines**; V15
+reports the delta and it must be **negative**, with the coverage table accounting for every
+removed clause. Duplicated rule text between the constitution and the memory trio: **→ 0**
+(A21.3's scan).
+**Tests: +0 added / −0 deleted.** Authored text; its acceptance is V15 and the duplicate scan.
 **Bug-history evidence:** the same fact stated in two documents drifts; that is the
 stale-citation class (A10's evidence) applied to the constitution, which is read by every
 agent on every session.
@@ -1849,8 +2461,40 @@ agent on every session.
   Proven by a contract test over the hook scripts and by the CLI-output-stability fixtures.
 - A22.7 Every picked entry is dispositioned; residuals — including all of FR16's findings —
   are compiled into the PM's intake report, never materialized by an agent.
-- A22.8 **Every `rc` holds A22.1–A22.7**, and every `rc-N ≥ 2` traces to a defect or
+- A22.8 **Every `rc` holds A22.1–A22.8**, and every `rc-N ≥ 2` traces to a defect or
   adjustment **on this scope**, named with where it was found on `develop`.
+- A22.9 **The test suite is net non-positive** (fold 3, operator mandate; `qa-engineer`
+  amendment 1). `pytest --collect-only -q` is captured **before** (T-050-03) and **after**
+  (T-050-34), per tier, and the after-count of test **functions** is **≤ the before-count**
+  (baseline **1 859** in 396 files, **2 873** collected items with parametrization; the
+  T-050-03 re-measure is what binds). The per-FR `Tests: +N / −M` lines above sum to the
+  claim; a divergence between the sum and the measurement is a defect of the accounting, not
+  of the measurement. **If the after-count exceeds the before-count, the release does not
+  close on that number** — `qa-engineer` produces the demotion/deletion map that closes the
+  gap, or the operator accepts the overshoot **explicitly, with the number in the closure
+  record**. Silence is not acceptance.
+- A22.10 **The suite's marking and structure ratchets hold** (**V26**–**V30**): private-symbol
+  imports **24 → 0** (or a recorded number with its residue routed to intake), `Intent:` +
+  size on **396/396** files (or a per-segment ratchet carrying its number), every `SCAFFOLD`
+  carrying `expires: <M.m.p>` and none expired against an archived release, exactly one home
+  for each numeric parameter, and the pyramid shape reported from `--collect-only`.
+- A22.11 **The mutation floor on `core/` is a recorded number** (**V31**): one
+  `tests/scripts/run_mutation_baseline.sh` pass over `core/` — the package taking the most new
+  pure-function surface (`bug_provenance.py`, `release_events.py`, the record models) — with
+  the score recorded as a floor that ratchets **up** only, and every zero-kill test outside a
+  named `SENTINEL` entering the closure curation table with a disposition. **`mutmut`
+  availability is verified, never assumed:** the fold-3 review could not reach a `mutmut`
+  binary from its read-only session and reported that as **unverified, not absent**. If
+  T-050-03 finds it unavailable, the floor is recorded as `null` **with the reason and an
+  intake candidate** — a value nobody measured is never a default.
+- A22.12 **The ruff complexity ceiling ratchets to reality** (**V35**, fold 3, directive J).
+  `pyproject.toml`'s `max-complexity` is **63** while the measured maximum is **61**
+  (`_list_agents_impl`, `features/telemetry/aggregator/queries.py:181`, untouched by this
+  release) — a ceiling two above the code it governs is not a ratchet. At T-050-34 the observed
+  maximum is re-measured with `radon cc` and the ceiling is set **to that number** (61 if
+  nothing moved), never above; the change is recorded in the closure record's
+  `## Size accounting`. Functions with CC > 10: **131 → ≤ 133**, with every new function above
+  10 named.
 
 ---
 
@@ -1874,7 +2518,15 @@ agent on every session.
 7. **Publishing `0.5.0` to PyPI** as an assumption (AS-6) — the operator decides at ship.
 8. **Re-litigating a ratified ruling.** D1–D15 are given; where an entry's older wording
    conflicts, the ruling governs and §2.3's stated assumption records the residue.
-9. **Any FR not listed in §3.** Nothing discovered mid-release is added without an operator
+9. **The three deferred public-assets engines** (AS-17) — doctor goldens,
+   `shipped-hashes.json`, the two projection authorities — **the `specs upgrade` rename
+   automation** (§1.6), **`reconcile`'s three cross-feature edges** (A18.5 declares and caps
+   them; collapsing them is a feature rewrite), **`memory_lint.py`'s heading-allowlist
+   derivation** (FR17), and **extending the `Intent:` gate beyond `tests/e2e/**`** (V27 measures
+   and ratchets; extending `check_test_intent_declared.py`'s CI scope is a separate pick). Each
+   is named with its bug ids or its number and routed to intake at closure — deferred **out
+   loud**, never by omission.
+10. **Any FR not listed in §3.** Nothing discovered mid-release is added without an operator
    ruling at the moment of discovery. The standing exception is a **bug**, fixed on the spot
    as Arm B on `feature/0.5.0` (`DADAIA.md` §1) — never backlog demand.
 
@@ -1914,10 +2566,27 @@ memory itself (FR17–FR21), so the closure pass writes into the new Part 1 / Pa
 - **The FR16 audit** referenced by folder, with its finding count per pillar and severity.
 - **The ADR ledger** — every inventory ADR with its operator decision (FR20).
 - **Coverage tables** — FR7, FR12, FR17, FR21, each mapping removed block → surviving home.
-- **Test dispositions** — every demotion, quarantine (with its bug id) and SCAFFOLD expiry.
+- **Test dispositions and the test-economy accounting (fold 3)** — every demotion, quarantine
+  (with its bug id) and SCAFFOLD expiry, **plus the numbers**: V25's before/after per tier
+  against A22.9's net-non-positive gate; the per-FR `Tests: +N / −M` roll-up and its agreement
+  with the measurement; V26's private-import residue; V27's `Intent:` coverage; V30's pyramid
+  shape and the e2e marker-vs-directory drift (42 vs 15) as measured known drift; V31's
+  mutation floor (or `null` with its reason) and every zero-kill curation disposition;
+  **V35's ruff ceiling change 63 → the observed maximum**, recorded here as the closure step
+  directive J requires.
+- **`QUALITY.md`'s mandatory rewrite reconciles the LARGE cap to one home** (A18.6) and
+  records the measured 302/396 undeclared-`Intent:` baseline so the next release ratchets from
+  a number instead of re-measuring cold.
 - **The `rc` ledger** — every `rc` burned, what was found on `develop`, by whom, its fix.
 - **Intake candidates** — FR16's findings plus any residual, compiled for the PM's
-  operator-facing intake report; `product-engineer` creates no backlog entry.
+  operator-facing intake report; `product-engineer` creates no backlog entry. **Named at fold
+  3, each with its reason:** (1) `public-assets-single-source-engines` — AS-17's three deferred
+  engines with their bug ids; (2) the deferred `specs upgrade` rename automation (§1.6);
+  (3) `reconcile`'s three cross-feature edges, to collapse the cap 17 → 14 (A18.5);
+  (4) `memory_lint.py`'s 87-entry heading allowlist, to derive from the templates (FR17);
+  (5) the `Intent:` gate's extension beyond `tests/e2e/**` and any private-import residue above
+  0 (V26/V27); (6) the e2e marker-vs-directory fix (V30); (7) FR9's secret-scan coverage limit
+  (A9.6). A deferral without a named target is what produced four of public-assets' eighteen.
 - **Archive decision:** `MOVE` — into `specs/releases/_archive/0.5.0/` (the per-area archive
   this release creates), not the deleted root `_archive/`.
 
@@ -1938,7 +2607,7 @@ Every item is checkable by a command; each is captured by a shell-holding agent 
 | **V6** | Ref scope | `git log --all --no-merges --format=%H -- specs/bugs/ \| wc -l` ≥ **295**, with `git tag -l 'archive/*' \| wc -l` = **50** recorded beside it | before FR3 runs (AS-9) |
 | **V7** | Back-fill report | `releases_histo.jsonl` block count = **the number of release directories the scan visited across both archive layouts** (`specs/_archive/releases/<id>/` and `specs/_archive/<id>/`), with the four non-version directories named and excluded; every non-null sha passes `git cat-file -e` | `S1` (A4.3) |
 | **V8** | Archive reachability | `git show <archive-tag>:specs/_archive/releases/v0.4.4/CLOSURE.md \| head` succeeds after FR6 | `S1` (A6.4) |
-| **V9** | Hook posture | `pre-commit` exits 0 on a staged set `backlog doctor` rejects; `pre-push` refuses only on branch name and denylist | `S2` (A9.1, A9.2) |
+| **V9** | Hook posture | `pre-commit` exits 0 on a staged set `backlog doctor` rejects; `pre-push` refuses on exactly **three** things and nothing else — invalid branch name, denylist hit, **unresolvable runner** — plus a fixture proving a failing preflight no longer blocks *(fold 3, contradiction 1: this row read "only on branch name and denylist" against A9.2's three refusals; the pre-push fail-closed runner **survives** by A-5/A22.6 and its refusal is asserted)* | `S2` (A9.1, A9.2) |
 | **V10** | FR9 LOC delta | `git diff --stat` over the hook scripts + `cli/commands/ci.py`, **negative** | `S2` (A9.5) |
 | **V11** | AI-surface net | line count over `public/{agents,skills,data,entities}/**` before and after `S2` | `S2` close |
 | **V12** | Always-on token delta | the v0.4.5 measurement recipe re-run before and after FR11, with per-section attribution | `S2` (A11.3) |
@@ -1953,6 +2622,17 @@ Every item is checkable by a command; each is captured by a shell-holding agent 
 | **V21** | Every canon path is tracked | `git check-ignore` reports *not ignored* for each path of A1.7; the three orphaned stanzas are gone | `S1` (A1.7) |
 | **V22** | Migration range is clean | `dadaia ci push-gate-check` over the migration range, **before** the first push; zero hits, or every hit remediated at the source record | `S1`, before pushing T-050-10 (A3.9) |
 | **V23** | U+2028 precondition present | write a free-text field carrying U+2028 (and an ESC byte) **through the write seam**: T-045-20 **strips** them, the **stripped record round-trips** (read/write cycle byte-stable), the live ledger parses fully, `bugs status` reports `skipped: 0`, and **no historical record is rewritten** — proving the `v0.4.5` T-045-20 fix is on the branch. "Byte-identical round-trip of a U+2028-carrying field" is unsatisfiable against that fix and is **withdrawn** (AS-14) | before FR3 runs (A3.7) |
+| **V25** | **Test-suite size, before and after** | `pytest --collect-only -q -p no:cacheprovider tests` **per tier** at T-050-03 and again at T-050-34, plus `grep -rc "^def test_" tests` for the function count. Baseline **1 859** functions / 396 files / **2 873** items (unit 1 376 · integration 241 · contract 200 · e2e 42). **Gate: after ≤ before** (A22.9); the per-FR `Tests:` lines must sum to the measured delta | T-050-03 (baseline) + `scope complete` (A22.9) |
+| **V26** | Private-symbol imports ratchet | `tests/contract/test_test_suite_ratchets.py` pins the count of `from dadaia_workspace… import …_name` statements in `tests/**` outside an inline-commented allowlist. Baseline **24 statements / ~21–22 files**; **target 0**, ratchet **down only**. One of the 24 dies with FR9's deletion; a residue above 0 is recorded with its number and routed to intake | `S2` (T-050-18A), re-checked at `scope complete` |
+| **V27** | `Intent:` + size header coverage | same file: every `tests/**/test_*.py` carries `Intent: <KIND>` and a size in its module docstring. Baseline **94/396 declared, 302 undeclared (76 %, SCAFFOLD by doctrine)**; target **396/396**, or a **per-segment ratchet carrying the number** if the sweep is not completed in this release — never an unmeasured "later" | `S2` (T-050-18A) + T-050-33 |
+| **V28** | SCAFFOLD carries an expiry | same file: every `Intent: SCAFFOLD` declares `expires: <M.m.p>`, and a SCAFFOLD whose named release is under `releases/_archive/` turns **RED**. Covers T-050-09's `migrate_v5` tests (`expires: 0.6.0`); a slipped expiry is renewed by a recorded `qa-engineer` verdict, never by silence | `S2` (T-050-18A) |
+| **V29** | One number per parameter | same file: a scan proving each numeric cap (LARGE census, flake ceiling, quarantine cap) appears in **exactly one** doctrine file — `dadaia-test-stewardship/PARAMETERS.md`. Baseline: the LARGE cap has **three homes, two values** (30 / 30 / 100). Gate: **1 home, value 30** (A18.6) | `S4` (A18.6) |
+| **V30** | Pyramid shape, reported | per-tier shares computed from the same `--collect-only` run. Baseline **unit 74.0 % · integration 13.0 % · contract 10.8 % · e2e 2.2 %** against the literature's SMALL ≥ 75 / MEDIUM ≤ 20 / LARGE ≤ 5. **Reported in the closure size accounting, not gated** — drift > 5 pp is a closure finding. Recorded beside it: the **e2e marker-vs-directory drift** (42 functions under `tests/e2e/**`, **15** `e2e`-marked — a 2.8× discrepancy for any `-m e2e` selector), as **measured known drift** with its fix routed to intake (`qa-engineer` amendment 8) | `scope complete` |
+| **V31** | Mutation floor on `core/` | one `tests/scripts/run_mutation_baseline.sh` pass over `core/`; the score recorded as a **floor, ratchet up only**; zero-kill tests outside a named `SENTINEL` listed in the closure curation table with a disposition. **If `mutmut` is unreachable in the workspace venv, the value is `null` with its reason and an intake candidate** — never a fabricated number (A22.11) | T-050-03 (availability + baseline) + `scope complete` |
+| **V32** | Independence contract is complete | `modules =` in `[importlinter:contract:features-no-cross-feature]` equals the `dadaia_workspace/features/*/` packages on disk (**20/24 → 24/24**); the measured cross-feature edge count is reported (**5**, of which **3** become declared ignores with a reason line); `_RECORDED_IGNORE_EDGE_CAP` reads **17** (`15 − 1 + 3`) and `tests/contract/test_import_linter_ignore_cap.py` agrees; `lint-imports` green | `S4`, **before** the principle is proposed (A18.5) |
+| **V33** | The eight forensic metrics | `AUDIT.md` carries all eight of FR14's metrics with `baseline → measured` and, where one exists, the target. A run reporting fewer than eight is incomplete (A14.7) | `S3` (A16.2) + the pillar-3 re-run at `scope complete` |
+| **V34** | Always-on ceiling | V12's after-value is **≤ 22 011 tokens** (+500 over the 21 511 baseline), with per-section attribution and anchors on their own line. An overshoot is closed by cutting text before `S2` closes (A11.3) | `S2` (A11.3) |
+| **V35** | Ruff ceiling ratcheted to reality | `radon cc` re-measures the observed maximum (**61** today, `_list_agents_impl`); `pyproject.toml`'s `max-complexity` **63 → that number**, never above; `#upgrade` **≤ 26**, `#doctor` **≤ 30**; CC > 10 count **131 → ≤ 133** with every new function above 10 named | `scope complete` (A22.12, A1.4) |
 | **V24** | Audit artifact is redaction-clean and self-cited | the FR16 folder and the FR3 migration report scanned by the push detector, zero hits; every `evidence` value is **the reproducible command + a redacted one-line result**, with any `.dadaia/tmp/**` capture as a convenience pointer only — that lane is GC'd at 3 days, so a path is never the sole citation; no transcript pasted | `S3` close (A13.5) |
 
 ---
@@ -2057,13 +2737,42 @@ Flagged for the operator; each is reversible before approval and none contradict
 18. **Absolute ledger counts leave the acceptance** (pass 2, SA-R5) — every threshold reads
     "every record present at branch cut"; 490 / 470 / 1 005 survive as the dated 2026-08-26
     evidence (§1.2's measurement note).
+19. **AS-16** *(fold 3, OPERATOR-GATED)* — one write seam for `BUGS.jsonl`, with the exposure
+    left to the operator: **(i)** the `dadaia bugs update` governance verb (recommended,
+    leaf-neutral at **71** once `specs release open` and `specs segment open` go) or **(ii)** a
+    skill-invoked Python entry point (69 leaves). The seam itself is not optional.
+20. **AS-17** *(fold 3, OPERATOR-GATED)* — three of public-assets' four recurrence engines are
+    deferred by name with their bug ids and one intake target; the fourth (the roster class) is
+    retired here as **FR10A**.
+21. **The record model gains three measuring fields no entry named** — the restored **FR23
+    evidence triple** (write-once), **`diff_direction`**, and a **closed `surface` enum**
+    sharing the independence contract's package list as its single source. Without them,
+    forensic metrics 1–4 and 6 are not computable and pillar 1 measures 2 of 8.
+22. **The test suite acquires a ceiling and its markers acquire ratchets** — A22.9's
+    net-non-positive gate, V25–V30's one contract file, and the explicit statement that these
+    are **test-suite** ratchets, outside A18.3's product-check scope.
+23. **The `specs upgrade` automation is cut and the complexity ceilings become acceptances** —
+    `#upgrade` ≤ 26, `#doctor` ≤ 30, `max-complexity` 63 → the observed maximum (61).
+24. **The always-on additions get a number, not just a measurement** — a **+500-token**
+    ceiling with a per-section budget (V34); an overshoot is closed by cutting text.
 
 ---
 
 ## 9. Review fold (2026-08-26)
 
-Two folds have run over this trio. **Every amendment every review raised carries a
+**Three** folds have run over this trio. **Every amendment every review raised carries a
 disposition below — none is silently dropped.**
+
+**Review-id namespaces, declared once (fold 3, `software-architect` §1).** The tables below —
+and the few normative clauses that cite a review by id — use these prefixes, and nothing else:
+`SA-*` / `SA-R*` / `SA-Q*` = `software-architect` (pass 1 / pass 2 / pass 3);
+`A-*` and `SEC-R*` = `security-reviewer`; `QA-*` / `QA-Q*` = `qa-engineer`; `AI-*` =
+`ai-engineer`; `CR-*` = `code-reviewer`; `S-*` and `N-*` = the `security-reviewer` reviews'
+own internal finding and note numbering; `AR-*` = an architecture ruling requested by a task
+(`AR-1`, T-050-04). **`BL-CONFLICT`** is a backlog cross-ownership adjudication recorded when
+two entries claim the same file (D-B). Each resolves in `reviews/`; **§9 is their index**, and
+a reader who has never opened those files needs nothing beyond this paragraph to follow the
+normative text.
 
 **Where a review conflicts with a ratified ruling, the ruling stands and the conflict is
 named** (`DADAIA.md` §6 / `dd-release-implement`: finalization order is memory → CLOSURE →
@@ -2183,30 +2892,79 @@ already.**
 statements were corrected against the tree rather than transcribed: the non-existent
 `resolved_release` validator (SA-R1) and the ledger's own drift, 473 → **474** `resolved`
 between the review and this fold (SA-R5) — which is itself the argument for retiring absolute
-counts from acceptance. No re-review is required for these ten (`security-reviewer` §5: each
-is a stated clause or a fixture arm, verifiable at the `S1` QA close and by V20's capture);
-the trio moves to `Em revisão` for the operator.
+counts from acceptance. No re-review was required for those ten.
+
+### 9.3 Pass 3 (2026-08-26, quantitative) — the two quantitative reviews
+
+`software-architect`'s full quantitative review (**REWORK**; §9 ten ranked changes; §11 verdict)
+and `qa-engineer`'s test-minimization review (**twelve ranked amendments**), read against
+`reviews/bug-history-forensic-100.md` §5, `reviews/architecture-metrics-baseline.md` §8 and
+`reviews/test-minimization-literature.md` Part 3. **22 items, 22 dispositions, nothing
+dropped.** Where a review conflicts with a ratified ruling the ruling wins and the conflict is
+recorded (none did at this fold); where a review conflicts with an operator directive of this
+fold, the directive wins and the deviation is named (one did — SA-Q5).
+
+| Reviewer | id | Amendment | Disposition | Where |
+|---|---|---|---|---|
+| `software-architect` | **SA-Q1** | One write seam for `BUGS.jsonl` on the executed path — the file has **3** writers, 2 of them file tools, so A2.6/A2.9/A14.6 are unprovable for them; add one governance verb and offset the leaf count | **applied** — the seam is fixed in `features/bugs`'s record store for **every** writer; the **exposure** becomes **AS-16 (operator-gated)**, (i) `bugs update` recommended with the D8 reasoning made explicit ("D8 forbids growth **by reflex**; replacing three ad-hoc writers with one seam is the opposite") and the leaf arithmetic closed at **71** by deleting `specs release open` + `specs segment open`, both verified at `cli/commands/specs.py:26,28`; (ii) the Python entry point stated as the honest fallback at 69 | **AS-16** · FR2 one-seam paragraph · **A2.13** · **A8.3** (verb correction) · FR4 bug-surface (the two dead leaves) · T-050-08, T-050-21A |
+| `software-architect` | **SA-Q2** | Restore the FR23 triple (`evidence_loop`/`_seam`/`_diff`) as write-once fields; migrate from v5; make forensic metric 2 a pillar-1 output | **applied** — restored as write-once, with `diff_direction` beside it; FR3 carries every existing value verbatim and counts what it carried | FR2 field categories + the FR23 paragraph · **A2.11** · FR3 step **6d** · **A3.11** · FR14 metric table rows 2–3 |
+| `software-architect` | **SA-Q3** | Do not automate `specs upgrade`; ship `doctor --recipe` only — chain 1 of the forensic is `specs upgrade` and the function is at CC 26 | **applied** — the automation is **cut**; `--recipe` renders in its own function; the acceptance becomes measured complexity (`#upgrade` ≤ 26, `#doctor` ≤ 30) and the deferral is an intake candidate | §1.6 specs-doctor row · FR1 (`specs upgrade` paragraph) · **A1.4** · **V35** · §4.9 · T-050-05 |
+| `software-architect` | **SA-Q4** | Move the derivation to `core/`; `migrate_v5.py` keeps the adapter + runner and stays deletable; FR8's resolver imports core | **applied** — **`core/bug_provenance.py`**, pure and stdlib-only, with a contract test proving no permanent consumer imports the deletable module; T-050-09's placement and write set corrected | **A3.10** · FR3 bug-surface · PLAN §2 `core` row · T-050-09 |
+| `software-architect` | **SA-Q5** | Canonical `surface` enum — the forensic's 18 buckets | **applied-modified — the operator's directive E supersedes the reviewer's shape, and the deviation is named.** The enum derives from **the feature-package list the independence contract uses**, not from the forensic's hand-normalised buckets: one source for two consumers (A2.12 ↔ A18.5) beats two lists that must be kept equal. The forensic's normalizer becomes FR3's legacy **mapping table**, unmapped → `surface: unknown`, counted | FR2 `surface` paragraph · **A2.12** · FR3 step **6d** · **A3.11** · **V32** |
+| `software-architect` | **SA-Q6** | Add the 6 missing forensic metrics to `PILLAR-BUGS.md` with baselines and targets, plus `diff_direction` | **applied** — all **eight** metrics carry definition, command, baseline and the record field that makes each computable, as a table `PILLAR-BUGS.md` reproduces verbatim; each row is a validation | FR14 metric table · **A14.7** · **V33** · T-050-24 |
+| `software-architect` | **SA-Q7** | Name the public-assets exposure and cap it; retire the hand rosters FR10's glob makes redundant | **applied — split, and the split is stated.** Engine 1 of 4 qualifies for a bounded FR and becomes **FR10A** (deletion-only, size S, `tests/` only); engines 2–4 do not (each lives in a 1 048-LOC module with a CC-40 `doctor` and each replacement is a new derivation) and become **AS-17**, operator-gated, with their bug ids and one intake target. Exposure quantified in §1.6: 10 projection cycles, 1 skill renamed, 1 added, 5 scoped `AGENTS.md` | **§1.6** · **AS-17** · **FR10A** (A10A.1–A10A.4) · §4.9 · T-050-19A |
+| `software-architect` | **SA-Q8** | Complete the independence contract before FR18 promotes it — a principle must be true when accepted | **applied**, with two reviewer figures corrected against the tree: the gap is **4 packages of 24** (not 5 of 25) — `capabilities`, `certification`, `reconcile`, `tmp_gc`; `workspace` and `workspace_clean` are **both** listed. Edges 5 → 5 visible, of which 3 become declared ignores with a reason line; cap **15 → 17** (`15 − 1` FR2 + `3`) in the same commit as `setup.cfg` | **A18.5** · FR18 independence table · **V32** · §4.9 · T-050-29 |
+| `software-architect` | **SA-Q9** | Test economy with numbers: tests before/after, private-symbol ratchet, 302 undeclared, one LARGE number, ruff 63 → 61 | **applied** — every clause landed as a validation: **V25** (count), **V26** (24 → 0), **V27** (94/396 → 396/396), **V29** (one number, PARAMETERS.md's 30), **V35** (63 → observed max) | **A22.9**–**A22.12** · **A18.6** · **V25**–**V35** · §3 standing rules · T-050-18A, T-050-34 |
+| `software-architect` | **SA-Q10** | Textual closure: 8 undefined review ids, 6 traceability gaps, 5 contradictions, `_OPTIONAL_STR_FIELDS`, `release_events.py` read-only, V12 ceiling | **applied, every sub-item.** Ids: §9's preamble now declares the review-id namespaces and PLAN §0 carries the row. Gaps: A4.1 → T-050-21A (**A4.1a** for T-050-11) · A16.4 re-run at scope-complete · T-050-03A given **A13.6** · `core/models/backlog.py`'s registration placed in FR5/T-050-13 · `registration_commit`'s writer named (pillar 1, A14.6) · `specs/bugs/README.md` retires **in T-050-16** beside its replacement. Contradictions: V9 ↔ A9.2 · T-050-26/27 evidence wording ↔ A13.5 · T-050-26's duplicate `Preconditions` · FR14's `_ideas` window ↔ AS-7/D10 · `dadaia bugs resolve` ↔ the real verb set. Plus `_OPTIONAL_STR_FIELDS` deleted (A2.10), `release_events.py` declared read-only with its file-tool append seam named, and V12 given the **+500** ceiling | **A2.10** · **A4.1/A4.1a** · **A13.6** · **A14.6** · **A16.4** · **V9** · **V34** · FR4 read-only paragraph · FR14 window · §9 preamble · PLAN §0 · T-050-10, T-050-13, T-050-16, T-050-26, T-050-34 |
+| `qa-engineer` | **QA-Q1** *(CRITICAL)* | Add `V-TESTCOUNT`: `--collect-only` before and after, per tier — the operator's "fewer tests" has **no metric anywhere** and PLAN disclaims the goal outright | **applied** — **V25** with a **gate** (A22.9: after ≤ before), per-FR `Tests: +N / −M` lines on **every** FR, and PLAN's "net-additive in tests by nature" **withdrawn and replaced** | **V25** · **A22.9** · §3 standing rules · every FR's `Tests:` line · PLAN §6 |
+| `qa-engineer` | **QA-Q2** | T-050-08 enumerates the `BugEvent`-referencing files with a per-file disposition | **applied**, re-measured: **9** files at this fold (the review measured 8), four deleted whole and five rewritten in place, each named — and the census is **re-measured at task time**, never trusted from the list | FR2 `Tests:` line · T-050-08 write set + done criterion |
+| `qa-engineer` | **QA-Q3** | T-050-25/25A enumerates the 3 SPEC-DOC-036/038 golden-fixture files | **applied**, all three verified present: `test_doctor_taxonomy_disposition.py`, `test_doctor_golden.py`, `_golden/doctor_golden_v0155.json` — with the anti-reflex rule stated (curate the entries whose subject died; never re-baseline the golden) | FR15 `Tests:` line · T-050-25A |
+| `qa-engineer` | **QA-Q4** | T-050-18's hook-test verdict pre-committed to **DELETE**, not left open | **applied** — both files DELETE, with the three replacement contract fixtures as the evidence and the reasoning stated: an open verdict on a test whose premise was deleted resolves to "rewrite" by default, which is how a change-detector enters a suite. This is the release's one LARGE-tier removal with no same-tier replacement | **A9.3** · FR9 `Tests:` line · T-050-18 |
+| `qa-engineer` | **QA-Q5** | T-050-33 records the measured 302/396 undeclared-SCAFFOLD count | **applied-modified** — recording alone leaves an invisible debt visible but unmoving; per the operator's mandate it becomes a **ratchet** (**V27**, 94/396 → 396/396 or a per-segment number) with the baseline also written into `QUALITY.md` so the next release ratchets from a number | **V27** · **A22.10** · §5 closure obligations · T-050-18A, T-050-33 |
+| `qa-engineer` | **QA-Q6** | T-050-19 names the two Windows bug ids and requires a cross-platform CI run of the five new mutation fixtures before `S2` closes | **applied** — the file being retired is the home of `citation-enforcer-resolves-projected-instance-paths-against-the-checkout` and `citation-mutation-fixtures-never-turn-red-on-windows`, and the second **is** a mutation fixture that never turned RED on Windows; each of the five is proven RED-then-green **on the matrix**, both ids cited by id in the done criterion | FR10 cross-platform paragraph · T-050-19 |
+| `qa-engineer` | **QA-Q7** | `QUALITY.md`'s rewrite reconciles the LARGE-cap 3-number contradiction into one source | **applied** — verified at HEAD (`PARAMETERS.md:10` = 30, `tests/AGENTS.md:69–71` = 30, `quality-assurance.md:79,208` = 100); per the operator's directive the decision is taken **now**: `PARAMETERS.md`'s **30** is the number and its only home, the other two statements are **deleted**, and V29 goes RED on a second numeric cap | **A18.6** · **V29** · FR18 one-number paragraph · §5 |
+| `qa-engineer` | **QA-Q8** | Record the e2e directory-vs-marker mismatch (42 vs 15) as known drift | **applied** — recorded inside **V30** as measured known drift with its 2.8× selector consequence stated, and the fix routed to intake (A18.3 keeps the correction out of this release) | **V30** · §5 closure obligations · §4.9 |
+| `qa-engineer` | **QA-Q9** | Add `V-MUT`: one mutation-baseline pass over `core/` | **applied** — **V31**/**A22.11**, floor recorded and ratcheting up only, zero-kill tests dispositioned at closure, and the availability caveat carried verbatim: `mutmut` was **unverified, not absent**, so an unreachable binary yields `null` **with its reason**, never a fabricated score | **V31** · **A22.11** · T-050-03, T-050-34 |
+| `qa-engineer` | **QA-Q10** | T-050-09's tests carry `Intent: SCAFFOLD — expires: <release>` | **applied**, and split correctly against SA-Q4: the `core/bug_provenance.py` tests are **CONTRACT** (the function outlives the migration), only the `migrate_v5` adapter/runner tests are **SCAFFOLD — expires: 0.6.0**, with renewal by an explicit verdict and **V28** turning an unrenewed expiry RED | FR3 `Tests:` line · **V28** · T-050-09 |
+| `qa-engineer` | **QA-Q11** | FR1's tasks name at least one existing test file each retires or supersedes | **applied** — FR1's `Tests:` line names the scaffold `README.md` presence assertions and the `assets/.gitkeep` assertion in `tests/unit/features/specs/test_scaffolder.py`, and the double-`upgrade` fixture is **not added** because A1.4 is now a zero-diff assertion | FR1 `Tests:` line · **A1.4** · T-050-05 |
+| `qa-engineer` | **QA-Q12** | File the private-import ratchet and the intent-header extension as backlog candidates for a companion release | **applied-modified — the operator's mandate pulls them forward.** Both are adopted **in 0.5.0** as **test-suite ratchets** in one contract file (T-050-18A), with the A18.3 conflict resolved in writing rather than by scope-shifting: A18.3 governs **product** checks; these measure the suite. What still routes to intake is the *residue* — a private-import count above 0, and the CI-scope extension of `check_test_intent_declared.py` beyond `tests/e2e/**` | **V26**, **V27** · **A18.3** boundary paragraph · §3 standing rules · §5 intake candidates · T-050-18A |
+
+**Pass-3 tally.** 22 items · **19 applied · 3 applied-modified** (SA-Q5, QA-Q5, QA-Q12 — each
+with its deviation named) · **0 rejected**. Two new operator-gated assumptions (**AS-16**,
+**AS-17**), one new bounded requirement (**FR10A**), one new task (**T-050-18A**) plus
+**T-050-19A**, eleven new validations (**V25–V35**), four new invariants (**A22.9–A22.12**).
+Three reviewer figures were corrected against the tree rather than transcribed: the
+independence gap (**4 of 24**, not 5 of 25), the `BugEvent` file census (**9**, not 8) and the
+fifth "missing" package `workspace_*` (both `workspace` and `workspace_clean` are listed).
+`software-architect`'s architecture-fidelity **FAIL** rests on three findings — the three
+`BUGS.jsonl` writers (SA-Q1), the derivation's placement (SA-Q4) and the caller-less findings
+store (SA-Q10/§6) — plus the untrue independence contract (SA-Q8); **all four are closed
+above**, which is the condition the verdict names for the gate to pass.
 
 ---
 
 ## 10. Approval
 
 Approving this SPEC ratifies, as written: **D1–D15** as carried in §2.1; the authoring
-decisions **D-A … D-J**; the fifteen stated assumptions **AS-1 … AS-15** — including AS-1's
-re-decided answer to the handoff's open reconciliation, AS-11's placement of the lineage
+decisions **D-A … D-J**; the **seventeen** stated assumptions **AS-1 … AS-17** — including
+AS-1's re-decided answer to the handoff's open reconciliation, AS-11's placement of the lineage
 check, **AS-12's recorded `S4` memory window**, AS-13's release-id disambiguation, AS-14's
-U+2028 precondition and AS-15's ruling-preserving verdict-gate fix; the six-entry pick with
-**no bug picked**; the destructive deletion of root `specs/_archive/` under FR6 with the
-operator present; the honest net-additive accounting of §3 and A22.3; and **both review
-folds (§9.1, §9.2)** — including the single reviewer amendment fold 1 refuses (SA-11,
-`--recipe`, whose rejection pass 2 accepted on the merits, with A1.3's condition) and the ten
-pass-2 items, all applied.
+U+2028 precondition, AS-15's ruling-preserving verdict-gate fix, **AS-16's one write seam** and
+**AS-17's named public-assets deferral**; the six-entry pick with **no bug picked**; the
+destructive deletion of root `specs/_archive/` under FR6 with the operator present; the honest
+net-additive accounting of §3 and A22.3 **against a net-non-positive test suite (A22.9)**; and
+**all three review folds (§9.1, §9.2, §9.3)** — including the single reviewer amendment fold 1
+refuses (SA-11, `--recipe`, whose rejection pass 2 accepted on the merits, with A1.3's
+condition), the ten pass-2 items and the twenty-two pass-3 items, all applied or
+applied-modified with their deviation named.
 
-Two items need the operator specifically: **AS-12** (the `S4` memory window, or its stated
-fallback) and **FR20** (no agent may accept an ADR).
+**Four items need the operator specifically:** **AS-12** (the `S4` memory window, or its stated
+fallback), **AS-16** (the write seam's exposure — `bugs update` recommended), **AS-17** (the
+three deferred public-assets engines) and **FR20** (no agent may accept an ADR).
 
-**Status:** Em revisão — authored 2026-08-26; folded twice the same day (five definition
-reviews, then the two blocking re-reviews: `software-architect` REWORK-targeted and
-`security-reviewer` **APPROVED**, ten textual items, all applied — §9.2). **Awaiting the
-operator**, who reviews next and flips this to `Aprovado` at promotion; the two items that
-need the operator specifically are unchanged (**AS-12**, **FR20**).
+**Status:** Em revisão — authored 2026-08-26; folded **three times** the same day: five
+definition reviews (§9.1), the two blocking re-reviews (§9.2 — `software-architect`
+REWORK-targeted and `security-reviewer` **APPROVED**, ten textual items), and the two
+quantitative reviews (§9.3 — `software-architect` **REWORK** with ten ranked changes and
+`qa-engineer`'s twelve test-minimization amendments, **22 dispositions, none dropped**).
+**Awaiting the operator**, who reviews next and flips this to `Aprovado` at promotion.

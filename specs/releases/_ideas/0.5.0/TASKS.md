@@ -26,18 +26,20 @@ segments and the lane. The live release carries no `segment:` line.
 
 ## Segment and candidate map
 
-**Ids are in execution order** — nothing below runs out of numeric sequence. Tasks added by
-the 2026-08-26 review fold carry a **letter suffix** (`T-050-03A`) and run immediately after
-the numbered task they follow; existing ids are never renumbered, because seven review
-documents, the SPEC's §9 fold tables and the backlog entries all cite them by number. The
-**pass-2 fold (SPEC §9.2) added no task** — its ten items land as write-set lines, description
-clauses, validation arms and done criteria on tasks that already existed.
+**Ids are in execution order** — nothing below runs out of numeric sequence. Tasks added by a
+review fold carry a **letter suffix** (`T-050-03A`) and run immediately after the numbered task
+they follow; existing ids are never renumbered, because nine review documents, the SPEC's §9
+fold tables and the backlog entries all cite them by number. The **pass-2 fold (SPEC §9.2)
+added no task**; the **pass-3 fold (SPEC §9.3) added two** — **T-050-18A** (the test-suite
+ratchets, `qa-engineer` amendments 5/12 and `software-architect` change 9) and **T-050-19A**
+(FR10A, `software-architect` change 7). Its other twenty items land as write-set lines,
+description clauses, validation arms and done criteria on tasks that already existed.
 
 | Block | Tasks | Contents | Gate |
 |---|---|---|---|
-| W0 | T-050-01 … 03, **03A** | promotion + definition commit + definition PR + baseline captures + the reviewer-persona allowlist widening | definition PR merged into `develop`; APPROVED verdict on its head sha |
+| W0 | T-050-01 … 03, **03A** | promotion + definition commit + definition PR + baseline captures **incl. V25–V27, V31, V32, V34/V35** + the reviewer-persona allowlist widening | definition PR merged into `develop`; APPROVED verdict on its head sha |
 | `S1` | T-050-04 … 15 (+ **06A**, **13A**) | the v6 canon, its two boundaries, and the historical ledger rewrite (FR1–FR6) | `qa-engineer` review **committed** + the `software-architect` **AR-1** confirmation |
-| `S2` | T-050-16 … 22 (+ **21A**) | lineage, commit shapes, hooks de-slop, the validated map, and FR4's contract step (FR7–FR12, FR4) | `qa-engineer` review committed |
+| `S2` | T-050-16 … 22 (+ **18A**, **19A**, **21A**) | lineage, commit shapes, hooks de-slop, the test-suite ratchets, the validated map, the public-assets roster retirement, and FR4's contract step (FR7–FR12, FR10A, FR4) | `qa-engineer` review committed |
 | `S3` | T-050-23 … 27 (+ **25A**) | the audit canon, its dry run, and the retirement of every `CLOSURE.md` parser (FR13–FR16) | `qa-engineer` review committed + the dry-run artifact satisfying A16.2 |
 | `S4` | T-050-28 … 33 | memory two-tier, principles, ADRs (FR17–FR21) | `qa-engineer` review committed + **operator** ADR decisions (FR20) |
 | scope complete | T-050-34 … 36 | invariants measured → six-axis review → security review + QA release verdict | the trio APPROVED on the same commit |
@@ -84,11 +86,19 @@ the archive move.
   `DEFINITION`/`CLOSURE` only. `S4` opens with a `phase: CLOSURE` record appended to
   `RELEASE.jsonl` (T-050-28) and closes with a `phase: IMPLEMENTATION` record (T-050-33).
   Both are ledger facts an audit can read. **No task silently flips a phase around itself.**
-- **Test intent at birth.** `Intent: CONTRACT — 0.5.0 <A-id>` or `Intent: SENTINEL — <seam>`.
-  **Zero new `tests/e2e/**`** without a named `qa-engineer` exception in that segment's QA
-  artifact.
+- **Test intent at birth.** `Intent: CONTRACT — 0.5.0 <A-id>`, `Intent: SENTINEL — <seam>`, or
+  `Intent: SCAFFOLD — <task-id> — expires: <M.m.p>` (**the expiry is mandatory** — V28 turns an
+  undeclared or unrenewed one RED). **Zero new `tests/e2e/**`** without a named `qa-engineer`
+  exception in that segment's QA artifact.
+- **The suite does not grow (fold 3, operator mandate).** Baseline **1 859** test functions /
+  396 files / **2 873** collected items, re-measured at T-050-03 — that re-measure is what
+  binds. Every task that touches `tests/**` states its **`Tests: +N added / −M deleted
+  (named)`** in its done criterion, and **A22.9/V25** gate the release total at **net
+  non-positive**. A task may not close with an unnamed `tests/**` write set.
 - **Never prune to go green.** A deletion, skip or disable is a `qa-engineer` verdict with
-  evidence, executed by `software-engineer`.
+  evidence — the `file:line` map of the coverage that supersedes it — executed by
+  `software-engineer`. Two verdicts are **pre-committed by the SPEC** and are not re-opened at
+  task time: T-050-18's two orphaned hook tests (**DELETE**, A9.3).
 - **Lane discipline.** `ai-engineer` performs every skill/persona/rule/projected-asset edit;
   `software-engineer` every production-code, CI-YAML and test edit; `project-manager` any
   backlog-file mechanics; `project-auditor` only `specs/audits/**`; `product-engineer` only
@@ -108,7 +118,7 @@ the archive move.
 |---|---|---|---|
 | T-050-01 | — | — | promotion commit sha; six subsections purged from `## ACTIVE`; `RELEASE.jsonl`/`ACTIVE.md` set to DEFINITION |
 | T-050-02 | — | SPEC §7 | definition PR merged; APPROVED verdict on the head sha; the `defined` milestone |
-| T-050-03 | — | AS-9 | V1, V2, V6, V11, V12 baseline captures |
+| T-050-03 | — | AS-9, A22.9–A22.12 | V1, V2, V6, V11, V12 **+ V25 (test count per tier), V26/V27 (marker counts), V31 (mutmut availability + `core/` floor), V32 (package inventory), V34/V35 (token + complexity ceilings)** baseline captures |
 | **T-050-03A** | — | AI-1 (§9.1.4), SEC-R5 (§9.2) | four reviewer personas widened to `specs/releases/**/reviews/**` + `security-reviewer` to `specs/releases/**/verdicts/**`; one refusal fixture each |
 | T-050-04 | FR2/FR3 | A2.5, A3.10, A13.4 | the `software-architect` **AR-1** confirmation of §2 F6/AR-1, verbatim |
 | T-050-05 | FR1 | A1.1–A1.4 | scaffold fixture; TREE-8 WARN fixture + exit-code fixture; `--recipe` output; double-`upgrade` byte comparison |
@@ -118,7 +128,7 @@ the archive move.
 | T-050-08 | FR2 | A2.3, A2.4, A2.7, A2.8 | WARN-with-unchanged-exit fixture; `bugs archive` idempotence; the doctor's core-vs-derived WARN; the event reader deleted after the switch |
 | T-050-09 | FR3 | A3.4, A3.10 (unit) | the pure derivation function over `GitHistoryReader` + its fixture tests, including the double-run |
 | T-050-10 | FR3 | A3.1–A3.9 | V4, V5, **V22**, **V23**; the migration report; the no-fabrication scan; `archive.jsonl` byte-identical |
-| T-050-11 | FR4 | A4.1, A4.2, A4.6 | `RELEASE.jsonl` written **and read in parallel with `ACTIVE.md`**; milestone immutability test; `core/release_events.py` |
+| T-050-11 | FR4 | **A4.1a**, A4.2, A4.6 | `RELEASE.jsonl` written **and read in parallel with `ACTIVE.md`**; milestone immutability test; `core/release_events.py` proven **read-only**. *(A4.1 proper belongs to T-050-21A — fold 3, traceability gap 1)* |
 | T-050-12 | FR4 | A4.3, A4.6 | V7 across **both** archive layouts; `releases_histo.jsonl`; every sha `git cat-file -e` green |
 | T-050-13 | FR5 | A5.1–A5.4 | `backlog_histo.jsonl`; BL-DUP deleted from `features/backlog/doctor.py`; the exit fixture |
 | **T-050-13A** | FR5 | A5.5 | the 18 `consumed_backlog.json` sidecars relocated; BL-STALE still fires on a relocated record |
@@ -127,10 +137,12 @@ the archive move.
 | T-050-16 | FR7 | A7.1–A7.5 | `dd-diagnose` + `LINEAGE.md`; the coverage table; zero `cli/`+`hooks/` diff |
 | T-050-17 | FR8 | A8.1–A8.4 | the duplicate scan; the resolver contract test on ≥ 20 records |
 | T-050-18 | FR9 | A9.1–A9.6 | V9, V10; the executed-path pre-commit fixture; the pre-push **runner-refusal** fixture; the two hook tests' stewardship verdict; zero-hit greps |
-| T-050-19 | FR10 | A10.1–A10.6 | V17; five mutation fixtures; **nine checks proven ported**; glob-based discovery; `rules-skills-map.json` retired |
+| **T-050-18A** | FR22 | A22.10, A18.3 (boundary) | **V26**–**V30** pinned in **one** contract file `tests/contract/test_test_suite_ratchets.py`; private-symbol imports, `Intent:` coverage, SCAFFOLD expiry, one-number-per-parameter, pyramid shape |
+| T-050-19 | FR10 | A10.1–A10.6 | V17; five mutation fixtures **proven RED on the cross-platform matrix**, citing both Windows bug ids; **nine checks proven ported**; glob-based discovery; `rules-skills-map.json` retired |
+| **T-050-19A** | FR10A | A10A.1–A10A.4 | the measured roster inventory with a per-entry disposition; zero-hit grep on the deleted literals; no `infrastructure/` file touched |
 | T-050-20 | FR11 | A11.1–A11.4 | V12 with anchor cost separated per section; the §3 ADDITIVE-row rewrite; **the `ACTIVE.md` citation removed here — the file's only writer**; `public doctor` green |
 | T-050-21 | FR12 | A12.1–A12.5 | V11; zero-hit grep for `dd-bug-fix`; the coverage table incl. the `dd-architecture-survey` pointer |
-| **T-050-21A** | FR4 | A4.4 (partly), A4.5, A4.7 | `ACTIVE.md` **deleted**; all 28 consumers + 26 test files repointed (**`DADAIA.md` excluded — repointed by T-050-20**); zero-hit grep; the no-`ACTIVE.md` gate fixture |
+| **T-050-21A** | FR4 | **A4.1**, A4.4 (partly), A4.5, A4.7 | `ACTIVE.md` **deleted**; all 28 consumers + 26 test files repointed (**`DADAIA.md` excluded — repointed by T-050-20**); **`specs release open` + `specs segment open` deleted** (dead once the phase is a fold); zero-hit grep; the no-`ACTIVE.md` gate fixture |
 | T-050-22 | all `S2` | A7–A12 ids, A4.5/A4.7 | `qa-engineer` artifact committed; zero new `tests/e2e/**` exceptions confirmed or named |
 | T-050-23 | FR13 | A13.1–A13.4 | the finding schema; the generic `JsonlRecordStore`; the FROZEN refusal fixture |
 | T-050-24 | FR14 | A14.1–A14.6 | the rewritten skill + 4 siblings; the executable window recipe; the one-rewrite pillar-1 fixture |
@@ -144,7 +156,7 @@ the archive move.
 | T-050-31 | FR20 | A20.1–A20.3 | one `docs(adr): accept …` commit per accepted ADR, carrying its Part-1 hunk |
 | T-050-32 | FR21 | A21.1–A21.3 | V15; the coverage table; the duplicate scan |
 | T-050-33 | all `S4` | A17–A21 ids | `qa-engineer` artifact committed; the `phase: IMPLEMENTATION` record closing the memory window; zero e2e exceptions confirmed |
-| T-050-34 | FR22 | A22.1–A22.7 | V18, V19; gate output; per-FR LOC direction; the xdist CI-matrix note |
+| T-050-34 | FR22, FR16 | A22.1–**A22.12**, **A16.4** | V18, V19, **V25 (after), V30, V31, V32, V35**; gate output; per-FR LOC direction; the xdist CI-matrix note; the **pillar-3 re-run** appended to `FINDINGS.jsonl`; the ruff ceiling ratcheted to the observed maximum |
 | T-050-35 | all | A22.1–A22.6 | `code-reviewer` APPROVED on a **thawed** tree, with the bug-surface verdict per feature |
 | T-050-36 | all | — | `security-reviewer` APPROVED + `qa-engineer` release verdict, same sha |
 | T-050-37 | — | — | **`rc-1`**: PR merged; CI green; verdict handoff for the PR head sha |
@@ -232,8 +244,33 @@ suite and the preflight, green); **V11** (AI-surface line count over
 `dadaia_workspace/public/{agents,skills,data,entities}/**`); **V12** (the always-on token
 count, using the v0.4.5 measurement recipe). Everything downstream is a delta against these.
 
-**Done criterion:** V1, V2, V6, V11, V12 captured with their exact commands recorded; the
-ledger-commit count is **≥ 295** and the `archive/*` tag count is recorded beside it.
+**The fold-3 baselines land here too — a ratchet with no starting number is not a ratchet.**
+
+- **V25** — `pytest --collect-only -q -p no:cacheprovider tests` **per tier** plus
+  `grep -rc "^def test_" tests`. The 2026-08-26 figures (**1 859** functions / 396 files /
+  **2 873** items; unit 1 376 · integration 241 · contract 200 · e2e 42) are **evidence, not
+  the baseline** — this capture is the baseline A22.9 gates against.
+- **V26** — private-symbol import statements in `tests/**`
+  (`from dadaia_workspace… import …_name`); ~**24** measured across ~21–22 files.
+- **V27** — `grep -rlE "^\s*Intent:" tests --include=test_*.py | wc -l` against the file
+  total; **94/396** measured, i.e. **302 undeclared**.
+- **V31** — **verify `mutmut` is reachable in the workspace venv before claiming anything.**
+  If it is, run `tests/scripts/run_mutation_baseline.sh` over `core/` and record the score as
+  the floor. If it is not, record **`null` with the reason** and open an intake candidate —
+  the fold-3 review could not reach the binary and reported that as *unverified, not absent*,
+  which is the posture to keep (A22.11).
+- **V32** — the package inventory: count `dadaia_workspace/features/*/__init__.py` (**24** at
+  this fold) against `[importlinter:contract:features-no-cross-feature]`'s `modules =` (**20**)
+  and record the four names; record `_RECORDED_IGNORE_EDGE_CAP` (**15**) and `lint-imports`
+  green.
+- **V34/V35** — the always-on token count (shared with V12) and `radon cc -s -j
+  dadaia_workspace` for the observed complexity maximum (**61** expected) plus
+  `cli/commands/specs.py#upgrade` (**26**) and `#doctor` (**30**).
+
+**Done criterion:** V1, V2, V6, V11, V12, **V25, V26, V27, V31, V32, V34, V35** captured with
+their exact commands recorded; the ledger-commit count is **≥ 295** and the `archive/*` tag
+count is recorded beside it; every fold-3 baseline is a **measured number or an explicit
+`null` with its reason** — no estimate, no figure copied from a review.
 
 **Parallelism:** none.
 
@@ -332,11 +369,32 @@ tree, TREE-8 and specs doctor --recipe`
 (`backlog/`, `bugs/`, `memory/`, `releases/`, `audits/`, `ADRs/`, `constitution.md`,
 `AGENTS.md`), `BUGS.jsonl`, a `RELEASE.jsonl`-ready `releases/` with `_ideas/` and `_archive/`,
 scoped `AGENTS.md` per area, **zero** `README.md` and **zero** `assets/`. The doctor gains
-TREE-8 "nothing beyond canon" and `--recipe`; `specs upgrade` automates the safe renames.
-**Compliance is WARN-only** — a fixture asserts the exit code is unchanged, because a canon
-that blocks is the slop this release exists to remove (D15).
+TREE-8 "nothing beyond canon" and `--recipe`. **Compliance is WARN-only** — a fixture asserts
+the exit code is unchanged, because a canon that blocks is the slop this release exists to
+remove (D15).
 
-**Done criterion:** A1.1–A1.4; the double-`upgrade` byte comparison green.
+**`specs upgrade` is NOT grown (fold 3, `software-architect` change 3).** The first Draft had
+this task automate the safe renames. That function is the engine of the forensic's chain 1 —
+`specs-upgrade-emits-atoms-violating-frontmatter-schema` bred **four followers in eight days**
+— and sits at **CC 26** while `#doctor` sits at **CC 30**. Ship `--recipe` only; render it in
+its **own** function so `#doctor`'s complexity does not move; leave the case-only renames to
+T-050-06 as recipe steps. If the migration chain needs a v6 entry so a consumer at v5 can still
+reach the stamp, add it **declaratively** — any change that raises either function's CC is
+refused at review. Measure both with `radon cc` and compare against T-050-03's capture.
+
+**`--recipe` renders the same finding objects `doctor --json` already emits** (A1.3) — never a
+second step table that could drift.
+
+**Tests: +8 / −2, named (fold 3, `qa-engineer` amendment 11).** Added: TREE-8 WARN + exit-code
+fixtures, the two `--recipe` contract tests, V21's `check-ignore` assertion, V20's arms (at
+T-050-06A). **Retired with their subject**, both in
+`tests/unit/features/specs/test_scaffolder.py`: the scaffold `README.md` presence assertions
+and the `assets/.gitkeep` assertion. The double-`upgrade` byte-comparison fixture is **not
+written** — A1.4 is now a zero-diff assertion over `features/migrate/upgrade.py` plus the two
+complexity numbers.
+
+**Done criterion:** A1.1–A1.4; `#upgrade` **CC ≤ 26** and `#doctor` **CC ≤ 30** measured and
+recorded; the two retired assertions named in the commit with their `qa-engineer` verdict.
 
 **Parallelism:** none.
 
@@ -479,9 +537,32 @@ bug-record-v1 with immutable core and mutable governance`
 record protocol, sibling of `git_object_reader.py`), `tests/**`.
 
 **Description:** Author the record model exactly as SPEC FR2 states it, with the **three**
-categories — immutable core, **write-once/absent-until-set** (`root_cause`, `solution`,
-`superseded_by`, `migration_note`), mutable governance — documented **per property in the
-schema**, not in prose elsewhere. `status` has **no `picked` value**. Add the in-place
+categories — immutable core, **write-once/absent-until-set**, mutable governance — documented
+**per property in the schema**, not in prose elsewhere. `status` has **no `picked` value**.
+
+**Three fold-3 additions, each a measuring instrument rather than a field (SPEC FR2):**
+
+1. **The FR23 evidence triple is restored** — `evidence_loop`, `evidence_seam`,
+   `evidence_diff`, write-once, alongside **`diff_direction`**
+   (`net-negative|net-neutral|net-positive`). They exist today at
+   `dadaia_workspace/public/schemas/bugs/bug-event-v1.schema.json:109/114/119` and are the
+   only structured evidence the ledger has ever carried (**23 of 92** recent resolutions).
+   Dropping them would delete the measurable evidence *in the release built to measure
+   evidence* (A2.11; forensic metrics 2–3).
+2. **`surface` becomes a closed enum, `component` stays free text** (A2.12). Its **single
+   source** is the feature-package list the independence contract uses: the 24
+   `dadaia_workspace/features/*/` packages plus `core`, `infrastructure`, `cli`, `hooks`,
+   `tests`, `public-assets`, plus `unknown`. A contract test asserts the enum's feature arm
+   equals `setup.cfg`'s `modules =` (which T-050-29 completes to 24/24). Recurrence is not
+   computable without this — 100 bugs used **86** distinct component strings.
+3. **`_OPTIONAL_STR_FIELDS` is deleted, not re-mirrored** (A2.10). At HEAD
+   `core/models/bugs.py:204` is a **16-name module-level tuple** that the redact docstring
+   itself calls "the SAME schema-mirror tuple" — a hand-kept list wearing a derivation's name,
+   inside the very field set whose two prior misses (T-043-23 → T-044-62) motivated the seam.
+   Read the property names from the schema; assert **zero** module-level field tuples in
+   `core/models/{bugs,findings,release_events}.py`.
+
+Add the in-place
 record-update seam: one line rewritten, every other byte identical, through the existing
 `dadaia_workspace/core/atomic_write.py` (temp file + `os.replace`) with a **re-read
 immediately before the rewrite** — the append stream's `O_APPEND` made concurrent writes
@@ -492,9 +573,10 @@ anywhere**, which is the defect that already fired twice (T-043-23 → T-044-62)
 deleted in this task** — `bug-event-v1.schema.json` and the event reader stay until T-050-08
 (D-F).
 
-**Done criterion:** A2.1, A2.2 (a/b/c), A2.6, A2.9; the immutability, write-once,
-in-place-rewrite, redaction (new schema property scrubbed with no code edited) and
-stale-rewrite-refused contract tests green.
+**Done criterion:** A2.1, A2.2 (a/b/c), A2.6, A2.9, **A2.10, A2.11, A2.12**; the immutability,
+write-once, in-place-rewrite, redaction (new schema property scrubbed with no code edited),
+stale-rewrite-refused, no-field-tuple, FR23-triple-write-once and surface-enum-equals-package-
+list contract tests green. **Tests: +9 in this task and T-050-08 together; −11 at T-050-08.**
 
 **Parallelism:** none.
 
@@ -508,9 +590,20 @@ record model and delete the event fold`
 **Preconditions:** T-050-07 `[x]`.
 
 **Write set:** `dadaia_workspace/features/bugs/service.py`,
-`dadaia_workspace/cli/commands/bugs.py`,
-`dadaia_workspace/public/schemas/bugs/bug-event-v1.schema.json` (deleted),
-`dadaia_workspace/features/specs/doctor.py` (the bug lane), `tests/**`.
+`dadaia_workspace/cli/commands/bugs.py` (**`bugs archive`, and `bugs update` if the operator
+takes AS-16(i)**), `dadaia_workspace/public/schemas/bugs/bug-event-v1.schema.json` (deleted),
+`dadaia_workspace/features/specs/doctor.py` (the bug lane), and — **named per file, not as a
+generic `tests/**`** (fold 3, `qa-engineer` amendment 2) — the `BugEvent` census, **9 files at
+this fold, re-measured with `grep -rl BugEvent tests` before the edit**:
+**deleted whole with their subject** `tests/unit/features/bugs/test_service_picked_fold.py`,
+`tests/unit/core/models/test_bugs_picked_event.py`,
+`tests/unit/features/bugs/test_append_coherence.py`,
+`tests/unit/features/bugs/test_jsonl_bug_store.py`; **rewritten in place against `BugRecord`**
+`tests/unit/features/bugs/test_control_format_char_sanitation.py`,
+`tests/unit/features/bugs/test_write_time_denylist_redaction.py`,
+`tests/integration/cli/test_bugs_write_time_denylist_redaction.py`,
+`tests/integration/infrastructure/test_live_bugs_ledger_still_parses.py`,
+`tests/contract/test_bind_resolution_seam_dynamic_walk.py`.
 
 **Description:** Switch `bugs status`/`bugs stats`/the doctor lane to the record reader, then
 delete the event fold and its terminal/non-terminal state machine **and the legacy
@@ -526,8 +619,25 @@ code. Add the **A2.7 detector**: a `specs doctor` WARN comparing each record's i
 against FR3's first-add derivation, because seam-level immutability is detection, not
 prevention, and the SPEC now says so.
 
-**Done criterion:** A2.3, A2.4, A2.7, A2.8; the CLI-output-stability fixtures green untouched
-for every input that succeeds today; the double-run `bugs archive` byte comparison green.
+**The one write seam lands here (AS-16, operator-gated).** Every governance-field write —
+registration, the fixer's resolve, the auditor's `audited`/provenance rewrite — goes through
+`features/bugs`'s record store: redacted, atomic, refuse-stale. At HEAD the fixer has **no
+verb** (`cli/commands/bugs.py` registers `append`/`status`/`stats`, and `append --event
+resolved` dies with the event kinds), so two of the three writers would be file tools and
+A2.6/A2.9/A14.6 would be unprovable for them. **If the operator takes AS-16(i)**, add
+`dadaia bugs update <id> --set <field>=<value>` — governance fields only, no validation added,
+exit codes unchanged (A8.3) — and the leaf count stays **71**: `+ bugs update + bugs archive
+− specs release open − specs segment open` (the last two deleted at T-050-21A). **If the
+operator takes AS-16(ii)**, drop `cli/commands/bugs.py` from this write set, expose the seam as
+a documented Python entry point, and record **69** leaves. The seam is identical either way;
+only its door changes. **A2.13's fixture exercises all three writer roles**, not just the CLI.
+
+**Done criterion:** A2.3, A2.4, A2.7, A2.8, **A2.13**; the CLI-output-stability fixtures green
+untouched for every input that succeeds today; the double-run `bugs archive` byte comparison
+green; the CLI leaf count recorded (**71** under AS-16(i), **69** under (ii)) — never left to
+be discovered at T-050-34. **Tests: −11 deleted (the four census files above, plus the seven
+event-fold and coherence cases inside them), each with its `qa-engineer` verdict and the
+`file:line` of the superseding coverage.**
 
 **Parallelism:** none.
 
@@ -540,16 +650,27 @@ resolution commits in one pass over the ledger history`
 
 **Preconditions:** T-050-08 `[x]`.
 
-**Write set:** `dadaia_workspace/features/bugs/migrate_v5.py` (**new** — the migration module
-and its v5 adapter), `dadaia_workspace/core/protocols/` (`GitHistoryReader`),
+**Write set:** **`dadaia_workspace/core/bug_provenance.py` (new — the pure derivation,
+permanent)**, `dadaia_workspace/features/bugs/migrate_v5.py` (**new** — the v5 line adapter,
+the legacy-`surface` mapping table and the one-shot runner, **deletable**),
+`dadaia_workspace/core/protocols/` (`GitHistoryReader`),
 `dadaia_workspace/infrastructure/git_subprocess.py` (`log_added_lines(pathspec)`), `tests/**`.
 
-**Description:** Implement SPEC FR3's algorithm and nothing else, as a **pure core function**
-over an iterator of `(sha, parents, date, touched_paths, added_lines)` — git access is behind
-`GitHistoryReader`, so `features/**` imports neither `infrastructure` nor `subprocess` and
-`lint-imports` gains no accepted edge (A3.10). The reader runs `git log --all --no-merges
---reverse --date-order -- specs/bugs/`; the function does one chronological pass, added lines
-only, parsed through the migration-owned v5 adapter, **first add wins**, with
+**Description:** Implement SPEC FR3's algorithm and nothing else, as a **pure function in
+`core/`** over an iterator of `(sha, parents, date, touched_paths, added_lines)`.
+
+**The placement is the point (fold 3, `software-architect` change 4).** The first Draft called
+this "a pure core function" and then put it in `migrate_v5.py`, the module FR3 declares
+**deletable** — while FR8's resolver and FR14's pillar 1 both consume it. A permanent consumer
+importing a disposable module is the fidelity defect; the split closes it:
+`core/bug_provenance.py` holds the derivation (stdlib-only, no `features/**` import), and
+`migrate_v5.py` holds only what dies with the migration. A contract test asserts **no permanent
+consumer imports `migrate_v5`**, so the deletion later is a `git rm`, not an archaeology dig.
+
+Git access stays behind `GitHistoryReader`, so `features/**` imports neither `infrastructure`
+nor `subprocess` and `lint-imports` gains no accepted edge (A3.10). The reader runs `git log
+--all --no-merges --reverse --date-order -- specs/bugs/`; the function does one chronological
+pass, added lines only, parsed through the migration-owned v5 adapter, **first add wins**, with
 `registration_granularity` / `resolution_granularity` computed from (number of bug lines added
 in that commit, whether the commit touches any non-`specs/` file). Ties across equal dates
 break by topological order then sha, and the tie-break used is recorded.
@@ -563,9 +684,19 @@ is exactly the profile that aggravates the still-open
 `windows-xdist-workers-crash-on-unit-fast-tier`, and the crash-prone tier is the `unit-fast`
 one. **Do not run the migration on the real ledger in this task.**
 
+**Marking, split correctly (fold 3, `qa-engineer` amendment 10).** The
+`core/bug_provenance.py` tests are `Intent: CONTRACT — 0.5.0 A3.10`: the function **outlives**
+the migration, so calling them SCAFFOLD would schedule the deletion of a permanent contract.
+Only the `migrate_v5.py` adapter and runner tests are
+`Intent: SCAFFOLD — T-050-09 — expires: 0.6.0`, naming the release that deletes their subject.
+A slipped expiry is renewed by an explicit `qa-engineer` verdict recorded at that release's
+closure — **V28 turns an unrenewed expiry RED**, which is the whole point of writing it down.
+
 **Done criterion:** every fixture case produces the expected sha and marker; running the
 derivation twice yields identical output; the git-touching test sits under `tests/contract/`
-and the CI matrix is watched for any xdist recurrence during this task (reported in T-050-34).
+and the CI matrix is watched for any xdist recurrence during this task (reported in T-050-34);
+a zero-hit grep proves no permanent consumer imports `migrate_v5`; every added test carries its
+`Intent:` and, where SCAFFOLD, its `expires:`. **Tests: +7 / −0.**
 
 **Parallelism:** none.
 
@@ -579,9 +710,12 @@ to BUGS.jsonl with derived commit provenance`
 **Preconditions:** T-050-09 `[x]`; V6 captured (T-050-03).
 
 **Write set:** `specs/bugs/bugs.jsonl` (retired) → `specs/bugs/BUGS.jsonl` (new),
-`specs/bugs/_archive/bugs_histo.jsonl` (new, empty), `specs/bugs/README.md` (retires into
-`specs/bugs/AGENTS.md`, authored in T-050-16), the migration report under
-`.dadaia/tmp/software-engineer/<YYYYMMDD>/`.
+`specs/bugs/_archive/bugs_histo.jsonl` (new, empty), the migration report under
+`.dadaia/tmp/software-engineer/<YYYYMMDD>/`. **`specs/bugs/README.md` is NOT deleted here**
+(fold 3, traceability gap 6): its replacement `specs/bugs/AGENTS.md` is authored in T-050-16,
+a whole segment later, and retiring a file before its replacement exists violates this
+release's own `expand → switch → contract` rule (D-F). The README retires **in T-050-16**, in
+the same commit that lands its replacement.
 
 **Description:** **First verify the precondition (V23).** The `v0.4.5` T-045-20 fix for
 `bug-event-field-with-unicode-line-separator-silently-drops-the-event` is on this branch —
@@ -599,7 +733,18 @@ shape this release exists to end (AS-14). Then run the migration.
 Populate `cause` **only** where the v5 `evidence_diff` / `notes` text literally states one;
 populate `caused_by` **only** where a record's text names another existing bug id, marked
 `lineage_source: "text-reference"`; everything else stays `null` — historical `caused_by` is
-never `"none"` (AS-2). **Every copied free-text value goes through the FR2 redaction seam**
+never `"none"` (AS-2).
+
+**Carry the FR23 triple and map `surface`, counting both (fold 3, step 6d / A3.11).** Copy
+every v5 `evidence_loop` / `evidence_seam` / `evidence_diff` value verbatim into the record's
+write-once fields; absent stays **absent**, never `""`. Populate `diff_direction` **only** where
+the `evidence_diff` text literally carries `net-negative` / `net-neutral` / `net-positive`.
+Map legacy `surface`/`component` free text onto the FR2 enum through the **table in
+`migrate_v5.py`**, one row per legacy string; an unmapped string becomes **`surface: unknown`**
+with the original preserved in `component`. Report: triple carried (all-three / partial /
+none), `diff_direction` populated vs absent, `surface` mapped vs `unknown` **with the full
+`unknown` list**. An `unknown` share above 10 % is a mapper row to add, never a reason to widen
+the enum. **Every copied free-text value goes through the FR2 redaction seam**
 with the operator's denylist terms loaded — write-time scrubbing began only on `eb03d01b`, so
 the whole 1 005-event history predates it. `specs/bugs/_archive/archive.jsonl` is **not
 touched** (AS-3). Run the migration a second time and prove byte-identical output (V5).
@@ -621,7 +766,8 @@ not a target to chase** — §1.2 counts different units (commit-message pattern
 commits) than the structural markers the algorithm computes; expect roughly 400
 `release-squash` against §1.2's 155, and report it.
 
-**Done criterion:** A3.1–A3.9; V4, V5, V22 and V23 captured; the report's **headline counts**
+**Done criterion:** A3.1–**A3.11**; V4, V5, V22 and V23 captured; the report's **headline
+counts**
 recorded in `RELEASE.jsonl` as a `note` record and in the closure record (the raw capture
 under `.dadaia/tmp/**` is GC'd at 3 days and may not be the sole home of the evidence); the
 report carries counts only, never values; this task is a **separate commit** from T-050-07.
@@ -659,7 +805,18 @@ container**), by `container.py` and by the doctor: one reader, one fold, three c
 three sha-bearing milestones are immutable; a contract test refuses a rewrite. `implemented`
 is written at the **final-`rc` QA close sha**, not at the PR merge (D3).
 
-**Done criterion:** A4.1, A4.2, A4.6; both files live and agreeing; `ACTIVE.md` still present.
+**`core/release_events.py` is read-only (fold 3, `software-architect` §2).** It reads and
+folds; it never writes, so `core/`'s mixed compute-and-write module count does not gain a
+member. Milestone and `phase` records are appended by **agents with file tools** — T-050-11,
+T-050-26, T-050-28/33, T-050-37/38, T-050-42/43 — which is safe because `RELEASE.jsonl` is
+**append-only**: no read-modify-write, so the `O_APPEND` race-benign property the bug ledger
+had to give up is kept here for free. A contract test asserts the module contains no write
+call (`open(… "w"/"a")`, `write_text`, `atomic_write`).
+
+**Done criterion:** **A4.1a** (both files live, read in parallel, agreeing), A4.2, A4.6;
+`ACTIVE.md` still present; the read-only assertion green. *(A4.1 — the gate resolving with
+`ACTIVE.md` gone — is evidenced at T-050-21A, not here: this task's done criterion is the
+file's continued presence, so it cannot evidence its absence.)* **Tests: +4 / −0.**
 
 **Parallelism:** none.
 
@@ -706,7 +863,12 @@ the evidence outlives the 3-day `.dadaia/tmp/**` GC.
 `dadaia_workspace/features/backlog/doctor.py` (**BL-DUP deleted — it lives here, not in
 `features/specs/doctor_governance.py`**), `dadaia_workspace/features/backlog/document.py` and
 `dadaia_workspace/features/backlog/ledger.py` (the in-file `## LEDGER` parsers retire),
-`dadaia_workspace/public/scaffold/backlog/**`, `tests/**`.
+`dadaia_workspace/core/models/backlog.py` **+ its container registration** (fold 3,
+traceability gap 4 — A13.4 claims "three registrations" and the backlog-histo one had no task
+write set; the model exists at HEAD, the registration does not),
+`dadaia_workspace/container.py`, `dadaia_workspace/public/scaffold/backlog/**`, and — named,
+not generic — the BL-DUP cases in `tests/unit/features/specs/test_doctor_ledger_invariants.py`
+plus the backlog-doctor duplicate cases, enumerated per file at task time.
 
 **Description:** Migrate every `## LEDGER` line into a histo record carrying the full entry
 snapshot where the entry text is recoverable and `entry_md: null` + a note where it is not;
@@ -714,7 +876,10 @@ report the counts. `BL-DUP` is **deleted**, not disabled — with one line per e
 append-only file, a duplicate ledger line is structurally impossible. Legacy
 `specs/backlog/_archive/*.md` stay byte-identical.
 
-**Done criterion:** A5.1–A5.4; `backlog doctor` green.
+**Done criterion:** A5.1–A5.4; `backlog doctor` green; the backlog-histo store instance
+registered **with a proven caller** (A13.4 — an instance nobody resolves is dead code behind a
+protocol). **Tests: +3 / −4 (named above), BL-DUP's deleted because the invariant became
+structurally impossible — the model `qa-engineer` §7 asks every other FR to match.**
 
 **Parallelism:** none.
 
@@ -835,13 +1000,22 @@ the diagnosing method`
 
 **Write set:** `dadaia_workspace/public/skills/dd-diagnose/SKILL.md` (new),
 `dadaia_workspace/public/skills/dd-diagnose/LINEAGE.md` (new), `specs/bugs/AGENTS.md` (new —
-the scoped summary), then one projection cycle
+the scoped summary) **and `specs/bugs/README.md` (deleted in this same commit — its
+replacement is the file beside it; fold 3, traceability gap 6)**, then one projection cycle
 (`dadaia public stage && dadaia public install --target all`).
 
 **Description:** Author the seven phases exactly as SPEC FR7 states them, each ending on a
 checkable *Done when*. Phase 0 states the window **once** (FR14's pillar 1 cites this text,
 never restates it) and instructs the reader to distrust a `release-squash` or `ledger-only` sha
-rather than diff it. Produce the coverage table for every block relocated out of
+rather than diff it.
+
+**Phase 0 is bounded, and the bound is written into the skill (fold 3,
+`software-architect` §5).** The filter is an **exact** `surface` enum match or a `component`
+match, capped at the **20 most recent** matching records in the window ordered by resolution
+date, diffing only those with `resolution_granularity == "exact"`. At 3.2 bugs/day over a
+five-release window an uncapped read is 100–300 records per fix — the shape that turns a
+procedure into a ritual nobody performs. Twenty is the number; a fixer who wants more runs the
+audit. The window itself excludes `_ideas/` (it carries no `RELEASE.jsonl` — D10/AS-7). Produce the coverage table for every block relocated out of
 `dd-bug-resolution` (the file itself is edited in T-050-21 — this task does not touch it, per
 the single-owner rule SPEC D-B). **Add no CLI verb and no hook**: the diff must touch nothing
 under `dadaia_workspace/cli/` or `dadaia_workspace/hooks/`.
@@ -907,17 +1081,76 @@ Assert the **executed path**, never the script's text: a fixture stages a set `b
 rejects and proves pre-commit exits 0; one proves a failing preflight no longer blocks a push;
 one proves an **unresolvable runner still refuses** the push.
 
-**The two tests this deletion breaks are in the write set, with a verdict.**
+**The two tests this deletion breaks are DELETED — the verdict is pre-committed, not opened
+at task time** (fold 3, `qa-engineer` amendment 4 / SPEC A9.3).
 `tests/integration/test_precommit_backlog_scoping.py` imports `_run_backlog_doctor_gate`
-directly and will fail to import; `tests/e2e/features/test_backlog_precommit.py` is its
-git-hook-path E2E companion. Both are outside `tests/contract/**` and were unnamed in the
-first Draft. Per test-stewardship, **`qa-engineer` records the per-file verdict — delete or
-rewrite — with its evidence, and `software-engineer` executes it.** The implementer never
-deletes or skips either to go green. Capture **V9** and **V10**, and record the secret-scan
-coverage limit (A9.6) as a known accepted gap with its intake candidate.
+directly and would fail to import; `tests/e2e/features/test_backlog_precommit.py` is its
+**LARGE-tier** git-hook-path companion **whose entire premise — pre-commit *blocking* a bad
+stage — this FR deletes**. Rewriting either would produce a change-detector test of the new
+advisory behaviour, the class `dadaia-test-stewardship` §B prohibits; the three new contract
+fixtures above **are** their replacement at a cheaper tier and are cited by `file:line` in the
+commit message, per the stewardship separation of powers (`qa-engineer` verdicts,
+`software-engineer` executes). This is the release's **one LARGE-tier removal with no
+replacement at that tier** — say so in the commit body rather than letting the census discover
+it. Capture **V9** and **V10**, and record the secret-scan coverage limit (A9.6) as a known
+accepted gap with its intake candidate.
 
 **Done criterion:** A9.1–A9.6; V9 and V10 captured; V10 **negative**; zero-hit greps for both
-deleted helpers; the two hook tests carry a recorded `qa-engineer` verdict.
+deleted helpers; **both hook tests deleted**, with the recorded verdict naming the three
+replacement fixtures. **Tests: +3 / −2 (both named), and the private-symbol import count drops
+by one — the number T-050-18A pins.**
+
+**Parallelism:** none.
+
+---
+
+- [ ] **T-050-18A — The test-suite ratchets, in one contract file**
+
+**Owner role:** software-engineer (the file) + qa-engineer (the verdict on every pinned
+number) · **Commit:** `test(T-050-18A): pin the test-suite ratchets at their measured values`
+
+**Preconditions:** T-050-18 `[x]` (its deletion removes one private-symbol import, so the pin
+is taken **after** it); T-050-03's baselines captured.
+
+**Write set:** `tests/contract/test_test_suite_ratchets.py` (**new — one file, not five**),
+`dadaia_workspace/public/skills/dadaia-test-stewardship/PARAMETERS.md` (reference only — the
+numeric caps stay there and T-050-29 reconciles them), `tests/AGENTS.md` (its competing LARGE
+number becomes a reference to `PARAMETERS.md`).
+
+**Description:** The operator's mandate — *"never again a temporary test without its marker"*
+and *"tests that ossify the architecture"* — becomes measurement rather than doctrine. One
+file, the **measure-then-pin-then-ratchet** law that
+`tests/contract/test_module_size_ceiling.py` and `test_import_linter_ignore_cap.py` already
+use, five pinned properties:
+
+1. **V26 — private-symbol imports.** Count `from dadaia_workspace… import …_name` statements in
+   `tests/**` outside an inline-commented allowlist (a documented-contract reason per entry).
+   Baseline ~**24** statements / ~21–22 files; **target 0**, ratchet **down only**. These are
+   the Hyrum's-Law liability the operator named: a test that pins a private helper freezes it.
+2. **V27 — `Intent:` + size coverage.** Baseline **94/396 declared, 302 undeclared (76 %,
+   SCAFFOLD by the taxonomy's own default)**; target **396/396**, or a per-segment ratchet
+   **carrying its number**. An undeclared test that nothing lists can never expire, which is
+   why 302 of them have not.
+3. **V28 — SCAFFOLD carries `expires: <M.m.p>`**, and a SCAFFOLD whose named release is under
+   `releases/_archive/` turns **RED**. Covers T-050-09's `migrate_v5` tests.
+4. **V29 — one number per parameter.** Each numeric cap (LARGE census, flake ceiling,
+   quarantine cap) appears in **exactly one** doctrine file. Measured today the LARGE cap has
+   **three homes and two values** — `PARAMETERS.md:10` = 30, `tests/AGENTS.md:69–71` = 30,
+   `specs/memory/quality-assurance.md:79,208` = census **100**. This task repoints
+   `tests/AGENTS.md`; T-050-29 deletes memory's competing statement.
+5. **V30 — pyramid shape**, computed from `--collect-only` and **reported, not gated**
+   (baseline unit 74.0 % · integration 13.0 % · contract 10.8 % · e2e 2.2 %).
+
+**The A18.3 boundary, stated in the file's own docstring so nobody re-litigates it later:**
+these are **test-suite ratchets** — they measure the suite, run in the existing `pytest` job,
+and add no CLI surface, no doctor code and no hook exit. A18.3's "zero new checks" governs
+**product** checks. A22.6 is unaffected: a red contract test fails the suite, as every contract
+test does.
+
+**Done criterion:** A22.10; one file, five pinned numbers, each equal to T-050-03's measurement
+(or to a value **lower** than it, with the delta explained); `tests/AGENTS.md` carries no
+numeric cap of its own; a mutation fixture per property proves the ratchet goes RED when
+violated. **Tests: +5 / −0**, and every one of them names the baseline it pins.
 
 **Parallelism:** none.
 
@@ -964,8 +1197,65 @@ produce a **name-diff with a zero-hit residue** plus a one-line note per check r
 behaviour it still asserts. Byte-for-byte equality is not the criterion and cannot be met by
 an extended enforcer; *no behaviour dropped* is.
 
+**The five new fixtures must prove RED on every platform (fold 3, `qa-engineer` amendment 6).**
+The file being retired is the home of two registered bugs —
+`citation-enforcer-resolves-projected-instance-paths-against-the-checkout` and
+`citation-mutation-fixtures-never-turn-red-on-windows` — and the second **is** a mutation
+fixture that never turned RED on Windows. Replacing it with five more mutation fixtures
+re-creates that shape class unless the RED direction is proven where it previously failed:
+each of the five is therefore observed **RED before its correction and green after, on the
+cross-platform CI matrix**, before `S2` closes, with both bug ids cited **by id** in this
+task's evidence. "Watched" is not enough for a shape that has already fired.
+
 **Done criterion:** A10.1–A10.6; V17 captured; the nine-check name-diff recorded with a
-zero-hit residue; zero-hit grep for `rules-skills-map.json` outside history.
+zero-hit residue; zero-hit grep for `rules-skills-map.json` outside history; the five fixtures'
+cross-platform RED runs named by CI run id, citing both prior bug ids. **Tests: +5 / −9 (the
+whole `test_rules_skills_map.py`, ported not duplicated).**
+
+**Parallelism:** none.
+
+---
+
+- [ ] **T-050-19A — FR10A: the public-assets hand rosters retire with the glob**
+
+**Owner role:** software-engineer (the deletions) + qa-engineer (the verdict on any roster
+kept) · **Commit:** `refactor(T-050-19A): retire the skill rosters FR10's glob makes redundant`
+
+**Preconditions:** T-050-19 `[x]` — the glob-based discovery it lands **is** the single-source
+replacement, so this task deletes only what already has one.
+
+**Write set:** `tests/**` **only** — the hand-kept roster and manifest literals, enumerated by
+measurement in this task and recorded in its evidence. **No file under
+`dadaia_workspace/infrastructure/` may appear in the diff** (that is AS-17's territory, and
+staying out of it is this task's bound).
+
+**Description:** public-assets is the forensic's **#1 surface: 18 bugs, 18 re-bugged**, and
+four of them are one class — *"a roster a human must remember to extend"*:
+`skill-orphans-unwired-agent-frontmatter`, `test-public-assets-stale-grill-me-name`,
+`test-public-pipeline-stale-skill-roster`, `skill-orphan-checker-misses-disable-model-invocation`
+— three of which were **fixed by extending the roster**. FR10's glob discovery is the
+structural replacement; this task is the deletion that makes the replacement real, and it is
+timely because this release gives those rosters ten fresh chances to drift (ten projection
+cycles, one skill renamed, one added, five scoped `AGENTS.md` authored).
+
+**Measure the inventory, do not hand-list it** (a hand list of hand lists is the same defect
+one level up): `grep -rn "EXPECTED_SKILLS\|SKILL_ROSTER\|frozenset({" tests/`, restricted to
+skill / persona / `AGENTS.md` membership. **Every entry gets a disposition** — *repointed at
+the glob* or *kept, with its reason recorded* when its subject is genuinely hand-curated.
+Nothing is deleted to make a number look better, and **no sixth mutation fixture is written**:
+one of T-050-19's five already proves a skill added without a `behavior-map.json` row goes RED.
+
+**Out of scope, deferred by name (AS-17):** doctor goldens, `shipped-hashes.json`, and the two
+projection authorities. Each lives in `infrastructure/public_assets.py` (**1 048 LOC**,
+`#doctor` at **CC 40**) and each replacement is a *new derivation*, not a deletion — growing a
+CC-40 function on the surface that re-bugs 18/18 is the shape the standing order refuses
+mid-release. They go to intake as `public-assets-single-source-engines`, with their bug ids.
+
+**Done criterion:** A10A.1–A10A.4; the measured inventory recorded with a per-entry
+disposition; zero-hit grep on every deleted literal; the repointed assertions green;
+`dadaia public doctor` green; the diff touches no `infrastructure/` file. **Tests: +0 / −0 —
+N literals removed, no test function added or deleted** (assertions are repointed, which is
+why this engine could be retired without spending the release's test budget).
 
 **Parallelism:** none.
 
@@ -1010,10 +1300,20 @@ segment. Re-capture **V12** with **anchor cost attributed separately from sectio
 so an anchor can never hide inside a section's number: a governance release is exactly the
 shape that quietly spends the token budget the last two releases fought for.
 
+**The additions have a ceiling, not just a measurement (fold 3, directive I / V34).** Baseline
+**21 511** always-on tokens. Per-section budget: D15 posture ≤ 90 · lineage/commit-shape ≤ 130
+· audits ≤ 110 · memory+ADR ≤ 110 · preflight rule ≤ 50 · §3 row ≤ 10 net · anchors ≤ 60
+(counted on their own line) · −15 for the removed `ACTIVE.md` sentence. **Ceiling: +500 ⇒
+≤ 22 011 (+2.3 %).** If V12 measures above it, **cut text in this task** — re-measuring,
+averaging across the persona set, or relocating a section into a skill the law must then cite
+are all refused. v0.4.4 missed its ≤ 3.5 k target by ~6× and v0.4.5 was still dieting this file
+this month; a governance release is exactly the shape that spends those gains silently.
+
 **Done criterion:** A11.1–A11.4; V12 re-captured with per-section attribution and anchors
-separated; the projected law byte-identical to source; `DADAIA.md` carries **zero**
-`ACTIVE.md` citations and a grep over every write-set block proves **exactly one** task in
-`TASKS.md` names `dadaia_workspace/public/data/DADAIA.md` (A11.1).
+separated, **at or under 22 011**; the projected law byte-identical to source; `DADAIA.md`
+carries **zero** `ACTIVE.md` citations and a grep over every write-set block proves **exactly
+one** task in `TASKS.md` names `dadaia_workspace/public/data/DADAIA.md` (A11.1).
+**Tests: +0 / −0.**
 
 **Parallelism:** none.
 
@@ -1068,7 +1368,11 @@ segment).
 `dadaia_workspace/features/specs/{doctor,doctor_common,doctor_release,doctor_structural,scaffolder}.py`,
 `dadaia_workspace/features/reports/next.py`,
 `dadaia_workspace/features/spec_context/gate_policy.py`,
-`dadaia_workspace/cli/commands/specs.py` (the `specs release` / `specs segment` verbs),
+`dadaia_workspace/cli/commands/specs.py` (**`specs release open` and `specs segment open`
+DELETED** — both verified at `cli/commands/specs.py:26,28`, both writing `ACTIVE.md` through
+`_write_active` at lines 390/428, and both **dead** the moment the phase is a `RELEASE.jsonl`
+fold; leaving a verb that writes a deleted file is dead code behind a dead artifact, and their
+removal is the offset AS-16's leaf arithmetic spends),
 `dadaia_workspace/public/agents/**` (the six personas citing it),
 `dadaia_workspace/public/skills/**` (the five skills citing it),
 `dadaia_workspace/public/scaffold/AGENTS.md`,
@@ -1092,9 +1396,15 @@ resolves the MEMORY phase from the fold alone. On the test side, **26 test files
 `ACTIVE.md` and 4 reference `CLOSURE.md`/`CLOSURE-TEMPLATE`**: enumerate them, and rewrite or
 delete each under a recorded `qa-engineer` verdict — none is silently orphaned.
 
-**Done criterion:** A4.5, A4.7; a **zero-hit grep** for `ACTIVE.md` outside `_archive/` and
-git history; the no-`ACTIVE.md` gate fixture green; the 26 + 4 census enumerated with a
-per-file disposition; `dadaia public doctor` green.
+**Done criterion:** **A4.1**, A4.5, A4.7; a **zero-hit grep** for `ACTIVE.md` outside
+`_archive/` and git history; the no-`ACTIVE.md` gate fixture green; the 26 + 4 census
+enumerated with a per-file disposition — **every file whose whole subject is the retired
+artifact is DELETED, not rewritten**, starting with
+`tests/unit/features/specs/test_active_md_schema_v2.py` (5 references) and
+`tests/contract/cli/test_cli_specs_segments.py` (the verbs deleted here); the CLI leaf count
+re-recorded after the two deletions; `dadaia public doctor` green. **Tests: −N deleted /
+−M rewritten, both counted into V25** (the census is 26 + 4 files, 84 `ACTIVE.md` occurrences,
+re-measured before the edit).
 
 **Parallelism:** none.
 
@@ -1190,18 +1500,35 @@ fix-induced definitions must be computable from `BUGS.jsonl` + `git show` with n
 judgement about what counts, and it filters `resolution_granularity == "exact"` (**never**
 `commit_granularity`, which is not a field).
 
+**`PILLAR-BUGS.md` carries all EIGHT forensic metrics, verbatim from SPEC FR14's table**
+(fold 3, `software-architect` change 6 / directive F). Each row states its definition, its
+command, its baseline and the record field that makes it computable: (1) per-bug diff
+attributability **28 % → 100 %** on post-0.5.0 resolutions; (2) FR23-triple coverage
+**25 % → 100 %**; (3) fix-shape ratio **0.68**, read from `diff_direction`; (4) same-surface
+re-bug rate **55 % / 73 %** at 3 d / 14 d, grouped on the `surface` **enum**; (5)
+hand-kept-list touch count **16/83**; (6) test-layer bug share **21/100**; (7)
+scanner-vs-prose recurrence **10/100, target 0** — expected to be **worse** after this release,
+which is exactly why it is measured; (8) sweep closures as `resolved` **9/92, target 0**. The
+first Draft measured six things the forensic never asked for and **two of the eight** it did,
+both partially — A16.2 would then have passed on the four pinned chains while the loop's
+aggregate rate stayed unmeasured. A run reporting fewer than eight is **incomplete** (A14.7).
+
 **Pillar 1 gains three cheap measures and one write.** Measures: the
 **registration→resolution interval** (`certify-cannot-install-installed-provider` reported
 18:41:56Z and resolved 18:41:57Z — the no-red-loop signature, detected by arithmetic instead
 of judgement); a **core-field mutation** hunk in `git log -p -- specs/bugs/BUGS.jsonl` as a
 **HIGH** finding (the detector that makes A2.2's seam-level rule auditable, since nothing
 prevents a file-tool rewrite); and a **cache disagreement** between a stored `resolved_commit`
-and the derivation. Write: on each record reviewed, `audited`, `resolved_commit` and
-`resolution_granularity` are set in **one atomic in-place rewrite** through the FR2 seam —
-one writer, one seam, which is what AS-1(ii) buys and why FR8 has no shape 3b.
-**Zero CLI verbs, zero hook changes** in this diff.
+and the derivation. Write: on each record reviewed, `audited` **and all four provenance
+fields** — `registration_commit`, `registration_granularity`, `resolved_commit`,
+`resolution_granularity` — are set in **one atomic in-place rewrite** through the FR2 seam
+(fold 3, traceability gap 5: the first Draft named a writer for the resolution sha and **none**
+for the registration sha on post-0.5.0 records). One writer, one seam, which is what AS-1(ii)
+buys and why FR8 has no shape 3b. **Zero CLI verbs, zero hook changes** in this diff — the
+`bugs update` verb, if the operator takes AS-16(i), belongs to FR2/T-050-08, not here.
 
-**Done criterion:** A14.1–A14.6; the one-rewrite-per-record fixture green.
+**Done criterion:** A14.1–**A14.7**; the one-rewrite-per-record fixture green; all eight
+metrics present in `PILLAR-BUGS.md` with baseline and target. **Tests: +1 / −0.**
 
 **Parallelism:** none.
 
@@ -1242,7 +1569,10 @@ gone by now).
 `dadaia_workspace/features/specs/catalog.py`,
 `dadaia_workspace/features/specs/memory_lint.py`,
 `dadaia_workspace/features/spec_context/gate_policy.py` (the duplicated
-`<YYYYMMDD>-<slug>` comment), `tests/**`.
+`<YYYYMMDD>-<slug>` comment), and — **named per file** (fold 3, `qa-engineer` amendment 3) —
+`tests/unit/features/specs/test_doctor_taxonomy_disposition.py`,
+`tests/unit/features/specs/test_doctor_golden.py` (its SPEC-DOC-036/038 cases) and
+`tests/unit/features/specs/_golden/doctor_golden_v0155.json` (the corresponding entries only).
 
 **Description:** FR4 deletes `CLOSURE.md`; T-050-25 retires only its *disposition* regexes.
 `CLOSURE.md` still appears in **seven** modules, and a checker that parses a file which no
@@ -1253,9 +1583,24 @@ checks in `doctor_closure_audit.py`, `doctor_release.py` and `doctor_governance.
 home for the `<YYYYMMDD>-<slug>` shape (also replacing the comment that repeats it in
 `gate_policy.py`). Deleted, not disabled.
 
+**Curate the golden, never re-baseline it.** Remove the entries whose subject died and leave
+the remainder byte-identical; a reflex-regenerated snapshot is prohibited by
+`dadaia-test-stewardship` §B, and the difference between curating a golden and re-baselining
+one is the difference between a deletion and a silent coverage loss. Each of the three files
+carries its own `qa-engineer` verdict.
+
+**One cross-tier duplicate is dispositioned here too** (literature rule 5): the memory-catalog
+generator is asserted at **two** tiers —
+`tests/unit/scripts/test_generate_memory_catalog.py` and
+`tests/integration/scripts/test_generate_memory_catalog.py`. `qa-engineer` records a verdict:
+demote to the cheaper tier with the `file:line` coverage map, or **keep with its reason** if
+the integration twin asserts something the unit test cannot. It is a candidate, not a
+foregone deletion — the evidence decides.
+
 **Done criterion:** A4.4; a **zero-hit grep for `CLOSURE.md` across
 `dadaia_workspace/features/**`**; one home for the audit-directory pattern; `specs doctor`
-**0 errors**; the LOC delta of this task **negative**.
+**0 errors**; the LOC delta of this task **negative**. **Tests: +2 / −3 (the three files
+named above), plus the catalog-twin verdict recorded either way.**
 
 **Parallelism:** none.
 
@@ -1271,9 +1616,13 @@ run)`
 **Write set:** `specs/audits/<YYYYMMDD>-canon-v6-first-audit/AUDIT.md` (new) +
 `FINDINGS.jsonl` (new); `specs/releases/0.5.0/RELEASE.jsonl` (the `audited` milestone).
 
-**Preconditions:** T-050-25A `[x]`.
+*(Fold 3, contradiction 3: this task carried **two** `Preconditions` lines. The single
+precondition is **T-050-25A `[x]`**, which subsumes T-050-25.)*
 
-**Description:** Run all three pillars over the window. **This is the release's acceptance,
+**Description:** Run all three pillars over the window, and report **all eight forensic
+metrics** with `baseline → measured` (A14.7/V33) — the four pinned chains are the qualitative
+half of the acceptance, the eight metrics are the quantitative half, and a run that delivers
+only the first passes the letter of A16.2 while leaving the loop's aggregate rate unmeasured. **This is the release's acceptance,
 not a formality:** pillar 1 must name, with evidence, the four documented chains of SPEC §1.1
 **by the bug ids §1.1 pins** — the nine-instance gitignore class (≥ 3 ids), the certify chain
 (`codex-live-probe-gate-checks-presence-not-usability` →
@@ -1292,13 +1641,22 @@ findings go to the PM's operator-gated intake report.
 
 **Redaction is mechanical here, not a promise (A13.5 / V24).** The auditor writes with file
 tools, so no seam can redact for it, and `Measured by:` runs (`lint-imports`, `pytest`, the
-ratchets) emit runner-absolute paths routinely. Capture every transcript under
-`.dadaia/tmp/**` and **cite it by path** in `evidence` — never paste it — then scan the whole
-folder with the same detector a push uses (`dadaia ci push-gate-check` over the range) and
-record the zero-hit result before the segment closes. The folder is committed inside `specs/`
-forever.
+ratchets) emit runner-absolute paths routinely. **Every `evidence` value is the reproducible
+command plus a redacted one-line result** — e.g. `git show <sha> --stat -- <module> → 2 files
+changed, second render path added` — written redacted **by hand**. A transcript is captured
+under `.dadaia/tmp/**` and cited **as a convenience pointer only, never as the citation
+itself**: that lane is GC'd at three days, so a path-only `evidence` decays into an
+unverifiable claim, which is the fabricated-evidence shape this release exists to end. *(Fold
+3, contradiction 2: this task and T-050-27 previously said "cite by path — never paste",
+against A13.5/V24's "command + redacted one-line result, a path is never the citation". A13.5
+governs; the wording is corrected here and at T-050-27.)* Then scan the whole folder with the
+same detector a push uses (`dadaia ci push-gate-check` over the range) and record the zero-hit
+result before the segment closes. The folder is committed inside `specs/` forever.
 
-**Done criterion:** A16.1–A16.6; V16 and V24 captured.
+**Done criterion:** A16.1–A16.6, **A14.7**; V16, **V24** and **V33** captured — all eight
+metrics present with `baseline → measured`, including the two whose target is 0 and the one
+(metric 7, scanner-vs-prose) that this release is **expected to worsen**; reporting that
+honestly is the acceptance. **Tests: +0 / −0.**
 
 **Parallelism:** none.
 
@@ -1315,12 +1673,17 @@ forever.
 **Description:** Evidence A13–A16. The single question that decides this segment: **did the
 dry run rediscover the loop?** Quote the four chains **and their pinned bug ids** from
 `FINDINGS.jsonl`, or reject the segment — a chain named in prose without its ids does not
-count. Verify **V24**: the audit folder was scanned by the push detector with a zero-hit
-result and every transcript is cited by `.dadaia/tmp/**` path rather than pasted — it is
-committed inside `specs/`, so it is public forever. Confirm **zero** new `tests/e2e/**` files,
-or name each exception granted.
+count. **Then the quantitative half:** all eight forensic metrics present with
+`baseline → measured` (A14.7/V33), including metric 7, which this release is expected to make
+**worse** — a missing metric is an incomplete run, and a metric silently omitted because it
+reads badly is the failure this segment exists to prevent. Verify **V24**: the audit folder was
+scanned by the push detector with a zero-hit result and **every `evidence` value is a
+reproducible command plus a redacted one-line result**, with any `.dadaia/tmp/**` capture as a
+convenience pointer only (that lane is GC'd at 3 days; a path is never the citation — fold 3,
+contradiction 2). Confirm **zero** new `tests/e2e/**` files, or name each exception granted.
 
-**Done criterion:** `APPROVE` committed on the branch, with A16.2 explicitly evidenced by id.
+**Done criterion:** `APPROVE` committed on the branch, with A16.2 explicitly evidenced by id
+and A14.7 evidenced by the eight-row metric table.
 
 **Parallelism:** none.
 
@@ -1374,10 +1737,33 @@ authoring) · **Commit:** `docs(T-050-29): promote the measured rules to Part 1 
 **Preconditions:** T-050-28 `[x]`.
 
 **Write set:** `specs/memory/ARCHITECTURE.md`, `specs/memory/QUALITY.md`,
-`specs/memory/TECHSTACK.md`, `tests/contract/**` (the contract-count test), the V13/V14
-captures.
+`specs/memory/TECHSTACK.md`, **`setup.cfg`** (the independence contract completed),
+**`tests/contract/test_import_linter_ignore_cap.py`** (the cap moved in the **same** commit as
+`setup.cfg`, as its own docstring requires), `tests/contract/**` (the contract-count test), the
+V13/V14/V32 captures.
 
-**Description:** One principle per existing mechanical check: **every**
+**Complete the independence contract BEFORE promoting it (fold 3,
+`software-architect` change 8 / A18.5).** The candidate principle *"features are mutually
+independent"* is **measurably false at birth** as the contract stands, and a principle whose
+`Measured by:` points at a check that cannot see the violations is the decoration this segment
+abolishes. Measured at this fold: **24** `dadaia_workspace/features/*/` packages carry
+`__init__.py`; `setup.cfg:177–197` lists **20**; the four missing are **`capabilities`,
+`certification`, `reconcile`, `tmp_gc`**. Five module-level cross-feature edges exist — two
+already declared (`specs.doctor_governance → backlog.document`,
+`chokepoints.service → spec_context`) and **three invisible** because their source package is
+unlisted (`features/reconcile/service.py:12,13,14` → `features.capabilities`,
+`features.migrate.legacy_dadaia_dirs`, `features.migrate.state_v2`).
+
+*Two review figures are corrected against the tree rather than transcribed: the review's
+"20 of 25" and its fifth missing package `workspace_*` — `workspace` **and** `workspace_clean`
+are both listed. **Re-count from disk at task time**; this paragraph is evidence, not input.*
+
+Add the four packages, declare the three `reconcile` edges as `ignore_imports` **with a reason
+line each**, and move `_RECORDED_IGNORE_EDGE_CAP` **15 → 17** (`15 − 1` for FR2's retired
+`cli.commands.bugs → infrastructure.jsonl_bug_store` at `setup.cfg:232`, `+ 3`). **Collapsing
+`reconcile`'s edges is not attempted here** — that is a feature rewrite, and it goes to intake.
+
+**Then the principles. One per existing mechanical check:** **every**
 `[importlinter:contract…]` section in `setup.cfg` (count read from the file — nine at HEAD, the
 grill counted eight, and the rule is "every contract"), the LOC ceilings and complexity
 ratchet, the LARGE-test census and the stewardship pyramid/lifecycle laws, the diagram drift
@@ -1386,8 +1772,27 @@ principle, and that constraint is what stops this inventory from becoming a seco
 layer. Execute every `Measured by:` command once and capture its output (**V14**); a
 `Measured by:` that does not run is not admitted.
 
-**Done criterion:** A18.1–A18.4; V13 and V14 captured; the contract-count test RED when a
-tenth import-linter contract is added without a principle.
+**One number per parameter, decided here (fold 3, `qa-engineer` amendment 7 / A18.6).** The
+LARGE-test census cap has **three homes and two values** at HEAD:
+`dadaia-test-stewardship/PARAMETERS.md:10` = **30** (with "current ~84"),
+`tests/AGENTS.md:69–71` = **30**, and `specs/memory/quality-assurance.md:79,208` = the census
+**is 100** and *that* is the ceiling. Promoting "the LARGE-test census ceiling" to a Part-1
+principle without picking one would promote a Sensitive-Equality smell into the constitution's
+own layer. **`PARAMETERS.md`'s 30 is the number and its only home**; `QUALITY.md` **references**
+it and its 100-census statement is **deleted**, not reconciled by prose (`tests/AGENTS.md` was
+already repointed at T-050-18A). Measured today: 42 functions under `tests/e2e/**`, 15
+`e2e`-marked — so 30 sits above the measured count either way, and the remediation stays where
+`PARAMETERS.md` already puts it. **V29** goes RED on a second numeric cap.
+
+**A18.3's scope, stated so it is not re-litigated:** this FR writes **zero new product
+checks** — no doctor code, no CI job, no hook exit. T-050-18A's five ratchets are `tests/`
+measurements of the suite itself, already landed in `S2`, and this FR **promotes** them exactly
+as it promotes the ceilings that already existed.
+
+**Done criterion:** A18.1–**A18.6**; V13, V14 and **V32** captured; `modules =` equals the
+packages on disk with the cap at **17** and `lint-imports` green **before** any principle is
+authored; `QUALITY.md` carries no numeric cap of its own; the contract-count test RED when a
+tenth import-linter contract is added without a principle. **Tests: +1 / −0.**
 
 **Parallelism:** none.
 
@@ -1475,12 +1880,27 @@ a `Measured by:` line pointing at a check nobody ran is decoration, which is wha
 exists to abolish, and **V14 is a one-time capture, not a standing gate**: a `Measured by:`
 that goes stale later is caught at the next audit (pillar 3), never at commit time, and the
 artifact says so rather than implying a permanent check; (2) **zero** new checks were written
-by FR18 (A18.3). Confirm every ADR carries a terminal operator decision, and **zero** new
-`tests/e2e/**` files (or name each exception). Then **close the memory window** with the
-`phase: IMPLEMENTATION` record (AS-12) — the segment does not close until the ledger says the
-window did.
+by FR18 (A18.3) — and that the boundary is stated in `test_test_suite_ratchets.py`'s docstring
+rather than assumed. Confirm every ADR carries a terminal operator decision, and **zero** new
+`tests/e2e/**` files (or name each exception).
 
-**Done criterion:** `APPROVE` committed on the branch; the window-closing record appended.
+**Record two inherited debts as numbers, not adjectives (fold 3, `qa-engineer` amendments
+5/8).** (1) The `Intent:` gap:
+`grep -rlE "^\s*Intent:" tests --include=test_*.py | wc -l` against the file total — **94/396
+declared, 302 undeclared (76 %)** at baseline, re-measured now, with the delta this release
+produced. `check_test_intent_declared.py` gates only `tests/e2e/**`, so those 302 sit outside
+any mechanism that could ever expire them; V27 pins the number so the next release ratchets
+from it instead of re-measuring cold, and `QUALITY.md`'s rewrite carries it. (2) The **e2e
+marker-vs-directory drift**: 42 functions live under `tests/e2e/**` but only **15** carry the
+`e2e` marker — any `-m e2e` selector under-reports the LARGE tier by **2.8×**. Recorded as
+**measured known drift** with its fix routed to intake; correcting it here would be a new
+check, which A18.3 forbids this segment.
+
+Then **close the memory window** with the `phase: IMPLEMENTATION` record (AS-12) — the segment
+does not close until the ledger says the window did.
+
+**Done criterion:** `APPROVE` committed on the branch; the window-closing record appended; the
+`Intent:` count and the e2e marker drift both recorded as numbers with their commands.
 
 **Parallelism:** none.
 
@@ -1503,6 +1923,38 @@ ceilings). A positive net inside an FR that declared itself net-negative is a de
 release; the release's overall net-positive production LOC is expected and stated (SPEC
 A22.3).
 
+**The fold-3 measurements land here, against T-050-03's baselines.**
+
+- **V25 (after)** — `pytest --collect-only -q` per tier + the `def test_` function count.
+  **A22.9 gates it: after ≤ before.** Reconcile the measurement against the sum of every
+  task's declared `Tests: +N / −M`; a divergence is a defect of the **accounting**, not of the
+  measurement, and is fixed by correcting the declarations. If the after-count exceeds the
+  before-count, the release does **not** close on that number: `qa-engineer` produces the
+  demotion/deletion map that closes the gap, **or** the operator accepts the overshoot
+  explicitly with the number written into the closure record. Silence is not acceptance.
+- **V30** — the pyramid shape from the same run (baseline unit 74.0 % · integration 13.0 % ·
+  contract 10.8 % · e2e 2.2 %), reported, not gated; drift > 5 pp is a closure finding.
+- **V31** — one `tests/scripts/run_mutation_baseline.sh` pass over `core/`, the package taking
+  the most new pure-function surface (`bug_provenance.py`, `release_events.py`, the record
+  models). Record the score as a floor that ratchets **up** only, and list every zero-kill test
+  outside a named `SENTINEL` for the closure curation table. **If `mutmut` is unreachable,
+  record `null` with the reason and an intake candidate** — never a fabricated score.
+- **V32** — `modules =` at 24/24, the measured edge count, the cap at **17**, `lint-imports`
+  green.
+- **V35 — ratchet the ruff ceiling to reality** (directive J). `radon cc -s -j
+  dadaia_workspace` for the observed maximum (**61** today, `_list_agents_impl`, untouched by
+  this release) and set `pyproject.toml`'s `max-complexity` **to that number**, never above —
+  a ceiling two above the code it governs is not a ratchet. Also record
+  `cli/commands/specs.py#upgrade` **≤ 26**, `#doctor` **≤ 30**, and the CC > 10 count
+  (**131 → ≤ 133**) with every new function above 10 named. The change is executed here and
+  **recorded in the closure record's `## Size accounting`** (T-050-40).
+
+**Dispatch `project-auditor` for the pillar-3 re-run (A16.4, fold 3, traceability gap 2).**
+FR16 ran in `S3`, before FR18 authored the Part-1 principles, so its pillar-3 half could only
+record "principle not yet written" as a gap — and no task re-ran it. Re-run pillar 3 against
+the now-authored principles and **append** the resulting findings to the existing
+`FINDINGS.jsonl` (findings are appended once; new findings take new ids, nothing is rewritten).
+
 **Also report the xdist observation.** `windows-xdist-workers-crash-on-unit-fast-tier` (LOW)
 is open and unpicked (AS-4), and this release adds a nontrivial number of new `unit`/
 `contract` tests. State whether any recurrence of that crash appeared on the **CI matrix**
@@ -1510,7 +1962,10 @@ during `S1`–`S4`, naming the runs, and confirm the git-touching derivation tes
 `tests/contract/` rather than the crash-prone `unit-fast` tier. A recurrence is a bug event
 appended to the open record, never a silent retry.
 
-**Done criterion:** A22.1–A22.7; V18 and V19 captured; the xdist CI-matrix note recorded.
+**Done criterion:** A22.1–**A22.12** and **A16.4**; V18, V19, **V25, V30, V31, V32, V35**
+captured; the test-suite total **net non-positive** against T-050-03's baseline, or the
+operator's explicit numbered acceptance recorded; the ruff ceiling ratcheted; the pillar-3
+re-run appended; the xdist CI-matrix note recorded.
 
 **Parallelism:** none.
 
@@ -1653,10 +2108,22 @@ summary; tasks + final shas; validations as `{description, command, evidence}` t
 headline counts inline** — `.dadaia/tmp/**` is GC'd at 3 days, so a closure record that cites
 only a path cites nothing a month later; the FR16 audit by folder with its per-pillar finding
 counts; the ADR
-ledger with every operator decision; the four coverage tables (FR7, FR12, FR17, FR21); test
-dispositions; the `rc` ledger; the artifact GC sweep; **intake candidates** — FR16's findings
+ledger with every operator decision; the four coverage tables (FR7, FR12, FR17, FR21);
+**the test-economy accounting (fold 3)** — V25 before/after per tier against A22.9's gate, the
+per-FR `Tests: +N / −M` roll-up and its agreement with the measurement, V26's private-import
+residue, V27's `Intent:` coverage, V30's pyramid shape and the e2e marker-vs-directory drift
+(42 vs 15) as measured known drift, V31's mutation floor (or `null` with its reason) with every
+zero-kill curation disposition, and **V35's ruff ceiling change 63 → the observed maximum**;
+test dispositions; the `rc` ledger; the artifact GC sweep; **intake candidates** — FR16's
+findings
 and every residual, compiled for the PM's operator-facing report, with **no backlog entry
-created by any agent** — including FR9's stated secret-scan coverage limit (A9.6: gitleaks
+created by any agent** — **the seven named at fold 3**: (1)
+`public-assets-single-source-engines` (AS-17's three deferred engines with their bug ids);
+(2) the deferred `specs upgrade` rename automation; (3) `reconcile`'s three cross-feature
+edges, to collapse the cap 17 → 14; (4) `memory_lint.py`'s 87-entry heading allowlist, to
+derive from the templates; (5) the `Intent:` gate's extension beyond `tests/e2e/**` and any
+private-import residue above 0; (6) the e2e marker-vs-directory fix; (7) FR9's stated
+secret-scan coverage limit (A9.6: gitleaks
 effectively runs once per release, on the ship PR, so `rc-1` carries the migrated ledger and
 the audit folder under the privacy denylist scan only) and any residual from the **seven**
 definition reviews; the restated git-identity standing question (which is also why A19.3
