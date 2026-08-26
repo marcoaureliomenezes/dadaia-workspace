@@ -629,7 +629,7 @@ undecided lane.
 
 ---
 
-- [-] **T-045-23 — FR10: the doctor learns `.dadaia/references/`**
+- [x] **T-045-23 — FR10: the doctor learns `.dadaia/references/`**
 
 **Owner role:** software-engineer · **Commit:** `feat(T-045-23): sanction .dadaia/references
 as an operator-owned subtree outside the context lifecycle`
