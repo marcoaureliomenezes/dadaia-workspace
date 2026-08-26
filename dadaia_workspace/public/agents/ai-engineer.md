@@ -215,7 +215,7 @@ Ground yourself first with `dadaia-step0-memory-bootstrap`, then:
 
 `dadaia_workspace/public/` IS your territory (AI-entity sources); the harness
 directories are propagated projections. `public/data/DADAIA.md` is the law **source** —
-you write it here; its projections are PROTECTED and human-only (`DADAIA.md` §5): re-project
+you write it here; its projections are PROTECTED and human-only (`DADAIA.md` §8): re-project
 via `dadaia public stage && dadaia public install`, never hand-edit a projected copy.
 
 ---
