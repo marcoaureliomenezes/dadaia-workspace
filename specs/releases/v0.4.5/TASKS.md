@@ -651,7 +651,7 @@ repeated per verb. `specs/` is untouched.
 
 ---
 
-- [ ] **T-045-24 — `S3` close: `qa-engineer` review committed on the branch**
+- [-] **T-045-24 — `S3` close: `qa-engineer` review committed on the branch**
 
 **Owner role:** qa-engineer · **Commit:** `docs(T-045-24): S3 QA close`
 
