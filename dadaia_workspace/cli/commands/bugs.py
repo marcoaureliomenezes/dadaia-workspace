@@ -28,6 +28,7 @@ import typer
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError
 
+from dadaia_workspace import container
 from dadaia_workspace.cli._specs_resolution import (
     repo_slug_for_context,
     resolve_context_for_cli,
@@ -254,8 +255,15 @@ def bugs_append_cmd(
         raise typer.Exit(code=1) from exc
 
     # The service is the enforced side of the stream-coherence authority — appending
-    # through the raw store here is what let incoherent events into the ledger.
-    service = BugService(JsonlBugStore(target / "bugs"))
+    # through the raw store here is what let incoherent events into the ledger. v0.4.5
+    # FR6 (T-045-19): it is now ALSO the enforced side of write-time denylist
+    # redaction — `load_denylist_terms` is the SAME loader the push-time scan
+    # consumes (`container.load_denylist_terms` -> `infrastructure.privacy_check.
+    # load_privacy_terms`), read here through the composition seam since this module
+    # must never import `infrastructure` directly (`cli-no-infrastructure`).
+    service = BugService(
+        JsonlBugStore(target / "bugs"), denylist_terms=container.load_denylist_terms()
+    )
     try:
         path = service.append_event(model)
     except ValueError as exc:

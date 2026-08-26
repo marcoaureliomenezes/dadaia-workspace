@@ -171,10 +171,14 @@ def _load_privacy_denylist() -> tuple[tuple[str, str], ...]:
 def load_privacy_terms() -> tuple[tuple[str, str], ...]:
     """Public accessor over the operator denylist loader (SPEC v0.9.0 FR3, source 1).
 
-    Reused by the push-range denylist scan (``features.chokepoints.denylist_scan``) so
-    the CLI wires ONE operator term source, not a second denylist — same resolution
-    order as :func:`check_public_privacy` (``$DADAIA_PRIVACY_DENYLIST``, then
-    ``<workspace>/.dadaia/states/privacy_denylist.json``). Empty when neither resolves.
+    Reused by the push-range denylist scan (``features.chokepoints.denylist_scan``)
+    AND, since v0.4.5 FR6 (T-045-19), by the bug-append write-time redaction
+    (``features.bugs.service.BugService``, threaded through
+    ``container.load_denylist_terms`` -> ``cli/commands/bugs.py``) — the SAME loader,
+    consumed twice, never a second reader — so the CLI wires ONE operator term source,
+    not a second denylist — same resolution order as :func:`check_public_privacy`
+    (``$DADAIA_PRIVACY_DENYLIST``, then ``<workspace>/.dadaia/states/privacy_denylist.json``).
+    Empty when neither resolves.
     """
     return _load_privacy_denylist()
 

@@ -1,13 +1,15 @@
 """Bug-event service — fold event streams into current state and aggregates (v0.1.46 AC-1).
 
-Pure fold over the append-only JSONL store. ``append_event`` redacts ``notes`` before
-handing the event to the store; ``status`` and ``stats`` reduce the event stream the same
-way the doctor coherence check does — event sourcing, one reduce.
+Pure fold over the append-only JSONL store. ``append_event`` redacts every free-text
+field (IP/home-path, and — v0.4.5 FR6, T-045-19 — any injected operator denylist term)
+before handing the event to the store; ``status`` and ``stats`` reduce the event stream
+the same way the doctor coherence check does — event sourcing, one reduce.
 """
 
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 
 from dadaia_workspace.core.models.bugs import (
@@ -60,8 +62,14 @@ class BugStats:
 class BugService:
     """Append + fold operations over an append-only :class:`BugStore`."""
 
-    def __init__(self, store: BugStore) -> None:
+    def __init__(self, store: BugStore, denylist_terms: Sequence[tuple[str, str]] = ()) -> None:
         self._store = store
+        # v0.4.5 FR6 (T-045-19): the SAME operator-denylist source the push-time scan
+        # (`features.chokepoints.denylist_scan`) already refuses on — threaded in here
+        # by the CLI composition root (`container.load_denylist_terms`) since
+        # `features-no-infrastructure` forbids importing the loader directly. Defaults
+        # to `()` so every pre-FR6 caller/test is unaffected.
+        self._denylist_terms = tuple(denylist_terms)
 
     def append_event(self, event: BugEvent) -> object:
         """Refuse an incoherent event, then redact and append (never rewrites history).
@@ -73,6 +81,11 @@ class BugService:
         bugs-append-allows-terminal-event-without-reported). History is folded
         tolerantly: an existing incoherent row is the doctor's finding, never an append
         blocker — only the NEW event is refused. Returns the store's append result.
+
+        v0.4.5 FR6 (T-045-19): this is the enforced write-time redaction seam — the
+        same role this method already plays for stream coherence. ``event.redact()``
+        now also carries ``self._denylist_terms``, so a leak the push-time gate would
+        refuse is masked here, before the raw term ever reaches the committed ledger.
         """
         seen_reported: set[str] = set()
         terminated: set[str] = set()
@@ -81,7 +94,7 @@ class BugService:
         violation = advance_coherence(event.bug_id, event.event, seen_reported, terminated)
         if violation is not None:
             raise ValueError(violation)
-        return self._store.append_event(event.redact())
+        return self._store.append_event(event.redact(self._denylist_terms))
 
     def _fold(self) -> dict[str, BugState]:
         """Reduce the event stream to current per-``bug_id`` state.

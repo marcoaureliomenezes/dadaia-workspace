@@ -228,11 +228,26 @@ _POSIX_HOME_RE = re.compile(r"(/home/|/Users/)[^/\s:]+")
 _WIN_HOME_RE = re.compile(r"([A-Za-z]:\\Users\\)[^\\\s:]+")
 
 
-def redact_text(text: str) -> str:
-    """Return ``text`` with operator-local home-path usernames and IPv4 addresses masked."""
+def redact_text(text: str, denylist_terms: Sequence[tuple[str, str]] = ()) -> str:
+    """Return ``text`` with operator-local home-path usernames, IPv4 addresses, and any
+    operator denylist term masked.
+
+    ``denylist_terms`` is ``(term, reason)`` pairs from the SAME operator-term source
+    the push-time scan already refuses on
+    (``infrastructure.privacy_check.load_privacy_terms`` /
+    ``features.chokepoints.denylist_scan.operator_terms_match``) — threaded in by the
+    caller since this module is pure core and must never import ``infrastructure``
+    (v0.4.5 FR6/T-045-19, `core-no-upper-layers`). Matched case-insensitively as a
+    literal substring, mirroring the push-time scan's own semantics exactly (A6.3), so
+    a term that would refuse a push is masked before it is ever committed. Defaults to
+    ``()`` — a no-op — so every pre-FR6 caller stays byte-identical.
+    """
     out = _IPV4_RE.sub("[REDACTED-IP]", text)
     out = _POSIX_HOME_RE.sub(r"\1[REDACTED]", out)
     out = _WIN_HOME_RE.sub(r"\1[REDACTED]", out)
+    for term, _reason in denylist_terms:
+        if term:
+            out = re.sub(re.escape(term), "[REDACTED-TERM]", out, flags=re.IGNORECASE)
     return out
 
 
@@ -283,8 +298,9 @@ class BugEvent:
         """True iff this event is one of the terminal set (``archived`` is NOT terminal)."""
         return self.event in TERMINAL_EVENTS
 
-    def redact(self) -> BugEvent:
-        """Return a copy with every free-text field scrubbed of operator-local paths/IPs.
+    def redact(self, denylist_terms: Sequence[tuple[str, str]] = ()) -> BugEvent:
+        """Return a copy with every free-text field scrubbed of operator-local paths/IPs
+        and, now, any operator denylist term.
 
         ``title``, ``symptom``, ``repro``, ``expected``, ``notes``, ``evidence``,
         ``release`` and ``reason`` are all operator/agent-authored free text that can
@@ -309,10 +325,21 @@ class BugEvent:
         starts with a fixed enum token (``net-negative:``/``net-positive:``/
         ``net-neutral:``) but its trailing detail is free text too, so it is scrubbed
         for the same reason.
+
+        v0.4.5 FR6 (T-045-19): ``denylist_terms`` is the SAME operator-term source the
+        push-time scan already refuses on
+        (``infrastructure.privacy_check.load_privacy_terms``), threaded here through
+        the CLI/container composition seam — this module is pure core and never
+        imports ``infrastructure`` (`core-no-upper-layers`). It rides through the SAME
+        :func:`redact_text` call every field above already goes through — one masking
+        pass per field, not a second independent one — so every field this method
+        already scrubs for IP/home-path leaks now also gets denylist-term masking, and
+        no new, separately hand-kept field list is introduced for it (A6.2/A6.5).
+        Defaults to ``()`` so every pre-FR6 caller is unaffected.
         """
 
         def _scrub(value: str | None) -> str | None:
-            return None if value is None else redact_text(value)
+            return None if value is None else redact_text(value, denylist_terms)
 
         return replace(
             self,
