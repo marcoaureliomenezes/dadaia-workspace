@@ -560,7 +560,7 @@ event schema, never from a hand-kept list. The denylist data stays operator-loca
 
 ---
 
-- [-] **T-045-20 — FR7: one control/format-character sanitation pass at the bug-event seam**
+- [x] **T-045-20 — FR7: one control/format-character sanitation pass at the bug-event seam**
 
 **Owner role:** software-engineer · **Commit:** `fix(T-045-20): sanitize control and format
 characters at the bug-event seam`
@@ -586,7 +586,7 @@ pass at one seam closes both — not two independent guards. Then prove the whol
 
 ---
 
-- [ ] **T-045-21 — FR8: `specs init --specs-dir` refuses a symlinked target**
+- [-] **T-045-21 — FR8: `specs init --specs-dir` refuses a symlinked target**
 
 **Owner role:** software-engineer · **Commit:** `fix(T-045-21): refuse a symlinked target on
 the explicit --specs-dir branch`
