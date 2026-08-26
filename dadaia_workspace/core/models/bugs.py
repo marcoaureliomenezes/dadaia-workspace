@@ -228,10 +228,35 @@ _IPV4_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
 _POSIX_HOME_RE = re.compile(r"(/home/|/Users/)[^/\s:]+")
 _WIN_HOME_RE = re.compile(r"([A-Za-z]:\\Users\\)[^\\\s:]+")
 
+#: C0 control characters (0x00-0x1F) plus the Unicode NEL/line-separator/paragraph-
+#: separator code points (0x85, U+2028, U+2029) that ``str.splitlines()`` additionally
+#: treats as a line terminator. Stripped — never escaped — FIRST inside
+#: :func:`redact_text`, before any masking pass (v0.4.5 FR7/A7.3/A7.6; bundles bug
+#: ``bug-event-field-with-unicode-line-separator-silently-drops-the-event``). Two
+#: independent hazards close through this ONE strip, not two guards: (a)
+#: ``JsonlBugStore.iter_events`` line-splits a ``bugs.jsonl`` text blob — a raw one of
+#: these bytes inside a serialized field value fragments the one physical JSON line
+#: into two unparseable halves, so the whole event silently vanishes on read (A7.1);
+#: (b) any consumer of a folded :class:`BugEvent` (``dadaia bugs status``/``bugs
+#: stats``, present or future) decodes the byte back out of the JSON and could print it
+#: straight to a terminal — a raw ESC forges an ANSI escape sequence or a fake second
+#: output line (CWE-117, A7.2), the same class ``core.models.doctor_report`` already
+#: fixed for diagnostic lines. Deleted rather than escaped, unlike that precedent: a
+#: denylisted term an attacker interrupts with one of these bytes must re-join into a
+#: contiguous substring for the masking pass immediately below to still catch it
+#: (A7.6) — an escape sequence (``"\\x1b"``) would leave the two halves apart.
+_UNSAFE_FORMAT_CHARS_RE = re.compile("[\x00-\x1f\x85\u2028\u2029]")
+
 
 def redact_text(text: str, denylist_terms: Sequence[tuple[str, str]] = ()) -> str:
-    """Return ``text`` with operator-local home-path usernames, IPv4 addresses, and any
-    operator denylist term masked.
+    """Return ``text`` with unsafe control/format characters stripped, then
+    operator-local home-path usernames, IPv4 addresses, and any operator denylist term
+    masked.
+
+    The control/format strip (see :data:`_UNSAFE_FORMAT_CHARS_RE`) runs FIRST, before
+    every masking pass (v0.4.5 FR7/A7.6) — so a denylisted term an attacker split with
+    an embedded ESC or Unicode line/paragraph separator still gets matched below, and
+    no such byte ever survives into a persisted field.
 
     ``denylist_terms`` is ``(term, reason)`` pairs from the SAME operator-term source
     the push-time scan already refuses on
@@ -241,9 +266,11 @@ def redact_text(text: str, denylist_terms: Sequence[tuple[str, str]] = ()) -> st
     (v0.4.5 FR6/T-045-19, `core-no-upper-layers`). Matched case-insensitively as a
     literal substring, mirroring the push-time scan's own semantics exactly (A6.3), so
     a term that would refuse a push is masked before it is ever committed. Defaults to
-    ``()`` — a no-op — so every pre-FR6 caller stays byte-identical.
+    ``()`` — a no-op for the denylist pass — so every pre-FR6 caller keeps masking
+    IP/home paths; the control/format strip is unconditional and a no-op on clean text.
     """
-    out = _IPV4_RE.sub("[REDACTED-IP]", text)
+    out = _UNSAFE_FORMAT_CHARS_RE.sub("", text)
+    out = _IPV4_RE.sub("[REDACTED-IP]", out)
     out = _POSIX_HOME_RE.sub(r"\1[REDACTED]", out)
     out = _WIN_HOME_RE.sub(r"\1[REDACTED]", out)
     for term, _reason in denylist_terms:
