@@ -822,7 +822,7 @@ say plainly whether each target was met, missed or partially met.
 
 ## Scope complete — gates and the trio
 
-- [ ] **T-045-32 — [shell] FR16: the invariants, measured**
+- [-] **T-045-32 — [shell] FR16: the invariants, measured**
 
 **Owner role:** software-engineer · **Commit:** the capture reference only
 
