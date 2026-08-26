@@ -121,3 +121,114 @@ path is down and the leak class — not one leak instance — is eliminated.
 lines *are* the missing structure the bug-history chain proves absent, the superseded
 seam is deleted rather than wrapped, and the floor below the measured net is
 test-proven to leave the defect live.
+
+---
+
+## Firing 2 — T-045-19 — SOUND-WITH-AMENDMENT
+
+**Subject:** commit `eb03d01b` "fix(T-045-19): one denylist loading seam, consumed by
+write-time redaction and the push scan" (SPEC FR6, A6.1–A6.5).
+**Measured diff:** `core/models/bugs.py` +37/−?, `features/bugs/service.py` +23,
+`cli/commands/bugs.py` +12, `infrastructure/privacy_check.py` +12 (docstring only) =
+**net +52**. By direct read, roughly 8 of those lines are logic (one `for` loop in
+`redact_text`, one kwarg on `redact`, one kwarg + attribute on `BugService`, one
+argument at the CLI call site); the remaining ~44 are provenance prose. Shell-less
+reviewer; tree state verified by read of all four files, both new tests, `container.py`,
+`setup.cfg` contracts, `core/redaction.py`, `denylist_scan.py`, and the ledger.
+
+### Problem and prior art (architect-core-workflow)
+
+Core problem: the operator denylist was consulted only at the publication boundary
+(push scan), never when a bug event is written, so a leak was committed first and
+refused later. Constraint: three import-linter contracts (`core-no-upper-layers`,
+`features-no-infrastructure`, `cli-no-infrastructure`) make `infrastructure.
+privacy_check.load_privacy_terms` reachable from the ledger only through the
+composition root. Prior art surveyed, all internal: `core/redaction.Redactor`
+(word-boundary, case-sensitive), `redact_text` (IP/home regexes, already the ledger's
+one masking call), `container.load_denylist_terms` (already the push gate's seam).
+
+### The four questions
+
+**1. Structurally sound, or a puxadinho?** Sound in shape. One loader (A6.2:
+`container.load_denylist_terms` → `load_privacy_terms`, the same seam
+`cli/commands/ci.py:316` uses; `grep` finds no second reader). DI through the existing
+`BugService(store, …)` constructor pattern. The terms ride the same `redact_text` call
+every field already goes through — no second algorithm, no flag, no new branch in the
+append path. Enforcement sits in `BugService.append_event`, the seam that already
+enforces coherence — the right home, per the ledger's own history (the coherence bugs
+were exactly "the CLI wrote what the doctor flagged"). Push scan untouched (A6.3).
+Two residuals keep this from plain SOUND, both fixable by deletion:
+- **`cli/commands/bugs.py:248` still calls `.redact()`** before validation. The append
+  path now redacts twice: CLI (IP/home) then service (IP/home + terms). That is the
+  superseded half-seam Firing 1's precedent says to delete, not leave beside the new one.
+- **A6.5 is not met.** `BugEvent.redact()` keeps its hand-kept 11-field list
+  (`title … evidence_diff`) while `_OPTIONAL_STR_FIELDS` (16, schema mirror) sits 60
+  lines above it. The SE reads A6.5 as "add no *new* hand list"; the SPEC says fields are
+  "enumerated by the schema, not by a hand-kept field list". The list is the thing.
+
+**2. Write-set overrun — necessary or avoidable?** Necessary; the TASKS write set was
+wrong. `core` cannot import the loader, so *some* caller must hand terms in; the only
+callers are the service and the CLI. The one-file alternative — passing terms straight
+into the CLI's `.redact()` at line 248 — would put enforcement in the CLI and leave
+`BugService` able to write raw terms, re-creating the coherence-bug pattern
+(`bugs-append-accepts-second-terminal-event`). Correction owed by `product-engineer`:
+amend T-045-19's write set to add `features/bugs/service.py` and
+`cli/commands/bugs.py`; no SE fault.
+
+**3. Class closed or instance patched?** Ledger evidence, `specs/bugs/bugs.jsonl`:
+- `public-privacy-consumer-leak-in-public-repo` (l.820/822, resolved 0.4.2, HEAD-only
+  scrub of 315 occurrences) — the denylist existed; nothing consulted it at write time.
+- T-043-23 (docstring in `BugEvent.redact`, v0.4.3) widened the hand list by
+  `release`/`reason`; T-044-62 (v0.4.4) widened it again by three `evidence_*` fields.
+  Same method, same defect shape, twice: a hand-kept list misses a field.
+- `reconciliation-merge-body-scan-unamendable-main-squash` (l.917/918, v0.4.3) —
+  push-time-only catch of an already-published body; fixed by a baseline carve-out.
+- SPEC FR6: two more committed leaks inside v0.4.4, one forcing an `rc-1` rewrite.
+This change **closes the class "denylist never consulted at write time"** (RED unit +
+integration tests fail for exactly that cause on the unfixed tree). It **leaves open
+the class "field missed by the hand list"** — the one the T-043-23 → T-044-62 chain
+proves — which A6.5 was written to close. Hence the amendment.
+
+**4. Smaller shape?** Not by relocation — `core.redaction.Redactor` is the wrong
+primitive here: word-boundary + case-sensitive versus the push scan's case-insensitive
+substring (`denylist_scan.py:250`), so `ACME-Corp` or `acme-corpx` would pass write-time
+and still be refused at push, breaking A6.3 parity. The kwarg thread is the minimum DI
+the three contracts allow. The smaller shape is by **deletion**, inside the same seam:
+- **AM-1** delete `.redact()` at `cli/commands/bugs.py:248` — one masking pass, in the
+  service. (−1 LOC; schema validation is shape-only, unaffected.)
+- **AM-2** in `BugEvent.redact`, replace the 11 explicit `field=_scrub(self.field)`
+  kwargs with `replace(self, **{n: _scrub(getattr(self, n)) for n in _OPTIONAL_STR_FIELDS})`
+  and cut the 30-line provenance docstring to the schema-mirror sentence. (≈ −11/+3 logic,
+  −25 prose.) Behavior change: `severity`/`component`/`context`/`surface`/`superseded_by`
+  now pass through `redact_text` — a no-op unless they carry a denylisted term, in which
+  case masking is the correct outcome (the push gate would refuse that record anyway).
+  Add one test: every schema string property is scrubbed, derived from the schema file.
+- **AM-3 (LOW, optional)** trim the duplicated provenance comments in `service.py`
+  and `cli/commands/bugs.py` to one line each.
+Expected landing: net ≈ +10 logic, prose −40; two paths → one; A6.5 literally met.
+
+### Persona gates
+
+- **Root-cause gate: PASS.** Structural cause (no write-time consumer of the loader)
+  fixed at the owning seam; RED proves the cause on both layers.
+- **Architecture-fidelity gate: PASS on layers** (core ← features ← cli → container →
+  infrastructure, all three contracts honored, `lint-imports` green). **A6.5 acceptance:
+  UNMET as committed** — resolved by AM-2.
+
+### Bug-surface verdict
+
+**Decreased** for the bugs-ledger feature on the write-time class (four-event chain
+above, third recurrence per SPEC FR6, now closed by tests at the service and CLI
+seams). **Unchanged** on the hand-list class until AM-2 lands; with AM-1 + AM-2 the
+append path drops from two redaction passes to one and the field set can no longer
+drift from the schema — decreased on both classes.
+
+### Verdict
+
+**SOUND-WITH-AMENDMENT.** The SE applies AM-1 and AM-2 (AM-3 at discretion) before the
+marker flips; `product-engineer` amends the T-045-19 write set. Then commit with
+`--evidence-diff "net-positive: one loader consumed at the write seam via container DI; superseded CLI redact pass deleted; field set derived from the schema mirror, closing the T-043-23/T-044-62 hand-list chain"`.
+
+**Precedent (one line):** when a fix closes the class the bug names but leaves beside
+it the older half-seam (a duplicate pass, a hand-kept list) whose own bug chain the
+SPEC already cites, the ruling is amendment-by-deletion, never acceptance as-is.
