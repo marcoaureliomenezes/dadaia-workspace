@@ -605,7 +605,7 @@ new vocabulary, no second symlink check. The non-symlinked explicit branch is un
 
 ---
 
-- [-] **T-045-22 — FR9: decide the healing lane for registry slug-ownership collisions**
+- [x] **T-045-22 — FR9: decide the healing lane for registry slug-ownership collisions**
 
 **Owner role:** software-architect (decision) + software-engineer (if implemented) ·
 **Commit:** `feat(T-045-22): registry-wide slug-ownership invariant` **or**
@@ -629,7 +629,7 @@ undecided lane.
 
 ---
 
-- [ ] **T-045-23 — FR10: the doctor learns `.dadaia/references/`**
+- [-] **T-045-23 — FR10: the doctor learns `.dadaia/references/`**
 
 **Owner role:** software-engineer · **Commit:** `feat(T-045-23): sanction .dadaia/references
 as an operator-owned subtree outside the context lifecycle`
