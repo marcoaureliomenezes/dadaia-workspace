@@ -1,7 +1,7 @@
 """Bug ``upgrade-never-refreshes-uncustomised-scoped-law-projection`` (MEDIUM) — TREE-5
 must tell a stale SHIPPED projection apart from real operator customisation.
 
-Intent: REGRESSION (bug upgrade-never-refreshes-uncustomised-scoped-law-projection). Size: SMALL.
+Intent: CONTRACT (bug upgrade-never-refreshes-uncustomised-scoped-law-projection). Size: SMALL.
 
 ``specs/AGENTS.md`` is projected from ``templates/specs-AGENTS.md`` and never refreshed:
 TREE-5 warns and ``--fix`` skips it, because a silent overwrite would destroy operator

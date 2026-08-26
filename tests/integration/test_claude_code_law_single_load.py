@@ -1,6 +1,6 @@
 """Bug ``dadaia-md-projected-twice-into-claude-code-context`` (MEDIUM) — FR31.
 
-Intent: REGRESSION (bug dadaia-md-projected-twice-into-claude-code-context). Size: MEDIUM.
+Intent: CONTRACT (bug dadaia-md-projected-twice-into-claude-code-context). Size: MEDIUM.
 
 A Claude Code session carries ``DADAIA.md``'s body **twice** at HEAD: once through the
 root import chain ``CLAUDE.md -> @AGENTS.md -> @DADAIA.md`` (Claude Code resolves an

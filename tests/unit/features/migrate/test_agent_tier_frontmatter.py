@@ -140,7 +140,7 @@ def _deny_access_to(monkeypatch: pytest.MonkeyPatch, atom: Path) -> None:
 def test_read_only_atom_needing_no_change_stays_silent(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Intent: REGRESSION (bug read-only-atom-honouring-is-advisory-and-root-bypasses-it).
+    """Intent: CONTRACT (bug read-only-atom-honouring-is-advisory-and-root-bypasses-it).
     Size: SMALL.
 
     DECIDED (T-044-39): the read-only check runs AFTER the no-change determination, so a

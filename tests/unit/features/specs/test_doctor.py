@@ -806,7 +806,7 @@ def test_segmented_active_release_artifacts_matrix(tmp_path: Path) -> None:
 
 # ---------------------------------------------------------------------------
 # v0.4.3 T-043-22 [Arm-B rider] bug specs-doctor-segment-router-silent-skip —
-# AB.1-AB.4. Intent: BUG — a live segment pointer at a MISSING directory must
+# AB.1-AB.4. Intent: CONTRACT — a live segment pointer at a MISSING directory must
 # produce an explicit ERROR from BOTH SPEC-DOC-004 and TREE-6, never a silent
 # early return. The stale "already reported by check 9" comment was wrong:
 # check 9 (SPEC-DOC-009) validates only the RELEASE directory

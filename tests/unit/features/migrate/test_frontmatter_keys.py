@@ -2,7 +2,7 @@
 ``migration-normalises-crlf-atoms-to-lf-contradicting-its-byte-preserve-wording`` (LOW,
 T-044-37).
 
-Intent: REGRESSION (bug
+Intent: CONTRACT (bug
 migration-normalises-crlf-atoms-to-lf-contradicting-its-byte-preserve-wording). Size:
 SMALL.
 
