@@ -4,7 +4,7 @@
   "declared_overlaps": [
     ["dd-release-implement", "dadaia-task-manager"],
     ["dd-audit-project", "dd-workspace-doctor"],
-    ["dd-bug-registration", "dd-bug-fix"],
+    ["dd-bug-registration", "dd-bug-fix", "dd-diagnose"],
     ["dadaia-handoff-emitter", "dd-manager-orchestration", "dd-workspace-doctor"]
   ],
   "rows": [
@@ -35,8 +35,8 @@
     {
       "topic": "Root cause, always",
       "section": "§7 Quality",
-      "skills": ["dd-bug-fix"],
-      "justification": null
+      "skills": ["dd-bug-fix", "dd-diagnose"],
+      "justification": "dd-bug-fix (renamed dd-bug-resolution at T-050-21) owns the bug lifecycle -- branch, concurrency, the resolved event and its commit; dd-diagnose owns the diagnosing method itself, phase 0's lineage check through cleanup (FR7/AS-11). One topic, two skills, split by lifecycle vs method."
     },
     {
       "topic": "Register every bug you hit",
