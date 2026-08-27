@@ -1,13 +1,13 @@
 ---
 name: dd-release-implement
-description: "Use when: implementing a release from the first task reservation through the final-rc ship — the whole implement-to-close arc under the v2/rc segment model. Covers TDD reservation, alpha/segment close (qa-only), rc-1 through rc-N, and the final-rc closure (memory update, CLOSURE.md, disposition sweep, artifact GC, archive) before the develop-to-main ship PR."
+description: "Use when: implementing a release from the first task reservation through the final-rc ship — the whole implement-to-close arc under the v2/rc segment model. Short SKILL-plus-disclosed-siblings shape (T-050-21, FR12): RC-FLOW.md (state ladder + gate cadence), RELEASE-EVENTS.md (RELEASE.jsonl append recipes), MEMORY-UPDATE.md (closure memory protocol). CLOSURE.md/CLOSURE-TEMPLATE.md retired — the closure narrative now lives in RELEASE.jsonl records."
 applyTo: "specs/releases/*/TASKS.md"
 ---
 
 # dd-release-implement
 
 > **Not a hook-enforced mechanism.** No engine advances gates, drives closure, or reads
-> `TASKS.md`. Every boundary below holds because implementers, reviewers and
+> `TASKS.md`. Every boundary holds because implementers, reviewers and
 > `product-engineer` uphold it directly; the git chokepoints (`DADAIA.md` §3) are the
 > only mechanical backstop.
 
@@ -19,85 +19,53 @@ reservation through the ship PR and the post-deploy branch cut.
 
 ## 2. Resolve release and segment
 
-Read `specs/releases/ACTIVE.md` (schema v2): `release:`, optional `segment:`
-(`alpha-N`/`rc-N`), `phase:`. A `segment:` present means `TASKS.md` lives at
+Resolve the active release and phase from the **RELEASE.jsonl fold** — the live
+release's `specs/releases/<release-id>/RELEASE.jsonl`, folded via
+`core/release_events.py` (last `phase` record wins; SPEC FR4). `releases/ACTIVE.md` is
+dual-written in parallel and remains the SDD gate's own literal decision authority until
+T-050-21A repoints it (expand→switch→contract, D-F) — keep both in sync, never let them
+diverge. A `segment:`/`data.segment` present means `TASKS.md` lives at
 `releases/<release-id>/<segment>/TASKS.md`; otherwise at `releases/<release-id>/TASKS.md`.
 Full navigation protocol: `dadaia-workspace-spec-navigator`.
 
-## Review/QA gate cadence (canonical home)
+## 3. The state ladder, the gate cadence, and the 14-step arc
 
-| Boundary | Who validates | What unlocks |
-|---|---|---|
-| Per task | implementer discipline only — TDD, unit/integration tests, local CI preflight, `implementation-complete` handoff; marker stays `[-]` | nothing; no per-task reviewer gate |
-| End of each `alpha-N` | `qa-engineer` only, `APPROVE`/`REQUEST_CHANGES` | a qa-gated commit on the branch — no push/PR/merge/CLOSURE |
-| At `rc-N` ship | `qa-engineer` + `code-reviewer` + `security-reviewer`, all `APPROVE` the same commit | `[x]`; ship; deploy; close; CLOSURE/memory |
+Disclosed sibling: **`RC-FLOW.md`** — the review/QA gate cadence table, the full
+step-by-step arc (reserve → TDD → segment close → scope-complete → rc rounds →
+final-rc trio → memory update → closure narrative → disposition sweep → artifact GC →
+archive → ship → post-deploy), the `dd-architecture-survey` operative pointer at
+segment close, the out-of-scope list, and the segments rule. Read it before acting on
+any step past reservation.
 
-Any `REQUEST_CHANGES`, CRITICAL/HIGH finding, failed E2E, or missing evidence sends the
-work back to implementation; rework continues until every required validator approves
-the same commit or the operator stops the release.
+## 4. Appending a `RELEASE.jsonl` record
 
-**Order (D8/FR5): review → closure → archive → ship.** The pre-PR six-axis code review
-of the delta runs on the thawed tree, before the `git mv` archive step — never after;
-only ship steps follow archive.
+Disclosed sibling: **`RELEASE-EVENTS.md`** — the seven canonical event kinds, who
+appends which milestone, the exact `data` shape per kind, and the `note` conventions
+that now carry the retired `CLOSURE.md`'s narrative content (summary, size accounting,
+drifts, artifact GC, test dispositions) — everything else (dispositions, record-only
+observations, intake candidates, tasks-completed, validations, memory updates) already
+has a **native** home and needs no `note` at all; see that file's conversion table.
 
-## 3. The arc, step by step
+## 5. Memory update at closure (step 8 of the arc)
 
-Each step ends on a checkable criterion. Steps 8–12 are final-rc-only — the rc round
-where the trio approves and the release ships (A10.3: segment closes on branch, rc-1
-merges the whole scope, rc-N rounds are fixes, the final rc ships).
+Disclosed sibling: **`MEMORY-UPDATE.md`** — the full protocol `product-engineer` runs
+at `RC-FLOW.md` step 8: gate-phase verification, atom update rules, the forbidden
+history/changelog sections, and the folder-catalog shape.
 
-1. **Reserve.** Flip `[ ]`→`[-]` in the active `TASKS.md`, commit
-   `chore(tasks): start <id>` (`dadaia-task-manager`). *Done when:* the reservation
-   commit exists and no other task on the branch is `[-]`.
-2. **TDD loop.** Implement with tests; run the local CI preflight. *Done when:* the
-   suite is green and an `implementation-complete` handoff is emitted.
-3. **Segment close (`alpha-N`).** Once every task in the segment is review-ready,
-   request `qa-engineer`. *Done when:* `qa-engineer` `APPROVE`s a commit on the branch —
-   flip every reviewed task `[x]`; no push/PR/merge/CLOSURE yet.
-4. **Scope-complete.** All segments' tasks are `[x]`. *Done when:* `TASKS.md` (or every
-   segment's `TASKS.md`) carries zero `[ ]`/`[-]` rows.
-5. **rc-1 PR.** Open the `feature/{M.m.p}` → `develop` PR carrying the whole scope.
-   *Done when:* it merges (branch contract: `DADAIA.md` §4 Gitflow, `dd-gitflow-default`).
-6. **rc-N rounds.** Fix/adjust only — never new backlog scope. *Done when:* CI is green
-   on the round's `feature/{M.m.p}` → `develop` PR and it merges.
-7. **Final-rc trio review.** `qa-engineer` + `code-reviewer` + `security-reviewer` all
-   `APPROVE` the same commit. *Done when:* all three verdicts are `APPROVE` on that sha —
-   only then may `[x]`, CLOSURE, merge, deploy, or close proceed.
-8. **Memory update (`product-engineer`).** Set `ACTIVE.md` phase to `CLOSURE`, update
-   `specs/memory/**` atoms to the product's current state. Protocol detail:
-   `CLOSURE-CHECKS.md` §1. *Done when:* `dadaia specs doctor` reports the memory atoms
-   clean.
-9. **Write `CLOSURE.md`.** Copy `CLOSURE-TEMPLATE.md` (sibling) to
-   `specs/releases/<release-id>/CLOSURE.md`; fill every section. *Done when:* every
-   template section is filled or explicitly marked n/a with a reason.
-10. **Disposition sweep.** Flip every bug/backlog item picked into (or superseded by)
-    this release to a terminal token — including the CONSUMED→DELIVERED **update**, never
-    a duplicate `## LEDGER` line (BL-DUP). Rule: `CLOSURE-CHECKS.md` §2. *Done when:*
-    every picked item has exactly one terminal `LEDGER` line with evidence.
-11. **Artifact GC sweep.** Run only after `## Validations`/`## Dispositions` evidence
-    pointers are final. Keep/delete rule and lane guard: `CLOSURE-CHECKS.md` §3. *Done
-    when:* `CLOSURE.md`'s `## Artifact GC sweep` table records kept/deleted counts.
-12. **Archive.** `git mv specs/releases/<release-id> specs/_archive/releases/<release-id>`;
-    point `ACTIVE.md` at the next release or `release: none`. *Done when:* the release
-    directory is under `_archive/` and `ACTIVE.md` is repointed, in the same commit as
-    steps 8–11 (memory → CLOSURE → sweep → archive, one commit).
-13. **Ship PR.** Open `develop` → `main`. *Done when:* it merges — mechanics, the
-    security-verdict PR gate, and CI: `DADAIA.md` §4 Gitflow, `dd-gitflow-default`.
-14. **Post-deploy.** Delete `feature/{M.m.p}`; cut `feature/{next}` from `main` in the
-    same step. *Done when:* exactly one `feature/*` branch exists, named for the next
-    version — full rule: `dd-gitflow-default` §4 (not restated here).
-
-## 4. Test-stewardship touchpoints (reference)
+## 6. Test-stewardship touchpoints (reference)
 
 Declare test intent at birth and pass the admission filter before a test enters the
 permanent suite: `dadaia-test-stewardship` §A/§B. Demotion and quarantine/SCAFFOLD
-expiry are closure-time work (step 10, `CLOSURE-CHECKS.md` §4), not earlier steps'.
+expiry are closure-time work (`RC-FLOW.md` step 9's `closure-test-dispositions` note),
+not earlier steps'.
 
 ## Checklist
 
-- [ ] Release + segment resolved from `ACTIVE.md`.
+- [ ] Release + segment resolved from the RELEASE.jsonl fold (`ACTIVE.md` dual-write
+      confirmed in sync).
 - [ ] Task reserved (`[-]`) with an isolated `chore(tasks): start <id>` commit.
-- [ ] Current step (§3) identified before attempting its unlock action.
+- [ ] Current step (`RC-FLOW.md`) identified before attempting its unlock action.
 - [ ] CI green before any push; trio `APPROVE`d before any final-rc unlock action.
-- [ ] At final rc: memory → CLOSURE → disposition sweep → artifact GC → archive, one
-      commit, in that order, before the ship PR.
+- [ ] At final rc: memory update → closure narrative (`RELEASE-EVENTS.md` notes) →
+      disposition sweep → artifact GC → archive, one commit, in that order, before the
+      ship PR.
