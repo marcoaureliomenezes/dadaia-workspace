@@ -1,18 +1,31 @@
-"""Bug-event domain model for the event-sourced JSONL bug telemetry (v0.1.46 AC-1/AC-2).
+"""Bug domain models — the event-sourced stream (v0.1.46 AC-1/AC-2) and, since v0.5.0
+FR2, the one-record-per-bug replacement it is expanding into (D-F: expand -> switch ->
+contract; T-050-07 is the 'expand' step — nothing on the executed path reads
+:class:`BugRecord` yet).
 
-Pure domain module — no I/O, no internal imports (stdlib only), so it lives in ``core`` as
-the bottom layer that both ``infrastructure`` and ``features`` may depend on. A
-:class:`BugEvent` is one append-only event in a ``specs/bugs/<YYYYMMDDTHH>Z-<n>.jsonl``
-stream. The append-only store (``infrastructure/jsonl_bug_store.py``) and the ``dadaia
-bugs`` CLI serialize these; the doctor coherence check folds them. Field set mirrors
-``public/schemas/bugs/bug-event-v1.schema.json`` exactly.
+Pure domain module — no I/O, no internal imports beyond ``dataclasses``/``enum``/``re``
+(stdlib only): ``core/models/bugs.py`` is NOT in ``architecture.md``'s "Core file-I/O
+authorized set", so neither model ever reads a schema file itself. A :class:`BugEvent`
+is one append-only event in a ``specs/bugs/<YYYYMMDDTHH>Z-<n>.jsonl`` stream (field set
+mirrors ``public/schemas/bugs/bug-event-v1.schema.json``); a :class:`BugRecord` is one
+line of the future ``specs/bugs/BUGS.jsonl``, appended once (field set mirrors
+``public/schemas/bugs/bug-record-v1.schema.json``, whose per-property ``x-mutability``/
+``x-redact`` keywords are the ONE documented source of the three-category split —
+A2.1). Both models derive their optional/redactable field sets from their OWN
+``dataclasses.field(metadata=...)`` declarations (per-field, colocated, zero I/O) rather
+than a second, separately-maintained module-level tuple — the exact hand-kept mirror
+that twice missed a newly added free-text field (T-043-23 -> T-044-62) and that A2.10
+now forbids outright. :func:`redactable_property_names` is the schema-mapping-side pure
+counterpart, used to prove the two never drift (contract tests) and reusable by a future
+model (``findings``/``backlog``) without depending on file I/O either.
 """
 
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, replace
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass, field, replace
+from dataclasses import fields as dc_fields
 from enum import StrEnum
 from typing import Any
 
@@ -22,9 +35,13 @@ __all__ = [
     "BugCoherenceViolation",
     "BugEvent",
     "BugEventKind",
+    "BugRecord",
+    "BugRecordImmutableFieldError",
+    "BugRecordWriteOnceFieldSetError",
     "advance_coherence",
     "diagnose_bug_coherence_history",
     "redact_text",
+    "redactable_property_names",
 ]
 
 
@@ -200,25 +217,56 @@ def diagnose_bug_coherence_history[P](
     ]
 
 
-#: Optional string payload fields (everything except ``tags``, which is a list).
-_OPTIONAL_STR_FIELDS: tuple[str, ...] = (
-    "title",
-    "severity",
-    "surface",
-    "component",
-    "context",
-    "symptom",
-    "repro",
-    "expected",
-    "notes",
-    "release",
-    "superseded_by",
-    "reason",
-    "evidence",
-    "evidence_loop",
-    "evidence_seam",
-    "evidence_diff",
-)
+def _dataclass_field_names(
+    dataclass_type: type, predicate: Callable[[Mapping[str, object]], bool]
+) -> tuple[str, ...]:
+    """Return the field names of *dataclass_type* whose ``metadata`` satisfies
+    *predicate* — pure ``dataclasses.fields()`` introspection, zero file I/O.
+
+    This is the ONE mechanism both :class:`BugEvent` and :class:`BugRecord` use to
+    derive their optional/redactable/categorized field sets: a per-field
+    ``dataclasses.field(metadata={...})`` entry, colocated with each field's own
+    declaration, never a second, separately-maintained module-level tuple/list/set of
+    names (A2.10) — adding a field to the dataclass is the only edit a new property
+    ever needs; nothing here can "miss" it the way a hand-kept list twice did
+    (T-043-23 -> T-044-62).
+    """
+    return tuple(f.name for f in dc_fields(dataclass_type) if predicate(f.metadata))
+
+
+def redactable_property_names(schema: Mapping[str, object]) -> tuple[str, ...]:
+    """Return every property of *schema* eligible for write-time redaction.
+
+    Pure function of an EXPLICIT schema mapping — performs zero file I/O itself, so it
+    is safe to call from ``core`` (which is not in ``architecture.md``'s core
+    file-I/O authorized set). Loading the packaged ``bug-record-v1.schema.json`` file
+    happens in ``infrastructure``/the container seam, or — as here — in a test, and is
+    threaded in as data, exactly like ``denylist_terms`` already is (v0.4.5 FR6/
+    T-045-19). A property qualifies when its declared ``type`` includes ``"string"``
+    and it is not explicitly opted out via ``"x-redact": false`` (set on exactly
+    ``id``/``ts``/``reported_by`` in ``bug-record-v1.schema.json`` — the record's
+    stable identity fields). A schema fixture that adds a brand-new free-text
+    property is picked up with NO code edited here (A2.6) — this function reads
+    property names, never a hand-kept list of them.
+    """
+    properties = schema.get("properties")
+    if not isinstance(properties, Mapping):
+        raise ValueError("schema has no 'properties' object")
+    names: list[str] = []
+    for name, spec in properties.items():
+        if not isinstance(spec, Mapping):
+            continue
+        if spec.get("x-redact") is False:
+            continue
+        declared_type = spec.get("type")
+        is_string_typed = declared_type == "string" or (
+            isinstance(declared_type, list) and "string" in declared_type
+        )
+        if not is_string_typed:
+            continue
+        names.append(name)
+    return tuple(names)
+
 
 # Redaction patterns for `notes` (privacy rules): operator-local home paths + IPs never
 # land in a committed bug event. The username segment of a home path is scrubbed; the IPv4
@@ -310,23 +358,23 @@ class BugEvent:
     event: str
     ts: str
     reported_by: str
-    title: str | None = None
-    severity: str | None = None
-    surface: str | None = None
-    component: str | None = None
-    context: str | None = None
+    title: str | None = field(default=None, metadata={"optional_str": True})
+    severity: str | None = field(default=None, metadata={"optional_str": True})
+    surface: str | None = field(default=None, metadata={"optional_str": True})
+    component: str | None = field(default=None, metadata={"optional_str": True})
+    context: str | None = field(default=None, metadata={"optional_str": True})
     tags: tuple[str, ...] = ()
-    symptom: str | None = None
-    repro: str | None = None
-    expected: str | None = None
-    notes: str | None = None
-    release: str | None = None
-    superseded_by: str | None = None
-    reason: str | None = None
-    evidence: str | None = None
-    evidence_loop: str | None = None
-    evidence_seam: str | None = None
-    evidence_diff: str | None = None
+    symptom: str | None = field(default=None, metadata={"optional_str": True})
+    repro: str | None = field(default=None, metadata={"optional_str": True})
+    expected: str | None = field(default=None, metadata={"optional_str": True})
+    notes: str | None = field(default=None, metadata={"optional_str": True})
+    release: str | None = field(default=None, metadata={"optional_str": True})
+    superseded_by: str | None = field(default=None, metadata={"optional_str": True})
+    reason: str | None = field(default=None, metadata={"optional_str": True})
+    evidence: str | None = field(default=None, metadata={"optional_str": True})
+    evidence_loop: str | None = field(default=None, metadata={"optional_str": True})
+    evidence_seam: str | None = field(default=None, metadata={"optional_str": True})
+    evidence_diff: str | None = field(default=None, metadata={"optional_str": True})
 
     @property
     def is_terminal(self) -> bool:
@@ -337,9 +385,10 @@ class BugEvent:
         """Return a copy with every optional string field scrubbed of operator-local
         paths/IPs and any operator denylist term, via :func:`redact_text`.
 
-        The field set is `_OPTIONAL_STR_FIELDS` — the SAME schema-mirror tuple
-        ``to_dict``/``from_dict`` already use — never an independently hand-kept list
-        (SPEC v0.4.5 FR6/A6.5; closes the T-043-23 -> T-044-62 chain, where a
+        The field set is derived from ``BugEvent``'s OWN ``dataclasses.field(metadata=
+        {"optional_str": True})`` declarations (see :func:`_dataclass_field_names`) —
+        never an independently hand-kept module-level tuple (SPEC v0.4.5 FR6/A6.5,
+        carried forward at v0.5.0 A2.10; closes the T-043-23 -> T-044-62 chain, where a
         hand-kept list twice missed a newly added free-text field). ``denylist_terms``
         is the SAME operator-term source the push-time scan already refuses on,
         threaded in via the CLI/container composition seam since this module never
@@ -355,7 +404,7 @@ class BugEvent:
         # single inferred value type); an explicitly `Any`-typed local sidesteps that
         # without weakening `_scrub`'s own `str | None` signature above.
         updates: dict[str, Any] = {
-            name: _scrub(getattr(self, name)) for name in _OPTIONAL_STR_FIELDS
+            name: _scrub(getattr(self, name)) for name in _BUG_EVENT_OPTIONAL_STR_FIELDS
         }
         return replace(self, **updates)
 
@@ -367,7 +416,7 @@ class BugEvent:
             "ts": self.ts,
             "reported_by": self.reported_by,
         }
-        for name in _OPTIONAL_STR_FIELDS:
+        for name in _BUG_EVENT_OPTIONAL_STR_FIELDS:
             value = getattr(self, name)
             if value is not None:
                 out[name] = value
@@ -409,3 +458,254 @@ class BugEvent:
             evidence_seam=_opt_str(raw, "evidence_seam"),
             evidence_diff=_opt_str(raw, "evidence_diff"),
         )
+
+
+#: Derived (never hand-kept — A2.10), from ``BugEvent``'s own field metadata; reproduces
+#: the exact 16-name/order set the retired ``_OPTIONAL_STR_FIELDS`` tuple held, since it
+#: was itself originally hand-transcribed from ``bug-event-v1.schema.json``'s property
+#: order — the source of truth is now this dataclass, not a copy of it.
+_BUG_EVENT_OPTIONAL_STR_FIELDS: tuple[str, ...] = _dataclass_field_names(
+    BugEvent, lambda metadata: bool(metadata.get("optional_str"))
+)
+
+
+# ============================================================================
+# BugRecord — v0.5.0 FR2: one record per bug, immutable core, mutable governance.
+# ============================================================================
+
+
+class BugRecordImmutableFieldError(ValueError):
+    """Raised by :meth:`BugRecord.apply_governance_update` when a change would alter
+    an immutable-core field's value (A2.2a).
+
+    Seam-level enforcement only, named in its own message per A2.7: any agent's file
+    tool can still hand-edit any field directly on disk — that is what the A2.7
+    ``specs doctor`` WARN and the FR14 pillar-1 finding DETECT, never prevent.
+    """
+
+    def __init__(self, field_name: str) -> None:
+        super().__init__(
+            f"bug-record field {field_name!r} is immutable-core and cannot be changed "
+            "through the record-store update seam (A2.2a) — seam-level enforcement "
+            "only; a file tool can still hand-edit it (A2.7 detects, never prevents)"
+        )
+        self.field_name = field_name
+
+
+class BugRecordWriteOnceFieldSetError(ValueError):
+    """Raised by :meth:`BugRecord.apply_governance_update` when a change would alter a
+    write-once field that is already set to a DIFFERENT value (A2.2b).
+
+    Re-applying the SAME value the field already holds is a no-op, not a violation —
+    only a genuinely differing second write is refused.
+    """
+
+    def __init__(self, field_name: str) -> None:
+        super().__init__(
+            f"bug-record field {field_name!r} is write-once and already set — a "
+            "second write with a different value is refused (A2.2b)"
+        )
+        self.field_name = field_name
+
+
+def _require_record_str(raw: Mapping[str, object], key: str) -> str:
+    value = raw.get(key)
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"bug record missing required string field {key!r}")
+    return value
+
+
+def _opt_record_str(raw: Mapping[str, object], key: str) -> str | None:
+    value = raw.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError(f"bug record field {key!r} must be a string")
+    return value
+
+
+@dataclass(frozen=True)
+class BugRecord:
+    """One record per bug (v0.5.0 FR2, D11) — appended once, no event stream, no fold.
+
+    Field set mirrors ``public/schemas/bugs/bug-record-v1.schema.json`` exactly. Every
+    field's ``category`` metadata below (``"immutable-core"`` | ``"write-once"`` |
+    ``"mutable-governance"``) reproduces that schema's per-property ``x-mutability``
+    keyword — the schema is the documented source (A2.1); this dataclass is the
+    zero-I/O runtime mirror a contract test keeps locked to it. THIS is the one place
+    the categorization lives in Python: nothing here re-collects it into a second,
+    independently-maintained module-level tuple/list/set of names (A2.10).
+
+    ``status`` has NO ``picked`` value (v0.5.0 FR2) — the pick is the bundled
+    definition commit (FR8 shape 5), not a status.
+    """
+
+    # -- Immutable core (required; refused when CHANGED through the update seam — A2.2a).
+    id: str = field(metadata={"category": "immutable-core", "identity": True})
+    ts: str = field(metadata={"category": "immutable-core", "identity": True})
+    reported_by: str = field(metadata={"category": "immutable-core", "identity": True})
+    title: str = field(metadata={"category": "immutable-core"})
+    severity: str = field(metadata={"category": "immutable-core"})
+    surface: str = field(metadata={"category": "immutable-core"})
+    component: str = field(metadata={"category": "immutable-core"})
+    context: str = field(metadata={"category": "immutable-core"})
+    symptom: str = field(metadata={"category": "immutable-core"})
+    repro: str = field(metadata={"category": "immutable-core"})
+    expected: str = field(metadata={"category": "immutable-core"})
+    # -- Mutable governance (required; present as null until set — v0.5.0 FR2).
+    status: str = field(default="open", metadata={"category": "mutable-governance"})
+    cause: str | None = field(default=None, metadata={"category": "mutable-governance"})
+    caused_by: str | None = field(default=None, metadata={"category": "mutable-governance"})
+    lineage_source: str | None = field(default=None, metadata={"category": "mutable-governance"})
+    registration_commit: str | None = field(
+        default=None, metadata={"category": "mutable-governance"}
+    )
+    registration_granularity: str | None = field(
+        default=None, metadata={"category": "mutable-governance"}
+    )
+    resolved_commit: str | None = field(default=None, metadata={"category": "mutable-governance"})
+    resolution_granularity: str | None = field(
+        default=None, metadata={"category": "mutable-governance"}
+    )
+    resolved_release: str | None = field(default=None, metadata={"category": "mutable-governance"})
+    audited: str | None = field(default=None, metadata={"category": "mutable-governance"})
+    # -- Write-once, absent until set (A2.2b / A2.11 — the FR23 evidence triple restored).
+    root_cause: str | None = field(default=None, metadata={"category": "write-once"})
+    solution: str | None = field(default=None, metadata={"category": "write-once"})
+    evidence_loop: str | None = field(default=None, metadata={"category": "write-once"})
+    evidence_seam: str | None = field(default=None, metadata={"category": "write-once"})
+    evidence_diff: str | None = field(default=None, metadata={"category": "write-once"})
+    diff_direction: str | None = field(default=None, metadata={"category": "write-once"})
+    superseded_by: str | None = field(default=None, metadata={"category": "write-once"})
+    migration_note: str | None = field(default=None, metadata={"category": "write-once"})
+
+    def apply_governance_update(self, changes: Mapping[str, object]) -> BugRecord:
+        """Apply *changes*, returning a NEW record — the seam every writer of an
+        EXISTING record goes through (registration is :meth:`from_dict`/the
+        constructor, not this method). ``features/bugs/service.py`` wraps this call
+        for ``dadaia bugs update`` (T-050-08/AS-16), for the fixer's resolution write
+        and the auditor's ``audited``/``resolved_commit`` write alike (A2.13 — one
+        seam, every writer role).
+
+        Refuses (:class:`BugRecordImmutableFieldError`) a CHANGE to an immutable-core
+        field's value — re-asserting its current value is a harmless no-op (A2.2a).
+        Refuses (:class:`BugRecordWriteOnceFieldSetError`) a second, DIFFERING write to
+        a write-once field that is already set; setting it from absent (``None``)
+        always succeeds (A2.2b). A governance field may be set freely.
+
+        A2.7's own limit, stated here per A2.2's docstring requirement: this is
+        SEAM-LEVEL enforcement only — any agent's file tool can still rewrite any
+        field directly on disk; that is what the A2.7 doctor WARN / FR14 pillar-1
+        finding DETECT, never prevent.
+        """
+        updates: dict[str, Any] = {}
+        for key, value in changes.items():
+            if key in _BUG_RECORD_IMMUTABLE_CORE_FIELDS:
+                if value != getattr(self, key):
+                    raise BugRecordImmutableFieldError(key)
+                continue
+            if key in _BUG_RECORD_WRITE_ONCE_FIELDS:
+                current = getattr(self, key)
+                if current is not None and value != current:
+                    raise BugRecordWriteOnceFieldSetError(key)
+                updates[key] = value
+                continue
+            if key in _BUG_RECORD_GOVERNANCE_FIELDS:
+                updates[key] = value
+                continue
+            raise ValueError(f"unknown bug-record field {key!r}")
+        if not updates:
+            return self
+        return replace(self, **updates)
+
+    def redact(self, denylist_terms: Sequence[tuple[str, str]] = ()) -> BugRecord:
+        """Return a copy with every free-text field scrubbed via :func:`redact_text`.
+
+        The field set is every declared field EXCEPT the three identity fields
+        (``id``/``ts``/``reported_by``, marked ``metadata={"identity": True}`` on
+        their OWN declarations above) — derived from THIS dataclass's own fields via
+        :func:`_dataclass_field_names`, zero file I/O. A field added to
+        :class:`BugRecord` is redacted by default with NO code edited here (A2.6/
+        A2.10). The SAME set is documented, per property, by
+        ``bug-record-v1.schema.json``'s ``x-redact`` keyword (``false`` on exactly
+        ``id``/``ts``/``reported_by``); :func:`redactable_property_names` is the pure
+        schema-mapping-side half of that same rule, cross-checked against this method's
+        field set by a contract test so the two never drift.
+        """
+
+        def _scrub(value: str | None) -> str | None:
+            return None if value is None else redact_text(value, denylist_terms)
+
+        updates: dict[str, Any] = {
+            name: _scrub(getattr(self, name)) for name in _BUG_RECORD_REDACTABLE_FIELDS
+        }
+        return replace(self, **updates)
+
+    def to_dict(self) -> dict[str, object]:
+        """Serialize to the JSONL object shape.
+
+        Immutable-core and mutable-governance fields are ALWAYS emitted (present as
+        ``null`` until a governance field is set — v0.5.0 FR2); write-once fields are
+        emitted only once set (legitimately absent from a freshly registered record).
+        """
+        out: dict[str, object] = {
+            name: getattr(self, name)
+            for name in (*_BUG_RECORD_IMMUTABLE_CORE_FIELDS, *_BUG_RECORD_GOVERNANCE_FIELDS)
+        }
+        for name in _BUG_RECORD_WRITE_ONCE_FIELDS:
+            value = getattr(self, name)
+            if value is not None:
+                out[name] = value
+        return out
+
+    @classmethod
+    def from_dict(cls, raw: Mapping[str, object]) -> BugRecord:
+        """Parse a JSONL object into a :class:`BugRecord`. Raises ``ValueError`` on a
+        malformed record (missing/typed-wrong required field) so tolerant readers can
+        skip it (mirrors :meth:`BugEvent.from_dict`)."""
+        return cls(
+            id=_require_record_str(raw, "id"),
+            ts=_require_record_str(raw, "ts"),
+            reported_by=_require_record_str(raw, "reported_by"),
+            title=_require_record_str(raw, "title"),
+            severity=_require_record_str(raw, "severity"),
+            surface=_require_record_str(raw, "surface"),
+            component=_require_record_str(raw, "component"),
+            context=_require_record_str(raw, "context"),
+            symptom=_require_record_str(raw, "symptom"),
+            repro=_require_record_str(raw, "repro"),
+            expected=_require_record_str(raw, "expected"),
+            status=_require_record_str(raw, "status"),
+            cause=_opt_record_str(raw, "cause"),
+            caused_by=_opt_record_str(raw, "caused_by"),
+            lineage_source=_opt_record_str(raw, "lineage_source"),
+            registration_commit=_opt_record_str(raw, "registration_commit"),
+            registration_granularity=_opt_record_str(raw, "registration_granularity"),
+            resolved_commit=_opt_record_str(raw, "resolved_commit"),
+            resolution_granularity=_opt_record_str(raw, "resolution_granularity"),
+            resolved_release=_opt_record_str(raw, "resolved_release"),
+            audited=_opt_record_str(raw, "audited"),
+            root_cause=_opt_record_str(raw, "root_cause"),
+            solution=_opt_record_str(raw, "solution"),
+            evidence_loop=_opt_record_str(raw, "evidence_loop"),
+            evidence_seam=_opt_record_str(raw, "evidence_seam"),
+            evidence_diff=_opt_record_str(raw, "evidence_diff"),
+            diff_direction=_opt_record_str(raw, "diff_direction"),
+            superseded_by=_opt_record_str(raw, "superseded_by"),
+            migration_note=_opt_record_str(raw, "migration_note"),
+        )
+
+
+#: Derived (A2.10) — never hand-kept — from ``BugRecord``'s own field metadata.
+_BUG_RECORD_IMMUTABLE_CORE_FIELDS: tuple[str, ...] = _dataclass_field_names(
+    BugRecord, lambda metadata: metadata.get("category") == "immutable-core"
+)
+_BUG_RECORD_WRITE_ONCE_FIELDS: tuple[str, ...] = _dataclass_field_names(
+    BugRecord, lambda metadata: metadata.get("category") == "write-once"
+)
+_BUG_RECORD_GOVERNANCE_FIELDS: tuple[str, ...] = _dataclass_field_names(
+    BugRecord, lambda metadata: metadata.get("category") == "mutable-governance"
+)
+_BUG_RECORD_REDACTABLE_FIELDS: tuple[str, ...] = _dataclass_field_names(
+    BugRecord, lambda metadata: not metadata.get("identity")
+)

@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from dadaia_workspace.core.models.bugs import BugRecord
     from dadaia_workspace.core.protocols.git_client import GitClient
     from dadaia_workspace.features.agents.model_policy import AgentModelPolicyService
     from dadaia_workspace.features.certification import CertificationResult
@@ -16,6 +17,7 @@ from dadaia_workspace.core.exceptions import (
 )
 from dadaia_workspace.core.protocols.git_object_reader import GitObjectReader
 from dadaia_workspace.core.protocols.process_ancestry import ProcessAncestry
+from dadaia_workspace.core.protocols.record_store import RecordStore
 from dadaia_workspace.core.specs_resolver import repo_slug_for_context
 from dadaia_workspace.core.specs_resolver import resolve_context as _core_resolve_context
 from dadaia_workspace.features.academy.service import AcademyService
@@ -206,6 +208,29 @@ def build_git_object_reader() -> GitObjectReader:
     from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
 
     return GitSubprocessObjectReader()
+
+
+def build_bug_record_store(workspace_root: Path) -> "RecordStore[BugRecord]":
+    """Composition-root seam for the generic bug-record JSONL store (v0.5.0 FR2, AR-1
+    ruling answer (b), ``specs/releases/0.5.0/reviews/S1-AR1-ruling.md`` §2).
+
+    The 'expand' half of D-F (T-050-07) — nothing on the executed path reads through
+    this seam yet; T-050-08 switches ``features/bugs/service.py`` and the CLI onto it,
+    then deletes ``infrastructure/jsonl_bug_store.py`` and
+    ``core/protocols/bug_store.py`` (AR-1 §1.4/§2.1), and this seam's ``cli ->
+    infrastructure.jsonl_record_store`` composition replaces the direct
+    ``cli.commands.bugs -> infrastructure.jsonl_bug_store`` import-linter ignore edge
+    the CLI layer must not otherwise reach infrastructure through.
+    """
+    from dadaia_workspace.core.models.bugs import BugRecord
+    from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
+
+    bugs_dir = workspace_root / "specs" / "bugs"
+    return JsonlRecordStore(
+        bugs_dir / "BUGS.jsonl",
+        to_dict=BugRecord.to_dict,
+        from_dict=BugRecord.from_dict,
+    )
 
 
 def load_denylist_terms() -> tuple[tuple[str, str], ...]:

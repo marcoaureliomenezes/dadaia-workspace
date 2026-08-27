@@ -1,0 +1,233 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "bug-record-v1",
+  "title": "Bug Record v1",
+  "description": "One record per bug, appended once — no event stream, no fold (v0.5.0 FR2, D11, AR-1). Each line of specs/bugs/BUGS.jsonl is one object validating this schema, keyed by `id`. Every property carries a custom `x-mutability` keyword — `immutable-core` (never rewritten through the record-store update seam once appended), `write-once` (legitimately absent from a freshly registered record; settable exactly once from absent, then immutable), or `mutable-governance` (rewritten in place through the atomic in-place update seam, `core/atomic_write.py` + refuse-stale) — THIS is the one place the three-category split is documented; core/models/bugs.py never re-declares it as a second, driftable list (A2.1/A2.10). `x-redact: false` marks the three fields (id, ts, reported_by) that write-time redaction must never scrub — every other string property is redacted by default. `status` has NO `picked` value (v0.5.0 FR2): the pick is the bundled definition commit, readable by pillar 2 (FR8 shape 5).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "ts",
+    "reported_by",
+    "title",
+    "severity",
+    "surface",
+    "component",
+    "context",
+    "symptom",
+    "repro",
+    "expected",
+    "status",
+    "cause",
+    "caused_by",
+    "lineage_source",
+    "registration_commit",
+    "registration_granularity",
+    "resolved_commit",
+    "resolution_granularity",
+    "resolved_release",
+    "audited"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "x-mutability": "immutable-core",
+      "x-redact": false,
+      "description": "Stable identifier of this bug (kebab-case slug) — the record store's key."
+    },
+    "ts": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})$",
+      "x-mutability": "immutable-core",
+      "x-redact": false,
+      "description": "ISO 8601 UTC timestamp when the record was first appended (registration time)."
+    },
+    "reported_by": {
+      "type": "string",
+      "minLength": 1,
+      "x-mutability": "immutable-core",
+      "x-redact": false,
+      "description": "Agent or runtime that registered this record."
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "x-mutability": "immutable-core",
+      "description": "Short human-readable bug title."
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"],
+      "x-mutability": "immutable-core",
+      "description": "Severity level, set at registration."
+    },
+    "surface": {
+      "type": "string",
+      "enum": [
+        "academy",
+        "agents",
+        "backlog",
+        "bugs",
+        "capabilities",
+        "certification",
+        "chokepoints",
+        "ci_preflight",
+        "cli",
+        "core",
+        "export",
+        "hooks",
+        "import_",
+        "infrastructure",
+        "migrate",
+        "panel",
+        "public",
+        "public-assets",
+        "reconcile",
+        "reports",
+        "repos",
+        "server_registry",
+        "spec_artifacts",
+        "spec_context",
+        "specs",
+        "telemetry",
+        "tests",
+        "tmp_gc",
+        "unknown",
+        "workspace",
+        "workspace_clean"
+      ],
+      "x-mutability": "immutable-core",
+      "description": "Closed enum, one source (v0.5.0 FR2/A2.12): the 24 `dadaia_workspace/features/<name>/` packages on disk, plus the non-feature layers `core`/`infrastructure`/`cli`/`hooks`/`tests`/`public-assets`, plus the `unknown` sentinel for an unmappable legacy value. A contract test asserts the feature arm of this enum equals the on-disk package list; setup.cfg's `[importlinter:contract:features-no-cross-feature]` `modules =` list is completed to the same 24 by T-050-29 and is not yet the comparison target at this fold."
+    },
+    "component": {
+      "type": "string",
+      "x-mutability": "immutable-core",
+      "description": "Free text: the `path#symbol` precision the fine-key analysis needs (component stays free text — only `surface` closed)."
+    },
+    "context": {
+      "type": "string",
+      "x-mutability": "immutable-core",
+      "description": "The active spec-context the bug was found in."
+    },
+    "symptom": {
+      "type": "string",
+      "minLength": 1,
+      "x-mutability": "immutable-core",
+      "description": "What happened (the error / wrong output)."
+    },
+    "repro": {
+      "type": "string",
+      "minLength": 1,
+      "x-mutability": "immutable-core",
+      "description": "The exact command / steps to reproduce."
+    },
+    "expected": {
+      "type": "string",
+      "minLength": 1,
+      "x-mutability": "immutable-core",
+      "description": "What the contract promises."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["open", "resolved", "superseded", "deferred", "rejected"],
+      "x-mutability": "mutable-governance",
+      "description": "Governance state. NO `picked` value (v0.5.0 FR2) — the pick is the bundled definition commit, not a status."
+    },
+    "cause": {
+      "type": ["string", "null"],
+      "x-mutability": "mutable-governance",
+      "description": "The fix's own statement of what caused the bug — filled when resolved."
+    },
+    "caused_by": {
+      "type": ["string", "null"],
+      "x-mutability": "mutable-governance",
+      "description": "The prior bug id this one was caused by, when this record is itself a reopen (a new id declaring `caused_by`)."
+    },
+    "lineage_source": {
+      "type": ["string", "null"],
+      "x-mutability": "mutable-governance",
+      "description": "How `caused_by` was established — e.g. `declared` (the fixer named it) or `text-reference` (inferred from prose, FR3 migration)."
+    },
+    "registration_commit": {
+      "type": ["string", "null"],
+      "x-mutability": "mutable-governance",
+      "description": "The 40-hex commit sha that first added this record's line, derived from git history (FR3) — never hand-written (D2)."
+    },
+    "registration_granularity": {
+      "type": ["string", "null"],
+      "enum": ["exact", "release-squash", "ledger-only", null],
+      "x-mutability": "mutable-governance",
+      "description": "How precisely `registration_commit` identifies the adding commit."
+    },
+    "resolved_commit": {
+      "type": ["string", "null"],
+      "x-mutability": "mutable-governance",
+      "description": "The 40-hex commit sha that fixed this bug, derived from git history (FR3) — null until an audit fills it (a commit cannot contain its own sha, AS-1)."
+    },
+    "resolution_granularity": {
+      "type": ["string", "null"],
+      "enum": ["exact", "release-squash", "ledger-only", null],
+      "x-mutability": "mutable-governance",
+      "description": "How precisely `resolved_commit` identifies the fixing commit."
+    },
+    "resolved_release": {
+      "type": ["string", "null"],
+      "x-mutability": "mutable-governance",
+      "description": "The release id that shipped the fix."
+    },
+    "audited": {
+      "type": ["string", "null"],
+      "x-mutability": "mutable-governance",
+      "description": "The audit window id that reviewed this resolution — the one place `resolved_commit`/`resolution_granularity`/`audited` are ever written together, in a single atomic rewrite (FR14 pillar 1)."
+    },
+    "root_cause": {
+      "type": "string",
+      "minLength": 1,
+      "x-mutability": "write-once",
+      "description": "Absent until the fix lands; immutable the moment it is written."
+    },
+    "solution": {
+      "type": "string",
+      "minLength": 1,
+      "x-mutability": "write-once",
+      "description": "Absent until the fix lands; immutable the moment it is written."
+    },
+    "evidence_loop": {
+      "type": "string",
+      "minLength": 5,
+      "x-mutability": "write-once",
+      "description": "The FR23 evidence triple, restored (v0.4.4, not re-invented): the red-loop command that reproduced the bug on the executed path, before any hypothesis."
+    },
+    "evidence_seam": {
+      "type": "string",
+      "minLength": 5,
+      "x-mutability": "write-once",
+      "description": "The FR23 evidence triple: the test file/node (the regression seam) that pins the fix."
+    },
+    "evidence_diff": {
+      "type": "string",
+      "pattern": "^(net-negative|net-positive|net-neutral):\\s*\\S.*$",
+      "x-mutability": "write-once",
+      "description": "The FR23 evidence triple: the diff direction on the touched feature, prefixed 'net-negative:'/'net-positive:'/'net-neutral:' with a checkable rationale."
+    },
+    "diff_direction": {
+      "type": "string",
+      "enum": ["net-negative", "net-neutral", "net-positive"],
+      "x-mutability": "write-once",
+      "description": "The closed-enum token `evidence_diff` already carries as free text — the fix-shape metric reads this field, not a parse of `evidence_diff` (FR14 metric 3)."
+    },
+    "superseded_by": {
+      "type": "string",
+      "minLength": 1,
+      "x-mutability": "write-once",
+      "description": "The backlog/bug/release slug that supersedes this record — required when `status` is `superseded`; a sweep closure takes this status, never `resolved` (FR2)."
+    },
+    "migration_note": {
+      "type": "string",
+      "minLength": 1,
+      "x-mutability": "write-once",
+      "description": "FR3 migration provenance note — e.g. an unmapped legacy `surface` counted as `unknown`, or a `caused_by` inferred from prose."
+    }
+  }
+}
