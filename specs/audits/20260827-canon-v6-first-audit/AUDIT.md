@@ -24,8 +24,9 @@ restated (A14.2). Applied here:
 the finding set: the audit lane has been nominally present and never executed, so every
 number below is a first measurement, not a delta.
 
-**Audited:** the whole `specs/bugs/BUGS.jsonl` ledger (**506 records** at read time; the 507th
-is the record this audit itself registered), this release's **121 commits**
+**Audited:** the whole `specs/bugs/BUGS.jsonl` ledger (**506 records** at the pillar-1 read;
+**509** at the write pass — the three added during the run are two records this auditor
+registered and one a concurrent session registered), this release's **121 commits**
 (`38916605~1..HEAD`), the full `dadaia specs doctor` surface, `releases_histo.jsonl`'s 97
 releases, the 28 `specs/ADRs/` Confirmation lines, the memory trio's Part 1 and
 `specs/constitution.md`.
@@ -47,7 +48,7 @@ releases, the 28 `specs/ADRs/` Confirmation lines, the memory trio's Part 1 and
 | Validation | Statement | Result |
 |---|---|---|
 | **V16** | The FR16 folder exists; pillar 1 names the four §1.1 chains with evidence; every finding `open` / `release: null` | **PASS** — all four chains named **by their pinned ids** (below); `FINDINGS.jsonl` = 33 records, every one `disposition: "open"`, `release: null`, `reason: null`, each validated line-by-line against `finding-record-v1.schema.json` (0 errors) |
-| **V24** | The folder is redaction-clean under the push detector; every `evidence` value is the reproducible command **plus** a redacted one-line result, never a path alone | **PASS** — see *Redaction and the push-gate scan* below. No `.dadaia/tmp/**` path appears as a citation anywhere in `FINDINGS.jsonl`; that lane GCs at 3 days and a path-only citation decays into an unverifiable claim |
+| **V24** | The folder is redaction-clean under the push detector; every `evidence` value is the reproducible command **plus** a redacted one-line result, never a path alone | **PASS for the folder** — the push detector finds **zero** hits inside `specs/audits/20260827-canon-v6-first-audit/`; it exits 1 on **8 pre-existing objects elsewhere on the branch** (F037), which is recorded, not this audit's to fix. No `.dadaia/tmp/**` path appears as a citation anywhere in `FINDINGS.jsonl`; that lane GCs at 3 days and a path-only citation decays into an unverifiable claim |
 | **V33** | All **eight** forensic metrics present with `baseline → measured` | **PASS** — the eight-metric table below. Metric 7 was expected to worsen and is reported honestly; metric 8's measured 0 is reported as a **false zero**, not as target-met |
 
 ---
@@ -209,19 +210,41 @@ at a ceiling that has nothing to do with commit discipline. → **F004**
 
 ### 1.4 The derived-cache write (A14.6)
 
-Pillar 1 is the single writer. **507 records rewritten, one atomic rewrite per record**,
-each through the FR2/AS-16 seam — `dadaia bugs update <id> --set audited=… [--set
-registration_commit=… --set registration_granularity=… --set resolved_commit=… --set
-resolution_granularity=…]`. No file-tool write touched `BUGS.jsonl`; no immutable-core field
-was passed to the seam.
+Pillar 1 is the single writer. **One atomic rewrite per record**, each through the
+FR2/AS-16 seam — `dadaia bugs update <id> --set audited=… [--set registration_commit=…
+--set registration_granularity=… --set resolved_commit=… --set resolution_granularity=…]`.
+No file-tool write touched `BUGS.jsonl`; no immutable-core field was passed to the seam.
 
-- `audited: "20260827-canon-v6-first-audit"` written on **507/507** records (previously
-  `null` on all 507).
+- `audited: "20260827-canon-v6-first-audit"` written on **509/509** records (previously
+  `null` on all of them). Verified after the write: `not audited: 0`.
 - **11 records** had a `null` provenance field the resolver can derive — every record
-  registered after T-050-10's migration ran, plus this audit's own registration. Filled.
+  registered after T-050-10's migration ran, plus this audit's own registrations. Filled.
 - **1 record** disagreed with the derivation (`test-git-history-reader-fixture-email-not-on-selfscan-baseline`:
   stored `resolution_granularity: exact`, derived `ledger-only`; the resolving commit
   `e5fa1fbf` stages only `BUGS.jsonl`, so `ledger-only` is correct). Corrected, and recorded.
+
+**The batch had to be run twice, and why that is a finding rather than a footnote.** The
+first pass completed `ok=507 fail=0` — every one of the 507 updates exited 0 with
+`[ok] updated`. A concurrent session then appended one new record (`5c0448dc`, a clean
+one-line isolated shape-1 commit), and immediately afterwards **507 of the 508 records
+carried `audited: null` again**: the whole batch had been overwritten by a whole-file write
+built from a pre-batch snapshot. Neither side reported anything — no update was refused as
+stale, and the append reported success. The seam that documents itself as *atomic, re-read
+before write, refuse-stale* lost 507 governance writes silently. Registered as
+`bugs-record-store-append-clobbers-concurrent-update-batch` (HIGH), and recorded as
+**F034**. The batch was then re-run against the current ledger — `ok=509 fail=0` — and verified
+record-by-record before staging.
+
+This is the dry run doing exactly what FR16 exists for: the canon failed **here**, on its
+own repository, under ordinary concurrent operation, rather than at a consumer.
+
+**And the auditor reproduced the same class itself, so it is disclosed rather than hidden.**
+Content this session staged before a later, unrelated bug-registration commit was swept
+into that commit, so the audit's own artifacts landed across **two** commits — `7e5b1725`
+(`AUDIT.md` +480, `FINDINGS.jsonl` +33, the ledger rewrite, the `audited` milestone) under a
+`chore(bugs): report …` subject, and `192251b1` under the correct `docs(T-050-26)` subject.
+History was **not** rewritten to tidy this: concurrent sessions are committing on this branch
+and a reset would destroy their work. Recorded as **F036**.
 
 **A seam discrepancy worth naming.** The task brief specified `--set audited=true`; the
 schema defines `audited` as *"the audit window id that reviewed this resolution"*
@@ -392,18 +415,18 @@ never migrated with the tree.
 
 ## Findings summary
 
-**33 findings**, every one `disposition: "open"`, `release: null`, `reason: null`
+**37 findings**, every one `disposition: "open"`, `release: null`, `reason: null`
 (A16.5), each line validated against
 `dadaia_workspace/public/schemas/audits/finding-record-v1.schema.json`.
 
 | Severity | Count | Ids |
 |---|---|---|
 | **CRITICAL** | **2** | F026 (constitution §16 gates every deploy on a deleted file), F027 (constitution §13 names three non-existent memory atoms) |
-| **HIGH** | **9** | F001, F003, F004, F005 · F013, F017, F019 · F028, F029 |
-| **MEDIUM** | **16** | F002, F006, F007, F008, F009, F010, F011 · F014, F015, F016, F018, F020, F021, F022 · F030, F031 |
+| **HIGH** | **10** | F001, F003, F004, F005, **F034** · F013, F017, F019 · F028, F029 |
+| **MEDIUM** | **19** | F002, F006, F007, F008, F009, F010, F011 · F014, F015, F016, F018, F020, F021, F022, **F035**, **F036**, **F037** · F030, F031 |
 | **LOW** | **6** | F012 · F023, F024, F025 · F032, F033 |
 
-By pillar: **bugs 12 · specs 13 · memory 8.**
+By pillar: **bugs 13 · specs 16 · memory 8.**
 
 **No backlog entry was created by this audit** (A16.5). The findings are compiled for
 `project-manager`'s operator-gated intake report, which decides what enters `## ACTIVE`.
@@ -436,7 +459,9 @@ The auditor recommends; it never dispatches. Remediation dispatch is `project-ma
 | 9 | Decide whether FR8 gains a sixth shape for the task commit, or states that it deliberately does not cover it — F016 | `software-architect` |
 | 10 | Exempt `AGENTS.md` from `SPEC-DOC-035` — F022 | `software-engineer` |
 | 11 | Backfill or explicitly waive the `implemented` milestone for the archived corpus (0/97 today) — F019 | `product-engineer` |
-| 12 | Re-run **pillar 3** at the final `rc` against the committed, ADR-accepted Part 1, appending new findings with new ids — A16.4, T-050-34 | `project-auditor`, dispatched by `project-manager` |
+| 12 | Close the lost-update path in the record store: an append must re-read immediately before writing, or refuse stale and exit non-zero — 507 governance writes were discarded silently — F034 | `software-engineer` |
+| 13 | Decide how the audited milestone's sha relates to a moving HEAD, so the next window does not re-scan the audit's own commits — F035 | `software-architect` |
+| 14 | Re-run **pillar 3** at the final `rc` against the committed, ADR-accepted Part 1, appending new findings with new ids — A16.4, T-050-34 | `project-auditor`, dispatched by `project-manager` |
 
 **Score floor.** Not applicable: FR14's canon retired the six-dimension 1–10 scorecard and
 absorbed it into pillar 3 (`dd-audit-project`, FR14 bug-surface note). This audit reports
@@ -454,8 +479,26 @@ never pasted. No `.dadaia/tmp/**` path is cited as evidence anywhere — that la
 days, and a path-only citation decays into exactly the unverifiable claim this release exists
 to end.
 
-The folder was then scanned with the same detector a push uses. The result is recorded in
-*Scan result* below.
+### Scan result — `dadaia ci push-gate-check`, real new-branch refspec on stdin
+
+```
+printf 'refs/heads/feature/0.5.0 <head> refs/heads/feature/0.5.0 0000…0000' | dadaia ci push-gate-check
+```
+
+**Exit 1 — 8 objects carrying a denylisted term. Zero of them are in this folder.**
+`grep -c 'specs/audits/'` over the gate's output → **0**. The audit artifact is
+redaction-clean; the branch is not yet publishable. The eight hits, recorded as
+pre-existing and **not this audit's to fix**:
+
+| Object | Term class |
+|---|---|
+| `specs/backlog/_archive/backlog_histo.jsonl:48` | operator denylist |
+| `specs/bugs/BUGS.jsonl:497` (two blobs), `:500` | `email-address` baseline, inside other sessions' record text — the open bug `bug-record-write-once-evidence-fields-can-embed-selfscan-triggering-literal-with-no-correction-path` is exactly this class |
+| `tests/contract/test_hooks_publication_boundary.py:98` | `email-address` baseline, test fixture |
+| `tests/contract/test_git_history_reader_log_added_lines.py:34` | `email-address` baseline, test fixture |
+| two commit messages (`ffe1b009`, `e5fa1fbf`) | `email-address` baseline |
+
+→ **F037**
 
 ---
 
