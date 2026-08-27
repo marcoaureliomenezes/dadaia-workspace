@@ -50,8 +50,6 @@ Declaração atômica do propósito do projeto e suas invariantes fundamentais.
 
 _BACKLOG_STUB = """\
 ## ACTIVE
-
-## LEDGER
 """
 
 

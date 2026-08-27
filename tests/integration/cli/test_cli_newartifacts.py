@@ -65,7 +65,6 @@ def test_release_new_and_backlog_new(specs: Path) -> None:
     assert target.is_file()
     backlog_content = target.read_text(encoding="utf-8")
     assert "## ACTIVE" in backlog_content
-    assert "## LEDGER" in backlog_content
     assert "### cool-idea" in backlog_content
     assert "- **Title:** cool-idea" in backlog_content
     assert "- **Status:** idea" in backlog_content

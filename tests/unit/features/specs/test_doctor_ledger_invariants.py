@@ -160,11 +160,13 @@ def _by_code(issues: list[SpecsDoctorIssue], code: str) -> list[SpecsDoctorIssue
 def _write_backlog_entry(specs: Path, slug: str, status_line: str) -> None:
     """Write (or append to) ``specs/backlog/BACKLOG.md`` with one ``## ACTIVE``
     subsection for *slug* at the given ``**Status:**`` line (SPEC v0.12.0 FR1/FR5 — the
-    single-source document, not a per-entry file). Multiple calls against the same
-    ``specs`` root accumulate subsections in one document."""
+    single-source document, not a per-entry file; v0.5.0 A5.2 — ``## ACTIVE`` is now
+    the document's only top-level section, so a fresh subsection is simply appended at
+    end-of-file, no insertion marker needed). Multiple calls against the same ``specs``
+    root accumulate subsections in one document."""
     (specs / "backlog").mkdir(parents=True, exist_ok=True)
     path = specs / "backlog" / "BACKLOG.md"
-    text = path.read_text(encoding="utf-8") if path.is_file() else "## ACTIVE\n\n## LEDGER\n"
+    text = path.read_text(encoding="utf-8") if path.is_file() else "## ACTIVE\n"
     block = (
         f"### {slug}\n"
         f"- **Title:** {slug}\n"
@@ -173,9 +175,7 @@ def _write_backlog_entry(specs: Path, slug: str, status_line: str) -> None:
         f"- **Description:** {slug} body.\n"
         "- **Provenance:** operator request\n\n"
     )
-    marker = "## LEDGER"
-    insertion = text.index(marker)
-    path.write_text(text[:insertion] + block + text[insertion:], encoding="utf-8")
+    path.write_text(text.rstrip("\n") + "\n\n" + block, encoding="utf-8")
 
 
 def _write_archived_closure(specs: Path, release_id: str, body: str) -> None:

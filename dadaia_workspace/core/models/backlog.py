@@ -1,4 +1,7 @@
-"""Typed ``intents[]`` backlog item schema (SPEC §3.1, ADR-A).
+"""Typed ``intents[]`` backlog item schema (SPEC §3.1, ADR-A), plus
+:class:`BacklogHistoRecord` (v0.5.0 FR5, A5.1) — the one-record-per-exit shape appended to
+``specs/backlog/_archive/backlog_histo.jsonl`` when a ``### <slug>`` ``## ACTIVE``
+subsection leaves ``BACKLOG.md``.
 
 The ``(subject{kind,ref} -> change)`` frontmatter shape every backlog item carries. This is
 a **pure** domain model: it validates that a ref is *well-formed for its kind*, but it does
@@ -16,13 +19,14 @@ backlog file.
 from __future__ import annotations
 
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 
 __all__ = [
     "INTENTS_EXEMPT_STATUS",
     "TERMINAL_DISPOSITION_TOKENS",
+    "BacklogHistoRecord",
     "Intent",
     "Subject",
     "SubjectKind",
@@ -233,3 +237,77 @@ def serialize_intents(intents: Sequence[Intent]) -> list[dict[str, object]]:
             subject["surface"] = intent.subject.surface
         out.append({"subject": subject, "change": intent.change})
     return out
+
+
+def _require_histo_str(raw: Mapping[str, object], key: str) -> str:
+    value = raw.get(key)
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"backlog-histo record missing required string field {key!r}: {raw!r}")
+    return value
+
+
+def _optional_histo_str(raw: Mapping[str, object], key: str) -> str | None:
+    value = raw.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError(f"backlog-histo record field {key!r} must be a string or null: {raw!r}")
+    return value
+
+
+@dataclass(frozen=True)
+class BacklogHistoRecord:
+    """One record per backlog-item exit (v0.5.0 FR5, A5.1) — appended once to
+    ``specs/backlog/_archive/backlog_histo.jsonl`` through the generic
+    :class:`~dadaia_workspace.core.protocols.record_store.RecordStore` seam
+    (``infrastructure.jsonl_record_store.JsonlRecordStore``, composed at
+    ``container.build_backlog_histo_store``) when a ``### <slug>`` ``## ACTIVE``
+    subsection leaves ``BACKLOG.md`` (any disposition).
+
+    ``id`` IS the backlog slug — the record's identity and the
+    :class:`~dadaia_workspace.core.protocols.record_store.RecordStore` key. With one
+    line per slug, ever, a duplicate exit is structurally impossible (A5.2): the
+    ``disposition``/``reason``/``release`` fields are rewritten IN PLACE through
+    :meth:`~dadaia_workspace.core.protocols.record_store.RecordStore.update` when a
+    provisional ``CONSUMED`` matures to its terminal token at closure (DADAIA.md §6) —
+    never a second record for the same slug.
+    """
+
+    id: str
+    ts: str
+    disposition: str
+    reason: str | None
+    release: str | None
+    by: str
+    entry_md: str | None
+    entry_md_source: str | None
+
+    def to_dict(self) -> dict[str, object]:
+        """Serialize to the JSONL object shape (``"id"`` present so the generic
+        ``JsonlRecordStore.update`` seam can locate this record by slug)."""
+        return {
+            "id": self.id,
+            "ts": self.ts,
+            "disposition": self.disposition,
+            "reason": self.reason,
+            "release": self.release,
+            "by": self.by,
+            "entry_md": self.entry_md,
+            "entry_md_source": self.entry_md_source,
+        }
+
+    @classmethod
+    def from_dict(cls, raw: Mapping[str, object]) -> BacklogHistoRecord:
+        """Parse a JSONL object into a :class:`BacklogHistoRecord`. Raises
+        ``ValueError`` on a malformed record so tolerant readers can skip it (mirrors
+        ``BugRecord.from_dict``)."""
+        return cls(
+            id=_require_histo_str(raw, "id"),
+            ts=_require_histo_str(raw, "ts"),
+            disposition=_require_histo_str(raw, "disposition"),
+            reason=_optional_histo_str(raw, "reason"),
+            release=_optional_histo_str(raw, "release"),
+            by=_require_histo_str(raw, "by"),
+            entry_md=_optional_histo_str(raw, "entry_md"),
+            entry_md_source=_optional_histo_str(raw, "entry_md_source"),
+        )

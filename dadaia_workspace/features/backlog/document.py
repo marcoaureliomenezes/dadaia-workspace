@@ -1,19 +1,20 @@
 """Pure single-source ``BACKLOG.md`` parser (SPEC v0.12.0 FR1, PLAN §5, ADR #14).
 
-The document has exactly two top-level sections. ``## ACTIVE`` holds one ``###
-<slug>`` subsection per live item, carrying the five ratified ``dd-backlog-definition``
-§2 keys (``**Title:**``, ``**Opened:**``, ``**Status:**``, ``**Description:**``,
-``**Provenance:**``) plus one optional key, ``**Intents:**``, whose value is a fenced
-YAML code span fed to :func:`core.models.backlog.parse_intents` (grill D7). ``##
-LEDGER`` holds one bullet line per closed item, the four-field ``·``-separated grammar
-``<slug> · <disposition> · <release-or-reason> · <date>``.
+The document has exactly one top-level section (v0.5.0 FR5, A5.2 — the in-file ``##
+LEDGER`` section retired: an exit now appends one record to
+``specs/backlog/_archive/backlog_histo.jsonl`` instead, see :func:`backlog_exit`).
+``## ACTIVE`` holds one ``### <slug>`` subsection per live item, carrying the five
+ratified ``dd-backlog-definition`` §2 keys (``**Title:**``, ``**Opened:**``,
+``**Status:**``, ``**Description:**``, ``**Provenance:**``) plus one optional key,
+``**Intents:**``, whose value is a fenced YAML code span fed to
+:func:`core.models.backlog.parse_intents` (grill D7).
 
-Parsing is **diagnostic, never throwing**: a malformed subsection, an unparseable
-intents block, and an ungrammatical LEDGER line are each captured as a located
-:class:`DocumentError` (section, slug, line, message) on the returned model — the caller
-(the doctor) reports instead of crashing. An absent ``BACKLOG.md`` (or an absent
-``backlog_dir`` itself) yields an EMPTY model, not an error (A1.2) — a context with no
-backlog is legitimate (the consumer-scaffold case).
+Parsing is **diagnostic, never throwing**: a malformed subsection and an unparseable
+intents block are each captured as a located :class:`DocumentError` (section, slug,
+line, message) on the returned model — the caller (the doctor) reports instead of
+crashing. An absent ``BACKLOG.md`` (or an absent ``backlog_dir`` itself) yields an EMPTY
+model, not an error (A1.2) — a context with no backlog is legitimate (the
+consumer-scaffold case).
 
 Section/subsection splitting is **fence-aware** (code-reviewer M1, v0.12.0 pre-PR): a
 ``## ``/``### `` line that appears inside an open ``` ``` ``` or ``~~~`` fence (any
@@ -22,6 +23,9 @@ longer outer fence wrapping a nested fenced example) is fenced CONTENT, never re
 document structure. Zero silent truncation: an unclosed fence running to end-of-file is
 a structural anomaly this parser cannot attribute to any section, so it is always
 captured as a located :class:`DocumentError` rather than silently shrinking the model.
+A document is never expected to carry more than one top-level heading NAME, but the
+generic duplicate-heading detection below is not name-specific — it fires on ANY
+repeated ``## <name>`` heading, ``## ACTIVE`` above all.
 
 Pure module: the only root is the injected ``backlog_dir`` (SPEC §3.8 #6); no cwd reads,
 no subprocess. The single reading path: ``features.backlog.doctor.run_backlog_doctor``
@@ -30,13 +34,17 @@ no subprocess. The single reading path: ``features.backlog.doctor.run_backlog_do
 is no per-entry fallback.
 
 ``backlog_new`` (SPEC v0.4.2 FR1, GRILL D1) lives here too: one feature owns the grammar
-for BOTH reading and writing — the writer locates its insertion point through the SAME
-fence-aware machinery :func:`load_document` runs (:func:`fenced_ranges` +
-:func:`top_level_heading_starts`), not a private, fence-blind regex, and checks slug
-membership by calling :func:`load_document` itself (ACTIVE ∪ LEDGER) rather than
-re-deriving the grammar a second time. Every write verifies itself: after writing, the
-writer re-parses its own output and raises if the fresh slug is absent
-(write-then-verify).
+for BOTH reading and writing — new subsections are appended at end-of-file (the single
+``## ACTIVE`` section IS the whole document body now, so there is no later heading to
+insert ahead of) — and checks slug membership by calling :func:`load_document` itself
+rather than re-deriving the grammar a second time. Every write verifies itself: after
+writing, the writer re-parses its own output and raises if the fresh slug is absent
+(write-then-verify). :func:`remove_active_subsection`/:func:`backlog_exit` (v0.5.0 FR5,
+A5.3) are the writer's mirror image: they remove exactly one ``### <slug>`` subsection
+and, for :func:`backlog_exit`, append its histo record through an injected
+:class:`~dadaia_workspace.core.protocols.record_store.RecordStore` (DI via
+``core.protocols`` — this module never imports ``infrastructure`` directly, per the
+``features-no-infrastructure`` import-linter contract).
 """
 
 from __future__ import annotations
@@ -50,7 +58,8 @@ from pathlib import Path
 
 import yaml
 
-from dadaia_workspace.core.models.backlog import Intent, is_terminal_disposition, parse_intents
+from dadaia_workspace.core.models.backlog import BacklogHistoRecord, Intent, parse_intents
+from dadaia_workspace.core.protocols.record_store import RecordStore
 from dadaia_workspace.features.backlog.preview import format_yaml_error
 
 #: PyYAML's C-accelerated loader when the libyaml bindings are available, else the
@@ -73,11 +82,11 @@ __all__ = [
     "BacklogDocument",
     "BacklogNewResult",
     "DocumentError",
-    "LedgerRow",
+    "backlog_exit",
     "backlog_new",
     "fenced_ranges",
     "load_document",
-    "top_level_heading_starts",
+    "remove_active_subsection",
 ]
 
 #: Backlog-slug validation, shared by the writer's own check (dd-backlog-definition §2):
@@ -105,10 +114,6 @@ _KEY_LINE_RE = re.compile(
 #: The fenced code span following an ``**Intents:**`` key line (```yaml ... ``` or a
 #: bare ``` ... ``` fence — the language tag is optional and ignored).
 _FENCE_RE = re.compile(r"```[^\n]*\n(?P<body>.*?)^```[ \t]*$", re.MULTILINE | re.DOTALL)
-
-#: A LEDGER bullet line — one closed item per line, ``<slug> · <disposition> ·
-#: <release-or-reason> · <date>``.
-_LEDGER_LINE_RE = re.compile(r"^-[ \t]+(?P<rest>\S.*?)[ \t]*$", re.MULTILINE)
 
 #: A fence-marker line: three-or-more backticks or tildes (optionally indented up to
 #: 3 columns), plus whatever trailing text shares that line (an info string for an
@@ -140,9 +145,8 @@ def fenced_ranges(text: str) -> tuple[tuple[tuple[int, int], ...], tuple[Documen
     runs to end-of-text, so every heading from the opening marker onward stays
     fence-shadowed rather than reappearing as phantom structure.
 
-    Public (v0.4.2 FR1): the SAME machinery :func:`backlog_new` uses, through
-    :func:`top_level_heading_starts`, to find its fence-aware insertion point — one
-    fence scanner, not a second private copy.
+    Public (v0.4.2 FR1): the SAME fence scanner every fence-aware caller in this module
+    shares — one scanner, not a second private copy.
     """
     ranges: list[tuple[int, int]] = []
     errors: list[DocumentError] = []
@@ -231,22 +235,12 @@ class ActiveItem:
 
 
 @dataclass(frozen=True)
-class LedgerRow:
-    """One ``## LEDGER`` line (PLAN §5)."""
-
-    slug: str
-    disposition: str
-    release_or_reason: str
-    date: str
-    line: int
-
-
-@dataclass(frozen=True)
 class BacklogDocument:
-    """The typed ``BACKLOG.md`` model: ``ACTIVE`` items + ``LEDGER`` rows + errors."""
+    """The typed ``BACKLOG.md`` model: ``ACTIVE`` items + errors (v0.5.0 FR5, A5.2 — the
+    ``LEDGER`` rows retired with the in-file ``## LEDGER`` section; an exit's record now
+    lives in ``backlog_histo.jsonl``, see :func:`backlog_exit`)."""
 
     active: tuple[ActiveItem, ...] = ()
-    ledger: tuple[LedgerRow, ...] = ()
     errors: tuple[DocumentError, ...] = ()
 
 
@@ -256,16 +250,17 @@ def _top_level_sections(
     """Map each top-level ``## <name>`` heading to EVERY occurrence's body ``(start,
     end)`` offsets — one range per occurrence, never dropped.
 
-    The document schema states exactly two top-level sections (one ``## ACTIVE``, one
-    ``## LEDGER``, module docstring); a heading name occurring more than once is
-    therefore a structural violation, captured here as a located :class:`DocumentError`
-    (bug ``backlog-doctor-silent-on-duplicate-top-level-sections``: the pre-fix
+    The document schema states exactly one top-level section (``## ACTIVE``, module
+    docstring, v0.5.0 A5.2); ANY top-level heading name occurring more than once is a
+    structural violation, captured here as a located :class:`DocumentError` (bug
+    ``backlog-doctor-silent-on-duplicate-top-level-sections``: the pre-fix
     ``dict.setdefault`` kept only the FIRST occurrence's range and silently discarded
-    every later one, so a duplicated ``## ACTIVE``/``## LEDGER`` block — and any
-    duplicate slug inside it — was never even handed to the caller, let alone
-    compared). Every occurrence's range is still returned so the caller parses ALL of
-    them: duplicate content is compared (and flagged by the doctor's own BL-DUP check),
-    never silently dropped.
+    every later one, so a duplicated ``## ACTIVE`` block — and any duplicate slug inside
+    it — was never even handed to the caller, let alone compared). This detection is
+    generic over the heading NAME (never hardcoded to ``ACTIVE``), so it still catches a
+    duplicate of any stray non-canonical heading too. Every occurrence's range is still
+    returned so the caller parses ALL of them: duplicate content is compared (and
+    flagged by the doctor's BL-SCHEMA/duplicate-slug checks), never silently dropped.
 
     A heading whose match starts inside a fenced span (*ranges*, M1) is fenced
     content, not real structure, and is excluded before offsets are derived.
@@ -285,31 +280,14 @@ def _top_level_sections(
                     line=_line_no(text, heading.start()),
                     message=(
                         f"duplicate top-level section heading {name!r} — the document "
-                        "schema states exactly two top-level sections (one "
-                        "'## ACTIVE', one '## LEDGER'); merge this section's content "
-                        f"into the single existing {name!r} section"
+                        "schema states exactly one top-level section ('## ACTIVE'); "
+                        f"merge this section's content into the single existing {name!r} "
+                        "section"
                     ),
                 )
             )
         sections.setdefault(name, []).append((start, end))
     return sections, tuple(errors)
-
-
-def top_level_heading_starts(text: str, ranges: Sequence[tuple[int, int]]) -> dict[str, int]:
-    """Map each top-level ``## <name>`` heading to the file offset of its OWN heading
-    LINE (not its body — contrast :func:`_top_level_sections`), fence-aware over the
-    already-computed *ranges* (:func:`fenced_ranges`).
-
-    Public (v0.4.2 FR1, GRILL D1): the insertion-point primitive :func:`backlog_new`
-    uses to find the real, unfenced ``## LEDGER`` heading — replacing the pre-v0.4.2
-    private ``_LEDGER_HEADING_RE.search(text)``, which was fence-BLIND and could match
-    a ``## LEDGER`` line quoted inside a Description's fenced example (A1.1).
-    """
-    headings = _outside_fences(_TOP_HEADING_RE.finditer(text), ranges)
-    starts: dict[str, int] = {}
-    for heading in headings:
-        starts.setdefault(heading.group("name").strip(), heading.start())
-    return starts
 
 
 def _parse_intents_block(
@@ -406,55 +384,6 @@ def _parse_active(
     return tuple(items), tuple(errors)
 
 
-def _parse_ledger(
-    text: str, start: int, end: int
-) -> tuple[tuple[LedgerRow, ...], tuple[DocumentError, ...]]:
-    rows: list[LedgerRow] = []
-    errors: list[DocumentError] = []
-    for line_match in _LEDGER_LINE_RE.finditer(text, start, end):
-        line_no = _line_no(text, line_match.start())
-        content = line_match.group("rest")
-        parts = [part.strip() for part in content.split("·")]
-        if len(parts) != 4 or not all(parts):
-            errors.append(
-                DocumentError(
-                    section="LEDGER",
-                    slug=None,
-                    line=line_no,
-                    message=(
-                        "malformed LEDGER line (expected 'slug · DISPOSITION · "
-                        f"release-or-reason · date'): {content!r}"
-                    ),
-                )
-            )
-            continue
-        slug, disposition, release_or_reason, date = parts
-        if not is_terminal_disposition(disposition):
-            errors.append(
-                DocumentError(
-                    section="LEDGER",
-                    slug=slug,
-                    line=line_no,
-                    message=(
-                        f"LEDGER disposition {disposition!r} is not one of the six "
-                        "canonical terminal tokens (DELIVERED, SUPERSEDED, RESOLVED, "
-                        "CONSUMED, DEFERRED, REJECTED)"
-                    ),
-                )
-            )
-            continue
-        rows.append(
-            LedgerRow(
-                slug=slug,
-                disposition=disposition.strip().upper(),
-                release_or_reason=release_or_reason,
-                date=date,
-                line=line_no,
-            )
-        )
-    return tuple(rows), tuple(errors)
-
-
 def load_document(backlog_dir: Path) -> BacklogDocument:
     """Parse ``<backlog_dir>/BACKLOG.md`` into a typed :class:`BacklogDocument`.
 
@@ -484,7 +413,6 @@ def load_document(backlog_dir: Path) -> BacklogDocument:
     ranges, fence_errors = fenced_ranges(text)
     sections, section_errors = _top_level_sections(text, ranges)
     active_items: list[ActiveItem] = []
-    ledger_rows: list[LedgerRow] = []
     errors: list[DocumentError] = [*fence_errors, *section_errors]
 
     # Every occurrence of a repeated top-level heading is still parsed (never just the
@@ -496,14 +424,7 @@ def load_document(backlog_dir: Path) -> BacklogDocument:
         active_items.extend(items)
         errors.extend(active_errors)
 
-    for start, end in sections.get("LEDGER", []):
-        rows, ledger_errors = _parse_ledger(text, start, end)
-        ledger_rows.extend(rows)
-        errors.extend(ledger_errors)
-
-    return BacklogDocument(
-        active=tuple(active_items), ledger=tuple(ledger_rows), errors=tuple(errors)
-    )
+    return BacklogDocument(active=tuple(active_items), errors=tuple(errors))
 
 
 # ═════════════════════════════════════════════════════════════════════════════════
@@ -534,13 +455,13 @@ def _today() -> str:
     return datetime.now(tz=UTC).strftime("%Y-%m-%d")
 
 
-#: The document skeleton a from-scratch ``BACKLOG.md`` starts from — both section
-#: headings, nothing else. MUST stay byte-identical to
+#: The document skeleton a from-scratch ``BACKLOG.md`` starts from — the single
+#: ``## ACTIVE`` heading, nothing else (v0.5.0 FR5, A5.2). MUST stay byte-identical to
 #: ``features.specs.scaffolder._BACKLOG_STUB`` (pinned by
 #: ``tests/unit/features/specs/test_scaffolder.py``): a fresh ``specs init`` scaffold
 #: and a fresh ``backlog new`` share one skeleton shape, and both round-trip through
 #: :func:`load_document` with zero errors.
-_BACKLOG_DOCUMENT_SKELETON = "## ACTIVE\n\n## LEDGER\n"
+_BACKLOG_DOCUMENT_SKELETON = "## ACTIVE\n"
 
 # The subsection is born at ``status: idea`` — an unbound brainstorm. ``backlog doctor``
 # exempts ``idea`` from the typed-intents requirement (v0.1.55 FR5, preserved verbatim
@@ -585,39 +506,30 @@ non-Python repo bind catalog/doc/invariant anchors instead).
 
 
 def _append_active_subsection(text: str, block: str) -> str:
-    """Splice *block* in immediately before the top-level ``## LEDGER`` heading,
-    fence-aware (A1.1 — replaces the pre-v0.4.2 fence-BLIND
-    ``_LEDGER_HEADING_RE.search(text)``, which could match a ``## LEDGER`` line quoted
-    inside a Description's fenced example, corrupting the document).
+    """Append *block* at end-of-file.
 
-    A pure string-slice insertion when the real ``## LEDGER`` heading is found: every
-    byte before and after the insertion point is untouched (A3.2's byte-diff
-    guarantee). Falls back to appending at end-of-file only if no top-level
-    ``## LEDGER`` heading exists at all — a malformed document outside this writer's
-    own skeleton/append contract, not a case this parser otherwise validates: the
-    appended text still conforms to the schema :func:`load_document` expects.
+    Since ``## ACTIVE`` is the document's ONLY top-level section (v0.5.0 FR5, A5.2 —
+    the ``## LEDGER`` heading this writer used to insert ahead of is retired), there is
+    no later heading to splice ahead of any more: the document body ENDS where
+    ``## ACTIVE``'s content ends, so appending at end-of-file lands the fresh subsection
+    inside the same section every time. Every byte before the insertion point is
+    untouched (A3.2's byte-diff guarantee).
     """
-    ranges, _ = fenced_ranges(text)
-    starts = top_level_heading_starts(text, ranges)
-    if "LEDGER" not in starts:
-        return text.rstrip("\n") + "\n\n" + block
-    insertion_point = starts["LEDGER"]
-    return text[:insertion_point] + block + text[insertion_point:]
+    return text.rstrip("\n") + "\n\n" + block
 
 
 def backlog_new(specs_dir: Path, slug: str) -> BacklogNewResult:
     """Append one ``### <slug>`` ACTIVE subsection to ``specs/backlog/BACKLOG.md``
     (SPEC v0.4.2 FR1 — moved from ``features.spec_artifacts.new_artifacts``, v0.12.0
-    FR3/ADR #14) — creating the document with both ``## ACTIVE`` and ``## LEDGER``
-    section headings first when it does not yet exist.
+    FR3/ADR #14) — creating the document with the ``## ACTIVE`` section heading first
+    when it does not yet exist.
 
-    Slug membership (ACTIVE ∪ LEDGER, A1.7/A3.3) is checked by calling
-    :func:`load_document` itself — the parser this writer shares its grammar with —
-    rather than re-deriving the check with a second, private regex pair. Every write
-    verifies itself: after writing, the fresh output is re-parsed and the slug's
-    presence in ``ACTIVE`` is asserted, raising :class:`RuntimeError` otherwise
-    (write-then-verify, A1.2) — a write that silently failed to round-trip is reported
-    as a failure, never as ``[ok] created:``.
+    Slug membership (A1.7/A3.3) is checked by calling :func:`load_document` itself —
+    the parser this writer shares its grammar with — rather than re-deriving the check
+    with a second, private regex pair. Every write verifies itself: after writing, the
+    fresh output is re-parsed and the slug's presence in ``ACTIVE`` is asserted, raising
+    :class:`RuntimeError` otherwise (write-then-verify, A1.2) — a write that silently
+    failed to round-trip is reported as a failure, never as ``[ok] created:``.
 
     Args:
         specs_dir: Absolute path to the ``specs/`` directory.
@@ -630,8 +542,10 @@ def backlog_new(specs_dir: Path, slug: str) -> BacklogNewResult:
     Raises:
         ValueError:      If ``slug`` does not match the slug pattern (A1.7/A3.4,
             unchanged message).
-        FileExistsError: If ``slug`` already names an ACTIVE subsection or a LEDGER
-            row (A1.7/A3.3 — the slug-uniqueness invariant across ``ACTIVE ∪ LEDGER``).
+        FileExistsError: If ``slug`` already names an ACTIVE subsection (A1.7/A3.3 —
+            the slug-uniqueness invariant within ``ACTIVE``; uniqueness against a
+            slug's own past exit lives in ``backlog_histo.jsonl``, not this document,
+            since v0.5.0 FR5).
         RuntimeError:    If a re-parse of the fresh write does not contain the fresh
             slug (A1.2, write-then-verify).
     """
@@ -647,12 +561,10 @@ def backlog_new(specs_dir: Path, slug: str) -> BacklogNewResult:
     target = backlog_dir / "BACKLOG.md"
 
     existing_doc = load_document(backlog_dir)
-    if any(item.slug == slug for item in existing_doc.active) or any(
-        row.slug == slug for row in existing_doc.ledger
-    ):
+    if any(item.slug == slug for item in existing_doc.active):
         raise FileExistsError(
-            f"Backlog slug already exists: {slug!r} is already present in ACTIVE or "
-            f"LEDGER of {target}. Use a different slug."
+            f"Backlog slug already exists: {slug!r} is already present in ACTIVE of "
+            f"{target}. Use a different slug."
         )
 
     if target.is_file():
@@ -672,3 +584,85 @@ def backlog_new(specs_dir: Path, slug: str) -> BacklogNewResult:
         )
 
     return BacklogNewResult(path=target, created=True)
+
+
+# ═════════════════════════════════════════════════════════════════════════════════
+# ── backlog_exit — the writer's mirror image (v0.5.0 FR5, A5.3) ────────────────────
+#
+# An entry exit (any disposition) removes exactly one ``### <slug>`` ACTIVE subsection
+# and appends exactly one record to ``backlog_histo.jsonl`` — never a second record for
+# the same slug (the retired in-file ``## LEDGER`` duplicate-line class this replaces,
+# BL-DUP, becomes structurally impossible, A5.2). ``entry_md`` is the removed
+# subsection's own source text (``### <slug>`` through its last byte before the next
+# subsection/EOF) — the full snapshot A5.1 asks for.
+# ═════════════════════════════════════════════════════════════════════════════════
+
+
+def remove_active_subsection(specs_dir: Path, slug: str) -> str:
+    """Remove exactly one ``### <slug>`` ``## ACTIVE`` subsection from
+    ``specs/backlog/BACKLOG.md`` and return its removed source text verbatim
+    (``entry_md``, A5.1) — every other byte of the file survives unchanged.
+
+    Pure string-slice removal: locates the subsection heading and body via the SAME
+    fence-aware machinery :func:`load_document` parses with
+    (:func:`_SUBSECTION_RE`/:func:`fenced_ranges`), not a second, private regex.
+
+    Raises:
+        KeyError: If *slug* does not name a live ``## ACTIVE`` subsection.
+    """
+    backlog_dir = specs_dir / "backlog"
+    target = backlog_dir / "BACKLOG.md"
+    text = target.read_text(encoding="utf-8") if target.is_file() else ""
+
+    ranges, _ = fenced_ranges(text)
+    sections, _ = _top_level_sections(text, ranges)
+    active_ranges = sections.get("ACTIVE", [])
+
+    for start, end in active_ranges:
+        subsections = _outside_fences(_SUBSECTION_RE.finditer(text, start, end), ranges)
+        for i, sub in enumerate(subsections):
+            if sub.group("slug").strip() != slug:
+                continue
+            body_end = subsections[i + 1].start() if i + 1 < len(subsections) else end
+            removed = text[sub.start() : body_end]
+            new_text = text[: sub.start()] + text[body_end:]
+            target.write_text(new_text, encoding="utf-8")
+            return removed.rstrip("\n")
+
+    raise KeyError(f"backlog slug {slug!r} does not name a live ACTIVE subsection in {target}")
+
+
+def backlog_exit(
+    specs_dir: Path,
+    slug: str,
+    *,
+    histo_store: RecordStore[BacklogHistoRecord],
+    disposition: str,
+    reason: str | None,
+    release: str | None,
+    by: str,
+    ts: str | None = None,
+) -> BacklogHistoRecord:
+    """Retire *slug* out of ``## ACTIVE`` and append its one histo record (v0.5.0 FR5,
+    A5.3) — the atomic pair :func:`remove_active_subsection` (the removal) and
+    ``histo_store.append`` (the record) — through an INJECTED
+    :class:`~dadaia_workspace.core.protocols.record_store.RecordStore` (DI via
+    ``core.protocols`` — this module never imports ``infrastructure`` directly; the
+    concrete store is composed at ``container.build_backlog_histo_store``).
+
+    ``entry_md`` is the exact removed subsection text; there is nothing to "recover"
+    for a live exit (only the historical migration reaches for an archived snapshot).
+    """
+    entry_md = remove_active_subsection(specs_dir, slug)
+    record = BacklogHistoRecord(
+        id=slug,
+        ts=ts if ts is not None else _today(),
+        disposition=disposition,
+        reason=reason,
+        release=release,
+        by=by,
+        entry_md=entry_md,
+        entry_md_source="live exit (backlog_exit) — exact removed ACTIVE subsection text",
+    )
+    histo_store.append(record)
+    return record

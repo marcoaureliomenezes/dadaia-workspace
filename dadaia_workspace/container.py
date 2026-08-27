@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from dadaia_workspace.core.models.backlog import BacklogHistoRecord
     from dadaia_workspace.core.models.bugs import BugRecord
     from dadaia_workspace.core.protocols.git_client import GitClient
     from dadaia_workspace.features.agents.model_policy import AgentModelPolicyService
@@ -274,6 +275,32 @@ def build_bug_archive_store(specs_dir: Path) -> "RecordStore[BugRecord]":
         Path(specs_dir) / "bugs" / "_archive" / "bugs_histo.jsonl",
         to_dict=BugRecord.to_dict,
         from_dict=BugRecord.from_dict,
+    )
+
+
+def build_backlog_histo_store(specs_dir: Path) -> "RecordStore[BacklogHistoRecord]":
+    """Composition-root seam for the generic backlog-exit JSONL store (v0.5.0 FR5,
+    A5.1/A13.4 — the third of the three ``JsonlRecordStore`` instances A13.4 names, the
+    one whose container registration this task adds).
+
+    ``specs/backlog/_archive/backlog_histo.jsonl``, one record per backlog slug that
+    ever exited ``## ACTIVE`` (:class:`~dadaia_workspace.core.models.backlog.
+    BacklogHistoRecord`). Two real callers resolve it (A13.4's "a store instance
+    exists only where a writer exists" + this task's own done criterion, "the backlog
+    doctor's BL-STALE/consumption reads must resolve it"):
+    :func:`~dadaia_workspace.features.backlog.document.backlog_exit` (writer, A5.3) and
+    :func:`~dadaia_workspace.features.backlog.doctor.run_backlog_doctor` (reader, the
+    BL-STALE condition that replaces the retired in-document ``## LEDGER`` check).
+    Takes *specs_dir* directly, the same resolved directory every other
+    ``build_*_store`` seam takes (never a bare ``workspace_root``).
+    """
+    from dadaia_workspace.core.models.backlog import BacklogHistoRecord
+    from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
+
+    return JsonlRecordStore(
+        Path(specs_dir) / "backlog" / "_archive" / "backlog_histo.jsonl",
+        to_dict=BacklogHistoRecord.to_dict,
+        from_dict=BacklogHistoRecord.from_dict,
     )
 
 

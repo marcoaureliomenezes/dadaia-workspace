@@ -1,24 +1,37 @@
-"""``backlog doctor`` — the ENFORCED backstop (SPEC v0.12.0 FR2, ADR-D, ADR D8).
+"""``backlog doctor`` — the ENFORCED backstop (SPEC v0.12.0 FR2, ADR-D, ADR D8; v0.5.0
+FR5, A5.2).
 
-Four checks, run by **one parameterized check engine** (SPEC §3.8 #8 — no copy-paste
+Three checks, run by **one parameterized check engine** (SPEC §3.8 #8 — no copy-paste
 fan-out): each check is a ``BacklogCheck`` (a code + a callable over the shared
 :class:`DoctorContext`), and the engine maps the same loop over all of them.
 
 * **BL-SCHEMA** — every non-``idea`` item has bound ``intents[]`` (every subject resolves
   in the registry) + a valid status; a structurally invalid ``intents:``/``**Intents:**``
   block is also BL-SCHEMA; a located :class:`~dadaia_workspace.features.backlog.document.DocumentError`
-  (a missing required key, an off-grammar LEDGER line) is one BL-SCHEMA per error.
-* **BL-DUP** — two items share anchor-set + change → ERROR (via the classifier
-  ``DUPLICATE``); a slug repeated in ``ACTIVE`` or in ``LEDGER`` → ERROR.
+  (a missing required key) is one BL-SCHEMA per error.
 * **BL-CONFLICT** — two items share an anchor with incompatible change → ERROR (the divergent
   twin, caught even when hand-written; classifier ``DIVERGENT_CONFLICT``).
-* **BL-STALE** (re-defined, ADR D8) — an ACTIVE item already consumed/dispositioned: its slug
-  is recorded in an archived ``consumed_backlog.json`` (``ledger.read_consumed``, unchanged),
-  OR it also carries a ``LEDGER`` line in the same document, OR its own ``Status`` is one of
-  the six canonical terminal disposition tokens.
+* **BL-STALE** (re-defined, ADR D8; v0.5.0 A5.2) — an ACTIVE item already
+  consumed/dispositioned: its slug is recorded in an archived ``consumed_backlog.json``
+  (``ledger.read_consumed``, unchanged), OR it already has an exit record in
+  ``backlog_histo.jsonl`` (the retired in-document ``## LEDGER`` condition's
+  replacement — v0.5.0 FR5), OR its own ``Status`` is one of the six canonical terminal
+  disposition tokens.
+
+**BL-DUP is DELETED, not disabled (v0.5.0 A5.2).** With ``BACKLOG.md`` holding only
+``## ACTIVE`` and every exit landing as one append-only ``backlog_histo.jsonl`` record
+keyed by slug, a duplicate EXIT is structurally impossible — there is no second place a
+slug's closure could be hand-duplicated into. `BL check codes 4 -> 3`; the classifier's
+``DUPLICATE`` verdict (same anchor-set + change on two live items) and the
+same-slug-twice-in-``ACTIVE`` check retire with it — both existed to police the
+dual-section document's duplicate-closure failure mode this task's SPEC (FR5) names as
+its bug-history evidence, not an independent invariant.
 
 Pure module: all roots are **injected** (SPEC §3.8 #6); no I/O outside the supplied paths and
-no subprocess. The CLI (``cli/commands/newartifacts.py``) and the pre-commit/CI chokepoint
+no subprocess (``histo_store``, when supplied, is an already-built
+:class:`~dadaia_workspace.core.protocols.record_store.RecordStore` — DI via
+``core.protocols``, never a direct ``infrastructure`` import). The CLI
+(``cli/commands/newartifacts.py``) and the pre-commit/CI chokepoint
 (``cli/commands/ci.py`` + ``public/scripts/``) are thin wirings over :func:`run_backlog_doctor`,
 which reads the single source ``specs/backlog/BACKLOG.md`` through
 :func:`~dadaia_workspace.features.backlog.document.load_document` (SPEC v0.12.0 FR1, ADR #14)
@@ -34,16 +47,13 @@ from pathlib import Path
 
 from dadaia_workspace.core.models.backlog import (
     INTENTS_EXEMPT_STATUS,
+    BacklogHistoRecord,
     is_intents_exempt,
     is_terminal_disposition,
 )
+from dadaia_workspace.core.protocols.record_store import RecordStore
 from dadaia_workspace.features.backlog.classifier import BoundItem, Verdict, classify
-from dadaia_workspace.features.backlog.document import (
-    ActiveItem,
-    DocumentError,
-    LedgerRow,
-    load_document,
-)
+from dadaia_workspace.features.backlog.document import ActiveItem, DocumentError, load_document
 from dadaia_workspace.features.backlog.ledger import read_consumed
 from dadaia_workspace.features.backlog.preview import bound_anchor_changes
 from dadaia_workspace.features.backlog.subject_registry import Registry, build_registry
@@ -92,10 +102,10 @@ _KNOWN_STATUSES = frozenset(
 
 
 class BacklogDoctorCode(StrEnum):
-    """The four backlog-consistency check codes (SPEC §3.4)."""
+    """The three backlog-consistency check codes (SPEC §3.4; v0.5.0 A5.2 — BL-DUP
+    deleted, structurally impossible under the single-section + histo shape)."""
 
     BL_SCHEMA = "BL-SCHEMA"
-    BL_DUP = "BL-DUP"
     BL_CONFLICT = "BL-CONFLICT"
     BL_STALE = "BL-STALE"
 
@@ -130,13 +140,14 @@ class DoctorContext:
     items: Sequence[ActiveItem]
     registry: Registry
     consumed: dict[str, set[str]]
-    #: ``## LEDGER`` rows of the document model (ADR D8's BL-STALE condition (b) and
-    #: BL-DUP's cross-LEDGER duplicate-slug condition). Empty for a document with no
-    #: ``## LEDGER`` section, or a fixture-built context that supplies none.
-    ledger: tuple[LedgerRow, ...] = ()
+    #: Slugs already carrying an exit record in ``backlog_histo.jsonl`` (v0.5.0 FR5) —
+    #: ADR D8's BL-STALE condition (b)'s replacement for the retired in-document
+    #: ``## LEDGER`` check. Empty when no ``histo_store`` was supplied (A2.8-style
+    #: no-op, never a false ERROR) or a fixture-built context that supplies none.
+    histo_slugs: frozenset[str] = frozenset()
     #: Located :class:`~dadaia_workspace.features.backlog.document.DocumentError`
-    #: diagnostics from the document parser (a missing required key, an off-grammar
-    #: LEDGER line). Empty when the document parsed with no located errors.
+    #: diagnostics from the document parser (a missing required key). Empty when the
+    #: document parsed with no located errors.
     document_errors: tuple[DocumentError, ...] = ()
     #: slug -> (anchor_changes, unresolved-messages), bound once.
     bound: dict[str, tuple[dict[str, str], list[str]]] = field(default_factory=dict)
@@ -217,26 +228,28 @@ def _check_schema(ctx: DoctorContext) -> list[Finding]:
     return findings
 
 
-def _pairwise(
-    ctx: DoctorContext, want: Verdict, code: BacklogDoctorCode, label: str
-) -> list[Finding]:
-    """Shared pairwise body for BL-DUP and BL-CONFLICT (classifier-driven)."""
+def _check_conflict(ctx: DoctorContext) -> list[Finding]:
+    """BL-CONFLICT (classifier-driven): two items share an anchor with an incompatible
+    change (the divergent twin). BL-DUP's sibling pairwise verdict (``DUPLICATE`` — same
+    anchor-set + change) is no longer consumed here: it retired with BL-DUP (v0.5.0
+    A5.2) — the classifier still computes it (unchanged, ``classifier.py`` is out of
+    this task's write set), this check simply never asks for it."""
     findings: list[Finding] = []
     bound_items = [ctx.bound_item(item.slug) for item in ctx.items if not ctx.bound[item.slug][1]]
     seen: set[frozenset[str]] = set()
     for i, new in enumerate(bound_items):
         existing = bound_items[:i]
         for result in classify(new, existing):
-            if result.verdict is want:
+            if result.verdict is Verdict.DIVERGENT_CONFLICT:
                 pair = frozenset({new.slug, result.other_slug})
                 if pair in seen:
                     continue
                 seen.add(pair)
                 findings.append(
                     Finding(
-                        code,
+                        BacklogDoctorCode.BL_CONFLICT,
                         Severity.ERROR,
-                        f"{label} with backlog item {result.other_slug!r} "
+                        f"divergent conflict with backlog item {result.other_slug!r} "
                         f"(shared anchors: {', '.join(result.shared_anchors)})",
                         slug=new.slug,
                     )
@@ -244,69 +257,22 @@ def _pairwise(
     return findings
 
 
-def _check_duplicate_slugs(ctx: DoctorContext) -> list[Finding]:
-    """BL-DUP's second condition (SPEC FR2): the same slug appearing twice in ``ACTIVE``
-    or twice in ``LEDGER``. Never fires over the legacy per-entry model — the filesystem
-    (one file per slug) already guarantees ACTIVE-slug uniqueness there, and it has no
-    LEDGER section at all."""
-    findings: list[Finding] = []
-    seen_active: set[str] = set()
-    for item in ctx.items:
-        if item.slug in seen_active:
-            findings.append(
-                Finding(
-                    BacklogDoctorCode.BL_DUP,
-                    Severity.ERROR,
-                    f"slug {item.slug!r} appears more than once in ACTIVE",
-                    slug=item.slug,
-                )
-            )
-        else:
-            seen_active.add(item.slug)
-    seen_ledger: set[str] = set()
-    for row in ctx.ledger:
-        if row.slug in seen_ledger:
-            findings.append(
-                Finding(
-                    BacklogDoctorCode.BL_DUP,
-                    Severity.ERROR,
-                    f"slug {row.slug!r} appears more than once in LEDGER",
-                    slug=row.slug,
-                )
-            )
-        else:
-            seen_ledger.add(row.slug)
-    return findings
-
-
-def _check_dup(ctx: DoctorContext) -> list[Finding]:
-    return _pairwise(
-        ctx, Verdict.DUPLICATE, BacklogDoctorCode.BL_DUP, "duplicate"
-    ) + _check_duplicate_slugs(ctx)
-
-
-def _check_conflict(ctx: DoctorContext) -> list[Finding]:
-    return _pairwise(
-        ctx, Verdict.DIVERGENT_CONFLICT, BacklogDoctorCode.BL_CONFLICT, "divergent conflict"
-    )
-
-
 def _check_stale(ctx: DoctorContext) -> list[Finding]:
-    """BL-STALE, re-defined over the document model (ADR D8): an ACTIVE item already
-    consumed/dispositioned fires on ANY of three ORed conditions — (a) its slug is
-    recorded in an archived ``consumed_backlog.json`` (``ledger.read_consumed``,
-    unchanged, FR4-kept), (b) it also carries a ``LEDGER`` line in the same document, or
-    (c) its own ``Status`` is itself one of the six canonical terminal disposition
-    tokens. Condition (b)/(c) are inert over the legacy per-entry model (empty
-    ``ctx.ledger``; no live per-entry item carries a terminal-token ``Status`` today)."""
+    """BL-STALE, re-defined over the single-section document (ADR D8; v0.5.0 A5.2): an
+    ACTIVE item already consumed/dispositioned fires on ANY of three ORed conditions —
+    (a) its slug is recorded in an archived ``consumed_backlog.json``
+    (``ledger.read_consumed``, unchanged, FR4-kept), (b) it already has an exit record
+    in ``backlog_histo.jsonl`` (the retired in-document ``## LEDGER`` condition's
+    replacement — ``ctx.histo_slugs``, empty/no-op when no ``histo_store`` was
+    supplied), or (c) its own ``Status`` is itself one of the six canonical terminal
+    disposition tokens."""
     findings: list[Finding] = []
-    ledger_slugs = {row.slug for row in ctx.ledger}
     for item in ctx.items:
         reasons: list[str] = []
         if item.slug in ctx.consumed:
             reasons.append("recorded as consumed in an archived release's consumed_backlog ledger")
-        if item.slug in ledger_slugs:
-            reasons.append("also carries a LEDGER line in the same document")
+        if item.slug in ctx.histo_slugs:
+            reasons.append("already has an exit record in backlog_histo.jsonl")
         if item.status is not None and is_terminal_disposition(item.status):
             reasons.append(f"its own Status {item.status!r} is a terminal disposition token")
         if reasons:
@@ -315,7 +281,8 @@ def _check_stale(ctx: DoctorContext) -> list[Finding]:
                     BacklogDoctorCode.BL_STALE,
                     Severity.ERROR,
                     "ACTIVE item is already consumed/dispositioned (" + "; ".join(reasons) + ") "
-                    "— it should be a LEDGER line, not an ACTIVE subsection",
+                    "— it should have exited to backlog_histo.jsonl, not stayed an ACTIVE "
+                    "subsection",
                     slug=item.slug,
                 )
             )
@@ -331,7 +298,6 @@ class _BacklogCheck:
 
 _CHECKS: tuple[_BacklogCheck, ...] = (
     _BacklogCheck(BacklogDoctorCode.BL_SCHEMA, _check_schema),
-    _BacklogCheck(BacklogDoctorCode.BL_DUP, _check_dup),
     _BacklogCheck(BacklogDoctorCode.BL_CONFLICT, _check_conflict),
     _BacklogCheck(BacklogDoctorCode.BL_STALE, _check_stale),
 )
@@ -358,14 +324,24 @@ def run_backlog_doctor(
     alias_map_path: Path,
     archive_root: Path,
     cli_anchors: frozenset[str],
+    histo_store: RecordStore[BacklogHistoRecord] | None = None,
 ) -> list[Finding]:
-    """Run BL-SCHEMA/DUP/CONFLICT/STALE over the single-source ``BACKLOG.md`` and return
+    """Run BL-SCHEMA/CONFLICT/STALE over the single-source ``BACKLOG.md`` and return
     all findings.
 
     All roots are injected (SPEC §3.8 #6), including ``cli_anchors`` — the pre-derived
     ``cli``-kind anchor set threaded in from the CLI composition boundary (FR1b), so this
-    feature never imports ``cli.main``. The registry is recomputed from live truth; the ledger
-    read is a no-op when absent.
+    feature never imports ``cli.main``. The registry is recomputed from live truth; the
+    ``consumed_backlog.json`` read is a no-op when absent.
+
+    ``histo_store`` (v0.5.0 FR5/A13.4) is an already-built
+    :class:`~dadaia_workspace.core.protocols.record_store.RecordStore` — DI via
+    ``core.protocols`` (composed at ``container.build_backlog_histo_store``), never a
+    direct ``infrastructure`` import from this pure module. ``None`` (the default) is a
+    no-op for BL-STALE's histo condition, never a false ERROR (mirrors
+    ``read_consumed``'s absent-ledger no-op) — this is the seam :func:`run_backlog_doctor`
+    resolves the generic backlog-histo store through (its second real caller, alongside
+    :func:`~dadaia_workspace.features.backlog.document.backlog_exit`).
 
     Reads ``specs/backlog/BACKLOG.md`` through
     :func:`~dadaia_workspace.features.backlog.document.load_document` (SPEC v0.12.0 FR1/FR2,
@@ -382,12 +358,17 @@ def run_backlog_doctor(
     )
     document = load_document(specs_dir / "backlog")
     consumed = read_consumed(archive_root)
+    histo_slugs: frozenset[str] = (
+        frozenset(record.id for record in histo_store.iter_records())
+        if histo_store is not None
+        else frozenset()
+    )
 
     ctx = DoctorContext(
         items=list(document.active),
         registry=registry,
         consumed=consumed,
-        ledger=document.ledger,
+        histo_slugs=histo_slugs,
         document_errors=document.errors,
     )
     for item in document.active:

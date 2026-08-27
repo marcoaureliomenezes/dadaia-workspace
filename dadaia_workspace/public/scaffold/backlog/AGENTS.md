@@ -3,18 +3,24 @@
 Scope: this file governs only `specs/backlog/`. It replaces the retired
 `backlog/README.md` (v6 canon, FR1) — its content lives here now.
 
-The backlog is a **single document**: `specs/backlog/BACKLOG.md`. There is no per-entry
-file per backlog item — everything lives in one of this document's two sections (ADR #14;
-full schema: `dd-backlog-definition` §2).
+The backlog is a **live photo**: `specs/backlog/BACKLOG.md` holds one section,
+`## ACTIVE`, and nothing else (v0.5.0 FR5). There is no per-entry file per backlog item
+— every live candidate or idea is one `### <slug>` subsection (ADR #14; full schema:
+`dd-backlog-definition` §2). A closed item's history lives beside the document, in
+`specs/backlog/_archive/backlog_histo.jsonl`, never in a second in-file section.
 
-## The two sections
+## The document, plus its histo
 
-- **`## ACTIVE`** — one `### <slug>` subsection per live candidate or idea.
-- **`## LEDGER`** — one line per closed item, in the grammar `<slug> · <disposition> ·
-  <release-or-reason> · <date>`.
+- **`## ACTIVE`** (in `BACKLOG.md`) — one `### <slug>` subsection per live candidate or
+  idea. The document's ONLY top-level section.
+- **`backlog_histo.jsonl`** (in `specs/backlog/_archive/`) — one append-only record per
+  closed item: `{id, ts, disposition, reason, release, by, entry_md, entry_md_source}`.
+  `id` is the slug; `entry_md` is the exited subsection's own source text.
 
-An item's whole life is `ACTIVE` → `LEDGER`; it never leaves the document and it never
-lives in both sections at once.
+An item's whole life is `ACTIVE` → one histo record. It never leaves the document by any
+other route, and it never lives ACTIVE while also carrying a histo record — with one
+record per slug, ever, a duplicate exit is structurally impossible (the retired in-file
+`## LEDGER` duplicate-line failure mode this shape replaces).
 
 ## Authoring Rules
 
@@ -31,17 +37,20 @@ lives in both sections at once.
 - Backlog entries are **not** specs. They do not authorise implementation. An entry must
   be picked into a release (via `dadaia release new`, naming the slug under
   `**Consumes:**`) to enter the SDD lifecycle.
-- **Never delete an entry.** A closed item moves from an `## ACTIVE` subsection to one
-  `## LEDGER` line carrying its terminal disposition token — it is never removed from
-  the document, and the file itself is never deleted.
+- **Never delete an entry.** A closed item's ACTIVE subsection is removed and one record
+  carrying its terminal disposition token is appended to `backlog_histo.jsonl` in the
+  same act — it is never lost, and `backlog_histo.jsonl` itself is append-only, never
+  edited or truncated.
 
 ## Terminal disposition tokens
 
-`## LEDGER` records exactly one of six canonical tokens per closed item (canonical home:
+A histo record carries exactly one of six canonical tokens (canonical home:
 `dd-backlog-definition` §2): `DELIVERED`, `SUPERSEDED`, `RESOLVED`, `CONSUMED`,
 `DEFERRED`, `REJECTED`. `DELIVERED`/`SUPERSEDED`/`RESOLVED`/`CONSUMED` carry the release
-id (`<slug> · DELIVERED · v0.10.0 · 2026-06-01`); `DEFERRED`/`REJECTED` carry a one-line
-reason in the release-or-reason field instead.
+id in the `release` field; `DEFERRED`/`REJECTED` carry a one-line reason in the `reason`
+field instead. A provisional `CONSUMED` (picked at definition, release still in
+progress) is rewritten IN PLACE to its terminal token at closure — never a second
+record for the same slug (BL-DUP is structurally impossible under this shape).
 
 ## Idea-stage freedom vs bound intents
 
@@ -94,4 +103,5 @@ JavaScript/TypeScript project), there are no `code` anchors — bind `catalog`, 
 
 A release SPEC names a picked entry's slug under `**Consumes:**`. The entry stays
 `## ACTIVE` (typically flipped to `status: picked`) until the release closes, at which
-point the disposition sweep moves it to `## LEDGER` with its terminal token.
+point the disposition sweep exits it: the ACTIVE subsection is removed and its terminal
+histo record is appended (or a provisional `CONSUMED` record is rewritten in place).

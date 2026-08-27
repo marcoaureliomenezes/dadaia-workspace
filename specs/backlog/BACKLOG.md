@@ -1,4 +1,4 @@
-# Backlog — single source (ACTIVE + LEDGER)
+# Backlog — single source (ACTIVE only; exits live in backlog_histo.jsonl)
 
 Consolidated 2026-08-15 by `project-manager` (v0.12.0 FR7, task T-120-07) from the 31 live
 per-entry files and `candidates.md` (both `git mv`-archived to `_archive/` at the v0.12.0
@@ -13,6 +13,8 @@ later curation (operator-adjudicated intake) appends entries and LEDGER lines on
 never renumbering.
 Entry numbering (`#N`) from the retired `candidates.md` index is carried in each Title —
 rows are never renumbered, and LEDGER rows are never deleted.
+
+**Live-photo notice (2026-08-27, v0.5.0 FR5/T-050-13).** The in-file `## LEDGER` section retired: this document now holds `## ACTIVE` only. Every historical `LEDGER` line (117 rows) migrated to `specs/backlog/_archive/backlog_histo.jsonl`, one record per exit (`{id, ts, disposition, reason, release, by, entry_md, entry_md_source}`), 68 with `entry_md` recovered from an archived per-entry file and 49 with `entry_md: null` (post-consolidation entries, no per-entry archive file — recoverable via `git log -p` if ever needed). Mentions of `LEDGER`/`LEDGER line` in the notices below describe history as it happened and are left as-is; a closed item's terminal record now lives in the histo file, never a second `## ACTIVE` section.
 
 **`## ACTIVE` is EMPTY (2026-08-17).** Release **v0.4.3 "claims-made-true / backlog-zero"**
 picked the entire queue in one release under the operator's standing order ("fila inteira
@@ -338,124 +340,3 @@ its SPEC assumption AS-5 states that a quarantine is never a resolution.
     surface: new
   change: "representative anchor for the ratified execution set: apply the nine per-skill dispositions (Update x5, Merge x3, Fuse x1, zero Retire) exactly as recorded in the study handoff; every merge/fuse updates all cross-references and the projection roster in the same change"
 ```
-
-
-## LEDGER
-
-- push-range-denylist-scan · DELIVERED · v0.9.0 · 2026-08-14
-- redact-foreign-context-names-at-qa-authoring · DELIVERED · v0.9.0 · 2026-08-14
-- tag-push-carve-out-reachability · DELIVERED · v0.9.0 · 2026-08-14
-- 20260814-dd-lifecycle-skills-family · DELIVERED · v0.10.0 · 2026-08-15
-- prior-published-term-amnesty · DELIVERED · v0.11.0 · 2026-08-15
-- denylist-scan-skip-note-oversized-mislabel · DELIVERED · v0.11.0 · 2026-08-15
-- registry-derived-foreign-name-set · DELIVERED · v0.11.0 · 2026-08-15
-- refusal-path-redaction · DELIVERED · v0.11.0 · 2026-08-15
-- push-ref-sha-validation-git-argv-hardening · DELIVERED · v0.11.0 · 2026-08-15
-- git-objects-batch-parse-typed-error-boundary · DELIVERED · v0.11.0 · 2026-08-15
-- git-objects-streamed-batch-reads · DELIVERED · v0.11.0 · 2026-08-15
-- closure-v14-perf-figure-correction · DELIVERED · v0.11.0 · 2026-08-15
-- self-scan-sentinel-integration-marker · DELIVERED · v0.11.0 · 2026-08-15
-- backlog-tooling-reconciliation · DELIVERED · v0.12.0 · 2026-08-15
-- backlog-md-physical-consolidation · DELIVERED · v0.12.0 · 2026-08-15
-- loud-flake-stats-key-residual · DELIVERED · fixed before materialization · 2026-08-14
-- frozen-wall-clock-baselines-in-repo-text · DELIVERED · baselines embedded in memory · 2026-08-14
-- dispose-published-denylist-term · REJECTED · void by construction under the range-scoped scan · 2026-08-14
-- 20260714-panel-games-pong-codex-v026 · REJECTED · surface removed in v0.3.0, nothing to validate · 2026-08-14
-- 20260714-snake-wall-wrap-v025-pi-validation · REJECTED · same removal, nothing to validate · 2026-08-14
-- intake-2-6-consumer-validation-recipe-glob · REJECTED · operator discard at intake (delegated) · 2026-08-15
-- intake-2-8-spec-drafting-zero-hit-grep-lesson · REJECTED · operator discard at intake (delegated) · 2026-08-15
-- 20260704-fast-tier-persona-validation · REJECTED · v0.1.64 · 2026-07-09
-- 20260707-dispatch-band-legacy-fallback-removal · SUPERSEDED · deprecation-strips-and-doctor-cleanup (2026-07-10 consolidation) · 2026-07-10
-- 20260707-platform-seam-todo-retirement · SUPERSEDED · lock-lease-session-identity-kernel (2026-07-10 consolidation) · 2026-07-10
-- 20260707-specs-doctor-partial-archive-invariant · SUPERSEDED · deprecation-strips-and-doctor-cleanup (2026-07-10 consolidation) · 2026-07-10
-- 20260708-panel-tab-reorg-agentic-layers · DELIVERED · v0.1.79 · 2026-07-11
-- 20260709-central-bind-resolution-seam · DELIVERED · v0.1.77 · 2026-07-11
-- 20260709-implement-review-write-scope-from-tasks-parity · SUPERSEDED · lifecycle-pipeline-correctness-and-diagnosability (2026-07-10 consolidation) · 2026-07-10
-- 20260709-preflight-block-reasons-missing-operator-command · SUPERSEDED · lifecycle-pipeline-correctness-and-diagnosability (2026-07-10 consolidation) · 2026-07-10
-- 20260709-tasks-write-scope-traversal-hardening · SUPERSEDED · lifecycle-pipeline-correctness-and-diagnosability (2026-07-10 consolidation) · 2026-07-10
-- 20260709-test-suite-remediation-waves · CONSUMED · v0.1.75 (PR #145) · 2026-07-10
-- 20260710-deprecation-strips-and-doctor-cleanup · DELIVERED · v0.1.81 (date gate operator-waived 2026-07-11) · 2026-07-11
-- 20260710-lifecycle-pipeline-correctness-and-diagnosability · DELIVERED · v0.1.78 · 2026-07-11
-- 20260710-lock-lease-session-identity-kernel · DELIVERED · v0.1.76 (NO-LOCKS doctrine) · 2026-07-10
-- 20260711-context-name-allowlist-at-resolution-rungs · DELIVERED · v0.1.80 · 2026-07-11
-- 20260715-bugfix-workflow-tdd · REJECTED · v0.3.0 engine demolition — strict-TDD bug flow is law (constitution §1) · 2026-08-12
-- 20260806-clean-architecture-remediation · CONSUMED · v0.5.0 · 2026-08-12
-- 20260806-dadaia-md-workspace-system-prompt · CONSUMED · v0.5.0 · 2026-08-12
-- 20260810-security-low-carryforwards-v030 · CONSUMED · v0.5.0 · 2026-08-12
-- backlog-definition-workflow-dedup-conflict-control · DELIVERED · v0.1.26 · 2026-07-02
-- codex-runtime-fidelity · DELIVERED · v0.1.13 (WS-CDX waves; protocol+hygiene verified at HEAD) · 2026-07-02
-- gitflow-standardization · DELIVERED · v0.6.0 · 2026-08-12
-- l1-agent-model-governance-panel · DELIVERED · v0.1.65 · 2026-07-08
-- lifecycle-prompt-fragments-ai-surface-dehydration · DELIVERED · v0.1.30 (Waves A/E) · 2026-07-02
-- selfrepo-agents-md-doubled-header · DELIVERED · v0.1.61 · 2026-07-07
-- shared-headless-adapter-base · DELIVERED · v0.1.30 Wave A · 2026-07-02
-- test-artifact-hygiene · CONSUMED · bug panel-e2e-artifacts-no-consumer (operator ruling 2026-08-12 — bad tests are bugs) · 2026-08-12
-- test-runtime-efficiency · CONSUMED · bug test-suite-real-venv-and-ci-longpole (operator ruling 2026-08-12 — bad tests are bugs) · 2026-08-12
-- test-stewardship-standardization · DELIVERED · v0.7.0 · 2026-08-12
-- wire-consumed-ledger-producer-at-release-definition · DELIVERED · v0.1.27 · 2026-07-02
-- workflow-model-governance-operator-profiles-and-context-overlays · DELIVERED · workflow-engine era, terminal frontmatter (engine removed v0.3.0) · 2026-07-02
-- workflow-model-governance-panel-control-plane · DELIVERED · v0.1.28 · 2026-07-02
-- workflow-step-handoff-data-plane-cleanup · DELIVERED · workflow-engine era, terminal frontmatter (engine removed v0.3.0) · 2026-07-02
-- intake-3-2-match-throughput-fallback · REJECTED · v0.11.0 measured rejection ratified at intake #3 (fallback is the rare shape; a matcher-engine change is its own correctness surface; 55 s one-time scan inside tolerance) · 2026-08-16
-- backlog-grammar-single-writer-seam · DELIVERED · v0.4.2 · 2026-08-16
-- denylist-masking-predicate-parity · DELIVERED · v0.4.2 · 2026-08-16
-- derived-values-computed-not-stored · DELIVERED · v0.4.2 · 2026-08-16
-- knowledge-duplication-doc-pass · DELIVERED · v0.4.2 · 2026-08-16
-- flat-release-ship-task-evidence · DELIVERED · v0.4.2 · 2026-08-16
-- intake-signal-calibration · DELIVERED · v0.4.2 · 2026-08-16
-- amnesty-multi-path-blob-fail-closed · DELIVERED · v0.4.2 · 2026-08-16
-- git-batch-epipe-swallow-width · DELIVERED · v0.4.2 · 2026-08-16
-- self-scan-sentinel-archive-authored-blobs · DELIVERED · v0.4.2 · 2026-08-16
-- document-parser-fence-filter-complexity · DELIVERED · v0.4.2 · 2026-08-16
-- retire-dead-hotfix-surface · DELIVERED · v0.4.2 · 2026-08-16
-- changelog-version-axis-reconciliation · DELIVERED · v0.4.2 · 2026-08-16
-- spec-doc-031-citation-classes · DELIVERED · v0.4.2 · 2026-08-16
-- bugs-jsonl-whole-blob-per-append · REJECTED · v0.4.3 operator ruling (ADR R4) — complexity exceeds value: three divergent candidate shapes, four consumers (panel, doctor, pick precedence, closure sweep) and two laws (never-delete, ADDITIVE class) in the blast radius, while the content-resurfacing half is already neutralized by the shipped prior-published-term amnesty and the measured scan cost stayed inside tolerance; revisit only on a measured problem · 2026-08-17
-- test-suite-remediation-stewardship · DELIVERED · v0.4.3 · 2026-08-18
-- consumer-side-validation-round · DELIVERED · v0.4.3 · 2026-08-18
-- thin-wrapper-projected-scripts · DELIVERED · v0.4.3 · 2026-08-18
-- bug-picked-ledger-event · DELIVERED · v0.4.3 · 2026-08-18
-- codex-persona-law-context-dehydration · DELIVERED · v0.4.3 · 2026-08-18
-- python-env-interpreter-probe-hardening · DELIVERED · v0.4.3 · 2026-08-18
-- panel-runtime-reliability-dangling-ledger-pointer · DELIVERED · v0.4.3 · 2026-08-18
-- mutation-testing-tool-selection-and-wiring · DELIVERED · v0.4.3 · 2026-08-18
-- intent-docstring-mechanical-enforcement · DELIVERED · v0.4.3 · 2026-08-18
-- gitflow-reconciliation-merge-mechanic · DELIVERED · v0.4.3 · 2026-08-18
-- memory-path-class-dotfiles · DELIVERED · v0.4.3 · 2026-08-18
-- commit-paths-index-scope-hardening · DELIVERED · v0.4.3 · 2026-08-18
-- commit-message-scanning-residual · DELIVERED · v0.4.3 · 2026-08-18
-- baseline-carve-out-review-cadence · DELIVERED · v0.4.3 (picked in full; absorbed the co-author-trailer carve-out gap and the CR-6 Windows escape) · 2026-08-18
-- dd-skills-applyto-glob-collisions · DELIVERED · v0.4.3 · 2026-08-18
-- dd-release-definition-orchestration-pointer-loop · DELIVERED · v0.4.3 · 2026-08-18
-- bug-event-redaction-always-on-reinforcement · DELIVERED · v0.4.3 · 2026-08-18
-- dd-audit-project-pinned-tool-installs · DELIVERED · v0.4.3 · 2026-08-18
-- dadaia-cli-skill-agent-grant · DELIVERED · v0.4.3 · 2026-08-18
-- codex-skill-ref-phantom-memory-ctx-prefix · SUPERSEDED · v0.4.3 — merged into codex-persona-law-context-dehydration at pick and shipped inside FR22/A22.6; the prefix proved real (a documented Codex runtime adapter), bound to the on-disk inventory by test · 2026-08-18
-- dadaia-artifact-event-driven-gc · DELIVERED · v0.4.3 · 2026-08-18
-- repo-agents-md-symlink-hardening · DELIVERED · v0.4.3 · 2026-08-18
-- stewardship-relocation-grep-homonym-note · DELIVERED · v0.4.3 · 2026-08-18
-- tests-agents-md-placeholder-doctor-warning · DELIVERED · v0.4.3 · 2026-08-18
-- spec-context-associated-repos · DELIVERED · v0.4.4 — FR15–FR19 shipped; closure sweep, specs/_archive/releases/v0.4.4/CLOSURE.md `## Dispositions` · 2026-08-24
-- gitflow-contract-v2-consolidation · DELIVERED · v0.4.4 — FR1–FR6 shipped; closure sweep, specs/_archive/releases/v0.4.4/CLOSURE.md `## Dispositions` · 2026-08-24
-- rules-skills-governance-map · DELIVERED · v0.4.4 — FR7–FR9 shipped; closure sweep, specs/_archive/releases/v0.4.4/CLOSURE.md `## Dispositions` · 2026-08-24
-- core-skills-consolidation · DELIVERED · v0.4.4 — FR10–FR14 + FR24–FR31 shipped; closure sweep, specs/_archive/releases/v0.4.4/CLOSURE.md `## Dispositions` · 2026-08-24
-- atomic-write-primitive-consolidation · DELIVERED · v0.4.5 — picked at definition, FR2 — delivered rc-1, FR2; 091b2401, CLOSURE §Dispositions · 2026-08-27
-- byte-golden-test-inventory-roster-split · DELIVERED · v0.4.5 — picked at definition, FR3 — delivered rc-1, FR3; 053f55e8, CLOSURE §Dispositions · 2026-08-27
-- coupled-inventory-shared-oracle · DELIVERED · v0.4.5 — picked at definition, FR4 — delivered rc-1, FR4; 78daad25, CLOSURE §Dispositions · 2026-08-27
-- scan-test-vacuity-guard · DELIVERED · v0.4.5 — picked at definition, FR5 — delivered rc-1, FR5; c4ba5383, CLOSURE §Dispositions · 2026-08-27
-- doctor-slug-ownership-uniqueness · DELIVERED · v0.4.5 — picked at definition, FR9 (invariant or recorded rule-out, AS-4) — delivered rc-1, FR9 implement arm (AS-4); 4f890913+fa43364e, CLOSURE §Dispositions · 2026-08-27
-- bug-append-write-time-denylist-redaction · DELIVERED · v0.4.5 — picked at definition, FR6 — delivered rc-1, FR6; eb03d01b+0cb08157, CLOSURE §Dispositions · 2026-08-27
-- specs-init-symlinked-target-refusal · DELIVERED · v0.4.5 — picked at definition, FR8 — delivered rc-1, FR8; f3acf990, CLOSURE §Dispositions · 2026-08-27
-- bug-event-control-character-sanitation · DELIVERED · v0.4.5 — picked at definition, FR7, bundling the open MEDIUM unicode-line-separator bug — delivered rc-1, FR7; 2b9b30c1, narrowed 27c3374a, CLOSURE §Dispositions · 2026-08-27
-- always-on-token-diet · DELIVERED · v0.4.5 — picked at definition, FR11 (consumed by executing and measuring the pass, AS-3) — delivered rc-1, FR11 pass executed and measured (AS-3); ba17bbe9, CLOSURE §Dispositions · 2026-08-27
-- memory-catalog-digest-trimming · DELIVERED · v0.4.5 — picked at definition, FR12 — delivered rc-1, FR12; 5c4f30c9+d85dfc19, CLOSURE §Dispositions · 2026-08-27
-- persona-line-ceiling-trim · DELIVERED · v0.4.5 — picked at definition, FR13 (bounded to existing sibling mechanisms, AS-1) — delivered rc-1, FR13 bounded (AS-1); 47074883, CLOSURE §Dispositions · 2026-08-27
-- ai-surface-hygiene-residuals · DELIVERED · v0.4.5 — picked at definition, FR14 — delivered rc-1, FR14; af7bd369+a4754a28, CLOSURE §Dispositions · 2026-08-27
-- intent-taxonomy-vocabulary-ruling · DELIVERED · v0.4.5 — picked at definition, FR15 (executed directly on the stewardship taxonomy, AS-2) — delivered rc-1, FR15; 91d559f6+96637803, CLOSURE §Dispositions · 2026-08-27
-- dadaia-references-doctor-sanction · DELIVERED · v0.4.5 — picked at definition, FR10, operator ruling O4 — delivered rc-1, FR10; 9bdb960b, CLOSURE §Dispositions · 2026-08-27
-- specs-canon-v6 · CONSUMED · 0.5.0 — picked at definition, FR1, FR2, FR3, FR4, FR5, FR6 · 2026-08-27
-- entity-behavior-map · CONSUMED · 0.5.0 — picked at definition, FR10, FR11, FR12 · 2026-08-27
-- bug-lineage-and-commit-discipline · CONSUMED · 0.5.0 — picked at definition, FR2, FR3, FR7, FR8, FR9 · 2026-08-27
-- audit-canon-v1 · CONSUMED · 0.5.0 — picked at definition, FR13, FR14, FR15, FR16 · 2026-08-27
-- memory-two-tier-principles · CONSUMED · 0.5.0 — picked at definition, FR17, FR18, FR19, FR20, FR21 · 2026-08-27
-- dd-diagnose · CONSUMED · 0.5.0 — picked at definition, FR7 phase 0, AS-11 · 2026-08-27

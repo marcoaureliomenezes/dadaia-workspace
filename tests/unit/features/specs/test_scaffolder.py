@@ -150,12 +150,12 @@ def test_scaffolded_backlog_skeleton_pins_writer_and_round_trips_load_document(
     (a) the two from-scratch skeleton literals stay byte-identical (a grammar change in
         one writer can no longer silently desync the other), and
     (b) a fresh ``specs init`` scaffold's ``BACKLOG.md`` round-trips through
-        ``load_document`` with zero errors (an empty ACTIVE/LEDGER skeleton is a
-        legitimate empty model, A1.2).
+        ``load_document`` with zero errors (an empty ``## ACTIVE``-only skeleton — the
+        single top-level section since v0.5.0 A5.2 — is a legitimate empty model, A1.2).
 
     ``backlog_new``'s own round-trip — a WRITTEN subsection, not just the empty
     skeleton, through ``load_document`` — is already covered by
-    ``test_document.test_backlog_new_on_absent_document_creates_both_sections_and_one_subsection``;
+    ``test_document.test_backlog_new_on_absent_document_creates_section_and_one_subsection``;
     this test extends the pin to the scaffolder producer rather than duplicating that
     coverage."""
     assert scaffolder._BACKLOG_STUB == document._BACKLOG_DOCUMENT_SKELETON, (
@@ -176,7 +176,6 @@ def test_scaffolded_backlog_skeleton_pins_writer_and_round_trips_load_document(
     doc = load_document(specs_dir / "backlog")
     assert doc.errors == ()
     assert doc.active == ()
-    assert doc.ledger == ()
 
 
 def test_scaffold_idempotent_force_and_template_render(tmp_path: Path) -> None:
