@@ -351,7 +351,7 @@ before T-050-07 starts.
 
 ---
 
-- [-] **T-050-05 — FR1: the v6 canon in the scaffold and the doctor**
+- [x] **T-050-05 — FR1: the v6 canon in the scaffold and the doctor**
 
 **Owner role:** software-engineer · **Commit:** `feat(T-050-05): specs pattern v6 — canon
 tree, TREE-8 and specs doctor --recipe`
@@ -400,7 +400,7 @@ recorded; the two retired assertions named in the commit with their `qa-engineer
 
 ---
 
-- [ ] **T-050-06 — FR1: migrate this repository's own `specs/` to v6**
+- [-] **T-050-06 — FR1: migrate this repository's own `specs/` to v6**
 
 **Owner role:** software-engineer · **Commit:** `refactor(T-050-06): migrate specs/ to canon
 v6`
