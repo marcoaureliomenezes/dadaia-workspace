@@ -851,7 +851,7 @@ the evidence outlives the 3-day `.dadaia/tmp/**` GC.
 
 ---
 
-- [-] **T-050-13 — FR5: `BACKLOG.md` becomes a live photo**
+- [x] **T-050-13 — FR5: `BACKLOG.md` becomes a live photo**
 
 **Owner role:** software-engineer (+ `project-manager` for the entry text) · **Commit:**
 `refactor(T-050-13): live-photo BACKLOG.md with backlog_histo.jsonl`
@@ -885,7 +885,7 @@ structurally impossible — the model `qa-engineer` §7 asks every other FR to m
 
 ---
 
-- [ ] **T-050-13A — FR5: relocate the 18 `consumed_backlog.json` sidecars before FR6**
+- [-] **T-050-13A — FR5: relocate the 18 `consumed_backlog.json` sidecars before FR6**
 
 **Owner role:** software-engineer · **Commit:** `fix(T-050-13A): keep BL-STALE's data feed
 across the archive deletion`
