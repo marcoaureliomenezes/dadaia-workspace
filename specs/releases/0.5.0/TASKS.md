@@ -1673,7 +1673,7 @@ honestly is the acceptance. **Tests: +0 / −0.**
 
 ---
 
-- [-] **T-050-27 — `S3` close: `qa-engineer` review committed on the branch**
+- [x] **T-050-27 — `S3` close: `qa-engineer` review committed on the branch**
 
 **Owner role:** qa-engineer · **Commit:** `docs(T-050-27): S3 QA close`
 
@@ -1919,7 +1919,7 @@ does not close until the ledger says the window did.
 
 ## Scope complete — gates and the trio
 
-- [ ] **T-050-34 — [shell] FR22: the invariants, measured**
+- [-] **T-050-34 — [shell] FR22: the invariants, measured**
 
 **Owner role:** software-engineer · **Commit:** the capture reference only
 
