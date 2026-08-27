@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "release-event-v1",
+  "title": "Release Event v1",
+  "description": "One record per line of specs/releases/<release-id>/RELEASE.jsonl (v0.5.0 FR4, D3, D7, D11) — the artifact that replaces ACTIVE.md's phase field and CLOSURE.md's closure narrative. Exactly SEVEN event kinds — phase, defined, implemented, shipped, audited, rc, note — replace the first Draft's fifteen: created, spec_status, review, push, pr, ship and archive are dropped because each is already recorded elsewhere (git history for commits/pushes/reviews, `phase: ARCHIVED` IS the archive record, `shipped` alone covers the ship fact) and none is required by D3. The envelope is `{ts, event, agent, data}` with NO `session_id` property — a harness session id lives in `.dadaia/sessions/` (PROTECTED) and committing it would link a governance milestone to a local session identifier permanently, for no governance value. `defined`, `implemented` and `shipped` are immutable sha-bearing milestone facts appended at most once per release (D3); the read-only fold in `core/release_events.py` takes the FIRST record of each of those three kinds and reports any later record of the same kind as a duplicate finding — a doctor WARNING surfaces it (SPEC-DOC-043), never a block (D15). The SDD gate folds the LAST `phase` record for the MEMORY path-class phase.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ts", "event", "agent", "data"],
+  "properties": {
+    "ts": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})$",
+      "description": "ISO 8601 UTC timestamp when this record was appended."
+    },
+    "event": {
+      "type": "string",
+      "enum": ["phase", "defined", "implemented", "shipped", "audited", "rc", "note"],
+      "description": "One of the seven canonical release-event kinds (D3/D7/D11). No eighth kind — the first Draft's fifteen collapsed here."
+    },
+    "agent": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Agent or runtime that appended this record (e.g. product-engineer, software-engineer, qa-engineer, project-auditor, project-manager)."
+    },
+    "data": {
+      "type": "object",
+      "description": "Event-specific payload, intentionally NOT closed by this schema (each kind's shape differs): `phase` carries `phase` (+ optional `segment`); `defined`/`implemented`/`shipped` carry `sha` (+ `pr`) as immutable facts, `implemented` also carries the closing `rc` number, `shipped` also carries `tag`; `audited` carries `sha` + `audit` (the audit window id); `rc` carries `open`/`close` (+ `n`, the rc number); `note` carries free-text governance fields (e.g. `text`) — headline counts and back-fill provenance that do not warrant their own event kind."
+    }
+  }
+}

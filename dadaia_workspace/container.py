@@ -566,6 +566,34 @@ def resolve_context_specs_dir(workspace_root: Path, context: str) -> Path:
     return _context_specs_dir(workspace_root, context)
 
 
+def resolve_release_phase(specs_dir: Path, release_id: str) -> str | None:
+    """Composition-root seam over the read-only ``RELEASE.jsonl`` fold (v0.5.0 FR4,
+    T-050-11) — one of the fold's three named callers (``core.release_events`` itself
+    never does file I/O; this seam supplies the tri-state disk read).
+
+    Tri-state, in the shape of ``hooks.sdd_gate._active_field``: ``str`` when the last
+    ``phase`` record is readable (possibly ``""`` when ``RELEASE.jsonl`` carries no
+    ``phase`` record yet), ``""`` when ``specs_dir/releases/<release_id>/RELEASE.jsonl``
+    does not exist (a release that has not reached DEFINITION), and ``None`` when the
+    file exists but could not be read (a genuine I/O failure) — callers must treat
+    ``None`` as UNKNOWN, never as "no phase".
+
+    This is the EXPAND-phase seam (A4.1a): ``ACTIVE.md`` stays the gate's decision
+    authority until the contract step (T-050-21A) repoints every remaining consumer.
+    """
+    from dadaia_workspace.core.release_events import fold_release_events, parse_release_events
+
+    path = specs_dir / "releases" / release_id / "RELEASE.jsonl"
+    try:
+        text = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return ""
+    except OSError:
+        return None
+    events, _errors = parse_release_events(text)
+    return fold_release_events(events).phase
+
+
 def _workspace_python_bin(workspace_root: Path) -> str | None:
     """The workspace venv interpreter, when provisioned — the runtime the bootstrap
     guarantees carries pytest (bug implementation-review-uses-parent-venv-without-

@@ -1,0 +1,4 @@
+{"ts":"2026-08-27T10:31:16Z","event":"phase","agent":"product-engineer","data":{"phase":"DEFINITION"}}
+{"ts":"2026-08-27T10:31:16Z","event":"defined","agent":"product-engineer","data":{"sha":"389166052c837769e31d3e79ccbf89e69c641ed8","pr":null}}
+{"ts":"2026-08-27T10:31:41Z","event":"phase","agent":"software-engineer","data":{"phase":"IMPLEMENTATION"}}
+{"ts":"2026-08-27T12:25:47Z","event":"note","agent":"software-engineer","data":{"text":"T-050-02's definition PR (feature/0.5.0 -> develop) is pending the operator's push; defined.pr is recorded null until that PR merges and the sha/number are confirmed (T-050-11 back-fill, FR4)."}}

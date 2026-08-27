@@ -155,6 +155,33 @@ def _active_field(specs_dir: Path, field: str) -> str | None:
     return m.group(1) if m else ""
 
 
+def _release_jsonl_phase(specs_dir: Path, release_id: str) -> str | None:
+    """Tri-state ``RELEASE.jsonl`` phase fold, in the shape of :func:`_active_field`
+    (v0.5.0 FR4, T-050-11, A4.1a).
+
+    Hooks never import the container (standing law) — this reads
+    ``core.release_events`` directly, the fold's one home, and does its OWN tiny disk
+    read exactly the way :func:`_active_field` already does for ``ACTIVE.md`` (the same
+    split already exists there: this function vs ``doctor_common.read_active_md``, two
+    independent readers of one file, for the same layer-boundary reason).
+    ``_active_field``/``ACTIVE.md`` stays the gate's sole decision authority in this
+    expand phase (A4.5) — a disagreement between the two is a doctor WARNING
+    (SPEC-DOC-042), never a gate decision (D15: never a block). Fail-soft: any
+    unexpected parse condition never raises past this function.
+    """
+    from dadaia_workspace.core.release_events import fold_release_events, parse_release_events
+
+    path = specs_dir / "releases" / release_id / "RELEASE.jsonl"
+    try:
+        text = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return ""
+    except OSError:
+        return None
+    events, _errors = parse_release_events(text)
+    return fold_release_events(events).phase
+
+
 def _evaluate_target(
     payload: dict[str, object], workspace: Path, raw_path: str
 ) -> tuple[gate_policy.Decision, str]:
@@ -204,6 +231,14 @@ def _evaluate_target(
     phase = _active_field(specs_dir, "phase") or ""
     release_raw = _active_field(specs_dir, "release")
     release = release_raw or "none"
+    # T-050-11 (FR4 expand half, A4.1a): call the fold directly (hooks never import the
+    # container) so RELEASE.jsonl is exercised on the write hot path from the first task
+    # that lands it. `_active_field`/ACTIVE.md stays the sole decision authority driving
+    # `gate_policy.evaluate` below until the contract step (T-050-21A, A4.1) repoints
+    # every remaining consumer — the fold's result is intentionally unused here; a
+    # disagreement is a doctor WARNING (SPEC-DOC-042), never a gate decision.
+    if release_raw:
+        _release_jsonl_phase(specs_dir, release_raw)
     session_id = _common.resolve_session_id(payload, default="anon-session")
     # Mode resolution order (v0.1.76 FR4, strictly self-scoped): DADAIA_MODE env
     # override → self-keyed session record → default. No context-incumbent fallback —

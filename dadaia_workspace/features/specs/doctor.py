@@ -180,6 +180,10 @@ class SpecsDoctor:
         issues.extend(self._closure_audit.check_loose_undisposed_audits())  # SPEC-DOC-038
         # v0.1.81 / FR2 (audit G-23) — partial (artifact-empty) archived release dirs
         issues.extend(self._release.check_partial_archived_release_dirs())  # SPEC-DOC-039
+        # v0.5.0 T-050-11 (FR4/A4.1a) — RELEASE.jsonl <-> ACTIVE.md agreement (expand phase)
+        issues.extend(self._release.check_release_jsonl_agreement())  # SPEC-DOC-042
+        # v0.5.0 T-050-11 (FR4/A4.2) — milestone immutability (defined/implemented/shipped)
+        issues.extend(self._release.check_release_jsonl_milestone_immutability())  # SPEC-DOC-043
         # v0.5.0 T-050-08 (FR2/A2.7) — immutable-core drift detector (WARN, never a block)
         issues.extend(self._governance.check_bug_record_immutable_core())  # SPEC-DOC-040
         # v0.5.0 T-050-08 (FR2/A2.8) — archive-overdue signal (WARN, never a block)

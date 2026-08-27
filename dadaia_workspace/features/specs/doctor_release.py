@@ -14,6 +14,7 @@ import re
 from datetime import date
 from pathlib import Path
 
+from dadaia_workspace.core.release_events import fold_release_events, parse_release_events
 from dadaia_workspace.core.spec_status import APPROVED, extract_status
 from dadaia_workspace.core.spec_status import CANONICAL_STATUS as _CANONICAL_STATUS
 from dadaia_workspace.core.specs_version import RELEASE_SEMVER_RE
@@ -80,6 +81,26 @@ RELEASE_NAMING_LEGACY_ALLOWLIST: frozenset[str] = frozenset(
 
 # SPEC-DOC-024: phase ↔ markers coherence.
 _TASK_MARKER_RE = re.compile(r"^\s*[-*]?\s*\[([ \-xX])\]", re.MULTILINE)
+
+
+def _fold_release_jsonl_phase(path: Path) -> str | None:
+    """Tri-state ``RELEASE.jsonl`` phase fold, in the shape of ``read_active_md``
+    (v0.5.0 FR4, T-050-11) — this validator's OWN tiny disk read; ``core.release_events``
+    itself never does file I/O (core file-I/O purity ratchet, architect A9).
+
+    ``str`` when the last ``phase`` record is readable (possibly ``""`` when the file
+    carries no ``phase`` record yet), ``""`` when ``path`` does not exist, ``None`` when
+    it exists but could not be read (genuine I/O failure) — callers must treat ``None``
+    as UNKNOWN, never as "no phase".
+    """
+    try:
+        text = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return ""
+    except OSError:
+        return None
+    events, _errors = parse_release_events(text)
+    return fold_release_events(events).phase
 
 
 def _extract_status(md_path: Path) -> str | None:
@@ -567,4 +588,81 @@ class ReleaseValidator:
                     path=str(entry),
                 )
             )
+        return issues
+
+    def check_release_jsonl_agreement(self) -> list[SpecsDoctorIssue]:
+        """SPEC-DOC-042 (v0.5.0 FR4/A4.1a, T-050-11) — WARN when the active release's
+        ``RELEASE.jsonl`` fold disagrees with ``ACTIVE.md``'s own ``phase:`` line.
+
+        Expand-phase invariant (D-F: expand -> switch -> contract, A4.5): from T-050-11
+        until the contract step (T-050-21A), both files are written and read in parallel
+        and must AGREE. ``ACTIVE.md`` stays the gate's sole decision authority in this
+        window (A4.1 — "the gate resolving with ACTIVE.md gone" — belongs to T-050-21A,
+        not this check); a disagreement is surfaced, never blocking (D15), so severity is
+        always WARNING and the doctor's exit code is unaffected. A release with no
+        ``RELEASE.jsonl`` yet (predates T-050-11, or has not reached DEFINITION through
+        this mechanism) and an unreadable ``RELEASE.jsonl`` (genuine I/O failure, tri-state
+        ``None``) are both silent here — neither is a disagreement.
+        """
+        issues: list[SpecsDoctorIssue] = []
+        active_path = self.specs_dir / "releases" / "ACTIVE.md"
+        release, _segment, active_phase, err = read_active_md(active_path)
+        if err or not release or release == "none" or active_phase is None:
+            return issues
+        jsonl_path = self.specs_dir / "releases" / release / "RELEASE.jsonl"
+        if not jsonl_path.exists():
+            return issues
+        fold_phase = _fold_release_jsonl_phase(jsonl_path)
+        if fold_phase is None or not fold_phase:
+            return issues
+        if fold_phase != active_phase:
+            issues.append(
+                SpecsDoctorIssue(
+                    code="SPEC-DOC-042",
+                    severity=Severity.WARNING,
+                    description=(
+                        f"RELEASE.jsonl phase '{fold_phase}' disagrees with ACTIVE.md "
+                        f"phase '{active_phase}' for release '{release}' — both are read "
+                        "in parallel during the expand phase (FR4, A4.1a) and must "
+                        "agree; ACTIVE.md remains authoritative until the contract step "
+                        "(T-050-21A). WARNING only (D15) — never a block."
+                    ),
+                    path=str(jsonl_path),
+                )
+            )
+        return issues
+
+    def check_release_jsonl_milestone_immutability(self) -> list[SpecsDoctorIssue]:
+        """SPEC-DOC-043 (v0.5.0 FR4/A4.2, T-050-11) — WARN on a duplicate milestone
+        record: a second ``defined``/``implemented``/``shipped`` line for one release.
+
+        The three sha-bearing milestones are immutable facts (D3). The fold
+        (``core.release_events.fold_release_events``) takes the FIRST record of each
+        kind and reports every later one as a finding — a model-level refusal to let a
+        rewrite attempt silently win; this check surfaces that finding at WARNING
+        severity (D15 — never a block, exit unchanged).
+        """
+        issues: list[SpecsDoctorIssue] = []
+        for jsonl_path in sorted(self.specs_dir.glob("releases/*/RELEASE.jsonl")):
+            try:
+                text = jsonl_path.read_text(encoding="utf-8")
+            except OSError:
+                continue
+            events, _errors = parse_release_events(text)
+            fold = fold_release_events(events)
+            for dup in fold.duplicate_milestones:
+                issues.append(
+                    SpecsDoctorIssue(
+                        code="SPEC-DOC-043",
+                        severity=Severity.WARNING,
+                        description=(
+                            f"RELEASE.jsonl carries a second '{dup.event}' record "
+                            f"(ts={dup.ts}, agent={dup.agent}) — the three sha-bearing "
+                            "milestones (defined/implemented/shipped) are immutable "
+                            "facts (D3); the fold keeps the FIRST and reports every "
+                            "later one here. WARNING only (D15) — never a block."
+                        ),
+                        path=str(jsonl_path),
+                    )
+                )
         return issues
