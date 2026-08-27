@@ -129,9 +129,13 @@ Enforcement has two arms, and the gap between them is measured rather than asser
 `Intent:` header, excluding the support modules `__init__.py`, `rendezvous.py` and
 `conftest.py`; it is wired into the gating suite through
 `tests/integration/scripts/test_check_test_intent_declared.py`. Suite-wide, P-24's floor
-measures the same declaration across every `tests/**/test_*.py`: **108 files declare it
-today**, pinned as a ratchet-up-only floor whose target is every file — the remaining
-undeclared files are the gap that ratchet closes, not a rule that does not apply to them.
+measures the same declaration across every `tests/**/test_*.py`: the pinned ratchet-up-only
+floor is **108 files**, and the last measurement read **115 declared of 409 files — 294
+undeclared, SCAFFOLD by doctrine**. Both numbers are recorded so the next release ratchets
+from a number instead of re-measuring cold; the gap is the debt that ratchet closes, disclosed
+rather than treated as a rule that does not apply to those files. The `Intent:` gate's own
+scope is `tests/e2e/**` only — widening it is a separate, named piece of work, not a silent
+extension.
 
 #### Safety backstops
 
@@ -295,7 +299,13 @@ The tool is **`mutmut==3.7.0`**, pinned in the optional Poetry group
 `[tool.poetry.group.mutation]` ([[tech-stack]]), and the cadence is backed by a runnable
 command — `tests/scripts/run_mutation_baseline.sh`, which stages a scoped copy and never
 writes inside the repo tree. It is absent from every push-path selector, pinned there by a
-contract test, so CI push timing is unaffected; its score is evidence, never a gate.
+contract test, so CI push timing is unaffected; its score is evidence, never a gate. The
+score on `core/` is a **floor that ratchets upward only**: it stands at **89.87 % (71/79)**,
+and a pass that cannot measure carries the floor forward with its reason rather than lowering
+it or inventing a number. Its script declares a scope invariant — `core/models/` and its unit
+tests import nothing beyond the standard library and pytest — and the isolated venv it builds
+installs only the mutation tool and pytest; when that invariant stops holding, collection
+fails outright and the gap is a registered bug, not a silent zero.
 
 Every third-party tool this project prescribes — **audit tooling and quality tooling alike** —
 is installed at an exact version or hash pin, never a floating `pip install <name>` or
@@ -367,6 +377,15 @@ Complexity and size are governed by a **measured ratchet** (P-19), never by an a
 selects `C90` (`C901`) and `PLR1702` scoped to `dadaia_workspace/`, with their ceilings pinned
 in `pyproject.toml` at the observed maxima of this codebase and the ratchet direction written
 beside them, so the reader of the rule and the reader of the number see the same law.
+
+**The ceiling is pinned against the enforcing tool, never against a proxy.** `radon cc` is a
+convenient reporter but it is not what gates: for a factory function that defines and returns
+a nested class, `radon` scores only the factory's own top-level branches while `C901` counts
+every branch in the enclosing lexical scope, so the two disagree by a wide margin on that
+shape. A ratchet derived from the reporter therefore breaks the linter it governs. The rule
+is measure with the enforcing rule, then pin — never a number that breaks the gate it
+governs — and a ceiling that cannot be lowered safely stays where it is with the discrepancy
+documented inline and registered as a bug.
 
 Every release accounts for what it added. The closure narrative in the release's
 `RELEASE.jsonl` carries a mandatory `closure-size-accounting` note — production LOC added,

@@ -7,7 +7,9 @@ summary: >-
   `dadaia doctor` checks workspace-root law, forbidden caches, required state layout,
   workspace venv health, context repository coherence, repo URLs, registry-wide repo-slug
   ownership uniqueness (report-only), stale presence, and
-  legacy lock/pointer residue. `.dadaia/references/` is a sanctioned operator-owned subtree
+  legacy lock/pointer residue. It is the after-the-fact backstop by design, because hooks
+  validate only at the publication boundary and never block a commit.
+  `.dadaia/references/` is a sanctioned operator-owned subtree
   outside the context lifecycle. `--fix` performs bounded deterministic cleanup and
   `--redact` masks foreign Spec Context names in the reported issues.
 tags:
@@ -17,13 +19,21 @@ tags:
 - repair
 - privacy
 last_updated: '2026-08-27'
-release_origin: v0.4.5
+release_origin: 0.5.0
 ---
 
 ## Purpose
 
 Workspace doctor is the after-the-fact backstop for state and hygiene invariants that
-cannot all be enforced by write hooks.
+cannot all be enforced by write hooks — and, deliberately, for many that could be.
+
+**The hook posture makes the backstop load-bearing.** Git pre-commit is advisory and always
+exits zero, on any staged set; pre-push refuses exactly three things — an invalid branch name,
+a denylist hit, an unresolvable runner — and the CI preflight left the hook to become an
+always-on rule ([[sdd-gate-v3]]). Nothing in the commit path blocks a human any more. So the
+diagnoses this verb reports, the specs doctor's, the backlog doctor's and the public doctor's
+are the surface where hygiene is actually observed, and each of them **reports**: an exit code
+here informs an agent or the operator, it never stops work mid-flow.
 
 ## Checks
 

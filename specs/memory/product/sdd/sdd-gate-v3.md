@@ -2,20 +2,24 @@
 slug: sdd-gate-v3
 title: sdd-gate-v3
 category: product
-tldr: No-lock SDD enforcement — origin-classified LAW, path/mode gates, advisory presence, feature-only push boundary with scan, verdict as PR gate.
+tldr: No-lock SDD enforcement — origin-classified LAW, path/mode gates, the phase read from the RELEASE.jsonl fold, and hooks pared to the publication boundary.
 summary: >-
   The merged Python PreToolUse gate enforces root whitelist, workspace venv usage, a
   cache-off posture for pytest/ruff/mypy, path class, phase, and the caller's own mode.
   LAW is decided by ORIGIN on a static fail-closed floor — the law basenames at the
   workspace root or inside a fixed harness projection dir — so a repo's own
   domain-scoped `AGENTS.md`/`CLAUDE.md` is MUTATING and no manifest read can promote or
-  demote a security decision.
-  It never waits for or blocks on another session. Presence is advisory. Git pre-commit
-  warns only; pre-push enforces the CI preflight, an inverted branch policy in which
+  demote a security decision. The MEMORY phase is resolved by folding the live release's
+  `RELEASE.jsonl` and nothing else, fail-closed when the fold is ambiguous or absent.
+  It never waits for or blocks on another session. Presence is advisory. Hooks validate
+  only at the publication boundary: git pre-commit is advisory and always exits zero,
+  and pre-push refuses exactly three things — an invalid branch name, a denylist hit, and
+  an unresolvable runner — under an inverted branch policy in which
   `feature/{M.m.p}` is the only pushable ref while `develop` and `main` are refused as
-  PR-only, and a range-scoped denylist scan of the new objects the push would publish —
+  PR-only. Its range-scoped denylist scan reads the new objects the push would publish —
   blobs AND commit/annotated-tag message bodies, with author/committer headers out of
-  scope by design. The security verdict left the hook: it is a CI job on both PR edges
+  scope by design. The CI preflight left the hook and is an always-on rule instead. The
+  security verdict is likewise a CI job on both PR edges
   requiring an APPROVED security-reviewer handoff covering the PR head sha, read from
   committed evidence. The scan reads a
   chunk-bounded batched git conversation, suppresses a hit only when the same single path
@@ -34,7 +38,7 @@ tags:
 - no-locks
 - privacy
 last_updated: '2026-08-27'
-release_origin: v0.4.5
+release_origin: 0.5.0
 ---
 
 ## Purpose
@@ -68,11 +72,11 @@ Path classes:
 | Class | Behavior |
 |---|---|
 | LAW | The projected law files — fail-closed, human-only in an instantiated workspace. The law's own class table groups LAW and PROTECTED as one blocked outcome; the classifier keeps them apart so each refusal names its own rule. |
-| ADDITIVE | `specs/bugs`, `specs/backlog`, `specs/audits`, and workspace reports/handoffs/tmp are writable. |
+| ADDITIVE | `specs/bugs`, `specs/backlog`, `specs/audits`, and workspace reports/handoffs/tmp are writable, in any mode. The bug record's own contract — immutable core, write-once, mutable governance — is **audited, not gated**: nothing here refuses a field-level rewrite, and the audit's first pillar is what detects one. |
 | MEMORY | Writable only in `DEFINITION` or `CLOSURE`. |
-| FROZEN | Archived specs are never writable — archive by `git mv`. |
+| FROZEN | The per-area archives — `specs/backlog/_archive/`, `specs/bugs/_archive/`, `specs/audits/_archive/` — plus the legacy root `specs/_archive/`, matched **before** the ADDITIVE prefixes so an archive under an additive area is never swallowed as writable. Archive by `git mv`. |
 | PROTECTED | Session identity records are fail-closed. |
-| MUTATING | Writable unless this session explicitly resolves to READ mode. |
+| MUTATING | Writable unless this session explicitly resolves to READ mode. `specs/releases/**` is MUTATING throughout — including `_ideas/<id>/`, which carries a SPEC only, and `releases/_archive/<id>/`, whose immutability is discipline and review rather than a classifier rule. |
 
 **LAW is decided by origin, on a static fail-closed floor.** A path is LAW when its
 basename is one of the law basenames — `DADAIA.md`, `AGENTS.md`, `CLAUDE.md` — **and** it
@@ -105,6 +109,17 @@ channel, so the phase rule blocks unconditionally regardless of what a SPEC sche
 SPEC needing such a write is an architecture-fidelity defect caught at review, not
 something the gate accommodates.
 
+**The phase comes from the `RELEASE.jsonl` fold, and from nothing else.** The gate locates the
+live release as the single directory under `specs/releases/` carrying a `RELEASE.jsonl`, parses
+that stream and takes the **last `phase` record** ([[sdd-bug-backlog-governance]]). `ACTIVE.md`
+is retired and no fallback branch survives — there is no mirror file to disagree with the
+stream, which is what retired the "artifact says one thing, tree says another" class the
+release-state surface produced repeatedly. The resolution is **fail-closed**: zero live
+releases, more than one, an unreadable file, or a stream carrying no `phase` record all yield
+an empty phase, which denies a MEMORY write rather than guessing a phase that would grant one.
+The hook reads the fold with the same stdlib parser the doctor uses and never imports the
+composition root.
+
 Mode resolution is environment, then this session's own record, then
 `IMPLEMENTATION`. There is no context-global mode or foreign-session fallback. A READ
 session blocks only its own mutating writes; it does not affect another session.
@@ -133,15 +148,29 @@ presence. It never blocks.
 
 ## Git Chokepoints
 
-- `pre-commit-presence-gate.sh` may warn about another live session but always permits
-  the commit on concurrency grounds.
-- `pre-push-ci-gate.sh` runs the local CI preflight and then applies branch policy and the
-  range-scoped denylist scan, in that order. **There is no third step** — the push
-  boundary reads no security handoff. The preflight's advertised check list and CI's
-  gating list are the **same set** — format, lint, `mypy --strict`, the import-boundary
-  contracts and the test suite — pinned by a parity test that fails when either side gains
-  a check the other lacks, so a boundary violation can no longer pass locally and fail in
-  CI.
+**Hooks validate only at the publication boundary, and never block a human.** That posture is
+the whole design of this pair.
+
+- `pre-commit-presence-gate.sh` is **advisory-only and always exits 0**, on any staged set —
+  including one the backlog doctor would reject. It may warn about another live session and it
+  warns about nothing else: the backlog-doctor block and the fail-closed runner resolution are
+  **deleted from this script**, not disabled, along with the CLI helpers that fed them. A gate
+  that stopped human commits on a shared tree pushed agents toward `--no-verify` and worse
+  workarounds — it caused the behavior it existed to prevent, and CI already runs the same
+  doctor unscoped.
+- `pre-push-ci-gate.sh` keeps **only** the publication boundary and refuses **exactly three
+  things and nothing else**: an invalid branch name, a denylist hit, and an **unresolvable
+  runner**. The runner refusal survives here deliberately — a machine without the venv would
+  otherwise push with no branch policy and no content scan, silently. **There is no third
+  step** — the push boundary reads no security handoff.
+- **The CI preflight left the hook.** `ruff format --check`, `ruff check`, `mypy --strict`, the
+  import-boundary contracts and the test suite are now the always-on rule *"run `dadaia ci
+  preflight` before you push"*, stated in the law and in the gitflow and release skills; a
+  failing preflight no longer blocks a push through this hook. CI still gates the same set
+  independently, and the preflight's advertised check list and CI's gating list stay pinned as
+  the **same set** by a parity test that fails when either side gains a check the other lacks —
+  so a boundary violation can no longer pass locally and fail in CI. The audit measures pushes
+  whose CI went red for preflight-class failures.
 
 The branch model itself is stated once in the law's gitflow section and operated by the
 `dd-gitflow-default` skill; this atom describes only what the chokepoint mechanically
@@ -204,9 +233,16 @@ like every other `.dadaia/logs/*.jsonl` writer, which its append-only property i
 against: rotation retires a generation, it never rewrites a line.
 
 The push and PR rules are a quality gate, not a concurrency lock. Commits are never
-blocked — not for missing review evidence, not for another session's presence. A push is
-blocked for a failing preflight, a refused ref or a leaking object; a merge is blocked for
-missing review evidence.
+blocked — not for missing review evidence, not for a failing preflight, not for another
+session's presence. A push is blocked for a refused ref, a leaking object or an unresolvable
+runner; a merge is blocked for missing review evidence.
+
+**The secret-scan lane's coverage is stated rather than assumed.** `secret-scan.yml` triggers
+on a `main` push and a `main` pull request; since `main` is never pushed directly, gitleaks
+effectively runs **once per release, on the ship PR**. Everything reaching `develop` at an
+earlier candidate is covered by the **privacy denylist scan only**, which is a
+foreign-name/home-path detector and not a secret scanner. The limit is recorded as a known,
+accepted gap rather than reported as a passed check.
 
 ### Push-Range Denylist Scan
 
@@ -403,10 +439,10 @@ valid UTF-8 falls back to the binary count and its wording.
 
 There is no sanctioned-terms or amnesty list anywhere in the product: the amnesty derives
 from published git state, and a value the same path never published always blocks. The edge
-case that would have demanded such a list — a term already published inside
-`specs/_archive/` — is void by construction:
+case that would have demanded such a list — a term already published inside an `_archive/`
+subtree — is void by construction:
 
-> **FROZEN↔scan invariant.** `specs/_archive/` is FROZEN (`DADAIA.md` §3): it is never
+> **FROZEN↔scan invariant.** An `_archive/` subtree is FROZEN (`DADAIA.md` §3): it is never
 > edited, and it is entered only by `git mv`. Git is content-addressed, so relocating a file
 > whose bytes are unchanged publishes no new object — the existing blob is reused. A tainted
 > archived file therefore can never appear as a *new* object of any future pushed range, and
@@ -415,16 +451,22 @@ case that would have demanded such a list — a term already published inside
 > an archived file, the scan will — correctly — refuse the push.
 
 The guarantee is content-addressing, not the directory: it covers **any byte-identical copy
-or relocation of an already-published blob**, and only those. A document *authored* into
-`specs/_archive/` — a `CLOSURE.md` written at close time, a QA artifact created in place — is
-an ordinary new blob: its content has never been published, the archive path grants it
-nothing, and the scan reads it like any other new object. This is correct behaviour, and it
-is the reason archive-time documents follow the redaction-at-authoring doctrine the
-quality-assurance atom records: a closure that transcribes a diagnostic literal refuses its
-own push.
+or relocation of an already-published blob**, and only those. A document *authored* into an
+archive — a QA artifact created in place — is an ordinary new blob: its content has never
+been published, the archive path grants it nothing, and the scan reads it like any other new
+object. This is correct behaviour, and it is the reason archive-time documents follow the
+redaction-at-authoring doctrine the quality-assurance atom records: a closure that transcribes
+a diagnostic literal refuses its own push.
+
+**A rename voids the amnesty, by design.** `prior_text` resolves per path, so renaming a file
+gives the new path no prior text at all and every historical value in it is re-flagged as new.
+The response is procedural, never an exclusion: run `dadaia ci push-gate-check` over the range
+before pushing, remediate each hit **at the source record** through that record's own write
+seam, and re-run until clean. Never `--no-verify`, never a scan exclusion, never a suppression
+entry.
 
 The repository's own self-scan sentinel draws the same line from the other side. It does not
-exclude `specs/_archive/**` wholesale: an archive-prefixed path is scanned **iff its blob is
+exclude an archive subtree wholesale: an archive-prefixed path is scanned **iff its blob is
 new at HEAD** — precisely, its blob sha is absent from `HEAD^`'s tree. An archive-authored
 document is therefore covered, a relocation into the archive republishes an existing sha and
 stays excluded, and an unavailable `HEAD^` (a shallow clone, an initial commit) degrades to
@@ -496,14 +538,20 @@ mode.
 
 ## Non-Goals
 
-The hook does not read approval status, task markers, or task write sets. It constrains
-**what** may be written, never **how** the change was produced — the ordered SDD
-sequence is carried by the specs documents and upheld by the agents. It also does not
-parse arbitrary shell strings; git chokepoints provide the independent commit/push
-boundary.
+The hook does not read approval status, task markers, or task write sets. It reads exactly one
+SDD artifact — the live release's `RELEASE.jsonl`, for the phase — and no other. It constrains
+**what** may be written, never **how** the change was produced: the ordered SDD sequence is
+carried by the specs documents and upheld by the agents. It also does not parse arbitrary
+shell strings; git chokepoints provide the independent commit/push boundary.
+
+**No new blocking validation enters this surface.** Skills instruct procedure, audits measure
+conformance from git and JSONL history, and hooks and the CLI validate only at the publication
+boundary. A record contract, a commit shape, a lineage duty and a memory-tier rule are each
+audited rather than gated — none of them adds a refusal here.
 
 ## Runtime State
 
+- `specs/releases/<release-id>/RELEASE.jsonl` — read-only, the phase source
 - `.dadaia/states/presence/<context>/<session-id>.json`
 - `.dadaia/sessions/<session-id>.json`
 - `.dadaia/tmp/ctx-inject-fired-<session-id>`

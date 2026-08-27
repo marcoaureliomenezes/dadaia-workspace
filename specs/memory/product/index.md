@@ -13,7 +13,7 @@
 | `agent-comms` | agent-comms — Handoff Contract v1 | handoff-v1.2 separates HTML reports from JSON handoffs, carries the self_pull Layer-1 read-proof line, and dies on consumption unless it is artifact-bearing. |
 | `agent-monitoring` | agent-monitoring | stdlib-only local telemetry → panel Sessions tab + /api/agents; allowlist gate preserves privacy; artifacts die event-driven, logs self-rotate. |
 | `agent-orchestration` | agent-orchestration | Nine core Layer-1 roles, two dispatchers, document-governed ordered work, and advisory-only concurrency. |
-| `agentic-entities` | agentic-entities | Abstract-entity registry — Personas, Behaviors, Rules; one rules-skills map with one enforcer; the measured always-on budget. |
+| `agentic-entities` | agentic-entities | Abstract-entity registry — Personas, Behaviors, Rules; one behavior map binding every skill and scoped rule to a law section; the always-on budget. |
 
 ### distribution
 
@@ -63,7 +63,8 @@
 
 | slug | title | tldr |
 |------|-------|------|
-| `sdd-bug-backlog-governance` | sdd-bug-backlog-governance | JSONL bugs written through one sanitize-then-mask seam, a three-field evidence gate, an operator-gated backlog, the rc ladder and the git contract. |
-| `sdd-gate-v3` | sdd-gate-v3 | No-lock SDD enforcement — origin-classified LAW, path/mode gates, advisory presence, feature-only push boundary with scan, verdict as PR gate. |
-| `specs-doctor` | specs-doctor | Validates canonical specs structure, memory/catalog and placeholder integrity, release/segment markers, closure evidence, dispositions, bugs, and audits. |
+| `audits-canon` | audits-canon | Audits are committed spec artifacts — three pillars over a sha window, findings as JSONL records, dispositioned by exactly one remediation release. |
+| `sdd-bug-backlog-governance` | sdd-bug-backlog-governance | One record per bug through one write seam, a live-photo backlog with histo exits, the RELEASE.jsonl milestone fold, and five isolated commit shapes. |
+| `sdd-gate-v3` | sdd-gate-v3 | No-lock SDD enforcement — origin-classified LAW, path/mode gates, the phase read from the RELEASE.jsonl fold, and hooks pared to the publication boundary. |
+| `specs-doctor` | specs-doctor | Validates the v6 canon tree, memory and catalog integrity, the RELEASE.jsonl fold, bug and backlog governance, and audit findings folded from JSONL. |
 

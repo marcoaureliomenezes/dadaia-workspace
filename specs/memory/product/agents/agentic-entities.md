@@ -2,7 +2,7 @@
 slug: agentic-entities
 title: agentic-entities
 category: product
-tldr: Abstract-entity registry — Personas, Behaviors, Rules; one rules-skills map with one enforcer; the measured always-on budget.
+tldr: Abstract-entity registry — Personas, Behaviors, Rules; one behavior map binding every skill and scoped rule to a law section; the always-on budget.
 summary: >-
   The workspace method is defined abstractly first: `public/entities/registry.json`
   holds the Personas, Deterministic Behaviors, Abstract Rules, and universal
@@ -10,13 +10,16 @@ summary: >-
   per-harness derivation of one of these entities (constitution §12.5); the derivation
   contract test and the `public doctor` `entities-derivation` check enforce the
   prohibition, the latter at behavioral-fidelity depth with a mutation fixture per drift
-  class. A 21-skill surface maps to the law through one machine-readable
-  rules-skills map with one deterministic enforcer, which also carries the citation check
-  and the invocation-model equivalence; the retired collision lint left with its
-  hard-coded table. The always-on load — law chain plus nine persona bodies plus the skill
-  descriptions — is measured (~20.5k tokens, 257 negations) against a ≤3.5k/≤60 target it
-  does not meet, with the gap named structurally; every removal carries a coverage table
-  and a pointer replaces a restatement. The panel
+  class. `public/entities/behavior-map.json` is the single map that retired
+  `rules-skills-map.json`: 28 rows bind all 22 core skills and all 16 scoped `AGENTS.md`
+  sources to exactly one law section each, every section to at least one owner, each with a
+  recorded content-hash tuple, and it also holds the declared activation overlaps, the
+  citation check and the invocation-model equivalence. Its discovery is structural — the
+  enforcer globs the generators rather than reading a hand roster — and it goes RED in five
+  directions, each proven by a mutation fixture on the cross-platform matrix. The map is
+  test-and-agent surface only, read by no CLI verb and no hook. The always-on load — law
+  chain plus nine persona bodies plus the skill descriptions — is measured against a stated
+  ceiling every release, and every removal carries a coverage table. The panel
   renders the registry in the Agentic Entities tab and as the Personas section of the
   Agents tab.
 tags:
@@ -25,7 +28,7 @@ tags:
 - derivation
 - governance
 last_updated: '2026-08-27'
-release_origin: v0.4.5
+release_origin: 0.5.0
 ---
 
 ## The derivation law
@@ -90,23 +93,49 @@ description can never drift from what the frontmatters actually grant:
   flags only an *undeclared* overlap between two non-universal skills. It is green on the
   real inventory, and its self-test proves both directions: silent for a `**` skill, firing
   for a newly introduced undeclared duplicate. The declaration of an intended overlap lives
-  in the map below, never in a script's own table and never in a skill's prose.
+  in the map below — `declared_overlaps` is its canonical home — never in a script's own
+  table and never in a skill's prose.
 
-### The rules-skills map
+### The behavior map
 
-`public/entities/rules-skills-map.json`, beside the registry and versioned by its own
-schema, is the **single** declaration of which skill operates which law topic. A row is
-`{topic, section, skills[], justification}`, keyed by the law's own bold topic. Every
-skill on disk appears in exactly one row and every named skill exists; a row naming more
-than one skill carries a non-empty justification. Not every topic has a skill — but every
-skill has a topic, and an orphan is fused or retired rather than kept.
+`public/entities/behavior-map.json`, beside the registry and versioned by its own schema, is
+the **single** declaration of which skill and which scoped rule file operate which section of
+the law. It is a superset of the retired `rules-skills-map.json`, which left with its topic
+keying: **one map file exists**, and a grep for the old filename outside history returns zero
+hits.
 
-**One enforcer, not two.** A single contract test in the gating tier reads the map, the
-law and the on-disk inventory, and fails when a mapped topic is absent from the law, a
-skill maps to nothing, a topic names a skill that does not exist, two skills share a topic
-with no justification, a `SKILL.md` exceeds the declared line ceiling, or two non-universal
-skills overlap undeclared. Two further checks ride the same test rather than earning a
-second script:
+A row is `{section, behavior, skill, scoped_agents_md[], hash_tuple, recorded_by, recorded_at}`,
+keyed by the law's own section heading. The cardinality is stated exactly: **every skill on
+disk and every scoped `AGENTS.md` source on disk has exactly one row; every law section has at
+least one owner row.** More than one skill legitimately owning a section is normal — quality
+alone owns several — so the RED condition is a section with *no* owner, never two owners
+sharing one. The map also carries the fleet's `declared_overlaps` and the `SKILL.md` line
+ceiling.
+
+Today that is **28 rows over 22 core skills and 16 scoped `AGENTS.md` sources**. Coverage is
+complete in both directions.
+
+**Discovery is structural, never a hand roster.** The enforcer globs the generators — every
+`SKILL.md` under `public/skills/`, and every `AGENTS.md`/`*-AGENTS.md` source under
+`public/{data,scaffold,templates}/` — so a source added tomorrow goes RED without anyone
+editing a list. Every `EXPECTED_SKILLS`-style hand-kept roster the glob made redundant is
+deleted rather than kept beside it; a hand list of hand lists is the same defect one level up.
+
+Each row records a **hash tuple** over its section body, its skill body and each scoped file.
+Re-recording a tuple is a deliberate act with a named reviewer: the failure message says what
+to re-read, not merely that a hash changed. That tuple is the structural answer to the
+stale-citation class — a persona or skill citing a section for content that has since moved —
+which had fired twice, both times found by a human.
+
+**One enforcer, not two.** A single contract test in the gating tier reads the map, the law and
+the on-disk inventory, and goes **RED in five directions**: a skill on disk with no row, a
+scoped `AGENTS.md` on disk with no row, a law section with no owner row, a row naming a member
+that does not exist, and a member changed without its hash tuple re-recorded. Each direction
+carries its own mutation fixture, and each fixture is observed RED before its correction and
+green after **on the cross-platform CI matrix** — because the file this enforcer replaced was
+itself the home of a registered bug in which a mutation fixture never turned red on Windows.
+It also fails when a `SKILL.md` exceeds the declared line ceiling or two non-universal skills
+overlap undeclared. Two further checks ride the same test rather than earning a second script:
 
 - **The citation check.** Every path a public asset cites must exist and every `dadaia`
   verb it cites must resolve, and the test names the first that does not. A projected
@@ -120,17 +149,33 @@ second script:
 
 The predecessor collision lint is **retired**, with its hard-coded overlap table; its
 self-test fixtures were ported onto the new test, so coverage moved rather than dropped.
+The same discipline governed the map's own retirement: before the old enforcer file was
+deleted, every test function it carried had a **named counterpart** in the new one, proven by
+a name-diff with a zero-hit residue plus a one-line note per check recording the behavior it
+still asserts. Byte equality is not the criterion and would be unachievable in an extended
+enforcer; *no behavior dropped* is.
+
+**The map adds no runtime dependency.** No CLI verb reads it and no hook loads it — it is
+consumed by the test suite and by agents. That is the general posture: skills instruct
+procedure, audits measure conformance, and hooks and the CLI validate only at the publication
+boundary.
 
 ## Operating Rules
 
-**The always-on budget is measured, and it is over target.** What every session pays before
-it does anything is the per-harness law chain, the nine persona bodies and the twenty-one
-skill descriptions the harness must list. Measured today, on a word-count estimator of
-`words × 1.33` and a negation regex over the same set: **~20.5k tokens and 257 negations**
-against targets of ≤3.5k and ≤60. The persona bodies are ~75 % of the mass and the law file
-alone exceeds the token target on its own, so the gap is structural rather than a missed
-pass: closing it takes relocation into on-demand surfaces, not another rewording round. The
-number is recorded as it is measured and the target is never redefined to fit it.
+**The always-on budget is measured against a stated ceiling, every release.** What every
+session pays before it does anything is the per-harness law chain, the nine persona bodies and
+the skill descriptions the harness must list. The measurement recipe is fixed — a word-count
+estimator of `words × 1.33` over the same three sets, with **per-section attribution and
+comment-form behavior anchors attributed on their own line**, so an anchor can never hide
+inside a section's number.
+
+A **ceiling is not a target, and an overshoot is not renegotiated**: a release that measures
+above its declared ceiling cuts text until it does not. Re-measuring, averaging across the
+persona set, and moving a section into a skill the law then has to cite are all refused. The
+number is recorded as it is measured and the ambition is never redefined to fit it. The
+persona bodies remain roughly three quarters of the mass and the law file alone exceeds the
+long-run ≤3.5k ambition on its own, so the remaining gap is structural: closing it takes
+relocation into on-demand surfaces, not another rewording round.
 
 Two mechanisms hold the line the diet already won. Each law topic is **stated once and
 pointed at** — a persona carries a pointer to the law's own section rather than a

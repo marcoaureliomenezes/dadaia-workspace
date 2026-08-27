@@ -3,7 +3,7 @@ slug: public-asset-distribution
 title: public-asset-distribution
 category: product
 tldr: canonical public assets, whole skill folders included, staged to .dadaia/agentic and projected to Claude Code, Codex, Kimi Code and .agents roots.
-summary: Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, universal skills projected as whole folders (SKILL.md plus every disclosed sibling) to one canonical .agents/skills home with no registry entry, the one-load-per-harness law projection, the thin-wrapper contract that keeps every public/scripts file an entry point over the package implementation, repo templates copied at alive() (repo-AGENTS.md, with destination-file symlink refusal at every write site, plus a conditional tests/AGENTS.md), harness-profile-aware install/doctor, render-at-install of core agents (staged generic body + resolved agent-model policy composed into both L1 projections) with a policy-aware doctor render-compare, provenance-gated consumer AGENTS fan-out (banner-canonical restored vs hand-authored left [foreign]) with lexical repo-slug containment + destination-file symlink refusal, scoped AGENTS projections, source-root hygiene guard, policy-only byte goldens whose asset inventory is a roster derived by scanning the real public tree, and runtime projection contract.
+summary: Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, universal skills projected as whole folders (SKILL.md plus every disclosed sibling) to one canonical .agents/skills home with no registry entry, the one-load-per-harness law projection, the thin-wrapper contract that keeps every public/scripts file an entry point over the package implementation, the v6 canon scaffold whose per-area AGENTS.md replaced every scaffold README and whose assets/ and remote-bugs/ members are retired, repo templates copied at alive() (repo-AGENTS.md, with destination-file symlink refusal at every write site, plus a conditional tests/AGENTS.md), harness-profile-aware install/doctor, render-at-install of core agents (staged generic body + resolved agent-model policy composed into both L1 projections) with a policy-aware doctor render-compare, provenance-gated consumer AGENTS fan-out (banner-canonical restored vs hand-authored left [foreign]) with lexical repo-slug containment + destination-file symlink refusal, scoped AGENTS projections, source-root hygiene guard, policy-only byte goldens whose asset inventory is a roster derived by scanning the real public tree, and runtime projection contract.
 tags:
 - public
 - assets
@@ -11,7 +11,7 @@ tags:
 - projection
 - privacy
 last_updated: '2026-08-27'
-release_origin: v0.4.5
+release_origin: 0.5.0
 ---
 
 ## Purpose
@@ -70,13 +70,20 @@ ordered protocol; its depth lives in sibling files inside the same folder, named
 `SKILL.md` so nothing disclosed becomes unreachable. Staging, install and doctor cover
 **every** sibling, not the `SKILL.md` alone, and the manifest tracks each one, so a
 disclosed reference is byte-identical across all four projection targets or doctor says so.
-The surface is 21 skills.
+The surface is 22 skills, and every one of them carries a row in
+`public/entities/behavior-map.json` binding it to exactly one law section
+([[agentic-entities]]).
 
 The **`dd-` lifecycle family** is distributed on that same universal path and is the
 development cycle's on-demand protocol surface: `dd-backlog-definition`,
-`dd-release-definition`, `dd-release-implement` (implementation **and** closure, the
-closure detail disclosed to its `CLOSURE-TEMPLATE.md` and `CLOSURE-CHECKS.md` siblings),
-`dd-audit-project`, `dd-bug-registration` and `dd-bug-fix` — one skill per stage, each the
+`dd-release-definition`, `dd-release-implement` (implementation **and** closure, disclosed to
+its `RC-FLOW.md`, `RELEASE-EVENTS.md` and `MEMORY-UPDATE.md` siblings — the state ladder, the
+`RELEASE.jsonl` append recipes, and the memory-window protocol; `CLOSURE-TEMPLATE.md` and
+`CLOSURE-CHECKS.md` retired with the file they templated),
+`dd-audit-project` (short, with `PILLAR-BUGS.md`, `PILLAR-SPECS.md`, `PILLAR-MEMORY.md` and
+`FINDINGS-FORMAT.md`), `dd-bug-registration`, `dd-bug-resolution` — renamed from `dd-bug-fix`,
+keeping only the bug lifecycle — and `dd-diagnose`, the diagnosing method whose `LINEAGE.md`
+sibling carries the lineage duty in full. One skill per stage, each the
 single operational home of its stage's protocol. The always-on law carries the
 classification and points at the stage's skill; the stage procedure exists only in the
 skill. Harness literacy has one home too: `dd-ai-eng-knowhow`, a short literacy layer every
@@ -163,6 +170,18 @@ scoped AGENTS files:
 - `.dadaia/reports/AGENTS.md` — human-readable report policy.
 - `.dadaia/handoff/AGENTS.md` — machine-readable handoff policy.
 - `specs/AGENTS.md` and repo-local `AGENTS.md` — SDD and production-source scope.
+
+**The scaffolded `specs/` tree carries the v6 canon and one scoped rule file per area.** A
+freshly scaffolded workspace emits exactly `backlog/`, `bugs/`, `memory/`, `releases/`,
+`audits/`, `ADRs/`, `constitution.md` and `AGENTS.md` at the canon root, stamped
+`specs_pattern_version: 6`, and each area ships its own `AGENTS.md` — `backlog/`, `bugs/`,
+`memory/`, `releases/`, `audits/`, `ADRs/` — so the library now ships nine scoped rule files
+where it once shipped four. **Zero `README.md` files survive in the scaffold**: each area's
+README retired *into* that area's `AGENTS.md`, which is the file agents actually read.
+`specs/assets/` is gone too — a diagram belongs in-doc as a fenced Mermaid block — and so is
+`backlog/remote-bugs/`. Every scoped rule file is hash-projected and doctor-compared like any
+other asset, and every one of them carries a row in `public/entities/behavior-map.json`
+binding it to exactly one law section.
 
 The installer and doctor manage only lib-originated projections. Operator-owned
 domain-scoped AGENTS files are not overwritten.

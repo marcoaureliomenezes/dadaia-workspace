@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-27T16:02:54Z",
+  "generated_at": "2026-08-27T17:41:25Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -74,7 +74,7 @@
       "title": "agentic-entities",
       "category": "product",
       "area": "agents",
-      "summary": "The workspace method is defined abstractly first: `public/entities/registry.json` holds the Personas, Deterministic Behaviors, Abstract Rules, and universal skills/AGENTS.md surface. Every scaffolded core sub-agent, hook, and rule file is a per-harness derivation of one of these entities (constitution §12.5); the derivation contract test and the `public doctor` `entities-derivation` check enforce the prohibition, the latter at behavioral-fidelity depth with a mutation fixture per drift class. A 21-skill surface maps to the law through one machine-readable rules-skills map with one deterministic enforcer, which also carries the citation check and the invocation-model equivalence; the retired collision lint left with its hard-coded table. The always-on load — law chain plus nine persona bodies plus the skill descriptions — is measured (~20.5k tokens, 257 negations) against a ≤3.5k/≤60 target it does not meet, with the gap named structurally; every removal carries a coverage table and a pointer replaces a restatement. The panel renders the registry in the Agentic Entities tab and as the Personas section of the Agents tab.",
+      "summary": "The workspace method is defined abstractly first: `public/entities/registry.json` holds the Personas, Deterministic Behaviors, Abstract Rules, and universal skills/AGENTS.md surface. Every scaffolded core sub-agent, hook, and rule file is a per-harness derivation of one of these entities (constitution §12.5); the derivation contract test and the `public doctor` `entities-derivation` check enforce the prohibition, the latter at behavioral-fidelity depth with a mutation fixture per drift class. `public/entities/behavior-map.json` is the single map that retired `rules-skills-map.json`: 28 rows bind all 22 core skills and all 16 scoped `AGENTS.md` sources to exactly one law section each, every section to at least one owner, each with a recorded content-hash tuple, and it also holds the declared activation overlaps, the citation check and the invocation-model equivalence. Its discovery is structural — the enforcer globs the generators rather than reading a hand roster — and it goes RED in five directions, each proven by a mutation fixture on the cross-platform matrix. The map is test-and-agent surface only, read by no CLI verb and no hook. The always-on load — law chain plus nine persona bodies plus the skill descriptions — is measured against a stated ceiling every release, and every removal carries a coverage table. The panel renders the registry in the Agentic Entities tab and as the Personas section of the Agents tab.",
       "path": "specs/memory/product/agents/agentic-entities.md",
       "tags": [
         "agents",
@@ -82,7 +82,7 @@
         "derivation",
         "governance"
       ],
-      "token_estimate": 1581,
+      "token_estimate": 2214,
       "depends_on": [
         "architecture",
         "agent-orchestration",
@@ -116,7 +116,7 @@
       "title": "public-asset-distribution",
       "category": "product",
       "area": "distribution",
-      "summary": "Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, universal skills projected as whole folders (SKILL.md plus every disclosed sibling) to one canonical .agents/skills home with no registry entry, the one-load-per-harness law projection, the thin-wrapper contract that keeps every public/scripts file an entry point over the package implementation, repo templates copied at alive() (repo-AGENTS.md, with destination-file symlink refusal at every write site, plus a conditional tests/AGENTS.md), harness-profile-aware install/doctor, render-at-install of core agents (staged generic body + resolved agent-model policy composed into both L1 projections) with a policy-aware doctor render-compare, provenance-gated consumer AGENTS fan-out (banner-canonical restored vs hand-authored left [foreign]) with lexical repo-slug containment + destination-file symlink refusal, scoped AGENTS projections, source-root hygiene guard, policy-only byte goldens whose asset inventory is a roster derived by scanning the real public tree, and runtime projection contract.",
+      "summary": "Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, universal skills projected as whole folders (SKILL.md plus every disclosed sibling) to one canonical .agents/skills home with no registry entry, the one-load-per-harness law projection, the thin-wrapper contract that keeps every public/scripts file an entry point over the package implementation, the v6 canon scaffold whose per-area AGENTS.md replaced every scaffold README and whose assets/ and remote-bugs/ members are retired, repo templates copied at alive() (repo-AGENTS.md, with destination-file symlink refusal at every write site, plus a conditional tests/AGENTS.md), harness-profile-aware install/doctor, render-at-install of core agents (staged generic body + resolved agent-model policy composed into both L1 projections) with a policy-aware doctor render-compare, provenance-gated consumer AGENTS fan-out (banner-canonical restored vs hand-authored left [foreign]) with lexical repo-slug containment + destination-file symlink refusal, scoped AGENTS projections, source-root hygiene guard, policy-only byte goldens whose asset inventory is a roster derived by scanning the real public tree, and runtime projection contract.",
       "path": "specs/memory/product/distribution/public-asset-distribution.md",
       "tags": [
         "public",
@@ -125,9 +125,10 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 3200,
+      "token_estimate": 3472,
       "depends_on": [
         "agent-orchestration",
+        "agentic-entities",
         "quality-assurance",
         "workspace-init",
         "specs-doctor"
@@ -452,7 +453,7 @@
       "title": "workspace-doctor",
       "category": "product",
       "area": "platform",
-      "summary": "`dadaia doctor` checks workspace-root law, forbidden caches, required state layout, workspace venv health, context repository coherence, repo URLs, registry-wide repo-slug ownership uniqueness (report-only), stale presence, and legacy lock/pointer residue. `.dadaia/references/` is a sanctioned operator-owned subtree outside the context lifecycle. `--fix` performs bounded deterministic cleanup and `--redact` masks foreign Spec Context names in the reported issues.",
+      "summary": "`dadaia doctor` checks workspace-root law, forbidden caches, required state layout, workspace venv health, context repository coherence, repo URLs, registry-wide repo-slug ownership uniqueness (report-only), stale presence, and legacy lock/pointer residue. It is the after-the-fact backstop by design, because hooks validate only at the publication boundary and never block a commit. `.dadaia/references/` is a sanctioned operator-owned subtree outside the context lifecycle. `--fix` performs bounded deterministic cleanup and `--redact` masks foreign Spec Context names in the reported issues.",
       "path": "specs/memory/product/platform/workspace-doctor.md",
       "tags": [
         "workspace",
@@ -461,11 +462,11 @@
         "repair",
         "privacy"
       ],
-      "token_estimate": 706,
+      "token_estimate": 856,
       "depends_on": [
+        "sdd-gate-v3",
         "quality-assurance",
         "context-management",
-        "sdd-gate-v3",
         "workspace-init"
       ]
     },
@@ -512,11 +513,34 @@
     },
     {
       "rank": 24,
+      "slug": "audits-canon",
+      "title": "audits-canon",
+      "category": "product",
+      "area": "sdd",
+      "summary": "An audit is a committed artifact under `specs/audits/<YYYYMMDD>-<slug>/`, holding `AUDIT.md` for scope, window, method and score and `FINDINGS.jsonl` for one record per finding with an immutable claim and a mutable governance triple. Three pillars always run together — bug history, spec compliance, and memory/constitution drift — over the window running from the newest `audited` milestone to HEAD, computed from the release streams alone and never from `_ideas/`. Pillar one measures eight forensic metrics and is the single writer of every bug record's derived provenance cache, in the same atomic rewrite that stamps `audited`. Every `evidence` value is a reproducible command plus a redacted one-line result, so a finding read months later can be re-run; a temp-lane path is a pointer, never the citation. The cadence is suggested every five releases and never mandatory, no CLI verb or hook exists, and one audit binds exactly one remediation release that gives every finding a terminal disposition before the folder may archive.",
+      "path": "specs/memory/product/sdd/audits-canon.md",
+      "tags": [
+        "sdd",
+        "audits",
+        "findings",
+        "governance",
+        "evidence"
+      ],
+      "token_estimate": 1580,
+      "depends_on": [
+        "sdd-bug-backlog-governance",
+        "specs-doctor",
+        "sdd-gate-v3",
+        "agent-comms"
+      ]
+    },
+    {
+      "rank": 25,
       "slug": "sdd-bug-backlog-governance",
       "title": "sdd-bug-backlog-governance",
       "category": "product",
       "area": "sdd",
-      "summary": "Bugs are append-only events written through one seam that sanitizes control and format characters (preserving TAB/LF/CR) and then masks every schema free-text field with the same operator denylist the push boundary refuses on; the kinds include a non-terminal repeatable `picked` reservation marker that surfaces contention without ever blocking it; a `resolved` event is refused unless it carries three checkable fields — the red-loop command, the test seam and the diff direction on the touched feature — and a net-positive diff routes the fix through software-architect before the commit. The backlog is the operator's demand queue, curated by project-manager in a single BACKLOG.md (ACTIVE + LEDGER) with purge-on-pick and continuous sanitizing — no agent materializes an entry, residuals reach the operator through a PM intake report, and only actionable defects do — record-only observations terminate in the closure record. A release consumes an explicit picked set, matures through an rc ladder with no alpha or beta stage, ends in the fixed order review → closure → archive → ship, and requires terminal dispositions at closure and audit. Work is placed on three branch patterns; every agent stage runs on the one live feature branch, and develop and main advance only by pull request. Bug, backlog and audit paths stay additive and never lock-gated.",
+      "summary": "`specs/bugs/BUGS.jsonl` carries one record per bug — never an event stream — with three declared field categories (immutable core, write-once, mutable governance) and a closed `surface` enum derived from the feature-package inventory. Exactly one write seam reaches it, the generic id-keyed record store, which sanitizes then masks through a schema-derived field set and rewrites in place through the atomic-write primitive's compare-then-swap, so a rewrite is refused rather than applied to a tree the writer never saw. Five CLI verbs expose it — `append`, `status`, `stats`, `update`, `archive` — and coherence is surfaced as a warning, never a block. Provenance shas are a derived cache over an all-refs `--full-history` walk whose sole writer is the audit's first pillar. The backlog is a live photo of `## ACTIVE` alone, every exit appending one rewritable record to `backlog_histo.jsonl`. A release's phase and its milestone facts are the fold of an append-only `RELEASE.jsonl`, which also carries the closure narrative; release ids are bare semver and `_ideas/` holds a SPEC only. Work runs on one live feature branch through an rc ladder that ends review, closure, archive, ship.",
       "path": "specs/memory/product/sdd/sdd-bug-backlog-governance.md",
       "tags": [
         "sdd",
@@ -526,20 +550,21 @@
         "bugs",
         "gitflow"
       ],
-      "token_estimate": 3460,
+      "token_estimate": 4763,
       "depends_on": [
         "sdd-gate-v3",
+        "audits-canon",
         "specs-doctor",
         "agent-comms"
       ]
     },
     {
-      "rank": 25,
+      "rank": 26,
       "slug": "sdd-gate-v3",
       "title": "sdd-gate-v3",
       "category": "product",
       "area": "sdd",
-      "summary": "The merged Python PreToolUse gate enforces root whitelist, workspace venv usage, a cache-off posture for pytest/ruff/mypy, path class, phase, and the caller's own mode. LAW is decided by ORIGIN on a static fail-closed floor — the law basenames at the workspace root or inside a fixed harness projection dir — so a repo's own domain-scoped `AGENTS.md`/`CLAUDE.md` is MUTATING and no manifest read can promote or demote a security decision. It never waits for or blocks on another session. Presence is advisory. Git pre-commit warns only; pre-push enforces the CI preflight, an inverted branch policy in which `feature/{M.m.p}` is the only pushable ref while `develop` and `main` are refused as PR-only, and a range-scoped denylist scan of the new objects the push would publish — blobs AND commit/annotated-tag message bodies, with author/committer headers out of scope by design. The security verdict left the hook: it is a CI job on both PR edges requiring an APPROVED security-reviewer handoff covering the PR head sha, read from committed evidence. The scan reads a chunk-bounded batched git conversation, suppresses a hit only when the same single path already published that exact value and never for a path-less object, derives its foreign-name layer from the context registry and names it when that layer degrades, partially scans and honestly reports oversized blobs, raises a typed error rather than reporting coverage it did not achieve, and masks private path segments through the detector's own matchers in everything it prints. The packaged baseline is version 8: single-line patterns only, every carve-out carrying a rationale a doctor check enforces, covering the home-path layout of all three declared platforms.",
+      "summary": "The merged Python PreToolUse gate enforces root whitelist, workspace venv usage, a cache-off posture for pytest/ruff/mypy, path class, phase, and the caller's own mode. LAW is decided by ORIGIN on a static fail-closed floor — the law basenames at the workspace root or inside a fixed harness projection dir — so a repo's own domain-scoped `AGENTS.md`/`CLAUDE.md` is MUTATING and no manifest read can promote or demote a security decision. The MEMORY phase is resolved by folding the live release's `RELEASE.jsonl` and nothing else, fail-closed when the fold is ambiguous or absent. It never waits for or blocks on another session. Presence is advisory. Hooks validate only at the publication boundary: git pre-commit is advisory and always exits zero, and pre-push refuses exactly three things — an invalid branch name, a denylist hit, and an unresolvable runner — under an inverted branch policy in which `feature/{M.m.p}` is the only pushable ref while `develop` and `main` are refused as PR-only. Its range-scoped denylist scan reads the new objects the push would publish — blobs AND commit/annotated-tag message bodies, with author/committer headers out of scope by design. The CI preflight left the hook and is an always-on rule instead. The security verdict is likewise a CI job on both PR edges requiring an APPROVED security-reviewer handoff covering the PR head sha, read from committed evidence. The scan reads a chunk-bounded batched git conversation, suppresses a hit only when the same single path already published that exact value and never for a path-less object, derives its foreign-name layer from the context registry and names it when that layer degrades, partially scans and honestly reports oversized blobs, raises a typed error rather than reporting coverage it did not achieve, and masks private path segments through the detector's own matchers in everything it prints. The packaged baseline is version 8: single-line patterns only, every carve-out carrying a rationale a doctor check enforces, covering the home-path layout of all three declared platforms.",
       "path": "specs/memory/product/sdd/sdd-gate-v3.md",
       "tags": [
         "sdd",
@@ -549,22 +574,22 @@
         "no-locks",
         "privacy"
       ],
-      "token_estimate": 7339,
+      "token_estimate": 8205,
       "depends_on": [
-        "context-management",
         "sdd-bug-backlog-governance",
+        "context-management",
         "architecture",
         "agent-monitoring",
         "workspace-doctor"
       ]
     },
     {
-      "rank": 26,
+      "rank": 27,
       "slug": "specs-doctor",
       "title": "specs-doctor",
       "category": "product",
       "area": "sdd",
-      "summary": "`dadaia specs doctor` coordinates structural, memory, release, closure/audit, governance, and coherence validators. Placeholder detection covers memory atoms (ERROR) and an installed tests/AGENTS.md (WARN, never the canonical template). A live segment pointer at a missing segment directory is an explicit ERROR, never a silent skip. `--fix` performs only deterministic repairs.",
+      "summary": "`dadaia specs doctor` coordinates structural, memory, release, closure/audit, governance and coherence validators over the v6 canon. TREE-8 reports anything under `specs/` outside the canon root as a WARNING, never a block, and `--recipe` renders ordered copy-pasteable steps hanging off the same finding objects `--json` emits, from its own function. The active release and its phase are the fold of `RELEASE.jsonl` with no fallback branch, a duplicate sha-bearing milestone is a warning, and every `CLOSURE.md` parser is deleted rather than left behind its retired subject. The audit checks fold `FINDINGS.jsonl` instead of regexing prose, and the bug lane reads the one canonical ledger through the shared record reader. Placeholder detection covers memory atoms as an error and an installed tests rule file as a warning, never the canonical template. A live segment pointer at a missing segment directory is an explicit error, never a silent skip. `--fix` performs only deterministic repairs.",
       "path": "specs/memory/product/sdd/specs-doctor.md",
       "tags": [
         "specs",
@@ -572,12 +597,13 @@
         "validation",
         "sdd"
       ],
-      "token_estimate": 1007,
+      "token_estimate": 1751,
       "depends_on": [
         "sdd-gate-v3",
         "workspace-doctor",
         "context-management",
-        "sdd-bug-backlog-governance"
+        "sdd-bug-backlog-governance",
+        "audits-canon"
       ]
     }
   ]

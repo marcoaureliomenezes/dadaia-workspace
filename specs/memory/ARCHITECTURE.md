@@ -387,6 +387,22 @@ name. Hand-kept copies of one correctness contract are what diverged before — 
 their temp file on a failed replace and some leaking it — and a derived census is what keeps
 them from regrowing.
 
+**Compare-then-swap lives inside the primitive, because it cannot live outside it.** A
+read-modify-write caller — the JSONL record store rewriting one governance line — needs to
+refuse a swap when the file moved under it. Doing that check in the caller is structurally
+unsound: the caller's re-read necessarily happens *before* it hands content to `atomic_write`,
+so a concurrent writer landing during the serialization of the temp sibling is invisible to
+the check and is silently discarded by the replace that follows. The optional
+`expected_previous` parameter closes that window by moving the comparison to be the **last**
+read the primitive performs, immediately before `os.replace` and after the temp sibling is
+already fully written; the gap then holds nothing but the comparison itself. A mismatch raises
+`ConcurrentModificationError` — a pure `core` exception type carrying no `dadaia_workspace`
+import, so a caller with its own domain error catches it and re-raises that instead — and the
+temp sibling is cleaned on that path like every other. The semantics are **refuse-stale, then
+the caller retries**, never last-write-wins: nothing blocks, and a rewrite is never applied to
+a tree the writer did not see. `expected_previous` is opt-in and its kind (`str`/`bytes`) must
+match the content's, so every existing append-only or whole-file writer is unaffected.
+
 ### Agent surface
 
 Nine core agent roles with two dispatchers run inside the entry harness. Their bodies are
