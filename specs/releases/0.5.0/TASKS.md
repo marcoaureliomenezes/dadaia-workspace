@@ -321,7 +321,7 @@ its declared globs and does not admit `specs/memory/**`; `dadaia public doctor` 
 
 ## Segment `S1` — the v6 canon and the historical ledger rewrite
 
-- [-] **T-050-04 — AR-1: the record model and the v5 boundary adapter, ruled**
+- [x] **T-050-04 — AR-1: the record model and the v5 boundary adapter, ruled**
 
 **Owner role:** software-architect · **Commit:** `docs(T-050-04): AR-1 ruling — bug record
 model and the v5 adapter boundary`
@@ -351,7 +351,7 @@ before T-050-07 starts.
 
 ---
 
-- [ ] **T-050-05 — FR1: the v6 canon in the scaffold and the doctor**
+- [-] **T-050-05 — FR1: the v6 canon in the scaffold and the doctor**
 
 **Owner role:** software-engineer · **Commit:** `feat(T-050-05): specs pattern v6 — canon
 tree, TREE-8 and specs doctor --recipe`
