@@ -1319,7 +1319,7 @@ one** task in `TASKS.md` names `dadaia_workspace/public/data/DADAIA.md` (A11.1).
 
 ---
 
-- [-] **T-050-21 — FR12: the skill surface rides the canon**
+- [x] **T-050-21 — FR12: the skill surface rides the canon**
 
 **Owner role:** ai-engineer · **Commit:** one coherent commit per skill family,
 `refactor(T-050-21): <skill> aligned to canon v6`
@@ -1354,7 +1354,7 @@ joint review FR10 exists to force, and skipping it is how
 
 ---
 
-- [ ] **T-050-21A — FR4 (contract): delete `ACTIVE.md`, all 28 consumers repointed**
+- [-] **T-050-21A — FR4 (contract): delete `ACTIVE.md`, all 28 consumers repointed**
 
 **Owner role:** software-engineer (code, tests) + ai-engineer (personas, skills, law) ·
 **Commit:** `refactor(T-050-21A): retire ACTIVE.md — the phase is the RELEASE.jsonl fold`
@@ -1490,7 +1490,7 @@ registrations, proven by the diff.
 
 ---
 
-- [ ] **T-050-24 — FR14: `dd-audit-project` rewritten around three pillars**
+- [-] **T-050-24 — FR14: `dd-audit-project` rewritten around three pillars**
 
 **Owner role:** ai-engineer · **Commit:** `refactor(T-050-24): dd-audit-project — three
 pillars over a sha window`
@@ -1809,7 +1809,7 @@ tenth import-linter contract is added without a principle. **Tests: +1 / −0.**
 
 ---
 
-- [ ] **T-050-30 — FR19: the `specs/ADRs/` canon and the proposed inventory ADRs**
+- [-] **T-050-30 — FR19: the `specs/ADRs/` canon and the proposed inventory ADRs**
 
 **Owner role:** product-engineer (authoring) + ai-engineer (the scoped `AGENTS.md`) ·
 **Commit:** one isolated `docs(adr): propose NNNN-<slug>` **per ADR** (SPEC FR8 shape 2)
