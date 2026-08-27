@@ -16,7 +16,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from jsonschema import Draft202012Validator
 
 from dadaia_workspace.core.models.findings import (
     FindingRecord,
@@ -160,9 +159,15 @@ def test_field_categories_documented_in_schema_match_dataclass_with_no_hand_kept
     documented PER PROPERTY in ``finding-record-v1.schema.json`` (``x-mutability``),
     and every property is accounted for; the dataclass's own ``field(metadata=...)``
     matches it exactly, with zero second, hand-kept mirror (A2.10, reused from
-    ``BugRecord``'s own contract)."""
+    ``BugRecord``'s own contract).
+
+    Draft 2020-12 self-validity of ``finding-record-v1.schema.json`` is already proven
+    at the CONTRACT tier, in ``tests/contract/test_finding_record_schema.py`` — that
+    assertion needs ``jsonschema``, which this file (a pure ``core`` model unit test,
+    in ``tests/scripts/run_mutation_baseline.sh``'s isolated-venv scope) stays free of
+    (``mutation-baseline-core-models-scope-now-imports-jsonschema-isolated-venv-cannot-collect``).
+    This test itself reads ``x-mutability`` as plain JSON, stdlib-only."""
     schema = _schema()
-    Draft202012Validator.check_schema(schema)
     properties = schema["properties"]
     assert isinstance(properties, dict)
 

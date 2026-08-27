@@ -19,7 +19,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from jsonschema import Draft202012Validator
 
 from dadaia_workspace.core.models.bugs import (
     BugRecord,
@@ -168,9 +167,16 @@ def test_field_categories_documented_in_schema_match_dataclass_with_no_hand_kept
     ``bug-record-v1.schema.json`` (``x-mutability``), and every property is accounted
     for. A2.10: ``core/models/{bugs,findings,release_events}.py`` declare ZERO
     module-level tuple/list/set literal of property names — ``findings.py``/
-    ``release_events.py`` do not exist yet at this fold (globbed, not hand-listed)."""
+    ``release_events.py`` do not exist yet at this fold (globbed, not hand-listed).
+
+    Draft 2020-12 self-validity of the schema document is proven separately, in
+    ``tests/contract/test_bug_record_schema.py`` — that assertion needs ``jsonschema``,
+    which this file (a pure ``core`` model unit test, in
+    ``tests/scripts/run_mutation_baseline.sh``'s isolated-venv scope) stays free of;
+    schema-vs-model agreement is a CONTRACT-tier concern
+    (``mutation-baseline-core-models-scope-now-imports-jsonschema-isolated-venv-cannot-collect``).
+    This test itself reads ``x-mutability`` as plain JSON, stdlib-only."""
     schema = _schema()
-    Draft202012Validator.check_schema(schema)
     properties = schema["properties"]
     assert isinstance(properties, dict)
 
