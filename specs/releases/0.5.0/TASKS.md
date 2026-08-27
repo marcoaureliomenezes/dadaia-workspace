@@ -961,7 +961,7 @@ the relocated verdicts; the tag pushed and proven before anything is removed.
 
 ---
 
-- [-] **T-050-15 — `S1` close: `qa-engineer` review committed on the branch**
+- [x] **T-050-15 — `S1` close: `qa-engineer` review committed on the branch**
 
 **Owner role:** qa-engineer · **Commit:** `docs(T-050-15): S1 QA close`
 
