@@ -1,6 +1,6 @@
 ---
 name: dd-backlog-definition
-description: "Use when: curating specs/backlog/**, sanitizing for staleness, adjudicating an intake report, or checking the terminal disposition-token vocabulary. Owns the BACKLOG.md ACTIVE/LEDGER schema and the operator-gated intake gate — the only path to a new backlog entry. project-manager runs this continuously."
+description: "Use when: curating specs/backlog/**, sanitizing for staleness, adjudicating an intake report, or checking the terminal disposition-token vocabulary. Owns the BACKLOG.md live-photo ACTIVE-only schema plus backlog_histo.jsonl, and the operator-gated intake gate — the only path to a new backlog entry. project-manager runs this continuously."
 applyTo: "specs/backlog/**"
 ---
 
@@ -17,9 +17,12 @@ picked, sanitized set.
 
 ## 2. Entry schema and status vocabulary
 
-Single source: `specs/backlog/BACKLOG.md` (ADR #14) — two sections, no per-entry files,
-no JSONL (JSONL stays bugs-only; backlog is a re-consolidated document, not an
-append log).
+Single source, live photo (v0.5.0 FR5, T-050-13): `specs/backlog/BACKLOG.md` holds
+**one** section, `## ACTIVE`, and nothing else — no per-entry files, no in-file
+`## LEDGER`. A closed item's history lives beside the document, in
+`specs/backlog/_archive/backlog_histo.jsonl`, one append-only record per exit — the
+"no JSONL for backlog" clause this skill carried before FR5 is retired; JSONL is no
+longer bugs-only.
 
 **`## ACTIVE`** — one subsection per live candidate, full prose, strict schema — five
 required keys plus one optional key:
@@ -44,31 +47,44 @@ required keys plus one optional key:
 overlap, so a `candidate`+ item with no resolvable `intents[]` is a BL-SCHEMA error, not
 a warning.
 
-**`## LEDGER`** — one line per closed item: `<slug> · <disposition> · <release-or-reason>
-· <date>`.
+**`backlog_histo.jsonl`** (in `specs/backlog/_archive/`) — one record per closed item:
+`{id, ts, disposition, reason, release, by, entry_md, entry_md_source}`. `id` is the
+slug and the record's key — one line per slug, ever, so a duplicate exit (the retired
+`## LEDGER`'s BL-DUP failure mode) is structurally impossible. `disposition`/`reason`/
+`release` are the fields a provisional `CONSUMED` mutates in place at closure (§2's
+CONSUMED→terminal note below); no CLI verb wraps this write today — an agent appends
+or rewrites the record with file tools directly (`specs/backlog/**` is an ADDITIVE
+path class, `DADAIA.md` §3, always writable).
 
 `dadaia backlog new <slug>` authors the `## ACTIVE` subsection directly into
-`BACKLOG.md` (creating the document with both section headings on first use);
-`dadaia backlog doctor` validates the whole file against this schema —
-`BL-SCHEMA`/`BL-DUP`/`BL-CONFLICT`/`BL-STALE` (the disposition tokens below are
-BL-STALE's terminal-state input). There is no per-entry file and no other schema
-authority.
+`BACKLOG.md` (creating the document with the `## ACTIVE` heading on first use, per
+FR5 — a `--help` still describing a second `## LEDGER` heading is a known stale-CLI-help
+bug, registered, not a schema fact); `dadaia backlog doctor` validates the whole file
+against this schema — `BL-SCHEMA`/`BL-CONFLICT`/`BL-STALE` (BL-DUP is **deleted**, not
+disabled, v0.5.0 A5.2: the single-section document makes a duplicate `## ACTIVE`
+subsection for one slug structurally impossible to reintroduce via the retired
+mechanism). There is no per-entry file and no other schema authority.
 
 **Terminal disposition tokens** (canonical home — appears nowhere else in `public/`):
 
 | Kind | Terminal tokens |
 |---|---|
-| Backlog (`BACKLOG.md` LEDGER) | `DELIVERED`, `SUPERSEDED`, `RESOLVED`, `CONSUMED`, `DEFERRED`, `REJECTED` |
-| Bug (`specs/bugs/**`) | `Closed` |
+| Backlog (`backlog_histo.jsonl` `disposition`) | `DELIVERED`, `SUPERSEDED`, `RESOLVED`, `CONSUMED`, `DEFERRED`, `REJECTED` |
+| Bug (`specs/bugs/BUGS.jsonl` `status`) | `resolved`, `superseded`, `deferred`, `rejected` (closed enum, `bug-record-v1`; `open` is the only non-terminal value) |
 
-`DELIVERED`/`SUPERSEDED`/`RESOLVED`/`CONSUMED` carry the release id (`DELIVERED —
-v0.10.0`); `DEFERRED`/`REJECTED` carry a one-line reason. `dd-release-implement` and
-`dd-audit-project` route their dispositions to these tokens by reference — this table
-is not repeated in either.
+`DELIVERED`/`SUPERSEDED`/`RESOLVED`/`CONSUMED` carry the release id in the histo
+record's `release` field; `DEFERRED`/`REJECTED` carry a one-line reason in `reason`.
+`dd-release-implement` and `dd-audit-project` route their dispositions to these tokens
+by reference — this table is not repeated in either.
 
-**Purge-on-pick (mandatory).** A picked entry leaves `ACTIVE` in the same commit that
-creates the release SPEC; the SPEC's provenance section records which entries it
-consumed. Leaving a picked entry in `ACTIVE` after its SPEC exists is a defect.
+**Purge-on-pick (mandatory).** A picked entry leaves `ACTIVE` — via a `backlog_histo.jsonl`
+exit record, often provisionally `CONSUMED` — in the same commit that creates the
+release SPEC; the SPEC's provenance section records which entries it consumed. Leaving
+a picked entry in `ACTIVE` after its SPEC exists is a defect. **CONSUMED → terminal is
+an update, never a second record:** the disposition sweep at closure rewrites that
+same slug's ONE histo record's `disposition`/`reason`/`release` fields in place —
+appending a second record for the same slug is the exact failure mode BL-DUP used to
+catch and this shape now makes structurally impossible (`id` is the record's key).
 
 ## 3. Continuous sanitize protocol
 
@@ -81,7 +97,7 @@ Run on every touch, not just at pick time:
    normalized text, not just exact match). A match is merged into the existing entry,
    never filed twice.
 3. **Disposition or keep.** Confirmed-stale or invalid → `DEFERRED`/`REJECTED` with a
-   one-line reason, moved to `LEDGER`. Still valid → stays in `ACTIVE`.
+   one-line reason, exited to `backlog_histo.jsonl`. Still valid → stays in `ACTIVE`.
 4. **Total-consolidation review.** Every new entry triggers a read of the whole file —
    `BACKLOG.md` is small enough that partial review is a discipline failure, not a
    shortcut.
@@ -92,7 +108,8 @@ restating this scan.
 ## 4. Never-delete (cited, not restated)
 
 No backlog file or bug is ever deleted — `DADAIA.md` §6 Backlog. A dead item moves
-`ACTIVE` → `LEDGER`; it never leaves the tree.
+`ACTIVE` → `backlog_histo.jsonl`; it never leaves the tree, and `backlog_histo.jsonl`
+itself is append-only.
 
 ## 5. Operator-gated intake (ADR #15 — the only path to a new entry)
 
@@ -111,8 +128,9 @@ apply this carve-out when they route a disposition — this is its one full stat
 **Record-only vs actionable (FR6/R4).** Reviews record everything — never-silent holds,
 zero observations lost. But not every recorded observation is a residual: **record-only**
 observations (INFO-grade, awareness-only, already-fixed-at-HEAD) terminate in the
-release CLOSURE record or the reviewer's own handoff and **never** enter an intake
-report. Only **actionable defects** (LOW+ with a concrete fix surface) are compiled into
+reviewer's own findings array/handoff — never re-homed into a release artifact
+(`dd-release-implement`'s `RELEASE-EVENTS.md` conversion table) — and **never** enter
+an intake report. Only **actionable defects** (LOW+ with a concrete fix surface) are compiled into
 the operator-facing intake report — "each item" above means each actionable defect, not
 every observation a reviewer recorded.
 
@@ -135,7 +153,12 @@ further triage needed on the release-definition side. Purge-on-pick (§2) is the
 
 ```bash
 dadaia backlog new <slug>          # appends an ## ACTIVE subsection to BACKLOG.md
-dadaia backlog doctor              # validates BACKLOG.md — BL-SCHEMA/DUP/CONFLICT/STALE
+dadaia backlog doctor              # validates BACKLOG.md — BL-SCHEMA/CONFLICT/STALE
+dadaia backlog subjects            # list canonical anchors bindable in Intents
 dadaia bugs status                 # open/closed bug counts
 dadaia bugs stats                  # bug-ledger aggregate view
 ```
+
+Exiting an item (any disposition) — removing its `## ACTIVE` subsection and appending
+or updating its `backlog_histo.jsonl` record — has no CLI verb yet; do it with file
+tools directly, ADDITIVE (`DADAIA.md` §3).
