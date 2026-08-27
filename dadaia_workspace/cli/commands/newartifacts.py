@@ -19,6 +19,7 @@ import typer
 
 from dadaia_workspace import container
 from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
+from dadaia_workspace.core.atomic_write import ConcurrentModificationError
 from dadaia_workspace.core.models.backlog import SubjectKind
 from dadaia_workspace.features.backlog.document import backlog_new
 from dadaia_workspace.features.spec_artifacts.new_artifacts import release_new
@@ -150,6 +151,13 @@ def backlog_new_cmd(
     except RuntimeError as exc:
         # A1.2 (v0.4.2) — write-then-verify: the writer raises rather than reporting
         # success when a re-parse of its own fresh write does not show the slug.
+        typer.echo(f"[error] {exc}", err=True)
+        sys.exit(1)
+    except ConcurrentModificationError as exc:
+        # Code review M-8 (0.5.0 T-050-35 re-verdict) — after 7280856c (F-14 CAS),
+        # backlog_new's expected_previous write can lose a lost-update race under the
+        # NO-LOCKS DOCTRINE. Report it the same way as its three siblings above,
+        # rather than an uncaught traceback.
         typer.echo(f"[error] {exc}", err=True)
         sys.exit(1)
 

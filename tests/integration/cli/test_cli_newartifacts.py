@@ -19,6 +19,7 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.atomic_write import ConcurrentModificationError
 
 _runner = CliRunner()
 
@@ -78,3 +79,30 @@ def test_release_new_and_backlog_new(specs: Path) -> None:
     )
     assert dup_result.exit_code != 0
     assert "[error]" in (dup_result.output + (dup_result.stderr or ""))
+
+
+def test_backlog_new_reports_concurrent_modification_as_error_exit_1(
+    specs: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Intent: CONTRACT — 0.5.0 T-050-35 M-8
+
+    After 7280856c (F-14 CAS), ``backlog_new`` can raise
+    ``core.atomic_write.ConcurrentModificationError`` on a lost-update race — a
+    subclass of none of the three exceptions the CLI already catches
+    (``ValueError``/``FileExistsError``/``RuntimeError``). Before the fix this
+    propagated as an uncaught traceback instead of the ``[error] {exc}`` + exit 1
+    shape its three siblings already use.
+    """
+    import dadaia_workspace.cli.commands.newartifacts as newartifacts_module
+
+    def _raise_concurrent_modification(*_args: object, **_kwargs: object) -> object:
+        raise ConcurrentModificationError(specs / "backlog" / "BACKLOG.md")
+
+    monkeypatch.setattr(newartifacts_module, "backlog_new", _raise_concurrent_modification)
+
+    result = _runner.invoke(
+        app,
+        ["backlog", "new", "cool-idea", "--specs-dir", str(specs)],
+    )
+    assert result.exit_code == 1
+    assert "[error]" in (result.output + (result.stderr or ""))
