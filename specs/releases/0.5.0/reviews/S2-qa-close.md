@@ -286,3 +286,198 @@ git diff --diff-filter=A --name-only 7de7c48c..HEAD -- tests/e2e/
 dadaia bugs status
 PYTHONDONTWRITEBYTECODE=1 pytest -p no:cacheprovider -q -n auto tests
 ```
+
+---
+
+## Re-verdict
+
+**Reviewer:** qa-engineer · **HEAD re-reviewed:** `7e5b1725` (T-050-25A landed as
+`99b4c83b`/`086f2a4c`; the AI-surface sweep landed as `2898a312`; the fixture repoint
+landed as `2234edd4`) · **Re-reviewed at:** 2026-08-27 (post-`72d7c882`).
+
+### Verdict: **APPROVE-CONDITIONAL**
+
+**Condition:** a `product-engineer`/operator disposition on A12.5's wording is still
+required (item 4 below) — a spec-wording decision, not further engineering, and does not
+require another QA re-run once made.
+
+### Item-by-item re-verification
+
+**1. AI-surface sweep (`dadaia-task-manager/SKILL.md` + hash tuples) — RESOLVED.**
+`grep -n "ACTIVE\.md\|dual-writ" dadaia_workspace/public/skills/dadaia-task-manager/SKILL.md`
+now returns exactly one hit, a past-tense provenance note ("`ACTIVE.md` retired at
+T-050-21A") — the "dual-written to `ACTIVE.md`'s `phase:` line" operative sentences at
+the old lines 116/145 are gone. `2898a312` re-recorded the 6 touched `hash_tuple.skill`
+rows plus 3 `hash_tuple.scoped` rows in `behavior-map.json`.
+
+**2. `ruff format specs.py` — RESOLVED.** `2234edd4` removed the trailing blank line at
+`dadaia_workspace/cli/commands/specs.py:404`; confirmed clean in the full-suite run
+below (the one remaining `ruff format` mention in git history is unrelated, a different
+untracked file from concurrent work, itself now green — see full-suite classification).
+
+**3. Fixture repoint (`test_cli_reports_next.py`,
+`test_one_place_of_control_associated_repo.py`, the symlink classifier test) —
+RESOLVED.** `2234edd4` introduced `tests/helpers/release_jsonl.py::write_release_phase`
+and repointed all three fixtures. None of the three appear in either full-suite run
+below.
+
+**4. A12.5 wording (whole-S2 +544 vs FR12 −1) — DECLARED MISS, routed to
+operator/`product-engineer`, not narrowed here.** No commit since `72d7c882` reworded
+A12.5 or recorded an accepted-overshoot ruling for it. Restating the original review's
+own measured numbers without re-deriving them (per this re-verdict's instruction): whole
+S2 segment total AI-surface LOC delta **+544** (positive); the narrower FR7+FR11+FR12
+scope A22.4 actually names **+203** (still positive); only FR12 in isolation is
+**−1** (negative). A12.5's literal text ("AI-surface LOC net for `S2` is negative") is
+satisfied under none of the broader readings, only under FR12 read alone — the same
+gap the original review found, unchanged. This is the same class of resolution v0.4.5
+used for its V6/V7 misses (record the measured gap explicitly, do not silently narrow
+the acceptance text to fit the evidence). Disposition — reword A12.5 to A22.4's
+per-FR framing, or record an explicit accepted-overshoot ruling the way A22.9 already
+does for the test-function count — is `product-engineer`/operator's call, not a QA
+substitution.
+
+### `test_behavior_map.py` (V17/A10.2) — **30/30 PASS**
+
+```
+PYTHONDONTWRITEBYTECODE=1 pytest -p no:cacheprovider -q -n auto tests/contract/test_behavior_map.py
+30 passed
+```
+Re-confirmed twice, at `086f2a4c` (before the bug-registration commit below) and again
+at `7e5b1725` (current HEAD) — both green. `test_every_cited_path_exists` and
+`test_every_hash_tuple_is_current`, both RED at the original review's `f22dc7bd`, are
+now green.
+
+### `ACTIVE.md` zero-hit grep (A4.7) — provenance notes excepted
+
+`grep -rn "ACTIVE\.md" dadaia_workspace/ tests/ specs/ --include="*.py" --include="*.md"
+--include="*.toml" --include="*.json"`, `_archive/` excepted.
+
+**Provenance notes (past-tense "retired at T-050-21A", accepted, listed here per the
+instruction):**
+`dadaia_workspace/hooks/sdd_gate.py` (×2), `public/schemas/releases/release-event-v1.schema.json`,
+`public/data/CONSUMER_VALIDATION_RECIPE.md`, `public/skills/dadaia-task-manager/SKILL.md`,
+`public/skills/dadaia-workspace-spec-reviewer/SKILL.md`,
+`public/skills/dadaia-workspace-spec-navigator/SKILL.md`,
+`public/skills/dd-release-definition/SKILL.md`,
+`public/skills/dd-release-implement/{SKILL,MEMORY-UPDATE,RELEASE-EVENTS,RC-FLOW}.md`,
+`public/skills/dd-manager-orchestration/SKILL.md`, `public/agents/{product-engineer,
+code-reviewer,ai-engineer,project-manager,project-auditor}.md`,
+`cli/commands/specs.py` (comment), `features/specs/doctor.py` (comment),
+`features/specs/doctor_common.py` (×3), `features/specs/scaffolder.py` (comment),
+`features/specs/doctor_release.py` (×2), `features/reports/next.py` (×2),
+`core/release_events.py` (×2), `core/exceptions.py`. Also every `tests/**` hit: either a
+provenance-note docstring/comment (`tests/helpers/release_jsonl.py`,
+`tests/helpers/__init__.py`, `tests/unit/hooks/test_sdd_gate.py`,
+`tests/unit/features/specs/{test_doctor_release_jsonl,test_doctor_ledger_invariants,
+test_doctor,test_scaffolder}.py`, `tests/integration/{test_one_place_of_control_
+associated_repo,gate/test_classifier_symlink_canonicalization}.py`,
+`tests/unit/features/reports/test_next_service.py`) or a deliberate fixture that
+constructs a synthetic/legacy `ACTIVE.md` as its own test subject — negative cases, old-
+format regression pins, or `scripts/pr_verdict_check.py`'s own "must never mention
+`ACTIVE.md`" assertion (`tests/integration/scripts/test_pr_verdict_check_wiring.py`,
+`tests/unit/hooks/{test_pre_gate,test_gate_never_blocks_doctrine}.py`,
+`tests/e2e/**`, `tests/integration/{cli/test_bind_resolution_seam_executed_path,
+gate/test_read_mode_non_acquiring}.py`, `tests/unit/features/panel/test_views_memory.py`,
+`tests/unit/features/spec_context/test_baseline_scaffold_followup.py`,
+`tests/fixtures/memory/{panel,architecture}.md`, `tests/fixtures/memory/MAPPING.md`,
+`tests/contract/test_source_repo_hygiene.py`, `tests/unit/test_handoff_models.py`) — read
+each in context; none instructs a live action against a file that exists.
+
+**Non-provenance hit found, NOT excepted — new finding, this re-verdict:**
+`specs/AGENTS.md` and `specs/releases/AGENTS.md` (the repo's own live scoped rule files,
+governing `specs/` per `DADAIA.md`'s scoped-rules precedence, read every session) still
+describe `ACTIVE.md` as a **live, transitional dual-write pointer** — "dual-written to
+`ACTIVE.md`'s `phase:` line, which remains the SDD gate's own literal decision authority
+**until T-050-21A repoints it** at the fold" (future tense, but T-050-21A already
+landed as `d33786cb`), plus `specs/AGENTS.md`'s write-permission table still grants
+`product-engineer` write access to `releases/ACTIVE.md` as a "dual-write mirror,
+transitional." Confirmed these two files are untouched by `2898a312` (that commit's own
+message scopes it to 5 personas + 10 skills, not `specs/AGENTS.md`) and last touched at
+`417f97b2` (T-050-21, not T-050-21A). Root cause: `2898a312`'s AI-surface sweep correctly
+updated the **source templates** (`public/scaffold/AGENTS.md`,
+`public/scaffold/releases/AGENTS.md` — confirmed clean, no "dual-writ" hits) but this
+repo's own **already-scaffolded, independently-maintained copies** at `specs/AGENTS.md`
+and `specs/releases/AGENTS.md` were never re-synced — the same "stale citation" bug
+class the original review flagged for `dadaia-task-manager/SKILL.md` (§3 of the
+pre-re-verdict body above), recurring in a sibling location the sweep's own declared
+scope did not cover.
+
+**Disposition:** registered as bug
+`scoped-agents-md-stale-active-md-dual-write-text-past-t-050-21a` (LOW,
+`spec_artifacts`, committed isolated at `5c0448dc` per commit-shape 1) rather than
+blocking this re-verdict. Rationale for not blocking: (a) it is documentation staleness
+in two prose files, not a functional or security defect — `RULE A` and the gate's real
+decision authority are unaffected (the SDD gate reads the `RELEASE.jsonl` fold directly,
+confirmed by `test_behavior_map.py` and the full suite, never `ACTIVE.md`); (b)
+`specs/AGENTS.md`/`specs/releases/AGENTS.md` are outside `qa-engineer`'s write
+allowlist (`product-engineer`'s), so the fix itself cannot land in this commit; (c) it
+was outside item 1's declared scope (the AI-surface sweep named exactly 5 personas + 10
+skills; these two files are specs infrastructure, not AI surface) and outside T-050-22's
+own declared scope (A7–A12, A4.5/A4.7, A22.4/A22.10) as anything more than a bug-worthy
+finding. Filed, not narrowed, per the same principle applied to item 4.
+
+### Full suite (once), current HEAD `7e5b1725`
+
+```
+PYTHONDONTWRITEBYTECODE=1 pytest -p no:cacheprovider -q -n auto tests
+1 failed, 2961 passed, 4 skipped in 80.47s
+```
+
+| Failure | Classification |
+|---|---|
+| `test_public_source_hygiene.py::test_pre_push_ci_gate_ships_pyproject_excludes_bytecode_and_scripts_leave_no_pycache` | **Caused by concurrent uncommitted state**, not S2/T-050-21A. `lint-memory-atoms.py` reports 2 ERROR atoms: `specs/memory/ARCHITECTURE.md` (explicitly named as concurrently-edited in this re-verdict's dispatch — confirmed `git diff` mid-edit, "26 packages" → "24 packages" heading in flight) and `specs/memory/QUALITY.md` (landed at `b076b0f2`, T-050-28, a different task stream). Root cause of both: an unquoted colon inside the YAML `tldr:` frontmatter field ("Two-tier memory: N measured …"), breaking `yaml.safe_load` with "mapping values are not allowed here" — this is the exact repro of the already-registered, already-open bug `memory-lint-blames-missing-delimiter-for-a-yaml-parse-error` (LOW, filed by `project-auditor` at `106bec24`, predates this session). No new bug registered for it. |
+
+An earlier run at `086f2a4c` (before the isolated bug-registration commit) additionally
+showed `test_architecture_diagrams_current.py::test_architecture_diagrams_present_and_
+match_live_names` (same root cause — the in-flight `ARCHITECTURE.md` heading edit,
+explicitly named in this re-verdict's dispatch) and
+`test_ruff_format_repo_tree_green.py::test_ruff_format_check_is_green_over_the_real_
+tracked_tree` (an unformatted line in the concurrently-added, untracked
+`tests/contract/test_memory_two_tier_shape.py`, also explicitly named in this
+re-verdict's dispatch) — both converged to green by the second run at `7e5b1725` as the
+concurrent session's own work progressed. **Zero of the 10 failures from the original
+review (`f22dc7bd`) recur; zero new S2/T-050-21A-caused failures were found in either
+run.**
+
+### Concurrency handling note (procedural, not a finding against S2)
+
+`specs/bugs/BUGS.jsonl` carried a concurrent audit session's uncommitted `audited`-field
+stamps (from the in-flight `specs/audits/20260827-canon-v6-first-audit/`) at the moment
+this re-verdict's own bug registration (item "non-provenance hit" above) ran. To keep
+`dadaia bugs append`'s isolated-commit shape (commit-shape 1) from also committing that
+foreign session's uncommitted 506-record diff, the commit was reconstructed to contain
+only the one new record against the last-committed `BUGS.jsonl`, committed, and the
+working tree was restored to the concurrent session's in-flight state afterward
+(`git diff` on `specs/bugs/BUGS.jsonl` shows exactly the same foreign-session diff
+before and after `5c0448dc`, confirmed with the PM's own follow-up instruction:
+"Do not stage BUGS.jsonl or specs/audits (the auditor's in-flight work)").
+
+### Bug-surface delta (re-check)
+
+`dadaia bugs status`: 6 open (`backlog-cli-help-cites-retired-ledger-and-bl-dup` LOW,
+`bug-record-write-once-evidence-fields-can-embed-selfscan-triggering-literal-with-no-
+correction-path` MEDIUM, the 2 concurrent-git-index MEDIUMs, `memory-lint-blames-
+missing-delimiter-for-a-yaml-parse-error` LOW, `windows-xdist-workers-crash-on-unit-
+fast-tier` LOW), plus this re-verdict's own new LOW finding. Net for S2/T-050-21A's own
+touched surface: unchanged from the original review's "hook feature net negative"
+finding — no new S2-caused bug. The one new registration this re-verdict adds is
+documentation-scope, LOW, and outside S2's own write set.
+
+### Security/privacy leakage note
+
+No credentials, tokens, hostnames, IPs, or consumer-specific slugs were introduced or
+observed in any file read, written, or committed during this re-verdict. The one new
+commit (`5c0448dc`) touches only `specs/bugs/BUGS.jsonl`, an ADDITIVE path, with a
+redacted symptom/repro/expected description. Not escalated to `security-reviewer`; no
+suspected leakage found.
+
+### Evidence commands (this re-verdict)
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 pytest -p no:cacheprovider -q -n auto tests/contract/test_behavior_map.py
+grep -n "ACTIVE\.md\|dual-writ" dadaia_workspace/public/skills/dadaia-task-manager/SKILL.md
+grep -rln "dual-writ" dadaia_workspace/ tests/ specs/ 2>/dev/null | grep -v "_archive/"
+PYTHONDONTWRITEBYTECODE=1 pytest -p no:cacheprovider -q -n auto tests
+dadaia bugs status
+git log --oneline 72d7c882..HEAD
+```
