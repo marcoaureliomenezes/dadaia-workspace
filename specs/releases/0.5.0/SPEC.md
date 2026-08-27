@@ -777,7 +777,11 @@ pillar 1). Every other byte is identical:
 **Bug-surface direction, with numbers (fold 3, K):** *net-negative in surface, +≈50 LOC.* The
 fold logic (`reported` + N events → a state machine with terminal/non-terminal/repeatable
 event kinds, seven `allOf` conditional blocks in the schema) is deleted and replaced by a flat
-record; `core/models/bugs.py#BugEvent` becomes `BugRecord` with no state machine. Measured:
+record; `core/models/bugs.py#BugEvent` becomes `BugRecord` with no state machine. *(This claim
+was FALSE at the S1 firing measurement — `BugEvent`/`advance_coherence`/the coherence
+diagnostic survived, consumed only by the doctor's dead v5 branch and the migration adapter's
+dead fold, per `specs/releases/0.5.0/reviews/S1-FR23-firing.md` finding F2 — amendment A3
+deletes them for real; the claim now holds at HEAD.)* Measured:
 **write seams on `BUGS.jsonl` 3 → 1** (AS-16 — the release's one architecture-fidelity
 regression, closed); **"two writers of one truth" 14 → 12** on the ledger (forensic P2 — the
 pair `bugs-append-accepts-second-terminal-event` + `bugs-append-allows-terminal-event-without-reported`
@@ -826,11 +830,15 @@ around the append-only model, disappear as `status` values.
   new free-text property to the schema fixture and proves it is scrubbed on *both* the append
   path and the in-place update path with **no code list edited** anywhere. The denylist terms
   come from the operator's configured set, as they do today.
-- A2.7 **Immutability is detected, never prevented — and the detector exists.** `specs doctor`
-  emits a **WARN** comparing each record's immutable core against FR3's first-add derivation
-  (the derivation already exists; no new engine), and FR14 pillar 1 reports any in-window
-  core-field diff as a HIGH finding. Proven by a fixture that hand-edits a core field with a
-  file tool and shows the WARN and the finding, with the exit code unchanged.
+- A2.7 *(corrected at the S1 FR23 firing, `specs/releases/0.5.0/reviews/S1-FR23-firing.md`
+  §5 correction 3 — the doctor-WARN half never fired in production: SPEC-DOC-040's own input
+  was always the empty default, and is deleted, A5)* **Immutability is detected, never
+  prevented — by FR14 pillar 1, the ONE detector.** `immutable_core_drift` (the pure
+  comparison function, `core/models/bugs.py`) stays; FR14 pillar 1 owns the git walk that
+  supplies its first-add baseline and reports any in-window core-field diff as a HIGH finding
+  — `specs doctor` itself carries no drift check, since it has no git access to derive a real
+  baseline from (a genuine no-op input is not worth a permanent code path). Proven by a
+  fixture that hand-edits a core field with a file tool and shows pillar 1's finding.
 - A2.8 **`dadaia bugs archive` is idempotent and non-blocking:** a fixture runs it twice over
   a corpus with terminal records older and newer than 90 days and proves byte-identical
   output on the second run, the newer records untouched, and the doctor's overdue signal a
@@ -843,9 +851,16 @@ around the append-only model, disappear as `status` values.
   `specs doctor`, with **exit code unchanged** — proven by a fixture asserting the exit code.
 - A2.4 `expand → switch → contract` (D-F): the record reader lands and every consumer switches
   before the event reader is deleted; each step independently green.
-- A2.5 The v5 event shape is decoded by **one boundary adapter that lives in the migration
-  module** (`dadaia_workspace/features/bugs/migrate_v5.py`), imported by nothing else and
-  deletable with it — no v5 branch survives inside the bugs feature after the contract step.
+- A2.5 *(corrected at the S1 FR23 firing, `specs/releases/0.5.0/reviews/S1-FR23-firing.md`
+  §5 correction 1 — the first reading below was wrong at HEAD)* The v5 **fold** adapter
+  (`read_ledger`, the surface-mapping table, the cause/lineage miners, the one-shot
+  runner) lives in the migration module (`dadaia_workspace/features/bugs/migrate_v5.py`),
+  imported by nothing outside `tests/**` and deletable with it at 0.6.0. The v5/v6 **line
+  classifier** (`classify_ledger_line`) is **permanent** and lives in
+  `core/bug_provenance.py` instead — this repository's git history is v5-shaped for
+  hundreds of commits forever, and FR8's resolver plus FR14's pillar-1 audit both need to
+  decode it permanently, not only during the one migration that ran once at T-050-10. No
+  v5 branch survives inside the bugs feature's WRITE side after the contract step.
   The record store itself is **model-agnostic**: `infrastructure/jsonl_record_store.py`
   exposes a generic `JsonlRecordStore` keyed by `id`, with parse/serialise injected through a
   `core.protocols` record protocol (sibling of the existing
@@ -1105,9 +1120,15 @@ commits rather than a range ending in an integration artifact. T-050-42 records 
 moment and merges afterwards.
 
 **The fold has one home: `dadaia_workspace/core/release_events.py`** — a stdlib-only,
-tri-state resolver in the same shape as today's `_active_field`. `hooks/sdd_gate.py` calls it
-directly (hooks never import the container, standing law), and so do `container.py` and the
-doctor. One reader, one fold, three callers.
+tri-state resolver in the same shape as today's `_active_field`. *(Corrected at the S1 FR23
+firing, `specs/releases/0.5.0/reviews/S1-FR23-firing.md` §5 correction 4 — the first Draft's
+"three callers" reading copy-pasted the SAME tri-state disk-read body into
+`hooks/sdd_gate.py`, `container.py` and the doctor, defended by precedent from
+`_active_field`/`read_active_md`'s own two-reader split — the ruling names that precedent
+itself as the "N readers of one file" defect this release exists to retire, not a reason to
+add a third.)* **One reader** — `features/specs/doctor_release.py`'s `read_release_phase` —
+owns the disk read; the hook's copy is deleted until T-050-21A actually needs the phase
+DECISION value, and the container's copy is deleted uncalled. One fold, one reader.
 
 **`release_events.py` is read-only, and the append seam is named (fold 3,
 `software-architect` §2 — an `UNSPECIFIED` closed).** The module **reads and folds; it never

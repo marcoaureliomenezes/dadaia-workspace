@@ -83,16 +83,27 @@ RELEASE_NAMING_LEGACY_ALLOWLIST: frozenset[str] = frozenset(
 _TASK_MARKER_RE = re.compile(r"^\s*[-*]?\s*\[([ \-xX])\]", re.MULTILINE)
 
 
-def _fold_release_jsonl_phase(path: Path) -> str | None:
-    """Tri-state ``RELEASE.jsonl`` phase fold, in the shape of ``read_active_md``
-    (v0.5.0 FR4, T-050-11) — this validator's OWN tiny disk read; ``core.release_events``
-    itself never does file I/O (core file-I/O purity ratchet, architect A9).
+def read_release_phase(specs_dir: Path, release_id: str) -> str | None:
+    """The ONE tri-state ``RELEASE.jsonl`` phase reader (v0.5.0 FR4/T-050-11, S1 FR23
+    firing amendment A6, `specs/releases/0.5.0/reviews/S1-FR23-firing.md` §3) — in the
+    shape of ``read_active_md``; ``core.release_events`` itself never does file I/O
+    (core file-I/O purity ratchet, architect A9).
+
+    The first Draft copy-pasted this same ~10-line body into ``hooks/sdd_gate.py`` and
+    ``container.py`` too, defended by precedent from the pre-existing
+    ``_active_field``/``read_active_md`` two-reader split — the S1 firing ruling names
+    that precedent itself as the "N readers of one file" defect this release exists to
+    retire (AR-1 §4), not a reason to add a third. This is now the ONE reader; the
+    hook's read is deleted until T-050-21A actually needs the phase DECISION value, and
+    the container's uncalled seam is deleted with it.
 
     ``str`` when the last ``phase`` record is readable (possibly ``""`` when the file
-    carries no ``phase`` record yet), ``""`` when ``path`` does not exist, ``None`` when
-    it exists but could not be read (genuine I/O failure) — callers must treat ``None``
-    as UNKNOWN, never as "no phase".
+    carries no ``phase`` record yet), ``""`` when
+    ``specs_dir/releases/<release_id>/RELEASE.jsonl`` does not exist, ``None`` when it
+    exists but could not be read (genuine I/O failure) — callers must treat ``None`` as
+    UNKNOWN, never as "no phase".
     """
+    path = specs_dir / "releases" / release_id / "RELEASE.jsonl"
     try:
         text = path.read_text(encoding="utf-8")
     except FileNotFoundError:
@@ -612,7 +623,7 @@ class ReleaseValidator:
         jsonl_path = self.specs_dir / "releases" / release / "RELEASE.jsonl"
         if not jsonl_path.exists():
             return issues
-        fold_phase = _fold_release_jsonl_phase(jsonl_path)
+        fold_phase = read_release_phase(self.specs_dir, release)
         if fold_phase is None or not fold_phase:
             return issues
         if fold_phase != active_phase:

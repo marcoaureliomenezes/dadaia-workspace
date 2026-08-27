@@ -1,19 +1,28 @@
 """Complexity ratchet for `cli/commands/specs.py` (T-050-05, FR1, A1.4).
 
-Intent: CONTRACT — A1.4.
+Intent: CONTRACT — A1.4 (the `#doctor`/`#upgrade` CC ratchet, permanent). The
+`features/migrate/upgrade.py` zero-diff proof below is
+Intent: SCAFFOLD — T-050-05 — expires: 0.6.0 (S1 FR23 firing amendment A7,
+`specs/releases/0.5.0/reviews/S1-FR23-firing.md` §3 LOW finding: a hand-kept SHA-256
+pin with no expiry is the `shipped-hashes.json` shape the forensic's P1/P4 condemn —
+legitimate as a one-release zero-diff proof, not as a permanent guard).
 
 `#upgrade` and `#doctor` are the engine of the forensic's chain 1 —
 `specs-upgrade-emits-atoms-violating-frontmatter-schema` bred four followers in eight
 days (specs/releases/0.5.0/SPEC.md FR1). `specs upgrade` is NOT grown by this
 release; `--recipe` renders in its own function so `#doctor`'s complexity does not
 move either. Baseline (T-050-03, before this release's FR1 work): `#upgrade` CC 26,
-`#doctor` CC 30. Lowering either ceiling is welcome; raising one requires a
-same-commit justification.
+`#doctor` CC 30, ratcheted DOWN at the S1 FR23 firing (A8) to the measured `radon`
+value at HEAD (10) — a ratchet that never tightens re-arms the exact chain-1 engine
+this test exists to close (`specs/releases/0.5.0/reviews/S1-FR23-firing.md` §4).
+Lowering either ceiling is welcome; raising one requires a same-commit justification.
 
 A1.4 also names a zero-diff assertion over `features/migrate/upgrade.py` — FR1's own
 rename automation is cut (fold 3, `software-architect` change 3), so that module must
 stay byte-identical under this task. Pinned by content hash so any edit under this
-release must justify itself here, not slip in silently.
+release must justify itself here, not slip in silently — SCAFFOLD, expires 0.6.0
+(A7): a hand-kept hash with no expiry is itself the P1 `shipped-hashes.json` shape at
+the test-tier level; V28 turns an unrenewed expiry RED at that release's closure.
 """
 
 from __future__ import annotations
@@ -30,10 +39,12 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SPECS_CLI = _REPO_ROOT / "dadaia_workspace" / "cli" / "commands" / "specs.py"
 _UPGRADE_MODULE = _REPO_ROOT / "dadaia_workspace" / "features" / "migrate" / "upgrade.py"
 
-# Recorded ceilings (ratchet, T-050-03 baseline). Lowering is welcome; raising needs
+# Recorded ceilings (ratchet, T-050-03 baseline; `_DOCTOR_CEILING` re-pinned at the
+# measured HEAD value by the S1 FR23 firing, A8 — "a ratchet that does not ratchet
+# lets #doctor regrow to 30 silently"). Lowering is welcome; raising needs a
 # same-commit justification.
 _UPGRADE_CEILING = 26
-_DOCTOR_CEILING = 30
+_DOCTOR_CEILING = 10
 
 # Pinned at T-050-05 (before this task touched anything else in the tree) — proves
 # `features/migrate/upgrade.py` is untouched by FR1's scaffold/doctor/--recipe work.
@@ -62,7 +73,9 @@ def test_upgrade_and_doctor_complexity_stay_at_or_below_baseline() -> None:
 
 def test_migrate_upgrade_module_is_untouched_by_fr1() -> None:
     """A1.4: `features/migrate/upgrade.py` stays byte-identical under T-050-05 — the
-    rename automation this module carries is explicitly cut from FR1's scope."""
+    rename automation this module carries is explicitly cut from FR1's scope.
+
+    Intent: SCAFFOLD — T-050-05 — expires: 0.6.0 (S1 FR23 firing amendment A7)."""
     digest = hashlib.sha256(_UPGRADE_MODULE.read_bytes()).hexdigest()
     assert digest == _UPGRADE_MODULE_SHA256, (
         "features/migrate/upgrade.py changed — T-050-05 (FR1) explicitly does not grow "

@@ -3,7 +3,9 @@
 Intent: CONTRACT — SPEC v0.5.0 A4.2 (milestone immutability: the fold takes the FIRST
 ``defined``/``implemented``/``shipped`` record and reports every later one as a
 duplicate finding, never silently overwriting it) plus the phase LAST-wins resolution
-D3 assigns the SDD gate. Size: SMALL — pure functions over in-memory text, no I/O.
+D3 assigns the SDD gate; A4 (S1 FR23 firing,
+`specs/releases/0.5.0/reviews/S1-FR23-firing.md`) for the U+2028 split-boundary case.
+Size: SMALL — pure functions over in-memory text, no I/O.
 """
 
 from __future__ import annotations
@@ -52,3 +54,26 @@ def test_fold_takes_last_phase_and_first_milestone_reporting_later_duplicates() 
     assert fold.duplicate_milestones[0].data["sha"] == "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     # the duplicate never overwrote the first-seen sha
     assert fold.milestones["defined"].data["sha"] != fold.duplicate_milestones[0].data["sha"]
+
+
+def test_a_note_carrying_a_unicode_line_separator_folds_to_one_event_not_zero() -> None:
+    """A4 (`S1-FR23-firing.md` finding F3): ``text.splitlines()`` treats U+2028 (and
+    U+2029/U+0085/U+000B/U+000C) as a line terminator, fragmenting one physical JSONL
+    line into two invalid halves that both fail ``json.loads`` — the exact
+    ``bug-event-field-with-unicode-line-separator-silently-drops-the-event`` root
+    cause, re-introduced in this new reader 3 days after that bug closed. A ``note``
+    record whose ``data.text`` embeds a raw U+2028 must still fold to exactly ONE
+    event with ZERO parse errors — the fix is ``text.split("\n")``, never
+    ``text.splitlines()``."""
+    line_separator = "\u2028"
+    note_line = (
+        '{"ts":"2026-08-27T10:00:00Z","event":"note","agent":"software-engineer",'
+        f'"data":{{"text":"before{line_separator}after"}}}}'
+    )
+
+    events, errors = parse_release_events(note_line)
+
+    assert errors == ()
+    assert len(events) == 1
+    assert events[0].event == "note"
+    assert events[0].data["text"] == f"before{line_separator}after"

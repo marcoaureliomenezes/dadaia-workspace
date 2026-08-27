@@ -9,19 +9,30 @@ authoring time against ``public/schemas/releases/release-event-v1.schema.json``.
 parsed events; ``core/`` file I/O is a ratchet (``tests/contract/test_core_file_io_purity.py``,
 architect A9) and adding this module's stem to that ratchet's authorized set would also
 require re-opening ``specs/memory/architecture.md`` — MEMORY, writable only in
-DEFINITION/CLOSURE. The three callers FR4 names (``hooks/sdd_gate.py``, ``container.py``,
-``features/specs/doctor_release.py``) each own their OWN tiny tri-state disk read, in the
-exact shape ``hooks.sdd_gate._active_field`` already uses for ``ACTIVE.md`` — precedent
-already exists for that split (``_active_field`` in ``hooks`` vs ``doctor_common.read_active_md``
-in ``features/specs``, two independent readers of the same file, for the same
-layer-boundary reason). What lands in exactly ONE place here is the FOLD semantics: which
-``phase`` record wins, which milestone record wins, and what counts as an immutability
-violation.
+DEFINITION/CLOSURE. **ONE reader owns the tri-state disk read** (S1 FR23 firing amendment
+A6, `specs/releases/0.5.0/reviews/S1-FR23-firing.md` §3 finding "three copy-pasted
+tri-state readers") — ``features/specs/doctor_release.py``'s ``read_release_phase``. The
+first Draft copy-pasted the same ~10-line body into ``hooks/sdd_gate.py`` and
+``container.py`` too, defended by precedent from ``_active_field``/``read_active_md``'s
+own two-reader split — the ruling names that precedent itself as the defect this release
+exists to retire (AR-1 §4's "N readers of one file"), not a reason to add a third. The
+hook's own read is deleted until T-050-21A actually needs the DECISION value (today it
+only reads ``ACTIVE.md``); the container's ``resolve_release_phase`` seam is deleted
+uncalled. What lands in exactly ONE place here is the FOLD semantics: which ``phase``
+record wins, which milestone record wins, and what counts as an immutability violation.
 
 A contract test (``tests/contract/test_release_events_read_only.py``) asserts this module's
 source contains no write call (``open(..., "w"/"a")``, ``.write_text(``, ``atomic_write(``) —
 milestone and phase records are appended elsewhere, by agents with file tools, because
 ``RELEASE.jsonl`` is append-only (no read-modify-write race to guard against here).
+
+**Split on ``"\n"`` only, never ``str.splitlines()`` (S1 FR23 firing amendment A4).**
+:func:`parse_release_events` briefly re-introduced the exact
+``bug-event-field-with-unicode-line-separator-silently-drops-the-event`` root cause: a
+U+2028/U+2029/U+0085 embedded in a ``note`` record's free-text ``data.text`` field
+fragments one physical JSONL line into two invalid halves, both silently dropped as
+parse errors. Fixed at the one-token change every other JSONL reader in this release
+already carries.
 """
 
 from __future__ import annotations
@@ -110,7 +121,7 @@ def parse_release_events(text: str) -> tuple[tuple[ReleaseEvent, ...], tuple[str
     """
     events: list[ReleaseEvent] = []
     errors: list[str] = []
-    for lineno, raw_line in enumerate(text.splitlines(), start=1):
+    for lineno, raw_line in enumerate(text.split("\n"), start=1):
         line = raw_line.strip()
         if not line:
             continue
