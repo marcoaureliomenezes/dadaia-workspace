@@ -1990,7 +1990,7 @@ CI-matrix note recorded.
 
 ---
 
-- [ ] **T-050-35 — Six-axis code review on the thawed tree**
+- [x] **T-050-35 — Six-axis code review on the thawed tree**
 
 **Owner role:** code-reviewer · **Commit:** `docs(T-050-35): release code review`
 
@@ -2012,7 +2012,7 @@ second record-update seam — that the single-owner rule (SPEC D-B) was supposed
 
 ---
 
-- [ ] **T-050-36 — Security review + the QA release verdict**
+- [x] **T-050-36 — Security review + the QA release verdict**
 
 **Owner role:** security-reviewer + qa-engineer · **Commit:**
 `docs(T-050-36): release verdicts`
