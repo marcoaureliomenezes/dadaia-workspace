@@ -1449,7 +1449,7 @@ motivated it (`precommit-backlog-doctor-blocks-unrelated-commits`). Confirm **ze
 
 ## Segment `S3` — the audit canon
 
-- [ ] **T-050-23 — FR13: audits become committed spec artifacts**
+- [-] **T-050-23 — FR13: audits become committed spec artifacts**
 
 **Owner role:** software-engineer (schema, scaffold) + ai-engineer (persona, scoped law) ·
 **Commit:** `feat(T-050-23): audits as committed artifacts — AUDIT.md + FINDINGS.jsonl`
@@ -1545,7 +1545,7 @@ metrics present in `PILLAR-BUGS.md` with baseline and target. **Tests: +1 / −0
 
 ---
 
-- [ ] **T-050-25 — FR15: `specs doctor` folds `FINDINGS.jsonl`**
+- [-] **T-050-25 — FR15: `specs doctor` folds `FINDINGS.jsonl`**
 
 **Owner role:** software-engineer · **Commit:** `refactor(T-050-25): fold FINDINGS.jsonl
 instead of regexing audit prose`
