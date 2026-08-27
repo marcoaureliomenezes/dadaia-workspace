@@ -220,3 +220,102 @@ after the F1 rework — narrower than its pre-FR7 state on the classes it exists
 Three multi-bug recurrence chains (privacy-leak-into-committed-material,
 hand-kept-field-list, `.dadaia/` duplicate allowlists) are each now structurally
 unrepresentable, per the standing order, not merely patched per instance.
+
+---
+
+## Re-verdict @395bfb35
+
+**Author:** qa-engineer, 2026-08-27
+**Governs:** T-045-35 (`rc-1`) — all three verdicts (QA, code, security) on one sha,
+required before the `feature/0.4.5` → `develop` PR merges.
+**Delta since the prior APPROVED sha (`27c3374a`):** `e34f1209` registers
+`push-gate-foreign-slug-layer-flags-library-asset-and-bug-id-substrings` (HIGH) — the
+rc-1 push-gate false positive; `7de4783f` is `software-architect`'s ruling
+(`T-045-35-foreign-slug-ruling.md`, option 1 selected); `395bfb35` carries the fix.
+
+### Verdict
+
+**APPROVED** for `395bfb352a4cdefa7cbbbf06d0c1908a1af38728`.
+
+### What the delta actually is
+
+`compile_slug_patterns` anchored a registry-derived slug with `\b`. Python's `\b` treats
+`-`/`.` as non-word delimiters, so a hyphenated slug (every `repos/<slug>` in this
+workspace is hyphenated) matched **inside** a longer hyphen/dot-glued identifier —
+`<slug>-anything`, `<slug>.ext` — not just as a whole token. The rc-1 push hit two false
+positives from this: the library's own tracked asset basename
+(`public/data/dadaia-AGENTS.md`-shaped path) and a ledger bug id beginning with a
+consumer slug substring, neither a real private-name publication. The fix replaces the
+`\b` anchor with a lookaround (`(?<![\w-])(?<!\w\.)…(?![\w-])(?!\.\w)`) that bounds the
+match to true token edges; `IGNORECASE` is kept. **One predicate, no branch, no
+allowlist, no new code path** — both consumers (`_slug_suppressed` and
+`_PathMasker._segment_is_offending`) inherit the change unmodified, by construction, not
+by a second edit kept in sync by convention.
+
+### Independent re-verification performed for this re-verdict
+
+```
+python -m pytest tests/unit/features/chokepoints/ -p no:cacheprovider -q
+  -> 108 passed
+dadaia ci preflight   (unpiped, exit captured directly)
+  -> [PASS] ruff format --check / ruff check / mypy --strict / lint-imports / pytest
+  -> exit 0
+dadaia bugs status
+  -> windows-xdist-workers-crash-on-unit-fast-tier  open  LOW
+  -> [ok] 1 open bug(s)                      (the AS-5 item only, unchanged)
+```
+
+`git show 395bfb35` read directly for both production files
+(`denylist_scan.py` +2/−1 logic + docstring, `service.py` docstring-word-swap only) and
+the test file — confirmed a whole-token regex swap, zero new branch/function/call site,
+zero allowlist.
+
+### Stewardship check on the 5 new tests (`test_denylist_scan.py`)
+
+| Check | Result |
+|---|---|
+| Intent + size declared at birth | All 5 declare `Intent: CONTRACT — T-045-35 …` in the docstring; appended to an existing declared-CONTRACT module, not a new undeclared file |
+| Synthetic names only | `_SYNTHETIC_FOREIGN_SLUG = "zz-fake-context-name"` — a fabricated slug, not a real foreign Spec Context or consumer repo name; no private name transcribed |
+| Structure-sensitive (P1 class) | None — no private-symbol import, no exact-string assertion on a message body (asserts on `outcome.hits` tuple contents and `source_layer` field, not on rendered text), no hand-kept inventory |
+| Duplicate coverage | No — one RED-then-GREEN pair (`test_foreign_slug_inside_hyphenated_basename_and_bug_id_does_not_match`, `test_foreign_slug_after_dotted_prefix_does_not_match`) plus three no-regression controls (bare-prose match, sentence-end-period match, `repos/<slug>/` path match) — each control asserts a distinct boundary condition, none redundant with another |
+| Tier | `tests/unit/` — SMALL, correctly the cheapest tier that detects a regex-boundary regression |
+
+**Verdict: 5 KEEP (admitted as-is).** Zero SCAFFOLD/undeclared, zero quarantine, zero new
+`tests/e2e/**`. No demotion/deletion action needed for this delta.
+
+### FR23 evidence triple (`push-gate-foreign-slug-layer-flags-library-asset-and-bug-id-substrings`, `resolved`)
+
+`evidence_loop` (RED-then-GREEN: 2 cases failed at `7de4783f`, green after the fix, plus
+a real chokepoint refspec replay going exit 1 → 0), `evidence_seam` (the 5 named test ids
+above), `evidence_diff` (`net-neutral: +2/−1 code, docstring updates only — no allowlist,
+no branch, no new code path`) — all three present, consistent with the diff I
+independently read.
+
+### Security verdict cross-check
+
+`security-reviewer` independently APPROVED this same sha
+(`specs/releases/v0.4.5/verdicts/395bfb352a4cdefa7cbbbf06d0c1908a1af38728.handoff.json`,
+commit `2c23e717`) — noted for T-045-35's "all three verdicts on one sha" precondition,
+not relied on in place of my own re-verification above.
+
+### Bug ledger, re-checked
+
+13 bugs from the original verdict remain terminal/AS-5-open as recorded; **+1** this
+delta (`push-gate-foreign-slug-layer-flags-library-asset-and-bug-id-substrings`, HIGH,
+`resolved` at `395bfb35`, FR23 triple present). `dadaia bugs status` confirms exactly one
+bug open workspace-wide (`windows-xdist-workers-crash-on-unit-fast-tier`, unchanged).
+
+### Security/privacy leakage note
+
+None. The fix narrows a false-positive detector — it does not weaken the push-gate's
+true-positive behavior (the three no-regression controls above prove bare-slug,
+sentence-end and `repos/<slug>/`-path occurrences still match). No secrets, tokens,
+home-absolute paths or real consumer/context names appear in the diff, the architect
+ruling, or this section — the test fixture's slug is fabricated. No new dependency.
+
+### Standing
+
+Everything else in the original verdict (§1–§9 above) is unchanged by this delta — this
+section supersedes only the "sha reviewed" fact for T-045-35's gate; it does not
+re-litigate FR1–FR16 or the earlier bug/test-suite findings, which still hold as recorded
+at `27c3374a`.
