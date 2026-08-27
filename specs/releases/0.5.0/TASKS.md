@@ -171,7 +171,7 @@ the archive move.
 
 ## W0 — promotion and definition
 
-- [ ] **T-050-01 — [git] Promotion + definition commit**
+- [x] **T-050-01 — [git] Promotion + definition commit**
 
 **Owner role:** dispatcher (+ `project-manager` for the backlog mechanics) · **Commit:**
 `docs(specs): 0.5.0 definition — governance, lineage and audits (Aprovado)`
@@ -228,7 +228,7 @@ sha and PR number captured for the `defined` milestone.
 
 ---
 
-- [ ] **T-050-03 — [shell] Baselines, before anything changes**
+- [x] **T-050-03 — [shell] Baselines, before anything changes**
 
 **Owner role:** software-engineer (+ `ai-engineer` for V11/V12) · **Commit:** the capture
 reference only
@@ -276,7 +276,7 @@ count is recorded beside it; every fold-3 baseline is a **measured number or an 
 
 ---
 
-- [ ] **T-050-03A — Widen the four reviewer personas to `specs/releases/**/reviews/**`**
+- [-] **T-050-03A — Widen the four reviewer personas to `specs/releases/**/reviews/**`**
 
 **Owner role:** ai-engineer · **Commit:** `feat(T-050-03A): reviewer personas may write
 release review artifacts`
@@ -321,7 +321,7 @@ its declared globs and does not admit `specs/memory/**`; `dadaia public doctor` 
 
 ## Segment `S1` — the v6 canon and the historical ledger rewrite
 
-- [ ] **T-050-04 — AR-1: the record model and the v5 boundary adapter, ruled**
+- [-] **T-050-04 — AR-1: the record model and the v5 boundary adapter, ruled**
 
 **Owner role:** software-architect · **Commit:** `docs(T-050-04): AR-1 ruling — bug record
 model and the v5 adapter boundary`
