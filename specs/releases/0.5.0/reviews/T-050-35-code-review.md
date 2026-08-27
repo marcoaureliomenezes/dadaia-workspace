@@ -498,3 +498,339 @@ twice (a single green run does not disprove a contention flake).
 `S1-AR1-ruling.md`, `FR23-firings.md`, the five coverage tables);
 `specs/audits/20260827-canon-v6-first-audit/`. Commit reviewed: `d981855c`
 (delta through `343acc38`, §0).
+
+---
+
+# Re-verdict @7280856c
+
+**Re-reviewed:** 2026-08-27 · `feature/0.5.0` · HEAD `7280856cb1310a5b7922284d10325cacce09ed9f`
+· working tree **clean** and quiescent (no concurrent session mid-edit, unlike the first
+pass) · rework delta `d981855c..7280856c` = **10 commits**.
+
+## Verdict: **APPROVE-CONDITIONAL**
+
+**Both blockers are cleared**, and both were fixed *structurally* — by deletion, not by
+raising a number or bolting on a branch. One new MEDIUM (**M-8**) was introduced by the
+rework itself; it is the exact condition below. Nothing in the rework reopens an FR, a
+ruling, or an architectural decision.
+
+**The condition (one, exact, checkable):**
+
+> `dadaia_workspace/cli/commands/newartifacts.py:142-154` catches `ValueError`,
+> `FileExistsError` and `RuntimeError` around `backlog_new(...)`. `7280856c` (F-14) made
+> that call able to raise a **fourth** exception —
+> `core.atomic_write.ConcurrentModificationError`, MRO
+> `[ConcurrentModificationError, Exception, BaseException, object]`, a subclass of none of
+> the three caught — so a genuine lost-update race now exits `dadaia backlog new` with an
+> uncaught traceback instead of the `[error] {exc}` + `sys.exit(1)` shape its three
+> siblings already use. Add the fourth `except` arm in the same shape, with one test arm.
+> No new branch beyond the catch; the CAS itself is correct and stays as written.
+
+That is a two-line completion of an existing handler chain, not new machinery. It must
+land before the `feature/0.5.0` push this review gates; nothing else does.
+
+---
+
+## 1. Evidence produced by this re-review (all at `7280856c`)
+
+Static checks against a **pristine `git archive` export** of HEAD (1,772 files), never the
+live tree:
+
+```
+ruff format --check --no-cache .                 -> 1008 files already formatted
+ruff check --no-cache .                          -> All checks passed!
+mypy --strict --no-incremental dadaia_workspace  -> Success: no issues found in 279 source files
+lint-imports                                     -> Contracts: 9 kept, 0 broken
+```
+
+Tests, live tree, `PYTHONDONTWRITEBYTECODE=1 … -p no:cacheprovider`:
+
+| Run | Result |
+|---|---|
+| `tests/contract/test_test_suite_ratchets.py` run 1 | **5 passed** in 7.04 s |
+| `tests/contract/test_test_suite_ratchets.py` run 2 | **5 passed** in 7.20 s |
+| `tests/contract/test_test_suite_ratchets.py` run 3 | **5 passed** in 7.06 s |
+| **full suite** `-q -n auto tests` | **2983 passed · 4 skipped · 1 warning in 50.05 s** |
+| `dadaia ci preflight` (the literal push gate) | **5/5 PASS** (ruff format, ruff check, mypy --strict, lint-imports, pytest) in 55.7 s, exit 0 |
+| `tests/contract/test_behavior_map.py` | **30 passed** (was 28/30 at `S2` — the citation/hash bookkeeping is now closed) |
+
+The four skips are the four known environment skips (two Windows-only, one no-LAN-IPv4,
+one codex entitlement — A22.4 honest degrade). The 1 warning is the pre-existing
+`pytest_asyncio` default-loop-scope deprecation, not this release's.
+
+**The suite is faster after the rework, not slower:** 50.05 s at HEAD vs 93.7 s / 123.1 s
+for the two first-pass runs. That is H-2's fix paying for itself — a whole second
+interpreter + plugin bootstrap left the run.
+
+---
+
+## 2. H-1 — **CLEARED**
+
+`d82c723e` (12 files, **+38 / −44 — net −6 lines**) swept `CLOSURE.md` exactly as
+`ACTIVE.md` was swept, and went past the three sites this review named.
+
+**Zero live citations, verified mechanically** over the pristine export:
+
+```
+grep -rn "CLOSURE\.md" dadaia_workspace/public   -> 18 hits, ALL retirement citations
+grep -rn "ACTIVE\.md"  dadaia_workspace/public   -> 16 hits, ALL retirement citations
+grep -n  "CLOSURE\.md" public/data/DADAIA.md
+                       public/scaffold/constitution.md
+                       public/scaffold/audits/AGENTS.md   -> ZERO hits at all three H-1 sites
+```
+
+Every surviving hit is a *retirement* statement — "retired at T-050-21", "replaces
+`CLOSURE.md`'s closure narrative", "never write a `CLOSURE.md`", "no separate
+`CLOSURE.md`", "Old `CLOSURE.md` section" (the `RELEASE-EVENTS.md` migration table),
+"its doctor-side parser retired T-050-25A — never expect one". Not one directs an agent
+to author or read the file. Four residual hits survived my first filter pass purely as
+line-wrap artifacts (the retirement clause sits on the following line) — read in context,
+all four are retirement citations too.
+
+Three sites were named in the finding; **twelve** were fixed. The fix direction was
+followed literally: no compatibility clause was added, the prose was repointed at the
+`RELEASE.jsonl` `note` records, and the diff is **net-negative**.
+
+Collateral verified: `dadaia public doctor` exit 0, `[ok] public-privacy`, `[ok]
+entities-derivation` (9 personas ↔ 9 sub-agents), no `[drift]`/`[missing]` line; the
+behavior-map hash tuples were re-recorded in the same commit (28 lines of
+`entities/behavior-map.json`) and `test_behavior_map.py` is now **30/30**.
+`DADAIA.md` moved **2772 → 2776 words (+4)** — V12's ≤ 22,011 always-on ceiling is not in
+play at that magnitude, and the reported 21,492.8 leaves 518.2 tokens of headroom.
+
+## 3. H-2 — **CLEARED, structurally**
+
+`3375cb9c` did not raise the timeout. It **deleted the subprocess**:
+
+- `subprocess.run(..., timeout=25)` → `pytest.main([...], plugins=[collector])` in-process.
+- The stdout-grep (`line.startswith("tests/")`) → a `_NodeidCollector` plugin reading
+  `item.nodeid` as structured data. A *second* fragility left with the first.
+- No private timeout survives: the measurement now answers to
+  `tests/conftest.py`'s `_TIER_TIMEOUTS["contract"]` — the single timeout authority every
+  other test already answers to, instead of "a second, tighter, ad hoc budget racing it
+  from inside" (the code's own words).
+- **No quarantine marker**, no `-p no:randomly` escape hatch, no skip. The bug
+  `test-v30-pyramid-shape-collect-only-subprocess-times-out-under-nauto-contention` is
+  `resolved`, not parked.
+
+This is the correct shape for this defect class: two mechanisms removed, none added, and
+the property the test asserts is unchanged. It is also immune to the *cause* rather than
+the *symptom* — a second OS-scheduled entity competing with `-n auto` workers no longer
+exists, so no future suite growth can re-arm it.
+
+**Determinism, proven the way the finding asked** ("a single green run does not disprove a
+contention flake"): 3× standalone green (7.04 / 7.20 / 7.06 s — a 0.16 s spread), 1× green
+*inside* `-n auto` with the whole suite as contention, and 1× green inside
+`dadaia ci preflight`. Five consecutive greens across both the contended and uncontended
+paths. V30 now reports rather than times out:
+
+```
+V30 pyramid (reported, not gated) — collected 2987: small 90.0% · medium 8.4% · large 1.6% — findings: none
+```
+
+`dadaia ci preflight` is deterministic again, which was H-2's stated acceptance.
+
+---
+
+## 4. New finding from the rework
+
+#### M-8 · MEDIUM · Patterns / dead error path · `dadaia_workspace/cli/commands/newartifacts.py:143`
+
+The condition above, stated once as a finding. `backlog_new` passes
+`expected_previous=previous_text` **unconditionally** (`features/backlog/document.py:579-589`
+— `""` when the file is absent, the file's bytes otherwise), so the CAS arm at
+`core/atomic_write.py:111` is reachable on every invocation, not just on a create. Under the
+NO-LOCKS DOCTRINE with concurrent agent sessions — and two of the eight open bugs are
+precisely concurrent-session contention — this is a realistic path, not a theoretical one.
+
+The **correctness** goal of F-14 is met: the lost update is prevented, and the docstrings at
+`document.py:552` and `:626` name the exception honestly. The defect is that the one
+CLI boundary that reaches it (`dadaia backlog new`) routes four sibling failures to
+`[error] …` + exit 1 and this fifth one to a traceback. `backlog_exit` /
+`remove_active_subsection` have **no** CLI caller today, so `backlog_new` is the single
+site to fix.
+
+Severity MEDIUM, not HIGH: no data is lost, no wrong answer is produced, and the blast
+radius is one command's error presentation under a race.
+
+## 5. Security-review MEDIUMs (`7280856c`) — verified, all sound
+
+Read against the six findings, per file:
+
+| Finding | Shape at HEAD | Assessment |
+|---|---|---|
+| **F-13** | `denylist_terms` default `= ()` **deleted**; now required keyword-only on `backlog_exit`. Four test call sites updated; zero production call sites existed. | Correct. The default was a silent re-arm of `backlog-histo-writer-skips-write-time-denylist-redaction` — a deletion, not a guard. |
+| **F-14** | Both `BACKLOG.md` writers route through the existing `core.atomic_write.atomic_write` with `expected_previous`. | Correct primitive, no second write path invented. See **M-8** for the one loose end. |
+| **F-16** | Bare `RELEASE_GLOB=*` expansion now validates each hit's release-id segment against the canon-derived pattern; new RED arm `test_arm3_ideas_direct_verdicts_dir_refused_fails_closed`. | Fails closed. |
+| **F-17** | The bash `case` pattern whose `*` crossed `/` replaced with an anchored `_is_verdict_evidence_path()`; the **dead** pre-v6 `specs/_archive/releases/*/verdicts/*` arm deleted; RED arm `test_arm6_…_still_disqualifies`. | Correct — one anchored predicate replaces a permissive glob, and a dead arm leaves with it. |
+| **F-18** | `PR_HEAD_SHA` shape-checked as 40-hex **before** it reaches any git argv, mirroring the existing `metrics.commit_sha` check; arm `test_arm8_symbolic_pr_head_sha_refused_before_any_git_argv`. | Correct, and it reuses the existing check's shape rather than inventing a second one. |
+| **F-20** | Scratch denies carried to every newly-opened canon area, **and** the latent ordering bug fixed — the `specs/releases/**` denies sat *before* `!/specs/releases/_archive/**`, so gitignore's last-match-wins silently undid them for every archived release. `git check-ignore` assertions added. | The ordering bug is the real catch here; the assertions pin it. |
+
+Production cost of the whole security commit: `dadaia_workspace/` **+33 / −8** in one file.
+The rest is the bash gate (+102/−23) and **+102 test lines** across three files. The
+commit message's own claim — "all changes are deletions … or routing through an existing
+primitive … no new branch, no new special case" — is **accurate as written**; I checked
+each of the six.
+
+`a0caa28e` (fictional denylist term in redaction fixtures) and `348d5547` (schema
+validation to the contract tier) are likewise sound and both are the *right* direction: a
+real operator term left a committed fixture, and a test moved tier rather than acquiring a
+skip.
+
+---
+
+## 6. The four second-code-path MEDIUMs — status at HEAD
+
+All four were "recommended, not blocking" in the first pass. **All four remain**, verified
+by grep over the pristine export. None is a regression; each is a duplication this release
+created that the rework did not take up.
+
+| id | Status | Evidence at `7280856c` | Intake name |
+|---|---|---|---|
+| **M-1** — third `RELEASE.jsonl` read shim + a docstring that denies it | **REMAINS** | 4 call sites of `parse_release_events` (`hooks/sdd_gate.py:182`, `features/specs/doctor_common.py:111`, `features/specs/doctor_release.py:635`, `features/reports/next.py:136`); the `("_archive", "_ideas")` predicate hand-written at `sdd_gate.py:170`, `doctor_common.py:71`, `next.py:120`. `doctor_common.py` still asserts *"every reader of these bytes goes through this one function … its only two (thin) callers"*. `grep -rl "ONE reader" tests` → **0**. | `release-jsonl-live-dir-predicate-to-core-and-pin-the-reader-count` |
+| **M-2 / M-3** — dead container seam, and the N+1 latent behind it | **REMAINS** | `grep -rn "\.resolved_commit("` over `dadaia_workspace/` → **0 hits**. `build_git_history_reader` = definition at `container.py:216` + 3 docstrings, no call. The `container.py:231` docstring still asserts *"the CLI composition root threads this exact adapter into `BugService(…)`"*. M-3 stays latent exactly because M-2 is. | `delete-or-wire-git-history-reader-seam-and-its-per-record-walk` |
+| **M-4** — `_CANON_SINGLE_FILENAMES` twice | **REMAINS** | `features/specs/memory_lint.py:307` and `features/panel/views/_md_render.py:139`, 11 lines of identical literal apart. | `canon-single-filenames-map-one-home-in-core` |
+| **M-5** — `_dataclass_field_names` three times | **REMAINS** | `core/models/findings.py:42`, `core/models/bugs.py:106`, `core/models/backlog.py:261`. The `backlog.py:26` docstring still names the other two while duplicating them. | `dataclass-field-names-helper-one-home-beside-redact-text` |
+| **M-6** — redaction asymmetry across the four JSONL artifacts | **REMAINS**, unchanged | `FINDINGS.jsonl` / `RELEASE.jsonl` are still agent-authored with the push-gate denylist scan as sole control — and the branch is **still unpushed**, so that control has still never run. | `findings-and-release-jsonl-redaction-asymmetry-write-it-down` |
+| **M-7** — `split("\n")`-not-`splitlines()`, no census | **REMAINS**, still exactly 7 sites | `core/release_events.py:124`, `features/bugs/migrate_v5.py:101`, `features/specs/doctor_governance.py:141` + `:343`, `infrastructure/jsonl_record_store.py:89` + `:132` + `:168`. All seven correct; nothing pins the eighth. | `jsonl-reader-splitlines-census-test` |
+
+**Routing.** Six intake candidates, named above, to `project-manager` for the
+operator-facing intake report. Every one is a *deletion or a collapse* — none adds a
+mechanism — so each is eligible under the standing order as written. **M-8** joins them
+under `backlog-new-cli-unhandled-concurrent-modification-error`, but unlike the other six
+it is this review's condition and belongs to **this** release.
+
+---
+
+## 7. Release defects for the closure record
+
+Recorded here so the operator disposes of them explicitly rather than discovering them
+after archive.
+
+#### D-1 · **FR15 declared −200 LOC and measured positive** (was **L-3**)
+
+Re-measured independently at HEAD over `02eef219..7280856c`, scope
+`dadaia_workspace/features/specs/doctor*.py`:
+
+```
+added 746   deleted 440   net +306
+  doctor.py               +27 / −6      doctor_release.py     +123 / −41
+  doctor_closure_audit.py +149 / −150   doctor_structural.py   +84 / −28
+  doctor_common.py       +138 / −35     doctor_memory.py       +17 / −3
+  doctor_governance.py   +208 / −177
+```
+
+T-050-34 §V19 reported **+236** over its own (narrower, FR15-named-file) scope; my
+`doctor*.py` glob gives **+306**. **Both are positive against a declared ≈−200**, and
+A22.3 is explicit: *"a positive net inside an FR that declared itself net-negative is a
+defect."* The declaration, not the code, is what failed — the regex→structured-fold
+conversion adds dataclass and helper code an LOC estimate could not have anticipated.
+
+The FR's structural wins are real and independently confirmed at HEAD:
+`radon cc dadaia_workspace/cli/commands/specs.py` → **`F 127:0 doctor - B (10)`**, down
+from 30. Four regex-prose checkers are gone. **This is a declaration defect, not a code
+defect** — the operator's numbered disposition should say which of the two it is retiring:
+the −200 claim, or the remaining deletion. Do **not** manufacture deletions to reach −200.
+
+#### D-2 · A22.9 test-count overshoot moved (was **L-4**)
+
+Collected items: **2982 → 2987 (+5)** across the rework, so the overshoot against the
+T-050-03 baseline moves **+91 → +96**. The +5 are the F-16/F-17/F-18 RED arms, the F-20
+`check-ignore` assertions and the F-13 call-site updates — i.e. **regression tests for
+security findings**, which is the *right* reason for a suite to grow and the same
+FR-attribution gap §3 already named (bug-fix and finding-fix commits contribute tests to
+no FR's `Tests:` line). §3's recommendation stands unchanged: accept the overshoot
+explicitly and numerically in the closure record; carry the roll-up mechanism as intake.
+
+#### D-3 · `specs doctor` warning count
+
+**1 error / 494 warnings** at HEAD (was 1/493), of which **484 are SPEC-DOC-033** —
+legacy pre-v6 bug records missing `caused_by`/`solution`. The single error remains the
+tolerated SPEC-DOC-024 (`TASKS.md` legitimately `Em revisão` during IMPLEMENTATION).
+`dadaia bugs stats` emits the same count as its own `[warn] 484 record(s) incomplete`.
+Pre-existing and WARN-only by design (D15), but 484 hides any new instance in the noise —
+closure note plus a bulk-backfill intake candidate, unchanged from §4.
+
+---
+
+## 8. Bug-surface delta of the rework (FR24)
+
+`dadaia bugs stats` at HEAD: **515 total · 8 open · 489 resolved · 13 superseded · 4
+rejected · 1 deferred** (first pass: 515 / **9** open / 488 resolved).
+
+**One open bug closed, zero opened.** The eight remaining are the same eight the first
+pass characterised, minus the V30 flake:
+
+```
+MEDIUM  concurrent-sessions-share-git-index-commit-boundary-contamination
+MEDIUM  concurrent-agent-git-add-clobbers-other-sessions-staged-files-into-unrelated-commit
+MEDIUM  bug-record-write-once-evidence-fields-can-embed-selfscan-triggering-literal-with-no-correction-path
+MEDIUM  radon-undercounts-nested-class-in-function-complexity-vs-ruff-c901
+MEDIUM  mutation-baseline-core-models-scope-omits-public-schemas-fixture-directory
+LOW     windows-xdist-workers-crash-on-unit-fast-tier
+LOW     backlog-cli-help-cites-retired-ledger-and-bl-dup
+LOW     memory-lint-blames-missing-delimiter-for-a-yaml-parse-error
+```
+
+Two are agent-operating-model contention, two are measurement-tooling gaps found *by* this
+release's own honest measurement, two are documentation staleness, one is the Windows LOW,
+one is a bug-record evidence edge case. **None is a design defect of this scope**, and the
+distribution is still the healthy shape: discovered by measuring, not caused by patching.
+
+**Per-feature direction of the rework itself:**
+
+| Feature | Direction | Evidence |
+|---|---|---|
+| **AI surface / the law** (FR11/FR12) | **reduced** | `d82c723e` is **net −6 lines** and takes the law from *contradicting* the retirement to *stating* it. The single highest-cost residual in the release is gone; the sweep now covers 12 sites, not the 3 named. |
+| **test suite** (FR22) | **reduced, structurally** | H-2 removed a subprocess **and** a stdout-grep and added neither. Two mechanisms out, zero in; wall clock −43 s. The one ratchet that "bought its property with a subprocess" no longer does. Suite grew +5 items, all security-regression arms. |
+| **backlog** (FR5) | **reduced** | F-13 deleted a defaulted parameter that silently re-armed a *just-closed* bug — the textbook shape of ending a loop rather than extending it. F-14 routed both writers through the **existing** `atomic_write` primitive instead of adding a lock or a retry. |
+| **chokepoints / CI gate** (FR9) | **reduced** | F-16/F-17/F-18 replaced two permissive glob/`case` patterns with anchored predicates, **deleted** a dead pre-v6 arm, and reused the existing sha shape-check. Every arm fails closed and each has a RED test. |
+| **repo hygiene** | **reduced** | F-20's latent last-match-wins ordering bug is a real live defect found and fixed, now pinned by `git check-ignore` assertions. |
+| **CLI error surface** | **increased, slightly** | **M-8** — one new raise reaches one CLI boundary that does not route it. The rework's only backward step, and the condition on this verdict. |
+
+**Net: the rework reduced the bug surface.** Production cost across all three fix commits
+is `dadaia_workspace/` **+71 / −52 = +19 lines** — for one closed bug, six closed security
+findings, and a swept law. Every fix is a deletion or a routing through a primitive that
+already existed. Not one adds a flag, a branch, a special case, a second code path or a
+cross-feature reach-in. Measured against the standing order, this is the shape asked for.
+
+---
+
+## 9. Re-verdict summary
+
+| Severity | First pass | At `7280856c` | Delta |
+|---|---:|---:|---|
+| CRITICAL | 0 | **0** | — |
+| **HIGH** | **2** | **0** | **H-1 cleared, H-2 cleared** |
+| MEDIUM | 7 | **7** | M-1…M-7 remain (all non-blocking, all routed); **M-8** new |
+| LOW | 4 | 2 | L-1 open; L-2 informational; **L-3 → D-1**, **L-4 → D-2** (closure record) |
+
+## 10. Recommendation
+
+**APPROVE-CONDITIONAL** on commit `7280856cb1310a5b7922284d10325cacce09ed9f`.
+
+Both blocking findings are discharged with evidence, both structurally. The static gate is
+clean on a pristine export (ruff format, ruff check, mypy --strict, lint-imports 9/9), the
+suite is green (**2983 passed · 4 skipped**, 50.05 s), the previously flaky ratchet is
+green **five consecutive times** across contended and uncontended paths, `dadaia ci
+preflight` is 5/5 green, `dadaia public doctor` is `[ok]` with no drift, and
+`test_behavior_map.py` recovered from 28/30 to 30/30.
+
+**Condition — must land before the `feature/0.5.0` push:** M-8 only, as stated verbatim in
+the header. Nothing else blocks.
+
+**Not blocking, routed to intake by name (§6):** M-1, M-2/M-3, M-4, M-5, M-6, M-7 — six
+candidates, each a deletion or a collapse.
+
+**Routed to the closure record for an explicit numbered operator disposition (§7):** D-1
+(FR15 declared −200, measured +236/+306), D-2 (A22.9 overshoot now +96 collected items),
+D-3 (484 SPEC-DOC-033 warnings). Add M-6's asymmetry as a written decision, per the first
+pass.
+
+**Re-review scope if M-8 is fixed:** the single `except` arm and its test — a targeted run
+of `tests/unit/cli` plus `dadaia ci preflight`. No further full re-review is warranted;
+this pass covered the whole rework delta.
+
+*Evidence for this re-verdict:* pristine export of `7280856c`; the five test runs and the
+preflight run tabulated in §1; grep transcripts in §2 and §6; `dadaia bugs stats`,
+`dadaia specs doctor`, `dadaia public doctor` at HEAD. Commit re-reviewed: **`7280856c`**.
