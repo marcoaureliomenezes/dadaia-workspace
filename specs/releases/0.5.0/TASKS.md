@@ -1051,7 +1051,7 @@ historical records.
 
 ---
 
-- [ ] **T-050-18 — FR9: de-slop the hooks to the publication boundary**
+- [-] **T-050-18 — FR9: de-slop the hooks to the publication boundary**
 
 **Owner role:** software-engineer · **Commit:** `refactor(T-050-18): hooks validate only at
 the publication boundary`
