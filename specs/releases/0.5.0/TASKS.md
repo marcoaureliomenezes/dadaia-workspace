@@ -582,7 +582,7 @@ list contract tests green. **Tests: +9 in this task and T-050-08 together; −11
 
 ---
 
-- [-] **T-050-08 — FR2 (switch + contract): every consumer reads records; the event fold dies**
+- [x] **T-050-08 — FR2 (switch + contract): every consumer reads records; the event fold dies**
 
 **Owner role:** software-engineer · **Commit:** `refactor(T-050-08): route bugs through the
 record model and delete the event fold`
@@ -643,7 +643,7 @@ event-fold and coherence cases inside them), each with its `qa-engineer` verdict
 
 ---
 
-- [ ] **T-050-09 — FR3 (build): the commit derivation, unit-tested on a fixture repo**
+- [-] **T-050-09 — FR3 (build): the commit derivation, unit-tested on a fixture repo**
 
 **Owner role:** software-engineer · **Commit:** `feat(T-050-09): derive registration and
 resolution commits in one pass over the ledger history`
