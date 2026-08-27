@@ -9,15 +9,17 @@ This directory contains all release directories for this Spec Context Project.
 
 ```
 releases/
-  ACTIVE.md                  — points to the currently active release
+  ACTIVE.md                  — dual-written phase pointer (transitional, see below)
   AGENTS.md                  — this file
   <release-id>/               — bare SemVer (e.g. `0.6.0`), the current axis
     SPEC.md                  — release specification (Status: Draft → Aprovado)
     PLAN.md                  — implementation plan (added after SPEC is approved)
     TASKS.md                 — task checklist with [ ]/[-]/[x] markers
+    RELEASE.jsonl            — append-only event stream: phase/defined/implemented/
+                                shipped/audited/rc/note (v0.5.0 FR4) — the canonical
+                                release+phase record and the closure narrative's home
     reviews/                 — pre-PR review artifacts
     verdicts/                — required-check evidence handoffs
-    CLOSURE.md               — closure report (added after all tasks are done)
   _ideas/<release-id>/        — pre-approval drafts; MUTATING, never a trust root
   _archive/<release-id>/      — archived releases (`v`-prefixed ids resolve here too)
 ```
@@ -30,28 +32,39 @@ releases/
 - Release directories are created with `dadaia release new <id>` — do NOT create them
   manually to ensure canonical SPEC.md frontmatter.
 - SDD lifecycle order: `SPEC.md` (Status: Draft) → operator approval → `PLAN.md` →
-  `TASKS.md` → implementation → `CLOSURE.md`.
-- Only one release may be in IMPLEMENTATION phase at a time. The active release is
-  declared in `ACTIVE.md`.
-- The `ACTIVE.md` format (schema v2):
-  ```
-  release: <release-id>
-  segment: <alpha-N|rc-N>   # optional — present for segmented releases
-  phase: <DISCOVERY|DEFINITION|SPEC|PLAN|TASKS|IMPLEMENTATION|CLOSURE|ARCHIVED>
-  ```
-  The branch, commit and push contract for each SDD stage is the `dd-gitflow-default`
-  skill — this file states only the specs-directory layout.
+  `TASKS.md` → implementation → closure (memory update, closure narrative in
+  `RELEASE.jsonl`, disposition sweep, artifact GC, archive — no separate `CLOSURE.md`;
+  full arc: `dd-release-implement`'s `RC-FLOW.md`).
+- Only one release may be in IMPLEMENTATION phase at a time.
 
-## ACTIVE.md Management
+## The active release and its phase (RELEASE.jsonl fold, D3/D7/D11)
 
-`ACTIVE.md` is managed by `product-engineer`. Agents must read it at the start of every
-session to resolve the active release before touching any implementation file. When no
-release is active, `ACTIVE.md` must contain `release: none`.
+**Canonical record: `RELEASE.jsonl`.** The active release's phase is the fold of the
+newest `phase` record in the live release's own `specs/releases/<release-id>/RELEASE.jsonl`
+(last `phase` record wins) — one file, event-sourced, replacing `ACTIVE.md`'s two-line
+format and `CLOSURE.md`'s closure narrative (SPEC FR4). The seven event kinds, who
+appends which milestone, and the exact `data` shape per kind: `dd-release-implement`'s
+`RELEASE-EVENTS.md` — referenced, not restated.
+
+**Transitional dual-write (until T-050-21A).** The SDD gate's own literal decision
+authority is still `ACTIVE.md`'s `phase:` line — it has not yet been repointed at the
+fold (expand→switch→contract, SPEC D-F). Every agent that appends a `phase` record to
+`RELEASE.jsonl` also writes the matching `release:`/`phase:` lines to `ACTIVE.md` in
+the same commit, so the two never diverge:
+```
+release: <release-id>
+segment: <alpha-N|rc-N>   # optional — present for segmented releases
+phase: <DISCOVERY|DEFINITION|SPEC|PLAN|TASKS|IMPLEMENTATION|CLOSURE|ARCHIVED>
+```
+When no release is active, `ACTIVE.md` carries `release: none`. `product-engineer`
+maintains both; every agent reads `RELEASE.jsonl` first and treats `ACTIVE.md` as the
+gate-facing mirror during the transition.
 
 ## `_ideas/` and `_archive/`
 
 `_ideas/<release-id>/` holds a pre-approval Draft (SPEC, and sometimes PLAN/TASKS) before
 its release opens for real — it stays MUTATING and is never treated as an evidence root
-by any required check. `_archive/<release-id>/` is the landing zone for a closed
-release, moved there by `git mv` at closure; both bare and legacy `v`-prefixed ids
-resolve for read-only archive lookups.
+by any required check; it carries no `RELEASE.jsonl` (a Draft mints no milestone).
+`_archive/<release-id>/` is the landing zone for a closed release, moved there by
+`git mv` at closure; both bare and legacy `v`-prefixed ids resolve for read-only archive
+lookups.
