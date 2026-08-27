@@ -885,7 +885,7 @@ structurally impossible — the model `qa-engineer` §7 asks every other FR to m
 
 ---
 
-- [-] **T-050-13A — FR5: relocate the 18 `consumed_backlog.json` sidecars before FR6**
+- [x] **T-050-13A — FR5: relocate the 18 `consumed_backlog.json` sidecars before FR6**
 
 **Owner role:** software-engineer · **Commit:** `fix(T-050-13A): keep BL-STALE's data feed
 across the archive deletion`
@@ -961,7 +961,7 @@ the relocated verdicts; the tag pushed and proven before anything is removed.
 
 ---
 
-- [ ] **T-050-15 — `S1` close: `qa-engineer` review committed on the branch**
+- [-] **T-050-15 — `S1` close: `qa-engineer` review committed on the branch**
 
 **Owner role:** qa-engineer · **Commit:** `docs(T-050-15): S1 QA close`
 
@@ -1156,7 +1156,7 @@ violated. **Tests: +5 / −0**, and every one of them names the baseline it pins
 
 ---
 
-- [-] **T-050-19 — FR10: `behavior-map.json` and its enforcer**
+- [x] **T-050-19 — FR10: `behavior-map.json` and its enforcer**
 
 **Owner role:** ai-engineer (the map) + software-engineer (the contract tests) · **Commit:**
 `feat(T-050-19): behavior map — every skill and scoped AGENTS.md maps to one DADAIA.md section`
@@ -1216,7 +1216,7 @@ whole `test_rules_skills_map.py`, ported not duplicated).**
 
 ---
 
-- [ ] **T-050-19A — FR10A: the public-assets hand rosters retire with the glob**
+- [-] **T-050-19A — FR10A: the public-assets hand rosters retire with the glob**
 
 **Owner role:** software-engineer (the deletions) + qa-engineer (the verdict on any roster
 kept) · **Commit:** `refactor(T-050-19A): retire the skill rosters FR10's glob makes redundant`
@@ -1261,7 +1261,7 @@ why this engine could be retired without spending the release's test budget).
 
 ---
 
-- [ ] **T-050-20 — FR11: `DADAIA.md` — anchors, the D15 posture, three short sections**
+- [-] **T-050-20 — FR11: `DADAIA.md` — anchors, the D15 posture, three short sections**
 
 **Owner role:** ai-engineer · **Commit:** `feat(T-050-20): DADAIA.md behavior anchors and the
 enforcement-posture section`
