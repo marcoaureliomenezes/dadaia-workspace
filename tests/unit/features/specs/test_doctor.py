@@ -126,11 +126,11 @@ def _make_clean_specs_tree(root: Path, release_id: str = "r1") -> Path:
     (specs / "memory" / "product" / "feature-a.md").write_text(
         MINIMAL_MEMORY_PRODUCT_FEATURE_MD, encoding="utf-8"
     )
-    (specs / "memory" / "architecture.md").write_text(
+    (specs / "memory" / "ARCHITECTURE.md").write_text(
         MINIMAL_MEMORY_ARCHITECTURE_MD, encoding="utf-8"
     )
-    (specs / "memory" / "tech-stack.md").write_text(MINIMAL_MEMORY_TECH_STACK_MD, encoding="utf-8")
-    (specs / "memory" / "quality-assurance.md").write_text(
+    (specs / "memory" / "TECHSTACK.md").write_text(MINIMAL_MEMORY_TECH_STACK_MD, encoding="utf-8")
+    (specs / "memory" / "QUALITY.md").write_text(
         "---\nslug: quality-assurance\ntitle: Quality Assurance\ncategory: core\n"
         "tldr: 'QA standards.'\nsummary: 'QA standards and anti-slop rules.'\n"
         "tags: []\nagent_tier: self-pull\ntoken_estimate: 20\nlast_updated: '2026-06-07'\n"
@@ -295,7 +295,7 @@ def test_fresh_scaffold_passes_all_tree_invariants(tmp_path: Path) -> None:
     assert (specs2_dir / "audits").is_dir()
     assert (specs2_dir / "audits" / "AGENTS.md").exists()
     assert (specs2_dir / "memory" / "AGENTS.md").exists()
-    assert (specs2_dir / "memory" / "quality-assurance.md").exists()
+    assert (specs2_dir / "memory" / "QUALITY.md").exists()
 
 
 # ---------------------------------------------------------------------------
@@ -320,7 +320,7 @@ def test_fresh_scaffold_passes_all_tree_invariants(tmp_path: Path) -> None:
         ),
         pytest.param(
             "missing-architecture",
-            lambda specs: (specs / "memory" / "architecture.md").unlink(),
+            lambda specs: (specs / "memory" / "ARCHITECTURE.md").unlink(),
             "SPEC-DOC-002",
             id="doc002-missing-architecture",
         ),
@@ -573,10 +573,10 @@ def test_tree4_creates_missing_dirs_others_have_no_autofix(tmp_path: Path) -> No
     doctor2.fix(issues2)
     assert root_spec.exists()
 
-    # TREE-3: missing architecture.md never auto-created; missing quality-assurance.md
+    # TREE-3: missing ARCHITECTURE.md never auto-created; missing QUALITY.md
     # trips both TREE-3 (WARNING, no autofix) and SPEC-DOC-002.
     specs3 = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-tree3"))
-    arch_md = specs3 / "memory" / "architecture.md"
+    arch_md = specs3 / "memory" / "ARCHITECTURE.md"
     arch_md.unlink()
     doctor3 = SpecsDoctor(specs3, templates_dir=_TEMPLATES_DIR)
     issues3 = doctor3.check()
@@ -587,19 +587,13 @@ def test_tree4_creates_missing_dirs_others_have_no_autofix(tmp_path: Path) -> No
     assert not arch_md.exists()
 
     specs3b = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-tree3-qa"))
-    qa_md = specs3b / "memory" / "quality-assurance.md"
+    qa_md = specs3b / "memory" / "QUALITY.md"
     qa_md.unlink()
     issues3b = SpecsDoctor(specs3b).check()
-    tree3_qa = [
-        i
-        for i in issues3b
-        if i.code == "TREE-3" and "quality-assurance.md" in (i.description or "")
-    ]
+    tree3_qa = [i for i in issues3b if i.code == "TREE-3" and "QUALITY.md" in (i.description or "")]
     assert tree3_qa and tree3_qa[0].severity == Severity.WARNING and not tree3_qa[0].fixable
     spec_doc_002_qa = [
-        i
-        for i in issues3b
-        if i.code == "SPEC-DOC-002" and "quality-assurance.md" in (i.description or "")
+        i for i in issues3b if i.code == "SPEC-DOC-002" and "QUALITY.md" in (i.description or "")
     ]
     assert spec_doc_002_qa
 

@@ -40,7 +40,7 @@ def _ws(tmp_path: Path, slug: str = "ctx") -> Path:
     )
     mem = tmp_path / "repos" / slug / "specs" / "memory"
     mem.mkdir(parents=True)
-    (mem / "tech-stack.md").write_text("# tech\nPython 3.12\n", encoding="utf-8")
+    (mem / "TECHSTACK.md").write_text("# tech\nPython 3.12\n", encoding="utf-8")
     (mem / "product").mkdir()
     (mem / "product" / "catalog.json").write_text('{"features": []}', encoding="utf-8")
     return tmp_path

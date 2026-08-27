@@ -62,7 +62,7 @@ def _seed_specs_tree(repo: Path, release: str) -> None:
         f"release: {release}\nphase: IMPLEMENTATION\n", encoding="utf-8"
     )
     (repo / "specs" / "memory" / "product").mkdir(parents=True)
-    (repo / "specs" / "memory" / "tech-stack.md").write_text("# tech\n", encoding="utf-8")
+    (repo / "specs" / "memory" / "TECHSTACK.md").write_text("# tech\n", encoding="utf-8")
     (repo / "specs" / "memory" / "product" / "catalog.json").write_text(
         '{"features": []}', encoding="utf-8"
     )

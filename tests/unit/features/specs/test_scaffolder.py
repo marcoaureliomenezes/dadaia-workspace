@@ -35,9 +35,9 @@ _EXPECTED_FILES = [
     "constitution.md",
     "AGENTS.md",
     "memory/AGENTS.md",
-    "memory/architecture.md",
-    "memory/tech-stack.md",
-    "memory/quality-assurance.md",
+    "memory/ARCHITECTURE.md",
+    "memory/TECHSTACK.md",
+    "memory/QUALITY.md",
     "memory/product/index.md",
     "memory/product/catalog.json",
     "releases/ACTIVE.md",
@@ -93,7 +93,7 @@ def test_scaffold_happy_path_creates_all_artifacts(tmp_path: Path) -> None:
     assert "phase: none" in active_content
 
     # Born-markdown .md stubs exist and start with YAML frontmatter (memory-markdown-source-v1).
-    for rel in ("memory/architecture.md", "memory/tech-stack.md", "memory/product/index.md"):
+    for rel in ("memory/ARCHITECTURE.md", "memory/TECHSTACK.md", "memory/product/index.md"):
         content = (specs_dir / rel).read_text(encoding="utf-8")
         assert content.startswith("---"), f"{rel} must start with YAML frontmatter"
 
@@ -204,7 +204,7 @@ def test_scaffold_idempotent_force_and_template_render(tmp_path: Path) -> None:
     assert len(second.skipped) == len(_EXPECTED_FILES)
 
     # --force overwrites existing (mutated) files with canonical scaffold content.
-    arch_path = specs_dir / "memory" / "architecture.md"
+    arch_path = specs_dir / "memory" / "ARCHITECTURE.md"
     arch_path.write_text("# MUTATED\n", encoding="utf-8")
     third = scaffold(
         specs_dir=specs_dir,

@@ -169,6 +169,64 @@ def test_wikilink_resolution_valid_and_broken(tmp_path: Path) -> None:
     assert not any("[[target]]" in e for e in result.errors)
 
 
+@pytest.mark.parametrize(
+    ("slug", "canon_filename"),
+    [
+        ("architecture", "ARCHITECTURE.md"),
+        ("tech-stack", "TECHSTACK.md"),
+        ("quality-assurance", "QUALITY.md"),
+    ],
+)
+def test_v6_canon_single_slug_stem_divergence_is_not_an_error(
+    tmp_path: Path, slug: str, canon_filename: str
+) -> None:
+    """v6 canon (FR1/A1.5/A1.6, T-050-06): the three top-level singles keep their
+    lowercase ``slug`` while their on-disk filename is the renamed canon name — this
+    is the ONE named exception to "slug == filename stem", not a general relaxation."""
+    schema = load_frontmatter_schema()
+    path = _make_atom(tmp_path, slug=slug, filename=canon_filename)
+
+    result = lint_atom(path, tmp_path, schema)
+
+    assert not any("filename stem" in e for e in result.errors), result.errors
+
+
+def test_slug_stem_mismatch_still_errors_when_not_a_v6_canon_single(tmp_path: Path) -> None:
+    """The v6 canon exception is narrow: an unrelated slug/stem mismatch still errors."""
+    schema = load_frontmatter_schema()
+    path = _make_atom(tmp_path, slug="architecture", filename="not-the-canon-name.md")
+
+    result = lint_atom(path, tmp_path, schema)
+
+    assert any("slug" in e and "filename stem" in e for e in result.errors)
+
+
+@pytest.mark.parametrize(
+    ("wikilink_slug", "canon_filename"),
+    [
+        ("architecture", "ARCHITECTURE.md"),
+        ("tech-stack", "TECHSTACK.md"),
+        ("quality-assurance", "QUALITY.md"),
+    ],
+)
+def test_wikilink_resolves_to_renamed_v6_canon_single(
+    tmp_path: Path, wikilink_slug: str, canon_filename: str
+) -> None:
+    """A ``[[wikilink]]`` to one of the v6 canon singles resolves to the RENAMED file,
+    not to ``<slug>.md`` (which no longer exists on disk)."""
+    schema = load_frontmatter_schema()
+    _make_atom(tmp_path, slug=wikilink_slug, filename=canon_filename)
+    path = _make_atom(
+        tmp_path,
+        slug="source",
+        body=f"## Purpose\n\nsee [[{wikilink_slug}]]\n",
+    )
+
+    result = lint_atom(path, tmp_path, schema)
+
+    assert not any(wikilink_slug in e for e in result.errors), result.errors
+
+
 def test_lint_directory_scans_toplevel_and_product_subdir_excludes_index(
     tmp_path: Path,
 ) -> None:

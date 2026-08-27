@@ -62,7 +62,7 @@ def memory_view_url(slug: str, path: str) -> str:
         Spec context project slug (e.g. "dadaia-workspace").
     path:
         Relative path to the atom within ``specs/memory/``, with ``.md``
-        extension (e.g. "architecture.md", "product/index.md").
+        extension (e.g. "ARCHITECTURE.md", "product/index.md").
 
     Returns
     -------
@@ -129,6 +129,19 @@ class _MemoryHTMLRenderer(HTMLRenderer):
 # Pattern: [[slug-with-dashes-or-underscores]]
 _WIKILINK_PATTERN = r"\[\[[^\]]+\]\]"
 
+# v6 canon top-level singles (FR1/A1.5/A1.6, T-050-06): these three atoms' on-disk
+# filenames diverge from their frontmatter `slug` (ARCHITECTURE.md/TECHSTACK.md/
+# QUALITY.md vs architecture/tech-stack/quality-assurance) — every `[[wikilink]]`
+# across the memory corpus still spells the slug, so the renderer must map it to the
+# renamed file instead of the generic `<slug>.md` guess (mirrors
+# ``features.specs.memory_lint._CANON_SINGLE_FILENAMES``; kept here too since panel
+# and specs are sibling features that may not import one another).
+_CANON_SINGLE_FILENAMES: dict[str, str] = {
+    "architecture": "ARCHITECTURE.md",
+    "tech-stack": "TECHSTACK.md",
+    "quality-assurance": "QUALITY.md",
+}
+
 
 def _parse_wikilink(inline: InlineParser, m: re.Match[str], state: InlineState) -> int:
     """Extract slug from [[slug]] and emit a wikilink token."""
@@ -152,7 +165,8 @@ def _make_render_wikilink(context_slug: str) -> Callable[[HTMLRenderer, str], st
     """
 
     def _render_wikilink(renderer: HTMLRenderer, text: str) -> str:  # noqa: ARG001
-        href = memory_view_url(context_slug, f"{text}.md")
+        target_name = _CANON_SINGLE_FILENAMES.get(text, f"{text}.md")
+        href = memory_view_url(context_slug, target_name)
         return f'<a href="{href}">{text}</a>'
 
     return _render_wikilink

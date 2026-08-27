@@ -84,7 +84,7 @@ def _ws_with_catalog(tmp_path: Path, slug: str = "ctx") -> Path:
     )
     mem = tmp_path / "repos" / slug / "specs" / "memory"
     (mem / "product").mkdir(parents=True)
-    (mem / "tech-stack.md").write_text("# tech\nPython 3.12\n", encoding="utf-8")
+    (mem / "TECHSTACK.md").write_text("# tech\nPython 3.12\n", encoding="utf-8")
     (mem / "product" / "catalog.json").write_text(
         json.dumps(_CATALOG, ensure_ascii=False, indent=2), encoding="utf-8"
     )
@@ -168,7 +168,7 @@ def test_index_md_fallback_emitted_verbatim_when_no_catalog(tmp_path: Path) -> N
     )
     mem = tmp_path / "repos" / "ctx" / "specs" / "memory"
     (mem / "product").mkdir(parents=True)
-    (mem / "tech-stack.md").write_text("# tech\n", encoding="utf-8")
+    (mem / "TECHSTACK.md").write_text("# tech\n", encoding="utf-8")
     (mem / "product" / "index.md").write_text("# product index\n- feature A\n", encoding="utf-8")
     out = _run(tmp_path, "idx1")
     assert "product index" in out

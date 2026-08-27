@@ -107,11 +107,11 @@ def test_symlink_directory_into_memory_classifies_memory(tmp_path: Path) -> None
 
     link_dir = ws / "repos" / slug / "shortcut"
     _symlink_or_skip(link_dir, mem_dir)
-    (mem_dir / "tech-stack.md").write_text("x\n", encoding="utf-8")
+    (mem_dir / "TECHSTACK.md").write_text("x\n", encoding="utf-8")
 
     payload = {
         "tool_name": "Write",
-        "tool_input": {"file_path": str(link_dir / "tech-stack.md")},
+        "tool_input": {"file_path": str(link_dir / "TECHSTACK.md")},
         "session_id": "claude-sess-dirlink",
     }
     result = run_hook_subprocess("sdd_gate", payload, claude_hook_env(ws))

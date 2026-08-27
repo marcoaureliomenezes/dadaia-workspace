@@ -55,7 +55,7 @@ def _ws(tmp_path: Path, slug: str = "ctx", *, with_memory: bool = True) -> Path:
     if with_memory:
         mem = specs / "memory"
         mem.mkdir()
-        (mem / "tech-stack.md").write_text("# tech\nPython 3.12\n", encoding="utf-8")
+        (mem / "TECHSTACK.md").write_text("# tech\nPython 3.12\n", encoding="utf-8")
         (mem / "product").mkdir()
         (mem / "product" / "catalog.json").write_text('{"features": []}', encoding="utf-8")
     return tmp_path
@@ -72,7 +72,7 @@ def _add_context(tmp_path: Path, slug: str, *, with_memory: bool = True) -> None
     if with_memory:
         mem = specs / "memory"
         mem.mkdir()
-        (mem / "tech-stack.md").write_text(f"# tech {slug}\nNode 20\n", encoding="utf-8")
+        (mem / "TECHSTACK.md").write_text(f"# tech {slug}\nNode 20\n", encoding="utf-8")
         (mem / "product").mkdir()
         (mem / "product" / "catalog.json").write_text('{"features": []}', encoding="utf-8")
 

@@ -26,7 +26,7 @@ _AGENTS_MD_COPIES = [
 ]
 
 # architecture.md carries a differently-worded false claim.
-_ARCHITECTURE_MD = _REPO_ROOT / "specs" / "memory" / "architecture.md"
+_ARCHITECTURE_MD = _REPO_ROOT / "specs" / "memory" / "ARCHITECTURE.md"
 _ARCHITECTURE_MD_LIE = "retains a deprecated optional `agent_tier`"
 
 # Truth markers: each corrected surface must say agent_tier is

@@ -77,7 +77,7 @@ def test_doctor_clean_tree_then_remove_backlog_then_fix_recreates_then_no_fix_ne
         f"Expected exit 0; got {fix_result.exit_code}:\n{fix_result.output}"
     )
 
-    arch = specs / "memory" / "architecture.md"
+    arch = specs / "memory" / "ARCHITECTURE.md"
     arch.unlink()
     _runner.invoke(app, ["specs", "doctor", "--specs-dir", str(specs)])
     assert not arch.exists(), "Without --fix, missing files must NOT be created"

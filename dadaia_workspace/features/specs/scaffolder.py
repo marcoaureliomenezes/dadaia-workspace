@@ -165,10 +165,12 @@ def scaffold(
     # memory-markdown-source-v1: .md is the sole source of truth; the legacy
     # .yaml/.html scaffolds and the placeholder.html stub were retired (no committed
     # HTML — the panel renders .md in-memory, D-4).
+    # v6 canon (FR1/A1.5/A1.6, T-050-06): the top-level trio renamed to
+    # ARCHITECTURE.md, TECHSTACK.md, QUALITY.md — source and dest share the name.
     _memory_md_stubs = [
-        ("architecture.md", specs_dir / "memory" / "architecture.md"),
-        ("tech-stack.md", specs_dir / "memory" / "tech-stack.md"),
-        ("quality-assurance.md", specs_dir / "memory" / "quality-assurance.md"),
+        ("ARCHITECTURE.md", specs_dir / "memory" / "ARCHITECTURE.md"),
+        ("TECHSTACK.md", specs_dir / "memory" / "TECHSTACK.md"),
+        ("QUALITY.md", specs_dir / "memory" / "QUALITY.md"),
         ("product/index.md", specs_dir / "memory" / "product" / "index.md"),
     ]
     for rel, dest in _memory_md_stubs:

@@ -182,6 +182,9 @@ _HEADING_GROUP_G: frozenset[str] = frozenset(
         "Adoption (9 core agents)",
         "Agent topology (9 core)",
         "Approved dependencies",
+        # v6 canon (FR1/A1.5/A1.6, T-050-06): specs/assets/ retired into
+        # ARCHITECTURE.md's own "## Architecture Diagrams" subsection.
+        "Architecture Diagrams",
         "Canonical commands",
         "Capability map",
         "Contracts between modules",
@@ -290,6 +293,19 @@ _FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
 _H2_RE = re.compile(r"^##\s+(.+)$", re.MULTILINE)
 _WIKILINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
 
+# v6 canon top-level singles (FR1/A1.5/A1.6, T-050-06): these three atoms' on-disk
+# filenames were renamed (ARCHITECTURE.md, TECHSTACK.md, QUALITY.md) while their
+# frontmatter `slug:` — the stable identity every `[[wikilink]]` across the memory
+# corpus already references — stays unchanged (architecture / tech-stack /
+# quality-assurance). This is the ONE named exception to "slug == filename stem" and
+# to "wikilink target == <slug>.md": both checks below consult it instead of adding a
+# second slug-resolution mechanism.
+_CANON_SINGLE_FILENAMES: dict[str, str] = {
+    "architecture": "ARCHITECTURE.md",
+    "tech-stack": "TECHSTACK.md",
+    "quality-assurance": "QUALITY.md",
+}
+
 
 def _parse_frontmatter(content: str) -> tuple[dict[str, Any] | None, str]:
     """Return (frontmatter_dict, body_text) or (None, full_content) if no frontmatter."""
@@ -375,7 +391,11 @@ def lint_atom(
 
     slug = fm.get("slug")
     if isinstance(slug, str) and slug != stem:
-        result.error(f"'slug' frontmatter value '{slug}' does not match filename stem '{stem}'.")
+        canon_name = _CANON_SINGLE_FILENAMES.get(slug)
+        if canon_name is None or f"{stem}.md" != canon_name:
+            result.error(
+                f"'slug' frontmatter value '{slug}' does not match filename stem '{stem}'."
+            )
 
     headings = _extract_h2_headings(body)
     seen: set[str] = set()
@@ -404,7 +424,8 @@ def lint_atom(
 
     wikilinks = _extract_wikilinks(body)
     for wikilink_slug in wikilinks:
-        if not any(memory_dir.rglob(f"{wikilink_slug}.md")):
+        target_name = _CANON_SINGLE_FILENAMES.get(wikilink_slug, f"{wikilink_slug}.md")
+        if not any(memory_dir.rglob(target_name)):
             result.error(
                 f"Wikilink [[{wikilink_slug}]] does not resolve to any .md file under {memory_dir}."
             )

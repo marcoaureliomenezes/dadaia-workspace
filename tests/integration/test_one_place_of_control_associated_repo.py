@@ -77,7 +77,7 @@ def _seed_main_repo(repo: Path) -> None:
     )
     mem = repo / "specs" / "memory" / "product"
     mem.mkdir(parents=True)
-    (repo / "specs" / "memory" / "tech-stack.md").write_text("# tech\nmain\n", encoding="utf-8")
+    (repo / "specs" / "memory" / "TECHSTACK.md").write_text("# tech\nmain\n", encoding="utf-8")
     (mem / "catalog.json").write_text('{"features": []}', encoding="utf-8")
     # A2.8 (backlog doctor): an empty backlog/ dir with NO BACKLOG.md is a clean no-op.
     (repo / "specs" / "backlog").mkdir(parents=True)
@@ -94,7 +94,7 @@ def _seed_associated_repo(repo: Path) -> None:
         f"release: {_ASSOC_RELEASE}\nphase: {_ASSOC_PHASE}\n", encoding="utf-8"
     )
     (repo / "specs" / "memory").mkdir(parents=True)
-    (repo / "specs" / "memory" / "tech-stack.md").write_text(
+    (repo / "specs" / "memory" / "TECHSTACK.md").write_text(
         f"# the associated repo's OWN tech stack\n{_ASSOC_MEMORY_MARKER}\n", encoding="utf-8"
     )
     (repo / "specs" / "backlog").mkdir(parents=True)

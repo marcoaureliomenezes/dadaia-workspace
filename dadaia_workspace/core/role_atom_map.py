@@ -16,8 +16,8 @@ from __future__ import annotations
 #: ``security-reviewer``, ``project-auditor``) carries no mapped atom: the harness injects
 #: nothing for it, and the v1.2 coverage check imposes no requirement on it.
 ROLE_ATOM_MAP: dict[str, str] = {
-    "software-architect": "memory/architecture.md",
-    "qa-engineer": "memory/quality-assurance.md",
+    "software-architect": "memory/ARCHITECTURE.md",
+    "qa-engineer": "memory/QUALITY.md",
     "product-engineer": "memory/product/catalog.json",
 }
 

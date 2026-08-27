@@ -191,7 +191,7 @@ def test_ctx_inject_hook_never_mutates_tasks_md_content(tmp_path: Path) -> None:
     target = _seed_release_tasks_md(specs_dir)
     mem = specs_dir / "memory"
     mem.mkdir(parents=True, exist_ok=True)
-    (mem / "tech-stack.md").write_text("# tech\nPython 3.12\n", encoding="utf-8")
+    (mem / "TECHSTACK.md").write_text("# tech\nPython 3.12\n", encoding="utf-8")
     (mem / "product").mkdir(exist_ok=True)
     (mem / "product" / "catalog.json").write_text('{"features": []}', encoding="utf-8")
     before = target.read_text(encoding="utf-8")

@@ -61,9 +61,19 @@ def _seed_below_canonical_tree(root: Path) -> Path:
     scaffold_memory = (
         Path(__import__("dadaia_workspace").__file__).parent / "public" / "scaffold" / "memory"
     )
-    for rel in ("architecture.md", "tech-stack.md", "quality-assurance.md"):
+    # This fixture is a deliberately BELOW-canonical (pre-v6, pattern version 0) tree —
+    # `specs upgrade` is not grown to rename these case-only (FR1, T-050-05/T-050-06:
+    # the rename is a by-hand recipe step, never automated) — so the legacy lowercase
+    # destination names are kept on purpose. Only the scaffold SOURCE filenames moved
+    # to the v6 canon (ARCHITECTURE.md/TECHSTACK.md/QUALITY.md).
+    _legacy_to_canon_source = {
+        "architecture.md": "ARCHITECTURE.md",
+        "tech-stack.md": "TECHSTACK.md",
+        "quality-assurance.md": "QUALITY.md",
+    }
+    for rel, source_name in _legacy_to_canon_source.items():
         (specs / "memory" / rel).write_text(
-            (scaffold_memory / rel).read_text(encoding="utf-8"), encoding="utf-8"
+            (scaffold_memory / source_name).read_text(encoding="utf-8"), encoding="utf-8"
         )
     (specs / "memory" / "product" / "index.md").write_text(
         (scaffold_memory / "product" / "index.md").read_text(encoding="utf-8"),

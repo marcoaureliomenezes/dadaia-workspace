@@ -19,10 +19,12 @@ from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIs
 from dadaia_workspace.features.specs.template_history import was_shipped
 
 # TREE-3: memory .md files that must exist.  No Jinja templates — .md is canonical source.
+# v6 canon (FR1/A1.5/A1.6, T-050-06): the top-level trio renamed to ARCHITECTURE.md,
+# TECHSTACK.md, QUALITY.md — case-only for the first, word-shortened for the other two.
 _TREE3_MEMORY_FILES: tuple[str, ...] = (
-    "architecture.md",
-    "tech-stack.md",
-    "quality-assurance.md",
+    "ARCHITECTURE.md",
+    "TECHSTACK.md",
+    "QUALITY.md",
     "product/index.md",
 )
 
@@ -123,8 +125,8 @@ class StructuralValidator:
     def check_tree3_memory_md(self) -> list[SpecsDoctorIssue]:
         """TREE-3: required memory .md atom files must exist.
 
-        Checks: memory/architecture.md, memory/tech-stack.md,
-        memory/quality-assurance.md, memory/product/index.md.
+        Checks: memory/ARCHITECTURE.md, memory/TECHSTACK.md,
+        memory/QUALITY.md, memory/product/index.md.
 
         .md is the canonical source (memory-markdown-source-v1 / D-4).
         No auto-fix: .md atoms are operator-authored, not generated from templates.

@@ -183,7 +183,7 @@ declares is required, and an undeclared field is invalid — the schema rejects 
 `SpecsDoctor` is a thin coordinator that owns `check()`/`fix()` ORDER and delegates every
 family's logic to six single-responsibility validator siblings over two shared leaf
 modules; the class-level picture and its regeneration law are
-[`specs/assets/architecture/doctor-decomposition.md`](../assets/architecture/doctor-decomposition.md),
+the `SpecsDoctor` diagram in this atom's **Architecture Diagrams** section below,
 kept honest by an introspection drift-guard that imports the live modules. Release
 scaffolding is `features/spec_artifacts/new_artifacts.py`, which creates a release SPEC and
 nothing else — the workspace scaffolds no hotfix release, because a bug fix carries no
@@ -321,6 +321,246 @@ which surface carries it — a harness that resolves an import chain from its ow
 constitution needs no rules-directory mirror, and one that reads `AGENTS.md` natively
 keeps its own path. The decision lives at the seam, never as a per-file exclusion, and no
 harness ends with zero copies ([[public-asset-distribution]]).
+
+## Architecture Diagrams
+
+Retired from `specs/assets/architecture/` (FR1, T-050-06): the v6 canon root has no `assets/` member, so the three class/package diagrams that lived there fold in here, verbatim, as their own subsections. `tests/contract/test_architecture_diagrams_current.py` parses these in-doc Mermaid blocks the same way it parsed the retired files.
+
+### `features/specs/doctor` — SpecsDoctor coordinator + validator siblings
+
+This class diagram is the canonical picture of the `features/specs/doctor` subsystem: a thin
+`SpecsDoctor` **coordinator** that owns `check()`/`fix()` ORDER and delegates all LOGIC to six
+single-responsibility validator siblings, plus two shared leaf modules (`doctor_types`,
+`doctor_common`). Each validator is independently testable; the coordinator holds no family
+logic of its own.
+
+Boundary imports are **confined** to exactly one validator each: `doctor_memory` is the sole
+holder of the lazy `infrastructure.subprocess_runner` edge (the LINT-1 shell-out), and
+`doctor_governance` is the sole holder of the `features.backlog.document` edge (the parsed
+ACTIVE/LEDGER model it validates against, never a second grammar reader). The coordinator
+holds neither, and the doctor package carries no `spec_context` edge at all.
+
+```mermaid
+classDiagram
+    class SpecsDoctor {
+        +check() list~SpecsDoctorIssue~
+        +fix() list~SpecsDoctorIssue~
+    }
+    class StructuralValidator {
+        +check_tree1_foundation()
+        +check_tree4_required_dirs()
+        +fix_tree4()
+    }
+    class MemoryValidator {
+        +check_memory_files()
+        +check_cat1_catalog_sync()
+        +check_lint1_memory_atoms()
+    }
+    class ReleaseValidator {
+        +check_active_md()
+        +check_release_semver_naming()
+        +check_phase_markers_coherence()
+    }
+    class ClosureAuditValidator {
+        +check_archive_closures()
+        +check_audit_disposition()
+        +fix_archive_dir()
+    }
+    class GovernanceValidator {
+        +check_consumed_backlog_disposition()
+        +check_bug_status_canon()
+        +check_bugs_jsonl_invariant()
+    }
+    class CoherenceValidator {
+        +check_constitution()
+        +check_constitution_file_refs()
+        +check_specs_pattern_version()
+    }
+    class doctor_types {
+        <<leaf module>>
+        Severity
+        SpecsDoctorIssue
+    }
+    class doctor_common {
+        <<leaf module>>
+        read_active_md()
+        iter_archive_release_dirs()
+    }
+
+    SpecsDoctor --> StructuralValidator : owns ORDER
+    SpecsDoctor --> MemoryValidator : owns ORDER
+    SpecsDoctor --> ReleaseValidator : owns ORDER
+    SpecsDoctor --> ClosureAuditValidator : owns ORDER
+    SpecsDoctor --> GovernanceValidator : owns ORDER
+    SpecsDoctor --> CoherenceValidator : owns ORDER
+    StructuralValidator ..> doctor_types : uses
+    MemoryValidator ..> doctor_types : uses
+    ReleaseValidator ..> doctor_common : uses
+    ClosureAuditValidator ..> doctor_common : uses
+    GovernanceValidator ..> doctor_common : uses
+    CoherenceValidator ..> doctor_types : uses
+
+    note for MemoryValidator "SOLE holder of the lazy infrastructure.subprocess_runner import (boundary edge)"
+    note for GovernanceValidator "SOLE holder of the features.backlog.document import — the parsed backlog model, one grammar reader"
+    note for SpecsDoctor "imports NEITHER spec_context NOR subprocess_runner — no cross-feature edge of its own"
+```
+
+**Regeneration law.** Regenerate at the closure of every structural release (any rename,
+split, or merge of the `SpecsDoctor` coordinator or its validator siblings). The class names
+above are pinned by the introspection drift-guard
+`tests/contract/test_architecture_diagrams_current.py`, which imports the live `doctor_*`
+modules and fails if a diagrammed class name goes stale or a live validator is missing. The
+same guard requires this file to carry exactly one fenced Mermaid block.
+
+### `dadaia_workspace/features` — package map (26 packages)
+
+**Release origin:** v0.1.55 (Architecture Decomposition, FR3). This package graph is the
+canonical picture of the feature layer after the `reports_next` / `reports_retention` /
+`reports_validation` triplet merged into one `features/reports/` package (flat `next` /
+`retention` / `validation` submodules), plus the v0.2.5 capability, certification, and
+transactional reconciliation boundaries. The current feature count is **26**.
+
+Each feature is isolated (no feature imports another feature — composition happens in
+`container.py`); the surviving cross-feature edges are frozen by the import-linter
+`features-no-cross-feature` contract (ignore-cap **26 = 9/4/13**, unchanged this release —
+the doctor + reports moves repoint existing edges 1:1). The `workflows ↔ lifecycle` cycle is
+broken by hosting the governed catalog seam in `features/lifecycle/governed_catalog.py`,
+pinned by the `lifecycle-no-workflows` contract.
+
+```mermaid
+flowchart TB
+    subgraph features["dadaia_workspace/features — 26 packages"]
+        academy["academy"]
+        agents["agents"]
+        ai_surface["ai_surface"]
+        backlog["backlog"]
+        bugs["bugs"]
+        capabilities["capabilities"]
+        certification["certification"]
+        chokepoints["chokepoints"]
+        ci_preflight["ci_preflight"]
+        export["export"]
+        import_["import_"]
+        lifecycle["lifecycle"]
+        migrate["migrate"]
+        panel["panel"]
+        public["public"]
+        reconcile["reconcile"]
+        reports["reports"]
+        repos["repos"]
+        server_registry["server_registry"]
+        spec_artifacts["spec_artifacts"]
+        spec_context["spec_context"]
+        specs["specs"]
+        telemetry["telemetry"]
+        tmp_gc["tmp_gc"]
+        workflows["workflows"]
+        workspace["workspace"]
+        workspace_clean["workspace_clean"]
+    end
+
+    subgraph reports_pkg["features/reports — merged v0.1.55 FR3 (was 3 top-level packages)"]
+        next["next"]
+        retention["retention"]
+        validation["validation"]
+    end
+
+    reports --> reports_pkg
+    lifecycle -. governed_catalog seam .-> workflows
+    container["container.py (composition root)"] --> features
+    core["core/ (models · protocols · exceptions)"]
+    features --> core
+
+    note1["edge #7: lifecycle.report_workflow -> reports.validation (FR3 target repoint)"]
+    reports_pkg -.- note1
+```
+
+**Regeneration law.** Regenerate at the closure of every structural release (any feature
+package added, removed, renamed, split, or merged). The 26 package names and the three
+`features/reports` submodule names above are pinned by the introspection drift-guard
+`tests/contract/test_architecture_diagrams_current.py`, which discovers the live packages via
+`pkgutil` and fails if a diagrammed package name goes stale or a live package is missing.
+
+### `features/panel/views` — per-domain API view modules
+
+**Release origin:** v0.1.55 (Architecture Decomposition, FR2). This module graph is the
+canonical picture of the decomposed panel API surface: the former 1,279-line
+`features/panel/views/api.py` god module split into **seven per-domain view modules**, one
+responsibility each. `api.py` is **deleted** — there is no facade, barrel, or re-export shim.
+`container.py` imports each `render_api_*` function from its per-domain module via explicit
+named imports (extending the incumbent named-import pattern shared with
+`panel.views.workflow_policy`).
+
+Every module imports **only** `features.panel.service` (`PanelService`) plus `core.models` —
+zero cross-feature / infrastructure edges — so FR2 changed no `setup.cfg` ignore edge.
+
+```mermaid
+classDiagram
+    class PanelService {
+        <<service>>
+    }
+    class container {
+        <<composition root>>
+        build_panel_views()
+    }
+    class api_servers {
+        <<view module>>
+        render_api_servers()
+    }
+    class api_contexts {
+        <<view module>>
+        render_api_contexts()
+    }
+    class api_agents {
+        <<view module>>
+        render_api_agents_canonical()
+        render_api_agent_prompt()
+    }
+    class api_sessions {
+        <<view module>>
+        render_api_sessions()
+    }
+    class api_academy {
+        <<view module>>
+        render_api_academy()
+    }
+    class api_reports {
+        <<view module>>
+        render_api_reports()
+        serve_report_file()
+        mark_report_important()
+        unmark_report_important()
+        delete_report_file()
+    }
+    class api_health {
+        <<view module>>
+        render_health()
+    }
+
+    container ..> api_servers : named import
+    container ..> api_contexts : named import
+    container ..> api_agents : named import
+    container ..> api_sessions : named import
+    container ..> api_academy : named import
+    container ..> api_reports : named import
+    container ..> api_health : named import
+    api_servers ..> PanelService
+    api_contexts ..> PanelService
+    api_agents ..> PanelService
+    api_sessions ..> PanelService
+    api_academy ..> PanelService
+    api_reports ..> PanelService
+    api_health ..> PanelService
+
+    note for container "no facade / no api.py barrel — api.py is DELETED; each render_api_* named-imported from its domain module"
+```
+
+**Regeneration law.** Regenerate at the closure of every structural release (any rename,
+split, or merge of a panel `api_*` view module or its public render functions). The module
+and function names above are pinned by the introspection drift-guard
+`tests/contract/test_architecture_diagrams_current.py`, which imports the live
+`features.panel.views.api_*` modules and fails if a diagrammed name goes stale or a live
+render function is missing.
 
 ## Dependencies
 

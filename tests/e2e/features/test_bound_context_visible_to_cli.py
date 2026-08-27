@@ -86,7 +86,7 @@ def _make_workspace(root: Path) -> Path:
         f"release: {_RELEASE}\nphase: IMPLEMENTATION\n", encoding="utf-8"
     )
     (repo / "specs" / "memory" / "product").mkdir(parents=True)
-    (repo / "specs" / "memory" / "tech-stack.md").write_text(
+    (repo / "specs" / "memory" / "TECHSTACK.md").write_text(
         "# tech\nJOURNEY-MARKER\n", encoding="utf-8"
     )
     (repo / "specs" / "memory" / "product" / "catalog.json").write_text(

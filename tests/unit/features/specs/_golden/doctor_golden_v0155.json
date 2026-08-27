@@ -8,20 +8,20 @@
     },
     {
       "code": "SPEC-DOC-002",
-      "description": "memory/architecture.md is missing — memory must be Markdown (.md)",
-      "path": "<SPECS>/memory/architecture.md",
+      "description": "memory/ARCHITECTURE.md is missing — memory must be Markdown (.md)",
+      "path": "<SPECS>/memory/ARCHITECTURE.md",
       "severity": "error"
     },
     {
       "code": "SPEC-DOC-002",
-      "description": "memory/tech-stack.md is missing — memory must be Markdown (.md)",
-      "path": "<SPECS>/memory/tech-stack.md",
+      "description": "memory/TECHSTACK.md is missing — memory must be Markdown (.md)",
+      "path": "<SPECS>/memory/TECHSTACK.md",
       "severity": "error"
     },
     {
       "code": "SPEC-DOC-002",
-      "description": "memory/quality-assurance.md is missing — memory must be Markdown (.md)",
-      "path": "<SPECS>/memory/quality-assurance.md",
+      "description": "memory/QUALITY.md is missing — memory must be Markdown (.md)",
+      "path": "<SPECS>/memory/QUALITY.md",
       "severity": "error"
     },
     {
@@ -44,20 +44,20 @@
     },
     {
       "code": "TREE-3",
-      "description": "memory/architecture.md is missing — required memory .md atom. Create it using `dadaia memory product add` or the born-markdown scaffold.",
-      "path": "<SPECS>/memory/architecture.md",
+      "description": "memory/ARCHITECTURE.md is missing — required memory .md atom. Create it using `dadaia memory product add` or the born-markdown scaffold.",
+      "path": "<SPECS>/memory/ARCHITECTURE.md",
       "severity": "warning"
     },
     {
       "code": "TREE-3",
-      "description": "memory/tech-stack.md is missing — required memory .md atom. Create it using `dadaia memory product add` or the born-markdown scaffold.",
-      "path": "<SPECS>/memory/tech-stack.md",
+      "description": "memory/TECHSTACK.md is missing — required memory .md atom. Create it using `dadaia memory product add` or the born-markdown scaffold.",
+      "path": "<SPECS>/memory/TECHSTACK.md",
       "severity": "warning"
     },
     {
       "code": "TREE-3",
-      "description": "memory/quality-assurance.md is missing — required memory .md atom. Create it using `dadaia memory product add` or the born-markdown scaffold.",
-      "path": "<SPECS>/memory/quality-assurance.md",
+      "description": "memory/QUALITY.md is missing — required memory .md atom. Create it using `dadaia memory product add` or the born-markdown scaffold.",
+      "path": "<SPECS>/memory/QUALITY.md",
       "severity": "warning"
     },
     {

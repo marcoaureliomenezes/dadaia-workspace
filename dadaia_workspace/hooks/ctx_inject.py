@@ -1,7 +1,7 @@
 """Context-injection hook (the canonical, cross-platform gate surface).
 
 Invoked on SessionStart and UserPromptSubmit. It injects the lean workspace bootstrap
-(context line + tech-stack.md + catalog — FR30, T-044-60: the four-point dispatcher
+(context line + TECHSTACK.md + catalog — FR30, T-044-60: the four-point dispatcher
 preflight restatement of ``DADAIA.md`` §1/§2 is deleted; it is law, not state). A
 session-keyed sentinel
 guards re-injection: subsequent prompts emit nothing UNLESS this session's own bind is
@@ -242,7 +242,7 @@ def _digest_catalog(raw: str) -> str:
     return json.dumps({"features": digested}, ensure_ascii=False, indent=2)
 
 
-#: Max non-empty lines of ``tech-stack.md`` kept in the bind-time SESSION bootstrap digest.
+#: Max non-empty lines of ``TECHSTACK.md`` kept in the bind-time SESSION bootstrap digest.
 #: WS-C dehydration (v0.1.30 / T-30-E-05): the bootstrap is a lean session-orientation aid
 #: for an interactive agent session, so the hook does not dump the FULL tech-stack body —
 #: it emits a bounded digest plus a self-pull pointer. A small tech-stack file (≤ the cap)
@@ -251,7 +251,7 @@ _TECH_STACK_DIGEST_MAX_LINES = 24
 
 
 def _digest_tech_stack(raw: str) -> str:
-    """Return a bounded digest of ``tech-stack.md`` for the lean session bootstrap.
+    """Return a bounded digest of ``TECHSTACK.md`` for the lean session bootstrap.
 
     Keeps the leading non-empty lines, capped at :data:`_TECH_STACK_DIGEST_MAX_LINES`. When
     the file is already within the cap it is returned verbatim (so a small atom is unchanged).
@@ -273,7 +273,7 @@ def _digest_tech_stack(raw: str) -> str:
             break
     return (
         "\n".join(kept).strip()
-        + "\n\n… (tech-stack digest — self-pull specs/memory/tech-stack.md for full detail)"
+        + "\n\n… (tech-stack digest — self-pull specs/memory/TECHSTACK.md for full detail)"
     )
 
 
@@ -282,7 +282,7 @@ def _build_memory(specs_dir: Path) -> str:
 
     WS-C (v0.1.30 / T-30-E-05): this is a session-orientation bootstrap for an interactive
     agent session — a lightweight orientation aid, not the full memory tree. The agent
-    self-pulls deeper atoms (e.g. ``architecture.md``, a specific product atom) directly when
+    self-pulls deeper atoms (e.g. ``ARCHITECTURE.md``, a specific product atom) directly when
     a decision needs them, per the ``dadaia-step0-memory-bootstrap`` skill. So the bootstrap
     stays lean — a bounded tech-stack digest + the lean catalog tldr-digest, never the full
     memory tree.
@@ -291,7 +291,7 @@ def _build_memory(specs_dir: Path) -> str:
     if not memory_dir.is_dir():
         return ""
     parts = ["", "=== workspace memory (tech + catalog) ==="]
-    tech = memory_dir / "tech-stack.md"
+    tech = memory_dir / "TECHSTACK.md"
     if tech.is_file():
         with contextlib.suppress(OSError):
             parts.append(_digest_tech_stack(tech.read_text(encoding="utf-8")))

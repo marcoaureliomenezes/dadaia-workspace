@@ -366,7 +366,7 @@ def certify(
             json.dumps(
                 {
                     "schema_version": "handoff-v1.2",
-                    "self_pull": {"refs": ["specs/memory/quality-assurance.md"]},
+                    "self_pull": {"refs": ["specs/memory/QUALITY.md"]},
                     "agent": "qa-engineer",
                     "context": "certified-consumer",
                     "produced_at": "2026-07-15T00:00:00Z",
