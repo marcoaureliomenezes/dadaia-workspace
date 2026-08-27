@@ -238,6 +238,23 @@
     },
     {
       "section": "\u00a76 Specs, tasks and memory",
+      "anchor": "adrs",
+      "skill": null,
+      "scoped_agents_md": [
+        "dadaia_workspace/public/scaffold/ADRs/AGENTS.md"
+      ],
+      "hash_tuple": {
+        "section": "sha256:d89dffaf8bd1d630f8337ce4db15e1f46c15df666a178a1a9c587966fbda8e36",
+        "skill": null,
+        "scoped": [
+          "sha256:676151143bc8f4dbedfa053185fb76aa65283f0f75f074205b7388460d0443cb"
+        ]
+      },
+      "recorded_by": "ai-engineer",
+      "recorded_at": "2026-08-27"
+    },
+    {
+      "section": "\u00a76 Specs, tasks and memory",
       "anchor": "releases",
       "skill": "dd-grill-me",
       "scoped_agents_md": [],
