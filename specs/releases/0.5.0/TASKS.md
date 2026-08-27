@@ -991,7 +991,7 @@ term in the artifact.
 
 ## Segment `S2` — lineage, commit shapes, hooks, the validated map
 
-- [-] **T-050-16 — FR7: `dd-diagnose`, with lineage as phase 0**
+- [x] **T-050-16 — FR7: `dd-diagnose`, with lineage as phase 0**
 
 **Owner role:** ai-engineer · **Commit:** `feat(T-050-16): dd-diagnose — lineage phase 0 plus
 the diagnosing method`
@@ -1026,7 +1026,7 @@ under `dadaia_workspace/cli/` or `dadaia_workspace/hooks/`.
 
 ---
 
-- [ ] **T-050-17 — FR8: the commit shapes and the one resolver seam**
+- [-] **T-050-17 — FR8: the commit shapes and the one resolver seam**
 
 **Owner role:** ai-engineer (the rules) + software-engineer (the resolver + its test) ·
 **Commit:** `feat(T-050-17): commit shapes and one resolver seam for resolved_commit`
