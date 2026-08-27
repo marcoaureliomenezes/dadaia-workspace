@@ -11,15 +11,15 @@ line, never an event; :meth:`apply_update` rewrites an existing record's governa
 fields in place through the SAME seam (AS-16 — the fixer's resolve and the auditor's
 ``audited``/``resolved_commit`` write both go through this one method, A2.13).
 
-**The live ledger is still v5-event-shaped (T-050-08 scope).** ``specs/bugs/bugs.jsonl``
-is not yet physically migrated to one-record-per-line (FR3/T-050-10) — every READ method
-here therefore goes through :func:`~dadaia_workspace.features.bugs.migrate_v5.read_ledger`
-(the ONE place the v5 shape is still decoded, A2.5), which folds the legacy event stream
-into the SAME :class:`BugRecord` shape a fresh registration produces. :meth:`archive`
-is the one method that does NOT read through the v5 adapter — archiving moves a single
-PHYSICAL line, which only exists for a record already in native v6 shape (a v5-folded
-"record" spans many physical lines and has no single line to move; T-050-10's physical
-migration is what makes every historical record archivable).
+**The live ledger is ``specs/bugs/BUGS.jsonl`` (T-050-10 physically migrated it).**
+Every historical v5 event stream is now one native v6 :class:`BugRecord` line per bug
+id, with ``registration_commit``/``resolved_commit`` derived from git history (FR3).
+Every READ method here still goes through
+:func:`~dadaia_workspace.features.bugs.migrate_v5.read_ledger` (A2.5) — it now decodes
+the (all-native) v6 shape only, but keeps its v5-tolerant path so a workspace mid-way
+through the migration, or a foreign write, never crashes the read. :meth:`archive`
+moves a single PHYSICAL line per record — every migrated record is single-line
+native v6 shape and is therefore archivable.
 """
 
 from __future__ import annotations

@@ -108,7 +108,7 @@ def test_bugs_append_resolves_the_slug_and_closure_lands_in_scope(workspace: Pat
         "ex",
     )
     assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert (workspace / "repos" / _SLUG / "specs" / "bugs" / "bugs.jsonl").is_file(), (
+    assert (workspace / "repos" / _SLUG / "specs" / "bugs" / "BUGS.jsonl").is_file(), (
         "the event must land in the context's real ledger, under its SLUG"
     )
 

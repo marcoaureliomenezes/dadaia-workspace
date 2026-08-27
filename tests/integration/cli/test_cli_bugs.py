@@ -3,7 +3,7 @@ v0.5.0 T-050-08 against the one-record-per-bug model — `append --event resolve
 resolution is now `bugs update <id> --set ...`).
 
 Merged per plan-integration.md (6 -> 2): (a) one seeded lifecycle fn (append ->
-bugs.jsonl name -> status open/resolved -> stats aggregates); (b) one parametrized
+BUGS.jsonl name -> status open/resolved -> stats aggregates); (b) one parametrized
 rejection fn (missing payload, bad severity -> nothing written).
 """
 
@@ -82,7 +82,7 @@ def _resolve(specs_dir: Path, bug_id: str) -> None:
 
 
 def test_seeded_lifecycle_append_status_and_stats(specs: Path) -> None:
-    """append writes the ONE canonical bugs.jsonl; status lists open/resolved
+    """append writes the ONE canonical BUGS.jsonl; status lists open/resolved
     correctly; stats aggregates by status and severity."""
     _append_reported(specs, "a", severity="HIGH")
     _append_reported(specs, "b", severity="LOW")
@@ -91,7 +91,8 @@ def test_seeded_lifecycle_append_status_and_stats(specs: Path) -> None:
     logs = list((specs / "bugs").glob("*.jsonl"))
     assert len(logs) == 1
     # v0.1.73 FR1 (operator contract): the ONE canonical append-only ledger.
-    assert logs[0].name == "bugs.jsonl"
+    # v0.5.0 T-050-10 renamed it bugs.jsonl -> BUGS.jsonl (FR3 physical migration).
+    assert logs[0].name == "BUGS.jsonl"
 
     _resolve(specs, "c")
 

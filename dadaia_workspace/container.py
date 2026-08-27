@@ -243,15 +243,15 @@ def build_bug_record_store(specs_dir: Path) -> "RecordStore[BugRecord]":
     verb's ``--specs-dir``/bind-resolution seam already produces (never a
     ``workspace_root``, which would silently assume ``<root>/specs`` and break every
     ``--specs-dir <tmp>`` test fixture and remote-context routing). The ledger's
-    physical filename is still ``bugs.jsonl`` (T-050-08) — it stays v5-event-shaped
-    until FR3/T-050-10's physical migration renames it to ``BUGS.jsonl``; only that
-    task moves this constant.
+    physical filename is ``BUGS.jsonl`` (T-050-10 physically migrated the ledger
+    from the retired v5-event-shaped ``bugs.jsonl`` — the record model FR3
+    produced, one line per bug id, commit provenance derived from git).
     """
     from dadaia_workspace.core.models.bugs import BugRecord
     from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
 
     return JsonlRecordStore(
-        Path(specs_dir) / "bugs" / "bugs.jsonl",
+        Path(specs_dir) / "bugs" / "BUGS.jsonl",
         to_dict=BugRecord.to_dict,
         from_dict=BugRecord.from_dict,
     )

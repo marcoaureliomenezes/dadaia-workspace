@@ -3,7 +3,7 @@
 Release v0.1.46 / T-46-04 (AC-1); rewritten v0.5.0 T-050-08 (FR2/A2.3/A2.7/A2.8, AR-1
 ruling "the doctor's bug lane is a second hand-kept reader"). The legacy hourly-file
 rotation reader is dead under canon v6 and is not carried forward — every case below
-targets the ONE canonical ``specs/bugs/bugs.jsonl``. Covers: line validity (ERROR),
+targets the ONE canonical ``specs/bugs/BUGS.jsonl`` (T-050-10 rename). Covers: line validity (ERROR),
 v5 event-stream coherence (demoted to WARNING, never a block), governance-completeness
 gaps on a native v6 record (WARNING), the A2.7 immutable-core-drift detector, and the
 A2.8 archive-overdue signal.
@@ -86,7 +86,7 @@ def _record(bug_id: str, **overrides: object) -> dict[str, Any]:
 
 
 def _write_ledger(bugs: Path, rows: list[dict[str, Any]]) -> Path:
-    path = bugs / "bugs.jsonl"
+    path = bugs / "BUGS.jsonl"
     path.write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
     return path
 
@@ -110,7 +110,7 @@ def test_coherent_reported_then_resolved_is_clean(tmp_path: Path) -> None:
 def test_malformed_json_line_is_an_error(tmp_path: Path) -> None:
     specs = tmp_path / "specs"
     bugs = _bugs_dir(specs)
-    (bugs / "bugs.jsonl").write_text("{not json\n", encoding="utf-8")
+    (bugs / "BUGS.jsonl").write_text("{not json\n", encoding="utf-8")
     errors = _doc033(specs)
     assert len(errors) == 1
     assert "not valid JSON" in errors[0].description

@@ -31,7 +31,7 @@ pytestmark = [pytest.mark.slow]
 def _init_repo(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
     subprocess.run(["git", "init"], cwd=path, capture_output=True, check=True)
-    subprocess.run(["git", "config", "user.email", "t@t.invalid"], cwd=path, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=path, capture_output=True)
     subprocess.run(["git", "config", "user.name", "T"], cwd=path, capture_output=True)
 
 

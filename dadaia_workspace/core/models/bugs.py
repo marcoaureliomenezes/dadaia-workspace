@@ -8,10 +8,10 @@ authorized set", so neither model ever reads a schema file itself. :class:`BugEv
 own JSON Schema (``public/schemas/bugs/bug-event-v1.schema.json``) was RETIRED at
 T-050-08 — the class itself stays (its field set is now documented here, not in a
 schema file) because it is still the ONE shape
-``features.bugs.migrate_v5.read_ledger`` decodes the LIVE ``specs/bugs/bugs.jsonl``
-with, until FR3/T-050-10 physically migrates every historical line to
-:class:`BugRecord` shape. :class:`BugRecord` is one line of ``specs/bugs/bugs.jsonl``
-(renamed ``BUGS.jsonl`` at T-050-10), appended once (field set mirrors
+``features.bugs.migrate_v5.read_ledger`` decoded the LIVE ``specs/bugs/bugs.jsonl``
+with, until FR3/T-050-10 physically migrated every historical line to
+:class:`BugRecord` shape. :class:`BugRecord` is one line of ``specs/bugs/BUGS.jsonl``
+(the T-050-10 rename of the retired ``bugs.jsonl``), appended once (field set mirrors
 ``public/schemas/bugs/bug-record-v1.schema.json``, whose per-property ``x-mutability``/
 ``x-redact`` keywords are the ONE documented source of the three-category split —
 A2.1). Both models derive their optional/redactable field sets from their OWN

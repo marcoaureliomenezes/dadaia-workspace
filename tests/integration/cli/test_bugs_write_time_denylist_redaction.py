@@ -75,7 +75,7 @@ def test_bugs_append_masks_a_denylisted_term_via_the_container_seam(
 ) -> None:
     """THE end-to-end RED test (A6.1/A6.2): with the container seam wired to a real
     operator denylist term, ``dadaia bugs append`` must never write the raw term to
-    ``bugs.jsonl`` — before the fix, the CLI never even read the loader for this
+    ``BUGS.jsonl`` — before the fix, the CLI never even read the loader for this
     command, so the raw term landed on disk unmasked."""
     monkeypatch.setattr(
         container,
@@ -85,7 +85,7 @@ def test_bugs_append_masks_a_denylisted_term_via_the_container_seam(
 
     _append_leaky(specs)
 
-    written = (specs / "bugs" / "bugs.jsonl").read_text(encoding="utf-8")
+    written = (specs / "bugs" / "BUGS.jsonl").read_text(encoding="utf-8")
     record = json.loads(written.strip().splitlines()[-1])
     assert "acme-corp" not in record["symptom"].lower()
     assert "[REDACTED-TERM]" in record["symptom"]
@@ -101,6 +101,6 @@ def test_bugs_append_with_empty_denylist_leaves_symptom_untouched(
 
     _append_leaky(specs)
 
-    written = (specs / "bugs" / "bugs.jsonl").read_text(encoding="utf-8")
+    written = (specs / "bugs" / "BUGS.jsonl").read_text(encoding="utf-8")
     record = json.loads(written.strip().splitlines()[-1])
     assert record["symptom"] == "deployment landed at acme-corp's staging box"

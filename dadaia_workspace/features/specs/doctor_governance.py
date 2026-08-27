@@ -20,7 +20,7 @@ this rewrite). This validator now reads through ``core.models.bugs``'s OWN parse
 only — one parser, not a second hand-kept mirror of it. The legacy hourly-file rotation
 reader (``_BUGS_JSONL_ROW_CEILING``, ``_BUGS_JSONL_NAME_RE``, the ``*.jsonl`` glob) is
 DEAD under canon v6 (AR-1 (a)4) and is deleted, not carried forward: only the single
-canonical ``bugs/bugs.jsonl`` is read.
+canonical ``bugs/BUGS.jsonl`` is read.
 """
 
 from __future__ import annotations
@@ -325,7 +325,7 @@ class GovernanceValidator:
 
     def check_bugs_jsonl_invariant(self) -> list[SpecsDoctorIssue]:
         """SPEC-DOC-033 (v0.1.46 AC-1; rewritten v0.5.0 T-050-08, FR2/A2.3): the single
-        canonical ``specs/bugs/bugs.jsonl`` ledger invariant.
+        canonical ``specs/bugs/BUGS.jsonl`` ledger invariant.
 
         Three sub-checks over the ONE canonical file (the legacy hourly-file rotation
         reader is dead under canon v6 and is not carried forward — module docstring):
@@ -348,7 +348,7 @@ class GovernanceValidator:
         ``specs-doctor-bug-lane-splits-ledger-on-unicode-line-separators`` — the
         module docstring's AR-1 finding). Absent ``bugs/`` dir -> no-op.
         """
-        ledger_path = self.specs_dir / "bugs" / "bugs.jsonl"
+        ledger_path = self.specs_dir / "bugs" / "BUGS.jsonl"
         if not ledger_path.is_file():
             return []
 
@@ -371,7 +371,7 @@ class GovernanceValidator:
                         code="SPEC-DOC-033",
                         severity=Severity.ERROR,
                         description=(
-                            f"bugs/bugs.jsonl line {lineno}: not valid JSON ({exc.msg}) — "
+                            f"bugs/BUGS.jsonl line {lineno}: not valid JSON ({exc.msg}) — "
                             "every JSONL row must be one bug-event or bug-record object "
                             "(SPEC-DOC-033, ERROR)."
                         ),
@@ -390,7 +390,7 @@ class GovernanceValidator:
                             code="SPEC-DOC-033",
                             severity=Severity.ERROR,
                             description=(
-                                f"bugs/bugs.jsonl line {lineno}: not a valid bug-event "
+                                f"bugs/BUGS.jsonl line {lineno}: not a valid bug-event "
                                 f"object ({exc}) (SPEC-DOC-033, ERROR)."
                             ),
                             path=str(ledger_path),
@@ -409,7 +409,7 @@ class GovernanceValidator:
                         code="SPEC-DOC-033",
                         severity=Severity.ERROR,
                         description=(
-                            f"bugs/bugs.jsonl line {lineno}: not a valid bug-record "
+                            f"bugs/BUGS.jsonl line {lineno}: not a valid bug-record "
                             f"object ({exc}) (SPEC-DOC-033, ERROR)."
                         ),
                         path=str(ledger_path),
@@ -423,7 +423,7 @@ class GovernanceValidator:
                         code="SPEC-DOC-033",
                         severity=Severity.WARNING,
                         description=(
-                            f"bugs/bugs.jsonl record {record.id!r}: status "
+                            f"bugs/BUGS.jsonl record {record.id!r}: status "
                             f"{record.status!r} is missing {', '.join(gaps)} "
                             "(SPEC-DOC-033, WARNING — never a block, D15)."
                         ),
@@ -447,7 +447,7 @@ class GovernanceValidator:
                     code="SPEC-DOC-033",
                     severity=Severity.WARNING,
                     description=(
-                        f"bugs/bugs.jsonl line {violation.position}: {violation.clause} "
+                        f"bugs/BUGS.jsonl line {violation.position}: {violation.clause} "
                         "(SPEC-DOC-033, WARNING — never a block, D15)."
                     ),
                     path=str(ledger_path),
@@ -468,7 +468,7 @@ class GovernanceValidator:
         """
         if not self._bug_first_add_baselines:
             return []
-        ledger_path = self.specs_dir / "bugs" / "bugs.jsonl"
+        ledger_path = self.specs_dir / "bugs" / "BUGS.jsonl"
         if not ledger_path.is_file():
             return []
         issues: list[SpecsDoctorIssue] = []
@@ -483,7 +483,7 @@ class GovernanceValidator:
                         code="SPEC-DOC-040",
                         severity=Severity.WARNING,
                         description=(
-                            f"bugs/bugs.jsonl record {record.id!r}: immutable-core "
+                            f"bugs/BUGS.jsonl record {record.id!r}: immutable-core "
                             f"field(s) {', '.join(drifted)} differ from the first-add "
                             "snapshot — a file tool bypassed the record-store update "
                             "seam (SPEC-DOC-040, WARNING — detected, never prevented, "
@@ -501,7 +501,7 @@ class GovernanceValidator:
         still live (not yet moved by ``dadaia bugs archive``). Never a block (D15);
         the exit code is unchanged. Absent ``bugs/`` dir -> no-op.
         """
-        ledger_path = self.specs_dir / "bugs" / "bugs.jsonl"
+        ledger_path = self.specs_dir / "bugs" / "BUGS.jsonl"
         if not ledger_path.is_file():
             return []
         cutoff = (now or datetime.now(tz=UTC)) - timedelta(days=BUG_ARCHIVE_THRESHOLD_DAYS)
@@ -516,7 +516,7 @@ class GovernanceValidator:
                         code="SPEC-DOC-041",
                         severity=Severity.WARNING,
                         description=(
-                            f"bugs/bugs.jsonl record {record.id!r} has been terminal "
+                            f"bugs/BUGS.jsonl record {record.id!r} has been terminal "
                             f"({record.status!r}) since {record.ts} — past the "
                             f"{BUG_ARCHIVE_THRESHOLD_DAYS}-day archive threshold; run "
                             "'dadaia bugs archive' (SPEC-DOC-041, WARNING — never a "

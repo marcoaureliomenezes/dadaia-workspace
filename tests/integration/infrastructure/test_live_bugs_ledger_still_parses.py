@@ -1,15 +1,17 @@
-"""A7.4 (SPEC v0.4.5 FR7, T-045-20) + v0.5.0 T-050-08 (FR2/A2.5): the whole LIVE
-``specs/bugs/bugs.jsonl`` ledger still parses through the v5 boundary adapter, and no
-historical event is rewritten.
+"""A7.4 (SPEC v0.4.5 FR7, T-045-20) + v0.5.0 T-050-08/T-050-10 (FR2/FR3, A2.5/A3.7):
+the whole LIVE ``specs/bugs/BUGS.jsonl`` ledger still parses through
+``features.bugs.migrate_v5.read_ledger``, and no historical record is rewritten.
 
 Intent: CONTRACT — SPEC v0.4.5 FR7/A7.4, carried forward at v0.5.0 T-050-08 (the store
-this file exercised, ``JsonlBugStore``, is deleted — ``features.bugs.migrate_v5`` is now
-the ONE place the live v5 ledger is decoded, A2.5). Reads the real on-disk ledger this
-repository ships (never a ``tmp_path`` fixture) through the SAME production seam
-``dadaia bugs status``/``bugs stats`` use, and proves every non-blank physical line
-still contributes to a folded :class:`~dadaia_workspace.core.models.bugs.BugRecord`
-(zero WARN-level "skipping ..." log records) — the read-side fix changed HOW lines are
-split, never what a well-formed historical record means.
+this file exercised, ``JsonlBugStore``, is deleted) and T-050-10/A3.7 (FR3 physically
+migrated ``bugs.jsonl`` -> ``BUGS.jsonl``, one native v6 :class:`BugRecord` line per
+bug id — ``read_ledger`` keeps its v5-tolerant path so a foreign/pre-migration write
+never crashes the read, but every LIVE row is now native v6 shape). Reads the real
+on-disk ledger this repository ships (never a ``tmp_path`` fixture) through the SAME
+production seam ``dadaia bugs status``/``bugs stats`` use, and proves every non-blank
+physical line still contributes to a folded
+:class:`~dadaia_workspace.core.models.bugs.BugRecord` (zero WARN-level "skipping ..."
+log records — A3.7's "skipped: 0").
 
 Size: SMALL (directory-tiered ``integration`` — real file I/O over an on-disk file this
 repo already tracks, no subprocess/network).
@@ -25,7 +27,7 @@ import pytest
 from dadaia_workspace.features.bugs import migrate_v5
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
-_LEDGER = _REPO_ROOT / "specs" / "bugs" / "bugs.jsonl"
+_LEDGER = _REPO_ROOT / "specs" / "bugs" / "BUGS.jsonl"
 
 
 def test_live_ledger_exists_and_is_non_empty() -> None:
