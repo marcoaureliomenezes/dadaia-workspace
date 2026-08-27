@@ -54,6 +54,34 @@ for this task, so none is touched here):
 
 Left exactly as written; a future task can pick this up.
 
+## [0.4.5] — 2026-08-27
+
+Internal spec-release id: `v0.4.5` ("hardening and consolidation"). This version is
+**minted locally and deliberately unpublished** by operator order (O5): the published
+PyPI lineage stays `0.4.2 → 0.4.4` while `main` reads `0.4.5`; the release-gate approval
+is withheld and no `v0.4.5` tag is created.
+
+### Added
+- **One atomic-write primitive** (`core/atomic_write.py`) replacing eleven per-feature
+  writers; derived call-site census; injected-failure battery on the single seam.
+- **Write-time bug-event redaction and sanitation**: the bug ledger masks denylisted
+  terms through the push gate's own loader and strips raw control/format characters
+  (TAB/LF/CR preserved) at the service seam.
+- `specs init` refuses a symlinked target on the explicit `--specs-dir` branch.
+- Workspace doctor **INV-6**: registry-wide slug-ownership collision detection
+  (report-only); `.dadaia/references/` sanctioned as an operator-owned subtree.
+
+### Changed
+- **LAW path class classified by origin** (workspace-root law family + manifest-tracked
+  projections) — a repo's own domain-scoped `AGENTS.md` is MUTATING.
+- Foreign-slug push-scan layer matches **whole tokens** only (hyphen/dot-glued
+  identifiers are other identifiers).
+- Byte goldens pin policy only; asset rosters and the skill-inventory oracle are derived
+  by scanning `public/**` — three hand-kept inventories deleted.
+- Always-on surface diet: `DADAIA.md` negations 58 → 28, bound-session prefix
+  1 506 → 878 tokens, persona bodies −92 lines with coverage tables; Intent vocabulary
+  fixed at four tokens.
+
 ## [0.4.4] — 2026-08-24
 
 Internal spec-release id: `v0.4.4` ("organize the core"). Note: `0.4.3` was minted
