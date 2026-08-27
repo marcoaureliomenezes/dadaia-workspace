@@ -1617,7 +1617,7 @@ named above), plus the catalog-twin verdict recorded either way.**
 
 ---
 
-- [ ] **T-050-26 — FR16: the first audit, as a dry run over this repository**
+- [-] **T-050-26 — FR16: the first audit, as a dry run over this repository**
 
 **Owner role:** project-auditor · **Commit:** `docs(T-050-26): first audit under canon v6 (dry
 run)`
@@ -1702,7 +1702,7 @@ and A14.7 evidenced by the eight-row metric table.
 
 ## Segment `S4` — memory two-tier, principles, ADRs
 
-- [ ] **T-050-28 — FR17: split the memory trio into Part 1 and Part 2**
+- [-] **T-050-28 — FR17: split the memory trio into Part 1 and Part 2**
 
 **Owner role:** product-engineer · **Commit:** `docs(T-050-28): memory Part 1 Principles /
 Part 2 Implementation`
