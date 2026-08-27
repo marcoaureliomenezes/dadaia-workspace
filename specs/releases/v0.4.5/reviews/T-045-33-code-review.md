@@ -290,3 +290,48 @@ CLOSURE and intake. Everything else is approved on the evidence above: FR1 left 
 feature smaller on every axis, the demolitions landed as `expand → switch → contract` with
 one recorded per-site deviation, and eleven of twelve touched surfaces reduced their bug
 surface with named ledger evidence rather than "tests green".
+
+## Re-verdict @27c3374a
+
+**APPROVE.** F1 is closed. Re-verified by me at HEAD `27c3374a`, on the executed path.
+
+**Arm B order correct.** `2dbc2b41` registers `bug-event-sanitation-strips-tab-lf-cr-from-free-text`
+(HIGH) as an isolated one-line ledger commit; `27c3374a` carries the fix. No history rewritten.
+
+**The fix is a narrowing in place, not an addition.** `core/models/bugs.py:255` — the class
+becomes `[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\x80-\x9f` + U+2028/U+2029`]`: same one assignment,
+same one `sub()` call, no new branch, function or call site. Production diff `+25/−18`, of
+which 24 of 25 added lines are the rewritten `#:` block. Per-character probe against the
+installed venv:
+
+| input | result |
+|---|---|
+| `"a\tb\nc\rd"`, `"a b  c"` | **preserved byte-identically** |
+| ESC `\x1b`, DEL `\x7f`, NUL `\x00`, C1 `\x9d`, NEL `\x85`, U+2028, U+2029 | **stripped** |
+
+So the fragment hazard (A7.1 — the bytes `json.dumps` leaves raw) and the render hazard
+(A7.2/CWE-117 — the ESC/C1 family) both stay closed, while the whitespace that carries word
+boundaries round-trips. A7.6's re-join property is unaffected: the masking passes still run
+after the strip.
+
+**Tests.** `tests/unit/features/bugs/test_control_format_char_sanitation.py` +
+`test_live_bugs_ledger_still_parses.py` → **13 passed** (`-p no:cacheprovider`), re-run by
+me. Three new cases: TAB/LF/CR preservation, ESC/C1/NEL/LS still stripped, and a
+`BugService.append_event` multi-line `repro` round-trip that also asserts the record stays
+one physical JSONL line. **No new structure-sensitive test** — no private-symbol import, no
+hand-kept inventory, no exact-string assert on a message body; the oracles are round-trip
+identity on data each test constructs itself. `dadaia ci preflight` exit 0 at HEAD;
+`dadaia bugs stats` open 1 (the AS-5 item only).
+
+**F2 addressed.** The new `resolved` event carries `evidence_diff: net-negative: …` with the
+measured figures, a RED-loop command, three named regression seams, and it explicitly names
+T-045-20's prior mislabel — the append-only ledger is corrected forward rather than rewritten.
+
+### Updated bug-surface row (FR24)
+
+| Surface | Verdict | Ledger evidence |
+|---|---|---|
+| bugs ledger — core (`redact_text`) | **reduced** (was *increased*) | Privacy-leak ×3 and hand-kept-field-list (T-043-23 → T-044-62 → schema-derived scrub set) both closed by construction; the F1 lane opened by `2b9b30c1` is now closed by `27c3374a` with a RED proof, and the strip class is narrowed to exactly the two hazards it exists to close — smaller than it was at my first pass |
+
+**Standing:** F3 (stale-citation class, no structural close) remains a PM intake item;
+F4–F10 remain LOW/INFO and non-blocking. Nothing else in the release changed.
