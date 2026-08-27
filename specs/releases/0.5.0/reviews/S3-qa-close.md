@@ -141,7 +141,7 @@ two commit messages — all `email-address` baseline / operator-denylist hits th
 this segment).
 
 **`evidence` field shape.** Sampled all 37 `FINDINGS.jsonl` records programmatically: no
-`evidence` value contains a home-absolute path (`/home/`, `/marco`); every value contains
+`evidence` value contains a home-absolute path (`/home/`, `/the-operator`); every value contains
 a command-shaped token (`git `, `grep`, `pytest`, `ruff`, `->`/`→`, or a `file:line`
 anchor) followed by a result, matching A13.5's "reproducible command plus a redacted
 one-line result." No `.dadaia/tmp/**` path is cited as the sole evidence in any record.
