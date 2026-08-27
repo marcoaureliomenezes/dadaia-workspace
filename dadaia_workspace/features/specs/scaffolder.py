@@ -188,13 +188,13 @@ def scaffold(
         + "\n",
     )
 
-    # 5 — releases/ACTIVE.md
-    _write(
-        specs_dir / "releases" / "ACTIVE.md",
-        "release: none\nphase: none\n",
-    )
+    # ACTIVE.md retired (v0.5.0 FR4/T-050-21A, A4.1): no replacement file — a fresh
+    # scaffold's "no active release" state is now the honest absence of any directory
+    # under releases/ carrying a RELEASE.jsonl (features.specs.doctor_common
+    # .resolve_live_release_id), the same state `dadaia specs release ...` back-fills
+    # the moment a release is defined (T-050-11).
 
-    # 6 — backlog/BACKLOG.md (SPEC v0.12.0 FR1/FR3, ADR #14): the single-source
+    # 5 — backlog/BACKLOG.md (SPEC v0.12.0 FR1/FR3, ADR #14): the single-source
     # document skeleton — both section headings, nothing else. Matches exactly what
     # `features.spec_artifacts.new_artifacts.backlog_new` creates when it finds no
     # document; a fresh scaffold and a fresh `backlog new` share one skeleton shape.

@@ -1,4 +1,5 @@
-"""Release validator (v0.1.55 FR1): ACTIVE.md, release artifacts, SemVer + ledger invariants.
+"""Release validator (v0.1.55 FR1): the active release, its artifacts, SemVer + ledger
+invariants.
 
 Single-responsibility sibling of the SpecsDoctor coordinator. Owns the active-release lifecycle
 checks (SPEC-DOC-003/004/005/009), SemVer naming (SPEC-DOC-016), the release ledger
@@ -6,6 +7,12 @@ invariants (phase↔markers SPEC-DOC-024, unique ids SPEC-DOC-026, naming canon 
 and the partial-archive residue invariant (SPEC-DOC-039, v0.1.81 FR2), plus the family-local
 status/created-date extractors. Leaf-only: imports the shared leaves + core, never a sibling
 validator.
+
+v0.5.0 FR4/T-050-21A: ``ACTIVE.md`` is retired — the active release, its optional
+segment, and its phase are resolved by folding ``RELEASE.jsonl`` (see
+:func:`resolve_active_release`). No fallback branch survives; a workspace with zero
+live release directories resolves cleanly to "no active release", the same as the old
+scaffold default did.
 """
 
 from __future__ import annotations
@@ -20,8 +27,9 @@ from dadaia_workspace.core.spec_status import CANONICAL_STATUS as _CANONICAL_STA
 from dadaia_workspace.core.specs_version import RELEASE_SEMVER_RE
 from dadaia_workspace.features.specs.doctor_common import (
     RELEASE_ARTIFACTS,
+    _read_and_parse_release_jsonl,
     iter_all_release_dirs,
-    read_active_md,
+    resolve_active_release,
 )
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
 
@@ -84,18 +92,15 @@ _TASK_MARKER_RE = re.compile(r"^\s*[-*]?\s*\[([ \-xX])\]", re.MULTILINE)
 
 
 def read_release_phase(specs_dir: Path, release_id: str) -> str | None:
-    """The ONE tri-state ``RELEASE.jsonl`` phase reader (v0.5.0 FR4/T-050-11, S1 FR23
-    firing amendment A6, `specs/releases/0.5.0/reviews/S1-FR23-firing.md` §3) — in the
-    shape of ``read_active_md``; ``core.release_events`` itself never does file I/O
-    (core file-I/O purity ratchet, architect A9).
-
-    The first Draft copy-pasted this same ~10-line body into ``hooks/sdd_gate.py`` and
-    ``container.py`` too, defended by precedent from the pre-existing
-    ``_active_field``/``read_active_md`` two-reader split — the S1 firing ruling names
-    that precedent itself as the "N readers of one file" defect this release exists to
-    retire (AR-1 §4), not a reason to add a third. This is now the ONE reader; the
-    hook's read is deleted until T-050-21A actually needs the phase DECISION value, and
-    the container's uncalled seam is deleted with it.
+    """The narrow ``RELEASE.jsonl`` phase reader, given an ALREADY-KNOWN ``release_id``
+    (v0.5.0 FR4/T-050-11) — a thin wrapper over
+    :func:`doctor_common._read_and_parse_release_jsonl`, the ONE tri-state disk read
+    (S1 FR23 amendment A6); it does not re-implement that read. The hook's own read is
+    deleted until T-050-21A actually needs the phase DECISION value, and the
+    container's uncalled seam is deleted with it — the hook instead reads directly
+    through ``core.release_events`` (its own light, hot-path exception; importing this
+    module's ``features.specs`` package pulls in the entire ``SpecsDoctor``
+    decomposition, the exact heavy-import cost the container was avoided for).
 
     ``str`` when the last ``phase`` record is readable (possibly ``""`` when the file
     carries no ``phase`` record yet), ``""`` when
@@ -103,14 +108,11 @@ def read_release_phase(specs_dir: Path, release_id: str) -> str | None:
     exists but could not be read (genuine I/O failure) — callers must treat ``None`` as
     UNKNOWN, never as "no phase".
     """
-    path = specs_dir / "releases" / release_id / "RELEASE.jsonl"
-    try:
-        text = path.read_text(encoding="utf-8")
-    except FileNotFoundError:
+    events, found = _read_and_parse_release_jsonl(specs_dir, release_id)
+    if not found:
         return ""
-    except OSError:
+    if events is None:
         return None
-    events, _errors = parse_release_events(text)
     return fold_release_events(events).phase
 
 
@@ -142,9 +144,18 @@ class ReleaseValidator:
         self.specs_dir = specs_dir
 
     def check_active_md(self) -> list[SpecsDoctorIssue]:
+        """SPEC-DOC-003/009 (v0.5.0 FR4/T-050-21A): the active release, resolved by
+        folding ``RELEASE.jsonl`` (:func:`resolve_active_release`) — ``ACTIVE.md`` is
+        retired, no file stands in its place. SPEC-DOC-009 (a resolved release_id
+        naming a directory that does not exist) is now unreachable in practice:
+        :func:`resolve_live_release_id` only ever returns a release_id it found BY
+        locating that exact directory — kept as a defensive assertion, never dead
+        code behind a docstring, in case a future resolver relaxes that guarantee.
+        """
         issues: list[SpecsDoctorIssue] = []
-        path = self.specs_dir / "releases" / "ACTIVE.md"
-        release, segment, phase, err = read_active_md(path)
+        path = self.specs_dir / "releases"
+        release, segment, phase, err = resolve_active_release(self.specs_dir)
+        del segment
         if err:
             issues.append(
                 SpecsDoctorIssue(
@@ -161,7 +172,7 @@ class ReleaseValidator:
                     code="SPEC-DOC-003",
                     severity=Severity.ERROR,
                     description=(
-                        f"ACTIVE.md phase '{phase}' is not canonical. "
+                        f"Active release phase '{phase}' is not canonical. "
                         f"Valid: {sorted(CANONICAL_PHASES)}"
                     ),
                     path=str(path),
@@ -175,7 +186,7 @@ class ReleaseValidator:
                         code="SPEC-DOC-009",
                         severity=Severity.ERROR,
                         description=(
-                            f"ACTIVE.md release='{release}' but no directory at {release_dir}"
+                            f"Active release='{release}' but no directory at {release_dir}"
                         ),
                         path=str(release_dir),
                     )
@@ -184,25 +195,25 @@ class ReleaseValidator:
 
     def check_active_release_artifacts(self) -> list[SpecsDoctorIssue]:
         issues: list[SpecsDoctorIssue] = []
-        path = self.specs_dir / "releases" / "ACTIVE.md"
-        release, segment, phase, err = read_active_md(path)
+        release, segment, phase, err = resolve_active_release(self.specs_dir)
         if err or not release or release == "none":
             return issues
-        # Schema v2 (ADR-1/ADR-5): when ACTIVE.md carries a segment, the active
-        # SPEC/PLAN/TASKS live in releases/<release>/<segment>/; else flat.
+        # Dir-based segment (ADR-1/ADR-5): when the active phase record carries a
+        # segment, the active SPEC/PLAN/TASKS live in releases/<release>/<segment>/;
+        # else flat. D-E: this release's own phase records carry none.
         rdir = self.specs_dir / "releases" / release
         if segment:
             rdir = rdir / segment
         if not rdir.exists():
             # v0.4.3 T-043-22 [Arm-B rider] bug specs-doctor-segment-router-silent-skip:
-            # a live segment: pointer at a missing segment directory used to `return
+            # a live segment pointer at a missing segment directory used to `return
             # issues` here silently, UNCONDITIONALLY. Check 9 (SPEC-DOC-009,
             # check_active_md above) only validates the RELEASE directory
             # (releases/<release>/) — it NEVER checks the segment SUBdirectory
-            # (releases/<release>/<segment>/), so a segmented ACTIVE.md pointing at a
-            # missing segment dir was invisible to every downstream check (this one AND
-            # TREE-6 in doctor_structural.py). Scoped to `segment` truthy only: the
-            # FLAT-release case (no segment:) is genuinely, correctly covered already
+            # (releases/<release>/<segment>/), so a segmented active-release pointer at
+            # a missing segment dir was invisible to every downstream check (this one
+            # AND TREE-6 in doctor_structural.py). Scoped to `segment` truthy only: the
+            # FLAT-release case (no segment) is genuinely, correctly covered already
             # by check 9's own release-dir check (rdir IS the release dir there) —
             # firing here too would duplicate that finding.
             if segment:
@@ -211,10 +222,10 @@ class ReleaseValidator:
                         code="SPEC-DOC-004",
                         severity=Severity.ERROR,
                         description=(
-                            f"ACTIVE.md segment='{segment}' but no directory at {rdir} "
-                            f"(release='{release}') — the segment directory itself is "
-                            "missing; SPEC-DOC-009 validates only the release "
-                            "directory, never the segment subdirectory."
+                            f"Active release segment='{segment}' but no directory at "
+                            f"{rdir} (release='{release}') — the segment directory "
+                            "itself is missing; SPEC-DOC-009 validates only the "
+                            "release directory, never the segment subdirectory."
                         ),
                         path=str(rdir),
                     )
@@ -264,8 +275,9 @@ class ReleaseValidator:
                         code="SPEC-DOC-004",
                         severity=Severity.WARNING,
                         description=(
-                            f"{fname} is '{status}' but ACTIVE.md phase is '{phase}'; "
-                            "expected 'Aprovado' for implementation-bound phases"
+                            f"{fname} is '{status}' but the active release phase is "
+                            f"'{phase}'; expected 'Aprovado' for implementation-bound "
+                            "phases"
                         ),
                         path=str(fpath),
                     )
@@ -378,8 +390,8 @@ class ReleaseValidator:
         return [m.group(1).lower() for m in _TASK_MARKER_RE.finditer(text)]
 
     def check_phase_markers_coherence(self) -> list[SpecsDoctorIssue]:
-        """SPEC-DOC-024: ACTIVE.md ``phase`` must be coherent with the active release's
-        TASKS.md markers (constitution §7 lifecycle).
+        """SPEC-DOC-024 (v0.5.0 FR4/T-050-21A): the active release's ``RELEASE.jsonl``
+        phase must be coherent with its TASKS.md markers (constitution §7 lifecycle).
 
         Mechanical rules (minimal):
         - phase ∈ {SPEC, DEFINITION}: the active TASKS must NOT already be an
@@ -390,8 +402,8 @@ class ReleaseValidator:
         Other phases are not constrained here.
         """
         issues: list[SpecsDoctorIssue] = []
-        active_path = self.specs_dir / "releases" / "ACTIVE.md"
-        release, segment, phase, err = read_active_md(active_path)
+        active_path = self.specs_dir / "releases"
+        release, segment, phase, err = resolve_active_release(self.specs_dir)
         if err or not release or release == "none" or phase is None:
             return issues
         rdir = self.specs_dir / "releases" / release
@@ -411,11 +423,12 @@ class ReleaseValidator:
                             code="SPEC-DOC-024",
                             severity=Severity.ERROR,
                             description=(
-                                f"ACTIVE.md phase='{phase}' but the active release "
-                                f"'{release}' has an [x]-majority TASKS.md "
-                                f"({done}/{len(markers)} done). The phase field was "
-                                "never advanced through IMPLEMENTATION — advance ACTIVE.md "
-                                "or correct the markers (constitution §7)."
+                                f"Active release phase='{phase}' but the active "
+                                f"release '{release}' has an [x]-majority TASKS.md "
+                                f"({done}/{len(markers)} done). The phase was never "
+                                "advanced through IMPLEMENTATION — append a `phase` "
+                                "record to RELEASE.jsonl or correct the markers "
+                                "(constitution §7)."
                             ),
                             path=str(active_path),
                         )
@@ -428,7 +441,7 @@ class ReleaseValidator:
                         code="SPEC-DOC-024",
                         severity=Severity.ERROR,
                         description=(
-                            f"ACTIVE.md phase='IMPLEMENTATION' but active release "
+                            f"Active release phase='IMPLEMENTATION' but release "
                             f"'{release}' has no TASKS.md."
                         ),
                         path=str(tasks),
@@ -440,8 +453,8 @@ class ReleaseValidator:
                         code="SPEC-DOC-024",
                         severity=Severity.ERROR,
                         description=(
-                            f"ACTIVE.md phase='IMPLEMENTATION' but TASKS.md of release "
-                            f"'{release}' is not '**Status:** Aprovado' "
+                            f"Active release phase='IMPLEMENTATION' but TASKS.md of "
+                            f"release '{release}' is not '**Status:** Aprovado' "
                             f"(found '{_extract_status(tasks)}'). Implementation phase "
                             "requires an approved TASKS.md (constitution §7)."
                         ),
@@ -456,7 +469,7 @@ class ReleaseValidator:
                         code="SPEC-DOC-024",
                         severity=Severity.ERROR,
                         description=(
-                            f"ACTIVE.md phase='CLOSURE' but active release '{release}' "
+                            f"Active release phase='CLOSURE' but release '{release}' "
                             f"has {unfinished} unfinished task marker(s) "
                             "(expected every task '[x]' before closure; "
                             "constitution §7)."
@@ -597,48 +610,6 @@ class ReleaseValidator:
                         "WARNING."
                     ),
                     path=str(entry),
-                )
-            )
-        return issues
-
-    def check_release_jsonl_agreement(self) -> list[SpecsDoctorIssue]:
-        """SPEC-DOC-042 (v0.5.0 FR4/A4.1a, T-050-11) — WARN when the active release's
-        ``RELEASE.jsonl`` fold disagrees with ``ACTIVE.md``'s own ``phase:`` line.
-
-        Expand-phase invariant (D-F: expand -> switch -> contract, A4.5): from T-050-11
-        until the contract step (T-050-21A), both files are written and read in parallel
-        and must AGREE. ``ACTIVE.md`` stays the gate's sole decision authority in this
-        window (A4.1 — "the gate resolving with ACTIVE.md gone" — belongs to T-050-21A,
-        not this check); a disagreement is surfaced, never blocking (D15), so severity is
-        always WARNING and the doctor's exit code is unaffected. A release with no
-        ``RELEASE.jsonl`` yet (predates T-050-11, or has not reached DEFINITION through
-        this mechanism) and an unreadable ``RELEASE.jsonl`` (genuine I/O failure, tri-state
-        ``None``) are both silent here — neither is a disagreement.
-        """
-        issues: list[SpecsDoctorIssue] = []
-        active_path = self.specs_dir / "releases" / "ACTIVE.md"
-        release, _segment, active_phase, err = read_active_md(active_path)
-        if err or not release or release == "none" or active_phase is None:
-            return issues
-        jsonl_path = self.specs_dir / "releases" / release / "RELEASE.jsonl"
-        if not jsonl_path.exists():
-            return issues
-        fold_phase = read_release_phase(self.specs_dir, release)
-        if fold_phase is None or not fold_phase:
-            return issues
-        if fold_phase != active_phase:
-            issues.append(
-                SpecsDoctorIssue(
-                    code="SPEC-DOC-042",
-                    severity=Severity.WARNING,
-                    description=(
-                        f"RELEASE.jsonl phase '{fold_phase}' disagrees with ACTIVE.md "
-                        f"phase '{active_phase}' for release '{release}' — both are read "
-                        "in parallel during the expand phase (FR4, A4.1a) and must "
-                        "agree; ACTIVE.md remains authoritative until the contract step "
-                        "(T-050-21A). WARNING only (D15) — never a block."
-                    ),
-                    path=str(jsonl_path),
                 )
             )
         return issues

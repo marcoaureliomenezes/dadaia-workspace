@@ -40,7 +40,6 @@ _EXPECTED_FILES = [
     "memory/QUALITY.md",
     "memory/product/index.md",
     "memory/product/catalog.json",
-    "releases/ACTIVE.md",
     "releases/AGENTS.md",
     "backlog/AGENTS.md",
     "backlog/BACKLOG.md",
@@ -88,9 +87,11 @@ def test_scaffold_happy_path_creates_all_artifacts(tmp_path: Path) -> None:
         gitkeep = specs_dir / artifact / "_archive" / ".gitkeep"
         assert gitkeep in result.created, f"{artifact}/_archive/.gitkeep must be reported created"
 
-    active_content = (specs_dir / "releases" / "ACTIVE.md").read_text(encoding="utf-8")
-    assert "release: none" in active_content
-    assert "phase: none" in active_content
+    # ACTIVE.md retired (v0.5.0 FR4/T-050-21A, A4.1): no replacement file — a fresh
+    # scaffold's "no active release" state is the honest absence of any directory
+    # under releases/ carrying a RELEASE.jsonl.
+    assert not (specs_dir / "releases" / "ACTIVE.md").exists()
+    assert list((specs_dir / "releases").glob("*/RELEASE.jsonl")) == []
 
     # Born-markdown .md stubs exist and start with YAML frontmatter (memory-markdown-source-v1).
     for rel in ("memory/ARCHITECTURE.md", "memory/TECHSTACK.md", "memory/product/index.md"):

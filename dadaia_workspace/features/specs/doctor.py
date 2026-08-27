@@ -5,11 +5,11 @@ coordinator (this file) that **owns check()/fix() ORDER** and delegates all LOGI
 single-responsibility validator siblings plus two shared leaf modules:
 
   * ``doctor_types``     — ``Severity`` / ``SpecsDoctorIssue`` / ``_MemoryMdSummary``
-  * ``doctor_common``    — cross-validator pure helpers (``read_active_md`` + release-dir discovery)
+  * ``doctor_common``    — cross-validator pure helpers (``resolve_live_release_id`` + release-dir discovery)
   * ``doctor_structural``   — TREE-1..7 + TREE-5M spec-tree invariants; ``fix_tree4``
   * ``doctor_memory``       — memory files/atomicity, CAT-1, LINT-1 (holds the lazy
                               ``infrastructure.subprocess_runner`` import)
-  * ``doctor_release``      — ACTIVE.md, release artifacts, SemVer + ledger invariants
+  * ``doctor_release``      — active release (RELEASE.jsonl fold), release artifacts, SemVer + ledger invariants
   * ``doctor_closure_audit``— archive closures, orphan specs, audit disposition; ``fix_archive_dir``
   * ``doctor_governance``   — single-source backlog invariants, bug status/JSONL
   * ``doctor_coherence``    — constitution and pattern-version coherence
@@ -171,8 +171,8 @@ class SpecsDoctor:
         issues.extend(self._closure_audit.check_loose_undisposed_audits())  # SPEC-DOC-038
         # v0.1.81 / FR2 (audit G-23) — partial (artifact-empty) archived release dirs
         issues.extend(self._release.check_partial_archived_release_dirs())  # SPEC-DOC-039
-        # v0.5.0 T-050-11 (FR4/A4.1a) — RELEASE.jsonl <-> ACTIVE.md agreement (expand phase)
-        issues.extend(self._release.check_release_jsonl_agreement())  # SPEC-DOC-042
+        # SPEC-DOC-042 RETIRED (v0.5.0 T-050-21A, FR4) — it existed only to watch
+        # RELEASE.jsonl and ACTIVE.md agree during the expand window; ACTIVE.md is gone.
         # v0.5.0 T-050-11 (FR4/A4.2) — milestone immutability (defined/implemented/shipped)
         issues.extend(self._release.check_release_jsonl_milestone_immutability())  # SPEC-DOC-043
         # v0.5.0 T-050-08 (FR2/A2.8) — archive-overdue signal (WARN, never a block)

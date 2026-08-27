@@ -14,7 +14,7 @@ import shutil
 from pathlib import Path
 
 from dadaia_workspace.core.atomic_write import atomic_write
-from dadaia_workspace.features.specs.doctor_common import read_active_md
+from dadaia_workspace.features.specs.doctor_common import resolve_active_release
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
 from dadaia_workspace.features.specs.template_history import was_shipped
 
@@ -401,24 +401,24 @@ class StructuralValidator:
         per-release artifact check (SPEC-DOC-004) covers Status: field validation.
         """
         issues: list[SpecsDoctorIssue] = []
-        active_path = self.specs_dir / "releases" / "ACTIVE.md"
-        release, segment, phase, err = read_active_md(active_path)
+        release, segment, phase, err = resolve_active_release(self.specs_dir)
         if err or not release or release == "none":
             return issues
         if phase not in ("IMPLEMENTATION", "CLOSURE"):
             return issues
         rdir = self.specs_dir / "releases" / release
-        if segment:  # schema v2: artifacts live in the active segment dir
+        if segment:  # dir-based segment (ADR-1/ADR-5): artifacts live in the segment dir
             rdir = rdir / segment
         if not rdir.exists():
             # v0.4.3 T-043-22 [Arm-B rider] bug specs-doctor-segment-router-silent-skip:
-            # a live segment: pointer at a missing segment directory used to `return
+            # a live segment pointer at a missing segment directory used to `return
             # issues` here silently, UNCONDITIONALLY. SPEC-DOC-009 (check_active_md,
             # doctor_release.py) only validates the RELEASE directory
             # (releases/<release>/) — it NEVER checks the segment SUBdirectory
-            # (releases/<release>/<segment>/), so a segmented ACTIVE.md pointing at a
-            # missing segment dir was invisible to every downstream check (this one AND
-            # SPEC-DOC-004 in doctor_release.py). Scoped to `segment` truthy only: the
+            # (releases/<release>/<segment>/), so a segmented active-release pointer
+            # at a missing segment dir was invisible to every downstream check (this
+            # one AND SPEC-DOC-004 in doctor_release.py). Scoped to `segment` truthy
+            # only: the
             # FLAT-release case (no segment:) is genuinely, correctly covered already
             # by check 9's own release-dir check (rdir IS the release dir there) —
             # firing here too would duplicate that finding.

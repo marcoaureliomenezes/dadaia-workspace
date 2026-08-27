@@ -31,12 +31,6 @@
       "severity": "error"
     },
     {
-      "code": "SPEC-DOC-009",
-      "description": "ACTIVE.md release='v9.9.9' but no directory at <SPECS>/releases/v9.9.9",
-      "path": "<SPECS>/releases/v9.9.9",
-      "severity": "error"
-    },
-    {
       "code": "SPEC-DOC-016",
       "description": "Release folder 'badname-release' does not follow SemVer naming (^v\\d+\\.\\d+\\.\\d+$). Created: 2026-07-10. Rename to v<MAJOR>.<MINOR>.<PATCH> (D3, SPEC-DOC-016).",
       "path": "<SPECS>/releases/badname-release",
@@ -119,17 +113,11 @@
       "description": "backlog/candidates.md is a loose per-entry file directly under specs/backlog/ — the single source is BACKLOG.md (## ACTIVE + ## LEDGER); fold it into BACKLOG.md and move the superseded file into specs/backlog/_archive/ (SPEC-DOC-035, WARNING).",
       "path": "<SPECS>/backlog/candidates.md",
       "severity": "warning"
-    },
-    {
-      "code": "SPEC-DOC-038",
-      "description": "audits/bad-audit-name is loose in specs/audits/ — a dispositioned audit must be archived to specs/audits/_archive/ (one remediation release dispositions every finding, then archives; audit-disposition law). SPEC-DOC-038, WARNING.",
-      "path": "<SPECS>/audits/bad-audit-name",
-      "severity": "warning"
     }
   ],
   "specs_dir": "<SPECS>",
   "summary": {
-    "errors": 8,
-    "warnings": 13
+    "errors": 7,
+    "warnings": 12
   }
 }

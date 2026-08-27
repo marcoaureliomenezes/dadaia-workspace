@@ -73,8 +73,9 @@ class HandoffValidationError(DadaiaError):
 class NoActiveReleaseError(DadaiaError):
     """Raised when ``reports next`` cannot resolve an active release.
 
-    Covers a missing/``none`` ``releases/ACTIVE.md`` in the active context's specs dir.
-    The CLI maps this to exit code 3 with an orienting message.
+    Covers a live-release directory tree with no directory carrying a ``RELEASE.jsonl``
+    (v0.5.0 FR4/T-050-21A: ``ACTIVE.md`` retired, no replacement file) in the active
+    context's specs dir. The CLI maps this to exit code 3 with an orienting message.
     """
 
 

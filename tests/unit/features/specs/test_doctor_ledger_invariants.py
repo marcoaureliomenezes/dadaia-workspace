@@ -125,9 +125,7 @@ def _make_clean_specs_tree(root: Path, release_id: str = "v0.1.10") -> Path:
             MINIMAL_MEMORY_ATOM_MD.format(slug=slug, title=title), encoding="utf-8"
         )
 
-    (specs / "releases" / "ACTIVE.md").write_text(
-        f"release: {release_id}\nphase: IMPLEMENTATION\n", encoding="utf-8"
-    )
+    _set_active(specs, release_id, "IMPLEMENTATION")
     spec_md = "# Spec\n\n> **Status:** Aprovado\n> **Created:** 2026-06-09\n\nContent.\n"
     plan_md = "# Plan\n\n> **Status:** Aprovado\n\nShort.\n"
     tasks_md = "# Tasks\n\n> **Status:** Aprovado\n\n- [-] T1 something\n- [ ] T2 other\n"
@@ -138,9 +136,21 @@ def _make_clean_specs_tree(root: Path, release_id: str = "v0.1.10") -> Path:
 
 
 def _set_active(specs: Path, release_id: str, phase: str) -> None:
-    (specs / "releases" / "ACTIVE.md").write_text(
-        f"release: {release_id}\nphase: {phase}\n", encoding="utf-8"
-    )
+    """Write (overwrite) the release's ``RELEASE.jsonl`` with exactly ONE ``phase``
+    record (v0.5.0 FR4/T-050-21A) -- the fixture-side replacement for the retired
+    ``ACTIVE.md``; the fold takes the LAST ``phase`` record, so one line fully
+    represents "current state" for a test."""
+    import json as _json
+
+    rdir = specs / "releases" / release_id
+    rdir.mkdir(parents=True, exist_ok=True)
+    record = {
+        "ts": "2026-06-01T00:00:00Z",
+        "event": "phase",
+        "agent": "test",
+        "data": {"phase": phase},
+    }
+    (rdir / "RELEASE.jsonl").write_text(_json.dumps(record) + "\n", encoding="utf-8")
 
 
 def _write_tasks(specs: Path, release_id: str, body: str) -> None:

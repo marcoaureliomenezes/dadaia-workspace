@@ -1,9 +1,11 @@
 """Reports-next feature service — discovers the next expected agent handoff.
 
 Infra-free per the constitution (L67): this module imports only ``core/`` and the
-Python standard library. It reads ``releases/ACTIVE.md``, the active release's
-``PLAN.md``, and the ``.dadaia/reports/`` tree via :mod:`pathlib`, mirroring the
-stdlib file access already used by ``ReportsValidationService``.
+Python standard library. It resolves the active release by folding the live release
+directory's ``RELEASE.jsonl`` (v0.5.0 FR4/T-050-21A, A4.1 — ``ACTIVE.md`` is retired,
+no file replaces it), reads that release's ``PLAN.md``, and the ``.dadaia/reports/``
+tree via :mod:`pathlib`, mirroring the stdlib file access already used by
+``ReportsValidationService``.
 
 Wiring (which context/specs_dir/reports_root to use) is resolved in
 ``dadaia_workspace.container.build_reports_next_service`` — never here.
@@ -17,6 +19,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from dadaia_workspace.core.exceptions import NoActiveReleaseError, NoAgentSequenceError
+from dadaia_workspace.core.release_events import fold_release_events, parse_release_events
 
 #: Canonical 9-agent core topology. Owner names parsed from
 #: PLAN.md are filtered to this set so prose like ``owner: TBD`` never enters a sequence.
@@ -43,8 +46,6 @@ _OWNER_RE = re.compile(
     r"|(?:^|\s)owner:\s*([a-z][a-z0-9-]+)",
     re.IGNORECASE | re.MULTILINE,
 )
-
-_RELEASE_RE = re.compile(r"^release:\s*(.+?)\s*$", re.MULTILINE)
 
 _NO_SEQUENCE_MSG = (
     "No agent sequence found in PLAN.md. Ensure PLAN.md declares owners using "
@@ -84,7 +85,7 @@ class ReportsNextService:
         """Return the next expected agent (or ``None`` if all have emitted handoffs).
 
         Raises:
-            NoActiveReleaseError: ACTIVE.md missing or ``release: none``.
+            NoActiveReleaseError: no live release directory carries a ``RELEASE.jsonl``.
             NoAgentSequenceError: PLAN.md missing or declares no recognizable owners.
         """
         release_id = self._active_release()
@@ -105,20 +106,39 @@ class ReportsNextService:
     # ------------------------------------------------------------------
 
     def _active_release(self) -> str:
-        active_path = self._specs_dir / "releases" / "ACTIVE.md"
-        if not active_path.is_file():
-            raise NoActiveReleaseError(
-                "No active release: releases/ACTIVE.md not found under the active context. "
-                "Run `eval $(dadaia context bind <name> --mode read)` and open a release."
+        """Resolve the live release id (v0.5.0 FR4/T-050-21A, A4.1): the ONE
+        directory directly under ``releases/`` — excluding ``_archive``/``_ideas``
+        (A4.6) — that carries a ``RELEASE.jsonl``. No file replaces ``ACTIVE.md``;
+        this directory scan is the sole successor of its ``release:`` field."""
+        releases_root = self._specs_dir / "releases"
+        candidates: list[str] = []
+        if releases_root.is_dir():
+            candidates = sorted(
+                d.name
+                for d in releases_root.iterdir()
+                if d.is_dir()
+                and d.name not in ("_archive", "_ideas")
+                and (d / "RELEASE.jsonl").is_file()
             )
-        m = _RELEASE_RE.search(active_path.read_text(encoding="utf-8"))
-        release = m.group(1).strip() if m else ""
-        if not release or release.lower() == "none":
+        if not candidates:
             raise NoActiveReleaseError(
-                "No active release (releases/ACTIVE.md has `release: none`). "
-                "Open a release before running `dadaia reports next`."
+                "No active release: no directory under releases/ carries a "
+                "RELEASE.jsonl under the active context. Run "
+                "`eval $(dadaia context bind <name> --mode read)` and open a release."
             )
-        return release
+        if len(candidates) > 1:
+            raise NoActiveReleaseError(
+                "No active release: multiple live release directories carry a "
+                f"RELEASE.jsonl ({', '.join(candidates)}) — ambiguous, refusing to guess."
+            )
+        release_id = candidates[0]
+        jsonl_path = releases_root / release_id / "RELEASE.jsonl"
+        events, _errors = parse_release_events(jsonl_path.read_text(encoding="utf-8"))
+        if not fold_release_events(events).phase:
+            raise NoActiveReleaseError(
+                f"No active release: {release_id}/RELEASE.jsonl carries no 'phase' record."
+            )
+        return release_id
 
     def _agent_sequence(self, plan_path: Path) -> list[str]:
         if not plan_path.is_file():

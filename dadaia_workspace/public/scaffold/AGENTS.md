@@ -14,7 +14,6 @@ memory/ARCHITECTURE.md
 memory/TECHSTACK.md
 memory/product/index.md
 releases/<release-id>/RELEASE.jsonl   (folded: last `phase` record wins)
-releases/ACTIVE.md                    (dual-written mirror, transitional — see below)
 releases/<release-id>/SPEC.md
 releases/<release-id>/PLAN.md
 releases/<release-id>/TASKS.md
@@ -34,8 +33,7 @@ concurrency lock.
 Implementation is allowed only when:
 
 - The live release's `RELEASE.jsonl` folds to `phase: IMPLEMENTATION` (last `phase`
-  record) — dual-written to `ACTIVE.md`'s `phase:` line, which remains the SDD gate's
-  own literal decision authority until T-050-21A repoints it at the fold (SPEC FR4).
+  record) — the SDD gate's own decision authority (SPEC FR4, v0.5.0 T-050-21A, A4.1).
 - `SPEC.md`, `PLAN.md`, and `TASKS.md` contain `**Status:** Aprovado`.
 - The active task is changed from `[ ]` to `[-]` before production edits.
 - The task's declared write set contains every production file to be edited.
@@ -49,7 +47,6 @@ editing production.
 |---|---|
 | `constitution.md` | operator or `product-engineer` during approved governance work |
 | `releases/<id>/RELEASE.jsonl` | agents with file tools, per event kind — `dd-release-implement`'s `RELEASE-EVENTS.md` |
-| `releases/ACTIVE.md` | `product-engineer` (dual-write mirror of the `RELEASE.jsonl` fold, transitional) |
 | `releases/<id>/SPEC.md` | `product-engineer` |
 | `releases/<id>/PLAN.md` | `product-engineer` |
 | `releases/<id>/TASKS.md` | `product-engineer`; implementers may change only their task marker |

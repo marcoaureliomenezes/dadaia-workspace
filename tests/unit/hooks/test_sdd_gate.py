@@ -34,17 +34,32 @@ from dadaia_workspace.hooks import sdd_gate
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
 
+def _write_release_jsonl(specs: Path, release_id: str, phase: str) -> None:
+    """Write (overwrite) the release's RELEASE.jsonl with exactly ONE phase record
+    (v0.5.0 FR4/T-050-21A) -- the fixture-side replacement for the retired
+    ACTIVE.md."""
+    rdir = specs / "releases" / release_id
+    rdir.mkdir(parents=True, exist_ok=True)
+    record = {
+        "ts": "2026-06-01T00:00:00Z",
+        "event": "phase",
+        "agent": "test",
+        "data": {"phase": phase},
+    }
+    (rdir / "RELEASE.jsonl").write_text(json.dumps(record) + "\n", encoding="utf-8")
+
+
 def _mk_workspace(tmp_path: Path, *slugs: str) -> Path:
-    """Build a minimal workspace with repos/<slug>/specs/releases/ACTIVE.md for each slug."""
+    """Build a minimal workspace with repos/<slug>/specs/releases/<id>/RELEASE.jsonl
+    (phase: IMPLEMENTATION) for each slug (v0.5.0 FR4/T-050-21A -- ACTIVE.md retired)."""
     (tmp_path / ".dadaia" / "states").mkdir(parents=True)
     (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text(
         json.dumps({"contexts": [{"repo_slug": s, "state": "alive"} for s in slugs]}),
         encoding="utf-8",
     )
     for s in slugs:
-        rel = tmp_path / "repos" / s / "specs" / "releases"
-        rel.mkdir(parents=True)
-        (rel / "ACTIVE.md").write_text("release: rel-1\nphase: IMPLEMENTATION\n", encoding="utf-8")
+        specs = tmp_path / "repos" / s / "specs"
+        _write_release_jsonl(specs, "rel-1", "IMPLEMENTATION")
     return tmp_path
 
 
@@ -770,50 +785,48 @@ def test_resolve_mode_foreign_read_bind_end_to_end_never_blocks_my_write(tmp_pat
     assert result2.block_envelope() is None  # doctrine: never blocked by a foreign bind
 
 
-def test_unreadable_active_md_fails_closed_for_memory(tmp_path: Path) -> None:
-    """An unreadable ``ACTIVE.md`` must never open the MEMORY gate.
+def test_unreadable_release_jsonl_fails_closed_for_memory(tmp_path: Path) -> None:
+    """An unreadable ``RELEASE.jsonl`` must never open the MEMORY gate (v0.5.0
+    FR4/T-050-21A -- ACTIVE.md retired, RELEASE.jsonl is the sole phase source).
 
-    ``_active_field`` is tri-state and its docstring tells callers to treat ``None`` as
-    UNKNOWN, never as "none"; the caller collapses it to ``""``. ``""`` is not in
-    ``{DEFINITION, CLOSURE}``, so the write BLOCKS — the collapse is fail-CLOSED. Driven
-    through the real subprocess entrypoint so the workspace resolves the way production
-    resolves it; pinned so a future "cleanup" of the collapse cannot silently invert it.
+    ``_resolve_active_release`` treats a genuine I/O failure the same as "no active
+    release" (phase ``""``). ``""`` is not in ``{DEFINITION, CLOSURE}``, so the write
+    BLOCKS — fail-CLOSED. Driven through the real subprocess entrypoint so the
+    workspace resolves the way production resolves it.
     """
     workspace = _mk_workspace(tmp_path, "demo")
     specs = workspace / "repos" / "demo" / "specs"
     (specs / "memory").mkdir(parents=True)
-    active = specs / "releases" / "ACTIVE.md"
-    active.write_text("release: rel-1\nphase: DEFINITION\n", encoding="utf-8")
+    _write_release_jsonl(specs, "rel-1", "DEFINITION")
+    jsonl_path = specs / "releases" / "rel-1" / "RELEASE.jsonl"
     target = str(specs / "memory" / "product.md")
     payload: dict[str, Any] = {"tool_name": "Write", "tool_input": {"file_path": target}}
 
     # DEFINITION phase, readable ⇒ ALLOW. Proves the probe reaches the MEMORY arm at all.
     assert _run(tmp_path, payload) is None, "DEFINITION must allow a memory write"
 
-    active.chmod(0o000)
+    jsonl_path.chmod(0o000)
     try:
-        if os.access(active, os.R_OK):  # running as root ignores the mode bits
+        if os.access(jsonl_path, os.R_OK):  # running as root ignores the mode bits
             pytest.skip("cannot make a file unreadable as this uid")
         envelope = _run(tmp_path, payload)
-        assert envelope is not None, "unreadable ACTIVE.md must not open the MEMORY gate"
+        assert envelope is not None, "unreadable RELEASE.jsonl must not open the MEMORY gate"
         assert "DEFINITION or CLOSURE" in str(envelope.get("reason", "")), envelope
     finally:
-        active.chmod(0o644)
+        jsonl_path.chmod(0o644)
 
 
 def test_memory_gate_reads_active_via_repo_slug_when_name_differs(tmp_path: Path) -> None:
     """F-02 (v0.5.0 six-axis review): the authority returns the context NAME; the gate
     must map it to the registry ``repo_slug`` before joining ``repos/<...>/specs`` —
-    a `context create <name> --repo <slug>` workspace otherwise reads ``ACTIVE.md``
+    a `context create <name> --repo <slug>` workspace otherwise reads the release tree
     from a non-existent dir, collapses phase to ``""``, and wrongly blocks MEMORY."""
     (tmp_path / ".dadaia" / "states").mkdir(parents=True)
     (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text(
         json.dumps({"contexts": [{"name": "meu-projeto", "repo_slug": "demo", "state": "alive"}]}),
         encoding="utf-8",
     )
-    rel = tmp_path / "repos" / "demo" / "specs" / "releases"
-    rel.mkdir(parents=True)
-    (rel / "ACTIVE.md").write_text("release: rel-1\nphase: DEFINITION\n", encoding="utf-8")
+    _write_release_jsonl(tmp_path / "repos" / "demo" / "specs", "rel-1", "DEFINITION")
     (tmp_path / "repos" / "demo" / "specs" / "memory").mkdir(parents=True)
     target = str(tmp_path / "repos" / "demo" / "specs" / "memory" / "product.md")
     payload: dict[str, Any] = {"tool_name": "Write", "tool_input": {"file_path": target}}
