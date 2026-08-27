@@ -181,7 +181,7 @@
       ],
       "hash_tuple": {
         "section": "sha256:d89dffaf8bd1d630f8337ce4db15e1f46c15df666a178a1a9c587966fbda8e36",
-        "skill": "sha256:82f408ac87d4e2cc9cd96b7115435b548758a2c6d7be4a02436bf3b9be7fde20",
+        "skill": "sha256:a6274e815c8b106d0f4b870e6eb2fc54b713637a3cec2429f79f103107be2f5e",
         "scoped": [
           "sha256:d09b123c6d65ef07f0cf643368422adaea2bf241716be131ed684c5b34e563a4"
         ]
@@ -196,7 +196,7 @@
       "scoped_agents_md": [],
       "hash_tuple": {
         "section": "sha256:d89dffaf8bd1d630f8337ce4db15e1f46c15df666a178a1a9c587966fbda8e36",
-        "skill": "sha256:d36072f11b05a3d996d5effe185e0a41cc5be1a7d0a89238c75833241102d561",
+        "skill": "sha256:fd661e6403841eb560360fdbf48cd61fb9ea727be0dee32bcba55c91547cc229",
         "scoped": []
       },
       "recorded_by": "ai-engineer",

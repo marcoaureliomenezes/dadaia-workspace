@@ -7,10 +7,9 @@ touching any `specs/memory/**` atom at closure. Carries forward `CLOSURE-CHECKS.
 ## Protocol
 
 1. **Verify gate phase.** Confirm the live release is in `CLOSURE` phase before writing
-   `specs/memory/**` (also writable in `DEFINITION`). The gate's own decision authority
-   is still `releases/ACTIVE.md`'s `phase:` line during the FR4 transition — dual-write
-   it alongside the `RELEASE.jsonl` `phase` record (`RELEASE-EVENTS.md`) until
-   T-050-21A repoints the gate to the fold. Otherwise the gate blocks the write.
+   `specs/memory/**` (also writable in `DEFINITION`) — dual-write `phase` to
+   `RELEASE.jsonl` and `ACTIVE.md` together (`RELEASE-EVENTS.md`, `specs/releases/AGENTS.md`).
+   Otherwise the gate blocks the write.
 2. **Do not author legacy HTML memory.** If legacy HTML memory exists, treat it as
    read-only migration input. New memory writes are Markdown atoms.
 3. **Update Markdown atoms.** Apply the release's deltas to the corresponding

@@ -77,25 +77,10 @@ Only now write the release SPEC (Draft), with:
 - the picked bug + backlog set and their acceptance,
 - every `superseded_by` link from step 2.
 
-**Release id: bare SemVer, `^\d+\.\d+\.\d+$`** (e.g. `0.6.0`) — no `v` prefix, no
-suffix. `dadaia release new <id>` scaffolds `specs/releases/<id>/SPEC.md` with
-canonical Draft frontmatter; do not create the directory by hand. A `v`-prefixed id is
-minted nowhere and resolves only archived directories (read-only legacy lookup).
-
-**Pre-approval drafting in `_ideas/` (optional).** A SPEC may start as a Draft under
-`specs/releases/_ideas/<release-id>/` — MUTATING, never a trust root for any required
-check — before it is promoted into the live `releases/<release-id>/` tree. The
-promotion commit's shape is `dd-gitflow-default` §3a shape 5's `_ideas/` variant: it
-carries the SPEC alone (PLAN/TASKS follow once SPEC is `Aprovado`, in the live tree).
-
-**Append the `defined` milestone.** At the promotion commit — SPEC + PLAN + TASKS all
-`Aprovado`, the moment the definition PR opens — append the `defined` record to
-`specs/releases/<release-id>/RELEASE.jsonl`, carrying that commit's own sha (and the
-PR number once known): `{"event":"defined","agent":"product-engineer","data":{"sha":
-"<sha>","pr":<n|null>}}` — the exact recipe and cardinality rule (once, ever):
-`dd-release-implement`'s `RELEASE-EVENTS.md`. Also set `releases/ACTIVE.md`'s `phase:`
-field to match (dual-write, until T-050-21A repoints the gate) — `dd-release-implement`
-§2.
+Release-id format (bare SemVer) and `_ideas/`'s pre-approval role: `specs/releases/AGENTS.md`
+— referenced, not restated. At the promotion commit (SPEC+PLAN+TASKS all `Aprovado`,
+the definition PR opening), append the `defined` milestone and dual-write `ACTIVE.md`:
+recipe and cardinality rule (once, ever) at `dd-release-implement`'s `RELEASE-EVENTS.md`.
 
 Definition runs on `feature/{M.m.p}`. Once SPEC + PLAN + TASKS are all `Aprovado`, open
 the definition PR — a mandatory obligation, not optional cleanup (branch contract:

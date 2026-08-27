@@ -80,11 +80,9 @@ by reference — this table is not repeated in either.
 **Purge-on-pick (mandatory).** A picked entry leaves `ACTIVE` — via a `backlog_histo.jsonl`
 exit record, often provisionally `CONSUMED` — in the same commit that creates the
 release SPEC; the SPEC's provenance section records which entries it consumed. Leaving
-a picked entry in `ACTIVE` after its SPEC exists is a defect. **CONSUMED → terminal is
-an update, never a second record:** the disposition sweep at closure rewrites that
-same slug's ONE histo record's `disposition`/`reason`/`release` fields in place —
-appending a second record for the same slug is the exact failure mode BL-DUP used to
-catch and this shape now makes structurally impossible (`id` is the record's key).
+a picked entry in `ACTIVE` after its SPEC exists is a defect. CONSUMED→terminal is an
+in-place update, never a second record — full rule: `dd-release-implement`'s
+`RC-FLOW.md` step 10.
 
 ## 3. Continuous sanitize protocol
 
