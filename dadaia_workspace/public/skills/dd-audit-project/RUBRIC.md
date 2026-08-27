@@ -64,7 +64,7 @@ drift when memory's agent topology diverges from on-disk personas/skills/rules).
 
 | Score | Anchor |
 |---|---|
-| 10 | Every persona/skill/rule matches its declared scope and topic row in `rules-skills-map.json`; `dadaia public doctor` reports zero drift; no undeclared activation-glob overlap; no disclosed content orphaned from its `SKILL.md` pointer |
+| 10 | Every persona/skill/rule matches its declared row in `entities/behavior-map.json` (retired `rules-skills-map.json` at T-050-19); `dadaia public doctor` reports zero drift; no undeclared activation-glob overlap; no disclosed content orphaned from its `SKILL.md` pointer |
 | 7 | 1–2 minor scope/pointer staleness issues; projections mostly hash-matched; no undeclared overlap |
 | 4 | Several personas/skills diverge from actual agent behavior; disclosed depth duplicated across files instead of pointed-to; projection drift present but non-blocking |
 | 1 | Personas/skills/rules materially out of sync with actual behavior; undeclared activation-glob overlaps; `dadaia public doctor` reports drift or missing projections |

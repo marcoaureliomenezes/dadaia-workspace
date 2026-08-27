@@ -1,6 +1,6 @@
 ---
 name: dadaia-workspace-spec-navigator
-description: "Use when: loading dadaia-workspace specs in canonical order for implementation, review, planning, or release closure. Resolves the active release via specs/releases/ACTIVE.md and reads memory Markdown + the active release's SPEC/PLAN/TASKS. Supports both the dadaia-workspace repository itself and any active runtime context discovered via spec_contexts.json (v2 registry) or `dadaia context show --json`."
+description: "Use when: loading dadaia-workspace specs in canonical order for implementation, review, planning, or release closure. Resolves the active release via its RELEASE.jsonl phase fold (dual-written to specs/releases/ACTIVE.md) and reads memory Markdown + the active release's SPEC/PLAN/TASKS. Supports both the dadaia-workspace repository itself and any active runtime context discovered via spec_contexts.json (v2 registry) or `dadaia context show --json`."
 ---
 
 # dadaia-workspace-spec-navigator
@@ -23,10 +23,11 @@ specs/
 │       ├── catalog.json         ← generated machine-readable feature catalog
 │       └── <feature-slug>.md    ← one Markdown atom per feature in production
 ├── releases/
-│   ├── ACTIVE.md                ← which release is active and in which phase
-│   └── <release-id>/{SPEC,PLAN,TASKS,CLOSURE}.md
+│   ├── <release-id>/RELEASE.jsonl ← phase/milestone fold — the canonical record
+│   ├── ACTIVE.md                ← dual-written phase mirror (transitional)
+│   └── <release-id>/{SPEC,PLAN,TASKS}.md
 ├── backlog/
-│   ├── BACKLOG.md                ← single source: ## ACTIVE (candidates) + ## LEDGER (closed)
+│   ├── BACKLOG.md                ← live photo: ## ACTIVE only (candidates)
 │   └── _archive/                 ← superseded entry files, historical (git mv only)
 └── _archive/                    ← archived releases, legacy features/memory/root (read-only)
 ```
@@ -65,14 +66,17 @@ referenced, not restated.
    atoms relevant to the task; do not load every product atom by default.
 
 3. **Resolve the active release (and segment).**
-   - Read `<specs-dir>/releases/ACTIVE.md`. Format (schema v2, ADR-1/ADR-5):
+   - Fold `<specs-dir>/releases/<release-id>/RELEASE.jsonl` — the last `phase` record
+     wins (SPEC FR4). `<specs-dir>/releases/ACTIVE.md` carries the same two facts,
+     dual-written and still the SDD gate's own literal read until T-050-21A repoints
+     it:
      ```
      release: <release-id>
      segment: <alpha-N|rc-N>   # optional — present for segmented releases
      phase: <DISCOVERY|DEFINITION|SPEC|PLAN|TASKS|IMPLEMENTATION|CLOSURE|ARCHIVED>
      ```
-   - If file is missing or `release: none`: no active release. Inform the operator and
-     stop before implementation.
+   - If both are missing or `release: none`: no active release. Inform the operator
+     and stop before implementation.
    - Let `<rel-path>` = `<release-id>/<segment>` when a `segment:` is present, else
      `<release-id>`.
 
@@ -80,8 +84,8 @@ referenced, not restated.
    - `<specs-dir>/releases/<rel-path>/SPEC.md`
    - `<specs-dir>/releases/<rel-path>/PLAN.md` (if planning/implementation in scope)
    - `<specs-dir>/releases/<rel-path>/TASKS.md` (if implementation in scope)
-   - `<specs-dir>/releases/<rel-path>/CLOSURE.md` (only if phase = `CLOSURE` or
-     `ARCHIVED`)
+   - `<specs-dir>/releases/<rel-path>/RELEASE.jsonl` (its closure `note` records, only
+     if phase = `CLOSURE` or `ARCHIVED` — `CLOSURE.md` retired at T-050-21)
 
 5. **Approval verification.**
    - If implementation is in scope, every loaded SPEC/PLAN/TASKS must contain the explicit
