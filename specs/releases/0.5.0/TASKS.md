@@ -776,7 +776,7 @@ report carries counts only, never values; this task is a **separate commit** fro
 
 ---
 
-- [ ] **T-050-11 — FR4: `RELEASE.jsonl` replaces `ACTIVE.md`**
+- [-] **T-050-11 — FR4: `RELEASE.jsonl` replaces `ACTIVE.md`**
 
 **Owner role:** software-engineer · **Commit:** `feat(T-050-11): RELEASE.jsonl milestones
 replace ACTIVE.md`
