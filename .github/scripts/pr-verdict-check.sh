@@ -83,6 +83,25 @@ set -euo pipefail
 PR_HEAD_SHA="${PR_HEAD_SHA:?PR_HEAD_SHA is required}"
 RELEASE_ID="${RELEASE_ID:-}"
 
+# Self-locate the package, never rely on the caller's cwd (bug
+# pr-verdict-check-wiring-fixture-lacks-cwd-relative-dadaia-workspace-package): the
+# canon derivation below imports `dadaia_workspace.core.specs_version`, a pure
+# module whose output never depends on which repo instance invokes this script — it
+# is always this script's OWN sibling package, never the caller's cwd. CWD-relative
+# `python3 -c` resolution happened to work because every real CI invocation's cwd is
+# already the checkout root (`security-verdict-gate` runs `bash
+# .github/scripts/pr-verdict-check.sh` with no `working-directory:` override) — but
+# that made the derivation's correctness an incidental property of the caller's cwd
+# rather than a property of the script itself, exactly the assumption a synthetic
+# git-repo fixture (a throwaway tmp_path repo with no dadaia_workspace/ tree at all)
+# legitimately does not share. `PYTHONPATH` is set to this script's own repo root
+# (derived from `BASH_SOURCE[0]`, never `$0` — robust if this script is ever
+# sourced) so the derivation resolves identically regardless of cwd; every later git
+# operation in this script still runs against the CALLER's cwd (the checked-out PR
+# tree in CI, the synthetic fixture repo in tests) — only the python3 import path is
+# self-located, nothing else.
+_SCRIPT_REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
 # Derive the id pattern + the exactly-two verdict-evidence root templates from the
 # canon. Fail-closed (SPEC §9.2 SEC-R2): interpreter absent, import error, missing
 # symbol, or empty/unparseable output all exit non-zero with the reason — there is
@@ -93,7 +112,7 @@ RELEASE_ID="${RELEASE_ID:-}"
 # themselves; the id-pattern check below still refuses the literal token
 # "_ideas"/"_archive" (or any traversal shape) before it is ever interpolated,
 # because none of those strings can match a release-id pattern.
-if ! _CANON_OUTPUT="$(python3 -c '
+if ! _CANON_OUTPUT="$(PYTHONPATH="${_SCRIPT_REPO_ROOT}${PYTHONPATH:+:${PYTHONPATH}}" python3 -c '
 import dadaia_workspace.core.specs_version as s
 print(s.release_semver_ere_pattern())
 for template in s.VERDICT_EVIDENCE_ROOT_TEMPLATES:
