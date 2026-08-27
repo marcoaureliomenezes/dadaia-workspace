@@ -39,9 +39,9 @@ backlog.
 
 Arm A is agent-dispatched: each stage — backlog-definition, release-definition,
 implementation with its reviews and gates, and audit — is carried out by dispatching the
-owning agent for that stage (§2) against the SDD documents (`ACTIVE.md`, SPEC, PLAN,
-TASKS, CLOSURE, per §6). You fan out explicitly; the documents themselves are the record
-of progress.
+owning agent for that stage (§2) against the SDD documents (the `RELEASE.jsonl` fold,
+SPEC, PLAN, TASKS, CLOSURE, per §6). You fan out explicitly; the documents themselves are
+the record of progress.
 
 ---
 
@@ -87,7 +87,7 @@ root and inside every `repos/<slug>/`.
 
 | Class | Paths | Verdict |
 |---|---|---|
-| ADDITIVE | `specs/bugs|backlog|audits/`, `.dadaia/reports|handoff|tmp/` | Always writable — register bugs freely, in any mode |
+| ADDITIVE | `specs/bugs|backlog|audits/`, `.dadaia/reports|handoff|tmp/` | Always writable; the record contract — immutable core, write-once, mutable governance — is audited, not gated. |
 | MEMORY | `specs/memory/` | Writable in `DEFINITION` and `CLOSURE` phase |
 | MUTATING | everything else in-repo | Writable; records advisory presence |
 | FROZEN | `specs/_archive/` | Blocked — archive by `git mv`, never edit |
@@ -122,6 +122,11 @@ as git hooks, independent of any harness hook firing:
 The gate constrains **what** may be written; it stays silent on **how** the change was
 produced, and reads zero SDD artifacts. Everything in §6 you uphold yourself.
 
+**Skills instruct procedure. Audits measure conformance from git and JSONL history.
+Hooks and the CLI validate only at the publication boundary (push/PR) and never block a
+human.** This is the release's enforcement posture — the acceptance bar for every rule
+in this file.
+
 ---
 
 ## 4. Gitflow — the branch contract
@@ -143,9 +148,10 @@ Exactly one live `feature/{M.m.p}` branch at a time. At deploy of `{M.m.p}`, del
 `feature/{M.m.p}` and cut `feature/{next}` in the same step. Bugs are fixed on the live
 feature branch in any phase — no ceremony, no separate branch.
 
-`rc-N` is a state of the specs, never a branch name: it lives in `ACTIVE.md`'s phase and
-in `TASKS.md`, and each `rc` burns exactly one `feature/{M.m.p}` → `develop` merge. `rc`
-scope is fixes and adjustments to the current release only — never new backlog.
+`rc-N` is a state of the specs, never a branch name: it lives in the `RELEASE.jsonl`
+fold's phase and in `TASKS.md`, and each `rc` burns exactly one `feature/{M.m.p}` →
+`develop` merge. `rc` scope is fixes and adjustments to the current release only — never
+new backlog.
 
 Both PRs — `feature/{M.m.p}` → `develop` and `develop` → `main` — are gated by a required
 CI check demanding an APPROVED `security-reviewer` verdict covering the PR head sha.
@@ -196,18 +202,26 @@ HTML's integrity rides on the handoff's `content_hash`.
 `Aprovado`, `Em revisão` and `Draft` are the canonical status tokens — keep them as they
 are, in any language.
 
-**Task lifecycle.** Read `ACTIVE.md` for the release and phase. Read SPEC, PLAN and TASKS
-— all three carry `**Status:** Aprovado`. Reserve your task by flipping `[ ]` → `[-]`
-*before* writing; hold at most one `[-]` at a time unless TASKS declares disjoint write
-sets. Complete the work inside the task's declared write set. Flip `[-]` → `[x]` and
-commit as `conventional-commit(task-id): description`. The markers are the auditable
-trace of who took what.
+**Task lifecycle.** Read SPEC, PLAN and TASKS — all three carry `**Status:** Aprovado`.
+Reserve your task by flipping `[ ]` → `[-]` *before* writing; hold at most one `[-]` at a
+time unless TASKS declares disjoint write sets. Complete the work inside the task's
+declared write set. Flip `[-]` → `[x]` and commit as `conventional-commit(task-id):
+description`. The markers are the auditable trace of who took what.
 
+<!-- behavior: memory -->
 **Memory is current product truth, not history.** Read it before changing production
 behavior. `product-engineer` writes `specs/memory/**` in the `DEFINITION` and `CLOSURE`
 phases; every other agent reads it. Changelog and history live in `CLOSURE.md` and
-`_archive/`.
+`_archive/`. Each of `ARCHITECTURE.md`, `QUALITY.md` and `TECHSTACK.md` splits into
+ADR-gated Part 1 Principles (each carrying `Measured by:`) and an evolving Part 2
+Implementation.
 
+<!-- behavior: adrs -->
+**ADRs.** `specs/ADRs/NNNN-<slug>.md` records every principle-level decision — any agent
+proposes, only the operator flips a decision to `accepted`, and the commit that changes a
+Part-1 principle carries its accepted ADR.
+
+<!-- behavior: backlog -->
 **Backlog.** The backlog is the **operator's demand queue**: only the operator creates
 demand. `project-manager` curates the single-source `specs/backlog/BACKLOG.md` — an
 ACTIVE section of live candidates and a LEDGER section of one line per closed item;
@@ -222,17 +236,20 @@ schema, intake protocol and the disposition vocabulary: `dd-backlog-definition`.
 
 **Branches.** Branch model, stage placement and merge/push mechanics: §4 (Gitflow).
 
+<!-- behavior: releases -->
 **Releases.** A release is `major.minor.patch` and matures through the `rc-N` lane
 (branch mechanics: §4 Gitflow). A `dd-grill-me` session on the picked set precedes
 the SPEC. At pick time, open bugs and undispositioned audits outrank fresh backlog.
 Finalization order is **memory update → CLOSURE → archive**; a completed task group is
 one commit.
 
-**Audits.** One audit generates exactly one remediation release, and that release gives
-**every** finding an explicit disposition — `fixed`, `superseded` by a broader picked
-item, or `deferred`/`rejected` with a reason routed to the backlog. An audit archives to
-`specs/audits/_archive/` only once fully dispositioned by an approved release, and names
-that release.
+<!-- behavior: audits -->
+**Audits.** `specs/audits/<YYYYMMDD>-<slug>/AUDIT.md` + `FINDINGS.jsonl` hold the three
+pillars — bug history, spec compliance, memory drift — run together, over the window
+since the last audited release. An audit is suggested every 5 releases, never mandatory,
+and generates exactly one remediation release that gives every finding an explicit
+disposition — `fixed`, `superseded`, or `deferred`/`rejected` routed to the backlog. An
+audit archives to `specs/audits/_archive/` only once fully dispositioned.
 
 ---
 
@@ -250,6 +267,7 @@ evidence, executed by `software-engineer`. Tombstone tests and expired SCAFFOLD 
 Test-artifact capture is failure-gated, written where §5 already says. Full protocol:
 `dadaia-test-stewardship`.
 
+<!-- behavior: bugs -->
 **Register every bug you hit** while operating this tooling — any behavior that breaks
 its own contract. Classify first: environment limits, invalid input, wrong usage, and a
 validation the tool is designed to emit count as working-as-designed, outside the
@@ -264,14 +282,22 @@ the touched feature — then **commit**, staging exactly what the fix touched, e
 blanket `-A` over a shared tree; a net-positive diff routes to `software-architect` before
 the commit. A solved bug leaves a clean worktree.
 
+**Lineage and commit shape.** Every bug fix checks prior resolutions on the same
+component before closing, declaring `caused_by: <bug_id> | none` with evidence —
+protocol: `dd-diagnose`. Commit shapes (isolated registration/backlog/ADR commits; the
+fix and its lineage line share the resolving commit) are `dd-gitflow-default` §3a —
+measured by audits via `git log`, never a hook.
+
 **Push green.** Every `feature/{M.m.p}` push runs the local CI preflight —
 `ruff format --check`, `ruff check`, `mypy --strict` and `pytest` — before the branch
-contract (§4 Gitflow) even considers it; run the tests locally before you push. A full
-scan survives solely in the audit lane (`project-auditor` dispatch); the PR-gate security
-review is diff-based only. Only pushes are review-blocked; commits flow freely. After every
-push or PR, watch CI to green (`dd-release-implement`). A `quarantine`-marked test sits
-outside the gating selectors by design and requires a registered bug — a green run with
-quarantined tests is still green, but an unregistered pass-on-retry is a failure.
+contract (§4 Gitflow) even considers it; run the tests locally before you push. This is
+an always-on rule — the agent runs `dadaia ci preflight` before every push, not because
+a hook forces it. A full scan survives solely in the audit lane (`project-auditor`
+dispatch); the PR-gate security review is diff-based only. Only pushes are
+review-blocked; commits flow freely. After every push or PR, watch CI to green
+(`dd-release-implement`). A `quarantine`-marked test sits outside the gating selectors by
+design and requires a registered bug — a green run with quarantined tests is still
+green, but an unregistered pass-on-retry is a failure.
 
 **Approval.** A candidate is approved when the operator and the consumer-side validation
 agent agree, after validating a real workspace. A green internal gate that diverges from
@@ -324,7 +350,7 @@ receives only the values it needs from that root `.env` and never writes a secon
 | Surface | Where |
 |---|---|
 | Scoped law | `specs/AGENTS.md`, `.dadaia/reports/AGENTS.md`, `.dadaia/handoff/AGENTS.md`, `repos/<slug>/AGENTS.md`, and any nested `AGENTS.md` |
-| Skills | `.claude/skills/`, `.agents/skills/` — which skill operates which rule is declared once, in `public/entities/rules-skills-map.json` alone |
+| Skills | `.claude/skills/`, `.agents/skills/` — which skill operates which rule is declared once, in `public/entities/behavior-map.json` alone |
 | State | `dadaia context show --json`, `dadaia specs doctor`, `dadaia public doctor`, `dadaia server list`, `dadaia bugs status`, `dadaia panel` |
 
 Language: follow the operator's preference, defaulting to English. Tone: direct, concise,
