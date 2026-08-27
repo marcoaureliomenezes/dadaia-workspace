@@ -1026,7 +1026,7 @@ under `dadaia_workspace/cli/` or `dadaia_workspace/hooks/`.
 
 ---
 
-- [-] **T-050-17 — FR8: the commit shapes and the one resolver seam**
+- [x] **T-050-17 — FR8: the commit shapes and the one resolver seam**
 
 **Owner role:** ai-engineer (the rules) + software-engineer (the resolver + its test) ·
 **Commit:** `feat(T-050-17): commit shapes and one resolver seam for resolved_commit`
@@ -1156,7 +1156,7 @@ violated. **Tests: +5 / −0**, and every one of them names the baseline it pins
 
 ---
 
-- [ ] **T-050-19 — FR10: `behavior-map.json` and its enforcer**
+- [-] **T-050-19 — FR10: `behavior-map.json` and its enforcer**
 
 **Owner role:** ai-engineer (the map) + software-engineer (the contract tests) · **Commit:**
 `feat(T-050-19): behavior map — every skill and scoped AGENTS.md maps to one DADAIA.md section`
