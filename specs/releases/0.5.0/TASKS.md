@@ -1354,7 +1354,7 @@ joint review FR10 exists to force, and skipping it is how
 
 ---
 
-- [-] **T-050-21A — FR4 (contract): delete `ACTIVE.md`, all 28 consumers repointed**
+- [x] **T-050-21A — FR4 (contract): delete `ACTIVE.md`, all 28 consumers repointed**
 
 **Owner role:** software-engineer (code, tests) + ai-engineer (personas, skills, law) ·
 **Commit:** `refactor(T-050-21A): retire ACTIVE.md — the phase is the RELEASE.jsonl fold`
@@ -1421,7 +1421,7 @@ by revising this floor upward on paper.
 
 ---
 
-- [ ] **T-050-22 — `S2` close: `qa-engineer` review committed on the branch**
+- [-] **T-050-22 — `S2` close: `qa-engineer` review committed on the branch**
 
 **Owner role:** qa-engineer · **Commit:** `docs(T-050-22): S2 QA close`
 
@@ -1565,7 +1565,7 @@ SPEC-DOC-038 and fold the JSONL instead: an `open` record inside an archived aud
 
 ---
 
-- [ ] **T-050-25A — FR15/FR4: retire every surviving `CLOSURE.md` parser**
+- [-] **T-050-25A — FR15/FR4: retire every surviving `CLOSURE.md` parser**
 
 **Owner role:** software-engineer · **Commit:** `refactor(T-050-25A): no checker outlives the
 file it parses`
