@@ -28,8 +28,15 @@ authoring time (14 ``home-abs-path``, 9 ``email-address``, 5 ``ipv4-literal``, 1
 was deleted as a recorded supersession (its subject, ``ledger_writer.py``, retired by
 FR4) and its row removed per this test's own shrink-only contract. Shrunk to 27 rows
 at v0.5.0 T-050-08: ``tests/unit/features/bugs/test_jsonl_bug_store.py`` was deleted
-(its subject, ``JsonlBugStore``, retired by FR2) and its row removed. Two properties
-make the baseline honest, asserted in the two directions below:
+(its subject, ``JsonlBugStore``, retired by FR2) and its row removed. Shrunk to 25 rows
+at v0.5.0 T-050-18 (FR9, hooks de-slop): ``tests/integration/
+test_precommit_backlog_scoping.py`` (imported ``_run_backlog_doctor_gate``, the symbol
+this FR deletes) and ``tests/e2e/features/test_backlog_precommit.py`` (its entire
+premise — pre-commit *blocking* a bad stage — this FR deletes) were both DELETED under
+a recorded ``qa-engineer`` verdict, replaced by three CONTRACT-tier fixtures in
+``tests/contract/test_hooks_publication_boundary.py`` — their two ``email-address``
+rows removed. Two properties make the baseline honest, asserted in the two directions
+below:
 
 1. **No hit outside the baseline** (:func:`test_no_hit_outside_the_shrink_only_baseline`)
    — a NEW matching literal anywhere in the scanned scope (``dadaia_workspace/`` and
@@ -151,6 +158,12 @@ _NO_FOREIGN_SLUGS: tuple[str, ...] = ()
 #: supersession): 13 ``home-abs-path``, 9 ``email-address``, 5 ``ipv4-literal``,
 #: 1 ``secret-token``. The v0.11.0 §1 census (29/14) is the authoring-time baseline.
 #:
+#: Shrunk to 25 rows at v0.5.0 T-050-18 (FR9, hooks de-slop): both
+#: ``tests/integration/test_precommit_backlog_scoping.py`` and ``tests/e2e/features/
+#: test_backlog_precommit.py`` were DELETED (their ``email-address`` rows removed with
+#: them) — 13 ``home-abs-path``, 7 ``email-address``, 4 ``ipv4-literal``,
+#: 1 ``secret-token``.
+#:
 #: SPEC v0.4.2 FR10/GRILL P15/D9 — +2 rows at T-042-11 (30 total): the baseline v5
 #: cross-platform home-path patterns (``users-abs-path``, ``windows-users-path``) each
 #: brought their OWN dedicated fixture file
@@ -173,7 +186,6 @@ _NO_FOREIGN_SLUGS: tuple[str, ...] = ()
 #: module's own :func:`_archive_fixture_literal` already uses — never contiguous in
 #: tracked source, so there is no longer a row for either file here.
 _TESTS_SCOPE_BASELINE: tuple[tuple[str, str], ...] = (
-    ("tests/e2e/features/test_backlog_precommit.py", "email-address"),
     ("tests/e2e/test_pre_commit_presence_gate.py", "email-address"),
     ("tests/fixtures/telemetry/sample_session_basic.jsonl", "home-abs-path"),
     ("tests/fixtures/telemetry/sample_session_malformed_mid.jsonl", "home-abs-path"),
@@ -182,7 +194,6 @@ _TESTS_SCOPE_BASELINE: tuple[tuple[str, str], ...] = (
     ("tests/integration/test_context_alive_scaffold_commit.py", "email-address"),
     ("tests/integration/test_dead_review_gate.py", "email-address"),
     ("tests/integration/test_git_subprocess.py", "email-address"),
-    ("tests/integration/test_precommit_backlog_scoping.py", "email-address"),
     ("tests/integration/test_public_assets.py", "ipv4-literal"),
     ("tests/integration/test_telemetry_end_to_end_aggregation.py", "home-abs-path"),
     ("tests/unit/features/migrate/test_bugs_jsonl.py", "home-abs-path"),

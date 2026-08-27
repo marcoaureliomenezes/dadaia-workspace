@@ -69,8 +69,12 @@ def test_install_hook_writes_and_refuses_overwrite_without_force(
     pre_commit = tmp_path / ".git" / "hooks" / "pre-commit"
     assert pre_push.exists()
     assert pre_commit.exists()
-    assert "ci preflight" in pre_push.read_text()
-    assert "ci push-gate-check" in pre_push.read_text()
+    pre_push_text = pre_push.read_text()
+    # v0.5.0 FR9/D9: the installed pre-push hook no longer INVOKES `ci preflight` — it
+    # only documents the always-on manual rule; `ci push-gate-check` (branch-name +
+    # denylist scan) is the only verb this hook actually runs.
+    assert "ci preflight --quick" not in pre_push_text
+    assert "ci push-gate-check" in pre_push_text
     assert "ci pre-commit-check" in pre_commit.read_text()
 
     # second call without --force is refused (pre-commit already present).
