@@ -228,24 +228,31 @@ _IPV4_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
 _POSIX_HOME_RE = re.compile(r"(/home/|/Users/)[^/\s:]+")
 _WIN_HOME_RE = re.compile(r"([A-Za-z]:\\Users\\)[^\\\s:]+")
 
-#: C0 control characters (0x00-0x1F) plus the Unicode NEL/line-separator/paragraph-
-#: separator code points (0x85, U+2028, U+2029) that ``str.splitlines()`` additionally
-#: treats as a line terminator. Stripped — never escaped — FIRST inside
-#: :func:`redact_text`, before any masking pass (v0.4.5 FR7/A7.3/A7.6; bundles bug
-#: ``bug-event-field-with-unicode-line-separator-silently-drops-the-event``). Two
-#: independent hazards close through this ONE strip, not two guards: (a)
-#: ``JsonlBugStore.iter_events`` line-splits a ``bugs.jsonl`` text blob — a raw one of
-#: these bytes inside a serialized field value fragments the one physical JSON line
-#: into two unparseable halves, so the whole event silently vanishes on read (A7.1);
-#: (b) any consumer of a folded :class:`BugEvent` (``dadaia bugs status``/``bugs
-#: stats``, present or future) decodes the byte back out of the JSON and could print it
-#: straight to a terminal — a raw ESC forges an ANSI escape sequence or a fake second
-#: output line (CWE-117, A7.2), the same class ``core.models.doctor_report`` already
-#: fixed for diagnostic lines. Deleted rather than escaped, unlike that precedent: a
-#: denylisted term an attacker interrupts with one of these bytes must re-join into a
-#: contiguous substring for the masking pass immediately below to still catch it
-#: (A7.6) — an escape sequence (``"\\x1b"``) would leave the two halves apart.
-_UNSAFE_FORMAT_CHARS_RE = re.compile("[\x00-\x1f\x85\u2028\u2029]")
+#: The C0/C1/DEL control range MINUS TAB (0x09), LF (0x0A) and CR (0x0D), plus the
+#: Unicode LINE/PARAGRAPH SEPARATORS (U+2028/U+2029). Stripped — never escaped — FIRST
+#: inside :func:`redact_text`, before any masking pass (v0.4.5 FR7/A7.3/A7.6, narrowed
+#: by bug ``bug-event-sanitation-strips-tab-lf-cr-from-free-text``; bundles bug
+#: ``bug-event-field-with-unicode-line-separator-silently-drops-the-event``).
+#: ``JsonlBugStore.append_event`` serializes every field with ``json.dumps(...,
+#: ensure_ascii=False)``, which already escapes the WHOLE C0/C1/DEL range as a JSON
+#: string escape — a literal TAB/LF/CR inside a field value can never fragment a
+#: JSONL line, because ``JsonlBugStore.iter_events`` splits the file on a literal
+#: ``"\\n"`` character, never on ``str.splitlines()``'s wider terminator set (v0.4.5
+#: FR7 read-side fix). TAB/LF/CR carry neither hazard this class exists to close and
+#: must round-trip intact — deleting them only destroyed the word boundaries of every
+#: multi-line free-text field (``repro``, ``evidence_loop``, ``evidence_seam``, …),
+#: silently, on the live write path (bug
+#: ``bug-event-sanitation-strips-tab-lf-cr-from-free-text``). What DOES still need
+#: stripping: (a) U+0085/U+2028/U+2029 — the only bytes ``json.dumps`` leaves raw AND
+#: a naive ``str.splitlines()``-style reader would treat as a terminator, the actual
+#: fragmentation hazard (A7.1); (b) ESC and the rest of C0/C1/DEL — a raw ESC forges
+#: an ANSI escape sequence or a fake second output line in any consumer that ever
+#: decodes a folded :class:`BugEvent` back to a terminal (CWE-117, A7.2). Deleted
+#: rather than escaped, unlike that precedent: a denylisted term an attacker
+#: interrupts with one of these bytes must re-join into a contiguous substring for
+#: the masking pass immediately below to still catch it (A7.6) — an escape sequence
+#: (``"\\x1b"``) would leave the two halves apart.
+_UNSAFE_FORMAT_CHARS_RE = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\x80-\x9f\u2028\u2029]")
 
 
 def redact_text(text: str, denylist_terms: Sequence[tuple[str, str]] = ()) -> str:
