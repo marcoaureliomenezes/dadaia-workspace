@@ -523,7 +523,7 @@ at T-050-41.
 
 ---
 
-- [-] **T-050-07 — FR2 (expand): the bug record model**
+- [x] **T-050-07 — FR2 (expand): the bug record model**
 
 **Owner role:** software-engineer · **Commit:** `feat(T-050-07): one record per bug —
 bug-record-v1 with immutable core and mutable governance`
@@ -582,7 +582,7 @@ list contract tests green. **Tests: +9 in this task and T-050-08 together; −11
 
 ---
 
-- [ ] **T-050-08 — FR2 (switch + contract): every consumer reads records; the event fold dies**
+- [-] **T-050-08 — FR2 (switch + contract): every consumer reads records; the event fold dies**
 
 **Owner role:** software-engineer · **Commit:** `refactor(T-050-08): route bugs through the
 record model and delete the event fold`
