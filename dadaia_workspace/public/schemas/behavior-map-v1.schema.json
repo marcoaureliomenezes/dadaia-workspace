@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "behavior-map-v1",
+  "title": "Behavior Map v1",
+  "description": "D14 — the single declared map from a DADAIA.md section to the member(s) that operationalize it: EVERY core skill under dadaia_workspace/public/skills/*/SKILL.md and EVERY scoped AGENTS.md/*-AGENTS.md source under dadaia_workspace/public/{data,scaffold,templates}/ (never the projected instance path — see the two citation-path bugs cited in the enforcer). Supersedes rules-skills-map-v1 (retired, A10.3): the `skills` array + `justification` topic model is replaced by one row per member — a member (a skill name, or one scoped_agents_md path) maps to EXACTLY ONE row/section; a section MAY be owned by more than one row (A10.1). `anchor` carries T-050-20's future `<!-- behavior: ... -->` comment-anchor id inside the section body; null until that task lands. `hash_tuple` records the content hash of each side at the moment the row was last reviewed (A10.4) — the enforcer recomputes and compares, and a re-recording is a deliberate, reviewed act.",
+  "type": "object",
+  "required": ["schema_version", "rows"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "behavior-map-v1",
+      "description": "Schema version identifier. Must equal 'behavior-map-v1'."
+    },
+    "skill_md_line_ceiling": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Ported from rules-skills-map-v1 unchanged (FR9/G12) — the declared line-count ceiling a SKILL.md's own content must stay within."
+    },
+    "declared_overlaps": {
+      "type": "array",
+      "description": "Ported from rules-skills-map-v1 unchanged (FR9/D4) — pre-cleared applyTo activation-glob overlap groups among non-universal skills.",
+      "items": {
+        "type": "array",
+        "minItems": 2,
+        "items": { "type": "string", "minLength": 1 },
+        "uniqueItems": true
+      }
+    },
+    "rows": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/row" }
+    }
+  },
+  "$defs": {
+    "row": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["section", "anchor", "skill", "scoped_agents_md", "hash_tuple", "recorded_by", "recorded_at"],
+      "properties": {
+        "section": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^§[0-9]+ .+$",
+          "description": "The DADAIA.md section this row's member(s) operationalize, title-anchored: '§N <Section Title>' using the CURRENT numbering (never a bare '§N')."
+        },
+        "anchor": {
+          "type": ["string", "null"],
+          "description": "T-050-20's future <!-- behavior: <id> --> comment-anchor id inside the section body. Null until that task lands (D14/D15 — this schema carries the field now so that task is additive, never a schema migration)."
+        },
+        "skill": {
+          "type": ["string", "null"],
+          "minLength": 1,
+          "description": "The single skill (under dadaia_workspace/public/skills/<name>/SKILL.md) this row owns, or null when the row is scoped_agents_md-only."
+        },
+        "scoped_agents_md": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "pattern": "^dadaia_workspace/public/" },
+          "uniqueItems": true,
+          "description": "Repo-relative POSIX SOURCE paths (never the projected instance path — the checkout-vs-instance bug this enforcer already guards against) under dadaia_workspace/public/{data,scaffold,templates}/ this row owns. May be empty when the row is skill-only."
+        },
+        "hash_tuple": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["section", "skill", "scoped"],
+          "properties": {
+            "section": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "description": "sha256 of the section body (from its '## N. Title' heading up to, exclusive of, the next heading) at last review."
+            },
+            "skill": {
+              "type": ["string", "null"],
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "description": "sha256 of the skill's SKILL.md content at last review; null exactly when 'skill' is null."
+            },
+            "scoped": {
+              "type": "array",
+              "items": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+              "description": "sha256 of each scoped_agents_md source's content at last review, same order/length as scoped_agents_md."
+            }
+          }
+        },
+        "recorded_by": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The agent (or operator) who last reviewed and recorded this row's hash_tuple (A10.4)."
+        },
+        "recorded_at": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "ISO date (YYYY-MM-DD) this row's hash_tuple was last recorded."
+        }
+      },
+      "anyOf": [
+        { "properties": { "skill": { "type": "string" } }, "required": ["skill"] },
+        { "properties": { "scoped_agents_md": { "minItems": 1 } }, "required": ["scoped_agents_md"] }
+      ],
+      "if": {
+        "properties": { "skill": { "type": "string" } },
+        "required": ["skill"]
+      },
+      "then": {
+        "properties": {
+          "hash_tuple": {
+            "properties": { "skill": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" } }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "hash_tuple": {
+            "properties": { "skill": { "type": "null" } }
+          }
+        }
+      }
+    }
+  }
+}

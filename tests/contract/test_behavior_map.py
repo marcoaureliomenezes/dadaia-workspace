@@ -1,118 +1,111 @@
-"""FR9 — one deterministic enforcer for the rules-to-skills map (T-044-15).
+"""D14/FR10 — one deterministic enforcer for the behavior map (T-050-19).
 
-Intent: CONTRACT — A9.1, A9.2, A9.4 (SPEC v0.4.4). Size: SMALL (pure JSON/Markdown/
+Intent: CONTRACT — A10.1-A10.6 (SPEC v0.5.0). Size: SMALL (pure JSON/Markdown/
 frontmatter reads against the real package tree, no subprocess, no network).
 
-This is the ONE enforcer FR9 mandates, reading the REAL
-``dadaia_workspace/public/entities/rules-skills-map.json``, the REAL
-``dadaia_workspace/public/data/DADAIA.md`` (the law source, title-anchored — never a
-hardcoded copy) and the REAL on-disk skills inventory
-(``dadaia_workspace/public/skills/*/SKILL.md``), resolved the same way
-``infrastructure/public_assets.py`` resolves ``public/`` (``Path(__file__).parent /
-"public"`` from the package root). It replaces ``lint-skill-collisions.py`` (retired,
-D4): its ``applyTo``-glob overlap logic and ``DECLARED_OVERLAPS`` data are ported
-verbatim below, now reading ``declared_overlaps`` from the map JSON instead of a
-hardcoded Python list, and its ``--self-test`` fixtures (a) and (b) are ported as
-dedicated tests (A9.4) — see ``test_ported_self_test_a_*`` / ``test_ported_self_test_b_*``.
+This file **retires and extends** `tests/contract/test_rules_skills_map.py` (FR9,
+v0.4.4) — "no second enforcer" (D4/D10): one map file
+(`dadaia_workspace/public/entities/behavior-map.json`), one schema
+(`dadaia_workspace/public/schemas/behavior-map-v1.schema.json`), one enforcer module.
+`rules-skills-map.json` and its schema are retired in the SAME commit (A10.3, zero-hit
+grep for the old filename outside history). The full accounting of what ported, what
+folded into a broader check, and what is structurally obviated — proven by a
+**name-diff with a zero-hit residue** (A10.6) — is recorded in
+`specs/releases/0.5.0/reviews/T-050-19-enforcer-name-diff.md`, produced BEFORE the old
+file was deleted; this docstring does not repeat it.
 
-Six failure modes (FR9), each proven by a real "green at HEAD" test plus a dedicated
-mutation fixture that turns the SAME check function red (A9.1/A9.2). Every mutation
-fixture mutates an in-memory ``copy.deepcopy`` of the real map or a ``tmp_path`` copy of
-skill inventory data — never a repo file.
+**What D14 adds over FR9's `rules-skills-map.json`.** The old schema modelled a row as
+`{topic, section, skills: [...], justification}` — N skills sharing ONE row. The new
+schema models a row as `{section, anchor, skill, scoped_agents_md: [...], hash_tuple,
+recorded_by, recorded_at}` — cardinality moves from "N skills per topic-row" to
+"exactly one row per member" (A10.1): a member (one skill name, OR the row's
+`scoped_agents_md` path set) maps to **exactly one** row/section; a section MAY be
+owned by more than one row — unlimited, unlike the old model's "shared topic needs a
+justification" guard, which is now structurally impossible to need (see the name-diff's
+group-2 note on `test_shared_topics_carry_a_justification`). D14 also adds a member type
+the old map never covered at all: every **scoped `AGENTS.md`/`*-AGENTS.md` SOURCE** under
+`dadaia_workspace/public/{data,scaffold,templates}/` (never the projected instance
+path — see the citation-bug note below), discovered the same structural way the skill
+inventory already is: **glob the generators, never a hand-written roster**
+(`_skills_on_disk`/`_scoped_agents_md_sources` below). `public/data/AGENTS.md` is
+excluded by name — it is, together with `public/data/DADAIA.md`, the LAW SOURCE itself
+(the two files `public/data/*.md` law state so), not a scoped rule.
 
-1. A mapped topic/section does not exist in the law (title-anchored; numbers may shift).
-2. A skill on disk maps to no row.
-3. A row names a skill that does not exist on disk.
-4. Two skills share a topic without a non-empty justification.
-5. A ``SKILL.md`` exceeds the declared line ceiling (``skill_md_line_ceiling``, G12).
-6. Two non-universal skills have an undeclared ``applyTo`` activation-glob overlap.
+Five NEW RED conditions this map's own completeness requires, each with a dedicated
+mutation fixture (A10.2), listed in the name-diff's closing table:
 
-FR28 (T-044-56, A28.1) adds a seventh, two-directional check to this SAME enforcer — "no
-second enforcer" (D4/D10) applies here too. A skill's model-invocation grant is derived,
-never hand-kept: the union of every persona frontmatter's ``skills:`` allowlist
-(``dadaia_workspace/public/agents/*.md``), plus the universal-grant mechanism failure
-mode 6 already treats specially (``_UNIVERSAL_NAMES`` / an ``applyTo`` in
-``_UNIVERSAL_GLOBS``) — a universal skill is implicitly granted to every model and must
-never be forced into an explicit per-persona allowlist. Against that derived grant set,
-the equivalence holds in BOTH directions with the set of skills whose frontmatter
-carries ``disable-model-invocation: true``:
+1. A member (skill or scoped `AGENTS.md` source) on disk has no row.
+2. A row names a member path that does not exist on disk.
+3. The same member maps to more than one row (A10.1's "exactly one" cardinality).
+4. A `DADAIA.md` section has zero owning rows (A10.1's "at least one owner" cardinality
+   — the OLD enforcer never checked this direction at all).
+5. A member's real content hash no longer matches its row's recorded `hash_tuple` entry
+   (A10.4 — re-recording a hash is a deliberate, reviewed act).
 
-7a. A skill in NO allowlist (and not universally granted) must carry
-    ``disable-model-invocation: true``.
-7b. A skill carrying ``disable-model-invocation: true`` must be in NO allowlist.
+Every failure message in this module names **what to re-read** — the file/section to
+open, never merely "a hash changed" (A10.4's own acceptance line).
 
-FR27 (T-044-58, A27.20) adds the **citation check** to this SAME enforcer — "no second
-enforcer" (D4/D10) applies here too: every public asset under ``dadaia_workspace/public/
-**/*.md`` (skills AND agents — the same ``_PUBLIC`` tree the six failure modes already
-read) is scanned for two kinds of backticked citation, each resolved with real ``test -e``
-/ command-tree semantics — never a hand-kept per-file allowlist of "this one is fine":
+**Bug-history citations (A16.2 discipline, applied per fold 3 `qa-engineer` amendment
+6).** Two bugs the retired `test_rules_skills_map.py` carried are re-cited here because
+this file's own five new mutation fixtures reproduce the exact same fixture SHAPE that
+fired both — proving RED on this platform is not sufficient; the fix must be structural,
+not observational:
 
-**(a) Path citations.** A backticked token is *path-shaped* only if it starts with one of
-three prefixes that are real, checked-in directories of THIS repo — ``specs/``,
-``dadaia_workspace/``, ``.github/`` — resolved against the repo root; or it is a *bare*
-filename (``<name>.md|json|rules|txt``, no ``/``) immediately annotated ``(sibling)`` /
-``sibling`` in the surrounding prose — an annotation convention already used in this
-corpus (e.g. ``` `RUBRIC.md` (sibling) ```) — resolved first against the citing file's own
-folder, falling back to anywhere under ``dadaia_workspace/public/`` (a small number of
-sibling mentions are cross-folder, e.g. a persona pointing at a skill's own template).
+* `citation-enforcer-resolves-projected-instance-paths-against-the-checkout` (HIGH) — a
+  citation/reference check resolved a `specs/`-prefixed token against checkout
+  PRESENCE, when the token actually named a PROJECTED instance path that a bare CI
+  clone never has on disk. This module's `scoped_agents_md` entries are SOURCE paths
+  under `dadaia_workspace/public/` for exactly this reason — never the projected
+  destination (e.g. `specs/bugs/AGENTS.md`), which would silently repeat this exact bug
+  class on the new member type. `test_every_mapped_member_exists_on_disk` and the
+  `scoped_agents_md` schema pattern (`^dadaia_workspace/public/`) are the structural
+  fix, not a per-row allowlist.
+* `citation-mutation-fixtures-never-turn-red-on-windows` (HIGH) — a mutation fixture
+  that DETECTED its planted violation correctly but rendered the violation's
+  `file:line`-shaped message with the OS-native separator, so a naive string
+  comparison in a Windows-specific assertion could pass vacuously. Every violation
+  string this module produces is built from POSIX-relative paths
+  (`Path.relative_to(...).as_posix()` — never `str(path)`, never
+  `os.path.join`-shaped interpolation), and the five new mutation fixtures below build
+  their fixture data purely in-memory (`copy.deepcopy` of the real map, or literal
+  fabricated strings) — never a real filesystem path whose separator could vary — so
+  the RED direction is provable identically on POSIX and Windows CI runners.
 
-Exclusions are structural RULES, never a per-citation allowlist:
+FR27 (citation check) and FR28 (bidirectional model-invocation grant check) are ported
+verbatim from `test_rules_skills_map.py` below (both are independent of the map's row
+shape — they scan `public/**/*.md` broadly and derive the grant set from persona
+frontmatter/skill frontmatter). Their own docstrings, preserved from the original file,
+document their behaviour and bug citations in full.
 
-1. Any token containing a placeholder character ``< > { } *`` or ``|`` (alternation) is
-   skipped — covers ``<slug>``, ``{M.m.p}``, ``<id>``, globs like ``**``, and compact
-   multi-directory notation like ``specs/bugs|backlog|audits/``.
-2. Any token containing an ellipsis (``...`` / ``…``) is skipped — an illustrative
-   elision, never a real path.
-3. Any ``.dadaia/``-prefixed token is skipped — ``.dadaia/`` is the workspace-level
-   runtime directory this very law (``DADAIA.md`` §4) forbids from ever living inside a
-   repo tree, so no repo-relative ``test -e`` could legitimately resolve it; checking it
-   would either always fail (breaking A9.1's "green at HEAD") or reach outside the repo
-   (breaking CI hermeticity — the checkout has no ambient ``.dadaia/`` at all).
-4. Any prefix other than the three checked ones (``repos/<slug>``, ``.claude/``,
-   ``.codex/``, ``.agents/``, ``.kimi-code/``, ``mattpocock/skills/...``) is simply not
-   *path-shaped* under this pattern — a narrow allow-prefix by construction, not a
-   denylist, so external/example refs are excluded without ever naming them.
-5. A bare filename with **no** ``(sibling)``/``sibling`` annotation is generic SDD/
-   workspace vocabulary (``SPEC.md``, ``TASKS.md``, ``AGENTS.md``, … naming a document
-   *type*, not a specific file relative to anything) — never checked, since there is no
-   structural signal it names a real citable file.
+**(a) Path citations — FR27, ported verbatim.** A backticked token is *path-shaped*
+only if it starts with one of three prefixes that are real, checked-in directories of
+THIS repo — ``specs/``, ``dadaia_workspace/``, ``.github/`` — resolved against the repo
+root; or it is a *bare* filename (``<name>.md|json|rules|txt``, no ``/``) immediately
+annotated ``(sibling)`` / ``sibling`` in the surrounding prose, resolved first against
+the citing file's own folder, falling back to anywhere under
+``dadaia_workspace/public/``.
 
-**(b) Command citations.** A backticked span containing the standalone word ``dadaia``
-(never matched inside a path like ``.dadaia/.venv/bin/dadaia`` or the identifier
-``dadaia_workspace`` — a negative lookbehind/lookahead enforces the word boundary) followed
-by up to two further lowercase-hyphen words is the acceptance line's own
-``dadaia <verb> [<sub>]`` shape; trailing flags/args/placeholders are ignored (arguments,
-not the citation's own resolvable verb path). The live command tree is derived by
-**importing** ``dadaia_workspace.cli.main:app`` and walking it with
-``typer.main.get_command`` — never a subprocess ``--help`` parse — because it is hermetic
-(no PATH/venv indirection inside the test process), fast (no process spawn per group), and
-always exactly the code under test (never a stale transcription); it is computed once per
-run (``functools.lru_cache``).
+**(b) Command citations — FR27, ported verbatim.** A backticked span containing the
+standalone word ``dadaia`` followed by up to two further lowercase-hyphen words is the
+acceptance line's own ``dadaia <verb> [<sub>]`` shape, resolved against the live
+``typer`` command tree (imported, never a subprocess ``--help`` parse).
 
-Both checks fail naming ``file:line`` and the dead path/verb (A27.20). Two mutation
-fixtures (dead path, dead verb) prove each red on a ``tmp_path`` copy — never a repo file.
-
-Bug fix (``citation-enforcer-resolves-projected-instance-paths-against-the-checkout``,
-HIGH): failure mode (a) resolved every ``specs/``-prefixed citation against checkout
-presence, including ``specs/AGENTS.md`` — an INSTANCE reality that
-``dadaia_workspace.features.specs.scaffolder.scaffold`` projects from
-``dadaia_workspace/public/templates/specs-AGENTS.md`` and this repo's own
-``.gitignore``/repo-hygiene job together forbid ever tracking, so the six sites citing
-it were green only via an untracked local lib-projection leftover and red on a bare CI
-clone. The one literal citation of that ONE projected path is now classified by
-**executing** the real installer mapping (``scaffold()``, never a second hand-kept
-allowlist, D4/D10) against a throwaway scratch directory and confirming the produced
-``AGENTS.md`` is byte-identical to its generating public asset — proof by generating
-asset, never by checkout presence. See ``_projected_specs_agents_relpath``.
+**FR28 — ported verbatim.** A skill's model-invocation grant is derived, never
+hand-kept: the union of every persona frontmatter's ``skills:`` allowlist plus the
+universal-grant mechanism (failure mode 6's own ``_UNIVERSAL_NAMES`` /
+``_UNIVERSAL_GLOBS``), checked in both directions against
+``disable-model-invocation: true``.
 """
 
 from __future__ import annotations
 
 import copy
 import functools
+import hashlib
 import json
 import re
 import tempfile
+from collections import Counter
 from itertools import combinations
 from pathlib import Path, PurePath, PureWindowsPath
 from typing import Any
@@ -125,15 +118,15 @@ from tests.helpers.scan_population import assert_populated
 
 pytestmark = pytest.mark.contract
 
-# Resolved the same way infrastructure/public_assets.py resolves `public/`:
-# `Path(__file__).parent.parent / "public"` from inside `dadaia_workspace/infrastructure/`
-# is `dadaia_workspace/public`; here we walk up from this test file to the package root.
+# Resolved the same way infrastructure/public_assets.py resolves `public/`: walk up
+# from this test file to the package root, same as the retired enforcer.
 _PKG_ROOT = Path(__file__).resolve().parents[2] / "dadaia_workspace"
 _PUBLIC = _PKG_ROOT / "public"
-_MAP_PATH = _PUBLIC / "entities" / "rules-skills-map.json"
-_SCHEMA_PATH = _PUBLIC / "schemas" / "rules-skills-map-v1.schema.json"
+_MAP_PATH = _PUBLIC / "entities" / "behavior-map.json"
+_SCHEMA_PATH = _PUBLIC / "schemas" / "behavior-map-v1.schema.json"
 _LAW_PATH = _PUBLIC / "data" / "DADAIA.md"
 _SKILLS_DIR = _PUBLIC / "skills"
+_REPO_ROOT = _PKG_ROOT.parent
 
 _HEADING_RE = re.compile(r"^##\s+\d+\.\s+(.+?)\s*$", re.MULTILINE)
 _SECTION_FIELD_RE = re.compile(r"^§\d+\s+(.+)$")
@@ -142,18 +135,27 @@ _FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
 _NAME_RE = re.compile(r"^name:\s*(\S+)\s*$", re.MULTILINE)
 _APPLYTO_RE = re.compile(r'^applyTo:\s*"?([^"\n]*)"?\s*$', re.MULTILINE)
 
-# Ported verbatim from the retired lint-skill-collisions.py: skills whose activation
-# surface is intentionally universal/near-universal — never asserted disjoint.
+# Ported verbatim from the retired lint-skill-collisions.py (via test_rules_skills_map.py):
+# skills whose activation surface is intentionally universal/near-universal.
 _UNIVERSAL_GLOBS: frozenset[str] = frozenset({"**"})
 _UNIVERSAL_NAMES: frozenset[str] = frozenset({"dd-grill-me"})
 
 # --------------------------------------------------------------------------- #
-# FR27/A27.20 — the citation check. See the module docstring for the full
-# citable-pattern definition and exclusion rules; the constants/regexes below
-# implement exactly what is documented there, nothing more.
+# D14 — scoped AGENTS.md/*-AGENTS.md SOURCE discovery. Structural (glob the
+# generators), never a hand-written roster — the exact defect D14 exists to catch
+# (this SPEC's own first Draft omitted three sources that ship today).
 # --------------------------------------------------------------------------- #
 
-_REPO_ROOT = _PKG_ROOT.parent
+_SCOPED_SUBDIRS = ("data", "scaffold", "templates")
+# The law source itself — public/data/*.md carries DADAIA.md + AGENTS.md, the two LAW
+# files, never a "scoped" rule — is the ONE exclusion from an otherwise-structural glob.
+_LAW_SOURCE_RELPATH = "dadaia_workspace/public/data/AGENTS.md"
+
+
+# --------------------------------------------------------------------------- #
+# FR27/A27.20 — the citation check constants. See the module docstring for the
+# full citable-pattern definition and exclusion rules.
+# --------------------------------------------------------------------------- #
 
 _CITATION_BACKTICK_RE = re.compile(r"`([^`\n]+)`")
 _PLACEHOLDER_CHARS = frozenset("<>{}*|")
@@ -164,10 +166,6 @@ _SIBLING_FILENAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*\.(?:md|json|rule
 _SIBLING_MARKER_RE = re.compile(r"^\(?\s*sibling\b")
 _BLOCKQUOTE_PREFIX_RE = re.compile(r"^>\s*")
 
-# `dadaia` as a standalone word only — never inside `.dadaia/.venv/bin/dadaia` (preceded
-# by a path char) or `dadaia_workspace` (followed by a word char) — then up to two
-# further lowercase-hyphen words (the `dadaia <verb> [<sub>]` shape; trailing flags/args
-# are simply not captured by the pattern and are ignored).
 _DADAIA_VERB_RE = re.compile(
     r"(?<![\w./-])dadaia(?!\w)(?:\s+([a-z][a-z0-9-]*))?(?:\s+([a-z][a-z0-9-]*))?"
 )
@@ -197,6 +195,19 @@ def _law_section_titles(law_path: Path = _LAW_PATH) -> set[str]:
     return {m.group(1).strip() for m in _HEADING_RE.finditer(text)}
 
 
+def _law_section_bodies(law_path: Path = _LAW_PATH) -> dict[str, str]:
+    """Title -> section body text, from its heading through, exclusive of, the next
+    heading — the exact span `hash_tuple.section` hashes (A10.4)."""
+    text = law_path.read_text(encoding="utf-8")
+    heads = list(_HEADING_RE.finditer(text))
+    out: dict[str, str] = {}
+    for i, m in enumerate(heads):
+        start = m.start()
+        end = heads[i + 1].start() if i + 1 < len(heads) else len(text)
+        out[m.group(1).strip()] = text[start:end]
+    return out
+
+
 def _section_title(section_field: str) -> str:
     """Strip a map row's '§N ' prefix, leaving the title to resolve against the law."""
     m = _SECTION_FIELD_RE.match(section_field)
@@ -207,19 +218,39 @@ def _section_title(section_field: str) -> str:
 
 def _skills_on_disk(skills_dir: Path = _SKILLS_DIR) -> set[str]:
     skills = {p.parent.name for p in skills_dir.glob("*/SKILL.md")}
-    # v0.4.5 FR5 (scan-test-vacuity-guard): a mis-rooted _SKILLS_DIR would degrade this
-    # to an empty set, under which several `violations == []` consumers below
-    # (test_every_skill_on_disk_is_mapped, the line-ceiling check, ...) pass vacuously.
     assert_populated(skills, sentinel="dd-cli-library")
     return skills
 
 
-def _mapped_skills(map_data: dict[str, Any]) -> set[str]:
-    return {name for row in map_data["rows"] for name in row["skills"]}
+def _scoped_agents_md_sources(public_dir: Path = _PUBLIC) -> set[str]:
+    """Every scoped `AGENTS.md`/`*-AGENTS.md` SOURCE under
+    `dadaia_workspace/public/{data,scaffold,templates}/`, repo-relative POSIX,
+    excluding the law source itself (`public/data/AGENTS.md`)."""
+    found: set[str] = set()
+    for sub in _SCOPED_SUBDIRS:
+        base = public_dir / sub
+        if not base.exists():
+            continue
+        candidates = set(base.glob("**/AGENTS.md")) | set(base.glob("**/*-AGENTS.md"))
+        for p in candidates:
+            rel = "dadaia_workspace/public/" + p.relative_to(public_dir).as_posix()
+            if rel == _LAW_SOURCE_RELPATH:
+                continue
+            found.add(rel)
+    assert_populated(found, sentinel="dadaia_workspace/public/scaffold/bugs/AGENTS.md")
+    return found
+
+
+def _mapped_skill_names(map_data: dict[str, Any]) -> list[str]:
+    return [row["skill"] for row in map_data["rows"] if row["skill"] is not None]
+
+
+def _mapped_scoped_paths(map_data: dict[str, Any]) -> list[str]:
+    return [p for row in map_data["rows"] for p in row["scoped_agents_md"]]
 
 
 # --------------------------------------------------------------------------- #
-# Failure mode 1 — mapped section does not exist in the law.
+# Ported mode 1 — mapped section does not exist in the law.
 # --------------------------------------------------------------------------- #
 
 
@@ -229,41 +260,128 @@ def _find_missing_sections(map_data: dict[str, Any], law_titles: set[str]) -> li
         title = _section_title(row["section"])
         if title not in law_titles:
             violations.append(
-                f"topic {row['topic']!r}: section {row['section']!r} (title {title!r}) "
+                f"skill={row['skill']!r}: section {row['section']!r} (title {title!r}) "
                 "not found as a '## N. <Title>' heading in the law"
             )
     return violations
 
 
 # --------------------------------------------------------------------------- #
-# Failure modes 2/3 — skill<->row bijection.
+# D14 — member<->row bijection, generalized over BOTH member types (folds the
+# retired modes 2/3 — see the name-diff for the "folded, not dropped" accounting).
 # --------------------------------------------------------------------------- #
 
 
-def _find_unmapped_skills(map_data: dict[str, Any], skills: set[str]) -> list[str]:
-    return sorted(skills - _mapped_skills(map_data))
+def _find_unmapped_members(
+    map_data: dict[str, Any], skills: set[str], scoped_sources: set[str]
+) -> list[str]:
+    mapped_skills = set(_mapped_skill_names(map_data))
+    mapped_scoped = set(_mapped_scoped_paths(map_data))
+    violations = [f"skill:{s}" for s in sorted(skills - mapped_skills)]
+    violations += [f"scoped_agents_md:{s}" for s in sorted(scoped_sources - mapped_scoped)]
+    return violations
 
 
-def _find_missing_skills(map_data: dict[str, Any], skills: set[str]) -> list[str]:
-    return sorted(_mapped_skills(map_data) - skills)
-
-
-# --------------------------------------------------------------------------- #
-# Failure mode 4 — shared topic without justification.
-# --------------------------------------------------------------------------- #
-
-
-def _find_undeclared_shared_topics(map_data: dict[str, Any]) -> list[str]:
-    violations: list[str] = []
-    for row in map_data["rows"]:
-        justification = row.get("justification")
-        if len(row["skills"]) > 1 and not (justification or "").strip():
-            violations.append(row["topic"])
+def _find_dangling_member_references(
+    map_data: dict[str, Any], skills: set[str], scoped_sources: set[str]
+) -> list[str]:
+    mapped_skills = set(_mapped_skill_names(map_data))
+    mapped_scoped = set(_mapped_scoped_paths(map_data))
+    violations = [f"skill:{s}" for s in sorted(mapped_skills - skills)]
+    violations += [f"scoped_agents_md:{s}" for s in sorted(mapped_scoped - scoped_sources)]
     return violations
 
 
 # --------------------------------------------------------------------------- #
-# Failure mode 5 — SKILL.md line ceiling (G12).
+# D14/A10.1 — new cardinality checks the old enforcer never had.
+# --------------------------------------------------------------------------- #
+
+
+def _find_members_mapped_to_two_sections(map_data: dict[str, Any]) -> list[str]:
+    """A10.1's "exactly one row" direction — a member (skill name, or one
+    scoped_agents_md path) claimed by more than one row is a violation regardless of
+    whether the two rows happen to name the same section: the ROW is the ownership
+    unit, and a member owned by two rows is ambiguous by construction."""
+    skill_counts = Counter(_mapped_skill_names(map_data))
+    scoped_counts = Counter(_mapped_scoped_paths(map_data))
+    violations = [f"skill:{k}" for k, v in sorted(skill_counts.items()) if v > 1]
+    violations += [f"scoped_agents_md:{k}" for k, v in sorted(scoped_counts.items()) if v > 1]
+    return violations
+
+
+def _find_sections_without_an_owner(map_data: dict[str, Any], law_titles: set[str]) -> list[str]:
+    """A10.1's "at least one owner" direction — a `DADAIA.md` section with zero owning
+    rows. The retired enforcer never checked this direction: its schema had no notion
+    of section completeness, only per-row validity."""
+    owned = {_section_title(row["section"]) for row in map_data["rows"]}
+    return sorted(law_titles - owned)
+
+
+# --------------------------------------------------------------------------- #
+# D14/A10.4 — hash-tuple staleness. Every message names what to re-read.
+# --------------------------------------------------------------------------- #
+
+
+def _sha256_text(text: str) -> str:
+    return "sha256:" + hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _sha256_file(path: Path) -> str:
+    return _sha256_text(path.read_text(encoding="utf-8"))
+
+
+def _find_stale_hash_tuples(
+    map_data: dict[str, Any],
+    law_sections: dict[str, str],
+    skills_dir: Path = _SKILLS_DIR,
+    repo_root: Path = _REPO_ROOT,
+) -> list[str]:
+    violations: list[str] = []
+    for row in map_data["rows"]:
+        title = _section_title(row["section"])
+        body = law_sections.get(title)
+        if body is not None:
+            real_section_hash = _sha256_text(body)
+            if real_section_hash != row["hash_tuple"]["section"]:
+                violations.append(
+                    f"row(skill={row['skill']!r}): section hash stale for {row['section']!r} — "
+                    f"re-read `dadaia_workspace/public/data/DADAIA.md` {row['section']} and "
+                    "re-record hash_tuple.section"
+                )
+        if row["skill"] is not None:
+            skill_path = skills_dir / row["skill"] / "SKILL.md"
+            if skill_path.exists():
+                real_skill_hash = _sha256_file(skill_path)
+                if real_skill_hash != row["hash_tuple"]["skill"]:
+                    rel = skill_path.relative_to(repo_root).as_posix()
+                    violations.append(
+                        f"row(skill={row['skill']!r}): skill hash stale — re-read `{rel}` "
+                        "and re-record hash_tuple.skill"
+                    )
+        recorded_scoped = row["hash_tuple"]["scoped"]
+        scoped_paths = row["scoped_agents_md"]
+        if len(recorded_scoped) != len(scoped_paths):
+            violations.append(
+                f"row(skill={row['skill']!r}): hash_tuple.scoped has {len(recorded_scoped)} "
+                f"entries but scoped_agents_md has {len(scoped_paths)} — re-read the row and "
+                "re-record hash_tuple.scoped"
+            )
+            continue
+        for rel, recorded_hash in zip(scoped_paths, recorded_scoped, strict=True):
+            path = repo_root / rel
+            if not path.exists():
+                continue  # dangling reference — already flagged by the member check
+            real_hash = _sha256_file(path)
+            if real_hash != recorded_hash:
+                violations.append(
+                    f"row(skill={row['skill']!r}): scoped_agents_md hash stale for `{rel}` — "
+                    f"re-read `{rel}` and re-record hash_tuple.scoped"
+                )
+    return violations
+
+
+# --------------------------------------------------------------------------- #
+# Ported mode 5 — SKILL.md line ceiling (G12). Unchanged: independent of row shape.
 # --------------------------------------------------------------------------- #
 
 
@@ -278,9 +396,8 @@ def _find_ceiling_violations(map_data: dict[str, Any], skills_dir: Path) -> list
 
 
 # --------------------------------------------------------------------------- #
-# Failure mode 6 — undeclared applyTo activation-glob overlap.
-# Ported verbatim from lint-skill-collisions.py (D4): _glob_to_regex, _probe_paths,
-# globs_overlap, _parse_skill, collect_stage_skills, find_undeclared_overlaps.
+# Ported mode 6 — undeclared applyTo activation-glob overlap. Unchanged: independent
+# of row shape (reads declared_overlaps + SKILL.md frontmatter).
 # --------------------------------------------------------------------------- #
 
 
@@ -396,7 +513,7 @@ def test_map_validates_against_its_own_schema() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# Six failure modes — green at HEAD (A9.1).
+# Ported checks — green at HEAD (A9.1's discipline, carried into A10.2).
 # --------------------------------------------------------------------------- #
 
 
@@ -405,19 +522,37 @@ def test_every_mapped_section_exists_in_the_law() -> None:
     assert violations == [], f"row(s) point at a section absent from the law: {violations}"
 
 
-def test_every_skill_on_disk_is_mapped() -> None:
-    violations = _find_unmapped_skills(_real_map(), _skills_on_disk())
-    assert violations == [], f"skill(s) on disk map to no row: {violations}"
+def test_every_member_on_disk_is_mapped() -> None:
+    """D14 — folds the retired `test_every_skill_on_disk_is_mapped` (skill arm) and
+    extends it to the new scoped-AGENTS.md member type (see the name-diff)."""
+    violations = _find_unmapped_members(_real_map(), _skills_on_disk(), _scoped_agents_md_sources())
+    assert violations == [], f"member(s) on disk with no row: {violations}"
 
 
-def test_every_mapped_skill_exists_on_disk() -> None:
-    violations = _find_missing_skills(_real_map(), _skills_on_disk())
-    assert violations == [], f"row(s) name a skill absent from disk: {violations}"
+def test_every_mapped_member_exists_on_disk() -> None:
+    """D14 — folds the retired `test_every_mapped_skill_exists_on_disk` (skill arm)
+    and extends it to the new scoped-AGENTS.md member type (see the name-diff)."""
+    violations = _find_dangling_member_references(
+        _real_map(), _skills_on_disk(), _scoped_agents_md_sources()
+    )
+    assert violations == [], f"row(s) name a member absent from disk: {violations}"
 
 
-def test_shared_topics_carry_a_justification() -> None:
-    violations = _find_undeclared_shared_topics(_real_map())
-    assert violations == [], f"multi-skill row(s) with no justification: {violations}"
+def test_no_member_maps_to_two_sections() -> None:
+    violations = _find_members_mapped_to_two_sections(_real_map())
+    assert violations == [], f"member(s) claimed by more than one row: {violations}"
+
+
+def test_every_law_section_has_an_owner() -> None:
+    violations = _find_sections_without_an_owner(_real_map(), _law_section_titles())
+    assert violations == [], f"DADAIA.md section(s) with zero owning rows: {violations}"
+
+
+def test_every_hash_tuple_is_current() -> None:
+    violations = _find_stale_hash_tuples(_real_map(), _law_section_bodies())
+    assert violations == [], "stale hash_tuple(s) — re-record after review:\n" + "\n".join(
+        violations
+    )
 
 
 def test_every_skill_md_is_within_the_declared_line_ceiling() -> None:
@@ -431,8 +566,7 @@ def test_no_undeclared_activation_glob_overlap() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# Six mutation fixtures — one per failure mode, each proven RED against a mutated
-# in-memory copy or tmp_path copy of the real inputs (A9.2). Never mutates a repo file.
+# Ported mutation fixtures 1/5/6 — unchanged (see the name-diff for 2/3/4's fate).
 # --------------------------------------------------------------------------- #
 
 
@@ -441,27 +575,6 @@ def test_mutation_fixture_1_missing_section_turns_red() -> None:
     mutated["rows"][0]["section"] = "§4 A Section Title That Does Not Exist"
     violations = _find_missing_sections(mutated, _law_section_titles())
     assert violations, "a row pointing at a nonexistent section title must be flagged"
-
-
-def test_mutation_fixture_2_unmapped_skill_turns_red() -> None:
-    mutated_skills = _skills_on_disk() | {"fixture-orphan-skill"}
-    violations = _find_unmapped_skills(_real_map(), mutated_skills)
-    assert violations == ["fixture-orphan-skill"]
-
-
-def test_mutation_fixture_3_missing_skill_on_disk_turns_red() -> None:
-    mutated = copy.deepcopy(_real_map())
-    mutated["rows"][0]["skills"] = ["fixture-nonexistent-skill"]
-    violations = _find_missing_skills(mutated, _skills_on_disk())
-    assert violations == ["fixture-nonexistent-skill"]
-
-
-def test_mutation_fixture_4_undeclared_shared_topic_turns_red() -> None:
-    mutated = copy.deepcopy(_real_map())
-    mutated["rows"][0]["skills"] = ["fixture-skill-a", "fixture-skill-b"]
-    mutated["rows"][0]["justification"] = None
-    violations = _find_undeclared_shared_topics(mutated)
-    assert violations == [mutated["rows"][0]["topic"]]
 
 
 def test_mutation_fixture_5_skill_md_over_ceiling_turns_red(tmp_path: Path) -> None:
@@ -496,6 +609,100 @@ def test_mutation_fixture_6_undeclared_activation_overlap_turns_red(tmp_path: Pa
 
 
 # --------------------------------------------------------------------------- #
+# D14 — the five NEW mutation fixtures (A10.2). Bug citations
+# (`citation-enforcer-resolves-projected-instance-paths-against-the-checkout`,
+# `citation-mutation-fixtures-never-turn-red-on-windows`): module docstring. Every
+# fixture builds its corrupted data purely in-memory (`copy.deepcopy` of the real
+# map, or a fabricated string) — never touches a real repo file, and never depends
+# on the host OS path separator, so the RED direction is provable identically on
+# POSIX and Windows CI runners (the exact class the second cited bug fired on).
+# --------------------------------------------------------------------------- #
+
+
+def test_mutation_fixture_a_member_without_a_row_turns_red() -> None:
+    """RED condition 1 — a skill AND a scoped AGENTS.md source, each added to the
+    on-disk population without a corresponding row, must both be flagged. Extends the
+    retired `test_mutation_fixture_2_unmapped_skill_turns_red`, which proved only the
+    skill arm; the scoped-AGENTS.md arm is new territory this map adds."""
+    mutated_skills = _skills_on_disk() | {"fixture-orphan-skill"}
+    mutated_scoped = _scoped_agents_md_sources() | {
+        "dadaia_workspace/public/data/fixture-orphan-AGENTS.md"
+    }
+    violations = _find_unmapped_members(_real_map(), mutated_skills, mutated_scoped)
+    assert violations == [
+        "skill:fixture-orphan-skill",
+        "scoped_agents_md:dadaia_workspace/public/data/fixture-orphan-AGENTS.md",
+    ]
+
+
+def test_mutation_fixture_b_row_without_a_member_turns_red() -> None:
+    """RED condition 2 — a row naming a skill path, and a row naming a scoped
+    AGENTS.md path, that resolve to nothing on disk must both be flagged. Extends the
+    retired `test_mutation_fixture_3_missing_skill_on_disk_turns_red`, which proved
+    only the skill arm."""
+    mutated = copy.deepcopy(_real_map())
+    mutated["rows"][0]["skill"] = "fixture-nonexistent-skill"
+    mutated["rows"][1]["scoped_agents_md"] = [
+        "dadaia_workspace/public/data/fixture-nonexistent-AGENTS.md"
+    ]
+    violations = _find_dangling_member_references(
+        mutated, _skills_on_disk(), _scoped_agents_md_sources()
+    )
+    assert violations == [
+        "skill:fixture-nonexistent-skill",
+        "scoped_agents_md:dadaia_workspace/public/data/fixture-nonexistent-AGENTS.md",
+    ]
+
+
+def test_mutation_fixture_c_member_maps_to_two_sections_turns_red() -> None:
+    """RED condition 3 (A10.1) — a skill duplicated across two rows must be flagged
+    even when it is the SAME real, correctly-mapped skill; the violation is the
+    duplicate ownership itself, regardless of which section either row names. No
+    counterpart in the retired enforcer — its schema made this structurally
+    impossible to represent (a skill lived in at most one row's `skills` array by
+    hand-curation), so it was never a checkable condition until rows became looser."""
+    mutated = copy.deepcopy(_real_map())
+    duplicate_row = copy.deepcopy(mutated["rows"][0])
+    target_skill = mutated["rows"][1]["skill"]
+    assert target_skill is not None, "fixture precondition: rows[1] must own a skill"
+    duplicate_row["skill"] = target_skill
+    mutated["rows"].append(duplicate_row)
+    violations = _find_members_mapped_to_two_sections(mutated)
+    assert violations == [f"skill:{target_skill}"]
+
+
+def test_mutation_fixture_d_section_without_an_owner_turns_red() -> None:
+    """RED condition 4 (A10.1, the inverse cardinality direction) — a `DADAIA.md`
+    section with zero owning rows must be flagged. The retired enforcer never checked
+    this direction: its schema had no notion of section completeness. A fabricated
+    title is unioned into the law-titles set (never a real section demoted) — the
+    fixture only needs a title no row owns, which this guarantees without touching
+    any of the map's real, correctly-owned sections."""
+    orphaned_title = "A Section Title That Definitely Does Not Own Anything Fixture"
+    law_titles = _law_section_titles() | {orphaned_title}
+    violations = _find_sections_without_an_owner(_real_map(), law_titles)
+    assert violations == [orphaned_title]
+
+
+def test_mutation_fixture_e_stale_hash_tuple_turns_red() -> None:
+    """RED condition 5 (A10.4) — a member whose real content diverges from its row's
+    recorded `hash_tuple` entry must be flagged: both the section-hash side and the
+    skill-hash side, proven independently. Regression context (module docstring): an
+    un-checked hash is exactly what lets a stale citation happen silently — a member
+    moves, the map does not notice."""
+    mutated = copy.deepcopy(_real_map())
+    fabricated_hash = "sha256:" + "0" * 64
+    mutated["rows"][0]["hash_tuple"]["skill"] = fabricated_hash
+    mutated["rows"][1]["hash_tuple"]["section"] = fabricated_hash
+    law_sections = _law_section_bodies()
+
+    violations = _find_stale_hash_tuples(mutated, law_sections)
+
+    assert any("skill hash stale" in v for v in violations), violations
+    assert any("section hash stale" in v for v in violations), violations
+
+
+# --------------------------------------------------------------------------- #
 # Ported --self-test fixtures (A9.4) — lint-skill-collisions.py --self-test (a)/(b),
 # exercised here against the pure `_find_overlap_pairs` (in-memory, no I/O), matching
 # the retired script's own self-test shape exactly.
@@ -524,13 +731,10 @@ def test_ported_self_test_b_undeclared_duplicate_glob_fires() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# FR28 (T-044-56, A28.1) — the invocation model, checked in BOTH directions,
-# no hand-kept list. The grant set is DERIVED: the union of every persona
+# FR28 (T-044-56, A28.1) — ported verbatim. The invocation model, checked in BOTH
+# directions, no hand-kept list. The grant set is DERIVED: the union of every persona
 # frontmatter's `skills:` allowlist, plus the same universal-grant mechanism
-# failure mode 6 already special-cases (`_UNIVERSAL_NAMES` / an `applyTo` in
-# `_UNIVERSAL_GLOBS`) — a universal skill is implicitly granted to every model
-# and must never be forced into an explicit per-persona allowlist to avoid a
-# false "no allowlist" finding.
+# failure mode 6 already special-cases.
 # --------------------------------------------------------------------------- #
 
 _AGENTS_DIR = _PUBLIC / "agents"
@@ -634,13 +838,6 @@ def test_disable_model_invocation_skills_are_in_no_allowlist() -> None:
     )
 
 
-# --------------------------------------------------------------------------- #
-# Two mutation fixtures — one per direction (7a/7b), each proven RED against an
-# in-memory mutated grant/flag set built from the real skill/agent inventory.
-# Never mutates a repo file.
-# --------------------------------------------------------------------------- #
-
-
 def test_mutation_fixture_7_ungranted_skill_without_flag_turns_red() -> None:
     """Direction 7a mutation fixture: drop a real, explicitly-allowlisted (non-
     universal) skill out of the granted set without flagging it — the finder must
@@ -670,7 +867,7 @@ def test_mutation_fixture_8_flagged_skill_still_granted_turns_red() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# FR27/A27.20 (T-044-58) — the citation check. Citable-pattern definition and
+# FR27/A27.20 (T-044-58) — ported verbatim. Citable-pattern definition and
 # exclusion rules: module docstring. Command-tree derivation choice (import, never
 # subprocess) and its justification: module docstring.
 # --------------------------------------------------------------------------- #
@@ -723,20 +920,13 @@ def _projected_specs_agents_relpath(repo_root: Path) -> str | None:
     ``dadaia_workspace/public/templates/specs-AGENTS.md`` (the generating public asset)
     into any ``<specs_dir>/AGENTS.md`` — at the workspace root and inside every
     ``repos/<slug>/`` alike. It is deliberately never tracked in ANY checkout of this
-    library repo (``.gitignore``'s ``/specs/*`` carve-out has no opt-in for it; the "repo
-    hygiene" CI job forbids tracking it), so a bare clone never has it on disk even
-    though a locally-instantiated workspace carries it as an untracked lib-projection
-    leftover.
+    library repo, so a bare clone never has it on disk even though a
+    locally-instantiated workspace carries it as an untracked lib-projection leftover.
 
     Runs ``scaffold()`` against a throwaway scratch directory and confirms the produced
     ``AGENTS.md`` is byte-identical to the real source template — proof by generating
     asset, never by checkout presence. Returns ``None`` (never special-cased) when the
-    source template itself is absent under *repo_root*, so a fixture ``repo_root`` under
-    ``tmp_path`` — which never carries
-    ``dadaia_workspace/public/templates/specs-AGENTS.md`` — is untouched by this
-    classification and keeps resolving every ``specs/``-prefixed citation against
-    checkout presence exactly as before (mutation fixture 9 and its lookalike follow-up
-    depend on this)."""
+    source template itself is absent under *repo_root*."""
     templates_dir = repo_root / "dadaia_workspace" / "public" / "templates"
     source = templates_dir / _SPECS_AGENTS_SOURCE_TEMPLATE
     if not source.exists():
@@ -768,8 +958,8 @@ def _is_placeholder_or_ellipsis(token: str) -> bool:
 
 def _sibling_marked(same_line_remainder: str, next_line: str) -> bool:
     """True if the ``(sibling)``/``sibling`` annotation follows the citation, either on
-    the same line or (the one corpus case that needs it) on the very next line — a
-    blockquote continuation, whose leading ``>`` marker is stripped first."""
+    the same line or on the very next line — a blockquote continuation, whose leading
+    ``>`` marker is stripped first."""
     if _SIBLING_MARKER_RE.match(same_line_remainder.lstrip()):
         return True
     stripped_next = _BLOCKQUOTE_PREFIX_RE.sub("", next_line).lstrip()
@@ -805,10 +995,6 @@ def _find_dead_path_citations(public_dir: Path, repo_root: Path) -> list[str]:
                 if token.startswith(_CITABLE_PATH_PREFIXES):
                     projected_relpath = _projected_specs_agents_relpath(repo_root)
                     if projected_relpath is not None and token == f"specs/{projected_relpath}":
-                        # Projected INSTANCE path — already proven above by its
-                        # generating public asset, never by checkout presence (bug
-                        # citation-enforcer-resolves-projected-instance-paths-
-                        # against-the-checkout).
                         continue
                     if not (repo_root / token).exists():
                         violations.append(f"{rel}:{idx + 1}: dead path `{token}`")
@@ -864,16 +1050,16 @@ def test_every_cited_path_exists() -> None:
 
 def test_projected_specs_agents_md_citation_survives_bare_checkout() -> None:
     """Regression — bug ``citation-enforcer-resolves-projected-instance-paths-
-    against-the-checkout`` (HIGH). ``specs/AGENTS.md`` is cited by six public docs; it
-    is an INSTANCE reality (``dadaia_workspace.features.specs.scaffolder.scaffold``
-    projects it from ``dadaia_workspace/public/templates/specs-AGENTS.md``) that this
-    repo's own ``.gitignore`` (``/specs/*`` with no opt-in for ``AGENTS.md``) and the
-    "repo hygiene" CI job both forbid ever tracking — so a bare CI clone never has it
-    on disk even though a locally-instantiated workspace does (it exists here only as
-    an untracked lib-projection leftover). This test proves the check no longer
-    depends on that presence difference: it hides the real local leftover (if any) —
-    never deletes it — before scanning, and restores it unconditionally, so the
-    exact bare-checkout condition CI hits is exercised locally too."""
+    against-the-checkout`` (HIGH). ``specs/AGENTS.md`` is cited by public docs; it is
+    an INSTANCE reality that
+    ``dadaia_workspace.features.specs.scaffolder.scaffold`` projects from
+    ``dadaia_workspace/public/templates/specs-AGENTS.md``, which this repo's own
+    ``.gitignore``/repo-hygiene job both forbid ever tracking — so a bare CI clone
+    never has it on disk even though a locally-instantiated workspace does. This test
+    proves the check no longer depends on that presence difference: it hides the real
+    local leftover (if any) — never deletes it — before scanning, and restores it
+    unconditionally, so the exact bare-checkout condition CI hits is exercised locally
+    too."""
     real_path = _REPO_ROOT / "specs" / "AGENTS.md"
     hidden_path = real_path.with_name("AGENTS.md.hidden-for-bare-checkout-test")
     moved = False
@@ -925,12 +1111,8 @@ def test_mutation_fixture_11_lookalike_projected_path_still_turns_red(tmp_path: 
     follow-up mutation fixture — both directions (a cited path absent from the checkout
     AND absent from the known projection target still fails). A `specs/`-prefixed
     citation that merely resembles the ONE projected target this fix special-cases
-    (``specs/AGENTS.md`` — wrong nesting here) must still be flagged: the projection
-    classification matches the EXACT token, never a basename/suffix match, and never
-    activates at all when the fixture carries no
-    ``dadaia_workspace/public/templates/specs-AGENTS.md`` source to prove it against.
-    Never touches a real repo file: `repo_root` and `public_dir` are both under
-    `tmp_path`."""
+    (``specs/AGENTS.md`` — wrong nesting here) must still be flagged. Never touches a
+    real repo file: `repo_root` and `public_dir` are both under `tmp_path`."""
     fixture_repo_root = tmp_path / "fixture-repo"
     fixture_public = fixture_repo_root / "dadaia_workspace" / "public" / "skills" / "fixture-skill"
     fixture_public.mkdir(parents=True)
@@ -965,29 +1147,15 @@ def test_mutation_fixture_10_dead_verb_citation_turns_red(tmp_path: Path) -> Non
     assert violations[0].startswith("dadaia_workspace/public/skills/fixture-skill/SKILL.md:1:")
 
 
-# --------------------------------------------------------------------------- #
-# Bug `citation-mutation-fixtures-never-turn-red-on-windows` (HIGH, rc-1 CI runs
-# 32761749438/32761754813) — regression at the shared seam both citation checkers use
-# to render a violation's `file:line` prefix. `_posix_relpath` is pure path arithmetic
-# (`Path.relative_to`/`as_posix`, no I/O), so it is driven directly with
-# `PureWindowsPath`-shaped (backslash) inputs here — the Windows-path-semantics class
-# is locally observable on any host OS, never only provable post-hoc by a Windows CI
-# run, mirroring the bare-checkout simulation pattern in
-# `test_projected_specs_agents_md_citation_survives_bare_checkout` (a7a67541).
-# --------------------------------------------------------------------------- #
-
-
 def test_posix_relpath_is_separator_agnostic_under_windows_path_semantics() -> None:
     """Regression — bug `citation-mutation-fixtures-never-turn-red-on-windows` (HIGH).
     On windows-latest CI, `_find_dead_path_citations`/`_find_dead_verb_citations`
     correctly DETECTED the planted violation (`len(violations) == 1`, correct token) —
     the bug was never a vacuous no-op. It was the violation's `file:line` prefix
     rendering with the OS-native separator (backslash on Windows) instead of the
-    POSIX form every consumer of a `file:line` citation expects — confirmed verbatim
-    against the CI trace: `'dadaia_workspace\\public\\...\\SKILL.md:1: ...'` where
-    `'dadaia_workspace/public/.../SKILL.md:1:'` was expected. `PureWindowsPath` proves
-    the fixed seam produces POSIX output even when built from genuine Windows path
-    semantics, on any host OS."""
+    POSIX form every consumer of a `file:line` citation expects. `PureWindowsPath`
+    proves the fixed seam produces POSIX output even when built from genuine Windows
+    path semantics, on any host OS."""
     windows_root = PureWindowsPath(r"D:\pytest-fixture-repo")
     windows_md_path = (
         windows_root / "dadaia_workspace" / "public" / "skills" / "fixture-skill" / "SKILL.md"

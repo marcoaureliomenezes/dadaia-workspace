@@ -252,7 +252,7 @@ def test_no_file_combines_a_frozen_datetime_constant_with_a_real_clock_call() ->
 
 def test_mutation_fixture_frozen_constant_plus_real_clock_call_turns_red() -> None:
     """Mutation-sanity proof, built entirely in-memory (never a repo file — the pattern
-    ``tests/contract/test_rules_skills_map.py``'s two mutation fixtures use): a synthetic
+    ``tests/contract/test_behavior_map.py``'s two mutation fixtures use): a synthetic
     module reproducing the tmp_gc shape (a frozen ``_NOW`` constant plus a ``time.time()``
     aging call) must trip both detectors, proving the ratchet bites."""
     source = (

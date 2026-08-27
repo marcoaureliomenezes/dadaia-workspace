@@ -26,9 +26,11 @@ census, the two byte-golden-roster consumers, the three skill-inventory-oracle
 consumers) and two pre-existing scans the original ruling's grep pass did not enumerate
 (the self-scan, which discovers its tracked-file population via ``git ls-files`` rather
 than ``rglob``/``glob``; the public-source hygiene directory listing). The honest
-current count is 20 files / 21 call sites — a measured, not estimated, deviation from
-the SPEC text's "~15", which quotes the pre-S2 backlog finding verbatim (SPEC v0.4.5
-§3, FR5 body).
+count at v0.4.5 S2 HEAD was 20 files / 21 call sites — a measured, not estimated,
+deviation from the SPEC text's "~15", which quotes the pre-S2 backlog finding verbatim
+(SPEC v0.4.5 §3, FR5 body). v0.5.0 T-050-19 (D14/FR10) adds one call site inside the
+same file (`_scoped_agents_md_sources()`, the new scoped-`AGENTS.md`-source scan the
+behavior map's own enforcer needs) — 20 files / 22 call sites now.
 
 Tree-/package-walking population scans (the convention applies at the call site named):
 
@@ -45,7 +47,8 @@ Tree-/package-walking population scans (the convention applies at the call site 
 * ``tests/unit/public/test_no_gpt_only_claim.py`` :: test_no_surviving_gpt_only_claim
 * ``tests/unit/features/panel/test_no_bearer_in_url.py`` ::
   test_no_credential_query_param_in_panel_or_cli_sources
-* ``tests/contract/test_rules_skills_map.py`` :: ``_skills_on_disk()``
+* ``tests/contract/test_behavior_map.py`` :: ``_skills_on_disk()``,
+  ``_scoped_agents_md_sources()``
 * ``tests/contract/test_public_scripts_thin_wrapper.py`` ::
   test_thin_wrapper_registry_stays_data_driven_and_correctly_scoped
 * ``tests/contract/test_bind_resolution_seam_dynamic_walk.py`` ::
