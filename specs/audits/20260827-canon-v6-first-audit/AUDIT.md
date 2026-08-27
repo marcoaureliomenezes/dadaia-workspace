@@ -521,3 +521,173 @@ persona's own protocol, and a leaf dispatch would have added a hop without addin
   `tests/contract/**`
 - `git log` / `git show` over `[e61e5fc7, HEAD]`; `dadaia specs doctor --json` / `--recipe`;
   `lint-imports`; `ruff`; the 18 named `pytest` node sets; `dadaia ci push-gate-check`
+
+---
+
+## Pillar 3 — re-run (A16.4)
+
+**Task:** T-050-34 · **Head at re-run:** `4c688965` · **Protocol:** `dd-audit-project`'s
+`PILLAR-MEMORY.md`, §1 (every `Measured by:` executed), §2 (the ADR-pairing check), §3/§5
+(memory and constitution vs code over the window).
+
+The first pass (§3.1/§3.2, commit `29f506bc`) ran the 28 measures against **uncommitted
+working-tree text** and recorded the ADR-pairing check as a *gap* — F029, "cannot run in
+this window". Part 1 is now committed: `b076b0f2` (the three Part 1 sections),
+`661445d7` and `6b6ed174` (Part 2 / frontmatter follow-ups), with `81fc078e` amending the
+constitution to reference principles by id. The gap is therefore closed by execution, and
+this section reports what execution found.
+
+**Snapshot integrity.** `git status --short` was **empty** at the moment the 28 commands
+ran — this is a measurement of the committed tree, not of anyone's in-flight edit. Two
+files (`core/atomic_write.py`, `infrastructure/jsonl_record_store.py`) went dirty under
+another session *after* the run; a transient `F401/F811/F841` hit observed in that dirty
+window cleared on re-run and is recorded here as **concurrent in-flight work, not a
+finding**.
+
+### 3.5 The 28 `Measured by:` commands, executed once each by this auditor
+
+Every command was run from the repo root against the workspace venv binaries, with
+`PYTHONDONTWRITEBYTECODE=1` and `-p no:cacheprovider`. This is a full independent
+execution, not a verification sample of the V14 capture.
+
+| P-id | Named check | Exit | Result (redacted) | Verdict |
+|---|---|---|---|---|
+| P-01 | `lint-imports --config setup.cfg --no-cache` — `features-no-infrastructure` | 0 | KEPT | RUNS, PASSES |
+| P-02 | same — `features-no-subprocess` | 0 | KEPT | RUNS, PASSES |
+| P-03 | same — `core-no-os-primitives` | 0 | KEPT | RUNS, PASSES |
+| P-04 | same — `core-no-upper-layers` | 0 | KEPT | RUNS, PASSES |
+| P-05 | same — `infrastructure-no-upper-layers` | 0 | KEPT | RUNS, PASSES |
+| P-06 | same — `kernel-tunables-is-a-leaf` | 0 | KEPT | RUNS, PASSES |
+| P-07 | same — `features-no-cross-feature` | 0 | KEPT | RUNS, PASSES |
+| P-08 | same — `cli-no-infrastructure` | 0 | KEPT | RUNS, PASSES |
+| P-09 | same — `bind-resolution-seam-is-a-single-home` | 0 | KEPT — one run, `Contracts: 9 kept, 0 broken` | RUNS, PASSES |
+| P-10 | `pytest tests/contract/test_import_linter_ignore_cap.py` | 0 | 2 passed in 0.20s | RUNS, PASSES |
+| P-11 | `pytest tests/contract/test_core_file_io_purity.py` | 0 | 1 passed in 0.23s | RUNS, PASSES |
+| P-12 | `pytest tests/contract/test_hook_import_surface.py` | 0 | 7 passed in 0.46s | RUNS, PASSES |
+| P-13 | `pytest tests/contract/test_architecture_diagrams_current.py` | 0 | 1 passed in 0.26s | RUNS, PASSES |
+| P-14 | `pytest tests/contract/test_release_events_read_only.py` | 0 | 1 passed in 0.20s | RUNS, PASSES |
+| P-15 | `pytest tests/contract/test_release_event_schema.py` | 0 | 1 passed in 0.21s | RUNS, PASSES |
+| P-16 | `pytest tests/contract/test_resolved_commit_stored_equals_derived.py` | 0 | 21 passed in 4.67s — pass still tautological (F030 stands) | RUNS, PASSES |
+| **P-17** | `pytest tests/contract/test_behavior_map.py` | **1** | **1 failed, 29 passed — `test_every_hash_tuple_is_current`: stale `hash_tuple.scoped` for `public/templates/specs-AGENTS.md`** | **RUNS, FAILS → F038** |
+| P-18 | `pytest tests/contract/test_module_size_ceiling.py` | 0 | 2 passed in 0.21s | RUNS, PASSES |
+| P-19 | `ruff check --no-cache dadaia_workspace/` | 0 | `All checks passed!` | RUNS, PASSES |
+| P-20 | `pytest tests/contract/test_specs_cli_complexity_ratchet.py` | 0 | 2 passed in 0.21s | RUNS, PASSES |
+| P-21 | `pytest tests/contract/test_stewardship_mechanics.py -k timeout` | 0 | 8 passed in 2.69s — selector overbroad → F041 | RUNS, PASSES |
+| P-22 | `… -k quarantine` | 0 | 4 passed, 4 deselected in 2.74s | RUNS, PASSES |
+| P-23 | `pytest tests/contract/test_test_suite_ratchets.py -k v26` | 0 | 1 passed, 4 deselected in 0.84s | RUNS, PASSES |
+| P-24 | `… -k v27` | 0 | 1 passed, 4 deselected in 0.60s | RUNS, PASSES |
+| P-25 | `… -k v28` | 0 | 1 passed, 4 deselected in 0.65s | RUNS, PASSES |
+| P-26 | `… -k v29` | 0 | 1 passed, 4 deselected in 0.22s | RUNS, PASSES |
+| P-27 | `pytest -s … -k v30` | 0 | 1 passed, 4 deselected in 6.64s — prints `collected 2966: small 89.9% · medium 8.5% · large 1.6% — findings: none` | RUNS, PASSES |
+| P-28 | `pytest tests/contract/test_stewardship_mechanics.py -k marker_set` | 0 | 1 passed, 7 deselected in 0.21s | RUNS, PASSES |
+
+**Executed: 28 / 28. Pass: 27. Fail: 1. "Check does not run": 0.**
+
+**The one red row is real, committed drift — not concurrent noise.** Both of P-17's
+inputs were clean at run time and the failure reproduced on a second run. The cause is
+mechanical: `behavior-map.json` records `hash_tuple.scoped = sha256:3709fc2c…`, which is
+the hash of `public/templates/specs-AGENTS.md` at `5259f5d8~1`; at `5259f5d8` and at HEAD
+that template hashes `sha256:55420708…`. Commit `5259f5d8` — itself the fix for the
+registered bug `scoped-agents-md-stale-active-md-dual-write-text-past-t-050-21a` — changed
+the template and `shipped-hashes.json` and left `behavior-map.json` untouched. **A bug fix
+broke the very principle that guards the map**, and it landed after `29f506bc` and before
+this re-run, unnoticed by anything in between (pre-commit warns and always allows).
+**F032's "28 / 28 pass" no longer holds at this head.** → **F038**, HIGH
+
+### 3.6 The pairing check — "Part 1 changed without an accepted ADR"
+
+Run per `PILLAR-MEMORY` §2 over
+`git log -p 02eef219..HEAD -- specs/memory/{ARCHITECTURE,QUALITY,TECHSTACK}.md`.
+
+| Commit | `+## Part 1` adds | Nature of the trio hunk |
+|---|---|---|
+| `fb81a03c` — `refactor(T-050-06): migrate specs/ to canon v6` | 0 | 976 added lines, zero `P-NN` / `Measured by:` / `ADR:` markers — the canon-v6 rename, no Part 1 |
+| **`b076b0f2`** — `docs(T-050-28): memory Part 1 Principles / Part 2 Implementation` | **3** | **the Part-1 hunk** — creates all three `## Part 1 — Principles` sections and all 28 principles at once |
+| `661445d7` — `test(T-050-29): memory two-tier shape contract…` | 0 | Part 2 only — the package-map heading, `26 packages` → `24 packages` |
+| `6b6ed174` — `docs(memory): tldr lines are valid YAML` | 0 | frontmatter only — the `tldr` scalars |
+
+**Exactly one Part-1-bearing commit in the window, and it is a pure CREATE.**
+
+The other half of the pair does not exist:
+`git log --all --format='%s' | grep -c '^docs(adr): accept'` → **0**;
+`grep -h '^Status:' specs/ADRs/0*.md | sort | uniq -c` → **28 `Status: proposed`**.
+
+**Verdict — the pairing law is NOT satisfied, and the first-inventory shape does not
+satisfy it.** Stated plainly, because the question was asked directly:
+
+1. **Mechanically, the check fails.** One Part-1 hunk, zero paired `accept` commits.
+   `PILLAR-MEMORY` §2 grades an unmatched hunk **HIGH**, with no exception clause for a
+   creating commit. There is no reading of the law as written under which
+   `b076b0f2` passes. → **F039**, HIGH
+2. **Substantively, the failure is a bootstrap artifact, not misconduct.** The law's
+   shape — `specs/ADRs/AGENTS.md`, the `docs(adr): accept NNNN-<slug>` commit "carrying
+   its Part-1 memory hunk in the same commit" — presupposes a Part 1 that *already
+   exists* and is being *changed*. At first inventory there is nothing to change, and the
+   operator cannot accept an ADR for a principle whose text is not yet on disk. Because
+   only the operator may flip a `Status` to `accepted` (`specs/ADRs/AGENTS.md:43`, D12),
+   **no agent could have produced a passing state here.** The remediation is not a code
+   or memory change; it is **T-050-31, the operator's acceptance sitting** — after which
+   the 28 principles pair with 28 `accepted` ADRs and the check becomes meaningful for
+   every *subsequent* change.
+3. **The law itself has a gap, and that is a finding of its own.** As written, a
+   legitimate first inventory is textually indistinguishable from real drift: both
+   present as an unmatched Part-1 hunk. Until `PILLAR-MEMORY` §2 gains an explicit
+   first-inventory case (or FR19 states that the creating commit is paired by the
+   subsequent accept sweep), every future workspace bootstrapping its own Part 1 will
+   trip this HIGH on its first audit. → **F040**, MEDIUM
+
+F029 ("the pairing check cannot run in this window") is **superseded in substance** by
+F039 — the check now runs, and it fails. F029's own record is left byte-identical; only
+the remediation release may rewrite a disposition.
+
+### 3.7 Memory and constitution vs code, over the window
+
+- **The two CRITICALs are genuinely closed.** `grep -c 'rules-skills-map' specs/constitution.md`
+  → **0** (was the F026 gate); `grep -c 'memory/architecture.md\|memory/tech-stack.md\|memory/quality-assurance.md'`
+  → **0** (was F027). `81fc078e` also made the constitution reference principles by id —
+  18 `P-NN` citations. The `fixed` dispositions recorded on F026/F027 are verified, not
+  merely asserted.
+- **The Part-2 package-map claim matches the tree.** `ls -d dadaia_workspace/features/*/__init__.py | wc -l`
+  → **24**, against `ARCHITECTURE.md:512` "package map (24 packages)". `661445d7` closed
+  the `26` → `24` drift the first pass would have caught.
+- **Production-code surface in the window.** `git diff --stat 02eef219..HEAD -- dadaia_workspace/`
+  → 116 files, +7092 / −3450; but `29f506bc..HEAD` → **2 files, +3 / −2**
+  (`specs-AGENTS.md`, `shipped-hashes.json`) — the entire delta since the first audit,
+  and it is exactly the delta that broke P-17. No new atom-vs-code contradiction was
+  found in the re-sampled walk.
+- **Dead code — still partial, still said so.** The ruff arm
+  (`--select F401,F811,F841`) is clean on the committed tree; `vulture` / `ts-prune` /
+  `knip` / `depcheck` / `pydeps` remain **not-run** under A14.5's zero-new-dependency
+  posture. **F033 stands unchanged.**
+- **`dadaia specs doctor`** now reports **1 error** (SPEC-DOC-024, this release's TASKS.md
+  is `Em revisão` while phase is `IMPLEMENTATION`) rather than the 2 the first pass saw —
+  a pillar-2 surface already carried by F017, not re-recorded here.
+
+### 3.8 Findings appended by this re-run
+
+Appended to the same `FINDINGS.jsonl` with `>>`; the pre-existing 37 lines are
+byte-identical to the committed blob (`md5sum` of `head -37` equals `md5sum` of
+`git show HEAD:…FINDINGS.jsonl`). All 41 records validate against
+`finding-record-v1.schema.json` with **0 errors**, 41 unique ids.
+
+| id | Severity | Claim in one line |
+|---|---|---|
+| **F038** | HIGH | P-17's own check is RED at this head — `5259f5d8` changed the scoped template without re-recording `behavior-map.json`'s hash tuple; 27/28, not 28/28 |
+| **F039** | HIGH | The pairing check now runs and is unsatisfied — one Part-1 hunk (`b076b0f2`), zero `docs(adr): accept` commits, 28/28 `proposed` |
+| **F040** | MEDIUM | The pairing law has no first-inventory case, so a legitimate bootstrap is indistinguishable from drift and no agent can clear it |
+| **F041** | LOW | P-21's `-k "timeout"` selector matches the tier marker on every item — 8 collected, 0 deselected, against 3 by name |
+
+**Recommended actions, each naming its owner** (this auditor recommends; it never
+dispatches and never fixes):
+
+1. **F038 → `ai-engineer`** — `behavior-map.json` is the AI-entity surface. Re-record
+   `hash_tuple.scoped` for `dadaia-workspace-spec-navigator` after re-reading
+   `public/templates/specs-AGENTS.md`, in the same commit shape the map's own law
+   requires. This is a **RED Part-1 measure on the release's final `rc`** and should be
+   green before the `rc` ships.
+2. **F039 → the operator, via `project-manager`** — T-050-31 is the remediation; nothing
+   an agent writes can close it.
+3. **F040 → `ai-engineer`** (skill text, `public/skills/dd-audit-project/PILLAR-MEMORY.md`)
+   with `product-engineer` on the FR19 wording — add the first-inventory case.
+4. **F041 → `product-engineer`** — tighten P-21's `Measured by:` line and ADR-0021's
+   matching `## Confirmation` line to the three named tests.
