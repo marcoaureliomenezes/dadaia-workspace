@@ -776,7 +776,7 @@ report carries counts only, never values; this task is a **separate commit** fro
 
 ---
 
-- [-] **T-050-11 — FR4: `RELEASE.jsonl` replaces `ACTIVE.md`**
+- [x] **T-050-11 — FR4: `RELEASE.jsonl` replaces `ACTIVE.md`**
 
 **Owner role:** software-engineer · **Commit:** `feat(T-050-11): RELEASE.jsonl milestones
 replace ACTIVE.md`
@@ -822,7 +822,7 @@ file's continued presence, so it cannot evidence its absence.)* **Tests: +4 / �
 
 ---
 
-- [ ] **T-050-12 — FR4: back-fill the archived releases' milestone shas**
+- [-] **T-050-12 — FR4: back-fill the archived releases' milestone shas**
 
 **Owner role:** software-engineer · **Commit:** `feat(T-050-12): back-fill archived release
 milestones into releases_histo.jsonl`
