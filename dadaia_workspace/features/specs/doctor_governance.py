@@ -2,20 +2,45 @@
 
 Single-responsibility sibling of the SpecsDoctor coordinator. Owns the bug/backlog governance
 invariants: consumed-but-unsanitized ACTIVE backlog item (SPEC-DOC-031, SPEC v0.4.2 FR14),
-bug-status canon (SPEC-DOC-032), the event-sourced JSONL bug-telemetry invariant
-(SPEC-DOC-033), and the single-source loose-file invariant (SPEC-DOC-035, SPEC v0.12.0 FR5).
+bug-status canon (SPEC-DOC-032), the bug-ledger invariant (SPEC-DOC-033), the immutable-core
+drift detector (SPEC-DOC-040, v0.5.0 A2.7) and the archive-overdue signal (SPEC-DOC-041,
+v0.5.0 A2.8), and the single-source loose-file invariant (SPEC-DOC-035, SPEC v0.12.0 FR5).
 Leaf-only: imports the shared leaves + core, plus one documented cross-feature leaf edge
 (``features.backlog.document`` — SPEC v0.12.0 PLAN §6, ``setup.cfg``'s
 ``features-no-cross-feature`` ``ignore_imports``), never a sibling validator.
+
+**v0.5.0 T-050-08 (FR2/AR-1 finding "the doctor's bug lane is a second hand-kept
+reader").** ``check_bugs_jsonl_invariant`` used to hand-parse each line's ``bug_id``/
+``event`` fields directly and split the file with ``str.splitlines()`` — the EXACT
+defect class fixed at the store's OWN reader by T-045-20
+(``bug-event-field-with-unicode-line-separator-silently-drops-the-event``), left live
+here (bug ``specs-doctor-bug-lane-splits-ledger-on-unicode-line-separators``, closed by
+this rewrite). This validator now reads through ``core.models.bugs``'s OWN parsers
+(``BugEvent.from_dict``/``BugRecord.from_dict``) and splits on a literal ``"\\n"``
+only — one parser, not a second hand-kept mirror of it. The legacy hourly-file rotation
+reader (``_BUGS_JSONL_ROW_CEILING``, ``_BUGS_JSONL_NAME_RE``, the ``*.jsonl`` glob) is
+DEAD under canon v6 (AR-1 (a)4) and is deleted, not carried forward: only the single
+canonical ``bugs/bugs.jsonl`` is read.
 """
 
 from __future__ import annotations
 
 import json
 import re
+from collections.abc import Mapping
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from dadaia_workspace.core.models.bugs import BugCoherenceRecord, diagnose_bug_coherence_history
+from dadaia_workspace.core.models.bugs import (
+    BUG_ARCHIVE_THRESHOLD_DAYS,
+    TERMINAL_EVENTS,
+    BugCoherenceRecord,
+    BugEvent,
+    BugRecord,
+    diagnose_bug_coherence_history,
+    governance_completeness_gaps,
+    immutable_core_drift,
+)
 from dadaia_workspace.features.backlog.document import load_document
 from dadaia_workspace.features.specs.doctor_common import iter_archive_release_dirs
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
@@ -32,15 +57,6 @@ _BACKLOG_NONTERMINAL_PREFIXES: tuple[str, ...] = ("open", "picked", "candidate")
 # Bugs (ADR-11): the canon is exactly {Open, Closed} (case-insensitive). SPEC-DOC-032
 # WARNs on anything else (legacy Fixed/resolved/Rejected tokens, etc.).
 _BUG_STATUS_CANON: frozenset[str] = frozenset({"open", "closed"})
-
-# SPEC-DOC-033 (v0.1.46 AC-1): the JSONL bug-telemetry rotation ceiling. A
-# ``specs/bugs/<hour>Z-<n>.jsonl`` file with more than this many rows is a hard ERROR
-# (the store rolls to ``-<n+1>`` at the boundary). Kept as a local doctor constant so the
-# pure ``features.specs`` module never imports the infrastructure store (layering law).
-_BUGS_JSONL_ROW_CEILING = 1000
-
-# SPEC-DOC-033 canonical bug-log filename: ``<YYYYMMDDTHH>Z-<n>.jsonl``.
-_BUGS_JSONL_NAME_RE = re.compile(r"^\d{8}T\d{2}Z-\d+\.jsonl$")
 
 # Match a bug frontmatter ``status:`` line (frontmatter is leading YAML-like lines).
 _BUG_STATUS_RE = re.compile(r"^status\s*:\s*(\S+)", re.IGNORECASE | re.MULTILINE)
@@ -112,12 +128,62 @@ def _dispositions_tokens(closure_text: str) -> frozenset[str]:
     return frozenset(tokens)
 
 
+def _iter_native_bug_records(ledger_path: Path) -> list[BugRecord]:
+    """Every line of *ledger_path* that parses as a native v6 :class:`BugRecord` (no
+    ``"event"`` key) — a v5 line, malformed JSON, or a non-object line is silently
+    skipped (SPEC-DOC-033's own line-validity check already reports those). Splits on
+    a literal ``"\\n"`` only. Shared by A2.7's and A2.8's checks, both of which only
+    ever act on already-native lines (module docstring)."""
+    if not ledger_path.is_file():
+        return []
+    records: list[BugRecord] = []
+    for raw_line in ledger_path.read_text(encoding="utf-8").split("\n"):
+        stripped = raw_line.strip()
+        if not stripped:
+            continue
+        try:
+            obj = json.loads(stripped)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(obj, dict) or "event" in obj:
+            continue
+        try:
+            records.append(BugRecord.from_dict(obj))
+        except (ValueError, TypeError):
+            continue
+    return records
+
+
+def _parse_bug_record_ts(value: str) -> datetime | None:
+    """Parse a ``BugRecord.ts`` ISO-8601 UTC value; ``None`` on anything unparseable
+    (an unparseable timestamp is never treated as overdue — A2.8's own no-guess rule)."""
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
+
+
 class GovernanceValidator:
     """Bug/backlog governance: single-source backlog invariants, bug status/JSONL."""
 
-    def __init__(self, specs_dir: Path, public_dir: Path | None = None) -> None:
+    def __init__(
+        self,
+        specs_dir: Path,
+        public_dir: Path | None = None,
+        *,
+        bug_first_add_baselines: Mapping[str, BugRecord] | None = None,
+    ) -> None:
         self.specs_dir = specs_dir
         self.public_dir = public_dir
+        # v0.5.0 A2.7 — the TODO-free seam FR3/T-050-09's core.bug_provenance
+        # derivation plugs a real git-derived first-add snapshot into: this release
+        # (T-050-08) has no git access here (a "pure module, no I/O outside
+        # specs_dir/public_dir" leaf) and no derivation exists yet, so every current
+        # caller passes ``None`` — the check is a genuine production no-op (nothing to
+        # compare against) until T-050-09 threads a real mapping through this same
+        # constructor param.
+        self._bug_first_add_baselines = bug_first_add_baselines or {}
 
     def _archive_consumption_hits(self, slug: str) -> list[str]:
         """Release ids of archived releases that ASSERT ``slug`` was consumed (SPEC
@@ -257,157 +323,208 @@ class GovernanceValidator:
             )
         return issues
 
-    def _bug_event_schema_path(self) -> Path:
-        """Resolve the packaged ``bug-event-v1`` JSON Schema.
-
-        Prefers the injected ``public_dir`` (composition-root wiring); falls back to the
-        package-relative source tree (``dadaia_workspace/public/schemas/bugs/``) so the
-        pure module still validates without an injected public dir. Reading a bundled
-        schema resource is not I/O outside the pattern's own package.
-        """
-        if self.public_dir is not None:
-            return self.public_dir / "schemas" / "bugs" / "bug-event-v1.schema.json"
-        package_root = Path(__file__).resolve().parents[2]
-        return package_root / "public" / "schemas" / "bugs" / "bug-event-v1.schema.json"
-
     def check_bugs_jsonl_invariant(self) -> list[SpecsDoctorIssue]:
-        """SPEC-DOC-033 (v0.1.46 AC-1): event-sourced JSONL bug-telemetry invariant.
+        """SPEC-DOC-033 (v0.1.46 AC-1; rewritten v0.5.0 T-050-08, FR2/A2.3): the single
+        canonical ``specs/bugs/bugs.jsonl`` ledger invariant.
 
-        Three sub-checks over every ``specs/bugs/<hour>Z-<n>.jsonl`` (``_archive/`` excluded
-        — non-recursive glob):
+        Three sub-checks over the ONE canonical file (the legacy hourly-file rotation
+        reader is dead under canon v6 and is not carried forward — module docstring):
 
-        1. **Per-line schema validity** (ERROR) — each non-blank line must be a JSON object
-           validating ``bug-event-v1``. A malformed-JSON line or a schema violation ERRORs.
-        2. **Rotation ceiling** (ERROR) — a file with more than
-           :data:`_BUGS_JSONL_ROW_CEILING` rows ERRORs (the store rolls at the boundary).
-        3. **Event coherence** over the terminal set ``{resolved, superseded, deferred,
-           rejected}`` (``archived`` is a NON-terminal annotation and is IGNORED): a
-           terminal event for a ``bug_id`` with no prior ``reported`` ERRORs; a terminal
-           after an existing terminal for the same ``bug_id`` ERRORs. A ``reported`` event
-           (re)opens a ``bug_id`` — clearing any prior terminal so a legitimate reopen is
-           not mis-flagged as a double-terminal.
+        1. **Line validity** (ERROR) — each non-blank line must parse as EITHER a v5
+           :class:`~dadaia_workspace.core.models.bugs.BugEvent` (an ``"event"`` key
+           present) or a native v6
+           :class:`~dadaia_workspace.core.models.bugs.BugRecord` (no ``"event"`` key),
+           through THEIR OWN ``from_dict`` parsers — never a hand-rolled field check.
+        2. **Event-stream coherence** (WARNING, demoted from ERROR — A2.3/D15: never a
+           block) over the v5 portion's whole history — see
+           :func:`~dadaia_workspace.core.models.bugs.diagnose_bug_coherence_history`'s
+           own docstring for why this is now a diagnostic-only survivor.
+        3. **Governance completeness** (WARNING — A2.3) — every native v6
+           :class:`BugRecord` line whose
+           :func:`~dadaia_workspace.core.models.bugs.governance_completeness_gaps` is
+           non-empty.
 
-        Pure module: reads only under ``specs_dir`` plus the packaged schema resource.
-        Absent ``bugs/`` dir → no-op.
+        Splits on a literal ``"\\n"`` only, never ``str.splitlines()`` (closes
+        ``specs-doctor-bug-lane-splits-ledger-on-unicode-line-separators`` — the
+        module docstring's AR-1 finding). Absent ``bugs/`` dir -> no-op.
         """
-        bugs_dir = self.specs_dir / "bugs"
-        if not bugs_dir.is_dir():
+        ledger_path = self.specs_dir / "bugs" / "bugs.jsonl"
+        if not ledger_path.is_file():
             return []
-
-        schema_path = self._bug_event_schema_path()
-        validator = None
-        if schema_path.is_file():
-            from jsonschema import Draft202012Validator
-
-            validator = Draft202012Validator(json.loads(schema_path.read_text(encoding="utf-8")))
 
         issues: list[SpecsDoctorIssue] = []
         # v0.5.0 FR2: coherence is a WHOLE-HISTORY diagnosis (the healing rule needs to
         # see events that come later than a violation), so this loop only COLLECTS one
-        # (bug_id, event, position) record per valid line; the fold itself runs once,
-        # after every file has been read, in `_fold_bug_coherence`.
-        coherence_records: list[BugCoherenceRecord[tuple[Path, int]]] = []
+        # (bug_id, event, position) record per valid v5 line; the fold itself runs
+        # once, after every line has been read, in `_fold_bug_coherence`.
+        coherence_records: list[BugCoherenceRecord[int]] = []
 
-        for jsonl_path in sorted(bugs_dir.glob("*.jsonl")):
-            # v0.1.73 FR1: the single canonical bugs.jsonl gets schema + coherence checks
-            # but NO rotation ceiling (the one-file contract has no rotation); legacy
-            # hourly files keep all three sub-checks.
-            is_canonical = jsonl_path.name == "bugs.jsonl"
-            if not is_canonical and not _BUGS_JSONL_NAME_RE.match(jsonl_path.name):
+        for lineno, raw_line in enumerate(ledger_path.read_text(encoding="utf-8").split("\n"), 1):
+            stripped = raw_line.strip()
+            if not stripped:
                 continue
-            lines = jsonl_path.read_text(encoding="utf-8").splitlines()
-            row_count = sum(1 for line in lines if line.strip())
-            if not is_canonical and row_count > _BUGS_JSONL_ROW_CEILING:
+            try:
+                obj = json.loads(stripped)
+            except json.JSONDecodeError as exc:
                 issues.append(
                     SpecsDoctorIssue(
                         code="SPEC-DOC-033",
                         severity=Severity.ERROR,
                         description=(
-                            f"bugs/{jsonl_path.name} has {row_count} rows, exceeding the "
-                            f"{_BUGS_JSONL_ROW_CEILING}-row rotation ceiling — the store must "
-                            "roll to the next '-<n+1>' counter (SPEC-DOC-033, ERROR)."
+                            f"bugs/bugs.jsonl line {lineno}: not valid JSON ({exc.msg}) — "
+                            "every JSONL row must be one bug-event or bug-record object "
+                            "(SPEC-DOC-033, ERROR)."
                         ),
-                        path=str(jsonl_path),
+                        path=str(ledger_path),
                     )
                 )
-            for lineno, raw_line in enumerate(lines, start=1):
-                stripped = raw_line.strip()
-                if not stripped:
-                    continue
+                continue
+            if not isinstance(obj, dict):
+                continue
+            if "event" in obj:
                 try:
-                    obj = json.loads(stripped)
-                except json.JSONDecodeError as exc:
+                    event = BugEvent.from_dict(obj)
+                except (ValueError, TypeError) as exc:
                     issues.append(
                         SpecsDoctorIssue(
                             code="SPEC-DOC-033",
                             severity=Severity.ERROR,
                             description=(
-                                f"bugs/{jsonl_path.name} line {lineno}: not valid JSON "
-                                f"({exc.msg}) — every JSONL row must be one bug-event object "
-                                "(SPEC-DOC-033, ERROR)."
+                                f"bugs/bugs.jsonl line {lineno}: not a valid bug-event "
+                                f"object ({exc}) (SPEC-DOC-033, ERROR)."
                             ),
-                            path=str(jsonl_path),
+                            path=str(ledger_path),
                         )
                     )
                     continue
-                if validator is not None:
-                    error = next(iter(validator.iter_errors(obj)), None)
-                    if error is not None:
-                        issues.append(
-                            SpecsDoctorIssue(
-                                code="SPEC-DOC-033",
-                                severity=Severity.ERROR,
-                                description=(
-                                    f"bugs/{jsonl_path.name} line {lineno}: fails "
-                                    f"bug-event-v1 schema ({error.message}) "
-                                    "(SPEC-DOC-033, ERROR)."
-                                ),
-                                path=str(jsonl_path),
-                            )
-                        )
-                        continue
-                if not isinstance(obj, dict):
-                    continue
-                bug_id = obj.get("bug_id")
-                event = obj.get("event")
-                if isinstance(bug_id, str) and isinstance(event, str):
-                    coherence_records.append(
-                        BugCoherenceRecord(
-                            bug_id=bug_id, event=event, position=(jsonl_path, lineno)
-                        )
+                coherence_records.append(
+                    BugCoherenceRecord(bug_id=event.bug_id, event=event.event, position=lineno)
+                )
+                continue
+            try:
+                record = BugRecord.from_dict(obj)
+            except (ValueError, TypeError) as exc:
+                issues.append(
+                    SpecsDoctorIssue(
+                        code="SPEC-DOC-033",
+                        severity=Severity.ERROR,
+                        description=(
+                            f"bugs/bugs.jsonl line {lineno}: not a valid bug-record "
+                            f"object ({exc}) (SPEC-DOC-033, ERROR)."
+                        ),
+                        path=str(ledger_path),
                     )
-        issues.extend(self._fold_bug_coherence(coherence_records))
+                )
+                continue
+            gaps = governance_completeness_gaps(record)
+            if gaps:
+                issues.append(
+                    SpecsDoctorIssue(
+                        code="SPEC-DOC-033",
+                        severity=Severity.WARNING,
+                        description=(
+                            f"bugs/bugs.jsonl record {record.id!r}: status "
+                            f"{record.status!r} is missing {', '.join(gaps)} "
+                            "(SPEC-DOC-033, WARNING — never a block, D15)."
+                        ),
+                        path=str(ledger_path),
+                    )
+                )
+        issues.extend(self._fold_bug_coherence(ledger_path, coherence_records))
         return issues
 
     @staticmethod
     def _fold_bug_coherence(
-        records: list[BugCoherenceRecord[tuple[Path, int]]],
+        ledger_path: Path, records: list[BugCoherenceRecord[int]]
     ) -> list[SpecsDoctorIssue]:
-        """Format the WHOLE-HISTORY coherence diagnosis as ``SpecsDoctorIssue`` lines.
-
-        A thin caller: every coherence semantic — the per-event fold, the one-terminal
-        invariant, and the v0.5.0 FR2 healing rule (a violation is reported only while
-        no LATER ``reported`` event exists for the same ``bug_id``) — lives in
-        :func:`dadaia_workspace.core.models.bugs.diagnose_bug_coherence_history`, the
-        same authority ``BugService.append_event`` folds through (via
-        :func:`advance_coherence`) to REFUSE an incoherent append, so the diagnostic
-        gate and the enforced gate can never diverge (v0.1.72 law). This method only
-        renders the message — byte-identical to the pre-FR2 format.
-        """
+        """Format the WHOLE-HISTORY v5 coherence diagnosis as ``SpecsDoctorIssue``
+        lines, at WARNING severity (A2.3/D15 — demoted from the pre-T-050-08 ERROR: a
+        diagnosis over RETIRED-write-path history is detection, not a live gate)."""
         issues: list[SpecsDoctorIssue] = []
         for violation in diagnose_bug_coherence_history(records):
-            jsonl_path, lineno = violation.position
             issues.append(
                 SpecsDoctorIssue(
                     code="SPEC-DOC-033",
-                    severity=Severity.ERROR,
+                    severity=Severity.WARNING,
                     description=(
-                        f"bugs/{jsonl_path.name} line {lineno}: {violation.clause} "
-                        "(SPEC-DOC-033, ERROR)."
+                        f"bugs/bugs.jsonl line {violation.position}: {violation.clause} "
+                        "(SPEC-DOC-033, WARNING — never a block, D15)."
                     ),
-                    path=str(jsonl_path),
+                    path=str(ledger_path),
                 )
             )
+        return issues
+
+    def check_bug_record_immutable_core(self) -> list[SpecsDoctorIssue]:
+        """SPEC-DOC-040 (v0.5.0 A2.7) — WARN when a native v6 :class:`BugRecord`'s
+        immutable-core fields differ from its injected first-add baseline.
+
+        Detects, never prevents (A2.2a already refuses a core-field CHANGE made
+        through the record-store update seam — this is the residual-gap detector for
+        a file tool that bypassed it entirely). ``self._bug_first_add_baselines``
+        defaults to ``{}`` (constructor docstring) — a genuine production no-op until
+        FR3/T-050-09 threads a real git-derived mapping through the same seam. Absent
+        ``bugs/`` dir or no baselines configured -> no-op.
+        """
+        if not self._bug_first_add_baselines:
+            return []
+        ledger_path = self.specs_dir / "bugs" / "bugs.jsonl"
+        if not ledger_path.is_file():
+            return []
+        issues: list[SpecsDoctorIssue] = []
+        for record in _iter_native_bug_records(ledger_path):
+            baseline = self._bug_first_add_baselines.get(record.id)
+            if baseline is None:
+                continue
+            drifted = immutable_core_drift(record, baseline)
+            if drifted:
+                issues.append(
+                    SpecsDoctorIssue(
+                        code="SPEC-DOC-040",
+                        severity=Severity.WARNING,
+                        description=(
+                            f"bugs/bugs.jsonl record {record.id!r}: immutable-core "
+                            f"field(s) {', '.join(drifted)} differ from the first-add "
+                            "snapshot — a file tool bypassed the record-store update "
+                            "seam (SPEC-DOC-040, WARNING — detected, never prevented, "
+                            "A2.7)."
+                        ),
+                        path=str(ledger_path),
+                    )
+                )
+        return issues
+
+    def check_bug_archive_overdue(self, *, now: datetime | None = None) -> list[SpecsDoctorIssue]:
+        """SPEC-DOC-041 (v0.5.0 A2.8) — WARN when a native v6 terminal
+        :class:`BugRecord` is older than
+        :data:`~dadaia_workspace.core.models.bugs.BUG_ARCHIVE_THRESHOLD_DAYS` and is
+        still live (not yet moved by ``dadaia bugs archive``). Never a block (D15);
+        the exit code is unchanged. Absent ``bugs/`` dir -> no-op.
+        """
+        ledger_path = self.specs_dir / "bugs" / "bugs.jsonl"
+        if not ledger_path.is_file():
+            return []
+        cutoff = (now or datetime.now(tz=UTC)) - timedelta(days=BUG_ARCHIVE_THRESHOLD_DAYS)
+        issues: list[SpecsDoctorIssue] = []
+        for record in _iter_native_bug_records(ledger_path):
+            if record.status not in TERMINAL_EVENTS:
+                continue
+            record_ts = _parse_bug_record_ts(record.ts)
+            if record_ts is not None and record_ts < cutoff:
+                issues.append(
+                    SpecsDoctorIssue(
+                        code="SPEC-DOC-041",
+                        severity=Severity.WARNING,
+                        description=(
+                            f"bugs/bugs.jsonl record {record.id!r} has been terminal "
+                            f"({record.status!r}) since {record.ts} — past the "
+                            f"{BUG_ARCHIVE_THRESHOLD_DAYS}-day archive threshold; run "
+                            "'dadaia bugs archive' (SPEC-DOC-041, WARNING — never a "
+                            "block, D15)."
+                        ),
+                        path=str(ledger_path),
+                    )
+                )
         return issues
 
     def check_unarchived_terminal_backlog(self) -> list[SpecsDoctorIssue]:

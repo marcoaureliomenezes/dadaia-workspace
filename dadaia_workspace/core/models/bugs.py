@@ -1,14 +1,17 @@
-"""Bug domain models — the event-sourced stream (v0.1.46 AC-1/AC-2) and, since v0.5.0
-FR2, the one-record-per-bug replacement it is expanding into (D-F: expand -> switch ->
-contract; T-050-07 is the 'expand' step — nothing on the executed path reads
-:class:`BugRecord` yet).
+"""Bug domain models — :class:`BugEvent`, the retired-but-still-read v5 event shape
+(v0.1.46 AC-1/AC-2), and :class:`BugRecord`, the one-record-per-bug model that replaced
+it on the WRITE side at v0.5.0 FR2/T-050-08 (D-F: expand -> switch -> contract).
 
 Pure domain module — no I/O, no internal imports beyond ``dataclasses``/``enum``/``re``
 (stdlib only): ``core/models/bugs.py`` is NOT in ``architecture.md``'s "Core file-I/O
-authorized set", so neither model ever reads a schema file itself. A :class:`BugEvent`
-is one append-only event in a ``specs/bugs/<YYYYMMDDTHH>Z-<n>.jsonl`` stream (field set
-mirrors ``public/schemas/bugs/bug-event-v1.schema.json``); a :class:`BugRecord` is one
-line of the future ``specs/bugs/BUGS.jsonl``, appended once (field set mirrors
+authorized set", so neither model ever reads a schema file itself. :class:`BugEvent`'s
+own JSON Schema (``public/schemas/bugs/bug-event-v1.schema.json``) was RETIRED at
+T-050-08 — the class itself stays (its field set is now documented here, not in a
+schema file) because it is still the ONE shape
+``features.bugs.migrate_v5.read_ledger`` decodes the LIVE ``specs/bugs/bugs.jsonl``
+with, until FR3/T-050-10 physically migrates every historical line to
+:class:`BugRecord` shape. :class:`BugRecord` is one line of ``specs/bugs/bugs.jsonl``
+(renamed ``BUGS.jsonl`` at T-050-10), appended once (field set mirrors
 ``public/schemas/bugs/bug-record-v1.schema.json``, whose per-property ``x-mutability``/
 ``x-redact`` keywords are the ONE documented source of the three-category split —
 A2.1). Both models derive their optional/redactable field sets from their OWN
@@ -40,6 +43,8 @@ __all__ = [
     "BugRecordWriteOnceFieldSetError",
     "advance_coherence",
     "diagnose_bug_coherence_history",
+    "governance_completeness_gaps",
+    "immutable_core_drift",
     "redact_text",
     "redactable_property_names",
 ]
@@ -66,6 +71,14 @@ class BugEventKind(StrEnum):
 
 #: The terminal set for event coherence (AC-1 decision). ``archived`` is deliberately NOT
 #: here — it is a non-terminal annotation exempt from the double-terminal coherence rule.
+#:
+#: v0.5.0 FR2/T-050-08 reuses this SAME string set as the terminal ``BugRecord.status``
+#: values ("resolved"/"superseded"/"deferred"/"rejected" — the ``status`` enum's four
+#: non-"open" members, ``bug-record-v1.schema.json``) rather than declaring a second,
+#: independently-maintained constant: both ``features.bugs.service`` (archive
+#: eligibility) and ``features.specs.doctor_governance`` (the archive-overdue WARN,
+#: A2.8) import it from here, since neither may import the other
+#: (`features-no-cross-feature`).
 TERMINAL_EVENTS: frozenset[str] = frozenset(
     {
         BugEventKind.RESOLVED.value,
@@ -74,6 +87,12 @@ TERMINAL_EVENTS: frozenset[str] = frozenset(
         BugEventKind.REJECTED.value,
     }
 )
+
+#: v0.5.0 FR2/A2.8 — the default age (days) at which a terminal ``BugRecord`` becomes
+#: eligible for ``dadaia bugs archive`` and, if still live past it, trips the doctor's
+#: overdue WARN. One shared constant so the CLI verb and the doctor check can never
+#: drift apart on the threshold.
+BUG_ARCHIVE_THRESHOLD_DAYS: int = 90
 
 
 def advance_coherence(
@@ -84,11 +103,14 @@ def advance_coherence(
 ) -> str | None:
     """Advance the one-terminal stream-coherence fold by a single event.
 
-    THE single authority for the coherence invariant — every stream opens with
-    ``reported``; an open stream carries at most one terminal; ``reported`` reopens. The
-    specs doctor folds history through it to DIAGNOSE (SPEC-DOC-033) and
-    ``BugService.append_event`` folds through it to REFUSE, so the diagnostic gate and
-    the enforced gate can never diverge (v0.1.72 law).
+    THE single authority for the v5 event-stream coherence invariant — every stream
+    opens with ``reported``; an open stream carries at most one terminal; ``reported``
+    reopens. Enforced at v0.1.46-v0.5.0 T-050-07 by ``BugService.append_event``
+    (retired at T-050-08 with the whole event-append write path — registration is now
+    ``BugRecord``-shaped and carries no per-bug event stream to be incoherent within);
+    the specs doctor still folds the LIVE v5 ledger's HISTORY through this function to
+    DIAGNOSE it, at WARNING severity (A2.3/D15) — a diagnostic-only survivor of a
+    retired enforcement path, not a live enforced/diagnostic pair.
 
     Mutates the fold state (*seen_reported*/*terminated*) in place; returns the
     violation clause for THIS event, or ``None`` when it is coherent. ``archived`` and
@@ -169,10 +191,10 @@ def diagnose_bug_coherence_history[P](
     lives (v0.5.0 FR2).
 
     Folds *records*, in order, through :func:`advance_coherence` — the SAME per-event
-    authority ``BugService.append_event`` folds through to REFUSE an append — so a
-    violation this function reports is always one the append path would also have
-    refused, and vice versa (the v0.1.72 law: the diagnostic gate and the enforced gate
-    can never diverge).
+    authority ``BugService.append_event`` enforced until T-050-08 retired the whole v5
+    event-append write path (see :func:`advance_coherence`'s own docstring). This
+    function is now the diagnostic half's ONLY surviving consumer, at WARNING severity
+    (A2.3/D15) — a historical-history read, never a live write refusal.
 
     **The healing rule.** A violation for ``bug_id`` is HEALED — dropped from the
     result — when a LATER ``reported`` event for the same ``bug_id`` exists anywhere
@@ -352,7 +374,10 @@ def _opt_str(raw: Mapping[str, object], key: str) -> str | None:
 
 @dataclass(frozen=True)
 class BugEvent:
-    """One append-only bug-telemetry event. Field set mirrors ``bug-event-v1.schema.json``."""
+    """One v5-shape bug-telemetry event (retired on the WRITE side at T-050-08; field set
+    formerly mirrored the now-deleted ``bug-event-v1.schema.json`` — the class is the
+    surviving documentation of that shape). Still parsed by ``features.bugs.migrate_v5``
+    while the live ledger is v5-shaped."""
 
     bug_id: str
     event: str
@@ -709,3 +734,70 @@ _BUG_RECORD_GOVERNANCE_FIELDS: tuple[str, ...] = _dataclass_field_names(
 _BUG_RECORD_REDACTABLE_FIELDS: tuple[str, ...] = _dataclass_field_names(
     BugRecord, lambda metadata: not metadata.get("identity")
 )
+
+
+# ============================================================================
+# v0.5.0 T-050-08 (FR2 A2.3 / A2.7) — WARN-only diagnostics over a BugRecord.
+#
+# Both functions are pure and read only their own arguments (zero I/O — required for a
+# `core` leaf); they exist here, not in `features/bugs` or `features/specs`, because
+# BOTH `features.bugs.service.BugService` (``dadaia bugs status``) and
+# `features.specs.doctor_governance.GovernanceValidator` (`specs doctor`) must render
+# the SAME diagnosis and neither may import the other (`features-no-cross-feature`) —
+# `core` is the one layer both already import. D15: coherence is DETECTED, never a
+# block; every caller of these two functions renders a WARNING, never refuses a write
+# or changes an exit code.
+# ============================================================================
+
+
+def governance_completeness_gaps(record: BugRecord) -> tuple[str, ...]:
+    """A2.3 — the governance-completeness rule (SPEC FR2): reaching ``status:
+    "resolved"`` without ``cause``/``caused_by``/``resolved_release``/``solution``, or
+    ``status: "superseded"`` without ``superseded_by``, is a coherence GAP — surfaced as
+    a WARNING by ``dadaia bugs status`` and ``specs doctor``, never a block (D15).
+
+    Returns the sorted tuple of missing field names (empty when the record is complete
+    for its own ``status``, or its ``status`` carries no completeness rule at all —
+    ``open``/``deferred``/``rejected``).
+    """
+    if record.status == "resolved":
+        return tuple(
+            sorted(
+                name
+                for name, value in (
+                    ("cause", record.cause),
+                    ("caused_by", record.caused_by),
+                    ("resolved_release", record.resolved_release),
+                    ("solution", record.solution),
+                )
+                if not value
+            )
+        )
+    if record.status == "superseded":
+        return () if record.superseded_by else ("superseded_by",)
+    return ()
+
+
+def immutable_core_drift(record: BugRecord, baseline: BugRecord) -> tuple[str, ...]:
+    """A2.7 — detect (never prevent) an immutable-core field that changed between
+    *baseline* (the id's first-add snapshot) and *record* (the current on-disk value).
+
+    Seam-level enforcement (``BugRecord.apply_governance_update``, A2.2a) already
+    refuses a core-field CHANGE made through the record-store update seam; this
+    function is the DETECTOR for the residual gap A2.2's own docstring names — any
+    agent's file tool can still hand-edit a core field directly on disk, bypassing the
+    seam entirely. ``baseline`` is an INJECTED snapshot (never derived here — this
+    module holds no git access): until FR3/T-050-09's ``core.bug_provenance`` supplies
+    a real git-derived first-add snapshot, every caller in this release passes an EMPTY
+    baseline mapping, so the check is a genuine no-op in production (nothing to compare
+    against) while staying provably correct here and at the two call sites' own fixture
+    tests (fed a synthetic baseline directly). Returns ``()`` when *record* and
+    *baseline* do not share an ``id``, or when nothing drifted.
+    """
+    if record.id != baseline.id:
+        return ()
+    return tuple(
+        name
+        for name in _BUG_RECORD_IMMUTABLE_CORE_FIELDS
+        if getattr(record, name) != getattr(baseline, name)
+    )

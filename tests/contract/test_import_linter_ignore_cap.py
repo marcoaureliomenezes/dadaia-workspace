@@ -90,7 +90,14 @@ _SETUP_CFG = _REPO_ROOT / "setup.cfg"
 # ADDED — the push-verdict-gc ledger appender funnels through the single shared
 # rotation helper (a function-scoped lazy import, same ADR-1-style DI-pending idiom as
 # the telemetry-lock edges already in this family). Cap raised 14 -> 15 (+1).
-_RECORDED_IGNORE_EDGE_CAP = 15
+#
+# v0.5.0 T-050-08 NOTE (FR2, AR-1 §2.4(v)): `cli.commands.bugs ->
+# infrastructure.jsonl_bug_store` REMOVED — the CLI now obtains the bug-record store
+# through `container.build_bug_record_store`/`build_bug_archive_store` (the sanctioned
+# composition-root direction) instead of constructing the concrete infrastructure
+# adapter directly, and `infrastructure/jsonl_bug_store.py` itself is deleted. Cap
+# lowered 15 -> 14 (-1 cli-no-infrastructure).
+_RECORDED_IGNORE_EDGE_CAP = 14
 
 # Per-family recorded breakdown, pinned per contract section so a wrong 13-edge cross-feature
 # set (or a silent shift between families) fails loudly, not just the grand total.
@@ -98,7 +105,7 @@ _RECORDED_PER_FAMILY_CAP: dict[str, int] = {
     "features-no-infrastructure": 7,
     "features-no-subprocess": 3,
     "features-no-cross-feature": 2,
-    "cli-no-infrastructure": 3,
+    "cli-no-infrastructure": 2,
 }
 
 

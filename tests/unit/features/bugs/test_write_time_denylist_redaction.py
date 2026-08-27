@@ -1,58 +1,63 @@
-"""Write-time bug-append redaction sees what the push gate refuses (SPEC v0.4.5 FR6,
-T-045-19).
+"""Write-time bug-record redaction sees what the push gate refuses (SPEC v0.4.5 FR6,
+T-045-19). Rewritten at v0.5.0 T-050-08 against ``BugRecord``/``BugService`` (the event
+fold and ``JsonlBugStore`` it exercised are deleted).
 
-Intent: CONTRACT — SPEC v0.4.5 FR6/A6.1-A6.3/A6.5. Third recurrence of the class (SPEC
-entry ``bug-append-write-time-denylist-redaction``): the operator denylist
-(``infrastructure.privacy_check.load_privacy_terms``) was consulted only at push time
-(``features.chokepoints.denylist_scan``) — a bug event whose free-text field carries a
-denylisted term was written RAW by ``dadaia bugs append``, caught only later at the
-push gate (twice, inside v0.4.4 alone, one forcing an ``rc-1`` history rewrite). This
-pins the fix at the write-time seam: ``BugService.append_event`` (the SAME method
-already enforcing stream coherence) now also enforces denylist-term masking, reusing
-the SAME field-scrub call ``BugEvent.redact()`` already runs for IP/home-path leaks.
-Architect ruling SOUND-WITH-AMENDMENT (``specs/releases/v0.4.5/reviews/FR23-firings.md``
-"Firing 2") on commit eb03d01b: AM-1 deleted the CLI's superseded second ``.redact()``
-call, AM-2 made the scrubbed field set schema-DERIVED (``_OPTIONAL_STR_FIELDS``, no
-hand-kept list — A6.5).
+Intent: CONTRACT — SPEC v0.4.5 FR6/A6.1-A6.3/A6.5, carried forward by v0.5.0 A2.6 (the
+SAME redaction seam now covers ``BugRecord``'s write paths too — registration AND the
+governance-update seam, ``BugService.apply_update``).
+
+Third recurrence of the class (SPEC entry ``bug-append-write-time-denylist-redaction``):
+the operator denylist (``infrastructure.privacy_check.load_privacy_terms``) was
+consulted only at push time (``features.chokepoints.denylist_scan``) — a bug record
+whose free-text field carries a denylisted term was written RAW, caught only later at
+the push gate. This pins the fix at the write-time seam: ``BugService.register``/
+``apply_update`` (the SAME service already enforcing the record-store seam) enforces
+denylist-term masking via ``BugRecord.redact()``.
 
 Size: SMALL (directory-tiered ``unit`` — real ``tmp_path`` file I/O only, no
-subprocess/network; matches the sibling redaction-matrix coverage already in
-``test_jsonl_bug_store.py``).
+subprocess/network; matches the sibling redaction-matrix coverage in
+``test_control_format_char_sanitation.py``).
 """
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
-from dadaia_workspace.core.models.bugs import BugEvent, redact_text
+from dadaia_workspace.core.models.bugs import BugRecord, redact_text
 from dadaia_workspace.features.bugs.service import BugService
-from dadaia_workspace.infrastructure.jsonl_bug_store import JsonlBugStore
+from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
+
+from ._bug_record_helpers import bug_record_store
 
 _TS = "2026-08-26T10:00:00Z"
 
 
-def _reported(bug_id: str, *, notes: str, title: str = "t") -> BugEvent:
-    return BugEvent(
+def _register(
+    store: JsonlRecordStore[BugRecord],
+    bug_id: str,
+    *,
+    denylist_terms: tuple[tuple[str, str], ...] = (),
+    notes: str,
+    title: str = "t",
+) -> None:
+    service = BugService(store, denylist_terms=denylist_terms)
+    service.register(
         bug_id=bug_id,
-        event="reported",
         ts=_TS,
         reported_by="software-engineer",
         title=title,
         severity="HIGH",
-        surface="s",
+        surface="bugs",
         component="c",
         context="dadaia-workspace",
-        tags=(),
-        symptom="sy",
+        symptom=notes,
         repro="re",
         expected="ex",
-        notes=notes,
     )
 
 
 # ---------------------------------------------------------------------------
-# Core seam — redact_text/BugEvent.redact accept the SAME (term, reason) pairs
+# Core seam — redact_text/BugRecord.redact accept the SAME (term, reason) pairs
 # infrastructure.privacy_check.load_privacy_terms returns.
 # ---------------------------------------------------------------------------
 
@@ -78,65 +83,63 @@ def test_redact_text_with_no_terms_is_byte_identical_to_pre_fr6() -> None:
     assert redact_text(raw) == raw
 
 
-def test_bug_event_redact_masks_denylisted_term_across_free_text_fields() -> None:
+def test_bug_record_redact_masks_denylisted_term_across_free_text_fields() -> None:
     """A6.5: the denylist masking rides through the SAME field set + the SAME
-    :func:`redact_text` call ``BugEvent.redact`` already uses for IP/home-path
+    :func:`redact_text` call ``BugRecord.redact`` already uses for IP/home-path
     scrubbing — not a second, independently hand-kept field list."""
-    event = BugEvent(
-        bug_id="b1",
-        event="reported",
+    record = BugRecord(
+        id="b1",
         ts=_TS,
         reported_by="software-engineer",
         title="incident at consumer-vps-7",
         severity="HIGH",
-        surface="s",
+        surface="bugs",
         component="c",
         context="dadaia-workspace",
-        tags=(),
-        symptom="sy",
+        symptom="root cause traced to consumer-vps-7's disk",
         repro="re",
         expected="ex",
-        notes="root cause traced to consumer-vps-7's disk",
+        status="open",
     )
 
-    redacted = event.redact(denylist_terms=(("consumer-vps-7", "private host name"),))
+    redacted = record.redact(denylist_terms=(("consumer-vps-7", "private host name"),))
 
-    assert "consumer-vps-7" not in (redacted.title or "")
-    assert "consumer-vps-7" not in (redacted.notes or "")
-    assert "[REDACTED-TERM]" in (redacted.title or "")
-    assert "[REDACTED-TERM]" in (redacted.notes or "")
-    # Structured fields are never touched by denylist masking either.
-    assert redacted.bug_id == "b1"
+    assert "consumer-vps-7" not in redacted.title
+    assert "consumer-vps-7" not in redacted.symptom
+    assert "[REDACTED-TERM]" in redacted.title
+    assert "[REDACTED-TERM]" in redacted.symptom
+    # Identity fields are never touched by denylist masking either.
+    assert redacted.id == "b1"
     assert redacted.context == "dadaia-workspace"
 
 
 # ---------------------------------------------------------------------------
-# THE RED test (A6.1) — BugService.append_event is the enforced write-time seam.
+# THE RED test (A6.1) — BugService.register is the enforced write-time seam.
 # ---------------------------------------------------------------------------
 
 
-def test_bug_service_append_event_masks_denylisted_term_before_it_reaches_disk(
+def test_bug_service_register_masks_denylisted_term_before_it_reaches_disk(
     tmp_path: Path,
 ) -> None:
-    """Before the fix: a bug event whose ``notes`` field carries an operator
-    denylisted term is written RAW to ``bugs.jsonl`` — ``BugService.append_event``
-    only ever threaded IP/home-path masking through ``BugEvent.redact()``, never the
+    """Before the fix: a bug record whose ``symptom`` field carries an operator
+    denylisted term is written RAW to ``bugs.jsonl`` — ``BugService.register`` only
+    ever threaded IP/home-path masking through ``BugRecord.redact()``, never the
     operator denylist. Constructing ``BugService`` with the SAME ``(term, reason)``
     shape ``load_privacy_terms`` returns (the CLI wires the real loader through
-    ``container.load_denylist_terms``; this unit test injects the pair directly,
-    mirroring the sibling redaction-matrix tests' own convention) proves the term
-    never reaches the committed record."""
-    store = JsonlBugStore(tmp_path / "bugs")
-    service = BugService(store, denylist_terms=(("acme-corp", "private client name"),))
+    ``container.load_denylist_terms``; this unit test injects the pair directly)
+    proves the term never reaches the committed record."""
+    store = bug_record_store(tmp_path)
 
-    service.append_event(
-        _reported("leaky-denylist", notes="deployment landed at acme-corp's staging box")
+    _register(
+        store,
+        "leaky-denylist",
+        denylist_terms=(("acme-corp", "private client name"),),
+        notes="deployment landed at acme-corp's staging box",
     )
 
-    persisted = list(store.iter_events())[-1]
-    assert persisted.notes is not None
-    assert "acme-corp" not in persisted.notes.lower()
-    assert "[REDACTED-TERM]" in persisted.notes
+    persisted = list(store.iter_records())[-1]
+    assert "acme-corp" not in persisted.symptom.lower()
+    assert "[REDACTED-TERM]" in persisted.symptom
 
 
 def test_bug_service_with_no_denylist_terms_stays_byte_identical_to_pre_fr6(
@@ -145,57 +148,87 @@ def test_bug_service_with_no_denylist_terms_stays_byte_identical_to_pre_fr6(
     """A6.3 sibling guarantee for the write-time seam: a ``BugService`` constructed
     with no denylist terms (the pre-FR6 default) behaves exactly as before — only
     IP/home-path masking runs; an arbitrary term is left alone."""
-    store = JsonlBugStore(tmp_path / "bugs")
-    service = BugService(store)  # no denylist_terms -> defaults to ()
+    store = bug_record_store(tmp_path)
 
-    service.append_event(
-        _reported("not-leaky", notes="deployment landed at acme-corp's staging box")
+    _register(store, "not-leaky", notes="deployment landed at acme-corp's staging box")
+
+    persisted = list(store.iter_records())[-1]
+    assert persisted.symptom == "deployment landed at acme-corp's staging box"
+
+
+def test_bug_service_apply_update_also_masks_a_denylisted_term(tmp_path: Path) -> None:
+    """A2.6: the SAME redaction seam covers the governance-UPDATE write path too, not
+    just registration — a resolve carrying a denylisted term in ``solution`` is masked
+    identically."""
+    store = bug_record_store(tmp_path)
+    _register(store, "resolved-leaky", notes="clean symptom")
+    service = BugService(store, denylist_terms=(("acme-corp", "private client name"),))
+
+    updated = service.apply_update(
+        "resolved-leaky",
+        {"solution": "root-caused at acme-corp's staging box; regression test added"},
     )
 
-    persisted = list(store.iter_events())[-1]
-    assert persisted.notes == "deployment landed at acme-corp's staging box"
+    assert "acme-corp" not in (updated.solution or "").lower()
+    assert "[REDACTED-TERM]" in (updated.solution or "")
 
 
 # ---------------------------------------------------------------------------
-# AM-2 (architect ruling, FR23-firings.md "Firing 2") — A6.5: the scrubbed field set
-# must be DERIVED from the schema file, never a hand-kept list either in production
-# (BugEvent.redact now iterates _OPTIONAL_STR_FIELDS) or in this test.
+# AM-2 (architect ruling, FR23-firings.md "Firing 2") — A6.5/A2.10: the scrubbed field
+# set must be DERIVED from BugRecord's OWN field metadata, never a hand-kept list.
 # ---------------------------------------------------------------------------
 
-_SCHEMA_PATH = (
-    Path(__file__).resolve().parents[4]
-    / "dadaia_workspace"
-    / "public"
-    / "schemas"
-    / "bugs"
-    / "bug-event-v1.schema.json"
-)
 
-
-def _schema_optional_string_fields() -> set[str]:
-    schema = json.loads(_SCHEMA_PATH.read_text(encoding="utf-8"))
-    identity_fields = set(schema["required"])  # bug_id, event, ts, reported_by
-    return {
-        name
-        for name, prop in schema["properties"].items()
-        if prop.get("type") == "string" and name not in identity_fields
-    }
-
-
-def test_bug_event_redact_scrubs_every_schema_string_field_derived_from_schema() -> None:
-    """A6.5: regression guard for the T-043-23 -> T-044-62 chain (a hand-kept field
-    list twice missed a newly added free-text field). Reads the REAL schema file at
-    test time and proves ``BugEvent.redact()`` scrubs every optional string property
-    it names — title/severity/surface/component/context/superseded_by included, not
-    just the narrower pre-AM-2 set."""
-    schema_fields = _schema_optional_string_fields()
+def test_bug_record_redact_scrubs_every_non_identity_field() -> None:
+    """A2.6/A2.10: regression guard for the T-043-23 -> T-044-62 chain (a hand-kept
+    field list twice missed a newly added free-text field). Every free-text field
+    ``BugRecord.redact()`` derives from its OWN dataclass metadata (never
+    ``id``/``ts``/``reported_by``, the identity fields) is scrubbed."""
     term = "acme-corp"
-    leaky = {name: f"leaked {term} here" for name in schema_fields}
-    event = BugEvent(bug_id="b1", event="reported", ts=_TS, reported_by="se", **leaky)
+    record = BugRecord(
+        id="b1",
+        ts=_TS,
+        reported_by="software-engineer",
+        title=f"leaked {term} here",
+        severity="HIGH",
+        surface="bugs",
+        component=f"leaked {term} here",
+        context=f"leaked {term} here",
+        symptom=f"leaked {term} here",
+        repro=f"leaked {term} here",
+        expected=f"leaked {term} here",
+        status="resolved",
+        cause=f"leaked {term} here",
+        caused_by=None,
+        lineage_source=None,
+        registration_commit=None,
+        registration_granularity=None,
+        resolved_commit=None,
+        resolution_granularity=None,
+        resolved_release=f"leaked {term} here",
+        audited=None,
+        root_cause=f"leaked {term} here",
+        solution=f"leaked {term} here",
+    )
 
-    redacted = event.redact(denylist_terms=((term, "private client name"),))
+    redacted = record.redact(denylist_terms=((term, "private client name"),))
 
-    for name in schema_fields:
+    for name in (
+        "title",
+        "component",
+        "context",
+        "symptom",
+        "repro",
+        "expected",
+        "cause",
+        "resolved_release",
+        "root_cause",
+        "solution",
+    ):
         value = getattr(redacted, name)
         assert value is not None
-        assert term not in value, f"schema field {name!r} was not scrubbed"
+        assert term not in value, f"field {name!r} was not scrubbed"
+    # Identity fields never touched.
+    assert redacted.id == "b1"
+    assert redacted.ts == _TS
+    assert redacted.reported_by == "software-engineer"

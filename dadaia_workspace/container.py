@@ -210,24 +210,45 @@ def build_git_object_reader() -> GitObjectReader:
     return GitSubprocessObjectReader()
 
 
-def build_bug_record_store(workspace_root: Path) -> "RecordStore[BugRecord]":
+def build_bug_record_store(specs_dir: Path) -> "RecordStore[BugRecord]":
     """Composition-root seam for the generic bug-record JSONL store (v0.5.0 FR2, AR-1
     ruling answer (b), ``specs/releases/0.5.0/reviews/S1-AR1-ruling.md`` §2).
 
-    The 'expand' half of D-F (T-050-07) — nothing on the executed path reads through
-    this seam yet; T-050-08 switches ``features/bugs/service.py`` and the CLI onto it,
-    then deletes ``infrastructure/jsonl_bug_store.py`` and
-    ``core/protocols/bug_store.py`` (AR-1 §1.4/§2.1), and this seam's ``cli ->
-    infrastructure.jsonl_record_store`` composition replaces the direct
-    ``cli.commands.bugs -> infrastructure.jsonl_bug_store`` import-linter ignore edge
-    the CLI layer must not otherwise reach infrastructure through.
+    T-050-08 switches ``features/bugs/service.py`` and the CLI onto this seam and
+    deletes ``infrastructure/jsonl_bug_store.py`` + ``core/protocols/bug_store.py``
+    (AR-1 §1.4/§2.1); this seam's ``cli -> infrastructure.jsonl_record_store``
+    composition replaces the direct ``cli.commands.bugs -> infrastructure.jsonl_bug_store``
+    import-linter ignore edge the CLI layer must not otherwise reach infrastructure
+    through (cap 15 -> 14, same commit).
+
+    Takes *specs_dir* directly — the SAME resolved directory every ``dadaia bugs``
+    verb's ``--specs-dir``/bind-resolution seam already produces (never a
+    ``workspace_root``, which would silently assume ``<root>/specs`` and break every
+    ``--specs-dir <tmp>`` test fixture and remote-context routing). The ledger's
+    physical filename is still ``bugs.jsonl`` (T-050-08) — it stays v5-event-shaped
+    until FR3/T-050-10's physical migration renames it to ``BUGS.jsonl``; only that
+    task moves this constant.
     """
     from dadaia_workspace.core.models.bugs import BugRecord
     from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
 
-    bugs_dir = workspace_root / "specs" / "bugs"
     return JsonlRecordStore(
-        bugs_dir / "BUGS.jsonl",
+        Path(specs_dir) / "bugs" / "bugs.jsonl",
+        to_dict=BugRecord.to_dict,
+        from_dict=BugRecord.from_dict,
+    )
+
+
+def build_bug_archive_store(specs_dir: Path) -> "RecordStore[BugRecord]":
+    """Composition-root seam for ``dadaia bugs archive``'s destination store (A2.8) —
+    ``specs/bugs/_archive/bugs_histo.jsonl``, through the SAME generic
+    ``JsonlRecordStore`` mechanism :func:`build_bug_record_store` uses, one record per
+    line."""
+    from dadaia_workspace.core.models.bugs import BugRecord
+    from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
+
+    return JsonlRecordStore(
+        Path(specs_dir) / "bugs" / "_archive" / "bugs_histo.jsonl",
         to_dict=BugRecord.to_dict,
         from_dict=BugRecord.from_dict,
     )

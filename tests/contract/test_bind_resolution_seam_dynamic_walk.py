@@ -29,9 +29,13 @@ fixed centrally — each fix patched one command surface and the family kept rec
    ``resolve_specs_dir_for_cli`` / ``resolve_context_for_cli`` / any
    ``container.build_*``/``container.resolve_*`` attribute call) as opposed to same-named
    but semantically unrelated parameters that this project's own source distinguishes
-   deliberately:
-     - ``bugs append --context`` is bug-event METADATA (flows into ``BugEvent(context=...)``,
-       never into a resolution call) — never a specs-dir resolution input.
+   deliberately. At this fold ``known_non_resolver`` (part (b), below) is EMPTY: every
+   currently-registered ``context``/``specs_dir`` param IS resolver-driven, including
+   ``bugs append --context`` (left the non-resolver set in v0.1.82 — its value routes
+   through ``resolve_context_for_cli`` for LEDGER-destination resolution, and — since
+   v0.5.0 T-050-08 — the resolved specs_dir also reaches
+   ``container.build_bug_record_store``/``build_bug_archive_store``, one more seam
+   edge on the same already-resolver-driven param, not a new one).
    The reachability check is itself dynamic (graph search over the real source), not a
    hand-maintained exclude list, so a future non-resolver ``context``/``specs_dir`` param
    is correctly excluded automatically, and a future resolver-driven one is correctly

@@ -26,8 +26,10 @@ authoring time (14 ``home-abs-path``, 9 ``email-address``, 5 ``ipv4-literal``, 1
 ``secret-token``), matching the SPEC v0.11.0 §1 census exactly. Shrunk to 28 rows (13
 ``home-abs-path``) at v0.12.0 T-120-03: ``tests/unit/test_backlog_ledger_writer.py``
 was deleted as a recorded supersession (its subject, ``ledger_writer.py``, retired by
-FR4) and its row removed per this test's own shrink-only contract. Two properties make
-the baseline honest, asserted in the two directions below:
+FR4) and its row removed per this test's own shrink-only contract. Shrunk to 27 rows
+at v0.5.0 T-050-08: ``tests/unit/features/bugs/test_jsonl_bug_store.py`` was deleted
+(its subject, ``JsonlBugStore``, retired by FR2) and its row removed. Two properties
+make the baseline honest, asserted in the two directions below:
 
 1. **No hit outside the baseline** (:func:`test_no_hit_outside_the_shrink_only_baseline`)
    — a NEW matching literal anywhere in the scanned scope (``dadaia_workspace/`` and
@@ -83,7 +85,7 @@ this module's own tracked source.
 So the scope asserted here is ``dadaia_workspace/`` + ``specs/`` (excluding both archive
 trees) + ``tests/`` + ``pyproject.toml`` — every tracked file, with ``tests/**`` alone
 carrying the shrink-only baseline exception (29 rows at authoring time, 28 after
-v0.12.0 T-120-03). Measured at the time this test was written:
+v0.12.0 T-120-03, 27 after v0.5.0 T-050-08). Measured at the time this test was written:
 ~990 files / well under 5 MB, read through ONE ``git ls-files`` subprocess call plus
 in-process file reads (no per-file subprocess) — well under a second, far inside the
 integration tier's 60 s budget.
@@ -144,7 +146,7 @@ _NO_FOREIGN_SLUGS: tuple[str, ...] = ()
 #: row here is a pre-existing, deliberate synthetic-but-pattern-shaped fixture literal
 #: (fake IPv4s, ``t@example.com``-style addresses, ``/home/...`` fixture paths, a
 #: fixture-shaped token) that predates T-110-12 — NOT a scan suppression list (see the
-#: module docstring). 28 rows (shrunk from 29 at v0.12.0 T-120-03 — the
+#: module docstring). 27 rows (shrunk from 29 at v0.12.0 T-120-03 — the
 #: ``test_backlog_ledger_writer.py`` row removed with its file, a recorded
 #: supersession): 13 ``home-abs-path``, 9 ``email-address``, 5 ``ipv4-literal``,
 #: 1 ``secret-token``. The v0.11.0 §1 census (29/14) is the authoring-time baseline.
@@ -183,7 +185,6 @@ _TESTS_SCOPE_BASELINE: tuple[tuple[str, str], ...] = (
     ("tests/integration/test_precommit_backlog_scoping.py", "email-address"),
     ("tests/integration/test_public_assets.py", "ipv4-literal"),
     ("tests/integration/test_telemetry_end_to_end_aggregation.py", "home-abs-path"),
-    ("tests/unit/features/bugs/test_jsonl_bug_store.py", "ipv4-literal"),
     ("tests/unit/features/migrate/test_bugs_jsonl.py", "home-abs-path"),
     ("tests/unit/features/panel/test_no_auth_contract.py", "ipv4-literal"),
     ("tests/unit/features/server_registry/test_scan.py", "ipv4-literal"),

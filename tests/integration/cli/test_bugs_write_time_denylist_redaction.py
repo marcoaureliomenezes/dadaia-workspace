@@ -1,10 +1,11 @@
 """CLI composition-seam proof: `dadaia bugs append` threads the SAME operator denylist
 source the push-time scan consumes into write-time redaction (SPEC v0.4.5 FR6,
-T-045-19).
+T-045-19). Rewritten v0.5.0 T-050-08 against ``BugRecord`` (the event fold it exercised
+is deleted).
 
-Intent: CONTRACT — SPEC v0.4.5 FR6/A6.2. Proves the REAL wiring
-``cli/commands/bugs.py`` -> ``container.load_denylist_terms()`` ->
-``features.bugs.service.BugService`` -> ``core.models.bugs.BugEvent.redact()`` — not a
+Intent: CONTRACT — SPEC v0.4.5 FR6/A6.2, carried forward by v0.5.0 A2.6. Proves the
+REAL wiring ``cli/commands/bugs.py`` -> ``container.load_denylist_terms()`` ->
+``features.bugs.service.BugService`` -> ``core.models.bugs.BugRecord.redact()`` — not a
 fake terms list threaded only at the unit-test layer
 (``tests/unit/features/bugs/test_write_time_denylist_redaction.py``). Patches the
 ``container.load_denylist_terms`` composition-root seam directly, mirroring
@@ -48,26 +49,22 @@ def _append_leaky(specs_dir: Path) -> None:
             str(specs_dir),
             "--bug-id",
             "leaky-cli-denylist",
-            "--event",
-            "reported",
             "--title",
             "title",
             "--severity",
             "HIGH",
             "--surface",
-            "gate",
+            "spec_context",
             "--component",
             "spec_context",
             "--context",
             "dadaia-workspace",
             "--symptom",
-            "sym",
+            "deployment landed at acme-corp's staging box",
             "--repro",
             "repro",
             "--expected",
             "exp",
-            "--notes",
-            "deployment landed at acme-corp's staging box",
         ],
     )
     assert result.exit_code == 0, result.output
@@ -90,11 +87,11 @@ def test_bugs_append_masks_a_denylisted_term_via_the_container_seam(
 
     written = (specs / "bugs" / "bugs.jsonl").read_text(encoding="utf-8")
     record = json.loads(written.strip().splitlines()[-1])
-    assert "acme-corp" not in record["notes"].lower()
-    assert "[REDACTED-TERM]" in record["notes"]
+    assert "acme-corp" not in record["symptom"].lower()
+    assert "[REDACTED-TERM]" in record["symptom"]
 
 
-def test_bugs_append_with_empty_denylist_leaves_notes_untouched(
+def test_bugs_append_with_empty_denylist_leaves_symptom_untouched(
     specs: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A6.3 sibling guarantee: with an empty operator denylist (the common case — no
@@ -106,4 +103,4 @@ def test_bugs_append_with_empty_denylist_leaves_notes_untouched(
 
     written = (specs / "bugs" / "bugs.jsonl").read_text(encoding="utf-8")
     record = json.loads(written.strip().splitlines()[-1])
-    assert record["notes"] == "deployment landed at acme-corp's staging box"
+    assert record["symptom"] == "deployment landed at acme-corp's staging box"

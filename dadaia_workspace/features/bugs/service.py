@@ -1,146 +1,273 @@
-"""Bug-event service — fold event streams into current state and aggregates (v0.1.46 AC-1).
+"""Bug-record service — the one write seam + read view over the bug ledger (v0.5.0 FR2).
 
-Pure fold over the append-only JSONL store. ``append_event`` redacts every free-text
-field (IP/home-path, and — v0.4.5 FR6, T-045-19 — any injected operator denylist term)
-before handing the event to the store; ``status`` and ``stats`` reduce the event stream
-the same way the doctor coherence check does — event sourcing, one reduce.
+D-F "switch": every consumer (``dadaia bugs status``/``stats``/``update``/``archive``,
+the CLI composition root) now reads and writes through :class:`BugService`, which holds
+the generic :class:`~dadaia_workspace.core.protocols.record_store.RecordStore` (DI seam
+— the concrete ``JsonlRecordStore`` is injected at the CLI composition root, so
+``features`` never imports ``infrastructure``). The event fold (``BugEvent``'s
+``advance_coherence`` state machine) is retired from the WRITE side entirely —
+:meth:`register` appends exactly one :class:`~dadaia_workspace.core.models.bugs.BugRecord`
+line, never an event; :meth:`apply_update` rewrites an existing record's governance
+fields in place through the SAME seam (AS-16 — the fixer's resolve and the auditor's
+``audited``/``resolved_commit`` write both go through this one method, A2.13).
+
+**The live ledger is still v5-event-shaped (T-050-08 scope).** ``specs/bugs/bugs.jsonl``
+is not yet physically migrated to one-record-per-line (FR3/T-050-10) — every READ method
+here therefore goes through :func:`~dadaia_workspace.features.bugs.migrate_v5.read_ledger`
+(the ONE place the v5 shape is still decoded, A2.5), which folds the legacy event stream
+into the SAME :class:`BugRecord` shape a fresh registration produces. :meth:`archive`
+is the one method that does NOT read through the v5 adapter — archiving moves a single
+PHYSICAL line, which only exists for a record already in native v6 shape (a v5-folded
+"record" spans many physical lines and has no single line to move; T-050-10's physical
+migration is what makes every historical record archivable).
 """
 
 from __future__ import annotations
 
+import json
+import logging
 from collections import Counter
-from collections.abc import Sequence
-from dataclasses import dataclass, field, replace
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
+from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.models.bugs import (
+    BUG_ARCHIVE_THRESHOLD_DAYS,
     TERMINAL_EVENTS,
-    BugEvent,
-    BugEventKind,
-    advance_coherence,
+    BugRecord,
+    governance_completeness_gaps,
 )
+from dadaia_workspace.core.protocols.record_store import RecordStore
+from dadaia_workspace.features.bugs import migrate_v5
 
-# The store is an infrastructure concern; the service holds it behind the ``BugStore``
-# core Protocol (DI seam) — the concrete ``JsonlBugStore`` is injected at the CLI
-# composition root, so features never imports infrastructure (features-no-infrastructure).
-from dadaia_workspace.core.protocols.bug_store import BugStore
+__all__ = [
+    "BugArchiveResult",
+    "BugCoherenceGap",
+    "BugDuplicateIdError",
+    "BugService",
+    "BugStats",
+]
 
-__all__ = ["BugService", "BugState", "BugStats"]
-
-#: Fold status for a bug whose stream has a `reported` but no terminal event yet.
-_OPEN = "open"
+_LOG = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
-class BugState:
-    """Current folded state of one ``bug_id``."""
+class BugDuplicateIdError(ValueError):
+    """Raised by :meth:`BugService.register` when *id* already exists in the ledger.
 
-    bug_id: str
-    status: str
-    severity: str | None = None
-    title: str | None = None
-    component: str | None = None
-    #: v0.4.3 T-043-18/FR14 — every actor that has ``picked`` this bug's CURRENT
-    #: (post-latest-``reported``) stream, in event order, duplicates preserved (a
-    #: repeated pick is the sanctioned NO-LOCKS race outcome, surfaced not deduped).
-    #: Reset to ``()`` on every ``reported`` (including a reopen) — never carries a
-    #: prior stream's picks forward. Never terminal-gated: a picked-only tail leaves
-    #: ``status`` at ``"open"`` (I6); a pick after a terminal event still folds here
-    #: (the STATE fold is tolerant of on-disk history — see :meth:`_fold`'s docstring
-    #: — coherence is `core.models.bugs.advance_coherence`'s job, enforced at append).
-    picked_by: tuple[str, ...] = ()
+    v0.5.0 FR2: "a reopen is a new record with a new id declaring ``caused_by:
+    <prior-id>``" — reusing an existing id would silently duplicate a line (the record
+    store is keyed by ``id``, A13.4/A2.5) rather than express a reopen the model's own
+    way, so registration refuses it up front rather than corrupting the ledger.
+    """
+
+    def __init__(self, bug_id: str) -> None:
+        super().__init__(
+            f"bug id {bug_id!r} already exists in the ledger — a reopen is a NEW record "
+            "declaring 'caused_by: <prior-id>' via 'dadaia bugs append', never a second "
+            "'reported' under the same id (v0.5.0 FR2)"
+        )
+        self.bug_id = bug_id
 
 
 @dataclass(frozen=True)
 class BugStats:
-    """Aggregate counts across all folded bugs."""
+    """Aggregate counts across every folded record (open + terminal)."""
 
     total: int
     by_status: dict[str, int] = field(default_factory=dict)
     by_severity: dict[str, int] = field(default_factory=dict)
 
 
-class BugService:
-    """Append + fold operations over an append-only :class:`BugStore`."""
+@dataclass(frozen=True)
+class BugCoherenceGap:
+    """A2.3 — one record whose governance fields are incomplete for its own ``status``."""
 
-    def __init__(self, store: BugStore, denylist_terms: Sequence[tuple[str, str]] = ()) -> None:
-        self._store = store
+    bug_id: str
+    status: str
+    missing: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class BugArchiveResult:
+    """A2.8 — the outcome of one ``dadaia bugs archive`` run."""
+
+    archived: int
+    kept: int
+
+
+class BugService:
+    """The one write seam (AS-16) plus the read view over the bug ledger."""
+
+    def __init__(
+        self,
+        record_store: RecordStore[BugRecord],
+        *,
+        archive_store: RecordStore[BugRecord] | None = None,
+        denylist_terms: Sequence[tuple[str, str]] = (),
+    ) -> None:
+        self._record_store = record_store
+        self._archive_store = archive_store
         # v0.4.5 FR6: the SAME operator-denylist source the push scan already refuses
-        # on, DI'd in via the CLI/container seam (features-no-infrastructure).
+        # on, DI'd in via the CLI/container seam (features-no-infrastructure) —
+        # threaded through BOTH write paths (append, A2.6).
         self._denylist_terms = tuple(denylist_terms)
 
-    def append_event(self, event: BugEvent) -> object:
-        """Refuse an incoherent event, then redact and append (never rewrites history).
+    # -- writes ----------------------------------------------------------------------
 
-        Coherence is judged by the SAME core fold the specs doctor diagnoses with
-        (:func:`advance_coherence`) — before this, the one-terminal invariant lived only
-        in the doctor, so the CLI happily wrote what the doctor then flagged (bugs
-        bugs-append-accepts-second-terminal-event /
-        bugs-append-allows-terminal-event-without-reported). History is folded
-        tolerantly: an existing incoherent row is the doctor's finding, never an append
-        blocker — only the NEW event is refused. Returns the store's append result.
+    def register(
+        self,
+        *,
+        bug_id: str,
+        ts: str,
+        reported_by: str,
+        title: str,
+        severity: str,
+        surface: str,
+        component: str,
+        context: str,
+        symptom: str,
+        repro: str,
+        expected: str,
+    ) -> Path:
+        """Append one NEW, freshly-registered :class:`BugRecord` (``status="open"``).
 
-        v0.4.5 FR6: also the enforced write-time redaction seam — ``event.redact()``
-        carries ``self._denylist_terms`` so a leak the push scan would refuse is
-        masked here first.
+        Refuses (:class:`BugDuplicateIdError`) an *bug_id* already present anywhere in
+        the ledger (v5-folded history included, via :func:`migrate_v5.read_ledger`).
+        Redacts every free-text field through the same seam the update path uses
+        (A2.6) before appending. Returns the ledger path.
         """
-        seen_reported: set[str] = set()
-        terminated: set[str] = set()
-        for prior in self._store.iter_events():
-            advance_coherence(prior.bug_id, prior.event, seen_reported, terminated)
-        violation = advance_coherence(event.bug_id, event.event, seen_reported, terminated)
-        if violation is not None:
-            raise ValueError(violation)
-        return self._store.append_event(event.redact(self._denylist_terms))
+        existing = {record.id for record in migrate_v5.read_ledger(self._record_store.path)}
+        if bug_id in existing:
+            raise BugDuplicateIdError(bug_id)
+        record = BugRecord(
+            id=bug_id,
+            ts=ts,
+            reported_by=reported_by,
+            title=title,
+            severity=severity,
+            surface=surface,
+            component=component,
+            context=context,
+            symptom=symptom,
+            repro=repro,
+            expected=expected,
+            status="open",
+        ).redact(self._denylist_terms)
+        self._record_store.append(record)
+        return self._record_store.path
 
-    def _fold(self) -> dict[str, BugState]:
-        """Reduce the event stream to current per-``bug_id`` state.
+    def apply_update(self, record_id: str, changes: Mapping[str, object]) -> BugRecord:
+        """The one governance-write seam (AS-16/A2.13): registration's resolve, the
+        fixer's resolve, and the auditor's ``audited``/``resolved_commit`` rewrite all
+        call this same method. Delegates structural refusal (immutable-core changed,
+        write-once field re-set with a differing value, unknown field) to
+        :meth:`BugRecord.apply_governance_update` (A2.2), then redacts the WHOLE
+        resulting record (A2.6 — identical posture to :meth:`register`) before the
+        store's refuse-stale atomic rewrite (A2.9, A2.2c)."""
 
-        ``reported`` (re)opens with metadata AND resets ``picked_by`` to ``()`` — a
-        reopen never carries a prior stream's picks forward (v0.4.3 T-043-18/FR14,
-        I5); a terminal event sets the status to that terminal kind; ``archived`` is a
-        non-terminal annotation and never changes state; ``picked`` (v0.4.3 FR14)
-        APPENDS the actor to ``picked_by`` (order and duplicates preserved — a
-        repeated pick is the sanctioned NO-LOCKS race outcome, surfaced not deduped,
-        I2) and never otherwise changes state — a picked-only tail leaves ``status``
-        at ``"open"`` (I6). This fold is tolerant of on-disk history exactly like the
-        terminal-event branch already is: coherence (pick-after-terminal,
-        pick-before-reported) is enforced once, at append time, by
-        ``core.models.bugs.advance_coherence`` — never re-checked here.
+        def _mutate(record: BugRecord) -> BugRecord:
+            updated = record.apply_governance_update(changes)
+            return updated.redact(self._denylist_terms)
+
+        return self._record_store.update(record_id, _mutate)
+
+    def archive(
+        self, *, now: datetime | None = None, threshold_days: int = BUG_ARCHIVE_THRESHOLD_DAYS
+    ) -> BugArchiveResult:
+        """A2.8 — move every NATIVE (v6-shaped) terminal record older than
+        *threshold_days* from the live ledger to the archive store, through the same
+        record-store seam. Idempotent: a second run with nothing newly eligible never
+        touches either file (proven byte-identical by a fixture).
+
+        Only records already in native v6 shape are eligible — a v5-folded record has
+        no single physical line to move (see module docstring); T-050-10's physical
+        migration is what makes every historical record archivable.
         """
-        states: dict[str, BugState] = {}
-        for event in self._store.iter_events():
-            if event.event == BugEventKind.REPORTED.value:
-                states[event.bug_id] = BugState(
-                    bug_id=event.bug_id,
-                    status=_OPEN,
-                    severity=event.severity,
-                    title=event.title,
-                    component=event.component,
-                )
-            elif event.event in TERMINAL_EVENTS:
-                current = states.get(event.bug_id) or BugState(event.bug_id, _OPEN)
-                states[event.bug_id] = replace(current, status=event.event)
-            elif event.event == BugEventKind.PICKED.value:
-                current = states.get(event.bug_id) or BugState(event.bug_id, _OPEN)
-                states[event.bug_id] = replace(
-                    current, picked_by=(*current.picked_by, event.reported_by)
-                )
-            # BugEventKind.ARCHIVED: annotation only — leaves folded state untouched.
-        return states
+        if self._archive_store is None:
+            raise ValueError("BugService.archive() requires an archive_store")
+        live_path = self._record_store.path
+        if not live_path.is_file():
+            return BugArchiveResult(archived=0, kept=0)
+        cutoff = (now or datetime.now(tz=UTC)) - timedelta(days=threshold_days)
+        eligible_ids = {
+            record.id
+            for record in self._record_store.iter_records()
+            if record.status in TERMINAL_EVENTS and _parse_ts(record.ts) < cutoff
+        }
+        text = live_path.read_text(encoding="utf-8")
+        if not eligible_ids:
+            kept = sum(1 for line in text.split("\n") if line.strip())
+            return BugArchiveResult(archived=0, kept=kept)
 
-    def status(self, *, include_closed: bool = False) -> list[BugState]:
-        """Return folded bug states, open-only by default, sorted by ``bug_id``."""
-        folded = self._fold().values()
-        selected = [s for s in folded if include_closed or s.status == _OPEN]
-        return sorted(selected, key=lambda s: s.bug_id)
+        kept_lines: list[str] = []
+        to_archive: list[BugRecord] = []
+        for line in text.split("\n"):
+            stripped = line.strip()
+            if not stripped:
+                continue
+            record_id = _line_record_id(stripped)
+            if record_id in eligible_ids:
+                to_archive.append(BugRecord.from_dict(json.loads(stripped)))
+            else:
+                kept_lines.append(line)
+
+        for record in to_archive:
+            self._archive_store.append(record)
+        new_content = "".join(f"{line}\n" for line in kept_lines)
+        atomic_write(live_path, new_content, newline="")
+        return BugArchiveResult(archived=len(to_archive), kept=len(kept_lines))
+
+    # -- reads -------------------------------------------------------------------------
+
+    def status(self, *, include_closed: bool = False) -> list[BugRecord]:
+        """Return folded records, open-only by default, sorted by ``id``."""
+        records = migrate_v5.read_ledger(self._record_store.path)
+        selected = [r for r in records if include_closed or r.status == "open"]
+        return sorted(selected, key=lambda r: r.id)
 
     def stats(self) -> BugStats:
-        """Aggregate folded bugs by status and by severity."""
-        folded = list(self._fold().values())
-        by_status: Counter[str] = Counter(s.status for s in folded)
-        by_severity: Counter[str] = Counter(s.severity for s in folded if s.severity is not None)
+        """Aggregate every folded record by status and by severity."""
+        records = migrate_v5.read_ledger(self._record_store.path)
+        by_status: Counter[str] = Counter(r.status for r in records)
+        by_severity: Counter[str] = Counter(r.severity for r in records if r.severity)
         return BugStats(
-            total=len(folded),
-            by_status=dict(by_status),
-            by_severity=dict(by_severity),
+            total=len(records), by_status=dict(by_status), by_severity=dict(by_severity)
         )
+
+    def coherence_violations(self) -> list[BugCoherenceGap]:
+        """A2.3 — every record whose governance fields are incomplete for its own
+        ``status``, sorted by ``id``. Never blocks (D15); the caller renders these as a
+        WARNING."""
+        records = migrate_v5.read_ledger(self._record_store.path)
+        gaps = [
+            BugCoherenceGap(bug_id=record.id, status=record.status, missing=missing)
+            for record in records
+            if (missing := governance_completeness_gaps(record))
+        ]
+        return sorted(gaps, key=lambda gap: gap.bug_id)
+
+
+def _parse_ts(value: str) -> datetime:
+    """Parse a ``BugRecord.ts`` ISO-8601 UTC value; naive/unparseable -> epoch (never
+    archived — a record whose age cannot be established is kept, never silently moved)."""
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return datetime.fromtimestamp(0, tz=UTC)
+    return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
+
+
+def _line_record_id(stripped_line: str) -> str | None:
+    """Best-effort ``"id"`` extraction from one physical JSONL line, for the archive
+    rewrite's line-matching pass only — a malformed line yields ``None`` and is always
+    KEPT (never silently dropped by archive)."""
+    try:
+        raw = json.loads(stripped_line)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(raw, dict):
+        return None
+    record_id = raw.get("id")
+    return record_id if isinstance(record_id, str) else None

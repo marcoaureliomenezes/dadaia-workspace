@@ -5,9 +5,11 @@ Intent: CONTRACT — A2.2(c), A2.6, A2.9 (T-050-07).
 
 Size: SMALL — real ``tmp_path`` filesystem, no subprocess/network. Exercises the store
 generically through ``BugRecord`` (the one concrete model this release lands) and the
-``container.build_bug_record_store`` composition seam, since nothing in
-``features/bugs/service.py`` reads through this store yet (T-050-08 switches it — D-F,
-"expand" is this task, "switch" is the next).
+``container.build_bug_record_store`` composition seam, which ``features/bugs/service.py``
+now reads/writes through (T-050-08 — D-F "switch"). The store's physical file is still
+``bugs.jsonl`` (T-050-08) — FR3/T-050-10 renames it to ``BUGS.jsonl`` once the physical
+migration lands; ``build_bug_record_store`` takes a ``specs_dir`` directly, never a
+``workspace_root``.
 """
 
 from __future__ import annotations
@@ -68,7 +70,7 @@ def test_governance_update_rewrites_one_line_in_place_byte_identical_elsewhere(
     rewrite. Exercised through ``container.build_bug_record_store`` so the composition
     seam this task adds is proven, not merely the class in isolation."""
     store = container.build_bug_record_store(tmp_path)
-    store_path = tmp_path / "specs" / "bugs" / "BUGS.jsonl"
+    store_path = tmp_path / "bugs" / "bugs.jsonl"
     store.append(_sample_record("bug-a"))
     store.append(_sample_record("bug-b"))
     store.append(_sample_record("bug-c"))
@@ -98,7 +100,7 @@ def test_update_refuses_stale_rewrite_when_file_changed_since_read(tmp_path: Pat
     write it never saw — the file is left exactly as the concurrent writer left it,
     never corrupted (A2.9, one race semantics: refuse-stale, caller retries)."""
     store = container.build_bug_record_store(tmp_path)
-    store_path = tmp_path / "specs" / "bugs" / "BUGS.jsonl"
+    store_path = tmp_path / "bugs" / "bugs.jsonl"
     store.append(_sample_record("race-bug"))
     original_bytes = store_path.read_bytes()
 

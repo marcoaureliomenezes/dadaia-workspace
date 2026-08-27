@@ -42,8 +42,6 @@ def _append_args(context: str, *, specs_dir: Path | None = None) -> list[str]:
         "append",
         "--bug-id",
         "routing-probe",
-        "--event",
-        "reported",
         "--title",
         "routing probe",
         "--severity",
@@ -60,8 +58,6 @@ def _append_args(context: str, *, specs_dir: Path | None = None) -> list[str]:
         "repro",
         "--expected",
         "exp",
-        "--notes",
-        "n",
     ]
     if specs_dir is not None:
         args += ["--specs-dir", str(specs_dir)]
@@ -82,7 +78,7 @@ def test_context_flag_routes_to_that_contexts_ledger(workspace: Path) -> None:
     result = _runner.invoke(app, _append_args("ctx-b"), env={"DADAIA_CONTEXT": "ctx-a"})
     assert result.exit_code == 0, result.output
     b_events = _ledger_events(workspace / "repos" / "ctx-b" / "specs")
-    assert [e["bug_id"] for e in b_events] == ["routing-probe"]
+    assert [e["id"] for e in b_events] == ["routing-probe"]
     assert b_events[0]["context"] == "ctx-b"
     assert _ledger_events(workspace / "repos" / "ctx-a" / "specs") == []
 
@@ -102,5 +98,5 @@ def test_explicit_specs_dir_still_wins_over_context_flag(workspace: Path) -> Non
     result = _runner.invoke(app, _append_args("ctx-b", specs_dir=target))
     assert result.exit_code == 0, result.output
     a_events = _ledger_events(target)
-    assert [e["bug_id"] for e in a_events] == ["routing-probe"]
+    assert [e["id"] for e in a_events] == ["routing-probe"]
     assert _ledger_events(workspace / "repos" / "ctx-b" / "specs") == []

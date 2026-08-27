@@ -1,4 +1,6 @@
-"""Integration tests for `dadaia bugs append|status|stats` (T-46-03).
+"""Integration tests for `dadaia bugs append|status|stats|update` (T-46-03; rewritten
+v0.5.0 T-050-08 against the one-record-per-bug model — `append --event resolved` dies,
+resolution is now `bugs update <id> --set ...`).
 
 Merged per plan-integration.md (6 -> 2): (a) one seeded lifecycle fn (append ->
 bugs.jsonl name -> status open/resolved -> stats aggregates); (b) one parametrized
@@ -34,14 +36,12 @@ def _append_reported(specs_dir: Path, bug_id: str, *, severity: str = "HIGH") ->
             str(specs_dir),
             "--bug-id",
             bug_id,
-            "--event",
-            "reported",
             "--title",
             f"title {bug_id}",
             "--severity",
             severity,
             "--surface",
-            "gate",
+            "cli",
             "--component",
             "spec_context",
             "--context",
@@ -52,8 +52,6 @@ def _append_reported(specs_dir: Path, bug_id: str, *, severity: str = "HIGH") ->
             "repro",
             "--expected",
             "exp",
-            "--notes",
-            "n",
         ],
     )
     assert result.exit_code == 0, result.output
@@ -64,23 +62,20 @@ def _resolve(specs_dir: Path, bug_id: str) -> None:
         app,
         [
             "bugs",
-            "append",
+            "update",
+            bug_id,
+            "--set",
+            "status=resolved",
+            "--set",
+            "cause=the gate reused a stale specs_dir",
+            "--set",
+            "caused_by=none-first-fix",
+            "--set",
+            "resolved_release=v0.1.46",
+            "--set",
+            "solution=reporter-artifact repro replayed; all named surfaces covered.",
             "--specs-dir",
             str(specs_dir),
-            "--bug-id",
-            bug_id,
-            "--event",
-            "resolved",
-            "--resolution-evidence",
-            "test: reporter-artifact repro replayed; all named surfaces covered.",
-            "--evidence-loop",
-            "pytest tests/integration/cli/test_cli_bugs.py -q",
-            "--evidence-seam",
-            "tests/integration/cli/test_cli_bugs.py::test_seeded_lifecycle_append_status_and_stats",
-            "--evidence-diff",
-            "net-negative: -2/+0 lines on the seeded-lifecycle fixture",
-            "--release",
-            "v0.1.46",
         ],
     )
     assert result.exit_code == 0, result.output
@@ -136,7 +131,7 @@ def test_seeded_lifecycle_append_status_and_stats(specs: Path) -> None:
                 "--severity",
                 "SEVERE",
                 "--surface",
-                "s",
+                "cli",
                 "--component",
                 "c",
                 "--context",
@@ -147,8 +142,6 @@ def test_seeded_lifecycle_append_status_and_stats(specs: Path) -> None:
                 "r",
                 "--expected",
                 "e",
-                "--notes",
-                "n",
             ],
         ),
     ],
@@ -164,10 +157,22 @@ def test_append_rejection_writes_nothing(specs: Path, bug_id: str, extra_args: l
             str(specs),
             "--bug-id",
             bug_id,
-            "--event",
-            "reported",
             *extra_args,
         ],
     )
     assert result.exit_code == 1
     assert list((specs / "bugs").glob("*.jsonl")) == []
+
+
+def test_update_refuses_an_immutable_core_field_and_writes_no_change(specs: Path) -> None:
+    """AS-16: the update seam refuses a change to an immutable-core field (A2.2a) with
+    a non-zero exit — never a block on a human, but never silently accepted either."""
+    _append_reported(specs, "d")
+
+    result = _runner.invoke(
+        app,
+        ["bugs", "update", "d", "--set", "title=a different title", "--specs-dir", str(specs)],
+    )
+
+    assert result.exit_code == 1
+    assert "immutable-core" in result.output

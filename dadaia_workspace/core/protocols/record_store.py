@@ -15,6 +15,7 @@ before this release (mirrors ``core/protocols/git_object_reader.py``).
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator
+from pathlib import Path
 from typing import Protocol
 
 
@@ -44,6 +45,14 @@ class StaleRecordWriteError(Exception):
 
 class RecordStore[T](Protocol):
     """Port for a JSONL "one record per id, appended once, rewritten in place" store."""
+
+    @property
+    def path(self) -> Path:
+        """The ledger file this store is rooted at (v0.5.0 T-050-08 — the seam callers
+        that still need file-level access — ``features.bugs.migrate_v5``'s v5 boundary
+        adapter, ``BugService.archive``'s live-file rewrite — read the SAME path the
+        store itself reads/writes, never a second, independently-resolved one)."""
+        ...
 
     def append(self, record: T) -> None:
         """Append one NEW record as a line (``O_APPEND`` semantics — race-benign)."""
