@@ -839,7 +839,7 @@ defect of the release, justified per contributing FR or refused.
 
 ---
 
-- [-] **T-045-33 — Six-axis code review on the thawed tree**
+- [x] **T-045-33 — Six-axis code review on the thawed tree**
 
 **Owner role:** code-reviewer · **Commit:** `docs(T-045-33): release code review`
 
@@ -859,7 +859,7 @@ land as `expand → switch → contract` rather than big-bang?
 
 ---
 
-- [ ] **T-045-34 — Security review + the QA release verdict**
+- [-] **T-045-34 — Security review + the QA release verdict**
 
 **Owner role:** security-reviewer + qa-engineer · **Commit:**
 `docs(T-045-34): release verdicts`
