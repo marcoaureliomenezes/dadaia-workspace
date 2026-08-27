@@ -214,13 +214,13 @@ def test_backlog_histo_record_redact_masks_denylisted_term_in_entry_md() -> None
     ``BugRecord.redact`` exactly — same ``(term, reason)`` shape, same
     ``[REDACTED-TERM]`` placeholder."""
     record = _histo_record(
-        entry_md="See .dadaia/reports/consumer-game-games/qa-engineer/report.html for detail."
+        entry_md="See .dadaia/reports/acme-corp-games/qa-engineer/report.html for detail."
     )
 
-    redacted = record.redact(denylist_terms=(("consumer-game", "private project/person identifier"),))
+    redacted = record.redact(denylist_terms=(("acme-corp", "private project/person identifier"),))
 
     assert redacted.entry_md is not None
-    assert "consumer-game" not in redacted.entry_md.lower()
+    assert "acme-corp" not in redacted.entry_md.lower()
     assert "[REDACTED-TERM]" in redacted.entry_md
 
 

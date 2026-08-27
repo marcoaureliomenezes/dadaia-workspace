@@ -917,7 +917,7 @@ _ACTIVE_ITEM_WITH_DENYLISTED_TERM = """\
 - **Title:** Leaky exit
 - **Opened:** 2026-08-10
 - **Status:** candidate
-- **Description:** See .dadaia/reports/consumer-game-games/qa-engineer/report.html for detail.
+- **Description:** See .dadaia/reports/acme-corp-games/qa-engineer/report.html for detail.
 - **Provenance:** operator request
 """
 
@@ -945,16 +945,16 @@ def test_backlog_exit_masks_a_denylisted_term_in_entry_md_before_append(
         release="v9.9.9",
         by="test-suite",
         ts="2026-08-27",
-        denylist_terms=(("consumer-game", "private project/person identifier"),),
+        denylist_terms=(("acme-corp", "private project/person identifier"),),
     )
 
     assert record.entry_md is not None
-    assert "consumer-game" not in record.entry_md.lower()
+    assert "acme-corp" not in record.entry_md.lower()
     assert "[REDACTED-TERM]" in record.entry_md
 
     persisted = list(store.iter_records())[0]
     assert persisted.entry_md is not None
-    assert "consumer-game" not in persisted.entry_md.lower()
+    assert "acme-corp" not in persisted.entry_md.lower()
 
 
 def test_backlog_exit_with_no_denylist_terms_stays_byte_identical_to_pre_fix(
@@ -982,4 +982,4 @@ def test_backlog_exit_with_no_denylist_terms_stays_byte_identical_to_pre_fix(
     )
 
     assert record.entry_md is not None
-    assert "consumer-game-games" in record.entry_md
+    assert "acme-corp-games" in record.entry_md
