@@ -66,6 +66,9 @@ Tree-/package-walking population scans (the convention applies at the call site 
   ``TestInstallAll`` (two call sites, one per staged/installed skill-set comparison)
 * ``tests/integration/test_public_assets.py`` ::
   test_stage_manifest_codex_adapters_and_install_all
+* ``tests/contract/test_migrate_v5_not_imported_by_permanent_consumer.py`` (v0.5.0
+  T-050-09) ::
+  test_migrate_v5_has_no_permanent_consumer_outside_the_known_switch_step
 
 Deliberately EXCLUDED:
 

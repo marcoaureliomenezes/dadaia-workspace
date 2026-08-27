@@ -15,6 +15,7 @@ from dadaia_workspace.core.exceptions import (
     NoActiveReleaseError,
     WorkspaceNotInitializedError,
 )
+from dadaia_workspace.core.protocols.git_history_reader import GitHistoryReader
 from dadaia_workspace.core.protocols.git_object_reader import GitObjectReader
 from dadaia_workspace.core.protocols.process_ancestry import ProcessAncestry
 from dadaia_workspace.core.protocols.record_store import RecordStore
@@ -208,6 +209,23 @@ def build_git_object_reader() -> GitObjectReader:
     from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
 
     return GitSubprocessObjectReader()
+
+
+def build_git_history_reader() -> GitHistoryReader:
+    """Composition-root seam for the ``GitHistoryReader`` adapter (v0.5.0 FR3/A3.10,
+    AR-1 ruling answer (c), ``specs/releases/0.5.0/reviews/S1-AR1-ruling.md`` §3).
+
+    The CLI layer must not import infrastructure directly (import-linter contract);
+    a future ``dadaia bugs migrate-v5`` verb (T-050-10) composes the subprocess-backed
+    reader here, exactly as :func:`build_git_object_reader` does for the push-gate scan.
+    A single concrete adapter today — the SAME ``GitSubprocessClient`` class
+    :func:`build_git_client` already returns, which is why this seam needs no new
+    infrastructure module: the ruling's whole point is one adapter class, one new
+    narrow port, no sibling adapter. Not yet wired into any CLI command by T-050-09 —
+    this task builds the port and the pure derivation it feeds, never runs the
+    migration against the real ledger.
+    """
+    return GitSubprocessClient()
 
 
 def build_bug_record_store(specs_dir: Path) -> "RecordStore[BugRecord]":

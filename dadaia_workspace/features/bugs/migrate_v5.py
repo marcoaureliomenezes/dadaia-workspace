@@ -37,23 +37,51 @@ the ledger by anything in this module.
 Deleted whole once T-050-10 rewrites the physical ledger to pure v6-record shape and
 ``features/bugs/service.py`` drops this import (D-F's "contract" step) — a contract
 test (T-050-09, A3.10) then asserts no permanent module still imports it.
+
+**T-050-09 extends this module with the pieces FR3 names as "the migration module"'s
+own job (A2.5), still never the pure derivation itself.** :func:`classify_ledger_line`
+is the boundary adapter :func:`~dadaia_workspace.core.bug_provenance
+.derive_commit_provenance` is injected with (the v5/v6 shape decoding stays here, never
+migrates into ``core``); :data:`LEGACY_SURFACE_MAP`/:func:`map_legacy_surface` are FR3
+step 6d's "table in the migration module"; :func:`run_migration` is the one-shot runner
+**scaffolding** that composes a caller-supplied
+:class:`~dadaia_workspace.core.protocols.git_history_reader.GitHistoryReader` with the
+two above. All four die with this module at 0.6.0, same as :func:`read_ledger` — their
+tests are marked ``Intent: SCAFFOLD — T-050-09 — expires: 0.6.0`` (qa-engineer amendment
+10), distinct from ``core/bug_provenance.py``'s own ``CONTRACT`` tests, which outlive
+this module.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Mapping
+from collections.abc import Set as AbstractSet
 from dataclasses import replace
 from pathlib import Path
 
+from dadaia_workspace.core.bug_provenance import (
+    ClassifiedLedgerLine,
+    DerivedBugProvenance,
+    LedgerLineKind,
+    derive_commit_provenance,
+)
 from dadaia_workspace.core.models.bugs import (
     TERMINAL_EVENTS,
     BugEvent,
     BugEventKind,
     BugRecord,
 )
+from dadaia_workspace.core.protocols.git_history_reader import GitHistoryReader
 
-__all__ = ["read_ledger"]
+__all__ = [
+    "LEGACY_SURFACE_MAP",
+    "classify_ledger_line",
+    "map_legacy_surface",
+    "read_ledger",
+    "run_migration",
+]
 
 _LOG = logging.getLogger(__name__)
 
@@ -149,3 +177,113 @@ def _fold_v5_events(events: list[BugEvent]) -> dict[str, BugRecord]:
             evidence_diff=event.evidence_diff or current.evidence_diff,
         )
     return records
+
+
+def classify_ledger_line(raw_line: str) -> ClassifiedLedgerLine | None:
+    """FR3 step 2's "boundary adapter" (A2.5) — classify ONE added ledger line as a
+    registration or a terminal line for its bug id, or ``None`` when the line is
+    neither (malformed JSON, a non-object, a ``picked``/``archived`` v5 event, or a v6
+    record whose ``status`` this function does not recognise).
+
+    THE one place that decodes the v5/v6 shape for :mod:`core.bug_provenance`'s pure
+    derivation (:func:`~dadaia_workspace.core.bug_provenance.derive_commit_provenance`
+    takes this as its injected ``classify_line`` callable — the module boundary A3.10
+    exists to keep the derivation itself free of this decoding). Understands BOTH
+    shapes :func:`read_ledger` already understands, by the SAME ``"event" in raw``
+    discriminator: a v5 :class:`~dadaia_workspace.core.models.bugs.BugEvent` line
+    (``reported`` -> registration, one of :data:`TERMINAL_EVENTS` -> terminal,
+    ``picked``/``archived`` -> ``None``, FR2's "contributes nothing"), or a v6
+    :class:`~dadaia_workspace.core.models.bugs.BugRecord` line (``status == "open"`` ->
+    registration, ``status`` in :data:`TERMINAL_EVENTS` -> terminal, anything else ->
+    ``None``).
+    """
+    try:
+        raw = json.loads(raw_line)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(raw, dict):
+        return None
+    if "event" in raw:
+        bug_id = raw.get("bug_id")
+        event = raw.get("event")
+        if not isinstance(bug_id, str) or not bug_id:
+            return None
+        if event == BugEventKind.REPORTED.value:
+            return ClassifiedLedgerLine(bug_id=bug_id, kind=LedgerLineKind.REGISTRATION)
+        if event in TERMINAL_EVENTS:
+            return ClassifiedLedgerLine(bug_id=bug_id, kind=LedgerLineKind.TERMINAL)
+        return None  # `picked`/`archived` — contribute nothing (FR2).
+    bug_id = raw.get("id")
+    status = raw.get("status")
+    if not isinstance(bug_id, str) or not bug_id:
+        return None
+    if status == "open":
+        return ClassifiedLedgerLine(bug_id=bug_id, kind=LedgerLineKind.REGISTRATION)
+    if isinstance(status, str) and status in TERMINAL_EVENTS:
+        return ClassifiedLedgerLine(bug_id=bug_id, kind=LedgerLineKind.TERMINAL)
+    return None
+
+
+#: Legacy free-text ``surface``/``component`` values observed on a v5 ``reported``
+#: event, mapped onto ``bug-record-v1.schema.json``'s closed ``surface`` enum (FR3 step
+#: 6d, SA-Q5: "the enum derives from the feature-package list the independence contract
+#: uses ... the forensic's normalizer becomes FR3's legacy mapping table"). Deliberately
+#: NOT exhaustive here — enumerating every historical string requires scanning the REAL
+#: corpus, which T-050-10's actual migration run does and this task explicitly does not
+#: (this task never runs against the real ledger); this table seeds the two example
+#: strings this module's own docstring already named (``"gate"``, ``"dadaia certify"``)
+#: as the mapping MECHANISM's proof, and T-050-10 extends it with every unmapped string
+#: its migration report finds. One row per legacy string, exact match, case-sensitive —
+#: no fuzzy/guessed mapping (FR3: "nothing is guessed and nothing is dropped").
+LEGACY_SURFACE_MAP: Mapping[str, str] = {
+    "gate": "chokepoints",
+    "dadaia certify": "certification",
+}
+
+
+def map_legacy_surface(
+    raw_surface: str, canonical_surfaces: AbstractSet[str]
+) -> tuple[str, str | None]:
+    """Map one legacy free-text ``surface`` value onto the closed enum.
+
+    *canonical_surfaces* is the caller-supplied enum member set (T-050-29 is the task
+    that publishes the single Python-side source for it, per A2.12's "one source, two
+    consumers" rule — this module does not hardcode a second, independently-maintained
+    copy of that 30-member list; it takes the set as a parameter, exactly like
+    :func:`derive_commit_provenance` takes its classifier). Returns
+    ``(mapped_surface, original_if_unmapped)``: when *raw_surface* is already a
+    canonical member, or :data:`LEGACY_SURFACE_MAP` maps it onto one, the pair is
+    ``(surface, None)``; otherwise the pair is ``("unknown", raw_surface)`` — the
+    original is preserved (never dropped) for the migration report's ``unknown`` list
+    (FR3 step 6d, A3.11).
+    """
+    mapped = LEGACY_SURFACE_MAP.get(raw_surface, raw_surface)
+    if mapped in canonical_surfaces:
+        return mapped, None
+    return "unknown", raw_surface
+
+
+def run_migration(
+    repo: Path,
+    pathspec: str,
+    history_reader: GitHistoryReader,
+) -> dict[str, DerivedBugProvenance]:
+    """The one-shot runner **scaffolding** (T-050-09) — composes an injected
+    :class:`~dadaia_workspace.core.protocols.git_history_reader.GitHistoryReader` with
+    :func:`classify_ledger_line` and
+    :func:`~dadaia_workspace.core.bug_provenance.derive_commit_provenance` to derive
+    every bug id's commit provenance from *repo*'s real history over *pathspec*.
+
+    **Scaffolding, not the migration.** This function performs no ledger write, no
+    report, no CLI wiring — T-050-10 is the task that runs the full FR3 migration
+    (rewrites ``bugs.jsonl`` -> ``BUGS.jsonl``, writes the migration report, wires a CLI
+    verb) and it is EXPECTED to call something shaped like this, but this task never
+    invokes it against the real ``specs/bugs/`` history (per its own instructions) —
+    only fixture tests, with a fake :class:`GitHistoryReader`, exercise it. No
+    ``infrastructure``/``subprocess`` import here: *history_reader* arrives already
+    constructed (``container.build_git_history_reader()`` in production), matching
+    `features-no-infrastructure`/`features-no-subprocess` — this module never imports
+    either directly, even for its own runner.
+    """
+    commits = history_reader.log_added_lines(repo, pathspec)
+    return derive_commit_provenance(commits, classify_ledger_line)

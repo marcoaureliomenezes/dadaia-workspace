@@ -2,10 +2,14 @@
 
 import logging
 import subprocess
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from pathlib import Path
 
 from dadaia_workspace.core.exceptions import GitCloneError, GitSyncError
+from dadaia_workspace.core.protocols.git_history_reader import (
+    GitHistoryReadError,
+    HistoryCommit,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +21,81 @@ def _run(args: list[str], cwd: Path | None = None) -> subprocess.CompletedProces
         capture_output=True,
         text=True,
     )
+
+
+def _run_bytes(args: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[bytes]:
+    """Byte-mode sibling of :func:`_run` — used exclusively by
+    :meth:`GitSubprocessClient.log_added_lines` (v0.5.0 FR3/A3.10, AR-1 ruling §3.3).
+
+    ``_run``'s ``text=True`` decodes with the PLATFORM LOCALE (no ``encoding=``
+    given) — on ``windows-latest`` that is cp1252, not UTF-8, and a ledger line
+    carrying a genuine UTF-8 multi-byte character would be corrupted or raise. The
+    ledger is a JSON-lines file that MUST decode as UTF-8 strictly, so
+    ``log_added_lines`` never routes through ``_run``: it captures raw bytes here and
+    decodes them itself, per line, catching (not replacing) an undecodable line —
+    see :func:`_decode_lines_strict`. ``_run`` itself is intentionally UNTOUCHED by
+    this change (AR-1 ruling §3.3): its 13 existing callers keep today's behavior.
+    """
+    return subprocess.run(args, cwd=cwd, capture_output=True)
+
+
+def _decode_lines_strict(raw: bytes, *, context: str) -> tuple[str, ...]:
+    """Split *raw* on a literal ``b"\\n"`` (never ``bytes.splitlines()`` — the same
+    U+2028/U+2029/U+0085 root cause T-045-20 fixed at the ledger reader, carried here
+    since this is a second, independent reader of the same kind of content) and decode
+    each non-empty line strictly as UTF-8. An undecodable line is SKIPPED and logged
+    (never replaced with U+FFFD, which would silently alter a ledger value) — *context*
+    names what was being read, for the log line only.
+    """
+    lines: list[str] = []
+    for raw_line in raw.split(b"\n"):
+        if not raw_line:
+            continue
+        try:
+            lines.append(raw_line.decode("utf-8"))
+        except UnicodeDecodeError as exc:
+            logger.warning("log_added_lines: undecodable line skipped (%s): %s", context, exc)
+            continue
+    return tuple(lines)
+
+
+def _added_lines_for_commit(repo: Path, sha: str, pathspec: str) -> tuple[str, ...]:
+    """The *pathspec*-restricted lines *sha* ADDED (diff ``+`` lines, marker stripped,
+    the ``+++`` file-header line excluded) — FR3 step 2's per-commit added-line read.
+    ``--format=`` suppresses the commit-message header so the output is diff body only.
+    """
+    result = _run_bytes(
+        ["git", "show", "--no-color", "--format=", "-p", sha, "--", pathspec],
+        cwd=repo,
+    )
+    if result.returncode != 0:
+        raise GitHistoryReadError(
+            f"git show failed in {repo} for {sha}: "
+            f"{result.stderr.decode('utf-8', errors='replace').strip()}"
+        )
+    diff_lines = _decode_lines_strict(result.stdout, context=f"{sha} added-lines diff")
+    return tuple(
+        line[1:] for line in diff_lines if line.startswith("+") and not line.startswith("+++")
+    )
+
+
+def _touched_paths_for_commit(repo: Path, sha: str) -> tuple[str, ...]:
+    """*sha*'s WHOLE, unrestricted changed-path set (AR-1 ruling §3.4) — never
+    pathspec-filtered, because the ``exact`` granularity marker (FR3 step 4) asks
+    "does this commit touch a file outside ``specs/``", which a pathspec-scoped diff can
+    never answer. ``--root`` diffs a parentless (root) commit against the empty tree, so
+    the same call shape covers both a root commit and an ordinary one.
+    """
+    result = _run_bytes(
+        ["git", "diff-tree", "--no-commit-id", "--name-only", "-r", "--root", sha],
+        cwd=repo,
+    )
+    if result.returncode != 0:
+        raise GitHistoryReadError(
+            f"git diff-tree failed in {repo} for {sha}: "
+            f"{result.stderr.decode('utf-8', errors='replace').strip()}"
+        )
+    return _decode_lines_strict(result.stdout, context=f"{sha} touched-paths")
 
 
 def _has_embedded_git(directory: Path) -> bool:
@@ -331,3 +410,59 @@ class GitSubprocessClient:
         if result.returncode != 0:
             return ""
         return result.stdout.strip()
+
+    def log_added_lines(self, repo: Path, pathspec: str) -> Iterable[HistoryCommit]:
+        """``core.protocols.git_history_reader.GitHistoryReader`` implementation
+        (v0.5.0 FR3/A3.10, AR-1 ruling §3 — no sibling adapter module, this EXISTING
+        client gains the one new method).
+
+        Walks ``git log --all --no-merges --reverse --date-order -- <pathspec>``
+        (FR3 step 1: all refs including tags, oldest first) to get the ordered
+        ``(sha, parents, date)`` triple for every commit that ever touched *pathspec*,
+        then reads each commit's pathspec-restricted added lines
+        (:func:`_added_lines_for_commit`) and its WHOLE unrestricted touched-path set
+        (:func:`_touched_paths_for_commit`) — two extra calls per commit, ``≈2N+1``
+        subprocess calls total, accepted for the one-shot migration this port serves
+        (AR-1 ruling §3.4). Every call reads raw bytes and decodes strictly per line
+        (never ``_run``'s locale-decoded ``text=True``) — see
+        :func:`_run_bytes`/:func:`_decode_lines_strict`.
+
+        Raises :class:`GitHistoryReadError` on any non-zero git exit — a policy-relevant
+        history walk never silently under-reports.
+        """
+        header = _run_bytes(
+            [
+                "git",
+                "log",
+                "--all",
+                "--no-merges",
+                "--reverse",
+                "--date-order",
+                "--format=%H%x00%P%x00%aI",
+                "--",
+                pathspec,
+            ],
+            cwd=repo,
+        )
+        if header.returncode != 0:
+            raise GitHistoryReadError(
+                f"git log failed in {repo} for pathspec {pathspec!r}: "
+                f"{header.stderr.decode('utf-8', errors='replace').strip()}"
+            )
+        headers = _decode_lines_strict(header.stdout, context=f"{repo} log --all header")
+
+        commits: list[HistoryCommit] = []
+        for decoded in headers:
+            sha, _, rest = decoded.partition("\x00")
+            parents_raw, _, date = rest.partition("\x00")
+            parents = tuple(p for p in parents_raw.split(" ") if p)
+            commits.append(
+                HistoryCommit(
+                    sha=sha,
+                    parents=parents,
+                    date=date,
+                    touched_paths=_touched_paths_for_commit(repo, sha),
+                    added_lines=_added_lines_for_commit(repo, sha, pathspec),
+                )
+            )
+        return commits
