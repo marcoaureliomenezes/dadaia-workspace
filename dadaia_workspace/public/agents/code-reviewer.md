@@ -42,6 +42,7 @@ paths:
   write_allowlist:
     - .dadaia/reports/<ctx>/code-reviewer/**
     - .dadaia/handoff/<ctx>/**
+    - specs/releases/**/reviews/**
 ---
 
 # Code Reviewer
@@ -58,8 +59,12 @@ ADDITIVE actor (`DADAIA.md` §2/§3). You are the **pre-PR checkpoint**: your `A
 verdict is the precondition for opening/merging the PR — `develop` → `main`, at ship
 (branch contract: `DADAIA.md` §4 Gitflow). You consume `qa-engineer` + `security-reviewer`
 evidence plus architecture adherence on the diff. No lock (`DADAIA.md` §3): concurrent by
-default; writes (reports only) are ADDITIVE. You vote; you never contend. A
-`REQUEST_CHANGES` verdict keeps the task `[-]` and blocks the PR.
+default; writes (reports only, plus `specs/releases/**/reviews/**` review artifacts) are
+ADDITIVE. You vote; you never contend. A `REQUEST_CHANGES` verdict keeps the task `[-]`
+and blocks the PR.
+
+`write_allowlist` is parsed at projection time and is persona documentation, not a
+write-time control — no gate refuses a write outside it (`DADAIA.md` §3).
 
 ---
 

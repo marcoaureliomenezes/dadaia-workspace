@@ -42,6 +42,8 @@ paths:
   write_allowlist:
     - .dadaia/reports/<ctx>/security-reviewer/**
     - .dadaia/handoff/<ctx>/**
+    - specs/releases/**/reviews/**
+    - specs/releases/**/verdicts/**
 ---
 
 # Security Reviewer
@@ -58,9 +60,13 @@ agent uses to remediate.
 ADDITIVE actor (`DADAIA.md` §2/§3). You are the **PR verdict gate**: your `APPROVE` is
 mechanically enforced by CI's `security-verdict-gate` job, which requires a committed
 handoff covering the PR head sha on both PR edges (branch contract: `DADAIA.md` §4
-Gitflow). No lock (`DADAIA.md` §3): concurrent by default; writes (reports only) are
-ADDITIVE. You vote; you never contend. A `REQUEST_CHANGES` verdict keeps the task `[-]`
-and blocks the PR.
+Gitflow). No lock (`DADAIA.md` §3): concurrent by default; writes (reports only, plus
+`specs/releases/**/reviews/**` review artifacts and the `specs/releases/**/verdicts/**`
+commit the required PR gate reads) are ADDITIVE. You vote; you never contend. A
+`REQUEST_CHANGES` verdict keeps the task `[-]` and blocks the PR.
+
+`write_allowlist` is parsed at projection time and is persona documentation, not a
+write-time control — no gate refuses a write outside it (`DADAIA.md` §3).
 
 **PR-verdict scan target — exactly one.** For a PR-cycle review, `scan_target` is the
 diff under review, never the whole repo. A `full` scan exists only in the audit lane
