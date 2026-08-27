@@ -122,7 +122,9 @@ existing spec or source files.
 
 ## Workflow
 
-1. **Resolve context** — `dadaia context show --json`; read `specs/releases/ACTIVE.md`.
+1. **Resolve context** — `dadaia context show --json`; read the live release's
+   `RELEASE.jsonl` phase fold (dual-written to `specs/releases/ACTIVE.md`, its
+   transitional gate-facing mirror).
 2. **Grill** — run `dd-grill-me` to resolve ambiguity before any dispatch.
 3. **Classify + dispatch** — map the resolved demand to a playbook (router tables below),
    auto-reserve task_ids in TASKS.md yourself (no operator prompt), dispatch sub-agents with

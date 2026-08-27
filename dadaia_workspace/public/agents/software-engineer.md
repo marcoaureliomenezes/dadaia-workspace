@@ -21,7 +21,7 @@ skills:
   - dd-ai-eng-knowhow
   - dev-server-registry
   - dd-release-implement
-  - dd-bug-fix
+  - dd-bug-resolution
   - dd-bug-registration
   - dd-gitflow-default
   - dadaia-test-stewardship

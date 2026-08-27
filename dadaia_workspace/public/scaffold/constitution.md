@@ -138,8 +138,10 @@ domínio descrito em sua própria persona.
 - Toda regra sempre-ativa deste projeto é uma seção da lei da workspace (`DADAIA.md`), e
   toda seção sempre-ativa está mapeada para a(s) skill(s) que a operam.
 - Essa relação é declarada em uma única fonte controlada — o mapa JSON de
-  regras→skills (convenção de nome: `entities/rules-skills-map.json`), linhas de
-  `{topic, section, skills[], justification}`, chaveadas pelo tópico em negrito da lei.
+  comportamento (convenção de nome: `entities/behavior-map.json`, que aposentou
+  `rules-skills-map.json`), linhas de `{section, anchor, skill, scoped_agents_md,
+  hash_tuple, recorded_by, recorded_at}`, uma linha por membro (uma skill OU um
+  conjunto `scoped_agents_md`), chaveadas pela seção da lei que cada linha possui.
   Nenhuma skill, persona, arquivo de regra, hook ou doctor pode declarar essa relação em
   outro lugar; uma segunda declaração é lixo (slop, §8) e deve ser removida.
 - Um teste determinístico lê o mapa, a fonte da lei e o inventário de skills em disco, e
