@@ -36,16 +36,21 @@ second.
 
 ## 3. Redaction rule
 
-Absolute local paths, IPs, hostnames, private names and secrets never enter an event
-field — redact before writing. Every `--notes`/`--symptom`/`--repro` value is sanitized
-text, never a raw log dump.
+Absolute local paths, IPs, hostnames, private names and secrets never enter a record
+field — redact before writing. Every `--symptom`/`--repro`/`--expected` value is
+sanitized text, never a raw log dump.
 
 ## 4. `dadaia bugs append` command reference
 
+Verified against `dadaia bugs append --help` — no `--event` flag exists (v0.5.0 FR2:
+one record per bug, appended once, never an event stream). This append's isolated-commit
+shape (staging only `BUGS.jsonl`) is stated once in `dd-gitflow-default` §3a shape 1 —
+not restated here.
+
 ```bash
-dadaia bugs append --bug-id <slug> --event reported --reported-by <agent> \
+dadaia bugs append --bug-id <slug> --reported-by <agent> \
   --title "…" --severity LOW|MEDIUM|HIGH|CRITICAL --surface "…" --component "…" \
-  --context <ctx> --tag <tag> --symptom "…" --repro "…" --expected "…" --notes "… (redacted)"
+  --context <ctx> --symptom "… (redacted)" --repro "… (redacted)" --expected "… (redacted)"
 ```
 
 ## 5. Review-verdict bug-surface axis (FR24)

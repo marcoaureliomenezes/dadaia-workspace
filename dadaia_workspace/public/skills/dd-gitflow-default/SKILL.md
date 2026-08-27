@@ -38,9 +38,33 @@ the just-deployed commit.
 | Definition | SPEC/PLAN/TASKS authored; PR to `develop` opens the moment the trio is `Aprovado` |
 | Implementation | one commit per completed task group |
 | `rc` merges | each `rc` burns one `feature/{M.m.p}` → `develop` PR merge; scope is fixes/adjustments to this release only, never new backlog |
-| Bugs | fixed on the live feature branch, in any phase — no ceremony, no separate branch |
+| Bugs | fixed on the live feature branch, in any phase — no ceremony, no separate branch (commit shape: §3a) |
 
 *Done when:* every commit for the release traces to one of these four rows.
+
+## 3a. Commit shapes (FR8) — stated once, here
+
+Five isolated write shapes. Each stages nothing else, so the audit can diff it via
+`git log` — never a hook (D10).
+
+| # | Shape | What's staged, alone | Commit message |
+|---|---|---|---|
+| 1 | Bug registration | `specs/bugs/BUGS.jsonl` only (`dadaia bugs append`) | `chore(bugs): report <id>` |
+| 2 | Backlog entry / ADR proposal | `specs/backlog/BACKLOG.md` only, or the new `specs/ADRs/NNNN-<slug>.md` only | `chore(backlog): add <slug>` / `docs(adr): propose NNNN-<slug>` |
+| 3 | Bug fix — one commit, no second | code + regression test + the `BUGS.jsonl` line, staged together — `dadaia bugs update <id> --set status=resolved --set cause=… --set caused_by=… --set resolved_release=…` | `fix(<scope>): <what> (resolves <id>)` |
+| 4 | No push on resolve (D4) | commit only; a push happens when the operator asks, and `dadaia ci preflight` runs first because it is an always-on rule (`DADAIA.md` §7 / row 7 below), never because a hook forces it | — |
+| 5 | Release definition | SPEC + PLAN + TASKS + purge-on-pick + the picked bugs' records, staged together — an `_ideas/` variant carries the SPEC only | one bundled commit |
+
+`resolved_commit` stays `null` at resolve time — a commit cannot contain its own sha.
+Git is the sole authority; the only writer of that cache is the audit's pillar 1, in the
+same atomic rewrite that also sets `audited` (**AS-1**). No follow-up ledger commit
+exists.
+
+Every other home — `dd-bug-registration`, `dd-bug-resolution`, `dd-backlog-definition`,
+the scoped `AGENTS.md` files — points at this table; none restates it.
+
+*Done when:* a `git log` scan over the release's own commits (FR16 pillar-2 dry run)
+finds each write above alone in its own commit, matching its message pattern.
 
 ## 4. Deploy step
 

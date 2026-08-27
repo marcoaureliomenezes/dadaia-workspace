@@ -156,11 +156,12 @@ an initialized workspace, create it:
   pass `--specs-dir` on EVERY `bugs` call (append AND status), the same way F-04/F-10/F-15
   do; a `bugs status` with no `--specs-dir` and no bind correctly errors with guidance
   ("Pass --specs-dir or bind a context"), which is expected, not a FAIL.
-- Run the complete append with EVERY required `reported` field —
-  `--event reported --bug-id valbug --reported-by selfrun --title t --severity LOW
-  --surface s --component c --context vp --tag x --symptom sy --repro rp --expected ex
-  --notes no --specs-dir repos/vp/specs`; then `$D bugs status --specs-dir repos/vp/specs`;
-  then an INCOMPLETE append `$D bugs append --event reported --bug-id x --specs-dir
+- Run the complete append with EVERY required field (`bugs append` has no `--event`
+  flag — one record per bug, appended once, v0.5.0 FR2) —
+  `--bug-id valbug --reported-by selfrun --title t --severity LOW
+  --surface unknown --component c --context vp --symptom sy --repro rp --expected ex
+  --specs-dir repos/vp/specs`; then `$D bugs status --specs-dir repos/vp/specs`;
+  then an INCOMPLETE append `$D bugs append --bug-id x --specs-dir
   repos/vp/specs` (omitting the fields above).
 - **PASS if:** the complete append exits 0 and appears in `bugs status --specs-dir
   repos/vp/specs`; the incomplete one exits non-zero and writes nothing.
