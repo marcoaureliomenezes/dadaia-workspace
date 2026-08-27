@@ -15,6 +15,7 @@ from dadaia_workspace.cli.main import app
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
+from tests.helpers.release_jsonl import write_release_phase
 
 _runner = CliRunner()
 _CTX = "demo"
@@ -32,13 +33,20 @@ def _init_workspace(workspace: Path) -> None:
 def _seed_context(
     workspace: Path,
     *,
-    active: str = f"release: {_RELEASE}\nphase: TASKS\n",
+    phase: str | None = "TASKS",
     plan: str = "**Owner:** qa-engineer\n**Owner:** product-engineer\n",
     handoffs: dict[str, str] | None = None,
 ) -> None:
-    releases = workspace / "repos" / _CTX / "specs" / "releases"
+    """Seed ``repos/<_CTX>/specs/releases/<_RELEASE>/`` with a PLAN.md and, unless
+    ``phase`` is None, a RELEASE.jsonl carrying that phase (v0.5.0 FR4/T-050-21A --
+    ``ACTIVE.md`` is retired). ``phase=None`` simulates "no active release": the
+    release directory exists (with a PLAN.md) but carries no RELEASE.jsonl, so the
+    resolver's directory scan finds zero candidates."""
+    specs = workspace / "repos" / _CTX / "specs"
+    releases = specs / "releases"
     (releases / _RELEASE).mkdir(parents=True)
-    (releases / "ACTIVE.md").write_text(active, encoding="utf-8")
+    if phase is not None:
+        write_release_phase(specs, _RELEASE, phase)
     (releases / _RELEASE / "PLAN.md").write_text(plan, encoding="utf-8")
     for agent, rel in (handoffs or {}).items():
         handoff_dir = workspace / ".dadaia" / "handoff" / _CTX
@@ -87,7 +95,7 @@ def test_next_json_text_all_completed_no_active_release_and_plan_without_owners(
     # Exit-3 error paths: no active release, and a PLAN with no declared owners.
     no_release_ws = tmp_path / "no-release-case"
     _init_workspace(no_release_ws)
-    _seed_context(no_release_ws, active="release: none\nphase: DISCOVERY\n")
+    _seed_context(no_release_ws, phase=None)
     monkeypatch.chdir(no_release_ws)
     no_release_result = _runner.invoke(app, ["reports", "next", "--context", _CTX])
     assert no_release_result.exit_code == 3

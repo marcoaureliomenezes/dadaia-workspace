@@ -401,4 +401,3 @@ def init(
 
     if result.errors:
         sys.exit(1)
-

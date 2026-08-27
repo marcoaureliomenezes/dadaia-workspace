@@ -35,6 +35,7 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
+from tests.helpers.release_jsonl import write_release_phase
 
 pytestmark = [pytest.mark.integration]
 
@@ -72,9 +73,9 @@ def _seed_main_repo(repo: Path) -> None:
     release_dir.mkdir(parents=True)
     for name in ("SPEC.md", "PLAN.md", "TASKS.md"):
         (release_dir / name).write_text(f"# {name}\n\n> **Status:** Aprovado\n", encoding="utf-8")
-    (repo / "specs" / "releases" / "ACTIVE.md").write_text(
-        f"release: {_MAIN_RELEASE}\nphase: {_MAIN_PHASE}\n", encoding="utf-8"
-    )
+    # ACTIVE.md retired (v0.5.0 FR4/T-050-21A) -- the live phase is folded from
+    # RELEASE.jsonl (core.release_events.fold_release_events).
+    write_release_phase(repo / "specs", _MAIN_RELEASE, _MAIN_PHASE)
     mem = repo / "specs" / "memory" / "product"
     mem.mkdir(parents=True)
     (repo / "specs" / "memory" / "TECHSTACK.md").write_text("# tech\nmain\n", encoding="utf-8")
@@ -89,10 +90,9 @@ def _seed_main_repo(repo: Path) -> None:
 def _seed_associated_repo(repo: Path) -> None:
     """The associated repo's OWN, DELIBERATELY DIVERGENT specs/ tree — committed to its
     own git history, exactly as A16.3 proves a real ``alive()`` clone would leave it."""
-    (repo / "specs" / "releases").mkdir(parents=True)
-    (repo / "specs" / "releases" / "ACTIVE.md").write_text(
-        f"release: {_ASSOC_RELEASE}\nphase: {_ASSOC_PHASE}\n", encoding="utf-8"
-    )
+    # ACTIVE.md retired (v0.5.0 FR4/T-050-21A) -- the decoy phase now lives in this
+    # repo's OWN RELEASE.jsonl, which must never be read while resolving inside it.
+    write_release_phase(repo / "specs", _ASSOC_RELEASE, _ASSOC_PHASE)
     (repo / "specs" / "memory").mkdir(parents=True)
     (repo / "specs" / "memory" / "TECHSTACK.md").write_text(
         f"# the associated repo's OWN tech stack\n{_ASSOC_MEMORY_MARKER}\n", encoding="utf-8"
@@ -198,7 +198,7 @@ def test_backlog_doctor_from_inside_associated_repo_never_sees_the_associated_ba
 
 # --------------------------------------------------------------------------- #
 # SDD gate — the phase decision for a write INSIDE the associated repo's own
-# specs/memory/ still reads the MAIN repo's ACTIVE.md phase, never the associated
+# specs/memory/ still reads the MAIN repo's RELEASE.jsonl phase, never the associated
 # repo's own (divergent) one.
 # --------------------------------------------------------------------------- #
 
@@ -218,11 +218,11 @@ def _run_gate(
 def test_gate_memory_write_inside_associated_repo_is_governed_by_the_main_repos_phase(
     workspace: Path,
 ) -> None:
-    """The associated repo's own ``specs/releases/ACTIVE.md`` claims phase DEFINITION
-    (which would ALLOW a memory write); the MAIN repo's real phase is IMPLEMENTATION
-    (which BLOCKs one). A write physically inside ``repos/assoc-repo/specs/memory/``
-    must be BLOCKed on the MAIN's phase — proving the gate never reads the associated
-    repo's own ACTIVE.md."""
+    """The associated repo's own ``specs/releases/<id>/RELEASE.jsonl`` claims phase
+    DEFINITION (which would ALLOW a memory write); the MAIN repo's real phase is
+    IMPLEMENTATION (which BLOCKs one). A write physically inside
+    ``repos/assoc-repo/specs/memory/`` must be BLOCKed on the MAIN's phase — proving
+    the gate never reads the associated repo's own RELEASE.jsonl."""
     target = workspace / "repos" / _ASSOC_SLUG / "specs" / "memory" / "leak-probe.md"
     target.parent.mkdir(parents=True, exist_ok=True)
 
