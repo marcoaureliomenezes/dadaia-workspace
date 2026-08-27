@@ -1,9 +1,12 @@
 """Bug domain models — :class:`BugRecord`, the one-record-per-bug model (v0.5.0
 FR2/T-050-08, D-F: expand -> switch -> contract).
 
-Pure domain module — no I/O, no internal imports beyond ``dataclasses``/``enum``/``re``
-(stdlib only): ``core/models/bugs.py`` is NOT in ``architecture.md``'s "Core file-I/O
-authorized set", so the model never reads a schema file itself. :class:`BugRecord` is
+Pure domain module — no I/O, no internal imports beyond ``dataclasses``/``enum``
+(stdlib only) plus ONE sibling core module, ``core.redaction`` (the shared, also-pure
+``redact_text`` masking primitive both this model and ``core.models.backlog`` import —
+never each other; see :data:`redact_text`'s re-export note below): ``core/models/bugs.py``
+is NOT in ``architecture.md``'s "Core file-I/O authorized set", so the model never
+reads a schema file itself. :class:`BugRecord` is
 one line of ``specs/bugs/BUGS.jsonl`` (the T-050-10 rename of the retired
 ``bugs.jsonl``), appended once (field set mirrors
 ``public/schemas/bugs/bug-record-v1.schema.json``, whose per-property ``x-mutability``/
@@ -34,12 +37,13 @@ necessity: git history is v5-shaped forever) and the closed set of terminal
 
 from __future__ import annotations
 
-import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from dataclasses import fields as dc_fields
 from enum import StrEnum
 from typing import Any
+
+from dadaia_workspace.core.redaction import redact_text
 
 __all__ = [
     "TERMINAL_EVENTS",
@@ -150,70 +154,15 @@ def redactable_property_names(schema: Mapping[str, object]) -> tuple[str, ...]:
     return tuple(names)
 
 
-# Redaction patterns for `notes` (privacy rules): operator-local home paths + IPs never
-# land in a committed bug event. The username segment of a home path is scrubbed; the IPv4
-# form is masked wholesale. (A version token like v0.1.46 has only three numeric groups and
-# is never matched.)
-_IPV4_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
-_POSIX_HOME_RE = re.compile(r"(/home/|/Users/)[^/\s:]+")
-_WIN_HOME_RE = re.compile(r"([A-Za-z]:\\Users\\)[^\\\s:]+")
-
-#: The C0/C1/DEL control range MINUS TAB (0x09), LF (0x0A) and CR (0x0D), plus the
-#: Unicode LINE/PARAGRAPH SEPARATORS (U+2028/U+2029). Stripped — never escaped — FIRST
-#: inside :func:`redact_text`, before any masking pass (v0.4.5 FR7/A7.3/A7.6, narrowed
-#: by bug ``bug-event-sanitation-strips-tab-lf-cr-from-free-text``; bundles bug
-#: ``bug-event-field-with-unicode-line-separator-silently-drops-the-event``).
-#: ``JsonlBugStore.append_event`` serializes every field with ``json.dumps(...,
-#: ensure_ascii=False)``, which already escapes the WHOLE C0/C1/DEL range as a JSON
-#: string escape — a literal TAB/LF/CR inside a field value can never fragment a
-#: JSONL line, because ``JsonlBugStore.iter_events`` splits the file on a literal
-#: ``"\\n"`` character, never on ``str.splitlines()``'s wider terminator set (v0.4.5
-#: FR7 read-side fix). TAB/LF/CR carry neither hazard this class exists to close and
-#: must round-trip intact — deleting them only destroyed the word boundaries of every
-#: multi-line free-text field (``repro``, ``evidence_loop``, ``evidence_seam``, …),
-#: silently, on the live write path (bug
-#: ``bug-event-sanitation-strips-tab-lf-cr-from-free-text``). What DOES still need
-#: stripping: (a) U+0085/U+2028/U+2029 — the only bytes ``json.dumps`` leaves raw AND
-#: a naive ``str.splitlines()``-style reader would treat as a terminator, the actual
-#: fragmentation hazard (A7.1); (b) ESC and the rest of C0/C1/DEL — a raw ESC forges
-#: an ANSI escape sequence or a fake second output line in any consumer that ever
-#: decodes a folded :class:`BugRecord` back to a terminal (CWE-117, A7.2). Deleted
-#: rather than escaped, unlike that precedent: a denylisted term an attacker
-#: interrupts with one of these bytes must re-join into a contiguous substring for
-#: the masking pass immediately below to still catch it (A7.6) — an escape sequence
-#: (``"\\x1b"``) would leave the two halves apart.
-_UNSAFE_FORMAT_CHARS_RE = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\x80-\x9f\u2028\u2029]")
-
-
-def redact_text(text: str, denylist_terms: Sequence[tuple[str, str]] = ()) -> str:
-    """Return ``text`` with unsafe control/format characters stripped, then
-    operator-local home-path usernames, IPv4 addresses, and any operator denylist term
-    masked.
-
-    The control/format strip (see :data:`_UNSAFE_FORMAT_CHARS_RE`) runs FIRST, before
-    every masking pass (v0.4.5 FR7/A7.6) — so a denylisted term an attacker split with
-    an embedded ESC or Unicode line/paragraph separator still gets matched below, and
-    no such byte ever survives into a persisted field.
-
-    ``denylist_terms`` is ``(term, reason)`` pairs from the SAME operator-term source
-    the push-time scan already refuses on
-    (``infrastructure.privacy_check.load_privacy_terms`` /
-    ``features.chokepoints.denylist_scan.operator_terms_match``) — threaded in by the
-    caller since this module is pure core and must never import ``infrastructure``
-    (v0.4.5 FR6/T-045-19, `core-no-upper-layers`). Matched case-insensitively as a
-    literal substring, mirroring the push-time scan's own semantics exactly (A6.3), so
-    a term that would refuse a push is masked before it is ever committed. Defaults to
-    ``()`` — a no-op for the denylist pass — so every pre-FR6 caller keeps masking
-    IP/home paths; the control/format strip is unconditional and a no-op on clean text.
-    """
-    out = _UNSAFE_FORMAT_CHARS_RE.sub("", text)
-    out = _IPV4_RE.sub("[REDACTED-IP]", out)
-    out = _POSIX_HOME_RE.sub(r"\1[REDACTED]", out)
-    out = _WIN_HOME_RE.sub(r"\1[REDACTED]", out)
-    for term, _reason in denylist_terms:
-        if term:
-            out = re.sub(re.escape(term), "[REDACTED-TERM]", out, flags=re.IGNORECASE)
-    return out
+#: Case-insensitive substring denylist masking + control/format-char stripping +
+#: IP/home-path scrubbing (SPEC v0.4.5 FR6/FR7, T-045-19) — the primitive itself
+#: lives in ``core.redaction`` (relocated at the bug
+#: ``backlog-histo-writer-skips-write-time-denylist-redaction`` fix: a SECOND
+#: write-time record model, ``core.models.backlog.BacklogHistoRecord``, needed the
+#: identical seam, and ``core/models/bugs.py`` must never import
+#: ``core/models/backlog.py`` — both import this shared, domain-agnostic sibling
+#: instead). Re-exported here, unchanged, for every existing caller of
+#: ``dadaia_workspace.core.models.bugs.redact_text``.
 
 
 # ============================================================================

@@ -900,3 +900,86 @@ def test_backlog_exit_twice_for_the_same_slug_is_structurally_impossible(
         )
 
     assert len(list(store.iter_records())) == 1
+
+
+# ═════════════════════════════════════════════════════════════════════════════════
+# bug backlog-histo-writer-skips-write-time-denylist-redaction — backlog_exit must
+# thread an injected operator denylist through BacklogHistoRecord.redact() BEFORE
+# appending, exactly as BugService.register/apply_update already do (SPEC v0.4.5
+# FR6/T-045-19). Before the fix: an entry_md snapshot carrying a denylisted term is
+# appended RAW, caught only later at the push gate.
+# ═════════════════════════════════════════════════════════════════════════════════
+
+_ACTIVE_ITEM_WITH_DENYLISTED_TERM = """\
+## ACTIVE
+
+### leaky-exit
+- **Title:** Leaky exit
+- **Opened:** 2026-08-10
+- **Status:** candidate
+- **Description:** See .dadaia/reports/consumer-game-games/qa-engineer/report.html for detail.
+- **Provenance:** operator request
+"""
+
+
+def test_backlog_exit_masks_a_denylisted_term_in_entry_md_before_append(
+    tmp_path: Path,
+) -> None:
+    """The RED test (bug backlog-histo-writer-skips-write-time-denylist-redaction):
+    ``backlog_exit`` threads its ``denylist_terms`` parameter through
+    ``BacklogHistoRecord.redact()`` before the record ever reaches the injected
+    store — the SAME write-time seam ``BugService.register`` already enforces."""
+    specs = tmp_path / "specs"
+    (specs / "backlog").mkdir(parents=True)
+    (specs / "backlog" / "BACKLOG.md").write_text(
+        _ACTIVE_ITEM_WITH_DENYLISTED_TERM, encoding="utf-8"
+    )
+
+    store = _FakeHistoStore()
+    record = backlog_exit(
+        specs,
+        "leaky-exit",
+        histo_store=store,
+        disposition="DELIVERED",
+        reason=None,
+        release="v9.9.9",
+        by="test-suite",
+        ts="2026-08-27",
+        denylist_terms=(("consumer-game", "private project/person identifier"),),
+    )
+
+    assert record.entry_md is not None
+    assert "consumer-game" not in record.entry_md.lower()
+    assert "[REDACTED-TERM]" in record.entry_md
+
+    persisted = list(store.iter_records())[0]
+    assert persisted.entry_md is not None
+    assert "consumer-game" not in persisted.entry_md.lower()
+
+
+def test_backlog_exit_with_no_denylist_terms_stays_byte_identical_to_pre_fix(
+    tmp_path: Path,
+) -> None:
+    """A6.3-class sibling guarantee: ``backlog_exit`` called with no ``denylist_terms``
+    (the default) behaves exactly as before the fix — the removed subsection text is
+    appended verbatim, byte-identical."""
+    specs = tmp_path / "specs"
+    (specs / "backlog").mkdir(parents=True)
+    (specs / "backlog" / "BACKLOG.md").write_text(
+        _ACTIVE_ITEM_WITH_DENYLISTED_TERM, encoding="utf-8"
+    )
+
+    store = _FakeHistoStore()
+    record = backlog_exit(
+        specs,
+        "leaky-exit",
+        histo_store=store,
+        disposition="DELIVERED",
+        reason=None,
+        release="v9.9.9",
+        by="test-suite",
+        ts="2026-08-27",
+    )
+
+    assert record.entry_md is not None
+    assert "consumer-game-games" in record.entry_md

@@ -642,6 +642,7 @@ def backlog_exit(
     release: str | None,
     by: str,
     ts: str | None = None,
+    denylist_terms: Sequence[tuple[str, str]] = (),
 ) -> BacklogHistoRecord:
     """Retire *slug* out of ``## ACTIVE`` and append its one histo record (v0.5.0 FR5,
     A5.3) — the atomic pair :func:`remove_active_subsection` (the removal) and
@@ -652,6 +653,14 @@ def backlog_exit(
 
     ``entry_md`` is the exact removed subsection text; there is nothing to "recover"
     for a live exit (only the historical migration reaches for an archived snapshot).
+
+    ``denylist_terms`` is redacted through :meth:`BacklogHistoRecord.redact` BEFORE the
+    record is appended (bug ``backlog-histo-writer-skips-write-time-denylist-redaction``)
+    — the SAME write-time seam ``BugService.register``/``apply_update`` already enforce
+    for ``BugRecord`` (SPEC v0.4.5 FR6/T-045-19). Defaults to ``()``: this module never
+    imports ``infrastructure``/``container`` (``features-no-infrastructure``), so the
+    caller wires the real operator denylist in via ``container.load_denylist_terms()``,
+    mirroring how ``cli/commands/bugs.py`` wires ``BugService`` today.
     """
     entry_md = remove_active_subsection(specs_dir, slug)
     record = BacklogHistoRecord(
@@ -663,6 +672,6 @@ def backlog_exit(
         by=by,
         entry_md=entry_md,
         entry_md_source="live exit (backlog_exit) — exact removed ACTIVE subsection text",
-    )
+    ).redact(denylist_terms)
     histo_store.append(record)
     return record

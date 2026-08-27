@@ -14,14 +14,32 @@ Privacy invariant (SPEC §3.8 finding #7): a ``code`` ref stored in a committed 
 paths (``/home/...``, ``~/...``), parent-directory traversal (``../``), and Windows drive
 prefixes are rejected at construction so no operator-local path can ever land in a committed
 backlog file.
+
+**``BacklogHistoRecord.redact()`` (bug
+``backlog-histo-writer-skips-write-time-denylist-redaction``).** The SAME defect class
+``core.models.bugs.BugRecord`` already had fixed twice (T-043-23 -> T-044-62 -> T-045-19,
+SPEC v0.4.5 FR6): a write-time record model appended a free-text snapshot field
+(``entry_md``) with no denylist masking, caught only later at the push gate. Every
+free-text field this dataclass declares — except the three identity fields (``id``,
+``ts``, ``by``, mirroring ``BugRecord``'s own ``id``/``ts``/``reported_by`` exemption) —
+is derived from THIS dataclass's own ``dataclasses.field(metadata=...)`` declarations
+(the SAME ``_dataclass_field_names`` mechanism ``core.models.bugs``/``core.models.findings``
+each already use, per-module, never a second hand-kept list — A2.10). Masking itself
+routes through ``core.redaction.redact_text``, the SAME primitive
+``BugRecord.redact()`` calls — ``core/models/backlog.py`` and ``core/models/bugs.py``
+never import each other; both import that one shared, domain-agnostic sibling.
 """
 
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass, field, replace
+from dataclasses import fields as dc_fields
 from enum import StrEnum
+from typing import Any
+
+from dadaia_workspace.core.redaction import redact_text
 
 __all__ = [
     "INTENTS_EXEMPT_STATUS",
@@ -240,6 +258,23 @@ def serialize_intents(intents: Sequence[Intent]) -> list[dict[str, object]]:
     return out
 
 
+def _dataclass_field_names(
+    dataclass_type: type, predicate: Callable[[Mapping[str, object]], bool]
+) -> tuple[str, ...]:
+    """Return the field names of *dataclass_type* whose ``metadata`` satisfies
+    *predicate* — pure ``dataclasses.fields()`` introspection, zero file I/O.
+
+    The SAME per-module mechanism ``core.models.bugs``/``core.models.findings`` each
+    already declare (a per-field ``dataclasses.field(metadata={...})`` entry, colocated
+    with the field's own declaration, never a second, separately-maintained
+    module-level tuple/list/set of names — A2.10). Duplicated here rather than
+    imported from either sibling: every ``core/models/*.py`` domain model stays
+    self-contained, importing no OTHER ``core/models`` module (only the shared,
+    domain-agnostic ``core.redaction``/stdlib) — see this module's own docstring.
+    """
+    return tuple(f.name for f in dc_fields(dataclass_type) if predicate(f.metadata))
+
+
 def _require_histo_str(raw: Mapping[str, object], key: str) -> str:
     value = raw.get(key)
     if not isinstance(value, str) or not value:
@@ -272,16 +307,43 @@ class BacklogHistoRecord:
     :meth:`~dadaia_workspace.core.protocols.record_store.RecordStore.update` when a
     provisional ``CONSUMED`` matures to its terminal token at closure (DADAIA.md §6) —
     never a second record for the same slug.
+
+    ``id``/``ts``/``by`` are marked ``metadata={"identity": True}`` — the record's
+    stable identity/attribution fields, mirroring ``BugRecord``'s own
+    ``id``/``ts``/``reported_by`` exemption — and are the ONLY fields
+    :meth:`redact` never scrubs; every other field is free text a committed exit
+    snapshot must never carry a denylisted term in (bug
+    ``backlog-histo-writer-skips-write-time-denylist-redaction``).
     """
 
-    id: str
-    ts: str
+    id: str = field(metadata={"identity": True})
+    ts: str = field(metadata={"identity": True})
     disposition: str
     reason: str | None
     release: str | None
-    by: str
+    by: str = field(metadata={"identity": True})
     entry_md: str | None
     entry_md_source: str | None
+
+    def redact(self, denylist_terms: Sequence[tuple[str, str]] = ()) -> BacklogHistoRecord:
+        """Return a copy with every free-text field scrubbed via
+        :func:`~dadaia_workspace.core.redaction.redact_text` — the SAME primitive
+        :meth:`~dadaia_workspace.core.models.bugs.BugRecord.redact` calls.
+
+        The field set is every declared field EXCEPT the three identity fields
+        (``id``/``ts``/``by``, marked ``metadata={"identity": True}`` above) —
+        derived from THIS dataclass's own fields via :func:`_dataclass_field_names`,
+        zero file I/O. A field added to :class:`BacklogHistoRecord` is redacted by
+        default with NO code edited here (A2.10).
+        """
+
+        def _scrub(value: str | None) -> str | None:
+            return None if value is None else redact_text(value, denylist_terms)
+
+        updates: dict[str, Any] = {
+            name: _scrub(getattr(self, name)) for name in _BACKLOG_HISTO_RECORD_REDACTABLE_FIELDS
+        }
+        return replace(self, **updates)
 
     def to_dict(self) -> dict[str, object]:
         """Serialize to the JSONL object shape (``"id"`` present so the generic
@@ -312,6 +374,13 @@ class BacklogHistoRecord:
             entry_md=_optional_histo_str(raw, "entry_md"),
             entry_md_source=_optional_histo_str(raw, "entry_md_source"),
         )
+
+
+#: Derived (A2.10) — never hand-kept — from ``BacklogHistoRecord``'s own field
+#: metadata: every field except the three identity fields (``id``/``ts``/``by``).
+_BACKLOG_HISTO_RECORD_REDACTABLE_FIELDS: tuple[str, ...] = _dataclass_field_names(
+    BacklogHistoRecord, lambda metadata: not metadata.get("identity")
+)
 
 
 def _require_histo_consumed_list(raw: Mapping[str, object], key: str) -> list[dict[str, object]]:
