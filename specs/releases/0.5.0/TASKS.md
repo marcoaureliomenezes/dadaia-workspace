@@ -1449,7 +1449,7 @@ motivated it (`precommit-backlog-doctor-blocks-unrelated-commits`). Confirm **ze
 
 ## Segment `S3` — the audit canon
 
-- [-] **T-050-23 — FR13: audits become committed spec artifacts**
+- [x] **T-050-23 — FR13: audits become committed spec artifacts**
 
 **Owner role:** software-engineer (schema, scaffold) + ai-engineer (persona, scoped law) ·
 **Commit:** `feat(T-050-23): audits as committed artifacts — AUDIT.md + FINDINGS.jsonl`
@@ -1490,7 +1490,7 @@ registrations, proven by the diff.
 
 ---
 
-- [-] **T-050-24 — FR14: `dd-audit-project` rewritten around three pillars**
+- [x] **T-050-24 — FR14: `dd-audit-project` rewritten around three pillars**
 
 **Owner role:** ai-engineer · **Commit:** `refactor(T-050-24): dd-audit-project — three
 pillars over a sha window`
@@ -1809,7 +1809,7 @@ tenth import-linter contract is added without a principle. **Tests: +1 / −0.**
 
 ---
 
-- [-] **T-050-30 — FR19: the `specs/ADRs/` canon and the proposed inventory ADRs**
+- [x] **T-050-30 — FR19: the `specs/ADRs/` canon and the proposed inventory ADRs**
 
 **Owner role:** product-engineer (authoring) + ai-engineer (the scoped `AGENTS.md`) ·
 **Commit:** one isolated `docs(adr): propose NNNN-<slug>` **per ADR** (SPEC FR8 shape 2)
