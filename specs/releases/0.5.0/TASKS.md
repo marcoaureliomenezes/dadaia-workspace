@@ -1216,7 +1216,7 @@ whole `test_rules_skills_map.py`, ported not duplicated).**
 
 ---
 
-- [-] **T-050-19A — FR10A: the public-assets hand rosters retire with the glob**
+- [x] **T-050-19A — FR10A: the public-assets hand rosters retire with the glob**
 
 **Owner role:** software-engineer (the deletions) + qa-engineer (the verdict on any roster
 kept) · **Commit:** `refactor(T-050-19A): retire the skill rosters FR10's glob makes redundant`
