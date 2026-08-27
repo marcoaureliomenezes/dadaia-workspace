@@ -416,16 +416,27 @@ class GitSubprocessClient:
         (v0.5.0 FR3/A3.10, AR-1 ruling §3 — no sibling adapter module, this EXISTING
         client gains the one new method).
 
-        Walks ``git log --all --no-merges --reverse --date-order -- <pathspec>``
-        (FR3 step 1: all refs including tags, oldest first) to get the ordered
-        ``(sha, parents, date)`` triple for every commit that ever touched *pathspec*,
-        then reads each commit's pathspec-restricted added lines
+        Walks ``git log --all --full-history --no-merges --reverse --date-order --
+        <pathspec>`` (FR3 step 1: all refs including tags, oldest first) to get the
+        ordered ``(sha, parents, date)`` triple for every commit that ever touched
+        *pathspec*, then reads each commit's pathspec-restricted added lines
         (:func:`_added_lines_for_commit`) and its WHOLE unrestricted touched-path set
         (:func:`_touched_paths_for_commit`) — two extra calls per commit, ``≈2N+1``
         subprocess calls total, accepted for the one-shot migration this port serves
         (AR-1 ruling §3.4). Every call reads raw bytes and decodes strictly per line
         (never ``_run``'s locale-decoded ``text=True``) — see
         :func:`_run_bytes`/:func:`_decode_lines_strict`.
+
+        ``--full-history`` (bug
+        ``git-history-walk-omits-full-history-hides-ledger-commits``) is load-bearing,
+        not cosmetic: without it, git's default treesame-based history simplification
+        can prune a commit that genuinely touched *pathspec* off the walk entirely —
+        specifically a commit on a branch whose later merge discarded its change and
+        whose own ref was since deleted (the routine post-merge shape
+        ``dd-gitflow-default`` mandates: "delete ``feature/{M.m.p}``" the moment its
+        work lands elsewhere). That commit remains a real ancestor, reachable only
+        through the merge's parent list — a "policy-relevant history walk never
+        silently under-reports" only holds with this flag present.
 
         Raises :class:`GitHistoryReadError` on any non-zero git exit — a policy-relevant
         history walk never silently under-reports.
@@ -435,6 +446,7 @@ class GitSubprocessClient:
                 "git",
                 "log",
                 "--all",
+                "--full-history",
                 "--no-merges",
                 "--reverse",
                 "--date-order",
