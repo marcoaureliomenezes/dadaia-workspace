@@ -146,8 +146,30 @@ ignore = ["E501", "B008", "B903"]
 preview = true
 
 [tool.ruff.lint.mccabe]
-# Ceiling pinned at the measured maximum (V6). Ratchets DOWN ONLY — see the doctrine
-# comment above `[tool.ruff.lint]`.
+# Ceiling pinned at the measured maximum. Ratchets DOWN ONLY — see the doctrine comment
+# above `[tool.ruff.lint]`.
+#
+# V35/A22.12 (T-050-34, v0.5.0) RE-MEASURED AND FOUND THE PRIOR "61" RADON READING
+# UNSAFE TO RATCHET TO — recorded here rather than silently applied, per the
+# ratchet-direction doctrine above ("measure, then pin", never a number that breaks
+# `ruff check .`). `radon cc -s -j dadaia_workspace` reports a maximum of 61
+# (`features/telemetry/aggregator/queries.py::_list_agents_impl`, unchanged), but
+# `ruff check .` itself (the actual gate this ceiling governs) still flags
+# `dadaia_workspace/features/panel/handler.py::make_handler_class` at complexity 63 —
+# unchanged since the original v0.4.3 T-043-29 measurement that set this ceiling.
+# Root cause: `make_handler_class` is a factory function that defines and returns a
+# nested `class PanelHandler(...)` with several methods (`do_GET`, `_host_rejected`,
+# etc.) in its body; `radon cc -s -j`'s file-level walk scores the factory function's
+# OWN top-level branches only (6) and never separately surfaces the nested class's
+# methods, while ruff's C901 (the actual enforced rule) counts every branch inside the
+# enclosing function's lexical scope, nested class included, as one unit (63). Verified
+# directly: T-050-03's own baseline radon JSON already scored `make_handler_class` at 6,
+# not 63 — the "radon methodology parity" it claimed was checked only against
+# `#upgrade`/`#doctor`'s two named CC values, never against the whole-codebase max.
+# Bug registered: `radon-undercounts-nested-class-in-function-complexity-vs-ruff-c901`.
+# The true, gate-enforced maximum this release is still 63 (make_handler_class,
+# untouched) — no ratchet is safe until that function is refactored or the measurement
+# tooling is fixed; lowering to 61 here would fail `ruff check .` outright.
 max-complexity = 63
 
 [tool.ruff.lint.pylint]
