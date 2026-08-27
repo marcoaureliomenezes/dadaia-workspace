@@ -523,7 +523,7 @@ at T-050-41.
 
 ---
 
-- [ ] **T-050-07 — FR2 (expand): the bug record model**
+- [-] **T-050-07 — FR2 (expand): the bug record model**
 
 **Owner role:** software-engineer · **Commit:** `feat(T-050-07): one record per bug —
 bug-record-v1 with immutable core and mutable governance`
