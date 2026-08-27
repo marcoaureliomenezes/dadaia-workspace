@@ -1,0 +1,123 @@
+{
+  "schema_version": "handoff-v1.2",
+  "agent": "security-reviewer",
+  "context": "dadaia-workspace",
+  "release_id": "0.5.0",
+  "produced_at": "2026-08-27T18:05:00Z",
+  "scope": "PR-cycle security verdict for release 0.5.0 (rc-1 = final rc). Re-key of the T-050-36 review (f3e13023, APPROVED-PENDING-REKEY, snapshot 343acc38) onto HEAD 14ec830c, plus a diff-based review of the delta 343acc38..14ec830c (13 commits, 44 files, +3324/-518). Diff-based per DADAIA.md \u00a77 \u2014 the whole-tree posture belongs to the audit lane and is labelled as such where recorded.",
+  "verdict": "APPROVED",
+  "verdict_reason": "No blocking security or privacy finding stands against the HEAD tree at 14ec830c. None of the mandatory REQUEST_CHANGES triggers fires: public-asset privacy clean (`dadaia public doctor` \u2192 [ok] public-privacy, [ok] entities-derivation, 0 drift/missing); zero secrets, emails, IPv4 literals, home-abs-paths or private-key blocks across the delta's 3324 added lines; zero foreign-repo-slug hits against the gate-equivalent 10-slug foreign set (the single raw hit was the workspace's OWN slug, which the gate correctly excludes); no dependency added (pyproject delta is the version line alone); no CI workflow YAML touched; no mode/exec-bit change; no generated-file or consumer-data leakage. The six security findings routed for fix (F-13, F-14, F-16, F-17, F-18, F-20) are verified landed at 7280856c, each carrying a regression seam, and the F-14 fallout (M-8) is closed at 0246bbae; 52 targeted tests pass. CONDITIONAL ON THE OPERATOR'S HISTORY REWRITE (see finding 2): the push gate still blocks on 11 historical objects, none of which is in the HEAD tree; after the rewrite every sha in the range changes and THIS VERDICT MUST BE RE-KEYED to the new HEAD.",
+  "artifact": {
+    "type": "report"
+  },
+  "self_pull": {
+    "refs": [
+      "specs/memory/product/catalog.json",
+      "specs/memory/product/distribution/public-asset-distribution.md",
+      "specs/memory/product/sdd/sdd-bug-backlog-governance.md",
+      "specs/memory/ARCHITECTURE.md"
+    ]
+  },
+  "metrics": {
+    "commit_sha": "14ec830cf1b6ae76ed19d37aef342fde1d82ef3e",
+    "reviewed_branch": "feature/0.5.0",
+    "prior_review": "specs/releases/0.5.0/reviews/T-050-36-security-review.md",
+    "prior_review_commit": "f3e13023",
+    "prior_review_snapshot": "343acc3805b7e15c36cb98a640a389b26870b899",
+    "delta_range": "343acc38..14ec830c",
+    "delta_commits": 13,
+    "delta_files_changed": 44,
+    "delta_lines_added": 3324,
+    "delta_lines_removed": 518,
+    "delta_secret_assignment_hits": 0,
+    "delta_email_hits": 0,
+    "delta_ipv4_hits": 0,
+    "delta_home_abs_path_hits": 0,
+    "delta_private_key_block_hits": 0,
+    "delta_vendor_token_hits": 0,
+    "delta_operator_denylist_hits": 0,
+    "delta_foreign_repo_slug_hits": 0,
+    "delta_dependencies_added": 0,
+    "delta_workflow_yaml_files_changed": 0,
+    "push_gate_offending_objects": 11,
+    "push_gate_offending_objects_in_head_tree": 0,
+    "push_gate_offending_objects_introduced_by_delta": 0,
+    "public_doctor_drift_or_missing": 0,
+    "regression_tests_run": 52,
+    "regression_tests_passed": 52,
+    "severity_totals": {
+      "CRITICAL": 0,
+      "HIGH": 0,
+      "MEDIUM": 1,
+      "LOW": 2,
+      "INFO": 5
+    },
+    "bug_surface_axis": "REDUCED",
+    "bugs_ledger_total": 515,
+    "bugs_ledger_open": 8,
+    "rekey_required_after_history_rewrite": true
+  },
+  "findings": [
+    {
+      "severity": "INFO",
+      "message": "HEAD TREE IS CLEAN \u2014 all 11 push-gate offending objects are historical, and the delta introduced zero new ones.",
+      "detail_md": "Re-ran the new-branch push-gate simulation exactly as the pre-push hook runs it:\n\n```\nprintf 'refs/heads/feature/0.5.0 %s refs/heads/feature/0.5.0 0000000000000000000000000000000000000000\\n' \"$(git rev-parse HEAD)\" | <ws>/.dadaia/.venv/bin/dadaia ci push-gate-check   # BLOCKED, 11 objects\n```\n\nCount unchanged from the f3e13023 review (11), and every object classified:\n\n| Class | Count | Classification evidence |\n|---|---|---|\n| Superseded blob (not the HEAD blob for its path) | 8 | each flagged blob id compared against `git rev-parse HEAD:<path>` \u2014 all 8 differ; e.g. `specs/bugs/BUGS.jsonl` flagged blobs `1a53838dd027`/`067f11a3711f`/`3122160426f5` vs HEAD blob `fa02026bddaa` |\n| Commit message | 3 | `a0caa28eb22b` (operator denylist), `ffe1b00982e8`, `e5fa1fbf2677` (baseline `email-address`) \u2014 all three verified `git merge-base --is-ancestor <c> 343acc38` \u2192 true, i.e. **at or before the prior review's snapshot**, so the delta added none |\n| HEAD-tree blob | **0** | no flagged blob id equals a HEAD blob for the same path |\n\n**Independent whole-tree cross-check** (audit-lane posture, out of diff scope, recorded for completeness): running the packaged scanner (`features/chokepoints/denylist_scan.scan_objects`, 18 operator terms + 8 baseline patterns) over all 1773 HEAD-tree blobs raw \u2014 i.e. ignoring the gate's range/newness semantics \u2014 surfaces 40 raw matches. **Zero** of them are in a file the delta changed, 37 are byte-identical to `origin/develop`, and the 3 in branch-modified files (`tests/integration/test_public_assets.py:193`, `tests/unit/test_public_assets.py:30`, `tests/unit/test_backlog_models.py:66`) carry line content that is present verbatim on `origin/develop` \u2014 pre-existing, already-published synthetic scanner fixtures. Raw values redacted throughout; terms appear only in the scanner's own masked `t\u2026n` form.",
+      "fix_recommendation": "No action on the code. The 11 objects dissolve with the operator's planned history rewrite \u2014 see the next finding for its blocking condition."
+    },
+    {
+      "severity": "MEDIUM",
+      "message": "F-01 CARRIED FORWARD \u2014 the history rewrite is deferred to the operator, must reword three commit MESSAGES (not just blobs), and this verdict must be re-keyed afterwards.",
+      "detail_md": "CWE-532 (Insertion of Sensitive Information into Log File). **Blocking for the push, not for the code.** The agent cannot perform this rewrite; it is the operator's.\n\nThree of the eleven offending objects are **commit messages**, which a rewrite that only rewrites trees/blobs leaves published:\n\n- `a0caa28eb22b` \u2014 line 4, operator denylist term. This is the very commit that removed the real operator term from the test fixtures, and it **names that term in its own message**.\n- `ffe1b00982e8` \u2014 line 5, baseline `email-address`.\n- `e5fa1fbf2677` \u2014 line 3, baseline `email-address`.\n\n**Re-key condition (mechanical).** A history rewrite changes every sha in the range, including `14ec830cf1b6ae76ed19d37aef342fde1d82ef3e`. `metrics.commit_sha` in this handoff would then name a commit that no longer exists on the branch, and `.github/scripts/pr-verdict-check.sh` fails closed on it (`git cat-file -e -- <sha>^{commit}` \u2192 SKIP, then `no APPROVED security-reviewer verdict covers PR head`). This verdict therefore does **not** survive the rewrite by design.",
+      "fix_recommendation": "Operator: (1) rewrite the range with `--reword` on all three commits above, not merely `--amend` of their trees; (2) re-run `dadaia ci push-gate-check` and require **exit 0** before the first push; (3) re-dispatch `security-reviewer` to emit a NEW APPROVED verdict handoff keyed to the post-rewrite HEAD, committed at `specs/releases/0.5.0/verdicts/<new-head-sha>.handoff.json`. Do not open either PR on a range whose gate still exits non-zero."
+    },
+    {
+      "severity": "INFO",
+      "message": "F-13/F-14/F-16/F-17/F-18/F-20 verified fixed at 7280856c \u2014 every fix is a deletion or a routing through an existing primitive, and each carries a regression seam.",
+      "detail_md": "Diff-reviewed each fix against the finding it closes:\n\n| Finding | Fix | Shape | Regression seam |\n|---|---|---|---|\n| F-13 (CWE-1188) | `features/backlog/document.py:665` \u2014 `denylist_terms` is now a required keyword-only parameter; the `= ()` default is **deleted** | deletion | 4 test call sites updated to pass it explicitly; mypy --strict now enforces at every future call site |\n| F-14 (CWE-367/CWE-662) | `backlog_new` (`:576-589`) and `remove_active_subsection` (`:650`) route through `core.atomic_write.atomic_write(..., expected_previous=...)`; two bespoke `read_text`\u2192`write_text` pairs deleted | routing to an existing primitive | `ConcurrentModificationError` surfaced verbatim, never swallowed. Verified `atomic_write` treats a missing target as `\"\"` (`core/atomic_write.py:105-110`), so the fresh-file path with `expected_previous=\"\"` is correct, not a spurious refusal. `features \u2192 core` is a legal edge under ARCHITECTURE P-04 |\n| F-16 (CWE-1220) | `pr-verdict-check.sh:213-252` \u2014 every glob hit's release-id **segment** is validated against `_RELEASE_ID_RE`; strip prefixes derived from the canon templates, never a second hardcoded literal | added validation, no new trust root | `test_arm3_ideas_direct_verdicts_dir_refused_fails_closed` \u2014 asserts `no candidate verdict files found` for a `verdicts/` dir placed directly under `_ideas/` |\n| F-17 (CWE-183) | `_is_verdict_evidence_path()` (`:182-203`) replaces the `case` glob whose `*` crossed `/`; the dead pre-v6 `specs/_archive/releases/*/verdicts/*` arm **deleted** | deletion + anchoring | `test_arm6_verdicts_shaped_path_outside_the_id_position_still_disqualifies` \u2014 asserts `specs/releases/0.5.0/reviews/verdicts/evil.py` still disqualifies |\n| F-18 (CWE-20) | `pr-verdict-check.sh:92-96` \u2014 `PR_HEAD_SHA` shape-checked as 40-hex before it reaches any git argv | 4-line symmetry with the existing `metrics.commit_sha` check | `test_arm8_symbolic_pr_head_sha_refused_before_any_git_argv` \u2014 asserts `PR_HEAD_SHA=HEAD` is refused **and** that `PASS` never appears |\n| F-20 (CWE-538) | `.gitignore:136-196` \u2014 `local-notes.md`/`tmp/` scratch denies carried to `specs/audits/**`, `specs/ADRs/**`, `specs/bugs/_archive/**`, `specs/backlog/_archive/**`, `specs/_archive/**`; plus a **latent ordering defect** the fix uncovered: the `specs/releases/**` denies sat BEFORE `!/specs/releases/_archive/**`, so last-match-wins silently undid them for every archived release \u2014 moved after | one line per area + a reorder | `git check-ignore` assertions in `tests/contract/test_source_repo_hygiene.py` |\n\nVerified ordering hazards in the fixed script: the `_archive` arm of `_is_verdict_evidence_path` is tested first and a 5-segment archive path can never fall through to the 4-segment live arm; `_RELEASE_ID_RE` is the canon-derived anchored ERE, so `_ideas`/`_archive`/traversal tokens can never match.\n\n**Fallout closed.** F-14 introduced a new exception type into two writers; `0246bbae` (code-review M-8) adds the fourth `except ConcurrentModificationError` arm in `cli/commands/newartifacts.py:156`, shaped identically to its three siblings (`[error] {exc}` + exit 1) rather than an uncaught traceback. Checked the other new raiser: `remove_active_subsection`/`backlog_exit` have **zero production call sites** (`grep` over `dadaia_workspace/` returns only docstring cross-references in `container.py:292` and `features/backlog/doctor.py:350`), so no second uncaught path exists today.\n\n`pytest -p no:cacheprovider` over the five security-relevant suites \u2014 `tests/contract/test_pr_verdict_check_gate.py`, `tests/contract/test_source_repo_hygiene.py`, `tests/unit/features/backlog/test_document.py`, `tests/integration/cli/test_cli_newartifacts.py`, `tests/unit/core/test_atomic_write_census.py` \u2014 **52 passed**.",
+      "fix_recommendation": "None \u2014 accepted as landed. When `backlog_exit`/`remove_active_subsection` gain their first production caller, that caller must handle `ConcurrentModificationError` the way `backlog_new_cmd` now does."
+    },
+    {
+      "severity": "INFO",
+      "message": "The delta itself (343acc38..14ec830c) is privacy- and secret-clean across every scanned class.",
+      "detail_md": "3324 added lines extracted with `git diff --unified=0` and scanned:\n\n| Class | Method | Hits |\n|---|---|---|\n| Secret-shaped assignment (`password\\|passwd\\|secret\\|token\\|api_key\\|apikey\\|private_key` `[:=]` quoted \u22656 chars) | persona grep | 0 |\n| `BEGIN (RSA\\|EC\\|OPENSSH\\|PGP\\|DSA) PRIVATE KEY` | grep | 0 |\n| Vendor tokens (`ghp_`, `gho_`, `github_pat_`, `AKIA…`, `xox[baprs]-`, `sk-…`, `Bearer …`) | grep | 0 |\n| Email address | grep | 0 |\n| IPv4 literal | grep | 0 |\n| `/home/<user>`, `/Users/<user>`, `C:\\Users\\` | grep | 0 |\n| Operator local username as a bare token | grep, word-boundary | 0 |\n| Operator denylist (18 terms) + baseline (8 patterns) | packaged `scan_objects` | 0 |\n| Foreign repo slug (10 private consumer slugs, gate-equivalent own-slug exclusion) | packaged `scan_objects` | 0 |\n\nOne raw slug hit appeared **only** when the own-slug was left in the set; `context_slug_for_path` resolves the own slug to the 16-char `d\u2026e` value the hit masked to, and the gate excludes it from the foreign-name layer by construction. With the gate-equivalent 10-slug foreign set the delta scores **0**.\n\nOther axes: `dadaia public doctor` \u2192 0 `[drift]`/`[missing]`/`[error]` lines, `[ok] public-privacy` (operator-denylist mode, not the degraded baseline-only mode), `[ok] entities-derivation`; the only non-`[ok]` lines are `[info] codex:trust-boundary` (an un-recertified codex-cli version note) and `[foreign] .claude/settings.local.json` (an operator file, correctly kept). `d82c723e` edits `public/**` sources (retired-`CLOSURE.md` citations) and the projections are in sync. Zero `.github/workflows/**` files changed. Zero mode changes \u2014 the six `create mode 100644` entries are new regular files. `pyproject.toml`/`poetry.lock` delta is the `0.4.5` \u2192 `0.5.0` version line alone, so the prior review's CVE posture is unchanged: 32 ambient `pip-audit` findings, **0** in a declared dependency, **0** dependencies added.",
+      "fix_recommendation": "None."
+    },
+    {
+      "severity": "LOW",
+      "message": "NEW (audit-lane, pre-existing and already published): two HEAD-tree blobs under `specs/backlog/_archive/` carry a real operator denylist term.",
+      "detail_md": "CWE-200. Surfaced by the whole-tree cross-check, **not** by the range-scoped gate \u2014 correctly, because both blobs pre-date this branch entirely:\n\n| Path | Line | Layer |\n|---|---|---|\n| `specs/backlog/_archive/test-artifact-hygiene.md` | 48 | operator denylist (masked `t\u2026n`) |\n| `specs/backlog/_archive/test-runtime-efficiency.md` | 63 | operator denylist (masked `t\u2026n`) |\n\nBoth blob ids are **byte-identical on `origin/main`, `origin/develop` and HEAD** (`49651ca3d717` and `fa4bde9c76b7` respectively) \u2014 i.e. already published, untouched by this branch and untouched by this delta. The range-scoped denylist scan is a *publication* boundary, so it will never re-flag them, and a history rewrite of this branch will not remove them. Same class as F-21 in the prior review (a private consumer slug and the operator's GitHub handle in the committed bug ledger), same disposition: recorded, not a regression of this release. Raw term never echoed \u2014 masked form only.",
+      "fix_recommendation": "Operator decision, in the audit lane rather than this PR: either accept these as already-published history, or (if the term must be retracted) plan a published-history rewrite that covers `main`/`develop` too \u2014 a strictly larger operation than the branch rewrite of F-01. Bundle the call with open item O-2 (F-21), which is the same decision on the same denylist."
+    },
+    {
+      "severity": "LOW",
+      "message": "F-22 still unfixed \u2014 the operator's local username is spelled as a literal in a committed review artifact.",
+      "detail_md": "CWE-200. `specs/releases/0.5.0/reviews/S3-qa-close.md:144` still carries 1 occurrence of the operator's local username as a bare token in prose describing a path check. The baseline `home-abs-path` pattern does not fire (the token is not followed by a path segment), so no boundary refuses it and the push gate stays silent. The file is tracked and will be published with the PR. The delta added three new review artifacts (`RELEASE-VERDICT.md`, `T-050-35-code-review.md`, `T-050-36-security-review.md`) and every one of them scores **0** on the same check \u2014 the defect did not spread.",
+      "fix_recommendation": "Genericize the token to `<user>` at closure (one-word edit, `specs/releases/0.5.0/reviews/S3-qa-close.md:144`). Non-blocking; cosmetic privacy hygiene. Ideally folded into the same commit as any other closure text pass so it does not cost a round."
+    },
+    {
+      "severity": "INFO",
+      "message": "Open items and unfixed findings from the f3e13023 review are carried forward unchanged \u2014 nothing regressed, nothing else was taken.",
+      "detail_md": "**Still open (operator decision, prior review \u00a76):**\n\n| # | Item |\n|---|---|\n| O-1 | F-19 \u2014 the verdict gate's trust model is omission-detection, not forgery-resistance: the evidence is a committed JSON file the PR author controls, with no signature, no provenance check and no CODEOWNERS rule on `specs/releases/**/verdicts/**`. F-17's anchoring narrowed the exemption but does not change this. Choose: (a) document it honestly, (b) CODEOWNERS second approver, or (c) verify a signed commit / trusted author on the verdict file's own commit. |\n| O-2 | F-21 \u2014 a private consumer project slug and the operator's GitHub handle in the committed bug ledger (already published at the range base). See also the new LOW above. |\n| O-3 | F-01 \u2014 the history rewrite must reword three commit messages. **This is the condition on this verdict.** |\n| O-4 | F-20's second half \u2014 whether `specs/**` should carry a secret-shaped deny (`*.env`, `*.pem`, `*.key`, `id_rsa*`) now that the `.gitignore` inversion tracks it by default. **Not landed at 7280856c** (only the scratch-deny half was), so a `secrets.env` under `specs/releases/0.5.0/` is still tracked \u2014 root-level `.env`/`*.pem`/`*.key` denies (`.gitignore:34-93`) remain the mitigation. |\n\n**Routed to PM intake as backlog candidates (prior review C-3), untaken and non-blocking:** F-02 (CWE-59 symlink-following `append()` in `jsonl_record_store`, inconsistent with `atomic_write`'s `os.replace` on the same store), F-03 (CWE-276 temp-sibling default mode), F-04 (CWE-367 residual CAS window \u2014 accepted under NO-LOCKS, docstring overclaims), F-05 (CWE-778 silently skipped malformed ledger lines), F-06 (CWE-88 pathspec not `:(literal)`-wrapped), F-07 (CWE-20 `startswith(\"+++\")` drops a genuine `++`-prefixed content line), F-08 (CWE-20 `bugs update --set` performs no schema validation \u2014 an out-of-enum `status` hides an unresolved bug from `bugs status`), F-09 (CWE-117 `id`/`reported_by` are redaction-exempt with no schema `pattern`), F-10 (CWE-436 re-redaction is indistinguishable from tampering to the A2.7 detector), F-11 (CWE-176 Unicode `Cf` category not stripped \u2014 both privacy layers miss the same split-term input), F-12 (IPv6/hostname masked at push time but not at write time), F-15 (CWE-460 non-transactional `backlog_exit` pair), F-19, F-21, F-23 (CWE-79 unescaped wikilink sink in the panel's `_md_render.py:167-169`, pre-existing, mitigated by loopback bind + Host allowlist + sha256-pinned CSP).\n\nNone of these is a mandatory `REQUEST_CHANGES` trigger and none regressed in the delta.",
+      "fix_recommendation": "`project-manager` to run the operator-facing intake report over O-1..O-4 and the C-3 candidate list. F-02 and F-08 are the two worth pulling forward: F-02 is the A17.1 symlink doctrine unapplied at a brand-new write site, and F-08 lets a defect be hidden from the ledger view without ever being resolved."
+    },
+    {
+      "severity": "INFO",
+      "message": "Bug-surface axis (FR24 / dd-bug-registration \u00a75): the delta REDUCES the bug surface of every feature it touches.",
+      "detail_md": "Assessed against the standing order (permanent architecture review, oriented by bug history), not against \u201ctests green\u201d.\n\n- **`features/backlog/document.py`** \u2014 F-13 deletes a default that silently reintroduced `backlog-histo-writer-skips-write-time-denylist-redaction`, a bug this same release fixed; F-14 deletes two bespoke `read_text`\u2192`write_text` writers and routes them through the release's own `atomic_write` primitive, closing the lost-update class `bugs-record-store-append-clobbers-concurrent-update-batch` was raised for. Both are **net deletions of a code path**, not additions.\n- **`.github/scripts/pr-verdict-check.sh`** \u2014 F-17 deletes a `case` glob and a dead pre-v6 legacy arm, replacing them with one anchored predicate; F-18 adds four lines that make an existing asymmetry symmetric. F-16 is the only net-additive change, and it removes a trust root rather than adding a branch to a feature.\n- **`.gitignore`** \u2014 F-20 fixes a latent last-match-wins ordering defect that had silently un-ignored scratch paths for every archived release. Pure correction.\n- **`cli/commands/newartifacts.py`** \u2014 M-8 adds a fourth `except` arm, shaped identically to its three siblings. This is the one addition in the delta; it is consistency completion for an exception type F-14 introduced, not a new semantic path, and it has no alternative (the only other raiser has zero production callers).\n\nNo puxadinho: no flag, no second code path, no cross-feature reach-in, no new shared mutable state. Ledger context: 515 records, 8 open, 489 resolved (`dadaia bugs stats`).\n\n**Method and limitations.** Diff-based per `DADAIA.md` \u00a77; whole-tree observations are labelled audit-lane and pre-existing where recorded. `gitleaks`/`trufflehog` are **not installed** on this host \u2014 the secret pass used the persona grep patterns plus the packaged `privacy_baseline.json` `secret-token` pattern; a `gitleaks` run before the first push would be a cheap additional layer. **No exploit code was run**; the gate's pathname-expansion behaviour was re-verified only through the committed contract fixtures, never against this repository. All raw values are redacted \u2014 denylist terms appear only in the scanner's own masked `t\u2026n` form, and no matched secret, email, path or private name is reproduced anywhere in this handoff.",
+      "fix_recommendation": "None \u2014 recorded as the FR24 axis this verdict is required to state."
+    }
+  ],
+  "decisions_required": [
+    "BLOCKING FOR THE PUSH \u2014 operator performs the history rewrite over the unpushed range, rewording the three offending commit MESSAGES (a0caa28eb22b, ffe1b00982e8, e5fa1fbf2677), not merely amending their trees; then `dadaia ci push-gate-check` must exit 0 before the first push.",
+    "MECHANICAL CONSEQUENCE \u2014 the rewrite changes every sha, so this verdict must be RE-KEYED: re-dispatch security-reviewer for a new APPROVED handoff at specs/releases/0.5.0/verdicts/<new-head-sha>.handoff.json. pr-verdict-check.sh fails closed on the stale sha otherwise.",
+    "O-1 \u2014 F-19: choose the verdict gate's trust model (document as omission-detection / CODEOWNERS on specs/releases/**/verdicts/** / signed-commit or trusted-author verification).",
+    "O-2 \u2014 F-21 plus the two newly recorded already-published operator-denylist blobs under specs/backlog/_archive/: accept as published history, or plan a published-history rewrite covering main and develop.",
+    "O-4 \u2014 F-20 second half: whether specs/** should carry a secret-shaped deny (*.env, *.pem, *.key, id_rsa*) now that the .gitignore inversion tracks it by default. Not landed at 7280856c.",
+    "F-22 \u2014 genericize the operator's local username at specs/releases/0.5.0/reviews/S3-qa-close.md:144 to <user> during the closure text pass."
+  ],
+  "next_handoff": {
+    "agent": "project-manager",
+    "context": "dadaia-workspace",
+    "expected_artifact_type": "report"
+  }
+}
