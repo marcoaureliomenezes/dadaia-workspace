@@ -1104,7 +1104,7 @@ by one — the number T-050-18A pins.**
 
 ---
 
-- [-] **T-050-18A — The test-suite ratchets, in one contract file**
+- [x] **T-050-18A — The test-suite ratchets, in one contract file**
 
 **Owner role:** software-engineer (the file) + qa-engineer (the verdict on every pinned
 number) · **Commit:** `test(T-050-18A): pin the test-suite ratchets at their measured values`
