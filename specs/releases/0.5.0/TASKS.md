@@ -702,7 +702,7 @@ a zero-hit grep proves no permanent consumer imports `migrate_v5`; every added t
 
 ---
 
-- [-] **T-050-10 — FR3 (run): migrate every historical record present at branch cut**
+- [x] **T-050-10 — FR3 (run): migrate every historical record present at branch cut**
 
 **Owner role:** software-engineer · **Commit:** `refactor(T-050-10): migrate the bug ledger
 to BUGS.jsonl with derived commit provenance`
@@ -822,7 +822,7 @@ file's continued presence, so it cannot evidence its absence.)* **Tests: +4 / �
 
 ---
 
-- [-] **T-050-12 — FR4: back-fill the archived releases' milestone shas**
+- [x] **T-050-12 — FR4: back-fill the archived releases' milestone shas**
 
 **Owner role:** software-engineer · **Commit:** `feat(T-050-12): back-fill archived release
 milestones into releases_histo.jsonl`
@@ -851,7 +851,7 @@ the evidence outlives the 3-day `.dadaia/tmp/**` GC.
 
 ---
 
-- [ ] **T-050-13 — FR5: `BACKLOG.md` becomes a live photo**
+- [-] **T-050-13 — FR5: `BACKLOG.md` becomes a live photo**
 
 **Owner role:** software-engineer (+ `project-manager` for the entry text) · **Commit:**
 `refactor(T-050-13): live-photo BACKLOG.md with backlog_histo.jsonl`
@@ -991,7 +991,7 @@ term in the artifact.
 
 ## Segment `S2` — lineage, commit shapes, hooks, the validated map
 
-- [ ] **T-050-16 — FR7: `dd-diagnose`, with lineage as phase 0**
+- [-] **T-050-16 — FR7: `dd-diagnose`, with lineage as phase 0**
 
 **Owner role:** ai-engineer · **Commit:** `feat(T-050-16): dd-diagnose — lineage phase 0 plus
 the diagnosing method`
