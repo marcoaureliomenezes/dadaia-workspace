@@ -67,10 +67,7 @@ that today's repository happens to be clean.
 from __future__ import annotations
 
 import ast
-import os
 import re
-import subprocess
-import sys
 from pathlib import Path
 
 import pytest
@@ -419,24 +416,52 @@ def _pyramid_drift_findings(
     return findings
 
 
+class _NodeidCollector:
+    """A minimal pytest plugin: records every collected item's nodeid, straight
+    from the `Item` object — no stdout-line parsing (`nodeid` is structured
+    data; the old subprocess implementation's `line.startswith("tests/")`
+    stdout-grep was itself a second, unnecessary fragility this rewrite drops
+    along with the subprocess)."""
+
+    def __init__(self) -> None:
+        self.nodeids: list[str] = []
+
+    def pytest_collection_modifyitems(self, items: list[pytest.Item]) -> None:
+        self.nodeids.extend(item.nodeid for item in items)
+
+
 def _collect_tier_counts() -> dict[str, int]:
-    """One `--collect-only` run (V30's own requirement: "same --collect-only
+    """One `--collect-only` pass (V30's own requirement: "same --collect-only
     run"), bucketed by the `tests/<tier>/` directory each item's nodeid falls
     under — the same directory layout `tests/conftest.py` already auto-marks by,
-    so no second, marker-filtered subprocess per tier is needed."""
-    proc = subprocess.run(
-        [sys.executable, "-m", "pytest", "--collect-only", "-q", "-p", "no:cacheprovider", "tests"],
-        cwd=_REPO_ROOT,
-        capture_output=True,
-        text=True,
-        timeout=25,
-        env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+    so no second, marker-filtered pass per tier is needed.
+
+    Runs `pytest.main` **in-process** rather than spawning a `subprocess.run`
+    child. A subprocess is a second OS-scheduled entity that must wait its turn
+    for a free core exactly like every sibling `-n auto` xdist worker already
+    running, on top of paying for a second full interpreter + plugin bootstrap
+    — that combination is what pushed the previous implementation past its
+    fixed 25 s subprocess timeout under contention
+    (`test-v30-pyramid-shape-collect-only-subprocess-times-out-under-nauto-contention`).
+    In-process collection carries no private timeout of its own to blow past —
+    it answers to this test's own `contract`-tier timeout
+    (`tests/conftest.py`'s `_TIER_TIMEOUTS["contract"]`), the single timeout
+    authority every other test in the suite already answers to, instead of a
+    second, tighter, ad hoc budget racing it from inside."""
+    collector = _NodeidCollector()
+    exit_code = pytest.main(
+        ["-p", "no:cacheprovider", "--collect-only", "-q", str(_TESTS_DIR)],
+        plugins=[collector],
+    )
+    assert exit_code in (pytest.ExitCode.OK, pytest.ExitCode.NO_TESTS_COLLECTED), (
+        f"in-process pytest collection exited {exit_code!r} (nodeids collected: "
+        f"{len(collector.nodeids)})"
     )
     counts: dict[str, int] = {"unit": 0, "integration": 0, "contract": 0, "e2e": 0}
-    for line in proc.stdout.splitlines():
-        if not line.startswith("tests/") or "::" not in line:
+    for nodeid in collector.nodeids:
+        if not nodeid.startswith("tests/") or "::" not in nodeid:
             continue
-        tier = line.split("/", 2)[1]
+        tier = nodeid.split("/", 2)[1]
         if tier in counts:
             counts[tier] += 1
     return counts
