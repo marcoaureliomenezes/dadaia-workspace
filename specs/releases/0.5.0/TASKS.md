@@ -2085,7 +2085,7 @@ rounds** recorded, in which case the final `rc` **is** `rc-1`.
 
 ## The final `rc` — closure, archive, ship
 
-- [ ] **T-050-39 — Memory window (SPEC §5)**
+- [x] **T-050-39 — Memory window (SPEC §5)**
 
 **Owner role:** product-engineer · **Commit:** `docs(T-050-39): memory after 0.5.0`
 
@@ -2109,7 +2109,7 @@ explicitly marked "no change" with its reason.
 
 ---
 
-- [ ] **T-050-40 — The closure record with every sweep**
+- [x] **T-050-40 — The closure record with every sweep**
 
 **Owner role:** product-engineer · **Commit:** `docs(T-050-40): 0.5.0 closure`
 
