@@ -3,8 +3,8 @@
 **Status:** Em revisão
 **Release ID:** 0.5.0
 **Owner:** product-engineer
-**Source SPEC:** `specs/releases/_ideas/0.5.0/SPEC.md`
-**Location:** `specs/releases/_ideas/0.5.0/` — a future-release Draft; promoted by `git mv`
+**Source SPEC:** `specs/releases/0.5.0/SPEC.md`
+**Location:** `specs/releases/0.5.0/` — a future-release Draft; promoted by `git mv`
 to `specs/releases/0.5.0/` when `v0.4.5` archives (operator ruling D6 of 2026-08-23).
 **Branch (at promotion):** `feature/0.5.0`, cut from `main` at the shipped `v0.4.5`
 (SPEC AS-5; branch model: `DADAIA.md` §4, operations: `dd-gitflow-default`).
@@ -240,7 +240,7 @@ Full register in SPEC §6/§8/§9; the nine that shape this plan's order and gat
 |---|---|---|
 | **R-1** | **The migration is irreversible in perception.** Every record is rewritten in one pass; a wrong derivation silently becomes "the history". | Idempotence proven by double execution (V5); counts asserted against ground truth measured in the same run (V4); the derivation is one pure `core/` function unit-tested on an in-memory fixture; the pre-migration ledger stays in git history and in the `archive/*` tags forever. |
 | **R-2** | **Migration ambiguity.** Squash-to-main erased per-bug granularity; 39 of 117 resolution commits carry no code. | The granularity markers record coarseness instead of hiding it; pillar 1 consumes only `exact` shas as diff-able lineage; A3.5 forbids inventing `cause`/`caused_by`; unmapped surfaces become `unknown` and are counted. |
-| **R-3** | **Concurrent `v0.4.5` work.** | This Draft writes only under `specs/releases/_ideas/0.5.0/`. Promotion is gated on `v0.4.5` being archived; the first task re-derives the commit map and re-reads every write-set path before any edit. |
+| **R-3** | **Concurrent `v0.4.5` work.** | This Draft writes only under `specs/releases/0.5.0/`. Promotion is gated on `v0.4.5` being archived; the first task re-derives the commit map and re-reads every write-set path before any edit. |
 | **R-4** | **Canon rename churn** — every reference in 22 skills, 9 personas and the law file can go stale. | `expand → switch → contract` per rename; FR10's enforcer with hash tuples lands **in the same segment** as FR12's renames. Case-only renames use an explicit two-step `git mv`. |
 | **R-5** | **A governance release grows the always-on budget.** | Every added section is a pointer; V34 gives the additions a **+500-token ceiling** with per-section attribution and anchors counted separately; an overshoot is cut, not renegotiated. |
 | **R-6** | **The destructive deletion (FR6)** — the root archive holds every past security verdict and 18 sidecars a live rule reads. | Ordered gates: back-fills complete → sidecars relocated → historical `verdicts/**` relocated and V20 green → tag pushed and proven from a throwaway clone → deletion, one commit, operator present, FROZEN repointed in the same commit. No `archive/*` tag is ever deleted. |

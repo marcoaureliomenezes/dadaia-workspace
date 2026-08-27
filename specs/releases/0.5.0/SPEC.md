@@ -5,14 +5,14 @@
 **Owner:** product-engineer
 **Opened:** 2026-08-26
 **Created:** 2026-08-26
-**Location:** `specs/releases/_ideas/0.5.0/` — a **future-release Draft**, not the live
+**Location:** `specs/releases/0.5.0/` — a **future-release Draft**, not the live
 release. Promoted to `specs/releases/0.5.0/` by `git mv` when `v0.4.5` archives (operator
 ruling **D6 of 2026-08-23**, the `_ideas/` lane). While it sits here it authorizes nothing:
 no task is reserved, no backlog entry is purged, no bug is `picked`.
 **Branch (at promotion):** `feature/0.5.0`, cut from `main` at the shipped `v0.4.5` (branch
 model: `DADAIA.md` §4, operations: `dd-gitflow-default`). See **AS-5** — this supersedes the
 `feature/0.4.6` cut named in `specs/releases/v0.4.5/TASKS.md` T-045-41.
-**Consumes (declared at promotion, NOT executed by this Draft):** `specs-canon-v6`,
+**Consumes:** `specs-canon-v6`,
 `entity-behavior-map`, `bug-lineage-and-commit-discipline`, `audit-canon-v1`,
 `memory-two-tier-principles`, `dd-diagnose`
 **Intended picked set:** the six `## ACTIVE` backlog entries above — the five entries the

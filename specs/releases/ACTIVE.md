@@ -1,2 +1,2 @@
-release: v0.4.5
-phase: CLOSURE
+release: 0.5.0
+phase: DEFINITION

@@ -3,9 +3,9 @@
 **Status:** Em revisão
 **Release ID:** 0.5.0
 **Owner:** product-engineer
-**Source SPEC:** `specs/releases/_ideas/0.5.0/SPEC.md`
-**Source PLAN:** `specs/releases/_ideas/0.5.0/PLAN.md`
-**Location:** `specs/releases/_ideas/0.5.0/` — a future-release Draft. **No task below is
+**Source SPEC:** `specs/releases/0.5.0/SPEC.md`
+**Source PLAN:** `specs/releases/0.5.0/PLAN.md`
+**Location:** `specs/releases/0.5.0/` — a future-release Draft. **No task below is
 reservable while this file lives here.** Reservation begins at promotion (T-050-01).
 **Branch (at promotion):** `feature/0.5.0`, cut from `main` at the shipped `v0.4.5`
 (SPEC AS-5 — this supersedes the `feature/0.4.6` cut named in `specs/releases/v0.4.5/TASKS.md`
@@ -180,7 +180,7 @@ the archive move.
 commit (AS-5); SPEC, PLAN and TASKS reviewed and carrying `**Status:** Aprovado`.
 
 **Write set (staging only — content authored by `product-engineer` / `project-manager`):**
-`specs/releases/_ideas/0.5.0/` → `specs/releases/0.5.0/` (a `git mv`),
+`specs/releases/0.5.0/` → `specs/releases/0.5.0/` (a `git mv`),
 `specs/releases/ACTIVE.md`, `specs/backlog/BACKLOG.md` (purge-on-pick: the six `## ACTIVE`
 subsections `specs-canon-v6`, `entity-behavior-map`, `bug-lineage-and-commit-discipline`,
 `audit-canon-v1`, `memory-two-tier-principles`, `dd-diagnose` removed and their
