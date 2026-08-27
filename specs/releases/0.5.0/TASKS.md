@@ -643,7 +643,7 @@ event-fold and coherence cases inside them), each with its `qa-engineer` verdict
 
 ---
 
-- [-] **T-050-09 — FR3 (build): the commit derivation, unit-tested on a fixture repo**
+- [x] **T-050-09 — FR3 (build): the commit derivation, unit-tested on a fixture repo**
 
 **Owner role:** software-engineer · **Commit:** `feat(T-050-09): derive registration and
 resolution commits in one pass over the ledger history`
@@ -702,7 +702,7 @@ a zero-hit grep proves no permanent consumer imports `migrate_v5`; every added t
 
 ---
 
-- [ ] **T-050-10 — FR3 (run): migrate every historical record present at branch cut**
+- [-] **T-050-10 — FR3 (run): migrate every historical record present at branch cut**
 
 **Owner role:** software-engineer · **Commit:** `refactor(T-050-10): migrate the bug ledger
 to BUGS.jsonl with derived commit provenance`
