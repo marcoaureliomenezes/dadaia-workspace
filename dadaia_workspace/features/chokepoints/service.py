@@ -380,11 +380,11 @@ class _PathMasker:
     SPEC v0.4.2 FR4/GRILL D3: the offending-segment TEST consumes the detector's OWN
     compiled matchers (``denylist_scan.operator_terms_match`` +
     ``denylist_scan.compile_slug_patterns`` — the SAME predicates :func:`_first_match`
-    uses, case-insensitive, hyphen-aware word boundaries) instead of a second, narrower
+    uses, case-insensitive, whole-token boundaries) instead of a second, narrower
     predicate built from ``core.redaction.compile_candidates`` (case-SENSITIVE, and
     treats ``-`` as a word character rather than a boundary — GRILL P8: a path segment
     like ``Acme-Corp`` that the detector already flags for the lowercase term ``acme``
-    used to render UNMASKED). Case-insensitivity and word-boundary treatment are now
+    used to render UNMASKED). Case-insensitivity and token-boundary treatment are now
     identical by construction: detector-hit implies masker-hit.
 
     Masking happens at PATH-SEGMENT granularity: the path is split on ``/``, each
