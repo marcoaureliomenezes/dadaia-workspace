@@ -1,7 +1,7 @@
 """Integration tests for the BL-SCHEMA/CONFLICT/STALE checks over the single-source
 ``BACKLOG.md`` document model (SPEC v0.12.0 FR2, ADR D8, PLAN §6, §8; v0.5.0 FR5, A5.2).
 
-Intent: CONTRACT — v0.12.0 A2.1-A2.4, A2.6-A2.8, A3.5, A5.6; v0.5.0 A5.2, A5.5-adjacent
+Intent: CONTRACT — v0.12.0 A2.1-A2.4, A2.6-A2.8, A3.5, A5.6; v0.5.0 A5.2, A5.5
 
 **BL-DUP is DELETED (v0.5.0 A5.2), not disabled** — see ``dadaia_workspace.features.
 backlog.doctor``'s module docstring for the structural argument (a duplicate exit is
@@ -40,7 +40,7 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.models.backlog import BacklogHistoRecord
+from dadaia_workspace.core.models.backlog import BacklogHistoRecord, ConsumedBacklogHistoRecord
 from dadaia_workspace.features.backlog.doctor import (
     BacklogDoctorCode,
     DoctorContext,
@@ -114,6 +114,37 @@ def _histo_record(slug: str, *, disposition: str = "DELIVERED") -> BacklogHistoR
     )
 
 
+class _FakeConsumedHistoStore:
+    """A minimal in-memory double satisfying
+    :class:`~dadaia_workspace.core.protocols.record_store.RecordStore` for
+    :class:`ConsumedBacklogHistoRecord` — the relocated consumed-backlog ledger
+    (v0.5.0 T-050-13A, A5.5)."""
+
+    def __init__(self, records: list[ConsumedBacklogHistoRecord] | None = None) -> None:
+        self._records = list(records or [])
+
+    @property
+    def path(self) -> Path:
+        return Path("fake-consumed-backlog-histo.jsonl")
+
+    def append(self, record: ConsumedBacklogHistoRecord) -> None:
+        self._records.append(record)
+
+    def iter_records(self) -> Iterator[ConsumedBacklogHistoRecord]:
+        return iter(self._records)
+
+    def update(
+        self,
+        record_id: str,
+        mutate: Callable[[ConsumedBacklogHistoRecord], ConsumedBacklogHistoRecord],
+    ) -> ConsumedBacklogHistoRecord:
+        raise NotImplementedError
+
+
+def _consumed_record(release: str, entries: list[dict[str, object]]) -> ConsumedBacklogHistoRecord:
+    return ConsumedBacklogHistoRecord(id=release, consumed=entries)
+
+
 def _build_roots(tmp_path: Path) -> tuple[Path, Path]:
     specs = tmp_path / "specs"
     (specs / "backlog").mkdir(parents=True)
@@ -135,7 +166,7 @@ def _write_backlog_md(specs: Path, active_body: str) -> None:
 def _run(
     specs: Path,
     src: Path,
-    archive_root: Path | None = None,
+    consumed_store: _FakeConsumedHistoStore | None = None,
     histo_store: _FakeHistoStore | None = None,
 ) -> list[Finding]:
     document = load_document(specs / "backlog")
@@ -146,7 +177,7 @@ def _run(
         specs_dir=specs,
         cli_anchors=frozenset(),
     )
-    consumed = read_consumed(archive_root if archive_root is not None else specs / "_archive")
+    consumed = read_consumed(consumed_store)
     histo_slugs = (
         frozenset(record.id for record in histo_store.iter_records())
         if histo_store is not None
@@ -320,11 +351,68 @@ def test_active_slug_with_histo_record_fires_bl_stale(tmp_path: Path) -> None:
 
 
 def test_no_histo_store_supplied_is_a_noop_for_that_condition(tmp_path: Path) -> None:
-    """No ``histo_store`` (the CLI-unwired default) degrades to a no-op — mirrors
-    ``read_consumed``'s absent-ledger no-op, never a false ERROR."""
+    """No ``histo_store`` (``run_backlog_doctor``'s own default) degrades to a no-op —
+    mirrors ``read_consumed``'s absent-ledger no-op, never a false ERROR."""
     specs, src = _build_roots(tmp_path)
     active = _ACTIVE_SUBSECTION.format(
         slug="live-feature",
+        title="Live",
+        status="candidate",
+        intents_block=_intents_block("pkg/m.py#Widget", "still live"),
+    )
+    _write_backlog_md(specs, active)
+    findings = _run(specs, src)
+    assert not any(f.code is BacklogDoctorCode.BL_STALE for f in findings), [
+        f.to_dict() for f in findings
+    ]
+
+
+# ── A2.7/v0.5.0 A5.5 — an ACTIVE item whose slug is recorded in the relocated
+# consumed-backlog histo ledger fires BL-STALE (condition (a); T-050-13A). Replaces
+# ``test_slug_in_archived_consumed_ledger_fires_bl_stale`` /
+# ``test_no_archived_ledger_is_a_noop_for_that_condition`` (deleted — SPEC A2.7's
+# subject, the directory-glob-over-``specs/_archive/<release>/consumed_backlog.json``
+# read, no longer exists; ``read_consumed`` now takes an injected
+# ``RecordStore[ConsumedBacklogHistoRecord] | None``, so those fixtures would not even
+# type-check against the new signature) ──────────────────────────────────────────────
+
+
+def test_active_slug_with_consumed_histo_record_fires_bl_stale(tmp_path: Path) -> None:
+    """BL-STALE condition (a), re-fed by the relocated
+    ``consumed_backlog_histo.jsonl`` store (T-050-13A/A5.5) instead of the
+    pre-relocation ``specs/_archive/<release-id>/consumed_backlog.json`` directory
+    glob FR6 deletes: an ACTIVE item whose slug already appears in a relocated
+    release's ``consumed[]`` entries still fires."""
+    specs, src = _build_roots(tmp_path)
+    active = _ACTIVE_SUBSECTION.format(
+        slug="already-shipped-elsewhere",
+        title="Already shipped",
+        status="candidate",
+        intents_block=_intents_block("pkg/m.py#Widget", "duplicate of a shipped item"),
+    )
+    _write_backlog_md(specs, active)
+    store = _FakeConsumedHistoStore(
+        [
+            _consumed_record(
+                "v0.1.20",
+                [{"slug": "already-shipped-elsewhere", "shipped_anchors": ["pkg/m.py#Widget"]}],
+            )
+        ]
+    )
+    findings = _run(specs, src, consumed_store=store)
+    stale = [f for f in findings if f.code is BacklogDoctorCode.BL_STALE]
+    assert any(f.slug == "already-shipped-elsewhere" for f in stale), [
+        f.to_dict() for f in findings
+    ]
+    assert any("consumed_backlog" in f.message for f in stale)
+
+
+def test_no_consumed_store_supplied_is_a_noop_for_that_condition(tmp_path: Path) -> None:
+    """No ``consumed_store`` injected degrades to a no-op for condition (a) — mirrors
+    the pre-relocation absent-ledger no-op (A5.5), never a false ERROR."""
+    specs, src = _build_roots(tmp_path)
+    active = _ACTIVE_SUBSECTION.format(
+        slug="live-feature-2",
         title="Live",
         status="candidate",
         intents_block=_intents_block("pkg/m.py#Widget", "still live"),
@@ -373,46 +461,6 @@ def test_deferred_active_status_fires_bl_stale(tmp_path: Path) -> None:
     assert any(f.slug == "prematurely-deferred" for f in stale), [f.to_dict() for f in findings]
 
 
-# ── A2.7 — an ACTIVE item whose slug appears in an archived consumed_backlog.json ───
-
-
-def test_slug_in_archived_consumed_ledger_fires_bl_stale(tmp_path: Path) -> None:
-    specs, src = _build_roots(tmp_path)
-    active = _ACTIVE_SUBSECTION.format(
-        slug="shipped-feature",
-        title="Shipped feature",
-        status="candidate",
-        intents_block=_intents_block("pkg/m.py#Widget", "already shipped"),
-    )
-    _write_backlog_md(specs, active)
-    archive = specs / "_archive" / "v0.1.20"
-    archive.mkdir(parents=True)
-    (archive / "consumed_backlog.json").write_text(
-        json.dumps(
-            {"release": "v0.1.20", "consumed": [{"slug": "shipped-feature", "shipped_anchors": []}]}
-        ),
-        encoding="utf-8",
-    )
-    findings = _run(specs, src)
-    stale = [f for f in findings if f.code is BacklogDoctorCode.BL_STALE]
-    assert any(f.slug == "shipped-feature" for f in stale), [f.to_dict() for f in findings]
-
-
-def test_no_archived_ledger_is_a_noop_for_that_condition(tmp_path: Path) -> None:
-    specs, src = _build_roots(tmp_path)
-    active = _ACTIVE_SUBSECTION.format(
-        slug="live-feature-2",
-        title="Live",
-        status="candidate",
-        intents_block=_intents_block("pkg/m.py#Widget", "still live"),
-    )
-    _write_backlog_md(specs, active)
-    findings = _run(specs, src)
-    assert not any(f.code is BacklogDoctorCode.BL_STALE for f in findings), [
-        f.to_dict() for f in findings
-    ]
-
-
 # ── A2.8 — an absent BACKLOG.md yields zero findings and exit 0 ─────────────────────
 
 
@@ -426,7 +474,13 @@ def test_absent_backlog_md_yields_zero_findings(tmp_path: Path) -> None:
 # ── T-120-08 cutover — run_backlog_doctor (CLI-facing) reads the document model ─────
 
 
-def _run_wired(specs: Path, src: Path) -> list[Finding]:
+def _run_wired(
+    specs: Path,
+    src: Path,
+    *,
+    histo_store: _FakeHistoStore | None = None,
+    consumed_histo_store: _FakeConsumedHistoStore | None = None,
+) -> list[Finding]:
     """Drive the CLI-facing :func:`run_backlog_doctor` directly — the live wiring
     proven end to end, not the hand-built ``_run`` helper above."""
     from dadaia_workspace.features.backlog.doctor import run_backlog_doctor
@@ -436,8 +490,9 @@ def _run_wired(specs: Path, src: Path) -> list[Finding]:
         source_root=src,
         catalog_path=specs / "memory" / "product" / "catalog.json",
         alias_map_path=specs / "no-aliases.txt",
-        archive_root=specs / "_archive",
         cli_anchors=frozenset(),
+        histo_store=histo_store,
+        consumed_histo_store=consumed_histo_store,
     )
 
 
@@ -462,10 +517,12 @@ def test_run_backlog_doctor_absent_document_is_a_clean_noop(tmp_path: Path) -> N
 
 
 def test_run_backlog_doctor_default_histo_store_is_a_noop(tmp_path: Path) -> None:
-    """``run_backlog_doctor``'s ``histo_store`` parameter defaults to ``None`` — the
-    live CLI callsite (unmodified by this task, out of its write set) stays a clean
-    no-op for the histo BL-STALE condition until it is wired, exactly like the
-    pre-existing ``consumed_backlog.json`` no-op behaviour."""
+    """``run_backlog_doctor``'s ``histo_store``/``consumed_histo_store`` parameters
+    default to ``None`` — a caller that supplies neither (e.g. a fixture like this
+    one) stays a clean no-op for both histo BL-STALE conditions, exactly like the
+    pre-relocation ``consumed_backlog.json`` no-op behaviour. The real CLI callsite
+    (``cli/commands/newartifacts.py``) wires both through the container (v0.5.0
+    T-050-13A) — this fixture only proves the library function's own default."""
     specs, src = _build_roots(tmp_path)
     active = _ACTIVE_SUBSECTION.format(
         slug="terminal-status-only",
@@ -478,6 +535,34 @@ def test_run_backlog_doctor_default_histo_store_is_a_noop(tmp_path: Path) -> Non
     # Condition (c) — own terminal Status — still fires with no histo_store at all.
     stale = [f for f in findings if f.code is BacklogDoctorCode.BL_STALE]
     assert any(f.slug == "terminal-status-only" for f in stale), [f.to_dict() for f in findings]
+
+
+def test_run_backlog_doctor_wired_consumed_histo_store_fires_condition_a(
+    tmp_path: Path,
+) -> None:
+    """The CLI-facing ``run_backlog_doctor`` wired with a real
+    ``consumed_histo_store`` fires BL-STALE condition (a) — the exact shape
+    ``cli/commands/newartifacts.py``'s ``backlog_doctor_cmd`` now wires through
+    ``container.build_consumed_backlog_histo_store`` (v0.5.0 T-050-13A/A5.5)."""
+    specs, src = _build_roots(tmp_path)
+    active = _ACTIVE_SUBSECTION.format(
+        slug="already-shipped-wired",
+        title="Already shipped",
+        status="candidate",
+        intents_block=_intents_block("pkg/m.py#Widget", "duplicate of a shipped item"),
+    )
+    _write_backlog_md(specs, active)
+    consumed_store = _FakeConsumedHistoStore(
+        [
+            _consumed_record(
+                "v0.1.20",
+                [{"slug": "already-shipped-wired", "shipped_anchors": ["pkg/m.py#Widget"]}],
+            )
+        ]
+    )
+    findings = _run_wired(specs, src, consumed_histo_store=consumed_store)
+    stale = [f for f in findings if f.code is BacklogDoctorCode.BL_STALE]
+    assert any(f.slug == "already-shipped-wired" for f in stale), [f.to_dict() for f in findings]
 
 
 # ── bug backlog-doctor-silent-on-duplicate-top-level-sections — end-to-end through the

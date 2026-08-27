@@ -27,6 +27,7 @@ __all__ = [
     "INTENTS_EXEMPT_STATUS",
     "TERMINAL_DISPOSITION_TOKENS",
     "BacklogHistoRecord",
+    "ConsumedBacklogHistoRecord",
     "Intent",
     "Subject",
     "SubjectKind",
@@ -310,4 +311,64 @@ class BacklogHistoRecord:
             by=_require_histo_str(raw, "by"),
             entry_md=_optional_histo_str(raw, "entry_md"),
             entry_md_source=_optional_histo_str(raw, "entry_md_source"),
+        )
+
+
+def _require_histo_consumed_list(raw: Mapping[str, object], key: str) -> list[dict[str, object]]:
+    """Validate :class:`ConsumedBacklogHistoRecord`'s ``consumed`` field: a list of
+    mapping entries, each carrying at least a non-empty ``slug`` string. Every other
+    key (``shipped_anchors``, ``note``, ...) passes through opaque and untouched — the
+    relocation this record backs is byte-lossless, not a narrower reshape."""
+    value = raw.get(key)
+    if not isinstance(value, list):
+        raise ValueError(f"consumed-backlog histo record field {key!r} must be a list: {raw!r}")
+    entries: list[dict[str, object]] = []
+    for entry in value:
+        if not isinstance(entry, dict):
+            raise ValueError(f"consumed-backlog histo record entry must be a mapping: {entry!r}")
+        slug = entry.get("slug")
+        if not isinstance(slug, str) or not slug:
+            raise ValueError(
+                f"consumed-backlog histo record entry missing a non-empty 'slug': {entry!r}"
+            )
+        entries.append(dict(entry))
+    return entries
+
+
+@dataclass(frozen=True)
+class ConsumedBacklogHistoRecord:
+    """One record per archived release's ``consumed_backlog.json`` sidecar (v0.5.0
+    T-050-13A, SPEC A5.5) — the relocation target for the 18 per-release
+    ``specs/_archive/<release-id>/consumed_backlog.json`` files FR6 (T-050-14) would
+    otherwise delete out from under BL-STALE's condition (a) with no failure signal
+    (FR13's "documented convention with no data behind it" shape).
+
+    Appended once per release to ``specs/backlog/_archive/consumed_backlog_histo.jsonl``
+    through the SAME generic
+    :class:`~dadaia_workspace.core.protocols.record_store.RecordStore` seam
+    :class:`BacklogHistoRecord` uses (``infrastructure.jsonl_record_store.
+    JsonlRecordStore``, composed at ``container.build_consumed_backlog_histo_store``).
+    ``id`` is the release id the original sidecar's directory named (e.g.
+    ``"v0.1.47"``) — the record's identity and the
+    :class:`~dadaia_workspace.core.protocols.record_store.RecordStore` key. ``consumed``
+    is that sidecar's original ``consumed`` entry list (``{slug, shipped_anchors[],
+    ...}``), preserved verbatim — a byte-lossless relocation, not a reshape.
+    """
+
+    id: str
+    consumed: list[dict[str, object]]
+
+    def to_dict(self) -> dict[str, object]:
+        """Serialize to the JSONL object shape (``"id"`` present so the generic
+        ``JsonlRecordStore`` seam can locate this record by release id)."""
+        return {"id": self.id, "consumed": self.consumed}
+
+    @classmethod
+    def from_dict(cls, raw: Mapping[str, object]) -> ConsumedBacklogHistoRecord:
+        """Parse a JSONL object into a :class:`ConsumedBacklogHistoRecord`. Raises
+        ``ValueError`` on a malformed record so the generic ``JsonlRecordStore`` skips
+        it (WARN-logged) rather than crashing the whole read."""
+        return cls(
+            id=_require_histo_str(raw, "id"),
+            consumed=_require_histo_consumed_list(raw, "consumed"),
         )

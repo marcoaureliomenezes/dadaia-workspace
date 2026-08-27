@@ -17,6 +17,7 @@ from pathlib import Path
 
 import typer
 
+from dadaia_workspace import container
 from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
 from dadaia_workspace.core.models.backlog import SubjectKind
 from dadaia_workspace.features.backlog.document import backlog_new
@@ -25,20 +26,24 @@ from dadaia_workspace.features.spec_artifacts.new_artifacts import release_new
 
 def _resolve_backlog_roots(
     specs_dir: Path, source_root: str | None, alias_map: str | None
-) -> tuple[Path, Path, Path, Path]:
+) -> tuple[Path, Path, Path]:
     """Resolve the injected roots the registry/doctor need (SPEC §3.8 #6 — never cwd).
 
-    Returns ``(source_root, catalog_path, alias_map_path, archive_root)``. ``source_root``
-    defaults to the repo root that owns ``specs_dir`` (``specs_dir.parent``) so code anchors
-    are derived REPO-ROOT-relative (e.g. ``dadaia_workspace/core/...#Sym``) — matching the way
+    Returns ``(source_root, catalog_path, alias_map_path)``. ``source_root`` defaults to
+    the repo root that owns ``specs_dir`` (``specs_dir.parent``) so code anchors are
+    derived REPO-ROOT-relative (e.g. ``dadaia_workspace/core/...#Sym``) — matching the way
     committed ``code`` refs are authored. The alias map defaults to the workspace-level
     ``.dadaia/states/backlog_subject_aliases.txt`` resolved up from ``specs_dir``.
+
+    No longer returns an ``archive_root`` (v0.5.0 T-050-13A): the doctor's BL-STALE
+    condition (a) reads the relocated ``consumed_backlog_histo.jsonl`` store via
+    ``container.build_consumed_backlog_histo_store``, wired at the call site below —
+    the pre-relocation directory-glob root has no reader left to inject it into.
     """
     src = Path(source_root).resolve() if source_root else specs_dir.parent.resolve()
     catalog_path = specs_dir / "memory" / "product" / "catalog.json"
-    archive_root = specs_dir / "_archive"
     alias_map_path = Path(alias_map).resolve() if alias_map else _default_alias_map_path(specs_dir)
-    return src, catalog_path, alias_map_path, archive_root
+    return src, catalog_path, alias_map_path
 
 
 def _default_alias_map_path(specs_dir: Path) -> Path:
@@ -186,9 +191,7 @@ def backlog_subjects_cmd(
     if not target.is_dir():
         typer.echo(f"[error] specs_dir not found: {target}", err=True)
         sys.exit(1)
-    src, catalog_path, alias_map_path, _archive = _resolve_backlog_roots(
-        target, source_root, alias_map
-    )
+    src, catalog_path, alias_map_path = _resolve_backlog_roots(target, source_root, alias_map)
     registry = build_registry(
         source_root=src,
         catalog_path=catalog_path,
@@ -251,9 +254,7 @@ def backlog_doctor_cmd(
     if not target.is_dir():
         typer.echo(f"[error] specs_dir not found: {target}", err=True)
         sys.exit(1)
-    src, catalog_path, alias_map_path, archive_root = _resolve_backlog_roots(
-        target, source_root, alias_map
-    )
+    src, catalog_path, alias_map_path = _resolve_backlog_roots(target, source_root, alias_map)
 
     if explain:
         _explain_backlog(target, src, catalog_path, alias_map_path)
@@ -263,8 +264,12 @@ def backlog_doctor_cmd(
         source_root=src,
         catalog_path=catalog_path,
         alias_map_path=alias_map_path,
-        archive_root=archive_root,
         cli_anchors=derive_cli_anchors(),
+        # v0.5.0 T-050-13's documented residual, closed by T-050-13A: both generic
+        # backlog-histo stores are wired through the container so BL-STALE's histo
+        # conditions are live from the real CLI callsite, not a permanent no-op.
+        histo_store=container.build_backlog_histo_store(target),
+        consumed_histo_store=container.build_consumed_backlog_histo_store(target),
     )
 
     errors = [f for f in findings if f.severity is Severity.ERROR]

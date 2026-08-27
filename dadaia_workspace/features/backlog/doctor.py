@@ -12,11 +12,14 @@ fan-out): each check is a ``BacklogCheck`` (a code + a callable over the shared
 * **BL-CONFLICT** — two items share an anchor with incompatible change → ERROR (the divergent
   twin, caught even when hand-written; classifier ``DIVERGENT_CONFLICT``).
 * **BL-STALE** (re-defined, ADR D8; v0.5.0 A5.2) — an ACTIVE item already
-  consumed/dispositioned: its slug is recorded in an archived ``consumed_backlog.json``
-  (``ledger.read_consumed``, unchanged), OR it already has an exit record in
-  ``backlog_histo.jsonl`` (the retired in-document ``## LEDGER`` condition's
-  replacement — v0.5.0 FR5), OR its own ``Status`` is one of the six canonical terminal
-  disposition tokens.
+  consumed/dispositioned: its slug is recorded in the relocated consumed-backlog histo
+  ledger (``ledger.read_consumed``, T-050-13A/A5.5 — reads
+  ``consumed_backlog_histo.jsonl`` through an injected
+  ``RecordStore[ConsumedBacklogHistoRecord]``, the relocation target for the 18
+  per-release ``consumed_backlog.json`` sidecars FR6 deletes), OR it already has an
+  exit record in ``backlog_histo.jsonl`` (the retired in-document ``## LEDGER``
+  condition's replacement — v0.5.0 FR5), OR its own ``Status`` is one of the six
+  canonical terminal disposition tokens.
 
 **BL-DUP is DELETED, not disabled (v0.5.0 A5.2).** With ``BACKLOG.md`` holding only
 ``## ACTIVE`` and every exit landing as one append-only ``backlog_histo.jsonl`` record
@@ -28,9 +31,9 @@ dual-section document's duplicate-closure failure mode this task's SPEC (FR5) na
 its bug-history evidence, not an independent invariant.
 
 Pure module: all roots are **injected** (SPEC §3.8 #6); no I/O outside the supplied paths and
-no subprocess (``histo_store``, when supplied, is an already-built
-:class:`~dadaia_workspace.core.protocols.record_store.RecordStore` — DI via
-``core.protocols``, never a direct ``infrastructure`` import). The CLI
+no subprocess (``histo_store``/``consumed_histo_store``, when supplied, are each an
+already-built :class:`~dadaia_workspace.core.protocols.record_store.RecordStore` — DI
+via ``core.protocols``, never a direct ``infrastructure`` import). The CLI
 (``cli/commands/newartifacts.py``) and the pre-commit/CI chokepoint
 (``cli/commands/ci.py`` + ``public/scripts/``) are thin wirings over :func:`run_backlog_doctor`,
 which reads the single source ``specs/backlog/BACKLOG.md`` through
@@ -48,6 +51,7 @@ from pathlib import Path
 from dadaia_workspace.core.models.backlog import (
     INTENTS_EXEMPT_STATUS,
     BacklogHistoRecord,
+    ConsumedBacklogHistoRecord,
     is_intents_exempt,
     is_terminal_disposition,
 )
@@ -260,8 +264,9 @@ def _check_conflict(ctx: DoctorContext) -> list[Finding]:
 def _check_stale(ctx: DoctorContext) -> list[Finding]:
     """BL-STALE, re-defined over the single-section document (ADR D8; v0.5.0 A5.2): an
     ACTIVE item already consumed/dispositioned fires on ANY of three ORed conditions —
-    (a) its slug is recorded in an archived ``consumed_backlog.json``
-    (``ledger.read_consumed``, unchanged, FR4-kept), (b) it already has an exit record
+    (a) its slug is recorded in the relocated consumed-backlog histo ledger
+    (``ledger.read_consumed``, T-050-13A/A5.5 — empty/no-op when no
+    ``consumed_histo_store`` was supplied), (b) it already has an exit record
     in ``backlog_histo.jsonl`` (the retired in-document ``## LEDGER`` condition's
     replacement — ``ctx.histo_slugs``, empty/no-op when no ``histo_store`` was
     supplied), or (c) its own ``Status`` is itself one of the six canonical terminal
@@ -322,26 +327,31 @@ def run_backlog_doctor(
     source_root: Path,
     catalog_path: Path,
     alias_map_path: Path,
-    archive_root: Path,
     cli_anchors: frozenset[str],
     histo_store: RecordStore[BacklogHistoRecord] | None = None,
+    consumed_histo_store: RecordStore[ConsumedBacklogHistoRecord] | None = None,
 ) -> list[Finding]:
     """Run BL-SCHEMA/CONFLICT/STALE over the single-source ``BACKLOG.md`` and return
     all findings.
 
     All roots are injected (SPEC §3.8 #6), including ``cli_anchors`` — the pre-derived
     ``cli``-kind anchor set threaded in from the CLI composition boundary (FR1b), so this
-    feature never imports ``cli.main``. The registry is recomputed from live truth; the
-    ``consumed_backlog.json`` read is a no-op when absent.
+    feature never imports ``cli.main``. The registry is recomputed from live truth.
 
-    ``histo_store`` (v0.5.0 FR5/A13.4) is an already-built
+    ``histo_store`` (v0.5.0 FR5/A13.4) and ``consumed_histo_store`` (v0.5.0 T-050-13A/
+    A5.5) are each an already-built
     :class:`~dadaia_workspace.core.protocols.record_store.RecordStore` — DI via
-    ``core.protocols`` (composed at ``container.build_backlog_histo_store``), never a
-    direct ``infrastructure`` import from this pure module. ``None`` (the default) is a
-    no-op for BL-STALE's histo condition, never a false ERROR (mirrors
-    ``read_consumed``'s absent-ledger no-op) — this is the seam :func:`run_backlog_doctor`
-    resolves the generic backlog-histo store through (its second real caller, alongside
-    :func:`~dadaia_workspace.features.backlog.document.backlog_exit`).
+    ``core.protocols`` (composed at ``container.build_backlog_histo_store`` and
+    ``container.build_consumed_backlog_histo_store`` respectively), never a direct
+    ``infrastructure`` import from this pure module. ``None`` (the default for both) is
+    a no-op for the corresponding BL-STALE condition, never a false ERROR — this is the
+    seam :func:`run_backlog_doctor` resolves the generic backlog-histo stores through:
+    ``histo_store``'s second real caller is
+    :func:`~dadaia_workspace.features.backlog.document.backlog_exit`;
+    ``consumed_histo_store`` replaces the pre-relocation ``archive_root``
+    directory-glob parameter (T-050-13A relocated the 18 per-release
+    ``consumed_backlog.json`` sidecars into one ``consumed_histo_store``-backed file
+    before FR6/T-050-14 deletes the tree they lived under).
 
     Reads ``specs/backlog/BACKLOG.md`` through
     :func:`~dadaia_workspace.features.backlog.document.load_document` (SPEC v0.12.0 FR1/FR2,
@@ -357,7 +367,7 @@ def run_backlog_doctor(
         cli_anchors=cli_anchors,
     )
     document = load_document(specs_dir / "backlog")
-    consumed = read_consumed(archive_root)
+    consumed = read_consumed(consumed_histo_store)
     histo_slugs: frozenset[str] = (
         frozenset(record.id for record in histo_store.iter_records())
         if histo_store is not None

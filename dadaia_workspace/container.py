@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from dadaia_workspace.core.models.backlog import BacklogHistoRecord
+    from dadaia_workspace.core.models.backlog import BacklogHistoRecord, ConsumedBacklogHistoRecord
     from dadaia_workspace.core.models.bugs import BugRecord
     from dadaia_workspace.core.protocols.git_client import GitClient
     from dadaia_workspace.features.agents.model_policy import AgentModelPolicyService
@@ -301,6 +301,32 @@ def build_backlog_histo_store(specs_dir: Path) -> "RecordStore[BacklogHistoRecor
         Path(specs_dir) / "backlog" / "_archive" / "backlog_histo.jsonl",
         to_dict=BacklogHistoRecord.to_dict,
         from_dict=BacklogHistoRecord.from_dict,
+    )
+
+
+def build_consumed_backlog_histo_store(
+    specs_dir: Path,
+) -> "RecordStore[ConsumedBacklogHistoRecord]":
+    """Composition-root seam for the relocated consumed-backlog ledger (v0.5.0
+    T-050-13A, SPEC A5.5) — ``specs/backlog/_archive/consumed_backlog_histo.jsonl``,
+    one record per archived release, through the SAME generic ``JsonlRecordStore``
+    mechanism :func:`build_backlog_histo_store` uses.
+
+    Relocates the 18 per-release ``specs/_archive/<release-id>/consumed_backlog.json``
+    sidecars FR6 (T-050-14) deletes out from under BL-STALE's condition (a) data feed
+    — the sidecars documented an absent-ledger no-op, but never a *permanently* absent
+    one (FR13's "documented convention with no data behind it" shape). The one real
+    caller is
+    :func:`~dadaia_workspace.features.backlog.ledger.read_consumed`, itself resolved
+    by :func:`~dadaia_workspace.features.backlog.doctor.run_backlog_doctor`.
+    """
+    from dadaia_workspace.core.models.backlog import ConsumedBacklogHistoRecord
+    from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
+
+    return JsonlRecordStore(
+        Path(specs_dir) / "backlog" / "_archive" / "consumed_backlog_histo.jsonl",
+        to_dict=ConsumedBacklogHistoRecord.to_dict,
+        from_dict=ConsumedBacklogHistoRecord.from_dict,
     )
 
 
