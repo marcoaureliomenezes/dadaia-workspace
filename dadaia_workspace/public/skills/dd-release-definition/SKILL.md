@@ -79,8 +79,9 @@ Only now write the release SPEC (Draft), with:
 
 Release-id format (bare SemVer) and `_ideas/`'s pre-approval role: `specs/releases/AGENTS.md`
 — referenced, not restated. At the promotion commit (SPEC+PLAN+TASKS all `Aprovado`,
-the definition PR opening), append the `defined` milestone and dual-write `ACTIVE.md`:
-recipe and cardinality rule (once, ever) at `dd-release-implement`'s `RELEASE-EVENTS.md`.
+the definition PR opening), append the `defined` milestone (`ACTIVE.md` retired at
+T-050-21A — no dual-write): recipe and cardinality rule (once, ever) at
+`dd-release-implement`'s `RELEASE-EVENTS.md`.
 
 Definition runs on `feature/{M.m.p}`. Once SPEC + PLAN + TASKS are all `Aprovado`, open
 the definition PR — a mandatory obligation, not optional cleanup (branch contract:

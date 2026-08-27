@@ -39,8 +39,8 @@ When you work on production (any MUTATING path under the active context), the ma
 trace is:
 
 1. **Reserve.** Flip `[ ]`→`[-]` for an OPEN task that exists in the active `TASKS.md`
-   (resolved via the live release's RELEASE.jsonl phase fold, dual-written to
-   `specs/releases/ACTIVE.md`), then make an isolated
+   (resolved via the live release's RELEASE.jsonl phase fold — `ACTIVE.md` retired at
+   T-050-21A), then make an isolated
    `chore(tasks): start <task-id>` commit. That commit is the **observable
    reservation** — it is how a parallel session learns "agent X took this task".
    If the task is not OPEN, raise an interruption with the operator first.
@@ -113,7 +113,7 @@ violation** that reviewers and the operator will catch. Reserve anyway, always.
 ## Where TASKS.md lives
 
 - **Primary:** `<specs_dir>/releases/<active-release-id>/TASKS.md` — the active release
-  (pointed at by the RELEASE.jsonl fold, dual-written to `<specs_dir>/releases/ACTIVE.md`)
+  (pointed at by the RELEASE.jsonl fold)
   keeps its tasks here.
 - **Legacy compat:** `<specs_dir>/features/*/TASKS.md` — only when
   `SDD_LEGACY_FEATURES=1` during a migration window.
@@ -142,6 +142,6 @@ SDD stage runs on.
 
 For a segmented release, the active TASKS.md lives at
 `specs/releases/<release-id>/<segment>/TASKS.md` (segment = `alpha-N`/`rc-N` from
-the `phase` record's `data.segment` (dual-written to `ACTIVE.md`'s `segment:` line)).
+the `phase` record's `data.segment`).
 Reserve/flip `[ ] -> [-] -> [x]` markers there. Flat
 (no-segment) releases keep `releases/<release-id>/TASKS.md`.

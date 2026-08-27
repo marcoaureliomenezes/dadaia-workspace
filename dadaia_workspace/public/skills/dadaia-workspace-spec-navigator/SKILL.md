@@ -1,6 +1,6 @@
 ---
 name: dadaia-workspace-spec-navigator
-description: "Use when: loading dadaia-workspace specs in canonical order for implementation, review, planning, or release closure. Resolves the active release via its RELEASE.jsonl phase fold (dual-written to specs/releases/ACTIVE.md) and reads memory Markdown + the active release's SPEC/PLAN/TASKS. Supports both the dadaia-workspace repository itself and any active runtime context discovered via spec_contexts.json (v2 registry) or `dadaia context show --json`."
+description: "Use when: loading dadaia-workspace specs in canonical order for implementation, review, planning, or release closure. Resolves the active release via its RELEASE.jsonl phase fold and reads memory Markdown + the active release's SPEC/PLAN/TASKS. Supports both the dadaia-workspace repository itself and any active runtime context discovered via spec_contexts.json (v2 registry) or `dadaia context show --json`."
 ---
 
 # dadaia-workspace-spec-navigator
@@ -24,7 +24,6 @@ specs/
 │       └── <feature-slug>.md    ← one Markdown atom per feature in production
 ├── releases/
 │   ├── <release-id>/RELEASE.jsonl ← phase/milestone fold — the canonical record
-│   ├── ACTIVE.md                ← dual-written phase mirror (transitional)
 │   └── <release-id>/{SPEC,PLAN,TASKS}.md
 ├── backlog/
 │   ├── BACKLOG.md                ← live photo: ## ACTIVE only (candidates)
@@ -67,16 +66,13 @@ referenced, not restated.
 
 3. **Resolve the active release (and segment).**
    - Fold `<specs-dir>/releases/<release-id>/RELEASE.jsonl` — the last `phase` record
-     wins (SPEC FR4). `<specs-dir>/releases/ACTIVE.md` carries the same two facts,
-     dual-written and still the SDD gate's own literal read until T-050-21A repoints
-     it:
-     ```
-     release: <release-id>
-     segment: <alpha-N|rc-N>   # optional — present for segmented releases
-     phase: <DISCOVERY|DEFINITION|SPEC|PLAN|TASKS|IMPLEMENTATION|CLOSURE|ARCHIVED>
-     ```
-   - If both are missing or `release: none`: no active release. Inform the operator
-     and stop before implementation.
+     wins (SPEC FR4); its `data.segment` field, when present, names the active
+     `alpha-N`/`rc-N` segment. `ACTIVE.md` retired at T-050-21A — the SDD gate reads
+     this same fold directly, no mirror file. Record shapes: `dd-release-implement`'s
+     `RELEASE-EVENTS.md`.
+   - If no RELEASE.jsonl-carrying release directory is found, or the fold yields no
+     `phase` record: no active release. Inform the operator and stop before
+     implementation.
    - Let `<rel-path>` = `<release-id>/<segment>` when a `segment:` is present, else
      `<release-id>`.
 

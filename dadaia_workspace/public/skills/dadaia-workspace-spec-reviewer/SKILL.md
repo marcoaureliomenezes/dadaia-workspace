@@ -18,9 +18,8 @@ TASKS → CLOSURE) and the atomic memory contract.
    when present, `memory/product/index.md`, and `memory/TECHSTACK.md`.
    Load feature atoms under `memory/product/` on demand.
 3. Fold `<specs-dir>/releases/<release-id>/RELEASE.jsonl` (last `phase` record wins)
-   and resolve the active release id; cross-check against the dual-written
-   `<specs-dir>/releases/ACTIVE.md` mirror — a divergence between the two is itself a
-   finding (they must never drift, per the FR4 transition contract).
+   and resolve the active release id (`ACTIVE.md` retired at T-050-21A — the SDD gate
+   reads this same fold directly, no mirror to cross-check).
 4. Load active release artifacts: `SPEC.md`, `PLAN.md`, `TASKS.md`, and, if phase ∈
    {CLOSURE, ARCHIVED}, the `RELEASE.jsonl` closure `note` records (`CLOSURE.md`
    retired T-050-21 — until T-050-25A, a minimal freeform `CLOSURE.md` may still exist
@@ -46,9 +45,8 @@ TASKS → CLOSURE) and the atomic memory contract.
      target renderer.
    - **Status canonicity** — every SPEC/PLAN/TASKS uses `**Status:** Draft|Em revisão|Aprovado`
      exactly. No `[x] Approved`, `Accepted`, `Implementado`, `Completed`, `Source of Truth`.
-   - **Phase consistency** — the RELEASE.jsonl fold's phase (and its dual-written
-     `ACTIVE.md` mirror) matches the artifacts that exist (e.g. phase = TASKS implies
-     PLAN is Aprovado).
+   - **Phase consistency** — the RELEASE.jsonl fold's phase matches the artifacts that
+     exist (e.g. phase = TASKS implies PLAN is Aprovado).
    - **PLAN ≤ 300 lines** — warning for releases created before 2026-05-17, error after.
    - **Closure narrative completeness** — every `RELEASE.jsonl` `note` record class
      `dd-release-implement`'s `RELEASE-EVENTS.md` names is present once the release
@@ -80,4 +78,4 @@ TASKS → CLOSURE) and the atomic memory contract.
 
 ## Segments (ADR-1/ADR-5)
 
-Segmented releases (ADR-1/ADR-5) place SPEC/PLAN/TASKS under `releases/<release-id>/<segment>/` (`alpha-N`/`rc-N`) — `RELEASE.jsonl` stays one file per release, its `phase`/`note` records carrying `data.segment`. When reviewing, resolve the active segment from the fold's `data.segment` (dual-written to `ACTIVE.md`'s `segment:` line) and audit that segment's artifacts; flat releases keep `releases/<release-id>/`.
+Segmented releases (ADR-1/ADR-5) place SPEC/PLAN/TASKS under `releases/<release-id>/<segment>/` (`alpha-N`/`rc-N`) — `RELEASE.jsonl` stays one file per release, its `phase`/`note` records carrying `data.segment`. When reviewing, resolve the active segment from the fold's `data.segment` and audit that segment's artifacts; flat releases keep `releases/<release-id>/`.

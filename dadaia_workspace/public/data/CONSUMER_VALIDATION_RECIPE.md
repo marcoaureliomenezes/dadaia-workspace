@@ -103,8 +103,9 @@ an initialized workspace, create it:
   commits its own scaffold (repo left clean — `git status --porcelain` empty of
   tool-created files); the freshly-scaffolded context is doctor-clean —
   `$D specs doctor --context alpha` reports **0 errors AND 0 warnings** (a supported
-  init path must reach a fully clean tree, with `ACTIVE.md`, catalog, and no raw
-  placeholder atom — a fresh context that doctor rejects is a FAIL); `dead` flips back
+  init path must reach a fully clean tree — catalog present, no raw placeholder atom,
+  no live release directory at all (the honest absence, `ACTIVE.md` retired at
+  T-050-21A) — a fresh context that doctor rejects is a FAIL); `dead` flips back
   WITHOUT the untracked-consent refusal (the tool must never refuse its own scaffold);
   and a guard fails cleanly (`$D context dead ghost` exits non-zero with a clear
   message, no traceback).
@@ -389,7 +390,12 @@ never exercised the live backlog path was false confidence).
 
 ### R-13 — Producers pass their own validators (scaffold / backlog / baseline)
 
-- `specs release open v0.1.0` then `specs doctor`; `specs segment open alpha-2` then
+- Hand-write a release scaffold — `mkdir -p specs/releases/v0.1.0`, a Draft `SPEC.md`
+  stub, and a `RELEASE.jsonl` carrying one `phase: SPEC` record (shape: `{ts, event,
+  agent, data}`, `dd-release-implement`'s `RELEASE-EVENTS.md` — `specs release open`/
+  `specs segment open` retired at T-050-21A, no CLI verb replaces them) — then `specs
+  doctor`; add a dir-based segment the same way (a `phase` record carrying
+  `data.segment: "alpha-2"`, plus `specs/releases/<release-id>/alpha-2/TASKS.md`) then
   doctor again; `backlog new <slug>` then `backlog doctor`; fresh context:
   `context create` → `alive` → `specs init` → `context baseline`.
 - **PASS if ALL of:** both doctors report 0 errors AND 0 warnings on the fresh

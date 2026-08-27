@@ -2,8 +2,8 @@
 
 Disclosed reference reached from `SKILL.md` and `RC-FLOW.md` wherever the arc says
 "append a RELEASE.jsonl record". `specs/releases/<release-id>/RELEASE.jsonl` is the
-append-only event stream that is replacing `ACTIVE.md`'s phase field and `CLOSURE.md`'s
-closure narrative (SPEC FR4, D3/D7/D11). Schema:
+append-only event stream that replaced `ACTIVE.md`'s phase field (retired at T-050-21A)
+and is replacing `CLOSURE.md`'s closure narrative (SPEC FR4, D3/D7/D11). Schema:
 `dadaia_workspace/public/schemas/releases/release-event-v1.schema.json` — validate a
 new line against it before appending; the fold that reads this file back is
 `dadaia_workspace/core/release_events.py` (read-only, no write call — pure

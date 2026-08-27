@@ -53,7 +53,7 @@ merges the whole scope, rc-N rounds are fixes, the final rc ships).
    *Done when:* all three verdicts are `APPROVE` on that sha — only then may `[x]`,
    closure, merge, deploy, or archive proceed.
 8. **Memory update (`product-engineer`).** Append `phase: CLOSURE` to `RELEASE.jsonl`
-   and dual-write `ACTIVE.md`'s phase field (until T-050-21A); update `specs/memory/**`
+   (`ACTIVE.md` retired at T-050-21A, no mirror to keep in sync); update `specs/memory/**`
    atoms to the product's current state. Protocol detail: `MEMORY-UPDATE.md`. *Done
    when:* `dadaia specs doctor` reports the memory atoms clean.
 9. **Record the closure narrative.** Append the `note` records `RELEASE-EVENTS.md`
@@ -93,10 +93,10 @@ merges the whole scope, rc-N rounds are fixes, the final rc ships).
     *Done when:* the `closure-artifact-gc` `note` record states kept/deleted counts per
     artifact class, with evidence.
 12. **Archive.** `git mv specs/releases/<release-id> specs/_archive/releases/<release-id>`;
-    point `ACTIVE.md` at the next release or `release: none` (dual-write, T-050-21A);
-    append `phase: ARCHIVED` to the now-archived `RELEASE.jsonl`. *Done when:* the
-    release directory is under `_archive/` and `ACTIVE.md` is repointed, in the same
-    commit as steps 8–11 (memory → closure narrative → sweep → archive, one commit).
+    append `phase: ARCHIVED` to the now-archived `RELEASE.jsonl` — nothing to repoint,
+    the next release starts fresh with its own `RELEASE.jsonl`. *Done when:* the
+    release directory is under `_archive/`, in the same commit as steps 8–11 (memory →
+    closure narrative → sweep → archive, one commit).
 13. **Ship PR.** Open `develop` → `main`. On merge, append the `shipped` milestone
     (`RELEASE-EVENTS.md`). *Done when:* it merges — mechanics, the security-verdict PR
     gate, and CI: `DADAIA.md` §4 Gitflow, `dd-gitflow-default`.
@@ -123,9 +123,9 @@ steps'.
 
 ## Segments (ADR-1/ADR-5)
 
-When the active release carries a `segment:` in `ACTIVE.md` (schema v2) or a `phase`
-record's `data.segment` (RELEASE.jsonl — the field the schema itself carries for this
-purpose), each segment closes independently, but `RELEASE.jsonl` stays **one file per
+When the active release carries a `phase` record's `data.segment` (RELEASE.jsonl — the
+field the schema itself carries for this purpose), each segment closes independently,
+but `RELEASE.jsonl` stays **one file per
 release**, never one per segment — `TASKS.md` is the artifact that splits under
 `specs/releases/<release-id>/<segment>/TASKS.md`; `RELEASE.jsonl` records which segment
 each `phase`/`note` belongs to via `data.segment` instead of splitting the file. Per

@@ -166,10 +166,10 @@ Ground yourself first with `dadaia-step0-memory-bootstrap`, then:
 
 1. Resolve the active release from the RELEASE.jsonl fold — the live release's
    `specs/releases/<release-id>/RELEASE.jsonl`, folded via `core/release_events.py`'s
-   rule (last `phase` record wins) — then read `SPEC/PLAN/TASKS.md`. `releases/ACTIVE.md`
-   is dual-written in parallel until T-050-21A repoints the gate (SPEC FR4
-   expand->switch->contract); AI-entity authoring without an approved release-level task
-   is forbidden either way — the SDD gate blocks it.
+   rule (last `phase` record wins) — then read `SPEC/PLAN/TASKS.md`. `ACTIVE.md`
+   retired at T-050-21A (SPEC FR4): the SDD gate itself reads the fold now, no
+   replacement file; AI-entity authoring without an approved release-level task is
+   forbidden either way — the SDD gate blocks it.
 2. Reserve the task via `dadaia-task-manager`: `[ ]` -> `[-]` + commit before editing.
 3. Read the persona brief (product-engineer, or the release's SPEC.md/TASKS.md).
 4. Apply the instruction-hierarchy ordering and persona-consistency invariants

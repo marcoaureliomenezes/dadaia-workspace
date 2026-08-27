@@ -21,10 +21,9 @@ reservation through the ship PR and the post-deploy branch cut.
 
 Resolve the active release and phase from the **RELEASE.jsonl fold** — the live
 release's `specs/releases/<release-id>/RELEASE.jsonl`, folded via
-`core/release_events.py` (last `phase` record wins; SPEC FR4). `releases/ACTIVE.md` is
-dual-written in parallel and remains the SDD gate's own literal decision authority until
-T-050-21A repoints it (expand→switch→contract, D-F) — keep both in sync, never let them
-diverge. A `segment:`/`data.segment` present means `TASKS.md` lives at
+`core/release_events.py` (last `phase` record wins; SPEC FR4) — the SDD gate itself
+reads this same fold; `ACTIVE.md` retired at T-050-21A, no replacement file. A
+`segment:`/`data.segment` present means `TASKS.md` lives at
 `releases/<release-id>/<segment>/TASKS.md`; otherwise at `releases/<release-id>/TASKS.md`.
 Full navigation protocol: `dadaia-workspace-spec-navigator`.
 
@@ -61,8 +60,7 @@ not earlier steps'.
 
 ## Checklist
 
-- [ ] Release + segment resolved from the RELEASE.jsonl fold (`ACTIVE.md` dual-write
-      confirmed in sync).
+- [ ] Release + segment resolved from the RELEASE.jsonl fold.
 - [ ] Task reserved (`[-]`) with an isolated `chore(tasks): start <id>` commit.
 - [ ] Current step (`RC-FLOW.md`) identified before attempting its unlock action.
 - [ ] CI green before any push; trio `APPROVE`d before any final-rc unlock action.

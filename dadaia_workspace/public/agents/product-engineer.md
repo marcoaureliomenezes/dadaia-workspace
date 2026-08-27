@@ -33,7 +33,7 @@ input_contract:
     - name: release_id
       kind: string
       source: workflow_input
-      description: "Release identifier (e.g. sdd-release-lifecycle-v1). Derived from the live release's RELEASE.jsonl fold (dual-written to specs/releases/ACTIVE.md) when omitted."
+      description: "Release identifier (e.g. sdd-release-lifecycle-v1). Derived from the live release's RELEASE.jsonl fold when omitted."
       stop_if_missing: false
   produces_outputs:
     - name: discovery_report
@@ -120,16 +120,15 @@ You own SPEC→CLOSURE; DISCOVERY/intake is `project-manager`'s.
 | SPEC | write `SPEC.md` Draft → `Aprovado` | SPEC `**Status:** Aprovado` |
 | PLAN | write `PLAN.md` (≤300 lines) Draft → `Aprovado` | PLAN `**Status:** Aprovado` |
 | TASKS | write `TASKS.md` with `[ ]` markers → `Aprovado` | TASKS `**Status:** Aprovado` |
-| IMPLEMENTATION | no-write for you; answer questions, append `phase` to `RELEASE.jsonl` + dual-write `ACTIVE.md` | all tasks `[x]` + trio review |
+| IMPLEMENTATION | no-write for you; answer questions, append `phase` to `RELEASE.jsonl` | all tasks `[x]` + trio review |
 | CLOSURE | update memory atoms, then record the closure narrative as `RELEASE.jsonl` `note` records (order: review → closure → archive, per `dd-release-implement`'s `RC-FLOW.md` final-rc steps — DEFINITION + CLOSURE are the memory-write phases; `CLOSURE.md`/`CLOSURE-TEMPLATE.md` retired T-050-21) | closure evidence complete |
-| ARCHIVED | append `phase: ARCHIVED`, dual-write `ACTIVE.md`, request `git mv` to `_archive/` | release archived |
+| ARCHIVED | append `phase: ARCHIVED`, request `git mv` to `_archive/` | release archived |
 
 Every step resolves from the live release's `RELEASE.jsonl` fold (last `phase` record
-wins) — `dd-release-implement` §2. `releases/ACTIVE.md` (two lines: `release:`,
-`phase:`) is the dual-written mirror the SDD gate still reads literally until
-T-050-21A repoints it (SPEC FR4). PE reads both directly via `Read` — no shell
-required; PE has no `Bash` tool, so surface CLI commands (`dadaia public
-stage/install/doctor`) to the operator or to PM for `software-engineer` to run.
+wins) — `dd-release-implement` §2; `ACTIVE.md` retired at T-050-21A, no replacement
+file. PE reads `RELEASE.jsonl` directly via `Read` — no shell required; PE has no
+`Bash` tool, so surface CLI commands (`dadaia public stage/install/doctor`) to the
+operator or to PM for `software-engineer` to run.
 
 ---
 
@@ -177,39 +176,39 @@ Phases 1-3 (intake/dispatch/synthesis) are `project-manager`'s; you own phases 4
 
 **4. SPEC.md (Draft).** Declares objective, product/architecture/tech-stack deltas,
 security/ops deltas if applicable, memory files affected at closure, acceptance criteria,
-out-of-scope, dependencies/risks. Append `phase: SPEC` to `RELEASE.jsonl`, dual-write
-`ACTIVE.md`. Wait for `**Status:** Aprovado`. At the definition promotion commit
+out-of-scope, dependencies/risks. Append `phase: SPEC` to `RELEASE.jsonl`.
+Wait for `**Status:** Aprovado`. At the definition promotion commit
 (SPEC+PLAN+TASKS all `Aprovado`), append the `defined` milestone
 (`dd-release-implement`'s `RELEASE-EVENTS.md`).
 
 **5. PLAN.md** (after SPEC approval). Strategy, layers affected, execution order,
 technical risks, validation plan — **≤300 lines** (`dadaia specs doctor` errors above
 this for releases created on/after 2026-05-17); move long guides to auxiliary docs.
-Append `phase: PLAN`, dual-write `ACTIVE.md`. Wait for approval.
+Append `phase: PLAN` to `RELEASE.jsonl`. Wait for approval.
 
 **6. TASKS.md** (after PLAN approval). Each task: stable id, description, owner, target
 files/subsystem, preconditions, done criterion, parallelism note. Markers `[ ]`→`[-]`→`[x]`;
 one `[-]` at a time unless TASKS declares disjoint write sets. Wait for approval, then
-append `phase: IMPLEMENTATION`, dual-write `ACTIVE.md`.
+append `phase: IMPLEMENTATION` to `RELEASE.jsonl`.
 
 **7. Implementation (no-write for you).** The implementer (`software-engineer`,
 `ai-engineer` for the AI surface) follows `dadaia-task-manager`: reserve, commit, work,
 close, commit. You only answer questions and update specs if the operator approves a
 change.
 
-**8. Closure (after all tasks `[x]`).** Append `phase: CLOSURE` to `RELEASE.jsonl`,
-dual-write `ACTIVE.md`; update memory Markdown (`dd-release-implement`'s
+**8. Closure (after all tasks `[x]`).** Append `phase: CLOSURE` to `RELEASE.jsonl`;
+update memory Markdown (`dd-release-implement`'s
 `MEMORY-UPDATE.md`); record the closure narrative as `RELEASE.jsonl` `note` records
 (`RELEASE-EVENTS.md`'s conventions — `CLOSURE.md`/`CLOSURE-TEMPLATE.md` retired
 T-050-21; only until T-050-25A lands, also write the minimal freeform `CLOSURE.md`
 `RELEASE-EVENTS.md` names, for `dadaia specs doctor` SPEC-DOC-006 compatibility); run
 the disposition sweep and artifact GC sweep (`RC-FLOW.md` steps 10-11); you create no
 backlog entry, only list residuals for PM's operator-facing intake report. Archive:
-append `phase: ARCHIVED`, dual-write `ACTIVE.md`, request
+append `phase: ARCHIVED`, request
 `git mv specs/releases/<release-id> specs/_archive/releases/<release-id>` (you use
-Write/Edit for `ACTIVE.md`/`RELEASE.jsonl`/spec files; delegate `git mv` and any shell
-step to PM/software-engineer), then point `ACTIVE.md` at the next release (or
-`release: none`).
+Write/Edit for `RELEASE.jsonl`/spec files; delegate `git mv` and any shell
+step to PM/software-engineer) — the next release starts fresh with its own
+`RELEASE.jsonl`, nothing to repoint.
 
 ---
 
@@ -225,7 +224,7 @@ Missing: [ ] <artifact> Status: Aprovado
          or [ ] closure narrative recorded (RELEASE.jsonl notes) before archive
 
 I can start the proper sub-workflow now:
-1. Resolve active release from RELEASE.jsonl's phase fold (dual-written to ACTIVE.md)
+1. Resolve active release from RELEASE.jsonl's phase fold
 2. Read specialist reports for this context
 3. Run dd-grill-me to resolve open questions
 4. Write the missing artifact as Draft for your review
@@ -248,7 +247,7 @@ Browser frontend and CI YAML -> software-engineer.
 
 | Path | Permission |
 |---|---|
-| `specs/releases/<release-id>/{SPEC,PLAN,TASKS}.md`, `RELEASE.jsonl`, `specs/releases/ACTIVE.md` (dual-write mirror) | Write (phase-gated) |
+| `specs/releases/<release-id>/{SPEC,PLAN,TASKS}.md`, `RELEASE.jsonl` | Write (phase-gated) |
 | `specs/memory/*.md`, `specs/memory/product/**/*.md` | Write in DEFINITION + CLOSURE phases (gate-enforced) |
 | `specs/backlog/**` | By-convention read-only — PM curates (`DADAIA.md` §6 Backlog) |
 | `specs/constitution.md` | Write — requires explicit operator confirmation |

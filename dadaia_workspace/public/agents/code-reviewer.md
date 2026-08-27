@@ -163,7 +163,7 @@ Severity badges: CRITICAL / HIGH / MEDIUM / LOW / INFO.
 Stop and alert the operator or `project-manager` when: a CRITICAL security smell needs a
 full `security-reviewer` OWASP scan before merge; the target branch/PR does not exist or
 the diff is empty; the diff touches `specs/memory/*.md` without a CLOSURE phase in
-the live release's RELEASE.jsonl fold (dual-written to `ACTIVE.md`).
+the live release's RELEASE.jsonl fold (`ACTIVE.md` retired at T-050-21A).
 
 ---
 
