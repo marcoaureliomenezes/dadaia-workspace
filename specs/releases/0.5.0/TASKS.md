@@ -1565,7 +1565,7 @@ SPEC-DOC-038 and fold the JSONL instead: an `open` record inside an archived aud
 
 ---
 
-- [-] **T-050-25A — FR15/FR4: retire every surviving `CLOSURE.md` parser**
+- [x] **T-050-25A — FR15/FR4: retire every surviving `CLOSURE.md` parser**
 
 **Owner role:** software-engineer · **Commit:** `refactor(T-050-25A): no checker outlives the
 file it parses`
