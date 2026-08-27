@@ -1,6 +1,6 @@
 ---
 name: dd-bug-registration
-description: "Use when: registering a genuine product bug you hit while operating this tooling — classify-first, redact, append the `reported` event. The opening move of Arm B only; the fix itself belongs to `dd-bug-fix`. Any agent may invoke it."
+description: "Use when: registering a genuine product bug you hit while operating this tooling — classify-first, redact, append the one-record-per-bug entry (`status: open`). The opening move of Arm B only; the fix itself belongs to `dd-bug-resolution`. Any agent may invoke it."
 applyTo: "specs/bugs/*.jsonl"
 ---
 
@@ -10,17 +10,17 @@ applyTo: "specs/bugs/*.jsonl"
 > writable, in any mode — this is discipline, not gate enforcement. Any agent runs this
 > protocol; it is not owned by one role.
 
-The narrower glob names the exact write target — the `reported` event append. It is a
-declared subset of `dd-bug-fix`'s broader `specs/bugs/**` (activation precedence:
-`declared_overlaps` in `entities/rules-skills-map.json`, canonical home, FR9/D4).
+The narrower glob names the exact write target — the new `BUGS.jsonl` record append. It
+is a declared subset of `dd-bug-resolution`'s broader `specs/bugs/**` (activation
+precedence: `declared_overlaps` in `entities/behavior-map.json`, canonical home, FR9/D4
+— this map retired `rules-skills-map.json` at T-050-19).
 
 ## 1. When to invoke
 
 Any agent, the moment a tool breaks its own contract while operating this tooling —
 projection, doctor, upgrade, scaffolding, hooks, the gate, presence, context, panel,
-reports, or the CLI itself. Append the `reported` event before the turn ends — the
-ADDITIVE path class (`DADAIA.md` §3) never blocks this write, so nothing is gained by
-waiting.
+reports, or the CLI itself. Append the record before the turn ends — the ADDITIVE path
+class (`DADAIA.md` §3) never blocks this write, so nothing is gained by waiting.
 
 ## 2. Classify-first decision table
 
@@ -66,6 +66,6 @@ In this self-hosting workspace, bugs go to `repos/dadaia-workspace/specs/bugs/`.
 consumer workspace, bugs go to the active context's `specs/bugs/` plus an upstream
 report.
 
-This skill's only output is the `reported` event — never the fix. Hand-off to the fix:
-`dd-bug-fix` (picked up once a bug carries `reported`). Further CLI reference:
+This skill's only output is the `open` record — never the fix. Hand-off to the fix:
+`dd-bug-resolution` (picked up once a bug carries a record). Further CLI reference:
 `dadaia bugs append --help` / `dd-cli-library`.

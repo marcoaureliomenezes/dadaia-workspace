@@ -1,6 +1,6 @@
 ---
 name: dd-diagnose
-description: "The diagnosing method for Arm B, called by dd-bug-resolution (`dd-bug-fix` until T-050-21's rename): seven phases from lineage through cleanup, each ending on a checkable Done when. Phase 0 reads the bug ledger's lineage before any hypothesis is formed."
+description: "The diagnosing method for Arm B, called by dd-bug-resolution: seven phases from lineage through cleanup, each ending on a checkable Done when. Phase 0 reads the bug ledger's lineage before any hypothesis is formed."
 applyTo: "specs/bugs/**"
 disable-model-invocation: true
 ---
