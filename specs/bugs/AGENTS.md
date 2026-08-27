@@ -47,7 +47,7 @@ never re-states the field-by-field split, only the three classes:
 - **Redaction, classification and the CLI reference** for filing a new bug:
   `dd-bug-registration`.
 - **The rest of Arm B** — branch, concurrency, the `resolved` write and its evidence
-  triple: `dd-bug-resolution` (`dd-bug-fix` until its T-050-21 rename).
+  triple: `dd-bug-resolution` (renamed from `dd-bug-fix` at T-050-21).
 
 ## Relationship to Sessions
 
