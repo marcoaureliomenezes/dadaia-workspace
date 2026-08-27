@@ -195,6 +195,10 @@ _HEADING_GROUP_G: frozenset[str] = frozenset(
         "Layers",
         "Lease acquire (O_EXCL CAS + stable-session-identity)",
         "Overview",
+        # v0.5.0 memory two-tier split (FR17, T-050-28): ARCHITECTURE.md, QUALITY.md and
+        # TECHSTACK.md each carry exactly these two top-level parts now.
+        "Part 1 — Principles",
+        "Part 2 — Implementation",
         "Platform seam — `core/platform.py`",
         "Ports and adapters (4 + 9)",
         "Resilience contract — 3 tiers",

@@ -39,8 +39,18 @@ _ARCHITECTURE_MD = _REPO_ROOT / "specs" / "memory" / "ARCHITECTURE.md"
 # Subsection headings (the diagram's own H3, verbatim) — NOT a name-expectation list; every
 # class/module/package NAME asserted below is derived by introspection, never hardcoded.
 _DOCTOR_HEADING = "### `features/specs/doctor` — SpecsDoctor coordinator + validator siblings"
-_FEATURES_HEADING = "### `dadaia_workspace/features` — package map (26 packages)"
 _PANEL_HEADING = "### `features/panel/views` — per-domain API view modules"
+
+# The features package-map heading carries its own package COUNT in the parenthetical
+# (e.g. "(24 packages)"). That count is FORBIDDEN to hardcode here — v0.5.0 T-050-28/29
+# found it stale at 26 while the live tree held 24, which is exactly the drift this guard
+# exists to catch. Instead the heading is located by a pattern that captures the count, and
+# the captured value is asserted equal to the live introspected package count (below) before
+# it is ever used as the mermaid-block lookup key — so a future rename/add/remove of a
+# feature package goes RED here even if nobody remembers to hand-edit the heading.
+_FEATURES_HEADING_RE = re.compile(
+    r"### `dadaia_workspace/features` — package map \((\d+) packages\)"
+)
 
 _MERMAID_BLOCK_RE = re.compile(r"```mermaid\n(.*?)\n```", re.DOTALL)
 _IDENT_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
@@ -192,14 +202,30 @@ def test_architecture_diagrams_present_and_match_live_names() -> None:
     )
 
     # features subsection: the post-merge feature packages + merged reports submodules.
-    mermaid = _mermaid_block_under_heading(text, _FEATURES_HEADING)
-    tokens = _tokens(mermaid)
     packages = _live_feature_packages()
     reports_submodules = _live_reports_submodules()
     assert packages, "introspection found no feature packages — imports broken?"
     assert reports_submodules, "introspection found no reports submodules — imports broken?"
+
+    heading_match = _FEATURES_HEADING_RE.search(text)
+    assert heading_match, (
+        "ARCHITECTURE.md is missing the features package-map heading matching "
+        f"{_FEATURES_HEADING_RE.pattern!r}."
+    )
+    declared_count = int(heading_match.group(1))
+    live_count = len(packages)
+    assert declared_count == live_count, (
+        f"the features package-map heading pins {declared_count} package(s) but the live "
+        f"tree has {live_count}: {sorted(packages)}. Move the heading's count and this test "
+        "in the SAME commit (v0.5.0 T-050-28/29 R3) — the count is the drift-guard's own "
+        "lookup key and must never go stale."
+    )
+    features_heading = heading_match.group(0)
+
+    mermaid = _mermaid_block_under_heading(text, features_heading)
+    tokens = _tokens(mermaid)
     missing = (packages | reports_submodules) - tokens
     assert not missing, (
-        f"{_FEATURES_HEADING!r} does not diagram live package(s)/submodule(s): "
+        f"{features_heading!r} does not diagram live package(s)/submodule(s): "
         f"{sorted(missing)}. Regenerate the diagram (v0.1.55 FR7 regeneration law)."
     )

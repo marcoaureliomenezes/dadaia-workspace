@@ -315,10 +315,11 @@ _PARAMETERS_MD_OWN_VALUE_RE = re.compile(r"\|\s*LARGE \(E2E\) cap\s*\|\s*(\d+)")
 _TESTS_AGENTS_MD_OWN_VALUE_RE = re.compile(r"LARGE cap for this repo:\s*\*\*(\d+)\*\*")
 _QUALITY_MD_OWN_VALUE_RE = re.compile(r"census is \*\*(\d+)\*\*")
 
-# RECORDED CEILING (ratchet DOWN ONLY) — measured 2026-08-27, immediately after
-# this task repoints tests/AGENTS.md: one competing home remains
-# (specs/memory/QUALITY.md's 100), T-050-29's to delete. Target: 0.
-_V29_COMPETING_HOME_CEILING = 1
+# RECORDED CEILING (ratchet DOWN ONLY) — measured 2026-08-27: zero competing homes remain.
+# specs/memory/QUALITY.md's "census is **100**" statement was deleted by the v0.5.0
+# T-050-28/29 memory-trio rewrite (P-26/Q7/Q22); `PARAMETERS.md`'s 30 is now the sole
+# literal home. Target reached: 0.
+_V29_COMPETING_HOME_CEILING = 0
 
 
 def _own_declared_value(text: str, pattern: re.Pattern[str]) -> int | None:
@@ -329,9 +330,10 @@ def _own_declared_value(text: str, pattern: re.Pattern[str]) -> int | None:
 def test_v29_one_number_per_parameter_for_the_large_cap() -> None:
     """V29 (A22.10) — `PARAMETERS.md` stays the LARGE cap's one literal source
     (pinned: 30); `tests/AGENTS.md` carries no numeric cap of its own (this task's
-    own write-set achievement — repoints it to a reference); the residual
-    competing home (`specs/memory/QUALITY.md`'s 100, T-050-29's to remove) is
-    pinned at **1**, ratchet DOWN ONLY, target 0."""
+    own write-set achievement — repoints it to a reference); `specs/memory/QUALITY.md`'s
+    former competing 100-census statement was deleted by the v0.5.0 T-050-28/29
+    memory-trio rewrite, so the competing-home ceiling is now pinned at **0**,
+    ratchet DOWN ONLY."""
     canonical = _own_declared_value(
         _V29_PARAMETERS_MD.read_text(encoding="utf-8"), _PARAMETERS_MD_OWN_VALUE_RE
     )
@@ -363,8 +365,8 @@ def test_v29_one_number_per_parameter_for_the_large_cap() -> None:
     assert len(competing_homes) <= _V29_COMPETING_HOME_CEILING, (
         f"{len(competing_homes)} non-canonical doctrine file(s) declare their own "
         f"LARGE-cap number: {competing_homes} (ceiling {_V29_COMPETING_HOME_CEILING}, "
-        "ratchet DOWN ONLY). specs/memory/QUALITY.md's remaining 100 is T-050-29's to "
-        "delete (see TASKS.md T-050-18A's preconditions/description)."
+        "ratchet DOWN ONLY, target reached at 0 by v0.5.0 T-050-28/29 — someone "
+        "reintroduced a competing LARGE-cap literal)."
     )
 
     # Mutation fixture — the exact regex that now finds nothing in tests/AGENTS.md

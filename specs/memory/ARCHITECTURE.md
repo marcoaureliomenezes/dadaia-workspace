@@ -509,7 +509,7 @@ split, or merge of the `SpecsDoctor` coordinator or its validator siblings). The
 above are pinned by P-13's drift-guard, which imports the live `doctor_*` modules and fails if
 a diagrammed class name goes stale or a live validator is missing.
 
-### `dadaia_workspace/features` — package map (26 packages)
+### `dadaia_workspace/features` — package map (24 packages)
 
 This package graph is the canonical picture of the feature layer. **The live package count is
 24**; the parenthetical in the heading above is the drift-guard's pinned lookup key
