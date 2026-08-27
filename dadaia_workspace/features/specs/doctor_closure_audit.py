@@ -3,13 +3,22 @@
 Single-responsibility sibling of the SpecsDoctor coordinator. Owns archive-CLOSURE completeness
 (SPEC-DOC-006), orphan-spec detection (SPEC-DOC-007), audit naming canon (SPEC-DOC-030), the
 per-artifact ``_archive`` landing zones (SPEC-DOC-034 + ``fix_archive_dir``), archived-audit
-disposition (SPEC-DOC-036), and loose-undisposed-audit detection (SPEC-DOC-038). Leaf-only:
-imports the shared leaves, never a sibling validator.
+disposition (SPEC-DOC-036), and archive-due detection (SPEC-DOC-038). Leaf-only: imports the
+shared leaves, never a sibling validator.
+
+v0.5.0 FR15 (T-050-25, ``audit-canon-v1`` D5/D7): SPEC-DOC-036/038 no longer regex audit
+prose — the disposition-marker pattern the former ``check_audit_disposition`` matched
+against ``**Disposition:** vX.Y.Z`` lines is deleted outright (A15.1). Both checks fold
+``specs/audits/<slug>/FINDINGS.jsonl`` instead, through the ``_iter_findings`` seam below.
+``check_archive_closures`` (SPEC-DOC-006, CLOSURE.md) is untouched here — its retirement
+is T-050-25A's, once FR4/T-050-21A deletes ``CLOSURE.md`` outright.
 """
 
 from __future__ import annotations
 
+import json
 import re
+from collections.abc import Iterator
 from pathlib import Path
 
 from dadaia_workspace.features.specs.doctor_common import (
@@ -40,13 +49,41 @@ _AUDIT_DIR_GRANDFATHER: frozenset[str] = frozenset(
 # (the FROZEN landing zone for disposed bugs/backlog/audits). Absent → WARN + auto-fix.
 _ARCHIVE_PARENT_DIRS: tuple[str, ...] = ("backlog", "audits", "bugs")
 
-# SPEC-DOC-036 (v0.1.46 AC-4/AC-5): an archived audit must carry a disposing-release
-# pointer. Matches an explicit disposition marker line (frontmatter or ``**Disposition:**``)
-# whose value names a SemVer release.
-_AUDIT_DISPOSITION_RE = re.compile(
-    r"(?im)^\s*\**\s*(?:disposition|disposed_by|disposing[ _]release|release)"
-    r"[\s:*]*v\d+\.\d+\.\d+"
-)
+# FR13 (D5): a finding's mutable governance triple. A record is done once its
+# ``disposition`` lands here AND names a disposing ``release`` — the only two facts
+# SPEC-DOC-036/038 need out of the finding-record shape.
+_TERMINAL_DISPOSITIONS: frozenset[str] = frozenset({"fixed", "superseded", "deferred", "rejected"})
+
+# Names never treated as a per-audit entry when walking ``audits/`` or ``audits/_archive/``.
+_AUDIT_DIR_SKIP_NAMES: frozenset[str] = frozenset({".gitkeep", "README.md"})
+
+
+def _iter_findings(findings_path: Path) -> Iterator[dict[str, object]]:
+    """Yield one dict per JSON line of a ``FINDINGS.jsonl`` file.
+
+    Deliberate seam (T-050-25 note, D15/A14.5 — no CLI verb writes this file; it is
+    read here with plain file tools + ``json.loads``, never a typed model). The
+    finding-record model/store lands in ``core/models/findings.py`` + the
+    ``JsonlRecordStore`` seam under T-050-23, authored concurrently with this task;
+    this function is the one place T-050-25A swaps for that model/store once it
+    exists. Nothing downstream of this function assumes more than the plain FR13
+    field names: ``id, pillar, severity, refs, claim, evidence, disposition,
+    release, reason``. Missing file or a malformed line yields nothing for that
+    line — this validator never raises on a corrupt/absent findings file.
+    """
+    if not findings_path.is_file():
+        return
+    with findings_path.open(encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(record, dict):
+                yield record
 
 
 class ClosureAuditValidator:
@@ -234,60 +271,72 @@ class ClosureAuditValidator:
             gitkeep.write_text("", encoding="utf-8")
 
     def check_audit_disposition(self) -> list[SpecsDoctorIssue]:
-        """SPEC-DOC-036 (v0.1.46 AC-4/AC-5): an archived audit must name its disposing release.
+        """SPEC-DOC-036 (v0.5.0 FR15, A15.1/A15.2): fold ``FINDINGS.jsonl``, never prose.
 
-        Every immediate child of ``specs/audits/_archive/`` (a per-audit dir or file) must
-        carry a disposition marker whose value is a SemVer release (see
-        :data:`_AUDIT_DISPOSITION_RE`). An archived audit with no release pointer WARNs —
-        an audit archives only when fully dispositioned by an approved release. Absent
+        Every immediate child of ``specs/audits/_archive/`` that carries a
+        ``FINDINGS.jsonl`` is folded (:func:`_iter_findings`): any record whose
+        ``disposition`` is still ``"open"`` is an ERROR — an audit archives only once
+        every finding is terminal (D5/D7). A child with no ``FINDINGS.jsonl`` predates
+        the ``audit-canon-v1`` schema (Markdown-only, pre-canon) and is never itself
+        inspected for a disposition marker — that regex is deleted (A15.1). It is
+        instead counted into a single aggregate WARNING so the legacy population stays
+        visible without turning into N false positives per legacy audit. Absent
         ``audits/_archive/`` dir → no-op.
         """
         archive_dir = self.specs_dir / "audits" / "_archive"
         if not archive_dir.is_dir():
             return []
         issues: list[SpecsDoctorIssue] = []
+        legacy_names: list[str] = []
         for child in sorted(archive_dir.iterdir()):
-            if child.name in (".gitkeep", "README.md"):
+            if child.name in _AUDIT_DIR_SKIP_NAMES:
                 continue
-            if self._audit_has_disposition(child):
+            findings_path = child / "FINDINGS.jsonl" if child.is_dir() else None
+            if findings_path is None or not findings_path.is_file():
+                legacy_names.append(child.name)
                 continue
+            for record in _iter_findings(findings_path):
+                if record.get("disposition") != "open":
+                    continue
+                issues.append(
+                    SpecsDoctorIssue(
+                        code="SPEC-DOC-036",
+                        severity=Severity.ERROR,
+                        description=(
+                            f"audits/_archive/{child.name}: finding "
+                            f"{record.get('id', '?')} is still 'open' inside an archived "
+                            "audit — an audit archives only once every finding is terminal "
+                            "(SPEC-DOC-036, ERROR)."
+                        ),
+                        path=str(findings_path),
+                    )
+                )
+        if legacy_names:
             issues.append(
                 SpecsDoctorIssue(
                     code="SPEC-DOC-036",
                     severity=Severity.WARNING,
                     description=(
-                        f"audits/_archive/{child.name} is archived but names no disposing "
-                        "release — an audit archives only when fully dispositioned by an "
-                        "approved release (SPEC-DOC-036, WARNING)."
+                        f"{len(legacy_names)} archived audit(s) under audits/_archive/ "
+                        "predate the FINDINGS.jsonl canon (audit-canon-v1, D5) and carry no "
+                        "FINDINGS.jsonl — skipped by the fold, never an error: "
+                        + ", ".join(legacy_names)
                     ),
-                    path=str(child),
+                    path=str(archive_dir),
                 )
             )
         return issues
 
-    @staticmethod
-    def _audit_has_disposition(target: Path) -> bool:
-        """True iff ``target`` (an archived audit dir or file) names a disposing release."""
-        files = target.rglob("*.md") if target.is_dir() else iter([target])
-        for path in files:
-            if not path.is_file():
-                continue
-            try:
-                text = path.read_text(encoding="utf-8")
-            except (OSError, UnicodeDecodeError):
-                continue
-            if _AUDIT_DISPOSITION_RE.search(text):
-                return True
-        return False
-
     def check_loose_undisposed_audits(self) -> list[SpecsDoctorIssue]:
-        """SPEC-DOC-038 (v0.1.47 W1-9): WARN per loose audit directory in ``specs/audits/``.
+        """SPEC-DOC-038 (v0.5.0 FR15, A15.1/A15.2): fold ``FINDINGS.jsonl`` archive-due WARN.
 
-        Audit-disposition law (DADAIA.md §5, Audits): a dispositioned audit archives to
-        ``specs/audits/_archive/``. Every audit DIRECTORY still loose directly under
-        ``specs/audits/`` (not under ``_archive/``) is the signal it has not been archived —
-        one WARN each, so an undisposed/loose audit is visible until its remediation release
-        archives it. Silent when ``audits/`` is absent or holds only ``_archive/``.
+        A live (non-archived) audit directory directly under ``specs/audits/`` whose
+        ``FINDINGS.jsonl`` records are ALL terminal (:data:`_TERMINAL_DISPOSITIONS`) and
+        each names a disposing ``release`` is due for archiving — one WARN
+        (:func:`_iter_findings`). A live audit still carrying an open record, or one
+        with no ``FINDINGS.jsonl`` at all (still in flight, or pre-canon), is silent —
+        it is not the doctor's concern until it is fully dispositioned. Silent when
+        ``audits/`` is absent or holds only ``_archive/``.
         """
         audits_dir = self.specs_dir / "audits"
         if not audits_dir.is_dir():
@@ -296,17 +345,23 @@ class ClosureAuditValidator:
         for child in sorted(audits_dir.iterdir()):
             if not child.is_dir() or child.name == "_archive":
                 continue
-            issues.append(
-                SpecsDoctorIssue(
-                    code="SPEC-DOC-038",
-                    severity=Severity.WARNING,
-                    description=(
-                        f"audits/{child.name} is loose in specs/audits/ — a dispositioned "
-                        "audit must be archived to specs/audits/_archive/ (one remediation "
-                        "release dispositions every finding, then archives; audit-disposition "
-                        "law). SPEC-DOC-038, WARNING."
-                    ),
-                    path=str(child),
+            records = list(_iter_findings(child / "FINDINGS.jsonl"))
+            if not records:
+                continue
+            if all(
+                record.get("disposition") in _TERMINAL_DISPOSITIONS and record.get("release")
+                for record in records
+            ):
+                issues.append(
+                    SpecsDoctorIssue(
+                        code="SPEC-DOC-038",
+                        severity=Severity.WARNING,
+                        description=(
+                            f"audits/{child.name} is fully dispositioned (every finding "
+                            "terminal, each naming a release) — archive due (SPEC-DOC-038, "
+                            "WARNING)."
+                        ),
+                        path=str(child),
+                    )
                 )
-            )
         return issues
