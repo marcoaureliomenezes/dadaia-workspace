@@ -9,11 +9,17 @@ feature/container's concern, this module knows no ledger (AR-1 (b)(i)). Reads sp
 at the one reader this release leaves standing (AR-1 (b)(ii); bug
 ``bug-event-field-with-unicode-line-separator-silently-drops-the-event``).
 
-``update`` re-reads the file immediately before ``atomic_write`` and refuses a stale
-rewrite by comparing the RE-READ BYTES to the snapshot read at the top of the call —
-never mtime (sub-second granularity, Windows; AR-1 (b)(iii)) — raising
-:class:`~dadaia_workspace.core.protocols.record_store.StaleRecordWriteError` the caller
-retries (A2.9, one race semantics: refuse-stale, never last-write-wins). Every line
+``update``/``remove`` refuse a stale rewrite by comparing the ledger's LIVE bytes,
+re-read as ``atomic_write``'s very last step before ``os.replace`` (``expected_previous``,
+bug ``bugs-record-store-append-clobbers-concurrent-update-batch``), to the snapshot read
+at the top of the call — never mtime (sub-second granularity, Windows; AR-1 (b)(iii)) —
+raising :class:`~dadaia_workspace.core.protocols.record_store.StaleRecordWriteError` the
+caller retries (A2.9, one race semantics: refuse-stale, never last-write-wins). A
+staleness check performed by the CALLER before invoking a separate, unconditional write
+call leaves a gap for exactly this: a concurrent write landing while that write call is
+still serializing content is invisible to the caller's own check and gets silently
+discarded by the swap that follows — the symptom the bug above reports (a concurrent
+``append`` erasing an in-flight ``update`` batch, every command exiting 0). Every line
 OTHER than the one being updated is copied through verbatim (never re-serialized), so a
 governance update leaves every other byte of the file identical (A2.2c).
 """
@@ -25,7 +31,7 @@ import logging
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from pathlib import Path
 
-from dadaia_workspace.core.atomic_write import atomic_write
+from dadaia_workspace.core.atomic_write import ConcurrentModificationError, atomic_write
 from dadaia_workspace.core.protocols.record_store import (
     RecordNotFoundError,
     StaleRecordWriteError,
@@ -107,10 +113,10 @@ class JsonlRecordStore[T]:
                 new_lines.append(line)
         if not found or updated is None:
             raise RecordNotFoundError(record_id)
-        after_reread = self._read_text()
-        if after_reread != before:
-            raise StaleRecordWriteError(record_id)
-        atomic_write(self._path, "\n".join(new_lines), newline="")
+        try:
+            atomic_write(self._path, "\n".join(new_lines), newline="", expected_previous=before)
+        except ConcurrentModificationError as exc:
+            raise StaleRecordWriteError(record_id) from exc
         return updated
 
     def remove(self, record_ids: Iterable[str]) -> list[T]:
@@ -142,10 +148,10 @@ class JsonlRecordStore[T]:
             kept_lines.append(line)
         if not removed:
             return []
-        after_reread = self._read_text()
-        if after_reread != before:
-            raise StaleRecordWriteError(next(iter(ids)))
-        atomic_write(self._path, "\n".join(kept_lines), newline="")
+        try:
+            atomic_write(self._path, "\n".join(kept_lines), newline="", expected_previous=before)
+        except ConcurrentModificationError as exc:
+            raise StaleRecordWriteError(next(iter(ids))) from exc
         return removed
 
     # -- reads ---------------------------------------------------------------------

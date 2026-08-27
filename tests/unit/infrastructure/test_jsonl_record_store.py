@@ -24,6 +24,7 @@ from typing import Any
 import pytest
 
 from dadaia_workspace import container
+from dadaia_workspace.core.atomic_write import atomic_write as real_atomic_write
 from dadaia_workspace.core.models.bugs import BugRecord, redactable_property_names
 from dadaia_workspace.core.protocols.record_store import StaleRecordWriteError
 from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
@@ -119,6 +120,58 @@ def test_update_refuses_stale_rewrite_when_file_changed_since_read(tmp_path: Pat
     assert store_path.read_bytes() == original_bytes + b"\n"
 
 
+def test_update_refuses_a_concurrent_append_that_lands_after_the_rereads_own_check(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """bug ``bugs-record-store-append-clobbers-concurrent-update-batch``: the test above
+    (``test_update_refuses_stale_rewrite_when_file_changed_since_read``) only proves the
+    window BEFORE ``update``'s own re-read check — it races INSIDE the caller's
+    ``mutate`` callback, which runs before that re-read. It never exercises the window
+    AFTER the re-read passes and BEFORE the file is actually swapped, while
+    ``atomic_write`` is still serializing content to its temp sibling — exactly where a
+    second live session's real ``dadaia bugs append`` (a genuine ``O_APPEND`` write,
+    ``JsonlRecordStore.append``) can land. Before the fix, ``update`` built its rewrite
+    from the STALE pre-append snapshot and its ``atomic_write`` call silently replaced
+    the file, discarding the concurrent append with no error and no trace — the exact
+    507-updates-vanish symptom the bug reports. The fix must detect this landing and
+    refuse (never last-write-wins, A2.9), leaving the concurrent append on disk."""
+    store = _store(tmp_path)
+    store.append(_sample_record("race-bug"))
+
+    injected = {"done": False}
+
+    def _racing_atomic_write(path: Path, content: str, **kwargs: Any) -> None:
+        if not injected["done"]:
+            injected["done"] = True
+            # A genuine second-session O_APPEND write landing strictly AFTER update()'s
+            # own stale-check already passed, while THIS call is still in flight —
+            # mirrors JsonlRecordStore.append's real write shape exactly.
+            line = json.dumps(_sample_record("concurrent-append").to_dict(), sort_keys=True)
+            with path.open("a", encoding="utf-8") as handle:
+                handle.write(line + "\n")
+        real_atomic_write(path, content, **kwargs)
+
+    monkeypatch.setattr(
+        "dadaia_workspace.infrastructure.jsonl_record_store.atomic_write", _racing_atomic_write
+    )
+
+    with pytest.raises(StaleRecordWriteError):
+        store.update(
+            "race-bug", lambda record: record.apply_governance_update({"status": "resolved"})
+        )
+
+    ids = {
+        json.loads(line)["id"]
+        for line in store.path.read_text(encoding="utf-8").split("\n")
+        if line.strip()
+    }
+    assert ids == {"race-bug", "concurrent-append"}, (
+        f"the concurrent append was silently discarded by the stale rewrite: {ids}"
+    )
+    # ...and the refused update never touched race-bug's own content either.
+    assert next(r for r in store.iter_records() if r.id == "race-bug").status == "open"
+
+
 # --- A1 (S1 FR23 firing) — remove() drops matching records, refuse-stale like update -
 
 
@@ -159,29 +212,30 @@ def test_remove_refuses_stale_rewrite_when_file_changed_since_read(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The SAME refuse-stale race semantics :meth:`update` already has (A2.9) —
-    ``remove`` re-reads immediately before its atomic rewrite and raises
-    ``StaleRecordWriteError`` rather than clobbering a write it never saw.
+    ``remove`` refuses (``StaleRecordWriteError``) rather than clobbering a write it
+    never saw.
 
-    ``remove`` (unlike ``update``) takes no caller-supplied callback to hook a race
-    into, so the interleave is simulated at its OWN internal ``_read_text`` seam
-    (its snapshot read and its pre-write re-read) — the closest external hook point
-    without a real second thread/process (no ``time.sleep``/``threading.Barrier``)."""
+    bug ``bugs-record-store-append-clobbers-concurrent-update-batch``: the interleave is
+    simulated at the ``atomic_write`` seam — a concurrent writer landing AFTER
+    ``remove``'s own snapshot read but WHILE ``atomic_write`` is still serializing its
+    rewrite to a temp sibling, exactly the window a real second session's ``append`` can
+    land in (the closest external hook point without a real second thread/process — no
+    ``time.sleep``/``threading.Barrier``)."""
     store = _store(tmp_path)
     store.append(_sample_record("race-bug"))
     original_bytes = store.path.read_bytes()
 
-    real_read_text = JsonlRecordStore._read_text
-    calls = {"n": 0}
+    injected = {"done": False}
 
-    def _racy_read_text(self: JsonlRecordStore[BugRecord]) -> str:
-        calls["n"] += 1
-        if calls["n"] == 2:
-            # Simulate a second writer racing between remove()'s initial read and
-            # its pre-write re-read.
+    def _racing_atomic_write(path: Path, content: str, **kwargs: Any) -> None:
+        if not injected["done"]:
+            injected["done"] = True
             store.path.write_text(store.path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
-        return real_read_text(self)
+        real_atomic_write(path, content, **kwargs)
 
-    monkeypatch.setattr(JsonlRecordStore, "_read_text", _racy_read_text)
+    monkeypatch.setattr(
+        "dadaia_workspace.infrastructure.jsonl_record_store.atomic_write", _racing_atomic_write
+    )
 
     with pytest.raises(StaleRecordWriteError):
         store.remove({"race-bug"})

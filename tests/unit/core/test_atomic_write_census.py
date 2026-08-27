@@ -46,7 +46,7 @@ _PACKAGE_ROOT = _REPO_ROOT / "dadaia_workspace"
 #: Every writer this census forbids from re-appearing — the SOLE surviving definition
 #: site, exactly one entry, proven by scan rather than declared by name (the assertion
 #: below fails loudly the moment a second one exists, for ANY def, named anything).
-_EXPECTED_SOLE_DEFINITION = "dadaia_workspace/core/atomic_write.py:27:atomic_write"
+_EXPECTED_SOLE_DEFINITION = "dadaia_workspace/core/atomic_write.py:55:atomic_write"
 
 
 def _writes_then_replaces(func: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
