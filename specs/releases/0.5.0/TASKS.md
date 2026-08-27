@@ -1261,7 +1261,7 @@ why this engine could be retired without spending the release's test budget).
 
 ---
 
-- [-] **T-050-20 — FR11: `DADAIA.md` — anchors, the D15 posture, three short sections**
+- [x] **T-050-20 — FR11: `DADAIA.md` — anchors, the D15 posture, three short sections**
 
 **Owner role:** ai-engineer · **Commit:** `feat(T-050-20): DADAIA.md behavior anchors and the
 enforcement-posture section`
@@ -1319,7 +1319,7 @@ one** task in `TASKS.md` names `dadaia_workspace/public/data/DADAIA.md` (A11.1).
 
 ---
 
-- [ ] **T-050-21 — FR12: the skill surface rides the canon**
+- [-] **T-050-21 — FR12: the skill surface rides the canon**
 
 **Owner role:** ai-engineer · **Commit:** one coherent commit per skill family,
 `refactor(T-050-21): <skill> aligned to canon v6`
