@@ -335,3 +335,61 @@ T-045-20's prior mislabel — the append-only ledger is corrected forward rather
 
 **Standing:** F3 (stale-citation class, no structural close) remains a PM intake item;
 F4–F10 remain LOW/INFO and non-blocking. Nothing else in the release changed.
+
+## Re-verdict @395bfb35
+
+**APPROVE.** Six-axis quick pass on `git diff 27c3374a..395bfb35 -- dadaia_workspace/ tests/`
+(prod `+30/−7` across 2 files, tests `+80`). The reviewed code is byte-identical at the
+current branch tip, so this verdict binds `395bfb352a4cdefa7cbbbf06d0c1908a1af38728`.
+
+**One seam, no allowlist, no branch.** The whole change is one regex literal inside the
+existing list comprehension at `features/chokepoints/denylist_scan.py:138` —
+`\b<slug>\b` → `(?<![\w-])(?<!\w\.)<slug>(?![\w-])(?!\.\w)`, `re.IGNORECASE` kept. Same
+one function, same one return, no exception list, no flag, no second predicate. A4.1 (no
+allowlist) stays green unmodified. `service.py` is docstring-only (`hyphen-aware` →
+`whole-token`), and because `_PathMasker._segment_is_offending` and `_slug_suppressed`
+still consume this *same* compiled matcher, detector-hit ⇒ masker-hit parity survives by
+construction rather than by convention.
+
+**Behaviour, probed on the executed path** (synthetic slug):
+
+| still BLOCKS | now MISSES (the ruled trade) |
+|---|---|
+| bare in prose · `repos/<slug>/…` · `<slug>.` at sentence end · quoted/bracketed/comma'd · `<slug>/README` · `<slug>:8080` · `https://host/org/<slug>` · upper-case | `<slug>-x` · `x-<slug>` · `<slug>.md` · `pkg.<slug>` |
+
+`<slug>_x`, `x<slug>` and `<slug>s` were already misses under `\b` — not new.
+
+**The false-negative trade is acceptable at this boundary.** The ruling
+(`reviews/T-045-35-foreign-slug-ruling.md` §3 option 1) states the risk explicitly and
+names the compensating control: the operator-denylist layer is a case-insensitive
+**substring** match and is untouched, so a genuinely private term still fires wherever it
+appears, glued or not. The layer being narrowed is the auto-derived registry-slug layer —
+defense in depth, not the sole control — and the pre-fix shape was blocking the release on
+the library's own tracked asset basenames and its own ledger bug ids, i.e. false positives
+on non-private material. Narrowing one predicate beats options 2/3, both of which the
+ruling correctly rejects as reopening a smuggling path or adding a carve-out predicate.
+
+**F11 · INFO · residual worth naming for intake.** The dotted-suffix miss class includes
+**clone URLs** — `https://host/org/<slug>.git` and `git@host:org/<slug>.git` both go from
+BLOCK to MISS, while the same URL without `.git` still blocks. That is the highest-value
+instance of the `<slug>.ext` trade the ruling names in the abstract (`<slug>.md`,
+`acme-prod.tf`) without calling out this shape. Within the ruled trade, not a new decision;
+routed to the PM's intake, not reworked here.
+
+**Tests.** `tests/unit/features/chokepoints/` → **108 passed** (`-p no:cacheprovider`),
+re-run by me; `dadaia ci preflight` exit 0; `dadaia bugs stats` open 1 (the AS-5 item only).
+The +5 cases use the synthetic `zz-fake-context-name` throughout — **no real slug enters the
+tree**. Two negatives (hyphen-glued basename + bug id; `pkg.<slug>`) and three positive
+controls (bare prose, sentence-end dot, `repos/<slug>/`). **No structure-sensitive test
+added**: public API (`scan_objects`, `compile_slug_patterns`), no private-symbol import, no
+hand-kept inventory, oracles are hit-count and the pre-existing `source_layer` discriminator
+on data each test constructs itself. Every case declares `Intent: CONTRACT`.
+
+### Updated bug-surface row (FR24)
+
+| Surface | Verdict | Ledger evidence |
+|---|---|---|
+| chokepoints / privacy push gate | **reduced** (was *unchanged by design*) | `push-gate-foreign-slug-layer-flags-library-asset-and-bug-id-substrings` (HIGH, `e34f1209` → `395bfb35`) closed by narrowing the one predicate — the first fix on this surface to touch the matcher rather than edit the offending text (the ruling's forensic: 10 of the P3 class fixed by RELOCATE, none structural except `new-branch-push-loses-prior-published-denylist-amnesty`, which also deleted rather than added). The slug-in-identifier sub-class is closed permanently with zero new code paths; A6.3's push-scan-unchanged pin still holds for the operator-term layer, which this fix does not touch |
+
+**Standing:** F3 remains a PM intake item; F4–F10 remain LOW/INFO; F11 joins intake. The
+release verdict is **APPROVE at `395bfb35`**.
