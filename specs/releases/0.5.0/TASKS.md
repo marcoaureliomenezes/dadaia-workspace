@@ -1919,7 +1919,7 @@ does not close until the ledger says the window did.
 
 ## Scope complete — gates and the trio
 
-- [-] **T-050-34 — [shell] FR22: the invariants, measured**
+- [x] **T-050-34 — [shell] FR22: the invariants, measured**
 
 **Owner role:** software-engineer · **Commit:** the capture reference only
 
