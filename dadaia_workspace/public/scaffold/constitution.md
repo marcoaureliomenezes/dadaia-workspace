@@ -118,8 +118,8 @@ release) segue a `DADAIA.md` §6.
 `specs/memory/**` tem um único autor: o agente responsável por specs/planejamento de
 release, e apenas nas fases de definição e de fechamento de release. Todo outro agente
 lê a memória livremente mas nunca a escreve. Memória é o estado atual do produto, não
-um changelog — histórico e decisões superadas vivem no fechamento do release
-(`CLOSURE.md`) e no arquivo, nunca em `specs/memory/**`.
+um changelog — histórico e decisões superadas vivem nos registros `note` do
+`RELEASE.jsonl` de cada release e no arquivo, nunca em `specs/memory/**`.
 
 ---
 

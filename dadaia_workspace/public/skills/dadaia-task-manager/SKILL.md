@@ -55,8 +55,8 @@ finishes code, unit tests, and integration tests, the task remains `[-]` until
 same commit — boundary-by-boundary cadence: `dd-release-implement`'s gate-cadence table,
 canonical home (branch contract: `DADAIA.md` §4 Gitflow, operations: `dd-gitflow-default`).
 Before those approvals it is forbidden to mark
-`[x]`, open a PR, request merge, deploy, close the release, write `CLOSURE.md`, or update
-memory. If any reviewer requests changes, return to step 2 and keep `[-]`.
+`[x]`, open a PR, request merge, deploy, close the release, or update memory. If any
+reviewer requests changes, return to step 2 and keep `[-]`.
 
 ## Dispatcher relaying for a shell-less sub-agent (FR5)
 

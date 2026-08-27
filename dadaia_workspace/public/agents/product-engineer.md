@@ -199,9 +199,8 @@ change.
 **8. Closure (after all tasks `[x]`).** Append `phase: CLOSURE` to `RELEASE.jsonl`;
 update memory Markdown (`dd-release-implement`'s
 `MEMORY-UPDATE.md`); record the closure narrative as `RELEASE.jsonl` `note` records
-(`RELEASE-EVENTS.md`'s conventions — `CLOSURE.md`/`CLOSURE-TEMPLATE.md` retired
-T-050-21; only until T-050-25A lands, also write the minimal freeform `CLOSURE.md`
-`RELEASE-EVENTS.md` names, for `dadaia specs doctor` SPEC-DOC-006 compatibility); run
+(`RELEASE-EVENTS.md`'s conventions — `CLOSURE.md`/`CLOSURE-TEMPLATE.md` retired T-050-21,
+its doctor-side parser (SPEC-DOC-006) retired T-050-25A; never write one); run
 the disposition sweep and artifact GC sweep (`RC-FLOW.md` steps 10-11); you create no
 backlog entry, only list residuals for PM's operator-facing intake report. Archive:
 append `phase: ARCHIVED`, request

@@ -22,8 +22,7 @@ TASKS → CLOSURE) and the atomic memory contract.
    reads this same fold directly, no mirror to cross-check).
 4. Load active release artifacts: `SPEC.md`, `PLAN.md`, `TASKS.md`, and, if phase ∈
    {CLOSURE, ARCHIVED}, the `RELEASE.jsonl` closure `note` records (`CLOSURE.md`
-   retired T-050-21 — until T-050-25A, a minimal freeform `CLOSURE.md` may still exist
-   for SPEC-DOC-006 compatibility only).
+   retired T-050-21, its doctor-side parser retired T-050-25A — never expect one).
 5. Load `specs/backlog/BACKLOG.md` (`ACTIVE` section) if present — the single-source
    backlog (`dd-backlog-definition`).
 6. Compare the spec set across these dimensions:

@@ -211,8 +211,8 @@ description`. The markers are the auditable trace of who took what.
 <!-- behavior: memory -->
 **Memory is current product truth, not history.** Read it before changing production
 behavior. `product-engineer` writes `specs/memory/**` in the `DEFINITION` and `CLOSURE`
-phases; every other agent reads it. Changelog and history live in `CLOSURE.md` and
-`_archive/`. Each of `ARCHITECTURE.md`, `QUALITY.md` and `TECHSTACK.md` splits into
+phases; every other agent reads it. Changelog and history live in each release's
+`RELEASE.jsonl` `note` records and `_archive/`. Each of `ARCHITECTURE.md`, `QUALITY.md` and `TECHSTACK.md` splits into
 ADR-gated Part 1 Principles (each carrying `Measured by:`) and an evolving Part 2
 Implementation.
 

@@ -58,11 +58,10 @@ merges the whole scope, rc-N rounds are fixes, the final rc ships).
    when:* `dadaia specs doctor` reports the memory atoms clean.
 9. **Record the closure narrative.** Append the `note` records `RELEASE-EVENTS.md`
    conventions describe (summary, size accounting, drifts, artifact-GC, test
-   dispositions) — `CLOSURE.md`/`CLOSURE-TEMPLATE.md` retire here (T-050-21); until
-   T-050-25A finishes retiring the doctor-side `CLOSURE.md` parsers, also write the
-   minimal freeform `CLOSURE.md` that `RELEASE-EVENTS.md` names (SPEC-DOC-006
-   compatibility only — no template dependency). *Done when:* every narrative class has either a
-   `note` record or the named native home (`RELEASE-EVENTS.md`'s conversion table).
+   dispositions) — `CLOSURE.md`/`CLOSURE-TEMPLATE.md` retired at T-050-21, and the
+   doctor-side `CLOSURE.md` parser retired at T-050-25A; never write one. *Done when:*
+   every narrative class has either a `note` record or the named native home
+   (`RELEASE-EVENTS.md`'s conversion table).
 10. **Disposition sweep.** Flip every bug/backlog item picked into (or superseded by)
     this release to a terminal token — vocabulary and format: `dd-backlog-definition`
     §2. **CONSUMED → terminal token is an update, never a second histo record** —

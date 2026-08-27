@@ -63,13 +63,9 @@ as `note` records, one per class, `data.kind` naming which:
 | `## Validations` | *(none needed)* | already native: per-task `implementation-complete` handoffs + the trio's `APPROVE` verdicts |
 | `## Memory updates` | *(none needed)* | already native: the memory atom diffs themselves, in git history |
 
-**Transitional note (until T-050-25A).** `dadaia specs doctor`'s SPEC-DOC-006 still
-requires an *archived* release directory to carry a `CLOSURE.md` with `## Summary`,
-`## Validations`, `## Drifts`, `## Memory updates` headings and a validation triple —
-that doctor-side parser retires at **T-050-25A** (FR15), not here. Until it lands,
-write a minimal freeform `CLOSURE.md` carrying exactly those four headings (sourced
-from the `note` records above — no template dependency, no `CLOSURE-TEMPLATE.md`); the
-`RELEASE.jsonl` records are the canonical, forward-looking form regardless.
+**T-050-25A (FR15) landed** — the doctor-side parser that once required an *archived*
+release directory to carry a `CLOSURE.md` (SPEC-DOC-006) is deleted. Never write a
+`CLOSURE.md`; the `RELEASE.jsonl` `note` records above are the sole, canonical form.
 
 ## Validation
 

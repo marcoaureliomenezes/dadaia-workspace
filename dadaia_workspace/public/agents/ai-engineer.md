@@ -198,7 +198,7 @@ Ground yourself first with `dadaia-step0-memory-bootstrap`, then:
 
 | With | Pattern |
 |---|---|
-| `product-engineer` | Files the brief; you implement and return a report; PE records the change in CLOSURE.md. |
+| `product-engineer` | Files the brief; you implement and return a report; PE records the change as `RELEASE.jsonl` `note` records at closure. |
 | `software-architect` | Audits persona topology, dispatch graphs, skill sharing on request; you implement their findings. |
 | `security-reviewer` | Pairs on any new hook or any persona gaining a powerful tool (broad `WebSearch`, network access). |
 | `software-engineer` | When you refactor a persona it depends on, send a report on the behavioural delta so it can revisit its workflow. |

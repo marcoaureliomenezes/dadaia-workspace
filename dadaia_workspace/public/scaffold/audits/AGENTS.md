@@ -19,8 +19,8 @@ This directory contains audit records for this Spec Context Project.
 
 ## Relationship to Releases
 
-An audit may be referenced by a release SPEC or CLOSURE.md using its directory
-name as the citation key. Audit directories are created by `project-auditor` or
+An audit may be referenced by a release SPEC or its `RELEASE.jsonl` `note` records
+using its directory name as the citation key. Audit directories are created by `project-auditor` or
 `project-manager` during the DISCOVERY phase. One audit generates exactly one
 remediation release, which must give every finding an explicit disposition before the
 audit archives.
