@@ -2,7 +2,7 @@
 slug: architecture
 title: Architecture Memory
 category: core
-tldr: Two-tier memory: 17 measured architecture principles, then the three-ring implementation map, resolution seam, projection chain, runtime state and diagrams.
+tldr: Two-tier memory — 17 measured architecture principles, then the three-ring implementation map, resolution seam, projection chain, runtime state and diagrams.
 summary: >-
   Part 1 carries the ADR-gated architecture principles, each naming the existing
   mechanical check that measures it — the import-linter ring contracts, the capped

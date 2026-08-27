@@ -2,7 +2,7 @@
 slug: quality-assurance
 title: quality-assurance
 category: core
-tldr: Two-tier memory: 10 measured quality principles, then test layers, intent taxonomy, flake and quarantine policy, test health, CI gates and anti-slop rules.
+tldr: Two-tier memory — 10 measured quality principles, then test layers, intent taxonomy, flake and quarantine policy, test health, CI gates and anti-slop rules.
 summary: >-
   Part 1 carries the ADR-gated quality principles, each naming the existing mechanical
   check that measures it — module-size and complexity ratchets, the tier timeouts,
