@@ -19,8 +19,9 @@ reads the section named at each step; no other agent needs this file for earlier
    flowchart LR
      A --> B
    ```
-   For screenshots, place PNGs under `specs/assets/<scope>/<id>.png` and reference via
-   `<img src="../assets/<scope>/<id>.png" alt="<text>">`.
+   The v6 canon root carries no `assets/` member (FR1, T-050-06) — memory Markdown
+   carries no external image references; a diagram belongs in-doc as a fenced Mermaid
+   block. `ARCHITECTURE.md`'s own `## Architecture Diagrams` section is the pattern.
 5. **Forbidden in memory Markdown:**
    - `<h2>Changelog</h2>`, `<h2>History</h2>`, `<h2>Histórico</h2>`, `<h2>Versions</h2>`
    - `<section class="changelog">` and similar
@@ -28,7 +29,7 @@ reads the section named at each step; no other agent needs this file for earlier
 
    If the operator asks for history, point to `CLOSURE.md` or `_archive/`.
 6. **Validate** with `dadaia specs doctor` before moving to archive. Doctor checks
-   atomicity, broken `<img>` references, and Mermaid script presence.
+   atomicity and Mermaid script presence.
 7. **Product memory is a folder catalog** at `specs/memory/product/`, not a single file —
    a product has many features and bundling them overloads humans and wastes tokens for
    agents that need only one feature's depth.
@@ -41,9 +42,11 @@ reads the section named at each step; no other agent needs this file for earlier
      Typical trigger (1 sentence), Differentiator (the problem it solves), Runtime state
      touched (files/dirs touched), Dependencies (run order) — English canon,
      `.heading-allowlist`.
-   - Templates: `public/templates/memory-architecture.md.j2`,
-     `public/templates/memory-tech-stack.md.j2`; product atoms are authored directly as
-     Markdown during release closure.
+   - The top-level trio's scaffold source is
+     `dadaia_workspace/public/scaffold/memory/ARCHITECTURE.md`,
+     `dadaia_workspace/public/scaffold/memory/TECHSTACK.md` (source and dest share the
+     name — no `.j2` templating); product atoms are authored directly as Markdown
+     during release closure.
    - Update `index.md` only if the catalog order changed or a feature was added/removed;
      update affected feature atoms; leave the rest intact. A new feature gets its atom
      created and linked from `index.md`; a deprecated feature's link is removed and its

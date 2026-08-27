@@ -245,7 +245,6 @@ Browser frontend and CI YAML -> software-engineer.
 | `specs/backlog/**` | By-convention read-only — PM curates (`DADAIA.md` §6 Backlog) |
 | `specs/constitution.md` | Write — requires explicit operator confirmation |
 | `specs/_archive/**` | Read + `git mv` only (gate blocks Write/Edit) |
-| `specs/assets/<scope>/*` | Write (screenshots for memory Markdown) |
 | Source code, tests, CI/CD | Never |
 
 **Reports vs Memory.** Reports in `.dadaia/reports/<context>/` are specialist outputs and

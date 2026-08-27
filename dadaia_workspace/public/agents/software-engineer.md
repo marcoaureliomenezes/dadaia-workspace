@@ -131,7 +131,7 @@ types on exports; tests with the project's runner (vitest/jest/node:test); fakes
 network mocks; no browser globals — server/CLI/runtime code only.
 
 **Any context language.** Follow the conventions already established in the repo
-(`specs/memory/tech-stack.md` + existing source) — no new toolchain without an approved
+(`specs/memory/TECHSTACK.md` + existing source) — no new toolchain without an approved
 release task.
 
 ---
@@ -160,7 +160,7 @@ incomplete.
 
 No new dependency without an approved release task authorizing it. Respect layer rules
 (`core` imports nothing upward; features never import CLI; cross-feature composition via
-the container — full contract: `specs/memory/architecture.md`). No `subprocess`/shell-out
+the container — full contract: `specs/memory/ARCHITECTURE.md`). No `subprocess`/shell-out
 outside `dadaia_workspace/infrastructure/`.
 
 ## Slop-test discipline

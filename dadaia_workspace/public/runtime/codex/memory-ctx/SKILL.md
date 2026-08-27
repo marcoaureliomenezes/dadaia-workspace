@@ -22,10 +22,10 @@ bootstrap payload for Claude Code sessions — delivered here for Codex
 sessions where the hook does not fire.
 Every Codex session receives:
 
-1. Approved toolchain and constraints (`tech-stack.md`)
+1. Approved toolchain and constraints (`TECHSTACK.md`)
 2. Feature catalog for task-scoped self-pull (`product/catalog.json` or `product/index.md`)
 
-Architecture (`architecture.md`) is **not** injected here — it is large (~7.5K tokens)
+Architecture (`ARCHITECTURE.md`) is **not** injected here — it is large (~7.5K tokens)
 and agents self-pull it before any architectural, cross-layer, or design decision.
 
 It supplements the canonical agent persona — it does NOT duplicate it.
@@ -55,16 +55,16 @@ OR
 Read: .dadaia/states/spec_contexts.json → find first alive entry → derive: repos/<slug>/specs/
 ```
 
-### Step 2 — Read `tech-stack.md`
+### Step 2 — Read `TECHSTACK.md`
 
-Read `<specs_dir>/memory/tech-stack.md` directly. Preserve frontmatter and body
+Read `<specs_dir>/memory/TECHSTACK.md` directly. Preserve frontmatter and body
 content; do not strip Markdown.
 
 ```
-Read: <specs_dir>/memory/tech-stack.md
+Read: <specs_dir>/memory/TECHSTACK.md
 ```
 
-If the file is absent, record `[tech-stack.md not found]` and continue.
+If the file is absent, record `[TECHSTACK.md not found]` and continue.
 
 ### Step 3 — Read feature catalog
 
@@ -89,7 +89,7 @@ Emit the following context block before any role-specific adapter runs or any wo
 
 ```
 === workspace memory (tech + catalog) ===
-[tech-stack.md content]
+[TECHSTACK.md content]
 
 [catalog.json content OR product/index.md content]
 === end memory bootstrap ===
@@ -103,7 +103,7 @@ After emitting this block, proceed to any role-specific adapter (`design-ctx`,
 Before any architectural, cross-layer, or design decision, self-pull:
 
 ```
-Read: <specs_dir>/memory/architecture.md
+Read: <specs_dir>/memory/ARCHITECTURE.md
 ```
 
 Architecture is NOT part of the bootstrap payload (it is large). Pull it on demand,
@@ -120,7 +120,7 @@ not at session start.
 | Read-only | No Write, Edit, or Bash calls beyond the read operations above during context gathering. |
 | No persona duplication | This adapter supplements the canonical agent persona — it does not replace or restate it. |
 | Graceful degradation | If a memory file is missing, record the absence and continue — do not block the session. |
-| Architecture is self-pull | Never inject architecture.md as part of bootstrap. Self-pull it only when making architectural or cross-layer decisions. |
+| Architecture is self-pull | Never inject ARCHITECTURE.md as part of bootstrap. Self-pull it only when making architectural or cross-layer decisions. |
 | Self-pull responsibility | Use the catalog to identify relevant features; self-pull only 1-3 `product/<area>/<slug>.md` files (per each entry's `path` field) for your specific task to avoid context overload. |
 
 ---

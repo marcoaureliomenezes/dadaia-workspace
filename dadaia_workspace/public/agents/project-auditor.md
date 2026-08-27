@@ -111,7 +111,7 @@ skill file needed for those.
 
 Ground yourself first with `dadaia-step0-memory-bootstrap`, anchored on
 `specs/constitution.md` and the memory catalog (`specs/memory/product/catalog.json`,
-`specs/memory/architecture.md`, `specs/memory/product/index.md`) — the authoritative
+`specs/memory/ARCHITECTURE.md`, `specs/memory/product/index.md`) — the authoritative
 statement of what the workspace *should* be doing; every drift finding is measured
 against them.
 

@@ -28,13 +28,16 @@ place outside the allowed phases.
 
 | Path | Holds |
 |---|---|
-| `architecture.md` | top-level — system structure, layers, dispatch topology |
-| `tech-stack.md` | top-level — languages, runtimes, dependencies |
-| `quality-assurance.md` | top-level — QA contract and test policy |
+| `ARCHITECTURE.md` | top-level — system structure, layers, dispatch topology |
+| `TECHSTACK.md` | top-level — languages, runtimes, dependencies |
+| `QUALITY.md` | top-level — QA contract and test policy |
 | `product/index.md` | human entry point for the product catalog |
 | `product/catalog.json` | machine index, regenerated from atom frontmatter |
 | `product/<area>/<slug>.md` | one product-truth atom per feature/area |
-| `assets/` | images referenced by atoms |
+
+The v6 canon root carries no `assets/` member — a diagram belongs in-doc as a fenced
+Mermaid block (`ARCHITECTURE.md`'s own `## Architecture Diagrams` section is the
+pattern); memory Markdown carries no external image references.
 
 Regenerate the machine index after any atom path change:
 

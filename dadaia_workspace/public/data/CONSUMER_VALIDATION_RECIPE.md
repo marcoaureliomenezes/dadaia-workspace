@@ -188,7 +188,7 @@ an initialized workspace, create it:
   `next_handoff:{"agent":"human","context":<ctx>,"expected_artifact_type":"other"}`.
   `self_pull.refs` MUST list the memory atom the agent's role maps to, or the validator
   rejects it — correctly: an agent's handoff has to show it read its own memory. For
-  `agent:"qa-engineer"` that is `specs/memory/quality-assurance.md` (context-relative, and
+  `agent:"qa-engineer"` that is `specs/memory/QUALITY.md` (context-relative, and
   it exists in any scaffolded context). A ref like `AGENTS.md` alone is NOT enough
   (bug recipe-f12-minimal-valid-handoff-is-invalid: the earlier wording prescribed exactly
   that, so following the recipe verbatim produced a FAIL against a healthy product).

@@ -108,7 +108,7 @@ SPEC/PLAN review (`product-engineer`'s).
 Ground yourself first with `dadaia-step0-memory-bootstrap`, then walk every diff along
 these six axes, in order:
 
-1. **Architecture conformance** — respects `specs/memory/architecture.md`'s layer
+1. **Architecture conformance** — respects `specs/memory/ARCHITECTURE.md`'s layer
    boundaries? Watch for cross-layer imports, business logic leaking into
    infrastructure, presentation logic in domain code.
 2. **Design patterns** — misused God object, anemic domain model, service-locator DI,

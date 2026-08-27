@@ -62,11 +62,11 @@ specs_pattern_version: 5
 
 ## 7. Mapa de Responsabilidade das Specs
 
-- `specs/memory/architecture.md` é a fonte única da estrutura do runtime e das decisões de arquitetura.
+- `specs/memory/ARCHITECTURE.md` é a fonte única da estrutura do runtime e das decisões de arquitetura.
 - `specs/memory/product/index.md` é o catálogo de features; cada feature tem seu próprio
   atomo Markdown em `specs/memory/product/<area>/<slug>.md`, fonte única da definição do
   produto e dos usuários por feature.
-- `specs/memory/tech-stack.md` é a fonte única da política de toolchain.
+- `specs/memory/TECHSTACK.md` é a fonte única da política de toolchain.
 - `specs/releases/<release-id>/SPEC.md` é a fonte única do comportamento do produto para
   a release ativa — não existe um SPEC.md monolítico na raiz de specs/; cada release tem
   o seu.

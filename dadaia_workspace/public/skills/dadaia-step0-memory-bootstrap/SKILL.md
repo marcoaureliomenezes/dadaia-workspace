@@ -46,8 +46,8 @@ the task actually needs, and reading them before deciding, is yours.
    directly, no stripping. `[[slug]]` wikilinks resolve to any `<slug>.md` file found
    under `specs/memory/` (recursive lookup). If
    `catalog.json` is absent (migration), fall back to `specs/memory/product/index.md`.
-2. **Self-pull architecture only when the decision needs it.** `architecture.md` is NOT
-   in the prefix (it is large). Read `specs/memory/architecture.md` before any decision
+2. **Self-pull architecture only when the decision needs it.** `ARCHITECTURE.md` is NOT
+   in the prefix (it is large). Read `specs/memory/ARCHITECTURE.md` before any decision
    touching layer boundaries / cross-layer dependency rules, agent topology or dispatch
    graphs, schema contracts, or any structural design choice — and skip it when the task
    is self-contained within one well-understood component.
@@ -66,7 +66,7 @@ missing context.
   stale and should be treated as `.md`.
 - `catalog.json` is the machine index. Prefer it over reading all atom files
   individually for an initial scan.
-- `architecture.md` is large. Self-pull it only when needed (Step 2 criteria
+- `ARCHITECTURE.md` is large. Self-pull it only when needed (Step 2 criteria
   above), not for every task.
 - Never edit memory atoms. They are write-locked for all agents except
   `product-engineer` during the DEFINITION and CLOSURE phases (constitution, Memory Canon).

@@ -18,13 +18,13 @@ under `<specs-dir>/memory/`. Load each atom in order; read the Markdown directly
 
 | Atom | Path | What it declares | Headings of interest |
 |---|---|---|---|
-| Architecture | `memory/architecture.md` | Layers, module boundaries, subsystems, runtime state, dependencies | `Primary Subsystems`, `Concurrency`, `Runtime State` |
+| Architecture | `memory/ARCHITECTURE.md` | Layers, module boundaries, subsystems, runtime state, dependencies | `Primary Subsystems`, `Concurrency`, `Runtime State` |
 | Product catalog | `memory/product/index.md` | Feature catalog (one entry per shipped feature) | catalog listing (Markdown headings, no `<section>` wrapper) |
 | Feature detail | `memory/product/<area>/<slug>.md` | Purpose, usage flow, trigger, differentiator, runtime state, dependencies per feature | `Purpose`, `Usage flow`, `Differentiator`, `Dependencies` |
-| Tech stack | `memory/tech-stack.md` | Languages, frameworks, versions, tooling, rationale | `Snapshot`, `Canonical Commands`, `Packaging Notes` |
+| Tech stack | `memory/TECHSTACK.md` | Languages, frameworks, versions, tooling, rationale | `Snapshot`, `Canonical Commands`, `Packaging Notes` |
 
 Rules for loading:
-- Load `architecture.md` and `tech-stack.md` on every audit.
+- Load `ARCHITECTURE.md` and `TECHSTACK.md` on every audit.
 - Load `product/index.md` first; then load individual feature files only for features
   that are in-scope for the current audit.
 - Never use `_archive/` atoms as the authoritative source.
@@ -39,9 +39,9 @@ Rules for loading:
 
 | Dimension | Evidence agent | Supplies |
 |---|---|---|
-| A — Architecture | `software-architect` | layer-boundary / module-dependency drift vs `architecture.md` |
+| A — Architecture | `software-architect` | layer-boundary / module-dependency drift vs `ARCHITECTURE.md` |
 | B — Product Features | `software-engineer` | code-surface drift vs each feature's acceptance criteria |
-| C — Tech Stack | `software-engineer` | dependency/version drift vs `tech-stack.md` and lockfiles |
+| C — Tech Stack | `software-engineer` | dependency/version drift vs `TECHSTACK.md` and lockfiles |
 | D — Security | `security-reviewer` | OWASP scan, CVEs, secrets, IaC findings |
 | E — Test Detection Quality | `qa-engineer` | test-pyramid health, intent taxonomy, quarantine/SCAFFOLD state |
 | F — Agent-surface | `ai-engineer` | prompt-efficiency / persona-shape drift vs `public/agents`, `public/skills`, `public/data` |
@@ -54,7 +54,7 @@ Rules for loading:
 
 ### Step 1 — Layer Sample Walk
 
-For each architectural layer declared in `architecture.md`:
+For each architectural layer declared in `ARCHITECTURE.md`:
 
 1. List the declared responsibilities and module paths.
 2. `find <repo-root>/<module-path> -type f -name "*.py" -o -name "*.ts" | head -20`
@@ -79,7 +79,7 @@ For each feature in `memory/product/index.md`:
 
 ### Step 3 — Tech-Stack Cross-Reference
 
-For each declared dependency in `tech-stack.md`:
+For each declared dependency in `TECHSTACK.md`:
 
 1. Verify it appears in `pyproject.toml` / `package.json` / `go.mod`.
 2. Verify the pinned version matches the declared version.

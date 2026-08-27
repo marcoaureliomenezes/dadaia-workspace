@@ -1,6 +1,6 @@
 ---
 name: dadaia-workspace-spec-reviewer
-description: "Use when: reviewing or refining dadaia-workspace specs before implementation or before declaring a refinement pass complete. Audits memory Markdown atomicity, ACTIVE.md, status canonicity, CLOSURE evidence triples, broken image references, and the 300-line PLAN policy. Loads canonical owner docs first, detects duplicated ownership, and routes unresolved gaps to the PM's operator-gated intake report."
+description: "Use when: reviewing or refining dadaia-workspace specs before implementation or before declaring a refinement pass complete. Audits memory Markdown atomicity, ACTIVE.md, status canonicity, CLOSURE evidence triples, external image references, and the 300-line PLAN policy. Loads canonical owner docs first, detects duplicated ownership, and routes unresolved gaps to the PM's operator-gated intake report."
 ---
 
 # dadaia-workspace-spec-reviewer
@@ -14,8 +14,8 @@ TASKS → CLOSURE) and the atomic memory contract.
 ## Review workflow
 
 1. Load `<specs-dir>/constitution.md`.
-2. Load atomic memory (Markdown): `memory/architecture.md`, `memory/product/catalog.json`
-   when present, `memory/product/index.md`, and `memory/tech-stack.md`.
+2. Load atomic memory (Markdown): `memory/ARCHITECTURE.md`, `memory/product/catalog.json`
+   when present, `memory/product/index.md`, and `memory/TECHSTACK.md`.
    Load feature atoms under `memory/product/` on demand.
 3. Read `<specs-dir>/releases/ACTIVE.md` and resolve the active release id.
 4. Load active release artifacts: `SPEC.md`, `PLAN.md`, `TASKS.md`, and `CLOSURE.md` if
@@ -33,8 +33,10 @@ TASKS → CLOSURE) and the atomic memory contract.
      feature sections: `Purpose`, `Usage flow`, `Typical trigger`, `Differentiator`,
      `Runtime state touched`, and `Dependencies` (English canon, `.heading-allowlist`).
      Missing any of these is a finding.
-   - **Broken image references** — every image reference in any memory Markdown resolves
-     to a real file under `specs/assets/…`.
+   - **No external image references** — the v6 canon root carries no `assets/` member;
+     a diagram belongs in-doc as a fenced Mermaid block (`ARCHITECTURE.md`'s own
+     `## Architecture Diagrams` section is the pattern), never an `<img>` reference to
+     an external file.
    - **Mermaid syntax** — fenced Mermaid blocks must be syntactically readable by the
      target renderer.
    - **Status canonicity** — every SPEC/PLAN/TASKS uses `**Status:** Draft|Em revisão|Aprovado`

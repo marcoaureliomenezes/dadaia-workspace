@@ -16,13 +16,12 @@ canonical order for the current task.
 specs/
 ├── constitution.md              ← absolute laws of the product — read first, always
 ├── memory/
-│   ├── architecture.md        ← layer rules, modules, dependency contracts
-│   ├── tech-stack.md          ← approved technologies and constraints
+│   ├── ARCHITECTURE.md        ← layer rules, modules, dependency contracts
+│   ├── TECHSTACK.md          ← approved technologies and constraints
 │   └── product/                 ← FOLDER catalog (functional view)
 │       ├── index.md             ← entry point: vision, users, ordered feature catalog with links
 │       ├── catalog.json         ← generated machine-readable feature catalog
 │       └── <feature-slug>.md    ← one Markdown atom per feature in production
-├── assets/<scope>/<id>.png      ← screenshots referenced by memory Markdown
 ├── releases/
 │   ├── ACTIVE.md                ← which release is active and in which phase
 │   └── <release-id>/{SPEC,PLAN,TASKS,CLOSURE}.md
@@ -53,14 +52,14 @@ referenced, not restated.
 
 2. **Read constitution and atomic memory (Markdown).**
    - `<specs-dir>/constitution.md`
-   - `<specs-dir>/memory/architecture.md`
+   - `<specs-dir>/memory/ARCHITECTURE.md`
    - `<specs-dir>/memory/product/catalog.json` — preferred machine-readable feature catalog when present.
    - `<specs-dir>/memory/product/index.md` — entry point for product catalog. Load
      specific `<specs-dir>/memory/product/<area>/<feature-slug>.md` files (per
      `catalog.json`'s `path` field) on demand when the
      task requires functional depth on a particular feature (avoids overloading context
      with all features at once).
-   - `<specs-dir>/memory/tech-stack.md`
+   - `<specs-dir>/memory/TECHSTACK.md`
 
    Read Markdown atoms directly. Use `catalog.json` to select the 1-3 feature
    atoms relevant to the task; do not load every product atom by default.

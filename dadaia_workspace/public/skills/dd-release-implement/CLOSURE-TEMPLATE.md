@@ -94,13 +94,13 @@ drift?
 ## Memory updates
 
 Explicit list of memory files written during this CLOSURE phase. If a memory file was not
-updated, state the reason here (e.g. "memory/tech-stack.md: no change — release did not
+updated, state the reason here (e.g. "memory/TECHSTACK.md: no change — release did not
 touch dependencies").
 
 - `specs/memory/product/index.md` — <one-liner of what changed in the catalog>
 - `specs/memory/product/<area>/<slug>.md` — <one-liner per feature page updated>
-- `specs/memory/architecture.md` — <one-liner>
-- `specs/memory/tech-stack.md` — <one-liner or "no change: reason">
+- `specs/memory/ARCHITECTURE.md` — <one-liner>
+- `specs/memory/TECHSTACK.md` — <one-liner or "no change: reason">
 
 ## Dispositions
 

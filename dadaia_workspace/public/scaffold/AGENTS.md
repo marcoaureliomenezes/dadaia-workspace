@@ -10,8 +10,8 @@ Before writing or reviewing SDD artifacts, read:
 
 ```text
 constitution.md
-memory/architecture.md
-memory/tech-stack.md
+memory/ARCHITECTURE.md
+memory/TECHSTACK.md
 memory/product/index.md
 releases/ACTIVE.md
 releases/<release-id>/SPEC.md
@@ -72,7 +72,8 @@ evidence in the implementing report.
 Memory describes the product as it is now.
 
 - No changelog/history/version sections in `memory/**`.
-- Screenshots referenced by memory live under `assets/`.
+- The v6 canon root carries no `assets/` member; a diagram belongs in-doc as a
+  fenced Mermaid block (memory carries no external image references).
 - Stale memory found during implementation becomes a bug or closure note; do
   not patch memory mid-implementation.
 
