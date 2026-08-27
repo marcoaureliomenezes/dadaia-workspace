@@ -50,7 +50,7 @@ editing production.
 | `releases/<id>/SPEC.md` | `product-engineer` |
 | `releases/<id>/PLAN.md` | `product-engineer` |
 | `releases/<id>/TASKS.md` | `product-engineer`; implementers may change only their task marker |
-| `memory/**` | `product-engineer` in `CLOSURE` only |
+| `memory/**` | `product-engineer` in `DEFINITION` and `CLOSURE` phase |
 | `backlog/**` | `project-manager` only (sole backlog author; `product-engineer` is a read-only consumer) |
 | `bugs/**` | any agent may file; `product-engineer` resolves into release work |
 
