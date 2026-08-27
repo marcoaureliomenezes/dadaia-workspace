@@ -432,7 +432,7 @@ no TREE-8 WARN on this release's own directory; zero `specs/assets/` and zero
 
 ---
 
-- [-] **T-050-06A — FR1: the two boundaries a canon change breaks**
+- [x] **T-050-06A — FR1: the two boundaries a canon change breaks**
 
 **Owner role:** software-engineer · **Commit:** `fix(T-050-06A): track every canon path and
 resolve verdict evidence from the canon`
