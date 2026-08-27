@@ -735,17 +735,17 @@ Accepted form differs only in `Status: accepted` (+ `Accepted by: operator, 2026
 - gitflow-contract-v2-consolidation · DELIVERED · v0.4.4 — FR1–FR6 shipped; closure sweep, specs/_archive/releases/v0.4.4/CLOSURE.md `## Dispositions` · 2026-08-24
 - rules-skills-governance-map · DELIVERED · v0.4.4 — FR7–FR9 shipped; closure sweep, specs/_archive/releases/v0.4.4/CLOSURE.md `## Dispositions` · 2026-08-24
 - core-skills-consolidation · DELIVERED · v0.4.4 — FR10–FR14 + FR24–FR31 shipped; closure sweep, specs/_archive/releases/v0.4.4/CLOSURE.md `## Dispositions` · 2026-08-24
-- atomic-write-primitive-consolidation · CONSUMED · v0.4.5 — picked at definition, FR2; updated in place at the closure sweep · 2026-08-24
-- byte-golden-test-inventory-roster-split · CONSUMED · v0.4.5 — picked at definition, FR3; updated in place at the closure sweep · 2026-08-24
-- coupled-inventory-shared-oracle · CONSUMED · v0.4.5 — picked at definition, FR4; updated in place at the closure sweep · 2026-08-24
-- scan-test-vacuity-guard · CONSUMED · v0.4.5 — picked at definition, FR5; updated in place at the closure sweep · 2026-08-24
-- doctor-slug-ownership-uniqueness · CONSUMED · v0.4.5 — picked at definition, FR9 (invariant or recorded rule-out, AS-4); updated in place at the closure sweep · 2026-08-24
-- bug-append-write-time-denylist-redaction · CONSUMED · v0.4.5 — picked at definition, FR6; updated in place at the closure sweep · 2026-08-24
-- specs-init-symlinked-target-refusal · CONSUMED · v0.4.5 — picked at definition, FR8; updated in place at the closure sweep · 2026-08-24
-- bug-event-control-character-sanitation · CONSUMED · v0.4.5 — picked at definition, FR7, bundling the open MEDIUM unicode-line-separator bug; updated in place at the closure sweep · 2026-08-24
-- always-on-token-diet · CONSUMED · v0.4.5 — picked at definition, FR11 (consumed by executing and measuring the pass, AS-3); updated in place at the closure sweep · 2026-08-24
-- memory-catalog-digest-trimming · CONSUMED · v0.4.5 — picked at definition, FR12; updated in place at the closure sweep · 2026-08-24
-- persona-line-ceiling-trim · CONSUMED · v0.4.5 — picked at definition, FR13 (bounded to existing sibling mechanisms, AS-1); updated in place at the closure sweep · 2026-08-24
-- ai-surface-hygiene-residuals · CONSUMED · v0.4.5 — picked at definition, FR14; updated in place at the closure sweep · 2026-08-24
-- intent-taxonomy-vocabulary-ruling · CONSUMED · v0.4.5 — picked at definition, FR15 (executed directly on the stewardship taxonomy, AS-2); updated in place at the closure sweep · 2026-08-24
-- dadaia-references-doctor-sanction · CONSUMED · v0.4.5 — picked at definition, FR10, operator ruling O4; updated in place at the closure sweep · 2026-08-24
+- atomic-write-primitive-consolidation · DELIVERED · v0.4.5 — picked at definition, FR2 — delivered rc-1, FR2; 091b2401, CLOSURE §Dispositions · 2026-08-27
+- byte-golden-test-inventory-roster-split · DELIVERED · v0.4.5 — picked at definition, FR3 — delivered rc-1, FR3; 053f55e8, CLOSURE §Dispositions · 2026-08-27
+- coupled-inventory-shared-oracle · DELIVERED · v0.4.5 — picked at definition, FR4 — delivered rc-1, FR4; 78daad25, CLOSURE §Dispositions · 2026-08-27
+- scan-test-vacuity-guard · DELIVERED · v0.4.5 — picked at definition, FR5 — delivered rc-1, FR5; c4ba5383, CLOSURE §Dispositions · 2026-08-27
+- doctor-slug-ownership-uniqueness · DELIVERED · v0.4.5 — picked at definition, FR9 (invariant or recorded rule-out, AS-4) — delivered rc-1, FR9 implement arm (AS-4); 4f890913+fa43364e, CLOSURE §Dispositions · 2026-08-27
+- bug-append-write-time-denylist-redaction · DELIVERED · v0.4.5 — picked at definition, FR6 — delivered rc-1, FR6; eb03d01b+0cb08157, CLOSURE §Dispositions · 2026-08-27
+- specs-init-symlinked-target-refusal · DELIVERED · v0.4.5 — picked at definition, FR8 — delivered rc-1, FR8; f3acf990, CLOSURE §Dispositions · 2026-08-27
+- bug-event-control-character-sanitation · DELIVERED · v0.4.5 — picked at definition, FR7, bundling the open MEDIUM unicode-line-separator bug — delivered rc-1, FR7; 2b9b30c1, narrowed 27c3374a, CLOSURE §Dispositions · 2026-08-27
+- always-on-token-diet · DELIVERED · v0.4.5 — picked at definition, FR11 (consumed by executing and measuring the pass, AS-3) — delivered rc-1, FR11 pass executed and measured (AS-3); ba17bbe9, CLOSURE §Dispositions · 2026-08-27
+- memory-catalog-digest-trimming · DELIVERED · v0.4.5 — picked at definition, FR12 — delivered rc-1, FR12; 5c4f30c9+d85dfc19, CLOSURE §Dispositions · 2026-08-27
+- persona-line-ceiling-trim · DELIVERED · v0.4.5 — picked at definition, FR13 (bounded to existing sibling mechanisms, AS-1) — delivered rc-1, FR13 bounded (AS-1); 47074883, CLOSURE §Dispositions · 2026-08-27
+- ai-surface-hygiene-residuals · DELIVERED · v0.4.5 — picked at definition, FR14 — delivered rc-1, FR14; af7bd369+a4754a28, CLOSURE §Dispositions · 2026-08-27
+- intent-taxonomy-vocabulary-ruling · DELIVERED · v0.4.5 — picked at definition, FR15 (executed directly on the stewardship taxonomy, AS-2) — delivered rc-1, FR15; 91d559f6+96637803, CLOSURE §Dispositions · 2026-08-27
+- dadaia-references-doctor-sanction · DELIVERED · v0.4.5 — picked at definition, FR10, operator ruling O4 — delivered rc-1, FR10; 9bdb960b, CLOSURE §Dispositions · 2026-08-27
