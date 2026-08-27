@@ -1421,7 +1421,7 @@ by revising this floor upward on paper.
 
 ---
 
-- [-] **T-050-22 — `S2` close: `qa-engineer` review committed on the branch**
+- [x] **T-050-22 — `S2` close: `qa-engineer` review committed on the branch**
 
 **Owner role:** qa-engineer · **Commit:** `docs(T-050-22): S2 QA close`
 
