@@ -1876,7 +1876,7 @@ Capture **V15**.
 
 ---
 
-- [-] **T-050-33 — `S4` close: `qa-engineer` review committed on the branch**
+- [x] **T-050-33 — `S4` close: `qa-engineer` review committed on the branch**
 
 **Owner role:** qa-engineer · **Commit:** `docs(T-050-33): S4 QA close`
 
