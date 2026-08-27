@@ -45,7 +45,13 @@ def test_release_open_then_segment_open_advances_active(tmp_path: Path) -> None:
 def test_specs_segment_error_matrix(tmp_path: Path, setup_and_invoke: str) -> None:
     specs = _specs(tmp_path)
     if setup_and_invoke == "bad-version":
-        res = _runner.invoke(app, ["specs", "release", "open", "0.1.6", "--specs-dir", str(specs)])
+        # AS-13/T-050-06A: bare "0.1.6" is now ALSO a valid (current-axis) release id
+        # for `scaffold_release_segment` (unchanged, still matches the broader
+        # RELEASE_SEMVER_RE) — a genuinely malformed id is required to exercise the
+        # rejection branch here.
+        res = _runner.invoke(
+            app, ["specs", "release", "open", "not-a-version", "--specs-dir", str(specs)]
+        )
     elif setup_and_invoke == "bad-segment":
         _runner.invoke(app, ["specs", "release", "open", "v0.1.6", "--specs-dir", str(specs)])
         res = _runner.invoke(app, ["specs", "segment", "open", "beta-1", "--specs-dir", str(specs)])

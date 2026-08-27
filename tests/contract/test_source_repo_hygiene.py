@@ -65,30 +65,53 @@ def test_sdd_gate_artifacts_visible_and_noncanonical_content_stays_gitignored() 
         "specs/_archive/releases/v9.9.8/alpha-1/SPEC.md",
         "specs/_archive/releases/v9.9.8/verdicts/"
         "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.handoff.json",
+        # v9.9.8's per-area archive shape (FR6/T-050-06A): the new
+        # specs/releases/_archive/<id>/ home, one level deeper than the old
+        # specs/_archive/releases/<id>/ layout above — both are live until T-050-14/
+        # T-050-41 finish the move, and both must stay visible in the meantime.
+        "specs/releases/_archive/v9.9.8/verdicts/"
+        "cccccccccccccccccccccccccccccccccccccccc.handoff.json",
         # Bug records are repository truth (bug-registration-guardrail); the
-        # /specs/* privacy backstop must not hide them from review/CI.
+        # /specs/* privacy backstop must not hide them from review/CI. T-050-06A
+        # (A1.7/V21) widened audits/ and bugs/_archive/ from *.md-only to every
+        # artifact type — FINDINGS.jsonl and bugs_histo.jsonl are the concrete
+        # evidence that shape change was needed (both were IGNORED before it).
         "specs/bugs/some-bug.md",
+        "specs/bugs/BUGS.jsonl",
+        "specs/bugs/_archive/bugs_histo.jsonl",
         "specs/audits/20991231T235959Z/index.md",
+        "specs/audits/20991231T235959Z/FINDINGS.jsonl",
+        # ADRs/ (FR19's canon area, tracked ahead of its own folder existing on
+        # disk — a gitignore negation is inert until a matching path appears).
+        "specs/ADRs/0001-x.md",
+        "specs/ADRs/AGENTS.md",
         # Backlog is PM-curated repository truth (v0.1.49 FR1 — bug
         # backlog-gitignored-governance-vacuous): live entries, the curated
         # index, and _archive durable copies are all visible to review/CI.
+        # T-050-06A widened _archive/ from *.md-only to every artifact type
+        # (backlog_histo.jsonl and the FROZEN-landing-zone .gitkeep are the
+        # concrete evidence — both were IGNORED before it).
         "specs/backlog/candidates.md",
         "specs/backlog/some-entry.md",
         "specs/backlog/_archive/some-consumed-entry.md",
+        "specs/backlog/_archive/backlog_histo.jsonl",
+        "specs/backlog/_archive/.gitkeep",
     ]
     ignored = [path for path in visible_paths if _is_ignored(path)]
     assert ignored == []
 
     ignored_paths = [
-        # Backlog opt-in is Markdown-only (v0.1.49 FR1): non-md content and the
-        # _archive/.gitkeep placeholder stay hidden by the privacy backstop.
+        # Non-canon content stays hidden by the privacy backstop: top-level
+        # bugs/ and backlog/ (outside _archive/, still *.md/*.jsonl-only) never
+        # widened by T-050-06A — only their _archive/ subtrees did.
         "specs/backlog/non-markdown-attachment.png",
-        "specs/backlog/_archive/.gitkeep",
         "specs/bugs/non-markdown-attachment.png",
         # The inverted release-tree rule (gitignore-verdict-evidence-untrackable-
-        # fourth-recurrence) still hides exactly the two classes the original
-        # catch-all ever protected: private local-notes.md and tmp/ scratch dirs,
-        # at any depth (release root or nested inside an alpha-N/rc-N segment).
+        # fourth-recurrence, widened to every other canon area by T-050-06A) still
+        # hides exactly the two classes the original catch-all ever protected:
+        # private local-notes.md and tmp/ scratch dirs, at any depth (release
+        # root, nested inside an alpha-N/rc-N segment, or under either archive
+        # layout — old root specs/_archive/ or the live specs/releases/ tree).
         "specs/releases/v9.9.9/local-notes.md",
         "specs/releases/v9.9.9/tmp/debug.json",
         "specs/releases/v9.9.9/alpha-1/local-notes.md",

@@ -29,6 +29,24 @@ from dadaia_workspace.features.migrate.retired_frontmatter_keys import (
 from dadaia_workspace.features.migrate.tree_v2 import MigrateResult, migrate_tree_v2
 
 
+def migrate_canon_v6_stamp(specs_dir: Path, *, dry_run: bool = False) -> MigrateResult:
+    """Declarative v5 -> v6 stamp-only hop (v0.5.0 T-050-06A).
+
+    Carries no filesystem action. The canon-v6 tree-shape changes are applied by hand
+    via ``specs doctor --recipe`` (FR1's explicit "no rename automation" ruling); this
+    step exists solely so the migration-chain registry has a ``from_version=5`` entry,
+    keeping ``dadaia specs upgrade`` (and its dry-run) from raising ``ValueError`` for
+    any tree already stamped at pattern version 5.
+    """
+    result = MigrateResult(dry_run=dry_run)
+    result.skipped.append(
+        "v5 -> v6 is a stamp-only hop: run `dadaia specs doctor --recipe` for the "
+        "canon-shape steps (memory file renames, specs/assets/ retirement, "
+        "specs/backlog/remote-bugs/ removal) and apply them by hand."
+    )
+    return result
+
+
 @dataclass(frozen=True)
 class MigrationStep:
     """One versioned, idempotent, dry-run-capable migration step."""
@@ -72,6 +90,23 @@ REGISTRY: tuple[MigrationStep, ...] = (
         to_version=5,
         key="retired-frontmatter-keys",
         apply=migrate_retired_frontmatter_keys,
+    ),
+    # v0.5.0 T-050-06A: CANONICAL_SPECS_VERSION 5 -> 6 (canon-v6 tree shape, FR1). FR1
+    # explicitly retires `specs upgrade`'s automated-rename surface (software-architect
+    # change 3, specs/releases/0.5.0/SPEC.md FR1) — the canon-v6 shape changes (memory
+    # file renames, specs/assets/ retirement, specs/backlog/remote-bugs/ removal) are
+    # `specs doctor --recipe` steps, applied BY HAND (as this repo's own T-050-06
+    # migration did), never automated here. This step carries NO filesystem action of
+    # its own; it exists ONLY so the registry chain still resolves current=5 -> target=6
+    # and the version stamp stays reachable for a tree already at v5 — an omitted step
+    # here would make `dadaia specs upgrade` (and its dry-run) raise
+    # ``ValueError: no migration step registered from version 5`` for every consumer
+    # sitting at v5 the moment CANONICAL_SPECS_VERSION became 6.
+    MigrationStep(
+        from_version=5,
+        to_version=6,
+        key="canon-v6-stamp",
+        apply=migrate_canon_v6_stamp,
     ),
 )
 

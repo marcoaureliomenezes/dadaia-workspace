@@ -229,12 +229,14 @@ def test_migration_registry_chain_never_touches_release_artifacts(tmp_path: Path
 
 
 def test_release_new_refuses_to_clobber_an_existing_release_tasks_md(tmp_path: Path) -> None:
+    # AS-13/T-050-06A: bare "1.0.0" is the current, mintable axis (a "v"-prefixed id
+    # is refused at mint before this no-clobber check is ever reached).
     specs_dir = tmp_path / "specs"
-    target = _seed_release_tasks_md(specs_dir, release_id="v1.0.0")
+    target = _seed_release_tasks_md(specs_dir, release_id="1.0.0")
     before = target.read_text(encoding="utf-8")
 
     with pytest.raises(FileExistsError):
-        new_artifacts.release_new(specs_dir, "v1.0.0")
+        new_artifacts.release_new(specs_dir, "1.0.0")
 
     after = target.read_text(encoding="utf-8")
     _assert_sdd_invariants_preserved(before, after)

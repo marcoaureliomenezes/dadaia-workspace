@@ -32,7 +32,10 @@ def test_creates_spec_plan_tasks_under_segment(tmp_path: Path, version: str, seg
 @pytest.mark.parametrize(
     ("version", "segment", "match"),
     [
-        pytest.param("0.1.6", "alpha-1", "SemVer", id="rejects-non-semver-version"),
+        # AS-13/T-050-06A: bare "0.1.6" is now ALSO a valid (current-axis) release id —
+        # RELEASE_SEMVER_RE (which scaffold_release_segment matches against, unchanged)
+        # accepts both axes; only a truly malformed id is rejected here.
+        pytest.param("not-a-version", "alpha-1", "SemVer", id="rejects-non-semver-version"),
         pytest.param("v0.1.6", "alpha1", "segment", id="rejects-malformed-segment-alpha1"),
         pytest.param("v0.1.6", "alpha", "segment", id="rejects-malformed-segment-alpha"),
         pytest.param("v0.1.6", "beta-1", "segment", id="rejects-malformed-segment-beta"),
