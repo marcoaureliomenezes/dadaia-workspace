@@ -1702,7 +1702,7 @@ and A14.7 evidenced by the eight-row metric table.
 
 ## Segment `S4` — memory two-tier, principles, ADRs
 
-- [-] **T-050-28 — FR17: split the memory trio into Part 1 and Part 2**
+- [x] **T-050-28 — FR17: split the memory trio into Part 1 and Part 2**
 
 **Owner role:** product-engineer · **Commit:** `docs(T-050-28): memory Part 1 Principles /
 Part 2 Implementation`
@@ -1740,7 +1740,7 @@ architecture principle they carried. Memory stays a current-state document: no `
 
 ---
 
-- [ ] **T-050-29 — FR18: the first principle inventory**
+- [x] **T-050-29 — FR18: the first principle inventory**
 
 **Owner role:** software-architect (the inventory and its measures) + product-engineer (the
 authoring) · **Commit:** `docs(T-050-29): promote the measured rules to Part 1 principles`
@@ -1855,7 +1855,7 @@ enter Part 1 and is recorded in the coverage table with its reason.
 
 ---
 
-- [ ] **T-050-32 — FR21: the constitution references principles**
+- [x] **T-050-32 — FR21: the constitution references principles**
 
 **Owner role:** product-engineer · **Commit:** `docs(T-050-32): constitution references
 principles by id`
@@ -1876,7 +1876,7 @@ Capture **V15**.
 
 ---
 
-- [ ] **T-050-33 — `S4` close: `qa-engineer` review committed on the branch**
+- [-] **T-050-33 — `S4` close: `qa-engineer` review committed on the branch**
 
 **Owner role:** qa-engineer · **Commit:** `docs(T-050-33): S4 QA close`
 
