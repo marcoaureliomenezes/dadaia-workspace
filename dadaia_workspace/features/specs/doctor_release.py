@@ -568,18 +568,20 @@ class ReleaseValidator:
 
     def check_partial_archived_release_dirs(self) -> list[SpecsDoctorIssue]:
         """SPEC-DOC-039 (v0.1.81 FR2): WARN on a ``specs/_archive/releases/<id>/`` dir
-        that carries NONE of SPEC.md/PLAN.md/TASKS.md/CLOSURE.md — directly, or nested
-        under any of its subdirectories (a segmented layout, e.g. ``<id>/alpha-1/``,
-        ``<id>/rc-1/``, is a legitimate archived-release shape whose artifacts live one
-        level down).
+        that carries NONE of :data:`~dadaia_workspace.features.specs.doctor_common.
+        RELEASE_ARTIFACTS` (SPEC.md/PLAN.md/TASKS.md — ``CLOSURE.md`` dropped at v0.5.0
+        T-050-25A, A4.4: it retired as a going-forward artifact, so its bare presence is
+        no longer release-dir evidence) — directly, or nested under any of its
+        subdirectories (a segmented layout, e.g. ``<id>/alpha-1/``, ``<id>/rc-1/``, is a
+        legitimate archived-release shape whose artifacts live one level down).
 
         Such a dir is residue masquerading as an archived release — the v0.1.41
         precedent held only ``GRILL.md`` + ``OQ-DECISIONS.md`` and sat undetected until
         the 2026-07-06 audit (audit G-23). The check honors the SPEC-DOC-027 permanent
         legacy-name allowlist (ADR-9: frozen history, never flagged by name alone) and
         only inspects ``_archive/releases/`` — the live ``releases/`` tree is untouched
-        (an active release under construction legitimately lacks CLOSURE.md, and
-        SPEC-DOC-004/009 already cover it). WARNING severity only: historical trees
+        (an active release under construction legitimately lacks a real artifact yet,
+        and SPEC-DOC-004/009 already cover it). WARNING severity only: historical trees
         must never hard-fail doctor over this.
         """
         issues: list[SpecsDoctorIssue] = []
@@ -602,7 +604,7 @@ class ReleaseValidator:
                     severity=Severity.WARNING,
                     description=(
                         f"_archive/releases/{entry.name} carries none of "
-                        "SPEC.md/PLAN.md/TASKS.md/CLOSURE.md (directly or in any segment "
+                        "SPEC.md/PLAN.md/TASKS.md (directly or in any segment "
                         "subdir) — residue masquerading as an archived release "
                         "(the v0.1.41 precedent). Relocate it to "
                         f"specs/_archive/wip-abandoned/{entry.name}/ with a README "

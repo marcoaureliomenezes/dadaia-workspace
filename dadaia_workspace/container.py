@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from dadaia_workspace.core.models.backlog import BacklogHistoRecord, ConsumedBacklogHistoRecord
     from dadaia_workspace.core.models.bugs import BugRecord
+    from dadaia_workspace.core.models.findings import FindingRecord
     from dadaia_workspace.core.protocols.git_client import GitClient
     from dadaia_workspace.features.agents.model_policy import AgentModelPolicyService
     from dadaia_workspace.features.certification import CertificationResult
@@ -327,6 +328,26 @@ def build_consumed_backlog_histo_store(
         Path(specs_dir) / "backlog" / "_archive" / "consumed_backlog_histo.jsonl",
         to_dict=ConsumedBacklogHistoRecord.to_dict,
         from_dict=ConsumedBacklogHistoRecord.from_dict,
+    )
+
+
+def build_findings_store(findings_path: Path) -> "RecordStore[FindingRecord]":
+    """Composition-root seam for the audit-finding JSONL store (v0.5.0 FR13/FR15, A13.4
+    — deferred there until a real caller existed; T-050-25A adds one). Takes
+    *findings_path* directly, never a ``specs_dir``: the caller
+    (``doctor_closure_audit.ClosureAuditValidator``, SPEC-DOC-036/038) resolves one
+    ``FINDINGS.jsonl`` per audit dir itself, over an unbounded discovered set. Accepted
+    as its ``findings_store_factory`` DI seam (mirrors ``features.agents.reader``'s
+    ``store_factory``) so that leaf module never gains a ``features -> infrastructure``
+    edge; unwired, it falls back to a zero-dependency reader of the SAME model.
+    """
+    from dadaia_workspace.core.models.findings import FindingRecord
+    from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
+
+    return JsonlRecordStore(
+        findings_path,
+        to_dict=FindingRecord.to_dict,
+        from_dict=FindingRecord.from_dict,
     )
 
 

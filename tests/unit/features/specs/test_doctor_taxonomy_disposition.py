@@ -9,10 +9,20 @@ Four invariants:
                  the audit-disposition law's own doctor invariant, kept as a named pair;
   SPEC-DOC-037 — constitution must not enumerate AgentRuntimeKind members;
   SPEC-DOC-038 — loose (unarchived) audit directories.
+
+v0.5.0 T-050-25A (fold 3, `qa-engineer` amendment 3): the DOC-036/DOC-038 fixtures below
+were rewritten off ``**Disposition:** vX.Y.Z`` prose (T-050-25 already deleted that regex
+— these rows had been silently passing/failing for the wrong reason since) onto
+``FINDINGS.jsonl`` records, the SAME shape ``doctor_closure_audit.py`` actually folds.
+Verdict: two rows genuinely rewritten as new coverage (the "+2" tests FR15 extended
+scope names) — an archived audit with a still-``open`` finding record (DOC-036 sad
+path), and a live audit whose finding records are ALL terminal-and-release-named
+(DOC-038 sad path, single + multiple) — never a reflex re-baseline.
 """
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -41,10 +51,42 @@ def _archived_audit(specs: Path, name: str, body: str) -> None:
     (audit_dir / "audit.md").write_text(body, encoding="utf-8")
 
 
+def _finding_record(
+    finding_id: str, *, disposition: str = "open", release: str | None = None
+) -> dict[str, object]:
+    """A minimal well-formed ``FindingRecord`` JSONL row (schema:
+    ``public/schemas/audits/finding-record-v1.schema.json``)."""
+    return {
+        "id": finding_id,
+        "pillar": "coverage",
+        "severity": "medium",
+        "refs": ["dadaia_workspace/features/specs/doctor_closure_audit.py"],
+        "claim": "fixture claim",
+        "evidence": "fixture evidence",
+        "disposition": disposition,
+        "release": release,
+        "reason": None,
+    }
+
+
+def _write_findings(audit_dir: Path, records: list[dict[str, object]]) -> None:
+    audit_dir.mkdir(parents=True, exist_ok=True)
+    lines = "\n".join(json.dumps(record) for record in records)
+    (audit_dir / "FINDINGS.jsonl").write_text(lines + "\n", encoding="utf-8")
+
+
+def _archived_audit_findings(specs: Path, name: str, records: list[dict[str, object]]) -> None:
+    _write_findings(specs / "audits" / "_archive" / name, records)
+
+
 def _loose_audit(specs: Path, name: str) -> None:
     audit_dir = specs / "audits" / name
     audit_dir.mkdir(parents=True)
     (audit_dir / "report.md").write_text("# Audit\n\nFindings.\n", encoding="utf-8")
+
+
+def _loose_audit_findings(specs: Path, name: str, records: list[dict[str, object]]) -> None:
+    _write_findings(specs / "audits" / name, records)
 
 
 def _write_constitution(specs: Path, body: str) -> None:
@@ -73,57 +115,100 @@ def _setup_doc035(specs) -> None:  # type: ignore[no-untyped-def]
 
 
 def _setup_doc036(specs) -> None:  # type: ignore[no-untyped-def]
+    """An archived audit whose FINDINGS.jsonl still carries an ``open`` record — an
+    audit archives only once every finding is terminal (SPEC-DOC-036 ERROR)."""
     _seed_archives(specs)
-    _archived_audit(
+    _archived_audit_findings(
         specs,
         "20260612T001813Z-deadbeef",
-        "# Audit\n\nOverall 4/10. Findings listed. No disposing release recorded.\n",
+        [_finding_record("F-1", disposition="open")],
     )
 
 
 def _setup_doc038_single(specs) -> None:  # type: ignore[no-untyped-def]
-    _loose_audit(specs, "20260701T201136Z-0bcd6c19")
+    """A live audit whose FINDINGS.jsonl records are ALL terminal-and-release-named —
+    archive due (SPEC-DOC-038 WARNING)."""
+    _loose_audit_findings(
+        specs,
+        "20260701T201136Z-0bcd6c19",
+        [_finding_record("F-1", disposition="fixed", release="v0.1.47")],
+    )
 
 
 def _setup_doc038_multiple(specs) -> None:  # type: ignore[no-untyped-def]
-    _loose_audit(specs, "20260701T201136Z-0bcd6c19")
-    _loose_audit(specs, "20260612T001813Z-deadbeef")
+    _loose_audit_findings(
+        specs,
+        "20260701T201136Z-0bcd6c19",
+        [_finding_record("F-1", disposition="fixed", release="v0.1.47")],
+    )
+    _loose_audit_findings(
+        specs,
+        "20260612T001813Z-deadbeef",
+        [_finding_record("F-1", disposition="deferred", release="v0.1.48")],
+    )
 
 
 @pytest.mark.parametrize(
-    ("code", "setup", "expect_count", "expect_substring"),
+    ("code", "setup", "expect_count", "expect_substring", "expect_severity"),
     [
-        pytest.param("SPEC-DOC-034", _setup_doc034, 1, "backlog", id="doc034-missing-archive-dir"),
         pytest.param(
-            "SPEC-DOC-035", _setup_doc035, 1, "shipped-item.md", id="doc035-loose-per-entry-file"
+            "SPEC-DOC-034",
+            _setup_doc034,
+            1,
+            "backlog",
+            Severity.WARNING,
+            id="doc034-missing-archive-dir",
+        ),
+        pytest.param(
+            "SPEC-DOC-035",
+            _setup_doc035,
+            1,
+            "shipped-item.md",
+            Severity.WARNING,
+            id="doc035-loose-per-entry-file",
         ),
         pytest.param(
             "SPEC-DOC-036",
             _setup_doc036,
             1,
             "20260612T001813Z-deadbeef",
-            id="doc036-archived-audit-without-disposition",
+            # A finding still 'open' inside an archived audit is an ERROR (D5/D7) —
+            # never a WARNING; distinct from SPEC-DOC-036's OTHER, WARNING-severity
+            # aggregate ("N archived audit(s) predate the FINDINGS.jsonl canon").
+            Severity.ERROR,
+            id="doc036-archived-audit-with-open-finding",
         ),
         pytest.param(
             "SPEC-DOC-038",
             _setup_doc038_single,
             1,
             "20260701T201136Z-0bcd6c19",
+            Severity.WARNING,
             id="doc038-single-loose-audit",
         ),
         pytest.param(
-            "SPEC-DOC-038", _setup_doc038_multiple, 2, None, id="doc038-multiple-loose-audits"
+            "SPEC-DOC-038",
+            _setup_doc038_multiple,
+            2,
+            None,
+            Severity.WARNING,
+            id="doc038-multiple-loose-audits",
         ),
     ],
 )
 def test_sad_path_matrix(  # type: ignore[no-untyped-def]
-    tmp_path: Path, code: str, setup, expect_count: int, expect_substring: str | None
+    tmp_path: Path,
+    code: str,
+    setup,
+    expect_count: int,
+    expect_substring: str | None,
+    expect_severity: Severity,
 ) -> None:
     specs = tmp_path / "specs"
     setup(specs)
     warns = _codes(specs, code)
     assert len(warns) == expect_count
-    assert all(w.severity is Severity.WARNING for w in warns)
+    assert all(w.severity is expect_severity for w in warns)
     if expect_substring is not None:
         assert expect_substring in warns[0].description
 
@@ -170,11 +255,13 @@ def _silent_doc035_only_single_source_files(specs: Path) -> None:
 
 
 def _silent_doc036_with_disposition(specs: Path) -> None:
+    """An archived audit whose FINDINGS.jsonl records are ALL terminal — clean, no
+    ``open`` record survives into the archive (SPEC-DOC-036 stays silent)."""
     _seed_archives(specs)
-    _archived_audit(
+    _archived_audit_findings(
         specs,
         "20260701T135346Z-6145b869",
-        "# Audit\n\n**Disposition:** v0.1.46\n\nAll findings fixed.\n",
+        [_finding_record("F-1", disposition="fixed", release="v0.1.46")],
     )
 
 

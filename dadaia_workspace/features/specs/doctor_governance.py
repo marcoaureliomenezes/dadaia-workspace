@@ -31,6 +31,19 @@ diagnosis. A5: SPEC-DOC-040 (the immutable-core drift WARN) is deleted along wit
 ``bug_first_add_baselines`` plumbing — it never fired in production (its input was
 always the empty default); A2.7's detector moves to FR14 pillar 1, which owns the git
 walk this check would have needed.
+
+**v0.5.0 T-050-25A (FR15 extended scope, A4.4).** ``_archive_consumption_hits``'s
+CLOSURE.md-side evidence (an archived CLOSURE's ``## Dispositions`` table) is deleted —
+FR4/T-050-21A retired ``CLOSURE.md`` as a going-forward artifact, so a checker that
+parses it is dead code behind a dead artifact. SPEC-DOC-031's evidence surface narrows
+to ONLY an archived SPEC's own ``**Consumes:**`` declaration; the disposition sweep this
+lost half used to also (imperfectly) catch is already native elsewhere —
+``specs/backlog/_archive/backlog_histo.jsonl``'s ``release`` field and ``BUGS.jsonl``'s
+``resolved_release`` field (`dd-release-implement`'s ``RELEASE-EVENTS.md``) — so nothing
+is left unrecorded, only unread by THIS check. The narrowing is an accepted false
+NEGATIVE (R3, already documented below): a genuinely consumed slug whose SPEC never
+declared it in ``**Consumes:**`` was already a false negative before this task; it
+simply loses its second (smaller) evidence source too.
 """
 
 from __future__ import annotations
@@ -81,17 +94,14 @@ _BACKLOG_SINGLE_SOURCE_FILES: frozenset[str] = frozenset({"BACKLOG.md", "README.
 #
 # An archived SPEC's own ``**Consumes:**`` declaration (P19: its value continues onto
 # subsequent lines until a blank line or the next ``**Key:**`` line — 27 archived
-# SPEC/CLOSURE files carry this line, several wrapped across two lines).
+# SPEC files carry this line, several wrapped across two lines). The surviving evidence
+# source (v0.5.0 T-050-25A, A4.4 — the CLOSURE.md-side ``## Dispositions`` table was
+# the other one, deleted; module docstring).
 _CONSUMES_LINE_RE = re.compile(r"^[ \t]*\*\*Consumes:\*\*[ \t]*(?P<rest>.*)$")
 
 # Any other bold-key line (``**Key:** value``) — the continuation-stop boundary. Matches
 # the SPEC frontmatter shape (``**Status:**``, ``**Picked set:**``, ``**Branch:**``, …).
 _BOLD_KEY_LINE_RE = re.compile(r"^[ \t]*\*\*[^*\n]+:\*\*")
-
-# An archived CLOSURE's ``## Dispositions`` section — only its table ROWS (lines starting
-# with ``|``, a Markdown table cell boundary) are evidence; the surrounding prose
-# (rationale paragraphs, "Explicit non-flips" notes) is never scanned.
-_DISPOSITIONS_HEADING_RE = re.compile(r"^##[ \t]+Dispositions\b")
 
 # Slug-shaped tokens (P19): backlog slugs are always ``^[a-z][a-z0-9-]+$`` — splitting
 # consumption-evidence text on anything OUTSIDE that charset isolates candidate tokens
@@ -117,20 +127,6 @@ def _consumes_tokens(spec_text: str) -> frozenset[str]:
             span.append(lines[i])
             i += 1
     return frozenset(_SLUG_TOKEN_RE.findall(" ".join(span)))
-
-
-def _dispositions_tokens(closure_text: str) -> frozenset[str]:
-    """Whole-token slug candidates from every table row under an archived CLOSURE's
-    ``## Dispositions`` heading — never its rationale prose, never any other section."""
-    tokens: list[str] = []
-    in_section = False
-    for line in closure_text.splitlines():
-        if line.startswith("## "):
-            in_section = bool(_DISPOSITIONS_HEADING_RE.match(line))
-            continue
-        if in_section and line.lstrip().startswith("|"):
-            tokens.extend(_SLUG_TOKEN_RE.findall(line))
-    return frozenset(tokens)
 
 
 def _iter_native_bug_records(ledger_path: Path) -> list[BugRecord]:
@@ -184,13 +180,16 @@ class GovernanceValidator:
         """Release ids of archived releases that ASSERT ``slug`` was consumed (SPEC
         v0.4.2 FR14/GRILL D6) — never a raw line-substring scan of the whole document.
 
-        A mention counts as consumption evidence in exactly two shapes:
+        A mention counts as consumption evidence in exactly one shape: an archived
+        SPEC's ``**Consumes:**`` declaration (its value plus continuation lines, P19),
+        tokenized on non-slug characters and matched as a WHOLE token. The other former
+        evidence source — an archived CLOSURE's ``## Dispositions`` table rows — is
+        deleted (v0.5.0 T-050-25A, A4.4: CLOSURE.md retired as a going-forward artifact;
+        module docstring). Narrower evidence is an accepted false NEGATIVE (R3), never a
+        false positive: a genuinely consumed slug whose SPEC never declared it in
+        ``**Consumes:**`` was already missed before this task.
 
-        - an archived SPEC's ``**Consumes:**`` declaration (its value plus continuation
-          lines, P19), tokenized on non-slug characters and matched as a WHOLE token; or
-        - an archived CLOSURE's ``## Dispositions`` table ROWS, tokenized the same way.
-
-        Everything else in either document — prose, non-goals, provenance notes, a
+        Everything else in the document — prose, non-goals, provenance notes, a
         ``## Backlog returns`` section — is never read here; it never asserted
         consumption in the first place, so there is no special case to carve it out
         (D6 deletes the old ``## Backlog returns`` exclusion as subsumed). Returns the
@@ -206,12 +205,6 @@ class GovernanceValidator:
                 spec_doc.read_text(encoding="utf-8")
             ):
                 hits.add(release_dir.name)
-                continue
-            closure_doc = release_dir / "CLOSURE.md"
-            if closure_doc.is_file() and slug in _dispositions_tokens(
-                closure_doc.read_text(encoding="utf-8")
-            ):
-                hits.add(release_dir.name)
         return sorted(hits)
 
     def check_consumed_backlog_disposition(self) -> list[SpecsDoctorIssue]:
@@ -223,8 +216,8 @@ class GovernanceValidator:
         item whose ``**Status:**`` is an ADR-11 NON-TERMINAL token ({OPEN, PICKED,
         CANDIDATE}, case-insensitive prefix match) AND whose slug is a whole-token match
         inside an archived release's CONSUMPTION-ASSERTING evidence — an archived SPEC's
-        ``**Consumes:**`` declaration or an archived CLOSURE's ``## Dispositions`` table
-        rows (:func:`_archive_consumption_hits`, FR14) — ⇒ **WARNING**. The lifecycle
+        ``**Consumes:**`` declaration (:func:`_archive_consumption_hits`, FR14; narrowed
+        at v0.5.0 T-050-25A, A4.4) — ⇒ **WARNING**. The lifecycle
         contract is that an item consumed into a shipped+archived release must move
         ``ACTIVE`` → ``LEDGER`` at CLOSURE; a non-terminal ACTIVE item whose slug is
         consumption-asserted is the drift.

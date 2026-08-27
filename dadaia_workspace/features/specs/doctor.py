@@ -10,7 +10,7 @@ single-responsibility validator siblings plus two shared leaf modules:
   * ``doctor_memory``       — memory files/atomicity, CAT-1, LINT-1 (holds the lazy
                               ``infrastructure.subprocess_runner`` import)
   * ``doctor_release``      — active release (RELEASE.jsonl fold), release artifacts, SemVer + ledger invariants
-  * ``doctor_closure_audit``— archive closures, orphan specs, audit disposition; ``fix_archive_dir``
+  * ``doctor_closure_audit``— orphan specs, audit disposition; ``fix_archive_dir``
   * ``doctor_governance``   — single-source backlog invariants, bug status/JSONL
   * ``doctor_coherence``    — constitution and pattern-version coherence
 
@@ -28,9 +28,12 @@ Pure module — no I/O outside the supplied specs_dir / public_dir. No external 
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
+from dadaia_workspace.core.models.findings import FindingRecord
 from dadaia_workspace.core.protocols.process_runner import ProcessRunner
+from dadaia_workspace.core.protocols.record_store import RecordStore
 from dadaia_workspace.features.specs.doctor_closure_audit import ClosureAuditValidator
 from dadaia_workspace.features.specs.doctor_coherence import CoherenceValidator
 from dadaia_workspace.features.specs.doctor_governance import GovernanceValidator
@@ -55,6 +58,10 @@ class SpecsDoctor:
             (templates loaded from ``public_dir/templates/``).
             When *not* provided the TREE checks still run but TREE-3 fix and TREE-5
             hash comparison are skipped (issue is still emitted, fix is no-op).
+        findings_store_factory: Optional DI seam for SPEC-DOC-036/038's
+            ``FINDINGS.jsonl`` fold (v0.5.0 T-050-25A, A13.4) — a composition root
+            wires ``container.build_findings_store``; ``None`` keeps
+            ``ClosureAuditValidator``'s zero-dependency fallback reader (same model).
     """
 
     def __init__(
@@ -64,6 +71,7 @@ class SpecsDoctor:
         templates_dir: Path | None = None,
         process_runner: ProcessRunner | None = None,
         repo_root: Path | None = None,
+        findings_store_factory: Callable[[Path], RecordStore[FindingRecord]] | None = None,
     ) -> None:
         self.specs_dir = Path(specs_dir)
         self.public_dir: Path | None = Path(public_dir) if public_dir is not None else None
@@ -99,7 +107,7 @@ class SpecsDoctor:
         )
         self._memory = MemoryValidator(self.specs_dir, self._process_runner)
         self._release = ReleaseValidator(self.specs_dir)
-        self._closure_audit = ClosureAuditValidator(self.specs_dir)
+        self._closure_audit = ClosureAuditValidator(self.specs_dir, findings_store_factory)
         self._governance = GovernanceValidator(
             self.specs_dir,
             self.public_dir,
@@ -124,7 +132,10 @@ class SpecsDoctor:
         issues.extend(self._release.check_active_md())
         issues.extend(self._release.check_active_release_artifacts())
         issues.extend(self._release.check_plan_line_limit())
-        issues.extend(self._closure_audit.check_archive_closures())
+        # SPEC-DOC-006 (CLOSURE.md-before-archive completeness) RETIRED (v0.5.0
+        # T-050-25A, A4.4): FR4/T-050-21A retired CLOSURE.md as a going-forward
+        # artifact; a checker that parses a file which no longer exists is dead code
+        # behind a dead artifact.
         issues.extend(self._closure_audit.check_no_orphan_specs())
         issues.extend(self._memory.check_memory_atomicity())
         # 9: covered inside check_active_md (release id ↔ dir)

@@ -38,8 +38,9 @@ __all__ = ["Decision", "PathClass", "classify_path", "evaluate"]
 _ADVISORY_THROTTLE_SECONDS = 300
 
 #: Ordered ADDITIVE prefixes — always allowed.
-#: Parallel audit sessions use collision-safe directories:
-#:   specs/audits/<YYYYMMDDTHHMMSSZ>-<session_id_8chars>/
+#: Parallel audit sessions use collision-safe directories, named per the single home
+#: ``core.workspace_layout.AUDIT_DIR_NAME_RE`` (v0.5.0 T-050-25A — this comment used to
+#: repeat that shape in prose; one fact, one place now).
 #:
 #: WS-R1 split (FR-R1-01/05): the ``specs/`` ADDITIVE classes apply both at the
 #: workspace root *and* relative to a context root (``repos/<slug>/``). The ``.dadaia/``

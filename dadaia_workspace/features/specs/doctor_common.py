@@ -32,7 +32,13 @@ from dadaia_workspace.core.release_events import (
 # A dir counts as a "release dir" iff it carries at least one SDD release artifact.
 # Public name (v0.1.81 FR2): reused by doctor_release's partial-archive invariant
 # (SPEC-DOC-039) so both checks share one canonical artifact-filename set.
-RELEASE_ARTIFACTS: tuple[str, ...] = ("SPEC.md", "PLAN.md", "TASKS.md", "CLOSURE.md")
+#
+# v0.5.0 T-050-25A (A4.4): ``CLOSURE.md`` dropped — FR4/T-050-21A retired it as a
+# going-forward artifact, so a lone CLOSURE.md with no SPEC/PLAN/TASKS is now an
+# anomaly, never legitimate. Every archived release in this repo's own history already
+# carries a surviving artifact alongside its CLOSURE.md, so this changes zero
+# classification here.
+RELEASE_ARTIFACTS: tuple[str, ...] = ("SPEC.md", "PLAN.md", "TASKS.md")
 _RELEASE_ARTIFACTS = RELEASE_ARTIFACTS
 # Segment dirs (ADR-1/ADR-5) live *inside* a release dir and are not themselves releases:
 # alpha-N, rc-N, plus the historical `integration` segment container.

@@ -419,17 +419,11 @@ def test_fresh_scaffold_passes_all_tree_invariants(tmp_path: Path) -> None:
             "SPEC-DOC-004",
             id="doc004-non-canonical-status",
         ),
-        pytest.param(
-            "archived-release-no-closure",
-            lambda specs: (
-                (specs / "_archive" / "releases" / "old-release").mkdir(parents=True),
-                (specs / "_archive" / "releases" / "old-release" / "SPEC.md").write_text(
-                    "# spec", encoding="utf-8"
-                ),
-            ),
-            "SPEC-DOC-006",
-            id="doc006-archived-without-closure",
-        ),
+        # doc006-archived-without-closure DELETED (v0.5.0 T-050-25A, A4.4): SPEC-DOC-006
+        # (check_archive_closures) is deleted with CLOSURE.md itself — a checker that
+        # parses a file which no longer exists is dead code behind a dead artifact.
+        # Verdict: criterion (a) feature removed, dadaia_workspace/features/specs/
+        # doctor_closure_audit.py (this task's commit deletes check_archive_closures).
         pytest.param(
             "orphan-legacy-feature",
             lambda specs: (
