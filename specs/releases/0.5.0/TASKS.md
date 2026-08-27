@@ -1051,7 +1051,7 @@ historical records.
 
 ---
 
-- [-] **T-050-18 — FR9: de-slop the hooks to the publication boundary**
+- [x] **T-050-18 — FR9: de-slop the hooks to the publication boundary**
 
 **Owner role:** software-engineer · **Commit:** `refactor(T-050-18): hooks validate only at
 the publication boundary`
@@ -1104,7 +1104,7 @@ by one — the number T-050-18A pins.**
 
 ---
 
-- [ ] **T-050-18A — The test-suite ratchets, in one contract file**
+- [-] **T-050-18A — The test-suite ratchets, in one contract file**
 
 **Owner role:** software-engineer (the file) + qa-engineer (the verdict on every pinned
 number) · **Commit:** `test(T-050-18A): pin the test-suite ratchets at their measured values`
