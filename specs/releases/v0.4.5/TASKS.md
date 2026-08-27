@@ -859,7 +859,7 @@ land as `expand → switch → contract` rather than big-bang?
 
 ---
 
-- [-] **T-045-34 — Security review + the QA release verdict**
+- [x] **T-045-34 — Security review + the QA release verdict**
 
 **Owner role:** security-reviewer + qa-engineer · **Commit:**
 `docs(T-045-34): release verdicts`
@@ -881,7 +881,7 @@ QA, code, security — must `APPROVE` the **same** commit.
 
 ## `rc-1` — the whole scope integrates once
 
-- [ ] **T-045-35 — [git] `rc-1`: PR `feature/0.4.5` → `develop`**
+- [-] **T-045-35 — [git] `rc-1`: PR `feature/0.4.5` → `develop`**
 
 **Owner role:** dispatcher + security-reviewer · **Preconditions:** T-045-34 `[x]`.
 
