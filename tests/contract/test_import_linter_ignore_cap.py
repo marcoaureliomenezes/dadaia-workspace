@@ -97,16 +97,35 @@ _SETUP_CFG = _REPO_ROOT / "setup.cfg"
 # composition-root direction) instead of constructing the concrete infrastructure
 # adapter directly, and `infrastructure/jsonl_bug_store.py` itself is deleted. Cap
 # lowered 15 -> 14 (-1 cli-no-infrastructure).
-_RECORDED_IGNORE_EDGE_CAP = 14
+#
+# v0.5.0 T-050-29 NOTE (FR18/A18.5, V32): the `features-no-cross-feature` contract's
+# `modules =` was measurably incomplete (20 of the 24 `dadaia_workspace/features/*/`
+# packages on disk) — the missing four (`capabilities`, `certification`, `reconcile`,
+# `tmp_gc`) were added, which makes import-linter analyze `reconcile/service.py`'s three
+# pre-existing cross-feature imports for the first time: `-> capabilities`,
+# `-> migrate.legacy_dadaia_dirs`, `-> migrate.state_v2`. Each is declared as a capped,
+# documented `ignore_imports` edge with its own reason comment (collapsing them is a
+# `reconcile` feature rewrite, routed to intake — not attempted here). Cap raised
+# 14 -> 17 (+3 features-no-cross-feature) in the same commit as `setup.cfg`.
+_RECORDED_IGNORE_EDGE_CAP = 17
 
 # Per-family recorded breakdown, pinned per contract section so a wrong 13-edge cross-feature
 # set (or a silent shift between families) fails loudly, not just the grand total.
 _RECORDED_PER_FAMILY_CAP: dict[str, int] = {
     "features-no-infrastructure": 7,
     "features-no-subprocess": 3,
-    "features-no-cross-feature": 2,
+    "features-no-cross-feature": 5,
     "cli-no-infrastructure": 2,
 }
+
+# A18.1 (V13): the total count of `[importlinter:contract:*]` sections in setup.cfg,
+# pinned so a tenth contract added without a matching Part-1 principle in
+# specs/memory/ARCHITECTURE.md goes RED here first (the test at the bottom of this
+# file). Raising this requires the same discipline as the ignore-edge cap: a new
+# contract AND a bump of this constant, in the same commit, with the new principle
+# authored alongside it (FR18/A18.1) — not attempted in this task (T-050-29's
+# mechanical half writes zero new contracts).
+_RECORDED_CONTRACT_COUNT = 9
 
 
 def _ignore_edges_by_contract() -> dict[str, list[str]]:
@@ -195,4 +214,54 @@ def _assert_every_ignored_edge_is_a_features_layering_exception(
                 offenders.append(f"[{section}] {edge}")
     assert not offenders, (
         "ignored import edges that are not features-layering exceptions:\n" + "\n".join(offenders)
+    )
+
+
+# --- A18.5/V32 — the independence contract is complete before promotion --------------
+
+
+def test_cross_feature_contract_modules_equals_disk_and_contract_count_is_pinned() -> None:
+    """Intent: CONTRACT — 0.5.0 A18.5.
+
+    V32: the ``features-no-cross-feature`` contract's ``modules =`` list must equal
+    every ``dadaia_workspace/features/<name>/`` package on disk. A principle
+    ("features are mutually independent", FR18) whose ``Measured by:`` check cannot see
+    every feature package is decoration, not a contract — this test is what makes that
+    impossible to author unnoticed: a package added to ``dadaia_workspace/features/``
+    tomorrow without a matching ``modules =`` line goes RED here (T-050-29 completed the
+    list 20 -> 24: ``capabilities``, ``certification``, ``reconcile``, ``tmp_gc`` added).
+
+    Same function also pins the total number of ``[importlinter:contract:*]`` sections
+    in ``setup.cfg`` (A18.1) — a tenth contract added without a matching Part-1 principle
+    (and without bumping ``_RECORDED_CONTRACT_COUNT`` above) goes RED here too. One
+    function, not two (SPEC v0.5.0 FR18 bug-surface paragraph).
+    """
+    features_dir = _REPO_ROOT / "dadaia_workspace" / "features"
+    on_disk_packages = {
+        f"dadaia_workspace.features.{p.name}"
+        for p in features_dir.iterdir()
+        if p.is_dir() and p.name != "__pycache__" and (p / "__init__.py").is_file()
+    }
+    assert len(on_disk_packages) == 24
+
+    parser = configparser.ConfigParser()
+    read = parser.read(_SETUP_CFG, encoding="utf-8")
+    assert read, f"setup.cfg not found at {_SETUP_CFG}"
+
+    raw_modules = parser["importlinter:contract:features-no-cross-feature"]["modules"]
+    declared_modules = {line.strip() for line in raw_modules.splitlines() if line.strip()}
+    assert declared_modules == on_disk_packages, (
+        "features-no-cross-feature's modules = list drifted from the packages on disk "
+        f"(missing from setup.cfg: {sorted(on_disk_packages - declared_modules)}; "
+        f"stale in setup.cfg: {sorted(declared_modules - on_disk_packages)}). A18.5/V32: "
+        "the independence contract must see every feature package before the 'features "
+        "are mutually independent' principle is authored."
+    )
+
+    contract_sections = [s for s in parser.sections() if s.startswith("importlinter:contract:")]
+    assert len(contract_sections) == _RECORDED_CONTRACT_COUNT, (
+        f"setup.cfg carries {len(contract_sections)} [importlinter:contract:*] sections "
+        f"but the pinned inventory count is {_RECORDED_CONTRACT_COUNT} (A18.1). A new "
+        "contract requires a matching Part-1 principle in specs/memory/ARCHITECTURE.md "
+        "before this pin is raised, in the same commit."
     )
