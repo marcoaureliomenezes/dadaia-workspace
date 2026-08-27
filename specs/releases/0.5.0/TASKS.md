@@ -276,7 +276,7 @@ count is recorded beside it; every fold-3 baseline is a **measured number or an 
 
 ---
 
-- [-] **T-050-03A — Widen the four reviewer personas to `specs/releases/**/reviews/**`**
+- [x] **T-050-03A — Widen the four reviewer personas to `specs/releases/**/reviews/**`**
 
 **Owner role:** ai-engineer · **Commit:** `feat(T-050-03A): reviewer personas may write
 release review artifacts`
