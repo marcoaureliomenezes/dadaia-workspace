@@ -25,7 +25,10 @@ it should be paired with: the same commit (or the immediately preceding one, per
 "accept commit also carries the Part-1 memory hunk") must add or update a
 `docs(adr): accept NNNN-<slug>` under `specs/ADRs/`, and that ADR's own text must name
 the changed principle. An unmatched hunk is a **HIGH** finding — Part 1 is ADR-gated by
-law, and this is the only mechanical check that law has.
+law, and this is the only mechanical check that law has. **Exception: the first-inventory
+case.** `specs/ADRs/AGENTS.md`'s "Relationship to memory and audits" section states, once,
+the bootstrap shape and its T-050-31-class grading — read it there before scoring the
+CREATING commit of a Part 1 section.
 
 ## 3 — Product atoms and Part-2 implementation vs code (the retained drift-walk method)
 

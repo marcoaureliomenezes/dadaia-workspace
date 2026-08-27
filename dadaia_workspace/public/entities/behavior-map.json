@@ -247,7 +247,7 @@
         "section": "sha256:d89dffaf8bd1d630f8337ce4db15e1f46c15df666a178a1a9c587966fbda8e36",
         "skill": null,
         "scoped": [
-          "sha256:676151143bc8f4dbedfa053185fb76aa65283f0f75f074205b7388460d0443cb"
+          "sha256:007265c33c86c0b3fa5032708f47e849947f9dea8cb1c4396e3b3a3ec8a4fc10"
         ]
       },
       "recorded_by": "ai-engineer",
@@ -277,7 +277,7 @@
         "section": "sha256:d89dffaf8bd1d630f8337ce4db15e1f46c15df666a178a1a9c587966fbda8e36",
         "skill": "sha256:dacff54f8b8a8fd327c2669498e83ca5b1254d98bce918e7e45d4d6aa1d481bf",
         "scoped": [
-          "sha256:3709fc2ca5271b74f0895e1daa3c1e0750787aed22f22501ef889a03bf7254ef"
+          "sha256:55420708dbc015e3337c83538646606418c5e8cec7e142b6a9759dffcddb83a6"
         ]
       },
       "recorded_by": "ai-engineer",

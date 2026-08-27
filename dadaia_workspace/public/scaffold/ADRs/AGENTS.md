@@ -106,3 +106,16 @@ atom points at the ADR, the ADR does not point back into memory beyond its own
 `## Confirmation` line. `dd-audit-project`'s pillar 3 (`PILLAR-MEMORY.md`) is the sole
 mechanical check that a Part-1 hunk and an `accept` commit travel together — no CLI verb
 and no `specs doctor` rule are added for this (A19.4).
+
+**The first-inventory case (bootstrap).** The pairing law above presupposes a Part 1
+that already exists. It does not apply to the CREATING commit — the one that adds
+`## Part 1 — Principles` to a memory trio file for the first time, with every one of
+its principles' `ADR:` lines naming a `proposed` (not yet `accepted`) ADR: that commit
+is the bootstrap shape, not drift. Pillar 3's pairing check (`PILLAR-MEMORY.md` §2)
+grades it as a T-050-31-class operator finding — the operator's acceptance sitting has
+not yet happened — never a HIGH drift finding, and never something an agent is expected
+to clear, since flipping a `Status` line to `accepted` is operator-only (above). From
+the first `docs(adr): accept NNNN-<slug>` commit onward — the first commit anywhere in
+history that flips any ADR's `Status` to `accepted` — the pairing law applies
+unconditionally: every later Part-1 hunk needs its own `accept` commit, same or
+immediately preceding, no further exception.
