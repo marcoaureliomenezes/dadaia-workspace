@@ -65,6 +65,14 @@ _BASH = shutil.which("bash") or "/usr/bin/bash"
 _DEADLINE = 30.0
 _ZERO = "0" * 40
 
+#: bug self-scan-baseline-drift-t05018-hooks-publication-boundary-fixture: the
+#: prior email-shaped placeholder used a real ccTLD, never one of
+#: privacy_baseline.json's RFC-2606-reserved-domain exclusions
+#: (.invalid/.test/.example/.localhost) -- one placeholder, reused at both synthetic
+#: git-identity call sites in this module, rather than two independently-typed
+#: literals drifting apart again.
+_SYNTHETIC_GIT_EMAIL = "test@example.invalid"
+
 
 def _write_executable(path: Path, body: str) -> None:
     path.write_text(body, encoding="utf-8")
@@ -95,7 +103,7 @@ def _init_context_repo(workspace: Path, slug: str) -> Path:
     (repo / "dadaia_workspace").mkdir()
     (repo / "dadaia_workspace" / "m.py").write_text("class Widget:\n    pass\n", encoding="utf-8")
     subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
-    subprocess.run(["git", "config", "user.email", "t@e.invalid"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.email", _SYNTHETIC_GIT_EMAIL], cwd=repo, check=True)
     subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True)
     return repo
 
@@ -215,7 +223,7 @@ def test_unresolvable_runner_still_refuses_the_push(tmp_path: Path) -> None:
     repo = workspace / "isolated-repo"
     repo.mkdir(parents=True)
     subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
-    subprocess.run(["git", "config", "user.email", "t@e.invalid"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.email", _SYNTHETIC_GIT_EMAIL], cwd=repo, check=True)
     subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True)
 
     # A fully controlled PATH with no poetry/dadaia reachable — same isolation
