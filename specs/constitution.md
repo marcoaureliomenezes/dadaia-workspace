@@ -1,261 +1,207 @@
 ---
 specs_pattern_version: 5
-constitution_version: 4.1.0
+constitution_version: 5.0.0
 ---
 
 # Constitution — dadaia-workspace
 
-Permanent product law. Read before changing architecture, public agentic assets, SDD
-behavior, memory, or distribution rules. Each article is a binding, verifiable
-principle; mechanism and inventory live in the memory canon (§13) and are cited, never
-duplicated (§12.3).
+Permanent product law, stated **once** and by reference. Every article names where its rule
+is measured or described; no article restates a mechanism that the memory trio
+(`specs/memory/ARCHITECTURE.md`, `specs/memory/QUALITY.md`, `specs/memory/TECHSTACK.md`),
+`specs/memory/product/**` or `DADAIA.md` already carries. A rule stated twice is slop (§12.3)
+and is deleted from here, never mirrored.
+
+**How to read a reference.** `P-01…P-17` are the Part-1 principles of `ARCHITECTURE.md`,
+`P-18…P-27` of `QUALITY.md`, `P-28` of `TECHSTACK.md`; each names the mechanical check that
+measures it and the ADR that admitted it. **Every ADR cited below is `proposed`** — the ids
+become final at the operator's acceptance sitting (release 0.5.0, T-050-31), and a rejected
+ADR takes its principle and this file's reference to it with it. **`C-NN`** marks a clause no
+principle measures yet: it is a `proposed`-ADR candidate carried to the operator in the
+coverage table of the release that introduced it, and it carries no ADR number until the
+operator rules on it.
 
 ## 0. Identity & Definitions
 
 `dadaia-workspace` is a multi-AI-harness, multi-project, SDD-oriented, multi-agent
 development workspace. Its product is workspace-level context-engineering: it orients a
-generic agent fleet to build many projects safely, in parallel, without re-deriving how
-to work and without colliding. Vision: [[product-vision]]. Layout and module map:
-[[architecture]].
+generic agent fleet to build many projects safely, in parallel, without re-deriving how to
+work and without colliding.
 
-- **Spec Context Project** — one canonical specs folder bound to one repository;
-  session-bindable. The bind → inject → enforce → parallel chain is the value spine
-  ([[spec-context-project]]).
-- **Entry harness** — the coding harness a human launches in a terminal. Governed by
-  AGENTS.md read up-tree plus the projected per-harness asset trees. The concrete
-  roster is enumerated in exactly ONE memory atom — [[tech-stack]] §Agent runtimes —
-  set-equal to `core/harness_registry.py`. This constitution never enumerates the
-  roster; individual harness names may appear where a law is harness-specific.
-- **Harness isolation** — a workspace may be installed for any subset of the entry
-  harnesses (`dadaia public install --target <t>`); scaffolding follows the choice.
-  Per-harness capability and scaffold truth: the `memory/product/harness/` atoms.
-- **Agentic entity** — an abstract, harness-agnostic definition the workspace owns:
-  **Persona** (agent role), **Deterministic Behavior** (enforced action), **Abstract
-  Rule** (always-on law), and the **universal** surface (skills under
-  `.agents/skills/`, `AGENTS.md` guardrails) that every entry harness reads natively.
-  Registry: `public/entities/registry.json` ([[agentic-entities]]).
+Definitions are pointers, not rules — each term is defined once, in the atom named.
 
-The SDD flow is agent-dispatched and document-governed: agents execute the phases of §7
-against the SDD documents (SPEC/PLAN/TASKS/ACTIVE.md), constrained by the deterministic
-gate and the git chokepoints. The workspace ships no agent-execution runtime.
+| Term | Defined once in |
+|---|---|
+| Vision · layout and module map | [[product-vision]] · [[architecture]] |
+| **Spec Context Project** — one canonical specs folder bound to one repository | [[spec-context-project]] |
+| **Entry harness** — the coding harness a human launches, and the roster of them | [[tech-stack]] Part 2 › Snapshot |
+| **Harness isolation** — a workspace installed for any subset of the roster | the `specs/memory/product/harness/` atoms |
+| **Agentic entity** — Persona, Deterministic Behavior, Abstract Rule, universal surface | [[agentic-entities]], registry `dadaia_workspace/public/entities/registry.json` |
+
+**Law.** The harness roster is enumerated in exactly one memory atom, set-equal to
+`dadaia_workspace/core/harness_registry.py`; this constitution never enumerates it
+(**C-01** — measured today by `dadaia specs doctor` SPEC-DOC-037).
 
 ## 1. SDD Is Binding
 
-Production changes require an approved release gate (`SPEC.md`, `PLAN.md`, `TASKS.md`,
-each `**Status:** Aprovado`) and a reserved task before implementation. Bypass language
-never overrides the gate. `Aprovado`, `Em revisão`, `Draft` are canonical status tokens
-— never translated.
+No production change lands without an approved release gate and a reserved task, and bypass
+language never overrides that. The gate artifacts, the canonical status tokens and the
+task-marker lifecycle are stated once in `DADAIA.md` §6 (**C-02**).
 
-**Operational-change lane** (the only sanctioned `release: none` lane): with
-`ACTIVE.md` at `release: none`, only version-metadata bumps, documentation-only
-changes, CI-infrastructure fixes, and dependency bumps may land — each on explicit
-operator order, through the sha-keyed security-APPROVE push gate, with green CI.
-**The memory-bearing test:** any change that alters agent or product behavior, or that
-would require a `specs/memory/**` edit for memory to stay true, requires a release. An
-ungated span that creates memory drift obligates the next release to carry a
-memory-truth pass. This lane is judgment-enforced (human PR review).
+**Operational-change lane** — the only sanctioned lane with no live release: version-metadata
+bumps, documentation-only changes, CI-infrastructure fixes and dependency bumps, each on
+explicit operator order, through the sha-keyed security-APPROVE push gate, with green CI.
+**The memory-bearing test:** any change that alters agent or product behavior, or that would
+require a `specs/memory/**` edit for memory to stay true, requires a release; an ungated span
+that creates memory drift obligates the next release to carry a memory-truth pass. This lane
+is judgment-enforced, at human PR review (**C-03**).
 
-**Bug-hotfix lane** (operator decree 2026-07-15 — releases are FORBIDDEN for bug
-fixing): a reported bug is fixed immediately, never through a release. The flow:
-register (`dadaia bugs append`, `reported`) → root cause (reproduce on the executed
-path, never patch symptoms) → RED test → fix → GREEN (new test + full suite) →
-`resolved` with the evidence triple (test, fix, suite) → wheel to the operator's
-consumer-side validator. Fix approval belongs to the operator and the consumer-side
-validation agent; internal gates never substitute. Releases are exclusively for
-feature work picked from backlog (§10).
+Bugs never travel through a release — the register → root-cause → RED → fix → GREEN →
+`resolved` arm is `DADAIA.md` §1 Arm B. Fix approval belongs to the operator and the
+consumer-side validation agent; an internal gate never substitutes (**C-04**).
 
 ## 2. Public Defaults Must Be Generic
 
-Publicly distributed assets (agents, skills, rules, hooks, templates, AGENTS.md,
-DADAIA.md) must be safe for any user: no private project names, hostnames, IPs,
-credentials, personal paths, or non-generic domain packs. Domain knowledge belongs in
-optional packs or private overlays.
+A publicly distributed asset must be safe for **any** consumer: it carries nothing private,
+and consumer-specific domain knowledge belongs in an optional pack or a private overlay, never
+in a default. What counts as private, the credential boundary and the push-path scan are
+stated once in `DADAIA.md` §8 and §9 (**C-05** — measured today by `dadaia public doctor`'s
+`public-privacy` check and the pre-push denylist scan).
 
 ## 3. Memory Is Repository Truth
 
-`specs/memory/**` is committed product memory describing the CURRENT product — never a
-changelog (history belongs in release `CLOSURE.md` and `_archive/`). Memory source is
-Markdown with frontmatter; generated formats are never committed as memory. A claim in
-memory the product does not honor is a defect of the same severity as failing code.
+A claim in memory the product does not honor is a defect of the same severity as failing
+code — that is what makes memory binding rather than documentation. Memory's current-truth
+posture is `DADAIA.md` §6; its canon shape and authorship are §13 (**C-06**).
 
 ## 4. Runtime Parity Must Be Honest
 
-Projections and doctor output describe only what each runtime actually enforces.
-Enforcement postures (which harness has pre-disk hooks, which relies on git
-chokepoints) are documented in [[architecture]] and the `memory/product/harness/`
-atoms; no projection or doctor line may claim enforcement a runtime does not perform.
-Harness-specific behavior is expressed in that harness's native terms.
+No projection, doctor line or document claims enforcement a runtime does not actually
+perform, and harness-specific behavior is expressed in that harness's native terms. Each
+runtime's real posture: the `specs/memory/product/harness/` atoms and [[architecture]]
+Part 2 (**C-07**).
 
 ## 5. Source Repo Must Stay Clean
 
-The source repository never tracks generated runtime projections, harness artefacts, or
-tool caches. Temporary files belong under the consumer workspace's `.dadaia/tmp/` or
-system temp. Repos never contain `.dadaia/` or cache/state dirs.
+The source repository never tracks what a runtime generates — a checkout is source and its
+own artifacts, nothing a tool produced. The exclusion list, the per-tool redirection recipes
+and the workspace-root whitelist are stated once in `DADAIA.md` §5 (**C-08** — measured today
+by `dadaia doctor`'s ROOT checks and `tests/contract/test_source_repo_hygiene.py`).
 
 ## 6. Layering
 
-Business behavior in `features/**`; runtime/I-O adapters in `infrastructure/**`; CLI
-wiring in `cli/**`; pure models/protocols in `core/**`. `core` imports nothing from the
-other layers and performs no I/O (named exceptions: [[architecture]]); features import
-neither CLI nor infrastructure directly (ports + container injection); cross-feature
-composition goes through the container. `container.py` is the sole composition root.
+The ring shape of this codebase is described once, in [[architecture]] Part 2 › Overview.
+Every **edge** of that shape is a measured principle, and this article adds nothing to them —
+it exists to make them constitutional: ports over direct adapters
+(`ARCHITECTURE.md` P-01, ADR 0001 proposed); no subprocess inside a feature (P-02, ADR 0002
+proposed); a `core` free of OS primitives (P-03, ADR 0003 proposed) and file-I-O-pure outside
+its authorized set (P-11, ADR 0011 proposed) that imports no upper ring (P-04, ADR 0004
+proposed); `infrastructure` on `core` only (P-05, ADR 0005 proposed); a pure-constant
+tunables leaf (P-06, ADR 0006 proposed); mutually independent features composing through the
+container (P-07, ADR 0007 proposed); container-composed CLI verbs (P-08, ADR 0008 proposed);
+one context-resolution authority with three sanctioned importers (P-09, ADR 0009 proposed);
+hooks that never import the composition root (P-12, ADR 0012 proposed); and every suppressed
+layering edge capped and ratcheting down only (P-10, ADR 0010 proposed).
 
 ## 7. Canonical Development Lifecycle
 
-Every action belongs to one of eight phases. This table is normative.
+Every action belongs to exactly one of eight phases: backlog definition · bug filing ·
+research · audit · release definition · implementation · review gates · closure. Which agent
+owns each phase is stated once in `DADAIA.md` §2; the write class and concurrency posture of
+each path is stated once in `DADAIA.md` §3. The phase vocabulary a release may record is
+closed by the release-record envelope (`ARCHITECTURE.md` P-15, ADR 0015 proposed) and folded
+read-only (P-14, ADR 0014 proposed), so the fold is the one answer to "what phase is this
+release in".
 
-| # | Phase | Owner | Writes to | Class | Concurrency |
-|---|-------|-------|-----------|-------|-------------|
-| 1 | Backlog definition | project-manager | `specs/backlog/**` | ADDITIVE | concurrent |
-| 2 | Bug filing | any agent | `specs/bugs/**` (JSONL events) | ADDITIVE | concurrent |
-| 3 | Research | PM-dispatched | `.dadaia/reports/**` | ADDITIVE | concurrent |
-| 4 | Audit | project-auditor | `specs/audits/<ts>-<sid8>/` | ADDITIVE | concurrent |
-| 5 | Release definition | product-engineer | `specs/releases/<id>/**` | MUTATING | advisory presence |
-| 6 | Implementation | software-engineer | context production tree | MUTATING | advisory presence |
-| 7 | Review gates | qa / security / code reviewers | handoffs + reports | ADDITIVE; gates transitions | concurrent |
-| 8 | Closure | product-engineer | `specs/memory/**`, CLOSURE, ACTIVE | MUTATING | advisory presence |
-
-MUTATING actors coordinate through task ownership and declared write scopes; the
-workspace never serializes them — concurrent writes are surfaced through advisory
-presence. Audit output is committed Markdown in `specs/audits/` (channel 3, §11), named
-`<ts>-<session_id_8chars>`. Every audit generates exactly one remediation release that
-dispositions every finding (fixed / superseded / deferred-with-reason); an audit
-archives only when fully dispositioned by an approved release.
+The audit lane's own law — one audit, one remediation release, every finding dispositioned
+before the audit archives — is stated once in `DADAIA.md` §6 (Audits) (**C-09**).
 
 ## 8. Concurrency Invariants
 
-- No workspace lock, lease, acquisition, adoption, or steal operation exists.
-- Races are accepted and surfaced, never prevented. MUTATING writes upsert caller-owned
-  presence and may emit one throttled warning when another live session is present.
-- Presence I/O is fail-open; it can never block a write or a commit.
-- ADDITIVE writes are always concurrency-independent, with collision-safe naming where
-  trees are parallel-writable.
-- READ mode is caller-local self-protection: it blocks only that caller's MUTATING
-  writes. Another session's bind or presence never changes the caller's mode.
-- Pre-commit may warn about peer presence but always allows. Pre-push may block on
-  missing CI or security-review evidence — a quality gate, not a lock.
-- Context memory injection follows the session's own bind, never another session's.
-- Mechanism (presence record, TTL cleanup, caller mode, classifier, hook order,
-  tunables): [[sdd-gate-v3]], [[context-management]], `core/kernel_tunables.py`.
+**The workspace never serializes its actors.** Every concurrency mechanism it may not have —
+lock, lease, acquisition, adoption, steal — and every one it does have — advisory presence,
+caller-local READ mode, fail-open presence I/O, the push boundary as a quality gate rather
+than a lock — is stated once in `DADAIA.md` §3, and its embodiment in code is described in
+[[architecture]] Part 2 › Concurrency and [[sdd-gate-v3]] (**C-10**).
 
 ## 9. Coordinator + Sub-Agent Architecture
 
-project-manager coordinates a release's MUTATING span through task ownership and
-explicit write scopes. product-engineer and software-engineer run as PM sub-agents with
-caller-scoped binds; peer presence is advisory only. Outside a release span,
-ai-engineer may perform authorized surface fixes under the same no-lock model.
-**Dispatcher purity:** only project-manager and project-auditor dispatch sub-agents;
+**Dispatcher purity:** only `project-manager` and `project-auditor` dispatch sub-agents;
 every other persona is a worker that surfaces needs to its dispatcher and never spawns
-agents.
+agents. Roles and their write scopes are stated once in `DADAIA.md` §2, and the map from each
+persona and scoped `AGENTS.md` to the law section it owns is measured by `ARCHITECTURE.md`
+P-17 (ADR 0017 proposed).
 
 ## 10. Backlog → Release
 
-project-manager curates `specs/backlog/**`. product-engineer, PM-dispatched (never
-self-initiated), sanitizes stale items (`deferred`/`rejected` with reason — never
-deleted), picks the bug + backlog set (open bugs and undispositioned audits outrank
-plain backlog), and writes the SPEC. Every picked bug is solved unless a picked item
-supersedes it (recorded, never silently dropped). A grill session on the picked set is
-mandatory before the SPEC; PM does not unblock a release whose SPEC/PLAN/TASKS lack
-`Aprovado`.
+Stated once in `DADAIA.md` §6 (Backlog, Releases): who creates demand, who curates it, how an
+entry enters and leaves, pick-time priority, the bug-always-solved rule and the mandatory
+grill before the SPEC. This constitution adds nothing to it and keeps the article only so the
+lane has a constitutional address (**C-11**).
 
 ## 11. Checkpoints, Gates, and the Three Channels
 
-A **checkpoint** is PM-mediated discipline (an APPROVE handoff required to advance); a
-**gate** is a mechanical block (the merged PreToolUse gate and the git chokepoints).
-Checkpoints never block mechanically — commits always flow (§8); only the push gate
-blocks.
-Spec review: qa-engineer first (mandatory), software-architect parallel (optional),
-software-engineer last. Implementation: qa APPROVE → commit; the push boundary is
-mechanical — every pushed sha requires an APPROVED security-reviewer handoff sha-matched
-to that exact sha (stale approvals fail; deletions/tag-only exempt; mechanism:
-[[sdd-gate-v3]], [[agent-comms]]); code-review APPROVE → PR merge; memory updates only
-after the code-review checkpoint. A REJECT re-opens the task (`[-]` → `[ ]`).
+A **checkpoint** is PM-mediated discipline — an APPROVE handoff advances it. A **gate** is a
+mechanical block. Checkpoints never block mechanically: commits always flow (§8) and only the
+push boundary blocks. The review cadence and the sha-keyed push verdict are stated once in
+`DADAIA.md` §7; the git chokepoints in §3.
 
-Exactly three report/comms channels: user reports (HTML) →
-`.dadaia/reports/<ctx>/<agent>/`; agent↔agent handoffs (JSON) →
-`.dadaia/handoff/<ctx>/`; audit results (committed Markdown) → `specs/audits/`. The
-panel serves only channel 1. No `specs/releases/<id>/evidence/` subtree exists.
+**Exactly three** report and communication channels exist — no fourth is created — and each
+has exactly one path. The channels and their paths: `DADAIA.md` §5 and §6 (**C-12**).
 
 ## 12. Anti-Slop Law
 
-1. No agent, skill, rule, or hook ships without a §7 phase it owns or gates; phase-less
-   artifacts are removed.
-2. No store without a GC mechanism: every state file, session record, or cache has a
-   defined expiry and cleanup path.
-3. No fact in two sources, no fact in two channels. The constitution states law once;
-   memory states mechanism once; skills and personas cite, never duplicate. Injected
-   context carries no filler: text that does not change an agent's action is slop and
-   is deleted.
-4. A bug fix that only adds code carries an explicit justification of why removal was
-   impossible; reviewers reject additive-by-default. Deleted surface stops producing
-   bugs; surface added by a fix produces the next one.
-5. **Derivation law.** The workspace defines its method abstractly and only then
-   implements it per harness. No scaffolded core sub-agent exists without its Persona,
-   no core hook without its Deterministic Behavior, no core rule file without its
-   Abstract Rule — all in the agentic-entity registry (§0), enforced by the derivation
-   contract test and the `public doctor` `entities-derivation` check. Operator-created
-   agents, skills and rules are exempt: the law governs only what the library
-   scaffolds.
+1. Every agent, skill, rule and hook owns or gates a phase of §7; a phase-less artifact is
+   removed. Measured by `ARCHITECTURE.md` P-17 (ADR 0017 proposed) — every asset maps to a
+   law section, and every section has at least one owner.
+2. No store without a GC mechanism: every state file, session record and cache has a defined
+   expiry and a cleanup path (**C-13**).
+3. No fact in two sources, no fact in two channels. The constitution states law once, memory
+   states mechanism once, skills and personas cite and never duplicate; injected context that
+   does not change an agent's action is slop and is deleted. The parameter case is measured
+   by `QUALITY.md` P-26 (ADR 0026 proposed); the general case is **C-14**.
+4. A fix that only adds code carries an explicit justification of why removal was impossible,
+   and reviewers reject additive-by-default; the bug-surface axis every verdict must state is
+   `DADAIA.md` §7 (**C-15**).
+5. **Derivation law.** The workspace defines its method abstractly and only then implements
+   it per harness: no scaffolded core sub-agent without its Persona, no core hook without its
+   Deterministic Behavior, no core rule file without its Abstract Rule — all in the agentic
+   entity registry (§0). Operator-created agents, skills and rules are exempt: this law
+   governs only what the library scaffolds. Measured today by `dadaia public doctor`'s
+   `entities-derivation` check and `tests/contract/test_agentic_entities_derivation.py`
+   (**C-16**).
 
 ## 13. Memory Canon
 
-Authoritative memory: `specs/memory/architecture.md` (layers, module map, topology) ·
-`specs/memory/product/**` (one atom per production feature + `index.md`, the generated
-catalog TOC — regenerated by `dadaia memory catalog generate`, never hand-edited;
-vision lives in `product/philosophy/product-vision.md`; `harness/` carries per-harness
-truth) · `specs/memory/tech-stack.md` (approved tech; THE home of the harness roster) ·
-`specs/memory/quality-assurance.md` (test architecture + CI split). Memory files are
-snapshots, never changelogs; `Changelog`/`History`/`Histórico`/`Versions` sections are
-forbidden. product-engineer is the sole memory author, writing in DEFINITION (new
-atoms, with operator confirmation outside a release span) and CLOSURE.
+Authoritative memory is the trio — `specs/memory/ARCHITECTURE.md`, `specs/memory/QUALITY.md`,
+`specs/memory/TECHSTACK.md` — plus `specs/memory/product/**`. **`product-engineer` is the sole
+memory author**, writing only in the DEFINITION and CLOSURE phases: this is the "who" half no
+hook can verify, and `specs/memory/AGENTS.md` defers to this article for it. That same file is
+the one home of everything else about memory — the two-tier shape, the Part-1 admission rule
+and its ADR gate, the atom format, and the forbidden history sections — read there, never
+restated here (**C-17**).
 
 ## 14. Agent Roster
 
-Nine core agents — the complete scaffolded roster; there are no plugin agents.
-
-| Agent | Phase | Class | Concurrency |
-|-------|-------|-------|-------------|
-| project-manager | 1–2 + coordinates MUTATING | ADDITIVE; coordinator | advisory presence |
-| project-auditor | 4 | ADDITIVE | concurrent |
-| product-engineer | 5 + 8 | MUTATING | caller-scoped bind |
-| software-engineer | 6 | MUTATING | caller-scoped bind |
-| qa-engineer | 7 → commit | ADDITIVE; votes | concurrent |
-| security-reviewer | 7 → push | ADDITIVE; votes | concurrent |
-| code-reviewer | 7 → PR | ADDITIVE; votes | concurrent |
-| ai-engineer | AI-entity surface (`public/**`) | MUTATING | caller-scoped bind |
-| software-architect | feeds 4/5 | ADDITIVE | concurrent |
-
-Every core persona in `public/agents/` must own or gate a §7 phase; personas for
-removed agents must not exist. Agents are generic AI implementations specialized only
-in their SDD role; all project-domain knowledge lives in the bound context's `specs/`.
-Domains without a dedicated persona (browser frontend, CI/CD) belong to
-`software-engineer`, the generic implementer; operators may author their OWN agents,
-which are exempt from the derivation law (§12.5) and never scaffolded by the library.
+The scaffolded roster is **closed** — the library ships no plugin agent — and an operator's
+own agents are exempt from §12.5 and never scaffolded by it. Agents are generic
+implementations specialized only in their SDD role: all project-domain knowledge lives in the
+bound context's `specs/`, never in a persona. Roster membership, phase ownership and write
+scope are stated once in `DADAIA.md` §2, and every persona-to-law-section mapping is measured
+by `ARCHITECTURE.md` P-17 (ADR 0017 proposed) (**C-18**).
 
 ## 15. Governance
 
-This constitution is versioned (`constitution_version`, semver): MAJOR for a
-changed/removed article, MINOR for a new article or substantive clarification, PATCH
-for wording. Amendment history lives in the amending releases' CLOSURE files and
-`_archive/` — never inline. The `specs doctor` invariants (including SPEC-DOC-037, the
-no-roster-enumeration guard) hold this law consistent with code and memory.
+This constitution is versioned (`constitution_version`, semver): MAJOR for a changed or
+removed article, MINOR for a new article or substantive clarification, PATCH for wording. An
+amendment lands with the ADR that decided it (§13); amendment history lives in the amending
+release's `RELEASE.jsonl` notes and in `_archive/`, never inline. `dadaia specs doctor` holds
+this law consistent with code and memory (**C-19**).
 
 ## 16. Rules Map to Skills
 
-Every always-on rule of this workspace is a section of `DADAIA.md`, and every such
-section is mapped to exactly the skill(s) that operate it. That relation is declared in
-exactly one controlled source — `public/entities/rules-skills-map.json` (schema
-`rules-skills-map-v1`), rows of `{topic, section, skills[], justification}`, keyed by the
-law's bold topic. No skill, persona, rule file, hook, or doctor check may declare a
-section↔skill relation elsewhere; a second declaration is slop (§12.3) and is deleted.
-A deterministic test reads the map, the law source, and the on-disk skills inventory, and
-gates every deploy: no deploy without a valid map.
-
-Rule and skill divide, never overlap. The rule is the concise statement of what always
-holds; the skill is its complement — the procedure that operates it. Depth belongs to the
-skill, law belongs to the rule, and neither restates the other. One topic has one skill;
-two or more require a justification recorded in the row itself. A skill no topic claims
-is fused or retired by default, and the law gains a topic only for behavior that is
-genuinely always-on.
-
-Provenance: v0.4.4 FR8, operator ruling 2026-08-23.
+Every always-on rule of this workspace is a section of `DADAIA.md`; every core skill and every
+scoped `AGENTS.md` maps to exactly one such section, and every section has at least one owner.
+That relation is declared in exactly one controlled source,
+`dadaia_workspace/public/entities/behavior-map.json`, and is measured by `ARCHITECTURE.md`
+P-17 (ADR 0017 proposed). A second declaration of the same relation, anywhere, is slop
+(§12.3) and is deleted.
