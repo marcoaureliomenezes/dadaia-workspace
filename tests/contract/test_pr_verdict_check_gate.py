@@ -216,6 +216,28 @@ def test_arm3_ideas_root_refused_fails_closed(tmp_path: Path) -> None:
     assert "no candidate verdict files found" in _output(result)
 
 
+def test_arm3_ideas_direct_verdicts_dir_refused_fails_closed(tmp_path: Path) -> None:
+    """F-16 (T-050-36 security review): a `verdicts/` directory placed DIRECTLY
+    under `_ideas/` — one path segment in the release-id position, never the nested
+    `_ideas/<id>/verdicts/` shape arm3 above already covers — matched the OLD glob
+    template (`specs/releases/*/verdicts/*.handoff.json`, a bare `RELEASE_GLOB=*`)
+    because `_ideas` is itself a valid single path segment. Refused by validating
+    the release-id SEGMENT against the canon pattern, not by the glob shape alone."""
+    repo = tmp_path / "repo"
+    reviewed = _init_repo(repo)
+    _write_verdict(
+        repo,
+        f"specs/releases/_ideas/verdicts/{reviewed}.handoff.json",
+        reviewed_sha=reviewed,
+    )
+    head = _commit_all(repo, "add a verdict directly under _ideas/ — must never qualify")
+
+    result = _run_gate(repo, tmp_path, pr_head_sha=head)
+
+    assert result.returncode != 0
+    assert "no candidate verdict files found" in _output(result)
+
+
 # ---------------------------------------------------------------------------
 # Arm 4 — narrowing + refusal matrix
 # ---------------------------------------------------------------------------
@@ -331,6 +353,34 @@ def test_arm6_gate_own_offender_allowlist_line_still_disqualifies(tmp_path: Path
     assert "does not cover PR head" in _output(result)
 
 
+def test_arm6_verdicts_shaped_path_outside_the_id_position_still_disqualifies(
+    tmp_path: Path,
+) -> None:
+    """F-17 (T-050-36 security review) RED arm: the OLD coverage-exemption used a
+    bash `case` pattern (`specs/releases/*/verdicts/*`) whose `*` crosses `/` under
+    fnmatch's default semantics — ANY path with a `/verdicts/` segment anywhere
+    under `specs/releases/` was excused, source files included. A file landing at
+    `specs/releases/<id>/reviews/verdicts/evil.py` after the review must still
+    disqualify coverage: it is not `specs/releases/<id>/verdicts/<file>` at all —
+    `reviews` sits between the release id and `verdicts/`."""
+    repo = tmp_path / "repo"
+    reviewed = _init_repo(repo)
+    _write_verdict(
+        repo, f"specs/releases/0.5.0/verdicts/{reviewed}.handoff.json", reviewed_sha=reviewed
+    )
+    _commit_all(repo, "add verdict")
+    evil_dir = repo / "specs" / "releases" / "0.5.0" / "reviews" / "verdicts"
+    evil_dir.mkdir(parents=True)
+    (evil_dir / "evil.py").write_text("print('not evidence')\n", encoding="utf-8")
+    head = _commit_all(repo, "sneak a file under a verdicts-shaped path — must still disqualify")
+
+    result = _run_gate(repo, tmp_path, pr_head_sha=head)
+
+    assert result.returncode != 0
+    assert "does not cover PR head" in _output(result)
+    assert "specs/releases/0.5.0/reviews/verdicts/evil.py" in _output(result)
+
+
 # ---------------------------------------------------------------------------
 # Arm 7 — derivation failure -> exit non-zero, no fallback glob
 # ---------------------------------------------------------------------------
@@ -349,4 +399,31 @@ def test_arm7_derivation_failure_exits_nonzero_no_fallback(tmp_path: Path) -> No
     assert result.returncode != 0
     assert "could not derive the release-id pattern" in _output(result)
     # No fallback: the verdict that WOULD have qualified is never even mentioned.
+    assert "PASS" not in result.stdout
+
+
+# ---------------------------------------------------------------------------
+# Arm 8 — PR_HEAD_SHA shape check (F-18, T-050-36 security review)
+# ---------------------------------------------------------------------------
+
+
+def test_arm8_symbolic_pr_head_sha_refused_before_any_git_argv(tmp_path: Path) -> None:
+    """F-18: `PR_HEAD_SHA` is checked for presence but was never checked for shape,
+    while the handoff-sourced `metrics.commit_sha` is pinned to 40-hex (T-044-46
+    S-1). A symbolic value ("HEAD", "@", an option-shaped string) would otherwise
+    resolve dynamically against whatever the checkout happens to have, collapsing
+    the ancestor and diff-emptiness checks into tautologies. A qualifying verdict
+    exists in this fixture — the derivation must fail closed before ever reading
+    it, exactly like arm 7's derivation-failure case."""
+    repo = tmp_path / "repo"
+    reviewed = _init_repo(repo)
+    _write_verdict(
+        repo, f"specs/releases/0.5.0/verdicts/{reviewed}.handoff.json", reviewed_sha=reviewed
+    )
+    _commit_all(repo, "add verdict — a symbolic PR_HEAD_SHA must still be refused")
+
+    result = _run_gate(repo, tmp_path, pr_head_sha="HEAD")
+
+    assert result.returncode != 0
+    assert "is not a 40-hex sha" in _output(result)
     assert "PASS" not in result.stdout

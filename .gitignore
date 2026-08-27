@@ -136,8 +136,17 @@ pip-wheel-metadata/
 !/specs/memory/**
 !/specs/audits/
 !/specs/audits/**
+# F-20 (T-050-36 security review): the scratch/private-notes denies (local-notes.md,
+# tmp/ working dirs — see test_source_repo_hygiene.py) were carried to
+# specs/releases/** but NOT to the other newly-opened areas this same inversion
+# tracks by default — an agent writing scratch material into specs/audits/<ts>/tmp/
+# (a shape DADAIA.md §5 makes natural) had it staged by default. Carried here too.
+/specs/audits/**/local-notes.md
+/specs/audits/**/tmp/
 !/specs/ADRs/
 !/specs/ADRs/**
+/specs/ADRs/**/local-notes.md
+/specs/ADRs/**/tmp/
 # Bug records are repository truth (bug-registration-guardrail mandates
 # registration in specs/bugs/ with redacted content). Top-level bugs/ stays a
 # narrow *.md/*.jsonl opt-in (covers BUGS.jsonl + AGENTS.md); _archive/ is fully
@@ -149,6 +158,10 @@ pip-wheel-metadata/
 !/specs/bugs/*.jsonl
 !/specs/bugs/_archive/
 !/specs/bugs/_archive/**
+# F-20 (T-050-36 security review): see the audits/ADRs comment above — same class,
+# same fix.
+/specs/bugs/_archive/**/local-notes.md
+/specs/bugs/_archive/**/tmp/
 # Backlog is PM-curated repository truth (backlog-ownership + release-governance;
 # v0.1.49 FR1). Top-level backlog/ stays a narrow *.md opt-in; _archive/ is fully
 # tracked (widened from *.md-only, same reason as bugs/_archive/ above).
@@ -157,14 +170,28 @@ pip-wheel-metadata/
 !/specs/backlog/*.md
 !/specs/backlog/_archive/
 !/specs/backlog/_archive/**
+# F-20 (T-050-36 security review): see the audits/ADRs comment above — same class,
+# same fix.
+/specs/backlog/_archive/**/local-notes.md
+/specs/backlog/_archive/**/tmp/
 !/specs/releases/
 !/specs/releases/**
+!/specs/releases/_archive/**
+# F-20 (T-050-36 security review): these two denies must come AFTER the
+# `!/specs/releases/_archive/**` re-inclusion line above (gitignore is last-match-
+# wins) — the pre-fix ordering had them BEFORE it, so the un-ignore silently undid
+# them for every archived release: `specs/releases/_archive/<id>/local-notes.md`
+# and `.../tmp/` were TRACKED, not ignored, even though the same paths under a live
+# (non-archived) release were correctly hidden. Placed last here, they win for both
+# the live and the archived subtree.
 /specs/releases/**/local-notes.md
 /specs/releases/**/tmp/
-!/specs/releases/_archive/**
 !/specs/_archive/
 !/specs/_archive/**
 /specs/_archive/**/local-notes.md
+# F-20 (T-050-36 security review): local-notes.md was carried here, tmp/ was not —
+# same class, same fix.
+/specs/_archive/**/tmp/
 
 # Operator private working draft — never commit
 docs/00_medium_mine.md

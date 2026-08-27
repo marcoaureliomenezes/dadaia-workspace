@@ -58,6 +58,7 @@ from pathlib import Path
 
 import yaml
 
+from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.models.backlog import BacklogHistoRecord, Intent, parse_intents
 from dadaia_workspace.core.protocols.record_store import RecordStore
 from dadaia_workspace.features.backlog.preview import format_yaml_error
@@ -548,6 +549,13 @@ def backlog_new(specs_dir: Path, slug: str) -> BacklogNewResult:
             since v0.5.0 FR5).
         RuntimeError:    If a re-parse of the fresh write does not contain the fresh
             slug (A1.2, write-then-verify).
+        core.atomic_write.ConcurrentModificationError:
+            If ``BACKLOG.md`` changed since it was read (F-14, T-050-36 security
+            review): the write routes through :func:`core.atomic_write.atomic_write`
+            with ``expected_previous`` set to the exact bytes just read, closing the
+            plain-``write_text`` lost-update window a concurrent writer under the
+            NO-LOCKS DOCTRINE could otherwise silently clobber. Surfaced to the
+            caller verbatim — never swallowed here.
     """
     if not _SLUG_RE.fullmatch(slug):
         raise ValueError(
@@ -568,11 +576,17 @@ def backlog_new(specs_dir: Path, slug: str) -> BacklogNewResult:
         )
 
     if target.is_file():
-        existing_text = target.read_text(encoding="utf-8")
+        previous_text = target.read_text(encoding="utf-8")
+        base_text = previous_text
     else:
-        existing_text = _BACKLOG_DOCUMENT_SKELETON
+        previous_text = ""
+        base_text = _BACKLOG_DOCUMENT_SKELETON
     block = _ACTIVE_SUBSECTION_TEMPLATE.format(slug=slug, today=_today())
-    target.write_text(_append_active_subsection(existing_text, block), encoding="utf-8")
+    atomic_write(
+        target,
+        _append_active_subsection(base_text, block),
+        expected_previous=previous_text,
+    )
 
     # Write-then-verify (A1.2): re-parse the fresh output and confirm the slug is
     # really there before reporting success.
@@ -609,6 +623,13 @@ def remove_active_subsection(specs_dir: Path, slug: str) -> str:
 
     Raises:
         KeyError: If *slug* does not name a live ``## ACTIVE`` subsection.
+        core.atomic_write.ConcurrentModificationError:
+            If ``BACKLOG.md`` changed since it was read (F-14, T-050-36 security
+            review): the write routes through :func:`core.atomic_write.atomic_write`
+            with ``expected_previous`` set to the exact bytes just read, closing the
+            plain-``write_text`` lost-update window a concurrent writer under the
+            NO-LOCKS DOCTRINE could otherwise silently clobber. Surfaced to the
+            caller verbatim — never swallowed here.
     """
     backlog_dir = specs_dir / "backlog"
     target = backlog_dir / "BACKLOG.md"
@@ -626,7 +647,7 @@ def remove_active_subsection(specs_dir: Path, slug: str) -> str:
             body_end = subsections[i + 1].start() if i + 1 < len(subsections) else end
             removed = text[sub.start() : body_end]
             new_text = text[: sub.start()] + text[body_end:]
-            target.write_text(new_text, encoding="utf-8")
+            atomic_write(target, new_text, expected_previous=text)
             return removed.rstrip("\n")
 
     raise KeyError(f"backlog slug {slug!r} does not name a live ACTIVE subsection in {target}")
@@ -641,8 +662,8 @@ def backlog_exit(
     reason: str | None,
     release: str | None,
     by: str,
+    denylist_terms: Sequence[tuple[str, str]],
     ts: str | None = None,
-    denylist_terms: Sequence[tuple[str, str]] = (),
 ) -> BacklogHistoRecord:
     """Retire *slug* out of ``## ACTIVE`` and append its one histo record (v0.5.0 FR5,
     A5.3) — the atomic pair :func:`remove_active_subsection` (the removal) and
@@ -657,9 +678,13 @@ def backlog_exit(
     ``denylist_terms`` is redacted through :meth:`BacklogHistoRecord.redact` BEFORE the
     record is appended (bug ``backlog-histo-writer-skips-write-time-denylist-redaction``)
     — the SAME write-time seam ``BugService.register``/``apply_update`` already enforce
-    for ``BugRecord`` (SPEC v0.4.5 FR6/T-045-19). Defaults to ``()``: this module never
-    imports ``infrastructure``/``container`` (``features-no-infrastructure``), so the
-    caller wires the real operator denylist in via ``container.load_denylist_terms()``,
+    for ``BugRecord`` (SPEC v0.4.5 FR6/T-045-19). REQUIRED, no default (F-13, T-050-36
+    security review): a default of ``()`` silently reintroduces the exact bug this
+    parameter exists to fix the moment a future caller omits the keyword, with no error,
+    no warning and no test failure — the type checker now enforces at every call site
+    what the docstring can only request. This module still never imports
+    ``infrastructure``/``container`` (``features-no-infrastructure``), so the caller
+    wires the real operator denylist in via ``container.load_denylist_terms()``,
     mirroring how ``cli/commands/bugs.py`` wires ``BugService`` today.
     """
     entry_md = remove_active_subsection(specs_dir, slug)

@@ -851,6 +851,7 @@ def test_backlog_exit_removes_active_and_appends_exactly_one_histo_record(
         reason=None,
         release="v9.9.9",
         by="test-suite",
+        denylist_terms=(),
         ts="2026-08-27",
     )
 
@@ -886,6 +887,7 @@ def test_backlog_exit_twice_for_the_same_slug_is_structurally_impossible(
         reason=None,
         release="v9.9.9",
         by="test-suite",
+        denylist_terms=(),
     )
 
     with pytest.raises(KeyError):
@@ -897,6 +899,7 @@ def test_backlog_exit_twice_for_the_same_slug_is_structurally_impossible(
             reason=None,
             release="v9.9.9",
             by="test-suite",
+            denylist_terms=(),
         )
 
     assert len(list(store.iter_records())) == 1
@@ -957,11 +960,12 @@ def test_backlog_exit_masks_a_denylisted_term_in_entry_md_before_append(
     assert "acme-corp" not in persisted.entry_md.lower()
 
 
-def test_backlog_exit_with_no_denylist_terms_stays_byte_identical_to_pre_fix(
+def test_backlog_exit_with_empty_denylist_terms_stays_byte_identical_to_pre_fix(
     tmp_path: Path,
 ) -> None:
-    """A6.3-class sibling guarantee: ``backlog_exit`` called with no ``denylist_terms``
-    (the default) behaves exactly as before the fix — the removed subsection text is
+    """A6.3-class sibling guarantee: ``backlog_exit`` called with an explicit empty
+    ``denylist_terms=()`` (F-13, T-050-36 security review: the parameter is REQUIRED,
+    no default) behaves exactly as before the fix — the removed subsection text is
     appended verbatim, byte-identical."""
     specs = tmp_path / "specs"
     (specs / "backlog").mkdir(parents=True)
@@ -978,6 +982,7 @@ def test_backlog_exit_with_no_denylist_terms_stays_byte_identical_to_pre_fix(
         reason=None,
         release="v9.9.9",
         by="test-suite",
+        denylist_terms=(),
         ts="2026-08-27",
     )
 

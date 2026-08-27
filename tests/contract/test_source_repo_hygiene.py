@@ -117,6 +117,31 @@ def test_sdd_gate_artifacts_visible_and_noncanonical_content_stays_gitignored() 
         "specs/releases/v9.9.9/alpha-1/local-notes.md",
         "specs/releases/v9.9.9/alpha-1/tmp/debug.json",
         "specs/_archive/releases/v9.9.8/local-notes.md",
+        # F-20 (T-050-36 security review): the scratch/private-notes denies were
+        # carried to specs/releases/** ONLY — every other newly-opened canon area
+        # (audits/, ADRs/, bugs/_archive/, backlog/_archive/, root _archive/) had
+        # neither local-notes.md nor tmp/ denied, so an agent writing scratch
+        # material there (a shape DADAIA.md §5 makes natural) had it staged by
+        # default.
+        "specs/audits/20991231T235959Z/local-notes.md",
+        "specs/audits/20991231T235959Z/tmp/debug.json",
+        "specs/ADRs/local-notes.md",
+        "specs/ADRs/tmp/debug.json",
+        "specs/bugs/_archive/local-notes.md",
+        "specs/bugs/_archive/tmp/debug.json",
+        "specs/backlog/_archive/local-notes.md",
+        "specs/backlog/_archive/tmp/debug.json",
+        "specs/_archive/x/local-notes.md",
+        # F-20's own regression seam: root specs/_archive/ denied local-notes.md
+        # already, but NOT tmp/ — the asymmetry this fix closes.
+        "specs/_archive/x/tmp/debug.json",
+        # F-20's own regression seam: the pre-fix ordering placed the
+        # local-notes.md/tmp/ denies BEFORE `!/specs/releases/_archive/**`, so the
+        # archive re-inclusion (gitignore is last-match-wins) silently undid them
+        # for every archived release — a path identical in shape to the live-tree
+        # assertion above, but nested one level under specs/releases/_archive/.
+        "specs/releases/_archive/v9.9.8/local-notes.md",
+        "specs/releases/_archive/v9.9.8/tmp/debug.json",
     ]
     not_ignored = [path for path in ignored_paths if not _is_ignored(path)]
     assert not_ignored == []
