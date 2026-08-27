@@ -1,12 +1,14 @@
-"""Unit tests for SpecsDoctor SPEC-DOC-033/040/041 — the bug-ledger invariant.
+"""Unit tests for SpecsDoctor SPEC-DOC-033/041 — the bug-ledger invariant.
 
-Release v0.1.46 / T-46-04 (AC-1); rewritten v0.5.0 T-050-08 (FR2/A2.3/A2.7/A2.8, AR-1
-ruling "the doctor's bug lane is a second hand-kept reader"). The legacy hourly-file
-rotation reader is dead under canon v6 and is not carried forward — every case below
-targets the ONE canonical ``specs/bugs/BUGS.jsonl`` (T-050-10 rename). Covers: line validity (ERROR),
-v5 event-stream coherence (demoted to WARNING, never a block), governance-completeness
-gaps on a native v6 record (WARNING), the A2.7 immutable-core-drift detector, and the
-A2.8 archive-overdue signal.
+Release v0.1.46 / T-46-04 (AC-1); rewritten v0.5.0 T-050-08 (FR2/A2.3/A2.8, AR-1
+ruling "the doctor's bug lane is a second hand-kept reader"); the v5 event fold and
+SPEC-DOC-040 deleted at the S1 FR23 firing (A3/A5,
+`specs/releases/0.5.0/reviews/S1-FR23-firing.md`). The legacy hourly-file rotation
+reader is dead under canon v6 and is not carried forward — every case below targets
+the ONE canonical ``specs/bugs/BUGS.jsonl`` (T-050-10 rename). Covers: line validity
+(ERROR), the v5-line-is-an-ERROR shape (A3 — no fold, no diagnosis), governance-
+completeness gaps on a native v6 record (WARNING), and the A2.8 archive-overdue
+signal.
 """
 
 from __future__ import annotations
@@ -15,7 +17,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-from dadaia_workspace.core.models.bugs import BugRecord
 from dadaia_workspace.features.specs import Severity, SpecsDoctor, SpecsDoctorIssue
 from dadaia_workspace.features.specs.doctor_governance import GovernanceValidator
 
@@ -24,37 +25,6 @@ def _bugs_dir(specs: Path) -> Path:
     d = specs / "bugs"
     d.mkdir(parents=True, exist_ok=True)
     return d
-
-
-def _reported(
-    bug_id: str, *, severity: str = "HIGH", ts: str = "2026-07-01T13:00:00Z"
-) -> dict[str, Any]:
-    return {
-        "bug_id": bug_id,
-        "event": "reported",
-        "ts": ts,
-        "reported_by": "software-engineer",
-        "title": f"title {bug_id}",
-        "severity": severity,
-        "surface": "gate",
-        "component": "spec_context",
-        "context": "dadaia-workspace",
-        "tags": ["gate"],
-        "symptom": "sym",
-        "repro": "repro",
-        "expected": "exp",
-        "notes": "n",
-    }
-
-
-def _resolved(bug_id: str, *, ts: str = "2026-07-01T14:00:00Z") -> dict[str, Any]:
-    return {
-        "bug_id": bug_id,
-        "event": "resolved",
-        "ts": ts,
-        "reported_by": "software-engineer",
-        "release": "v0.1.46",
-    }
 
 
 def _record(bug_id: str, **overrides: object) -> dict[str, Any]:
@@ -101,12 +71,6 @@ def test_no_bugs_dir_is_a_noop(tmp_path: Path) -> None:
     assert _doc033(specs) == []
 
 
-def test_coherent_reported_then_resolved_is_clean(tmp_path: Path) -> None:
-    specs = tmp_path / "specs"
-    _write_ledger(_bugs_dir(specs), [_reported("bug-a"), _resolved("bug-a")])
-    assert _doc033(specs) == []
-
-
 def test_malformed_json_line_is_an_error(tmp_path: Path) -> None:
     specs = tmp_path / "specs"
     bugs = _bugs_dir(specs)
@@ -117,22 +81,9 @@ def test_malformed_json_line_is_an_error(tmp_path: Path) -> None:
     assert errors[0].severity is Severity.ERROR
 
 
-def test_v5_event_missing_required_field_is_an_error(tmp_path: Path) -> None:
-    """A line carrying an ``"event"`` key that fails ``BugEvent.from_dict`` (missing a
-    required field) is an ERROR — the model's OWN parser is the validation, not a
-    second hand-kept field check."""
-    specs = tmp_path / "specs"
-    bugs = _bugs_dir(specs)
-    _write_ledger(bugs, [{"bug_id": "b", "event": "reported", "reported_by": "se"}])  # no ts
-    errors = _doc033(specs)
-    assert len(errors) == 1
-    assert "not a valid bug-event object" in errors[0].description
-    assert errors[0].severity is Severity.ERROR
-
-
 def test_native_v6_record_line_parses_clean(tmp_path: Path) -> None:
     """A freshly-registered (native v6) line — no ``"event"`` key — is read through
-    ``BugRecord.from_dict`` directly, no v5 folding applied."""
+    ``BugRecord.from_dict`` directly."""
     specs = tmp_path / "specs"
     _write_ledger(_bugs_dir(specs), [_record("native-bug")])
     assert _doc033(specs) == []
@@ -149,46 +100,61 @@ def test_native_v6_record_missing_required_field_is_an_error(tmp_path: Path) -> 
 
 
 # ---------------------------------------------------------------------------
-# A2.3 — v5 event-stream coherence is now WARNING, never ERROR (D15).
+# S1 FR23 firing A3 — a v5-shaped line ("event" key) is now ALWAYS a single ERROR,
+# never folded, never diagnosed. The live ledger has zero v5 lines by construction
+# (T-050-10 physically migrated every historical record) — a surviving one means a
+# foreign/pre-migration write, and the doctor names it loudly rather than silently
+# re-interpreting it.
 # ---------------------------------------------------------------------------
 
 
-def test_terminal_without_reported_is_a_warning_not_an_error(tmp_path: Path) -> None:
+def test_v5_shaped_line_is_a_single_error_never_folded(tmp_path: Path) -> None:
     specs = tmp_path / "specs"
-    _write_ledger(_bugs_dir(specs), [_resolved("orphan")])
-    issues = _doc033(specs)
-    assert len(issues) == 1
-    assert "no prior 'reported'" in issues[0].description
-    assert issues[0].severity is Severity.WARNING
-    assert "never a block" in issues[0].description
-
-
-def test_double_terminal_is_a_warning_not_an_error(tmp_path: Path) -> None:
-    specs = tmp_path / "specs"
-    _write_ledger(
-        _bugs_dir(specs),
-        [_reported("bug-a"), _resolved("bug-a"), _resolved("bug-a", ts="2026-07-01T16:00:00Z")],
+    bugs = _bugs_dir(specs)
+    (bugs / "BUGS.jsonl").write_text(
+        json.dumps(
+            {
+                "bug_id": "legacy-bug",
+                "event": "reported",
+                "ts": "2026-07-01T13:00:00Z",
+                "reported_by": "software-engineer",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
     )
-    issues = _doc033(specs)
-    assert len(issues) == 1
-    assert "second terminal event" in issues[0].description
-    assert issues[0].severity is Severity.WARNING
+    errors = _doc033(specs)
+    assert len(errors) == 1
+    assert errors[0].severity is Severity.ERROR
+    assert "v5 line in a v6 ledger" in errors[0].description
+    assert "migrate" in errors[0].description
 
 
-def test_later_reported_heals_the_violation_row(tmp_path: Path) -> None:
-    """The FR2 healing rule survives the rewrite: a violation followed by a later
-    ``reported`` for the same bug_id is healed — reported as nothing."""
+def test_two_v5_shaped_lines_are_two_independent_errors(tmp_path: Path) -> None:
+    """No fold, no coherence diagnosis over the v5 portion anymore (A3) — a
+    ``reported``+``resolved`` pair that the pre-A3 fold would have accepted as
+    coherent (zero issues) is now TWO independent ERRORs, one per physical line."""
     specs = tmp_path / "specs"
-    _write_ledger(
-        _bugs_dir(specs),
-        [
-            _reported("ghost"),
-            _resolved("ghost", ts="2026-07-01T14:00:00Z"),
-            _resolved("ghost", ts="2026-07-01T15:00:00Z"),  # double-terminal violation
-            _reported("ghost", ts="2026-07-01T16:00:00Z"),  # compensation: heals it
-        ],
-    )
-    assert _doc033(specs) == []
+    bugs = _bugs_dir(specs)
+    rows = [
+        {
+            "bug_id": "legacy-bug",
+            "event": "reported",
+            "ts": "2026-07-01T13:00:00Z",
+            "reported_by": "software-engineer",
+        },
+        {
+            "bug_id": "legacy-bug",
+            "event": "resolved",
+            "ts": "2026-07-01T14:00:00Z",
+            "reported_by": "software-engineer",
+        },
+    ]
+    _write_ledger(bugs, rows)
+    errors = _doc033(specs)
+    assert len(errors) == 2
+    assert all(e.severity is Severity.ERROR for e in errors)
+    assert all("v5 line in a v6 ledger" in e.description for e in errors)
 
 
 # ---------------------------------------------------------------------------
@@ -230,45 +196,6 @@ def test_superseded_without_superseded_by_is_a_warning(tmp_path: Path) -> None:
     issues = _doc033(specs)
     assert len(issues) == 1
     assert "superseded_by" in issues[0].description
-
-
-# ---------------------------------------------------------------------------
-# A2.7 — SPEC-DOC-040 immutable-core drift detector (production no-op with no
-# injected baseline; provably correct with one injected directly).
-# ---------------------------------------------------------------------------
-
-
-def test_immutable_core_drift_check_is_a_noop_with_no_baseline(tmp_path: Path) -> None:
-    specs = tmp_path / "specs"
-    _write_ledger(_bugs_dir(specs), [_record("drifted-bug", title="hand-edited title")])
-    issues = [i for i in SpecsDoctor(specs).check() if i.code == "SPEC-DOC-040"]
-    assert issues == []
-
-
-def test_immutable_core_drift_check_fires_with_an_injected_baseline(tmp_path: Path) -> None:
-    specs = tmp_path / "specs"
-    bugs = _bugs_dir(specs)
-    _write_ledger(bugs, [_record("drifted-bug", title="hand-edited title")])
-    baseline = BugRecord.from_dict(_record("drifted-bug", title="original title"))
-    validator = GovernanceValidator(specs, bug_first_add_baselines={"drifted-bug": baseline})
-
-    issues = validator.check_bug_record_immutable_core()
-
-    assert len(issues) == 1
-    assert issues[0].code == "SPEC-DOC-040"
-    assert issues[0].severity is Severity.WARNING
-    assert "title" in issues[0].description
-
-
-def test_immutable_core_drift_check_is_silent_when_nothing_drifted(tmp_path: Path) -> None:
-    specs = tmp_path / "specs"
-    bugs = _bugs_dir(specs)
-    row = _record("stable-bug")
-    _write_ledger(bugs, [row])
-    baseline = BugRecord.from_dict(row)
-    validator = GovernanceValidator(specs, bug_first_add_baselines={"stable-bug": baseline})
-
-    assert validator.check_bug_record_immutable_core() == []
 
 
 # ---------------------------------------------------------------------------

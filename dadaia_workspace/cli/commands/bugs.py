@@ -210,7 +210,7 @@ def bugs_append_cmd(
 
     service = _service(target)
     try:
-        path = service.register(
+        service.register(
             bug_id=bug_id,
             ts=resolved_ts,
             reported_by=reported_by,
@@ -226,7 +226,7 @@ def bugs_append_cmd(
     except BugDuplicateIdError as exc:
         typer.echo(f"[error] {exc}", err=True)
         raise typer.Exit(code=1) from exc
-    typer.echo(f"[ok] registered {bug_id} -> {path}")
+    typer.echo(f"[ok] registered {bug_id} -> {target}")
 
 
 @bugs_app.command("status")

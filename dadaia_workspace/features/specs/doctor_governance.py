@@ -2,12 +2,12 @@
 
 Single-responsibility sibling of the SpecsDoctor coordinator. Owns the bug/backlog governance
 invariants: consumed-but-unsanitized ACTIVE backlog item (SPEC-DOC-031, SPEC v0.4.2 FR14),
-bug-status canon (SPEC-DOC-032), the bug-ledger invariant (SPEC-DOC-033), the immutable-core
-drift detector (SPEC-DOC-040, v0.5.0 A2.7) and the archive-overdue signal (SPEC-DOC-041,
-v0.5.0 A2.8), and the single-source loose-file invariant (SPEC-DOC-035, SPEC v0.12.0 FR5).
-Leaf-only: imports the shared leaves + core, plus one documented cross-feature leaf edge
-(``features.backlog.document`` — SPEC v0.12.0 PLAN §6, ``setup.cfg``'s
-``features-no-cross-feature`` ``ignore_imports``), never a sibling validator.
+bug-status canon (SPEC-DOC-032), the bug-ledger invariant (SPEC-DOC-033), and the
+archive-overdue signal (SPEC-DOC-041, v0.5.0 A2.8), and the single-source loose-file
+invariant (SPEC-DOC-035, SPEC v0.12.0 FR5). Leaf-only: imports the shared leaves + core,
+plus one documented cross-feature leaf edge (``features.backlog.document`` — SPEC
+v0.12.0 PLAN §6, ``setup.cfg``'s ``features-no-cross-feature`` ``ignore_imports``),
+never a sibling validator.
 
 **v0.5.0 T-050-08 (FR2/AR-1 finding "the doctor's bug lane is a second hand-kept
 reader").** ``check_bugs_jsonl_invariant`` used to hand-parse each line's ``bug_id``/
@@ -15,31 +15,36 @@ reader").** ``check_bugs_jsonl_invariant`` used to hand-parse each line's ``bug_
 defect class fixed at the store's OWN reader by T-045-20
 (``bug-event-field-with-unicode-line-separator-silently-drops-the-event``), left live
 here (bug ``specs-doctor-bug-lane-splits-ledger-on-unicode-line-separators``, closed by
-this rewrite). This validator now reads through ``core.models.bugs``'s OWN parsers
-(``BugEvent.from_dict``/``BugRecord.from_dict``) and splits on a literal ``"\\n"``
-only — one parser, not a second hand-kept mirror of it. The legacy hourly-file rotation
-reader (``_BUGS_JSONL_ROW_CEILING``, ``_BUGS_JSONL_NAME_RE``, the ``*.jsonl`` glob) is
-DEAD under canon v6 (AR-1 (a)4) and is deleted, not carried forward: only the single
+this rewrite). This validator now reads through ``core.models.bugs``'s OWN parser
+(``BugRecord.from_dict``) and splits on a literal ``"\\n"`` only — one parser, not a
+second hand-kept mirror of it. The legacy hourly-file rotation reader
+(``_BUGS_JSONL_ROW_CEILING``, ``_BUGS_JSONL_NAME_RE``, the ``*.jsonl`` glob) is DEAD
+under canon v6 (AR-1 (a)4) and is deleted, not carried forward: only the single
 canonical ``bugs/BUGS.jsonl`` is read.
+
+**S1 FR23 firing amendments A3/A5
+(`specs/releases/0.5.0/reviews/S1-FR23-firing.md`).** A3: the v5 event fold and its
+coherence state machine are deleted from ``core/models/bugs.py`` — the live ledger
+carries zero v5 lines, so a surviving ``"event"``-keyed line is now a single
+SPEC-DOC-033 ERROR ("v5 line in a v6 ledger — migrate"), never a folded WARNING
+diagnosis. A5: SPEC-DOC-040 (the immutable-core drift WARN) is deleted along with the
+``bug_first_add_baselines`` plumbing — it never fired in production (its input was
+always the empty default); A2.7's detector moves to FR14 pillar 1, which owns the git
+walk this check would have needed.
 """
 
 from __future__ import annotations
 
 import json
 import re
-from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from dadaia_workspace.core.models.bugs import (
     BUG_ARCHIVE_THRESHOLD_DAYS,
     TERMINAL_EVENTS,
-    BugCoherenceRecord,
-    BugEvent,
     BugRecord,
-    diagnose_bug_coherence_history,
     governance_completeness_gaps,
-    immutable_core_drift,
 )
 from dadaia_workspace.features.backlog.document import load_document
 from dadaia_workspace.features.specs.doctor_common import iter_archive_release_dirs
@@ -171,19 +176,9 @@ class GovernanceValidator:
         self,
         specs_dir: Path,
         public_dir: Path | None = None,
-        *,
-        bug_first_add_baselines: Mapping[str, BugRecord] | None = None,
     ) -> None:
         self.specs_dir = specs_dir
         self.public_dir = public_dir
-        # v0.5.0 A2.7 — the TODO-free seam FR3/T-050-09's core.bug_provenance
-        # derivation plugs a real git-derived first-add snapshot into: this release
-        # (T-050-08) has no git access here (a "pure module, no I/O outside
-        # specs_dir/public_dir" leaf) and no derivation exists yet, so every current
-        # caller passes ``None`` — the check is a genuine production no-op (nothing to
-        # compare against) until T-050-09 threads a real mapping through this same
-        # constructor param.
-        self._bug_first_add_baselines = bug_first_add_baselines or {}
 
     def _archive_consumption_hits(self, slug: str) -> list[str]:
         """Release ids of archived releases that ASSERT ``slug`` was consumed (SPEC
@@ -324,27 +319,26 @@ class GovernanceValidator:
         return issues
 
     def check_bugs_jsonl_invariant(self) -> list[SpecsDoctorIssue]:
-        """SPEC-DOC-033 (v0.1.46 AC-1; rewritten v0.5.0 T-050-08, FR2/A2.3): the single
-        canonical ``specs/bugs/BUGS.jsonl`` ledger invariant.
+        """SPEC-DOC-033 (v0.1.46 AC-1; rewritten v0.5.0 T-050-08, FR2/A2.3; the v5
+        coherence fold retired at the S1 FR23 firing, A3): the single canonical
+        ``specs/bugs/BUGS.jsonl`` ledger invariant.
 
-        Three sub-checks over the ONE canonical file (the legacy hourly-file rotation
+        Two sub-checks over the ONE canonical file (the legacy hourly-file rotation
         reader is dead under canon v6 and is not carried forward — module docstring):
 
-        1. **Line validity** (ERROR) — each non-blank line must parse as EITHER a v5
-           :class:`~dadaia_workspace.core.models.bugs.BugEvent` (an ``"event"`` key
-           present) or a native v6
+        1. **Line validity** (ERROR) — each non-blank line must parse as a native v6
            :class:`~dadaia_workspace.core.models.bugs.BugRecord` (no ``"event"`` key),
-           through THEIR OWN ``from_dict`` parsers — never a hand-rolled field check.
-        2. **Event-stream coherence** (WARNING, demoted from ERROR — A2.3/D15: never a
-           block) over the v5 portion's whole history — see
-           :func:`~dadaia_workspace.core.models.bugs.diagnose_bug_coherence_history`'s
-           own docstring for why this is now a diagnostic-only survivor.
-        3. **Governance completeness** (WARNING — A2.3) — every native v6
+           through its OWN ``from_dict`` parser — never a hand-rolled field check. A
+           line carrying an ``"event"`` key is a v5 line in a v6 ledger: the live
+           ledger has zero of them (S1 FR23 firing ruling assumption 2) and this is now
+           a single ERROR, never folded/decoded/diagnosed (the v5 event fold and its
+           coherence state machine are deleted from ``core/models/bugs.py``, A3).
+        2. **Governance completeness** (WARNING — A2.3) — every native v6
            :class:`BugRecord` line whose
            :func:`~dadaia_workspace.core.models.bugs.governance_completeness_gaps` is
            non-empty.
 
-        Splits on a literal ``"\\n"`` only, never ``str.splitlines()`` (closes
+        Splits on a literal ``"\n"`` only, never ``str.splitlines()`` (closes
         ``specs-doctor-bug-lane-splits-ledger-on-unicode-line-separators`` — the
         module docstring's AR-1 finding). Absent ``bugs/`` dir -> no-op.
         """
@@ -353,12 +347,6 @@ class GovernanceValidator:
             return []
 
         issues: list[SpecsDoctorIssue] = []
-        # v0.5.0 FR2: coherence is a WHOLE-HISTORY diagnosis (the healing rule needs to
-        # see events that come later than a violation), so this loop only COLLECTS one
-        # (bug_id, event, position) record per valid v5 line; the fold itself runs
-        # once, after every line has been read, in `_fold_bug_coherence`.
-        coherence_records: list[BugCoherenceRecord[int]] = []
-
         for lineno, raw_line in enumerate(ledger_path.read_text(encoding="utf-8").split("\n"), 1):
             stripped = raw_line.strip()
             if not stripped:
@@ -372,7 +360,7 @@ class GovernanceValidator:
                         severity=Severity.ERROR,
                         description=(
                             f"bugs/BUGS.jsonl line {lineno}: not valid JSON ({exc.msg}) — "
-                            "every JSONL row must be one bug-event or bug-record object "
+                            "every JSONL row must be one bug-record object "
                             "(SPEC-DOC-033, ERROR)."
                         ),
                         path=str(ledger_path),
@@ -382,23 +370,18 @@ class GovernanceValidator:
             if not isinstance(obj, dict):
                 continue
             if "event" in obj:
-                try:
-                    event = BugEvent.from_dict(obj)
-                except (ValueError, TypeError) as exc:
-                    issues.append(
-                        SpecsDoctorIssue(
-                            code="SPEC-DOC-033",
-                            severity=Severity.ERROR,
-                            description=(
-                                f"bugs/BUGS.jsonl line {lineno}: not a valid bug-event "
-                                f"object ({exc}) (SPEC-DOC-033, ERROR)."
-                            ),
-                            path=str(ledger_path),
-                        )
+                issues.append(
+                    SpecsDoctorIssue(
+                        code="SPEC-DOC-033",
+                        severity=Severity.ERROR,
+                        description=(
+                            f"bugs/BUGS.jsonl line {lineno}: v5 line in a v6 ledger — "
+                            "migrate (SPEC-DOC-033, ERROR). The event fold that used "
+                            "to decode/diagnose this shape is deleted (S1 FR23 firing, "
+                            "A3) — the live ledger must carry native v6 records only."
+                        ),
+                        path=str(ledger_path),
                     )
-                    continue
-                coherence_records.append(
-                    BugCoherenceRecord(bug_id=event.bug_id, event=event.event, position=lineno)
                 )
                 continue
             try:
@@ -426,68 +409,6 @@ class GovernanceValidator:
                             f"bugs/BUGS.jsonl record {record.id!r}: status "
                             f"{record.status!r} is missing {', '.join(gaps)} "
                             "(SPEC-DOC-033, WARNING — never a block, D15)."
-                        ),
-                        path=str(ledger_path),
-                    )
-                )
-        issues.extend(self._fold_bug_coherence(ledger_path, coherence_records))
-        return issues
-
-    @staticmethod
-    def _fold_bug_coherence(
-        ledger_path: Path, records: list[BugCoherenceRecord[int]]
-    ) -> list[SpecsDoctorIssue]:
-        """Format the WHOLE-HISTORY v5 coherence diagnosis as ``SpecsDoctorIssue``
-        lines, at WARNING severity (A2.3/D15 — demoted from the pre-T-050-08 ERROR: a
-        diagnosis over RETIRED-write-path history is detection, not a live gate)."""
-        issues: list[SpecsDoctorIssue] = []
-        for violation in diagnose_bug_coherence_history(records):
-            issues.append(
-                SpecsDoctorIssue(
-                    code="SPEC-DOC-033",
-                    severity=Severity.WARNING,
-                    description=(
-                        f"bugs/BUGS.jsonl line {violation.position}: {violation.clause} "
-                        "(SPEC-DOC-033, WARNING — never a block, D15)."
-                    ),
-                    path=str(ledger_path),
-                )
-            )
-        return issues
-
-    def check_bug_record_immutable_core(self) -> list[SpecsDoctorIssue]:
-        """SPEC-DOC-040 (v0.5.0 A2.7) — WARN when a native v6 :class:`BugRecord`'s
-        immutable-core fields differ from its injected first-add baseline.
-
-        Detects, never prevents (A2.2a already refuses a core-field CHANGE made
-        through the record-store update seam — this is the residual-gap detector for
-        a file tool that bypassed it entirely). ``self._bug_first_add_baselines``
-        defaults to ``{}`` (constructor docstring) — a genuine production no-op until
-        FR3/T-050-09 threads a real git-derived mapping through the same seam. Absent
-        ``bugs/`` dir or no baselines configured -> no-op.
-        """
-        if not self._bug_first_add_baselines:
-            return []
-        ledger_path = self.specs_dir / "bugs" / "BUGS.jsonl"
-        if not ledger_path.is_file():
-            return []
-        issues: list[SpecsDoctorIssue] = []
-        for record in _iter_native_bug_records(ledger_path):
-            baseline = self._bug_first_add_baselines.get(record.id)
-            if baseline is None:
-                continue
-            drifted = immutable_core_drift(record, baseline)
-            if drifted:
-                issues.append(
-                    SpecsDoctorIssue(
-                        code="SPEC-DOC-040",
-                        severity=Severity.WARNING,
-                        description=(
-                            f"bugs/BUGS.jsonl record {record.id!r}: immutable-core "
-                            f"field(s) {', '.join(drifted)} differ from the first-add "
-                            "snapshot — a file tool bypassed the record-store update "
-                            "seam (SPEC-DOC-040, WARNING — detected, never prevented, "
-                            "A2.7)."
                         ),
                         path=str(ledger_path),
                     )

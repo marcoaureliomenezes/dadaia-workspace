@@ -1,7 +1,10 @@
 """``JsonlRecordStore`` — the generic "one record per id" store (v0.5.0 FR2, AR-1
-ruling answer (b), ``specs/releases/0.5.0/reviews/S1-AR1-ruling.md`` §2).
+ruling answer (b), ``specs/releases/0.5.0/reviews/S1-AR1-ruling.md`` §2), plus its
+:meth:`~dadaia_workspace.infrastructure.jsonl_record_store.JsonlRecordStore.remove`
+seam (S1 FR23 firing amendment A1,
+`specs/releases/0.5.0/reviews/S1-FR23-firing.md` §3).
 
-Intent: CONTRACT — A2.2(c), A2.6, A2.9 (T-050-07).
+Intent: CONTRACT — A2.2(c), A2.6, A2.9 (T-050-07); A1 (S1 FR23 firing) for ``remove``.
 
 Size: SMALL — real ``tmp_path`` filesystem, no subprocess/network. Exercises the store
 generically through ``BugRecord`` (the one concrete model this release lands) and the
@@ -114,6 +117,76 @@ def test_update_refuses_stale_rewrite_when_file_changed_since_read(tmp_path: Pat
         store.update("race-bug", _mutate)
 
     assert store_path.read_bytes() == original_bytes + b"\n"
+
+
+# --- A1 (S1 FR23 firing) — remove() drops matching records, refuse-stale like update -
+
+
+def test_remove_drops_matching_records_and_returns_them_in_file_order(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    store.append(_sample_record("bug-a"))
+    store.append(_sample_record("bug-b"))
+    store.append(_sample_record("bug-c"))
+
+    removed = store.remove({"bug-a", "bug-c"})
+
+    assert [r.id for r in removed] == ["bug-a", "bug-c"]
+    assert [r.id for r in store.iter_records()] == ["bug-b"]
+
+
+def test_remove_with_no_matching_ids_is_a_noop(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    store.append(_sample_record("bug-a"))
+
+    removed = store.remove({"no-such-id"})
+
+    assert removed == []
+    assert [r.id for r in store.iter_records()] == ["bug-a"]
+
+
+def test_remove_with_empty_ids_is_a_noop_without_touching_the_file(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    store.append(_sample_record("bug-a"))
+    before = store.path.read_bytes()
+
+    removed = store.remove(())
+
+    assert removed == []
+    assert store.path.read_bytes() == before
+
+
+def test_remove_refuses_stale_rewrite_when_file_changed_since_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The SAME refuse-stale race semantics :meth:`update` already has (A2.9) —
+    ``remove`` re-reads immediately before its atomic rewrite and raises
+    ``StaleRecordWriteError`` rather than clobbering a write it never saw.
+
+    ``remove`` (unlike ``update``) takes no caller-supplied callback to hook a race
+    into, so the interleave is simulated at its OWN internal ``_read_text`` seam
+    (its snapshot read and its pre-write re-read) — the closest external hook point
+    without a real second thread/process (no ``time.sleep``/``threading.Barrier``)."""
+    store = _store(tmp_path)
+    store.append(_sample_record("race-bug"))
+    original_bytes = store.path.read_bytes()
+
+    real_read_text = JsonlRecordStore._read_text
+    calls = {"n": 0}
+
+    def _racy_read_text(self: JsonlRecordStore[BugRecord]) -> str:
+        calls["n"] += 1
+        if calls["n"] == 2:
+            # Simulate a second writer racing between remove()'s initial read and
+            # its pre-write re-read.
+            store.path.write_text(store.path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+        return real_read_text(self)
+
+    monkeypatch.setattr(JsonlRecordStore, "_read_text", _racy_read_text)
+
+    with pytest.raises(StaleRecordWriteError):
+        store.remove({"race-bug"})
+
+    assert store.path.read_bytes() == original_bytes + b"\n"
 
 
 # --- A2.6 — redaction is schema-derived and covers both write paths ------------------

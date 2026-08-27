@@ -1,6 +1,7 @@
 """A3.10's two-sided import fence around the deletable ``migrate_v5`` module.
 
-Intent: CONTRACT — 0.5.0 A3.10. Size: SMALL.
+Intent: CONTRACT — 0.5.0 A3.10, S1 FR23 firing amendment A1/A2
+(`specs/releases/0.5.0/reviews/S1-FR23-firing.md`). Size: SMALL.
 
 **The regression this guards against (SA-Q4, `specs/releases/0.5.0/reviews
 /S1-AR1-ruling.md` §3).** The first Draft called the FR3 derivation "a pure core
@@ -15,15 +16,13 @@ ratchet that keeps it closed, scanned by AST rather than declared by a hand-kept
 
 1. ``core/bug_provenance.py`` itself imports nothing from ``dadaia_workspace.features``
    — the derivation stays pure and stdlib-only, by construction, not by promise.
-2. Outside ``tests/**`` and ``migrate_v5.py`` itself, ``migrate_v5`` is imported from
-   exactly ONE already-known, already-documented site:
-   ``features/bugs/service.py`` (T-050-08's ``read_ledger`` render-side consumer,
-   named "deleted whole once T-050-10 rewrites the physical ledger ... and
-   ``features/bugs/service.py`` drops this import" in ``migrate_v5.py``'s own module
-   docstring — a pre-existing, D-F "switch" step **not** in this task's write set, so
-   this test pins it as a NAMED, dated exception rather than silently allowing it).
-   ANY additional importer — a hypothetical FR8 resolver or FR14 pillar-1 module reading
-   the derivation through the wrong door — fails this test loudly.
+2. Outside ``tests/**`` and ``migrate_v5.py`` itself, ``migrate_v5`` has ZERO importers
+   (S1 FR23 firing A1) — ``features/bugs/service.py`` was T-050-08's own ``read_ledger``
+   render-side consumer, pinned here as a NAMED, dated exception; the S1 firing ruling
+   found it "not retired" (F1) and closed it: ``service.py`` now reads exclusively
+   through the injected ``RecordStore.iter_records()`` seam and imports nothing from
+   this module. ANY importer — a hypothetical FR8 resolver or FR14 pillar-1 module
+   reading the derivation through the wrong door — fails this test loudly.
 """
 
 from __future__ import annotations
@@ -39,11 +38,9 @@ _BUG_PROVENANCE = _PACKAGE_ROOT / "core" / "bug_provenance.py"
 _MIGRATE_V5 = _PACKAGE_ROOT / "features" / "bugs" / "migrate_v5.py"
 _MIGRATE_V5_DOTTED = "dadaia_workspace.features.bugs.migrate_v5"
 
-#: The one pre-existing, dated, D-F "switch"-step exception (T-050-08) — retired by
-#: T-050-10 per migrate_v5.py's own module docstring. Any OTHER hit is a regression.
-_KNOWN_MIGRATE_V5_IMPORTERS: frozenset[str] = frozenset(
-    {"dadaia_workspace/features/bugs/service.py"}
-)
+#: S1 FR23 firing A1 closed the one prior exception (``features/bugs/service.py``,
+#: T-050-08's D-F "switch" step) — the empty set is now the correct permanent shape.
+_KNOWN_MIGRATE_V5_IMPORTERS: frozenset[str] = frozenset()
 
 
 def _module_dotted_names(node: ast.Import | ast.ImportFrom) -> set[str]:

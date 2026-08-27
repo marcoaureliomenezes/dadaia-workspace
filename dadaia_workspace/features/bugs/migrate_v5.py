@@ -1,55 +1,46 @@
-"""The v5 ledger boundary adapter (v0.5.0 FR2/A2.5, AR-1 ruling answer (a)).
+"""The v5 fold adapter — deletable at 0.6.0 (v0.5.0 FR2/A2.5, AR-1 ruling answer (a),
+amended by the S1 FR23 firing, `specs/releases/0.5.0/reviews/S1-FR23-firing.md` A1/A2).
 
-**Deletable, imported by nothing outside ``features/bugs``.** ``specs/bugs/bugs.jsonl``
-is still, at T-050-08, the LIVE ledger in its pre-canon-v6 shape: every historical line
-is a :class:`~dadaia_workspace.core.models.bugs.BugEvent` (``reported``/``resolved``/
-...), one event per physical line, many lines per bug id. FR2's record model
-(:class:`~dadaia_workspace.core.models.bugs.BugRecord`) is one line per id — so until
-FR3/T-050-10 physically rewrites the file (``bugs.jsonl`` -> ``BUGS.jsonl``, one record
-per id, commit provenance derived from git history), :func:`read_ledger` is the ONE
-place that decodes the v5 shape on the READ side: it folds every v5 event for a given
-``bug_id`` into a single in-memory :class:`BugRecord`, exactly mirroring the semantics
-the pre-T-050-08 ``BugService._fold``/``BugState`` used (a reopen — a later ``reported``
-— replaces the immutable-core snapshot; the latest terminal event supplies ``status``;
-``picked``/``archived`` annotations contribute nothing, per FR2: "the value, its
-transition and picked_by all disappear").
+**``read_ledger`` is DELETED (A1).** It used to be the permanent
+``features/bugs/service.py``'s ONLY read path — a second, independently-maintained
+tolerant-JSON loop beside the injected
+:class:`~dadaia_workspace.core.protocols.record_store.RecordStore`, reaching around the
+store to its raw file. The live ledger has zero v5 lines (the migration this module's
+own scope name promises physically ran at T-050-10); every permanent read now goes
+through ``self._record_store.iter_records()`` directly. What survives here is
+:func:`parse_ledger_lines` (the raw-text tolerant split, still useful to a one-shot
+migration runner working from in-memory text) and the fold/mining pieces below it.
+
+**``classify_ledger_line`` MOVED to ``core/bug_provenance.py`` and is PERMANENT there
+(A2), not deletable with this module.** The first reading of A2.5 called it "deletable
+with the migration module" — wrong: this repository's git history is v5-shaped for
+hundreds of commits forever, and FR8's resolver
+(``BugService.resolved_commit``)/FR14's pillar-1 audit both need to decode that history
+permanently. Import it from :mod:`dadaia_workspace.core.bug_provenance` instead.
 
 **Deliberately minimal — no git, no cause-mining (T-050-08 scope).**
 ``registration_commit``/``resolved_commit``/``registration_granularity``/
-``resolution_granularity``/``cause``/``caused_by``/``lineage_source`` all stay ``None``:
-deriving them from git history (FR3, ``core/bug_provenance.py``) and mining ``cause``
-from free prose are T-050-09/T-050-10's job, not this adapter's. The FR23 evidence
-triple (``evidence_loop``/``evidence_seam``/``evidence_diff``) IS carried verbatim on a
-terminal event — a direct 1:1 field copy, not an inference — because A2.11 requires it
-"restored, not re-invented" and T-050-10's physical migration will copy the identical
-value again from the identical source, so doing it here too is harmless.
-
-**Ephemeral output — never round-tripped to disk.** A record this adapter folds may
-carry a ``surface``/``component`` value that is NOT a member of
-``bug-record-v1.schema.json``'s closed ``surface`` enum (the legacy free-text values a
-v5 ``reported`` event carried, e.g. ``"gate"``, ``"dadaia certify"``); mapping legacy
-free text onto the closed enum is FR3's "table in the migration module" (SPEC FR3 step
-6d), not this task's. :func:`read_ledger`'s result is therefore a pure in-memory
-rendering view for ``dadaia bugs status``/``stats``/``specs doctor`` — it is never
-passed to :meth:`~dadaia_workspace.core.models.bugs.BugRecord.to_dict`/written back to
-the ledger by anything in this module.
-
-Deleted whole once T-050-10 rewrites the physical ledger to pure v6-record shape and
-``features/bugs/service.py`` drops this import (D-F's "contract" step) — a contract
-test (T-050-09, A3.10) then asserts no permanent module still imports it.
+``resolution_granularity``/``cause``/``caused_by``/``lineage_source`` all stay ``None``
+in the raw v5 fold: deriving them from git history (FR3, ``core/bug_provenance.py``) and
+mining ``cause`` from free prose are :func:`build_migrated_record`'s job.
 
 **T-050-09 extends this module with the pieces FR3 names as "the migration module"'s
-own job (A2.5), still never the pure derivation itself.** :func:`classify_ledger_line`
-is the boundary adapter :func:`~dadaia_workspace.core.bug_provenance
-.derive_commit_provenance` is injected with (the v5/v6 shape decoding stays here, never
-migrates into ``core``); :data:`LEGACY_SURFACE_MAP`/:func:`map_legacy_surface` are FR3
-step 6d's "table in the migration module"; :func:`run_migration` is the one-shot runner
-**scaffolding** that composes a caller-supplied
-:class:`~dadaia_workspace.core.protocols.git_history_reader.GitHistoryReader` with the
-two above. All four die with this module at 0.6.0, same as :func:`read_ledger` — their
-tests are marked ``Intent: SCAFFOLD — T-050-09 — expires: 0.6.0`` (qa-engineer amendment
-10), distinct from ``core/bug_provenance.py``'s own ``CONTRACT`` tests, which outlive
-this module.
+own job (A2.5), never the pure derivation itself.**
+:data:`LEGACY_SURFACE_MAP`/:func:`map_legacy_surface` are FR3 step 6d's "table in the
+migration module"; :func:`run_migration` is the one-shot runner **scaffolding** that
+composes a caller-supplied
+:class:`~dadaia_workspace.core.protocols.git_history_reader.GitHistoryReader` with
+:func:`~dadaia_workspace.core.bug_provenance.classify_ledger_line` and
+:func:`~dadaia_workspace.core.bug_provenance.derive_commit_provenance`. Every function in
+this module below :func:`parse_ledger_lines` consumes RAW ``dict``/``Mapping`` v5-event
+shapes, never :class:`~dadaia_workspace.core.models.bugs.BugEvent` (deleted, S1 FR23
+firing A3 — the model has no writer left to justify it) — the dict IS the shape this
+module's own tolerant parse already produces.
+
+Deleted whole at 0.6.0, once no consumer needs the v5 fold at all — a contract test
+(T-050-09, A3.10) asserts no PERMANENT module imports this one; its tests are marked
+``Intent: SCAFFOLD — T-050-09 — expires: 0.6.0`` (qa-engineer amendment 10), distinct
+from ``core/bug_provenance.py``'s own ``CONTRACT`` tests, which outlive this module.
 """
 
 from __future__ import annotations
@@ -63,14 +54,12 @@ from dataclasses import replace
 from pathlib import Path
 
 from dadaia_workspace.core.bug_provenance import (
-    ClassifiedLedgerLine,
     DerivedBugProvenance,
-    LedgerLineKind,
+    classify_ledger_line,
     derive_commit_provenance,
 )
 from dadaia_workspace.core.models.bugs import (
     TERMINAL_EVENTS,
-    BugEvent,
     BugEventKind,
     BugRecord,
 )
@@ -80,84 +69,34 @@ __all__ = [
     "LEGACY_SURFACE_MAP",
     "build_bug_id_matcher",
     "build_migrated_record",
-    "classify_ledger_line",
     "map_legacy_surface",
     "mine_cause",
     "mine_caused_by",
     "parse_ledger_lines",
-    "read_ledger",
     "run_migration",
 ]
 
 _LOG = logging.getLogger(__name__)
 
 
-def read_ledger(path: Path) -> list[BugRecord]:
-    """Read *path* (the live ``bugs.jsonl``) and return one :class:`BugRecord` per bug
-    id, sorted by ``id``.
+def parse_ledger_lines(text: str) -> tuple[list[dict[str, object]], dict[str, BugRecord]]:
+    """Parse raw ledger *text* into ``(v5 event lines in file order, as raw dicts;
+    native v6 records by id)``.
 
-    Every physical line is classified by shape: a JSON object carrying an ``"event"``
-    key is a v5 :class:`BugEvent` line (folded, see the module docstring); a JSON
-    object with no ``"event"`` key is treated as an already-native v6
-    :class:`BugRecord` line (parsed as-is — the shape a fresh ``dadaia bugs append``
-    writes going forward, T-050-08's own "switch" half of D-F) and takes precedence
-    over any v5-folded record sharing the same id, though the two should never collide
-    in practice (a v5 id is retired the moment its v6 successor is registered).
-    Malformed JSON, a non-object line, or a line failing BOTH shapes' required-field
-    parse is skipped with a logged WARNING — one corrupt line never breaks the whole
-    read (mirrors ``infrastructure.jsonl_record_store.JsonlRecordStore``'s own
-    tolerance). Splits on ``"\\n"`` only, never ``str.splitlines()`` (T-045-20's root-cause
-    fix, carried forward at every reader this release leaves standing). Absent file ->
-    ``[]``.
+    A v5 event line (an ``"event"`` key present) is returned as its RAW parsed
+    ``dict`` — never decoded into a model (S1 FR23 firing A3: ``BugEvent`` is deleted,
+    the model had no writer left to justify it) — so :func:`_fold_v5_events`/
+    :func:`mine_cause`/:func:`mine_caused_by` read it with plain ``.get(...)`` calls, the
+    same tolerant shape this function's own parse already produces. A v6 record line
+    (no ``"event"`` key) is parsed through :meth:`BugRecord.from_dict` as before.
+    Malformed JSON, a non-object line, a v5 line with no usable ``bug_id``, or a v6 line
+    failing ``BugRecord.from_dict`` is skipped with a logged WARNING — one corrupt line
+    never breaks the whole read. Splits on ``"\\n"`` only, never ``str.splitlines()``
+    (T-045-20's root-cause fix, carried forward at every reader this release leaves
+    standing). Takes *text* directly (no file I/O) so a caller already holding the
+    ledger text in memory (the migration runner reads it once) never re-reads the file.
     """
-    if not path.is_file():
-        return []
-    v5_events: list[BugEvent] = []
-    native_records: dict[str, BugRecord] = {}
-    text = path.read_text(encoding="utf-8")
-    for lineno, raw_line in enumerate(text.split("\n"), start=1):
-        stripped = raw_line.strip()
-        if not stripped:
-            continue
-        try:
-            raw = json.loads(stripped)
-        except json.JSONDecodeError as exc:
-            _LOG.warning("skipping malformed ledger line %s:%d: %s", path, lineno, exc)
-            continue
-        if not isinstance(raw, dict):
-            _LOG.warning("skipping non-object ledger line %s:%d", path, lineno)
-            continue
-        if "event" in raw:
-            try:
-                v5_events.append(BugEvent.from_dict(raw))
-            except (ValueError, TypeError) as exc:
-                _LOG.warning("skipping invalid v5 bug-event line %s:%d: %s", path, lineno, exc)
-            continue
-        try:
-            native_records[str(raw.get("id"))] = BugRecord.from_dict(raw)
-        except (ValueError, TypeError) as exc:
-            _LOG.warning("skipping invalid bug-record line %s:%d: %s", path, lineno, exc)
-
-    folded = _fold_v5_events(v5_events)
-    folded.update(native_records)
-    return sorted(folded.values(), key=lambda record: record.id)
-
-
-def parse_ledger_lines(text: str) -> tuple[list[BugEvent], dict[str, BugRecord]]:
-    """Parse raw ledger *text* into ``(v5 events in file order, native v6 records by
-    id)`` — the SAME two collections :func:`read_ledger` folds together, exposed as
-    their own function (T-050-10) so the migration runner can reach the RAW v5 event
-    list per bug id — :func:`read_ledger`'s folded :class:`BugRecord` output does not
-    retain ``notes``/``reason``/``evidence``/``evidence_loop``/``evidence_seam``/
-    ``evidence_diff`` on non-terminal events, which the FR3 step 6 cause/lineage mining
-    (:func:`mine_cause`/:func:`mine_caused_by`) needs to read — without a second,
-    independently-maintained parse of this module's own tolerant JSON/shape decoding.
-    Tolerance and warnings mirror :func:`read_ledger` exactly (one corrupt line never
-    breaks the whole read); this function takes *text* directly (no file I/O) so a
-    caller already holding the ledger text in memory (the migration runner reads it
-    once) never re-reads the file a second time.
-    """
-    v5_events: list[BugEvent] = []
+    v5_events: list[dict[str, object]] = []
     native_records: dict[str, BugRecord] = {}
     for lineno, raw_line in enumerate(text.split("\n"), start=1):
         stripped = raw_line.strip()
@@ -172,10 +111,11 @@ def parse_ledger_lines(text: str) -> tuple[list[BugEvent], dict[str, BugRecord]]
             _LOG.warning("skipping non-object ledger line %d", lineno)
             continue
         if "event" in raw:
-            try:
-                v5_events.append(BugEvent.from_dict(raw))
-            except (ValueError, TypeError) as exc:
-                _LOG.warning("skipping invalid v5 bug-event line %d: %s", lineno, exc)
+            bug_id = raw.get("bug_id")
+            if not isinstance(bug_id, str) or not bug_id:
+                _LOG.warning("skipping v5 bug-event line %d: missing/invalid bug_id", lineno)
+                continue
+            v5_events.append(raw)
             continue
         try:
             native_records[str(raw.get("id"))] = BugRecord.from_dict(raw)
@@ -184,91 +124,60 @@ def parse_ledger_lines(text: str) -> tuple[list[BugEvent], dict[str, BugRecord]]
     return v5_events, native_records
 
 
-def _fold_v5_events(events: list[BugEvent]) -> dict[str, BugRecord]:
-    """Fold a v5 event stream into one :class:`BugRecord` per ``bug_id`` (see module
-    docstring for the exact semantics carried over from the pre-T-050-08 fold)."""
+def _str_field(event: Mapping[str, object], key: str) -> str | None:
+    """Best-effort ``str``-or-``None`` extraction from a raw v5 event dict."""
+    value = event.get(key)
+    return value if isinstance(value, str) else None
+
+
+def _fold_v5_events(events: list[dict[str, object]]) -> dict[str, BugRecord]:
+    """Fold a raw v5 event-dict stream into one :class:`BugRecord` per ``bug_id`` (see
+    module docstring for the exact semantics carried over from the pre-T-050-08 fold).
+    """
     records: dict[str, BugRecord] = {}
     for event in events:
-        if event.event == BugEventKind.REPORTED.value:
-            records[event.bug_id] = BugRecord(
-                id=event.bug_id,
-                ts=event.ts,
-                reported_by=event.reported_by,
-                title=event.title or "",
-                severity=event.severity or "",
-                surface=event.surface or "",
-                component=event.component or "",
-                context=event.context or "",
-                symptom=event.symptom or "",
-                repro=event.repro or "",
-                expected=event.expected or "",
+        bug_id = _str_field(event, "bug_id")
+        kind = _str_field(event, "event")
+        if bug_id is None or kind is None:
+            continue
+        if kind == BugEventKind.REPORTED.value:
+            records[bug_id] = BugRecord(
+                id=bug_id,
+                ts=_str_field(event, "ts") or "",
+                reported_by=_str_field(event, "reported_by") or "",
+                title=_str_field(event, "title") or "",
+                severity=_str_field(event, "severity") or "",
+                surface=_str_field(event, "surface") or "",
+                component=_str_field(event, "component") or "",
+                context=_str_field(event, "context") or "",
+                symptom=_str_field(event, "symptom") or "",
+                repro=_str_field(event, "repro") or "",
+                expected=_str_field(event, "expected") or "",
                 status="open",
             )
             continue
-        if event.event not in TERMINAL_EVENTS:
+        if kind not in TERMINAL_EVENTS:
             continue  # `picked`/`archived`: contribute nothing to the record (FR2).
-        current = records.get(event.bug_id)
+        current = records.get(bug_id)
         if current is None:
             # Terminal-without-reported is incoherent history (the doctor's own
             # SPEC-DOC-033 finding) — this adapter never synthesizes a phantom record
             # for it; there is nothing to fold onto.
             continue
-        records[event.bug_id] = replace(
+        records[bug_id] = replace(
             current,
-            status=event.event,
-            superseded_by=event.superseded_by
-            if event.event == BugEventKind.SUPERSEDED.value
-            else current.superseded_by,
-            evidence_loop=event.evidence_loop or current.evidence_loop,
-            evidence_seam=event.evidence_seam or current.evidence_seam,
-            evidence_diff=event.evidence_diff or current.evidence_diff,
+            status=kind,
+            superseded_by=(
+                _str_field(event, "superseded_by")
+                if kind == BugEventKind.SUPERSEDED.value
+                else None
+            )
+            or current.superseded_by,
+            evidence_loop=_str_field(event, "evidence_loop") or current.evidence_loop,
+            evidence_seam=_str_field(event, "evidence_seam") or current.evidence_seam,
+            evidence_diff=_str_field(event, "evidence_diff") or current.evidence_diff,
         )
     return records
-
-
-def classify_ledger_line(raw_line: str) -> ClassifiedLedgerLine | None:
-    """FR3 step 2's "boundary adapter" (A2.5) — classify ONE added ledger line as a
-    registration or a terminal line for its bug id, or ``None`` when the line is
-    neither (malformed JSON, a non-object, a ``picked``/``archived`` v5 event, or a v6
-    record whose ``status`` this function does not recognise).
-
-    THE one place that decodes the v5/v6 shape for :mod:`core.bug_provenance`'s pure
-    derivation (:func:`~dadaia_workspace.core.bug_provenance.derive_commit_provenance`
-    takes this as its injected ``classify_line`` callable — the module boundary A3.10
-    exists to keep the derivation itself free of this decoding). Understands BOTH
-    shapes :func:`read_ledger` already understands, by the SAME ``"event" in raw``
-    discriminator: a v5 :class:`~dadaia_workspace.core.models.bugs.BugEvent` line
-    (``reported`` -> registration, one of :data:`TERMINAL_EVENTS` -> terminal,
-    ``picked``/``archived`` -> ``None``, FR2's "contributes nothing"), or a v6
-    :class:`~dadaia_workspace.core.models.bugs.BugRecord` line (``status == "open"`` ->
-    registration, ``status`` in :data:`TERMINAL_EVENTS` -> terminal, anything else ->
-    ``None``).
-    """
-    try:
-        raw = json.loads(raw_line)
-    except json.JSONDecodeError:
-        return None
-    if not isinstance(raw, dict):
-        return None
-    if "event" in raw:
-        bug_id = raw.get("bug_id")
-        event = raw.get("event")
-        if not isinstance(bug_id, str) or not bug_id:
-            return None
-        if event == BugEventKind.REPORTED.value:
-            return ClassifiedLedgerLine(bug_id=bug_id, kind=LedgerLineKind.REGISTRATION)
-        if event in TERMINAL_EVENTS:
-            return ClassifiedLedgerLine(bug_id=bug_id, kind=LedgerLineKind.TERMINAL)
-        return None  # `picked`/`archived` — contribute nothing (FR2).
-    bug_id = raw.get("id")
-    status = raw.get("status")
-    if not isinstance(bug_id, str) or not bug_id:
-        return None
-    if status == "open":
-        return ClassifiedLedgerLine(bug_id=bug_id, kind=LedgerLineKind.REGISTRATION)
-    if isinstance(status, str) and status in TERMINAL_EVENTS:
-        return ClassifiedLedgerLine(bug_id=bug_id, kind=LedgerLineKind.TERMINAL)
-    return None
 
 
 #: Legacy free-text ``surface``/``component`` values observed on a v5 ``reported``
@@ -545,7 +454,8 @@ def run_migration(
 ) -> dict[str, DerivedBugProvenance]:
     """The one-shot runner **scaffolding** (T-050-09) — composes an injected
     :class:`~dadaia_workspace.core.protocols.git_history_reader.GitHistoryReader` with
-    :func:`classify_ledger_line` and
+    :func:`~dadaia_workspace.core.bug_provenance.classify_ledger_line` (permanent, S1
+    FR23 firing A2) and
     :func:`~dadaia_workspace.core.bug_provenance.derive_commit_provenance` to derive
     every bug id's commit provenance from *repo*'s real history over *pathspec*.
 
@@ -578,7 +488,7 @@ _CAUSE_MARKER_RE = re.compile(r"\bcause", re.IGNORECASE)
 _DIFF_DIRECTION_RE = re.compile(r"^(net-negative|net-neutral|net-positive):")
 
 
-def mine_cause(events_for_id: Sequence[BugEvent]) -> str | None:
+def mine_cause(events_for_id: Sequence[Mapping[str, object]]) -> str | None:
     """FR3 step 6: ``cause`` copied VERBATIM from the record's own v5 ``evidence_diff``
     or ``notes`` text — only where that text literally states one
     (:data:`_CAUSE_MARKER_RE`). Checked on the LAST terminal event in *events_for_id*
@@ -590,14 +500,17 @@ def mine_cause(events_for_id: Sequence[BugEvent]) -> str | None:
     "zero records carry a cause string that is not literally present in the source
     record's text" hold by construction. ``None`` when there is no terminal event, or
     neither field mentions a cause — "nothing is guessed" (FR3 step 6).
+
+    *events_for_id* carries raw v5 event dicts (S1 FR23 firing A3: ``BugEvent`` is
+    deleted; :func:`parse_ledger_lines` already produces this shape).
     """
-    terminal: BugEvent | None = None
+    terminal: Mapping[str, object] | None = None
     for event in events_for_id:
-        if event.event in TERMINAL_EVENTS:
+        if _str_field(event, "event") in TERMINAL_EVENTS:
             terminal = event  # last one wins — mirrors _fold_v5_events' status rule.
     if terminal is None:
         return None
-    for candidate in (terminal.evidence_diff, terminal.notes):
+    for candidate in (_str_field(terminal, "evidence_diff"), _str_field(terminal, "notes")):
         if candidate and _CAUSE_MARKER_RE.search(candidate):
             return candidate
     return None
@@ -615,7 +528,7 @@ def build_bug_id_matcher(bug_ids: AbstractSet[str]) -> re.Pattern[str]:
     return re.compile(rf"(?<![A-Za-z0-9-])(?:{alternation})(?![A-Za-z0-9-])")
 
 
-#: Every free-text field a v5 :class:`BugEvent` carries that could name another bug id
+#: Every free-text field a raw v5 event dict carries that could name another bug id
 #: in prose (title/symptom/repro/expected describe the bug itself; notes/evidence*/
 #: reason are where a fixer's cross-reference — a ``[[wikilink]]`` or a bare mention —
 #: actually shows up in this corpus, per the T-050-10 forensic scan).
@@ -634,7 +547,7 @@ _CAUSED_BY_TEXT_FIELDS: tuple[str, ...] = (
 
 
 def mine_caused_by(
-    bug_id: str, events_for_id: Sequence[BugEvent], matcher: re.Pattern[str]
+    bug_id: str, events_for_id: Sequence[Mapping[str, object]], matcher: re.Pattern[str]
 ) -> str | None:
     """FR3 step 6: ``caused_by`` populated ONLY where the record's OWN text — every
     field in :data:`_CAUSED_BY_TEXT_FIELDS` on EVERY one of its own events, reported
@@ -647,11 +560,13 @@ def mine_caused_by(
     (never a guess) when zero, or MORE THAN ONE, distinct other id is named in *this*
     record's own text — an ambiguous multi-reference is not resolved by picking one
     (AS-2/A3.5: every populated value is unambiguous or absent, never invented).
+
+    *events_for_id* carries raw v5 event dicts (S1 FR23 firing A3).
     """
     found: set[str] = set()
     for event in events_for_id:
         for field_name in _CAUSED_BY_TEXT_FIELDS:
-            value = getattr(event, field_name)
+            value = _str_field(event, field_name)
             if not value:
                 continue
             found.update(m for m in matcher.findall(value) if m != bug_id)
@@ -662,7 +577,7 @@ def mine_caused_by(
 
 def build_migrated_record(
     folded: BugRecord,
-    events_for_id: Sequence[BugEvent],
+    events_for_id: Sequence[Mapping[str, object]],
     provenance: DerivedBugProvenance | None,
     canonical_surfaces: AbstractSet[str],
     matcher: re.Pattern[str],

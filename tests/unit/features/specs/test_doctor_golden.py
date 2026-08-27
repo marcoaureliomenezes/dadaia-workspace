@@ -91,7 +91,6 @@ _FAMILY_OF_CODE: dict[str, str] = {
     "SPEC-DOC-032": "governance",
     "SPEC-DOC-033": "governance",
     "SPEC-DOC-035": "governance",
-    "SPEC-DOC-040": "governance",
     "SPEC-DOC-041": "governance",
     "TREE-1": "structural",
     "TREE-2": "structural",

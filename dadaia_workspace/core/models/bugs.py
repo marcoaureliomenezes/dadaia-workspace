@@ -1,26 +1,35 @@
-"""Bug domain models — :class:`BugEvent`, the retired-but-still-read v5 event shape
-(v0.1.46 AC-1/AC-2), and :class:`BugRecord`, the one-record-per-bug model that replaced
-it on the WRITE side at v0.5.0 FR2/T-050-08 (D-F: expand -> switch -> contract).
+"""Bug domain models — :class:`BugRecord`, the one-record-per-bug model (v0.5.0
+FR2/T-050-08, D-F: expand -> switch -> contract).
 
 Pure domain module — no I/O, no internal imports beyond ``dataclasses``/``enum``/``re``
 (stdlib only): ``core/models/bugs.py`` is NOT in ``architecture.md``'s "Core file-I/O
-authorized set", so neither model ever reads a schema file itself. :class:`BugEvent`'s
-own JSON Schema (``public/schemas/bugs/bug-event-v1.schema.json``) was RETIRED at
-T-050-08 — the class itself stays (its field set is now documented here, not in a
-schema file) because it is still the ONE shape
-``features.bugs.migrate_v5.read_ledger`` decoded the LIVE ``specs/bugs/bugs.jsonl``
-with, until FR3/T-050-10 physically migrated every historical line to
-:class:`BugRecord` shape. :class:`BugRecord` is one line of ``specs/bugs/BUGS.jsonl``
-(the T-050-10 rename of the retired ``bugs.jsonl``), appended once (field set mirrors
+authorized set", so the model never reads a schema file itself. :class:`BugRecord` is
+one line of ``specs/bugs/BUGS.jsonl`` (the T-050-10 rename of the retired
+``bugs.jsonl``), appended once (field set mirrors
 ``public/schemas/bugs/bug-record-v1.schema.json``, whose per-property ``x-mutability``/
 ``x-redact`` keywords are the ONE documented source of the three-category split —
-A2.1). Both models derive their optional/redactable field sets from their OWN
+A2.1). It derives its optional/redactable field set from its OWN
 ``dataclasses.field(metadata=...)`` declarations (per-field, colocated, zero I/O) rather
 than a second, separately-maintained module-level tuple — the exact hand-kept mirror
 that twice missed a newly added free-text field (T-043-23 -> T-044-62) and that A2.10
 now forbids outright. :func:`redactable_property_names` is the schema-mapping-side pure
 counterpart, used to prove the two never drift (contract tests) and reusable by a future
 model (``findings``/``backlog``) without depending on file I/O either.
+
+**``BugEvent`` and the v5 event-stream coherence fold are DELETED (v0.5.0 S1 FR23
+firing, amendment A3, `specs/releases/0.5.0/reviews/S1-FR23-firing.md` §3).** SPEC FR2
+and the earlier AR-1 ruling both said "the event fold and its state machine deleted";
+they were not, at S1 firing time — ``BugEvent``, ``advance_coherence`` and the
+``BugCoherenceRecord``/``BugCoherenceViolation``/``diagnose_bug_coherence_history`` v5
+diagnostic survived here, consumed only by the doctor's now-retired v5 branch and the
+migration adapter's now-retired fold, against a live ledger that carries **zero** v5
+lines. They are gone; ``specs doctor`` now reports any surviving ``"event"``-keyed line
+in the v6 ledger as a single SPEC-DOC-033 ERROR ("v5 line in a v6 ledger — migrate"),
+never a folded diagnosis. :data:`BugEventKind`/:data:`TERMINAL_EVENTS` stay — they are
+the v5/v6 line-classifier's vocabulary
+(:func:`~dadaia_workspace.core.bug_provenance.classify_ledger_line`, permanent by
+necessity: git history is v5-shaped forever) and the closed set of terminal
+``BugRecord.status`` values.
 """
 
 from __future__ import annotations
@@ -34,15 +43,10 @@ from typing import Any
 
 __all__ = [
     "TERMINAL_EVENTS",
-    "BugCoherenceRecord",
-    "BugCoherenceViolation",
-    "BugEvent",
     "BugEventKind",
     "BugRecord",
     "BugRecordImmutableFieldError",
     "BugRecordWriteOnceFieldSetError",
-    "advance_coherence",
-    "diagnose_bug_coherence_history",
     "governance_completeness_gaps",
     "immutable_core_drift",
     "redact_text",
@@ -51,14 +55,14 @@ __all__ = [
 
 
 class BugEventKind(StrEnum):
-    """The seven event kinds. ``reported`` opens a stream; the four in
-    :data:`TERMINAL_EVENTS` are terminal (at most one per ``bug_id``); ``archived`` is a
-    NON-terminal annotation (defined-but-unemitted in v0.1.46); ``picked`` (v0.4.3
-    T-043-18/FR14) is a NON-terminal, repeatable OBSERVABLE RESERVATION MARKER — never
-    a lease (NO-LOCKS DOCTRINE): it grants nothing, expires never, blocks nothing. A
-    repeated pick on the same open stream is allowed and surfaced, never refused; the
-    only refusals are stream-integrity refusals (pick-after-terminal, pick before any
-    ``reported``), never concurrency refusals — see :func:`advance_coherence`."""
+    """The seven historical v5 event kinds — the closed vocabulary
+    :func:`~dadaia_workspace.core.bug_provenance.classify_ledger_line` still decodes
+    permanently (git history is v5-shaped forever). ``reported`` opens a stream; the
+    four in :data:`TERMINAL_EVENTS` are terminal (at most one per ``bug_id``);
+    ``archived``/``picked`` are non-terminal annotations. The v5 write-side enforcement
+    and diagnostic fold this enum once drove (``advance_coherence``,
+    ``diagnose_bug_coherence_history``) are deleted (v0.5.0 S1 FR23 firing, A3) — the
+    live ledger carries zero v5 lines, so nothing folds them anymore."""
 
     REPORTED = "reported"
     RESOLVED = "resolved"
@@ -95,158 +99,14 @@ TERMINAL_EVENTS: frozenset[str] = frozenset(
 BUG_ARCHIVE_THRESHOLD_DAYS: int = 90
 
 
-def advance_coherence(
-    bug_id: str,
-    event: str,
-    seen_reported: set[str],
-    terminated: set[str],
-) -> str | None:
-    """Advance the one-terminal stream-coherence fold by a single event.
-
-    THE single authority for the v5 event-stream coherence invariant — every stream
-    opens with ``reported``; an open stream carries at most one terminal; ``reported``
-    reopens. Enforced at v0.1.46-v0.5.0 T-050-07 by ``BugService.append_event``
-    (retired at T-050-08 with the whole event-append write path — registration is now
-    ``BugRecord``-shaped and carries no per-bug event stream to be incoherent within);
-    the specs doctor still folds the LIVE v5 ledger's HISTORY through this function to
-    DIAGNOSE it, at WARNING severity (A2.3/D15) — a diagnostic-only survivor of a
-    retired enforcement path, not a live enforced/diagnostic pair.
-
-    Mutates the fold state (*seen_reported*/*terminated*) in place; returns the
-    violation clause for THIS event, or ``None`` when it is coherent. ``archived`` and
-    any other non-terminal annotation always advance cleanly.
-
-    ``picked`` (v0.4.3 T-043-18/FR14) is checked BEFORE the generic non-terminal
-    early-return: it is a STREAM-INTEGRITY check, never a concurrency lock — a pick
-    after a terminal event (the stream is closed) or before any ``reported`` (the
-    stream was never opened) is incoherent, exactly like a terminal event would be.
-    Coherent picks (including a REPEATED pick on the same open stream — NO-LOCKS: two
-    visible picks is the sanctioned race outcome, never refused) mutate NEITHER
-    *seen_reported* nor *terminated* — a pick is a marker, not a state transition.
-    """
-    if event == BugEventKind.REPORTED.value:
-        seen_reported.add(bug_id)
-        terminated.discard(bug_id)  # a reopen clears the prior terminal state
-        return None
-    if event == BugEventKind.PICKED.value:
-        if bug_id in terminated:
-            return (
-                f"bug '{bug_id}' has a 'picked' event after an existing terminal — a "
-                "pick is only valid on an open stream"
-            )
-        if bug_id not in seen_reported:
-            return (
-                f"'picked' event for bug '{bug_id}' with no prior 'reported' event — "
-                "every stream must open with 'reported'"
-            )
-        return None
-    if event not in TERMINAL_EVENTS:
-        return None
-    if bug_id in terminated:
-        return (
-            f"bug '{bug_id}' has a second terminal event '{event}' after an existing "
-            "terminal — a bug_id may carry at most one terminal"
-        )
-    terminated.add(bug_id)
-    if bug_id not in seen_reported:
-        return (
-            f"terminal event '{event}' for bug '{bug_id}' with no prior 'reported' "
-            "event — every stream must open with 'reported'"
-        )
-    return None
-
-
-@dataclass(frozen=True)
-class BugCoherenceRecord[P]:
-    """One ``(bug_id, event)`` pair from a whole-history bug-event stream, tagged with an
-    opaque *position* the caller supplies (e.g. ``(jsonl_path, lineno)``) purely so a
-    returned violation can be traced back to its source line. The fold in
-    :func:`diagnose_bug_coherence_history` never inspects *position* — it only round-trips
-    it back onto the matching :class:`BugCoherenceViolation`.
-    """
-
-    bug_id: str
-    event: str
-    position: P
-
-
-@dataclass(frozen=True)
-class BugCoherenceViolation[P]:
-    """One still-UNHEALED coherence violation surfaced by
-    :func:`diagnose_bug_coherence_history`, carrying the offending record's *clause* (the
-    exact text :func:`advance_coherence` produced) and its *position* back to the caller.
-    """
-
-    bug_id: str
-    event: str
-    clause: str
-    position: P
-
-
-def diagnose_bug_coherence_history[P](
-    records: Sequence[BugCoherenceRecord[P]],
-) -> list[BugCoherenceViolation[P]]:
-    """Diagnose a WHOLE ``bug_id``/``event`` history for still-unhealed coherence
-    violations — SPEC-DOC-033's diagnostic half, and the ONE place the healing rule
-    lives (v0.5.0 FR2).
-
-    Folds *records*, in order, through :func:`advance_coherence` — the SAME per-event
-    authority ``BugService.append_event`` enforced until T-050-08 retired the whole v5
-    event-append write path (see :func:`advance_coherence`'s own docstring). This
-    function is now the diagnostic half's ONLY surviving consumer, at WARNING severity
-    (A2.3/D15) — a historical-history read, never a live write refusal.
-
-    **The healing rule.** A violation for ``bug_id`` is HEALED — dropped from the
-    result — when a LATER ``reported`` event for the same ``bug_id`` exists anywhere
-    after it in *records*. A later ``reported`` is the store's own append-only
-    compensation vocabulary: it already clears the prior terminal state inside the fold
-    (see the ``reported`` branch above, which discards *terminated*), so a history that
-    reopens and re-terminates coherently is, as a whole, healed. A violation with no
-    later ``reported`` for its ``bug_id`` — including a FRESH violation that occurs
-    *after* a healing ``reported`` (a re-violation of an already-reopened stream) —
-    has no later compensation and stays UNHEALED.
-
-    This function only DIAGNOSES: it never mutates, reorders, or drops any record from
-    the underlying append-only store — healing is a reporting decision, not a rewrite.
-    Returned violations preserve the input order of *records*.
-    """
-    seen_reported: set[str] = set()
-    terminated: set[str] = set()
-    last_reported_index: dict[str, int] = {}
-    raw_violations: list[tuple[int, BugCoherenceViolation[P]]] = []
-
-    for index, record in enumerate(records):
-        if record.event == BugEventKind.REPORTED.value:
-            last_reported_index[record.bug_id] = index
-        clause = advance_coherence(record.bug_id, record.event, seen_reported, terminated)
-        if clause is not None:
-            raw_violations.append(
-                (
-                    index,
-                    BugCoherenceViolation(
-                        bug_id=record.bug_id,
-                        event=record.event,
-                        clause=clause,
-                        position=record.position,
-                    ),
-                )
-            )
-
-    return [
-        violation
-        for index, violation in raw_violations
-        if last_reported_index.get(violation.bug_id, -1) <= index
-    ]
-
-
 def _dataclass_field_names(
     dataclass_type: type, predicate: Callable[[Mapping[str, object]], bool]
 ) -> tuple[str, ...]:
     """Return the field names of *dataclass_type* whose ``metadata`` satisfies
     *predicate* — pure ``dataclasses.fields()`` introspection, zero file I/O.
 
-    This is the ONE mechanism both :class:`BugEvent` and :class:`BugRecord` use to
-    derive their optional/redactable/categorized field sets: a per-field
+    This is the ONE mechanism :class:`BugRecord` uses to
+    derive its optional/redactable/categorized field sets: a per-field
     ``dataclasses.field(metadata={...})`` entry, colocated with each field's own
     declaration, never a second, separately-maintained module-level tuple/list/set of
     names (A2.10) — adding a field to the dataclass is the only edit a new property
@@ -317,7 +177,7 @@ _WIN_HOME_RE = re.compile(r"([A-Za-z]:\\Users\\)[^\\\s:]+")
 #: a naive ``str.splitlines()``-style reader would treat as a terminator, the actual
 #: fragmentation hazard (A7.1); (b) ESC and the rest of C0/C1/DEL — a raw ESC forges
 #: an ANSI escape sequence or a fake second output line in any consumer that ever
-#: decodes a folded :class:`BugEvent` back to a terminal (CWE-117, A7.2). Deleted
+#: decodes a folded :class:`BugRecord` back to a terminal (CWE-117, A7.2). Deleted
 #: rather than escaped, unlike that precedent: a denylisted term an attacker
 #: interrupts with one of these bytes must re-join into a contiguous substring for
 #: the masking pass immediately below to still catch it (A7.6) — an escape sequence
@@ -354,144 +214,6 @@ def redact_text(text: str, denylist_terms: Sequence[tuple[str, str]] = ()) -> st
         if term:
             out = re.sub(re.escape(term), "[REDACTED-TERM]", out, flags=re.IGNORECASE)
     return out
-
-
-def _require_str(raw: Mapping[str, object], key: str) -> str:
-    value = raw.get(key)
-    if not isinstance(value, str) or not value:
-        raise ValueError(f"bug event missing required string field {key!r}")
-    return value
-
-
-def _opt_str(raw: Mapping[str, object], key: str) -> str | None:
-    value = raw.get(key)
-    if value is None:
-        return None
-    if not isinstance(value, str):
-        raise ValueError(f"bug event field {key!r} must be a string")
-    return value
-
-
-@dataclass(frozen=True)
-class BugEvent:
-    """One v5-shape bug-telemetry event (retired on the WRITE side at T-050-08; field set
-    formerly mirrored the now-deleted ``bug-event-v1.schema.json`` — the class is the
-    surviving documentation of that shape). Still parsed by ``features.bugs.migrate_v5``
-    while the live ledger is v5-shaped."""
-
-    bug_id: str
-    event: str
-    ts: str
-    reported_by: str
-    title: str | None = field(default=None, metadata={"optional_str": True})
-    severity: str | None = field(default=None, metadata={"optional_str": True})
-    surface: str | None = field(default=None, metadata={"optional_str": True})
-    component: str | None = field(default=None, metadata={"optional_str": True})
-    context: str | None = field(default=None, metadata={"optional_str": True})
-    tags: tuple[str, ...] = ()
-    symptom: str | None = field(default=None, metadata={"optional_str": True})
-    repro: str | None = field(default=None, metadata={"optional_str": True})
-    expected: str | None = field(default=None, metadata={"optional_str": True})
-    notes: str | None = field(default=None, metadata={"optional_str": True})
-    release: str | None = field(default=None, metadata={"optional_str": True})
-    superseded_by: str | None = field(default=None, metadata={"optional_str": True})
-    reason: str | None = field(default=None, metadata={"optional_str": True})
-    evidence: str | None = field(default=None, metadata={"optional_str": True})
-    evidence_loop: str | None = field(default=None, metadata={"optional_str": True})
-    evidence_seam: str | None = field(default=None, metadata={"optional_str": True})
-    evidence_diff: str | None = field(default=None, metadata={"optional_str": True})
-
-    @property
-    def is_terminal(self) -> bool:
-        """True iff this event is one of the terminal set (``archived`` is NOT terminal)."""
-        return self.event in TERMINAL_EVENTS
-
-    def redact(self, denylist_terms: Sequence[tuple[str, str]] = ()) -> BugEvent:
-        """Return a copy with every optional string field scrubbed of operator-local
-        paths/IPs and any operator denylist term, via :func:`redact_text`.
-
-        The field set is derived from ``BugEvent``'s OWN ``dataclasses.field(metadata=
-        {"optional_str": True})`` declarations (see :func:`_dataclass_field_names`) —
-        never an independently hand-kept module-level tuple (SPEC v0.4.5 FR6/A6.5,
-        carried forward at v0.5.0 A2.10; closes the T-043-23 -> T-044-62 chain, where a
-        hand-kept list twice missed a newly added free-text field). ``denylist_terms``
-        is the SAME operator-term source the push-time scan already refuses on,
-        threaded in via the CLI/container composition seam since this module never
-        imports ``infrastructure`` (`core-no-upper-layers`). Defaults to ``()`` so
-        IP/home-path masking alone still runs for every caller.
-        """
-
-        def _scrub(value: str | None) -> str | None:
-            return None if value is None else redact_text(value, denylist_terms)
-
-        # `dataclasses.replace`'s mypy plugin cannot field-check a bare **dict
-        # comprehension (it unifies every remaining field's type against the dict's
-        # single inferred value type); an explicitly `Any`-typed local sidesteps that
-        # without weakening `_scrub`'s own `str | None` signature above.
-        updates: dict[str, Any] = {
-            name: _scrub(getattr(self, name)) for name in _BUG_EVENT_OPTIONAL_STR_FIELDS
-        }
-        return replace(self, **updates)
-
-    def to_dict(self) -> dict[str, object]:
-        """Serialize to the JSONL object shape — only the set fields are emitted."""
-        out: dict[str, object] = {
-            "bug_id": self.bug_id,
-            "event": self.event,
-            "ts": self.ts,
-            "reported_by": self.reported_by,
-        }
-        for name in _BUG_EVENT_OPTIONAL_STR_FIELDS:
-            value = getattr(self, name)
-            if value is not None:
-                out[name] = value
-        # `reported` always carries tags (the schema requires the array, even when empty);
-        # other events carry it only when non-empty.
-        if self.event == BugEventKind.REPORTED.value or self.tags:
-            out["tags"] = list(self.tags)
-        return out
-
-    @classmethod
-    def from_dict(cls, raw: Mapping[str, object]) -> BugEvent:
-        """Parse a JSONL object into a :class:`BugEvent`. Raises ``ValueError`` on a
-        malformed record (missing/typed-wrong required field) so tolerant readers can skip."""
-        tags_raw = raw.get("tags", ())
-        if isinstance(tags_raw, list | tuple):
-            tags = tuple(str(t) for t in tags_raw)
-        else:
-            raise ValueError("bug event field 'tags' must be an array")
-        return cls(
-            bug_id=_require_str(raw, "bug_id"),
-            event=_require_str(raw, "event"),
-            ts=_require_str(raw, "ts"),
-            reported_by=_require_str(raw, "reported_by"),
-            title=_opt_str(raw, "title"),
-            severity=_opt_str(raw, "severity"),
-            surface=_opt_str(raw, "surface"),
-            component=_opt_str(raw, "component"),
-            context=_opt_str(raw, "context"),
-            tags=tags,
-            symptom=_opt_str(raw, "symptom"),
-            repro=_opt_str(raw, "repro"),
-            expected=_opt_str(raw, "expected"),
-            notes=_opt_str(raw, "notes"),
-            release=_opt_str(raw, "release"),
-            superseded_by=_opt_str(raw, "superseded_by"),
-            reason=_opt_str(raw, "reason"),
-            evidence=_opt_str(raw, "evidence"),
-            evidence_loop=_opt_str(raw, "evidence_loop"),
-            evidence_seam=_opt_str(raw, "evidence_seam"),
-            evidence_diff=_opt_str(raw, "evidence_diff"),
-        )
-
-
-#: Derived (never hand-kept — A2.10), from ``BugEvent``'s own field metadata; reproduces
-#: the exact 16-name/order set the retired ``_OPTIONAL_STR_FIELDS`` tuple held, since it
-#: was itself originally hand-transcribed from ``bug-event-v1.schema.json``'s property
-#: order — the source of truth is now this dataclass, not a copy of it.
-_BUG_EVENT_OPTIONAL_STR_FIELDS: tuple[str, ...] = _dataclass_field_names(
-    BugEvent, lambda metadata: bool(metadata.get("optional_str"))
-)
 
 
 # ============================================================================
@@ -687,7 +409,7 @@ class BugRecord:
     def from_dict(cls, raw: Mapping[str, object]) -> BugRecord:
         """Parse a JSONL object into a :class:`BugRecord`. Raises ``ValueError`` on a
         malformed record (missing/typed-wrong required field) so tolerant readers can
-        skip it (mirrors :meth:`BugEvent.from_dict`)."""
+        skip it."""
         return cls(
             id=_require_record_str(raw, "id"),
             ts=_require_record_str(raw, "ts"),

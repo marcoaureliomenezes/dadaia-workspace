@@ -11,16 +11,19 @@ contract test (``tests/contract/test_migrate_v5_not_imported_by_permanent_consum
 asserts the inverse holds too — no permanent module imports the deletable
 ``migrate_v5``.
 
-**Why this module never parses JSON itself (A2.5).** FR3 step 2 says "parse each added
-line as JSON through the FR2 boundary adapter" — that boundary adapter is
-``features/bugs/migrate_v5.py``'s ``classify_ledger_line`` (A2.5: "the v5 event shape is
-decoded by ONE boundary adapter that lives in the migration module"), a features-layer
-concern. This module never imports it (that would be the exact ``core -> features``
-edge A3.10 forbids); instead :func:`derive_commit_provenance` takes the classifier as an
-injected callable (:data:`LineClassifier`), decoupling the permanent algorithm from the
-disposable v5/v6 shape-decoding — the algorithm below has zero opinion on what a
-"registration" or "terminal" line looks like on disk, only on what to do once a line has
-already been classified as one.
+**The v5/v6 line classifier lives here too, permanently (S1 FR23 firing amendment A2,
+`specs/releases/0.5.0/reviews/S1-FR23-firing.md` §5 correction 1).** A2.5's first
+reading placed :func:`classify_ledger_line` inside ``features/bugs/migrate_v5.py`` and
+called it "deletable with the module" — wrong: this repository's git history is
+v5-shaped for hundreds of commits **forever**, and FR8's resolver
+(``BugService.resolved_commit``) plus FR14's pillar-1 audit both need to decode that
+history permanently, not only during the one migration that ran once at T-050-10. The
+classifier moved here, alongside :func:`derive_commit_provenance`, which it is injected
+into as :data:`LineClassifier` — a ``core -> core`` edge only (this module still imports
+nothing from ``features``; the contract test above proves it). What stays deletable in
+``migrate_v5.py`` is the v5 event **fold** (``_fold_v5_events``, the surface-mapping
+table, the cause/lineage miners, the one-shot runner) — the shape-decoding, permanent by
+necessity, is the one piece that does not die with it.
 
 **Ordering is the caller's contract, not this module's.** FR3 step 2 calls the walk "one
 chronological pass"; :func:`derive_commit_provenance` performs exactly that — a single
@@ -36,11 +39,13 @@ better owned once, at the git-facing seam.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Literal
 
+from dadaia_workspace.core.models.bugs import TERMINAL_EVENTS, BugEventKind
 from dadaia_workspace.core.protocols.git_history_reader import HistoryCommit
 
 __all__ = [
@@ -49,6 +54,7 @@ __all__ = [
     "Granularity",
     "LedgerLineKind",
     "LineClassifier",
+    "classify_ledger_line",
     "derive_commit_provenance",
 ]
 
@@ -205,3 +211,46 @@ def derive_commit_provenance(
         )
         for bug_id in sorted(known_bug_ids)
     }
+
+
+def classify_ledger_line(raw_line: str) -> ClassifiedLedgerLine | None:
+    """FR3 step 2's boundary adapter (A2.5, corrected by the S1 FR23 firing amendment
+    A2 — permanent, not deletable) — classify ONE added ledger line as a registration
+    or a terminal line for its bug id, or ``None`` when the line is neither (malformed
+    JSON, a non-object, a ``picked``/``archived`` v5 event, or a v6 record whose
+    ``status`` this function does not recognise).
+
+    THE one place that decodes the v5/v6 shape for :func:`derive_commit_provenance` —
+    the default :data:`LineClassifier` every caller (FR8's resolver, FR14's pillar 1,
+    the deletable ``migrate_v5.run_migration`` scaffolding) injects. Understands BOTH
+    shapes: a v5 event line (``"event"`` key present — ``reported`` -> registration, one
+    of :data:`~dadaia_workspace.core.models.bugs.TERMINAL_EVENTS` -> terminal,
+    ``picked``/``archived`` -> ``None``, FR2's "contributes nothing"), or a v6 record
+    line (``status == "open"`` -> registration, ``status`` in ``TERMINAL_EVENTS`` ->
+    terminal, anything else -> ``None``).
+    """
+    try:
+        raw = json.loads(raw_line)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(raw, dict):
+        return None
+    if "event" in raw:
+        bug_id = raw.get("bug_id")
+        event = raw.get("event")
+        if not isinstance(bug_id, str) or not bug_id:
+            return None
+        if event == BugEventKind.REPORTED.value:
+            return ClassifiedLedgerLine(bug_id=bug_id, kind=LedgerLineKind.REGISTRATION)
+        if event in TERMINAL_EVENTS:
+            return ClassifiedLedgerLine(bug_id=bug_id, kind=LedgerLineKind.TERMINAL)
+        return None  # `picked`/`archived` — contribute nothing (FR2).
+    bug_id = raw.get("id")
+    status = raw.get("status")
+    if not isinstance(bug_id, str) or not bug_id:
+        return None
+    if status == "open":
+        return ClassifiedLedgerLine(bug_id=bug_id, kind=LedgerLineKind.REGISTRATION)
+    if isinstance(status, str) and status in TERMINAL_EVENTS:
+        return ClassifiedLedgerLine(bug_id=bug_id, kind=LedgerLineKind.TERMINAL)
+    return None

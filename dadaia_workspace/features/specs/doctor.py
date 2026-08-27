@@ -29,12 +29,6 @@ Pure module — no I/O outside the supplied specs_dir / public_dir. No external 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from collections.abc import Mapping
-
-    from dadaia_workspace.core.models.bugs import BugRecord
 
 from dadaia_workspace.core.protocols.process_runner import ProcessRunner
 from dadaia_workspace.features.specs.doctor_closure_audit import ClosureAuditValidator
@@ -70,8 +64,6 @@ class SpecsDoctor:
         templates_dir: Path | None = None,
         process_runner: ProcessRunner | None = None,
         repo_root: Path | None = None,
-        *,
-        bug_first_add_baselines: Mapping[str, BugRecord] | None = None,
     ) -> None:
         self.specs_dir = Path(specs_dir)
         self.public_dir: Path | None = Path(public_dir) if public_dir is not None else None
@@ -111,7 +103,6 @@ class SpecsDoctor:
         self._governance = GovernanceValidator(
             self.specs_dir,
             self.public_dir,
-            bug_first_add_baselines=bug_first_add_baselines,
         )
         self._coherence = CoherenceValidator(
             self.specs_dir,
@@ -184,8 +175,6 @@ class SpecsDoctor:
         issues.extend(self._release.check_release_jsonl_agreement())  # SPEC-DOC-042
         # v0.5.0 T-050-11 (FR4/A4.2) — milestone immutability (defined/implemented/shipped)
         issues.extend(self._release.check_release_jsonl_milestone_immutability())  # SPEC-DOC-043
-        # v0.5.0 T-050-08 (FR2/A2.7) — immutable-core drift detector (WARN, never a block)
-        issues.extend(self._governance.check_bug_record_immutable_core())  # SPEC-DOC-040
         # v0.5.0 T-050-08 (FR2/A2.8) — archive-overdue signal (WARN, never a block)
         issues.extend(self._governance.check_bug_archive_overdue())  # SPEC-DOC-041
         return issues

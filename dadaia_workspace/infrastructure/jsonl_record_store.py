@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import json
 import logging
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from pathlib import Path
 
 from dadaia_workspace.core.atomic_write import atomic_write
@@ -58,6 +58,14 @@ class JsonlRecordStore[T]:
 
     @property
     def path(self) -> Path:
+        """The ledger file this concrete store instance is rooted at.
+
+        NOT part of the :class:`~dadaia_workspace.core.protocols.record_store.RecordStore`
+        Protocol (v0.5.0 S1 FR23 firing, A1) — a caller typed to the Protocol can never
+        reach through it to the raw file; this remains a plain implementation-detail
+        attribute of the concrete adapter, for a test that builds one directly (never
+        for a feature-layer consumer holding the Protocol type).
+        """
         return self._path
 
     # -- writes --------------------------------------------------------------------
@@ -104,6 +112,41 @@ class JsonlRecordStore[T]:
             raise StaleRecordWriteError(record_id)
         atomic_write(self._path, "\n".join(new_lines), newline="")
         return updated
+
+    def remove(self, record_ids: Iterable[str]) -> list[T]:
+        """Drop every line whose ``"id"`` is in *record_ids*, returning the removed
+        records in file order (v0.5.0 S1 FR23 firing, A1) — the SAME
+        read-snapshot / filter / re-read-compare / ``atomic_write`` shape
+        :meth:`update` already uses, so a caller that used to rewrite the ledger's raw
+        bytes (``BugService.archive``) gets the SAME refuse-stale race guarantee."""
+        ids = frozenset(record_ids)
+        if not ids:
+            return []
+        before = self._read_text()
+        lines = before.split("\n")
+        kept_lines: list[str] = []
+        removed: list[T] = []
+        for line in lines:
+            stripped = line.strip()
+            if not stripped:
+                kept_lines.append(line)
+                continue
+            try:
+                raw = json.loads(stripped)
+            except json.JSONDecodeError:
+                kept_lines.append(line)
+                continue
+            if isinstance(raw, dict) and raw.get("id") in ids:
+                removed.append(self._from_dict(raw))
+                continue
+            kept_lines.append(line)
+        if not removed:
+            return []
+        after_reread = self._read_text()
+        if after_reread != before:
+            raise StaleRecordWriteError(next(iter(ids)))
+        atomic_write(self._path, "\n".join(kept_lines), newline="")
+        return removed
 
     # -- reads ---------------------------------------------------------------------
 
