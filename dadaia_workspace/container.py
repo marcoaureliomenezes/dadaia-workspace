@@ -215,15 +215,20 @@ def build_git_history_reader() -> GitHistoryReader:
     """Composition-root seam for the ``GitHistoryReader`` adapter (v0.5.0 FR3/A3.10,
     AR-1 ruling answer (c), ``specs/releases/0.5.0/reviews/S1-AR1-ruling.md`` §3).
 
-    The CLI layer must not import infrastructure directly (import-linter contract);
-    a future ``dadaia bugs migrate-v5`` verb (T-050-10) composes the subprocess-backed
-    reader here, exactly as :func:`build_git_object_reader` does for the push-gate scan.
+    The CLI layer must not import infrastructure directly (import-linter contract).
     A single concrete adapter today — the SAME ``GitSubprocessClient`` class
     :func:`build_git_client` already returns, which is why this seam needs no new
     infrastructure module: the ruling's whole point is one adapter class, one new
-    narrow port, no sibling adapter. Not yet wired into any CLI command by T-050-09 —
-    this task builds the port and the pure derivation it feeds, never runs the
-    migration against the real ledger.
+    narrow port, no sibling adapter.
+
+    T-050-09 built this port against a one-shot migration runner
+    (``features.bugs.migrate_v5.run_migration``) that T-050-10 ran once, standalone,
+    never wiring a permanent CLI verb to it. **T-050-17 (FR8/AS-1) is the first
+    permanent, ongoing caller**: ``features.bugs.service.BugService.resolved_commit``
+    is the one resolver seam for a record's ``resolved_commit`` — the CLI composition
+    root threads this exact adapter into ``BugService(..., history_reader=...,
+    repo_root=...)`` wherever derive-on-read is needed (both parameters optional —
+    most construction sites never need a git walk).
     """
     return GitSubprocessClient()
 

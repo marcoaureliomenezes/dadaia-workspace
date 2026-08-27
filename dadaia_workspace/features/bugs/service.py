@@ -20,6 +20,18 @@ the (all-native) v6 shape only, but keeps its v5-tolerant path so a workspace mi
 through the migration, or a foreign write, never crashes the read. :meth:`archive`
 moves a single PHYSICAL line per record — every migrated record is single-line
 native v6 shape and is therefore archivable.
+
+**FR8's one resolver seam (AS-1, v0.5.0 T-050-17).** :meth:`BugService.resolved_commit`
+is the SOLE resolver for a record's ``resolved_commit``: the stored value when present,
+derived from git history otherwise — one function, one caller-facing signature (A8.2).
+``resolved_commit`` stays ``null`` at resolve time by construction (a commit cannot
+contain its own sha); the field is a cache, and its ONE writer is FR14's pillar-1 audit,
+in the same atomic in-place rewrite that sets ``audited`` (a later task) — never this
+read-only seam, never a second commit. Derivation needs a real git walk, so it is
+DI'd in via the constructor (``history_reader``/``repo_root``, both optional): most
+``BugService`` construction sites (every ``append``, every plain ``status``/``stats``
+read) never pass them and the seam degrades to "stored or ``None``", never raising and
+never adding a blocking validation (A8.3).
 """
 
 from __future__ import annotations
@@ -33,12 +45,14 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from dadaia_workspace.core.atomic_write import atomic_write
+from dadaia_workspace.core.bug_provenance import derive_commit_provenance
 from dadaia_workspace.core.models.bugs import (
     BUG_ARCHIVE_THRESHOLD_DAYS,
     TERMINAL_EVENTS,
     BugRecord,
     governance_completeness_gaps,
 )
+from dadaia_workspace.core.protocols.git_history_reader import GitHistoryReader
 from dadaia_workspace.core.protocols.record_store import RecordStore
 from dadaia_workspace.features.bugs import migrate_v5
 
@@ -106,6 +120,8 @@ class BugService:
         *,
         archive_store: RecordStore[BugRecord] | None = None,
         denylist_terms: Sequence[tuple[str, str]] = (),
+        history_reader: GitHistoryReader | None = None,
+        repo_root: Path | None = None,
     ) -> None:
         self._record_store = record_store
         self._archive_store = archive_store
@@ -113,6 +129,11 @@ class BugService:
         # on, DI'd in via the CLI/container seam (features-no-infrastructure) —
         # threaded through BOTH write paths (append, A2.6).
         self._denylist_terms = tuple(denylist_terms)
+        # v0.5.0 FR8/AS-1 (T-050-17): the resolved_commit resolver's git-facing DI —
+        # both optional (container.build_git_history_reader() wires the real adapter;
+        # most construction sites never need it, see :meth:`resolved_commit`).
+        self._history_reader = history_reader
+        self._repo_root = repo_root
 
     # -- writes ----------------------------------------------------------------------
 
@@ -220,6 +241,45 @@ class BugService:
         return BugArchiveResult(archived=len(to_archive), kept=len(kept_lines))
 
     # -- reads -------------------------------------------------------------------------
+
+    def resolved_commit(self, record: BugRecord) -> str | None:
+        """FR8's one resolver seam (AS-1, A8.2) — the stored value when present,
+        derived from real git history otherwise. One function, one caller-facing
+        signature: the SAME method a read-only display (a future ``bugs status``/
+        ``stats`` renderer) and this release's stored-equals-derived contract test
+        both call.
+
+        **Read-only.** Never writes ``resolved_commit`` back to the ledger — the
+        field stays a cache by construction (a commit cannot contain its own sha) and
+        its ONE writer is FR14's pillar-1 audit, in the same atomic in-place rewrite
+        that sets ``audited`` (a later task; not this seam, not a second commit).
+
+        Derivation needs a real git walk over ``specs/bugs/`` through
+        :func:`~dadaia_workspace.core.bug_provenance.derive_commit_provenance`
+        (``core/bug_provenance.py`` — the permanent half of FR3's split, A3.10),
+        classified through :func:`~dadaia_workspace.features.bugs.migrate_v5
+        .classify_ledger_line` (the SAME v5/v6 boundary adapter T-050-09/10 already
+        use — the walked history spans both shapes). It runs only when *record* has
+        no stored value AND this service was constructed with both
+        ``history_reader``/``repo_root`` — most construction sites (every ``append``,
+        a plain read with no derivation need) pass neither, and this method degrades
+        to "stored or ``None``", never raising and never a new blocking validation
+        (A8.3).
+
+        Returns ``None`` for an open bug, for a resolved bug whose commit the walked
+        history never captured (FR3 step 5 — ``null`` is correct there, not a
+        failure, A8.2), and whenever derivation is unavailable.
+        """
+        if record.resolved_commit is not None:
+            return record.resolved_commit
+        if self._history_reader is None or self._repo_root is None:
+            return None
+        provenance = derive_commit_provenance(
+            self._history_reader.log_added_lines(self._repo_root, "specs/bugs/"),
+            migrate_v5.classify_ledger_line,
+        )
+        derived = provenance.get(record.id)
+        return derived.resolved_commit if derived is not None else None
 
     def status(self, *, include_closed: bool = False) -> list[BugRecord]:
         """Return folded records, open-only by default, sorted by ``id``."""
