@@ -937,7 +937,7 @@ minted-unpublished lineage) **first**, then the rest, one authoring pass per ato
 
 ---
 
-- [ ] **T-045-38 — `CLOSURE.md` with every sweep**
+- [-] **T-045-38 — `CLOSURE.md` with every sweep**
 
 **Owner role:** product-engineer · **Commit:** `docs(T-045-38): v0.4.5 closure`
 
