@@ -1545,7 +1545,7 @@ metrics present in `PILLAR-BUGS.md` with baseline and target. **Tests: +1 / −0
 
 ---
 
-- [-] **T-050-25 — FR15: `specs doctor` folds `FINDINGS.jsonl`**
+- [x] **T-050-25 — FR15: `specs doctor` folds `FINDINGS.jsonl`**
 
 **Owner role:** software-engineer · **Commit:** `refactor(T-050-25): fold FINDINGS.jsonl
 instead of regexing audit prose`
