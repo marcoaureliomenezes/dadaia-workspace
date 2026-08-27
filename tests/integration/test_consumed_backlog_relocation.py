@@ -1,7 +1,7 @@
 """Self-scan proving the ``consumed_backlog.json`` sidecar relocation is complete and
 lossless (v0.5.0 T-050-13A, SPEC A5.5).
 
-Intent: SCAFFOLD — T-050-13A (expires at T-050-14, which deletes the root
+Intent: SCAFFOLD — T-050-13A — expires: 0.6.0 (retired at T-050-14, which deletes the root
 ``specs/_archive/`` source files this test's own live count depends on — the very next
 task in the same release, sequenced by TASKS.md's ``T-050-13A`` precondition on
 ``T-050-14``)
