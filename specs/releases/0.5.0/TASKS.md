@@ -1617,7 +1617,7 @@ named above), plus the catalog-twin verdict recorded either way.**
 
 ---
 
-- [-] **T-050-26 — FR16: the first audit, as a dry run over this repository**
+- [x] **T-050-26 — FR16: the first audit, as a dry run over this repository**
 
 **Owner role:** project-auditor · **Commit:** `docs(T-050-26): first audit under canon v6 (dry
 run)`
@@ -1673,7 +1673,7 @@ honestly is the acceptance. **Tests: +0 / −0.**
 
 ---
 
-- [ ] **T-050-27 — `S3` close: `qa-engineer` review committed on the branch**
+- [-] **T-050-27 — `S3` close: `qa-engineer` review committed on the branch**
 
 **Owner role:** qa-engineer · **Commit:** `docs(T-050-27): S3 QA close`
 
