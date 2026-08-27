@@ -54,6 +54,51 @@ for this task, so none is touched here):
 
 Left exactly as written; a future task can pick this up.
 
+## [0.5.0] — 2026-08-27
+
+Internal spec-release id: `0.5.0` ("governance, lineage and audits"). Bare-semver release ids
+begin here (specs pattern v6); `v`-prefixed ids are read-only archive history.
+The older `[0.5.0] — Unreleased` heading further below is the retired internal spec id
+`v0.3.0` (see the versioning note) — kept as written, never renamed; this section is the
+package version.
+
+### Added
+- **One record per bug** (`specs/bugs/BUGS.jsonl`, `bug-record-v1`): immutable core,
+  write-once root cause/solution/FR23 evidence, mutable governance fields (`status`,
+  `cause`, `caused_by`, `resolved_commit`, `resolved_release`, `audited`); provenance
+  (`registration_commit`, `resolved_commit`, granularity markers) derived from a
+  `--full-history` walk of the ledger; one write seam — `dadaia bugs update` /
+  `dadaia bugs archive`.
+- **`RELEASE.jsonl`** milestones (`defined`, `implemented`, `shipped`, `audited`, `rc`,
+  `phase`, `note`) replace `ACTIVE.md` and `CLOSURE.md`; archived releases back-filled into
+  `specs/releases/_archive/releases_histo.jsonl`.
+- **Audits as committed artifacts** (`specs/audits/<YYYYMMDD>-<slug>/AUDIT.md` +
+  `FINDINGS.jsonl`, `finding-record-v1`), three pillars run together (bug history,
+  spec compliance, memory drift); `dd-audit-project` rewritten; first audit shipped.
+- **`specs/ADRs/`** canon (Nygard + MADR, operator-only acceptance) with the first
+  28 proposed ADRs; memory trio split into Part 1 Principles (each with `Measured by:`)
+  and Part 2 Implementation; constitution references principles by id.
+- `dd-diagnose` skill (lineage as phase 0); `behavior-map.json` — every skill and scoped
+  `AGENTS.md` maps to one `DADAIA.md` section, enforced by contract tests.
+- `core/atomic_write` compare-and-swap (`expected_previous`) — the one primitive refuses
+  a stale rewrite.
+
+### Changed
+- Specs pattern **v6**: canon tree, `TREE-8`, `specs doctor --recipe`; memory files
+  `ARCHITECTURE.md` / `QUALITY.md` / `TECHSTACK.md`; backlog is a live photo with
+  `backlog_histo.jsonl` (LEDGER section and BL-DUP retired).
+- Hooks validate only at the publication boundary: pre-commit is advisory (always exit 0);
+  pre-push keeps branch policy + denylist scan; the CI preflight is an always-on rule.
+- `.gitignore` inversion tracks every canon governance path; the PR verdict gate derives
+  its evidence roots from the canon and refuses `_ideas/`.
+- `dd-bug-fix` renamed `dd-bug-resolution`; `dd-release-implement` rebuilt around
+  `RELEASE.jsonl` records.
+
+### Removed
+- Bug event fold and state machine, `jsonl_bug_store`, `ACTIVE.md`, `CLOSURE.md`
+  parsers, `rules-skills-map.json`, `specs release open` / `specs segment open`,
+  pre-commit `backlog doctor` block, root `specs/assets/`.
+
 ## [0.4.5] — 2026-08-27
 
 Internal spec-release id: `v0.4.5` ("hardening and consolidation"). This version is
