@@ -13,7 +13,7 @@
 | `agent-comms` | agent-comms — Handoff Contract v1 | handoff-v1.2 separates HTML reports from JSON handoffs, carries the self_pull Layer-1 read-proof line, and dies on consumption unless it is artifact-bearing. |
 | `agent-monitoring` | agent-monitoring | stdlib-only local telemetry → panel Sessions tab + /api/agents; allowlist gate preserves privacy; artifacts die event-driven, logs self-rotate. |
 | `agent-orchestration` | agent-orchestration | Nine core Layer-1 roles, two dispatchers, document-governed ordered work, and advisory-only concurrency. |
-| `agentic-entities` | agentic-entities | Abstract-entity registry — Personas, Behaviors, Rules, universal surface — plus the one rules-skills map and its single deterministic enforcer. |
+| `agentic-entities` | agentic-entities | Abstract-entity registry — Personas, Behaviors, Rules; one rules-skills map with one enforcer; the measured always-on budget. |
 
 ### distribution
 
@@ -21,7 +21,7 @@
 |------|-------|------|
 | `academy` | academy | browsable knowledge_basis in the panel's Academy tab + copy-from-template management via CLI. |
 | `public-asset-distribution` | public-asset-distribution | canonical public assets, whole skill folders included, staged to .dadaia/agentic and projected to Claude Code, Codex, Kimi Code and .agents roots. |
-| `pypi-distribution` | pypi-distribution | The published dadaia-workspace PyPI package on a single version axis, the release.yml OIDC publish pipeline, and the wheel content contract. |
+| `pypi-distribution` | pypi-distribution | The published PyPI package on one version axis, the OIDC publish pipeline, the minted-unpublished shape, and the wheel content contract. |
 
 ### harness
 
@@ -55,7 +55,7 @@
 | `multi-platform-parity` | multi-platform-parity | Claude Code, Codex, and Kimi Code receive truthful runtime-specific projections from one canonical public source. |
 | `repos-catalog` | repos-catalog | repos.xlsx lookup for fast discovery of known repos with slug + URL. |
 | `server-registry` | server-registry | internal port registry with TTL+PID to avoid conflicts between parallel agents' dev servers; the 3000-3999 range applies only to next_port allocation. |
-| `workspace-doctor` | workspace-doctor | Diagnoses root hygiene, venv health, context coherence, stale presence, and retired lock-state residue; repairs only deterministic state. |
+| `workspace-doctor` | workspace-doctor | Diagnoses root hygiene, venv health, context coherence, slug-ownership collisions, stale presence, lock residue; repairs deterministic state only. |
 | `workspace-init` | workspace-init | Idempotent bootstrap of workspace state, Python venv, selected harness projections, and governance hooks. |
 | `workspace-portability` | workspace-portability | export/import of the whole workspace as a tar.gz for backup or migration between machines. |
 
@@ -63,7 +63,7 @@
 
 | slug | title | tldr |
 |------|-------|------|
-| `sdd-bug-backlog-governance` | sdd-bug-backlog-governance | Event-sourced JSONL bugs closed by a three-field evidence gate, an operator-gated backlog, an rc release ladder, and a three-branch git contract. |
-| `sdd-gate-v3` | sdd-gate-v3 | No-lock SDD enforcement: path/mode/cache gates, advisory presence, a feature-only push boundary with content scan, and the security verdict as a PR gate. |
+| `sdd-bug-backlog-governance` | sdd-bug-backlog-governance | JSONL bugs written through one sanitize-then-mask seam, a three-field evidence gate, an operator-gated backlog, the rc ladder and the git contract. |
+| `sdd-gate-v3` | sdd-gate-v3 | No-lock SDD enforcement — origin-classified LAW, path/mode gates, advisory presence, feature-only push boundary with scan, verdict as PR gate. |
 | `specs-doctor` | specs-doctor | Validates canonical specs structure, memory/catalog and placeholder integrity, release/segment markers, closure evidence, dispositions, bugs, and audits. |
 

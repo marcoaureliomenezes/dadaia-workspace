@@ -4,8 +4,10 @@ title: quality-assurance
 category: core
 tldr: Layered pytest/browser validation; intent declared and enforced over tests/e2e only; measured ratcheted complexity and census ceilings; quarantine; CI gates.
 summary: >-
-  Defines test layers and their size tiers, the intent taxonomy and its e2e-scoped
-  mechanical enforcement, safety fixtures, browser evidence, the flake/quarantine policy
+  Defines test layers and their size tiers, the four-token intent taxonomy and its
+  e2e-scoped mechanical enforcement, the derived-inventory rule (policy-only byte goldens,
+  one scanned asset roster, one skill-inventory oracle) and the scan-vacuity convention,
+  safety fixtures, browser evidence, the flake/quarantine policy
   and its escalation ladder, the test-health metrics with tiered timeouts, ratcheted
   wall-clock ceilings and the LARGE census re-pinned at its measured value, the pinned
   mutation tool and its runnable cadence, the exact-pin rule for all third-party audit and
@@ -24,8 +26,8 @@ tags:
 - flake
 - quarantine
 - privacy
-last_updated: '2026-08-24'
-release_origin: v0.3.0
+last_updated: '2026-08-27'
+release_origin: v0.4.5
 ---
 
 ## Purpose
@@ -48,7 +50,11 @@ Every test declares its **intent** in the module docstring —
 `Intent: <KIND> — <AC id | bug-id | task-id>` — mapping to one of CONTRACT (permanent,
 asserts an acceptance criterion or a bug), SENTINEL (permanent, the single integration
 test of one seam), SCAFFOLD (temporary, expires at its task/release closure) or
-QUARANTINE (flaky, carries a registered bug id). An undeclared test is SCAFFOLD. Intent
+QUARANTINE (flaky, carries a registered bug id). **Those four are the whole vocabulary.**
+`REGRESSION` and `BUG` are not tokens: a test pinning a fixed defect is CONTRACT declared
+against that bug id, which is what the id in the header is for. The taxonomy section of
+`dadaia-test-stewardship` states that ruling once, and zero off-taxonomy declarations
+remain in the suite. An undeclared test is SCAFFOLD. Intent
 is never a pytest marker, because the marker namespace already binds `contract` to the
 layer directory `tests/contract/` and a same-named intent marker would silently re-tier
 tests and corrupt every `-m` selector. The taxonomy prose lives in `tests/AGENTS.md` and
@@ -74,11 +80,31 @@ Codex invocation unless the corresponding live flag is set
 `DADAIA_CLAUDE_LIVE`), and it fakes `ensure_workspace_venv` so no test ever builds a
 real venv (disk/time protection). Temporary workspaces use pytest `tmp_path` or
 workspace `.dadaia/tmp/`; they never bootstrap the source repo as a consumer
-workspace. A full local run passes **2,822** with 4 environment-conditional skips — two
+workspace. A full local run passes with 4 environment-conditional skips — two
 Windows-only, one requiring a LAN IPv4, and one honest degrade when the installed Codex
 binary is present but unusable. The broad LARGE census is **100**: the 54
 e2e-tier pytest journeys plus 46 Playwright specs across 11 files. The declared
 wall-clock baselines live in "Test Health" below.
+
+**An inventory a test asserts is derived, never hand-kept.** Three seams hold that rule.
+The two install/doctor byte goldens pin **policy only** — target mapping, banners, mode and
+newline conventions — while the per-file asset inventory they used to carry is a **roster
+scanned from `dadaia_workspace/public/**`** at test time, reusing the asset manager's own
+walk, so adding or removing an asset fails the roster and never forces a golden regen
+whose multi-line diff could hide a policy change. The skill inventory has **one derived
+oracle**, extracted from that same roster, consumed by the pipeline e2e, the integration
+path assertions and the orphan checker alike — the three hand-kept lists that used to
+disagree are gone, and a skill added, renamed or removed is green everywhere after one
+edit to the real tree. Both helpers reach for the product's own enumeration rather than a
+second walk, because a second walk is the next inventory to drift.
+
+**A tree-walking scan test proves its own population.** Every source-scan test asserts the
+enumerated population is non-empty **and** that one known sentinel member is in it, applied
+as a two-line convention at each call site — deliberately not a shared harness or base
+class, which would couple independent ratchets to one framework. A walker that loses its
+root then fails loudly at its own call site instead of scanning zero files and passing
+vacuously green forever. The census of those call sites lives in the convention helper's
+own docstring, enumerated file by file.
 
 ## Root Cause, Always
 
@@ -166,6 +192,9 @@ before the raise, so the reason survives an xdist worker crash. The marker set i
 and pinned: a contract test compares `pyproject.toml`'s markers against the known set in
 `tests/conftest.py`, so a typo cannot become a new exclusion lane.
 
+**No test is quarantined today**: the lane is empty, and the last observed pass-and-fail on
+identical code was root-caused at its seam instead — a porcelain comparison that raced a
+concurrent session's legitimate ADDITIVE write, which the no-locks doctrine permits.
 Quarantine is capped at 8 tests and, at cap, blocks admission of new LARGE tests.
 Escalation is time-bound: 30 days unresolved becomes `disabled`; 30 clean days restores
 the test; `disabled` plus one release with no registered plan is deleted. Diagnostic

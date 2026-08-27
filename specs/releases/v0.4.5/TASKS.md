@@ -919,7 +919,7 @@ rounds**, in which case the final `rc` **is** `rc-1`.
 
 ## The final `rc` — closure, archive, ship without publish
 
-- [-] **T-045-37 — Memory window (SPEC §5)**
+- [x] **T-045-37 — Memory window (SPEC §5)**
 
 **Owner role:** product-engineer · **Commit:** `docs(T-045-37): memory after v0.4.5`
 

@@ -12,7 +12,9 @@ summary: >-
   resolution function
   answers "which context is this?" for every verb, hook and gate; bind persists context
   and mode only for the caller, never acquires a lock, and drives an injection that
-  carries memory rather than a restatement of the law. Concurrent work is allowed and
+  carries memory rather than a restatement of the law, its catalog half curated at
+  generation so every atom stays one self-pull away. A registry-wide doctor invariant
+  reports a repo slug owned by more than one context without ever choosing a winner. Concurrent work is allowed and
   surfaced through expiring presence records. `list` and `show` accept `--redact` to mask
   foreign context names in table and JSON output.
 tags:
@@ -21,8 +23,8 @@ tags:
 - session
 - no-locks
 - privacy
-last_updated: '2026-08-24'
-release_origin: v0.2.3
+last_updated: '2026-08-27'
+release_origin: v0.4.5
 ---
 
 ## Purpose
@@ -67,6 +69,16 @@ introduce a slug from an argument — `create` for the main repo and `repo add` 
 associated one — consult one ownership predicate and refuse a slug another context already
 owns, naming the owner. The four other registry writes carry an existing slug forward and
 cannot break the invariant.
+
+Enforcement by construction covers new writes; **historical state is covered by
+detection**. The v2→v3 migration is purely additive and imports whatever the old registry
+said, so a registry that collided before the two seams existed keeps its collision. The
+workspace doctor's registry-wide `INV-6` check reads the folded registry and reports every
+slug with more than one owner, main or associated ([[workspace-doctor]]). It reports and
+stops: which owner should lose the slug is a disposition only the operator holds, and the
+verbs to act on it already exist, so no automatic choice is made on the destructive side of
+the invariant. With that lane decided, the class has no undecided lane left — two write
+seams guarded, historical state surfaced, `dead` untouched.
 
 Concurrent alive/dead races are not serialized. Operations are idempotent where
 possible and surface ordinary filesystem/Git conflicts instead of waiting on a lock.
@@ -135,7 +147,20 @@ is the lean memory bootstrap — the tech-stack digest plus the product catalog 
 nothing else: no dispatcher preflight (the law states the flow once, and a session already
 carrying the law does not need it a second time per prompt) and no ALIVE-context list,
 which is useful only to a session that is **unbound** and is therefore emitted only there.
-The memory half of the prefix is untouched by that trim.
+
+The catalog half is **curated at generation, not at injection**. The catalog generator
+persists the one-line `tldr` only for atoms in the injected tier — selected by the atom's
+existing `category` frontmatter field, today `core` — and drops it from the persisted file
+for the rest; the in-memory catalog and the rendered `product/index.md` are fed the full,
+uncurated set, so `index.md` still carries every atom's `tldr` as a one-step lookup. The
+hook's digest logic is unchanged and simply emits the fields present. **Every catalog entry
+stays reachable**: `slug`, `title` and `path` survive on every entry, so any atom is one
+self-pull away — the policy changes what is *injected*, never what *exists*. The policy
+lives in the generator, and both writers of `catalog.json` apply it identically, pinned by a
+contract over their written output. The measured prefix on a real bound session is **877.8
+tokens** against a ≤0.7k target, down from 1,505.6; the remaining floor is the bounded
+tech-stack digest (~564 tokens, outside this lever) plus ~314 tokens of catalog structure
+that cannot shrink without dropping an entry's `path`.
 
 **One place of control.** Specs, bind, memory, releases and backlog resolve only from the
 main repo. A bind to a context with associated repos injects the **main** repo's memory

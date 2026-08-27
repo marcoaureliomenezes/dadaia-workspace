@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-26T14:33:53Z",
+  "generated_at": "2026-08-27T10:02:16Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -74,7 +74,7 @@
       "title": "agentic-entities",
       "category": "product",
       "area": "agents",
-      "summary": "The workspace method is defined abstractly first: `public/entities/registry.json` holds the Personas, Deterministic Behaviors, Abstract Rules, and universal skills/AGENTS.md surface. Every scaffolded core sub-agent, hook, and rule file is a per-harness derivation of one of these entities (constitution §12.5); the derivation contract test and the `public doctor` `entities-derivation` check enforce the prohibition, the latter at behavioral-fidelity depth with a mutation fixture per drift class. A 21-skill surface maps to the law through one machine-readable rules-skills map with one deterministic enforcer, which also carries the citation check and the invocation-model equivalence; the retired collision lint left with its hard-coded table. The panel renders the registry in the Agentic Entities tab and as the Personas section of the Agents tab.",
+      "summary": "The workspace method is defined abstractly first: `public/entities/registry.json` holds the Personas, Deterministic Behaviors, Abstract Rules, and universal skills/AGENTS.md surface. Every scaffolded core sub-agent, hook, and rule file is a per-harness derivation of one of these entities (constitution §12.5); the derivation contract test and the `public doctor` `entities-derivation` check enforce the prohibition, the latter at behavioral-fidelity depth with a mutation fixture per drift class. A 21-skill surface maps to the law through one machine-readable rules-skills map with one deterministic enforcer, which also carries the citation check and the invocation-model equivalence; the retired collision lint left with its hard-coded table. The always-on load — law chain plus nine persona bodies plus the skill descriptions — is measured (~20.5k tokens, 257 negations) against a ≤3.5k/≤60 target it does not meet, with the gap named structurally; every removal carries a coverage table and a pointer replaces a restatement. The panel renders the registry in the Agentic Entities tab and as the Personas section of the Agents tab.",
       "path": "specs/memory/product/agents/agentic-entities.md",
       "tags": [
         "agents",
@@ -82,8 +82,9 @@
         "derivation",
         "governance"
       ],
-      "token_estimate": 1193,
+      "token_estimate": 1581,
       "depends_on": [
+        "architecture",
         "agent-orchestration",
         "panel",
         "public-asset-distribution",
@@ -115,7 +116,7 @@
       "title": "public-asset-distribution",
       "category": "product",
       "area": "distribution",
-      "summary": "Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, universal skills projected as whole folders (SKILL.md plus every disclosed sibling) to one canonical .agents/skills home with no registry entry, the one-load-per-harness law projection, the thin-wrapper contract that keeps every public/scripts file an entry point over the package implementation, repo templates copied at alive() (repo-AGENTS.md, with destination-file symlink refusal at every write site, plus a conditional tests/AGENTS.md), harness-profile-aware install/doctor, render-at-install of core agents (staged generic body + resolved agent-model policy composed into both L1 projections) with a policy-aware doctor render-compare, provenance-gated consumer AGENTS fan-out (banner-canonical restored vs hand-authored left [foreign]) with lexical repo-slug containment + destination-file symlink refusal, scoped AGENTS projections, source-root hygiene guard, and runtime projection contract.",
+      "summary": "Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, universal skills projected as whole folders (SKILL.md plus every disclosed sibling) to one canonical .agents/skills home with no registry entry, the one-load-per-harness law projection, the thin-wrapper contract that keeps every public/scripts file an entry point over the package implementation, repo templates copied at alive() (repo-AGENTS.md, with destination-file symlink refusal at every write site, plus a conditional tests/AGENTS.md), harness-profile-aware install/doctor, render-at-install of core agents (staged generic body + resolved agent-model policy composed into both L1 projections) with a policy-aware doctor render-compare, provenance-gated consumer AGENTS fan-out (banner-canonical restored vs hand-authored left [foreign]) with lexical repo-slug containment + destination-file symlink refusal, scoped AGENTS projections, source-root hygiene guard, policy-only byte goldens whose asset inventory is a roster derived by scanning the real public tree, and runtime projection contract.",
       "path": "specs/memory/product/distribution/public-asset-distribution.md",
       "tags": [
         "public",
@@ -124,9 +125,10 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 3005,
+      "token_estimate": 3200,
       "depends_on": [
         "agent-orchestration",
+        "quality-assurance",
         "workspace-init",
         "specs-doctor"
       ]
@@ -137,7 +139,7 @@
       "title": "pypi-distribution",
       "category": "product",
       "area": "distribution",
-      "summary": "Owns PyPI distribution as product behavior — the live `dadaia-workspace` package, the `.github/workflows/release.yml` pipeline (version-vs-tag check → five test legs → build → release-gate approval → OIDC trusted publishing + tag → post-publish smoke), the wheel content contract (public assets ship in-package), and the single version axis: the `pyproject.toml` version tracks the published PyPI lineage and a release id is that same minted number, `v`-prefixed. The CHANGELOG records that lineage completely — a git-derived, range-cited section for every published version, and an unpublished-internal annotation for every heading matching none; nothing is deleted or renamed.",
+      "summary": "Owns PyPI distribution as product behavior — the live `dadaia-workspace` package, the `.github/workflows/release.yml` pipeline (version-vs-tag check → five test legs → build → release-gate approval → OIDC trusted publishing + tag → post-publish smoke), the wheel content contract (public assets ship in-package), and the single version axis: one number carries the release id, the `pyproject.toml` version and, once published, the PyPI lineage. Minting and publishing are separate acts — `HEAD` carries the newest minted number while the published lineage carries only the numbers the withheld release-gate approval let through, and a minted-unpublished number is retired rather than reused. The CHANGELOG records that lineage completely — a git-derived, range-cited section for every published version, and an unpublished-internal annotation for every heading matching none; nothing is deleted or renamed.",
       "path": "specs/memory/product/distribution/pypi-distribution.md",
       "tags": [
         "distribution",
@@ -145,7 +147,7 @@
         "release",
         "packaging"
       ],
-      "token_estimate": 1227,
+      "token_estimate": 1436,
       "depends_on": [
         "quality-assurance",
         "public-asset-distribution",
@@ -339,7 +341,7 @@
       "title": "context-management",
       "category": "product",
       "area": "platform",
-      "summary": "Manages Spec Context Projects and their repositories — one unique main repo plus an ordered collection of associated repos, resolved everywhere through a single accessor, with a backup-first idempotent registry migration to schema v3. ALIVE/DEAD, the surface verbs, export/import and the panel all cover the full set; a single branch-resolution implementation serves both `list` and `show`, so they cannot disagree. A single resolution function answers \"which context is this?\" for every verb, hook and gate; bind persists context and mode only for the caller, never acquires a lock, and drives an injection that carries memory rather than a restatement of the law. Concurrent work is allowed and surfaced through expiring presence records. `list` and `show` accept `--redact` to mask foreign context names in table and JSON output.",
+      "summary": "Manages Spec Context Projects and their repositories — one unique main repo plus an ordered collection of associated repos, resolved everywhere through a single accessor, with a backup-first idempotent registry migration to schema v3. ALIVE/DEAD, the surface verbs, export/import and the panel all cover the full set; a single branch-resolution implementation serves both `list` and `show`, so they cannot disagree. A single resolution function answers \"which context is this?\" for every verb, hook and gate; bind persists context and mode only for the caller, never acquires a lock, and drives an injection that carries memory rather than a restatement of the law, its catalog half curated at generation so every atom stays one self-pull away. A registry-wide doctor invariant reports a repo slug owned by more than one context without ever choosing a winner. Concurrent work is allowed and surfaced through expiring presence records. `list` and `show` accept `--redact` to mask foreign context names in table and JSON output.",
       "path": "specs/memory/product/platform/context-management.md",
       "tags": [
         "context",
@@ -348,12 +350,12 @@
         "no-locks",
         "privacy"
       ],
-      "token_estimate": 1897,
+      "token_estimate": 2287,
       "depends_on": [
+        "workspace-doctor",
         "quality-assurance",
         "spec-context-project",
         "sdd-gate-v3",
-        "workspace-doctor",
         "workspace-init"
       ]
     },
@@ -450,7 +452,7 @@
       "title": "workspace-doctor",
       "category": "product",
       "area": "platform",
-      "summary": "`dadaia doctor` checks workspace-root law, forbidden caches, required state layout, workspace venv health, context repository coherence, repo URLs, stale presence, and legacy lock/pointer residue. `--fix` performs bounded deterministic cleanup and `--redact` masks foreign Spec Context names in the reported issues.",
+      "summary": "`dadaia doctor` checks workspace-root law, forbidden caches, required state layout, workspace venv health, context repository coherence, repo URLs, registry-wide repo-slug ownership uniqueness (report-only), stale presence, and legacy lock/pointer residue. `.dadaia/references/` is a sanctioned operator-owned subtree outside the context lifecycle. `--fix` performs bounded deterministic cleanup and `--redact` masks foreign Spec Context names in the reported issues.",
       "path": "specs/memory/product/platform/workspace-doctor.md",
       "tags": [
         "workspace",
@@ -459,7 +461,7 @@
         "repair",
         "privacy"
       ],
-      "token_estimate": 306,
+      "token_estimate": 706,
       "depends_on": [
         "quality-assurance",
         "context-management",
@@ -514,7 +516,7 @@
       "title": "sdd-bug-backlog-governance",
       "category": "product",
       "area": "sdd",
-      "summary": "Bugs are append-only events, including a non-terminal repeatable `picked` reservation marker that surfaces contention without ever blocking it; a `resolved` event is refused unless it carries three checkable fields — the red-loop command, the test seam and the diff direction on the touched feature — and a net-positive diff routes the fix through software-architect before the commit. The backlog is the operator's demand queue, curated by project-manager in a single BACKLOG.md (ACTIVE + LEDGER) with purge-on-pick and continuous sanitizing — no agent materializes an entry, residuals reach the operator through a PM intake report, and only actionable defects do — record-only observations terminate in the closure record. A release consumes an explicit picked set, matures through an rc ladder with no alpha or beta stage, ends in the fixed order review → closure → archive → ship, and requires terminal dispositions at closure and audit. Work is placed on three branch patterns; every agent stage runs on the one live feature branch, and develop and main advance only by pull request. Bug, backlog and audit paths stay additive and never lock-gated.",
+      "summary": "Bugs are append-only events written through one seam that sanitizes control and format characters (preserving TAB/LF/CR) and then masks every schema free-text field with the same operator denylist the push boundary refuses on; the kinds include a non-terminal repeatable `picked` reservation marker that surfaces contention without ever blocking it; a `resolved` event is refused unless it carries three checkable fields — the red-loop command, the test seam and the diff direction on the touched feature — and a net-positive diff routes the fix through software-architect before the commit. The backlog is the operator's demand queue, curated by project-manager in a single BACKLOG.md (ACTIVE + LEDGER) with purge-on-pick and continuous sanitizing — no agent materializes an entry, residuals reach the operator through a PM intake report, and only actionable defects do — record-only observations terminate in the closure record. A release consumes an explicit picked set, matures through an rc ladder with no alpha or beta stage, ends in the fixed order review → closure → archive → ship, and requires terminal dispositions at closure and audit. Work is placed on three branch patterns; every agent stage runs on the one live feature branch, and develop and main advance only by pull request. Bug, backlog and audit paths stay additive and never lock-gated.",
       "path": "specs/memory/product/sdd/sdd-bug-backlog-governance.md",
       "tags": [
         "sdd",
@@ -524,7 +526,7 @@
         "bugs",
         "gitflow"
       ],
-      "token_estimate": 3114,
+      "token_estimate": 3460,
       "depends_on": [
         "sdd-gate-v3",
         "specs-doctor",
@@ -537,7 +539,7 @@
       "title": "sdd-gate-v3",
       "category": "product",
       "area": "sdd",
-      "summary": "The merged Python PreToolUse gate enforces root whitelist, workspace venv usage, a cache-off posture for pytest/ruff/mypy, path class, phase, and the caller's own mode. It never waits for or blocks on another session. Presence is advisory. Git pre-commit warns only; pre-push enforces the CI preflight, an inverted branch policy in which `feature/{M.m.p}` is the only pushable ref while `develop` and `main` are refused as PR-only, and a range-scoped denylist scan of the new objects the push would publish — blobs AND commit/annotated-tag message bodies, with author/committer headers out of scope by design. The security verdict left the hook: it is a CI job on both PR edges requiring an APPROVED security-reviewer handoff covering the PR head sha, read from committed evidence. The scan reads a chunk-bounded batched git conversation, suppresses a hit only when the same single path already published that exact value and never for a path-less object, derives its foreign-name layer from the context registry and names it when that layer degrades, partially scans and honestly reports oversized blobs, raises a typed error rather than reporting coverage it did not achieve, and masks private path segments through the detector's own matchers in everything it prints. The packaged baseline is version 8: single-line patterns only, every carve-out carrying a rationale a doctor check enforces, covering the home-path layout of all three declared platforms.",
+      "summary": "The merged Python PreToolUse gate enforces root whitelist, workspace venv usage, a cache-off posture for pytest/ruff/mypy, path class, phase, and the caller's own mode. LAW is decided by ORIGIN on a static fail-closed floor — the law basenames at the workspace root or inside a fixed harness projection dir — so a repo's own domain-scoped `AGENTS.md`/`CLAUDE.md` is MUTATING and no manifest read can promote or demote a security decision. It never waits for or blocks on another session. Presence is advisory. Git pre-commit warns only; pre-push enforces the CI preflight, an inverted branch policy in which `feature/{M.m.p}` is the only pushable ref while `develop` and `main` are refused as PR-only, and a range-scoped denylist scan of the new objects the push would publish — blobs AND commit/annotated-tag message bodies, with author/committer headers out of scope by design. The security verdict left the hook: it is a CI job on both PR edges requiring an APPROVED security-reviewer handoff covering the PR head sha, read from committed evidence. The scan reads a chunk-bounded batched git conversation, suppresses a hit only when the same single path already published that exact value and never for a path-less object, derives its foreign-name layer from the context registry and names it when that layer degrades, partially scans and honestly reports oversized blobs, raises a typed error rather than reporting coverage it did not achieve, and masks private path segments through the detector's own matchers in everything it prints. The packaged baseline is version 8: single-line patterns only, every carve-out carrying a rationale a doctor check enforces, covering the home-path layout of all three declared platforms.",
       "path": "specs/memory/product/sdd/sdd-gate-v3.md",
       "tags": [
         "sdd",
@@ -547,9 +549,10 @@
         "no-locks",
         "privacy"
       ],
-      "token_estimate": 6813,
+      "token_estimate": 7339,
       "depends_on": [
         "context-management",
+        "sdd-bug-backlog-governance",
         "architecture",
         "agent-monitoring",
         "workspace-doctor"
@@ -569,11 +572,12 @@
         "validation",
         "sdd"
       ],
-      "token_estimate": 906,
+      "token_estimate": 1007,
       "depends_on": [
         "sdd-gate-v3",
-        "sdd-bug-backlog-governance",
-        "workspace-doctor"
+        "workspace-doctor",
+        "context-management",
+        "sdd-bug-backlog-governance"
       ]
     }
   ]
