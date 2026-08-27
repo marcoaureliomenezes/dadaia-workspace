@@ -57,6 +57,84 @@ def _resolve_public_dir(specs_dir: Path) -> Path | None:
     return None
 
 
+def _print_migration_hints(issues: list[SpecsDoctorIssue]) -> None:
+    """Always surface TREE-1/TREE-2 migration hints (even under --fix)."""
+    migration_issues = [i for i in issues if i.code in ("TREE-1", "TREE-2")]
+    for mi in migration_issues:
+        typer.echo(f"[MIGRATION] {mi.description}", err=True)
+
+
+def _apply_doctor_fix(
+    doctor_svc: SpecsDoctor, issues: list[SpecsDoctorIssue]
+) -> list[SpecsDoctorIssue]:
+    """Apply --fix, print what was fixed, and return the residual issue set."""
+    fixed = doctor_svc.fix(issues)
+    if fixed:
+        typer.echo(f"[fix] Applied {len(fixed)} auto-fix(es):")
+        for f_issue in fixed:
+            typer.echo(f"  [fixed] {f_issue.code}: {f_issue.path}")
+    return doctor_svc.check()
+
+
+def _print_json_result(target: Path, issues: list[SpecsDoctorIssue]) -> None:
+    payload = {
+        "specs_dir": str(target),
+        "issues": [i.to_dict() for i in issues],
+        "summary": {
+            "errors": sum(1 for i in issues if i.severity == Severity.ERROR),
+            "warnings": sum(1 for i in issues if i.severity == Severity.WARNING),
+        },
+    }
+    typer.echo(json.dumps(payload, indent=2, ensure_ascii=False))
+
+
+def _print_human_result(target: Path, issues: list[SpecsDoctorIssue]) -> None:
+    if not issues:
+        typer.echo(f"[ok] {target} — 0 errors, 0 warnings.")
+        return
+    errors = [i for i in issues if i.severity == Severity.ERROR]
+    warnings = [i for i in issues if i.severity == Severity.WARNING]
+    typer.echo(
+        f"[{'fail' if errors else 'warn'}] {target} — "
+        f"{len(errors)} error(s), {len(warnings)} warning(s):"
+    )
+    for issue in issues:
+        marker = "ERR " if issue.severity == Severity.ERROR else "WARN"
+        location = f" ({issue.path})" if issue.path else ""
+        typer.echo(f"  [{marker}] {issue.code}: {issue.description}{location}")
+    # Authoritative final verdict line (bug: specs-doctor-dual-error-counter).
+    # A memory-lint issue may embed its own "Summary: … 0 ERROR" text; this final
+    # line is the single source of truth so the last output line never contradicts
+    # the real result.
+    typer.echo(
+        f"[{'fail' if errors else 'ok'}] overall: {len(errors)} error(s), "
+        f"{len(warnings)} warning(s) — {target}"
+    )
+
+
+def _render_recipe_steps(issues: list[SpecsDoctorIssue]) -> list[str]:
+    """Render ``--recipe``'s ordered, copy-pasteable steps — one per finding, in
+    ``check()`` order (A1.3). Never a second step table: every step is a rendering of
+    the SAME finding object ``--json`` emits (code/path/description) — nothing here is
+    looked up from a second, code-keyed table that could drift from the findings.
+    """
+    steps: list[str] = []
+    for n, issue in enumerate(issues, start=1):
+        location = f" ({issue.path})" if issue.path else ""
+        steps.append(f"{n}. [{issue.code}]{location} {issue.description}")
+    return steps
+
+
+def _print_recipe(issues: list[SpecsDoctorIssue]) -> None:
+    steps = _render_recipe_steps(issues)
+    if not steps:
+        typer.echo("[recipe] 0 finding(s) — nothing to do.")
+        return
+    typer.echo(f"[recipe] {len(steps)} step(s) — copy-paste in order:")
+    for step in steps:
+        typer.echo(step)
+
+
 @app.command("doctor")
 def doctor(
     specs_dir: str | None = typer.Option(
@@ -72,6 +150,15 @@ def doctor(
     json_output: bool = typer.Option(
         False, "--json", help="Emit machine-readable JSON instead of human output."
     ),
+    recipe: bool = typer.Option(
+        False,
+        "--recipe",
+        help=(
+            "Emit ordered, concrete, copy-pasteable steps for every finding — a "
+            "rendering of the SAME finding objects --json emits (A1.3), never a "
+            "second step table. Takes precedence over --json."
+        ),
+    ),
     public_dir: str | None = typer.Option(
         None,
         "--public-dir",
@@ -86,10 +173,10 @@ def doctor(
         "--fix",
         help=(
             "Apply auto-fixes for fixable issues (TREE-3: render missing memory HTML; "
-            "TREE-4: create missing dirs with README + .gitkeep; MEM-PLACEHOLDER-1: "
+            "TREE-4: create missing dirs with AGENTS.md + .gitkeep; MEM-PLACEHOLDER-1: "
             "remove unfilled placeholder atoms from old scaffolds). "
-            "Warn-only invariants (TREE-1, TREE-2, TREE-5) are never auto-fixed. "
-            "After fixing, re-checks and reports residual issues."
+            "Warn-only invariants (TREE-1, TREE-2, TREE-5, TREE-8) are never "
+            "auto-fixed. After fixing, re-checks and reports residual issues."
         ),
     ),
 ) -> None:
@@ -119,53 +206,17 @@ def doctor(
     )
     issues = doctor_svc.check()
 
-    # Always surface TREE-1/TREE-2 migration hints (even under --fix).
-    migration_issues = [i for i in issues if i.code in ("TREE-1", "TREE-2")]
-    if migration_issues:
-        for mi in migration_issues:
-            typer.echo(f"[MIGRATION] {mi.description}", err=True)
+    _print_migration_hints(issues)
 
     if fix:
-        fixed = doctor_svc.fix(issues)
-        if fixed:
-            typer.echo(f"[fix] Applied {len(fixed)} auto-fix(es):")
-            for f_issue in fixed:
-                typer.echo(f"  [fixed] {f_issue.code}: {f_issue.path}")
-        # Re-check after fixes to get residual state.
-        issues = doctor_svc.check()
+        issues = _apply_doctor_fix(doctor_svc, issues)
 
-    if json_output:
-        payload = {
-            "specs_dir": str(target),
-            "issues": [i.to_dict() for i in issues],
-            "summary": {
-                "errors": sum(1 for i in issues if i.severity == Severity.ERROR),
-                "warnings": sum(1 for i in issues if i.severity == Severity.WARNING),
-            },
-        }
-        typer.echo(json.dumps(payload, indent=2, ensure_ascii=False))
+    if recipe:
+        _print_recipe(issues)
+    elif json_output:
+        _print_json_result(target, issues)
     else:
-        if not issues:
-            typer.echo(f"[ok] {target} — 0 errors, 0 warnings.")
-        else:
-            errors = [i for i in issues if i.severity == Severity.ERROR]
-            warnings = [i for i in issues if i.severity == Severity.WARNING]
-            typer.echo(
-                f"[{'fail' if errors else 'warn'}] {target} — "
-                f"{len(errors)} error(s), {len(warnings)} warning(s):"
-            )
-            for issue in issues:
-                marker = "ERR " if issue.severity == Severity.ERROR else "WARN"
-                location = f" ({issue.path})" if issue.path else ""
-                typer.echo(f"  [{marker}] {issue.code}: {issue.description}{location}")
-            # Authoritative final verdict line (bug: specs-doctor-dual-error-counter).
-            # A memory-lint issue may embed its own "Summary: … 0 ERROR" text; this final
-            # line is the single source of truth so the last output line never contradicts
-            # the real result.
-            typer.echo(
-                f"[{'fail' if errors else 'ok'}] overall: {len(errors)} error(s), "
-                f"{len(warnings)} warning(s) — {target}"
-            )
+        _print_human_result(target, issues)
 
     has_errors = any(i.severity == Severity.ERROR for i in issues)
     sys.exit(1 if has_errors else 0)

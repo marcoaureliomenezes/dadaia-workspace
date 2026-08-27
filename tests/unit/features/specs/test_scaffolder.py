@@ -25,6 +25,12 @@ _TEMPLATES_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "templates"
 # retired. The paths below are the complete scaffolded set, including scoped rules,
 # an empty generated catalog, and the v0.1.46
 # AC-4 per-artifact _archive dirs (FROZEN gate-class landing zone).
+#
+# v6 canon (T-050-05, FR1, specs_pattern_version 5 -> 6): root specs/_archive/ and
+# specs/assets/ retire — neither is a v6 canon root member (TREE-8) — replaced by
+# releases/_ideas/ + releases/_archive/ (RELEASE.jsonl-ready) and a new ADRs/ root
+# member. Every scaffold README.md retires into its area's AGENTS.md (backlog/,
+# bugs/, releases/, audits/ now each carry one, matching root and memory/).
 _EXPECTED_FILES = [
     "constitution.md",
     "AGENTS.md",
@@ -35,14 +41,25 @@ _EXPECTED_FILES = [
     "memory/product/index.md",
     "memory/product/catalog.json",
     "releases/ACTIVE.md",
+    "releases/AGENTS.md",
+    "backlog/AGENTS.md",
     "backlog/BACKLOG.md",
-    "_archive/releases/.gitkeep",
-    "_archive/legacy-features/.gitkeep",
-    "assets/.gitkeep",
+    "bugs/AGENTS.md",
+    "audits/AGENTS.md",
+    "releases/_ideas/.gitkeep",
+    "releases/_archive/.gitkeep",
+    "ADRs/.gitkeep",
     "backlog/_archive/.gitkeep",
     "audits/_archive/.gitkeep",
     "bugs/_archive/.gitkeep",
 ]
+
+# T-050-05 (A1.1): the v6 canon root is exactly these 8 members — nothing else is
+# emitted directly under specs_dir by a fresh scaffold (retired: root _archive/,
+# assets/; new: ADRs/).
+_V6_CANON_ROOT = frozenset(
+    {"backlog", "bugs", "memory", "releases", "audits", "ADRs", "constitution.md", "AGENTS.md"}
+)
 
 
 def test_scaffold_happy_path_creates_all_artifacts(tmp_path: Path) -> None:
@@ -86,6 +103,38 @@ def test_scaffold_happy_path_creates_all_artifacts(tmp_path: Path) -> None:
     assert (specs_dir / "AGENTS.md").read_text(encoding="utf-8") == (
         _TEMPLATES_DIR / "specs-AGENTS.md"
     ).read_text(encoding="utf-8")
+
+
+def test_scaffold_emits_exact_v6_canon_root_zero_readme_zero_assets(tmp_path: Path) -> None:
+    """Intent: CONTRACT — A1.1 (T-050-05).
+
+    A freshly scaffolded workspace emits the v6 canon root exactly (backlog/, bugs/,
+    memory/, releases/, audits/, ADRs/, constitution.md, AGENTS.md) — nothing else
+    directly under specs_dir — and carries zero README.md and zero assets/ anywhere
+    in the scaffolded tree.
+    """
+    specs_dir = tmp_path / "specs"
+    result = scaffold(
+        specs_dir=specs_dir,
+        project_name="v6-project",
+        force=False,
+        templates_dir=_TEMPLATES_DIR,
+    )
+    assert result.errors == [], f"Unexpected errors: {result.errors}"
+
+    root_entries = {p.name for p in specs_dir.iterdir()}
+    assert root_entries == _V6_CANON_ROOT, (
+        f"specs/ root must be exactly the v6 canon: {sorted(_V6_CANON_ROOT)}, "
+        f"got: {sorted(root_entries)}"
+    )
+
+    readmes = list(specs_dir.rglob("README.md"))
+    assert readmes == [], f"v6 canon emits zero README.md, found: {readmes}"
+
+    assert not (specs_dir / "assets").exists(), "v6 canon emits zero assets/"
+
+    for area in ("backlog", "bugs", "releases", "audits"):
+        assert (specs_dir / area / "AGENTS.md").exists(), f"{area}/AGENTS.md must exist"
 
 
 def test_scaffolded_backlog_skeleton_pins_writer_and_round_trips_load_document(

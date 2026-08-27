@@ -271,21 +271,11 @@ def test_fresh_scaffold_passes_all_tree_invariants(tmp_path: Path) -> None:
         templates_dir=_TEMPLATES_DIR,
     )
     assert result.errors == [], f"Scaffold errors: {result.errors}"
-
-    bugs_dir = specs / "bugs"
-    bugs_dir.mkdir(exist_ok=True)
-    src_readme = _SCAFFOLD_DIR / "bugs" / "README.md"
-    if src_readme.exists():
-        (bugs_dir / "README.md").write_text(
-            src_readme.read_text(encoding="utf-8"), encoding="utf-8"
-        )
-    (bugs_dir / ".gitkeep").write_text("", encoding="utf-8")
-
-    agents_template = _TEMPLATES_DIR / "specs-AGENTS.md"
-    if agents_template.exists():
-        (specs / "AGENTS.md").write_text(
-            agents_template.read_text(encoding="utf-8"), encoding="utf-8"
-        )
+    # v6 canon (T-050-05, FR1): scaffold() already writes bugs/AGENTS.md,
+    # bugs/_archive/.gitkeep and specs/AGENTS.md itself — the old hand-rolled
+    # bugs/README.md + specs/AGENTS.md injection this test used to need (the scaffold
+    # README.md presence assertions this test carried, qa-engineer amendment 11) is
+    # retired with its subject: scaffold() covers the full tree on its own now.
 
     doctor = SpecsDoctor(specs, public_dir=_PUBLIC_DIR)
     issues = doctor.check()
@@ -296,13 +286,14 @@ def test_fresh_scaffold_passes_all_tree_invariants(tmp_path: Path) -> None:
     )
 
     # Also assert the canonical scaffold copytree route (T-021-16 (a)) yields the same
-    # full tree independent of the scaffold() function's own file list.
+    # full tree independent of the scaffold() function's own file list. v6 canon: the
+    # source scaffold tree carries AGENTS.md per area now (README.md retired).
     import shutil
 
     specs2_dir = tmp_path.parent / (tmp_path.name + "-copytree") / "specs"
     shutil.copytree(str(_SCAFFOLD_DIR), str(specs2_dir))
     assert (specs2_dir / "audits").is_dir()
-    assert (specs2_dir / "audits" / "README.md").exists()
+    assert (specs2_dir / "audits" / "AGENTS.md").exists()
     assert (specs2_dir / "memory" / "AGENTS.md").exists()
     assert (specs2_dir / "memory" / "quality-assurance.md").exists()
 
@@ -538,7 +529,8 @@ def test_silent_matrix(tmp_path: Path, case: str, mutate, code: str | None) -> N
 def test_tree4_creates_missing_dirs_others_have_no_autofix(tmp_path: Path) -> None:
     import shutil
 
-    # TREE-4 fix creates backlog/, bugs/ (and audits/) with README.md + .gitkeep.
+    # TREE-4 fix creates backlog/, bugs/ (and audits/) with AGENTS.md + .gitkeep
+    # (v6 canon, T-050-05, FR1: README.md retired).
     specs = _make_clean_specs_tree(tmp_path)
     for dirname in ("backlog", "bugs", "audits"):
         d = specs / dirname
@@ -553,7 +545,7 @@ def test_tree4_creates_missing_dirs_others_have_no_autofix(tmp_path: Path) -> No
     for dirname in ("backlog", "bugs", "audits"):
         d = specs / dirname
         assert d.exists(), f"specs/{dirname}/ must be created by fix()"
-        assert (d / "README.md").exists()
+        assert (d / "AGENTS.md").exists()
         assert (d / ".gitkeep").exists()
     residual = [i for i in doctor.check() if i.code == "TREE-4"]
     assert residual == [], f"Residual TREE-4 after fix: {[i.description for i in residual]}"

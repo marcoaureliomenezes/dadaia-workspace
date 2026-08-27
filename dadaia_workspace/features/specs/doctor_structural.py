@@ -29,6 +29,25 @@ _TREE3_MEMORY_FILES: tuple[str, ...] = (
 # TREE-4: directories that must exist.
 _TREE4_REQUIRED_DIRS = ("audits", "backlog", "bugs", "releases")
 
+# TREE-8: the v6 canon root (FR1, specs_pattern_version 5 -> 6) — nothing else is
+# conformant directly under specs/. WARN-only (D15): a canon that blocks is the slop
+# this release removes. Root-canon membership only; nested per-area member shape
+# (e.g. the release-directory member canon of A1.9) is out of this check's scope for
+# now — left for whichever later FR (FR2/FR13/FR19/FR6) extends it once that area's
+# shape is built (T-050-05 commit).
+_TREE8_CANON_ROOT: frozenset[str] = frozenset(
+    {
+        "backlog",
+        "bugs",
+        "memory",
+        "releases",
+        "audits",
+        "ADRs",
+        "constitution.md",
+        "AGENTS.md",
+    }
+)
+
 # TREE-6: mandatory artifacts per phase bucket.
 _TREE6_IMPL_ARTIFACTS = ("SPEC.md", "PLAN.md", "TASKS.md")
 
@@ -134,9 +153,9 @@ class StructuralValidator:
         """TREE-4: backlog/, bugs/, and releases/ must exist under specs/.
 
         When a directory is absent the issue is emitted as fixable=True.
-        The fix creates the dir, writes README.md (content copied from the
-        canonical scaffold source), and touches .gitkeep — matching the exact
-        output of ``scaffold()``.
+        The fix creates the dir, writes AGENTS.md (content copied from the
+        canonical scaffold source — v6 canon, FR1: README.md retired), and
+        touches .gitkeep — matching the exact output of ``scaffold()``.
         """
         issues: list[SpecsDoctorIssue] = []
         for dirname in _TREE4_REQUIRED_DIRS:
@@ -145,7 +164,7 @@ class StructuralValidator:
                 continue
             fixable = (
                 self._scaffold_dir is not None
-                and (self._scaffold_dir / dirname / "README.md").exists()
+                and (self._scaffold_dir / dirname / "AGENTS.md").exists()
             )
             issues.append(
                 SpecsDoctorIssue(
@@ -206,20 +225,20 @@ class StructuralValidator:
         shutil.rmtree(stray, ignore_errors=True)
 
     def fix_tree4(self, issue: SpecsDoctorIssue) -> None:
-        """Create the missing directory with README.md and .gitkeep."""
+        """Create the missing directory with AGENTS.md and .gitkeep."""
         assert issue.code == "TREE-4"
         target = Path(issue.path)  # type: ignore[arg-type]
         dirname = target.name
         target.mkdir(parents=True, exist_ok=True)
-        # README.md — copy from scaffold source
-        readme_content = ""
+        # AGENTS.md — copy from scaffold source (v6 canon, FR1: README.md retired)
+        agents_content = ""
         if self._scaffold_dir is not None:
-            src_readme = self._scaffold_dir / dirname / "README.md"
-            if src_readme.exists():
-                readme_content = src_readme.read_text(encoding="utf-8")
-        readme = target / "README.md"
-        if not readme.exists():
-            readme.write_text(readme_content, encoding="utf-8")
+            src_agents = self._scaffold_dir / dirname / "AGENTS.md"
+            if src_agents.exists():
+                agents_content = src_agents.read_text(encoding="utf-8")
+        agents_md = target / "AGENTS.md"
+        if not agents_md.exists():
+            agents_md.write_text(agents_content, encoding="utf-8")
         # .gitkeep
         gitkeep = target / ".gitkeep"
         if not gitkeep.exists():
@@ -453,8 +472,9 @@ class StructuralValidator:
         if not bugs_dir.exists():
             return issues
         for bug_file in sorted(bugs_dir.glob("*.md")):
-            # Skip README.md and other non-bug files
-            if bug_file.name in ("README.md",):
+            # Skip README.md (legacy) and AGENTS.md (v6 canon, FR1) and other
+            # non-bug files
+            if bug_file.name in ("README.md", "AGENTS.md"):
                 continue
             text = bug_file.read_text(encoding="utf-8")
             has_session_id = bool(re.search(r"^session_id\s*:", text, re.MULTILINE))
@@ -473,4 +493,38 @@ class StructuralValidator:
                         fixable=False,
                     )
                 )
+        return issues
+
+    def check_tree8_canon_root(self) -> list[SpecsDoctorIssue]:
+        """TREE-8: every top-level entry directly under specs/ must be a v6 canon
+        root member (FR1, specs_pattern_version 5 -> 6): backlog/, bugs/, memory/,
+        releases/, audits/, ADRs/, constitution.md, AGENTS.md — nothing else.
+
+        WARN-only (fixable=False) — compliance never blocks (D15): a canon that exits
+        non-zero on a migration-in-progress tree is exactly the slop this release
+        removes. Dotfiles (e.g. editor/OS artifacts) are ignored. Root-canon
+        membership only; TREE-8 does not recurse into conformant areas.
+        """
+        if not self.specs_dir.is_dir():
+            return []
+        issues: list[SpecsDoctorIssue] = []
+        for entry in sorted(self.specs_dir.iterdir()):
+            if entry.name.startswith("."):
+                continue
+            if entry.name in _TREE8_CANON_ROOT:
+                continue
+            issues.append(
+                SpecsDoctorIssue(
+                    code="TREE-8",
+                    severity=Severity.WARNING,
+                    description=(
+                        f"specs/{entry.name} is not part of the v6 canon root "
+                        "(backlog/, bugs/, memory/, releases/, audits/, ADRs/, "
+                        "constitution.md, AGENTS.md). Compliance is WARN-only — "
+                        "migrate or remove it when convenient (TREE-8, D15)."
+                    ),
+                    path=str(entry),
+                    fixable=False,
+                )
+            )
         return issues

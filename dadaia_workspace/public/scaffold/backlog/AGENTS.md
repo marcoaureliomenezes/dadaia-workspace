@@ -1,4 +1,7 @@
-# Backlog
+# specs/backlog/ — Backlog Rules
+
+Scope: this file governs only `specs/backlog/`. It replaces the retired
+`backlog/README.md` (v6 canon, FR1) — its content lives here now.
 
 The backlog is a **single document**: `specs/backlog/BACKLOG.md`. There is no per-entry
 file per backlog item — everything lives in one of this document's two sections (ADR #14;

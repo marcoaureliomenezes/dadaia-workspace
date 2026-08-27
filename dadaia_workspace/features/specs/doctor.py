@@ -140,6 +140,7 @@ class SpecsDoctor:
         issues.extend(self._structural.check_memory_agents_md())
         issues.extend(self._structural.check_tree6_release_artifacts())
         issues.extend(self._structural.check_tree7_bug_session_id())
+        issues.extend(self._structural.check_tree8_canon_root())  # v6 canon, FR1
         # CAT-1 (memory-context-enforcement-v1) — now based on .md files
         issues.extend(self._memory.check_cat1_catalog_sync())
         # LINT-1 (memory-markdown-source-v1) — invoke lint-memory-atoms.py

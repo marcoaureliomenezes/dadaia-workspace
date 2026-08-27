@@ -1,4 +1,7 @@
-# Releases
+# specs/releases/ — Release Rules
+
+Scope: this file governs only `specs/releases/`. It replaces the retired
+`releases/README.md` (v6 canon, FR1) — its content lives here now.
 
 This directory contains all release directories for this Spec Context Project.
 
@@ -7,19 +10,23 @@ This directory contains all release directories for this Spec Context Project.
 ```
 releases/
   ACTIVE.md                  — points to the currently active release
-  <release-id>/
+  AGENTS.md                  — this file
+  <release-id>/               — bare SemVer (e.g. `0.6.0`), the current axis
     SPEC.md                  — release specification (Status: Draft → Aprovado)
     PLAN.md                  — implementation plan (added after SPEC is approved)
     TASKS.md                 — task checklist with [ ]/[-]/[x] markers
+    reviews/                 — pre-PR review artifacts
+    verdicts/                — required-check evidence handoffs
     CLOSURE.md               — closure report (added after all tasks are done)
-  legacy/                    — deprecated artifacts migrated from old tree layout
+  _ideas/<release-id>/        — pre-approval drafts; MUTATING, never a trust root
+  _archive/<release-id>/      — archived releases (`v`-prefixed ids resolve here too)
 ```
 
 ## Authoring Rules
 
-- Each release directory is named with a version matching `^v\d+\.\d+\.\d+$` (e.g.
-  `v0.6.0`) — the canonical release-naming pattern; a bare slug is not a valid
-  release id.
+- Each live release directory is named with a **bare** SemVer id (`^\d+\.\d+\.\d+$`, e.g.
+  `0.6.0`) — the canonical current-axis pattern; a `v`-prefixed id is minted nowhere and
+  resolves only archived directories (read-only lookup).
 - Release directories are created with `dadaia release new <id>` — do NOT create them
   manually to ensure canonical SPEC.md frontmatter.
 - SDD lifecycle order: `SPEC.md` (Status: Draft) → operator approval → `PLAN.md` →
@@ -41,7 +48,10 @@ releases/
 session to resolve the active release before touching any implementation file. When no
 release is active, `ACTIVE.md` must contain `release: none`.
 
-## Legacy Directory
+## `_ideas/` and `_archive/`
 
-The `legacy/` subdirectory is populated by `dadaia migrate tree-v2` when migrating
-existing consumer repos from the old layout. Do not create files there manually.
+`_ideas/<release-id>/` holds a pre-approval Draft (SPEC, and sometimes PLAN/TASKS) before
+its release opens for real — it stays MUTATING and is never treated as an evidence root
+by any required check. `_archive/<release-id>/` is the landing zone for a closed
+release, moved there by `git mv` at closure; both bare and legacy `v`-prefixed ids
+resolve for read-only archive lookups.
