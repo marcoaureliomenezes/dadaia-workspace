@@ -961,7 +961,7 @@ entry is created here); the restated git-identity standing question; archive dec
 
 ---
 
-- [ ] **T-045-39 — [git] Archive the release**
+- [x] **T-045-39 — [git] Archive the release**
 
 **Owner role:** dispatcher · **Commit:** `chore(T-045-39): archive v0.4.5`
 
@@ -977,7 +977,7 @@ memory → CLOSURE → sweep → archive.
 
 ---
 
-- [ ] **T-045-40 — [git] Final-`rc` merge: version bump and PR → `develop`**
+- [-] **T-045-40 — [git] Final-`rc` merge: version bump and PR → `develop`**
 
 **Owner role:** dispatcher + software-engineer + security-reviewer
 
