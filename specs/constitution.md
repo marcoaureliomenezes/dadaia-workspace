@@ -194,7 +194,7 @@ by `ARCHITECTURE.md` P-17 (ADR 0017 proposed) (**C-18**).
 This constitution is versioned (`constitution_version`, semver): MAJOR for a changed or
 removed article, MINOR for a new article or substantive clarification, PATCH for wording. An
 amendment lands with the ADR that decided it (§13); amendment history lives in the amending
-release's `RELEASE.jsonl` notes and in `_archive/`, never inline. `dadaia specs doctor` holds
+release's `RELEASE.json` notes and in `_archive/`, never inline. `dadaia specs doctor` holds
 this law consistent with code and memory (**C-19**).
 
 ## 16. Rules Map to Skills

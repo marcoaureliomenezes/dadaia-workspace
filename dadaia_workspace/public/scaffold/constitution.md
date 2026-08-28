@@ -119,7 +119,7 @@ release) segue a `DADAIA.md` §6.
 release, e apenas nas fases de definição e de fechamento de release. Todo outro agente
 lê a memória livremente mas nunca a escreve. Memória é o estado atual do produto, não
 um changelog — histórico e decisões superadas vivem nos registros `note` do
-`RELEASE.jsonl` de cada release e no arquivo, nunca em `specs/memory/**`.
+`RELEASE.json` de cada release e no arquivo, nunca em `specs/memory/**`.
 
 ---
 
