@@ -27,7 +27,9 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 def test_contract_tier_carries_30s_timeout(request: pytest.FixtureRequest) -> None:
     marker = request.node.get_closest_marker("timeout")
     assert marker is not None, "conftest applied no timeout marker to a contract-tier test"
-    assert marker.args and marker.args[0] == 30
+    from tests import conftest
+
+    assert marker.args and marker.args[0] == conftest.tier_timeout_seconds("contract")
 
 
 @pytest.mark.timeout(45)
@@ -171,3 +173,21 @@ def test_naked_quarantine_refusal_is_actionable_serial_and_xdist() -> None:
             )
     finally:
         probe.unlink(missing_ok=True)
+
+
+def test_tier_ceiling_is_platform_calibrated_once_in_conftest() -> None:
+    """Intent: CONTRACT — bug ``windows-xdist-workers-crash-on-unit-fast-tier``.
+
+    The tier table is calibrated on the Linux runners; Windows CI runs the same
+    tree-copying unit tests 2–3× slower (the goldens test: <5s Linux, 9.7–16s Windows),
+    and pytest-timeout's only Windows method (``thread``) ends the xdist worker with
+    ``os._exit`` — an unattributable "worker crashed" instead of a loud failure. The
+    calibration lives in ONE function, never in per-test markers.
+    """
+    from tests import conftest
+
+    assert conftest.tier_timeout_seconds("unit", platform="linux") == 10
+    assert conftest.tier_timeout_seconds("unit", platform="win32") == 30
+    assert conftest.tier_timeout_seconds("contract", platform="darwin") == 30
+    assert conftest.tier_timeout_seconds("e2e", platform="win32") == 360
+    assert conftest.tier_timeout_seconds("slow", platform="win32") is None
