@@ -49,9 +49,13 @@ _AUDIT_DIR_GRANDFATHER: frozenset[str] = frozenset(
     }
 )
 
-# SPEC-DOC-034 (v0.1.46 AC-4): the three per-artifact ``_archive`` dirs that must exist
-# (the FROZEN landing zone for disposed bugs/backlog/audits). Absent → WARN + auto-fix.
-_ARCHIVE_PARENT_DIRS: tuple[str, ...] = ("backlog", "audits", "bugs")
+# SPEC-DOC-034 (v0.1.46 AC-4): the per-artifact ``_archive`` dirs that must PRE-EXIST
+# (the FROZEN landing zone for disposed bugs/backlog). ``audits`` is deliberately
+# excluded (v0.5.0 specs-canon closure): an audit archives to specs/audits/_archive/
+# only once fully dispositioned (DADAIA.md §6) — a rare, optional event, unlike
+# backlog/bugs' routine histo-ledger appends — so it must NOT be pre-created empty;
+# it lands on disk the moment the first audit actually archives.
+_ARCHIVE_PARENT_DIRS: tuple[str, ...] = ("backlog", "bugs")
 
 # FR13 (D5): a finding's mutable governance triple. A record is done once its
 # ``disposition`` lands here AND names a disposing ``release`` — the only two facts

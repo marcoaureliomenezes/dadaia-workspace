@@ -161,9 +161,10 @@ def doctor(
         "--fix",
         help=(
             "Apply auto-fixes for fixable issues (TREE-3: render missing memory HTML; "
-            "TREE-4: create missing dirs with AGENTS.md; MEM-PLACEHOLDER-1: "
-            "remove unfilled placeholder atoms from old scaffolds). "
-            "Warn-only invariants (TREE-1, TREE-2, TREE-5, TREE-8) are never "
+            "TREE-4: create missing dirs with AGENTS.md; TREE-8: remove a stray "
+            "non-canon root entry or dotfile; MEM-PLACEHOLDER-1: remove unfilled "
+            "placeholder atoms from old scaffolds). "
+            "Warn-only invariants (TREE-1, TREE-2, TREE-5) are never "
             "auto-fixed. After fixing, re-checks and reports residual issues."
         ),
     ),

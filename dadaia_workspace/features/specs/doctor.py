@@ -6,7 +6,8 @@ single-responsibility validator siblings plus two shared leaf modules:
 
   * ``doctor_types``     — ``Severity`` / ``SpecsDoctorIssue`` / ``_MemoryMdSummary``
   * ``doctor_common``    — cross-validator pure helpers (``resolve_live_release_id`` + release-dir discovery)
-  * ``doctor_structural``   — TREE-1..7 + TREE-5M spec-tree invariants; ``fix_tree4``
+  * ``doctor_structural``   — TREE-1..8 + TREE-5M spec-tree invariants; ``fix_tree4``,
+                              ``fix_tree8``
   * ``doctor_memory``       — memory files/atomicity, CAT-1, LINT-1 (holds the lazy
                               ``infrastructure.subprocess_runner`` import)
   * ``doctor_release``      — active release (RELEASE.jsonl fold), release artifacts, SemVer + ledger invariants
@@ -222,6 +223,9 @@ class SpecsDoctor:
                     fixed.append(issue)
                 elif issue.code == "REPO-DADAIA-1":
                     self._structural.fix_repo_dadaia1(issue)
+                    fixed.append(issue)
+                elif issue.code == "TREE-8":
+                    self._structural.fix_tree8(issue)
                     fixed.append(issue)
                 elif issue.code == "SPEC-DOC-034":
                     self._closure_audit.fix_archive_dir(issue)

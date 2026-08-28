@@ -103,12 +103,6 @@
       "severity": "warning"
     },
     {
-      "code": "SPEC-DOC-034",
-      "description": "specs/audits/_archive/ is missing — the FROZEN landing zone for disposed artifacts (SPEC-DOC-034, WARNING). Auto-fix available (run doctor --fix).",
-      "path": "<SPECS>/audits/_archive",
-      "severity": "warning"
-    },
-    {
       "code": "SPEC-DOC-035",
       "description": "backlog/candidates.md is a loose per-entry file directly under specs/backlog/ — the single source is BACKLOG.md (## ACTIVE + ## LEDGER); fold it into BACKLOG.md and move the superseded file into specs/backlog/_archive/ (SPEC-DOC-035, WARNING).",
       "path": "<SPECS>/backlog/candidates.md",
@@ -118,6 +112,6 @@
   "specs_dir": "<SPECS>",
   "summary": {
     "errors": 7,
-    "warnings": 12
+    "warnings": 11
   }
 }

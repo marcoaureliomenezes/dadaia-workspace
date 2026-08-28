@@ -139,7 +139,6 @@ def _make_clean_specs_tree(root: Path, release_id: str = "r1") -> Path:
     specs = root / "specs"
     (specs / "memory" / "product").mkdir(parents=True)
     (specs / "releases" / release_id).mkdir(parents=True)
-    (specs / "_archive" / "releases").mkdir(parents=True)
     (specs / "backlog").mkdir(parents=True)
 
     (specs / "constitution.md").write_text("# Constitution\n\nThe laws.\n", encoding="utf-8")

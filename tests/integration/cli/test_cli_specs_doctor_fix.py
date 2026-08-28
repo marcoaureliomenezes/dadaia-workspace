@@ -83,10 +83,10 @@ def test_doctor_clean_tree_then_remove_backlog_then_fix_recreates_then_no_fix_ne
     assert not arch.exists(), "Without --fix, missing files must NOT be created"
 
 
-def test_tree8_stray_root_folder_warns_but_exit_code_stays_unchanged(tmp_path: Path) -> None:
-    """A1.2 exit-code fixture: TREE-8 compliance is WARN-only (D15) — a stray,
-    non-canon top-level folder under specs/ is reported, but never flips exit code
-    away from what the rest of the tree would already produce."""
+def test_tree8_stray_root_folder_errors_and_fix_removes_it(tmp_path: Path) -> None:
+    """v0.5.0 specs-canon closure: TREE-8 compliance is ERROR + auto-fixable — a
+    stray, non-canon top-level folder under specs/ flips the exit code non-zero,
+    and ``--fix`` removes it, restoring the baseline exit code."""
     specs = _make_minimal_specs(tmp_path)
 
     baseline = _runner.invoke(
@@ -95,7 +95,8 @@ def test_tree8_stray_root_folder_warns_but_exit_code_stays_unchanged(tmp_path: P
     )
     assert baseline.exit_code == 0, f"Expected exit 0; got {baseline.exit_code}:\n{baseline.output}"
 
-    (specs / "scratch-legacy-folder").mkdir()
+    stray = specs / "scratch-legacy-folder"
+    stray.mkdir()
 
     stray_result = _runner.invoke(
         app,
@@ -104,7 +105,17 @@ def test_tree8_stray_root_folder_warns_but_exit_code_stays_unchanged(tmp_path: P
     assert "TREE-8" in stray_result.output, (
         f"Expected TREE-8 to fire on the stray folder; output:\n{stray_result.output}"
     )
-    assert stray_result.exit_code == baseline.exit_code == 0, (
-        "TREE-8 WARNING must never change the exit code (D15, A1.2) — got "
+    assert stray_result.exit_code != 0, (
+        "TREE-8 ERROR must flip the exit code non-zero — got "
         f"{stray_result.exit_code}:\n{stray_result.output}"
+    )
+
+    fix_result = _runner.invoke(
+        app,
+        ["specs", "doctor", "--fix", "--specs-dir", str(specs), "--public-dir", str(_PUBLIC_DIR)],
+    )
+    assert not stray.exists(), f"--fix must remove the stray folder; output:\n{fix_result.output}"
+    assert fix_result.exit_code == 0, (
+        f"Expected exit 0 after --fix removes the stray entry; got "
+        f"{fix_result.exit_code}:\n{fix_result.output}"
     )
