@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 
 from tests.helpers.scan_population import assert_populated
+from tests.helpers.suite_files import tracked_test_files
 
 pytestmark = pytest.mark.unit
 
@@ -47,7 +48,7 @@ _BESPOKE_EXEMPT = frozenset(
 
 
 def _test_files() -> list[Path]:
-    files = [p for p in _TESTS_ROOT.rglob("*.py") if "_golden" not in p.parts]
+    files = [p for p in tracked_test_files(_TESTS_ROOT.parent) if "_golden" not in p.parts]
     # v0.4.5 FR5 (scan-test-vacuity-guard): non-empty alone still leaves a partially
     # mis-rooted walk undetected; the sentinel half pins this file as a member of its
     # own scanned population.
