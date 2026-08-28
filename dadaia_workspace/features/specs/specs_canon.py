@@ -145,9 +145,7 @@ def canon_violations(paths: Iterable[str]) -> list[str]:
     return [path for path in paths if not is_canon_path(path)]
 
 
-def verdict_violations(
-    paths: Iterable[str], head_sha: str, parent_sha: str | None
-) -> list[str]:
+def verdict_violations(paths: Iterable[str], head_sha: str, parent_sha: str | None) -> list[str]:
     """The verdict business rule (operator, 2026-08-28): ``verdicts/`` may hold at most
     ONE file whose 40-hex name equals *head_sha* or *head_sha*'s first parent
     (*parent_sha*).

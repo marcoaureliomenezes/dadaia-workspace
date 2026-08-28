@@ -129,7 +129,10 @@ def test_at_most_one_matching_verdict_extras_are_violations() -> None:
 
 
 def test_verdict_violations_ignores_non_verdict_shaped_paths() -> None:
-    assert verdict_violations(["AGENTS.md", "backlog/BACKLOG.json"], head_sha="x", parent_sha=None) == []
+    assert (
+        verdict_violations(["AGENTS.md", "backlog/BACKLOG.json"], head_sha="x", parent_sha=None)
+        == []
+    )
 
 
 def test_verdict_violations_with_no_parent_only_checks_head() -> None:
