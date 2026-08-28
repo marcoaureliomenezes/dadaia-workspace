@@ -236,6 +236,8 @@ class ClosureAuditValidator:
         issues: list[SpecsDoctorIssue] = []
         legacy_names: list[str] = []
         for child in sorted(archive_dir.iterdir()):
+            if child.name.endswith("_histo.jsonl"):
+                continue  # the area history file is not an archived audit
             if child.name in _AUDIT_DIR_SKIP_NAMES:
                 continue
             findings_path = child / "FINDINGS.jsonl" if child.is_dir() else None

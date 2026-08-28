@@ -48,6 +48,13 @@ Declaração atômica do propósito do projeto e suas invariantes fundamentais.
 - (Definir o que este projeto não é)
 """
 
+_AREA_HISTO_FILES: tuple[tuple[str, str], ...] = (
+    ("releases", "releases_histo.jsonl"),
+    ("backlog", "backlog_histo.jsonl"),
+    ("bugs", "bugs_histo.jsonl"),
+    ("audits", "audits_histo.jsonl"),
+)
+
 _BACKLOG_STUB = '{"schema": "backlog-v1", "active": []}\n'
 
 
@@ -146,6 +153,14 @@ def scaffold(
                 specs_dir / area / "AGENTS.md",
                 (_scaffold_dir / area / "AGENTS.md").read_text(encoding="utf-8"),
             )
+        # Canon per-area history: each `_archive/` holds only its `*_histo.jsonl`
+        # (empty at birth); releases/_ideas/ carries its own scoped rule.
+        for area, histo in _AREA_HISTO_FILES:
+            _write(specs_dir / area / "_archive" / histo, "")
+        _write(
+            specs_dir / "releases" / "_ideas" / "AGENTS.md",
+            (_scaffold_dir / "releases" / "_ideas" / "AGENTS.md").read_text(encoding="utf-8"),
+        )
     except Exception as exc:
         result.errors.append(f"Scaffold rules error: {exc}")
 

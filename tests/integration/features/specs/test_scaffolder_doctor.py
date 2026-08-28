@@ -49,7 +49,4 @@ def test_fresh_scaffold_passes_specs_doctor(tmp_path: Path) -> None:
             f"  {issue.severity.value} {issue.code}: {issue.description}" for issue in unexpected
         )
     )
-    assert len(known_gaps) == 1, (
-        "Expected exactly one known SPEC-DOC-035 gap (backlog/AGENTS.md); "
-        f"got {known_gaps} — doctor_governance.py may have been fixed, tighten this test."
-    )
+    assert known_gaps == set(), f"no known doctor gap remains on a fresh scaffold: {known_gaps}"

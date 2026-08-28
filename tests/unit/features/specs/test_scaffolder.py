@@ -47,6 +47,11 @@ _EXPECTED_FILES = [
     "bugs/AGENTS.md",
     "audits/AGENTS.md",
     "ADRs/AGENTS.md",
+    "releases/_ideas/AGENTS.md",
+    "releases/_archive/releases_histo.jsonl",
+    "backlog/_archive/backlog_histo.jsonl",
+    "bugs/_archive/bugs_histo.jsonl",
+    "audits/_archive/audits_histo.jsonl",
 ]
 
 # T-050-05 (A1.1): the v6 canon root is exactly these 8 members — nothing else is
@@ -78,12 +83,6 @@ def test_scaffold_happy_path_creates_all_artifacts(tmp_path: Path) -> None:
     for rel in _EXPECTED_FILES:
         full = specs_dir / rel
         assert full.exists(), f"Expected file/dir missing: {rel}"
-
-    for artifact in ("backlog", "audits", "bugs"):
-        assert not (specs_dir / artifact / "_archive").exists(), (
-            f"{artifact}/_archive/ must not be pre-created empty by a fresh scaffold "
-            "— it is kept by its own future content, never a .gitkeep placeholder"
-        )
 
     # ACTIVE.md retired (v0.5.0 FR4/T-050-21A, A4.1): no replacement file — a fresh
     # scaffold's "no active release" state is the honest absence of any directory
