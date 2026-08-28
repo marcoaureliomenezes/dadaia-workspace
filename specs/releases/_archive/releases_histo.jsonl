@@ -169,3 +169,5 @@
 {"ts": "2026-08-28T12:28:39Z", "event": "implemented", "agent": "claude-code", "data": {"release": "v0.4.5", "sha": "c0b2080cf1b6ae76ed19d37aef342fde1d82ef3e", "rc": 1}}
 {"ts": "2026-08-28T12:28:39Z", "event": "shipped", "agent": "claude-code", "data": {"release": "v0.4.5", "sha": "4d1411bbaa9ba4b4cd95fcbf098e2ed95442ff20", "pr": 213}}
 {"ts": "2026-08-28T12:28:39Z", "event": "note", "agent": "claude-code", "data": {"release": "v0.4.5", "text": "Back-fill at ship: rc-1 = final rc (PR #211 -> develop f6373f87); closure PR #212 (60c06b08); squash-merged to main 4d1411bb by PR #213 with tree identity develop==main. Publication withheld by operator order O5."}}
+{"ts": "2026-08-28T19:13:52Z", "event": "shipped", "agent": "claude-code", "data": {"release": "v0.5.0", "sha": "9ebefd5f", "pr": 221}}
+{"ts": "2026-08-28T19:13:52Z", "event": "note", "agent": "claude-code", "data": {"release": "v0.5.0", "text": "Ship back-fill: rc-1 = final rc (PR #219 -> develop be4b2cc2); closure PR #220 (7d5f958a); ancestry PR #222 (f1e8ef45); squash-merged to main 9ebefd5f by PR #221, tree identity develop==main. Publication withheld: no tag, PyPI 0.4.4, approve waiting."}}
