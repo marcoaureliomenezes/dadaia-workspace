@@ -59,7 +59,7 @@
 
 ## W0
 
-- [ ] **T-051-02** — Baselines, before anything changes · owner: software-engineer · write set: none in-repo (captures under `.dadaia/tmp/software-engineer/<YYYYMMDD>/`) · acceptance: A-0.1, A-0.2, A-0.5 baselines exist as measured numbers, never estimates
+- [x] **T-051-02** — Baselines, before anything changes · owner: software-engineer · write set: none in-repo (captures under `.dadaia/tmp/software-engineer/<YYYYMMDD>/`) · acceptance: A-0.1, A-0.2, A-0.5 baselines exist as measured numbers, never estimates
   - captures: `git ls-files 'dadaia_workspace/**/*.py' | xargs wc -l` (production LOC/modules); decider counts per SPEC §1 by `rg` with the exact patterns recorded; `pytest --collect-only -q` per tier + file/function counts; `lint-imports` edge count and `_RECORDED_IGNORE_EDGE_CAP`; `radon cc -s -j dadaia_workspace` ceiling; `dadaia bugs stats`
   - deletes: none
   - parallelism: none — runs first
@@ -68,7 +68,7 @@
 
 ## `alpha-1` — vocabulary, the one value, the free deletion (strictly serial)
 
-- [ ] **T-051-01** — `CONTEXT.md`: the 16 overloaded terms resolved · owner: product-engineer · write set: `CONTEXT.md` (repo root, new) · acceptance: A-11.1
+- [x] **T-051-01** — `CONTEXT.md`: the 16 overloaded terms resolved · owner: product-engineer · write set: `CONTEXT.md` (repo root, new) · acceptance: A-11.1
   - content: one canonical meaning + an **Avoid** list per term, exactly as ruled in R4 — context, session, bind, invocation, root, gate, chokepoint, verdict, projection, harness, drift, record, histo, terminal, canon, handoff, doctor, store/registry/service
   - deletes: none (the only additive task in the release; ~1 file, no production LOC)
   - parallelism: none — naming gate for every later task
@@ -80,14 +80,14 @@
   - preconditions: T-051-01 `[x]`
   - parallelism: none — shares `container.py` with T-051-04
 
-- [ ] **T-051-04** — K9 deletion half: purge the composition root · owner: software-engineer · write set: `dadaia_workspace/container.py`, `dadaia_workspace/features/repos/**` (deleted), `dadaia_workspace/infrastructure/` single-consumer modules that move inside their feature, `pyproject.toml`, `poetry.lock`, the matching `tests/unit/**` files · acceptance: A-9.1, A-9.2, A-9.4
+- [x] **T-051-04** — K9 deletion half: purge the composition root · owner: software-engineer · write set: `dadaia_workspace/container.py`, `dadaia_workspace/features/repos/**` (deleted), `dadaia_workspace/infrastructure/` single-consumer modules that move inside their feature, `pyproject.toml`, `poetry.lock`, the matching `tests/unit/**` files · acceptance: A-9.1, A-9.2, A-9.4
   - deletes: `_workspace_python_bin` · `_repo_hygiene_sweeper` · `_definition_committer` · `_closure_committer` (a `git add -A` committer) · `_memory_lint_gate` (dead since `b94aede3`) · `features/repos` + `ExcelReader` + the `openpyxl` dependency — ~500 LOC
   - keeps: `TelemetryRefreshLock`, `FilePermissionSetter`, `ShutdownHandler` — the three real seams
   - out of scope: retiring the ~17 one-adapter protocol files — gated on the operator accepting T-051-05's ADR
   - preconditions: T-051-03 `[x]` (shared file)
   - parallelism: none
 
-- [ ] **T-051-05** — ADR proposals: P-01/P-08 protocol-per-adapter, P-09 home rename · owner: software-architect · write set: `specs/ADRs/decisions.jsonl` · acceptance: A-9.3
+- [x] **T-051-05** — ADR proposals: P-01/P-08 protocol-per-adapter, P-09 home rename · owner: software-architect · write set: `specs/ADRs/decisions.jsonl` · acceptance: A-9.3
   - content: one record proposing that the ring rule stays and the "every adapter behind a protocol" requirement is dropped from P-01/P-08 as measured, with the container-funnel evidence; the same or a sibling record carrying P-09's home move `core.specs_resolver.resolve_context` → `core.invocation.resolve`
   - status: **`proposed`** — an agent never writes `accepted`
   - deletes: none (governance record; zero production LOC)

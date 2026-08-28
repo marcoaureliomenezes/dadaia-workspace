@@ -423,17 +423,6 @@ def copy_tree(
         copy_file(src, dst_dir / rel, force, installed)
 
 
-def remove_stale_files(src_dir: Path, dst_dir: Path, pattern: str, installed: list[str]) -> None:
-    """Remove stale files from *dst_dir* whose names no longer exist in *src_dir*."""
-    if not dst_dir.exists():
-        return
-    expected = {src.name for src in src_dir.glob(pattern)} if src_dir.exists() else set()
-    for stale in sorted(dst_dir.glob(pattern)):
-        if stale.name not in expected:
-            stale.unlink()
-            installed.append(f"[rm]   {stale}")
-
-
 # ---------------------------------------------------------------------------
 # Runtime expectations (yields for doctor comparison)
 # ---------------------------------------------------------------------------
