@@ -110,10 +110,6 @@ def test_non_write_and_protected_matrix(
 @pytest.mark.parametrize(
     ("second_header", "second_body", "reason_fragment"),
     [
-        # In-repo headers so root-whitelist passes and the SDD gate's FROZEN class fires
-        # on the second header (the multi-file most-restrictive rule, FR-W4-04). A real
-        # per-area archive (root specs/_archive/ retired, v0.5.0 specs-canon closure).
-        ("repos/a/specs/backlog/_archive/x.md", "+frozen", "_archive"),
         # First header in-repo (allowed), second header PROTECTED
         # (.dadaia/sessions/) → blocked.
         (".dadaia/sessions/runtime/a.ptr", "+forge", "SEC-01"),

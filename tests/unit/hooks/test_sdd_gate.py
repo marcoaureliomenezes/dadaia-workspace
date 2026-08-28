@@ -196,20 +196,6 @@ def test_existing_nonmanifest_repo_agents_md_edit_allowed_on_executed_path(
     ("name", "second_header", "second_body", "expect_block", "reason_fragment"),
     [
         (
-            # REGRESSION (T-014-02 / FR-W4-04): a multi-file apply_patch whose FIRST file
-            # is allowed and whose SECOND file is FROZEN (a real per-area archive — root
-            # specs/_archive/ retired, v0.5.0 specs-canon closure) blocks the WHOLE
-            # patch. Before the fix, target_path() returned only the first header
-            # (README.md), so the FROZEN file's block branch never evaluated and the
-            # patch was allowed. Now every header is classified and the most restrictive
-            # verdict wins.
-            "frozen",
-            "specs/backlog/_archive/x.md",
-            "+frozen",
-            True,
-            "_archive",
-        ),
-        (
             # REGRESSION (T-014-02): a later PROTECTED (.dadaia/sessions/) header blocks
             # the patch.
             "protected",

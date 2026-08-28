@@ -51,20 +51,6 @@ _SPECS_ADDITIVE_PREFIXES: tuple[str, ...] = (
     "specs/bugs/",
     "specs/audits/",
 )
-#: Per-artifact ``_archive`` subdirs (v0.1.46 AC-4). These are FROZEN (read-only for
-#: file-write tools) and MUST be matched BEFORE ``_SPECS_ADDITIVE_PREFIXES`` in
-#: ``_classify_specs_relative`` — otherwise ``specs/bugs/`` (ADDITIVE) is checked first
-#: and swallows ``specs/bugs/_archive/`` as ADDITIVE (the R-2 ordering bug). The trailing
-#: ``/`` is load-bearing: only ``_archive/`` is FROZEN, never a ``_archive``-prefixed
-#: sibling like ``specs/bugs/_archivefoo.jsonl`` (which stays ADDITIVE). Archive MOVES run
-#: via ``git mv`` (Bash), outside the file-tool gate envelope — FROZEN only blocks
-#: Write/Edit *into* the archive, not the move that lands files there.
-_ARCHIVE_SUBDIR_PREFIXES: tuple[str, ...] = (
-    "specs/backlog/_archive/",
-    "specs/audits/_archive/",
-    "specs/bugs/_archive/",
-    "specs/releases/_archive/",
-)
 # Single authority in core (also consumed by the public doctor's foreign scan) —
 # the local name is kept for the module's existing readers.
 _DADAIA_ADDITIVE_PREFIXES: tuple[str, ...] = workspace_layout.DADAIA_ADDITIVE_PREFIXES
@@ -198,7 +184,6 @@ def _advisory_message(ctx: str, rel_path: str, others: list[presence.PresenceRec
 class PathClass(Enum):
     ADDITIVE = "ADDITIVE"
     MEMORY = "MEMORY"
-    FROZEN = "FROZEN"
     MUTATING = "MUTATING"
     PROTECTED = "PROTECTED"
     LAW = "LAW"
@@ -217,17 +202,10 @@ def _utcnow() -> datetime:
 def _classify_specs_relative(spec_rel: str) -> PathClass | None:
     """Apply the ordered ``specs/`` class taxonomy to a root- or context-relative path.
 
-    Returns the matched ``PathClass`` (ADDITIVE/MEMORY/FROZEN), or ``None`` when no
+    Returns the matched ``PathClass`` (ADDITIVE/MEMORY), or ``None`` when no
     ``specs/`` class prefix matched — the caller decides the no-match verdict (MUTATING
     for in-repo, the release/protected/ungated tail for workspace-root paths).
     """
-    # R-2 ordering fix (v0.1.46 AC-4): the per-artifact ``_archive/`` subdirs are FROZEN
-    # and MUST be checked BEFORE the ADDITIVE prefixes, or ``specs/bugs/`` would swallow
-    # ``specs/bugs/_archive/`` as ADDITIVE. Trailing-slash match keeps ``_archivefoo``
-    # siblings ADDITIVE.
-    for prefix in _ARCHIVE_SUBDIR_PREFIXES:
-        if spec_rel.startswith(prefix):
-            return PathClass.FROZEN
     for prefix in _SPECS_ADDITIVE_PREFIXES:
         if spec_rel.startswith(prefix):
             return PathClass.ADDITIVE
@@ -349,9 +327,6 @@ def evaluate(
 
     if cls in (PathClass.ADDITIVE, PathClass.UNGATED):
         return Decision.ALLOW, ""
-
-    if cls == PathClass.FROZEN:
-        return Decision.BLOCK, f"[RULE B] '{rel_path}' is a frozen archive path (read-only)."
 
     if cls == PathClass.MEMORY:
         if phase in _MEMORY_WRITE_PHASES:
