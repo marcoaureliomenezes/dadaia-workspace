@@ -83,7 +83,7 @@ _BUG_STATUS_RE = re.compile(r"^status\s*:\s*(\S+)", re.IGNORECASE | re.MULTILINE
 # filenames permitted loose directly under ``specs/backlog/``. Anything else (a per-entry
 # item that survived the v0.12.0 consolidation, or was hand-authored outside `dadaia
 # backlog new`) is drift.
-_BACKLOG_SINGLE_SOURCE_FILES: frozenset[str] = frozenset({"BACKLOG.md", "README.md"})
+_BACKLOG_SINGLE_SOURCE_FILES: frozenset[str] = frozenset({"BACKLOG.json", "AGENTS.md"})
 
 # SPEC-DOC-031 evidence surface (SPEC v0.4.2 FR14/GRILL D6): a mention counts as
 # consumption evidence only when it ASSERTS consumption, never on free-text prose —
@@ -209,7 +209,7 @@ class GovernanceValidator:
 
     def check_consumed_backlog_disposition(self) -> list[SpecsDoctorIssue]:
         """SPEC-DOC-031 (re-targeted, SPEC v0.4.2 FR14/GRILL D6): WARN on a consumed-but-
-        unsanitized ``## ACTIVE`` item in ``specs/backlog/BACKLOG.md``.
+        unsanitized ``## ACTIVE`` item in ``specs/backlog/BACKLOG.json``.
 
         Iterates the document's ACTIVE subsections (:func:`~dadaia_workspace.features.
         backlog.document.load_document`) instead of globbing per-entry files. An ACTIVE
@@ -237,7 +237,7 @@ class GovernanceValidator:
         document = load_document(backlog_dir)
         if not document.active:
             return []
-        backlog_md_path = backlog_dir / "BACKLOG.md"
+        backlog_md_path = backlog_dir / "BACKLOG.json"
         issues: list[SpecsDoctorIssue] = []
         for item in document.active:
             if item.status is None:
@@ -467,8 +467,8 @@ class GovernanceValidator:
                     severity=Severity.WARNING,
                     description=(
                         f"backlog/{entry.name} is a loose per-entry file directly under "
-                        "specs/backlog/ — the single source is BACKLOG.md (## ACTIVE + "
-                        "## LEDGER); fold it into BACKLOG.md and move the superseded "
+                        "specs/backlog/ — the single source is BACKLOG.json (## ACTIVE + "
+                        "## LEDGER); fold it into BACKLOG.json and move the superseded "
                         "file into specs/backlog/_archive/ (SPEC-DOC-035, WARNING)."
                     ),
                     path=str(entry),

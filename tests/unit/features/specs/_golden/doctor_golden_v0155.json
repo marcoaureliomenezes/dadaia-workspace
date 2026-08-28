@@ -104,7 +104,7 @@
     },
     {
       "code": "SPEC-DOC-035",
-      "description": "backlog/candidates.md is a loose per-entry file directly under specs/backlog/ — the single source is BACKLOG.md (## ACTIVE + ## LEDGER); fold it into BACKLOG.md and move the superseded file into specs/backlog/_archive/ (SPEC-DOC-035, WARNING).",
+      "description": "backlog/candidates.md is a loose per-entry file directly under specs/backlog/ — the single source is BACKLOG.json (## ACTIVE + ## LEDGER); fold it into BACKLOG.json and move the superseded file into specs/backlog/_archive/ (SPEC-DOC-035, WARNING).",
       "path": "<SPECS>/backlog/candidates.md",
       "severity": "warning"
     }

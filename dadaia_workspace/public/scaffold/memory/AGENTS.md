@@ -96,8 +96,8 @@ dadaia memory catalog generate
 
 - YAML frontmatter validated against `memory-frontmatter-v1`
   (`dadaia_workspace/public/schemas/memory/memory-frontmatter-v1.schema.json`).
-  All 8 fields are required: `slug`, `title`, `category`, `tldr`, `summary`,
-  `tags`, `last_updated`, `release_origin` — and
+  All 6 fields are required: `slug`, `title`, `category`, `tldr`, `summary`,
+  `tags` — and
   `additionalProperties: false` makes any stray field a hard error.
   `agent_tier` is **rejected** by the schema (deprecated v0.1.53, schema-dropped
   in v0.1.61) — do not include it. The catalog computes the atom's size from its

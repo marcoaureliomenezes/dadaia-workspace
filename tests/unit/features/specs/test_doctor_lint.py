@@ -23,8 +23,6 @@ category: core
 tldr: "a valid atom for LINT-1 fixture purposes"
 summary: "a valid atom for LINT-1 fixture purposes, used across doctor_memory tests"
 tags: ["fixture"]
-last_updated: "2026-08-17"
-release_origin: "v0.4.3"
 ---
 """
 

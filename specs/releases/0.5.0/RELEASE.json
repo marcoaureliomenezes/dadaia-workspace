@@ -14,7 +14,7 @@
     "ts": "2026-08-27T15:55:12Z",
     "audit": "20260827-canon-v6-first-audit"
   },
-  "notes": [
+  "log": [
     {
       "ts": "2026-08-27T12:25:47Z",
       "agent": "software-engineer",

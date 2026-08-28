@@ -8,8 +8,6 @@ tags:
 - agent-comms
 - handoff
 - schema
-last_updated: '2026-08-28'
-release_origin: 0.5.0
 ---
 
 ## What it is

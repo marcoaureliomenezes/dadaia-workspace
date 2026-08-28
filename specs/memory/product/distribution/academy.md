@@ -8,8 +8,6 @@ tags:
 - academy
 - onboarding
 - courses
-last_updated: '2026-08-28'
-release_origin: 0.5.0
 ---
 
 ## Purpose

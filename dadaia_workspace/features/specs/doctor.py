@@ -10,7 +10,7 @@ single-responsibility validator siblings plus two shared leaf modules:
                               ``fix_tree8``
   * ``doctor_memory``       — memory files/atomicity, CAT-1, LINT-1 (holds the lazy
                               ``infrastructure.subprocess_runner`` import)
-  * ``doctor_release``      — active release (RELEASE.jsonl fold), release artifacts, SemVer + ledger invariants
+  * ``doctor_release``      — active release (RELEASE.json state document), release artifacts, SemVer + ledger invariants
   * ``doctor_closure_audit``— orphan specs, audit disposition; ``fix_archive_dir``
   * ``doctor_governance``   — single-source backlog invariants, bug status/JSONL
   * ``doctor_coherence``    — constitution and pattern-version coherence
@@ -185,8 +185,14 @@ class SpecsDoctor:
         issues.extend(self._release.check_partial_archived_release_dirs())  # SPEC-DOC-039
         # SPEC-DOC-042 RETIRED (v0.5.0 T-050-21A, FR4) — it existed only to watch
         # RELEASE.jsonl and ACTIVE.md agree during the expand window; ACTIVE.md is gone.
-        # v0.5.0 T-050-11 (FR4/A4.2) — milestone immutability (defined/implemented/shipped)
-        issues.extend(self._release.check_release_jsonl_milestone_immutability())  # SPEC-DOC-043
+        # SPEC-DOC-043 RETIRED (v0.5.x, RELEASE.json migration) — it existed only to
+        # detect a duplicate defined/implemented/shipped record in the append-only
+        # RELEASE.jsonl event stream; RELEASE.json is ONE mutable document with one
+        # `defined`/`implemented`/`shipped` field each, so a "duplicate milestone" is
+        # now structurally impossible (criterion (a) feature removed —
+        # check_release_jsonl_milestone_immutability and its whole test file,
+        # tests/unit/features/specs/test_doctor_release_jsonl.py, are deleted with it;
+        # pruning verdict owed to qa-engineer per dadaia-test-stewardship §E).
         # v0.5.0 T-050-08 (FR2/A2.8) — archive-overdue signal (WARN, never a block)
         issues.extend(self._governance.check_bug_archive_overdue())  # SPEC-DOC-041
         return issues

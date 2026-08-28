@@ -38,8 +38,6 @@ summary: Uma a duas frases expandindo o tldr.
 tags:
   - feature
 token_estimate: 0
-last_updated: "2026-01-01"
-release_origin: RELEASE_PLACEHOLDER
 ---
 
 ## Propósito
@@ -113,8 +111,6 @@ def test_filled_atom_is_never_flagged_or_removed(tmp_path: Path) -> None:
         "summary: This placeholder text in prose is NOT a template marker.\n"
         "tags: [feature]\n"
         "token_estimate: 50\n"
-        "last_updated: '2026-07-19'\n"
-        "release_origin: v0.2.9\n"
         "---\n\n## Propósito\n\nReal content mentioning placeholder concepts.\n",
         encoding="utf-8",
     )

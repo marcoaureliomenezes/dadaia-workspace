@@ -42,7 +42,7 @@ def write_release_phase(
         "implemented": None,
         "shipped": None,
         "audited": None,
-        "notes": [],
+        "log": [],
     }
     if segment:
         state["segment"] = segment

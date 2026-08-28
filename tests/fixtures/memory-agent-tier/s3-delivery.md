@@ -12,8 +12,6 @@ tags:
   - boundary
 agent_tier: self-pull
 token_estimate: 650
-last_updated: "2026-07-08"
-release_origin: v0.1.1
 ---
 
 # Entrega S3 via Kafka Connect

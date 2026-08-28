@@ -21,6 +21,7 @@ following the SPEC-DOC-NNN convention:
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -37,8 +38,6 @@ summary: 'Product catalog entry point.'
 tags: []
 agent_tier: self-pull
 token_estimate: 20
-last_updated: '2026-06-01'
-release_origin: test-release
 ---
 
 ## Catalog
@@ -56,8 +55,6 @@ summary: 'summary.'
 tags: []
 agent_tier: self-pull
 token_estimate: 20
-last_updated: '2026-06-01'
-release_origin: test-release
 ---
 
 ## Heading
@@ -135,21 +132,25 @@ def _make_clean_specs_tree(root: Path, release_id: str = "v0.1.10") -> Path:
 
 
 def _set_active(specs: Path, release_id: str, phase: str) -> None:
-    """Write (overwrite) the release's ``RELEASE.jsonl`` with exactly ONE ``phase``
-    record (v0.5.0 FR4/T-050-21A) -- the fixture-side replacement for the retired
-    ``ACTIVE.md``; the fold takes the LAST ``phase`` record, so one line fully
-    represents "current state" for a test."""
+    """Write (overwrite) the release's ``RELEASE.json`` with a minimal
+    release-state-v1 document (v0.5.x, successor to the RELEASE.jsonl fold; v0.5.0
+    FR4/T-050-21A) -- the fixture-side replacement for the retired ``ACTIVE.md``."""
     import json as _json
 
     rdir = specs / "releases" / release_id
     rdir.mkdir(parents=True, exist_ok=True)
-    record = {
-        "ts": "2026-06-01T00:00:00Z",
-        "event": "phase",
-        "agent": "test",
-        "data": {"phase": phase},
+    state = {
+        "schema": "release-state-v1",
+        "release": release_id,
+        "phase": phase,
+        "rc": None,
+        "defined": None,
+        "implemented": None,
+        "shipped": None,
+        "audited": None,
+        "log": [],
     }
-    (rdir / "RELEASE.jsonl").write_text(_json.dumps(record) + "\n", encoding="utf-8")
+    (rdir / "RELEASE.json").write_text(_json.dumps(state) + "\n", encoding="utf-8")
 
 
 def _write_tasks(specs: Path, release_id: str, body: str) -> None:
@@ -174,17 +175,23 @@ def _write_backlog_entry(specs: Path, slug: str, status_line: str) -> None:
     end-of-file, no insertion marker needed). Multiple calls against the same ``specs``
     root accumulate subsections in one document."""
     (specs / "backlog").mkdir(parents=True, exist_ok=True)
-    path = specs / "backlog" / "BACKLOG.md"
-    text = path.read_text(encoding="utf-8") if path.is_file() else "## ACTIVE\n"
-    block = (
-        f"### {slug}\n"
-        f"- **Title:** {slug}\n"
-        "- **Opened:** 2026-08-01\n"
-        f"- **Status:** {status_line}\n"
-        f"- **Description:** {slug} body.\n"
-        "- **Provenance:** operator request\n\n"
+    path = specs / "backlog" / "BACKLOG.json"
+    document = (
+        json.loads(path.read_text(encoding="utf-8"))
+        if path.is_file()
+        else {"schema": "backlog-v1", "active": []}
     )
-    path.write_text(text.rstrip("\n") + "\n\n" + block, encoding="utf-8")
+    document["active"].append(
+        {
+            "id": slug,
+            "title": slug,
+            "opened": "2026-08-01",
+            "status": status_line,
+            "description": f"{slug} body.",
+            "provenance": "operator request",
+        }
+    )
+    path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
 
 
 _MINIMAL_SPEC_MD = "# Spec\n\n> **Status:** Aprovado\n"
@@ -328,7 +335,7 @@ def test_sad_matrix(tmp_path: Path) -> None:
     assert "LEDGER" in text031 and "DELIVERED" in text031
     assert "ACTIVE" in text031 and "BL-STALE" in text031
     assert "Do NOT" in text031
-    assert doc031[0].path is not None and doc031[0].path.endswith("BACKLOG.md")
+    assert doc031[0].path is not None and doc031[0].path.endswith("BACKLOG.json")
 
     # A5.2 regression: SPEC-DOC-031 never emits a finding with slug/path treated as the
     # BACKLOG.md document itself (grill P4) — the document's own "BACKLOG" filename

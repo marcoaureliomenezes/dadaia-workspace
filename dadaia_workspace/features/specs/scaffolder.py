@@ -48,9 +48,7 @@ Declaração atômica do propósito do projeto e suas invariantes fundamentais.
 - (Definir o que este projeto não é)
 """
 
-_BACKLOG_STUB = """\
-## ACTIVE
-"""
+_BACKLOG_STUB = '{"schema": "backlog-v1", "active": []}\n'
 
 
 def _render_template(
@@ -182,15 +180,15 @@ def scaffold(
 
     # ACTIVE.md retired (v0.5.0 FR4/T-050-21A, A4.1): no replacement file — a fresh
     # scaffold's "no active release" state is now the honest absence of any directory
-    # under releases/ carrying a RELEASE.jsonl (features.specs.doctor_common
+    # under releases/ carrying a RELEASE.json (features.specs.doctor_common
     # .resolve_live_release_id), the same state `dadaia specs release ...` back-fills
     # the moment a release is defined (T-050-11).
 
-    # 5 — backlog/BACKLOG.md (SPEC v0.12.0 FR1/FR3, ADR #14): the single-source
+    # 5 — backlog/BACKLOG.json: the single-source structured backlog document
     # document skeleton — both section headings, nothing else. Matches exactly what
     # `features.spec_artifacts.new_artifacts.backlog_new` creates when it finds no
     # document; a fresh scaffold and a fresh `backlog new` share one skeleton shape.
-    _write(specs_dir / "backlog" / "BACKLOG.md", _BACKLOG_STUB)
+    _write(specs_dir / "backlog" / "BACKLOG.json", _BACKLOG_STUB)
 
     # 7, 8 — releases/{_ideas,_archive}/, and 10-12 — the backlog/audits/bugs
     # per-artifact _archive/ dirs (v0.1.46 AC-4, FROZEN gate-class landing zones) are

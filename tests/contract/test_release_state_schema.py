@@ -36,7 +36,7 @@ _SCHEMA_PATH = (
 )
 
 _REQUIRED_TOP_LEVEL = frozenset(
-    {"schema", "release", "phase", "rc", "defined", "implemented", "shipped", "audited", "notes"}
+    {"schema", "release", "phase", "rc", "defined", "implemented", "shipped", "audited", "log"}
 )
 
 
@@ -54,7 +54,7 @@ def _minimal_document(**overrides: object) -> dict[str, object]:
         "implemented": None,
         "shipped": None,
         "audited": None,
-        "notes": [],
+        "log": [],
     }
     base.update(overrides)
     return base
@@ -90,11 +90,11 @@ def test_each_milestone_object_closes_to_its_own_declared_shape(kind: str) -> No
 
 def test_notes_entries_require_ts_agent_kind_text() -> None:
     validator = Draft202012Validator(_schema())
-    doc = _minimal_document(notes=[{"ts": "2026-08-27T10:31:16Z", "agent": "test"}])
+    doc = _minimal_document(log=[{"ts": "2026-08-27T10:31:16Z", "agent": "test"}])
     assert list(validator.iter_errors(doc)) != []
 
     doc_ok = _minimal_document(
-        notes=[
+        log=[
             {
                 "ts": "2026-08-27T10:31:16Z",
                 "agent": "test",

@@ -28,8 +28,6 @@ summary: '{summary}'
 tags: {tags}
 agent_tier: self-pull
 token_estimate: 100
-last_updated: '2026-06-01'
-release_origin: test-release
 ---
 
 ## Propósito

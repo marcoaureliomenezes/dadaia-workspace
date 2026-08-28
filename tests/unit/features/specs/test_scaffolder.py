@@ -8,9 +8,7 @@ import jinja2
 import pytest
 
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
-from dadaia_workspace.features.backlog import document
 from dadaia_workspace.features.backlog.document import load_document
-from dadaia_workspace.features.specs import scaffolder
 from dadaia_workspace.features.specs.scaffolder import (
     _render_template,
     scaffold,
@@ -45,7 +43,7 @@ _EXPECTED_FILES = [
     "memory/product/catalog.json",
     "releases/AGENTS.md",
     "backlog/AGENTS.md",
-    "backlog/BACKLOG.md",
+    "backlog/BACKLOG.json",
     "bugs/AGENTS.md",
     "audits/AGENTS.md",
     "ADRs/AGENTS.md",
@@ -89,9 +87,9 @@ def test_scaffold_happy_path_creates_all_artifacts(tmp_path: Path) -> None:
 
     # ACTIVE.md retired (v0.5.0 FR4/T-050-21A, A4.1): no replacement file — a fresh
     # scaffold's "no active release" state is the honest absence of any directory
-    # under releases/ carrying a RELEASE.jsonl.
+    # under releases/ carrying a RELEASE.json.
     assert not (specs_dir / "releases" / "ACTIVE.md").exists()
-    assert list((specs_dir / "releases").glob("*/RELEASE.jsonl")) == []
+    assert list((specs_dir / "releases").glob("*/RELEASE.json")) == []
 
     # Born-markdown .md stubs exist and start with YAML frontmatter (memory-markdown-source-v1).
     for rel in ("memory/ARCHITECTURE.md", "memory/TECHSTACK.md", "memory/product/index.md"):
@@ -141,30 +139,9 @@ def test_scaffold_emits_exact_v6_canon_root_zero_readme_zero_assets(tmp_path: Pa
 def test_scaffolded_backlog_skeleton_pins_writer_and_round_trips_load_document(
     tmp_path: Path,
 ) -> None:
-    """LOW (code-reviewer, v0.12.0 pre-PR): the BACKLOG.md grammar is written by THREE
-    modules (``scaffolder._BACKLOG_STUB`` for a fresh ``specs init``,
-    ``document._BACKLOG_DOCUMENT_SKELETON`` for ``backlog new`` on an absent document
-    — moved here from ``new_artifacts`` at SPEC v0.4.2 FR1/GRILL D1 — and the live
-    subsection-append template) and parsed by a FOURTH, ``document.load_document`` —
-    with no test pinning their agreement. Pin two things:
-
-    (a) the two from-scratch skeleton literals stay byte-identical (a grammar change in
-        one writer can no longer silently desync the other), and
-    (b) a fresh ``specs init`` scaffold's ``BACKLOG.md`` round-trips through
-        ``load_document`` with zero errors (an empty ``## ACTIVE``-only skeleton — the
-        single top-level section since v0.5.0 A5.2 — is a legitimate empty model, A1.2).
-
-    ``backlog_new``'s own round-trip — a WRITTEN subsection, not just the empty
-    skeleton, through ``load_document`` — is already covered by
-    ``test_document.test_backlog_new_on_absent_document_creates_section_and_one_subsection``;
-    this test extends the pin to the scaffolder producer rather than duplicating that
-    coverage."""
-    assert scaffolder._BACKLOG_STUB == document._BACKLOG_DOCUMENT_SKELETON, (
-        "the scaffolder's fresh-tree BACKLOG.md skeleton must stay byte-identical to "
-        "backlog_new's from-scratch skeleton — both are parsed by the SAME grammar "
-        "document.load_document owns, and a drift here would desync them silently"
-    )
-
+    """A fresh ``specs init`` scaffold's ``BACKLOG.json`` round-trips through
+    ``document.load_document`` with zero errors — an empty ``active`` array is a
+    legitimate empty model."""
     specs_dir = tmp_path / "specs"
     result = scaffold(
         specs_dir=specs_dir,

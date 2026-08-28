@@ -7,8 +7,6 @@ summary: Define as camadas (features, infrastructure, CLI), regras de dependênc
 tags: [architecture, layers, contracts]
 agent_tier: self-pull
 token_estimate: 420
-last_updated: "2026-06-01"
-release_origin: memory-markdown-source-v1
 ---
 
 ## Propósito

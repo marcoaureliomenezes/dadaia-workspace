@@ -50,7 +50,7 @@ _MILESTONE_REQUIRED: dict[str, frozenset[str]] = {
 }
 
 _TOP_LEVEL_REQUIRED: frozenset[str] = frozenset(
-    {"schema", "release", "phase", "rc", "defined", "implemented", "shipped", "audited", "notes"}
+    {"schema", "release", "phase", "rc", "defined", "implemented", "shipped", "audited", "log"}
 )
 
 _NOTE_REQUIRED: frozenset[str] = frozenset({"ts", "agent", "kind", "text"})
@@ -62,9 +62,9 @@ class ReleaseState:
 
     ``defined``/``implemented``/``shipped``/``audited`` are ``dict | None`` rather than
     four near-identical dataclasses -- each already carries its own shape via
-    :data:`_MILESTONE_REQUIRED` and gains nothing from a bespoke type per kind. ``notes``
+    :data:`_MILESTONE_REQUIRED` and gains nothing from a bespoke type per kind. ``log``
     is the append-only narrative array living INSIDE this otherwise-mutable document
-    (governance text: closure narrative, drift/dispositions, free-form notes) --
+    (governance text: closure narrative, drift/dispositions, free-form log) --
     rewritten in place by a CAS writer the same as every other field, never a second
     file.
     """
@@ -77,12 +77,12 @@ class ReleaseState:
     implemented: dict[str, Any] | None
     shipped: dict[str, Any] | None
     audited: dict[str, Any] | None
-    notes: tuple[dict[str, Any], ...] = field(default_factory=tuple)
+    log: tuple[dict[str, Any], ...] = field(default_factory=tuple)
     segment: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """The canonical field order this module always serializes -- schema first,
-        notes last, matching ``release-state-v1.schema.json``'s ``properties`` order."""
+        log last, matching ``release-state-v1.schema.json``'s ``properties`` order."""
         out: dict[str, Any] = {
             "schema": self.schema,
             "release": self.release,
@@ -95,7 +95,7 @@ class ReleaseState:
         }
         if self.segment is not None:
             out["segment"] = self.segment
-        out["notes"] = [dict(n) for n in self.notes]
+        out["log"] = [dict(n) for n in self.log]
         return out
 
 
@@ -112,16 +112,16 @@ def _validate_milestone(kind: str, value: Any) -> dict[str, Any] | None:
 
 def _validate_notes(value: Any) -> tuple[dict[str, Any], ...]:
     if not isinstance(value, list):
-        raise ValueError(f"'notes' must be an array, got {type(value).__name__}")
-    notes: list[dict[str, Any]] = []
+        raise ValueError(f"'log' must be an array, got {type(value).__name__}")
+    log: list[dict[str, Any]] = []
     for i, entry in enumerate(value):
         if not isinstance(entry, dict):
-            raise ValueError(f"notes[{i}] must be an object, got {type(entry).__name__}")
+            raise ValueError(f"log[{i}] must be an object, got {type(entry).__name__}")
         missing = _NOTE_REQUIRED - entry.keys()
         if missing:
-            raise ValueError(f"notes[{i}] is missing required key(s): {sorted(missing)}")
-        notes.append(entry)
-    return tuple(notes)
+            raise ValueError(f"log[{i}] is missing required key(s): {sorted(missing)}")
+        log.append(entry)
+    return tuple(log)
 
 
 def parse_release_state(text: str) -> ReleaseState:
@@ -166,7 +166,7 @@ def parse_release_state(text: str) -> ReleaseState:
         implemented=_validate_milestone("implemented", obj["implemented"]),
         shipped=_validate_milestone("shipped", obj["shipped"]),
         audited=_validate_milestone("audited", obj["audited"]),
-        notes=_validate_notes(obj["notes"]),
+        log=_validate_notes(obj["log"]),
         segment=segment,
     )
 

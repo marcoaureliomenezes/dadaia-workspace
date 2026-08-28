@@ -2,8 +2,8 @@
 slug: architecture
 title: Architecture Memory
 category: core
-tldr: Two-tier memory — 17 measured architecture principles, then the three-ring implementation map, resolution seam, projection chain, runtime state and diagrams.
-summary: Part 1 carries the ADR-gated architecture principles with the mechanical check that measures each; Part 2 describes the cli/features/core/infrastructure rings, the resolution seam, chokepoints, projection chain, runtime state and the live diagrams.
+tldr: 17 measured architecture principles, then the three-ring implementation map, resolution seam, projection chain, runtime state and diagrams.
+summary: Part 1 carries the ADR-gated architecture principles and the check that measures each; Part 2 describes the cli/features/core/infrastructure rings, the resolution seam, chokepoints, projection chain, runtime state and the live diagrams.
 tags:
 - architecture
 - layers
@@ -13,13 +13,6 @@ tags:
 ---
 
 ## Part 1 — Principles
-
-A principle is admitted only with an **existing mechanical check** that fails when it is
-violated; its `Measured by:` line names that check verbatim. A rule nobody can measure is
-Part-2 description. Its `ADR:` line is `none` for a pre-canon principle (predates the ADR
-mechanism) or `NNNN (proposed|accepted)` once a real decision record exists — a FUTURE
-change to any of these principles requires a new ADR; an agent proposes, only the operator
-accepts.
 
 ### P-01 · We keep features on ports: a feature never imports `infrastructure` directly; the container injects the adapter.
 Measured by: `lint-imports --config setup.cfg --no-cache` — contract `features-no-infrastructure`.
@@ -54,7 +47,7 @@ Rationale: hooks import it on the write hot path; one upper edge drags in the co
 ### P-07 · We keep features mutually independent: they compose through the container, never through sibling imports; a helper two features need lives in each.
 Measured by: `lint-imports --config setup.cfg --no-cache` — contract `features-no-cross-feature`, whose `modules =` list is asserted equal to the on-disk `dadaia_workspace/features/*/__init__.py` package set by `pytest -p no:cacheprovider tests/contract/test_import_linter_ignore_cap.py`.
 ADR: none
-Rationale: a hand-kept `modules =` list hid three real sibling edges from the only check that measures independence.
+Rationale: a hand-kept `modules =` list hid three real sibling edges from the check that measures independence.
 
 ### P-08 · We compose the CLI through the container: a verb never imports an infrastructure adapter directly.
 Measured by: `lint-imports --config setup.cfg --no-cache` — contract `cli-no-infrastructure`.
@@ -110,9 +103,6 @@ Rationale: law that no asset owns is law nobody applies.
 
 ### Overview
 
-dadaia-workspace is a Python package and local workspace runtime organized around Spec
-Context Projects, in three rings plus a composition root:
-
 ```mermaid
 flowchart LR
   CLI[cli - Typer adapters] --> CT[container.py]
@@ -123,217 +113,116 @@ flowchart LR
   I --> C
 ```
 
-- `cli/` parses operator input, renders output and delegates.
-- `features/` owns product behavior by domain.
-- `core/` owns pure models, protocols, constants and classifiers.
-- `infrastructure/` owns filesystem, git, subprocess, JSON and platform adapters.
-- `container.py` is the composition root the CLI and the panel build through.
+`container.py` is the composition root the CLI and the panel build through. An unavoidable
+edge uses a function-scoped lazy import — the two capped `chokepoints` and `doctor_memory`
+edges. The workspace ships no agent-execution runtime.
 
-Where an edge is unavoidable, a **function-scoped lazy import** keeps the module's
-load-time posture intact — the idiom the two capped `chokepoints` and `doctor_memory`
-edges use. **The workspace ships no agent-execution runtime**: it provides context, law,
-deterministic boundaries, evidence validation and diagnostics.
+### Seams
 
-### Context and SDD
+- `core/specs_resolver.resolve_context()` — single context-NAME authority (P-09); its
+  docstring holds the rung law ([[context-management]]). Consumers: the CLI seam,
+  `container`, the SDD gate, ctx-inject. `core` duplicates
+  `features/spec_context/session_identity`'s record read, since P-04 forbids the import.
+- `core/atomic_write.py` — the one atomic-write primitive: uuid-suffixed temp sibling plus
+  `os.replace`, parameterized by preserve-mode, text-or-bytes content and newline policy,
+  temp cleanup on every failure path, importing nothing from `dadaia_workspace` so `hooks/`
+  consume it without the composition root (P-12). Compare-then-swap is inside it: optional
+  `expected_previous` is the last read before `os.replace`, a mismatch raises the pure-`core`
+  `ConcurrentModificationError` and cleans the temp sibling, and its kind (`str`/`bytes`)
+  must match the content's. Semantics are refuse-stale then retry.
+  `tests/unit/core/test_atomic_write_census.py` asserts every atomic write routes through it.
+- `core/redaction.py` — stdlib-pure masking behind `cli/redact.py`'s `--redact`:
+  word-boundary alternation, longest-first ordering, first-appearance placeholder ordinals.
+  The push gate does not consume it; its render boundary masks with the detector's own
+  matchers.
+- The P-11 file-I/O authorized stems are `specs_backup`, `specs_version`, `specs_resolver`,
+  `workspace_resolver`, `specs_repair`, `atomic_write`.
 
-`features/spec_context/` owns ALIVE/DEAD lifecycle, binding, caller-owned session identity,
-advisory presence, path classification and workspace doctor checks; there is no lease or
-locking module. `hooks/pre_gate.py` composes root whitelist, venv guard and the SDD
-path/phase/mode gate; `hooks/sdd_post_gate.py` refreshes presence and runs the nonblocking
-reconciler; `hooks/ctx_inject.py` emits the once-per-session bootstrap, re-armed when this
-session's own bind record is newer than its injection sentinel. Its tech-stack digest reads
-only the leading lines of [[tech-stack]], which is why that atom's `Snapshot` bullets sit at
-the top of its Part 2.
+### Feature packages
 
-`core/specs_resolver.resolve_context()` is the single authority resolving a Spec Context
-NAME (P-09), and the rung law is its docstring ([[context-management]]). The CLI seam,
-`container`, the SDD gate and ctx-inject all consume it, each supplying its own caller
-input. Session-record reading inside `core` is a documented duplicate of
-`features/spec_context/session_identity`, because `core` may not import `features` (P-04).
+- `features/spec_context/` — ALIVE/DEAD lifecycle, binding, session identity, advisory
+  presence, path classification, workspace doctor checks. No lease or locking module.
+- `features/chokepoints/` — pre-commit/pre-push decision logic, no subprocess (P-02); its
+  one `infrastructure` edge (`jsonl_log_rotation`) is function-scoped and capped under P-10.
+  I/O arrives as injected core ports: `ProcessAncestry` and `GitObjectReader` (adapter
+  `infrastructure/git_objects.GitSubprocessObjectReader`), the latter a required parameter of
+  the push decision function. `GitObjectReader` yields each object's new content plus the
+  prior published text of the same path at the range base, or an explicit absence value
+  (never an empty string); the protocol module is data-only, the adapter owns every
+  subprocess, chunks to a constant resident bound and raises its own typed read error.
+- `features/specs/` — structural validators, the memory-atom lint (one package module the
+  doctor imports directly), catalog generation. Markdown atoms are the source; `catalog.json`
+  and `product/index.md` are generated from frontmatter, and a catalog value derivable from
+  an atom body is computed at generation time
+  (`tests/contract/test_memory_catalog_render_contract.py`). `SpecsDoctor` is a thin
+  coordinator over six validator siblings ([[specs-doctor]]).
+- `features/backlog/` — the sole owner of the backlog grammar, parsing and writing: `backlog
+  new` finds its insertion point through the parsed fence-aware structure, checks slug
+  membership through the parsed document, and re-parses its own output.
+- `features/spec_artifacts/new_artifacts.py` — creates a release SPEC and nothing else; the
+  workspace scaffolds no hotfix release ([[sdd-bug-backlog-governance]]).
+- `features/reports/` — handoff validation, discovery and retention, stdlib-only behind
+  `ValidatorPort`. `features/panel/` — loopback-only stdlib HTTP UI ([[panel]]).
+  `features/public/` — the projection chain ([[public-asset-distribution]]).
+- Other bounded packages: certification, capabilities, telemetry, server registry, bugs,
+  repos, academy, import/export, migration, workspace initialization and cleanup.
 
-Exit codes tell the truth: `dadaia doctor` and `reports validate` exit non-zero whenever
-issues remain. Tool-initiated commits (`alive` scaffold, `dead` sync) fall back to an
-injected `dadaia-workspace <dadaia@workspace.local>` git identity when the environment has
-none (`infrastructure/git_subprocess.py`).
+### Hooks and chokepoints
 
-### Git chokepoints
-
-Installed from `public/scripts/pre-commit-presence-gate.sh` (concurrency warning only) and
-`public/scripts/pre-push-ci-gate.sh` (branch policy plus the range-scoped denylist scan;
-the security verdict lives at the PR boundary — [[sdd-gate-v3]]).
-
-`features/chokepoints/` is decision logic: it spawns no subprocess (P-02) and carries no
-module-load-time edge into `infrastructure` — its one infrastructure edge
-(`jsonl_log_rotation`) is function-scoped and capped under P-10. The I/O its gates need
-arrives as core ports the CLI injects: `ProcessAncestry` for the pre-commit ancestry probe,
-and `GitObjectReader` (adapter `infrastructure/git_objects.GitSubprocessObjectReader`) for
-listing the new objects of a pushed range. That object source is a required parameter of
-the push decision function, so an unwired call site is a type error, not a skipped gate.
-
-`GitObjectReader`'s contract covers both sides of a scanned path: each object carries its
-own new content **and** the prior published text of the same path at the range's base, or
-an explicit absence — a distinct value, never an empty string. The protocol module stays
-data-only and zero-I/O; the adapter owns every subprocess, chunks its batched conversation
-to a constant resident bound, and converts every parse failure into its own typed read
-error.
-
-`core/redaction.py` is the stdlib-pure masking primitive — word-boundary alternation,
-longest-first ordering, stable first-appearance placeholder ordinals — behind the operator
-`--redact` surface in `cli/redact.py`. It sits in `core` because it performs no I/O and is
-outside the file-I/O authorized set (P-11). The push gate does **not** consume it: its
-render boundary masks path segments with the detector's own compiled matchers, so what the
-scan detects and what the refusal masks cannot diverge.
-
-### Handoffs, panel and public assets
-
-`features/reports/` validates, discovers and retains handoff-first communication:
-cross-agent handoffs under `.dadaia/handoff/<context>/`, optional HTML reports under
-`.dadaia/reports/<context>/<agent>/`, validation stdlib-only behind `ValidatorPort`.
-`features/panel/` serves a loopback-only stdlib HTTP UI with route/view modules split by
-domain ([[panel]]).
-
-Canonical harness assets live in `dadaia_workspace/public/`. `public stage` copies
-versioned source into `.dadaia/agentic/`; `public install` resolves its arguments once into
-an immutable install plan and runs an ordered list of flag-free steps projecting to
-`.claude/`, `.codex/`, `.kimi-code/` and the shared `.agents/`; `public doctor` compares
-source, staging, projection, privacy and policy-aware rendering. Projection files are never
-edited in place, projected law files are PROTECTED, and the source repository carries no
-generated projection roots.
-
-The projection chain is a derivation, not an origin: every core sub-agent, hook and rule
-file implements an abstract entity declared in `public/entities/registry.json`, while
-skills and `AGENTS.md` are universal. Underived core surface is forbidden
-([[agentic-entities]]), measured by `tests/contract/test_agentic_entities_derivation.py`
-and the `entities-derivation` doctor check. A projected script is a thin entry-point
-wrapper over a package module, measured by
-`tests/contract/test_public_scripts_thin_wrapper.py`.
-
-### Specs, memory and other feature domains
-
-`features/specs/` owns structural validators, the memory-atom lint (one canonical package
-module, imported directly by the doctor) and memory catalog generation. Markdown atoms are
-the memory source; `catalog.json` and `product/index.md` are generated from frontmatter,
-and a catalog value derivable from an atom's body is computed at generation time rather
-than stored, measured by `tests/contract/test_memory_catalog_render_contract.py`.
-`SpecsDoctor` is a thin coordinator delegating each family's logic to six validator
-siblings. `features/spec_artifacts/new_artifacts.py` creates a release SPEC and nothing
-else — the workspace scaffolds no hotfix release ([[sdd-bug-backlog-governance]]).
-
-The backlog grammar has one owner: `features/backlog/` both parses and writes it, so
-`backlog new` finds its insertion point through the parsed fence-aware structure, checks
-slug membership through the parsed document, and re-parses its own output before reporting
-success. Certification runs the deterministic checks behind `dadaia certify`; capabilities
-publishes the `dadaia-capabilities-v2` payload; telemetry owns allowlisted local metadata
-and its refresh serialization primitive; server registry owns collision-free dev-port
-allocation. Bugs, repos, academy, import/export, migration, workspace initialization and
-cleanup remain bounded feature packages.
+`hooks/pre_gate.py` composes root whitelist, venv guard and the path/phase/mode gate;
+`hooks/sdd_post_gate.py` refreshes presence and runs the nonblocking reconciler;
+`hooks/ctx_inject.py` emits the once-per-session bootstrap and reads only the leading lines
+of [[tech-stack]] for its digest. The git chokepoints are installed from
+`public/scripts/pre-commit-presence-gate.sh` and `public/scripts/pre-push-ci-gate.sh`
+([[sdd-gate-v3]]).
 
 ### Concurrency
 
-Workspace concurrency never blocks on another session. Mutating file-tool calls record
-best-effort presence and a peer record produces an advisory warning; the caller's own READ
-mode is self-protection; ordinary filesystem and git conflicts surface races. Narrow
-adapter primitives that serialize a single telemetry refresh or database write must have
-bounded failure behavior and cannot freeze Spec Context work.
+No workspace operation blocks on another session. A mutating file-tool call records
+best-effort presence; a peer record produces an advisory warning; the caller's own READ mode
+is self-protection; filesystem and git conflicts surface races. Adapter primitives that
+serialize a single telemetry refresh or database write have bounded failure behavior.
 
 ### Runtime state
 
-Canonical workspace state is rooted at `.dadaia/`. The binding whitelist is
-`_DADAIA_ALLOWED_SUBDIRS` in `features/spec_context/doctor.py` (ROOT-4 flags anything
-else); this table mirrors it:
-
-| Path | Owner |
-|---|---|
-| `states/spec_contexts.json` | context registry |
-| `sessions/` | caller-owned bind records (protected) |
-| `states/presence/` | advisory live-session records |
-| `states/server_registry.json` | development server registry |
-| `states/agent_model_policy.json` | Layer-1 agent model governance overlay |
-| `states/root_exceptions.txt` | operator-approved root-whitelist exceptions |
-| `states/import-manifest.json` | provenance of the last `dadaia import` |
-| `handoff/` | machine-readable agent handoffs |
-| `reports/` | optional human-readable reports |
-| `tmp/` | bounded ephemeral files (incl. `tmp/legacy-quarantine/`) |
-| `agentic/` | staged public assets and manifest |
-| `hooks/` | projected harness hook wrappers |
-| `scripts/` | projected governance/gate scripts |
-| `mcps/` | MCP server working dirs |
-| `runtime/` | projected runtime assets |
-| `academy/` | academy working data |
-| `logs/` | hook/reconciler diagnostics |
-| `dev-report/`, `dist/` | dev artifacts and built wheels |
-| `.venv/`, `.cache/` | workspace Python runtime and tool caches |
-
-Legacy `states/ctx_locks/` and `sessions/runtime/` are invalid retired state, removed by
-`doctor --fix`; `states/bind_epoch/` is swept by the named `remove_legacy_bind_epoch_state`
-install migration. Known-legacy `.dadaia/` subdirs (`bugs`, `src`, `locks`,
-`figma-bridge`, `imgs`, `references`) are quarantined — never deleted — by the reconcile
-`legacy-dir-quarantine` step (`features/migrate/legacy_dadaia_dirs.py`) into
-`tmp/legacy-quarantine/run-<id>/` with a manifest. `dadaia import` relocates the archive's
-`export-manifest.json` to `states/import-manifest.json`.
+Workspace state is rooted at `.dadaia/` and nowhere else; the allowed subdirectory set is
+`_DADAIA_ALLOWED_SUBDIRS` in `features/spec_context/doctor.py`, enforced by ROOT-4. Legacy
+`states/ctx_locks/` and `sessions/runtime/` are retired state removed by `doctor --fix`;
+`states/bind_epoch/` is swept by the `remove_legacy_bind_epoch_state` install migration;
+known-legacy subdirs (`bugs`, `src`, `locks`, `figma-bridge`, `imgs`, `references`) are
+quarantined — never deleted — into `tmp/legacy-quarantine/run-<id>/` with a manifest by the
+reconcile `legacy-dir-quarantine` step (`features/migrate/legacy_dadaia_dirs.py`).
 
 No repo may contain `.dadaia/`, a virtualenv, cache directories, test-results, Playwright
-reports or coverage artifacts — measured by `dadaia doctor`'s ROOT-4 and
-`tests/contract/test_source_repo_hygiene.py`.
-
-### Core file-I/O authorized set
-
-`core/` is stdlib-pure; file I/O is allowed only in the ratchet-authorized set (P-11):
-`specs_backup`, `specs_version`, `specs_resolver`, `workspace_resolver`, `specs_repair`
-and `atomic_write`.
-
-`core/atomic_write.py` is **the** atomic-write primitive: a uuid-suffixed temp sibling plus
-`os.replace`, parameterized by preserve-mode, text-or-bytes content and newline policy,
-with temp cleanup on every failure path for every parameter combination. It is stateless
-and imports nothing from `dadaia_workspace`, which lets `hooks/` consume it without
-touching the composition root (P-12). `tests/unit/core/test_atomic_write_census.py`
-enumerates every atomic write in the package and asserts each routes through the primitive
-— zero named per-module writers, zero inline `.tmp` writers, no surviving shim.
-
-**Compare-then-swap lives inside the primitive**, because a caller's own re-read
-necessarily precedes the serialization a concurrent writer can land inside. The optional
-`expected_previous` parameter makes the comparison the last read the primitive performs,
-immediately before `os.replace`; a mismatch raises `ConcurrentModificationError`, a pure
-`core` exception type, and the temp sibling is cleaned on that path. Semantics are
-refuse-stale, then retry — never last-write-wins. `expected_previous` is opt-in and its
-kind (`str`/`bytes`) must match the content's.
+reports or coverage artifacts — measured by ROOT-4 and
+`tests/contract/test_source_repo_hygiene.py`. `dadaia doctor` and `reports validate` exit
+non-zero while issues remain. Tool-initiated commits (`alive` scaffold, `dead` sync) fall
+back to an injected `dadaia-workspace <dadaia@workspace.local>` git identity
+(`infrastructure/git_subprocess.py`).
 
 ### Agent surface
 
 Nine core agent roles with two dispatchers run inside the entry harness
 ([[agent-orchestration]]). Their bodies are canonical Markdown under `public/agents/`,
-rendered at install with the resolved model/effort policy and projected per harness. The
-ordered release ritual is owned by the SDD documents and by the agents that write them;
-hooks enforce mechanical file/git boundaries only.
-
-**A persona carries only what the law does not.** Its body targets 120-220 lines, states
-its rules as positive targets rather than a prohibition list, and drops anything the law
-already says. The target is measured, not met: the overflow in each exceeding persona is
-content whose only home is that role, justified inline. A block leaves a persona only when
-a named surviving home — a disclosed skill sibling that already exists — receives it, and
-a persona never loses a write-allowlist row, a scope boundary or a hard-stop block.
-
-Which skill and which scoped `AGENTS.md` operates which `DADAIA.md` section is declared in
-exactly one machine-readable place, `public/entities/behavior-map.json` (P-17); its
-contract test is also the citation check, so every path and CLI verb a public asset cites
-must exist. **The law reaches each harness exactly once**: the projection seam decides, per
-harness, which surface carries it, and no harness ends with zero copies
-([[public-asset-distribution]]).
+rendered at install with the resolved model/effort policy and projected per harness. A
+persona body targets 120-220 lines; each exceeding persona justifies its overflow inline, and
+no persona loses a write-allowlist row, a scope boundary or a hard-stop block. Every core
+sub-agent, hook and rule file derives from an abstract entity in
+`public/entities/registry.json`, and `public/entities/behavior-map.json` binds each skill and
+scoped `AGENTS.md` to one `DADAIA.md` section (P-17) ([[agentic-entities]]).
 
 ### Architecture diagrams
 
-The three class/package diagrams live here as their own subsections, parsed in place by
-P-13's drift-guard, and each is regenerated at the closure of any structural release that
-renames, splits, adds, removes or merges what it depicts.
+The three diagrams below are parsed in place by P-13's drift-guard and regenerated at the
+closure of any structural release that renames, splits, adds, removes or merges what they
+depict.
 
 ### `features/specs/doctor` — SpecsDoctor coordinator + validator siblings
 
-A thin `SpecsDoctor` coordinator owns `check()`/`fix()` ORDER and delegates all logic to
-six single-responsibility validator siblings, plus two shared leaf modules
-(`doctor_types`, `doctor_common`). Boundary imports are confined to exactly one validator
-each: `doctor_memory` is the sole holder of the lazy `infrastructure.subprocess_runner`
-edge, and `doctor_governance` is the sole holder of the `features.backlog.document` edge.
-The coordinator holds neither, and the package carries no `spec_context` edge at all.
+The coordinator owns `check()`/`fix()` ORDER only; six validator siblings hold the logic,
+over two shared leaf modules. Each boundary import sits in exactly one validator:
+`doctor_memory` holds the lazy `infrastructure.subprocess_runner` edge, `doctor_governance`
+the `features.backlog.document` edge. The package carries no `spec_context` edge.
 
 ```mermaid
 classDiagram
@@ -402,9 +291,9 @@ classDiagram
 
 ### `dadaia_workspace/features` — package map (24 packages)
 
-Each feature is isolated (P-07); composition happens in `container.py`, and the surviving
-cross-feature edges are declared, reasoned and capped under P-10. The parenthetical count
-above is the drift-guard's pinned lookup key and moves only with the live package set.
+The parenthetical count is the drift-guard's pinned lookup key and moves only with the live
+package set. The guard is forward-only for packages — a retired package left in the diagram
+passes — which is why regeneration is a stated closure step.
 
 ```mermaid
 flowchart TB
@@ -447,16 +336,10 @@ flowchart TB
     features --> core
 ```
 
-The guard is forward-only for packages: a retired package left in the diagram passes,
-which is why regeneration is a stated closure step rather than a check.
-
 ### `features/panel/views` — per-domain API view modules
 
-The panel API surface is seven per-domain view modules, one responsibility each. There is
-no facade, barrel or re-export shim: `container.py` imports each `render_api_*` function
-from its own module via explicit named imports. Every module imports only
-`features.panel.service` (`PanelService`) plus `core.models` — zero cross-feature or
-infrastructure edges.
+No facade, barrel or re-export shim: `container.py` named-imports each `render_api_*` from
+its own module. Every view module imports only `features.panel.service` and `core.models`.
 
 ```mermaid
 classDiagram

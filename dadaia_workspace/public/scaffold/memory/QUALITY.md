@@ -8,8 +8,6 @@ tags:
   - quality-assurance
   - testing
   - anti-slop
-last_updated: "2026-08-12"
-release_origin: v0.2.1
 ---
 
 ## Padrões de qualidade

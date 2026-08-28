@@ -41,8 +41,6 @@ _REQUIRED_FM = {
     "tldr": "fixture atom for memory_lint tests",
     "summary": "fixture atom for memory_lint tests, exercising the ported package module",
     "tags": ["fixture"],
-    "last_updated": "2026-08-17",
-    "release_origin": "v0.4.3",
 }
 
 
@@ -133,8 +131,6 @@ def test_missing_required_frontmatter_field_is_an_error(tmp_path: Path) -> None:
         'tldr: "x"\n'
         'summary: "x"\n'
         "tags:\n  - fixture\n"
-        'last_updated: "2026-08-17"\n'
-        'release_origin: "v0.4.3"\n'
         "---\n\n## Purpose\n\nBody.\n"
     )
     path = tmp_path / "test-atom.md"

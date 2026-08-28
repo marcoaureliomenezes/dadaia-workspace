@@ -245,12 +245,13 @@ def _silent_doc035_archived(specs: Path) -> None:
 
 
 def _silent_doc035_only_single_source_files(specs: Path) -> None:
-    """BACKLOG.md and README.md are the only two filenames the single-source invariant
-    permits loose directly under specs/backlog/ (SPEC v0.12.0 FR5) — present together,
-    the tree is clean regardless of BACKLOG.md's content."""
+    """BACKLOG.json and AGENTS.md are the only two filenames the single-source invariant
+    permits loose directly under specs/backlog/ — present together, the tree is clean."""
     _seed_archives(specs)
-    (specs / "backlog" / "BACKLOG.md").write_text("## ACTIVE\n\n## LEDGER\n", encoding="utf-8")
-    (specs / "backlog" / "README.md").write_text("# Backlog\n", encoding="utf-8")
+    (specs / "backlog" / "BACKLOG.json").write_text(
+        '{"schema": "backlog-v1", "active": []}\n', encoding="utf-8"
+    )
+    (specs / "backlog" / "AGENTS.md").write_text("# Backlog\n", encoding="utf-8")
 
 
 def _silent_doc036_with_disposition(specs: Path) -> None:

@@ -18,7 +18,7 @@ from dadaia_workspace.features.specs.scaffolder import scaffold
 app = typer.Typer(help="SDD release-lifecycle structural checks and helpers.")
 
 # `specs release open` / `specs segment open` RETIRED (v0.5.0 FR4/T-050-21A): both
-# wrote ACTIVE.md via `_write_active`; the phase is now the RELEASE.jsonl fold and no
+# wrote ACTIVE.md via `_write_active`; the phase is now read from RELEASE.json and no
 # file stands in ACTIVE.md's place, so both verbs are dead the moment there is nothing
 # left for them to write. `scaffold_release_segment` (features.specs.scaffolder)
 # stays — it still scaffolds the SPEC/PLAN/TASKS stubs of a dir-based segment

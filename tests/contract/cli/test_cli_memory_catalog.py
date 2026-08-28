@@ -30,8 +30,6 @@ summary: '{summary}'
 tags: []
 agent_tier: self-pull
 token_estimate: 100
-last_updated: '2026-06-01'
-release_origin: test-release
 ---
 
 ## Propósito
@@ -132,8 +130,6 @@ def test_catalog_generate_computes_token_estimate_ignoring_wrong_frontmatter(
         "tags: []\n"
         "agent_tier: self-pull\n"
         "token_estimate: 999999\n"  # deliberately wrong — must be ignored
-        "last_updated: '2026-06-01'\n"
-        "release_origin: test-release\n"
         "---\n\n" + body,
         encoding="utf-8",
     )

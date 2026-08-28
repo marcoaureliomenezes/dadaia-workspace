@@ -8,11 +8,11 @@ and the partial-archive residue invariant (SPEC-DOC-039, v0.1.81 FR2), plus the 
 status/created-date extractors. Leaf-only: imports the shared leaves + core, never a sibling
 validator.
 
-v0.5.0 FR4/T-050-21A: ``ACTIVE.md`` is retired — the active release, its optional
-segment, and its phase are resolved by folding ``RELEASE.jsonl`` (see
-:func:`resolve_active_release`). No fallback branch survives; a workspace with zero
-live release directories resolves cleanly to "no active release", the same as the old
-scaffold default did.
+v0.5.x (successor to the RELEASE.jsonl fold; v0.5.0 FR4/T-050-21A): ``ACTIVE.md`` is
+retired — the active release, its optional segment, and its phase are read directly
+off ``RELEASE.json`` (see :func:`resolve_active_release`). No fallback branch
+survives; a workspace with zero live release directories resolves cleanly to "no
+active release", the same as the old scaffold default did.
 """
 
 from __future__ import annotations
@@ -21,13 +21,12 @@ import re
 from datetime import date
 from pathlib import Path
 
-from dadaia_workspace.core.release_events import fold_release_events, parse_release_events
 from dadaia_workspace.core.spec_status import APPROVED, extract_status
 from dadaia_workspace.core.spec_status import CANONICAL_STATUS as _CANONICAL_STATUS
 from dadaia_workspace.core.specs_version import RELEASE_SEMVER_RE
 from dadaia_workspace.features.specs.doctor_common import (
     RELEASE_ARTIFACTS,
-    _read_and_parse_release_jsonl,
+    _read_and_parse_release_json,
     iter_all_release_dirs,
     resolve_active_release,
 )
@@ -92,28 +91,29 @@ _TASK_MARKER_RE = re.compile(r"^\s*[-*]?\s*\[([ \-xX])\]", re.MULTILINE)
 
 
 def read_release_phase(specs_dir: Path, release_id: str) -> str | None:
-    """The narrow ``RELEASE.jsonl`` phase reader, given an ALREADY-KNOWN ``release_id``
-    (v0.5.0 FR4/T-050-11) — a thin wrapper over
-    :func:`doctor_common._read_and_parse_release_jsonl`, the ONE tri-state disk read
-    (S1 FR23 amendment A6); it does not re-implement that read. The hook's own read is
-    deleted until T-050-21A actually needs the phase DECISION value, and the
-    container's uncalled seam is deleted with it — the hook instead reads directly
-    through ``core.release_events`` (its own light, hot-path exception; importing this
-    module's ``features.specs`` package pulls in the entire ``SpecsDoctor``
-    decomposition, the exact heavy-import cost the container was avoided for).
+    """The narrow ``RELEASE.json`` phase reader, given an ALREADY-KNOWN ``release_id``
+    (v0.5.x, successor to the RELEASE.jsonl fold; v0.5.0 FR4/T-050-11) — a thin
+    wrapper over :func:`doctor_common._read_and_parse_release_json`, the ONE
+    tri-state disk read (S1 FR23 amendment A6); it does not re-implement that read.
+    The hook's own read is deleted until T-050-21A actually needs the phase DECISION
+    value, and the container's uncalled seam is deleted with it — the hook instead
+    reads directly through ``core.release_state`` (its own light, hot-path exception;
+    importing this module's ``features.specs`` package pulls in the entire
+    ``SpecsDoctor`` decomposition, the exact heavy-import cost the container was
+    avoided for).
 
-    ``str`` when the last ``phase`` record is readable (possibly ``""`` when the file
-    carries no ``phase`` record yet), ``""`` when
-    ``specs_dir/releases/<release_id>/RELEASE.jsonl`` does not exist, ``None`` when it
-    exists but could not be read (genuine I/O failure) — callers must treat ``None`` as
-    UNKNOWN, never as "no phase".
+    ``str`` when the document's ``phase`` field is readable (possibly ``""`` when it
+    carries an empty phase value), ``""`` when
+    ``specs_dir/releases/<release_id>/RELEASE.json`` does not exist, ``None`` when it
+    exists but could not be read or parsed (genuine I/O failure or a malformed
+    document) — callers must treat ``None`` as UNKNOWN, never as "no phase".
     """
-    events, found = _read_and_parse_release_jsonl(specs_dir, release_id)
-    if not found:
+    state, exists = _read_and_parse_release_json(specs_dir, release_id)
+    if not exists:
         return ""
-    if events is None:
+    if state is None:
         return None
-    return fold_release_events(events).phase
+    return state.phase
 
 
 def _extract_status(md_path: Path) -> str | None:
@@ -144,8 +144,9 @@ class ReleaseValidator:
         self.specs_dir = specs_dir
 
     def check_active_md(self) -> list[SpecsDoctorIssue]:
-        """SPEC-DOC-003/009 (v0.5.0 FR4/T-050-21A): the active release, resolved by
-        folding ``RELEASE.jsonl`` (:func:`resolve_active_release`) — ``ACTIVE.md`` is
+        """SPEC-DOC-003/009 (v0.5.x, successor to the RELEASE.jsonl fold; v0.5.0
+        FR4/T-050-21A): the active release, resolved by reading ``RELEASE.json``
+        directly (:func:`resolve_active_release`) — ``ACTIVE.md`` is
         retired, no file stands in its place. SPEC-DOC-009 (a resolved release_id
         naming a directory that does not exist) is now unreachable in practice:
         :func:`resolve_live_release_id` only ever returns a release_id it found BY
@@ -385,8 +386,9 @@ class ReleaseValidator:
         return [m.group(1).lower() for m in _TASK_MARKER_RE.finditer(text)]
 
     def check_phase_markers_coherence(self) -> list[SpecsDoctorIssue]:
-        """SPEC-DOC-024 (v0.5.0 FR4/T-050-21A): the active release's ``RELEASE.jsonl``
-        phase must be coherent with its TASKS.md markers (constitution §7 lifecycle).
+        """SPEC-DOC-024 (v0.5.x, successor to the RELEASE.jsonl fold; v0.5.0
+        FR4/T-050-21A): the active release's ``RELEASE.json`` phase must be coherent
+        with its TASKS.md markers (constitution §7 lifecycle).
 
         Mechanical rules (minimal):
         - phase ∈ {SPEC, DEFINITION}: the active TASKS must NOT already be an
@@ -421,8 +423,8 @@ class ReleaseValidator:
                                 f"Active release phase='{phase}' but the active "
                                 f"release '{release}' has an [x]-majority TASKS.md "
                                 f"({done}/{len(markers)} done). The phase was never "
-                                "advanced through IMPLEMENTATION — append a `phase` "
-                                "record to RELEASE.jsonl or correct the markers "
+                                "advanced through IMPLEMENTATION — update `phase` in "
+                                "RELEASE.json or correct the markers "
                                 "(constitution §7)."
                             ),
                             path=str(active_path),
@@ -609,39 +611,4 @@ class ReleaseValidator:
                     path=str(entry),
                 )
             )
-        return issues
-
-    def check_release_jsonl_milestone_immutability(self) -> list[SpecsDoctorIssue]:
-        """SPEC-DOC-043 (v0.5.0 FR4/A4.2, T-050-11) — WARN on a duplicate milestone
-        record: a second ``defined``/``implemented``/``shipped`` line for one release.
-
-        The three sha-bearing milestones are immutable facts (D3). The fold
-        (``core.release_events.fold_release_events``) takes the FIRST record of each
-        kind and reports every later one as a finding — a model-level refusal to let a
-        rewrite attempt silently win; this check surfaces that finding at WARNING
-        severity (D15 — never a block, exit unchanged).
-        """
-        issues: list[SpecsDoctorIssue] = []
-        for jsonl_path in sorted(self.specs_dir.glob("releases/*/RELEASE.jsonl")):
-            try:
-                text = jsonl_path.read_text(encoding="utf-8")
-            except OSError:
-                continue
-            events, _errors = parse_release_events(text)
-            fold = fold_release_events(events)
-            for dup in fold.duplicate_milestones:
-                issues.append(
-                    SpecsDoctorIssue(
-                        code="SPEC-DOC-043",
-                        severity=Severity.WARNING,
-                        description=(
-                            f"RELEASE.jsonl carries a second '{dup.event}' record "
-                            f"(ts={dup.ts}, agent={dup.agent}) — the three sha-bearing "
-                            "milestones (defined/implemented/shipped) are immutable "
-                            "facts (D3); the fold keeps the FIRST and reports every "
-                            "later one here. WARNING only (D15) — never a block."
-                        ),
-                        path=str(jsonl_path),
-                    )
-                )
         return issues

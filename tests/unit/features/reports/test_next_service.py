@@ -52,7 +52,7 @@ def _build(
             "implemented": None,
             "shipped": None,
             "audited": None,
-            "notes": [],
+            "log": [],
         }
         (rdir / "RELEASE.json").write_text(json.dumps(state) + "\n", encoding="utf-8")
     if plan is not None:

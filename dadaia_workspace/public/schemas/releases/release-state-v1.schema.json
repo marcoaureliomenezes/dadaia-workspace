@@ -2,10 +2,10 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "release-state-v1",
   "title": "Release State v1",
-  "description": "The whole content of specs/releases/<release-id>/RELEASE.json — ONE mutable JSON object, the release's current state, never an append-only event stream (operator ruling: 'e um arquivo altamente mutavel onde acompanhamos o estado do release. Nao faz sentido ser append-only' — retires release-event-v1.schema.json and its RELEASE.jsonl fold, core/release_events.py). `phase`, `rc`, `defined`, `implemented`, `shipped` and `audited` are rewritten IN PLACE through core/atomic_write.py's compare-and-swap seam (expected_previous, refuse-stale) whenever a code path writes this document; an agent with file tools (product-engineer, at the phase boundaries this document's history used to record as separate `phase` lines) may also Read-then-Edit it directly, the same discipline a CAS write enforces mechanically. `defined`/`implemented`/`shipped`/`audited` are the four sha-bearing milestone facts (each set at most once meaningfully — a later legitimate rewrite is a correction, not a second append, so there is no more 'duplicate milestone' finding to detect: SPEC-DOC-043 retires with the JSONL fold it existed to police). `notes` is the one place free-form governance narrative survives INSIDE this otherwise-typed document — the closure narrative (summary, size accounting, drifts, dispositions, artifact GC, intake candidates, rc ledger, archive decision) that RELEASE.jsonl's `note` records used to carry, one entry per note, oldest first, never rewritten once appended.",
+  "description": "The whole content of specs/releases/<release-id>/RELEASE.json — ONE mutable JSON object, the release's current state, never an append-only event stream (operator ruling: 'e um arquivo altamente mutavel onde acompanhamos o estado do release. Nao faz sentido ser append-only' — retires release-event-v1.schema.json and its RELEASE.jsonl fold, core/release_events.py). `phase`, `rc`, `defined`, `implemented`, `shipped` and `audited` are rewritten IN PLACE through core/atomic_write.py's compare-and-swap seam (expected_previous, refuse-stale) whenever a code path writes this document; an agent with file tools (product-engineer, at the phase boundaries this document's history used to record as separate `phase` lines) may also Read-then-Edit it directly, the same discipline a CAS write enforces mechanically. `defined`/`implemented`/`shipped`/`audited` are the four sha-bearing milestone facts (each set at most once meaningfully — a later legitimate rewrite is a correction, not a second append, so there is no more 'duplicate milestone' finding to detect: SPEC-DOC-043 retires with the JSONL fold it existed to police). `log` is the one place free-form governance narrative survives INSIDE this otherwise-typed document — the closure narrative (summary, size accounting, drifts, dispositions, artifact GC, intake candidates, rc ledger, archive decision) that RELEASE.jsonl's `note` records used to carry, one entry per note, oldest first, never rewritten once appended.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema", "release", "phase", "rc", "defined", "implemented", "shipped", "audited", "notes"],
+  "required": ["schema", "release", "phase", "rc", "defined", "implemented", "shipped", "audited", "log"],
   "properties": {
     "schema": {
       "type": "string",
@@ -19,7 +19,7 @@
     },
     "phase": {
       "type": "string",
-      "description": "The release's current lifecycle phase (DISCOVERY/DEFINITION/SPEC/PLAN/TASKS/IMPLEMENTATION/CLOSURE/ARCHIVED — the canonical vocabulary lives in features/specs/doctor_release.py, not duplicated here). Overwritten in place on every phase transition — no history of prior phases survives in this field; a transition worth remembering is recorded as a `notes` entry."
+      "description": "The release's current lifecycle phase (DISCOVERY/DEFINITION/SPEC/PLAN/TASKS/IMPLEMENTATION/CLOSURE/ARCHIVED — the canonical vocabulary lives in features/specs/doctor_release.py, not duplicated here). Overwritten in place on every phase transition — no history of prior phases survives in this field; a transition worth remembering is recorded as a `log` entry."
     },
     "rc": {
       "type": ["integer", "null"],
@@ -74,7 +74,7 @@
       "pattern": "^(alpha|rc)-\\d+$",
       "description": "OPTIONAL: the active dir-based segment (ADR-1/ADR-5) when the release's SPEC/PLAN/TASKS live under releases/<id>/<segment>/ rather than flat. Omitted or null for a flat (unsegmented) release."
     },
-    "notes": {
+    "log": {
       "type": "array",
       "description": "Append-only governance narrative living inside this mutable document, oldest first. An entry is appended, never edited or removed once written.",
       "items": {

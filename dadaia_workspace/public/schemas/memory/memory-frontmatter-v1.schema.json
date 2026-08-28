@@ -11,9 +11,7 @@
     "category",
     "tldr",
     "summary",
-    "tags",
-    "last_updated",
-    "release_origin"
+    "tags"
   ],
   "properties": {
     "slug": {
@@ -28,7 +26,11 @@
     },
     "category": {
       "type": "string",
-      "enum": ["core", "product", "ops"],
+      "enum": [
+        "core",
+        "product",
+        "ops"
+      ],
       "description": "Catalog grouping."
     },
     "tldr": {
@@ -44,20 +46,12 @@
     },
     "tags": {
       "type": "array",
-      "items": { "type": "string", "minLength": 1 },
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
       "uniqueItems": true,
       "description": "Free-form topic tags for catalog filtering."
-    },
-    "last_updated": {
-      "type": "string",
-      "format": "date",
-      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
-      "description": "ISO date of last content change (set by product-engineer at CLOSURE)."
-    },
-    "release_origin": {
-      "type": "string",
-      "minLength": 1,
-      "description": "Release ID that last modified this atom."
     }
   }
 }

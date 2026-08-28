@@ -35,7 +35,7 @@ def _doc(**overrides: object) -> dict[str, object]:
         "implemented": None,
         "shipped": None,
         "audited": None,
-        "notes": [
+        "log": [
             {
                 "ts": "2026-08-27T12:25:47Z",
                 "agent": "software-engineer",
@@ -59,8 +59,8 @@ def test_parse_release_state_reads_every_field() -> None:
     assert state.implemented is None
     assert state.shipped is None
     assert state.audited is None
-    assert len(state.notes) == 1
-    assert state.notes[0]["kind"] == "note"
+    assert len(state.log) == 1
+    assert state.log[0]["kind"] == "note"
     assert state.segment is None
 
 
@@ -77,8 +77,8 @@ def test_parse_release_state_reads_optional_segment() -> None:
         (lambda d: d.__setitem__("phase", 3), "'phase' must be a string"),
         (lambda d: d.__setitem__("rc", "one"), "'rc' must be an integer"),
         (lambda d: d.__setitem__("defined", {"sha": "a" * 40}), "missing required key"),
-        (lambda d: d.__setitem__("notes", [{"ts": "x"}]), "missing required key"),
-        (lambda d: d.__setitem__("notes", "not-a-list"), "'notes' must be an array"),
+        (lambda d: d.__setitem__("log", [{"ts": "x"}]), "missing required key"),
+        (lambda d: d.__setitem__("log", "not-a-list"), "'log' must be an array"),
     ],
 )
 def test_parse_release_state_rejects_malformed_documents_in_full(mutator, match) -> None:
@@ -110,9 +110,9 @@ def test_serialize_release_state_round_trips() -> None:
 
     assert reparsed == original
     assert text.endswith("\n")
-    # Field order is fixed and readable — schema/release/phase lead, notes trails.
+    # Field order is fixed and readable — schema/release/phase lead, log trails.
     assert list(json.loads(text).keys())[:3] == ["schema", "release", "phase"]
-    assert list(json.loads(text).keys())[-1] == "notes"
+    assert list(json.loads(text).keys())[-1] == "log"
 
 
 def test_release_state_is_a_frozen_dataclass_value_object() -> None:

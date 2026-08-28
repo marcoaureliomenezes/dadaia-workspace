@@ -32,8 +32,6 @@ summary: 'Product catalog entry point.'
 tags: []
 agent_tier: self-pull
 token_estimate: 20
-last_updated: '2026-06-01'
-release_origin: test-release
 ---
 
 ## Catálogo de features
@@ -51,8 +49,6 @@ summary: 'Does A.'
 tags: []
 agent_tier: self-pull
 token_estimate: 20
-last_updated: '2026-06-01'
-release_origin: test-release
 ---
 
 ## Propósito
@@ -70,8 +66,6 @@ summary: 'System architecture layers and dependency contracts.'
 tags: []
 agent_tier: self-pull
 token_estimate: 20
-last_updated: '2026-06-01'
-release_origin: test-release
 ---
 
 ## Visão geral
@@ -89,8 +83,6 @@ summary: 'Technology stack and approved dependencies.'
 tags: []
 agent_tier: self-pull
 token_estimate: 20
-last_updated: '2026-06-01'
-release_origin: test-release
 ---
 
 ## Linguagens
@@ -114,24 +106,27 @@ def _skip_memory_lint_subprocess(monkeypatch: pytest.MonkeyPatch) -> None:
 def _write_release_jsonl(
     specs: Path, release_id: str, phase: str, segment: str | None = None
 ) -> None:
-    """Write (overwrite) ``specs/releases/<release_id>/RELEASE.jsonl`` with exactly
-    ONE ``phase`` record (v0.5.0 FR4/T-050-21A) -- the fixture-side replacement for
-    the retired ``ACTIVE.md``. A single record is sufficient: the fold takes the
-    LAST ``phase`` record, so one line fully represents "current state" for a test."""
+    """Write (overwrite) ``specs/releases/<release_id>/RELEASE.json`` with a minimal
+    release-state-v1 document (v0.5.x, successor to the RELEASE.jsonl fold; v0.5.0
+    FR4/T-050-21A) -- the fixture-side replacement for the retired ``ACTIVE.md``."""
     import json as _json
 
     rdir = specs / "releases" / release_id
     rdir.mkdir(parents=True, exist_ok=True)
-    data: dict[str, object] = {"phase": phase}
-    if segment:
-        data["segment"] = segment
-    record = {
-        "ts": "2026-06-01T00:00:00Z",
-        "event": "phase",
-        "agent": "test",
-        "data": data,
+    state: dict[str, object] = {
+        "schema": "release-state-v1",
+        "release": release_id,
+        "phase": phase,
+        "rc": None,
+        "defined": None,
+        "implemented": None,
+        "shipped": None,
+        "audited": None,
+        "log": [],
     }
-    (rdir / "RELEASE.jsonl").write_text(_json.dumps(record) + "\n", encoding="utf-8")
+    if segment:
+        state["segment"] = segment
+    (rdir / "RELEASE.json").write_text(_json.dumps(state) + "\n", encoding="utf-8")
 
 
 def _make_clean_specs_tree(root: Path, release_id: str = "r1") -> Path:
@@ -155,8 +150,8 @@ def _make_clean_specs_tree(root: Path, release_id: str = "r1") -> Path:
     (specs / "memory" / "QUALITY.md").write_text(
         "---\nslug: quality-assurance\ntitle: Quality Assurance\ncategory: core\n"
         "tldr: 'QA standards.'\nsummary: 'QA standards and anti-slop rules.'\n"
-        "tags: []\nagent_tier: self-pull\ntoken_estimate: 20\nlast_updated: '2026-06-07'\n"
-        "release_origin: test-release\n---\n\n## Standards\n\nQA standards.\n",
+        "tags: []\nagent_tier: self-pull\ntoken_estimate: 20\n"
+        "---\n\n## Standards\n\nQA standards.\n",
         encoding="utf-8",
     )
     _write_release_jsonl(specs, release_id, "IMPLEMENTATION")
@@ -211,8 +206,6 @@ summary: 'Does {slug}.'
 tags: []
 agent_tier: self-pull
 token_estimate: 100
-last_updated: '2026-06-01'
-release_origin: test-release
 ---
 
 ## Propósito
@@ -397,8 +390,10 @@ def test_fresh_scaffold_passes_all_tree_invariants(tmp_path: Path) -> None:
         ),
         pytest.param(
             "release-jsonl-carries-no-phase-record",
-            lambda specs: (specs / "releases" / "r1" / "RELEASE.jsonl").write_text(
-                '{"ts":"2026-06-01T00:00:00Z","event":"note","agent":"test","data":{"text":"x"}}\n',
+            lambda specs: (specs / "releases" / "r1" / "RELEASE.json").write_text(
+                '{"schema":"release-state-v1","release":"r1","phase":"",'
+                '"rc":null,"defined":null,"implemented":null,"shipped":null,'
+                '"audited":null,"log":[]}\n',
                 encoding="utf-8",
             ),
             "SPEC-DOC-003",
@@ -437,7 +432,7 @@ def test_fresh_scaffold_passes_all_tree_invariants(tmp_path: Path) -> None:
         # doc009-release-id-without-dir RETIRED (v0.5.0 T-050-21A): SPEC-DOC-009 fired
         # when ACTIVE.md's `release:` field named a directory that did not exist.
         # `resolve_active_release`/`resolve_live_release_id` only ever return a
-        # release_id they found BY LOCATING that exact directory (RELEASE.jsonl
+        # release_id they found BY LOCATING that exact directory (RELEASE.json
         # inside it) — this scenario is now structurally unreachable; the ERROR
         # branch in `check_active_md` is a defensive assertion, kept but untestable
         # through the public API.
@@ -495,8 +490,8 @@ def test_sad_matrix(tmp_path: Path, case: str, mutate, expected_code: str) -> No
                 (specs / "memory" / "product" / "sdd" / "specs-doctor.md").write_text(
                     "---\nslug: specs-doctor\ntitle: Specs Doctor\ncategory: product\n"
                     "tldr: 'Doctor checks.'\nsummary: 'Doctor structural checks.'\ntags: []\n"
-                    "agent_tier: self-pull\ntoken_estimate: 100\nlast_updated: '2026-06-07'\n"
-                    "release_origin: test-release\n---\n\n## Propósito\n\nValidates specs.\n",
+                    "agent_tier: self-pull\ntoken_estimate: 100\n"
+                    "---\n\n## Propósito\n\nValidates specs.\n",
                     encoding="utf-8",
                 ),
             ),
@@ -935,7 +930,7 @@ def test_cat1_sync_matrix(tmp_path: Path) -> None:
     (subdir_g / "product-vision.md").write_text(
         "---\nslug: product-vision\ntitle: Product Vision\ncategory: product\n"
         "tldr: 'Vision.'\nsummary: 'Vision summary.'\ntags: []\nagent_tier: self-pull\n"
-        "token_estimate: 100\nlast_updated: '2026-06-07'\nrelease_origin: test-release\n---\n\n"
+        "token_estimate: 100\n---\n\n"
         "## Vision\n\nThe vision.\n",
         encoding="utf-8",
     )
