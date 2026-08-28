@@ -23,8 +23,6 @@ def _scaffold_dir(tmp_path: Path) -> Path:
                 "---",
                 "slug: SLUG_PLACEHOLDER",
                 "title: TITLE_PLACEHOLDER",
-                "release_origin: RELEASE_PLACEHOLDER",
-                'last_updated: "2026-01-01"',
                 "---",
                 "",
                 "# TITLE_PLACEHOLDER",
@@ -56,8 +54,8 @@ def test_placeholders_idempotence_and_invalid_slug(tmp_path: Path) -> None:
     content = _build_feature_md("payment-links", "2026-06-03", scaffold)
     assert "slug: payment-links" in content
     assert "title: Payment Links" in content
-    assert "release_origin: none" in content
-    assert 'last_updated: "2026-06-03"' in content
+    assert "release_origin" not in content
+    assert "last_updated" not in content
     assert "SLUG_PLACEHOLDER" not in content
     assert "TITLE_PLACEHOLDER" not in content
 

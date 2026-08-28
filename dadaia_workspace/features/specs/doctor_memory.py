@@ -29,8 +29,9 @@ from dadaia_workspace.features.specs.doctor_types import (
 )
 
 FORBIDDEN_MEMORY_H2_RE = re.compile(r"^(Changelog|History|Hist[óo]rico|Versions?)\b", re.IGNORECASE)
-# Top-level memory files (.md canonical source).
-TOPLEVEL_MEMORY_FILES = ("architecture.md", "tech-stack.md", "quality-assurance.md")
+# Top-level memory files (.md canonical source). v6 canon (FR1/A1.5/A1.6, T-050-06):
+# renamed from the lowercase trio (architecture.md, tech-stack.md, quality-assurance.md).
+TOPLEVEL_MEMORY_FILES = ("ARCHITECTURE.md", "TECHSTACK.md", "QUALITY.md")
 # Product memory is a folder catalog: index.md is required + 0..N feature .md atoms.
 PRODUCT_INDEX_REL = "product/index.md"
 
@@ -87,7 +88,7 @@ def _parse_memory_md(path: Path) -> _MemoryMdSummary:
 def _iter_memory_md_files(mem_dir: Path) -> list[Path]:
     """All memory .md atom files that should be checked for atomicity.
 
-    Includes the top-level singles (architecture.md, tech-stack.md) and every
+    Includes the top-level singles (ARCHITECTURE.md, TECHSTACK.md, QUALITY.md) and every
     *.md under product/ except index.md (the catalog folder).
     """
     out: list[Path] = []
@@ -300,11 +301,24 @@ class MemoryValidator:
             # Orphaned .md files at root (no known canonical role) — flag as legacy.
             # AGENTS.md is exempt. TOPLEVEL_MEMORY_FILES (.md) are canonical. index.md in
             # product/ is the generated TOC.  Everything else is flagged.
+            #
+            # v6 canon (FR1/A1.5/A1.6, T-050-06): the top-level trio's PRE-migration
+            # lowercase names (architecture.md, tech-stack.md, quality-assurance.md) are
+            # recognized here too, so a consumer tree `specs upgrade` has not yet
+            # hand-renamed (the rename is a by-hand recipe step, never automated) is not
+            # mistaken for a genuinely stray/orphaned file — SPEC-DOC-002/TREE-3 already
+            # correctly report the RENAMED file as missing; SPEC-DOC-002L's job is orphan
+            # detection, not a second "please rename" signal.
+            _RETIRED_TOPLEVEL_MEMORY_NAMES = frozenset(
+                {"architecture.md", "tech-stack.md", "quality-assurance.md"}
+            )
             _canonical_root_md = {Path(f).name for f in TOPLEVEL_MEMORY_FILES}
             for legacy in mem_dir.glob("*.md"):
                 if legacy.name == "AGENTS.md":
                     continue
                 if legacy.name in _canonical_root_md:
+                    continue
+                if legacy.name in _RETIRED_TOPLEVEL_MEMORY_NAMES:
                     continue
                 issues.append(
                     SpecsDoctorIssue(
@@ -353,8 +367,10 @@ class MemoryValidator:
     def check_lint1_memory_atoms(self) -> list[SpecsDoctorIssue]:
         """LINT-1: lint every memory atom under specs/memory/ via ``memory_lint``.
 
-        ERROR on frontmatter/schema violations + forbidden headings.
-        WARNING on unknown (non-allowlisted) headings.
+        ERROR on frontmatter/schema violations, forbidden (changelog/history)
+        headings, duplicate headings, and unresolved wikilinks. A heading vocabulary
+        is prose policy, not a lint (v0.5.0) — no WARNING severity path exists here
+        any more.
 
         v0.4.3 T-043-20/FR16: ``memory_lint`` is imported directly — no subprocess,
         no dependency on the projected ``public/scripts/lint-memory-atoms.py`` copy

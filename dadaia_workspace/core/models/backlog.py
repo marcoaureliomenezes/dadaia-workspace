@@ -1,4 +1,9 @@
-"""Typed ``intents[]`` backlog item schema (SPEC §3.1, ADR-A).
+"""Typed ``intents[]`` backlog item schema (SPEC §3.1, ADR-A), plus
+:class:`BacklogHistoRecord` (v0.5.0 FR5, A5.1) — the one-record-per-exit shape appended to
+``specs/backlog/_archive/backlog_histo.jsonl`` when an ``active[]`` entry leaves the live
+document (``specs/backlog/BACKLOG.json`` — operator ruling 2026-08-28; ``BACKLOG.md``'s
+retired ``### <slug>`` ``## ACTIVE`` Markdown subsection shape is the historical
+predecessor this field naming still echoes).
 
 The ``(subject{kind,ref} -> change)`` frontmatter shape every backlog item carries. This is
 a **pure** domain model: it validates that a ref is *well-formed for its kind*, but it does
@@ -11,18 +16,38 @@ Privacy invariant (SPEC §3.8 finding #7): a ``code`` ref stored in a committed 
 paths (``/home/...``, ``~/...``), parent-directory traversal (``../``), and Windows drive
 prefixes are rejected at construction so no operator-local path can ever land in a committed
 backlog file.
+
+**``BacklogHistoRecord.redact()`` (bug
+``backlog-histo-writer-skips-write-time-denylist-redaction``).** The SAME defect class
+``core.models.bugs.BugRecord`` already had fixed twice (T-043-23 -> T-044-62 -> T-045-19,
+SPEC v0.4.5 FR6): a write-time record model appended a free-text snapshot field
+(``entry_md``) with no denylist masking, caught only later at the push gate. Every
+free-text field this dataclass declares — except the three identity fields (``id``,
+``ts``, ``by``, mirroring ``BugRecord``'s own ``id``/``ts``/``reported_by`` exemption) —
+is derived from THIS dataclass's own ``dataclasses.field(metadata=...)`` declarations
+(the SAME ``_dataclass_field_names`` mechanism ``core.models.bugs``/``core.models.findings``
+each already use, per-module, never a second hand-kept list — A2.10). Masking itself
+routes through ``core.redaction.redact_text``, the SAME primitive
+``BugRecord.redact()`` calls — ``core/models/backlog.py`` and ``core/models/bugs.py``
+never import each other; both import that one shared, domain-agnostic sibling.
 """
 
 from __future__ import annotations
 
 import re
-from collections.abc import Sequence
-from dataclasses import dataclass
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass, field, replace
+from dataclasses import fields as dc_fields
 from enum import StrEnum
+from typing import Any
+
+from dadaia_workspace.core.redaction import redact_text
 
 __all__ = [
     "INTENTS_EXEMPT_STATUS",
     "TERMINAL_DISPOSITION_TOKENS",
+    "BacklogHistoRecord",
+    "ConsumedBacklogHistoRecord",
     "Intent",
     "Subject",
     "SubjectKind",
@@ -233,3 +258,188 @@ def serialize_intents(intents: Sequence[Intent]) -> list[dict[str, object]]:
             subject["surface"] = intent.subject.surface
         out.append({"subject": subject, "change": intent.change})
     return out
+
+
+def _dataclass_field_names(
+    dataclass_type: type, predicate: Callable[[Mapping[str, object]], bool]
+) -> tuple[str, ...]:
+    """Return the field names of *dataclass_type* whose ``metadata`` satisfies
+    *predicate* — pure ``dataclasses.fields()`` introspection, zero file I/O.
+
+    The SAME per-module mechanism ``core.models.bugs``/``core.models.findings`` each
+    already declare (a per-field ``dataclasses.field(metadata={...})`` entry, colocated
+    with the field's own declaration, never a second, separately-maintained
+    module-level tuple/list/set of names — A2.10). Duplicated here rather than
+    imported from either sibling: every ``core/models/*.py`` domain model stays
+    self-contained, importing no OTHER ``core/models`` module (only the shared,
+    domain-agnostic ``core.redaction``/stdlib) — see this module's own docstring.
+    """
+    return tuple(f.name for f in dc_fields(dataclass_type) if predicate(f.metadata))
+
+
+def _require_histo_str(raw: Mapping[str, object], key: str) -> str:
+    value = raw.get(key)
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"backlog-histo record missing required string field {key!r}: {raw!r}")
+    return value
+
+
+def _optional_histo_str(raw: Mapping[str, object], key: str) -> str | None:
+    value = raw.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError(f"backlog-histo record field {key!r} must be a string or null: {raw!r}")
+    return value
+
+
+@dataclass(frozen=True)
+class BacklogHistoRecord:
+    """One record per backlog-item exit (v0.5.0 FR5, A5.1) — appended once to
+    ``specs/backlog/_archive/backlog_histo.jsonl`` through the generic
+    :class:`~dadaia_workspace.core.protocols.record_store.RecordStore` seam
+    (``infrastructure.jsonl_record_store.JsonlRecordStore``, composed at
+    ``container.build_backlog_histo_store``) when an ``active[]`` entry leaves
+    ``BACKLOG.json`` (any disposition).
+
+    ``id`` IS the backlog slug — the record's identity and the
+    :class:`~dadaia_workspace.core.protocols.record_store.RecordStore` key. With one
+    line per slug, ever, a duplicate exit is structurally impossible (A5.2): the
+    ``disposition``/``reason``/``release`` fields are rewritten IN PLACE through
+    :meth:`~dadaia_workspace.core.protocols.record_store.RecordStore.update` when a
+    provisional ``CONSUMED`` matures to its terminal token at closure (DADAIA.md §6) —
+    never a second record for the same slug.
+
+    ``id``/``ts``/``by`` are marked ``metadata={"identity": True}`` — the record's
+    stable identity/attribution fields, mirroring ``BugRecord``'s own
+    ``id``/``ts``/``reported_by`` exemption — and are the ONLY fields
+    :meth:`redact` never scrubs; every other field is free text a committed exit
+    snapshot must never carry a denylisted term in (bug
+    ``backlog-histo-writer-skips-write-time-denylist-redaction``).
+    """
+
+    id: str = field(metadata={"identity": True})
+    ts: str = field(metadata={"identity": True})
+    disposition: str
+    reason: str | None
+    release: str | None
+    by: str = field(metadata={"identity": True})
+    entry_md: str | None
+    entry_md_source: str | None
+
+    def redact(self, denylist_terms: Sequence[tuple[str, str]] = ()) -> BacklogHistoRecord:
+        """Return a copy with every free-text field scrubbed via
+        :func:`~dadaia_workspace.core.redaction.redact_text` — the SAME primitive
+        :meth:`~dadaia_workspace.core.models.bugs.BugRecord.redact` calls.
+
+        The field set is every declared field EXCEPT the three identity fields
+        (``id``/``ts``/``by``, marked ``metadata={"identity": True}`` above) —
+        derived from THIS dataclass's own fields via :func:`_dataclass_field_names`,
+        zero file I/O. A field added to :class:`BacklogHistoRecord` is redacted by
+        default with NO code edited here (A2.10).
+        """
+
+        def _scrub(value: str | None) -> str | None:
+            return None if value is None else redact_text(value, denylist_terms)
+
+        updates: dict[str, Any] = {
+            name: _scrub(getattr(self, name)) for name in _BACKLOG_HISTO_RECORD_REDACTABLE_FIELDS
+        }
+        return replace(self, **updates)
+
+    def to_dict(self) -> dict[str, object]:
+        """Serialize to the JSONL object shape (``"id"`` present so the generic
+        ``JsonlRecordStore.update`` seam can locate this record by slug)."""
+        return {
+            "id": self.id,
+            "ts": self.ts,
+            "disposition": self.disposition,
+            "reason": self.reason,
+            "release": self.release,
+            "by": self.by,
+            "entry_md": self.entry_md,
+            "entry_md_source": self.entry_md_source,
+        }
+
+    @classmethod
+    def from_dict(cls, raw: Mapping[str, object]) -> BacklogHistoRecord:
+        """Parse a JSONL object into a :class:`BacklogHistoRecord`. Raises
+        ``ValueError`` on a malformed record so tolerant readers can skip it (mirrors
+        ``BugRecord.from_dict``)."""
+        return cls(
+            id=_require_histo_str(raw, "id"),
+            ts=_require_histo_str(raw, "ts"),
+            disposition=_require_histo_str(raw, "disposition"),
+            reason=_optional_histo_str(raw, "reason"),
+            release=_optional_histo_str(raw, "release"),
+            by=_require_histo_str(raw, "by"),
+            entry_md=_optional_histo_str(raw, "entry_md"),
+            entry_md_source=_optional_histo_str(raw, "entry_md_source"),
+        )
+
+
+#: Derived (A2.10) — never hand-kept — from ``BacklogHistoRecord``'s own field
+#: metadata: every field except the three identity fields (``id``/``ts``/``by``).
+_BACKLOG_HISTO_RECORD_REDACTABLE_FIELDS: tuple[str, ...] = _dataclass_field_names(
+    BacklogHistoRecord, lambda metadata: not metadata.get("identity")
+)
+
+
+def _require_histo_consumed_list(raw: Mapping[str, object], key: str) -> list[dict[str, object]]:
+    """Validate :class:`ConsumedBacklogHistoRecord`'s ``consumed`` field: a list of
+    mapping entries, each carrying at least a non-empty ``slug`` string. Every other
+    key (``shipped_anchors``, ``note``, ...) passes through opaque and untouched — the
+    relocation this record backs is byte-lossless, not a narrower reshape."""
+    value = raw.get(key)
+    if not isinstance(value, list):
+        raise ValueError(f"consumed-backlog histo record field {key!r} must be a list: {raw!r}")
+    entries: list[dict[str, object]] = []
+    for entry in value:
+        if not isinstance(entry, dict):
+            raise ValueError(f"consumed-backlog histo record entry must be a mapping: {entry!r}")
+        slug = entry.get("slug")
+        if not isinstance(slug, str) or not slug:
+            raise ValueError(
+                f"consumed-backlog histo record entry missing a non-empty 'slug': {entry!r}"
+            )
+        entries.append(dict(entry))
+    return entries
+
+
+@dataclass(frozen=True)
+class ConsumedBacklogHistoRecord:
+    """One record per archived release's ``consumed_backlog.json`` sidecar (v0.5.0
+    T-050-13A, SPEC A5.5) — the relocation target for the 18 per-release
+    ``specs/_archive/<release-id>/consumed_backlog.json`` files FR6 (T-050-14) would
+    otherwise delete out from under BL-STALE's condition (a) with no failure signal
+    (FR13's "documented convention with no data behind it" shape).
+
+    Appended once per release to ``specs/backlog/_archive/consumed_backlog_histo.jsonl``
+    through the SAME generic
+    :class:`~dadaia_workspace.core.protocols.record_store.RecordStore` seam
+    :class:`BacklogHistoRecord` uses (``infrastructure.jsonl_record_store.
+    JsonlRecordStore``, composed at ``container.build_consumed_backlog_histo_store``).
+    ``id`` is the release id the original sidecar's directory named (e.g.
+    ``"v0.1.47"``) — the record's identity and the
+    :class:`~dadaia_workspace.core.protocols.record_store.RecordStore` key. ``consumed``
+    is that sidecar's original ``consumed`` entry list (``{slug, shipped_anchors[],
+    ...}``), preserved verbatim — a byte-lossless relocation, not a reshape.
+    """
+
+    id: str
+    consumed: list[dict[str, object]]
+
+    def to_dict(self) -> dict[str, object]:
+        """Serialize to the JSONL object shape (``"id"`` present so the generic
+        ``JsonlRecordStore`` seam can locate this record by release id)."""
+        return {"id": self.id, "consumed": self.consumed}
+
+    @classmethod
+    def from_dict(cls, raw: Mapping[str, object]) -> ConsumedBacklogHistoRecord:
+        """Parse a JSONL object into a :class:`ConsumedBacklogHistoRecord`. Raises
+        ``ValueError`` on a malformed record so the generic ``JsonlRecordStore`` skips
+        it (WARN-logged) rather than crashing the whole read."""
+        return cls(
+            id=_require_histo_str(raw, "id"),
+            consumed=_require_histo_consumed_list(raw, "consumed"),
+        )

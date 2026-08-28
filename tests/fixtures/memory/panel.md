@@ -7,8 +7,6 @@ summary: HTTP server Python puro (no frameworks) que serve a UI do workspace com
 tags: [panel, http, ui]
 agent_tier: self-pull
 token_estimate: 350
-last_updated: "2026-06-01"
-release_origin: memory-markdown-source-v1
 ---
 
 ## Propósito

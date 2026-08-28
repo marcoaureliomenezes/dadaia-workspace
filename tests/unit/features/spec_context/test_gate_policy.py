@@ -32,7 +32,7 @@ _SPEC_RELATIVE_CASES: tuple[tuple[str, str, PathClass], ...] = (
     ("additive_audits", "specs/audits/2026-01-01T000000Z-abc12345/index.md", PathClass.ADDITIVE),
     ("memory_atom", "specs/memory/architecture.md", PathClass.MEMORY),
     ("memory_product", "specs/memory/product/catalog.md", PathClass.MEMORY),
-    ("frozen_archive", "specs/_archive/releases/v0.1.9/SPEC.md", PathClass.FROZEN),
+    ("archived_release", "specs/releases/_archive/v0.1.9/SPEC.md", PathClass.MUTATING),
     ("mutating_release", "specs/releases/v0.1.10/SPEC.md", PathClass.MUTATING),
     ("mutating_constitution", "specs/constitution.md", PathClass.MUTATING),
 )
@@ -153,59 +153,14 @@ def test_first_match_wins_ordering_in_repo() -> None:
     assert classify_path(_in_repo(_DEFAULT_SLUG, "specs/bugs/x.md")) == PathClass.ADDITIVE
 
 
-# ---------------------------------------------------------------------------
-# v0.1.46 AC-4 / R-2 — per-artifact _archive/ subdirs classify FROZEN, matched BEFORE
-# the ADDITIVE prefixes (the ordering bug the release fixes) — CRITICAL boundary.
-# ---------------------------------------------------------------------------
-
-
-def test_archive_prefix_boundary_and_ordering() -> None:
-    """Only ``_archive/`` (trailing slash) is FROZEN — a ``_archive``-prefixed sibling
-    like ``_archivefoo.jsonl`` stays ADDITIVE, and _archive/ is matched BEFORE the
-    ADDITIVE prefix (a live sibling in the same family stays ADDITIVE)."""
-    for rel_path in (
-        "specs/backlog/_archive/epic.md",
-        "specs/audits/_archive/2026-01-01T000000Z-abc12345/audit.md",
-        "specs/bugs/_archive/concurrency-warning.md",
-    ):
-        assert classify_path(rel_path) == PathClass.FROZEN
-
-    # Live siblings in the same family stay ADDITIVE — the fix must not overreach.
-    assert classify_path("specs/bugs/20260701T00Z-00.jsonl") == PathClass.ADDITIVE
-    assert classify_path("specs/backlog/candidates.md") == PathClass.ADDITIVE
-    assert classify_path("specs/audits/live-report/audit.md") == PathClass.ADDITIVE
-    assert classify_path("specs/bugs/_archive/20260101T00Z-00.jsonl") == PathClass.FROZEN
-
-    # Boundary: only the trailing-slash form is FROZEN.
-    assert classify_path("specs/bugs/_archivefoo.jsonl") == PathClass.ADDITIVE
-    assert classify_path("specs/backlog/_archived.md") == PathClass.ADDITIVE
-    assert classify_path("specs/bugs/_archive") == PathClass.ADDITIVE
-
-    # Holds context-relatively, both slugs.
-    for slug in (_DEFAULT_SLUG, _NONDEFAULT_SLUG):
-        assert (
-            classify_path(_in_repo(slug, "specs/audits/_archive/2026-01-01T00Z-abc/audit.md"))
-            == PathClass.FROZEN
-        )
-        assert (
-            classify_path(_in_repo(slug, "specs/audits/2026-01-01T00Z-abc/audit.md"))
-            == PathClass.ADDITIVE
-        )
-
-
-# ---------------------------------------------------------------------------
-# evaluate() block/allow pair — the archive is really blocked, a live additive write flows
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.parametrize(
     ("rel_path", "expected_decision", "message_contains"),
     [
         pytest.param(
-            "specs/audits/_archive/2026-01-01T00Z-abc/audit.md",
-            Decision.BLOCK,
-            "frozen archive",
-            id="blocks-write-into-archive",
+            "specs/audits/_archive/audits_histo.jsonl",
+            Decision.ALLOW,
+            None,
+            id="allows-append-into-area-histo",
         ),
         pytest.param(
             "specs/bugs/20260701T00Z-00.jsonl",
@@ -215,7 +170,7 @@ def test_archive_prefix_boundary_and_ordering() -> None:
         ),
     ],
 )
-def test_evaluate_archive_block_and_additive_allow(
+def test_evaluate_area_histo_and_live_bugs_allow(
     tmp_path: Path, rel_path: str, expected_decision: Decision, message_contains: str | None
 ) -> None:
     decision, message = evaluate(
@@ -305,8 +260,8 @@ def test_evaluate_anon_session_emits_no_presence_events(tmp_path: Path) -> None:
 # ═════════════════════════════════════════════════════════════════════════════════
 
 _MEMORY_DOTFILE_PATHS: tuple[str, ...] = (
-    "specs/memory/.heading-allowlist",
-    f"repos/{_DEFAULT_SLUG}/specs/memory/.heading-allowlist",
+    "specs/memory/.editor-scratch",
+    f"repos/{_DEFAULT_SLUG}/specs/memory/.editor-scratch",
 )
 #: A non-dot sibling atom, in BOTH root and in-repo form, pinned for parity (the
 #: ruling's fixture requirement) — same MEMORY class, same phase gate, no distinction.

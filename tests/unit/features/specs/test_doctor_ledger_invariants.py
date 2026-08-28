@@ -21,6 +21,7 @@ following the SPEC-DOC-NNN convention:
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -37,8 +38,6 @@ summary: 'Product catalog entry point.'
 tags: []
 agent_tier: self-pull
 token_estimate: 20
-last_updated: '2026-06-01'
-release_origin: test-release
 ---
 
 ## Catalog
@@ -56,8 +55,6 @@ summary: 'summary.'
 tags: []
 agent_tier: self-pull
 token_estimate: 20
-last_updated: '2026-06-01'
-release_origin: test-release
 ---
 
 ## Heading
@@ -109,7 +106,6 @@ def _make_clean_specs_tree(root: Path, release_id: str = "v0.1.10") -> Path:
     specs = root / "specs"
     (specs / "memory" / "product").mkdir(parents=True)
     (specs / "releases" / release_id).mkdir(parents=True)
-    (specs / "_archive" / "releases").mkdir(parents=True)
     (specs / "backlog").mkdir(parents=True)
 
     (specs / "constitution.md").write_text("# Constitution\n\nThe laws.\n", encoding="utf-8")
@@ -125,9 +121,7 @@ def _make_clean_specs_tree(root: Path, release_id: str = "v0.1.10") -> Path:
             MINIMAL_MEMORY_ATOM_MD.format(slug=slug, title=title), encoding="utf-8"
         )
 
-    (specs / "releases" / "ACTIVE.md").write_text(
-        f"release: {release_id}\nphase: IMPLEMENTATION\n", encoding="utf-8"
-    )
+    _set_active(specs, release_id, "IMPLEMENTATION")
     spec_md = "# Spec\n\n> **Status:** Aprovado\n> **Created:** 2026-06-09\n\nContent.\n"
     plan_md = "# Plan\n\n> **Status:** Aprovado\n\nShort.\n"
     tasks_md = "# Tasks\n\n> **Status:** Aprovado\n\n- [-] T1 something\n- [ ] T2 other\n"
@@ -138,9 +132,25 @@ def _make_clean_specs_tree(root: Path, release_id: str = "v0.1.10") -> Path:
 
 
 def _set_active(specs: Path, release_id: str, phase: str) -> None:
-    (specs / "releases" / "ACTIVE.md").write_text(
-        f"release: {release_id}\nphase: {phase}\n", encoding="utf-8"
-    )
+    """Write (overwrite) the release's ``RELEASE.json`` with a minimal
+    release-state-v1 document (v0.5.x, successor to the RELEASE.jsonl fold; v0.5.0
+    FR4/T-050-21A) -- the fixture-side replacement for the retired ``ACTIVE.md``."""
+    import json as _json
+
+    rdir = specs / "releases" / release_id
+    rdir.mkdir(parents=True, exist_ok=True)
+    state = {
+        "schema": "release-state-v1",
+        "release": release_id,
+        "phase": phase,
+        "rc": None,
+        "defined": None,
+        "implemented": None,
+        "shipped": None,
+        "audited": None,
+        "log": [],
+    }
+    (rdir / "RELEASE.json").write_text(_json.dumps(state) + "\n", encoding="utf-8")
 
 
 def _write_tasks(specs: Path, release_id: str, body: str) -> None:
@@ -160,28 +170,63 @@ def _by_code(issues: list[SpecsDoctorIssue], code: str) -> list[SpecsDoctorIssue
 def _write_backlog_entry(specs: Path, slug: str, status_line: str) -> None:
     """Write (or append to) ``specs/backlog/BACKLOG.md`` with one ``## ACTIVE``
     subsection for *slug* at the given ``**Status:**`` line (SPEC v0.12.0 FR1/FR5 — the
-    single-source document, not a per-entry file). Multiple calls against the same
-    ``specs`` root accumulate subsections in one document."""
+    single-source document, not a per-entry file; v0.5.0 A5.2 — ``## ACTIVE`` is now
+    the document's only top-level section, so a fresh subsection is simply appended at
+    end-of-file, no insertion marker needed). Multiple calls against the same ``specs``
+    root accumulate subsections in one document."""
     (specs / "backlog").mkdir(parents=True, exist_ok=True)
-    path = specs / "backlog" / "BACKLOG.md"
-    text = path.read_text(encoding="utf-8") if path.is_file() else "## ACTIVE\n\n## LEDGER\n"
-    block = (
-        f"### {slug}\n"
-        f"- **Title:** {slug}\n"
-        "- **Opened:** 2026-08-01\n"
-        f"- **Status:** {status_line}\n"
-        f"- **Description:** {slug} body.\n"
-        "- **Provenance:** operator request\n\n"
+    path = specs / "backlog" / "BACKLOG.json"
+    document = (
+        json.loads(path.read_text(encoding="utf-8"))
+        if path.is_file()
+        else {"schema": "backlog-v1", "active": []}
     )
-    marker = "## LEDGER"
-    insertion = text.index(marker)
-    path.write_text(text[:insertion] + block + text[insertion:], encoding="utf-8")
+    document["active"].append(
+        {
+            "id": slug,
+            "title": slug,
+            "opened": "2026-08-01",
+            "status": status_line,
+            "description": f"{slug} body.",
+            "provenance": "operator request",
+        }
+    )
+    path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+
+
+_MINIMAL_SPEC_MD = "# Spec\n\n> **Status:** Aprovado\n"
+
+
+def _write_minimal_spec(rel: Path) -> None:
+    """A companion SPEC.md (v0.5.0 T-050-25A, A4.4): ``RELEASE_ARTIFACTS`` dropped
+    ``CLOSURE.md`` — a lone CLOSURE.md, with no SPEC/PLAN/TASKS alongside it, no longer
+    counts as release-dir evidence (``is_release_dir``/``iter_archive_release_dirs``).
+    Every real archived release in this repo's own history already carries at least
+    one surviving artifact alongside its CLOSURE.md (verified at T-050-25A time);
+    fixtures below that used to rely on CLOSURE.md ALONE now need this companion so
+    they keep exercising the SAME (unrelated) invariant they always tested."""
+    rel.mkdir(parents=True, exist_ok=True)
+    (rel / "SPEC.md").write_text(_MINIMAL_SPEC_MD, encoding="utf-8")
 
 
 def _write_archived_closure(specs: Path, release_id: str, body: str) -> None:
     rel = specs / "_archive" / "releases" / release_id
     rel.mkdir(parents=True, exist_ok=True)
     (rel / "CLOSURE.md").write_text(body, encoding="utf-8")
+    _write_minimal_spec(rel)
+
+
+def _write_archived_spec_consumes(specs: Path, release_id: str, *slugs: str) -> None:
+    """An archived SPEC.md declaring ``**Consumes:** <slugs>`` — the SURVIVING
+    consumption-evidence source SPEC-DOC-031 reads (v0.5.0 T-050-25A, A4.4: the
+    CLOSURE.md-side ``## Dispositions`` table evidence is deleted; module docstring
+    below at the DOC-031 sad-path fixture)."""
+    rel = specs / "_archive" / "releases" / release_id
+    rel.mkdir(parents=True, exist_ok=True)
+    (rel / "SPEC.md").write_text(
+        f"# Spec\n\n> **Status:** Aprovado\n\n**Consumes:** {' '.join(slugs)}\n",
+        encoding="utf-8",
+    )
 
 
 def _write_bug(specs: Path, slug: str, status: str, extra: str = "") -> None:
@@ -243,23 +288,15 @@ def test_sad_matrix(tmp_path: Path) -> None:
     _write_tasks(specs_b, "v0.1.10", "- [x] T1 done\n- [-] T2 in-progress\n")
     assert "SPEC-DOC-024" in _codes(SpecsDoctor(specs_b).check())
 
-    # DOC-006 (extended, recursive): nested archived release dir with no CLOSURE.md.
-    specs_c = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-006"))
-    nested = specs_c / "_archive" / "releases" / "v0.2.0" / "milestone-1"
-    nested.mkdir(parents=True)
-    (nested / "SPEC.md").write_text("# Spec\n\n> **Status:** Aprovado\n", encoding="utf-8")
-    (nested / "TASKS.md").write_text("# Tasks\n\n> **Status:** Aprovado\n", encoding="utf-8")
-    (specs_c / "_archive" / "releases" / "v0.2.0" / "CLOSURE.md").write_text(
-        _CLOSURE_MD, encoding="utf-8"
-    )
-    doc006 = _by_code(SpecsDoctor(specs_c).check(), "SPEC-DOC-006")
-    assert any("milestone-1" in (i.path or "") for i in doc006)
+    # DOC-006 RETIRED (v0.5.0 T-050-25A, A4.4): check_archive_closures deleted along
+    # with CLOSURE.md itself -- a checker that parses a file which no longer exists is
+    # dead code behind a dead artifact. Verdict: criterion (a) feature removed,
+    # dadaia_workspace/features/specs/doctor_closure_audit.py (this task's own commit).
 
     # DOC-026: duplicate release id across releases/ and _archive/releases/ -> ERROR.
     specs_d = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-026"))
     dup = specs_d / "_archive" / "releases" / "v0.1.10"
-    dup.mkdir(parents=True)
-    (dup / "CLOSURE.md").write_text(_CLOSURE_MD, encoding="utf-8")
+    _write_minimal_spec(dup)
     doc026 = _by_code(SpecsDoctor(specs_d).check(), "SPEC-DOC-026")
     assert any(i.severity == Severity.ERROR for i in doc026)
 
@@ -285,19 +322,12 @@ def test_sad_matrix(tmp_path: Path) -> None:
     assert doc030 and all(i.severity == Severity.WARNING for i in doc030)
 
     # DOC-031: non-terminal ACTIVE backlog item CONSUMPTION-ASSERTED by an archived
-    # CLOSURE's ## Dispositions table row (SPEC v0.4.2 FR14 — the evidence surface is
-    # narrower than free-text conversation, but the message shape is unchanged).
+    # SPEC's **Consumes:** declaration (SPEC v0.4.2 FR14 -- the CLOSURE.md-side
+    # ## Dispositions evidence retired at v0.5.0 T-050-25A, A4.4; the message shape is
+    # unchanged).
     specs_h = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-031"))
     _write_backlog_entry(specs_h, "feat-consumed-thing", "PICKED — blocked on operator grill")
-    _write_archived_closure(
-        specs_h,
-        "v0.0.9",
-        "# Closure\n\n## Dispositions\n\n"
-        "| File | Kind | Terminal status | Evidence |\n"
-        "|---|---|---|---|\n"
-        "| `specs/backlog/BACKLOG.md` › LEDGER line `feat-consumed-thing` | backlog "
-        "| `DELIVERED — v0.0.9` | delivered, accepted |\n",
-    )
+    _write_archived_spec_consumes(specs_h, "v0.0.9", "feat-consumed-thing")
     doc031 = _by_code(SpecsDoctor(specs_h).check(), "SPEC-DOC-031")
     assert doc031 and all(i.severity == Severity.WARNING for i in doc031)
     text031 = " ".join(i.description for i in doc031)
@@ -305,7 +335,7 @@ def test_sad_matrix(tmp_path: Path) -> None:
     assert "LEDGER" in text031 and "DELIVERED" in text031
     assert "ACTIVE" in text031 and "BL-STALE" in text031
     assert "Do NOT" in text031
-    assert doc031[0].path is not None and doc031[0].path.endswith("BACKLOG.md")
+    assert doc031[0].path is not None and doc031[0].path.endswith("BACKLOG.json")
 
     # A5.2 regression: SPEC-DOC-031 never emits a finding with slug/path treated as the
     # BACKLOG.md document itself (grill P4) — the document's own "BACKLOG" filename
@@ -335,25 +365,18 @@ def test_silent_matrix(tmp_path: Path) -> None:
     _write_tasks(specs_a2, "v0.1.10", "- [x] T1 done\n- [x] T2 done\n")
     assert "SPEC-DOC-024" not in _codes(SpecsDoctor(specs_a2).check())
 
-    # DOC-006: properly closed archived release -> silent.
-    specs_c = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-006ok"))
-    arch_c = specs_c / "_archive" / "releases" / "v0.0.9"
-    arch_c.mkdir(parents=True)
-    (arch_c / "CLOSURE.md").write_text(_CLOSURE_MD, encoding="utf-8")
-    assert "SPEC-DOC-006" not in _codes(SpecsDoctor(specs_c).check())
+    # DOC-006 RETIRED (v0.5.0 T-050-25A, A4.4): see test_sad_matrix's own note above.
 
     # DOC-026: distinct release ids -> silent.
     specs_d = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-026ok"))
     arch_d = specs_d / "_archive" / "releases" / "v0.1.9"
-    arch_d.mkdir(parents=True)
-    (arch_d / "CLOSURE.md").write_text(_CLOSURE_MD, encoding="utf-8")
+    _write_minimal_spec(arch_d)
     assert "SPEC-DOC-026" not in _codes(SpecsDoctor(specs_d).check())
 
     # DOC-027: SemVer-clean dirs -> silent; allowlisted legacy names -> silent.
     specs_e = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-027ok"))
     arch_e = specs_e / "_archive" / "releases" / "v0.1.9"
-    arch_e.mkdir(parents=True)
-    (arch_e / "CLOSURE.md").write_text(_CLOSURE_MD, encoding="utf-8")
+    _write_minimal_spec(arch_e)
     assert "SPEC-DOC-027" not in _codes(SpecsDoctor(specs_e).check())
 
     # DOC-028: resolvable ref + no-repo-root no-op -> silent.
@@ -387,20 +410,14 @@ def test_silent_matrix(tmp_path: Path) -> None:
     assert not (specs_g3 / "audits").exists()
     assert "SPEC-DOC-030" not in _codes(SpecsDoctor(specs_g3).check())
 
-    # DOC-031: legitimate return (a "## Backlog returns" section is not a
-    # "**Consumes:**"/"## Dispositions" declaration, so it is simply never read — D6
-    # deletes the old per-section exclusion special case as subsumed, not replaces it
-    # with a new one), terminal-and-referenced, never-referenced-open, and aggregate
-    # files skipped -> all silent.
-    specs_h1 = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-031returns"))
-    _write_backlog_entry(specs_h1, "newly-returned-item", "CANDIDATE — not picked")
-    _write_archived_closure(
-        specs_h1,
-        "v0.0.7",
-        "# Closure\n\n## Backlog returns\n\n"
-        "- `specs/backlog/newly-returned-item.md` ← registered for a future release.\n",
-    )
-    assert "SPEC-DOC-031" not in _codes(SpecsDoctor(specs_h1).check())
+    # DOC-031: terminal-and-referenced, never-referenced-open, and aggregate files
+    # skipped -> all silent. The "## Backlog returns" vs "## Dispositions" heading
+    # distinction this matrix used to test (a CLOSURE.md-only concept) is DELETED
+    # (v0.5.0 T-050-25A, A4.4: CLOSURE.md is never read at all now) -- its coverage
+    # collapses into the "open, never referenced" row directly below (same file,
+    # -031open), since neither shape is a **Consumes:** declaration. Verdict:
+    # criterion (b) duplicate coverage, tests/unit/features/specs/
+    # test_doctor_ledger_invariants.py -031open (a few lines below).
 
     specs_h2 = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-031terminal"))
     _write_backlog_entry(specs_h2, "shipped-thing", "DELIVERED — v0.0.9 (see CLOSURE)")
@@ -495,22 +512,21 @@ def test_legacy_nested_and_allowlist_forward_enforcement(tmp_path: Path) -> None
     # DOC-026: legacy nested milestone collision -> WARNING (never ERROR).
     specs_a = _make_clean_specs_tree(tmp_path)
     real = specs_a / "_archive" / "releases" / "v0.1.9"
-    real.mkdir(parents=True)
-    (real / "CLOSURE.md").write_text(_CLOSURE_MD, encoding="utf-8")
+    _write_minimal_spec(real)
     nested = specs_a / "_archive" / "releases" / "v0.2.0" / "v0.1.9"
     nested.mkdir(parents=True)
     (nested / "SPEC.md").write_text("# Spec\n\n> **Status:** Aprovado\n", encoding="utf-8")
-    (specs_a / "_archive" / "releases" / "v0.2.0" / "CLOSURE.md").write_text(
-        _CLOSURE_MD, encoding="utf-8"
-    )
+    # The v0.2.0 PARENT also needs its own artifact -- is_release_dir(parent) is what
+    # makes is_legacy_nested_release recognize the nested v0.1.9 as a NESTED release
+    # (v0.5.0 T-050-25A, A4.4: CLOSURE.md alone no longer counts).
+    _write_minimal_spec(specs_a / "_archive" / "releases" / "v0.2.0")
     doc026 = _by_code(SpecsDoctor(specs_a).check(), "SPEC-DOC-026")
     assert doc026 and all(i.severity == Severity.WARNING for i in doc026)
 
     # DOC-027: unlisted legacy archive dir -> WARNING.
     specs_b = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-027unlisted"))
     legacy = specs_b / "_archive" / "releases" / "some-unlisted-legacy-name-v1"
-    legacy.mkdir(parents=True)
-    (legacy / "CLOSURE.md").write_text(_CLOSURE_MD, encoding="utf-8")
+    _write_minimal_spec(legacy)
     doc027_unlisted = _by_code(SpecsDoctor(specs_b).check(), "SPEC-DOC-027")
     assert doc027_unlisted and all(i.severity == Severity.WARNING for i in doc027_unlisted)
 
@@ -528,19 +544,16 @@ def test_legacy_nested_and_allowlist_forward_enforcement(tmp_path: Path) -> None
         "v0.1.4.6",
     ):
         legacy_c = specs_c / "_archive" / "releases" / allowlisted_name
-        legacy_c.mkdir(parents=True)
-        (legacy_c / "CLOSURE.md").write_text(_CLOSURE_MD, encoding="utf-8")
+        _write_minimal_spec(legacy_c)
     assert "SPEC-DOC-027" not in _codes(SpecsDoctor(specs_c).check())
 
     # DOC-027: forward enforcement — a NEW non-canon dir still WARNs alongside an
     # allowlisted one; the allowlist NEVER silences the live releases/ tree.
     specs_d = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-027forward"))
     allowed = specs_d / "_archive" / "releases" / "v0.1.4.6"
-    allowed.mkdir(parents=True)
-    (allowed / "CLOSURE.md").write_text(_CLOSURE_MD, encoding="utf-8")
+    _write_minimal_spec(allowed)
     bad = specs_d / "_archive" / "releases" / "brand-new-non-canon-dir"
-    bad.mkdir(parents=True)
-    (bad / "CLOSURE.md").write_text(_CLOSURE_MD, encoding="utf-8")
+    _write_minimal_spec(bad)
     doc027_forward = _by_code(SpecsDoctor(specs_d).check(), "SPEC-DOC-027")
     assert any("brand-new-non-canon-dir" in (i.path or "") for i in doc027_forward)
     assert not any("v0.1.4.6" in (i.path or "") for i in doc027_forward)

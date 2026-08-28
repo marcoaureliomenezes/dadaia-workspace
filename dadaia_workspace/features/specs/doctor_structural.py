@@ -14,20 +14,41 @@ import shutil
 from pathlib import Path
 
 from dadaia_workspace.core.atomic_write import atomic_write
-from dadaia_workspace.features.specs.doctor_common import read_active_md
+from dadaia_workspace.features.specs.doctor_common import resolve_active_release
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
+from dadaia_workspace.features.specs.specs_canon import CANON_ROOT_MEMBERS, is_canon_path
 from dadaia_workspace.features.specs.template_history import was_shipped
 
 # TREE-3: memory .md files that must exist.  No Jinja templates — .md is canonical source.
+# v6 canon (FR1/A1.5/A1.6, T-050-06): the top-level trio renamed to ARCHITECTURE.md,
+# TECHSTACK.md, QUALITY.md — case-only for the first, word-shortened for the other two.
 _TREE3_MEMORY_FILES: tuple[str, ...] = (
-    "architecture.md",
-    "tech-stack.md",
-    "quality-assurance.md",
+    "ARCHITECTURE.md",
+    "TECHSTACK.md",
+    "QUALITY.md",
     "product/index.md",
 )
 
 # TREE-4: directories that must exist.
 _TREE4_REQUIRED_DIRS = ("audits", "backlog", "bugs", "releases")
+
+# TREE-8: the v6 canon root (FR1, specs_pattern_version 5 -> 6) — nothing else is
+# conformant directly under specs/. ERROR + auto-fixable (v0.5.0 specs-canon closure):
+# a stray root entry, or any non-canon file anywhere inside specs/ (a dotfile, a loose
+# per-entry file, a markdown ADR, an old reviews/ file, …), is real drift — a directory
+# is kept by its AGENTS.md, never a placeholder file — never a WARN-only migration
+# nicety. Root-canon membership (:data:`CANON_ROOT_MEMBERS`, imported) plus a full-tree
+# nested-shape sweep, both driven by the ONE shared predicate in
+# ``features.specs.specs_canon`` — the SAME module the pre-push gate uses
+# (``features.chokepoints.service.push_gate_decision``), never a second, hand-kept
+# member list (operator ruling 2026-08-28).
+_TREE8_CANON_ROOT: frozenset[str] = CANON_ROOT_MEMBERS
+
+#: Deprecated-layout root entries TREE-1/TREE-2 already own (loud migration hint,
+#: fixable=False by explicit design: auto-moving may destroy SDD-approved content
+#: pending operator consent). TREE-8 must never additionally flag-and-auto-remove
+#: either — that would silently destroy exactly the content TREE-1/TREE-2 protect.
+_TREE8_DEFERRED_TO_SIBLING_CHECKS: frozenset[str] = frozenset({"foundation", "SPEC.md"})
 
 # TREE-6: mandatory artifacts per phase bucket.
 _TREE6_IMPL_ARTIFACTS = ("SPEC.md", "PLAN.md", "TASKS.md")
@@ -104,8 +125,8 @@ class StructuralValidator:
     def check_tree3_memory_md(self) -> list[SpecsDoctorIssue]:
         """TREE-3: required memory .md atom files must exist.
 
-        Checks: memory/architecture.md, memory/tech-stack.md,
-        memory/quality-assurance.md, memory/product/index.md.
+        Checks: memory/ARCHITECTURE.md, memory/TECHSTACK.md,
+        memory/QUALITY.md, memory/product/index.md.
 
         .md is the canonical source (memory-markdown-source-v1 / D-4).
         No auto-fix: .md atoms are operator-authored, not generated from templates.
@@ -134,9 +155,10 @@ class StructuralValidator:
         """TREE-4: backlog/, bugs/, and releases/ must exist under specs/.
 
         When a directory is absent the issue is emitted as fixable=True.
-        The fix creates the dir, writes README.md (content copied from the
-        canonical scaffold source), and touches .gitkeep — matching the exact
-        output of ``scaffold()``.
+        The fix creates the dir and writes AGENTS.md (content copied from the
+        canonical scaffold source — v6 canon, FR1: README.md retired) — matching
+        the exact output of ``scaffold()``. A directory is kept by its AGENTS.md;
+        no separate .gitkeep placeholder is written.
         """
         issues: list[SpecsDoctorIssue] = []
         for dirname in _TREE4_REQUIRED_DIRS:
@@ -145,7 +167,7 @@ class StructuralValidator:
                 continue
             fixable = (
                 self._scaffold_dir is not None
-                and (self._scaffold_dir / dirname / "README.md").exists()
+                and (self._scaffold_dir / dirname / "AGENTS.md").exists()
             )
             issues.append(
                 SpecsDoctorIssue(
@@ -206,24 +228,21 @@ class StructuralValidator:
         shutil.rmtree(stray, ignore_errors=True)
 
     def fix_tree4(self, issue: SpecsDoctorIssue) -> None:
-        """Create the missing directory with README.md and .gitkeep."""
+        """Create the missing directory with AGENTS.md — a directory is kept by its
+        AGENTS.md, no separate .gitkeep placeholder."""
         assert issue.code == "TREE-4"
         target = Path(issue.path)  # type: ignore[arg-type]
         dirname = target.name
         target.mkdir(parents=True, exist_ok=True)
-        # README.md — copy from scaffold source
-        readme_content = ""
+        # AGENTS.md — copy from scaffold source (v6 canon, FR1: README.md retired)
+        agents_content = ""
         if self._scaffold_dir is not None:
-            src_readme = self._scaffold_dir / dirname / "README.md"
-            if src_readme.exists():
-                readme_content = src_readme.read_text(encoding="utf-8")
-        readme = target / "README.md"
-        if not readme.exists():
-            readme.write_text(readme_content, encoding="utf-8")
-        # .gitkeep
-        gitkeep = target / ".gitkeep"
-        if not gitkeep.exists():
-            gitkeep.write_text("", encoding="utf-8")
+            src_agents = self._scaffold_dir / dirname / "AGENTS.md"
+            if src_agents.exists():
+                agents_content = src_agents.read_text(encoding="utf-8")
+        agents_md = target / "AGENTS.md"
+        if not agents_md.exists():
+            agents_md.write_text(agents_content, encoding="utf-8")
 
     def check_tree5_agents_md(self) -> list[SpecsDoctorIssue]:
         """TREE-5: specs/AGENTS.md must exist and its content must match the canonical template.
@@ -380,24 +399,24 @@ class StructuralValidator:
         per-release artifact check (SPEC-DOC-004) covers Status: field validation.
         """
         issues: list[SpecsDoctorIssue] = []
-        active_path = self.specs_dir / "releases" / "ACTIVE.md"
-        release, segment, phase, err = read_active_md(active_path)
+        release, segment, phase, err = resolve_active_release(self.specs_dir)
         if err or not release or release == "none":
             return issues
         if phase not in ("IMPLEMENTATION", "CLOSURE"):
             return issues
         rdir = self.specs_dir / "releases" / release
-        if segment:  # schema v2: artifacts live in the active segment dir
+        if segment:  # dir-based segment (ADR-1/ADR-5): artifacts live in the segment dir
             rdir = rdir / segment
         if not rdir.exists():
             # v0.4.3 T-043-22 [Arm-B rider] bug specs-doctor-segment-router-silent-skip:
-            # a live segment: pointer at a missing segment directory used to `return
+            # a live segment pointer at a missing segment directory used to `return
             # issues` here silently, UNCONDITIONALLY. SPEC-DOC-009 (check_active_md,
             # doctor_release.py) only validates the RELEASE directory
             # (releases/<release>/) — it NEVER checks the segment SUBdirectory
-            # (releases/<release>/<segment>/), so a segmented ACTIVE.md pointing at a
-            # missing segment dir was invisible to every downstream check (this one AND
-            # SPEC-DOC-004 in doctor_release.py). Scoped to `segment` truthy only: the
+            # (releases/<release>/<segment>/), so a segmented active-release pointer
+            # at a missing segment dir was invisible to every downstream check (this
+            # one AND SPEC-DOC-004 in doctor_release.py). Scoped to `segment` truthy
+            # only: the
             # FLAT-release case (no segment:) is genuinely, correctly covered already
             # by check 9's own release-dir check (rdir IS the release dir there) —
             # firing here too would duplicate that finding.
@@ -453,8 +472,9 @@ class StructuralValidator:
         if not bugs_dir.exists():
             return issues
         for bug_file in sorted(bugs_dir.glob("*.md")):
-            # Skip README.md and other non-bug files
-            if bug_file.name in ("README.md",):
+            # Skip README.md (legacy) and AGENTS.md (v6 canon, FR1) and other
+            # non-bug files
+            if bug_file.name in ("README.md", "AGENTS.md"):
                 continue
             text = bug_file.read_text(encoding="utf-8")
             has_session_id = bool(re.search(r"^session_id\s*:", text, re.MULTILINE))
@@ -474,3 +494,105 @@ class StructuralValidator:
                     )
                 )
         return issues
+
+    def check_tree8_canon_root(self) -> list[SpecsDoctorIssue]:
+        """TREE-8: every path under specs/ must be v6-canon-conformant (FR1, v0.5.0
+        specs-canon closure, operator ruling 2026-08-28) — driven by the ONE shared
+        predicate in ``features.specs.specs_canon``, the SAME module the pre-push
+        gate uses (``features.chokepoints.service.push_gate_decision``), never a
+        second, hand-kept member list.
+
+        Two tiers, mirroring the pre-canon-closure two-loop shape (root membership,
+        then a full-tree sweep) but now both driven by that one predicate instead of a
+        root-only set plus a separate dotfile-only sweep:
+
+        1. **Root membership** (:data:`CANON_ROOT_MEMBERS`) — a path directly under
+           ``specs/`` whose NAME is not a v6 canon root member is flagged ONCE,
+           whether it is a file or a directory, ALWAYS fixable=True — a name that
+           is not even canon-shaped at the root (e.g. a scratch/legacy directory) is
+           unambiguously disposable, and the fix removes the whole stray subtree.
+        2. **Nested canon-shape sweep** (:func:`~dadaia_workspace.features.specs
+           .specs_canon.is_canon_path`) — every FILE inside an otherwise-conformant
+           root member is checked against its full ``specs/``-relative POSIX path; a
+           non-matching file (a dotfile, a loose per-entry file, a markdown ADR, an
+           old ``reviews/`` file, an unmigrated legacy-cased memory atom, …) is
+           flagged individually. **Only a dotfile is auto-fixable here** — a
+           genuinely disposable placeholder (the retired ``.gitkeep`` landing-zone
+           mechanism). Every OTHER tier-2 finding is fixable=False, ERROR, loud: a
+           non-dotfile nested violation may be REAL, unmigrated content (bug data,
+           an archived legacy-release landing zone tree-v2 relocated specifically so
+           it would not be dropped, a memory atom under a pre-canon filename) —
+           mirrors ``_TREE8_DEFERRED_TO_SIBLING_CHECKS``'s own precedent
+           ("auto-moving may destroy SDD-approved content pending operator
+           consent"). A real, destructive incident this exact distinction closes:
+           an earlier draft of this widened sweep marked EVERY tier-2 finding
+           fixable=True and ``doctor --fix`` silently deleted a migrated bug
+           ledger, three renamed-but-real memory atoms, and a tree-v2 legacy
+           landing zone in one pass (caught by
+           ``tests/e2e/features/test_specs_upgrade_e2e.py`` before it ever shipped).
+        """
+        if not self.specs_dir.is_dir():
+            return []
+        issues: list[SpecsDoctorIssue] = []
+        for entry in sorted(self.specs_dir.iterdir()):
+            if entry.name in _TREE8_CANON_ROOT:
+                continue
+            if entry.name in _TREE8_DEFERRED_TO_SIBLING_CHECKS:
+                continue
+            issues.append(self._tree8_issue(entry, fixable=True))
+        for entry in sorted(self.specs_dir.rglob("*")):
+            if entry.is_dir():
+                continue
+            # Root-level entries are already covered by the loop above (whether
+            # canon-named or not); this second pass reaches every FILE nested inside
+            # an otherwise-conformant root member. Never descend into a deprecated
+            # root TREE-1/TREE-2 owns (its own content is exempt from removal), nor
+            # into a root entry the first loop already flagged as a stray whole
+            # subtree (that finding already covers everything inside it).
+            root_name = entry.relative_to(self.specs_dir).parts[0]
+            if root_name in _TREE8_DEFERRED_TO_SIBLING_CHECKS or root_name not in _TREE8_CANON_ROOT:
+                continue
+            rel_posix = entry.relative_to(self.specs_dir).as_posix()
+            if not is_canon_path(rel_posix):
+                issues.append(self._tree8_issue(entry, fixable=entry.name.startswith(".")))
+        return issues
+
+    def _tree8_issue(self, entry: Path, *, fixable: bool) -> SpecsDoctorIssue:
+        rel = entry.relative_to(self.specs_dir).as_posix()
+        remedy = (
+            "Auto-fix available (run doctor --fix) to remove it"
+            if fixable
+            else "NOT auto-fixed — it may be real, unmigrated content; move/rename it "
+            "into the canon shape (or delete it) by hand"
+        )
+        return SpecsDoctorIssue(
+            code="TREE-8",
+            severity=Severity.ERROR,
+            description=(
+                f"specs/{rel} is not part of the v6 canon (DADAIA.md §6) — either a "
+                "stray root entry (not one of backlog/, bugs/, memory/, releases/, "
+                "audits/, ADRs/, constitution.md, AGENTS.md) or a file nested inside "
+                "a canon area whose shape does not match that area's canon (a "
+                "dotfile, a loose per-entry file, a markdown ADR, an old reviews/ "
+                "file, …) — a directory is kept by its AGENTS.md, never a "
+                f"placeholder. {remedy} (TREE-8)."
+            ),
+            path=str(entry),
+            fixable=fixable,
+        )
+
+    def fix_tree8(self, issue: SpecsDoctorIssue) -> None:
+        """Remove a stray non-canon root entry or nested non-canon file (TREE-8 auto-fix).
+
+        Tolerant of an already-removed target: fixing a non-canon root DIRECTORY
+        first (via ``rmtree``) can make a separately-reported nested issue inside it
+        vanish in the same pass — never an error, just a no-op residual.
+        """
+        assert issue.code == "TREE-8"
+        target = Path(issue.path)  # type: ignore[arg-type]
+        if not target.exists() and not target.is_symlink():
+            return
+        if target.is_dir() and not target.is_symlink():
+            shutil.rmtree(target, ignore_errors=True)
+        else:
+            target.unlink(missing_ok=True)

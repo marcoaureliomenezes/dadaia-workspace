@@ -1,86 +1,94 @@
-"""Unit tests for the single-source ``BACKLOG.md`` parser (SPEC v0.12.0 FR1, PLAN §5).
+"""Unit tests for the single-source ``BACKLOG.json`` reader/writer (operator ruling
+2026-08-28: "BACKLOG.md e BACKLOG.json — estruturado"; schema: ``public/schemas/backlog/
+backlog-v1.schema.json``).
 
-Intent: CONTRACT — v0.12.0 A1.1-A1.6
+Intent: CONTRACT — v0.12.0 A1.1-A1.6 (superseded shape); v0.5.0 A5.2, A5.3 (unchanged
+semantics, new storage)
 
-One pure module, ``features/backlog/document.py``, parses ``BACKLOG.md`` into a typed
-``BacklogDocument`` (``ACTIVE`` subsections + ``LEDGER`` rows). Parsing is diagnostic,
-never throwing: every malformed piece is CAPTURED as a located :class:`DocumentError`
-(section, slug, line, message), never raised. All roots are injected (``backlog_dir``);
-no cwd reads.
+**Supersession (recorded, same pattern this module already used at the T-120-08
+cutover — see ``tests/unit/features/backlog/test_frontmatter_yaml_parse_error.py``'s own
+docstring for precedent).** The Markdown grammar (``## ACTIVE`` / ``### <slug>``
+subsections, fenced ```yaml **Intents:** blocks, CommonMark fence-awareness, PyYAML
+loader fallback) is retired outright — ``BACKLOG.md`` support is DELETED, not kept as a
+fallback. Every test whose sole subject was that grammar (duplicate-heading detection,
+fenced-heading-in-description, nested/unclosed fence handling, the CSafeLoader/SafeLoader
+YAML-loader-fallback pair, the 140 KB fence-aware parse-budget test) is deleted with its
+subject — JSON has no fence-ambiguity, no nested-heading-collision and needs no YAML
+dependency for ``intents[]`` (a native JSON array now, parsed by the SAME
+``core.models.backlog.parse_intents`` the old fenced-YAML block already fed). Replacement
+coverage: a JSON-native duplicate-``id``-in-``active`` test, a malformed-document-shape
+test (non-object/non-array), and a lighter N-item parse-budget test with the same intent.
 
-Not wired to anything yet (T-120-04) — these tests exercise :func:`load_document`
-directly over inline ``tmp_path`` fixtures, never the live CLI.
+One pure module, ``features/backlog/document.py``, parses ``BACKLOG.json`` into a typed
+``BacklogDocument`` (``active`` items + errors). Parsing is diagnostic, never throwing:
+every malformed piece is CAPTURED as a located :class:`DocumentError` (section, slug,
+index, message), never raised. All roots are injected (``backlog_dir``); no cwd reads.
 """
 
 from __future__ import annotations
 
+import json
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.models.backlog import BacklogHistoRecord
 from dadaia_workspace.features.backlog.document import (
     ActiveItem,
     BacklogDocument,
     DocumentError,
-    LedgerRow,
     load_document,
 )
 
 pytestmark = pytest.mark.unit
 
 
-def _write(tmp_path: Path, content: str) -> Path:
+def _write(tmp_path: Path, document: dict[str, object]) -> Path:
     backlog_dir = tmp_path / "backlog"
     backlog_dir.mkdir(parents=True, exist_ok=True)
-    (backlog_dir / "BACKLOG.md").write_text(content, encoding="utf-8")
+    (backlog_dir / "BACKLOG.json").write_text(json.dumps(document), encoding="utf-8")
     return backlog_dir
 
 
-# ── A1.1 — a well-formed document parses to N items + M rows, fields preserved ──────
-
-_WELL_FORMED = """\
-# BACKLOG
-
-## ACTIVE
-
-### widget-refactor
-- **Title:** Refactor the widget
-- **Opened:** 2026-08-10
-- **Status:** idea
-- **Description:** The widget needs a refactor.
-- **Provenance:** operator request
-
-### gadget-intents
-- **Title:** Bind the gadget
-- **Opened:** 2026-08-12
-- **Status:** candidate
-- **Description:** Gadget needs typed intents.
-- **Provenance:** intake-report item 2-2 (approved 2026-08-15)
-- **Intents:**
-```yaml
-- subject:
-    kind: code
-    ref: pkg/mod.py#Gadget
-  change: extend Gadget
-```
-
-## LEDGER
-
-- old-feature · DELIVERED · v0.9.0 · 2026-06-01
-- rejected-idea · REJECTED · not worth pursuing · 2026-05-10
-"""
+def _doc(active: list[dict[str, object]]) -> dict[str, object]:
+    return {"schema": "backlog-v1", "active": active}
 
 
-def test_well_formed_document_parses_n_items_and_m_rows_preserving_fields(
-    tmp_path: Path,
-) -> None:
+# ── A1.1 — a well-formed document parses to N items, fields preserved ──────────────
+
+_WELL_FORMED = _doc(
+    [
+        {
+            "id": "widget-refactor",
+            "title": "Refactor the widget",
+            "opened": "2026-08-10",
+            "status": "idea",
+            "description": "The widget needs a refactor.",
+            "provenance": "operator request",
+        },
+        {
+            "id": "gadget-intents",
+            "title": "Bind the gadget",
+            "opened": "2026-08-12",
+            "status": "candidate",
+            "description": "Gadget needs typed intents.",
+            "provenance": "intake-report item 2-2 (approved 2026-08-15)",
+            "intents": [
+                {"subject": {"kind": "code", "ref": "pkg/mod.py#Gadget"}, "change": "extend Gadget"}
+            ],
+        },
+    ]
+)
+
+
+def test_well_formed_document_parses_n_items_preserving_fields(tmp_path: Path) -> None:
     backlog_dir = _write(tmp_path, _WELL_FORMED)
     doc = load_document(backlog_dir)
 
     assert isinstance(doc, BacklogDocument)
     assert doc.errors == ()
     assert len(doc.active) == 2
-    assert len(doc.ledger) == 2
 
     by_slug = {item.slug: item for item in doc.active}
     widget = by_slug["widget-refactor"]
@@ -91,7 +99,7 @@ def test_well_formed_document_parses_n_items_and_m_rows_preserving_fields(
     assert widget.provenance == "operator request"
     assert widget.intents == ()
     assert widget.intents_error is None
-    assert widget.line > 0
+    assert widget.index == 0
 
     gadget = by_slug["gadget-intents"]
     assert gadget.status == "candidate"
@@ -100,29 +108,18 @@ def test_well_formed_document_parses_n_items_and_m_rows_preserving_fields(
     assert gadget.intents[0].subject.ref == "pkg/mod.py#Gadget"
     assert gadget.intents[0].change == "extend Gadget"
     assert gadget.intents_error is None
-
-    rows_by_slug = {row.slug: row for row in doc.ledger}
-    old = rows_by_slug["old-feature"]
-    assert old.disposition == "DELIVERED"
-    assert old.release_or_reason == "v0.9.0"
-    assert old.date == "2026-06-01"
-    assert old.line > 0
-
-    rejected = rows_by_slug["rejected-idea"]
-    assert rejected.disposition == "REJECTED"
-    assert rejected.release_or_reason == "not worth pursuing"
+    assert gadget.index == 1
 
 
-# ── A1.2 — an absent BACKLOG.md yields an empty model, not an error ─────────────────
+# ── A1.2 — an absent BACKLOG.json yields an empty model, not an error ───────────────
 
 
-def test_absent_backlog_md_yields_empty_model_not_error(tmp_path: Path) -> None:
+def test_absent_backlog_json_yields_empty_model_not_error(tmp_path: Path) -> None:
     backlog_dir = tmp_path / "backlog"
     backlog_dir.mkdir()
     doc = load_document(backlog_dir)
     assert doc == BacklogDocument()
     assert doc.active == ()
-    assert doc.ledger == ()
     assert doc.errors == ()
 
 
@@ -131,28 +128,29 @@ def test_absent_backlog_dir_itself_yields_empty_model_not_error(tmp_path: Path) 
     assert doc == BacklogDocument()
 
 
-# ── A1.3 — a subsection missing a required key: located error, parsing continues ────
+# ── A1.3 — an entry missing a required key: located error, parsing continues ────────
 
-_MISSING_KEY = """\
-## ACTIVE
+_MISSING_KEY = _doc(
+    [
+        {
+            "id": "broken-item",
+            "title": "Broken",
+            "opened": "2026-08-10",
+            "description": "Missing status and provenance.",
+        },
+        {
+            "id": "next-item",
+            "title": "Fine",
+            "opened": "2026-08-11",
+            "status": "idea",
+            "description": "This one is fine.",
+            "provenance": "operator request",
+        },
+    ]
+)
 
-### broken-item
-- **Title:** Broken
-- **Opened:** 2026-08-10
-- **Description:** Missing Status and Provenance.
 
-### next-item
-- **Title:** Fine
-- **Opened:** 2026-08-11
-- **Status:** idea
-- **Description:** This one is fine.
-- **Provenance:** operator request
-
-## LEDGER
-"""
-
-
-def test_subsection_missing_required_key_yields_located_error_and_continues(
+def test_entry_missing_required_key_yields_located_error_and_continues(
     tmp_path: Path,
 ) -> None:
     backlog_dir = _write(tmp_path, _MISSING_KEY)
@@ -162,376 +160,160 @@ def test_subsection_missing_required_key_yields_located_error_and_continues(
     assert schema_errors, doc.errors
     assert all(isinstance(e, DocumentError) for e in schema_errors)
     messages = " ".join(e.message for e in schema_errors)
-    assert "Status" in messages
-    assert "Provenance" in messages
-    assert all(e.line > 0 for e in schema_errors)
+    assert "status" in messages
+    assert "provenance" in messages
+    assert all(e.index >= 0 for e in schema_errors)
 
-    # Parsing continues: the well-formed subsection after the broken one still parses.
+    # Parsing continues: the well-formed entry after the broken one still parses.
     slugs = {item.slug for item in doc.active}
     assert "next-item" in slugs
     next_item = next(item for item in doc.active if item.slug == "next-item")
     assert next_item.status == "idea"
 
 
-# ── A1.4 — a malformed **Intents:** block: located error, intents left empty, never raises ──
+# ── A1.4 — a structurally invalid intents[] shape: located error, intents left empty,
+# never raises ────────────────────────────────────────────────────────────────────────
 
-_BAD_INTENTS_YAML = """\
-## ACTIVE
-
-### bad-yaml-item
-- **Title:** Bad YAML
-- **Opened:** 2026-08-10
-- **Status:** candidate
-- **Description:** The intents block is not valid YAML.
-- **Provenance:** operator request
-- **Intents:**
-```yaml
-- subject: { kind: code, ref: pkg/m.py#X
-  change: unterminated flow mapping
-```
-
-## LEDGER
-"""
-
-_STRUCTURALLY_INVALID_INTENTS = """\
-## ACTIVE
-
-### bad-structure-item
-- **Title:** Bad structure
-- **Opened:** 2026-08-10
-- **Status:** idea
-- **Description:** The intents block is valid YAML but not a valid intents[] shape.
-- **Provenance:** operator request
-- **Intents:**
-```yaml
-just_a_string
-```
-
-## LEDGER
-"""
-
-
-def test_malformed_intents_yaml_yields_located_error_never_raises(tmp_path: Path) -> None:
-    backlog_dir = _write(tmp_path, _BAD_INTENTS_YAML)
-    doc = load_document(backlog_dir)  # must never raise
-
-    item = next(i for i in doc.active if i.slug == "bad-yaml-item")
-    assert item.intents == ()
-    assert item.intents_error is not None
-
-    schema_errors = [e for e in doc.errors if e.slug == "bad-yaml-item"]
-    assert schema_errors
-    assert all(e.line > 0 for e in schema_errors)
+_STRUCTURALLY_INVALID_INTENTS = _doc(
+    [
+        {
+            "id": "bad-structure-item",
+            "title": "Bad structure",
+            "opened": "2026-08-10",
+            "status": "idea",
+            "description": "intents is valid JSON but not a valid intents[] shape.",
+            "provenance": "operator request",
+            "intents": "just_a_string",
+        }
+    ]
+)
 
 
 def test_structurally_invalid_intents_at_idea_status_still_yields_located_error(
     tmp_path: Path,
 ) -> None:
-    """A1.4: the malformed-block diagnostic fires at ANY status, including ``idea``
+    """A1.4: the malformed-intents diagnostic fires at ANY status, including ``idea``
     (the FR5 status GATE only exempts the "no intents[] declared" / unresolved-subject
-    findings — both doctor-level BL-SCHEMA concerns handled in T-120-05, not here)."""
+    findings — both doctor-level BL-SCHEMA concerns, not this parser's)."""
     backlog_dir = _write(tmp_path, _STRUCTURALLY_INVALID_INTENTS)
-    doc = load_document(backlog_dir)
+    doc = load_document(backlog_dir)  # must never raise
 
     item = next(i for i in doc.active if i.slug == "bad-structure-item")
     assert item.intents == ()
     assert item.intents_error is not None
+    assert item.intents_error.startswith("malformed intents[] frontmatter:")
     assert any(e.slug == "bad-structure-item" for e in doc.errors)
 
 
-# ── A1.5 — a LEDGER line off-grammar or with an unknown disposition: located error ──
+# ── duplicate ``id`` within ``active`` — the JSON-native replacement for the retired
+# same-slug-twice-in-ACTIVE / duplicate-top-level-heading checks ────────────────────
 
-_BAD_LEDGER = """\
-## ACTIVE
-
-## LEDGER
-
-- good-slug · DELIVERED · v0.9.0 · 2026-06-01
-- too-few-fields · DELIVERED · v0.9.0
-- unknown-token-slug · MAYBE · v0.9.0 · 2026-06-01
-"""
-
-
-def test_ledger_line_off_grammar_or_unknown_disposition_yields_located_error(
-    tmp_path: Path,
-) -> None:
-    backlog_dir = _write(tmp_path, _BAD_LEDGER)
-    doc = load_document(backlog_dir)
-
-    good_slugs = {row.slug for row in doc.ledger}
-    assert good_slugs == {"good-slug"}
-
-    error_lines = {e.line for e in doc.errors}
-    assert len(error_lines) == 2  # too-few-fields + unknown-token-slug
-    assert all(isinstance(e, DocumentError) for e in doc.errors)
-    assert all(e.section == "LEDGER" for e in doc.errors)
-
-
-@pytest.mark.parametrize(
-    "token",
-    ["DELIVERED", "SUPERSEDED", "RESOLVED", "CONSUMED", "DEFERRED", "REJECTED"],
-)
-def test_every_canonical_disposition_token_accepted(tmp_path: Path, token: str) -> None:
-    content = f"## ACTIVE\n\n## LEDGER\n\n- some-slug · {token} · v0.9.0 · 2026-06-01\n"
-    backlog_dir = _write(tmp_path, content)
-    doc = load_document(backlog_dir)
-    assert len(doc.ledger) == 1
-    assert doc.ledger[0].disposition == token
-    assert doc.errors == ()
-
-
-# ── bug backlog-doctor-silent-on-duplicate-top-level-sections — a repeated top-level
-# heading is a located DocumentError, and EVERY occurrence still parses (never just
-# the first) ─────────────────────────────────────────────────────────────────────────
-#
-# Root cause (dd-bug-fix H1, confirmed by instrumentation): ``_top_level_sections()``
-# used ``dict.setdefault`` to map a heading NAME to its body range — the first
-# occurrence won and every later occurrence's body was silently discarded, so a
-# duplicated ``## ACTIVE`` block (and any duplicate slug inside it) never reached
-# ``load_document``'s caller at all. The document schema states exactly two top-level
-# sections (module docstring); the parser now says so itself.
-
-_DUPLICATE_ACTIVE_HEADING_SAME_SLUG = """\
-## ACTIVE
-
-### dup-item
-- **Title:** First
-- **Opened:** 2026-08-10
-- **Status:** idea
-- **Description:** first copy.
-- **Provenance:** operator request
-
-## ACTIVE
-
-### dup-item
-- **Title:** Second
-- **Opened:** 2026-08-10
-- **Status:** idea
-- **Description:** second copy, same slug.
-- **Provenance:** operator request
-
-## LEDGER
-"""
-
-
-def test_duplicate_top_level_active_heading_yields_document_error_and_parses_both_bodies(
-    tmp_path: Path,
-) -> None:
-    """Intent: CONTRACT — bug backlog-doctor-silent-on-duplicate-top-level-sections.
-
-    A second ``## ACTIVE`` heading is a located :class:`DocumentError` (the document
-    schema states exactly two top-level sections) AND its body is still parsed — both
-    ``dup-item`` subsections reach ``doc.active``, so a downstream duplicate-slug check
-    (BL-DUP) can compare them instead of one being silently dropped."""
-    backlog_dir = _write(tmp_path, _DUPLICATE_ACTIVE_HEADING_SAME_SLUG)
-    doc = load_document(backlog_dir)
-
-    duplicate_heading_errors = [
-        e for e in doc.errors if "duplicate top-level section heading" in e.message
+_DUPLICATE_ID = _doc(
+    [
+        {
+            "id": "dup-item",
+            "title": "First",
+            "opened": "2026-08-10",
+            "status": "idea",
+            "description": "first copy.",
+            "provenance": "operator request",
+        },
+        {
+            "id": "dup-item",
+            "title": "Second",
+            "opened": "2026-08-10",
+            "status": "idea",
+            "description": "second copy, same id.",
+            "provenance": "operator request",
+        },
     ]
-    assert len(duplicate_heading_errors) == 1, doc.errors
-    assert "'ACTIVE'" in duplicate_heading_errors[0].message
-    assert duplicate_heading_errors[0].line > 0
+)
+
+
+def test_duplicate_id_in_active_yields_document_error_and_both_still_parse(
+    tmp_path: Path,
+) -> None:
+    """The JSON-native replacement for bug
+    ``backlog-doctor-silent-on-duplicate-top-level-sections``: a duplicate ``id`` in
+    ``active`` is a located :class:`DocumentError` AND both entries still parse — never
+    silently dropped, so BL-SCHEMA can report it."""
+    backlog_dir = _write(tmp_path, _DUPLICATE_ID)
+    doc = load_document(backlog_dir)
+
+    dup_errors = [e for e in doc.errors if "duplicate id" in e.message]
+    assert len(dup_errors) == 1, doc.errors
+    assert "'dup-item'" in dup_errors[0].message
 
     dup_items = [item for item in doc.active if item.slug == "dup-item"]
     assert len(dup_items) == 2, (
-        "both occurrences of the duplicated '## ACTIVE' block must parse — the second "
-        f"must never be silently dropped: got {[i.title for i in doc.active]}"
+        "both entries with the duplicated id must parse — the second must never be "
+        f"silently dropped: got {[i.title for i in doc.active]}"
     )
     titles = {item.title for item in dup_items}
     assert titles == {"First", "Second"}
 
 
-_DUPLICATE_LEDGER_HEADING_SAME_SLUG = """\
-## ACTIVE
-
-## LEDGER
-
-- dup-row · DELIVERED · v0.9.0 · 2026-06-01
-
-## LEDGER
-
-- dup-row · DELIVERED · v0.9.0 · 2026-06-01
-"""
+# ── malformed document shape: never raises, always a located DocumentError ─────────
 
 
-def test_duplicate_top_level_ledger_heading_yields_document_error_and_parses_both_bodies(
-    tmp_path: Path,
-) -> None:
-    """Symmetric coverage: a repeated ``## LEDGER`` heading is also a located
-    DocumentError, and both LEDGER bodies still parse — a duplicated row reaches
-    ``doc.ledger`` twice rather than the second copy vanishing."""
-    backlog_dir = _write(tmp_path, _DUPLICATE_LEDGER_HEADING_SAME_SLUG)
-    doc = load_document(backlog_dir)
+def test_malformed_json_yields_located_error_never_raises(tmp_path: Path) -> None:
+    backlog_dir = tmp_path / "backlog"
+    backlog_dir.mkdir(parents=True)
+    (backlog_dir / "BACKLOG.json").write_text("{not valid json", encoding="utf-8")
 
-    duplicate_heading_errors = [
-        e for e in doc.errors if "duplicate top-level section heading" in e.message
-    ]
-    assert len(duplicate_heading_errors) == 1, doc.errors
-    assert "'LEDGER'" in duplicate_heading_errors[0].message
-
-    dup_rows = [row for row in doc.ledger if row.slug == "dup-row"]
-    assert len(dup_rows) == 2, (
-        "both occurrences of the duplicated '## LEDGER' block must parse — the second "
-        f"must never be silently dropped: got {doc.ledger}"
-    )
-
-
-# ── M1 (code-reviewer, v0.12.0 pre-PR) — section splitting is fence-aware ───────────
-#
-# Reproduces the reviewer's finding: a fenced ``## ``/``### `` line inside an ACTIVE
-# subsection's body used to be read as REAL structure by ``_top_level_sections``/
-# ``_SUBSECTION_RE``, silently truncating ``## ACTIVE`` (or splicing a phantom
-# subsection) with ZERO diagnostics — a clean report over a shrunken model.
-
-_FENCED_TOP_HEADING_IN_DESCRIPTION = """\
-## ACTIVE
-
-### item-one
-- **Title:** Item one
-- **Opened:** 2026-08-10
-- **Status:** idea
-- **Description:** Example of a nested heading in a fenced span:
-```markdown
-## Example heading
-```
-- **Provenance:** operator request
-
-### item-two
-- **Title:** Item two
-- **Opened:** 2026-08-11
-- **Status:** candidate
-- **Description:** Defined after the fence — must survive (the reviewer's repro).
-- **Provenance:** operator request
-
-## LEDGER
-"""
-
-
-def test_fenced_top_heading_inside_active_description_does_not_truncate_active_section(
-    tmp_path: Path,
-) -> None:
-    """M1: a fenced ``## Example heading`` inside item-one's Description must not end
-    the ``## ACTIVE`` body early — item-two (declared after the fence) must still
-    parse, and the fenced line must never be read as a real top-level section."""
-    backlog_dir = _write(tmp_path, _FENCED_TOP_HEADING_IN_DESCRIPTION)
-    doc = load_document(backlog_dir)
-
-    slugs = {item.slug for item in doc.active}
-    assert slugs == {"item-one", "item-two"}, (
-        "item-two must not be silently dropped by a fenced '##' line in item-one's body"
-    )
-    item_two = next(item for item in doc.active if item.slug == "item-two")
-    assert item_two.status == "candidate"
-    assert item_two.description.startswith("Defined after the fence")
-    # A truncation this parser cannot attribute would previously vanish with zero
-    # errors AND zero LEDGER (since '## LEDGER' itself would be swallowed by the same
-    # bug). Confirm the real '## LEDGER' heading is still found, not phantom-shadowed.
-    assert doc.ledger == ()  # no rows declared, but the section itself parsed (not an error)
-
-
-_FENCED_SUBSECTION_HEADING_IN_DESCRIPTION = """\
-## ACTIVE
-
-### item-one
-- **Title:** Item one
-- **Opened:** 2026-08-10
-- **Status:** idea
-- **Description:** A fenced example that itself looks like a subsection heading:
-```markdown
-### phantom-slug
-- **Title:** This is fenced content, not a real subsection.
-```
-- **Provenance:** operator request
-
-## LEDGER
-"""
-
-
-def test_fenced_subsection_heading_inside_description_does_not_spawn_phantom_item(
-    tmp_path: Path,
-) -> None:
-    """M1: a fenced ``### phantom-slug`` line inside item-one's Description must not be
-    read by ``_SUBSECTION_RE`` as a second, real ``### <slug>`` subsection."""
-    backlog_dir = _write(tmp_path, _FENCED_SUBSECTION_HEADING_IN_DESCRIPTION)
-    doc = load_document(backlog_dir)
-
-    slugs = [item.slug for item in doc.active]
-    assert slugs == ["item-one"], f"a fenced '###' line must never spawn a phantom item: {slugs}"
-
-
-_NESTED_FENCE_WITH_LONGER_OUTER_FENCE = """\
-## ACTIVE
-
-### item-one
-- **Title:** Item one
-- **Opened:** 2026-08-10
-- **Status:** idea
-- **Description:** Shows a fenced example that itself contains a fence — the outer
-  fence must be longer (CommonMark close-length rule) so the inner ``` doesn't
-  prematurely close it:
-````markdown
-Some text, then a nested fence containing a heading line:
-```yaml
-## still fenced, still content
-```
-````
-- **Provenance:** operator request
-
-### item-two
-- **Title:** Item two
-- **Opened:** 2026-08-11
-- **Status:** candidate
-- **Description:** Defined after the nested/outer fence pair.
-- **Provenance:** operator request
-
-## LEDGER
-"""
-
-
-def test_longer_outer_fence_is_not_closed_by_a_shorter_nested_fence(tmp_path: Path) -> None:
-    """M1: a 4-backtick outer fence containing a nested 3-backtick fence (and a heading
-    line inside it) must stay open across the whole nested span — the inner ``` must
-    not close it early, and item-two after the whole span must still parse."""
-    backlog_dir = _write(tmp_path, _NESTED_FENCE_WITH_LONGER_OUTER_FENCE)
-    doc = load_document(backlog_dir)
-
-    slugs = {item.slug for item in doc.active}
-    assert slugs == {"item-one", "item-two"}
-    item_two = next(item for item in doc.active if item.slug == "item-two")
-    assert item_two.status == "candidate"
-
-
-_UNCLOSED_FENCE_AT_EOF = """\
-## ACTIVE
-
-### item-one
-- **Title:** Item one
-- **Opened:** 2026-08-10
-- **Status:** idea
-- **Description:** An unclosed fence follows — a structural anomaly this parser
-  cannot attribute to any section:
-```markdown
-this fence is never closed before end-of-file
-- **Provenance:** operator request
-
-## LEDGER
-"""
-
-
-def test_unclosed_fence_at_eof_surfaces_a_diagnostic_never_a_silent_shrunken_model(
-    tmp_path: Path,
-) -> None:
-    """M1 backstop: an unclosed fence swallows everything to EOF (including the real
-    '## LEDGER' heading) — the model shrinks, but ``load_document`` must NEVER return
-    that shrunken model with zero errors. Diagnostic-never-throwing still holds: no
-    exception escapes."""
-    backlog_dir = _write(tmp_path, _UNCLOSED_FENCE_AT_EOF)
     doc = load_document(backlog_dir)  # must never raise
 
-    assert doc.errors, "an unclosed fence at EOF must never yield a silently clean model"
-    assert any("fence" in e.message.lower() for e in doc.errors)
-    assert all(e.line > 0 for e in doc.errors)
+    assert doc.active == ()
+    assert doc.errors
+    assert any("cannot parse" in e.message for e in doc.errors)
+
+
+def test_document_not_a_json_object_yields_located_error(tmp_path: Path) -> None:
+    backlog_dir = tmp_path / "backlog"
+    backlog_dir.mkdir(parents=True)
+    (backlog_dir / "BACKLOG.json").write_text("[1, 2, 3]", encoding="utf-8")
+
+    doc = load_document(backlog_dir)
+
+    assert doc.active == ()
+    assert doc.errors
+    assert any("JSON object" in e.message for e in doc.errors)
+
+
+def test_active_field_not_an_array_yields_located_error(tmp_path: Path) -> None:
+    backlog_dir = _write(tmp_path, {"schema": "backlog-v1", "active": "nope"})
+    doc = load_document(backlog_dir)
+
+    assert doc.active == ()
+    assert doc.errors
+    assert any("JSON array" in e.message for e in doc.errors)
+
+
+def test_active_entry_not_an_object_yields_located_error_and_continues(
+    tmp_path: Path,
+) -> None:
+    backlog_dir = _write(
+        tmp_path,
+        {
+            "schema": "backlog-v1",
+            "active": [
+                "not-an-object",
+                {
+                    "id": "fine-item",
+                    "title": "Fine",
+                    "opened": "2026-08-10",
+                    "status": "idea",
+                    "description": "d",
+                    "provenance": "operator request",
+                },
+            ],
+        },
+    )
+    doc = load_document(backlog_dir)
+
+    assert any("must be a JSON object" in e.message for e in doc.errors)
+    slugs = {item.slug for item in doc.active}
+    assert "fine-item" in slugs
 
 
 # ── A1.6 — the module imports nothing from cli, infrastructure or hooks ─────────────
@@ -551,14 +333,10 @@ def test_module_imports_nothing_from_cli_infrastructure_or_hooks() -> None:
         assert forbidden not in source, f"document.py must not import {forbidden}"
 
 
-# ── extra coverage: dataclass shapes stay importable/typed as PLAN §5 declares ──────
+# ── extra coverage: dataclass shapes stay importable/typed ──────────────────────────
 
 
-def test_ledger_row_and_active_item_dataclass_shapes() -> None:
-    row = LedgerRow(
-        slug="x", disposition="DELIVERED", release_or_reason="v0.1.0", date="2026-01-01", line=1
-    )
-    assert row.slug == "x"
+def test_active_item_dataclass_shape() -> None:
     item = ActiveItem(
         slug="y",
         title="Y",
@@ -569,22 +347,19 @@ def test_ledger_row_and_active_item_dataclass_shapes() -> None:
     )
     assert item.intents == ()
     assert item.intents_error is None
-    assert item.line == 0
+    assert item.index == 0
 
 
 # ═════════════════════════════════════════════════════════════════════════════════
-# FR1 (v0.4.2, D1) — backlog_new MOVES here: one feature owns the grammar for both
-# reading and writing. The A3.1-A3.4 coverage below is relocated UNMODIFIED from
-# tests/unit/features/spec_artifacts/test_new_artifacts.py (its pre-move home); the new
-# A1.1/A1.2 seams (fence-aware insertion point, write-then-verify) are new tests.
+# backlog_new — the single writer, now emitting BACKLOG.json.
 # ═════════════════════════════════════════════════════════════════════════════════
 
 from dadaia_workspace.features.backlog.document import backlog_new  # noqa: E402
 
-# Intent: CONTRACT — v0.4.2 A3.1 (relocated from test_new_artifacts.py, v0.12.0 origin)
+# Intent: CONTRACT — v0.4.2 A3.1 (relocated); JSON-native shape
 
 
-def test_backlog_new_on_absent_document_creates_both_sections_and_one_subsection(
+def test_backlog_new_on_absent_document_creates_document_and_one_entry(
     tmp_path: Path,
 ) -> None:
     specs = tmp_path / "specs"
@@ -593,35 +368,25 @@ def test_backlog_new_on_absent_document_creates_both_sections_and_one_subsection
 
     result = backlog_new(specs, "cool-idea")
 
-    target = specs / "backlog" / "BACKLOG.md"
-    assert target.is_file(), "BACKLOG.md must be created (A3.1)"
+    target = specs / "backlog" / "BACKLOG.json"
+    assert target.is_file(), "BACKLOG.json must be created (A3.1)"
     assert result.path == target
     assert result.created is True
 
-    content = target.read_text(encoding="utf-8")
-    assert content.count("## ACTIVE") == 1
-    assert content.count("## LEDGER") == 1
-    assert content.index("## ACTIVE") < content.index("## LEDGER")
-    assert "### cool-idea" in content
-    assert content.index("### cool-idea") > content.index("## ACTIVE")
-    assert content.index("### cool-idea") < content.index("## LEDGER")
-
-    assert "- **Title:** cool-idea" in content
-    assert "- **Status:** idea" in content
-    assert "- **Provenance:**" in content
+    raw = json.loads(target.read_text(encoding="utf-8"))
+    assert raw["schema"] == "backlog-v1"
+    assert len(raw["active"]) == 1
+    entry = raw["active"][0]
+    assert entry["id"] == "cool-idea"
+    assert entry["title"] == "cool-idea"
+    assert entry["status"] == "idea"
+    assert entry["provenance"]
     from datetime import UTC, datetime
 
     today = datetime.now(tz=UTC).strftime("%Y-%m-%d")
-    assert f"- **Opened:** {today}" in content
+    assert entry["opened"] == today
 
-    # The intents teaching comment is preserved (SPEC FR3), as a commented block, not
-    # a live `**Intents:**` binding — an `idea` stays doctor-clean with none.
-    assert "<!--" in content and "-->" in content
-    assert "**Intents:**" in content  # named inside the teaching comment
-    for kind in ("code", "cli", "catalog", "doc", "invariant"):
-        assert kind in content
-
-    # The fresh subsection parses clean under the single-source document model.
+    # The fresh entry parses clean under the single-source document model.
     doc = load_document(specs / "backlog")
     assert doc.errors == ()
     assert len(doc.active) == 1
@@ -630,33 +395,27 @@ def test_backlog_new_on_absent_document_creates_both_sections_and_one_subsection
     assert doc.active[0].intents == ()
 
 
-# Intent: CONTRACT — v0.4.2 A3.2/A1.7 (relocated from test_new_artifacts.py, v0.12.0 origin)
+# Intent: CONTRACT — v0.4.2 A3.2/A1.7 (relocated); JSON-native shape
 
 
-def test_backlog_new_append_leaves_every_other_byte_unchanged(tmp_path: Path) -> None:
+def test_backlog_new_append_leaves_the_first_entry_intact(tmp_path: Path) -> None:
     specs = tmp_path / "specs"
     specs.mkdir()
     backlog_new(specs, "first-idea")
 
-    target = specs / "backlog" / "BACKLOG.md"
-    before = target.read_text(encoding="utf-8")
+    target = specs / "backlog" / "BACKLOG.json"
+    before = json.loads(target.read_text(encoding="utf-8"))
 
     backlog_new(specs, "second-idea")
-    after = target.read_text(encoding="utf-8")
+    after = json.loads(target.read_text(encoding="utf-8"))
 
-    assert after != before
-    assert after.startswith(before[: before.index("## LEDGER")]), (
-        "everything before the LEDGER heading in the original file must survive "
-        "byte-for-byte, with the new subsection appended just ahead of it"
-    )
-    assert after.endswith(before[before.index("## LEDGER") :]), (
-        "the LEDGER heading and everything after it must survive byte-for-byte"
-    )
-    assert "### second-idea" in after
-    assert "### first-idea" in after
+    assert len(after["active"]) == 2
+    assert after["active"][0] == before["active"][0], "the first entry survives untouched"
+    ids = {e["id"] for e in after["active"]}
+    assert ids == {"first-idea", "second-idea"}
 
 
-# Intent: CONTRACT — v0.4.2 A3.3/A1.7 (relocated from test_new_artifacts.py, v0.12.0 origin)
+# Intent: CONTRACT — v0.4.2 A3.3/A1.7 (relocated)
 
 
 def test_backlog_new_refuses_slug_already_in_active(tmp_path: Path) -> None:
@@ -668,21 +427,7 @@ def test_backlog_new_refuses_slug_already_in_active(tmp_path: Path) -> None:
         backlog_new(specs, "cool-idea")
 
 
-def test_backlog_new_refuses_slug_already_in_ledger(tmp_path: Path) -> None:
-    specs = tmp_path / "specs"
-    specs.mkdir()
-    backlog_dir = specs / "backlog"
-    backlog_dir.mkdir()
-    (backlog_dir / "BACKLOG.md").write_text(
-        "## ACTIVE\n\n## LEDGER\n\n- delivered-slug · DELIVERED · v0.9.0 · 2026-06-01\n",
-        encoding="utf-8",
-    )
-
-    with pytest.raises(FileExistsError, match=r"already exists"):
-        backlog_new(specs, "delivered-slug")
-
-
-# Intent: CONTRACT — v0.4.2 A3.4/A1.7 (relocated from test_new_artifacts.py, v0.12.0 origin)
+# Intent: CONTRACT — v0.4.2 A3.4/A1.7 (relocated)
 
 
 def test_backlog_new_invalid_slug_refused_with_unchanged_message(tmp_path: Path) -> None:
@@ -690,63 +435,6 @@ def test_backlog_new_invalid_slug_refused_with_unchanged_message(tmp_path: Path)
     specs.mkdir()
     with pytest.raises(ValueError, match=r"Invalid slug"):
         backlog_new(specs, "Not-A-Valid-Slug")
-
-
-# ── A1.1 — RED: a Description quoting a fenced ``## LEDGER`` example must not steer the
-# insertion point. Intent: CONTRACT — v0.4.2 A1.1 ─────────────────────────────────────
-
-_QUOTES_A_FENCED_LEDGER_EXAMPLE = """\
-## ACTIVE
-
-### existing-item
-- **Title:** Existing item
-- **Opened:** 2026-08-10
-- **Status:** idea
-- **Description:** Example BACKLOG.md snippet quoting the grammar it documents:
-```markdown
-## LEDGER
-
-- some-old-slug · DELIVERED · v0.1.0 · 2026-01-01
-```
-- **Provenance:** operator request
-
-## LEDGER
-"""
-
-
-def test_backlog_new_inserts_before_the_real_ledger_heading_not_a_fenced_example(
-    tmp_path: Path,
-) -> None:
-    """A1.1: a fence-blind insertion point (the pre-fix private ``_LEDGER_HEADING_RE``
-    regex search) finds the FENCED ``## LEDGER`` example first — it appears earlier in
-    the file than the real heading — and splices the new subsection inside the fenced
-    span, corrupting the document. The fence-aware insertion point promoted from the
-    parser's own machinery must find the REAL, unfenced ``## LEDGER`` heading instead,
-    landing the fresh subsection inside ``## ACTIVE`` where ``load_document`` parses
-    it."""
-    specs = tmp_path / "specs"
-    specs.mkdir()
-    backlog_dir = specs / "backlog"
-    backlog_dir.mkdir()
-    (backlog_dir / "BACKLOG.md").write_text(_QUOTES_A_FENCED_LEDGER_EXAMPLE, encoding="utf-8")
-
-    backlog_new(specs, "fresh-slug")
-
-    doc = load_document(backlog_dir)
-    assert doc.errors == ()
-    slugs = {item.slug for item in doc.active}
-    assert slugs == {"existing-item", "fresh-slug"}, (
-        "a fence-blind writer would splice 'fresh-slug' inside the fenced LEDGER "
-        f"example, where it never parses as a real ACTIVE subsection — got {slugs}"
-    )
-
-    text = (backlog_dir / "BACKLOG.md").read_text(encoding="utf-8")
-    # Exactly one REAL '## LEDGER' heading exists; the fenced example's line still
-    # reads '## LEDGER' too (2 raw occurrences total), but only the unfenced one is
-    # structure — proven by 'fresh-slug' parsing into doc.active above.
-    assert text.count("## LEDGER") == 2
-    assert text.index("### fresh-slug") > text.index("### existing-item")
-    assert text.index("### fresh-slug") < text.rindex("## LEDGER")
 
 
 # ── A1.2 — write-then-verify: raise when a re-parse of the fresh write is missing the
@@ -773,7 +461,7 @@ def test_backlog_new_raises_when_reparse_of_own_write_lacks_the_fresh_slug(
         if calls["n"] == 1:
             # The pre-write slug-membership check: behave normally (empty tree).
             return real_load_document(backlog_dir)
-        # The post-write verify re-parse: lie — report no ACTIVE items at all, as a
+        # The post-write verify re-parse: lie — report no active items at all, as a
         # silent-write-loss bug would look from the caller's side.
         return BacklogDocument()
 
@@ -794,26 +482,23 @@ def test_backlog_new_rejects_slug_with_trailing_newline(tmp_path: Path) -> None:
         backlog_new(specs, "valid-slug\n")
 
 
-# ── A1.5 — an unreadable BACKLOG.md diagnostic carries no absolute filesystem path.
+# ── A1.5 — an unreadable BACKLOG.json diagnostic carries no absolute filesystem path.
 # Intent: CONTRACT — v0.4.2 A1.5 ─────────────────────────────────────────────────────
 
 
-def test_unreadable_backlog_md_diagnostic_carries_no_absolute_path(
+def test_unreadable_backlog_json_diagnostic_carries_no_absolute_path(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     backlog_dir = tmp_path / "backlog"
     backlog_dir.mkdir()
-    target = backlog_dir / "BACKLOG.md"
-    target.write_text("## ACTIVE\n\n## LEDGER\n", encoding="utf-8")
+    target = backlog_dir / "BACKLOG.json"
+    target.write_text(json.dumps({"schema": "backlog-v1", "active": []}), encoding="utf-8")
 
     # Portable unreadability simulation (not `target.chmod(0o000)`): POSIX permission
-    # bits are a platform no-op on Windows, so the chmod-based simulation never denies
-    # the read there and the OSError-handling path in load_document goes unexercised
-    # (bug: Windows CI green-lit a diagnostic path it never ran). Monkeypatching
-    # ``Path.read_text`` to raise for this exact target exercises the same
-    # `except OSError` branch identically on every platform. Matched by value equality
-    # (`self == target`), not identity, because ``load_document`` builds its own
-    # ``Path`` instance for the same file.
+    # bits are a platform no-op on Windows. Monkeypatching ``Path.read_text`` to raise
+    # for this exact target exercises the same `except OSError` branch identically on
+    # every platform. Matched by value equality (`self == target`), not identity,
+    # because ``load_document`` builds its own ``Path`` instance for the same file.
     real_read_text = Path.read_text
 
     def _read_text_denied(self: Path, *args: object, **kwargs: object) -> str:
@@ -829,103 +514,293 @@ def test_unreadable_backlog_md_diagnostic_carries_no_absolute_path(
     message = doc.errors[0].message
     assert str(backlog_dir) not in message, f"diagnostic leaked an absolute path: {message!r}"
     assert str(target) not in message, f"diagnostic leaked an absolute path: {message!r}"
-    assert "BACKLOG.md" in message
+    assert "BACKLOG.json" in message
 
 
-# ═════════════════════════════════════════════════════════════════════════════════
-# FR11 (v0.4.2, GRILL P5/P6, D7) — the fence filter is bisect-based (not the
-# O(headings × fences) rescan), and load_document pays PyYAML once through
-# yaml.CSafeLoader-when-available (falling back to the pure-Python loader otherwise).
-# No second parse mode is added (D7) — exactly one parse path exists (A11.4, covered by
-# T-042-04's A1.6 zero-hit grep test, which already asserts no module outside this one
-# compiles the backlog grammar).
-# ═════════════════════════════════════════════════════════════════════════════════
-
-# ── A11.1 — budget regression: a ~140 KB synthetic document parses well under one
-# second. Intent: CONTRACT — v0.4.2 A11.1 ───────────────────────────────────────────
+# ── budget regression: an N-item document parses well under one second. Intent:
+# CONTRACT — v0.4.2 A11.1 (lighter, JSON-native replacement) ────────────────────────
 
 
-def _synthetic_backlog_document(n_items: int) -> str:
-    """Build an N-subsection ``BACKLOG.md`` where every subsection's Description also
-    quotes a small fenced example — the exact shape GRILL P5 measured as
-    O(headings × fences): every ``### <slug>`` heading (a match) coexists with an
-    unrelated fenced span (a range) it must be checked against."""
-    parts = ["## ACTIVE\n\n"]
-    for i in range(n_items):
-        parts.append(
-            f"### synthetic-item-{i}\n"
-            f"- **Title:** Synthetic item {i}\n"
-            f"- **Opened:** 2026-08-10\n"
-            f"- **Status:** idea\n"
-            f"- **Description:** budget-regression fixture with a fenced example:\n"
-            f"```markdown\nsynthetic fenced content {i}\n```\n"
-            f"- **Provenance:** operator request\n\n"
-        )
-    parts.append("## LEDGER\n")
-    return "".join(parts)
+def _synthetic_backlog_document(n_items: int) -> dict[str, object]:
+    return _doc(
+        [
+            {
+                "id": f"synthetic-item-{i}",
+                "title": f"Synthetic item {i}",
+                "opened": "2026-08-10",
+                "status": "idea",
+                "description": "budget-regression fixture " * 10,
+                "provenance": "operator request",
+            }
+            for i in range(n_items)
+        ]
+    )
 
 
-def test_backlog_document_budget_140kb_parses_well_under_one_second(tmp_path: Path) -> None:
+def test_backlog_document_1000_items_parses_well_under_one_second(tmp_path: Path) -> None:
     import time
 
-    text = _synthetic_backlog_document(565)  # ~140 KB
-    size = len(text.encode("utf-8"))
-    assert 120_000 < size < 160_000, f"fixture drifted outside the ~140 KB budget: {size} bytes"
-
-    backlog_dir = _write(tmp_path, text)
+    backlog_dir = _write(tmp_path, _synthetic_backlog_document(1000))
 
     start = time.perf_counter()
     doc = load_document(backlog_dir)
     elapsed = time.perf_counter() - start
 
     assert doc.errors == ()
-    assert len(doc.active) == 565
+    assert len(doc.active) == 1000
     # A budget, not a stopwatch (D7): generous headroom so this is not a flake
     # generator, while still catching a real algorithmic regression.
-    assert elapsed < 1.0, f"140 KB document took {elapsed:.3f}s — budget is 1.0s"
+    assert elapsed < 1.0, f"1000-item document took {elapsed:.3f}s — budget is 1.0s"
 
 
-# ── A11.3 — CSafeLoader absence is exercised (forced fallback) and yields identical
-# results. Intent: CONTRACT — v0.4.2 A11.3 ──────────────────────────────────────────
+# ═════════════════════════════════════════════════════════════════════════════════
+# v0.5.0 FR5, A5.3 — remove_active_subsection / backlog_exit: the writer's mirror
+# image. An entry exit (any disposition) removes exactly one ``active[]`` entry and
+# appends exactly one histo record — proven by an executed fixture.
+# ═════════════════════════════════════════════════════════════════════════════════
 
-_WITH_INTENTS = """\
-## ACTIVE
-
-### fallback-item
-- **Title:** Fallback item
-- **Opened:** 2026-08-10
-- **Status:** candidate
-- **Description:** Exercises the Intents YAML parse path under both loaders.
-- **Provenance:** operator request
-- **Intents:**
-```yaml
-- subject:
-    kind: code
-    ref: pkg/mod.py#Widget
-  change: extend Widget
-```
-
-## LEDGER
-"""
+from dadaia_workspace.features.backlog.document import (  # noqa: E402
+    backlog_exit,
+    remove_active_subsection,
+)
 
 
-def test_forced_safeloader_fallback_produces_identical_results(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+class _FakeHistoStore:
+    """A minimal in-memory double satisfying
+    :class:`~dadaia_workspace.core.protocols.record_store.RecordStore` for
+    :class:`BacklogHistoRecord` — a fake, not a mock (internal Protocol dependency),
+    per this workspace's own test-authoring convention."""
+
+    def __init__(self) -> None:
+        self._records: dict[str, BacklogHistoRecord] = {}
+
+    @property
+    def path(self) -> Path:
+        return Path("fake-backlog-histo.jsonl")
+
+    def append(self, record: BacklogHistoRecord) -> None:
+        assert record.id not in self._records, f"duplicate append for {record.id!r}"
+        self._records[record.id] = record
+
+    def iter_records(self) -> Iterator[BacklogHistoRecord]:
+        return iter(self._records.values())
+
+    def update(
+        self, record_id: str, mutate: Callable[[BacklogHistoRecord], BacklogHistoRecord]
+    ) -> BacklogHistoRecord:
+        current = self._records[record_id]
+        updated = mutate(current)
+        self._records[record_id] = updated
+        return updated
+
+
+_TWO_ACTIVE_ITEMS = _doc(
+    [
+        {
+            "id": "going-away",
+            "title": "Going away",
+            "opened": "2026-08-10",
+            "status": "candidate",
+            "description": "About to exit.",
+            "provenance": "operator request",
+            "intents": [
+                {"subject": {"kind": "code", "ref": "pkg/mod.py#Widget"}, "change": "retire Widget"}
+            ],
+        },
+        {
+            "id": "staying-put",
+            "title": "Staying put",
+            "opened": "2026-08-11",
+            "status": "idea",
+            "description": "Not touched by the exit.",
+            "provenance": "operator request",
+        },
+    ]
+)
+
+
+def test_remove_active_subsection_removes_exactly_one_and_returns_its_source(
+    tmp_path: Path,
 ) -> None:
-    """A11.3: force the fallback (as if the C-accelerated ``CSafeLoader`` were
-    unavailable) and assert the parse is identical to the default (``CSafeLoader``,
-    when the environment has libyaml) path."""
-    import dadaia_workspace.features.backlog.document as document_module
+    specs = tmp_path / "specs"
+    (specs / "backlog").mkdir(parents=True)
+    (specs / "backlog" / "BACKLOG.json").write_text(json.dumps(_TWO_ACTIVE_ITEMS), encoding="utf-8")
 
-    backlog_dir = _write(tmp_path, _WITH_INTENTS)
+    removed = remove_active_subsection(specs, "going-away")
 
-    default_doc = load_document(backlog_dir)
+    assert '"id": "going-away"' in removed
+    assert "retire Widget" in removed
 
-    monkeypatch.setattr(document_module, "_YAML_LOADER", document_module.yaml.SafeLoader)
-    fallback_doc = load_document(backlog_dir)
+    doc = load_document(specs / "backlog")
+    assert doc.errors == ()
+    slugs = {item.slug for item in doc.active}
+    assert slugs == {"staying-put"}, "only the named entry is removed"
 
-    assert fallback_doc == default_doc
-    assert fallback_doc.errors == ()
-    assert len(fallback_doc.active) == 1
-    assert fallback_doc.active[0].intents[0].subject.ref == "pkg/mod.py#Widget"
-    assert fallback_doc.active[0].intents[0].change == "extend Widget"
+
+def test_remove_active_subsection_raises_for_an_unknown_slug(tmp_path: Path) -> None:
+    specs = tmp_path / "specs"
+    (specs / "backlog").mkdir(parents=True)
+    (specs / "backlog" / "BACKLOG.json").write_text(json.dumps(_TWO_ACTIVE_ITEMS), encoding="utf-8")
+
+    with pytest.raises(KeyError):
+        remove_active_subsection(specs, "does-not-exist")
+
+
+def test_backlog_exit_removes_active_and_appends_exactly_one_histo_record(
+    tmp_path: Path,
+) -> None:
+    """A5.3: an entry exit (any disposition) removes exactly one ``active[]`` entry
+    and appends exactly one histo record — the executed fixture the acceptance
+    criterion asks for."""
+    specs = tmp_path / "specs"
+    (specs / "backlog").mkdir(parents=True)
+    (specs / "backlog" / "BACKLOG.json").write_text(json.dumps(_TWO_ACTIVE_ITEMS), encoding="utf-8")
+
+    store = _FakeHistoStore()
+    record = backlog_exit(
+        specs,
+        "going-away",
+        histo_store=store,
+        disposition="DELIVERED",
+        reason=None,
+        release="v9.9.9",
+        by="test-suite",
+        denylist_terms=(),
+        ts="2026-08-27",
+    )
+
+    assert record.id == "going-away"
+    assert record.disposition == "DELIVERED"
+    assert record.release == "v9.9.9"
+    assert record.entry_md is not None and '"id": "going-away"' in record.entry_md
+
+    stored = list(store.iter_records())
+    assert len(stored) == 1
+    assert stored[0].id == "going-away"
+
+    doc = load_document(specs / "backlog")
+    assert {item.slug for item in doc.active} == {"staying-put"}
+
+
+def test_backlog_exit_twice_for_the_same_slug_is_structurally_impossible(
+    tmp_path: Path,
+) -> None:
+    """BL-DUP's retirement rationale (v0.5.0 A5.2), proven: once a slug has exited,
+    it no longer names a live ``active[]`` entry — a second exit attempt for the same
+    slug fails at the removal step, never producing a second histo record."""
+    specs = tmp_path / "specs"
+    (specs / "backlog").mkdir(parents=True)
+    (specs / "backlog" / "BACKLOG.json").write_text(json.dumps(_TWO_ACTIVE_ITEMS), encoding="utf-8")
+
+    store = _FakeHistoStore()
+    backlog_exit(
+        specs,
+        "going-away",
+        histo_store=store,
+        disposition="DELIVERED",
+        reason=None,
+        release="v9.9.9",
+        by="test-suite",
+        denylist_terms=(),
+    )
+
+    with pytest.raises(KeyError):
+        backlog_exit(
+            specs,
+            "going-away",
+            histo_store=store,
+            disposition="DELIVERED",
+            reason=None,
+            release="v9.9.9",
+            by="test-suite",
+            denylist_terms=(),
+        )
+
+    assert len(list(store.iter_records())) == 1
+
+
+# ═════════════════════════════════════════════════════════════════════════════════
+# bug backlog-histo-writer-skips-write-time-denylist-redaction — backlog_exit must
+# thread an injected operator denylist through BacklogHistoRecord.redact() BEFORE
+# appending, exactly as BugService.register/apply_update already do (SPEC v0.4.5
+# FR6/T-045-19). Before the fix: an entry_md snapshot carrying a denylisted term is
+# appended RAW, caught only later at the push gate.
+# ═════════════════════════════════════════════════════════════════════════════════
+
+_ACTIVE_ITEM_WITH_DENYLISTED_TERM = _doc(
+    [
+        {
+            "id": "leaky-exit",
+            "title": "Leaky exit",
+            "opened": "2026-08-10",
+            "status": "candidate",
+            "description": "See .dadaia/reports/acme-corp-games/qa-engineer/report.html for detail.",
+            "provenance": "operator request",
+        }
+    ]
+)
+
+
+def test_backlog_exit_masks_a_denylisted_term_in_entry_md_before_append(
+    tmp_path: Path,
+) -> None:
+    """The RED test (bug backlog-histo-writer-skips-write-time-denylist-redaction):
+    ``backlog_exit`` threads its ``denylist_terms`` parameter through
+    ``BacklogHistoRecord.redact()`` before the record ever reaches the injected
+    store — the SAME write-time seam ``BugService.register`` already enforces."""
+    specs = tmp_path / "specs"
+    (specs / "backlog").mkdir(parents=True)
+    (specs / "backlog" / "BACKLOG.json").write_text(
+        json.dumps(_ACTIVE_ITEM_WITH_DENYLISTED_TERM), encoding="utf-8"
+    )
+
+    store = _FakeHistoStore()
+    record = backlog_exit(
+        specs,
+        "leaky-exit",
+        histo_store=store,
+        disposition="DELIVERED",
+        reason=None,
+        release="v9.9.9",
+        by="test-suite",
+        ts="2026-08-27",
+        denylist_terms=(("acme-corp", "private project/person identifier"),),
+    )
+
+    assert record.entry_md is not None
+    assert "acme-corp" not in record.entry_md.lower()
+    assert "[REDACTED-TERM]" in record.entry_md
+
+    persisted = list(store.iter_records())[0]
+    assert persisted.entry_md is not None
+    assert "acme-corp" not in persisted.entry_md.lower()
+
+
+def test_backlog_exit_with_empty_denylist_terms_stays_byte_identical_to_pre_fix(
+    tmp_path: Path,
+) -> None:
+    """A6.3-class sibling guarantee: ``backlog_exit`` called with an explicit empty
+    ``denylist_terms=()`` (F-13, T-050-36 security review: the parameter is REQUIRED,
+    no default) behaves exactly as before the fix — the removed entry's snapshot is
+    appended verbatim, byte-identical."""
+    specs = tmp_path / "specs"
+    (specs / "backlog").mkdir(parents=True)
+    (specs / "backlog" / "BACKLOG.json").write_text(
+        json.dumps(_ACTIVE_ITEM_WITH_DENYLISTED_TERM), encoding="utf-8"
+    )
+
+    store = _FakeHistoStore()
+    record = backlog_exit(
+        specs,
+        "leaky-exit",
+        histo_store=store,
+        disposition="DELIVERED",
+        reason=None,
+        release="v9.9.9",
+        by="test-suite",
+        denylist_terms=(),
+        ts="2026-08-27",
+    )
+
+    assert record.entry_md is not None
+    assert "acme-corp-games" in record.entry_md

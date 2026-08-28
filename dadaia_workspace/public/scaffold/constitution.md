@@ -62,11 +62,11 @@ specs_pattern_version: 5
 
 ## 7. Mapa de Responsabilidade das Specs
 
-- `specs/memory/architecture.md` é a fonte única da estrutura do runtime e das decisões de arquitetura.
+- `specs/memory/ARCHITECTURE.md` é a fonte única da estrutura do runtime e das decisões de arquitetura.
 - `specs/memory/product/index.md` é o catálogo de features; cada feature tem seu próprio
   atomo Markdown em `specs/memory/product/<area>/<slug>.md`, fonte única da definição do
   produto e dos usuários por feature.
-- `specs/memory/tech-stack.md` é a fonte única da política de toolchain.
+- `specs/memory/TECHSTACK.md` é a fonte única da política de toolchain.
 - `specs/releases/<release-id>/SPEC.md` é a fonte única do comportamento do produto para
   a release ativa — não existe um SPEC.md monolítico na raiz de specs/; cada release tem
   o seu.
@@ -118,8 +118,8 @@ release) segue a `DADAIA.md` §6.
 `specs/memory/**` tem um único autor: o agente responsável por specs/planejamento de
 release, e apenas nas fases de definição e de fechamento de release. Todo outro agente
 lê a memória livremente mas nunca a escreve. Memória é o estado atual do produto, não
-um changelog — histórico e decisões superadas vivem no fechamento do release
-(`CLOSURE.md`) e no arquivo, nunca em `specs/memory/**`.
+um changelog — histórico e decisões superadas vivem nos registros `note` do
+`RELEASE.json` de cada release e no arquivo, nunca em `specs/memory/**`.
 
 ---
 
@@ -138,8 +138,10 @@ domínio descrito em sua própria persona.
 - Toda regra sempre-ativa deste projeto é uma seção da lei da workspace (`DADAIA.md`), e
   toda seção sempre-ativa está mapeada para a(s) skill(s) que a operam.
 - Essa relação é declarada em uma única fonte controlada — o mapa JSON de
-  regras→skills (convenção de nome: `entities/rules-skills-map.json`), linhas de
-  `{topic, section, skills[], justification}`, chaveadas pelo tópico em negrito da lei.
+  comportamento (convenção de nome: `entities/behavior-map.json`, que aposentou
+  `rules-skills-map.json`), linhas de `{section, anchor, skill, scoped_agents_md,
+  hash_tuple, recorded_by, recorded_at}`, uma linha por membro (uma skill OU um
+  conjunto `scoped_agents_md`), chaveadas pela seção da lei que cada linha possui.
   Nenhuma skill, persona, arquivo de regra, hook ou doctor pode declarar essa relação em
   outro lugar; uma segunda declaração é lixo (slop, §8) e deve ser removida.
 - Um teste determinístico lê o mapa, a fonte da lei e o inventário de skills em disco, e

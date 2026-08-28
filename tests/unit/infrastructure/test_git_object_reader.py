@@ -1637,3 +1637,88 @@ def test_resolvable_remote_sha_and_new_branch_fallback_agree_on_the_same_final_s
         return sorted((obj.path, obj.sha, obj.prior_text) for obj in objs if obj.kind == "blob")
 
     assert _shape(via_resolvable_remote_sha) == _shape(via_new_branch_fallback)
+
+
+# ---------------------------------------------------------------------------------------
+# list_tree_paths / first_parent (v0.5.0 specs-canon closure, operator ruling 2026-08-28)
+# ---------------------------------------------------------------------------------------
+
+
+def test_list_tree_paths_lists_only_files_under_the_prefix(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "specs").mkdir()
+    (repo / "specs" / "AGENTS.md").write_text("agents\n")
+    (repo / "specs" / "backlog").mkdir()
+    (repo / "specs" / "backlog" / "BACKLOG.json").write_text("{}\n")
+    (repo / "outside.txt").write_text("not under specs/\n")
+    tip_sha = _commit(repo, "seed")
+
+    reader = GitSubprocessObjectReader()
+    paths = reader.list_tree_paths(repo, tip_sha, "specs")
+
+    assert sorted(paths) == ["specs/AGENTS.md", "specs/backlog/BACKLOG.json"]
+
+
+def test_list_tree_paths_over_an_absent_prefix_is_empty(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "a.txt").write_text("a\n")
+    tip_sha = _commit(repo, "seed")
+
+    reader = GitSubprocessObjectReader()
+    assert reader.list_tree_paths(repo, tip_sha, "specs") == []
+
+
+def test_list_tree_paths_rejects_an_option_shaped_sha(tmp_path: Path) -> None:
+    """CWE-88 — the same second-layer shape defence every other adapter call applies."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "a.txt").write_text("a\n")
+    _commit(repo, "seed")
+
+    reader = GitSubprocessObjectReader()
+    with pytest.raises(GitObjectReadError):
+        reader.list_tree_paths(repo, "--upload-pack=evil", "specs")
+
+
+def test_first_parent_of_a_child_commit_resolves_the_base(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "a.txt").write_text("first\n")
+    base_sha = _commit(repo, "c1")
+    (repo / "a.txt").write_text("second\n")
+    tip_sha = _commit(repo, "c2")
+
+    reader = GitSubprocessObjectReader()
+    assert reader.first_parent(repo, tip_sha) == base_sha
+
+
+def test_first_parent_of_a_root_commit_is_none(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "a.txt").write_text("first\n")
+    root_sha = _commit(repo, "c1")
+
+    reader = GitSubprocessObjectReader()
+    assert reader.first_parent(repo, root_sha) is None
+
+
+def test_first_parent_of_an_unresolvable_sha_is_none_never_raises(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "a.txt").write_text("first\n")
+    _commit(repo, "seed")
+
+    reader = GitSubprocessObjectReader()
+    assert reader.first_parent(repo, "a" * 40) is None
+
+
+def test_first_parent_of_an_option_shaped_sha_is_none_never_raises(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / "a.txt").write_text("first\n")
+    _commit(repo, "seed")
+
+    reader = GitSubprocessObjectReader()
+    assert reader.first_parent(repo, "--upload-pack=evil") is None

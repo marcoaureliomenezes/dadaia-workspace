@@ -10,10 +10,11 @@ Scope (deliberately bounded so the assertion is satisfiable):
 
 * **Included:** live production source + public assets under ``dadaia_workspace/`` —
   ``*.py`` and ``public/**/*.md`` (the rule/AGENTS/fragment/persona doc surface).
-* **Excluded by construction:** ``specs/_archive/`` (FROZEN history), ``specs/memory/``
-  (product-engineer-owned, updated at CLOSURE by T-44-18), the v0.1.44 ``specs/`` text,
-  this test file itself, and the projected runtime trees (``.claude/`` etc.) — none live
-  under ``dadaia_workspace/``.
+* **Excluded by construction:** the ``specs/`` tree entirely (governed by SPEC/
+  product-engineer, not this scan — e.g. ``specs/memory/`` is product-engineer-owned,
+  updated at CLOSURE by T-44-18), the v0.1.44 ``specs/`` text, this test file itself,
+  and the projected runtime trees (``.claude/`` etc.) — none live under
+  ``dadaia_workspace/``.
 
 A "GPT-only" occurrence is a violation **unless** it is negated ("not GPT-only"), which is
 exactly how the corrected docstrings affirm the new law.

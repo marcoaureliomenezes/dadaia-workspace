@@ -41,8 +41,6 @@ def _make_product_atom(product_dir: Path, slug: str, body: str = "## Propósito\
         "tags": ["test"],
         "agent_tier": "self-pull",
         "token_estimate": 50,
-        "last_updated": "2026-06-01",
-        "release_origin": "memory-markdown-source-v1",
     }
     lines = ["---"]
     for k, v in fm.items():
@@ -87,8 +85,6 @@ def test_subprocess_valid_exits_zero_bad_frontmatter_exits_one(tmp_path: Path) -
         "tags: []\n"
         "agent_tier: self-pull\n"
         "token_estimate: 50\n"
-        "last_updated: '2026-06-01'\n"
-        "release_origin: test\n"
         "---\n\n## Propósito\n\nBody.\n"
     )
     (bad_product_dir / "bad-feature.md").write_text(content, encoding="utf-8")

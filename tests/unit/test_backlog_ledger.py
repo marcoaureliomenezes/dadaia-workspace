@@ -1,71 +1,123 @@
-"""Unit tests for the ``consumed_backlog`` ledger reader (T-25-05, SPEC §3.6, ADR-C).
+"""Unit tests for the ``consumed_backlog`` ledger reader (SPEC §3.6, ADR-C; v0.5.0
+T-050-13A, A5.5).
 
-R1 READS the sidecar JSON at ``specs/_archive/<release>/consumed_backlog.json`` by exact slug
-membership; the writer is R2. The read is a **no-op (empty) when absent** — never a false
-ERROR (acceptance §3.7.6). All paths injected (SPEC §3.8 #6). Fixtures use ``tmp_path``.
+Intent: CONTRACT — v0.5.0 A5.5
 
-Absent-is-noop (never false ERROR) row preserved; malformed-ledger-skipped-not-crash kept
-standalone.
+BL-STALE keys on a **structured** ledger; ``read_consumed`` iterates an injected
+:class:`~dadaia_workspace.core.protocols.record_store.RecordStore`
+[``ConsumedBacklogHistoRecord``] — never a directory glob (T-050-13A relocated the 18
+per-release ``consumed_backlog.json`` sidecars into one append-only file, before FR6
+deletes the root archive tree those sidecars lived under). ``None`` (no store injected)
+degrades to ``{}`` — never a false ERROR (acceptance §3.7.6, A5.5).
+
+A fake, not a mock, satisfies the internal ``RecordStore`` Protocol dependency (this
+workspace's own test-authoring convention) — see ``_FakeConsumedHistoStore``.
 """
 
 from __future__ import annotations
 
-import json
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.models.backlog import ConsumedBacklogHistoRecord
 from dadaia_workspace.features.backlog.ledger import read_consumed
 
 pytestmark = pytest.mark.unit
 
 
-def _write_ledger(archive_root: Path, release: str, entries: list[dict[str, object]]) -> None:
-    rel_dir = archive_root / release
-    rel_dir.mkdir(parents=True, exist_ok=True)
-    (rel_dir / "consumed_backlog.json").write_text(
-        json.dumps({"release": release, "consumed": entries}), encoding="utf-8"
+class _FakeConsumedHistoStore:
+    """A minimal in-memory double satisfying
+    :class:`~dadaia_workspace.core.protocols.record_store.RecordStore` for
+    :class:`ConsumedBacklogHistoRecord`."""
+
+    def __init__(self, records: list[ConsumedBacklogHistoRecord] | None = None) -> None:
+        self._records = list(records or [])
+
+    @property
+    def path(self) -> Path:
+        return Path("fake-consumed-backlog-histo.jsonl")
+
+    def append(self, record: ConsumedBacklogHistoRecord) -> None:
+        self._records.append(record)
+
+    def iter_records(self) -> Iterator[ConsumedBacklogHistoRecord]:
+        return iter(self._records)
+
+    def update(
+        self,
+        record_id: str,
+        mutate: Callable[[ConsumedBacklogHistoRecord], ConsumedBacklogHistoRecord],
+    ) -> ConsumedBacklogHistoRecord:
+        raise NotImplementedError
+
+
+def _record(release: str, entries: list[dict[str, object]]) -> ConsumedBacklogHistoRecord:
+    return ConsumedBacklogHistoRecord(id=release, consumed=entries)
+
+
+def test_none_store_is_noop() -> None:
+    """No store injected (never wired, or genuinely absent record) degrades to ``{}`` —
+    never a false ERROR (A5.5's kept degrade-to-``{}`` behaviour)."""
+    assert read_consumed(None) == {}
+
+
+def test_empty_store_is_noop() -> None:
+    assert read_consumed(_FakeConsumedHistoStore()) == {}
+
+
+def test_single_multi_release_and_union_reads() -> None:
+    single = _FakeConsumedHistoStore(
+        [_record("v0.1.20", [{"slug": "old-feature", "shipped_anchors": ["a#X", "b#Y"]}])]
     )
-
-
-def test_absent_or_empty_archive_root_is_noop(tmp_path: Path) -> None:
-    assert read_consumed(tmp_path / "does-not-exist") == {}
-    (tmp_path / "_archive").mkdir()
-    assert read_consumed(tmp_path / "_archive") == {}
-
-
-def test_single_multi_release_and_union_reads(tmp_path: Path) -> None:
-    single = tmp_path / "single"
-    _write_ledger(single, "v0.1.20", [{"slug": "old-feature", "shipped_anchors": ["a#X", "b#Y"]}])
     assert read_consumed(single) == {"old-feature": {"a#X", "b#Y"}}
 
-    multi = tmp_path / "multi"
-    _write_ledger(multi, "v0.1.20", [{"slug": "feat-a", "shipped_anchors": ["a#X"]}])
-    _write_ledger(multi, "v0.1.21", [{"slug": "feat-b", "shipped_anchors": ["b#Y"]}])
+    multi = _FakeConsumedHistoStore(
+        [
+            _record("v0.1.20", [{"slug": "feat-a", "shipped_anchors": ["a#X"]}]),
+            _record("v0.1.21", [{"slug": "feat-b", "shipped_anchors": ["b#Y"]}]),
+        ]
+    )
     assert set(read_consumed(multi)) == {"feat-a", "feat-b"}
 
-    union = tmp_path / "union"
-    _write_ledger(union, "v0.1.20", [{"slug": "feat-a", "shipped_anchors": ["a#X"]}])
-    _write_ledger(union, "v0.1.21", [{"slug": "feat-a", "shipped_anchors": ["a#Z"]}])
+    # Same slug recorded by two different releases' records — anchors union.
+    union = _FakeConsumedHistoStore(
+        [
+            _record("v0.1.20", [{"slug": "feat-a", "shipped_anchors": ["a#X"]}]),
+            _record("v0.1.21", [{"slug": "feat-a", "shipped_anchors": ["a#Z"]}]),
+        ]
+    )
     assert read_consumed(union)["feat-a"] == {"a#X", "a#Z"}
 
 
-def test_malformed_ledger_skipped_not_crash(tmp_path: Path) -> None:
-    archive = tmp_path / "_archive"
-    bad = archive / "v0.1.99"
-    bad.mkdir(parents=True)
-    (bad / "consumed_backlog.json").write_text("{ not json", encoding="utf-8")
-    # A good ledger alongside the malformed one still reads.
-    _write_ledger(archive, "v0.1.20", [{"slug": "feat-a", "shipped_anchors": ["a#X"]}])
-    consumed = read_consumed(archive)
-    assert consumed == {"feat-a": {"a#X"}}
+def test_entry_without_anchors_tolerated() -> None:
+    store = _FakeConsumedHistoStore([_record("v0.1.20", [{"slug": "feat-a"}])])
+    assert read_consumed(store) == {"feat-a": set()}
 
 
-def test_entry_without_anchors_tolerated_and_without_slug_skipped(tmp_path: Path) -> None:
-    tolerant = tmp_path / "tolerant"
-    _write_ledger(tolerant, "v0.1.20", [{"slug": "feat-a"}])
-    assert read_consumed(tolerant) == {"feat-a": set()}
+def test_entry_without_slug_skipped() -> None:
+    store = _FakeConsumedHistoStore([_record("v0.1.20", [{"shipped_anchors": ["a#X"]}])])
+    assert read_consumed(store) == {}
 
-    skipped = tmp_path / "skipped"
-    _write_ledger(skipped, "v0.1.20", [{"shipped_anchors": ["a#X"]}])
-    assert read_consumed(skipped) == {}
+
+def test_extra_entry_keys_are_ignored_not_fatal() -> None:
+    """Every original ``consumed_backlog.json`` entry key survives the relocation
+    (byte-lossless, A5.5) — ``read_consumed`` only consults ``slug``/``shipped_anchors``
+    and tolerates any other key (e.g. ``note``, carried by several of the 18 relocated
+    sidecars) without erroring."""
+    store = _FakeConsumedHistoStore(
+        [
+            _record(
+                "v0.1.57",
+                [
+                    {
+                        "slug": "hard-remove-model-flag-across-run-verbs",
+                        "shipped_anchors": [],
+                        "note": "DELIVERED — v0.1.57 (archived at SHIP)",
+                    }
+                ],
+            )
+        ]
+    )
+    assert read_consumed(store) == {"hard-remove-model-flag-across-run-verbs": set()}

@@ -1,54 +1,35 @@
 # DADAIA.md — the workspace system prompt
 
-You are operating inside a dadaia-workspace. This file is the **complete always-on law**:
-one file, every rule, one source. It is generated from
-`dadaia_workspace/public/data/DADAIA.md` and projected to the workspace root and
-`.codex/`/`.kimi-code/`; Claude Code reaches it via `CLAUDE.md` -> `AGENTS.md` ->
-`DADAIA.md` instead of a second projected copy. Sections cross-reference by name; each
-fact is stated once.
-
-Scoped `AGENTS.md` files govern their own subtree and take precedence there. This
-library ships exactly two rule-file kinds: this one, and scoped `AGENTS.md` — anything
-else you find is the operator's own.
+- Complete always-on law: one file, every rule, one source.
+- Source: `dadaia_workspace/public/data/DADAIA.md`; projects to workspace root, `.codex/`, `.kimi-code/`.
+- Claude Code reaches it via `CLAUDE.md -> AGENTS.md -> DADAIA.md` — no second copy.
+- Each fact stated once; sections cross-reference by number.
+- A scoped `AGENTS.md` governs its own subtree, takes precedence there.
+- Two rule-file kinds ship: this file, and scoped `AGENTS.md` — anything else is the operator's own.
 
 ---
 
 ## 1. The flow — the mandatory default
 
-Every demand runs through one of two arms. Classify the demand, **say which arm you are
-in**, then follow it. Deviating requires an explicit, confirmed request from the
-operator; when in doubt, follow the flow.
+### 1.1 The two arms
 
-**Arm A — feature work** (new capability):
+- Classify every demand: Arm A (feature) or Arm B (bug); state the arm before acting.
+- Deviation needs an explicit, confirmed operator request; default to the flow.
+- Arm A: `demand -> backlog-definition -> release-definition -> implementation+reviews -> audit`.
+- Arm B: `register -> reproduce -> RED test -> root-cause fix -> GREEN -> resolved -> commit`.
+- Test: does the tool break its own contract? Yes -> Arm B, fixed now. No -> Arm A, via a release.
+- A feature enters only through the backlog; a bug is fixed immediately, outside release material.
 
-```
-demand → backlog-definition → release-definition → implementation + reviews/gates → audit
-```
+### 1.2 Dispatch
 
-**Arm B — bug** (the tool violated its own contract):
-
-```
-register → reproduce on the executed path → RED test → root-cause fix → GREEN → resolved event → commit
-```
-
-Choose the arm by one question: *does the tool violate a contract it already promises?*
-Yes → Arm B, fixed on the spot. No → Arm A, matured through a release.
-
-A bug is fixed immediately, outside release material; a feature enters only through the
-backlog.
-
-Arm A is agent-dispatched: each stage — backlog-definition, release-definition,
-implementation with its reviews and gates, and audit — is carried out by dispatching the
-owning agent for that stage (§2) against the SDD documents (`ACTIVE.md`, SPEC, PLAN,
-TASKS, CLOSURE, per §6). You fan out explicitly; the documents themselves are the record
-of progress.
+- Each Arm-A stage runs by dispatching its owning agent (§2) against the SDD documents (§6).
+- No workflow engine — the SDD documents are the record of progress.
 
 ---
 
 ## 2. Who does what
 
-Dispatch by artifact class. Each agent's frontmatter carries its own write allowlist;
-stay inside it.
+### 2.1 Ownership
 
 | The work | Owner |
 |---|---|
@@ -59,76 +40,67 @@ stay inside it.
 | Production code and its tests, in any language | `software-engineer` |
 | E2E, test pyramid, deploy validation; closes each `rc-N` | `qa-engineer` |
 | Six-axis review before a PR | `code-reviewer` |
-| Vulnerabilities, secrets, CVEs; the push verdict (§7) | `security-reviewer` |
+| Vulnerabilities, secrets, CVEs; the push verdict (§4.2) | `security-reviewer` |
 | Agents, skills, rules, workflows, commands, hooks — the AI surface | `ai-engineer` |
 | Drift audits; dispatches evidence agents; scores compliance | `project-auditor` |
 
-`product-engineer` reads the PM-curated backlog to author a release; it does not curate
-the backlog. Every agent invokes `dd-ai-eng-knowhow` for harness literacy; only
-`ai-engineer` reads its depth siblings to author or audit the AI-entity surface — every
-other agent dispatches `ai-engineer` for that depth.
+### 2.2 Cross-cutting
+
+- `product-engineer` authors releases from the PM-curated backlog; it never curates the backlog itself.
+- Every agent invokes `dd-ai-eng-knowhow` for harness literacy; only `ai-engineer` reads its depth siblings — others dispatch it.
 
 ---
 
 ## 3. What is enforced deterministically
 
-One PreToolUse entrypoint — `dadaia_workspace.hooks.pre_gate` — reads each tool payload
-once and evaluates three policies in fixed order, **first block wins**:
+### 3.1 The gate
 
-1. **Root whitelist** — file-tool writes that would create a new top-level workspace-root
-   entry (§5).
-2. **Venv guard** — `Bash` only, matched on fixed leading tokens: `dadaia`, `pip`, and
-   `python -m dadaia_workspace` run from `.dadaia/.venv/bin/`. The block message carries
-   the corrected command.
-3. **SDD gate** — path class × presence × phase × mode.
+- One PreToolUse entrypoint (`pre_gate`), fixed order, first block wins: root whitelist -> venv guard -> SDD gate.
+- Root whitelist blocks a new top-level workspace-root entry (§5.1).
+- Venv guard (`Bash` only) blocks `dadaia`/`pip`/`python -m dadaia_workspace` run outside `.dadaia/.venv/bin/`; message carries the fix.
+- SDD gate: path class × presence × phase × mode — context-relative, root and every `repos/<slug>/` alike.
 
-**Path classes** are context-relative: the same `specs/` taxonomy applies at the workspace
-root and inside every `repos/<slug>/`.
+### 3.2 Path classes
 
 | Class | Paths | Verdict |
 |---|---|---|
-| ADDITIVE | `specs/bugs|backlog|audits/`, `.dadaia/reports|handoff|tmp/` | Always writable — register bugs freely, in any mode |
+| ADDITIVE | `specs/bugs\|backlog\|audits/`, each area's `_archive/*_histo.jsonl`, `.dadaia/reports\|handoff\|tmp/` | Always writable |
 | MEMORY | `specs/memory/` | Writable in `DEFINITION` and `CLOSURE` phase |
 | MUTATING | everything else in-repo | Writable; records advisory presence |
-| FROZEN | `specs/_archive/` | Blocked — archive by `git mv`, never edit |
-| PROTECTED | `.dadaia/sessions/`, projected law files (§8) | Blocked |
+| PROTECTED | `.dadaia/sessions/`, projected law files (§8.2) | Blocked |
 
-**Races are surfaced, always allowed** — locks, leases, and ownership blocks are absent by
-design. A MUTATING write records an advisory presence record and proceeds; when another
-live session holds presence on the same context, the write proceeds and one throttled
-warning names that session. Presence I/O errors are swallowed and the write proceeds.
+- ADDITIVE's record contract (immutable core, write-once, mutable governance) is audited, not gated.
+- No FROZEN class: no root `_archive/` under `specs/`; archiving is histo-only under ADDITIVE, backstopped by pre-push (§3.4).
 
-**Mode** resolves from the environment, then your own session record, defaulting to
-IMPLEMENTATION. A session in READ mode blocks only its *own* MUTATING writes, as opt-in
-self-protection; ADDITIVE paths stay writable and every other session is unaffected.
+### 3.3 Races, mode, context
 
-**Context and memory.** Resolve the active context from `DADAIA_CONTEXT`, then your own
-session binding — the live session record keyed by your harness session id — then the
-repo containing the working directory; inspect the result with `dadaia context show
---json`. `dadaia context bind` refreshes your session record and is the sole trigger for
-context-memory injection; in a plain shell with no harness session id, the exported
-`DADAIA_CONTEXT` env var **is** the binding (`bind` prints the export line). Bind selects
-which memory you receive — it is optional, and ADDITIVE work needs none. Keep working;
-alert the operator only when the workspace has zero ALIVE contexts.
+- Races surface, never block — no locks, leases, ownership blocks.
+- A MUTATING write records advisory presence and proceeds; one throttled warning names a colliding session.
+- Presence I/O errors are swallowed; the write proceeds.
+- Mode: env -> session record -> IMPLEMENTATION default; READ blocks only your own MUTATING writes.
+- Context: `DADAIA_CONTEXT` -> session binding -> repo of the cwd; inspect via `dadaia context show --json`.
+- `dadaia context bind` refreshes the session; it is the sole context-memory-injection trigger.
+- A plain shell's exported `DADAIA_CONTEXT` env var IS the binding.
+- Bind is optional; ADDITIVE needs none; alert the operator only at zero ALIVE contexts.
 
-**Git chokepoints** close the `Bash` write path, outside the gate's own parsing. They run
-as git hooks, independent of any harness hook firing:
+### 3.4 Git chokepoints
 
-- **pre-commit** warns and always allows — commits flow, presence is surfaced.
-- **pre-push** allows a `feature/*` push after the local CI preflight and a valid branch
-  name; refuses any direct push of `develop` or `main` — those advance only by PR (full
-  contract: §4 Gitflow).
+- Git hooks gate the `Bash` write path, outside the gate's own parsing, independent of any harness hook.
+- pre-commit: warns and always allows.
+- pre-push: allows `feature/*` after CI preflight + valid name.
+- pre-push: refuses a direct `develop`/`main` push (§4), a non-canon `specs/` path, or a stale PR verdict.
 
-The gate constrains **what** may be written; it stays silent on **how** the change was
-produced, and reads zero SDD artifacts. Everything in §6 you uphold yourself.
+### 3.5 Enforcement posture
+
+- The gate constrains what is written, not how — it reads zero SDD artifacts; §6 is upheld by agent discipline, not the gate.
+- Skills instruct procedure; audits measure conformance from git and JSONL history.
+- Hooks and the CLI validate only at the publication boundary (push/PR); never a human.
 
 ---
 
 ## 4. Gitflow — the branch contract
 
-One law states the branch model; every other mention in this file is a cross-reference.
-Start-of-work protocol, uniqueness and deletion discipline, and the CI/CD automation
-suggestion for consumers: `dd-gitflow-default`.
+### 4.1 Branches
 
 | Branch | Pushable | Cut from | Advances by |
 |---|---|---|---|
@@ -136,196 +108,247 @@ suggestion for consumers: `dd-gitflow-default`.
 | `develop` | No — never a direct push | `main` (bootstrap only) | PR from `feature/{M.m.p}`, at definition `Aprovado` and at each `rc` merge |
 | `main` | No — never a direct push | — | PR from `develop`, at the final `rc` |
 
-No `v` prefix, no suffix, no fifth pattern. `hotfix/*` is retired: reachable only on an
-explicit operator request — no stage, no cadence, no PATCH-mint rule.
+### 4.2 Rules
 
-Exactly one live `feature/{M.m.p}` branch at a time. At deploy of `{M.m.p}`, delete
-`feature/{M.m.p}` and cut `feature/{next}` in the same step. Bugs are fixed on the live
-feature branch in any phase — no ceremony, no separate branch.
-
-`rc-N` is a state of the specs, never a branch name: it lives in `ACTIVE.md`'s phase and
-in `TASKS.md`, and each `rc` burns exactly one `feature/{M.m.p}` → `develop` merge. `rc`
-scope is fixes and adjustments to the current release only — never new backlog.
-
-Both PRs — `feature/{M.m.p}` → `develop` and `develop` → `main` — are gated by a required
-CI check demanding an APPROVED `security-reviewer` verdict covering the PR head sha.
-Every stage of the flow — backlog definition, research, bug registration, release
-definition and implementation — runs on `feature/{M.m.p}`; `develop` and `main` are PR
-targets only, never a working branch.
-
-Suggest the operator automate this contract in CI/CD whenever the topic comes up.
+- No `v` prefix, no suffix, no fifth pattern; `hotfix/*` retired (operator-request only, no cadence).
+- Exactly one live `feature/{M.m.p}`; at deploy, delete it and cut `feature/{next}` in the same step; bugs fix on it in any phase, no ceremony.
+- `rc-N` is a specs state (`RELEASE.json`'s `phase` field + `TASKS.md`), never a branch name.
+- Each `rc` burns one `feature -> develop` merge; scope is fixes only, never new backlog.
+- Both PRs require an APPROVED `security-reviewer` verdict on the PR head sha, consumed once by the merge and deleted after — a survivor is slop.
+- Every flow stage runs on `feature/{M.m.p}`; `develop`/`main` are PR targets only, never a working branch.
+- Suggest CI/CD automation of this contract to the operator; mechanics: `dd-gitflow-default`.
 
 ---
 
 ## 5. Where things are written
 
-**Workspace root** holds only: `.agents/` `.claude/` `.codex/` `.dadaia/` `.kimi-code/`
-`repos/` `AGENTS.md` `CLAUDE.md` `DADAIA.md` `prompt.md`. Anything the operator created
-by hand stays, permanently. A tool that genuinely requires another root entry gets a
-documented glob in `.dadaia/states/root_exceptions.txt`.
+### 5.1 Workspace root
 
-Everything else has a home under `.dadaia/`:
+- Root holds only: `.agents/ .claude/ .codex/ .dadaia/ .kimi-code/ repos/ AGENTS.md CLAUDE.md DADAIA.md prompt.md`.
+- Anything the operator created by hand stays, permanently.
+- A tool needing another root entry gets a documented glob in `.dadaia/states/root_exceptions.txt`.
+
+### 5.2 Output paths
 
 | Output | Path |
 |---|---|
-| Your temp files, scripts, screenshots, captures | `.dadaia/tmp/<agent>/<YYYYMMDD>/` |
-| Machine-readable handoffs (the default emission) | `.dadaia/handoff/<context>/<UTC>-<agent>-<slug>.handoff.json` |
+| Temp files, scripts, screenshots, captures | `.dadaia/tmp/<agent>/<YYYYMMDD>/` |
+| Machine-readable handoffs (default emission) | `.dadaia/handoff/<context>/<UTC>-<agent>-<slug>.handoff.json` |
 | HTML reports | `.dadaia/reports/<context>/<agent>/<UTC>-<slug>.html` |
 | Tool caches, MCP working dirs | `.dadaia/` (`.dadaia/mcps/<server>/`) |
 
-**Repos stay clean.** A repo working tree carries source and its own artifacts only,
-excluding `.dadaia/`, `.venv/`, `.pytest_cache/`, `.mypy_cache/`, `.hypothesis/`,
-`.ruff_cache/`, `test-results/`, `playwright-report/`, `coverage/`, `.coverage`.
-`.dadaia/` is workspace-level only; creating one inside a repo corrupts context
-resolution for every tool that walks the tree. Run tools with caching off or redirected:
-pytest
-`-p no:cacheprovider`, mypy `incremental = false`, hypothesis `database = None`, ruff
-`--no-cache`, Playwright `outputDir` into `.dadaia/tmp/`. Gitignore is defence in depth,
-not permission to create them.
+### 5.3 Repos stay clean
 
-**Emission is handoff-first.** Emit the JSON handoff by default. Add an HTML report when
-the operator asks for one or the next handoff target is human; split reports over 30 KB
-into multiple files behind an `index.html`. Validate with
-`dadaia reports validate <path>.handoff.json` — the validator takes handoff files, and the
-HTML's integrity rides on the handoff's `content_hash`.
+- A repo working tree carries source and its own artifacts only — never `.dadaia/`.
+- A nested `.dadaia/` corrupts context resolution for every tree-walking tool.
+- Excluded: `.venv/ .pytest_cache/ .mypy_cache/ .hypothesis/ .ruff_cache/ test-results/ playwright-report/ coverage/ .coverage`.
+- Redirect caches: pytest `-p no:cacheprovider`, mypy `incremental = false`, hypothesis `database = None`, ruff `--no-cache`.
+- Redirect Playwright's `outputDir` into `.dadaia/tmp/`.
+- Gitignore is defence in depth, not permission to create them.
+
+### 5.4 Emission
+
+- Handoff-first: JSON handoff by default; HTML report only on operator request or when the next hop is human.
+- Split a report over 30 KB into multiple files behind an `index.html`.
+- Validate with `dadaia reports validate <path>.handoff.json`; HTML integrity rides on `content_hash`.
 
 ---
 
 ## 6. Specs, tasks and memory
 
-`Aprovado`, `Em revisão` and `Draft` are the canonical status tokens — keep them as they
-are, in any language.
+### 6.1 Status tokens
 
-**Task lifecycle.** Read `ACTIVE.md` for the release and phase. Read SPEC, PLAN and TASKS
-— all three carry `**Status:** Aprovado`. Reserve your task by flipping `[ ]` → `[-]`
-*before* writing; hold at most one `[-]` at a time unless TASKS declares disjoint write
-sets. Complete the work inside the task's declared write set. Flip `[-]` → `[x]` and
-commit as `conventional-commit(task-id): description`. The markers are the auditable
-trace of who took what.
+- `Aprovado`, `Em revisão`, `Draft` are the canonical status tokens — keep as-is, any language.
 
-**Memory is current product truth, not history.** Read it before changing production
-behavior. `product-engineer` writes `specs/memory/**` in the `DEFINITION` and `CLOSURE`
-phases; every other agent reads it. Changelog and history live in `CLOSURE.md` and
-`_archive/`.
+### 6.2 Canon
 
-**Backlog.** The backlog is the **operator's demand queue**: only the operator creates
-demand. `project-manager` curates the single-source `specs/backlog/BACKLOG.md` — an
-ACTIVE section of live candidates and a LEDGER section of one line per closed item;
-everyone reads it freely. An entry materializes only through the PM's operator-facing
-**intake report** (residuals from a closure, review or audit), which the operator decides
-on first — an operator-ratified deferral taken during a release already counts as
-approved intake. Every item is retained: it leaves ACTIVE only by gaining a LEDGER line
-carrying its disposition and reason, and a picked item leaves ACTIVE in the same commit
-that creates the release SPEC, which records its provenance. This retention law covers
-bugs and backlog only — tests are prunable under the stewardship criteria (§7). Entry
-schema, intake protocol and the disposition vocabulary: `dd-backlog-definition`.
+| Area | Members |
+|---|---|
+| root | `AGENTS.md constitution.md memory/ releases/ backlog/ bugs/ audits/ ADRs/` |
+| `releases/` | `AGENTS.md`, `_ideas/` (own `AGENTS.md`), `_archive/<release-id>/` |
+| `releases/<M.m.p>/` | `RELEASE.json SPEC.md PLAN.md TASKS.md verdicts/` |
+| `backlog/` | `AGENTS.md BACKLOG.json`, `_archive/backlog_histo.jsonl` |
+| `bugs/` | `AGENTS.md BUGS.jsonl`, `_archive/bugs_histo.jsonl` |
+| `audits/` | `AGENTS.md`, `_archive/audits_histo.jsonl`, `<YYYYMMDD-slug>/` |
+| `ADRs/` | `AGENTS.md decisions.jsonl`, `_superseded/superseded.jsonl` |
+| `memory/` | `AGENTS.md ARCHITECTURE.md QUALITY.md TECHSTACK.md product/**` |
 
-**Branches.** Branch model, stage placement and merge/push mechanics: §4 (Gitflow).
+- No stray root archive directory or dotfile; `specs doctor` flags anything else.
 
-**Releases.** A release is `major.minor.patch` and matures through the `rc-N` lane
-(branch mechanics: §4 Gitflow). A `dd-grill-me` session on the picked set precedes
-the SPEC. At pick time, open bugs and undispositioned audits outrank fresh backlog.
-Finalization order is **memory update → CLOSURE → archive**; a completed task group is
-one commit.
+### 6.3 Tasks
 
-**Audits.** One audit generates exactly one remediation release, and that release gives
-**every** finding an explicit disposition — `fixed`, `superseded` by a broader picked
-item, or `deferred`/`rejected` with a reason routed to the backlog. An audit archives to
-`specs/audits/_archive/` only once fully dispositioned by an approved release, and names
-that release.
+- Read SPEC, PLAN and TASKS — all three must carry `**Status:** Aprovado`.
+- Reserve: flip `[ ] -> [-]` before writing; one `[-]` at a time unless TASKS declares disjoint write sets.
+- Complete the work inside the task's declared write set.
+- Flip `[-] -> [x]` and commit as `conventional-commit(task-id): description` — the auditable trace.
+
+### 6.4 Memory
+
+<!-- behavior: memory -->
+
+- Current product truth, not history — read it before changing production behavior.
+- `product-engineer` writes `specs/memory/**` only in `DEFINITION`/`CLOSURE` phases; every other agent reads it.
+- Changelog and history live in each release's `RELEASE.json` `log` and in git.
+- Atom frontmatter carries exactly 6 fields: `slug title category tldr summary tags`.
+- `ARCHITECTURE.md QUALITY.md TECHSTACK.md` split into ADR-gated Part 1 Principles (each `Measured by:`) and Part 2 Implementation.
+
+### 6.5 ADRs
+
+<!-- behavior: adrs -->
+
+- `ADRs/decisions.jsonl` (+ `_superseded/superseded.jsonl`) records a decision; shape: `specs/ADRs/AGENTS.md`.
+- Any agent proposes; only the operator flips a decision to `accepted`.
+- One decision per Part-1 principle created or changed — never one per principle that merely exists.
+- The commit touching a Part-1 principle carries its accepted decision; a pre-canon principle carries `ADR: none` until next touched.
+
+### 6.6 Backlog
+
+<!-- behavior: backlog -->
+
+- The operator's demand queue: only the operator creates demand; `project-manager` curates `specs/backlog/BACKLOG.json`'s `active[]`.
+- A closed item's terminal record lives in `backlog/_archive/backlog_histo.jsonl`; everyone reads both freely.
+- An entry materializes only via the PM's operator-facing intake report; an operator-ratified in-release deferral already counts as intake.
+- Every item is retained: leaves `active[]` only via a histo disposition record.
+- A picked item leaves `active[]` in the same commit that creates the release SPEC.
+- Covers bugs and backlog only — tests are prunable under stewardship criteria (§7.2). Protocol: `dd-backlog-definition`.
+
+### 6.7 Releases
+
+<!-- behavior: releases -->
+
+- A release is `major.minor.patch`, matures through the `rc-N` lane (branch mechanics: §4).
+- A `dd-grill-me` session on the picked set precedes the SPEC.
+- At pick time, open bugs and undispositioned audits outrank fresh backlog.
+- Finalization order: memory update -> CLOSURE -> archive; a completed task group is one commit.
+
+### 6.8 Audits
+
+<!-- behavior: audits -->
+
+- `specs/audits/<YYYYMMDD>-<slug>/AUDIT.md` + `FINDINGS.jsonl` hold three pillars: bug history, spec compliance, memory drift.
+- The three pillars run together, over the window since the last audited release.
+- Suggested every 5 releases, never mandatory.
+- Generates exactly one remediation release; every finding gets a disposition: `fixed`, `superseded`, or `deferred`/`rejected` to backlog.
+- Fully dispositioned: summary lands in `audits/_archive/audits_histo.jsonl`, the audit directory is deleted.
 
 ---
 
 ## 7. Quality
 
-**Root cause, always.** Reproduce the failure on the executed path, write the test that
-fails for the real reason, fix the cause, prove it green. Only a root-cause fix qualifies
-as an acceptable outcome — workarounds and symptom patches are excluded.
+### 7.1 Root cause
 
-**Test lifecycle.** Every test declares its intent and its size at birth; an undeclared
-test is SCAFFOLD and expires. Demotion — replacing a LARGE test with equivalent cheaper
-coverage — is a step of release closure, planned in advance. Pruning to go green is
-exclusively a `qa-engineer` verdict: deleting, skipping or disabling a test carries
-evidence, executed by `software-engineer`. Tombstone tests and expired SCAFFOLD are slop.
-Test-artifact capture is failure-gated, written where §5 already says. Full protocol:
-`dadaia-test-stewardship`.
+- Reproduce the failure on the executed path; write the test that fails for the real reason; fix the cause; prove it green.
+- Only a root-cause fix qualifies as acceptable — workarounds and symptom patches are excluded.
 
-**Register every bug you hit** while operating this tooling — any behavior that breaks
-its own contract. Classify first: environment limits, invalid input, wrong usage, and a
-validation the tool is designed to emit count as working-as-designed, outside the
-product-bug definition. Append the `reported` event before the turn ends; bug paths are
-ADDITIVE, so registration is always possible and immediate registration is always the
-right call. Every event field excludes absolute local paths, IPs, hostnames, private
-names and secrets. Command, redaction rule and context routing: `dd-bug-registration`.
+### 7.2 Test lifecycle
 
-Close a bug in the same session you prove the fix: append `resolved` with evidence that
-is checkable — the red-loop command, the regression-test seam, and the diff direction on
-the touched feature — then **commit**, staging exactly what the fix touched, excluding a
-blanket `-A` over a shared tree; a net-positive diff routes to `software-architect` before
-the commit. A solved bug leaves a clean worktree.
+- Every test declares its intent and size at birth; an undeclared test is SCAFFOLD and expires.
+- Demotion (LARGE test -> equivalent cheaper coverage) is planned release-closure work.
+- Pruning to go green is exclusively a `qa-engineer` verdict; deletion/skip/disable carries evidence, executed by `software-engineer`.
+- Tombstones and expired SCAFFOLD are slop; artifact capture is failure-gated (§5.2). Protocol: `dadaia-test-stewardship`.
 
-**Push green.** Every `feature/{M.m.p}` push runs the local CI preflight —
-`ruff format --check`, `ruff check`, `mypy --strict` and `pytest` — before the branch
-contract (§4 Gitflow) even considers it; run the tests locally before you push. A full
-scan survives solely in the audit lane (`project-auditor` dispatch); the PR-gate security
-review is diff-based only. Only pushes are review-blocked; commits flow freely. After every
-push or PR, watch CI to green (`dd-release-implement`). A `quarantine`-marked test sits
-outside the gating selectors by design and requires a registered bug — a green run with
-quarantined tests is still green, but an unregistered pass-on-retry is a failure.
+### 7.3 Bugs
 
-**Approval.** A candidate is approved when the operator and the consumer-side validation
-agent agree, after validating a real workspace. A green internal gate that diverges from
-real consumer behavior is itself a bug.
+<!-- behavior: bugs -->
+
+- Register every bug you hit while operating this tooling — any behavior that breaks its own contract.
+- Classify first: environment limits, invalid input, wrong usage, and a designed validation are not bugs.
+- Append `reported` before the turn ends; bug paths are ADDITIVE, so registration is always possible.
+- Redact local paths, IPs, hostnames, private names, secrets from every field. Protocol: `dd-bug-registration`.
+- Close in the same session as the fix: append `resolved` with the red-loop command, the regression-test seam, the diff direction.
+- Commit exactly what the fix touched, never a blanket `-A`; a net-positive diff routes to `software-architect` first.
+- Check prior resolutions on the same component first; declare `caused_by: <bug_id>|none` — protocol: `dd-diagnose`.
+- Commit shapes: `dd-gitflow-default` §3a — measured by audits via `git log`, never a hook.
+
+### 7.4 Push green
+
+- Every `feature/{M.m.p}` push runs the local CI preflight first — always-on, not hook-forced.
+- Preflight: `ruff format --check`, `ruff check`, `mypy --strict`, `pytest`.
+- A full scan lives only in the audit lane; the PR-gate review is diff-based; only pushes are review-blocked, commits flow freely.
+- Watch every push/PR to green (`dd-release-implement`).
+- A `quarantine`-marked test sits outside the gating selectors, bug-gated; unregistered pass-on-retry is a failure.
+
+### 7.5 Approval
+
+- Approved when the operator and the consumer-side validation agent agree, after validating a real workspace.
+- A green internal gate that diverges from real consumer behavior is itself a bug.
 
 ---
 
 ## 8. The library surface
 
-Files listed in `.dadaia/agentic/manifest.json` are lib-originated projections. Change
-them at the source, then re-project:
+### 8.1 Reprojection
 
-```bash
-dadaia public stage
-dadaia public install --target all      # overwrites whenever the staged hash differs
-dadaia public doctor                    # must report [ok] public-privacy
-```
+- Files listed in `.dadaia/agentic/manifest.json` are lib-originated projections — change them at the source.
+- Re-project: `dadaia public stage` -> `dadaia public install --target all` (overwrites on hash diff).
+- Then `dadaia public doctor` — must report `[ok] public-privacy`.
+- `--force` is only for a projection hand-edited away from both source and staging.
 
-`--force` is only for a projection someone hand-edited away from both source and staging.
+### 8.2 Law files
 
-**The law files are human-only in an instantiated workspace.** `DADAIA.md` and the
-library's `AGENTS.md` files are projected read-only and are PROTECTED (§3): change them by
-editing `dadaia_workspace/public/` and re-projecting. Only a human operator edits a
-projected law file by hand.
+- `DADAIA.md` and library `AGENTS.md` files are projected read-only and PROTECTED (§3.2).
+- Change them by editing `dadaia_workspace/public/` and re-projecting; only a human hand-edits a projected copy.
 
-**Public assets stay generic:** private repo names, hostnames, IPs, customer or
-infrastructure names, operator-local paths, and optional domain-pack assumptions are
-excluded from `dadaia_workspace/public/` entirely.
+### 8.3 Public asset hygiene
 
-**Use the workspace venv.** Invoke `.dadaia/.venv/bin/dadaia` and `.dadaia/.venv/bin/pip`
-directly, with absolute paths.
+- No private repo names, hostnames, IPs, customer/infrastructure names, or operator-local paths in `public/`.
+- No optional domain-pack assumptions in `dadaia_workspace/public/` either.
 
-**Register every dev server** you start with `dadaia server register`, and check the
-registry before opening a port.
+### 8.4 Venv and servers
+
+- Invoke `.dadaia/.venv/bin/dadaia` and `.dadaia/.venv/bin/pip` directly, with absolute paths.
+- Register every dev server you start with `dadaia server register`; check the registry before opening a port.
 
 ---
 
 ## 9. Credentials
 
-Credential material lives in exactly one place: the operator-managed `.env` at the
-workspace root. Never create, copy, persist, commit, print, or report tokens, passwords,
-private keys, cookies, auth payloads, or secret files — not in a repository, runtime
-mount, image, generated configuration, cache, report, or handoff. A runtime process
-receives only the values it needs from that root `.env` and never writes a second store.
+- Credential material lives in exactly one place: the operator-managed `.env` at the workspace root.
+- Never create, copy, persist, commit, print, or report tokens, passwords, keys, cookies, auth payloads, secrets.
+- Applies everywhere: repo, runtime mount, image, generated config, cache, report, handoff.
+- A runtime process receives only the values it needs from that root `.env` and never writes a second store.
 
 ---
 
 ## 10. Where to look next
 
+### 10.1 Reference
+
 | Surface | Where |
 |---|---|
-| Scoped law | `specs/AGENTS.md`, `.dadaia/reports/AGENTS.md`, `.dadaia/handoff/AGENTS.md`, `repos/<slug>/AGENTS.md`, and any nested `AGENTS.md` |
-| Skills | `.claude/skills/`, `.agents/skills/` — which skill operates which rule is declared once, in `public/entities/rules-skills-map.json` alone |
+| Scoped law | `specs/AGENTS.md`, `.dadaia/reports/AGENTS.md`, `.dadaia/handoff/AGENTS.md`, `repos/<slug>/AGENTS.md`, any nested `AGENTS.md` |
+| Skills | `.claude/skills/`, `.agents/skills/` — skill-to-rule mapping declared once in `public/entities/behavior-map.json` |
 | State | `dadaia context show --json`, `dadaia specs doctor`, `dadaia public doctor`, `dadaia server list`, `dadaia bugs status`, `dadaia panel` |
 
-Language: follow the operator's preference, defaulting to English. Tone: direct, concise,
-operational.
+- Language: operator preference, default English. Tone: direct, concise, operational.
+
+### 10.2 Glossary
+
+- **workspace** — root tree holding `.dadaia/`, `repos/`, the law, every projection.
+- **instance** — a live, operator-run dadaia-workspace instantiated from the library.
+- **library** — this source repo, `dadaia_workspace/`, that scaffolds instances.
+- **context** — the active Spec Context Project resolved for this session (§3.3).
+- **spec context** — a `specs/` tree (root or `repos/<slug>/`) governed by this law.
+- **release** — a `major.minor.patch` unit maturing through the `rc-N` lane.
+- **rc** — a release-candidate round: fixes/adjustments only, never new backlog.
+- **segment** — a named sub-phase of a release's `TASKS.md` (e.g. `alpha-N`/`rc-N`).
+- **task marker** — the `[ ] [-] [x]` open/in-progress/done trace in `TASKS.md`.
+- **handoff** — the machine-readable JSON completion record an agent emits (§5.4).
+- **verdict** — a PR-head-scoped approval record, consumed once, deleted after merge.
+- **chokepoint** — a git hook that gates the write path outside the harness hook.
+- **gate** — the deterministic PreToolUse enforcement chain (§3.1).
+- **path class** — the ADDITIVE/MEMORY/MUTATING/PROTECTED category a write path belongs to (§3.2).
+- **presence** — the advisory record a session leaves when it writes, surfaced to others.
+- **canon** — the closed set of paths a `specs/` root may contain (§6.2).
+- **histo** — an append-only JSONL history file under an area's `_archive/`.
+- **memory atom** — one Markdown file under `specs/memory/product/**` carrying current truth.
+- **Part 1/Part 2** — a memory doc's ADR-gated Principles section vs its Implementation section.
+- **ADR** — an accepted decision record in `ADRs/decisions.jsonl`.
+- **backlog entry** — a candidate item in `backlog/BACKLOG.json`'s `active[]`.
+- **disposition** — the terminal verdict closing a bug, backlog entry, or audit finding.
+- **audit** — a periodic three-pillar review producing one remediation release.
+- **finding** — one recorded audit observation in `FINDINGS.jsonl`.
+- **denylist** — the pattern list the pre-push scan refuses to let through.
+- **projection** — a lib-originated copy of a `public/` asset installed into a runtime tree.
+- **operator** — the human who owns the workspace and approves ADRs, deferrals, releases.
+- **dispatcher** — an agent authorized to invoke another agent via subagent dispatch.

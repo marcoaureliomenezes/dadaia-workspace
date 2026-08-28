@@ -134,25 +134,58 @@ def _resolve_mode(workspace: Path, session_id: str, ctx: str = "") -> str:
     return _DEFAULT_MODE
 
 
-def _active_field(specs_dir: Path, field: str) -> str | None:
-    """Read a ``<field>: <value>`` line from ``releases/ACTIVE.md`` (tri-state).
+def _resolve_active_release(specs_dir: Path) -> tuple[str, str]:
+    """Resolve ``(release_id, phase)`` straight from the live release's
+    ``RELEASE.json`` mutable state document (v0.5.x, successor to the RELEASE.jsonl
+    fold — operator ruling: the release record is "altamente mutavel", never
+    append-only) — ``ACTIVE.md`` is retired, no file replaces it.
 
-    v0.1.50 FR1 (audit F-3): the return distinguishes three outcomes —
-    ``str`` (readable; ``""`` when the field is missing), ``""`` when the file does
-    not exist (a fresh context legitimately has no ACTIVE.md — "no release" truth),
-    and ``None`` when the file exists but could NOT be read (a genuine I/O failure).
-    Callers must treat ``None`` as UNKNOWN, never as "none".
+    Deliberately re-implements the tiny directory scan + tri-state disk read
+    ``features.specs.doctor_common`` already owns (``resolve_live_release_id`` +
+    ``resolve_active_release``) rather than importing it: this hook is a one-shot
+    process spawned on every gated write, and ``from dadaia_workspace.features.specs
+    import ...`` runs ``features/specs/__init__.py``, which imports ``doctor
+    .SpecsDoctor`` — the entire ``SpecsDoctor`` decomposition — the exact heavy
+    hot-path import cost ``core.specs_resolver`` (vs. the DI container) was already
+    chosen to avoid (module docstring, :func:`_context_slug`). ``core.release_state``
+    stays the ONE place the DOCUMENT SHAPE is validated (:func:`parse_release_state`);
+    only the disk read itself is re-implemented here, an authorized, documented
+    hook-only exception (checked against this hook's own import budget by
+    ``tests/contract/test_hook_import_surface.py``). There is no fold anymore — the
+    document already IS the current phase, one JSON object read straight off disk.
+
+    Returns ``("none", "")`` when no live release directory exists, more than one
+    does (ambiguous), or its ``RELEASE.json`` cannot be read or fails to parse — the
+    gate then treats the write the same as "no active release" (fail toward blocking a
+    MEMORY write rather than guessing a phase that grants one).
     """
-    active = specs_dir / "releases" / "ACTIVE.md"
+    from dadaia_workspace.core.release_state import parse_release_state
+
+    releases_root = specs_dir / "releases"
+    if not releases_root.is_dir():
+        return "none", ""
     try:
-        text = active.read_text(encoding="utf-8")
-    except FileNotFoundError:
-        return ""
+        candidates = sorted(
+            d.name
+            for d in releases_root.iterdir()
+            if d.is_dir()
+            and d.name not in ("_archive", "_ideas")
+            and (d / "RELEASE.json").is_file()
+        )
     except OSError:
-        return None
-    pat = re.compile(rf"^{re.escape(field)}:\s*(.+?)\s*$", re.MULTILINE)
-    m = pat.search(text)
-    return m.group(1) if m else ""
+        return "none", ""
+    if len(candidates) != 1:
+        return "none", ""
+    release_id = candidates[0]
+    try:
+        text = (releases_root / release_id / "RELEASE.json").read_text(encoding="utf-8")
+    except OSError:
+        return release_id, ""
+    try:
+        state = parse_release_state(text)
+    except ValueError:
+        return release_id, ""
+    return release_id, state.phase
 
 
 def _evaluate_target(
@@ -193,7 +226,7 @@ def _evaluate_target(
     # F-02 (v0.5.0 code review): the authority returns the context NAME; the on-disk
     # directory is the registry's repo_slug, and the two legitimately differ
     # (`context create <name> --repo <slug>`). Map before joining, like
-    # container._context_specs_dir does — otherwise ACTIVE.md is read from a
+    # container._context_specs_dir does — otherwise the release tree is read from a
     # non-existent dir and MEMORY writes are wrongly phase-blocked.
     if ctx:
         from dadaia_workspace.core.specs_resolver import repo_slug_for_context
@@ -201,9 +234,9 @@ def _evaluate_target(
         specs_dir = workspace / "repos" / repo_slug_for_context(workspace, ctx) / "specs"
     else:
         specs_dir = workspace / "specs"
-    phase = _active_field(specs_dir, "phase") or ""
-    release_raw = _active_field(specs_dir, "release")
-    release = release_raw or "none"
+    # The RELEASE.json state document is the gate's sole decision authority (v0.5.x,
+    # T-050-21A, A4.1) — ACTIVE.md is retired, no fallback branch survives.
+    release, phase = _resolve_active_release(specs_dir)
     session_id = _common.resolve_session_id(payload, default="anon-session")
     # Mode resolution order (v0.1.76 FR4, strictly self-scoped): DADAIA_MODE env
     # override → self-keyed session record → default. No context-incumbent fallback —

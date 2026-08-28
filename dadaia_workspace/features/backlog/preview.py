@@ -9,11 +9,12 @@ strictly read-only — it never writes a backlog file or the alias map.
   ``UNRESOLVED``/``AMBIGUOUS`` with the candidate set + an actionable alias-map suggestion.
 
 It also hosts :func:`bound_anchor_changes`, the intent binder the doctor (T-120-05/08)
-consumes to bind ``## ACTIVE`` subsection intents from the single-source
-``specs/backlog/BACKLOG.md`` (:mod:`dadaia_workspace.features.backlog.document`) against the
-registry. Kept here rather than in ``document.py`` so neither module imports the other's
-concrete type — :func:`bound_anchor_changes` is typed against the structural
-:class:`_IntentBearing` Protocol instead.
+consumes to bind ``active[]`` entry intents from the single-source
+``specs/backlog/BACKLOG.json`` (:mod:`dadaia_workspace.features.backlog.document`;
+operator ruling 2026-08-28) against the registry. Kept here rather than in
+``document.py`` so neither module imports the other's concrete type —
+:func:`bound_anchor_changes` is typed against the structural :class:`_IntentBearing`
+Protocol instead.
 """
 
 from __future__ import annotations

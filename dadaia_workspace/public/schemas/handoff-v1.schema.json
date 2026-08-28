@@ -24,7 +24,7 @@
           "items": {
             "type": "string",
             "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[a-zA-Z0-9_./-]+$",
-            "description": "Context-relative, specs/-prefixed atom ref (e.g. specs/memory/architecture.md). No absolute paths, no .. traversal."
+            "description": "Context-relative, specs/-prefixed atom ref (e.g. specs/memory/ARCHITECTURE.md). No absolute paths, no .. traversal."
           },
           "description": "Non-empty list of self-pulled atom refs. Never list an atom that was not read."
         }

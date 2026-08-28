@@ -48,11 +48,14 @@ Declaração atômica do propósito do projeto e suas invariantes fundamentais.
 - (Definir o que este projeto não é)
 """
 
-_BACKLOG_STUB = """\
-## ACTIVE
+_AREA_HISTO_FILES: tuple[tuple[str, str], ...] = (
+    ("releases", "releases_histo.jsonl"),
+    ("backlog", "backlog_histo.jsonl"),
+    ("bugs", "bugs_histo.jsonl"),
+    ("audits", "audits_histo.jsonl"),
+)
 
-## LEDGER
-"""
+_BACKLOG_STUB = '{"schema": "backlog-v1", "active": []}\n'
 
 
 def _render_template(
@@ -107,18 +110,6 @@ def scaffold(
         except OSError as exc:
             result.errors.append(f"Failed to write {path}: {exc}")
 
-    def _touch(path: Path) -> None:
-        """Create an empty .gitkeep file; respect force flag."""
-        if path.exists() and not force:
-            result.skipped.append(path)
-            return
-        try:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text("", encoding="utf-8")
-            result.created.append(path)
-        except OSError as exc:
-            result.errors.append(f"Failed to create {path}: {exc}")
-
     # 1 — constitution.md (stub; operator-owned — only create if absent)
     constitution_path = specs_dir / "constitution.md"
     if constitution_path.exists() and not force:
@@ -141,6 +132,13 @@ def scaffold(
     _scaffold_memory_dir = _scaffold_dir / "memory"
 
     # 2 — scoped SDD rules. This exact template is what doctor compares against.
+    # v6 canon (FR1, specs_pattern_version 5 -> 6): every scaffold README.md retires
+    # into its area's AGENTS.md — root and memory/ already carried one; backlog/,
+    # bugs/, releases/, audits/ and ADRs/ now do too. A directory is kept by its
+    # AGENTS.md — no separate .gitkeep landing-zone mechanism (retired: git does not
+    # track empty directories, and none of these needs to be empty-but-present; a
+    # per-artifact `_archive/` subdir is created on demand by the first real write
+    # into it, via the shared atomic_write mkdir-parents idiom).
     try:
         _write(
             specs_dir / "AGENTS.md",
@@ -150,6 +148,26 @@ def scaffold(
             specs_dir / "memory" / "AGENTS.md",
             (_scaffold_memory_dir / "AGENTS.md").read_text(encoding="utf-8"),
         )
+        for area in ("backlog", "bugs", "releases", "audits", "ADRs"):
+            _write(
+                specs_dir / area / "AGENTS.md",
+                (_scaffold_dir / area / "AGENTS.md").read_text(encoding="utf-8"),
+            )
+        # Canon per-area history: each `_archive/` holds only its `*_histo.jsonl`
+        # (empty at birth); releases/_ideas/ carries its own scoped rule.
+        for area, histo in _AREA_HISTO_FILES:
+            _write(specs_dir / area / "_archive" / histo, "")
+        _write(
+            specs_dir / "releases" / "_ideas" / "AGENTS.md",
+            (_scaffold_dir / "releases" / "_ideas" / "AGENTS.md").read_text(encoding="utf-8"),
+        )
+        # ADRs/ (v0.5.0 specs-canon closure, operator ruling 2026-08-28): one JSONL
+        # record store, empty at birth — decisions.jsonl (live) + its own
+        # _superseded/superseded.jsonl (a decision moves there when superseded).
+        # Mirrors the per-area histo pattern above: written directly, empty content,
+        # never sourced from a scaffold-tree file (there is nothing to template).
+        _write(specs_dir / "ADRs" / "decisions.jsonl", "")
+        _write(specs_dir / "ADRs" / "_superseded" / "superseded.jsonl", "")
     except Exception as exc:
         result.errors.append(f"Scaffold rules error: {exc}")
 
@@ -157,10 +175,12 @@ def scaffold(
     # memory-markdown-source-v1: .md is the sole source of truth; the legacy
     # .yaml/.html scaffolds and the placeholder.html stub were retired (no committed
     # HTML — the panel renders .md in-memory, D-4).
+    # v6 canon (FR1/A1.5/A1.6, T-050-06): the top-level trio renamed to
+    # ARCHITECTURE.md, TECHSTACK.md, QUALITY.md — source and dest share the name.
     _memory_md_stubs = [
-        ("architecture.md", specs_dir / "memory" / "architecture.md"),
-        ("tech-stack.md", specs_dir / "memory" / "tech-stack.md"),
-        ("quality-assurance.md", specs_dir / "memory" / "quality-assurance.md"),
+        ("ARCHITECTURE.md", specs_dir / "memory" / "ARCHITECTURE.md"),
+        ("TECHSTACK.md", specs_dir / "memory" / "TECHSTACK.md"),
+        ("QUALITY.md", specs_dir / "memory" / "QUALITY.md"),
         ("product/index.md", specs_dir / "memory" / "product" / "index.md"),
     ]
     for rel, dest in _memory_md_stubs:
@@ -180,32 +200,30 @@ def scaffold(
         + "\n",
     )
 
-    # 5 — releases/ACTIVE.md
-    _write(
-        specs_dir / "releases" / "ACTIVE.md",
-        "release: none\nphase: none\n",
-    )
+    # ACTIVE.md retired (v0.5.0 FR4/T-050-21A, A4.1): no replacement file — a fresh
+    # scaffold's "no active release" state is now the honest absence of any directory
+    # under releases/ carrying a RELEASE.json (features.specs.doctor_common
+    # .resolve_live_release_id), the same state `dadaia specs release ...` back-fills
+    # the moment a release is defined (T-050-11).
 
-    # 6 — backlog/BACKLOG.md (SPEC v0.12.0 FR1/FR3, ADR #14): the single-source
+    # 5 — backlog/BACKLOG.json: the single-source structured backlog document
     # document skeleton — both section headings, nothing else. Matches exactly what
     # `features.spec_artifacts.new_artifacts.backlog_new` creates when it finds no
     # document; a fresh scaffold and a fresh `backlog new` share one skeleton shape.
-    _write(specs_dir / "backlog" / "BACKLOG.md", _BACKLOG_STUB)
+    _write(specs_dir / "backlog" / "BACKLOG.json", _BACKLOG_STUB)
 
-    # 7, 8, 9 — .gitkeep files
-    _touch(specs_dir / "_archive" / "releases" / ".gitkeep")
-    _touch(specs_dir / "_archive" / "legacy-features" / ".gitkeep")
-    _touch(specs_dir / "assets" / ".gitkeep")
+    # 7, 8 — releases/{_ideas,_archive}/, and 10-12 — the backlog/audits/bugs
+    # per-artifact _archive/ dirs (v0.1.46 AC-4, FROZEN gate-class landing zones) are
+    # deliberately NOT pre-created here: none carries its own AGENTS.md, root
+    # specs/_archive/ and specs/assets/ retired (neither is a v6 canon root member,
+    # TREE-8), and a directory that is kept by nothing but an empty placeholder file
+    # is exactly the .gitkeep mechanism this scaffold retires. Each lands on disk the
+    # moment its first real artifact is written into it (mkdir-parents=True, the
+    # shared atomic_write idiom) — never eagerly, never empty-on-purpose.
 
-    # 10, 11, 12 — per-artifact _archive dirs (v0.1.46 AC-4, FROZEN gate-class landing
-    # zone). Each additive artifact family (backlog/audits/bugs) gets its own _archive/
-    # subdir where terminal/dispositioned entries are git-mv'd. The gate classifies these
-    # three subdirs FROZEN (features/spec_context/gate_policy.py); creating them here
-    # ensures new + upgraded workspaces have the landing zone before any archive move
-    # (the bugs->JSONL migration moves source .md into specs/bugs/_archive/ in-process).
-    _touch(specs_dir / "backlog" / "_archive" / ".gitkeep")
-    _touch(specs_dir / "audits" / "_archive" / ".gitkeep")
-    _touch(specs_dir / "bugs" / "_archive" / ".gitkeep")
+    # 9 — ADRs/AGENTS.md, ADRs/decisions.jsonl and ADRs/_superseded/superseded.jsonl
+    # already written above (v6 canon root member; specs/ADRs/AGENTS.md owns the
+    # decision-record law).
 
     return result
 

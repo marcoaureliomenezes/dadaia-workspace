@@ -61,7 +61,7 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.atomic_write import atomic_write
+from dadaia_workspace.core.atomic_write import ConcurrentModificationError, atomic_write
 
 _ORIGINAL_WRITE_TEXT = Path.write_text
 _ORIGINAL_WRITE_BYTES = Path.write_bytes
@@ -154,6 +154,71 @@ def test_missing_parent_without_ensure_parent_raises_and_leaves_nothing(
     with pytest.raises(OSError):
         atomic_write(target, "hello\n")
     assert not target.parent.exists()
+
+
+def test_expected_previous_matching_allows_the_swap(tmp_path: Path) -> None:
+    target = tmp_path / "a.md"
+    target.write_text("orig\n", encoding="utf-8")
+    atomic_write(target, "new\n", expected_previous="orig\n")
+    assert target.read_text(encoding="utf-8") == "new\n"
+
+
+def test_expected_previous_none_for_a_target_that_does_not_exist_yet_allows_the_swap(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "new-atom.md"
+    atomic_write(target, "new\n", expected_previous="")
+    assert target.read_text(encoding="utf-8") == "new\n"
+
+
+def test_expected_previous_mismatch_refuses_the_swap_and_leaves_the_live_content(
+    tmp_path: Path,
+) -> None:
+    """bug ``bugs-record-store-append-clobbers-concurrent-update-batch`` — a caller's
+    stale snapshot must never be swapped over content it never saw; the live file is
+    left exactly as the concurrent writer left it, and no ``.tmp`` sibling survives."""
+    target = tmp_path / "a.md"
+    target.write_text("orig\n", encoding="utf-8")
+    target.write_text("orig\nconcurrent-write\n", encoding="utf-8")  # a "concurrent" writer
+
+    with pytest.raises(ConcurrentModificationError):
+        atomic_write(target, "rewrite-based-on-stale-snapshot\n", expected_previous="orig\n")
+
+    assert target.read_text(encoding="utf-8") == "orig\nconcurrent-write\n"
+    assert _no_tmp_sibling_left(tmp_path)
+
+
+def test_expected_previous_check_is_the_last_read_before_the_swap_not_before_the_temp_write(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The check must sit adjacent to ``os.replace``, AFTER the temp sibling is already
+    fully serialized — never before it — so a concurrent write landing while THIS call
+    is still writing its own temp file is still caught. Simulated by injecting the
+    concurrent write from inside the temp-file ``write_text`` call itself: if the
+    freshness check ran before that write (the bug), the injected change would go
+    undetected and the swap would silently proceed."""
+    target = tmp_path / "a.md"
+    target.write_text("orig\n", encoding="utf-8")
+
+    def _write_text_then_race(self: Path, *args: object, **kwargs: object) -> int:
+        result = _ORIGINAL_WRITE_TEXT(self, *args, **kwargs)  # type: ignore[arg-type]
+        _ORIGINAL_WRITE_TEXT(target, "orig\nconcurrent-write\n", encoding="utf-8")
+        return result
+
+    monkeypatch.setattr(Path, "write_text", _write_text_then_race)
+
+    with pytest.raises(ConcurrentModificationError):
+        atomic_write(target, "rewrite-based-on-stale-snapshot\n", expected_previous="orig\n")
+
+    assert target.read_text(encoding="utf-8") == "orig\nconcurrent-write\n"
+    assert _no_tmp_sibling_left(tmp_path)
+
+
+def test_expected_previous_bytes_content_round_trips(tmp_path: Path) -> None:
+    target = tmp_path / "a.bin"
+    target.write_bytes(b"orig")
+    atomic_write(target, b"new", expected_previous=b"orig")
+    assert target.read_bytes() == b"new"
 
 
 def test_hardlink_target_is_rebound_not_written_through(tmp_path: Path) -> None:

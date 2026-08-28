@@ -32,8 +32,6 @@ summary: 'Product catalog entry point.'
 tags: []
 agent_tier: self-pull
 token_estimate: 20
-last_updated: '2026-06-01'
-release_origin: test-release
 ---
 
 ## Catálogo de features
@@ -51,8 +49,6 @@ summary: 'Does A.'
 tags: []
 agent_tier: self-pull
 token_estimate: 20
-last_updated: '2026-06-01'
-release_origin: test-release
 ---
 
 ## Propósito
@@ -70,8 +66,6 @@ summary: 'System architecture layers and dependency contracts.'
 tags: []
 agent_tier: self-pull
 token_estimate: 20
-last_updated: '2026-06-01'
-release_origin: test-release
 ---
 
 ## Visão geral
@@ -89,8 +83,6 @@ summary: 'Technology stack and approved dependencies.'
 tags: []
 agent_tier: self-pull
 token_estimate: 20
-last_updated: '2026-06-01'
-release_origin: test-release
 ---
 
 ## Linguagens
@@ -111,35 +103,60 @@ def _skip_memory_lint_subprocess(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(MemoryValidator, "check_lint1_memory_atoms", lambda self: [])
 
 
-def _make_clean_specs_tree(root: Path, release_id: str = "r1") -> Path:
+def _write_release_jsonl(
+    specs: Path, release_id: str, phase: str, segment: str | None = None
+) -> None:
+    """Write (overwrite) ``specs/releases/<release_id>/RELEASE.json`` with a minimal
+    release-state-v1 document (v0.5.x, successor to the RELEASE.jsonl fold; v0.5.0
+    FR4/T-050-21A) -- the fixture-side replacement for the retired ``ACTIVE.md``."""
+    import json as _json
+
+    rdir = specs / "releases" / release_id
+    rdir.mkdir(parents=True, exist_ok=True)
+    state: dict[str, object] = {
+        "schema": "release-state-v1",
+        "release": release_id,
+        "phase": phase,
+        "rc": None,
+        "defined": None,
+        "implemented": None,
+        "shipped": None,
+        "audited": None,
+        "log": [],
+    }
+    if segment:
+        state["segment"] = segment
+    (rdir / "RELEASE.json").write_text(_json.dumps(state) + "\n", encoding="utf-8")
+
+
+def _make_clean_specs_tree(root: Path, release_id: str = "1.2.3") -> Path:
     """Create a minimal but valid specs/ tree using .md memory atoms."""
     specs = root / "specs"
-    (specs / "memory" / "product").mkdir(parents=True)
+    (specs / "memory" / "product" / "testarea").mkdir(parents=True)
     (specs / "releases" / release_id).mkdir(parents=True)
-    (specs / "_archive" / "releases").mkdir(parents=True)
     (specs / "backlog").mkdir(parents=True)
 
     (specs / "constitution.md").write_text("# Constitution\n\nThe laws.\n", encoding="utf-8")
     (specs / "memory" / "product" / "index.md").write_text(
         MINIMAL_MEMORY_PRODUCT_INDEX_MD, encoding="utf-8"
     )
-    (specs / "memory" / "product" / "feature-a.md").write_text(
+    # v6 canon (operator ruling 2026-08-28): memory/product/<area>/<slug>.md — the
+    # 2-level nested shape, matching the real, live product catalog tree.
+    (specs / "memory" / "product" / "testarea" / "feature-a.md").write_text(
         MINIMAL_MEMORY_PRODUCT_FEATURE_MD, encoding="utf-8"
     )
-    (specs / "memory" / "architecture.md").write_text(
+    (specs / "memory" / "ARCHITECTURE.md").write_text(
         MINIMAL_MEMORY_ARCHITECTURE_MD, encoding="utf-8"
     )
-    (specs / "memory" / "tech-stack.md").write_text(MINIMAL_MEMORY_TECH_STACK_MD, encoding="utf-8")
-    (specs / "memory" / "quality-assurance.md").write_text(
+    (specs / "memory" / "TECHSTACK.md").write_text(MINIMAL_MEMORY_TECH_STACK_MD, encoding="utf-8")
+    (specs / "memory" / "QUALITY.md").write_text(
         "---\nslug: quality-assurance\ntitle: Quality Assurance\ncategory: core\n"
         "tldr: 'QA standards.'\nsummary: 'QA standards and anti-slop rules.'\n"
-        "tags: []\nagent_tier: self-pull\ntoken_estimate: 20\nlast_updated: '2026-06-07'\n"
-        "release_origin: test-release\n---\n\n## Standards\n\nQA standards.\n",
+        "tags: []\nagent_tier: self-pull\ntoken_estimate: 20\n"
+        "---\n\n## Standards\n\nQA standards.\n",
         encoding="utf-8",
     )
-    (specs / "releases" / "ACTIVE.md").write_text(
-        f"release: {release_id}\nphase: IMPLEMENTATION\n", encoding="utf-8"
-    )
+    _write_release_jsonl(specs, release_id, "IMPLEMENTATION")
     spec_md = "# Spec\n\n> **Status:** Aprovado\n> **Created:** 2026-04-01\n\nContent.\n"
     plan_md = "# Plan\n\n> **Status:** Aprovado\n\nShort.\n"
     tasks_md = "# Tasks\n\n> **Status:** Aprovado\n\n- [-] T1 something\n"
@@ -191,8 +208,6 @@ summary: 'Does {slug}.'
 tags: []
 agent_tier: self-pull
 token_estimate: 100
-last_updated: '2026-06-01'
-release_origin: test-release
 ---
 
 ## Propósito
@@ -210,9 +225,7 @@ def _segment_active(specs: Path, release_id: str, segment: str) -> None:
     for fname in ("SPEC.md", "PLAN.md", "TASKS.md"):
         (seg / fname).write_text((rel / fname).read_text(encoding="utf-8"), encoding="utf-8")
         (rel / fname).unlink()
-    (specs / "releases" / "ACTIVE.md").write_text(
-        f"release: {release_id}\nsegment: {segment}\nphase: IMPLEMENTATION\n", encoding="utf-8"
-    )
+    _write_release_jsonl(specs, release_id, "IMPLEMENTATION", segment=segment)
 
 
 # ---------------------------------------------------------------------------
@@ -230,10 +243,10 @@ def test_clean_tree_has_no_errors(tmp_path: Path) -> None:
 
 def test_freshly_opened_release_segment_is_doctor_clean(tmp_path: Path) -> None:
     """Bug fresh-release-scaffold-emits-spec-doctor-warnings-042 (Consumer R1-A): the
-    canonical 'specs release open' output — Draft SPEC/PLAN/TASKS with ACTIVE.md
-    phase SPEC — instantly drew three SPEC-DOC-004 warnings. Draft IS the legitimate
-    state of an authoring-phase release; the scaffolder and the doctor must agree on
-    the fresh state (0 errors, 0 warnings)."""
+    canonical 'specs release open' output — Draft SPEC/PLAN/TASKS with the active
+    release phase SPEC — instantly drew three SPEC-DOC-004 warnings. Draft IS the
+    legitimate state of an authoring-phase release; the scaffolder and the doctor
+    must agree on the fresh state (0 errors, 0 warnings)."""
     from dadaia_workspace.features.specs.scaffolder import scaffold_release_segment
 
     specs = _make_clean_specs_tree(tmp_path, "v0.1.0")
@@ -242,9 +255,7 @@ def test_freshly_opened_release_segment_is_doctor_clean(tmp_path: Path) -> None:
         (specs / "releases" / "v0.1.0" / fname).unlink()
     result = scaffold_release_segment(specs, "v0.1.0", "alpha-1")
     assert not result.errors, result.errors
-    (specs / "releases" / "ACTIVE.md").write_text(
-        "release: v0.1.0\nsegment: alpha-1\nphase: SPEC\n", encoding="utf-8"
-    )
+    _write_release_jsonl(specs, "v0.1.0", "SPEC", segment="alpha-1")
 
     issues = SpecsDoctor(specs).check()
     doc004 = [i for i in issues if i.code == "SPEC-DOC-004"]
@@ -252,9 +263,7 @@ def test_freshly_opened_release_segment_is_doctor_clean(tmp_path: Path) -> None:
 
     # The warning is NOT lost where it matters: a Draft artifact in an
     # implementation-bound phase still warns.
-    (specs / "releases" / "ACTIVE.md").write_text(
-        "release: v0.1.0\nsegment: alpha-1\nphase: IMPLEMENTATION\n", encoding="utf-8"
-    )
+    _write_release_jsonl(specs, "v0.1.0", "IMPLEMENTATION", segment="alpha-1")
     issues_impl = SpecsDoctor(specs).check()
     assert any(i.code == "SPEC-DOC-004" for i in issues_impl)
 
@@ -271,21 +280,11 @@ def test_fresh_scaffold_passes_all_tree_invariants(tmp_path: Path) -> None:
         templates_dir=_TEMPLATES_DIR,
     )
     assert result.errors == [], f"Scaffold errors: {result.errors}"
-
-    bugs_dir = specs / "bugs"
-    bugs_dir.mkdir(exist_ok=True)
-    src_readme = _SCAFFOLD_DIR / "bugs" / "README.md"
-    if src_readme.exists():
-        (bugs_dir / "README.md").write_text(
-            src_readme.read_text(encoding="utf-8"), encoding="utf-8"
-        )
-    (bugs_dir / ".gitkeep").write_text("", encoding="utf-8")
-
-    agents_template = _TEMPLATES_DIR / "specs-AGENTS.md"
-    if agents_template.exists():
-        (specs / "AGENTS.md").write_text(
-            agents_template.read_text(encoding="utf-8"), encoding="utf-8"
-        )
+    # v6 canon (T-050-05, FR1): scaffold() already writes bugs/AGENTS.md and
+    # specs/AGENTS.md itself — the old hand-rolled bugs/README.md + specs/AGENTS.md
+    # injection this test used to need (the scaffold README.md presence assertions
+    # this test carried, qa-engineer amendment 11) is retired with its subject:
+    # scaffold() covers the full tree on its own now.
 
     doctor = SpecsDoctor(specs, public_dir=_PUBLIC_DIR)
     issues = doctor.check()
@@ -296,15 +295,16 @@ def test_fresh_scaffold_passes_all_tree_invariants(tmp_path: Path) -> None:
     )
 
     # Also assert the canonical scaffold copytree route (T-021-16 (a)) yields the same
-    # full tree independent of the scaffold() function's own file list.
+    # full tree independent of the scaffold() function's own file list. v6 canon: the
+    # source scaffold tree carries AGENTS.md per area now (README.md retired).
     import shutil
 
     specs2_dir = tmp_path.parent / (tmp_path.name + "-copytree") / "specs"
     shutil.copytree(str(_SCAFFOLD_DIR), str(specs2_dir))
     assert (specs2_dir / "audits").is_dir()
-    assert (specs2_dir / "audits" / "README.md").exists()
+    assert (specs2_dir / "audits" / "AGENTS.md").exists()
     assert (specs2_dir / "memory" / "AGENTS.md").exists()
-    assert (specs2_dir / "memory" / "quality-assurance.md").exists()
+    assert (specs2_dir / "memory" / "QUALITY.md").exists()
 
 
 # ---------------------------------------------------------------------------
@@ -329,13 +329,13 @@ def test_fresh_scaffold_passes_all_tree_invariants(tmp_path: Path) -> None:
         ),
         pytest.param(
             "missing-architecture",
-            lambda specs: (specs / "memory" / "architecture.md").unlink(),
+            lambda specs: (specs / "memory" / "ARCHITECTURE.md").unlink(),
             "SPEC-DOC-002",
             id="doc002-missing-architecture",
         ),
         pytest.param(
             "product-feature-no-heading",
-            lambda specs: (specs / "memory" / "product" / "feature-a.md").write_text(
+            lambda specs: (specs / "memory" / "product" / "testarea" / "feature-a.md").write_text(
                 "---\nslug: feature-a\ntitle: Feature A\n---\n\nNo heading here, only prose.\n",
                 encoding="utf-8",
             ),
@@ -360,7 +360,7 @@ def test_fresh_scaffold_passes_all_tree_invariants(tmp_path: Path) -> None:
         ),
         pytest.param(
             "history-heading-changelog",
-            lambda specs: (specs / "memory" / "product" / "feature-a.md").write_text(
+            lambda specs: (specs / "memory" / "product" / "testarea" / "feature-a.md").write_text(
                 "---\nslug: feature-a\ntitle: Feature A\n---\n\n## Propósito\n\nDoes A.\n\n"
                 "## Changelog\n\nHistorical details.\n",
                 encoding="utf-8",
@@ -370,7 +370,7 @@ def test_fresh_scaffold_passes_all_tree_invariants(tmp_path: Path) -> None:
         ),
         pytest.param(
             "history-heading-history",
-            lambda specs: (specs / "memory" / "product" / "feature-a.md").write_text(
+            lambda specs: (specs / "memory" / "product" / "testarea" / "feature-a.md").write_text(
                 "---\nslug: feature-a\ntitle: Feature A\n---\n\n## Propósito\n\nDoes A.\n\n"
                 "## History\n\nHistorical details.\n",
                 encoding="utf-8",
@@ -379,60 +379,47 @@ def test_fresh_scaffold_passes_all_tree_invariants(tmp_path: Path) -> None:
             id="doc008-history-heading-history",
         ),
         pytest.param(
-            "missing-active-md",
-            lambda specs: (specs / "releases" / "ACTIVE.md").unlink(),
-            "SPEC-DOC-003",
-            id="doc003-missing-active-md",
-        ),
-        pytest.param(
             "non-canonical-phase",
-            lambda specs: (specs / "releases" / "ACTIVE.md").write_text(
-                "release: r1\nphase: WORKING\n", encoding="utf-8"
-            ),
+            lambda specs: _write_release_jsonl(specs, "1.2.3", "WORKING"),
             "SPEC-DOC-003",
             id="doc003-non-canonical-phase",
         ),
         pytest.param(
-            "empty-release-value",
-            lambda specs: (specs / "releases" / "ACTIVE.md").write_text(
-                "release:   \nphase: TASKS\n", encoding="utf-8"
-            ),
+            "ambiguous-two-live-releases",
+            lambda specs: _write_release_jsonl(specs, "r2", "IMPLEMENTATION"),
             "SPEC-DOC-003",
-            id="doc003-empty-release-value",
+            id="doc003-ambiguous-two-live-releases",
         ),
         pytest.param(
-            "empty-phase-value",
-            lambda specs: (specs / "releases" / "ACTIVE.md").write_text(
-                "release: r1\nphase:   \n", encoding="utf-8"
+            "release-jsonl-carries-no-phase-record",
+            lambda specs: (specs / "releases" / "1.2.3" / "RELEASE.json").write_text(
+                '{"schema":"release-state-v1","release":"1.2.3","phase":"",'
+                '"rc":null,"defined":null,"implemented":null,"shipped":null,'
+                '"audited":null,"log":[]}\n',
+                encoding="utf-8",
             ),
             "SPEC-DOC-003",
             id="doc003-empty-phase-value",
         ),
         pytest.param(
             "missing-plan-in-active-release",
-            lambda specs: (specs / "releases" / "r1" / "PLAN.md").unlink(),
+            lambda specs: (specs / "releases" / "1.2.3" / "PLAN.md").unlink(),
             "SPEC-DOC-004",
             id="doc004-missing-plan",
         ),
         pytest.param(
             "non-canonical-status",
-            lambda specs: (specs / "releases" / "r1" / "SPEC.md").write_text(
+            lambda specs: (specs / "releases" / "1.2.3" / "SPEC.md").write_text(
                 "# Spec\n\n> **Status:** Accepted\n", encoding="utf-8"
             ),
             "SPEC-DOC-004",
             id="doc004-non-canonical-status",
         ),
-        pytest.param(
-            "archived-release-no-closure",
-            lambda specs: (
-                (specs / "_archive" / "releases" / "old-release").mkdir(parents=True),
-                (specs / "_archive" / "releases" / "old-release" / "SPEC.md").write_text(
-                    "# spec", encoding="utf-8"
-                ),
-            ),
-            "SPEC-DOC-006",
-            id="doc006-archived-without-closure",
-        ),
+        # doc006-archived-without-closure DELETED (v0.5.0 T-050-25A, A4.4): SPEC-DOC-006
+        # (check_archive_closures) is deleted with CLOSURE.md itself — a checker that
+        # parses a file which no longer exists is dead code behind a dead artifact.
+        # Verdict: criterion (a) feature removed, dadaia_workspace/features/specs/
+        # doctor_closure_audit.py (this task's commit deletes check_archive_closures).
         pytest.param(
             "orphan-legacy-feature",
             lambda specs: (
@@ -444,14 +431,13 @@ def test_fresh_scaffold_passes_all_tree_invariants(tmp_path: Path) -> None:
             "SPEC-DOC-007",
             id="doc007-orphan-legacy-feature",
         ),
-        pytest.param(
-            "active-release-id-without-dir",
-            lambda specs: (specs / "releases" / "ACTIVE.md").write_text(
-                "release: missing-id\nphase: IMPLEMENTATION\n", encoding="utf-8"
-            ),
-            "SPEC-DOC-009",
-            id="doc009-release-id-without-dir",
-        ),
+        # doc009-release-id-without-dir RETIRED (v0.5.0 T-050-21A): SPEC-DOC-009 fired
+        # when ACTIVE.md's `release:` field named a directory that did not exist.
+        # `resolve_active_release`/`resolve_live_release_id` only ever return a
+        # release_id they found BY LOCATING that exact directory (RELEASE.json
+        # inside it) — this scenario is now structurally unreachable; the ERROR
+        # branch in `check_active_md` is a defensive assertion, kept but untestable
+        # through the public API.
     ],
 )
 def test_sad_matrix(tmp_path: Path, case: str, mutate, expected_code: str) -> None:  # type: ignore[no-untyped-def]
@@ -506,8 +492,8 @@ def test_sad_matrix(tmp_path: Path, case: str, mutate, expected_code: str) -> No
                 (specs / "memory" / "product" / "sdd" / "specs-doctor.md").write_text(
                     "---\nslug: specs-doctor\ntitle: Specs Doctor\ncategory: product\n"
                     "tldr: 'Doctor checks.'\nsummary: 'Doctor structural checks.'\ntags: []\n"
-                    "agent_tier: self-pull\ntoken_estimate: 100\nlast_updated: '2026-06-07'\n"
-                    "release_origin: test-release\n---\n\n## Propósito\n\nValidates specs.\n",
+                    "agent_tier: self-pull\ntoken_estimate: 100\n"
+                    "---\n\n## Propósito\n\nValidates specs.\n",
                     encoding="utf-8",
                 ),
             ),
@@ -538,7 +524,9 @@ def test_silent_matrix(tmp_path: Path, case: str, mutate, code: str | None) -> N
 def test_tree4_creates_missing_dirs_others_have_no_autofix(tmp_path: Path) -> None:
     import shutil
 
-    # TREE-4 fix creates backlog/, bugs/ (and audits/) with README.md + .gitkeep.
+    # TREE-4 fix creates backlog/, bugs/ (and audits/) with AGENTS.md
+    # (v6 canon, T-050-05, FR1: README.md retired; a directory is kept by its
+    # AGENTS.md, no separate .gitkeep placeholder).
     specs = _make_clean_specs_tree(tmp_path)
     for dirname in ("backlog", "bugs", "audits"):
         d = specs / dirname
@@ -553,8 +541,7 @@ def test_tree4_creates_missing_dirs_others_have_no_autofix(tmp_path: Path) -> No
     for dirname in ("backlog", "bugs", "audits"):
         d = specs / dirname
         assert d.exists(), f"specs/{dirname}/ must be created by fix()"
-        assert (d / "README.md").exists()
-        assert (d / ".gitkeep").exists()
+        assert (d / "AGENTS.md").exists()
     residual = [i for i in doctor.check() if i.code == "TREE-4"]
     assert residual == [], f"Residual TREE-4 after fix: {[i.description for i in residual]}"
 
@@ -581,10 +568,10 @@ def test_tree4_creates_missing_dirs_others_have_no_autofix(tmp_path: Path) -> No
     doctor2.fix(issues2)
     assert root_spec.exists()
 
-    # TREE-3: missing architecture.md never auto-created; missing quality-assurance.md
+    # TREE-3: missing ARCHITECTURE.md never auto-created; missing QUALITY.md
     # trips both TREE-3 (WARNING, no autofix) and SPEC-DOC-002.
     specs3 = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-tree3"))
-    arch_md = specs3 / "memory" / "architecture.md"
+    arch_md = specs3 / "memory" / "ARCHITECTURE.md"
     arch_md.unlink()
     doctor3 = SpecsDoctor(specs3, templates_dir=_TEMPLATES_DIR)
     issues3 = doctor3.check()
@@ -595,19 +582,13 @@ def test_tree4_creates_missing_dirs_others_have_no_autofix(tmp_path: Path) -> No
     assert not arch_md.exists()
 
     specs3b = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-tree3-qa"))
-    qa_md = specs3b / "memory" / "quality-assurance.md"
+    qa_md = specs3b / "memory" / "QUALITY.md"
     qa_md.unlink()
     issues3b = SpecsDoctor(specs3b).check()
-    tree3_qa = [
-        i
-        for i in issues3b
-        if i.code == "TREE-3" and "quality-assurance.md" in (i.description or "")
-    ]
+    tree3_qa = [i for i in issues3b if i.code == "TREE-3" and "QUALITY.md" in (i.description or "")]
     assert tree3_qa and tree3_qa[0].severity == Severity.WARNING and not tree3_qa[0].fixable
     spec_doc_002_qa = [
-        i
-        for i in issues3b
-        if i.code == "SPEC-DOC-002" and "quality-assurance.md" in (i.description or "")
+        i for i in issues3b if i.code == "SPEC-DOC-002" and "QUALITY.md" in (i.description or "")
     ]
     assert spec_doc_002_qa
 
@@ -664,7 +645,7 @@ def test_tree4_creates_missing_dirs_others_have_no_autofix(tmp_path: Path) -> No
 
     # TREE-6: missing PLAN.md in IMPLEMENTATION phase never auto-created.
     specs6 = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-tree6"))
-    plan = specs6 / "releases" / "r1" / "PLAN.md"
+    plan = specs6 / "releases" / "1.2.3" / "PLAN.md"
     plan.unlink()
     doctor6 = SpecsDoctor(specs6, templates_dir=_TEMPLATES_DIR)
     issues6 = doctor6.check()
@@ -684,7 +665,12 @@ def test_tree4_creates_missing_dirs_others_have_no_autofix(tmp_path: Path) -> No
     issues7 = doctor7.check()
     tree7 = [i for i in issues7 if i.code == "TREE-7"]
     assert tree7 and tree7[0].severity == Severity.ERROR and not tree7[0].fixable
-    doctor7.fix(issues7)
+    # Fix only the TREE-7 finding itself (fixable=False, so this is a no-op for it) —
+    # the fuller issues7 set now ALSO carries a TREE-8 finding for this same legacy
+    # per-bug .md file (non-canon under v6: bugs/ permits only AGENTS.md/BUGS.jsonl/
+    # _archive/bugs_histo.jsonl), and TREE-8 IS fixable — invoking the full set would
+    # correctly delete it under TREE-8, which is not what this assertion is about.
+    doctor7.fix(tree7)
     assert bug_path.read_text(encoding="utf-8") == original
 
     specs7b = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-tree7-ok"))
@@ -716,8 +702,8 @@ def test_doc005_plan_line_limit_cutoff_boundary(
 ) -> None:
     specs = _make_clean_specs_tree(tmp_path)
     big = "# Plan\n\n> **Status:** Aprovado\n\n" + "\n".join(f"- line {i}" for i in range(400))
-    (specs / "releases" / "r1" / "PLAN.md").write_text(big, encoding="utf-8")
-    (specs / "releases" / "r1" / "SPEC.md").write_text(
+    (specs / "releases" / "1.2.3" / "PLAN.md").write_text(big, encoding="utf-8")
+    (specs / "releases" / "1.2.3" / "SPEC.md").write_text(
         f"# Spec\n\n> **Status:** Aprovado\n> **Created:** {created}\n", encoding="utf-8"
     )
     issues = SpecsDoctor(specs).check()
@@ -819,7 +805,7 @@ def test_segmented_active_release_artifacts_matrix(tmp_path: Path) -> None:
 def test_missing_segment_directory_is_an_explicit_error_not_a_silent_skip(
     tmp_path: Path,
 ) -> None:
-    """AB.1: an ACTIVE.md whose segment: names a non-existent directory produces an
+    """AB.1: an active release whose phase record's segment: names a non-existent directory produces an
     explicit ERROR (from BOTH SPEC-DOC-004 and TREE-6) naming the missing segment
     directory — never a silent pass. Pre-fix, this fixture produced ZERO findings
     from either check."""
@@ -863,8 +849,8 @@ def test_healthy_segmented_release_is_unaffected_by_the_missing_segment_check(
 
 def test_flat_release_is_unaffected_by_the_missing_segment_check(tmp_path: Path) -> None:
     """AB.3: a flat release (segment: none / no segment line) is unaffected — the
-    missing-segment-directory check only ever activates when ACTIVE.md actually
-    carries a live segment: value."""
+    missing-segment-directory check only ever activates when the active phase
+    record actually carries a live segment value."""
     specs = _make_clean_specs_tree(tmp_path, "v0.1.6")
 
     issues = SpecsDoctor(specs).check()
@@ -906,7 +892,7 @@ def test_cat1_sync_matrix(tmp_path: Path) -> None:
     # absent catalog, NO feature atoms (only index.md) -> silent.
     specs_b = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-b"))
     product_dir_b = specs_b / "memory" / "product"
-    (product_dir_b / "feature-a.md").unlink()
+    (product_dir_b / "testarea" / "feature-a.md").unlink()
     cat1_b = [i for i in SpecsDoctor(specs_b).check() if i.code == "CAT-1"]
     assert cat1_b == []
 
@@ -951,7 +937,7 @@ def test_cat1_sync_matrix(tmp_path: Path) -> None:
     (subdir_g / "product-vision.md").write_text(
         "---\nslug: product-vision\ntitle: Product Vision\ncategory: product\n"
         "tldr: 'Vision.'\nsummary: 'Vision summary.'\ntags: []\nagent_tier: self-pull\n"
-        "token_estimate: 100\nlast_updated: '2026-06-07'\nrelease_origin: test-release\n---\n\n"
+        "token_estimate: 100\n---\n\n"
         "## Vision\n\nThe vision.\n",
         encoding="utf-8",
     )

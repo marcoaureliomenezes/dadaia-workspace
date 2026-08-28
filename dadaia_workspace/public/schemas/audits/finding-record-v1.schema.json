@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "finding-record-v1",
+  "title": "Finding Record v1",
+  "description": "One record per audit finding, appended once — no event stream, no fold (v0.5.0 FR13, D5, D11). Each line of specs/audits/<YYYYMMDDTHHMMSSZ>-<session_id_8chars>/FINDINGS.jsonl is one object validating this schema, keyed by `id`. Every property carries a custom `x-mutability` keyword — `immutable-core` (never rewritten once appended: id, pillar, severity, refs, claim, evidence) or `mutable-governance` (rewritten in place by the remediation release that dispositions it: disposition, release, reason) — THIS is the one place the two-category split is documented; core/models/findings.py never re-declares it as a second, driftable list (A13.1, mirrors A2.1/A2.10). `specs/audits/**` has no CLI writer (D15/A14.5) — a finding is appended and later rewritten by an agent's file tools, so A13.5's hand-redaction rule (evidence is the reproducible command plus a redacted one-line result, never a raw transcript) is what keeps a record clean, not a write-time seam.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "pillar", "severity", "refs", "claim", "evidence", "disposition", "release", "reason"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*-F\\d{3,}$",
+      "x-mutability": "immutable-core",
+      "description": "`<audit-slug>-F<nnn>` — stable identifier of this finding within its audit window."
+    },
+    "pillar": {
+      "type": "string",
+      "enum": ["bugs", "specs", "memory"],
+      "x-mutability": "immutable-core",
+      "description": "Which of the three audit pillars (FR14) produced this finding."
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"],
+      "x-mutability": "immutable-core",
+      "description": "Severity level, set when the finding is first appended."
+    },
+    "refs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1,
+      "x-mutability": "immutable-core",
+      "description": "file:line, bug ids, commit shas, and/or release ids the claim is anchored to."
+    },
+    "claim": {
+      "type": "string",
+      "minLength": 1,
+      "x-mutability": "immutable-core",
+      "description": "One sentence stating what the finding asserts."
+    },
+    "evidence": {
+      "type": "string",
+      "minLength": 1,
+      "x-mutability": "immutable-core",
+      "description": "The reproducible command plus a redacted one-line result (A13.5) — e.g. `git show <sha> --stat -- <module> → 2 files changed, second render path added`. A `.dadaia/tmp/**` path may accompany it as a convenience pointer, never replace it."
+    },
+    "disposition": {
+      "type": "string",
+      "enum": ["open", "fixed", "superseded", "deferred", "rejected"],
+      "x-mutability": "mutable-governance",
+      "description": "Governance state, appended as `open` and rewritten in place by the remediation release that dispositions this finding."
+    },
+    "release": {
+      "type": ["string", "null"],
+      "x-mutability": "mutable-governance",
+      "description": "The remediation release id that dispositioned this finding — null until one does."
+    },
+    "reason": {
+      "type": ["string", "null"],
+      "x-mutability": "mutable-governance",
+      "description": "Free-text rationale for the disposition — null until the finding is dispositioned."
+    }
+  },
+  "examples": [
+    {
+      "id": "20261020-five-release-window-F003",
+      "pillar": "bugs",
+      "severity": "HIGH",
+      "refs": [
+        "certify-skip-detail-leaks-full-codex-output",
+        "codex-live-probe-gate-checks-presence-not-usability",
+        "<sha-B>",
+        "<sha-A>"
+      ],
+      "claim": "fix-induced bug: the skip-detail leak rides the second render path the probe-gate fix introduced, and the probe-gate bug resolved without a structural cause",
+      "evidence": "git show <sha-A> -- dadaia_workspace/features/certification (second render path added); BUGS.jsonl codex-live-probe-gate-checks-presence-not-usability cause=null",
+      "disposition": "open",
+      "release": null,
+      "reason": null
+    }
+  ]
+}

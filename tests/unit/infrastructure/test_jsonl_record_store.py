@@ -1,0 +1,292 @@
+"""``JsonlRecordStore`` — the generic "one record per id" store (v0.5.0 FR2, AR-1
+ruling answer (b), ``specs/releases/0.5.0/reviews/S1-AR1-ruling.md`` §2), plus its
+:meth:`~dadaia_workspace.infrastructure.jsonl_record_store.JsonlRecordStore.remove`
+seam (S1 FR23 firing amendment A1,
+`specs/releases/0.5.0/reviews/S1-FR23-firing.md` §3).
+
+Intent: CONTRACT — A2.2(c), A2.6, A2.9 (T-050-07); A1 (S1 FR23 firing) for ``remove``.
+
+Size: SMALL — real ``tmp_path`` filesystem, no subprocess/network. Exercises the store
+generically through ``BugRecord`` (the one concrete model this release lands) and the
+``container.build_bug_record_store`` composition seam, which ``features/bugs/service.py``
+now reads/writes through (T-050-08 — D-F "switch"). The store's physical file is
+``BUGS.jsonl`` (FR3/T-050-10 physically renamed it from ``bugs.jsonl``);
+``build_bug_record_store`` takes a ``specs_dir`` directly, never a
+``workspace_root``.
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+from dadaia_workspace import container
+from dadaia_workspace.core.atomic_write import atomic_write as real_atomic_write
+from dadaia_workspace.core.models.bugs import BugRecord, redactable_property_names
+from dadaia_workspace.core.protocols.record_store import StaleRecordWriteError
+from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
+
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_SCHEMA_PATH = (
+    _REPO_ROOT / "dadaia_workspace" / "public" / "schemas" / "bugs" / "bug-record-v1.schema.json"
+)
+
+
+def _schema() -> dict[str, Any]:
+    return json.loads(_SCHEMA_PATH.read_text(encoding="utf-8"))  # type: ignore[no-any-return]
+
+
+def _sample_record(record_id: str, **overrides: object) -> BugRecord:
+    base: dict[str, object] = {
+        "id": record_id,
+        "ts": "2026-08-27T12:00:00Z",
+        "reported_by": "software-engineer",
+        "title": f"title for {record_id}",
+        "severity": "MEDIUM",
+        "surface": "bugs",
+        "component": "features/bugs/service.py#BugService",
+        "context": "dadaia-workspace",
+        "symptom": "something broke",
+        "repro": "run the thing",
+        "expected": "it should not break",
+    }
+    base.update(overrides)
+    return BugRecord(**base)  # type: ignore[arg-type]
+
+
+def _store(tmp_path: Path) -> JsonlRecordStore[BugRecord]:
+    return JsonlRecordStore(
+        tmp_path / "BUGS.jsonl", to_dict=BugRecord.to_dict, from_dict=BugRecord.from_dict
+    )
+
+
+# --- A2.2(c) — governance update rewrites the line in place, byte-identical elsewhere --
+
+
+def test_governance_update_rewrites_one_line_in_place_byte_identical_elsewhere(
+    tmp_path: Path,
+) -> None:
+    """The store's ``update`` touches ONLY the matching line; every other line is
+    copied through verbatim (never re-serialized), so it is byte-identical after the
+    rewrite. Exercised through ``container.build_bug_record_store`` so the composition
+    seam this task adds is proven, not merely the class in isolation."""
+    store = container.build_bug_record_store(tmp_path)
+    store_path = tmp_path / "bugs" / "BUGS.jsonl"
+    store.append(_sample_record("bug-a"))
+    store.append(_sample_record("bug-b"))
+    store.append(_sample_record("bug-c"))
+
+    before_lines = store_path.read_text(encoding="utf-8").split("\n")
+    assert len(before_lines) == 4  # 3 records + trailing empty split
+
+    updated = store.update(
+        "bug-b", lambda record: record.apply_governance_update({"status": "resolved"})
+    )
+    assert updated.status == "resolved"
+
+    after_lines = store_path.read_text(encoding="utf-8").split("\n")
+    assert after_lines[0] == before_lines[0]  # bug-a untouched
+    assert after_lines[2] == before_lines[2]  # bug-c untouched
+    assert after_lines[3] == before_lines[3] == ""  # trailing newline preserved
+    assert after_lines[1] != before_lines[1]  # bug-b is the one line that changed
+    assert json.loads(after_lines[1])["status"] == "resolved"
+
+
+# --- A2.9 — refuse a stale rewrite, never clobber it ---------------------------------
+
+
+def test_update_refuses_stale_rewrite_when_file_changed_since_read(tmp_path: Path) -> None:
+    """Re-reads the file immediately before the atomic rewrite; when it changed since
+    the record was read, refuses (``StaleRecordWriteError``) rather than clobbering a
+    write it never saw — the file is left exactly as the concurrent writer left it,
+    never corrupted (A2.9, one race semantics: refuse-stale, caller retries)."""
+    store = container.build_bug_record_store(tmp_path)
+    store_path = tmp_path / "bugs" / "BUGS.jsonl"
+    store.append(_sample_record("race-bug"))
+    original_bytes = store_path.read_bytes()
+
+    def _mutate(record: BugRecord) -> BugRecord:
+        # Simulate a second writer racing between `update`'s initial read and its
+        # pre-write re-read — the only hook point available from inside one call.
+        with store_path.open("ab") as handle:
+            handle.write(b"\n")
+        return record.apply_governance_update({"status": "resolved"})
+
+    with pytest.raises(StaleRecordWriteError):
+        store.update("race-bug", _mutate)
+
+    assert store_path.read_bytes() == original_bytes + b"\n"
+
+
+def test_update_refuses_a_concurrent_append_that_lands_after_the_rereads_own_check(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """bug ``bugs-record-store-append-clobbers-concurrent-update-batch``: the test above
+    (``test_update_refuses_stale_rewrite_when_file_changed_since_read``) only proves the
+    window BEFORE ``update``'s own re-read check — it races INSIDE the caller's
+    ``mutate`` callback, which runs before that re-read. It never exercises the window
+    AFTER the re-read passes and BEFORE the file is actually swapped, while
+    ``atomic_write`` is still serializing content to its temp sibling — exactly where a
+    second live session's real ``dadaia bugs append`` (a genuine ``O_APPEND`` write,
+    ``JsonlRecordStore.append``) can land. Before the fix, ``update`` built its rewrite
+    from the STALE pre-append snapshot and its ``atomic_write`` call silently replaced
+    the file, discarding the concurrent append with no error and no trace — the exact
+    507-updates-vanish symptom the bug reports. The fix must detect this landing and
+    refuse (never last-write-wins, A2.9), leaving the concurrent append on disk."""
+    store = _store(tmp_path)
+    store.append(_sample_record("race-bug"))
+
+    injected = {"done": False}
+
+    def _racing_atomic_write(path: Path, content: str, **kwargs: Any) -> None:
+        if not injected["done"]:
+            injected["done"] = True
+            # A genuine second-session O_APPEND write landing strictly AFTER update()'s
+            # own stale-check already passed, while THIS call is still in flight —
+            # mirrors JsonlRecordStore.append's real write shape exactly.
+            line = json.dumps(_sample_record("concurrent-append").to_dict(), sort_keys=True)
+            with path.open("a", encoding="utf-8") as handle:
+                handle.write(line + "\n")
+        real_atomic_write(path, content, **kwargs)
+
+    monkeypatch.setattr(
+        "dadaia_workspace.infrastructure.jsonl_record_store.atomic_write", _racing_atomic_write
+    )
+
+    with pytest.raises(StaleRecordWriteError):
+        store.update(
+            "race-bug", lambda record: record.apply_governance_update({"status": "resolved"})
+        )
+
+    ids = {
+        json.loads(line)["id"]
+        for line in store.path.read_text(encoding="utf-8").split("\n")
+        if line.strip()
+    }
+    assert ids == {"race-bug", "concurrent-append"}, (
+        f"the concurrent append was silently discarded by the stale rewrite: {ids}"
+    )
+    # ...and the refused update never touched race-bug's own content either.
+    assert next(r for r in store.iter_records() if r.id == "race-bug").status == "open"
+
+
+# --- A1 (S1 FR23 firing) — remove() drops matching records, refuse-stale like update -
+
+
+def test_remove_drops_matching_records_and_returns_them_in_file_order(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    store.append(_sample_record("bug-a"))
+    store.append(_sample_record("bug-b"))
+    store.append(_sample_record("bug-c"))
+
+    removed = store.remove({"bug-a", "bug-c"})
+
+    assert [r.id for r in removed] == ["bug-a", "bug-c"]
+    assert [r.id for r in store.iter_records()] == ["bug-b"]
+
+
+def test_remove_with_no_matching_ids_is_a_noop(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    store.append(_sample_record("bug-a"))
+
+    removed = store.remove({"no-such-id"})
+
+    assert removed == []
+    assert [r.id for r in store.iter_records()] == ["bug-a"]
+
+
+def test_remove_with_empty_ids_is_a_noop_without_touching_the_file(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    store.append(_sample_record("bug-a"))
+    before = store.path.read_bytes()
+
+    removed = store.remove(())
+
+    assert removed == []
+    assert store.path.read_bytes() == before
+
+
+def test_remove_refuses_stale_rewrite_when_file_changed_since_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The SAME refuse-stale race semantics :meth:`update` already has (A2.9) —
+    ``remove`` refuses (``StaleRecordWriteError``) rather than clobbering a write it
+    never saw.
+
+    bug ``bugs-record-store-append-clobbers-concurrent-update-batch``: the interleave is
+    simulated at the ``atomic_write`` seam — a concurrent writer landing AFTER
+    ``remove``'s own snapshot read but WHILE ``atomic_write`` is still serializing its
+    rewrite to a temp sibling, exactly the window a real second session's ``append`` can
+    land in (the closest external hook point without a real second thread/process — no
+    ``time.sleep``/``threading.Barrier``)."""
+    store = _store(tmp_path)
+    store.append(_sample_record("race-bug"))
+    original_bytes = store.path.read_bytes()
+
+    injected = {"done": False}
+
+    def _racing_atomic_write(path: Path, content: str, **kwargs: Any) -> None:
+        if not injected["done"]:
+            injected["done"] = True
+            with store.path.open("ab") as handle:
+                handle.write(b"\n")
+        real_atomic_write(path, content, **kwargs)
+
+    monkeypatch.setattr(
+        "dadaia_workspace.infrastructure.jsonl_record_store.atomic_write", _racing_atomic_write
+    )
+
+    with pytest.raises(StaleRecordWriteError):
+        store.remove({"race-bug"})
+
+    assert store.path.read_bytes() == original_bytes + b"\n"
+
+
+# --- A2.6 — redaction is schema-derived and covers both write paths ------------------
+
+
+def test_redaction_is_schema_derived_and_covers_both_write_paths(tmp_path: Path) -> None:
+    """A NEW free-text property added to a schema FIXTURE (an in-memory dict — no file
+    edited) is picked up by :func:`redactable_property_names` with NO code changed
+    anywhere, proving the derivation is genuinely schema-driven. Separately, the SAME
+    ``BugRecord.redact()`` seam scrubs a real denylist term on BOTH the append path and
+    the in-place update path, through the generic store."""
+    schema = _schema()
+    baseline_fields = set(redactable_property_names(schema))
+    assert "id" not in baseline_fields
+    assert "ts" not in baseline_fields
+    assert "reported_by" not in baseline_fields
+
+    extended_schema = {
+        **schema,
+        "properties": {
+            **schema["properties"],
+            "extra_free_text_field": {"type": "string"},
+        },
+    }
+    extended_fields = set(redactable_property_names(extended_schema))
+    assert extended_fields == baseline_fields | {"extra_free_text_field"}
+
+    denylist = (("SECRET-TOKEN", "test-term"),)
+    store = _store(tmp_path)
+    record = _sample_record("leaky-bug", component="leaked SECRET-TOKEN in the log", cause=None)
+
+    # append path
+    store.append(record.redact(denylist))
+    appended = next(store.iter_records())
+    assert "SECRET-TOKEN" not in appended.component
+    assert "[REDACTED-TERM]" in appended.component
+
+    # in-place update path
+    updated = store.update(
+        "leaky-bug",
+        lambda current: current.apply_governance_update(
+            {"cause": "root SECRET-TOKEN exposure"}
+        ).redact(denylist),
+    )
+    assert updated.cause is not None
+    assert "SECRET-TOKEN" not in updated.cause
+    assert "[REDACTED-TERM]" in updated.cause

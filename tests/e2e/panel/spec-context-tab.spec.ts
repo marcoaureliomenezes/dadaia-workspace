@@ -137,9 +137,9 @@ test('E2E-SCP-05 — Product memory chip click loads iframe with 200 non-empty r
 });
 
 // ---------------------------------------------------------------------------
-// E2E-SCP-06 — API contract: GET /memory/<slug>/architecture.md → 200 text/html >500 bytes
+// E2E-SCP-06 — API contract: GET /memory/<slug>/ARCHITECTURE.md → 200 text/html >500 bytes
 // ---------------------------------------------------------------------------
-test('E2E-SCP-06 — API contract: GET /memory/<slug>/architecture.md returns 200 text/html', async ({
+test('E2E-SCP-06 — API contract: GET /memory/<slug>/ARCHITECTURE.md returns 200 text/html', async ({
   page,
   request,
 }) => {
@@ -150,7 +150,7 @@ test('E2E-SCP-06 — API contract: GET /memory/<slug>/architecture.md returns 20
   const slug = await page.$eval('.context-card [data-slug]', (el) => el.getAttribute('data-slug') ?? '');
   expect(slug).not.toBe('');
 
-  const url = `${BASE_URL}/memory/${slug}/architecture.md`;
+  const url = `${BASE_URL}/memory/${slug}/ARCHITECTURE.md`;
   const response = await request.get(url);
   expect(response.status(), `${url} must return 200`).toBe(200);
   const contentType = response.headers()['content-type'] ?? '';

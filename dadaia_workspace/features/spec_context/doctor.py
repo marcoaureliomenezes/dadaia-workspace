@@ -231,7 +231,7 @@ class DoctorService:
             return issues
         for entry in sorted(entries):
             name = entry.name
-            # Allow dotfiles at the .dadaia level (e.g. .gitkeep, .DS_Store)
+            # Allow dotfiles at the .dadaia level (e.g. .DS_Store)
             if name.startswith(".") and not entry.is_dir():
                 continue
             if entry.is_dir() and name not in _DADAIA_ALLOWED_SUBDIRS:

@@ -13,7 +13,10 @@ internal imports — a pure constants leaf, pinned by contract tests.
 
 from __future__ import annotations
 
+import re
+
 __all__ = [
+    "AUDIT_DIR_NAME_RE",
     "DADAIA_ADDITIVE_PREFIXES",
     "DADAIA_ALLOWED_SUBDIRS",
     "DADAIA_MD_HARNESS_TARGETS",
@@ -22,6 +25,12 @@ __all__ = [
     "ROOT_ALLOWED_DIRS",
     "ROOT_ALLOWED_FILES",
 ]
+
+#: SPEC-DOC-030 (constitution §8): every new ``specs/audits/`` directory must be named
+#: ``<YYYYMMDDTHHMMSSZ>-<session_id_8chars>`` so concurrent additive sessions never
+#: collide. v0.5.0 T-050-25A: single home for this shape — ``doctor_closure_audit.py``
+#: and ``gate_policy.py`` both repeated it in prose; one fact, one place (module docstring).
+AUDIT_DIR_NAME_RE: re.Pattern[str] = re.compile(r"^\d{8}T\d{6}Z-[A-Za-z0-9]{8}$")
 
 #: Directories the workspace root may contain (the Workspace Root Law).
 ROOT_ALLOWED_DIRS: frozenset[str] = frozenset(

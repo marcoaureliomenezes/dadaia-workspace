@@ -2,11 +2,10 @@
 
 Scope: this file governs only `.dadaia/reports/**`.
 
-Reports are operational evidence for humans and `dadaia panel`. They must be
-small, self-contained, and machine-linkable through handoff JSON in
-`.dadaia/handoff/<context>/`.
+Reports are operational evidence for humans and `dadaia panel`.
+They must be small, self-contained, and machine-linkable through handoff JSON in `.dadaia/handoff/<context>/`.
 
-## File Contract
+## 1. File contract
 
 Write one HTML report per agent run:
 
@@ -14,10 +13,10 @@ Write one HTML report per agent run:
 .dadaia/reports/<context>/<agent>/<YYYY-MM-DDTHHMMSSZ>-<slug>.html
 ```
 
-Do not write Markdown reports. Do not store temporary logs here; use
-`.dadaia/tmp/`.
+- Do not write Markdown reports.
+- Do not store temporary logs here — use `.dadaia/tmp/`.
 
-## HTML Minimum
+## 2. HTML minimum
 
 Every report must be valid standalone HTML:
 
@@ -43,11 +42,10 @@ Every report must be valid standalone HTML:
 </html>
 ```
 
-Inline CSS is allowed when useful. External assets are allowed only when they
-are committed under `.dadaia/reports/<context>/<agent>/` or referenced as
-evidence with stable relative paths.
+- Inline CSS is allowed when useful.
+- External assets are allowed only when committed under `.dadaia/reports/<context>/<agent>/`, or referenced as evidence with stable relative paths.
 
-## Required Sections
+## 3. Required sections
 
 All reports:
 
@@ -56,41 +54,16 @@ All reports:
 - `Result` — `pass`, `fail`, `blocked`, or `informational`.
 - `Next action` — one concrete next step or `none`.
 
-Implementation reports:
+| Report kind | Extra sections |
+|---|---|
+| Implementation | `Changed files`, `Validation`, `Risks` |
+| Review/audit | `Findings`, `Severity`, `Recommendations` |
+| Design/QA | `Coverage`, `Screenshots or traces`, `Open issues` |
+| Spec/refinement | `Question resolved`, `Decision needed`, `Spec impact` |
 
-- `Changed files`
-- `Validation`
-- `Risks`
+## 4. Findings
 
-Review/audit reports:
-
-- `Findings`
-- `Severity`
-- `Recommendations`
-
-Design/QA reports:
-
-- `Coverage`
-- `Screenshots or traces`
-- `Open issues`
-
-Spec/refinement reports:
-
-- `Question resolved`
-- `Decision needed`
-- `Spec impact`
-
-## Findings
-
-Use these severity labels exactly:
-
-```text
-CRITICAL
-HIGH
-MEDIUM
-LOW
-INFO
-```
+Use these severity labels exactly: `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`, `INFO`.
 
 Each finding must include:
 
@@ -99,22 +72,15 @@ Each finding must include:
 - Impact
 - Recommendation
 
-## Handoff JSON
+## 5. Handoff JSON
 
-The machine-readable handoff is written under `.dadaia/handoff/<context>/` and
-is consumed by downstream agents and validation tooling. It must identify:
+- The machine-readable handoff is written under `.dadaia/handoff/<context>/`.
+- It is consumed by downstream agents and validation tooling.
+- It must identify: producing agent, context, status/result, report path, key findings/outputs, next recommended agent/action.
+- Use the `dadaia-handoff-emitter` skill immediately after writing the HTML.
 
-- producing agent
-- context
-- status/result
-- report path
-- key findings or outputs
-- next recommended agent/action when applicable
+## 6. Panel compatibility
 
-Use the `dadaia-handoff-emitter` skill immediately after writing the HTML.
-
-## Panel Compatibility
-
-`dadaia panel` expects stable paths and valid HTML. If a report is renamed,
-update the matching handoff JSON under `.dadaia/handoff/<context>/`. Do not move
-reports between agents after creation.
+- `dadaia panel` expects stable paths and valid HTML.
+- If a report is renamed, update the matching handoff JSON under `.dadaia/handoff/<context>/`.
+- Do not move reports between agents after creation.

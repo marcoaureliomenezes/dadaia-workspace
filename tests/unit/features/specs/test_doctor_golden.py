@@ -81,7 +81,6 @@ _FAMILY_OF_CODE: dict[str, str] = {
     "SPEC-DOC-026": "release",
     "SPEC-DOC-027": "release",
     "SPEC-DOC-039": "release",
-    "SPEC-DOC-006": "closure_audit",
     "SPEC-DOC-007": "closure_audit",
     "SPEC-DOC-030": "closure_audit",
     "SPEC-DOC-034": "closure_audit",
@@ -91,6 +90,7 @@ _FAMILY_OF_CODE: dict[str, str] = {
     "SPEC-DOC-032": "governance",
     "SPEC-DOC-033": "governance",
     "SPEC-DOC-035": "governance",
+    "SPEC-DOC-041": "governance",
     "TREE-1": "structural",
     "TREE-2": "structural",
     "TREE-3": "structural",
@@ -99,6 +99,7 @@ _FAMILY_OF_CODE: dict[str, str] = {
     "TREE-5M": "structural",
     "TREE-6": "structural",
     "TREE-7": "structural",
+    "TREE-8": "structural",
 }
 
 _ALL_FAMILIES = {

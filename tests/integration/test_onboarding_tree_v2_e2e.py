@@ -10,7 +10,7 @@ memory-markdown-source-v1 (T-MMS-10/11): The scaffold now ships ONLY .md born-ma
 atoms for memory.  The legacy YAML stubs (architecture.yaml, tech-stack.yaml,
 product/index.yaml), Jinja templates, and placeholder.html were all deleted.
 The copytree path therefore:
-  - Contains .md atoms (architecture.md, tech-stack.md, product/index.md).
+  - Contains .md atoms (ARCHITECTURE.md, TECHSTACK.md, product/index.md).
   - Does NOT contain YAML stubs or HTML files for those atoms.
   - A fresh copytree must produce 0 TREE-* ERROR-severity doctor issues.
 """
@@ -33,11 +33,13 @@ _PUBLIC_DIR = _REPO_ROOT / "dadaia_workspace" / "public"
 def test_ac_o1_copytree_scaffold_produces_valid_v2_tree_and_repo_specs_have_no_tree_errors(
     tmp_path: Path,
 ) -> None:
-    """AC-O-1 (updated memory-markdown-source-v1): A specs/ tree materialised via copytree
-    from public/scaffold/ (the exact mechanism used by `dadaia context activate`) must:
+    """AC-O-1 (updated memory-markdown-source-v1; v6 canon T-050-05/FR1): A specs/ tree
+    materialised via copytree from public/scaffold/ (the exact mechanism used by
+    `dadaia context activate`) must:
       1. Contain the v2 mandatory directories (backlog/, bugs/, releases/) each with
-         README.md and .gitkeep.
-      2. Contain the born-markdown memory atoms (architecture.md, tech-stack.md,
+         AGENTS.md (README.md retired; a directory is kept by its AGENTS.md, no
+         .gitkeep placeholder).
+      2. Contain the born-markdown memory atoms (ARCHITECTURE.md, TECHSTACK.md,
          product/index.md), each with valid YAML frontmatter.
       3. Contain specs/AGENTS.md (the SDD workflow contract).
       4. NOT contain specs/foundation/ or specs/SPEC.md at the tree root (the
@@ -54,13 +56,12 @@ def test_ac_o1_copytree_scaffold_produces_valid_v2_tree_and_repo_specs_have_no_t
         d = specs_dir / dirname
         assert d.exists(), f"specs/{dirname}/ must exist after copytree-from-scaffold"
         assert d.is_dir(), f"specs/{dirname} must be a directory"
-        assert (d / "README.md").exists(), f"specs/{dirname}/README.md must exist"
-        assert (d / ".gitkeep").exists(), f"specs/{dirname}/.gitkeep must exist"
+        assert (d / "AGENTS.md").exists(), f"specs/{dirname}/AGENTS.md must exist"
 
     # ---- Assertion 2: born-markdown memory atoms exist and have frontmatter ----
     md_atoms = [
-        specs_dir / "memory" / "architecture.md",
-        specs_dir / "memory" / "tech-stack.md",
+        specs_dir / "memory" / "ARCHITECTURE.md",
+        specs_dir / "memory" / "TECHSTACK.md",
         specs_dir / "memory" / "product" / "index.md",
     ]
     for md_path in md_atoms:

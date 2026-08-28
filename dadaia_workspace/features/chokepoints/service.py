@@ -618,6 +618,83 @@ def _run_denylist_scan(
     )
 
 
+#: The fix hint every specs-canon refusal line carries (operator, 2026-08-28) — a
+#: canon or verdict violation has exactly one remediation: remove the offending path.
+_SPECS_CANON_FIX_HINT = "delete the path; canon: DADAIA.md §6"
+
+
+def _compose_specs_canon_refusal(violations: list[tuple[PushRef, str]]) -> str:
+    """FR2 (v0.5.0 specs-canon closure): ref, the offending ``specs/``-relative path,
+    the law, one fix hint per offending path, ``--no-verify``, capped at 10 hits —
+    the SAME shape :func:`_compose_denylist_refusal` uses."""
+    lines = [
+        f"[pre-push] BLOCKED: the pushed range publishes {len(violations)} specs/ "
+        "path(s) violating the v6 canon or the verdict rule (DADAIA.md §6)."
+    ]
+    shown = violations[:_MAX_LISTED_HITS]
+    remainder = len(violations) - len(shown)
+    for ref, path in shown:
+        lines.append(
+            f"  {ref.local_ref} -> {ref.remote_ref}: specs/{path} — {_SPECS_CANON_FIX_HINT}"
+        )
+    if remainder > 0:
+        lines.append(f"  ... and {remainder} more offending path(s).")
+    lines.append(
+        "  If this push is a genuine emergency, git's sanctioned, traceable bypass is "
+        "`git push --no-verify` (discouraged; leaves a reflog trace)."
+    )
+    return "\n".join(lines)
+
+
+def _run_specs_canon_scan(
+    scan_refs: list[PushRef],
+    object_source: GitObjectReader,
+    repo: Path,
+) -> Decision | None:
+    """SPEC v0.5.0 specs-canon closure (operator ruling 2026-08-28): every pushed
+    non-deletion ref's tree is checked for a ``specs/`` path violating the v6 canon
+    (or the verdict business rule) — via ``features.specs.specs_canon``, the SAME
+    predicate the doctor's TREE-8 check uses (never a second, hand-kept member list).
+
+    Function-scoped import (mirrors this module's own docstring: "NEVER imports
+    infrastructure" is a module-load-time promise; ``features.specs`` is a sibling
+    feature, not infrastructure, but the lazy import keeps this module's import graph
+    unchanged for every caller that never reaches this policy step).
+    """
+    from dadaia_workspace.features.specs.specs_canon import canon_violations, verdict_violations
+
+    violations: list[tuple[PushRef, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for ref in scan_refs:
+        try:
+            raw_paths = object_source.list_tree_paths(repo, ref.local_sha, "specs")
+        except GitObjectReadError as exc:
+            return Decision(
+                allowed=False,
+                message=(
+                    f"[pre-push] BLOCKED: reading the pushed specs/ tree failed ({exc}) "
+                    "— a policy gate never skips what it cannot evaluate (fail "
+                    "closed).\n"
+                    "  If this push is a genuine emergency, git's sanctioned, "
+                    "traceable bypass is `git push --no-verify` (discouraged; "
+                    "leaves a reflog trace)."
+                ),
+            )
+        specs_rel = [p[len("specs/") :] for p in raw_paths if p.startswith("specs/")]
+        bad = set(canon_violations(specs_rel))
+        parent_sha = object_source.first_parent(repo, ref.local_sha)
+        bad.update(verdict_violations(specs_rel, ref.local_sha, parent_sha))
+        for path in sorted(bad):
+            key = (ref.local_sha, path)
+            if key in seen:
+                continue
+            seen.add(key)
+            violations.append((ref, path))
+    if not violations:
+        return None
+    return Decision(allowed=False, message=_compose_specs_canon_refusal(violations))
+
+
 def push_gate_decision(
     refs: list[PushRef],
     *,
@@ -636,12 +713,16 @@ def push_gate_decision(
        ``refs/heads/feature/{M.m.p}``, pushed to the SAME remote name: ``develop`` and
        ``main`` are refused outright (they advance by PR only); names outside the three
        permitted patterns are refused as invalid.
-    2. **Range-scoped denylist scan** (v0.9.0 FR1/FR2) — every non-deletion ref, tags
+    2. **specs/ canon scan** (v0.5.0 specs-canon closure, operator ruling 2026-08-28)
+       — every non-deletion ref, tags included, is checked via *object_source* for a
+       ``specs/`` path violating the v6 canon or the verdict business rule
+       (``features.specs.specs_canon``).
+    3. **Range-scoped denylist scan** (v0.9.0 FR1/FR2) — every non-deletion ref, tags
        included, is scanned via *object_source* for new objects carrying a denylisted
-       term. Runs AFTER branch policy (free and pure) — under v2 this feature push is
-       the first publication to ``origin`` (A3.3).
+       term. Runs AFTER branch policy and the canon scan (both free and pure) — under
+       v2 this feature push is the first publication to ``origin`` (A3.3).
 
-    There is no third step: the former diff-based security-verdict check is DELETED
+    There is no fourth step: the former diff-based security-verdict check is DELETED
     from this path (v0.4.4 A3.4) — it relocates to a PR gate covering
     ``feature/{M.m.p}`` → ``develop`` and ``develop`` → ``main`` (FR4).
 
@@ -699,11 +780,18 @@ def push_gate_decision(
                 ),
             )
 
-    # v0.9.0 FR1/FR2: scan every non-deletion ref (tags included) — computed
-    # independently of `branch_policy_refs`, which excludes tags. Runs after branch
-    # policy (free and pure, already checked above); this is now the LAST policy
-    # step (A3.4).
+    # Every non-deletion ref (tags included) — computed independently of
+    # `branch_policy_refs`, which excludes tags. Runs after branch policy (free and
+    # pure, already checked above); shared by both the specs-canon scan (step 2) and
+    # the denylist scan (step 3, A3.4).
     scan_refs = [r for r in refs if not r.is_deletion]
+
+    # v0.5.0 specs-canon closure (operator ruling 2026-08-28): step 2.
+    canon_refusal = _run_specs_canon_scan(scan_refs, object_source, repo)
+    if canon_refusal is not None:
+        return canon_refusal
+
+    # v0.9.0 FR1/FR2: step 3.
     scan_refusal, skipped_binary_count, oversized_notes, path_masker = _run_denylist_scan(
         scan_refs, object_source, repo, denylist_terms, baseline_patterns, foreign_slugs
     )
@@ -711,7 +799,10 @@ def push_gate_decision(
         return _annotate_skip(scan_refusal, skipped_binary_count, oversized_notes, path_masker)
 
     return _annotate_skip(
-        Decision(allowed=True, message="[pre-push] branch policy + denylist scan passed; allow."),
+        Decision(
+            allowed=True,
+            message="[pre-push] branch policy + specs-canon scan + denylist scan passed; allow.",
+        ),
         skipped_binary_count,
         oversized_notes,
         path_masker,

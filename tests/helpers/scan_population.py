@@ -4,8 +4,11 @@ Deliberately NOT a shared harness or base class — the v0.4.4 S5-FR23 ruling ev
 "one scan harness, N rules" and REJECTED it as premature abstraction on evidence (zero
 registered bugs trace to walker duplication across the census below; the detectors are
 rule-specific by nature and a harness would couple N independent ratchets to one
-framework — see ``specs/_archive/releases/v0.4.4/reviews/S5-FR23-first-firing-ruling.md``,
-"One scan harness, N rules"). This module is a two-line CONVENTION every tree-walking
+framework — see the v0.4.4 S5-FR23 ruling in git history (its
+``specs/_archive/releases/v0.4.4/reviews/S5-FR23-first-firing-ruling.md`` path no
+longer resolves on disk: root ``specs/_archive/`` retired, v0.5.0 specs-canon
+closure — the ruling's text survives in the commit that authored it), "One scan
+harness, N rules"). This module is a two-line CONVENTION every tree-walking
 source-scan test applies **at its own call site**: assert the enumerated population is
 non-empty, and assert one known sentinel member is present in it. A future mis-rooted
 walker (a file moved one directory deeper, a ``.parents[N]`` off by one) then fails
@@ -18,7 +21,7 @@ Census (T-045-17, produced by scan over ``tests/**`` at v0.4.5 S2 HEAD; the raw 
 transcript is captured at
 ``.dadaia/tmp/software-engineer/20260825/T-045-17-census.txt``). The v0.4.4 ruling
 counted 15 tree-/package-walking + single-module source-scan tests at ITS HEAD
-(``specs/_archive/releases/v0.4.4/reviews/S5-FR23-first-firing-ruling.md`` check (b)).
+(the same ruling's check (b), git history).
 Landing FR5 last inside S2 — after FR2 (T-045-14), FR3 (T-045-15) and FR4 (T-045-16),
 per the TASKS.md sequencing — means the population this task guards is that same 15
 PLUS the new scan-shaped tests those three FRs themselves introduced (the atomic-write
@@ -26,9 +29,11 @@ census, the two byte-golden-roster consumers, the three skill-inventory-oracle
 consumers) and two pre-existing scans the original ruling's grep pass did not enumerate
 (the self-scan, which discovers its tracked-file population via ``git ls-files`` rather
 than ``rglob``/``glob``; the public-source hygiene directory listing). The honest
-current count is 20 files / 21 call sites — a measured, not estimated, deviation from
-the SPEC text's "~15", which quotes the pre-S2 backlog finding verbatim (SPEC v0.4.5
-§3, FR5 body).
+count at v0.4.5 S2 HEAD was 20 files / 21 call sites — a measured, not estimated,
+deviation from the SPEC text's "~15", which quotes the pre-S2 backlog finding verbatim
+(SPEC v0.4.5 §3, FR5 body). v0.5.0 T-050-19 (D14/FR10) adds one call site inside the
+same file (`_scoped_agents_md_sources()`, the new scoped-`AGENTS.md`-source scan the
+behavior map's own enforcer needs) — 20 files / 22 call sites now.
 
 Tree-/package-walking population scans (the convention applies at the call site named):
 
@@ -45,7 +50,8 @@ Tree-/package-walking population scans (the convention applies at the call site 
 * ``tests/unit/public/test_no_gpt_only_claim.py`` :: test_no_surviving_gpt_only_claim
 * ``tests/unit/features/panel/test_no_bearer_in_url.py`` ::
   test_no_credential_query_param_in_panel_or_cli_sources
-* ``tests/contract/test_rules_skills_map.py`` :: ``_skills_on_disk()``
+* ``tests/contract/test_behavior_map.py`` :: ``_skills_on_disk()``,
+  ``_scoped_agents_md_sources()``
 * ``tests/contract/test_public_scripts_thin_wrapper.py`` ::
   test_thin_wrapper_registry_stays_data_driven_and_correctly_scoped
 * ``tests/contract/test_bind_resolution_seam_dynamic_walk.py`` ::
@@ -66,6 +72,9 @@ Tree-/package-walking population scans (the convention applies at the call site 
   ``TestInstallAll`` (two call sites, one per staged/installed skill-set comparison)
 * ``tests/integration/test_public_assets.py`` ::
   test_stage_manifest_codex_adapters_and_install_all
+* ``tests/contract/test_migrate_v5_not_imported_by_permanent_consumer.py`` (v0.5.0
+  T-050-09) ::
+  test_migrate_v5_has_no_permanent_consumer_outside_the_known_switch_step
 
 Deliberately EXCLUDED:
 

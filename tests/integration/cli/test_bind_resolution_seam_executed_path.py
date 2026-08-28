@@ -62,7 +62,7 @@ def _seed_specs_tree(repo: Path, release: str) -> None:
         f"release: {release}\nphase: IMPLEMENTATION\n", encoding="utf-8"
     )
     (repo / "specs" / "memory" / "product").mkdir(parents=True)
-    (repo / "specs" / "memory" / "tech-stack.md").write_text("# tech\n", encoding="utf-8")
+    (repo / "specs" / "memory" / "TECHSTACK.md").write_text("# tech\n", encoding="utf-8")
     (repo / "specs" / "memory" / "product" / "catalog.json").write_text(
         '{"features": []}', encoding="utf-8"
     )
@@ -166,14 +166,12 @@ def test_bugs_status_resolves_bound_context(two_ctx_workspace: Path) -> None:
                 "append",
                 "--bug-id",
                 bug_id,
-                "--event",
-                "reported",
                 "--title",
                 "seam probe bug",
                 "--severity",
                 "LOW",
                 "--surface",
-                "test",
+                "cli",
                 "--component",
                 "test",
                 "--context",
@@ -183,8 +181,6 @@ def test_bugs_status_resolves_bound_context(two_ctx_workspace: Path) -> None:
                 "--repro",
                 "n/a",
                 "--expected",
-                "n/a",
-                "--notes",
                 "n/a",
                 "--specs-dir",
                 str(specs_dir),

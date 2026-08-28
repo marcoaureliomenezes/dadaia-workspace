@@ -4,131 +4,80 @@ description: >
   Generic dispatch reference for project-manager and project-auditor agents.
   Defines the default public agent inventory, SDD stage inventory, dispatch
   protocol, mediation rules, escalation triggers, and forbidden actions.
+tldr: "Dispatch reference: 9-agent inventory, SDD stage table, dispatch protocol, decision authority, escalation, forbidden actions."
 applyTo: ".dadaia/handoff/**"
 ---
 
 # dd-manager-orchestration
 
-> **Not an enforcement mechanism.** There is no workflow engine: the ordered SDD flow
-> (`DADAIA.md` §1) is agent-dispatched — carried out by dispatching the owning agent for
-> each stage against the SDD documents. This skill is reference / dispatcher guidance,
-> not a substitute for the documents themselves.
+> Not an enforcement mechanism. No engine runs the SDD flow — each stage is agent-dispatched (`DADAIA.md` §1).
+> This skill is reference/dispatcher guidance, never a substitute for the SDD documents.
 
-This is the public default orchestration skill. It must stay generic: no
-operator-private project names, hostnames, IPs, customer names, private repo
-slugs, or optional domain-pack assumptions.
+Stays generic: no operator-private project names, hostnames, IPs, customer names, private repo slugs, or optional domain-pack assumptions.
 
-## Agent Inventory
+## 1. When
 
-Default topology: 9 core agents (constitution, Agent Roster). Roles and phases are
-normative in the §7/§14 matrices; this table is the dispatch view. There is no
-concurrency lock between agents (NO-LOCKS DOCTRINE, v0.1.76) — dispatch purity below is
-an orchestration convention, not a session primitive.
+- `project-manager`/`project-auditor` dispatching work to any core agent.
+- Resolving a mediation conflict, an escalation trigger, or a decision-authority question.
 
-The "Routes next to" column is **handoff routing, not executable dispatch**: it names
-the agent the dispatcher (PM, top-level) should send to next after consuming this
-agent's handoff. Only the top-level session agent holds dispatch capability — a
-dispatched sub-agent cannot spawn another agent in either harness, at any approval
-level. `project-manager` is the only roster entry whose cell is real dispatch, and only
-when it runs as the top-level session agent.
+## 2. Steps
 
-| Agent | Phase (§7) | Primary mission | Routes next to (via PM) | Do not call when |
+1. Resolve the target agent from the inventory table (§4) by phase, mission, and "do not call when" clause.
+2. Confirm only the top-level dispatcher calls other agents — a leaf specialist cannot chain further dispatch in either harness.
+3. Route a leaf's returned handoff to its `next_handoff.agent` — this is handoff routing, not executable dispatch.
+4. Build the sub-agent prompt with `subagent_type`, `description`, `prompt` fields.
+5. Open every dispatch prompt with the Input Contract block (context, specs_dir, release_id, task_id, report_dir, handoff_dir, allowed_write_paths).
+6. Write reports to `.dadaia/reports/<context-name>/<agent-name>/<UTC>-<task-slug>.html`.
+7. Emit a handoff JSON for every HTML report that feeds another agent, under `.dadaia/handoff/<context-name>/`.
+8. Never treat the review/QA sequence as mechanically enforced — it holds only because dispatcher/implementer/reviewer each uphold their half.
+9. Rely on git chokepoints (pre-commit warns and allows; pre-push requires an APPROVED security handoff) as the only mechanical backstop.
+10. Resolve a decision by domain using the Decision Authority table (§4).
+11. Evidence means file:line, spec citation, command output, or handoff field.
+11. On a two-agent deadlock: have each agent write a `Conflict Position` section in its report.
+12. Write a synthesis report naming the exact decision point.
+13. If still unresolved, call `dd-grill-me` and ask the operator one concrete question.
+14. Reflect the operator's answer in SPEC, PLAN, TASKS, ADR, or memory as appropriate for the current phase.
+15. Stop and escalate to the operator on any trigger in §4's Escalation table.
+16. Never perform any action in §4's Forbidden table.
+
+## 3. Done when
+
+- Every dispatch prompt carries the Input Contract block and a handoff on completion.
+- Every conflict either resolved via evidence-based decision authority or escalated per §4.
+- No forbidden action occurred.
+
+## 4. References
+
+### Agent inventory (9 core agents; roles/phases normative in constitution §7/§14)
+
+| Agent | Phase | Primary mission | Routes next to (via PM) | Do not call when |
 |---|---|---|---|---|
-| `project-manager` | 1–2; coordinates all MUTATING phases | Operator-gated intake report + bug intake, cross-agent dispatch, mediation, sole dispatch authority | any core agent (real dispatch — top-level only) | A single specialist can complete the task directly |
-| `project-auditor` | 4 (audit) | Memory/implementation drift, dead-code and compliance reports | project-manager | A release is still mid-implementation |
-| `product-engineer` | 5 + 8 (definition, closure) | SPEC, PLAN, TASKS, CLOSURE, ACTIVE.md, memory | software-architect, project-manager | Task is code-only and already approved |
+| `project-manager` | 1-2, MUTATING | Intake, bug intake, dispatch, mediation | any core agent (top-level only) | A single specialist suffices |
+| `project-auditor` | 4 (audit) | Memory/implementation drift, dead-code, compliance | project-manager | A release is still mid-implementation |
+| `product-engineer` | 5+8 (defn, closure) | SPEC, PLAN, TASKS, RELEASE.json, memory | architect, PM | Task is code-only, already approved |
 | `software-architect` | feeds 4/5 | Architecture decisions, ADRs, dependency contracts | software-engineer | No architectural trade-off exists |
-| `software-engineer` | 6 (implementation) | Production code + tests for the bound context | qa-engineer | Task is spec authorship, AI-entity surface, or pure review |
-| `ai-engineer` | surface owner (`dadaia_workspace/public/**`) | Agents, skills, rules, commands, hooks | security-reviewer, code-reviewer | Task is product code or spec authorship |
-| `qa-engineer` | 7 gate → commit | E2E strategy, acceptance validation, smoke evidence | none | Only unit/integration tests are needed |
-| `security-reviewer` | 7 gate → push | Security audit, threat modeling, secret/leak review | implementer | No security-relevant surface is involved |
-| `code-reviewer` | 7 gate → PR | Diff/PR review, no authoring | none | There is no diff, PR, or staged set |
+| `software-engineer` | 6 (implementation) | Production code + tests for the bound context | qa-engineer | Task is spec, AI-entity, or pure review |
+| `ai-engineer` | surface owner | Agents, skills, rules, commands, hooks | security-reviewer, code-reviewer | Task is product code or spec |
+| `qa-engineer` | 7 gate -> commit | E2E strategy, acceptance validation, smoke evidence | none | Only unit/integration tests are needed |
+| `security-reviewer` | 7 gate -> push | Security audit, threat modeling, secret/leak review | implementer | No security-relevant surface |
+| `code-reviewer` | 7 gate -> PR | Diff/PR review, no authoring | none | There is no diff, PR, or staged set |
 
-## SDD Stage Inventory
-
-Arm A (`DADAIA.md` §1) has exactly four stages. Each is agent-dispatched — there is no
-engine that runs them; the dispatcher hands the stage to its owning agent against the
-SDD documents (`ACTIVE.md`, SPEC, PLAN, TASKS, CLOSURE):
+### SDD stage inventory (Arm A, `DADAIA.md` §1 — exactly four stages, no engine)
 
 | Stage | Entry agent | Governing document(s) |
 |---|---|---|
-| Backlog definition | `project-manager` (operator-gated intake + curates — `dd-backlog-definition`), `product-engineer` (reads to author) | `specs/backlog/**` |
+| Backlog definition | `project-manager` (intake+curate), `product-engineer` (reads to author) | `specs/backlog/**` |
 | Release definition | `product-engineer` | SPEC, PLAN, TASKS |
 | Implementation + reviews | surface implementer, then the review trio | TASKS, review handoffs |
 | Audit | `project-auditor` | `specs/audits/**` |
 
-There is no parallel Markdown workflow catalog and no workflow executor to invoke.
+### Pre-Implementation Agreement
 
-## Dispatch Protocol
+- Settled at TASKS approval, not at implementation time.
+- The owning implementer set, `qa-engineer`, `code-reviewer`, `security-reviewer` must agree the task definition.
+- Missing agreement blocks TASKS approval.
 
-Only the top-level dispatcher calls other agents. Leaf specialists **cannot** chain
-further dispatch — the harness does not grant dispatch capability to sub-agents (this
-is a runtime fact, not a policy that an operator approval can lift). A leaf that needs
-another agent's work returns a handoff naming `next_handoff.agent`; the dispatcher
-routes it.
-
-Use this shape for sub-agent prompts:
-
-```json
-{
-  "subagent_type": "<agent-name>",
-  "description": "<one-sentence task summary>",
-  "prompt": "<full task prompt with input contract>"
-}
-```
-
-Every dispatch prompt starts with:
-
-```text
-## Input Contract
-- context: <context-name>
-- specs_dir: <absolute-path>
-- release_id: <release-id>
-- task_id: <task-id or n/a>
-- report_dir: .dadaia/reports/<context-name>/<agent-name>/
-- handoff_dir: .dadaia/handoff/<context-name>/
-- allowed_write_paths: <explicit paths or reports-only>
-```
-
-Reports land in:
-
-```text
-.dadaia/reports/<context-name>/<agent-name>/<UTC>-<task-slug>.html
-```
-
-Every HTML report that feeds another agent must have a handoff JSON file under:
-
-```text
-.dadaia/handoff/<context-name>/<UTC>-<agent-name>-<task-slug>.handoff.json
-```
-
-## Orchestration judgment (no engine backstop)
-
-The **ordered review/QA sequence** — the per-task → end-of-alpha → rc-ship transition
-ladder — is not mechanically enforced anywhere: there is no engine state machine and no
-gate that reads TASKS.md. It holds only because `project-manager` (dispatch discipline),
-implementers (marker discipline, `dadaia-task-manager`), and reviewers (evidence-backed
-`APPROVE`/`REQUEST_CHANGES`) each uphold their half. The only mechanical backstops are
-the git chokepoints (`DADAIA.md` §3): pre-commit warns and always allows; pre-push
-requires an APPROVED `security-reviewer` handoff whose `metrics.commit_sha` matches.
-
-This skill carries the **orchestration judgment** a document alone cannot supply: who may
-dispatch (dispatcher purity), the persona inventory and routing, decision authority,
-mediation, escalation, and the forbidden actions.
-
-## Review/QA gate cadence
-
-The gate-cadence table and its per-(task, segment) decision procedure moved to
-`dd-release-implement` (ADR #9/E-3) — the implementers' skill, not the dispatcher's.
-
-**Pre-Implementation Agreement (settled at TASKS approval, not at implementation time).**
-The task definition must be agreed by the owning implementer set, `qa-engineer`,
-`code-reviewer`, and `security-reviewer`. The approved task states implementation scope,
-declared write set, unit and integration test plan, E2E/validation plan, code-review
-criteria, security and privacy checks, and expected evidence paths. Missing agreement
-blocks TASKS approval.
-
-## Decision Authority
+### Decision authority
 
 | Domain | Primary authority | May object with evidence | Tie-breaker |
 |---|---|---|---|
@@ -141,109 +90,36 @@ blocks TASKS approval.
 | Drift scoring | project-auditor | product-engineer | product-engineer |
 | Orchestration | project-manager | any agent | operator |
 
-Evidence means a file:line citation, spec citation, command output, screenshot,
-or handoff JSON field. Objections without evidence do not block progress.
+### Escalation triggers — stop and surface to the operator when
 
-## Anti-Deadlock
-
-Use this when two agents remain blocked after one exchange:
-
-1. Each agent writes a `Conflict Position` section in its report.
-2. `project-manager` writes a synthesis report with the exact decision point.
-3. If the decision still cannot be resolved, call the Skill tool with `dd-grill-me`
-   and ask the operator one concrete question.
-
-The operator's answer must be reflected in SPEC, PLAN, TASKS, ADR, or memory as
-appropriate for the current phase.
-
-## Escalation Triggers
-
-Stop and surface to the operator when:
-
-1. Required `SPEC.md`, `PLAN.md`, `TASKS.md`, or `ACTIVE.md` files are missing
-   or not approved.
+1. Required `SPEC.md`/`PLAN.md`/`TASKS.md` or a resolvable `RELEASE.json` `phase` field are missing or not approved.
 2. A CRITICAL security issue is reported.
 3. A dispatched agent returns `[SCOPE ERROR]`.
 4. Three or more unresolved conflicts are open.
 5. The requested work requires an optional domain pack that is not installed.
-6. The requested workflow is unknown and cannot be decomposed into default
-   workflows without changing the spec.
+6. The requested workflow is unknown and cannot be decomposed into default workflows without changing the spec.
 
-## Forbidden Actions
+### Forbidden actions
 
 | Action | Why forbidden |
 |---|---|
-| Dispatchers editing outside `.dadaia/reports/` and `.dadaia/handoff/` | They are report/handoff-only roles. |
-| Recursive agent chains without operator approval | Breaks traceability. |
-| Marking tasks DONE without validation evidence | Skips acceptance. |
-| Push, PR, merge, deploy, release closure, or `[x]` before QA/code/security approval | Bypasses the quality gate. |
-| Editing `specs/` outside product-engineer authority | Breaks SDD ownership. |
-| Editing production files without a `[-]` task reservation | Breaks task traceability. |
-| Shipping private/project-specific details in public assets | Security and portability risk. |
+| Dispatchers editing outside `.dadaia/reports/` and `.dadaia/handoff/` | They are report/handoff-only roles |
+| Recursive agent chains without operator approval | Breaks traceability |
+| Marking tasks DONE without validation evidence | Skips acceptance |
+| Push, PR, merge, deploy, closure, or `[x]` before QA/code/security approval | Bypasses the quality gate |
+| Editing `specs/` outside product-engineer authority | Breaks SDD ownership |
+| Editing production files without a `[-]` task reservation | Breaks task traceability |
+| Shipping private/project-specific details in public assets | Security and portability risk |
 
-## Generic Playbooks
+### Generic playbooks
 
-### Playbook — architecture-review
-
-Entry: `software-architect`.
-
-Use for ADRs, dependency boundaries, cross-cutting migrations, or pattern
-selection. Architect reports the recommendation; implementation is dispatched
-only after the relevant SDD gate exists.
-
-### Playbook — tdd-cycle
-
-Entry: the surface implementer.
-
-Use for non-trivial logic. Engineer writes or updates a failing test, implements
-the smallest passing change, refactors if needed, then requests QA when
-operator-visible behavior changed.
-
-### Playbook — bug-fix-fastlane
-
-Entry: the surface implementer.
-
-Use for a reproducible defect with narrow blast radius. Include reproduction
-steps, expected/actual behavior, suspected files, and validation command.
-
-### Playbook — release-definition
-
-Entry: `product-engineer` (dispatched by `project-manager`).
-
-Use when the operator wants a new release built from reported bugs + backlog.
-`project-manager` dispatches `product-engineer` with the `dd-release-definition`
-skill, which owns the full protocol (sanitize reference, pick, bug-always-solved,
-the mandatory `dd-grill-me` session, SPEC authoring). See the `DADAIA.md` §6
-(Releases).
-
-### Playbook — security-patch
-
-Entry: `security-reviewer`.
-
-Reviewer triages severity and blast radius. `project-manager` then dispatches
-`software-engineer`, followed by security verification.
-
-### Playbook — deploy-validation-only
-
-Entry: `qa-engineer`.
-
-Use when deployment already happened and only smoke/evidence is needed. QA
-captures command output, screenshots, logs, or endpoint probes and writes a
-validation report.
-
-### Playbook — ai-entity-refinement
-
-Entry: `ai-engineer`.
-
-Use for public agents, skills, rules, workflows, commands, hooks, and runtime
-projection behavior. Scope must list exact files or globs. Public asset edits
-must pass `dadaia public doctor` and the public privacy gate.
-
-### Playbook — ai-engineer-recursive-bootstrap
-
-Entry: `ai-engineer`.
-
-Use only for the first restricted-scope self-edit of public AI entities. The
-task must name exact files or globs, keep the edit generic/public-safe, and end
-with `dadaia public doctor`, memory lint when memory is touched, and a privacy
-gate result.
+| Playbook | Entry | Use for |
+|---|---|---|
+| architecture-review | software-architect | ADRs, dependency boundaries, cross-cutting migrations, pattern selection |
+| tdd-cycle | surface implementer | Non-trivial logic: failing test, smallest passing change, refactor, QA request |
+| bug-fix-fastlane | surface implementer | Reproducible defect, narrow blast radius |
+| release-definition | product-engineer (dispatched by PM) | Building a release from bugs+backlog — see `dd-release-definition` |
+| security-patch | security-reviewer | Reviewer triages, PM dispatches engineer, then security verification |
+| deploy-validation-only | qa-engineer | Deployment already happened, only smoke/evidence needed |
+| ai-entity-refinement | ai-engineer | Public agents/skills/rules/commands/hooks; must pass `dadaia public doctor` |
+| ai-engineer-recursive-bootstrap | ai-engineer | First restricted-scope self-edit of public AI entities only |

@@ -35,6 +35,7 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
+from tests.helpers.release_state import write_release_phase
 
 pytestmark = [pytest.mark.integration]
 
@@ -72,14 +73,14 @@ def _seed_main_repo(repo: Path) -> None:
     release_dir.mkdir(parents=True)
     for name in ("SPEC.md", "PLAN.md", "TASKS.md"):
         (release_dir / name).write_text(f"# {name}\n\n> **Status:** Aprovado\n", encoding="utf-8")
-    (repo / "specs" / "releases" / "ACTIVE.md").write_text(
-        f"release: {_MAIN_RELEASE}\nphase: {_MAIN_PHASE}\n", encoding="utf-8"
-    )
+    # ACTIVE.md retired (v0.5.0 FR4/T-050-21A) -- the live phase is read directly off
+    # RELEASE.json (core.release_state.parse_release_state).
+    write_release_phase(repo / "specs", _MAIN_RELEASE, _MAIN_PHASE)
     mem = repo / "specs" / "memory" / "product"
     mem.mkdir(parents=True)
-    (repo / "specs" / "memory" / "tech-stack.md").write_text("# tech\nmain\n", encoding="utf-8")
+    (repo / "specs" / "memory" / "TECHSTACK.md").write_text("# tech\nmain\n", encoding="utf-8")
     (mem / "catalog.json").write_text('{"features": []}', encoding="utf-8")
-    # A2.8 (backlog doctor): an empty backlog/ dir with NO BACKLOG.md is a clean no-op.
+    # A2.8 (backlog doctor): an empty backlog/ dir with NO BACKLOG.json is a clean no-op.
     (repo / "specs" / "backlog").mkdir(parents=True)
     _git(repo, "-c", "init.defaultBranch=main", "init")
     _git(repo, "add", "-A")
@@ -89,22 +90,28 @@ def _seed_main_repo(repo: Path) -> None:
 def _seed_associated_repo(repo: Path) -> None:
     """The associated repo's OWN, DELIBERATELY DIVERGENT specs/ tree — committed to its
     own git history, exactly as A16.3 proves a real ``alive()`` clone would leave it."""
-    (repo / "specs" / "releases").mkdir(parents=True)
-    (repo / "specs" / "releases" / "ACTIVE.md").write_text(
-        f"release: {_ASSOC_RELEASE}\nphase: {_ASSOC_PHASE}\n", encoding="utf-8"
-    )
+    # ACTIVE.md retired (v0.5.0 FR4/T-050-21A) -- the decoy phase now lives in this
+    # repo's OWN RELEASE.json, which must never be read while resolving inside it.
+    write_release_phase(repo / "specs", _ASSOC_RELEASE, _ASSOC_PHASE)
     (repo / "specs" / "memory").mkdir(parents=True)
-    (repo / "specs" / "memory" / "tech-stack.md").write_text(
+    (repo / "specs" / "memory" / "TECHSTACK.md").write_text(
         f"# the associated repo's OWN tech stack\n{_ASSOC_MEMORY_MARKER}\n", encoding="utf-8"
     )
     (repo / "specs" / "backlog").mkdir(parents=True)
-    (repo / "specs" / "backlog" / "BACKLOG.md").write_text(
-        "## ACTIVE\n\n"
-        f"### {_ASSOC_BACKLOG_SLUG}\n"
-        "- **Title:** Broken on purpose\n"
-        "- **Opened:** 2026-08-23\n"
-        "- **Description:** missing Status and Provenance — a BL-SCHEMA violation.\n\n"
-        "## LEDGER\n",
+    (repo / "specs" / "backlog" / "BACKLOG.json").write_text(
+        json.dumps(
+            {
+                "schema": "backlog-v1",
+                "active": [
+                    {
+                        "id": _ASSOC_BACKLOG_SLUG,
+                        "title": "Broken on purpose",
+                        "opened": "2026-08-23",
+                        "description": "missing status and provenance — a BL-SCHEMA violation.",
+                    }
+                ],
+            }
+        ),
         encoding="utf-8",
     )
     _git(repo, "-c", "init.defaultBranch=main", "init")
@@ -188,8 +195,8 @@ def test_backlog_doctor_from_inside_associated_repo_never_sees_the_associated_ba
 
     result = _runner.invoke(app, ["backlog", "doctor"])
 
-    # The MAIN repo's backlog/ has no BACKLOG.md at all (A2.8: absent -> clean, exit 0).
-    # If this had instead resolved to the associated repo's own (broken) BACKLOG.md, the
+    # The MAIN repo's backlog/ has no BACKLOG.json at all (A2.8: absent -> clean, exit 0).
+    # If this had instead resolved to the associated repo's own (broken) BACKLOG.json, the
     # BL-SCHEMA violation would fail the command (exit 1) and name the broken slug.
     assert result.exit_code == 0, result.output
     assert "clean" in result.output
@@ -198,7 +205,7 @@ def test_backlog_doctor_from_inside_associated_repo_never_sees_the_associated_ba
 
 # --------------------------------------------------------------------------- #
 # SDD gate — the phase decision for a write INSIDE the associated repo's own
-# specs/memory/ still reads the MAIN repo's ACTIVE.md phase, never the associated
+# specs/memory/ still reads the MAIN repo's RELEASE.json phase, never the associated
 # repo's own (divergent) one.
 # --------------------------------------------------------------------------- #
 
@@ -218,11 +225,11 @@ def _run_gate(
 def test_gate_memory_write_inside_associated_repo_is_governed_by_the_main_repos_phase(
     workspace: Path,
 ) -> None:
-    """The associated repo's own ``specs/releases/ACTIVE.md`` claims phase DEFINITION
-    (which would ALLOW a memory write); the MAIN repo's real phase is IMPLEMENTATION
-    (which BLOCKs one). A write physically inside ``repos/assoc-repo/specs/memory/``
-    must be BLOCKed on the MAIN's phase — proving the gate never reads the associated
-    repo's own ACTIVE.md."""
+    """The associated repo's own ``specs/releases/<id>/RELEASE.json`` claims phase
+    DEFINITION (which would ALLOW a memory write); the MAIN repo's real phase is
+    IMPLEMENTATION (which BLOCKs one). A write physically inside
+    ``repos/assoc-repo/specs/memory/`` must be BLOCKed on the MAIN's phase — proving
+    the gate never reads the associated repo's own RELEASE.json."""
     target = workspace / "repos" / _ASSOC_SLUG / "specs" / "memory" / "leak-probe.md"
     target.parent.mkdir(parents=True, exist_ok=True)
 

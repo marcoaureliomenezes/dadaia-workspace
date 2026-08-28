@@ -2,51 +2,20 @@
 slug: cross-platform-portability
 title: cross-platform-portability
 category: product
-tldr: Linux, macOS, and Windows support through a single platform capability seam, injected adapters, Python hooks, and hard-gated cross-OS tests.
-summary: >-
-  `core/platform.py` owns platform detection. OS-sensitive behavior is behind ports and
-  infrastructure adapters; security failures are loud, non-security features degrade
-  explicitly, and unsupported capabilities fail at construction.
-tags:
-- platform
-- cross-platform
-- portability
-- windows
-- macos
-- linux
-last_updated: '2026-07-13'
-release_origin: v0.2.3
+tldr: Linux, macOS and Windows through one platform capability seam, injected adapters, Python hooks and hard-gated cross-OS CI legs.
+summary: core/platform.py is the single capability seam and the container selects adapters; security failures are loud, non-security features degrade explicitly, unsupported capabilities fail at construction.
+tags: [platform, cross-platform, portability, windows, macos, linux]
 ---
 
-## Purpose
+## Seam and validation
 
-The package imports and the CLI starts on Linux, macOS, and Windows. Feature code does
-not scatter platform checks; `core/platform.py` is the capability source and
-`container.py` selects adapters.
-
-## Adapter Boundaries
-
-Ports cover telemetry refresh serialization, file permissions, process probing,
-process ancestry, and shutdown handling. Infrastructure supplies POSIX/Windows
-implementations. Workspace/Spec Context coordination itself has no file-lock port.
-
-Security controls fail loudly when a platform cannot provide them. Non-security
-features may degrade with an explicit log and bounded behavior. Unsupported critical
-capabilities fail during service construction.
-
-## Hooks
-
-Harness governance hooks are Python modules. Kimi Code invokes them through user-level
-TypeScript extension. Git chokepoints remain shell scripts because Git for Windows
-ships a compatible shell: `pre-commit-presence-gate.sh` and `pre-push-ci-gate.sh`.
-
-## Validation
-
-CI hard-gates Windows/macOS importability plus unit/contract subsets. Linux runs the
-integration and browser suites that depend on local process/network facilities.
-Repository contracts prevent new unauthorized `sys.platform`, `fcntl`, or adapter
-construction sites.
+- The package imports and the CLI starts on Linux, macOS and Windows, with no platform check scattered in feature code: `core/platform.py` (`Capabilities`, `detect()`) is the capability source and `container.py` selects adapters.
+- Ports cover telemetry refresh serialization, file permissions, process probing, ancestry and shutdown, with POSIX and Windows implementations in `infrastructure/`.
+- Spec Context coordination itself has no file-lock port.
+- Security controls fail loudly when a platform cannot provide them, non-security features degrade with an explicit log, and an unsupported critical capability fails at service construction.
+- Harness governance hooks are Python modules invoked through per-harness wrappers or shims, while the git chokepoints stay shell scripts and run regardless of harness hook support ([[sdd-gate-v3]]).
+- CI hard-gates Windows/macOS importability plus unit and contract subsets, Linux running the integration and browser suites; repository contracts refuse new unauthorized `sys.platform`, `fcntl` or adapter construction sites.
 
 ## Dependencies
 
-[[workspace-init]], [[sdd-gate-v3]], [[architecture]], [[multi-platform-parity]].
+[[workspace-init]], [[sdd-gate-v3]], [[architecture]], [[public-asset-distribution]].
