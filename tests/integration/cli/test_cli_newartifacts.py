@@ -4,8 +4,8 @@ Intent: CONTRACT — v0.12.0 A3.1, A3.3 (CLI byte-diff coverage lives in the uni
 
 `release new` (SPEC.md + Draft status + release-id in body + Owner/Opened fields +
 existing-dir exits non-zero, unchanged by SPEC v0.12.0) and `backlog new` (now authors
-an ACTIVE subsection into BACKLOG.md — the `[ok] created:` / `[error]` CLI contract is
-preserved, SPEC FR3).
+an active[] entry into BACKLOG.json — the `[ok] created:` / `[error]` CLI contract is
+preserved, SPEC FR3; operator ruling 2026-08-28 for the JSON storage swap).
 
 (The legacy ``dadaia bug new`` command was retired in v0.1.53 — bugs are event-sourced
 JSONL via ``dadaia bugs append``.)
@@ -13,6 +13,7 @@ JSONL via ``dadaia bugs append``.)
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -62,14 +63,14 @@ def test_release_new_and_backlog_new(specs: Path) -> None:
     assert backlog_result.exit_code == 0, backlog_result.output
     assert "[ok] created:" in backlog_result.output
 
-    target = specs / "backlog" / "BACKLOG.md"
+    target = specs / "backlog" / "BACKLOG.json"
     assert target.is_file()
-    backlog_content = target.read_text(encoding="utf-8")
-    assert "## ACTIVE" in backlog_content
-    assert "### cool-idea" in backlog_content
-    assert "- **Title:** cool-idea" in backlog_content
-    assert "- **Status:** idea" in backlog_content
-    assert "- **Opened:**" in backlog_content
+    backlog_doc = json.loads(target.read_text(encoding="utf-8"))
+    assert backlog_doc["schema"] == "backlog-v1"
+    entry = next(e for e in backlog_doc["active"] if e["id"] == "cool-idea")
+    assert entry["title"] == "cool-idea"
+    assert entry["status"] == "idea"
+    assert entry["opened"]
 
     # A3.3: the slug-uniqueness refusal (not file-level no-clobber) — same CLI exit
     # code class / `[error]` contract as the retired file-level check.
@@ -96,7 +97,7 @@ def test_backlog_new_reports_concurrent_modification_as_error_exit_1(
     import dadaia_workspace.cli.commands.newartifacts as newartifacts_module
 
     def _raise_concurrent_modification(*_args: object, **_kwargs: object) -> object:
-        raise ConcurrentModificationError(specs / "backlog" / "BACKLOG.md")
+        raise ConcurrentModificationError(specs / "backlog" / "BACKLOG.json")
 
     monkeypatch.setattr(newartifacts_module, "backlog_new", _raise_concurrent_modification)
 

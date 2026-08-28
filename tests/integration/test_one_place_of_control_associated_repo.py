@@ -80,7 +80,7 @@ def _seed_main_repo(repo: Path) -> None:
     mem.mkdir(parents=True)
     (repo / "specs" / "memory" / "TECHSTACK.md").write_text("# tech\nmain\n", encoding="utf-8")
     (mem / "catalog.json").write_text('{"features": []}', encoding="utf-8")
-    # A2.8 (backlog doctor): an empty backlog/ dir with NO BACKLOG.md is a clean no-op.
+    # A2.8 (backlog doctor): an empty backlog/ dir with NO BACKLOG.json is a clean no-op.
     (repo / "specs" / "backlog").mkdir(parents=True)
     _git(repo, "-c", "init.defaultBranch=main", "init")
     _git(repo, "add", "-A")
@@ -98,13 +98,20 @@ def _seed_associated_repo(repo: Path) -> None:
         f"# the associated repo's OWN tech stack\n{_ASSOC_MEMORY_MARKER}\n", encoding="utf-8"
     )
     (repo / "specs" / "backlog").mkdir(parents=True)
-    (repo / "specs" / "backlog" / "BACKLOG.md").write_text(
-        "## ACTIVE\n\n"
-        f"### {_ASSOC_BACKLOG_SLUG}\n"
-        "- **Title:** Broken on purpose\n"
-        "- **Opened:** 2026-08-23\n"
-        "- **Description:** missing Status and Provenance — a BL-SCHEMA violation.\n\n"
-        "## LEDGER\n",
+    (repo / "specs" / "backlog" / "BACKLOG.json").write_text(
+        json.dumps(
+            {
+                "schema": "backlog-v1",
+                "active": [
+                    {
+                        "id": _ASSOC_BACKLOG_SLUG,
+                        "title": "Broken on purpose",
+                        "opened": "2026-08-23",
+                        "description": "missing status and provenance — a BL-SCHEMA violation.",
+                    }
+                ],
+            }
+        ),
         encoding="utf-8",
     )
     _git(repo, "-c", "init.defaultBranch=main", "init")
@@ -188,8 +195,8 @@ def test_backlog_doctor_from_inside_associated_repo_never_sees_the_associated_ba
 
     result = _runner.invoke(app, ["backlog", "doctor"])
 
-    # The MAIN repo's backlog/ has no BACKLOG.md at all (A2.8: absent -> clean, exit 0).
-    # If this had instead resolved to the associated repo's own (broken) BACKLOG.md, the
+    # The MAIN repo's backlog/ has no BACKLOG.json at all (A2.8: absent -> clean, exit 0).
+    # If this had instead resolved to the associated repo's own (broken) BACKLOG.json, the
     # BL-SCHEMA violation would fail the command (exit 1) and name the broken slug.
     assert result.exit_code == 0, result.output
     assert "clean" in result.output

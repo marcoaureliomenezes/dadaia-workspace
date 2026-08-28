@@ -163,11 +163,15 @@ pip-wheel-metadata/
 /specs/bugs/_archive/**/local-notes.md
 /specs/bugs/_archive/**/tmp/
 # Backlog is PM-curated repository truth (backlog-ownership + release-governance;
-# v0.1.49 FR1). Top-level backlog/ stays a narrow *.md opt-in; _archive/ is fully
-# tracked (widened from *.md-only, same reason as bugs/_archive/ above).
+# v0.1.49 FR1). Top-level backlog/ stays a narrow *.md/*.json opt-in (operator ruling
+# 2026-08-28 widened *.md-only to include *.json: the single-source document moved
+# from BACKLOG.md to BACKLOG.json — AGENTS.md stays *.md, the document is *.json now,
+# same class as bugs/'s *.md + *.jsonl pair above); _archive/ is fully tracked
+# (widened from *.md-only, same reason as bugs/_archive/ above).
 !/specs/backlog/
 /specs/backlog/*
 !/specs/backlog/*.md
+!/specs/backlog/*.json
 !/specs/backlog/_archive/
 !/specs/backlog/_archive/**
 # F-20 (T-050-36 security review): see the audits/ADRs comment above — same class,

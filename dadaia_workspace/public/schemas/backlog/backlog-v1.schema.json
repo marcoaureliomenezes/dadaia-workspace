@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "backlog-v1",
+  "title": "Backlog Document v1",
+  "description": "The single-source specs/backlog/BACKLOG.json document (operator ruling 2026-08-28: 'BACKLOG.md e BACKLOG.json — estruturado' — the live-photo Markdown grammar, ## ACTIVE with ### <slug> subsections plus fenced-YAML **Intents:** blocks, is retired; every field it carried becomes a native JSON field, nothing lost). One document, one top-level object: 'active' is the live photo of every candidate/idea backlog item (mirrors the retired ActiveItem shape 1:1 — id/title/opened/status/description/provenance plus an optional typed intents[] array, no more fenced YAML). A closed item's terminal record does NOT live in this document — it already moved to the append-only, JSON-native specs/backlog/_archive/backlog_histo.jsonl at v0.5.0 FR5 (one BacklogHistoRecord line per exit), and stays there: folding a mutable live list and an immutable append-only exit ledger back into one rewritten-in-place JSON blob would resurrect the exact duplicate-closure failure mode (the retired in-document ## LEDGER, BL-DUP) that FR5 deleted structurally, not merely disabled. 'schema' pins the document version so a reader never has to sniff a Markdown-vs-JSON ambiguity again.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "active"],
+  "properties": {
+    "schema": {
+      "const": "backlog-v1",
+      "description": "Document schema id — always the literal string 'backlog-v1'."
+    },
+    "active": {
+      "type": "array",
+      "description": "One entry per live candidate/idea backlog item, in document order — the exact set the retired '## ACTIVE' Markdown section held, one '### <slug>' subsection per array entry. 'id' is unique within this array (the retired same-slug-twice-in-ACTIVE check, now a plain array-uniqueness invariant enforced by dadaia_workspace.features.backlog.document.load_document, surfaced as BL-SCHEMA — BL-DUP itself stays deleted, not reinstated, per v0.5.0 A5.2: a duplicate EXIT is still structurally impossible because exits never land back in this array).",
+      "items": { "$ref": "#/$defs/activeItem" }
+    }
+  },
+  "$defs": {
+    "activeItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "opened", "status", "description", "provenance"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]+$",
+          "description": "Backlog slug — the retired '### <slug>' heading text. Stable identity; never renumbered or reused."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Short human-readable name — the retired '**Title:**' bullet."
+        },
+        "opened": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "ISO 8601 date (YYYY-MM-DD) the entry was opened — the retired '**Opened:**' bullet."
+        },
+        "status": {
+          "type": "string",
+          "description": "Live-stage token (e.g. 'idea', 'candidate', 'picked', or another live/non-terminal token) — the retired '**Status:**' bullet. The backlog status vocabulary is deliberately informal beyond the 'idea' intents-exemption gate (dd-backlog-definition SS2); the six canonical TERMINAL disposition tokens (core.models.backlog.TERMINAL_DISPOSITION_TOKENS) are refused here by BL-STALE — a terminal status belongs to a backlog_histo.jsonl record, never a live 'active' entry.",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "description": "One-paragraph description of the need — the retired '**Description:**' bullet."
+        },
+        "provenance": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Where this entry came from (operator request, or an intake-report item id + approval date) — the retired '**Provenance:**' bullet."
+        },
+        "intents": {
+          "type": "array",
+          "description": "Optional typed intents[] — the retired fenced ```yaml **Intents:** code span, now native JSON. Every subject binds one change to one canonical subject anchor (dadaia_workspace.core.models.backlog.parse_intents is the one parser/validator, shared by both the pre-migration Markdown reader's old fenced block and this native array). Required once 'status' matures past 'idea' (dd-backlog-definition SS2, BL-SCHEMA); absent or empty is doctor-clean at 'idea'.",
+          "items": { "$ref": "#/$defs/intent" }
+        }
+      }
+    },
+    "intent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["subject", "change"],
+      "properties": {
+        "subject": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "ref"],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": ["code", "api", "cli", "panel", "doc", "invariant", "catalog"],
+              "description": "The registry source class this subject ref resolves against (dadaia_workspace.core.models.backlog.SubjectKind)."
+            },
+            "ref": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The typed reference itself — 'path/to/module.py#Symbol' for kind=code (module-relative only; an absolute/operator-local path is refused at construction), a 'dadaia <command>' id for kind=cli, a catalog.json feature slug for kind=catalog, a SPEC-DOC id or memory heading anchor for kind=doc, an INV-* id for kind=invariant."
+            },
+            "surface": {
+              "type": "string",
+              "enum": ["existing", "new"],
+              "default": "existing",
+              "description": "'existing' (default) — ref must resolve to a live registry anchor. 'new' — this item INTRODUCES the surface; bound by declared identity, never forced onto an unrelated existing anchor."
+            }
+          }
+        },
+        "change": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable delta this item proposes for the bound subject."
+        }
+      }
+    }
+  }
+}

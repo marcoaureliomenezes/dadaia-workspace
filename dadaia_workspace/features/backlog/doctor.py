@@ -1,14 +1,15 @@
 """``backlog doctor`` — the ENFORCED backstop (SPEC v0.12.0 FR2, ADR-D, ADR D8; v0.5.0
-FR5, A5.2).
+FR5, A5.2; operator ruling 2026-08-28 — ``BACKLOG.md`` -> ``BACKLOG.json``).
 
 Three checks, run by **one parameterized check engine** (SPEC §3.8 #8 — no copy-paste
 fan-out): each check is a ``BacklogCheck`` (a code + a callable over the shared
 :class:`DoctorContext`), and the engine maps the same loop over all of them.
 
 * **BL-SCHEMA** — every non-``idea`` item has bound ``intents[]`` (every subject resolves
-  in the registry) + a valid status; a structurally invalid ``intents:``/``**Intents:**``
-  block is also BL-SCHEMA; a located :class:`~dadaia_workspace.features.backlog.document.DocumentError`
-  (a missing required key) is one BL-SCHEMA per error.
+  in the registry) + a valid status; a structurally invalid ``intents`` value is also
+  BL-SCHEMA; a located :class:`~dadaia_workspace.features.backlog.document.DocumentError`
+  (a missing required key, or a duplicate ``id`` in ``active[]``) is one BL-SCHEMA per
+  error.
 * **BL-CONFLICT** — two items share an anchor with incompatible change → ERROR (the divergent
   twin, caught even when hand-written; classifier ``DIVERGENT_CONFLICT``).
 * **BL-STALE** (re-defined, ADR D8; v0.5.0 A5.2) — an ACTIVE item already
@@ -21,12 +22,16 @@ fan-out): each check is a ``BacklogCheck`` (a code + a callable over the shared
   condition's replacement — v0.5.0 FR5), OR its own ``Status`` is one of the six
   canonical terminal disposition tokens.
 
-**BL-DUP is DELETED, not disabled (v0.5.0 A5.2).** With ``BACKLOG.md`` holding only
-``## ACTIVE`` and every exit landing as one append-only ``backlog_histo.jsonl`` record
-keyed by slug, a duplicate EXIT is structurally impossible — there is no second place a
-slug's closure could be hand-duplicated into. `BL check codes 4 -> 3`; the classifier's
-``DUPLICATE`` verdict (same anchor-set + change on two live items) and the
-same-slug-twice-in-``ACTIVE`` check retire with it — both existed to police the
+**BL-DUP is DELETED, not disabled (v0.5.0 A5.2) — still true under the JSON document.**
+With ``BACKLOG.json`` holding only the live ``active[]`` array and every exit landing as
+one append-only ``backlog_histo.jsonl`` record keyed by slug, a duplicate EXIT is
+structurally impossible — there is no second place a slug's closure could be
+hand-duplicated into (the migration to JSON does not reopen this: ``backlog_histo.jsonl``
+stays the one, append-only exit ledger; it is not folded back into ``BACKLOG.json``). `BL
+check codes 4 -> 3`; the classifier's ``DUPLICATE`` verdict (same anchor-set + change on
+two live items) and the same-id-twice-in-``active`` check (now a plain
+:class:`~dadaia_workspace.features.backlog.document.DocumentError`, surfaced as
+BL-SCHEMA rather than a dedicated code) retire with BL-DUP — both existed to police the
 dual-section document's duplicate-closure failure mode this task's SPEC (FR5) names as
 its bug-history evidence, not an independent invariant.
 
@@ -36,9 +41,9 @@ already-built :class:`~dadaia_workspace.core.protocols.record_store.RecordStore`
 via ``core.protocols``, never a direct ``infrastructure`` import). The CLI
 (``cli/commands/newartifacts.py``) and the pre-commit/CI chokepoint
 (``cli/commands/ci.py`` + ``public/scripts/``) are thin wirings over :func:`run_backlog_doctor`,
-which reads the single source ``specs/backlog/BACKLOG.md`` through
-:func:`~dadaia_workspace.features.backlog.document.load_document` (SPEC v0.12.0 FR1, ADR #14)
-— the T-120-08 cutover; there is no per-entry fallback.
+which reads the single source ``specs/backlog/BACKLOG.json`` through
+:func:`~dadaia_workspace.features.backlog.document.load_document` (SPEC v0.12.0 FR1, ADR #14;
+operator ruling 2026-08-28) — there is no per-entry fallback and no Markdown dual path.
 """
 
 from __future__ import annotations
@@ -71,13 +76,9 @@ __all__ = [
 
 #: A located document-level error whose own message already IS the intents diagnostic
 #: surfaced (once, deduplicated) via the item's own ``intents_error`` in the per-item
-#: loop below — skipped here so a malformed ``**Intents:**``/``intents:`` block never
-#: produces two findings for the same item.
-_INTENTS_DOCUMENT_ERROR_PREFIXES = (
-    "malformed intents[] YAML:",
-    "malformed intents[] frontmatter:",
-    "**Intents:** key present",
-)
+#: loop below — skipped here so a malformed ``intents`` value never produces two
+#: findings for the same item.
+_INTENTS_DOCUMENT_ERROR_PREFIXES = ("malformed intents[] frontmatter:",)
 
 #: The one status EXEMPT from the resolvable-typed-intents requirement (v0.1.55 FR5, bug
 #: ``backlog-new-stub-readme-lag-intents-schema``). An ``idea`` is an unbound brainstorm: it
@@ -167,8 +168,8 @@ class DoctorContext:
 def _check_schema(ctx: DoctorContext) -> list[Finding]:
     findings: list[Finding] = []
     # Items whose own intents_error already covers the diagnostic (below) — skip the
-    # matching DocumentError so a malformed **Intents:**/intents: block never produces
-    # two findings for the same item.
+    # matching DocumentError so a malformed 'intents' value never produces two findings
+    # for the same item.
     intents_error_slugs = {item.slug for item in ctx.items if item.intents_error is not None}
     malformed_slugs: set[str] = set()
     for error in ctx.document_errors:
@@ -188,8 +189,8 @@ def _check_schema(ctx: DoctorContext) -> list[Finding]:
             # covers this item — downstream schema noise for it is suppressed, exactly
             # as a frontmatter/intents parse failure suppresses it below (FR10).
             continue
-        # A malformed ``intents:``/``**Intents:**`` block is always BL-SCHEMA, at ANY
-        # status (FR10, v0.1.65 — preserved bit for bit over the new shape).
+        # A malformed 'intents' value is always BL-SCHEMA, at ANY status (FR10, v0.1.65
+        # — preserved bit for bit over the JSON-native shape).
         if item.intents_error is not None:
             findings.append(
                 Finding(
@@ -331,7 +332,7 @@ def run_backlog_doctor(
     histo_store: RecordStore[BacklogHistoRecord] | None = None,
     consumed_histo_store: RecordStore[ConsumedBacklogHistoRecord] | None = None,
 ) -> list[Finding]:
-    """Run BL-SCHEMA/CONFLICT/STALE over the single-source ``BACKLOG.md`` and return
+    """Run BL-SCHEMA/CONFLICT/STALE over the single-source ``BACKLOG.json`` and return
     all findings.
 
     All roots are injected (SPEC §3.8 #6), including ``cli_anchors`` — the pre-derived
@@ -353,11 +354,12 @@ def run_backlog_doctor(
     ``consumed_backlog.json`` sidecars into one ``consumed_histo_store``-backed file
     before FR6/T-050-14 deletes the tree they lived under).
 
-    Reads ``specs/backlog/BACKLOG.md`` through
+    Reads ``specs/backlog/BACKLOG.json`` through
     :func:`~dadaia_workspace.features.backlog.document.load_document` (SPEC v0.12.0 FR1/FR2,
-    ADR #14 — T-120-08 cutover): an absent document yields an empty model, so a context with
-    no backlog is a clean no-op (A2.8). Findings are returned in check order then item order;
-    an empty list ⇒ a clean backlog.
+    ADR #14; operator ruling 2026-08-28 — BACKLOG.md is DELETED, not kept as a fallback):
+    an absent document yields an empty model, so a context with no backlog is a clean
+    no-op (A2.8). Findings are returned in check order then item order; an empty list ⇒
+    a clean backlog.
     """
     registry = build_registry(
         source_root=source_root,

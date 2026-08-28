@@ -38,6 +38,7 @@ Owner: software-engineer
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import stat
@@ -110,19 +111,31 @@ def _init_context_repo(workspace: Path, slug: str) -> Path:
 
 def _plant_backlog_doctor_violation(repo: Path) -> None:
     """A BL-SCHEMA violation (an unresolved subject symbol) — the exact shape the
-    deleted integration test used to prove the (now-removed) blocking gate against."""
-    (repo / "specs" / "backlog" / "BACKLOG.md").write_text(
-        "## ACTIVE\n\n"
-        "### bad-item\n"
-        "- **Title:** Bad\n"
-        "- **Opened:** 2026-08-15\n"
-        "- **Status:** candidate\n"
-        "- **Description:** references a phantom symbol.\n"
-        "- **Provenance:** operator request\n"
-        "- **Intents:**\n```yaml\n"
-        "- subject:\n    kind: code\n    ref: dadaia_workspace/m.py#Ghost\n  change: x\n"
-        "```\n\n"
-        "## LEDGER\n",
+    deleted integration test used to prove the (now-removed) blocking gate against.
+    ``BACKLOG.json`` (operator ruling 2026-08-28) replaces the retired ``BACKLOG.md``
+    Markdown grammar — the content shape changes, the violation itself does not."""
+    (repo / "specs" / "backlog" / "BACKLOG.json").write_text(
+        json.dumps(
+            {
+                "schema": "backlog-v1",
+                "active": [
+                    {
+                        "id": "bad-item",
+                        "title": "Bad",
+                        "opened": "2026-08-15",
+                        "status": "candidate",
+                        "description": "references a phantom symbol.",
+                        "provenance": "operator request",
+                        "intents": [
+                            {
+                                "subject": {"kind": "code", "ref": "dadaia_workspace/m.py#Ghost"},
+                                "change": "x",
+                            }
+                        ],
+                    }
+                ],
+            }
+        ),
         encoding="utf-8",
     )
 
@@ -150,7 +163,7 @@ def test_pre_commit_exits_0_on_a_staged_set_backlog_doctor_would_reject(
     workspace = tmp_path
     repo = _init_context_repo(workspace, "demo-ctx")
     _plant_backlog_doctor_violation(repo)
-    subprocess.run(["git", "add", "specs/backlog/BACKLOG.md"], cwd=repo, check=True)
+    subprocess.run(["git", "add", "specs/backlog/BACKLOG.json"], cwd=repo, check=True)
 
     stub = workspace / "dadaia-stub.sh"
     _write_dadaia_forwarder(stub)

@@ -1,7 +1,9 @@
 """Typed ``intents[]`` backlog item schema (SPEC §3.1, ADR-A), plus
 :class:`BacklogHistoRecord` (v0.5.0 FR5, A5.1) — the one-record-per-exit shape appended to
-``specs/backlog/_archive/backlog_histo.jsonl`` when a ``### <slug>`` ``## ACTIVE``
-subsection leaves ``BACKLOG.md``.
+``specs/backlog/_archive/backlog_histo.jsonl`` when an ``active[]`` entry leaves the live
+document (``specs/backlog/BACKLOG.json`` — operator ruling 2026-08-28; ``BACKLOG.md``'s
+retired ``### <slug>`` ``## ACTIVE`` Markdown subsection shape is the historical
+predecessor this field naming still echoes).
 
 The ``(subject{kind,ref} -> change)`` frontmatter shape every backlog item carries. This is
 a **pure** domain model: it validates that a ref is *well-formed for its kind*, but it does
@@ -297,8 +299,8 @@ class BacklogHistoRecord:
     ``specs/backlog/_archive/backlog_histo.jsonl`` through the generic
     :class:`~dadaia_workspace.core.protocols.record_store.RecordStore` seam
     (``infrastructure.jsonl_record_store.JsonlRecordStore``, composed at
-    ``container.build_backlog_histo_store``) when a ``### <slug>`` ``## ACTIVE``
-    subsection leaves ``BACKLOG.md`` (any disposition).
+    ``container.build_backlog_histo_store``) when an ``active[]`` entry leaves
+    ``BACKLOG.json`` (any disposition).
 
     ``id`` IS the backlog slug — the record's identity and the
     :class:`~dadaia_workspace.core.protocols.record_store.RecordStore` key. With one

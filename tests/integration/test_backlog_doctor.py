@@ -1,35 +1,34 @@
 """Integration tests for the BL-SCHEMA/CONFLICT/STALE checks over the single-source
-``BACKLOG.md`` document model (SPEC v0.12.0 FR2, ADR D8, PLAN §6, §8; v0.5.0 FR5, A5.2).
+``BACKLOG.json`` document model (SPEC v0.12.0 FR2, ADR D8, PLAN §6, §8; v0.5.0 FR5,
+A5.2; operator ruling 2026-08-28 — ``BACKLOG.md`` -> ``BACKLOG.json``).
 
 Intent: CONTRACT — v0.12.0 A2.1-A2.4, A2.6-A2.8, A3.5, A5.6; v0.5.0 A5.2, A5.5
 
 **BL-DUP is DELETED (v0.5.0 A5.2), not disabled** — see ``dadaia_workspace.features.
 backlog.doctor``'s module docstring for the structural argument (a duplicate exit is
-impossible once ``BACKLOG.md`` holds only ``## ACTIVE`` and every exit lands as one
-append-only, slug-keyed ``backlog_histo.jsonl`` record). The two BL-DUP-subject tests
-this file used to carry — ``test_duplicate_slug_in_active_fires_bl_dup``
-(same-slug-twice-in-ACTIVE) and ``test_same_anchor_same_change_fires_bl_dup_pairwise``
-(classifier ``DUPLICATE`` verdict) — are deleted with their subject (qa-engineer
-test-minimization verdict, ``specs/releases/0.5.0/reviews/
-qa-engineer-test-minimization-review.md:221``: "BL-DUP rule + tests — structurally
-impossible, deleted not disabled"), replaced by BL-STALE's new histo-backed condition
+impossible once the document holds only a live ``active[]`` array and every exit lands
+as one append-only, slug-keyed ``backlog_histo.jsonl`` record; migrating the live
+document from Markdown to JSON does not reopen this — ``backlog_histo.jsonl`` stays
+untouched, out of this task's write set). The two BL-DUP-subject tests this file used to
+carry are deleted with their subject, replaced by BL-STALE's histo-backed condition
 (``test_active_slug_with_histo_record_fires_bl_stale`` /
 ``test_no_histo_store_supplied_is_a_noop_for_that_condition``) and a BL-SCHEMA-only
-version of the duplicate-top-level-heading regression this file also carried.
+version of the duplicate-heading regression (now a duplicate-``id``-in-``active``
+regression, since JSON has no "heading" concept to duplicate).
 
 The three BL-* checks are exercised by a **single parameterized** test (one fixture
 matrix) — NOT four copy-pasted functions (SPEC §3.8 #8). A planted violation per check
 ERRORs; a clean tree passes (no findings). Roots injected over a ``tmp_path`` fixture.
 
 Most tests below drive :func:`document.load_document` + :func:`doctor.run_checks`
-DIRECTLY over inline ``BACKLOG.md`` fixtures — fine-grained control over the check
+DIRECTLY over inline ``BACKLOG.json`` fixtures — fine-grained control over the check
 engine, independent of the CLI wiring. ``_CHECKS``, ``Finding``, ``Severity`` and the
 message texts are the SAME symbols the CLI-facing :func:`doctor.run_backlog_doctor`
 uses — this is the same engine, fed the same (fixture-built) item source by hand. The
 final section proves the wiring itself: :func:`run_backlog_doctor` (wired to
-:func:`document.load_document` since the T-120-08 cutover) and ``specs doctor``'s
-backlog-surface checks agree on the same tree (A5.6), and a freshly authored
-``backlog_new`` subsection passes both out of the box (A3.5).
+:func:`document.load_document`) and ``specs doctor``'s backlog-surface checks agree on
+the same tree (A5.6), and a freshly authored ``backlog_new`` entry passes both out of
+the box (A3.5).
 """
 
 from __future__ import annotations
@@ -58,22 +57,28 @@ pytestmark = pytest.mark.integration
 # A minimal source root the registry scans for code anchors.
 _SOURCE = "class Widget:\n    pass\n\n\nclass Gadget:\n    pass\n"
 
-_ACTIVE_SUBSECTION = """\
-### {slug}
-- **Title:** {title}
-- **Opened:** 2026-08-10
-- **Status:** {status}
-- **Description:** {slug} needs a change.
-- **Provenance:** operator request
-{intents_block}
-"""
 
-
-def _intents_block(ref: str, change: str) -> str:
-    return (
-        "- **Intents:**\n```yaml\n"
-        f"- subject:\n    kind: code\n    ref: {ref}\n  change: {change}\n```\n"
-    )
+def _active_entry(
+    slug: str,
+    title: str,
+    status: str,
+    *,
+    ref: str | None = None,
+    change: str | None = None,
+    **overrides: object,
+) -> dict[str, object]:
+    entry: dict[str, object] = {
+        "id": slug,
+        "title": title,
+        "opened": "2026-08-10",
+        "status": status,
+        "description": f"{slug} needs a change.",
+        "provenance": "operator request",
+    }
+    if ref is not None:
+        entry["intents"] = [{"subject": {"kind": "code", "ref": ref}, "change": change}]
+    entry.update(overrides)
+    return entry
 
 
 class _FakeHistoStore:
@@ -158,9 +163,9 @@ def _build_roots(tmp_path: Path) -> tuple[Path, Path]:
     return specs, src
 
 
-def _write_backlog_md(specs: Path, active_body: str) -> None:
-    text = f"## ACTIVE\n\n{active_body}"
-    (specs / "backlog" / "BACKLOG.md").write_text(text, encoding="utf-8")
+def _write_backlog_json(specs: Path, active: list[dict[str, object]]) -> None:
+    text = json.dumps({"schema": "backlog-v1", "active": active})
+    (specs / "backlog" / "BACKLOG.json").write_text(text, encoding="utf-8")
 
 
 def _run(
@@ -195,46 +200,43 @@ def _run(
     return run_checks(ctx)
 
 
-# ── A2.1 — a clean consolidated BACKLOG.md yields zero findings, exit 0 ─────────────
+# ── A2.1 — a clean consolidated BACKLOG.json yields zero findings, exit 0 ───────────
 
 
 def test_clean_document_yields_zero_findings(tmp_path: Path) -> None:
     specs, src = _build_roots(tmp_path)
-    active = _ACTIVE_SUBSECTION.format(
-        slug="clean-one",
-        title="Clean one",
-        status="idea",
-        intents_block="",
-    ) + _ACTIVE_SUBSECTION.format(
-        slug="clean-two",
-        title="Clean two",
-        status="candidate",
-        intents_block=_intents_block("pkg/m.py#Widget", "tweak Widget"),
-    )
-    _write_backlog_md(specs, active)
+    active = [
+        _active_entry("clean-one", "Clean one", "idea"),
+        _active_entry(
+            "clean-two", "Clean two", "candidate", ref="pkg/m.py#Widget", change="tweak Widget"
+        ),
+    ]
+    _write_backlog_json(specs, active)
     findings = _run(specs, src)
     assert findings == [], [f.to_dict() for f in findings]
 
 
-# ── A2.2 — a subsection missing a required key fires exactly one BL-SCHEMA ERROR ────
+# ── A2.2 — an entry missing a required key fires exactly one BL-SCHEMA ERROR ────────
 
 
 def test_missing_required_key_fires_exactly_one_bl_schema_naming_slug(tmp_path: Path) -> None:
     specs, src = _build_roots(tmp_path)
-    active = (
-        "### broken-item\n"
-        "- **Title:** Broken\n"
-        "- **Opened:** 2026-08-10\n"
-        "- **Description:** Missing Status and Provenance.\n\n"
-    )
-    _write_backlog_md(specs, active)
+    active = [
+        {
+            "id": "broken-item",
+            "title": "Broken",
+            "opened": "2026-08-10",
+            "description": "Missing status and provenance.",
+        }
+    ]
+    _write_backlog_json(specs, active)
     findings = _run(specs, src)
     schema_findings = [f for f in findings if f.slug == "broken-item"]
     assert len(schema_findings) == 1, [f.to_dict() for f in findings]
     assert schema_findings[0].code is BacklogDoctorCode.BL_SCHEMA
     assert schema_findings[0].severity is Severity.ERROR
-    assert "Status" in schema_findings[0].message
-    assert "Provenance" in schema_findings[0].message
+    assert "status" in schema_findings[0].message
+    assert "provenance" in schema_findings[0].message
 
 
 # ── A2.3 — candidate with no Intents fires BL-SCHEMA; idea does not (FR5 preserved) ──
@@ -242,10 +244,8 @@ def test_missing_required_key_fires_exactly_one_bl_schema_naming_slug(tmp_path: 
 
 def test_candidate_with_no_intents_fires_but_idea_does_not(tmp_path: Path) -> None:
     specs, src = _build_roots(tmp_path)
-    active = _ACTIVE_SUBSECTION.format(
-        slug="candidate-no-intents", title="Cand", status="candidate", intents_block=""
-    )
-    _write_backlog_md(specs, active)
+    active = [_active_entry("candidate-no-intents", "Cand", "candidate")]
+    _write_backlog_json(specs, active)
     findings = _run(specs, src)
     assert any(
         f.code is BacklogDoctorCode.BL_SCHEMA and "no intents[] declared" in f.message
@@ -253,29 +253,29 @@ def test_candidate_with_no_intents_fires_but_idea_does_not(tmp_path: Path) -> No
     ), [f.to_dict() for f in findings]
 
     specs2, src2 = _build_roots(tmp_path / "idea-case")
-    active2 = _ACTIVE_SUBSECTION.format(
-        slug="idea-no-intents", title="Idea", status="idea", intents_block=""
-    )
-    _write_backlog_md(specs2, active2)
+    active2 = [_active_entry("idea-no-intents", "Idea", "idea")]
+    _write_backlog_json(specs2, active2)
     findings2 = _run(specs2, src2)
     assert findings2 == [], [f.to_dict() for f in findings2]
 
 
-# ── A2.4 — a malformed intents YAML block fires BL-SCHEMA at ANY status ─────────────
+# ── A2.4 — a structurally invalid intents value fires BL-SCHEMA at ANY status ───────
 
 
-def test_malformed_intents_yaml_fires_at_any_status_including_idea(tmp_path: Path) -> None:
+def test_malformed_intents_value_fires_at_any_status_including_idea(tmp_path: Path) -> None:
     specs, src = _build_roots(tmp_path)
-    active = (
-        "### bad-intents\n"
-        "- **Title:** Bad\n"
-        "- **Opened:** 2026-08-10\n"
-        "- **Status:** idea\n"
-        "- **Description:** malformed intents block.\n"
-        "- **Provenance:** operator request\n"
-        "- **Intents:**\n```yaml\njust_a_string\n```\n\n"
-    )
-    _write_backlog_md(specs, active)
+    active = [
+        {
+            "id": "bad-intents",
+            "title": "Bad",
+            "opened": "2026-08-10",
+            "status": "idea",
+            "description": "malformed intents value.",
+            "provenance": "operator request",
+            "intents": "just_a_string",
+        }
+    ]
+    _write_backlog_json(specs, active)
     findings = _run(specs, src)
     assert any(
         f.code is BacklogDoctorCode.BL_SCHEMA
@@ -289,18 +289,11 @@ def test_malformed_intents_yaml_fires_at_any_status_including_idea(tmp_path: Pat
 
 def test_divergent_anchor_change_fires_bl_conflict(tmp_path: Path) -> None:
     specs, src = _build_roots(tmp_path)
-    active = _ACTIVE_SUBSECTION.format(
-        slug="twin-d",
-        title="D",
-        status="candidate",
-        intents_block=_intents_block("pkg/m.py#Widget", "change to D"),
-    ) + _ACTIVE_SUBSECTION.format(
-        slug="twin-e",
-        title="E",
-        status="candidate",
-        intents_block=_intents_block("pkg/m.py#Widget", "change to E"),
-    )
-    _write_backlog_md(specs, active)
+    active = [
+        _active_entry("twin-d", "D", "candidate", ref="pkg/m.py#Widget", change="change to D"),
+        _active_entry("twin-e", "E", "candidate", ref="pkg/m.py#Widget", change="change to E"),
+    ]
+    _write_backlog_json(specs, active)
     findings = _run(specs, src)
     assert any(f.code is BacklogDoctorCode.BL_CONFLICT for f in findings), [
         f.to_dict() for f in findings
@@ -313,18 +306,11 @@ def test_bl_dup_code_no_longer_exists(tmp_path: Path) -> None:
     classifier's own ``DUPLICATE`` verdict is unchanged, ``classifier.py`` is out of
     this task's write set; this doctor simply never asks for it any more)."""
     specs, src = _build_roots(tmp_path)
-    active = _ACTIVE_SUBSECTION.format(
-        slug="dup-a",
-        title="A",
-        status="candidate",
-        intents_block=_intents_block("pkg/m.py#Widget", "refactor Widget"),
-    ) + _ACTIVE_SUBSECTION.format(
-        slug="dup-b",
-        title="B",
-        status="candidate",
-        intents_block=_intents_block("pkg/m.py#Widget", "refactor Widget"),
-    )
-    _write_backlog_md(specs, active)
+    active = [
+        _active_entry("dup-a", "A", "candidate", ref="pkg/m.py#Widget", change="refactor Widget"),
+        _active_entry("dup-b", "B", "candidate", ref="pkg/m.py#Widget", change="refactor Widget"),
+    ]
+    _write_backlog_json(specs, active)
     findings = _run(specs, src)
     assert "BL-DUP" not in {f.code.value for f in findings}, [f.to_dict() for f in findings]
     assert not hasattr(BacklogDoctorCode, "BL_DUP")
@@ -336,13 +322,16 @@ def test_bl_dup_code_no_longer_exists(tmp_path: Path) -> None:
 
 def test_active_slug_with_histo_record_fires_bl_stale(tmp_path: Path) -> None:
     specs, src = _build_roots(tmp_path)
-    active = _ACTIVE_SUBSECTION.format(
-        slug="shipped-but-still-active",
-        title="Shipped",
-        status="candidate",
-        intents_block=_intents_block("pkg/m.py#Widget", "already shipped"),
-    )
-    _write_backlog_md(specs, active)
+    active = [
+        _active_entry(
+            "shipped-but-still-active",
+            "Shipped",
+            "candidate",
+            ref="pkg/m.py#Widget",
+            change="already shipped",
+        )
+    ]
+    _write_backlog_json(specs, active)
     store = _FakeHistoStore([_histo_record("shipped-but-still-active")])
     findings = _run(specs, src, histo_store=store)
     stale = [f for f in findings if f.code is BacklogDoctorCode.BL_STALE]
@@ -354,13 +343,12 @@ def test_no_histo_store_supplied_is_a_noop_for_that_condition(tmp_path: Path) ->
     """No ``histo_store`` (``run_backlog_doctor``'s own default) degrades to a no-op —
     mirrors ``read_consumed``'s absent-ledger no-op, never a false ERROR."""
     specs, src = _build_roots(tmp_path)
-    active = _ACTIVE_SUBSECTION.format(
-        slug="live-feature",
-        title="Live",
-        status="candidate",
-        intents_block=_intents_block("pkg/m.py#Widget", "still live"),
-    )
-    _write_backlog_md(specs, active)
+    active = [
+        _active_entry(
+            "live-feature", "Live", "candidate", ref="pkg/m.py#Widget", change="still live"
+        )
+    ]
+    _write_backlog_json(specs, active)
     findings = _run(specs, src)
     assert not any(f.code is BacklogDoctorCode.BL_STALE for f in findings), [
         f.to_dict() for f in findings
@@ -368,29 +356,24 @@ def test_no_histo_store_supplied_is_a_noop_for_that_condition(tmp_path: Path) ->
 
 
 # ── A2.7/v0.5.0 A5.5 — an ACTIVE item whose slug is recorded in the relocated
-# consumed-backlog histo ledger fires BL-STALE (condition (a); T-050-13A). Replaces
-# ``test_slug_in_archived_consumed_ledger_fires_bl_stale`` /
-# ``test_no_archived_ledger_is_a_noop_for_that_condition`` (deleted — SPEC A2.7's
-# subject, the directory-glob-over-``specs/_archive/<release>/consumed_backlog.json``
-# read, no longer exists; ``read_consumed`` now takes an injected
-# ``RecordStore[ConsumedBacklogHistoRecord] | None``, so those fixtures would not even
-# type-check against the new signature) ──────────────────────────────────────────────
+# consumed-backlog histo ledger fires BL-STALE (condition (a); T-050-13A) ───────────
 
 
 def test_active_slug_with_consumed_histo_record_fires_bl_stale(tmp_path: Path) -> None:
-    """BL-STALE condition (a), re-fed by the relocated
-    ``consumed_backlog_histo.jsonl`` store (T-050-13A/A5.5) instead of the
-    pre-relocation ``specs/_archive/<release-id>/consumed_backlog.json`` directory
-    glob FR6 deletes: an ACTIVE item whose slug already appears in a relocated
+    """BL-STALE condition (a), fed by the relocated ``consumed_backlog_histo.jsonl``
+    store (T-050-13A/A5.5): an ACTIVE item whose slug already appears in a relocated
     release's ``consumed[]`` entries still fires."""
     specs, src = _build_roots(tmp_path)
-    active = _ACTIVE_SUBSECTION.format(
-        slug="already-shipped-elsewhere",
-        title="Already shipped",
-        status="candidate",
-        intents_block=_intents_block("pkg/m.py#Widget", "duplicate of a shipped item"),
-    )
-    _write_backlog_md(specs, active)
+    active = [
+        _active_entry(
+            "already-shipped-elsewhere",
+            "Already shipped",
+            "candidate",
+            ref="pkg/m.py#Widget",
+            change="duplicate of a shipped item",
+        )
+    ]
+    _write_backlog_json(specs, active)
     store = _FakeConsumedHistoStore(
         [
             _consumed_record(
@@ -411,13 +394,12 @@ def test_no_consumed_store_supplied_is_a_noop_for_that_condition(tmp_path: Path)
     """No ``consumed_store`` injected degrades to a no-op for condition (a) — mirrors
     the pre-relocation absent-ledger no-op (A5.5), never a false ERROR."""
     specs, src = _build_roots(tmp_path)
-    active = _ACTIVE_SUBSECTION.format(
-        slug="live-feature-2",
-        title="Live",
-        status="candidate",
-        intents_block=_intents_block("pkg/m.py#Widget", "still live"),
-    )
-    _write_backlog_md(specs, active)
+    active = [
+        _active_entry(
+            "live-feature-2", "Live", "candidate", ref="pkg/m.py#Widget", change="still live"
+        )
+    ]
+    _write_backlog_json(specs, active)
     findings = _run(specs, src)
     assert not any(f.code is BacklogDoctorCode.BL_STALE for f in findings), [
         f.to_dict() for f in findings
@@ -428,13 +410,16 @@ def test_active_item_with_own_terminal_status_fires_bl_stale(tmp_path: Path) -> 
     """The third BL-STALE ORed condition (ADR D8): an ACTIVE item's own ``Status`` is
     itself one of the six canonical terminal disposition tokens."""
     specs, src = _build_roots(tmp_path)
-    active = _ACTIVE_SUBSECTION.format(
-        slug="mis-statused",
-        title="Mis-statused",
-        status="DELIVERED",
-        intents_block=_intents_block("pkg/m.py#Widget", "already shipped"),
-    )
-    _write_backlog_md(specs, active)
+    active = [
+        _active_entry(
+            "mis-statused",
+            "Mis-statused",
+            "DELIVERED",
+            ref="pkg/m.py#Widget",
+            change="already shipped",
+        )
+    ]
+    _write_backlog_json(specs, active)
     findings = _run(specs, src)
     stale = [f for f in findings if f.code is BacklogDoctorCode.BL_STALE]
     assert any(f.slug == "mis-statused" for f in stale), [f.to_dict() for f in findings]
@@ -445,33 +430,55 @@ def test_deferred_active_status_fires_bl_stale(tmp_path: Path) -> None:
     the literal repro from the report: an ACTIVE entry with ``Status: deferred``.
     ``deferred`` IS one of the six canonical terminal disposition tokens
     (``core.models.backlog.TERMINAL_DISPOSITION_TOKENS``), so BL-STALE firing here is the
-    correct, decided behaviour — not the bug. The statement that was actually wrong was
-    ``dd-backlog-definition`` SKILL.md listing ``deferred`` as a live ACTIVE status; see
-    ``tests/contract/test_backlog_status_vocabulary_contract.py`` for that half."""
+    correct, decided behaviour."""
     specs, src = _build_roots(tmp_path)
-    active = _ACTIVE_SUBSECTION.format(
-        slug="prematurely-deferred",
-        title="Prematurely deferred",
-        status="deferred",
-        intents_block=_intents_block("pkg/m.py#Widget", "still needs a home"),
-    )
-    _write_backlog_md(specs, active)
+    active = [
+        _active_entry(
+            "prematurely-deferred",
+            "Prematurely deferred",
+            "deferred",
+            ref="pkg/m.py#Widget",
+            change="still needs a home",
+        )
+    ]
+    _write_backlog_json(specs, active)
     findings = _run(specs, src)
     stale = [f for f in findings if f.code is BacklogDoctorCode.BL_STALE]
     assert any(f.slug == "prematurely-deferred" for f in stale), [f.to_dict() for f in findings]
 
 
-# ── A2.8 — an absent BACKLOG.md yields zero findings and exit 0 ─────────────────────
+# ── A2.8 — an absent BACKLOG.json yields zero findings and exit 0 ───────────────────
 
 
-def test_absent_backlog_md_yields_zero_findings(tmp_path: Path) -> None:
+def test_absent_backlog_json_yields_zero_findings(tmp_path: Path) -> None:
     specs, src = _build_roots(tmp_path)
-    # No BACKLOG.md written at all.
+    # No BACKLOG.json written at all.
     findings = _run(specs, src)
     assert findings == [], [f.to_dict() for f in findings]
 
 
-# ── T-120-08 cutover — run_backlog_doctor (CLI-facing) reads the document model ─────
+# ── the JSON-native replacement for bug backlog-doctor-silent-on-duplicate-top-level-
+# sections: a duplicate ``id`` in ``active[]`` fires BL-SCHEMA and is never clean ────
+
+
+def test_duplicate_id_in_active_fires_bl_schema_and_is_never_clean(tmp_path: Path) -> None:
+    specs, src = _build_roots(tmp_path)
+    active = [
+        _active_entry("dup-item", "First", "idea"),
+        _active_entry("dup-item", "Second", "idea"),
+    ]
+    _write_backlog_json(specs, active)
+    findings = _run(specs, src)
+    errors = [f for f in findings if f.severity is Severity.ERROR]
+    assert errors, "a duplicated-id BACKLOG.json must never report clean"
+    schema_findings = [
+        f for f in findings if f.code is BacklogDoctorCode.BL_SCHEMA and "duplicate id" in f.message
+    ]
+    assert len(schema_findings) == 1, [f.to_dict() for f in findings]
+    assert "'dup-item'" in schema_findings[0].message
+
+
+# ── the wired CLI-facing entry point (run_backlog_doctor) ───────────────────────────
 
 
 def _run_wired(
@@ -497,20 +504,18 @@ def _run_wired(
 
 
 def test_run_backlog_doctor_reads_the_single_source_document(tmp_path: Path) -> None:
-    """T-120-08 cutover: the CLI-facing ``run_backlog_doctor`` reads
-    ``specs/backlog/BACKLOG.md`` through :func:`document.load_document` — a clean
-    document yields zero findings through the wired entry point."""
+    """The CLI-facing ``run_backlog_doctor`` reads ``specs/backlog/BACKLOG.json``
+    through :func:`document.load_document` — a clean document yields zero findings
+    through the wired entry point."""
     specs, src = _build_roots(tmp_path)
-    active = _ACTIVE_SUBSECTION.format(
-        slug="wired-clean", title="Wired", status="idea", intents_block=""
-    )
-    _write_backlog_md(specs, active)
+    active = [_active_entry("wired-clean", "Wired", "idea")]
+    _write_backlog_json(specs, active)
     findings = _run_wired(specs, src)
     assert findings == [], [f.to_dict() for f in findings]
 
 
 def test_run_backlog_doctor_absent_document_is_a_clean_noop(tmp_path: Path) -> None:
-    """A2.8 over the wired entry point: no BACKLOG.md ⇒ zero findings, not an error."""
+    """A2.8 over the wired entry point: no BACKLOG.json ⇒ zero findings, not an error."""
     specs, src = _build_roots(tmp_path)
     findings = _run_wired(specs, src)
     assert findings == [], [f.to_dict() for f in findings]
@@ -519,18 +524,20 @@ def test_run_backlog_doctor_absent_document_is_a_clean_noop(tmp_path: Path) -> N
 def test_run_backlog_doctor_default_histo_store_is_a_noop(tmp_path: Path) -> None:
     """``run_backlog_doctor``'s ``histo_store``/``consumed_histo_store`` parameters
     default to ``None`` — a caller that supplies neither (e.g. a fixture like this
-    one) stays a clean no-op for both histo BL-STALE conditions, exactly like the
-    pre-relocation ``consumed_backlog.json`` no-op behaviour. The real CLI callsite
+    one) stays a clean no-op for both histo BL-STALE conditions. The real CLI callsite
     (``cli/commands/newartifacts.py``) wires both through the container (v0.5.0
     T-050-13A) — this fixture only proves the library function's own default."""
     specs, src = _build_roots(tmp_path)
-    active = _ACTIVE_SUBSECTION.format(
-        slug="terminal-status-only",
-        title="Terminal by its own Status",
-        status="DELIVERED",
-        intents_block=_intents_block("pkg/m.py#Widget", "shipped"),
-    )
-    _write_backlog_md(specs, active)
+    active = [
+        _active_entry(
+            "terminal-status-only",
+            "Terminal by its own Status",
+            "DELIVERED",
+            ref="pkg/m.py#Widget",
+            change="shipped",
+        )
+    ]
+    _write_backlog_json(specs, active)
     findings = _run_wired(specs, src)
     # Condition (c) — own terminal Status — still fires with no histo_store at all.
     stale = [f for f in findings if f.code is BacklogDoctorCode.BL_STALE]
@@ -540,18 +547,21 @@ def test_run_backlog_doctor_default_histo_store_is_a_noop(tmp_path: Path) -> Non
 def test_run_backlog_doctor_wired_consumed_histo_store_fires_condition_a(
     tmp_path: Path,
 ) -> None:
-    """The CLI-facing ``run_backlog_doctor`` wired with a real
-    ``consumed_histo_store`` fires BL-STALE condition (a) — the exact shape
-    ``cli/commands/newartifacts.py``'s ``backlog_doctor_cmd`` now wires through
-    ``container.build_consumed_backlog_histo_store`` (v0.5.0 T-050-13A/A5.5)."""
+    """The CLI-facing ``run_backlog_doctor`` wired with a real ``consumed_histo_store``
+    fires BL-STALE condition (a) — the exact shape ``cli/commands/newartifacts.py``'s
+    ``backlog_doctor_cmd`` wires through ``container.build_consumed_backlog_histo_store``
+    (v0.5.0 T-050-13A/A5.5)."""
     specs, src = _build_roots(tmp_path)
-    active = _ACTIVE_SUBSECTION.format(
-        slug="already-shipped-wired",
-        title="Already shipped",
-        status="candidate",
-        intents_block=_intents_block("pkg/m.py#Widget", "duplicate of a shipped item"),
-    )
-    _write_backlog_md(specs, active)
+    active = [
+        _active_entry(
+            "already-shipped-wired",
+            "Already shipped",
+            "candidate",
+            ref="pkg/m.py#Widget",
+            change="duplicate of a shipped item",
+        )
+    ]
+    _write_backlog_json(specs, active)
     consumed_store = _FakeConsumedHistoStore(
         [
             _consumed_record(
@@ -565,51 +575,37 @@ def test_run_backlog_doctor_wired_consumed_histo_store_fires_condition_a(
     assert any(f.slug == "already-shipped-wired" for f in stale), [f.to_dict() for f in findings]
 
 
-# ── bug backlog-doctor-silent-on-duplicate-top-level-sections — end-to-end through the
-# wired CLI-facing entry point (v0.5.0 A5.2: BL-SCHEMA only now, BL-DUP retired) ────
-
-
-def test_duplicated_active_sections_fire_bl_schema_and_are_never_clean(
+def test_duplicated_id_fires_bl_schema_through_the_wired_entry_point(
     tmp_path: Path,
 ) -> None:
-    """Intent: CONTRACT — bug backlog-doctor-silent-on-duplicate-top-level-sections.
-
-    The exact reported repro through the wired, CLI-facing entry point, adjusted for
-    the single-section document (v0.5.0 A5.2 — the fixture's duplicated ``## LEDGER``
-    half retired with the section itself): two ``## ACTIVE`` headings, the same slug
-    present in both copies. Expected: one BL-SCHEMA error for the repeated heading —
+    """The JSON-native replacement for bug
+    ``backlog-doctor-silent-on-duplicate-top-level-sections``, proven end-to-end through
+    the wired, CLI-facing entry point: one BL-SCHEMA error for the duplicated ``id`` —
     never a clean report."""
     specs, src = _build_roots(tmp_path)
-    text = (
-        "## ACTIVE\n\n"
-        + _ACTIVE_SUBSECTION.format(slug="dup-item", title="First", status="idea", intents_block="")
-        + "\n## ACTIVE\n\n"
-        + _ACTIVE_SUBSECTION.format(
-            slug="dup-item", title="Second", status="idea", intents_block=""
-        )
-    )
-    (specs / "backlog" / "BACKLOG.md").write_text(text, encoding="utf-8")
+    active = [
+        _active_entry("dup-item", "First", "idea"),
+        _active_entry("dup-item", "Second", "idea"),
+    ]
+    _write_backlog_json(specs, active)
 
     findings = _run_wired(specs, src)
     errors = [f for f in findings if f.severity is Severity.ERROR]
-    assert errors, "a duplicated-section BACKLOG.md must never report clean"
+    assert errors, "a duplicated-id BACKLOG.json must never report clean"
 
     schema_findings = [
-        f
-        for f in findings
-        if f.code is BacklogDoctorCode.BL_SCHEMA
-        and "duplicate top-level section heading" in f.message
+        f for f in findings if f.code is BacklogDoctorCode.BL_SCHEMA and "duplicate id" in f.message
     ]
     assert len(schema_findings) == 1, [f.to_dict() for f in findings]
-    assert "'ACTIVE'" in schema_findings[0].message
+    assert "'dup-item'" in schema_findings[0].message
 
 
-# ── A3.5 — a freshly authored subsection is clean under BOTH doctors ────────────────
+# ── A3.5 — a freshly authored entry is clean under BOTH doctors ─────────────────────
 
 
-def test_freshly_authored_subsection_is_clean_under_both_doctors(tmp_path: Path) -> None:
+def test_freshly_authored_entry_is_clean_under_both_doctors(tmp_path: Path) -> None:
     """A3.5 (R-13, the producer-passes-its-own-validator rule): ``backlog_new``'s
-    freshly appended ACTIVE subsection is ``backlog doctor``-clean AND ``specs
+    freshly appended ``active[]`` entry is ``backlog doctor``-clean AND ``specs
     doctor``-clean out of the box — proven over the real writer + both live doctors,
     not fixtures hand-built to match the parser."""
     from dadaia_workspace.features.backlog.document import backlog_new
@@ -631,7 +627,7 @@ def test_freshly_authored_subsection_is_clean_under_both_doctors(tmp_path: Path)
 
 def test_two_doctors_agree_on_clean_and_violation_trees(tmp_path: Path) -> None:
     """A5.6: ``backlog doctor`` and ``specs doctor`` never contradict on the same tree.
-    (a) a clean ``BACKLOG.md`` is accepted by both. (b) a planted ACTIVE-schema
+    (a) a clean ``BACKLOG.json`` is accepted by both. (b) a planted ACTIVE-schema
     violation is rejected by ``backlog doctor`` (BL-SCHEMA ERROR) while ``specs
     doctor``'s backlog-surface checks (SPEC-DOC-031/035) stay silent on it — nothing
     consumed, no loose file — so neither doctor contradicts the other."""
@@ -642,20 +638,24 @@ def test_two_doctors_agree_on_clean_and_violation_trees(tmp_path: Path) -> None:
 
     # (a) clean tree — both doctors accept.
     specs_a, src_a = _build_roots(tmp_path / "clean")
-    active = _ACTIVE_SUBSECTION.format(
-        slug="agree-clean", title="Clean", status="idea", intents_block=""
-    )
-    _write_backlog_md(specs_a, active)
+    active = [_active_entry("agree-clean", "Clean", "idea")]
+    _write_backlog_json(specs_a, active)
     assert _run_wired(specs_a, src_a) == []
     assert _backlog_surface_issues(specs_a) == []
 
     # (b) a planted ACTIVE-schema violation — backlog doctor rejects (ERROR); specs
     # doctor's backlog-surface checks stay silent.
     specs_b, src_b = _build_roots(tmp_path / "violation")
-    (specs_b / "backlog" / "BACKLOG.md").write_text(
-        "## ACTIVE\n\n### broken\n- **Title:** Broken\n- **Opened:** 2026-08-10\n"
-        "- **Description:** missing Status and Provenance.\n",
-        encoding="utf-8",
+    _write_backlog_json(
+        specs_b,
+        [
+            {
+                "id": "broken",
+                "title": "Broken",
+                "opened": "2026-08-10",
+                "description": "missing status and provenance.",
+            }
+        ],
     )
     findings_b = _run_wired(specs_b, src_b)
     errors = [f for f in findings_b if f.severity is Severity.ERROR]

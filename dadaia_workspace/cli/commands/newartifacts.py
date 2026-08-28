@@ -2,12 +2,15 @@
 
 Implements:
 - dadaia release new <id>    → specs/releases/<id>/SPEC.md stub
-- dadaia backlog new <slug>  → specs/backlog/<slug>.md stub
+- dadaia backlog new <slug>  → appends one active[] entry to specs/backlog/BACKLOG.json
 - dadaia backlog subjects    → read-only resolve/preview of canonical subjects (v0.1.25 R1)
-- dadaia backlog doctor      → BL-SCHEMA/DUP/CONFLICT/STALE backlog-consistency check (R1)
+- dadaia backlog doctor      → BL-SCHEMA/CONFLICT/STALE backlog-consistency check (BL-DUP
+  deleted, not disabled, v0.5.0 A5.2)
 
 The legacy ``dadaia bug new`` Markdown scaffolder was retired in v0.1.53 — bugs are
-event-sourced JSONL via ``dadaia bugs append`` (the v0.1.46 canon).
+event-sourced JSONL via ``dadaia bugs append`` (the v0.1.46 canon). ``BACKLOG.md`` support
+is retired outright (operator ruling 2026-08-28) — the single source is
+``specs/backlog/BACKLOG.json``, schema ``public/schemas/backlog/backlog-v1.schema.json``.
 """
 
 from __future__ import annotations
@@ -128,11 +131,11 @@ def backlog_new_cmd(
         help="Path to specs/ directory. Default: resolve from bound context session.",
     ),
 ) -> None:
-    """Append one ``## ACTIVE`` subsection for <slug> to specs/backlog/BACKLOG.md.
+    """Append one ``active[]`` entry for <slug> to specs/backlog/BACKLOG.json.
 
-    Creates the document (with both ``## ACTIVE`` and ``## LEDGER`` section headings)
-    first when it does not yet exist (SPEC v0.12.0 FR3, ADR #14 — the single-source
-    document, not a per-entry file).
+    Creates the document (``{"schema": "backlog-v1", "active": []}``) first when it does
+    not yet exist (SPEC v0.12.0 FR3, ADR #14; operator ruling 2026-08-28 — the
+    single-source JSON document, not a per-entry file and not Markdown).
     """
     target = _resolve_specs_dir(specs_dir)
 
@@ -247,13 +250,13 @@ def backlog_doctor_cmd(
         False, "--explain", help="Print the per-item bound-anchor resolution alongside findings."
     ),
 ) -> None:
-    """Run BL-SCHEMA/DUP/CONFLICT/STALE over the live backlog; exit non-zero on any ERROR.
+    """Run BL-SCHEMA/CONFLICT/STALE over the live backlog; exit non-zero on any ERROR.
 
     This is the ENFORCED backstop (ADR-D): wired into the pre-commit chokepoint + CI, it
     rejects a hand-written divergent twin even though ``specs/backlog/`` is ADDITIVE —
-    ``BACKLOG.md`` (the single source, SPEC v0.12.0 FR1/ADR #14) is committed repository
-    truth (``.gitignore:133-142`` opts ``*.md`` back in). ``--explain`` additionally
-    prints how each item's subjects resolved.
+    ``BACKLOG.json`` (the single source, SPEC v0.12.0 FR1/ADR #14; operator ruling
+    2026-08-28) is committed repository truth. ``--explain`` additionally prints how
+    each item's subjects resolved.
     """
     from dadaia_workspace.cli.anchors import derive_cli_anchors
     from dadaia_workspace.features.backlog.doctor import Severity, run_backlog_doctor
@@ -297,9 +300,9 @@ def backlog_doctor_cmd(
 def _explain_backlog(specs_dir: Path, src: Path, catalog_path: Path, alias_map_path: Path) -> None:
     """Print how each ACTIVE backlog item's subjects bind to canonical anchors (read-only).
 
-    Reads the single source ``specs/backlog/BACKLOG.md`` through
+    Reads the single source ``specs/backlog/BACKLOG.json`` through
     :func:`~dadaia_workspace.features.backlog.document.load_document` (SPEC v0.12.0
-    FR1/FR2, ADR #14 — T-120-08 cutover).
+    FR1/FR2, ADR #14; operator ruling 2026-08-28).
     """
     from dadaia_workspace.cli.anchors import derive_cli_anchors
     from dadaia_workspace.features.backlog.document import load_document
