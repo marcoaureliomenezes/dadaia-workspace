@@ -29,7 +29,10 @@ def test_contract_tier_carries_30s_timeout(request: pytest.FixtureRequest) -> No
     assert marker is not None, "conftest applied no timeout marker to a contract-tier test"
     from tests import conftest
 
-    assert marker.args and marker.args[0] == conftest.tier_timeout_seconds("contract")
+    covered = bool(getattr(request.config.option, "cov_source", None))
+    assert marker.args and marker.args[0] == conftest.tier_timeout_seconds(
+        "contract", coverage=covered
+    )
 
 
 @pytest.mark.timeout(45)
