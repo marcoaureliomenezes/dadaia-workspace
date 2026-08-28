@@ -121,6 +121,8 @@ import jsonschema
 import pytest
 from typer.main import get_command
 
+from tests.helpers.scan_population import assert_populated
+
 pytestmark = pytest.mark.contract
 
 # Resolved the same way infrastructure/public_assets.py resolves `public/`:
@@ -204,7 +206,12 @@ def _section_title(section_field: str) -> str:
 
 
 def _skills_on_disk(skills_dir: Path = _SKILLS_DIR) -> set[str]:
-    return {p.parent.name for p in skills_dir.glob("*/SKILL.md")}
+    skills = {p.parent.name for p in skills_dir.glob("*/SKILL.md")}
+    # v0.4.5 FR5 (scan-test-vacuity-guard): a mis-rooted _SKILLS_DIR would degrade this
+    # to an empty set, under which several `violations == []` consumers below
+    # (test_every_skill_on_disk_is_mapped, the line-ceiling check, ...) pass vacuously.
+    assert_populated(skills, sentinel="dd-cli-library")
+    return skills
 
 
 def _mapped_skills(map_data: dict[str, Any]) -> set[str]:

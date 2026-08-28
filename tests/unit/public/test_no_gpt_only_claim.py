@@ -24,6 +24,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from tests.helpers.scan_population import assert_populated
+
 #: Repo root: tests/unit/public/<this file> → parents[3] == repo root.
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _SOURCE_ROOT = _REPO_ROOT / "dadaia_workspace"
@@ -56,9 +58,9 @@ def _violations() -> list[str]:
 
 
 def test_no_surviving_gpt_only_claim() -> None:
-    # Sanity folded in: the scan set is non-empty (a silent empty glob would pass
-    # vacuously).
-    assert _scanned_files(), "doc-lint scan found no files under dadaia_workspace/"
+    # v0.4.5 FR5 (scan-test-vacuity-guard): non-empty alone would still miss a
+    # partially mis-rooted walk; the sentinel half pins a real package file.
+    assert_populated(_scanned_files(), sentinel=_SOURCE_ROOT / "__init__.py")
 
     violations = _violations()
     assert violations == [], (

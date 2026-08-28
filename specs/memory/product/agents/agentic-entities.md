@@ -2,7 +2,7 @@
 slug: agentic-entities
 title: agentic-entities
 category: product
-tldr: Abstract-entity registry — Personas, Behaviors, Rules, universal surface — plus the one rules-skills map and its single deterministic enforcer.
+tldr: Abstract-entity registry — Personas, Behaviors, Rules; one rules-skills map with one enforcer; the measured always-on budget.
 summary: >-
   The workspace method is defined abstractly first: `public/entities/registry.json`
   holds the Personas, Deterministic Behaviors, Abstract Rules, and universal
@@ -13,7 +13,10 @@ summary: >-
   class. A 21-skill surface maps to the law through one machine-readable
   rules-skills map with one deterministic enforcer, which also carries the citation check
   and the invocation-model equivalence; the retired collision lint left with its
-  hard-coded table. The panel
+  hard-coded table. The always-on load — law chain plus nine persona bodies plus the skill
+  descriptions — is measured (~20.5k tokens, 257 negations) against a ≤3.5k/≤60 target it
+  does not meet, with the gap named structurally; every removal carries a coverage table
+  and a pointer replaces a restatement. The panel
   renders the registry in the Agentic Entities tab and as the Personas section of the
   Agents tab.
 tags:
@@ -21,8 +24,8 @@ tags:
 - entities
 - derivation
 - governance
-last_updated: '2026-08-24'
-release_origin: v0.3.0
+last_updated: '2026-08-27'
+release_origin: v0.4.5
 ---
 
 ## The derivation law
@@ -117,6 +120,30 @@ second script:
 
 The predecessor collision lint is **retired**, with its hard-coded overlap table; its
 self-test fixtures were ported onto the new test, so coverage moved rather than dropped.
+
+## Operating Rules
+
+**The always-on budget is measured, and it is over target.** What every session pays before
+it does anything is the per-harness law chain, the nine persona bodies and the twenty-one
+skill descriptions the harness must list. Measured today, on a word-count estimator of
+`words × 1.33` and a negation regex over the same set: **~20.5k tokens and 257 negations**
+against targets of ≤3.5k and ≤60. The persona bodies are ~75 % of the mass and the law file
+alone exceeds the token target on its own, so the gap is structural rather than a missed
+pass: closing it takes relocation into on-demand surfaces, not another rewording round. The
+number is recorded as it is measured and the target is never redefined to fit it.
+
+Two mechanisms hold the line the diet already won. Each law topic is **stated once and
+pointed at** — a persona carries a pointer to the law's own section rather than a
+restatement, and a restatement is never accepted in place of a pointer. And every removal
+carries a **coverage table**: removed block → the surviving home that now carries it, read
+row by row at review, because the risk of a diet is deleting a law with no other home. A
+fact with no home stays where it is, with its justification.
+
+Line ceilings follow the same posture: nine personas, four inside the 120–220 ceiling and
+five above it, each overflow named with the reason its content has no other home
+([[architecture]]). Content relocated out of a persona lands in the disclosed skill siblings
+that already exist, which are loaded on demand — so a skill sibling growing while the fleet
+shrinks is the mechanism working, not fleet growth.
 
 ## Panel surface
 

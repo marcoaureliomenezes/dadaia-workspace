@@ -14,7 +14,7 @@ This file pins the decision — refuse, uniformly, once, at that seam — throug
 entry points the bug named, proving the fix is not duplicated per write site (the
 puxadinho this bug forbids): ``specs upgrade`` and ``specs doctor --fix``.
 
-Intent: REGRESSION (bug ``symlinked-specs-root-is-followed-by-migration-and-repair``,
+Intent: CONTRACT (bug ``symlinked-specs-root-is-followed-by-migration-and-repair``,
 T-044-40).
 Size: MEDIUM (CliRunner over the real ``app``, real tmp filesystem).
 Owner: software-engineer

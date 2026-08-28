@@ -130,7 +130,7 @@ the archive move.
 
 ## W0 — definition
 
-- [ ] **T-045-01 — [git] Definition commit**
+- [x] **T-045-01 — [git] Definition commit**
 
 **Owner role:** dispatcher (+ `project-manager` for the backlog mechanics) · **Commit:**
 `docs(specs): v0.4.5 definition — hardening and consolidation (Aprovado)`
@@ -156,7 +156,7 @@ T-045-02, not here. Append the supersession before committing:
 
 ---
 
-- [ ] **T-045-02 — [git] Milestone (a): push and open the definition PR → `develop`**
+- [x] **T-045-02 — [git] Milestone (a): push and open the definition PR → `develop`**
 
 **Owner role:** dispatcher + `security-reviewer` · **Commit:** the `ACTIVE.md` phase flip,
 then git refs
@@ -200,7 +200,7 @@ secret, token or org-internal identifier is recorded anywhere.
 
 ## Segment `S1` — the open-bug sweep
 
-- [ ] **T-045-04 — FR1: the LAW path class decides by origin, not by basename**
+- [x] **T-045-04 — FR1: the LAW path class decides by origin, not by basename**
 
 **Owner role:** software-engineer · **Commit:** `fix(T-045-04): classify AGENTS.md as LAW by
 origin, not by name` · **Lands first in the release** (SPEC D-2).
@@ -231,7 +231,7 @@ decision — no per-repo exception list, no flag, no second classification path.
 
 ---
 
-- [ ] **T-045-05 — [shell] Install the gate fix and probe it on the executed path**
+- [x] **T-045-05 — [shell] Install the gate fix and probe it on the executed path**
 
 **Owner role:** software-engineer · **Commit:** the V3 capture reference only
 
@@ -250,7 +250,7 @@ repo `AGENTS.md` write is allowed, and a manifest-tracked projection is still re
 
 ---
 
-- [ ] **T-045-06 — Bug (Arm B): `dadaia-task-manager-stale-workspace-protocol-citation`**
+- [x] **T-045-06 — Bug (Arm B): `dadaia-task-manager-stale-workspace-protocol-citation`**
 
 **Owner role:** ai-engineer · **Commit:** `fix(T-045-06): cite DADAIA.md §3 for the gate
 description in dadaia-task-manager`
@@ -272,7 +272,7 @@ ratified nine-skill `dadaia-task-manager` Update (O3) — that release rebases o
 
 ---
 
-- [ ] **T-045-07 — Bug (Arm B): `certify-skip-detail-leaks-full-codex-output` (CWE-532)**
+- [x] **T-045-07 — Bug (Arm B): `certify-skip-detail-leaks-full-codex-output` (CWE-532)**
 
 **Owner role:** software-engineer · **Commit:** `fix(T-045-07): certify detail carries only
 the parsed error message, redacted and capped`
@@ -294,7 +294,7 @@ event with the three fields.
 
 ---
 
-- [ ] **T-045-08 — Bug (Arm B): `codex-probe-unit-fixture-carries-real-session-uuid`**
+- [x] **T-045-08 — Bug (Arm B): `codex-probe-unit-fixture-carries-real-session-uuid`**
 
 **Owner role:** software-engineer · **Commit:** `fix(T-045-08): synthetic session UUID in
 the codex probe fixture`
@@ -314,7 +314,7 @@ fixture retires in the same commit.
 
 ---
 
-- [ ] **T-045-09 — Bug (Arm B, time-boxed): `windows-xdist-workers-crash-on-unit-fast-tier`**
+- [x] **T-045-09 — Bug (Arm B, time-boxed): `windows-xdist-workers-crash-on-unit-fast-tier`**
 
 **Owner role:** software-engineer (attempt) + `qa-engineer` (verdict) · **Commit:**
 `fix(T-045-09): <root cause>` **or** `test(T-045-09): quarantine <selector> per QA verdict`
@@ -339,7 +339,7 @@ verdict plus the CLOSURE record of the still-open bug.
 
 ---
 
-- [ ] **T-045-10 — `S1` close: `qa-engineer` review committed on the branch**
+- [x] **T-045-10 — `S1` close: `qa-engineer` review committed on the branch**
 
 **Owner role:** qa-engineer · **Commit:** `docs(T-045-10): S1 QA close`
 
@@ -360,7 +360,7 @@ term in the artifact.
 
 ## Segment `S2` — structural consolidation
 
-- [ ] **T-045-11 — AR-1: the atomic-write primitive's home, ruled**
+- [x] **T-045-11 — AR-1: the atomic-write primitive's home, ruled**
 
 **Owner role:** software-architect · **Commit:** `docs(T-045-11): AR-1 ruling — atomic-write
 home`
@@ -382,7 +382,7 @@ D5, state the alternative home **and** whether one sanctioned import-light dupli
 
 ---
 
-- [ ] **T-045-12 — FR2 (expand): the primitive and its injected-failure battery**
+- [x] **T-045-12 — FR2 (expand): the primitive and its injected-failure battery**
 
 **Owner role:** software-engineer · **Commit:** `feat(T-045-12): one atomic-write primitive
 with temp cleanup on every failure path`
@@ -404,7 +404,7 @@ task** — the net exists before anything is cut (D7).
 
 ---
 
-- [ ] **T-045-13 — FR2 (switch): eleven call sites move to the primitive**
+- [x] **T-045-13 — FR2 (switch): eleven call sites move to the primitive**
 
 **Owner role:** software-engineer · **Commit:** one coherent commit per module family,
 `refactor(T-045-13): route <module> through the atomic-write primitive`
@@ -430,7 +430,7 @@ posture unchanged, measured.
 
 ---
 
-- [ ] **T-045-14 — FR2 (contract): delete the writers, land the derived census**
+- [x] **T-045-14 — FR2 (contract): delete the writers, land the derived census**
 
 **Owner role:** software-engineer · **Commit:** `refactor(T-045-14): delete the eight named
 and three inline atomic writers`
@@ -453,7 +453,7 @@ net-negative, measured.
 
 ---
 
-- [ ] **T-045-15 — FR3: split the inventory out of the two byte goldens**
+- [x] **T-045-15 — FR3: split the inventory out of the two byte goldens**
 
 **Owner role:** software-engineer · **Commit:** `test(T-045-15): policy-only byte goldens,
 derived roster for the inventory`
@@ -474,7 +474,7 @@ keep policy-only assertions. Prove by an executed fixture: adding a throwaway as
 
 ---
 
-- [ ] **T-045-16 — FR4: one shared skill-inventory oracle**
+- [x] **T-045-16 — FR4: one shared skill-inventory oracle**
 
 **Owner role:** software-engineer · **Commit:** `test(T-045-16): one derived skill-inventory
 oracle replaces three hand-kept lists`
@@ -496,7 +496,7 @@ v0.4.4 bugs — the reviewer's bug-surface verdict must say so.
 
 ---
 
-- [ ] **T-045-17 — FR5: the scan-test vacuity convention**
+- [x] **T-045-17 — FR5: the scan-test vacuity convention**
 
 **Owner role:** software-engineer · **Commit:** `test(T-045-17): non-empty population +
 sentinel on the tree-walking scan tests`
@@ -517,7 +517,7 @@ least three sampled tests RED.
 
 ---
 
-- [ ] **T-045-18 — `S2` close: `qa-engineer` review committed on the branch**
+- [x] **T-045-18 — `S2` close: `qa-engineer` review committed on the branch**
 
 **Owner role:** qa-engineer · **Commit:** `docs(T-045-18): S2 QA close`
 
@@ -538,7 +538,7 @@ and state the bug-surface delta of the atomic-write and test-inventory surfaces.
 
 ## Segment `S3` — gate, doctor and seam hardening
 
-- [ ] **T-045-19 — FR6: the denylist reaches the write-time redaction seam**
+- [x] **T-045-19 — FR6: the denylist reaches the write-time redaction seam**
 
 **Owner role:** software-engineer · **Commit:** `fix(T-045-19): one denylist loading seam,
 consumed by write-time redaction and the push scan`
@@ -560,7 +560,7 @@ event schema, never from a hand-kept list. The denylist data stays operator-loca
 
 ---
 
-- [ ] **T-045-20 — FR7: one control/format-character sanitation pass at the bug-event seam**
+- [x] **T-045-20 — FR7: one control/format-character sanitation pass at the bug-event seam**
 
 **Owner role:** software-engineer · **Commit:** `fix(T-045-20): sanitize control and format
 characters at the bug-event seam`
@@ -586,7 +586,7 @@ pass at one seam closes both — not two independent guards. Then prove the whol
 
 ---
 
-- [ ] **T-045-21 — FR8: `specs init --specs-dir` refuses a symlinked target**
+- [x] **T-045-21 — FR8: `specs init --specs-dir` refuses a symlinked target**
 
 **Owner role:** software-engineer · **Commit:** `fix(T-045-21): refuse a symlinked target on
 the explicit --specs-dir branch`
@@ -605,7 +605,7 @@ new vocabulary, no second symlink check. The non-symlinked explicit branch is un
 
 ---
 
-- [ ] **T-045-22 — FR9: decide the healing lane for registry slug-ownership collisions**
+- [x] **T-045-22 — FR9: decide the healing lane for registry slug-ownership collisions**
 
 **Owner role:** software-architect (decision) + software-engineer (if implemented) ·
 **Commit:** `feat(T-045-22): registry-wide slug-ownership invariant` **or**
@@ -629,7 +629,7 @@ undecided lane.
 
 ---
 
-- [ ] **T-045-23 — FR10: the doctor learns `.dadaia/references/`**
+- [x] **T-045-23 — FR10: the doctor learns `.dadaia/references/`**
 
 **Owner role:** software-engineer · **Commit:** `feat(T-045-23): sanction .dadaia/references
 as an operator-owned subtree outside the context lifecycle`
@@ -651,7 +651,7 @@ repeated per verb. `specs/` is untouched.
 
 ---
 
-- [ ] **T-045-24 — `S3` close: `qa-engineer` review committed on the branch**
+- [x] **T-045-24 — `S3` close: `qa-engineer` review committed on the branch**
 
 **Owner role:** qa-engineer · **Commit:** `docs(T-045-24): S3 QA close`
 
@@ -671,7 +671,7 @@ three times.
 
 ## Segment `S4` — the token-economy program
 
-- [ ] **T-045-25 — [shell] FR11 baseline: measure before any cut**
+- [x] **T-045-25 — [shell] FR11 baseline: measure before any cut**
 
 **Owner role:** ai-engineer · **Commit:** the capture reference only
 
@@ -690,7 +690,7 @@ all nine). Measured, never estimated — everything downstream is a delta agains
 
 ---
 
-- [ ] **T-045-26 — FR12: trim, page or tier the catalog digest**
+- [x] **T-045-26 — FR12: trim, page or tier the catalog digest**
 
 **Owner role:** product-engineer (the curation policy) + ai-engineer (its mechanism) ·
 **Commit:** `feat(T-045-26): catalog digest curation policy`
@@ -713,7 +713,7 @@ unchanged** (v0.4.4 A30.3). Every catalog entry stays reachable: this changes wh
 
 ---
 
-- [ ] **T-045-27 — FR11: the always-on diet pass**
+- [x] **T-045-27 — FR11: the always-on diet pass**
 
 **Owner role:** ai-engineer · **Commit:** `refactor(T-045-27): always-on diet pass —
 <before>→<after> tokens`
@@ -736,7 +736,7 @@ target is never redefined to fit the result (AS-3).
 
 ---
 
-- [ ] **T-045-28 — FR13: trim the four over-ceiling personas**
+- [x] **T-045-28 — FR13: trim the four over-ceiling personas**
 
 **Owner role:** ai-engineer · **Commit:** `refactor(T-045-28): relocate justified persona
 overflow into existing siblings`
@@ -759,7 +759,7 @@ or a hard-stop block. Any persona still above 220 lines afterwards is **named** 
 
 ---
 
-- [ ] **T-045-29 — FR14: the AI-surface hygiene residuals**
+- [x] **T-045-29 — FR14: the AI-surface hygiene residuals**
 
 **Owner role:** ai-engineer · **Commit:** `fix(T-045-29): ai-engineer citation + F-7/F-8/F-10
 wording residuals`
@@ -780,7 +780,7 @@ green.
 
 ---
 
-- [ ] **T-045-30 — FR15: rule the test-Intent vocabulary**
+- [x] **T-045-30 — FR15: rule the test-Intent vocabulary**
 
 **Owner role:** ai-engineer (the skill text) + software-engineer (the sweep, if that is the
 ruling) · **Commit:** `docs(T-045-30): rule the test-Intent vocabulary`
@@ -802,7 +802,7 @@ than reverts (AS-2).
 
 ---
 
-- [ ] **T-045-31 — `S4` close: `qa-engineer` review committed on the branch**
+- [x] **T-045-31 — `S4` close: `qa-engineer` review committed on the branch**
 
 **Owner role:** qa-engineer · **Commit:** `docs(T-045-31): S4 QA close`
 
@@ -822,7 +822,7 @@ say plainly whether each target was met, missed or partially met.
 
 ## Scope complete — gates and the trio
 
-- [ ] **T-045-32 — [shell] FR16: the invariants, measured**
+- [x] **T-045-32 — [shell] FR16: the invariants, measured**
 
 **Owner role:** software-engineer · **Commit:** the capture reference only
 
@@ -839,7 +839,7 @@ defect of the release, justified per contributing FR or refused.
 
 ---
 
-- [ ] **T-045-33 — Six-axis code review on the thawed tree**
+- [x] **T-045-33 — Six-axis code review on the thawed tree**
 
 **Owner role:** code-reviewer · **Commit:** `docs(T-045-33): release code review`
 
@@ -859,7 +859,7 @@ land as `expand → switch → contract` rather than big-bang?
 
 ---
 
-- [ ] **T-045-34 — Security review + the QA release verdict**
+- [x] **T-045-34 — Security review + the QA release verdict**
 
 **Owner role:** security-reviewer + qa-engineer · **Commit:**
 `docs(T-045-34): release verdicts`
@@ -881,7 +881,7 @@ QA, code, security — must `APPROVE` the **same** commit.
 
 ## `rc-1` — the whole scope integrates once
 
-- [ ] **T-045-35 — [git] `rc-1`: PR `feature/0.4.5` → `develop`**
+- [-] **T-045-35 — [git] `rc-1`: PR `feature/0.4.5` → `develop`**
 
 **Owner role:** dispatcher + security-reviewer · **Preconditions:** T-045-34 `[x]`.
 
@@ -919,7 +919,7 @@ rounds**, in which case the final `rc` **is** `rc-1`.
 
 ## The final `rc` — closure, archive, ship without publish
 
-- [ ] **T-045-37 — Memory window (SPEC §5)**
+- [x] **T-045-37 — Memory window (SPEC §5)**
 
 **Owner role:** product-engineer · **Commit:** `docs(T-045-37): memory after v0.4.5`
 
@@ -937,7 +937,7 @@ minted-unpublished lineage) **first**, then the rest, one authoring pass per ato
 
 ---
 
-- [ ] **T-045-38 — `CLOSURE.md` with every sweep**
+- [x] **T-045-38 — `CLOSURE.md` with every sweep**
 
 **Owner role:** product-engineer · **Commit:** `docs(T-045-38): v0.4.5 closure`
 

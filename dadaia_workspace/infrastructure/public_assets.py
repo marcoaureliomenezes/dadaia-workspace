@@ -14,6 +14,7 @@ from pathlib import Path, PurePosixPath
 from typing import Literal
 
 from dadaia_workspace.core.agent_model_templates import CORE_AGENTS, resolve_agent_model
+from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES, PROJECTION_TARGETS
 from dadaia_workspace.core.models.agent_model_policy import (
@@ -86,7 +87,6 @@ from dadaia_workspace.infrastructure.public_assets_common import (  # noqa: F401
     _SCHEMA_VERSION,
     _VALID_TARGETS,
     OverwritePolicy,
-    _atomic_write_text,
     _json_dump,
     _log_cleanup_error,
     _package_version,
@@ -435,11 +435,11 @@ class FileSystemPublicAssetManager:
         # LF-exact, atomic writes: staged JSON is hash-compared by doctor, so it must
         # not pick up Windows CRLF translation (FR-RC2-2).
         manifest_path = agentic_dir / "manifest.json"
-        _atomic_write_text(manifest_path, _json_dump(build_manifest(agentic_dir, self._iter_files)))
+        atomic_write(manifest_path, _json_dump(build_manifest(agentic_dir, self._iter_files)))
         staged.append(f"[stage] {manifest_path}")
 
         index_path = agentic_dir / "agents.index.json"
-        _atomic_write_text(index_path, _json_dump(build_agents_index(agentic_dir)))
+        atomic_write(index_path, _json_dump(build_agents_index(agentic_dir)))
         staged.append(f"[stage] {index_path}")
         return staged
 
@@ -1249,7 +1249,7 @@ class FileSystemPublicAssetManager:
         existing = config_path.read_text(encoding="utf-8") if config_path.exists() else ""
         updated = upsert_kimi_hooks_block(existing, kimi_hooks_block(home))
         if updated != existing:
-            _atomic_write_text(config_path, updated)
+            atomic_write(config_path, updated)
             installed.append(f"[ok]   {config_path}")
         else:
             installed.append(f"[skip] {config_path}")

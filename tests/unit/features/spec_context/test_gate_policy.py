@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.workspace_layout import LAW_BASENAMES
 from dadaia_workspace.features.spec_context.gate_policy import (
     Decision,
     PathClass,
@@ -398,3 +400,169 @@ def test_memory_dotfile_evaluate_matches_a_non_dot_sibling_atom_across_every_pha
             assert dot_decision == sibling_decision, (
                 f"phase={phase}: dotfile and sibling atom must get the SAME decision"
             )
+
+
+# ═════════════════════════════════════════════════════════════════════════════════
+# v0.4.5 FR1 (T-045-04) — LAW is a static, fail-closed floor decided by ORIGIN
+# (workspace root + LAW_HARNESS_DIRS), never by the basename alone. A repo's own
+# domain-scoped AGENTS.md/CLAUDE.md — fresh or existing, referenced by the manifest
+# or not — is never LAW: its parent (repos/<slug>/) never matches a harness dir, and
+# it is never a bare root basename, so the static floor excludes it by construction.
+# Bugs: sdd-gate-blocks-fresh-repo-root-agents-md +
+# repo-agents-md-law-gate-contradicts-template — one shared root cause: the
+# classifier decided by *name*, not by *origin*.
+# ═════════════════════════════════════════════════════════════════════════════════
+
+
+def test_fresh_repo_agents_md_classifies_mutating_not_law() -> None:
+    """Intent: CONTRACT — v0.4.5 A1.1.
+
+    A brand-new repo with no prior projection, no manifest entry, nothing on disk
+    yet: repos/<fresh-slug>/AGENTS.md must classify MUTATING, never LAW. Before the
+    fix this asserted PathClass.LAW and failed (the false positive
+    `sdd-gate-blocks-fresh-repo-root-agents-md` reports).
+    """
+    fresh_slug = "brand-new-repo-never-scaffolded-yet"
+    assert classify_path(_in_repo(fresh_slug, "AGENTS.md")) == PathClass.MUTATING
+    assert classify_path(_in_repo(fresh_slug, "CLAUDE.md")) == PathClass.MUTATING
+
+
+def test_fresh_repo_agents_md_write_is_allowed_on_the_executed_path(tmp_path: Path) -> None:
+    """Intent: CONTRACT — v0.4.5 A1.1 (evaluate()/Write envelope, not just classify_path)."""
+    fresh_slug = "brand-new-repo-never-scaffolded-yet"
+    decision, message = evaluate(
+        tmp_path,
+        _in_repo(fresh_slug, "AGENTS.md"),
+        ctx=fresh_slug,
+        phase="IMPLEMENTATION",
+        session_id="anon-session",
+        release="none",
+        mode="IMPLEMENTATION",
+    )
+    assert decision == Decision.ALLOW
+    assert "[GATE]" not in message
+
+
+def test_existing_nonmanifest_repo_agents_md_edit_is_allowed(tmp_path: Path) -> None:
+    """Intent: CONTRACT — v0.4.5 A1.2.
+
+    An EXISTING repos/<slug>/AGENTS.md that was scaffolded from
+    templates/repo-AGENTS.md (never carries the canonical `data/AGENTS.md`
+    provenance banner, so `dadaia public install` never re-touches it either) is
+    repo-owned, editable content — classifies MUTATING and ALLOWs, same as any other
+    repo-domain file. classify_path() is tool-agnostic (Write vs Edit both resolve
+    through the same `file_path`), so the classification proof covers both tools.
+    """
+    slug = "existing-repo-with-scaffolded-agents-md"
+    repo_agents_md = tmp_path / "repos" / slug / "AGENTS.md"
+    repo_agents_md.parent.mkdir(parents=True)
+    repo_agents_md.write_text(
+        "# existing-repo-with-scaffolded-agents-md — Repo Rules\n", encoding="utf-8"
+    )
+
+    assert classify_path(_in_repo(slug, "AGENTS.md")) == PathClass.MUTATING
+
+    decision, message = evaluate(
+        tmp_path,
+        _in_repo(slug, "AGENTS.md"),
+        ctx=slug,
+        phase="IMPLEMENTATION",
+        session_id="anon-session",
+        release="none",
+        mode="IMPLEMENTATION",
+    )
+    assert decision == Decision.ALLOW
+    assert "[GATE]" not in message
+
+
+# Known source -> installed TARGET mapping for every LAW-basename asset the real
+# .dadaia/agentic/manifest.json ships today (v0.4.5 A1.3 fixture — this table is
+# derived from infrastructure/workspace_guardrail.py + install_helpers.py's actual
+# projection targets, NEVER from reading the operator's live manifest file).
+# `templates/repo-AGENTS.md` is deliberately absent from this table: its installed
+# target (repos/<slug>/AGENTS.md) is a provenance-gated CONSUMER projection (FOREIGN
+# once it carries repo-specific content — see workspace_guardrail._write_consumer_agents),
+# never a floor path; A1.1/A1.2 above pin it MUTATING.
+_LAW_ASSET_TARGETS: dict[str, tuple[str, ...]] = {
+    "data/AGENTS.md": ("AGENTS.md",),
+    "data/DADAIA.md": ("DADAIA.md", ".codex/DADAIA.md", ".kimi-code/DADAIA.md"),
+    "kimi-code/AGENTS.md": (".kimi-code/AGENTS.md",),
+}
+
+#: A fixture manifest — mirrors .dadaia/agentic/manifest.json's real shape
+#: (assets: [{path, sha256, type}]) but is NEVER loaded from the operator's live
+#: workspace file (A1.3 explicitly forbids that dependency).
+_FIXTURE_MANIFEST: dict[str, object] = {
+    "package_version": "0.0.0-test",
+    "schema_version": 1,
+    "assets": [
+        {"path": "agents/software-engineer.md", "sha256": "a" * 64, "type": "agents"},
+        {"path": "data/AGENTS.md", "sha256": "b" * 64, "type": "data"},
+        {"path": "data/DADAIA.md", "sha256": "c" * 64, "type": "data"},
+        {"path": "kimi-code/AGENTS.md", "sha256": "d" * 64, "type": "kimi-code"},
+        {"path": "templates/repo-AGENTS.md", "sha256": "e" * 64, "type": "templates"},
+    ],
+}
+
+
+def test_manifest_tracked_law_projections_stay_law() -> None:
+    """Intent: CONTRACT — v0.4.5 A1.3.
+
+    Enumerates the fixture manifest (never the operator's live file) and pins that
+    every LAW-basename asset's installed TARGET still classifies LAW after the fix.
+    The static floor (workspace root + LAW_HARNESS_DIRS) already covers every
+    lib-originated law projection this release's manifest ships — the additive
+    manifest arm has nothing left to extend today, and nothing regresses.
+    """
+    law_assets = [
+        asset
+        for asset in _FIXTURE_MANIFEST["assets"]  # type: ignore[union-attr]
+        if Path(asset["path"]).name in LAW_BASENAMES
+    ]
+    assert law_assets, "fixture manifest must carry at least one LAW-basename asset"
+    checked_any = False
+    for asset in law_assets:
+        targets = _LAW_ASSET_TARGETS.get(asset["path"])
+        if targets is None:
+            # repo-scoped template projections (e.g. templates/repo-AGENTS.md) are
+            # asserted MUTATING by A1.1/A1.2 above, never LAW.
+            continue
+        for target in targets:
+            assert classify_path(target) == PathClass.LAW, target
+            checked_any = True
+    assert checked_any, "fixture manifest carried no known floor-mapped LAW asset"
+
+
+def test_manifest_removal_never_demotes_a_statically_floored_law_path(tmp_path: Path) -> None:
+    """Intent: CONTRACT — v0.4.5 A1.7 (security, CWE-284).
+
+    classify_path() takes only a path string — no workspace/manifest argument — and
+    performs zero I/O, so the static floor can never be demoted by editing or
+    deleting .dadaia/agentic/manifest.json: the floor never reads it. Prove the
+    attack directly — write a manifest with every LAW asset stripped, then delete it
+    outright — and confirm every statically-floored path is LAW regardless.
+    """
+    manifest_dir = tmp_path / ".dadaia" / "agentic"
+    manifest_dir.mkdir(parents=True)
+    manifest_path = manifest_dir / "manifest.json"
+    stripped_manifest = {"assets": [], "package_version": "0.0.0", "schema_version": 1}
+    manifest_path.write_text(json.dumps(stripped_manifest), encoding="utf-8")
+
+    floor_paths = (
+        "AGENTS.md",
+        "CLAUDE.md",
+        "DADAIA.md",
+        ".codex/AGENTS.md",
+        ".codex/DADAIA.md",
+        ".kimi-code/AGENTS.md",
+        ".kimi-code/DADAIA.md",
+        ".agents/AGENTS.md",
+        ".claude/rules/AGENTS.md",
+    )
+    for floor_path in floor_paths:
+        assert classify_path(floor_path) == PathClass.LAW, floor_path
+
+    manifest_path.unlink()
+    assert not manifest_path.exists()
+    for floor_path in floor_paths:
+        assert classify_path(floor_path) == PathClass.LAW, floor_path

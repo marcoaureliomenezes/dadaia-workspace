@@ -29,6 +29,8 @@ silently re-tier tests and corrupt every `-m` selector in CI.
 | SCAFFOLD | temporary | Guides an in-progress task/release; expires at its closure |
 | QUARANTINE | temporary | Flaky, under investigation, carries a bug id |
 
+A test that pins a bug fix is CONTRACT — `REGRESSION`/`BUG` are not tokens.
+
 An **undeclared test is SCAFFOLD** — the default is to die, not to stay.
 
 ## B — Admission filter

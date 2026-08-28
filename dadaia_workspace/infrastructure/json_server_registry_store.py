@@ -14,8 +14,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.models.server_registry import PortEntry
-from dadaia_workspace.infrastructure.public_assets_common import _atomic_write_text
 
 logger = logging.getLogger(__name__)
 
@@ -155,14 +155,14 @@ class JsonServerRegistryStore:
     def save(self, entry: PortEntry) -> None:
         data = _load(self._path)
         data["entries"].append(_to_dict(entry))
-        _atomic_write_text(self._path, json.dumps(data, indent=2))
+        atomic_write(self._path, json.dumps(data, indent=2))
 
     def update(self, entry: PortEntry) -> None:
         data = _load(self._path)
         data["entries"] = [
             _to_dict(entry) if e.get("port") == entry.port else e for e in data["entries"]
         ]
-        _atomic_write_text(self._path, json.dumps(data, indent=2))
+        atomic_write(self._path, json.dumps(data, indent=2))
 
     def get(self, port: int) -> PortEntry | None:
         data = _load(self._path)
@@ -184,4 +184,4 @@ class JsonServerRegistryStore:
         data["entries"] = [
             e for e in data["entries"] if not (isinstance(e, dict) and e.get("port") == port)
         ]
-        _atomic_write_text(self._path, json.dumps(data, indent=2))
+        atomic_write(self._path, json.dumps(data, indent=2))

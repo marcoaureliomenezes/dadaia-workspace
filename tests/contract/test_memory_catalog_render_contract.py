@@ -123,6 +123,41 @@ def _both_indexes(tmp_path: Path) -> tuple[str, str]:
     )
 
 
+def _normalize_generated_at(text: str) -> str:
+    data = json.loads(text)
+    data["generated_at"] = "<TS>"
+    return json.dumps(data, ensure_ascii=False, indent=2)
+
+
+def _assert_written_catalog_json_matches(tmp_path: Path) -> None:
+    """FR23 Firing 3 / T-045-26 AM-1: the two WRITTEN catalog.json files (not just the
+    in-memory dicts) must curate identically — a persistence policy applied by one
+    writer and not the other is exactly the divergence F-84 exists to catch."""
+    specs = _make_specs_tree(tmp_path, context="written-parity")
+    lib_cat = lib_catalog_mod.generate_catalog(specs)
+    lib_catalog_mod.write_catalog(specs, lib_cat)
+    lib_text = (specs / "memory" / "product" / "catalog.json").read_text(encoding="utf-8")
+
+    script_out = tmp_path / "script-written-catalog.json"
+    rc = _script_mod.main(
+        [
+            "--memory-dir",
+            str(specs / "memory"),
+            "--out",
+            str(script_out),
+            "--context",
+            "written-parity",
+        ]
+    )
+    assert rc == 0
+    script_text = script_out.read_text(encoding="utf-8")
+
+    assert _normalize_generated_at(lib_text) == _normalize_generated_at(script_text), (
+        "the two catalog.json WRITERS diverge — a curation policy applied to a "
+        "persisted artifact must be applied by every writer of that artifact"
+    )
+
+
 # ---------------------------------------------------------------------------
 # F-73 — the GFM table block is contiguous (no blank line inside the table)
 # ---------------------------------------------------------------------------
@@ -190,6 +225,7 @@ def test_both_implementations_emit_identical_output_shape(tmp_path: Path) -> Non
     assert normalized_lib == normalized_script, (
         "index.md output diverges beyond the re-run tool name — F-84 regression"
     )
+    _assert_written_catalog_json_matches(tmp_path)
     for name, index_md in (("lib", lib_index), ("script", script_index)):
         for area in ("product", "sdd", "platform"):
             assert f"### {area}" in index_md, f"[{name}] missing '### {area}' area section"

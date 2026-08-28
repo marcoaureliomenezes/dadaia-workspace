@@ -13,12 +13,11 @@ On unknown schema versions it raises ValueError.
 
 from __future__ import annotations
 
-import contextlib
 import json
-import os
-import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
+
+from dadaia_workspace.core.atomic_write import atomic_write
 
 _BACKUP_NAME = "spec_contexts.v2.bak.json"
 
@@ -78,24 +77,6 @@ def plan_migration(states_dir: Path) -> MigrationPlan:
     )
 
 
-def _atomic_write_json(path: Path, data: dict[str, object]) -> None:
-    """Atomic write via unique temp file + ``os.replace`` (POSIX + Windows safe).
-
-    Mirrors ``dadaia_workspace.features.spec_context.presence._atomic_write_json``
-    (T-044-45 F-4): a fixed, predictable ``.tmp`` sibling name is symlink-followable
-    (CWE-59) — a ``uuid4``-suffixed name closes that window, matching the idiom the
-    package's other internal-state writers already use.
-    """
-    tmp = path.parent / f"{path.name}.{uuid.uuid4().hex}.tmp"
-    tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
-    try:
-        os.replace(tmp, path)
-    except OSError:
-        with contextlib.suppress(OSError):
-            tmp.unlink(missing_ok=True)
-        raise
-
-
 def execute_migration(states_dir: Path) -> None:
     """Execute the v2 -> v3 migration atomically, backup-first.
 
@@ -103,11 +84,13 @@ def execute_migration(states_dir: Path) -> None:
     1.  Detect schema_version. No file -> nothing to do.
     2.  Already "3" -> idempotent no-op: no write, no backup.
     3.  Unknown version (not "2"/"3"/missing) -> raise ValueError.
-    4.  Backup: copy the v2 file verbatim to ``spec_contexts.v2.bak.json`` *before*
-        any mutation (A15.1).
+    4.  Backup: copy the v2 file's text contents to ``spec_contexts.v2.bak.json``
+        *before* any mutation (A15.1) — a UTF-8 text copy via ``read_text``/
+        ``write_text``, not a byte-for-byte copy (universal-newline translation
+        applies).
     5.  Add ``associated_repos: []`` to every context row that lacks it.
     6.  Set ``schema_version = "3"``.
-    7.  Write atomically via a unique-named temp file + ``os.replace()``.
+    7.  Write atomically via ``core.atomic_write.atomic_write`` (T-045-14).
     """
     ctx_file = states_dir / "spec_contexts.json"
 
@@ -126,7 +109,9 @@ def execute_migration(states_dir: Path) -> None:
             "migration. Manual intervention required."
         )
 
-    # Backup-first: preserve the pre-migration v2 file byte-for-byte before any write.
+    # Backup-first: preserve the pre-migration v2 file's text contents before any
+    # write (UTF-8 text copy via read_text/write_text — universal-newline
+    # translation applies, not byte-for-byte).
     backup_file = states_dir / _BACKUP_NAME
     backup_file.write_text(ctx_file.read_text(encoding="utf-8"), encoding="utf-8")
 
@@ -141,4 +126,4 @@ def execute_migration(states_dir: Path) -> None:
         "contexts": new_contexts,
     }
 
-    _atomic_write_json(ctx_file, migrated)
+    atomic_write(ctx_file, json.dumps(migrated, indent=2), newline=None)

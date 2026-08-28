@@ -1,7 +1,7 @@
 """Bug ``specs-upgrade-emits-atoms-violating-frontmatter-schema`` (HIGH) — the canonical
 upgrade chain must leave every memory atom valid against ``memory-frontmatter-v1``.
 
-Intent: REGRESSION (bug specs-upgrade-emits-atoms-violating-frontmatter-schema). Size: SMALL.
+Intent: CONTRACT (bug specs-upgrade-emits-atoms-violating-frontmatter-schema). Size: SMALL.
 
 ``memory-frontmatter-v1`` is closed (``additionalProperties: false``) and the migrate
 feature exists precisely because *a schema-drop MUST ship its migration*
@@ -157,7 +157,7 @@ def _deny_access_to(monkeypatch: pytest.MonkeyPatch, atom: Path) -> None:
 def test_read_only_atom_needing_no_change_stays_silent(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Intent: REGRESSION (bug read-only-atom-honouring-is-advisory-and-root-bypasses-it).
+    """Intent: CONTRACT (bug read-only-atom-honouring-is-advisory-and-root-bypasses-it).
     Size: SMALL.
 
     DECIDED (T-044-39): the read-only check runs AFTER the no-change determination, so a

@@ -17,11 +17,9 @@ from collections.abc import Callable
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Literal
 
+from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
-from dadaia_workspace.infrastructure.public_assets_common import (
-    _atomic_write_text,
-    _package_version,
-)
+from dadaia_workspace.infrastructure.public_assets_common import _package_version
 
 # T-021-18: CLAUDE.md is the Claude Code bridge that imports @AGENTS.md — the single
 # source of workspace law. Claude Code reads CLAUDE.md natively and follows the @-import
@@ -334,11 +332,11 @@ def _install_guardrail_pair(
         if sibling_written:
             dst.parent.mkdir(parents=True, exist_ok=True)
             if not dst.exists():
-                _atomic_write_text(dst, _CLAUDE_MD_STUB)
+                atomic_write(dst, _CLAUDE_MD_STUB)
                 installed.append(f"[ok]   {dst}")
             elif dst.read_text(encoding="utf-8") == _CLAUDE_MD_STUB:
                 if force:
-                    _atomic_write_text(dst, _CLAUDE_MD_STUB)
+                    atomic_write(dst, _CLAUDE_MD_STUB)
                     installed.append(f"[ok]   {dst}")
                 else:
                     installed.append(f"[skip] {dst}")
@@ -360,7 +358,7 @@ def _install_guardrail_pair(
         _write_one(
             claude_dst,
             stub_sha,
-            lambda: _atomic_write_text(claude_dst, _CLAUDE_MD_STUB),
+            lambda: atomic_write(claude_dst, _CLAUDE_MD_STUB),
             is_consumer,
         )
 

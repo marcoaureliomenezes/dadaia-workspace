@@ -133,6 +133,86 @@ def test_foreign_slug_matches_case_insensitively() -> None:
 
 
 # ---------------------------------------------------------------------------
+# T-045-35 — whole-token slug match: a slug is a hit only as a whole TOKEN, never a
+# mere substring glued onto a longer hyphenated/dotted identifier. Python's `\b` treats
+# `-` and `.` as non-word delimiters, so the pre-fix `\bslug\b` anchor matched a
+# hyphenated slug INSIDE `<slug>-anything` and `<slug>.ext` — flagging the library's
+# own tracked asset basename and a ledger bug id as if either were a private-name
+# publication (architect ruling:
+# specs/releases/v0.4.5/reviews/T-045-35-foreign-slug-ruling.md).
+# ---------------------------------------------------------------------------
+
+
+def test_foreign_slug_inside_hyphenated_basename_and_bug_id_does_not_match() -> None:
+    """Intent: CONTRACT — T-045-35 (HIGH), rc-1 push-gate false positive. RED at HEAD:
+    the pre-fix `\\bslug\\b` anchor treats `-`/`.` as boundaries, so this synthetic
+    slug fires twice in this one blob — once glued inside a tracked-asset basename
+    (`ZZ-FAKE-context-name-AGENTS.md`), once glued inside a ledger bug-id substring
+    (`zz-fake-context-name-md-canonical-...`) — even though neither occurrence is a
+    whole-token publication of the slug itself. Both must produce ZERO hits."""
+    objects = [
+        _obj(
+            "specs/releases/x/reviews/r.md",
+            "cites public/data/ZZ-FAKE-context-name-AGENTS.md and bug id "
+            f"{_SYNTHETIC_FOREIGN_SLUG}-md-canonical-table-omits-sanctioned-references\n",
+        )
+    ]
+
+    outcome = scan_objects(objects, terms=(), patterns=(), slugs=(_SYNTHETIC_FOREIGN_SLUG,))
+
+    assert outcome.hits == ()
+
+
+def test_foreign_slug_bare_in_prose_still_matches() -> None:
+    """Intent: CONTRACT — T-045-35 control. A bare slug bounded by whitespace on both
+    sides is a whole-token occurrence and must still BLOCK — the fix narrows the
+    boundary to token edges, it does not disable the detector."""
+    objects = [_obj("notes.md", f"see {_SYNTHETIC_FOREIGN_SLUG} in prose\n")]
+
+    outcome = scan_objects(objects, terms=(), patterns=(), slugs=(_SYNTHETIC_FOREIGN_SLUG,))
+
+    assert len(outcome.hits) == 1
+    assert outcome.hits[0].source_layer == "foreign repo slug"
+
+
+def test_foreign_slug_at_sentence_end_before_period_still_matches() -> None:
+    """Intent: CONTRACT — T-045-35 control. A trailing `.` at sentence end is not a
+    dotted continuation into another identifier (no word character follows the dot),
+    so the slug is still a whole-token occurrence and must still BLOCK."""
+    objects = [_obj("notes.md", f"see {_SYNTHETIC_FOREIGN_SLUG}.\n")]
+
+    outcome = scan_objects(objects, terms=(), patterns=(), slugs=(_SYNTHETIC_FOREIGN_SLUG,))
+
+    assert len(outcome.hits) == 1
+    assert outcome.hits[0].source_layer == "foreign repo slug"
+
+
+def test_foreign_slug_in_repos_path_segment_still_matches() -> None:
+    """Intent: CONTRACT — T-045-35 no-regression control, restated explicitly next to
+    the new whole-token tests: `repos/<slug>/README.md` (slug bounded by `/` on both
+    sides) is unchanged by the fix — it was already covered by
+    ``test_foreign_slug_matches_as_whole_word`` above; this pins it under the T-045-35
+    section too so the ruling's three named controls are co-located."""
+    objects = [_obj("readme.md", f"see repos/{_SYNTHETIC_FOREIGN_SLUG}/README.md\n")]
+
+    outcome = scan_objects(objects, terms=(), patterns=(), slugs=(_SYNTHETIC_FOREIGN_SLUG,))
+
+    assert len(outcome.hits) == 1
+    assert outcome.hits[0].source_layer == "foreign repo slug"
+
+
+def test_foreign_slug_after_dotted_prefix_does_not_match() -> None:
+    """Intent: CONTRACT — T-045-35: a slug glued after a `word.` dotted prefix
+    (`pkg.<slug>`) is a different identifier — the dotted-continuation lookbehind must
+    refuse it even though a bare `\\b` would have matched (`.` is a non-word char)."""
+    objects = [_obj("notes.md", f"see pkg.{_SYNTHETIC_FOREIGN_SLUG} elsewhere\n")]
+
+    outcome = scan_objects(objects, terms=(), patterns=(), slugs=(_SYNTHETIC_FOREIGN_SLUG,))
+
+    assert outcome.hits == ()
+
+
+# ---------------------------------------------------------------------------
 # A3.4 — baseline `exclude_regex` carve-outs still apply.
 # ---------------------------------------------------------------------------
 
