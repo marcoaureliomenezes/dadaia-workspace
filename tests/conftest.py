@@ -128,6 +128,23 @@ _PATH_MARKERS: tuple[tuple[str, str], ...] = (
 # declare an explicit justified @pytest.mark.timeout; never raise these defaults.
 _TIER_TIMEOUTS: dict[str, int] = {"unit": 10, "contract": 30, "integration": 60, "e2e": 120}
 
+# Bug ``windows-xdist-workers-crash-on-unit-fast-tier``: the table above is calibrated on
+# the Linux runners. Windows CI runs the tree-copying install/doctor tests 2-3x slower
+# (measured: <5s Linux vs 9.7-16s Windows for one unit test) and pytest-timeout's only
+# Windows method (``thread``) ends the xdist worker with ``os._exit`` — reported as an
+# unattributable "worker crashed" rather than a loud timeout. One calibration, here,
+# never a per-test marker.
+_TIER_TIMEOUT_PLATFORM_FACTOR: dict[str, int] = {"win32": 3}
+
+
+def tier_timeout_seconds(tier: str, *, platform: str = sys.platform) -> int | None:
+    """The enforced ceiling for *tier* on *platform*, or ``None`` for a non-tier marker."""
+    base = _TIER_TIMEOUTS.get(tier)
+    if base is None:
+        return None
+    return base * _TIER_TIMEOUT_PLATFORM_FACTOR.get(platform, 1)
+
+
 #: The closed marker set — must stay set-equal with pyproject.toml's markers block
 #: (pinned by tests/contract/test_stewardship_mechanics.py).
 _KNOWN_MARKERS: frozenset[str] = frozenset(
@@ -175,7 +192,7 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
                 item.add_marker(getattr(pytest.mark, marker))
                 if marker == "e2e":
                     item.add_marker(pytest.mark.slow(reason="e2e process-boundary suite"))
-                tier_timeout = _TIER_TIMEOUTS.get(marker)
+                tier_timeout = tier_timeout_seconds(marker)
                 if tier_timeout is not None and item.get_closest_marker("timeout") is None:
                     item.add_marker(pytest.mark.timeout(tier_timeout))
                 break
