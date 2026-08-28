@@ -191,3 +191,7 @@ def test_tier_ceiling_is_platform_calibrated_once_in_conftest() -> None:
     assert conftest.tier_timeout_seconds("contract", platform="darwin") == 30
     assert conftest.tier_timeout_seconds("e2e", platform="win32") == 360
     assert conftest.tier_timeout_seconds("slow", platform="win32") is None
+    # Coverage tracing slows the executed path ~2x (Contract coverage job, windows: a
+    # 30s-ceiling unit test measured 32.3s under --cov); same function, one more input.
+    assert conftest.tier_timeout_seconds("unit", platform="linux", coverage=True) == 20
+    assert conftest.tier_timeout_seconds("unit", platform="win32", coverage=True) == 60

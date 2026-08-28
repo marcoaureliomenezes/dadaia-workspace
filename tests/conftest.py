@@ -135,14 +135,23 @@ _TIER_TIMEOUTS: dict[str, int] = {"unit": 10, "contract": 30, "integration": 60,
 # unattributable "worker crashed" rather than a loud timeout. One calibration, here,
 # never a per-test marker.
 _TIER_TIMEOUT_PLATFORM_FACTOR: dict[str, int] = {"win32": 3}
+# Coverage tracing (pytest --cov) roughly halves execution speed on the same runner
+# (bug tier-ceiling-trips-under-coverage-instrumentation-on-windows-contract-coverage-job:
+# a 30s-ceiling unit test measured 32.3s under --cov on Windows).
+_TIER_TIMEOUT_COVERAGE_FACTOR = 2
 
 
-def tier_timeout_seconds(tier: str, *, platform: str = sys.platform) -> int | None:
+def tier_timeout_seconds(
+    tier: str, *, platform: str = sys.platform, coverage: bool = False
+) -> int | None:
     """The enforced ceiling for *tier* on *platform*, or ``None`` for a non-tier marker."""
     base = _TIER_TIMEOUTS.get(tier)
     if base is None:
         return None
-    return base * _TIER_TIMEOUT_PLATFORM_FACTOR.get(platform, 1)
+    factor = _TIER_TIMEOUT_PLATFORM_FACTOR.get(platform, 1)
+    if coverage:
+        factor *= _TIER_TIMEOUT_COVERAGE_FACTOR
+    return base * factor
 
 
 #: The closed marker set — must stay set-equal with pyproject.toml's markers block
@@ -185,6 +194,7 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
     not fall out of layer-specific commands. The tier timeout is applied only
     when the test declares no explicit ``timeout`` marker of its own.
     """
+    covered = bool(getattr(config.option, "cov_source", None))
     for item in items:
         rel = Path(str(item.fspath)).resolve().relative_to(_REPO_ROOT).as_posix()
         for prefix, marker in _PATH_MARKERS:
@@ -192,7 +202,7 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
                 item.add_marker(getattr(pytest.mark, marker))
                 if marker == "e2e":
                     item.add_marker(pytest.mark.slow(reason="e2e process-boundary suite"))
-                tier_timeout = tier_timeout_seconds(marker)
+                tier_timeout = tier_timeout_seconds(marker, coverage=covered)
                 if tier_timeout is not None and item.get_closest_marker("timeout") is None:
                     item.add_marker(pytest.mark.timeout(tier_timeout))
                 break
