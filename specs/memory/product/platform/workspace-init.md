@@ -11,33 +11,24 @@ tags:
 - idempotent
 ---
 
-## Purpose
-
-`dadaia init [--workspace PATH] [--skip-assets] [--harness <set>]` is the only verb that
-operates on a zero workspace, and re-running it is idempotent.
-
 ## Bootstrap
 
-Init creates the canonical `.dadaia/` subdirectories, the virtual environment at
-`.dadaia/.venv`, an empty context registry and the selected harness roots. Unless
-`--skip-assets`, it runs public stage/install and registers the merged Python gate,
-context injection and post-gate hooks for the supported runtimes.
+`dadaia init [--workspace PATH] [--skip-assets] [--harness <set>]` is the only verb that operates on
+a zero workspace, and re-running it is idempotent. It creates the canonical `.dadaia/`
+subdirectories, the virtual environment at `.dadaia/.venv`, an empty context registry and the
+selected harness roots; unless `--skip-assets` it runs public stage/install and registers the merged
+Python gate, context injection and post-gate hooks for the supported runtimes.
 
-The persisted harness profile accepts `claude`, `codex`, `kimi-code` or `all`; omitted
-means all, and public install and doctor honor it. A harness projection is created only
-when that harness is selected. A re-init with a subset **merges** into the persisted
-profile in canonical Layer-1 order — init deletes no projection, so narrowing the managed
-set stays a deliberate operator state edit.
+The persisted harness profile accepts `claude`, `codex`, `kimi-code` or `all`; omitted means all,
+and public install and doctor honor it. A harness projection is created only when that harness is
+selected, and a re-init with a subset **merges** into the persisted profile in canonical Layer-1
+order — init deletes no projection, so narrowing the managed set stays a deliberate operator state
+edit. Git chokepoints are installed separately by `dadaia ci install-hook`.
 
-Git chokepoints are installed separately by `dadaia ci install-hook` from
-`pre-commit-presence-gate.sh` and `pre-push-ci-gate.sh`.
-
-## Runtime state
-
-`.dadaia/.venv/`, `.dadaia/states/spec_contexts.json`,
-`.dadaia/states/harness_profile.json`, `.dadaia/agentic/`, and `.claude/`, `.codex/`,
-`.kimi-code/`, `.agents/` according to the profile. No `src/` cache and no repo-local
-`.dadaia/` is part of initialization.
+Runtime state: `.dadaia/.venv/`, `.dadaia/states/spec_contexts.json`,
+`.dadaia/states/harness_profile.json`, `.dadaia/agentic/`, and `.claude/`, `.codex/`, `.kimi-code/`,
+`.agents/` according to the profile. No `src/` cache and no repo-local `.dadaia/` is part of
+initialization.
 
 ## Dependencies
 

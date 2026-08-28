@@ -11,36 +11,25 @@ tags:
 - dashboard
 ---
 
-## Purpose
+## Boundary and tabs
 
-The panel exposes local workspace state and governance without becoming a remote service.
-It binds only to `127.0.0.1`, a Host allowlist rejects DNS-rebinding, and there is no
-token, cookie or credential store.
+The panel exposes local workspace state and governance without becoming a remote service: it binds
+only to `127.0.0.1`, a Host allowlist rejects DNS-rebinding, and there is no token, cookie or
+credential store. The stdlib HTTP server applies strict CSP, `nosniff`, loopback binding and Host
+validation to reads and mutations alike; operator-controlled strings are escaped, mutating routes
+validate payloads before atomic writes, and CSS/JS assets are served from packaged source with no
+external CDN.
 
-## Tabs
+Six tabs: **Projects** (Spec Context Projects and their memory, each card listing the main repo and
+any associated repos, [[context-management]]), **Agents** (persona cards, agent model
+templates/overrides, and the Sessions telemetry dashboard), **Agentic Entities** (the
+abstract-entity registry rendered server-side, [[agentic-entities]]), **Reports** (handoff/report
+discovery and retention controls), **Academy** ([[academy]]) and **Servers** (registered dev servers
+with TTL/PID status, [[server-registry]]).
 
-| Tab | Content |
-|---|---|
-| Projects | Spec Context Projects and their memory; each card lists the main repo and any associated repos ([[context-management]]) |
-| Agents | Persona cards, agent model templates/overrides, and the Sessions telemetry dashboard |
-| Agentic Entities | the abstract-entity registry rendered server-side ([[agentic-entities]]) |
-| Reports | handoff/report discovery and retention controls |
-| Academy | packaged knowledge-base content ([[academy]]) |
-| Servers | registered dev servers with TTL/PID status ([[server-registry]]) |
-
-## Model governance surface
-
-The Agents tab is the panel's only governance editor: it renders the Layer-1 model
-templates and the operator overlay, validates a submitted model/effort pair against the
-registry catalog, and writes `.dadaia/states/agent_model_policy.json` atomically. It
-never invents a model outside the catalog.
-
-## HTTP boundary
-
-The stdlib HTTP server applies strict CSP, `nosniff`, loopback binding and Host
-validation to reads and mutations alike. Operator-controlled strings are escaped,
-mutating routes validate payloads before atomic writes, and CSS/JS assets are served from
-packaged source with no external CDN.
+The Agents tab is the panel's only governance editor: it renders the Layer-1 model templates and the
+operator overlay, validates a submitted model/effort pair against the registry catalog, and writes
+`.dadaia/states/agent_model_policy.json` atomically, never inventing a model outside the catalog.
 
 ## Runtime state
 

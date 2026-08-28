@@ -2,8 +2,8 @@
 slug: sdd-bug-backlog-governance
 title: sdd-bug-backlog-governance
 category: product
-tldr: One record per bug through one write seam, a live-photo backlog with histo exits, and the RELEASE.jsonl milestone fold.
-summary: The bug ledger, the backlog live photo and the release-event stream — one record per bug, one write seam, one exit record per backlog slug, and a folded `RELEASE.jsonl` per release.
+tldr: One record per bug through one write seam, a live-photo backlog with histo exits, and the RELEASE.json state document.
+summary: The bug ledger, the backlog live photo and the release state document — one record per bug, one write seam, one exit record per backlog slug, and one mutable `RELEASE.json` per release.
 tags:
 - sdd
 - governance
@@ -15,227 +15,101 @@ tags:
 
 ## Bugs
 
-`specs/bugs/BUGS.jsonl` is the single canonical bug ledger: one record per bug, appended
-once, keyed by `id`. There is no event stream, no state machine and no fold — a bug's state
-is the one line that carries it, and git history is that line's change log.
+`specs/bugs/BUGS.jsonl` is the single canonical ledger: one record per bug, appended once, keyed by
+`id`. No event stream, no state machine, no fold — a bug's state is its one line, and git history is
+that line's change log. `bug-record-v1.schema.json` (`additionalProperties: false`) names the fields
+and marks each per property as immutable core, write-once, or mutable governance.
 
-`bug-record-v1.schema.json` (`additionalProperties: false`) declares the fields and splits
-them per property into three mutability categories: **immutable core** (`id`, `ts`,
-`reported_by`, `title`, `severity`, `surface`, `component`, `context`, `symptom`, `repro`,
-`expected`), **write-once** (`root_cause`, `solution`, the three evidence fields,
-`diff_direction`, `superseded_by`, `migration_note`) and **mutable governance** (`status`,
-`cause`, `caused_by`, `lineage_source`, the four provenance fields, `resolved_release`,
-`audited`).
+`status` is `open | resolved | superseded | deferred | rejected`; a pick is not a status. A sweep
+closure is `superseded` with `superseded_by`; `resolved` requires a regression seam. A reopen is a
+new record with a new `id` declaring `caused_by: <prior-id>`. `surface` is a closed enum whose one
+source is the `features/*/` package inventory on disk plus `core`, `infrastructure`, `cli`, `hooks`,
+`tests`, `public-assets`, `unknown`, its feature arm asserted equal to the import-linter
+independence contract's `modules =` list; `component` keeps free-text `path#symbol` precision.
+Evidence is `evidence_loop`, `evidence_seam` and `evidence_diff`, closed by `diff_direction` onto
+`net-negative | net-neutral | net-positive`.
 
-`status` is `open | resolved | superseded | deferred | rejected`. A pick is not a status. A
-sweep closure is `superseded` with `superseded_by` naming what met the need — `resolved`
-requires a regression seam. A reopen is a new record with a new `id` declaring
-`caused_by: <prior-id>`.
+`features/bugs`'s record store is the only code path that writes a governance field. Every write is
+**sanitize, then mask**, each once: sanitation deletes the control ranges (preserving TAB/LF/CR) by
+deletion rather than escaping, so a split term re-joins for the masking pass; masking consumes the
+operator denylist through the same loader the push-boundary scan uses ([[sdd-gate-v3]]). The rewrite
+is a compare-then-swap: refuse-stale, then retry. The backlog histo writer uses the same redaction.
+Five verbs sit over that seam — `append`, `status`, `stats`, `update` (the governance door, refusing
+an immutable core field and a second write to a write-once field) and `archive`; there is no
+`--event` flag and no `resolve` verb. `bugs archive` moves terminal records older than 90 days to
+`_archive/bugs_histo.jsonl`, idempotently; the legacy `_archive/archive.jsonl` stays byte-frozen.
+Coherence gaps are surfaced by `bugs status` and SPEC-DOC-033 with the exit code unchanged — the
+record contract is audited, never gated.
 
-`surface` is a closed enum with one source: the `dadaia_workspace/features/*/` package
-inventory on disk (24 packages) plus `core`, `infrastructure`, `cli`, `hooks`, `tests`,
-`public-assets` and `unknown`; a contract test asserts its feature arm equals the
-import-linter independence contract's `modules =` list. `component` keeps free-text
-`path#symbol` precision. Evidence is `evidence_loop` (the red-loop command run),
-`evidence_seam` (the regression test's boundary) and `evidence_diff`, closed by
-`diff_direction` onto `net-negative | net-neutral | net-positive`.
+**Resolution.** A bug is fixed on the spot — register → root-cause → RED test → fix → GREEN →
+`status: resolved` with evidence → commit — on the one live feature branch, in whatever phase it is
+in, with no SPEC, PLAN, TASKS or release directory. Releases are never created to fix bugs.
+Diagnosis is seven ordered phases; **phase 0 is the lineage duty**: filter the ledger for records
+sharing this bug's `surface` or `component` inside the audit window, capped at the 20 most recent by
+resolution date, diffing only those with `resolution_granularity == "exact"`, and ending in
+`caused_by: <bug-id>` or `caused_by: none` with evidence, in the record and in the fix commit body.
+When no correct seam exists the absence is the finding: an architecture finding is registered and
+`software-architect` dispatched before the fix proceeds, as does any net-positive diff.
 
-### The write seam
-
-`features/bugs`'s record store is the only code path that writes a governance field. It sits
-on the generic `infrastructure/jsonl_record_store.py`, a `JsonlRecordStore` keyed by `id`
-whose parse/serialise pair is injected through a `core.protocols` record protocol; each
-feature owns its model (`core/models/{bugs,findings,backlog}.py`) and gets its own store
-instance from the container.
-
-Every write passes the seam in a fixed order — **sanitize, then mask** — each once.
-
-- **Sanitation** deletes the C0/C1/DEL control range including ESC, plus U+0085 and
-  U+2028/U+2029; TAB, LF and CR are preserved. Characters are deleted rather than escaped, so
-  a term split by one of them re-joins into a substring the masking pass catches.
-- **Masking** consumes the operator denylist through the same loader the push-boundary scan
-  uses ([[sdd-gate-v3]]), on top of the home-path and IPv4 patterns. The field set is read
-  from the schema at load time and the terms arrive from the composition root, so `core`
-  never imports the loader. The backlog histo writer uses the same redaction.
-- **The rewrite is a compare-then-swap** through `core/atomic_write.py` carrying
-  `expected_previous`; a mismatch raises `ConcurrentModificationError`, re-raised as the
-  store's own stale-write error. Semantics are refuse-stale, then retry.
-
-### CLI surface
-
-Five verbs over the one seam: `dadaia bugs append`, `status`, `stats`, `update` (the
-governance door — `--set key=value`, refusing an immutable core field and a second write to a
-write-once field) and `archive`. There is no `--event` flag and no `resolve` verb.
-
-`bugs archive` is idempotent: terminal records older than 90 days move to
-`specs/bugs/_archive/bugs_histo.jsonl`, one per line, and a second run is a no-op;
-`specs doctor` emits SPEC-DOC-041 as an overdue WARN. The legacy
-`specs/bugs/_archive/archive.jsonl` stays byte-frozen. Coherence gaps — resolved without
-`cause`/`caused_by`/`resolved_release`, superseded without `superseded_by`, a surviving v5
-`"event"`-keyed line — are surfaced by `bugs status` and SPEC-DOC-033 with the exit code
-unchanged. The record contract is audited, never gated.
-
-### Resolution
-
-A bug is fixed on the spot — register → root-cause → RED test → fix → GREEN →
-`status: resolved` with evidence → commit — on the one live feature branch, in whatever phase
-it is in, with no SPEC, PLAN, TASKS or release directory. Releases are never created to fix
-bugs.
-
-Diagnosis is a method of seven ordered phases. **Phase 0 is the lineage duty**: before any
-hypothesis, filter the ledger for records sharing this bug's `surface` or `component` inside
-the audit window (newest `audited` milestone to HEAD; the whole file when none), capped at the
-20 most recent matching records by resolution date, diffing only those with
-`resolution_granularity == "exact"`. It ends by declaring `caused_by: <bug-id>` or
-`caused_by: none` with evidence, in the record and in the fix commit body. Phases 1-6 are a
-reproduction loop observed red before any hypothesis, minimisation, falsifiable hypotheses one
-at a time, instrumentation of the executed path, a regression test at the boundary the bug
-crossed, and removal of the instrumentation.
-
-When no correct seam exists the absence is the finding: an architecture finding is registered
-and `software-architect` dispatched before the fix proceeds. A `caused_by` pointing at a prior
-fix requires the structural cause and a diff that does not grow the feature; a net-positive
-diff routes to `software-architect` before the commit.
-
-### Provenance
-
-`registration_commit` and `resolved_commit` are a cache over git, never a second truth.
-`core/bug_provenance.py` derives them — pure and stdlib-only over an iterator of
-`(sha, parents, date, touched_paths, added_lines)`, with git access from a `core.protocols`
-history reader implemented in `infrastructure/git_subprocess.py`.
-
-The walk is all refs, chronological, first-add wins:
-`git log --all --full-history --no-merges --reverse --date-order -- specs/bugs/`. For each
-`bug_id` the first commit adding a registration line supplies `registration_commit` and the
-first adding a terminal line supplies `resolved_commit`; only additions count, and
-`--full-history` is load-bearing against history simplification on merged side branches.
-
-| Granularity | Meaning |
-|---|---|
-| `exact` | adds exactly one bug's line **and** touches a file outside `specs/` |
-| `release-squash` | adds more than one bug's line |
-| `ledger-only` | one bug's line, no file outside `specs/` |
-
-`resolved_commit` stays `null` at resolve time — a commit cannot contain its own sha. The only
-writer of the cache is the audit's first pillar ([[audits-canon]]), which writes `audited` and
-all four provenance fields in one atomic in-place rewrite through this seam. `cause` and
-`caused_by` are never fabricated: a value populated from prose carries
-`lineage_source: "text-reference"`. The v5→v6 line classifier is permanent in
-`core/bug_provenance.py`; the v5 fold adapter lives in `features/bugs/migrate_v5.py`, imported
-by nothing permanent.
-
-Five isolated write shapes exist, measured by the audit from `git log` and never by a hook;
-their operative home is `dd-gitflow-default` §3a. The product truth is that each stages
-nothing else.
+**Provenance.** `registration_commit` and `resolved_commit` are a cache over git, never a second
+truth, derived by `core/bug_provenance.py` from an all-refs chronological first-add-wins walk over
+`specs/bugs/` in which only additions count; granularity is `exact` (one bug's line plus a file
+outside `specs/`), `release-squash` or `ledger-only`. `resolved_commit` stays `null` at resolve
+time, and the only writer of the cache is the audit's first pillar ([[audits-canon]]). A `cause` or
+`caused_by` populated from prose carries `lineage_source: "text-reference"`; neither is ever
+fabricated. Five isolated write shapes exist, measured by the audit from `git log` and never by a
+hook; their operative home is `dd-gitflow-default`, and each stages nothing else.
 
 ## Backlog
 
-The backlog is the operator's demand queue: only the operator creates demand.
-`project-manager` curates one source, `specs/backlog/BACKLOG.md`, a live photo carrying
-`## ACTIVE` only; every other agent reads it and none writes it.
+Only the operator creates demand. `project-manager` curates one source,
+`specs/backlog/BACKLOG.json`, whose `active[]` holds the live candidate set; every other agent reads
+it and none writes it. `specs/backlog/` holds exactly `BACKLOG.json`, `AGENTS.md` and `_archive/`,
+the last holding `backlog_histo.jsonl` and `consumed_backlog_histo.jsonl`.
 
-Leaving `ACTIVE` appends one record `{ts, slug, disposition, reason, release, by, entry_md}`
-to `specs/backlog/_archive/backlog_histo.jsonl`, through the same write-time redaction the bug
-ledger uses. Consumption is executed at two moments against **one** record: purge-on-pick
-removes the `## ACTIVE` subsection in the same commit that creates the release SPEC and
-appends the (often provisional) exit record; the closure disposition sweep rewrites that
-record's `disposition`/`reason`/`release` in place to its terminal token. Never a second line.
+Leaving `active[]` appends one record `{ts, slug, disposition, reason, release, by, entry}` to
+`backlog_histo.jsonl`. Consumption executes at two moments against **one** record: purge-on-pick
+removes the entry in the same commit that creates the release SPEC and appends the (often
+provisional) exit record; the closure disposition sweep rewrites that record's
+`disposition`/`reason`/`release` in place to its terminal token. Never a second line.
 `**Consumes:**` in a SPEC is provenance, not a call site.
 
-Intake is operator-gated: no agent materializes an entry. A residual found at a closure,
-review or audit is listed as an intake candidate, and `project-manager` compiles those into an
-operator-facing intake report decided before anything reaches `ACTIVE`; the one carve-out is a
-deferral the operator ratified during a release. Only an actionable defect reaches an intake
-report — a record-only observation terminates in the closure notes. Every touch runs a
-staleness scan and a dedup scan of the whole file. The entry schema, intake protocol and
-disposition vocabulary have one home, `dd-backlog-definition`.
+Intake is operator-gated: no agent materializes an entry. A residual found at a closure, review or
+audit is listed as an intake candidate for `project-manager`'s operator-facing intake report; the
+one carve-out is a deferral the operator ratified during a release, and a record-only observation
+terminates in the closure notes instead. Every touch runs a staleness and dedup scan of the whole
+document. Entry schema, intake protocol and disposition vocabulary: `dd-backlog-definition`.
+`dadaia backlog doctor` validates the parsed model with **BL-SCHEMA** (a located parse error, an
+invalid status token, a bad slug, or an item at `candidate` or beyond with no bound or unresolvable
+`intents[]` subject — `idea` exempt), **BL-CONFLICT** (two active items sharing an anchor with an
+incompatible change) and **BL-STALE** (an active item already consumed or dispositioned);
+`specs doctor` backstops with SPEC-DOC-031 and SPEC-DOC-035.
 
-The single source is physical: `specs/backlog/` holds exactly `BACKLOG.md`, `AGENTS.md` and
-`_archive/`, the last holding superseded entry files, `backlog_histo.jsonl` and
-`consumed_backlog_histo.jsonl`.
+## The release state document
 
-`features/backlog/document.py` parses the document into a typed model with its roots injected
-and no I/O outside the supplied path. An `### <slug>` ACTIVE subsection carries five required
-keys — `Title`, `Opened` (`YYYY-MM-DD`), `Status`, `Description`, `Provenance` — plus optional
-`Intents` holding typed `intents[]` YAML in a fenced span. Parsing is diagnostic and never
-throws: a malformed subsection or unparseable intents block becomes a located error naming
-section, slug and line, and an absent document is an empty model.
+Each release directory carries `RELEASE.json`, a mutable `release-state-v1` document parsed by
+`core/release_state.py`: `phase` is a plain top-level field — no stream, no fold — beside `release`,
+`rc`, the milestone objects `defined`, `implemented`, `shipped` and `audited`, and a `log` array.
+Agents update it with file tools. `phase` resolves the active release and phase for the SDD gate,
+the doctor and every navigating agent. The milestones are immutable once set, each carrying its sha
+plus its own fields — `defined` `{sha, ts, pr}` at the definition promotion commit, `implemented`
+`{sha, rc}` at the final-`rc` QA close, `shipped` `{sha, pr, tag}` at the ship merge, `audited`
+`{sha, audit}`. `rc-N` is a state of the specs living in `rc`/`segment` and in TASKS, never a branch
+name; an internal segment closed by a committed QA review burns no `rc`.
 
-`dadaia backlog doctor` validates that model with three codes: **BL-SCHEMA** (a located parse
-error, an invalid status token, a slug outside `^[a-z][a-z0-9-]+$`, or an item at `candidate`
-or beyond with no bound or unresolvable `intents[]` subject — `idea` exempt); **BL-CONFLICT**
-(two ACTIVE items sharing an anchor with an incompatible change); and **BL-STALE** (an ACTIVE
-item already consumed or dispositioned). `dadaia backlog new <slug>` appends one conformant
-subsection at `status: idea`, creates the document when absent, and refuses a slug already
-present. `specs doctor` backstops with SPEC-DOC-031 and SPEC-DOC-035, both WARNING.
+**The closure narrative lives in `log` entries** — `{ts, agent, kind, text}` — over the kinds
+`closure-summary`, `closure-size-accounting`, `closure-drift` (one per drift),
+`closure-test-dispositions` and `closure-artifact-gc`. Everything else has a native home:
+dispositions in `backlog_histo.jsonl` and `BUGS.jsonl`, tasks in `TASKS.md` markers and their
+commits, validations in handoffs and verdicts, memory updates in the atom diffs, the archive
+decision in the `git mv` plus `phase: ARCHIVED`. Inside closure the order is memory update → closure
+log entries → disposition sweep → artifact GC → archive, the pre-PR six-axis code review running on
+the thawed tree before the `git mv` that freezes the directory.
 
-## Merge cadence
-
-Every agent stage — backlog definition, research, bug registration, release definition and
-implementation — runs on the one live feature branch, with a commit after every registration;
-`develop` and `main` are pull-request targets only. The branch contract itself has two homes,
-one law section and `dd-gitflow-default`.
-
-Each release directory carries `RELEASE.jsonl`, an append-only stream of `release-event-v1`
-records with the envelope `{ts, event, agent, data}` and no `session_id`. Exactly seven kinds
-exist: `phase`, `defined`, `implemented`, `shipped`, `audited`, `rc`, `note`. Records are
-appended by agents with file tools — no code writes the stream.
-
-The fold has one home and one reader: `core/release_events.py` parses and folds with no write
-call and no file I/O, and `features/specs/doctor_release.py` owns the single disk read. The
-**last `phase` record wins**, resolving the active release and phase for the SDD gate, the
-doctor and every navigating agent. The three sha-bearing milestones are immutable facts and
-the fold takes the **first** record of each, reporting a later duplicate as SPEC-DOC-043
-(WARNING): `defined` carries `{sha, pr}` at the definition promotion commit, `implemented`
-carries `{sha, rc}` written at the final-`rc` QA close on that closed commit's sha, `shipped`
-carries `{sha, pr, tag}` at the ship merge, and `audited` carries `{sha, audit}`.
-
-**The closure narrative lives in `note` records**, keyed by `data.kind`: `closure-summary`,
-`closure-size-accounting`, `closure-drift` (one per drift), `closure-test-dispositions`,
-`closure-artifact-gc`. Everything else has a native home — dispositions in
-`backlog_histo.jsonl`'s `release` field and `BUGS.jsonl`'s `resolved_release`, tasks in
-`TASKS.md`'s `[x]` markers and their commits, validations in the per-task handoffs and the
-trio's verdicts, memory updates in the atom diffs, and the archive decision in the `git mv`
-plus the `phase: ARCHIVED` record.
-
-Release ids are bare semver; a `v` prefix resolves only for read-only lookups of an
-already-archived directory. `specs/releases/_ideas/<id>/` holds a SPEC only — no
-`RELEASE.jsonl`, never an audit-window source, refused as an evidence root by the CI verdict
-gate.
-
-There is no alpha and no beta. A release matures through `rc-N` only, and `rc-N` is a state of
-the specs — it lives in the `phase` record's `data.segment` and in TASKS, never in a branch
-name. `rc-1` burns when the whole implemented scope is validated, gate-green and closed by QA;
-each later `rc` is an adjustment round over that same scope, one candidate per merge, and no
-new backlog ever enters a candidate. An internal segment closed by a committed QA review is
-not a candidate and burns no `rc`. `develop` advances by pull request at the definition
-`Aprovado` and once per candidate; `main` advances by pull request from `develop` at the final
-candidate. Both edges are gated by the committed security verdict ([[sdd-gate-v3]]).
-
-A release ends in one fixed order: **review → closure → archive → ship**. The pre-PR six-axis
-code review runs on the thawed tree, before the `git mv` that freezes the release directory;
-inside closure the order is memory update → the closure `note` records → disposition sweep →
-artifact GC → archive. A group of completed tasks is one commit. A dispatcher relaying work
-for a shell-less sub-agent commits that sub-agent's `[ ]`→`[-]` flip before relaying the next
-work item.
-
-Release definition records exactly which backlog and bug inputs are consumed; at pick time
-open bugs and undispositioned audits outrank fresh backlog, and closure gives each consumed
-item a terminal disposition and evidence. Audits are committed spec artifacts under
-`specs/audits/`, run as three pillars over a sha window and dispositioned by exactly one
-remediation release ([[audits-canon]]).
-
-## Runtime state
-
-- `specs/bugs/BUGS.jsonl`; `specs/bugs/_archive/{bugs_histo.jsonl,archive.jsonl}`
-- `specs/backlog/BACKLOG.md`;
-  `specs/backlog/_archive/{backlog_histo,consumed_backlog_histo}.jsonl`
-- `specs/releases/<id>/RELEASE.jsonl`; `specs/releases/_archive/releases_histo.jsonl`;
-  `specs/releases/_ideas/<id>/SPEC.md`
-- `specs/releases/<id>/verdicts/<sha>.handoff.json`; `specs/releases/<id>/reviews/`
-- `specs/audits/<YYYYMMDD>-<slug>/` and `specs/audits/_archive/<audit>/`
-- `.dadaia/reports/<context>/project-manager/<UTC>-intake/`
-- `pyproject.toml` and `CHANGELOG.md` at the final-candidate merge
+Release ids are bare semver; a `v` prefix resolves only for read-only lookups of an already-archived
+directory. `specs/releases/_ideas/<id>/` holds a SPEC only — no `RELEASE.json`, never an
+audit-window source, refused as an evidence root by the CI verdict gate. Audits are committed spec
+artifacts dispositioned by exactly one remediation release ([[audits-canon]]).
 
 ## Dependencies
 

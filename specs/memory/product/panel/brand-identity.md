@@ -11,31 +11,18 @@ tags:
 - tokens
 ---
 
-## Purpose
+## Tokens
 
-One home for the panel's visual constants:
-`dadaia_workspace/features/panel/views/assets/css/tokens.py` holds spacing, radius,
+`dadaia_workspace/features/panel/views/assets/css/tokens.py` is the one home for spacing, radius,
 shadows, z-index, motion, dimensions and colours. The three themes
-(`[data-theme="mint|sage|warm"]`) extend those base tokens; no second token module
-exists ([[panel]]).
+(`[data-theme="mint|sage|warm"]`) extend those base tokens; no second token module exists
+([[panel]]).
 
-## Canonical palette
-
-| Name | Hex | Role |
-|---|---|---|
-| accent | `#9cddc8` | active tab, highlight border, decorative badges with dark text — never a text colour (~2.1:1 on white fails WCAG AA) |
-| accent_secondary | `#bfd8ad` | positive-state badge background, expanded-row background |
-| warning_bg | `#ddd9ab` | stale-price warning banner; overlaid text `#3d3600` |
-| alert | `#f7af63` | inline alert icon/border — never a text colour |
-| cost | `#633d2e` | monetary values and the topbar wordmark (~8:1 on white, WCAG AAA) |
-
-## CSS token mapping
-
-| Token | Palette |
-|---|---|
-| `--color-accent`, `--color-primary-ring` | accent `#9cddc8` |
-| `--color-primary-bg` | derived from accent, `#f0fbf7` |
-| `--color-accent-secondary` | accent_secondary `#bfd8ad` |
-| `--color-warning-bg` | warning_bg `#ddd9ab` |
-| `--color-alert` | alert `#f7af63` |
-| `--color-cost` | cost `#633d2e` |
+| Name | Hex | CSS token | Role |
+|---|---|---|---|
+| accent | `#9cddc8` | `--color-accent`, `--color-primary-ring` | active tab, highlight border, decorative badges with dark text — never a text colour (~2.1:1 on white fails WCAG AA) |
+| — | `#f0fbf7` | `--color-primary-bg` | derived from accent |
+| accent_secondary | `#bfd8ad` | `--color-accent-secondary` | positive-state badge background, expanded-row background |
+| warning_bg | `#ddd9ab` | `--color-warning-bg` | stale-price warning banner; overlaid text `#3d3600` |
+| alert | `#f7af63` | `--color-alert` | inline alert icon/border — never a text colour |
+| cost | `#633d2e` | `--color-cost` | monetary values and the topbar wordmark (~8:1 on white, WCAG AAA) |

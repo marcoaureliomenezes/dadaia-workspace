@@ -113,116 +113,54 @@ flowchart LR
   I --> C
 ```
 
-`container.py` is the composition root the CLI and the panel build through. An unavoidable
-edge uses a function-scoped lazy import — the two capped `chokepoints` and `doctor_memory`
-edges. The workspace ships no agent-execution runtime.
+`container.py` is the composition root; an unavoidable edge uses a function-scoped lazy import (the
+two capped `chokepoints` and `doctor_memory` edges). The workspace ships no agent-execution runtime,
+and no workspace operation blocks on another session.
 
-### Seams
+### Single-authority seams
 
-- `core/specs_resolver.resolve_context()` — single context-NAME authority (P-09); its
-  docstring holds the rung law ([[context-management]]). Consumers: the CLI seam,
-  `container`, the SDD gate, ctx-inject. `core` duplicates
-  `features/spec_context/session_identity`'s record read, since P-04 forbids the import.
-- `core/atomic_write.py` — the one atomic-write primitive: uuid-suffixed temp sibling plus
-  `os.replace`, parameterized by preserve-mode, text-or-bytes content and newline policy,
-  temp cleanup on every failure path, importing nothing from `dadaia_workspace` so `hooks/`
-  consume it without the composition root (P-12). Compare-then-swap is inside it: optional
-  `expected_previous` is the last read before `os.replace`, a mismatch raises the pure-`core`
-  `ConcurrentModificationError` and cleans the temp sibling, and its kind (`str`/`bytes`)
-  must match the content's. Semantics are refuse-stale then retry.
-  `tests/unit/core/test_atomic_write_census.py` asserts every atomic write routes through it.
-- `core/redaction.py` — stdlib-pure masking behind `cli/redact.py`'s `--redact`:
-  word-boundary alternation, longest-first ordering, first-appearance placeholder ordinals.
-  The push gate does not consume it; its render boundary masks with the detector's own
-  matchers.
-- The P-11 file-I/O authorized stems are `specs_backup`, `specs_version`, `specs_resolver`,
-  `workspace_resolver`, `specs_repair`, `atomic_write`.
+`core/specs_resolver.resolve_context()` — context-NAME resolution (P-09), its docstring holding the
+rung law ([[context-management]]). `core/atomic_write.py` — every atomic write, with optional
+`expected_previous` making it compare-then-swap. `core/redaction.py` — the `--redact` primitive.
+`core/release_state.py` — the `RELEASE.json` parser. `features/backlog/` — the backlog grammar.
+`features/bugs/` — every governance-field write ([[sdd-bug-backlog-governance]]). P-11 authorized
+file-I/O stems: `specs_backup`, `specs_version`, `specs_resolver`, `workspace_resolver`,
+`specs_repair`, `atomic_write`.
 
-### Feature packages
+### Feature packages and hooks
 
-- `features/spec_context/` — ALIVE/DEAD lifecycle, binding, session identity, advisory
-  presence, path classification, workspace doctor checks. No lease or locking module.
-- `features/chokepoints/` — pre-commit/pre-push decision logic, no subprocess (P-02); its
-  one `infrastructure` edge (`jsonl_log_rotation`) is function-scoped and capped under P-10.
-  I/O arrives as injected core ports: `ProcessAncestry` and `GitObjectReader` (adapter
-  `infrastructure/git_objects.GitSubprocessObjectReader`), the latter a required parameter of
-  the push decision function. `GitObjectReader` yields each object's new content plus the
-  prior published text of the same path at the range base, or an explicit absence value
-  (never an empty string); the protocol module is data-only, the adapter owns every
-  subprocess, chunks to a constant resident bound and raises its own typed read error.
-- `features/specs/` — structural validators, the memory-atom lint (one package module the
-  doctor imports directly), catalog generation. Markdown atoms are the source; `catalog.json`
-  and `product/index.md` are generated from frontmatter, and a catalog value derivable from
-  an atom body is computed at generation time
-  (`tests/contract/test_memory_catalog_render_contract.py`). `SpecsDoctor` is a thin
-  coordinator over six validator siblings ([[specs-doctor]]).
-- `features/backlog/` — the sole owner of the backlog grammar, parsing and writing: `backlog
-  new` finds its insertion point through the parsed fence-aware structure, checks slug
-  membership through the parsed document, and re-parses its own output.
-- `features/spec_artifacts/new_artifacts.py` — creates a release SPEC and nothing else; the
-  workspace scaffolds no hotfix release ([[sdd-bug-backlog-governance]]).
-- `features/reports/` — handoff validation, discovery and retention, stdlib-only behind
-  `ValidatorPort`. `features/panel/` — loopback-only stdlib HTTP UI ([[panel]]).
-  `features/public/` — the projection chain ([[public-asset-distribution]]).
-- Other bounded packages: certification, capabilities, telemetry, server registry, bugs,
-  repos, academy, import/export, migration, workspace initialization and cleanup.
-
-### Hooks and chokepoints
+The package set is the diagram below. Notable boundaries: `spec_context` carries no lease or locking
+module; `chokepoints` holds pre-commit/pre-push decision logic over injected git ports
+([[sdd-gate-v3]]); `specs` owns the validators, memory-atom lint, catalog generation and the
+`SpecsDoctor` coordinator ([[specs-doctor]]); `spec_artifacts` creates a release SPEC and nothing
+else.
 
 `hooks/pre_gate.py` composes root whitelist, venv guard and the path/phase/mode gate;
 `hooks/sdd_post_gate.py` refreshes presence and runs the nonblocking reconciler;
-`hooks/ctx_inject.py` emits the once-per-session bootstrap and reads only the leading lines
-of [[tech-stack]] for its digest. The git chokepoints are installed from
-`public/scripts/pre-commit-presence-gate.sh` and `public/scripts/pre-push-ci-gate.sh`
-([[sdd-gate-v3]]).
-
-### Concurrency
-
-No workspace operation blocks on another session. A mutating file-tool call records
-best-effort presence; a peer record produces an advisory warning; the caller's own READ mode
-is self-protection; filesystem and git conflicts surface races. Adapter primitives that
-serialize a single telemetry refresh or database write have bounded failure behavior.
-
-### Runtime state
-
-Workspace state is rooted at `.dadaia/` and nowhere else; the allowed subdirectory set is
-`_DADAIA_ALLOWED_SUBDIRS` in `features/spec_context/doctor.py`, enforced by ROOT-4. Legacy
-`states/ctx_locks/` and `sessions/runtime/` are retired state removed by `doctor --fix`;
-`states/bind_epoch/` is swept by the `remove_legacy_bind_epoch_state` install migration;
-known-legacy subdirs (`bugs`, `src`, `locks`, `figma-bridge`, `imgs`, `references`) are
-quarantined — never deleted — into `tmp/legacy-quarantine/run-<id>/` with a manifest by the
-reconcile `legacy-dir-quarantine` step (`features/migrate/legacy_dadaia_dirs.py`).
-
-No repo may contain `.dadaia/`, a virtualenv, cache directories, test-results, Playwright
-reports or coverage artifacts — measured by ROOT-4 and
-`tests/contract/test_source_repo_hygiene.py`. `dadaia doctor` and `reports validate` exit
-non-zero while issues remain. Tool-initiated commits (`alive` scaffold, `dead` sync) fall
-back to an injected `dadaia-workspace <dadaia@workspace.local>` git identity
-(`infrastructure/git_subprocess.py`).
+`hooks/ctx_inject.py` emits the once-per-session bootstrap from the leading lines of [[tech-stack]].
+Workspace state is rooted at `.dadaia/` and nowhere else, the allowed subdirectory set being
+`_DADAIA_ALLOWED_SUBDIRS` in `features/spec_context/doctor.py`, enforced by ROOT-4, which also
+refuses a repo-local `.dadaia/`, virtualenv, cache, test-results, Playwright or coverage tree.
+Tool-initiated commits fall back to an injected `dadaia-workspace <dadaia@workspace.local>` git
+identity.
 
 ### Agent surface
 
-Nine core agent roles with two dispatchers run inside the entry harness
-([[agent-orchestration]]). Their bodies are canonical Markdown under `public/agents/`,
-rendered at install with the resolved model/effort policy and projected per harness. A
-persona body targets 120-220 lines; each exceeding persona justifies its overflow inline, and
-no persona loses a write-allowlist row, a scope boundary or a hard-stop block. Every core
-sub-agent, hook and rule file derives from an abstract entity in
-`public/entities/registry.json`, and `public/entities/behavior-map.json` binds each skill and
-scoped `AGENTS.md` to one `DADAIA.md` section (P-17) ([[agentic-entities]]).
+Nine core agent roles with two dispatchers run inside the entry harness ([[agent-orchestration]]).
+Bodies are canonical Markdown under `public/agents/`, rendered at install with the resolved
+model/effort policy and projected per harness. Every core sub-agent, hook and rule file derives from
+an abstract entity in `public/entities/registry.json`, and `public/entities/behavior-map.json` binds
+each skill and scoped `AGENTS.md` to one `DADAIA.md` section (P-17) ([[agentic-entities]]).
 
 ### Architecture diagrams
 
-The three diagrams below are parsed in place by P-13's drift-guard and regenerated at the
-closure of any structural release that renames, splits, adds, removes or merges what they
-depict.
+Parsed in place by P-13's drift-guard; regenerated at the closure of any structural release that
+renames, splits, adds, removes or merges what they depict.
 
 ### `features/specs/doctor` — SpecsDoctor coordinator + validator siblings
 
-The coordinator owns `check()`/`fix()` ORDER only; six validator siblings hold the logic,
-over two shared leaf modules. Each boundary import sits in exactly one validator:
-`doctor_memory` holds the lazy `infrastructure.subprocess_runner` edge, `doctor_governance`
-the `features.backlog.document` edge. The package carries no `spec_context` edge.
+The coordinator owns `check()`/`fix()` ORDER only. Each boundary import sits in exactly one
+validator; the package carries no `spec_context` edge.
 
 ```mermaid
 classDiagram
@@ -291,9 +229,8 @@ classDiagram
 
 ### `dadaia_workspace/features` — package map (24 packages)
 
-The parenthetical count is the drift-guard's pinned lookup key and moves only with the live
-package set. The guard is forward-only for packages — a retired package left in the diagram
-passes — which is why regeneration is a stated closure step.
+The parenthetical count is the drift-guard's pinned lookup key. The guard is forward-only for
+packages, which is why regeneration is a stated closure step.
 
 ```mermaid
 flowchart TB
