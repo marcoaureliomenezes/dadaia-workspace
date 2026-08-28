@@ -28,9 +28,14 @@ import stat
 import subprocess
 from pathlib import Path
 
+import sys
+
 import pytest
 
-pytestmark = pytest.mark.contract
+pytestmark = pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="POSIX bash CI script; the Windows runner's bash is the WSL stub",
+)
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SCRIPT = _REPO_ROOT / ".github" / "scripts" / "pr-verdict-check.sh"
