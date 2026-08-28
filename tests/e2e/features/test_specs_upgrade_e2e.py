@@ -82,7 +82,6 @@ def _seed_below_canonical_tree(root: Path) -> Path:
 
     for d in ("backlog", "bugs", "releases"):
         (specs / d / "README.md").write_text(f"# {d}\n", encoding="utf-8")
-        (specs / d / ".gitkeep").write_text("", encoding="utf-8")
 
     # Legacy artifacts both registry steps consume: pre-v2 foundation tree + root
     # SPEC.md (tree-v2 moves them under releases/legacy/) and a legacy bug markdown

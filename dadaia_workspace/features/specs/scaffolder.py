@@ -105,18 +105,6 @@ def scaffold(
         except OSError as exc:
             result.errors.append(f"Failed to write {path}: {exc}")
 
-    def _touch(path: Path) -> None:
-        """Create an empty .gitkeep file; respect force flag."""
-        if path.exists() and not force:
-            result.skipped.append(path)
-            return
-        try:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text("", encoding="utf-8")
-            result.created.append(path)
-        except OSError as exc:
-            result.errors.append(f"Failed to create {path}: {exc}")
-
     # 1 — constitution.md (stub; operator-owned — only create if absent)
     constitution_path = specs_dir / "constitution.md"
     if constitution_path.exists() and not force:
@@ -141,7 +129,11 @@ def scaffold(
     # 2 — scoped SDD rules. This exact template is what doctor compares against.
     # v6 canon (FR1, specs_pattern_version 5 -> 6): every scaffold README.md retires
     # into its area's AGENTS.md — root and memory/ already carried one; backlog/,
-    # bugs/, releases/ and audits/ now do too.
+    # bugs/, releases/, audits/ and ADRs/ now do too. A directory is kept by its
+    # AGENTS.md — no separate .gitkeep landing-zone mechanism (retired: git does not
+    # track empty directories, and none of these needs to be empty-but-present; a
+    # per-artifact `_archive/` subdir is created on demand by the first real write
+    # into it, via the shared atomic_write mkdir-parents idiom).
     try:
         _write(
             specs_dir / "AGENTS.md",
@@ -151,7 +143,7 @@ def scaffold(
             specs_dir / "memory" / "AGENTS.md",
             (_scaffold_memory_dir / "AGENTS.md").read_text(encoding="utf-8"),
         )
-        for area in ("backlog", "bugs", "releases", "audits"):
+        for area in ("backlog", "bugs", "releases", "audits", "ADRs"):
             _write(
                 specs_dir / area / "AGENTS.md",
                 (_scaffold_dir / area / "AGENTS.md").read_text(encoding="utf-8"),
@@ -200,26 +192,17 @@ def scaffold(
     # document; a fresh scaffold and a fresh `backlog new` share one skeleton shape.
     _write(specs_dir / "backlog" / "BACKLOG.md", _BACKLOG_STUB)
 
-    # 7, 8 — releases/ landing zones (v6 canon: at most one live {version}/ plus
-    # _ideas/{version}/ for pre-approval drafts and _archive/{version}/ for closed
-    # releases — RELEASE.jsonl-ready). Root specs/_archive/ and specs/assets/ retire:
-    # neither is a v6 canon root member (TREE-8).
-    _touch(specs_dir / "releases" / "_ideas" / ".gitkeep")
-    _touch(specs_dir / "releases" / "_archive" / ".gitkeep")
+    # 7, 8 — releases/{_ideas,_archive}/, and 10-12 — the backlog/audits/bugs
+    # per-artifact _archive/ dirs (v0.1.46 AC-4, FROZEN gate-class landing zones) are
+    # deliberately NOT pre-created here: none carries its own AGENTS.md, root
+    # specs/_archive/ and specs/assets/ retired (neither is a v6 canon root member,
+    # TREE-8), and a directory that is kept by nothing but an empty placeholder file
+    # is exactly the .gitkeep mechanism this scaffold retires. Each lands on disk the
+    # moment its first real artifact is written into it (mkdir-parents=True, the
+    # shared atomic_write idiom) — never eagerly, never empty-on-purpose.
 
-    # 9 — ADRs/ (v6 canon root member; FR19 owns the decision-record law/index — "No
-    # CLI verb, no doctor rule beyond FR1's folder shape").
-    _touch(specs_dir / "ADRs" / ".gitkeep")
-
-    # 10, 11, 12 — per-artifact _archive dirs (v0.1.46 AC-4, FROZEN gate-class landing
-    # zone). Each additive artifact family (backlog/audits/bugs) gets its own _archive/
-    # subdir where terminal/dispositioned entries are git-mv'd. The gate classifies these
-    # three subdirs FROZEN (features/spec_context/gate_policy.py); creating them here
-    # ensures new + upgraded workspaces have the landing zone before any archive move
-    # (the bugs->JSONL migration moves source .md into specs/bugs/_archive/ in-process).
-    _touch(specs_dir / "backlog" / "_archive" / ".gitkeep")
-    _touch(specs_dir / "audits" / "_archive" / ".gitkeep")
-    _touch(specs_dir / "bugs" / "_archive" / ".gitkeep")
+    # 9 — ADRs/AGENTS.md already written above (v6 canon root member; FR19 owns the
+    # decision-record law/index).
 
     return result
 

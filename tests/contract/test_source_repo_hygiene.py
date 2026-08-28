@@ -89,13 +89,11 @@ def test_sdd_gate_artifacts_visible_and_noncanonical_content_stays_gitignored() 
         # backlog-gitignored-governance-vacuous): live entries, the curated
         # index, and _archive durable copies are all visible to review/CI.
         # T-050-06A widened _archive/ from *.md-only to every artifact type
-        # (backlog_histo.jsonl and the FROZEN-landing-zone .gitkeep are the
-        # concrete evidence — both were IGNORED before it).
+        # (backlog_histo.jsonl is the concrete evidence — it was IGNORED before it).
         "specs/backlog/candidates.md",
         "specs/backlog/some-entry.md",
         "specs/backlog/_archive/some-consumed-entry.md",
         "specs/backlog/_archive/backlog_histo.jsonl",
-        "specs/backlog/_archive/.gitkeep",
     ]
     ignored = [path for path in visible_paths if _is_ignored(path)]
     assert ignored == []

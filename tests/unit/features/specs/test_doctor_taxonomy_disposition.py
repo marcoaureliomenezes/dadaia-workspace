@@ -221,7 +221,6 @@ def test_sad_path_matrix(  # type: ignore[no-untyped-def]
         fixed = doctor.fix()
         assert any(i.code == "SPEC-DOC-034" for i in fixed)
         assert (specs / "backlog" / "_archive").is_dir()
-        assert (specs / "backlog" / "_archive" / ".gitkeep").exists()
         assert _codes(specs, "SPEC-DOC-034") == []
 
 
@@ -267,7 +266,6 @@ def _silent_doc036_with_disposition(specs: Path) -> None:
 
 def _silent_doc036_empty_archive(specs: Path) -> None:
     _seed_archives(specs)
-    (specs / "audits" / "_archive" / ".gitkeep").write_text("", encoding="utf-8")
 
 
 @pytest.mark.parametrize(

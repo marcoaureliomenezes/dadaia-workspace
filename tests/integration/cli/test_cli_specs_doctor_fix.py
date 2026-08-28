@@ -28,9 +28,9 @@ _PUBLIC_DIR = _REPO_ROOT / "dadaia_workspace" / "public"
 def _make_minimal_specs(root: Path) -> Path:
     """Scaffold a minimal valid specs/ tree using the canonical scaffold().
 
-    v6 canon (T-050-05, FR1): scaffold() already writes bugs/AGENTS.md,
-    bugs/_archive/.gitkeep and specs/AGENTS.md itself — no hand-rolled
-    README.md/AGENTS.md injection needed anymore.
+    v6 canon (T-050-05, FR1): scaffold() already writes bugs/AGENTS.md and
+    specs/AGENTS.md itself — no hand-rolled README.md/AGENTS.md injection
+    needed anymore.
     """
     specs = root / "specs"
     result = scaffold(
@@ -47,9 +47,10 @@ def test_doctor_clean_tree_then_remove_backlog_then_fix_recreates_then_no_fix_ne
     tmp_path: Path,
 ) -> None:
     """A fully clean scaffolded tree exits 0 without --fix; removing backlog/ and
-    running --fix recreates it (AGENTS.md + .gitkeep, v6 canon); and without --fix,
-    behaviour is unchanged — the doctor never auto-creates/mutates anything (removing
-    the core architecture.md atom stays removed)."""
+    running --fix recreates it (AGENTS.md, v6 canon — a directory is kept by its
+    AGENTS.md, no .gitkeep placeholder); and without --fix, behaviour is unchanged —
+    the doctor never auto-creates/mutates anything (removing the core architecture.md
+    atom stays removed)."""
     specs = _make_minimal_specs(tmp_path)
 
     clean_result = _runner.invoke(
@@ -72,7 +73,6 @@ def test_doctor_clean_tree_then_remove_backlog_then_fix_recreates_then_no_fix_ne
     )
     assert backlog.exists(), f"backlog/ must be created; output:\n{fix_result.output}"
     assert (backlog / "AGENTS.md").exists(), "backlog/AGENTS.md must be created"
-    assert (backlog / ".gitkeep").exists(), "backlog/.gitkeep must be created"
     assert fix_result.exit_code == 0, (
         f"Expected exit 0; got {fix_result.exit_code}:\n{fix_result.output}"
     )

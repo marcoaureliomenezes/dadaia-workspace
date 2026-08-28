@@ -155,9 +155,10 @@ class StructuralValidator:
         """TREE-4: backlog/, bugs/, and releases/ must exist under specs/.
 
         When a directory is absent the issue is emitted as fixable=True.
-        The fix creates the dir, writes AGENTS.md (content copied from the
-        canonical scaffold source — v6 canon, FR1: README.md retired), and
-        touches .gitkeep — matching the exact output of ``scaffold()``.
+        The fix creates the dir and writes AGENTS.md (content copied from the
+        canonical scaffold source — v6 canon, FR1: README.md retired) — matching
+        the exact output of ``scaffold()``. A directory is kept by its AGENTS.md;
+        no separate .gitkeep placeholder is written.
         """
         issues: list[SpecsDoctorIssue] = []
         for dirname in _TREE4_REQUIRED_DIRS:
@@ -227,7 +228,8 @@ class StructuralValidator:
         shutil.rmtree(stray, ignore_errors=True)
 
     def fix_tree4(self, issue: SpecsDoctorIssue) -> None:
-        """Create the missing directory with AGENTS.md and .gitkeep."""
+        """Create the missing directory with AGENTS.md — a directory is kept by its
+        AGENTS.md, no separate .gitkeep placeholder."""
         assert issue.code == "TREE-4"
         target = Path(issue.path)  # type: ignore[arg-type]
         dirname = target.name
@@ -241,10 +243,6 @@ class StructuralValidator:
         agents_md = target / "AGENTS.md"
         if not agents_md.exists():
             agents_md.write_text(agents_content, encoding="utf-8")
-        # .gitkeep
-        gitkeep = target / ".gitkeep"
-        if not gitkeep.exists():
-            gitkeep.write_text("", encoding="utf-8")
 
     def check_tree5_agents_md(self) -> list[SpecsDoctorIssue]:
         """TREE-5: specs/AGENTS.md must exist and its content must match the canonical template.

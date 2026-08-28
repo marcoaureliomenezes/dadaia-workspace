@@ -185,11 +185,10 @@ def test_legacy_archived_audits_fold_into_a_single_warning(tmp_path: Path) -> No
     assert all(i.severity is not Severity.ERROR for i in errs)
 
 
-def test_gitkeep_and_readme_are_never_legacy_entries(tmp_path: Path) -> None:
+def test_readme_is_never_a_legacy_entry(tmp_path: Path) -> None:
     specs = tmp_path / "specs"
     archive = specs / "audits" / "_archive"
     archive.mkdir(parents=True)
-    (archive / ".gitkeep").write_text("", encoding="utf-8")
     (archive / "README.md").write_text("# Audits archive\n", encoding="utf-8")
 
     assert _codes(specs, "SPEC-DOC-036") == []

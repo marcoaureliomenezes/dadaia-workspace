@@ -59,7 +59,7 @@ _ARCHIVE_PARENT_DIRS: tuple[str, ...] = ("backlog", "audits", "bugs")
 _TERMINAL_DISPOSITIONS: frozenset[str] = frozenset({"fixed", "superseded", "deferred", "rejected"})
 
 # Names never treated as a per-audit entry when walking ``audits/`` or ``audits/_archive/``.
-_AUDIT_DIR_SKIP_NAMES: frozenset[str] = frozenset({".gitkeep", "README.md"})
+_AUDIT_DIR_SKIP_NAMES: frozenset[str] = frozenset({"README.md"})
 
 
 def _default_iter_findings(findings_path: Path) -> Iterator[FindingRecord]:
@@ -178,8 +178,9 @@ class ClosureAuditValidator:
         """SPEC-DOC-034 (v0.1.46 AC-4): the three per-artifact ``_archive`` dirs must exist.
 
         ``specs/{backlog,audits,bugs}/_archive/`` are the FROZEN landing zones for disposed
-        artifacts. A missing dir is a WARNING with an auto-fix (``doctor --fix`` mkdirs it
-        with a ``.gitkeep``). A parent dir that does not itself exist is skipped — its
+        artifacts. A missing dir is a WARNING with an auto-fix (``doctor --fix`` mkdirs
+        it — a directory is kept by its own future content, no ``.gitkeep``
+        placeholder). A parent dir that does not itself exist is skipped — its
         absence is a separate TREE-4 concern, not this taxonomy invariant.
         """
         issues: list[SpecsDoctorIssue] = []
@@ -206,13 +207,11 @@ class ClosureAuditValidator:
         return issues
 
     def fix_archive_dir(self, issue: SpecsDoctorIssue) -> None:
-        """Create a missing ``_archive`` dir with a ``.gitkeep`` (SPEC-DOC-034 auto-fix)."""
+        """Create a missing ``_archive`` dir (SPEC-DOC-034 auto-fix). A directory is
+        kept by its own future content — no ``.gitkeep`` placeholder is written."""
         assert issue.code == "SPEC-DOC-034"
         target = Path(issue.path)  # type: ignore[arg-type]
         target.mkdir(parents=True, exist_ok=True)
-        gitkeep = target / ".gitkeep"
-        if not gitkeep.exists():
-            gitkeep.write_text("", encoding="utf-8")
 
     def check_audit_disposition(self) -> list[SpecsDoctorIssue]:
         """SPEC-DOC-036 (v0.5.0 FR15, A15.1/A15.2): fold ``FINDINGS.jsonl``, never prose.

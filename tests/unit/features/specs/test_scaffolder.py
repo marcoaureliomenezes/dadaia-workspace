@@ -27,10 +27,13 @@ _TEMPLATES_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "templates"
 # AC-4 per-artifact _archive dirs (FROZEN gate-class landing zone).
 #
 # v6 canon (T-050-05, FR1, specs_pattern_version 5 -> 6): root specs/_archive/ and
-# specs/assets/ retire — neither is a v6 canon root member (TREE-8) — replaced by
-# releases/_ideas/ + releases/_archive/ (RELEASE.jsonl-ready) and a new ADRs/ root
-# member. Every scaffold README.md retires into its area's AGENTS.md (backlog/,
-# bugs/, releases/, audits/ now each carry one, matching root and memory/).
+# specs/assets/ retire — neither is a v6 canon root member (TREE-8) — replaced by a
+# new ADRs/ root member. Every scaffold README.md retires into its area's AGENTS.md
+# (backlog/, bugs/, releases/, audits/, ADRs/ now each carry one, matching root and
+# memory/). A directory is kept by its AGENTS.md: the .gitkeep landing-zone mechanism
+# for releases/_ideas/, releases/_archive/ and the backlog/audits/bugs per-artifact
+# _archive/ dirs is retired — none of those is pre-created by a fresh scaffold; each
+# lands on disk the moment its first real artifact is written into it.
 _EXPECTED_FILES = [
     "constitution.md",
     "AGENTS.md",
@@ -45,12 +48,7 @@ _EXPECTED_FILES = [
     "backlog/BACKLOG.md",
     "bugs/AGENTS.md",
     "audits/AGENTS.md",
-    "releases/_ideas/.gitkeep",
-    "releases/_archive/.gitkeep",
-    "ADRs/.gitkeep",
-    "backlog/_archive/.gitkeep",
-    "audits/_archive/.gitkeep",
-    "bugs/_archive/.gitkeep",
+    "ADRs/AGENTS.md",
 ]
 
 # T-050-05 (A1.1): the v6 canon root is exactly these 8 members — nothing else is
@@ -84,8 +82,10 @@ def test_scaffold_happy_path_creates_all_artifacts(tmp_path: Path) -> None:
         assert full.exists(), f"Expected file/dir missing: {rel}"
 
     for artifact in ("backlog", "audits", "bugs"):
-        gitkeep = specs_dir / artifact / "_archive" / ".gitkeep"
-        assert gitkeep in result.created, f"{artifact}/_archive/.gitkeep must be reported created"
+        assert not (specs_dir / artifact / "_archive").exists(), (
+            f"{artifact}/_archive/ must not be pre-created empty by a fresh scaffold "
+            "— it is kept by its own future content, never a .gitkeep placeholder"
+        )
 
     # ACTIVE.md retired (v0.5.0 FR4/T-050-21A, A4.1): no replacement file — a fresh
     # scaffold's "no active release" state is the honest absence of any directory
@@ -134,7 +134,7 @@ def test_scaffold_emits_exact_v6_canon_root_zero_readme_zero_assets(tmp_path: Pa
 
     assert not (specs_dir / "assets").exists(), "v6 canon emits zero assets/"
 
-    for area in ("backlog", "bugs", "releases", "audits"):
+    for area in ("backlog", "bugs", "releases", "audits", "ADRs"):
         assert (specs_dir / area / "AGENTS.md").exists(), f"{area}/AGENTS.md must exist"
 
 
