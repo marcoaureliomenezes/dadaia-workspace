@@ -141,6 +141,10 @@ def release_new(specs_dir: Path, release_id: str) -> NewArtifactResult:
         )
 
     release_dir = specs_dir / "releases" / release_id
+    if release_dir.is_symlink():
+        raise FileExistsError(
+            f"Release directory is a symlink, refusing to mint through it: {release_dir}"
+        )
     minted = [n for n in _RELEASE_ARTIFACTS if (release_dir / n).exists()]
     if minted:
         raise FileExistsError(

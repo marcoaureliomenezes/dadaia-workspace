@@ -131,3 +131,17 @@ def test_release_new_accepts_a_directory_that_holds_only_verdicts(tmp_path: Path
 
     assert result.path == specs / "releases" / "0.9.0" / "SPEC.md"
     assert result.path.is_file()
+
+
+def test_release_new_refuses_a_symlinked_release_directory(tmp_path: Path) -> None:
+    """Security review LOW at b7fd1c22: minting must never follow a symlinked
+    release directory out of the specs tree."""
+    specs = tmp_path / "specs"
+    (specs / "releases").mkdir(parents=True)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (specs / "releases" / "0.9.1").symlink_to(outside, target_is_directory=True)
+
+    with pytest.raises(FileExistsError, match="symlink"):
+        release_new(specs, "0.9.1")
+    assert not (outside / "SPEC.md").exists()
