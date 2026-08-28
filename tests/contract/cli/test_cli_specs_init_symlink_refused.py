@@ -16,7 +16,6 @@ Owner: software-engineer
 
 from __future__ import annotations
 
-import re
 import shutil
 import tempfile
 from pathlib import Path
@@ -25,6 +24,7 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
+from tests.helpers.golden_platform import norm_stderr
 
 _runner = CliRunner()
 
@@ -81,9 +81,9 @@ def test_specs_init_symlink_refusal_reuses_the_hardened_resolver_message(tmp_pat
     result = _runner.invoke(app, ["specs", "init", "--specs-dir", str(linked)])
 
     assert result.exit_code != 0, result.output
-    # Rich/Click box-wraps long error text; collapse borders + whitespace to a flowed
-    # line before matching so wrapping never masks (or fakes) the message shape.
-    flowed = re.sub(r"[\s│╭╮╰╯─]+", " ", result.output)
+    # Rich box-wraps + colours the error on a tty (GHA forces colour); the shared
+    # golden-platform normaliser strips ANSI + borders so the substring holds anywhere.
+    flowed = norm_stderr(result.output)
     assert "Refusing a symlinked specs root" in flowed, result.output
     assert "Point --specs-dir at the real directory instead of a link to it" in flowed, (
         result.output
