@@ -1,6 +1,6 @@
 # SPEC — Release 0.5.0 — governance, lineage and audits: make the bug loop visible
 
-**Status:** Em revisão
+**Status:** Aprovado
 **Release ID:** 0.5.0
 **Owner:** product-engineer
 **Opened:** 2026-08-26

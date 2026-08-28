@@ -1,6 +1,6 @@
 # TASKS — Release 0.5.0 — governance, lineage and audits
 
-**Status:** Em revisão
+**Status:** Aprovado
 **Release ID:** 0.5.0
 **Owner:** product-engineer
 **Source SPEC:** `specs/releases/0.5.0/SPEC.md`
