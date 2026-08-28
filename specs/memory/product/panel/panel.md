@@ -2,63 +2,52 @@
 slug: panel
 title: panel
 category: product
-tldr: Local six-tab panel with agent model governance, agentic entities, telemetry, reports, academy, and servers.
-summary: >-
-  `dadaia panel` serves the local workspace UI. Its six tabs are Projects,
-  Agents, Agentic Entities, Reports, Academy, and Servers. It is loopback-only,
-  no-auth, Host-guarded, and CSP-constrained.
+tldr: Local loopback-only six-tab workspace UI — Projects, Agents, Agentic Entities, Reports, Academy, Servers.
+summary: "`dadaia panel` serves a loopback-only, no-auth, Host-guarded, CSP-constrained six-tab UI over local workspace state; the Agents tab is its only governance editor."
 tags:
 - panel
 - ui
 - http
 - dashboard
-last_updated: '2026-08-24'
-release_origin: v0.3.0
 ---
 
 ## Purpose
 
-The panel exposes local workspace state and governance without becoming a remote
-service. It binds only to `127.0.0.1`; the Host allowlist rejects DNS-rebinding attempts.
-There is no panel token, cookie, or credential store.
+The panel exposes local workspace state and governance without becoming a remote service.
+It binds only to `127.0.0.1`, a Host allowlist rejects DNS-rebinding, and there is no
+token, cookie or credential store.
 
 ## Tabs
 
-1. **Projects** - active Spec Context Projects and current memory. A context card lists
-   its main repository and, when it has any, its associated repositories; a context with
-   none renders exactly as it always did, and the JSON contract carries the same list
-   ([[context-management]]).
-2. **Agents** - Persona definition cards, agent model templates/overrides, plus
-   the aggregate Sessions telemetry dashboard.
-3. **Agentic Entities** - the abstract-entity registry rendered server-side:
-   universal Skills/AGENTS.md, Deterministic Actions, and Rules with their
-   per-harness derivations ([[agentic-entities]]).
-4. **Reports** - handoff/report discovery and retention controls.
-5. **Academy** - packaged knowledge-base content.
-6. **Servers** - registered development servers and TTL/PID status.
+| Tab | Content |
+|---|---|
+| Projects | Spec Context Projects and their memory; each card lists the main repo and any associated repos ([[context-management]]) |
+| Agents | Persona cards, agent model templates/overrides, and the Sessions telemetry dashboard |
+| Agentic Entities | the abstract-entity registry rendered server-side ([[agentic-entities]]) |
+| Reports | handoff/report discovery and retention controls |
+| Academy | packaged knowledge-base content ([[academy]]) |
+| Servers | registered dev servers with TTL/PID status ([[server-registry]]) |
 
-## Model Governance Surface
+## Model governance surface
 
-The Agents tab is the panel's only governance editor. It renders the
-Layer-1 agent model templates and the operator overlay, validates a submitted
-model/effort pair against the registry, and writes
-`.dadaia/states/agent_model_policy.json` atomically. It never invents a model outside
-the registry catalog.
+The Agents tab is the panel's only governance editor: it renders the Layer-1 model
+templates and the operator overlay, validates a submitted model/effort pair against the
+registry catalog, and writes `.dadaia/states/agent_model_policy.json` atomically. It
+never invents a model outside the catalog.
 
-## HTTP Boundary
+## HTTP boundary
 
-The stdlib HTTP server uses strict CSP, `nosniff`, loopback binding, and Host validation
-for reads and mutations. Operator-controlled strings are escaped. Mutating policy routes
-validate payloads before atomic writes. Static CSS/JS assets are served from packaged
-source; no external CDN is required.
+The stdlib HTTP server applies strict CSP, `nosniff`, loopback binding and Host
+validation to reads and mutations alike. Operator-controlled strings are escaped,
+mutating routes validate payloads before atomic writes, and CSS/JS assets are served from
+packaged source with no external CDN.
 
-## Runtime State
+## Runtime state
 
-- `.dadaia/states/agent_model_policy.json`
-- `.dadaia/states/server_registry.json`
-- `.dadaia/reports/` and `.dadaia/handoff/`
-- operator telemetry database outside repositories
+`.dadaia/states/agent_model_policy.json`, `.dadaia/states/server_registry.json`,
+`.dadaia/reports/`, `.dadaia/handoff/`, and the telemetry database outside repositories.
 
 ## Dependencies
 
-[[agent-orchestration]], [[agent-monitoring]], [[agentic-entities]], [[server-registry]], [[brand-identity]].
+[[agent-orchestration]], [[agent-monitoring]], [[agentic-entities]], [[server-registry]],
+[[brand-identity]].

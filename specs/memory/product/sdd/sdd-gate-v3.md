@@ -2,34 +2,8 @@
 slug: sdd-gate-v3
 title: sdd-gate-v3
 category: product
-tldr: No-lock SDD enforcement — origin-classified LAW, path/mode gates, the phase read from the RELEASE.jsonl fold, and hooks pared to the publication boundary.
-summary: >-
-  The merged Python PreToolUse gate enforces root whitelist, workspace venv usage, a
-  cache-off posture for pytest/ruff/mypy, path class, phase, and the caller's own mode.
-  LAW is decided by ORIGIN on a static fail-closed floor — the law basenames at the
-  workspace root or inside a fixed harness projection dir — so a repo's own
-  domain-scoped `AGENTS.md`/`CLAUDE.md` is MUTATING and no manifest read can promote or
-  demote a security decision. The MEMORY phase is resolved by folding the live release's
-  `RELEASE.jsonl` and nothing else, fail-closed when the fold is ambiguous or absent.
-  It never waits for or blocks on another session. Presence is advisory. Hooks validate
-  only at the publication boundary: git pre-commit is advisory and always exits zero,
-  and pre-push refuses exactly three things — an invalid branch name, a denylist hit, and
-  an unresolvable runner — under an inverted branch policy in which
-  `feature/{M.m.p}` is the only pushable ref while `develop` and `main` are refused as
-  PR-only. Its range-scoped denylist scan reads the new objects the push would publish —
-  blobs AND commit/annotated-tag message bodies, with author/committer headers out of
-  scope by design. The CI preflight left the hook and is an always-on rule instead. The
-  security verdict is likewise a CI job on both PR edges
-  requiring an APPROVED security-reviewer handoff covering the PR head sha, read from
-  committed evidence. The scan reads a
-  chunk-bounded batched git conversation, suppresses a hit only when the same single path
-  already published that exact value and never for a path-less object, derives its
-  foreign-name layer from the context registry and names it when that layer degrades,
-  partially scans and honestly reports oversized blobs, raises a typed error rather than
-  reporting coverage it did not achieve, and masks private path segments through the
-  detector's own matchers in everything it prints. The packaged baseline is version 8:
-  single-line patterns only, every carve-out carrying a rationale a doctor check
-  enforces, covering the home-path layout of all three declared platforms.
+tldr: No-lock enforcement — origin-classified LAW, path/phase/mode gates, phase from the RELEASE.jsonl fold, git hooks pared to the publication boundary.
+summary: The merged Python PreToolUse gate enforces root whitelist, venv and cache posture, path class, phase and caller mode; the git chokepoints enforce only the publication boundary, with a range-scoped privacy denylist scan at push.
 tags:
 - sdd
 - gate
@@ -37,530 +11,222 @@ tags:
 - enforcement
 - no-locks
 - privacy
-last_updated: '2026-08-27'
-release_origin: 0.5.0
 ---
 
 ## Purpose
 
-The gate constrains unsafe writes without serializing agents. Races are accepted and
-surfaced; no lease, mutex, lock file, incumbent pointer, acquisition, adoption, steal,
-or wait path exists in the SDD concurrency design.
+The gate constrains unsafe writes without serializing agents. No lease, mutex, lock file,
+incumbent pointer, acquisition, adoption, steal or wait path exists in the SDD concurrency
+design.
 
 ## PreToolUse
 
 `dadaia_workspace.hooks.pre_gate` reads each tool payload once and evaluates three
 policies in order, first block wins:
 
-1. **root whitelist** blocks file-tool creation of forbidden workspace-root entries;
-2. **venv + cache guard** — two orthogonal rules in one Bash policy. Venv-rooting blocks
-   leading invocations of `dadaia`, `python -m dadaia_workspace`, or `pip` outside
-   `.dadaia/.venv/bin/`. The **cache guard** blocks a `pytest`/`ruff`/`mypy` invocation
-   that would be born writing a cache into a repo working tree: `pytest` without the
-   adjacent pair `-p no:cacheprovider`, `ruff check`/`ruff format` without `--no-cache`,
-   `mypy` without a `--cache-dir` redirect (`incremental = false` does not stop the
-   directory from being created — only redirecting it does). Every other `ruff`
-   subcommand writes no cache and is out of scope. Both rules match on **fixed leading
-   tokens only** — the bare name, or a token rooted in our own venv whose basename is
-   exactly one of them — with no shell parsing, so a foreign venv's binary, a quoted
-   string, `pytest-watch` or `mypyc` never false-block. Every block message carries the
-   corrected command;
-3. **SDD gate** evaluates context-relative path class, phase, and caller-owned mode.
+1. **Root whitelist** — blocks file-tool creation of forbidden workspace-root entries.
+2. **Venv + cache guard** (Bash only) — venv-rooting blocks leading invocations of
+   `dadaia`, `python -m dadaia_workspace` or `pip` outside `.dadaia/.venv/bin/`; the cache
+   guard blocks `pytest` without `-p no:cacheprovider`, `ruff check`/`ruff format` without
+   `--no-cache`, and `mypy` without a `--cache-dir` redirect. Both match fixed leading
+   tokens only — the bare name or a token rooted in our own venv — with no shell parsing.
+   Every block message carries the corrected command.
+3. **SDD gate** — context-relative path class, phase, and the caller's own mode.
 
-Path classes:
+### Path classes
 
 | Class | Behavior |
 |---|---|
-| LAW | The projected law files — fail-closed, human-only in an instantiated workspace. The law's own class table groups LAW and PROTECTED as one blocked outcome; the classifier keeps them apart so each refusal names its own rule. |
-| ADDITIVE | `specs/bugs`, `specs/backlog`, `specs/audits`, and workspace reports/handoffs/tmp are writable, in any mode. The bug record's own contract — immutable core, write-once, mutable governance — is **audited, not gated**: nothing here refuses a field-level rewrite, and the audit's first pillar is what detects one. |
-| MEMORY | Writable only in `DEFINITION` or `CLOSURE`. |
-| FROZEN | The per-area archives — `specs/backlog/_archive/`, `specs/bugs/_archive/`, `specs/audits/_archive/` — plus the legacy root `specs/_archive/`, matched **before** the ADDITIVE prefixes so an archive under an additive area is never swallowed as writable. Archive by `git mv`. |
-| PROTECTED | Session identity records are fail-closed. |
-| MUTATING | Writable unless this session explicitly resolves to READ mode. `specs/releases/**` is MUTATING throughout — including `_ideas/<id>/`, which carries a SPEC only, and `releases/_archive/<id>/`, whose immutability is discipline and review rather than a classifier rule. |
+| LAW | Projected law files — fail-closed, human-only in an instantiated workspace |
+| ADDITIVE | `specs/bugs`, `specs/backlog`, `specs/audits` and workspace reports/handoffs/tmp, writable in any mode |
+| MEMORY | Writable only in `DEFINITION` or `CLOSURE` |
+| FROZEN | `specs/{backlog,bugs,audits}/_archive/` plus the legacy root `specs/_archive/`, matched before the ADDITIVE prefixes; entered only by `git mv` |
+| PROTECTED | Session identity records, fail-closed |
+| MUTATING | Everything else, writable unless this session resolves to READ mode; `specs/releases/**` throughout, `_ideas/` and `releases/_archive/` included |
 
-**LAW is decided by origin, on a static fail-closed floor.** A path is LAW when its
-basename is one of the law basenames — `DADAIA.md`, `AGENTS.md`, `CLAUDE.md` — **and** it
-sits at exactly one of two structurally fixed origins: the workspace root, or a fixed
-harness projection directory (`.claude/rules`, `.codex`, `.kimi-code`, `.agents`). Both
-sets are read from `core/workspace_layout.py`, the single authority the installer and the
-doctor derive from as well, so the guarded set and the projected set cannot disagree.
-`classify_path` performs **zero I/O** on that decision: the predicate is a pure function of
-the relative path string, so the classification of a projected law file cannot be changed
-by editing any file on disk. `.dadaia/agentic/manifest.json` classifies UNGATED and is
-never consulted — a security decision that a writable inventory could demote would be the
-CWE-284 shape the floor exists to refuse.
+**LAW is decided by origin on a static fail-closed floor.** A path is LAW when its
+basename is `DADAIA.md`, `AGENTS.md` or `CLAUDE.md` **and** it sits at the workspace root
+or in a fixed harness projection directory (`.claude/rules`, `.codex`, `.kimi-code`,
+`.agents`). Both sets come from `core/workspace_layout.py`. `classify_path` performs zero
+I/O on that decision, and `.dadaia/agentic/manifest.json` classifies UNGATED and is never
+consulted. A path under `repos/<slug>/` matches neither origin, so a repo's own
+domain-scoped `AGENTS.md`/`CLAUDE.md` is MUTATING.
 
-The consequence at the repository boundary is explicit: a path under `repos/<slug>/`
-matches neither origin shape, so a repo's **own** domain-scoped `AGENTS.md` or `CLAUDE.md`
-— fresh or long-lived, tracked or untracked — classifies **MUTATING** and is edited
-directly, exactly as the scaffold template it ships from says. The gate and the template
-state one contract about that file, and a manifest-enumerating contract test pins the other
-direction: every workspace-root law file and every harness-dir projection stays LAW.
+**MEMORY covers dotfiles**: the classifier matches the bare prefix `specs/memory/`, with
+no carve-out. The gate reads no SDD artifact and has no SPEC-override channel, so a SPEC
+cannot schedule a memory write outside `DEFINITION`/`CLOSURE`.
 
-**MEMORY covers dotfiles, by decision.** The classifier matches the bare prefix
-`specs/memory/`, so *every* path beneath it — `.heading-allowlist` included — is
-MEMORY-class. There is no dotfile carve-out and none is added: a carve-out would open an
-always-writable hole under the MEMORY prefix through which curated lint canon could mutate
-mid-implementation, which is the stale-layer pattern the gate exists to prevent. A memory
-dotfile is curated canon, not runtime config, and it belongs in the same phase window as
-the atoms it governs. Correspondingly, **a SPEC may not assign a memory-class write to a
-non-`DEFINITION`/`CLOSURE` task**: the gate reads no SDD artifact and has no SPEC-override
-channel, so the phase rule blocks unconditionally regardless of what a SPEC schedules. A
-SPEC needing such a write is an architecture-fidelity defect caught at review, not
-something the gate accommodates.
+**Phase comes from the `RELEASE.jsonl` fold and nothing else.** The gate locates the live
+release as the single directory under `specs/releases/` carrying a `RELEASE.jsonl`, parses
+it with the same stdlib parser the doctor uses, and takes the last `phase` record
+([[sdd-bug-backlog-governance]]). Resolution is fail-closed: zero live releases, more than
+one, an unreadable file, or no `phase` record all yield an empty phase and deny a MEMORY
+write. The hook never imports the composition root.
 
-**The phase comes from the `RELEASE.jsonl` fold, and from nothing else.** The gate locates the
-live release as the single directory under `specs/releases/` carrying a `RELEASE.jsonl`, parses
-that stream and takes the **last `phase` record** ([[sdd-bug-backlog-governance]]). `ACTIVE.md`
-is retired and no fallback branch survives — there is no mirror file to disagree with the
-stream, which is what retired the "artifact says one thing, tree says another" class the
-release-state surface produced repeatedly. The resolution is **fail-closed**: zero live
-releases, more than one, an unreadable file, or a stream carrying no `phase` record all yield
-an empty phase, which denies a MEMORY write rather than guessing a phase that would grant one.
-The hook reads the fold with the same stdlib parser the doctor uses and never imports the
-composition root.
+Mode resolves from the environment, then this session's own record, then `IMPLEMENTATION`.
+A READ session blocks only its own mutating writes.
 
-Mode resolution is environment, then this session's own record, then
-`IMPLEMENTATION`. There is no context-global mode or foreign-session fallback. A READ
-session blocks only its own mutating writes; it does not affect another session.
+## Attribution and presence
 
-## Context Attribution
-
-The gate does not carry a resolution ladder of its own. It calls the shared authority
-`core.specs_resolver.resolve_context()` ([[context-management]]) and passes the write's
-target path as the caller-supplied input, which keeps attribution **path-first**: a
-write under `repos/<slug>/` is attributed to that slug's context even when
-`DADAIA_CONTEXT` names another. A write under no repo falls through the remaining law
-rungs — the environment, then this session's own live record, then the repo containing
-the working directory — so a demonstrably bound session's out-of-repo write belongs to
-its own context. The slug reaching the classifier is mapped back to the context NAME
-through the registry.
-
-## Presence
+The gate carries no resolution ladder of its own: it calls
+`core.specs_resolver.resolve_context()` ([[context-management]]) passing the write target
+as caller-supplied input, keeping attribution path-first.
 
 A mutating write best-effort upserts
-`.dadaia/states/presence/<context>/<session-id>.json`. Another live presence record
-causes one throttled warning and never changes the verdict. Presence I/O failure is
-swallowed. Stale records are removed opportunistically and by doctor.
+`.dadaia/states/presence/<context>/<session-id>.json`. Another live record causes one
+throttled warning and never changes the verdict; presence I/O failure is swallowed. The
+PostToolUse reconciler reports out-of-scope dirty paths, refreshes presence and never
+blocks.
 
-The PostToolUse reconciler reports out-of-scope dirty paths and refreshes advisory
-presence. It never blocks.
+## Git chokepoints
 
-## Git Chokepoints
+- `pre-commit-presence-gate.sh` is advisory-only and **always exits 0** on any staged set;
+  it may warn about another live session and warns about nothing else.
+- `pre-push-ci-gate.sh` refuses exactly three things: an invalid branch name, a denylist
+  hit, and an unresolvable runner. It reads no security handoff.
+- The CI preflight is an always-on rule (`dadaia ci preflight` before every push), not a
+  hook step; its advertised check list and CI's gating list are pinned as one set by a
+  parity test.
 
-**Hooks validate only at the publication boundary, and never block a human.** That posture is
-the whole design of this pair.
-
-- `pre-commit-presence-gate.sh` is **advisory-only and always exits 0**, on any staged set —
-  including one the backlog doctor would reject. It may warn about another live session and it
-  warns about nothing else: the backlog-doctor block and the fail-closed runner resolution are
-  **deleted from this script**, not disabled, along with the CLI helpers that fed them. A gate
-  that stopped human commits on a shared tree pushed agents toward `--no-verify` and worse
-  workarounds — it caused the behavior it existed to prevent, and CI already runs the same
-  doctor unscoped.
-- `pre-push-ci-gate.sh` keeps **only** the publication boundary and refuses **exactly three
-  things and nothing else**: an invalid branch name, a denylist hit, and an **unresolvable
-  runner**. The runner refusal survives here deliberately — a machine without the venv would
-  otherwise push with no branch policy and no content scan, silently. **There is no third
-  step** — the push boundary reads no security handoff.
-- **The CI preflight left the hook.** `ruff format --check`, `ruff check`, `mypy --strict`, the
-  import-boundary contracts and the test suite are now the always-on rule *"run `dadaia ci
-  preflight` before you push"*, stated in the law and in the gitflow and release skills; a
-  failing preflight no longer blocks a push through this hook. CI still gates the same set
-  independently, and the preflight's advertised check list and CI's gating list stay pinned as
-  the **same set** by a parity test that fails when either side gains a check the other lacks —
-  so a boundary violation can no longer pass locally and fail in CI. The audit measures pushes
-  whose CI went red for preflight-class failures.
-
-The branch model itself is stated once in the law's gitflow section and operated by the
-`dd-gitflow-default` skill; this atom describes only what the chokepoint mechanically
-enforces of it.
-
-Branch policy at the push boundary is **inverted**: `refs/heads/feature/{M.m.p}` is the
-only pushable ref, because under the branch contract that push is the act that opens a
-pull request. A push of `develop` or `main` is refused, the message naming the PR path
-that advances it instead. Three branch-name patterns exist and no fourth — `^main$`,
-`^develop$`, `^feature/\d+\.\d+\.\d+$` — with **no `v` prefix and no `hotfix` row**; a ref
-outside them is refused by the branch-name validator, and a local ref that is not a branch
-head gets its own diagnosis. The pattern has one source in the package; CI carries its
-POSIX-ERE translation at the PR boundary with a cross-reference, because no literal share
-is possible across that runtime boundary. The remote side is policed too — a refspec
-aiming a local ref at a different remote ref is refused. Parsing is fail-closed:
-any unparseable stdin line refuses the whole push and the message names `git push
---no-verify` as the one traceable bypass, while empty stdin remains the distinct
-"nothing to gate" allow. Both shas on a line are shape-validated — 40- or 64-character
-hex, or the all-zero deletion sentinel — before they can reach a git argv, so an
-option-shaped ref value is a malformed line rather than a successful empty range that
-silently skips the scan for that ref. Downstream, revision arguments carry an explicit
-`--` end-of-options marker and a sha is prefix-checked before interpolation, so no
-supplied value is parsed as a git option. Branch deletions publish no object and are not
-scanned. Tag pushes are covered by the denylist scan and by nothing else, which is what
-keeps release publication reachable.
+Branch policy at the push boundary is inverted: `refs/heads/feature/{M.m.p}` is the only
+pushable ref, and `develop` or `main` is refused with the PR path named. Three
+branch-name patterns exist — `^main$`, `^develop$`, `^feature/\d+\.\d+\.\d+$` — with one
+source in the package and a cross-referenced POSIX-ERE translation in CI. A refspec aiming
+a local ref at a different remote ref is refused. Parsing is fail-closed: an unparseable
+stdin line refuses the whole push naming `git push --no-verify` as the one traceable
+bypass, while empty stdin is the distinct "nothing to gate" allow. Both shas per line are
+shape-validated (40- or 64-character hex, or the all-zero deletion sentinel) before
+reaching a git argv, revision arguments carry `--`, and deletions publish no object and
+are not scanned.
 
 **The security verdict is a pull-request gate, not a push-time check.** A CI job on both
-PR edges — `feature/{M.m.p}` → `develop` and `develop` → `main` — requires an APPROVED
-`security-reviewer` handoff whose `metrics.commit_sha` is the **PR head sha**, or an
-ancestor of it whose only intervening diff is committed verdict evidence, since a verdict
-can never live inside the commit it reviews. That exemption is scoped to the evidence
-class itself. The evidence channel is committed rather than local:
-`specs/releases/<release-id>/verdicts/<sha>.handoff.json`, with the release id constrained
-to the release-id canon before it reaches a path, and the coverage diff read through an
-explicitly checked exit status so an unreadable diff fails **closed**. A second, older
-job — the dual qa-plus-security closure gate — reads a different key set (`release_id` and
-context, no sha) at a different moment, and is deliberately kept distinct rather than
-folded in: it is the only mechanical check of the qa-engineer verdict. Every refusal on
-either boundary names the rule that fired, the permitted value, and the corrective action,
-so each one is clearable by an action the product accepts.
+edges requires an APPROVED `security-reviewer` handoff whose `metrics.commit_sha` is the
+PR head sha, or an ancestor whose only intervening diff is committed verdict evidence. The
+evidence is committed at `specs/releases/<release-id>/verdicts/<sha>.handoff.json`, the
+release id is constrained to the release-id canon before it reaches a path, and the
+coverage diff is read through a checked exit status so an unreadable diff fails closed. A
+separate dual qa-plus-security closure gate reads `release_id` and context at a different
+moment and is the only mechanical check of the qa-engineer verdict.
 
-**A consumed verdict is collected after the merge, and it outlives its handoff.** The
-pre-push hook could never do this collection: it runs *before* git transfers anything, so
-from inside it "the push succeeded" is unknowable. The sanctioned observation point is the
-caller that wraps the merge, realized as
-`dadaia ci gc-push-verdicts --sha <merged-pr-head-sha>`, which the ship flow runs
-immediately after a confirmed merge — the cadence contract lives in the verb's own
-`--help`. It deletes exactly the verdict handoff(s) covering the given sha(s) and leaves
-every other verdict untouched, and it is
-idempotent and best-effort by construction: it exits 0 when nothing matches, when the lane
-guard refuses a candidate, and when an append fails, because a sweep that runs strictly
-after the merge it cleans up after can never change that merge's outcome.
+After a confirmed merge the ship flow runs `dadaia ci gc-push-verdicts --sha <sha>`, which
+deletes exactly the verdict handoffs covering those shas. One line — reviewing agent,
+verdict, covered sha, timestamp — is appended to the append-only
+`.dadaia/logs/push-verdict-gc-ledger.jsonl` **before** each delete; a failed append leaves
+the handoff in place. The verb is idempotent and exits 0 when nothing matches.
 
-Deletion never erases the evidence that the merge was covered. Before a consumed verdict
-handoff is removed, one line — reviewing agent, verdict, covered sha, timestamp — is
-appended to the append-only `.dadaia/logs/push-verdict-gc-ledger.jsonl`. The **append
-precedes the delete**, and a failed append leaves the handoff in place, so the durable
-record either exists or the handoff still does — never neither. The ledger caps and rotates
-like every other `.dadaia/logs/*.jsonl` writer, which its append-only property is defined
-against: rotation retires a generation, it never rewrites a line.
+`secret-scan.yml` (gitleaks) triggers on a `main` push and a `main` pull request, so it
+effectively runs once per release on the ship PR. Everything reaching `develop` earlier is
+covered by the privacy denylist scan only — a foreign-name/home-path detector, not a
+secret scanner. That is a recorded, accepted gap.
 
-The push and PR rules are a quality gate, not a concurrency lock. Commits are never
-blocked — not for missing review evidence, not for a failing preflight, not for another
-session's presence. A push is blocked for a refused ref, a leaking object or an unresolvable
-runner; a merge is blocked for missing review evidence.
+### Push-range denylist scan
 
-**The secret-scan lane's coverage is stated rather than assumed.** `secret-scan.yml` triggers
-on a `main` push and a `main` pull request; since `main` is never pushed directly, gitleaks
-effectively runs **once per release, on the ship PR**. Everything reaching `develop` at an
-earlier candidate is covered by the **privacy denylist scan only**, which is a
-foreign-name/home-path detector and not a secret scanner. The limit is recorded as a known,
-accepted gap rather than reported as a passed check.
+For every non-deletion ref the scan reads the **new objects the push would publish**,
+before any network I/O. The range is `git rev-list --objects <local-sha> --not
+<remote-sha>` when the remote sha resolves locally, and `--not --remotes` otherwise. Blob
+entries **and** commit/annotated-tag objects are read through a batched `git cat-file`
+conversation over fixed 500-sha chunks, decoded as UTF-8, de-duplicated by object sha and
+streamed into the matcher. The working tree and existing history are out of scope;
+whole-tree scanning stays in the audit lane. A commit **body** is scanned;
+`author`/`committer` **headers are out of scope by design**.
 
-### Push-Range Denylist Scan
+**Prior-published-term amnesty.** Where the range has a resolvable base, each scanned
+object also carries the prior published text of its own path, and a hit is suppressed
+**iff the exact matched value was already published at that same path**. The same value in
+a new path still refuses; a new value in an edited path still refuses. Suppression is
+decided per layer in that layer's own semantics — operator denylist by case-insensitive
+literal substring, a baseline pattern by re-running the same anchored pattern over the
+prior text and comparing matched values, a foreign name by its own `\bname\b` search. An
+object reachable at more than one path in the range, an oversized object, and the
+`--not --remotes` fallback shape carry no prior text and are never amnestied.
 
-The push boundary inspects content, not only refs. For every non-deletion ref, tag or
-branch, the **new objects the push would publish** are scanned before any network I/O.
-The range is computed from the `remote_sha` git itself supplies on the pre-push stdin
-line: `git rev-list --objects <local-sha> --not <remote-sha>` when that sha resolves
-locally, and `--not --remotes` when it is zero or unresolvable, so a stale or ahead
-remote-tracking ref can neither over- nor under-scan. Blob entries **and commit objects**
-are read — through a batched `git cat-file` conversation rather than one subprocess per
-object, which is what keeps a full-history fallback range affordable, and run over
-**fixed-size chunks of shas** (500) rather than one buffer per range, so the peak resident
-set is a constant of the chunk size and the per-object cap instead of growing with the
-range. Each object is decoded as UTF-8 and de-duplicated by object sha across the whole
-push, then streamed into the matcher rather than materialised as a list. A deletion ref
-publishes no object and is not scanned. The working tree and existing history are out of
-scope by design — whole-tree scanning stays in the audit lane.
+Term sources are additive and the scan is never a no-op:
 
-**A commit message is published content, so it is scanned.** `rev-list --objects` lists a
-commit without a path, and a scanner that read only blobs was blind to the largest thing
-some pushes publish: a reconciliation merge can publish *zero* blobs and a
-hundred-thousand-character commit body. The same reader seam yields the range's commit
-objects, and an annotated tag's body on a tag-ref push, through the same batched
-conversation, the same typed-error contract and the same three term layers, ending in the
-same masked, satisfiable refusal — whose healing action is reword-or-amend before the push.
-Two boundaries make that scannable surface exact:
+1. the **operator denylist** — literal, case-insensitive substrings from
+   `$DADAIA_PRIVACY_DENYLIST` or `.dadaia/states/privacy_denylist.json`, operator-private
+   and never committed. That loader is one seam consumed twice: the push boundary refuses
+   on these terms and the bug ledger masks them at write time
+   ([[sdd-bug-backlog-governance]]).
+2. the **packaged structural baseline**, version 8 — IPv4/IPv6 literals, internal
+   hostnames, absolute home paths (POSIX `/home/<user>`, macOS `/Users/<name>`, Windows
+   `<drive>:\Users\<name>`; `/root` deliberately uncovered), email addresses and
+   secret-looking tokens, with `exclude_regex` carve-outs honored. Every pattern is
+   single-line, every carve-out carries a rationale enforced by `public doctor`'s
+   baseline-rationale check, and the version bumps with the pattern set.
+3. the **foreign names** — the registry's context names unioned with its repo slugs and
+   the directory names under `repos/`, minus both identities of the repository being
+   pushed. A missing, empty or malformed registry degrades to the directory-derived set
+   with exactly one stderr note. A name matches as a whole token, case-insensitively, so
+   `<slug>-x`, `x-<slug>`, `<slug>.ext` and `pkg.<slug>` are other identifiers.
 
-- **Header/body boundary.** The message **body** is scanned; the commit object's
-  `author`/`committer` **headers are out of scope by design**. They carry the repository's
-  standing mail identity on *every* commit, and a commit object has no path, so no amnesty
-  could ever suppress a header hit — the gate would refuse every push of its own history,
-  permanently and unclearably.
-- **Path-less amnesty semantics.** A body hit is **never amnestied**. The amnesty predicate
-  keys on the prior published text *of the object's own path*, and a commit object has no
-  path to key on, so it fails closed exactly as a blob reachable at more than one path does.
-  Headers raise no amnesty question at all, because they are never scanned.
+With no operator denylist present, layers 2 and 3 still run and the gate names its mode on
+stderr. The scan runs after branch policy and is the last policy step; on a tag ref it is
+the only policy that runs.
 
-#### Prior-published-term amnesty
-
-A new blob is not the same thing as a new publication. Where the range has a resolvable
-base, every scanned object also carries the **prior published text of its own path**,
-resolved at that base inside the same chunk loop through two extra batched calls per chunk —
-never one per blob — and the matcher suppresses a candidate hit **iff the exact matched value
-was already published at that same path**. Three consequences define the semantics:
-
-- editing a file that already published the matched value at the same path never refuses, so
-  the gate never demands a rewrite of content the operator already published;
-- the same value introduced into a **new path** still refuses — the amnesty binds to the
-  path, not to the value;
-- a **new value** in an edited path still refuses, even when a different value of the same
-  pattern was already there, because the predicate keys on the matched value itself and never
-  on the pattern id or the term layer. That distinction is the whole difference between an
-  amnesty and a smuggling path.
-
-"Already published that value" is decided per layer, in each layer's own defined semantics,
-so the two sides of the comparison are never anchored differently:
-
-| Layer | Suppressed when the prior text |
-|---|---|
-| operator denylist | contains the term as a literal, case-insensitive substring — the same notion detection itself uses |
-| baseline pattern | yields, under that same anchored pattern re-run over it, an occurrence whose value equals the current matched value case-insensitively — never a raw substring test, so a longer published path value cannot amnesty an unrelated new value it merely contains |
-| foreign name | matches that name's own anchored `\bname\b` search, where the pattern *is* the value |
-
-A blob reachable at **more than one path anywhere in the pushed range** receives no prior
-text at all and is therefore never amnestied — fail-closed, because a blob is content-
-addressed and one shared object cannot be attributed to the single path whose publication
-history the predicate keys on. Reachability is unioned over every commit in the range, not
-only the tip tree, so a second path that exists in an intermediate commit and is gone by the
-tip still denies the amnesty; the outcome is independent of both tree order and commit
-order. The denial lives entirely in the object adapter — the matcher and its amnesty
-predicate take no multi-path parameter — and it is never a per-sha amnesty in either
-direction. An **oversized current object** likewise never carries prior text: the prior-side
-lookup rides the under-cap chunk loop only, so a blob scanned as a capped prefix is judged
-with no amnesty at all.
-
-In the `--not --remotes` fallback shape there is no single published base, so no object
-carries prior text and **no hit is ever suppressed** — a deliberate conservative boundary.
-The prior text serves the predicate and is discarded; only the masked term ever leaves the
-matcher. The matcher gains no parameter and no new input source to obtain it: the prior side
-arrives on the scanned object itself, so the decision logic stays a pure function of the
-objects and terms it already receives.
-
-Term sources are additive, and the scan is never a no-op:
-
-1. the **operator denylist** when present — literal, case-insensitive substrings loaded
-   from `$DADAIA_PRIVACY_DENYLIST` or `.dadaia/states/privacy_denylist.json`, which are
-   operator-private by design and never enter the repository. That loader is **one seam
-   consumed twice**: the push boundary refuses on these terms, and the bug ledger masks
-   them at the moment an event is written ([[sdd-bug-backlog-governance]]), so the
-   write-time redaction can see exactly what the publication boundary refuses;
-2. the **packaged structural baseline** (version 8) — IPv4/IPv6 literals, internal
-   hostnames, absolute home paths, email addresses, and secret-looking tokens — with its
-   `exclude_regex` carve-outs honored. The home-path layer covers the home layout of **every
-   platform the product declares support for**, one single-line pattern each (the scan
-   matches line by line): POSIX `/home/<user>`, macOS `/Users/<name>`, and Windows
-   `<drive>:\Users\<name>` at any drive letter. `/root` is deliberately **not** covered — it
-   carries no user-identifying segment and appears routinely in container documentation, so
-   including it would buy false positives and no privacy. The carve-out set is: loopback and
-   documentation address ranges; `example.*` hosts and the noreply mail domains; RFC-2606
-   reserved-TLD email domains at any subdomain depth; the product's **own synthetic git
-   commit identity** host `workspace.local`, as an exact literal in both the
-   internal-hostname pattern and as an email domain, because it is a fixture host the product
-   itself injects rather than an operator's network; the law-mandated
-   `noreply@anthropic.com` `Co-Authored-By` trailer address, anchored on the **local part**
-   as an exact full-address literal, because the law requires that exact string on every
-   commit while any other mailbox at the same apex domain must still refuse; the Python
-   identifier chain ending in `.home` (`Path.home()`, `pathlib.Path.home()`), which the
-   internal-hostname pattern would otherwise read as a `.home` hostname; and, per home-path
-   pattern, its documentation placeholders plus that platform's real non-personal system
-   directories (`/Users/Shared`, `\Users\Public`, `\Users\Default`), tolerating a single
-   trailing period after a placeholder because Windows itself treats it as insignificant and
-   ordinary prose ends sentences. Exactly one carve-out is **structural rather than
-   literal** — the dotted-chain rule — and it is narrowed to the `.home` label class alone,
-   because an unanchored "any uppercase-initial chain, any TLD" form silently excluded real
-   personal- and corporate-name-bearing hostnames across every TLD. Everything else is
-   anchored to an exact literal: any other `.local` host, any other subdomain of a carved-out
-   host, any real `.home` hostname, any dotted hostname not ending in `.home`, and any other
-   user name under any of the three home roots still match;
-3. the **foreign names** — every Spec Context identity the workspace knows: the registry's
-   context names unioned with its repo slugs unioned with the directory names under
-   `repos/`, minus **both** identities of the repository being pushed (its context name and
-   its repo slug are separate fields and may differ, so subtracting only one would make the
-   gate refuse every push of its own repository). Deriving the layer from the registry rather
-   than from directories alone is what keeps a DEAD or relocated context protecting its name
-   at exactly the lifecycle moment that name becomes more sensitive, not less. The registry
-   reaches the CLI through a container seam, and a missing, empty or malformed registry
-   degrades to the directory-derived set rather than killing the push hook — a degradation
-   that is never silent: exactly one stderr note names it and the scan proceeds. A name matches
-   as a **whole token** and never as a fragment glued into a longer identifier: a preceding or
-   following word character, hyphen or dotted continuation denies the match. Every repo slug is
-   itself hyphenated, so a plain word-boundary anchor treated `<slug>-anything` and
-   `<slug>.ext` as publications of the name — the product's own tracked asset basenames and its
-   own ledger bug ids among them. A bare name in prose, a name bounded by `/` inside a
-   `repos/<slug>/…` path, and a name ending a sentence before a period all still match;
-   `<slug>-x`, `x-<slug>`, `<slug>.ext` and `pkg.<slug>` are other identifiers. Matching is
-   **case-insensitive**, so a name written with different capitalisation is still caught.
-   The whole matcher is case-insensitive on every layer.
-
-The baseline is a governed artifact, not a growing pile of literals. Three properties hold
-it in shape. **Every carve-out carries a rationale**, and a mechanical check
-(`privacy_check`'s baseline-rationale check, run on every `dadaia public doctor`) flags an
-`exclude_regex` that lacks one — a carve-out nobody can explain is indistinguishable from a
-hole. **Every pattern is single-line**, without exception: the push scan matches line by
-line while the public-privacy doctor matches whole text, so a multi-line pattern would mean
-one surface silently covering what the other does not. **The version bumps with the pattern
-set**, and its `_header` rationale is extended in the same edit, which the file states as
-its own editing rule. Re-examination is event-driven rather than calendared: a newly
-declared support platform whose home layout no pattern covers, a false-positive class
-recurring literal by literal (the signal that a *structural* rule is owed instead), and a
-review finding that a carve-out is wider than its rationale each trigger it. Growing the
-baseline one literal at a time, with no rationale and no cadence, is the failure mode the
-governance exists to end.
-
-With no operator denylist present, layers 2 and 3 still run; the gate names on stderr the
-mode it ran in — `operator denylist + baseline` or `baseline only (no operator
-denylist)`. The scan runs after branch policy and is the **last** policy step at the push
-boundary; on a tag ref it is the only policy that runs. Under the inverted branch policy
-the `feature/{M.m.p}` push is the first publication of that work to `origin`, which is
-exactly why the content scan sits there.
-
-The boundary between fail-closed and fail-open is explicit, and one rule decides every row:
-**the gate never reports coverage it did not achieve.**
+One rule decides every row: **the gate never reports coverage it did not achieve.**
 
 | Situation | Verdict |
 |---|---|
 | A term matches and the same path did not already publish that value | refuse |
-| `git rev-list` or an object read fails | refuse, naming the git failure |
-| The prior-side lookup fails | refuse — an amnesty is never granted from a base the adapter could not read |
-| The path is absent at the base, or its prior blob is over the cap or undecodable | no prior content, so every hit on it refuses; absence is explicit and is never an empty string |
-| git answers the documented `<base>:<path> missing` for a prior-side lookup | ordinary absence — a genuinely new path is the common case, not a failure. The row is recognised by its `missing` **suffix**, so a path carrying embedded spaces is absence rather than a false desync |
-| The batch stream desynchronises, or a header field will not parse | abort with the reader's own typed error — no fabricated object is ever yielded, so nothing invented can reach a skip count |
-| A blob is not valid UTF-8 | skip that blob, count it, and report the count on the allow and refuse paths alike |
-| A blob exceeds the 5 MB per-object cap | scan its first 5 MB and report it as an oversized note; the remainder is never fetched |
-| A blob is reachable at more than one path in the range | no prior text at all, so every hit on it refuses |
-| A commit or annotated-tag **body** matches | refuse — a path-less object carries no prior text and is never amnestied |
-| A commit's `author`/`committer` **header** matches | not scanned at all; the headers are out of the scanned surface by design |
-| The bounded oversized read fails and delivers fewer than the cap's bytes | raise the typed read error — a failed read is never reported as a successfully (if trivially) scanned prefix |
-| No object source wired into the decision function | refuse at the CLI boundary — the source is a required parameter, so an unwired production path is a defect, not a bypass |
+| `git rev-list`, an object read, or the prior-side lookup fails | refuse, naming the git failure |
+| The path is absent at the base, or its prior blob is over the cap or undecodable | no prior content — every hit refuses; absence is explicit, never an empty string |
+| git answers the documented `<base>:<path> missing` | ordinary absence, recognised by the `missing` suffix |
+| The batch stream desynchronises or a header will not parse | abort with the reader's typed error; no fabricated object is yielded |
+| A blob is not valid UTF-8 | skip, count, and report the count on allow and refuse alike |
+| A blob exceeds the 5 MB per-object cap | scan the first 5 MB and report an oversized note; the remainder is never fetched |
+| A bounded oversized read delivers fewer than the cap's bytes | raise the typed read error |
+| A commit or annotated-tag body matches | refuse — path-less objects are never amnestied |
+| No object source wired into the decision function | refuse at the CLI boundary — the source is a required parameter |
 
-The cap is a partial-coverage fail-open, not a blind spot, and it is reported as one. An
-over-cap blob is read through a separate bounded per-object stream that is closed once the
-cap's worth of bytes is in hand, so git stops producing and the remainder is genuinely never
-fetched, and that prefix is matched like any other content — an oversized text blob whose
-first 5 MB carries a term refuses the push. Closing that stream early makes git exit non-zero
-on the *success* path, and that one intentional early close is the **only** failure shape the
-read swallows: a read that failed while delivering fewer than the cap's worth of bytes — a
-nonexistent oid, a non-blob sha — raises the typed error instead of returning a zero-byte
-"partially scanned" prefix. The two skip classes stay separately counted and
-separately worded: the binary count covers genuinely undecodable blobs only, while oversized
-blobs are carried as structured notes bearing the path, the total size and the scanned bytes,
-and rendered as what they are — first 5 MB scanned, remainder **not** scanned, verify by
-hand — on the allow path and the refuse path alike. An oversized blob whose prefix is not
-valid UTF-8 falls back to the binary count and its wording.
+**FROZEN↔scan invariant.** An `_archive/` subtree is never edited and is entered only by
+`git mv`; git is content-addressed, so relocating an unchanged file publishes no new
+object and an already-published term stays amnestied by construction. The guarantee is
+content-addressing, not the directory: a document *authored* into an archive is an
+ordinary new blob and is scanned. A rename likewise voids the amnesty; the response is
+`dadaia ci push-gate-check` over the range plus remediation at each hit's source record,
+never `--no-verify` and never an exclusion. The repository's own self-scan sentinel scans
+an archive-prefixed path iff its blob sha is absent from `HEAD^`'s tree, degrading to
+plain exclusion when `HEAD^` is unavailable.
 
-There is no sanctioned-terms or amnesty list anywhere in the product: the amnesty derives
-from published git state, and a value the same path never published always blocks. The edge
-case that would have demanded such a list — a term already published inside an `_archive/`
-subtree — is void by construction:
+The refusal is satisfiable and masked. Per offending object it names the ref, the blob
+path with the 1-based line number of the first match, the short object sha, the term
+masked to `first…last`, the source layer, and the remediation — edit the file and rewrite
+the offending commits before pushing. It never prints the matched line or the unmasked
+term, lists at most ten objects plus a remainder count, and names `--no-verify` as the
+single traceable bypass. **Every operator-facing string the gate emits that names a blob
+path masks that path's private-name-bearing segments**, using the detector's own compiled
+matchers, so detector-hit implies masker-hit. The `--redact` CLI surface keeps its own
+placeholder shape and its own primitive in `core/redaction.py` ([[architecture]]). A
+failed object read carries the offending path as a structured field, never inside its
+message.
 
-> **FROZEN↔scan invariant.** An `_archive/` subtree is FROZEN (`DADAIA.md` §3): it is never
-> edited, and it is entered only by `git mv`. Git is content-addressed, so relocating a file
-> whose bytes are unchanged publishes no new object — the existing blob is reused. A tainted
-> archived file therefore can never appear as a *new* object of any future pushed range, and
-> the already-published term is amnestied by construction rather than by exception list. The
-> invariant holds exactly as long as `_archive/` stays FROZEN; if a future release ever edits
-> an archived file, the scan will — correctly — refuse the push.
+Decision logic stays pure: git object listing and prior-side resolution arrive through a
+port the CLI injects, never a subprocess inside the decision module.
 
-The guarantee is content-addressing, not the directory: it covers **any byte-identical copy
-or relocation of an already-published blob**, and only those. A document *authored* into an
-archive — a QA artifact created in place — is an ordinary new blob: its content has never
-been published, the archive path grants it nothing, and the scan reads it like any other new
-object. This is correct behaviour, and it is the reason archive-time documents follow the
-redaction-at-authoring doctrine the quality-assurance atom records: a closure that transcribes
-a diagnostic literal refuses its own push.
+## Context injection
 
-**A rename voids the amnesty, by design.** `prior_text` resolves per path, so renaming a file
-gives the new path no prior text at all and every historical value in it is re-flagged as new.
-The response is procedural, never an exclusion: run `dadaia ci push-gate-check` over the range
-before pushing, remediate each hit **at the source record** through that record's own write
-seam, and re-run until clean. Never `--no-verify`, never a scan exclusion, never a suppression
-entry.
+`dadaia context bind` writes the caller's session record; that record's `bound_at` against
+this session's injection sentinel is the only trigger for context-memory injection. An
+unbound session gets generic preflight only, and a foreign session's bind cannot alter
+this session's context or mode.
 
-The repository's own self-scan sentinel draws the same line from the other side. It does not
-exclude an archive subtree wholesale: an archive-prefixed path is scanned **iff its blob is
-new at HEAD** — precisely, its blob sha is absent from `HEAD^`'s tree. An archive-authored
-document is therefore covered, a relocation into the archive republishes an existing sha and
-stays excluded, and an unavailable `HEAD^` (a shallow clone, an initial commit) degrades to
-plain exclusion rather than to a failure.
+## Non-goals
 
-The refusal is satisfiable and masked. Per offending object it names the ref
-(`<local-ref> → <remote-ref>`), the blob path with the 1-based line number of the first
-match, the short object sha, the term masked to `first…last`, and the source layer
-(operator denylist, baseline pattern id, or foreign name). It then names the law it
-enforces and the remediation: edit the file, rewrite the offending commits (`--amend`,
-interactive rebase, cherry-pick) so no pushed object carries the term, and push again —
-the range scope means already-published history never needs a rewrite. The message never
-prints the matched line and never prints the term unmasked; at most ten offending objects
-are listed, followed by a count of the remainder. `git push --no-verify` remains the
-single traceable bypass and is named in the message.
+The hook reads no approval status, task marker or task write set, and exactly one SDD
+artifact — the live release's `RELEASE.jsonl`, for the phase. It constrains what may be
+written, never how the change was produced, and parses no arbitrary shell string. No new
+blocking validation enters this surface: skills instruct procedure, audits measure
+conformance from git and JSONL history, and hooks and the CLI validate only at the
+publication boundary.
 
-The masking is stated over a class, not a call site: **every operator-facing string the gate
-emits that names a blob path masks that path's private-name-bearing segments** — the denylist
-refusal, the oversized note, the git-failure refusal, and any future channel by inheritance.
-The path is split on `/` and only the segments matching a term source are replaced; the line
-number, the short sha and every non-matching segment are left alone, so the operator can
-still find the file, and a path that matches nothing renders byte-identically to an unmasked
-one.
-
-What decides "offending segment" is the **detector's own compiled matchers**, not a second
-predicate: the masker consumes the very case-insensitive, whole-token matchers the scan
-detects with, so detector-hit implies masker-hit by construction, a narrowing of the
-matcher reaches both sides in one edit, and a segment can never render unmasked for a term
-the scan already flagged. The operator-facing
-`--redact` CLI surface keeps its own placeholder shape and its own stdlib-pure primitive in
-`core/redaction.py` ([[architecture]]) — a different channel, deliberately not merged with
-this one. A failed object read is masked at the same boundary: the typed read error carries
-the offending path as a **structured field** rather than embedded in its message, so no
-refusal ever interpolates a raw path or a raw exception string.
-
-Measured cost on this repository's own content, on the shipped code. The fallback shape —
-the whole reachable history a fresh clone presents, 9,095 blobs and 130.29 MB — reads in
-1.26 s and matches in 53.87 s: **0.42 s/MB end to end at a 285.5 MiB peak resident set**,
-with matching accounting for ~98% of the total. The ordinary resolvable-base range is the
-one operators actually meet and is three orders of magnitude cheaper: a 70-blob push costs
-~48 ms, about 12 ms of which is the prior-side lookup's two extra batched calls per chunk.
-The multi-path enumeration that denies amnesty to a shared blob costs one tree listing **per
-commit in the range**, never per object — a handful of calls for an ordinary push, and
-proportionally more only in the fallback shape that walks a whole history, where nothing
-degrades to a partial scan either way.
-**These are the product's figures; the 2.978 s benchmark recorded in the archived v0.9.0
-closure was measured on a synthetic corpus roughly two orders of magnitude smaller than real
-content and is superseded, as is the ~1.3 s/MB reading taken before the chunked reader
-shipped.** Match throughput is the dominant term and is deliberately left unoptimised: the
-shape that pays it is rare and one-time per remote, and replacing the matching engine is its
-own engineering effort with its own correctness surface.
-
-Decision logic stays pure: git object listing and prior-side resolution reach it through a
-port the CLI injects, never a subprocess inside the decision module ([[architecture]]). The
-adapter's parse boundary is typed in both directions — a truncated stream, a non-numeric size
-field or a desynchronised header raises the reader's own error rather than letting a raw
-parse exception escape or, worse, letting the reader keep parsing content bytes as headers.
-An unparseable batch row is typed or counted at every site that reads one, never invisible;
-what stays an ordinary filtered outcome is only what git documents as one — a non-blob entry
-and the `missing` absence row.
-
-## Context Injection
-
-`dadaia context bind` writes the caller's session record. That record's `bound_at`
-timestamp, compared against this session's injection sentinel, is the only trigger for
-context-memory injection — so a re-bind reaches a live session. An unbound session gets
-generic preflight only. A foreign session's bind cannot alter this session's context or
-mode.
-
-## Non-Goals
-
-The hook does not read approval status, task markers, or task write sets. It reads exactly one
-SDD artifact — the live release's `RELEASE.jsonl`, for the phase — and no other. It constrains
-**what** may be written, never **how** the change was produced: the ordered SDD sequence is
-carried by the specs documents and upheld by the agents. It also does not parse arbitrary
-shell strings; git chokepoints provide the independent commit/push boundary.
-
-**No new blocking validation enters this surface.** Skills instruct procedure, audits measure
-conformance from git and JSONL history, and hooks and the CLI validate only at the publication
-boundary. A record contract, a commit shape, a lineage duty and a memory-tier rule are each
-audited rather than gated — none of them adds a refusal here.
-
-## Runtime State
+## Runtime state
 
 - `specs/releases/<release-id>/RELEASE.jsonl` — read-only, the phase source
-- `.dadaia/states/presence/<context>/<session-id>.json`
-- `.dadaia/sessions/<session-id>.json`
-- `.dadaia/tmp/ctx-inject-fired-<session-id>`
-- `.dadaia/logs/hook-latency.jsonl`
-- `.dadaia/logs/reconciler-events.jsonl`
-- `.dadaia/logs/push-verdict-gc-ledger.jsonl`
-
-Every one of those log files rotates at write time under its own writer ([[agent-monitoring]]);
-none is trimmed by an external cron.
+- `.dadaia/states/presence/<context>/<session-id>.json`,
+  `.dadaia/sessions/<session-id>.json`,
+  `.dadaia/tmp/ctx-inject-fired-<session-id>`
+- `.dadaia/logs/{hook-latency,reconciler-events,push-verdict-gc-ledger}.jsonl` — each
+  rotated at write time by its own writer ([[agent-monitoring]])
 
 Legacy `.dadaia/states/ctx_locks/` and `.dadaia/sessions/runtime/` are retired residue;
 doctor reports and removes them.

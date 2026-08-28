@@ -285,20 +285,18 @@ and `atomic_write`.
 `core/atomic_write.py` is **the** atomic-write primitive: a uuid-suffixed temp sibling plus
 `os.replace`, parameterized by preserve-mode, text-or-bytes content and newline policy,
 with temp cleanup on every failure path for every parameter combination. It is stateless
-and imports nothing from `dadaia_workspace`, which is what lets `hooks/` consume it without
-touching the composition root (P-12).
-`tests/unit/core/test_atomic_write_census.py` enumerates every atomic write in the package
-and asserts each routes through the primitive — zero named per-module writers, zero inline
-`.tmp` writers, no surviving call-through shim.
+and imports nothing from `dadaia_workspace`, which lets `hooks/` consume it without
+touching the composition root (P-12). `tests/unit/core/test_atomic_write_census.py`
+enumerates every atomic write in the package and asserts each routes through the primitive
+— zero named per-module writers, zero inline `.tmp` writers, no surviving shim.
 
-**Compare-then-swap lives inside the primitive, because it cannot live outside it.** The
-optional `expected_previous` parameter makes the comparison the last read the primitive
-performs, immediately before `os.replace` and after the temp sibling is fully written; a
-caller's own re-read necessarily precedes the serialization a concurrent writer can land
-inside. A mismatch raises `ConcurrentModificationError` — a pure `core` exception type
-carrying no `dadaia_workspace` import — and the temp sibling is cleaned on that path.
-Semantics are refuse-stale, then the caller retries, never last-write-wins.
-`expected_previous` is opt-in and its kind (`str`/`bytes`) must match the content's.
+**Compare-then-swap lives inside the primitive**, because a caller's own re-read
+necessarily precedes the serialization a concurrent writer can land inside. The optional
+`expected_previous` parameter makes the comparison the last read the primitive performs,
+immediately before `os.replace`; a mismatch raises `ConcurrentModificationError`, a pure
+`core` exception type, and the temp sibling is cleaned on that path. Semantics are
+refuse-stale, then retry — never last-write-wins. `expected_previous` is opt-in and its
+kind (`str`/`bytes`) must match the content's.
 
 ### Agent surface
 
@@ -310,11 +308,10 @@ hooks enforce mechanical file/git boundaries only.
 
 **A persona carries only what the law does not.** Its body targets 120-220 lines, states
 its rules as positive targets rather than a prohibition list, and drops anything the law
-already says. That target is measured, not met: four of the nine personas sit inside it and
-five above it, each overflow being content whose only home is that role, with its
-justification inline. A block leaves a persona only when a named surviving home — a
-disclosed skill sibling that already exists — receives it, and a persona never loses a
-write-allowlist row, a scope boundary or a hard-stop block to a trim.
+already says. The target is measured, not met: the overflow in each exceeding persona is
+content whose only home is that role, justified inline. A block leaves a persona only when
+a named surviving home — a disclosed skill sibling that already exists — receives it, and
+a persona never loses a write-allowlist row, a scope boundary or a hard-stop block.
 
 Which skill and which scoped `AGENTS.md` operates which `DADAIA.md` section is declared in
 exactly one machine-readable place, `public/entities/behavior-map.json` (P-17); its
@@ -325,10 +322,9 @@ harness, which surface carries it, and no harness ends with zero copies
 
 ### Architecture diagrams
 
-The v6 canon root has no `assets/` member: the three class/package diagrams live here as
-their own subsections, parsed in place by P-13's drift-guard. Each is regenerated at the
-closure of any structural release that renames, splits, adds, removes or merges what it
-depicts.
+The three class/package diagrams live here as their own subsections, parsed in place by
+P-13's drift-guard, and each is regenerated at the closure of any structural release that
+renames, splits, adds, removes or merges what it depicts.
 
 ### `features/specs/doctor` — SpecsDoctor coordinator + validator siblings
 

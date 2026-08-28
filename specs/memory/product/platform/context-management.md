@@ -2,204 +2,148 @@
 slug: context-management
 title: context-management
 category: product
-tldr: ALIVE/DEAD registry of one main repo plus N associated repos, one resolution authority, one repo accessor, lean bind-driven injection, advisory presence.
-summary: >-
-  Manages Spec Context Projects and their repositories — one unique main repo plus an
-  ordered collection of associated repos, resolved everywhere through a single accessor,
-  with a backup-first idempotent registry migration to schema v3. ALIVE/DEAD, the surface
-  verbs, export/import and the panel all cover the full set; a single branch-resolution
-  implementation serves both `list` and `show`, so they cannot disagree. A single
-  resolution function
-  answers "which context is this?" for every verb, hook and gate; bind persists context
-  and mode only for the caller, never acquires a lock, and drives an injection that
-  carries memory rather than a restatement of the law, its catalog half curated at
-  generation so every atom stays one self-pull away. A registry-wide doctor invariant
-  reports a repo slug owned by more than one context without ever choosing a winner. Concurrent work is allowed and
-  surfaced through expiring presence records. `list` and `show` accept `--redact` to mask
-  foreign context names in table and JSON output.
+tldr: ALIVE/DEAD registry of one main repo plus N associated repos, one resolution authority, lean bind-driven injection, advisory presence, redactable output.
+summary: Manages Spec Context Projects and their repositories through a v3 registry, a single resolution authority, a single repo accessor, bind-driven memory injection, expiring presence records, and workspace export/import.
 tags:
 - context
 - lifecycle
 - session
 - no-locks
 - privacy
-last_updated: '2026-08-27'
-release_origin: v0.4.5
 ---
 
 ## Purpose
 
-A Spec Context Project binds one canonical `specs/` tree to **one main repository, plus
-any number of associated repositories**. The workspace registry stores name, main repo
-slug, main repo URL, the ordered associated-repo collection (slug + url each), state,
-branch, and lifecycle timestamps. The main repo is unique and is the only specs, bind,
-memory, release and backlog target; an associated repo is a working checkout the context
-owns and nothing more. There is no global primary context.
+A Spec Context Project binds one canonical `specs/` tree to one main repository plus any
+number of associated repositories. The registry stores name, main repo slug and URL, the
+ordered associated-repo collection (slug + url), state, branch and lifecycle timestamps.
+The main repo is unique and is the only specs, bind, memory, release and backlog target;
+an associated repo is a working checkout and nothing more. There is no global primary
+context.
 
-Every consumer that needs "this context's repos" resolves through **one accessor** —
-main first, then the associated repos in order. The lifecycle verbs, the display verbs,
-export and the panel all use it; no second repo-resolution path exists. The registry
-schema is v3, reached by a backup-first, idempotent migration that writes the v2 file
-verbatim beside it before touching anything and is a proven no-op on re-run; a v3 record
-with an empty associated collection behaves exactly as its v2 form did, and the read path
-tolerates a v2 file rather than gating on a version it could not repair.
+Every consumer resolves "this context's repos" through **one accessor** — main first, then
+the associated repos in order. The registry schema is v3, reached by a backup-first,
+idempotent migration that writes the v2 file verbatim beside it first; a v3 record with an
+empty associated collection behaves exactly as its v2 form, and the read path tolerates a
+v2 file.
 
 ## Lifecycle
 
-- `context create` registers a DEAD context, optionally with associated repos declared
-  up front.
-- `context alive` clones or keeps **every** repo of the set under `repos/`, idempotently,
-  restores the recorded branch, merges missing scaffold files without overwriting existing
-  files, and marks the context ALIVE. An associated repo is cloned **clean**: it receives
-  no scaffold, no bind, and its own `specs/` — if it has one — is never read by the
-  context.
-- `context dead` requires a reviewable clean transition across the whole set, refusing
-  and naming the offending repo when **any** of them is dirty or unpushed, scans newly
-  committed material for secrets when `--commit` is used, records the branch, and removes
-  the local repos.
-- `context repo add|remove|list` manages the associated collection. Each verb is
-  idempotent and fails loudly on an unknown context or slug; `remove` mutates the registry
-  only and states what it leaves on disk rather than deleting a checkout silently.
-- `context update --url` repairs the remote URL. Alive/dead also backfill an absent URL
-  from the repository origin when available.
+| Verb | Behavior |
+|---|---|
+| `context create` | registers a DEAD context, optionally with associated repos declared up front; back-fills `repo_url` from the repos catalog when `--url` is omitted |
+| `context alive` | clones or keeps every repo of the set under `repos/`, restores the recorded branch, merges missing scaffold without overwriting, marks ALIVE. An associated repo is cloned clean — no scaffold, no bind, its own `specs/` never read |
+| `context dead` | requires a clean, pushed state across the whole set, naming the offending repo otherwise; scans newly committed material for secrets with `--commit`; records the branch and removes the local repos |
+| `context repo add\|remove\|list` | manages the associated collection idempotently; `remove` mutates the registry only and states what it leaves on disk |
+| `context update --url` | repairs the remote URL; alive/dead backfill an absent URL from the origin |
 
-**A repo slug is owned by exactly one context.** `repos/<slug>` is a namespace every
-context shares and `dead` destroys every entry of the set it walks, so both seams that can
-introduce a slug from an argument — `create` for the main repo and `repo add` for an
-associated one — consult one ownership predicate and refuse a slug another context already
-owns, naming the owner. The four other registry writes carry an existing slug forward and
-cannot break the invariant.
+**A repo slug is owned by exactly one context.** `repos/<slug>` is a shared namespace and
+`dead` destroys every entry of the set it walks, so both seams that introduce a slug from
+an argument — `create` and `repo add` — consult one ownership predicate and refuse a slug
+another context owns, naming the owner. The v2→v3 migration is additive and imports
+whatever the old registry said, so historical collisions are covered by detection instead:
+the workspace doctor's registry-wide `INV-6` reports every slug with more than one owner
+and never chooses a winner ([[workspace-doctor]]).
 
-Enforcement by construction covers new writes; **historical state is covered by
-detection**. The v2→v3 migration is purely additive and imports whatever the old registry
-said, so a registry that collided before the two seams existed keeps its collision. The
-workspace doctor's registry-wide `INV-6` check reads the folded registry and reports every
-slug with more than one owner, main or associated ([[workspace-doctor]]). It reports and
-stops: which owner should lose the slug is a disposition only the operator holds, and the
-verbs to act on it already exist, so no automatic choice is made on the destructive side of
-the invariant. With that lane decided, the class has no undecided lane left — two write
-seams guarded, historical state surfaced, `dead` untouched.
-
-Concurrent alive/dead races are not serialized. Operations are idempotent where
-possible and surface ordinary filesystem/Git conflicts instead of waiting on a lock.
+Concurrent alive/dead races are not serialized; operations are idempotent where possible
+and surface ordinary filesystem/git conflicts.
 
 ## Usage
 
 `context show` renders main and associated repos — slug, url, on-disk, live branch — in
-both table and `--json` form; `context list` carries the associated count in the table and
-the full list in `--json`. **`list` and `show` can never disagree on `current_branch`**:
-one live branch-resolution implementation serves both, and the stored snapshot, where it
-is still meaningful, is exposed under its own distinct field name rather than as
-`current_branch`. Export and import round-trip the associated repos (url and branch)
-through a structural record copy that cannot silently drop a field it does not know about,
-and import's own `alive` re-clones the whole set. The panel's context card lists main and
-associated alike, and the CI foreign-slug derivation covers the full set.
+table and `--json` form; `context list` carries the associated count in the table and the
+full list in `--json`. One live branch-resolution implementation serves both, so they
+cannot disagree on `current_branch`; the stored snapshot is exposed under its own field
+name. The panel's context card lists main and associated alike.
+
+`dadaia repos list` reads the static catalog at `.dadaia/agentic/data/repos.xlsx`
+(projected from `dadaia_workspace/public/data/repos.xlsx`) and shows slug, URL and
+description, so a context can be created from a short slug.
 
 ## Resolution
 
-`core.specs_resolver.resolve_context()` is the single authority that answers "which
-context is this?". Every consumer — the CLI seam, `container`, the SDD gate and the
-ctx-inject hook — calls that one function, and the law it implements is its docstring:
+`core.specs_resolver.resolve_context()` is the single authority answering "which context
+is this?"; the CLI seam, `container`, the SDD gate and ctx-inject all call it.
 
 | Rung | Input | Meaning |
 |---|---|---|
-| 0 | caller-supplied | the `--context` flag, or the context derived from an explicit write **target** under `repos/<slug>/` |
+| 0 | caller-supplied | the `--context` flag, or the context derived from an explicit write target under `repos/<slug>/` |
 | 1 | `DADAIA_CONTEXT` | the environment binding |
-| 2 | this session's own **live** record | keyed by the harness-native session id |
+| 2 | this session's own live record | keyed by the harness-native session id |
 | 3 | the repo containing the cwd | `repos/<slug>/…` |
 
-Rungs 1–3 are the law's three rungs in the law's order. Rung 0 is the caller's explicit
-input, which is why a write into `repos/x/` is attributed to `x` even while
-`DADAIA_CONTEXT=y` — the gate keeps path-first attribution by passing the write target.
-Rungs 0 and 3 resolve a repo slug and then recover the context NAME through the
-registry — the same inverse lookup covers an **associated** slug, so a walk from inside an
-associated checkout resolves the owning context rather than inventing a second one.
-The lookup falls back to the slug when it is unregistered. Every rung fails soft;
-resolution returns nothing only when all four are exhausted, and `resolve_specs_dir`
-then raises rather than guessing from the cwd.
+Rung 0 is why a write into `repos/x/` is attributed to `x` even under
+`DADAIA_CONTEXT=y` — the gate passes the write target and keeps attribution path-first.
+Rungs 0 and 3 resolve a slug and recover the context NAME through the registry, and the
+same inverse lookup covers an associated slug, falling back to the slug when it is
+unregistered. Every rung fails soft; when all are exhausted `resolve_specs_dir` raises
+rather than guessing from the cwd.
 
-`DADAIA_CONTEXT` is the only environment variable that participates in resolution.
-`DADAIA_MODE` carries mode, and `WORKSPACE_ROOT` / `DADAIA_RUNTIME` /
-`DADAIA_HOOK_OUTPUT` / `DADAIA_HOOK_EVENT` are hook transport; none of them resolves a
-context.
+`DADAIA_CONTEXT` is the only environment variable participating in resolution.
+`DADAIA_MODE` carries mode; `WORKSPACE_ROOT`, `DADAIA_RUNTIME`, `DADAIA_HOOK_OUTPUT` and
+`DADAIA_HOOK_EVENT` are hook transport.
 
-## Binding
+## Binding and injection
 
-`dadaia context bind <context> --mode READ|IMPLEMENTATION|...` writes exactly one
-artifact: the caller-owned record at `.dadaia/sessions/<session-id>.json`, carrying the
-context, the mode and a `bound_at` timestamp. It writes no context-global incumbent
-pointer and acquires nothing.
+`dadaia context bind <context> --mode READ|IMPLEMENTATION|…` writes exactly one artifact:
+the caller-owned record at `.dadaia/sessions/<session-id>.json`, carrying context, mode
+and `bound_at`. It writes no context-global pointer and acquires nothing. That record is
+reachable at rung 2 only when keyed by the session's own harness-native id; with neither a
+native id nor `DADAIA_CONTEXT`, `bind` warns that the export is the binding, and
+`bind --print-env` emits the export line.
 
-That record is reachable at rung 2 only when it is keyed by the session's own
-harness-native id. When the shell has neither a harness-native session id nor
-`DADAIA_CONTEXT`, `bind` prints a loud warning saying the binding is reachable only if
-`DADAIA_CONTEXT=<context>` is exported — for a plain shell, and for a harness that
-exposes no session id of its own, the environment variable **is** the binding (rung 1).
-`bind --print-env` emits that export line.
+`bound_at` newer than this session's injection sentinel is the sole injection trigger, so
+a re-bind — including one to the same context — reaches a live session. **The injection
+carries state, never a restatement of the law**: the prefix is the tech-stack digest plus
+the product catalog digest, with the ALIVE-context list emitted only to an unbound
+session. The catalog half is curated at generation: the generator persists the one-line
+`tldr` only for atoms in the injected tier (selected by the atom's `category` field) and
+drops it from the persisted file for the rest, while `product/index.md` is rendered from
+the full set. `slug`, `title` and `path` survive on every entry, so every atom stays one
+self-pull away. Both writers of `catalog.json` apply the policy identically, pinned by a
+contract over their written output.
 
-The record's `bound_at` is also the sole context-memory injection trigger: ctx-inject
-re-injects when this session's own `bound_at` is newer than its injection sentinel, so a
-re-bind — including a re-bind to the same context — delivers the changed mode or release
-to a live session.
+Specs, bind, memory, releases and backlog resolve only from the main repo: a bind injects
+the main repo's memory alone, and `specs doctor`, `backlog doctor` and the SDD gate each
+see exactly one `specs/` tree per context. READ mode is opt-in self-protection — it blocks
+this session's mutating file-tool writes, leaves additive paths writable, and cannot be
+imposed on another session.
 
-**The injection carries state, never a restatement of the law.** A bound session's prefix
-is the lean memory bootstrap — the tech-stack digest plus the product catalog digest — and
-nothing else: no dispatcher preflight (the law states the flow once, and a session already
-carrying the law does not need it a second time per prompt) and no ALIVE-context list,
-which is useful only to a session that is **unbound** and is therefore emitted only there.
+## Redacted output
 
-The catalog half is **curated at generation, not at injection**. The catalog generator
-persists the one-line `tldr` only for atoms in the injected tier — selected by the atom's
-existing `category` frontmatter field, today `core` — and drops it from the persisted file
-for the rest; the in-memory catalog and the rendered `product/index.md` are fed the full,
-uncurated set, so `index.md` still carries every atom's `tldr` as a one-step lookup. The
-hook's digest logic is unchanged and simply emits the fields present. **Every catalog entry
-stays reachable**: `slug`, `title` and `path` survive on every entry, so any atom is one
-self-pull away — the policy changes what is *injected*, never what *exists*. The policy
-lives in the generator, and both writers of `catalog.json` apply it identically, pinned by a
-contract over their written output. The measured prefix on a real bound session is **877.8
-tokens** against a ≤0.7k target, down from 1,505.6; the remaining floor is the bounded
-tech-stack digest (~564 tokens, outside this lever) plus ~314 tokens of catalog structure
-that cannot shrink without dropping an entry's `path`.
-
-**One place of control.** Specs, bind, memory, releases and backlog resolve only from the
-main repo. A bind to a context with associated repos injects the **main** repo's memory
-alone, and `specs doctor`, `backlog doctor` and the SDD gate each see exactly one `specs/`
-tree per context even when an associated repo carries a `specs/` directory of its own.
-
-READ is opt-in self-protection: it blocks this session's mutating file-tool writes while
-leaving additive intake paths writable. It cannot impose READ mode on another session.
-
-## Redacted Output
-
-`context list` and `context show` accept `--redact` in both their table and `--json`
-forms, including the `presence` block. Every context name and repo slug other than the
-caller's resolved context is replaced by a stable `[REDACTED-CONTEXT-<n>]` placeholder,
-ordinal by first appearance within one invocation, so the same foreign context carries
-the same placeholder everywhere it appears in that output. The caller's own context stays
-visible. Redaction applies at the render boundary only — the registry and services keep
-returning true names, the default output is unchanged, and the redacted `--json` remains
-valid JSON with the same key set, so a machine consumer's parsing contract does not
-change. The purpose is authoring hygiene: output pasted into a document must not carry a
-foreign Spec Context name ([[quality-assurance]]).
+`context list` and `context show` accept `--redact` in table and `--json` form, including
+the `presence` block. Every context name and repo slug other than the caller's resolved
+context becomes a stable `[REDACTED-CONTEXT-<n>]` placeholder, ordinal by first appearance
+within one invocation. Redaction applies at the render boundary only: services keep
+returning true names, default output is unchanged, and the redacted `--json` keeps the
+same key set ([[quality-assurance]]).
 
 ## Presence
 
 Mutating file-tool activity best-effort records advisory presence under
-`.dadaia/states/presence/<context>/<session-id>.json`. Live peer presence produces a
-warning, never a denial. Records expire by heartbeat age and are garbage-collected by
-the gate and workspace doctor.
+`.dadaia/states/presence/<context>/<session-id>.json`. A live peer produces a warning,
+never a denial. Records expire by heartbeat age and are collected by the gate and the
+workspace doctor.
 
-## Runtime State
+## Export and import
 
-- `.dadaia/states/spec_contexts.json` - context registry.
-- `.dadaia/sessions/` - caller-owned binding records (context, mode, `bound_at`).
-- `.dadaia/states/presence/` - advisory live-session records.
-- `.dadaia/tmp/ctx-inject-fired-<session-id>` - per-session injection sentinel.
-- `repos/<slug>/` - ALIVE repository checkout; the main repo's tree carries the canonical
-  specs, an associated repo's does not.
-- `.dadaia/states/spec_contexts.v2.bak.json` - the pre-migration registry, written
-  verbatim before the v3 stamp.
+`dadaia export [--output DIR] [--include-reports] [--exclude-mnt] [--list]` packages the
+workspace's durable state — state files, academy, rules, skills — as
+`.dadaia/dist/workspace-<timestamp>.tar.gz`. `.env`, caches and cloned `repos/` are
+excluded; HTML reports are opt-in. `dadaia import <archive> [--workspace DEST]
+[--skip-mnt] [--skip-activate] [--dry-run]` extracts, patches absolute paths, restores
+contexts as they were and re-runs workspace init unless `--skip-activate`. Associated and
+main repos are re-cloned by `context alive` after import; export/import round-trip the
+associated repos through a structural record copy that cannot silently drop a field.
+
+## Runtime state
+
+- `.dadaia/states/spec_contexts.json` — context registry;
+  `.dadaia/states/spec_contexts.v2.bak.json` — the pre-migration file, written verbatim.
+- `.dadaia/sessions/` — caller-owned binding records.
+- `.dadaia/states/presence/` — advisory live-session records.
+- `.dadaia/tmp/ctx-inject-fired-<session-id>` — per-session injection sentinel.
+- `repos/<slug>/` — ALIVE checkout; only the main repo's tree carries canonical specs.
 
 No `.dadaia/` directory may exist inside a repository.
 
