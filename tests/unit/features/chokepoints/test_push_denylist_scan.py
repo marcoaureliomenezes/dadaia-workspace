@@ -35,10 +35,22 @@ class _FakeObjectSource:
         self.calls.append((local_sha, remote_sha))
         return self.by_range.get((local_sha, remote_sha), [])
 
+    def list_tree_paths(self, repo: Path, sha: str, prefix: str) -> list[str]:
+        return []
+
+    def first_parent(self, repo: Path, sha: str) -> str | None:
+        return None
+
 
 class _FailingObjectSource:
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
         raise GitObjectReadError("simulated git rev-list failure")
+
+    def list_tree_paths(self, repo: Path, sha: str, prefix: str) -> list[str]:
+        return []
+
+    def first_parent(self, repo: Path, sha: str) -> str | None:
+        return None
 
 
 def _refs(*lines: str) -> list[PushRef]:
@@ -549,6 +561,12 @@ class _FailingObjectSourceWithPath:
             "git cat-file --batch stream desynchronised resolving prior content",
             path=f"repos/{_FOREIGN_SLUG}/leak.md",
         )
+
+    def list_tree_paths(self, repo: Path, sha: str, prefix: str) -> list[str]:
+        return []
+
+    def first_parent(self, repo: Path, sha: str) -> str | None:
+        return None
 
 
 def test_git_object_read_failure_at_a_denylisted_path_masks_the_path(tmp_path: Path) -> None:

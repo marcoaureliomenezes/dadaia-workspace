@@ -36,10 +36,20 @@ _ZERO = "0" * 40
 
 
 class _EmptyObjectSource:
-    """No denylist configured for these tests — the scan step is a pure pass-through."""
+    """No denylist configured for these tests — the scan step is a pure pass-through.
+
+    ``list_tree_paths``/``first_parent`` (v0.5.0 specs-canon closure) also return
+    empty/None — this fixture never publishes a specs/ tree, so the canon scan step
+    is a pure pass-through too."""
 
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
         return ()
+
+    def list_tree_paths(self, repo: Path, sha: str, prefix: str) -> list[str]:
+        return []
+
+    def first_parent(self, repo: Path, sha: str) -> str | None:
+        return None
 
 
 def _decide(refs: list[PushRef], root: Path, **kwargs: Any) -> Decision:

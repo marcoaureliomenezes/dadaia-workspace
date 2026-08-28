@@ -98,6 +98,11 @@ _SETUP_CFG = _REPO_ROOT / "setup.cfg"
 # adapter directly, and `infrastructure/jsonl_bug_store.py` itself is deleted. Cap
 # lowered 15 -> 14 (-1 cli-no-infrastructure).
 #
+# v0.5.0 specs-canon closure NOTE (operator ruling 2026-08-28):
+# `chokepoints.service -> specs.specs_canon` ADDED — the pre-push specs-canon policy
+# step reuses the SAME canon predicate module the doctor's TREE-8 check uses (one
+# canon source, never a second hand-kept copy). Cap raised 17 -> 18
+# (+1 features-no-cross-feature).
 # v0.5.0 T-050-29 NOTE (FR18/A18.5, V32): the `features-no-cross-feature` contract's
 # `modules =` was measurably incomplete (20 of the 24 `dadaia_workspace/features/*/`
 # packages on disk) — the missing four (`capabilities`, `certification`, `reconcile`,
@@ -107,14 +112,14 @@ _SETUP_CFG = _REPO_ROOT / "setup.cfg"
 # documented `ignore_imports` edge with its own reason comment (collapsing them is a
 # `reconcile` feature rewrite, routed to intake — not attempted here). Cap raised
 # 14 -> 17 (+3 features-no-cross-feature) in the same commit as `setup.cfg`.
-_RECORDED_IGNORE_EDGE_CAP = 17
+_RECORDED_IGNORE_EDGE_CAP = 18
 
 # Per-family recorded breakdown, pinned per contract section so a wrong 13-edge cross-feature
 # set (or a silent shift between families) fails loudly, not just the grand total.
 _RECORDED_PER_FAMILY_CAP: dict[str, int] = {
     "features-no-infrastructure": 7,
     "features-no-subprocess": 3,
-    "features-no-cross-feature": 5,
+    "features-no-cross-feature": 6,
     "cli-no-infrastructure": 2,
 }
 

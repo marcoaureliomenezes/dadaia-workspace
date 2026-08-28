@@ -81,11 +81,16 @@ def _tag_push_ref(local_sha: str, *, remote_sha: str = _ZERO) -> PushRef:
 
 
 def test_git_mv_into_archive_produces_no_new_blob_and_a_clean_scan(tmp_path: Path) -> None:
-    """FR4/A4.2: renaming a tainted file into ``specs/backlog/_archive/`` (a canon
-    per-area archive — root specs/_archive/ retired, v0.5.0 specs-canon closure)
-    reuses the same blob object — the range carries no NEW blob, so the scan is
-    clean by construction. The gate's blob-reuse logic itself is directory-name
-    agnostic; this fixture uses a real canon archive path on principle."""
+    """FR4/A4.2: renaming a tainted file into ``specs/releases/_archive/<M.m.p>/`` (a
+    canon per-area archive — root specs/_archive/ retired, v0.5.0 specs-canon
+    closure) reuses the same blob object — the range carries no NEW blob, so the
+    scan is clean by construction. The gate's blob-reuse logic itself is
+    directory-name agnostic; this fixture uses a real canon archive path on
+    principle. ``releases/_archive/<M.m.p>/**`` (wide open, any nested path) is used
+    rather than ``backlog/_archive/`` (a CLOSED shape — only ``backlog_histo.jsonl``/
+    ``consumed_backlog_histo.jsonl`` — since the v0.5.0 specs-canon closure's
+    pre-push canon scan now ALSO runs on this same push and would otherwise refuse
+    an arbitrary ``notes.md`` under the closed-shape area)."""
     repo = tmp_path / "repo"
     _init_repo(repo)
     (repo / "notes.md").write_text(f"leftover {_SYNTHETIC_TERM} content\n")
@@ -93,8 +98,8 @@ def test_git_mv_into_archive_produces_no_new_blob_and_a_clean_scan(tmp_path: Pat
     # holds relative to a real range boundary; `remote_sha` anchors it (FR1 row 1).
     already_published_sha = _commit(repo, "already-published")
 
-    (repo / "specs" / "backlog" / "_archive").mkdir(parents=True)
-    _git(["mv", "notes.md", "specs/backlog/_archive/notes.md"], repo)
+    (repo / "specs" / "releases" / "_archive" / "0.4.0").mkdir(parents=True)
+    _git(["mv", "notes.md", "specs/releases/_archive/0.4.0/notes.md"], repo)
     renamed_sha = _commit(repo, "archive: git mv the tainted file")
 
     reader = GitSubprocessObjectReader()

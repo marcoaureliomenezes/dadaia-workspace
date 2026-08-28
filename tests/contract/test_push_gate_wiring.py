@@ -28,7 +28,11 @@ _ZERO = "0" * 40
 
 
 class _SpyObjectSource:
-    """Wraps no real git — records every call so the test can assert it was reached."""
+    """Wraps no real git — records every call so the test can assert it was reached.
+
+    ``list_tree_paths``/``first_parent`` (v0.5.0 specs-canon closure) return
+    empty/None — this spy never publishes a specs/ tree, so the pre-push canon scan
+    step this class also now reaches is a pure pass-through."""
 
     def __init__(self) -> None:
         self.calls: list[tuple[Path, str, str]] = []
@@ -36,6 +40,12 @@ class _SpyObjectSource:
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
         self.calls.append((repo, local_sha, remote_sha))
         return ()
+
+    def list_tree_paths(self, repo: Path, sha: str, prefix: str) -> list[str]:
+        return []
+
+    def first_parent(self, repo: Path, sha: str) -> str | None:
+        return None
 
 
 def _init_repo(path: Path) -> str:
