@@ -90,7 +90,7 @@ root and inside every `repos/<slug>/`.
 | ADDITIVE | `specs/bugs|backlog|audits/`, `.dadaia/reports|handoff|tmp/` | Always writable; the record contract — immutable core, write-once, mutable governance — is audited, not gated. |
 | MEMORY | `specs/memory/` | Writable in `DEFINITION` and `CLOSURE` phase |
 | MUTATING | everything else in-repo | Writable; records advisory presence |
-| FROZEN | `specs/_archive/` | Blocked — archive by `git mv`, never edit |
+| FROZEN | `specs/{backlog,bugs,audits}/_archive/` | Blocked — archive by `git mv`, never edit |
 | PROTECTED | `.dadaia/sessions/`, projected law files (§8) | Blocked |
 
 **Races are surfaced, always allowed** — locks, leases, and ownership blocks are absent by
@@ -202,6 +202,12 @@ HTML's integrity rides on the handoff's `content_hash`.
 `Aprovado`, `Em revisão` and `Draft` are the canonical status tokens — keep them as they
 are, in any language.
 
+**Canon.** A specs root's only members are `AGENTS.md`, `constitution.md`, `memory/`,
+`releases/`, `backlog/`, `bugs/`, `audits/`, `ADRs/`; each of `releases/`, `backlog/`,
+`bugs/` and `audits/` carries its own `_archive/` holding that area's history as an
+append-only histo JSONL — no root-level archive directory, no generator dotfile, no
+stray dotfile; `specs doctor` flags anything else.
+
 **Task lifecycle.** Read SPEC, PLAN and TASKS — all three carry `**Status:** Aprovado`.
 Reserve your task by flipping `[ ]` → `[-]` *before* writing; hold at most one `[-]` at a
 time unless TASKS declares disjoint write sets. Complete the work inside the task's
@@ -217,9 +223,11 @@ ADR-gated Part 1 Principles (each carrying `Measured by:`) and an evolving Part 
 Implementation.
 
 <!-- behavior: adrs -->
-**ADRs.** `specs/ADRs/NNNN-<slug>.md` records every principle-level decision — any agent
-proposes, only the operator flips a decision to `accepted`, and the commit that changes a
-Part-1 principle carries its accepted ADR.
+**ADRs.** `specs/ADRs/NNNN-<slug>.md` records a decision — any agent proposes, only the
+operator flips a decision to `accepted`. An ADR is written when a Part-1 principle is
+created or changed, never one file per principle that merely exists; the commit that
+creates or changes a Part-1 principle carries its accepted ADR, and a principle that
+predates this canon carries `ADR: none` until the change that next touches it mints one.
 
 <!-- behavior: backlog -->
 **Backlog.** The backlog is the **operator's demand queue**: only the operator creates

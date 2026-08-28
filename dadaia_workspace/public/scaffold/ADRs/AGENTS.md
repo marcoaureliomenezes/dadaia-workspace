@@ -61,42 +61,13 @@ staged alone; superseding is a **new** ADR proposal plus, once accepted, the sup
 ADR's own `Superseded by: NNNN` line updated by the operator in the accept commit of the
 new one.
 
-## Index — the 28 ADRs at T-050-30
+## Index
 
-Discover the live set with `ls specs/ADRs/*.md` — this table is a snapshot, not the
-source of truth; a contract test (`tests/contract/test_adr_canon.py`) discovers the real
-inventory by glob and enforces monotonic, gap-free, duplicate-free numbering.
-
-| # | Title | Status |
-|---|---|---|
-| 0001 | Features depend on ports, not adapters | proposed |
-| 0002 | Features never spawn a subprocess | proposed |
-| 0003 | `core` is OS-primitive free | proposed |
-| 0004 | `core` is the bottom ring | proposed |
-| 0005 | `infrastructure` depends only on `core` | proposed |
-| 0006 | `core.kernel_tunables` is a pure-constant leaf | proposed |
-| 0007 | Features are mutually independent | proposed |
-| 0008 | The CLI composes via the container | proposed |
-| 0009 | One context-resolution authority | proposed |
-| 0010 | Suppressed layering edges are capped and ratchet down | proposed |
-| 0011 | File I/O enters `core` only through an authorized set | proposed |
-| 0012 | Hooks never import the composition root | proposed |
-| 0013 | Architecture diagrams derive from live code | proposed |
-| 0014 | The release-event fold never writes | proposed |
-| 0015 | The release-record envelope is closed | proposed |
-| 0016 | Stored provenance equals derived provenance | proposed |
-| 0017 | Every behavior surface maps to exactly one law section | proposed |
-| 0018 | Module-size ceilings ratchet down | proposed |
-| 0019 | Complexity ceilings ratchet down | proposed |
-| 0020 | `specs upgrade` and `specs doctor` do not grow | proposed |
-| 0021 | Every test carries a size tier with an enforced timeout | proposed |
-| 0022 | Quarantine requires a registered bug | proposed |
-| 0023 | Private-symbol imports in tests ratchet down | proposed |
-| 0024 | Test intent is declared at birth | proposed |
-| 0025 | SCAFFOLD tests expire | proposed |
-| 0026 | One number per parameter | proposed |
-| 0027 | The pyramid shape is measured every run, reported not gated | proposed |
-| 0028 | The pytest marker set is closed and single-sourced | proposed |
+An ADR exists per DECISION — written when a Part-1 principle is created or changed —
+never one file per principle that merely exists. Discover the live set with `ls
+specs/ADRs/*.md`; a contract test (`tests/contract/test_adr_canon.py`) discovers the
+real inventory by glob and enforces monotonic, gap-free, duplicate-free numbering. This
+file carries no hand-kept table of the inventory.
 
 ## Relationship to memory and audits
 

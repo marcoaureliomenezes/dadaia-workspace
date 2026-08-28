@@ -19,8 +19,24 @@ releases/<release-id>/PLAN.md
 releases/<release-id>/TASKS.md
 ```
 
-Use `_archive/` only for history. Use `backlog/` and `bugs/` for intake and
-triage; they are not approval gates.
+## Canon Members
+
+A specs root carries exactly these members — nothing else:
+
+| Member | Holds |
+|---|---|
+| `AGENTS.md` | this file |
+| `constitution.md` | absolute product laws |
+| `memory/` | current product truth (`memory/AGENTS.md`) |
+| `releases/` | release SPEC/PLAN/TASKS/RELEASE.jsonl, `_ideas/` pre-approval drafts, `_archive/` history |
+| `backlog/` | the live demand queue, `_archive/` history |
+| `bugs/` | the bug ledger, `_archive/` history |
+| `audits/` | audit records, `_archive/` history |
+| `ADRs/` | decision records (`ADRs/AGENTS.md`) |
+
+No root `_archive/`, no `.gitkeep`, no stray dotfile — `dadaia specs doctor` flags
+anything else. Use `backlog/` and `bugs/` for intake and triage; they are not approval
+gates.
 
 Run ordered work by dispatching the owning agent for each stage — backlog-definition,
 release-definition, implementation with its reviews and gates, and audit — against
