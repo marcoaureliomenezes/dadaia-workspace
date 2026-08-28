@@ -2,130 +2,91 @@
 slug: agent-monitoring
 title: agent-monitoring
 category: product
-tldr: stdlib-only local telemetry → panel Sessions tab + /api/agents; allowlist gate
-  preserves privacy; artifacts die event-driven, logs self-rotate.
-summary: stdlib-only local telemetry consuming Claude Code jsonl + Codex sqlite
-  (~/.codex/state_5.sqlite) + Kimi session index (~/.kimi-code/session_index.jsonl); feeds the
-  panel's Sessions tab and the /api/agents and /api/sessions endpoints; a hardcoded
-  allowlist gate preserves privacy by construction; endpoints served with no
-  credential behind the panel's loopback bind + Host allowlist. Also owns the runtime
-  artifact lifecycle under .dadaia/ — release-closure GC of a release's own reports,
-  handoffs, tmp captures and run records; reconciler reaping of stale session/presence
-  records, their markers and zombie run records; write-time 1 MB rotation with current+1
-  retention for every logs/*.jsonl writer; and dadaia tmp gc as the only calendar-based
-  backstop.
+tldr: Stdlib-only local agent telemetry behind an allowlist gate, plus the event-driven lifecycle of every runtime artifact under .dadaia/.
+summary: '`features/telemetry/` ingests Claude Code, Codex and Kimi Code session metadata into a local SQLite store behind a hardcoded allowlist gate and serves the panel dashboard; the same atom owns artifact GC, reconciler reaping and write-time log rotation under `.dadaia/`.'
 tags:
 - monitoring
 - telemetry
 - sessions
-last_updated: '2026-08-18'
-release_origin: v0.1.61
+- lifecycle
+last_updated: '2026-08-28'
+release_origin: 0.5.0
 ---
-
-CLI surface: integrated into `dadaia panel` (Sessions tab + endpoints `/api/agents`, `/api/sessions`)
 
 ## Purpose
 
-Local agent telemetry consumed exclusively from the operator's files (Claude Code `~/.claude/projects/*.jsonl` + Codex `~/.codex/state_5.sqlite`) — zero remote APIs, zero Node dependencies, zero `ccusage`. The `features/telemetry/` module (peer of `features/panel/`) materializes a local SQLite layer (`~/.dadaia/state/telemetry/telemetry.sqlite`) with WAL + foreign keys + schema versioned via `PRAGMA user_version`, and exposes the `/api/agents` (+ drill-down `/api/agents/{id}/sessions`) and `/api/sessions` endpoints consumed by the [[panel]] Sessions tab — served **with no credential**, behind the panel's loopback bind + Host allowlist.
+Local agent telemetry read only from the operator's own files — no remote API, no Node
+dependency. `features/telemetry/` materializes SQLite at
+`~/.dadaia/state/telemetry/telemetry.sqlite` (WAL, foreign keys, `PRAGMA user_version`,
+one pragmatized factory `store/schema.open_connection`) and serves `/api/sessions`,
+`/api/agents`, `/api/agents/{id}/sessions` and `/api/agents/{id}/prompt` to the [[panel]].
 
-**The three telemetry runtimes are `{claude, codex, kimi-code}`.** `reader/kimi.py` ingests Kimi session metadata from `~/.kimi-code/session_index.jsonl` (sessionId, sessionDir, workDir) and the `KimiRuntimeAdapter` (`ADAPTER_REGISTRY["kimi-code"]`, `aggregator/runtimes.py`) does enrichment + liveness by session-directory mtime, mirroring the Claude/Codex posture; cost is unknown for Kimi (no per-event pricing) ⇒ `cumulative_cost_usd=None`/`cost_known=False`, never faked. Invariant T1: the reader reads only the index metadata and never opens session content, degrading gracefully on IO/parse failure.
+Runtimes are `claude`, `codex`, `kimi-code`, each with a reader (`reader/claude.py`,
+`reader/codex.py`, `reader/kimi.py`) and an adapter in `aggregator/runtimes.py`. Kimi has
+no per-event pricing, so its cost is reported unknown rather than faked.
 
-The pragmatized factory `store/schema.open_connection` (WAL + synchronous=NORMAL + foreign_keys) **is wired into the real connection paths** (since v0.1.52 — `features/telemetry/service.py`, `aggregator/queries.py`); a corrupt database at boot degrades to the 503 "no-telemetry" mode described in the usage flow.
-
-It solves the invisibility of per-agent costs and usage patterns: the operator runs product-engineer / software-engineer / software-architect / 7 other specialist agents in parallel, and until the `agent-monitoring-v1` release there was no way to inspect who consumed how much, per model, per Spec Context, per day. The release delivers a numbers-only surface (D-AM-20) — no thresholds, no alerts, no push — where the operator inspects visually. Privacy by construction: **no endpoint serves raw message content** — the hardcoded allowlist gate in the reader is the only door to SQLite.
+**Privacy by construction:** `reader/allowlist.py` is a hardcoded key allowlist every event
+passes before reaching SQLite; no column and no endpoint carries message content. Routes
+carry no credential, behind the panel's loopback bind and Host allowlist. `os.getuid() == 0`
+refuses to start the service.
 
 ## Usage flow
 
-  1. **Panel boot**: `dadaia panel` boots the `TelemetryService` in "no-telemetry" mode if `PRAGMA integrity_check` fails (SQLite renamed to `telemetry.sqlite.corrupt.<ts>` + endpoints 503 with a human-readable message). No token is created — the routes are served with no credential.
-  2. **Operator opens the Sessions tab**: `sessions.js` does `fetch('/api/sessions?runtime=…')`. The service detects a cache miss (cache TTL 30s) or a cache hit. On cache miss: it calls `refresh()` which (a) acquires the lock via `fcntl.flock` on `~/.dadaia/state/telemetry/telemetry.lock`; (b) the reader factory picks the Claude jsonl / Codex sqlite / PI jsonl readers; (c) they run with an enforced budget (`MAX_BYTES_PER_FILE_PER_CYCLE`, `MAX_LINE_LENGTH`, `MAX_EVENTS_PER_CYCLE`); (d) the allowlist gate filters each event keeping only approved keys; (e) the DAO inserts events idempotently via `event_id = sha1(sessionId||uuid)[:20]`; (f) the aggregator queries with a `cwd→spec_context` lookup at query time via `SpecContextService.list_all()`. Since v0.1.52 `/api/sessions` returns the **aggregate-only envelope** — `sessions.js` renders it as the 4-card summary dashboard; **the Sessions tab is dashboard-only** (no per-session rows, no list table, no detail drawer).
-  3. **Aggregation endpoints**: `/api/agents` (+ `/api/agents/{id}/sessions`) remain served for per-agent aggregation (there is no dedicated Agents tab); SessionId truncated to 8 chars + `...` (anti-enumeration).
-  4. **Sub-agents**: identity comes from the Claude event `type=agent-name` (`agentName` field). `is_subagent` derived from `isSidechain=1` + `sub_slug`; they appear separate from "claude (main)".
+1. `dadaia panel` boots telemetry; a database failing `PRAGMA integrity_check` is renamed
+   aside and the endpoints answer 503.
+2. On a cache miss the service takes the `telemetry.lock` file lock, runs the readers under
+   a per-cycle byte/line/event budget, filters through the allowlist gate, and inserts
+   idempotently by hashed event id.
+3. Each session's `cwd` resolves to a Spec Context at query time via
+   `SpecContextService.list_all()`, with an "unassigned" bucket for a cwd outside every
+   context.
+4. Sub-agent identity comes from the Claude `agent-name` event plus `isSidechain`, so
+   sub-agents aggregate separately.
 
-
-
-```mermaid
-flowchart LR
-    OP[operator] -->|Sessions tab| JS[sessions.js fetch]
-    JS -->|GET /api/sessions| H[PanelHandler - loopback + Host guard]
-    H -->|PanelService.telemetry.*| SVC[TelemetryService]
-    SVC -.cache miss.-> RFR[refresh: lock+read+filter+insert]
-    RFR -->|reader factory| CR[reader/claude.py jsonl]
-    RFR -->|reader factory| CX[reader/codex.py sqlite RO]
-    RFR -->|reader factory| KIr[reader/kimi.py index metadata]
-    CR -->|allowlist gate T1| ALW[reader/allowlist.py]
-    CX -->|allowlist gate T1| ALW
-    ALW -->|approved keys| DAO[store/dao.py]
-    DAO -->|insert idempotent| DB[(SQLite WAL\nchmod 600)]
-    SVC -.cache hit.-> AGG[aggregator/queries.py]
-    AGG -->|cwd-to-context| SCS[SpecContextService]
-    AGG -->|AgentSummary list| H
-    H -->|JSON + nosniff| JS
-```
-
-## Typical trigger
-
-The operator inspects per-agent token/cost consumption to decide model-choice trade-offs, or correlates a cost spike with a specific Spec Context. Mechanical criterion: **if the operator wants to see "who consumed how much, where, when", they open the panel's Sessions tab** — a dashboard-only surface (4 aggregate stat cards; no per-session list or detail view). There is no Agents tab; `/api/agents` remains served with no dedicated tab.
-
-## Differentiator
-
-Without this module, `ccusage` (npm) was the only alternative: an external Node dependency, no Codex sqlite support, no aggregation by Spec Context Project, no allowlist gate. Local telemetry delivers: (a) **stdlib-only** — zero new dependencies, zero supply-chain surface; (b) **privacy by construction** — hardcoded allowlist gate before SQLite + no endpoint serves message content (T1 CRITICAL devops); (c) **price reproducibility** — denormalization via `events.cost_micro_usd` + `events.pricing_version` preserves historical prices when `pricing.py` changes; (d) **per-Spec-Context aggregation** resolved at query time, "unassigned" bucket for cwd outside the contexts; (e) **sub-agents tracked separately** via the `type=agent-name` event + `isSidechain`; (f) **defensive boot** — corrupt SQLite degrades to 503 with a message, not a crash.
+The Sessions tab is dashboard-only: aggregate cards, no per-session list or detail view.
+There is no Agents tab; `/api/agents` has no dedicated UI consumer. Session ids render
+truncated.
 
 ## Runtime state touched
 
-  * **Read**: `~/.claude/projects/*/.jsonl` (Claude Code transcripts) incremental tail with `byte_offset` checkpoint in `reader_state` + inode detection for rotation; `~/.codex/state_5.sqlite` (default; env-overridable) via `sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=5.0)` with defensive column selection; `~/.kimi-code/session_index.jsonl` (Kimi session index, metadata-only, T1). Telemetry does NOT ingest workflows — workflow ingestion was removed (the panel reads workflows from the canonical store; [[panel]]).
-  * **Read+Write**: `~/.dadaia/state/telemetry/telemetry.sqlite` (chmod 600, dir 0o700) with schema `PRAGMA user_version=6` (`store/schema.py`, migrations 1→6): 4 tables (`reader_state`, `sessions`, `agents`, `events`) + 6 indices — migration 6 dropped the dead `workflows`/`workflow_agents` tables (workflow data moved to the canonical store). WAL + synchronous=NORMAL + foreign_keys=ON. **NO** content column (`content`/`text`/`messages`/`snapshot`/`thinking`/`prompt`/`response`) — blocked by construction via the allowlist gate.
-  * **Read+Write**: `~/.dadaia/state/telemetry/telemetry.lock` — process lock via `fcntl.flock` prevents concurrent refresh. (There is no token file: the panel is no-auth; no `panel.token` residue remains in `features/telemetry/` — the tracked cleanup completed.)
-  * **HTTP routes**: `GET /api/sessions?runtime=…` (aggregate-only envelope), `GET /api/agents` (query params: `limit`, `context`, `days`), `GET /api/agents/{id}/sessions` (pagination), and `/api/agents/{id}/prompt` (agent-prompt surface). All routes are served **with no credential** behind the loopback bind + Host allowlist ([[panel]]), with `X-Content-Type-Options: nosniff` on JSON.
-  * **Retention**: none — no retention/compaction/deletion machinery exists and there is no daily-aggregate table; raw events accumulate in `events` indefinitely. The only 180-day figure is the aggregation-query default `window_days=180` (`features/telemetry/service.py`), surfaced as the `days` query param default.
-  * **Guard**: `os.getuid() == 0` refuses to start the TelemetryService (devops T6 — does not read other users' `~/.claude/projects/`).
-
-
+- Read: `~/.claude/projects/*/*.jsonl` (incremental tail, byte-offset checkpoint, inode
+  rotation detection), `~/.codex/state_5.sqlite` (read-only URI, env-overridable),
+  `~/.kimi-code/session_index.jsonl` (index metadata only; session content is never opened
+  and IO/parse failure degrades silently).
+- Read+write: the SQLite file (chmod 600, dir 0o700) with tables `reader_state`,
+  `sessions`, `agents`, `events`; and `telemetry.lock`, a `flock` guard against concurrent
+  refresh.
+- No retention or compaction exists — raw events accumulate. The 180-day figure is the
+  aggregation query's default window, exposed as the `days` parameter.
+- Stdlib only: `sqlite3`, `fcntl`, `subprocess`, `pathlib`, `json`, `dataclasses`,
+  `datetime`, `re`.
 
 ## Lifecycle
 
-Runtime artifacts under `.dadaia/` are governed by one doctrine: **an artifact dies when
-the thing it exists for dies**, not when a clock says so. Four event-driven capabilities
-implement it, and every one of them is fail-open where it rides a hook — a GC error never
-changes a gate verdict — and every one obeys the same deletion-lane guard: resolve the
-target, refuse any resolved target outside `.dadaia/`, never follow a symlinked directory.
+Runtime artifacts under `.dadaia/` die when the thing they exist for dies. Each capability
+is fail-open where it rides a hook, and each resolves its target, refuses a resolved target
+outside `.dadaia/`, and never follows a symlinked directory.
 
-  * **Closing a release ends its artifacts' lives.** Release closure runs a GC sweep over
-    that release's own reports, handoffs, `tmp/<agent>/` captures and lifecycle run
-    records, after its CLOSURE evidence pointers are final and before the archive move.
-    The rule is inviolable in one direction: anything a surviving `## Validations` or
-    `## Dispositions` pointer references is **kept** — when in doubt, kept — and only the
-    unreferenced remainder is deleted. Another release's artifacts are never in scope.
-  * **The reconciler reaps what it already walks.** Session and presence records stale
-    beyond 3× their TTL are deleted together with their tmp markers (`reconciler-last-*`,
-    `ctx-inject-fired-*`) and any context directories they leave empty, and zombie
-    lifecycle/state run records are reaped with them. A live session's records are never
-    touched. The reap runs in the PostToolUse pass — off the blocking path — behind the
-    same 30-second throttle the reconciler already uses, isolated so a reap failure cannot
-    break the reconciler around it.
-  * **Every `.dadaia/logs/*.jsonl` writer rotates its own file.** Rotation happens at
-    write time, by the file's owner, through one shared helper every appender funnels
-    through: at a 1 MB cap the file is rotated and exactly **current + 1** generation is
-    retained. There is no external cron and no separate rotation process. The size is
-    re-checked under a lock before the replace, so two near-simultaneous crossers cannot
-    destroy each other's generation, and the lock is taken only when the file is at or over
-    the cap — the overwhelming majority of appends are lock-free. A contended timeout
-    appends without rotating rather than dropping the line, and telemetry stays fail-open
-    throughout.
-  * **The cache must not be born.** Rather than deleting tool caches after the fact, the
-    venv guard refuses the invocation that would create one in a repo tree
-    ([[sdd-gate-v3]]).
+- **Release closure** sweeps that release's reports, handoffs, `tmp/<agent>/` captures and
+  run records, after its evidence pointers are final and before the archive move. Anything
+  a surviving pointer references is kept; another release's artifacts are never in scope.
+- **The reconciler reaps what it walks:** session and presence records stale beyond 3× TTL
+  go with their tmp markers, the directories they empty, and zombie run records. A live
+  session is never touched. It runs in the PostToolUse pass behind the reconciler's
+  30-second throttle, isolated so a reap failure cannot break the pass.
+- **Each `.dadaia/logs/*.jsonl` writer rotates its own file** through
+  `infrastructure/jsonl_log_rotation.py`: at a 1 MB cap it rotates and retains current + 1
+  generation. Size is re-checked under a lock before the replace; the lock is taken only at
+  or over the cap, and a contended timeout appends without rotating. No external cron.
+- **A cache is refused, not deleted:** the venv guard blocks the invocation that would write
+  one into a repo tree ([[sdd-gate-v3]]).
 
-**Calendar-based deletion survives in exactly one place**, as the orphan backstop:
-`dadaia tmp gc` removes dated scratch older than 3 days, any `*cache*` directory under
-`.dadaia/` (excluding the venv and session records), and orphaned session markers. It
-takes **no path argument** — there is no operator-supplied deletion target — offers a
-dry-run that reports without touching anything, is idempotent (a second run reports and
-changes nothing), never removes a live session's markers or a non-dated path, and is safe
-to run from `SessionStart`. Everything else above is event-driven by design.
+`dadaia tmp gc` is the only calendar-based backstop: dated scratch older than 3 days, any
+`*cache*` directory under `.dadaia/` excluding the venv and session records, and orphaned
+session markers. It takes no path argument, offers a dry run, is idempotent, never removes
+a live session's markers or a non-dated path, and is safe at `SessionStart`.
 
 ## Dependencies
 
-  * Consumed by [[panel]]: the dashboard-only Sessions tab fetches the `/api/sessions` aggregate; there is no Agents tab (`/api/agents` is served with no dedicated UI consumer); `PanelService` injects `TelemetryService` via DI.
-  * Consumes [[context-management]] via `SpecContextService.list_all()` for the cwd→context lookup at query time (architect D9); "unassigned" bucket for cwd outside the contexts.
-  * Consumes [[brand-identity]] tokens (`--color-cost`, `--color-warning-bg`, `--color-alert`, `--color-accent`, `--color-accent-secondary`) with fallback to the previous values (D-AM-22). Zero schedule coupling — release is order-agnostic.
-  * Stdlib only: `sqlite3`, `secrets`, `fcntl`, `subprocess`, `pathlib`, `json`, `dataclasses`, `datetime`, `re`. Zero new dependencies (NFR3).
+[[panel]] (injects the service, renders the dashboard), [[context-management]] (cwd→context
+lookup), [[brand-identity]] (cost/warning/alert tokens).
