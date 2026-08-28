@@ -29,7 +29,10 @@ def test_contract_tier_carries_30s_timeout(request: pytest.FixtureRequest) -> No
     assert marker is not None, "conftest applied no timeout marker to a contract-tier test"
     from tests import conftest
 
-    assert marker.args and marker.args[0] == conftest.tier_timeout_seconds("contract")
+    covered = bool(getattr(request.config.option, "cov_source", None))
+    assert marker.args and marker.args[0] == conftest.tier_timeout_seconds(
+        "contract", coverage=covered
+    )
 
 
 @pytest.mark.timeout(45)
@@ -191,3 +194,7 @@ def test_tier_ceiling_is_platform_calibrated_once_in_conftest() -> None:
     assert conftest.tier_timeout_seconds("contract", platform="darwin") == 30
     assert conftest.tier_timeout_seconds("e2e", platform="win32") == 360
     assert conftest.tier_timeout_seconds("slow", platform="win32") is None
+    # Coverage tracing slows the executed path ~2x (Contract coverage job, windows: a
+    # 30s-ceiling unit test measured 32.3s under --cov); same function, one more input.
+    assert conftest.tier_timeout_seconds("unit", platform="linux", coverage=True) == 20
+    assert conftest.tier_timeout_seconds("unit", platform="win32", coverage=True) == 60
