@@ -13,10 +13,12 @@ the law"). An ADR carrying ``Status: accepted`` with no ``Accepted by: operator`
 refused.
 
 Every RED condition below is proven on an in-memory mutation fixture, never a real file on
-disk: at the time this test lands, all 28 committed ADRs are ``Status: proposed`` — there is
-no real accepted-without-attribution file to reproduce the acceptance-law violation against,
-and mutating a real, committed ADR in place to manufacture one would corrupt the very
-inventory this test exists to guard.
+disk. The committed inventory itself may legitimately be EMPTY (v0.5.0 specs-canon closure:
+the 28 mechanical, auto-generated ADRs this release shipped at authoring time were deleted
+as non-canon — a decision record is now authored only when a real principle-level decision
+needs one, never as a backfill) — every check below is written to hold vacuously true over
+an empty inventory, and the per-file parametrized test collects zero cases rather than
+failing when none exist.
 
 No CLI verb and no `specs doctor` rule are introduced by this file (A19.4) — it is a
 pytest-only contract over the files already on disk plus in-memory fixtures.
@@ -142,8 +144,12 @@ def find_numbering_violations(filenames: list[str]) -> list[str]:
 # ---------------------------------------------------------------------------------------
 
 
-def test_adr_inventory_is_not_empty() -> None:
-    assert _ADR_FILES, f"no ADR files discovered under {_ADR_DIR}"
+def test_adr_inventory_may_be_legitimately_empty() -> None:
+    """An empty specs/ADRs/ inventory is valid (v0.5.0 specs-canon closure) — discovery
+    itself must never raise regardless of population; every other check in this module
+    (numbering, per-file field validation) is written to hold vacuously true when the
+    discovered set is empty, never to require a minimum count."""
+    assert isinstance(_ADR_FILES, list)
 
 
 def test_adr_files_are_discovered_by_glob_never_a_hand_list() -> None:

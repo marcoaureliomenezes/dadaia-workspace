@@ -4,13 +4,18 @@ Intent: CONTRACT — 0.5.0 A17.1
 
 `specs/memory/{ARCHITECTURE,QUALITY,TECHSTACK}.md` are each split into exactly two
 top-level (``## ``) parts, Part 1 before Part 2 (A17.1). Every ``### P-NN ·`` block inside
-Part 1 carries a ``Measured by:`` line and an ``ADR: NNNN (proposed|accepted...)`` line
-(A17.2) — the field is spelled ``ADR:``, not SPEC FR17's illustrative ``Accepted by: ADR
-NNNN``, because every promoted principle is `proposed` until the operator accepts it at
-T-050-31 (T-050-28 coverage table §5 R2) and writing ``Accepted by:`` today would assert
-an acceptance nobody gave. P-ids are unique across the trio and each maps to an existing
-``specs/ADRs/NNNN-*.md`` file. No file carries a ``Changelog``/``History``/``Histórico``/
-``Versions`` heading — memory stays current-state (A17.5).
+Part 1 carries a ``Measured by:`` line and an ``ADR:`` line (A17.2) — the field is
+spelled ``ADR:``, not SPEC FR17's illustrative ``Accepted by: ADR NNNN``, because every
+promoted principle is `proposed` until the operator accepts it at T-050-31 (T-050-28
+coverage table §5 R2) and writing ``Accepted by:`` today would assert an acceptance
+nobody gave. The ``ADR:`` line is either ``ADR: NNNN (proposed|accepted...)``, mapping to
+an existing ``specs/ADRs/NNNN-*.md`` file, or the literal ``ADR: none`` — a pre-canon
+principle that predates the ADR mechanism entirely (v0.5.0 specs-canon closure: the 28
+mechanical, auto-generated ADRs this trio originally pointed at were deleted as
+non-canon; a FUTURE change to one of these principles requires a real ADR, but the
+principle's OWN pre-existing text does not retroactively need one manufactured for it).
+P-ids are unique across the trio. No file carries a ``Changelog``/``History``/
+``Histórico``/``Versions`` heading — memory stays current-state (A17.5).
 """
 
 from __future__ import annotations
@@ -38,7 +43,9 @@ _FORBIDDEN_HEADING_RE = re.compile(
 _PRINCIPLE_HEADING_RE = re.compile(r"^### P-(\d{2}) ·.*$", re.MULTILINE)
 _BLOCK_BOUNDARY_RE = re.compile(r"^(?:### P-\d{2} ·|## )", re.MULTILINE)
 _MEASURED_BY_RE = re.compile(r"^Measured by: .+$", re.MULTILINE)
-_ADR_LINE_RE = re.compile(r"^ADR: (\d{4}) \((proposed|accepted)\b.*\)\s*$", re.MULTILINE)
+_ADR_LINE_RE = re.compile(
+    r"^ADR: (?:none|(\d{4}) \((?:proposed|accepted)\b.*\))\s*$", re.MULTILINE
+)
 
 
 # --------------------------------------------------------------------------- file loading
@@ -71,13 +78,17 @@ def _block_violations(body: str) -> list[str]:
     if not _MEASURED_BY_RE.search(body):
         violations.append("missing a `Measured by:` line")
     if not _ADR_LINE_RE.search(body):
-        violations.append("missing an `ADR: NNNN (proposed|accepted...)` line")
+        violations.append("missing an `ADR: NNNN (proposed|accepted...)` or `ADR: none` line")
     return violations
 
 
 def _adr_number_of(body: str) -> str | None:
+    """The ``NNNN`` capture, or ``None`` for either "no ADR: line at all" or the literal
+    ``ADR: none`` — the two cases the caller must distinguish."""
     match = _ADR_LINE_RE.search(body)
-    return match.group(1) if match else None
+    if match is None:
+        return None
+    return match.group(1)
 
 
 def _adr_file_exists(adr_number: str) -> bool:
@@ -148,7 +159,10 @@ def test_every_principle_block_carries_measured_by_and_adr_line() -> None:
     # Mutation fixture — RED condition: a block missing the `ADR:` line.
     missing_adr = "### P-99 · A synthetic principle.\nMeasured by: `pytest something`.\n"
     body = _principle_blocks(missing_adr)[0][1]
-    assert "missing an `ADR: NNNN (proposed|accepted...)` line" in _block_violations(body)
+    assert (
+        "missing an `ADR: NNNN (proposed|accepted...)` or `ADR: none` line"
+        in _block_violations(body)
+    )
 
     # Mutation fixture — GREEN: a complete synthetic block carries no violation.
     complete = (
@@ -158,6 +172,15 @@ def test_every_principle_block_carries_measured_by_and_adr_line() -> None:
         "Rationale: because.\n"
     )
     body = _principle_blocks(complete)[0][1]
+    assert not _block_violations(body)
+
+    # Mutation fixture — GREEN: `ADR: none` (a pre-canon principle) is also complete.
+    complete_pre_canon = (
+        "### P-98 · Another synthetic principle.\n"
+        "Measured by: `pytest something else`.\n"
+        "ADR: none\n"
+    )
+    body = _principle_blocks(complete_pre_canon)[0][1]
     assert not _block_violations(body)
 
 
@@ -185,11 +208,14 @@ def test_principle_ids_are_unique_across_the_trio() -> None:
     assert duplicate_found, "duplicate-id mutation fixture failed to reproduce a collision"
 
 
-def test_every_principle_maps_to_an_existing_adr_file() -> None:
+def test_every_principle_maps_to_an_existing_adr_file_or_declares_adr_none() -> None:
     for name in _MEMORY_FILES:
         for pid, body in _principle_blocks(_memory_text(name)):
-            adr_number = _adr_number_of(body)
-            assert adr_number is not None, f"{name} P-{pid} carries no parseable ADR number"
+            adr_line_match = _ADR_LINE_RE.search(body)
+            assert adr_line_match is not None, f"{name} P-{pid} carries no parseable ADR line"
+            adr_number = adr_line_match.group(1)
+            if adr_number is None:
+                continue  # `ADR: none` — a pre-canon principle; nothing to map to
             assert _adr_file_exists(adr_number), (
                 f"{name} P-{pid} points at ADR {adr_number}, but no "
                 f"specs/ADRs/{adr_number}-*.md file exists (A17.2/A18.4)."
@@ -197,3 +223,9 @@ def test_every_principle_maps_to_an_existing_adr_file() -> None:
 
     # Mutation fixture — RED condition: an ADR number with no backing file.
     assert _adr_file_exists("9999") is False
+
+    # Mutation fixture — `_adr_number_of` returns None for `ADR: none` (never treated as
+    # "no parseable ADR line", the RED condition above's own distinct failure mode).
+    none_body = _principle_blocks("### P-97 · Synthetic.\nADR: none\n")[0][1]
+    assert _ADR_LINE_RE.search(none_body) is not None
+    assert _adr_number_of(none_body) is None
