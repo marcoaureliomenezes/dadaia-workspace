@@ -508,19 +508,28 @@ class StructuralValidator:
 
         1. **Root membership** (:data:`CANON_ROOT_MEMBERS`) — a path directly under
            ``specs/`` whose NAME is not a v6 canon root member is flagged ONCE,
-           whether it is a file or a directory — the fix removes the whole stray
-           subtree.
+           whether it is a file or a directory, ALWAYS fixable=True — a name that
+           is not even canon-shaped at the root (e.g. a scratch/legacy directory) is
+           unambiguously disposable, and the fix removes the whole stray subtree.
         2. **Nested canon-shape sweep** (:func:`~dadaia_workspace.features.specs
            .specs_canon.is_canon_path`) — every FILE inside an otherwise-conformant
            root member is checked against its full ``specs/``-relative POSIX path; a
            non-matching file (a dotfile, a loose per-entry file, a markdown ADR, an
-           old ``reviews/`` file, …) is flagged individually — the fix removes only
-           that file, never its conformant siblings.
-
-        ERROR, fixable=True (removal — mirrors :meth:`fix_repo_dadaia1`'s stray-dir
-        rmtree pattern). TREE-1/TREE-2's own deprecated ``foundation``/``SPEC.md``
-        stay exempt (``_TREE8_DEFERRED_TO_SIBLING_CHECKS``): those checks already own
-        reporting them, fixable=False by explicit design.
+           old ``reviews/`` file, an unmigrated legacy-cased memory atom, …) is
+           flagged individually. **Only a dotfile is auto-fixable here** — a
+           genuinely disposable placeholder (the retired ``.gitkeep`` landing-zone
+           mechanism). Every OTHER tier-2 finding is fixable=False, ERROR, loud: a
+           non-dotfile nested violation may be REAL, unmigrated content (bug data,
+           an archived legacy-release landing zone tree-v2 relocated specifically so
+           it would not be dropped, a memory atom under a pre-canon filename) —
+           mirrors ``_TREE8_DEFERRED_TO_SIBLING_CHECKS``'s own precedent
+           ("auto-moving may destroy SDD-approved content pending operator
+           consent"). A real, destructive incident this exact distinction closes:
+           an earlier draft of this widened sweep marked EVERY tier-2 finding
+           fixable=True and ``doctor --fix`` silently deleted a migrated bug
+           ledger, three renamed-but-real memory atoms, and a tree-v2 legacy
+           landing zone in one pass (caught by
+           ``tests/e2e/features/test_specs_upgrade_e2e.py`` before it ever shipped).
         """
         if not self.specs_dir.is_dir():
             return []
@@ -530,7 +539,7 @@ class StructuralValidator:
                 continue
             if entry.name in _TREE8_DEFERRED_TO_SIBLING_CHECKS:
                 continue
-            issues.append(self._tree8_issue(entry))
+            issues.append(self._tree8_issue(entry, fixable=True))
         for entry in sorted(self.specs_dir.rglob("*")):
             if entry.is_dir():
                 continue
@@ -545,11 +554,17 @@ class StructuralValidator:
                 continue
             rel_posix = entry.relative_to(self.specs_dir).as_posix()
             if not is_canon_path(rel_posix):
-                issues.append(self._tree8_issue(entry))
+                issues.append(self._tree8_issue(entry, fixable=entry.name.startswith(".")))
         return issues
 
-    def _tree8_issue(self, entry: Path) -> SpecsDoctorIssue:
+    def _tree8_issue(self, entry: Path, *, fixable: bool) -> SpecsDoctorIssue:
         rel = entry.relative_to(self.specs_dir).as_posix()
+        remedy = (
+            "Auto-fix available (run doctor --fix) to remove it"
+            if fixable
+            else "NOT auto-fixed — it may be real, unmigrated content; move/rename it "
+            "into the canon shape (or delete it) by hand"
+        )
         return SpecsDoctorIssue(
             code="TREE-8",
             severity=Severity.ERROR,
@@ -560,11 +575,10 @@ class StructuralValidator:
                 "a canon area whose shape does not match that area's canon (a "
                 "dotfile, a loose per-entry file, a markdown ADR, an old reviews/ "
                 "file, …) — a directory is kept by its AGENTS.md, never a "
-                "placeholder. Auto-fix available (run doctor --fix) to remove it "
-                "(TREE-8)."
+                f"placeholder. {remedy} (TREE-8)."
             ),
             path=str(entry),
-            fixable=True,
+            fixable=fixable,
         )
 
     def fix_tree8(self, issue: SpecsDoctorIssue) -> None:

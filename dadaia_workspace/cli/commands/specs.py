@@ -29,6 +29,43 @@ def _resolve_specs_dir(specs_dir: str | None) -> Path:
     return resolve_specs_dir_for_cli(specs_dir)
 
 
+def _resolve_head_and_parent_sha(specs_dir: Path) -> tuple[str | None, str | None]:
+    """Resolve the branch HEAD sha and its first parent (v0.5.0 specs-canon closure)
+    — plain data fed into SPEC-DOC-044's stale-verdict check. The repo root is
+    ``specs_dir.parent`` (the SAME convention :func:`_resolve_public_dir` already
+    uses: ``specs/`` sits directly at the repo root). Returns ``(None, None)`` when
+    *specs_dir*'s repo root is not a git repository, or the resolution otherwise
+    fails — a doctor invocation with no git context stays silent on that one check
+    rather than guessing (never raises; this is a read-only convenience, not a
+    policy gate).
+    """
+    import subprocess
+
+    repo_root = specs_dir.parent
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None, None
+    if result.returncode != 0:
+        return None, None
+    head_sha = result.stdout.strip()
+    if not head_sha:
+        return None, None
+
+    parent_sha: str | None
+    try:
+        parent_sha = container.build_git_object_reader().first_parent(repo_root, head_sha)
+    except Exception:  # noqa: BLE001 — a failed parent lookup degrades to None, never a crash
+        parent_sha = None
+    return head_sha, parent_sha
+
+
 def _resolve_public_dir(specs_dir: Path) -> Path | None:
     """Try to locate ``dadaia_workspace/public/`` relative to the specs directory.
 
@@ -188,10 +225,13 @@ def doctor(
         resolved_public: Path | None = Path(public_dir).resolve()
     else:
         resolved_public = _resolve_public_dir(target)
+    head_sha, parent_sha = _resolve_head_and_parent_sha(target)
     doctor_svc = SpecsDoctor(
         target,
         public_dir=resolved_public,
         templates_dir=_TEMPLATES_DIR,
+        head_sha=head_sha,
+        parent_sha=parent_sha,
     )
     issues = doctor_svc.check()
 

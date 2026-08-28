@@ -63,6 +63,12 @@ class SpecsDoctor:
             ``FINDINGS.jsonl`` fold (v0.5.0 T-050-25A, A13.4) — a composition root
             wires ``container.build_findings_store``; ``None`` keeps
             ``ClosureAuditValidator``'s zero-dependency fallback reader (same model).
+        head_sha: Optional branch HEAD sha, resolved ONCE by the CLI composition
+            root (through the ``GitObjectReader`` port) and passed in as plain data
+            (v0.5.0 specs-canon closure) — feeds SPEC-DOC-044 (stale verdicts).
+            ``None`` (default) keeps that check a silent no-op; this coordinator
+            never resolves git state itself.
+        parent_sha: Optional first-parent sha of *head_sha*, resolved the same way.
     """
 
     def __init__(
@@ -73,12 +79,18 @@ class SpecsDoctor:
         process_runner: ProcessRunner | None = None,
         repo_root: Path | None = None,
         findings_store_factory: Callable[[Path], RecordStore[FindingRecord]] | None = None,
+        head_sha: str | None = None,
+        parent_sha: str | None = None,
     ) -> None:
         self.specs_dir = Path(specs_dir)
         self.public_dir: Path | None = Path(public_dir) if public_dir is not None else None
         # repo_root: when supplied, the constitution file-ref invariant (SPEC-DOC-028)
         # resolves path-like references against it. None → that check is a no-op.
         self.repo_root: Path | None = Path(repo_root) if repo_root is not None else None
+        # head_sha/parent_sha (v0.5.0 specs-canon closure): SPEC-DOC-044's plain-data
+        # inputs, resolved once by the CLI. None -> that check is a no-op.
+        self.head_sha: str | None = head_sha
+        self.parent_sha: str | None = parent_sha
         # templates_dir is resolved from public_dir if not explicitly supplied.
         if templates_dir is not None:
             self._templates_dir: Path | None = Path(templates_dir)
@@ -195,6 +207,10 @@ class SpecsDoctor:
         # pruning verdict owed to qa-engineer per dadaia-test-stewardship §E).
         # v0.5.0 T-050-08 (FR2/A2.8) — archive-overdue signal (WARN, never a block)
         issues.extend(self._governance.check_bug_archive_overdue())  # SPEC-DOC-041
+        # v0.5.0 specs-canon closure (operator ruling 2026-08-28) — stale verdicts
+        issues.extend(
+            self._release.check_stale_verdicts(head_sha=self.head_sha, parent_sha=self.parent_sha)
+        )  # SPEC-DOC-044
         return issues
 
     def fix(self, issues: list[SpecsDoctorIssue] | None = None) -> list[SpecsDoctorIssue]:
@@ -235,6 +251,9 @@ class SpecsDoctor:
                     fixed.append(issue)
                 elif issue.code == "SPEC-DOC-034":
                     self._closure_audit.fix_archive_dir(issue)
+                    fixed.append(issue)
+                elif issue.code == "SPEC-DOC-044":
+                    self._release.fix_stale_verdict(issue)
                     fixed.append(issue)
                 elif issue.code == "MEM-PLACEHOLDER-1":
                     self._memory.fix_placeholder_atom(issue)

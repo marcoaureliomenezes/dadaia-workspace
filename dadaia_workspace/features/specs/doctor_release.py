@@ -31,6 +31,7 @@ from dadaia_workspace.features.specs.doctor_common import (
     resolve_active_release,
 )
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
+from dadaia_workspace.features.specs.specs_canon import verdict_violations
 
 # Vocabulary + parser live in core.spec_status (single definition); re-exported here
 # because doctor_release has been the documented import site for both.
@@ -612,3 +613,54 @@ class ReleaseValidator:
                 )
             )
         return issues
+
+    def check_stale_verdicts(
+        self, *, head_sha: str | None, parent_sha: str | None
+    ) -> list[SpecsDoctorIssue]:
+        """SPEC-DOC-044 (v0.5.0 specs-canon closure, operator ruling 2026-08-28): a
+        verdict under ``releases/<id>/verdicts/`` whose 40-hex sha is neither the
+        branch HEAD nor HEAD's first parent is stale — ERROR, ``--fix`` deletes.
+
+        Uses :func:`~dadaia_workspace.features.specs.specs_canon.verdict_violations`
+        — the SAME predicate the pre-push gate uses
+        (``features.chokepoints.service.push_gate_decision``) — never a second,
+        hand-kept rule. *head_sha*/*parent_sha* are resolved ONCE by the CLI
+        composition root (through the ``GitObjectReader`` port) and passed in as
+        plain data; this validator stays zero-I/O (it never resolves git state
+        itself). A ``None`` *head_sha* (no repo_root/git context available) is a
+        silent no-op — this check genuinely cannot evaluate without a resolved head,
+        so it stays silent rather than guessing (mirrors the constitution file-ref
+        check's own optional-``repo_root`` shape).
+        """
+        if head_sha is None:
+            return []
+        verdict_paths = sorted(self.specs_dir.glob("releases/*/verdicts/*.handoff.json"))
+        if not verdict_paths:
+            return []
+        rel_paths = [p.relative_to(self.specs_dir).as_posix() for p in verdict_paths]
+        stale_rels = verdict_violations(rel_paths, head_sha, parent_sha)
+        issues: list[SpecsDoctorIssue] = []
+        for rel in stale_rels:
+            parent_display = parent_sha[:12] if parent_sha else "none"
+            issues.append(
+                SpecsDoctorIssue(
+                    code="SPEC-DOC-044",
+                    severity=Severity.ERROR,
+                    description=(
+                        f"specs/{rel} is a stale verdict — its sha is neither the "
+                        f"branch head ({head_sha[:12]}) nor its first parent "
+                        f"({parent_display}). A consumed-or-stale verdict never "
+                        "stays on disk (SPEC-DOC-044). Auto-fix available (run "
+                        "doctor --fix) to delete it."
+                    ),
+                    path=str(self.specs_dir / rel),
+                    fixable=True,
+                )
+            )
+        return issues
+
+    def fix_stale_verdict(self, issue: SpecsDoctorIssue) -> None:
+        """Delete a stale verdict file (SPEC-DOC-044 auto-fix)."""
+        assert issue.code == "SPEC-DOC-044"
+        target = Path(issue.path)  # type: ignore[arg-type]
+        target.unlink(missing_ok=True)
