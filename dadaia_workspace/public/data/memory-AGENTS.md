@@ -40,17 +40,18 @@ mechanical check that fails when it is violated. Each entry is:
 ```markdown
 ### P-NN · <statement, in the form "We …">
 Measured by: `<the exact command that measures it>`
-ADR: NNNN (proposed)
+ADR: NNNN (proposed) | none
 Rationale: <one line — why this rule exists>
 ```
 
 `Measured by:` names a check that already runs — a doctor code, a contract test,
 a lint contract, a CI job. A rule nobody can measure is **not** a principle: it
-is Part-2 description or a proposed ADR, never a `P-NN`. `ADR: NNNN` points at
-`specs/ADRs/NNNN-<slug>.md`, one ADR per principle and one principle per ADR;
-it reads `(proposed)` until the operator accepts that ADR. **Only the operator
-flips an ADR to `accepted`** — an agent that writes `accepted` has violated the
-law.
+is Part-2 description or a proposed ADR, never a `P-NN`. An ADR is written when a
+Part-1 principle is created or changed — never one file per principle that merely
+exists. `ADR: NNNN` points at `specs/ADRs/NNNN-<slug>.md` and reads `(proposed)`
+until the operator accepts it; a principle predating this canon carries `ADR: none`
+until the change that next touches it mints one. **Only the operator flips an ADR
+to `accepted`** — an agent that writes `accepted` has violated the law.
 
 **Part 2 is the living description.** It is where a rule without a measure lands
 when it survives, where every diagram lives, and where a number that has a home
