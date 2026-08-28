@@ -2,10 +2,10 @@
 
 Scope: this file governs only `.dadaia/handoff/**`.
 
-Handoffs are machine-readable coordination records between agents. Reports stay
-in `.dadaia/reports/`; handoff JSON stays here.
+Handoffs are machine-readable coordination records between agents.
+Reports stay in `.dadaia/reports/`; handoff JSON stays here.
 
-## File Contract
+## 1. File contract
 
 Write one handoff per completed report or review decision:
 
@@ -31,27 +31,20 @@ Validate before handing work to another agent:
 dadaia reports validate <handoff-json-path>
 ```
 
-## Write Rules
+## 2. Write rules
 
-- Emit `schema_version: "handoff-v1.2"` and record in `self_pull.refs` the memory
-  atoms this session actually self-pulled/read (step-0 atoms plus any deep atom read
-  during the task), as `specs/`-prefixed context-relative paths. Never list an atom
-  that was not read (with zero atoms read, the emitter skill's honest legacy fallback
-  applies — see `dadaia-handoff-emitter`).
+- Emit `schema_version: "handoff-v1.2"`.
+- Record in `self_pull.refs` the memory atoms this session actually self-pulled/read.
+- Use step-0 atoms plus any deep atom read during the task, as `specs/`-prefixed context-relative paths.
+- Never list an atom that was not read — with zero atoms read, the emitter's honest legacy fallback applies.
 - Keep the file concise: status, findings, decisions, and next action only.
 - Use stable workspace-relative paths.
 - Include only information needed by the next agent.
 - Do not store HTML, screenshots, logs, or temporary notes here.
 - Do not write handoff JSON under `.dadaia/reports/`.
 
-## Read Rules
+## 3. Read rules
 
-Before implementation review, QA, security review, or release closure, read the
-latest relevant handoff under:
-
-```text
-.dadaia/handoff/<context>/
-```
-
-If a required handoff is missing or invalid, stop and request the producing
-agent to emit or fix it.
+- Before implementation review, QA, security review, or release closure, read the latest relevant handoff.
+- Handoffs live under `.dadaia/handoff/<context>/`.
+- If a required handoff is missing or invalid, stop and request the producing agent to emit or fix it.

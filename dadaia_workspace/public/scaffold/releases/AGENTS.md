@@ -1,11 +1,10 @@
 # specs/releases/ — Release Rules
 
-Scope: this file governs only `specs/releases/`. It replaces the retired
-`releases/README.md` (v6 canon, FR1) — its content lives here now.
+Scope: this file governs only `specs/releases/`. Replaces the retired `releases/README.md` (v6 canon, FR1).
 
 This directory contains all release directories for this Spec Context Project.
 
-## Structure
+## 1. Structure
 
 ```
 releases/
@@ -24,39 +23,30 @@ releases/
                                 per-release directory survives archiving)
 ```
 
-## Authoring Rules
+## 2. Authoring rules
 
-- Each live release directory is named with a **bare** SemVer id (`^\d+\.\d+\.\d+$`, e.g.
-  `0.6.0`) — the canonical current-axis pattern; a `v`-prefixed id is minted nowhere.
-  A legacy `v`-prefixed id resolves only in `_archive/releases_histo.jsonl` (read-only
-  lookup) — no archived directory exists to resolve to.
-- Release directories are created with `dadaia release new <id>` — do NOT create them
-  manually to ensure canonical SPEC.md frontmatter.
-- SDD lifecycle order: `SPEC.md` (Status: Draft) → operator approval → `PLAN.md` →
-  `TASKS.md` → implementation → closure (memory update, closure narrative in
-  `RELEASE.json`'s `log`, disposition sweep, artifact GC, archive — no separate
-  `CLOSURE.md`; full arc: `dd-release-implement`'s `RC-FLOW.md`).
+- Each live release directory is named with a bare SemVer id (`^\d+\.\d+\.\d+$`, e.g. `0.6.0`) — no `v`-prefixed id is minted.
+- A legacy `v`-prefixed id resolves only in `_archive/releases_histo.jsonl` (read-only lookup) — no archived directory exists.
+- Release directories are created with `dadaia release new <id>` — never manually, to keep canonical SPEC.md frontmatter.
+- SDD lifecycle order: `SPEC.md` (Draft) -> operator approval -> `PLAN.md` -> `TASKS.md` -> implementation -> closure.
+- Closure: memory update, closure narrative in `RELEASE.json`'s `log`, disposition sweep, artifact GC, archive.
+- No separate `CLOSURE.md` — full arc: `dd-release-implement`'s `RC-FLOW.md`.
 - Only one release may be in IMPLEMENTATION phase at a time.
 
-## The active release and its phase (RELEASE.json, D3/D7/D11)
+## 3. The active release and its phase (RELEASE.json, D3/D7/D11)
 
-**Canonical record: `RELEASE.json`.** The active release's phase is its `phase` field —
-read directly, no fold (retires the `RELEASE.jsonl` event stream, SPEC FR4-successor).
-Who sets which milestone, and the exact shape per field: `dd-release-implement`'s
-`RELEASE-EVENTS.md` — referenced, not restated.
+- Canonical record: `RELEASE.json`. The active release's phase is its `phase` field — read directly, no fold.
+- Retires the `RELEASE.jsonl` event stream (SPEC FR4-successor).
+- Who sets which milestone, and the exact shape per field: `dd-release-implement`'s `RELEASE-EVENTS.md`.
+- No dual-write, no mirror file (v0.5.0 FR4/T-050-21A, A4.1).
+- The SDD gate resolves the active release directly: the ONE non-archived, non-`_ideas` directory with a `RELEASE.json`.
+- When no such directory exists, there is no active release — honest absence, no placeholder file.
 
-**No dual-write, no mirror file (v0.5.0 FR4/T-050-21A, A4.1).** The SDD gate resolves
-the active release and its phase directly from `RELEASE.json`'s `phase` field: the ONE
-non-archived, non-`_ideas` directory under `releases/` that carries a `RELEASE.json`
-is the live release. When no such directory exists, there is no active release — the
-honest absence, with no placeholder file to say so.
+## 4. `_ideas/` and `_archive/`
 
-## `_ideas/` and `_archive/`
-
-`_ideas/<release-id>/` holds a pre-approval Draft (SPEC, and sometimes PLAN/TASKS) before
-its release opens for real — it stays MUTATING and is never treated as an evidence root
-by any required check; it carries no `RELEASE.json` (a Draft mints no milestone). Its own
-scoped rule: `releases/_ideas/AGENTS.md`. `_archive/releases_histo.jsonl` is the ADDITIVE,
-append-only landing zone for a closed release — one summary record per release, appended
-at archive time; the release directory itself is deleted, never `git mv`'d — history
-survives in git and this record, never a second on-disk copy.
+- `_ideas/<release-id>/` holds a pre-approval Draft (SPEC, sometimes PLAN/TASKS) before the release opens.
+- It stays MUTATING and is never an evidence root for any required check; carries no `RELEASE.json`.
+- Its own scoped rule: `releases/_ideas/AGENTS.md`.
+- `_archive/releases_histo.jsonl` is the ADDITIVE, append-only landing zone for a closed release.
+- One summary record per release, appended at archive time; the release directory itself is deleted, never `git mv`'d.
+- History survives in git and this record, never a second on-disk copy.
