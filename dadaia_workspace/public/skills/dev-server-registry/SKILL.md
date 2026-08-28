@@ -6,84 +6,45 @@ description: >
   .dadaia/states/server_registry.json is the single source of truth for which
   ports are taken by which projects, and you MUST consult it before opening any
   port. Prevents silent port collisions between concurrent agents.
+tldr: "Never open a port without dadaia server list/next/register first — the registry is the single source of truth."
 ---
 
 # Skill: dev-server-registry
 
-Use this skill whenever you need to start, stop, or check a local dev server for any project in this workspace.
+## 1. When
 
-## Invariant
+- Starting, stopping, or checking a local dev server for any project in this workspace.
+- Before opening any port — never start a server without registering it first.
 
-**Never start a server without registering its port first.** The registry at `.dadaia/states/server_registry.json` is the single source of truth.
+## 2. Steps
 
-## Protocol (4 steps)
+1. Inspect current state: `dadaia server list`.
+2. Reuse an existing entry for your project instead of starting a second server.
+3. Get a safe port: `dadaia server next --project <project-name> --json`.
+4. Use the returned port even when `is_base_port: false` — the canonical port was occupied.
+5. Never skip step 3 and pick a port manually.
+6. Start the server on the returned port.
+7. Register it: `dadaia server register --port <N> --project <project-name> --pid <pid> [--description "..."]`.
+8. Pass `--pid` when possible — it enables automatic stale detection.
+9. Release the port when stopping: `dadaia server release --port <N>`.
+10. Release every port for a project at once: `dadaia server release --project <project-name>`.
+11. Open `dadaia panel` (Servers tab) to see all registered servers in the browser.
+12. On a `PortConflictError`: check `dadaia server list` — another agent may have registered first.
+13. Run `dadaia server next` again to get the next available port.
+14. Run `dadaia server clean` first if the conflicting entry looks stale, then retry.
 
-### Step 1 — Inspect current state
+## 3. Done when
 
-```bash
-dadaia server list
-```
+- Every dev server you started is registered in `server_registry.json`.
+- Every server you stop is released.
+- No port was opened without first calling `dadaia server next`/`list`.
 
-Shows all active servers across all projects. If your project already has an entry, use that port — do not start a second server.
+## 4. References
 
-### Step 2 — Get a safe port
-
-```bash
-dadaia server next --project <project-name> --json
-```
-
-Returns `{"port": N, "url": "http://localhost:N", "is_base_port": true|false}`.
-
-- If `is_base_port: false`, the canonical port was occupied; use the returned port instead.
-- Do NOT skip this step and pick a port manually.
-
-### Step 3 — Start the server and register
-
-Start the server on the port returned by `next`, then register:
-
-```bash
-dadaia server register --port <N> --project <project-name> --pid <pid> [--description "Vite dev server"]
-```
-
-`--pid` is optional but strongly recommended — enables automatic stale detection.
-
-### Step 4 — Release when done
-
-When stopping the server:
-
-```bash
-dadaia server release --port <N>
-```
-
-Or to release all ports for a project at once:
-
-```bash
-dadaia server release --project <project-name>
-```
-
-## Panel
-
-To see all registered servers in the browser, open the workspace panel (Servers tab):
-
-```bash
-dadaia panel
-```
-
-## Conflict handling
-
-If `register` returns a `PortConflictError`:
-1. Check `dadaia server list` — another agent may have registered first.
-2. Run `dadaia server next` again to get the next available port.
-3. If the conflict entry looks stale: `dadaia server clean` first, then retry.
-
-## Quick reference
-
-| Command | Purpose |
-|---|---|
-| `dadaia server list [--json]` | Show all registered servers |
-| `dadaia server next --project <name>` | Get safe port (does not register) |
-| `dadaia server register --port N --project <name>` | Register a port |
-| `dadaia server release --port N` | Release a port |
-| `dadaia server show --project <name>` | Show URL for a project |
-| `dadaia server clean [--dry-run]` | Remove stale entries |
-| `dadaia panel` | Browser view of registered servers (Servers tab) |
+- `dadaia server list [--json]` — show all registered servers.
+- `dadaia server next --project <name>` — get a safe port, does not register.
+- `dadaia server register --port N --project <name>` — register a port.
+- `dadaia server release --port N` / `--project <name>` — release a port or all of a project's.
+- `dadaia server show --project <name>` — show URL for a project.
+- `dadaia server clean [--dry-run]` — remove stale entries.
+- `dadaia panel` — browser view of registered servers (Servers tab).

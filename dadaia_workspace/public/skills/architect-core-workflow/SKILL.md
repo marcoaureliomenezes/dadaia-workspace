@@ -6,60 +6,39 @@ description: >
   PRIMARY CALLER: software-architect, in every DRAFT/REVIEW/ONBOARD mode and before
   any spec/release review verdict. Use when the architect must propose, choose, or
   judge an approach. Keeps recommendations strictly evidence-based.
+tldr: "Understand the problem, then survey prior art on 5 axes, before any recommendation or verdict."
 applyTo: "**"
 ---
 
 # architect-core-workflow
 
-Run both steps before recommending, choosing, or judging an approach. Skipping a step
-is itself slop: a recommendation with no understood problem or no surveyed prior art is
-a guess. Record the output of each step in the report you emit.
+## 1. When
 
-## Step 1 — Understand the Problem
+- Before forming any recommendation or verdict.
+- Every DRAFT/REVIEW/ONBOARD mode, and before any spec/release review verdict.
+- Skipping a step is slop — a recommendation with no understood problem or no surveyed prior art is a guess.
 
-Before any solution, extract and write down:
+## 2. Steps
 
-- **Core problem** — the one sentence describing what must actually be solved.
-- **Constraints** — time, budget, team skills, existing systems it must live inside.
-- **Success criteria** — how you will know the solution worked, in testable terms.
-- **Assumptions** — make every implicit assumption explicit; an unstated assumption is a
-  future incident.
+1. Extract the core problem: one sentence describing what must actually be solved.
+2. Extract constraints: time, budget, team skills, existing systems it must live inside.
+3. Extract success criteria: how you will know the solution worked, in testable terms.
+4. Extract assumptions: make every implicit assumption explicit — an unstated one is a future incident.
+5. Ask clarifying questions when any of the above is unclear — never invent the missing context.
+6. Call the Skill tool with `dd-grill-me` for operator-facing clarification; never ask what `Read`/`Glob`/`Grep` can answer.
+7. Use `WebSearch` to find existing tools/libraries, established patterns, known pitfalls, honest comparisons.
+8. Score each candidate on: maturity, fit (80%+ of the problem without contortion), integration, cost, risk.
+9. Prefer the simplest candidate that clears all five axes.
+10. Build new only when no mature option fits — state why explicitly.
+11. Record both steps' output in the report you emit: core problem, constraints, candidates surveyed, chosen direction, trade-off.
 
-When any of these is unclear, ask clarifying questions before proposing — do not invent
-the missing context:
+## 3. Done when
 
-- What problem does this solve, for whom?
-- What must it integrate with?
-- Expected scale (now, and at growth)?
-- Must-haves vs nice-to-haves?
+- The core problem, constraints, success criteria, and assumptions are written down.
+- Prior art was searched and at least one candidate was scored on all five axes.
+- The report states the trade-off behind the chosen direction — a recommendation with no trail is rejected as unfounded.
 
-Call the Skill tool with `dd-grill-me` for operator-facing clarification. Never ask what
-`Read`/`Glob`/`Grep` can answer.
+## 4. References
 
-## Step 2 — Research Existing Solutions
-
-Do not design from a blank page when prior art exists. Use `WebSearch` to find:
-
-- Existing tools / libraries that already solve this.
-- Established implementation patterns.
-- Known pitfalls and failure modes.
-- Honest comparisons between candidates.
-
-Evaluate each candidate on five axes:
-
-| Axis | Question |
-|---|---|
-| Maturity | Is it proven in production, maintained, documented? |
-| Fit | Does it solve **80%+** of the actual problem without contortion? |
-| Integration | Does it fit the current stack and layer boundaries cleanly? |
-| Cost | Build/run/maintenance cost vs. building it ourselves? |
-| Risk | Lock-in, learning curve, abandonment, hidden complexity? |
-
-Prefer the simplest candidate that clears all five axes. Build new only when no mature
-option fits — and state why explicitly.
-
-## Output
-
-Both steps feed the architecture report. State the core problem, the constraints, the
-candidates surveyed, and the chosen direction with its trade-off. A recommendation
-without this trail is rejected as unfounded.
+- `dd-grill-me` — operator-facing clarification protocol.
+- `WebSearch` — prior-art discovery.

@@ -5,100 +5,52 @@ description: >
   or minting a version. The one operational home of the three-branch model: when to start
   work, which branch to cut, how a release rides it, and what actually gates a push.
   `DADAIA.md` §4 states the law once; this skill is where it operates.
+tldr: "feature/{M.m.p} -> develop -> main, PR-only past feature; 5 isolated commit shapes; delete+cut on deploy."
 ---
 
 # dd-gitflow-default — The Branch Contract, v2
 
-## 1. Start-of-work protocol
+## 1. When
 
-Before the first commit of any session:
+- Start of any session touching git.
+- Branching, committing, opening a PR, starting a task, or minting a version.
+- Any bug fix (fixed on the live feature branch, in any phase, no ceremony).
+
+## 2. Steps
 
 1. `git fetch --all --prune`.
 2. Diff `main` against `develop` — a nonzero diff means `develop` carries undeployed work.
-3. Identify the live `feature/{M.m.p}` branch — there is at most one.
-4. A `feature/{v}` whose first commit predates `develop`'s last move is **stale** —
-   surface it to the operator before touching it.
+3. Identify the one live `feature/{M.m.p}` branch.
+4. Surface a `feature/{v}` predating `develop`'s last move to the operator first — it is stale.
 5. Refuse to create a second `feature/*` branch while one is already live.
+6. Cut `feature/{next-version}` from `main` only, once `{version}` is deployed on `main`.
+7. Name the new branch exactly `M.m.p` — no `v` prefix, no suffix.
+8. Definition stage: author SPEC/PLAN/TASKS on `feature/{M.m.p}`.
+9. Open the PR to `develop` the moment the trio is `Aprovado`.
+10. Implementation stage: one commit per completed task group.
+11. Each `rc`: one `feature/{M.m.p}` → `develop` PR merge; scope is fixes/adjustments only, never new backlog.
+12. Stage every write per its isolated shape — table in §4.
+13. At the final `rc`, open the PR `develop` → `main`.
+14. The moment it merges, delete `feature/{M.m.p}` and cut `feature/{next}` (step 6) in the same step.
+15. Tag `archive/<name>` then delete a branch the moment its work lands elsewhere.
 
-*Done when:* you know which branch is live, whether it is stale, and whether `main` and
-`develop` are in sync.
+## 3. Done when
 
-## 2. Branch-creation rule
+- Exactly one live `feature/*` branch exists at all times.
+- That branch is named for the next version immediately after each deploy.
+- Every commit for a release traces to definition, implementation, `rc` merge, or bug fix.
+- A `git log` scan finds each write in §4 alone in its own commit, matching its message pattern.
+- Only `feature/*` is pushable directly; `develop`/`main` advance by PR only.
 
-Cut `feature/{next-version}` from `main` only, and only once `{version}` is deployed on
-`main`. Name it `M.m.p` — no `v` prefix, no suffix, no fifth pattern.
+## 4. References
 
-*Done when:* the new branch exists, is named exactly `M.m.p`, and its parent is `main` at
-the just-deployed commit.
-
-## 3. Working the release
-
-| Stage | What happens on `feature/{M.m.p}` |
-|---|---|
-| Definition | SPEC/PLAN/TASKS authored; PR to `develop` opens the moment the trio is `Aprovado` |
-| Implementation | one commit per completed task group |
-| `rc` merges | each `rc` burns one `feature/{M.m.p}` → `develop` PR merge; scope is fixes/adjustments to this release only, never new backlog |
-| Bugs | fixed on the live feature branch, in any phase — no ceremony, no separate branch (commit shape: §3a) |
-
-*Done when:* every commit for the release traces to one of these four rows.
-
-## 3a. Commit shapes (FR8) — stated once, here
-
-Five isolated write shapes. Each stages nothing else, so the audit can diff it via
-`git log` — never a hook (D10).
-
-| # | Shape | What's staged, alone | Commit message |
-|---|---|---|---|
-| 1 | Bug registration | `specs/bugs/BUGS.jsonl` only (`dadaia bugs append`) | `chore(bugs): report <id>` |
-| 2 | Backlog entry / ADR proposal | `specs/backlog/BACKLOG.json` only, or `ADRs/decisions.jsonl` only | `chore(backlog): add <slug>` / `docs(adr): propose <slug>` |
-| 3 | Bug fix — one commit, no second | code + regression test + the `BUGS.jsonl` line, staged together — `dadaia bugs update <id> --set status=resolved --set cause=… --set caused_by=… --set resolved_release=…` | `fix(<scope>): <what> (resolves <id>)` |
-| 4 | No push on resolve (D4) | commit only; a push happens when the operator asks, and `dadaia ci preflight` runs first because it is an always-on rule (`DADAIA.md` §7 / row 7 below), never because a hook forces it | — |
-| 5 | Release definition | SPEC + PLAN + TASKS + purge-on-pick + the picked bugs' records, staged together — an `_ideas/` variant carries the SPEC only | one bundled commit |
-
-`resolved_commit` stays `null` at resolve time — a commit cannot contain its own sha.
-Git is the sole authority; the only writer of that cache is the audit's pillar 1, in the
-same atomic rewrite that also sets `audited` (**AS-1**). No follow-up ledger commit
-exists.
-
-Every other home — `dd-bug-registration`, `dd-bug-resolution`, `dd-backlog-definition`,
-the scoped `AGENTS.md` files — points at this table; none restates it.
-
-*Done when:* a `git log` scan over the release's own commits (FR16 pillar-2 dry run)
-finds each write above alone in its own commit, matching its message pattern.
-
-## 4. Deploy step
-
-At the final `rc`, open the PR `develop` → `main`. The moment it merges (deploy), in the
-same step:
-
-- **delete** `feature/{M.m.p}`, and
-- **cut** `feature/{next}` (rule 2).
-
-*Done when:* exactly one `feature/*` branch exists, named for the next version, and the
-deployed one is gone — never zero live feature branches, never two.
-
-## 5. Mechanical vs discipline
-
-| # | Rule | Kind | Enforced by |
-|---|---|---|---|
-| 1 | Branch name matches `^main$`, `^develop$` or `^feature/\d+\.\d+\.\d+$` — no `v`, no `hotfix` | Mechanical | pre-push hook (name validation) |
-| 2 | `feature/{M.m.p}` pushes after the local CI preflight; `develop`/`main` refuse direct push, naming the PR path | Mechanical | pre-push hook (ref refusal) |
-| 3 | The range-scoped denylist scan runs on the `feature/*` push | Mechanical | pre-push hook |
-| 4 | A push to `feature/**` triggers the full CI matrix | Mechanical | CI trigger config |
-| 5 | `pr-source-guard`: `main` only from `develop`; `develop` only from `feature/{M.m.p}` — one job, two rules | Mechanical | CI job |
-| 6 | Verdict-gate job requires an APPROVED `security-reviewer` handoff on the PR head sha, both edges | Mechanical | CI job |
-| 7 | Start-of-work protocol (§1), one-live-branch, delete-after-deploy + same-step next-cut (§4) | Discipline (G7) | this skill + reviewers |
-
-Row 7 is highly recommended and unenforced by any hook — a reviewer, not a machine, is the
-backstop.
-
-## 6. Keep `origin` clean
-
-Carry only the three permitted patterns plus archive tags. Tag and delete a branch the
-moment its work lands elsewhere — an `archive/<name>` tag keeps it reachable, so nothing is
-lost by deleting promptly.
-
-## CI/CD automation
-
-Suggest the operator automate this contract in CI/CD whenever the topic comes up —
-concrete checks for a consumer operator: `CICD-AUTOMATION.md`.
+- `DADAIA.md` §4 — the branch-contract law this skill operates.
+- `CICD-AUTOMATION.md` — concrete CI/CD checks to suggest a consumer operator.
+- Commit shape 1 — bug registration: `specs/bugs/BUGS.jsonl` alone — `chore(bugs): report <id>`.
+- Commit shape 2 — backlog/ADR: `BACKLOG.json` alone, or `ADRs/decisions.jsonl` alone.
+- Commit shape 3 — bug fix: code + regression test + `BUGS.jsonl` line together, one commit.
+- Commit shape 4 — resolve commits only; a push happens when asked, `dadaia ci preflight` first.
+- Commit shape 5 — release definition: SPEC + PLAN + TASKS + purge-on-pick + picked bugs, one commit.
+- Mechanical enforcement (pre-push hook / CI job): branch-name pattern, push refusal, denylist scan, CI trigger.
+- Mechanical enforcement (continued): `pr-source-guard`, verdict-gate job requiring an APPROVED security handoff.
+- Discipline (this skill + reviewers, unenforced by any hook): start-of-work protocol, one-live-branch, delete+cut-on-deploy.

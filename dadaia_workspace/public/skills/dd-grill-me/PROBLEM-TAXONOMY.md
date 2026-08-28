@@ -1,8 +1,7 @@
 # PROBLEM-TAXONOMY — dd-grill-me
 
-Disclosed reference reached during Step 1 (inspect before asking): the problem shapes
-that destroy specs, named so a gap can be classified before deciding whether it
-resolves by inspection or promotes to the design tree.
+Disclosed reference reached during Step 1 (inspect before asking): the problem shapes that destroy specs.
+Named so a gap can be classified before it resolves by inspection or promotes to the design tree.
 
 | Problem type | Example |
 |---|---|
@@ -15,6 +14,5 @@ resolves by inspection or promotes to the design tree.
 | Incorrect category | A feature named "guardrails" actually specifies config backups |
 | Stale constitution | `constitution.md` names Provider A as primary; a later release shipped Provider B |
 
-When several gaps compete for the same round, prioritize in this order: gaps that
-block implementation, then spec↔code drift, then order dependencies, then naming,
-then unanswerable acceptance criteria, then a stale constitution.
+- Priority order when several gaps compete for the same round: gaps that block implementation first.
+- Priority order (continued): then spec-vs-code drift, then order dependencies, then naming, then unanswerable ACs, then a stale constitution.

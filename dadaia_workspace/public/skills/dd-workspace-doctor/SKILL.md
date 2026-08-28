@@ -5,91 +5,42 @@ description: >
   and assists with JSON schema migration when .dadaia/states/*.json becomes stale after
   a dadaia-workspace library update. Use when the operator mentions "doctor", "drift",
   "schema stale", "fix workspace", or "/dd-workspace-doctor".
+tldr: "Diagnose lib-vs-.claude drift and stale state-JSON schema; repair via dadaia public stage/install, never hand-edit."
 applyTo: ".dadaia/**"
 ---
 
 # dd-workspace-doctor — Workspace Diagnosis & Repair
 
-## Scope
+## 1. When
 
-This skill handles **operational state** only:
-1. Lib canonical vs installed `.claude/` drift
-2. JSON schema migration in `.dadaia/states/*.json`
+- The operator mentions "doctor", "drift", "schema stale", "fix workspace", or "/dd-workspace-doctor".
+- Operational state only: lib-vs-`.claude/` drift, and `.dadaia/states/*.json` schema migration.
+- Spec-vs-code drift (feature behavior vs approved SPEC.md) belongs to `project-auditor` instead.
 
-Spec↔code drift (feature behavior vs approved SPEC.md) belongs to `project-auditor`.
+## 2. Steps
 
----
+1. Locate the workspace: `ls .dadaia/` (confirm root); locate the library: `dadaia --version` or `pip show dadaia-workspace`.
+2. List canonical files in `dadaia_workspace/public/<type>/` for each asset type (`rules/`, `skills/`, `commands/`, `agents/`).
+3. List the corresponding files in `.claude/<type>/`.
+4. Compare content; flag any file that differs or is missing in `.claude/`.
+5. Run `dadaia doctor` as the CLI shortcut for the drift check.
+6. Auto-repair with `dadaia doctor --fix`, or `dadaia public stage` then `dadaia public install --target all --force`.
+7. For schema migration, read the current frozen dataclasses from the installed library (`core/models/spec_context.py`, `core/models/course.py`).
+8. Read the current JSON content: `spec_contexts.json` under `.dadaia/states/`, `academy.json` under `.dadaia/academy/`.
+9. Map old fields to new: drop disappeared fields, ask the operator for a default on new required fields, infer or ask on renames.
+10. Rewrite the JSON file atomically: write `.tmp` then `os.replace()`.
+11. Report every field change made.
+12. Never guess a required field value silently — always confirm with the operator.
+13. Write a summary report to `.dadaia/reports/<context>/dd-workspace-doctor/<UTC>.html`: issues found, actions taken, operator decisions needed.
+14. Never edit `.agents/`, `.claude/`, `.codex/`, `.kimi-code/` directly for drift repair — always `dadaia public stage`/`install --force`.
 
-## Phase 0 — Locate workspace and library
+## 3. Done when
 
-```bash
-# Find workspace root
-ls .dadaia/ 2>/dev/null || echo "Not in a dadaia workspace"
+- `dadaia doctor` (or `--fix`) reports drift resolved, or every remaining item is named for operator decision.
+- Every JSON schema migration change is reported field-by-field.
+- No lib-originated file was hand-edited to fake a fix.
 
-# Find installed library version
-dadaia --version 2>/dev/null || pip show dadaia-workspace | grep Version
-```
+## 4. References
 
----
-
-## Phase 1 — Lib vs .claude/ drift check
-
-For each asset type (`rules/`, `skills/`, `commands/`, `agents/`):
-
-1. List canonical files in `dadaia_workspace/public/<type>/`
-2. List corresponding files in `.claude/<type>/`
-3. Compare content — flag any file that differs or is missing in `.claude/`
-
-**CLI shortcut:**
-```bash
-dadaia doctor
-```
-
-**Auto-repair:**
-```bash
-dadaia doctor --fix
-# or
-dadaia public stage
-dadaia public install --target all --force
-```
-
----
-
-## Phase 2 — JSON schema migration
-
-When `spec_contexts.json` or `academy.json` has a stale schema:
-
-1. Read the current Python frozen dataclasses from the installed library:
-   - `dadaia_workspace/core/models/spec_context.py`
-   - `dadaia_workspace/core/models/course.py`
-
-2. Read the current JSON file content — `spec_contexts.json` lives under
-   `.dadaia/states/`, `academy.json` under `.dadaia/academy/`
-
-3. Map old fields to new fields:
-   - Fields that disappeared: drop them
-   - Fields that are new (non-optional): ask the operator for a default value
-   - Fields that were renamed: infer from context if obvious; ask otherwise
-
-4. Rewrite the JSON file atomically (write `.tmp` → `os.replace()`)
-
-5. Report every field change made
-
-**Never** guess required field values silently — always confirm with the operator.
-
----
-
-## Phase 3 — Report
-
-Write a summary to `.dadaia/reports/<context-name>/dd-workspace-doctor/<YYYY-MM-DDTHHMMSSZ>.html` covering:
-- Issues found (per category)
-- Actions taken (per file)
-- Items requiring operator decision
-
----
-
-## Guardrail
-
-Never edit files under `.agents/`, `.claude/`, `.codex/`, or `.kimi-code/` directly for
-drift repair — use `dadaia public stage` plus `dadaia public install --target all --force`
-instead. Manual edits to lib-originated files create new drift rather than resolving it.
+- `dadaia public stage` / `dadaia public install --target all --force` — the only drift-repair path.
+- `project-auditor` — spec-vs-code drift, out of this skill's scope.
