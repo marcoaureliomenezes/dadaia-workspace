@@ -1,10 +1,11 @@
 """Reports-next feature service — discovers the next expected agent handoff.
 
 Infra-free per the constitution (L67): this module imports only ``core/`` and the
-Python standard library. It resolves the active release by folding the live release
-directory's ``RELEASE.jsonl`` (v0.5.0 FR4/T-050-21A, A4.1 — ``ACTIVE.md`` is retired,
-no file replaces it), reads that release's ``PLAN.md``, and the ``.dadaia/reports/``
-tree via :mod:`pathlib`, mirroring the stdlib file access already used by
+Python standard library. It resolves the active release by reading the live release
+directory's ``RELEASE.json`` mutable state document (v0.5.x, successor to the
+RELEASE.jsonl fold; v0.5.0 FR4/T-050-21A, A4.1 — ``ACTIVE.md`` is retired, no file
+replaces it), reads that release's ``PLAN.md``, and the ``.dadaia/reports/`` tree via
+:mod:`pathlib`, mirroring the stdlib file access already used by
 ``ReportsValidationService``.
 
 Wiring (which context/specs_dir/reports_root to use) is resolved in
@@ -19,7 +20,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from dadaia_workspace.core.exceptions import NoActiveReleaseError, NoAgentSequenceError
-from dadaia_workspace.core.release_events import fold_release_events, parse_release_events
+from dadaia_workspace.core.release_state import parse_release_state
 
 #: Canonical 9-agent core topology. Owner names parsed from
 #: PLAN.md are filtered to this set so prose like ``owner: TBD`` never enters a sequence.
@@ -85,7 +86,7 @@ class ReportsNextService:
         """Return the next expected agent (or ``None`` if all have emitted handoffs).
 
         Raises:
-            NoActiveReleaseError: no live release directory carries a ``RELEASE.jsonl``.
+            NoActiveReleaseError: no live release directory carries a ``RELEASE.json``.
             NoAgentSequenceError: PLAN.md missing or declares no recognizable owners.
         """
         release_id = self._active_release()
@@ -106,10 +107,11 @@ class ReportsNextService:
     # ------------------------------------------------------------------
 
     def _active_release(self) -> str:
-        """Resolve the live release id (v0.5.0 FR4/T-050-21A, A4.1): the ONE
-        directory directly under ``releases/`` — excluding ``_archive``/``_ideas``
-        (A4.6) — that carries a ``RELEASE.jsonl``. No file replaces ``ACTIVE.md``;
-        this directory scan is the sole successor of its ``release:`` field."""
+        """Resolve the live release id (v0.5.x, successor to the RELEASE.jsonl fold;
+        v0.5.0 FR4/T-050-21A, A4.1): the ONE directory directly under ``releases/`` —
+        excluding ``_archive``/``_ideas`` (A4.6) — that carries a ``RELEASE.json``. No
+        file replaces ``ACTIVE.md``; this directory scan is the sole successor of its
+        ``release:`` field."""
         releases_root = self._specs_dir / "releases"
         candidates: list[str] = []
         if releases_root.is_dir():
@@ -118,25 +120,30 @@ class ReportsNextService:
                 for d in releases_root.iterdir()
                 if d.is_dir()
                 and d.name not in ("_archive", "_ideas")
-                and (d / "RELEASE.jsonl").is_file()
+                and (d / "RELEASE.json").is_file()
             )
         if not candidates:
             raise NoActiveReleaseError(
                 "No active release: no directory under releases/ carries a "
-                "RELEASE.jsonl under the active context. Run "
+                "RELEASE.json under the active context. Run "
                 "`eval $(dadaia context bind <name> --mode read)` and open a release."
             )
         if len(candidates) > 1:
             raise NoActiveReleaseError(
                 "No active release: multiple live release directories carry a "
-                f"RELEASE.jsonl ({', '.join(candidates)}) — ambiguous, refusing to guess."
+                f"RELEASE.json ({', '.join(candidates)}) — ambiguous, refusing to guess."
             )
         release_id = candidates[0]
-        jsonl_path = releases_root / release_id / "RELEASE.jsonl"
-        events, _errors = parse_release_events(jsonl_path.read_text(encoding="utf-8"))
-        if not fold_release_events(events).phase:
+        json_path = releases_root / release_id / "RELEASE.json"
+        try:
+            state = parse_release_state(json_path.read_text(encoding="utf-8"))
+        except ValueError as exc:
             raise NoActiveReleaseError(
-                f"No active release: {release_id}/RELEASE.jsonl carries no 'phase' record."
+                f"No active release: {release_id}/RELEASE.json failed to parse: {exc}"
+            ) from exc
+        if not state.phase:
+            raise NoActiveReleaseError(
+                f"No active release: {release_id}/RELEASE.json carries no 'phase' value."
             )
         return release_id
 

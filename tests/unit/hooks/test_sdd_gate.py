@@ -34,23 +34,28 @@ from dadaia_workspace.hooks import sdd_gate
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
 
-def _write_release_jsonl(specs: Path, release_id: str, phase: str) -> None:
-    """Write (overwrite) the release's RELEASE.jsonl with exactly ONE phase record
-    (v0.5.0 FR4/T-050-21A) -- the fixture-side replacement for the retired
-    ACTIVE.md."""
+def _write_release_json(specs: Path, release_id: str, phase: str) -> None:
+    """Write (overwrite) the release's RELEASE.json with a minimal release-state-v1
+    document (v0.5.x, successor to the RELEASE.jsonl fold; v0.5.0 FR4/T-050-21A) --
+    the fixture-side replacement for the retired ACTIVE.md."""
     rdir = specs / "releases" / release_id
     rdir.mkdir(parents=True, exist_ok=True)
-    record = {
-        "ts": "2026-06-01T00:00:00Z",
-        "event": "phase",
-        "agent": "test",
-        "data": {"phase": phase},
+    state = {
+        "schema": "release-state-v1",
+        "release": release_id,
+        "phase": phase,
+        "rc": None,
+        "defined": None,
+        "implemented": None,
+        "shipped": None,
+        "audited": None,
+        "notes": [],
     }
-    (rdir / "RELEASE.jsonl").write_text(json.dumps(record) + "\n", encoding="utf-8")
+    (rdir / "RELEASE.json").write_text(json.dumps(state) + "\n", encoding="utf-8")
 
 
 def _mk_workspace(tmp_path: Path, *slugs: str) -> Path:
-    """Build a minimal workspace with repos/<slug>/specs/releases/<id>/RELEASE.jsonl
+    """Build a minimal workspace with repos/<slug>/specs/releases/<id>/RELEASE.json
     (phase: IMPLEMENTATION) for each slug (v0.5.0 FR4/T-050-21A -- ACTIVE.md retired)."""
     (tmp_path / ".dadaia" / "states").mkdir(parents=True)
     (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text(
@@ -59,7 +64,7 @@ def _mk_workspace(tmp_path: Path, *slugs: str) -> Path:
     )
     for s in slugs:
         specs = tmp_path / "repos" / s / "specs"
-        _write_release_jsonl(specs, "rel-1", "IMPLEMENTATION")
+        _write_release_json(specs, "rel-1", "IMPLEMENTATION")
     return tmp_path
 
 
@@ -786,9 +791,10 @@ def test_resolve_mode_foreign_read_bind_end_to_end_never_blocks_my_write(tmp_pat
     assert result2.block_envelope() is None  # doctrine: never blocked by a foreign bind
 
 
-def test_unreadable_release_jsonl_fails_closed_for_memory(tmp_path: Path) -> None:
-    """An unreadable ``RELEASE.jsonl`` must never open the MEMORY gate (v0.5.0
-    FR4/T-050-21A -- ACTIVE.md retired, RELEASE.jsonl is the sole phase source).
+def test_unreadable_release_json_fails_closed_for_memory(tmp_path: Path) -> None:
+    """An unreadable ``RELEASE.json`` must never open the MEMORY gate (v0.5.x,
+    successor to the RELEASE.jsonl fold; v0.5.0 FR4/T-050-21A -- ACTIVE.md retired,
+    RELEASE.json is the sole phase source).
 
     ``_resolve_active_release`` treats a genuine I/O failure the same as "no active
     release" (phase ``""``). ``""`` is not in ``{DEFINITION, CLOSURE}``, so the write
@@ -798,23 +804,23 @@ def test_unreadable_release_jsonl_fails_closed_for_memory(tmp_path: Path) -> Non
     workspace = _mk_workspace(tmp_path, "demo")
     specs = workspace / "repos" / "demo" / "specs"
     (specs / "memory").mkdir(parents=True)
-    _write_release_jsonl(specs, "rel-1", "DEFINITION")
-    jsonl_path = specs / "releases" / "rel-1" / "RELEASE.jsonl"
+    _write_release_json(specs, "rel-1", "DEFINITION")
+    json_path = specs / "releases" / "rel-1" / "RELEASE.json"
     target = str(specs / "memory" / "product.md")
     payload: dict[str, Any] = {"tool_name": "Write", "tool_input": {"file_path": target}}
 
     # DEFINITION phase, readable ⇒ ALLOW. Proves the probe reaches the MEMORY arm at all.
     assert _run(tmp_path, payload) is None, "DEFINITION must allow a memory write"
 
-    jsonl_path.chmod(0o000)
+    json_path.chmod(0o000)
     try:
-        if os.access(jsonl_path, os.R_OK):  # running as root ignores the mode bits
+        if os.access(json_path, os.R_OK):  # running as root ignores the mode bits
             pytest.skip("cannot make a file unreadable as this uid")
         envelope = _run(tmp_path, payload)
-        assert envelope is not None, "unreadable RELEASE.jsonl must not open the MEMORY gate"
+        assert envelope is not None, "unreadable RELEASE.json must not open the MEMORY gate"
         assert "DEFINITION or CLOSURE" in str(envelope.get("reason", "")), envelope
     finally:
-        jsonl_path.chmod(0o644)
+        json_path.chmod(0o644)
 
 
 def test_memory_gate_reads_active_via_repo_slug_when_name_differs(tmp_path: Path) -> None:
@@ -827,7 +833,7 @@ def test_memory_gate_reads_active_via_repo_slug_when_name_differs(tmp_path: Path
         json.dumps({"contexts": [{"name": "meu-projeto", "repo_slug": "demo", "state": "alive"}]}),
         encoding="utf-8",
     )
-    _write_release_jsonl(tmp_path / "repos" / "demo" / "specs", "rel-1", "DEFINITION")
+    _write_release_json(tmp_path / "repos" / "demo" / "specs", "rel-1", "DEFINITION")
     (tmp_path / "repos" / "demo" / "specs" / "memory").mkdir(parents=True)
     target = str(tmp_path / "repos" / "demo" / "specs" / "memory" / "product.md")
     payload: dict[str, Any] = {"tool_name": "Write", "tool_input": {"file_path": target}}

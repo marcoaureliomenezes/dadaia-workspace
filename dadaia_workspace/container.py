@@ -685,7 +685,7 @@ def _definition_committer(repo_root: Path, release_id: str) -> "Callable[[], Non
     """Build the definition-time commit of the context repo (Python-owned, post-success).
 
     Bug fake-release-definition-leaves-dirty-worktree: a completed release-definition
-    leaves SPEC/PLAN/TASKS/backlog/RELEASE.jsonl uncommitted, and implementation-reviews
+    leaves SPEC/PLAN/TASKS/backlog/RELEASE.json uncommitted, and implementation-reviews
     then blocks at preflight on the dirty tree. Mirror of :func:`_closure_committer`
     — commits everything the definition produced with a conventional message and
     per-invocation identity fallbacks; ``None`` when the repo is not a git checkout

@@ -19,14 +19,14 @@ from pathlib import Path
 import pytest
 
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
-from tests.helpers.release_jsonl import write_release_phase
+from tests.helpers.release_state import write_release_phase
 
 pytestmark = pytest.mark.integration
 
 
 def _make_workspace(tmp_path: Path, slug: str = "dadaia-workspace", phase: str = "SPEC") -> Path:
     # ACTIVE.md retired (v0.5.0 FR4/T-050-21A) -- the live phase is folded from
-    # specs/releases/<release_id>/RELEASE.jsonl.
+    # specs/releases/<release_id>/RELEASE.json.
     specs = tmp_path / "repos" / slug / "specs"
     write_release_phase(specs, "v0.1.10", phase)
     (specs / "memory").mkdir(parents=True)

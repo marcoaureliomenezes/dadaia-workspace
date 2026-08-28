@@ -15,7 +15,7 @@ from dadaia_workspace.cli.main import app
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
-from tests.helpers.release_jsonl import write_release_phase
+from tests.helpers.release_state import write_release_phase
 
 _runner = CliRunner()
 _CTX = "demo"
@@ -38,9 +38,9 @@ def _seed_context(
     handoffs: dict[str, str] | None = None,
 ) -> None:
     """Seed ``repos/<_CTX>/specs/releases/<_RELEASE>/`` with a PLAN.md and, unless
-    ``phase`` is None, a RELEASE.jsonl carrying that phase (v0.5.0 FR4/T-050-21A --
+    ``phase`` is None, a RELEASE.json carrying that phase (v0.5.x, T-050-21A --
     ``ACTIVE.md`` is retired). ``phase=None`` simulates "no active release": the
-    release directory exists (with a PLAN.md) but carries no RELEASE.jsonl, so the
+    release directory exists (with a PLAN.md) but carries no RELEASE.json, so the
     resolver's directory scan finds zero candidates."""
     specs = workspace / "repos" / _CTX / "specs"
     releases = specs / "releases"

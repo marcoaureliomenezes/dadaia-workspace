@@ -30,9 +30,10 @@ def _build(
 ) -> ReportsNextService:
     """Construct a service over a temp specs/reports layout.
 
-    ``active``: ``(release_id, phase)`` written as a single ``RELEASE.jsonl`` ``phase``
-    record (v0.5.0 FR4/T-050-21A — ``ACTIVE.md`` retired, no replacement file);
-    ``None`` means no live release directory at all.
+    ``active``: ``(release_id, phase)`` written as a minimal ``RELEASE.json``
+    release-state-v1 document (v0.5.x, successor to the RELEASE.jsonl fold; v0.5.0
+    FR4/T-050-21A — ``ACTIVE.md`` retired, no replacement file); ``None`` means no live
+    release directory at all.
     handoffs: maps agent name -> release_id to seed a handoff sidecar for that agent.
     """
     specs = tmp_path / "specs"
@@ -42,13 +43,18 @@ def _build(
         release_id, phase = active
         rdir = releases / release_id
         rdir.mkdir(parents=True, exist_ok=True)
-        record = {
-            "ts": "2026-06-01T00:00:00Z",
-            "event": "phase",
-            "agent": "test",
-            "data": {"phase": phase},
+        state = {
+            "schema": "release-state-v1",
+            "release": release_id,
+            "phase": phase,
+            "rc": None,
+            "defined": None,
+            "implemented": None,
+            "shipped": None,
+            "audited": None,
+            "notes": [],
         }
-        (rdir / "RELEASE.jsonl").write_text(json.dumps(record) + "\n", encoding="utf-8")
+        (rdir / "RELEASE.json").write_text(json.dumps(state) + "\n", encoding="utf-8")
     if plan is not None:
         (releases / _RELEASE / "PLAN.md").write_text(plan, encoding="utf-8")
     reports = tmp_path / "reports"

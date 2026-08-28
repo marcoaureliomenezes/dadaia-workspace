@@ -136,8 +136,9 @@ def _resolve_mode(workspace: Path, session_id: str, ctx: str = "") -> str:
 
 def _resolve_active_release(specs_dir: Path) -> tuple[str, str]:
     """Resolve ``(release_id, phase)`` straight from the live release's
-    ``RELEASE.jsonl`` fold (v0.5.0 FR4/T-050-21A, A4.1) — ``ACTIVE.md`` is retired,
-    no file replaces it.
+    ``RELEASE.json`` mutable state document (v0.5.x, successor to the RELEASE.jsonl
+    fold — operator ruling: the release record is "altamente mutavel", never
+    append-only) — ``ACTIVE.md`` is retired, no file replaces it.
 
     Deliberately re-implements the tiny directory scan + tri-state disk read
     ``features.specs.doctor_common`` already owns (``resolve_live_release_id`` +
@@ -146,18 +147,19 @@ def _resolve_active_release(specs_dir: Path) -> tuple[str, str]:
     import ...`` runs ``features/specs/__init__.py``, which imports ``doctor
     .SpecsDoctor`` — the entire ``SpecsDoctor`` decomposition — the exact heavy
     hot-path import cost ``core.specs_resolver`` (vs. the DI container) was already
-    chosen to avoid (module docstring, :func:`_context_slug`). ``core.release_events``
-    stays the ONE place the FOLD semantics live (S1 FR23 amendment A6); only the disk
-    read itself is re-implemented here, an authorized, documented hook-only exception
-    (checked against this hook's own import budget by
-    ``tests/contract/test_hook_import_surface.py``).
+    chosen to avoid (module docstring, :func:`_context_slug`). ``core.release_state``
+    stays the ONE place the DOCUMENT SHAPE is validated (:func:`parse_release_state`);
+    only the disk read itself is re-implemented here, an authorized, documented
+    hook-only exception (checked against this hook's own import budget by
+    ``tests/contract/test_hook_import_surface.py``). There is no fold anymore — the
+    document already IS the current phase, one JSON object read straight off disk.
 
     Returns ``("none", "")`` when no live release directory exists, more than one
-    does (ambiguous), or its ``RELEASE.jsonl`` cannot be read or carries no ``phase``
-    record — the gate then treats the write the same as "no active release" (fail
-    toward blocking a MEMORY write rather than guessing a phase that grants one).
+    does (ambiguous), or its ``RELEASE.json`` cannot be read or fails to parse — the
+    gate then treats the write the same as "no active release" (fail toward blocking a
+    MEMORY write rather than guessing a phase that grants one).
     """
-    from dadaia_workspace.core.release_events import fold_release_events, parse_release_events
+    from dadaia_workspace.core.release_state import parse_release_state
 
     releases_root = specs_dir / "releases"
     if not releases_root.is_dir():
@@ -168,7 +170,7 @@ def _resolve_active_release(specs_dir: Path) -> tuple[str, str]:
             for d in releases_root.iterdir()
             if d.is_dir()
             and d.name not in ("_archive", "_ideas")
-            and (d / "RELEASE.jsonl").is_file()
+            and (d / "RELEASE.json").is_file()
         )
     except OSError:
         return "none", ""
@@ -176,11 +178,14 @@ def _resolve_active_release(specs_dir: Path) -> tuple[str, str]:
         return "none", ""
     release_id = candidates[0]
     try:
-        text = (releases_root / release_id / "RELEASE.jsonl").read_text(encoding="utf-8")
+        text = (releases_root / release_id / "RELEASE.json").read_text(encoding="utf-8")
     except OSError:
         return release_id, ""
-    events, _errors = parse_release_events(text)
-    return release_id, fold_release_events(events).phase
+    try:
+        state = parse_release_state(text)
+    except ValueError:
+        return release_id, ""
+    return release_id, state.phase
 
 
 def _evaluate_target(
@@ -229,7 +234,7 @@ def _evaluate_target(
         specs_dir = workspace / "repos" / repo_slug_for_context(workspace, ctx) / "specs"
     else:
         specs_dir = workspace / "specs"
-    # The RELEASE.jsonl fold is the gate's sole decision authority (v0.5.0 FR4,
+    # The RELEASE.json state document is the gate's sole decision authority (v0.5.x,
     # T-050-21A, A4.1) — ACTIVE.md is retired, no fallback branch survives.
     release, phase = _resolve_active_release(specs_dir)
     session_id = _common.resolve_session_id(payload, default="anon-session")
