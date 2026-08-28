@@ -13,7 +13,7 @@ constitution.md
 memory/ARCHITECTURE.md
 memory/TECHSTACK.md
 memory/product/index.md
-releases/<release-id>/RELEASE.jsonl   (folded: last `phase` record wins)
+releases/<release-id>/RELEASE.json    (phase field read directly, no fold)
 releases/<release-id>/SPEC.md
 releases/<release-id>/PLAN.md
 releases/<release-id>/TASKS.md
@@ -28,7 +28,7 @@ A specs root carries exactly these members — nothing else:
 | `AGENTS.md` | this file |
 | `constitution.md` | absolute product laws |
 | `memory/` | current product truth (`memory/AGENTS.md`) |
-| `releases/` | release SPEC/PLAN/TASKS/RELEASE.jsonl, `_ideas/` pre-approval drafts, `_archive/` history |
+| `releases/` | release SPEC/PLAN/TASKS/RELEASE.json, `_ideas/` pre-approval drafts, `_archive/releases_histo.jsonl` history |
 | `backlog/` | the live demand queue, `_archive/` history |
 | `bugs/` | the bug ledger, `_archive/` history |
 | `audits/` | audit records, `_archive/` history |
@@ -48,8 +48,8 @@ concurrency lock.
 
 Implementation is allowed only when:
 
-- The live release's `RELEASE.jsonl` folds to `phase: IMPLEMENTATION` (last `phase`
-  record) — the SDD gate's own decision authority (SPEC FR4, v0.5.0 T-050-21A, A4.1).
+- The live release's `RELEASE.json` `phase` field reads `IMPLEMENTATION` — the SDD
+  gate's own decision authority (SPEC FR4, v0.5.0 T-050-21A, A4.1).
 - `SPEC.md`, `PLAN.md`, and `TASKS.md` contain `**Status:** Aprovado`.
 - The active task is changed from `[ ]` to `[-]` before production edits.
 - The task's declared write set contains every production file to be edited.
@@ -62,7 +62,7 @@ editing production.
 | Path | Writer |
 |---|---|
 | `constitution.md` | operator or `product-engineer` during approved governance work |
-| `releases/<id>/RELEASE.jsonl` | agents with file tools, per event kind — `dd-release-implement`'s `RELEASE-EVENTS.md` |
+| `releases/<id>/RELEASE.json` | agents with file tools, per field — `dd-release-implement`'s `RELEASE-EVENTS.md` |
 | `releases/<id>/SPEC.md` | `product-engineer` |
 | `releases/<id>/PLAN.md` | `product-engineer` |
 | `releases/<id>/TASKS.md` | `product-engineer`; implementers may change only their task marker |

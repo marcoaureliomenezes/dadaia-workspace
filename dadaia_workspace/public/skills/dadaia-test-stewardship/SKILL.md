@@ -67,7 +67,7 @@ Each LARGE that validated a feature either (a) yields file:line of the equivalen
 SMALL/MEDIUM coverage that now carries the assertion, or (b) is kept as the seam's
 single SENTINEL. Deleting coverage without the map is cheating; deleting it with the
 map is engineering. The demotion map — deleted LARGE → replacement file:line — is
-recorded in the release's `RELEASE.jsonl` `note` records (`dd-release-implement`'s
+recorded in the release's `RELEASE.json` `log` entries (`dd-release-implement`'s
 closure steps own the exact block).
 
 ## E — Deletion criteria and the tombstone ban
@@ -87,8 +87,8 @@ closure steps own the exact block).
 removed — a deleted feature now 404s, a module became a stub, a directory/repo was
 removed, an old migration no longer exists — validates a historical event, not a live
 behavior. It is born SCAFFOLD of the release that removed the thing and dies at that
-release's closure; the memory of the removal belongs to the release's `RELEASE.jsonl`
-`note` records / changelog / product memory, never the suite.
+release's closure; the memory of the removal belongs to the release's `RELEASE.json`
+`log` entries / product memory, never the suite.
 
 **Separation of powers.** The implementer never prunes to go green. Pruning is a
 `qa-engineer` verdict carrying this table's evidence at `file:line`; `software-engineer`

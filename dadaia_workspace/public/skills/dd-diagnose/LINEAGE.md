@@ -7,12 +7,13 @@ disagree, this file is stale and the disagreement is itself a defect to fix here
 
 ## The window (stated once)
 
-The window runs from the last `audited` milestone to `HEAD`: scan every
-`RELEASE.jsonl` — the live release's, every archived release's under
-`specs/releases/_archive/**`, and `releases_histo.jsonl` — for the newest `audited`
-milestone; the window is `[that milestone's sha, HEAD]`. When no `audited` milestone
-exists yet, the window is the whole file. `specs/releases/_ideas/**` is never scanned: a
-Draft carries no `RELEASE.jsonl` to fold (D10/AS-7), so it can carry no milestone.
+The window runs from the last `audited` milestone to `HEAD`: read the live
+release's `RELEASE.json` `audited` field, plus every archived release's own `audited`
+fact carried in `releases/_archive/releases_histo.jsonl` (no per-release `RELEASE.json`
+survives archiving — v0.5.0 FR5) — for the newest `audited` milestone; the window is
+`[that milestone's sha, HEAD]`. When no `audited` milestone exists yet, the window is the
+whole file. `specs/releases/_ideas/**` is never scanned: a Draft carries no
+`RELEASE.json` (D10/AS-7), so it can carry no milestone.
 
 ## The filter
 

@@ -1,6 +1,6 @@
 ---
 name: dd-backlog-definition
-description: "Use when: curating specs/backlog/**, sanitizing for staleness, adjudicating an intake report, or checking the terminal disposition-token vocabulary. Owns the BACKLOG.md live-photo ACTIVE-only schema plus backlog_histo.jsonl, and the operator-gated intake gate — the only path to a new backlog entry. project-manager runs this continuously."
+description: "Use when: curating specs/backlog/**, sanitizing for staleness, adjudicating an intake report, or checking the terminal disposition-token vocabulary. Owns the BACKLOG.json single-source active[] schema plus backlog_histo.jsonl, and the operator-gated intake gate — the only path to a new backlog entry. project-manager runs this continuously."
 applyTo: "specs/backlog/**"
 ---
 
@@ -17,30 +17,28 @@ picked, sanitized set.
 
 ## 2. Entry schema and status vocabulary
 
-Single source, live photo (v0.5.0 FR5, T-050-13): `specs/backlog/BACKLOG.md` holds
-**one** section, `## ACTIVE`, and nothing else — no per-entry files, no in-file
-`## LEDGER`. A closed item's history lives beside the document, in
-`specs/backlog/_archive/backlog_histo.jsonl`, one append-only record per exit — the
-"no JSONL for backlog" clause this skill carried before FR5 is retired; JSONL is no
-longer bugs-only.
+Single source, single JSON document (v0.5.x, operator ruling: "BACKLOG.md e
+BACKLOG.json — estruturado"): `specs/backlog/BACKLOG.json` holds one top-level object,
+`{schema: "backlog-v1", active: [...]}` — no per-entry files, no in-document ledger.
+Schema: `dadaia_workspace/public/schemas/backlog/backlog-v1.schema.json`. A closed
+item's history lives beside the document, in
+`specs/backlog/_archive/backlog_histo.jsonl`, one append-only record per exit.
 
-**`## ACTIVE`** — one subsection per live candidate, full prose, strict schema — five
-required keys plus one optional key:
+**`active[]`** — one object per live candidate, strict schema — five required fields
+plus one optional field:
 
-````markdown
-### <slug>
-- **Title:** <short name>
-- **Opened:** YYYY-MM-DD
-- **Status:** idea | candidate
-- **Description:** <one paragraph — the need>
-- **Provenance:** operator request | intake-report item <id> (approved <date>)
-- **Intents:**
-```yaml
-<typed intents[] block — see core.models.backlog.parse_intents>
+```json
+{"id": "<slug>", "title": "<short name>", "opened": "YYYY-MM-DD",
+ "status": "idea | candidate", "description": "<one paragraph — the need>",
+ "provenance": "operator request | intake-report item <id> (approved <date>)",
+ "intents": [{"subject": {"kind": "...", "ref": "..."}, "change": "..."}]}
 ```
-````
 
-**`**Intents:**` status gate (ADR D7, OD-1).** Optional at `status: idea`
+- **Status:** idea | candidate — a live (non-terminal) token; a terminal disposition
+  token (§2 table below) never appears here — that belongs to a `backlog_histo.jsonl`
+  record instead.
+
+**`intents[]` status gate (ADR D7, OD-1).** Optional at `status: idea`
 (`core.models.backlog.INTENTS_EXEMPT_STATUS`) — an idea is an unbound brainstorm.
 **Required** at `candidate` and beyond: the anchor-set binding through
 `subject_registry.py`/`classifier.py` is how BL-DUP and BL-CONFLICT resolve pairwise
@@ -56,14 +54,12 @@ CONSUMED→terminal note below); no CLI verb wraps this write today — an agent
 or rewrites the record with file tools directly (`specs/backlog/**` is an ADDITIVE
 path class, `DADAIA.md` §3, always writable).
 
-`dadaia backlog new <slug>` authors the `## ACTIVE` subsection directly into
-`BACKLOG.md` (creating the document with the `## ACTIVE` heading on first use, per
-FR5 — a `--help` still describing a second `## LEDGER` heading is a known stale-CLI-help
-bug, registered, not a schema fact); `dadaia backlog doctor` validates the whole file
-against this schema — `BL-SCHEMA`/`BL-CONFLICT`/`BL-STALE` (BL-DUP is **deleted**, not
-disabled, v0.5.0 A5.2: the single-section document makes a duplicate `## ACTIVE`
-subsection for one slug structurally impossible to reintroduce via the retired
-mechanism). There is no per-entry file and no other schema authority.
+`dadaia backlog new <slug>` appends an `active[]` entry directly into `BACKLOG.json`
+(creating the document with an empty `active[]` on first use); `dadaia backlog doctor`
+validates the whole document against the schema — `BL-SCHEMA`/`BL-CONFLICT`/`BL-STALE`
+(BL-DUP is **deleted**, not disabled, v0.5.0 A5.2: array-uniqueness on `id` makes a
+duplicate live entry for one slug structurally impossible to reintroduce). There is no
+per-entry file and no other schema authority.
 
 **Terminal disposition tokens** (canonical home — appears nowhere else in `public/`):
 
@@ -95,10 +91,10 @@ Run on every touch, not just at pick time:
    normalized text, not just exact match). A match is merged into the existing entry,
    never filed twice.
 3. **Disposition or keep.** Confirmed-stale or invalid → `DEFERRED`/`REJECTED` with a
-   one-line reason, exited to `backlog_histo.jsonl`. Still valid → stays in `ACTIVE`.
-4. **Total-consolidation review.** Every new entry triggers a read of the whole file —
-   `BACKLOG.md` is small enough that partial review is a discipline failure, not a
-   shortcut.
+   one-line reason, exited to `backlog_histo.jsonl`. Still valid → stays in `active[]`.
+4. **Total-consolidation review.** Every new entry triggers a read of the whole
+   document — `BACKLOG.json` is small enough that partial review is a discipline
+   failure, not a shortcut.
 
 `dd-release-definition` references step 1 of its own protocol here instead of
 restating this scan.
@@ -106,17 +102,19 @@ restating this scan.
 ## 4. Never-delete (cited, not restated)
 
 No backlog file or bug is ever deleted — `DADAIA.md` §6 Backlog. A dead item moves
-`ACTIVE` → `backlog_histo.jsonl`; it never leaves the tree, and `backlog_histo.jsonl`
-itself is append-only.
+`active[]` → `backlog_histo.jsonl`; it never leaves the tree, and `backlog_histo.jsonl`
+itself is append-only. This never-delete law is backlog/bug-scoped only: a release's
+own archiving is histo-only (one `releases_histo.jsonl` summary, directory deleted) and
+a PR verdict is deleted once the gate consumes it — neither contradicts this section.
 
 ## 5. Operator-gated intake (ADR #15 — the only path to a new entry)
 
 **The doctrine.** The backlog is the **operator's demand queue**. Only the operator
 creates demand. No agent — `project-manager` included — writes a technical residual (a
 review finding, a CLOSURE return, a reviewer note, an audit observation) directly into
-`BACKLOG.md`. At each release close and each review round, the PM **compiles residuals
+`BACKLOG.json`. At each release close and each review round, the PM **compiles residuals
 into an intake report** and presents it to the operator; each item is approved, rejected
-or discarded **before** it can become an `ACTIVE` entry.
+or discarded **before** it can become an `active[]` entry.
 
 **Pre-approved intake.** An operator-ratified deferral taken during a release ("defer to
 backlog", recorded in the SPEC or at approval) is already-approved intake and is **not**
@@ -143,20 +141,20 @@ operator-ratified deferral is the one exception that skips re-adjudication.
 
 ## 6. Picked-set handoff to `dd-release-definition`
 
-Release-definition step 2 ("pick the set") reads `BACKLOG.md`'s `ACTIVE` section plus
+Release-definition step 2 ("pick the set") reads `BACKLOG.json`'s `active[]` array plus
 `specs/bugs/*.jsonl` directly — this skill supplies a sanitized, deduplicated set with no
 further triage needed on the release-definition side. Purge-on-pick (§2) is the receipt.
 
 ## 7. CLI reference
 
 ```bash
-dadaia backlog new <slug>          # appends an ## ACTIVE subsection to BACKLOG.md
-dadaia backlog doctor              # validates BACKLOG.md — BL-SCHEMA/CONFLICT/STALE
+dadaia backlog new <slug>          # appends an active[] entry to BACKLOG.json
+dadaia backlog doctor              # validates BACKLOG.json — BL-SCHEMA/CONFLICT/STALE
 dadaia backlog subjects            # list canonical anchors bindable in Intents
 dadaia bugs status                 # open/closed bug counts
 dadaia bugs stats                  # bug-ledger aggregate view
 ```
 
-Exiting an item (any disposition) — removing its `## ACTIVE` subsection and appending
+Exiting an item (any disposition) — removing its `active[]` entry and appending
 or updating its `backlog_histo.jsonl` record — has no CLI verb yet; do it with file
 tools directly, ADDITIVE (`DADAIA.md` §3).

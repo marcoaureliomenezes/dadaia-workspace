@@ -7,7 +7,7 @@ touching any `specs/memory/**` atom at closure. Carries forward `CLOSURE-CHECKS.
 ## Protocol
 
 1. **Verify gate phase.** Confirm the live release is in `CLOSURE` phase before writing
-   `specs/memory/**` (also writable in `DEFINITION`) — append `phase` to `RELEASE.jsonl`
+   `specs/memory/**` (also writable in `DEFINITION`) — set `phase` in `RELEASE.json`
    (`ACTIVE.md` retired at T-050-21A, no mirror to keep in sync — `RELEASE-EVENTS.md`,
    `specs/releases/AGENTS.md`). Otherwise the gate blocks the write.
 2. **Do not author legacy HTML memory.** If legacy HTML memory exists, treat it as
@@ -15,7 +15,7 @@ touching any `specs/memory/**` atom at closure. Carries forward `CLOSURE-CHECKS.
 3. **Update Markdown atoms.** Apply the release's deltas to the corresponding
    `specs/memory/*.md` or `specs/memory/product/*.md` files. Memory describes the
    product **as it is now** — not what changed. The change history now lives in this
-   release's `RELEASE.jsonl` records (`RELEASE-EVENTS.md`) and the archived release dir.
+   release's `RELEASE.json` `log` (`RELEASE-EVENTS.md`) and git.
 4. **Diagrams.** Use fenced Mermaid blocks:
    ```mermaid
    flowchart LR
@@ -29,8 +29,8 @@ touching any `specs/memory/**` atom at closure. Carries forward `CLOSURE-CHECKS.
    - `<section class="changelog">` and similar
    - Narrative of past versions ("we used to use X, now we use Y")
 
-   If the operator asks for history, point to this release's `RELEASE.jsonl` or
-   `_archive/`.
+   If the operator asks for history, point to this release's `RELEASE.json` `log` or
+   git.
 6. **Validate** with `dadaia specs doctor` before moving to archive. Doctor checks
    atomicity and Mermaid script presence.
 7. **Product memory is a folder catalog** at `specs/memory/product/`, not a single file —
@@ -52,9 +52,8 @@ touching any `specs/memory/**` atom at closure. Carries forward `CLOSURE-CHECKS.
      during release closure.
    - Update `index.md` only if the catalog order changed or a feature was added/removed;
      update affected feature atoms; leave the rest intact. A new feature gets its atom
-     created and linked from `index.md`; a deprecated feature's link is removed and its
-     atom moves to `_archive/legacy-memory/<timestamp>/`.
+     created and linked from `index.md`; a deprecated feature's link and its atom are
+     deleted outright -- memory carries no archive of its own (history lives in git).
 
 *Done when:* every affected atom reflects current product truth, `dadaia specs doctor`
-reports the memory atoms clean, and the RELEASE.jsonl fold's `phase` record reads
-`CLOSURE`.
+reports the memory atoms clean, and `RELEASE.json`'s `phase` field reads `CLOSURE`.

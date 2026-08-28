@@ -58,7 +58,9 @@ dadaia bugs append --bug-id <slug> --reported-by <agent> \
 A reviewer's `APPROVE`/`REQUEST_CHANGES` (or REJECT) verdict also states whether the
 change reduced or increased the bug surface of the touched feature, with evidence from
 `specs/bugs/*.jsonl` (`dadaia bugs stats`). A verdict without this axis is incomplete —
-tests green is insufficient on its own; check the bug surface separately.
+tests green is insufficient on its own; check the bug surface separately. (Distinct from
+the PR security verdict file, which the merge gate deletes once consumed — `BUGS.jsonl`
+is never deleted, only its own `_archive/bugs_histo.jsonl` grows.)
 
 ## 6. Context routing (self-hosting vs consumer)
 

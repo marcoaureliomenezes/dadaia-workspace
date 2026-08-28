@@ -24,9 +24,8 @@ steps 1–3 below are complete.
 
 - `specs/bugs/BUGS.jsonl` — one record per bug (v0.5.0 FR2), inspected through
   `dadaia bugs status`/`stats`.
-- Sanitized, deduplicated candidates: `specs/backlog/BACKLOG.md` `## ACTIVE`
-  (see `dd-backlog-definition` §2) — the live-photo, single-source document, no
-  per-entry files.
+- Sanitized, deduplicated candidates: `specs/backlog/BACKLOG.json`'s `active[]`
+  (see `dd-backlog-definition` §2) — the single-source document, no per-entry files.
 - The operator's intent for the release (theme, urgency).
 
 This skill **reads** `specs/backlog/**` but never writes it (purge-on-pick is executed

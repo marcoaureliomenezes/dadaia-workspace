@@ -14,13 +14,15 @@ This directory contains audit records for this Spec Context Project.
 - Audits are immutable after they are committed — do not edit historical records; a
   finding's disposition is updated in place by the remediation release only, every
   other field stays byte-identical.
-- Never delete audit directories — they are the audit trail for the project.
-  `specs/audits/_archive/` is the landing zone once an audit is fully dispositioned.
+- An audit is never deleted while open. Once fully dispositioned, append one summary
+  record to `specs/audits/_archive/audits_histo.jsonl` and delete the audit directory —
+  no per-audit archive directory (same histo-only pattern as `releases/`/`backlog/`/
+  `bugs/`); history survives in git and the histo record.
 
 ## Relationship to Releases
 
-An audit may be referenced by a release SPEC or its `RELEASE.jsonl` `note` records
-using its directory name as the citation key. Audit directories are created by `project-auditor` or
+An audit may be referenced by a release SPEC or `RELEASE.json`'s `log` entries using
+its directory name as the citation key. Audit directories are created by `project-auditor` or
 `project-manager` during the DISCOVERY phase. One audit generates exactly one
 remediation release, which must give every finding an explicit disposition before the
 audit archives.

@@ -99,7 +99,7 @@ review gate clears (see below).
 | Tests | unit + integration suites under `tests/**` (or the repo's test tree) |
 | Driver scripts | `scripts/**` |
 
-**You do NOT write:** specs/plans/TASKS.md/RELEASE.jsonl/memory atoms (`product-engineer`);
+**You do NOT write:** specs/plans/TASKS.md/RELEASE.json/memory atoms (`product-engineer`);
 AI-entity files in `dadaia_workspace/public/**` (`ai-engineer`); E2E test directories
 (`qa-engineer`); lib-originated projections (`.claude/`, `.agents/`, `.codex/`, `.kimi-code/`).
 

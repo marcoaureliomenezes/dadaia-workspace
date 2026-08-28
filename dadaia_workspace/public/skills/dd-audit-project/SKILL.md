@@ -13,10 +13,11 @@ applyTo: "specs/audits/**"
 ## The window (cited, never restated)
 
 `dd-diagnose`'s `LINEAGE.md`, section "The window (stated once)", **is** this skill's
-window (A14.2 — the same computation FR7 phase 0 uses): scan every `RELEASE.jsonl` (the
-live release's, every archived release's, and `releases_histo.jsonl`) for the newest
-`audited` milestone; the window is `[that sha, HEAD]`, or the whole history when no
-`audited` milestone exists yet. `specs/releases/_ideas/**` is never scanned (D10/AS-7).
+window (A14.2 — the same computation FR7 phase 0 uses): read the live release's
+`RELEASE.json` `audited` field plus every archived release's `audited` fact in
+`releases/_archive/releases_histo.jsonl` for the newest `audited` milestone; the window
+is `[that sha, HEAD]`, or the whole history when no `audited` milestone exists yet.
+`specs/releases/_ideas/**` is never scanned (D10/AS-7).
 Run it once per audit; record the resulting `[from-sha, HEAD]` in `AUDIT.md`'s scope.
 
 ## The three pillars — always together, never one alone
@@ -27,7 +28,7 @@ An audit that emits fewer than three pillar sections is not an audit — refuse 
 | Pillar | Disclosed sibling | Input | Done when |
 |---|---|---|---|
 | 1 — Bug history | `PILLAR-BUGS.md` | every `BUGS.jsonl` record whose registration or resolution sha falls in the window | all **eight** forensic metrics computed with baseline + target (A14.7); `audited` + the four provenance fields written in **one** atomic rewrite per reviewed record (A14.6) |
-| 2 — Spec compliance | `PILLAR-SPECS.md` | `git log` over every release commit in the window + `dadaia specs doctor` | FR8 commit-shape conformance reported per shape; canon-v6 pattern compliance reported; `RELEASE.jsonl` milestone completeness checked |
+| 2 — Spec compliance | `PILLAR-SPECS.md` | `git log` over every release commit in the window + `dadaia specs doctor` | FR8 commit-shape conformance reported per shape; canon-v6 pattern compliance reported; `RELEASE.json` milestone completeness checked |
 | 3 — Memory/constitution drift | `PILLAR-MEMORY.md` | the memory trio's Part 1 `Measured by:` lines, `product/` atoms, `constitution.md` | every Part-1 principle's named check executed and recorded; every Part-1 hunk in the window matched to an `accepted` ADR in the same commit, or flagged HIGH |
 
 ## Cadence and lifecycle

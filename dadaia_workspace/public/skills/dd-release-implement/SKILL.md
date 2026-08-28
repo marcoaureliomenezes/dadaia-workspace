@@ -1,6 +1,6 @@
 ---
 name: dd-release-implement
-description: "Use when: implementing a release from the first task reservation through the final-rc ship — the whole implement-to-close arc under the v2/rc segment model. Short SKILL-plus-disclosed-siblings shape (T-050-21, FR12): RC-FLOW.md (state ladder + gate cadence), RELEASE-EVENTS.md (RELEASE.jsonl append recipes), MEMORY-UPDATE.md (closure memory protocol). CLOSURE.md/CLOSURE-TEMPLATE.md retired — the closure narrative now lives in RELEASE.jsonl records."
+description: "Use when: implementing a release from the first task reservation through the final-rc ship — the whole implement-to-close arc under the v2/rc segment model. Short SKILL-plus-disclosed-siblings shape (T-050-21, FR12): RC-FLOW.md (state ladder + gate cadence), RELEASE-EVENTS.md (RELEASE.json state+log contract), MEMORY-UPDATE.md (closure memory protocol). CLOSURE.md/CLOSURE-TEMPLATE.md retired — the closure narrative now lives in RELEASE.json's log."
 applyTo: "specs/releases/*/TASKS.md"
 ---
 
@@ -19,11 +19,11 @@ reservation through the ship PR and the post-deploy branch cut.
 
 ## 2. Resolve release and segment
 
-Resolve the active release and phase from the **RELEASE.jsonl fold** — the live
-release's `specs/releases/<release-id>/RELEASE.jsonl`, folded via
-`core/release_events.py` (last `phase` record wins; SPEC FR4) — the SDD gate itself
-reads this same fold; `ACTIVE.md` retired at T-050-21A, no replacement file. A
-`segment:`/`data.segment` present means `TASKS.md` lives at
+Resolve the active release and phase by reading **`RELEASE.json`** directly — the live
+release's `specs/releases/<release-id>/RELEASE.json`, a mutable state document (no fold:
+`phase` is a plain top-level field; parser: `core/release_state.py`) — the SDD gate
+itself reads this same field; `ACTIVE.md` retired at T-050-21A, no replacement file. A
+`segment` field present means `TASKS.md` lives at
 `releases/<release-id>/<segment>/TASKS.md`; otherwise at `releases/<release-id>/TASKS.md`.
 Full navigation protocol: `dadaia-workspace-spec-navigator`.
 
@@ -36,14 +36,14 @@ archive → ship → post-deploy), the `dd-architecture-survey` operative pointe
 segment close, the out-of-scope list, and the segments rule. Read it before acting on
 any step past reservation.
 
-## 4. Appending a `RELEASE.jsonl` record
+## 4. Updating `RELEASE.json`
 
-Disclosed sibling: **`RELEASE-EVENTS.md`** — the seven canonical event kinds, who
-appends which milestone, the exact `data` shape per kind, and the `note` conventions
-that now carry the retired `CLOSURE.md`'s narrative content (summary, size accounting,
-drifts, artifact GC, test dispositions) — everything else (dispositions, record-only
-observations, intake candidates, tasks-completed, validations, memory updates) already
-has a **native** home and needs no `note` at all; see that file's conversion table.
+Disclosed sibling: **`RELEASE-EVENTS.md`** — the state document's shape, who sets which
+milestone, and the `log` conventions that now carry the retired `CLOSURE.md`'s narrative
+content (summary, size accounting, drifts, artifact GC, test dispositions) — everything
+else (dispositions, record-only observations, intake candidates, tasks-completed,
+validations, memory updates) already has a **native** home and needs no `log` entry at
+all; see that file's conversion table.
 
 ## 5. Memory update at closure (step 8 of the arc)
 
@@ -55,15 +55,15 @@ history/changelog sections, and the folder-catalog shape.
 
 Declare test intent at birth and pass the admission filter before a test enters the
 permanent suite: `dadaia-test-stewardship` §A/§B. Demotion and quarantine/SCAFFOLD
-expiry are closure-time work (`RC-FLOW.md` step 9's `closure-test-dispositions` note),
-not earlier steps'.
+expiry are closure-time work (`RC-FLOW.md` step 9's `closure-test-dispositions` log
+entry), not earlier steps'.
 
 ## Checklist
 
-- [ ] Release + segment resolved from the RELEASE.jsonl fold.
+- [ ] Release + segment resolved by reading `RELEASE.json` directly.
 - [ ] Task reserved (`[-]`) with an isolated `chore(tasks): start <id>` commit.
 - [ ] Current step (`RC-FLOW.md`) identified before attempting its unlock action.
 - [ ] CI green before any push; trio `APPROVE`d before any final-rc unlock action.
-- [ ] At final rc: memory update → closure narrative (`RELEASE-EVENTS.md` notes) →
+- [ ] At final rc: memory update → closure narrative (`RELEASE-EVENTS.md` log entries) →
       disposition sweep → artifact GC → archive, one commit, in that order, before the
       ship PR.

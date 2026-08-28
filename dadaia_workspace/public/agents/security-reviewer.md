@@ -184,7 +184,9 @@ after rework before changing the recommendation.
 commit the handoff at `specs/releases/<release-id>/verdicts/<sha>.handoff.json` on the PR
 branch. CI's `security-verdict-gate` keys on this field against the PR head sha
 (`.github/scripts/pr-verdict-check.sh`) — a PR without a qualifying committed verdict does
-not pass. After rework, emit a new `APPROVE` handoff carrying the new sha.
+not pass. After rework, emit a new `APPROVE` handoff carrying the new sha. The verdict
+is consumed exactly once, by the merge that keys on it, and deleted immediately after —
+a verdict left on disk once its PR has merged is slop, not evidence.
 
 ---
 

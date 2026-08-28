@@ -68,7 +68,9 @@ referenced, not restated).
 This skill ends at phase 6, GREEN. Appending the `resolved` event, the FR23 evidence
 triple (`evidence_loop`/`evidence_seam`/`evidence_diff`), the commit shape, and the
 no-separate-release-ceremony rule are `dd-bug-resolution`'s own bug-lifecycle territory —
-consult it, do not restate it here.
+consult it, do not restate it here. Evidence lives in git + `BUGS.jsonl` only — never a
+`specs/releases/**/reviews/` artifact (retired) or a PR verdict, which the merge gate
+deletes once consumed.
 
 ## 6. Checklist
 

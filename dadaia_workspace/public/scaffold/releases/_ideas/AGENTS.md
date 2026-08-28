@@ -2,5 +2,5 @@
 
 Scope: this directory only. An idea is a release candidate the operator has named but
 not yet defined: `_ideas/<M.m.p>/SPEC.md` in `Draft`, nothing else. Promotion is a
-`git mv` to `specs/releases/<M.m.p>/` in the commit that creates the release fold
-(`RELEASE.jsonl`); the PR verdict gate refuses `_ideas/` paths. No other file lives here.
+`git mv` to `specs/releases/<M.m.p>/` in the commit that creates `RELEASE.json`; the
+pre-push chokepoint refuses `_ideas/` paths on a PR branch. No other file lives here.

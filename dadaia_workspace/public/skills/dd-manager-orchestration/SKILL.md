@@ -36,7 +36,7 @@ when it runs as the top-level session agent.
 |---|---|---|---|---|
 | `project-manager` | 1–2; coordinates all MUTATING phases | Operator-gated intake report + bug intake, cross-agent dispatch, mediation, sole dispatch authority | any core agent (real dispatch — top-level only) | A single specialist can complete the task directly |
 | `project-auditor` | 4 (audit) | Memory/implementation drift, dead-code and compliance reports | project-manager | A release is still mid-implementation |
-| `product-engineer` | 5 + 8 (definition, closure) | SPEC, PLAN, TASKS, RELEASE.jsonl, memory | software-architect, project-manager | Task is code-only and already approved |
+| `product-engineer` | 5 + 8 (definition, closure) | SPEC, PLAN, TASKS, RELEASE.json, memory | software-architect, project-manager | Task is code-only and already approved |
 | `software-architect` | feeds 4/5 | Architecture decisions, ADRs, dependency contracts | software-engineer | No architectural trade-off exists |
 | `software-engineer` | 6 (implementation) | Production code + tests for the bound context | qa-engineer | Task is spec authorship, AI-entity surface, or pure review |
 | `ai-engineer` | surface owner (`dadaia_workspace/public/**`) | Agents, skills, rules, commands, hooks | security-reviewer, code-reviewer | Task is product code or spec authorship |
@@ -48,7 +48,7 @@ when it runs as the top-level session agent.
 
 Arm A (`DADAIA.md` §1) has exactly four stages. Each is agent-dispatched — there is no
 engine that runs them; the dispatcher hands the stage to its owning agent against the
-SDD documents (RELEASE.jsonl — ACTIVE.md retired at T-050-21A — SPEC, PLAN, TASKS):
+SDD documents (RELEASE.json — ACTIVE.md retired at T-050-21A — SPEC, PLAN, TASKS):
 
 | Stage | Entry agent | Governing document(s) |
 |---|---|---|
@@ -160,8 +160,8 @@ appropriate for the current phase.
 
 Stop and surface to the operator when:
 
-1. Required `SPEC.md`, `PLAN.md`, `TASKS.md` files or a resolvable RELEASE.jsonl
-   phase fold are missing or not approved.
+1. Required `SPEC.md`, `PLAN.md`, `TASKS.md` files or a resolvable `RELEASE.json`
+   `phase` field are missing or not approved.
 2. A CRITICAL security issue is reported.
 3. A dispatched agent returns `[SCOPE ERROR]`.
 4. Three or more unresolved conflicts are open.

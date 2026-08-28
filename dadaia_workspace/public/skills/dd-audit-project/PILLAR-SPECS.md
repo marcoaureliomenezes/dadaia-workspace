@@ -30,23 +30,26 @@ dadaia specs doctor --context <ctx> --recipe
 ordered, copy-pasteable remediation steps for each. Every non-zero-severity issue inside
 the window becomes a `FINDINGS-FORMAT.md` record with `pillar: "specs"`; a WARN that
 `--recipe` can fix mechanically is still a finding — this pillar measures, it never
-fixes.
+fixes. A merged PR's `specs/releases/**/verdicts/**` file being absent is expected, not
+a finding — the gate deletes a verdict once consumed; and an archived release carrying
+no directory (only its `releases_histo.jsonl` summary) is the canon shape, not drift.
 
-## `RELEASE.jsonl` milestone completeness
+## `RELEASE.json` milestone completeness
 
-For every release whose `RELEASE.jsonl` the window's commits touch: confirm the three
-canonical milestones — `defined` (SPEC `Aprovado`), `implemented`/`shipped`'s
-predecessor (final-rc QA close), `shipped` (merge to `main`) — each carry a `sha` (and,
-where applicable, a `pr`). A release with a `shipped` milestone but no `defined` or no
-implemented-and-tested milestone is a finding — the chain has a gap.
+For every release whose `RELEASE.json` the window's commits touch (or, once archived,
+whose summary lands in `releases/_archive/releases_histo.jsonl`): confirm the three
+canonical milestones — `defined` (SPEC `Aprovado`), `implemented` (final-rc QA close),
+`shipped` (merge to `main`) — each carry a `sha` (and, where applicable, a `pr`). A
+release with a `shipped` milestone but no `defined` or no implemented-and-tested
+milestone is a finding — the chain has a gap.
 
 ## SPEC provenance and purge-on-pick
 
 For each release's SPEC in the window: confirm `**Consumes:**` names the backlog
 entry/entries it picked, and confirm the release-definition commit (shape 5, above)
-actually removed those entries from `BACKLOG.md`'s `## ACTIVE` in the **same** commit —
-a SPEC that consumes an entry still present in `## ACTIVE` after the definition commit
-is a finding (the purge-on-pick rule, unmet).
+actually removed those entries from `BACKLOG.json`'s `active` array in the **same**
+commit — a SPEC that consumes an entry still present in `active` after the definition
+commit is a finding (the purge-on-pick rule, unmet).
 
 ## Findings
 

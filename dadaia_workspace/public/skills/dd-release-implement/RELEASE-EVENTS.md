@@ -1,77 +1,42 @@
-# RELEASE-EVENTS — `RELEASE.jsonl` append recipes per milestone
+# RELEASE-EVENTS — the `RELEASE.json` state+log contract
 
-Disclosed reference reached from `SKILL.md` and `RC-FLOW.md` wherever the arc says
-"append a RELEASE.jsonl record". `specs/releases/<release-id>/RELEASE.jsonl` is the
-append-only event stream that replaced `ACTIVE.md`'s phase field (retired at T-050-21A)
-and is replacing `CLOSURE.md`'s closure narrative (SPEC FR4, D3/D7/D11). Schema:
-`dadaia_workspace/public/schemas/releases/release-event-v1.schema.json` — validate a
-new line against it before appending; the fold that reads this file back is
-`dadaia_workspace/core/release_events.py` (read-only, no write call — pure
-parse-and-fold, never the writer).
+Disclosed reference reached from `SKILL.md`/`RC-FLOW.md` wherever the arc says "update
+the release state" or "append a log entry". `specs/releases/<release-id>/RELEASE.json`
+is ONE mutable JSON object — the release's current state, never an append-only event
+stream (retires `RELEASE.jsonl`, `release-event-v1.schema.json`,
+`core/release_events.py`). Schema:
+`dadaia_workspace/public/schemas/releases/release-state-v1.schema.json`.
 
-## Envelope
+## Shape
 
-Every line is one JSON object, no trailing comma, `{ts, event, agent, data}` — no
-`session_id` (a harness session id is PROTECTED state; committing it would link a
-governance milestone to a local session permanently, for no governance value).
+`{schema, release, phase, rc, defined, implemented, shipped, audited, segment?, log[]}`
+`phase`, `rc`, `segment` are rewritten in place on every transition — no history of
+prior values survives in the field itself; a transition worth remembering becomes a
+`log` entry. `defined`/`implemented`/`shipped`/`audited` are the four sha-bearing
+milestone facts, each set at most once meaningfully (a later legitimate rewrite is a
+correction, not a duplicate) or `null` before that point. `log` is the one append-only
+array inside the document — oldest first, never rewritten once appended.
 
-## The seven kinds, who appends which, and the shape
+## Who sets which milestone
 
-| Kind | Appended by | `data` shape | Cardinality |
-|---|---|---|---|
-| `phase` | whoever drives the transition (`product-engineer` at DEFINITION/CLOSURE, the first implementer at IMPLEMENTATION) | `{"phase": "<DISCOVERY\|DEFINITION\|SPEC\|PLAN\|TASKS\|IMPLEMENTATION\|CLOSURE\|ARCHIVED>", "segment"?: "<alpha-N\|rc-N>"}` | many — the fold takes the **last** record |
-| `defined` | `product-engineer`, at the definition promotion commit (`dd-release-definition`'s own recipe) | `{"sha": "<sha>", "pr": <n\|null>}` | once — a later record is a duplicate finding |
-| `implemented` | `qa-engineer`, at the **final-`rc` QA close**, on that closed commit's sha — **not** the merge commit (D3; the two differ by the merge artifact) | `{"sha": "<sha>", "rc": <n>}` | once |
-| `shipped` | `project-manager` (or whoever opens/merges the `develop`→`main` ship PR), at the merge | `{"sha": "<sha>", "pr": <n>, "tag": "<M.m.p>"}` | once |
-| `audited` | `project-auditor`, the one place `resolved_commit`/`resolution_granularity`/`audited` are ever written together on a bug record, in a single atomic rewrite (FR14 pillar 1) | `{"sha": "<sha>", "audit": "audits/<window-id>"}` | once per audit window that reviewed this release |
-| `rc` | `product-engineer`/implementer, opening and closing each `rc-N` round | `{"open\|close": true, "n": <rc-number>}` | many — one open + one close per round |
-| `note` | any implementer, for governance text that doesn't warrant its own kind | `{"kind": "<free text>", "text": "<free text>"}` | many |
-
-`defined`/`implemented`/`shipped` are the three **sha-bearing milestone facts** — each
-appended **at most once meaningfully**; the fold (`core/release_events.py`) takes the
-FIRST record of each kind and reports any later one as a duplicate — a doctor WARNING
-(SPEC-DOC-043), never a block (D15).
-
-## Worked example (from SPEC FR4)
-
-```json
-{"ts":"2026-08-28T14:02:11Z","event":"defined","agent":"product-engineer","data":{"sha":"4e5f6a7","pr":210}}
-{"ts":"2026-09-03T18:40:05Z","event":"implemented","agent":"qa-engineer","data":{"sha":"b8c9d0e","rc":2}}
-{"ts":"2026-09-04T10:15:00Z","event":"shipped","agent":"project-manager","data":{"sha":"f1a2b3c","pr":214,"tag":"0.5.0"}}
-{"ts":"2026-10-20T09:00:00Z","event":"audited","agent":"project-auditor","data":{"sha":"c0ffee1","audit":"audits/20261020-five-release-window"}}
-```
-
-## `note` conventions for the retired `CLOSURE.md` narrative (T-050-21, A12.2)
-
-`CLOSURE-TEMPLATE.md`/`CLOSURE.md` retire at T-050-21 (FR12) — everything they carried
-gets a named surviving home; the narrative sections (Summary, Size accounting, Drifts,
-Artifact GC sweep, Test dispositions) that used to live in `CLOSURE.md` prose now land
-as `note` records, one per class, `data.kind` naming which:
-
-| Old `CLOSURE.md` section | `note` `data.kind` | Surviving home if not a `note` |
+| Milestone | Set by | Shape |
 |---|---|---|
-| `## Summary` | `closure-summary` | — |
-| `## Size accounting` | `closure-size-accounting` | — |
-| `## Drifts` | `closure-drift` (one per drift) | — |
-| `## Test dispositions` | `closure-test-dispositions` | `dadaia-test-stewardship`'s own demotion/quarantine record is the primary source; this note only summarizes |
-| `## Artifact GC sweep` | `closure-artifact-gc` | — |
-| `## Dispositions` | *(none needed)* | already native: `specs/backlog/_archive/backlog_histo.jsonl`'s `release` field and `BUGS.jsonl`'s `resolved_release` field carry this per-item, per record — the sweep is verified with `dadaia bugs stats` / `dadaia backlog doctor`, never re-tabulated |
-| `## Record-only observations` | *(none needed)* | already native: the reviewer's own findings array/handoff — never re-homed (FR6/R4) |
-| `## Intake candidates` | *(none needed)* | handed directly to `project-manager`'s intake-report workflow (`dd-backlog-definition` §5) instead of staging in a closure doc first |
-| `## Archive decision` | *(none needed)* | implicit in the `git mv` + `phase: ARCHIVED` record — `MOVE` is the only path now |
-| `## Tasks completed` | *(none needed)* | already native: `TASKS.md`'s `[x]` markers + each task's final commit sha |
-| `## Validations` | *(none needed)* | already native: per-task `implementation-complete` handoffs + the trio's `APPROVE` verdicts |
-| `## Memory updates` | *(none needed)* | already native: the memory atom diffs themselves, in git history |
+| `phase` | whoever drives the transition (`product-engineer` at DEFINITION/CLOSURE, the first implementer at IMPLEMENTATION) | phase string |
+| `defined` | `product-engineer`, at the definition promotion commit | `{sha, ts}` |
+| `implemented` | `qa-engineer`, at final-`rc` QA close, on the closed commit's sha — not the merge commit (D3) | `{sha, rc, ts}` |
+| `shipped` | `project-manager` (or whoever merges the ship PR) | `{sha, pr, ts}` |
+| `audited` | `project-auditor`, the same atomic rewrite that sets a bug's `resolved_commit`/`audited` | `{sha, ts, audit}` |
 
-**T-050-25A (FR15) landed** — the doctor-side parser that once required an *archived*
-release directory to carry a `CLOSURE.md` (SPEC-DOC-006) is deleted. Never write a
-`CLOSURE.md`; the `RELEASE.jsonl` `note` records above are the sole, canonical form.
+## `log` — the retired `CLOSURE.md` narrative's home
 
-## Validation
+Every closure-narrative class (summary, size accounting, drifts, artifact-GC, test
+dispositions) lands as one `log` entry, `kind` naming the class. Already-native classes
+need no entry: dispositions (`backlog_histo.jsonl`/`BUGS.jsonl`'s `resolved_release`),
+tasks completed (`TASKS.md` `[x]` + sha), validations (trio `APPROVE` handoffs), memory
+updates (the atom diffs themselves).
 
-```bash
-python -c "import json; json.loads(open('specs/releases/<release-id>/RELEASE.jsonl').readlines()[-1])"
-```
+## Write seam
 
-A malformed line never loses the well-formed records around it — the fold
-(`core/release_events.py`) skips a bad line and reports it, not the whole file.
+A code path rewrites the milestone fields through `core/atomic_write.py`'s CAS seam
+(refuse-stale); an agent with file tools may Read-then-Edit directly, same discipline.
+Parser: `core/release_state.py` (no file I/O).

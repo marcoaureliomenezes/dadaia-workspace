@@ -4,7 +4,7 @@ Scope: this file governs only the `specs/memory/**` tree of one Spec Context
 Project. Broader SDD rules are in the sibling `specs/AGENTS.md`.
 
 Memory is **product truth**: it describes the product as it is now, never how it
-got there. History lives in each release's `RELEASE.jsonl` closure notes and
+got there. History lives in each release's `RELEASE.json` `log` entries and
 under `_archive/`. Memory is the grounding context every agent reads before
 implementation, review, or report work.
 
@@ -48,10 +48,11 @@ Rationale: <one line — why this rule exists>
 a lint contract, a CI job. A rule nobody can measure is **not** a principle: it
 is Part-2 description or a proposed ADR, never a `P-NN`. An ADR is written when a
 Part-1 principle is created or changed — never one file per principle that merely
-exists. `ADR: NNNN` points at `specs/ADRs/NNNN-<slug>.md` and reads `(proposed)`
-until the operator accepts it; a principle predating this canon carries `ADR: none`
-until the change that next touches it mints one. **Only the operator flips an ADR
-to `accepted`** — an agent that writes `accepted` has violated the law.
+exists. `ADR: <id>` points at a `ADRs/decisions.jsonl` record (shape:
+`specs/ADRs/AGENTS.md`) and reads `(proposed)` until the operator accepts it; a
+principle predating this canon carries `ADR: none` until the change that next touches
+it mints one. **Only the operator flips a decision to `accepted`** — an agent that
+writes `accepted` has violated the law.
 
 **Part 2 is the living description.** It is where a rule without a measure lands
 when it survives, where every diagram lives, and where a number that has a home

@@ -187,7 +187,7 @@ via `project-manager` — never decided unilaterally.
 
 Stop and alert the operator when: a CRITICAL drift item is found (needs acknowledgement
 before continuing); a sub-agent fails to produce its report with no fallback; memory
-atoms are missing/unreadable; the RELEASE.jsonl fold (`ACTIVE.md` retired at
+atoms are missing/unreadable; `RELEASE.json`'s `phase` field (`ACTIVE.md` retired at
 T-050-21A) points at a non-existent release directory;
 evidence from two sub-agents directly contradicts.
 

@@ -164,12 +164,12 @@ tier bump/downgrade justification protocol: `dd-ai-eng-knowhow`'s `CONTEXT-ENGIN
 
 Ground yourself first with `dadaia-step0-memory-bootstrap`, then:
 
-1. Resolve the active release from the RELEASE.jsonl fold — the live release's
-   `specs/releases/<release-id>/RELEASE.jsonl`, folded via `core/release_events.py`'s
-   rule (last `phase` record wins) — then read `SPEC/PLAN/TASKS.md`. `ACTIVE.md`
-   retired at T-050-21A (SPEC FR4): the SDD gate itself reads the fold now, no
-   replacement file; AI-entity authoring without an approved release-level task is
-   forbidden either way — the SDD gate blocks it.
+1. Resolve the active release by reading `RELEASE.json`'s `phase` field directly —
+   the live release's `specs/releases/<release-id>/RELEASE.json`, a mutable state
+   document, no fold — then read `SPEC/PLAN/TASKS.md`. `ACTIVE.md` retired at
+   T-050-21A: the SDD gate itself reads this same field now, no replacement file;
+   AI-entity authoring without an approved release-level task is forbidden either
+   way — the SDD gate blocks it.
 2. Reserve the task via `dadaia-task-manager`: `[ ]` -> `[-]` + commit before editing.
 3. Read the persona brief (product-engineer, or the release's SPEC.md/TASKS.md).
 4. Apply the instruction-hierarchy ordering and persona-consistency invariants
@@ -198,7 +198,7 @@ Ground yourself first with `dadaia-step0-memory-bootstrap`, then:
 
 | With | Pattern |
 |---|---|
-| `product-engineer` | Files the brief; you implement and return a report; PE records the change as `RELEASE.jsonl` `note` records at closure. |
+| `product-engineer` | Files the brief; you implement and return a report; PE records the change as `RELEASE.json` `log` entries at closure. |
 | `software-architect` | Audits persona topology, dispatch graphs, skill sharing on request; you implement their findings. |
 | `security-reviewer` | Pairs on any new hook or any persona gaining a powerful tool (broad `WebSearch`, network access). |
 | `software-engineer` | When you refactor a persona it depends on, send a report on the behavioural delta so it can revisit its workflow. |

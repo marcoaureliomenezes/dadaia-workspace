@@ -50,7 +50,7 @@ Five isolated write shapes. Each stages nothing else, so the audit can diff it v
 | # | Shape | What's staged, alone | Commit message |
 |---|---|---|---|
 | 1 | Bug registration | `specs/bugs/BUGS.jsonl` only (`dadaia bugs append`) | `chore(bugs): report <id>` |
-| 2 | Backlog entry / ADR proposal | `specs/backlog/BACKLOG.md` only, or the new `specs/ADRs/NNNN-<slug>.md` only | `chore(backlog): add <slug>` / `docs(adr): propose NNNN-<slug>` |
+| 2 | Backlog entry / ADR proposal | `specs/backlog/BACKLOG.json` only, or `ADRs/decisions.jsonl` only | `chore(backlog): add <slug>` / `docs(adr): propose <slug>` |
 | 3 | Bug fix — one commit, no second | code + regression test + the `BUGS.jsonl` line, staged together — `dadaia bugs update <id> --set status=resolved --set cause=… --set caused_by=… --set resolved_release=…` | `fix(<scope>): <what> (resolves <id>)` |
 | 4 | No push on resolve (D4) | commit only; a push happens when the operator asks, and `dadaia ci preflight` runs first because it is an always-on rule (`DADAIA.md` §7 / row 7 below), never because a hook forces it | — |
 | 5 | Release definition | SPEC + PLAN + TASKS + purge-on-pick + the picked bugs' records, staged together — an `_ideas/` variant carries the SPEC only | one bundled commit |

@@ -2,8 +2,8 @@
 
 Disclosed reference reached from `SKILL.md` §3. Absorbs `CLOSURE-CHECKS.md`'s
 disposition-sweep, artifact-GC, out-of-scope and segments sections (T-050-21 rename;
-content unchanged in substance except where the RELEASE.jsonl fold replaces `CLOSURE.md`
-prose — see `RELEASE-EVENTS.md`'s conversion table).
+content unchanged in substance except where the `RELEASE.json` state document replaces
+`CLOSURE.md` prose — see `RELEASE-EVENTS.md`'s conversion table).
 
 ## Review/QA gate cadence
 
@@ -42,25 +42,25 @@ merges the whole scope, rc-N rounds are fixes, the final rc ships).
    commit on the branch — flip every reviewed task `[x]`; no push/PR/merge/closure yet.
 4. **Scope-complete.** All segments' tasks are `[x]`. *Done when:* `TASKS.md` (or every
    segment's `TASKS.md`) carries zero `[ ]`/`[-]` rows.
-5. **rc-1 PR.** Append a `rc` open record (`RELEASE-EVENTS.md`), open the
+5. **rc-1 PR.** Set `rc` open in `RELEASE.json` (`RELEASE-EVENTS.md`), open the
    `feature/{M.m.p}` → `develop` PR carrying the whole scope. *Done when:* it merges
    (branch contract: `DADAIA.md` §4 Gitflow, `dd-gitflow-default`).
 6. **rc-N rounds.** Fix/adjust only — never new backlog scope. *Done when:* CI is green
    on the round's `feature/{M.m.p}` → `develop` PR and it merges.
 7. **Final-rc trio review.** `qa-engineer` + `code-reviewer` + `security-reviewer` all
-   `APPROVE` the same commit; `qa-engineer` appends the `implemented` milestone
-   (`RELEASE-EVENTS.md`) **on that closed commit's sha**, then the `rc` close record.
+   `APPROVE` the same commit; `qa-engineer` sets the `implemented` milestone
+   (`RELEASE-EVENTS.md`) **on that closed commit's sha**, then closes `rc`.
    *Done when:* all three verdicts are `APPROVE` on that sha — only then may `[x]`,
    closure, merge, deploy, or archive proceed.
-8. **Memory update (`product-engineer`).** Append `phase: CLOSURE` to `RELEASE.jsonl`
+8. **Memory update (`product-engineer`).** Set `phase: CLOSURE` in `RELEASE.json`
    (`ACTIVE.md` retired at T-050-21A, no mirror to keep in sync); update `specs/memory/**`
    atoms to the product's current state. Protocol detail: `MEMORY-UPDATE.md`. *Done
    when:* `dadaia specs doctor` reports the memory atoms clean.
-9. **Record the closure narrative.** Append the `note` records `RELEASE-EVENTS.md`
+9. **Record the closure narrative.** Append the `log` entries `RELEASE-EVENTS.md`
    conventions describe (summary, size accounting, drifts, artifact-GC, test
    dispositions) — `CLOSURE.md`/`CLOSURE-TEMPLATE.md` retired at T-050-21, and the
    doctor-side `CLOSURE.md` parser retired at T-050-25A; never write one. *Done when:*
-   every narrative class has either a `note` record or the named native home
+   every narrative class has either a `log` entry or the named native home
    (`RELEASE-EVENTS.md`'s conversion table).
 10. **Disposition sweep.** Flip every bug/backlog item picked into (or superseded by)
     this release to a terminal token — vocabulary and format: `dd-backlog-definition`
@@ -89,14 +89,16 @@ merges the whole scope, rc-N rounds are fixes, the final rc ships).
     - **Lane guard (AG.1, inherited by every deletion lane in this release):** resolve
       the target, refuse any resolved target outside `.dadaia/`, never follow a
       symlinked directory.
-    *Done when:* the `closure-artifact-gc` `note` record states kept/deleted counts per
+    *Done when:* the `closure-artifact-gc` `log` entry states kept/deleted counts per
     artifact class, with evidence.
-12. **Archive.** `git mv specs/releases/<release-id> specs/releases/_archive/<release-id>`;
-    append `phase: ARCHIVED` to the now-archived `RELEASE.jsonl` — nothing to repoint,
-    the next release starts fresh with its own `RELEASE.jsonl`. *Done when:* the
-    release directory is under `releases/_archive/`, in the same commit as steps 8–11
-    (memory → closure narrative → sweep → archive, one commit).
-13. **Ship PR.** Open `develop` → `main`. On merge, append the `shipped` milestone
+12. **Archive.** No per-release archive directory (v0.5.0 FR5): append one summary
+    record to `releases/_archive/releases_histo.jsonl` (this release's id, terminal
+    phase, and its milestone shas), then delete the release directory — `git rm -r
+    specs/releases/<release-id>`. History survives in git and the histo record, never
+    a `git mv`'d copy. *Done when:* the release directory is gone and the histo record
+    exists, in the same commit as steps 8–11 (memory → closure narrative → sweep →
+    archive, one commit).
+13. **Ship PR.** Open `develop` → `main`. On merge, set the `shipped` milestone
     (`RELEASE-EVENTS.md`). *Done when:* it merges — mechanics, the security-verdict PR
     gate, and CI: `DADAIA.md` §4 Gitflow, `dd-gitflow-default`.
 14. **Post-deploy.** Delete `feature/{M.m.p}`; cut `feature/{next}` from `main` in the
@@ -107,8 +109,8 @@ merges the whole scope, rc-N rounds are fixes, the final rc ships).
 
 Declare test intent at birth and pass the admission filter before a test enters the
 permanent suite: `dadaia-test-stewardship` §A/§B. Demotion and quarantine/SCAFFOLD
-expiry are closure-time work (step 9's `closure-test-dispositions` note), not earlier
-steps'.
+expiry are closure-time work (step 9's `closure-test-dispositions` log entry), not
+earlier steps'.
 
 ## Out of scope for closure
 
@@ -122,12 +124,11 @@ steps'.
 
 ## Segments (ADR-1/ADR-5)
 
-When the active release carries a `phase` record's `data.segment` (RELEASE.jsonl — the
-field the schema itself carries for this purpose), each segment closes independently,
-but `RELEASE.jsonl` stays **one file per
-release**, never one per segment — `TASKS.md` is the artifact that splits under
-`specs/releases/<release-id>/<segment>/TASKS.md`; `RELEASE.jsonl` records which segment
-each `phase`/`note` belongs to via `data.segment` instead of splitting the file. Per
+When the active release carries a `segment` field (`RELEASE.json` — top-level, OPTIONAL,
+`release-state-v1`), each segment closes independently, but `RELEASE.json` stays **one
+file per release**, never one per segment — `TASKS.md` is the artifact that splits under
+`specs/releases/<release-id>/<segment>/TASKS.md`; `RELEASE.json`'s `segment` field names
+which one is active instead of splitting the file. Per
 ADR-3, qa-only gates an `alpha-N` (commit, no closure/ship), and the full trio + closure
 + archive happen at the shipping `rc-N` — the final-rc steps above. Flat releases are
 unchanged.

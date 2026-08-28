@@ -169,15 +169,15 @@ an initialized workspace, create it:
 
 ### F-10 — Backlog governance
 - Run against the IN-REPO specs tree from F-04: `$D specs doctor --json --specs-dir
-  repos/valproj/specs` (must be valid JSON); plant the malformed item as an `## ACTIVE`
-  subsection directly in `repos/valproj/specs/backlog/BACKLOG.md` (the single source —
-  `dadaia backlog new <slug> --specs-dir repos/valproj/specs` creates the document with
-  both section headings if it does not exist yet; then edit the new subsection's
-  `**Status:**` to `candidate` and leave it with no `**Intents:**` block), then run the
-  backlog-specific doctor — `$D backlog doctor --specs-dir repos/valproj/specs` (NOT
-  `specs doctor`, which validates the single-source loose-file/consumption invariants
-  SPEC-DOC-031/035, not the ACTIVE-subsection schema; BL-SCHEMA is the `backlog doctor`
-  path). Assert its exit code directly, not through a pipe.
+  repos/valproj/specs` (must be valid JSON); plant the malformed item as an `active[]`
+  entry directly in `repos/valproj/specs/backlog/BACKLOG.json` (the single source —
+  `dadaia backlog new <slug> --specs-dir repos/valproj/specs` creates the document if it
+  does not exist yet; then edit the new entry's `status` to `candidate` and leave it
+  with no `intents[]` array), then run the backlog-specific doctor — `$D backlog doctor
+  --specs-dir repos/valproj/specs` (NOT `specs doctor`, which validates the
+  single-source loose-file/consumption invariants SPEC-DOC-031/035, not the `active[]`
+  entry schema; BL-SCHEMA is the `backlog doctor` path). Assert its exit code directly,
+  not through a pipe.
 - **PASS if:** `specs doctor --json` emits parseable JSON exit 0; and `backlog doctor`
   flags the malformed item `[ERROR] BL-SCHEMA` and exits non-zero.
 
@@ -344,8 +344,8 @@ never exercised the live backlog path was false confidence).
   --specs-dir <ctx>/specs`.
 - **PASS if:** every emitted `intents[].ref` resolves against the live registry (no
   unresolved subjects) AND a release SPEC naming the item under `**Consumes:**` is
-  accepted by `specs doctor`, with the declared slug resolving to an `## ACTIVE`
-  subsection in `specs/backlog/BACKLOG.md`.
+  accepted by `specs doctor`, with the declared slug resolving to an `active[]` entry
+  in `specs/backlog/BACKLOG.json`.
 
 ### R-03 — Fresh specs tree is doctor-clean with no manual edits
 
@@ -391,17 +391,17 @@ never exercised the live backlog path was false confidence).
 ### R-13 — Producers pass their own validators (scaffold / backlog / baseline)
 
 - Hand-write a release scaffold — `mkdir -p specs/releases/v0.1.0`, a Draft `SPEC.md`
-  stub, and a `RELEASE.jsonl` carrying one `phase: SPEC` record (shape: `{ts, event,
-  agent, data}`, `dd-release-implement`'s `RELEASE-EVENTS.md` — `specs release open`/
-  `specs segment open` retired at T-050-21A, no CLI verb replaces them) — then `specs
-  doctor`; add a dir-based segment the same way (a `phase` record carrying
-  `data.segment: "alpha-2"`, plus `specs/releases/<release-id>/alpha-2/TASKS.md`) then
-  doctor again; `backlog new <slug>` then `backlog doctor`; fresh context:
-  `context create` → `alive` → `specs init` → `context baseline`.
+  stub, and a `RELEASE.json` with `phase: "SPEC"` (shape: `release-state-v1`,
+  `dd-release-implement`'s `RELEASE-EVENTS.md` — `specs release open`/`specs segment
+  open` retired at T-050-21A, no CLI verb replaces them) — then `specs doctor`; add a
+  dir-based segment the same way (a top-level `segment: "alpha-2"` field, plus
+  `specs/releases/<release-id>/alpha-2/TASKS.md`) then doctor again; `backlog new
+  <slug>` then `backlog doctor`; fresh context: `context create` → `alive` → `specs
+  init` → `context baseline`.
 - **PASS if ALL of:** both doctors report 0 errors AND 0 warnings on the fresh
   scaffold (Draft + phase SPEC is the legitimate authoring state — bug
-  fresh-release-scaffold-emits-spec-doctor-warnings-042); the freshly-created ACTIVE
-  subsection in `specs/backlog/BACKLOG.md` (the single source, SPEC v0.12.0 FR3, ADR #14)
+  fresh-release-scaffold-emits-spec-doctor-warnings-042); the freshly-created `active[]`
+  entry in `specs/backlog/BACKLOG.json` (the single source, SPEC v0.12.0 FR3, ADR #14)
   is BL-SCHEMA-valid out of the box; and baseline COMPLETES after the official
   scaffold follow-up while still refusing a tree carrying operator files (bug
   context-baseline-rejects-official-scaffold-followup).
