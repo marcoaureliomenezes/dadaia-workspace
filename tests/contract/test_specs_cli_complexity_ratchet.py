@@ -31,7 +31,9 @@ import hashlib
 from pathlib import Path
 
 import pytest
-from radon.complexity import cc_visit
+
+pytest.importorskip("radon")  # CI does not install radon; ruff C901 is the CI-side ceiling
+from radon.complexity import cc_visit  # noqa: E402
 
 pytestmark = pytest.mark.contract
 

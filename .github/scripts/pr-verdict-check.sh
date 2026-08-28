@@ -234,7 +234,7 @@ _ROOT_PREFIX_1="${_ROOT_TEMPLATE_1%%\{glob\}*}"
 _ROOT_PREFIX_2="${_ROOT_TEMPLATE_2%%\{glob\}*}"
 
 CANDIDATES=()
-for _candidate in "${_LIVE_CANDIDATES[@]}"; do
+for _candidate in ${_LIVE_CANDIDATES[@]+"${_LIVE_CANDIDATES[@]}"}; do
   _release_segment="${_candidate#"$_ROOT_PREFIX_1"}"
   _release_segment="${_release_segment%%/verdicts/*}"
   if [[ "$_release_segment" =~ $_RELEASE_ID_RE ]]; then
@@ -243,7 +243,7 @@ for _candidate in "${_LIVE_CANDIDATES[@]}"; do
     echo "[pr-verdict-check] SKIP candidate root: ${_candidate} — release-id segment '${_release_segment}' is not a canon release id; refusing as a candidate root."
   fi
 done
-for _candidate in "${_ARCHIVE_CANDIDATES[@]}"; do
+for _candidate in ${_ARCHIVE_CANDIDATES[@]+"${_ARCHIVE_CANDIDATES[@]}"}; do
   _release_segment="${_candidate#"$_ROOT_PREFIX_2"}"
   _release_segment="${_release_segment%%/verdicts/*}"
   if [[ "$_release_segment" =~ $_RELEASE_ID_RE ]]; then
@@ -253,13 +253,13 @@ for _candidate in "${_ARCHIVE_CANDIDATES[@]}"; do
   fi
 done
 
-if [ "${#CANDIDATES[@]}" -eq 0 ]; then
+if [ "${CANDIDATES[@]+${#CANDIDATES[@]}}" = "" ] || [ "${#CANDIDATES[@]}" -eq 0 ]; then
   echo "::error::pr-verdict-check: no APPROVED security-reviewer verdict covers PR head ${PR_HEAD_SHA} — expected one at ${EXPECTED_SHAPE} (no candidate verdict files found)."
   exit 1
 fi
 
 pass=0
-for handoff in "${CANDIDATES[@]}"; do
+for handoff in ${CANDIDATES[@]+"${CANDIDATES[@]}"}; do
   agent="$(jq -r '.agent // empty' "$handoff" 2>/dev/null || true)"
   verdict="$(jq -r '.verdict // empty' "$handoff" 2>/dev/null || true)"
   sha="$(jq -r '.metrics.commit_sha // empty' "$handoff" 2>/dev/null || true)"

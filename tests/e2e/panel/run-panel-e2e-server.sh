@@ -137,7 +137,7 @@ JSON
 # repos/<slug>/ indirection (memory now lives one level down, behind the
 # symlink, not at $TEMP_WS directly).
 REPO_SYMLINK="$TEMP_WS/repos/dadaia-workspace"
-for atom in specs/memory/architecture.md specs/memory/tech-stack.md specs/memory/product/index.md; do
+for atom in specs/memory/ARCHITECTURE.md specs/memory/TECHSTACK.md specs/memory/product/index.md; do
   if [ ! -f "$REPO_SYMLINK/$atom" ]; then
     log "ERROR: $atom missing under $REPO_SYMLINK"
     exit 1

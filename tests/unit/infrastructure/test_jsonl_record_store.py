@@ -111,7 +111,8 @@ def test_update_refuses_stale_rewrite_when_file_changed_since_read(tmp_path: Pat
     def _mutate(record: BugRecord) -> BugRecord:
         # Simulate a second writer racing between `update`'s initial read and its
         # pre-write re-read — the only hook point available from inside one call.
-        store_path.write_text(store_path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+        with store_path.open("ab") as handle:
+            handle.write(b"\n")
         return record.apply_governance_update({"status": "resolved"})
 
     with pytest.raises(StaleRecordWriteError):
@@ -230,7 +231,8 @@ def test_remove_refuses_stale_rewrite_when_file_changed_since_read(
     def _racing_atomic_write(path: Path, content: str, **kwargs: Any) -> None:
         if not injected["done"]:
             injected["done"] = True
-            store.path.write_text(store.path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+            with store.path.open("ab") as handle:
+                handle.write(b"\n")
         real_atomic_write(path, content, **kwargs)
 
     monkeypatch.setattr(
