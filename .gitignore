@@ -199,3 +199,6 @@ docs/00_medium_mine.md
 # specs-evolution migration backups (FR-S04) — never tracked
 specs_bkp/
 **/specs_bkp/
+
+# memory atoms are Markdown; rendered HTML is ephemeral (was specs/memory/.gitignore)
+specs/memory/**/*.html
