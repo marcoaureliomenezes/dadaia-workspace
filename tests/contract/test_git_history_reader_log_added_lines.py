@@ -148,3 +148,31 @@ def test_log_added_lines_sees_a_commit_history_simplification_would_otherwise_hi
         f"missing from the walk: {[c.sha for c in commits]}"
     )
     assert '{"id": "bug-t1-must-not-be-hidden"}' in commits[1].added_lines
+
+
+def test_log_added_lines_refuses_a_shallow_repository(tmp_path: Path) -> None:
+    """bug ``release-workflow-shallow-checkout-collapses-resolved-commit-derivation-to-head``:
+    a shallow clone can only walk the commits it has, so every ledger line derives to
+    HEAD — the silent under-report the port forbids. The adapter refuses the walk
+    instead of returning a partial history (fixes the class, not one more yaml checkout)."""
+    from dadaia_workspace.core.protocols.git_history_reader import GitHistoryReadError
+
+    origin = tmp_path / "origin"
+    _init_repo(origin)
+    bugs_dir = origin / "specs" / "bugs"
+    bugs_dir.mkdir(parents=True)
+    ledger = bugs_dir / "bugs.jsonl"
+    ledger.write_text('{"event": "reported", "bug_id": "bug-alpha"}\n')
+    _commit_all(origin, "register bug-alpha")
+    ledger.write_text(ledger.read_text() + '{"event": "resolved", "bug_id": "bug-alpha"}\n')
+    _commit_all(origin, "resolve bug-alpha")
+
+    shallow = tmp_path / "shallow"
+    subprocess.run(
+        ["git", "clone", "--quiet", "--depth", "1", origin.as_uri(), str(shallow)],
+        capture_output=True,
+        check=True,
+    )
+
+    with pytest.raises(GitHistoryReadError, match="shallow"):
+        list(GitSubprocessClient().log_added_lines(shallow, "specs/bugs/"))
