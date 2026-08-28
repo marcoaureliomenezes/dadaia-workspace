@@ -326,6 +326,7 @@ def test_doctor_stage_lines_match_the_public_asset_roster(
     assert stage_paths == roster
 
 
+@pytest.mark.timeout(30)  # two full install+doctor cycles over public/: ~10s on Windows CI
 def test_adding_a_throwaway_public_asset_fails_the_roster_leaves_goldens_green(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
