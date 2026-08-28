@@ -881,7 +881,7 @@ QA, code, security — must `APPROVE` the **same** commit.
 
 ## `rc-1` — the whole scope integrates once
 
-- [-] **T-045-35 — [git] `rc-1`: PR `feature/0.4.5` → `develop`**
+- [x] **T-045-35 — [git] `rc-1`: PR `feature/0.4.5` → `develop`**
 
 **Owner role:** dispatcher + security-reviewer · **Preconditions:** T-045-34 `[x]`.
 
