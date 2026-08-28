@@ -112,6 +112,9 @@ _RELEASE_SPEC_STUB = """\
 # ── public API ────────────────────────────────────────────────────────────────
 
 
+_RELEASE_ARTIFACTS = ("SPEC.md", "PLAN.md", "TASKS.md", "RELEASE.json")
+
+
 def release_new(specs_dir: Path, release_id: str) -> NewArtifactResult:
     """Create ``specs/releases/<release_id>/SPEC.md`` with a canonical stub.
 
@@ -138,9 +141,10 @@ def release_new(specs_dir: Path, release_id: str) -> NewArtifactResult:
         )
 
     release_dir = specs_dir / "releases" / release_id
-    if (release_dir / "SPEC.md").exists():
+    minted = [n for n in _RELEASE_ARTIFACTS if (release_dir / n).exists()]
+    if minted:
         raise FileExistsError(
-            f"Release already minted: {release_dir / 'SPEC.md'}. "
+            f"Release already minted: {release_dir / minted[0]}. "
             "Use a different release ID or remove the existing directory first."
         )
 
