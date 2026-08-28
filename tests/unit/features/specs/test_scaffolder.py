@@ -47,6 +47,8 @@ _EXPECTED_FILES = [
     "bugs/AGENTS.md",
     "audits/AGENTS.md",
     "ADRs/AGENTS.md",
+    "ADRs/decisions.jsonl",
+    "ADRs/_superseded/superseded.jsonl",
     "releases/_ideas/AGENTS.md",
     "releases/_archive/releases_histo.jsonl",
     "backlog/_archive/backlog_histo.jsonl",

@@ -161,6 +161,13 @@ def scaffold(
             specs_dir / "releases" / "_ideas" / "AGENTS.md",
             (_scaffold_dir / "releases" / "_ideas" / "AGENTS.md").read_text(encoding="utf-8"),
         )
+        # ADRs/ (v0.5.0 specs-canon closure, operator ruling 2026-08-28): one JSONL
+        # record store, empty at birth — decisions.jsonl (live) + its own
+        # _superseded/superseded.jsonl (a decision moves there when superseded).
+        # Mirrors the per-area histo pattern above: written directly, empty content,
+        # never sourced from a scaffold-tree file (there is nothing to template).
+        _write(specs_dir / "ADRs" / "decisions.jsonl", "")
+        _write(specs_dir / "ADRs" / "_superseded" / "superseded.jsonl", "")
     except Exception as exc:
         result.errors.append(f"Scaffold rules error: {exc}")
 
@@ -214,8 +221,9 @@ def scaffold(
     # moment its first real artifact is written into it (mkdir-parents=True, the
     # shared atomic_write idiom) — never eagerly, never empty-on-purpose.
 
-    # 9 — ADRs/AGENTS.md already written above (v6 canon root member; FR19 owns the
-    # decision-record law/index).
+    # 9 — ADRs/AGENTS.md, ADRs/decisions.jsonl and ADRs/_superseded/superseded.jsonl
+    # already written above (v6 canon root member; specs/ADRs/AGENTS.md owns the
+    # decision-record law).
 
     return result
 
