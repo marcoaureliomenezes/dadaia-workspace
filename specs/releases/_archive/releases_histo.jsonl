@@ -165,3 +165,7 @@
 {"ts": "2026-08-27T12:51:58Z", "event": "note", "agent": "software-engineer", "data": {"release": "v0.1.81", "text": "T-050-12 back-fill scan: layout=root; closure=present; defined=null; shipped=found."}}
 {"ts": "2026-08-27T12:51:58Z", "event": "shipped", "agent": "software-engineer", "data": {"release": "v0.1.81", "sha": "11cfd37c4d8da3411508a7a475ee323ac64a0a3d", "pr": 159}}
 {"ts": "2026-08-27T12:51:58Z", "event": "note", "agent": "software-engineer", "data": {"release": "v0.2.3", "text": "T-050-12 back-fill scan: layout=root; closure=absent; defined=null; shipped=null."}}
+{"ts": "2026-08-28T12:28:39Z", "event": "defined", "agent": "claude-code", "data": {"release": "v0.4.5", "sha": "e619557a", "pr": null}}
+{"ts": "2026-08-28T12:28:39Z", "event": "implemented", "agent": "claude-code", "data": {"release": "v0.4.5", "sha": "c0b2080cf1b6ae76ed19d37aef342fde1d82ef3e", "rc": 1}}
+{"ts": "2026-08-28T12:28:39Z", "event": "shipped", "agent": "claude-code", "data": {"release": "v0.4.5", "sha": "4d1411bbaa9ba4b4cd95fcbf098e2ed95442ff20", "pr": 213}}
+{"ts": "2026-08-28T12:28:39Z", "event": "note", "agent": "claude-code", "data": {"release": "v0.4.5", "text": "Back-fill at ship: rc-1 = final rc (PR #211 -> develop f6373f87); closure PR #212 (60c06b08); squash-merged to main 4d1411bb by PR #213 with tree identity develop==main. Publication withheld by operator order O5."}}
