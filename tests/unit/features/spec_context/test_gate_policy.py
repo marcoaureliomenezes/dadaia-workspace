@@ -32,7 +32,7 @@ _SPEC_RELATIVE_CASES: tuple[tuple[str, str, PathClass], ...] = (
     ("additive_audits", "specs/audits/2026-01-01T000000Z-abc12345/index.md", PathClass.ADDITIVE),
     ("memory_atom", "specs/memory/architecture.md", PathClass.MEMORY),
     ("memory_product", "specs/memory/product/catalog.md", PathClass.MEMORY),
-    ("frozen_archive", "specs/_archive/releases/v0.1.9/SPEC.md", PathClass.FROZEN),
+    ("frozen_archive", "specs/releases/_archive/v0.1.9/SPEC.md", PathClass.FROZEN),
     ("mutating_release", "specs/releases/v0.1.10/SPEC.md", PathClass.MUTATING),
     ("mutating_constitution", "specs/constitution.md", PathClass.MUTATING),
 )
@@ -162,11 +162,15 @@ def test_first_match_wins_ordering_in_repo() -> None:
 def test_archive_prefix_boundary_and_ordering() -> None:
     """Only ``_archive/`` (trailing slash) is FROZEN — a ``_archive``-prefixed sibling
     like ``_archivefoo.jsonl`` stays ADDITIVE, and _archive/ is matched BEFORE the
-    ADDITIVE prefix (a live sibling in the same family stays ADDITIVE)."""
+    ADDITIVE prefix (a live sibling in the same family stays ADDITIVE). Covers all
+    four per-area archives: backlog/audits/bugs (ADDITIVE parents) and releases (a
+    MUTATING parent — root specs/_archive/ retired, specs/releases/_archive/ is the
+    only FROZEN releases-archive prefix now)."""
     for rel_path in (
         "specs/backlog/_archive/epic.md",
         "specs/audits/_archive/2026-01-01T000000Z-abc12345/audit.md",
         "specs/bugs/_archive/concurrency-warning.md",
+        "specs/releases/_archive/v0.1.9/verdicts/deadbeef.handoff.json",
     ):
         assert classify_path(rel_path) == PathClass.FROZEN
 
@@ -175,6 +179,7 @@ def test_archive_prefix_boundary_and_ordering() -> None:
     assert classify_path("specs/backlog/candidates.md") == PathClass.ADDITIVE
     assert classify_path("specs/audits/live-report/audit.md") == PathClass.ADDITIVE
     assert classify_path("specs/bugs/_archive/20260101T00Z-00.jsonl") == PathClass.FROZEN
+    assert classify_path("specs/releases/v9.9.9/verdicts/x.handoff.json") == PathClass.MUTATING
 
     # Boundary: only the trailing-slash form is FROZEN.
     assert classify_path("specs/bugs/_archivefoo.jsonl") == PathClass.ADDITIVE

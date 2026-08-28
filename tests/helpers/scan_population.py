@@ -4,8 +4,11 @@ Deliberately NOT a shared harness or base class — the v0.4.4 S5-FR23 ruling ev
 "one scan harness, N rules" and REJECTED it as premature abstraction on evidence (zero
 registered bugs trace to walker duplication across the census below; the detectors are
 rule-specific by nature and a harness would couple N independent ratchets to one
-framework — see ``specs/_archive/releases/v0.4.4/reviews/S5-FR23-first-firing-ruling.md``,
-"One scan harness, N rules"). This module is a two-line CONVENTION every tree-walking
+framework — see the v0.4.4 S5-FR23 ruling in git history (its
+``specs/_archive/releases/v0.4.4/reviews/S5-FR23-first-firing-ruling.md`` path no
+longer resolves on disk: root ``specs/_archive/`` retired, v0.5.0 specs-canon
+closure — the ruling's text survives in the commit that authored it), "One scan
+harness, N rules"). This module is a two-line CONVENTION every tree-walking
 source-scan test applies **at its own call site**: assert the enumerated population is
 non-empty, and assert one known sentinel member is present in it. A future mis-rooted
 walker (a file moved one directory deeper, a ``.parents[N]`` off by one) then fails
@@ -18,7 +21,7 @@ Census (T-045-17, produced by scan over ``tests/**`` at v0.4.5 S2 HEAD; the raw 
 transcript is captured at
 ``.dadaia/tmp/software-engineer/20260825/T-045-17-census.txt``). The v0.4.4 ruling
 counted 15 tree-/package-walking + single-module source-scan tests at ITS HEAD
-(``specs/_archive/releases/v0.4.4/reviews/S5-FR23-first-firing-ruling.md`` check (b)).
+(the same ruling's check (b), git history).
 Landing FR5 last inside S2 — after FR2 (T-045-14), FR3 (T-045-15) and FR4 (T-045-16),
 per the TASKS.md sequencing — means the population this task guards is that same 15
 PLUS the new scan-shaped tests those three FRs themselves introduced (the atomic-write

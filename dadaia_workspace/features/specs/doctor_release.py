@@ -322,7 +322,8 @@ class ReleaseValidator:
         non-destructive remediation (bug
         doctor-016-errors-archived-legacy-release-027-tolerates).
 
-        Applies to both specs/releases/ and specs/_archive/releases/.
+        Applies to specs/releases/ — root specs/_archive/releases/ retired (v6 canon,
+        not a canon root member; T-050-14 deleted its last content).
         """
         issues: list[SpecsDoctorIssue] = []
         today = date.today()
@@ -331,16 +332,10 @@ class ReleaseValidator:
         if today < RELEASE_SEMVER_CUTOFF:
             return issues
 
-        base_severity = Severity.ERROR if today >= RELEASE_SEMVER_HARD else Severity.WARNING
+        severity = Severity.ERROR if today >= RELEASE_SEMVER_HARD else Severity.WARNING
 
-        for releases_root in (
-            self.specs_dir / "releases",
-            self.specs_dir / "_archive" / "releases",
-        ):
-            if not releases_root.exists():
-                continue
-            is_archive = releases_root.name != "releases" or releases_root.parent.name == "_archive"
-            severity = Severity.WARNING if is_archive else base_severity
+        releases_root = self.specs_dir / "releases"
+        if releases_root.exists():
             for entry in releases_root.iterdir():
                 if not entry.is_dir():
                     continue

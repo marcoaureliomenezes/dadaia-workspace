@@ -63,6 +63,7 @@ _ARCHIVE_SUBDIR_PREFIXES: tuple[str, ...] = (
     "specs/backlog/_archive/",
     "specs/audits/_archive/",
     "specs/bugs/_archive/",
+    "specs/releases/_archive/",
 )
 # Single authority in core (also consumed by the public doctor's foreign scan) —
 # the local name is kept for the module's existing readers.
@@ -70,7 +71,6 @@ _DADAIA_ADDITIVE_PREFIXES: tuple[str, ...] = workspace_layout.DADAIA_ADDITIVE_PR
 #: v0.4.3 FR13 (ratified): bare-prefix match — dotfiles included, by decision; no
 #: carve-out; no SPEC override of the phase rule (see the module docstring above).
 _MEMORY_PREFIX = "specs/memory/"
-_FROZEN_PREFIX = "specs/_archive/"
 #: A path under ``repos/<slug>/`` whose context-relative remainder matches one of these
 #: ``specs/`` class prefixes is classified by that class. Every other in-repo remainder —
 #: production source AND unlisted ``specs/<other>`` files (e.g. ``specs/constitution.md``)
@@ -233,8 +233,6 @@ def _classify_specs_relative(spec_rel: str) -> PathClass | None:
             return PathClass.ADDITIVE
     if spec_rel.startswith(_MEMORY_PREFIX):
         return PathClass.MEMORY
-    if spec_rel.startswith(_FROZEN_PREFIX):
-        return PathClass.FROZEN
     return None
 
 

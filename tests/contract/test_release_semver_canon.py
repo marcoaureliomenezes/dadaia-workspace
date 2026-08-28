@@ -187,7 +187,11 @@ def test_v_prefixed_release_id_refused_at_mint_but_archived_dir_still_resolves(
 ) -> None:
     """A1.10: a fixture proves a new release id carrying a `v` prefix is refused at
     minting (`dadaia release new`), while an existing `v`-prefixed archived directory
-    still resolves (`specs doctor`'s SPEC-DOC-016/SPEC-DOC-027 naming checks)."""
+    still resolves as conformant (`specs doctor`'s SPEC-DOC-027 naming check —
+    SPEC-DOC-016 no longer scans root specs/_archive/releases/ at all, v6 canon:
+    that root retired, T-050-14 deleted its last content, so this fixture's
+    SPEC-DOC-016 exemption is now moot by construction rather than by allowlist;
+    SPEC-DOC-027's own allowlist is the check still meaningfully exercised here)."""
     from dadaia_workspace.features.spec_artifacts.new_artifacts import release_new
     from dadaia_workspace.features.specs import Severity, SpecsDoctor
 

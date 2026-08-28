@@ -68,12 +68,13 @@ itself, discovered only because this test exists):
   (``privacy_baseline.json`` v4), proven by
   ``test_baseline_excludes_the_stdlib_pathlib_home_method_call``.
 
-``specs/_archive/**`` and ``specs/audits/_archive/**`` stay excluded — FROZEN/
-dispositioned archives. A tainted blob already published there is exempt from the real
-push gate by construction (the FROZEN<->scan invariant, ``sdd-gate-v3`` memory atom: a
-rename reuses the blob, so an archived file is never a NEW object of a future push
-range). Scanning them here would fail this sentinel forever for content the real gate
-will never re-flag.
+``specs/audits/_archive/**`` stays excluded — FROZEN/dispositioned archives (root
+specs/_archive/** retired, v0.5.0 specs-canon closure: it is no longer a v6 canon
+root member at all, so nothing is ever tracked there again). A tainted blob already
+published there is exempt from the real push gate by construction (the
+FROZEN<->scan invariant, ``sdd-gate-v3`` memory atom: a rename reuses the blob, so an
+archived file is never a NEW object of a future push range). Scanning it here would
+fail this sentinel forever for content the real gate will never re-flag.
 
 **SPEC v0.4.2 FR9/GRILL P14 — the exclusion is no longer wholesale.** A path under an
 archive prefix is added BACK into scan scope iff its blob sha is absent from ``HEAD^``'s
@@ -141,7 +142,7 @@ pytestmark = [
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 _SCAN_SCOPE = ("dadaia_workspace", "specs", "tests")
 _EXTRA_PATHS = ("pyproject.toml",)
-_EXCLUDED_PREFIXES = ("specs/_archive/", "specs/audits/_archive/")
+_EXCLUDED_PREFIXES = ("specs/audits/_archive/",)
 _TIMEOUT_S = 60
 
 #: Deterministic by design — see the module docstring's "Foreign-slug layer" section.
@@ -394,15 +395,15 @@ def _archive_fixture_literal() -> str:
 
 
 def test_archive_authored_blob_is_scanned_and_fails(tmp_path: Path) -> None:
-    """A9.1: a file AUTHORED directly under ``specs/_archive/`` (a genuinely new blob,
-    never published before) carrying a baseline-matching literal is scanned — and
-    fails — rather than hidden by the wholesale archive exclusion."""
+    """A9.1: a file AUTHORED directly under ``specs/audits/_archive/`` (a genuinely
+    new blob, never published before) carrying a baseline-matching literal is
+    scanned — and fails — rather than hidden by the wholesale archive exclusion."""
     repo = tmp_path / "repo"
     _init_repo(repo)
     (repo / "README.md").write_text("clean\n", encoding="utf-8")
     _commit(repo, "c1 — a real HEAD^")
 
-    archive_dir = repo / "specs" / "_archive"
+    archive_dir = repo / "specs" / "audits" / "_archive"
     archive_dir.mkdir(parents=True)
     (archive_dir / "CLOSURE.md").write_text(
         f"backed up under {_archive_fixture_literal()}\n", encoding="utf-8"
@@ -410,23 +411,23 @@ def test_archive_authored_blob_is_scanned_and_fails(tmp_path: Path) -> None:
     _commit(repo, "c2 — author a CLOSURE straight into the archive")
 
     paths = _tracked_paths(repo, ("specs",), excluded_prefixes=_EXCLUDED_PREFIXES)
-    assert "specs/_archive/CLOSURE.md" in paths, (
+    assert "specs/audits/_archive/CLOSURE.md" in paths, (
         "a genuinely new archive-authored blob must be added back into scan scope"
     )
 
     objects = [_scan_object_for(repo, path) for path in paths]
     baseline_patterns = load_baseline_patterns()
     outcome = scan_objects(objects, terms=(), patterns=baseline_patterns, slugs=_NO_FOREIGN_SLUGS)
-    assert any(hit.path == "specs/_archive/CLOSURE.md" for hit in outcome.hits), (
+    assert any(hit.path == "specs/audits/_archive/CLOSURE.md" for hit in outcome.hits), (
         "the archive-authored blob's baseline-matching literal must surface as a hit"
     )
 
 
 def test_archive_rename_of_an_existing_blob_stays_excluded(tmp_path: Path) -> None:
-    """A9.2: a ``git mv`` of an EXISTING published file into ``specs/_archive/``
-    republishes the SAME blob sha (no new object) — it must stay excluded, preserving
-    the FROZEN<->scan invariant (R5's guard against A9.1's "new" reading being too
-    loose)."""
+    """A9.2: a ``git mv`` of an EXISTING published file into
+    ``specs/audits/_archive/`` republishes the SAME blob sha (no new object) — it
+    must stay excluded, preserving the FROZEN<->scan invariant (R5's guard against
+    A9.1's "new" reading being too loose)."""
     repo = tmp_path / "repo"
     _init_repo(repo)
     (repo / "specs").mkdir()
@@ -435,12 +436,12 @@ def test_archive_rename_of_an_existing_blob_stays_excluded(tmp_path: Path) -> No
     )
     _commit(repo, "c1 — publish the doc outside the archive")
 
-    (repo / "specs" / "_archive").mkdir()
-    _git(["mv", "specs/old-doc.md", "specs/_archive/old-doc.md"], repo)
+    (repo / "specs" / "audits" / "_archive").mkdir(parents=True)
+    _git(["mv", "specs/old-doc.md", "specs/audits/_archive/old-doc.md"], repo)
     _commit(repo, "c2 — relocate into the archive via git mv")
 
     paths = _tracked_paths(repo, ("specs",), excluded_prefixes=_EXCLUDED_PREFIXES)
-    assert "specs/_archive/old-doc.md" not in paths, (
+    assert "specs/audits/_archive/old-doc.md" not in paths, (
         "a renamed/relocated blob that already existed must stay excluded"
     )
 
@@ -451,11 +452,11 @@ def test_missing_head_parent_degrades_to_prior_behaviour(tmp_path: Path) -> None
     excluded, and resolving the scope never raises."""
     repo = tmp_path / "repo"
     _init_repo(repo)
-    (repo / "specs" / "_archive").mkdir(parents=True)
-    (repo / "specs" / "_archive" / "CLOSURE.md").write_text(
+    (repo / "specs" / "audits" / "_archive").mkdir(parents=True)
+    (repo / "specs" / "audits" / "_archive" / "CLOSURE.md").write_text(
         f"backed up under {_archive_fixture_literal()}\n", encoding="utf-8"
     )
     _commit(repo, "c1 — the initial commit, no parent")
 
     paths = _tracked_paths(repo, ("specs",), excluded_prefixes=_EXCLUDED_PREFIXES)
-    assert "specs/_archive/CLOSURE.md" not in paths
+    assert "specs/audits/_archive/CLOSURE.md" not in paths
