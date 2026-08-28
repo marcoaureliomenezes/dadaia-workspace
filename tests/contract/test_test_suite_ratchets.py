@@ -70,6 +70,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.helpers.suite_files import tracked_test_files
+
 pytestmark = pytest.mark.contract
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -131,7 +133,7 @@ def test_v26_private_symbol_import_ratchet_pins_the_hyrums_law_liability() -> No
     T-050-03's capture). Ratchet DOWN ONLY; target 0."""
     total_statements = 0
     files_with_hits: set[Path] = set()
-    for path in sorted(_TESTS_DIR.rglob("*.py")):
+    for path in tracked_test_files(_REPO_ROOT):
         hits = _private_symbol_import_statements(
             path.read_text(encoding="utf-8"), filename=str(path)
         )
@@ -194,7 +196,7 @@ def test_v27_intent_header_coverage_ratchet() -> None:
     declared files out of `tests/**/test_*.py` (T-050-03 baseline 94/396; this
     re-measure on the current HEAD is higher — later tasks already declared more).
     Ratchet UP ONLY; target is every collected test file."""
-    test_files = sorted(_TESTS_DIR.glob("**/test_*.py"))
+    test_files = tracked_test_files(_REPO_ROOT, "test_*.py")
     declared_count = sum(
         1
         for path in test_files
@@ -259,7 +261,7 @@ def test_v28_scaffold_expiry_goes_red_against_an_archived_release(tmp_path: Path
     `expires: 0.6.0`, checked against the exact-name-match archive listing)."""
     archive_releases_dir = _REPO_ROOT / "specs" / "releases" / "_archive"
     violations = []
-    for path in sorted(_TESTS_DIR.glob("**/test_*.py")):
+    for path in tracked_test_files(_REPO_ROOT, "test_*.py"):
         violation = _scaffold_expiry_violation(
             path.read_text(encoding="utf-8"),
             archive_releases_dir=archive_releases_dir,
@@ -498,3 +500,16 @@ def test_v30_pyramid_shape_reported_from_collect_only() -> None:
     skewed = _pyramid_shares({"small": 40, "medium": 20, "large": 40})
     skewed_findings = _pyramid_drift_findings(skewed)
     assert skewed_findings, "the drift-finding detector failed to flag a skewed pyramid"
+
+
+def test_ratchet_scope_is_the_tracked_suite_never_a_tests_tmp_probe() -> None:
+    """Bug ``v26-ratchet-scans-tests-tmp-scratch-dir-xdist-race`` (caused_by
+    ``frozen-clock-ratchet-scans-tests-tmp-scratch-dir``): a probe another xdist worker
+    writes under ``tests/tmp/`` must never enter any ratchet's scope."""
+    probe = _TESTS_DIR / "tmp" / "_ratchet_scope_probe.py"
+    probe.write_text("x = 1\n", encoding="utf-8")
+    try:
+        assert probe not in tracked_test_files(_REPO_ROOT)
+        assert _TESTS_DIR / "conftest.py" in tracked_test_files(_REPO_ROOT)
+    finally:
+        probe.unlink()
