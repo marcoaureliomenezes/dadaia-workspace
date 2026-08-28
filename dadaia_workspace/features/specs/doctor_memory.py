@@ -367,8 +367,10 @@ class MemoryValidator:
     def check_lint1_memory_atoms(self) -> list[SpecsDoctorIssue]:
         """LINT-1: lint every memory atom under specs/memory/ via ``memory_lint``.
 
-        ERROR on frontmatter/schema violations + forbidden headings.
-        WARNING on unknown (non-allowlisted) headings.
+        ERROR on frontmatter/schema violations, forbidden (changelog/history)
+        headings, duplicate headings, and unresolved wikilinks. A heading vocabulary
+        is prose policy, not a lint (v0.5.0) — no WARNING severity path exists here
+        any more.
 
         v0.4.3 T-043-20/FR16: ``memory_lint`` is imported directly — no subprocess,
         no dependency on the projected ``public/scripts/lint-memory-atoms.py`` copy

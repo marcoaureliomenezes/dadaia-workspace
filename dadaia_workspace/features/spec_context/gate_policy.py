@@ -7,10 +7,9 @@ session records remain fail-closed against file-tool writes.
 **The MEMORY path class covers dotfiles, by decision (v0.4.3 FR13, software-architect
 ruling, handoff 2026-08-17T161500Z-software-architect-v0.4.3-fr13-fr14).**
 ``_MEMORY_PREFIX``'s bare-prefix match classifies EVERY path under ``specs/memory/`` —
-dotfiles included (e.g. ``specs/memory/.heading-allowlist``, curated lint canon, not
-runtime config) — as MEMORY. No dotfile carve-out exists and none is added: a
+dotfiles included — as MEMORY. No dotfile carve-out exists and none is added: a
 carve-out would open an always-writable hole under the MEMORY prefix through which
-lint canon could mutate mid-implementation, the exact stale-layer pattern the gate
+memory content could mutate mid-implementation, the exact stale-layer pattern the gate
 exists to prevent. Second, a SPEC may NOT assign a memory-class write to a
 non-``DEFINITION``/``CLOSURE`` task: the gate reads no SDD artifacts by design and
 gains no SPEC-override channel — ``[RULE A]`` (``evaluate``, below) keeps blocking

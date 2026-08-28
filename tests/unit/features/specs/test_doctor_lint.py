@@ -63,32 +63,34 @@ def test_lint1_forbidden_heading_maps_to_error(tmp_path: Path) -> None:
     assert "Changelog" in issues[0].description
 
 
-def test_lint1_unknown_heading_maps_to_warning(tmp_path: Path) -> None:
+def test_lint1_unknown_heading_produces_no_issue(tmp_path: Path) -> None:
+    """The heading-vocabulary check (a curated allowlist of "known" headings) is
+    retired (v0.5.0): a heading vocabulary is prose policy, not a lint. A heading
+    nobody has ever seen before is neither an error nor a warning at the doctor
+    mapping layer either."""
     specs = _make_specs_with_memory(tmp_path)
     (specs / "memory" / "architecture.md").write_text(
         _VALID_FRONTMATTER.format(slug="architecture")
-        + "\n## Some Brand New Unallowlisted Heading\n\ncontent\n",
+        + "\n## Some Brand New Never Before Seen Heading\n\ncontent\n",
         encoding="utf-8",
     )
 
     issues = MemoryValidator(specs).check_lint1_memory_atoms()
 
-    assert len(issues) == 1
-    assert issues[0].code == "LINT-1"
-    assert issues[0].severity == Severity.WARNING
-    assert "not in the curated allowlist" in issues[0].description
+    assert issues == []
 
 
-def test_lint1_error_takes_priority_over_warning_in_the_same_run(tmp_path: Path) -> None:
-    """When BOTH an error-class and a warning-class atom exist, the aggregate issue is
-    ERROR — errors are never silently downgraded by a co-occurring warning."""
+def test_lint1_error_atom_and_clean_atom_coexist_only_the_error_surfaces(tmp_path: Path) -> None:
+    """Multiple atoms aggregate correctly: a genuine forbidden-heading ERROR in one
+    atom surfaces, while a sibling atom with an ordinary (never-curated) heading
+    contributes nothing — exactly one issue, not silently swallowed or duplicated."""
     specs = _make_specs_with_memory(tmp_path)
     (specs / "memory" / "architecture.md").write_text(
         _VALID_FRONTMATTER.format(slug="architecture") + "\n## History\n\nforbidden\n",
         encoding="utf-8",
     )
     (specs / "memory" / "tech-stack.md").write_text(
-        _VALID_FRONTMATTER.format(slug="tech-stack") + "\n## Totally Unknown Heading\n\nx\n",
+        _VALID_FRONTMATTER.format(slug="tech-stack") + "\n## Some Other Heading\n\nx\n",
         encoding="utf-8",
     )
 

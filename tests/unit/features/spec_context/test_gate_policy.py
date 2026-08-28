@@ -305,8 +305,8 @@ def test_evaluate_anon_session_emits_no_presence_events(tmp_path: Path) -> None:
 # ═════════════════════════════════════════════════════════════════════════════════
 
 _MEMORY_DOTFILE_PATHS: tuple[str, ...] = (
-    "specs/memory/.heading-allowlist",
-    f"repos/{_DEFAULT_SLUG}/specs/memory/.heading-allowlist",
+    "specs/memory/.editor-scratch",
+    f"repos/{_DEFAULT_SLUG}/specs/memory/.editor-scratch",
 )
 #: A non-dot sibling atom, in BOTH root and in-repo form, pinned for parity (the
 #: ruling's fixture requirement) — same MEMORY class, same phase gate, no distinction.
