@@ -49,6 +49,28 @@ def _repo_root() -> Path:
     return Path(out.stdout.strip())
 
 
+def _repo_identity_root(worktree_root: Path) -> Path:
+    """The repository's main working tree — its identity under ``<workspace>/repos/``.
+
+    A linked worktree (``git worktree add``) may sit anywhere on disk; the repo it
+    belongs to is named by the git common dir's parent, never by the worktree's own
+    filesystem position. Falls back to *worktree_root* when git cannot answer.
+    """
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "--git-common-dir"],
+            cwd=worktree_root,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return worktree_root
+    # git prints ".git" (relative) from the main checkout and an absolute path from a
+    # linked worktree; anchoring on the worktree root covers both without a git>=2.31 flag.
+    return (worktree_root / out.stdout.strip()).resolve().parent
+
+
 @app.command()
 def preflight(
     quick: bool = typer.Option(False, "--quick", help="Skip the slow e2e suite."),
@@ -130,7 +152,7 @@ def pre_commit_check() -> None:
 
     repo_root = _repo_root()
     workspace = _resolve_workspace_root(repo_root)
-    ctx = context_slug_for_path(workspace, repo_root)
+    ctx = context_slug_for_path(workspace, _repo_identity_root(repo_root))
 
     # Wire the read-only ancestry adapter and the pid-liveness probe from the composition root.
     ancestry_adapter = build_process_ancestry()
@@ -243,7 +265,7 @@ def push_gate_check() -> None:
 
     denylist_terms = load_denylist_terms()
     baseline_patterns = load_denylist_baseline_patterns()
-    own_slug = context_slug_for_path(workspace, repo_root)
+    own_slug = context_slug_for_path(workspace, _repo_identity_root(repo_root))
     registry_result = load_registry_context_identities(workspace)
     if registry_result.degraded:
         # SPEC v0.4.2 FR8(2)/GRILL P13/A8.3: a malformed registry no longer shrinks the
