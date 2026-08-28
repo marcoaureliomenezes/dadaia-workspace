@@ -3,7 +3,7 @@
 Reads/writes the operator-editable overlay at
 ``.dadaia/states/agent_model_policy.json`` (schema ``agent-model-policy-v1`` —
 ``public/schemas/agent-model-policy-v1.schema.json``):
-atomic temp+rename write (``tempfile.mkstemp`` in the target dir → ``os.replace``) and a
+atomic temp+rename write (``core.atomic_write.atomic_write``) and a
 ``.last-good.json`` backup of the prior valid file.
 
 Two load paths, deliberately distinct (NFR-4, "missing != invalid"):
@@ -25,8 +25,6 @@ panel validate endpoint in Wave 4).
 from __future__ import annotations
 
 import json
-import os
-import tempfile
 from pathlib import Path
 
 from dadaia_workspace.core.agent_model_templates import (
@@ -34,6 +32,7 @@ from dadaia_workspace.core.agent_model_templates import (
     resolve_agent_model,
     template_by_id,
 )
+from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.model_registry import registry_by_claude_id
 from dadaia_workspace.core.models.agent_model_policy import (
     _SCHEMA_VERSION,
@@ -104,8 +103,12 @@ class JsonAgentModelPolicyStore:
         self._path.parent.mkdir(parents=True, exist_ok=True)
         if self._path.exists():
             # Snapshot the PRIOR valid file verbatim before overwriting (NFR-1).
-            self._atomic_write_bytes(self.last_good_path, self._path.read_bytes())
-        self._atomic_write(self._path, json.dumps(overlay.to_dict(), indent=2, sort_keys=True))
+            atomic_write(self.last_good_path, self._path.read_bytes(), ensure_parent=True)
+        atomic_write(
+            self._path,
+            json.dumps(overlay.to_dict(), indent=2, sort_keys=True) + "\n",
+            ensure_parent=True,
+        )
 
     # -- validation -------------------------------------------------------
 
@@ -230,27 +233,6 @@ class JsonAgentModelPolicyStore:
                 "Fable is never assigned to security-reviewer (operator ruling G-1)",
                 path,
             )
-
-    # -- atomic write -------------------------------------------------------
-
-    def _atomic_write(self, path: Path, content: str) -> None:
-        self._atomic_write_bytes(path, (content + "\n").encode("utf-8"))
-
-    def _atomic_write_bytes(self, path: Path, payload: bytes) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        fd, tmp_name = tempfile.mkstemp(
-            dir=path.parent,
-            prefix=f".{path.name}.",
-            suffix=".tmp",
-        )
-        tmp_path = Path(tmp_name)
-        try:
-            with os.fdopen(fd, "wb") as handle:
-                handle.write(payload)
-            os.replace(tmp_path, path)
-        except Exception:
-            tmp_path.unlink(missing_ok=True)
-            raise
 
 
 __all__ = [

@@ -18,6 +18,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.helpers.scan_population import assert_populated
+
 pytestmark = pytest.mark.unit
 
 _REPO_ROOT = Path(__file__).parents[4]  # repos/dadaia-workspace/
@@ -39,8 +41,13 @@ def _python_sources() -> list[Path]:
 def test_no_credential_query_param_in_panel_or_cli_sources() -> None:
     """Neither the CLI panel launch path nor any panel Python source ever
     interpolates a credential into a URL (`?token=` / `?launch=`)."""
+    # v0.4.5 FR5 (scan-test-vacuity-guard): `_LAUNCH_CLI` is appended unconditionally,
+    # so this list is never fully empty even when `_PANEL` is mis-rooted — the sentinel
+    # half is what actually catches a mis-rooted `_PANEL` scan (a real panel module).
+    sources = _python_sources()
+    assert_populated(sources, sentinel=_PANEL / "service.py")
     offenders: list[str] = []
-    for path in _python_sources():
+    for path in sources:
         text = path.read_text(encoding="utf-8")
         for i, line in enumerate(text.splitlines(), start=1):
             if _TOKEN_IN_URL_RE.search(line):

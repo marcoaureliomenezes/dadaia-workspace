@@ -2,32 +2,35 @@
 slug: pypi-distribution
 title: pypi-distribution
 category: product
-tldr: The published dadaia-workspace PyPI package on a single version axis, the release.yml OIDC publish pipeline, and the wheel content contract.
+tldr: The published PyPI package on one version axis, the OIDC publish pipeline, the minted-unpublished shape, and the wheel content contract.
 summary: >-
   Owns PyPI distribution as product behavior — the live `dadaia-workspace` package, the
   `.github/workflows/release.yml` pipeline (version-vs-tag check → five test legs → build →
   release-gate approval → OIDC trusted publishing + tag → post-publish smoke), the wheel
-  content contract (public assets ship in-package), and the single version axis: the
-  `pyproject.toml` version tracks the published PyPI lineage and a release id is that same
-  minted number, `v`-prefixed. The CHANGELOG records that lineage completely — a
-  git-derived, range-cited section for every published version, and an
-  unpublished-internal annotation for every heading matching none; nothing is deleted or
-  renamed.
+  content contract (public assets ship in-package), and the single version axis: one number
+  carries the release id, the `pyproject.toml` version and, once published, the PyPI
+  lineage. Minting and publishing are separate acts — `HEAD` carries the newest minted
+  number while the published lineage carries only the numbers the withheld release-gate
+  approval let through, and a minted-unpublished number is retired rather than reused. The
+  CHANGELOG records that lineage completely — a git-derived, range-cited section for every
+  published version, and an unpublished-internal annotation for every heading matching
+  none; nothing is deleted or renamed.
 tags:
 - distribution
 - pypi
 - release
 - packaging
-last_updated: '2026-08-24'
-release_origin: v0.4.2
+last_updated: '2026-08-27'
+release_origin: v0.4.5
 ---
 
 ## Purpose
 
 `dadaia-workspace` is a published PyPI package: `pip install dadaia-workspace`
 installs the library and its `dadaia` CLI. `pyproject.toml` `version` is the single source
-of the number, and it tracks one lineage: what PyPI has published. A minted version stays
-unpublished until it is deployed, and no other file restates the number.
+of the number, and no other file restates it. Minting a number and publishing it are two
+acts: the number is minted at a release's final candidate and reaches PyPI only when the
+operator approves the release gate.
 Consumer-validation candidates are throwaway wheels — they NEVER mint intermediate
 published versions; version numbers advance only at deploy time, on the operator's order.
 PyPI descriptions are immutable per release: a documentation-only fix to the project page
@@ -50,7 +53,9 @@ secrets; the `pypi` GitHub environment carries the trust binding.
 4. `build` produces sdist + wheel (`poetry build`) and uploads them as a
    versioned artifact.
 5. `approve` blocks on the **`release-gate` GitHub environment** — a human
-   approval step before anything reaches PyPI.
+   approval step before anything reaches PyPI. Withholding it is a supported outcome, not
+   a stall: `publish` never runs, no `v<version>` tag is created, and the merge to `main`
+   still shipped the code. That is exactly how a number becomes minted-unpublished.
 6. `publish` downloads the built artifact, publishes via
    `pypa/gh-action-pypi-publish` under the `pypi` environment (OIDC
    `id-token: write`), then creates and pushes the `v<version>` git tag.
@@ -68,17 +73,27 @@ to.
 
 ## Differentiator
 
-**One version axis — the published PyPI lineage.** There is a single number, and it means
-what PyPI shows: a release id **is** the version that release mints, `v`-prefixed
-(`v0.4.2` ⇔ package `0.4.2`), so `pyproject.toml`, the git tag, the release directory and
-the CHANGELOG section for a shipped release all carry the same digits. No number is minted
-on an internal axis, and a release never renumbers itself to reconcile with the package.
-Reading any `v`-prefixed id in `specs/` and the bare number on PyPI, one resolves the other.
+**One version axis, two positions on it.** There is a single number: a release id **is**
+the version that release mints, `v`-prefixed (`v0.4.2` ⇔ package `0.4.2`), so
+`pyproject.toml`, the release directory and the CHANGELOG section for a release all carry
+the same digits. No number is minted on an internal axis, and a release never renumbers
+itself to reconcile with the package.
 
-The published lineage runs `0.4.2 → 0.4.4`. **`0.4.3` was minted locally and never
-published**: it keeps its CHANGELOG section as a local-only mint and its archived release
-directory, and the number is retired rather than reused — reusing it would have collided
-with both. The gap is the honest record of that, not a missing entry.
+What the one axis carries at two different positions is **`HEAD`** and the **published
+lineage**. `pyproject.toml` on `main` is the newest **minted** number; PyPI shows the
+newest **published** one; a git tag `v<version>` exists only for the published ones,
+because the publish job is what creates it. The two positions coincide whenever the
+operator approves the release gate, and diverge whenever the approval is deliberately
+withheld.
+
+Today `main` reads `0.4.5` and the published lineage runs `0.4.2 → 0.4.4`. **`0.4.3` and
+`0.4.5` were minted locally and never published** — the shape is now repeated rather than
+accidental, so it is product truth and not a footnote. A minted-unpublished number keeps
+its CHANGELOG section, annotated as a local-only mint, and its archived release directory;
+the number is **retired rather than reused**, because reusing it would collide with both.
+Each such gap in the lineage is the honest record of a withheld approval, never a missing
+entry. Publication of an already-minted number remains available on a later operator order,
+and a higher number may supersede it instead; nothing in the shape forecloses either.
 
 `CHANGELOG.md` carries the reconciling preamble this implies: it states which of its
 historical headings were minted internally and never reached PyPI, maps them to the
@@ -122,7 +137,8 @@ workspace-venv bootstraps install the candidate itself instead of pinning the
 - GitHub environments `release-gate` (human approval) and `pypi` (OIDC trusted
   publishing binding).
 - Git tags `v<package-version>` — created by the publish job after a successful
-  upload.
+  upload, so a tag exists for exactly the published numbers and for no minted-unpublished
+  one.
 
 ## Dependencies
 

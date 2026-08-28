@@ -389,7 +389,7 @@ def _different_local_part_at_the_mandated_domain() -> str:
 
 
 def test_email_address_pattern_excludes_the_mandated_noreply_trailer_address() -> None:
-    """Intent: BUG — privacy-baseline-noreply-local-part-not-carved-out (HIGH).
+    """Intent: CONTRACT — privacy-baseline-noreply-local-part-not-carved-out (HIGH).
 
     Root-cause proof at the regex level (not only through the doctor plumbing): the
     exact law-mandated trailer address must both match the email-address SHAPE (it is
@@ -519,7 +519,7 @@ def _different_realistic_home_path_literal() -> str:
 
 
 def test_home_abs_path_pattern_excludes_the_reconciliation_bug_synthetic_fixture_literals() -> None:
-    """Intent: BUG — reconciliation-merge-body-scan-unamendable-main-squash (HIGH).
+    """Intent: CONTRACT — reconciliation-merge-body-scan-unamendable-main-squash (HIGH).
 
     Root-cause proof at the regex level (not only through the doctor plumbing): BOTH
     synthetic fixture literals quoted in main's already-published squash-commit body

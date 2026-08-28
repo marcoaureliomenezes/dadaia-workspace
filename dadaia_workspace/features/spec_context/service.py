@@ -564,11 +564,7 @@ class SpecContextService:
         if ctx is None:
             raise ContextNotFoundError(f"Context '{name}' not found.")
 
-        ctx_latest = self._store.get(name)
-        if ctx_latest is None:
-            raise ContextNotFoundError(f"Context '{name}' not found.")
-
-        for repo in ctx_latest.all_repos():
+        for repo in ctx.all_repos():
             repo_dest = self._repo_path(repo.slug)
             if not repo_dest.exists():
                 self._git.clone(repo.url, repo_dest)
@@ -582,12 +578,12 @@ class SpecContextService:
         actual_branch: str | None = None
         backfilled_url: str = ctx.repo_url
 
-        if ctx_latest.current_branch:
+        if ctx.current_branch:
             try:
-                self._git.checkout(repo_path, ctx_latest.current_branch)
+                self._git.checkout(repo_path, ctx.current_branch)
             except Exception as exc:
                 print(
-                    f"WARNING: could not checkout branch {ctx_latest.current_branch!r}: {exc}",
+                    f"WARNING: could not checkout branch {ctx.current_branch!r}: {exc}",
                     file=sys.stderr,
                 )
 
@@ -596,7 +592,7 @@ class SpecContextService:
         except Exception:
             actual_branch = None
 
-        backfilled_url = self._backfill_repo_url(repo_slug, ctx_latest.repo_url)
+        backfilled_url = self._backfill_repo_url(repo_slug, ctx.repo_url)
 
         # Bug context-alive-sweeps-unrelated-worktree-changes (MEDIUM): the scaffold
         # commit below must stage EXACTLY the paths this method creates/modifies below

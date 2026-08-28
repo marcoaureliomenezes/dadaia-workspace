@@ -36,10 +36,10 @@ so a pid-keyed bind GC would collect every legitimate READ bind (ADR-8 amended r
 from __future__ import annotations
 
 import json
-import os
 import re
-import uuid
 from pathlib import Path
+
+from dadaia_workspace.core.atomic_write import atomic_write
 
 __all__ = [
     "SESSION_CREATION_FIELDS",
@@ -105,22 +105,6 @@ def sessions_dir(workspace: Path, *, create: bool = False) -> Path:
 
 
 # ---------------------------------------------------------------------------
-# Atomic write primitive (temp + os.replace) — POSIX + Windows safe.
-# ---------------------------------------------------------------------------
-
-
-def _atomic_write_text(path: Path, text: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.parent / f"{path.name}.{uuid.uuid4().hex}.tmp"
-    tmp.write_text(text, encoding="utf-8")
-    try:
-        os.replace(tmp, path)
-    except OSError:
-        tmp.unlink(missing_ok=True)
-        raise
-
-
-# ---------------------------------------------------------------------------
 # Session record — <id>.json
 # ---------------------------------------------------------------------------
 
@@ -153,7 +137,7 @@ def write_session(
     """
     _validate(session_id, field="session_id")
     path = session_record_path(workspace, session_id, create=True)
-    _atomic_write_text(path, json.dumps(record, indent=2))
+    atomic_write(path, json.dumps(record, indent=2), ensure_parent=True, newline=None)
 
 
 # ---------------------------------------------------------------------------

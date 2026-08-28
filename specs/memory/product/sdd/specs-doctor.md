@@ -14,7 +14,7 @@ tags:
 - doctor
 - validation
 - sdd
-last_updated: '2026-08-18'
+last_updated: '2026-08-27'
 release_origin: v0.4.2
 ---
 
@@ -77,13 +77,20 @@ the segment subdirectory, so returning quietly there disabled artifact-presence 
 is worse than one that goes loud. The refusal is scoped to a live segment pointer: a flat
 release is genuinely covered by the release-directory check and fires nothing here.
 
-The doctor is not the only checker in this family. `dadaia public doctor` carries the
-privacy-baseline **carve-out rationale** check: an `exclude_regex` with no
-`exclude_rationale` is reported on every run, so a carve-out nobody can explain cannot sit
-in the baseline unnoticed ([[sdd-gate-v3]]).
+The doctor is not the only checker in this family, and the split is by subject. `dadaia
+public doctor` carries the privacy-baseline **carve-out rationale** check: an
+`exclude_regex` with no `exclude_rationale` is reported on every run, so a carve-out nobody
+can explain cannot sit in the baseline unnoticed ([[sdd-gate-v3]]). `dadaia doctor` owns
+every **workspace-state** invariant — the `.dadaia/` layout allowlist, repository
+coherence, and the registry-wide repo-slug ownership check `INV-6` ([[workspace-doctor]]).
+Specs doctor holds no second opinion on any of them: it validates SDD documents.
 
 There is no lease/session-coherence validator. Workspace concurrency state is advisory
 presence and belongs to `dadaia doctor`, not specs doctor.
+
+The memory validators are unchanged by the catalog's injection-tier curation: `CAT-1`
+reconciles catalog entries against atom files by **slug set**, so which optional fields the
+persisted catalog carries is outside what it asserts ([[context-management]]).
 
 ## Usage
 

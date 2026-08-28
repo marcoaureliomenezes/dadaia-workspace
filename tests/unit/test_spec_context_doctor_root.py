@@ -236,6 +236,14 @@ def test_root3_table(tmp_path: Path) -> None:
             "dotfile_inside_dadaia",
             lambda tp: (tp / ".dadaia" / ".gitkeep").write_text(""),
         ),
+        (
+            # Operator ruling O4 (v0.4.5, T-045-23, FR10): .dadaia/references/<clone>/
+            # is the sanctioned home for an operator-placed reference clone — no longer
+            # ROOT-4. See test_dadaia_references_lifecycle_sanction.py for the paired
+            # A10.2 proof that no lifecycle verb can ever act on it.
+            "dadaia_references_reference_clone",
+            lambda tp: (tp / ".dadaia" / "references" / "some-clone").mkdir(parents=True),
+        ),
     ],
 )
 def test_root4_allow_table(tmp_path: Path, name: str, setup_fn: object) -> None:
@@ -247,14 +255,19 @@ def test_root4_allow_table(tmp_path: Path, name: str, setup_fn: object) -> None:
     assert "ROOT-4" not in codes
 
 
-@pytest.mark.parametrize("name", ["figma-bridge", "imgs", "references"])
+@pytest.mark.parametrize("name", ["figma-bridge", "imgs"])
 def test_root4_flags_retired_junk_drawer_dirs(tmp_path: Path, name: str) -> None:
     """Bug doctor-whitelist-legitimizes-slop-dirs (2026-07-15).
 
     The retired 'Additional dirs observed in practice' junk-drawer entries
-    (figma-bridge, imgs, references) are NO LONGER canonical — they have no
+    (figma-bridge, imgs) are NO LONGER canonical — they have no
     architectural purpose (MCP state -> mcps/, evidence -> tmp/<agent>/<date>/).
     Doctor must flag them ROOT-4 so slop stops accumulating at the .dadaia root.
+
+    ``references`` was a third entry in this same 2026-07-15 sweep; operator ruling O4
+    (v0.4.5, T-045-23, FR10) re-sanctions it under a new, explicit purpose (operator
+    reference clones) — it moved to the ROOT-4 allow-table above and is no longer
+    flagged here.
     """
     _init_workspace(tmp_path)
     (tmp_path / ".dadaia" / name).mkdir()

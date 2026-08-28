@@ -1,6 +1,6 @@
 ---
 name: dd-bug-registration
-description: "Use when: registering a genuine product bug you hit while operating this tooling — classify-first, redact, append the `reported` event. The opening move of Arm B only, never the fix (that's `dd-bug-fix`). Any agent may invoke it."
+description: "Use when: registering a genuine product bug you hit while operating this tooling — classify-first, redact, append the `reported` event. The opening move of Arm B only; the fix itself belongs to `dd-bug-fix`. Any agent may invoke it."
 applyTo: "specs/bugs/*.jsonl"
 ---
 
@@ -48,7 +48,14 @@ dadaia bugs append --bug-id <slug> --event reported --reported-by <agent> \
   --context <ctx> --tag <tag> --symptom "…" --repro "…" --expected "…" --notes "… (redacted)"
 ```
 
-## 5. Context routing (self-hosting vs consumer)
+## 5. Review-verdict bug-surface axis (FR24)
+
+A reviewer's `APPROVE`/`REQUEST_CHANGES` (or REJECT) verdict also states whether the
+change reduced or increased the bug surface of the touched feature, with evidence from
+`specs/bugs/*.jsonl` (`dadaia bugs stats`). A verdict without this axis is incomplete —
+tests green is insufficient on its own; check the bug surface separately.
+
+## 6. Context routing (self-hosting vs consumer)
 
 In this self-hosting workspace, bugs go to `repos/dadaia-workspace/specs/bugs/`. In a
 consumer workspace, bugs go to the active context's `specs/bugs/` plus an upstream

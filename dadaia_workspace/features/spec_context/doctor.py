@@ -66,41 +66,11 @@ _ROOT_FORBIDDEN_CACHES: frozenset[str] = frozenset(
 #: root-law-allowed (see ``_ROOT_ALLOWED_FILES``).
 _ROOT_TOOL_CONFIGS: frozenset[str] = frozenset({".mcp.json"})
 
-#: Canonical top-level subdirectories allowed inside `.dadaia/` (ROOT-4).
-# The canonical .dadaia/ subdirs. Each has ONE architectural purpose, documented in
-# the projected .dadaia/AGENTS.md canonical-folder table. This set is the enforcement
-# half of that law: anything else is slop and flags ROOT-4. Do NOT re-add a folder here
-# to silence the check — route the concern into the zone that owns it (bug
-# doctor-whitelist-legitimizes-slop-dirs, 2026-07-15; the retired junk-drawer entries
-# figma-bridge/imgs/references were removed — MCP state -> mcps/, evidence ->
-# tmp/<agent>/<date>/).
-_DADAIA_ALLOWED_SUBDIRS: frozenset[str] = frozenset(
-    {
-        # ── Projections (lib-originated; regen via `dadaia public install`) ──
-        "agentic",  # staged public assets + manifest.json (projection source-of-truth)
-        "hooks",  # projected Python governance hook entrypoints (v0.1.47 W1-9)
-        "scripts",  # projected runtime/git-hook scripts
-        # ── Runtime working areas ──
-        "mcps",  # per-MCP-server working dirs (mcps/<server>/)
-        "runtime",  # long-lived local runtime working area for tooling
-        # ── CLI/service-owned state ──
-        "states",  # machine-readable runtime state JSON
-        "sessions",  # per-session identity/bind records (PROTECTED)
-        # ── Outputs ──
-        "handoff",  # machine-readable agent handoffs (handoff/<context>/)
-        "reports",  # human-readable HTML reports (reports/<context>/<agent>/)
-        "academy",  # durable agent study/mastery notes + validation ledgers
-        # ── Ephemeral (disposable, GC'd) ──
-        "tmp",  # scratch + evidence, tmp/<agent>/<YYYYMMDD>/
-        "logs",  # telemetry/event logs
-        "runs",  # workflow run transcripts
-        "dev-report",  # generated developer diagnostic reports
-        # ── Artifacts / managed environments ──
-        "dist",  # built wheels + local exports
-        ".venv",  # managed workspace Python environment
-        ".cache",  # redirected tool caches (ruff/coverage), kept out of repos
-    }
-)
+#: Canonical top-level subdirectories allowed inside `.dadaia/` (ROOT-4) — DERIVED from
+#: the single authority ``core/workspace_layout.py`` (one fact, one place; see the hook's
+#: twin note). Never hand-copy a literal set here — that produced bug
+#: dadaia-reconcile-quarantines-sanctioned-references-clone.
+_DADAIA_ALLOWED_SUBDIRS: frozenset[str] = workspace_layout.DADAIA_ALLOWED_SUBDIRS
 
 # Sessions expired beyond this age are graveyard entries eligible for GC. The field names
 # are owned by ``session_identity`` (the single owner of the session-record schema); the
@@ -488,6 +458,32 @@ class DoctorService:
                             fixable=True,
                         )
                     )
+
+        # INV-6 (T-045-22): registry-wide slug-ownership uniqueness — report-only,
+        # heals nothing (S3-FR9-ruling.md); surfaces a pre-migration collision.
+        owners: dict[str, list[str]] = {}
+        for ctx in contexts:
+            owners.setdefault(ctx.repo_slug, []).append(ctx.name)
+            for r in ctx.associated_repos:
+                owners.setdefault(r.slug, []).append(ctx.name)
+        for slug in sorted(owners):
+            names = owners[slug]
+            if len(names) > 1:
+                issues.append(
+                    DoctorIssue(
+                        code="INV-6",
+                        fixable=False,
+                        description=(
+                            f"Repo slug '{slug}' is owned by more than one context "
+                            f"({', '.join(sorted(names))}). 'repos/<slug>' is a "
+                            "namespace every context shares — 'dadaia context dead' "
+                            "on any owner would commit, push and delete the others' "
+                            "working tree. Remove it from all but one owner "
+                            "('dadaia context repo remove') or re-create the context "
+                            "with a different slug."
+                        ),
+                    )
+                )
 
         # ---- ROOT invariants (T-SANI-05) ----
         exc_globs = self._root_exception_globs()

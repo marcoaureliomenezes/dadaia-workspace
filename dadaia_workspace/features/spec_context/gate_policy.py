@@ -253,15 +253,14 @@ def _context_relative(p: str) -> str | None:
     return rest[slash + 1 :]
 
 
-def _is_law_path(rel_path: str, ctx_rel: str | None) -> bool:
-    """True when *rel_path* is a PROJECTED law file (see ``_LAW_BASENAMES``).
+def _is_law_path(rel_path: str) -> bool:
+    """True when *rel_path* sits at a structurally fixed LAW origin (see ``_LAW_BASENAMES``).
 
-    Exact-path match only: the workspace root, a harness projection dir, or the root of a
-    ``repos/<slug>/``. Library sources (``dadaia_workspace/public/**``) and test fixtures
-    sit deeper and never match, so authoring the law stays fully writable.
+    Static, ORIGIN-only floor (v0.4.5 FR1): the workspace root or a fixed harness dir
+    (``_LAW_HARNESS_DIRS``). ``repos/<slug>/`` never matches either shape, so a repo's
+    own AGENTS.md/CLAUDE.md is never LAW (closes sdd-gate-blocks-fresh-repo-root-agents-md
+    + repo-agents-md-law-gate-contradicts-template) — never reads the manifest (CWE-284).
     """
-    if ctx_rel is not None:
-        return ctx_rel in _LAW_BASENAMES
     parts = rel_path.split("/")
     if len(parts) == 1:
         return parts[0] in _LAW_BASENAMES
@@ -280,10 +279,10 @@ def classify_path(rel_path: str) -> PathClass:
     fail-closed PROTECTED class, and the UNGATED fall-through are all preserved.
     """
     p = rel_path.lstrip("/")
+    if _is_law_path(p):
+        return PathClass.LAW
 
     ctx_rel = _context_relative(p)
-    if _is_law_path(p, ctx_rel):
-        return PathClass.LAW
     if ctx_rel is not None:
         # In-repo: re-root the taxonomy at the context. Unmatched ⇒ MUTATING (never UNGATED).
         return _classify_specs_relative(ctx_rel) or PathClass.MUTATING

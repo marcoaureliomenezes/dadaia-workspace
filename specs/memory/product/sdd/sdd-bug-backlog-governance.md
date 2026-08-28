@@ -2,9 +2,12 @@
 slug: sdd-bug-backlog-governance
 title: sdd-bug-backlog-governance
 category: product
-tldr: Event-sourced JSONL bugs closed by a three-field evidence gate, an operator-gated backlog, an rc release ladder, and a three-branch git contract.
+tldr: JSONL bugs written through one sanitize-then-mask seam, a three-field evidence gate, an operator-gated backlog, the rc ladder and the git contract.
 summary: >-
-  Bugs are append-only events, including a non-terminal repeatable `picked` reservation
+  Bugs are append-only events written through one seam that sanitizes control and format
+  characters (preserving TAB/LF/CR) and then masks every schema free-text field with the
+  same operator denylist the push boundary refuses on; the kinds include a non-terminal
+  repeatable `picked` reservation
   marker that surfaces contention without ever blocking it; a `resolved` event is refused
   unless it carries three checkable fields — the red-loop command, the test seam and the
   diff direction on the touched feature — and a net-positive diff routes the fix through
@@ -25,8 +28,8 @@ tags:
 - backlog
 - bugs
 - gitflow
-last_updated: '2026-08-24'
-release_origin: v0.4.2
+last_updated: '2026-08-27'
+release_origin: v0.4.5
 ---
 
 ## Bugs
@@ -35,6 +38,30 @@ release_origin: v0.4.2
 `reported` establishes the bug; terminal events such as `resolved` or `rejected` close
 it. `bugs status` and `bugs stats` fold the ledger. Agents never hand-author one-file
 Markdown bug records and never delete bug history.
+
+### The write seam
+
+Every event passes one seam before it reaches the ledger, in a fixed order: **sanitize,
+then mask**, both inside the service that already enforces stream coherence, and each
+exactly once.
+
+**Sanitation** deletes the characters that break a record or a terminal — the C0/C1/DEL
+control range including ESC, plus U+0085 and the Unicode line/paragraph separators
+U+2028/U+2029. TAB, LF and CR are **preserved**: they round-trip intact, because JSON
+string escaping already makes them harmless inside a value and the reader splits the file
+on a literal newline rather than on the wider terminator set a naive `splitlines()`
+recognises. Deleting them once cost every multi-line free-text field its word boundaries,
+silently, which is why the rule is narrow by design. Characters are deleted rather than
+escaped so that a term an author split with one of them re-joins into a contiguous
+substring the masking pass can still catch.
+
+**Masking** consumes the operator denylist through the **same loader the push-boundary scan
+uses** ([[sdd-gate-v3]]) — one loader, two consumers, no second reader of the file — on top
+of the home-path and IPv4 patterns it already applied. A leak is therefore masked at the
+moment of writing rather than caught after it is committed. The field set is the schema
+mirror the serializer itself uses, so a newly added free-text field is scrubbed the day it
+exists; a hand-kept field list is what missed one twice. `core` never imports the loader:
+the terms are handed in from the composition root, which keeps the ring boundary intact.
 
 The schema carries **seven** event kinds. Four are terminal — at most one per bug id —
 while `archived` is a non-terminal annotation and **`picked` is a non-terminal, repeatable

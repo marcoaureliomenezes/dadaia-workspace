@@ -1,0 +1,79 @@
+{
+  "schema_version": "handoff-v1.2",
+  "self_pull": {
+    "refs": [
+      "specs/memory/product/catalog.json",
+      "specs/memory/product/sdd/sdd-gate-v3.md"
+    ]
+  },
+  "agent": "security-reviewer",
+  "context": "dadaia-workspace",
+  "produced_at": "2026-08-25T02:05:00Z",
+  "release_id": "v0.4.5",
+  "scope": "Definition-PR security verdict for release v0.4.5 (feature/0.4.5 -> develop, milestone (a)). Diff-based review of origin/main..199b356b: 4 commits, docs/specs only \u2014 backlog materialization, archive sweep (git mv of one v0.4.4 verdict), and the SPEC/PLAN/TASKS definition + BACKLOG purge + ACTIVE flip + superseded event. Zero production code, zero dependency manifest, zero CI/IaC in the delta. Live-tree placement because specs/_archive is FROZEN.",
+  "verdict": "APPROVED",
+  "verdict_reason": "The delta is authored specs prose only and carries no blocking security or privacy finding: six pattern sweeps over the 2065 added lines return zero hits (secret assignments, PEM key blocks, home-absolute paths, email literals, IPv4/host literals, cloud key prefixes), the refspec-fed push gate runs the operator denylist + baseline over the real new-branch range and exits 0 with zero offenders, and the repo self-scan passes 5/5. The design spot-check confirms the release strengthens rather than weakens the security surface: FR6 makes the operator denylist a single loading seam consumed by both the write-time redaction and the push-time scan with A6.3 pinning the push-time scan unchanged in behaviour ('complements, never replaces') and A6.4 keeping the denylist data out of public/**; FR7 closes CWE-117 plus a silent-event-loss path at one seam with A7.4 forbidding any historical rewrite; FR8 extends the CWE-59 refusal posture without new vocabulary. Section 2.4 records the no-publish ADR against operator order O5 honestly, naming the one-axis tension rather than hiding it, and A16.8 makes it mechanically verifiable (approve job pending-unapproved, no v0.4.5 tag, PyPI latest still 0.4.4) \u2014 a supply-chain-positive posture. Two non-blocking findings (one MEDIUM, one LOW) are design constraints on code that does not yet exist; both are prescriptions the S1/S3 implementation reviews must enforce, not defects of this diff. Routing: the MEDIUM (FR1 manifest-sourced LAW class) is carried into S1 as an added acceptance A1.7 before FR1 is coded, and the LOW (FR6/FR7 runtime ordering) into S3 as an added acceptance A7.6; both are prescriptions on unwritten code and neither blocks this PR.",
+  "artifact": {
+    "type": "report"
+  },
+  "metrics": {
+    "commit_sha": "199b356bb8c7e12a9dc41191b52ed891172f3d6b",
+    "previous_covered_sha": "dfa2e95eb9f6382ad5d510a8bdbe50d6b0cbae3f",
+    "base_sha": "origin/main",
+    "delta_commits": 4,
+    "delta_files": 7,
+    "delta_lines_added": 2059,
+    "delta_lines_removed": 2,
+    "delta_added_lines_swept": 2065,
+    "delta_production_code_files": 0,
+    "delta_dependency_manifest_files": 0,
+    "delta_ci_iac_files": 0,
+    "sweeps_run": 6,
+    "sweeps_with_hits": 0,
+    "secrets_detected": 0,
+    "home_absolute_paths": 0,
+    "email_literals": 0,
+    "denylist_terms": 0,
+    "push_gate_exit": 0,
+    "push_gate_offenders": 0,
+    "self_scan_tests_passed": 5,
+    "cve_findings": 0,
+    "new_dependencies": 0,
+    "findings_critical": 0,
+    "findings_high": 0,
+    "findings_medium": 1,
+    "findings_low": 1,
+    "findings_info": 2
+  },
+  "findings": [
+    {
+      "severity": "MEDIUM",
+      "message": "FR1 sources the fail-closed LAW class partly from .dadaia/agentic/manifest.json, which classifies UNGATED on the executed path \u2014 an agent can demote a projected law file to MUTATING by editing the manifest, then edit the law. Prescribe a fail-closed floor before implementation.",
+      "detail_md": "**Where.** `specs/releases/v0.4.5/SPEC.md:210-214` (FR1's predicate): *\"a path is LAW when it is the workspace-root law family (`DADAIA.md`, `AGENTS.md`, `CLAUDE.md` at the root) **or** it is listed in `.dadaia/agentic/manifest.json` as a lib-originated projection.\"*\n\n**Why it matters.** Current product truth (`specs/memory/product/sdd/sdd-gate-v3.md:69`) states the class contract: *\"PROTECTED | Session identity records and projected law files are fail-closed.\"* Today that fail-closed set is **static** \u2014 `dadaia_workspace/core/workspace_layout.py:48,53` pin `LAW_BASENAMES` and `LAW_HARNESS_DIRS`, and `features/spec_context/gate_policy.py:256-269` matches against those frozensets with no file read. FR1 replaces the harness-dir arm of that static floor with a lookup into a file that the gate itself does not protect.\n\n**Executed-path evidence** (`classify_path` called directly, not inferred):\n\n```\n.dadaia/agentic/manifest.json            -> UNGATED\n.claude/rules/DADAIA.md                  -> LAW\nDADAIA.md                                -> LAW\nrepos/x/AGENTS.md                        -> LAW      <- the over-match FR1 correctly fixes\n.dadaia/sessions/a.json                  -> PROTECTED\n```\n\n`_PROTECTED_PREFIX` is `.dadaia/sessions/` alone (`gate_policy.py:80`) and `DADAIA_ADDITIVE_PREFIXES` covers only `.dadaia/{reports,handoff,tmp}/` (`workspace_layout.py:41-45`), so `.dadaia/agentic/manifest.json` falls through to `UNGATED` \u2014 writable by any agent with a file tool, with no gate decision at all.\n\n**The gap.** Post-FR1, the sequence `Write .dadaia/agentic/manifest.json` (removing an entry) then `Edit .claude/rules/DADAIA.md` classifies MUTATING and proceeds \u2014 a self-service bypass of a class DADAIA.md \u00a78 reserves for a human operator (CWE-284: security decision relies on data outside the trust boundary; the manifest becomes untrusted input to an access-control decision). A1.3's contract test enumerates the manifest as it stands at test time, so it proves the mapping is honoured \u2014 it cannot prove the mapping is tamper-resistant at runtime.\n\n**This is a design constraint, not a defect of this diff.** The reviewed delta contains no code and changes no gate behaviour; the risk materializes only if FR1 lands as literally worded.\n\n**Precedent for the prescription.** The same atom already rejects exactly this shape one section down (`sdd-gate-v3.md:72-79`): the MEMORY dotfile carve-out was refused because it *\"would open an always-writable hole under the MEMORY prefix through which curated lint canon could mutate mid-implementation, which is the stale-layer pattern the gate exists to prevent.\"* A manifest-sourced LAW set is that same hole, one class over.",
+      "fix_recommendation": "Make the manifest arm **additive-only** \u2014 the cheapest option, and the one that adds no branch (standing order: the fix must not grow the feature). Keep the existing static floor (`LAW_BASENAMES` at the workspace root **and** at `LAW_HARNESS_DIRS`) as an unconditional LAW match, and let the manifest lookup only **extend** LAW to further projections \u2014 never remove a path from it. FR1's two RED cases (A1.1/A1.2: `repos/<slug>/AGENTS.md`, fresh or existing) still flip to MUTATING, because the repo arm is where the basename over-match lives (`gate_policy.py:263-264`), and that arm is deleted outright \u2014 so the fix stays net-negative in `gate_policy.py` as A1.4 requires. Then add one acceptance to FR1: *A1.7 \u2014 removing an entry from `.dadaia/agentic/manifest.json` does not demote any statically-floored law path out of LAW, proven on the executed path.* If instead the manifest is to be authoritative, classify `.dadaia/agentic/manifest.json` PROTECTED in the same commit and make an unreadable/missing manifest fail **closed** (treat law basenames at projection dirs as LAW) rather than open."
+    },
+    {
+      "severity": "LOW",
+      "message": "FR6 and FR7 share the bug-event seam but no acceptance pins their RUNTIME order; redact-then-sanitize lets a control-character-interrupted denylisted term evade the FR6 redaction and be normalized back into the ledger by FR7.",
+      "detail_md": "**Where.** `specs/releases/v0.4.5/SPEC.md:332-374` (FR6, FR7) and `specs/releases/v0.4.5/PLAN.md:162-163`.\n\nThe PLAN pins the **implementation** order \u2014 *\"FR6 and FR7 both touch the bug ledger and are sequenced FR6 \u2192 FR7 so the redaction seam is settled before the sanitation pass wraps it\"* \u2014 which is about which FR lands first. Neither FR's acceptance pins the order the two passes run **at write time**, and after both land they sit on the same seam.\n\n**The vector.** If redaction runs on the raw field and sanitation runs after it, a free-text value carrying a denylisted term interrupted by an ESC or U+2028 (`sec<U+2028>ret`) does not match FR6's term patterns, passes redaction unmasked, and is then normalized by FR7's sanitation pass into the clean term \u2014 written to `specs/bugs/bugs.jsonl` in the clear. FR6's own premise is that this class already cost two committed leaks in v0.4.4, one forcing an `rc-1` history rewrite; the push gate would still catch the committed result at push time (`sdd-gate-v3.md:395-410`), so the failure mode is a repeat of the expensive late catch FR6 exists to eliminate, not an unbounded leak.\n\nSeverity is LOW: it needs an adversarially- or accidentally-shaped field value, and the push-time scan remains as the backstop A6.3 explicitly preserves.",
+      "fix_recommendation": "Add one acceptance to FR7 fixing the runtime order at the single seam: *A7.6 \u2014 sanitation runs **before** redaction, so the redaction pass sees normalized text; proven by a fixture whose field carries a denylisted term interrupted by U+2028 and by one carrying it interrupted by ESC, both masked in the written record.* This costs one ordering line and two fixture cases inside the one seam FR7 already builds \u2014 no new branch, no second guard, consistent with A7.3."
+    },
+    {
+      "severity": "INFO",
+      "message": "Section 2.4's no-publish ADR states operator order O5 explicitly, rejects 'publish anyway because the pipeline is automated', and is made mechanically verifiable by A16.8 \u2014 an honest and supply-chain-positive posture.",
+      "detail_md": "Spot-check requested by the dispatch. `SPEC.md:139-160` decides the release id is `v0.4.5` with `pyproject.toml` bumping at the final `rc` per the one-axis law, and states *\"The PUBLISH step is withheld by operator order O5.\"* O5 is recorded verbatim in the ruling table (`SPEC.md:83`) as **RELEASE LAW \u2014 v0.4.5 does not publish to PyPI**, with the `release-gate` environment approval left deliberately unapproved. Rejected alternative (c) is explicitly *\"Publishing anyway because the pipeline is automated \u2014 the pipeline's `approve` job exists precisely so a human decides\"*, which is the correct reading of a manual-approval gate as a control rather than an obstacle.\n\nThe ADR does not paper over the consequence: it records that the one-axis law's sentence becomes true of the **lineage** (`0.4.2 \u2192 0.4.4`) and not of `HEAD` (`0.4.5`), names this the second such mint after the retired `0.4.3`, and routes the wording fix to memory at closure with an explicit revisit trigger. D6 (`SPEC.md:110-115`) states the mechanism once, including that **no `v0.4.5` git tag is created**.\n\nSecurity reading: A16.8 turns the order into three verifiable post-conditions \u2014 `release.yml`'s `approve` job pending-unapproved, no `v0.4.5` tag, PyPI latest still `0.4.4`. No artifact reaches a public index without a human decision, and the absence of a tag means no release asset is mintable from this ship. Nothing to remediate.",
+      "fix_recommendation": "None."
+    },
+    {
+      "severity": "INFO",
+      "message": "Sweep detail over the full delta: 2065 added lines, six pattern classes, zero hits; push gate exit 0 on the real new-branch refspec; self-scan 5 passed. The one moved file is a pure R100 rename of an existing verdict into the archive.",
+      "detail_md": "**Delta shape** (`git diff --name-status origin/main..199b356b`): `R100` `specs/releases/v0.4.4/verdicts/dfa2e95e\u2026.handoff.json` \u2192 `specs/_archive/releases/v0.4.4/verdicts/dfa2e95e\u2026.handoff.json` (rename, 0 content lines changed \u2014 the archive sweep the file's own `scope` field anticipated, executed by `git mv` as the FROZEN class requires); `M` BACKLOG.md (+94), bugs.jsonl (+1), ACTIVE.md (\u00b12); `A` v0.4.5 SPEC.md (+694), PLAN.md (+248), TASKS.md (+1020). **No file under `dadaia_workspace/`, no `pyproject.toml`/lockfile, no `.github/**`, no Dockerfile/compose/Terraform** \u2014 so the CVE lane and the IaC lane have no input in this delta (`cve_findings: 0`, `new_dependencies: 0` are true by absence of a manifest, not by an unrun scan).\n\n**Sweeps over the added lines** (`grep '^+'` on the specs diff \u2192 2065 lines), each exit code read directly, no pipe:\n\n| # | class | pattern | result |\n|---|---|---|---|\n| 1 | secret assignment | `(password|passwd|secret|token|api_key|apikey|private_key)\\s*=\\s*[\"'][^\"']{6,}` | exit 1 \u2014 no match |\n| 2 | PEM private key | `BEGIN (RSA|EC|OPENSSH|PGP|DSA)? ?PRIVATE KEY` | exit 1 \u2014 no match |\n| 3 | home-absolute path | `/home/[a-z]`, `/Users/[a-z]`, `C:\\\\Users` | exit 1 \u2014 no match |\n| 4 | email literal | RFC-ish address shape | exit 1 \u2014 no match |\n| 5 | IPv4 / host literal | dotted quad, `https?://\u2026\\.(com|net|io|org)` | exit 1 \u2014 no match |\n| 6 | cloud key / bearer | `AKIA\u2026`, `gh[pousr]_\u2026`, `sk-\u2026`, `xox[baprs]-`, `Bearer \u2026`, `eyJ\u2026.` | exit 1 \u2014 no match |\n\nSupplementary passes for consumer-specific exposure (the recurring class): zero hits for private repo slugs and consumer product names, zero for operator personal-name tokens, zero for `.env`/`credentials`/`.pypirc`/`id_rsa`/`.pem`/`PYPI_*TOKEN`/`GITHUB_TOKEN`/`AWS_*` filename or variable references.\n\n**Push gate**, fed the real new-branch refspec on stdin with the exit read into a variable before any pipe: `refs/heads/feature/0.4.5 199b356b\u2026 refs/heads/feature/0.4.5 000\u20260` \u2192 `[pre-push] denylist scan mode: operator denylist + baseline`, **exit 0**, zero offenders \u2014 the operator denylist layer was loaded, so this is a substantive pass and not a no-op.\n\n**Self-scan**: `tests/integration/test_repo_self_scan.py` \u2192 **5 passed**, run with `-p no:cacheprovider` so no cache artifact lands in the repo tree.\n\n**Ledger event** added by the definition commit is clean and carries no path, host or free-text leak surface: `{\"bug_id\": \"two-atomic-writers-leak-temp-file-on-injected-os-replace-failure\", \"event\": \"superseded\", \"reported_by\": \"software-engineer\", \"superseded_by\": \"atomic-write-primitive-consolidation\", \"ts\": \"\u2026\"}` \u2014 matching D4's requirement that the `superseded` event be appended in the definition commit.\n\n**Bug-surface direction** (standing order): the delta is specs prose and changes no executed path, so it neither reduces nor increases the bug surface of any feature. The release it defines is declared net-negative in production LOC and AI-surface lines with FR16/A16.3/A16.4 as the acceptance, and its three deletion engines (FR2, FR4, FR13) each land `expand \u2192 switch \u2192 contract` per D7 \u2014 the correct direction under the standing order.",
+      "fix_recommendation": "None."
+    }
+  ],
+  "next_handoff": {
+    "agent": "project-manager",
+    "context": "dadaia-workspace",
+    "expected_artifact_type": "other"
+  }
+}

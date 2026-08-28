@@ -2,10 +2,14 @@
 slug: sdd-gate-v3
 title: sdd-gate-v3
 category: product
-tldr: "No-lock SDD enforcement: path/mode/cache gates, advisory presence, a feature-only push boundary with content scan, and the security verdict as a PR gate."
+tldr: No-lock SDD enforcement — origin-classified LAW, path/mode gates, advisory presence, feature-only push boundary with scan, verdict as PR gate.
 summary: >-
   The merged Python PreToolUse gate enforces root whitelist, workspace venv usage, a
   cache-off posture for pytest/ruff/mypy, path class, phase, and the caller's own mode.
+  LAW is decided by ORIGIN on a static fail-closed floor — the law basenames at the
+  workspace root or inside a fixed harness projection dir — so a repo's own
+  domain-scoped `AGENTS.md`/`CLAUDE.md` is MUTATING and no manifest read can promote or
+  demote a security decision.
   It never waits for or blocks on another session. Presence is advisory. Git pre-commit
   warns only; pre-push enforces the CI preflight, an inverted branch policy in which
   `feature/{M.m.p}` is the only pushable ref while `develop` and `main` are refused as
@@ -29,8 +33,8 @@ tags:
 - enforcement
 - no-locks
 - privacy
-last_updated: '2026-08-24'
-release_origin: v0.4.2
+last_updated: '2026-08-27'
+release_origin: v0.4.5
 ---
 
 ## Purpose
@@ -63,11 +67,31 @@ Path classes:
 
 | Class | Behavior |
 |---|---|
+| LAW | The projected law files — fail-closed, human-only in an instantiated workspace. The law's own class table groups LAW and PROTECTED as one blocked outcome; the classifier keeps them apart so each refusal names its own rule. |
 | ADDITIVE | `specs/bugs`, `specs/backlog`, `specs/audits`, and workspace reports/handoffs/tmp are writable. |
 | MEMORY | Writable only in `DEFINITION` or `CLOSURE`. |
 | FROZEN | Archived specs are never writable — archive by `git mv`. |
-| PROTECTED | Session identity records and projected law files are fail-closed. |
+| PROTECTED | Session identity records are fail-closed. |
 | MUTATING | Writable unless this session explicitly resolves to READ mode. |
+
+**LAW is decided by origin, on a static fail-closed floor.** A path is LAW when its
+basename is one of the law basenames — `DADAIA.md`, `AGENTS.md`, `CLAUDE.md` — **and** it
+sits at exactly one of two structurally fixed origins: the workspace root, or a fixed
+harness projection directory (`.claude/rules`, `.codex`, `.kimi-code`, `.agents`). Both
+sets are read from `core/workspace_layout.py`, the single authority the installer and the
+doctor derive from as well, so the guarded set and the projected set cannot disagree.
+`classify_path` performs **zero I/O** on that decision: the predicate is a pure function of
+the relative path string, so the classification of a projected law file cannot be changed
+by editing any file on disk. `.dadaia/agentic/manifest.json` classifies UNGATED and is
+never consulted — a security decision that a writable inventory could demote would be the
+CWE-284 shape the floor exists to refuse.
+
+The consequence at the repository boundary is explicit: a path under `repos/<slug>/`
+matches neither origin shape, so a repo's **own** domain-scoped `AGENTS.md` or `CLAUDE.md`
+— fresh or long-lived, tracked or untracked — classifies **MUTATING** and is edited
+directly, exactly as the scaffold template it ships from says. The gate and the template
+state one contract about that file, and a manifest-enumerating contract test pins the other
+direction: every workspace-root law file and every harness-dir projection stays LAW.
 
 **MEMORY covers dotfiles, by decision.** The classifier matches the bare prefix
 `specs/memory/`, so *every* path beneath it — `.heading-allowlist` included — is
@@ -269,7 +293,10 @@ Term sources are additive, and the scan is never a no-op:
 
 1. the **operator denylist** when present — literal, case-insensitive substrings loaded
    from `$DADAIA_PRIVACY_DENYLIST` or `.dadaia/states/privacy_denylist.json`, which are
-   operator-private by design and never enter the repository;
+   operator-private by design and never enter the repository. That loader is **one seam
+   consumed twice**: the push boundary refuses on these terms, and the bug ledger masks
+   them at the moment an event is written ([[sdd-bug-backlog-governance]]), so the
+   write-time redaction can see exactly what the publication boundary refuses;
 2. the **packaged structural baseline** (version 8) — IPv4/IPv6 literals, internal
    hostnames, absolute home paths, email addresses, and secret-looking tokens — with its
    `exclude_regex` carve-outs honored. The home-path layer covers the home layout of **every
@@ -307,9 +334,15 @@ Term sources are additive, and the scan is never a no-op:
    at exactly the lifecycle moment that name becomes more sensitive, not less. The registry
    reaches the CLI through a container seam, and a missing, empty or malformed registry
    degrades to the directory-derived set rather than killing the push hook — a degradation
-   that is never silent: exactly one stderr note names it and the scan proceeds. Terms match on
-   word boundaries so a short name never fires inside a longer word, and
-   **case-insensitively**, so a name written with different capitalisation is still caught.
+   that is never silent: exactly one stderr note names it and the scan proceeds. A name matches
+   as a **whole token** and never as a fragment glued into a longer identifier: a preceding or
+   following word character, hyphen or dotted continuation denies the match. Every repo slug is
+   itself hyphenated, so a plain word-boundary anchor treated `<slug>-anything` and
+   `<slug>.ext` as publications of the name — the product's own tracked asset basenames and its
+   own ledger bug ids among them. A bare name in prose, a name bounded by `/` inside a
+   `repos/<slug>/…` path, and a name ending a sentence before a period all still match;
+   `<slug>-x`, `x-<slug>`, `<slug>.ext` and `pkg.<slug>` are other identifiers. Matching is
+   **case-insensitive**, so a name written with different capitalisation is still caught.
    The whole matcher is case-insensitive on every layer.
 
 The baseline is a governed artifact, not a growing pile of literals. Three properties hold
@@ -417,9 +450,10 @@ still find the file, and a path that matches nothing renders byte-identically to
 one.
 
 What decides "offending segment" is the **detector's own compiled matchers**, not a second
-predicate: the masker consumes the very case-insensitive, hyphen-aware matchers the scan
-detects with, so detector-hit implies masker-hit by construction and a segment like
-`Acme-Corp` can never render unmasked for a term the scan already flagged. The operator-facing
+predicate: the masker consumes the very case-insensitive, whole-token matchers the scan
+detects with, so detector-hit implies masker-hit by construction, a narrowing of the
+matcher reaches both sides in one edit, and a segment can never render unmasked for a term
+the scan already flagged. The operator-facing
 `--redact` CLI surface keeps its own placeholder shape and its own stdlib-pure primitive in
 `core/redaction.py` ([[architecture]]) — a different channel, deliberately not merged with
 this one. A failed object read is masked at the same boundary: the typed read error carries

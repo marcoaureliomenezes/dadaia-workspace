@@ -23,6 +23,7 @@ import json
 import re
 from pathlib import Path
 
+from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.features.migrate.tree_v2 import MigrateResult
 
 __all__ = ["migrate_bugs_single_file"]
@@ -62,9 +63,7 @@ def migrate_bugs_single_file(specs_dir: Path, *, dry_run: bool = False) -> Migra
                 if canonical.is_file()
                 else ""
             )
-            tmp = canonical.with_suffix(".jsonl.tmp")
-            tmp.write_text(legacy_text + existing, encoding="utf-8")
-            tmp.replace(canonical)
+            atomic_write(canonical, legacy_text + existing, newline=None)
             for p in legacy:
                 p.unlink()
                 result.moved.append((p, canonical))

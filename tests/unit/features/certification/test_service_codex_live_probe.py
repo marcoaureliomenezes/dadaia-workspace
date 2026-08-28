@@ -96,11 +96,13 @@ def test_codex_live_probe_fails_on_nonzero_exec_exit(
 # an installed-but-unentitled Codex account rejects `codex exec` with an upstream
 # invalid_request_error/4xx — that is the SAME "installed Codex is unusable" condition
 # `_CertificationSkip` already exists for (see the absent-binary test above), not a new
-# state. This fixture is the real stderr captured on the reporting machine (`codex
-# login status` -> "Logged in using ChatGPT", no Codex entitlement) — it carries no
-# account identifiers; only the operator-local `workdir:` absolute path is redacted
-# (never a tracked-file literal, per DADAIA.md §8), which is inert to the classifier
-# under test (it parses the trailing `ERROR: {...}` JSON payload, not this line).
+# state. This fixture reproduces the stderr shape captured on the reporting machine
+# (`codex login status` -> "Logged in using ChatGPT", no Codex entitlement) — it
+# carries no account identifiers; the operator-local `workdir:` absolute path is
+# redacted (never a tracked-file literal, per DADAIA.md §8) and the `session id:` line
+# is a synthetic placeholder UUID (codex-probe-unit-fixture-carries-real-session-uuid),
+# both inert to the classifier under test (it parses the trailing `ERROR: {...}` JSON
+# payload, not either of these lines).
 _REAL_ENTITLEMENT_REJECTION_STDERR = (
     "Reading additional input from stdin...\n"
     "OpenAI Codex v0.145.0\n"
@@ -112,7 +114,7 @@ _REAL_ENTITLEMENT_REJECTION_STDERR = (
     "sandbox: read-only\n"
     "reasoning effort: high\n"
     "reasoning summaries: none\n"
-    "session id: 01a0300f-ae62-7383-8bcf-7b1ddfb70ece\n"
+    "session id: deadbeef-dead-4bee-8bee-deadbeefdead\n"
     "--------\n"
     "user\n"
     "Reply with exactly the single line: DADAIA-LIVE-PROBE-OK. No tool calls, no other "
