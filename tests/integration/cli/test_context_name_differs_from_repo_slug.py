@@ -88,8 +88,6 @@ def test_bugs_append_resolves_the_slug_and_closure_lands_in_scope(workspace: Pat
         "append",
         "--bug-id",
         "probe",
-        "--event",
-        "reported",
         "--reported-by",
         "test",
         "--title",
@@ -97,24 +95,20 @@ def test_bugs_append_resolves_the_slug_and_closure_lands_in_scope(workspace: Pat
         "--severity",
         "LOW",
         "--surface",
-        "s",
+        "cli",
         "--component",
         "c",
         "--context",
         _NAME,
-        "--tag",
-        "x",
         "--symptom",
         "sy",
         "--repro",
         "rp",
         "--expected",
         "ex",
-        "--notes",
-        "no",
     )
     assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert (workspace / "repos" / _SLUG / "specs" / "bugs" / "bugs.jsonl").is_file(), (
+    assert (workspace / "repos" / _SLUG / "specs" / "bugs" / "BUGS.jsonl").is_file(), (
         "the event must land in the context's real ledger, under its SLUG"
     )
 

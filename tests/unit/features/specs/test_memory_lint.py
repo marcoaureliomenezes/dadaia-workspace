@@ -10,8 +10,8 @@ as a normal Python import.
 ``importlib.util.spec_from_file_location`` and called its own ``lint_atom``/``lint_directory``/
 ``HEADING_ALLOWLIST``/etc.) is DELETED, ai-engineer's T-043-20 half (A16.1/A16.2): once the
 script stopped owning those symbols, the file tested a surface that no longer exists on the
-script. Its behavioral coverage (lint_atom/lint_directory scenarios, workspace-allowlist
-merge, main() exit codes) was already a byte-identical port of what this file covers — see
+script. Its behavioral coverage (lint_atom/lint_directory scenarios, main() exit codes) was
+already a byte-identical port of what this file covers — see
 the functions above this docstring's insertion point. Four checks in the deleted file were
 NOT duplicates — they validate real on-disk public assets (the frontmatter schema, the
 scaffold atoms, the memory-feature template) against this package's canon, independent of
@@ -27,12 +27,9 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.features.specs.memory_lint import (
-    HEADING_ALLOWLIST,
-    _extract_h2_headings,
     lint_atom,
     lint_directory,
     load_frontmatter_schema,
-    load_workspace_allowlist,
     main,
 )
 
@@ -44,8 +41,6 @@ _REQUIRED_FM = {
     "tldr": "fixture atom for memory_lint tests",
     "summary": "fixture atom for memory_lint tests, exercising the ported package module",
     "tags": ["fixture"],
-    "last_updated": "2026-08-17",
-    "release_origin": "v0.4.3",
 }
 
 
@@ -81,7 +76,7 @@ def test_load_frontmatter_schema_returns_the_packaged_schema() -> None:
     assert "slug" in schema["required"]
 
 
-def test_valid_atom_with_allowlisted_heading_has_no_errors_or_warnings(tmp_path: Path) -> None:
+def test_valid_atom_with_a_normal_heading_has_no_errors_or_warnings(tmp_path: Path) -> None:
     schema = load_frontmatter_schema()
     path = _make_atom(tmp_path, slug="test-atom", body="## Purpose\n\nBody.\n")
 
@@ -101,17 +96,21 @@ def test_forbidden_heading_is_an_error(tmp_path: Path) -> None:
     assert any("Forbidden heading" in e for e in result.errors)
 
 
-def test_unknown_heading_is_a_warning_not_an_error(tmp_path: Path) -> None:
+def test_novel_heading_is_never_flagged(tmp_path: Path) -> None:
+    """The heading-vocabulary check (a curated allowlist of "known" headings) is
+    retired (v0.5.0): a heading vocabulary is prose policy, not a lint. A heading
+    nobody has ever seen before is neither an error nor a warning — only frontmatter
+    schema conformance, forbidden (changelog/history) headings, duplicate headings,
+    and wikilink resolution remain mechanically checked."""
     schema = load_frontmatter_schema()
     path = _make_atom(
-        tmp_path, slug="test-atom", body="## A Brand New Never Allowlisted Heading\n\nx\n"
+        tmp_path, slug="test-atom", body="## A Brand New Never Before Seen Heading\n\nx\n"
     )
 
     result = lint_atom(path, tmp_path, schema)
 
-    assert not result.has_errors
-    assert result.has_warnings
-    assert any("not in the curated allowlist" in w for w in result.warnings)
+    assert not result.has_errors, result.errors
+    assert not result.has_warnings, result.warnings
 
 
 def test_duplicate_heading_is_an_error(tmp_path: Path) -> None:
@@ -132,8 +131,6 @@ def test_missing_required_frontmatter_field_is_an_error(tmp_path: Path) -> None:
         'tldr: "x"\n'
         'summary: "x"\n'
         "tags:\n  - fixture\n"
-        'last_updated: "2026-08-17"\n'
-        'release_origin: "v0.4.3"\n'
         "---\n\n## Purpose\n\nBody.\n"
     )
     path = tmp_path / "test-atom.md"
@@ -169,6 +166,64 @@ def test_wikilink_resolution_valid_and_broken(tmp_path: Path) -> None:
     assert not any("[[target]]" in e for e in result.errors)
 
 
+@pytest.mark.parametrize(
+    ("slug", "canon_filename"),
+    [
+        ("architecture", "ARCHITECTURE.md"),
+        ("tech-stack", "TECHSTACK.md"),
+        ("quality-assurance", "QUALITY.md"),
+    ],
+)
+def test_v6_canon_single_slug_stem_divergence_is_not_an_error(
+    tmp_path: Path, slug: str, canon_filename: str
+) -> None:
+    """v6 canon (FR1/A1.5/A1.6, T-050-06): the three top-level singles keep their
+    lowercase ``slug`` while their on-disk filename is the renamed canon name — this
+    is the ONE named exception to "slug == filename stem", not a general relaxation."""
+    schema = load_frontmatter_schema()
+    path = _make_atom(tmp_path, slug=slug, filename=canon_filename)
+
+    result = lint_atom(path, tmp_path, schema)
+
+    assert not any("filename stem" in e for e in result.errors), result.errors
+
+
+def test_slug_stem_mismatch_still_errors_when_not_a_v6_canon_single(tmp_path: Path) -> None:
+    """The v6 canon exception is narrow: an unrelated slug/stem mismatch still errors."""
+    schema = load_frontmatter_schema()
+    path = _make_atom(tmp_path, slug="architecture", filename="not-the-canon-name.md")
+
+    result = lint_atom(path, tmp_path, schema)
+
+    assert any("slug" in e and "filename stem" in e for e in result.errors)
+
+
+@pytest.mark.parametrize(
+    ("wikilink_slug", "canon_filename"),
+    [
+        ("architecture", "ARCHITECTURE.md"),
+        ("tech-stack", "TECHSTACK.md"),
+        ("quality-assurance", "QUALITY.md"),
+    ],
+)
+def test_wikilink_resolves_to_renamed_v6_canon_single(
+    tmp_path: Path, wikilink_slug: str, canon_filename: str
+) -> None:
+    """A ``[[wikilink]]`` to one of the v6 canon singles resolves to the RENAMED file,
+    not to ``<slug>.md`` (which no longer exists on disk)."""
+    schema = load_frontmatter_schema()
+    _make_atom(tmp_path, slug=wikilink_slug, filename=canon_filename)
+    path = _make_atom(
+        tmp_path,
+        slug="source",
+        body=f"## Purpose\n\nsee [[{wikilink_slug}]]\n",
+    )
+
+    result = lint_atom(path, tmp_path, schema)
+
+    assert not any(wikilink_slug in e for e in result.errors), result.errors
+
+
 def test_lint_directory_scans_toplevel_and_product_subdir_excludes_index(
     tmp_path: Path,
 ) -> None:
@@ -190,26 +245,10 @@ def test_lint_directory_empty_is_a_noop(tmp_path: Path) -> None:
     assert lint_directory(tmp_path, schema) == []
 
 
-def test_workspace_allowlist_extends_the_curated_set(tmp_path: Path) -> None:
-    (tmp_path / ".heading-allowlist").write_text(
-        "# comment\nA Workspace-Specific Heading\n\nAnother One\n", encoding="utf-8"
-    )
-
-    loaded = load_workspace_allowlist(tmp_path)
-
-    assert loaded == frozenset({"A Workspace-Specific Heading", "Another One"})
-    assert "A Workspace-Specific Heading" not in HEADING_ALLOWLIST  # curated set untouched
-
-
-def test_workspace_allowlist_absent_file_is_empty(tmp_path: Path) -> None:
-    assert load_workspace_allowlist(tmp_path) == frozenset()
-
-
 @pytest.mark.parametrize(
     ("shape", "expected_exit"),
     [
         pytest.param("clean", 0, id="clean-exit-0"),
-        pytest.param("warn", 2, id="warn-only-exit-2"),
         pytest.param("error", 1, id="error-exit-1"),
     ],
 )
@@ -218,8 +257,6 @@ def test_main_end_to_end_exit_codes(tmp_path: Path, shape: str, expected_exit: i
     mem_dir.mkdir()
     if shape == "clean":
         _make_atom(mem_dir, slug="test-atom", body="## Purpose\n\nclean\n")
-    elif shape == "warn":
-        _make_atom(mem_dir, slug="test-atom", body="## Never Allowlisted\n\nwarn only\n")
     else:
         _make_atom(mem_dir, slug="test-atom", body="## Changelog\n\nforbidden\n")
 
@@ -227,9 +264,12 @@ def test_main_end_to_end_exit_codes(tmp_path: Path, shape: str, expected_exit: i
 
 
 # ---------------------------------------------------------------------------
-# Ported from the deleted tests/unit/scripts/test_lint_memory_atoms.py — these four
-# checks validate REAL on-disk public assets against this package's canon and were
-# never duplicates of the behavioral tests above (see the module docstring).
+# Ported from the deleted tests/unit/scripts/test_lint_memory_atoms.py — validates a
+# REAL on-disk public asset (the frontmatter schema) against this package's canon,
+# never a duplicate of the behavioral tests above (see the module docstring). Its
+# three siblings (scaffold-atom-headings-allowlisted, memory-feature-template-
+# headings-allowlisted, allowlist-content-pins) retired with HEADING_ALLOWLIST
+# itself (v0.5.0): a heading vocabulary is prose policy, not a lint.
 # ---------------------------------------------------------------------------
 
 
@@ -244,106 +284,3 @@ def test_agent_tier_property_absent_from_schema() -> None:
     schema = load_frontmatter_schema()
     assert "agent_tier" not in schema["properties"]
     assert "agent_tier" not in schema.get("required", [])
-
-
-def test_scaffold_atom_headings_are_allowlisted() -> None:
-    """Every ``##`` heading of the LINTED scaffold atoms is curated-allowlisted.
-
-    Scope mirrors ``lint_directory``'s exclusions: ``public/scaffold/memory/**/*.md``
-    minus ``AGENTS.md`` (a directory contract, never linted) and ``index.md`` (a
-    generated TOC). AGENTS.md governance headings must never enter the allowlist
-    (v0.1.49 FR3) — a fresh scaffold must lint clean with NO workspace file.
-    """
-    scaffold_memory = _REPO_ROOT / "dadaia_workspace" / "public" / "scaffold" / "memory"
-    assert scaffold_memory.is_dir()
-    missing: list[str] = []
-    for md in sorted(scaffold_memory.glob("**/*.md")):
-        if md.name in {"AGENTS.md", "index.md"}:
-            continue
-        for heading in _extract_h2_headings(md.read_text(encoding="utf-8")):
-            if heading not in HEADING_ALLOWLIST:
-                missing.append(f"{md.name}: {heading}")
-    assert missing == [], f"scaffold headings missing from allowlist: {missing}"
-
-
-def test_memory_feature_template_headings_are_allowlisted() -> None:
-    """Bug: `dadaia memory product add` emits an atom from
-    ``public/templates/memory-feature.md``; every ``##`` heading it writes must be
-    curated-allowlisted, or the supported "add a feature" path yields an atom that
-    ``specs doctor`` immediately flags LINT-1 (unknown heading) — the product's own
-    template contradicting its own linter, so a context can never reach 0 warnings."""
-    template = _REPO_ROOT / "dadaia_workspace" / "public" / "templates" / "memory-feature.md"
-    assert template.is_file()
-    missing = [
-        heading
-        for heading in _extract_h2_headings(template.read_text(encoding="utf-8"))
-        if heading not in HEADING_ALLOWLIST
-    ]
-    assert missing == [], f"memory-feature template headings missing from allowlist: {missing}"
-
-
-@pytest.mark.parametrize(
-    ("name", "required_headings"),
-    [
-        (
-            # T-PIO-09 (F9): legitimate current-atom headings must NOT warn.
-            "legitimate_canon_headings",
-            [
-                "Acquire do lease (O_EXCL CAS + stable-session-identity)",
-                "Adoção (9 agentes core)",
-                "Agent roster and phase ownership (constitution §14 + §7)",
-                "Blocking and resume",
-                "CI matrix 3-OS (graduated — hard-gated)",
-                "Contrato de resiliência — 3 tiers",
-                "Core services",
-                "Current limits",
-                "Dispatcher purity (constitution §9)",
-                "Fluxo de dados — gate v3 SDD (v0.1.14: entrypoint merged pre_gate)",
-                "Gating note (current behavior)",
-                "Harness runtime boundary",
-                "Hygiene and anti-slop behavior",
-                "Model assignments (9 core agents)",
-                "Modelo de concorrência e lease (v0.1.14)",
-                "Multi-harness runtime parity (constitution §4)",
-                "Os 3 canais de reporte/comunicação (constitution §11)",
-                "O Spec Context Project (conceito central)",
-                "Plataforma seam — `core/platform.py`",
-                "Portos e adapters (4 + 9)",
-                "Public surface counts (v0.2.0)",
-                "Purpose",
-                "Python governance hooks package",
-                "Structured-memory-source subsystem (memory-markdown-source-v1)",
-                "Sub-agent model (constitution §9)",
-                "Topologia de agentes (9 core)",
-            ],
-        ),
-        (
-            # T-46-23 (DRIFT-5): v0.1.25-v0.1.45 workflow/backlog subsystem headings.
-            "group_e_workflow_headings",
-            [
-                "Backlog-consistency subsystem (`features/backlog/`, v0.1.25)",
-                "Workflow control plane subsystem (v0.1.28 + v0.1.29)",
-                "Workflow-step handoff data plane (v0.1.30)",
-                "Workflows control plane (v0.1.28, redesenhado em v0.1.45)",
-                "Workflow model governance (control plane, v0.1.28)",
-                "Harness as a governed dimension (v0.1.29)",
-                "Gating note (review-only typed gate + coherent worker-output contract)",
-            ],
-        ),
-        (
-            # v0.1.48 W3 (F-79): the 4 post-W2 architecture.md headings + EN canon
-            # forms pre-added for the W4 rename.
-            "architecture_current_and_english_forms",
-            [
-                "Modelo de concorrência e lease",
-                "Backlog-consistency subsystem (`features/backlog/`)",
-                "Workflow control plane subsystem",
-                "Workflow-step handoff data plane",
-                "Concurrency and lease model",
-            ],
-        ),
-    ],
-)
-def test_allowlist_content_pins(name: str, required_headings: list[str]) -> None:
-    missing = [h for h in required_headings if h not in HEADING_ALLOWLIST]
-    assert not missing, f"{name}: headings missing from allowlist: {missing}"

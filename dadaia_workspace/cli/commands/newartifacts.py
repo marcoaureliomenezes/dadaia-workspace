@@ -2,12 +2,15 @@
 
 Implements:
 - dadaia release new <id>    → specs/releases/<id>/SPEC.md stub
-- dadaia backlog new <slug>  → specs/backlog/<slug>.md stub
+- dadaia backlog new <slug>  → appends one active[] entry to specs/backlog/BACKLOG.json
 - dadaia backlog subjects    → read-only resolve/preview of canonical subjects (v0.1.25 R1)
-- dadaia backlog doctor      → BL-SCHEMA/DUP/CONFLICT/STALE backlog-consistency check (R1)
+- dadaia backlog doctor      → BL-SCHEMA/CONFLICT/STALE backlog-consistency check (BL-DUP
+  deleted, not disabled, v0.5.0 A5.2)
 
 The legacy ``dadaia bug new`` Markdown scaffolder was retired in v0.1.53 — bugs are
-event-sourced JSONL via ``dadaia bugs append`` (the v0.1.46 canon).
+event-sourced JSONL via ``dadaia bugs append`` (the v0.1.46 canon). ``BACKLOG.md`` support
+is retired outright (operator ruling 2026-08-28) — the single source is
+``specs/backlog/BACKLOG.json``, schema ``public/schemas/backlog/backlog-v1.schema.json``.
 """
 
 from __future__ import annotations
@@ -17,7 +20,9 @@ from pathlib import Path
 
 import typer
 
+from dadaia_workspace import container
 from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
+from dadaia_workspace.core.atomic_write import ConcurrentModificationError
 from dadaia_workspace.core.models.backlog import SubjectKind
 from dadaia_workspace.features.backlog.document import backlog_new
 from dadaia_workspace.features.spec_artifacts.new_artifacts import release_new
@@ -25,20 +30,24 @@ from dadaia_workspace.features.spec_artifacts.new_artifacts import release_new
 
 def _resolve_backlog_roots(
     specs_dir: Path, source_root: str | None, alias_map: str | None
-) -> tuple[Path, Path, Path, Path]:
+) -> tuple[Path, Path, Path]:
     """Resolve the injected roots the registry/doctor need (SPEC §3.8 #6 — never cwd).
 
-    Returns ``(source_root, catalog_path, alias_map_path, archive_root)``. ``source_root``
-    defaults to the repo root that owns ``specs_dir`` (``specs_dir.parent``) so code anchors
-    are derived REPO-ROOT-relative (e.g. ``dadaia_workspace/core/...#Sym``) — matching the way
+    Returns ``(source_root, catalog_path, alias_map_path)``. ``source_root`` defaults to
+    the repo root that owns ``specs_dir`` (``specs_dir.parent``) so code anchors are
+    derived REPO-ROOT-relative (e.g. ``dadaia_workspace/core/...#Sym``) — matching the way
     committed ``code`` refs are authored. The alias map defaults to the workspace-level
     ``.dadaia/states/backlog_subject_aliases.txt`` resolved up from ``specs_dir``.
+
+    No longer returns an ``archive_root`` (v0.5.0 T-050-13A): the doctor's BL-STALE
+    condition (a) reads the relocated ``consumed_backlog_histo.jsonl`` store via
+    ``container.build_consumed_backlog_histo_store``, wired at the call site below —
+    the pre-relocation directory-glob root has no reader left to inject it into.
     """
     src = Path(source_root).resolve() if source_root else specs_dir.parent.resolve()
     catalog_path = specs_dir / "memory" / "product" / "catalog.json"
-    archive_root = specs_dir / "_archive"
     alias_map_path = Path(alias_map).resolve() if alias_map else _default_alias_map_path(specs_dir)
-    return src, catalog_path, alias_map_path, archive_root
+    return src, catalog_path, alias_map_path
 
 
 def _default_alias_map_path(specs_dir: Path) -> Path:
@@ -122,11 +131,11 @@ def backlog_new_cmd(
         help="Path to specs/ directory. Default: resolve from bound context session.",
     ),
 ) -> None:
-    """Append one ``## ACTIVE`` subsection for <slug> to specs/backlog/BACKLOG.md.
+    """Append one ``active[]`` entry for <slug> to specs/backlog/BACKLOG.json.
 
-    Creates the document (with both ``## ACTIVE`` and ``## LEDGER`` section headings)
-    first when it does not yet exist (SPEC v0.12.0 FR3, ADR #14 — the single-source
-    document, not a per-entry file).
+    Creates the document (``{"schema": "backlog-v1", "active": []}``) first when it does
+    not yet exist (SPEC v0.12.0 FR3, ADR #14; operator ruling 2026-08-28 — the
+    single-source JSON document, not a per-entry file and not Markdown).
     """
     target = _resolve_specs_dir(specs_dir)
 
@@ -145,6 +154,13 @@ def backlog_new_cmd(
     except RuntimeError as exc:
         # A1.2 (v0.4.2) — write-then-verify: the writer raises rather than reporting
         # success when a re-parse of its own fresh write does not show the slug.
+        typer.echo(f"[error] {exc}", err=True)
+        sys.exit(1)
+    except ConcurrentModificationError as exc:
+        # Code review M-8 (0.5.0 T-050-35 re-verdict) — after 7280856c (F-14 CAS),
+        # backlog_new's expected_previous write can lose a lost-update race under the
+        # NO-LOCKS DOCTRINE. Report it the same way as its three siblings above,
+        # rather than an uncaught traceback.
         typer.echo(f"[error] {exc}", err=True)
         sys.exit(1)
 
@@ -186,9 +202,7 @@ def backlog_subjects_cmd(
     if not target.is_dir():
         typer.echo(f"[error] specs_dir not found: {target}", err=True)
         sys.exit(1)
-    src, catalog_path, alias_map_path, _archive = _resolve_backlog_roots(
-        target, source_root, alias_map
-    )
+    src, catalog_path, alias_map_path = _resolve_backlog_roots(target, source_root, alias_map)
     registry = build_registry(
         source_root=src,
         catalog_path=catalog_path,
@@ -236,13 +250,13 @@ def backlog_doctor_cmd(
         False, "--explain", help="Print the per-item bound-anchor resolution alongside findings."
     ),
 ) -> None:
-    """Run BL-SCHEMA/DUP/CONFLICT/STALE over the live backlog; exit non-zero on any ERROR.
+    """Run BL-SCHEMA/CONFLICT/STALE over the live backlog; exit non-zero on any ERROR.
 
     This is the ENFORCED backstop (ADR-D): wired into the pre-commit chokepoint + CI, it
     rejects a hand-written divergent twin even though ``specs/backlog/`` is ADDITIVE —
-    ``BACKLOG.md`` (the single source, SPEC v0.12.0 FR1/ADR #14) is committed repository
-    truth (``.gitignore:133-142`` opts ``*.md`` back in). ``--explain`` additionally
-    prints how each item's subjects resolved.
+    ``BACKLOG.json`` (the single source, SPEC v0.12.0 FR1/ADR #14; operator ruling
+    2026-08-28) is committed repository truth. ``--explain`` additionally prints how
+    each item's subjects resolved.
     """
     from dadaia_workspace.cli.anchors import derive_cli_anchors
     from dadaia_workspace.features.backlog.doctor import Severity, run_backlog_doctor
@@ -251,9 +265,7 @@ def backlog_doctor_cmd(
     if not target.is_dir():
         typer.echo(f"[error] specs_dir not found: {target}", err=True)
         sys.exit(1)
-    src, catalog_path, alias_map_path, archive_root = _resolve_backlog_roots(
-        target, source_root, alias_map
-    )
+    src, catalog_path, alias_map_path = _resolve_backlog_roots(target, source_root, alias_map)
 
     if explain:
         _explain_backlog(target, src, catalog_path, alias_map_path)
@@ -263,8 +275,12 @@ def backlog_doctor_cmd(
         source_root=src,
         catalog_path=catalog_path,
         alias_map_path=alias_map_path,
-        archive_root=archive_root,
         cli_anchors=derive_cli_anchors(),
+        # v0.5.0 T-050-13's documented residual, closed by T-050-13A: both generic
+        # backlog-histo stores are wired through the container so BL-STALE's histo
+        # conditions are live from the real CLI callsite, not a permanent no-op.
+        histo_store=container.build_backlog_histo_store(target),
+        consumed_histo_store=container.build_consumed_backlog_histo_store(target),
     )
 
     errors = [f for f in findings if f.severity is Severity.ERROR]
@@ -284,9 +300,9 @@ def backlog_doctor_cmd(
 def _explain_backlog(specs_dir: Path, src: Path, catalog_path: Path, alias_map_path: Path) -> None:
     """Print how each ACTIVE backlog item's subjects bind to canonical anchors (read-only).
 
-    Reads the single source ``specs/backlog/BACKLOG.md`` through
+    Reads the single source ``specs/backlog/BACKLOG.json`` through
     :func:`~dadaia_workspace.features.backlog.document.load_document` (SPEC v0.12.0
-    FR1/FR2, ADR #14 — T-120-08 cutover).
+    FR1/FR2, ADR #14; operator ruling 2026-08-28).
     """
     from dadaia_workspace.cli.anchors import derive_cli_anchors
     from dadaia_workspace.features.backlog.document import load_document

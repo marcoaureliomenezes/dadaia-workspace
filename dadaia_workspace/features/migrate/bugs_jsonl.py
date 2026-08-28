@@ -27,7 +27,7 @@ from pathlib import Path
 
 import yaml
 
-from dadaia_workspace.core.models.bugs import BugEvent
+from dadaia_workspace.core.models.bugs import redact_text
 from dadaia_workspace.features.migrate.tree_v2 import MigrateResult
 
 __all__ = ["migrate_bugs_jsonl"]
@@ -91,7 +91,10 @@ def migrate_bugs_jsonl(specs_dir: Path, *, dry_run: bool = False) -> MigrateResu
         events = _events_for_bug(md_path, result)
         if not events:
             continue
-        bug_id = events[0].bug_id
+        bug_id_raw = events[0]["bug_id"]
+        if not isinstance(bug_id_raw, str):
+            continue
+        bug_id = bug_id_raw
         dst = archive_dir / md_path.name
         if bug_id in already:
             result.skipped.append(
@@ -116,17 +119,22 @@ def migrate_bugs_jsonl(specs_dir: Path, *, dry_run: bool = False) -> MigrateResu
 # ---------------------------------------------------------------------------
 
 
-def _events_for_bug(md_path: Path, result: MigrateResult) -> list[BugEvent]:
-    """Reconstruct the coherent event stream for one bug ``.md`` (``[]`` if unparseable)."""
+def _events_for_bug(md_path: Path, result: MigrateResult) -> list[dict[str, object]]:
+    """Reconstruct the coherent event stream for one bug ``.md`` (``[]`` if unparseable).
+
+    Each event is a raw ``dict`` — the v5 event shape this migration step has always
+    emitted — rather than the retired ``BugEvent`` dataclass (v0.5.0 S1 FR23 firing,
+    A3: ``BugEvent`` is deleted from ``core/models/bugs.py``, the model had no writer
+    left to justify it; this one-shot ``specs upgrade`` step still targets the v5 event
+    shape and constructs it directly)."""
     text = md_path.read_text(encoding="utf-8")
     fm = _frontmatter(text)
     bug_id = _str(fm.get("name")) or md_path.stem
     reported_ts = _to_ts(fm.get("reported") or fm.get("opened") or fm.get("created_at"))
     body = _body_sections(text)
 
-    reported = BugEvent(
+    reported = _reported_event(
         bug_id=bug_id,
-        event="reported",
         ts=reported_ts,
         reported_by=_str(fm.get("reported_by")) or "bugs-jsonl-migration",
         title=_str(fm.get("title")) or bug_id,
@@ -134,12 +142,11 @@ def _events_for_bug(md_path: Path, result: MigrateResult) -> list[BugEvent]:
         surface=_str(fm.get("surface")) or "",
         component=_str(fm.get("component")) or "",
         context=_str(fm.get("context")) or "",
-        tags=(),
         symptom=body.get("symptom", ""),
         repro=body.get("repro", ""),
         expected=body.get("expected", ""),
         notes=body.get("notes", ""),
-    ).redact()
+    )
 
     if _is_open(fm.get("status")):
         return [reported]
@@ -148,13 +155,49 @@ def _events_for_bug(md_path: Path, result: MigrateResult) -> list[BugEvent]:
     return [reported, terminal]
 
 
+def _reported_event(
+    *,
+    bug_id: str,
+    ts: str,
+    reported_by: str,
+    title: str,
+    severity: str,
+    surface: str,
+    component: str,
+    context: str,
+    symptom: str,
+    repro: str,
+    expected: str,
+    notes: str,
+) -> dict[str, object]:
+    """Build one ``reported``-shape v5 event dict, redacted field-by-field exactly like
+    the retired ``BugEvent.redact()`` scrubbed its own optional-string fields (operator-
+    local paths/IPs stripped from free text, via :func:`redact_text`)."""
+    return {
+        "bug_id": bug_id,
+        "event": "reported",
+        "ts": ts,
+        "reported_by": reported_by,
+        "title": redact_text(title),
+        "severity": redact_text(severity),
+        "surface": redact_text(surface),
+        "component": redact_text(component),
+        "context": redact_text(context),
+        "symptom": redact_text(symptom),
+        "repro": redact_text(repro),
+        "expected": redact_text(expected),
+        "notes": redact_text(notes),
+        "tags": [],
+    }
+
+
 def _terminal_event(
     bug_id: str,
     fm: dict[str, object],
     reported_ts: str,
     md_path: Path,
     result: MigrateResult,
-) -> BugEvent:
+) -> dict[str, object]:
     """Reconstruct the single terminal event for a Closed bug."""
     terminal_ts = _clamp_ts(
         _to_ts(fm.get("closed") or fm.get("adopted"), default=reported_ts),
@@ -162,13 +205,13 @@ def _terminal_event(
     )
     superseded_by = _str(fm.get("superseded_by"))
     if superseded_by:
-        return BugEvent(
-            bug_id=bug_id,
-            event="superseded",
-            ts=terminal_ts,
-            reported_by="bugs-jsonl-migration",
-            superseded_by=superseded_by,
-        )
+        return {
+            "bug_id": bug_id,
+            "event": "superseded",
+            "ts": terminal_ts,
+            "reported_by": "bugs-jsonl-migration",
+            "superseded_by": superseded_by,
+        }
 
     release = _closing_release(fm)
     if release == _UNKNOWN_RELEASE:
@@ -176,13 +219,13 @@ def _terminal_event(
             f"{md_path.name}: Closed bug with no recorded closing release — "
             f"emitting resolved with release '{_UNKNOWN_RELEASE}' (WARN, R-3)."
         )
-    return BugEvent(
-        bug_id=bug_id,
-        event="resolved",
-        ts=terminal_ts,
-        reported_by="bugs-jsonl-migration",
-        release=release,
-    )
+    return {
+        "bug_id": bug_id,
+        "event": "resolved",
+        "ts": terminal_ts,
+        "reported_by": "bugs-jsonl-migration",
+        "release": release,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -293,11 +336,14 @@ def _clamp_ts(ts: str, *, floor: str) -> str:
     return floor if ts_dt < floor_dt else ts
 
 
-def _append_event_line(bugs_dir: Path, event: BugEvent) -> None:
+def _append_event_line(bugs_dir: Path, event: dict[str, object]) -> None:
     """Append one event as a JSONL line to ``<hour>Z-<n>.jsonl`` (store naming contract)."""
-    hour = datetime.fromisoformat(event.ts.replace("Z", "+00:00")).strftime("%Y%m%dT%H")
+    ts_value = event["ts"]
+    if not isinstance(ts_value, str):
+        raise TypeError("event 'ts' must be a string")
+    hour = datetime.fromisoformat(ts_value.replace("Z", "+00:00")).strftime("%Y%m%dT%H")
     target = _target_file(bugs_dir, hour)
-    line = json.dumps(event.to_dict(), sort_keys=True, ensure_ascii=False) + "\n"
+    line = json.dumps(event, sort_keys=True, ensure_ascii=False) + "\n"
     with target.open("a", encoding="utf-8") as handle:
         handle.write(line)
 

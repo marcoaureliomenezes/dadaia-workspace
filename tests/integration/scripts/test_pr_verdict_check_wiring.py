@@ -121,9 +121,13 @@ def _commit_verdict_archived(
     agent: str = "security-reviewer",
     release_id: str = _RELEASE_ID,
 ) -> str:
-    """Places the verdict directly under ``specs/_archive/releases/<id>/verdicts/`` —
-    the shape release closure produces by ``git mv``-ing the whole release directory
-    (verdicts included) out of the live tree, per T-044-50's fix scope.
+    """Places the verdict directly under ``specs/releases/_archive/<id>/verdicts/`` —
+    the v6 per-area-archive shape release closure produces by ``git mv``-ing the whole
+    release directory (verdicts included) out of the live tree, per T-044-50's fix scope
+    and T-050-06A's canon rename (bug
+    pr-verdict-check-wiring-fixture-archived-verdict-path-predates-v6-canon: this
+    fixture used to place evidence at the pre-v6 ``specs/_archive/releases/<id>/``
+    layout, which the canon-derived script never resolves against).
     """
     payload = {
         "schema_version": "handoff-v1.2",
@@ -133,7 +137,7 @@ def _commit_verdict_archived(
         "verdict": verdict,
         "metrics": {"commit_sha": covers_sha},
     }
-    verdicts_dir = repo / "specs" / "_archive" / "releases" / release_id / "verdicts"
+    verdicts_dir = repo / "specs" / "releases" / "_archive" / release_id / "verdicts"
     verdicts_dir.mkdir(parents=True, exist_ok=True)
     (verdicts_dir / f"{covers_sha}.handoff.json").write_text(json.dumps(payload), encoding="utf-8")
     _git("add", "-A", cwd=repo)
@@ -453,7 +457,7 @@ def test_archived_release_tree_evidence_with_active_release_none_passes(tmp_path
     GREEN after: at a closed release (ACTIVE.md 'release: none', mirroring
     ``dd-release-implement`` step 12's archive) the security-reviewer's APPROVED
     verdict has already been ``git mv``'d into
-    ``specs/_archive/releases/<id>/verdicts/`` by the closure that just ran. The gate
+    ``specs/releases/_archive/<id>/verdicts/`` by the closure that just ran. The gate
     must still PASS — resolving evidence by the artifact, never the ACTIVE.md
     pointer that legitimately (and, pre-fix, fatally) reads 'none' here.
     """
@@ -490,7 +494,7 @@ def test_archived_evidence_with_trailing_unreviewed_production_change_fails(
     """T-044-50 item 3: mixing archived-tree verdict evidence with a genuinely
     unreviewed production change landing AFTER the review must still FAIL — the
     widened only-verdict-drift exemption (now matching both
-    ``specs/releases/*/verdicts/*`` and ``specs/_archive/releases/*/verdicts/*``)
+    ``specs/releases/*/verdicts/*`` and ``specs/releases/_archive/*/verdicts/*``)
     must not swallow a real production diff just because it happens to land near
     archived evidence.
     """

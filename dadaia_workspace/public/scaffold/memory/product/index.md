@@ -8,8 +8,6 @@ tags:
   - catalog
   - product
   - index
-last_updated: "2026-01-01"
-release_origin: memory-markdown-source-v1
 ---
 
 ## Visão atômica

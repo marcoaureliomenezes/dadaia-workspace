@@ -38,7 +38,7 @@ class HygieneProtectionKind(StrEnum):
     LOCK = "lock"
     SESSION = "session"
     OPERATOR_PROTECTED = "operator_protected"
-    #: v0.1.74: a zone-root doc file (AGENTS.md / README.md / .gitkeep) — the documented
+    #: v0.1.74: a zone-root doc file (AGENTS.md / README.md) — the documented
     #: scoped-rules / zone-documentation mechanism, lib-projected with historical mtimes;
     #: canonical, never reclaimable (bug public-install-restores-expired-zone-agents).
     CANONICAL_ZONE_DOC = "canonical_zone_doc"

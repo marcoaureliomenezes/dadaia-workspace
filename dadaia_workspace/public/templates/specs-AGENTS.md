@@ -1,62 +1,52 @@
 # specs/AGENTS.md — Spec Context Rules
 
 Scope: this file governs only the `specs/` tree of one Spec Context Project.
-Root workspace behavior is in the workspace `AGENTS.md`; production-source
-behavior is in the repo-local `AGENTS.md`.
+Root workspace behavior is in the workspace `AGENTS.md`; production-source behavior is in the repo-local `AGENTS.md`.
 
-## Load Order
+## 1. Load order
 
 Before writing or reviewing SDD artifacts, read:
 
 ```text
 constitution.md
-memory/architecture.md
-memory/tech-stack.md
+memory/ARCHITECTURE.md
+memory/TECHSTACK.md
 memory/product/index.md
-releases/ACTIVE.md
+releases/<release-id>/RELEASE.json    (phase field read directly, no fold)
 releases/<release-id>/SPEC.md
 releases/<release-id>/PLAN.md
 releases/<release-id>/TASKS.md
 ```
 
-Use `_archive/` only for history. Use `backlog/` and `bugs/` for intake and
-triage; they are not approval gates.
+- Use `_archive/` only for history.
+- Use `backlog/` and `bugs/` for intake and triage; they are not approval gates.
+- Run ordered work by dispatching the owning agent for each stage — no workflow engine executes stages.
+- Concurrent sessions are allowed and surfaced through advisory presence; never wait for a concurrency lock.
 
-Run ordered work by dispatching the owning agent for each stage — backlog-definition,
-release-definition, implementation with its reviews and gates, and audit — against
-these documents; no workflow engine executes the stages for you. Concurrent sessions are
-allowed and surfaced through advisory presence; never wait for or create a workspace
-concurrency lock.
-
-## Release Gate
+## 2. Release gate
 
 Implementation is allowed only when:
 
-- `ACTIVE.md` declares the active release and `phase: IMPLEMENTATION`.
+- The live release's `RELEASE.json` `phase` field reads `IMPLEMENTATION`.
 - `SPEC.md`, `PLAN.md`, and `TASKS.md` contain `**Status:** Aprovado`.
 - The active task is changed from `[ ]` to `[-]` before production edits.
 - The task's declared write set contains every production file to be edited.
+- If any item is missing: stop, draft or repair the SDD artifact instead of editing production.
 
-If any item is missing, stop. Draft or repair the SDD artifact instead of
-editing production.
-
-## Artifact Authority
+## 3. Artifact authority
 
 | Path | Writer |
 |---|---|
 | `constitution.md` | operator or `product-engineer` during approved governance work |
-| `releases/ACTIVE.md` | `product-engineer` |
+| `releases/<id>/RELEASE.json` | agents with file tools, per field (`dd-release-implement`'s `RELEASE-EVENTS.md`) |
 | `releases/<id>/SPEC.md` | `product-engineer` |
 | `releases/<id>/PLAN.md` | `product-engineer` |
 | `releases/<id>/TASKS.md` | `product-engineer`; implementers may change only their task marker |
-| `releases/<id>/CLOSURE.md` | `product-engineer` in `CLOSURE` |
-| `memory/**` | `product-engineer` in `CLOSURE` only |
-| `backlog/**` | `project-manager` only (sole backlog author; `product-engineer` is a read-only consumer) |
+| `memory/**` | `product-engineer` in `DEFINITION` and `CLOSURE` phase |
+| `backlog/**` | `project-manager` only (sole backlog author) |
 | `bugs/**` | any agent may file; `product-engineer` resolves into release work |
 
-## Task Markers
-
-Use only these markers:
+## 4. Task markers
 
 ```text
 [ ] OPEN
@@ -64,32 +54,26 @@ Use only these markers:
 [x] DONE
 ```
 
-Do not take a task already marked `[-]`. Do not mark `[x]` without validation
-evidence in the implementing report.
+- Do not take a task already marked `[-]`.
+- Do not mark `[x]` without validation evidence in the implementing report.
 
-## Memory
+## 5. Memory
 
-Memory describes the product as it is now.
-
+- Memory describes the product as it is now.
 - No changelog/history/version sections in `memory/**`.
-- Screenshots referenced by memory live under `assets/`.
-- Stale memory found during implementation becomes a bug or closure note; do
-  not patch memory mid-implementation.
+- The v6 canon root carries no `assets/` member — a diagram is an in-doc fenced Mermaid block.
+- Stale memory found during implementation becomes a bug or closure note — never patch memory mid-implementation.
 
-## Doctor
-
-Run before closing spec work:
+## 6. Doctor
 
 ```bash
 dadaia specs doctor
 ```
 
-`dadaia specs doctor --fix` may repair scaffoldable tree issues. It must not be
-used to bypass missing approval, unclear scope, or task ownership.
+- `dadaia specs doctor --fix` may repair scaffoldable tree issues.
+- Never use it to bypass missing approval, unclear scope, or task ownership.
 
-## Escalation
-
-Use this exact shape when blocked:
+## 7. Escalation
 
 ```text
 [SDD BLOCKED]
@@ -100,6 +84,5 @@ Reason: <one sentence>
 Needed decision: <one concrete question or action>
 ```
 
-Generated from `dadaia_workspace/public/templates/specs-AGENTS.md`. Project
-teams may customize this file; `dadaia specs doctor` reports drift instead of
-overwriting it.
+Generated from `dadaia_workspace/public/templates/specs-AGENTS.md`.
+Project teams may customize this file; `dadaia specs doctor` reports drift instead of overwriting it.

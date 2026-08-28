@@ -9,9 +9,13 @@ being byte-identical). The projected ``public/scripts/lint-memory-atoms.py`` bec
 wrapper that execs the workspace venv's ``python -m dadaia_workspace.features.specs.memory_lint``
 entry point (ai-engineer's half of T-043-20 — see the task's handoff note for the exact contract).
 
-Ported faithfully from the pre-v0.4.3 script (same heading-allowlist groups, same frontmatter
-schema, same per-atom checks, same CLI shape/exit codes) — behavior is unchanged, only the
-DEPENDENCY DIRECTION inverts (A16.1).
+Ported faithfully from the pre-v0.4.3 script (same frontmatter schema, same CLI
+shape/exit codes) — the DEPENDENCY DIRECTION inverts (A16.1). The heading-vocabulary
+check (a curated allowlist of "known" ## headings, plus an optional per-workspace
+``.heading-allowlist`` extension file) is RETIRED: a heading vocabulary is prose
+policy, not a lint. This module keeps only what a lint can mechanically decide —
+frontmatter schema conformance, forbidden (changelog/history) headings, duplicate
+headings, and wikilink resolution.
 """
 
 from __future__ import annotations
@@ -27,235 +31,16 @@ import yaml
 from jsonschema import ValidationError, validate
 
 __all__ = [
-    "HEADING_ALLOWLIST",
     "AtomResult",
     "lint_atom",
     "lint_directory",
     "load_frontmatter_schema",
-    "load_workspace_allowlist",
     "main",
 ]
 
-# ---------------------------------------------------------------------------
-# Heading allowlist (union of Groups A + B + C from the W0 decisions report,
-# extended by Groups D-S over subsequent releases). Exact strings, case-sensitive.
-# ---------------------------------------------------------------------------
-
-# Group A — Standard product atom sections.
-# PT legacy entries are KEPT (G2, v0.1.48): consumer workspaces carry PT atoms and
-# must keep linting clean without any atom edit.
-_HEADING_GROUP_A: frozenset[str] = frozenset(
-    [
-        "Propósito",
-        "Fluxo de uso",
-        "Trigger típico",
-        "Diferencial",
-        "Estado runtime tocado",
-        "Dependências",
-    ]
-)
-
-# Group A (EN) — the ENGLISH canonical Group-A set (F-79 / v0.1.48 English canon).
-# 1:1 translations of the PT Group-A sections above; new/renamed atoms use these.
-_HEADING_GROUP_A_EN: frozenset[str] = frozenset(
-    [
-        "Purpose",
-        "Usage flow",
-        "Typical trigger",
-        "Differentiator",
-        "Runtime state touched",
-        "Dependencies",
-        # Canonical headings emitted by the `dadaia memory product add` template
-        # (public/templates/memory-feature.md). A supported "add a feature" atom must
-        # lint clean out of the box (test_memory_feature_template_headings_are_allowlisted).
-        "Current behavior",
-        "Boundaries",
-    ]
-)
-
-# Group B — Extended product atom sections (one-offs in divergent atoms)
-_HEADING_GROUP_B: frozenset[str] = frozenset(
-    [
-        "Fora de escopo (deferido a backlog)",
-        "Fora de escopo (drifts conhecidos)",
-        "Próximos passos",
-        "O que é",
-        "Schema location",
-        "CLI",
-        "Skill: dadaia-handoff-emitter",
-        # "Adoção (15 de 15 agentes)" pruned in v0.1.48 (F-79): 0 usages in specs/memory/.
-        "Referência",
-        "Brand identity",
-        "Decision Authority Matrix — domínios novos (r3)",
-        "Handoff-first emission contract (ADR-X5)",
-        "Dispatch-to-researcher pattern (ADR-X6)",
-        "Codex Dispatcher Capability Matrix (ADR-3)",
-    ]
-)
-
-# Group C — Core and index atom sections (architecture, tech-stack, index only)
-_HEADING_GROUP_C: frozenset[str] = frozenset(
-    [
-        "Visão atômica",
-        "Usuários",
-        "Catálogo de features",
-        "Mapa de capacidades",
-        "Limites conhecidos",
-        "Evidências visuais",
-        "Visão geral",
-        "Camadas",
-        "Regras de dependência",
-        "Fluxo de dados — pipeline asset chain",
-        "Fluxo de dados — gate v3 SDD (com RULE E e PostToolUse)",
-        "Contratos entre módulos",
-        "Estado runtime",
-        "Memory injection subsystem",
-        "Structured-memory-source subsystem",
-        "Linguagens",
-        "Runtimes e ferramentas",
-        "Agent runtimes",
-        # "Model assignments (20 agentes)" pruned in v0.1.48 (F-79): 0 usages in specs/memory/.
-        "Schema handoff-v1.1",
-        "Dependências aprovadas",
-        "Restrições e proibições",
-        "Comandos canônicos",
-    ]
-)
-
-# Group D — Legitimate current-atom canon headings (F9 / T-PIO-09).
-_HEADING_GROUP_D: frozenset[str] = frozenset(
-    [
-        "Acquire do lease (O_EXCL CAS + stable-session-identity)",
-        "Adoção (9 agentes core)",
-        "Agent roster and phase ownership (constitution §14 + §7)",
-        "Blocking and resume",
-        "CI matrix 3-OS (graduated — hard-gated)",
-        "Contrato de resiliência — 3 tiers",
-        "Core services",
-        "Current limits",
-        "Dispatcher purity (constitution §9)",
-        "Fluxo de dados — gate v3 SDD (v0.1.14: entrypoint merged pre_gate)",
-        "Gating note (current behavior)",
-        "Harness runtime boundary",
-        "Hygiene and anti-slop behavior",
-        "Model assignments (9 core agents)",
-        "Modelo de concorrência e lease (v0.1.14)",
-        "Multi-harness runtime parity (constitution §4)",
-        "Os 3 canais de reporte/comunicação (constitution §11)",
-        "O Spec Context Project (conceito central)",
-        "Plataforma seam — `core/platform.py`",
-        "Portos e adapters (4 + 9)",
-        "Public surface counts (v0.2.0)",
-        "Python governance hooks package",
-        "Structured-memory-source subsystem (memory-markdown-source-v1)",
-        "Sub-agent model (constitution §9)",
-        "Topologia de agentes (9 core)",
-    ]
-)
-
-# Group E — Workflow / backlog subsystem canon headings (v0.1.25–v0.1.45).
-_HEADING_GROUP_E: frozenset[str] = frozenset(
-    [
-        "Backlog-consistency subsystem (`features/backlog/`, v0.1.25)",
-        "Workflow control plane subsystem (v0.1.28 + v0.1.29)",
-        "Workflow-step handoff data plane (v0.1.30)",
-        "Workflows control plane (v0.1.28, redesenhado em v0.1.45)",
-        "Workflow model governance (control plane, v0.1.28)",
-        "Harness as a governed dimension (v0.1.29)",
-        "Gating note (review-only typed gate + coherent worker-output contract)",
-    ]
-)
-
-# Group F — v0.1.48 architecture.md canon (F-79).
-_HEADING_GROUP_F: frozenset[str] = frozenset(
-    [
-        "Modelo de concorrência e lease",
-        "Backlog-consistency subsystem (`features/backlog/`)",
-        "Workflow control plane subsystem",
-        "Workflow-step handoff data plane",
-        "Concurrency and lease model",
-    ]
-)
-
-_HEADING_GROUP_G: frozenset[str] = frozenset(
-    [
-        "Adoption (9 core agents)",
-        "Agent topology (9 core)",
-        "Approved dependencies",
-        "Canonical commands",
-        "Capability map",
-        "Contracts between modules",
-        "Data flow — asset chain pipeline",
-        "Dependency rules",
-        "Known limits",
-        "Languages",
-        "Layers",
-        "Lease acquire (O_EXCL CAS + stable-session-identity)",
-        "Overview",
-        "Platform seam — `core/platform.py`",
-        "Ports and adapters (4 + 9)",
-        "Resilience contract — 3 tiers",
-        "Restrictions and prohibitions",
-        "Runtimes and tools",
-        "Runtime state",
-        "The 3 report/communication channels (constitution §11)",
-        "The Spec Context Project (central concept)",
-        "Users",
-        "Visual evidence",
-        "What it is",
-        "Workflows control plane (v0.1.28, redesigned in v0.1.45)",
-    ]
-)
-
-# Group S — scaffold template sections (v0.1.49 FR3).
-_HEADING_GROUP_S: frozenset[str] = frozenset(
-    [
-        "Padrões de qualidade",
-        "Disciplina de testes",
-    ]
-)
-
-HEADING_ALLOWLIST: frozenset[str] = (
-    _HEADING_GROUP_A
-    | _HEADING_GROUP_A_EN
-    | _HEADING_GROUP_B
-    | _HEADING_GROUP_C
-    | _HEADING_GROUP_D
-    | _HEADING_GROUP_E
-    | _HEADING_GROUP_F
-    | _HEADING_GROUP_G
-    | _HEADING_GROUP_S
-)
-
-# Workspace extension file (v0.1.49 FR3): optional `<memory-dir>/.heading-allowlist`
-# — UTF-8, one exact heading per line; blank lines and `#` comments ignored. Merged
-# (union) with the curated allowlist at lint time so consumers extend the canon
-# without editing this module. The file sits in the MEMORY path class: consumers
-# edit it via file tools in DEFINITION/CLOSURE phase (gate law, v0.4.3 FR13 ratifies
-# this classification explicitly — no dotfile carve-out).
-_WORKSPACE_ALLOWLIST_NAME = ".heading-allowlist"
-
-
-def load_workspace_allowlist(memory_dir: Path) -> frozenset[str]:
-    """Load the optional workspace heading allowlist from ``memory_dir``."""
-    path = memory_dir / _WORKSPACE_ALLOWLIST_NAME
-    if not path.is_file():
-        return frozenset()
-    try:
-        raw = path.read_text(encoding="utf-8")
-    except (OSError, ValueError):
-        return frozenset()
-    headings: set[str] = set()
-    for line in raw.splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#"):
-            continue
-        headings.add(stripped)
-    return frozenset(headings)
-
-
-# Forbidden headings — belt-and-suspenders, checked independently of the allowlist.
-# Case-insensitive match (strip/lower comparison).
+# Forbidden headings — the one heading-shaped check that survives the retired
+# vocabulary allowlist: changelog/history sections violate the atomicity contract
+# regardless of prose policy. Case-insensitive match (strip/lower comparison).
 _FORBIDDEN_HEADING_LOWER: frozenset[str] = frozenset(
     ["changelog", "histórico", "history", "versions"]
 )
@@ -289,6 +74,19 @@ def load_frontmatter_schema() -> dict[str, Any]:
 _FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
 _H2_RE = re.compile(r"^##\s+(.+)$", re.MULTILINE)
 _WIKILINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
+
+# v6 canon top-level singles (FR1/A1.5/A1.6, T-050-06): these three atoms' on-disk
+# filenames were renamed (ARCHITECTURE.md, TECHSTACK.md, QUALITY.md) while their
+# frontmatter `slug:` — the stable identity every `[[wikilink]]` across the memory
+# corpus already references — stays unchanged (architecture / tech-stack /
+# quality-assurance). This is the ONE named exception to "slug == filename stem" and
+# to "wikilink target == <slug>.md": both checks below consult it instead of adding a
+# second slug-resolution mechanism.
+_CANON_SINGLE_FILENAMES: dict[str, str] = {
+    "architecture": "ARCHITECTURE.md",
+    "tech-stack": "TECHSTACK.md",
+    "quality-assurance": "QUALITY.md",
+}
 
 
 def _parse_frontmatter(content: str) -> tuple[dict[str, Any] | None, str]:
@@ -349,7 +147,6 @@ def lint_atom(
     md_path: Path,
     memory_dir: Path,
     schema: dict[str, Any],
-    allowlist: frozenset[str] = HEADING_ALLOWLIST,
 ) -> AtomResult:
     """Lint a single memory atom .md file. Returns an AtomResult."""
     result = AtomResult(md_path)
@@ -375,7 +172,11 @@ def lint_atom(
 
     slug = fm.get("slug")
     if isinstance(slug, str) and slug != stem:
-        result.error(f"'slug' frontmatter value '{slug}' does not match filename stem '{stem}'.")
+        canon_name = _CANON_SINGLE_FILENAMES.get(slug)
+        if canon_name is None or f"{stem}.md" != canon_name:
+            result.error(
+                f"'slug' frontmatter value '{slug}' does not match filename stem '{stem}'."
+            )
 
     headings = _extract_h2_headings(body)
     seen: set[str] = set()
@@ -390,13 +191,6 @@ def lint_atom(
             )
             continue
 
-        if heading not in allowlist:
-            result.warn(
-                f"'## {heading}' is not in the curated allowlist — consider "
-                "normalising, adding it to the allowlist in memory_lint.py, "
-                f"or listing it in <memory-dir>/{_WORKSPACE_ALLOWLIST_NAME}."
-            )
-
         if heading in seen:
             result.error(f"Duplicate '## {heading}' heading found.")
         else:
@@ -404,7 +198,8 @@ def lint_atom(
 
     wikilinks = _extract_wikilinks(body)
     for wikilink_slug in wikilinks:
-        if not any(memory_dir.rglob(f"{wikilink_slug}.md")):
+        target_name = _CANON_SINGLE_FILENAMES.get(wikilink_slug, f"{wikilink_slug}.md")
+        if not any(memory_dir.rglob(target_name)):
             result.error(
                 f"Wikilink [[{wikilink_slug}]] does not resolve to any .md file under {memory_dir}."
             )
@@ -435,10 +230,9 @@ def lint_directory(memory_dir: Path, schema: dict[str, Any]) -> list[AtomResult]
         print(f"WARNING: no .md atoms found in {memory_dir}", file=sys.stderr)
         return []
 
-    allowlist = HEADING_ALLOWLIST | load_workspace_allowlist(memory_dir)
     results: list[AtomResult] = []
     for md_path in atom_files:
-        results.append(lint_atom(md_path, memory_dir, schema, allowlist))
+        results.append(lint_atom(md_path, memory_dir, schema))
     return results
 
 

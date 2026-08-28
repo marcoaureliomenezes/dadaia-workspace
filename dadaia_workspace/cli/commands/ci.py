@@ -49,6 +49,28 @@ def _repo_root() -> Path:
     return Path(out.stdout.strip())
 
 
+def _repo_identity_root(worktree_root: Path) -> Path:
+    """The repository's main working tree — its identity under ``<workspace>/repos/``.
+
+    A linked worktree (``git worktree add``) may sit anywhere on disk; the repo it
+    belongs to is named by the git common dir's parent, never by the worktree's own
+    filesystem position. Falls back to *worktree_root* when git cannot answer.
+    """
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "--git-common-dir"],
+            cwd=worktree_root,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return worktree_root
+    # git prints ".git" (relative) from the main checkout and an absolute path from a
+    # linked worktree; anchoring on the worktree root covers both without a git>=2.31 flag.
+    return (worktree_root / out.stdout.strip()).resolve().parent
+
+
 @app.command()
 def preflight(
     quick: bool = typer.Option(False, "--quick", help="Skip the slow e2e suite."),
@@ -114,16 +136,23 @@ def _resolve_workspace_root(repo_root: Path) -> Path:
 
 @app.command("pre-commit-check")
 def pre_commit_check() -> None:
-    """Warn about other live context presence, then run scoped backlog checks.
+    """Warn about other live context presence. Advisory only — never blocks the commit.
 
-    Concurrent-session detection is advisory and always allows the commit.
+    Concurrent-session detection is advisory and always allows the commit (NO-LOCKS
+    DOCTRINE, v0.1.76). v0.5.0 FR9/D9: the backlog-doctor BLOCK that used to run here
+    is DELETED — CI's `backlog-doctor` job already runs the unscoped sweep over the
+    whole tree; blocking a commit on pre-existing backlog debt only ever punished
+    humans and agents on a shared tree (bug
+    `precommit-backlog-doctor-blocks-unrelated-commits`). The installed
+    `pre-commit-presence-gate.sh` wrapper additionally guarantees exit 0 unconditionally,
+    regardless of what this command does.
     """
     from dadaia_workspace.container import build_process_ancestry
     from dadaia_workspace.features.chokepoints import context_slug_for_path, pre_commit_decision
 
     repo_root = _repo_root()
     workspace = _resolve_workspace_root(repo_root)
-    ctx = context_slug_for_path(workspace, repo_root)
+    ctx = context_slug_for_path(workspace, _repo_identity_root(repo_root))
 
     # Wire the read-only ancestry adapter and the pid-liveness probe from the composition root.
     ancestry_adapter = build_process_ancestry()
@@ -148,85 +177,6 @@ def pre_commit_check() -> None:
         typer.echo(decision.warn, err=True)
     if not decision.allowed:
         typer.secho(decision.message, fg=typer.colors.RED, err=True)
-        raise typer.Exit(1)
-
-    # Backlog-consistency backstop (v0.1.25 R1, ADR-D): a hand-written divergent twin (and
-    # planted BL-SCHEMA/DUP/CONFLICT/STALE violations) is rejected at the commit boundary even
-    # though specs/backlog/ is gitignored + ADDITIVE. Runs over the committing repo's specs/.
-    _run_backlog_doctor_gate(repo_root)
-
-
-def _staged_backlog_paths(repo_root: Path) -> list[str]:
-    """Return the paths staged for the pending commit that live under ``specs/backlog/``.
-
-    Uses ``git diff --cached --name-only -- specs/backlog`` (pathspec-filtered) run from the
-    repo root, the same ``subprocess`` seam this cli module already uses in ``_repo_root``.
-    An empty list means the staged changeset does not touch the backlog. Any git failure
-    (no repo, no git) yields an empty list — the caller then skips the gate (fail-open, the
-    CI full sweep remains the backstop).
-    """
-    try:
-        out = subprocess.run(
-            ["git", "diff", "--cached", "--name-only", "--", "specs/backlog"],
-            cwd=repo_root,
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return []
-    return [line.strip() for line in out.stdout.splitlines() if line.strip()]
-
-
-def _run_backlog_doctor_gate(repo_root: Path) -> None:
-    """Run BL-* over ``<repo_root>/specs`` at the pre-commit chokepoint (v0.1.25 R1).
-
-    A no-op when the repo has no ``specs/backlog/`` (not an SDD spec context). Any ERROR
-    finding blocks the commit with an actionable per-finding listing.
-
-    W1-4 scoping: the blocking BL-* sweep runs ONLY when the staged changeset intersects
-    ``specs/backlog/**``. A commit that stages no backlog file is never blocked by
-    pre-existing backlog debt (bugs ``precommit-backlog-doctor-blocks-unrelated-commits`` +
-    ``backlog-doctor-blocks-consumed-item-refactor-commit``). The full, unscoped sweep still
-    runs in CI via ``dadaia backlog doctor`` (the ci.yml backlog-doctor job) — unchanged.
-    """
-    specs_dir = repo_root / "specs"
-    if not (specs_dir / "backlog").is_dir():
-        return
-    if not _staged_backlog_paths(repo_root):
-        typer.echo(
-            "[pre-commit] no staged specs/backlog changes — skipping backlog doctor gate.",
-            err=True,
-        )
-        return
-    from dadaia_workspace.cli.anchors import derive_cli_anchors
-    from dadaia_workspace.features.backlog.doctor import Severity, run_backlog_doctor
-
-    # Code refs in committed intents are REPO-ROOT-relative (e.g.
-    # ``dadaia_workspace/core/models/lifecycle.py#Sym``), so the registry's source root is the
-    # repo root — anchors are derived as ``<repo-relative-path>#symbol`` matching the refs.
-    source_root = repo_root
-    workspace = _resolve_workspace_root(repo_root)
-    alias_map_path = workspace / ".dadaia" / "states" / "backlog_subject_aliases.txt"
-
-    findings = run_backlog_doctor(
-        specs_dir=specs_dir,
-        source_root=source_root,
-        catalog_path=specs_dir / "memory" / "product" / "catalog.json",
-        alias_map_path=alias_map_path,
-        archive_root=specs_dir / "_archive",
-        cli_anchors=derive_cli_anchors(),
-    )
-    errors = [f for f in findings if f.severity is Severity.ERROR]
-    if errors:
-        typer.secho(
-            f"[pre-commit] BLOCKED: backlog doctor found {len(errors)} error(s):",
-            fg=typer.colors.RED,
-            err=True,
-        )
-        for finding in errors:
-            slug = f" [{finding.slug}]" if finding.slug else ""
-            typer.echo(f"  {finding.code.value}{slug} {finding.message}", err=True)
         raise typer.Exit(1)
 
 
@@ -315,7 +265,7 @@ def push_gate_check() -> None:
 
     denylist_terms = load_denylist_terms()
     baseline_patterns = load_denylist_baseline_patterns()
-    own_slug = context_slug_for_path(workspace, repo_root)
+    own_slug = context_slug_for_path(workspace, _repo_identity_root(repo_root))
     registry_result = load_registry_context_identities(workspace)
     if registry_result.degraded:
         # SPEC v0.4.2 FR8(2)/GRILL P13/A8.3: a malformed registry no longer shrinks the

@@ -7,10 +7,9 @@ session records remain fail-closed against file-tool writes.
 **The MEMORY path class covers dotfiles, by decision (v0.4.3 FR13, software-architect
 ruling, handoff 2026-08-17T161500Z-software-architect-v0.4.3-fr13-fr14).**
 ``_MEMORY_PREFIX``'s bare-prefix match classifies EVERY path under ``specs/memory/`` —
-dotfiles included (e.g. ``specs/memory/.heading-allowlist``, curated lint canon, not
-runtime config) — as MEMORY. No dotfile carve-out exists and none is added: a
+dotfiles included — as MEMORY. No dotfile carve-out exists and none is added: a
 carve-out would open an always-writable hole under the MEMORY prefix through which
-lint canon could mutate mid-implementation, the exact stale-layer pattern the gate
+memory content could mutate mid-implementation, the exact stale-layer pattern the gate
 exists to prevent. Second, a SPEC may NOT assign a memory-class write to a
 non-``DEFINITION``/``CLOSURE`` task: the gate reads no SDD artifacts by design and
 gains no SPEC-override channel — ``[RULE A]`` (``evaluate``, below) keeps blocking
@@ -38,8 +37,9 @@ __all__ = ["Decision", "PathClass", "classify_path", "evaluate"]
 _ADVISORY_THROTTLE_SECONDS = 300
 
 #: Ordered ADDITIVE prefixes — always allowed.
-#: Parallel audit sessions use collision-safe directories:
-#:   specs/audits/<YYYYMMDDTHHMMSSZ>-<session_id_8chars>/
+#: Parallel audit sessions use collision-safe directories, named per the single home
+#: ``core.workspace_layout.AUDIT_DIR_NAME_RE`` (v0.5.0 T-050-25A — this comment used to
+#: repeat that shape in prose; one fact, one place now).
 #:
 #: WS-R1 split (FR-R1-01/05): the ``specs/`` ADDITIVE classes apply both at the
 #: workspace root *and* relative to a context root (``repos/<slug>/``). The ``.dadaia/``
@@ -51,26 +51,12 @@ _SPECS_ADDITIVE_PREFIXES: tuple[str, ...] = (
     "specs/bugs/",
     "specs/audits/",
 )
-#: Per-artifact ``_archive`` subdirs (v0.1.46 AC-4). These are FROZEN (read-only for
-#: file-write tools) and MUST be matched BEFORE ``_SPECS_ADDITIVE_PREFIXES`` in
-#: ``_classify_specs_relative`` — otherwise ``specs/bugs/`` (ADDITIVE) is checked first
-#: and swallows ``specs/bugs/_archive/`` as ADDITIVE (the R-2 ordering bug). The trailing
-#: ``/`` is load-bearing: only ``_archive/`` is FROZEN, never a ``_archive``-prefixed
-#: sibling like ``specs/bugs/_archivefoo.jsonl`` (which stays ADDITIVE). Archive MOVES run
-#: via ``git mv`` (Bash), outside the file-tool gate envelope — FROZEN only blocks
-#: Write/Edit *into* the archive, not the move that lands files there.
-_ARCHIVE_SUBDIR_PREFIXES: tuple[str, ...] = (
-    "specs/backlog/_archive/",
-    "specs/audits/_archive/",
-    "specs/bugs/_archive/",
-)
 # Single authority in core (also consumed by the public doctor's foreign scan) —
 # the local name is kept for the module's existing readers.
 _DADAIA_ADDITIVE_PREFIXES: tuple[str, ...] = workspace_layout.DADAIA_ADDITIVE_PREFIXES
 #: v0.4.3 FR13 (ratified): bare-prefix match — dotfiles included, by decision; no
 #: carve-out; no SPEC override of the phase rule (see the module docstring above).
 _MEMORY_PREFIX = "specs/memory/"
-_FROZEN_PREFIX = "specs/_archive/"
 #: A path under ``repos/<slug>/`` whose context-relative remainder matches one of these
 #: ``specs/`` class prefixes is classified by that class. Every other in-repo remainder —
 #: production source AND unlisted ``specs/<other>`` files (e.g. ``specs/constitution.md``)
@@ -198,7 +184,6 @@ def _advisory_message(ctx: str, rel_path: str, others: list[presence.PresenceRec
 class PathClass(Enum):
     ADDITIVE = "ADDITIVE"
     MEMORY = "MEMORY"
-    FROZEN = "FROZEN"
     MUTATING = "MUTATING"
     PROTECTED = "PROTECTED"
     LAW = "LAW"
@@ -217,24 +202,15 @@ def _utcnow() -> datetime:
 def _classify_specs_relative(spec_rel: str) -> PathClass | None:
     """Apply the ordered ``specs/`` class taxonomy to a root- or context-relative path.
 
-    Returns the matched ``PathClass`` (ADDITIVE/MEMORY/FROZEN), or ``None`` when no
+    Returns the matched ``PathClass`` (ADDITIVE/MEMORY), or ``None`` when no
     ``specs/`` class prefix matched — the caller decides the no-match verdict (MUTATING
     for in-repo, the release/protected/ungated tail for workspace-root paths).
     """
-    # R-2 ordering fix (v0.1.46 AC-4): the per-artifact ``_archive/`` subdirs are FROZEN
-    # and MUST be checked BEFORE the ADDITIVE prefixes, or ``specs/bugs/`` would swallow
-    # ``specs/bugs/_archive/`` as ADDITIVE. Trailing-slash match keeps ``_archivefoo``
-    # siblings ADDITIVE.
-    for prefix in _ARCHIVE_SUBDIR_PREFIXES:
-        if spec_rel.startswith(prefix):
-            return PathClass.FROZEN
     for prefix in _SPECS_ADDITIVE_PREFIXES:
         if spec_rel.startswith(prefix):
             return PathClass.ADDITIVE
     if spec_rel.startswith(_MEMORY_PREFIX):
         return PathClass.MEMORY
-    if spec_rel.startswith(_FROZEN_PREFIX):
-        return PathClass.FROZEN
     return None
 
 
@@ -351,9 +327,6 @@ def evaluate(
 
     if cls in (PathClass.ADDITIVE, PathClass.UNGATED):
         return Decision.ALLOW, ""
-
-    if cls == PathClass.FROZEN:
-        return Decision.BLOCK, f"[RULE B] '{rel_path}' is a frozen archive path (read-only)."
 
     if cls == PathClass.MEMORY:
         if phase in _MEMORY_WRITE_PHASES:

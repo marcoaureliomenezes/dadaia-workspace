@@ -1,34 +1,28 @@
-"""One control/format-character sanitation pass at the bug-event seam (SPEC v0.4.5 FR7,
-T-045-20; narrowed by bug ``bug-event-sanitation-strips-tab-lf-cr-from-free-text``,
-code review T-045-33 F1).
+"""One control/format-character sanitation pass at the bug-record seam (SPEC v0.4.5 FR7,
+T-045-20; narrowed by bug ``bug-event-sanitation-strips-tab-lf-cr-from-free-text``, code
+review T-045-33 F1). Rewritten at v0.5.0 T-050-08 against ``BugRecord``/``BugService``
+(the event fold and ``JsonlBugStore`` it exercised are deleted).
 
-Intent: CONTRACT — SPEC v0.4.5 FR7/A7.1-A7.3/A7.6. Bundles the open bug
-``bug-event-field-with-unicode-line-separator-silently-drops-the-event`` (MEDIUM, D3)
-and the fix for ``bug-event-sanitation-strips-tab-lf-cr-from-free-text`` (HIGH).
+Intent: CONTRACT — SPEC v0.4.5 FR7/A7.1-A7.3/A7.6, carried forward by v0.5.0 A2.6 (the
+SAME redaction seam now covers ``BugRecord``'s write paths too).
 
 Two symptoms, one root cause each, one fix:
 
-1. ``JsonlBugStore.append_event`` serializes with ``json.dumps(..., ensure_ascii=False)``,
+1. ``JsonlRecordStore.append`` serializes with ``json.dumps(..., ensure_ascii=False)``,
    so a raw U+2028/U+2029 (or any other C0/C1 control byte) lands verbatim inside the
    JSON string; before the FR7 fix nothing ever stopped that byte reaching disk.
 2. ``dadaia bugs status``/``bugs stats`` (or any future consumer of a folded
-   :class:`BugEvent`) decode that same raw byte back out of the JSON — a raw ESC
+   :class:`BugRecord`) decode that same raw byte back out of the JSON — a raw ESC
    (CWE-117) can forge an ANSI escape sequence or a fake second output line in ANY
    consumer, present or future.
 
 Fixed by construction, at the ONE write-time normalization seam every field already
 passes through (``core.models.bugs.redact_text``, called once per field by
-``BugEvent.redact()``, called once by ``BugService.append_event`` — SPEC v0.4.5 FR6/
-T-045-19): a single strip of the C0/C1/DEL control range MINUS TAB/LF/CR, plus the
-Unicode NEL/line/paragraph-separator group, runs FIRST, before the IP/home/denylist
-masking passes (A7.6) — so a value can never reach ``JsonlBugStore`` (and from there, a
-fresh ``JsonlBugStore.append_event`` round trip through ``iter_events``) carrying one
-of these bytes, and a denylisted term an attacker split across an interrupting byte
-re-joins into a contiguous substring before the masking regex runs over it. TAB/LF/CR
-are excluded from the strip: ``json.dumps`` already escapes the whole C0/C1/DEL range,
-so they can never fragment a JSONL line (the reader splits on a literal ``"\n"``, never
-``str.splitlines()``'s wider terminator set), and deleting them destroyed the word
-boundaries of every multi-line free-text field for no fragment/render benefit.
+``BugRecord.redact()``, called once by ``BugService.register()``): a single strip of
+the C0/C1/DEL control range MINUS TAB/LF/CR, plus the Unicode NEL/line/paragraph-
+separator group, runs FIRST, before the IP/home/denylist masking passes (A7.6) — so a
+value can never reach ``JsonlRecordStore`` (and from there, a fresh
+``JsonlRecordStore.iter_records`` round trip) carrying one of these bytes.
 
 Size: SMALL (directory-tiered ``unit`` — pure functions plus real ``tmp_path`` file I/O
 only, no subprocess/network; sibling of ``test_write_time_denylist_redaction.py``).
@@ -38,32 +32,39 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dadaia_workspace.core.models.bugs import BugEvent, redact_text
+from dadaia_workspace.core.models.bugs import BugRecord, redact_text
 from dadaia_workspace.features.bugs.service import BugService
-from dadaia_workspace.infrastructure.jsonl_bug_store import JsonlBugStore
+from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
+
+from ._bug_record_helpers import bug_record_store
 
 _TS = "2026-08-26T10:00:00Z"
 _ESC = "\x1b"
-_LS = "\u2028"  # LINE SEPARATOR -- the bundled bug's exact reproduction character (U+2028).
+_LS = chr(0x2028)  # LINE SEPARATOR -- the bundled bug's exact reproduction character.
 _NEL = "\x85"  # NEXT LINE -- the other splitlines()-only terminator json.dumps leaves raw.
 
 
-def _reported(bug_id: str, *, title: str = "t", notes: str = "n", repro: str = "re") -> BugEvent:
-    return BugEvent(
+def _register(
+    store: JsonlRecordStore[BugRecord],
+    bug_id: str,
+    *,
+    title: str = "t",
+    symptom: str = "sy",
+    repro: str = "re",
+) -> None:
+    service = BugService(store)
+    service.register(
         bug_id=bug_id,
-        event="reported",
         ts=_TS,
         reported_by="software-engineer",
         title=title,
         severity="MEDIUM",
-        surface="bugs ledger",
-        component="infrastructure/jsonl_bug_store.py",
+        surface="bugs",
+        component="infrastructure/jsonl_record_store.py",
         context="dadaia-workspace",
-        tags=(),
-        symptom="sy",
+        symptom=symptom,
         repro=repro,
         expected="ex",
-        notes=notes,
     )
 
 
@@ -120,65 +121,40 @@ def test_redact_text_masks_a_denylisted_term_interrupted_by_esc() -> None:
 
 
 # ---------------------------------------------------------------------------
-# A7.2 — CWE-117: no consumer of a redacted BugEvent can ever observe a raw ESC.
+# A7.1/A7.2 — THE RED test: a record carrying U+2028/ESC in a free-text field is
+# registered and read back INTACT (present, not silently dropped/leaking a raw byte).
 # ---------------------------------------------------------------------------
 
 
-def test_bug_event_redact_never_leaves_a_raw_esc_in_any_field() -> None:
-    """A7.2: fixed by construction — every ``_OPTIONAL_STR_FIELDS`` value ``.redact()``
-    touches is stripped of ESC, so no present or future renderer (``bugs status``,
-    ``bugs stats``, or anything reading a folded :class:`BugEvent`) can ever print a
-    raw control character it never received."""
-    event = _reported("esc-in-title", title=f"urgent{_ESC}[31mFAKE ERROR{_ESC}[0m")
-    redacted = event.redact()
-    assert redacted.title is not None
-    assert _ESC not in redacted.title
-
-
-# ---------------------------------------------------------------------------
-# A7.1 — THE RED test: an event carrying U+2028 in a free-text field is appended
-# with [ok] and then read back INTACT (present, not silently dropped) by the store's
-# own fold — before the fix it is absent because JsonlBugStore.iter_events's
-# str.splitlines() call fragments the physical line on the raw U+2028 byte.
-# ---------------------------------------------------------------------------
-
-
-def test_bug_service_append_event_with_line_separator_in_notes_is_readable_back(
+def test_bug_service_register_with_line_separator_in_symptom_is_readable_back(
     tmp_path: Path,
 ) -> None:
-    """Before the fix: appending this event succeeds (the store's ``append_event`` never
-    validates the byte it writes), but the SAME event is absent from
-    ``JsonlBugStore.iter_events()`` — ``str.splitlines()`` treats the embedded U+2028 as
-    a second line terminator, so the one JSON record fragments into two unparseable
-    halves and both are skipped with a logged WARN."""
-    store = JsonlBugStore(tmp_path / "bugs")
-    service = BugService(store)
+    """Before the fix: registering succeeds (the store's ``append`` never validates
+    the byte it writes), but the SAME record would be absent from
+    ``JsonlRecordStore.iter_records()`` if the reader still split on
+    ``str.splitlines()`` — it fragments the physical line on the embedded U+2028."""
+    store = bug_record_store(tmp_path)
+    _register(store, "unicode-ls-record", symptom=f"before{_LS}after")
 
-    service.append_event(_reported("unicode-ls-event", notes=f"before{_LS}after"))
-
-    ids = [e.bug_id for e in store.iter_events()]
-    assert "unicode-ls-event" in ids, (
-        "event silently dropped on read-back — the embedded U+2028 fragmented the "
+    ids = [r.id for r in store.iter_records()]
+    assert "unicode-ls-record" in ids, (
+        "record silently dropped on read-back — the embedded U+2028 fragmented the "
         "physical JSONL line"
     )
-    persisted = next(e for e in store.iter_events() if e.bug_id == "unicode-ls-event")
-    assert persisted.notes is not None
-    assert _LS not in persisted.notes
+    persisted = next(r for r in store.iter_records() if r.id == "unicode-ls-record")
+    assert _LS not in persisted.symptom
 
 
-def test_bug_service_append_event_with_esc_in_title_is_readable_back_without_raw_esc(
+def test_bug_service_register_with_esc_in_title_is_readable_back_without_raw_esc(
     tmp_path: Path,
 ) -> None:
-    """End-to-end round trip for A7.2: an event whose title carries ESC is appended,
+    """End-to-end round trip for A7.2: a record whose title carries ESC is registered,
     then read back through the real store — the persisted, folded title never carries
     a raw ESC, so nothing downstream can ever render one."""
-    store = JsonlBugStore(tmp_path / "bugs")
-    service = BugService(store)
+    store = bug_record_store(tmp_path)
+    _register(store, "esc-in-title-roundtrip", title=f"boom{_ESC}[2Khidden")
 
-    service.append_event(_reported("esc-in-title-roundtrip", title=f"boom{_ESC}[2Khidden"))
-
-    persisted = next(e for e in store.iter_events() if e.bug_id == "esc-in-title-roundtrip")
-    assert persisted.title is not None
+    persisted = next(r for r in store.iter_records() if r.id == "esc-in-title-roundtrip")
     assert _ESC not in persisted.title
     assert "boom" in persisted.title and "hidden" in persisted.title
 
@@ -195,8 +171,8 @@ def test_bug_service_append_event_with_esc_in_title_is_readable_back_without_raw
 def test_redact_text_preserves_tab_lf_cr_word_boundaries() -> None:
     """RED for F1: a multi-line value must keep its word boundaries -- TAB/LF/CR are
     not a fragment or render hazard (json.dumps escapes them; no reader splits on a
-    literal char class that includes them since JsonlBugStore.iter_events splits on
-    the literal newline only), so ``redact_text`` must not delete them."""
+    literal char class that includes them since JsonlRecordStore.iter_records splits
+    on the literal newline only), so ``redact_text`` must not delete them."""
     out = redact_text("step one\nstep two\ttabbed\r\n")
     assert out == "step one\nstep two\ttabbed\r\n"
 
@@ -213,29 +189,24 @@ def test_redact_text_still_strips_esc_and_c1_and_nel_and_line_separators() -> No
     assert out == "before\nmidafter\tend"
 
 
-def test_bug_service_append_event_with_multiline_repro_survives_write_time_redaction(
+def test_bug_service_register_with_multiline_repro_survives_write_time_redaction(
     tmp_path: Path,
 ) -> None:
-    """End-to-end RED for F1: a multi-line ``repro`` -- the exact shape of a real FR23
-    evidence field -- must round-trip through ``BugService.append_event`` ->
-    ``JsonlBugStore.iter_events`` with its newlines and tabs intact, never word-joined."""
-    store = JsonlBugStore(tmp_path / "bugs")
-    service = BugService(store)
+    """End-to-end RED for F1: a multi-line ``repro`` must round-trip through
+    ``BugService.register`` -> ``JsonlRecordStore.iter_records`` with its newlines and
+    tabs intact, never word-joined, and the ledger stays exactly one physical line."""
+    store = bug_record_store(tmp_path)
     multiline_repro = "step one\nstep two\ttabbed\nstep three"
+    _register(store, "multiline-repro-record", repro=multiline_repro)
 
-    service.append_event(_reported("multiline-repro-event", repro=multiline_repro))
-
-    persisted = next(e for e in store.iter_events() if e.bug_id == "multiline-repro-event")
+    persisted = next(r for r in store.iter_records() if r.id == "multiline-repro-record")
     assert persisted.repro == multiline_repro
 
-    # The reader (``JsonlBugStore.iter_events``) splits the file on a literal "\n"
-    # only (v0.4.5 FR7) -- prove the two embedded newlines above never produced a
-    # second physical line: json.dumps has escaped them to the two-character "\\n"
-    # sequence inside the JSON string, so exactly one physical line holds the whole
-    # record despite the repro field carrying two raw "\n" characters in memory.
-    raw_file = store.root / "bugs.jsonl"
+    # The reader splits the file on a literal "\n" only (v0.4.5 FR7) -- prove the two
+    # embedded newlines above never produced a second physical line: json.dumps has
+    # escaped them to the two-character "\\n" sequence inside the JSON string.
     physical_lines = [
-        line for line in raw_file.read_text(encoding="utf-8").split("\n") if line.strip()
+        line for line in store.path.read_text(encoding="utf-8").split("\n") if line.strip()
     ]
     assert len(physical_lines) == 1, (
         "embedded repro newline fragmented the JSONL file into more than one physical "

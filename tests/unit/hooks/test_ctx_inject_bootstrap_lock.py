@@ -143,7 +143,7 @@ def _build_fixture_specs(tmp_path: Path) -> Path:
     specs = tmp_path / "specs"
     mem = specs / "memory"
     (mem / "product").mkdir(parents=True)
-    (mem / "tech-stack.md").write_text(_TECH_STACK, encoding="utf-8")
+    (mem / "TECHSTACK.md").write_text(_TECH_STACK, encoding="utf-8")
     (mem / "product" / "catalog.json").write_text(
         json.dumps(_CATALOG, ensure_ascii=False, indent=2), encoding="utf-8"
     )

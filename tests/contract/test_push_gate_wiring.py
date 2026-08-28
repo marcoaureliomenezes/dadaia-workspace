@@ -28,7 +28,11 @@ _ZERO = "0" * 40
 
 
 class _SpyObjectSource:
-    """Wraps no real git — records every call so the test can assert it was reached."""
+    """Wraps no real git — records every call so the test can assert it was reached.
+
+    ``list_tree_paths``/``first_parent`` (v0.5.0 specs-canon closure) return
+    empty/None — this spy never publishes a specs/ tree, so the pre-push canon scan
+    step this class also now reaches is a pure pass-through."""
 
     def __init__(self) -> None:
         self.calls: list[tuple[Path, str, str]] = []
@@ -36,6 +40,12 @@ class _SpyObjectSource:
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
         self.calls.append((repo, local_sha, remote_sha))
         return ()
+
+    def list_tree_paths(self, repo: Path, sha: str, prefix: str) -> list[str]:
+        return []
+
+    def first_parent(self, repo: Path, sha: str) -> str | None:
+        return None
 
 
 def _init_repo(path: Path) -> str:
@@ -173,3 +183,39 @@ def test_healthy_registry_produces_no_degradation_note(monkeypatch, tmp_path: Pa
 
     assert result.exit_code == 0, result.output
     assert "registry" not in result.output.lower()
+
+
+def test_own_slug_is_excluded_when_pushing_from_a_linked_worktree(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """Intent: CONTRACT — bug ``push-gate-own-repo-slug-not-excluded-from-a-git-worktree-outside-repos``.
+
+    The pushed repo's identity is the repository (git common dir), not the worktree's
+    position under ``<workspace>/repos/``. A linked worktree parked under
+    ``.dadaia/tmp/`` must not see its own slug refused as a foreign one."""
+    (tmp_path / ".dadaia").mkdir()
+    repo = tmp_path / "repos" / "myrepo"
+    _init_repo(repo)
+    worktree = tmp_path / ".dadaia" / "tmp" / "wt"
+    subprocess.run(
+        ["git", "worktree", "add", "-q", "-b", "feature/1.0.0", str(worktree)], cwd=repo, check=True
+    )
+    (worktree / "note.md").write_text("context: myrepo\n", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=worktree, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "own slug"], cwd=worktree, check=True)
+    tip_sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=worktree, capture_output=True, text=True, check=True
+    ).stdout.strip()
+
+    monkeypatch.setattr(ci, "_repo_root", lambda: worktree)
+    monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
+    monkeypatch.delenv("DADAIA_PRIVACY_DENYLIST", raising=False)
+
+    result = _runner.invoke(
+        app,
+        ["ci", "push-gate-check"],
+        input=f"refs/heads/feature/1.0.0 {tip_sha} refs/heads/feature/1.0.0 {_ZERO}\n",
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "foreign repo slug" not in result.output

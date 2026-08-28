@@ -24,19 +24,37 @@ _RELEASE = "rel-1"
 def _build(
     tmp_path: Path,
     *,
-    active: str | None = f"release: {_RELEASE}\nphase: TASKS\n",
+    active: tuple[str, str] | None = (_RELEASE, "TASKS"),
     plan: str | None = "**Owner:** qa-engineer\n**Owner:** product-engineer\n",
     handoffs: dict[str, str] | None = None,
 ) -> ReportsNextService:
     """Construct a service over a temp specs/reports layout.
 
+    ``active``: ``(release_id, phase)`` written as a minimal ``RELEASE.json``
+    release-state-v1 document (v0.5.x, successor to the RELEASE.jsonl fold; v0.5.0
+    FR4/T-050-21A — ``ACTIVE.md`` retired, no replacement file); ``None`` means no live
+    release directory at all.
     handoffs: maps agent name -> release_id to seed a handoff sidecar for that agent.
     """
     specs = tmp_path / "specs"
     releases = specs / "releases"
     (releases / _RELEASE).mkdir(parents=True)
     if active is not None:
-        (releases / "ACTIVE.md").write_text(active, encoding="utf-8")
+        release_id, phase = active
+        rdir = releases / release_id
+        rdir.mkdir(parents=True, exist_ok=True)
+        state = {
+            "schema": "release-state-v1",
+            "release": release_id,
+            "phase": phase,
+            "rc": None,
+            "defined": None,
+            "implemented": None,
+            "shipped": None,
+            "audited": None,
+            "log": [],
+        }
+        (rdir / "RELEASE.json").write_text(json.dumps(state) + "\n", encoding="utf-8")
     if plan is not None:
         (releases / _RELEASE / "PLAN.md").write_text(plan, encoding="utf-8")
     reports = tmp_path / "reports"
@@ -77,20 +95,14 @@ def test_first_pending_agent_identified_and_other_release_handoff_excluded(
 # --- Error-raises matrix (no active release / no owners / non-canonical) ---
 
 
-_DEFAULT_ACTIVE = f"release: {_RELEASE}\nphase: TASKS\n"
+_DEFAULT_ACTIVE = (_RELEASE, "TASKS")
 _DEFAULT_PLAN = "**Owner:** qa-engineer\n**Owner:** product-engineer\n"
 
 
 @pytest.mark.parametrize(
     ("active", "plan", "expected_exc"),
     [
-        pytest.param(None, _DEFAULT_PLAN, NoActiveReleaseError, id="missing-active-md"),
-        pytest.param(
-            "release: none\nphase: DISCOVERY\n",
-            _DEFAULT_PLAN,
-            NoActiveReleaseError,
-            id="release-none",
-        ),
+        pytest.param(None, _DEFAULT_PLAN, NoActiveReleaseError, id="no-live-release"),
         pytest.param(_DEFAULT_ACTIVE, None, NoAgentSequenceError, id="missing-plan"),
         pytest.param(
             _DEFAULT_ACTIVE,
@@ -107,7 +119,7 @@ _DEFAULT_PLAN = "**Owner:** qa-engineer\n**Owner:** product-engineer\n"
     ],
 )
 def test_error_raises_matrix(
-    tmp_path: Path, active: str | None, plan: str | None, expected_exc: type[Exception]
+    tmp_path: Path, active: tuple[str, str] | None, plan: str | None, expected_exc: type[Exception]
 ) -> None:
     svc = _build(tmp_path, active=active, plan=plan)
     with pytest.raises(expected_exc):

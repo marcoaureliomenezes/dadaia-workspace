@@ -39,8 +39,8 @@ def _run_lint(memory_dir: Path) -> subprocess.CompletedProcess[str]:
 def test_generated_and_canonical_scaffold_atoms_lint_clean(tmp_path: Path) -> None:
     # Canonical scaffold assets exist with YAML frontmatter (pre-condition).
     expected = [
-        _SCAFFOLD_MEMORY / "architecture.md",
-        _SCAFFOLD_MEMORY / "tech-stack.md",
+        _SCAFFOLD_MEMORY / "ARCHITECTURE.md",
+        _SCAFFOLD_MEMORY / "TECHSTACK.md",
         _SCAFFOLD_MEMORY / "product" / "index.md",
     ]
     for path in expected:
@@ -64,8 +64,8 @@ def test_generated_and_canonical_scaffold_atoms_lint_clean(tmp_path: Path) -> No
     # The canonical scaffold atoms themselves are also lint-clean.
     memory_dir = tmp_path / "memory"
     (memory_dir / "product").mkdir(parents=True)
-    shutil.copy(_SCAFFOLD_MEMORY / "architecture.md", memory_dir / "architecture.md")
-    shutil.copy(_SCAFFOLD_MEMORY / "tech-stack.md", memory_dir / "tech-stack.md")
+    shutil.copy(_SCAFFOLD_MEMORY / "ARCHITECTURE.md", memory_dir / "ARCHITECTURE.md")
+    shutil.copy(_SCAFFOLD_MEMORY / "TECHSTACK.md", memory_dir / "TECHSTACK.md")
 
     proc2 = _run_lint(memory_dir)
     assert proc2.returncode != 1, (

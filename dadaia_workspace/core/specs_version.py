@@ -20,36 +20,82 @@ from pathlib import Path
 #: Single source of truth for the current canonical specs-pattern version.
 #: Bump this when a new migration step is added to the registry (see ``registry.py``).
 #: v3 = agent-tier-frontmatter (v0.1.72 FR1); v4 = bugs-single-file (v0.1.73 FR1 —
-#: the operator's ONE-append-only-ledger contract).
-CANONICAL_SPECS_VERSION = 5
+#: the operator's ONE-append-only-ledger contract); v5 = specs-canon-v6's tree shape
+#: (T-050-05); v6 = this stamp, T-050-06A — the version number itself, deferred by
+#: T-050-05 because RELEASE_SEMVER_RE's axis flip (below) is this task's write set.
+CANONICAL_SPECS_VERSION = 6
 
 #: Version assigned to a tree with no stamp (pre-framework flat layout).
 UNSTAMPED_VERSION = 0
 
-#: Single source of truth for the release-directory SemVer form ``vX.Y.Z`` (v0.1.53 FR3).
-#: This is the ONE compiled home for the ``^v\d+\.\d+\.\d+$`` pattern — previously
-#: triplicated in ``features/specs/scaffolder.py``, ``features/specs/doctor.py``, and
+#: Single source of truth for the release-directory SemVer form (v0.1.53 FR3, flipped
+#: to canon v6 / two-axis form at T-050-06A, SPEC FR1 boundary 2a / AS-13). This is the
+#: ONE compiled home for the pattern — previously triplicated in
+#: ``features/specs/scaffolder.py``, ``features/specs/doctor.py``, and
 #: ``features/spec_artifacts/new_artifacts.py``. Every consumer imports THIS object; the
 #: agreement contract ``tests/contract/test_release_semver_canon.py`` locks the identity
 #: (same compiled object everywhere) and forbids any re-introduced ``re.compile`` copy.
-#: The ONE release-id canon every public entry point validates against (bug
-#: lifecycle-accepts-noncanonical-release-id): vMAJOR.MINOR.PATCH with an optional
-#: -suffix segment (rc/canary/hotfix flows are legitimate release identities).
-RELEASE_SEMVER_RE = re.compile(r"^v\d+\.\d+\.\d+(-[0-9A-Za-z][0-9A-Za-z.]*)?$")
+#:
+#: Two axes, ONE compiled object (AS-13): the current, LIVE axis is bare
+#: ``MAJOR.MINOR.PATCH`` (canon v6 moved live/archived release ids off the ``v`` prefix);
+#: the retired axis (every id shipped before v0.5.0's canon move) is ``vMAJOR.MINOR.PATCH``
+#: and stays matched here ONLY so an existing archived directory still resolves for
+#: read-only lookups (doctor naming checks, the CI verdict-evidence gate). The ``v``
+#: prefix is therefore OPTIONAL in this object, but ``is_release_semver()`` below narrows
+#: to the bare, current-axis form ONLY — nothing may *mint* a new ``v``-prefixed id. Both
+#: axes keep the optional ``-suffix`` segment (rc/canary/hotfix flows are legitimate
+#: release identities on either axis).
+RELEASE_SEMVER_RE = re.compile(r"^v?\d+\.\d+\.\d+(-[0-9A-Za-z][0-9A-Za-z.]*)?$")
+
+#: The exactly-two verdict-evidence root templates the CI security-verdict gate
+#: (``.github/scripts/pr-verdict-check.sh``) resolves against (SPEC AS-15, T-050-06A
+#: boundary 2). Each string carries ONE ``{glob}`` placeholder the caller substitutes
+#: with either ``*`` (search every release, live and archived) or a narrowing value
+#: already validated against :data:`RELEASE_SEMVER_RE`. Never
+#: ``specs/releases/_ideas/`` — T-050-01 moves every verdict-bearing trio out of
+#: ``_ideas/`` before any PR exists, and ``_ideas/`` stays deliberately MUTATING
+#: (A6.3): a freely-writable directory is never a trust root of a required check.
+#: The gate shells out to a bare ``python3 -c`` importing this module (stdlib-only —
+#: ``re`` + ``pathlib``, no install step) to read this tuple and
+#: :data:`RELEASE_SEMVER_RE`'s pattern; a derivation failure there is fail-closed
+#: (SPEC §9.2 SEC-R2) — no fallback glob, ever.
+VERDICT_EVIDENCE_ROOT_TEMPLATES: tuple[str, str] = (
+    "specs/releases/{glob}/verdicts",
+    "specs/releases/_archive/{glob}/verdicts",
+)
 
 _FRONTMATTER_RE = re.compile(r"\A---\n(.*?)\n---\n", re.DOTALL)
 _STAMP_RE = re.compile(r"^specs_pattern_version:\s*(\d+)\s*$", re.MULTILINE)
 
 
-def is_release_semver(value: str) -> bool:
-    """Return ``True`` when ``value`` is the canonical release-dir SemVer form ``vX.Y.Z``.
+def release_semver_ere_pattern() -> str:
+    """Return :data:`RELEASE_SEMVER_RE`'s pattern translated to POSIX ERE syntax.
 
-    The single predicate for "is this string a strict ``v<major>.<minor>.<patch>``
-    release id?" — used by the scaffolder, the doctor's release-folder naming checks, and
-    the ``dadaia release new`` validator. Callers that also accept the legacy slug form
-    compose this with their own slug check.
+    ``.github/scripts/pr-verdict-check.sh`` validates an optional ``RELEASE_ID``
+    narrowing value with bash's ``[[ value =~ pattern ]]`` — POSIX Extended Regular
+    Expressions, a different dialect from Python's ``re``. ``\\d`` is the ONLY
+    PCRE-only construct :data:`RELEASE_SEMVER_RE` uses (POSIX ERE has no digit-class
+    shorthand; bash's regex engine treats a literal ``\\d`` as an escaped ``d``,
+    silently rejecting every valid id — reproduced and fixed at T-050-06A). This is a
+    MECHANICAL syntax translation of the one canon pattern, computed here so the gate
+    reads a single derived value rather than a second, hand-typed copy; it is not a
+    second definition of the release-id shape.
     """
-    return RELEASE_SEMVER_RE.match(value) is not None
+    return RELEASE_SEMVER_RE.pattern.replace(r"\d", "[0-9]")
+
+
+def is_release_semver(value: str) -> bool:
+    """Return ``True`` when ``value`` is the CURRENT-axis release id: bare
+    ``MAJOR.MINOR.PATCH`` (optional ``-suffix``), no ``v`` prefix.
+
+    The single MINT predicate (AS-13/A1.10, T-050-06A): "is this string a value a NEW
+    release/segment may be created under?" A ``v``-prefixed id matches the broader
+    :data:`RELEASE_SEMVER_RE` (it must still resolve for archived-directory lookups) but
+    is refused here — the retired axis is read-only, never mintable again. Used by
+    ``dadaia release new`` (``new_artifacts.release_new``). Callers that also accept the
+    legacy slug form compose this with their own slug check.
+    """
+    return RELEASE_SEMVER_RE.match(value) is not None and not value.startswith("v")
 
 
 def _constitution_path(specs_dir: Path) -> Path:

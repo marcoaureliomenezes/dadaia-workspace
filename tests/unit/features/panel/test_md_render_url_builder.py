@@ -105,16 +105,18 @@ def test_wikilink_renderer_slug_parameterisation_default_and_cache() -> None:
     # 'dadaia-workspace', and always with a .md extension.
     md = build_renderer("my-project")
     result: str = md("[[architecture]]")  # type: ignore[assignment]
-    assert "/memory-view/my-project/architecture.md" in result
+    # v6 canon single (FR1/A1.5/A1.6, T-050-06): [[architecture]] resolves to the
+    # RENAMED file, not the generic "<slug>.md" guess.
+    assert "/memory-view/my-project/ARCHITECTURE.md" in result
 
     md_default = build_renderer()
     result_default: str = md_default("[[tech-stack]]")  # type: ignore[assignment]
-    assert "/memory-view/dadaia-workspace/tech-stack.md" in result_default
+    assert "/memory-view/dadaia-workspace/TECHSTACK.md" in result_default
 
     md_other = build_renderer("other-project")
     result_other: str = md_other("[[architecture]]")  # type: ignore[assignment]
     assert "dadaia-workspace" not in result_other
-    assert "/memory-view/other-project/architecture.md" in result_other
+    assert "/memory-view/other-project/ARCHITECTURE.md" in result_other
 
     md_ext = build_renderer("some-context")
     result_ext: str = md_ext("[[product]]")  # type: ignore[assignment]

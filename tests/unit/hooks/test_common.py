@@ -57,7 +57,7 @@ def test_target_path_forms() -> None:
     multi_cmd = (
         "*** Begin Patch\n"
         "*** Update File: README.md\n"
-        "*** Update File: specs/_archive/x.md\n"
+        "*** Update File: specs/backlog/_archive/x.md\n"
         "*** End Patch"
     )
     assert _common.target_path({"tool_input": {"command": multi_cmd}}) == "README.md"
@@ -76,14 +76,14 @@ def test_target_paths_multi_file_all_headers() -> None:
         "*** Begin Patch\n"
         "*** Update File: README.md\n"
         "+ok\n"
-        "*** Update File: specs/_archive/x.md\n"
+        "*** Update File: specs/backlog/_archive/x.md\n"
         "+frozen\n"
         "*** Delete File: .dadaia/sessions/runtime/y.ptr\n"
         "*** End Patch"
     )
     assert _common.target_paths({"tool_input": {"command": cmd}}) == [
         "README.md",
-        "specs/_archive/x.md",
+        "specs/backlog/_archive/x.md",
         ".dadaia/sessions/runtime/y.ptr",
     ]
 

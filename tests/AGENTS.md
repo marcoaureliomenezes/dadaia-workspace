@@ -66,9 +66,11 @@ Agents creating or editing tests must follow them. Full protocol: skill
 | `e2e` (LARGE) | `tests/e2e/**` | 120 s | every file names an owner |
 
 A test that needs more time than its tier's default is **mis-tiered** — fix the
-tier, never raise the default (mechanical enforcement: T-070-05). LARGE cap for
-this repo: **30**, declared and measured as a WARN (current ~84 is the companion
-release's remediation target), never a hard failure in this release.
+tier, never raise the default (mechanical enforcement: T-070-05). The LARGE-tier
+census cap for this repo lives in exactly one place —
+`dadaia-test-stewardship/PARAMETERS.md`'s "LARGE (E2E) cap" row — declared and
+measured as a WARN, never a hard failure in this release; this file does not
+restate the number (V29, `tests/contract/test_test_suite_ratchets.py`).
 
 `flaky` and `quarantine` markers are mechanically wired (T-070-05): both are
 registered in `pyproject.toml`, a `quarantine` marker without `bug="<bug-slug>"`

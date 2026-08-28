@@ -7,123 +7,54 @@ description: >
   few non-obvious idioms. Granted to every shell-capable agent (any agent whose tools
   include `Bash`); the two shell-less roles (`product-engineer`, `software-architect`)
   are ungranted — see §Reachability below.
+tldr: "dadaia CLI is self-documenting; use --help/--json; grant only to Bash-capable agents."
 ---
 
 # Skill: dd-cli-library
 
-The `dadaia` CLI is the single control surface for the workspace. It is **self-documenting** — discover, don't guess. Everything below is a **cache of expensive lookups**, not a transcription of the live command tree: when the table and `--help` disagree, `--help` wins — treat a stale cache entry as a defect to fix at the source, not to work around.
+Cache of expensive lookups, not a transcription of the live command tree — when a table here and `--help` disagree, `--help` wins.
 
-## Reachability (FR5, per-agent decision — derivation surface)
+## 1. When
 
-A CLI-literacy grant to an agent with no `Bash` tool is inert: it can never run a
-command. The rule is mechanical, not a blanket grant: **grant iff `Bash` is in the
-agent's `tools:` list.**
+- Operating the CLI: panel, binding a context, authoring backlog/release artifacts.
+- Checking state, registering a bug, or discovering any command.
+- Starting any new or upgraded runtime session.
+- Only when `Bash` is in the agent's `tools:` list — see §4 reachability table.
 
-| Agent | `Bash`? | Grant `dd-cli-library`? |
-|---|---|---|
-| `ai-engineer` | yes | yes |
-| `code-reviewer` | yes | yes |
-| `project-auditor` | yes | yes |
-| `project-manager` | yes | yes |
-| `qa-engineer` | yes | yes |
-| `security-reviewer` | yes | yes |
-| `software-engineer` | yes | yes |
-| `product-engineer` | no (D-1, shell-less) | no — inert |
-| `software-architect` | no | no — inert |
+## 2. Steps
 
-`dadaia_workspace/public/scripts/lint-dadaia-cli-reachability.py` derives this same
-table from each agent frontmatter's `tools:`/`skills:` lists at projection time and
-fails loud on drift (`--self-test` proves both directions).
+1. Run `dadaia --help` for all command groups; `dadaia <group> --help` for a group's subcommands.
+2. Call the venv binary always: `.dadaia/.venv/bin/dadaia` — never system Python/pip.
+3. Add `--json` to read commands for machine-readable output.
+4. Run `dadaia capabilities --json` first in any new/upgraded session.
+5. Use `dadaia panel` (default port 4999) for the human view.
+6. Bind the session: `dadaia context bind <ctx> --mode implementation --release <id>`.
+7. Export `DADAIA_CONTEXT=<ctx>` instead in a plain shell or under kimi-code — the env var **is** the binding there.
+8. Skip binding for ADDITIVE work (bugs/backlog/audits/reports) — none needed.
+9. Run `specs doctor --context <ctx> --json` before implementing; do not proceed against errors or warnings.
+10. Reserve the task in TASKS.md (`dadaia-task-manager`) before writing any production file.
+11. Pass explicit `--context`/`--release-id` on every command.
+12. Converge a runtime: resolve `provider.distribution_version` from `dadaia capabilities --json`.
+13. Run `dadaia reconcile --expect-version "$version" --json`, then `dadaia certify --json`.
+14. Treat any failed `certify` check as a release blocker.
+15. On a failing command: preserve the full evidence trail (command, exit code, output).
+16. Classify and register a genuine bug (`dd-bug-registration`) before any workaround.
+17. Emit/validate the final handoff (`dadaia-handoff-emitter`).
 
-## Discover
+## 3. Done when
 
-- `dadaia --help` — all command groups.
-- `dadaia <group> --help` — a group's subcommands (e.g. `dadaia context --help`, `dadaia backlog --help`).
-- Always call the binary in the workspace venv: `.dadaia/.venv/bin/dadaia`. Never system Python/pip.
-- Add `--json` to most read commands for machine-readable output.
-- Start every new or upgraded runtime with `dadaia capabilities --json`; this versioned
-  document is authoritative over remembered command syntax.
+- The command run matches live `--help` output, not a remembered table.
+- `specs doctor` is clean before any implementation write.
+- `certify --json` is green before promoting a runtime.
+- Every dev server started is registered (`dadaia server register`).
 
-## Panel — see everything
+## 4. References
 
-`dadaia panel` starts the local UI (default port 4999). Tabs: Projects (Spec Context Projects, ALIVE/DEAD + advisory presence), Agents (sub-agent model/effort policy + sessions dashboard), Reports (reports/handoffs), Academy, Servers. Use it to inspect state instead of reading files.
-
-## Command groups (`dadaia <group> --help` for detail)
-
-Verified against the live command tree, not transcribed from memory — a verb this
-table names is a verb `dadaia <group> --help` still shows; a verb the table omits
-still exists, discoverable the same way.
-
-| Group | What |
-|---|---|
-| `context` | Spec Context Projects: `list show create alive dead bind release heartbeat delete` |
-| `specs` | SDD structure: `doctor upgrade init release segment` |
-| `capabilities` / `certify` / `reconcile` | Discover, prove, and converge the installed provider |
-| `bugs` | Event-sourced bug telemetry: `append status stats` |
-| `backlog` / `release` | Backlog + release entry management |
-| `reports` | Handoff/report inspection: `validate lint doctor status …` |
-| `server` | Dev-server port registry: `list next register release …` |
-| `ci` | Local CI-equivalent preflight + git-hook chokepoints |
-| `public` | Lib-asset projection: `stage install list doctor` |
-| `doctor` / `migrate` | Diagnose+repair / migration helpers |
-| `init export import clean` | Workspace bootstrap + portability |
-
-## Spec Contexts (everyday)
-
-```bash
-dadaia context show --json          # active context + specs_dir + session
-dadaia context list --json          # all contexts, ALIVE/DEAD
-dadaia context bind <ctx> --mode implementation --release <id>   # bind THIS session
-dadaia context alive <ctx> / dead <ctx>                          # lifecycle transitions
-dadaia context baseline <ctx> --yes --push                       # explicit unborn-repo baseline
-```
-
-Bind binds the **context** (persists mode + session id in the session record, keyed by your harness session id, self-scoped). In a plain shell — or under kimi-code, which exposes no session-id env — export `DADAIA_CONTEXT=<ctx>` instead: the env var **is** the binding there, and `bind` warns when neither channel can carry it. ADDITIVE work (bugs/backlog/audits/reports) needs no bind.
-
-## SDD stages (agent-dispatched, not a CLI verb)
-
-There is no workflow engine and no lifecycle command group. Each SDD stage —
-backlog definition, release definition, implementation with its reviews, and audit — is
-carried out by dispatching the owning agent (`DADAIA.md` §2) against the SDD documents,
-using the ordinary command groups above (`backlog`, `release`, `specs`) to scaffold and
-validate what that agent authors.
-
-## Runtime convergence and certification
-
-An install is not promoted merely because `pip` returned zero. Converge the exact
-installed version, then require a green disposable certification ledger:
-
-```bash
-version="$(${DADAIA_BIN:-.dadaia/.venv/bin/dadaia} capabilities --json | \
-  .dadaia/.venv/bin/python -c 'import json,sys; print(json.load(sys.stdin)["provider"]["distribution_version"])')"
-${DADAIA_BIN:-.dadaia/.venv/bin/dadaia} reconcile --expect-version "$version" --json
-${DADAIA_BIN:-.dadaia/.venv/bin/dadaia} certify --json
-```
-
-`reconcile` validates the exact provider version, migrates state, reinstalls projections,
-runs public/workspace doctors, and executes a capability canary. `certify` creates a
-disposable workspace and proves init, projections, clean specs scaffolds, empty Git remote
-baseline, caller-owned bind/heartbeat, strict handoff validation, panel HTTP/server
-registry, and ALIVE/DEAD/delete teardown (checks: `capability-contract`,
-`exact-version-reconciliation`, `context-empty-remote-baseline`, `context-list-show-json`,
-`context-bind-heartbeat`, `reports-handoff-validation`, `panel-and-server-registry`,
-`context-dead-alive-delete-roundtrip`). Any failed check is a release blocker.
-
-## Agent operating sequence
-
-1. Read `dadaia capabilities --json`; never infer features from an older conversation.
-2. Select the target with `context list/show --json`, then bind this session explicitly.
-3. Run `specs doctor --context <ctx> --json`; do not implement against errors or warnings.
-4. Reserve your task in TASKS.md (`dadaia-task-manager`) before writing any production
-   file, with explicit `--context` and `--release-id` for every command you run.
-5. Preserve the complete evidence trail when blocked (command, exit code, output); never
-   reduce it to a vague "it failed".
-6. Use `dadaia panel` for the human view and the server registry for ports.
-7. Emit/validate the final handoff and register genuine provider bugs before workarounds.
-
-## Bug registration, and when a command fails
-
-Classify-first, the `dadaia bugs append` command, redaction and context routing:
-`dd-bug-registration`. Never hand-edit a projected asset to fake a result; fix the
-source and re-project (`dadaia public stage && dadaia public install --target all
-&& dadaia public doctor`).
+- Reachability — grant iff `Bash` in `tools:`: `ai-engineer`, `code-reviewer`, `project-auditor`, `project-manager` — yes.
+- Reachability — grant iff `Bash` in `tools:` (continued): `qa-engineer`, `security-reviewer`, `software-engineer` — yes.
+- Reachability — ungranted (no `Bash`): `product-engineer` (D-1, shell-less), `software-architect`.
+- `dadaia_workspace/public/scripts/lint-dadaia-cli-reachability.py` — derives this table at projection time; `--self-test` proves both directions.
+- Command groups (`dadaia <group> --help` for detail): `context`, `specs`, `capabilities`/`certify`/`reconcile`.
+- Command groups (continued): `bugs`, `backlog`/`release`, `reports`, `server`, `ci`, `public`, `doctor`/`migrate`, `init`/`export`/`import`/`clean`.
+- `DADAIA.md` §2 — SDD stages are agent-dispatched, not a CLI verb group.
+- `dd-bug-registration` — classify-first, redaction, `dadaia bugs append` reference.

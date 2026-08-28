@@ -890,6 +890,30 @@ def _read_blobs(
 class GitSubprocessObjectReader:
     """Subprocess-backed ``GitObjectReader`` (SPEC v0.9.0 FR1/FR7 injected port)."""
 
+    def list_tree_paths(self, repo: Path, sha: str, prefix: str) -> list[str]:
+        """``git ls-tree -r --name-only --full-tree <sha> -- <prefix>`` (v0.5.0
+        specs-canon closure) — see the port's own docstring for the full contract."""
+        if not sha or not _SHA_SHAPE_RE.match(sha):
+            raise GitObjectReadError(f"sha is not a valid sha shape: {sha!r}")
+        args = ["git", "ls-tree", "-r", "--name-only", "--full-tree", sha, "--", prefix]
+        result = _run(args, repo)
+        if result.returncode != 0:
+            raise GitObjectReadError(
+                f"git ls-tree -r --name-only failed: {_decode(result.stderr).strip()}"
+            )
+        return [line for line in _decode(result.stdout).splitlines() if line]
+
+    def first_parent(self, repo: Path, sha: str) -> str | None:
+        """``git rev-parse <sha>^1`` (v0.5.0 specs-canon closure) — see the port's own
+        docstring for why a missing parent is ``None``, never a raise."""
+        if not sha or not _SHA_SHAPE_RE.match(sha):
+            return None
+        result = _run(["git", "rev-parse", f"{sha}^1"], repo)
+        if result.returncode != 0:
+            return None
+        parent = _decode(result.stdout).strip()
+        return parent or None
+
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterator[ScannedObject]:
         if not local_sha or local_sha == ZERO_SHA:
             return

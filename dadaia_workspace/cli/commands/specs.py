@@ -12,33 +12,58 @@ from dadaia_workspace import container
 from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.specs import Severity, SpecsDoctor
-from dadaia_workspace.features.specs.doctor_common import read_active_md
 from dadaia_workspace.features.specs.doctor_types import SpecsDoctorIssue
-from dadaia_workspace.features.specs.scaffolder import (
-    scaffold,
-    scaffold_release_segment,
-)
+from dadaia_workspace.features.specs.scaffolder import scaffold
 
 app = typer.Typer(help="SDD release-lifecycle structural checks and helpers.")
 
-# Sub-apps for the alpha/rc release-segment model (ADR-1/ADR-5).
-release_app = typer.Typer(help="Release scaffolding (parent + alpha/rc segments).")
-app.add_typer(release_app, name="release")
-segment_app = typer.Typer(help="Open the next alpha/rc segment of the active release.")
-app.add_typer(segment_app, name="segment")
-
-
-def _write_active(specs_dir: Path, release: str, segment: str | None, phase: str) -> None:
-    """Write specs/releases/ACTIVE.md (schema v2 — optional segment line)."""
-    lines = [f"release: {release}"]
-    if segment:
-        lines.append(f"segment: {segment}")
-    lines.append(f"phase: {phase}")
-    (specs_dir / "releases" / "ACTIVE.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+# `specs release open` / `specs segment open` RETIRED (v0.5.0 FR4/T-050-21A): both
+# wrote ACTIVE.md via `_write_active`; the phase is now read from RELEASE.json and no
+# file stands in ACTIVE.md's place, so both verbs are dead the moment there is nothing
+# left for them to write. `scaffold_release_segment` (features.specs.scaffolder)
+# stays — it still scaffolds the SPEC/PLAN/TASKS stubs of a dir-based segment
+# (ADR-1/ADR-5) and is exercised directly by its own unit tests.
 
 
 def _resolve_specs_dir(specs_dir: str | None) -> Path:
     return resolve_specs_dir_for_cli(specs_dir)
+
+
+def _resolve_head_and_parent_sha(specs_dir: Path) -> tuple[str | None, str | None]:
+    """Resolve the branch HEAD sha and its first parent (v0.5.0 specs-canon closure)
+    — plain data fed into SPEC-DOC-044's stale-verdict check. The repo root is
+    ``specs_dir.parent`` (the SAME convention :func:`_resolve_public_dir` already
+    uses: ``specs/`` sits directly at the repo root). Returns ``(None, None)`` when
+    *specs_dir*'s repo root is not a git repository, or the resolution otherwise
+    fails — a doctor invocation with no git context stays silent on that one check
+    rather than guessing (never raises; this is a read-only convenience, not a
+    policy gate).
+    """
+    import subprocess
+
+    repo_root = specs_dir.parent
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None, None
+    if result.returncode != 0:
+        return None, None
+    head_sha = result.stdout.strip()
+    if not head_sha:
+        return None, None
+
+    parent_sha: str | None
+    try:
+        parent_sha = container.build_git_object_reader().first_parent(repo_root, head_sha)
+    except Exception:  # noqa: BLE001 — a failed parent lookup degrades to None, never a crash
+        parent_sha = None
+    return head_sha, parent_sha
 
 
 def _resolve_public_dir(specs_dir: Path) -> Path | None:
@@ -57,6 +82,84 @@ def _resolve_public_dir(specs_dir: Path) -> Path | None:
     return None
 
 
+def _print_migration_hints(issues: list[SpecsDoctorIssue]) -> None:
+    """Always surface TREE-1/TREE-2 migration hints (even under --fix)."""
+    migration_issues = [i for i in issues if i.code in ("TREE-1", "TREE-2")]
+    for mi in migration_issues:
+        typer.echo(f"[MIGRATION] {mi.description}", err=True)
+
+
+def _apply_doctor_fix(
+    doctor_svc: SpecsDoctor, issues: list[SpecsDoctorIssue]
+) -> list[SpecsDoctorIssue]:
+    """Apply --fix, print what was fixed, and return the residual issue set."""
+    fixed = doctor_svc.fix(issues)
+    if fixed:
+        typer.echo(f"[fix] Applied {len(fixed)} auto-fix(es):")
+        for f_issue in fixed:
+            typer.echo(f"  [fixed] {f_issue.code}: {f_issue.path}")
+    return doctor_svc.check()
+
+
+def _print_json_result(target: Path, issues: list[SpecsDoctorIssue]) -> None:
+    payload = {
+        "specs_dir": str(target),
+        "issues": [i.to_dict() for i in issues],
+        "summary": {
+            "errors": sum(1 for i in issues if i.severity == Severity.ERROR),
+            "warnings": sum(1 for i in issues if i.severity == Severity.WARNING),
+        },
+    }
+    typer.echo(json.dumps(payload, indent=2, ensure_ascii=False))
+
+
+def _print_human_result(target: Path, issues: list[SpecsDoctorIssue]) -> None:
+    if not issues:
+        typer.echo(f"[ok] {target} — 0 errors, 0 warnings.")
+        return
+    errors = [i for i in issues if i.severity == Severity.ERROR]
+    warnings = [i for i in issues if i.severity == Severity.WARNING]
+    typer.echo(
+        f"[{'fail' if errors else 'warn'}] {target} — "
+        f"{len(errors)} error(s), {len(warnings)} warning(s):"
+    )
+    for issue in issues:
+        marker = "ERR " if issue.severity == Severity.ERROR else "WARN"
+        location = f" ({issue.path})" if issue.path else ""
+        typer.echo(f"  [{marker}] {issue.code}: {issue.description}{location}")
+    # Authoritative final verdict line (bug: specs-doctor-dual-error-counter).
+    # A memory-lint issue may embed its own "Summary: … 0 ERROR" text; this final
+    # line is the single source of truth so the last output line never contradicts
+    # the real result.
+    typer.echo(
+        f"[{'fail' if errors else 'ok'}] overall: {len(errors)} error(s), "
+        f"{len(warnings)} warning(s) — {target}"
+    )
+
+
+def _render_recipe_steps(issues: list[SpecsDoctorIssue]) -> list[str]:
+    """Render ``--recipe``'s ordered, copy-pasteable steps — one per finding, in
+    ``check()`` order (A1.3). Never a second step table: every step is a rendering of
+    the SAME finding object ``--json`` emits (code/path/description) — nothing here is
+    looked up from a second, code-keyed table that could drift from the findings.
+    """
+    steps: list[str] = []
+    for n, issue in enumerate(issues, start=1):
+        location = f" ({issue.path})" if issue.path else ""
+        steps.append(f"{n}. [{issue.code}]{location} {issue.description}")
+    return steps
+
+
+def _print_recipe(issues: list[SpecsDoctorIssue]) -> None:
+    steps = _render_recipe_steps(issues)
+    if not steps:
+        typer.echo("[recipe] 0 finding(s) — nothing to do.")
+        return
+    typer.echo(f"[recipe] {len(steps)} step(s) — copy-paste in order:")
+    for step in steps:
+        typer.echo(step)
+
+
 @app.command("doctor")
 def doctor(
     specs_dir: str | None = typer.Option(
@@ -72,6 +175,15 @@ def doctor(
     json_output: bool = typer.Option(
         False, "--json", help="Emit machine-readable JSON instead of human output."
     ),
+    recipe: bool = typer.Option(
+        False,
+        "--recipe",
+        help=(
+            "Emit ordered, concrete, copy-pasteable steps for every finding — a "
+            "rendering of the SAME finding objects --json emits (A1.3), never a "
+            "second step table. Takes precedence over --json."
+        ),
+    ),
     public_dir: str | None = typer.Option(
         None,
         "--public-dir",
@@ -86,10 +198,11 @@ def doctor(
         "--fix",
         help=(
             "Apply auto-fixes for fixable issues (TREE-3: render missing memory HTML; "
-            "TREE-4: create missing dirs with README + .gitkeep; MEM-PLACEHOLDER-1: "
-            "remove unfilled placeholder atoms from old scaffolds). "
-            "Warn-only invariants (TREE-1, TREE-2, TREE-5) are never auto-fixed. "
-            "After fixing, re-checks and reports residual issues."
+            "TREE-4: create missing dirs with AGENTS.md; TREE-8: remove a stray "
+            "non-canon root entry or dotfile; MEM-PLACEHOLDER-1: remove unfilled "
+            "placeholder atoms from old scaffolds). "
+            "Warn-only invariants (TREE-1, TREE-2, TREE-5) are never "
+            "auto-fixed. After fixing, re-checks and reports residual issues."
         ),
     ),
 ) -> None:
@@ -112,60 +225,27 @@ def doctor(
         resolved_public: Path | None = Path(public_dir).resolve()
     else:
         resolved_public = _resolve_public_dir(target)
+    head_sha, parent_sha = _resolve_head_and_parent_sha(target)
     doctor_svc = SpecsDoctor(
         target,
         public_dir=resolved_public,
         templates_dir=_TEMPLATES_DIR,
+        head_sha=head_sha,
+        parent_sha=parent_sha,
     )
     issues = doctor_svc.check()
 
-    # Always surface TREE-1/TREE-2 migration hints (even under --fix).
-    migration_issues = [i for i in issues if i.code in ("TREE-1", "TREE-2")]
-    if migration_issues:
-        for mi in migration_issues:
-            typer.echo(f"[MIGRATION] {mi.description}", err=True)
+    _print_migration_hints(issues)
 
     if fix:
-        fixed = doctor_svc.fix(issues)
-        if fixed:
-            typer.echo(f"[fix] Applied {len(fixed)} auto-fix(es):")
-            for f_issue in fixed:
-                typer.echo(f"  [fixed] {f_issue.code}: {f_issue.path}")
-        # Re-check after fixes to get residual state.
-        issues = doctor_svc.check()
+        issues = _apply_doctor_fix(doctor_svc, issues)
 
-    if json_output:
-        payload = {
-            "specs_dir": str(target),
-            "issues": [i.to_dict() for i in issues],
-            "summary": {
-                "errors": sum(1 for i in issues if i.severity == Severity.ERROR),
-                "warnings": sum(1 for i in issues if i.severity == Severity.WARNING),
-            },
-        }
-        typer.echo(json.dumps(payload, indent=2, ensure_ascii=False))
+    if recipe:
+        _print_recipe(issues)
+    elif json_output:
+        _print_json_result(target, issues)
     else:
-        if not issues:
-            typer.echo(f"[ok] {target} — 0 errors, 0 warnings.")
-        else:
-            errors = [i for i in issues if i.severity == Severity.ERROR]
-            warnings = [i for i in issues if i.severity == Severity.WARNING]
-            typer.echo(
-                f"[{'fail' if errors else 'warn'}] {target} — "
-                f"{len(errors)} error(s), {len(warnings)} warning(s):"
-            )
-            for issue in issues:
-                marker = "ERR " if issue.severity == Severity.ERROR else "WARN"
-                location = f" ({issue.path})" if issue.path else ""
-                typer.echo(f"  [{marker}] {issue.code}: {issue.description}{location}")
-            # Authoritative final verdict line (bug: specs-doctor-dual-error-counter).
-            # A memory-lint issue may embed its own "Summary: … 0 ERROR" text; this final
-            # line is the single source of truth so the last output line never contradicts
-            # the real result.
-            typer.echo(
-                f"[{'fail' if errors else 'ok'}] overall: {len(errors)} error(s), "
-                f"{len(warnings)} warning(s) — {target}"
-            )
+        _print_human_result(target, issues)
 
     has_errors = any(i.severity == Severity.ERROR for i in issues)
     sys.exit(1 if has_errors else 0)
@@ -362,68 +442,3 @@ def init(
 
     if result.errors:
         sys.exit(1)
-
-
-@release_app.command("open")
-def release_open(
-    version_id: str = typer.Argument(..., help="SemVer release id, e.g. v0.1.6."),
-    specs_dir: str | None = typer.Option(None, "--specs-dir", help="Path to specs/."),
-    force: bool = typer.Option(False, "--force", help="Overwrite existing segment files."),
-) -> None:
-    """Open a new release: scaffold the parent + its first segment (alpha-1).
-
-    Sets specs/releases/ACTIVE.md to ``release: <version> / segment: alpha-1 /
-    phase: SPEC`` (schema v2, ADR-1/ADR-5).
-    """
-    target = _resolve_specs_dir(specs_dir)
-    try:
-        result = scaffold_release_segment(target, version_id, "alpha-1", force=force)
-    except ValueError as exc:
-        typer.echo(f"[error] {exc}", err=True)
-        raise typer.Exit(2) from exc
-    for path in result.created:
-        typer.echo(f"[created] {path}")
-    for error in result.errors:
-        typer.echo(f"[error] {error}", err=True)
-    if result.errors:
-        raise typer.Exit(1)
-    _write_active(target, version_id, "alpha-1", "SPEC")
-    typer.echo(
-        f"[ok] Release {version_id} opened at segment alpha-1; "
-        "ACTIVE.md -> release/segment/phase set. Author SPEC.md next."
-    )
-
-
-@segment_app.command("open")
-def segment_open(
-    segment: str = typer.Argument(..., help="Segment to open, e.g. alpha-2 or rc-1."),
-    specs_dir: str | None = typer.Option(None, "--specs-dir", help="Path to specs/."),
-    force: bool = typer.Option(False, "--force", help="Overwrite existing segment files."),
-) -> None:
-    """Open the next segment (alpha-N/rc-N) of the active release.
-
-    Reads the active release from ACTIVE.md, scaffolds the segment, and advances
-    ACTIVE.md's ``segment:`` to it (phase reset to SPEC).
-    """
-    target = _resolve_specs_dir(specs_dir)
-    release, _segment, _phase, err = read_active_md(target / "releases" / "ACTIVE.md")
-    if err is not None or not release or release == "none":
-        typer.echo(
-            f"[error] no active release in ACTIVE.md ({err or 'release: none'}). "
-            "Open a release first: dadaia specs release open <version>.",
-            err=True,
-        )
-        raise typer.Exit(2)
-    try:
-        result = scaffold_release_segment(target, release, segment, force=force)
-    except ValueError as exc:
-        typer.echo(f"[error] {exc}", err=True)
-        raise typer.Exit(2) from exc
-    for path in result.created:
-        typer.echo(f"[created] {path}")
-    for error in result.errors:
-        typer.echo(f"[error] {error}", err=True)
-    if result.errors:
-        raise typer.Exit(1)
-    _write_active(target, release, segment, "SPEC")
-    typer.echo(f"[ok] Segment {segment} opened for {release}; ACTIVE.md segment advanced.")

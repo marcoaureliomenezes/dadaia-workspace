@@ -17,9 +17,10 @@
 # — the same "review artifact committed on the branch" cadence DADAIA.md §4 (Gitflow)
 # already uses for a qa-engineer segment-close review. At release closure, the whole
 # release directory (verdicts included) is `git mv`'d verbatim to
-# `specs/_archive/releases/<release-id>/verdicts/` — so a PASSING PR against a closed
-# release (the final-rc PR, and every develop -> main deploy PR) must resolve its
-# evidence there too.
+# `specs/releases/_archive/<release-id>/verdicts/` (canon v6, T-050-06A — one level
+# DEEPER than the pre-v6 `specs/_archive/releases/<release-id>/verdicts/` layout) — so
+# a PASSING PR against a closed release (the final-rc PR, and every develop -> main
+# deploy PR) must resolve its evidence there too.
 #
 # Bug `verdict-gate-cannot-resolve-evidence-after-release-archive` (HIGH, T-044-50):
 # the gate used to resolve `RELEASE_ID` by reading `specs/releases/ACTIVE.md`'s
@@ -39,9 +40,15 @@
 # whatever commit carries it — the reviewed commit can never retroactively include
 # its own evidence. A verdict COVERS a PR head sha when:
 #   1. its `metrics.commit_sha` IS the PR head sha, OR an ancestor of it, AND
-#   2. every path that differs between the named sha and the PR head is itself under
-#      specs/releases/*/verdicts/ OR specs/_archive/releases/*/verdicts/ — i.e.
-#      nothing but more verdict evidence landed after the reviewed commit.
+#   2. every path that differs between the named sha and the PR head is itself
+#      ANCHORED under specs/releases/<id>/verdicts/ OR
+#      specs/releases/_archive/<id>/verdicts/, with <id> validated against the canon
+#      release-id pattern (F-17, T-050-36 security review: a bash `case` pattern's
+#      `*` crosses `/` under fnmatch's default semantics, so the pre-fix version of
+#      this check excused ANY path with a `/verdicts/` segment anywhere under
+#      specs/releases/ — source files included; see `_is_verdict_evidence_path`
+#      below) — i.e. nothing but more verdict evidence landed after the reviewed
+#      commit.
 # This reuses the SAME qualification fields
 # features/chokepoints/service.py::iter_security_approvals already applies to the
 # (now push-retired, gc-only) local reader: agent == "security-reviewer",
@@ -52,61 +59,207 @@
 #   PR_HEAD_SHA=<sha> [RELEASE_ID=<id>] bash .github/scripts/pr-verdict-check.sh
 #
 # Environment variables:
-#   PR_HEAD_SHA  required — the PR head sha to prove coverage for.
+#   PR_HEAD_SHA  required — the PR head sha to prove coverage for. Shape-checked as
+#                40-hex (F-18, T-050-36 security review) before it reaches any git
+#                argv or coverage comparison — the same discipline the
+#                handoff-sourced `metrics.commit_sha` already gets below.
 #   RELEASE_ID   optional narrowing only. Unset, empty, or the literal "none"
 #                (the exact value ACTIVE.md carries at closure) means: search every
 #                release's verdicts directory, live and archived — never an error.
-#                A canonical `vMAJOR.MINOR.PATCH[-suffix]` value restricts the search
-#                to that one release id, in both trees. Any other value is refused
-#                before it ever reaches a path (no traversal shape, no unexpected
-#                characters).
+#                A value matching the release-id canon (derived below) restricts the
+#                search to that one release id, in both trees. Any other value is
+#                refused before it ever reaches a path (no traversal shape, no
+#                unexpected characters).
+#
+# T-050-06A (SPEC FR1 boundary 2a / AS-13 / §9.2 SEC-R1/SEC-R2): the id pattern and
+# the two evidence roots below are DERIVED from the canon
+# (dadaia_workspace/core/specs_version.py), never hard-coded — the third firing of
+# `verdict-gate-cannot-resolve-evidence-after-release-archive` (HIGH, T-044-50) was
+# caused by a canon move (v6's per-area archive: specs/releases/_archive/<id>/
+# instead of specs/_archive/releases/<id>/) leaving this script's own hard-coded
+# glob and `v`-required id pattern behind, exactly as it did twice before. Bash
+# cannot `import` the Python object, so it shells out to the interpreter instead
+# (feasible on the bare checkout: `security-verdict-gate` runs with no
+# `setup-python`/install step, and both `dadaia_workspace/__init__.py` and
+# `core/__init__.py` are empty while `core/specs_version.py` imports only stdlib
+# `re` + `pathlib`).
 
 set -euo pipefail
 
 PR_HEAD_SHA="${PR_HEAD_SHA:?PR_HEAD_SHA is required}"
 RELEASE_ID="${RELEASE_ID:-}"
 
-# RELEASE_ID, when supplied, is interpolated straight into a filesystem glob below —
-# so a PR that supplies (or, upstream, a crafted ACTIVE.md that fed) this value
-# controls a path. Pin it to the release-id canon before it ever reaches a path, and
-# fail closed on mismatch (no traversal shape, no unexpected characters). This
-# mirrors, in bash, the ONE canonical pattern every other public entry point
-# validates against (dadaia_workspace/core/specs_version.py::RELEASE_SEMVER_RE) — a
-# bash script cannot import that Python object, so the pattern is restated here, not
-# re-derived. "none" (unset/empty's sibling — the literal ACTIVE.md carries at
-# closure) is deliberately exempt from this check: it means "no narrowing", not
-# "malformed value".
-_RELEASE_ID_RE='^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.]*)?$'
+# F-18 (T-050-36 security review): shape-check PR_HEAD_SHA the same way the
+# handoff-sourced `sha` is pinned to 40-hex below (T-044-46 S-1) — otherwise a
+# symbolic or option-shaped value ("HEAD", "@", "--glob=...") resolves dynamically
+# against whatever the checkout happens to have, collapsing the ancestor check and
+# the diff-emptiness check into tautologies. Today PR_HEAD_SHA is always supplied by
+# `github.event.pull_request.head.sha` and is trustworthy; this closes the asymmetry.
+if ! [[ "$PR_HEAD_SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
+  echo "::error::pr-verdict-check: PR_HEAD_SHA '${PR_HEAD_SHA}' is not a 40-hex sha — refusing to use it as a git argument or coverage anchor."
+  exit 1
+fi
+
+# Self-locate the package, never rely on the caller's cwd (bug
+# pr-verdict-check-wiring-fixture-lacks-cwd-relative-dadaia-workspace-package): the
+# canon derivation below imports `dadaia_workspace.core.specs_version`, a pure
+# module whose output never depends on which repo instance invokes this script — it
+# is always this script's OWN sibling package, never the caller's cwd. CWD-relative
+# `python3 -c` resolution happened to work because every real CI invocation's cwd is
+# already the checkout root (`security-verdict-gate` runs `bash
+# .github/scripts/pr-verdict-check.sh` with no `working-directory:` override) — but
+# that made the derivation's correctness an incidental property of the caller's cwd
+# rather than a property of the script itself, exactly the assumption a synthetic
+# git-repo fixture (a throwaway tmp_path repo with no dadaia_workspace/ tree at all)
+# legitimately does not share. `PYTHONPATH` is set to this script's own repo root
+# (derived from `BASH_SOURCE[0]`, never `$0` — robust if this script is ever
+# sourced) so the derivation resolves identically regardless of cwd; every later git
+# operation in this script still runs against the CALLER's cwd (the checked-out PR
+# tree in CI, the synthetic fixture repo in tests) — only the python3 import path is
+# self-located, nothing else.
+_SCRIPT_REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
+# Derive the id pattern + the exactly-two verdict-evidence root templates from the
+# canon. Fail-closed (SPEC §9.2 SEC-R2): interpreter absent, import error, missing
+# symbol, or empty/unparseable output all exit non-zero with the reason — there is
+# NO `|| <default glob>`, no fallback root, no "assume the old pattern". `_ideas/`
+# never appears in the two templates the canon exports (AS-15/A6.3: a
+# freely-writable directory is never a trust root of a required check), and the
+# nested `_ideas/<id>/verdicts/` shape never matches either 4-segment glob at all —
+# but a bare `RELEASE_GLOB=*` template expansion still matches a `verdicts/`
+# directory placed DIRECTLY under `_ideas/` (F-16, T-050-36 security review: the
+# glob shape alone is not sufficient BY CONSTRUCTION). The candidate-discovery
+# section below therefore ALSO validates every glob hit's release-id segment
+# against `_RELEASE_ID_RE` explicitly, rather than relying on the glob shape alone;
+# the narrowing `RELEASE_ID` check further down refuses the literal token
+# "_ideas"/"_archive" (or any traversal shape) before it is ever interpolated there,
+# because none of those strings can match a release-id pattern — two independent
+# refusals, neither alone.
+if ! _CANON_OUTPUT="$(PYTHONPATH="${_SCRIPT_REPO_ROOT}${PYTHONPATH:+:${PYTHONPATH}}" python3 -c '
+import dadaia_workspace.core.specs_version as s
+print(s.release_semver_ere_pattern())
+for template in s.VERDICT_EVIDENCE_ROOT_TEMPLATES:
+    print(template)
+' 2>&1)"; then
+  echo "::error::pr-verdict-check: could not derive the release-id pattern and verdict-evidence roots from dadaia_workspace.core.specs_version — refusing to fall back to a hard-coded glob. Interpreter/import output: ${_CANON_OUTPUT}"
+  exit 1
+fi
+
+_CANON_LINE_COUNT="$(printf '%s\n' "$_CANON_OUTPUT" | sed '/^$/d' | wc -l | tr -d ' ')"
+if [ "$_CANON_LINE_COUNT" -ne 3 ]; then
+  echo "::error::pr-verdict-check: expected 1 id pattern + exactly 2 verdict-evidence root templates from the canon, got ${_CANON_LINE_COUNT} non-empty line(s): ${_CANON_OUTPUT}"
+  exit 1
+fi
+
+_RELEASE_ID_RE="$(printf '%s\n' "$_CANON_OUTPUT" | sed -n '1p')"
+_ROOT_TEMPLATE_1="$(printf '%s\n' "$_CANON_OUTPUT" | sed -n '2p')"
+_ROOT_TEMPLATE_2="$(printf '%s\n' "$_CANON_OUTPUT" | sed -n '3p')"
+if [ -z "$_RELEASE_ID_RE" ] || [ -z "$_ROOT_TEMPLATE_1" ] || [ -z "$_ROOT_TEMPLATE_2" ]; then
+  echo "::error::pr-verdict-check: the canon derivation produced an empty id pattern or root template — refusing to interpolate an empty value into a path."
+  exit 1
+fi
+
+# RELEASE_ID, when supplied, is interpolated straight into the derived root
+# templates below — so a PR that supplies (or, upstream, a crafted ACTIVE.md that
+# fed) this value controls a path. Pin it to the derived release-id canon before it
+# ever reaches a path, and fail closed on mismatch (no traversal shape, no
+# unexpected characters — "_ideas", "_archive", "../" and every other non-canon
+# token are refused here, since none of them can match a release-id pattern).
+# "none" (unset/empty's sibling — the literal ACTIVE.md carries at closure) is
+# deliberately exempt from this check: it means "no narrowing", not "malformed
+# value".
 RELEASE_GLOB='*'
 if [ -n "$RELEASE_ID" ] && [ "$RELEASE_ID" != "none" ]; then
   if ! [[ "$RELEASE_ID" =~ $_RELEASE_ID_RE ]]; then
-    echo "::error::pr-verdict-check: RELEASE_ID '${RELEASE_ID}' does not match the canonical release-id pattern vMAJOR.MINOR.PATCH[-suffix] — refusing to interpolate it into a path."
+    echo "::error::pr-verdict-check: RELEASE_ID '${RELEASE_ID}' does not match the canon-derived release-id pattern (${_RELEASE_ID_RE}) — refusing to interpolate it into a path."
     exit 1
   fi
   RELEASE_GLOB="$RELEASE_ID"
 fi
 
-EXPECTED_SHAPE="specs/releases/<release-id>/verdicts/<reviewed-sha>.handoff.json or specs/_archive/releases/<release-id>/verdicts/<reviewed-sha>.handoff.json (agent=\"security-reviewer\", verdict=\"APPROVED\", metrics.commit_sha=\"<reviewed-sha>\")"
+EXPECTED_SHAPE="specs/releases/<release-id>/verdicts/<reviewed-sha>.handoff.json or specs/releases/_archive/<release-id>/verdicts/<reviewed-sha>.handoff.json (agent=\"security-reviewer\", verdict=\"APPROVED\", metrics.commit_sha=\"<reviewed-sha>\")"
+
+# F-17 (T-050-36 security review): an anchored, per-segment membership test — never a
+# bash `case` glob, whose `*` crosses `/` under fnmatch's default (no FNM_PATHNAME)
+# semantics and therefore excuses ANY path with a `/verdicts/` segment anywhere under
+# `specs/releases/`, source files included (verified:
+# `specs/releases/0.5.0/reviews/verdicts/evil.py` matched the old pattern). Matches
+# ONLY `specs/releases/<id>/verdicts/<file>` or
+# `specs/releases/_archive/<id>/verdicts/<file>`, with `<id>` validated against the
+# SAME canon release-id pattern the candidate discovery below uses — never the
+# retired pre-v6 `specs/_archive/releases/<id>/verdicts/<file>` shape (dead since
+# T-050-06A moved the archive one level up; deleted, not carried forward).
+_is_verdict_evidence_path() {
+  local path="$1"
+  local id
+  if [[ "$path" =~ ^specs/releases/_archive/([^/]+)/verdicts/[^/]+$ ]]; then
+    id="${BASH_REMATCH[1]}"
+  elif [[ "$path" =~ ^specs/releases/([^/]+)/verdicts/[^/]+$ ]]; then
+    id="${BASH_REMATCH[1]}"
+  else
+    return 1
+  fi
+  [[ "$id" =~ $_RELEASE_ID_RE ]]
+}
 
 # Resolve candidate verdict files BY THE ARTIFACT, never by a lifecycle pointer:
-# every release's verdicts directory, live and archived, optionally narrowed by
-# RELEASE_ID. `nullglob` makes a directory that does not exist (or a release id with
-# no verdicts at all) contribute zero candidates rather than a literal, unexpanded
-# glob string.
+# every release's verdicts directory under the two canon-derived roots, live and
+# per-area archived, optionally narrowed by RELEASE_ID. `nullglob` makes a
+# directory that does not exist (or a release id with no verdicts at all)
+# contribute zero candidates rather than a literal, unexpanded glob string.
+# Deliberately UNQUOTED: RELEASE_GLOB is either the literal wildcard `*` or a value
+# already validated against `_RELEASE_ID_RE` above (digits/dots/hyphens/alnum only,
+# never whitespace or another shell metacharacter) — quoting it here would turn the
+# intentional `*` into a literal asterisk character and silently match nothing
+# (verified: this exact bug reproduced and was fixed on this line).
 shopt -s nullglob
-CANDIDATES=(
-  specs/releases/${RELEASE_GLOB}/verdicts/*.handoff.json
-  specs/_archive/releases/${RELEASE_GLOB}/verdicts/*.handoff.json
-)
+_LIVE_CANDIDATES=( ${_ROOT_TEMPLATE_1/\{glob\}/$RELEASE_GLOB}/*.handoff.json )
+_ARCHIVE_CANDIDATES=( ${_ROOT_TEMPLATE_2/\{glob\}/$RELEASE_GLOB}/*.handoff.json )
 shopt -u nullglob
 
-if [ "${#CANDIDATES[@]}" -eq 0 ]; then
+# F-16 (T-050-36 security review): a bare `RELEASE_GLOB=*` template expansion
+# matches ANY single path segment in the release-id position — including a
+# `specs/releases/_ideas/verdicts/` shape (a `verdicts/` directory placed DIRECTLY
+# under `_ideas/`, never the nested `_ideas/<release-id>/verdicts/` shape, which was
+# already refused BY CONSTRUCTION: each template has exactly one `{glob}` segment,
+# so a 5-segment path never matches the 4-segment glob at all). `_ideas/` is a
+# freely-writable MUTATING directory (AS-15/A6.3) and must never be a trust root of
+# this required check. Filter every raw glob hit by validating its release-id
+# SEGMENT against the canon pattern, rather than trusting the glob shape alone —
+# `_ideas` (and `_archive`/`../`/any other non-canon token) never matches. The
+# strip prefixes are themselves DERIVED from the canon templates (never a second,
+# hardcoded literal of "specs/releases/" — the same discipline T-050-06A already
+# applies to the glob roots below).
+_ROOT_PREFIX_1="${_ROOT_TEMPLATE_1%%\{glob\}*}"
+_ROOT_PREFIX_2="${_ROOT_TEMPLATE_2%%\{glob\}*}"
+
+CANDIDATES=()
+for _candidate in ${_LIVE_CANDIDATES[@]+"${_LIVE_CANDIDATES[@]}"}; do
+  _release_segment="${_candidate#"$_ROOT_PREFIX_1"}"
+  _release_segment="${_release_segment%%/verdicts/*}"
+  if [[ "$_release_segment" =~ $_RELEASE_ID_RE ]]; then
+    CANDIDATES+=("$_candidate")
+  else
+    echo "[pr-verdict-check] SKIP candidate root: ${_candidate} — release-id segment '${_release_segment}' is not a canon release id; refusing as a candidate root."
+  fi
+done
+for _candidate in ${_ARCHIVE_CANDIDATES[@]+"${_ARCHIVE_CANDIDATES[@]}"}; do
+  _release_segment="${_candidate#"$_ROOT_PREFIX_2"}"
+  _release_segment="${_release_segment%%/verdicts/*}"
+  if [[ "$_release_segment" =~ $_RELEASE_ID_RE ]]; then
+    CANDIDATES+=("$_candidate")
+  else
+    echo "[pr-verdict-check] SKIP candidate root: ${_candidate} — release-id segment '${_release_segment}' is not a canon release id; refusing as a candidate root."
+  fi
+done
+
+if [ "${CANDIDATES[@]+${#CANDIDATES[@]}}" = "" ] || [ "${#CANDIDATES[@]}" -eq 0 ]; then
   echo "::error::pr-verdict-check: no APPROVED security-reviewer verdict covers PR head ${PR_HEAD_SHA} — expected one at ${EXPECTED_SHAPE} (no candidate verdict files found)."
   exit 1
 fi
 
 pass=0
-for handoff in "${CANDIDATES[@]}"; do
+for handoff in ${CANDIDATES[@]+"${CANDIDATES[@]}"}; do
   agent="$(jq -r '.agent // empty' "$handoff" 2>/dev/null || true)"
   verdict="$(jq -r '.verdict // empty' "$handoff" 2>/dev/null || true)"
   sha="$(jq -r '.metrics.commit_sha // empty' "$handoff" 2>/dev/null || true)"
@@ -157,11 +310,10 @@ for handoff in "${CANDIDATES[@]}"; do
     fi
     while IFS= read -r changed_path; do
       [ -z "$changed_path" ] && continue
-      case "$changed_path" in
-        specs/releases/*/verdicts/*|specs/_archive/releases/*/verdicts/*)
-          ;; # pure evidence, live or archived — never disqualifies coverage.
-        *) offenders="${offenders}${changed_path}"$'\n' ;;
-      esac
+      if _is_verdict_evidence_path "$changed_path"; then
+        continue # pure evidence, live or archived — never disqualifies coverage.
+      fi
+      offenders="${offenders}${changed_path}"$'\n'
     done <<< "$diff_output"
   fi
 

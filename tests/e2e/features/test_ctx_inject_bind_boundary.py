@@ -74,7 +74,7 @@ def _add_context(workspace: Path, slug: str, *, tech: str) -> None:
 
     mem = workspace / "repos" / slug / "specs" / "memory"
     (mem / "product").mkdir(parents=True, exist_ok=True)
-    (mem / "tech-stack.md").write_text(tech, encoding="utf-8")
+    (mem / "TECHSTACK.md").write_text(tech, encoding="utf-8")
     (mem / "product" / "catalog.json").write_text('{"features": []}', encoding="utf-8")
 
 

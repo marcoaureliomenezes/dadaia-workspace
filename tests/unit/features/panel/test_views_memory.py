@@ -172,7 +172,6 @@ def test_frontmatter_meta_render(tmp_path: Path) -> None:
         "tags:\n"
         "  - architecture\n"
         "  - layers\n"
-        "last_updated: '2026-06-11'\n"
         "---\n\n"
         "## Body heading\n\nContent.\n"
     )
@@ -186,7 +185,6 @@ def test_frontmatter_meta_render(tmp_path: Path) -> None:
     assert "The layered architecture of the system." in html
     assert '<li class="memory-meta__chip">architecture</li>' in html
     assert '<li class="memory-meta__chip">layers</li>' in html
-    assert "2026-06-11" in html
     main_body = html.split('<main class="memory-doc">', 1)[1]
     assert "slug: arch" not in main_body
     assert "tldr:" not in main_body

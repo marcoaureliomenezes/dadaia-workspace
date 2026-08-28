@@ -67,8 +67,6 @@ _REQUIRED_FM: dict[str, Any] = {
     "tags": ["test"],
     "agent_tier": "self-pull",
     "token_estimate": 50,
-    "last_updated": "2026-06-01",
-    "release_origin": "memory-markdown-source-v1",
 }
 
 
@@ -191,8 +189,6 @@ def test_missing_required_field_returns_error(tmp_path: Path) -> None:
         "tags:\n  - test\n"
         "agent_tier: self-pull\n"
         "token_estimate: 50\n"
-        "last_updated: '2026-06-01'\n"
-        "release_origin: memory-markdown-source-v1\n"
         "---\n"
         "\n"
         "## Propósito\n\nBody.\n"

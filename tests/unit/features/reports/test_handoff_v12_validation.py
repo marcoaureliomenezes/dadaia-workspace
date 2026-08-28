@@ -257,7 +257,7 @@ def test_schema_version_matrix(
 ) -> None:
     """v1 ✓ / v1.1 ✓ / v1.2+self_pull ✓ / v1.2−self_pull ✗ (one auditability point)."""
     service = _service(tmp_path)
-    ref = "specs/memory/architecture.md"
+    ref = "specs/memory/ARCHITECTURE.md"
     _plant_atom(tmp_path, ref)
     doc = _v12_doc([ref] if with_self_pull else None, schema_version=schema_version)
     handoff_path = _write_handoff(tmp_path, doc, f"matrix-{schema_version}-{with_self_pull}")
@@ -287,18 +287,18 @@ def test_backcompat_corpus_lock_via_validate_all(tmp_path: Path) -> None:
 
 
 def _refs_nonexistent_ref(ws: Path) -> list[str]:
-    _plant_atom(ws, "specs/memory/architecture.md")
-    return ["specs/memory/architecture.md", "specs/memory/ghost-atom.md"]
+    _plant_atom(ws, "specs/memory/ARCHITECTURE.md")
+    return ["specs/memory/ARCHITECTURE.md", "specs/memory/ghost-atom.md"]
 
 
 def _refs_resolves_under_repos_context(ws: Path) -> list[str]:
-    _plant_atom(ws, "repos/dadaia-workspace/specs/memory/quality-assurance.md")
-    return ["specs/memory/quality-assurance.md"]
+    _plant_atom(ws, "repos/dadaia-workspace/specs/memory/QUALITY.md")
+    return ["specs/memory/QUALITY.md"]
 
 
 def _refs_coverage_miss(ws: Path) -> list[str]:
-    _plant_atom(ws, "specs/memory/architecture.md")
-    return ["specs/memory/architecture.md"]
+    _plant_atom(ws, "specs/memory/ARCHITECTURE.md")
+    return ["specs/memory/ARCHITECTURE.md"]
 
 
 def _refs_unmapped_agent(ws: Path) -> list[str]:
@@ -333,7 +333,7 @@ def _refs_unmapped_agent(ws: Path) -> list[str]:
             _refs_coverage_miss,
             False,
             "self_pull.refs",
-            "quality-assurance",
+            "QUALITY.md",
             id="mapped-agent-missing-its-atom-fails-coverage",
         ),
         pytest.param(
@@ -433,7 +433,7 @@ def test_v12_sidecar_never_routes_to_v10_compat_cli(
     FileSystemPublicAssetManager().stage(tmp_path)
     monkeypatch.chdir(tmp_path)
 
-    ref = "specs/memory/architecture.md"
+    ref = "specs/memory/ARCHITECTURE.md"
     _plant_atom(tmp_path, ref)
     doc = _v12_doc([ref])
     assert "findings" not in doc  # the repro's trigger condition

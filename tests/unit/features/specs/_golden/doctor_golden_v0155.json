@@ -8,32 +8,26 @@
     },
     {
       "code": "SPEC-DOC-002",
-      "description": "memory/architecture.md is missing — memory must be Markdown (.md)",
-      "path": "<SPECS>/memory/architecture.md",
+      "description": "memory/ARCHITECTURE.md is missing — memory must be Markdown (.md)",
+      "path": "<SPECS>/memory/ARCHITECTURE.md",
       "severity": "error"
     },
     {
       "code": "SPEC-DOC-002",
-      "description": "memory/tech-stack.md is missing — memory must be Markdown (.md)",
-      "path": "<SPECS>/memory/tech-stack.md",
+      "description": "memory/TECHSTACK.md is missing — memory must be Markdown (.md)",
+      "path": "<SPECS>/memory/TECHSTACK.md",
       "severity": "error"
     },
     {
       "code": "SPEC-DOC-002",
-      "description": "memory/quality-assurance.md is missing — memory must be Markdown (.md)",
-      "path": "<SPECS>/memory/quality-assurance.md",
+      "description": "memory/QUALITY.md is missing — memory must be Markdown (.md)",
+      "path": "<SPECS>/memory/QUALITY.md",
       "severity": "error"
     },
     {
       "code": "SPEC-DOC-002",
       "description": "memory/product/index.md is missing — memory must be Markdown (.md)",
       "path": "<SPECS>/memory/product/index.md",
-      "severity": "error"
-    },
-    {
-      "code": "SPEC-DOC-009",
-      "description": "ACTIVE.md release='v9.9.9' but no directory at <SPECS>/releases/v9.9.9",
-      "path": "<SPECS>/releases/v9.9.9",
       "severity": "error"
     },
     {
@@ -44,20 +38,20 @@
     },
     {
       "code": "TREE-3",
-      "description": "memory/architecture.md is missing — required memory .md atom. Create it using `dadaia memory product add` or the born-markdown scaffold.",
-      "path": "<SPECS>/memory/architecture.md",
+      "description": "memory/ARCHITECTURE.md is missing — required memory .md atom. Create it using `dadaia memory product add` or the born-markdown scaffold.",
+      "path": "<SPECS>/memory/ARCHITECTURE.md",
       "severity": "warning"
     },
     {
       "code": "TREE-3",
-      "description": "memory/tech-stack.md is missing — required memory .md atom. Create it using `dadaia memory product add` or the born-markdown scaffold.",
-      "path": "<SPECS>/memory/tech-stack.md",
+      "description": "memory/TECHSTACK.md is missing — required memory .md atom. Create it using `dadaia memory product add` or the born-markdown scaffold.",
+      "path": "<SPECS>/memory/TECHSTACK.md",
       "severity": "warning"
     },
     {
       "code": "TREE-3",
-      "description": "memory/quality-assurance.md is missing — required memory .md atom. Create it using `dadaia memory product add` or the born-markdown scaffold.",
-      "path": "<SPECS>/memory/quality-assurance.md",
+      "description": "memory/QUALITY.md is missing — required memory .md atom. Create it using `dadaia memory product add` or the born-markdown scaffold.",
+      "path": "<SPECS>/memory/QUALITY.md",
       "severity": "warning"
     },
     {
@@ -85,8 +79,26 @@
       "severity": "warning"
     },
     {
+      "code": "TREE-8",
+      "description": "specs/audits/bad-audit-name/placeholder.md is not part of the v6 canon (DADAIA.md §6) — either a stray root entry (not one of backlog/, bugs/, memory/, releases/, audits/, ADRs/, constitution.md, AGENTS.md) or a file nested inside a canon area whose shape does not match that area's canon (a dotfile, a loose per-entry file, a markdown ADR, an old reviews/ file, …) — a directory is kept by its AGENTS.md, never a placeholder. NOT auto-fixed — it may be real, unmigrated content; move/rename it into the canon shape (or delete it) by hand (TREE-8).",
+      "path": "<SPECS>/audits/bad-audit-name/placeholder.md",
+      "severity": "error"
+    },
+    {
+      "code": "TREE-8",
+      "description": "specs/backlog/candidates.md is not part of the v6 canon (DADAIA.md §6) — either a stray root entry (not one of backlog/, bugs/, memory/, releases/, audits/, ADRs/, constitution.md, AGENTS.md) or a file nested inside a canon area whose shape does not match that area's canon (a dotfile, a loose per-entry file, a markdown ADR, an old reviews/ file, …) — a directory is kept by its AGENTS.md, never a placeholder. NOT auto-fixed — it may be real, unmigrated content; move/rename it into the canon shape (or delete it) by hand (TREE-8).",
+      "path": "<SPECS>/backlog/candidates.md",
+      "severity": "error"
+    },
+    {
+      "code": "TREE-8",
+      "description": "specs/releases/badname-release/SPEC.md is not part of the v6 canon (DADAIA.md §6) — either a stray root entry (not one of backlog/, bugs/, memory/, releases/, audits/, ADRs/, constitution.md, AGENTS.md) or a file nested inside a canon area whose shape does not match that area's canon (a dotfile, a loose per-entry file, a markdown ADR, an old reviews/ file, …) — a directory is kept by its AGENTS.md, never a placeholder. NOT auto-fixed — it may be real, unmigrated content; move/rename it into the canon shape (or delete it) by hand (TREE-8).",
+      "path": "<SPECS>/releases/badname-release/SPEC.md",
+      "severity": "error"
+    },
+    {
       "code": "SPECS-VERSION",
-      "description": "specs_pattern_version is 0, below the canonical 5. Run: dadaia specs upgrade",
+      "description": "specs_pattern_version is 0, below the canonical 6. Run: dadaia specs upgrade",
       "path": "<SPECS>/constitution.md",
       "severity": "warning"
     },
@@ -109,27 +121,15 @@
       "severity": "warning"
     },
     {
-      "code": "SPEC-DOC-034",
-      "description": "specs/audits/_archive/ is missing — the FROZEN landing zone for disposed artifacts (SPEC-DOC-034, WARNING). Auto-fix available (run doctor --fix).",
-      "path": "<SPECS>/audits/_archive",
-      "severity": "warning"
-    },
-    {
       "code": "SPEC-DOC-035",
-      "description": "backlog/candidates.md is a loose per-entry file directly under specs/backlog/ — the single source is BACKLOG.md (## ACTIVE + ## LEDGER); fold it into BACKLOG.md and move the superseded file into specs/backlog/_archive/ (SPEC-DOC-035, WARNING).",
+      "description": "backlog/candidates.md is a loose per-entry file directly under specs/backlog/ — the single source is BACKLOG.json (## ACTIVE + ## LEDGER); fold it into BACKLOG.json and move the superseded file into specs/backlog/_archive/ (SPEC-DOC-035, WARNING).",
       "path": "<SPECS>/backlog/candidates.md",
-      "severity": "warning"
-    },
-    {
-      "code": "SPEC-DOC-038",
-      "description": "audits/bad-audit-name is loose in specs/audits/ — a dispositioned audit must be archived to specs/audits/_archive/ (one remediation release dispositions every finding, then archives; audit-disposition law). SPEC-DOC-038, WARNING.",
-      "path": "<SPECS>/audits/bad-audit-name",
       "severity": "warning"
     }
   ],
   "specs_dir": "<SPECS>",
   "summary": {
-    "errors": 8,
-    "warnings": 13
+    "errors": 10,
+    "warnings": 11
   }
 }

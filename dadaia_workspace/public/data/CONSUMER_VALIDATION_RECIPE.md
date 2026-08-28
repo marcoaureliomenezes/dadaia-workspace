@@ -103,8 +103,9 @@ an initialized workspace, create it:
   commits its own scaffold (repo left clean — `git status --porcelain` empty of
   tool-created files); the freshly-scaffolded context is doctor-clean —
   `$D specs doctor --context alpha` reports **0 errors AND 0 warnings** (a supported
-  init path must reach a fully clean tree, with `ACTIVE.md`, catalog, and no raw
-  placeholder atom — a fresh context that doctor rejects is a FAIL); `dead` flips back
+  init path must reach a fully clean tree — catalog present, no raw placeholder atom,
+  no live release directory at all (the honest absence, `ACTIVE.md` retired at
+  T-050-21A) — a fresh context that doctor rejects is a FAIL); `dead` flips back
   WITHOUT the untracked-consent refusal (the tool must never refuse its own scaffold);
   and a guard fails cleanly (`$D context dead ghost` exits non-zero with a clear
   message, no traceback).
@@ -125,7 +126,7 @@ an initialized workspace, create it:
   bare root `specs/...` write is intercepted FIRST by the root-whitelist (that is a
   separate, correct decision, asserted on its own):
   - `repos/valproj/specs/bugs/x.md` (ADDITIVE) → expect `allow`;
-  - `repos/valproj/specs/_archive/x.md` (FROZEN) → expect `block`;
+  - `repos/valproj/specs/bugs/_archive/x.jsonl` (FROZEN) → expect `block`;
   - `.dadaia/sessions/x` (PROTECTED) → expect `block`;
   - `newdir/x.md` (new top-level root entry) → expect `block` naming the root
     whitelist.
@@ -156,26 +157,27 @@ an initialized workspace, create it:
   pass `--specs-dir` on EVERY `bugs` call (append AND status), the same way F-04/F-10/F-15
   do; a `bugs status` with no `--specs-dir` and no bind correctly errors with guidance
   ("Pass --specs-dir or bind a context"), which is expected, not a FAIL.
-- Run the complete append with EVERY required `reported` field —
-  `--event reported --bug-id valbug --reported-by selfrun --title t --severity LOW
-  --surface s --component c --context vp --tag x --symptom sy --repro rp --expected ex
-  --notes no --specs-dir repos/vp/specs`; then `$D bugs status --specs-dir repos/vp/specs`;
-  then an INCOMPLETE append `$D bugs append --event reported --bug-id x --specs-dir
+- Run the complete append with EVERY required field (`bugs append` has no `--event`
+  flag — one record per bug, appended once, v0.5.0 FR2) —
+  `--bug-id valbug --reported-by selfrun --title t --severity LOW
+  --surface unknown --component c --context vp --symptom sy --repro rp --expected ex
+  --specs-dir repos/vp/specs`; then `$D bugs status --specs-dir repos/vp/specs`;
+  then an INCOMPLETE append `$D bugs append --bug-id x --specs-dir
   repos/vp/specs` (omitting the fields above).
 - **PASS if:** the complete append exits 0 and appears in `bugs status --specs-dir
   repos/vp/specs`; the incomplete one exits non-zero and writes nothing.
 
 ### F-10 — Backlog governance
 - Run against the IN-REPO specs tree from F-04: `$D specs doctor --json --specs-dir
-  repos/valproj/specs` (must be valid JSON); plant the malformed item as an `## ACTIVE`
-  subsection directly in `repos/valproj/specs/backlog/BACKLOG.md` (the single source —
-  `dadaia backlog new <slug> --specs-dir repos/valproj/specs` creates the document with
-  both section headings if it does not exist yet; then edit the new subsection's
-  `**Status:**` to `candidate` and leave it with no `**Intents:**` block), then run the
-  backlog-specific doctor — `$D backlog doctor --specs-dir repos/valproj/specs` (NOT
-  `specs doctor`, which validates the single-source loose-file/consumption invariants
-  SPEC-DOC-031/035, not the ACTIVE-subsection schema; BL-SCHEMA is the `backlog doctor`
-  path). Assert its exit code directly, not through a pipe.
+  repos/valproj/specs` (must be valid JSON); plant the malformed item as an `active[]`
+  entry directly in `repos/valproj/specs/backlog/BACKLOG.json` (the single source —
+  `dadaia backlog new <slug> --specs-dir repos/valproj/specs` creates the document if it
+  does not exist yet; then edit the new entry's `status` to `candidate` and leave it
+  with no `intents[]` array), then run the backlog-specific doctor — `$D backlog doctor
+  --specs-dir repos/valproj/specs` (NOT `specs doctor`, which validates the
+  single-source loose-file/consumption invariants SPEC-DOC-031/035, not the `active[]`
+  entry schema; BL-SCHEMA is the `backlog doctor` path). Assert its exit code directly,
+  not through a pipe.
 - **PASS if:** `specs doctor --json` emits parseable JSON exit 0; and `backlog doctor`
   flags the malformed item `[ERROR] BL-SCHEMA` and exits non-zero.
 
@@ -188,7 +190,7 @@ an initialized workspace, create it:
   `next_handoff:{"agent":"human","context":<ctx>,"expected_artifact_type":"other"}`.
   `self_pull.refs` MUST list the memory atom the agent's role maps to, or the validator
   rejects it — correctly: an agent's handoff has to show it read its own memory. For
-  `agent:"qa-engineer"` that is `specs/memory/quality-assurance.md` (context-relative, and
+  `agent:"qa-engineer"` that is `specs/memory/QUALITY.md` (context-relative, and
   it exists in any scaffolded context). A ref like `AGENTS.md` alone is NOT enough
   (bug recipe-f12-minimal-valid-handoff-is-invalid: the earlier wording prescribed exactly
   that, so following the recipe verbatim produced a FAIL against a healthy product).
@@ -342,8 +344,8 @@ never exercised the live backlog path was false confidence).
   --specs-dir <ctx>/specs`.
 - **PASS if:** every emitted `intents[].ref` resolves against the live registry (no
   unresolved subjects) AND a release SPEC naming the item under `**Consumes:**` is
-  accepted by `specs doctor`, with the declared slug resolving to an `## ACTIVE`
-  subsection in `specs/backlog/BACKLOG.md`.
+  accepted by `specs doctor`, with the declared slug resolving to an `active[]` entry
+  in `specs/backlog/BACKLOG.json`.
 
 ### R-03 — Fresh specs tree is doctor-clean with no manual edits
 
@@ -388,13 +390,18 @@ never exercised the live backlog path was false confidence).
 
 ### R-13 — Producers pass their own validators (scaffold / backlog / baseline)
 
-- `specs release open v0.1.0` then `specs doctor`; `specs segment open alpha-2` then
-  doctor again; `backlog new <slug>` then `backlog doctor`; fresh context:
-  `context create` → `alive` → `specs init` → `context baseline`.
+- Hand-write a release scaffold — `mkdir -p specs/releases/v0.1.0`, a Draft `SPEC.md`
+  stub, and a `RELEASE.json` with `phase: "SPEC"` (shape: `release-state-v1`,
+  `dd-release-implement`'s `RELEASE-EVENTS.md` — `specs release open`/`specs segment
+  open` retired at T-050-21A, no CLI verb replaces them) — then `specs doctor`; add a
+  dir-based segment the same way (a top-level `segment: "alpha-2"` field, plus
+  `specs/releases/<release-id>/alpha-2/TASKS.md`) then doctor again; `backlog new
+  <slug>` then `backlog doctor`; fresh context: `context create` → `alive` → `specs
+  init` → `context baseline`.
 - **PASS if ALL of:** both doctors report 0 errors AND 0 warnings on the fresh
   scaffold (Draft + phase SPEC is the legitimate authoring state — bug
-  fresh-release-scaffold-emits-spec-doctor-warnings-042); the freshly-created ACTIVE
-  subsection in `specs/backlog/BACKLOG.md` (the single source, SPEC v0.12.0 FR3, ADR #14)
+  fresh-release-scaffold-emits-spec-doctor-warnings-042); the freshly-created `active[]`
+  entry in `specs/backlog/BACKLOG.json` (the single source, SPEC v0.12.0 FR3, ADR #14)
   is BL-SCHEMA-valid out of the box; and baseline COMPLETES after the official
   scaffold follow-up while still refusing a tree carrying operator files (bug
   context-baseline-rejects-official-scaffold-followup).

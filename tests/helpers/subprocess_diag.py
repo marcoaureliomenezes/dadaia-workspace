@@ -15,7 +15,6 @@ directly and decode.
 
 from __future__ import annotations
 
-import fcntl
 import os
 import subprocess
 import time
@@ -28,6 +27,8 @@ def drain_stderr_nonblocking(proc: subprocess.Popen[str], wait: float = 0.3) -> 
     so a plain ``proc.stderr.read()`` on a live process blocks forever. We mark the fd
     non-blocking and read what is buffered so diagnostics never hang the caller.
     """
+    import fcntl  # POSIX-only; imported lazily so Windows collection stays importable
+
     if proc.stderr is None:
         return ""
     time.sleep(wait)

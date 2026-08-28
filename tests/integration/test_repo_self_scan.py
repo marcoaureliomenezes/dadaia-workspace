@@ -26,8 +26,17 @@ authoring time (14 ``home-abs-path``, 9 ``email-address``, 5 ``ipv4-literal``, 1
 ``secret-token``), matching the SPEC v0.11.0 §1 census exactly. Shrunk to 28 rows (13
 ``home-abs-path``) at v0.12.0 T-120-03: ``tests/unit/test_backlog_ledger_writer.py``
 was deleted as a recorded supersession (its subject, ``ledger_writer.py``, retired by
-FR4) and its row removed per this test's own shrink-only contract. Two properties make
-the baseline honest, asserted in the two directions below:
+FR4) and its row removed per this test's own shrink-only contract. Shrunk to 27 rows
+at v0.5.0 T-050-08: ``tests/unit/features/bugs/test_jsonl_bug_store.py`` was deleted
+(its subject, ``JsonlBugStore``, retired by FR2) and its row removed. Shrunk to 25 rows
+at v0.5.0 T-050-18 (FR9, hooks de-slop): ``tests/integration/
+test_precommit_backlog_scoping.py`` (imported ``_run_backlog_doctor_gate``, the symbol
+this FR deletes) and ``tests/e2e/features/test_backlog_precommit.py`` (its entire
+premise — pre-commit *blocking* a bad stage — this FR deletes) were both DELETED under
+a recorded ``qa-engineer`` verdict, replaced by three CONTRACT-tier fixtures in
+``tests/contract/test_hooks_publication_boundary.py`` — their two ``email-address``
+rows removed. Two properties make the baseline honest, asserted in the two directions
+below:
 
 1. **No hit outside the baseline** (:func:`test_no_hit_outside_the_shrink_only_baseline`)
    — a NEW matching literal anywhere in the scanned scope (``dadaia_workspace/`` and
@@ -59,12 +68,13 @@ itself, discovered only because this test exists):
   (``privacy_baseline.json`` v4), proven by
   ``test_baseline_excludes_the_stdlib_pathlib_home_method_call``.
 
-``specs/_archive/**`` and ``specs/audits/_archive/**`` stay excluded — FROZEN/
-dispositioned archives. A tainted blob already published there is exempt from the real
-push gate by construction (the FROZEN<->scan invariant, ``sdd-gate-v3`` memory atom: a
-rename reuses the blob, so an archived file is never a NEW object of a future push
-range). Scanning them here would fail this sentinel forever for content the real gate
-will never re-flag.
+``specs/audits/_archive/**`` stays excluded — FROZEN/dispositioned archives (root
+specs/_archive/** retired, v0.5.0 specs-canon closure: it is no longer a v6 canon
+root member at all, so nothing is ever tracked there again). A tainted blob already
+published there is exempt from the real push gate by construction (the
+FROZEN<->scan invariant, ``sdd-gate-v3`` memory atom: a rename reuses the blob, so an
+archived file is never a NEW object of a future push range). Scanning it here would
+fail this sentinel forever for content the real gate will never re-flag.
 
 **SPEC v0.4.2 FR9/GRILL P14 — the exclusion is no longer wholesale.** A path under an
 archive prefix is added BACK into scan scope iff its blob sha is absent from ``HEAD^``'s
@@ -83,7 +93,7 @@ this module's own tracked source.
 So the scope asserted here is ``dadaia_workspace/`` + ``specs/`` (excluding both archive
 trees) + ``tests/`` + ``pyproject.toml`` — every tracked file, with ``tests/**`` alone
 carrying the shrink-only baseline exception (29 rows at authoring time, 28 after
-v0.12.0 T-120-03). Measured at the time this test was written:
+v0.12.0 T-120-03, 27 after v0.5.0 T-050-08). Measured at the time this test was written:
 ~990 files / well under 5 MB, read through ONE ``git ls-files`` subprocess call plus
 in-process file reads (no per-file subprocess) — well under a second, far inside the
 integration tier's 60 s budget.
@@ -132,7 +142,7 @@ pytestmark = [
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 _SCAN_SCOPE = ("dadaia_workspace", "specs", "tests")
 _EXTRA_PATHS = ("pyproject.toml",)
-_EXCLUDED_PREFIXES = ("specs/_archive/", "specs/audits/_archive/")
+_EXCLUDED_PREFIXES = ("specs/audits/_archive/",)
 _TIMEOUT_S = 60
 
 #: Deterministic by design — see the module docstring's "Foreign-slug layer" section.
@@ -144,10 +154,16 @@ _NO_FOREIGN_SLUGS: tuple[str, ...] = ()
 #: row here is a pre-existing, deliberate synthetic-but-pattern-shaped fixture literal
 #: (fake IPv4s, ``t@example.com``-style addresses, ``/home/...`` fixture paths, a
 #: fixture-shaped token) that predates T-110-12 — NOT a scan suppression list (see the
-#: module docstring). 28 rows (shrunk from 29 at v0.12.0 T-120-03 — the
+#: module docstring). 27 rows (shrunk from 29 at v0.12.0 T-120-03 — the
 #: ``test_backlog_ledger_writer.py`` row removed with its file, a recorded
 #: supersession): 13 ``home-abs-path``, 9 ``email-address``, 5 ``ipv4-literal``,
 #: 1 ``secret-token``. The v0.11.0 §1 census (29/14) is the authoring-time baseline.
+#:
+#: Shrunk to 25 rows at v0.5.0 T-050-18 (FR9, hooks de-slop): both
+#: ``tests/integration/test_precommit_backlog_scoping.py`` and ``tests/e2e/features/
+#: test_backlog_precommit.py`` were DELETED (their ``email-address`` rows removed with
+#: them) — 13 ``home-abs-path``, 7 ``email-address``, 4 ``ipv4-literal``,
+#: 1 ``secret-token``.
 #:
 #: SPEC v0.4.2 FR10/GRILL P15/D9 — +2 rows at T-042-11 (30 total): the baseline v5
 #: cross-platform home-path patterns (``users-abs-path``, ``windows-users-path``) each
@@ -171,7 +187,6 @@ _NO_FOREIGN_SLUGS: tuple[str, ...] = ()
 #: module's own :func:`_archive_fixture_literal` already uses — never contiguous in
 #: tracked source, so there is no longer a row for either file here.
 _TESTS_SCOPE_BASELINE: tuple[tuple[str, str], ...] = (
-    ("tests/e2e/features/test_backlog_precommit.py", "email-address"),
     ("tests/e2e/test_pre_commit_presence_gate.py", "email-address"),
     ("tests/fixtures/telemetry/sample_session_basic.jsonl", "home-abs-path"),
     ("tests/fixtures/telemetry/sample_session_malformed_mid.jsonl", "home-abs-path"),
@@ -180,10 +195,8 @@ _TESTS_SCOPE_BASELINE: tuple[tuple[str, str], ...] = (
     ("tests/integration/test_context_alive_scaffold_commit.py", "email-address"),
     ("tests/integration/test_dead_review_gate.py", "email-address"),
     ("tests/integration/test_git_subprocess.py", "email-address"),
-    ("tests/integration/test_precommit_backlog_scoping.py", "email-address"),
     ("tests/integration/test_public_assets.py", "ipv4-literal"),
     ("tests/integration/test_telemetry_end_to_end_aggregation.py", "home-abs-path"),
-    ("tests/unit/features/bugs/test_jsonl_bug_store.py", "ipv4-literal"),
     ("tests/unit/features/migrate/test_bugs_jsonl.py", "home-abs-path"),
     ("tests/unit/features/panel/test_no_auth_contract.py", "ipv4-literal"),
     ("tests/unit/features/server_registry/test_scan.py", "ipv4-literal"),
@@ -382,15 +395,15 @@ def _archive_fixture_literal() -> str:
 
 
 def test_archive_authored_blob_is_scanned_and_fails(tmp_path: Path) -> None:
-    """A9.1: a file AUTHORED directly under ``specs/_archive/`` (a genuinely new blob,
-    never published before) carrying a baseline-matching literal is scanned — and
-    fails — rather than hidden by the wholesale archive exclusion."""
+    """A9.1: a file AUTHORED directly under ``specs/audits/_archive/`` (a genuinely
+    new blob, never published before) carrying a baseline-matching literal is
+    scanned — and fails — rather than hidden by the wholesale archive exclusion."""
     repo = tmp_path / "repo"
     _init_repo(repo)
     (repo / "README.md").write_text("clean\n", encoding="utf-8")
     _commit(repo, "c1 — a real HEAD^")
 
-    archive_dir = repo / "specs" / "_archive"
+    archive_dir = repo / "specs" / "audits" / "_archive"
     archive_dir.mkdir(parents=True)
     (archive_dir / "CLOSURE.md").write_text(
         f"backed up under {_archive_fixture_literal()}\n", encoding="utf-8"
@@ -398,23 +411,23 @@ def test_archive_authored_blob_is_scanned_and_fails(tmp_path: Path) -> None:
     _commit(repo, "c2 — author a CLOSURE straight into the archive")
 
     paths = _tracked_paths(repo, ("specs",), excluded_prefixes=_EXCLUDED_PREFIXES)
-    assert "specs/_archive/CLOSURE.md" in paths, (
+    assert "specs/audits/_archive/CLOSURE.md" in paths, (
         "a genuinely new archive-authored blob must be added back into scan scope"
     )
 
     objects = [_scan_object_for(repo, path) for path in paths]
     baseline_patterns = load_baseline_patterns()
     outcome = scan_objects(objects, terms=(), patterns=baseline_patterns, slugs=_NO_FOREIGN_SLUGS)
-    assert any(hit.path == "specs/_archive/CLOSURE.md" for hit in outcome.hits), (
+    assert any(hit.path == "specs/audits/_archive/CLOSURE.md" for hit in outcome.hits), (
         "the archive-authored blob's baseline-matching literal must surface as a hit"
     )
 
 
 def test_archive_rename_of_an_existing_blob_stays_excluded(tmp_path: Path) -> None:
-    """A9.2: a ``git mv`` of an EXISTING published file into ``specs/_archive/``
-    republishes the SAME blob sha (no new object) — it must stay excluded, preserving
-    the FROZEN<->scan invariant (R5's guard against A9.1's "new" reading being too
-    loose)."""
+    """A9.2: a ``git mv`` of an EXISTING published file into
+    ``specs/audits/_archive/`` republishes the SAME blob sha (no new object) — it
+    must stay excluded, preserving the FROZEN<->scan invariant (R5's guard against
+    A9.1's "new" reading being too loose)."""
     repo = tmp_path / "repo"
     _init_repo(repo)
     (repo / "specs").mkdir()
@@ -423,12 +436,12 @@ def test_archive_rename_of_an_existing_blob_stays_excluded(tmp_path: Path) -> No
     )
     _commit(repo, "c1 — publish the doc outside the archive")
 
-    (repo / "specs" / "_archive").mkdir()
-    _git(["mv", "specs/old-doc.md", "specs/_archive/old-doc.md"], repo)
+    (repo / "specs" / "audits" / "_archive").mkdir(parents=True)
+    _git(["mv", "specs/old-doc.md", "specs/audits/_archive/old-doc.md"], repo)
     _commit(repo, "c2 — relocate into the archive via git mv")
 
     paths = _tracked_paths(repo, ("specs",), excluded_prefixes=_EXCLUDED_PREFIXES)
-    assert "specs/_archive/old-doc.md" not in paths, (
+    assert "specs/audits/_archive/old-doc.md" not in paths, (
         "a renamed/relocated blob that already existed must stay excluded"
     )
 
@@ -439,11 +452,11 @@ def test_missing_head_parent_degrades_to_prior_behaviour(tmp_path: Path) -> None
     excluded, and resolving the scope never raises."""
     repo = tmp_path / "repo"
     _init_repo(repo)
-    (repo / "specs" / "_archive").mkdir(parents=True)
-    (repo / "specs" / "_archive" / "CLOSURE.md").write_text(
+    (repo / "specs" / "audits" / "_archive").mkdir(parents=True)
+    (repo / "specs" / "audits" / "_archive" / "CLOSURE.md").write_text(
         f"backed up under {_archive_fixture_literal()}\n", encoding="utf-8"
     )
     _commit(repo, "c1 — the initial commit, no parent")
 
     paths = _tracked_paths(repo, ("specs",), excluded_prefixes=_EXCLUDED_PREFIXES)
-    assert "specs/_archive/CLOSURE.md" not in paths
+    assert "specs/audits/_archive/CLOSURE.md" not in paths

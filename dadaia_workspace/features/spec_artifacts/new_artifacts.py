@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from dadaia_workspace.core.specs_version import RELEASE_SEMVER_RE
+from dadaia_workspace.core.specs_version import is_release_semver
 
 # ── slug validation patterns ──────────────────────────────────────────────────
 # Shared pattern for the legacy release-id slug form:
@@ -30,16 +30,20 @@ from dadaia_workspace.core.specs_version import RELEASE_SEMVER_RE
 _SLUG_RE = re.compile(r"^[a-z][a-z0-9-]+$")
 
 # Canonical release-dir SemVer form REQUIRED by `specs doctor` SPEC-DOC-027 for a live
-# release dir. The compiled pattern is the shared canon (RELEASE_SEMVER_RE, imported from
-# core.specs_version — v0.1.53 FR3 centralised the previously-triplicated literal). A
-# release id must satisfy EITHER this SemVer canon (preferred) OR the legacy slug — closing
-# the bug `release-new-rejects-semver-but-doctor-requires-it`, where the old slug-only
-# validator rejected the very `vX.Y.Z` form the doctor mandates.
+# release dir. The MINT predicate is the shared canon (is_release_semver, imported from
+# core.specs_version — v0.1.53 FR3 centralised the previously-triplicated literal;
+# T-050-06A/AS-13 narrowed the mint arm to the bare, current axis only — a `v`-prefixed id
+# is the retired archive axis and is refused here, at creation). A release id must satisfy
+# EITHER this SemVer canon (preferred) OR the legacy slug — closing the bug
+# `release-new-rejects-semver-but-doctor-requires-it`, where the old slug-only validator
+# rejected the very bare-SemVer form the doctor now mandates.
 
 
 def _is_valid_release_id(release_id: str) -> bool:
-    """A release id is valid if it is the SemVer canon (``vX.Y.Z``) or the legacy slug."""
-    return bool(RELEASE_SEMVER_RE.match(release_id) or _SLUG_RE.match(release_id))
+    """A release id is valid if it is the bare SemVer canon (``X.Y.Z``) or the legacy
+    slug. A ``v``-prefixed id is the retired archive axis (AS-13) and is refused here —
+    minting always lands on the current, bare axis."""
+    return bool(is_release_semver(release_id) or _SLUG_RE.match(release_id))
 
 
 def _today() -> str:
@@ -127,8 +131,9 @@ def release_new(specs_dir: Path, release_id: str) -> NewArtifactResult:
     if not _is_valid_release_id(release_id):
         raise ValueError(
             f"Invalid release ID {release_id!r}. "
-            "Must be SemVer ^v\\d+\\.\\d+\\.\\d+$ (e.g. v0.1.23 — preferred, matches the "
-            "specs-doctor naming canon) or the legacy slug ^[a-z][a-z0-9-]+$ "
+            "Must be bare SemVer ^\\d+\\.\\d+\\.\\d+$ (e.g. 0.1.23 — preferred, matches "
+            "the specs-doctor naming canon; a `v`-prefixed id is the retired archive axis "
+            "and is refused at minting, AS-13) or the legacy slug ^[a-z][a-z0-9-]+$ "
             "(lowercase letters, digits, and hyphens; must start with a letter)."
         )
 

@@ -151,3 +151,37 @@ class GitObjectReader(Protocol):
     def new_objects(
         self, repo: Path, local_sha: str, remote_sha: str
     ) -> Iterable[ScannedObject]: ...
+
+    def list_tree_paths(self, repo: Path, sha: str, prefix: str) -> list[str]:
+        """Every FILE path (blobs only, never a tree entry) reachable under *prefix*
+        in *sha*'s tree, repo-relative POSIX paths (v0.5.0 specs-canon closure,
+        operator ruling 2026-08-28) — ``git ls-tree -r --name-only --full-tree <sha>
+        -- <prefix>``.
+
+        The one caller (``features.chokepoints.service.push_gate_decision``'s
+        specs-canon policy step) feeds each returned path straight into
+        ``features.specs.specs_canon.canon_violations`` — never a filesystem walk,
+        since a pushed sha is not necessarily checked out on disk. Raises
+        :class:`GitObjectReadError` on any git failure (a policy gate never skips
+        what it cannot evaluate), including an *sha* that fails the same shape check
+        :func:`~dadaia_workspace.infrastructure.git_objects._is_resolvable_commit`
+        already applies elsewhere in this module (CWE-88 — never interpolated
+        unchecked into a git argv).
+        """
+        ...
+
+    def first_parent(self, repo: Path, sha: str) -> str | None:
+        """*sha*'s first parent commit sha, or ``None`` when *sha* has no parent (a
+        root commit) or does not resolve at all (v0.5.0 specs-canon closure).
+
+        Feeds the SPEC-DOC-044 stale-verdict business rule
+        (``features.specs.specs_canon.verdict_violations``) — both the doctor (via a
+        CLI-resolved ``head_sha``/``first_parent(head_sha)`` pair, passed as plain
+        data into :class:`~dadaia_workspace.features.specs.doctor.SpecsDoctor`, never
+        a live git handle) and the push gate (via *this* port, injected exactly like
+        :meth:`new_objects`) share this one resolver. Deliberately never raises on a
+        missing parent — a root commit or an unresolvable sha both legitimately
+        answer "no parent" for this grace-window lookup, which is not itself a
+        security-relevant refusal path (unlike :meth:`list_tree_paths`).
+        """
+        ...

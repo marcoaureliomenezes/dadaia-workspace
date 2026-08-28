@@ -33,7 +33,7 @@ Scope is deliberately narrow — do NOT read "every script under public/scripts/
   it has no package canonical to mirror at all, so it is outside this contract's scope
   entirely, not merely excluded. ``lint-skill-collisions.py`` was the same shape and is
   RETIRED (FR9/T-044-15, v0.4.4): its logic is ported into
-  ``tests/contract/test_rules_skills_map.py``, the one deterministic enforcer that
+  ``tests/contract/test_behavior_map.py``, the one deterministic enforcer that
   replaces it — no projected script mirrors it any more.
 """
 
