@@ -100,8 +100,8 @@ message tells you which rule fired. The SDD-gate stage's block reasons:
   rights require the operator binding once:
   `dadaia context bind <ctx> --mode implementation`.
 - **MEMORY phase** — `specs/memory/` is writable only in DEFINITION/CLOSURE phase.
-- **FROZEN / PROTECTED** — `specs/_archive/` is read-only; `.dadaia/sessions/` is
-  CLI-owned (never write it via file tools).
+- **FROZEN / PROTECTED** — `specs/{backlog,bugs,audits}/_archive/` is read-only;
+  `.dadaia/sessions/` is CLI-owned (never write it via file tools).
 
 A live foreign session's presence on the same context never blocks — the write is
 **allowed** and a single throttled advisory warning is surfaced naming the other

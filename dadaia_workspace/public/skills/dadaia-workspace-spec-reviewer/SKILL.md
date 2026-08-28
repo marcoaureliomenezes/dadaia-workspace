@@ -34,8 +34,8 @@ TASKS → CLOSURE) and the atomic memory contract.
      present, must match the Markdown frontmatter.
    - **Feature atom structure** — each `memory/product/<area>/<slug>.md` contains the required
      feature sections: `Purpose`, `Usage flow`, `Typical trigger`, `Differentiator`,
-     `Runtime state touched`, and `Dependencies` (English canon, `.heading-allowlist`).
-     Missing any of these is a finding.
+     `Runtime state touched`, and `Dependencies` (English canon, curated headings only —
+     `specs/memory/AGENTS.md`'s heading rule). Missing any of these is a finding.
    - **No external image references** — the v6 canon root carries no `assets/` member;
      a diagram belongs in-doc as a fenced Mermaid block (`ARCHITECTURE.md`'s own
      `## Architecture Diagrams` section is the pattern), never an `<img>` reference to

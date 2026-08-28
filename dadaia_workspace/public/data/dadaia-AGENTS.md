@@ -7,7 +7,7 @@ scratch. Treat it as operational state, **not** product source.
 ## Canonical folder law
 
 `.dadaia/` may contain **only** the canonical subdirectories in the table below,
-plus dotfiles at the `.dadaia` level (e.g. `.gitkeep`). **Every other directory
+plus dotfiles at the `.dadaia` level (e.g. `.gitignore`). **Every other directory
 is slop and is forbidden** — the ROOT-4 doctor invariant blocks unknown
 subdirs, and `dadaia reconcile` quarantines known-legacy ones into
 `.dadaia/tmp/legacy-quarantine/` (moved, never deleted). Do not create a new

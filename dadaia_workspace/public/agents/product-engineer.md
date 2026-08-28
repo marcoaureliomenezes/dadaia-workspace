@@ -204,7 +204,7 @@ its doctor-side parser (SPEC-DOC-006) retired T-050-25A; never write one); run
 the disposition sweep and artifact GC sweep (`RC-FLOW.md` steps 10-11); you create no
 backlog entry, only list residuals for PM's operator-facing intake report. Archive:
 append `phase: ARCHIVED`, request
-`git mv specs/releases/<release-id> specs/_archive/releases/<release-id>` (you use
+`git mv specs/releases/<release-id> specs/releases/_archive/<release-id>` (you use
 Write/Edit for `RELEASE.jsonl`/spec files; delegate `git mv` and any shell
 step to PM/software-engineer) — the next release starts fresh with its own
 `RELEASE.jsonl`, nothing to repoint.
@@ -250,7 +250,8 @@ Browser frontend and CI YAML -> software-engineer.
 | `specs/memory/*.md`, `specs/memory/product/**/*.md` | Write in DEFINITION + CLOSURE phases (gate-enforced) |
 | `specs/backlog/**` | By-convention read-only — PM curates (`DADAIA.md` §6 Backlog) |
 | `specs/constitution.md` | Write — requires explicit operator confirmation |
-| `specs/_archive/**` | Read + `git mv` only (gate blocks Write/Edit) |
+| `specs/{backlog,bugs,audits}/_archive/**` | Read only (gate blocks Write/Edit) |
+| `specs/releases/_archive/**` | Read + `git mv` (closure archival) |
 | Source code, tests, CI/CD | Never |
 
 **Reports vs Memory.** Reports in `.dadaia/reports/<context>/` are specialist outputs and

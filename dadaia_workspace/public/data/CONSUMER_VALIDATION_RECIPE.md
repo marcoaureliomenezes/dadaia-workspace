@@ -126,7 +126,7 @@ an initialized workspace, create it:
   bare root `specs/...` write is intercepted FIRST by the root-whitelist (that is a
   separate, correct decision, asserted on its own):
   - `repos/valproj/specs/bugs/x.md` (ADDITIVE) → expect `allow`;
-  - `repos/valproj/specs/_archive/x.md` (FROZEN) → expect `block`;
+  - `repos/valproj/specs/bugs/_archive/x.jsonl` (FROZEN) → expect `block`;
   - `.dadaia/sessions/x` (PROTECTED) → expect `block`;
   - `newdir/x.md` (new top-level root entry) → expect `block` naming the root
     whitelist.

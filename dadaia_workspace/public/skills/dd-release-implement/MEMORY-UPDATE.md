@@ -43,8 +43,8 @@ touching any `specs/memory/**` atom at closure. Carries forward `CLOSURE-CHECKS.
    - `<area>/<feature-slug>.md` — one Markdown atom per production feature: Purpose (2–3
      paragraphs, functionally), Usage flow (3–5 numbered steps, optional Mermaid),
      Typical trigger (1 sentence), Differentiator (the problem it solves), Runtime state
-     touched (files/dirs touched), Dependencies (run order) — English canon,
-     `.heading-allowlist`.
+     touched (files/dirs touched), Dependencies (run order) — English canon, curated
+     headings only (`specs/memory/AGENTS.md`'s heading rule).
    - The top-level trio's scaffold source is
      `dadaia_workspace/public/scaffold/memory/ARCHITECTURE.md`,
      `dadaia_workspace/public/scaffold/memory/TECHSTACK.md` (source and dest share the

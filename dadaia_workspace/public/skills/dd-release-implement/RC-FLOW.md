@@ -91,11 +91,11 @@ merges the whole scope, rc-N rounds are fixes, the final rc ships).
       symlinked directory.
     *Done when:* the `closure-artifact-gc` `note` record states kept/deleted counts per
     artifact class, with evidence.
-12. **Archive.** `git mv specs/releases/<release-id> specs/_archive/releases/<release-id>`;
+12. **Archive.** `git mv specs/releases/<release-id> specs/releases/_archive/<release-id>`;
     append `phase: ARCHIVED` to the now-archived `RELEASE.jsonl` — nothing to repoint,
     the next release starts fresh with its own `RELEASE.jsonl`. *Done when:* the
-    release directory is under `_archive/`, in the same commit as steps 8–11 (memory →
-    closure narrative → sweep → archive, one commit).
+    release directory is under `releases/_archive/`, in the same commit as steps 8–11
+    (memory → closure narrative → sweep → archive, one commit).
 13. **Ship PR.** Open `develop` → `main`. On merge, append the `shipped` milestone
     (`RELEASE-EVENTS.md`). *Done when:* it merges — mechanics, the security-verdict PR
     gate, and CI: `DADAIA.md` §4 Gitflow, `dd-gitflow-default`.
