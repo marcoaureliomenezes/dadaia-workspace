@@ -253,7 +253,14 @@ and the QA verdict judge the delta **higher-value per line** than what it replac
 
 ## Ship-without-publish record
 
-**To be filled at T-045-41** — this section records A16.8's three verifications (capture
+**Where V12 lands.** This directory is archived at T-045-39 (below), and `specs/_archive/`
+is FROZEN — so the three verifications are captured at T-045-41 and recorded as a `note`
+record in the live release's `RELEASE.jsonl` (`specs/releases/0.5.0/`), keyed
+`v0.4.5-ship-without-publish`, and in the archived-releases histo line for `v0.4.5`. What is
+already checkable at `f6373f87` (rc-1 on `develop`): `pyproject.toml` reads `0.4.5`
+(T-045-40's bump rode rc-1), `git tag -l v0.4.5` is empty, `release.yml` untouched.
+
+This section originally read: **To be filled at T-045-41** — this section records A16.8's three verifications (capture
 **V12**), which are only checkable after the `develop` → `main` merge fires `release.yml`.
 The three verifications owed are:
 
