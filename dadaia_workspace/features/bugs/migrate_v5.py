@@ -305,7 +305,6 @@ LEGACY_SURFACE_MAP: Mapping[str, str] = {
     "sdd-spec-gate.sh (backlog-ownership branch) + dadaia backlog CLI": "backlog",
     "dadaia backlog subjects / backlog doctor fail-closed classifier": "backlog",
     "backlog README": "backlog",
-    "specs/backlog/remote-bugs/*.md intake": "backlog",
     "pre-commit hook (backlog doctor / BL-SCHEMA gate)": "backlog",
     # certification ("dadaia certify" itself is the seed row above)
     "dadaia certify --json": "certification",

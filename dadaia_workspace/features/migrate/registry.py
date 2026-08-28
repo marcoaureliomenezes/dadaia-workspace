@@ -41,8 +41,8 @@ def migrate_canon_v6_stamp(specs_dir: Path, *, dry_run: bool = False) -> Migrate
     result = MigrateResult(dry_run=dry_run)
     result.skipped.append(
         "v5 -> v6 is a stamp-only hop: run `dadaia specs doctor --recipe` for the "
-        "canon-shape steps (memory file renames, specs/assets/ retirement, "
-        "specs/backlog/remote-bugs/ removal) and apply them by hand."
+        "canon-shape steps (memory file renames, specs/assets/ retirement) and "
+        "apply them by hand."
     )
     return result
 
@@ -94,9 +94,9 @@ REGISTRY: tuple[MigrationStep, ...] = (
     # v0.5.0 T-050-06A: CANONICAL_SPECS_VERSION 5 -> 6 (canon-v6 tree shape, FR1). FR1
     # explicitly retires `specs upgrade`'s automated-rename surface (software-architect
     # change 3, specs/releases/0.5.0/SPEC.md FR1) — the canon-v6 shape changes (memory
-    # file renames, specs/assets/ retirement, specs/backlog/remote-bugs/ removal) are
-    # `specs doctor --recipe` steps, applied BY HAND (as this repo's own T-050-06
-    # migration did), never automated here. This step carries NO filesystem action of
+    # file renames, specs/assets/ retirement) are `specs doctor --recipe` steps,
+    # applied BY HAND (as this repo's own T-050-06 migration did), never automated
+    # here. This step carries NO filesystem action of
     # its own; it exists ONLY so the registry chain still resolves current=5 -> target=6
     # and the version stamp stays reachable for a tree already at v5 — an omitted step
     # here would make `dadaia specs upgrade` (and its dry-run) raise

@@ -450,9 +450,9 @@ class GovernanceValidator:
         ``BACKLOG.md``, with ``## ACTIVE`` + ``## LEDGER``" (ADR #14); a loose per-entry
         file is now itself the drift signal, regardless of any status text it carries —
         either a stray survivor of the v0.12.0 consolidation, or a file hand-authored
-        outside ``dadaia backlog new``. ``specs/backlog/_archive/`` and
-        ``specs/backlog/remote-bugs/`` are excluded (non-recursive glob already skips
-        both — they are subdirectories, not ``*.md`` siblings).
+        outside ``dadaia backlog new``. ``specs/backlog/_archive/`` is excluded
+        (non-recursive glob already skips it — it is a subdirectory, not a
+        ``*.md`` sibling).
         """
         backlog_dir = self.specs_dir / "backlog"
         if not backlog_dir.is_dir():
