@@ -10,6 +10,31 @@ description: "Use when: loading dadaia-workspace specs in canonical order for im
 Resolve the active Spec Context Project, the active release, and load the right specs in
 canonical order for the current task.
 
+## Directory reference
+
+```
+specs/
+├── constitution.md              ← absolute laws of the product — read first, always
+├── memory/
+│   ├── architecture.md        ← layer rules, modules, dependency contracts
+│   ├── tech-stack.md          ← approved technologies and constraints
+│   └── product/                 ← FOLDER catalog (functional view)
+│       ├── index.md             ← entry point: vision, users, ordered feature catalog with links
+│       ├── catalog.json         ← generated machine-readable feature catalog
+│       └── <feature-slug>.md    ← one Markdown atom per feature in production
+├── assets/<scope>/<id>.png      ← screenshots referenced by memory Markdown
+├── releases/
+│   ├── ACTIVE.md                ← which release is active and in which phase
+│   └── <release-id>/{SPEC,PLAN,TASKS,CLOSURE}.md
+├── backlog/
+│   ├── BACKLOG.md                ← single source: ## ACTIVE (candidates) + ## LEDGER (closed)
+│   └── _archive/                 ← superseded entry files, historical (git mv only)
+└── _archive/                    ← archived releases, legacy features/memory/root (read-only)
+```
+
+Status-token lifecycle (`Draft` → `Em revisão` → `Aprovado`): `DADAIA.md` §6 —
+referenced, not restated.
+
 ## Workflow
 
 1. **Resolve workspace context.**

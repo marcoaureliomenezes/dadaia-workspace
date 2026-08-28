@@ -65,6 +65,20 @@ class JsonlBugStore:
         Malformed JSON lines and records failing model parse are skipped with a logged
         WARN — a single corrupt line never breaks the whole stream (mirrors the
         corrupt-record tolerance in ``JsonLifecycleRunStore.list_runs``).
+
+        Splits on ``"\\n"`` only — never ``str.splitlines()`` (v0.4.5 FR7, bug
+        ``bug-event-field-with-unicode-line-separator-silently-drops-the-event``).
+        JSONL is a strict newline-delimited format: exactly one physical ``"\\n"``
+        terminates a record, and JSON permits every code point ``splitlines()``
+        additionally treats as a terminator (U+000B/U+000C/U+001C-U+001E/U+0085/
+        U+2028/U+2029) to appear unescaped inside a string. ``str.splitlines()`` is a
+        general text-processing helper, not a line-delimited-format reader — using it
+        here fragmented any record whose field happened to carry one of those bytes
+        into two unparseable halves, silently dropping the whole event. Written events
+        no longer carry these bytes at all (``core.models.bugs.redact_text`` strips
+        them at the write seam), but this read-side fix is the actual root cause: any
+        writer, present or future, that ever emits one of these bytes must still be
+        read correctly.
         """
         for path in self._sorted_files():
             try:
@@ -72,7 +86,7 @@ class JsonlBugStore:
             except OSError as exc:
                 _LOG.warning("skipping unreadable bug log %s: %s", path, exc)
                 continue
-            for line in text.splitlines():
+            for line in text.split("\n"):
                 stripped = line.strip()
                 if not stripped:
                     continue

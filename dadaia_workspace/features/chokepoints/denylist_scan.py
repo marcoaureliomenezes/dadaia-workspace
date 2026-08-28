@@ -112,10 +112,22 @@ def _mask(term: str) -> str:
 
 
 def compile_slug_patterns(slugs: Iterable[str]) -> list[tuple[str, re.Pattern[str]]]:
-    """Word-boundary regex per slug (A3.3) — a short slug never matches inside a longer
-    word. Case-insensitive (``re.IGNORECASE``), matching the operator-term layer's
-    case-insensitive substring match — a foreign slug referenced with different casing
-    (``MyClient`` vs ``myclient``) is still caught (code-reviewer LOW finding).
+    """Whole-token regex per slug (T-045-35) — a slug is a hit only as a whole token,
+    never a mere substring glued onto a longer hyphenated/dotted identifier. Python's
+    ``\\b`` treats ``-`` and ``.`` as non-word delimiters, so a plain ``\\bslug\\b``
+    anchor (the pre-fix shape) matches a hyphenated slug INSIDE ``<slug>-anything`` and
+    ``<slug>.ext`` — every ``repos/`` slug is itself hyphenated, so this flagged the
+    library's own tracked asset basenames and ledger bug ids as private-name
+    publications (architect ruling:
+    ``specs/releases/v0.4.5/reviews/T-045-35-foreign-slug-ruling.md``). The lookaround
+    bounds the match to token edges instead: not preceded by a word char or ``-``, not
+    preceded by a dotted continuation (``word.``), not followed by a word char or
+    ``-``, not followed by a dotted continuation (``.word``). A bare slug in prose or a
+    slug bounded by ``/`` still matches; ``<slug>-x``, ``x-<slug>``, ``<slug>.ext`` and
+    ``pkg.<slug>`` do not — those are other identifiers. Case-insensitive
+    (``re.IGNORECASE``), matching the operator-term layer's case-insensitive substring
+    match — a foreign slug referenced with different casing (``MyClient`` vs
+    ``myclient``) is still caught (code-reviewer LOW finding).
 
     Public (SPEC v0.4.2 FR4/GRILL D3): the SAME compiled matcher the gate-side path
     masker (``features.chokepoints.service._PathMasker``) consumes for
@@ -123,7 +135,15 @@ def compile_slug_patterns(slugs: Iterable[str]) -> list[tuple[str, re.Pattern[st
     a second, narrower predicate promised to stay in sync by convention.
     """
     return [
-        (slug, re.compile(r"\b" + re.escape(slug) + r"\b", re.IGNORECASE)) for slug in slugs if slug
+        (
+            slug,
+            re.compile(
+                r"(?<![\w-])(?<!\w\.)" + re.escape(slug) + r"(?![\w-])(?!\.\w)",
+                re.IGNORECASE,
+            ),
+        )
+        for slug in slugs
+        if slug
     ]
 
 

@@ -44,6 +44,7 @@ from pathlib import Path
 import pytest
 
 from tests.fixtures.harness_env import ALLOWLISTED_DADAIA_ENV, HOOK_MODULES
+from tests.helpers.scan_population import assert_populated
 
 pytestmark = pytest.mark.contract
 
@@ -66,6 +67,11 @@ def _iter_test_files() -> list[Path]:
         if "__pycache__" in path.parts or "node_modules" in path.parts:
             continue
         files.append(path)
+    # v0.4.5 FR5 (scan-test-vacuity-guard): a mis-rooted _TESTS_ROOT would degrade this
+    # walk to an empty list, under which both _scan_env_violations() and
+    # _scan_hook_behavior_violations() below return {} and their `== {}` assertions pass
+    # VACUOUSLY GREEN. This file is itself a tests/** module, so it is its own sentinel.
+    assert_populated(files, sentinel=Path(__file__))
     return files
 
 

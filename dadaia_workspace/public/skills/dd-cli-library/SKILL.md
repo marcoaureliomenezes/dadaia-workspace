@@ -6,7 +6,7 @@ description: >
   a bug, or discover any command. The CLI is self-documenting; this is the map plus the
   few non-obvious idioms. Granted to every shell-capable agent (any agent whose tools
   include `Bash`); the two shell-less roles (`product-engineer`, `software-architect`)
-  carry no grant — see §Reachability below.
+  are ungranted — see §Reachability below.
 ---
 
 # Skill: dd-cli-library

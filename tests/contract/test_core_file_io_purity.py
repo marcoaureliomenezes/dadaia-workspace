@@ -38,6 +38,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.helpers.scan_population import assert_populated
+
 pytestmark = pytest.mark.contract
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -48,9 +50,19 @@ _CORE_DIR = _REPO_ROOT / "dadaia_workspace" / "core"
 # placeholder atoms from old-scaffold trees (v0.2.9 — the one home both repair surfaces,
 # features.specs and features.migrate, may import without a forbidden sibling edge);
 # specs_resolver + workspace_resolver walk
-# the filesystem). architecture.md pins this exact set.
+# the filesystem; atomic_write (v0.4.5 FR2/T-045-12, architect ruling AR-1: UPHOLD D5) is
+# the single atomic tmp-file + os.replace primitive for hooks/infrastructure/features —
+# same precedent as specs_repair, exercised deliberately per this ratchet's own
+# prescribed path, not re-opened by accident). architecture.md pins this exact set.
 _AUTHORIZED_STEMS: frozenset[str] = frozenset(
-    {"specs_backup", "specs_repair", "specs_version", "specs_resolver", "workspace_resolver"}
+    {
+        "specs_backup",
+        "specs_repair",
+        "specs_version",
+        "specs_resolver",
+        "workspace_resolver",
+        "atomic_write",
+    }
 )
 
 # pathlib.Path (and os.PathLike) write/read/traversal helpers flagged by attribute name.
@@ -100,8 +112,12 @@ def test_core_file_io_purity_ratchet_and_authorized_set_grounded() -> None:
     """No unauthorized ``core/`` module performs file I/O (the ratchet is GREEN), and
     every authorized stem names a real ``core/`` module (no stale exception — a stem
     that no longer maps to a file would silently widen the exception surface)."""
+    modules = _core_modules()
+    # v0.4.5 FR5 (scan-test-vacuity-guard): a mis-rooted _CORE_DIR would degrade this
+    # walk to zero modules, under which `assert not violations` below passes vacuously.
+    assert_populated(modules, sentinel=_CORE_DIR / "atomic_write.py")
     violations: list[str] = []
-    for module in _core_modules():
+    for module in modules:
         if module.stem in _AUTHORIZED_STEMS:
             continue
         for lineno, description in _file_io_offenses(module.read_text(encoding="utf-8")):

@@ -19,21 +19,24 @@ import shutil
 import uuid
 from pathlib import Path
 
-#: ``.dadaia/`` top-level subdirs known to be legacy leftovers of earlier versions.
-#: Only names on this list are ever quarantined — unknown dirs keep failing ROOT-4
-#: loudly (that is the invariant working, and operator-created dirs are never touched
-#: implicitly).
-LEGACY_DADAIA_SUBDIRS: frozenset[str] = frozenset(
+from dadaia_workspace.core import workspace_layout
+
+#: Legacy leftover names — raw quarantine candidates, filtered below by what is canonical.
+_LEGACY_DADAIA_CANDIDATES: frozenset[str] = frozenset(
     {
         "bugs",  # legacy bug store — superseded by specs/bugs/bugs.jsonl
         "src",  # legacy stray (repos.xlsx belongs in public/data)
         "locks",  # retired by the NO-LOCKS doctrine
-        # Retired ROOT-4 junk-drawer dirs (bug doctor-whitelist-legitimizes-slop-dirs):
-        # no architectural purpose — MCP state -> mcps/, evidence -> tmp/<agent>/<date>/.
-        "figma-bridge",
-        "imgs",
-        "references",
+        "figma-bridge",  # retired junk-drawer entry (bug doctor-whitelist-legitimizes-slop-dirs)
+        "imgs",  # retired junk-drawer entry (same bug)
+        "references",  # retired there too, then RE-SANCTIONED (operator ruling O4, T-045-23)
     }
+)
+
+#: DERIVED — never re-duplicate a canonical name here (bug
+#: dadaia-reconcile-quarantines-sanctioned-references-clone).
+LEGACY_DADAIA_SUBDIRS: frozenset[str] = (
+    _LEGACY_DADAIA_CANDIDATES - workspace_layout.DADAIA_ALLOWED_SUBDIRS
 )
 
 

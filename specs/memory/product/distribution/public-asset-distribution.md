@@ -3,15 +3,15 @@ slug: public-asset-distribution
 title: public-asset-distribution
 category: product
 tldr: canonical public assets, whole skill folders included, staged to .dadaia/agentic and projected to Claude Code, Codex, Kimi Code and .agents roots.
-summary: Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, universal skills projected as whole folders (SKILL.md plus every disclosed sibling) to one canonical .agents/skills home with no registry entry, the one-load-per-harness law projection, the thin-wrapper contract that keeps every public/scripts file an entry point over the package implementation, repo templates copied at alive() (repo-AGENTS.md, with destination-file symlink refusal at every write site, plus a conditional tests/AGENTS.md), harness-profile-aware install/doctor, render-at-install of core agents (staged generic body + resolved agent-model policy composed into both L1 projections) with a policy-aware doctor render-compare, provenance-gated consumer AGENTS fan-out (banner-canonical restored vs hand-authored left [foreign]) with lexical repo-slug containment + destination-file symlink refusal, scoped AGENTS projections, source-root hygiene guard, and runtime projection contract.
+summary: Describes the canonical public asset chain, hash-compare install overwrite, staging-vs-projected drift detection, privacy gate, universal skills projected as whole folders (SKILL.md plus every disclosed sibling) to one canonical .agents/skills home with no registry entry, the one-load-per-harness law projection, the thin-wrapper contract that keeps every public/scripts file an entry point over the package implementation, repo templates copied at alive() (repo-AGENTS.md, with destination-file symlink refusal at every write site, plus a conditional tests/AGENTS.md), harness-profile-aware install/doctor, render-at-install of core agents (staged generic body + resolved agent-model policy composed into both L1 projections) with a policy-aware doctor render-compare, provenance-gated consumer AGENTS fan-out (banner-canonical restored vs hand-authored left [foreign]) with lexical repo-slug containment + destination-file symlink refusal, scoped AGENTS projections, source-root hygiene guard, policy-only byte goldens whose asset inventory is a roster derived by scanning the real public tree, and runtime projection contract.
 tags:
 - public
 - assets
 - distribution
 - projection
 - privacy
-last_updated: '2026-08-24'
-release_origin: v0.1.65
+last_updated: '2026-08-27'
+release_origin: v0.4.5
 ---
 
 ## Purpose
@@ -119,6 +119,18 @@ model/effort correctness is asserted install-time by the lockstep integration te
 public assets with a denylist for private identifiers and reports
 `[ok] public-privacy` only when the distributed surface is clean. CI treats this
 as a release gate.
+
+**The byte goldens pin policy; a derived roster pins the inventory.** The install-target
+and profile-doctor goldens assert target-mapping rules, banners, and mode/newline
+conventions — the decisions a regen must never quietly change — and carry no per-file asset
+inventory. That dimension is a **roster scanned from `dadaia_workspace/public/**` at test
+time**, built on the asset manager's own include/exclude walk (the same enumeration
+`stage`, `install` and `doctor` use), so it can never drift from what the product really
+discovers. Adding or removing an asset therefore fails the roster and leaves both goldens
+green: a regen stops being the place an unintended policy change can hide. The **skill
+inventory** rides one derived oracle extracted from that roster and consumed by every check
+that needs it, so a skill added, renamed or removed is answered by the tree itself rather
+than by a hand-kept list beside it ([[quality-assurance]]).
 
 Install-all and doctor are **harness-profile-aware**. When
 `.dadaia/states/harness_profile.json` exists (written by `dadaia init --harness <set>` —

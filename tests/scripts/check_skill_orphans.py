@@ -6,9 +6,29 @@ import re
 import sys
 from pathlib import Path
 
+from tests.helpers.skill_inventory_oracle import skill_names
+
 _ROOT = Path(os.environ.get("DADAIA_WORKSPACE_ROOT", Path(__file__).resolve().parent.parent.parent))
 _SKILLS_DIR = _ROOT / "dadaia_workspace" / "public" / "skills"
 _AGENTS_DIR = _ROOT / "dadaia_workspace" / "public" / "agents"
+
+
+def _all_skills(skills_dir: Path = _SKILLS_DIR) -> set[str]:
+    """The exact skill-directory roster, derived by the one shared oracle (v0.4.5 FR4)
+    — never a second, independently-maintained ``skills_dir.iterdir()`` scan.
+
+    v0.4.5 FR5 (scan-test-vacuity-guard) deliberately does NOT add a non-empty/
+    sentinel guard here: this function is root-parameterized (``DADAIA_WORKSPACE_ROOT``)
+    and its own dedicated suite (``tests/integration/scripts/test_check_skill_orphans.py``)
+    legitimately drives it against tiny SYNTHETIC scratch trees (``__wired_skill``/
+    ``__orphan_skill``) to test the checker's own reachability logic in isolation — a
+    fixed real-skill sentinel would break that by-design scratch usage. The real-tree
+    invocation (``dadaia ci preflight`` / ``test_real_repo_orphans_match_known_exemption_or_none``)
+    is instead guarded by ``tests/integration/test_public_assets.py``'s FR4 fixture and
+    by the real-repo wiring test itself failing loudly on an empty/broken tree (zero
+    skills -> zero orphans is caught by the exemption-set equality assertion there).
+    """
+    return skill_names(skills_dir.parent)
 
 
 def _referenced_skills() -> set[str]:
@@ -59,8 +79,7 @@ def _disable_model_invocation_skills() -> set[str]:
 
 
 def main() -> int:
-    all_skills = {d.name for d in _SKILLS_DIR.iterdir() if d.is_dir()}
-    orphans = sorted(all_skills - _referenced_skills() - _disable_model_invocation_skills())
+    orphans = sorted(_all_skills() - _referenced_skills() - _disable_model_invocation_skills())
     if orphans:
         for name in orphans:
             print(name, file=sys.stderr)

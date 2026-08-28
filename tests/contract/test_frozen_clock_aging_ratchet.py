@@ -96,6 +96,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.helpers.scan_population import assert_populated
+
 pytestmark = pytest.mark.contract
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -107,8 +109,16 @@ _ISO_DATE_PREFIX_RE = re.compile(r"^\d{4}-\d{2}-\d{2}")
 
 
 def _test_files() -> list[Path]:
-    """Every ``*.py`` under ``tests/`` (recursively), excluding cache artifacts."""
-    return sorted(p for p in _TESTS_DIR.rglob("*.py") if "__pycache__" not in p.parts)
+    """Every ``*.py`` under ``tests/`` (recursively), excluding cache artifacts and the
+    ``tests/tmp/`` scratch directory (``pyproject.toml``'s ``norecursedirs`` — transient
+    probe files other tests write/delete there at run time are not permanent ratchet
+    subjects and race with concurrent xdist workers mid-scan; see
+    ``test_test_files_excludes_tests_tmp_scratch_directory`` below)."""
+    return sorted(
+        p
+        for p in _TESTS_DIR.rglob("*.py")
+        if "__pycache__" not in p.parts and p.relative_to(_TESTS_DIR).parts[0] != "tmp"
+    )
 
 
 def _trailing_name(node: ast.expr) -> str | None:
@@ -192,12 +202,36 @@ def _offenses(source: str) -> tuple[list[tuple[int, str]], list[int]]:
     return _frozen_constants(tree), _real_clock_calls(tree)
 
 
+def test_test_files_excludes_tests_tmp_scratch_directory() -> None:
+    """Bug ``windows-xdist-workers-crash-on-unit-fast-tier`` investigation finding.
+
+    ``tests/tmp/`` is pytest's own documented scratch directory — declared in
+    ``pyproject.toml``'s ``norecursedirs`` and in ``tests/tmp/README.md`` ("excluded
+    from default pytest collection ... every test here must be deleted or promoted
+    before release closure"). Other tests write and delete real ``.py`` files there at
+    run time (``test_stewardship_mechanics.py``'s naked-quarantine xdist probe).
+    ``_test_files()`` re-implements file discovery with a raw ``Path.rglob()`` walk that
+    ignored ``norecursedirs``, so a probe file present at ``rglob()`` time but deleted by
+    a concurrent xdist worker before this ratchet's later ``path.read_text()`` call
+    raised an unhandled ``FileNotFoundError`` — an xdist scratch-path collection race,
+    never a real ratchet violation. ``tests/tmp/`` must never appear in ``_test_files()``.
+    """
+    probe = _TESTS_DIR / "tmp" / "_ratchet_probe_marker.py"
+    probe.write_text("X = 1\n", encoding="utf-8")
+    try:
+        assert probe not in _test_files()
+    finally:
+        probe.unlink(missing_ok=True)
+
+
 def test_no_file_combines_a_frozen_datetime_constant_with_a_real_clock_call() -> None:
     """No ``tests/**`` file declares a frozen datetime constant AND calls
     ``time.time()``/``datetime.now()`` in the same file — see the module docstring for the
     precise rule and why every currently-known aging site stays green under it."""
+    files = _test_files()
+    assert_populated(files, sentinel=Path(__file__))
     violations: list[str] = []
-    for path in _test_files():
+    for path in files:
         constants, clock_calls = _offenses(path.read_text(encoding="utf-8"))
         if constants and clock_calls:
             rel = path.relative_to(_REPO_ROOT)

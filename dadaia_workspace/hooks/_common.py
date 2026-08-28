@@ -20,7 +20,6 @@ import json
 import os
 import re
 import sys
-import uuid
 from pathlib import Path
 from typing import Any
 
@@ -226,13 +225,3 @@ def default_python_bin(workspace: Path) -> str:
     if sys.executable:
         return sys.executable
     return "python"
-
-
-def atomic_write_text(path: Path, text: str) -> None:
-    """Write ``text`` to ``path`` atomically via a temp file + ``os.replace`` (UTF-8).
-
-    ``os.replace`` is atomic-over-existing on both POSIX and Windows, unlike ``os.rename``.
-    """
-    tmp = path.with_suffix(f".{uuid.uuid4().hex}.tmp")
-    tmp.write_text(text, encoding="utf-8")
-    os.replace(tmp, path)

@@ -2,8 +2,8 @@
 
 The ``infrastructure`` adapter for the :class:`~dadaia_workspace.core.protocols.
 harness_profile_store.HarnessProfileStore` port, mirroring ``json_context_store.py``'s
-read/write style (atomic write via ``_atomic_write_text``, explicit ``_to_dict``/
-``_from_dict`` shaping). It persists the harness-selection profile a workspace was
+read/write style (atomic write via ``core.atomic_write.atomic_write``, explicit
+``_to_dict``/``_from_dict`` shaping). It persists the harness-selection profile a workspace was
 scaffolded for to ``.dadaia/states/harness_profile.json``:
 
     {"schema_version": "1", "harnesses": ["claude"]}
@@ -22,8 +22,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.models.harness_profile import HarnessProfile
-from dadaia_workspace.infrastructure.public_assets_common import _atomic_write_text
 
 _FILENAME = "harness_profile.json"
 
@@ -64,4 +64,4 @@ class JsonHarnessProfileStore:
         new_text = json.dumps(_to_dict(profile), indent=2)
         if path.exists() and path.read_text(encoding="utf-8") == new_text:
             return
-        _atomic_write_text(path, new_text)
+        atomic_write(path, new_text)

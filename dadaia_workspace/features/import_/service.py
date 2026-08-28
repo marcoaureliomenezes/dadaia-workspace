@@ -5,6 +5,7 @@ import sys
 import tarfile
 from pathlib import Path
 
+from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.models.import_ import ImportManifest, ImportOptions, ImportResult
 from dadaia_workspace.core.protocols.process_runner import ProcessRunner
 
@@ -132,9 +133,13 @@ class ImportService:
         data["schema_version"] = "2"
         data.pop("version", None)
 
-        tmp = contexts_file.with_suffix(".tmp")
-        tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
-        tmp.replace(contexts_file)
+        # T-045-13: core.atomic_write.atomic_write (AR-1) replaces the inline .tmp
+        # writer in place — newline=None matches this writer's original platform-
+        # default newline behaviour (no newline="" override). This was one of the
+        # three never-characterized inline writers (T-045-12's behaviour matrix); the
+        # primitive's unconditional cleanup now closes that uncharacterized gap by
+        # construction rather than leaving it open.
+        atomic_write(contexts_file, json.dumps(data, indent=2), newline=None)
 
         primary_file = workspace_root / ".dadaia" / "states" / "primary_context.json"
         if primary_file.exists():
@@ -164,9 +169,9 @@ class ImportService:
                 data = json.loads(target.read_text(encoding="utf-8"))
                 patched, count = self._rewrite_paths_in_value(data, old_posix, workspace_root)
                 if count:
-                    tmp = target.with_suffix(".tmp")
-                    tmp.write_text(json.dumps(patched, indent=2), encoding="utf-8")
-                    tmp.replace(target)
+                    # T-045-13: core.atomic_write.atomic_write (AR-1), same rationale
+                    # as patch_state's write above.
+                    atomic_write(target, json.dumps(patched, indent=2), newline=None)
             except (json.JSONDecodeError, OSError):
                 print(f"WARNING: Could not patch paths in {target}", file=sys.stderr)
 

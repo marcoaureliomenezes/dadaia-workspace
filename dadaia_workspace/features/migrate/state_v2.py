@@ -10,9 +10,10 @@ On unknown schema versions it raises ValueError.
 from __future__ import annotations
 
 import json
-import os
 from dataclasses import dataclass, field
 from pathlib import Path
+
+from dadaia_workspace.core.atomic_write import atomic_write
 
 
 @dataclass
@@ -162,10 +163,12 @@ def execute_migration(states_dir: Path, workspace_root: Path) -> None:
         "contexts": new_contexts,
     }
 
-    # Write atomically
-    tmp = ctx_file.with_suffix(".tmp")
-    tmp.write_text(json.dumps(migrated, indent=2), encoding="utf-8")
-    os.replace(tmp, ctx_file)
+    # Write atomically (T-045-13: core.atomic_write.atomic_write, AR-1). This writer
+    # never passed newline="" — platform-default newline translation, matched here by
+    # newline=None — and never cleaned up its temp sibling on an injected os.replace
+    # failure (uncharacterized gap, per the T-045-12 behaviour matrix); the primitive's
+    # cleanup is unconditional on every failure path, closing that gap by construction.
+    atomic_write(ctx_file, json.dumps(migrated, indent=2), newline=None)
 
     # Delete primary_context.json
     if primary_file.exists():

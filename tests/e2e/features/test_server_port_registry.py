@@ -1,7 +1,8 @@
 """E2E acceptance tests — Dev Server Port Registry (US-REG-001 to US-REG-007).
 
 US-REG-007 (skill file presence + content asserts) is folded into
-``test_public_pipeline.TestContentConsistency`` — presence is pinned by EXPECTED_SKILLS
+``test_public_pipeline.TestContentConsistency`` — presence is pinned by the one derived
+skill-inventory oracle (``tests.helpers.skill_inventory_oracle.skill_names``, v0.4.5 FR4)
 and the content asserts (dadaia server list/next/register/release) are folded into the
 merged content-consistency check there.
 

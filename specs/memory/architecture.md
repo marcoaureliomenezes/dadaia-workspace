@@ -6,7 +6,9 @@ tldr: Three-ring Python architecture, document-governed SDD lifecycle, no-lock b
 summary: >-
   Defines the CLI/features/infrastructure dependency structure, core ports and models,
   composition root, Spec Context boundary, handoff data plane, panel, public asset
-  projections, concurrency posture, and canonical runtime state. Accepted ignore edges
+  projections, concurrency posture, and canonical runtime state. One stdlib-pure `core`
+  primitive performs every atomic write in the package, proven by a derived census.
+  Accepted ignore edges
   ratchet only downward and are justified per edge; a projected script is a thin wrapper
   over a package implementation, never the implementation itself.
 tags:
@@ -15,8 +17,8 @@ tags:
 - dependency-rules
 - agents
 - sdd
-last_updated: '2026-08-24'
-release_origin: v0.4.2
+last_updated: '2026-08-27'
+release_origin: v0.4.5
 ---
 
 ## Overview
@@ -258,10 +260,29 @@ Playwright reports, or coverage artifacts.
 
 `core/` is stdlib-pure; file I/O is allowed only in the ratchet-authorized set:
 `specs_backup` (consumer-tree migration), `specs_version` (pattern-version stamp),
-`specs_resolver` and `workspace_resolver` (tree walks), and `specs_repair` (removal of
+`specs_resolver` and `workspace_resolver` (tree walks), `specs_repair` (removal of
 unfilled placeholder atoms from old-scaffold trees; the single home both repair
 surfaces, `features.specs` and `features.migrate`, may import without a forbidden
-sibling edge).
+sibling edge), and `atomic_write`.
+
+`core/atomic_write.py` is **the** atomic-write primitive of the package: a uuid-suffixed
+temp sibling plus `os.replace`, parameterized by preserve-mode, text-or-bytes content and
+newline policy, with **temp cleanup on every failure path, for every parameter
+combination**. It is stateless and imports nothing from `dadaia_workspace` — not even a
+`core` sibling — which is what lets `hooks/` consume it without touching the composition
+root, so the hooks-never-import-`container` latency law holds by construction and no
+sanctioned duplicate is owed anywhere. Its consumers span `features/`, `infrastructure/`
+and `hooks/`, and `core` is the only ring all three may import downward; a feature- or
+infrastructure-hosted home would have created the forbidden sibling or upward edge instead.
+The rationale rides the ratchet entry itself, on the `specs_repair` precedent — the ratchet
+is a guard against file I/O drifting into `core` by accident, and its own failure message
+prescribes this deliberate path.
+
+**One writer, proven by scan.** A census test enumerates every atomic write in the package
+and asserts each routes through the primitive: zero named per-module writers, zero inline
+`.tmp` writers, no call-through shim surviving under an old name. Hand-kept copies of one
+correctness contract are what diverged before — some cleaning their temp file on a failed
+replace and some leaking it — and a derived census is what keeps them from regrowing.
 
 ## Agent Surface
 
@@ -277,7 +298,20 @@ merge milestones are stated once in the law's gitflow section and operated by
 its rules as positive targets rather than a prohibition list, and drops anything the law
 already says — the memory-bootstrap ritual, handoff-first, the concurrency posture, the
 scope-error inventory. Where a fact genuinely has no other home it stays, and the persona
-says why. Which skill operates which law topic is declared in exactly one machine-readable
+says why. Relocation targets are the **disclosed skill siblings that already exist**: a
+block leaves a persona only when a named surviving home receives it, recorded row by row in
+the relocating release's coverage table, and a persona never loses a write-allowlist row, a
+scope boundary or a hard-stop block to a trim. Relocated content moves from the always-on
+budget into on-demand skill files, which is the point of the move.
+
+Four of the nine personas sit inside the ceiling (`code-reviewer`, `security-reviewer`,
+`project-manager`, `project-auditor`); five sit above it — `product-engineer` 279,
+`qa-engineer` 269, `ai-engineer` 252, `software-architect` 250, `software-engineer` 245
+projected lines, 2,095 across the fleet. Each overflow is content whose only home is that
+role — the SDD authorship phases, the E2E toolchain and pyramid tables, the
+harness-authoring identity, the architecture-review charter, the implementer stack and TDD
+sequence — and each carries its justification inline. The ceiling is a target the fleet is
+measured against every release, never a number a persona is silently declared to meet. Which skill operates which law topic is declared in exactly one machine-readable
 place, `public/entities/rules-skills-map.json`, enforced by one contract test that is also
 the citation check: every path and every CLI verb a public asset cites must exist
 ([[agentic-entities]]).

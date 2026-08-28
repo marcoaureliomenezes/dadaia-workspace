@@ -5,7 +5,7 @@ description: >
   or verdict. Two steps: (1) Understand the Problem, (2) Research Existing Solutions.
   PRIMARY CALLER: software-architect, in every DRAFT/REVIEW/ONBOARD mode and before
   any spec/release review verdict. Use when the architect must propose, choose, or
-  judge an approach. Keeps recommendations evidence-based, not invented.
+  judge an approach. Keeps recommendations strictly evidence-based.
 applyTo: "**"
 ---
 
