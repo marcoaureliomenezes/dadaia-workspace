@@ -45,6 +45,7 @@ import pytest
 
 from tests.fixtures.harness_env import ALLOWLISTED_DADAIA_ENV, HOOK_MODULES
 from tests.helpers.scan_population import assert_populated
+from tests.helpers.suite_files import tracked_test_files
 
 pytestmark = pytest.mark.contract
 
@@ -60,7 +61,7 @@ _ENVIRON_METHOD_CALLS: frozenset[str] = frozenset({"setdefault"})
 
 def _iter_test_files() -> list[Path]:
     files: list[Path] = []
-    for path in sorted(_TESTS_ROOT.rglob("*.py")):
+    for path in tracked_test_files(_TESTS_ROOT.parent):
         rel = path.relative_to(_TESTS_ROOT).as_posix()
         if rel == _FIXTURE_REL:
             continue  # the fixture module is the one sanctioned home

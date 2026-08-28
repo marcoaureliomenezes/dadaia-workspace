@@ -21,9 +21,10 @@ landed — through an optional ``findings_store_factory`` seam (mirrors
 ``features.agents.reader``'s ``store_factory`` DI) so this leaf-only module never gains a
 ``features -> infrastructure`` edge: the production default is a zero-dependency parse
 over the SAME model; the generic
-:class:`~dadaia_workspace.infrastructure.jsonl_record_store.JsonlRecordStore`, registered
-at :func:`~dadaia_workspace.container.build_findings_store`, is the SAME read shape the
-moment a caller injects it.
+:class:`~dadaia_workspace.infrastructure.jsonl_record_store.JsonlRecordStore` is the SAME
+read shape the moment a caller injects it — no composition-root seam wires one today
+(release 0.5.1 K9 deleted the never-called ``container.build_findings_store`` factory as
+dead code).
 """
 
 from __future__ import annotations
@@ -70,9 +71,9 @@ def _default_iter_findings(findings_path: Path) -> Iterator[FindingRecord]:
     """Zero-dependency fallback reader — one :class:`FindingRecord` per well-formed
     JSONL line of *findings_path*.
 
-    Used whenever no ``findings_store_factory`` is injected (the production default
-    until a caller wires :func:`~dadaia_workspace.container.build_findings_store` in) —
-    plain file I/O + ``json.loads`` + ``FindingRecord.from_dict``, never a hand-kept
+    Used whenever no ``findings_store_factory`` is injected (the production default —
+    no composition-root seam wires one today) — plain file I/O + ``json.loads`` +
+    ``FindingRecord.from_dict``, never a hand-kept
     field mirror (T-050-25's original ``_iter_findings`` note, now satisfied by the
     typed model instead of a bare dict). Missing file or a malformed line/record yields
     nothing for that line — this validator never raises on a corrupt/absent findings
@@ -106,9 +107,11 @@ class ClosureAuditValidator:
         findings_store_factory: Callable[[Path], RecordStore[FindingRecord]] | None = None,
     ) -> None:
         self.specs_dir = specs_dir
-        # DI seam (A13.4): injected by a composition root that wires
-        # container.build_findings_store; None keeps the zero-dependency default reader
-        # (_default_iter_findings) so this leaf module never imports infrastructure.
+        # DI seam (A13.4): a composition root could wire a JsonlRecordStore-backed
+        # factory here; none does today (release 0.5.1 K9 deleted the never-called
+        # container.build_findings_store as dead code). None keeps the
+        # zero-dependency default reader (_default_iter_findings) so this leaf
+        # module never imports infrastructure.
         self._findings_store_factory = findings_store_factory
 
     def _iter_findings(self, findings_path: Path) -> Iterator[FindingRecord]:
