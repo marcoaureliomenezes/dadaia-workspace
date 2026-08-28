@@ -39,7 +39,7 @@
     "security_tests_passed": 113,
     "glued_vs_whole_token_hits": "10 glued / 0 whole-token",
     "bug_surface_direction": "reduced",
-    "re_keyed_from": "395bfb352a4cdefa7cbbbf06d0c1908a1af38728",
+    "carried_from": "395bfb352a4cdefa7cbbbf06d0c1908a1af38728",
     "re_key_delta": "395bfb35..2a5cec96 — docs-only, 2 review files (+157), no code, no dependency, no IaC, sweep clean"
   },
   "findings": [

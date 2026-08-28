@@ -1,9 +1,0 @@
-# gitleaks configuration — extends the default ruleset.
-# Git object ids (40-hex) recorded in SDD verdict handoffs and release records are not
-# secrets; without this allowlist `generic-api-key` fires on `"re_keyed_from": "<sha>"`.
-[extend]
-useDefault = true
-
-[allowlist]
-description = "40-hex git object ids in SDD records are not credentials"
-regexes = ['''"(re_keyed_from|commit_sha|sha|reviewed_sha|head_sha)":\s*"[0-9a-f]{40}"''']
