@@ -16,6 +16,7 @@ from pathlib import Path
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.features.specs.doctor_common import resolve_active_release
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
+from dadaia_workspace.features.specs.specs_canon import CANON_ROOT_MEMBERS, is_canon_path
 from dadaia_workspace.features.specs.template_history import was_shipped
 
 # TREE-3: memory .md files that must exist.  No Jinja templates — .md is canonical source.
@@ -33,24 +34,15 @@ _TREE4_REQUIRED_DIRS = ("audits", "backlog", "bugs", "releases")
 
 # TREE-8: the v6 canon root (FR1, specs_pattern_version 5 -> 6) — nothing else is
 # conformant directly under specs/. ERROR + auto-fixable (v0.5.0 specs-canon closure):
-# a stray root entry, or any .gitkeep/dotfile anywhere inside specs/, is real drift —
-# a directory is kept by its AGENTS.md, never a placeholder file — never a WARN-only
-# migration nicety. Root-canon membership plus a full-tree dotfile sweep; nested
-# per-area member shape beyond dotfiles (e.g. the release-directory member canon of
-# A1.9) is out of this check's scope for now — left for whichever later FR
-# (FR2/FR13/FR19/FR6) extends it once that area's shape is built (T-050-05 commit).
-_TREE8_CANON_ROOT: frozenset[str] = frozenset(
-    {
-        "backlog",
-        "bugs",
-        "memory",
-        "releases",
-        "audits",
-        "ADRs",
-        "constitution.md",
-        "AGENTS.md",
-    }
-)
+# a stray root entry, or any non-canon file anywhere inside specs/ (a dotfile, a loose
+# per-entry file, a markdown ADR, an old reviews/ file, …), is real drift — a directory
+# is kept by its AGENTS.md, never a placeholder file — never a WARN-only migration
+# nicety. Root-canon membership (:data:`CANON_ROOT_MEMBERS`, imported) plus a full-tree
+# nested-shape sweep, both driven by the ONE shared predicate in
+# ``features.specs.specs_canon`` — the SAME module the pre-push gate uses
+# (``features.chokepoints.service.push_gate_decision``), never a second, hand-kept
+# member list (operator ruling 2026-08-28).
+_TREE8_CANON_ROOT: frozenset[str] = CANON_ROOT_MEMBERS
 
 #: Deprecated-layout root entries TREE-1/TREE-2 already own (loud migration hint,
 #: fixable=False by explicit design: auto-moving may destroy SDD-approved content
@@ -504,18 +496,31 @@ class StructuralValidator:
         return issues
 
     def check_tree8_canon_root(self) -> list[SpecsDoctorIssue]:
-        """TREE-8: every top-level entry directly under specs/ must be a v6 canon
-        root member (FR1, specs_pattern_version 5 -> 6): backlog/, bugs/, memory/,
-        releases/, audits/, ADRs/, constitution.md, AGENTS.md — nothing else. A
-        dotfile (e.g. a stray ``.gitkeep``) is never conformant, at the root OR
-        anywhere deeper in the tree — a directory is kept by its AGENTS.md, never a
-        placeholder file (v0.5.0 specs-canon closure).
+        """TREE-8: every path under specs/ must be v6-canon-conformant (FR1, v0.5.0
+        specs-canon closure, operator ruling 2026-08-28) — driven by the ONE shared
+        predicate in ``features.specs.specs_canon``, the SAME module the pre-push
+        gate uses (``features.chokepoints.service.push_gate_decision``), never a
+        second, hand-kept member list.
+
+        Two tiers, mirroring the pre-canon-closure two-loop shape (root membership,
+        then a full-tree sweep) but now both driven by that one predicate instead of a
+        root-only set plus a separate dotfile-only sweep:
+
+        1. **Root membership** (:data:`CANON_ROOT_MEMBERS`) — a path directly under
+           ``specs/`` whose NAME is not a v6 canon root member is flagged ONCE,
+           whether it is a file or a directory — the fix removes the whole stray
+           subtree.
+        2. **Nested canon-shape sweep** (:func:`~dadaia_workspace.features.specs
+           .specs_canon.is_canon_path`) — every FILE inside an otherwise-conformant
+           root member is checked against its full ``specs/``-relative POSIX path; a
+           non-matching file (a dotfile, a loose per-entry file, a markdown ADR, an
+           old ``reviews/`` file, …) is flagged individually — the fix removes only
+           that file, never its conformant siblings.
 
         ERROR, fixable=True (removal — mirrors :meth:`fix_repo_dadaia1`'s stray-dir
-        rmtree pattern): a stray root entry or dotfile is real drift, not a WARN-only
-        migration nicety. Root-canon membership (top-level only) plus a full-tree
-        dotfile sweep; nested per-area member shape beyond dotfiles is out of this
-        check's scope (see the module-level TREE-8 comment).
+        rmtree pattern). TREE-1/TREE-2's own deprecated ``foundation``/``SPEC.md``
+        stay exempt (``_TREE8_DEFERRED_TO_SIBLING_CHECKS``): those checks already own
+        reporting them, fixable=False by explicit design.
         """
         if not self.specs_dir.is_dir():
             return []
@@ -527,18 +532,19 @@ class StructuralValidator:
                 continue
             issues.append(self._tree8_issue(entry))
         for entry in sorted(self.specs_dir.rglob("*")):
+            if entry.is_dir():
+                continue
             # Root-level entries are already covered by the loop above (whether
-            # canon-named or not); this second pass reaches dotfiles NESTED inside an
-            # otherwise-conformant area (e.g. specs/backlog/.gitkeep) — the one shape
-            # the root-only loop never walks into. Never descend into a deprecated
-            # root TREE-1/TREE-2 owns (its own content is exempt from removal, so a
-            # dotfile inside it is exempt too — TREE-8 defers the whole subtree).
-            if entry.parent == self.specs_dir:
+            # canon-named or not); this second pass reaches every FILE nested inside
+            # an otherwise-conformant root member. Never descend into a deprecated
+            # root TREE-1/TREE-2 owns (its own content is exempt from removal), nor
+            # into a root entry the first loop already flagged as a stray whole
+            # subtree (that finding already covers everything inside it).
+            root_name = entry.relative_to(self.specs_dir).parts[0]
+            if root_name in _TREE8_DEFERRED_TO_SIBLING_CHECKS or root_name not in _TREE8_CANON_ROOT:
                 continue
-            deferred_root = entry.relative_to(self.specs_dir).parts[0]
-            if deferred_root in _TREE8_DEFERRED_TO_SIBLING_CHECKS:
-                continue
-            if entry.name.startswith("."):
+            rel_posix = entry.relative_to(self.specs_dir).as_posix()
+            if not is_canon_path(rel_posix):
                 issues.append(self._tree8_issue(entry))
         return issues
 
@@ -548,9 +554,12 @@ class StructuralValidator:
             code="TREE-8",
             severity=Severity.ERROR,
             description=(
-                f"specs/{rel} is not part of the v6 canon root (backlog/, bugs/, "
-                "memory/, releases/, audits/, ADRs/, constitution.md, AGENTS.md) or "
-                "is a stray dotfile — a directory is kept by its AGENTS.md, never a "
+                f"specs/{rel} is not part of the v6 canon (DADAIA.md §6) — either a "
+                "stray root entry (not one of backlog/, bugs/, memory/, releases/, "
+                "audits/, ADRs/, constitution.md, AGENTS.md) or a file nested inside "
+                "a canon area whose shape does not match that area's canon (a "
+                "dotfile, a loose per-entry file, a markdown ADR, an old reviews/ "
+                "file, …) — a directory is kept by its AGENTS.md, never a "
                 "placeholder. Auto-fix available (run doctor --fix) to remove it "
                 "(TREE-8)."
             ),
@@ -559,11 +568,11 @@ class StructuralValidator:
         )
 
     def fix_tree8(self, issue: SpecsDoctorIssue) -> None:
-        """Remove a stray non-canon root entry or nested dotfile (TREE-8 auto-fix).
+        """Remove a stray non-canon root entry or nested non-canon file (TREE-8 auto-fix).
 
         Tolerant of an already-removed target: fixing a non-canon root DIRECTORY
-        first (via ``rmtree``) can make a separately-reported dotfile issue nested
-        inside it vanish in the same pass — never an error, just a no-op residual.
+        first (via ``rmtree``) can make a separately-reported nested issue inside it
+        vanish in the same pass — never an error, just a no-op residual.
         """
         assert issue.code == "TREE-8"
         target = Path(issue.path)  # type: ignore[arg-type]

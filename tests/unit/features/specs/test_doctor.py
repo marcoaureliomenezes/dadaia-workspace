@@ -129,10 +129,10 @@ def _write_release_jsonl(
     (rdir / "RELEASE.json").write_text(_json.dumps(state) + "\n", encoding="utf-8")
 
 
-def _make_clean_specs_tree(root: Path, release_id: str = "r1") -> Path:
+def _make_clean_specs_tree(root: Path, release_id: str = "1.2.3") -> Path:
     """Create a minimal but valid specs/ tree using .md memory atoms."""
     specs = root / "specs"
-    (specs / "memory" / "product").mkdir(parents=True)
+    (specs / "memory" / "product" / "testarea").mkdir(parents=True)
     (specs / "releases" / release_id).mkdir(parents=True)
     (specs / "backlog").mkdir(parents=True)
 
@@ -140,7 +140,9 @@ def _make_clean_specs_tree(root: Path, release_id: str = "r1") -> Path:
     (specs / "memory" / "product" / "index.md").write_text(
         MINIMAL_MEMORY_PRODUCT_INDEX_MD, encoding="utf-8"
     )
-    (specs / "memory" / "product" / "feature-a.md").write_text(
+    # v6 canon (operator ruling 2026-08-28): memory/product/<area>/<slug>.md — the
+    # 2-level nested shape, matching the real, live product catalog tree.
+    (specs / "memory" / "product" / "testarea" / "feature-a.md").write_text(
         MINIMAL_MEMORY_PRODUCT_FEATURE_MD, encoding="utf-8"
     )
     (specs / "memory" / "ARCHITECTURE.md").write_text(
@@ -333,7 +335,7 @@ def test_fresh_scaffold_passes_all_tree_invariants(tmp_path: Path) -> None:
         ),
         pytest.param(
             "product-feature-no-heading",
-            lambda specs: (specs / "memory" / "product" / "feature-a.md").write_text(
+            lambda specs: (specs / "memory" / "product" / "testarea" / "feature-a.md").write_text(
                 "---\nslug: feature-a\ntitle: Feature A\n---\n\nNo heading here, only prose.\n",
                 encoding="utf-8",
             ),
@@ -358,7 +360,7 @@ def test_fresh_scaffold_passes_all_tree_invariants(tmp_path: Path) -> None:
         ),
         pytest.param(
             "history-heading-changelog",
-            lambda specs: (specs / "memory" / "product" / "feature-a.md").write_text(
+            lambda specs: (specs / "memory" / "product" / "testarea" / "feature-a.md").write_text(
                 "---\nslug: feature-a\ntitle: Feature A\n---\n\n## Propósito\n\nDoes A.\n\n"
                 "## Changelog\n\nHistorical details.\n",
                 encoding="utf-8",
@@ -368,7 +370,7 @@ def test_fresh_scaffold_passes_all_tree_invariants(tmp_path: Path) -> None:
         ),
         pytest.param(
             "history-heading-history",
-            lambda specs: (specs / "memory" / "product" / "feature-a.md").write_text(
+            lambda specs: (specs / "memory" / "product" / "testarea" / "feature-a.md").write_text(
                 "---\nslug: feature-a\ntitle: Feature A\n---\n\n## Propósito\n\nDoes A.\n\n"
                 "## History\n\nHistorical details.\n",
                 encoding="utf-8",
@@ -378,7 +380,7 @@ def test_fresh_scaffold_passes_all_tree_invariants(tmp_path: Path) -> None:
         ),
         pytest.param(
             "non-canonical-phase",
-            lambda specs: _write_release_jsonl(specs, "r1", "WORKING"),
+            lambda specs: _write_release_jsonl(specs, "1.2.3", "WORKING"),
             "SPEC-DOC-003",
             id="doc003-non-canonical-phase",
         ),
@@ -390,8 +392,8 @@ def test_fresh_scaffold_passes_all_tree_invariants(tmp_path: Path) -> None:
         ),
         pytest.param(
             "release-jsonl-carries-no-phase-record",
-            lambda specs: (specs / "releases" / "r1" / "RELEASE.json").write_text(
-                '{"schema":"release-state-v1","release":"r1","phase":"",'
+            lambda specs: (specs / "releases" / "1.2.3" / "RELEASE.json").write_text(
+                '{"schema":"release-state-v1","release":"1.2.3","phase":"",'
                 '"rc":null,"defined":null,"implemented":null,"shipped":null,'
                 '"audited":null,"log":[]}\n',
                 encoding="utf-8",
@@ -401,13 +403,13 @@ def test_fresh_scaffold_passes_all_tree_invariants(tmp_path: Path) -> None:
         ),
         pytest.param(
             "missing-plan-in-active-release",
-            lambda specs: (specs / "releases" / "r1" / "PLAN.md").unlink(),
+            lambda specs: (specs / "releases" / "1.2.3" / "PLAN.md").unlink(),
             "SPEC-DOC-004",
             id="doc004-missing-plan",
         ),
         pytest.param(
             "non-canonical-status",
-            lambda specs: (specs / "releases" / "r1" / "SPEC.md").write_text(
+            lambda specs: (specs / "releases" / "1.2.3" / "SPEC.md").write_text(
                 "# Spec\n\n> **Status:** Accepted\n", encoding="utf-8"
             ),
             "SPEC-DOC-004",
@@ -643,7 +645,7 @@ def test_tree4_creates_missing_dirs_others_have_no_autofix(tmp_path: Path) -> No
 
     # TREE-6: missing PLAN.md in IMPLEMENTATION phase never auto-created.
     specs6 = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-tree6"))
-    plan = specs6 / "releases" / "r1" / "PLAN.md"
+    plan = specs6 / "releases" / "1.2.3" / "PLAN.md"
     plan.unlink()
     doctor6 = SpecsDoctor(specs6, templates_dir=_TEMPLATES_DIR)
     issues6 = doctor6.check()
@@ -663,7 +665,12 @@ def test_tree4_creates_missing_dirs_others_have_no_autofix(tmp_path: Path) -> No
     issues7 = doctor7.check()
     tree7 = [i for i in issues7 if i.code == "TREE-7"]
     assert tree7 and tree7[0].severity == Severity.ERROR and not tree7[0].fixable
-    doctor7.fix(issues7)
+    # Fix only the TREE-7 finding itself (fixable=False, so this is a no-op for it) —
+    # the fuller issues7 set now ALSO carries a TREE-8 finding for this same legacy
+    # per-bug .md file (non-canon under v6: bugs/ permits only AGENTS.md/BUGS.jsonl/
+    # _archive/bugs_histo.jsonl), and TREE-8 IS fixable — invoking the full set would
+    # correctly delete it under TREE-8, which is not what this assertion is about.
+    doctor7.fix(tree7)
     assert bug_path.read_text(encoding="utf-8") == original
 
     specs7b = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-tree7-ok"))
@@ -695,8 +702,8 @@ def test_doc005_plan_line_limit_cutoff_boundary(
 ) -> None:
     specs = _make_clean_specs_tree(tmp_path)
     big = "# Plan\n\n> **Status:** Aprovado\n\n" + "\n".join(f"- line {i}" for i in range(400))
-    (specs / "releases" / "r1" / "PLAN.md").write_text(big, encoding="utf-8")
-    (specs / "releases" / "r1" / "SPEC.md").write_text(
+    (specs / "releases" / "1.2.3" / "PLAN.md").write_text(big, encoding="utf-8")
+    (specs / "releases" / "1.2.3" / "SPEC.md").write_text(
         f"# Spec\n\n> **Status:** Aprovado\n> **Created:** {created}\n", encoding="utf-8"
     )
     issues = SpecsDoctor(specs).check()
@@ -885,7 +892,7 @@ def test_cat1_sync_matrix(tmp_path: Path) -> None:
     # absent catalog, NO feature atoms (only index.md) -> silent.
     specs_b = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-b"))
     product_dir_b = specs_b / "memory" / "product"
-    (product_dir_b / "feature-a.md").unlink()
+    (product_dir_b / "testarea" / "feature-a.md").unlink()
     cat1_b = [i for i in SpecsDoctor(specs_b).check() if i.code == "CAT-1"]
     assert cat1_b == []
 

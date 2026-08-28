@@ -99,6 +99,7 @@ _FAMILY_OF_CODE: dict[str, str] = {
     "TREE-5M": "structural",
     "TREE-6": "structural",
     "TREE-7": "structural",
+    "TREE-8": "structural",
 }
 
 _ALL_FAMILIES = {

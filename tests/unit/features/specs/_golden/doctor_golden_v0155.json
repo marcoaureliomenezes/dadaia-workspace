@@ -79,6 +79,24 @@
       "severity": "warning"
     },
     {
+      "code": "TREE-8",
+      "description": "specs/audits/bad-audit-name/placeholder.md is not part of the v6 canon (DADAIA.md §6) — either a stray root entry (not one of backlog/, bugs/, memory/, releases/, audits/, ADRs/, constitution.md, AGENTS.md) or a file nested inside a canon area whose shape does not match that area's canon (a dotfile, a loose per-entry file, a markdown ADR, an old reviews/ file, …) — a directory is kept by its AGENTS.md, never a placeholder. Auto-fix available (run doctor --fix) to remove it (TREE-8).",
+      "path": "<SPECS>/audits/bad-audit-name/placeholder.md",
+      "severity": "error"
+    },
+    {
+      "code": "TREE-8",
+      "description": "specs/backlog/candidates.md is not part of the v6 canon (DADAIA.md §6) — either a stray root entry (not one of backlog/, bugs/, memory/, releases/, audits/, ADRs/, constitution.md, AGENTS.md) or a file nested inside a canon area whose shape does not match that area's canon (a dotfile, a loose per-entry file, a markdown ADR, an old reviews/ file, …) — a directory is kept by its AGENTS.md, never a placeholder. Auto-fix available (run doctor --fix) to remove it (TREE-8).",
+      "path": "<SPECS>/backlog/candidates.md",
+      "severity": "error"
+    },
+    {
+      "code": "TREE-8",
+      "description": "specs/releases/badname-release/SPEC.md is not part of the v6 canon (DADAIA.md §6) — either a stray root entry (not one of backlog/, bugs/, memory/, releases/, audits/, ADRs/, constitution.md, AGENTS.md) or a file nested inside a canon area whose shape does not match that area's canon (a dotfile, a loose per-entry file, a markdown ADR, an old reviews/ file, …) — a directory is kept by its AGENTS.md, never a placeholder. Auto-fix available (run doctor --fix) to remove it (TREE-8).",
+      "path": "<SPECS>/releases/badname-release/SPEC.md",
+      "severity": "error"
+    },
+    {
       "code": "SPECS-VERSION",
       "description": "specs_pattern_version is 0, below the canonical 6. Run: dadaia specs upgrade",
       "path": "<SPECS>/constitution.md",
@@ -111,7 +129,7 @@
   ],
   "specs_dir": "<SPECS>",
   "summary": {
-    "errors": 7,
+    "errors": 10,
     "warnings": 11
   }
 }
