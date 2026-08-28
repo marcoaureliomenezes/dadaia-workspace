@@ -35,13 +35,11 @@ code):
 * **V28** — SCAFFOLD expiry. Every `Intent: SCAFFOLD` header must carry an
   `expires: <M.m.p>` field, and the named release must not already be archived.
   The archive-membership check is an **exact** directory-name match against
-  `specs/_archive/releases/<M.m.p>` — no `v`-prefix normalization. This workspace
-  carries legacy `vM.m.p`-named archives from a numbering track that predates the
-  Gitflow-v2 no-`v`-prefix canon (`DADAIA.md` §4); normalizing the two forms
-  together would make a *coincidental* legacy archive name (for example the
-  pre-existing `specs/_archive/releases/v0.6.0`, unrelated to the yet-unshipped
-  `0.6.0` this repo's own SCAFFOLD tests expire against) falsely retire a live
-  SCAFFOLD. The canon-named exact match is the only form V28 checks.
+  `specs/releases/_archive/<M.m.p>` (v0.5.0 specs-canon closure: root
+  `specs/_archive/` retired — no directory-per-release ever lands there again
+  under the JSONL-only archive canon, so this check's real-repo self-scan is
+  permanently quiet going forward; its `tmp_path`-driven unit fixtures below still
+  exercise the pure predicate directly) — no `v`-prefix normalization.
 * **V29** — one number per parameter. `dadaia-test-stewardship/PARAMETERS.md` is
   the LARGE-cap's one canonical, literal home; every other scanned doctrine file
   either references it or carries no numeric statement of its own. Baseline (fold
@@ -259,7 +257,7 @@ def test_v28_scaffold_expiry_goes_red_against_an_archived_release(tmp_path: Path
     `expires: <M.m.p>` and names a release not yet archived (pinned: zero
     violations now — covers T-050-09's `migrate_v5_provenance_scaffold.py`,
     `expires: 0.6.0`, checked against the exact-name-match archive listing)."""
-    archive_releases_dir = _REPO_ROOT / "specs" / "_archive" / "releases"
+    archive_releases_dir = _REPO_ROOT / "specs" / "releases" / "_archive"
     violations = []
     for path in sorted(_TESTS_DIR.glob("**/test_*.py")):
         violation = _scaffold_expiry_violation(
