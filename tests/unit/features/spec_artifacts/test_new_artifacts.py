@@ -26,13 +26,13 @@ import pytest
 from dadaia_workspace.features.spec_artifacts.new_artifacts import release_new
 
 
-def test_existing_dir_raises_file_exists_error(tmp_path: Path) -> None:
-    """AC-T7-2: raises FileExistsError when dir already exists."""
+def test_existing_spec_raises_file_exists_error(tmp_path: Path) -> None:
+    """AC-T7-2: raises FileExistsError when the release's SPEC.md already exists."""
     specs = tmp_path / "specs"
-    specs.mkdir()
     (specs / "releases" / "my-feature-v1").mkdir(parents=True)
+    (specs / "releases" / "my-feature-v1" / "SPEC.md").write_text("x")
 
-    with pytest.raises(FileExistsError, match=r"already exists"):
+    with pytest.raises(FileExistsError, match=r"already minted"):
         release_new(specs, "my-feature-v1")
 
 
@@ -117,3 +117,17 @@ def test_release_new_creation_content(tmp_path: Path) -> None:
     for slug in ("hyphenated-release-v1", "release2026"):
         other_result = release_new(specs, slug)
         assert other_result.path.is_file()
+
+
+def test_release_new_accepts_a_directory_that_holds_only_verdicts(tmp_path: Path) -> None:
+    """Bug ``release-new-refuses-a-verdicts-only-lane-directory``: the bug lane commits
+    its PR verdict under ``releases/<id>/verdicts/`` before the release opens (canon
+    allows it); ``release new <id>`` must then mint SPEC.md there, not refuse."""
+    specs = tmp_path / "specs"
+    (specs / "releases" / "0.9.0" / "verdicts").mkdir(parents=True)
+    (specs / "releases" / "0.9.0" / "verdicts" / "abc.handoff.json").write_text("{}")
+
+    result = release_new(specs, "0.9.0")
+
+    assert result.path == specs / "releases" / "0.9.0" / "SPEC.md"
+    assert result.path.is_file()

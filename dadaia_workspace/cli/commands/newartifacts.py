@@ -85,7 +85,7 @@ def _resolve_specs_dir(specs_dir: str | None) -> Path:
 def release_new_cmd(
     release_id: str = typer.Argument(
         ...,
-        help="New release ID. SemVer vX.Y.Z (e.g. v0.1.23 — preferred, matches the specs-doctor canon) or the legacy slug in lowercase kebab-case (start with a letter, then a-z0-9 or hyphens).",
+        help="New release ID: bare SemVer X.Y.Z (e.g. 0.1.23 — the canon; a v prefix is refused) or the legacy slug in lowercase kebab-case.",
     ),
     specs_dir: str | None = typer.Option(
         None,
@@ -95,7 +95,7 @@ def release_new_cmd(
 ) -> None:
     """Create specs/releases/<id>/SPEC.md with canonical Draft frontmatter.
 
-    Exits non-zero if the release directory already exists (no-clobber) or if
+    Exits non-zero if the release's SPEC.md already exists (no-clobber) or if
     the release ID does not match the required slug pattern.
     """
     target = _resolve_specs_dir(specs_dir)
