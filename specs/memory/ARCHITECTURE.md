@@ -2,14 +2,9 @@
 slug: architecture
 title: Architecture Memory
 category: core
-tldr: 17 measured architecture principles, then the three-ring implementation map, resolution seam, projection chain, runtime state and diagrams.
-summary: Part 1 carries the ADR-gated architecture principles and the check that measures each; Part 2 describes the cli/features/core/infrastructure rings, the resolution seam, chokepoints, projection chain, runtime state and the live diagrams.
-tags:
-- architecture
-- layers
-- dependency-rules
-- agents
-- sdd
+tldr: 17 measured architecture principles, then the three drift-guarded diagrams of doctor classes, feature packages and panel view modules.
+summary: Part 1 carries the ADR-gated architecture principles and the check measuring each; Part 2 carries the three live-introspected diagrams.
+tags: [architecture, layers, dependency-rules, agents, sdd]
 ---
 
 ## Part 1 — Principles
@@ -45,9 +40,9 @@ ADR: none
 Rationale: hooks import it on the write hot path; one upper edge drags in the composition graph.
 
 ### P-07 · We keep features mutually independent: they compose through the container, never through sibling imports; a helper two features need lives in each.
-Measured by: `lint-imports --config setup.cfg --no-cache` — contract `features-no-cross-feature`, whose `modules =` list is asserted equal to the on-disk `dadaia_workspace/features/*/__init__.py` package set by `pytest -p no:cacheprovider tests/contract/test_import_linter_ignore_cap.py`.
+Measured by: `lint-imports --config setup.cfg --no-cache` — contract `features-no-cross-feature`, whose `modules =` list is asserted equal to the on-disk `features/*/__init__.py` package set by `pytest tests/contract/test_import_linter_ignore_cap.py`.
 ADR: none
-Rationale: a hand-kept `modules =` list hid three real sibling edges from the check that measures independence.
+Rationale: a hand-kept `modules =` list hid three real sibling edges from the check.
 
 ### P-08 · We compose the CLI through the container: a verb never imports an infrastructure adapter directly.
 Measured by: `lint-imports --config setup.cfg --no-cache` — contract `cli-no-infrastructure`.
@@ -60,286 +55,97 @@ ADR: none
 Rationale: every context bug came from a second resolution path answering differently.
 
 ### P-10 · We cap every suppressed layering edge and ratchet the cap only downward; an edge is added with its reason and the cap moved in the same commit.
-Measured by: `pytest -p no:cacheprovider tests/contract/test_import_linter_ignore_cap.py` — the test module is the cap's one numeric home.
+Measured by: `pytest tests/contract/test_import_linter_ignore_cap.py` — the test module is the cap's one numeric home.
 ADR: none
 Rationale: a pinned exception list turns every new suppression into a reviewable diff.
 
 ### P-11 · We keep `core` file-I/O pure outside an authorized set of six modules; new file I/O enters `core` only by joining that set on purpose.
-Measured by: `pytest -p no:cacheprovider tests/contract/test_core_file_io_purity.py` (AST walk; every authorized stem must exist).
+Measured by: `pytest tests/contract/test_core_file_io_purity.py` (AST walk; every authorized stem must exist).
 ADR: none
 Rationale: joining the set is legal; arriving there unnoticed is not.
 
 ### P-12 · We never import the composition root from a hook; hooks reach the resolution authority directly because they are one-shot processes on the write hot path.
-Measured by: `pytest -p no:cacheprovider tests/contract/test_hook_import_surface.py` (six hook modules plus the executed gate path, with `container` absent from `sys.modules`).
+Measured by: `pytest tests/contract/test_hook_import_surface.py` (six hook modules plus the executed gate path, with `container` absent from `sys.modules`).
 ADR: none
 Rationale: the composition graph costs seconds of import time per gated tool call.
 
 ### P-13 · We keep the architecture diagrams derived from live code: every diagrammed class, view module and feature package is introspected against the live tree.
-Measured by: `pytest -p no:cacheprovider tests/contract/test_architecture_diagrams_current.py`.
+Measured by: `pytest tests/contract/test_architecture_diagrams_current.py`.
 ADR: none
 Rationale: a diagram nobody checks is the first artifact to lie.
 
 ### P-14 · We keep the release-event fold read-only: `core/release_events.py` contains no write call and no file I/O at all.
-Measured by: `pytest -p no:cacheprovider tests/contract/test_release_events_read_only.py`.
+Measured by: `pytest tests/contract/test_release_events_read_only.py`.
 ADR: none
 Rationale: a reader that can write is a reader that can rewrite history.
 
 ### P-15 · We close the release-record envelope: exactly seven event kinds, `additionalProperties: false`, and no harness `session_id` in a governance record.
-Measured by: `pytest -p no:cacheprovider tests/contract/test_release_event_schema.py`.
+Measured by: `pytest tests/contract/test_release_event_schema.py`.
 ADR: none
 Rationale: an open envelope accumulates fields until no consumer can fold it.
 
 ### P-16 · We store no provenance a resolver cannot re-derive: a stored `resolved_commit` equals the value derived from git history.
-Measured by: `pytest -p no:cacheprovider tests/contract/test_resolved_commit_stored_equals_derived.py` (marked `slow`; runs in the `contract-coverage` job and the local preflight).
+Measured by: `pytest tests/contract/test_resolved_commit_stored_equals_derived.py` (marked `slow`; runs in the `contract-coverage` job and the local preflight).
 ADR: none
 Rationale: git is the authority for git facts; this test keeps the cache a cache.
 
 ### P-17 · We map every core skill and every scoped `AGENTS.md` source to exactly one `DADAIA.md` section, every section to at least one owner, with content hashes re-recorded only by review.
-Measured by: `pytest -p no:cacheprovider tests/contract/test_behavior_map.py` (bijection, hash tuples, citation check, invocation grants).
+Measured by: `pytest tests/contract/test_behavior_map.py` (bijection, hash tuples, citation check, invocation grants).
 ADR: none
 Rationale: law that no asset owns is law nobody applies.
 
 ## Part 2 — Implementation
 
-### Overview
-
-```mermaid
-flowchart LR
-  CLI[cli - Typer adapters] --> CT[container.py]
-  CLI --> F[features - use cases]
-  F --> C[core - models and ports]
-  CT --> F
-  CT --> I[infrastructure - adapters]
-  I --> C
-```
-
-`container.py` is the composition root; an unavoidable edge uses a function-scoped lazy import (the
-two capped `chokepoints` and `doctor_memory` edges). The workspace ships no agent-execution runtime,
-and no workspace operation blocks on another session.
-
-### Single-authority seams
-
-`core/specs_resolver.resolve_context()` — context-NAME resolution (P-09), its docstring holding the
-rung law ([[context-management]]). `core/atomic_write.py` — every atomic write, with optional
-`expected_previous` making it compare-then-swap. `core/redaction.py` — the `--redact` primitive.
-`core/release_state.py` — the `RELEASE.json` parser. `features/backlog/` — the backlog grammar.
-`features/bugs/` — every governance-field write ([[sdd-bug-backlog-governance]]). P-11 authorized
-file-I/O stems: `specs_backup`, `specs_version`, `specs_resolver`, `workspace_resolver`,
-`specs_repair`, `atomic_write`.
-
-### Feature packages and hooks
-
-The package set is the diagram below. Notable boundaries: `spec_context` carries no lease or locking
-module; `chokepoints` holds pre-commit/pre-push decision logic over injected git ports
-([[sdd-gate-v3]]); `specs` owns the validators, memory-atom lint, catalog generation and the
-`SpecsDoctor` coordinator ([[specs-doctor]]); `spec_artifacts` creates a release SPEC and nothing
-else.
-
-`hooks/pre_gate.py` composes root whitelist, venv guard and the path/phase/mode gate;
-`hooks/sdd_post_gate.py` refreshes presence and runs the nonblocking reconciler;
-`hooks/ctx_inject.py` emits the once-per-session bootstrap from the leading lines of [[tech-stack]].
-Workspace state is rooted at `.dadaia/` and nowhere else, the allowed subdirectory set being
-`_DADAIA_ALLOWED_SUBDIRS` in `features/spec_context/doctor.py`, enforced by ROOT-4, which also
-refuses a repo-local `.dadaia/`, virtualenv, cache, test-results, Playwright or coverage tree.
-Tool-initiated commits fall back to an injected `dadaia-workspace <dadaia@workspace.local>` git
-identity.
-
-### Agent surface
-
-Nine core agent roles with two dispatchers run inside the entry harness ([[agent-orchestration]]).
-Bodies are canonical Markdown under `public/agents/`, rendered at install with the resolved
-model/effort policy and projected per harness. Every core sub-agent, hook and rule file derives from
-an abstract entity in `public/entities/registry.json`, and `public/entities/behavior-map.json` binds
-each skill and scoped `AGENTS.md` to one `DADAIA.md` section (P-17) ([[agentic-entities]]).
-
-### Architecture diagrams
-
-Parsed in place by P-13's drift-guard; regenerated at the closure of any structural release that
-renames, splits, adds, removes or merges what they depict.
-
 ### `features/specs/doctor` — SpecsDoctor coordinator + validator siblings
-
-The coordinator owns `check()`/`fix()` ORDER only. Each boundary import sits in exactly one
-validator; the package carries no `spec_context` edge.
 
 ```mermaid
 classDiagram
-    class SpecsDoctor {
-        +check() list~SpecsDoctorIssue~
-        +fix() list~SpecsDoctorIssue~
-    }
-    class StructuralValidator {
-        +check_tree1_foundation()
-        +check_tree4_required_dirs()
-        +fix_tree4()
-    }
-    class MemoryValidator {
-        +check_memory_files()
-        +check_cat1_catalog_sync()
-        +check_lint1_memory_atoms()
-    }
-    class ReleaseValidator {
-        +check_active_md()
-        +check_release_semver_naming()
-        +check_phase_markers_coherence()
-    }
-    class ClosureAuditValidator {
-        +check_archive_closures()
-        +check_audit_disposition()
-        +fix_archive_dir()
-    }
-    class GovernanceValidator {
-        +check_consumed_backlog_disposition()
-        +check_bug_status_canon()
-        +check_bugs_jsonl_invariant()
-    }
-    class CoherenceValidator {
-        +check_constitution()
-        +check_constitution_file_refs()
-        +check_specs_pattern_version()
-    }
-    class doctor_types {
-        <<leaf module>>
-        Severity
-        SpecsDoctorIssue
-    }
-    class doctor_common {
-        <<leaf module>>
-        read_active_md()
-        iter_archive_release_dirs()
-    }
-
+    class SpecsDoctor
+    class StructuralValidator
+    class MemoryValidator
+    class ReleaseValidator
+    class ClosureAuditValidator
+    class GovernanceValidator
+    class CoherenceValidator
     SpecsDoctor --> StructuralValidator : owns ORDER
     SpecsDoctor --> MemoryValidator : owns ORDER
     SpecsDoctor --> ReleaseValidator : owns ORDER
     SpecsDoctor --> ClosureAuditValidator : owns ORDER
     SpecsDoctor --> GovernanceValidator : owns ORDER
     SpecsDoctor --> CoherenceValidator : owns ORDER
-    StructuralValidator ..> doctor_types : uses
-    MemoryValidator ..> doctor_types : uses
-    ReleaseValidator ..> doctor_common : uses
-    ClosureAuditValidator ..> doctor_common : uses
-    GovernanceValidator ..> doctor_common : uses
-    CoherenceValidator ..> doctor_types : uses
-
-    note for MemoryValidator "SOLE holder of the lazy infrastructure.subprocess_runner import (boundary edge)"
-    note for GovernanceValidator "SOLE holder of the features.backlog.document import — the parsed backlog model, one grammar reader"
-    note for SpecsDoctor "imports NEITHER spec_context NOR subprocess_runner — no cross-feature edge of its own"
+    note for MemoryValidator "sole lazy infrastructure.subprocess_runner import"
+    note for GovernanceValidator "sole features.backlog.document import"
+    note for SpecsDoctor "imports neither spec_context nor subprocess_runner"
 ```
 
 ### `dadaia_workspace/features` — package map (24 packages)
 
-The parenthetical count is the drift-guard's pinned lookup key. The guard is forward-only for
-packages, which is why regeneration is a stated closure step.
-
 ```mermaid
 flowchart TB
-    subgraph features["dadaia_workspace/features — 24 packages"]
-        academy["academy"]
-        agents["agents"]
-        backlog["backlog"]
-        bugs["bugs"]
-        capabilities["capabilities"]
-        certification["certification"]
-        chokepoints["chokepoints"]
-        ci_preflight["ci_preflight"]
-        export["export"]
-        import_["import_"]
-        migrate["migrate"]
-        panel["panel"]
-        public["public"]
-        reconcile["reconcile"]
-        reports["reports"]
-        repos["repos"]
-        server_registry["server_registry"]
-        spec_artifacts["spec_artifacts"]
-        spec_context["spec_context"]
-        specs["specs"]
-        telemetry["telemetry"]
-        tmp_gc["tmp_gc"]
-        workspace["workspace"]
-        workspace_clean["workspace_clean"]
+    subgraph features["dadaia_workspace/features"]
+      pkgs["academy · agents · backlog · bugs · capabilities · certification · chokepoints · ci_preflight · export · import_ · migrate · panel · public · reconcile · reports · repos · server_registry · spec_artifacts · spec_context · specs · telemetry · tmp_gc · workspace · workspace_clean"]
+      subs["reports submodules — next · retention · validation"]
     end
-
-    subgraph reports_pkg["features/reports — flat submodules"]
-        next["next"]
-        retention["retention"]
-        validation["validation"]
-    end
-
-    reports --> reports_pkg
-    container["container.py (composition root)"] --> features
-    core["core/ (models · protocols · exceptions)"]
-    features --> core
+    container["container.py"] --> features
+    features --> core["core"]
 ```
 
 ### `features/panel/views` — per-domain API view modules
 
-No facade, barrel or re-export shim: `container.py` named-imports each `render_api_*` from
-its own module. Every view module imports only `features.panel.service` and `core.models`.
-
 ```mermaid
 classDiagram
-    class PanelService {
-        <<service>>
-    }
-    class container {
-        <<composition root>>
-        build_panel_views()
-    }
-    class api_servers {
-        <<view module>>
-        render_api_servers()
-    }
-    class api_contexts {
-        <<view module>>
-        render_api_contexts()
-    }
-    class api_agents {
-        <<view module>>
-        render_api_agents_canonical()
-        render_api_agent_prompt()
-    }
-    class api_sessions {
-        <<view module>>
-        render_api_sessions()
-    }
-    class api_academy {
-        <<view module>>
-        render_api_academy()
-    }
-    class api_reports {
-        <<view module>>
-        render_api_reports()
-        serve_report_file()
-        mark_report_important()
-        unmark_report_important()
-        delete_report_file()
-    }
-    class api_health {
-        <<view module>>
-        render_health()
-    }
-
-    container ..> api_servers : named import
-    container ..> api_contexts : named import
-    container ..> api_agents : named import
-    container ..> api_sessions : named import
-    container ..> api_academy : named import
-    container ..> api_reports : named import
-    container ..> api_health : named import
-    api_servers ..> PanelService
-    api_contexts ..> PanelService
-    api_agents ..> PanelService
-    api_sessions ..> PanelService
-    api_academy ..> PanelService
-    api_reports ..> PanelService
-    api_health ..> PanelService
-
-    note for container "no facade / no api.py barrel — api.py is DELETED; each render_api_* named-imported from its domain module"
+    container : build_panel_views()
+    api_servers : render_api_servers()
+    api_contexts : render_api_contexts()
+    api_agents : render_api_agents_canonical()
+    api_agents : render_api_agent_prompt()
+    api_sessions : render_api_sessions()
+    api_academy : render_api_academy()
+    api_reports : render_api_reports()
+    api_reports : serve_report_file()
+    api_reports : mark_report_important()
+    api_reports : unmark_report_important()
+    api_reports : delete_report_file()
+    api_health : render_health()
+    note "no api.py barrel — container named-imports each render_api_* from its own module; each view imports only features.panel.service and core.models"
 ```
-
-### Dependencies
-
-[[spec-context-project]], [[context-management]], [[sdd-gate-v3]], [[agent-orchestration]],
-[[panel]], [[public-asset-distribution]], [[tech-stack]].

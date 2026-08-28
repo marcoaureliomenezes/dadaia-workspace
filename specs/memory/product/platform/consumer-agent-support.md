@@ -3,40 +3,21 @@ slug: consumer-agent-support
 title: Consumer validation gate
 category: product
 tldr: A consumer-side validation agent running the shipped recipe on a real workspace is the release gate; no wheel publishes without its CERTIFIED_100 verdict.
-summary: The canonical release gate is a consumer-side validation agent running `CONSUMER_VALIDATION_RECIPE.md` on a real workspace; a deterministic internal gate never approves a release by itself.
-tags:
-- consumer-validation
-- release-gate
-- sdd
+summary: The canonical release gate is a consumer-side validation agent running the shipped recipe on a real workspace; a deterministic internal gate never approves a release by itself.
+tags: [consumer-validation, release-gate, sdd]
 ---
 
 ## The gate
 
-A candidate wheel is certified by a **consumer-side validation agent** — an agent operating
-dadaia-workspace on a real workspace outside this repository — before any deploy. No version
-publishes without that agent's `CERTIFIED_100` verdict. Internal gates, `dadaia certify` included,
-are never validation by themselves: a green internal gate that diverges from real consumer behavior
-is itself a bug. An environment is declared **supported** only when a full real-use round reports
-zero failures, never from point checks.
-
-`dadaia_workspace/public/data/CONSUMER_VALIDATION_RECIPE.md` ships two halves: the deterministic
-matrix (F-01…F-26 plus structural certification), necessary and never sufficient; and the
-**real-use matrix (R-01…R-08)** derived from a real consumer's day-to-day inventory — the live Codex
-chain with per-link artifact proofs (backlog → release → implementation → audit), canonical backlog
-consumption, fresh/old-context doctor-clean repair, release-definition terminal honesty, bug-ledger
-round-trip, fake-chain honesty, and the kimi-code harness surface. Every candidate must pass all of
-both; `CERTIFIED_100` means every statement PASS, none excepted.
-
-A round may run against the operator's own environment or a throwaway real workspace created with
-`dadaia init`, exercised through supported interfaces only: the installed version-matched skill
-surface, every cited `dadaia` verb cross-checked against the live `--help`, and the throwaway repo's
-own projected hooks invoked directly to confirm FROZEN-block and ADDITIVE-allow behavior. Governance
-coherence is proven rather than asserted — the full `[ ] → [-] → [x]` cycle with a clean worktree at
-each commit, valid memory and schema state, immutable release evidence. The round budgets **one
-remediation cycle inside itself**, and what the environment could not exercise is a named limit
-reported as **not exercised**, never as passed.
+- A candidate wheel is certified by a consumer-side validation agent operating dadaia-workspace outside this repository, and no version publishes without its `CERTIFIED_100` verdict.
+- Internal gates, `dadaia certify` included, are never validation by themselves, and an environment is supported only after a full real-use round reports zero failures.
+- `public/data/CONSUMER_VALIDATION_RECIPE.md` ships the deterministic matrix (F-01…F-26 plus structural certification), necessary and never sufficient.
+- It also ships the real-use matrix (R-01…R-08) from a real consumer's inventory — the live Codex chain with per-link artifact proofs, backlog consumption, doctor-clean repair, terminal honesty, bug-ledger round-trip and the kimi-code surface.
+- Every candidate must pass all of both; `CERTIFIED_100` means every statement PASS, none excepted.
+- A round runs against the operator's environment or a throwaway `dadaia init` workspace, through supported interfaces only: the version-matched skill surface, every cited verb checked against the live `--help`, and the projected hooks invoked directly.
+- Governance coherence is proven, not asserted — the full `[ ] → [-] → [x]` cycle with a clean worktree at each commit, valid memory and schema state, immutable evidence.
+- The round budgets one remediation cycle inside itself, and what the environment could not exercise is reported as not exercised, never as passed.
 
 ## Dependencies
 
-[[workspace-init]], [[tech-stack]], [[spec-context-project]], [[sdd-gate-v3]],
-[[workspace-doctor]].
+[[workspace-init]], [[tech-stack]], [[spec-context-project]], [[sdd-gate-v3]], [[workspace-doctor]].
