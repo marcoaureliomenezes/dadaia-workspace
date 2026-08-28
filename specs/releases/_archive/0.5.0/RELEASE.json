@@ -1,13 +1,17 @@
 {
   "schema": "release-state-v1",
   "release": "0.5.0",
-  "phase": "CLOSURE",
-  "rc": null,
+  "phase": "ARCHIVED",
+  "rc": 1,
   "defined": {
     "sha": "389166052c837769e31d3e79ccbf89e69c641ed8",
     "ts": "2026-08-27T10:31:16Z"
   },
-  "implemented": null,
+  "implemented": {
+    "sha": "48d032dca6d6b4ceab3f0aea6e25cc68644bad8d",
+    "rc": 1,
+    "ts": "2026-08-28T18:50:35Z"
+  },
   "shipped": null,
   "audited": {
     "sha": "5c0448dcc1feeec204e24b4b4583618017f6c52b",
@@ -180,6 +184,27 @@
           "Bug-surface axis (FR24): all three findings are test/CI-infrastructure surface (tests, bugs-contract-suite), not application logic — dadaia bugs stats at close: total 528, open 15 (12 pre-existing + 3 registered this session), resolved 495, no new production-code surface opened.",
           "REJECT reason, narrowly: real GitHub Actions CI for feature/0.5.0 -> develop (PR #219) was not fully green at any point observed this session — first at f7078c93/head-of-session (multiple red jobs) and, after the fixer's follow-up commits, still red on exactly one job ('Contract coverage (Windows/macOS) (windows-latest)') as of run 33198451825. Per DADAIA.md §7 'Push green' / the workspace's watch-CI-until-green law, every job must be green, not most — rc-1 QA close cannot APPROVE while a real CI job is red. Re-close on the sha that finally shows all jobs green."
         ]
+      }
+    },
+    {
+      "ts": "2026-08-28T18:50:35Z",
+      "agent": "claude-code",
+      "event": "rc",
+      "data": {
+        "rc": 1,
+        "sha": "48d032dca6d6b4ceab3f0aea6e25cc68644bad8d",
+        "pr": 219,
+        "merge": "be4b2cc2",
+        "text": "rc-1 = final rc: PR #219 merged into develop with 36/36 CI green after five CI-portability fixes (full-history checkout, bash-3.2 arrays, LF-safe store tests, radon skip, WSL bash skip, lazy fcntl); qa-close REJECT at f7078c93 was solely the red CI, cleared by those fixes."
+      }
+    },
+    {
+      "ts": "2026-08-28T18:50:35Z",
+      "agent": "claude-code",
+      "event": "phase",
+      "data": {
+        "phase": "ARCHIVED",
+        "text": "T-050-41: release directory moves to specs/releases/_archive/0.5.0/ in this commit; the consumed rc-1 verdict is deleted; T-050-02/14/37/38/41 closed, T-050-42 in progress (closure PR), T-050-31 stays with the operator (ADR sitting over decisions.jsonl)."
       }
     }
   ]

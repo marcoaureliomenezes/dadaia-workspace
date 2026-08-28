@@ -203,7 +203,7 @@ since the pick **is** this commit (FR2, FR8 shape 5).
 
 ---
 
-- [ ] **T-050-02 — [git] Milestone (a): push and open the definition PR → `develop`**
+- [x] **T-050-02 — [git] Milestone (a): push and open the definition PR → `develop`**
 
 **Owner role:** dispatcher + `security-reviewer` · **Commit:** the phase flip, then git refs
 
@@ -915,7 +915,7 @@ stale `ACTIVE` item using a relocated record; `backlog doctor` green.
 
 ---
 
-- [ ] **T-050-14 — [operator] FR6: tag, then delete root `specs/_archive/`**
+- [x] **T-050-14 — [operator] FR6: tag, then delete root `specs/_archive/`**
 
 **Owner role:** **operator** (executes) + dispatcher (prepares and verifies) · **Commit:**
 `chore(T-050-14): delete root specs/_archive after tagging (operator ruling 2026-08-23)`
@@ -2041,7 +2041,7 @@ closing the scope. All three verdicts — QA, code, security — must `APPROVE` 
 
 ## `rc-1` — the whole scope integrates once
 
-- [ ] **T-050-37 — [git] `rc-1`: PR `feature/0.5.0` → `develop`**
+- [x] **T-050-37 — [git] `rc-1`: PR `feature/0.5.0` → `develop`**
 
 **Owner role:** dispatcher + security-reviewer · **Preconditions:** T-050-36 `[x]`.
 
@@ -2060,7 +2060,7 @@ scope.
 
 ## `rc-2 … rc-N` — adjustment rounds on the merged scope
 
-- [ ] **T-050-38 — Adjustment rounds: test `develop`, fix on the branch, merge again**
+- [x] **T-050-38 — Adjustment rounds: test `develop`, fix on the branch, merge again**
 
 **Owner role:** qa-engineer + operator (finding) · software-engineer / ai-engineer (fixing) ·
 dispatcher + security-reviewer (merging) · **Preconditions:** T-050-37 `[x]`.
@@ -2156,7 +2156,7 @@ never a duplicate. **No bug is closed by this release** (AS-4).
 
 ---
 
-- [ ] **T-050-41 — [git] Archive the release**
+- [x] **T-050-41 — [git] Archive the release**
 
 **Owner role:** dispatcher · **Commit:** `chore(T-050-41): archive 0.5.0`
 
@@ -2181,7 +2181,7 @@ reads `ARCHIVED`; the verdict gate resolves this release's evidence at its archi
 
 ---
 
-- [ ] **T-050-42 — [git] Final-`rc` merge: version bump and PR → `develop`**
+- [-] **T-050-42 — [git] Final-`rc` merge: version bump and PR → `develop`**
 
 **Owner role:** dispatcher + software-engineer + security-reviewer
 
