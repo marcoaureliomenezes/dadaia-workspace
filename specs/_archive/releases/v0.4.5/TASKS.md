@@ -881,7 +881,7 @@ QA, code, security — must `APPROVE` the **same** commit.
 
 ## `rc-1` — the whole scope integrates once
 
-- [-] **T-045-35 — [git] `rc-1`: PR `feature/0.4.5` → `develop`**
+- [x] **T-045-35 — [git] `rc-1`: PR `feature/0.4.5` → `develop`**
 
 **Owner role:** dispatcher + security-reviewer · **Preconditions:** T-045-34 `[x]`.
 
@@ -899,7 +899,7 @@ whole scope.
 
 ## `rc-2 … rc-N` — adjustment rounds on the merged scope
 
-- [ ] **T-045-36 — Adjustment rounds: test `develop`, fix on the branch, merge again**
+- [x] **T-045-36 — Adjustment rounds: test `develop`, fix on the branch, merge again**
 
 **Owner role:** qa-engineer + operator (finding) · software-engineer / ai-engineer (fixing) ·
 dispatcher + security-reviewer (merging) · **Preconditions:** T-045-35 `[x]`.
@@ -961,7 +961,7 @@ entry is created here); the restated git-identity standing question; archive dec
 
 ---
 
-- [ ] **T-045-39 — [git] Archive the release**
+- [x] **T-045-39 — [git] Archive the release**
 
 **Owner role:** dispatcher · **Commit:** `chore(T-045-39): archive v0.4.5`
 
@@ -977,7 +977,7 @@ memory → CLOSURE → sweep → archive.
 
 ---
 
-- [ ] **T-045-40 — [git] Final-`rc` merge: version bump and PR → `develop`**
+- [-] **T-045-40 — [git] Final-`rc` merge: version bump and PR → `develop`**
 
 **Owner role:** dispatcher + software-engineer + security-reviewer
 

@@ -89,8 +89,8 @@ last substantive commit is given and the marker-flip commit follows in parenthes
 | T-045-32 | [shell] FR16: the invariants, measured (V10/V11) | `b207c20d` (capture `.dadaia/tmp/software-engineer/20260826/T-045-32-invariants.md`) |
 | T-045-33 | Six-axis code review on the thawed tree | `e64a4922` → re-verdict `1bfd9209` (@`27c3374a`) → re-verdict `2a5cec96` (@`395bfb35`) |
 | T-045-34 | Security review + the QA release verdict | `ae84021e` → `f837168a` (@`395bfb35`); security verdicts `8b1e4aa3` (REJECTED @`5a8810ac`), `2c23e717` (APPROVED @`395bfb35`), `6214fc35` (re-key) |
-| T-045-35 | [git] `rc-1`: PR `feature/0.4.5` → `develop` | **`[-]` — pending push.** On-branch work complete: `e34f1209` (bug reported), `7de4783f` (architect ruling), `395bfb35` (fix), trio verdicts all APPROVE on `395bfb35`. **Remaining:** push `feature/0.4.5` through the chokepoint, open the PR, watch CI to green, merge |
-| T-045-36 | Adjustment rounds on the merged scope | **`[ ]` — pending push.** Zero rounds so far, because `develop` cannot be exercised before the push. **Remaining:** exercise the merged `develop`; any finding on this scope opens `rc-2` on the branch |
+| T-045-35 | [git] `rc-1`: PR `feature/0.4.5` → `develop` | **`[x]`** — pushed `02eef219`, CI-portability test fix `0d219434` (+ re-keyed APPROVED verdict `c0b2080c`), PR #211 36/36 green, merged `develop @ f6373f87` (develop CI green); marker `e0c52527`. Prior note: On-branch work complete: `e34f1209` (bug reported), `7de4783f` (architect ruling), `395bfb35` (fix), trio verdicts all APPROVE on `395bfb35`. **Remaining:** push `feature/0.4.5` through the chokepoint, open the PR, watch CI to green, merge |
+| T-045-36 | Adjustment rounds on the merged scope | **`[x]` — closed with ZERO rounds.** `qa-engineer` exercised `develop @ f6373f87` as a real consumer (handoff `2026-08-28T013036Z-qa-engineer-T-045-36-rc1-exercise`); its one HIGH — a symlinked *ancestor* of `--specs-dir` is followed — is outside A8.1 (literal symlinked target) and routed to intake (item below), not an `rc`. Prior note: Zero rounds so far, because `develop` cannot be exercised before the push. **Remaining:** exercise the merged `develop`; any finding on this scope opens `rc-2` on the branch |
 | T-045-37 | Memory window (SPEC §5) | `e514e679` (reservation `7b80e646`) |
 | T-045-38 | `CLOSURE.md` with every sweep | this document (reservation `bb96253a`) |
 | T-045-39 | [git] Archive the release | **`[ ]` — pending.** **Remaining:** `git mv specs/releases/v0.4.5 specs/_archive/releases/v0.4.5`, `ACTIVE.md` → `phase: ARCHIVED`, riding one commit with T-045-37/38 |
@@ -253,7 +253,14 @@ and the QA verdict judge the delta **higher-value per line** than what it replac
 
 ## Ship-without-publish record
 
-**To be filled at T-045-41** — this section records A16.8's three verifications (capture
+**Where V12 lands.** This directory is archived at T-045-39 (below), and `specs/_archive/`
+is FROZEN — so the three verifications are captured at T-045-41 and recorded as a `note`
+record in the live release's `RELEASE.jsonl` (`specs/releases/0.5.0/`), keyed
+`v0.4.5-ship-without-publish`, and in the archived-releases histo line for `v0.4.5`. What is
+already checkable at `f6373f87` (rc-1 on `develop`): `pyproject.toml` reads `0.4.5`
+(T-045-40's bump rode rc-1), `git tag -l v0.4.5` is empty, `release.yml` untouched.
+
+This section originally read: **To be filled at T-045-41** — this section records A16.8's three verifications (capture
 **V12**), which are only checkable after the `develop` → `main` merge fires `release.yml`.
 The three verifications owed are:
 
@@ -574,6 +581,13 @@ entry** — every item below is listed, never materialized (ADR #15).
     as a class: its structural fix is a policy decision about where review prose lives and
     what the scanner reads, which is not Arm B material.
 
+16. **`specs init --specs-dir` follows a symlinked *ancestor*** (`repos/<link>/specs`) — the
+   FR8 refusal covers the literal target only (A8.1 as accepted). Found by `qa-engineer` on
+   `develop @ f6373f87` (T-045-36 exercise, HIGH, CWE-59 class). Needs design, not a hotfix:
+   refusing any symlinked ancestor breaks macOS (`/var` → `/private/var`, every `tmp_path`);
+   the check must be scoped to links inside the workspace tree. Candidate entry:
+   `specs-init-symlinked-ancestor-refusal`.
+
 ### Pre-approved intake
 
 None. Every residual above is new to this release and carries no prior operator ruling; the
@@ -589,8 +603,8 @@ release itself rather than deferred out of it.
 
 | `rc` | Scope | What was found on `develop` | By whom | Fix | Status |
 |---|---|---|---|---|---|
-| `rc-1` | **The whole scope** — S1 … S4, every FR1–FR16 | — | — | — | **PR pending the operator's push.** All three verdicts APPROVE `395bfb35`; the branch is gate-green and the push-gate defect that blocked the first attempt is fixed and replayed clean |
-| `rc-2 … rc-N` | adjustment rounds | **Zero rounds so far** | — | — | Not opened — `develop` cannot be exercised before the push, and the push is an external action the agent fleet cannot take |
+| `rc-1` | **The whole scope** — S1 … S4, every FR1–FR16 | Two tests that never ran on GHA (ANSI-unaware CLI assert; unit-tier timeout crash on Windows) — bug `ci-portability-tests-landed-without-a-gha-run-ansi-and-unit-timeout` | CI of PR #211 | `0d219434` (tests-only, before the merge) | **MERGED — `develop @ f6373f87`, 36/36 green, develop CI green. Final `rc`.** Historical note: All three verdicts APPROVE `395bfb35`; the branch is gate-green and the push-gate defect that blocked the first attempt is fixed and replayed clean |
+| `rc-2 … rc-N` | adjustment rounds | **Zero rounds.** QA exercise of `develop @ f6373f87`: FR1/FR6/FR7/FR8-literal confirmed; the ancestor-symlink finding is out of A8.1 scope (intake) | `qa-engineer` | — | Not opened. The archive move (T-045-39) and marker closes ride the closure PR, gated on T-045-03 (operator) |
 
 **How this release's lane collapses.** D8 defines `rc-1` as the first and only integration of
 the whole scope, and the final `rc` as the one that carries memory → CLOSURE → archive and
