@@ -43,9 +43,7 @@ _FORBIDDEN_HEADING_RE = re.compile(
 _PRINCIPLE_HEADING_RE = re.compile(r"^### P-(\d{2}) ·.*$", re.MULTILINE)
 _BLOCK_BOUNDARY_RE = re.compile(r"^(?:### P-\d{2} ·|## )", re.MULTILINE)
 _MEASURED_BY_RE = re.compile(r"^Measured by: .+$", re.MULTILINE)
-_ADR_LINE_RE = re.compile(
-    r"^ADR: (?:none|(\d{4}) \((?:proposed|accepted)\b.*\))\s*$", re.MULTILINE
-)
+_ADR_LINE_RE = re.compile(r"^ADR: (?:none|(\d{4}) \((?:proposed|accepted)\b.*\))\s*$", re.MULTILINE)
 
 
 # --------------------------------------------------------------------------- file loading
@@ -159,9 +157,8 @@ def test_every_principle_block_carries_measured_by_and_adr_line() -> None:
     # Mutation fixture — RED condition: a block missing the `ADR:` line.
     missing_adr = "### P-99 · A synthetic principle.\nMeasured by: `pytest something`.\n"
     body = _principle_blocks(missing_adr)[0][1]
-    assert (
-        "missing an `ADR: NNNN (proposed|accepted...)` or `ADR: none` line"
-        in _block_violations(body)
+    assert "missing an `ADR: NNNN (proposed|accepted...)` or `ADR: none` line" in _block_violations(
+        body
     )
 
     # Mutation fixture — GREEN: a complete synthetic block carries no violation.

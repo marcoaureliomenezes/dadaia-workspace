@@ -288,5 +288,3 @@ def test_agent_tier_property_absent_from_schema() -> None:
     schema = load_frontmatter_schema()
     assert "agent_tier" not in schema["properties"]
     assert "agent_tier" not in schema.get("required", [])
-
-
