@@ -2,8 +2,8 @@
 slug: architecture
 title: Architecture Memory
 category: core
-tldr: 17 measured architecture principles, then the three drift-guarded diagrams of doctor classes, feature packages and panel view modules.
-summary: Part 1 carries the ADR-gated architecture principles and the check measuring each; Part 2 carries the three live-introspected diagrams.
+tldr: 17 measured architecture principles, then the one-decider module table and the diagrams of doctor classes, feature packages and panel view modules.
+summary: Part 1 carries the ADR-gated architecture principles and the check measuring each; Part 2 names the module deciding each cross-cutting fact and carries the three diagrams.
 tags: [architecture, layers, dependency-rules, agents, sdd]
 ---
 
@@ -70,7 +70,7 @@ ADR: none
 Rationale: the composition graph costs seconds of import time per gated tool call.
 
 ### P-13 · We keep the architecture diagrams derived from live code: every diagrammed class, view module and feature package is introspected against the live tree.
-Measured by: `pytest tests/contract/test_architecture_diagrams_current.py`.
+Measured by: `dadaia specs doctor` — rule `MEM-DRIFT-1` (`features/specs/doctor_memory.py`), one WARNING per package the map and the live tree disagree on.
 ADR: none
 Rationale: a diagram nobody checks is the first artifact to lie.
 
@@ -96,6 +96,26 @@ Rationale: law that no asset owns is law nobody applies.
 
 ## Part 2 — Implementation
 
+### One decider per fact
+
+| Fact | The module that decides it |
+|---|---|
+| workspace root, session, context, mode, release, phase | `core/invocation.py` — `resolve() -> Invocation`, over rungs 0 (explicit/`target_path`) … 3 (repo of the cwd) |
+| session record read, bind and touch | `core/session_store.py`, the sole owner; `core/record_liveness.py` holds the one staleness predicate |
+| presence liveness and reaping | `features/spec_context/presence.py` — `gc()` is the only reaper of records, markers, sentinels and emptied directories |
+| what a `specs/` tree may contain | `features/specs/canon.py`'s `CANON` table — scaffold renders it, doctor checks it |
+| whether a projection is current | `infrastructure/projection.py`'s `ProjectionRule` plus `projection_rules()`; install writes and doctor compares the same table |
+| which harness a projection targets | `HarnessProjection` in `infrastructure/projection_rules.py`, with three production adapters — Claude Code, Codex, Kimi Code |
+| a bug record's status | `core/models/bugs.py` transition methods; `RecordStore.scan()` is the one ledger parser, yielding `MalformedLine` for a bad row |
+| a handoff's version, artifact and validity | `core/handoff_index.py` — `HandoffIndex`/`Handoff`, the stdlib schema walker internal to it |
+| the git publication boundary | `features/chokepoints/{branch_policy,pre_commit,push_gate,verdict}.py`; `covering_verdict()` is the single verdict reader |
+| the telemetry database connection | `features/telemetry/store.py`'s `TelemetryStore`, owning open/migrate/`integrity_check`/`quarantine` |
+| a YAML frontmatter block | `core/frontmatter.py` |
+
+- `container.py` is composition wiring only; `build_telemetry_service` and `build_panel_views` are its panel-side entry points.
+- `features/migrate` stamps `specs_pattern_version: 6` or refuses, instructing a tree below v6 to upgrade to 0.4.x first — no in-wheel pre-v6 lineage.
+- Hooks import `core.invocation` directly and build the `Invocation` once per process; they never import `container` (P-12).
+
 ### `features/specs/doctor` — SpecsDoctor coordinator + validator siblings
 
 ```mermaid
@@ -113,18 +133,18 @@ classDiagram
     SpecsDoctor --> ClosureAuditValidator : owns ORDER
     SpecsDoctor --> GovernanceValidator : owns ORDER
     SpecsDoctor --> CoherenceValidator : owns ORDER
-    note for MemoryValidator "sole lazy infrastructure.subprocess_runner import"
-    note for GovernanceValidator "sole features.backlog.document import"
-    note for SpecsDoctor "imports neither spec_context nor subprocess_runner"
+    note for MemoryValidator "receives a ProcessRunner port; owns CAT-1, LINT-1 and MEM-DRIFT-1"
+    note for GovernanceValidator "sole features.backlog.document import; reads BUGS.jsonl only through the injected bug store"
+    note for SpecsDoctor "takes bug_store_factory; imports neither spec_context nor infrastructure"
 ```
 
-### `dadaia_workspace/features` — package map (24 packages)
+### `dadaia_workspace/features` — package map (23 packages)
 
 ```mermaid
 flowchart TB
     subgraph features["dadaia_workspace/features"]
-      pkgs["academy · agents · backlog · bugs · capabilities · certification · chokepoints · ci_preflight · export · import_ · migrate · panel · public · reconcile · reports · repos · server_registry · spec_artifacts · spec_context · specs · telemetry · tmp_gc · workspace · workspace_clean"]
-      subs["reports submodules — next · retention · validation"]
+      pkgs["academy · agents · backlog · bugs · capabilities · certification · chokepoints · ci_preflight · export · import_ · migrate · panel · public · reconcile · reports · repos · server_registry · spec_context · specs · telemetry · tmp_gc · workspace · workspace_clean"]
+      subs["reports submodules — next · retention"]
     end
     container["container.py"] --> features
     features --> core["core"]
@@ -139,6 +159,9 @@ classDiagram
     api_contexts : render_api_contexts()
     api_agents : render_api_agents_canonical()
     api_agents : render_api_agent_prompt()
+    api_agents : render_api_agent_sessions()
+    agent_policy : render_api_agent_model_policy()
+    agent_policy : render_api_agent_model_templates()
     api_sessions : render_api_sessions()
     api_academy : render_api_academy()
     api_reports : render_api_reports()
@@ -147,5 +170,5 @@ classDiagram
     api_reports : unmark_report_important()
     api_reports : delete_report_file()
     api_health : render_health()
-    note "no api.py barrel — container named-imports each render_api_* from its own module; each view imports only features.panel.service and core.models"
+    note "no api.py barrel — container named-imports each render_api_* from its own module; each view imports only features.panel.service and core.models; handler._ROUTES is the one (method, pattern, view_name) table and a route absent from it cannot exist"
 ```
