@@ -1,11 +1,12 @@
-"""Memory validator (v0.1.55 FR1): memory-atom files, atomicity, CAT-1, LINT-1.
+"""Memory validator (v0.1.55 FR1): memory-atom files, atomicity, CAT-1, LINT-1, MEM-DRIFT-1.
 
 Single-responsibility sibling of the SpecsDoctor coordinator. Owns the memory-markdown-source
 invariants: required atoms present with a heading (SPEC-DOC-002/002L), no changelog/history
-headings (SPEC-DOC-008), catalog↔atom sync (CAT-1), and the LINT-1 memory-atom lint. LINT-1
-imports ``features.specs.memory_lint`` directly (v0.4.3 T-043-20/FR16 — no subprocess, no
-dependency on the projected ``public/scripts/lint-memory-atoms.py`` copy existing or being
-current). Leaf-only: imports the shared leaves + core, never a sibling validator.
+headings (SPEC-DOC-008), catalog↔atom sync (CAT-1), the LINT-1 memory-atom lint, and (v0.5.1
+T-051-22 rework) MEM-DRIFT-1's features-package-map-vs-live-tree WARNING. LINT-1 imports
+``features.specs.memory_lint`` directly (v0.4.3 T-043-20/FR16 — no subprocess, no dependency
+on the projected ``public/scripts/lint-memory-atoms.py`` copy existing or being current).
+Leaf-only: imports the shared leaves + core, never a sibling validator.
 """
 
 from __future__ import annotations
@@ -80,6 +81,73 @@ def _parse_memory_md(path: Path) -> _MemoryMdSummary:
         frontmatter=fm,
         body=body,
     )
+
+
+# ---------------------------------------------------------------------------
+# MEM-DRIFT-1: features package-map mermaid block vs the live tree
+# ---------------------------------------------------------------------------
+#
+# Relocated (v0.5.1 T-051-22 rework) from the deleted push-gated contract test
+# ``tests/contract/test_architecture_diagrams_current.py`` (removed at 5e0719af, bug
+# ``push-gate-test-pins-memory-package-count-that-only-closure-may-change``) per
+# qa-engineer's 2026-08-29 deletion-verdict handoff: the diagram-vs-code correspondence
+# guard is real and must survive, but never on a push-gated tier — every future package
+# add/delete during IMPLEMENTATION would go red before the next CLOSURE gets to update
+# memory. See ``check_mem_drift1_features_package_map`` below for the WARNING itself.
+
+# ARCHITECTURE.md's "features package map" H3 heading — matched by SHAPE, not by the
+# parenthetical package count. The deleted test's package-COUNT assertion is the part the
+# bug diagnosed as structurally wrong and is DROPPED here entirely; never reintroduce it.
+_FEATURES_PKG_MAP_HEADING_RE = re.compile(
+    r"^### `dadaia_workspace/features` — package map \(\d+ packages\)\s*$", re.MULTILINE
+)
+_MERMAID_BLOCK_RE = re.compile(r"```mermaid\n(.*?)\n```", re.DOTALL)
+# The single `pkgs["a · b · c"]` flowchart node inside that heading's mermaid block — the
+# ONLY line this rule reads. The sibling `subs[...]` node (reports submodules) is out of
+# scope: MEM-DRIFT-1 covers feature PACKAGE names only.
+_PKGS_NODE_RE = re.compile(r'pkgs\["([^"]*)"\]')
+
+
+def _mermaid_block_after_heading(text: str, heading_end: int) -> str | None:
+    """The sole fenced ```mermaid block in the section starting at *heading_end* (up to
+    the next H2/H3 heading, or end of file). Mirrors the deleted contract test's helper."""
+    next_heading = re.search(r"\n#{2,3}\s", text[heading_end:])
+    section = (
+        text[heading_end : heading_end + next_heading.start()]
+        if next_heading
+        else text[heading_end:]
+    )
+    block_match = _MERMAID_BLOCK_RE.search(section)
+    return block_match.group(1) if block_match else None
+
+
+def _live_feature_package_names() -> set[str]:
+    """The live ``dadaia_workspace/features/<pkg>`` package names.
+
+    Introspects the SAME installed ``dadaia_workspace.features`` namespace this module
+    itself lives under — never a hardcoded name list (the deleted contract test's own
+    technique, preserved). ``dadaia_workspace.features`` is the package NAMESPACE, not a
+    sibling feature: the `features-no-cross-feature` independence contract's ``modules =``
+    list names only the sub-packages (``features.academy``, …, never bare ``features``
+    itself), and this module's own empty ``__init__.py`` means importing it loads no
+    sibling code — so this import carries no cross-feature edge (verified live by
+    `lint-imports --config setup.cfg --no-cache`, which this module's own contract gates).
+    Falls back to a filesystem walk from this module's own path — never a subprocess,
+    never a hardcoded list — if that ever stops holding.
+    """
+    try:
+        import importlib
+        import pkgutil
+
+        pkg = importlib.import_module("dadaia_workspace.features")
+        return {name for _finder, name, ispkg in pkgutil.iter_modules(pkg.__path__) if ispkg}
+    except ImportError:
+        features_dir = Path(__file__).resolve().parents[1]
+        return {
+            child.name
+            for child in features_dir.iterdir()
+            if child.is_dir() and (child / "__init__.py").is_file()
+        }
 
 
 def _iter_memory_md_files(mem_dir: Path) -> list[Path]:
@@ -420,6 +488,66 @@ class MemoryValidator:
                     severity=Severity.WARNING,
                     description=("LINT-1: memory atom lint warnings:\n" + "\n".join(warn_lines)),
                     path=str(mem_dir),
+                )
+            )
+        return issues
+
+    def check_mem_drift1_features_package_map(self) -> list[SpecsDoctorIssue]:
+        """MEM-DRIFT-1: the features package-map mermaid diagram matches the live tree.
+
+        One WARNING per stale node (a package the diagram names that no longer exists)
+        and one WARNING per missing node (a live package the diagram never names).
+        Severity is always WARNING — never ERROR, never blocking push/CI (same class as
+        SPECS-VERSION/SPEC-DOC-030) — this is a continuous memory-drift signal, not a
+        structural invariant. See the module-level docstring above
+        ``_FEATURES_PKG_MAP_HEADING_RE`` for the relocation history.
+
+        Silent (returns ``[]``) when ``ARCHITECTURE.md`` is absent, the features
+        package-map heading is absent, or its mermaid block / ``pkgs[...]`` node is
+        absent — this rule only fires when there is something concrete to compare;
+        SPEC-DOC-002/TREE-3 already own "the atom itself is missing".
+        """
+        architecture_md = self.specs_dir / "memory" / "ARCHITECTURE.md"
+        if not architecture_md.is_file():
+            return []
+        text = architecture_md.read_text(encoding="utf-8")
+        heading_match = _FEATURES_PKG_MAP_HEADING_RE.search(text)
+        if heading_match is None:
+            return []
+        mermaid = _mermaid_block_after_heading(text, heading_match.end())
+        if mermaid is None:
+            return []
+        pkgs_match = _PKGS_NODE_RE.search(mermaid)
+        if pkgs_match is None:
+            return []
+        declared = {tok.strip() for tok in pkgs_match.group(1).split("·") if tok.strip()}
+        live = _live_feature_package_names()
+
+        issues: list[SpecsDoctorIssue] = []
+        for stale in sorted(declared - live):
+            issues.append(
+                SpecsDoctorIssue(
+                    code="MEM-DRIFT-1",
+                    severity=Severity.WARNING,
+                    description=(
+                        f"ARCHITECTURE.md features package map names '{stale}' but "
+                        "dadaia_workspace/features has no such live package — update "
+                        "the diagram (memory drift)."
+                    ),
+                    path=str(architecture_md),
+                )
+            )
+        for missing in sorted(live - declared):
+            issues.append(
+                SpecsDoctorIssue(
+                    code="MEM-DRIFT-1",
+                    severity=Severity.WARNING,
+                    description=(
+                        f"dadaia_workspace/features/{missing} is a live package not named "
+                        "in ARCHITECTURE.md's features package map — update the diagram "
+                        "(memory drift)."
+                    ),
+                    path=str(architecture_md),
                 )
             )
         return issues
