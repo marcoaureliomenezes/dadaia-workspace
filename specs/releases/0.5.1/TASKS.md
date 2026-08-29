@@ -122,7 +122,7 @@
   - preconditions: T-051-06 `[x]`
   - parallelism: parallel with T-051-07, T-051-08
 
-- [ ] **T-051-10** — `alpha-2` QA close · owner: qa-engineer · write set: `specs/releases/0.5.1/RELEASE.json`, the segment's task markers · acceptance: A-0.2, A-0.3, A-0.5, A-0.6 for T-051-07/08/09
+- [x] **T-051-10** — `alpha-2` QA close · owner: qa-engineer · write set: `specs/releases/0.5.1/RELEASE.json`, the segment's task markers · acceptance: A-0.2, A-0.3, A-0.5, A-0.6 for T-051-07/08/09
   - verdict records: the same five items as T-051-06, plus the ignore-cap move evidenced at 15
   - parallelism: none — closes the segment
 
@@ -191,7 +191,7 @@
   - preconditions: T-051-14 `[x]`
   - parallelism: parallel with T-051-15, 16, 17, 18
 
-- [ ] **T-051-20** — `alpha-4` QA close · owner: qa-engineer · write set: `specs/releases/0.5.1/RELEASE.json`, the segment's task markers · acceptance: A-0.2, A-0.5, A-0.6, A-12.1 … A-12.3 for T-051-15 … 19
+- [x] **T-051-20** — `alpha-4` QA close · owner: qa-engineer · write set: `specs/releases/0.5.1/RELEASE.json`, the segment's task markers · acceptance: A-0.2, A-0.5, A-0.6, A-12.1 … A-12.3 for T-051-15 … 19
   - verdict records: deletion coverage map · bug-surface delta · every picked bug's terminal token or its stated `open` reason
   - parallelism: none — closes the segment
 
@@ -199,7 +199,7 @@
 
 ## Scope complete
 
-- [ ] **T-051-21** — Invariants measured · owner: software-engineer · write set: none in-repo (captures under `.dadaia/tmp/software-engineer/<YYYYMMDD>/`) · acceptance: A-0.1 … A-0.5 with `baseline → measured` per line
+- [x] **T-051-21** — Invariants measured · owner: software-engineer · write set: none in-repo (captures under `.dadaia/tmp/software-engineer/<YYYYMMDD>/`) · acceptance: A-0.1 … A-0.5 with `baseline → measured` per line
   - measures: `git diff --stat` production LOC over the release range **and per FR range**; the ten decider counts of A-0.2; `pytest --collect-only -q` before/after; `lint-imports` edges + cap; the four doctors; `dadaia bugs stats`
   - a measured overshoot is recorded as a drift, never renegotiated
   - parallelism: none
