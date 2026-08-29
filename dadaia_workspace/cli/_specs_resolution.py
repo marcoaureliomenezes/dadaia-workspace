@@ -103,3 +103,17 @@ def resolve_context_for_cli(explicit: str | None) -> str:
 def resolve_specs_dir_for_cli(specs_dir: str | None) -> Path:
     """Resolve the target specs/ dir (explicit flag, else the resolution authority)."""
     return _core_resolve_specs_dir(specs_dir)
+
+
+def resolve_workspace_root_for_cli(target_path: Path) -> Path:
+    """The workspace root above *target_path* — the single root walk
+    (:func:`dadaia_workspace.core.invocation.resolve`'s ``target_path``-first rung,
+    ``WORKSPACE_ROOT`` env included, cwd fallback). Falls back to *target_path* itself
+    when nothing is found (an uninitialized/consumer tree). The seam a git-hook-spawned
+    ``dadaia ci`` verb (a harness-FREE child, no session, no ``DADAIA_CONTEXT``) uses to
+    resolve its workspace without importing ``core.invocation`` directly
+    (``bind-resolution-seam-is-a-single-home``)."""
+    return (
+        _resolve_invocation(target_path=target_path, env=os.environ, cwd=Path.cwd()).workspace_root
+        or target_path
+    )

@@ -12,6 +12,7 @@ from pathlib import Path
 
 import typer
 
+from dadaia_workspace.cli._specs_resolution import resolve_workspace_root_for_cli
 from dadaia_workspace.container import is_source_repo_root as _is_source_repo_root
 from dadaia_workspace.core.exceptions import CiPreflightScopeError
 from dadaia_workspace.features.ci_preflight import (
@@ -116,19 +117,6 @@ def preflight(
     typer.secho("\nAll preflight checks passed.", fg=typer.colors.GREEN)
 
 
-def _resolve_workspace_root(repo_root: Path) -> Path:
-    """Resolve the workspace root from inside a (possibly sub-) repo. Falls back to the repo."""
-    if env := os.environ.get("WORKSPACE_ROOT"):
-        return Path(env)
-    from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
-    from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
-
-    try:
-        return resolve_workspace_root(repo_root)
-    except WorkspaceNotInitializedError:
-        return repo_root
-
-
 @app.command("pre-commit-check")
 def pre_commit_check() -> None:
     """Warn about other live context presence. Advisory only — never blocks the commit.
@@ -146,7 +134,7 @@ def pre_commit_check() -> None:
     from dadaia_workspace.features.spec_context import presence
 
     repo_root = _repo_root()
-    workspace = _resolve_workspace_root(repo_root)
+    workspace = resolve_workspace_root_for_cli(repo_root)
     ctx = context_slug_for_path(workspace, _repo_identity_root(repo_root))
 
     # v0.5.1 K7: the presence read is injected — `presence.others_alive` is wired
@@ -249,7 +237,7 @@ def push_gate_check() -> None:
     from dadaia_workspace.features.specs.canon import canon_violations, verdict_violations
 
     repo_root = _repo_root()
-    workspace = _resolve_workspace_root(repo_root)
+    workspace = resolve_workspace_root_for_cli(repo_root)
 
     denylist_terms = load_denylist_terms()
     baseline_patterns = load_denylist_baseline_patterns()

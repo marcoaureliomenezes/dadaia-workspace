@@ -156,6 +156,45 @@ def test_missing_presence_root_never_raises(tmp_path: Path) -> None:
     assert report.empty_context_dirs == ()
 
 
+# --------------------------------------------------------------------------- #
+# AG.1/FR17 — deletion-lane guard: never follow a symlinked directory, never reap a
+# target resolving outside <workspace>/.dadaia/. Ported from the deleted
+# tests/unit/hooks/test_post_gate_reap.py::test_lane_guard_never_follows_a_symlinked_directory
+# (SEC-0.5.1-01 — the guard was dropped when the post-gate reaper was deleted at K2 and
+# not re-implemented in presence.gc, its new sole owner).
+# --------------------------------------------------------------------------- #
+
+
+def test_symlinked_context_dir_to_outside_dadaia_never_followed(tmp_path: Path) -> None:
+    """A presence context dir symlinked to a target outside ``.dadaia/`` is never
+    followed: its content is never discovered, reaped, or deleted, and gc reports
+    nothing for it."""
+    outside = tmp_path / "outside-dadaia"
+    outside.mkdir()
+    decoy = outside / "decoy.json"
+    decoy.write_text(
+        json.dumps(
+            {
+                "session_id": "decoy",
+                "last_seen_at": (_NOW - timedelta(seconds=_PRESENCE_TTL + 60)).isoformat(),
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    presence_root = tmp_path / ".dadaia" / "states" / "presence"
+    presence_root.mkdir(parents=True)
+    linked_ctx = presence_root / "linked-ctx"
+    linked_ctx.symlink_to(outside, target_is_directory=True)
+
+    report = presence.gc(tmp_path, now=_NOW, own_session_id="")
+
+    assert decoy.exists()
+    assert linked_ctx.exists()
+    assert report.presence == ()
+    assert report.empty_context_dirs == ()
+
+
 @pytest.mark.parametrize(
     ("marker_name", "age_seconds", "should_survive"),
     [

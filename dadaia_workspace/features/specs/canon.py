@@ -698,10 +698,12 @@ def release_new(specs_dir: Path, release_id: str) -> Path:
        ``releases/`` itself) already exists as a symlink — minting through a symlink
        could write the release stub outside *specs_dir* entirely.
 
-    A bare-SemVer *release_id* renders through the SAME ``releases/<M.m.p>/SPEC.md``
-    CANON entry :func:`scaffold_entry` uses; a legacy slug is not canon-shaped (no
-    CANON entry matches it — TREE-8/SPEC-DOC-027 already treat a live slug-named
-    release dir as non-canon) and is rendered directly from the same stub template.
+    A bare-SemVer *release_id* renders through :func:`scaffold_entry`, over the SAME
+    ``releases/<M.m.p>/SPEC.md`` CANON entry every other on-demand entry renders
+    through — one render path, not two (M5, 2026-08-29 six-axis review). A legacy slug
+    is not canon-shaped (no CANON entry matches it — TREE-8/SPEC-DOC-027 already treat
+    a live slug-named release dir as non-canon), so it falls back to rendering the same
+    stub template directly.
     """
     if not (is_release_semver(release_id) or _LEGACY_RELEASE_SLUG_RE.match(release_id)):
         raise ValueError(
@@ -726,6 +728,11 @@ def release_new(specs_dir: Path, release_id: str) -> Path:
                 f"{artifact} already exists — refusing to overwrite a minted release artifact."
             )
 
+    if is_release_semver(release_id):
+        return scaffold_entry(specs_dir, f"releases/{release_id}/SPEC.md", release_id=release_id)
+
+    # Legacy slug: no CANON entry matches it, so it is rendered directly from the same
+    # stub template scaffold_entry would otherwise use.
     release_dir.mkdir(parents=True, exist_ok=True)
     spec_path = release_dir / "SPEC.md"
     spec_path.write_text(

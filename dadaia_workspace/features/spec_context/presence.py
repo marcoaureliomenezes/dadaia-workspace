@@ -121,6 +121,20 @@ def _presence_root(workspace: Path) -> Path:
     return workspace / ".dadaia" / "states" / "presence"
 
 
+def _within_dadaia(path: Path, workspace: Path) -> bool:
+    """AG.1/FR17: True iff *path*, fully resolved (symlinks included), falls under
+    ``<workspace>/.dadaia`` (also resolved). The ONE deletion-lane guard shared by both
+    reap lanes in :func:`gc` — resolve, then ``relative_to`` inside ``try/except``, never
+    a string-prefix check (CWE-22 class: a sibling directory whose name string-prefixes
+    the boundary)."""
+    boundary = (workspace / ".dadaia").resolve()
+    try:
+        path.resolve().relative_to(boundary)
+    except (ValueError, OSError):
+        return False
+    return True
+
+
 def _ctx_dir(workspace: Path, ctx: str) -> Path:
     return _presence_root(workspace) / ctx
 
@@ -403,10 +417,15 @@ def _reap_presence_records(
     """Presence records stale beyond ``PRESENCE_TTL_SECONDS``, and any context dir left
     empty afterward. ``own_session_id``'s own records are NEVER a candidate — the calling
     session (e.g. the PostToolUse reconciler) must never reap its own just-renewed
-    record out from under itself."""
+    record out from under itself.
+
+    AG.1/FR17: a symlinked context dir is never followed (``p.is_symlink()`` skipped
+    before ``p.is_dir()`` would otherwise say yes), and every unlink target is
+    re-checked against :func:`_within_dadaia` — the two guards a symlinked directory
+    AND a symlinked entry inside a real one, respectively."""
     root = _presence_root(workspace)
     try:
-        ctx_dirs = sorted(p for p in root.iterdir() if p.is_dir())
+        ctx_dirs = sorted(p for p in root.iterdir() if p.is_dir() and not p.is_symlink())
     except OSError:
         return (), ()
 
@@ -426,6 +445,9 @@ def _reap_presence_records(
             if own_session_id and sid == own_session_id:
                 remaining += 1
                 continue
+            if not _within_dadaia(entry, workspace):
+                remaining += 1
+                continue
             data = _read_json(entry)
             if data is not None and not _is_stale(data, now=now):
                 remaining += 1
@@ -443,7 +465,10 @@ def _reap_presence_records(
 def _reap_markers(workspace: Path, *, now: float) -> tuple[str, ...]:
     """Advisory markers under ``.dadaia/tmp/`` matching :data:`_MARKER_PREFIXES`, older
     than :data:`_MARKER_GC_TTL_SECONDS` by mtime. No session cross-reference (see the
-    module docstring: every marker this reaps is a spent throttle stamp)."""
+    module docstring: every marker this reaps is a spent throttle stamp).
+
+    AG.1/FR17: shares :func:`_within_dadaia` with the presence lane — the same guard,
+    one home."""
     tmp_dir = workspace / ".dadaia" / "tmp"
     try:
         entries = sorted(tmp_dir.iterdir())
@@ -452,6 +477,8 @@ def _reap_markers(workspace: Path, *, now: float) -> tuple[str, ...]:
     reaped: list[str] = []
     for path in entries:
         if not path.name.startswith(_MARKER_PREFIXES):
+            continue
+        if not _within_dadaia(path, workspace):
             continue
         try:
             mtime = path.stat().st_mtime

@@ -1,4 +1,4 @@
-"""Table-driven tests for the deepened ``features.handoff`` interface (release 0.5.1 K6).
+"""Table-driven tests for the deepened ``core.handoff_index`` interface (release 0.5.1 K6).
 
 Intent: CONTRACT — release 0.5.1 K6 ("features/handoff: one module owns discovery,
 version routing and artifact resolution").
@@ -12,8 +12,9 @@ report/handoff test files this candidate's card names for collapse —
 ``tests/unit/features/panel/test_reports_doctor_invariant.py`` are DELETED outright (the
 symbols they tested — ``HandoffDocument``, ``StdlibHandoffValidator``,
 ``ReportsValidationService``, ``ReportsDoctor`` — no longer exist); their coverage is
-re-derived here, at the one new interface (``core.handoff_index`` /
-``features.handoff``), never re-mocked against the deleted shallow modules. The
+re-derived here, at the one new interface (``core.handoff_index``, the sole
+implementation — no feature-layer facade), never re-mocked against the deleted
+shallow modules. The
 remaining reports/panel/CLI test files (``test_next_service.py``,
 ``test_retention_service.py``, ``test_views_reports.py``,
 ``test_reports_retention_cleanup.py``, ``tests/contract/cli/test_cli_reports*.py``) stay
@@ -36,7 +37,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.exceptions import HandoffSchemaError
-from dadaia_workspace.features.handoff import (
+from dadaia_workspace.core.handoff_index import (
     Handoff,
     HandoffIndex,
     discover_handoff_paths,

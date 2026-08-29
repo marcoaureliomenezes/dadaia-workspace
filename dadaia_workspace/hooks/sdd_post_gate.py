@@ -81,32 +81,22 @@ def _reconciler_marker(sess_id: str) -> str:
     return f"reconciler-last-{sess_id}"
 
 
-def _bound_context(workspace: Path, sess_id: str) -> str | None:
+def _bound_context(sess_id: str) -> str | None:
     """The context this session resolves to, for the advisory reconciler's own read side.
 
-    ``DADAIA.md`` §3 law order (F-03, v0.5.0 review): rung 1 ``DADAIA_CONTEXT`` first —
-    presence attribution always agrees with the gate and ctx_inject on the same prompt,
-    and the env rung is also kimi-code's bridge (launched with ``DADAIA_CONTEXT``
-    exported). Rung 2 is the session binding: this session's OWN record
-    (``session_store.read_session`` keyed by ``sess_id``), then the single authority
+    ONE call into the single resolution authority
     (:func:`dadaia_workspace.core.invocation.resolve` — hooks are sanctioned DIRECT
-    importers per the seam contract; the container never loads on a hook path, F-01),
-    which adds rung 3, the repo containing the current working directory.
+    importers per the seam contract; the container never loads on a hook path, F-01).
+    *sess_id* is the caller's already-resolved identity (``_common.resolve_session_id``
+    on the hook payload); threading it through as the ``payload`` mapping's
+    ``session_id`` field makes rung 2 (this session's own live record) resolve the SAME
+    identity, never a second re-derivation of it. ``resolve`` itself applies the
+    ``DADAIA.md`` §3 law order: rung 1 ``DADAIA_CONTEXT``, rung 2 the session binding,
+    rung 3 the repo containing the current working directory.
     """
-    # Law order (F-03, v0.5.0 code review): rung 1 `DADAIA_CONTEXT` first, so presence
-    # attribution always agrees with the gate and ctx_inject on the same prompt.
-    env_context = os.environ.get("DADAIA_CONTEXT")
-    if env_context:
-        return env_context
-
-    record = session_store.read_session(workspace, sess_id)
-    if isinstance(record, dict):
-        ctx = record.get("context")
-        if isinstance(ctx, str) and ctx:
-            return ctx
-
-    # Direct core import (F-01): never pay the container's import graph in a hook.
-    return invocation.resolve(env=os.environ, cwd=Path.cwd()).context_name
+    return invocation.resolve(
+        payload={"session_id": sess_id}, env=os.environ, cwd=Path.cwd()
+    ).context_name
 
 
 def _porcelain_paths(repo_root: Path) -> list[str] | None:
@@ -229,7 +219,7 @@ def _reconcile_working_tree(workspace: Path, sess_id: str) -> None:
     except Exception:  # noqa: BLE001 — fail-open: a GC bug must never break the reconciler.
         pass
 
-    ctx = _bound_context(workspace, sess_id)
+    ctx = _bound_context(sess_id)
     if ctx is None:
         return
 

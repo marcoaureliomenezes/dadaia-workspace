@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import time
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -33,7 +34,22 @@ _CTX = "demo-ctx"
 
 
 def _make_workspace(tmp_path: Path) -> Path:
-    (tmp_path / ".dadaia" / "states").mkdir(parents=True, exist_ok=True)
+    states = tmp_path / ".dadaia" / "states"
+    states.mkdir(parents=True, exist_ok=True)
+    # _bound_context now routes through core.invocation.resolve, whose rung-2 (own
+    # session record) requires the context to be REGISTERED (single-authority
+    # semantics) — the direct session_store.read_session the old implementation used
+    # never checked this. A registered ALIVE context is what a real `dadaia context
+    # bind` produces, so this fixture models that instead of working around it.
+    (states / "spec_contexts.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "2",
+                "contexts": [{"name": _CTX, "repo_slug": _CTX, "state": "alive"}],
+            }
+        ),
+        encoding="utf-8",
+    )
     (tmp_path / "repos" / _CTX).mkdir(parents=True, exist_ok=True)
     return tmp_path
 
@@ -42,7 +58,15 @@ def _bind_session(workspace: Path, ctx: str = _CTX) -> None:
     session_store.write_session(
         workspace,
         _SID,
-        {"session_id": _SID, "context": ctx, "mode": "IMPLEMENTATION", "pid": 1},
+        {
+            "session_id": _SID,
+            "context": ctx,
+            "mode": "IMPLEMENTATION",
+            "pid": 1,
+            # rung 2 (core.invocation._live_session_context) is liveness-gated —
+            # a fresh heartbeat keeps this fixture's record un-stale.
+            "last_seen_at": datetime.now(tz=UTC).isoformat(),
+        },
     )
 
 
@@ -68,6 +92,7 @@ def test_dirty_mutating_emits_flag_advisory_only(
     # post-gate-reconciler-tests-order-dependent-flake).
     monkeypatch.delenv("DADAIA_CONTEXT", raising=False)
     ws = _make_workspace(tmp_path)
+    monkeypatch.setenv("WORKSPACE_ROOT", str(ws))
     _bind_session(ws)
 
     # A dirty production file (MUTATING) in the bound context repo ⇒ the flagging branch
@@ -135,6 +160,7 @@ def test_no_flag_table(
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("DADAIA_CONTEXT", raising=False)
     ws = _make_workspace(tmp_path)
+    monkeypatch.setenv("WORKSPACE_ROOT", str(ws))
     if name != "no_bound_context":
         _bind_session(ws)
     setup_fn(ws, monkeypatch)  # type: ignore[operator]
@@ -153,9 +179,10 @@ def test_bound_context_leg2_falls_through_to_authority_via_dadaia_context_env(
     staying flag-free when NEITHER leg resolves anything usable."""
     ws = _make_workspace(tmp_path)
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("WORKSPACE_ROOT", str(ws))
     monkeypatch.setenv("DADAIA_CONTEXT", "env-ctx")
 
-    assert sdd_post_gate._bound_context(ws, "never-bound-sid") == "env-ctx"
+    assert sdd_post_gate._bound_context("never-bound-sid") == "env-ctx"
 
 
 def test_bound_context_env_wins_over_own_record_law_order(
@@ -166,14 +193,15 @@ def test_bound_context_env_wins_over_own_record_law_order(
     ctx_inject on the same prompt, per the DADAIA.md §3 rung order."""
     ws = _make_workspace(tmp_path)
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("WORKSPACE_ROOT", str(ws))
     monkeypatch.setenv("DADAIA_CONTEXT", "env-ctx")
     _bind_session(ws, ctx=_CTX)
 
-    assert sdd_post_gate._bound_context(ws, _SID) == "env-ctx"
+    assert sdd_post_gate._bound_context(_SID) == "env-ctx"
 
     # Without the env override the own record is the binding (rung 2), unchanged.
     monkeypatch.delenv("DADAIA_CONTEXT")
-    assert sdd_post_gate._bound_context(ws, _SID) == _CTX
+    assert sdd_post_gate._bound_context(_SID) == _CTX
 
 
 @pytest.mark.parametrize(
@@ -195,9 +223,9 @@ def test_fail_open_table(
 ) -> None:
     ws = _make_workspace(tmp_path)
     _bind_session(ws)
+    monkeypatch.setenv("WORKSPACE_ROOT", str(ws))
     monkeypatch.setattr(sdd_post_gate, "_porcelain_paths", porcelain_fn)
     if use_main:
-        monkeypatch.setenv("WORKSPACE_ROOT", str(ws))
         monkeypatch.setattr(_common, "read_stdin_json", lambda: {"session_id": _SID})
         monkeypatch.setattr(_common, "resolve_session_id", lambda payload: _SID)
         assert sdd_post_gate.main() == 0
@@ -214,6 +242,7 @@ def test_throttle_skip_and_expiry(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
     # (mocked) git child (bug post-gate-reconciler-tests-order-dependent-flake).
     monkeypatch.delenv("DADAIA_CONTEXT", raising=False)
     ws = _make_workspace(tmp_path)
+    monkeypatch.setenv("WORKSPACE_ROOT", str(ws))
     _bind_session(ws)
     spawn_count = {"n": 0}
 
