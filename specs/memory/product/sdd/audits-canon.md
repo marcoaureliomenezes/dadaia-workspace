@@ -12,7 +12,7 @@ tags: [sdd, audits, findings, governance, evidence]
 - The audit is the only full-tree inspection lane; every other quality boundary is diff-scoped.
 - It is a committed spec artifact, not a report: `AUDIT.md` carries scope, the window `[from-sha, to-sha]`, method per pillar, eight forensic metrics as `baseline → measured`, the score and the summary.
 - `FINDINGS.jsonl` carries one record per finding, appended once; `specs/audits/AGENTS.md` holds the scoped law and the index, and the HTML report is derived, never a substitute.
-- `specs/audits/**` is ADDITIVE and writable in any mode while `_archive/` is FROZEN, so the archive move is a `git mv`.
+- `specs/audits/**` is ADDITIVE and writable in any mode; the summary lands in `_archive/audits_histo.jsonl` and the audit directory is deleted.
 - `project-auditor` writes `specs/audits/**` plus `BUGS.jsonl` through the record store's one seam ([[sdd-bug-backlog-governance]]); no CLI verb and no hook exists.
 - `finding-record-v1` splits per property into immutable — `id`, `pillar` (`bugs | specs | memory`), `severity`, `refs`, `claim`, `evidence` — and mutable `disposition`, `release`, `reason`.
 - A remediation release rewrites the governance triple in place, leaving every other byte identical.

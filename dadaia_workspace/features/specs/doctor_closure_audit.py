@@ -52,7 +52,7 @@ _AUDIT_DIR_GRANDFATHER: frozenset[str] = frozenset(
 )
 
 # SPEC-DOC-034 (v0.1.46 AC-4): the per-artifact ``_archive`` dirs that must PRE-EXIST
-# (the FROZEN landing zone for disposed artifacts). Anchored to the canon table's
+# (the histo landing zone for disposed artifacts, ADDITIVE). Anchored to the canon table's
 # REQUIRED_ROOT_DIRS (v0.5.1 K4) rather than an independent hand-kept tuple, then
 # narrowed to the two areas that dispose routinely — backlog/bugs' histo ledgers grow
 # constantly, so a missing `_archive/` there is meaningful drift worth a standing
@@ -190,7 +190,7 @@ class ClosureAuditValidator:
     def check_archive_dirs_exist(self) -> list[SpecsDoctorIssue]:
         """SPEC-DOC-034 (v0.1.46 AC-4): the three per-artifact ``_archive`` dirs must exist.
 
-        ``specs/{backlog,audits,bugs}/_archive/`` are the FROZEN landing zones for disposed
+        ``specs/{backlog,audits,bugs}/_archive/`` are the ADDITIVE histo landing zones for disposed
         artifacts. A missing dir is a WARNING with an auto-fix (``doctor --fix`` mkdirs
         it — a directory is kept by its own future content, no ``.gitkeep``
         placeholder). A parent dir that does not itself exist is skipped — its
@@ -209,7 +209,7 @@ class ClosureAuditValidator:
                     code="SPEC-DOC-034",
                     severity=Severity.WARNING,
                     description=(
-                        f"specs/{parent}/_archive/ is missing — the FROZEN landing zone for "
+                        f"specs/{parent}/_archive/ is missing — the histo landing zone for "
                         "disposed artifacts (SPEC-DOC-034, WARNING). Auto-fix available "
                         "(run doctor --fix)."
                     ),

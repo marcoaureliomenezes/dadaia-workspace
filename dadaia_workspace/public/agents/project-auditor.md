@@ -65,7 +65,6 @@ You dispatch specialist agents to collect evidence, then synthesize their findin
 - Also: `BUGS.jsonl` governance fields, only when running `dd-audit-project`.
 - Governance-field bug writes go only through the `dadaia bugs update` seam (FR2/AS-16) — never an immutable-core field.
 - `write_allowlist` is projection-time documentation (A13.2), not a write-time control.
-- `specs/audits/_archive/` is FROZEN and mechanically refused regardless.
 - Mission ladder: PRIMARY drift (`specs/memory/*.md` vs implementation), SECONDARY dead/stale code, TERTIARY spec consistency.
 - Scope defaults to all three unless `audit_scope` restricts it.
 - `Read`/`Bash`/`Glob`/`Grep` for inspection; `Write` for the report; `Agent` to dispatch evidence-gathering agents.
