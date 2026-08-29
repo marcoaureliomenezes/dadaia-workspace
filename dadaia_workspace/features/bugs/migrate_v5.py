@@ -7,9 +7,12 @@ tolerant-JSON loop beside the injected
 :class:`~dadaia_workspace.core.protocols.record_store.RecordStore`, reaching around the
 store to its raw file. The live ledger has zero v5 lines (the migration this module's
 own scope name promises physically ran at T-050-10); every permanent read now goes
-through ``self._record_store.iter_records()`` directly. What survives here is
-:func:`parse_ledger_lines` (the raw-text tolerant split, still useful to a one-shot
-migration runner working from in-memory text) and the fold/mining pieces below it.
+through ``self._record_store.iter_records()`` directly. ``parse_ledger_lines`` (the
+raw-text tolerant split this docstring used to describe as "still useful to a one-shot
+migration runner") is DELETED at v0.5.1 K5 — it had zero callers, inside this module
+or out (``run_migration`` never called it either); what survives here is the fold/
+mining pieces below, reached only through :func:`build_migrated_record`/
+:func:`run_migration`.
 
 **``classify_ledger_line`` MOVED to ``core/bug_provenance.py`` and is PERMANENT there
 (A2), not deletable with this module.** The first reading of A2.5 called it "deletable
@@ -32,10 +35,9 @@ composes a caller-supplied
 :class:`~dadaia_workspace.core.protocols.git_history_reader.GitHistoryReader` with
 :func:`~dadaia_workspace.core.bug_provenance.classify_ledger_line` and
 :func:`~dadaia_workspace.core.bug_provenance.derive_commit_provenance`. Every function in
-this module below :func:`parse_ledger_lines` consumes RAW ``dict``/``Mapping`` v5-event
-shapes, never :class:`~dadaia_workspace.core.models.bugs.BugEvent` (deleted, S1 FR23
-firing A3 — the model has no writer left to justify it) — the dict IS the shape this
-module's own tolerant parse already produces.
+this module consumes RAW ``dict``/``Mapping`` v5-event shapes, never
+:class:`~dadaia_workspace.core.models.bugs.BugEvent` (deleted, S1 FR23 firing A3 — the
+model has no writer left to justify it).
 
 Deleted whole at 0.6.0, once no consumer needs the v5 fold at all — a contract test
 (T-050-09, A3.10) asserts no PERMANENT module imports this one; its tests are marked
@@ -45,7 +47,6 @@ from ``core/bug_provenance.py``'s own ``CONTRACT`` tests, which outlive this mod
 
 from __future__ import annotations
 
-import json
 import logging
 import re
 from collections.abc import Mapping, Sequence
@@ -72,56 +73,10 @@ __all__ = [
     "map_legacy_surface",
     "mine_cause",
     "mine_caused_by",
-    "parse_ledger_lines",
     "run_migration",
 ]
 
 _LOG = logging.getLogger(__name__)
-
-
-def parse_ledger_lines(text: str) -> tuple[list[dict[str, object]], dict[str, BugRecord]]:
-    """Parse raw ledger *text* into ``(v5 event lines in file order, as raw dicts;
-    native v6 records by id)``.
-
-    A v5 event line (an ``"event"`` key present) is returned as its RAW parsed
-    ``dict`` — never decoded into a model (S1 FR23 firing A3: ``BugEvent`` is deleted,
-    the model had no writer left to justify it) — so :func:`_fold_v5_events`/
-    :func:`mine_cause`/:func:`mine_caused_by` read it with plain ``.get(...)`` calls, the
-    same tolerant shape this function's own parse already produces. A v6 record line
-    (no ``"event"`` key) is parsed through :meth:`BugRecord.from_dict` as before.
-    Malformed JSON, a non-object line, a v5 line with no usable ``bug_id``, or a v6 line
-    failing ``BugRecord.from_dict`` is skipped with a logged WARNING — one corrupt line
-    never breaks the whole read. Splits on ``"\\n"`` only, never ``str.splitlines()``
-    (T-045-20's root-cause fix, carried forward at every reader this release leaves
-    standing). Takes *text* directly (no file I/O) so a caller already holding the
-    ledger text in memory (the migration runner reads it once) never re-reads the file.
-    """
-    v5_events: list[dict[str, object]] = []
-    native_records: dict[str, BugRecord] = {}
-    for lineno, raw_line in enumerate(text.split("\n"), start=1):
-        stripped = raw_line.strip()
-        if not stripped:
-            continue
-        try:
-            raw = json.loads(stripped)
-        except json.JSONDecodeError as exc:
-            _LOG.warning("skipping malformed ledger line %d: %s", lineno, exc)
-            continue
-        if not isinstance(raw, dict):
-            _LOG.warning("skipping non-object ledger line %d", lineno)
-            continue
-        if "event" in raw:
-            bug_id = raw.get("bug_id")
-            if not isinstance(bug_id, str) or not bug_id:
-                _LOG.warning("skipping v5 bug-event line %d: missing/invalid bug_id", lineno)
-                continue
-            v5_events.append(raw)
-            continue
-        try:
-            native_records[str(raw.get("id"))] = BugRecord.from_dict(raw)
-        except (ValueError, TypeError) as exc:
-            _LOG.warning("skipping invalid bug-record line %d: %s", lineno, exc)
-    return v5_events, native_records
 
 
 def _str_field(event: Mapping[str, object], key: str) -> str | None:

@@ -24,6 +24,7 @@ from dadaia_workspace.core.models.bugs import (
     BugRecord,
     BugRecordImmutableFieldError,
     BugRecordWriteOnceFieldSetError,
+    IncompleteTransitionError,
 )
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
@@ -248,3 +249,164 @@ def test_surface_enum_equals_on_disk_feature_packages() -> None:
     }
     assert enum_values == on_disk_packages | non_feature_members
     assert len(enum_values) == 31
+
+
+# --- v0.5.1 K5 — status transitions are the interface -------------------------------
+
+_RESOLVE_KWARGS: dict[str, str] = {
+    "cause": "root cause narrative",
+    "caused_by": "none",
+    "resolved_release": "v0.5.1",
+    "solution": "what the fix does",
+    "evidence_loop": "pytest -k the_red_loop",
+    "evidence_seam": "tests/unit/x.py::test_seam",
+    "evidence_diff": "net-negative: deleted more than added",
+    "diff_direction": "net-negative",
+}
+
+
+def test_resolve_reaches_resolved_status_with_every_field_set() -> None:
+    record = _sample_record()
+
+    resolved = record.resolve(**_RESOLVE_KWARGS)
+
+    assert resolved.status == "resolved"
+    for key, value in _RESOLVE_KWARGS.items():
+        assert getattr(resolved, key) == value
+    # The original record is untouched (frozen dataclass, new instance returned).
+    assert record.status == "open"
+
+
+def test_resolve_refuses_when_any_required_field_is_missing_or_blank() -> None:
+    record = _sample_record()
+    kwargs = dict(_RESOLVE_KWARGS)
+    kwargs["cause"] = "   "  # blank, not just absent
+    del kwargs["solution"]  # absent entirely
+
+    with pytest.raises(IncompleteTransitionError) as excinfo:
+        record.resolve(**kwargs)
+
+    assert "'cause' is required" in str(excinfo.value)
+    assert "'solution' is required" in str(excinfo.value)
+
+
+def test_resolve_refuses_a_caused_by_omission_the_literal_none_is_the_correct_way() -> None:
+    record = _sample_record()
+    kwargs = dict(_RESOLVE_KWARGS)
+    del kwargs["caused_by"]
+
+    with pytest.raises(IncompleteTransitionError) as excinfo:
+        record.resolve(**kwargs)
+
+    assert "'caused_by' is required" in str(excinfo.value)
+    # The literal "none" (already in _RESOLVE_KWARGS) is accepted, not refused.
+    assert record.resolve(**_RESOLVE_KWARGS).caused_by == "none"
+
+
+@pytest.mark.parametrize(
+    "bad_evidence_diff",
+    [
+        "no leading token at all",
+        "unknown-direction: rationale",
+        "net-negative:",
+        "net-negative:   ",
+    ],
+)
+def test_resolve_refuses_a_malformed_evidence_diff_pattern(bad_evidence_diff: str) -> None:
+    record = _sample_record()
+    kwargs = dict(_RESOLVE_KWARGS)
+    kwargs["evidence_diff"] = bad_evidence_diff
+
+    with pytest.raises(IncompleteTransitionError) as excinfo:
+        record.resolve(**kwargs)
+
+    assert "evidence_diff" in str(excinfo.value)
+
+
+def test_resolve_refuses_a_diff_direction_outside_the_closed_enum() -> None:
+    record = _sample_record()
+    kwargs = dict(_RESOLVE_KWARGS)
+    kwargs["diff_direction"] = "sideways"
+
+    with pytest.raises(IncompleteTransitionError) as excinfo:
+        record.resolve(**kwargs)
+
+    assert "diff_direction" in str(excinfo.value)
+
+
+@pytest.mark.parametrize(
+    ("field_name", "tainted_value", "expected_fragment"),
+    [
+        ("evidence_loop", "reach me at reporter@example-corp.test for details", "e-mail"),
+        ("evidence_seam", "fixture lives at /home/runner/workspace/x.py", "filesystem path"),
+        ("evidence_diff", "net-neutral: sha " + "a" * 40 + " proves it", "secret-shaped"),
+    ],
+)
+def test_resolve_refuses_an_evidence_field_carrying_a_self_scan_triggering_literal(
+    field_name: str, tainted_value: str, expected_fragment: str
+) -> None:
+    """Closes bug bug-record-write-once-evidence-fields-can-embed-selfscan-triggering-
+    literal-with-no-correction-path: the write-once evidence fields are refused BEFORE
+    they ever land, so there is always a correction path (call again with a fixed
+    value) — never a write-once field stuck holding the bad literal."""
+    record = _sample_record()
+    kwargs = dict(_RESOLVE_KWARGS)
+    kwargs[field_name] = tainted_value
+
+    with pytest.raises(IncompleteTransitionError) as excinfo:
+        record.resolve(**kwargs)
+
+    assert field_name in str(excinfo.value)
+    assert expected_fragment in str(excinfo.value)
+    # The record is provably untouched — no write-once field landed with the bad
+    # literal, so a corrected retry (never shown here) always has a clean path.
+    assert record.evidence_loop is None
+    assert record.status == "open"
+
+
+def test_supersede_requires_by_and_reaches_superseded_status() -> None:
+    record = _sample_record()
+
+    with pytest.raises(IncompleteTransitionError, match="'by' is required"):
+        record.supersede()
+
+    superseded = record.supersede(by="backlog-slug")
+    assert superseded.status == "superseded"
+    assert superseded.superseded_by == "backlog-slug"
+
+
+def test_defer_requires_reason_and_reaches_deferred_status() -> None:
+    record = _sample_record()
+
+    with pytest.raises(IncompleteTransitionError, match="'reason' is required"):
+        record.defer()
+
+    deferred = record.defer(reason="waiting on a dependency")
+    assert deferred.status == "deferred"
+    assert deferred.cause == "waiting on a dependency"
+
+
+def test_reject_requires_reason_and_reaches_rejected_status() -> None:
+    record = _sample_record()
+
+    with pytest.raises(IncompleteTransitionError, match="'reason' is required"):
+        record.reject()
+
+    rejected = record.reject(reason="not a real bug")
+    assert rejected.status == "rejected"
+    assert rejected.cause == "not a real bug"
+
+
+def test_from_dict_refuses_a_status_outside_the_closed_enum() -> None:
+    payload = _sample_record().to_dict()
+    payload["status"] = "fixed"  # not one of {open, resolved, superseded, deferred, rejected}
+
+    with pytest.raises(ValueError, match="status"):
+        BugRecord.from_dict(payload)
+
+
+def test_from_dict_round_trips_every_terminal_status() -> None:
+    for status in ("open", "resolved", "superseded", "deferred", "rejected"):
+        payload = _sample_record().to_dict()
+        payload["status"] = status
+        assert BugRecord.from_dict(payload).status == status

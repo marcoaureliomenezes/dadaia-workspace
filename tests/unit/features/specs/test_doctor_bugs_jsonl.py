@@ -1,14 +1,23 @@
 """Unit tests for SpecsDoctor SPEC-DOC-033/041 — the bug-ledger invariant.
 
+Intent: CONTRACT — SPEC-DOC-033/041, v0.5.1 K5 deepening.
+
 Release v0.1.46 / T-46-04 (AC-1); rewritten v0.5.0 T-050-08 (FR2/A2.3/A2.8, AR-1
 ruling "the doctor's bug lane is a second hand-kept reader"); the v5 event fold and
 SPEC-DOC-040 deleted at the S1 FR23 firing (A3/A5,
-`specs/releases/0.5.0/reviews/S1-FR23-firing.md`). The legacy hourly-file rotation
-reader is dead under canon v6 and is not carried forward — every case below targets
-the ONE canonical ``specs/bugs/BUGS.jsonl`` (T-050-10 rename). Covers: line validity
-(ERROR), the v5-line-is-an-ERROR shape (A3 — no fold, no diagnosis), governance-
-completeness gaps on a native v6 record (WARNING), and the A2.8 archive-overdue
-signal.
+`specs/releases/0.5.0/reviews/S1-FR23-firing.md`); rewritten again at v0.5.1 K5 to
+read through the ONE ``RecordStore`` seam (default zero-dependency fallback reader,
+or an injected ``bug_store_factory`` — proven equal below) instead of a second
+hand-kept parser. The legacy hourly-file rotation reader is dead under canon v6 and
+is not carried forward — every case below targets the ONE canonical
+``specs/bugs/BUGS.jsonl`` (T-050-10 rename). Covers: line validity (ERROR, the ONE
+malformed-line diagnosis — not valid JSON, not an object, or ``BugRecord.from_dict``
+refusing it, v5-shaped lines included) and the A2.8 archive-overdue signal.
+Governance-completeness (the former WARNING branch) is DELETED here — it is now
+enforced prospectively at the write seam
+(``core.models.bugs.BugRecord.resolve``/``supersede``/``defer``/``reject``,
+``tests/unit/core/models/test_bug_record.py``), never re-diagnosed by
+the doctor against history.
 """
 
 from __future__ import annotations
@@ -17,6 +26,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from dadaia_workspace import container
 from dadaia_workspace.features.specs import Severity, SpecsDoctor, SpecsDoctorIssue
 from dadaia_workspace.features.specs.doctor_governance import GovernanceValidator
 
@@ -96,7 +106,41 @@ def test_native_v6_record_missing_required_field_is_an_error(tmp_path: Path) -> 
     _write_ledger(_bugs_dir(specs), [bad])
     errors = _doc033(specs)
     assert len(errors) == 1
-    assert "not a valid bug-record object" in errors[0].description
+    assert "missing required string field 'title'" in errors[0].description
+
+
+def test_native_v6_record_invalid_status_enum_is_an_error(tmp_path: Path) -> None:
+    """v0.5.1 K5: ``BugRecord.from_dict`` now validates the ``status`` closed enum
+    itself — a value outside {open, resolved, superseded, deferred, rejected} is the
+    SAME malformed-line diagnosis as any other structurally invalid record, never a
+    second, separately-maintained enum check."""
+    specs = tmp_path / "specs"
+    _write_ledger(_bugs_dir(specs), [_record("bad-status-bug", status="fixed")])
+    errors = _doc033(specs)
+    assert len(errors) == 1
+    assert "status" in errors[0].description
+    assert "fixed" in errors[0].description
+
+
+def test_doctor_reads_through_an_injected_bug_store_factory(tmp_path: Path) -> None:
+    """v0.5.1 K5: ``SpecsDoctor(bug_store_factory=...)`` — mirrors
+    ``findings_store_factory`` exactly — is the SAME diagnosis as the default
+    zero-dependency fallback reader; injecting the real
+    ``container.build_bug_record_store`` (the SAME store ``BugService`` writes
+    through) proves the doctor is reading through the ONE store, not a second parser."""
+    specs = tmp_path / "specs"
+    bad = _record("native-bug")
+    del bad["title"]
+    _write_ledger(_bugs_dir(specs), [bad])
+
+    default_issues = [i for i in SpecsDoctor(specs).check() if i.code == "SPEC-DOC-033"]
+    injected_issues = [
+        i
+        for i in SpecsDoctor(specs, bug_store_factory=container.build_bug_record_store).check()
+        if i.code == "SPEC-DOC-033"
+    ]
+    assert len(default_issues) == 1
+    assert [i.description for i in default_issues] == [i.description for i in injected_issues]
 
 
 # ---------------------------------------------------------------------------
@@ -104,7 +148,12 @@ def test_native_v6_record_missing_required_field_is_an_error(tmp_path: Path) -> 
 # never folded, never diagnosed. The live ledger has zero v5 lines by construction
 # (T-050-10 physically migrated every historical record) — a surviving one means a
 # foreign/pre-migration write, and the doctor names it loudly rather than silently
-# re-interpreting it.
+# re-interpreting it. v0.5.1 K5: there is no dedicated "is this v5?" classification
+# any more — a v5-shaped line lacks the v6 required field set (``status`` above
+# all — a v5 line names its lifecycle stage ``event``, not ``status``) and fails
+# ``BugRecord.from_dict`` for that reason, the SAME malformed-line diagnosis every
+# other structurally invalid line gets — one classification, not a special case
+# for "v5".
 # ---------------------------------------------------------------------------
 
 
@@ -126,8 +175,7 @@ def test_v5_shaped_line_is_a_single_error_never_folded(tmp_path: Path) -> None:
     errors = _doc033(specs)
     assert len(errors) == 1
     assert errors[0].severity is Severity.ERROR
-    assert "v5 line in a v6 ledger" in errors[0].description
-    assert "migrate" in errors[0].description
+    assert "missing required string field 'status'" in errors[0].description
 
 
 def test_two_v5_shaped_lines_are_two_independent_errors(tmp_path: Path) -> None:
@@ -154,22 +202,24 @@ def test_two_v5_shaped_lines_are_two_independent_errors(tmp_path: Path) -> None:
     errors = _doc033(specs)
     assert len(errors) == 2
     assert all(e.severity is Severity.ERROR for e in errors)
-    assert all("v5 line in a v6 ledger" in e.description for e in errors)
+    assert all("missing required string field 'status'" in e.description for e in errors)
 
 
 # ---------------------------------------------------------------------------
-# A2.3 — governance-completeness gap on a native v6 record is WARNING.
+# v0.5.1 K5 — governance-completeness is NO LONGER diagnosed by the doctor at all;
+# a well-formed record (however incomplete for its own status) is doctor-clean, no
+# matter its status. Completeness is enforced prospectively at the transition write
+# seam instead — see tests/unit/core/models/test_bug_record.py.
 # ---------------------------------------------------------------------------
 
 
-def test_resolved_without_governance_fields_is_a_warning(tmp_path: Path) -> None:
+def test_resolved_without_governance_fields_is_doctor_clean(tmp_path: Path) -> None:
+    """The exact record shape that used to trigger SPEC-DOC-033's WARNING branch
+    (the "488 live warnings nobody acts on" the K5 card names) is silent now — the
+    doctor never re-diagnoses governance completeness against history."""
     specs = tmp_path / "specs"
     _write_ledger(_bugs_dir(specs), [_record("incomplete-resolve", status="resolved")])
-    issues = _doc033(specs)
-    assert len(issues) == 1
-    assert issues[0].severity is Severity.WARNING
-    assert "missing" in issues[0].description
-    assert "cause" in issues[0].description
+    assert _doc033(specs) == []
 
 
 def test_resolved_with_all_governance_fields_is_clean(tmp_path: Path) -> None:
@@ -190,12 +240,10 @@ def test_resolved_with_all_governance_fields_is_clean(tmp_path: Path) -> None:
     assert _doc033(specs) == []
 
 
-def test_superseded_without_superseded_by_is_a_warning(tmp_path: Path) -> None:
+def test_superseded_without_superseded_by_is_doctor_clean(tmp_path: Path) -> None:
     specs = tmp_path / "specs"
     _write_ledger(_bugs_dir(specs), [_record("superseded-bug", status="superseded")])
-    issues = _doc033(specs)
-    assert len(issues) == 1
-    assert "superseded_by" in issues[0].description
+    assert _doc033(specs) == []
 
 
 # ---------------------------------------------------------------------------

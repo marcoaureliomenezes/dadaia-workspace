@@ -18,12 +18,43 @@ that let a caller reach through the store and rewrite the ledger's bytes directl
 the injected store) was the reader/writer-count leak the S1 firing ruling closed. Every
 read goes through :meth:`iter_records`; every removal goes through :meth:`remove`,
 which carries the SAME refuse-stale race semantics :meth:`update` already has.
+
+**``MalformedLine`` / ``iter_records(strict=...)`` (v0.5.1 K5 deepening).** Before this
+release, a caller that needed to DIAGNOSE a malformed ledger line (rather than silently
+skip it, :meth:`iter_records`'s default) had no seam — ``features.specs.
+doctor_governance`` grew its OWN second hand-rolled parser of ``BUGS.jsonl`` instead,
+re-implementing the exact unicode-line-split defect class the store's own reader had
+already fixed once (T-045-20), and re-introducing it a second time at the doctor
+(``specs-doctor-bug-lane-splits-ledger-on-unicode-line-separators``) before it was
+fixed there too — the same bug, twice, because there were two parsers. ``strict=True``
+is the ONE seam a diagnostic caller now uses instead of writing a second reader:
+:meth:`iter_records` yields a :class:`MalformedLine` in place of silently skipping/
+WARN-logging a line that fails to parse. The split rule (a literal ``"\\n"``, never
+``str.splitlines()``) and the "what counts as parseable" rule (the model's own
+``from_dict``) are each stated in exactly one place regardless of *strict*.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Iterator
-from typing import Protocol
+from dataclasses import dataclass
+from typing import Literal, Protocol, overload
+
+
+@dataclass(frozen=True)
+class MalformedLine:
+    """One ledger line a :class:`RecordStore` could not parse as its record type —
+    the ONE malformed-line diagnosis every strict reader yields (v0.5.1 K5
+    deepening), covering every way a line can fail: not valid JSON, not a JSON
+    object, or refused by the model's own ``from_dict`` (a missing required field,
+    an invalid closed-enum value, or — historically — a v5-shaped event line that
+    never carried the v6 required field set). ``lineno`` is 1-based, counted over a
+    literal ``"\\n"`` split (never ``str.splitlines()``, which corrupts the count on
+    a line carrying a U+2028/U+2029/U+0085 unicode line separator)."""
+
+    lineno: int
+    raw: str
+    reason: str
 
 
 class RecordNotFoundError(Exception):
@@ -57,8 +88,18 @@ class RecordStore[T](Protocol):
     def append(self, record: T) -> None:
         """Append one NEW record as a line (``O_APPEND`` semantics — race-benign)."""
 
-    def iter_records(self) -> Iterator[T]:
-        """Yield every stored record, in file order, tolerating malformed lines."""
+    @overload
+    def iter_records(self, *, strict: Literal[False] = False) -> Iterator[T]: ...
+    @overload
+    def iter_records(self, *, strict: Literal[True]) -> Iterator[T | MalformedLine]: ...
+    def iter_records(self, *, strict: bool = False) -> Iterator[T] | Iterator[T | MalformedLine]:
+        """Yield every stored record, in file order.
+
+        ``strict=False`` (default): tolerates malformed lines — skips one, WARN-logged,
+        never breaking the whole stream. ``strict=True``: yields a :class:`MalformedLine`
+        in place of skipping — the ONE malformed-line diagnosis (v0.5.1 K5 deepening);
+        no second reader ever re-implements this classification.
+        """
 
     def update(self, record_id: str, mutate: Callable[[T], T]) -> T:
         """Read-modify-write the ONE line matching *record_id*, in place.
@@ -83,4 +124,4 @@ class RecordStore[T](Protocol):
         """
 
 
-__all__ = ["RecordNotFoundError", "RecordStore", "StaleRecordWriteError"]
+__all__ = ["MalformedLine", "RecordNotFoundError", "RecordStore", "StaleRecordWriteError"]

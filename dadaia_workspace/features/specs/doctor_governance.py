@@ -2,35 +2,53 @@
 
 Single-responsibility sibling of the SpecsDoctor coordinator. Owns the bug/backlog governance
 invariants: consumed-but-unsanitized ACTIVE backlog item (SPEC-DOC-031, SPEC v0.4.2 FR14),
-bug-status canon (SPEC-DOC-032), the bug-ledger invariant (SPEC-DOC-033), and the
-archive-overdue signal (SPEC-DOC-041, v0.5.0 A2.8), and the single-source loose-file
-invariant (SPEC-DOC-035, SPEC v0.12.0 FR5). Leaf-only: imports the shared leaves + core,
-plus one documented cross-feature leaf edge (``features.backlog.document`` — SPEC
-v0.12.0 PLAN §6, ``setup.cfg``'s ``features-no-cross-feature`` ``ignore_imports``),
-never a sibling validator.
+the bug-ledger invariant (SPEC-DOC-033), the archive-overdue signal (SPEC-DOC-041, v0.5.0
+A2.8), and the single-source loose-file invariant (SPEC-DOC-035, SPEC v0.12.0 FR5).
+Leaf-only: imports the shared leaves + core, plus one documented cross-feature leaf edge
+(``features.backlog.document`` — SPEC v0.12.0 PLAN §6, ``setup.cfg``'s
+``features-no-cross-feature`` ``ignore_imports``), never a sibling validator.
 
-**v0.5.0 T-050-08 (FR2/AR-1 finding "the doctor's bug lane is a second hand-kept
-reader").** ``check_bugs_jsonl_invariant`` used to hand-parse each line's ``bug_id``/
-``event`` fields directly and split the file with ``str.splitlines()`` — the EXACT
-defect class fixed at the store's OWN reader by T-045-20
-(``bug-event-field-with-unicode-line-separator-silently-drops-the-event``), left live
-here (bug ``specs-doctor-bug-lane-splits-ledger-on-unicode-line-separators``, closed by
-this rewrite). This validator now reads through ``core.models.bugs``'s OWN parser
-(``BugRecord.from_dict``) and splits on a literal ``"\\n"`` only — one parser, not a
-second hand-kept mirror of it. The legacy hourly-file rotation reader
-(``_BUGS_JSONL_ROW_CEILING``, ``_BUGS_JSONL_NAME_RE``, the ``*.jsonl`` glob) is DEAD
-under canon v6 (AR-1 (a)4) and is deleted, not carried forward: only the single
-canonical ``bugs/BUGS.jsonl`` is read.
+**v0.5.1 K5 deepening — the doctor reads through the ONE store, not a second hand-kept
+parser.** Two prior rewrites of ``check_bugs_jsonl_invariant`` (v0.5.0 T-050-08, then
+the 08-27 fix for bug ``specs-doctor-bug-lane-splits-ledger-on-unicode-line-separators``)
+each re-implemented the SAME classification the record store's own ``iter_records``
+already had — the unicode-line-split defect class (T-045-20) was fixed at the store
+08-24, then reproduced and fixed a SECOND time at this doctor 08-27, because there were
+two parsers. This deepening deletes the second one: ``check_bugs_jsonl_invariant`` now
+reads through an injected ``bug_store_factory`` (mirrors
+``ClosureAuditValidator``'s ``findings_store_factory`` seam) calling
+``RecordStore.iter_records(strict=True)`` — the ONE malformed-line diagnosis
+(``core.protocols.record_store.MalformedLine``), yielded by
+``infrastructure.jsonl_record_store.JsonlRecordStore`` in production, by a
+zero-dependency fallback reader here when no factory is injected (this module holds no
+``features -> infrastructure`` edge, mirroring ``ClosureAuditValidator``'s own
+``_default_iter_findings``) — either way, the record-level parsing is
+``BugRecord.from_dict`` (now enum-validating ``status`` too), never a second,
+hand-rolled field check.
+
+**Governance completeness is no longer diagnosed here at all.** The former WARNING
+branch (``governance_completeness_gaps``, "record X is missing field Y for its status")
+is DELETED along with that function — v0.5.1 K5 moves completeness to the WRITE seam
+(``core.models.bugs.BugRecord.resolve``/``supersede``/``defer``/``reject``: status is
+unreachable without its own required fields), never re-diagnosed against history. A
+historical record that reached an incomplete terminal status before this seam existed
+(the "488 live warnings nobody acts on" the K5 card names) is simply never re-checked —
+completeness is enforced prospectively, not retroactively.
+
+**``check_bug_status_canon`` (SPEC-DOC-032) is DELETED.** It regex-matched a
+``status:`` frontmatter line in ``specs/bugs/<slug>.md`` files — a per-bug Markdown
+file shape retired two migrations before this one (the v0.5.0 FR2 single-JSONL-ledger
+cutover); the check has had nothing to find since, dead code behind a dead artifact.
 
 **S1 FR23 firing amendments A3/A5
 (`specs/releases/0.5.0/reviews/S1-FR23-firing.md`).** A3: the v5 event fold and its
 coherence state machine are deleted from ``core/models/bugs.py`` — the live ledger
-carries zero v5 lines, so a surviving ``"event"``-keyed line is now a single
-SPEC-DOC-033 ERROR ("v5 line in a v6 ledger — migrate"), never a folded WARNING
-diagnosis. A5: SPEC-DOC-040 (the immutable-core drift WARN) is deleted along with the
-``bug_first_add_baselines`` plumbing — it never fired in production (its input was
-always the empty default); A2.7's detector moves to FR14 pillar 1, which owns the git
-walk this check would have needed.
+carries zero v5 lines, so a surviving ``"event"``-keyed (or otherwise v5-shaped) line
+now fails ``BugRecord.from_dict`` and surfaces as a plain ``MalformedLine`` — one ERROR,
+never a folded WARNING diagnosis. A5: SPEC-DOC-040 (the immutable-core drift WARN) is
+deleted along with the ``bug_first_add_baselines`` plumbing — it never fired in
+production (its input was always the empty default); A2.7's detector moves to FR14
+pillar 1, which owns the git walk this check would have needed.
 
 **v0.5.0 T-050-25A (FR15 extended scope, A4.4).** ``_archive_consumption_hits``'s
 CLOSURE.md-side evidence (an archived CLOSURE's ``## Dispositions`` table) is deleted —
@@ -44,40 +62,46 @@ is left unrecorded, only unread by THIS check. The narrowing is an accepted fals
 NEGATIVE (R3, already documented below): a genuinely consumed slug whose SPEC never
 declared it in ``**Consumes:**`` was already a false negative before this task; it
 simply loses its second (smaller) evidence source too.
+
+**Backlog "non-terminal status" vocabulary (v0.5.1 K5).** SPEC-DOC-031's own
+prefix-matched non-terminal set is DELETED; it now calls
+``core.models.backlog.is_nonterminal_active_status`` — the SAME vocabulary
+``features.backlog.doctor``'s BL-SCHEMA/BL-STALE checks already share (K5's "same shape
+applies to backlog" note) — rather than a THIRD, independently-maintained status
+classification.
 """
 
 from __future__ import annotations
 
 import json
 import re
+from collections.abc import Callable, Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Literal, overload
 
+from dadaia_workspace.core.models.backlog import is_nonterminal_active_status
 from dadaia_workspace.core.models.bugs import (
     BUG_ARCHIVE_THRESHOLD_DAYS,
     TERMINAL_EVENTS,
     BugRecord,
-    governance_completeness_gaps,
 )
+from dadaia_workspace.core.protocols.record_store import MalformedLine, RecordStore
 from dadaia_workspace.features.backlog.document import load_document
 from dadaia_workspace.features.specs.doctor_common import iter_archive_release_dirs
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
 
 # ADR-11 single-source status-token vocabulary.
 #
-# Backlog (case-insensitive prefix match on the Status line value):
-#   non-terminal = {OPEN, PICKED, CANDIDATE}; terminal = {DELIVERED, SUPERSEDED,
-#   RESOLVED, CONSUMED, DEFERRED, REJECTED} (+ free suffixes like ``— vX.Y.Z``).
-# Only the NON-TERMINAL set drives SPEC-DOC-031: a non-terminal backlog entry whose
-# slug is referenced by an archived release is the consumed-but-unsanitized drift.
-_BACKLOG_NONTERMINAL_PREFIXES: tuple[str, ...] = ("open", "picked", "candidate")
-
-# Bugs (ADR-11): the canon is exactly {Open, Closed} (case-insensitive). SPEC-DOC-032
-# WARNs on anything else (legacy Fixed/resolved/Rejected tokens, etc.).
-_BUG_STATUS_CANON: frozenset[str] = frozenset({"open", "closed"})
-
-# Match a bug frontmatter ``status:`` line (frontmatter is leading YAML-like lines).
-_BUG_STATUS_RE = re.compile(r"^status\s*:\s*(\S+)", re.IGNORECASE | re.MULTILINE)
+# Backlog: non-terminal/terminal classification lives in
+#   core.models.backlog.is_nonterminal_active_status (v0.5.1 K5 — was a private
+#   prefix-matched tuple here, now the shared source `features.backlog.doctor` also
+#   reads).
+# Bugs: terminal = {DELIVERED, SUPERSEDED, RESOLVED, CONSUMED, DEFERRED, REJECTED}
+#   (+ free suffixes like ``— vX.Y.Z``).
+# Only the NON-TERMINAL predicate drives SPEC-DOC-031: a non-terminal backlog entry
+# whose slug is referenced by an archived release is the consumed-but-unsanitized
+# drift — is_nonterminal_active_status is imported above (v0.5.1 K5).
 
 # SPEC-DOC-035 (SPEC v0.12.0 FR5, ADR D5/D9): the single-source invariant — the only two
 # filenames permitted loose directly under ``specs/backlog/``. Anything else (a per-entry
@@ -129,30 +153,51 @@ def _consumes_tokens(spec_text: str) -> frozenset[str]:
     return frozenset(_SLUG_TOKEN_RE.findall(" ".join(span)))
 
 
-def _iter_native_bug_records(ledger_path: Path) -> list[BugRecord]:
-    """Every line of *ledger_path* that parses as a native v6 :class:`BugRecord` (no
-    ``"event"`` key) — a v5 line, malformed JSON, or a non-object line is silently
-    skipped (SPEC-DOC-033's own line-validity check already reports those). Splits on
-    a literal ``"\\n"`` only. Shared by A2.7's and A2.8's checks, both of which only
-    ever act on already-native lines (module docstring)."""
+@overload
+def _default_iter_bug_records(
+    ledger_path: Path, *, strict: Literal[False] = False
+) -> Iterator[BugRecord]: ...
+@overload
+def _default_iter_bug_records(
+    ledger_path: Path, *, strict: Literal[True]
+) -> Iterator[BugRecord | MalformedLine]: ...
+def _default_iter_bug_records(
+    ledger_path: Path, *, strict: bool = False
+) -> Iterator[BugRecord | MalformedLine]:
+    """Zero-dependency fallback reader — mirrors ``doctor_closure_audit``'s own
+    ``_default_iter_findings`` shape (this module holds no ``features ->
+    infrastructure`` edge) and ``JsonlRecordStore.iter_records``'s own
+    ``strict`` split (v0.5.1 K5 deepening): ``strict=False`` (default) silently
+    skips a malformed line; ``strict=True`` yields a
+    :class:`~dadaia_workspace.core.protocols.record_store.MalformedLine` instead —
+    the ONE malformed-line diagnosis, never a second classification of what
+    "malformed" means. Splits on a literal ``"\\n"`` only (never
+    ``str.splitlines()`` — the T-045-20/AR-1 fix); every line parses through
+    :meth:`~dadaia_workspace.core.models.bugs.BugRecord.from_dict`, the model's OWN
+    parser, never a second hand-rolled field check."""
     if not ledger_path.is_file():
-        return []
-    records: list[BugRecord] = []
-    for raw_line in ledger_path.read_text(encoding="utf-8").split("\n"):
+        return
+    for lineno, raw_line in enumerate(ledger_path.read_text(encoding="utf-8").split("\n"), 1):
         stripped = raw_line.strip()
         if not stripped:
             continue
         try:
             obj = json.loads(stripped)
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as exc:
+            if strict:
+                yield MalformedLine(
+                    lineno=lineno, raw=stripped, reason=f"not valid JSON: {exc.msg}"
+                )
             continue
-        if not isinstance(obj, dict) or "event" in obj:
+        if not isinstance(obj, dict):
+            if strict:
+                yield MalformedLine(lineno=lineno, raw=stripped, reason="not a JSON object")
             continue
         try:
-            records.append(BugRecord.from_dict(obj))
-        except (ValueError, TypeError):
-            continue
-    return records
+            yield BugRecord.from_dict(obj)
+        except (ValueError, TypeError) as exc:
+            if strict:
+                yield MalformedLine(lineno=lineno, raw=stripped, reason=str(exc))
 
 
 def _parse_bug_record_ts(value: str) -> datetime | None:
@@ -172,9 +217,48 @@ class GovernanceValidator:
         self,
         specs_dir: Path,
         public_dir: Path | None = None,
+        bug_store_factory: Callable[[Path], RecordStore[BugRecord]] | None = None,
     ) -> None:
         self.specs_dir = specs_dir
         self.public_dir = public_dir
+        # DI seam (v0.5.1 K5, mirrors ClosureAuditValidator's findings_store_factory,
+        # A13.4): injected by a composition root that wires
+        # container.build_bug_record_store; None keeps the zero-dependency default
+        # reader (_default_iter_bug_records/_strict) so this leaf module never
+        # imports infrastructure.
+        self._bug_store_factory = bug_store_factory
+
+    @overload
+    def _iter_bug_records(
+        self, ledger_path: Path, *, strict: Literal[False] = False
+    ) -> Iterator[BugRecord]: ...
+    @overload
+    def _iter_bug_records(
+        self, ledger_path: Path, *, strict: Literal[True]
+    ) -> Iterator[BugRecord | MalformedLine]: ...
+    def _iter_bug_records(
+        self, ledger_path: Path, *, strict: bool = False
+    ) -> Iterator[BugRecord | MalformedLine]:
+        # container.build_bug_record_store(specs_dir) — takes specs_dir, not the
+        # ledger file path (unlike findings_store_factory, which takes the file path
+        # directly): a BugService has exactly ONE ledger per specs_dir, so this
+        # mirrors the SAME factory `cli.commands.bugs` already calls, never a
+        # second bug-store composition function with a different Path semantic.
+        # Each branch below passes a LITERAL True/False (never the *strict* variable
+        # itself) so the callee's own @overload resolves precisely — the same
+        # explicit-branch shape ``JsonlRecordStore.iter_records`` itself is called
+        # with everywhere else in this codebase.
+        if self._bug_store_factory is not None:
+            store = self._bug_store_factory(self.specs_dir)
+            if strict:
+                yield from store.iter_records(strict=True)
+            else:
+                yield from store.iter_records()
+            return
+        if strict:
+            yield from _default_iter_bug_records(ledger_path, strict=True)
+        else:
+            yield from _default_iter_bug_records(ledger_path, strict=False)
 
     def _archive_consumption_hits(self, slug: str) -> list[str]:
         """Release ids of archived releases that ASSERT ``slug`` was consumed (SPEC
@@ -242,8 +326,7 @@ class GovernanceValidator:
         for item in document.active:
             if item.status is None:
                 continue
-            status_lower = item.status.lower()
-            if not status_lower.startswith(_BACKLOG_NONTERMINAL_PREFIXES):
+            if not is_nonterminal_active_status(item.status):
                 continue
             hits = self._archive_consumption_hits(item.slug)
             if not hits:
@@ -272,140 +355,54 @@ class GovernanceValidator:
             )
         return issues
 
-    def check_bug_status_canon(self) -> list[SpecsDoctorIssue]:
-        """SPEC-DOC-032 (T-011-10, bug B1, ADR-11): WARN on non-canonical bug status tokens.
-
-        Every ``specs/bugs/<slug>.md`` frontmatter ``status:`` must be in the ADR-11 bug
-        canon {``Open``, ``Closed``} (case-insensitive). Anything else (legacy ``Fixed`` /
-        ``resolved`` / ``Rejected`` etc.) ⇒ **WARNING**. A duplicate/rejected bug should be
-        ``Closed`` with a ``superseded_by:`` frontmatter field, not a ``Rejected`` token.
-        ``README.md`` is skipped; an absent ``bugs/`` dir is a no-op.
-        """
-        bugs_dir = self.specs_dir / "bugs"
-        if not bugs_dir.is_dir():
-            return []
-        issues: list[SpecsDoctorIssue] = []
-        for bug_file in sorted(bugs_dir.glob("*.md")):
-            if bug_file.name in ("README.md",):
-                continue
-            m = _BUG_STATUS_RE.search(bug_file.read_text(encoding="utf-8"))
-            if m is None:
-                # Missing status is a separate concern (TREE-7 governs session_id); a bug
-                # with no status line at all is not flagged by this status-canon check.
-                continue
-            status = m.group(1).strip()
-            if status.lower() in _BUG_STATUS_CANON:
-                continue
-            issues.append(
-                SpecsDoctorIssue(
-                    code="SPEC-DOC-032",
-                    severity=Severity.WARNING,
-                    description=(
-                        f"bugs/{bug_file.name} has status '{status}' outside the ADR-11 bug "
-                        "canon {Open, Closed}. Normalize it: a fixed bug ⇒ 'Closed'; a "
-                        "duplicate/rejected bug ⇒ 'Closed' with a 'superseded_by: <slug>' "
-                        "frontmatter field (SPEC-DOC-032, WARNING)."
-                    ),
-                    path=str(bug_file),
-                )
-            )
-        return issues
-
     def check_bugs_jsonl_invariant(self) -> list[SpecsDoctorIssue]:
         """SPEC-DOC-033 (v0.1.46 AC-1; rewritten v0.5.0 T-050-08, FR2/A2.3; the v5
-        coherence fold retired at the S1 FR23 firing, A3): the single canonical
-        ``specs/bugs/BUGS.jsonl`` ledger invariant.
+        coherence fold retired at the S1 FR23 firing, A3; v0.5.1 K5 deepening: reads
+        through the injected/default ``RecordStore``, not a second hand-kept parser):
+        the single canonical ``specs/bugs/BUGS.jsonl`` ledger invariant.
 
-        Two sub-checks over the ONE canonical file (the legacy hourly-file rotation
+        ONE sub-check over the ONE canonical file (the legacy hourly-file rotation
         reader is dead under canon v6 and is not carried forward — module docstring):
+        **line validity** (ERROR) — each non-blank line must parse as a
+        :class:`~dadaia_workspace.core.models.bugs.BugRecord` through
+        :meth:`~dadaia_workspace.core.models.bugs.BugRecord.from_dict`, the model's
+        OWN parser (now enum-validating ``status`` too) — never a hand-rolled field
+        check. Every line the store's ``iter_records(strict=True)`` cannot parse (not
+        valid JSON, not an object, a v5-shaped line, an invalid enum value) surfaces
+        as exactly ONE :class:`~dadaia_workspace.core.protocols.record_store
+        .MalformedLine` -> ONE ERROR here — the ONE malformed-line diagnosis, never a
+        second classification of what "v5" or "invalid" means.
 
-        1. **Line validity** (ERROR) — each non-blank line must parse as a native v6
-           :class:`~dadaia_workspace.core.models.bugs.BugRecord` (no ``"event"`` key),
-           through its OWN ``from_dict`` parser — never a hand-rolled field check. A
-           line carrying an ``"event"`` key is a v5 line in a v6 ledger: the live
-           ledger has zero of them (S1 FR23 firing ruling assumption 2) and this is now
-           a single ERROR, never folded/decoded/diagnosed (the v5 event fold and its
-           coherence state machine are deleted from ``core/models/bugs.py``, A3).
-        2. **Governance completeness** (WARNING — A2.3) — every native v6
-           :class:`BugRecord` line whose
-           :func:`~dadaia_workspace.core.models.bugs.governance_completeness_gaps` is
-           non-empty.
+        **Governance completeness is no longer diagnosed here (v0.5.1 K5).** A
+        well-formed record — however incomplete for its own status — is not
+        re-checked: completeness is enforced prospectively, at the
+        :meth:`~dadaia_workspace.core.models.bugs.BugRecord.resolve`/``supersede``/
+        ``defer``/``reject`` write seam, never retroactively against history.
 
-        Splits on a literal ``"\n"`` only, never ``str.splitlines()`` (closes
-        ``specs-doctor-bug-lane-splits-ledger-on-unicode-line-separators`` — the
-        module docstring's AR-1 finding). Absent ``bugs/`` dir -> no-op.
+        Splits on a literal ``"\n"`` only, never ``str.splitlines()`` (the
+        T-045-20/AR-1 fix, now owned by the ONE reader — module docstring). Absent
+        ``bugs/`` dir -> no-op.
         """
         ledger_path = self.specs_dir / "bugs" / "BUGS.jsonl"
         if not ledger_path.is_file():
             return []
 
         issues: list[SpecsDoctorIssue] = []
-        for lineno, raw_line in enumerate(ledger_path.read_text(encoding="utf-8").split("\n"), 1):
-            stripped = raw_line.strip()
-            if not stripped:
+        for parsed in self._iter_bug_records(ledger_path, strict=True):
+            if not isinstance(parsed, MalformedLine):
                 continue
-            try:
-                obj = json.loads(stripped)
-            except json.JSONDecodeError as exc:
-                issues.append(
-                    SpecsDoctorIssue(
-                        code="SPEC-DOC-033",
-                        severity=Severity.ERROR,
-                        description=(
-                            f"bugs/BUGS.jsonl line {lineno}: not valid JSON ({exc.msg}) — "
-                            "every JSONL row must be one bug-record object "
-                            "(SPEC-DOC-033, ERROR)."
-                        ),
-                        path=str(ledger_path),
-                    )
+            issues.append(
+                SpecsDoctorIssue(
+                    code="SPEC-DOC-033",
+                    severity=Severity.ERROR,
+                    description=(
+                        f"bugs/BUGS.jsonl line {parsed.lineno}: {parsed.reason} — "
+                        "every JSONL row must be one bug-record object "
+                        "(SPEC-DOC-033, ERROR)."
+                    ),
+                    path=str(ledger_path),
                 )
-                continue
-            if not isinstance(obj, dict):
-                continue
-            if "event" in obj:
-                issues.append(
-                    SpecsDoctorIssue(
-                        code="SPEC-DOC-033",
-                        severity=Severity.ERROR,
-                        description=(
-                            f"bugs/BUGS.jsonl line {lineno}: v5 line in a v6 ledger — "
-                            "migrate (SPEC-DOC-033, ERROR). The event fold that used "
-                            "to decode/diagnose this shape is deleted (S1 FR23 firing, "
-                            "A3) — the live ledger must carry native v6 records only."
-                        ),
-                        path=str(ledger_path),
-                    )
-                )
-                continue
-            try:
-                record = BugRecord.from_dict(obj)
-            except (ValueError, TypeError) as exc:
-                issues.append(
-                    SpecsDoctorIssue(
-                        code="SPEC-DOC-033",
-                        severity=Severity.ERROR,
-                        description=(
-                            f"bugs/BUGS.jsonl line {lineno}: not a valid bug-record "
-                            f"object ({exc}) (SPEC-DOC-033, ERROR)."
-                        ),
-                        path=str(ledger_path),
-                    )
-                )
-                continue
-            gaps = governance_completeness_gaps(record)
-            if gaps:
-                issues.append(
-                    SpecsDoctorIssue(
-                        code="SPEC-DOC-033",
-                        severity=Severity.WARNING,
-                        description=(
-                            f"bugs/BUGS.jsonl record {record.id!r}: status "
-                            f"{record.status!r} is missing {', '.join(gaps)} "
-                            "(SPEC-DOC-033, WARNING — never a block, D15)."
-                        ),
-                        path=str(ledger_path),
-                    )
-                )
+            )
         return issues
 
     def check_bug_archive_overdue(self, *, now: datetime | None = None) -> list[SpecsDoctorIssue]:
@@ -420,7 +417,7 @@ class GovernanceValidator:
             return []
         cutoff = (now or datetime.now(tz=UTC)) - timedelta(days=BUG_ARCHIVE_THRESHOLD_DAYS)
         issues: list[SpecsDoctorIssue] = []
-        for record in _iter_native_bug_records(ledger_path):
+        for record in self._iter_bug_records(ledger_path):
             if record.status not in TERMINAL_EVENTS:
                 continue
             record_ts = _parse_bug_record_ts(record.ts)

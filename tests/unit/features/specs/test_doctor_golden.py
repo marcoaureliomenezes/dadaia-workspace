@@ -87,7 +87,7 @@ _FAMILY_OF_CODE: dict[str, str] = {
     "SPEC-DOC-036": "closure_audit",
     "SPEC-DOC-038": "closure_audit",
     "SPEC-DOC-031": "governance",
-    "SPEC-DOC-032": "governance",
+    # SPEC-DOC-032 RETIRED (v0.5.1 K5 deepening) — never emitted; omitted from this map.
     "SPEC-DOC-033": "governance",
     "SPEC-DOC-035": "governance",
     "SPEC-DOC-041": "governance",

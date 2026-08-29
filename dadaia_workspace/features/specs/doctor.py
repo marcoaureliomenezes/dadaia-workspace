@@ -32,6 +32,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
+from dadaia_workspace.core.models.bugs import BugRecord
 from dadaia_workspace.core.models.findings import FindingRecord
 from dadaia_workspace.core.protocols.process_runner import ProcessRunner
 from dadaia_workspace.core.protocols.record_store import RecordStore
@@ -64,6 +65,14 @@ class SpecsDoctor:
             wires this today (release 0.5.1 K9 deleted the never-called
             ``container.build_findings_store`` seam as dead code); ``None`` keeps
             ``ClosureAuditValidator``'s zero-dependency fallback reader (same model).
+        bug_store_factory: Optional DI seam for SPEC-DOC-033/041's ``BUGS.jsonl``
+            read (v0.5.1 K5 deepening, same ``strict``/malformed-line shape as
+            ``findings_store_factory`` — but takes ``specs_dir``, not a file path:
+            a bug ledger is ONE-per-``specs_dir``, unlike the unbounded per-audit-dir
+            ``FINDINGS.jsonl`` set) — a composition root wires
+            ``container.build_bug_record_store`` (the SAME factory ``cli.commands
+            .bugs`` already calls); ``None`` keeps ``GovernanceValidator``'s
+            zero-dependency fallback reader (same model).
         head_sha: Optional branch HEAD sha, resolved ONCE by the CLI composition
             root (through the ``GitObjectReader`` port) and passed in as plain data
             (v0.5.0 specs-canon closure) — feeds SPEC-DOC-044 (stale verdicts).
@@ -80,6 +89,7 @@ class SpecsDoctor:
         process_runner: ProcessRunner | None = None,
         repo_root: Path | None = None,
         findings_store_factory: Callable[[Path], RecordStore[FindingRecord]] | None = None,
+        bug_store_factory: Callable[[Path], RecordStore[BugRecord]] | None = None,
         head_sha: str | None = None,
         parent_sha: str | None = None,
     ) -> None:
@@ -125,6 +135,7 @@ class SpecsDoctor:
         self._governance = GovernanceValidator(
             self.specs_dir,
             self.public_dir,
+            bug_store_factory,
         )
         self._coherence = CoherenceValidator(
             self.specs_dir,
@@ -184,8 +195,13 @@ class SpecsDoctor:
         issues.extend(self._closure_audit.check_audits_naming_canon())  # SPEC-DOC-030
         # v0.1.11 / T-011-10 (bug B1) — closure-disposition canon
         issues.extend(self._governance.check_consumed_backlog_disposition())  # SPEC-DOC-031
-        issues.extend(self._governance.check_bug_status_canon())  # SPEC-DOC-032
-        # v0.1.46 / T-46-04 (AC-1) — event-sourced JSONL bug-telemetry invariant
+        # SPEC-DOC-032 RETIRED (v0.5.1 K5 deepening) — regex-matched a per-bug
+        # specs/bugs/<slug>.md frontmatter status: line, a shape retired two
+        # migrations before this one (v0.5.0 FR2's single-JSONL-ledger cutover);
+        # dead code behind a dead artifact, see doctor_governance.py's module
+        # docstring.
+        # v0.1.46 / T-46-04 (AC-1) — bug-ledger invariant, reads through the ONE
+        # RecordStore (v0.5.1 K5)
         issues.extend(self._governance.check_bugs_jsonl_invariant())  # SPEC-DOC-033
         # v0.1.46 / T-46-13 (AC-4) — taxonomy + disposition invariants
         issues.extend(self._closure_audit.check_archive_dirs_exist())  # SPEC-DOC-034
