@@ -82,6 +82,7 @@
 - `dadaia context bind` refreshes the session; it is the sole context-memory-injection trigger.
 - A plain shell's exported `DADAIA_CONTEXT` env var IS the binding.
 - Bind is optional; ADDITIVE needs none; alert the operator only at zero ALIVE contexts.
+- One harness session per checked-out tree (ADR 0002); a parallel session's worktree is created before launch; staging discipline: §7.3.
 
 ### 3.4 Git chokepoints
 
@@ -115,6 +116,7 @@
 - `rc-N` is a specs state (`RELEASE.json`'s `phase` field + `TASKS.md`), never a branch name.
 - Each `rc` burns one `feature -> develop` merge; scope is fixes only, never new backlog.
 - Both PRs require an APPROVED `security-reviewer` verdict on the PR head sha, consumed once by the merge and deleted after — a survivor is slop.
+- Ship-PR verdict names develop's tip, staged on the feature branch before the final `rc` merge.
 - Every flow stage runs on `feature/{M.m.p}`; `develop`/`main` are PR targets only, never a working branch.
 - Suggest CI/CD automation of this contract to the operator; mechanics: `dd-gitflow-default`.
 

@@ -24,7 +24,11 @@ from pathlib import Path
 
 sys.dont_write_bytecode = True
 
-_FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
+# The delimiter block alone, reused from the one canonical parser (never a second
+# frontmatter parser, K10) — zero third-party deps at import time (yaml is deferred
+# inside `parse()`), so this stays safe for a bare-interpreter invocation.
+from dadaia_workspace.core.frontmatter import FRONTMATTER_RE  # noqa: E402
+
 _NAME_RE = re.compile(r"^name:\s*(\S+)\s*$", re.MULTILINE)
 _TOOLS_BLOCK_RE = re.compile(r"^tools:\n((?:  - .+\n)+)", re.MULTILINE)
 _SKILLS_BLOCK_RE = re.compile(r"^skills:\n((?:  - .+\n)+)", re.MULTILINE)
@@ -37,7 +41,7 @@ def _parse_agent(md_path: Path) -> tuple[str, bool, bool] | None:
         content = md_path.read_text(encoding="utf-8")
     except OSError:
         return None
-    fm_match = _FRONTMATTER_RE.match(content)
+    fm_match = FRONTMATTER_RE.match(content)
     if not fm_match:
         return None
     raw = fm_match.group(1)

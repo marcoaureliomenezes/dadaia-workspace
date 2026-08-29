@@ -54,3 +54,7 @@ tldr: "feature/{M.m.p} -> develop -> main, PR-only past feature; 5 isolated comm
 - Mechanical enforcement (pre-push hook / CI job): branch-name pattern, push refusal, denylist scan, CI trigger.
 - Mechanical enforcement (continued): `pr-source-guard`, verdict-gate job requiring an APPROVED security handoff.
 - Discipline (this skill + reviewers, unenforced by any hook): start-of-work protocol, one-live-branch, delete+cut-on-deploy.
+- Verdict store is two-hop: PR head, or head's first parent (`features/chokepoints/verdict.py::covering_verdict`).
+- Ship PR (`develop` → `main`): stage the verdict naming develop's current tip as the last commit on `feature/{M.m.p}`, before the final `feature` → `develop` merge — the merged tip's first parent is then the named sha.
+- Nothing else lands on `develop` between that staged verdict commit and the merge.
+- The ship PR's verdict is consumed and deleted after the `main` merge, like any other.
