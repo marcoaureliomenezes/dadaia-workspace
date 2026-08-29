@@ -3,14 +3,14 @@
 Pure feature modules — no I/O outside the injected store:
 
 * ``service`` — ``BugService`` is the one write seam (AS-16) plus the read view over
-  the ledger (register/update/archive/status/stats/coherence_violations).
-* ``migrate_v5`` — the deletable v5-event-shape boundary adapter the live ledger still
-  needs until FR3/T-050-10 physically migrates it (A2.5); imported by nothing outside
-  this package.
+  the ledger (register/update/transition/archive/status/stats).
 
-The :class:`~dadaia_workspace.core.models.bugs.BugRecord` domain model, its
-:func:`~dadaia_workspace.core.models.bugs.governance_completeness_gaps` and
-:func:`~dadaia_workspace.core.models.bugs.immutable_core_drift` WARN-only diagnostics,
+The :class:`~dadaia_workspace.core.models.bugs.BugRecord` domain model — its
+:meth:`~dadaia_workspace.core.models.bugs.BugRecord.resolve`/:meth:`supersede`/
+:meth:`defer`/:meth:`reject` transitions (v0.5.1 K5 deepening: status is unreachable
+without its own required fields — ``governance_completeness_gaps``, the WARN-only
+completeness detector these transitions replace, is deleted) and its
+:func:`~dadaia_workspace.core.models.bugs.immutable_core_drift` WARN-only diagnostic —
 and the ``notes``/free-text redaction helper live in ``core/models/bugs.py`` — the
 bottom layer both ``infrastructure`` and ``features`` may import. Field set mirrors
 ``public/schemas/bugs/bug-record-v1.schema.json``. Persistence is the generic,

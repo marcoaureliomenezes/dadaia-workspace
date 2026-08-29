@@ -43,7 +43,7 @@ from __future__ import annotations
 
 import logging
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -53,18 +53,29 @@ from dadaia_workspace.core.models.bugs import (
     BUG_ARCHIVE_THRESHOLD_DAYS,
     TERMINAL_EVENTS,
     BugRecord,
-    governance_completeness_gaps,
 )
 from dadaia_workspace.core.protocols.git_history_reader import GitHistoryReader
 from dadaia_workspace.core.protocols.record_store import RecordStore
 
 __all__ = [
     "BugArchiveResult",
-    "BugCoherenceGap",
     "BugDuplicateIdError",
     "BugService",
     "BugStats",
 ]
+
+#: v0.5.1 K5 deepening — the ONE governance-write seam a status change goes through
+#: (AS-16): dispatches ``BugService.transition``'s *verb* to the matching
+#: :class:`~dadaia_workspace.core.models.bugs.BugRecord` transition method. Derived
+#: from the model's own methods, never a second, independently-maintained mapping of
+#: "what verbs exist" (mirrors ``core.models.bugs``'s own A2.10 "derive, never
+#: hand-keep" discipline).
+_TRANSITION_VERBS: Mapping[str, Callable[..., BugRecord]] = {
+    "resolve": BugRecord.resolve,
+    "supersede": BugRecord.supersede,
+    "defer": BugRecord.defer,
+    "reject": BugRecord.reject,
+}
 
 _LOG = logging.getLogger(__name__)
 
@@ -94,15 +105,6 @@ class BugStats:
     total: int
     by_status: dict[str, int] = field(default_factory=dict)
     by_severity: dict[str, int] = field(default_factory=dict)
-
-
-@dataclass(frozen=True)
-class BugCoherenceGap:
-    """A2.3 — one record whose governance fields are incomplete for its own ``status``."""
-
-    bug_id: str
-    status: str
-    missing: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -196,6 +198,33 @@ class BugService:
 
         return self._record_store.update(record_id, _mutate)
 
+    def transition(self, record_id: str, verb: str, **fields: str) -> BugRecord:
+        """AS-16 — the ONE governance-write seam a STATUS change goes through
+        (v0.5.1 K5 deepening): dispatches *verb* (``"resolve"``/``"supersede"``/
+        ``"defer"``/``"reject"``) to the matching
+        :class:`~dadaia_workspace.core.models.bugs.BugRecord` transition method,
+        called INSIDE the record-store's atomic update — exactly like
+        :meth:`apply_update` already does for a bare governance-field change, so a
+        refused transition (:class:`~dadaia_workspace.core.models.bugs
+        .IncompleteTransitionError`) never reaches the file at all: ``mutate()`` runs
+        BEFORE :meth:`~dadaia_workspace.core.protocols.record_store.RecordStore.update`
+        ever touches disk, so a refusal leaves the record byte-identical.
+
+        Raises ``ValueError`` for an unknown *verb*.
+        """
+        try:
+            method = _TRANSITION_VERBS[verb]
+        except KeyError:
+            raise ValueError(
+                f"unknown bug-record transition verb {verb!r} — one of {sorted(_TRANSITION_VERBS)}"
+            ) from None
+
+        def _mutate(record: BugRecord) -> BugRecord:
+            updated = method(record, **fields)
+            return updated.redact(self._denylist_terms)
+
+        return self._record_store.update(record_id, _mutate)
+
     def archive(
         self, *, now: datetime | None = None, threshold_days: int = BUG_ARCHIVE_THRESHOLD_DAYS
     ) -> BugArchiveResult:
@@ -277,17 +306,6 @@ class BugService:
         return BugStats(
             total=len(records), by_status=dict(by_status), by_severity=dict(by_severity)
         )
-
-    def coherence_violations(self) -> list[BugCoherenceGap]:
-        """A2.3 — every record whose governance fields are incomplete for its own
-        ``status``, sorted by ``id``. Never blocks (D15); the caller renders these as a
-        WARNING."""
-        gaps = [
-            BugCoherenceGap(bug_id=record.id, status=record.status, missing=missing)
-            for record in self._record_store.iter_records()
-            if (missing := governance_completeness_gaps(record))
-        ]
-        return sorted(gaps, key=lambda gap: gap.bug_id)
 
 
 def _parse_ts(value: str) -> datetime:

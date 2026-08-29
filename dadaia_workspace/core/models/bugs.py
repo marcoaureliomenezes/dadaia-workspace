@@ -33,10 +33,23 @@ the v5/v6 line-classifier's vocabulary
 (:func:`~dadaia_workspace.core.bug_provenance.classify_ledger_line`, permanent by
 necessity: git history is v5-shaped forever) and the closed set of terminal
 ``BugRecord.status`` values.
+
+**v0.5.1 K5 — status transitions are the interface.** ``status`` used to be a
+free-form governance field (``dadaia bugs update --set status=resolved`` landed with
+no completeness check); ``governance_completeness_gaps`` DETECTED the gap only after
+the fact (WARN-only, D15) — a rule enforced by a second pass over already-written
+data is one that gets forgotten at the write. That function is DELETED.
+:meth:`BugRecord.resolve`/:meth:`supersede`/:meth:`defer`/:meth:`reject` are now the
+ONLY way a record reaches their respective terminal status, each refusing
+(:class:`IncompleteTransitionError`) an incomplete/malformed call before any field is
+set — status is UNREACHABLE without its own required fields. A record that reached an
+incomplete terminal status before this seam existed is never re-diagnosed:
+completeness is prospective, not retroactive.
 """
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from dataclasses import fields as dc_fields
@@ -51,7 +64,7 @@ __all__ = [
     "BugRecord",
     "BugRecordImmutableFieldError",
     "BugRecordWriteOnceFieldSetError",
-    "governance_completeness_gaps",
+    "IncompleteTransitionError",
     "immutable_core_drift",
     "redact_text",
     "redactable_property_names",
@@ -204,6 +217,72 @@ class BugRecordWriteOnceFieldSetError(ValueError):
         self.field_name = field_name
 
 
+class IncompleteTransitionError(ValueError):
+    """Raised by a :class:`BugRecord` transition method (:meth:`resolve`,
+    :meth:`supersede`, :meth:`defer`, :meth:`reject`) when the caller omits a field
+    the target status requires, or supplies one that fails its own format rule
+    (``evidence_diff``'s pattern, ``diff_direction``'s closed enum, or the three
+    literal shapes an evidence field must never carry).
+
+    The record is left COMPLETELY untouched on refusal — a transition method raises
+    before ever calling :meth:`BugRecord.apply_governance_update`, so there is
+    always a correction path: a caller who mistyped a value simply calls the
+    transition again with the corrected one (closes bug
+    ``bug-record-write-once-evidence-fields-can-embed-selfscan-triggering-literal-
+    with-no-correction-path`` — the old failure mode was a write-once field that
+    landed WITH the bad literal, refusing any second write to correct it; refusing
+    AT the write means the bad literal never lands in the first place).
+    """
+
+    def __init__(self, verb: str, problems: Sequence[str]) -> None:
+        joined = "; ".join(problems)
+        super().__init__(
+            f"bug-record transition {verb!r} refused — {joined} (the record is "
+            "unchanged; call the transition again with corrected values)"
+        )
+        self.verb = verb
+        self.problems = tuple(problems)
+
+
+#: bug-record-v1.schema.json's ``evidence_diff`` pattern — restated here once, the
+#: schema being the documented source (A2.1); this is the runtime mirror.
+_EVIDENCE_DIFF_PATTERN_RE = re.compile(r"^(net-negative|net-positive|net-neutral):\s*\S.*$")
+
+#: bug-record-v1.schema.json's ``diff_direction`` closed enum.
+_DIFF_DIRECTIONS: frozenset[str] = frozenset({"net-negative", "net-neutral", "net-positive"})
+
+#: bug-record-v1.schema.json's ``status`` closed enum (mirrors ``TERMINAL_EVENTS`` +
+#: ``"open"`` — restated as its own set so :meth:`BugRecord.from_dict` can validate it
+#: without constructing a throwaway ``BugEventKind`` mapping).
+_STATUS_VALUES: frozenset[str] = frozenset({"open", *TERMINAL_EVENTS})
+
+#: Structural, dependency-free literal shapes a write-once evidence field must never
+#: carry: an operator-local filesystem path, an e-mail address, a 40-hex
+#: secret-shaped token (a git sha belongs in ``registration_commit``/
+#: ``resolved_commit``, never quoted inline in evidence prose). Narrower than
+#: ``infrastructure.privacy_check``'s public-asset baseline (no doc-example
+#: carve-outs) — evidence prose never legitimately needs any of these three shapes,
+#: so refusing unconditionally is the correct rule here.
+_EVIDENCE_LOCAL_PATH_RE = re.compile(
+    r"(?:/home/[a-z_][a-z0-9_-]*|/Users/[A-Za-z_][A-Za-z0-9_-]*|[A-Za-z]:\\Users\\[A-Za-z0-9_.-]+)"
+)
+_EVIDENCE_EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+_EVIDENCE_SECRET_SHAPED_RE = re.compile(r"\b[0-9a-fA-F]{40}\b")
+
+
+def _evidence_privacy_violation(value: str) -> str | None:
+    """Return a human-readable description of the FIRST literal shape *value*
+    carries that a write-once evidence field must never contain, or ``None`` when
+    it carries none of the three."""
+    if _EVIDENCE_LOCAL_PATH_RE.search(value):
+        return "an operator-local filesystem path"
+    if _EVIDENCE_EMAIL_RE.search(value):
+        return "an e-mail address"
+    if _EVIDENCE_SECRET_SHAPED_RE.search(value):
+        return "a 40-hex secret-shaped token"
+    return None
+
+
 def _require_record_str(raw: Mapping[str, object], key: str) -> str:
     value = raw.get(key)
     if not isinstance(value, str) or not value:
@@ -314,6 +393,114 @@ class BugRecord:
             return self
         return replace(self, **updates)
 
+    def resolve(
+        self,
+        *,
+        cause: str | None = None,
+        caused_by: str | None = None,
+        resolved_release: str | None = None,
+        solution: str | None = None,
+        evidence_loop: str | None = None,
+        evidence_seam: str | None = None,
+        evidence_diff: str | None = None,
+        diff_direction: str | None = None,
+    ) -> BugRecord:
+        """The ONE way a record reaches ``status="resolved"`` — never bare via
+        ``apply_governance_update``/``dadaia bugs update --set status=resolved``.
+        Every keyword is REQUIRED (every problem is collected, not just the first);
+        ``caused_by`` must be an explicit string — the literal ``"none"`` declares
+        "no known predecessor", a bare omission is refused like any other missing
+        field. ``evidence_diff`` must match ``bug-record-v1.schema.json``'s pattern;
+        ``diff_direction`` must be one of its closed enum; ``evidence_loop``/
+        ``evidence_seam``/``evidence_diff`` are each scanned for the three literal
+        shapes they must never carry (:func:`_evidence_privacy_violation`).
+
+        Raises :class:`IncompleteTransitionError` naming every problem found; the
+        record is left untouched on refusal. On success, delegates the actual field
+        application to :meth:`apply_governance_update` — the ONE seam that already
+        enforces the write-once/immutable-core structural rules.
+        """
+        problems: list[str] = []
+        values: dict[str, str] = {}
+        for name, value in (
+            ("cause", cause),
+            ("caused_by", caused_by),
+            ("resolved_release", resolved_release),
+            ("solution", solution),
+            ("evidence_loop", evidence_loop),
+            ("evidence_seam", evidence_seam),
+            ("evidence_diff", evidence_diff),
+            ("diff_direction", diff_direction),
+        ):
+            if value is None or not value.strip():
+                problems.append(f"{name!r} is required")
+                continue
+            values[name] = value
+
+        if "evidence_diff" in values and not _EVIDENCE_DIFF_PATTERN_RE.match(
+            values["evidence_diff"]
+        ):
+            problems.append(
+                "'evidence_diff' must match "
+                "'^(net-negative|net-positive|net-neutral): <rationale>' "
+                "(bug-record-v1.schema.json)"
+            )
+        if "diff_direction" in values and values["diff_direction"] not in _DIFF_DIRECTIONS:
+            problems.append(
+                f"'diff_direction' must be one of {sorted(_DIFF_DIRECTIONS)}, got "
+                f"{values['diff_direction']!r}"
+            )
+        for evidence_field in ("evidence_loop", "evidence_seam", "evidence_diff"):
+            evidence_value = values.get(evidence_field)
+            if evidence_value is None:
+                continue
+            violation = _evidence_privacy_violation(evidence_value)
+            if violation is not None:
+                problems.append(f"{evidence_field!r} must not contain {violation}")
+
+        if problems:
+            raise IncompleteTransitionError("resolve", problems)
+
+        return self.apply_governance_update(
+            {
+                "status": "resolved",
+                "cause": values["cause"],
+                "caused_by": values["caused_by"],
+                "resolved_release": values["resolved_release"],
+                "solution": values["solution"],
+                "evidence_loop": values["evidence_loop"],
+                "evidence_seam": values["evidence_seam"],
+                "evidence_diff": values["evidence_diff"],
+                "diff_direction": values["diff_direction"],
+            }
+        )
+
+    def supersede(self, *, by: str | None = None) -> BugRecord:
+        """The ONE way a record reaches ``status="superseded"`` — *by* (the
+        superseding backlog/bug/release slug) is REQUIRED, mirroring
+        ``governance_completeness_gaps``'s old ``superseded_by`` rule, now enforced
+        at the write instead of detected after it."""
+        if by is None or not by.strip():
+            raise IncompleteTransitionError("supersede", ["'by' is required"])
+        return self.apply_governance_update({"status": "superseded", "superseded_by": by})
+
+    def defer(self, *, reason: str | None = None) -> BugRecord:
+        """The ONE way a record reaches ``status="deferred"`` — *reason* is
+        REQUIRED. ``BugRecord`` carries no dedicated defer-reason field (the schema's
+        only generic mutable-governance free-text explanation field is ``cause``);
+        this reuses it as the record's own governance narrative rather than
+        inventing a second, transition-only field for the same purpose."""
+        if reason is None or not reason.strip():
+            raise IncompleteTransitionError("defer", ["'reason' is required"])
+        return self.apply_governance_update({"status": "deferred", "cause": reason})
+
+    def reject(self, *, reason: str | None = None) -> BugRecord:
+        """The ONE way a record reaches ``status="rejected"`` (same ``cause``-reuse
+        rule as :meth:`defer` — see its docstring). *reason* is REQUIRED."""
+        if reason is None or not reason.strip():
+            raise IncompleteTransitionError("reject", ["'reason' is required"])
+        return self.apply_governance_update({"status": "rejected", "cause": reason})
+
     def redact(self, denylist_terms: Sequence[tuple[str, str]] = ()) -> BugRecord:
         """Return a copy with every free-text field scrubbed via :func:`redact_text`.
 
@@ -357,8 +544,16 @@ class BugRecord:
     @classmethod
     def from_dict(cls, raw: Mapping[str, object]) -> BugRecord:
         """Parse a JSONL object into a :class:`BugRecord`. Raises ``ValueError`` on a
-        malformed record (missing/typed-wrong required field) so tolerant readers can
-        skip it."""
+        malformed record (missing/typed-wrong required field, or a ``status`` outside
+        the closed enum {open, resolved, superseded, deferred, rejected} —
+        bug-record-v1.schema.json; v0.5.1 K5 deepening) so tolerant readers can skip
+        it. This is the ONE record-level parser every reader (the record store, the
+        service, the doctor) shares — never a second, hand-rolled field check."""
+        status = _require_record_str(raw, "status")
+        if status not in _STATUS_VALUES:
+            raise ValueError(
+                f"bug record field 'status' must be one of {sorted(_STATUS_VALUES)}, got {status!r}"
+            )
         return cls(
             id=_require_record_str(raw, "id"),
             ts=_require_record_str(raw, "ts"),
@@ -371,7 +566,7 @@ class BugRecord:
             symptom=_require_record_str(raw, "symptom"),
             repro=_require_record_str(raw, "repro"),
             expected=_require_record_str(raw, "expected"),
-            status=_require_record_str(raw, "status"),
+            status=status,
             cause=_opt_record_str(raw, "cause"),
             caused_by=_opt_record_str(raw, "caused_by"),
             lineage_source=_opt_record_str(raw, "lineage_source"),
@@ -408,45 +603,18 @@ _BUG_RECORD_REDACTABLE_FIELDS: tuple[str, ...] = _dataclass_field_names(
 
 
 # ============================================================================
-# v0.5.0 T-050-08 (FR2 A2.3 / A2.7) — WARN-only diagnostics over a BugRecord.
+# v0.5.0 T-050-08 (A2.7) — WARN-only diagnostic over a BugRecord.
 #
-# Both functions are pure and read only their own arguments (zero I/O — required for a
-# `core` leaf); they exist here, not in `features/bugs` or `features/specs`, because
-# BOTH `features.bugs.service.BugService` (``dadaia bugs status``) and
-# `features.specs.doctor_governance.GovernanceValidator` (`specs doctor`) must render
-# the SAME diagnosis and neither may import the other (`features-no-cross-feature`) —
-# `core` is the one layer both already import. D15: coherence is DETECTED, never a
-# block; every caller of these two functions renders a WARNING, never refuses a write
-# or changes an exit code.
+# `governance_completeness_gaps` (A2.3's WARN-only completeness detector) is DELETED
+# here at v0.5.1 K5 — see the module docstring's "status transitions are the
+# interface" note: completeness is now refused AT the write
+# (BugRecord.resolve/supersede/defer/reject), never detected after it. This function
+# is pure and reads only its own arguments (zero I/O — required for a `core` leaf); it
+# stays here, not in `features/bugs` or `features/specs`, because A2.7's residual-gap
+# detector is a `features.specs.doctor_governance` concern this deepening did not
+# touch (a file tool can still hand-edit a core field directly on disk, bypassing
+# every write seam — that is what THIS function detects, never prevents).
 # ============================================================================
-
-
-def governance_completeness_gaps(record: BugRecord) -> tuple[str, ...]:
-    """A2.3 — the governance-completeness rule (SPEC FR2): reaching ``status:
-    "resolved"`` without ``cause``/``caused_by``/``resolved_release``/``solution``, or
-    ``status: "superseded"`` without ``superseded_by``, is a coherence GAP — surfaced as
-    a WARNING by ``dadaia bugs status`` and ``specs doctor``, never a block (D15).
-
-    Returns the sorted tuple of missing field names (empty when the record is complete
-    for its own ``status``, or its ``status`` carries no completeness rule at all —
-    ``open``/``deferred``/``rejected``).
-    """
-    if record.status == "resolved":
-        return tuple(
-            sorted(
-                name
-                for name, value in (
-                    ("cause", record.cause),
-                    ("caused_by", record.caused_by),
-                    ("resolved_release", record.resolved_release),
-                    ("solution", record.solution),
-                )
-                if not value
-            )
-        )
-    if record.status == "superseded":
-        return () if record.superseded_by else ("superseded_by",)
-    return ()
 
 
 def immutable_core_drift(record: BugRecord, baseline: BugRecord) -> tuple[str, ...]:

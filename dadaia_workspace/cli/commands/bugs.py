@@ -1,17 +1,26 @@
-"""CLI command group: ``dadaia bugs append|status|stats|update|archive`` (v0.5.0 FR2).
+"""CLI command group: ``dadaia bugs append|status|stats|update|resolve|supersede|defer|
+reject|archive`` (v0.5.0 FR2, transitions added at v0.5.1 K5 deepening).
 
 One record per bug (``core.models.bugs.BugRecord``), appended once — no event stream, no
-fold (D11, D-F). ``append`` registers a brand-new record (``status: "open"``); every
-governance write — the fixer's resolve, the auditor's ``audited``/``resolved_commit``
-rewrite — goes through ``update`` (AS-16, A2.13): the ONE write seam
-(``features.bugs.service.BugService``), redacted, atomic, refuse-stale. ``archive``
-(A2.8) moves terminal records older than 90 days to ``specs/bugs/_archive/bugs_histo.jsonl``.
-Writes land under an ADDITIVE path (never concurrency-blocked).
+fold (D11, D-F). ``append`` registers a brand-new record (``status: "open"``).
 
-The event kinds ``resolved``/``picked``/``archived`` no longer exist on this CLI —
-resolution/supersession/deferral/rejection are governance-field writes, made through
-``update``; the reservation marker (``picked``) and its annotation (``archived``)
-disappear entirely (FR2: "the value, its transition and picked_by all disappear").
+**Status transitions are the interface (v0.5.1 K5).** ``resolve``/``supersede``/
+``defer``/``reject`` are the ONLY way a record reaches their respective terminal
+status — each calls :meth:`~dadaia_workspace.features.bugs.service.BugService
+.transition`, which dispatches to the matching
+:class:`~dadaia_workspace.core.models.bugs.BugRecord` transition method: status is
+unreachable without its own required fields, refused
+(:class:`~dadaia_workspace.core.models.bugs.IncompleteTransitionError`) with every
+missing/invalid field named at once, the record left completely untouched on refusal.
+``update --set status=...`` is REFUSED, naming the matching transition command.
+``update`` remains the seam for every OTHER governance/write-once field (the auditor's
+``audited``/``resolved_commit`` rewrite, AS-16/A2.13). ``archive`` (A2.8) moves
+terminal records older than 90 days to ``specs/bugs/_archive/bugs_histo.jsonl``. Writes
+land under an ADDITIVE path (never concurrency-blocked).
+
+The event kinds ``resolved``/``picked``/``archived`` no longer exist on this CLI — the
+reservation marker (``picked``) and its annotation (``archived``) disappear entirely
+(FR2: "the value, its transition and picked_by all disappear").
 """
 
 from __future__ import annotations
@@ -36,6 +45,7 @@ from dadaia_workspace.core.models.bugs import (
     BUG_ARCHIVE_THRESHOLD_DAYS,
     BugRecordImmutableFieldError,
     BugRecordWriteOnceFieldSetError,
+    IncompleteTransitionError,
 )
 from dadaia_workspace.core.protocols.record_store import RecordNotFoundError, StaleRecordWriteError
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
@@ -43,7 +53,10 @@ from dadaia_workspace.features.bugs.service import BugDuplicateIdError, BugServi
 
 __all__ = ["bugs_app"]
 
-bugs_app = typer.Typer(help="One-record-per-bug telemetry (append/status/stats/update/archive).")
+bugs_app = typer.Typer(
+    help="One-record-per-bug telemetry "
+    "(append/status/stats/update/resolve/supersede/defer/reject/archive)."
+)
 
 #: The packaged schema id (file lives at ``public/schemas/bugs/<id>.schema.json``).
 _SCHEMA_ID = "bug-record-v1"
@@ -114,20 +127,6 @@ def _service(target: Path, *, with_archive: bool = False) -> BugService:
         container.build_bug_record_store(target),
         archive_store=container.build_bug_archive_store(target) if with_archive else None,
         denylist_terms=container.load_denylist_terms(),
-    )
-
-
-def _print_coherence_warnings(service: BugService) -> None:
-    """A2.3: surface governance-completeness gaps as a WARNING, never a block (D15) —
-    printed to stderr so stdout stays stable for every scripted consumer of ``status``/
-    ``stats`` (CLI-output stability)."""
-    gaps = service.coherence_violations()
-    if not gaps:
-        return
-    typer.echo(
-        f"[warn] {len(gaps)} record(s) incomplete for their status "
-        "(missing governance fields) — run 'specs doctor' for the per-record detail",
-        err=True,
     )
 
 
@@ -251,7 +250,6 @@ def bugs_status_cmd(
         typer.echo(f"{record.id}\t{record.status}\t{severity}")
     scope = "all" if include_closed else "open"
     typer.echo(f"[ok] {len(records)} {scope} bug(s).")
-    _print_coherence_warnings(service)
 
 
 @bugs_app.command("stats")
@@ -273,7 +271,6 @@ def bugs_stats_cmd(
         typer.echo(f"status:{status}\t{count}")
     for severity, count in sorted(stats.by_severity.items()):
         typer.echo(f"severity:{severity}\t{count}")
-    _print_coherence_warnings(service)
 
 
 def _parse_set_options(raw_sets: list[str]) -> dict[str, str]:
@@ -302,18 +299,33 @@ def bugs_update_cmd(
         None, "--specs-dir", help="Path to specs/ directory. Default: bound context session."
     ),
 ) -> None:
-    """AS-16 — the one governance-write seam: the fixer's resolve, the auditor's
-    ``audited``/``resolved_commit`` rewrite, and any other governance/write-once field
-    change all go through this verb. No content validation is added beyond the seam's
-    own structural refusals (immutable-core changed, write-once field re-set with a
-    differing value) — a refuse-stale race is reported as a non-zero exit naming the
-    re-read-and-retry remedy, never a block on a human (D15/AS-16)."""
+    """AS-16 — the one governance-write seam for every governance/write-once field
+    OTHER than ``status`` — the auditor's ``audited``/``resolved_commit`` rewrite and
+    any other non-status governance write go through this verb. No content validation
+    is added beyond the seam's own structural refusals (immutable-core changed,
+    write-once field re-set with a differing value) — a refuse-stale race is reported
+    as a non-zero exit naming the re-read-and-retry remedy, never a block on a human
+    (D15/AS-16).
+
+    ``--set status=...`` is REFUSED (v0.5.1 K5 deepening) — status is unreachable
+    without its own required fields; use the matching transition command instead
+    (``dadaia bugs resolve|supersede|defer|reject``)."""
     target = _resolve_specs_dir(specs_dir)
     if not target.is_dir():
         typer.echo(f"[error] specs_dir not found: {target}", err=True)
         raise typer.Exit(code=1)
 
     changes: Mapping[str, str] = _parse_set_options(set_)
+    if "status" in changes:
+        typer.echo(
+            "[error] 'bugs update --set status=...' is refused — status is "
+            "unreachable without its own required fields (v0.5.1 K5). Use the "
+            "matching transition command instead: 'dadaia bugs "
+            "resolve|supersede|defer|reject "
+            f"{bug_id}'.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
     service = _service(target)
     try:
         updated = service.apply_update(bug_id, changes)
@@ -327,6 +339,145 @@ def bugs_update_cmd(
         typer.echo(f"[error] {exc}", err=True)
         raise typer.Exit(code=1) from exc
     typer.echo(f"[ok] updated {', '.join(sorted(changes))} for {updated.id}")
+
+
+def _run_transition(target: Path, bug_id: str, verb: str, fields: Mapping[str, str | None]) -> None:
+    """Shared body for the four transition commands below (v0.5.1 K5 deepening) —
+    every option is threaded through as-is (``None`` when the operator omitted it),
+    so :meth:`~dadaia_workspace.core.models.bugs.BugRecord`'s own transition method
+    is the ONE place "what's required" is decided; this CLI layer duplicates none of
+    it."""
+    service = _service(target)
+    present = {key: value for key, value in fields.items() if value is not None}
+    try:
+        updated = service.transition(bug_id, verb, **present)
+    except (
+        IncompleteTransitionError,
+        BugRecordImmutableFieldError,
+        BugRecordWriteOnceFieldSetError,
+        RecordNotFoundError,
+        StaleRecordWriteError,
+        ValueError,
+    ) as exc:
+        typer.echo(f"[error] {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    past_tense = {
+        "resolve": "resolved",
+        "supersede": "superseded",
+        "defer": "deferred",
+        "reject": "rejected",
+    }
+    typer.echo(f"[ok] {past_tense[verb]} {updated.id}")
+
+
+@bugs_app.command("resolve")
+def bugs_resolve_cmd(
+    bug_id: str = typer.Argument(..., help="The record id to resolve."),
+    cause: str | None = typer.Option(None, "--cause", help="What caused the bug."),
+    caused_by: str | None = typer.Option(
+        None,
+        "--caused-by",
+        help="Prior bug id this one was caused by, or the literal 'none'.",
+    ),
+    resolved_release: str | None = typer.Option(
+        None, "--resolved-release", help="The release id that shipped the fix."
+    ),
+    solution: str | None = typer.Option(None, "--solution", help="What the fix does."),
+    evidence_loop: str | None = typer.Option(
+        None, "--evidence-loop", help="The red-loop command that reproduced the bug."
+    ),
+    evidence_seam: str | None = typer.Option(
+        None, "--evidence-seam", help="The regression test file/node that pins the fix."
+    ),
+    evidence_diff: str | None = typer.Option(
+        None,
+        "--evidence-diff",
+        help="'net-negative|net-positive|net-neutral: <rationale>'.",
+    ),
+    diff_direction: str | None = typer.Option(
+        None, "--diff-direction", help="net-negative|net-neutral|net-positive."
+    ),
+    specs_dir: str | None = typer.Option(
+        None, "--specs-dir", help="Path to specs/ directory. Default: bound context session."
+    ),
+) -> None:
+    """The ONE way a record reaches ``status="resolved"`` (v0.5.1 K5 deepening) —
+    every option above is REQUIRED by the model's own transition method
+    (:meth:`~dadaia_workspace.core.models.bugs.BugRecord.resolve`); omitting one is
+    refused with every missing/invalid field named at once, and the record is left
+    completely untouched (never a partial write)."""
+    target = _resolve_specs_dir(specs_dir)
+    if not target.is_dir():
+        typer.echo(f"[error] specs_dir not found: {target}", err=True)
+        raise typer.Exit(code=1)
+    _run_transition(
+        target,
+        bug_id,
+        "resolve",
+        {
+            "cause": cause,
+            "caused_by": caused_by,
+            "resolved_release": resolved_release,
+            "solution": solution,
+            "evidence_loop": evidence_loop,
+            "evidence_seam": evidence_seam,
+            "evidence_diff": evidence_diff,
+            "diff_direction": diff_direction,
+        },
+    )
+
+
+@bugs_app.command("supersede")
+def bugs_supersede_cmd(
+    bug_id: str = typer.Argument(..., help="The record id to supersede."),
+    by: str | None = typer.Option(
+        None, "--by", help="The backlog/bug/release slug that supersedes this record."
+    ),
+    specs_dir: str | None = typer.Option(
+        None, "--specs-dir", help="Path to specs/ directory. Default: bound context session."
+    ),
+) -> None:
+    """The ONE way a record reaches ``status="superseded"`` (v0.5.1 K5 deepening) —
+    ``--by`` is REQUIRED."""
+    target = _resolve_specs_dir(specs_dir)
+    if not target.is_dir():
+        typer.echo(f"[error] specs_dir not found: {target}", err=True)
+        raise typer.Exit(code=1)
+    _run_transition(target, bug_id, "supersede", {"by": by})
+
+
+@bugs_app.command("defer")
+def bugs_defer_cmd(
+    bug_id: str = typer.Argument(..., help="The record id to defer."),
+    reason: str | None = typer.Option(None, "--reason", help="Why the bug is deferred."),
+    specs_dir: str | None = typer.Option(
+        None, "--specs-dir", help="Path to specs/ directory. Default: bound context session."
+    ),
+) -> None:
+    """The ONE way a record reaches ``status="deferred"`` (v0.5.1 K5 deepening) —
+    ``--reason`` is REQUIRED."""
+    target = _resolve_specs_dir(specs_dir)
+    if not target.is_dir():
+        typer.echo(f"[error] specs_dir not found: {target}", err=True)
+        raise typer.Exit(code=1)
+    _run_transition(target, bug_id, "defer", {"reason": reason})
+
+
+@bugs_app.command("reject")
+def bugs_reject_cmd(
+    bug_id: str = typer.Argument(..., help="The record id to reject."),
+    reason: str | None = typer.Option(None, "--reason", help="Why the bug is rejected."),
+    specs_dir: str | None = typer.Option(
+        None, "--specs-dir", help="Path to specs/ directory. Default: bound context session."
+    ),
+) -> None:
+    """The ONE way a record reaches ``status="rejected"`` (v0.5.1 K5 deepening) —
+    ``--reason`` is REQUIRED."""
+    target = _resolve_specs_dir(specs_dir)
+    if not target.is_dir():
+        typer.echo(f"[error] specs_dir not found: {target}", err=True)
+        raise typer.Exit(code=1)
+    _run_transition(target, bug_id, "reject", {"reason": reason})
 
 
 @bugs_app.command("archive")

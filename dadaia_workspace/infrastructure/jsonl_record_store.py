@@ -30,9 +30,11 @@ import json
 import logging
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from pathlib import Path
+from typing import Literal, overload
 
 from dadaia_workspace.core.atomic_write import ConcurrentModificationError, atomic_write
 from dadaia_workspace.core.protocols.record_store import (
+    MalformedLine,
     RecordNotFoundError,
     StaleRecordWriteError,
 )
@@ -156,22 +158,36 @@ class JsonlRecordStore[T]:
 
     # -- reads ---------------------------------------------------------------------
 
-    def iter_records(self) -> Iterator[T]:
+    @overload
+    def iter_records(self, *, strict: Literal[False] = False) -> Iterator[T]: ...
+    @overload
+    def iter_records(self, *, strict: Literal[True]) -> Iterator[T | MalformedLine]: ...
+    def iter_records(self, *, strict: bool = False) -> Iterator[T | MalformedLine]:
         """Yield every stored record in file order.
 
-        Malformed JSON, a non-object line, or a model-parse failure is skipped with a
-        logged WARN — a single corrupt line never breaks the whole stream (mirrors the
-        tolerance ``infrastructure.jsonl_bug_store.JsonlBugStore.iter_events`` already
-        has). Splits on ``"\\n"`` ONLY (never ``str.splitlines()``) — the T-045-20 fix,
-        carried forward at the one reader this release leaves standing.
+        ``strict=False`` (default): malformed JSON, a non-object line, or a
+        model-parse failure is skipped with a logged WARN — a single corrupt line
+        never breaks the whole stream. ``strict=True``: the SAME classification
+        yields a :class:`MalformedLine` instead of skipping (v0.5.1 K5 deepening) —
+        the ONE malformed-line diagnosis, so a diagnostic caller (``specs doctor``)
+        never needs its own second parser. Splits on ``"\\n"`` ONLY (never
+        ``str.splitlines()``) — the T-045-20 fix, carried forward at the one reader
+        this release leaves standing.
         """
-        for line in self._read_text().split("\n"):
+        for lineno, line in enumerate(self._read_text().split("\n"), start=1):
             stripped = line.strip()
             if not stripped:
                 continue
-            record = self._parse_line(stripped)
-            if record is not None:
-                yield record
+            parsed = self._parse_line(lineno, stripped)
+            if isinstance(parsed, MalformedLine):
+                if strict:
+                    yield parsed
+                else:
+                    _LOG.warning(
+                        "skipping malformed record line in %s: %s", self._path, parsed.reason
+                    )
+                continue
+            yield parsed
 
     # -- internals -------------------------------------------------------------------
 
@@ -180,17 +196,14 @@ class JsonlRecordStore[T]:
             return ""
         return self._path.read_text(encoding="utf-8")
 
-    def _parse_line(self, stripped: str) -> T | None:
+    def _parse_line(self, lineno: int, stripped: str) -> T | MalformedLine:
         try:
             raw = json.loads(stripped)
         except json.JSONDecodeError as exc:
-            _LOG.warning("skipping malformed record line in %s: %s", self._path, exc)
-            return None
+            return MalformedLine(lineno=lineno, raw=stripped, reason=f"not valid JSON: {exc.msg}")
         if not isinstance(raw, dict):
-            _LOG.warning("skipping non-object record line in %s", self._path)
-            return None
+            return MalformedLine(lineno=lineno, raw=stripped, reason="not a JSON object")
         try:
             return self._from_dict(raw)
         except (ValueError, TypeError) as exc:
-            _LOG.warning("skipping invalid record in %s: %s", self._path, exc)
-            return None
+            return MalformedLine(lineno=lineno, raw=stripped, reason=str(exc))
