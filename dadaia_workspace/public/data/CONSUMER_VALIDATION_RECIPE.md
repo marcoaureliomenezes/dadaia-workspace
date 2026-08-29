@@ -223,8 +223,8 @@ an initialized workspace, create it:
 - Setup: an in-repo scaffolded specs tree `S` (`S=repos/vp/specs`; `mkdir -p repos/vp &&
   $D specs init --specs-dir S`) that is doctor-clean — confirm `$D specs doctor
   --specs-dir S` reports **0 errors AND 0 warnings**.
-- Run: `$D memory product add <slug> --specs-dir S`; `$D memory catalog generate
-  --specs-dir S`; then `$D specs doctor --specs-dir S` again.
+- Run: `$D memory product add <slug> --area <area> --specs-dir S`;
+  `$D memory catalog generate --specs-dir S`; then `$D specs doctor --specs-dir S` again.
 - **PASS if:** the verbs exist and exit 0; the atom is registered in the catalog; and the
   supported "add a feature" path leaves `specs doctor` at **0 errors AND 0 warnings** —
   the atom emitted by `memory product add` must lint clean out of the box (its template

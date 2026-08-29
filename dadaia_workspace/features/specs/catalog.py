@@ -58,6 +58,7 @@ from pathlib import Path
 from typing import Any
 
 from dadaia_workspace.core import frontmatter as _fm
+from dadaia_workspace.features.specs.canon import is_canon_path
 
 logger = logging.getLogger(__name__)
 
@@ -479,25 +480,38 @@ def memory_product_add(
     specs_dir: Path,
     slug: str,
     *,
+    area: str,
     templates_dir: Path | None = None,
     scaffold_dir: Path | None = None,
     project_name: str = "Projeto",
 ) -> MemoryProductAddResult:
-    """Create a product feature Markdown atom.
+    """Create a product feature Markdown atom under its canon area directory.
 
     1. Validates ``slug`` against ``^[a-z][a-z0-9-]+$``.
-    2. Creates ``specs/memory/product/<slug>.md`` from the born-markdown scaffold
-       template (``public/templates/memory-feature.md``) if it does not
+    2. Validates the resulting ``memory/product/<area>/<slug>.md`` path against
+       :func:`~dadaia_workspace.features.specs.canon.is_canon_path` — the SAME
+       decider ``doctor``/the pre-push gate use, never a second, hand-kept area
+       regex (bug memory-product-add-writes-a-flat-atom-path-outside-the-canon
+       -area-layout: this writer used to mint a flat ``memory/product/<slug>.md``,
+       a shape the v6 canon's ``memory/product/<area>/<slug>.md`` pattern refuses).
+    3. Creates ``specs/memory/product/<area>/<slug>.md`` from the born-markdown
+       scaffold template (``public/templates/memory-feature.md``) if it does not
        yet exist.
-    3. Returns the sorted list of all feature slugs in the product directory.
+    4. Returns the sorted list of all feature slugs across every area.
 
-    This operation is idempotent: calling it twice with the same slug produces
-    the same result.
+    This operation is idempotent: calling it twice with the same area/slug
+    produces the same result.
 
     Args:
         specs_dir:     Absolute path to the ``specs/`` directory.
         slug:          Feature slug (e.g. ``payments``). Must match
                        ``^[a-z][a-z0-9-]+$``.
+        area:          The canon area directory (e.g. ``platform``). Must match
+                       the canon's area shape (lowercase letters/digits/hyphens/
+                       underscores, starting with a letter) — the SAME shape
+                       :func:`~dadaia_workspace.features.specs.catalog
+                       .generate_catalog` reads back off an atom's parent
+                       directory name (F-75).
         templates_dir: Unused; kept for API compatibility during migration.
         scaffold_dir:  Optional compatibility directory containing ``feature.md``.
         project_name:  Unused; kept for API compatibility during migration.
@@ -506,7 +520,7 @@ def memory_product_add(
         :class:`MemoryProductAddResult`
 
     Raises:
-        ValueError: If ``slug`` does not match the required pattern.
+        ValueError: If ``slug`` or the resulting area path is not canon-conformant.
         OSError:    If the product directory cannot be created or written.
     """
     if not _PRODUCT_SLUG_RE.match(slug):
@@ -515,10 +529,19 @@ def memory_product_add(
             "(lowercase letters, digits, and hyphens; must start with a letter)."
         )
 
-    product_dir = specs_dir / "memory" / "product"
-    product_dir.mkdir(parents=True, exist_ok=True)
+    rel_path = f"memory/product/{area}/{slug}.md"
+    if not is_canon_path(rel_path):
+        raise ValueError(
+            f"Invalid area {area!r}: 'memory/product/{area}/{slug}.md' is not a "
+            "v6-canon-conformant path. area must be lowercase letters/digits/"
+            "hyphens/underscores, starting with a letter (features.specs.canon.CANON)."
+        )
 
-    feature_path = product_dir / f"{slug}.md"
+    product_dir = specs_dir / "memory" / "product"
+    area_dir = product_dir / area
+    area_dir.mkdir(parents=True, exist_ok=True)
+
+    feature_path = area_dir / f"{slug}.md"
     created_feature = False
 
     if not feature_path.exists():
@@ -527,8 +550,8 @@ def memory_product_add(
         feature_path.write_text(md_content, encoding="utf-8")
         created_feature = True
 
-    # Collect all feature slugs from *.md files (excluding index.md).
-    feature_slugs = sorted(p.stem for p in product_dir.glob("*.md") if p.name != "index.md")
+    # Collect all feature slugs from *.md files across every area (excluding index.md).
+    feature_slugs = sorted(p.stem for p in product_dir.rglob("*.md") if p.name != "index.md")
 
     return MemoryProductAddResult(
         feature_html=feature_path,

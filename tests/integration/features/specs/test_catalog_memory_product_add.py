@@ -57,10 +57,10 @@ def test_generated_and_canonical_scaffold_atoms_lint_clean(tmp_path: Path) -> No
     # A freshly generated atom is lint-clean.
     specs = tmp_path / "specs"
     specs.mkdir()
-    result = memory_product_add(specs, "my-feature")
+    result = memory_product_add(specs, "my-feature", area="testarea")
     proc = _run_lint(specs / "memory")
     assert result.created_feature is True
-    assert (specs / "memory" / "product" / "my-feature.md").is_file()
+    assert (specs / "memory" / "product" / "testarea" / "my-feature.md").is_file()
     assert proc.returncode != 1, (
         "Generated memory atom must not produce lint errors.\n"
         f"stdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
