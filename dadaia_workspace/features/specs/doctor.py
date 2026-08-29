@@ -8,8 +8,7 @@ single-responsibility validator siblings plus two shared leaf modules:
   * ``doctor_common``    — cross-validator pure helpers (``resolve_live_release_id`` + release-dir discovery)
   * ``doctor_structural``   — TREE-1..8 + TREE-5M spec-tree invariants; ``fix_tree4``,
                               ``fix_tree8``
-  * ``doctor_memory``       — memory files/atomicity, CAT-1, LINT-1 (holds the lazy
-                              ``infrastructure.subprocess_runner`` import)
+  * ``doctor_memory``       — memory files/atomicity, CAT-1, LINT-1
   * ``doctor_release``      — active release (RELEASE.json state document), release artifacts, SemVer + ledger invariants
   * ``doctor_closure_audit``— orphan specs, audit disposition; ``fix_archive_dir``
   * ``doctor_governance``   — single-source backlog invariants, bug status/JSONL
@@ -17,11 +16,11 @@ single-responsibility validator siblings plus two shared leaf modules:
 
 The coordinator owns ORDER: ``check()`` invokes the validators' public methods in the exact
 original interleaved sequence (families interleave — coherence→memory→release→…→governance→
-closure→coherence), and ``fix()`` dispatches by issue code. It imports NEITHER ``spec_context``
-NOR ``infrastructure.subprocess_runner`` (R-1 cap invariant): v0.1.76 T-4 retired the former
-``pid_probe``/``workspace_state_dir`` seam along with SPEC-DOC-029 (see ``doctor_coherence.py``),
-so the coordinator holds no ``spec_context`` cross-feature edge at all — not even via a typed
-leaf seam. Behavior is byte-identical to the pre-split module (golden lock
+closure→coherence), and ``fix()`` dispatches by issue code. It imports NO ``spec_context``
+(R-1 cap invariant): v0.1.76 T-4 retired the former ``pid_probe``/``workspace_state_dir`` seam
+along with SPEC-DOC-029 (see ``doctor_coherence.py``), so the coordinator holds no
+``spec_context`` cross-feature edge at all — not even via a typed leaf seam. Behavior is
+byte-identical to the pre-split module (golden lock
 ``tests/unit/features/specs/test_doctor_golden.py``).
 
 Pure module — no I/O outside the supplied specs_dir / public_dir. No external dependencies.
@@ -34,7 +33,6 @@ from pathlib import Path
 
 from dadaia_workspace.core.models.bugs import BugRecord
 from dadaia_workspace.core.models.findings import FindingRecord
-from dadaia_workspace.core.protocols.process_runner import ProcessRunner
 from dadaia_workspace.core.protocols.record_store import RecordStore
 from dadaia_workspace.features.specs.doctor_closure_audit import ClosureAuditValidator
 from dadaia_workspace.features.specs.doctor_coherence import CoherenceValidator
@@ -86,7 +84,6 @@ class SpecsDoctor:
         specs_dir: Path,
         public_dir: Path | None = None,
         templates_dir: Path | None = None,
-        process_runner: ProcessRunner | None = None,
         repo_root: Path | None = None,
         findings_store_factory: Callable[[Path], RecordStore[FindingRecord]] | None = None,
         bug_store_factory: Callable[[Path], RecordStore[BugRecord]] | None = None,
@@ -120,16 +117,12 @@ class SpecsDoctor:
         else:
             self._scaffold_dir = None
 
-        # ProcessRunner: injected for tests/DI; lazily resolved to the infra adapter in
-        # production when not provided (the memory validator holds the lazy import).
-        self._process_runner: ProcessRunner | None = process_runner
-
         # Build the six validators (each independently testable). The coordinator owns the
         # config resolution; validators own their family LOGIC and family-local helpers.
         self._structural = StructuralValidator(
             self.specs_dir, self._scaffold_dir, self._templates_dir
         )
-        self._memory = MemoryValidator(self.specs_dir, self._process_runner)
+        self._memory = MemoryValidator(self.specs_dir)
         self._release = ReleaseValidator(self.specs_dir)
         self._closure_audit = ClosureAuditValidator(self.specs_dir, findings_store_factory)
         self._governance = GovernanceValidator(

@@ -23,11 +23,11 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.protocols.certification_process import CertificationProcessResult
 from dadaia_workspace.features.certification.service import (
     _CertificationSkip,
     _codex_live_probe_detail,
 )
+from dadaia_workspace.infrastructure.certification_process import CertificationProcessResult
 
 
 class _FakeCertificationProcess:

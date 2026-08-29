@@ -9,8 +9,8 @@ from dadaia_workspace.core.models.agent_model_policy import (
     AgentModelPolicyStoreError,
 )
 from dadaia_workspace.core.models.doctor_report import DoctorReport
-from dadaia_workspace.core.protocols.storage import PublicAssetManager
 from dadaia_workspace.features.public.model_resolution import check_model_resolution
+from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 
 #: Loads the agent-model-policy overlay for a workspace root (v0.1.65 FR7). Injected by
 #: the composition root (``container.build_public_service``) so this feature module
@@ -21,7 +21,7 @@ AgentPolicyLoader = Callable[[Path], AgentModelPolicyOverlay | None]
 class PublicAssetService:
     def __init__(
         self,
-        public_assets: PublicAssetManager,
+        public_assets: FileSystemPublicAssetManager,
         agent_policy_loader: AgentPolicyLoader | None = None,
     ) -> None:
         self._public_assets = public_assets

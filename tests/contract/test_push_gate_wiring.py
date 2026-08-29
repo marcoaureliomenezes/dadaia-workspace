@@ -21,7 +21,7 @@ from typer.testing import CliRunner
 from dadaia_workspace import container
 from dadaia_workspace.cli.commands import ci
 from dadaia_workspace.cli.main import app
-from dadaia_workspace.core.protocols.git_object_reader import ScannedObject
+from dadaia_workspace.core.models.git_scan import ScannedObject
 
 _runner = CliRunner()
 _ZERO = "0" * 40

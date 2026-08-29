@@ -23,8 +23,8 @@ from dadaia_workspace.core.models.spec_context import (
     RepoLiveStatus,
     SpecContextProject,
 )
-from dadaia_workspace.core.protocols.context_store import ContextStore
-from dadaia_workspace.core.protocols.git_client import GitClient
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 
 # Canonical scaffold source — lives inside the installed package
 _PUBLIC_DIR = Path(__file__).parent.parent.parent / "public"
@@ -267,8 +267,8 @@ def _merge_scaffold_into(
 class SpecContextService:
     def __init__(
         self,
-        context_store: ContextStore,
-        git_client: GitClient,
+        context_store: JsonContextStore,
+        git_client: GitSubprocessClient,
         workspace_root: Path,
     ) -> None:
         self._store = context_store

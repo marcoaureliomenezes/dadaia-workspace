@@ -24,7 +24,7 @@ import pytest
 
 from dadaia_workspace import container
 from dadaia_workspace.cli.commands import ci
-from dadaia_workspace.core.protocols.git_object_reader import GitObjectReadError
+from dadaia_workspace.core.models.git_scan import GitObjectReadError
 from dadaia_workspace.features.chokepoints import push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import PushRef
 from dadaia_workspace.features.specs.canon import canon_violations, verdict_violations

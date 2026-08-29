@@ -12,10 +12,10 @@ from pathlib import Path
 from dadaia_workspace.core import kernel_tunables, session_store, workspace_layout
 from dadaia_workspace.core.models.spec_context import ContextState
 from dadaia_workspace.core.platform import PLATFORM
-from dadaia_workspace.core.protocols.context_store import ContextStore
-from dadaia_workspace.core.protocols.git_client import GitClient
 from dadaia_workspace.core.record_liveness import is_stale
 from dadaia_workspace.features.spec_context import presence
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 
 # Note: INV-1, INV-2, INV-3, INV-6 have been removed in v2. INV-4 and INV-5
 # are renamed for the ALIVE/DEAD semantics.
@@ -89,8 +89,8 @@ class DoctorIssue:
 class DoctorService:
     def __init__(
         self,
-        context_store: ContextStore,
-        git_client: GitClient,
+        context_store: JsonContextStore,
+        git_client: GitSubprocessClient,
         workspace_root: Path,
         pid_probe: Callable[[int], bool] | None = None,
     ) -> None:

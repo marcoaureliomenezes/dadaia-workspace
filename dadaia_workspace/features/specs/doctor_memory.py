@@ -15,7 +15,6 @@ import re
 from pathlib import Path
 
 from dadaia_workspace.core import frontmatter as _fm
-from dadaia_workspace.core.protocols.process_runner import ProcessRunner
 from dadaia_workspace.core.specs_repair import (  # noqa: F401
     has_unfilled_angle_placeholders,
     is_placeholder_atom,
@@ -174,15 +173,8 @@ def _iter_memory_md_files(mem_dir: Path) -> list[Path]:
 class MemoryValidator:
     """Memory-atom files, atomicity, CAT-1 catalog sync, and LINT-1 lint."""
 
-    def __init__(self, specs_dir: Path, process_runner: ProcessRunner | None = None) -> None:
+    def __init__(self, specs_dir: Path) -> None:
         self.specs_dir = specs_dir
-        # v0.4.3 T-043-20/FR16: LINT-1 no longer shells out (memory_lint is imported
-        # directly, below), so process_runner is UNUSED here now. The parameter is
-        # kept — never removed — purely for SpecsDoctor.__init__'s call-site
-        # compatibility (`MemoryValidator(self.specs_dir, self._process_runner)`,
-        # doctor.py:100, outside this task's write set); a future cleanup pass may
-        # retire the parameter from SpecsDoctor itself once nothing threads it here.
-        self._process_runner: ProcessRunner | None = process_runner
 
     def check_placeholder_atoms(self) -> list[SpecsDoctorIssue]:
         """MEM-PLACEHOLDER-1: unfilled placeholder atoms under ``specs/memory/**``.

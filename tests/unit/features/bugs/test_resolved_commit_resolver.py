@@ -19,7 +19,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from dadaia_workspace.core.models.bugs import BugRecord
-from dadaia_workspace.core.protocols.git_history_reader import HistoryCommit
+from dadaia_workspace.core.models.git_history import HistoryCommit
 from dadaia_workspace.features.bugs.service import BugService
 
 from ._bug_record_helpers import bug_record_store

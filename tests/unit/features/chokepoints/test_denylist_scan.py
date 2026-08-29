@@ -15,7 +15,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from dadaia_workspace.core.protocols.git_object_reader import ScannedObject
+from dadaia_workspace.core.models.git_scan import ScannedObject
 from dadaia_workspace.features.chokepoints.denylist_scan import _first_match, scan_objects
 from dadaia_workspace.infrastructure.privacy_check import load_baseline_patterns
 

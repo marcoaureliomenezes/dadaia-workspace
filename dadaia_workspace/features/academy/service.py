@@ -7,7 +7,7 @@ from pathlib import Path
 
 from dadaia_workspace.core.exceptions import ContextAlreadyExistsError, ContextNotFoundError
 from dadaia_workspace.core.models.course import Course
-from dadaia_workspace.core.protocols.course_store import CourseStore
+from dadaia_workspace.infrastructure.json_course_store import JsonCourseStore
 
 _KNOWLEDGE_PKG = "dadaia_workspace.features.academy.knowledge_basis"
 
@@ -51,7 +51,7 @@ def _first_heading(text: str) -> str | None:
 class AcademyService:
     def __init__(
         self,
-        course_store: CourseStore,
+        course_store: JsonCourseStore,
         workspace_root: Path,
     ) -> None:
         self._store = course_store

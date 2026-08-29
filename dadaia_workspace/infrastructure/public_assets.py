@@ -28,7 +28,6 @@ from dadaia_workspace.core.models.agent_model_policy import (
 )
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus, attest
 from dadaia_workspace.core.models.install_ledger import InstallLedger, LedgerEntry
-from dadaia_workspace.core.protocols.install_ledger_store import InstallLedgerStore
 from dadaia_workspace.core.workspace_layout import DADAIA_ADDITIVE_PREFIXES
 from dadaia_workspace.infrastructure.codex_doctor import (
     check_agent_skill_refs,
@@ -112,7 +111,7 @@ def _out_of_profile_warn(harness: str) -> DoctorLine:
 class FileSystemPublicAssetManager:
     def __init__(
         self,
-        install_ledger_store: InstallLedgerStore = JsonInstallLedgerStore(),
+        install_ledger_store: JsonInstallLedgerStore = JsonInstallLedgerStore(),
     ) -> None:
         self._public_dir = Path(__file__).parent.parent / "public"
         self._install_ledger_store = install_ledger_store

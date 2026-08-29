@@ -46,7 +46,7 @@ from enum import StrEnum
 from typing import Literal
 
 from dadaia_workspace.core.models.bugs import TERMINAL_EVENTS, BugEventKind
-from dadaia_workspace.core.protocols.git_history_reader import HistoryCommit
+from dadaia_workspace.core.models.git_history import HistoryCommit
 
 __all__ = [
     "ClassifiedLedgerLine",

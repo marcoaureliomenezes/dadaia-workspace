@@ -35,9 +35,9 @@ from dadaia_workspace.core.models.bugs import (
     TERMINAL_EVENTS,
     BugRecord,
 )
-from dadaia_workspace.core.protocols.git_history_reader import GitHistoryReader
 from dadaia_workspace.core.protocols.record_store import RecordStore
 from dadaia_workspace.core.redaction import PatternLike
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 
 __all__ = [
     "BugArchiveResult",
@@ -94,7 +94,7 @@ class BugService:
         archive_store: RecordStore[BugRecord] | None = None,
         denylist_terms: Sequence[tuple[str, str]] = (),
         baseline_patterns: Sequence[PatternLike] = (),
-        history_reader: GitHistoryReader | None = None,
+        history_reader: GitSubprocessClient | None = None,
         repo_root: Path | None = None,
         validate: Callable[[Mapping[str, object]], None] | None = None,
     ) -> None:
