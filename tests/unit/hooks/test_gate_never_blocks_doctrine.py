@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.features.spec_context import session_identity
+from dadaia_workspace.core import session_store
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
 pytestmark = pytest.mark.unit
@@ -32,7 +32,7 @@ def _mk_workspace(tmp_path: Path, *slugs: str, phase: str = "IMPLEMENTATION") ->
 
 
 def _write_session_record(ws: Path, session_id: str, mode: str) -> None:
-    session_identity.write_session(ws, session_id, {"session_id": session_id, "mode": mode})
+    session_store.write_session(ws, session_id, {"session_id": session_id, "mode": mode})
 
 
 def _write_target(ws: Path, ctx: str, name: str) -> Path:

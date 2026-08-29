@@ -47,7 +47,7 @@ __all__ = [
 ]
 
 #: Path-traversal allowlist (CWE-22/CWE-59), matching
-#: ``session_identity._validate``. Context names and session ids are filename
+#: ``session_store._validate``. Context names and session ids are filename
 #: components and must never escape their directory.
 _NAME_RE = re.compile(r"[A-Za-z0-9_-]+")
 

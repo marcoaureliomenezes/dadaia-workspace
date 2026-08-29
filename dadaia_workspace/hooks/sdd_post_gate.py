@@ -29,6 +29,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+from dadaia_workspace.core import invocation, session_store
 from dadaia_workspace.core.kernel_tunables import (
     PRESENCE_TTL_SECONDS,
     RECONCILER_REAP_TTL_MULTIPLIER,
@@ -36,25 +37,16 @@ from dadaia_workspace.core.kernel_tunables import (
     SESSION_GC_TTL_SECONDS,
 )
 from dadaia_workspace.core.record_liveness import is_stale
-from dadaia_workspace.features.spec_context import gate_policy, presence, session_identity
+from dadaia_workspace.features.spec_context import gate_policy, presence
 from dadaia_workspace.features.spec_context.gate_policy import PathClass
 from dadaia_workspace.hooks import _common
 from dadaia_workspace.infrastructure.jsonl_log_rotation import append_rotating_jsonl
 
 
-def _resolve_workspace() -> Path:
-    env = os.environ.get("WORKSPACE_ROOT")
-    if env:
-        return Path(env)
-    from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
-
-    return resolve_workspace_root()
-
-
 def _refresh_session_record(workspace: Path, sess_id: str) -> dict[str, object] | None:
     """Best-effort refresh of the session record's ``last_seen_at``. Returns the record.
 
-    Routed through ``session_identity`` (NF-3 fix, WS-R3 FR-R3-01): the single owner of the
+    Routed through ``session_store`` (NF-3 fix, WS-R3 FR-R3-01): the single owner of the
     ``sessions/<id>.json`` namespace constructs the path, reads the record, and writes it
     atomically. This hook no longer builds the session-record path itself, so it drops off
     the session-store ownership allowlist. Returns ``None`` (no-op) when the record is absent
@@ -66,7 +58,7 @@ def _refresh_session_record(workspace: Path, sess_id: str) -> dict[str, object] 
     every tool use and never silently decays.
     """
     now = datetime.now(tz=UTC).isoformat()
-    return session_identity.touch_last_seen_at(workspace, sess_id, now=now)
+    return session_store.touch_last_seen_at(workspace, sess_id, now=now)
 
 
 # ---------------------------------------------------------------------------------------
@@ -113,13 +105,11 @@ def _bound_context(workspace: Path, sess_id: str) -> str | None:
     ``DADAIA.md`` §3 law order (F-03, v0.5.0 review): rung 1 ``DADAIA_CONTEXT`` first —
     presence attribution always agrees with the gate and ctx_inject on the same prompt,
     and the env rung is also kimi-code's bridge (launched with ``DADAIA_CONTEXT``
-    exported, the SPEC coupling-2 disposition, since T-50-04 deleted the
-    marker-attributed self-adoption that used to key a kimi session's record). Rung 2 is
-    the session binding: this session's OWN record (``session_identity.read_session``
-    keyed by ``sess_id``), then the authority
-    (:func:`dadaia_workspace.core.specs_resolver.resolve_context` — hooks are sanctioned
-    DIRECT importers per the seam contract; the container never loads on a hook path,
-    F-01), which adds rung 3, the repo containing the current working directory.
+    exported). Rung 2 is the session binding: this session's OWN record
+    (``session_store.read_session`` keyed by ``sess_id``), then the single authority
+    (:func:`dadaia_workspace.core.invocation.resolve` — hooks are sanctioned DIRECT
+    importers per the seam contract; the container never loads on a hook path, F-01),
+    which adds rung 3, the repo containing the current working directory.
     """
     # Law order (F-03, v0.5.0 code review): rung 1 `DADAIA_CONTEXT` first, so presence
     # attribution always agrees with the gate and ctx_inject on the same prompt.
@@ -127,16 +117,14 @@ def _bound_context(workspace: Path, sess_id: str) -> str | None:
     if env_context:
         return env_context
 
-    record = session_identity.read_session(workspace, sess_id)
+    record = session_store.read_session(workspace, sess_id)
     if isinstance(record, dict):
         ctx = record.get("context")
         if isinstance(ctx, str) and ctx:
             return ctx
 
     # Direct core import (F-01): never pay the container's import graph in a hook.
-    from dadaia_workspace.core.specs_resolver import resolve_context
-
-    return resolve_context()
+    return invocation.resolve(env=os.environ, cwd=Path.cwd()).context_name
 
 
 def _porcelain_paths(repo_root: Path) -> list[str] | None:
@@ -237,7 +225,7 @@ _TMP_MARKER_PREFIXES: tuple[str, ...] = ("reconciler-last-", "ctx-inject-fired-"
 #: excluded on purpose (a paused run still awaiting an operator decision, never a zombie).
 _ZOMBIE_LIFECYCLE_STATUSES: frozenset[str] = frozenset({"running", "completed"})
 
-#: Path-traversal allowlist (CWE-22/CWE-59), matching ``session_identity``/``presence``'s
+#: Path-traversal allowlist (CWE-22/CWE-59), matching ``session_store``/``presence``'s
 #: own ``_NAME_RE`` — a marker's extracted session id must look like a real id before it is
 #: ever used to probe ``.dadaia/sessions/``.
 _MARKER_ID_RE = re.compile(r"[A-Za-z0-9_-]+")
@@ -299,7 +287,7 @@ def _read_json_dict(path: Path) -> dict[str, object] | None:
 def _reap_ttl(record: dict[str, object]) -> int:
     """This session record's own TTL (seconds) — the workspace default otherwise —
     multiplied by the reconciler's own N× reap multiplier (FR26: "stale beyond N×TTL")."""
-    raw = record.get(session_identity.SESSION_GC_TTL_FIELD, SESSION_GC_TTL_SECONDS)
+    raw = record.get(session_store.SESSION_GC_TTL_FIELD, SESSION_GC_TTL_SECONDS)
     base: int = SESSION_GC_TTL_SECONDS
     with contextlib.suppress(TypeError, ValueError):
         base = int(raw)  # type: ignore[call-overload]
@@ -310,7 +298,7 @@ def _reap_sessions(workspace: Path, dadaia_root: Path, sess_id: str) -> list[str
     """A26.1 — session records stale beyond N×TTL. The CALLING session's own record is
     NEVER a candidate (identity check, independent of whatever TTL math would say)."""
     reaped: list[str] = []
-    sessions_dir = session_identity.sessions_dir(workspace)
+    sessions_dir = session_store.sessions_dir(workspace)
     for path in _iter_files(sessions_dir):
         if path.suffix != ".json":
             continue
@@ -319,11 +307,11 @@ def _reap_sessions(workspace: Path, dadaia_root: Path, sess_id: str) -> list[str
             continue
         if not _resolved_within(path, dadaia_root):
             continue
-        data = session_identity.read_session(workspace, sid)
+        data = session_store.read_session(workspace, sid)
         if data is None:
             continue
         gc_check: dict[str, object] = {
-            "heartbeat": session_identity.liveness_timestamp(data),
+            "heartbeat": session_store.liveness_timestamp(data),
             "ttl": _reap_ttl(data),
         }
         if not is_stale(gc_check):
@@ -350,7 +338,7 @@ def _reap_markers(
     stale) is never touched."""
     reaped: list[str] = []
     tmp_dir = workspace / ".dadaia" / "tmp"
-    sessions_dir = session_identity.sessions_dir(workspace)
+    sessions_dir = session_store.sessions_dir(workspace)
     ttl = SESSION_GC_TTL_SECONDS * RECONCILER_REAP_TTL_MULTIPLIER
     for path in _iter_files(tmp_dir):
         name = path.name
@@ -603,7 +591,9 @@ def main() -> int:
         return 0
 
     try:
-        workspace = _resolve_workspace()
+        workspace = invocation.resolve(env=os.environ, cwd=Path.cwd()).workspace_root
+        if workspace is None:
+            raise RuntimeError("workspace not resolved")
     except Exception:  # noqa: BLE001 — fail-open: never block a tool call
         return 0
 

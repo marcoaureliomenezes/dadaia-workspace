@@ -214,7 +214,7 @@ def test_seed3_distinct_bind_sid_never_bridges_into_this_hook_session(tmp_path: 
     ``DADAIA_CONTEXT`` leaves the hook session's injection unbound, durably: the THIRD
     prompt proves this is not merely a one-shot omission.
     """
-    from dadaia_workspace.features.spec_context import session_identity
+    from dadaia_workspace.core import session_store as session_identity
 
     _add_context(tmp_path, "alpha", tech="# tech alpha\nPython 3.12 ALPHA-MARKER\n")
 

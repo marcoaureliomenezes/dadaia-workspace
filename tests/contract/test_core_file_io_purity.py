@@ -1,8 +1,10 @@
 """Core file-I/O purity AST ratchet (release v0.1.54, FR7 / T-54-12).
 
-`architecture.md` names exactly four `core/` modules as *authorized* file-I/O exceptions —
-``specs_backup``, ``specs_version``, ``specs_resolver``, ``workspace_resolver`` — pending
-the (now-consumed) ``import-boundary-enforcement`` backlog. The two import-linter contracts
+`architecture.md` names the `core/` modules that are *authorized* file-I/O exceptions —
+``specs_backup``, ``specs_version``, ``workspace_resolver``, ``atomic_write``,
+``invocation`` and ``session_store`` (release K1: the "One Invocation" deepening moved
+``core.specs_resolver`` and ``features.spec_context.session_identity`` into this pair —
+same authorized-exception status, new names, no net growth). The two import-linter contracts
 ``core-no-upper-layers`` and ``core-no-os-primitives`` are KEPT and unchanged; neither
 catches *file I/O* (they guard upward imports and OS-primitive modules, not calls to
 ``open`` / ``pathlib.Path`` write helpers). So the file-I/O purity of ``core/`` was, until
@@ -59,9 +61,10 @@ _AUTHORIZED_STEMS: frozenset[str] = frozenset(
         "specs_backup",
         "specs_repair",
         "specs_version",
-        "specs_resolver",
         "workspace_resolver",
         "atomic_write",
+        "invocation",
+        "session_store",
     }
 )
 

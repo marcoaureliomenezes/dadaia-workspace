@@ -88,7 +88,7 @@ _CACHE_SWEEP_EXCLUDED_TOP_LEVEL: frozenset[str] = frozenset({".venv", "sessions"
 #: Duplicated here (never imported) because ``features`` must not import ``hooks``.
 _MARKER_PREFIXES: tuple[str, ...] = ("reconciler-last-", "ctx-inject-fired-")
 
-#: Path-traversal allowlist (CWE-22/CWE-59), matching ``session_identity``'s own
+#: Path-traversal allowlist (CWE-22/CWE-59), matching ``session_store``'s own
 #: ``_NAME_RE`` — a marker's extracted session id must look like a real id before it is
 #: ever used to probe ``.dadaia/sessions/``.
 _MARKER_ID_RE = re.compile(r"[A-Za-z0-9_-]+")

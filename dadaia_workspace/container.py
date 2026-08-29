@@ -1,5 +1,6 @@
 """Composition root — builds services with concrete infrastructure."""
 
+import os
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -15,12 +16,13 @@ from dadaia_workspace.core.exceptions import (
     NoActiveReleaseError,
     WorkspaceNotInitializedError,
 )
+from dadaia_workspace.core.invocation import repo_slug_for_context
+from dadaia_workspace.core.invocation import resolve as _resolve_invocation
+from dadaia_workspace.core.invocation import resolve_context_specs_dir as _resolve_context_specs_dir
 from dadaia_workspace.core.protocols.git_history_reader import GitHistoryReader
 from dadaia_workspace.core.protocols.git_object_reader import GitObjectReader
 from dadaia_workspace.core.protocols.process_ancestry import ProcessAncestry
 from dadaia_workspace.core.protocols.record_store import RecordStore
-from dadaia_workspace.core.specs_resolver import repo_slug_for_context
-from dadaia_workspace.core.specs_resolver import resolve_context as _core_resolve_context
 from dadaia_workspace.features.academy.service import AcademyService
 from dadaia_workspace.features.agents.reader import FileSystemAgentsProvider
 from dadaia_workspace.features.chokepoints.denylist_scan import BaselinePatternLike
@@ -404,20 +406,6 @@ def is_source_repo_root(path: Path) -> bool:
     return _is_source_repo_root(path)
 
 
-def resolve_context(explicit: str | None = None, *, target_path: Path | None = None) -> str | None:
-    """Composition-root seam for the single context-resolution authority (hooks path).
-
-    T-50-02 (SPEC v0.5.0 FR1). ``core.specs_resolver`` is a forbidden direct import for
-    ``hooks`` (``bind-resolution-seam-is-a-single-home``, ZERO ``ignore_imports``): the
-    CLI routes through ``cli._specs_resolution`` (a sanctioned direct-import seam) and
-    every hook routes here instead. A thin, transparent pass-through to
-    :func:`dadaia_workspace.core.specs_resolver.resolve_context` (``DADAIA.md`` §3): no
-    behavior of its own, so a hook consumer resolves the EXACT same rungs the CLI seam
-    and every other consumer resolves.
-    """
-    return _core_resolve_context(explicit, target_path=target_path)
-
-
 def build_doctor_service(workspace_root: Path) -> DoctorService:
     _guard_initialized(workspace_root)
     states = _states_dir(workspace_root)
@@ -521,7 +509,9 @@ def build_reports_next_service(
     """
     _guard_initialized(workspace_root)
     reports_root = workspace_root / ".dadaia" / "handoff"
-    context_name = _core_resolve_context(context)
+    context_name = _resolve_invocation(
+        explicit=context, env=os.environ, cwd=Path.cwd()
+    ).context_name
     if not context_name:
         raise NoActiveReleaseError(
             "No bound context. Run `eval $(dadaia context bind <name> --mode read)` "
@@ -563,29 +553,14 @@ def build_agent_model_policy_service(workspace_root: Path) -> "AgentModelPolicyS
     return AgentModelPolicyService(store=store, rerender=_rerender_agents)
 
 
-def _context_specs_dir(workspace_root: Path, context: str) -> Path:
-    """Resolve a context's ``specs/`` tree (v0.1.57 FR2 / A1 — role→atom map wiring).
-
-    A consumer context resolves
-    to ``workspace_root/repos/<ctx>/specs``; the self-hosting library repo falls back to the
-    workspace-root ``specs`` tree. All roots derive from ``workspace_root`` — never cwd.
-    """
-    context_name = _core_resolve_context(context) or context
-    specs_dir = (
-        workspace_root / "repos" / repo_slug_for_context(workspace_root, context_name) / "specs"
-    )
-    if not specs_dir.is_dir():
-        specs_dir = workspace_root / "specs"
-    return specs_dir
-
-
 def resolve_context_specs_dir(workspace_root: Path, context: str) -> Path:
-    """Public seam for :func:`_context_specs_dir` (FR3, v0.1.68).
+    """Public seam (FR3, v0.1.68) for a context's ``specs/`` tree.
 
-    Lets a CLI verb resolve the same context→``specs/`` mapping the container
-    uses internally, without duplicating the resolution logic.
+    Thin pass-through to :func:`dadaia_workspace.core.invocation.resolve_context_specs_dir`
+    (release K1, the "One Invocation" deepening) — the container no longer holds its own
+    copy of the name-resolution + self-hosting-root-fallback logic.
     """
-    return _context_specs_dir(workspace_root, context)
+    return _resolve_context_specs_dir(workspace_root, context)
 
 
 def build_panel_views(

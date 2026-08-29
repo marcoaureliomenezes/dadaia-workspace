@@ -2,20 +2,10 @@
 
 Every resolver-driven ``dadaia`` command resolves through this module — its specs
 directory via :func:`resolve_specs_dir_for_cli`, or (v0.1.77) the bound CONTEXT NAME
-itself via :func:`resolve_context_for_cli`. Five per-command wrappers used to hand-copy
-the specs-dir call, which is exactly the drift centralizing here prevents.
-
-v0.1.77 (backlog ``central-bind-resolution-seam``, recurrence family F2 — 8 reports, 5
-partial per-command fixes v0.1.47->v0.1.71): a partial seam existed here
-(``resolve_specs_dir_for_cli``, consumed by specs/bugs/memory/migrate/newartifacts) but
-NOT the ~15 lifecycle verbs, whose ``--context`` Typer default was the hardcoded literal
-``"dadaia-workspace"`` passed as if explicit — the bind was never consulted.
-:func:`resolve_context_for_cli` is the single canonical order (SPEC FR1) every verb now
-resolves through: explicit -> ``DADAIA_CONTEXT`` env -> the single resolution authority's
-rung 2 (this session's own LIVE record, keyed by the harness-native session id) -> the
-repo containing cwd (the single authority's rung 3, SPEC v0.5.0 FR1 widening, which
-subsumes and generalizes the old hardcoded self-hosting-checkout literal this seam used
-to fall back to — T-50-05 deletes it).
+itself via :func:`resolve_context_for_cli`. A thin call onto the single resolution
+authority (release K1, the "One Invocation" deepening, 2026-08-28 audit):
+:mod:`dadaia_workspace.core.invocation`. This module's OWN job is the CLI-specific
+allowlist validation FR3 documents below — resolution itself has exactly one home now.
 
 v0.1.80 FR3 (backlog ``20260711-context-name-allowlist-at-resolution-rungs``, P4,
 defense-in-depth per v0.1.77 security review INFO): the *explicit* and ``DADAIA_CONTEXT``
@@ -23,7 +13,7 @@ env rungs both feed a ``repos/<name>/specs`` path join further downstream (this 
 own :func:`resolve_specs_dir_for_cli`, and every ``container.build_*`` factory keyed by
 context name), unvalidated. Both rungs are gated by the SAME ``[A-Za-z0-9_-]+`` allowlist
 the resolution authority already enforces on every repo-slug path component
-(:data:`~dadaia_workspace.core.specs_resolver._CONTEXT_NAME_RE`, mirrored in
+(:data:`~dadaia_workspace.core.invocation.CONTEXT_NAME_RE`, mirrored in
 ``features.spec_context.presence._valid_name``) BEFORE either value is used — an
 operator-controlled input has no privilege elevation here (the operator can already touch
 any path directly), so this is defense-in-depth, not a privilege boundary. The two rungs
@@ -39,16 +29,22 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from dadaia_workspace.core.specs_resolver import _CONTEXT_NAME_RE
-from dadaia_workspace.core.specs_resolver import repo_slug_for_context as _core_repo_slug
-from dadaia_workspace.core.specs_resolver import resolve_context as _resolve_context_authority
-from dadaia_workspace.core.specs_resolver import resolve_specs_dir as _core_resolve_specs_dir
+from dadaia_workspace.core.invocation import CONTEXT_NAME_RE as _CONTEXT_NAME_RE
+from dadaia_workspace.core.invocation import (
+    HARNESS_SESSION_ID_ENV_VARS as _HARNESS_SESSION_ID_ENV_VARS,
+)
+from dadaia_workspace.core.invocation import repo_slug_for_context as _core_repo_slug
+from dadaia_workspace.core.invocation import resolve as _resolve_invocation
+from dadaia_workspace.core.invocation import resolve_specs_dir as _core_resolve_specs_dir
+from dadaia_workspace.core.invocation import sanitize_session_id as _sanitize_session_id
 
-#: Re-exports so a verb never reaches ``core.specs_resolver`` directly (FR3,
+#: Re-exports so a verb never reaches ``core.invocation`` directly (FR3,
 #: ``bind-resolution-seam-is-a-single-home``). The contract takes ZERO ignore_imports,
-#: so every consumer of the context-name allowlist or the name->repo-slug mapping routes
-#: through this seam.
+#: so every consumer of the context-name allowlist, the harness-session-id env-var
+#: list, the sid sanitizer, or the name->repo-slug mapping routes through this seam.
 CONTEXT_NAME_RE = _CONTEXT_NAME_RE
+HARNESS_SESSION_ID_ENV_VARS = _HARNESS_SESSION_ID_ENV_VARS
+sanitize_session_id = _sanitize_session_id
 
 
 def repo_slug_for_context(workspace_root: Path, name: str) -> str:
@@ -62,18 +58,13 @@ def repo_slug_for_context(workspace_root: Path, name: str) -> str:
 
 
 def resolve_context_for_cli(explicit: str | None) -> str:
-    """Resolve the target Spec Context NAME (SPEC FR1 canonical order, v0.1.77; T-50-02/04
-    delegate the bound-session leg to the single resolution authority, SPEC v0.5.0 FR1 —
-    the bind-epoch marker ladder this seam used to call FIRST is deleted).
+    """Resolve the target Spec Context NAME (SPEC FR1 canonical order, v0.1.77; delegates
+    to :func:`dadaia_workspace.core.invocation.resolve` for the rung ladder itself).
 
     Order: *explicit* -> ``DADAIA_CONTEXT`` env -> the single authority's rung 2 (this
     session's own LIVE record, keyed by the harness-native session id) -> the repo
-    containing the current working directory (the single authority's rung 3, SPEC v0.5.0
-    FR1's *intended widening*). A consumer workspace without caller-owned selection
-    raises an actionable error; it never borrows the first ALIVE context, and T-50-05
-    deletes the old hardcoded self-hosting-checkout special case — rung 3 already
-    generalizes it (any registered ``repos/<slug>``, not only one literally named
-    ``dadaia-workspace``).
+    containing the current working directory. A consumer workspace without caller-owned
+    selection raises an actionable error; it never borrows the first ALIVE context.
 
     v0.1.80 FR3: both the *explicit* and ``DADAIA_CONTEXT`` env rungs are validated
     against the ``[A-Za-z0-9_-]+`` context-name allowlist before use (defense-in-depth
@@ -85,7 +76,7 @@ def resolve_context_for_cli(explicit: str | None) -> str:
     env var and echoes the invalid value back, the allowlist check on ``resolved``
     rejects the echo, and rungs 2-3 are deliberately NOT reachable past a set-but-invalid
     env var — silently ignoring an operator's explicit (mistyped) selection would resolve
-    a context they did not choose (T-50-05; replaces the pop/restore env mutation).
+    a context they did not choose.
     """
     if explicit:
         if not _CONTEXT_NAME_RE.fullmatch(explicit):
@@ -98,7 +89,7 @@ def resolve_context_for_cli(explicit: str | None) -> str:
     env_context = os.environ.get("DADAIA_CONTEXT")
     if env_context and _CONTEXT_NAME_RE.fullmatch(env_context):
         return env_context
-    resolved = _resolve_context_authority()
+    resolved = _resolve_invocation(env=os.environ, cwd=Path.cwd()).context_name
     if resolved and _CONTEXT_NAME_RE.fullmatch(resolved):
         return resolved
     raise ValueError(

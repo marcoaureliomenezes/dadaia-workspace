@@ -148,7 +148,7 @@ def test_no_stale_records_and_ttl_from_creation_fallback(tmp_path: Path) -> None
 
     # TTL-from-creation fallback: a record WITHOUT last_seen_at uses bound_at for GC;
     # the session-record pid is NEVER consulted for bind GC.
-    from dadaia_workspace.features.spec_context import session_identity
+    from dadaia_workspace.core import session_store as session_identity
 
     stale_id = "sess_pre01"
     session_identity.write_session(
@@ -233,7 +233,7 @@ def _write_read_bind(
     ws: Path, sess_id: str, *, last_seen_at: str, bound_at: str | None = None
 ) -> None:
     """Persist a READ-mode bind record via the session-identity owner (production writer)."""
-    from dadaia_workspace.features.spec_context import session_identity
+    from dadaia_workspace.core import session_store as session_identity
 
     record: dict[str, object] = {
         "session_id": sess_id,

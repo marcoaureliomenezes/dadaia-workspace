@@ -33,6 +33,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
+from dadaia_workspace.core import invocation
 from dadaia_workspace.hooks import _common, root_whitelist, sdd_gate, venv_guard
 from dadaia_workspace.infrastructure.jsonl_log_rotation import append_rotating_jsonl
 
@@ -136,22 +137,12 @@ def main() -> int:
         _common.emit_allow(system_message=advisory)
     duration_ms = (time.monotonic() - start) * 1000.0
     try:
-        workspace: Path | None = _resolve_workspace()
+        workspace: Path | None = invocation.resolve(env=os.environ, cwd=Path.cwd()).workspace_root
     except Exception:  # noqa: BLE001 — telemetry workspace resolution must never block
         workspace = None
     event = os.environ.get("DADAIA_HOOK_EVENT", "PreToolUse")
     _append_latency(workspace, event, duration_ms)
     return 0
-
-
-def _resolve_workspace() -> Path:
-    """Resolve the workspace root for telemetry: ``WORKSPACE_ROOT`` env, else walk up."""
-    env = os.environ.get("WORKSPACE_ROOT")
-    if env:
-        return Path(env)
-    from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
-
-    return resolve_workspace_root()
 
 
 if __name__ == "__main__":

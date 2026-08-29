@@ -28,12 +28,12 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core import session_store
 from dadaia_workspace.core.kernel_tunables import (
     PRESENCE_TTL_SECONDS,
     RECONCILER_REAP_TTL_MULTIPLIER,
     SESSION_GC_TTL_SECONDS,
 )
-from dadaia_workspace.features.spec_context import session_identity
 from dadaia_workspace.hooks import _common, sdd_post_gate
 
 _SELF = "self-session"
@@ -66,8 +66,8 @@ def _write_session(
     }
     if age_seconds is not None:
         record["last_seen_at"] = _iso(age_seconds, now=now)
-    session_identity.write_session(workspace, sid, record)
-    return session_identity.session_record_path(workspace, sid)
+    session_store.write_session(workspace, sid, record)
+    return session_store.session_record_path(workspace, sid)
 
 
 def _write_marker(workspace: Path, name: str, *, age_seconds: int) -> Path:
@@ -429,7 +429,7 @@ def test_reap_never_raises_and_never_changes_exit_code(
     ``main()`` still exits 0, and the advisory reconciler pass still runs to completion."""
     (tmp_path / ".dadaia" / "states").mkdir(parents=True, exist_ok=True)
     (tmp_path / "repos" / _CTX).mkdir(parents=True, exist_ok=True)
-    session_identity.write_session(
+    session_store.write_session(
         tmp_path,
         _SELF,
         {"session_id": _SELF, "context": _CTX, "mode": "IMPLEMENTATION", "pid": 1},
@@ -459,7 +459,7 @@ def test_reap_shares_the_reconciler_throttle_window(
 ) -> None:
     (tmp_path / ".dadaia" / "states").mkdir(parents=True, exist_ok=True)
     (tmp_path / "repos" / _CTX).mkdir(parents=True, exist_ok=True)
-    session_identity.write_session(
+    session_store.write_session(
         tmp_path,
         _SELF,
         {"session_id": _SELF, "context": _CTX, "mode": "IMPLEMENTATION", "pid": 1},

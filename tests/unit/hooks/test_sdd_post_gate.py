@@ -192,12 +192,17 @@ def _setup_missing_session_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
 
 
 def _setup_workspace_unresolvable(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    def _raise_no_workspace() -> Path:
-        raise RuntimeError("no workspace")
-
+    """No ``WORKSPACE_ROOT`` and a cwd outside any initialized workspace: release K1's
+    ``core.invocation.resolve`` fails soft (``workspace_root=None``) rather than
+    raising — ``main()`` turns that ``None`` into the same fail-open ``RuntimeError``
+    path a raising resolver used to hit (see ``main()``'s own ``if workspace is None``
+    guard)."""
+    _scrub_session_env(monkeypatch)
     monkeypatch.delenv("WORKSPACE_ROOT", raising=False)
+    not_a_workspace = tmp_path / "not-a-workspace"
+    not_a_workspace.mkdir()
+    monkeypatch.chdir(not_a_workspace)
     monkeypatch.setattr(_common, "read_stdin_json", lambda: {"session_id": "x"})
-    monkeypatch.setattr(sdd_post_gate, "_resolve_workspace", _raise_no_workspace)
 
 
 def _setup_empty_session_id(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

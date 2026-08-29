@@ -1,12 +1,12 @@
-"""Session identity storage.
+"""Session record storage — the sole reader/writer of ``.dadaia/sessions/<id>.json``.
 
-This module owns caller-scoped records at ``.dadaia/sessions/<id>.json``. It has no
-context-global incumbent pointer and no concurrency authority: one session's bind can
-never change another session's mode. The retired per-context marker subsystem this
-module used to also own is gone — T-50-04 (SPEC v0.5.0 FR1): context-memory injection is
-now driven by the session record's own ``bound_at`` field (see
-``hooks.ctx_inject._session_bound_at``), and context resolution is the single authority
-(``core.specs_resolver.resolve_context``).
+Moved into ``core`` from ``features.spec_context.session_identity`` (release K1, the
+"One Invocation" deepening — 2026-08-28 audit): session/bind-record persistence is a
+leaf concern with no policy of its own, and :mod:`dadaia_workspace.core.invocation`
+(the single context/session/root/mode resolution authority) needs to read it directly
+without reaching into ``features`` (``core`` cannot import ``features`` — constitution
+§6). This module owns caller-scoped records only: no context-global incumbent pointer,
+no concurrency authority — one session's bind can never change another session's mode.
 
 Stale legacy artifacts and expired session records are ignored and superseded. Every
 read fails soft on malformed or absent input.
@@ -22,7 +22,9 @@ The workspace doctor's graveyard GC measures TTL against this field, so a still-
 session renews and never decays (no silent READ→IMPLEMENTATION decay), while a dead
 session's bind expires after its ``ttl_seconds`` window. :func:`touch_last_seen_at` is the
 single accessor the heartbeat uses to stamp+persist the field; :func:`liveness_timestamp`
-is the single accessor the GC uses to read the effective liveness clock.
+is the single accessor the GC (and :mod:`core.invocation`) uses to read the effective
+liveness clock, fed into :func:`dadaia_workspace.core.record_liveness.is_stale` — the
+ONE staleness predicate.
 
 **TTL-from-creation fallback.** A record that carries no
 ``last_seen_at`` decays from its CREATION time instead — :func:`liveness_timestamp` falls
@@ -95,11 +97,9 @@ def session_record_path(workspace: Path, session_id: str, *, create: bool = Fals
 def sessions_dir(workspace: Path, *, create: bool = False) -> Path:
     """Path of the session-record directory ``.dadaia/sessions/`` (T-011-05 / FR-W1-05).
 
-    The single accessor for the session-store directory. The 2 legal consumers
-    (``cli/commands/context.py``, ``spec_context/doctor.py``) call this instead of
-    constructing the ``.dadaia/sessions`` path themselves (ADR-12);
-    ``core/specs_resolver.py`` stays the documented allowlist exception because ``core``
-    cannot import this features-layer owner (constitution §6).
+    The single accessor for the session-store directory. Every consumer (the bind CLI,
+    the workspace doctor, :mod:`core.invocation`) calls this instead of constructing the
+    ``.dadaia/sessions`` path itself (ADR-12).
     """
     return _sessions_dir(workspace, create=create)
 
@@ -174,11 +174,11 @@ def liveness_timestamp(record: dict[str, object]) -> str:
     Prefers the heartbeat-renewed ``last_seen_at``; when absent (a pre-heartbeat record),
     falls back to the creation timestamp (``bound_at`` then ``created_at``) so GC decays
     such a record TTL-from-creation. Returns ``""`` when no timestamp is present at all.
-    The consumer (``doctor.py`` graveyard-GC) feeds this string into
-    ``core.record_liveness.is_stale`` as the record's ``heartbeat``, and that predicate
-    treats an empty/non-string heartbeat as **STALE** (fail-open) — so a record that
-    carries no timestamp whatsoever is collected, not preserved. The ``pid`` field is never
-    consulted here (ADR-8 amended: the bind-CLI pid is dead by construction).
+    The consumer (``doctor.py`` graveyard-GC, :mod:`core.invocation`) feeds this string
+    into ``core.record_liveness.is_stale`` as the record's ``heartbeat``, and that
+    predicate treats an empty/non-string heartbeat as **STALE** (fail-open) — so a record
+    that carries no timestamp whatsoever is collected, not preserved. The ``pid`` field is
+    never consulted here (ADR-8 amended: the bind-CLI pid is dead by construction).
     """
     raw = record.get(SESSION_HEARTBEAT_FIELD)
     if isinstance(raw, str) and raw:

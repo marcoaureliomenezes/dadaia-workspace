@@ -24,8 +24,8 @@ from typing import Any
 
 import pytest
 
+from dadaia_workspace.core import session_store
 from dadaia_workspace.core.kernel_tunables import RECONCILER_THROTTLE_TTL_SECONDS
-from dadaia_workspace.features.spec_context import session_identity
 from dadaia_workspace.hooks import _common, sdd_post_gate
 
 _SID = "session-recon"
@@ -39,7 +39,7 @@ def _make_workspace(tmp_path: Path) -> Path:
 
 
 def _bind_session(workspace: Path, ctx: str = _CTX) -> None:
-    session_identity.write_session(
+    session_store.write_session(
         workspace,
         _SID,
         {"session_id": _SID, "context": ctx, "mode": "IMPLEMENTATION", "pid": 1},

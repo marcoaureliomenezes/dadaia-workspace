@@ -27,8 +27,8 @@ imports the other; both import this one, stdlib-pure sibling). ``core/models/bug
 re-exports :func:`redact_text` unchanged for every existing caller.
 
 Zero I/O — ``core/`` stays stdlib-pure; the file-I/O authorized set
-(``specs_backup``/``specs_repair``/``specs_version``/``specs_resolver``/
-``workspace_resolver``) is unaffected.
+(``specs_backup``/``specs_repair``/``specs_version``/``workspace_resolver``/
+``atomic_write``/``invocation``/``session_store``) is unaffected.
 """
 
 from __future__ import annotations

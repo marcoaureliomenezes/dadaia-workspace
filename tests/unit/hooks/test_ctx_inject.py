@@ -39,7 +39,7 @@ from typing import Any
 
 import pytest
 
-from dadaia_workspace.features.spec_context import session_identity
+from dadaia_workspace.core import session_store
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
 
@@ -89,7 +89,7 @@ def _bind_session(tmp_path: Path, session_id: str, context: str) -> None:
     wall-clock ordering across sequential, single-threaded calls, no synthetic offset
     needed.
     """
-    session_identity.write_session(
+    session_store.write_session(
         tmp_path,
         session_id,
         {
@@ -225,7 +225,7 @@ def test_session_record_binds_context_over_first_alive(tmp_path: Path) -> None:
     _add_context(tmp_path, "alpha")  # alpha second; its memory says "Node 20"
     sid = "bound-sid"
     # The hook session id (stdin session_id field) carries its OWN bound record → alpha.
-    session_identity.write_session(tmp_path, sid, {"id": sid, "context": "alpha"})
+    session_store.write_session(tmp_path, sid, {"id": sid, "context": "alpha"})
     out = _run(tmp_path, sid)
     assert "[alpha]" in out
     assert "end memory bootstrap" in out

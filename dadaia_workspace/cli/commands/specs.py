@@ -401,7 +401,7 @@ def init(
 ) -> None:
     """Bootstrap a SDD release-lifecycle specs/ directory structure."""
     # Resolve specs_dir. An explicit --specs-dir routes through the same resolver seam
-    # every other resolver-driven verb shares (T-044-40, `core.specs_resolver
+    # every other resolver-driven verb shares (T-044-40, `core.invocation
     # .resolve_specs_dir`) so a symlinked target is refused here too — reusing that
     # seam's existing refusal, not adding a second one (T-045-21/FR8, A8.2). `None`
     # keeps init's own default (cwd/specs, guarded by the Root Law check below) rather
