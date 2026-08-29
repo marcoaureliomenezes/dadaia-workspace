@@ -16,6 +16,7 @@ from dadaia_workspace.core.exceptions import (
     NoActiveReleaseError,
     WorkspaceNotInitializedError,
 )
+from dadaia_workspace.core.handoff_index import HandoffIndex
 from dadaia_workspace.core.invocation import repo_slug_for_context
 from dadaia_workspace.core.invocation import resolve as _resolve_invocation
 from dadaia_workspace.core.invocation import resolve_context_specs_dir as _resolve_context_specs_dir
@@ -58,7 +59,6 @@ from dadaia_workspace.features.panel.views.wrapper import render_memory_wrapper
 from dadaia_workspace.features.public.service import PublicAssetService
 from dadaia_workspace.features.reports.next import ReportsNextService
 from dadaia_workspace.features.reports.retention import ReportRetentionService
-from dadaia_workspace.features.reports.validation import ReportsValidationService
 from dadaia_workspace.features.repos.service import ReposService
 from dadaia_workspace.features.server_registry.service import ServerRegistryService
 from dadaia_workspace.features.spec_context.doctor import DoctorService
@@ -79,7 +79,6 @@ from dadaia_workspace.infrastructure.process_ancestry_adapter import (
 from dadaia_workspace.infrastructure.process_probe_adapter import OsProcessProbe, build_pid_probe
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
-from dadaia_workspace.infrastructure.stdlib_handoff_validator import StdlibHandoffValidator
 
 
 def build_shutdown_handler() -> Any:
@@ -472,23 +471,17 @@ def build_panel_service(
     )
 
 
-def build_reports_validation_service(workspace_root: Path) -> ReportsValidationService:
-    """Compose ``ReportsValidationService`` with ``StdlibHandoffValidator``.
+def build_handoff_index(workspace_root: Path) -> HandoffIndex:
+    """Compose the workspace-rooted :class:`HandoffIndex` (release 0.5.1 K6).
 
-    Schema is read from the staged location:
+    Construction is cheap (no schema load) — schema loading happens lazily, once, on
+    the first ``validate_file``/``validate_all`` call, from
     ``workspace_root/.dadaia/agentic/schemas/handoff-v1.schema.json``.
-    Handoff root is ``workspace_root/.dadaia/handoff``.
 
     Args:
         workspace_root: Root directory of the initialized dadaia workspace.
-
-    Returns:
-        A fully wired ``ReportsValidationService`` instance.
     """
-    schema_path = workspace_root / ".dadaia" / "agentic" / "schemas" / "handoff-v1.schema.json"
-    reports_root = workspace_root / ".dadaia" / "handoff"
-    validator = StdlibHandoffValidator(schema_path)
-    return ReportsValidationService(validator=validator, reports_root=reports_root)
+    return HandoffIndex(workspace_root)
 
 
 def build_reports_next_service(

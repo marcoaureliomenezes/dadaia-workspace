@@ -1,4 +1,10 @@
-"""Unit tests for memory product atom creation."""
+"""Unit tests for memory product atom creation.
+
+Moved verbatim from the retired ``features.spec_artifacts.memory`` (v0.5.1 K4): the
+writer now lives in ``features.specs.catalog`` alongside the catalog generator it
+feeds — the package existed only to dodge a features -> features cross-feature edge
+that never applied to this writer (both live in ``features/specs/`` now).
+"""
 
 from __future__ import annotations
 
@@ -7,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.features.spec_artifacts.memory import (
+from dadaia_workspace.features.specs.catalog import (
     MemoryProductAddResult,
     _build_feature_md,
     memory_product_add,

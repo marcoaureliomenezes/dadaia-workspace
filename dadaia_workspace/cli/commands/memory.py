@@ -8,9 +8,9 @@ from pathlib import Path
 import typer
 
 from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
-from dadaia_workspace.features.spec_artifacts.memory import memory_product_add
 from dadaia_workspace.features.specs.catalog import (
     generate_catalog,
+    memory_product_add,
     write_catalog,
     write_index,
 )

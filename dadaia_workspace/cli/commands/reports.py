@@ -17,13 +17,12 @@ from dadaia_workspace.core.exceptions import (
     NoAgentSequenceError,
     WorkspaceNotInitializedError,
 )
+from dadaia_workspace.core.handoff_index import Handoff, ValidationResult, scan_handoffs
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
-from dadaia_workspace.features.panel.reports_doctor import ReportsDoctor
 from dadaia_workspace.features.reports.retention import (
     CleanupCandidate,
     ReportRetentionService,
 )
-from dadaia_workspace.features.reports.validation import ValidationResult
 
 app = typer.Typer(help="Inspect and validate agent handoff reports.")
 console = Console()
@@ -70,80 +69,6 @@ def _candidate_payload(candidate: CleanupCandidate) -> dict[str, object]:
         "effective_timestamp": candidate.effective_timestamp.isoformat().replace("+00:00", "Z"),
         "important": candidate.important,
     }
-
-
-# ---------------------------------------------------------------------------
-# Version detection helpers (T-21)
-# ---------------------------------------------------------------------------
-
-
-def _detect_sidecar_version(doc: dict[str, object]) -> str:
-    """Return '1.1' (modern) for handoff-v1.1/handoff-v1.2 sidecars, else '1.0'.
-
-    v0.1.62 FR2 fix for bug ``reports-sidecar-version-detection-misroutes-future-tokens``
-    (HIGH): ``handoff-v1.2`` is modern and must NEVER fall through to ``_check_v10_compat``
-    — pre-fix any token other than the exact v1.1 string routed to the v1.0 compat check,
-    which hard-errors on a missing ``findings[]``. Modern sidecars take the full schema +
-    service validation path instead.
-    """
-    schema_version = doc.get("schema_version", "")
-    schema_id = str(doc.get("$id", ""))
-    if schema_version in ("handoff-v1.1", "handoff-v1.2"):
-        return "1.1"
-    if "v1.1" in schema_id or "v1.2" in schema_id:
-        return "1.1"
-    return "1.0"
-
-
-def _check_v10_compat(path: Path, doc: dict[str, object]) -> tuple[bool, list[str]]:
-    """Check a v1.0 sidecar for missing required v1.1 fields.
-
-    Returns:
-        (is_error, messages) — is_error=True triggers exit 1;
-        is_error=False means warnings only (exit 0).
-    """
-    messages: list[str] = []
-    is_error = False
-
-    # Missing findings[] entirely → hard error
-    if "findings" not in doc:
-        messages.append(
-            "ERROR: Missing required field 'findings[]'. "
-            "This sidecar appears to be v1.0 and is incompatible with v1.1."
-        )
-        is_error = True
-        return is_error, messages
-
-    # findings[] present but items missing detail_md or fix_recommendation → warning
-    findings = doc.get("findings", [])
-    if isinstance(findings, list):
-        for idx, finding in enumerate(findings):
-            if isinstance(finding, dict):
-                missing_subfields = []
-                if "detail_md" not in finding:
-                    missing_subfields.append("detail_md")
-                if "fix_recommendation" not in finding:
-                    missing_subfields.append("fix_recommendation")
-                if missing_subfields:
-                    messages.append(
-                        f"WARNING: findings[{idx}] missing "
-                        f"{' or '.join(repr(f) for f in missing_subfields)}. "
-                        f"Sidecar is v1.0-incomplete — consider upgrading to v1.1."
-                    )
-
-    # Missing scope or metrics → warning
-    missing_root = []
-    if "scope" not in doc:
-        missing_root.append("scope")
-    if "metrics" not in doc:
-        missing_root.append("metrics")
-    if missing_root:
-        messages.append(
-            f"WARNING: Missing {' or '.join(repr(f) for f in missing_root)} fields. "
-            f"Sidecar is v1.0-incomplete."
-        )
-
-    return is_error, messages
 
 
 # ---------------------------------------------------------------------------
@@ -347,13 +272,25 @@ def validate(
             "workspace) — otherwise artifact.path resolves against the wrong root."
         ),
     ),
+    reviewed_root: Path | None = typer.Option(
+        None,
+        "--reviewed-root",
+        help=(
+            "Resolve self_pull.refs against THIS filesystem root first (e.g. a linked "
+            "worktree checked out at the commit a verdict was authored/reviewed against), "
+            "before the ordinary repos/<context>/<ref> and <workspace>/<ref> candidates. "
+            "Fixes a false 'ref does not exist' when validating a handoff whose "
+            "self_pull.refs were resolved against a tree other than whatever "
+            "repos/<context> currently has checked out on disk."
+        ),
+    ),
 ) -> None:
     """Validate one or more agent handoff JSON files.
 
     \b
     Exit codes:
       0  All files valid (or violations found in non-strict mode)
-      1  One or more violations in strict mode, or v1.0 sidecar missing findings[]
+      1  One or more violations in strict mode
       2  One or more file paths not found
       3  Bad invocation (no paths and not --all) or workspace not initialized
 
@@ -364,22 +301,15 @@ def validate(
       dadaia reports validate --all --strict
       dadaia reports validate --all --json
       dadaia reports validate path/to/report.handoff.json --workspace /path/to/other/ws
+      dadaia reports validate path/to/verdict.handoff.json --reviewed-root /path/to/worktree
     """
     # Invocation guard: must have paths or --all
     if not paths and not all_:
         err_console.print("[red]Error:[/red] provide one or more PATHS or use [bold]--all[/bold].")
         raise typer.Exit(3)
 
-    # Build service — schema must be staged
     try:
         workspace_root = workspace.resolve() if workspace is not None else resolve_workspace_root()
-        service = container.build_reports_validation_service(workspace_root)
-    except HandoffSchemaError as exc:
-        err_console.print(
-            f"[red]Error:[/red] Could not load handoff schema: {exc}\n"
-            "Run [bold]dadaia public stage && dadaia public install --target all[/bold] first."
-        )
-        raise typer.Exit(3) from None
     except WorkspaceNotInitializedError:
         err_console.print(
             "[red]Error:[/red] Workspace not initialized. Run [bold]dadaia init[/bold] first."
@@ -392,6 +322,8 @@ def validate(
     # ancestor is never silently misread. --workspace above is the primary fix; this
     # diagnostic covers every invocation, including the cwd-default path.
     err_console.print(f"[dim]Resolved workspace root: {workspace_root}[/dim]")
+
+    index = container.build_handoff_index(workspace_root)
 
     # Collect paths to validate
     target_paths: list[Path] = []
@@ -406,46 +338,26 @@ def validate(
             raise typer.Exit(2)
         target_paths = list(paths)
 
-    # Per-file: detect version and apply appropriate validation
-    results: list[ValidationResult] = []
-    compat_errors: list[str] = []  # v1.0 hard errors (missing findings[])
-    compat_warnings: list[tuple[Path, list[str]]] = []  # v1.0 soft warnings
-    has_v10_error = False
-
-    for p in target_paths:
-        try:
-            raw = p.read_text(encoding="utf-8")
-            doc = _json.loads(raw)
-        except (_json.JSONDecodeError, OSError):
-            # Let the schema validator handle structural issues
-            results.append(service.validate_file(p))
-            continue
-
-        version = _detect_sidecar_version(doc)
-        if version == "1.0":
-            is_error, messages = _check_v10_compat(p, doc)
-            if is_error:
-                has_v10_error = True
-                for msg in messages:
-                    compat_errors.append(f"{p}: {msg}")
-            elif messages:
-                compat_warnings.append((p, messages))
-            # Also run schema validation so errors are reported
-            results.append(service.validate_file(p))
-        else:
-            # v1.1: full schema validation
-            results.append(service.validate_file(p))
+    # Version routing (v1/v1.1/v1.2, and refusal of any future/unknown token) lives in
+    # the schema's own ``schema_version`` enum now — Handoff.validate applies ONE
+    # validation path for every schema_version, never a second ad-hoc detector here.
+    try:
+        results: list[ValidationResult] = [
+            index.validate_file(p, reviewed_root=reviewed_root) for p in target_paths
+        ]
+    except HandoffSchemaError as exc:
+        err_console.print(
+            f"[red]Error:[/red] Could not load handoff schema: {exc}\n"
+            "Run [bold]dadaia public stage && dadaia public install --target all[/bold] first."
+        )
+        raise typer.Exit(3) from None
 
     # Apply release filter if requested
     if release:
         filtered: list[ValidationResult] = []
         for r in results:
             if r.valid:
-                try:
-                    doc = _json.loads(r.path.read_text(encoding="utf-8"))
-                    if doc.get("release_id") == release:
-                        filtered.append(r)
-                except Exception:  # noqa: BLE001
+                if Handoff.load(r.path).release_id == release:
                     filtered.append(r)
             else:
                 filtered.append(r)
@@ -475,15 +387,6 @@ def validate(
                 for err in r.errors:
                     console.print(f"         [yellow]{err.field_path}[/yellow]: {err.message}")
 
-        # Print v1.0 compat errors
-        for msg in compat_errors:
-            err_console.print(f"[red]{msg}[/red]")
-
-        # Print v1.0 compat warnings
-        for warn_path, warn_msgs in compat_warnings:
-            for msg in warn_msgs:
-                console.print(f"[yellow]{warn_path}: {msg}[/yellow]")
-
         console.print(
             f"\nSummary: [green]{n_valid} valid[/green], [red]{n_invalid} invalid[/red] "
             f"(of {len(results)} files)"
@@ -492,8 +395,6 @@ def validate(
     # Exit-code truthfulness (validation-029 F-12): an INVALID file is a hard failure
     # — printing INVALID while exiting 0 masked tampered/malformed handoffs from every
     # consuming script. --strict remains the elevation for soft warnings only.
-    if has_v10_error:
-        raise typer.Exit(1)
     if n_invalid > 0:
         raise typer.Exit(1)
 
@@ -541,7 +442,18 @@ def lint(
         raise typer.Exit(0)
 
     flags: list[str] = []
-    referenced_artifacts = _handoff_artifact_paths(handoff_root, workspace_root)
+    # The one discovery + artifact-path rule: every referenced artifact ref, both the
+    # raw declared string and its resolved workspace-relative form (a handoff can
+    # legitimately declare either shape — see Handoff.artifact_path's docstring).
+    referenced_artifacts: set[str] = set()
+    for handoff in scan_handoffs(handoff_root):
+        raw_ref = handoff.artifact_path_raw
+        if not raw_ref:
+            continue
+        referenced_artifacts.add(raw_ref)
+        resolved = handoff.artifact_path(workspace_root)
+        if resolved is not None:
+            referenced_artifacts.add(_workspace_relative_ref(resolved, workspace_root))
 
     for root in existing_directories:
         for dirpath_str, _dirnames, filenames in os.walk(root):
@@ -560,19 +472,17 @@ def lint(
                         flags.append(f"OVERSIZED: {filepath} ({size_kb:.1f}KB)")
 
                 elif filename.lower().endswith(".handoff.json"):
-                    try:
-                        raw = filepath.read_text(encoding="utf-8")
-                        doc = _json.loads(raw)
-                    except (_json.JSONDecodeError, OSError):
+                    handoff = Handoff.load(filepath)
+                    if handoff.malformed_error is not None:
                         flags.append(f"MISSING_FIELDS: {filepath} (malformed JSON)")
                         continue
 
                     missing_fields: list[str] = []
-                    if "findings" not in doc:
+                    if "findings" not in handoff.raw:
                         missing_fields.append("findings")
-                    if "scope" not in doc:
+                    if "scope" not in handoff.raw:
                         missing_fields.append("scope")
-                    if "metrics" not in doc:
+                    if "metrics" not in handoff.raw:
                         missing_fields.append("metrics")
 
                     if missing_fields:
@@ -621,58 +531,58 @@ def doctor(
       dadaia reports doctor --json
     """
     workspace_root = resolve_workspace_root()
-    reports_doctor = ReportsDoctor(workspace_root)
-    result = reports_doctor.check()
+    handoff_root = workspace_root / ".dadaia" / "handoff"
+    _RPT1_PREFIX = ".dadaia/reports/"
+    issues: list[dict[str, str | None]] = []
+    for handoff in scan_handoffs(handoff_root):
+        artifact_path_str = handoff.artifact_path_raw
+        if not artifact_path_str:
+            # No artifact.path declared — sidecar is valid (handoff-first emission).
+            continue
+        reason: str | None = None
+        if not artifact_path_str.startswith(_RPT1_PREFIX):
+            reason = f"artifact.path must start with '{_RPT1_PREFIX}'"
+        else:
+            resolved = handoff.artifact_path(workspace_root)
+            if resolved is None:
+                reason = "path traversal or boundary escape detected"
+            elif not resolved.exists():
+                reason = "file does not exist"
+            elif resolved.suffix.lower() != ".html":
+                reason = f"not an .html file — got {resolved.suffix!r}"
+        if reason is not None:
+            issues.append(
+                {
+                    "code": "RPT-1",
+                    "message": (
+                        f"[dangling-artifact-path] {handoff.path} → {artifact_path_str!r} "
+                        f"({reason})"
+                    ),
+                    "sidecar_path": str(handoff.path),
+                    "artifact_path": artifact_path_str,
+                }
+            )
 
     if json_output:
         typer.echo(
             _json.dumps(
                 {
-                    "ok": result.ok,
-                    "issue_count": len(result.issues),
-                    "issues": [
-                        {
-                            "code": i.code,
-                            "message": i.message,
-                            "sidecar_path": str(i.sidecar_path),
-                            "artifact_path": i.artifact_path,
-                        }
-                        for i in result.issues
-                    ],
+                    "ok": not issues,
+                    "issue_count": len(issues),
+                    "issues": issues,
                 }
             )
         )
-        raise typer.Exit(0 if result.ok else 1)
+        raise typer.Exit(0 if not issues else 1)
 
-    if result.ok:
+    if not issues:
         console.print("[green]OK[/green] No RPT-1 issues found.")
         raise typer.Exit(0)
 
-    for issue in result.issues:
-        console.print(f"[red]{issue.code}[/red] {issue.message}", markup=False)
-    console.print(f"\n{len(result.issues)} issue(s) found.")
+    for issue in issues:
+        console.print(f"[red]{issue['code']}[/red] {issue['message']}", markup=False)
+    console.print(f"\n{len(issues)} issue(s) found.")
     raise typer.Exit(1)
-
-
-def _handoff_artifact_paths(handoff_root: Path, workspace_root: Path) -> set[str]:
-    refs: set[str] = set()
-    if not handoff_root.exists():
-        return refs
-    for filepath in handoff_root.rglob("*.handoff.json"):
-        try:
-            doc = _json.loads(filepath.read_text(encoding="utf-8"))
-        except (_json.JSONDecodeError, OSError):
-            continue
-        artifact = doc.get("artifact", {})
-        if isinstance(artifact, dict):
-            path = artifact.get("path")
-            if isinstance(path, str) and path:
-                refs.add(path)
-                artifact_path = (
-                    workspace_root / path if path.startswith(".dadaia/") else filepath.parent / path
-                )
-                refs.add(_workspace_relative_ref(artifact_path, workspace_root))
-    return refs
 
 
 def _workspace_relative_ref(path: Path, workspace_root: Path) -> str:

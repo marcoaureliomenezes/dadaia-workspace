@@ -31,6 +31,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+from dadaia_workspace.core.handoff_index import scan_handoffs
 from dadaia_workspace.core.protocols.git_object_reader import (
     ZERO_SHA,
     GitObjectReader,
@@ -325,28 +326,20 @@ def iter_security_approvals(handoff_root: Path) -> list[_Approval]:
     ``handoff_root`` is ``<workspace>/.dadaia/handoff`` (all contexts). A handoff qualifies
     when ``agent == "security-reviewer"``, ``verdict == "APPROVED"``, and
     ``metrics.commit_sha`` is a non-empty string — the single canonical field (no ``scope``
-    fallback). Unreadable/malformed files are skipped (never crash the push hook).
+    fallback). Unreadable/malformed files are skipped (never crash the push hook) — the one
+    discovery+parse primitive (``core.handoff_index.scan_handoffs``) already degrades a
+    malformed file to empty fields, which fails every qualification check below the same
+    way a caught exception used to.
     """
     approvals: list[_Approval] = []
-    if not handoff_root.is_dir():
-        return approvals
-    for path in sorted(handoff_root.rglob("*.handoff.json")):
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError, ValueError):
+    for handoff in scan_handoffs(handoff_root):
+        if handoff.agent != _SECURITY_REVIEWER:
             continue
-        if not isinstance(data, dict):
+        if handoff.verdict != _APPROVED:
             continue
-        if data.get("agent") != _SECURITY_REVIEWER:
-            continue
-        if data.get("verdict") != _APPROVED:
-            continue
-        metrics = data.get("metrics")
-        if not isinstance(metrics, dict):
-            continue
-        sha = metrics.get("commit_sha")
-        if isinstance(sha, str) and sha:
-            approvals.append(_Approval(commit_sha=sha, source=path.name))
+        sha = handoff.commit_sha
+        if sha:
+            approvals.append(_Approval(commit_sha=sha, source=handoff.path.name))
     return approvals
 
 
@@ -653,7 +646,7 @@ def _run_specs_canon_scan(
 ) -> Decision | None:
     """SPEC v0.5.0 specs-canon closure (operator ruling 2026-08-28): every pushed
     non-deletion ref's tree is checked for a ``specs/`` path violating the v6 canon
-    (or the verdict business rule) — via ``features.specs.specs_canon``, the SAME
+    (or the verdict business rule) — via ``features.specs.canon``, the SAME
     predicate the doctor's TREE-8 check uses (never a second, hand-kept member list).
 
     Function-scoped import (mirrors this module's own docstring: "NEVER imports
@@ -661,7 +654,7 @@ def _run_specs_canon_scan(
     feature, not infrastructure, but the lazy import keeps this module's import graph
     unchanged for every caller that never reaches this policy step).
     """
-    from dadaia_workspace.features.specs.specs_canon import canon_violations, verdict_violations
+    from dadaia_workspace.features.specs.canon import canon_violations, verdict_violations
 
     violations: list[tuple[PushRef, str]] = []
     seen: set[tuple[str, str]] = set()
@@ -716,7 +709,7 @@ def push_gate_decision(
     2. **specs/ canon scan** (v0.5.0 specs-canon closure, operator ruling 2026-08-28)
        — every non-deletion ref, tags included, is checked via *object_source* for a
        ``specs/`` path violating the v6 canon or the verdict business rule
-       (``features.specs.specs_canon``).
+       (``features.specs.canon``).
     3. **Range-scoped denylist scan** (v0.9.0 FR1/FR2) — every non-deletion ref, tags
        included, is scanned via *object_source* for new objects carrying a denylisted
        term. Runs AFTER branch policy and the canon scan (both free and pure) — under

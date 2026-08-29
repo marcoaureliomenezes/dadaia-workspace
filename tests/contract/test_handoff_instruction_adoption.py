@@ -21,8 +21,8 @@ dropped, only re-aimed at what's true post-FR26:
   rewritten (A26.2's >=40% per-invocation body drop across the five disclosed skills
   depends on this being a hard zero);
 * the schema file the skill points at actually EXISTS on disk and is load-bearing: the
-  REAL ``StdlibHandoffValidator`` (the same validator ``dadaia reports validate`` runs in
-  production) loads it without hitting an unsupported keyword, accepts a minimal
+  REAL schema validator (``core.handoff_index.validate_schema_shape``, the same one ``dadaia reports validate`` runs in
+  production) loads it (`load_schema`) without hitting an unsupported keyword, accepts a minimal
   conformant handoff-v1.2 instance, and rejects one missing a required field, naming it
   — proving the pointer target is a working contract, not a broken link.
 """
@@ -35,7 +35,7 @@ from typing import Any
 
 import pytest
 
-from dadaia_workspace.infrastructure.stdlib_handoff_validator import StdlibHandoffValidator
+from dadaia_workspace.core.handoff_index import load_schema, validate_schema_shape
 
 pytestmark = pytest.mark.contract
 
@@ -144,16 +144,16 @@ def test_emitter_skill_points_at_schema_with_no_inline_json_example() -> None:
 
 def test_schema_the_skill_points_at_exists_and_validates() -> None:
     """The schema FR26's pointer names is not a broken link: it exists on disk, the
-    REAL StdlibHandoffValidator (the one `dadaia reports validate` runs in production)
+    REAL schema validator (`core.handoff_index.validate_schema_shape`, the one `dadaia reports validate` runs in production)
     loads it cleanly, accepts a minimal conformant handoff-v1.2 instance, and rejects
     one missing a required field, naming it."""
     assert _SCHEMA_PATH.is_file(), (
         f"the schema the emitter skill points at does not exist on disk: {_SCHEMA_PATH}"
     )
 
-    # Construction alone proves the schema is valid JSON using only supported
-    # keywords (StdlibHandoffValidator.__init__ raises HandoffSchemaError otherwise).
-    validator = StdlibHandoffValidator(_SCHEMA_PATH)
+    # Loading alone proves the schema is valid JSON using only supported keywords
+    # (load_schema raises HandoffSchemaError otherwise).
+    schema = load_schema(_SCHEMA_PATH)
 
     conformant: dict[str, Any] = {
         "schema_version": "handoff-v1.2",
@@ -165,14 +165,14 @@ def test_schema_the_skill_points_at_exists_and_validates() -> None:
         "artifact": {"type": "other"},
         "self_pull": {"refs": ["specs/memory/architecture.md"]},
     }
-    errors = list(validator.validate(conformant))
+    errors = validate_schema_shape(conformant, schema)
     assert not errors, (
         f"a minimal conformant handoff-v1.2 instance must validate cleanly against the "
         f"schema the emitter skill points at — errors: {errors}"
     )
 
     missing_artifact = {k: v for k, v in conformant.items() if k != "artifact"}
-    errors = list(validator.validate(missing_artifact))
+    errors = validate_schema_shape(missing_artifact, schema)
     assert errors, (
         "an instance missing the required 'artifact' object must fail validation — the "
         "schema is not vacuously permissive"

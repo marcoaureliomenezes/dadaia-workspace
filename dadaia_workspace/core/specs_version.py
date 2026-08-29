@@ -31,8 +31,9 @@ UNSTAMPED_VERSION = 0
 #: Single source of truth for the release-directory SemVer form (v0.1.53 FR3, flipped
 #: to canon v6 / two-axis form at T-050-06A, SPEC FR1 boundary 2a / AS-13). This is the
 #: ONE compiled home for the pattern — previously triplicated in
-#: ``features/specs/scaffolder.py``, ``features/specs/doctor.py``, and
-#: ``features/spec_artifacts/new_artifacts.py``. Every consumer imports THIS object; the
+#: ``features/specs/scaffolder.py``, ``features/specs/doctor.py``, and the retired
+#: ``features/spec_artifacts/new_artifacts.py`` (its ``release_new`` now lives in
+#: ``features/specs/canon.py``, v0.5.1 K4). Every consumer imports THIS object; the
 #: agreement contract ``tests/contract/test_release_semver_canon.py`` locks the identity
 #: (same compiled object everywhere) and forbids any re-introduced ``re.compile`` copy.
 #:

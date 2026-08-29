@@ -36,9 +36,9 @@ Census (file:line, T-044-03):
    ``specs/bugs/**`` (``bugs_jsonl.py``, ``bugs_single_file.py``), or
    ``specs/memory/**`` frontmatter, byte-preserving the rest (``agent_tier_frontmatter.py``,
    ``retired_frontmatter_keys.py``) — never ``specs/releases/**``.
-3. ``dadaia_workspace/features/spec_artifacts/new_artifacts.py:111-148``
-   (``release_new``) is a no-clobber scaffold: ``FileExistsError`` on an existing release
-   dir, never a touch of its content.
+3. ``dadaia_workspace/features/specs/canon.py`` (``release_new``) is a no-clobber
+   scaffold: ``FileExistsError`` on an existing release dir, never a touch of its
+   content.
 4. ``dadaia_workspace/core/specs_repair.py:73-90`` (``remove_placeholder_atoms``) is
    scoped to ``specs_dir/memory/**`` only.
 """
@@ -53,7 +53,7 @@ import pytest
 
 from dadaia_workspace.core import specs_repair
 from dadaia_workspace.features.migrate import registry as migrate_registry
-from dadaia_workspace.features.spec_artifacts import new_artifacts
+from dadaia_workspace.features.specs import canon
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
 _MARKER_RE = re.compile(r"^- \[([ xX-])\]", re.MULTILINE)
@@ -236,7 +236,7 @@ def test_release_new_refuses_to_clobber_an_existing_release_tasks_md(tmp_path: P
     before = target.read_text(encoding="utf-8")
 
     with pytest.raises(FileExistsError):
-        new_artifacts.release_new(specs_dir, "1.0.0")
+        canon.release_new(specs_dir, "1.0.0")
 
     after = target.read_text(encoding="utf-8")
     _assert_sdd_invariants_preserved(before, after)

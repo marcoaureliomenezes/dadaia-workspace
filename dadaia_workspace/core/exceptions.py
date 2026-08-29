@@ -50,7 +50,7 @@ class PortNotRegisteredError(DadaiaError):
 class HandoffSchemaError(DadaiaError):
     """Raised when the schema file itself is invalid or contains unsupported keywords.
 
-    Example: StdlibHandoffValidator.__init__ encounters 'oneOf' which is outside
+    Example: ``core.handoff_index._load_schema`` encounters 'oneOf' which is outside
     the supported keyword subset. This forces conscious schema evolution decisions
     rather than silent misses.
     """
@@ -60,8 +60,9 @@ class HandoffValidationError(DadaiaError):
     """Raised when a handoff document instance fails schema validation.
 
     Carries structured information about the field that failed and why.
-    Returned (not raised) by ``ValidatorPort.validate()`` as a sequence of
-    per-violation descriptors; raised by higher-level code when strict mode is on.
+    Returned (not raised) by ``core.handoff_index.Handoff.validate()`` as part of a
+    ``ValidationResult``'s ``errors`` tuple; raised by higher-level code when strict
+    mode is on.
     """
 
     def __init__(self, field_path: str, message: str) -> None:

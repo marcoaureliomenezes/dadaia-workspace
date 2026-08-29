@@ -1,11 +1,11 @@
-"""``specs_canon`` — the ONE canon predicate shared by TREE-8 and the pre-push gate.
+"""``canon`` — the ONE canon predicate shared by TREE-8 and the pre-push gate.
 
 Intent: CONTRACT — v0.5.0 specs-canon closure, operator ruling 2026-08-28.
 """
 
 from __future__ import annotations
 
-from dadaia_workspace.features.specs.specs_canon import (
+from dadaia_workspace.features.specs.canon import (
     canon_violations,
     is_canon_path,
     verdict_violations,
