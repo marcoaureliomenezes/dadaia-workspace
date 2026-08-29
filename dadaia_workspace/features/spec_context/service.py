@@ -970,5 +970,5 @@ class SpecContextService:
         self._store.delete(name)
         # Bug context-delete-leaves-stale-session-bind: a session record pointing at a
         # DELETED context degrades to unbound via the resolver's own existence check
-        # (core.specs_resolver._context_registered) — no marker artifact to clean up
+        # (core.invocation._context_registered) — no marker artifact to clean up
         # here since T-50-04 (SPEC v0.5.0 FR1) retires the bind-epoch marker subsystem.

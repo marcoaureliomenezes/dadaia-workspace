@@ -28,7 +28,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from dadaia_workspace.features.telemetry.aggregator.queries import TelemetryAggregator
-from dadaia_workspace.features.telemetry.store.schema import apply_migrations
+from dadaia_workspace.features.telemetry.store import apply_migrations
 from tests.fakes import shared_connection_factory
 
 _NOW = datetime.now(tz=UTC)

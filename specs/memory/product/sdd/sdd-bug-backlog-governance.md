@@ -14,7 +14,10 @@ tags: [sdd, governance, release-lifecycle, backlog, bugs, gitflow]
 - `status` is `open | resolved | superseded | deferred | rejected`; `resolved` requires a regression seam, a sweep closure is `superseded_by`, and a reopen is a new record declaring `caused_by`.
 - `surface` is a closed enum whose feature arm equals the import-linter independence contract's `modules =` list; `component` is free-text `path#symbol`.
 - `features/bugs`'s record store is the only code path that writes a governance field, sanitizing then masking each write once through the push scan's denylist loader, and rewriting compare-then-swap with refuse-stale plus retry ([[sdd-gate-v3]]).
-- Five verbs sit over that seam — `append`, `status`, `stats`, `update` (refusing an immutable core field and a second write to a write-once field) and `archive`; no `--event` or `resolve` verb exists.
+- `RecordStore.scan()` is the ledger's one parser, yielding a `MalformedLine` for a row it cannot read, so every reader — the CLI, the doctor, the audit — diagnoses a bad line identically.
+- A terminal status is reachable only through a transition that carries its evidence: `BugRecord.resolve/supersede/defer/reject` raise `IncompleteTransitionError` on missing input, and the model itself refuses a bare `status` key.
+- Nine verbs sit over that seam — `append`, `status`, `stats`, `update` (refusing an immutable core field, a second write to a write-once field, and `status` outright), `resolve`, `supersede`, `defer`, `reject` and `archive`; no `--event` flag exists.
+- Legacy v5-fold records carry `migration_note="v5-fold-incomplete"` and warn no further.
 - `bugs archive` idempotently moves terminal records older than 90 days to `_archive/bugs_histo.jsonl`.
 - A bug is fixed on the spot on the live feature branch — register, root-cause, RED test, fix, GREEN, `resolved` with evidence, commit — with no SPEC, PLAN, TASKS or release directory.
 - Diagnosis is seven ordered phases, phase 0 being the lineage duty over the 20 most recent records sharing this bug's `surface` or `component` in the audit window, ending in `caused_by: <bug-id> | none` with evidence (`dd-diagnose`).
@@ -28,6 +31,7 @@ tags: [sdd, governance, release-lifecycle, backlog, bugs, gitflow]
 - Consumption executes against that one record twice: purge-on-pick removes the entry in the SPEC-creating commit and appends the provisional exit, and the closure sweep rewrites its `disposition`/`reason`/`release` in place — never a second line.
 - A SPEC's `**Consumes:**` line is provenance, not a call site.
 - Intake is operator-gated: a residual is listed as an intake candidate for `project-manager`, the one carve-out being a deferral the operator ratified during a release.
+- The entry schema, the document parser and both doctors validate an entry through one checker, so no two of them can disagree about the same entry.
 - `dadaia backlog doctor` validates the parsed model with BL-SCHEMA (parse, status token, slug, unbound or unresolvable `intents[]` beyond `candidate`), BL-CONFLICT (two active items sharing an anchor incompatibly) and BL-STALE (an active item already consumed), backstopped by SPEC-DOC-031 and SPEC-DOC-035.
 
 ## The release state document
@@ -36,7 +40,7 @@ tags: [sdd, governance, release-lifecycle, backlog, bugs, gitflow]
 - `phase` is a plain top-level field — no stream, no fold — beside `release`, `rc`, the milestones `defined`, `implemented`, `shipped`, `audited`, and a `log` array.
 - Milestones are immutable once set, each carrying its sha: `defined` at the definition promotion commit, `implemented` at the final-`rc` QA close, `shipped` at the ship merge, `audited` at the audit.
 - `rc-N` is a state of the specs living in `rc`/`segment` and in TASKS, never a branch name; an internal segment closed by a committed QA review burns no `rc`.
-- The closure narrative lives in `log` entries `{ts, agent, kind, text}` over `closure-summary`, `closure-size-accounting`, `closure-drift`, `closure-test-dispositions` and `closure-artifact-gc`.
+- The closure narrative lives in `log` entries `{ts, agent, kind, text}` over `closure-summary`, `closure-size-accounting`, `closure-drift`, `closure-dispositions`, `closure-test-dispositions`, `closure-artifact-gc`, `closure-intake-candidates`, `closure-rc-ledger` and `closure-archive-decision`.
 - Everything else has a native home: dispositions in the histo and `BUGS.jsonl`, tasks in `TASKS.md` markers, validations in handoffs and verdicts, memory updates in atom diffs, archival in `phase: ARCHIVED`.
 - Inside closure the order is memory update, closure log entries, disposition sweep, artifact GC, archive, with the pre-PR six-axis review running on the thawed tree.
 - Release ids are bare semver; a `v` prefix resolves only for a read-only lookup of an archived directory.

@@ -20,13 +20,13 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.core.models.agent import AgentDTO
-from dadaia_workspace.features.panel.service import PanelService
-from dadaia_workspace.features.panel.views.api_agents import render_api_agents_canonical
-from dadaia_workspace.features.telemetry.aggregator.models import (
+from dadaia_workspace.core.models.telemetry import (
     AgentListResult,
     AgentSummary,
     TokenTotals,
 )
+from dadaia_workspace.features.panel.service import PanelService
+from dadaia_workspace.features.panel.views.api_agents import render_api_agents_canonical
 
 pytestmark = pytest.mark.unit
 

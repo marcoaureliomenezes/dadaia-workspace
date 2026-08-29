@@ -16,7 +16,10 @@ following the SPEC-DOC-NNN convention:
 - SPEC-DOC-030 — specs/audits/ naming canon.
 - SPEC-DOC-031 — consumed-backlog disposition drift (re-targeted at BACKLOG.md's ACTIVE
   subsections, SPEC v0.12.0 FR5/T-120-08 — the evidence source and severity are unchanged).
-- SPEC-DOC-032 — bug status-token canon.
+- SPEC-DOC-032 — RETIRED (v0.5.1 K5 deepening). Was a per-bug
+  ``specs/bugs/<slug>.md`` frontmatter ``status:`` regex canon check — dead code
+  behind a dead artifact (the v0.5.0 FR2 single-JSONL-ledger cutover retired the
+  per-bug Markdown file shape two migrations before this one).
 """
 
 from __future__ import annotations
@@ -229,14 +232,6 @@ def _write_archived_spec_consumes(specs: Path, release_id: str, *slugs: str) -> 
     )
 
 
-def _write_bug(specs: Path, slug: str, status: str, extra: str = "") -> None:
-    (specs / "bugs").mkdir(parents=True, exist_ok=True)
-    (specs / "bugs" / f"{slug}.md").write_text(
-        f"---\nname: {slug}\nstatus: {status}\nsession_id: null\n{extra}---\n\n**Symptom:** x.\n",
-        encoding="utf-8",
-    )
-
-
 def _seed_lock_record(
     workspace: Path,
     ctx: str,
@@ -343,12 +338,10 @@ def test_sad_matrix(tmp_path: Path) -> None:
     # `### <slug>` subsections, never the literal document name.
     assert not any(i.description.startswith("backlog ACTIVE item 'BACKLOG'") for i in doc031)
 
-    # DOC-032: legacy non-canonical bug status -> WARNING.
-    specs_i = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-032"))
-    _write_bug(specs_i, "some-old-bug", "Fixed")
-    doc032 = _by_code(SpecsDoctor(specs_i).check(), "SPEC-DOC-032")
-    assert doc032 and all(i.severity == Severity.WARNING for i in doc032)
-    assert "Fixed" in " ".join(i.description for i in doc032)
+    # DOC-032 (bug status-token canon over a per-bug specs/bugs/<slug>.md frontmatter
+    # file) is RETIRED at v0.5.1 K5 — see test_bug_record.py and
+    # test_doctor_governance.py for the replacement coverage over the single-JSONL
+    # ledger this doctor now reads exclusively.
 
 
 # ---------------------------------------------------------------------------
@@ -441,27 +434,6 @@ def test_silent_matrix(tmp_path: Path) -> None:
     )
     _write_archived_closure(specs_h4, "v0.0.9", "# Closure\n\nReferences candidates here.\n")
     assert "SPEC-DOC-031" not in _codes(SpecsDoctor(specs_h4).check())
-
-    # DOC-032: canonical statuses (case-insensitive), README skip, absent bugs/ dir,
-    # and the live-tree superseded_by fix shape -> all silent.
-    for idx, status in enumerate(("Open", "Closed", "open", "closed", "CLOSED")):
-        # Dir name carries an index, not the status: case-variant statuses collide
-        # on the case-insensitive filesystems of the macOS/Windows CI runners.
-        specs_i = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + f"-032-{idx}"))
-        _write_bug(specs_i, "well-formed-bug", status)
-        assert "SPEC-DOC-032" not in _codes(SpecsDoctor(specs_i).check())
-    specs_i2 = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-032readme"))
-    (specs_i2 / "bugs").mkdir(parents=True, exist_ok=True)
-    (specs_i2 / "bugs" / "README.md").write_text("# Bugs\n\nstatus: whatever\n", encoding="utf-8")
-    assert "SPEC-DOC-032" not in _codes(SpecsDoctor(specs_i2).check())
-    specs_i3 = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-032dup"))
-    _write_bug(
-        specs_i3,
-        "duplicate-bug",
-        "Closed",
-        extra="superseded_by: canonical-bug\nrejected_reason: marked duplicate\n",
-    )
-    assert "SPEC-DOC-032" not in _codes(SpecsDoctor(specs_i3).check())
 
 
 # ---------------------------------------------------------------------------

@@ -16,9 +16,14 @@ from rich.table import Table
 from dadaia_workspace import container
 from dadaia_workspace.cli._specs_resolution import CONTEXT_NAME_RE as _CONTEXT_NAME_RE
 from dadaia_workspace.cli._specs_resolution import (
+    HARNESS_SESSION_ID_ENV_VARS,
+    sanitize_session_id,
+)
+from dadaia_workspace.cli._specs_resolution import (
     resolve_context_for_cli as _resolve_context_for_cli,
 )
 from dadaia_workspace.cli.redact import ContextRedactor
+from dadaia_workspace.core import kernel_tunables, session_store
 from dadaia_workspace.core.exceptions import (
     ContextAlreadyExistsError,
     ContextNotFoundError,
@@ -29,9 +34,9 @@ from dadaia_workspace.core.exceptions import (
     WorkspaceNotInitializedError,
 )
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
-from dadaia_workspace.core.session_env import harness_session_id, sanitize_session_id
+from dadaia_workspace.core.record_liveness import is_stale
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
-from dadaia_workspace.features.spec_context import presence, session_identity
+from dadaia_workspace.features.spec_context import presence
 from dadaia_workspace.features.spec_context.service import (
     AssociatedRepoConflictError,
     AssociatedRepoNotFoundError,
@@ -132,34 +137,38 @@ def _now_iso() -> str:
 def _sessions_dir(workspace_root: Path) -> Path:
     # Session-store path via the single owner (T-011-05 / FR-W1-05, ADR-12) — the bind CLI
     # no longer constructs the ``.dadaia/sessions`` path itself.
-    return session_identity.sessions_dir(workspace_root)
+    return session_store.sessions_dir(workspace_root)
 
 
-def _load_session(sessions_dir: Path, session_id: str) -> dict[str, Any] | None:
-    """Load a session file, return None if not found."""
-    session_file = sessions_dir / f"{session_id}.json"
-    if not session_file.exists():
+def _live_session(workspace_root: Path, session_id: str) -> dict[str, Any] | None:
+    """This caller's own session record, or ``None`` when absent/stale.
+
+    Thin call onto the single session-record owner (:mod:`core.session_store`) and the
+    ONE staleness rule (:func:`core.record_liveness.is_stale`) — replaces the CLI's own
+    ``_load_session``/``_session_is_stale`` pair (release K1).
+    """
+    record = session_store.read_session(workspace_root, session_id)
+    if record is None:
         return None
-    try:
-        data: dict[str, Any] = json.loads(session_file.read_text(encoding="utf-8"))
-        return data
-    except (json.JSONDecodeError, OSError):
-        return None
+    gc_check: dict[str, object] = {
+        "heartbeat": session_store.liveness_timestamp(record),
+        "ttl": record.get(
+            session_store.SESSION_GC_TTL_FIELD, kernel_tunables.SESSION_GC_TTL_SECONDS
+        ),
+    }
+    return None if is_stale(gc_check) else record
 
 
-def _session_is_stale(session_data: dict) -> bool:  # type: ignore[type-arg]
-    """Check if a session is stale based on TTL."""
-    try:
-        last_seen = session_data.get("last_seen_at", "")
-        ttl = int(session_data.get("ttl_seconds", 300))
-        if not last_seen:
-            return False
-        last_seen_dt = datetime.fromisoformat(last_seen.replace("Z", "+00:00"))
-        now = datetime.now(tz=UTC)
-        elapsed = (now - last_seen_dt).total_seconds()
-        return elapsed > ttl
-    except Exception:
-        return False
+def _harness_session_id() -> str | None:
+    """Harness-native session id from the environment ONLY (no payload — this is a CLI
+    entrypoint, not a hook). Scans the single shared env-var list
+    (:data:`~dadaia_workspace.core.invocation.HARNESS_SESSION_ID_ENV_VARS`) so the
+    harness id never drifts from what the gate/hooks read (release K1)."""
+    for name in HARNESS_SESSION_ID_ENV_VARS:
+        sanitized = sanitize_session_id(os.environ.get(name))
+        if sanitized:
+            return sanitized
+    return None
 
 
 def _resolve_own_session_id(*, explicit: str | None = None, mint: bool = False) -> str | None:
@@ -169,16 +178,18 @@ def _resolve_own_session_id(*, explicit: str | None = None, mint: bool = False) 
     Order: *explicit* (a verb's own CLI override, e.g. ``release --session``) -> the
     eval-flow ``DADAIA_SESSION_ID`` (sanitized, CWE-22 — every site now gets the same
     defence ``bind`` already had) -> the harness-native session id
-    (:func:`harness_session_id`) -> when *mint* is set, a freshly minted ``sess_*`` id
+    (:func:`_harness_session_id`) -> when *mint* is set, a freshly minted ``sess_*`` id
     (``bind``'s own fallback when a record must be created but neither channel carries
-    an identity yet). Session IDENTITY only — never a context-resolution rung.
+    an identity yet — a WRITE-side concern this CLI command owns for itself, never part
+    of the read-side session-id rule, release K1). Session IDENTITY only — never a
+    context-resolution rung.
     """
     if explicit:
         return explicit
     env_sid = sanitize_session_id(os.environ.get("DADAIA_SESSION_ID"))
     if env_sid:
         return env_sid
-    harness_id = harness_session_id()
+    harness_id = _harness_session_id()
     if harness_id:
         return harness_id
     if mint:
@@ -431,13 +442,8 @@ def show(
             # Show only this caller's session. A context-wide "last binder" fallback would
             # expose foreign state as the caller's own and can never be authoritative.
             workspace_root = resolve_workspace_root()
-            sessions_dir = _sessions_dir(workspace_root)
             session_id = _resolve_own_session_id()
-            session_obj = None
-            if session_id:
-                session_data = _load_session(sessions_dir, session_id)
-                if session_data and not _session_is_stale(session_data):
-                    session_obj = session_data
+            session_obj = _live_session(workspace_root, session_id) if session_id else None
             data["session"] = session_obj
             # v0.1.76 T-4 (FR7): "presence" — who else is currently active on this
             # context, sourced from the ONLY concurrency-signal surface post-doctrine
@@ -709,7 +715,7 @@ def bind(
         "pid": pid,
         "bound_at": now,
         "last_seen_at": now,
-        "ttl_seconds": 300,
+        "ttl_seconds": kernel_tunables.SESSION_GC_TTL_SECONDS,
         "is_stale": False,
     }
 
@@ -720,7 +726,7 @@ def bind(
     # identity divergence this resolution order exists to prevent (consumer validation
     # F-07, 2026-07-15): hooks resolve DADAIA_SESSION_ID first too, so the alias never
     # carried information the primary record does not.
-    session_identity.write_session(workspace_root, session_id, session_data)
+    session_store.write_session(workspace_root, session_id, session_data)
 
     # T-50-05 (SPEC v0.5.0 FR1, the one addition in an otherwise subtractive lane):
     # T-50-04 deleted `_adopt_attributed_bind`, the ancestry-marker path that used to make
@@ -732,7 +738,7 @@ def bind(
     # hooks' identity channel), and a `--print-env` caller is mid `eval $(...)` — both
     # flows produce a working binding, so warning there is noise, not signal.
     if (
-        not harness_session_id()
+        not _harness_session_id()
         and not os.environ.get("DADAIA_CONTEXT")
         and not os.environ.get("DADAIA_SESSION_ID")
         and not print_env
@@ -778,7 +784,7 @@ def release_cmd(
 
     Resolution order for "this session's own id": ``--session``
     override -> ``DADAIA_SESSION_ID`` (eval-flow override) -> the harness-native session id
-    (:func:`harness_session_id`) -> the last bind's CLI-minted session id read back from the
+    (:func:`_harness_session_id`) -> the last bind's CLI-minted session id read back from the
     session record directory (legacy default-flow fallback). Every presence record this
     session owns (across every context) is deleted (:func:`presence.clear`, idempotent — a
     session with no presence record is a clean no-op), then the CLI session record is
@@ -831,9 +837,8 @@ def heartbeat() -> None:
         raise typer.Exit(1) from None
 
     workspace_root = resolve_workspace_root()
-    sessions_dir = _sessions_dir(workspace_root)
 
-    session_data = _load_session(sessions_dir, session_id)
+    session_data = session_store.read_session(workspace_root, session_id)
     if session_data is None:
         err_console.print(
             f"[red]Error:[/red] Session '{session_id}' not found. "
@@ -847,7 +852,7 @@ def heartbeat() -> None:
     ctx_name = session_data.get("context", "")
     now = _now_iso()
     presence.renew(workspace_root, session_id)
-    session_identity.touch_last_seen_at(workspace_root, session_id, now=now)
+    session_store.touch_last_seen_at(workspace_root, session_id, now=now)
     console.print(
         f"[green]✓[/green] Heartbeat renewed for session '[bold]{session_id}[/bold]' "
         f"(context={ctx_name}, last_seen_at={now})"

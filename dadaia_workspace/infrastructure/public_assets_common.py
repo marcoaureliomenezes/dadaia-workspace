@@ -9,12 +9,17 @@ from __future__ import annotations
 import hashlib
 import json
 import sys
+from collections.abc import Iterable
 from enum import StrEnum
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
 
 from dadaia_workspace.core.harness_registry import INSTALL_TARGETS
+from dadaia_workspace.infrastructure.privacy_check import (
+    _PUBLIC_ASSET_IGNORED_DIRS,
+    _PUBLIC_ASSET_IGNORED_SUFFIXES,
+)
 
 _SCHEMA_VERSION = "1"
 
@@ -68,6 +73,25 @@ _CLAUDE_DIRS = ("rules", "skills", "commands", "agents")
 #: Subdirectories of the staged ``kimi-code/`` tree for ``--only`` filtering (v0.2.8).
 #: Empty for now — the tree currently ships a single root ``AGENTS.md``.
 _KIMI_DIRS: tuple[str, ...] = ()
+
+
+def is_ignored_public_asset(path: Path) -> bool:
+    """True iff *path* is a build/cache artifact excluded from every public-asset walk."""
+    return path.suffix in _PUBLIC_ASSET_IGNORED_SUFFIXES or bool(
+        _PUBLIC_ASSET_IGNORED_DIRS.intersection(path.parts)
+    )
+
+
+def iter_public_files(root: Path) -> Iterable[Path]:
+    """Every real (non-ignored) file under *root*, sorted — the ONE recursive walk
+    ``stage()``/``install()``/``doctor()``/rule construction all share."""
+    if not root.exists():
+        return ()
+    return (
+        path
+        for path in sorted(root.rglob("*"))
+        if path.is_file() and not is_ignored_public_asset(path)
+    )
 
 
 def _sha256(path: Path) -> str:

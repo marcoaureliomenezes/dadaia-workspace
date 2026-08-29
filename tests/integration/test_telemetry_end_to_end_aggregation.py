@@ -18,8 +18,7 @@ from typing import Any
 
 from dadaia_workspace.features.telemetry.aggregator.queries import TelemetryAggregator
 from dadaia_workspace.features.telemetry.reader.claude import read_session_file
-from dadaia_workspace.features.telemetry.store.dao import TelemetryDao
-from dadaia_workspace.features.telemetry.store.schema import apply_migrations
+from dadaia_workspace.features.telemetry.store import TelemetryStore, apply_migrations
 from tests.fakes import shared_connection_factory
 
 
@@ -121,12 +120,12 @@ def _write_synthetic_jsonl(path: pathlib.Path, session_id: str, subagent_type: s
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def _make_dao(db_path: pathlib.Path) -> TelemetryDao:
+def _make_dao(db_path: pathlib.Path) -> TelemetryStore:
     conn = sqlite3.connect(str(db_path))
     conn.execute("PRAGMA foreign_keys=ON")
     conn.row_factory = sqlite3.Row
     apply_migrations(conn)
-    return TelemetryDao(conn)
+    return TelemetryStore.from_connection(conn)
 
 
 def test_seed_read_aggregate_single_multi_and_idempotent(tmp_path: pathlib.Path) -> None:

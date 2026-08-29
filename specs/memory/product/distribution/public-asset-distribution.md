@@ -11,6 +11,9 @@ tags: [public, assets, distribution, projection, privacy]
 
 - `dadaia public stage` copies `dadaia_workspace/public/` into `.dadaia/agentic/<type>/` with a SHA256 manifest.
 - `dadaia public install` projects staged assets into `.claude/`, `.codex/`, `.kimi-code/`, `.agents/`, the root law pair, scoped rule files and the Codex hook wrappers under `.dadaia/hooks/`.
+- `projection_rules(plan)` builds one `ProjectionRule(label, dst, render, compare, ownership)` table; `install` writes it, `doctor` compares it and the install ledger is its destination list — no second derivation of the managed set.
+- `HarnessProjection` has three production adapters — Claude Code, Codex, Kimi Code — each contributing its own rules plus the doctor lines a byte-compare cannot express.
+- The renderer is the only verifier: a rule's `render` maps the bytes on disk to the bytes that belong there, so a `bytes` rule is a plain compare while an `owned-slice` or `managed-block` rule is a fixed point that leaves an operator's own keys alone.
 - There is no `public/hooks/`: governance hooks are the Python package `dadaia_workspace/hooks/`.
 - Install compares content, not existence — a differing staged hash overwrites without `--force`, which is reserved for a hand-edited projection.
 - The nine `agents/*.md` bodies stage generic and render at install as `render(staged body + resolved (model, effort))`, precedence override > template > `balanced` over `.dadaia/states/agent_model_policy.json`.
@@ -21,10 +24,10 @@ tags: [public, assets, distribution, projection, privacy]
 ## Doctor
 
 - `dadaia public doctor` compares source against staging, then staging against each runtime projection, emitting `[ok]`, `[missing]`, `[drift]` or `[foreign]` per file and a non-zero exit on any mismatch.
-- A core `claude:agents/*.md` label compares against `render(staged + resolved policy)`, so an applied policy reads `[ok]` and a hand-edit `[drift]`; Codex TOMLs are checked structurally.
+- A core `claude:agents/*.md` label compares against `render(staged + resolved policy)`, so an applied policy reads `[ok]` and a hand-edit `[drift]`; a Codex TOML is byte-compared to its render exactly as a Claude agent is.
 - The privacy gate runs over source and staged assets, reporting `[ok] public-privacy` only on a clean surface, which CI treats as a release gate.
 - With `.dadaia/states/harness_profile.json` present, `install` without `--target` covers the profile's harnesses plus the shared `agents` tree; an absent profile means all four ([[workspace-init]]).
-- Doctor scopes per-runtime expectations to the profile and warns on a runtime directory outside it.
+- Doctor builds its rule table for the profile's harnesses only and warns on a runtime directory outside it.
 
 ## Scaffold and consumer fan-out
 

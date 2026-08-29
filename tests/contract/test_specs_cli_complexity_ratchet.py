@@ -48,9 +48,14 @@ _UPGRADE_MODULE = _REPO_ROOT / "dadaia_workspace" / "features" / "migrate" / "up
 _UPGRADE_CEILING = 26
 _DOCTOR_CEILING = 10
 
-# Pinned at T-050-05 (before this task touched anything else in the tree) — proves
-# `features/migrate/upgrade.py` is untouched by FR1's scaffold/doctor/--recipe work.
-_UPGRADE_MODULE_SHA256 = "95fe07aefd68bfbd200e1559495dc46bc51ea44dcfa9b5462248a99dc4b2f319"
+# Pinned at T-050-05 (before that task touched anything else in the tree) — proved
+# `features/migrate/upgrade.py` was untouched by FR1's scaffold/doctor/--recipe work.
+# Re-pinned at v0.5.1 T-051-16 (K10): the retired migration-chain deletion legitimately
+# rewrote this module (backup-first/chain-walk/re-stamp collapsed to the registry's
+# "stamp v6 or refuse" rule) — same-commit justification per this test's own error
+# message; the SCAFFOLD's 0.6.0 expiry (A7) is unaffected, this is a same-generation
+# re-pin, not a renewal.
+_UPGRADE_MODULE_SHA256 = "33b2683bb705bbc41cb7b25aa630c3e4dfbc1dd36d08734a7ea8ee9529fe3919"
 
 
 def _complexity_by_name(path: Path) -> dict[str, int]:

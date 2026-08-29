@@ -13,6 +13,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
+from dadaia_workspace.core.handoff_index import Handoff, scan_handoffs
 from dadaia_workspace.core.models.hygiene import SlopPolicy
 
 _DEFAULT_TTL = dt.timedelta(seconds=SlopPolicy().reports_ttl_seconds)
@@ -268,21 +269,17 @@ class ReportRetentionService:
         result: dict[str, list[Path]] = {}
         malformed: list[Path] = []
         for root in (self._handoff_root, self._reports_root):
-            if not root.exists():
-                continue
-            for handoff in sorted(root.rglob("*.handoff.json")):
+            for handoff_doc in scan_handoffs(root):
+                handoff = handoff_doc.path
                 if not self._is_under(handoff, root):
                     continue
-                try:
-                    doc = json.loads(handoff.read_text(encoding="utf-8"))
-                except (json.JSONDecodeError, OSError):
+                if handoff_doc.malformed_error is not None:
                     malformed.append(handoff)
                     stem_artifact = self._legacy_same_stem_artifact(handoff)
                     if stem_artifact is not None:
                         result.setdefault(stem_artifact, []).append(handoff)
                     continue
-                artifact = doc.get("artifact", {}) if isinstance(doc, dict) else {}
-                path = artifact.get("path") if isinstance(artifact, dict) else None
+                path = handoff_doc.artifact_path_raw
                 if isinstance(path, str) and path.startswith(".dadaia/reports/"):
                     result.setdefault(path, []).append(handoff)
                     continue
@@ -298,12 +295,9 @@ class ReportRetentionService:
             else handoffs
         )
         for handoff in timestamp_handoffs:
-            try:
-                doc = json.loads(handoff.read_text(encoding="utf-8"))
-            except (json.JSONDecodeError, OSError):
-                continue
-            produced_at = doc.get("produced_at") if isinstance(doc, dict) else None
-            parsed = self._parse_datetime(produced_at) if isinstance(produced_at, str) else None
+            handoff_doc = Handoff.load(handoff)
+            produced_at = handoff_doc.produced_at
+            parsed = self._parse_datetime(produced_at) if produced_at is not None else None
             if parsed is not None:
                 return parsed
         if report is not None:
@@ -357,12 +351,10 @@ class ReportRetentionService:
                 handoff, self._reports_root
             ):
                 raise ValueError("handoff path must be under .dadaia/handoff or .dadaia/reports")
-            try:
-                doc = json.loads(handoff.read_text(encoding="utf-8"))
-            except (json.JSONDecodeError, OSError):
+            handoff_doc = Handoff.load(handoff)
+            if handoff_doc.malformed_error is not None:
                 return self._workspace_ref(handoff)
-            artifact = doc.get("artifact", {}) if isinstance(doc, dict) else {}
-            artifact_path = artifact.get("path") if isinstance(artifact, dict) else None
+            artifact_path = handoff_doc.artifact_path_raw
             if isinstance(artifact_path, str):
                 ref = artifact_path
             else:

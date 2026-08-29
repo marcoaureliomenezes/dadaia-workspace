@@ -19,18 +19,18 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.features.agents.reader import FileSystemAgentsProvider
-from dadaia_workspace.features.panel.service import PanelService
-from dadaia_workspace.features.panel.views.api_agents import (
-    render_api_agent_prompt,
-    render_api_agents_canonical,
-)
-from dadaia_workspace.features.telemetry.aggregator.models import (
+from dadaia_workspace.core.models.telemetry import (
     AgentListResult,
     AgentSummary,
     ContextBreakdown,
     RecentSession,
     TokenTotals,
+)
+from dadaia_workspace.features.agents.reader import FileSystemAgentsProvider
+from dadaia_workspace.features.panel.service import PanelService
+from dadaia_workspace.features.panel.views.api_agents import (
+    render_api_agent_prompt,
+    render_api_agents_canonical,
 )
 from dadaia_workspace.infrastructure.markdown_agent_store import MarkdownAgentStore
 from tests.integration.panel.conftest import get

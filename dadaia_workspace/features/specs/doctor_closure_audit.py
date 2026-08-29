@@ -36,6 +36,7 @@ from pathlib import Path
 from dadaia_workspace.core.models.findings import FindingRecord
 from dadaia_workspace.core.protocols.record_store import RecordStore
 from dadaia_workspace.core.workspace_layout import AUDIT_DIR_NAME_RE
+from dadaia_workspace.features.specs.canon import REQUIRED_ROOT_DIRS
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
 
 # Four audit dirs from the v0.1.9/v0.1.10 audit cycles predate the doctor WARN and are
@@ -51,12 +52,17 @@ _AUDIT_DIR_GRANDFATHER: frozenset[str] = frozenset(
 )
 
 # SPEC-DOC-034 (v0.1.46 AC-4): the per-artifact ``_archive`` dirs that must PRE-EXIST
-# (the FROZEN landing zone for disposed bugs/backlog). ``audits`` is deliberately
-# excluded (v0.5.0 specs-canon closure): an audit archives to specs/audits/_archive/
-# only once fully dispositioned (DADAIA.md §6) — a rare, optional event, unlike
-# backlog/bugs' routine histo-ledger appends — so it must NOT be pre-created empty;
-# it lands on disk the moment the first audit actually archives.
-_ARCHIVE_PARENT_DIRS: tuple[str, ...] = ("backlog", "bugs")
+# (the FROZEN landing zone for disposed artifacts). Anchored to the canon table's
+# REQUIRED_ROOT_DIRS (v0.5.1 K4) rather than an independent hand-kept tuple, then
+# narrowed to the two areas that dispose routinely — backlog/bugs' histo ledgers grow
+# constantly, so a missing `_archive/` there is meaningful drift worth a standing
+# WARNING; releases/audits archive far less often (an audit's `_archive/` landing zone
+# is legitimately empty for most of a project's life) and stay outside this narrower
+# check. The narrowing is a deliberate, documented business decision — not a second
+# independent member list, since it can only ever be a SUBSET of REQUIRED_ROOT_DIRS.
+_ARCHIVE_PARENT_DIRS: tuple[str, ...] = tuple(
+    d for d in REQUIRED_ROOT_DIRS if d in ("backlog", "bugs")
+)
 
 # FR13 (D5): a finding's mutable governance triple. A record is done once its
 # ``disposition`` lands here AND names a disposing ``release`` — the only two facts

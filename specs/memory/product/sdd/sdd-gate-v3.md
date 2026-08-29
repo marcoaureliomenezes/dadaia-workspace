@@ -26,6 +26,7 @@ tags: [sdd, gate, hooks, enforcement, no-locks, privacy]
 - A path under `repos/<slug>/` matches neither origin, so a repo's scoped `AGENTS.md` is MUTATING; MEMORY matches the bare prefix `specs/memory/` with no dotfile carve-out.
 - Phase comes from `RELEASE.json` alone — the single directory under `specs/releases/` carrying one — fail-closed: zero or several live releases, an unreadable file or a missing `phase` denies the write.
 - Mode resolves from the environment, then this session's record, then `IMPLEMENTATION`; a READ session blocks only its own mutating writes.
+- The gate builds one `core.invocation.Invocation` per payload and reads context, mode, release and phase off it; it re-derives no fact and never imports the container ([[context-management]]).
 - It best-effort upserts a presence record, another live record warning once without changing the verdict.
 - The PostToolUse reconciler reports out-of-scope dirty paths, refreshes presence and never blocks; `bound_at` against the injection sentinel is the only injection trigger ([[context-management]]).
 
@@ -37,7 +38,8 @@ tags: [sdd, gate, hooks, enforcement, no-locks, privacy]
 - A refspec aiming a local ref at a different remote ref is refused; an unparseable stdin line refuses the push naming `git push --no-verify` as the one bypass, empty stdin being the nothing-to-gate allow.
 - The security verdict is a pull-request gate: a CI job on both edges requires an APPROVED `security-reviewer` handoff whose `metrics.commit_sha` is the PR head sha, or an ancestor whose only intervening diff is the verdict evidence at `specs/releases/<release-id>/verdicts/<sha>.handoff.json`.
 - The dual qa-plus-security closure gate is the only mechanical check of the qa-engineer verdict.
-- `dadaia ci gc-push-verdicts --sha <sha>` deletes exactly the covering verdict handoffs after a confirmed merge, appending one ledger line per delete.
+- `features/chokepoints` is four modules — `branch_policy`, `pre_commit`, `push_gate`, `verdict` — and `verdict.covering_verdict(paths, head_sha)` is the single verdict reader the push gate, `specs doctor` and the PR check all call.
+- A consumed verdict is deleted by hand after the merge; no GC verb exists.
 - `secret-scan.yml` (gitleaks) runs once per release on the ship PR; earlier material is covered only by the denylist scan, an accepted gap.
 
 ### Push-range denylist scan

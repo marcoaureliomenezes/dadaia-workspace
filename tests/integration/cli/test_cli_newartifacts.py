@@ -52,7 +52,7 @@ def test_release_new_and_backlog_new(specs: Path) -> None:
         ["release", "new", "my-feature-v1", "--specs-dir", str(specs)],
     )
     assert existing_result.exit_code != 0
-    assert "already minted" in existing_result.output.lower() or "already minted" in (
+    assert "already exist" in existing_result.output.lower() or "already exist" in (
         existing_result.stderr or ""
     )
 

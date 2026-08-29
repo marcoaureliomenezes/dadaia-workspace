@@ -16,7 +16,8 @@ from pathlib import Path
 
 from dadaia_workspace.core.protocols.git_object_reader import GitObjectReadError, ScannedObject
 from dadaia_workspace.features.chokepoints import push_gate_decision
-from dadaia_workspace.features.chokepoints.service import PushRef, parse_push_refs
+from dadaia_workspace.features.chokepoints.branch_policy import PushRef, parse_push_refs
+from dadaia_workspace.features.specs.canon import canon_violations, verdict_violations
 
 _SHA_A = "a" * 40
 _SHA_B = "b" * 40
@@ -88,6 +89,8 @@ def test_branch_push_with_denylisted_blob_in_range_is_refused(tmp_path: Path) ->
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         object_source=source,
         repo=tmp_path,
+        canon_violations_fn=canon_violations,
+        verdict_violations_fn=verdict_violations,
         denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
     )
     assert not decision.allowed
@@ -102,15 +105,13 @@ def test_branch_push_with_denylisted_blob_in_range_is_refused(tmp_path: Path) ->
 def test_term_outside_the_range_does_not_refuse(tmp_path: Path) -> None:
     """The fake never surfaces an object for this (local, remote) pair — mirroring an
     object that is reachable only from ``remote_sha`` and therefore out of range."""
-    from dadaia_workspace.features.chokepoints.service import iter_security_approvals
-
-    assert iter_security_approvals(tmp_path) == []  # sanity: no verdict on disk either.
-
     source = _FakeObjectSource(by_range={})
     decision = push_gate_decision(
         _refs(f"refs/tags/v9.9.9 {_SHA_A} refs/tags/v9.9.9 {_ZERO}"),
         object_source=source,
         repo=tmp_path,
+        canon_violations_fn=canon_violations,
+        verdict_violations_fn=verdict_violations,
         denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
     )
     assert decision.allowed
@@ -127,6 +128,8 @@ def test_deletion_ref_is_never_scanned(tmp_path: Path) -> None:
         _refs(f"refs/heads/old {_ZERO} refs/heads/old {_SHA_A}"),
         object_source=source,
         repo=tmp_path,
+        canon_violations_fn=canon_violations,
+        verdict_violations_fn=verdict_violations,
         denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
     )
     assert decision.allowed
@@ -153,6 +156,8 @@ def test_shared_blob_across_two_refs_is_deduped(tmp_path: Path) -> None:
         ),
         object_source=source,
         repo=tmp_path,
+        canon_violations_fn=canon_violations,
+        verdict_violations_fn=verdict_violations,
         denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
     )
     assert not decision.allowed
@@ -172,6 +177,8 @@ def test_tainted_tag_push_is_refused(tmp_path: Path) -> None:
         _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
         object_source=source,
         repo=tmp_path,
+        canon_violations_fn=canon_violations,
+        verdict_violations_fn=verdict_violations,
         denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
     )
     assert not decision.allowed
@@ -188,6 +195,8 @@ def test_clean_tag_push_is_allowed_with_no_verdict_required(tmp_path: Path) -> N
         _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
         object_source=source,
         repo=tmp_path,
+        canon_violations_fn=canon_violations,
+        verdict_violations_fn=verdict_violations,
         denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
     )
     assert decision.allowed  # no handoff file exists anywhere under tmp_path.
@@ -205,6 +214,8 @@ def test_branch_policy_refusal_precedes_the_scan(tmp_path: Path) -> None:
         _refs(f"refs/heads/main {_SHA_A} refs/heads/main {_ZERO}"),
         object_source=source,
         repo=tmp_path,
+        canon_violations_fn=canon_violations,
+        verdict_violations_fn=verdict_violations,
     )
     assert not decision.allowed
     assert "main" in decision.message
@@ -225,6 +236,8 @@ def test_refusal_message_shape_and_ten_item_cap(tmp_path: Path) -> None:
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         object_source=source,
         repo=tmp_path,
+        canon_violations_fn=canon_violations,
+        verdict_violations_fn=verdict_violations,
         denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
     )
     assert not decision.allowed
@@ -250,6 +263,8 @@ def test_git_object_read_failure_refuses_naming_the_failure(tmp_path: Path) -> N
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         object_source=_FailingObjectSource(),
         repo=tmp_path,
+        canon_violations_fn=canon_violations,
+        verdict_violations_fn=verdict_violations,
     )
     assert not decision.allowed
     assert "simulated git rev-list failure" in decision.message
@@ -281,6 +296,8 @@ def test_generator_denylist_terms_still_refuses_not_silently_emptied(tmp_path: P
         _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
         object_source=source,
         repo=tmp_path,
+        canon_violations_fn=canon_violations,
+        verdict_violations_fn=verdict_violations,
         denylist_terms=_term_generator(),
     )
     assert not decision.allowed
@@ -295,7 +312,7 @@ def test_generator_denylist_terms_still_refuses_not_silently_emptied(tmp_path: P
 
 
 def test_option_shaped_local_sha_glob_form_is_malformed() -> None:
-    from dadaia_workspace.features.chokepoints.service import parse_push_stdin
+    from dadaia_workspace.features.chokepoints.branch_policy import parse_push_stdin
 
     refs, malformed = parse_push_stdin(
         f"refs/heads/develop --glob=refs/nonexistent refs/heads/develop {_ZERO}\n"
@@ -305,7 +322,7 @@ def test_option_shaped_local_sha_glob_form_is_malformed() -> None:
 
 
 def test_option_shaped_local_sha_branches_form_is_malformed() -> None:
-    from dadaia_workspace.features.chokepoints.service import parse_push_stdin
+    from dadaia_workspace.features.chokepoints.branch_policy import parse_push_stdin
 
     refs, malformed = parse_push_stdin(
         f"refs/heads/develop --branches=zzz refs/heads/develop {_ZERO}\n"
@@ -316,7 +333,7 @@ def test_option_shaped_local_sha_branches_form_is_malformed() -> None:
 
 def test_option_shaped_remote_sha_is_also_malformed() -> None:
     """The same option-shaped hardening applies symmetrically to ``remote_sha``."""
-    from dadaia_workspace.features.chokepoints.service import parse_push_stdin
+    from dadaia_workspace.features.chokepoints.branch_policy import parse_push_stdin
 
     refs, malformed = parse_push_stdin(
         f"refs/heads/develop {_SHA_A} refs/heads/develop --glob=refs/nonexistent\n"
@@ -332,7 +349,7 @@ def test_option_shaped_remote_sha_is_also_malformed() -> None:
 
 
 def test_all_zero_deletion_sentinel_still_parses() -> None:
-    from dadaia_workspace.features.chokepoints.service import parse_push_stdin
+    from dadaia_workspace.features.chokepoints.branch_policy import parse_push_stdin
 
     refs, malformed = parse_push_stdin(f"refs/heads/old {_ZERO} refs/heads/old {_SHA_A}\n")
     assert malformed == 0
@@ -346,7 +363,7 @@ def test_all_zero_deletion_sentinel_still_parses() -> None:
 
 
 def test_sha256_length_local_sha_parses() -> None:
-    from dadaia_workspace.features.chokepoints.service import parse_push_stdin
+    from dadaia_workspace.features.chokepoints.branch_policy import parse_push_stdin
 
     sha256 = "f" * 64
     refs, malformed = parse_push_stdin(f"refs/heads/develop {sha256} refs/heads/develop {_ZERO}\n")
@@ -356,7 +373,7 @@ def test_sha256_length_local_sha_parses() -> None:
 
 
 def test_39_and_41_char_hex_shas_are_malformed() -> None:
-    from dadaia_workspace.features.chokepoints.service import parse_push_stdin
+    from dadaia_workspace.features.chokepoints.branch_policy import parse_push_stdin
 
     too_short = "a" * 39
     too_long = "a" * 41
@@ -385,6 +402,8 @@ def test_oversized_note_appears_in_decision_warn_on_allow(tmp_path: Path) -> Non
         _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
         object_source=source,
         repo=tmp_path,
+        canon_violations_fn=canon_violations,
+        verdict_violations_fn=verdict_violations,
     )
     assert decision.allowed
     assert decision.warn is not None
@@ -406,6 +425,8 @@ def test_oversized_note_appears_in_decision_warn_on_refuse(tmp_path: Path) -> No
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         object_source=source,
         repo=tmp_path,
+        canon_violations_fn=canon_violations,
+        verdict_violations_fn=verdict_violations,
         denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
     )
     assert not decision.allowed
@@ -433,6 +454,8 @@ def test_foreign_slugs_carrying_a_registry_name_and_slug_both_refuse(tmp_path: P
         _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
         object_source=source,
         repo=tmp_path,
+        canon_violations_fn=canon_violations,
+        verdict_violations_fn=verdict_violations,
         foreign_slugs=(dead_name, dead_slug),
     )
     assert not decision.allowed
@@ -457,6 +480,8 @@ def test_refusal_path_segment_matching_a_foreign_slug_is_masked(tmp_path: Path) 
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         object_source=source,
         repo=tmp_path,
+        canon_violations_fn=canon_violations,
+        verdict_violations_fn=verdict_violations,
         denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
         foreign_slugs=(_FOREIGN_SLUG,),
     )
@@ -475,6 +500,8 @@ def test_refusal_path_with_no_matching_segment_is_byte_identical(tmp_path: Path)
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         object_source=source,
         repo=tmp_path,
+        canon_violations_fn=canon_violations,
+        verdict_violations_fn=verdict_violations,
         denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
     )
     assert not decision.allowed
@@ -491,6 +518,8 @@ def test_oversized_note_path_segment_is_masked_too(tmp_path: Path) -> None:
         _refs(f"refs/tags/v1 {_SHA_A} refs/tags/v1 {_ZERO}"),
         object_source=source,
         repo=tmp_path,
+        canon_violations_fn=canon_violations,
+        verdict_violations_fn=verdict_violations,
         foreign_slugs=(_FOREIGN_SLUG,),
     )
     assert decision.allowed
@@ -536,6 +565,8 @@ def test_refusal_path_segment_uppercase_hyphenated_variant_of_term_is_masked(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         object_source=source,
         repo=tmp_path,
+        canon_violations_fn=canon_violations,
+        verdict_violations_fn=verdict_violations,
         denylist_terms=((_UPPERCASE_HYPHENATED_TERM, "synthetic"),),
     )
     assert not decision.allowed
@@ -574,6 +605,8 @@ def test_git_object_read_failure_at_a_denylisted_path_masks_the_path(tmp_path: P
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         object_source=_FailingObjectSourceWithPath(),
         repo=tmp_path,
+        canon_violations_fn=canon_violations,
+        verdict_violations_fn=verdict_violations,
         foreign_slugs=(_FOREIGN_SLUG,),
     )
     assert not decision.allowed
@@ -599,6 +632,8 @@ def test_same_offending_segment_gets_the_same_ordinal_across_hit_and_note(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         object_source=source,
         repo=tmp_path,
+        canon_violations_fn=canon_violations,
+        verdict_violations_fn=verdict_violations,
         denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
         foreign_slugs=(_FOREIGN_SLUG,),
     )
@@ -638,6 +673,8 @@ def test_push_with_denylisted_term_only_in_a_commit_message_body_is_refused(
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         object_source=source,
         repo=tmp_path,
+        canon_violations_fn=canon_violations,
+        verdict_violations_fn=verdict_violations,
         denylist_terms=((_SYNTHETIC_TERM, "synthetic"),),
     )
     assert not decision.allowed

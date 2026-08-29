@@ -1,66 +1,46 @@
-"""Bug-record service — the one write seam + read view over the bug ledger (v0.5.0 FR2,
-amended by the S1 FR23 firing, `specs/releases/0.5.0/reviews/S1-FR23-firing.md` A1).
+"""Bug-record service — the one write seam + read view over the bug ledger.
 
-D-F "switch": every consumer (``dadaia bugs status``/``stats``/``update``/``archive``,
-the CLI composition root) now reads and writes through :class:`BugService`, which holds
-the generic :class:`~dadaia_workspace.core.protocols.record_store.RecordStore` (DI seam
-— the concrete ``JsonlRecordStore`` is injected at the CLI composition root, so
-``features`` never imports ``infrastructure``). The v5 event fold is retired from the
-WRITE side entirely — :meth:`register` appends exactly one
-:class:`~dadaia_workspace.core.models.bugs.BugRecord` line, never an event;
-:meth:`apply_update` rewrites an existing record's governance fields in place through
-the SAME seam (AS-16 — the fixer's resolve and the auditor's
-``audited``/``resolved_commit`` write both go through this one method, A2.13).
+Every consumer (``dadaia bugs status``/``stats``/``update``/``resolve|supersede|defer|
+reject``/``archive``, the CLI composition root) reads and writes through
+:class:`BugService`, which holds the generic
+:class:`~dadaia_workspace.core.protocols.record_store.RecordStore` (DI seam — the
+concrete ``JsonlRecordStore`` is injected at the CLI composition root, so ``features``
+never imports ``infrastructure``). :meth:`register` appends exactly one
+:class:`~dadaia_workspace.core.models.bugs.BugRecord` line; :meth:`apply_update`
+rewrites an existing record's governance fields (never ``status`` — refused by
+:meth:`~dadaia_workspace.core.models.bugs.BugRecord.apply_governance_update` itself);
+:meth:`transition` is the ONE seam a status change goes through.
 
-**The live ledger is ``specs/bugs/BUGS.jsonl`` (T-050-10 physically migrated it) and
-this service reads it through ONE seam (A1).** Every historical v5 event stream is now
-one native v6 :class:`BugRecord` line per bug id, with
-``registration_commit``/``resolved_commit`` derived from git history (FR3). Every READ
-method here goes through ``self._record_store.iter_records()`` directly — the deletable
-``features.bugs.migrate_v5`` module is imported by NOTHING in this file (A1/A2.5): the
-live ledger carries zero v5 lines (a foreign/pre-migration write is the doctor's
-SPEC-DOC-033 ERROR to catch, not this service's to silently fold). :meth:`archive`
-removes eligible records through :meth:`~dadaia_workspace.core.protocols.record_store
-.RecordStore.remove` — the SAME refuse-stale seam :meth:`apply_update` already uses,
-never a second, unsealed raw-file rewrite.
-
-**FR8's one resolver seam (AS-1, v0.5.0 T-050-17).** :meth:`BugService.resolved_commit`
-is the SOLE resolver for a record's ``resolved_commit``: the stored value when present,
-derived from git history otherwise — one function, one caller-facing signature (A8.2).
-``resolved_commit`` stays ``null`` at resolve time by construction (a commit cannot
-contain its own sha); the field is a cache, and its ONE writer is FR14's pillar-1 audit,
-in the same atomic in-place rewrite that sets ``audited`` (a later task) — never this
-read-only seam, never a second commit. Derivation needs a real git walk, so it is
-DI'd in via the constructor (``history_reader``/``repo_root``, both optional): most
-``BugService`` construction sites (every ``append``, every plain ``status``/``stats``
-read) never pass them and the seam degrades to "stored or ``None``", never raising and
-never adding a blocking validation (A8.3). The v5/v6 line classifier it derives through
-is :func:`~dadaia_workspace.core.bug_provenance.classify_ledger_line` — permanent, in
-``core/`` (A2), not the deletable migration module.
+**FR8's one resolver seam (AS-1).** :meth:`BugService.resolved_commit` is the SOLE
+resolver for a record's ``resolved_commit``: the stored value when present, derived
+from git history otherwise (DI'd in via ``history_reader``/``repo_root``, both
+optional — most construction sites never need a git walk and the seam degrades to
+"stored or ``None``").
 """
 
 from __future__ import annotations
 
 import logging
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+
+from jsonschema.exceptions import ValidationError
 
 from dadaia_workspace.core.bug_provenance import classify_ledger_line, derive_commit_provenance
 from dadaia_workspace.core.models.bugs import (
     BUG_ARCHIVE_THRESHOLD_DAYS,
     TERMINAL_EVENTS,
     BugRecord,
-    governance_completeness_gaps,
 )
 from dadaia_workspace.core.protocols.git_history_reader import GitHistoryReader
 from dadaia_workspace.core.protocols.record_store import RecordStore
+from dadaia_workspace.core.redaction import PatternLike
 
 __all__ = [
     "BugArchiveResult",
-    "BugCoherenceGap",
     "BugDuplicateIdError",
     "BugService",
     "BugStats",
@@ -97,15 +77,6 @@ class BugStats:
 
 
 @dataclass(frozen=True)
-class BugCoherenceGap:
-    """A2.3 — one record whose governance fields are incomplete for its own ``status``."""
-
-    bug_id: str
-    status: str
-    missing: tuple[str, ...]
-
-
-@dataclass(frozen=True)
 class BugArchiveResult:
     """A2.8 — the outcome of one ``dadaia bugs archive`` run."""
 
@@ -122,20 +93,30 @@ class BugService:
         *,
         archive_store: RecordStore[BugRecord] | None = None,
         denylist_terms: Sequence[tuple[str, str]] = (),
+        baseline_patterns: Sequence[PatternLike] = (),
         history_reader: GitHistoryReader | None = None,
         repo_root: Path | None = None,
+        validate: Callable[[Mapping[str, object]], None] | None = None,
     ) -> None:
         self._record_store = record_store
         self._archive_store = archive_store
-        # v0.4.5 FR6: the SAME operator-denylist source the push scan already refuses
-        # on, DI'd in via the CLI/container seam (features-no-infrastructure) —
-        # threaded through BOTH write paths (append, A2.6).
+        # The SAME operator-denylist source the push scan already refuses on, DI'd in
+        # via the CLI/container seam (features-no-infrastructure) — threaded through
+        # both write paths (append, update/transition, A2.6).
         self._denylist_terms = tuple(denylist_terms)
-        # v0.5.0 FR8/AS-1 (T-050-17): the resolved_commit resolver's git-facing DI —
-        # both optional (container.build_git_history_reader() wires the real adapter;
-        # most construction sites never need it, see :meth:`resolved_commit`).
+        # The SAME packaged baseline privacy patterns the push-range scan already
+        # refuses on (container.load_denylist_baseline_patterns) — threaded through
+        # every transition method's write-once free-text field(s), D5.
+        self._baseline_patterns = tuple(baseline_patterns)
+        # FR8/AS-1: the resolved_commit resolver's git-facing DI — both optional
+        # (container.build_git_history_reader() wires the real adapter; most
+        # construction sites never need it, see :meth:`resolved_commit`).
         self._history_reader = history_reader
         self._repo_root = repo_root
+        # bug-record-v1.schema.json's validator (container.build_bug_record_validator)
+        # — optional; wired at :meth:`register` only (a freshly registered record is
+        # the one write this service builds from raw, Optional-typed CLI input).
+        self._validate = validate
 
     # -- writes ----------------------------------------------------------------------
 
@@ -145,53 +126,90 @@ class BugService:
         bug_id: str,
         ts: str,
         reported_by: str,
-        title: str,
-        severity: str,
-        surface: str,
+        title: str | None,
+        severity: str | None,
+        surface: str | None,
         component: str,
         context: str,
-        symptom: str,
-        repro: str,
-        expected: str,
+        symptom: str | None,
+        repro: str | None,
+        expected: str | None,
     ) -> None:
         """Append one NEW, freshly-registered :class:`BugRecord` (``status="open"``).
 
         Refuses (:class:`BugDuplicateIdError`) a *bug_id* already present anywhere in
-        the ledger, read through :meth:`~dadaia_workspace.core.protocols.record_store
-        .RecordStore.iter_records` (A1) — the one seam every read in this service now
-        uses. Redacts every free-text field through the same seam the update path uses
-        (A2.6) before appending.
+        the ledger. When a ``validate`` callable was injected (the schema, D9), the
+        raw payload is validated FIRST — a missing/mistyped/out-of-enum field raises
+        ``ValueError`` before any :class:`BugRecord` is constructed. Redacts every
+        free-text field through the same seam the update path uses (A2.6) before
+        appending.
         """
         existing = {record.id for record in self._record_store.iter_records()}
         if bug_id in existing:
             raise BugDuplicateIdError(bug_id)
-        record = BugRecord(
-            id=bug_id,
-            ts=ts,
-            reported_by=reported_by,
-            title=title,
-            severity=severity,
-            surface=surface,
-            component=component,
-            context=context,
-            symptom=symptom,
-            repro=repro,
-            expected=expected,
-            status="open",
-        ).redact(self._denylist_terms)
+        payload: dict[str, object] = {
+            "id": bug_id,
+            "ts": ts,
+            "reported_by": reported_by,
+            "title": title,
+            "severity": severity,
+            "surface": surface,
+            "component": component,
+            "context": context,
+            "symptom": symptom,
+            "repro": repro,
+            "expected": expected,
+            "status": "open",
+            "cause": None,
+            "caused_by": None,
+            "lineage_source": None,
+            "registration_commit": None,
+            "registration_granularity": None,
+            "resolved_commit": None,
+            "resolution_granularity": None,
+            "resolved_release": None,
+            "audited": None,
+        }
+        if self._validate is not None:
+            try:
+                self._validate(payload)
+            except ValidationError as exc:
+                raise ValueError(str(exc.message)) from exc
+        record = BugRecord.from_dict(payload).redact(self._denylist_terms)
         self._record_store.append(record)
 
     def apply_update(self, record_id: str, changes: Mapping[str, object]) -> BugRecord:
-        """The one governance-write seam (AS-16/A2.13): registration's resolve, the
-        fixer's resolve, and the auditor's ``audited``/``resolved_commit`` rewrite all
-        call this same method. Delegates structural refusal (immutable-core changed,
-        write-once field re-set with a differing value, unknown field) to
-        :meth:`BugRecord.apply_governance_update` (A2.2), then redacts the WHOLE
-        resulting record (A2.6 — identical posture to :meth:`register`) before the
-        store's refuse-stale atomic rewrite (A2.9, A2.2c)."""
+        """The one governance-write seam for every governance/write-once field OTHER
+        than ``status`` (refused by :meth:`~dadaia_workspace.core.models.bugs.BugRecord
+        .apply_governance_update` itself): the auditor's ``audited``/
+        ``resolved_commit`` rewrite and any other non-status governance write. Redacts
+        the WHOLE resulting record (A2.6) before the store's refuse-stale atomic
+        rewrite (A2.9, A2.2c)."""
 
         def _mutate(record: BugRecord) -> BugRecord:
             updated = record.apply_governance_update(changes)
+            return updated.redact(self._denylist_terms)
+
+        return self._record_store.update(record_id, _mutate)
+
+    def transition(
+        self, record_id: str, method: Callable[..., BugRecord], **fields: str
+    ) -> BugRecord:
+        """The ONE governance-write seam a STATUS change goes through: calls *method*
+        (an unbound :class:`~dadaia_workspace.core.models.bugs.BugRecord` transition
+        method — ``BugRecord.resolve``/``.supersede``/``.defer``/``.reject``, passed
+        directly by the caller, never a second verb->method mapping) INSIDE the
+        record-store's atomic update, threading the operator's baseline privacy
+        patterns (D5) — exactly like :meth:`apply_update` already does for a bare
+        governance-field change, so a refused transition
+        (:class:`~dadaia_workspace.core.models.bugs.IncompleteTransitionError`) never
+        reaches the file: ``mutate()`` runs BEFORE
+        :meth:`~dadaia_workspace.core.protocols.record_store.RecordStore.update` ever
+        touches disk, leaving the record byte-identical on refusal.
+        """
+
+        def _mutate(record: BugRecord) -> BugRecord:
+            updated = method(record, privacy_patterns=self._baseline_patterns, **fields)
             return updated.redact(self._denylist_terms)
 
         return self._record_store.update(record_id, _mutate)
@@ -277,17 +295,6 @@ class BugService:
         return BugStats(
             total=len(records), by_status=dict(by_status), by_severity=dict(by_severity)
         )
-
-    def coherence_violations(self) -> list[BugCoherenceGap]:
-        """A2.3 — every record whose governance fields are incomplete for its own
-        ``status``, sorted by ``id``. Never blocks (D15); the caller renders these as a
-        WARNING."""
-        gaps = [
-            BugCoherenceGap(bug_id=record.id, status=record.status, missing=missing)
-            for record in self._record_store.iter_records()
-            if (missing := governance_completeness_gaps(record))
-        ]
-        return sorted(gaps, key=lambda gap: gap.bug_id)
 
 
 def _parse_ts(value: str) -> datetime:

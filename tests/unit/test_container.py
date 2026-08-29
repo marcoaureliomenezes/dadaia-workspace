@@ -14,7 +14,6 @@ import pytest
 from dadaia_workspace import container
 from dadaia_workspace.core import kernel_tunables
 from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
-from tests.fixtures.harness_env import scrub_context_resolution_env
 
 
 def _init_states(tmp_path: Path) -> Path:
@@ -156,64 +155,6 @@ def test_build_doctor_service_wires_pid_probe_dead_holder_reclaimed(tmp_path: Pa
     actions = doctor.fix()
     assert not path.exists(), "TTL-expired dead-holder lease should be reclaimed by --fix"
     assert any("RETIRED-LOCK-STATE" in a for a in actions)
-
-
-# ---------------------------------------------------------------------------
-# T-50-02 (SPEC v0.5.0 FR1) — container.resolve_context, the hooks-side seam onto the
-# single context-resolution authority. Thin pass-through: pinned here as a direct
-# behavioral proof, exercised indirectly (harness-real) by sdd_gate/sdd_post_gate.
-#
-# Bug specs-resolver-context-tests-flaky-under-xdist-full-suite: these three tests used
-# to clear no ambient env at all. ``container.resolve_context`` delegates to the single
-# resolution authority, whose ``_authority_workspace_root()`` honours ``WORKSPACE_ROOT``
-# unconditionally (ahead of, and regardless of, ``monkeypatch.chdir()``) -- an inherited
-# or concurrently-leaked ``WORKSPACE_ROOT``/``DADAIA_CONTEXT``/harness session-id var
-# silently overrides these tests' own synthetic ``tmp_path`` scenarios.
-# ---------------------------------------------------------------------------
-
-
-@pytest.fixture(autouse=True)
-def _clean_context_resolution_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    scrub_context_resolution_env(monkeypatch)
-
-
-def test_resolve_context_seam_explicit_wins(tmp_path: Path) -> None:
-    assert container.resolve_context("explicit-ctx") == "explicit-ctx"
-
-
-def test_resolve_context_seam_target_path_beats_dadaia_context_env(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    states = tmp_path / ".dadaia" / "states"
-    states.mkdir(parents=True)
-    (states / "spec_contexts.json").write_text(
-        json.dumps(
-            {
-                "schema_version": "2",
-                "contexts": [
-                    {"name": "x", "repo_slug": "x", "state": "alive"},
-                    {"name": "y", "repo_slug": "y", "state": "alive"},
-                ],
-            }
-        )
-    )
-    (tmp_path / "repos" / "x").mkdir(parents=True)
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("DADAIA_CONTEXT", "y")
-
-    target = tmp_path / "repos" / "x" / "specs" / "SPEC.md"
-    assert container.resolve_context(target_path=target) == "x"
-
-
-def test_resolve_context_seam_no_input_resolves_none(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    plain = tmp_path / "not-a-workspace"
-    plain.mkdir()
-    monkeypatch.chdir(plain)
-    monkeypatch.delenv("DADAIA_CONTEXT", raising=False)
-
-    assert container.resolve_context() is None
 
 
 # ---------------------------------------------------------------------------

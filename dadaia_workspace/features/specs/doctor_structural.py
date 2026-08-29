@@ -14,9 +14,13 @@ import shutil
 from pathlib import Path
 
 from dadaia_workspace.core.atomic_write import atomic_write
+from dadaia_workspace.features.specs.canon import (
+    CANON_ROOT_MEMBERS,
+    REQUIRED_ROOT_DIRS,
+    is_canon_path,
+)
 from dadaia_workspace.features.specs.doctor_common import resolve_active_release
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
-from dadaia_workspace.features.specs.specs_canon import CANON_ROOT_MEMBERS, is_canon_path
 from dadaia_workspace.features.specs.template_history import was_shipped
 
 # TREE-3: memory .md files that must exist.  No Jinja templates — .md is canonical source.
@@ -29,8 +33,11 @@ _TREE3_MEMORY_FILES: tuple[str, ...] = (
     "product/index.md",
 )
 
-# TREE-4: directories that must exist.
-_TREE4_REQUIRED_DIRS = ("audits", "backlog", "bugs", "releases")
+# TREE-4: directories that must exist — folded over the canon table (v0.5.1 K4): every
+# area whose ``_archive/<area>_histo.jsonl`` is required_at_birth also needs its own
+# directory to exist (:data:`~dadaia_workspace.features.specs.canon.REQUIRED_ROOT_DIRS`,
+# imported) — never a second, hand-kept area tuple.
+_TREE4_REQUIRED_DIRS = REQUIRED_ROOT_DIRS
 
 # TREE-8: the v6 canon root (FR1, specs_pattern_version 5 -> 6) — nothing else is
 # conformant directly under specs/. ERROR + auto-fixable (v0.5.0 specs-canon closure):
@@ -39,7 +46,7 @@ _TREE4_REQUIRED_DIRS = ("audits", "backlog", "bugs", "releases")
 # is kept by its AGENTS.md, never a placeholder file — never a WARN-only migration
 # nicety. Root-canon membership (:data:`CANON_ROOT_MEMBERS`, imported) plus a full-tree
 # nested-shape sweep, both driven by the ONE shared predicate in
-# ``features.specs.specs_canon`` — the SAME module the pre-push gate uses
+# ``features.specs.canon`` — the SAME module the pre-push gate uses
 # (``features.chokepoints.service.push_gate_decision``), never a second, hand-kept
 # member list (operator ruling 2026-08-28).
 _TREE8_CANON_ROOT: frozenset[str] = CANON_ROOT_MEMBERS
@@ -152,7 +159,9 @@ class StructuralValidator:
         return issues
 
     def check_tree4_required_dirs(self) -> list[SpecsDoctorIssue]:
-        """TREE-4: backlog/, bugs/, and releases/ must exist under specs/.
+        """TREE-4: every area in ``REQUIRED_ROOT_DIRS`` (audits/, backlog/, bugs/,
+        releases/ today) must exist under specs/ — folded over the canon table
+        (v0.5.1 K4), not a second hand-kept tuple.
 
         When a directory is absent the issue is emitted as fixable=True.
         The fix creates the dir and writes AGENTS.md (content copied from the
@@ -498,7 +507,7 @@ class StructuralValidator:
     def check_tree8_canon_root(self) -> list[SpecsDoctorIssue]:
         """TREE-8: every path under specs/ must be v6-canon-conformant (FR1, v0.5.0
         specs-canon closure, operator ruling 2026-08-28) — driven by the ONE shared
-        predicate in ``features.specs.specs_canon``, the SAME module the pre-push
+        predicate in ``features.specs.canon``, the SAME module the pre-push
         gate uses (``features.chokepoints.service.push_gate_decision``), never a
         second, hand-kept member list.
 
@@ -512,7 +521,7 @@ class StructuralValidator:
            is not even canon-shaped at the root (e.g. a scratch/legacy directory) is
            unambiguously disposable, and the fix removes the whole stray subtree.
         2. **Nested canon-shape sweep** (:func:`~dadaia_workspace.features.specs
-           .specs_canon.is_canon_path`) — every FILE inside an otherwise-conformant
+           .canon.is_canon_path`) — every FILE inside an otherwise-conformant
            root member is checked against its full ``specs/``-relative POSIX path; a
            non-matching file (a dotfile, a loose per-entry file, a markdown ADR, an
            old ``reviews/`` file, an unmigrated legacy-cased memory atom, …) is

@@ -65,6 +65,8 @@ Rationale: a reported number promoted as if it gated is fabricated detection.
 
 - Size tiers: unit and contract SMALL, integration MEDIUM, E2E LARGE (Python journeys plus Playwright panel), live Codex-binary validation opt-in outside CI.
 - The suite is hermetic; `tests/conftest.py` blocks a real Codex call without its live flag and fakes `ensure_workspace_venv`.
+- `tests/conftest.py` prepends this checkout to `PYTHONPATH` once for the whole session, so every spawned CLI/hook subprocess imports the worktree under test, never the venv's installed package.
+- Every suite ratchet enumerates the same set — `tests/helpers/suite_files.tracked_test_files()` over `git ls-files -- tests` — so scratch files a concurrent xdist worker writes are outside the measurement by construction.
 - Module docstrings declare `Intent: <KIND> — <ref>` over CONTRACT, SENTINEL, SCAFFOLD and QUARANTINE; an undeclared test is SCAFFOLD, and intent is never a marker.
 - Output naming a foreign Spec Context is `--redact`ed before entering evidence ([[sdd-gate-v3]]).
 
@@ -86,6 +88,7 @@ Rationale: a reported number promoted as if it gated is fabricated detection.
 - Every review verdict states the bug-surface delta from `dadaia bugs stats`, and no deploy is approved without the consumer-side matrix ([[consumer-agent-support]]).
 - Ruff `C901` and `PLR1702` are scoped to `dadaia_workspace/` with ceilings pinned in `pyproject.toml` against the enforcing tool; `radon cc` reports and never gates.
 - Caches and artifacts are redirected outside the repository, and the forbidden repo-local set is measured by `tests/contract/test_source_repo_hygiene.py`.
+- Memory-vs-code drift is a `specs doctor` WARNING, never a push-gated test: a package added mid-implementation is drift to fix at the next closure, not a red build ([[specs-doctor]]).
 
 ### Dependencies
 

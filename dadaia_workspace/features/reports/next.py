@@ -4,9 +4,9 @@ Infra-free per the constitution (L67): this module imports only ``core/`` and th
 Python standard library. It resolves the active release by reading the live release
 directory's ``RELEASE.json`` mutable state document (v0.5.x, successor to the
 RELEASE.jsonl fold; v0.5.0 FR4/T-050-21A, A4.1 — ``ACTIVE.md`` is retired, no file
-replaces it), reads that release's ``PLAN.md``, and the ``.dadaia/reports/`` tree via
-:mod:`pathlib`, mirroring the stdlib file access already used by
-``ReportsValidationService``.
+replaces it), reads that release's ``PLAN.md``, and the ``.dadaia/handoff/`` tree via
+``core.handoff_index.scan_handoffs`` — the one discovery primitive every handoff reader
+now shares (release 0.5.1 K6).
 
 Wiring (which context/specs_dir/reports_root to use) is resolved in
 ``dadaia_workspace.container.build_reports_next_service`` — never here.
@@ -14,12 +14,12 @@ Wiring (which context/specs_dir/reports_root to use) is resolved in
 
 from __future__ import annotations
 
-import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from dadaia_workspace.core.exceptions import NoActiveReleaseError, NoAgentSequenceError
+from dadaia_workspace.core.handoff_index import scan_handoffs
 from dadaia_workspace.core.release_state import parse_release_state
 
 #: Canonical 9-agent core topology. Owner names parsed from
@@ -164,17 +164,7 @@ class ReportsNextService:
 
     def _has_handoff(self, agent: str, release_id: str) -> bool:
         context_dir = self._reports_root / self._context
-        if not context_dir.is_dir():
-            return False
-        for path in sorted(context_dir.rglob("*.handoff.json")):
-            try:
-                doc = json.loads(path.read_text(encoding="utf-8"))
-            except (json.JSONDecodeError, OSError):
-                continue
-            if (
-                isinstance(doc, dict)
-                and doc.get("release_id") == release_id
-                and doc.get("agent") == agent
-            ):
+        for handoff in scan_handoffs(context_dir):
+            if handoff.release_id == release_id and handoff.agent == agent:
                 return True
         return False

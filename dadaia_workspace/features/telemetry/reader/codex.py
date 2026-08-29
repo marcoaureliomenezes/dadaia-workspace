@@ -22,11 +22,11 @@ import pathlib
 import sqlite3
 from dataclasses import dataclass
 
-from dadaia_workspace.features.telemetry.store.dao import TelemetryDao
-from dadaia_workspace.features.telemetry.store.models import (
+from dadaia_workspace.features.telemetry.store import (
     Agent,
     Event,
     Session,
+    TelemetryStore,
 )
 
 logger = logging.getLogger(__name__)
@@ -93,7 +93,7 @@ def _epoch_to_iso(epoch: int | None) -> str | None:
 
 def read_codex_db(
     path: pathlib.Path,
-    dao: TelemetryDao,
+    dao: TelemetryStore,
     now_iso: str,
     *,
     _timeout: float = 5.0,
@@ -136,7 +136,7 @@ def read_codex_db(
 
 def _ingest(
     conn: sqlite3.Connection,
-    dao: TelemetryDao,
+    dao: TelemetryStore,
     now_iso: str,
     result: ReadResult,
 ) -> ReadResult:

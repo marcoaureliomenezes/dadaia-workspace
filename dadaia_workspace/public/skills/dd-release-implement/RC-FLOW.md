@@ -81,9 +81,10 @@ A10.3: segment closes on branch, rc-1 merges the whole scope, rc-N rounds are fi
 - Done when: the `closure-artifact-gc` log entry states kept/deleted counts per class, with evidence.
 
 **Step 12 — Archive.**
-- No per-release archive directory (v0.5.0 FR5) — append one summary record to `releases/_archive/releases_histo.jsonl`.
-- Delete the release directory — `git rm -r specs/releases/<release-id>`; history survives in git and the histo record.
-- Done when: the release directory is gone and the histo record exists, in the same commit as steps 8-11.
+- `git mv specs/releases/<release-id>/ specs/releases/_archive/<release-id>/` — the whole directory, verdicts included (operator ruling 2026-08-28, `DADAIA.md` §6.2).
+- Set the archived directory's `RELEASE.json` `phase: ARCHIVED`.
+- Append one summary record to `releases/_archive/releases_histo.jsonl`, same commit as the `git mv`.
+- Done when: `specs/releases/<release-id>/` no longer exists live, `_archive/<release-id>/RELEASE.json` carries `phase: ARCHIVED`, and the histo record exists, in the same commit as steps 8-11.
 
 **Step 13 — Ship PR.**
 - Open `develop` -> `main`; on merge, set the `shipped` milestone (`RELEASE-EVENTS.md`).

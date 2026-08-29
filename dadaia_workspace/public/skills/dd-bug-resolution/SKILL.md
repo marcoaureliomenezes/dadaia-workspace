@@ -8,7 +8,7 @@ description: >
   carries a record in `BUGS.jsonl`. Renamed from `dd-bug-fix` at v0.5.0 T-050-21
   (FR12) — the diagnosing phases moved out to `dd-diagnose` (FR7); this skill keeps
   only the bug-lifecycle rump.
-tldr: "Once dd-diagnose is GREEN: write the resolved record via `dadaia bugs update`, one commit, no separate release."
+tldr: "Once dd-diagnose is GREEN: close the record via `dadaia bugs resolve`, one commit, no separate release."
 applyTo: "specs/bugs/**"
 ---
 
@@ -26,9 +26,9 @@ applyTo: "specs/bugs/**"
 
 1. Call `dd-diagnose` now for phase 0 (lineage) through phase 6 (cleanup) — never restate the diagnosing method here.
 2. Work on the live `feature/{M.m.p}` branch — no separate branch, no ceremony (`DADAIA.md` §4 / `dd-gitflow-default`).
-3. Under the NO-LOCKS DOCTRINE, let races surface: two fixers resolve by whichever `dadaia bugs update` lands first.
+3. Under the NO-LOCKS DOCTRINE, let races surface: two fixers resolve by whichever `dadaia bugs resolve` lands first.
 4. A losing write fails non-zero — re-read and retry, never block a human.
-5. Once `dd-diagnose` phase 6 is GREEN, write the resolution with `dadaia bugs update <bug-id> --set status=resolved …`.
+5. Once `dd-diagnose` phase 6 is GREEN, write the resolution with `dadaia bugs resolve <bug-id> --cause … --caused-by … --resolved-release … --solution … --evidence-loop … --evidence-seam … --evidence-diff … --diff-direction …`.
 6. Include in that update: `cause`, `resolved_release`, `evidence_loop`, `evidence_seam`, `evidence_diff`, `diff_direction`.
 7. Never use `--event` — the event-stream shape was retired.
 8. Leave `caused_by`/`lineage_source` untouched — `dd-diagnose` phase 0 already set them.
@@ -41,7 +41,7 @@ applyTo: "specs/bugs/**"
 ## 3. Done when
 
 - `dd-diagnose` reached GREEN, lineage declared.
-- `dadaia bugs update` carries the FR23 evidence triple plus `diff_direction` and `resolved_release`.
+- `dadaia bugs resolve` carries the FR23 evidence triple plus `diff_direction` and `resolved_release`; `update --set status=` is refused.
 - A `net-positive` diff was routed to `software-architect` before committing.
 - One isolated commit exists; no separate ceremony opened; worktree clean.
 

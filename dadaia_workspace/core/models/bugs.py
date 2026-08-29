@@ -1,49 +1,44 @@
-"""Bug domain models — :class:`BugRecord`, the one-record-per-bug model (v0.5.0
-FR2/T-050-08, D-F: expand -> switch -> contract).
+"""Bug domain models — :class:`BugRecord`, the one-record-per-bug model.
 
 Pure domain module — no I/O, no internal imports beyond ``dataclasses``/``enum``
 (stdlib only) plus ONE sibling core module, ``core.redaction`` (the shared, also-pure
-``redact_text`` masking primitive both this model and ``core.models.backlog`` import —
-never each other; see :data:`redact_text`'s re-export note below): ``core/models/bugs.py``
-is NOT in ``architecture.md``'s "Core file-I/O authorized set", so the model never
-reads a schema file itself. :class:`BugRecord` is
-one line of ``specs/bugs/BUGS.jsonl`` (the T-050-10 rename of the retired
-``bugs.jsonl``), appended once (field set mirrors
-``public/schemas/bugs/bug-record-v1.schema.json``, whose per-property ``x-mutability``/
-``x-redact`` keywords are the ONE documented source of the three-category split —
-A2.1). It derives its optional/redactable field set from its OWN
+``redact_text``/``first_privacy_hit`` primitives both this model and
+``core.models.backlog`` import — never each other). ``core/models/bugs.py`` is NOT in
+``architecture.md``'s "Core file-I/O authorized set", so the model never reads a schema
+file itself. :class:`BugRecord` is one line of ``specs/bugs/BUGS.jsonl``, appended once
+(field set mirrors ``public/schemas/bugs/bug-record-v1.schema.json``, whose per-property
+``x-mutability``/``x-redact`` keywords are the ONE documented source of the
+three-category split — A2.1). It derives its optional/redactable field set from its OWN
 ``dataclasses.field(metadata=...)`` declarations (per-field, colocated, zero I/O) rather
-than a second, separately-maintained module-level tuple — the exact hand-kept mirror
-that twice missed a newly added free-text field (T-043-23 -> T-044-62) and that A2.10
-now forbids outright. :func:`redactable_property_names` is the schema-mapping-side pure
-counterpart, used to prove the two never drift (contract tests) and reusable by a future
-model (``findings``/``backlog``) without depending on file I/O either.
+than a second, separately-maintained module-level tuple (A2.10).
 
-**``BugEvent`` and the v5 event-stream coherence fold are DELETED (v0.5.0 S1 FR23
-firing, amendment A3, `specs/releases/0.5.0/reviews/S1-FR23-firing.md` §3).** SPEC FR2
-and the earlier AR-1 ruling both said "the event fold and its state machine deleted";
-they were not, at S1 firing time — ``BugEvent``, ``advance_coherence`` and the
-``BugCoherenceRecord``/``BugCoherenceViolation``/``diagnose_bug_coherence_history`` v5
-diagnostic survived here, consumed only by the doctor's now-retired v5 branch and the
-migration adapter's now-retired fold, against a live ledger that carries **zero** v5
-lines. They are gone; ``specs doctor`` now reports any surviving ``"event"``-keyed line
-in the v6 ledger as a single SPEC-DOC-033 ERROR ("v5 line in a v6 ledger — migrate"),
-never a folded diagnosis. :data:`BugEventKind`/:data:`TERMINAL_EVENTS` stay — they are
-the v5/v6 line-classifier's vocabulary
+``BugEventKind``/:data:`TERMINAL_EVENTS` are the v5/v6 line-classifier's vocabulary
 (:func:`~dadaia_workspace.core.bug_provenance.classify_ledger_line`, permanent by
 necessity: git history is v5-shaped forever) and the closed set of terminal
-``BugRecord.status`` values.
+``BugRecord.status`` values. A surviving ``"event"``-keyed v5 line in the v6 ledger
+fails :meth:`BugRecord.from_dict` and surfaces as a single SPEC-DOC-033 ERROR, never a
+folded diagnosis.
+
+**Status transitions are the interface.** :meth:`BugRecord.resolve`/:meth:`supersede`/
+:meth:`defer`/:meth:`reject` are the ONLY way a record reaches their respective terminal
+status, each refusing (:class:`IncompleteTransitionError`) an incomplete/malformed call
+before any field is set — status is UNREACHABLE without its own required fields, and
+unreachable at all through :meth:`apply_governance_update` (a bare ``status`` change is
+refused there; a transition method applies its evidence fields through that seam, then
+sets ``status`` itself). A record that reached an incomplete terminal status before this
+seam existed is never re-diagnosed: completeness is prospective, not retroactive.
 """
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from dataclasses import fields as dc_fields
 from enum import StrEnum
 from typing import Any
 
-from dadaia_workspace.core.redaction import redact_text
+from dadaia_workspace.core.redaction import PatternLike, first_privacy_hit, redact_text
 
 __all__ = [
     "TERMINAL_EVENTS",
@@ -51,10 +46,8 @@ __all__ = [
     "BugRecord",
     "BugRecordImmutableFieldError",
     "BugRecordWriteOnceFieldSetError",
-    "governance_completeness_gaps",
-    "immutable_core_drift",
+    "IncompleteTransitionError",
     "redact_text",
-    "redactable_property_names",
 ]
 
 
@@ -63,10 +56,7 @@ class BugEventKind(StrEnum):
     :func:`~dadaia_workspace.core.bug_provenance.classify_ledger_line` still decodes
     permanently (git history is v5-shaped forever). ``reported`` opens a stream; the
     four in :data:`TERMINAL_EVENTS` are terminal (at most one per ``bug_id``);
-    ``archived``/``picked`` are non-terminal annotations. The v5 write-side enforcement
-    and diagnostic fold this enum once drove (``advance_coherence``,
-    ``diagnose_bug_coherence_history``) are deleted (v0.5.0 S1 FR23 firing, A3) — the
-    live ledger carries zero v5 lines, so nothing folds them anymore."""
+    ``archived``/``picked`` are non-terminal annotations."""
 
     REPORTED = "reported"
     RESOLVED = "resolved"
@@ -77,15 +67,13 @@ class BugEventKind(StrEnum):
     PICKED = "picked"
 
 
-#: The terminal set for event coherence (AC-1 decision). ``archived`` is deliberately NOT
-#: here — it is a non-terminal annotation exempt from the double-terminal coherence rule.
-#:
-#: v0.5.0 FR2/T-050-08 reuses this SAME string set as the terminal ``BugRecord.status``
-#: values ("resolved"/"superseded"/"deferred"/"rejected" — the ``status`` enum's four
-#: non-"open" members, ``bug-record-v1.schema.json``) rather than declaring a second,
-#: independently-maintained constant: both ``features.bugs.service`` (archive
-#: eligibility) and ``features.specs.doctor_governance`` (the archive-overdue WARN,
-#: A2.8) import it from here, since neither may import the other
+#: The terminal set for event coherence. ``archived`` is deliberately NOT here — it is a
+#: non-terminal annotation exempt from the double-terminal coherence rule. Reused as the
+#: terminal ``BugRecord.status`` values ("resolved"/"superseded"/"deferred"/"rejected" —
+#: the ``status`` enum's four non-"open" members, ``bug-record-v1.schema.json``) rather
+#: than a second, independently-maintained constant: both ``features.bugs.service``
+#: (archive eligibility) and ``features.specs.doctor_governance`` (the archive-overdue
+#: WARN) import it from here, since neither may import the other
 #: (`features-no-cross-feature`).
 TERMINAL_EVENTS: frozenset[str] = frozenset(
     {
@@ -118,40 +106,6 @@ def _dataclass_field_names(
     (T-043-23 -> T-044-62).
     """
     return tuple(f.name for f in dc_fields(dataclass_type) if predicate(f.metadata))
-
-
-def redactable_property_names(schema: Mapping[str, object]) -> tuple[str, ...]:
-    """Return every property of *schema* eligible for write-time redaction.
-
-    Pure function of an EXPLICIT schema mapping — performs zero file I/O itself, so it
-    is safe to call from ``core`` (which is not in ``architecture.md``'s core
-    file-I/O authorized set). Loading the packaged ``bug-record-v1.schema.json`` file
-    happens in ``infrastructure``/the container seam, or — as here — in a test, and is
-    threaded in as data, exactly like ``denylist_terms`` already is (v0.4.5 FR6/
-    T-045-19). A property qualifies when its declared ``type`` includes ``"string"``
-    and it is not explicitly opted out via ``"x-redact": false`` (set on exactly
-    ``id``/``ts``/``reported_by`` in ``bug-record-v1.schema.json`` — the record's
-    stable identity fields). A schema fixture that adds a brand-new free-text
-    property is picked up with NO code edited here (A2.6) — this function reads
-    property names, never a hand-kept list of them.
-    """
-    properties = schema.get("properties")
-    if not isinstance(properties, Mapping):
-        raise ValueError("schema has no 'properties' object")
-    names: list[str] = []
-    for name, spec in properties.items():
-        if not isinstance(spec, Mapping):
-            continue
-        if spec.get("x-redact") is False:
-            continue
-        declared_type = spec.get("type")
-        is_string_typed = declared_type == "string" or (
-            isinstance(declared_type, list) and "string" in declared_type
-        )
-        if not is_string_typed:
-            continue
-        names.append(name)
-    return tuple(names)
 
 
 #: Case-insensitive substring denylist masking + control/format-char stripping +
@@ -202,6 +156,46 @@ class BugRecordWriteOnceFieldSetError(ValueError):
             "second write with a different value is refused (A2.2b)"
         )
         self.field_name = field_name
+
+
+class IncompleteTransitionError(ValueError):
+    """Raised by a :class:`BugRecord` transition method (:meth:`resolve`,
+    :meth:`supersede`, :meth:`defer`, :meth:`reject`) when the caller omits a field
+    the target status requires, or supplies one that fails its own format rule
+    (``evidence_diff``'s pattern, ``diff_direction``'s closed enum, or the three
+    literal shapes an evidence field must never carry).
+
+    The record is left COMPLETELY untouched on refusal — a transition method raises
+    before ever calling :meth:`BugRecord.apply_governance_update`, so there is
+    always a correction path: a caller who mistyped a value simply calls the
+    transition again with the corrected one (closes bug
+    ``bug-record-write-once-evidence-fields-can-embed-selfscan-triggering-literal-
+    with-no-correction-path`` — the old failure mode was a write-once field that
+    landed WITH the bad literal, refusing any second write to correct it; refusing
+    AT the write means the bad literal never lands in the first place).
+    """
+
+    def __init__(self, verb: str, problems: Sequence[str]) -> None:
+        joined = "; ".join(problems)
+        super().__init__(
+            f"bug-record transition {verb!r} refused — {joined} (the record is "
+            "unchanged; call the transition again with corrected values)"
+        )
+        self.verb = verb
+        self.problems = tuple(problems)
+
+
+#: bug-record-v1.schema.json's ``evidence_diff`` pattern — restated here once, the
+#: schema being the documented source (A2.1); this is the runtime mirror.
+_EVIDENCE_DIFF_PATTERN_RE = re.compile(r"^(net-negative|net-positive|net-neutral):\s*\S.*$")
+
+#: bug-record-v1.schema.json's ``diff_direction`` closed enum.
+_DIFF_DIRECTIONS: frozenset[str] = frozenset({"net-negative", "net-neutral", "net-positive"})
+
+#: bug-record-v1.schema.json's ``status`` closed enum (mirrors ``TERMINAL_EVENTS`` +
+#: ``"open"`` — restated as its own set so :meth:`BugRecord.from_dict` can validate it
+#: without constructing a throwaway ``BugEventKind`` mapping).
+_STATUS_VALUES: frozenset[str] = frozenset({"open", *TERMINAL_EVENTS})
 
 
 def _require_record_str(raw: Mapping[str, object], key: str) -> str:
@@ -279,15 +273,19 @@ class BugRecord:
         """Apply *changes*, returning a NEW record — the seam every writer of an
         EXISTING record goes through (registration is :meth:`from_dict`/the
         constructor, not this method). ``features/bugs/service.py`` wraps this call
-        for ``dadaia bugs update`` (T-050-08/AS-16), for the fixer's resolution write
-        and the auditor's ``audited``/``resolved_commit`` write alike (A2.13 — one
-        seam, every writer role).
+        for ``dadaia bugs update``, for the fixer's resolution write and the
+        auditor's ``audited``/``resolved_commit`` write alike (A2.13 — one seam,
+        every writer role).
 
         Refuses (:class:`BugRecordImmutableFieldError`) a CHANGE to an immutable-core
         field's value — re-asserting its current value is a harmless no-op (A2.2a).
         Refuses (:class:`BugRecordWriteOnceFieldSetError`) a second, DIFFERING write to
         a write-once field that is already set; setting it from absent (``None``)
-        always succeeds (A2.2b). A governance field may be set freely.
+        always succeeds (A2.2b). Refuses (``ValueError``) the key ``"status"`` outright
+        — status changes only through :meth:`resolve`/:meth:`supersede`/:meth:`defer`/
+        :meth:`reject`, each unreachable without its own required fields; a bare
+        governance write can never reach a terminal status. Any OTHER governance field
+        may be set freely.
 
         A2.7's own limit, stated here per A2.2's docstring requirement: this is
         SEAM-LEVEL enforcement only — any agent's file tool can still rewrite any
@@ -296,6 +294,13 @@ class BugRecord:
         """
         updates: dict[str, Any] = {}
         for key, value in changes.items():
+            if key == "status":
+                raise ValueError(
+                    "bug-record field 'status' is unreachable through "
+                    "apply_governance_update — use the matching transition instead: "
+                    "resolve|supersede|defer|reject (status is unreachable without "
+                    "its own required fields)"
+                )
             if key in _BUG_RECORD_IMMUTABLE_CORE_FIELDS:
                 if value != getattr(self, key):
                     raise BugRecordImmutableFieldError(key)
@@ -313,6 +318,130 @@ class BugRecord:
         if not updates:
             return self
         return replace(self, **updates)
+
+    def resolve(
+        self,
+        *,
+        cause: str | None = None,
+        caused_by: str | None = None,
+        resolved_release: str | None = None,
+        solution: str | None = None,
+        evidence_loop: str | None = None,
+        evidence_seam: str | None = None,
+        evidence_diff: str | None = None,
+        diff_direction: str | None = None,
+        privacy_patterns: Sequence[PatternLike] = (),
+    ) -> BugRecord:
+        """The ONE way a record reaches ``status="resolved"``. Every keyword is
+        REQUIRED (every problem is collected, not just the first); ``caused_by``
+        must be an explicit string — the literal ``"none"`` declares "no known
+        predecessor". ``evidence_loop``/``evidence_seam``/``evidence_diff`` are each
+        checked against *privacy_patterns* (the operator's own baseline privacy
+        patterns, threaded in by the caller — :func:`~dadaia_workspace.core.redaction
+        .first_privacy_hit`); a hit refuses the whole call.
+
+        Raises :class:`IncompleteTransitionError` naming every problem found; the
+        record is left untouched on refusal. Applies its fields through
+        :meth:`apply_governance_update` (write-once/immutable-core rules still
+        enforced), then sets ``status`` itself — ``apply_governance_update`` refuses
+        the key ``"status"``.
+        """
+        problems: list[str] = []
+        values: dict[str, str] = {}
+        for name, value in (
+            ("cause", cause),
+            ("caused_by", caused_by),
+            ("resolved_release", resolved_release),
+            ("solution", solution),
+            ("evidence_loop", evidence_loop),
+            ("evidence_seam", evidence_seam),
+            ("evidence_diff", evidence_diff),
+            ("diff_direction", diff_direction),
+        ):
+            if value is None or not value.strip():
+                problems.append(f"{name!r} is required")
+                continue
+            values[name] = value
+
+        if "evidence_diff" in values and not _EVIDENCE_DIFF_PATTERN_RE.match(
+            values["evidence_diff"]
+        ):
+            problems.append(
+                "'evidence_diff' must match "
+                "'^(net-negative|net-positive|net-neutral): <rationale>' "
+                "(bug-record-v1.schema.json)"
+            )
+        if "diff_direction" in values and values["diff_direction"] not in _DIFF_DIRECTIONS:
+            problems.append(
+                f"'diff_direction' must be one of {sorted(_DIFF_DIRECTIONS)}, got "
+                f"{values['diff_direction']!r}"
+            )
+        for evidence_field in ("evidence_loop", "evidence_seam", "evidence_diff"):
+            evidence_value = values.get(evidence_field)
+            if evidence_value is None:
+                continue
+            hit = first_privacy_hit(evidence_value, privacy_patterns)
+            if hit is not None:
+                problems.append(f"{evidence_field!r} must not contain {hit}")
+
+        if problems:
+            raise IncompleteTransitionError("resolve", problems)
+
+        updated = self.apply_governance_update(
+            {
+                "cause": values["cause"],
+                "caused_by": values["caused_by"],
+                "resolved_release": values["resolved_release"],
+                "solution": values["solution"],
+                "evidence_loop": values["evidence_loop"],
+                "evidence_seam": values["evidence_seam"],
+                "evidence_diff": values["evidence_diff"],
+                "diff_direction": values["diff_direction"],
+            }
+        )
+        return replace(updated, status="resolved")
+
+    def supersede(
+        self, *, by: str | None = None, privacy_patterns: Sequence[PatternLike] = ()
+    ) -> BugRecord:
+        """The ONE way a record reaches ``status="superseded"`` — *by* (the
+        superseding backlog/bug/release slug) is REQUIRED and checked against
+        *privacy_patterns* (see :meth:`resolve`)."""
+        if by is None or not by.strip():
+            raise IncompleteTransitionError("supersede", ["'by' is required"])
+        hit = first_privacy_hit(by, privacy_patterns)
+        if hit is not None:
+            raise IncompleteTransitionError("supersede", [f"'by' must not contain {hit}"])
+        updated = self.apply_governance_update({"superseded_by": by})
+        return replace(updated, status="superseded")
+
+    def defer(
+        self, *, reason: str | None = None, privacy_patterns: Sequence[PatternLike] = ()
+    ) -> BugRecord:
+        """The ONE way a record reaches ``status="deferred"`` — *reason* is REQUIRED
+        and checked against *privacy_patterns* (see :meth:`resolve`). Stored in
+        ``cause`` — the schema's only generic mutable-governance narrative field,
+        reused rather than a second, transition-only field for the same purpose."""
+        if reason is None or not reason.strip():
+            raise IncompleteTransitionError("defer", ["'reason' is required"])
+        hit = first_privacy_hit(reason, privacy_patterns)
+        if hit is not None:
+            raise IncompleteTransitionError("defer", [f"'reason' must not contain {hit}"])
+        updated = self.apply_governance_update({"cause": reason})
+        return replace(updated, status="deferred")
+
+    def reject(
+        self, *, reason: str | None = None, privacy_patterns: Sequence[PatternLike] = ()
+    ) -> BugRecord:
+        """The ONE way a record reaches ``status="rejected"`` (same ``cause``-reuse
+        rule as :meth:`defer`). *reason* is REQUIRED."""
+        if reason is None or not reason.strip():
+            raise IncompleteTransitionError("reject", ["'reason' is required"])
+        hit = first_privacy_hit(reason, privacy_patterns)
+        if hit is not None:
+            raise IncompleteTransitionError("reject", [f"'reason' must not contain {hit}"])
+        updated = self.apply_governance_update({"cause": reason})
+        return replace(updated, status="rejected")
 
     def redact(self, denylist_terms: Sequence[tuple[str, str]] = ()) -> BugRecord:
         """Return a copy with every free-text field scrubbed via :func:`redact_text`.
@@ -357,8 +486,16 @@ class BugRecord:
     @classmethod
     def from_dict(cls, raw: Mapping[str, object]) -> BugRecord:
         """Parse a JSONL object into a :class:`BugRecord`. Raises ``ValueError`` on a
-        malformed record (missing/typed-wrong required field) so tolerant readers can
-        skip it."""
+        malformed record (missing/typed-wrong required field, or a ``status`` outside
+        the closed enum {open, resolved, superseded, deferred, rejected} —
+        bug-record-v1.schema.json; v0.5.1 K5 deepening) so tolerant readers can skip
+        it. This is the ONE record-level parser every reader (the record store, the
+        service, the doctor) shares — never a second, hand-rolled field check."""
+        status = _require_record_str(raw, "status")
+        if status not in _STATUS_VALUES:
+            raise ValueError(
+                f"bug record field 'status' must be one of {sorted(_STATUS_VALUES)}, got {status!r}"
+            )
         return cls(
             id=_require_record_str(raw, "id"),
             ts=_require_record_str(raw, "ts"),
@@ -371,7 +508,7 @@ class BugRecord:
             symptom=_require_record_str(raw, "symptom"),
             repro=_require_record_str(raw, "repro"),
             expected=_require_record_str(raw, "expected"),
-            status=_require_record_str(raw, "status"),
+            status=status,
             cause=_opt_record_str(raw, "cause"),
             caused_by=_opt_record_str(raw, "caused_by"),
             lineage_source=_opt_record_str(raw, "lineage_source"),
@@ -405,70 +542,3 @@ _BUG_RECORD_GOVERNANCE_FIELDS: tuple[str, ...] = _dataclass_field_names(
 _BUG_RECORD_REDACTABLE_FIELDS: tuple[str, ...] = _dataclass_field_names(
     BugRecord, lambda metadata: not metadata.get("identity")
 )
-
-
-# ============================================================================
-# v0.5.0 T-050-08 (FR2 A2.3 / A2.7) — WARN-only diagnostics over a BugRecord.
-#
-# Both functions are pure and read only their own arguments (zero I/O — required for a
-# `core` leaf); they exist here, not in `features/bugs` or `features/specs`, because
-# BOTH `features.bugs.service.BugService` (``dadaia bugs status``) and
-# `features.specs.doctor_governance.GovernanceValidator` (`specs doctor`) must render
-# the SAME diagnosis and neither may import the other (`features-no-cross-feature`) —
-# `core` is the one layer both already import. D15: coherence is DETECTED, never a
-# block; every caller of these two functions renders a WARNING, never refuses a write
-# or changes an exit code.
-# ============================================================================
-
-
-def governance_completeness_gaps(record: BugRecord) -> tuple[str, ...]:
-    """A2.3 — the governance-completeness rule (SPEC FR2): reaching ``status:
-    "resolved"`` without ``cause``/``caused_by``/``resolved_release``/``solution``, or
-    ``status: "superseded"`` without ``superseded_by``, is a coherence GAP — surfaced as
-    a WARNING by ``dadaia bugs status`` and ``specs doctor``, never a block (D15).
-
-    Returns the sorted tuple of missing field names (empty when the record is complete
-    for its own ``status``, or its ``status`` carries no completeness rule at all —
-    ``open``/``deferred``/``rejected``).
-    """
-    if record.status == "resolved":
-        return tuple(
-            sorted(
-                name
-                for name, value in (
-                    ("cause", record.cause),
-                    ("caused_by", record.caused_by),
-                    ("resolved_release", record.resolved_release),
-                    ("solution", record.solution),
-                )
-                if not value
-            )
-        )
-    if record.status == "superseded":
-        return () if record.superseded_by else ("superseded_by",)
-    return ()
-
-
-def immutable_core_drift(record: BugRecord, baseline: BugRecord) -> tuple[str, ...]:
-    """A2.7 — detect (never prevent) an immutable-core field that changed between
-    *baseline* (the id's first-add snapshot) and *record* (the current on-disk value).
-
-    Seam-level enforcement (``BugRecord.apply_governance_update``, A2.2a) already
-    refuses a core-field CHANGE made through the record-store update seam; this
-    function is the DETECTOR for the residual gap A2.2's own docstring names — any
-    agent's file tool can still hand-edit a core field directly on disk, bypassing the
-    seam entirely. ``baseline`` is an INJECTED snapshot (never derived here — this
-    module holds no git access): until FR3/T-050-09's ``core.bug_provenance`` supplies
-    a real git-derived first-add snapshot, every caller in this release passes an EMPTY
-    baseline mapping, so the check is a genuine no-op in production (nothing to compare
-    against) while staying provably correct here and at the two call sites' own fixture
-    tests (fed a synthetic baseline directly). Returns ``()`` when *record* and
-    *baseline* do not share an ``id``, or when nothing drifted.
-    """
-    if record.id != baseline.id:
-        return ()
-    return tuple(
-        name
-        for name in _BUG_RECORD_IMMUTABLE_CORE_FIELDS
-        if getattr(record, name) != getattr(baseline, name)
-    )

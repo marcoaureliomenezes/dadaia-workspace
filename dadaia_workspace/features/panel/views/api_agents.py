@@ -124,6 +124,7 @@ def render_api_agents_canonical(
 
     def _view(
         active_window_days: int = _ACTIVE_WINDOW_DAYS_DEFAULT,
+        window_days: int = _TELEMETRY_WINDOW_DAYS,
         **_kwargs: object,
     ) -> tuple[int, str, bytes]:
         # Parse runtime filter from query-string (NFR5: default to "claude").
@@ -152,7 +153,7 @@ def render_api_agents_canonical(
         if service.telemetry is not None:
             try:
                 tel_result = service.telemetry.list_agents(
-                    window_days=_TELEMETRY_WINDOW_DAYS,
+                    window_days=window_days,
                     context_slug=None,
                     limit=200,
                 )
@@ -364,6 +365,53 @@ def render_api_agent_prompt(
             "source_path": relative_hint,
         }
         return (200, "application/json; charset=utf-8", json.dumps(payload).encode("utf-8"))
+
+    return _view
+
+
+def render_api_agent_sessions(
+    service: PanelService,
+) -> Callable[..., tuple[int, str, bytes]]:
+    """Return a closure that serves GET /api/agents/<id>/sessions.
+
+    Query parameters:
+    - limit: int (default 50)
+    - offset: int (default 0)
+
+    Response shape: {"sessions": [...]} (SPEC contract — each session is the
+    telemetry ``RecentSession`` dataclass, JSON-serialised via asdict).
+
+    Status codes:
+        200 — success (the handler's own BEARER_TELEMETRY pre-check already
+              503s before this view runs when telemetry is None/degraded;
+              this view stays defensive for direct/test invocation).
+        503 — telemetry unavailable.
+    """
+
+    def _view(agent_id: str = "", **_kwargs: object) -> tuple[int, str, bytes]:
+        if service.telemetry is None:
+            body = json.dumps({"error": "telemetry not configured"}).encode("utf-8")
+            return (503, "application/json; charset=utf-8", body)
+
+        qs: dict[str, list[str]] = _kwargs.get("qs", {})  # type: ignore[assignment]
+
+        def _parse_int(key: str, default: int) -> int:
+            vals = qs.get(key)
+            if vals:
+                try:
+                    return int(vals[0])
+                except (ValueError, IndexError):
+                    pass
+            return default
+
+        sessions = service.telemetry.list_sessions_by_agent(
+            agent_id=agent_id,
+            limit=_parse_int("limit", 50),
+            offset=_parse_int("offset", 0),
+        )
+        payload = {"sessions": [dataclasses.asdict(s) for s in sessions]}
+        body = json.dumps(payload).encode("utf-8")
+        return (200, "application/json; charset=utf-8", body)
 
     return _view
 

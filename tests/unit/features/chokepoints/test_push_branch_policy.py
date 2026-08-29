@@ -29,7 +29,8 @@ import pytest
 
 from dadaia_workspace.core.protocols.git_object_reader import ScannedObject
 from dadaia_workspace.features.chokepoints import Decision, push_gate_decision
-from dadaia_workspace.features.chokepoints.service import PushRef, parse_push_refs
+from dadaia_workspace.features.chokepoints.branch_policy import PushRef, parse_push_refs
+from dadaia_workspace.features.specs.canon import canon_violations, verdict_violations
 
 _SHA_A = "a" * 40
 _ZERO = "0" * 40
@@ -59,6 +60,8 @@ def _decide(refs: list[PushRef], root: Path, **kwargs: Any) -> Decision:
     longer lives on this path at all (A3.4)."""
     kwargs.setdefault("object_source", _EmptyObjectSource())
     kwargs.setdefault("repo", root)
+    kwargs.setdefault("canon_violations_fn", canon_violations)
+    kwargs.setdefault("verdict_violations_fn", verdict_violations)
     return push_gate_decision(refs, **kwargs)
 
 
@@ -173,7 +176,7 @@ def test_push_of_unpatterned_branch_is_refused_naming_the_three_patterns(
     ["main", "develop", "feature/0.6.0", "feature/12.0.3", "feature/1.22.333", "feature/0.0.0"],
 )
 def test_permitted_branch_names_are_accepted_by_the_validator(branch: str) -> None:
-    from dadaia_workspace.features.chokepoints.service import branch_name_is_permitted
+    from dadaia_workspace.features.chokepoints.branch_policy import branch_name_is_permitted
 
     assert branch_name_is_permitted(branch)
 
@@ -194,7 +197,7 @@ def test_permitted_branch_names_are_accepted_by_the_validator(branch: str) -> No
     ],
 )
 def test_unpatterned_branch_names_are_rejected_by_the_validator(branch: str) -> None:
-    from dadaia_workspace.features.chokepoints.service import branch_name_is_permitted
+    from dadaia_workspace.features.chokepoints.branch_policy import branch_name_is_permitted
 
     assert not branch_name_is_permitted(branch)
 
@@ -212,7 +215,7 @@ def test_malformed_stdin_fails_closed_naming_the_sanctioned_bypass(tmp_path: Pat
     is a different case — the gate must fail CLOSED and name git's sanctioned,
     traceable bypass (--no-verify) instead of silently disabling the whole law.
     """
-    from dadaia_workspace.features.chokepoints.service import parse_push_stdin
+    from dadaia_workspace.features.chokepoints.branch_policy import parse_push_stdin
 
     refs, malformed = parse_push_stdin("this line has three fields\n")
     assert refs == []

@@ -12,9 +12,9 @@ Bind-driven injection state machine (FR-W2-01 / FR-W2-02, v0.1.14; bound_at trig
 T-50-03)
 -----------------------------------------------------------------------------------
 Context NAME resolution (``_resolve_context``) delegates to the single resolution
-authority (``DADAIA.md`` §3, :func:`dadaia_workspace.container.resolve_context`): this
-session's own self-keyed session record → ``DADAIA_CONTEXT`` env → this session's own
-live harness-native record → the repo containing the cwd → ``""``. There is no
+authority (``DADAIA.md`` §3, :func:`dadaia_workspace.core.invocation.resolve`): rung 0
+(none here) → ``DADAIA_CONTEXT`` env → this session's own live record (payload or env
+session id) → the repo containing the cwd → ``""``. There is no
 first-ALIVE fallback and — since T-50-03 — the bind-epoch marker subsystem is no longer
 consulted here: a session bound ONLY via a bind-epoch marker (no harness id, no
 ``DADAIA_CONTEXT``) no longer resolves a context — the accepted FR1 coupling. T-50-04
@@ -68,12 +68,10 @@ import contextlib
 import json
 import os
 import sys
-import time
 from datetime import datetime
 from pathlib import Path
 
-from dadaia_workspace.core import kernel_tunables
-from dadaia_workspace.features.spec_context import session_identity
+from dadaia_workspace.core import invocation, session_store
 from dadaia_workspace.hooks import _common
 
 #: Lean fields kept in the INJECTED catalog digest. The heavy ``summary`` is dropped from
@@ -93,23 +91,6 @@ _SENTINEL_PREFIX = "ctx-inject-fired-"
 #: repeat-prompt guards as a re-injection trigger (mtime > sentinel mtime).
 _COMPACT_PREFIX = "ctx-compact-"
 
-#: Age (seconds) after which a once-per-session sentinel is considered stale and GC'd at
-#: inject time. Generous (24 h) so a long-running live session is never disturbed; a
-#: session older than this would at worst re-inject the bootstrap once. The sweep home is
-#: pinned HERE (inject time), not in ``spec_context/doctor.py`` — avoids the doctor
-#: write-set overlap (T-011-14 write set: the doctor leg is conditional and unused).
-#: DP-1 (v0.1.14): the value is sourced from ``core.kernel_tunables`` (single tunables home).
-_SENTINEL_GC_TTL_SECONDS = kernel_tunables.SENTINEL_GC_TTL_SECONDS
-
-
-def _resolve_workspace() -> Path:
-    env = os.environ.get("WORKSPACE_ROOT")
-    if env:
-        return Path(env)
-    from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
-
-    return resolve_workspace_root()
-
 
 def _alive_context_names(workspace: Path) -> list[str]:
     """Return the slugs of every ALIVE context in the registry (empty on any error)."""
@@ -127,19 +108,6 @@ def _alive_context_names(workspace: Path) -> list[str]:
     return names
 
 
-def _session_bound_context(workspace: Path, session_id: str) -> str:
-    """The context this session is bound to via its self-keyed session record, else ``""``.
-
-    The bind CLI mints its own sid, so in the default flow a harness session's record is
-    structurally absent — this leg fires only when the harness sid itself carries a bound
-    record (e.g. an operator who exported ``DADAIA_SESSION_ID`` to match the bind sid).
-    """
-    record = session_identity.read_session(workspace, session_id)
-    if not isinstance(record, dict):
-        return ""
-    return str(record.get("context") or "")
-
-
 def _session_bound_at(workspace: Path, session_id: str) -> float | None:
     """This session's own record ``bound_at``, as an epoch float, else ``None``.
 
@@ -151,7 +119,7 @@ def _session_bound_at(workspace: Path, session_id: str) -> float | None:
     or any parse error yields ``None`` (never a trigger — the caller degrades to "no
     rebind observed", never a crash).
     """
-    record = session_identity.read_session(workspace, session_id)
+    record = session_store.read_session(workspace, session_id)
     if not isinstance(record, dict):
         return None
     raw = record.get("bound_at")
@@ -163,38 +131,20 @@ def _session_bound_at(workspace: Path, session_id: str) -> float | None:
         return None
 
 
-def _resolve_context(workspace: Path, session_id: str) -> str:
+def _resolve_context(payload: dict[str, object]) -> str:
     """Resolve the context to inject, in the ``DADAIA.md`` §3 law order (F-03).
 
-    Rung 1 ``DADAIA_CONTEXT`` first — every consumer agrees with the gate on the same
-    prompt. Rung 2 is the session binding, read through TWO channels of the same record
-    store: this hook's own payload/``DADAIA_SESSION_ID``-keyed record
-    (:func:`_session_bound_context`), then the authority
-    (:func:`dadaia_workspace.core.specs_resolver.resolve_context` — hooks are sanctioned
-    DIRECT importers per the seam contract; the container is never imported on a hook
-    path, F-01) which re-reads rung 2 via the harness-native env id and adds rung 3, the
-    repo containing the current working directory. The bind-epoch marker subsystem
-    (deleted, T-50-04) is NOT consulted — a session bound ONLY via a marker (no harness
-    id, no ``DADAIA_CONTEXT``) no longer resolves a context.
+    ONE call into the single resolution authority (:mod:`dadaia_workspace.core.invocation`
+    — hooks are sanctioned DIRECT importers per the seam contract; the container is
+    never imported on a hook path, F-01). Rung 1 ``DADAIA_CONTEXT`` beats rung 2 (this
+    session's own live record — resolved through the payload's ``session_id`` field
+    just as readily as an env var, collapsing what used to be two separate reads of the
+    same record store into one), rung 2 beats rung 3 (the repo containing cwd). The
+    bind-epoch marker subsystem (deleted, T-50-04) is NOT consulted — a session bound
+    ONLY via a marker (no harness id, no ``DADAIA_CONTEXT``) no longer resolves a
+    context.
     """
-    # Law order (F-03, v0.5.0 code review): rung 1 `DADAIA_CONTEXT` beats rung 2 (any
-    # session binding) — every consumer must agree with the gate on this or the same
-    # prompt is attributed to one context and injected with another.
-    env_context = os.environ.get("DADAIA_CONTEXT")
-    if env_context:
-        return env_context
-
-    # Rung 2, payload-sid channel: the hook payload's session id can key a record the
-    # env-derived harness id cannot (the bind CLI writes both under the same id in the
-    # normal flow; this read is that same "own session binding", not a fourth rung).
-    bound = _session_bound_context(workspace, session_id)
-    if bound:
-        return bound
-
-    # Direct core import (F-01): never pay the container's import graph in a hook.
-    from dadaia_workspace.core.specs_resolver import resolve_context
-
-    return resolve_context() or ""
+    return invocation.resolve(payload=payload, env=os.environ, cwd=Path.cwd()).context_name or ""
 
 
 def _emit(payload: str) -> None:
@@ -307,27 +257,6 @@ def _build_memory(specs_dir: Path) -> str:
     return "\n".join(parts)
 
 
-def _gc_stale_sentinels(tmp_dir: Path, *, now: float | None = None) -> None:
-    """Sweep aged once-per-session sentinel/marker files at inject time (fail-open).
-
-    A sentinel (``ctx-inject-fired-*``) or compact marker (``ctx-compact-*``) whose mtime
-    is older than :data:`_SENTINEL_GC_TTL_SECONDS` is removed; fresh files (other live
-    sessions) and unrelated tmp files are left untouched. Any OS error during the scan is
-    suppressed — GC is best-effort housekeeping and must never break the bootstrap.
-    """
-    cutoff = (now if now is not None else time.time()) - _SENTINEL_GC_TTL_SECONDS
-    try:
-        entries = list(tmp_dir.iterdir())
-    except OSError:
-        return
-    for entry in entries:
-        if not entry.name.startswith((_SENTINEL_PREFIX, _COMPACT_PREFIX)):
-            continue
-        with contextlib.suppress(OSError):
-            if entry.is_file() and entry.stat().st_mtime < cutoff:
-                entry.unlink()
-
-
 #: Sentinel-content prefix recording the last injected context slug. A sentinel whose
 #: content is ``ctx=<slug>`` already injected that slug's memory; an empty/legacy sentinel
 #: (no prefix) is treated as the generic-preflight state (no slug injected yet).
@@ -397,7 +326,11 @@ def main() -> int:
     """Run the context-injection hook. Returns 0 always."""
     payload = _common.read_stdin_json()
     try:
-        workspace = _resolve_workspace()
+        workspace = invocation.resolve(
+            payload=payload, env=os.environ, cwd=Path.cwd()
+        ).workspace_root
+        if workspace is None:
+            raise RuntimeError("workspace not resolved")
     except Exception:  # noqa: BLE001 — fail-open: emit nothing rather than crash
         _emit("")
         return 0
@@ -405,8 +338,9 @@ def main() -> int:
     session_id = _common.resolve_session_id(payload, default="workspace")
 
     # Sentinel — path BYTE-IDENTICAL to the shell sentinel: .dadaia/tmp/ctx-inject-fired-<id>.
-    # Its content now records the last injected slug so a re-bind is detectable. Inject-time
-    # GC of stale sentinels runs first so leftover sentinels are reaped on every fire.
+    # Its content now records the last injected slug so a re-bind is detectable. Sentinel
+    # GC (release 0.5.1 K2) is no longer inject-time: it is owned by presence.gc(), called
+    # by the PostToolUse reconciler on its own throttle cadence and by doctor --fix.
     tmp_dir = workspace / ".dadaia" / "tmp"
 
     # PostCompact (v0.2.8, kimi-code): stamp the compact-epoch marker, then RE-EMIT the
@@ -428,7 +362,7 @@ def main() -> int:
         # slug: a bind with NO prior prompt leaves no sentinel file, but its session
         # record still names the bound context (consumer round-3 bug
         # kimi-postcompact-omits-bound-context-bootstrap).
-        context = _resolve_context(workspace, session_id)
+        context = _resolve_context(payload)
         if not context:
             context = recorded_slug
         if context and (workspace / "repos" / context / "specs").is_dir():
@@ -452,7 +386,7 @@ def main() -> int:
         sentinel = tmp_dir / f"{_SENTINEL_PREFIX}{session_id}"
         _, recorded_slug = _read_sentinel(sentinel)
         # Same single-authority resolution + recorded-slug fallback as PostCompact above.
-        context = _resolve_context(workspace, session_id)
+        context = _resolve_context(payload)
         if not context:
             context = recorded_slug
         if context and (workspace / "repos" / context / "specs").is_dir():
@@ -464,7 +398,6 @@ def main() -> int:
         return 0
 
     sentinel = tmp_dir / f"{_SENTINEL_PREFIX}{session_id}"
-    _gc_stale_sentinels(tmp_dir)
     sentinel_mtime, recorded_slug = _read_sentinel(sentinel)
     sentinel_exists = sentinel_mtime is not None
 
@@ -478,7 +411,7 @@ def main() -> int:
         sentinel_mtime is not None and compact_mtime is not None and compact_mtime > sentinel_mtime
     )
 
-    context = _resolve_context(workspace, session_id)
+    context = _resolve_context(payload)
 
     # T-50-03 injection trigger (SPEC v0.5.0 FR1 coupling 1): this session's OWN bind
     # (``bound_at``, self-keyed session record) newer than the sentinel forces
