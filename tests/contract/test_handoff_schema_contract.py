@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.infrastructure.stdlib_handoff_validator import StdlibHandoffValidator
+from dadaia_workspace.core.handoff_index import load_schema, validate_schema_shape
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SCHEMA_PATH = _REPO_ROOT / "dadaia_workspace" / "public" / "schemas" / "handoff-v1.schema.json"
@@ -39,9 +39,9 @@ def _valid_handoff() -> dict[str, object]:
 
 
 def test_handoff_v1_1_accepts_current_required_contract() -> None:
-    validator = StdlibHandoffValidator(_SCHEMA_PATH)
+    schema = load_schema(_SCHEMA_PATH)
 
-    assert list(validator.validate(_valid_handoff())) == []
+    assert validate_schema_shape(_valid_handoff(), schema) == []
 
 
 def _missing_metrics() -> dict[str, object]:
@@ -79,9 +79,9 @@ def _traversal_path(path: str) -> dict[str, object]:
 def test_handoff_contract_rejects_invalid_documents(
     doc: dict[str, object], expected_field: str | None
 ) -> None:
-    validator = StdlibHandoffValidator(_SCHEMA_PATH)
+    schema = load_schema(_SCHEMA_PATH)
 
-    errors = list(validator.validate(doc))
+    errors = validate_schema_shape(doc, schema)
 
     assert errors
     if expected_field is not None:

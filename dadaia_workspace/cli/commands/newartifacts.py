@@ -25,7 +25,7 @@ from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
 from dadaia_workspace.core.atomic_write import ConcurrentModificationError
 from dadaia_workspace.core.models.backlog import SubjectKind
 from dadaia_workspace.features.backlog.document import backlog_new
-from dadaia_workspace.features.spec_artifacts.new_artifacts import release_new
+from dadaia_workspace.features.specs.canon import release_new
 
 
 def _resolve_backlog_roots(
@@ -105,7 +105,7 @@ def release_new_cmd(
         sys.exit(1)
 
     try:
-        result = release_new(target, release_id)
+        spec_path = release_new(target, release_id)
     except ValueError as exc:
         typer.echo(f"[error] {exc}", err=True)
         sys.exit(1)
@@ -113,7 +113,7 @@ def release_new_cmd(
         typer.echo(f"[error] {exc}", err=True)
         sys.exit(1)
 
-    typer.echo(f"[ok] created: {result.path}")
+    typer.echo(f"[ok] created: {spec_path}")
 
 
 # ── dadaia backlog new ────────────────────────────────────────────────────────

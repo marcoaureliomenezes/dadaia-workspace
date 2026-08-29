@@ -215,14 +215,16 @@ def test_field_categories_documented_in_schema_match_dataclass_with_no_hand_kept
 
 def test_surface_enum_equals_on_disk_feature_packages() -> None:
     """A2.12: the schema ``surface`` enum's FEATURE arm equals the
-    ``dadaia_workspace/features/<name>/`` packages on disk (glob, 24 at this fold),
-    plus the 7 fixed non-feature members (``core``/``infrastructure``/``cli``/
-    ``hooks``/``tests``/``public-assets``/``unknown``).
+    ``dadaia_workspace/features/<name>/`` packages on disk (glob, 23 at this fold —
+    v0.5.1 K4 retired the ``spec_artifacts`` package, folding its two writers into
+    ``features.specs.canon``; the enum lost the matching ``"spec_artifacts"`` member in
+    the same commit), plus the 7 fixed non-feature members (``core``/``infrastructure``/
+    ``cli``/``hooks``/``tests``/``public-assets``/``unknown``).
 
     Compared against the ON-DISK package list, NOT ``setup.cfg``'s
     ``[importlinter:contract:features-no-cross-feature]`` ``modules =`` list: that list
     is 20 entries today (``capabilities``/``certification``/``reconcile``/``tmp_gc``
-    missing) and is completed to the full 24 by T-050-29 — asserting against it here
+    missing) and is completed to the full 23 by T-050-29 — asserting against it here
     would go RED for a gap this task does not own. Once T-050-29 lands, a SEPARATE
     assertion (there, not here) equates ``setup.cfg`` to this same on-disk list.
     """
@@ -235,7 +237,7 @@ def test_surface_enum_equals_on_disk_feature_packages() -> None:
         for p in features_dir.iterdir()
         if p.is_dir() and p.name != "__pycache__" and (p / "__init__.py").is_file()
     }
-    assert len(on_disk_packages) == 24
+    assert len(on_disk_packages) == 23
 
     non_feature_members = {
         "core",
@@ -247,4 +249,4 @@ def test_surface_enum_equals_on_disk_feature_packages() -> None:
         "unknown",
     }
     assert enum_values == on_disk_packages | non_feature_members
-    assert len(enum_values) == 31
+    assert len(enum_values) == 30

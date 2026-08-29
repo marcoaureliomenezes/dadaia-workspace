@@ -1,5 +1,10 @@
 """Integration tests for memory atom scaffolds and lint.
 
+Moved verbatim from the retired ``features.spec_artifacts.memory`` (v0.5.1 K4): the
+writer now lives in ``features.specs.catalog`` alongside the catalog generator it
+feeds — the package existed only to dodge a features -> features cross-feature edge
+that never applied to this writer (both live in ``features/specs/`` now).
+
 Merged per plan-integration.md into one fn: generated atom + canonical scaffold atoms
 both lint-clean via the real lint subprocess; the scaffold-assets-exist assertion folds
 in as a pre-condition check.
@@ -14,7 +19,7 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.features.spec_artifacts.memory import memory_product_add
+from dadaia_workspace.features.specs.catalog import memory_product_add
 
 pytestmark = [
     pytest.mark.integration,

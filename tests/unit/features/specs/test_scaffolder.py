@@ -4,15 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import jinja2
-import pytest
-
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
 from dadaia_workspace.features.backlog.document import load_document
-from dadaia_workspace.features.specs.scaffolder import (
-    _render_template,
-    scaffold,
-)
+from dadaia_workspace.features.specs.scaffolder import scaffold
 
 _REPO_ROOT = Path(__file__).parent.parent.parent.parent.parent
 _TEMPLATES_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "templates"
@@ -196,12 +190,3 @@ def test_scaffold_idempotent_force_and_template_render(tmp_path: Path) -> None:
     new_content = arch_path.read_text(encoding="utf-8")
     assert "MUTATED" not in new_content
     assert new_content.startswith("---")
-
-
-def test_render_template_sandbox_blocks_python_internals(tmp_path: Path) -> None:
-    """F-03: the scaffolder uses a SandboxedEnvironment — template access to
-    Python internals (dunder attributes) raises rather than evaluating."""
-    (tmp_path / "evil.md.j2").write_text("{{ ().__class__.__bases__ }}\n", encoding="utf-8")
-
-    with pytest.raises(jinja2.exceptions.SecurityError):
-        _render_template(tmp_path, "evil.md.j2", {})

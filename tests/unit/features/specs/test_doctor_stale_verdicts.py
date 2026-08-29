@@ -3,7 +3,7 @@ specs-canon closure, operator ruling 2026-08-28).
 
 A verdict under ``releases/<id>/verdicts/`` whose 40-hex name is neither the branch
 HEAD nor HEAD's first parent is stale — ERROR, ``--fix`` deletes. Uses the SAME
-``features.specs.specs_canon.verdict_violations`` predicate the pre-push gate uses
+``features.specs.canon.verdict_violations`` predicate the pre-push gate uses
 (``features.chokepoints.service``) — never a second, hand-kept rule.
 
 Intent: CONTRACT — v0.5.0 specs-canon closure

@@ -21,9 +21,11 @@ import re
 from datetime import date
 from pathlib import Path
 
+from dadaia_workspace.core.handoff_index import discover_handoff_paths
 from dadaia_workspace.core.spec_status import APPROVED, extract_status
 from dadaia_workspace.core.spec_status import CANONICAL_STATUS as _CANONICAL_STATUS
 from dadaia_workspace.core.specs_version import RELEASE_SEMVER_RE
+from dadaia_workspace.features.specs.canon import verdict_violations
 from dadaia_workspace.features.specs.doctor_common import (
     RELEASE_ARTIFACTS,
     _read_and_parse_release_json,
@@ -31,7 +33,6 @@ from dadaia_workspace.features.specs.doctor_common import (
     resolve_active_release,
 )
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
-from dadaia_workspace.features.specs.specs_canon import verdict_violations
 
 # Vocabulary + parser live in core.spec_status (single definition); re-exported here
 # because doctor_release has been the documented import site for both.
@@ -621,7 +622,7 @@ class ReleaseValidator:
         verdict under ``releases/<id>/verdicts/`` whose 40-hex sha is neither the
         branch HEAD nor HEAD's first parent is stale — ERROR, ``--fix`` deletes.
 
-        Uses :func:`~dadaia_workspace.features.specs.specs_canon.verdict_violations`
+        Uses :func:`~dadaia_workspace.features.specs.canon.verdict_violations`
         — the SAME predicate the pre-push gate uses
         (``features.chokepoints.service.push_gate_decision``) — never a second,
         hand-kept rule. *head_sha*/*parent_sha* are resolved ONCE by the CLI
@@ -634,7 +635,7 @@ class ReleaseValidator:
         """
         if head_sha is None:
             return []
-        verdict_paths = sorted(self.specs_dir.glob("releases/*/verdicts/*.handoff.json"))
+        verdict_paths = discover_handoff_paths(self.specs_dir, "releases/*/verdicts/*.handoff.json")
         if not verdict_paths:
             return []
         rel_paths = [p.relative_to(self.specs_dir).as_posix() for p in verdict_paths]
