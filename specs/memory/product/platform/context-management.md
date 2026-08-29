@@ -2,7 +2,7 @@
 slug: context-management
 title: context-management
 category: product
-tldr: ALIVE/DEAD registry of one main repo plus N associated repos, one resolution authority, bind-driven injection, advisory presence, redactable output.
+tldr: ALIVE/DEAD registry of one main repo plus N associated repos, one Invocation resolved per process, bind-driven injection, advisory presence, redactable output.
 summary: Spec Context Projects and their repositories through a v3 registry, one resolution authority, one repo accessor, bind-driven injection and expiring presence records.
 tags: [context, lifecycle, session, no-locks, privacy]
 ---
@@ -20,10 +20,12 @@ tags: [context, lifecycle, session, no-locks, privacy]
 
 ## Resolution
 
-- `core.specs_resolver.resolve_context()` is the single authority answering which context this is; the CLI seam, `container`, the gate and ctx-inject all call it.
+- `core.invocation.resolve()` answers workspace root, session, context, repo slug, specs dir, mode, release and phase in one call; the CLI seam, `container`, the gate and ctx-inject each build one `Invocation` and re-derive nothing.
 - Rung 0 is caller-supplied (`--context`, or a write target under `repos/<slug>/`), rung 1 `DADAIA_CONTEXT`, rung 2 this session's record keyed by its harness-native id, rung 3 the repo containing the cwd.
+- The workspace root is walked from an explicit `target_path` when one is given and only from the cwd otherwise, so every rung in a call shares one root.
 - Rungs 0 and 3 resolve a slug and recover the context name through the registry, falling back to the slug when unregistered.
 - Every rung fails soft, and when all are exhausted `resolve_specs_dir` raises rather than guessing.
+- `core.session_store` is the sole reader, writer and toucher of `.dadaia/sessions/`; `core.record_liveness.is_stale` is the one staleness predicate.
 - `DADAIA_CONTEXT` is the only environment variable in resolution; `DADAIA_MODE` carries mode and the other `DADAIA_*` variables are hook transport.
 
 ## Binding and injection
@@ -38,6 +40,7 @@ tags: [context, lifecycle, session, no-locks, privacy]
 ## Presence, redaction, export
 
 - Mutating file-tool activity best-effort records advisory presence; a live peer warns, never denies, and records expire by heartbeat age.
+- `presence.gc()` is the only reaper — presence records, throttle and sentinel markers, and the directories they empty — called by `doctor --fix` and the PostToolUse reconciler on one throttle; a live session's own record is never touched.
 - `context list`, `context show` and `dadaia doctor` accept `--redact`, presence block included, turning every foreign context name and repo slug into a stable `[REDACTED-CONTEXT-<n>]` placeholder at the render boundary.
 - `dadaia export` tars durable workspace state under `.dadaia/dist/`, excluding `.env`, caches and cloned `repos/`.
 - `dadaia import <archive>` restores contexts as they were, re-cloning through `context alive`.

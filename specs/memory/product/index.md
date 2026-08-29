@@ -50,7 +50,7 @@
 | slug | title | tldr |
 |------|-------|------|
 | `consumer-agent-support` | Consumer validation gate | A consumer-side validation agent running the shipped recipe on a real workspace is the release gate; no wheel publishes without its CERTIFIED_100 verdict. |
-| `context-management` | context-management | ALIVE/DEAD registry of one main repo plus N associated repos, one resolution authority, bind-driven injection, advisory presence, redactable output. |
+| `context-management` | context-management | ALIVE/DEAD registry of one main repo plus N associated repos, one Invocation resolved per process, bind-driven injection, advisory presence, redactable output. |
 | `cross-platform-portability` | cross-platform-portability | Linux, macOS and Windows through one platform capability seam, injected adapters, Python hooks and hard-gated cross-OS CI legs. |
 | `server-registry` | server-registry | Port registry with TTL and PID tracking so parallel agents' dev servers never collide; the 3000-3999 range binds only `next_port`. |
 | `workspace-doctor` | workspace-doctor | Diagnoses root hygiene, venv health, context coherence, slug-ownership collisions, stale presence and lock residue; repairs deterministic state only. |
@@ -63,5 +63,5 @@
 | `audits-canon` | audits-canon | Audits are committed spec artifacts — three pillars over a sha window, findings as JSONL records, dispositioned by exactly one remediation release. |
 | `sdd-bug-backlog-governance` | sdd-bug-backlog-governance | One record per bug through one write seam, a live-photo backlog with histo exits, and the RELEASE.json state document. |
 | `sdd-gate-v3` | sdd-gate-v3 | No-lock enforcement — origin-classified LAW, path/phase/mode gates, phase read from RELEASE.json, git hooks pared to the publication boundary. |
-| `specs-doctor` | specs-doctor | Validates the v6 canon tree, memory and catalog integrity, RELEASE.json, bug and backlog governance, and audit findings folded from JSONL. |
+| `specs-doctor` | specs-doctor | Validates the v6 canon tree, memory drift and catalog integrity, RELEASE.json, bug and backlog governance, and audit findings folded from JSONL. |
 

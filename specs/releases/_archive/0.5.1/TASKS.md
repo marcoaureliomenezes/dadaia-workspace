@@ -212,11 +212,11 @@
 
 ## `rc` lane
 
-- [-] **T-051-23** — `rc-1`: PR `feature/0.5.1` → `develop` · owner: dispatcher (+ security-reviewer) · write set: `specs/releases/0.5.1/RELEASE.json` (`rc: 1`), git refs · acceptance: merged with **every** CI job green, verdict covering the PR head sha
+- [x] **T-051-23** — `rc-1`: PR `feature/0.5.1` → `develop` · owner: dispatcher (+ security-reviewer) · write set: `specs/releases/0.5.1/RELEASE.json` (`rc: 1`), git refs · acceptance: merged with **every** CI job green, verdict covering the PR head sha
   - watch CI on a loop until all jobs are green; a red job is fixed at its root cause and the watch resumes
   - parallelism: none
 
-- [ ] **T-051-24** — `rc-2 … rc-N`: adjustment rounds · owner: software-engineer + qa-engineer · write set: per round, the fix's own files + `specs/releases/0.5.1/RELEASE.json` · acceptance: fixes on this scope only — never new backlog; one QA close and one merge per round
+- [x] **T-051-24** — `rc-2 … rc-N`: adjustment rounds · owner: software-engineer + qa-engineer · write set: per round, the fix's own files + `specs/releases/0.5.1/RELEASE.json` · acceptance: fixes on this scope only — never new backlog; one QA close and one merge per round
   - carries the accepted K11 option if, and only if, the operator accepted T-051-17's ADR inside this release
   - parallelism: none
 
@@ -224,20 +224,20 @@
 
 ## Final `rc` — closure
 
-- [ ] **T-051-25** — Memory update · owner: product-engineer · write set: `specs/memory/ARCHITECTURE.md`, `specs/memory/TECHSTACK.md`, `specs/memory/QUALITY.md`, `specs/memory/product/**`, `specs/releases/0.5.1/RELEASE.json` (`phase: CLOSURE` first) · acceptance: `dadaia specs doctor` reports the memory atoms clean (A-0.4)
+- [x] **T-051-25** — Memory update · owner: product-engineer · write set: `specs/memory/ARCHITECTURE.md`, `specs/memory/TECHSTACK.md`, `specs/memory/QUALITY.md`, `specs/memory/product/**`, `specs/releases/0.5.1/RELEASE.json` (`phase: CLOSURE` first) · acceptance: `dadaia specs doctor` reports the memory atoms clean (A-0.4)
   - protocol: `MEMORY-UPDATE.md`; memory describes current state only — no changelog, no history
   - content: P-09's named home → `core.invocation`; Part 2 implementation text for the eleven deepened surfaces; the frontmatter fields the open bug `memory-trio-missing-required-frontmatter-fields` names; atoms for deleted features (`repos`, the pre-v6 migrations) deleted outright; `product/index.md` touched only if catalog order/membership changed
   - preconditions: every task `[x]`; trio APPROVED on one sha
   - parallelism: none
 
-- [ ] **T-051-26** — Closure narrative + disposition sweep + artifact GC · owner: product-engineer · write set: `specs/releases/0.5.1/RELEASE.json` (`log`), `specs/backlog/_archive/backlog_histo.jsonl` (in-place terminal token), `specs/bugs/BUGS.jsonl` · acceptance: A-12.1 … A-12.3; `dadaia bugs stats` and `dadaia backlog doctor` show zero non-terminal picked items
+- [x] **T-051-26** — Closure narrative + disposition sweep + artifact GC · owner: product-engineer · write set: `specs/releases/0.5.1/RELEASE.json` (`log`), `specs/backlog/_archive/backlog_histo.jsonl` (in-place terminal token), `specs/bugs/BUGS.jsonl` · acceptance: A-12.1 … A-12.3; `dadaia bugs stats` and `dadaia backlog doctor` show zero non-terminal picked items
   - `log` entries: `closure-summary`, `closure-size-accounting` (the A-0.1/A-0.2 numbers), `closure-drift`, `closure-dispositions`, `closure-test-dispositions`, `closure-artifact-gc`, `closure-intake-candidates`, `closure-rc-ledger`, `closure-archive-decision` — never a `CLOSURE.md`, never a `RELEASE.jsonl`
   - sweep: `deepening-simplification-k1-k11` rewritten to its terminal token — **one** histo record updated in place, never a second line; the two `superseded` bugs and every `resolved` bug verified terminal; bugs 9/10 left `open` with their stated reason if the K11 ADR was not accepted
   - GC: this release's own `.dadaia/` artifacts only; refuse any target outside `.dadaia/`; never follow a symlinked directory; keep anything a surviving `log` entry references
   - residuals: listed for the PM's operator-facing intake report — `product-engineer` creates no backlog entry
   - parallelism: none
 
-- [ ] **T-051-27** — Archive · owner: product-engineer (authoring) + software-engineer `[git]` · write set: `specs/releases/0.5.1/RELEASE.json` (`phase: ARCHIVED`), `git mv specs/releases/0.5.1/ specs/releases/_archive/0.5.1/` (whole directory, verdicts included, per `DADAIA.md` §6.2 and the operator ruling of 2026-08-28), `specs/releases/_archive/releases_histo.jsonl` (one summary record appended) · acceptance: `specs/releases/0.5.1/` no longer exists live, `_archive/0.5.1/RELEASE.json` carries `phase: ARCHIVED`, the histo record exists, in the same commit as T-051-25/26
+- [x] **T-051-27** — Archive · owner: product-engineer (authoring) + software-engineer `[git]` · write set: `specs/releases/0.5.1/RELEASE.json` (`phase: ARCHIVED`), `git mv specs/releases/0.5.1/ specs/releases/_archive/0.5.1/` (whole directory, verdicts included, per `DADAIA.md` §6.2 and the operator ruling of 2026-08-28), `specs/releases/_archive/releases_histo.jsonl` (one summary record appended) · acceptance: `specs/releases/0.5.1/` no longer exists live, `_archive/0.5.1/RELEASE.json` carries `phase: ARCHIVED`, the histo record exists, in the same commit as T-051-25/26
   - law drift: `dd-release-implement/RC-FLOW.md` step 12 still says "no per-release archive directory" — fixed at the source (`public/skills/...`) in T-051-12 with the other R7 drift
   - order is fixed: memory → closure narrative → disposition sweep → artifact GC → archive
   - parallelism: none

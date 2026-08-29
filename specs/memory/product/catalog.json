@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-28T15:21:47Z",
+  "generated_at": "2026-08-29T20:47:51Z",
   "context": "dadaia-workspace",
   "features": [
     {
@@ -15,7 +15,7 @@
         "handoff",
         "schema"
       ],
-      "token_estimate": 347,
+      "token_estimate": 381,
       "depends_on": [
         "agent-monitoring",
         "public-asset-distribution"
@@ -35,11 +35,11 @@
         "sessions",
         "lifecycle"
       ],
-      "token_estimate": 571,
+      "token_estimate": 614,
       "depends_on": [
         "panel",
-        "sdd-gate-v3",
         "context-management",
+        "sdd-gate-v3",
         "brand-identity"
       ]
     },
@@ -127,7 +127,7 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 599,
+      "token_estimate": 756,
       "depends_on": [
         "agentic-entities",
         "workspace-init",
@@ -260,14 +260,14 @@
         "http",
         "dashboard"
       ],
-      "token_estimate": 217,
+      "token_estimate": 293,
       "depends_on": [
+        "agent-monitoring",
         "context-management",
         "agentic-entities",
         "academy",
         "server-registry",
         "agent-orchestration",
-        "agent-monitoring",
         "brand-identity"
       ]
     },
@@ -352,7 +352,7 @@
         "no-locks",
         "privacy"
       ],
-      "token_estimate": 764,
+      "token_estimate": 892,
       "depends_on": [
         "workspace-doctor",
         "spec-context-project",
@@ -488,7 +488,7 @@
         "bugs",
         "gitflow"
       ],
-      "token_estimate": 902,
+      "token_estimate": 1045,
       "depends_on": [
         "sdd-gate-v3",
         "audits-canon",
@@ -512,7 +512,7 @@
         "no-locks",
         "privacy"
       ],
-      "token_estimate": 954,
+      "token_estimate": 1022,
       "depends_on": [
         "context-management",
         "workspace-doctor",
@@ -534,7 +534,7 @@
         "validation",
         "sdd"
       ],
-      "token_estimate": 537,
+      "token_estimate": 630,
       "depends_on": [
         "sdd-gate-v3",
         "context-management",
