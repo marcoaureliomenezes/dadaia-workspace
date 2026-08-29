@@ -186,15 +186,22 @@ class IncompleteTransitionError(ValueError):
 
 
 #: bug-record-v1.schema.json's ``evidence_diff`` pattern — restated here once, the
-#: schema being the documented source (A2.1); this is the runtime mirror.
+#: schema being the documented source (A2.1); this is the runtime mirror
+#: (:meth:`BugRecord.resolve` is a pure function with no I/O and no DI'd validator —
+#: directly unit-tested that way — so it cannot read the schema itself). K5 residual
+#: D9: pinned byte-for-byte against the schema by
+#: ``tests/contract/test_bug_record_schema.py::
+#: test_bug_record_module_constants_are_pinned_to_the_schema`` — the ONE decider that
+#: catches drift, since this module is not in ``architecture.md``'s Core file-I/O
+#: authorized set and may never read the schema itself.
 _EVIDENCE_DIFF_PATTERN_RE = re.compile(r"^(net-negative|net-positive|net-neutral):\s*\S.*$")
 
-#: bug-record-v1.schema.json's ``diff_direction`` closed enum.
+#: bug-record-v1.schema.json's ``diff_direction`` closed enum — pinned the same way.
 _DIFF_DIRECTIONS: frozenset[str] = frozenset({"net-negative", "net-neutral", "net-positive"})
 
 #: bug-record-v1.schema.json's ``status`` closed enum (mirrors ``TERMINAL_EVENTS`` +
 #: ``"open"`` — restated as its own set so :meth:`BugRecord.from_dict` can validate it
-#: without constructing a throwaway ``BugEventKind`` mapping).
+#: without constructing a throwaway ``BugEventKind`` mapping) — pinned the same way.
 _STATUS_VALUES: frozenset[str] = frozenset({"open", *TERMINAL_EVENTS})
 
 
