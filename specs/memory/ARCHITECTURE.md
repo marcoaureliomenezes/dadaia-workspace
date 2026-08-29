@@ -14,9 +14,9 @@ Measured by: `lint-imports --config setup.cfg --no-cache` — contracts `core-no
 ADR: 0001 (accepted)
 Rationale: the ledger shows zero adapter substitutions ever fixed a bug; the port requirement only grew the container funnel.
 
-### P-02 · We never spawn a subprocess from a feature; process execution goes through `ProcessRunner`.
-Measured by: `lint-imports --config setup.cfg --no-cache` — contract `features-no-subprocess`.
-ADR: none
+### P-02 · We never spawn a subprocess from a feature; process execution goes through the one infrastructure adapter, `infrastructure/subprocess_runner.py`.
+Measured by: `lint-imports --config setup.cfg --no-cache` — contract `features-no-subprocess` (direct imports only, zero ignored edges).
+ADR: 0001 (accepted)
 Rationale: one process seam keeps execution observable, fakeable and bounded.
 
 ### P-03 · We keep `core` free of OS primitives (`fcntl`, `signal`, `subprocess`, `msvcrt`); `core/platform.py` is the sole platform seam.
@@ -106,13 +106,15 @@ Rationale: law that no asset owns is law nobody applies.
 | what a `specs/` tree may contain | `features/specs/canon.py`'s `CANON` table — scaffold renders it, doctor checks it |
 | whether a projection is current | `infrastructure/projection.py`'s `ProjectionRule` plus `projection_rules()`; install writes and doctor compares the same table |
 | which harness a projection targets | `HarnessProjection` in `infrastructure/projection_rules.py`, with three production adapters — Claude Code, Codex, Kimi Code |
-| a bug record's status | `core/models/bugs.py` transition methods; `RecordStore.scan()` is the one ledger parser, yielding `MalformedLine` for a bad row |
+| a bug record's status | `core/models/bugs.py` transition methods; `infrastructure/jsonl_record_store.py::JsonlRecordStore.scan()` is the one ledger parser, yielding `MalformedLine` for a bad row |
 | a handoff's version, artifact and validity | `core/handoff_index.py` — `HandoffIndex`/`Handoff`, the stdlib schema walker internal to it |
 | the git publication boundary | `features/chokepoints/{branch_policy,pre_commit,push_gate,verdict}.py`; `covering_verdict()` is the single verdict reader |
 | the telemetry database connection | `features/telemetry/store.py`'s `TelemetryStore`, owning open/migrate/`integrity_check`/`quarantine` |
 | a YAML frontmatter block | `core/frontmatter.py` |
 
-- `container.py` is composition wiring only; `build_telemetry_service` and `build_panel_views` are its panel-side entry points.
+- `container.py` is composition wiring only; `build_telemetry_service` and `build_panel_views` are its panel-side entry points; a single-consumer adapter is imported directly by its feature and never passes through it (ADR 0001).
+- `core/protocols/` holds seven Protocols: four two-adapter OS seams (`FilePermissionSetter`, `ProcessAncestry`, `ShutdownHandler`, `TelemetryRefreshLock`) and three panel cross-feature seams whose implementer lives under `features/` (`AgentsProvider`, `ContextProjectProvider`, `ServerRegistryProvider`); every other adapter is imported by its one consumer.
+- `setup.cfg` carries seven import-linter contracts; `features-no-infrastructure` and `cli-no-infrastructure` were deleted by ADR 0001, `features-no-subprocess` is direct-imports-only with no suppressed edge, and the four surviving suppressed edges all sit under `features-no-cross-feature`.
 - `features/migrate` stamps `specs_pattern_version: 6` or refuses, instructing a tree below v6 to upgrade to 0.4.x first — no in-wheel pre-v6 lineage.
 - Hooks import `core.invocation` directly and build the `Invocation` once per process; they never import `container` (P-12).
 
@@ -133,7 +135,7 @@ classDiagram
     SpecsDoctor --> ClosureAuditValidator : owns ORDER
     SpecsDoctor --> GovernanceValidator : owns ORDER
     SpecsDoctor --> CoherenceValidator : owns ORDER
-    note for MemoryValidator "receives a ProcessRunner port; owns CAT-1, LINT-1 and MEM-DRIFT-1"
+    note for MemoryValidator "takes the specs dir; runs the memory lint in-process; owns CAT-1, LINT-1 and MEM-DRIFT-1"
     note for GovernanceValidator "sole features.backlog.document import; reads BUGS.jsonl only through the injected bug store"
     note for SpecsDoctor "takes bug_store_factory; imports neither spec_context nor infrastructure"
 ```

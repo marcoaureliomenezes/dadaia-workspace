@@ -59,6 +59,14 @@ Left exactly as written; a future task can pick this up.
 Internal spec-release id: `0.5.1` ("deepening simplification K1–K11"). Shipped to `main` at
 `0fee8cdd` (PR #228); publication withheld — no tag, PyPI stays `0.4.4`.
 
+Post-ship work carried on `feature/0.5.2` and still unpublished is folded into this section:
+ADR 0001 executed, two `specs doctor` rules, one CLI signature change, four bugs fixed.
+
+### Added
+- `specs doctor` gains `SPEC-DOC-045` (ERROR): `pyproject.toml`'s `[tool.poetry].version` must equal
+  the active release id once that release reaches `CLOSURE`/`ARCHIVED` — read off disk, never from
+  installed-package metadata; silent without a `repo_root`, a `pyproject.toml` or a live release.
+
 ### Changed
 - **One decider per fact.** `core.invocation.resolve` resolves workspace, session, context, mode,
   release and phase once per process (K1); `core.session_store` is the sole owner of
@@ -72,6 +80,26 @@ Internal spec-release id: `0.5.1` ("deepening simplification K1–K11"). Shipped
 - `specs upgrade` refuses trees below pattern v6 ("upgrade with 0.4.x first") and is a no-op at v6.
 - `specs doctor` gains `MEM-DRIFT-1` (WARNING): the ARCHITECTURE.md package map vs live packages.
 - `secret-scan.yml` runs on develop PRs; gitleaks allowlist targets the line for `*sha` keys.
+- **ADR 0001 executed** ("ring rule stays; a Protocol exists only where two production adapters
+  exist"). `core/protocols/` 23 → 8 modules — `agents_provider`, `context_project_provider`,
+  `platform_services`, `process_ancestry`, `record_store` (retiring in the follow-up pass),
+  `server_registry_provider`, `shutdown_handler`, `telemetry_lock`; every other adapter is now
+  imported directly by the single feature or CLI verb that consumes it. `setup.cfg` drops
+  `features-no-infrastructure` and `cli-no-infrastructure` (9 → 7 contracts), `features-no-subprocess`
+  becomes direct-imports-only with zero ignored edges, the ignore-edge cap ratchets 14 → 4, and
+  `container.py` falls 708 → 677 LOC. The two-adapter invariant is now
+  `tests/contract/test_protocols_have_two_adapters.py`, not an import-linter contract.
+- `SPEC-DOC-030` enforces the `<YYYYMMDD>-<slug>` audit-directory shape from its one home,
+  `core/workspace_layout.py`'s `AUDIT_DIR_NAME_RE`, which `features/specs/canon.py` imports instead
+  of keeping a second regex — the old rule stated a stale `<YYYYMMDDTHHMMSSZ>-<session-id>` shape
+  that contradicted `DADAIA.md` §6.8.
+- `dadaia memory product add` requires `--area` and writes `memory/product/<area>/<slug>.md`,
+  validated by `features.specs.canon.is_canon_path` — the same decider `specs doctor` and the
+  pre-push gate use; an area that fails it is refused instead of minting a flat atom path.
+- The `SPECS-VERSION` hint no longer says "run specs upgrade": upgrade refuses pre-v6 trees, so the
+  named fix is migrate the tree to canon v6 (0.4.x or by hand), then re-stamp `constitution.md`.
+- `DADAIA.md` §3.3 states the git-index boundary as law: one harness session per checked-out tree
+  (ADR 0002), a parallel session's worktree created before launch, staging discipline in §7.3.
 
 ### Removed
 - `core/specs_resolver.py`, `core/session_env.py`, `features/spec_context/session_identity.py`,
@@ -88,6 +116,11 @@ Internal spec-release id: `0.5.1` ("deepening simplification K1–K11"). Shipped
   resolution, radon/ruff complexity disagreement, mutation-baseline staging, secret-scan trigger,
   memory trio frontmatter) plus the bugs found while shipping (shallow-checkout history walk,
   tests/tmp xdist race, hook subprocess import pin, read-only projection rewrite on Windows).
+- Four post-ship bugs, each root-caused at its single decider:
+  `memory-product-add-writes-a-flat-atom-path-outside-the-canon-area-layout`,
+  `spec-doc-030-audit-dir-rule-contradicts-dadaia-6-8-canon`,
+  `release-shipped-without-a-pyproject-version-bump`,
+  `verdict-check-head-or-first-parent-cannot-be-satisfied-by-a-develop-to-main-pr`.
 
 ## [0.5.0] — 2026-08-27
 
