@@ -21,7 +21,7 @@ from typing import Any
 
 import pytest
 
-from dadaia_workspace.features.telemetry.aggregator.models import (
+from dadaia_workspace.core.models.telemetry import (
     AgentListResult,
     AgentSummary,
     ContextBreakdown,

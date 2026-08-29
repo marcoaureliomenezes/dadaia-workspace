@@ -10,12 +10,16 @@ Refresh logic:
     1. Acquire LOCK_EX | LOCK_NB on state_dir/telemetry.lock via TelemetryRefreshLock.
        If another process holds it, skip refresh and return.
     2. If now - last_refresh < CACHE_TTL_SECONDS, return immediately (cache hit).
-    3. Open DAO + apply schema migrations.
-    4. Walk ~/.claude/projects/*/*.jsonl — call claude reader for each.
-    5. Run codex reader on ~/.codex/state_5.sqlite (or env override).
+    3. Integrity-check the existing file; quarantine + degrade if corrupt (T-AM-21).
+    4. Open the store's write connection + migrate.
+    5. Run every reader in ``readers`` (K8: ``Reader.ingest(store, now)``).
     6. Backfill costs: UPDATE events WHERE cost_micro_usd IS NULL AND model known.
     7. Update last_refresh timestamp.
     8. Release lock.
+
+K8 (0.5.1): the store is now the ONE connection owner — this service never
+touches a ``sqlite3.Connection`` or a DAO's private ``_conn`` (see
+``features/telemetry/store.py``).
 """
 
 from __future__ import annotations
@@ -24,29 +28,47 @@ import datetime
 import logging
 import os
 import pathlib
-import sqlite3
-import time
-from collections.abc import Callable
-from typing import Any, cast
+from collections.abc import Callable, Sequence
+from typing import Any, Protocol
 
 from dadaia_workspace.core.exceptions import PlatformSecurityError
-from dadaia_workspace.core.platform import PLATFORM
-from dadaia_workspace.core.protocols.platform_services import FilePermissionSetter
-from dadaia_workspace.core.protocols.telemetry_lock import TelemetryRefreshLock
-from dadaia_workspace.features.telemetry import budget as _budget
-from dadaia_workspace.features.telemetry.aggregator.models import (
+from dadaia_workspace.core.models.telemetry import (
     AgentListResult,
     RecentSession,
     SessionAggregate,
 )
+from dadaia_workspace.core.platform import PLATFORM
+from dadaia_workspace.core.protocols.platform_services import FilePermissionSetter
+from dadaia_workspace.core.protocols.telemetry_lock import TelemetryRefreshLock
+from dadaia_workspace.features.telemetry import budget as _budget
+from dadaia_workspace.features.telemetry.reader.adapters import Reader
+from dadaia_workspace.features.telemetry.store import TelemetryStore
 
 logger = logging.getLogger(__name__)
 
 _DEFAULT_STATE_DIR = pathlib.Path("~/.dadaia/state/telemetry").expanduser()
-_DEFAULT_SQLITE_FILENAME = "telemetry.sqlite"
-_DEFAULT_CODEX_PATH = pathlib.Path("~/.codex/state_5.sqlite").expanduser()
-_CLAUDE_PROJECTS_DIR = pathlib.Path("~/.claude/projects").expanduser()
-_DEFAULT_KIMI_INDEX = pathlib.Path("~/.kimi-code/session_index.jsonl").expanduser()
+
+
+class _Aggregator(Protocol):
+    """The read-side surface TelemetryService delegates its query methods to."""
+
+    def list_agents(
+        self, *, window_days: int, context_slug: str | None, limit: int
+    ) -> AgentListResult: ...
+
+    def list_sessions_by_agent(
+        self, *, agent_id: str, limit: int, offset: int
+    ) -> list[RecentSession]: ...
+
+    def aggregate_sessions(self, *, runtime: str) -> SessionAggregate: ...
+
+
+class _PricingModule(Protocol):
+    """The features/telemetry/pricing surface the cost-backfill step needs."""
+
+    def compute_cost(
+        self, usage: dict[str, Any], model: str, when: datetime.date
+    ) -> int | None: ...
 
 
 def _default_refresh_lock() -> TelemetryRefreshLock:
@@ -88,21 +110,19 @@ class TelemetryService:
 
     Parameters
     ----------
-    dao_factory:
-        Callable[[], TelemetryDao] — called inside refresh() to open a
-        DAO over the SQLite connection.
+    store:
+        The single ``TelemetryStore`` this service ingests into and backfills
+        costs against (K8 — the one connection owner; this service never opens
+        a ``sqlite3.Connection`` itself).
+    readers:
+        Every ingestion source to run on each refresh — ``Reader.ingest(store, now)``.
+    clock:
+        Returns float (monotonic seconds) — drives the refresh cache TTL.
     aggregator:
         TelemetryAggregator instance (features/telemetry/aggregator/queries.py).
-    reader_factory:
-        Callable returning a tuple of reader modules. The first two elements are
-        (claude_reader_module, codex_reader_module); an optional third element is
-        the Kimi reader module. Each module must expose its read function
-        (read_session_file, read_codex_db, read_pi_sessions respectively). A legacy
-        2-tuple is still accepted — Kimi ingestion is skipped when no third element
-        is present.
     pricing_module:
         The features/telemetry/pricing module (or compatible stub).  Must
-        expose compute_cost() and PRICING_TABLE.
+        expose compute_cost() and (optionally) PRICING_TABLE.
     workspace_root:
         pathlib.Path to the dadaia workspace root.
     state_dir:
@@ -119,24 +139,23 @@ class TelemetryService:
         direct ``os.chmod`` call (Tier-2: if a setter is provided and raises
         ``PlatformSecurityError``, telemetry degrades to ``None``; the panel
         starts but telemetry endpoints return 503).
-    _now_fn:
-        Injectable for tests: returns float (monotonic seconds).
     _getuid_fn:
         Injectable for tests: returns int (current uid).
     """
 
     def __init__(
         self,
-        dao_factory: Callable[[], Any],
-        aggregator: Any,
-        reader_factory: Callable[[], tuple[Any, ...]],
-        pricing_module: Any,
+        store: TelemetryStore,
+        readers: Sequence[Reader],
+        clock: Callable[[], float],
+        *,
+        aggregator: _Aggregator,
+        pricing_module: _PricingModule,
         workspace_root: pathlib.Path,
         state_dir: pathlib.Path = _DEFAULT_STATE_DIR,
         spec_context_service: Any = None,
         refresh_lock: TelemetryRefreshLock | None = None,
         permission_setter: FilePermissionSetter | None = None,
-        _now_fn: Callable[[], float] | None = None,
         _getuid_fn: Callable[[], int] | None = None,
     ) -> None:
         # T6: refuse uid=0
@@ -152,14 +171,14 @@ class TelemetryService:
                 "This prevents unintended access to other users' ~/.claude/projects/ data."
             )
 
-        self._dao_factory = dao_factory
+        self._store = store
+        self._readers = readers
+        self._clock = clock
         self._aggregator = aggregator
-        self._reader_factory = reader_factory
         self._pricing = pricing_module
         self._workspace_root = workspace_root
         self._state_dir = state_dir
         self._scs = spec_context_service
-        self._now_fn: Callable[[], float] = _now_fn or time.monotonic
         self._refresh_lock: TelemetryRefreshLock = refresh_lock or _default_refresh_lock()
         self._permission_setter: FilePermissionSetter | None = permission_setter
 
@@ -245,199 +264,82 @@ class TelemetryService:
 
         try:
             # Cache TTL check.
-            now = self._now_fn()
+            now = self._clock()
             if now - self._last_refresh < _budget.CACHE_TTL_SECONDS:
                 logger.debug("TelemetryService: cache hit; skipping refresh.")
                 return
 
             self._do_refresh()
-            self._last_refresh = self._now_fn()
+            self._last_refresh = self._clock()
 
         finally:
             self._refresh_lock.release()
 
-    # ------------------------------------------------------------------
-    # Integrity check (T-AM-21)
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    def _integrity_check(conn: sqlite3.Connection) -> bool:
-        """Run PRAGMA integrity_check; return True if the database is intact.
-
-        SQLite's integrity_check returns a single row with the text 'ok' when
-        the file is not corrupt.  Any other result (or an OperationalError) means
-        the database is damaged and should be quarantined.
-        """
-        try:
-            result = conn.execute("PRAGMA integrity_check").fetchone()
-            return result is not None and result[0] == "ok"
-        except sqlite3.OperationalError:
-            return False
-
-    def _quarantine_db(self) -> None:
-        """Rename the corrupt DB to telemetry.sqlite.corrupt.<utc_ts>.
-
-        Does not raise; only logs.  The service continues in degraded mode.
-        """
-        db_path = self._state_dir / _DEFAULT_SQLITE_FILENAME
-        ts = datetime.datetime.now(tz=datetime.UTC).strftime("%Y%m%dT%H%M%SZ")
-        quarantine_path = self._state_dir / f"telemetry.sqlite.corrupt.{ts}"
-        try:
-            os.replace(db_path, quarantine_path)
-            # A WAL store is three files (telemetry.sqlite + -wal + -shm). Move
-            # the siblings WITH the corrupt main DB so a fresh writer never
-            # picks up phantom WAL frames stranded next to a clean file
-            # (v0.1.52 FR3).
-            for suffix in ("-wal", "-shm"):
-                sibling = self._state_dir / f"{_DEFAULT_SQLITE_FILENAME}{suffix}"
-                if sibling.exists():
-                    os.replace(sibling, self._state_dir / f"{quarantine_path.name}{suffix}")
-            logger.warning(
-                "TelemetryService: corrupt database quarantined as %s. "
-                "Service is now in degraded mode. "
-                "Investigate and then run: shred -u %s",
-                quarantine_path,
-                quarantine_path,
-            )
-        except OSError as exc:
-            logger.error(
-                "TelemetryService: could not quarantine corrupt DB %s → %s: %s",
-                db_path,
-                quarantine_path,
-                exc,
-            )
-
     def _do_refresh(self) -> None:
-        """Inner refresh: open DAO, run readers, backfill costs."""
-        from dadaia_workspace.features.telemetry.store.schema import (
-            apply_migrations,
-            open_connection,
-        )
-
+        """Inner refresh: integrity-check, open+migrate the store, run readers, backfill."""
         # --- Integrity check on existing DB (T-AM-21 / devops T10) ---
-        # Open a temporary READ-ONLY connection to check the existing file
-        # BEFORE the DAO factory opens it (which would apply migrations). The
-        # probe routes through the pragma'd factory in read-only mode — an
-        # integrity check is a read; it must never flip the corrupt file into
-        # WAL (v0.1.52 FR3).
-        db_path = self._state_dir / _DEFAULT_SQLITE_FILENAME
-        if db_path.exists():
-            try:
-                _check_conn = open_connection(db_path, read_only=True)
-                try:
-                    intact = self._integrity_check(_check_conn)
-                finally:
-                    _check_conn.close()
-            except sqlite3.DatabaseError:
-                intact = False
+        # A read; must never flip a corrupt file into WAL (v0.1.52 FR3) — the
+        # store's integrity_check() opens its own throwaway read-only connection.
+        if not self._store.integrity_check():
+            quarantine_path = self._store.quarantine()
+            if quarantine_path is not None:
+                logger.warning(
+                    "TelemetryService: corrupt database quarantined as %s. "
+                    "Service is now in degraded mode. "
+                    "Investigate and then run: shred -u %s",
+                    quarantine_path,
+                    quarantine_path,
+                )
+            self._degraded = True
+            return  # Skip all readers — service stays alive in degraded mode.
 
-            if not intact:
-                self._quarantine_db()
-                self._degraded = True
-                return  # Skip all readers — service stays alive in degraded mode.
-
-        # The write DAO is opened per refresh and MUST be closed in finally so
-        # its connection (and any WAL/-shm handles) never leaks across refreshes
-        # (v0.1.52 FR3).
-        dao = self._dao_factory()
+        # The write connection is opened per refresh and MUST be closed in
+        # finally so its connection (and any WAL/-shm handles) never leaks
+        # across refreshes (v0.1.52 FR3).
+        self._store.open_write()
         try:
-            # Apply migrations (idempotent).
-            apply_migrations(dao._conn)
+            self._store.migrate()
 
             # Harden SQLite file permissions to owner-only (0o600). This is done after
-            # every refresh since the DAO may create the file on first connection. Routed
+            # every refresh since the store may create the file on first connection. Routed
             # through the same injected-setter + posix-guard path as the state dir so a
             # Windows host applies an ACL (or degrades) instead of silently no-op'ing an
             # os.chmod (CWE-732). See _restrict_owner_only.
-            if db_path.exists():
-                self._restrict_owner_only(db_path, is_dir=False)
+            if self._store.db_path.exists():
+                self._restrict_owner_only(self._store.db_path, is_dir=False)
 
-            # The reader factory returns (claude, codex) historically, or
-            # (claude, codex, kimi) once the Kimi reader is wired. Unpack
-            # tolerantly so legacy 2-tuple callers keep working unchanged.
-            readers = self._reader_factory()
-            claude_reader, codex_reader = readers[0], readers[1]
-            kimi_reader = readers[2] if len(readers) > 2 else None
             now_iso = datetime.datetime.now(tz=datetime.UTC).isoformat()
+            for reader in self._readers:
+                reader.ingest(self._store, now_iso)
 
-            # --- Claude reader ---
-            claude_projects = _CLAUDE_PROJECTS_DIR
-            if claude_projects.is_dir():
-                for project_dir in claude_projects.iterdir():
-                    if not project_dir.is_dir():
-                        continue
-                    for jsonl_file in project_dir.glob("*.jsonl"):
-                        try:
-                            claude_reader.read_session_file(jsonl_file, dao, now_iso)
-                        except Exception as exc:  # noqa: BLE001
-                            logger.warning(
-                                "TelemetryService: error reading %s: %s", jsonl_file, exc
-                            )
-
-            # --- Codex reader ---
-            codex_path_env = os.environ.get("DADAIA_CODEX_DB_PATH")
-            codex_path = pathlib.Path(codex_path_env) if codex_path_env else _DEFAULT_CODEX_PATH
-            try:
-                codex_reader.read_codex_db(codex_path, dao, now_iso)
-            except Exception as exc:  # noqa: BLE001
-                logger.warning("TelemetryService: codex reader error: %s", exc)
-
-            # --- Kimi reader ---
-            # Ingests Kimi session metadata from ~/.kimi-code/session_index.jsonl
-            # (env override: DADAIA_KIMI_SESSION_INDEX). Degrades to a no-op when
-            # absent or on any IO/parse failure (the reader is graceful).
-            if kimi_reader is not None:
-                kimi_env = os.environ.get("DADAIA_KIMI_SESSION_INDEX")
-                kimi_index = pathlib.Path(kimi_env) if kimi_env else _DEFAULT_KIMI_INDEX
-                try:
-                    kimi_reader.read_kimi_sessions(kimi_index, dao, now_iso)
-                except Exception as exc:  # noqa: BLE001
-                    logger.warning("TelemetryService: kimi reader error: %s", exc)
-
-            # --- Cost backfill ---
-            self._backfill_costs(dao, now_iso)
+            self._backfill_costs()
         finally:
-            dao._conn.close()
+            self._store.close()
 
-    def _backfill_costs(self, dao: Any, now_iso: str) -> None:
+    def _backfill_costs(self) -> None:
         """Fill cost_micro_usd for events where it is NULL and model is known."""
-        import datetime as _dt
-
-        conn = dao._conn
-        conn.row_factory = __import__("sqlite3").Row
-
-        rows = conn.execute(
-            """
-            SELECT event_id, model, occurred_at,
-                   tokens_input, tokens_cache_read, tokens_cache_create, tokens_output
-            FROM events
-            WHERE cost_micro_usd IS NULL
-            """
-        ).fetchall()
-
         updated = 0
-        for row in rows:
-            model = row["model"]
+        for row in self._store.iter_events_missing_cost():
             try:
-                when = _dt.date.fromisoformat(row["occurred_at"][:10])
+                when = datetime.date.fromisoformat(row.occurred_at[:10])
             except Exception:
-                when = _dt.date.today()
+                when = datetime.date.today()
 
             usage = {
-                "input_tokens": row["tokens_input"],
-                "output_tokens": row["tokens_output"],
-                "cache_creation_input_tokens": row["tokens_cache_create"],
-                "cache_read_input_tokens": row["tokens_cache_read"],
+                "input_tokens": row.tokens_input,
+                "output_tokens": row.tokens_output,
+                "cache_creation_input_tokens": row.tokens_cache_create,
+                "cache_read_input_tokens": row.tokens_cache_read,
             }
 
-            cost = self._pricing.compute_cost(usage, model, when)
+            cost = self._pricing.compute_cost(usage, row.model, when)
             if cost is None:
                 continue  # model unknown — leave NULL
 
             # Determine pricing_version (effective_from of selected row).
             pricing_version: str | None = None
             table = getattr(self._pricing, "PRICING_TABLE", {})
-            model_rows = table.get(model)
+            model_rows = table.get(row.model)
             if model_rows:
                 applicable = [r for r in model_rows if r.effective_from <= when]
                 if applicable:
@@ -445,14 +347,11 @@ class TelemetryService:
                         applicable, key=lambda r: r.effective_from
                     ).effective_from.isoformat()
 
-            conn.execute(
-                "UPDATE events SET cost_micro_usd = ?, pricing_version = ? WHERE event_id = ?",
-                (cost, pricing_version, row["event_id"]),
-            )
+            self._store.update_event_cost(row.event_id, cost, pricing_version)
             updated += 1
 
         if updated:
-            conn.commit()
+            self._store.commit()
             logger.debug("TelemetryService: backfilled costs for %d events.", updated)
 
     # ------------------------------------------------------------------
@@ -467,13 +366,10 @@ class TelemetryService:
     ) -> AgentListResult:
         """Return aggregated agent list. Triggers lazy refresh."""
         self.refresh()
-        return cast(
-            AgentListResult,
-            self._aggregator.list_agents(
-                window_days=window_days,
-                context_slug=context_slug,
-                limit=limit,
-            ),
+        return self._aggregator.list_agents(
+            window_days=window_days,
+            context_slug=context_slug,
+            limit=limit,
         )
 
     def list_sessions_by_agent(
@@ -484,19 +380,13 @@ class TelemetryService:
     ) -> list[RecentSession]:
         """Return paginated sessions for an agent. Triggers lazy refresh."""
         self.refresh()
-        return cast(
-            "list[RecentSession]",
-            self._aggregator.list_sessions_by_agent(
-                agent_id=agent_id,
-                limit=limit,
-                offset=offset,
-            ),
+        return self._aggregator.list_sessions_by_agent(
+            agent_id=agent_id,
+            limit=limit,
+            offset=offset,
         )
 
     def aggregate_sessions(self, runtime: str) -> SessionAggregate:
         """Return the server-side aggregate cost summary. Triggers lazy refresh."""
         self.refresh()
-        return cast(
-            SessionAggregate,
-            self._aggregator.aggregate_sessions(runtime=runtime),
-        )
+        return self._aggregator.aggregate_sessions(runtime=runtime)

@@ -160,7 +160,7 @@
 
 ## `alpha-4` — read-side tail, the ruling, two standalone bugs (disjoint write sets, parallel)
 
-- [ ] **T-051-15** — K8: one telemetry connection owner; table-driven panel routes · owner: software-engineer · write set: `dadaia_workspace/features/telemetry/{service.py,store/**,aggregator/**}`, `dadaia_workspace/features/panel/handler.py`, `dadaia_workspace/panel/views/**` (route table only), `dadaia_workspace/cli/commands/panel.py`, `dadaia_workspace/container.py`, the telemetry/panel test files · acceptance: A-8.1 … A-8.5
+- [x] **T-051-15** — K8: one telemetry connection owner; table-driven panel routes · owner: software-engineer · write set: `dadaia_workspace/features/telemetry/{service.py,store/**,aggregator/**}`, `dadaia_workspace/features/panel/handler.py`, `dadaia_workspace/panel/views/**` (route table only), `dadaia_workspace/cli/commands/panel.py`, `dadaia_workspace/container.py`, the telemetry/panel test files · acceptance: A-8.1 … A-8.5
   - deletes: `_try_build_telemetry` (moves into the container and shrinks) · one of `store/models.py`/`aggregator/models.py` · the `pricing_module`/`reader_factory` injections · `AuthClass` + `_BEARER_*` (inert since no-auth) · `handler._dispatch_telemetry`'s 100-line ladder + its legacy bypass · the inline `api_agent_sessions` branch · 3 of the 4 route tables — ~550 LOC; handler **735 → ≤ 300**
   - tests: route-table test + `TelemetryStore` lifecycle test including `integrity_check`/`quarantine`
   - bug: `radon-undercounts-nested-class-in-function-complexity-vs-ruff-c901` — the factory it measures is deleted here; set `superseded_by=deepening-simplification-k1-k11` naming the deleting commit

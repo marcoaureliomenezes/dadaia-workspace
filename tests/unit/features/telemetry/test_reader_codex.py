@@ -10,17 +10,16 @@ import pathlib
 import sqlite3
 
 from dadaia_workspace.features.telemetry.reader.codex import ReadResult, read_codex_db
-from dadaia_workspace.features.telemetry.store.dao import TelemetryDao
-from dadaia_workspace.features.telemetry.store.schema import apply_migrations
+from dadaia_workspace.features.telemetry.store import TelemetryStore, apply_migrations
 
 NOW_ISO = "2026-05-17T10:00:00Z"
 
 
-def _make_dao() -> TelemetryDao:
+def _make_dao() -> TelemetryStore:
     """Create a fresh in-memory SQLite DAO with migrations applied."""
     conn = sqlite3.connect(":memory:")
     apply_migrations(conn)
-    return TelemetryDao(conn)
+    return TelemetryStore.from_connection(conn)
 
 
 def _make_codex_db(tmp_path: pathlib.Path, rows: list[dict[str, object]]) -> pathlib.Path:
@@ -63,7 +62,7 @@ def _make_codex_db(tmp_path: pathlib.Path, rows: list[dict[str, object]]) -> pat
     return db_path
 
 
-def _count_table(dao: TelemetryDao, table: str) -> int:
+def _count_table(dao: TelemetryStore, table: str) -> int:
     row = dao._conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()  # noqa: SLF001
     return int(row[0])
 

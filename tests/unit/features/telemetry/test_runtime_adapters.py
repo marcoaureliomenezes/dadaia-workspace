@@ -24,7 +24,7 @@ from unittest.mock import patch
 
 import pytest
 
-from dadaia_workspace.features.telemetry.aggregator.models import (
+from dadaia_workspace.core.models.telemetry import (
     SessionDetail,
     SessionRow,
 )

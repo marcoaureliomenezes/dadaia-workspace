@@ -30,11 +30,11 @@ import os
 import pathlib
 from dataclasses import dataclass
 
-from dadaia_workspace.features.telemetry.store.dao import TelemetryDao
-from dadaia_workspace.features.telemetry.store.models import (
+from dadaia_workspace.features.telemetry.store import (
     Agent,
     Event,
     Session,
+    TelemetryStore,
 )
 
 logger = logging.getLogger(__name__)
@@ -82,7 +82,7 @@ def _session_dir_is_contained(session_dir: str, index_parent: pathlib.Path) -> b
 
 def read_kimi_sessions(
     index_path: pathlib.Path,
-    dao: TelemetryDao,
+    dao: TelemetryStore,
     now_iso: str,
 ) -> ReadResult:
     """Read the Kimi session index at *index_path* and ingest into *dao*.

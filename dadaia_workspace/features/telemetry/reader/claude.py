@@ -38,12 +38,12 @@ from typing import Any
 
 from dadaia_workspace.features.telemetry import budget as _budget
 from dadaia_workspace.features.telemetry.reader.allowlist import allowlist_event
-from dadaia_workspace.features.telemetry.store.dao import TelemetryDao
-from dadaia_workspace.features.telemetry.store.models import (
+from dadaia_workspace.features.telemetry.store import (
     Agent,
     Event,
     ReaderState,
     Session,
+    TelemetryStore,
 )
 
 logger = logging.getLogger(__name__)
@@ -177,7 +177,7 @@ class _SessionAcc:
 
 def read_session_file(
     path: pathlib.Path,
-    dao: TelemetryDao,
+    dao: TelemetryStore,
     now_iso: str,
 ) -> ReadResult:
     """Incrementally read *path* (a Claude Code jsonl file) into *dao*.

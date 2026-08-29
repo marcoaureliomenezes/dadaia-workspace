@@ -28,6 +28,7 @@ from dadaia_workspace.core.exceptions import PlatformSecurityError  # noqa: E402
 from dadaia_workspace.core.platform import Capabilities  # noqa: E402
 from dadaia_workspace.features.telemetry import service as service_mod  # noqa: E402
 from dadaia_workspace.features.telemetry.service import TelemetryService  # noqa: E402
+from dadaia_workspace.features.telemetry.store import TelemetryStore  # noqa: E402
 
 
 class _RecordingSetter:
@@ -66,10 +67,11 @@ def _make_service(
 ) -> TelemetryService:
     """Construct a TelemetryService with trivial DI parts (no refresh machinery needed)."""
     return TelemetryService(
-        dao_factory=lambda: None,
-        aggregator=object(),
-        reader_factory=lambda: (),
-        pricing_module=object(),
+        TelemetryStore(state_dir / "telemetry.sqlite"),
+        (),
+        lambda: 0.0,
+        aggregator=object(),  # type: ignore[arg-type]
+        pricing_module=object(),  # type: ignore[arg-type]
         workspace_root=workspace_root,
         state_dir=state_dir,
         spec_context_service=None,

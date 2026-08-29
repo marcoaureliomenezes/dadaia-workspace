@@ -1,7 +1,10 @@
-"""Unit tests for _try_build_telemetry() in dadaia_workspace/cli/commands/panel.py.
+"""Unit tests for container.build_telemetry_service() (K8 — the composition root
+moved out of cli/commands/panel.py's _try_build_telemetry into plain container
+wiring, no nested class).
 
 Verifies that each expected exception type is caught, a warning is logged,
-and None is returned — without propagating the exception.
+and None is returned — without propagating the exception; the panel starts
+regardless, telemetry endpoints degrade to 503.
 """
 
 from __future__ import annotations
@@ -12,13 +15,13 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.cli.commands.panel import _try_build_telemetry
+from dadaia_workspace import container
 
 
 def _patch_imports_ok(monkeypatch: pytest.MonkeyPatch, raise_exc: Exception) -> None:
-    """Patch the interior of _try_build_telemetry to raise *raise_exc* after imports."""
+    """Patch the interior of build_telemetry_service to raise *raise_exc* after imports."""
     monkeypatch.setattr(
-        "dadaia_workspace.cli.commands.panel.container.build_spec_context_service",
+        "dadaia_workspace.container.build_spec_context_service",
         lambda *_: (_ for _ in ()).throw(raise_exc),
     )
 
@@ -43,7 +46,7 @@ def _make_platform_security_error() -> Exception:
         (_make_platform_security_error(), "platform security"),
     ],
 )
-def test_try_build_telemetry_returns_none_on_expected_exceptions(
+def test_build_telemetry_service_returns_none_on_expected_exceptions(
     exc: Exception,
     fragment: str,
     tmp_path: Path,
@@ -53,8 +56,8 @@ def test_try_build_telemetry_returns_none_on_expected_exceptions(
     """Each expected exception type yields None + a warning log."""
     _patch_imports_ok(monkeypatch, exc)
 
-    with caplog.at_level(logging.WARNING, logger="dadaia_workspace.cli.commands.panel"):
-        result = _try_build_telemetry(tmp_path)
+    with caplog.at_level(logging.WARNING, logger="dadaia_workspace.container"):
+        result = container.build_telemetry_service(tmp_path)
 
     assert result is None
     assert any(fragment in record.message for record in caplog.records), (

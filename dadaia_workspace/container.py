@@ -1,6 +1,8 @@
 """Composition root — builds services with concrete infrastructure."""
 
+import logging
 import os
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -39,6 +41,7 @@ from dadaia_workspace.features.panel.views.agent_policy import (
 from dadaia_workspace.features.panel.views.api_academy import render_api_academy
 from dadaia_workspace.features.panel.views.api_agents import (
     render_api_agent_prompt,
+    render_api_agent_sessions,
     render_api_agents_canonical,
 )
 from dadaia_workspace.features.panel.views.api_contexts import render_api_contexts
@@ -79,6 +82,8 @@ from dadaia_workspace.infrastructure.process_ancestry_adapter import (
 from dadaia_workspace.infrastructure.process_probe_adapter import OsProcessProbe, build_pid_probe
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
+
+logger = logging.getLogger(__name__)
 
 
 def build_shutdown_handler() -> Any:
@@ -454,6 +459,76 @@ def run_certification(workspace_root: Path, *, keep: bool = False) -> "Certifica
     return certify(workspace_root, SubprocessCertificationProcess(), keep=keep)
 
 
+def build_telemetry_service(workspace_root: Path) -> object | None:
+    """Best-effort ``TelemetryService`` construction for the panel boot (K8).
+
+    Plain wiring — no nested class, no factory-of-factories. Returns ``None``
+    (never raises) when telemetry cannot be wired (root uid, permission/OS/
+    SQLite error) so the panel starts regardless; telemetry endpoints degrade
+    to 503 when this returns ``None``.
+    """
+    import sqlite3
+    from pathlib import Path as _Path
+
+    from dadaia_workspace.core.exceptions import PlatformSecurityError
+    from dadaia_workspace.features.telemetry import pricing as _pricing
+    from dadaia_workspace.features.telemetry.aggregator.queries import TelemetryAggregator
+    from dadaia_workspace.features.telemetry.reader.adapters import DEFAULT_READERS
+    from dadaia_workspace.features.telemetry.service import TelemetryService
+    from dadaia_workspace.features.telemetry.store import TelemetryStore
+
+    state_dir = _Path("~/.dadaia/state/telemetry").expanduser()
+    db_path = state_dir / "telemetry.sqlite"
+    store = TelemetryStore(db_path)
+
+    try:
+        state_dir.mkdir(parents=True, exist_ok=True)
+        # Materialise + migrate the store once at boot so the per-request
+        # read-only factory always has a database to open (mode=ro cannot
+        # create a file); this store instance is also what the service ingests
+        # into on each refresh.
+        store.open_write().migrate()
+        store.close()
+
+        spec_context = build_spec_context_service(workspace_root)
+        aggregator = TelemetryAggregator(
+            connection_factory=store.open_read,
+            spec_context_service=spec_context,
+            pricing_module=_pricing,
+            workspace_root=workspace_root,
+        )
+
+        return TelemetryService(
+            store,
+            DEFAULT_READERS,
+            time.monotonic,
+            aggregator=aggregator,
+            pricing_module=_pricing,
+            workspace_root=workspace_root,
+            state_dir=state_dir,
+            spec_context_service=spec_context,
+        )
+    except ImportError as exc:
+        logger.warning("Telemetry unavailable (missing dependency): %s", exc)
+        return None
+    except PermissionError as exc:
+        logger.warning("Telemetry unavailable (permission denied on telemetry state dir): %s", exc)
+        return None
+    except PlatformSecurityError as exc:
+        # Tier-2: telemetry dir permission restriction failed on this platform.
+        # The panel continues without telemetry (503 on telemetry endpoints).
+        logger.warning(
+            "Telemetry unavailable (platform security error restricting state dir): %s", exc
+        )
+        return None
+    except OSError as exc:
+        logger.warning("Telemetry unavailable (OS error initialising telemetry state): %s", exc)
+        return None
+    except sqlite3.OperationalError as exc:
+        logger.warning("Telemetry unavailable (SQLite database error): %s", exc)
+        return None
+
+
 def build_panel_service(
     workspace_root: Path,
     telemetry: object | None = None,
@@ -595,6 +670,7 @@ def build_panel_views(
         "api_report_unmark_important": unmark_report_important(service),
         "api_agents": render_api_agents_canonical(service),
         "api_agent_prompt": render_api_agent_prompt(service),
+        "api_agent_sessions": render_api_agent_sessions(service),
         # L1 agent model-governance control plane (v0.1.65 FR8 — T-65-11).
         "api_agent_model_policy": render_api_agent_model_policy(agent_policy_service),
         "api_agent_model_templates": render_api_agent_model_templates(agent_policy_service),
