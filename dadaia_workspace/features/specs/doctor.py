@@ -96,7 +96,9 @@ class SpecsDoctor:
         self.specs_dir = Path(specs_dir)
         self.public_dir: Path | None = Path(public_dir) if public_dir is not None else None
         # repo_root: when supplied, the constitution file-ref invariant (SPEC-DOC-028)
-        # resolves path-like references against it. None → that check is a no-op.
+        # resolves path-like references against it, and the pyproject-version-vs-
+        # release-id invariant (SPEC-DOC-045) reads pyproject.toml from it. None ->
+        # both checks are a no-op.
         self.repo_root: Path | None = Path(repo_root) if repo_root is not None else None
         # head_sha/parent_sha (v0.5.0 specs-canon closure): SPEC-DOC-044's plain-data
         # inputs, resolved once by the CLI. None -> that check is a no-op.
@@ -230,6 +232,11 @@ class SpecsDoctor:
         issues.extend(
             self._release.check_stale_verdicts(head_sha=self.head_sha, parent_sha=self.parent_sha)
         )  # SPEC-DOC-044
+        # bug release-shipped-without-a-pyproject-version-bump — pyproject.toml
+        # version must equal the release id at/after CLOSURE.
+        issues.extend(
+            self._release.check_pyproject_version_matches_release(self.repo_root)
+        )  # SPEC-DOC-045
         return issues
 
     def fix(self, issues: list[SpecsDoctorIssue] | None = None) -> list[SpecsDoctorIssue]:
