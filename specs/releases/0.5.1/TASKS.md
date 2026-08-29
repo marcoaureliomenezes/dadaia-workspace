@@ -94,7 +94,7 @@
   - commit: `BACKLOG.json`/`decisions.jsonl` alone (`dd-gitflow-default` §3a shape 2)
   - parallelism: none
 
-- [ ] **T-051-06** — `alpha-1` QA close · owner: qa-engineer · write set: `specs/releases/0.5.1/RELEASE.json` (`segment`, one `log` entry), the segment's task markers · acceptance: A-0.2, A-0.5, A-0.6 for T-051-01/03/04/05
+- [x] **T-051-06** — `alpha-1` QA close · owner: qa-engineer · write set: `specs/releases/0.5.1/RELEASE.json` (`segment`, one `log` entry), the segment's task markers · acceptance: A-0.2, A-0.5, A-0.6 for T-051-01/03/04/05
   - verdict records: decider counts before→after · the `file:line` coverage map for every deleted test file · pyramid shape · bug-surface delta per touched feature with bug-history evidence
   - deletes: none
   - parallelism: none — closes the segment
@@ -152,7 +152,7 @@
   - preconditions: T-051-10 `[x]`
   - parallelism: parallel with T-051-11, T-051-12
 
-- [ ] **T-051-14** — `alpha-3` QA close · owner: qa-engineer · write set: `specs/releases/0.5.1/RELEASE.json`, the segment's task markers · acceptance: A-0.1, A-0.2, A-0.4, A-0.5, A-0.6 for T-051-11/12/13
+- [x] **T-051-14** — `alpha-3` QA close · owner: qa-engineer · write set: `specs/releases/0.5.1/RELEASE.json`, the segment's task markers · acceptance: A-0.1, A-0.2, A-0.4, A-0.5, A-0.6 for T-051-11/12/13
   - verdict records: `public doctor` 0 drift · `specs doctor` on a fresh scaffold · the property test's evidence · deletion coverage map · bug-surface delta
   - parallelism: none — closes the segment
 

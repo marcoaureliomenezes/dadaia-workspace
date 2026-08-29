@@ -22,6 +22,25 @@
       "agent": "product-engineer",
       "kind": "defined",
       "text": "Definition promotion commit 61a689a7; grill handoff claude-code-0.5.1-grill; backlog entry consumed in the same commit."
+    },
+    {
+      "ts": "2026-08-29T19:06:25Z",
+      "agent": "qa-engineer",
+      "kind": "qa-close",
+      "text": "alpha-1: APPROVE — T-051-01/03/04/05 committed 18c6edc9/957080a8/fbaf813d/ea637c05/73bc0347: CONTEXT.md landed first; core.invocation is the sole context/session/root authority (container.py, cli/_specs_resolution.py are documented thin delegators, lint-imports contract 'only cli._specs_resolution, container and hooks may import core.invocation' KEPT); 8 context ladders/3 sid ladders/4 staleness predicates collapsed to 1 each; bug sdd-gate-memory-phase-resolves-empty-when-cwd-is-a-linked-worktree-outside-repos fixed with RED case in test_invocation.py; K9 deletion half -266 prod LOC (container.py dead lifecycle + features/repos + openpyxl gone); ADR P-01/P-08/P-09 proposed (never accepted by an agent). Gate green (ruff/mypy --strict/lint-imports 9 contracts kept), 2516 unit+contract passed + 2 legit Windows-only skips, 251 integration passed + 1 legit env-limit skip, specs doctor 0 errors (2 pre-existing out-of-scope warnings), public doctor 0 drift. Bug surface: REDUCED — 1 picked bug closed with lineage, deciders 8->1/3->1/4->1 measured by rg, no new decider added."
+    },
+    {
+      "ts": "2026-08-29T19:06:25Z",
+      "agent": "qa-engineer",
+      "kind": "qa-close",
+      "text": "alpha-2: REQUEST_CHANGES — T-051-07 (K2, af27c9f8) and T-051-08 (K7, 73e9eae0) are sound: presence.gc is the sole reaper (sdd_post_gate/doctor/ctx_inject all delegate, confirmed by rg), ignore-edge cap moved 18->14 in 5b79d255 (better than the 15 target), chokepoints split into branch_policy/pre_commit/push_gate/verdict. But T-051-09 (K5, cbacc99b) is BLOCKED: software-architect handoff 2026-08-29T120000Z-software-architect-0.5.1-k5-net-positive-review.handoff.json ruled REJECTED/REQUEST_CHANGES on the net +383 LOC (DADAIA.md 7.3 net-positive route) with 3 HIGH findings still unaddressed at HEAD 4ffc06b3 (no commit since cbacc99b touches core/models/bugs.py or doctor_governance.py; cli/commands/specs.py:229 still never wires bug_store_factory, confirmed by rg): D1 the doctor's executed path still reads BUGS.jsonl through its own second parser (_default_iter_bug_records) despite the module docstring's 'one store' claim; D6 the 'status unreachable without its fields' invariant is enforced only in the CLI, not the model/service, so a bare status write still reaches a terminal state; D11 the projected dd-bug-resolution SKILL.md and the sdd-bug-backlog-governance.md memory atom still instruct the --set status=resolved verb K5 now refuses. Segment stays open pending the D1-D9 rework and a re-review; also noting sdd_post_gate.py measures 283 LOC against A-2.1's declared <=60 LOC (pre-existing FR-W1-03 reconciler logic co-resident in the file, not itself a new duplicate decider, but the SPEC estimate is unmet). Bug surface: MIXED per the architect's own axis — REDUCED on bug-status completeness (4 deciders->1, 3 bugs closed, doctor warnings 494->3) and on GC/verdict-store consolidation; NOT reduced on the ledger-parser axis (still 2 parsers in the executed path, the exact recurring class of specs-doctor-bug-lane-splits-ledger-on-unicode-line-separators) and INCREASED by a CLI-only status guard and a third privacy-scan copy stricter than the push law."
+    },
+    {
+      "ts": "2026-08-29T19:06:25Z",
+      "agent": "qa-engineer",
+      "kind": "qa-close",
+      "text": "alpha-3: APPROVE — T-051-11/12/13 committed 5e0719af/055cfa50/4ffc06b3: features/handoff.HandoffIndex is the sole handoff reader (core/handoff_index.py implementation, every consumer — verdict.py, doctor_release.py, api_reports.py — calls discover_handoff_paths/Handoff.load/scan_handoffs, confirmed by rg, 10->1); features/specs/canon.py holds the one CANON table (3->1); ProjectionRule table + 3-adapter HarnessProjection seam landed in 4ffc06b3. Gate green (ruff/mypy --strict/lint-imports), 2516 unit+contract passed + 2 legit skips, 251 integration passed + 1 legit skip, specs doctor 0 errors (2 pre-existing warnings out of this release's scope: SPECS-VERSION and the 20260827 audit dir naming), public doctor: [ok] public-privacy, 0 drift across every claude/codex/kimi-code/dadaia/law asset. Production LOC over the alpha-3 commit range is net -488 (A-0.1: -24, 0, -464). Test deletion evidence: 5e0719af deletes test_handoff_models.py/test_reports_validation_service.py/test_stdlib_handoff_validator.py (575 LOC) replaced by HandoffIndex tests; 4ffc06b3 deletes test_public_assets_kimi/profile/render.py (1010 LOC) replaced by the rule-set-per-profile table test + golden renders; no skip/xfail/quarantine used to go green. Bug surface: REDUCED — reports-validate-resolves-self-pull-refs-against-the-checked-out-branch-not-the-reviewed-tree fixed in T-051-13 with RED case against the reviewed tree; the R7 releases/AGENTS.md law drift (RELEASE.jsonl/reviews/ wording) corrected at the source and re-projected."
     }
-  ]
+  ],
+  "segment": "alpha-3"
 }

@@ -222,7 +222,6 @@ _FORBIDDEN_HOOK_ENV: Final[tuple[str, ...]] = (
 #: ``_common`` is intentionally absent — it is a shared-primitives library (pure helpers
 #: like ``sanitize_session_id``), not a hook entrypoint, so unit-testing it directly is
 #: legitimate. The behavior-import contract test uses this same list.
-_CHECKOUT_ROOT = Path(__file__).resolve().parents[2]
 
 HOOK_MODULES: Final[frozenset[str]] = frozenset(
     {"sdd_gate", "sdd_post_gate", "ctx_inject", "root_whitelist", "pre_gate"}
@@ -466,10 +465,8 @@ def run_hook_subprocess(
     else:
         cmd = [sys.executable, "-m", f"dadaia_workspace.hooks.{hook_module}"]
     effective_cwd = cwd if cwd is not None else env.get("WORKSPACE_ROOT")
-    # The hook subprocess must import THIS checkout, whatever the venv's install mode —
-    # a non-editable install silently ran stale code here (bug
-    # hook-subprocess-tests-import-the-installed-package-not-the-checkout).
-    env = {**env, "PYTHONPATH": str(_CHECKOUT_ROOT)}
+    # PYTHONPATH pins the checkout for every test subprocess — one rule in tests/conftest.py.
+    env = {**env, "PYTHONPATH": os.environ.get("PYTHONPATH", "")}
     proc = subprocess.run(
         cmd,
         input=json.dumps(payload),
