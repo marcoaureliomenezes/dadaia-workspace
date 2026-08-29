@@ -94,7 +94,7 @@ def test_tunables_are_pure_constants_with_no_io_imports() -> None:
 @pytest.mark.parametrize(
     ("module", "name"),
     [
-        ("dadaia_workspace.hooks.ctx_inject", "SENTINEL_GC_TTL_SECONDS"),
+        ("dadaia_workspace.features.spec_context.presence", "SENTINEL_GC_TTL_SECONDS"),
         ("dadaia_workspace.features.spec_context.presence", "PRESENCE_TTL_SECONDS"),
     ],
 )

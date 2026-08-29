@@ -1,36 +1,25 @@
-"""T-011-14 / FR-W4-03 / AC-W4-03 — ctx-inject catalog tldr-digest + sentinel GC.
+"""T-011-14 / FR-W4-03 / AC-W4-03 — ctx-inject catalog tldr-digest.
 
-Two residual-R6 behaviors are pinned here, driven through the harness-real subprocess
-runner (never an in-process ``main()`` + ``sys.stdin`` simulation — banned by the
-harness-env contract):
+**tldr-digest of the injected catalog.** ``ctx_inject`` must inject a digest of
+``catalog.json`` that keeps ``slug``/``title``/``tldr``/``path`` and drops the heavy
+``summary`` field plus ``rank`` (F-77, v0.1.48: rank is alphabetical file order, not
+priority — it must not reach the session digest). The catalog ON DISK must stay
+byte-identical (self-pull depth intact). The injected payload must be measurably
+smaller than injecting the raw catalog; the before/after byte sizes are asserted here
+and recorded for CLOSURE. Driven through the harness-real subprocess runner (never an
+in-process ``main()`` + ``sys.stdin`` simulation — banned by the harness-env contract).
 
-1. **tldr-digest of the injected catalog.** ``ctx_inject`` must inject a digest of
-   ``catalog.json`` that keeps ``slug``/``title``/``tldr``/``path`` and drops the heavy
-   ``summary`` field plus ``rank`` (F-77, v0.1.48: rank is alphabetical file order, not
-   priority — it must not reach the session digest). The catalog ON DISK must stay
-   byte-identical (self-pull depth intact). The injected payload must be measurably
-   smaller than injecting the raw catalog; the before/after byte sizes are asserted
-   here and recorded for CLOSURE.
-
-2. **Stale once-per-session sentinel GC, pinned to INJECT TIME.** The home for the sweep is
-   inside ``ctx_inject`` itself (NOT ``spec_context/doctor.py`` — avoids the doctor
-   write-set overlap; the conditional in the task write set resolves to the inject-time
-   leg). An aged sentinel (mtime older than the GC TTL) is removed when the hook fires; a
-   fresh sentinel from a different session is left untouched. GC must keep the
-   fresh-foreign-sentinel-preserved row — deleting another live session's sentinel would
-   re-inject its context.
+Sentinel GC used to be pinned to inject time here (T-011-14); release 0.5.1 K2 retired
+that leg — sentinels are now reaped by the ONE reaper,
+``features.spec_context.presence.gc``, tested in ``tests/unit/features/spec_context/
+test_presence_gc.py``.
 """
 
 from __future__ import annotations
 
 import json
-import os
-import time
 from pathlib import Path
 
-import pytest
-
-from dadaia_workspace.hooks import ctx_inject
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
 # A realistic catalog fragment: each feature carries the heavy ``summary`` plus the lean
@@ -173,63 +162,3 @@ def test_index_md_fallback_emitted_verbatim_when_no_catalog(tmp_path: Path) -> N
     out = _run(tmp_path, "idx1")
     assert "product index" in out
     assert "feature A" in out
-
-
-# --- Sentinel GC (pinned to inject time) -------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    ("name", "sentinel_name", "seed_fn", "should_survive"),
-    [
-        (
-            # PIN: the GC home is the inject-time sweep inside ctx_inject, not doctor. An
-            # aged sentinel (mtime older than the GC TTL) is removed when the hook fires.
-            "aged_sentinel_swept",
-            "ctx-inject-fired-deadsession",
-            lambda p: os.utime(
-                p,
-                (
-                    time.time() - (ctx_inject._SENTINEL_GC_TTL_SECONDS + 3600),
-                    time.time() - (ctx_inject._SENTINEL_GC_TTL_SECONDS + 3600),
-                ),
-            ),
-            False,
-        ),
-        (
-            # A fresh sentinel from another live session must NOT be swept (mtime = now,
-            # well within TTL). Deleting a live foreign session's sentinel would
-            # re-inject its context.
-            "fresh_foreign_sentinel_preserved",
-            "ctx-inject-fired-otherlive",
-            None,
-            True,
-        ),
-        (
-            # The sweep must only target ctx-inject sentinels, never other tmp files.
-            "gc_ignores_non_sentinel_tmp_files",
-            "some-other-artifact.json",
-            lambda p: os.utime(
-                p,
-                (
-                    time.time() - (ctx_inject._SENTINEL_GC_TTL_SECONDS + 3600),
-                    time.time() - (ctx_inject._SENTINEL_GC_TTL_SECONDS + 3600),
-                ),
-            ),
-            True,
-        ),
-    ],
-)
-def test_sentinel_gc_table(
-    tmp_path: Path, name: str, sentinel_name: str, seed_fn: object, should_survive: bool
-) -> None:
-    _ws_with_catalog(tmp_path)
-    tmp_dir = tmp_path / ".dadaia" / "tmp"
-    tmp_dir.mkdir(parents=True, exist_ok=True)
-    target = tmp_dir / sentinel_name
-    target.touch()
-    if seed_fn is not None:
-        seed_fn(target)  # type: ignore[operator]
-
-    _run(tmp_path, f"live-{name}")
-
-    assert target.exists() == should_survive

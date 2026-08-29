@@ -259,44 +259,9 @@ def test_clear_never_touches_foreign_records(tmp_path: Path) -> None:
 
 
 # --------------------------------------------------------------------------- #
-# sweep — workspace-wide GC of stale records (doctor path).
-# --------------------------------------------------------------------------- #
-
-
-def test_sweep_removes_stale_records_workspace_wide(tmp_path: Path) -> None:
-    presence.upsert(tmp_path, _CTX, "sess-fresh", runtime="claude", pid=1)
-    _write_raw_presence(
-        tmp_path,
-        _CTX,
-        "sess-stale-a",
-        heartbeat_age_s=kernel_tunables.PRESENCE_TTL_SECONDS + 100,
-    )
-    _write_raw_presence(
-        tmp_path,
-        "other-ctx",
-        "sess-stale-b",
-        heartbeat_age_s=kernel_tunables.PRESENCE_TTL_SECONDS + 100,
-    )
-    removed = presence.sweep(tmp_path)
-    assert set(removed) == {"sess-stale-a", "sess-stale-b"}
-    assert _presence_path(tmp_path, _CTX, "sess-fresh").exists()
-    assert not _presence_path(tmp_path, _CTX, "sess-stale-a").exists()
-    assert not _presence_path(tmp_path, "other-ctx", "sess-stale-b").exists()
-
-
-def test_sweep_removes_corrupt_records(tmp_path: Path) -> None:
-    _write_raw_presence(tmp_path, _CTX, "sess-corrupt", corrupt=True)
-    removed = presence.sweep(tmp_path)
-    assert "sess-corrupt" in removed
-    assert not _presence_path(tmp_path, _CTX, "sess-corrupt").exists()
-
-
-def test_sweep_never_raises_on_missing_presence_root(tmp_path: Path) -> None:
-    assert presence.sweep(tmp_path) == []
-
-
-# --------------------------------------------------------------------------- #
-# stale_records — pure read-only companion to sweep (v0.1.76 T-4, doctor --check).
+# stale_records — pure read-only report (release 0.5.1 K2: presence-record
+# RECLAMATION moved to presence.gc(), tested in test_presence_gc.py; stale_records()
+# stays as the read-only helper `cli.commands.doctor`'s ``--redact`` uses).
 # --------------------------------------------------------------------------- #
 
 
@@ -321,24 +286,3 @@ def test_stale_records_includes_corrupt_records(tmp_path: Path) -> None:
 
 def test_stale_records_never_raises_on_missing_presence_root(tmp_path: Path) -> None:
     assert presence.stale_records(tmp_path) == []
-
-
-def test_stale_records_and_sweep_agree(tmp_path: Path) -> None:
-    """sweep() must remove EXACTLY what stale_records() reports — single source of truth."""
-    presence.upsert(tmp_path, _CTX, "sess-fresh", runtime="claude", pid=1)
-    _write_raw_presence(
-        tmp_path,
-        _CTX,
-        "sess-stale-a",
-        heartbeat_age_s=kernel_tunables.PRESENCE_TTL_SECONDS + 100,
-    )
-    _write_raw_presence(
-        tmp_path,
-        "other-ctx",
-        "sess-stale-b",
-        heartbeat_age_s=kernel_tunables.PRESENCE_TTL_SECONDS + 100,
-    )
-    reported = {(r.context, r.session_id) for r in presence.stale_records(tmp_path)}
-    removed = set(presence.sweep(tmp_path))
-    assert reported == {(_CTX, "sess-stale-a"), ("other-ctx", "sess-stale-b")}
-    assert removed == {"sess-stale-a", "sess-stale-b"}
