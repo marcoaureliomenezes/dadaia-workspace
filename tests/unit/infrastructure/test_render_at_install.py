@@ -219,3 +219,27 @@ def test_force_rerenders_diverged_claude_projection_to_render_output(
     after = dst.read_text(encoding="utf-8")
     assert after == expected, "--force must restore the RENDER output"
     assert after != _GENERIC_BODY, "--force must never re-copy raw staged bytes"
+
+
+def test_install_rules_rewrites_a_read_only_projection(tmp_path: Path) -> None:
+    """Windows CI at 4ffc06b3: os.replace onto a 0o444 law file raised PermissionError.
+    A changed read-only projection is made writable, rewritten, and re-pinned."""
+    from dadaia_workspace.infrastructure.projection import ProjectionRule, install_rules
+
+    dst = tmp_path / "DADAIA.md"
+    dst.write_bytes(b"old")
+    dst.chmod(0o444)
+    rule = ProjectionRule(
+        label="law",
+        harness="claude",
+        dst=dst,
+        render=lambda _current: b"new",
+        compare="bytes",
+        mode=0o444,
+    )
+
+    transcript = install_rules([rule], force=False)
+
+    assert dst.read_bytes() == b"new"
+    assert [line.status for line in transcript.lines] == ["ok"]
+    assert (dst.stat().st_mode & 0o777) == 0o444

@@ -124,6 +124,10 @@ def install_rules(rules: Sequence[ProjectionRule], *, force: bool) -> Transcript
         desired = rule.render(current)
         if current is None or current != desired or force:
             rule.dst.parent.mkdir(parents=True, exist_ok=True)
+            if current is not None:
+                # A read-only projection (law files are 0o444) must become writable
+                # before os.replace — Windows refuses to replace a read-only target.
+                _apply_mode(rule.dst, 0o644)
             atomic_write(rule.dst, desired)
             lines.append(TranscriptLine("ok", rule.dst))
         else:

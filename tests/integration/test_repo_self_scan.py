@@ -197,7 +197,6 @@ _TESTS_SCOPE_BASELINE: tuple[tuple[str, str], ...] = (
     ("tests/integration/test_git_subprocess.py", "email-address"),
     ("tests/integration/test_public_assets.py", "ipv4-literal"),
     ("tests/integration/test_telemetry_end_to_end_aggregation.py", "home-abs-path"),
-    ("tests/unit/features/migrate/test_bugs_jsonl.py", "home-abs-path"),
     ("tests/unit/features/panel/test_no_auth_contract.py", "ipv4-literal"),
     ("tests/unit/features/server_registry/test_scan.py", "ipv4-literal"),
     ("tests/unit/features/telemetry/test_allowlist.py", "home-abs-path"),
