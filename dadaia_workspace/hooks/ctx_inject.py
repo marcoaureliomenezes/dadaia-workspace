@@ -68,11 +68,10 @@ import contextlib
 import json
 import os
 import sys
-import time
 from datetime import datetime
 from pathlib import Path
 
-from dadaia_workspace.core import invocation, kernel_tunables, session_store
+from dadaia_workspace.core import invocation, session_store
 from dadaia_workspace.hooks import _common
 
 #: Lean fields kept in the INJECTED catalog digest. The heavy ``summary`` is dropped from
@@ -91,14 +90,6 @@ _SENTINEL_PREFIX = "ctx-inject-fired-"
 #: stamped by the PostCompact hook event (v0.2.8, kimi-code) and consumed by the
 #: repeat-prompt guards as a re-injection trigger (mtime > sentinel mtime).
 _COMPACT_PREFIX = "ctx-compact-"
-
-#: Age (seconds) after which a once-per-session sentinel is considered stale and GC'd at
-#: inject time. Generous (24 h) so a long-running live session is never disturbed; a
-#: session older than this would at worst re-inject the bootstrap once. The sweep home is
-#: pinned HERE (inject time), not in ``spec_context/doctor.py`` — avoids the doctor
-#: write-set overlap (T-011-14 write set: the doctor leg is conditional and unused).
-#: DP-1 (v0.1.14): the value is sourced from ``core.kernel_tunables`` (single tunables home).
-_SENTINEL_GC_TTL_SECONDS = kernel_tunables.SENTINEL_GC_TTL_SECONDS
 
 
 def _alive_context_names(workspace: Path) -> list[str]:
@@ -266,27 +257,6 @@ def _build_memory(specs_dir: Path) -> str:
     return "\n".join(parts)
 
 
-def _gc_stale_sentinels(tmp_dir: Path, *, now: float | None = None) -> None:
-    """Sweep aged once-per-session sentinel/marker files at inject time (fail-open).
-
-    A sentinel (``ctx-inject-fired-*``) or compact marker (``ctx-compact-*``) whose mtime
-    is older than :data:`_SENTINEL_GC_TTL_SECONDS` is removed; fresh files (other live
-    sessions) and unrelated tmp files are left untouched. Any OS error during the scan is
-    suppressed — GC is best-effort housekeeping and must never break the bootstrap.
-    """
-    cutoff = (now if now is not None else time.time()) - _SENTINEL_GC_TTL_SECONDS
-    try:
-        entries = list(tmp_dir.iterdir())
-    except OSError:
-        return
-    for entry in entries:
-        if not entry.name.startswith((_SENTINEL_PREFIX, _COMPACT_PREFIX)):
-            continue
-        with contextlib.suppress(OSError):
-            if entry.is_file() and entry.stat().st_mtime < cutoff:
-                entry.unlink()
-
-
 #: Sentinel-content prefix recording the last injected context slug. A sentinel whose
 #: content is ``ctx=<slug>`` already injected that slug's memory; an empty/legacy sentinel
 #: (no prefix) is treated as the generic-preflight state (no slug injected yet).
@@ -368,8 +338,9 @@ def main() -> int:
     session_id = _common.resolve_session_id(payload, default="workspace")
 
     # Sentinel — path BYTE-IDENTICAL to the shell sentinel: .dadaia/tmp/ctx-inject-fired-<id>.
-    # Its content now records the last injected slug so a re-bind is detectable. Inject-time
-    # GC of stale sentinels runs first so leftover sentinels are reaped on every fire.
+    # Its content now records the last injected slug so a re-bind is detectable. Sentinel
+    # GC (release 0.5.1 K2) is no longer inject-time: it is owned by presence.gc(), called
+    # by the PostToolUse reconciler on its own throttle cadence and by doctor --fix.
     tmp_dir = workspace / ".dadaia" / "tmp"
 
     # PostCompact (v0.2.8, kimi-code): stamp the compact-epoch marker, then RE-EMIT the
@@ -427,7 +398,6 @@ def main() -> int:
         return 0
 
     sentinel = tmp_dir / f"{_SENTINEL_PREFIX}{session_id}"
-    _gc_stale_sentinels(tmp_dir)
     sentinel_mtime, recorded_slug = _read_sentinel(sentinel)
     sentinel_exists = sentinel_mtime is not None
 

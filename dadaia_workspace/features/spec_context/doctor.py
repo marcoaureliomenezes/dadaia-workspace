@@ -274,18 +274,14 @@ class DoctorService:
         ]
 
     # ------------------------------------------------------------------
-    # PRESENCE-GC: stale/corrupt advisory presence-record GC (v0.1.76 T-4, FR7)
+    # PRESENCE-GC: stale/corrupt advisory presence-record REPORT (v0.1.76 T-4, FR7).
+    # Read-only — the ONLY reclamation authority is presence.gc() (release 0.5.1 K2),
+    # called by fix() below. check() reuses the SAME read-only predicate
+    # (presence.stale_records()) so it can never disagree with what --fix reclaims.
     # ------------------------------------------------------------------
 
     def _check_presence_gc(self) -> list[DoctorIssue]:
-        """PRESENCE-GC: report stale/corrupt advisory presence records (FR7).
-
-        ``features/spec_context/presence.py`` (``.dadaia/states/presence/<ctx>/<sid>.json``)
-        is the only concurrency signal. Presence is advisory-only, so every reported record is
-        always ``fixable``: ``--fix`` sweeps them via ``presence.sweep()``, the same
-        predicate ``presence.stale_records()`` reports (single source of truth — check()
-        and --fix can never disagree).
-        """
+        """PRESENCE-GC: report stale/corrupt advisory presence records (FR7)."""
         issues: list[DoctorIssue] = []
         for ref in presence.stale_records(self._workspace_root):
             issues.append(
@@ -494,7 +490,7 @@ class DoctorService:
 
         issues.extend(self._check_retired_lock_state())
 
-        # ---- Stale/corrupt advisory presence-record GC (v0.1.76 T-4, FR7) ----
+        # ---- Stale/corrupt advisory presence-record REPORT (v0.1.76 T-4, FR7) ----
         issues.extend(self._check_presence_gc())
 
         # ---- Venv health (FR-W3-02, T-014-13) ----
@@ -535,11 +531,16 @@ class DoctorService:
             shutil.rmtree(pointer_dir)
             actions.append("RETIRED-LOCK-STATE: removed .dadaia/sessions/runtime")
 
-        # PRESENCE-GC (v0.1.76 T-4, FR7): sweep stale/corrupt advisory presence records.
-        # presence.sweep() deletes exactly what presence.stale_records() (check()) reports —
-        # single source of truth, so --fix can never disagree with what check() flagged.
-        for sess_id in presence.sweep(self._workspace_root):
-            actions.append(f"PRESENCE-GC: deleted stale presence record for session '{sess_id}'")
+        # PRESENCE-GC (release 0.5.1 K2): presence.gc() is the ONE reaper of stale
+        # presence records, throttle/sentinel markers, and now-empty presence context
+        # dirs. Doctor has no "own" session to exclude, so nothing is exempted.
+        gc_report = presence.gc(self._workspace_root, now=datetime.now(tz=UTC), own_session_id="")
+        for key in gc_report.presence:
+            actions.append(f"PRESENCE-GC: deleted stale presence record '{key}'")
+        for name in gc_report.markers:
+            actions.append(f"PRESENCE-GC: deleted stale marker '{name}'")
+        for name in gc_report.empty_context_dirs:
+            actions.append(f"PRESENCE-GC: removed empty presence context dir '{name}'")
 
         # Graveyard GC: delete TTL-expired session files from .dadaia/sessions/
         sessions_dir = self._sessions_dir()

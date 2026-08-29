@@ -118,61 +118,23 @@ def _is_read_mode(mode: str) -> bool:
     return mode.strip().upper() in _READ_MODES
 
 
-def _advisory_throttle_path(workspace: Path, session_id: str, ctx: str) -> Path | None:
-    # Defense-in-depth mirror of presence._valid_name: hook callers already sanitize both
-    # components, but a direct-API caller must not be able to place the marker outside
-    # .dadaia/tmp/ via a traversal-shaped session_id/ctx.
-    if not (presence._valid_name(session_id) and presence._valid_name(ctx)):
-        return None
-    return workspace / ".dadaia" / "tmp" / f"presence-warn-{session_id}-{ctx}"
-
-
-def _advisory_throttled(workspace: Path, session_id: str, ctx: str, *, now: float) -> bool:
-    """True iff an advisory for this (session, ctx) fired within the throttle window."""
-    marker = _advisory_throttle_path(workspace, session_id, ctx)
-    if marker is None:
-        return False
-    try:
-        last = marker.stat().st_mtime
-    except OSError:
-        return False
-    return (now - last) < _ADVISORY_THROTTLE_SECONDS
-
-
-def _stamp_advisory_throttle(workspace: Path, session_id: str, ctx: str) -> None:
-    """Record that an advisory fired now (best-effort; must never raise)."""
-    marker = _advisory_throttle_path(workspace, session_id, ctx)
-    if marker is None:
-        return
-    try:
-        marker.parent.mkdir(parents=True, exist_ok=True)
-        marker.write_text(datetime.now(tz=UTC).isoformat(), encoding="utf-8")
-    except OSError:
-        return
-
-
-def _heartbeat_age_seconds(last_seen_at: str, *, now: datetime) -> float | None:
-    try:
-        seen = datetime.fromisoformat(last_seen_at.replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    if seen.tzinfo is None:
-        seen = seen.replace(tzinfo=UTC)
-    return (now - seen).total_seconds()
+def _advisory_marker_name(session_id: str, ctx: str) -> str:
+    """The advisory throttle marker's filename — validated by :func:`presence.throttled`/
+    :func:`presence.stamp_throttle` themselves (release 0.5.1 K2: the ONE
+    mtime-throttle-marker idiom, replacing this module's own copy)."""
+    return f"presence-warn-{session_id}-{ctx}"
 
 
 def _advisory_message(ctx: str, rel_path: str, others: list[presence.PresenceRecord]) -> str:
     """Build the one-line advisory naming every other live session (FR1).
 
-    Names each other session's id, runtime, and heartbeat age; states plainly that the
-    write was ALLOWED — this is a signal, never a block.
+    Names each other session's id, runtime, and last-seen timestamp; states plainly that
+    the write was ALLOWED — this is a signal, never a block.
     """
-    now = _utcnow()
-    parts = []
-    for rec in others:
-        age = _heartbeat_age_seconds(rec.last_seen_at, now=now)
-        age_txt = f"{int(age)}s ago" if age is not None else "unknown"
-        parts.append(f"{rec.session_id!r} (runtime={rec.runtime}, last seen {age_txt})")
+    parts = [
+        f"{rec.session_id!r} (runtime={rec.runtime}, last seen at {rec.last_seen_at or 'unknown'})"
+        for rec in others
+    ]
     names = "; ".join(parts)
     return (
         f"[PRESENCE] '{rel_path}' write ALLOWED in context {ctx!r}. Other live session(s) "
@@ -353,8 +315,12 @@ def evaluate(
         if session_id and session_id != _ANON_SESSION_ID and ctx:
             presence.upsert(workspace, ctx, session_id, runtime=runtime, pid=pid or 0)
             others = presence.others_alive(workspace, ctx, session_id)
-            if others and not _advisory_throttled(workspace, session_id, ctx, now=time.time()):
-                _stamp_advisory_throttle(workspace, session_id, ctx)
+            marker = _advisory_marker_name(session_id, ctx)
+            now = time.time()
+            if others and not presence.throttled(
+                workspace, marker, window_seconds=_ADVISORY_THROTTLE_SECONDS, now=now
+            ):
+                presence.stamp_throttle(workspace, marker)
                 message = _advisory_message(ctx, rel_path, others)
                 return Decision.ALLOW, message
     except Exception:  # noqa: BLE001 — fail-safe contract (AC-04): never fail-dead.

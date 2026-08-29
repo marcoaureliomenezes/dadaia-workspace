@@ -15,7 +15,6 @@ from __future__ import annotations
 __all__ = [
     "LOG_ROTATION_MAX_BYTES",
     "PRESENCE_TTL_SECONDS",
-    "RECONCILER_REAP_TTL_MULTIPLIER",
     "RECONCILER_THROTTLE_TTL_SECONDS",
     "SENTINEL_GC_TTL_SECONDS",
     "SESSION_GC_TTL_SECONDS",
@@ -37,17 +36,10 @@ SESSION_GC_TTL_SECONDS: int = 300
 
 #: Throttle window (seconds) for the advisory working-tree reconciler (FR-W1-03). A second
 #: PostToolUse invocation inside this window emits nothing and spawns no git child — checked
-#: BEFORE any subprocess is spawned. Consumed by ``hooks/sdd_post_gate.py`` (TG-5).
+#: BEFORE any subprocess is spawned. Consumed by ``hooks/sdd_post_gate.py`` (TG-5) and, on
+#: the same cadence, gates the ONE GC reaper's call (release 0.5.1 K2:
+#: ``features.spec_context.presence.gc``).
 RECONCILER_THROTTLE_TTL_SECONDS: int = 30
-
-#: Multiplier applied to the base session/presence TTL when the ADVISORY reconciler (not
-#: the manually-invoked ``dadaia doctor --fix`` graveyard GC, which reaps at exactly 1×TTL)
-#: reaps a stale record on its own throttled cadence (FR26, T-043-41). The reconciler fires
-#: on every PostToolUse call — far more often than an operator runs the doctor — so its own
-#: reap threshold is deliberately N times more conservative: a session/presence record must
-#: be stale N times over before the reconciler ever deletes it unattended, so a merely idle
-#: (but still bound, still heartbeating) session is never at risk of being auto-reaped.
-RECONCILER_REAP_TTL_MULTIPLIER: int = 3
 
 #: FR27 (T-043-42): the "~1 MB" cap every ``.dadaia/logs/*.jsonl`` appender rotates at
 #: (decimal MB, matching the SPEC's own wording). Not a timing constant like its

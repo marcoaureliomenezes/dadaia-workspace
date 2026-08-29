@@ -247,24 +247,23 @@ def test_anon_session_write_allowed_but_creates_no_presence_record(tmp_path: Pat
 
 
 def test_throttle_marker_rejects_traversal_shaped_identity_components(tmp_path: Path) -> None:
-    """Direct-API defense-in-depth (v0.1.76 security-review LOW): a traversal-shaped
-    ``session_id``/``ctx`` must never place the advisory throttle marker outside
-    ``.dadaia/tmp/`` — the helpers reject invalid name components outright (hook callers
-    already sanitize; this pins the module's own guard)."""
-    from dadaia_workspace.features.spec_context import gate_policy
+    """Direct-API defense-in-depth (v0.1.76 security-review LOW, carried into release
+    0.5.1 K2's ONE throttle-marker idiom): a traversal-shaped composite marker name
+    (built from a hostile ``session_id``/``ctx``) must never place the advisory throttle
+    marker outside ``.dadaia/tmp/`` — :func:`presence.throttled`/:func:`presence.
+    stamp_throttle` reject an invalid marker name outright (hook callers already
+    sanitize their components; this pins the module's own guard)."""
+    from dadaia_workspace.features.spec_context import presence
 
     ws = _mk_workspace(tmp_path, "dadaia-workspace")
     escape_probe = tmp_path / "escape-probe"
-    hostile = f"../../../{escape_probe.name}"
+    hostile_marker = f"presence-warn-../../../{escape_probe.name}-dadaia-workspace"
 
-    assert gate_policy._advisory_throttle_path(ws, hostile, "dadaia-workspace") is None
-    assert gate_policy._advisory_throttle_path(ws, "session-ok", hostile) is None
-
-    gate_policy._stamp_advisory_throttle(ws, hostile, "dadaia-workspace")
-    gate_policy._stamp_advisory_throttle(ws, "session-ok", hostile)
+    presence.stamp_throttle(ws, hostile_marker)
     assert not escape_probe.exists()
-    assert gate_policy._advisory_throttled(ws, hostile, "dadaia-workspace", now=0.0) is False
+    assert presence.throttled(ws, hostile_marker, window_seconds=300, now=0.0) is False
 
-    marker = gate_policy._advisory_throttle_path(ws, "session-ok", "dadaia-workspace")
-    assert marker is not None
+    presence.stamp_throttle(ws, "presence-warn-session-ok-dadaia-workspace")
+    marker = ws / ".dadaia" / "tmp" / "presence-warn-session-ok-dadaia-workspace"
+    assert marker.is_file()
     assert marker.parent == ws / ".dadaia" / "tmp"

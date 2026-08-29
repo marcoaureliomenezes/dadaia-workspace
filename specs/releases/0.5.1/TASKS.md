@@ -103,7 +103,7 @@
 
 ## `alpha-2` — what the sid unblocks, plus K5 (disjoint write sets, parallel)
 
-- [ ] **T-051-07** — K2: presence owns liveness and GC end-to-end · owner: software-engineer · write set: `dadaia_workspace/features/spec_context/{presence,doctor,gate_policy}.py`, `dadaia_workspace/hooks/sdd_post_gate.py`, `dadaia_workspace/hooks/ctx_inject.py`, `dadaia_workspace/features/tmp_gc/service.py`, `dadaia_workspace/core/record_liveness.py`, `tests/unit/features/spec_context/test_presence_gc.py` (new) + the four reaper test files · acceptance: A-2.1 … A-2.4, A-0.2 (4→1 GC authorities, 4→1 staleness predicates)
+- [x] **T-051-07** — K2: presence owns liveness and GC end-to-end · owner: software-engineer · write set: `dadaia_workspace/features/spec_context/{presence,doctor,gate_policy}.py`, `dadaia_workspace/hooks/sdd_post_gate.py`, `dadaia_workspace/hooks/ctx_inject.py`, `dadaia_workspace/features/tmp_gc/service.py`, `dadaia_workspace/core/record_liveness.py`, `tests/unit/features/spec_context/test_presence_gc.py` (new) + the four reaper test files · acceptance: A-2.1 … A-2.4, A-0.2 (4→1 GC authorities, 4→1 staleness predicates)
   - deletes: `sdd_post_gate.py:213-537` · `_reap_zombie_lifecycle_runs` (reaper for a demolished engine) · `gate_policy._heartbeat_age_seconds` · `tmp_gc/service._age_seconds` + its marker lane · one of two throttle-marker idioms — ~400 LOC; post-gate ≤ 60 LOC
   - tests: `test_post_gate_reap`, `test_doctor_presence_sweep`, `test_doctor_gc`, the `tmp_gc` marker tests → `test_presence_gc.py`, plus a case pinning that no reaper deletes a live session's own bind record
   - preconditions: T-051-06 `[x]` (needs `Invocation`'s sid)
