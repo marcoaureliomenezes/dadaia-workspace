@@ -196,11 +196,11 @@
       "scoped_agents_md": [],
       "hash_tuple": {
         "section": "sha256:709ba9f35227e8d3c31520eb9375ff2a856845db234e18c7f90102f11b809d97",
-        "skill": "sha256:68c1034387bbcee0e67abe1f4669fa8114389972cd08f5bcea9da017b7f95002",
+        "skill": "sha256:f62335bd7b10aaa68aab750c2cea10921170c9ff3626ec1126af13a57acdfca9",
         "scoped": []
       },
       "recorded_by": "ai-engineer",
-      "recorded_at": "2026-08-28"
+      "recorded_at": "2026-08-29"
     },
     {
       "section": "§6 Specs, tasks and memory",
@@ -322,11 +322,11 @@
       "scoped_agents_md": [],
       "hash_tuple": {
         "section": "sha256:f4ec3aa97bf457e84daf530f77a2355ec8347a73fe3428cca65cbeeb2eec356b",
-        "skill": "sha256:18115b3b12869b857286f758235b1b46ee370f1512b349f2cdd828f5acbd4903",
+        "skill": "sha256:926da9032a16d329a95a082d99df5909cdc17da110b1b8b8d7eeec6f047929a0",
         "scoped": []
       },
       "recorded_by": "ai-engineer",
-      "recorded_at": "2026-08-28"
+      "recorded_at": "2026-08-29"
     },
     {
       "section": "§7 Quality",
