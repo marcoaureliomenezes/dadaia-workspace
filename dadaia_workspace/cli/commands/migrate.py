@@ -31,12 +31,14 @@ app = typer.Typer(
 
 
 def _resolve_workspace_root() -> Path:
-    """Resolve the workspace root from cwd walking upwards."""
-    cwd = Path.cwd()
-    for parent in [cwd, *cwd.parents]:
-        if (parent / ".dadaia" / "states").exists():
-            return parent
-    return cwd
+    """The workspace root above cwd (core's one sentinel walk); cwd when uninitialized."""
+    from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
+    from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
+
+    try:
+        return resolve_workspace_root(Path.cwd())
+    except WorkspaceNotInitializedError:
+        return Path.cwd()
 
 
 def _resolve_specs_dir(specs_dir: str | None) -> Path:
