@@ -1,9 +1,9 @@
 """``BugService.transition`` — the ONE governance-write seam a status change goes
-through (v0.5.1 K5 deepening, AS-16): dispatches a verb to the matching
-:class:`~dadaia_workspace.core.models.bugs.BugRecord` transition method, called
-INSIDE the record-store's atomic update.
+through: calls the unbound :class:`~dadaia_workspace.core.models.bugs.BugRecord`
+transition method the caller passes directly (D7/D8, never a second verb->method
+mapping), INSIDE the record-store's atomic update.
 
-Intent: CONTRACT — v0.5.1 K5. Size: SMALL — real ``tmp_path`` filesystem, no
+Intent: CONTRACT — D6/D7/D8. Size: SMALL — real ``tmp_path`` filesystem, no
 subprocess/network.
 """
 
@@ -57,13 +57,13 @@ def test_transition_resolve_dispatches_to_the_matching_record_method(tmp_path: P
 
     updated = service.transition(
         "a",
-        "resolve",
+        BugRecord.resolve,
         cause="c",
         caused_by="none",
         resolved_release="v0.5.1",
         solution="s",
-        evidence_loop="el",
-        evidence_seam="es",
+        evidence_loop="el sufficiently long",
+        evidence_seam="es sufficiently long",
         evidence_diff="net-negative: deleted more than added",
         diff_direction="net-negative",
     )
@@ -71,26 +71,6 @@ def test_transition_resolve_dispatches_to_the_matching_record_method(tmp_path: P
     assert updated.status == "resolved"
     stored = next(r for r in service.status(include_closed=True) if r.id == "a")
     assert stored.status == "resolved"
-
-
-def test_transition_refuses_an_unknown_verb(tmp_path: Path) -> None:
-    service = _service(tmp_path)
-    service.register(
-        bug_id="a",
-        ts="2026-08-27T00:00:00Z",
-        reported_by="software-engineer",
-        title="t",
-        severity="HIGH",
-        surface="bugs",
-        component="c",
-        context="dadaia-workspace",
-        symptom="s",
-        repro="r",
-        expected="e",
-    )
-
-    with pytest.raises(ValueError, match="unknown bug-record transition verb"):
-        service.transition("a", "close")
 
 
 def test_transition_refusal_never_reaches_the_store(tmp_path: Path) -> None:
@@ -113,7 +93,7 @@ def test_transition_refusal_never_reaches_the_store(tmp_path: Path) -> None:
     before = bug_record_store(tmp_path).path.read_text(encoding="utf-8")
 
     with pytest.raises(IncompleteTransitionError):
-        service.transition("a", "resolve")  # every required field missing
+        service.transition("a", BugRecord.resolve)  # every required field missing
 
     after = bug_record_store(tmp_path).path.read_text(encoding="utf-8")
     assert after == before

@@ -227,7 +227,10 @@ def _extra_view_kwargs(view_name: str, qs: dict[str, list[str]]) -> dict[str, An
     if view_name in _QS_FORWARDING_VIEWS:
         return {"qs": qs}
     if view_name == "api_agents":
-        return {"active_window_days": _parse_int(qs, "active_window_days", 30)}
+        return {
+            "active_window_days": _parse_int(qs, "active_window_days", 30),
+            "window_days": _parse_int(qs, "window_days", 180),
+        }
     return {}
 
 

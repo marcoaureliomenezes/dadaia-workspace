@@ -232,6 +232,7 @@ def doctor(
         templates_dir=_TEMPLATES_DIR,
         head_sha=head_sha,
         parent_sha=parent_sha,
+        bug_store_factory=container.build_bug_record_store,
     )
     issues = doctor_svc.check()
 

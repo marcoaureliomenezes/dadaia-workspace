@@ -3,7 +3,7 @@
 import logging
 import os
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -231,6 +231,29 @@ def build_bug_record_store(specs_dir: Path) -> "RecordStore[BugRecord]":
         to_dict=BugRecord.to_dict,
         from_dict=BugRecord.from_dict,
     )
+
+
+def build_bug_record_validator() -> Callable[[Mapping[str, object]], None]:
+    """Composition-root seam for ``bug-record-v1.schema.json`` validation (D9) — the
+    ONE validation table, loaded once, reused by :meth:`~dadaia_workspace.features
+    .bugs.service.BugService.register` (relocated from ``cli/commands/bugs.py``'s own
+    schema loading, ``cli-no-infrastructure``: neither ``jsonschema``'s
+    ``Draft202012Validator`` nor the packaged schema path belongs at the CLI layer).
+    Raises ``jsonschema.exceptions.ValidationError`` on the first schema violation.
+    """
+    import json
+
+    from jsonschema import Draft202012Validator
+
+    package_root = Path(__file__).resolve().parent
+    schema_path = package_root / "public" / "schemas" / "bugs" / "bug-record-v1.schema.json"
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    validator = Draft202012Validator(schema)
+
+    def _validate(payload: Mapping[str, object]) -> None:
+        validator.validate(payload)
+
+    return _validate
 
 
 def build_bug_archive_store(specs_dir: Path) -> "RecordStore[BugRecord]":

@@ -30,7 +30,6 @@ import json
 import logging
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from pathlib import Path
-from typing import Literal, overload
 
 from dadaia_workspace.core.atomic_write import ConcurrentModificationError, atomic_write
 from dadaia_workspace.core.protocols.record_store import (
@@ -158,19 +157,10 @@ class JsonlRecordStore[T]:
 
     # -- reads ---------------------------------------------------------------------
 
-    @overload
-    def iter_records(self, *, strict: Literal[False] = False) -> Iterator[T]: ...
-    @overload
-    def iter_records(self, *, strict: Literal[True]) -> Iterator[T | MalformedLine]: ...
-    def iter_records(self, *, strict: bool = False) -> Iterator[T | MalformedLine]:
-        """Yield every stored record in file order.
-
-        ``strict=False`` (default): malformed JSON, a non-object line, or a
-        model-parse failure is skipped with a logged WARN — a single corrupt line
-        never breaks the whole stream. ``strict=True``: the SAME classification
-        yields a :class:`MalformedLine` instead of skipping (v0.5.1 K5 deepening) —
-        the ONE malformed-line diagnosis, so a diagnostic caller (``specs doctor``)
-        never needs its own second parser. Splits on ``"\\n"`` ONLY (never
+    def scan(self) -> Iterator[T | MalformedLine]:
+        """Yield every stored record OR :class:`MalformedLine` diagnosis, in file
+        order — the ONE malformed-line diagnosis, so a diagnostic caller (``specs
+        doctor``) never needs its own second parser. Splits on ``"\\n"`` ONLY (never
         ``str.splitlines()``) — the T-045-20 fix, carried forward at the one reader
         this release leaves standing.
         """
@@ -178,14 +168,15 @@ class JsonlRecordStore[T]:
             stripped = line.strip()
             if not stripped:
                 continue
-            parsed = self._parse_line(lineno, stripped)
+            yield self._parse_line(lineno, stripped)
+
+    def iter_records(self) -> Iterator[T]:
+        """Yield every stored record in file order — the tolerant view: a line
+        :meth:`scan` would diagnose as :class:`MalformedLine` is skipped instead,
+        with a logged WARN, never breaking the whole stream."""
+        for parsed in self.scan():
             if isinstance(parsed, MalformedLine):
-                if strict:
-                    yield parsed
-                else:
-                    _LOG.warning(
-                        "skipping malformed record line in %s: %s", self._path, parsed.reason
-                    )
+                _LOG.warning("skipping malformed record line in %s: %s", self._path, parsed.reason)
                 continue
             yield parsed
 

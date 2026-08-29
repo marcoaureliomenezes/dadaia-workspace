@@ -26,6 +26,7 @@ from dadaia_workspace.core.models.bugs import (
     BugRecordWriteOnceFieldSetError,
     IncompleteTransitionError,
 )
+from dadaia_workspace.infrastructure.privacy_check import load_baseline_patterns
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
 _SCHEMA_PATH = (
@@ -68,6 +69,21 @@ def _sample_record(**overrides: object) -> BugRecord:
     }
     base.update(overrides)
     return BugRecord(**base)  # type: ignore[arg-type]
+
+
+# --- D6 — status is unreachable through apply_governance_update ---------------------
+
+
+def test_apply_governance_update_refuses_a_bare_status_change_naming_the_transitions() -> None:
+    """D6: ``apply_governance_update({"status": ...})`` is refused outright — status
+    changes only through resolve()/supersede()/defer()/reject(), each unreachable
+    without its own required fields. One decider, not a CLI-only guard."""
+    record = _sample_record()
+
+    with pytest.raises(ValueError, match="resolve|supersede|defer|reject"):
+        record.apply_governance_update({"status": "resolved"})
+
+    assert record.status == "open"
 
 
 # --- A2.2(a) — immutable core -------------------------------------------------------
@@ -339,24 +355,23 @@ def test_resolve_refuses_a_diff_direction_outside_the_closed_enum() -> None:
 @pytest.mark.parametrize(
     ("field_name", "tainted_value", "expected_fragment"),
     [
-        ("evidence_loop", "reach me at reporter@example-corp.test for details", "e-mail"),
-        ("evidence_seam", "fixture lives at /home/runner/workspace/x.py", "filesystem path"),
-        ("evidence_diff", "net-neutral: sha " + "a" * 40 + " proves it", "secret-shaped"),
+        ("evidence_loop", "reach me at reporter" + "@" + "some-corp.com for details", "email"),
+        ("evidence_seam", "fixture lives at /" + "home/marco/workspace/x.py", "path"),
     ],
 )
 def test_resolve_refuses_an_evidence_field_carrying_a_self_scan_triggering_literal(
     field_name: str, tainted_value: str, expected_fragment: str
 ) -> None:
-    """Closes bug bug-record-write-once-evidence-fields-can-embed-selfscan-triggering-
-    literal-with-no-correction-path: the write-once evidence fields are refused BEFORE
-    they ever land, so there is always a correction path (call again with a fixed
-    value) — never a write-once field stuck holding the bad literal."""
+    """D5: the write-once evidence fields are checked against the operator's own
+    baseline privacy patterns (the SAME baseline the push-range scan enforces, D5) —
+    refused BEFORE they ever land, so there is always a correction path (call again
+    with a fixed value) — never a write-once field stuck holding the bad literal."""
     record = _sample_record()
     kwargs = dict(_RESOLVE_KWARGS)
     kwargs[field_name] = tainted_value
 
     with pytest.raises(IncompleteTransitionError) as excinfo:
-        record.resolve(**kwargs)
+        record.resolve(**kwargs, privacy_patterns=load_baseline_patterns())
 
     assert field_name in str(excinfo.value)
     assert expected_fragment in str(excinfo.value)
@@ -364,6 +379,19 @@ def test_resolve_refuses_an_evidence_field_carrying_a_self_scan_triggering_liter
     # literal, so a corrected retry (never shown here) always has a clean path.
     assert record.evidence_loop is None
     assert record.status == "open"
+
+
+def test_resolve_accepts_a_bare_40_hex_sha_the_baseline_never_flags() -> None:
+    """D5: a 40-hex git object id is not a credential (the baseline's own
+    ``secret-token`` pattern requires a keyword/known prefix, never a bare hex run) —
+    the write seam refuses exactly what the push scan refuses, nothing stricter."""
+    record = _sample_record()
+    kwargs = dict(_RESOLVE_KWARGS)
+    kwargs["evidence_diff"] = "net-neutral: sha " + "a" * 40 + " proves it"
+
+    resolved = record.resolve(**kwargs, privacy_patterns=load_baseline_patterns())
+
+    assert resolved.status == "resolved"
 
 
 def test_supersede_requires_by_and_reaches_superseded_status() -> None:

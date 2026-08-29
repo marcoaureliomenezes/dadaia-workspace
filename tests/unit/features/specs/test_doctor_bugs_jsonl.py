@@ -1,23 +1,18 @@
 """Unit tests for SpecsDoctor SPEC-DOC-033/041 — the bug-ledger invariant.
 
-Intent: CONTRACT — SPEC-DOC-033/041, v0.5.1 K5 deepening.
+Intent: CONTRACT — SPEC-DOC-033/041.
 
-Release v0.1.46 / T-46-04 (AC-1); rewritten v0.5.0 T-050-08 (FR2/A2.3/A2.8, AR-1
-ruling "the doctor's bug lane is a second hand-kept reader"); the v5 event fold and
-SPEC-DOC-040 deleted at the S1 FR23 firing (A3/A5,
-`specs/releases/0.5.0/reviews/S1-FR23-firing.md`); rewritten again at v0.5.1 K5 to
-read through the ONE ``RecordStore`` seam (default zero-dependency fallback reader,
-or an injected ``bug_store_factory`` — proven equal below) instead of a second
-hand-kept parser. The legacy hourly-file rotation reader is dead under canon v6 and
-is not carried forward — every case below targets the ONE canonical
-``specs/bugs/BUGS.jsonl`` (T-050-10 rename). Covers: line validity (ERROR, the ONE
+The doctor reads ``specs/bugs/BUGS.jsonl`` through the ONE injected
+``bug_store_factory`` (D1) — every case below wires
+``container.build_bug_record_store`` explicitly, the SAME factory the production CLI
+wires (``cli/commands/specs.py``). Covers: line validity (ERROR, the ONE
 malformed-line diagnosis — not valid JSON, not an object, or ``BugRecord.from_dict``
-refusing it, v5-shaped lines included) and the A2.8 archive-overdue signal.
-Governance-completeness (the former WARNING branch) is DELETED here — it is now
-enforced prospectively at the write seam
+refusing it, v5-shaped lines included) and the archive-overdue signal.
+Governance-completeness (the former WARNING branch) is deleted — it is enforced
+prospectively at the write seam
 (``core.models.bugs.BugRecord.resolve``/``supersede``/``defer``/``reject``,
-``tests/unit/core/models/test_bug_record.py``), never re-diagnosed by
-the doctor against history.
+``tests/unit/core/models/test_bug_record.py``), never re-diagnosed by the doctor
+against history.
 """
 
 from __future__ import annotations
@@ -72,7 +67,11 @@ def _write_ledger(bugs: Path, rows: list[dict[str, Any]]) -> Path:
 
 
 def _doc033(specs: Path) -> list[SpecsDoctorIssue]:
-    return [i for i in SpecsDoctor(specs).check() if i.code == "SPEC-DOC-033"]
+    return [
+        i
+        for i in SpecsDoctor(specs, bug_store_factory=container.build_bug_record_store).check()
+        if i.code == "SPEC-DOC-033"
+    ]
 
 
 def test_no_bugs_dir_is_a_noop(tmp_path: Path) -> None:
@@ -120,27 +119,6 @@ def test_native_v6_record_invalid_status_enum_is_an_error(tmp_path: Path) -> Non
     assert len(errors) == 1
     assert "status" in errors[0].description
     assert "fixed" in errors[0].description
-
-
-def test_doctor_reads_through_an_injected_bug_store_factory(tmp_path: Path) -> None:
-    """v0.5.1 K5: ``SpecsDoctor(bug_store_factory=...)`` — mirrors
-    ``findings_store_factory`` exactly — is the SAME diagnosis as the default
-    zero-dependency fallback reader; injecting the real
-    ``container.build_bug_record_store`` (the SAME store ``BugService`` writes
-    through) proves the doctor is reading through the ONE store, not a second parser."""
-    specs = tmp_path / "specs"
-    bad = _record("native-bug")
-    del bad["title"]
-    _write_ledger(_bugs_dir(specs), [bad])
-
-    default_issues = [i for i in SpecsDoctor(specs).check() if i.code == "SPEC-DOC-033"]
-    injected_issues = [
-        i
-        for i in SpecsDoctor(specs, bug_store_factory=container.build_bug_record_store).check()
-        if i.code == "SPEC-DOC-033"
-    ]
-    assert len(default_issues) == 1
-    assert [i.description for i in default_issues] == [i.description for i in injected_issues]
 
 
 # ---------------------------------------------------------------------------
@@ -260,7 +238,7 @@ def test_archive_overdue_warns_past_the_threshold(tmp_path: Path) -> None:
         bugs,
         [_record("old-terminal", status="resolved", ts="2026-01-01T00:00:00Z")],
     )
-    validator = GovernanceValidator(specs)
+    validator = GovernanceValidator(specs, bug_store_factory=container.build_bug_record_store)
 
     issues = validator.check_bug_archive_overdue(now=datetime(2026, 8, 27, tzinfo=UTC))
 
@@ -279,7 +257,7 @@ def test_archive_overdue_is_silent_for_a_recent_terminal_record(tmp_path: Path) 
         bugs,
         [_record("recent-terminal", status="resolved", ts="2026-08-20T00:00:00Z")],
     )
-    validator = GovernanceValidator(specs)
+    validator = GovernanceValidator(specs, bug_store_factory=container.build_bug_record_store)
 
     issues = validator.check_bug_archive_overdue(now=datetime(2026, 8, 27, tzinfo=UTC))
 
@@ -292,7 +270,7 @@ def test_archive_overdue_is_silent_for_an_open_record(tmp_path: Path) -> None:
     specs = tmp_path / "specs"
     bugs = _bugs_dir(specs)
     _write_ledger(bugs, [_record("still-open", status="open", ts="2026-01-01T00:00:00Z")])
-    validator = GovernanceValidator(specs)
+    validator = GovernanceValidator(specs, bug_store_factory=container.build_bug_record_store)
 
     issues = validator.check_bug_archive_overdue(now=datetime(2026, 8, 27, tzinfo=UTC))
 

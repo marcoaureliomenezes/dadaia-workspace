@@ -17,6 +17,7 @@ import threading
 import urllib.error
 import urllib.request
 from http.server import ThreadingHTTPServer
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -118,6 +119,10 @@ class StubTelemetryService:
 def _build_server(token: str, stub_telemetry: StubTelemetryService):
     """Build a ThreadingHTTPServer on port 0 with the panel handler."""
     from dadaia_workspace.features.panel.handler import make_handler_class
+    from dadaia_workspace.features.panel.views.api_agents import (
+        render_api_agent_sessions,
+        render_api_agents_canonical,
+    )
 
     def _stub_view(**kw: Any) -> tuple[int, str, bytes]:
         return (200, "text/html; charset=utf-8", b"<html>ok</html>")
@@ -132,7 +137,12 @@ def _build_server(token: str, stub_telemetry: StubTelemetryService):
         "memory": _stub_view,
         "memory_view": _stub_view,
         "static": lambda **kw: (200, "text/plain; charset=utf-8", b"ok"),
-        # New telemetry views are injected via telemetry_service arg.
+        "api_agents": render_api_agents_canonical(
+            SimpleNamespace(telemetry=stub_telemetry, list_canonical_agents=lambda: [])
+        ),
+        "api_agent_sessions": render_api_agent_sessions(
+            SimpleNamespace(telemetry=stub_telemetry, list_canonical_agents=lambda: [])
+        ),
     }
 
     HandlerClass = make_handler_class(stub_views, token=token, telemetry=stub_telemetry)

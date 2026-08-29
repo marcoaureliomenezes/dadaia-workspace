@@ -192,7 +192,7 @@ class TelemetryService:
 
         self._degraded = False
 
-        self._last_refresh: float = 0.0  # monotonic seconds of last successful refresh
+        self._last_refresh: float | None = None  # monotonic seconds of last successful refresh
 
     # ------------------------------------------------------------------
     # Permission hardening (single os.chmod home — CWE-732 / Tier-2)
@@ -263,9 +263,16 @@ class TelemetryService:
             return
 
         try:
+            # File-mode drift is corrected on every call, cached or not (CWE-732).
+            if self._store.db_path.exists():
+                self._restrict_owner_only(self._store.db_path, is_dir=False)
+
             # Cache TTL check.
             now = self._clock()
-            if now - self._last_refresh < _budget.CACHE_TTL_SECONDS:
+            if (
+                self._last_refresh is not None
+                and now - self._last_refresh < _budget.CACHE_TTL_SECONDS
+            ):
                 logger.debug("TelemetryService: cache hit; skipping refresh.")
                 return
 

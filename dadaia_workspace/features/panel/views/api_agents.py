@@ -124,6 +124,7 @@ def render_api_agents_canonical(
 
     def _view(
         active_window_days: int = _ACTIVE_WINDOW_DAYS_DEFAULT,
+        window_days: int = _TELEMETRY_WINDOW_DAYS,
         **_kwargs: object,
     ) -> tuple[int, str, bytes]:
         # Parse runtime filter from query-string (NFR5: default to "claude").
@@ -152,7 +153,7 @@ def render_api_agents_canonical(
         if service.telemetry is not None:
             try:
                 tel_result = service.telemetry.list_agents(
-                    window_days=_TELEMETRY_WINDOW_DAYS,
+                    window_days=window_days,
                     context_slug=None,
                     limit=200,
                 )

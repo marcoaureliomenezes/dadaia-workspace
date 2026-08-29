@@ -12,40 +12,33 @@ is the port a future ``features/*/service.py`` depends on instead of the concret
 adapter — the same shape ``core/protocols/bug_store.py`` served the event-sourced store
 before this release (mirrors ``core/protocols/git_object_reader.py``).
 
-**No file-level escape hatch (A1).** The Protocol exposes no ``path`` — the ONE seam
-that let a caller reach through the store and rewrite the ledger's bytes directly
-(``BugService.archive``'s raw ``atomic_write``, ``migrate_v5.read_ledger``'s bypass of
-the injected store) was the reader/writer-count leak the S1 firing ruling closed. Every
-read goes through :meth:`iter_records`; every removal goes through :meth:`remove`,
-which carries the SAME refuse-stale race semantics :meth:`update` already has.
+**No file-level escape hatch.** The Protocol exposes no ``path`` — the ONE seam that
+let a caller reach through the store and rewrite the ledger's bytes directly was the
+reader/writer-count leak the S1 firing ruling closed. Every removal goes through
+:meth:`remove`, which carries the SAME refuse-stale race semantics :meth:`update`
+already has.
 
-**``MalformedLine`` / ``iter_records(strict=...)`` (v0.5.1 K5 deepening).** Before this
-release, a caller that needed to DIAGNOSE a malformed ledger line (rather than silently
-skip it, :meth:`iter_records`'s default) had no seam — ``features.specs.
-doctor_governance`` grew its OWN second hand-rolled parser of ``BUGS.jsonl`` instead,
-re-implementing the exact unicode-line-split defect class the store's own reader had
-already fixed once (T-045-20), and re-introducing it a second time at the doctor
-(``specs-doctor-bug-lane-splits-ledger-on-unicode-line-separators``) before it was
-fixed there too — the same bug, twice, because there were two parsers. ``strict=True``
-is the ONE seam a diagnostic caller now uses instead of writing a second reader:
-:meth:`iter_records` yields a :class:`MalformedLine` in place of silently skipping/
-WARN-logging a line that fails to parse. The split rule (a literal ``"\\n"``, never
+**``MalformedLine`` / two read methods.** :meth:`scan` yields a :class:`MalformedLine`
+in place of skipping a line that fails to parse — the ONE malformed-line diagnosis a
+diagnostic caller (``specs doctor``) uses instead of writing a second reader.
+:meth:`iter_records` is the tolerant view: the SAME classification, skipped with a
+WARN log instead of surfaced. The split rule (a literal ``"\\n"``, never
 ``str.splitlines()``) and the "what counts as parseable" rule (the model's own
-``from_dict``) are each stated in exactly one place regardless of *strict*.
+``from_dict``) are each stated in exactly one place, shared by both methods.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass
-from typing import Literal, Protocol, overload
+from typing import Protocol
 
 
 @dataclass(frozen=True)
 class MalformedLine:
     """One ledger line a :class:`RecordStore` could not parse as its record type —
-    the ONE malformed-line diagnosis every strict reader yields (v0.5.1 K5
-    deepening), covering every way a line can fail: not valid JSON, not a JSON
+    the ONE malformed-line diagnosis :meth:`RecordStore.scan` yields, covering every
+    way a line can fail: not valid JSON, not a JSON
     object, or refused by the model's own ``from_dict`` (a missing required field,
     an invalid closed-enum value, or — historically — a v5-shaped event line that
     never carried the v6 required field set). ``lineno`` is 1-based, counted over a
@@ -88,18 +81,15 @@ class RecordStore[T](Protocol):
     def append(self, record: T) -> None:
         """Append one NEW record as a line (``O_APPEND`` semantics — race-benign)."""
 
-    @overload
-    def iter_records(self, *, strict: Literal[False] = False) -> Iterator[T]: ...
-    @overload
-    def iter_records(self, *, strict: Literal[True]) -> Iterator[T | MalformedLine]: ...
-    def iter_records(self, *, strict: bool = False) -> Iterator[T] | Iterator[T | MalformedLine]:
-        """Yield every stored record, in file order.
+    def scan(self) -> Iterator[T | MalformedLine]:
+        """Yield every stored record OR :class:`MalformedLine` diagnosis, in file
+        order — the ONE malformed-line diagnosis every diagnostic caller (``specs
+        doctor``) reads through, never a second, hand-rolled parser."""
 
-        ``strict=False`` (default): tolerates malformed lines — skips one, WARN-logged,
-        never breaking the whole stream. ``strict=True``: yields a :class:`MalformedLine`
-        in place of skipping — the ONE malformed-line diagnosis (v0.5.1 K5 deepening);
-        no second reader ever re-implements this classification.
-        """
+    def iter_records(self) -> Iterator[T]:
+        """Yield every stored record, in file order — the tolerant view: a line
+        :meth:`scan` would diagnose as :class:`MalformedLine` is skipped instead,
+        WARN-logged, never breaking the whole stream."""
 
     def update(self, record_id: str, mutate: Callable[[T], T]) -> T:
         """Read-modify-write the ONE line matching *record_id*, in place.
