@@ -184,6 +184,8 @@ class SpecsDoctor:
         issues.extend(self._memory.check_cat1_catalog_sync())
         # LINT-1 (memory-markdown-source-v1) — invoke lint-memory-atoms.py
         issues.extend(self._memory.check_lint1_memory_atoms())
+        # MEM-DRIFT-1 (v0.5.1 T-051-22 rework) — features package-map diagram vs live tree
+        issues.extend(self._memory.check_mem_drift1_features_package_map())
         # SPECS-VERSION (specs-evolution / FR-S05) — pattern-version staleness
         issues.extend(self._coherence.check_specs_pattern_version())
         # v0.1.10 / T-010-14 (R6b) — ledger invariants + identity-coherence backstop
