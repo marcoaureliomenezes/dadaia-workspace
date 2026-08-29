@@ -7,7 +7,6 @@ explicit arguments instead of ``self``, so there are no circular imports.
 
 from __future__ import annotations
 
-import contextlib
 import json
 import os
 import re
@@ -25,41 +24,6 @@ from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
     _parse_agent_frontmatter,
     _parse_skills_from_frontmatter,
 )
-
-# ---------------------------------------------------------------------------
-# Constants (class-level in the original; kept here as module-level)
-# ---------------------------------------------------------------------------
-_CODEX_CLAUDE_MODEL_RE: re.Pattern[str] = re.compile(
-    r"(?:^|[^a-zA-Z0-9_-])claude-(?:opus|sonnet|haiku)-[\w.-]+",
-    re.MULTILINE,
-)
-# Claude-only tool names that have no Codex meaning. Codex uses explicit subagent
-# delegation, not the Claude Code `Agent`/`Task` tools, so these must not leak into
-# any Codex-projected artifact (codex-agent-description-claude-ism-leak, T-013-09).
-_CODEX_CLAUDE_TOOL_RE: re.Pattern[str] = re.compile(
-    r"\b(?:Agent|Task) tool\b",
-)
-# Anthropic marketing TIER names used as standalone tier words in model-strategy
-# prose (codex-personas-claude-model-tiering-leak, T-013-12). These leak into
-# Codex personas when persona prose recommends Anthropic tiers ("Opus / Sonnet /
-# Haiku") instead of Codex-native tier terms. Matched on a word boundary so a
-# legitimate ``claude-*`` model id (already caught by _CODEX_CLAUDE_MODEL_RE) and
-# the skill name ``ai-harness-claude-code`` are NOT false-positived: those never
-# contain a standalone capitalised ``Opus``/``Sonnet``/``Haiku`` word.
-_CODEX_ANTHROPIC_TIER_RE: re.Pattern[str] = re.compile(
-    r"\b(?:Opus|Sonnet|Haiku)\b",
-)
-_CODEX_TEXT_SUFFIXES: frozenset[str] = frozenset({".toml", ".md", ".json", ".txt", ".yaml", ".yml"})
-_CODEX_EXPECTED_READ_ONLY_AGENTS: frozenset[str] = frozenset(
-    {
-        "code-reviewer",
-        "project-auditor",
-        "qa-engineer",
-        "security-reviewer",
-        "software-architect",
-    }
-)
-
 
 # ---------------------------------------------------------------------------
 # Dispatcher
@@ -82,133 +46,20 @@ ATTESTING_CHECK_IDS: tuple[str, ...] = (
 )
 
 
-def check_codex_drift(
-    agentic_dir: Path,
-    workspace_root: Path,
-    public_dir: Path,
-) -> list[DoctorLine]:
-    """Run codex-parity drift checks D-CX-1 through D-CX-10.
-
-    Returns a list of ``[missing]``, ``[extra]``, ``[error]``, ``[leak]``,
-    or ``[drift]`` report strings.  An empty list means no drift was detected.
-    """
-    codex_dir = workspace_root / ".codex"
-    out: list[DoctorLine] = []
-    out.extend(dcx1_missing_toml(agentic_dir, codex_dir))
-    out.extend(dcx2_config_toml_entries(agentic_dir, codex_dir))
-    out.extend(dcx4_claude_strings(codex_dir))
-    out.extend(dcx5_empty_developer_instructions(codex_dir))
-    out.extend(dcx6_codex_runtime_adapters(workspace_root, public_dir))
-    out.extend(dcx7_codex_skill_refs(workspace_root))
-    out.extend(dcx8_codex_rules_shape(codex_dir))
-    out.extend(dcx9_codex_hook_shape(workspace_root))
-    out.extend(dcx10_codex_agent_boundaries(codex_dir))
-    return out
-
-
 # ---------------------------------------------------------------------------
 # Individual checks
+#
+# D-CX-1 (missing toml), D-CX-2 (config.toml entries), D-CX-4 (claude-string leaks),
+# D-CX-5 (empty developer_instructions) and D-CX-10 (boundary fields) are RETIRED
+# (K3, v0.5.1): each re-derived "is this projected TOML correct" from its shape via a
+# narrow field/regex check. Since the codex per-agent TOML and config.toml are now
+# ProjectionRule entries compared byte-wise against their renderer
+# (``infrastructure/projection_rules.py``), an incorrect byte IS the drift signal —
+# a missing file is `[missing]`, any content difference is `[drift]` — and the
+# renderer itself (never patched by a hand-edit) is what a dev-time test proves
+# correct. The remaining structural/semantic checks below (D-CX-6/7/8/9) stay: none
+# of them is expressible as "does this one rendered file's bytes match".
 # ---------------------------------------------------------------------------
-
-
-def dcx1_missing_toml(agentic_dir: Path, codex_dir: Path) -> list[DoctorLine]:
-    """D-CX-1: every canonical agent .md must have a matching TOML in .codex/agents/."""
-    agents_src = agentic_dir / "agents"
-    codex_agents = codex_dir / "agents"
-    out: list[DoctorLine] = []
-    if not agents_src.exists():
-        return out
-    for md_file in sorted(agents_src.glob("*.md")):
-        try:
-            text = md_file.read_text(encoding="utf-8")
-        except OSError:
-            continue
-        fm = _parse_agent_frontmatter(text)
-        name = str(fm.get("name", "")) if fm else ""
-        if not name:
-            name = md_file.stem
-        toml_path = codex_agents / f"{name}.toml"
-        if not toml_path.exists():
-            out.append(DoctorLine(DoctorStatus.MISSING, f"codex:agents/{name}.toml (D-CX-1)"))
-    return out
-
-
-def dcx2_config_toml_entries(agentic_dir: Path, codex_dir: Path) -> list[DoctorLine]:
-    """D-CX-2: every .codex/agents/*.toml must have a config_file entry in config.toml."""
-    codex_agents = codex_dir / "agents"
-    config_toml = codex_dir / "config.toml"
-    out: list[DoctorLine] = []
-    if not codex_agents.exists():
-        return out
-    config_text = ""
-    if config_toml.exists():
-        with contextlib.suppress(OSError):
-            config_text = config_toml.read_text(encoding="utf-8")
-    for toml_file in sorted(codex_agents.glob("*.toml")):
-        name = toml_file.stem
-        needle = f'config_file = "agents/{name}.toml"'
-        if needle not in config_text:
-            out.append(
-                DoctorLine(DoctorStatus.MISSING, f"codex:config.toml entry for {name} (D-CX-2)")
-            )
-    return out
-
-
-def dcx4_claude_strings(codex_dir: Path) -> list[DoctorLine]:
-    """D-CX-4: Codex projections must not contain Claude model/path leaks."""
-    out: list[DoctorLine] = []
-    if not codex_dir.exists():
-        return out
-    for path in sorted(codex_dir.rglob("*")):
-        if not path.is_file():
-            continue
-        if path.suffix not in _CODEX_TEXT_SUFFIXES:
-            continue
-        try:
-            text = path.read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError):
-            continue
-        if _CODEX_CLAUDE_MODEL_RE.search(text) or ".claude/rules/" in text:
-            rel = path.relative_to(codex_dir).as_posix()
-            out.append(
-                DoctorLine(DoctorStatus.ERROR, f"codex:claude-model-or-path in {rel} (D-CX-4)")
-            )
-        elif _CODEX_CLAUDE_TOOL_RE.search(text):
-            rel = path.relative_to(codex_dir).as_posix()
-            out.append(DoctorLine(DoctorStatus.ERROR, f"codex:claude-tool-name in {rel} (D-CX-4)"))
-        elif _CODEX_ANTHROPIC_TIER_RE.search(text):
-            rel = path.relative_to(codex_dir).as_posix()
-            out.append(
-                DoctorLine(DoctorStatus.ERROR, f"codex:anthropic-tier-name in {rel} (D-CX-4)")
-            )
-    return out
-
-
-def dcx5_empty_developer_instructions(codex_dir: Path) -> list[DoctorLine]:
-    """D-CX-5: every .codex/agents/*.toml must have a non-empty developer_instructions."""
-    codex_agents = codex_dir / "agents"
-    out: list[DoctorLine] = []
-    if not codex_agents.exists():
-        return out
-    for toml_file in sorted(codex_agents.glob("*.toml")):
-        name = toml_file.stem
-        try:
-            text = toml_file.read_text(encoding="utf-8")
-            data = tomllib.loads(text)
-        except (OSError, tomllib.TOMLDecodeError):
-            out.append(
-                DoctorLine(DoctorStatus.ERROR, f"codex:{name}.toml: unparseable TOML (D-CX-5)")
-            )
-            continue
-        instructions = data.get("developer_instructions", "")
-        if not isinstance(instructions, str) or not instructions.strip():
-            out.append(
-                DoctorLine(
-                    DoctorStatus.ERROR,
-                    f"codex:{name}.toml: developer_instructions is empty (D-CX-5)",
-                )
-            )
-    return out
 
 
 def dcx6_codex_runtime_adapters(workspace_root: Path, public_dir: Path) -> list[DoctorLine]:
@@ -409,45 +260,6 @@ def _codex_hook_commands(value: object) -> list[str]:
         for item in value:
             commands.extend(_codex_hook_commands(item))
     return commands
-
-
-def dcx10_codex_agent_boundaries(codex_dir: Path) -> list[DoctorLine]:
-    """D-CX-10: Codex agent TOML must include role-boundary fields."""
-    codex_agents = codex_dir / "agents"
-    out: list[DoctorLine] = []
-    if not codex_agents.exists():
-        return out
-    for toml_file in sorted(codex_agents.glob("*.toml")):
-        try:
-            data = tomllib.loads(toml_file.read_text(encoding="utf-8"))
-        except (OSError, tomllib.TOMLDecodeError):
-            continue
-        for field in ("sandbox_mode", "model_reasoning_effort"):
-            if field not in data:
-                out.append(
-                    DoctorLine(
-                        DoctorStatus.MISSING, f"codex:agents/{toml_file.name}:{field} (D-CX-10)"
-                    )
-                )
-        if (
-            toml_file.stem in _CODEX_EXPECTED_READ_ONLY_AGENTS
-            and data.get("sandbox_mode") != "read-only"
-        ):
-            out.append(
-                DoctorLine(
-                    DoctorStatus.ERROR,
-                    f"codex:agents/{toml_file.name}:sandbox_mode must be read-only "
-                    "for evidence-only role (D-CX-10)",
-                )
-            )
-        for forbidden in ("provider", "api_key", "telemetry"):
-            if forbidden in data:
-                out.append(
-                    DoctorLine(
-                        DoctorStatus.ERROR, f"codex:agents/{toml_file.name}:{forbidden} (D-CX-10)"
-                    )
-                )
-    return out
 
 
 def check_agent_skill_refs(public_dir: Path) -> list[DoctorLine]:
