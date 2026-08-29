@@ -35,6 +35,7 @@ __all__ = [
     "BaselinePatternLike",
     "Hit",
     "OversizedNote",
+    "PathMasker",
     "ScanOutcome",
     "compile_slug_patterns",
     "operator_terms_match",
@@ -308,3 +309,91 @@ def scan_objects(
         skipped_binary_count=skipped,
         oversized_notes=tuple(oversized_notes),
     )
+
+
+#: v0.11.0 FR6(b)/entry #23 resolution A — the path-segment masking placeholder shape.
+#: Deliberately distinct from the CLI's ``[REDACTED-CONTEXT-n]`` (``cli/redact.py``):
+#: this is a different channel (a blob PATH segment in a gate refusal/note, not a Spec
+#: Context name in a CLI render), even though both are built on the SAME
+#: ``core/redaction.py`` primitive.
+_PATH_PLACEHOLDER_FMT = "[REDACTED-PATH-{n}]"
+
+
+class PathMasker:
+    """v0.11.0 FR6(b) — masks only the blob-path segments that match one of the THREE
+    FR3 term sources ``push_gate.push_gate_decision`` receives (operator denylist,
+    baseline structural patterns, foreign repo slugs) — entry #23 resolution A (ADR
+    D1/D1-a). Every operator-facing string the gate emits that names a blob path routes
+    through :meth:`mask_path` before rendering (FR6's class rule, not a single call
+    site) — today that is the denylist refusal and the FR4 oversized-blob note.
+
+    v0.5.1 K7 ("one masking predicate"): this class used to be a private copy
+    (``features.chokepoints.service._PathMasker``) that merely CALLED this module's own
+    :func:`operator_terms_match`/:func:`compile_slug_patterns`. Moved here — the module
+    that already owns those two predicates — so there is exactly ONE masking
+    implementation, not a detector module plus a second class elsewhere that reaches
+    into it.
+
+    Construct ONE instance per push-gate invocation and reuse it across every rendered
+    string, so a repeated offending segment gets the SAME stable, first-appearance
+    ordinal placeholder.
+
+    SPEC v0.4.2 FR4/GRILL D3: the offending-segment TEST consumes the detector's OWN
+    compiled matchers (:func:`operator_terms_match` + :func:`compile_slug_patterns` —
+    the SAME predicates :func:`_first_match` uses, case-insensitive, whole-token
+    boundaries) instead of a second, narrower predicate built from
+    ``core.redaction.compile_candidates`` (case-SENSITIVE, and treats ``-`` as a word
+    character rather than a boundary — GRILL P8: a path segment like ``Acme-Corp`` that
+    the detector already flags for the lowercase term ``acme`` used to render
+    UNMASKED). Case-insensitivity and token-boundary treatment are identical by
+    construction: detector-hit implies masker-hit.
+
+    Masking happens at PATH-SEGMENT granularity: the path is split on ``/``, each
+    segment is tested, and only a matching segment is replaced wholesale — the line
+    number, the short blob sha, and every non-matching segment stay untouched, so the
+    operator can still locate the offending file (satisfiable diagnostics,
+    ``quality-assurance.md``). Where no segment matches, the path is returned
+    byte-identical to the input (A6.2).
+    """
+
+    def __init__(
+        self,
+        denylist_terms: Iterable[tuple[str, str]],
+        baseline_patterns: Iterable[BaselinePatternLike],
+        foreign_slugs: Iterable[str],
+    ) -> None:
+        self._term_values = [term for term, _reason in denylist_terms if term]
+        self._slug_patterns = compile_slug_patterns(foreign_slugs)
+        self._pattern_list = list(baseline_patterns)
+        self._map: dict[str, str] = {}
+
+    def _segment_is_offending(self, segment: str) -> bool:
+        if not segment:
+            return False
+        if operator_terms_match(self._term_values, segment):
+            return True
+        if any(compiled.search(segment) for _slug, compiled in self._slug_patterns):
+            return True
+        for pattern in self._pattern_list:
+            for match in pattern.regex.finditer(segment):
+                value = match.group(0)
+                if pattern.exclude is not None and pattern.exclude.search(value):
+                    continue
+                return True
+        return False
+
+    def mask_path(self, path: str) -> str:
+        """Return *path* with every offending segment replaced; byte-identical to
+        *path* when no segment matches any of the three term sources (A6.2)."""
+        segments = path.split("/")
+        masked_segments: list[str] = []
+        for segment in segments:
+            if not self._segment_is_offending(segment):
+                masked_segments.append(segment)
+                continue
+            placeholder = self._map.get(segment)
+            if placeholder is None:
+                placeholder = _PATH_PLACEHOLDER_FMT.format(n=len(self._map) + 1)
+                self._map[segment] = placeholder
+            masked_segments.append(placeholder)
+        return "/".join(masked_segments)

@@ -19,6 +19,7 @@ import re
 from collections.abc import Callable
 from pathlib import Path
 
+from dadaia_workspace.core.handoff_index import scan_handoffs
 from dadaia_workspace.features.panel.service import PanelService
 
 logger = logging.getLogger(__name__)
@@ -38,18 +39,6 @@ def render_api_reports(
     findings_summary: {"CRITICAL": N, "HIGH": N, "MEDIUM": N, "LOW": N}
     """
     _log = logging.getLogger(__name__)
-
-    def _severity_counts(findings: object) -> dict[str, int]:
-        counts: dict[str, int] = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0}
-        if not isinstance(findings, list):
-            return counts
-        for f in findings:
-            if not isinstance(f, dict):
-                continue
-            sev = f.get("severity", "").upper()
-            if sev in counts:
-                counts[sev] += 1
-        return counts
 
     def _created_at_from_file(path: Path) -> str:
         match = re.match(r"^(\d{4}-\d{2}-\d{2}T\d{6}Z)", path.name)
@@ -78,13 +67,6 @@ def render_api_reports(
             "findings_summary": _empty_counts(),
         }
 
-    def _iter_handoffs(reports_root: Path) -> list[Path]:
-        handoffs: list[Path] = []
-        for root in (service.workspace_root / ".dadaia" / "handoff", reports_root):
-            if root.exists():
-                handoffs.extend(root.rglob("*.handoff.json"))
-        return handoffs
-
     def _view(**_kwargs: object) -> tuple[int, str, bytes]:
         reports_root = (service.workspace_root / ".dadaia" / "reports").resolve()
         retention = service.get_report_retention()
@@ -103,13 +85,16 @@ def render_api_reports(
                     row = _row_from_report(report, reports_root)
                     results_by_path[str(row["path"])] = row
 
-            for handoff in _iter_handoffs(reports_root):
-                try:
-                    data = json.loads(handoff.read_text(encoding="utf-8"))
-                    artifact = data.get("artifact", {})
-                    if not isinstance(artifact, dict):
+            for handoff_root in (service.workspace_root / ".dadaia" / "handoff", reports_root):
+                for handoff in scan_handoffs(handoff_root):
+                    if handoff.malformed_error is not None:
+                        _log.warning(
+                            "Skipping malformed handoff %s: %s",
+                            handoff.path,
+                            handoff.malformed_error,
+                        )
                         continue
-                    artifact_path = str(artifact.get("path", ""))
+                    artifact_path = handoff.artifact_path_raw or ""
                     if not artifact_path.startswith(".dadaia/reports/"):
                         continue
                     report_path = _report_route_path(artifact_path)
@@ -124,12 +109,10 @@ def render_api_reports(
                         report_path,
                         _row_from_report(report_file, reports_root),
                     )
-                    row["agent"] = data.get("agent") or row["agent"]
-                    row["context"] = data.get("context") or row["context"]
-                    row["created_at"] = data.get("produced_at") or row["created_at"]
-                    row["findings_summary"] = _severity_counts(data.get("findings", []))
-                except Exception as exc:  # noqa: BLE001
-                    _log.warning("Skipping malformed handoff %s: %s", handoff, exc)
+                    row["agent"] = handoff.agent or row["agent"]
+                    row["context"] = handoff.context or row["context"]
+                    row["created_at"] = handoff.produced_at or row["created_at"]
+                    row["findings_summary"] = handoff.findings_summary()
 
         results = list(results_by_path.values())
         now = datetime.datetime.now(tz=datetime.UTC)
@@ -341,14 +324,9 @@ def delete_report_file(
         ):
             if not handoff_root.exists():
                 continue
-            for handoff in handoff_root.rglob("*.handoff.json"):
-                try:
-                    data = json.loads(handoff.read_text(encoding="utf-8"))
-                except Exception:  # noqa: BLE001
-                    continue
-                artifact = data.get("artifact", {})
-                if isinstance(artifact, dict) and artifact.get("path") == target_ref:
-                    handoff.unlink()
+            for handoff in scan_handoffs(handoff_root):
+                if handoff.artifact_path_raw == target_ref:
+                    handoff.path.unlink()
         return (200, "application/json; charset=utf-8", b'{"deleted": true}')
 
     return _view

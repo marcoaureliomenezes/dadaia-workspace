@@ -18,6 +18,7 @@ now reads/writes through (T-050-08 — D-F "switch"). The store's physical file 
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -25,9 +26,35 @@ import pytest
 
 from dadaia_workspace import container
 from dadaia_workspace.core.atomic_write import atomic_write as real_atomic_write
-from dadaia_workspace.core.models.bugs import BugRecord, redactable_property_names
+from dadaia_workspace.core.models.bugs import BugRecord
 from dadaia_workspace.core.protocols.record_store import StaleRecordWriteError
 from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
+
+
+def _redactable_property_names(schema: Mapping[str, object]) -> tuple[str, ...]:
+    """Test-only (D4): every schema property eligible for write-time redaction — a
+    property qualifies when its declared ``type`` includes ``"string"`` and is not
+    opted out via ``"x-redact": false``. Moved here from production
+    (``core.models.bugs.redactable_property_names``, D3/D4) — its only caller was
+    this test module; ``BugRecord.redact`` already derives its own field set from
+    dataclass metadata, which is the invariant that matters in production."""
+    properties = schema.get("properties")
+    assert isinstance(properties, Mapping)
+    names: list[str] = []
+    for name, spec in properties.items():
+        if not isinstance(spec, Mapping):
+            continue
+        if spec.get("x-redact") is False:
+            continue
+        declared_type = spec.get("type")
+        is_string_typed = declared_type == "string" or (
+            isinstance(declared_type, list) and "string" in declared_type
+        )
+        if not is_string_typed:
+            continue
+        names.append(name)
+    return tuple(names)
+
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _SCHEMA_PATH = (
@@ -83,16 +110,17 @@ def test_governance_update_rewrites_one_line_in_place_byte_identical_elsewhere(
     assert len(before_lines) == 4  # 3 records + trailing empty split
 
     updated = store.update(
-        "bug-b", lambda record: record.apply_governance_update({"status": "resolved"})
+        "bug-b",
+        lambda record: record.apply_governance_update({"resolved_release": "v0.5.1"}),
     )
-    assert updated.status == "resolved"
+    assert updated.resolved_release == "v0.5.1"
 
     after_lines = store_path.read_text(encoding="utf-8").split("\n")
     assert after_lines[0] == before_lines[0]  # bug-a untouched
     assert after_lines[2] == before_lines[2]  # bug-c untouched
     assert after_lines[3] == before_lines[3] == ""  # trailing newline preserved
     assert after_lines[1] != before_lines[1]  # bug-b is the one line that changed
-    assert json.loads(after_lines[1])["status"] == "resolved"
+    assert json.loads(after_lines[1])["resolved_release"] == "v0.5.1"
 
 
 # --- A2.9 — refuse a stale rewrite, never clobber it ---------------------------------
@@ -113,7 +141,7 @@ def test_update_refuses_stale_rewrite_when_file_changed_since_read(tmp_path: Pat
         # pre-write re-read — the only hook point available from inside one call.
         with store_path.open("ab") as handle:
             handle.write(b"\n")
-        return record.apply_governance_update({"status": "resolved"})
+        return record.apply_governance_update({"resolved_release": "v0.5.1"})
 
     with pytest.raises(StaleRecordWriteError):
         store.update("race-bug", _mutate)
@@ -158,7 +186,8 @@ def test_update_refuses_a_concurrent_append_that_lands_after_the_rereads_own_che
 
     with pytest.raises(StaleRecordWriteError):
         store.update(
-            "race-bug", lambda record: record.apply_governance_update({"status": "resolved"})
+            "race-bug",
+            lambda record: record.apply_governance_update({"resolved_release": "v0.5.1"}),
         )
 
     ids = {
@@ -255,7 +284,7 @@ def test_redaction_is_schema_derived_and_covers_both_write_paths(tmp_path: Path)
     ``BugRecord.redact()`` seam scrubs a real denylist term on BOTH the append path and
     the in-place update path, through the generic store."""
     schema = _schema()
-    baseline_fields = set(redactable_property_names(schema))
+    baseline_fields = set(_redactable_property_names(schema))
     assert "id" not in baseline_fields
     assert "ts" not in baseline_fields
     assert "reported_by" not in baseline_fields
@@ -267,7 +296,7 @@ def test_redaction_is_schema_derived_and_covers_both_write_paths(tmp_path: Path)
             "extra_free_text_field": {"type": "string"},
         },
     }
-    extended_fields = set(redactable_property_names(extended_schema))
+    extended_fields = set(_redactable_property_names(extended_schema))
     assert extended_fields == baseline_fields | {"extra_free_text_field"}
 
     denylist = (("SECRET-TOKEN", "test-term"),)

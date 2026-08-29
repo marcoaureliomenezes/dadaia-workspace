@@ -9,7 +9,7 @@ consumer actually shares — never a rule bolted onto each verb (A10.3):
 2. A10.2 — a reference clone sits OUTSIDE the context lifecycle: no lifecycle verb can ever
    resolve, bind, alive, dead or GC it. This is proven twice: once at the ONE shared
    enumeration seam every lifecycle verb funnels context resolution through
-   (``core.specs_resolver.resolve_context`` / ``_repo_slug_under_repos``, scoped to
+   (``core.invocation.resolve`` / ``_repo_slug_under_repos``, scoped to
    ``<workspace_root>/repos/`` only — a reference clone under ``.dadaia/references/`` is
    structurally unreachable from it), and once on a REAL verb call path: the exact function
    backing ``dadaia context bind``/``show``'s no-arg resolution
@@ -30,12 +30,13 @@ import pytest
 pytest.importorskip("fcntl")
 
 import json  # noqa: E402
+import os  # noqa: E402
 from pathlib import Path  # noqa: E402
 
 from dadaia_workspace.cli._specs_resolution import (  # noqa: E402
     resolve_context_for_cli,
 )
-from dadaia_workspace.core import specs_resolver  # noqa: E402
+from dadaia_workspace.core import invocation  # noqa: E402
 from dadaia_workspace.features.spec_context.doctor import DoctorService  # noqa: E402
 from tests.fakes import FakeContextStore, FakeGitClient  # noqa: E402
 from tests.fixtures.harness_env import scrub_context_resolution_env  # noqa: E402
@@ -101,8 +102,8 @@ def test_shared_resolution_seam_never_resolves_a_reference_clone(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The ONE seam every lifecycle verb (bind/alive/dead/show's default resolution)
-    funnels context resolution through is ``core.specs_resolver.resolve_context`` — its
-    cwd rung (``_repo_slug_under_repos``) is scoped to ``<workspace_root>/repos/`` only.
+    funnels context resolution through is ``core.invocation.resolve`` — its cwd rung
+    (``_repo_slug_under_repos``) is scoped to ``<workspace_root>/repos/`` only.
     A cwd inside ``.dadaia/references/<clone>/`` sits entirely outside that tree, so the
     seam can never select the reference clone as an active context — proven directly,
     not inferred from the allowlist."""
@@ -111,7 +112,8 @@ def test_shared_resolution_seam_never_resolves_a_reference_clone(
     monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
     monkeypatch.chdir(clone_dir)
 
-    assert specs_resolver.resolve_context() is None
+    inv = invocation.resolve(env=os.environ, cwd=Path.cwd())
+    assert inv.context_name is None
 
 
 def test_bind_and_show_resolution_path_refuses_to_select_a_reference_clone(

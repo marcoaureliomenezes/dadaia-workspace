@@ -23,8 +23,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from dadaia_workspace.core import invocation
 from dadaia_workspace.core.platform import PLATFORM
-from dadaia_workspace.core.session_env import HARNESS_SESSION_ID_ENV_VARS
 
 #: Write-like tool names intercepted by the PreToolUse gates (Claude / Codex).
 WRITE_TOOLS: frozenset[str] = frozenset(
@@ -120,27 +120,20 @@ def sanitize_session_id(raw: str | None) -> str:
 
 
 def resolve_session_id(payload: dict[str, Any], *, default: str = "") -> str:
-    """Resolve the harness-native session id, sanitized.
+    """Resolve the harness-native session id, sanitized — a thin call onto the ONE
+    session-id rule (:func:`dadaia_workspace.core.invocation.resolve_session_id`).
 
     Order (v0.1.50 FR1): explicit ``DADAIA_SESSION_ID`` override (eval-flow contract,
     always first), then the stdin ``session_id`` payload field (the harness's live
     truth for THIS session), then the per-harness env vars (which may be INHERITED
     from a parent shell and stale — the audit F-1 rotated-sid self-block source),
-    then ``default``. Shared seam: the gate, the PostToolUse heartbeat, and
-    ctx-inject all resolve through here, staying sid-consistent by construction.
-
-    The harness-native env-var list is the single source ``core.session_env.
-    HARNESS_SESSION_ID_ENV_VARS`` (v0.1.55 FR4) — the same list the bind CLI and the
-    ``core`` bound-context resolver read, so the harness id never drifts across layers.
+    then ``default``. Shared seam: the gate, the PostToolUse heartbeat, ctx-inject, and
+    :func:`dadaia_workspace.core.invocation.resolve` all resolve through the SAME rule,
+    staying sid-consistent by construction — a CLI-minted ``sess_*`` id is never a
+    member of it (release K1: minting a fresh id when nothing resolves is a distinct,
+    write-side concern the bind CLI owns for itself).
     """
-    candidate = os.environ.get("DADAIA_SESSION_ID") or str(payload.get("session_id") or "")
-    if not candidate:
-        for name in HARNESS_SESSION_ID_ENV_VARS:
-            candidate = os.environ.get(name) or ""
-            if candidate:
-                break
-    sanitized = sanitize_session_id(candidate)
-    return sanitized or default
+    return invocation.resolve_session_id(payload, os.environ, default=default)
 
 
 def emit_block(reason: str) -> None:

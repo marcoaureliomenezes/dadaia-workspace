@@ -19,36 +19,35 @@ import sqlite3
 import pytest
 
 from dadaia_workspace.features.telemetry.reader.claude import read_session_file
-from dadaia_workspace.features.telemetry.store.dao import TelemetryDao
-from dadaia_workspace.features.telemetry.store.schema import apply_migrations
+from dadaia_workspace.features.telemetry.store import TelemetryStore, apply_migrations
 
 FIXTURES_DIR = pathlib.Path(__file__).parent.parent.parent.parent / "fixtures" / "telemetry"
 
 NOW_ISO = "2026-05-17T10:00:00Z"
 
 
-def _make_dao(tmp_path: pathlib.Path) -> TelemetryDao:
+def _make_dao(tmp_path: pathlib.Path) -> TelemetryStore:
     """Create a fresh in-memory SQLite DAO with migrations applied."""
     conn = sqlite3.connect(":memory:")
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
     apply_migrations(conn)
-    return TelemetryDao(conn)
+    return TelemetryStore.from_connection(conn)
 
 
-def _count_table(dao: TelemetryDao, table: str) -> int:
+def _count_table(dao: TelemetryStore, table: str) -> int:
     row = dao._conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()  # noqa: SLF001
     return int(row[0])
 
 
-def _get_session(dao: TelemetryDao, session_id: str) -> sqlite3.Row | None:
+def _get_session(dao: TelemetryStore, session_id: str) -> sqlite3.Row | None:
     row = dao._conn.execute(  # noqa: SLF001
         "SELECT * FROM sessions WHERE session_id = ?", (session_id,)
     ).fetchone()
     return row  # type: ignore[no-any-return]
 
 
-def _get_all_events(dao: TelemetryDao) -> list[sqlite3.Row]:
+def _get_all_events(dao: TelemetryStore) -> list[sqlite3.Row]:
     return dao._conn.execute("SELECT * FROM events").fetchall()  # noqa: SLF001
 
 
@@ -184,7 +183,7 @@ def test_inode_rotation_resets_offset(tmp_path: pathlib.Path) -> None:
     new_inode = target.stat().st_ino
 
     if old_inode == new_inode:
-        from dadaia_workspace.features.telemetry.store.models import ReaderState
+        from dadaia_workspace.features.telemetry.store import ReaderState
 
         dao.upsert_reader_state(
             ReaderState(

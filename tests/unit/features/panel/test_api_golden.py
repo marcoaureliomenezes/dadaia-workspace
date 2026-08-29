@@ -46,6 +46,7 @@ from dadaia_workspace.core.models.agent import (
 )
 from dadaia_workspace.core.models.server_registry import PortEntry, PortStatus
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
+from dadaia_workspace.core.models.telemetry import AgentSummary, TokenTotals
 from dadaia_workspace.features.panel.service import PanelService
 
 # --- render functions under lock (per-domain modules post-FR2-split; the bytes do not move) ---
@@ -66,7 +67,6 @@ from dadaia_workspace.features.panel.views.api_reports import (
 from dadaia_workspace.features.panel.views.api_servers import render_api_servers
 from dadaia_workspace.features.panel.views.api_sessions import render_api_sessions
 from dadaia_workspace.features.reports.retention import ReportRetentionService
-from dadaia_workspace.features.telemetry.aggregator.models import AgentSummary, TokenTotals
 
 pytestmark = pytest.mark.unit
 

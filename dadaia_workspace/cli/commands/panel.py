@@ -4,16 +4,12 @@ from __future__ import annotations
 
 import contextlib
 import logging
-import sqlite3
 import sys
 import webbrowser
-from pathlib import Path
-from typing import Any
 
 import typer
 
 from dadaia_workspace import container
-from dadaia_workspace.core.exceptions import PlatformSecurityError
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.panel.handler import make_handler_class
 from dadaia_workspace.features.panel.server import build_panel_http_server
@@ -23,96 +19,6 @@ _LOOPBACK_ONLY: frozenset[str] = frozenset({"127.0.0.1"})
 logger = logging.getLogger(__name__)
 
 app = typer.Typer(help="Start the Dadaia Workspace Panel (local UI).")
-
-
-def _try_build_telemetry(workspace_root: Path) -> object | None:
-    """Best-effort TelemetryService construction for the panel boot.
-
-    Returns a TelemetryService instance if all dependencies can be wired,
-    or None if telemetry is unavailable (e.g. running as root, missing
-    state directory, etc.).  The panel starts regardless — telemetry
-    endpoints degrade to 503 when this returns None.
-    """
-    try:
-        import pathlib
-
-        from dadaia_workspace.features.telemetry import pricing as _pricing
-        from dadaia_workspace.features.telemetry.aggregator.queries import TelemetryAggregator
-        from dadaia_workspace.features.telemetry.reader import claude as _claude_reader
-        from dadaia_workspace.features.telemetry.reader import codex as _codex_reader
-        from dadaia_workspace.features.telemetry.reader import kimi as _kimi_reader
-        from dadaia_workspace.features.telemetry.service import TelemetryService
-        from dadaia_workspace.features.telemetry.store.dao import TelemetryDao
-        from dadaia_workspace.features.telemetry.store.schema import (
-            apply_migrations,
-            open_connection,
-        )
-
-        state_dir = pathlib.Path("~/.dadaia/state/telemetry").expanduser()
-        state_dir.mkdir(parents=True, exist_ok=True)
-        db_path = state_dir / "telemetry.sqlite"
-
-        def _write_dao_factory() -> TelemetryDao:
-            # Writable per-refresh connection through the pragma'd factory (WAL +
-            # busy_timeout). Used only inside TelemetryService._do_refresh, which
-            # closes it in finally. Single-thread use → no check_same_thread.
-            conn = open_connection(db_path)
-            apply_migrations(conn)
-            return TelemetryDao(conn)
-
-        def _read_conn_factory() -> sqlite3.Connection:
-            # Per-call read-only connection for aggregator queries. Each panel
-            # request thread opens and closes its OWN connection — never shared
-            # across ThreadingHTTPServer worker threads (v0.1.52 FR3). Read-only
-            # (mode=ro) skips the WAL write; busy_timeout absorbs transient locks.
-            return open_connection(db_path, read_only=True)
-
-        # Materialise + migrate the store once at boot so the per-call read-only
-        # factory always has a database to open (mode=ro cannot create a file).
-        _boot_dao = _write_dao_factory()
-        _boot_dao._conn.close()
-
-        # We need a SpecContextService for context resolution.
-        spec_context = container.build_spec_context_service(workspace_root)
-
-        aggregator = TelemetryAggregator(
-            connection_factory=_read_conn_factory,
-            spec_context_service=spec_context,
-            pricing_module=_pricing,
-            workspace_root=workspace_root,
-        )
-
-        def _reader_factory() -> tuple[Any, ...]:
-            return (_claude_reader, _codex_reader, _kimi_reader)
-
-        return TelemetryService(
-            dao_factory=_write_dao_factory,
-            aggregator=aggregator,
-            reader_factory=_reader_factory,
-            pricing_module=_pricing,
-            workspace_root=workspace_root,
-            state_dir=state_dir,
-            spec_context_service=spec_context,
-        )
-    except ImportError as exc:
-        logger.warning("Telemetry unavailable (missing dependency): %s", exc)
-        return None
-    except PermissionError as exc:
-        logger.warning("Telemetry unavailable (permission denied on telemetry state dir): %s", exc)
-        return None
-    except PlatformSecurityError as exc:
-        # Tier-2: telemetry dir permission restriction failed on this platform.
-        # The panel continues without telemetry (503 on telemetry endpoints).
-        logger.warning(
-            "Telemetry unavailable (platform security error restricting state dir): %s", exc
-        )
-        return None
-    except OSError as exc:
-        logger.warning("Telemetry unavailable (OS error initialising telemetry state): %s", exc)
-        return None
-    except sqlite3.OperationalError as exc:
-        logger.warning("Telemetry unavailable (SQLite database error): %s", exc)
-        return None
 
 
 @app.callback(invoke_without_command=True)
@@ -136,9 +42,10 @@ def panel(
     # URL.  The handler's Host-header allowlist is the only residual guard
     # (DNS-rebinding protection — never a credential).
 
-    # Build telemetry first so it can be injected into the panel service,
-    # enabling the canonical agent overlay (PR3-08).
-    telemetry = _try_build_telemetry(workspace_root)
+    # Telemetry composition is plain wiring in the container (K8 — the
+    # composition root, not a nested-class factory) so it can be injected
+    # into the panel service, enabling the canonical agent overlay (PR3-08).
+    telemetry = container.build_telemetry_service(workspace_root)
 
     try:
         views = container.build_panel_views(workspace_root, telemetry=telemetry)

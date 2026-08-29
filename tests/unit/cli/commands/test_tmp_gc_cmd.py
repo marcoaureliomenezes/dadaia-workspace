@@ -10,7 +10,6 @@ backstop" text). The exhaustive lane/AG.1 behavior is proven at the service leve
 
 from __future__ import annotations
 
-import time
 from pathlib import Path
 
 import pytest
@@ -87,26 +86,3 @@ def test_help_documents_the_backstop_and_event_driven_posture() -> None:
     assert "backstop" in lowered
     assert "event-driven" in lowered
     assert "calendar" in lowered
-
-
-def test_live_owned_marker_survives_the_cli_path(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """End-to-end sanity through the CLI: a marker whose session record exists is never
-    touched, even by the real (non-dry-run) invocation."""
-    _patch_workspace(monkeypatch, tmp_path)
-    dadaia_root = tmp_path / ".dadaia"
-    (dadaia_root / "sessions").mkdir(parents=True)
-    (dadaia_root / "sessions" / "owned.json").write_text("{}", encoding="utf-8")
-    marker = dadaia_root / "tmp" / "reconciler-last-owned"
-    marker.parent.mkdir(parents=True, exist_ok=True)
-    marker.write_text("marker", encoding="utf-8")
-    import os
-
-    old = time.time() - 30 * 86400
-    os.utime(marker, (old, old))
-
-    result = runner.invoke(main_app, ["tmp", "gc"])
-
-    assert result.exit_code == 0
-    assert marker.exists()

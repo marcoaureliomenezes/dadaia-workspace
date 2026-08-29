@@ -1,6 +1,9 @@
 """Composition root — builds services with concrete infrastructure."""
 
-from collections.abc import Callable
+import logging
+import os
+import time
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -15,12 +18,14 @@ from dadaia_workspace.core.exceptions import (
     NoActiveReleaseError,
     WorkspaceNotInitializedError,
 )
+from dadaia_workspace.core.handoff_index import HandoffIndex
+from dadaia_workspace.core.invocation import repo_slug_for_context
+from dadaia_workspace.core.invocation import resolve as _resolve_invocation
+from dadaia_workspace.core.invocation import resolve_context_specs_dir as _resolve_context_specs_dir
 from dadaia_workspace.core.protocols.git_history_reader import GitHistoryReader
 from dadaia_workspace.core.protocols.git_object_reader import GitObjectReader
 from dadaia_workspace.core.protocols.process_ancestry import ProcessAncestry
 from dadaia_workspace.core.protocols.record_store import RecordStore
-from dadaia_workspace.core.specs_resolver import repo_slug_for_context
-from dadaia_workspace.core.specs_resolver import resolve_context as _core_resolve_context
 from dadaia_workspace.features.academy.service import AcademyService
 from dadaia_workspace.features.agents.reader import FileSystemAgentsProvider
 from dadaia_workspace.features.chokepoints.denylist_scan import BaselinePatternLike
@@ -36,6 +41,7 @@ from dadaia_workspace.features.panel.views.agent_policy import (
 from dadaia_workspace.features.panel.views.api_academy import render_api_academy
 from dadaia_workspace.features.panel.views.api_agents import (
     render_api_agent_prompt,
+    render_api_agent_sessions,
     render_api_agents_canonical,
 )
 from dadaia_workspace.features.panel.views.api_contexts import render_api_contexts
@@ -56,7 +62,6 @@ from dadaia_workspace.features.panel.views.wrapper import render_memory_wrapper
 from dadaia_workspace.features.public.service import PublicAssetService
 from dadaia_workspace.features.reports.next import ReportsNextService
 from dadaia_workspace.features.reports.retention import ReportRetentionService
-from dadaia_workspace.features.reports.validation import ReportsValidationService
 from dadaia_workspace.features.repos.service import ReposService
 from dadaia_workspace.features.server_registry.service import ServerRegistryService
 from dadaia_workspace.features.spec_context.doctor import DoctorService
@@ -77,7 +82,8 @@ from dadaia_workspace.infrastructure.process_ancestry_adapter import (
 from dadaia_workspace.infrastructure.process_probe_adapter import OsProcessProbe, build_pid_probe
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
-from dadaia_workspace.infrastructure.stdlib_handoff_validator import StdlibHandoffValidator
+
+logger = logging.getLogger(__name__)
 
 
 def build_shutdown_handler() -> Any:
@@ -225,6 +231,29 @@ def build_bug_record_store(specs_dir: Path) -> "RecordStore[BugRecord]":
         to_dict=BugRecord.to_dict,
         from_dict=BugRecord.from_dict,
     )
+
+
+def build_bug_record_validator() -> Callable[[Mapping[str, object]], None]:
+    """Composition-root seam for ``bug-record-v1.schema.json`` validation (D9) — the
+    ONE validation table, loaded once, reused by :meth:`~dadaia_workspace.features
+    .bugs.service.BugService.register` (relocated from ``cli/commands/bugs.py``'s own
+    schema loading, ``cli-no-infrastructure``: neither ``jsonschema``'s
+    ``Draft202012Validator`` nor the packaged schema path belongs at the CLI layer).
+    Raises ``jsonschema.exceptions.ValidationError`` on the first schema violation.
+    """
+    import json
+
+    from jsonschema import Draft202012Validator
+
+    package_root = Path(__file__).resolve().parent
+    schema_path = package_root / "public" / "schemas" / "bugs" / "bug-record-v1.schema.json"
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    validator = Draft202012Validator(schema)
+
+    def _validate(payload: Mapping[str, object]) -> None:
+        validator.validate(payload)
+
+    return _validate
 
 
 def build_bug_archive_store(specs_dir: Path) -> "RecordStore[BugRecord]":
@@ -404,20 +433,6 @@ def is_source_repo_root(path: Path) -> bool:
     return _is_source_repo_root(path)
 
 
-def resolve_context(explicit: str | None = None, *, target_path: Path | None = None) -> str | None:
-    """Composition-root seam for the single context-resolution authority (hooks path).
-
-    T-50-02 (SPEC v0.5.0 FR1). ``core.specs_resolver`` is a forbidden direct import for
-    ``hooks`` (``bind-resolution-seam-is-a-single-home``, ZERO ``ignore_imports``): the
-    CLI routes through ``cli._specs_resolution`` (a sanctioned direct-import seam) and
-    every hook routes here instead. A thin, transparent pass-through to
-    :func:`dadaia_workspace.core.specs_resolver.resolve_context` (``DADAIA.md`` §3): no
-    behavior of its own, so a hook consumer resolves the EXACT same rungs the CLI seam
-    and every other consumer resolves.
-    """
-    return _core_resolve_context(explicit, target_path=target_path)
-
-
 def build_doctor_service(workspace_root: Path) -> DoctorService:
     _guard_initialized(workspace_root)
     states = _states_dir(workspace_root)
@@ -467,6 +482,76 @@ def run_certification(workspace_root: Path, *, keep: bool = False) -> "Certifica
     return certify(workspace_root, SubprocessCertificationProcess(), keep=keep)
 
 
+def build_telemetry_service(workspace_root: Path) -> object | None:
+    """Best-effort ``TelemetryService`` construction for the panel boot (K8).
+
+    Plain wiring — no nested class, no factory-of-factories. Returns ``None``
+    (never raises) when telemetry cannot be wired (root uid, permission/OS/
+    SQLite error) so the panel starts regardless; telemetry endpoints degrade
+    to 503 when this returns ``None``.
+    """
+    import sqlite3
+    from pathlib import Path as _Path
+
+    from dadaia_workspace.core.exceptions import PlatformSecurityError
+    from dadaia_workspace.features.telemetry import pricing as _pricing
+    from dadaia_workspace.features.telemetry.aggregator.queries import TelemetryAggregator
+    from dadaia_workspace.features.telemetry.reader.adapters import DEFAULT_READERS
+    from dadaia_workspace.features.telemetry.service import TelemetryService
+    from dadaia_workspace.features.telemetry.store import TelemetryStore
+
+    state_dir = _Path("~/.dadaia/state/telemetry").expanduser()
+    db_path = state_dir / "telemetry.sqlite"
+    store = TelemetryStore(db_path)
+
+    try:
+        state_dir.mkdir(parents=True, exist_ok=True)
+        # Materialise + migrate the store once at boot so the per-request
+        # read-only factory always has a database to open (mode=ro cannot
+        # create a file); this store instance is also what the service ingests
+        # into on each refresh.
+        store.open_write().migrate()
+        store.close()
+
+        spec_context = build_spec_context_service(workspace_root)
+        aggregator = TelemetryAggregator(
+            connection_factory=store.open_read,
+            spec_context_service=spec_context,
+            pricing_module=_pricing,
+            workspace_root=workspace_root,
+        )
+
+        return TelemetryService(
+            store,
+            DEFAULT_READERS,
+            time.monotonic,
+            aggregator=aggregator,
+            pricing_module=_pricing,
+            workspace_root=workspace_root,
+            state_dir=state_dir,
+            spec_context_service=spec_context,
+        )
+    except ImportError as exc:
+        logger.warning("Telemetry unavailable (missing dependency): %s", exc)
+        return None
+    except PermissionError as exc:
+        logger.warning("Telemetry unavailable (permission denied on telemetry state dir): %s", exc)
+        return None
+    except PlatformSecurityError as exc:
+        # Tier-2: telemetry dir permission restriction failed on this platform.
+        # The panel continues without telemetry (503 on telemetry endpoints).
+        logger.warning(
+            "Telemetry unavailable (platform security error restricting state dir): %s", exc
+        )
+        return None
+    except OSError as exc:
+        logger.warning("Telemetry unavailable (OS error initialising telemetry state): %s", exc)
+        return None
+    except sqlite3.OperationalError as exc:
+        logger.warning("Telemetry unavailable (SQLite database error): %s", exc)
+        return None
+
+
 def build_panel_service(
     workspace_root: Path,
     telemetry: object | None = None,
@@ -484,23 +569,17 @@ def build_panel_service(
     )
 
 
-def build_reports_validation_service(workspace_root: Path) -> ReportsValidationService:
-    """Compose ``ReportsValidationService`` with ``StdlibHandoffValidator``.
+def build_handoff_index(workspace_root: Path) -> HandoffIndex:
+    """Compose the workspace-rooted :class:`HandoffIndex` (release 0.5.1 K6).
 
-    Schema is read from the staged location:
+    Construction is cheap (no schema load) — schema loading happens lazily, once, on
+    the first ``validate_file``/``validate_all`` call, from
     ``workspace_root/.dadaia/agentic/schemas/handoff-v1.schema.json``.
-    Handoff root is ``workspace_root/.dadaia/handoff``.
 
     Args:
         workspace_root: Root directory of the initialized dadaia workspace.
-
-    Returns:
-        A fully wired ``ReportsValidationService`` instance.
     """
-    schema_path = workspace_root / ".dadaia" / "agentic" / "schemas" / "handoff-v1.schema.json"
-    reports_root = workspace_root / ".dadaia" / "handoff"
-    validator = StdlibHandoffValidator(schema_path)
-    return ReportsValidationService(validator=validator, reports_root=reports_root)
+    return HandoffIndex(workspace_root)
 
 
 def build_reports_next_service(
@@ -521,7 +600,9 @@ def build_reports_next_service(
     """
     _guard_initialized(workspace_root)
     reports_root = workspace_root / ".dadaia" / "handoff"
-    context_name = _core_resolve_context(context)
+    context_name = _resolve_invocation(
+        explicit=context, env=os.environ, cwd=Path.cwd()
+    ).context_name
     if not context_name:
         raise NoActiveReleaseError(
             "No bound context. Run `eval $(dadaia context bind <name> --mode read)` "
@@ -563,29 +644,14 @@ def build_agent_model_policy_service(workspace_root: Path) -> "AgentModelPolicyS
     return AgentModelPolicyService(store=store, rerender=_rerender_agents)
 
 
-def _context_specs_dir(workspace_root: Path, context: str) -> Path:
-    """Resolve a context's ``specs/`` tree (v0.1.57 FR2 / A1 — role→atom map wiring).
-
-    A consumer context resolves
-    to ``workspace_root/repos/<ctx>/specs``; the self-hosting library repo falls back to the
-    workspace-root ``specs`` tree. All roots derive from ``workspace_root`` — never cwd.
-    """
-    context_name = _core_resolve_context(context) or context
-    specs_dir = (
-        workspace_root / "repos" / repo_slug_for_context(workspace_root, context_name) / "specs"
-    )
-    if not specs_dir.is_dir():
-        specs_dir = workspace_root / "specs"
-    return specs_dir
-
-
 def resolve_context_specs_dir(workspace_root: Path, context: str) -> Path:
-    """Public seam for :func:`_context_specs_dir` (FR3, v0.1.68).
+    """Public seam (FR3, v0.1.68) for a context's ``specs/`` tree.
 
-    Lets a CLI verb resolve the same context→``specs/`` mapping the container
-    uses internally, without duplicating the resolution logic.
+    Thin pass-through to :func:`dadaia_workspace.core.invocation.resolve_context_specs_dir`
+    (release K1, the "One Invocation" deepening) — the container no longer holds its own
+    copy of the name-resolution + self-hosting-root-fallback logic.
     """
-    return _context_specs_dir(workspace_root, context)
+    return _resolve_context_specs_dir(workspace_root, context)
 
 
 def build_panel_views(
@@ -627,6 +693,7 @@ def build_panel_views(
         "api_report_unmark_important": unmark_report_important(service),
         "api_agents": render_api_agents_canonical(service),
         "api_agent_prompt": render_api_agent_prompt(service),
+        "api_agent_sessions": render_api_agent_sessions(service),
         # L1 agent model-governance control plane (v0.1.65 FR8 — T-65-11).
         "api_agent_model_policy": render_api_agent_model_policy(agent_policy_service),
         "api_agent_model_templates": render_api_agent_model_templates(agent_policy_service),

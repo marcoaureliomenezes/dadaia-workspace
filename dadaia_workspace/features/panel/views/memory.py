@@ -34,22 +34,17 @@ from __future__ import annotations
 
 import html as _html
 import logging
-import re
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-import yaml
-
+from dadaia_workspace.core import frontmatter as _fm
 from dadaia_workspace.features.panel.views._md_render import (
     build_renderer,
     render_md_to_html,
 )
 
 _log = logging.getLogger(__name__)
-
-# YAML frontmatter delimited by leading `---` ... `---`.
-_FRONTMATTER_RE = re.compile(r"\A---\s*\n(?P<fm>.*?)\n---\s*\n?", re.DOTALL)
 
 # Content-type map keyed by file suffix (lower-case, dot included).
 _CONTENT_TYPES: dict[str, str] = {
@@ -81,16 +76,10 @@ def _split_frontmatter(source: str) -> tuple[dict[str, Any], str]:
     ``({}, source)``.  A malformed YAML block is treated as no frontmatter and
     left in the body (never raised) so a bad atom still renders.
     """
-    match = _FRONTMATTER_RE.match(source)
-    if match is None:
+    parsed = _fm.parse(source)
+    if isinstance(parsed, _fm.FrontmatterError):
         return {}, source
-    try:
-        loaded = yaml.safe_load(match.group("fm"))
-    except yaml.YAMLError:
-        return {}, source
-    meta = loaded if isinstance(loaded, dict) else {}
-    body = source[match.end() :]
-    return meta, body
+    return parsed.data, parsed.body
 
 
 def _render_meta_header(meta: dict[str, Any]) -> str:

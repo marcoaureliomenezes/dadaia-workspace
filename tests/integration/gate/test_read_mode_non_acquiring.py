@@ -24,7 +24,7 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.features.spec_context import session_identity
+from dadaia_workspace.core import session_store as session_identity
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
 pytestmark = pytest.mark.integration

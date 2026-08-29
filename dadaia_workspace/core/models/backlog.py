@@ -52,6 +52,7 @@ __all__ = [
     "Subject",
     "SubjectKind",
     "is_intents_exempt",
+    "is_nonterminal_active_status",
     "is_terminal_disposition",
     "parse_intents",
     "serialize_intents",
@@ -81,6 +82,29 @@ def is_terminal_disposition(token: str | None) -> bool:
     ``DEFERRED``, ``REJECTED`` (``dd-backlog-definition`` §2).
     """
     return token is not None and token.strip().upper() in _TERMINAL_DISPOSITION_TOKEN_SET
+
+
+#: v0.5.1 K5 ("same shape applies to backlog"): the ``active[]`` entry's own
+#: informal, lowercase live-stage prefixes SPEC-DOC-031 treats as "not yet
+#: dispositioned" — relocated here, UNCHANGED, from
+#: ``features.specs.doctor_governance``'s private ``_BACKLOG_NONTERMINAL_PREFIXES``
+#: tuple, so it is the ONE source both that check and (in a future pass)
+#: ``features.backlog.doctor`` read, rather than each keeping its own copy.
+_NONTERMINAL_ACTIVE_STATUS_PREFIXES: tuple[str, ...] = ("open", "picked", "candidate")
+
+
+def is_nonterminal_active_status(status: str | None) -> bool:
+    """True iff *status* (case-insensitively, prefix-matched) is one of an
+    ``active[]`` entry's informal non-terminal live stages: ``open``, ``picked``,
+    ``candidate`` (v0.5.1 K5). This is NOT :func:`is_terminal_disposition`'s inverse
+    — the two vocabularies classify different things (the six canonical LEDGER exit
+    tokens vs. the informal live-stage prefixes ``BACKLOG.json``'s own ``status``
+    field carries) and are kept as two named predicates rather than folded into one,
+    to avoid silently conflating them.
+    """
+    return status is not None and status.strip().lower().startswith(
+        _NONTERMINAL_ACTIVE_STATUS_PREFIXES
+    )
 
 
 def is_intents_exempt(status: str | None) -> bool:

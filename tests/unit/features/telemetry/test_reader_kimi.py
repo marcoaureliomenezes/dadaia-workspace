@@ -21,25 +21,24 @@ import sqlite3
 import pytest
 
 from dadaia_workspace.features.telemetry.reader.kimi import ReadResult, read_kimi_sessions
-from dadaia_workspace.features.telemetry.store.dao import TelemetryDao
-from dadaia_workspace.features.telemetry.store.schema import apply_migrations
+from dadaia_workspace.features.telemetry.store import TelemetryStore, apply_migrations
 
 NOW_ISO = "2026-05-17T10:00:00Z"
 
 
-def _make_dao() -> TelemetryDao:
+def _make_dao() -> TelemetryStore:
     """Create a fresh in-memory SQLite DAO with migrations applied."""
     conn = sqlite3.connect(":memory:")
     apply_migrations(conn)
-    return TelemetryDao(conn)
+    return TelemetryStore.from_connection(conn)
 
 
-def _count_table(dao: TelemetryDao, table: str) -> int:
+def _count_table(dao: TelemetryStore, table: str) -> int:
     row = dao._conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()  # noqa: SLF001
     return int(row[0])
 
 
-def _get_session(dao: TelemetryDao, session_id: str) -> sqlite3.Row | None:
+def _get_session(dao: TelemetryStore, session_id: str) -> sqlite3.Row | None:
     row = dao._conn.execute(  # noqa: SLF001
         "SELECT * FROM sessions WHERE session_id = ?", (session_id,)
     ).fetchone()

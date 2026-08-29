@@ -1,19 +1,30 @@
-"""Unit tests for the v0.1.65 FR5 render-at-install seam (T-65-08).
+"""T-65-08: the v0.1.65 FR5 render-at-install seam, rewritten at the K3 (v0.5.1)
+pure-render interface.
+
+Intent: CONTRACT — v0.1.65 F-3/F-5/F-6/D-3/D-6; K3 (v0.5.1) collapses
+``install_claude_agents``/``install_codex_agents`` into pure functions
+(``render_claude_agent``, ``resolve_codex_agent_model``,
+``projection_rules._codex_agent_toml_bytes``) plus the one ``ProjectionRule``
+seam (``install_rules``) — this file tests those directly instead of the
+retired per-writer delegators.
 
 Covers:
 - ``render_claude_agent`` — the D-6 single render seam: deterministic ``model:`` then
   ``effort:`` injection as the LAST frontmatter lines; pre-existing ``model:``/``effort:``
   lines stripped (pack bodies author ``model:``); ``effort:`` OMITTED entirely when
-  unresolved (F-6 plugin asymmetry — never empty/placeholder); a body without frontmatter
-  raises.
-- F-3 fail-closed core codex render: ``install_codex_agents`` RAISES a loud typed
-  ``PublicAssetError`` for a CORE agent supplied with neither a staged ``model:`` nor a
-  resolved policy model (the silent ``claude-sonnet-4-6`` default is removed for core
-  agents; kept only for plugin bodies/stubs, which keep working with no resolved policy).
-- D-3 clamp: the codex ``model_reasoning_effort`` derives from the RESOLVED effort via
-  the fixed clamp map (``xhigh``/``max`` → ``high``).
+  unresolved (F-6 — never empty/placeholder); a body without frontmatter raises.
+- ``resolve_codex_agent_model`` — F-3 fail-closed: a CORE agent with neither a staged
+  ``model:`` nor a resolved policy model raises a loud typed ``PublicAssetError``; a
+  resolved policy always wins over an authored ``model:``; a plugin body with neither
+  falls back to the legacy ``claude-sonnet-4-6`` default; D-3 clamps the resolved
+  effort via ``codex_effort_for_claude_effort``.
+- ``projection_rules._codex_agent_toml_bytes`` — the ONE codex-agent TOML renderer
+  (mirrors the historical ``install_codex_agents`` per-file body): F-3 fail-closed at
+  the render boundary, a plugin body keeps its authored model with no resolved policy,
+  and D-3's clamp reaches the rendered ``model_reasoning_effort`` field.
 - F-5: ``--force`` re-RENDERS a diverged claude agent projection back to the render
-  output — never to raw staged bytes.
+  output — never to raw staged bytes — through the real ``ProjectionRule``/
+  ``install_rules`` seam every rule (Claude, Codex, guardrail, kimi) now shares.
 """
 
 from __future__ import annotations
@@ -25,10 +36,11 @@ import pytest
 from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.core.models.agent_model_policy import ResolvedAgentModel
 from dadaia_workspace.infrastructure.install_helpers import (
-    install_claude_agents,
-    install_codex_agents,
     render_claude_agent,
+    resolve_codex_agent_model,
 )
+from dadaia_workspace.infrastructure.projection import ProjectionRule, install_rules
+from dadaia_workspace.infrastructure.projection_rules import _codex_agent_toml_bytes
 
 pytestmark = pytest.mark.unit
 
@@ -55,17 +67,10 @@ _PACK_BODY = (
 )
 
 
-def _iter_files(root: Path):  # type: ignore[no-untyped-def]
-    if not root.exists():
-        return ()
-    return (p for p in sorted(root.rglob("*")) if p.is_file())
-
-
-def _staged_tree(tmp_path: Path, name: str, text: str) -> Path:
-    agentic = tmp_path / ".dadaia" / "agentic"
-    (agentic / "agents").mkdir(parents=True, exist_ok=True)
-    (agentic / "agents" / f"{name}.md").write_text(text, encoding="utf-8")
-    return agentic
+def _staged_agent_md(tmp_path: Path, name: str, text: str) -> Path:
+    path = tmp_path / f"{name}.md"
+    path.write_text(text, encoding="utf-8")
+    return path
 
 
 # ---------------------------------------------------------------------------
@@ -116,41 +121,71 @@ def test_render_claude_agent_seam(case: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# F-3 — fail-closed core codex render (core agent) vs plugin body keeps working
+# resolve_codex_agent_model — F-3 fail-closed, precedence, D-3 clamp
 # ---------------------------------------------------------------------------
 
 
-def test_install_codex_agents_fails_closed_for_core_agent_without_model(
+def test_resolve_codex_agent_model_fails_closed_for_core_agent_without_model() -> None:
+    """F-3: a core agent with neither a staged ``model:`` nor a resolved policy model
+    raises loudly — never a silent ``claude-sonnet-4-6`` default."""
+    with pytest.raises(PublicAssetError, match="software-engineer"):
+        resolve_codex_agent_model("software-engineer", None, None)
+
+
+def test_resolve_codex_agent_model_prefers_resolved_over_staged() -> None:
+    """Precedence: resolved policy wins over an authored staged ``model:``."""
+    resolved = ResolvedAgentModel(model="claude-opus-4-8", effort="high", source="override")
+    model, effort = resolve_codex_agent_model("software-engineer", "claude-sonnet-5", resolved)
+    assert model == "claude-opus-4-8"
+    assert effort == "high"
+
+
+def test_resolve_codex_agent_model_falls_back_to_staged_when_no_resolved_policy() -> None:
+    """A plugin body's authored ``model:`` keeps working with no resolved policy (the
+    fail-closed guard applies to CORE agents only)."""
+    model, effort = resolve_codex_agent_model("frontend-engineer", "claude-sonnet-5", None)
+    assert model == "claude-sonnet-5"
+    assert effort is None
+
+
+def test_resolve_codex_agent_model_legacy_default_for_plugin_with_neither() -> None:
+    """A non-core agent with neither a resolved policy nor a staged ``model:`` falls
+    back to the legacy default (never raises — F-3 is scoped to CORE agents)."""
+    model, effort = resolve_codex_agent_model("frontend-engineer", None, None)
+    assert model == "claude-sonnet-4-6"
+    assert effort is None
+
+
+def test_resolve_codex_agent_model_uses_d3_clamp_of_resolved_effort() -> None:
+    """D-3: resolved ``xhigh`` clamps to codex ``model_reasoning_effort = "high"``."""
+    resolved = ResolvedAgentModel(model="claude-sonnet-5", effort="xhigh", source="default")
+    _model, effort = resolve_codex_agent_model("software-engineer", None, resolved)
+    assert effort == "high"
+
+
+# ---------------------------------------------------------------------------
+# projection_rules._codex_agent_toml_bytes — the ONE codex-agent TOML renderer
+# ---------------------------------------------------------------------------
+
+
+def test_codex_agent_toml_bytes_fails_closed_for_core_agent_without_model(
     tmp_path: Path,
 ) -> None:
-    """F-3: a core agent with neither staged ``model:`` nor resolved policy model
-    raises loudly — never a silent claude-sonnet-4-6 default."""
-    agentic = _staged_tree(tmp_path, "software-engineer", _GENERIC_BODY)
+    md = _staged_agent_md(tmp_path, "software-engineer", _GENERIC_BODY)
     with pytest.raises(PublicAssetError, match="software-engineer"):
-        install_codex_agents(agentic, tmp_path, False, [], resolved_models={})
+        _codex_agent_toml_bytes(md, "software-engineer", None)
 
 
-def test_install_codex_agents_keeps_authored_model_for_plugin_body(tmp_path: Path) -> None:
-    """A plugin body that authors ``model:`` keeps working with no resolved policy
-    (the fail-closed guard applies to CORE agents only)."""
-    agentic = _staged_tree(tmp_path, "frontend-engineer", _PACK_BODY)
-    installed: list[str] = []
-    install_codex_agents(agentic, tmp_path, False, installed, resolved_models={})
-    toml = (tmp_path / ".codex" / "agents" / "frontend-engineer.toml").read_text(encoding="utf-8")
+def test_codex_agent_toml_bytes_keeps_authored_model_for_plugin_body(tmp_path: Path) -> None:
+    md = _staged_agent_md(tmp_path, "frontend-engineer", _PACK_BODY)
+    toml = _codex_agent_toml_bytes(md, "frontend-engineer", None).decode("utf-8")
     assert 'model = "gpt-5.6-terra"' in toml
 
 
-def test_install_codex_agents_uses_d3_clamp_of_resolved_effort(tmp_path: Path) -> None:
-    """D-3: resolved ``xhigh`` clamps to codex ``model_reasoning_effort = "high"``."""
-    agentic = _staged_tree(tmp_path, "software-engineer", _GENERIC_BODY)
-    resolved = {
-        "software-engineer": ResolvedAgentModel(
-            model="claude-sonnet-5", effort="xhigh", source="default"
-        )
-    }
-    installed: list[str] = []
-    install_codex_agents(agentic, tmp_path, False, installed, resolved_models=resolved)
-    toml = (tmp_path / ".codex" / "agents" / "software-engineer.toml").read_text(encoding="utf-8")
+def test_codex_agent_toml_bytes_uses_d3_clamp_of_resolved_effort(tmp_path: Path) -> None:
+    md = _staged_agent_md(tmp_path, "software-engineer", _GENERIC_BODY)
+    resolved = ResolvedAgentModel(model="claude-sonnet-5", effort="xhigh", source="default")
+    toml = _codex_agent_toml_bytes(md, "software-engineer", resolved).decode("utf-8")
     assert 'model = "gpt-5.6-terra"' in toml
     assert 'model_reasoning_effort = "high"' in toml
 
@@ -163,20 +198,48 @@ def test_install_codex_agents_uses_d3_clamp_of_resolved_effort(tmp_path: Path) -
 def test_force_rerenders_diverged_claude_projection_to_render_output(
     tmp_path: Path,
 ) -> None:
-    agentic = _staged_tree(tmp_path, "software-engineer", _GENERIC_BODY)
-    resolved = {
-        "software-engineer": ResolvedAgentModel(
-            model="claude-sonnet-5", effort="xhigh", source="default"
-        )
-    }
-    installed: list[str] = []
-    install_claude_agents(agentic, tmp_path / ".claude", False, installed, _iter_files, resolved)
+    """--force restores a hand-edited (diverged) projection to the RENDER output —
+    never to the raw staged source bytes — through the same ``ProjectionRule`` seam
+    every Claude agent rule uses (``projection_rules._claude_agent_rules``)."""
+    resolved = ResolvedAgentModel(model="claude-sonnet-5", effort="xhigh", source="default")
     dst = tmp_path / ".claude" / "agents" / "software-engineer.md"
-    expected = render_claude_agent(_GENERIC_BODY, resolved["software-engineer"])
+    expected = render_claude_agent(_GENERIC_BODY, resolved)
+
+    def _render(_current: bytes | None) -> bytes:
+        return expected.encode("utf-8")
+
+    rule = ProjectionRule(
+        label="claude:agents/software-engineer.md", harness="claude", dst=dst, render=_render
+    )
+    install_rules((rule,), force=False)
     assert dst.read_text(encoding="utf-8") == expected
 
     dst.write_text("# hand-edited divergence\n", encoding="utf-8")
-    install_claude_agents(agentic, tmp_path / ".claude", True, installed, _iter_files, resolved)
+    install_rules((rule,), force=True)
     after = dst.read_text(encoding="utf-8")
     assert after == expected, "--force must restore the RENDER output"
     assert after != _GENERIC_BODY, "--force must never re-copy raw staged bytes"
+
+
+def test_install_rules_rewrites_a_read_only_projection(tmp_path: Path) -> None:
+    """Windows CI at 4ffc06b3: os.replace onto a 0o444 law file raised PermissionError.
+    A changed read-only projection is made writable, rewritten, and re-pinned."""
+    from dadaia_workspace.infrastructure.projection import ProjectionRule, install_rules
+
+    dst = tmp_path / "DADAIA.md"
+    dst.write_bytes(b"old")
+    dst.chmod(0o444)
+    rule = ProjectionRule(
+        label="law",
+        harness="claude",
+        dst=dst,
+        render=lambda _current: b"new",
+        compare="bytes",
+        mode=0o444,
+    )
+
+    transcript = install_rules([rule], force=False)
+
+    assert dst.read_bytes() == b"new"
+    assert [line.status for line in transcript.lines] == ["ok"]
+    assert (dst.stat().st_mode & 0o777) == 0o444

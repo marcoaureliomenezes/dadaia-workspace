@@ -1,12 +1,14 @@
 """T-13: SHA null-regression test.
 
-AC C7 (ADR-CX-004): Adding a Codex-only adapter must leave .claude/**
+Intent: CONTRACT — ADR-CX-004. Adding a Codex-only adapter must leave ``.claude/**``
 byte-identical before and after the install call.
 
 D-CX-6 doctor leak/drift/missing coverage lives in
-``test_public_assets_doctor.py`` (``TestDcx6CodexRuntimeAdapters``) — this file's
-sole survivor is the SHA null-regression proof, the only tree-hash isolation test
-in the suite.
+``tests/unit/infrastructure/test_public_assets_doctor.py``'s successor table test —
+this file's sole survivor is the SHA null-regression proof, the only tree-hash
+isolation test in the suite. K3 (v0.5.1): the codex-runtime-adapter rule set now comes
+from ``projection_rules._codex_runtime_adapter_rules`` + ``install_rules`` directly,
+rather than the retired ``manager._install_codex_runtime_adapters`` delegator.
 """
 
 from __future__ import annotations
@@ -14,10 +16,8 @@ from __future__ import annotations
 import hashlib
 import pathlib
 
-from dadaia_workspace.infrastructure.public_assets import (
-    FileSystemPublicAssetManager,
-    OverwritePolicy,
-)
+from dadaia_workspace.infrastructure.projection import install_rules
+from dadaia_workspace.infrastructure.projection_rules import _codex_runtime_adapter_rules
 
 _ADAPTER_CONTENT = "# Test adapter SKILL.md\n## Purpose\nCodex-only test adapter.\n"
 _EXISTING_CLAUDE_SKILL_CONTENT = "# Existing shared skill\n## Purpose\nAlready installed.\n"
@@ -45,13 +45,13 @@ def _make_workspace(tmp_path: pathlib.Path) -> tuple[pathlib.Path, pathlib.Path]
             runtime/
               codex/
                 test-adapter/
-                  SKILL.md   ← source adapter
+                  SKILL.md   <- source adapter
           workspace/
             .claude/
               skills/
                 existing-skill/
-                  SKILL.md   ← must not be touched by codex install
-            .codex/          ← install target
+                  SKILL.md   <- must not be touched by codex install
+            .codex/          <- install target
     """
     public_dir = tmp_path / "public"
     codex_src = public_dir / "runtime" / "codex" / "test-adapter"
@@ -60,46 +60,34 @@ def _make_workspace(tmp_path: pathlib.Path) -> tuple[pathlib.Path, pathlib.Path]
 
     workspace_root = tmp_path / "workspace"
 
-    # Pre-existing .claude/skills/existing-skill/SKILL.md
     existing_skill_dir = workspace_root / ".claude" / "skills" / "existing-skill"
     existing_skill_dir.mkdir(parents=True)
     (existing_skill_dir / "SKILL.md").write_text(_EXISTING_CLAUDE_SKILL_CONTENT, encoding="utf-8")
 
-    # Empty .codex/ dir
     (workspace_root / ".codex").mkdir(parents=True)
 
     return public_dir, workspace_root
 
 
-def _make_manager(public_dir: pathlib.Path) -> FileSystemPublicAssetManager:
-    """Instantiate a manager with *public_dir* patched as the asset source."""
-    manager = FileSystemPublicAssetManager()
-    manager._public_dir = public_dir
-    return manager
-
-
 def test_codex_null_regression_claude_unchanged_and_adapter_installed(
     tmp_path: pathlib.Path,
 ) -> None:
-    """SHA tree of .claude/ is byte-identical before and after
-    _install_codex_runtime_adapters, and the adapter itself lands under .codex/."""
+    """SHA tree of .claude/ is byte-identical before and after installing the codex
+    runtime-adapter rule set, and the adapter itself lands under .codex/."""
     public_dir, workspace_root = _make_workspace(tmp_path)
-    manager = _make_manager(public_dir)
 
     sha_before = _sha_tree(workspace_root / ".claude")
-    installed: list[str] = []
-    manager._install_codex_runtime_adapters(
-        workspace_root, overwrite=OverwritePolicy.PRESERVE, installed=installed
-    )
+    rules = _codex_runtime_adapter_rules(workspace_root, public_dir)
+    install_rules(rules, force=False)
     sha_after = _sha_tree(workspace_root / ".claude")
 
     assert sha_before == sha_after, (
-        ".claude/ was modified by _install_codex_runtime_adapters. "
+        ".claude/ was modified by installing the codex runtime-adapter rules. "
         f"Before: {sha_before!r}  After: {sha_after!r}"
     )
 
     installed_path = workspace_root / ".codex" / "skills" / "test-adapter" / "SKILL.md"
     assert installed_path.exists(), (
-        f".codex/skills/test-adapter/SKILL.md was not created. installed={installed!r}"
+        f".codex/skills/test-adapter/SKILL.md was not created. rules={rules!r}"
     )
     assert installed_path.read_text(encoding="utf-8") == _ADAPTER_CONTENT

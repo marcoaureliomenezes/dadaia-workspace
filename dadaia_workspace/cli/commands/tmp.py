@@ -1,14 +1,13 @@
 """``dadaia tmp`` — FR29/T-043-44: the orphan backstop (``dadaia tmp gc``).
 
-The **only** calendar-based deletion in v0.4.3 (alpha-5, WS-G): a dated-scratch sweep,
-a ``*cache*``-named directory sweep, and an orphaned-session-marker sweep, each gated by
-a 3-day age floor. Every OTHER GC capability this release ships (FR23-FR28 — a consumed
-push verdict, a closed release's artifacts, the reconciler's own stale-record reap, log
-rotation, the cache-must-not-be-born venv guard) is EVENT-DRIVEN: it fires because a
-specific, observable thing happened. This verb exists precisely because event-driven GC
-can still miss something (a session that crashed before any hook fired, a long gap
-between tool calls), and it is safe to run unattended at a harness's ``SessionStart``
-because nothing recent is ever eligible — see
+The **only** calendar-based deletion in this codebase: a dated-scratch sweep and a
+``*cache*``-named directory sweep, both gated by a 3-day age floor. Every OTHER GC
+capability (a consumed push verdict, a closed release's artifacts, presence records and
+their throttle/sentinel markers, log rotation, the cache-must-not-be-born venv guard) is
+EVENT-DRIVEN: it fires because a specific, observable thing happened. This verb exists
+precisely because event-driven GC can still miss something (a session that crashed
+before any hook fired, a long gap between tool calls), and it is safe to run unattended
+at a harness's ``SessionStart`` because nothing recent is ever eligible — see
 ``dadaia_workspace.features.tmp_gc.service`` for the full doctrine and the AG.1 lane
 guard.
 """
@@ -25,7 +24,6 @@ app = typer.Typer(help="Ephemeral .dadaia/ scratch backstop (the calendar-based 
 _LANE_LABELS: tuple[tuple[str, str], ...] = (
     ("scratch_dirs", "dated scratch (>3 days old)"),
     ("cache_dirs", "cache directories"),
-    ("orphan_markers", "orphaned session markers"),
 )
 
 
@@ -45,12 +43,11 @@ def gc(
         help="Report what would be removed without touching the filesystem.",
     ),
 ) -> None:
-    """The orphan backstop: dated scratch >3 days old, ``*cache*`` directories, and
-    orphaned session markers. This is the ONLY calendar-based deletion in this release
-    — every other GC capability here is event-driven (a push landing, a release
-    closing, the reconciler's own stale-record reap). Idempotent (a second run reports
-    and changes nothing) and safe to run unattended at SessionStart: nothing recent is
-    ever eligible, and a live session's own records/markers are never touched.
+    """The orphan backstop: dated scratch >3 days old and ``*cache*`` directories. This
+    is the ONLY calendar-based deletion in this codebase — every other GC capability is
+    event-driven (a push landing, a release closing, presence's own throttled reap).
+    Idempotent (a second run reports and changes nothing) and safe to run unattended at
+    SessionStart: nothing recent is ever eligible.
     """
     workspace_root = resolve_workspace_root()
     outcome: TmpGcOutcome = run_tmp_gc(workspace_root, dry_run=dry_run)

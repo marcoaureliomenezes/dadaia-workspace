@@ -20,7 +20,7 @@ import fnmatch
 import os
 from pathlib import Path
 
-from dadaia_workspace.core import workspace_layout
+from dadaia_workspace.core import invocation, workspace_layout
 from dadaia_workspace.hooks import _common
 
 #: Whitelisted root-level basenames (The Law) — DERIVED from the single authority
@@ -42,15 +42,6 @@ def _render_whitelist() -> str:
     the policy already allowed it)."""
     dirs = sorted(f"{name}/" for name in _WHITELIST if name not in _ROOT_FILES)
     return " ".join([*dirs, *sorted(_ROOT_FILES)])
-
-
-def _resolve_workspace() -> Path:
-    env = os.environ.get("WORKSPACE_ROOT")
-    if env:
-        return Path(env)
-    from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
-
-    return resolve_workspace_root()
 
 
 def _operator_exception(workspace: Path, basename: str) -> bool:
@@ -87,7 +78,9 @@ def evaluate_payload(payload: dict[str, object]) -> str | None:
         return None  # fail open
 
     try:
-        workspace = _resolve_workspace()
+        workspace = invocation.resolve(env=os.environ, cwd=Path.cwd()).workspace_root
+        if workspace is None:
+            raise RuntimeError("workspace not resolved")
     except Exception:  # noqa: BLE001 — fail-open
         return None
 

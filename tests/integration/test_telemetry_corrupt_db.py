@@ -18,7 +18,6 @@ import fnmatch
 import json
 import os
 import pathlib
-import sqlite3
 import sys
 import threading
 import urllib.error
@@ -32,7 +31,7 @@ import pytest
 pytest.importorskip("fcntl")
 
 from dadaia_workspace.features.telemetry.service import TelemetryService  # noqa: E402
-from dadaia_workspace.features.telemetry.store.dao import TelemetryDao
+from dadaia_workspace.features.telemetry.store import TelemetryStore
 
 
 class _StubPricing:
@@ -47,13 +46,8 @@ class _StubPricing:
         return None
 
 
-class _StubClaudeReader:
-    def read_session_file(self, path: Any, dao: Any, now_iso: str) -> None:
-        pass
-
-
-class _StubCodexReader:
-    def read_sessions(self, path: Any, dao: Any, now_iso: str) -> None:
+class _StubReader:
+    def ingest(self, store: Any, now: str) -> None:
         pass
 
 
@@ -73,16 +67,13 @@ class _StubSCS:
 def _make_service(state_dir: pathlib.Path, workspace_root: pathlib.Path) -> TelemetryService:
     """Build a TelemetryService using a real on-disk SQLite path under state_dir."""
     db_path = state_dir / "telemetry.sqlite"
-
-    def _dao_factory() -> TelemetryDao:
-        conn = sqlite3.connect(str(db_path))
-        conn.execute("PRAGMA foreign_keys=ON")
-        return TelemetryDao(conn)
+    store = TelemetryStore(db_path)
 
     return TelemetryService(
-        dao_factory=_dao_factory,
-        aggregator=_StubAggregator(),
-        reader_factory=lambda: (_StubClaudeReader(), _StubCodexReader()),
+        store,
+        (_StubReader(), _StubReader()),
+        lambda: 0.0,
+        aggregator=_StubAggregator(),  # type: ignore[arg-type]
         pricing_module=_StubPricing(),
         workspace_root=workspace_root,
         state_dir=state_dir,

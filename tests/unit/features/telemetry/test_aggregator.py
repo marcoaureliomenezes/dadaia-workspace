@@ -12,9 +12,9 @@ from typing import Any
 
 import pytest
 
-from dadaia_workspace.features.telemetry.aggregator.models import AgentListResult
+from dadaia_workspace.core.models.telemetry import AgentListResult
 from dadaia_workspace.features.telemetry.aggregator.queries import TelemetryAggregator
-from dadaia_workspace.features.telemetry.store.schema import apply_migrations
+from dadaia_workspace.features.telemetry.store import apply_migrations
 from tests.fakes import shared_connection_factory
 
 _KNOWN_ROOT = "/home/user/workspace/dadaia/repos/dadaia-workspace"

@@ -22,6 +22,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace import container
 from dadaia_workspace.features.specs import Severity, SpecsDoctor
 
 # Repo root: tests/integration/test_onboarding_tree_v2_e2e.py → 3 parents up = repo root
@@ -90,7 +91,9 @@ def test_ac_o1_copytree_scaffold_produces_valid_v2_tree_and_repo_specs_have_no_t
     # doctor checks TREE-1/TREE-2.)
 
     # ---- Assertion 5 (AC-O-1 core): SpecsDoctor reports 0 TREE-* ERRORs ----
-    doctor = SpecsDoctor(specs_dir, public_dir=_PUBLIC_DIR)
+    doctor = SpecsDoctor(
+        specs_dir, public_dir=_PUBLIC_DIR, bug_store_factory=container.build_bug_record_store
+    )
     issues = doctor.check()
 
     tree_errors = [i for i in issues if i.code.startswith("TREE-") and i.severity == Severity.ERROR]
@@ -104,7 +107,9 @@ def test_ac_o1_copytree_scaffold_produces_valid_v2_tree_and_repo_specs_have_no_t
     if not repo_specs.exists():
         pytest.skip("specs/ not found outside the dadaia-workspace repo context")
 
-    repo_issues = SpecsDoctor(repo_specs, public_dir=_PUBLIC_DIR).check()
+    repo_issues = SpecsDoctor(
+        repo_specs, public_dir=_PUBLIC_DIR, bug_store_factory=container.build_bug_record_store
+    ).check()
     repo_tree_errors = [
         i for i in repo_issues if i.code.startswith("TREE-") and i.severity == Severity.ERROR
     ]

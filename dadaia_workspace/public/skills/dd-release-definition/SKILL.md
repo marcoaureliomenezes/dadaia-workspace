@@ -28,7 +28,7 @@ applyTo: "specs/releases/*/SPEC.md"
 4. Keep picking scoped to `specs/bugs/`+`specs/backlog/` discovery — not wide-codebase discovery.
 5. Record the picked set; it becomes the SPEC's scope.
 6. Solve every picked bug in the release, with exactly one exception: subsumption by a picked backlog item.
-7. On subsumption, run `dadaia bugs update <slug> --set status=superseded --set superseded_by=<backlog-slug>` — never `--event`.
+7. On subsumption, run `dadaia bugs supersede <slug> --by <backlog-slug>` — never `update --set status=`.
 8. Note the subsumption in the release SPEC; ensure the backlog item's TASKS cover the bug's acceptance criteria.
 9. Never silently drop a bug — leave it `open` if neither fixed nor subsumed (`dd-backlog-definition` sanitizes it later).
 10. Call the Skill tool with `dd-grill-me` on the picked set — mandatory, never skipped even when scope "looks obvious".

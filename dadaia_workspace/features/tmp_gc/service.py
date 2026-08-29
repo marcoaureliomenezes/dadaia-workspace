@@ -2,18 +2,17 @@
 
 The doctrine (SPEC segment `alpha-5`): "an artifact dies when the thing it exists for
 dies, not when a clock says so. Calendar-based deletion survives ONLY in FR29's
-backstop." Every OTHER GC capability this release ships (FR23-FR28) is event-driven —
-it fires because something specific happened (a push landed, a release closed, a
-reconciler pass observed a stale record). This module is the deliberate exception: a
+backstop." Every OTHER GC capability this release ships is event-driven — it fires
+because something specific happened (a push landed, a release closed, the PostToolUse
+reconciler's own throttled pass). This module is the deliberate exception: a
 manually-invoked (or ``SessionStart``-invoked) sweep that catches whatever the
 event-driven mechanisms missed, using nothing but age as its signal. It never imports
 ``hooks`` (features must not import hooks — this module is a self-contained
-``features``-layer sibling of FR24's ``features.chokepoints.service`` and FR26's
-``hooks.sdd_post_gate``, not a caller of either) and duplicates their small,
-already-proven AG.1/marker idioms locally rather than reaching across a layer/feature
-boundary for them.
+``features``-layer sibling of FR24's ``features.chokepoints.service``, not a caller of
+it) and duplicates its small, already-proven AG.1 lane-guard idiom locally rather than
+reaching across a layer/feature boundary for it.
 
-Three lanes, one dataclass outcome (:class:`TmpGcOutcome`):
+Two lanes, one dataclass outcome (:class:`TmpGcOutcome`):
 
 (a) **Dated scratch** — ``.dadaia/tmp/<agent>/<YYYYMMDD>/`` directories whose OWN
     embedded calendar date (never mtime, which floats every time a file inside is
@@ -28,20 +27,20 @@ Three lanes, one dataclass outcome (:class:`TmpGcOutcome`):
     the workspace doctor's own taxonomy, never a GC target) or the PROTECTED
     session-identity store (``.dadaia/sessions``), and never matches or descends into a
     symlinked directory (AG.1).
-(c) **Orphaned session markers** — ``reconciler-last-<sid>`` / ``ctx-inject-fired-<sid>``
-    markers (the same two prefixes ``hooks.sdd_post_gate`` already owns) whose
-    ``<sid>`` has NO ``.dadaia/sessions/<sid>.json`` record at all. A marker is only
-    ever a candidate once it is ALSO older than :data:`_MAX_AGE_DAYS` days by its own
-    mtime — the fallback that makes this verb safe to run unattended at
-    ``SessionStart`` (A29.2): a session that has not yet written its own record (e.g.
-    ``ctx-inject`` fired before the first bind) has markers too young to qualify, so
-    the very session that just started can never have its own bootstrap evidence swept
-    out from under it.
+
+A third, calendar-based lane used to also sweep orphaned session throttle/sentinel
+markers here (``reconciler-last-<sid>`` / ``ctx-inject-fired-<sid>``) — release 0.5.1 K2
+("presence owns liveness end-to-end") retired it: every advisory marker under
+``.dadaia/tmp/`` this codebase writes is now reaped by the ONE reaper,
+:func:`dadaia_workspace.features.spec_context.presence.gc`, on the PostToolUse
+reconciler's own throttle cadence and at ``doctor --fix`` — a second, independent,
+calendar-gated copy of that exact sweep is exactly the kind of duplicated-TTL-authority
+this codebase's bug history warns against.
 
 AG.1 lane guard, uniformly across every target: resolved before removal, refused if the
 resolved path falls outside ``.dadaia/``, and a symlinked directory is never followed —
-mirrors ``features.chokepoints.service`` (FR24/T-043-39) and ``hooks.sdd_post_gate``
-(FR26/T-043-41), the two established precedents for this exact idiom in this segment.
+mirrors ``features.chokepoints.service`` (FR24/T-043-39), the established precedent for
+this exact idiom in this segment.
 
 Idempotent by construction (A29.1): every lane re-derives its candidate set from the
 filesystem on each call, so once a candidate is gone (deleted by a prior run, or never
@@ -83,16 +82,6 @@ _CACHE_NAME_RE = re.compile("cache", re.IGNORECASE)
 #: never even walks it, let alone deletes from it.
 _CACHE_SWEEP_EXCLUDED_TOP_LEVEL: frozenset[str] = frozenset({".venv", "sessions"})
 
-#: Marker filename prefixes this lane owns — the SAME two prefixes
-#: ``hooks.sdd_post_gate._TMP_MARKER_PREFIXES`` already writes/reaps (FR26/T-043-41).
-#: Duplicated here (never imported) because ``features`` must not import ``hooks``.
-_MARKER_PREFIXES: tuple[str, ...] = ("reconciler-last-", "ctx-inject-fired-")
-
-#: Path-traversal allowlist (CWE-22/CWE-59), matching ``session_identity``'s own
-#: ``_NAME_RE`` — a marker's extracted session id must look like a real id before it is
-#: ever used to probe ``.dadaia/sessions/``.
-_MARKER_ID_RE = re.compile(r"[A-Za-z0-9_-]+")
-
 
 @dataclass(frozen=True)
 class TmpGcOutcome:
@@ -110,13 +99,12 @@ class TmpGcOutcome:
     dry_run: bool
     scratch_dirs: tuple[str, ...] = ()
     cache_dirs: tuple[str, ...] = ()
-    orphan_markers: tuple[str, ...] = ()
     lane_guard_refused: tuple[str, ...] = ()
 
     @property
     def total(self) -> int:
         """Count of items acted on (or, in dry-run, that would be) across all lanes."""
-        return len(self.scratch_dirs) + len(self.cache_dirs) + len(self.orphan_markers)
+        return len(self.scratch_dirs) + len(self.cache_dirs)
 
 
 def _resolved_within(path: Path, boundary: Path) -> bool:
@@ -199,40 +187,6 @@ def _cache_candidates(dadaia_root: Path) -> list[Path]:
     return sorted(candidates)
 
 
-def _orphan_marker_candidates(
-    dadaia_root: Path, sessions_dir: Path, *, now_epoch: float, max_age_seconds: float
-) -> list[Path]:
-    """Lane (c): ``reconciler-last-*`` / ``ctx-inject-fired-*`` markers directly under
-    ``.dadaia/tmp/`` whose session id has NO record under ``.dadaia/sessions/`` at all,
-    AND whose own mtime is older than *max_age_seconds* (the SessionStart-safety
-    fallback — a marker for a session that simply has not bound yet is too young)."""
-    tmp_dir = dadaia_root / "tmp"
-    try:
-        entries = list(tmp_dir.iterdir())
-    except OSError:
-        return []
-    candidates: list[Path] = []
-    for path in sorted(entries):
-        name = path.name
-        sid: str | None = None
-        for prefix in _MARKER_PREFIXES:
-            if name.startswith(prefix):
-                sid = name[len(prefix) :]
-                break
-        if not sid or not _MARKER_ID_RE.fullmatch(sid):
-            continue
-        if (sessions_dir / f"{sid}.json").exists():
-            continue  # owned — never touched (A29.2).
-        try:
-            mtime = path.lstat().st_mtime  # never follow the symlink for its info.
-        except OSError:
-            continue
-        if (now_epoch - mtime) < max_age_seconds:
-            continue  # too young — SessionStart-safety.
-        candidates.append(path)
-    return candidates
-
-
 def _remove(path: Path) -> bool:
     """Best-effort delete; True iff *path* no longer exists on disk afterward."""
     try:
@@ -288,7 +242,6 @@ def run_tmp_gc(
     """
     clock = now or datetime.now(tz=UTC)
     dadaia_root = (workspace_root / ".dadaia").resolve()
-    sessions_dir = dadaia_root / "sessions"
 
     scratch_targets = _scratch_candidates(dadaia_root, today=clock, max_age_days=_MAX_AGE_DAYS)
     scratch_dirs, refused_a = _apply_lane(scratch_targets, dadaia_root, dry_run=dry_run)
@@ -296,18 +249,9 @@ def run_tmp_gc(
     cache_targets = _cache_candidates(dadaia_root)
     cache_dirs, refused_b = _apply_lane(cache_targets, dadaia_root, dry_run=dry_run)
 
-    marker_targets = _orphan_marker_candidates(
-        dadaia_root,
-        sessions_dir,
-        now_epoch=clock.timestamp(),
-        max_age_seconds=_MAX_MARKER_AGE_SECONDS,
-    )
-    orphan_markers, refused_c = _apply_lane(marker_targets, dadaia_root, dry_run=dry_run)
-
     return TmpGcOutcome(
         dry_run=dry_run,
         scratch_dirs=tuple(sorted(scratch_dirs)),
         cache_dirs=tuple(sorted(cache_dirs)),
-        orphan_markers=tuple(sorted(orphan_markers)),
-        lane_guard_refused=tuple(sorted(refused_a + refused_b + refused_c)),
+        lane_guard_refused=tuple(sorted(refused_a + refused_b)),
     )

@@ -1,0 +1,131 @@
+{
+  "schema_version": "handoff-v1.1",
+  "agent": "qa-engineer",
+  "context": "dadaia-workspace",
+  "produced_at": "2026-06-06T18:00:00Z",
+  "scope": "T-016-08 QA gate review — v0.1.6 state-model (locks, race conditions, deadlocks)",
+  "release_id": "v0.1.6",
+  "metrics": {
+    "tests_passed": 2208,
+    "tests_skipped": 2,
+    "tests_xpassed": 1,
+    "tests_failed": 0,
+    "gate_line_count": 171,
+    "gate_line_limit": 175,
+    "SDD_RULE_E_DISABLED_occurrences": 0,
+    "is_stale_branch_table_rows": 8,
+    "fail_safe_property_rows": 9,
+    "exemption_matrix_cells": 16,
+    "e2e_tests": 1
+  },
+  "artifact": {
+    "type": "report",
+    "content_hash": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "verdict": "APPROVED",
+  "verdict_reason": "All 10 QA gate checks PASS. Full suite 2208/0/2 (passed/failed/skipped). All 13 AC mapped. Deliberate threading.Barrier deviation accepted. No slop, no over-mocking, no volume padding.",
+  "findings": [
+    {
+      "severity": "INFO",
+      "message": "AC-01 PASS: gate <= 175 lines (actual 171).",
+      "detail_md": "wc -l dadaia_workspace/public/scripts/sdd-spec-gate.sh = 171. Under the 175-line limit.",
+      "fix_recommendation": "No action required."
+    },
+    {
+      "severity": "INFO",
+      "message": "AC-02 PASS: O_EXCL CAS is the only acquire path.",
+      "detail_md": "test_lease_toctou.py::test_concurrent_cas_fails_exactly_one_record PASSED. lease.py uses open(sentinel, 'x') as sole acquire path. No read-then-write path found.",
+      "fix_recommendation": "No action required."
+    },
+    {
+      "severity": "INFO",
+      "message": "AC-03 PASS: is_stale predicate body contains zero direct datetime.now() calls.",
+      "detail_md": "lock_liveness.py line 94: calls clock() not datetime.now(). _utcnow default only applies when clock not injected (production default). All 8 is_stale tests use FakeClock; no datetime.now in test_lease_stale.py bodies.",
+      "fix_recommendation": "No action required."
+    },
+    {
+      "severity": "INFO",
+      "message": "AC-04 PASS: fail-safe property table 9 rows including MEMORY+DEFINITION->ALLOW.",
+      "detail_md": "test_lease_property.py parametrized with 9 rows: 1_absent_mutating, 2_stale_mutating, 3_live_mine_mutating, 4_live_other_mutating (BLOCK+steal), 5_absent_additive, 6_live_other_additive, 7_any_frozen (BLOCK), 8_memory_non_write_phase (BLOCK), 9_memory_definition (ALLOW). All 3 BLOCK rows carry actionable message; 4_live_other_mutating asserts 'dadaia lock steal' in message.",
+      "fix_recommendation": "No action required."
+    },
+    {
+      "severity": "INFO",
+      "message": "AC-05 PASS: activity-class exemption matrix 16 cells + test_memory_definition_allow + test_memory_closure_allow.",
+      "detail_md": "test_lease_activity_exemption.py: 16 parametrized cells (4 path-classes x 4 lease-states, phase=SPEC) + 2 named RULE A exemption tests. All 18 PASSED.",
+      "fix_recommendation": "No action required."
+    },
+    {
+      "severity": "INFO",
+      "message": "AC-06 PASS: TOCTOU test sequential, no threading import.",
+      "detail_md": "test_lease_toctou.py: no 'import threading' found. Uses monkeypatch.setattr(lease, '_before_write', before) to simulate concurrent CAS attempt. PASSED.",
+      "fix_recommendation": "No action required."
+    },
+    {
+      "severity": "INFO",
+      "message": "AC-07 PASS: two-process denial e2e — holder blocks denier, 'dadaia lock steal' in output.",
+      "detail_md": "tests/e2e/test_two_process_denial.py PASSED. File-based rendezvous (time.sleep(0.01) per iteration, max 100 iterations — not CPU spin). proc_b.returncode != 0. 'dadaia lock steal' in proc_b output. A's record unchanged.",
+      "fix_recommendation": "No action required."
+    },
+    {
+      "severity": "INFO",
+      "message": "AC-08 PASS: doctor --fix deletes stale lock.json, expired sessions, orphan sentinels; no-stale case exits 0.",
+      "detail_md": "test_doctor_gc.py: 6 tests PASSED — test_stale_lock_json_deleted_after_fix, test_expired_session_file_deleted_after_fix, test_orphan_sentinel_deleted_after_fix, test_no_stale_records_fix_exits_clean, test_invalid_lock_file_deleted_after_fix, test_missing_fields_lock_file_deleted_after_fix.",
+      "fix_recommendation": "No action required."
+    },
+    {
+      "severity": "INFO",
+      "message": "AC-09 PASS: SDD_RULE_E_DISABLED fully absent from codebase.",
+      "detail_md": "grep -rn SDD_RULE_E_DISABLED dadaia_workspace/ = 0 results. Flag deleted, not disabled.",
+      "fix_recommendation": "No action required."
+    },
+    {
+      "severity": "INFO",
+      "message": "AC-10 PASS: fcntl Lock-1/Lock-2 tests pass with zero regressions.",
+      "detail_md": "tests/unit/test_spec_context_locking.py: 6 passed (Lock-1 ws_lock + Lock-2 per-context fcntl). threading.Barrier tests retained here — ACCEPTED: they test Lock-1/Lock-2 (retained primitives), not Lock-3 (deleted). Relocation would be pure churn.",
+      "fix_recommendation": "No action required."
+    },
+    {
+      "severity": "INFO",
+      "message": "AC-11 PASS: dadaia lock steal stale->succeeds; live->refuses.",
+      "detail_md": "tests/unit/features/spec_context/test_lock_steal.py: 4 tests PASSED — stale record stolen (new session_id written to disk), fresh record refused (record unchanged), absent record creates new, audit log written with 'steal' event.",
+      "fix_recommendation": "No action required."
+    },
+    {
+      "severity": "INFO",
+      "message": "AC-12 OPERATOR-ONLY: in-workspace mutate-edit-commit + forced stale-lease reclaim sign-off.",
+      "detail_md": "Not automatable. Requires human operator validation. No automated test exists or is expected per spec.",
+      "fix_recommendation": "Operator must perform and sign off before CLOSURE."
+    },
+    {
+      "severity": "INFO",
+      "message": "AC-13 PASS: cross-harness honesty comment block present in gate source.",
+      "detail_md": "sdd-spec-gate.sh lines 8-11 contain 'Cross-harness enforcement honesty:' block with Claude Code / Codex / opencode descriptions matching FR-P1-12 table.",
+      "fix_recommendation": "No action required."
+    },
+    {
+      "severity": "INFO",
+      "message": "Minor: SPEC.md AC-10 cites non-existent path 'test_locking_fcntl.py'.",
+      "detail_md": "The actual fcntl Lock-1/Lock-2 tests live at tests/unit/test_spec_context_locking.py. Spec path reference is a doc error only — no code impact.",
+      "fix_recommendation": "Update SPEC.md AC-10 path reference at CLOSURE time. No code change needed."
+    },
+    {
+      "severity": "INFO",
+      "message": "Test pyramid: unit-heavy, exactly 1 e2e. No slop, no over-mocking, no volume padding.",
+      "detail_md": "New tests: 8 (is_stale) + 9 (property) + 18 (exemption) + 6 (doctor-gc) + 4 (lock-steal) + 1 (toctou) + 2 (service) = 48 unit + 1 e2e. All test observable behavior via real file I/O on tmp_path or injectable FakeClock. monkeypatch in test_lease_toctou.py injects a documented hook seam (_before_write) — not magic mocking.",
+      "fix_recommendation": "No action required. Pyramid is correct."
+    },
+    {
+      "severity": "INFO",
+      "message": "Full suite: 2208 passed, 2 skipped, 1 xpassed, 0 failed.",
+      "detail_md": "2 skips: panel LAN-address (no non-loopback IPv4) and memory HTML fixture (pre-existing, unrelated to v0.1.6). 1 xpass: test_pid_zero_documented_as_xfail (expected, documented).",
+      "fix_recommendation": "No action required."
+    }
+  ],
+  "decisions_required": [],
+  "next_handoff": {
+    "agent": "security-reviewer",
+    "context": "dadaia-workspace",
+    "expected_artifact_type": "report"
+  }
+}

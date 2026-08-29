@@ -33,6 +33,7 @@ Session-level pollution guard (_session_root_pollution_guard):
 
 from __future__ import annotations
 
+import os
 import sys
 from collections.abc import Iterator, Sequence
 from pathlib import Path
@@ -40,6 +41,16 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.protocols.process_runner import ProcessResult
+
+# Every subprocess a test spawns (`python -m dadaia_workspace...`: CLI verbs, hooks) must
+# import THIS checkout, whatever the venv's install mode or the worktree it runs in — bugs
+# hook-subprocess-tests-import-the-installed-package-not-the-checkout and
+# worktree-subprocess-cli-tests-import-the-shared-venvs-editable-install-not-the-worktree.
+# One rule, set once for the whole session; never a per-helper copy.
+_CHECKOUT_ROOT = Path(__file__).resolve().parent.parent
+os.environ["PYTHONPATH"] = os.pathsep.join(
+    [str(_CHECKOUT_ROOT), *[p for p in os.environ.get("PYTHONPATH", "").split(os.pathsep) if p]]
+)
 
 # Repo-cleanliness law: the test run must never materialize bytecode caches inside
 # the working tree. Import-time compilation happens BEFORE any in-script

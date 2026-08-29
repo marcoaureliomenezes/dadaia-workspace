@@ -33,6 +33,7 @@ from pathlib import Path
 
 from dadaia_workspace.core.atomic_write import ConcurrentModificationError, atomic_write
 from dadaia_workspace.core.protocols.record_store import (
+    MalformedLine,
     RecordNotFoundError,
     StaleRecordWriteError,
 )
@@ -156,22 +157,28 @@ class JsonlRecordStore[T]:
 
     # -- reads ---------------------------------------------------------------------
 
-    def iter_records(self) -> Iterator[T]:
-        """Yield every stored record in file order.
-
-        Malformed JSON, a non-object line, or a model-parse failure is skipped with a
-        logged WARN — a single corrupt line never breaks the whole stream (mirrors the
-        tolerance ``infrastructure.jsonl_bug_store.JsonlBugStore.iter_events`` already
-        has). Splits on ``"\\n"`` ONLY (never ``str.splitlines()``) — the T-045-20 fix,
-        carried forward at the one reader this release leaves standing.
+    def scan(self) -> Iterator[T | MalformedLine]:
+        """Yield every stored record OR :class:`MalformedLine` diagnosis, in file
+        order — the ONE malformed-line diagnosis, so a diagnostic caller (``specs
+        doctor``) never needs its own second parser. Splits on ``"\\n"`` ONLY (never
+        ``str.splitlines()``) — the T-045-20 fix, carried forward at the one reader
+        this release leaves standing.
         """
-        for line in self._read_text().split("\n"):
+        for lineno, line in enumerate(self._read_text().split("\n"), start=1):
             stripped = line.strip()
             if not stripped:
                 continue
-            record = self._parse_line(stripped)
-            if record is not None:
-                yield record
+            yield self._parse_line(lineno, stripped)
+
+    def iter_records(self) -> Iterator[T]:
+        """Yield every stored record in file order — the tolerant view: a line
+        :meth:`scan` would diagnose as :class:`MalformedLine` is skipped instead,
+        with a logged WARN, never breaking the whole stream."""
+        for parsed in self.scan():
+            if isinstance(parsed, MalformedLine):
+                _LOG.warning("skipping malformed record line in %s: %s", self._path, parsed.reason)
+                continue
+            yield parsed
 
     # -- internals -------------------------------------------------------------------
 
@@ -180,17 +187,14 @@ class JsonlRecordStore[T]:
             return ""
         return self._path.read_text(encoding="utf-8")
 
-    def _parse_line(self, stripped: str) -> T | None:
+    def _parse_line(self, lineno: int, stripped: str) -> T | MalformedLine:
         try:
             raw = json.loads(stripped)
         except json.JSONDecodeError as exc:
-            _LOG.warning("skipping malformed record line in %s: %s", self._path, exc)
-            return None
+            return MalformedLine(lineno=lineno, raw=stripped, reason=f"not valid JSON: {exc.msg}")
         if not isinstance(raw, dict):
-            _LOG.warning("skipping non-object record line in %s", self._path)
-            return None
+            return MalformedLine(lineno=lineno, raw=stripped, reason="not a JSON object")
         try:
             return self._from_dict(raw)
         except (ValueError, TypeError) as exc:
-            _LOG.warning("skipping invalid record in %s: %s", self._path, exc)
-            return None
+            return MalformedLine(lineno=lineno, raw=stripped, reason=str(exc))

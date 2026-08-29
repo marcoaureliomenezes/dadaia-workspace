@@ -241,65 +241,38 @@ def test_clean_tree_has_no_errors(tmp_path: Path) -> None:
     assert errors == [], errors
 
 
-def test_freshly_opened_release_segment_is_doctor_clean(tmp_path: Path) -> None:
-    """Bug fresh-release-scaffold-emits-spec-doctor-warnings-042 (Consumer R1-A): the
-    canonical 'specs release open' output — Draft SPEC/PLAN/TASKS with the active
-    release phase SPEC — instantly drew three SPEC-DOC-004 warnings. Draft IS the
-    legitimate state of an authoring-phase release; the scaffolder and the doctor
-    must agree on the fresh state (0 errors, 0 warnings)."""
+def test_release_segment_phase_flip_still_warns_on_draft_in_implementation(tmp_path: Path) -> None:
+    """The "fresh scaffold is doctor-clean" half of the former bug-042 regression
+    (Draft SPEC/PLAN/TASKS at SPEC phase -> 0 errors) is now
+    ``tests/unit/features/specs/test_canon_property.py`` (the "fresh-release-segment"
+    case, asserting the FULL doctor is clean — a strictly stronger bar than this test's
+    original SPEC-DOC-004-only check). What survives here is the property that test
+    does NOT cover: the warning is not lost where it matters — a Draft artifact
+    is unmistakably no longer freshly-scaffolded once the release's phase moves to
+    IMPLEMENTATION, and SPEC-DOC-004 must still fire then."""
     from dadaia_workspace.features.specs.scaffolder import scaffold_release_segment
 
     specs = _make_clean_specs_tree(tmp_path, "v0.1.0")
-    # Re-open as the real scaffolder does: scaffold the segment + phase SPEC.
     for fname in ("SPEC.md", "PLAN.md", "TASKS.md"):
         (specs / "releases" / "v0.1.0" / fname).unlink()
     result = scaffold_release_segment(specs, "v0.1.0", "alpha-1")
     assert not result.errors, result.errors
-    _write_release_jsonl(specs, "v0.1.0", "SPEC", segment="alpha-1")
+    _write_release_jsonl(specs, "v0.1.0", "IMPLEMENTATION", segment="alpha-1")
 
     issues = SpecsDoctor(specs).check()
-    doc004 = [i for i in issues if i.code == "SPEC-DOC-004"]
-    assert doc004 == [], [i.to_dict() for i in doc004]
-
-    # The warning is NOT lost where it matters: a Draft artifact in an
-    # implementation-bound phase still warns.
-    _write_release_jsonl(specs, "v0.1.0", "IMPLEMENTATION", segment="alpha-1")
-    issues_impl = SpecsDoctor(specs).check()
-    assert any(i.code == "SPEC-DOC-004" for i in issues_impl)
+    assert any(i.code == "SPEC-DOC-004" for i in issues)
 
 
-def test_fresh_scaffold_passes_all_tree_invariants(tmp_path: Path) -> None:
-    """A freshly scaffolded workspace produces no TREE errors."""
-    from dadaia_workspace.features.specs.scaffolder import scaffold
-
-    specs = tmp_path / "specs"
-    result = scaffold(
-        specs_dir=specs,
-        project_name="test-project",
-        force=False,
-        templates_dir=_TEMPLATES_DIR,
-    )
-    assert result.errors == [], f"Scaffold errors: {result.errors}"
-    # v6 canon (T-050-05, FR1): scaffold() already writes bugs/AGENTS.md and
-    # specs/AGENTS.md itself — the old hand-rolled bugs/README.md + specs/AGENTS.md
-    # injection this test used to need (the scaffold README.md presence assertions
-    # this test carried, qa-engineer amendment 11) is retired with its subject:
-    # scaffold() covers the full tree on its own now.
-
-    doctor = SpecsDoctor(specs, public_dir=_PUBLIC_DIR)
-    issues = doctor.check()
-
-    tree_errors = [i for i in issues if i.code.startswith("TREE-") and i.severity == Severity.ERROR]
-    assert tree_errors == [], (
-        f"Unexpected TREE errors on fresh scaffold: {[i.to_dict() for i in tree_errors]}"
-    )
-
-    # Also assert the canonical scaffold copytree route (T-021-16 (a)) yields the same
-    # full tree independent of the scaffold() function's own file list. v6 canon: the
-    # source scaffold tree carries AGENTS.md per area now (README.md retired).
+def test_scaffold_copytree_source_tree_carries_agents_md_per_area(tmp_path: Path) -> None:
+    """The "scaffold() -> 0 TREE errors" half of this test is now
+    ``test_canon_property.py`` (asserting the FULL doctor is clean, not just TREE-*
+    codes). What survives here is independent: the canonical *source* scaffold tree
+    (``public/scaffold/``, copied verbatim rather than rendered through ``scaffold()``)
+    itself carries every area's AGENTS.md (v6 canon, T-021-16 (a); README.md
+    retired)."""
     import shutil
 
-    specs2_dir = tmp_path.parent / (tmp_path.name + "-copytree") / "specs"
+    specs2_dir = tmp_path / "copytree" / "specs"
     shutil.copytree(str(_SCAFFOLD_DIR), str(specs2_dir))
     assert (specs2_dir / "audits").is_dir()
     assert (specs2_dir / "audits" / "AGENTS.md").exists()

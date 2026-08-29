@@ -2,7 +2,7 @@
 
 Before this release the literal ``re.compile(r"^v\\d+\\.\\d+\\.\\d+$")`` was triplicated
 in three unrelated modules (``features/specs/scaffolder.py``,
-``features/specs/doctor.py``, ``features/spec_artifacts/new_artifacts.py``) with no
+``features/specs/doctor.py``, the retired ``features/spec_artifacts/new_artifacts.py`` (now ``features/specs/canon.py``)) with no
 shared constant and no test binding them together — a classic drift trap where one copy
 could be tightened and the others silently rot.
 
@@ -14,7 +14,7 @@ centralisation two ways, both decidable and free of false positives:
   object the canon module defines (``is`` identity, not mere equality) — either
   ``RELEASE_SEMVER_RE`` itself (scaffolder.py, doctor_release.py, which still need the
   broader two-axis match for archive/naming lookups) or ``is_release_semver``
-  (new_artifacts.py, which only ever MINTS and so only needs the bare-axis predicate).
+  (features.specs.canon, which only ever MINTS and so only needs the bare-axis predicate).
   A re-introduced private copy would be a different object and fail here.
 - **SCAN** — an AST walk of the production tree finds ``re.compile(<the semver
   pattern>)`` call sites; the only allowed site is the canon module. Message strings and
@@ -60,14 +60,14 @@ _CANON_REL = Path("core") / "specs_version.py"
 
 #: Modules that must reuse the canon object, as (import path, attribute name) — the
 #: attribute each module actually needs: the two naming/archive-lookup sites keep
-#: RELEASE_SEMVER_RE (the broader two-axis match); the one MINT site (new_artifacts,
+#: RELEASE_SEMVER_RE (the broader two-axis match); the one MINT site (features.specs.canon,
 #: T-050-06A) needs only the narrower is_release_semver predicate.
 #: v0.1.55 FR1: the SpecsDoctor RELEASE_SEMVER_RE consumer moved off the coordinator into the
 #: ``doctor_release`` validator sibling (the SemVer/naming-canon checks live there now).
 _CONSUMER_MODULES: tuple[tuple[str, str], ...] = (
     ("dadaia_workspace.features.specs.scaffolder", "RELEASE_SEMVER_RE"),
     ("dadaia_workspace.features.specs.doctor_release", "RELEASE_SEMVER_RE"),
-    ("dadaia_workspace.features.spec_artifacts.new_artifacts", "is_release_semver"),
+    ("dadaia_workspace.features.specs.canon", "is_release_semver"),
 )
 
 
@@ -192,8 +192,8 @@ def test_v_prefixed_release_id_refused_at_mint_but_archived_dir_still_resolves(
     that root retired, T-050-14 deleted its last content, so this fixture's
     SPEC-DOC-016 exemption is now moot by construction rather than by allowlist;
     SPEC-DOC-027's own allowlist is the check still meaningfully exercised here)."""
-    from dadaia_workspace.features.spec_artifacts.new_artifacts import release_new
     from dadaia_workspace.features.specs import Severity, SpecsDoctor
+    from dadaia_workspace.features.specs.canon import release_new
 
     specs = tmp_path / "specs"
     specs.mkdir()
@@ -202,10 +202,12 @@ def test_v_prefixed_release_id_refused_at_mint_but_archived_dir_still_resolves(
     with pytest.raises(ValueError, match="Invalid release ID"):
         release_new(specs, "v0.9.9")
     assert not (specs / "releases" / "v0.9.9").exists()
-    # The bare, current-axis form mints cleanly.
+    # The bare, current-axis form mints cleanly. `release_new` returns the minted
+    # SPEC.md path directly (v0.5.1 K4 — no wrapping result dataclass; the caller's
+    # own existence check IS the proof of creation).
     result = release_new(specs, "0.9.9")
-    assert (specs / "releases" / "0.9.9" / "SPEC.md").is_file()
-    assert result.created is True
+    assert result == specs / "releases" / "0.9.9" / "SPEC.md"
+    assert result.is_file()
 
     # Half 2 — archive resolution: an EXISTING v-prefixed archived directory (the
     # retired axis, pre-canon-v6) is still recognised as conformant, never flagged.

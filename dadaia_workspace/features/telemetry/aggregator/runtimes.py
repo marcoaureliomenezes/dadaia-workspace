@@ -26,7 +26,7 @@ import sqlite3
 from datetime import UTC, datetime, timedelta
 from typing import Literal, Protocol, runtime_checkable
 
-from dadaia_workspace.features.telemetry.aggregator.models import (
+from dadaia_workspace.core.models.telemetry import (
     SessionDetail,
     SessionRow,
 )

@@ -21,7 +21,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 
-from dadaia_workspace.features.telemetry.aggregator.models import (
+from dadaia_workspace.core.models.telemetry import (
     AgentListResult,
     AgentSummary,
     ContextBreakdown,

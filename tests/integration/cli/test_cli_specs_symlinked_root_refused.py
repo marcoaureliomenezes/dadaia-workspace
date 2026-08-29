@@ -52,7 +52,7 @@ def test_cli_specs_upgrade_refuses_a_symlinked_root(tmp_path: Path) -> None:
     real, linked = _symlinked_specs_root(tmp_path)
     before = (real / "memory" / "atom.md").read_text(encoding="utf-8")
 
-    result = _runner.invoke(app, ["specs", "upgrade", "--specs-dir", str(linked), "--yes"])
+    result = _runner.invoke(app, ["specs", "upgrade", "--specs-dir", str(linked)])
 
     assert result.exit_code != 0, result.output
     assert "symlink" in result.output.lower(), result.output

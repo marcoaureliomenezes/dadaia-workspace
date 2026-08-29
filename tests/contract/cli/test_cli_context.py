@@ -73,7 +73,7 @@ def _session_record_for(workspace: Path, output: str) -> dict:
     """Resolve the persisted session record from a bind command's confirmation output."""
     import re
 
-    from dadaia_workspace.features.spec_context import session_identity
+    from dadaia_workspace.core import session_store as session_identity
 
     session_id = ""
     for line in output.strip().split("\n"):
@@ -285,7 +285,7 @@ def test_context_bind_persists_harness_owned_record(
     workspace: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Bind persists the mode under the current harness id without a global pointer."""
-    from dadaia_workspace.features.spec_context import session_identity
+    from dadaia_workspace.core import session_store as session_identity
 
     monkeypatch.setenv("CODEX_THREAD_ID", "harness-session")
     _register_alive_ctx(workspace)
@@ -634,7 +634,7 @@ def test_context_baseline_creates_and_pushes_initial_history(
 
 def test_bind_reuses_harness_native_session_identity(workspace: Path, monkeypatch) -> None:
     """Two binds in one harness session keep ONE stable id (the harness-native id)."""
-    from dadaia_workspace.features.spec_context import session_identity
+    from dadaia_workspace.core import session_store as session_identity
 
     _register_alive_ctx(workspace)
     monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "claude-stable-abc123")
@@ -663,7 +663,7 @@ def test_bind_reuses_harness_native_session_identity(workspace: Path, monkeypatc
 
 def test_bind_reuses_dadaia_session_id_env(workspace: Path, monkeypatch) -> None:
     """An explicit DADAIA_SESSION_ID (eval-flow contract) is reused, never re-minted."""
-    from dadaia_workspace.features.spec_context import session_identity
+    from dadaia_workspace.core import session_store as session_identity
 
     _register_alive_ctx(workspace)
     monkeypatch.setenv("DADAIA_SESSION_ID", "sess_stable01")
@@ -707,7 +707,7 @@ def test_bind_env_id_with_harness_id_yields_single_record(workspace: Path, monke
     original bind-session-id-divergence fix removed: two records for one session.
     The resolved identity (env id first) owns the ONLY record.
     """
-    from dadaia_workspace.features.spec_context import session_identity
+    from dadaia_workspace.core import session_store as session_identity
 
     _register_alive_ctx(workspace)
     monkeypatch.setenv("DADAIA_SESSION_ID", "sess_envfixed")

@@ -1,45 +1,16 @@
-"""Consumer specs-upgrade path E2E (v0.1.51 FR2 / AC-2).
+"""Consumer specs-upgrade path E2E — the v0.5.1 contract (K10, T-051-16).
 
-The upgrade path had ZERO end-to-end coverage: only a unit test asserting the doctor's
-staleness WARN message. This E2E runs the REAL command chain a consumer runs —
+``dadaia specs upgrade`` no longer carries the pre-v6 migration chain: a tree below the
+canonical pattern version is REFUSED (exit non-zero, message names the 0.4.x release that
+still carries the chain) and nothing is written; a tree already at the canonical version
+is a no-op (exit 0, byte-identical tree). The two scenarios are driven end-to-end through
+the real CLI subprocess against a real on-disk tree.
 
-    dadaia specs upgrade --specs-dir <tree>   (migrate + re-stamp, backup-first)
-    dadaia specs init    --specs-dir <tree>   (fill canonical structure, skip existing)
-    <apply the by-hand v6 canon-shape recipe>  (dadaia specs doctor --recipe)
-    dadaia specs doctor  --specs-dir <tree>   (must report 0 errors)
-
-on a **below-canonical, structurally-complete** tree: an unstamped constitution
-(⇒ version 0) plus the required memory atoms and mandatory dirs, carrying legacy
-``foundation/`` + root ``SPEC.md`` (the tree-v2 registry step's input) and one legacy
-bug markdown (the bugs-jsonl step's input). Upgrade migrates and re-stamps — it never
-scaffolds; ``specs init`` fills canonical gaps without touching existing files.
-
-v0.5.0 specs-canon closure (operator ruling 2026-08-28) widened TREE-8 to check every
-NESTED path's shape, not just root membership + dotfiles. The migration steps above
-RELOCATE legacy content into shapes the v6 canon does not recognize (``releases/legacy/
-**``, a bugs ledger still carrying v5-event lines under the canon ``BUGS.jsonl`` name) —
-``specs upgrade``'s own pre/post doctor comparison correctly reports these as genuinely
-NEW drift and refuses (exit 1), exactly as designed: ``specs upgrade`` was deliberately
-never grown to auto-apply canon-shape fixes (FR1 — the case-only renames, and now this
-wider shape check too, are ``specs doctor --recipe`` steps, applied BY HAND). The
-migration's filesystem effects still happen regardless of the exit code; only the exit
-code communicates "review before proceeding". This journey now proves the FULL real
-consumer path: upgrade (flags relocated drift) → init → the documented by-hand recipe →
-doctor green — never a silent ``doctor --fix`` auto-delete, which TREE-8's own fixable
-scoping refuses for exactly this class of finding (only a dotfile is auto-fixable; real,
-unmigrated content is not — a destructive-delete class this task's own TDD pass caught
-before it ever shipped, see doctor_structural.py's TREE-8 docstring).
-
-Sandboxed: the tree lives in ``tmp_path``; every command is a bounded real subprocess.
-Test-only release: a failure here is a product bug to register, never an inline fix.
-
-Intent: CONTRACT — v0.1.51 FR2 / AC-2 (specs upgrade path); v0.5.0 specs-canon closure
-Owner: software-engineer
+Intent: CONTRACT — v0.1.51 FR2 / AC-2 (specs upgrade path), rewritten at v0.5.1 K10. Size: LARGE (subprocess).
 """
 
 from __future__ import annotations
 
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -113,85 +84,36 @@ def _seed_below_canonical_tree(root: Path) -> Path:
     return specs
 
 
-def test_upgrade_then_init_reaches_doctor_green_and_at_target_rerun_is_a_no_op(
+def _snapshot(root: Path) -> dict[str, bytes]:
+    return {
+        str(p.relative_to(root)): p.read_bytes() for p in sorted(root.rglob("*")) if p.is_file()
+    }
+
+
+def test_upgrade_refuses_a_tree_below_the_canonical_version_and_writes_nothing(
     tmp_path: Path,
 ) -> None:
-    """AC-2 scenario 1: version-0 tree → upgrade → init → by-hand recipe → doctor 0
-    errors. AC-2 scenario 2: rerunning upgrade at canonical version makes no new
-    backup."""
     specs = _seed_below_canonical_tree(tmp_path)
+    before = _snapshot(specs)
 
-    upgrade = _cli(tmp_path, "specs", "upgrade", "--specs-dir", str(specs), "--yes")
-    # v0.5.0 specs-canon closure: the tree-v2/bugs-jsonl migration steps relocate
-    # legacy content into shapes the v6 canon does not recognize (releases/legacy/**;
-    # a bugs ledger still carrying v5-event lines under the canon BUGS.jsonl name) —
-    # `upgrade`'s own pre/post doctor comparison correctly reports these as NEW
-    # drift and refuses (exit 1), exactly as designed (module docstring). The
-    # migration's filesystem effects already happened by this point regardless.
-    assert upgrade.returncode == 1, upgrade.stdout
-    assert "new doctor error(s)" in upgrade.stderr, upgrade.stderr
+    upgrade = _cli(tmp_path, "specs", "upgrade", "--specs-dir", str(specs))
 
-    # Backup-first: specs_bkp/<from>→<to>-<UTC>/ beside the tree.
-    backups = list((specs / "specs_bkp").glob("*")) + list((specs.parent / "specs_bkp").glob("*"))
-    assert backups, "upgrade must create the backup dir before mutating"
+    assert upgrade.returncode != 0, upgrade.stdout
+    assert "0.4.x" in (upgrade.stderr + upgrade.stdout)
+    assert _snapshot(specs) == before, "a refused upgrade must not touch the tree"
+    assert not list(tmp_path.rglob("*backup*")), "no backup dir is created on refusal"
 
-    # Re-stamp: constitution frontmatter carries the canonical version.
-    constitution = (specs / "constitution.md").read_text(encoding="utf-8")
-    assert _MARKER in constitution
-    assert str(CANONICAL_SPECS_VERSION) in constitution
 
-    # tree-v2 migration: foundation/ + root SPEC.md relocated under releases/legacy/.
-    assert not (specs / "foundation").exists()
-    assert not (specs / "SPEC.md").exists()
-    legacy_home = specs / "releases" / "legacy"
-    assert legacy_home.is_dir(), "tree-v2 must relocate legacy artifacts, not drop them"
-
-    init = _cli(tmp_path, "specs", "init", "--specs-dir", str(specs))
+def test_upgrade_at_the_canonical_version_is_a_byte_identical_no_op(tmp_path: Path) -> None:
+    root = tmp_path / "consumer"
+    root.mkdir()
+    init = _cli(root, "specs", "init", "--specs-dir", str(root / "specs"))
     assert init.returncode == 0, init.stderr or init.stdout
+    specs = root / "specs"
+    assert str(CANONICAL_SPECS_VERSION) in (specs / "constitution.md").read_text(encoding="utf-8")
+    before = _snapshot(specs)
 
-    # v0.5.0 specs-canon closure: doctor --fix is INTENTIONALLY a no-op for these —
-    # only a dotfile is auto-fixable at TREE-8's nested tier; every finding here is
-    # real, unmigrated content (proven by asserting nothing is deleted).
-    pre_fix_survivors = [
-        specs / "memory" / "architecture.md",
-        specs / "bugs" / "bugs.jsonl",
-        legacy_home / "SPEC.md",
-    ]
-    fixed = _cli(tmp_path, "specs", "doctor", "--specs-dir", str(specs), "--fix")
-    assert fixed.returncode != 0, "residual, non-auto-fixable TREE-8 drift must remain"
-    for survivor in pre_fix_survivors:
-        assert survivor.exists(), f"doctor --fix must never delete real content: {survivor}"
+    upgrade = _cli(root, "specs", "upgrade", "--specs-dir", str(specs))
 
-    # The documented by-hand recipe (dadaia specs doctor --recipe names these same
-    # findings): case-only memory renames (Path.rename onto an existing file
-    # replaces it — the REAL content wins over init's freshly-scaffolded stub);
-    # drop the retired README.md landing-zone files (init already wrote each area's
-    # AGENTS.md); drop the synthetic fixture-only legacy bug content (converting it
-    # properly needs the SEPARATE v5-bug migration tool, features/bugs/migrate_v5.py
-    # — out of scope for a rename-only recipe, and it carries no real information —
-    # keeping the canon-shaped, empty BUGS.jsonl `init` already wrote); and, mirroring
-    # the SAME operator-consent precedent TREE-1/TREE-2 already apply to foundation/,
-    # drop the pre-canon releases/legacy/ landing zone (it long predates the v6 canon
-    # and names no real semver release — there is no mechanical rename target).
-    (specs / "memory" / "architecture.md").rename(specs / "memory" / "ARCHITECTURE.md")
-    (specs / "memory" / "tech-stack.md").rename(specs / "memory" / "TECHSTACK.md")
-    (specs / "memory" / "quality-assurance.md").rename(specs / "memory" / "QUALITY.md")
-    for area in ("backlog", "bugs", "releases"):
-        (specs / area / "README.md").unlink()
-    (specs / "bugs" / "bugs.jsonl").unlink()
-    (specs / "bugs" / "_archive" / "archive.jsonl").unlink()
-    shutil.rmtree(legacy_home)
-
-    doctor = _cli(tmp_path, "specs", "doctor", "--specs-dir", str(specs))
-    assert doctor.returncode == 0, doctor.stderr or doctor.stdout
-    assert "0 errors, 0 warnings" in doctor.stdout, doctor.stdout
-
-    def _backups() -> set[Path]:
-        return set((specs / "specs_bkp").glob("*")) | set((specs.parent / "specs_bkp").glob("*"))
-
-    before = _backups()
-    assert before, "first upgrade must have produced a backup"
-
-    second = _cli(tmp_path, "specs", "upgrade", "--specs-dir", str(specs), "--yes")
-    assert second.returncode == 0, second.stderr or second.stdout
-    assert _backups() == before, "an at-target rerun must be a no-op (no new backup)"
+    assert upgrade.returncode == 0, upgrade.stderr or upgrade.stdout
+    assert _snapshot(specs) == before

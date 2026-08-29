@@ -27,7 +27,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from dadaia_workspace.features.telemetry.aggregator.queries import TelemetryAggregator
-from dadaia_workspace.features.telemetry.store.schema import apply_migrations, open_connection
+from dadaia_workspace.features.telemetry.store import TelemetryStore
 
 _NOW = datetime.now(tz=UTC)
 _T1 = (_NOW - timedelta(hours=2)).isoformat()
@@ -49,9 +49,11 @@ class _FakePricing:
 
 def _seed(db_path: Path, *, sessions: int = 3) -> None:
     """Create + migrate a real on-disk store and seed a few claude sessions."""
-    conn = open_connection(db_path)
+    store = TelemetryStore(db_path)
+    store.open_write()
+    store.migrate()
+    conn = store._conn  # noqa: SLF001 — test-only raw-SQL seeding
     try:
-        apply_migrations(conn)
         conn.execute(
             "INSERT OR IGNORE INTO agents (name, provider, is_subagent, first_seen_at, last_seen_at)"
             " VALUES (?,?,?,?,?)",
@@ -95,7 +97,7 @@ def test_two_concurrent_aggregate_calls_open_distinct_connections(tmp_path: Path
     plock = threading.Lock()
 
     def _connection_factory() -> sqlite3.Connection:
-        conn = open_connection(db_path, read_only=True)
+        conn = TelemetryStore(db_path).open_read()
         with plock:
             produced.append((threading.get_ident(), conn))
         return conn

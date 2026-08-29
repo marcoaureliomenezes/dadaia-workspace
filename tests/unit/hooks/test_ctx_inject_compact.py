@@ -23,7 +23,7 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.features.spec_context import session_identity
+from dadaia_workspace.core import session_store
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
 pytestmark = pytest.mark.unit
@@ -53,7 +53,7 @@ def _bind_session(tmp_path: Path, session_id: str, context: str) -> None:
     ISO timestamp of "now" — the field the injection trigger (T-50-03) compares against
     the sentinel's mtime.
     """
-    session_identity.write_session(
+    session_store.write_session(
         tmp_path,
         session_id,
         {
@@ -147,7 +147,14 @@ def test_post_compact_resolves_bound_context_from_session_record(tmp_path: Path)
     sessions = tmp_path / ".dadaia" / "sessions"
     sessions.mkdir(parents=True, exist_ok=True)
     (sessions / f"{sid}.json").write_text(
-        json.dumps({"session_id": sid, "context": "ctx", "mode": "implementation"}),
+        json.dumps(
+            {
+                "session_id": sid,
+                "context": "ctx",
+                "mode": "implementation",
+                "bound_at": datetime.now(tz=UTC).isoformat(),
+            }
+        ),
         encoding="utf-8",
     )
     out = _run(tmp_path, sid, event="PostCompact")

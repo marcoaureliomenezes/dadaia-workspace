@@ -2,20 +2,24 @@
 
 Pure module — no I/O outside the supplied specs_dir/templates_dir.
 Creates the canonical SDD directory tree for new repositories.
+
+``scaffold()`` is a thin, CLI-facing wrapper (v0.5.1 K4): "what a specs tree
+contains" lives ONCE, in :data:`~dadaia_workspace.features.specs.canon.CANON` — this
+module folds over that ONE table (no second, hand-kept file list) and adapts its
+result shape to the long-standing :class:`ScaffoldResult` (created/skipped/errors)
+contract every caller (``cli/commands/specs.py``'s ``init`` verb, this module's own
+test suite) already depends on.
 """
 
 from __future__ import annotations
 
-import datetime
-import json
 import re
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 
-import jinja2
-from jinja2.sandbox import SandboxedEnvironment
-
-from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION, RELEASE_SEMVER_RE
+from dadaia_workspace.core.specs_version import RELEASE_SEMVER_RE
+from dadaia_workspace.features.specs import canon
 
 
 @dataclass
@@ -27,203 +31,48 @@ class ScaffoldResult:
     errors: list[str] = field(default_factory=list)
 
 
-_CONSTITUTION_STUB = """\
----
-specs_pattern_version: {specs_pattern_version}
----
-# Constitution — {project_name}
-
-> **Created:** {today}
-
-## Propósito
-
-Declaração atômica do propósito do projeto e suas invariantes fundamentais.
-
-## Invariantes
-
-1. (Definir invariantes aqui)
-
-## Exclusões canônicas
-
-- (Definir o que este projeto não é)
-"""
-
-_AREA_HISTO_FILES: tuple[tuple[str, str], ...] = (
-    ("releases", "releases_histo.jsonl"),
-    ("backlog", "backlog_histo.jsonl"),
-    ("bugs", "bugs_histo.jsonl"),
-    ("audits", "audits_histo.jsonl"),
-)
-
-_BACKLOG_STUB = '{"schema": "backlog-v1", "active": []}\n'
-
-
-def _render_template(
-    templates_dir: Path,
-    template_name: str,
-    context: dict[str, str],
-) -> str:
-    """Render a Jinja2 template file with the given context."""
-    # SandboxedEnvironment blocks access to Python internals (e.g. dunder
-    # attributes) so a hostile project_name/version cannot reach a sandbox
-    # escape via template syntax. autoescape stays off: templates render
-    # Markdown, not HTML.
-    env = SandboxedEnvironment(
-        loader=jinja2.FileSystemLoader(str(templates_dir)),
-        undefined=jinja2.Undefined,
-        autoescape=False,
-    )
-    template = env.get_template(template_name)
-    rendered: str = template.render(context)
-    return rendered
-
-
 def scaffold(
     specs_dir: Path,
     project_name: str,
     force: bool,
     templates_dir: Path,
 ) -> ScaffoldResult:
-    """Scaffold the SDD release-lifecycle directory structure.
+    """Scaffold the SDD release-lifecycle directory structure — scaffold is canon
+    rendered (:func:`~dadaia_workspace.features.specs.canon.scaffold`).
 
     Args:
         specs_dir: Target specs/ directory (will be created if absent).
         project_name: Human-readable project name used in rendered templates.
         force: If True, overwrite existing files. If False, skip existing files.
-        templates_dir: Directory containing Jinja2 .j2 template files.
+        templates_dir: Directory containing the canonical templates
+            (``dadaia_workspace/public/templates/``); its sibling ``../scaffold/``
+            supplies every area's ``AGENTS.md``/memory-atom source content.
 
     Returns:
         ScaffoldResult with lists of created, skipped, and error entries.
     """
     result = ScaffoldResult()
-    today = datetime.date.today().isoformat()
-
-    def _write(path: Path, content: str) -> None:
-        """Write content to path; respect force flag."""
-        if path.exists() and not force:
-            result.skipped.append(path)
-            return
-        try:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(content, encoding="utf-8")
-            result.created.append(path)
-        except OSError as exc:
-            result.errors.append(f"Failed to write {path}: {exc}")
-
-    # 1 — constitution.md (stub; operator-owned — only create if absent)
-    constitution_path = specs_dir / "constitution.md"
-    if constitution_path.exists() and not force:
-        result.skipped.append(constitution_path)
-    else:
-        try:
-            constitution_path.parent.mkdir(parents=True, exist_ok=True)
-            content = _CONSTITUTION_STUB.format(
-                project_name=project_name,
-                today=today,
-                specs_pattern_version=CANONICAL_SPECS_VERSION,
-            )
-            constitution_path.write_text(content, encoding="utf-8")
-            result.created.append(constitution_path)
-        except OSError as exc:
-            result.errors.append(f"Failed to write {constitution_path}: {exc}")
-
-    # Locate canonical public assets adjacent to templates_dir.
-    _scaffold_dir = templates_dir.parent / "scaffold"
-    _scaffold_memory_dir = _scaffold_dir / "memory"
-
-    # 2 — scoped SDD rules. This exact template is what doctor compares against.
-    # v6 canon (FR1, specs_pattern_version 5 -> 6): every scaffold README.md retires
-    # into its area's AGENTS.md — root and memory/ already carried one; backlog/,
-    # bugs/, releases/, audits/ and ADRs/ now do too. A directory is kept by its
-    # AGENTS.md — no separate .gitkeep landing-zone mechanism (retired: git does not
-    # track empty directories, and none of these needs to be empty-but-present; a
-    # per-artifact `_archive/` subdir is created on demand by the first real write
-    # into it, via the shared atomic_write mkdir-parents idiom).
-    try:
-        _write(
-            specs_dir / "AGENTS.md",
-            (templates_dir / "specs-AGENTS.md").read_text(encoding="utf-8"),
-        )
-        _write(
-            specs_dir / "memory" / "AGENTS.md",
-            (_scaffold_memory_dir / "AGENTS.md").read_text(encoding="utf-8"),
-        )
-        for area in ("backlog", "bugs", "releases", "audits", "ADRs"):
-            _write(
-                specs_dir / area / "AGENTS.md",
-                (_scaffold_dir / area / "AGENTS.md").read_text(encoding="utf-8"),
-            )
-        # Canon per-area history: each `_archive/` holds only its `*_histo.jsonl`
-        # (empty at birth); releases/_ideas/ carries its own scoped rule.
-        for area, histo in _AREA_HISTO_FILES:
-            _write(specs_dir / area / "_archive" / histo, "")
-        _write(
-            specs_dir / "releases" / "_ideas" / "AGENTS.md",
-            (_scaffold_dir / "releases" / "_ideas" / "AGENTS.md").read_text(encoding="utf-8"),
-        )
-        # ADRs/ (v0.5.0 specs-canon closure, operator ruling 2026-08-28): one JSONL
-        # record store, empty at birth — decisions.jsonl (live) + its own
-        # _superseded/superseded.jsonl (a decision moves there when superseded).
-        # Mirrors the per-area histo pattern above: written directly, empty content,
-        # never sourced from a scaffold-tree file (there is nothing to template).
-        _write(specs_dir / "ADRs" / "decisions.jsonl", "")
-        _write(specs_dir / "ADRs" / "_superseded" / "superseded.jsonl", "")
-    except Exception as exc:
-        result.errors.append(f"Scaffold rules error: {exc}")
-
-    # 2-4 — born-markdown memory scaffolds (.md only).
-    # memory-markdown-source-v1: .md is the sole source of truth; the legacy
-    # .yaml/.html scaffolds and the placeholder.html stub were retired (no committed
-    # HTML — the panel renders .md in-memory, D-4).
-    # v6 canon (FR1/A1.5/A1.6, T-050-06): the top-level trio renamed to
-    # ARCHITECTURE.md, TECHSTACK.md, QUALITY.md — source and dest share the name.
-    _memory_md_stubs = [
-        ("ARCHITECTURE.md", specs_dir / "memory" / "ARCHITECTURE.md"),
-        ("TECHSTACK.md", specs_dir / "memory" / "TECHSTACK.md"),
-        ("QUALITY.md", specs_dir / "memory" / "QUALITY.md"),
-        ("product/index.md", specs_dir / "memory" / "product" / "index.md"),
+    public_dir = templates_dir.parent
+    required_dests: list[str] = [
+        entry.dest for entry in canon.CANON if entry.required_at_birth and entry.dest
     ]
-    for rel, dest in _memory_md_stubs:
-        try:
-            src = _scaffold_memory_dir / rel
-            _write(dest, src.read_text(encoding="utf-8"))
-        except Exception as exc:
-            result.errors.append(f"Scaffold error ({rel}): {exc}")
+    pre_existing = {dest for dest in required_dests if (specs_dir / dest).exists()}
 
-    # An empty product catalog is valid and makes a fresh tree self-pull ready.
-    _write(
-        specs_dir / "memory" / "product" / "catalog.json",
-        json.dumps(
-            {"generated_at": f"{today}T00:00:00Z", "context": project_name, "features": []},
-            indent=2,
+    try:
+        created = canon.scaffold(
+            specs_dir, project_name=project_name, force=force, public_dir=public_dir
         )
-        + "\n",
-    )
+    except OSError as exc:
+        result.errors.append(f"Scaffold error: {exc}")
+        created = []
 
-    # ACTIVE.md retired (v0.5.0 FR4/T-050-21A, A4.1): no replacement file — a fresh
-    # scaffold's "no active release" state is now the honest absence of any directory
-    # under releases/ carrying a RELEASE.json (features.specs.doctor_common
-    # .resolve_live_release_id), the same state `dadaia specs release ...` back-fills
-    # the moment a release is defined (T-050-11).
-
-    # 5 — backlog/BACKLOG.json: the single-source structured backlog document
-    # document skeleton — both section headings, nothing else. Matches exactly what
-    # `features.spec_artifacts.new_artifacts.backlog_new` creates when it finds no
-    # document; a fresh scaffold and a fresh `backlog new` share one skeleton shape.
-    _write(specs_dir / "backlog" / "BACKLOG.json", _BACKLOG_STUB)
-
-    # 7, 8 — releases/{_ideas,_archive}/, and 10-12 — the backlog/audits/bugs
-    # per-artifact _archive/ dirs (v0.1.46 AC-4, FROZEN gate-class landing zones) are
-    # deliberately NOT pre-created here: none carries its own AGENTS.md, root
-    # specs/_archive/ and specs/assets/ retired (neither is a v6 canon root member,
-    # TREE-8), and a directory that is kept by nothing but an empty placeholder file
-    # is exactly the .gitkeep mechanism this scaffold retires. Each lands on disk the
-    # moment its first real artifact is written into it (mkdir-parents=True, the
-    # shared atomic_write idiom) — never eagerly, never empty-on-purpose.
-
-    # 9 — ADRs/AGENTS.md, ADRs/decisions.jsonl and ADRs/_superseded/superseded.jsonl
-    # already written above (v6 canon root member; specs/ADRs/AGENTS.md owns the
-    # decision-record law).
+    created_rel = {p.relative_to(specs_dir).as_posix() for p in created}
+    for dest in required_dests:
+        target = specs_dir / dest
+        if dest in created_rel:
+            result.created.append(target)
+        elif dest in pre_existing and not force:
+            result.skipped.append(target)
 
     return result
 
@@ -325,7 +174,7 @@ def scaffold_release_segment(
         )
 
     result = ScaffoldResult()
-    today = datetime.date.today().isoformat()
+    today = date.today().isoformat()
     seg_dir = specs_dir / "releases" / version_id / segment
     ctx = {"version_id": version_id, "segment": segment, "today": today}
 

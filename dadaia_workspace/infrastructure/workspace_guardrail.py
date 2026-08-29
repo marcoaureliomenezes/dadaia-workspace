@@ -43,6 +43,15 @@ _CANONICAL_AGENTS_BANNER = (
 )
 
 
+def _agents_md_source(agentic_dir: Path) -> Path | None:
+    """The staged root ``AGENTS.md`` source: ``templates/`` takes precedence over
+    ``data/`` (a data-only tree is the fallback path a fresh/minimal stage carries)."""
+    for path in (agentic_dir / "templates" / "AGENTS.md", agentic_dir / "data" / "AGENTS.md"):
+        if path.exists():
+            return path
+    return None
+
+
 def _carries_canonical_banner(dst: Path) -> bool:
     """True when *dst* begins with the generated provenance banner (a lib-owned copy).
 
@@ -414,10 +423,11 @@ def _doctor_consumer_pair_lines(
 ) -> list[DoctorLine]:
     """The SINGLE authority for provenance-aware CONSUMER guardrail-pair doctor lines (FR9).
 
-    This is the one classification used by BOTH ``manager.doctor()`` (the real
-    ``dadaia public doctor`` consumer fan-out — the ``repos/<slug>:`` lines are no longer
-    emitted by ``runtime_expectations``) AND :func:`_doctor_guardrail_pair`. There is no
-    parallel legacy consumer-doctor path.
+    This is the one classification ``manager.doctor()`` uses for the real ``dadaia public
+    doctor`` consumer fan-out — the ``repos/<slug>:`` lines (K3, v0.5.1: the root pair is
+    now 2 ``ProjectionRule`` entries; the duplicate ``_doctor_guardrail_pair`` helper that
+    re-derived both root and consumer lines is retired). There is no parallel legacy
+    consumer-doctor path.
 
     Per registry-detected consumer repo (self-repo skipped):
       * **AGENTS.md** — absent → ``[missing]``; no canonical banner → ``[foreign]`` (repo-owned,
@@ -470,48 +480,4 @@ def _doctor_consumer_pair_lines(
         else:
             claude_line = DoctorLine(DoctorStatus.OK, c_label)
         lines.append(_emit(claude_line))
-    return lines
-
-
-def _doctor_guardrail_pair(
-    source: Path,
-    workspace_root: Path,
-) -> list[DoctorLine]:
-    """Return doctor parity lines for the guardrail pair projection.
-
-    Emits 2 root lines + the provenance-aware consumer pair lines from the single authority
-    :func:`_doctor_consumer_pair_lines` (so this helper and ``manager.doctor()`` classify
-    consumers identically — no dead parallel path). Lines are also written to stderr for CLI
-    visibility.
-
-    Labels: ``root:AGENTS.md``, ``root:CLAUDE.md``,
-    ``repos/<slug>:AGENTS.md``, ``repos/<slug>:CLAUDE.md``.
-    """
-    source_sha = hashlib.sha256(source.read_bytes()).hexdigest()
-
-    def _check(dst: Path, label: str) -> DoctorLine:
-        if not dst.exists():
-            line = DoctorLine(DoctorStatus.MISSING, label)
-        elif hashlib.sha256(dst.read_bytes()).hexdigest() != source_sha:
-            line = DoctorLine(DoctorStatus.DRIFT, label)
-        else:
-            line = DoctorLine(DoctorStatus.OK, label)
-        sys.stderr.write(line.render() + "\n")
-        return line
-
-    def _check_stub(dst: Path, label: str) -> DoctorLine:
-        """Verify that *dst* contains the expected 1-line CLAUDE.md stub (T-41)."""
-        if not dst.exists():
-            line = DoctorLine(DoctorStatus.MISSING, label)
-        elif dst.read_text(encoding="utf-8") != _CLAUDE_MD_STUB:
-            line = DoctorLine(DoctorStatus.DRIFT, label)
-        else:
-            line = DoctorLine(DoctorStatus.OK, label)
-        sys.stderr.write(line.render() + "\n")
-        return line
-
-    lines: list[DoctorLine] = []
-    lines.append(_check(workspace_root / "AGENTS.md", "root:AGENTS.md"))
-    lines.append(_check_stub(workspace_root / "CLAUDE.md", "root:CLAUDE.md"))
-    lines.extend(_doctor_consumer_pair_lines(source, workspace_root, emit_stderr=True))
     return lines

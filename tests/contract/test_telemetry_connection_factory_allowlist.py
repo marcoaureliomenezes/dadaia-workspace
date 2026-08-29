@@ -29,7 +29,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 _PKG_ROOT = _REPO_ROOT / "dadaia_workspace"
 
 # Allowlisted call sites, relative to the repo root (POSIX form).
-_FACTORY_INTERNAL = "dadaia_workspace/features/telemetry/store/schema.py"
+_FACTORY_INTERNAL = "dadaia_workspace/features/telemetry/store.py"
 _EXEMPT_FOREIGN_READERS = frozenset(
     {
         "dadaia_workspace/features/telemetry/aggregator/runtimes.py",

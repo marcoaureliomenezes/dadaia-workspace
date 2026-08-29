@@ -26,7 +26,7 @@ import sys
 _REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(_REPO_ROOT))
 
-from dadaia_workspace.features.telemetry.store.schema import apply_migrations  # noqa: E402
+from dadaia_workspace.features.telemetry.store import apply_migrations  # noqa: E402
 
 _FIXTURE_PATH = pathlib.Path(__file__).parent / "sessions_seeded.sqlite"
 

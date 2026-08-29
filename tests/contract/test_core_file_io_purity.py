@@ -1,8 +1,10 @@
 """Core file-I/O purity AST ratchet (release v0.1.54, FR7 / T-54-12).
 
-`architecture.md` names exactly four `core/` modules as *authorized* file-I/O exceptions —
-``specs_backup``, ``specs_version``, ``specs_resolver``, ``workspace_resolver`` — pending
-the (now-consumed) ``import-boundary-enforcement`` backlog. The two import-linter contracts
+`architecture.md` names the `core/` modules that are *authorized* file-I/O exceptions —
+``specs_backup``, ``specs_version``, ``workspace_resolver``, ``atomic_write``,
+``invocation`` and ``session_store`` (release K1: the "One Invocation" deepening moved
+``core.specs_resolver`` and ``features.spec_context.session_identity`` into this pair —
+same authorized-exception status, new names, no net growth). The two import-linter contracts
 ``core-no-upper-layers`` and ``core-no-os-primitives`` are KEPT and unchanged; neither
 catches *file I/O* (they guard upward imports and OS-primitive modules, not calls to
 ``open`` / ``pathlib.Path`` write helpers). So the file-I/O purity of ``core/`` was, until
@@ -53,15 +55,27 @@ _CORE_DIR = _REPO_ROOT / "dadaia_workspace" / "core"
 # the filesystem; atomic_write (v0.4.5 FR2/T-045-12, architect ruling AR-1: UPHOLD D5) is
 # the single atomic tmp-file + os.replace primitive for hooks/infrastructure/features —
 # same precedent as specs_repair, exercised deliberately per this ratchet's own
-# prescribed path, not re-opened by accident). architecture.md pins this exact set.
+# prescribed path, not re-opened by accident).
+#
+# handoff_index (release 0.5.1 K6, deepening candidate): the one handoff discovery +
+# artifact-path-resolution + version-routing module several MUTUALLY-INDEPENDENT feature
+# packages need (chokepoints, specs, panel, reports) — the P-07 cross-feature-independence
+# contract's cap must never rise (GATE requirement), so this joins the SAME precedent as
+# specs_resolver/workspace_resolver (a filesystem-walking resolver several layers need,
+# placed in `core` rather than behind a new suppressed features-no-cross-feature edge per
+# consumer) instead of a new features/* home. Follow-up owed to product-engineer:
+# specs/memory/ARCHITECTURE.md P-11's "authorized set of six modules" wording is now stale
+# (seven) — out of this task's write scope (specs/** is off-limits here).
 _AUTHORIZED_STEMS: frozenset[str] = frozenset(
     {
         "specs_backup",
         "specs_repair",
         "specs_version",
-        "specs_resolver",
         "workspace_resolver",
         "atomic_write",
+        "invocation",
+        "session_store",
+        "handoff_index",
     }
 )
 

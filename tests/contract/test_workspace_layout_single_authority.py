@@ -39,12 +39,14 @@ def test_gate_law_sets_are_the_same_objects() -> None:
 
 
 def test_installer_targets_are_the_same_object() -> None:
+    """K3 (v0.5.1): the law-projection rule builder (``_law_projection_rules``) reads
+    ``DADAIA_MD_HARNESS_TARGETS`` straight off ``core.workspace_layout`` — no more
+    private per-module re-export to keep byte-identical (the retired
+    ``install_helpers._DADAIA_MD_HARNESS_TARGETS`` alias)."""
     from dadaia_workspace.core import workspace_layout
-    from dadaia_workspace.infrastructure import install_helpers
+    from dadaia_workspace.infrastructure import projection_rules
 
-    assert install_helpers._DADAIA_MD_HARNESS_TARGETS is (
-        workspace_layout.DADAIA_MD_HARNESS_TARGETS
-    )
+    assert projection_rules.DADAIA_MD_HARNESS_TARGETS is workspace_layout.DADAIA_MD_HARNESS_TARGETS
 
 
 def test_doctor_dadaia_allowlist_is_the_same_object() -> None:

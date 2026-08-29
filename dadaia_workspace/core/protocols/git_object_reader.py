@@ -160,7 +160,7 @@ class GitObjectReader(Protocol):
 
         The one caller (``features.chokepoints.service.push_gate_decision``'s
         specs-canon policy step) feeds each returned path straight into
-        ``features.specs.specs_canon.canon_violations`` — never a filesystem walk,
+        ``features.specs.canon.canon_violations`` — never a filesystem walk,
         since a pushed sha is not necessarily checked out on disk. Raises
         :class:`GitObjectReadError` on any git failure (a policy gate never skips
         what it cannot evaluate), including an *sha* that fails the same shape check
@@ -175,7 +175,7 @@ class GitObjectReader(Protocol):
         root commit) or does not resolve at all (v0.5.0 specs-canon closure).
 
         Feeds the SPEC-DOC-044 stale-verdict business rule
-        (``features.specs.specs_canon.verdict_violations``) — both the doctor (via a
+        (``features.specs.canon.verdict_violations``) — both the doctor (via a
         CLI-resolved ``head_sha``/``first_parent(head_sha)`` pair, passed as plain
         data into :class:`~dadaia_workspace.features.specs.doctor.SpecsDoctor`, never
         a live git handle) and the push gate (via *this* port, injected exactly like
