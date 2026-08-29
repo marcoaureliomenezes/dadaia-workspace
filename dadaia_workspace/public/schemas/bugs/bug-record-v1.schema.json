@@ -136,7 +136,7 @@
     "cause": {
       "type": ["string", "null"],
       "x-mutability": "mutable-governance",
-      "description": "The fix's own statement of what caused the bug — filled when resolved."
+      "description": "The one generic mutable-governance narrative field, reused across transitions rather than a second field per verb: the fix's statement of what caused the bug when resolved, or the reason narrative when deferred/rejected."
     },
     "caused_by": {
       "type": ["string", "null"],
