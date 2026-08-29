@@ -24,6 +24,8 @@ from dadaia_workspace.core.models.doctor_report import (
     DoctorReport,
     DoctorStatus,
 )
+from dadaia_workspace.infrastructure.projection import doctor_rules
+from dadaia_workspace.infrastructure.projection_rules import _tree_bytes_rules
 from dadaia_workspace.infrastructure.public_assets import (
     FileSystemPublicAssetManager,
 )
@@ -95,7 +97,11 @@ def test_clean_ok_paths_incl_scripts(tmp_path: Path) -> None:
     assert "[drift]" not in line
     assert "[missing]" not in line
 
-    # Scripts: matching staged/projected script content → [ok].
+    # Scripts: matching staged/projected script content → [ok]. K3 (v0.5.1): the
+    # scripts family is `projection_rules._scripts_tree_rules`, one `_tree_bytes_rules`
+    # call over `.dadaia/agentic/scripts` -> `.dadaia/scripts` — exercised directly
+    # here (the manager no longer carries a `_runtime_expectations` generator; `doctor`
+    # compares this SAME rule table via `doctor_rules`).
     workspace = tmp_path / "ws"
     workspace.mkdir()
     agentic_scripts = workspace / ".dadaia" / "agentic" / "scripts"
@@ -106,21 +112,12 @@ def test_clean_ok_paths_incl_scripts(tmp_path: Path) -> None:
     projected_scripts.mkdir(parents=True)
     _write(projected_scripts / "hook.sh", script_content)
 
-    agentic_dir = workspace / ".dadaia" / "agentic"
-    expectations = list(mgr._runtime_expectations(agentic_dir, workspace))
-    script_expectations = [
-        (src, dst, label, transform)
-        for (src, dst, label, transform) in expectations
-        if src is not None and "scripts" in str(src) and "hook.sh" in str(src)
-    ]
-    assert script_expectations, (
-        "Expected at least one scripts expectation for hook.sh; "
-        f"got expectations: {[lbl for (_, _, lbl, _) in expectations]}"
+    rules = _tree_bytes_rules(
+        agentic_scripts, projected_scripts, harness="agents", label_prefix="dadaia:scripts/"
     )
-    src, dst, label, _transform = script_expectations[0]
-    script_line = _render_one(mgr._compare(src, dst, label))
-    assert script_line.startswith("[ok]"), (
-        f"Expected [ok] for matching scripts, got: {script_line!r}"
+    lines = doctor_rules(rules)
+    assert lines and all(line.status is DoctorStatus.OK for line in lines), (
+        f"Expected [ok] for matching scripts, got: {[_render_one(line) for line in lines]}"
     )
 
 

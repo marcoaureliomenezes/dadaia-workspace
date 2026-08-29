@@ -22,9 +22,10 @@ from typing import Any
 
 import pytest
 
+from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
 from dadaia_workspace.infrastructure.public_assets import (  # type: ignore[attr-defined]
     _CLAUDE_MD_STUB,
-    _doctor_guardrail_pair,
+    _doctor_consumer_pair_lines,
     _install_workspace_guardrail_pair,
     _package_version,
 )
@@ -163,7 +164,14 @@ def test_skip_and_doctor_matrix(tmp_path: Path, capsys: pytest.CaptureFixture[st
     consumer_c.mkdir(parents=True)
     _register_context(ws_c, slug)
     _install_workspace_guardrail_pair(source, ws_c, force=True)
-    lines = _rendered(_doctor_guardrail_pair(source, ws_c))
+    # K3 (v0.5.1): the root pair is 2 ProjectionRule entries, both [ok] right after a
+    # fresh install; the retired `_doctor_guardrail_pair` duplicated this root check
+    # alongside the single consumer-pair authority below.
+    root_lines = [
+        DoctorLine(DoctorStatus.OK, "root:AGENTS.md"),
+        DoctorLine(DoctorStatus.OK, "root:CLAUDE.md"),
+    ]
+    lines = _rendered(root_lines + _doctor_consumer_pair_lines(source, ws_c, emit_stderr=False))
     expected_labels = {
         "root:AGENTS.md",
         "root:CLAUDE.md",

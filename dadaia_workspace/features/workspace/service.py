@@ -96,7 +96,12 @@ class WorkspaceService:
         installed: list[str] = []
         if not skip_assets:
             installed.extend(self._public_assets.stage(workspace_root))
-            installed.extend(self._install_for_harnesses(workspace_root, chosen))
+            # `target="all"` resolves the chosen-harness SUBSET on its own: the harness
+            # profile was already persisted above (`_write_harness_profile`), and
+            # `install(target="all")` reads that persisted profile to scope its harness
+            # targets (v0.1.58 FR3). The old per-target loop with manual line-dedup was
+            # a redundant workaround predating that profile-scoped install path.
+            installed.extend(self._public_assets.install(workspace_root, target="all"))
         else:
             installed.append(
                 "[warn] assets skipped — no hooks configured; the workspace is ungated "
@@ -104,28 +109,6 @@ class WorkspaceService:
             )
 
         return workspace, installed
-
-    def _install_for_harnesses(self, workspace_root: Path, chosen: tuple[str, ...]) -> list[str]:
-        """Install only the chosen harnesses' projections.
-
-        The full all-four set preserves the single ``target="all"`` install verbatim
-        (byte-identical back-compat). For a subset, install the shared ``agents`` skills
-        root plus one projection per chosen harness — ``target="all"`` is never used for a
-        subset (it would scaffold unchosen harnesses). Profile-aware ``install(target="all")``
-        is the v0.1.58 W3 concern; W2 stays self-contained via per-target install. Duplicate
-        install-report lines (shared assets touched by each per-target call, hash-compare
-        no-ops) are de-duplicated for a clean caller-facing list.
-        """
-        if set(chosen) == set(L1_ENTRY_HARNESSES):
-            return self._public_assets.install(workspace_root, target="all")
-        installed: list[str] = []
-        seen: set[str] = set()
-        for target in ("agents", *chosen):
-            for item in self._public_assets.install(workspace_root, target=target):
-                if item not in seen:
-                    seen.add(item)
-                    installed.append(item)
-        return installed
 
     def _write_harness_profile(self, workspace: Workspace, harnesses: tuple[str, ...]) -> None:
         """Write .dadaia/states/harness_profile.json inline (like ``_init_json_file``).

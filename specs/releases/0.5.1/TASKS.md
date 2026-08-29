@@ -130,7 +130,7 @@
 
 ## `alpha-3` — the three big tables (disjoint write sets, parallel)
 
-- [ ] **T-051-11** — K3: one `ProjectionRule` table; harness as a real seam · owner: software-engineer · write set: `dadaia_workspace/features/public/service.py`, `dadaia_workspace/features/public/harnesses/{claude,codex,kimi}.py` (new), `dadaia_workspace/infrastructure/{public_assets,install_helpers,workspace_guardrail,runtime_config,codex_doctor}.py`, `dadaia_workspace/features/workspace/service.py`, `dadaia_workspace/core/workspace_layout.py`, the public-assets/codex test files · acceptance: A-3.1 … A-3.5, A-0.2 (5 compare semantics → 1, 4 sha sites → 1)
+- [x] **T-051-11** — K3: one `ProjectionRule` table; harness as a real seam · owner: software-engineer · write set: `dadaia_workspace/features/public/service.py`, `dadaia_workspace/features/public/harnesses/{claude,codex,kimi}.py` (new), `dadaia_workspace/infrastructure/{public_assets,install_helpers,workspace_guardrail,runtime_config,codex_doctor}.py`, `dadaia_workspace/features/workspace/service.py`, `dadaia_workspace/core/workspace_layout.py`, the public-assets/codex test files · acceptance: A-3.1 … A-3.5, A-0.2 (5 compare semantics → 1, 4 sha sites → 1)
   - deletes: `runtime_expectations` · every `_step_*`/`_install_*` · the `"[ok] "/"[skip] "` transcript protocol and its parsing · `_KIMI_DIRS` · `remove_stale_files` (0 callers) · `_render_codex_pack_agent` (0 callers) · `_doctor_guardrail_pair` duplication · the dcx1/2/4/5/10 regexes (~250 LOC) · 8 `from runtime_config import` stanzas + 4 `noqa: F401` shims · `workspace/service._install_for_harnesses` — ~900 LOC
   - order inside the task: author the rule table → switch `install` → switch `doctor` → switch the ledger, each independently green with `dadaia public doctor` clean between steps
   - tests: `test_public_assets_{install,doctor,profile,kimi,hooks,render}`, `test_install_target_goldens`, `test_consumer_fanout*`, `test_codex_*` (5) → one "rule set per profile" table test + one write/compare pair + per-harness golden renders
@@ -174,7 +174,7 @@
   - preconditions: T-051-14 `[x]`
   - parallelism: parallel with T-051-15, 17, 18, 19
 
-- [ ] **T-051-17** — K11 ruling: the git-index boundary between concurrent sessions · owner: software-architect · write set: `specs/ADRs/decisions.jsonl`, a DRAFT under `.dadaia/reports/dadaia-workspace/software-architect/` · acceptance: A-12.1 (bugs 9/10 carry a stated disposition, never a silent drop)
+- [x] **T-051-17** — K11 ruling: the git-index boundary between concurrent sessions · owner: software-architect · write set: `specs/ADRs/decisions.jsonl`, a DRAFT under `.dadaia/reports/dadaia-workspace/software-architect/` · acceptance: A-12.1 (bugs 9/10 carry a stated disposition, never a silent drop)
   - content: the two options — `bind` provisions a per-session worktree, or `pre_commit` refuses when the index holds paths staged by a foreign presence — each with its bug-surface delta, its cost, and the feature it grows; one ADR record appended **`proposed`**
   - deletes: none (ruling only; no code on an agent's authority — both options grow a feature)
   - if the operator accepts inside this release: the accepted option becomes an `rc` task under T-051-24; otherwise bugs 9 and 10 stay `open` with this record as their stated reason
