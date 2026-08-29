@@ -74,14 +74,14 @@ Measured by: `dadaia specs doctor` — rule `MEM-DRIFT-1` (`features/specs/docto
 ADR: none
 Rationale: a diagram nobody checks is the first artifact to lie.
 
-### P-14 · We keep the release-event fold read-only: `core/release_events.py` contains no write call and no file I/O at all.
-Measured by: `pytest tests/contract/test_release_events_read_only.py`.
-ADR: none
+### P-14 · We keep the release-state reader pure: `core/release_state.py` parses and serializes already-read text and performs no file I/O.
+Measured by: `pytest tests/contract/test_release_state_read_only.py`.
+ADR: 0004 (proposed)
 Rationale: a reader that can write is a reader that can rewrite history.
 
-### P-15 · We close the release-record envelope: exactly seven event kinds, `additionalProperties: false`, and no harness `session_id` in a governance record.
-Measured by: `pytest tests/contract/test_release_event_schema.py`.
-ADR: none
+### P-15 · We close the release-state envelope: `release-state-v1` carries `additionalProperties: false` at every level, a closed log-entry shape, and no harness `session_id`.
+Measured by: `pytest tests/contract/test_release_state_schema.py`.
+ADR: 0004 (proposed)
 Rationale: an open envelope accumulates fields until no consumer can fold it.
 
 ### P-16 · We store no provenance a resolver cannot re-derive: a stored `resolved_commit` equals the value derived from git history.
