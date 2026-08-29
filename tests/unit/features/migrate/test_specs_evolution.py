@@ -1,11 +1,19 @@
-"""Unit tests for the specs-evolution migration framework (WS-SPECS-EVOLUTION).
+"""Unit tests for the specs-evolution framework (WS-SPECS-EVOLUTION; simplified
+v0.5.1 T-051-16, K10).
 
-Covers FR-S02 (version stamp), FR-S03 (registry), FR-S04 (backup-first), FR-S05
-(upgrade orchestration). Determinism via injected ``clock``.
+Covers FR-S02 (version stamp), the registry's surviving "stamp v6 or refuse" rule
+(FR-S03, replacing the retired versioned migration chain — see
+``features/migrate/registry.py``'s docstring), FR-S04 (backup module + doctor
+integration, unaffected by the chain's retirement), and FR-S05 (upgrade
+orchestration).
 
-CRITICAL migration chain (data loss risk): idempotence on an already-migrated tree,
-dry-run writing nothing, and backup-before-write ordering are each kept as named
-tests — they are the irreplaceable data-loss detectors for this framework.
+The versioned-chain tests this file used to carry (``test_registry_plan_...``,
+``test_upgrade_dry_run_writes_nothing``, ``test_upgrade_backup_first_chain_restamp``)
+are DELETED with their subject (the six migration modules + ``MigrationStep``/
+``plan``/``run_chain``) — replaced below by ``test_check_upgradable_refuses_below_
+floor_and_is_silent_at_or_above_it`` and
+``test_upgrade_refuses_below_floor_without_any_write`` /
+``test_upgrade_at_or_above_floor_is_idempotent_and_repairs_placeholders``.
 """
 
 from __future__ import annotations
@@ -75,24 +83,16 @@ def test_write_version_creates_and_updates_stamp(tmp_path: Path) -> None:
 # ───────────────────────────── registry (FR-S03) — 1 param ────────────────────
 
 
-def test_registry_plan_latest_version_and_idempotent_chain(tmp_path: Path) -> None:
-    keys = [s.key for s in _registry.REGISTRY]
-    assert "tree-v2" in keys
-    first = _registry.REGISTRY[0]
-    assert (first.from_version, first.to_version) == (0, 1)
+def test_check_upgradable_refuses_below_floor_and_is_silent_at_or_above_it() -> None:
+    """A-10.1: "the registry refuses <6 with the upgrade instruction"."""
+    with pytest.raises(_registry.UpgradeRefused, match="0.4.x"):
+        _registry.check_upgradable(current=0, goal=6)
+    with pytest.raises(_registry.UpgradeRefused, match="0.4.x"):
+        _registry.check_upgradable(current=5, goal=6)
 
-    assert _registry.latest_version() == _version.CANONICAL_SPECS_VERSION
-    assert _registry.plan(1, 1) == []
-    assert [s.key for s in _registry.plan(0, 1)] == ["tree-v2"]
-
-    with pytest.raises(ValueError, match="downgrade"):
-        _registry.plan(1, 0)
-
-    specs = tmp_path / "specs"
-    (specs / "releases" / "legacy").mkdir(parents=True)  # already migrated
-    # tree-v2 on a tree with nothing legacy to move is a safe no-op (no moves).
-    results = _registry.run_chain(specs, 0, 1, dry_run=False)
-    assert results[0][1].moved == []
+    # At, or past, the floor: no exception (the caller treats it as "nothing to do").
+    _registry.check_upgradable(current=6, goal=6)
+    _registry.check_upgradable(current=7, goal=6)
 
 
 # ───────────────────────────── backup (FR-S04) + doctor integration — 1 param ─
@@ -127,54 +127,44 @@ def test_backup_label_location_copy_and_doctor_visibility(tmp_path: Path) -> Non
     assert [i for i in canonical_issues if i.code == "SPECS-VERSION"] == []
 
 
-# ───────────────────────────── upgrade (FR-S05) — CRITICAL, kept named ────────
+# ───────────────────────────── upgrade (FR-S05) ────────────────────────────────
 
 
-def test_upgrade_dry_run_writes_nothing(tmp_path: Path) -> None:
+def test_upgrade_refuses_below_floor_without_any_write(tmp_path: Path) -> None:
+    """A-10.1: refusing a below-floor tree never touches the filesystem — no
+    backup, no re-stamp, no migrated content."""
     specs = tmp_path / "specs"
-    _write_constitution(specs, "# C\n")  # version 0
-    (specs / "foundation").mkdir()
-    (specs / "foundation" / "SPEC.md").write_text("x", encoding="utf-8")
-    result = _upgrade.upgrade(specs, dry_run=True, clock=_FIXED)
-    assert result.dry_run is True
-    assert result.from_version == 0 and result.to_version == _version.CANONICAL_SPECS_VERSION
-    assert not (tmp_path / "specs_bkp").exists()  # no backup written on dry-run
-    assert _version.read_pattern_version(specs) == 0  # not re-stamped
-    assert (specs / "foundation").exists()  # not migrated
+    _write_constitution(specs, "# C\n")  # version 0, below the canonical floor
+
+    with pytest.raises(_registry.UpgradeRefused):
+        _upgrade.upgrade(specs, dry_run=True)
+    with pytest.raises(_registry.UpgradeRefused):
+        _upgrade.upgrade(specs, dry_run=False)
+
+    assert not (tmp_path / "specs_bkp").exists()
+    assert _version.read_pattern_version(specs) == 0
 
 
-def test_upgrade_backup_first_chain_restamp(tmp_path: Path) -> None:
-    """The order contract: backup happens BEFORE the chain mutates the tree, the
-    chain applies, and the tree is re-stamped to canonical only after both — and a
-    second run against the now-canonical tree is idempotent (no second backup)."""
+def test_upgrade_at_or_above_floor_is_idempotent_and_repairs_placeholders(
+    tmp_path: Path,
+) -> None:
+    """A tree already at (or past) the canonical version is a no-op besides the
+    unconditional placeholder-atom repair; re-running is stable."""
     specs = tmp_path / "specs"
-    _write_constitution(specs, "# Constitution\n")  # version 0
-    (specs / "foundation").mkdir()
-    (specs / "foundation" / "SPEC.md").write_text("found", encoding="utf-8")
+    stamp = _version.CANONICAL_SPECS_VERSION
+    _write_constitution(specs, f"---\nspecs_pattern_version: {stamp}\n---\n# C\n")
 
-    result = _upgrade.upgrade(specs, clock=_FIXED)
+    result = _upgrade.upgrade(specs)
+    assert result.from_version == stamp
+    assert result.to_version == stamp
+    assert result.no_op is True
+    assert result.placeholder_removed == []
 
-    assert result.no_op is False
-    # 1. backup-first happened
-    assert result.backup_path is not None and result.backup_path.exists()
-    assert (result.backup_path / "foundation" / "SPEC.md").read_text(encoding="utf-8") == "found"
-    # 2. chain applied (foundation moved to releases/legacy)
-    assert (specs / "releases" / "legacy" / "foundation").exists()
-    assert not (specs / "foundation").exists()
-    # 3. re-stamped to canonical
-    assert _version.read_pattern_version(specs) == _version.CANONICAL_SPECS_VERSION
+    # Dry-run at the floor plans nothing and writes nothing.
+    dry = _upgrade.upgrade(specs, dry_run=True)
+    assert dry.dry_run is True
+    assert dry.no_op is True
 
-    # Second run: already at target → no-op, no second backup.
-    second = _upgrade.upgrade(specs, clock=_FIXED)
+    # Re-running is stable (idempotent).
+    second = _upgrade.upgrade(specs)
     assert second.no_op is True
-    assert second.backup_path is None
-
-    # A tree already stamped canonical before any upgrade call is a no-op from the start.
-    fresh_specs = tmp_path.parent / (tmp_path.name + "-fresh-canonical") / "specs"
-    _write_constitution(
-        fresh_specs, f"---\nspecs_pattern_version: {_version.CANONICAL_SPECS_VERSION}\n---\n# C\n"
-    )
-    fresh_result = _upgrade.upgrade(fresh_specs, clock=_FIXED)
-    assert fresh_result.no_op is True
-    assert fresh_result.backup_path is None
-    assert not (fresh_specs.parent / "specs_bkp").exists()

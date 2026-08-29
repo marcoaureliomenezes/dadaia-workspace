@@ -4,12 +4,13 @@ Residual R7: ``dadaia_workspace/public/scripts/__pycache__/`` had been committed
 compiled bytecode leaking into the canonical public asset tree, which is source-of-truth
 for every consumer and is staged/projected verbatim. Two failure modes must stay closed:
 
-1. **Regeneration.** Running the public scripts (``lint-memory-atoms.py`` /
-   ``generate-memory-catalog.py``) must NOT drop a ``__pycache__/*.pyc`` under
-   ``dadaia_workspace/public/``. The scripts set ``sys.dont_write_bytecode = True`` so the
-   guard fires for any invocation style; ``features/specs/doctor_memory.py`` additionally
-   passes ``-B`` at the LINT-1 subprocess call site. This test executes the scripts WITHOUT
-   ``-B`` so it proves the in-script guard, not just the call-site flag.
+1. **Regeneration.** Running the public scripts (``lint-memory-atoms.py`` —
+   ``generate-memory-catalog.py`` DELETED, v0.5.1 T-051-16/A10.1/A10.4) must NOT drop a
+   ``__pycache__/*.pyc`` under ``dadaia_workspace/public/``. The script sets
+   ``sys.dont_write_bytecode = True`` so the guard fires for any invocation style;
+   ``features/specs/doctor_memory.py`` additionally passes ``-B`` at the LINT-1 subprocess
+   call site. This test executes the script WITHOUT ``-B`` so it proves the in-script guard,
+   not just the call-site flag.
 
 2. **Packaging.** The built wheel/sdist must contain no ``.pyc``. ``poetry-core`` honours
    the ``[tool.poetry] exclude`` globs for both artifacts; this test asserts the exclusion
@@ -43,9 +44,7 @@ def _bytecode_artifacts_under_public() -> list[str]:
     return sorted(pyc + caches)
 
 
-def test_pre_push_ci_gate_ships_pyproject_excludes_bytecode_and_scripts_leave_no_pycache(
-    tmp_path: Path,
-) -> None:
+def test_pre_push_ci_gate_ships_pyproject_excludes_bytecode_and_scripts_leave_no_pycache() -> None:
     """`pre-push-ci-gate.sh` is present in the public/scripts/ listing (the SINGLE
     explicit ship assertion for the pre-push gate script, suite-wide, v0.1.51 FR3),
     and the poetry-core build config excludes __pycache__/*.pyc from sdist and wheel.
@@ -74,9 +73,7 @@ def test_pre_push_ci_gate_ships_pyproject_excludes_bytecode_and_scripts_leave_no
     assert before == [], f"precondition: public/ already polluted: {before}"
 
     lint_script = _SCRIPTS_DIR / "lint-memory-atoms.py"
-    gen_script = _SCRIPTS_DIR / "generate-memory-catalog.py"
     assert lint_script.is_file()
-    assert gen_script.is_file()
 
     # lint exits 0 (clean) or 2 (warnings only); either is a valid run that imports the
     # script module and would otherwise drop a .pyc.
@@ -88,21 +85,5 @@ def test_pre_push_ci_gate_ships_pyproject_excludes_bytecode_and_scripts_leave_no
     )
     assert lint.returncode in (0, 2), lint.stderr.decode()
 
-    out_catalog = tmp_path / "catalog.json"
-    gen = subprocess.run(
-        [
-            sys.executable,
-            str(gen_script),
-            "--memory-dir",
-            str(_MEMORY_DIR),
-            "--out",
-            str(out_catalog),
-        ],
-        cwd=_REPO_ROOT,
-        capture_output=True,
-        check=False,
-    )
-    assert gen.returncode == 0, gen.stderr.decode()
-
     after = _bytecode_artifacts_under_public()
-    assert after == [], f"scripts left bytecode under public/: {after}"
+    assert after == [], f"script left bytecode under public/: {after}"

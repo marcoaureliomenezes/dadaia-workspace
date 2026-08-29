@@ -13,8 +13,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-import yaml
-
+from dadaia_workspace.core import frontmatter as _fm
 from dadaia_workspace.core.protocols.process_runner import ProcessRunner
 from dadaia_workspace.core.specs_repair import (  # noqa: F401
     has_unfilled_angle_placeholders,
@@ -39,7 +38,6 @@ PRODUCT_INDEX_REL = "product/index.md"
 # Markdown memory atom helpers
 # ---------------------------------------------------------------------------
 
-_MD_FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
 # Any ATX heading (H1-H6): satisfies the "has a heading" requirement.
 _MD_HEADING_RE = re.compile(r"^#{1,6}\s+\S", re.MULTILINE)
 _MD_H1_RE = re.compile(r"^#\s+(.+)$", re.MULTILINE)
@@ -51,16 +49,15 @@ def _parse_memory_md(path: Path) -> _MemoryMdSummary:
     """Extract the facts the doctor needs from a memory .md atom."""
     content = path.read_text(encoding="utf-8")
 
-    # Extract frontmatter if present
+    # Extract frontmatter if present — tolerant: any parse failure (no delimiter,
+    # invalid YAML, non-mapping block) degrades to "no frontmatter" rather than
+    # raising, same as the pre-consolidation behaviour.
     fm: dict | None = None  # type: ignore[type-arg]
     body = content
-    m = _MD_FRONTMATTER_RE.match(content)
-    if m:
-        try:
-            fm = yaml.safe_load(m.group(1))
-        except yaml.YAMLError:
-            fm = None
-        body = content[m.end() :]
+    parsed = _fm.parse(content)
+    if isinstance(parsed, _fm.Frontmatter):
+        fm = parsed.data
+        body = parsed.body
 
     # First H1 heading text (used for heading_text field; may be empty).
     h1_match = _MD_H1_RE.search(body)

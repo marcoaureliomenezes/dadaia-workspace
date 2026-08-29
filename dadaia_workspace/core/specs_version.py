@@ -17,6 +17,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from dadaia_workspace.core.frontmatter import FRONTMATTER_RE as _FRONTMATTER_RE
+
 #: Single source of truth for the current canonical specs-pattern version.
 #: Bump this when a new migration step is added to the registry (see ``registry.py``).
 #: v3 = agent-tier-frontmatter (v0.1.72 FR1); v4 = bugs-single-file (v0.1.73 FR1 —
@@ -65,7 +67,6 @@ VERDICT_EVIDENCE_ROOT_TEMPLATES: tuple[str, str] = (
     "specs/releases/_archive/{glob}/verdicts",
 )
 
-_FRONTMATTER_RE = re.compile(r"\A---\n(.*?)\n---\n", re.DOTALL)
 _STAMP_RE = re.compile(r"^specs_pattern_version:\s*(\d+)\s*$", re.MULTILINE)
 
 

@@ -43,7 +43,8 @@ Schema of the returned dict
 a stable enumeration aid, NOT a priority signal. ``area`` is the atom's parent
 directory name under ``product/`` (top-level ``product/`` files get ``"product"``).
 
-Pure module — only ``re``, ``json``, and ``yaml`` from runtime deps.
+Pure module — only ``re``, ``json``, and the package's own :mod:`core.frontmatter`
+(itself lazy about ``yaml``) from runtime deps.
 """
 
 from __future__ import annotations
@@ -56,7 +57,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-import yaml
+from dadaia_workspace.core import frontmatter as _fm
 
 logger = logging.getLogger(__name__)
 
@@ -64,15 +65,14 @@ logger = logging.getLogger(__name__)
 # Regexes
 # ---------------------------------------------------------------------------
 
-_FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
 _WIKILINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
 
 # Required frontmatter fields for catalog generation.
 # ``agent_tier`` was removed here in v0.1.53 (FR3): it has zero runtime consumers, so the
-# catalog neither requires it as input (tolerate) nor emits it in output (drop). The two
-# renderers move in lockstep — the byte-identical twin is
-# ``public/scripts/generate-memory-catalog.py`` (pinned by
-# tests/contract/test_memory_catalog_render_contract.py).
+# catalog neither requires it as input (tolerate) nor emits it in output (drop). The
+# duplicate ``public/scripts/generate-memory-catalog.py`` renderer this list used to move
+# in lockstep with is DELETED (v0.5.1 T-051-16/A10.1/A10.4) — this module is now the only
+# catalog generator.
 # ``token_estimate`` was removed here at SPEC v0.4.2 FR2/GRILL D5: the catalog COMPUTES
 # it from the atom body (:func:`estimate_tokens`) rather than reading a stored,
 # hand-maintained frontmatter copy — a value that is stored AND derivable drifts (two
@@ -107,22 +107,15 @@ def _parse_md_file(
     except OSError as exc:
         return None, None, f"Cannot read '{md_path}': {exc}"
 
-    m = _FRONTMATTER_RE.match(content)
-    if not m:
-        return None, None, f"'{md_path}': no YAML frontmatter found."
-
-    raw_yaml = m.group(1)
-    body = content[m.end() :]
-
-    try:
-        fm: Any = yaml.safe_load(raw_yaml)
-    except yaml.YAMLError as exc:
-        return None, None, f"'{md_path}': YAML parse error: {exc}"
-
-    if not isinstance(fm, dict):
+    parsed = _fm.parse(content)
+    if isinstance(parsed, _fm.FrontmatterError):
+        if parsed.kind == "missing_delimiter":
+            return None, None, f"'{md_path}': no YAML frontmatter found."
+        if parsed.kind == "invalid_yaml":
+            return None, None, f"'{md_path}': YAML parse error: {parsed.message}"
         return None, None, f"'{md_path}': frontmatter is not a YAML mapping."
 
-    return fm, body, None
+    return parsed.data, parsed.body, None
 
 
 def _extract_depends_on(body: str) -> list[str]:
@@ -194,7 +187,7 @@ def generate_catalog(specs_dir: Path) -> dict[str, Any]:
         assert body is not None
 
         # Validate required fields
-        missing = [f for f in _REQUIRED_FIELDS if f not in fm]
+        missing = _fm.missing_fields(fm, _REQUIRED_FIELDS)
         if missing:
             errors.append(f"'{md_path}': required frontmatter field(s) missing: {missing}")
             continue

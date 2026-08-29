@@ -21,14 +21,11 @@ Scope is deliberately narrow — do NOT read "every script under public/scripts/
 * ``lint-memory-atoms.py`` — fully one-sourced (A16.1/A16.2): its lint logic lives
   entirely in ``features/specs/memory_lint.py``; the projected copy only imports and
   calls that module's ``main()``. Asserted thin here.
-* ``generate-memory-catalog.py`` — only PARTIALLY one-sourced (A16.3): its duplicated
-  ``estimate_tokens`` formula is deleted in favour of importing
-  ``features/specs/catalog.py:estimate_tokens``, but its ``generate_catalog``/
-  ``generate_index_md`` functions and its ``--memory-dir``/``--out``/``--index-out``/
-  ``--context`` CLI surface stay LOCAL BY DESIGN — they are pinned by
-  ``tests/contract/test_memory_catalog_render_contract.py`` (F-84) with a signature
-  that differs from ``features/specs/catalog.py``'s own ``specs_dir``-rooted,
-  context-derived public API. It is intentionally NOT in the thin-wrapper registry.
+* ``generate-memory-catalog.py`` — DELETED (v0.5.1 T-051-16, K10/A10.1/A10.4): the
+  duplicate it was "only partially one-sourced" with is gone; ``features/specs/
+  catalog.py`` is now the only catalog generator, and the contract test that used to
+  police the pair's byte-identity (``test_memory_catalog_render_contract.py``) is
+  deleted with its subject.
 * ``lint-dadaia-cli-reachability.py`` — standalone by design (its own ``--self-test``);
   it has no package canonical to mirror at all, so it is outside this contract's scope
   entirely, not merely excluded. ``lint-skill-collisions.py`` was the same shape and is
@@ -66,7 +63,10 @@ _STANDALONE_BY_DESIGN: frozenset[str] = frozenset(
         "lint-dadaia-cli-reachability.py",
     }
 )
-_PARTIALLY_ONE_SOURCED: frozenset[str] = frozenset({"generate-memory-catalog.py"})
+#: v0.5.1 T-051-16: generate-memory-catalog.py (the only member of this set) is
+#: DELETED — the set stays declared, empty, so the exclusion test below still proves
+#: (by construction) that nothing is silently re-added to it without review.
+_PARTIALLY_ONE_SOURCED: frozenset[str] = frozenset()
 
 
 def _line_count(path: Path) -> int:
