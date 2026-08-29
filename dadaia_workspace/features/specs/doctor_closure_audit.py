@@ -149,15 +149,19 @@ class ClosureAuditValidator:
         return issues
 
     def check_audits_naming_canon(self) -> list[SpecsDoctorIssue]:
-        """SPEC-DOC-030 (constitution §8): WARN on any non-conforming ``specs/audits/`` dir.
+        """SPEC-DOC-030 (DADAIA.md §6.8, v6 canon): WARN on any non-conforming
+        ``specs/audits/`` dir.
 
-        Forward enforcement of the collision-safe naming law: every audit directory must
-        be named ``<YYYYMMDDTHHMMSSZ>-<session_id_8chars>`` (:data:`AUDIT_DIR_NAME_RE`,
-        the single home in ``core.workspace_layout``) so two concurrent additive sessions
-        never collide on a path. WARN-only (legacy names are preserved, never
-        auto-renamed), mirroring the SPEC-DOC-027 legacy policy.
+        Forward enforcement of the naming law: every audit directory must be named
+        ``<YYYYMMDD>-<slug>`` (:data:`AUDIT_DIR_NAME_RE`, the single home in
+        ``core.workspace_layout`` — the SAME shape ``features.specs.canon``'s own
+        audits ``CanonEntry`` pattern uses, never a second, independently hand-kept
+        regex; bug spec-doc-030-audit-dir-rule-contradicts-dadaia-6-8-canon fixed a
+        stale ``<YYYYMMDDTHHMMSSZ>-<session_id_8chars>`` shape that predated the v6
+        canon). WARN-only (legacy names are preserved, never auto-renamed), mirroring
+        the SPEC-DOC-027 legacy policy.
 
-        Exempt: the four grandfathered dirs from the §8 amendment
+        Exempt: the four grandfathered dirs from the old pre-canon amendment
         (:data:`_AUDIT_DIR_GRANDFATHER`) and ``specs/audits/_archive/``. Silent when the
         ``audits/`` dir is absent.
         """
@@ -178,9 +182,9 @@ class ClosureAuditValidator:
                     code="SPEC-DOC-030",
                     severity=Severity.WARNING,
                     description=(
-                        f"Audit dir 'audits/{name}' does not follow the collision-safe "
-                        "naming law <YYYYMMDDTHHMMSSZ>-<session_id_8chars> (constitution §8) "
-                        "— rename it (SPEC-DOC-030, WARNING)."
+                        f"Audit dir 'audits/{name}' does not follow the naming law "
+                        "<YYYYMMDD>-<slug> (DADAIA.md §6.8) — rename it (SPEC-DOC-030, "
+                        "WARNING)."
                     ),
                     path=str(child),
                 )

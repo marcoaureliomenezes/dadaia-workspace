@@ -110,7 +110,7 @@
     },
     {
       "code": "SPEC-DOC-030",
-      "description": "Audit dir 'audits/bad-audit-name' does not follow the collision-safe naming law <YYYYMMDDTHHMMSSZ>-<session_id_8chars> (constitution §8) — rename it (SPEC-DOC-030, WARNING).",
+      "description": "Audit dir 'audits/bad-audit-name' does not follow the naming law <YYYYMMDD>-<slug> (DADAIA.md §6.8) — rename it (SPEC-DOC-030, WARNING).",
       "path": "<SPECS>/audits/bad-audit-name",
       "severity": "warning"
     },
