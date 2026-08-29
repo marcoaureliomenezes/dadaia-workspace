@@ -9,10 +9,10 @@ tags: [architecture, layers, dependency-rules, agents, sdd]
 
 ## Part 1 — Principles
 
-### P-01 · We keep features on ports: a feature never imports `infrastructure` directly; the container injects the adapter.
-Measured by: `lint-imports --config setup.cfg --no-cache` — contract `features-no-infrastructure`.
-ADR: none
-Rationale: an adapter reached directly cannot be substituted or faked.
+### P-01 · We keep the dependency ring: core imports nothing internal, infrastructure imports only core, no layer imports upward; a feature imports the concrete infrastructure class it alone consumes.
+Measured by: `lint-imports --config setup.cfg --no-cache` — contracts `core-no-upper-layers` and `infrastructure-no-upper-layers` (zero ignored imports).
+ADR: 0001 (accepted)
+Rationale: the ledger shows zero adapter substitutions ever fixed a bug; the port requirement only grew the container funnel.
 
 ### P-02 · We never spawn a subprocess from a feature; process execution goes through `ProcessRunner`.
 Measured by: `lint-imports --config setup.cfg --no-cache` — contract `features-no-subprocess`.
@@ -44,14 +44,14 @@ Measured by: `lint-imports --config setup.cfg --no-cache` — contract `features
 ADR: none
 Rationale: a hand-kept `modules =` list hid three real sibling edges from the check.
 
-### P-08 · We compose the CLI through the container: a verb never imports an infrastructure adapter directly.
-Measured by: `lint-imports --config setup.cfg --no-cache` — contract `cli-no-infrastructure`.
-ADR: none
-Rationale: a verb that builds its own adapter is a second composition root.
+### P-08 · We keep a Protocol in `core/protocols` only where two production adapters exist; `container.py` composes platform seams and shared collaborators, nothing single-consumer.
+Measured by: `pytest tests/contract/test_protocols_have_two_adapters.py`.
+ADR: 0001 (accepted)
+Rationale: a Protocol with one implementer is interface text that hides a direct dependency.
 
-### P-09 · We resolve a Spec Context in exactly one place, `core.specs_resolver.resolve_context`, imported directly only by `cli._specs_resolution`, `container` and `hooks`.
-Measured by: `lint-imports --config setup.cfg --no-cache` — contract `bind-resolution-seam-is-a-single-home` (zero ignored imports, none ever accepted).
-ADR: none
+### P-09 · We resolve the whole Invocation — workspace root, session, context, specs dir, mode, release, phase — once per process in `core.invocation.resolve`, imported directly only by `cli._specs_resolution`, `container` and `hooks`.
+Measured by: `lint-imports --config setup.cfg --no-cache` — contract `bind-resolution-seam-is-a-single-home` (zero ignored imports, none ever accepted); `pytest tests/unit/core/test_invocation.py`.
+ADR: 0003 (accepted)
 Rationale: every context bug came from a second resolution path answering differently.
 
 ### P-10 · We cap every suppressed layering edge and ratchet the cap only downward; an edge is added with its reason and the cap moved in the same commit.
