@@ -11,8 +11,8 @@ from pathlib import Path
 from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.models.export import ExportManifest, ExportOptions, ExportResult
 from dadaia_workspace.core.models.spec_context import ContextState
-from dadaia_workspace.core.protocols.context_store import ContextStore
-from dadaia_workspace.core.protocols.git_client import GitClient
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 
 _EXCLUDED_DIR_NAMES: frozenset[str] = frozenset(
     {".npm", ".npm-global", ".cache", ".local", "linuxbrew", ".venv", "tmp", "contexts"}
@@ -39,7 +39,7 @@ def _dadaia_version() -> str:
 
 class ExportService:
     def __init__(
-        self, context_store: ContextStore, git_client: GitClient, workspace_root: Path
+        self, context_store: JsonContextStore, git_client: GitSubprocessClient, workspace_root: Path
     ) -> None:
         self._store = context_store
         self._git = git_client

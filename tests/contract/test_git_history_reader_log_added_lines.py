@@ -155,7 +155,7 @@ def test_log_added_lines_refuses_a_shallow_repository(tmp_path: Path) -> None:
     a shallow clone can only walk the commits it has, so every ledger line derives to
     HEAD — the silent under-report the port forbids. The adapter refuses the walk
     instead of returning a partial history (fixes the class, not one more yaml checkout)."""
-    from dadaia_workspace.core.protocols.git_history_reader import GitHistoryReadError
+    from dadaia_workspace.core.models.git_history import GitHistoryReadError
 
     origin = tmp_path / "origin"
     _init_repo(origin)

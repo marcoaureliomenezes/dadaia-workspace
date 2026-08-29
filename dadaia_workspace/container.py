@@ -22,8 +22,6 @@ from dadaia_workspace.core.handoff_index import HandoffIndex
 from dadaia_workspace.core.invocation import repo_slug_for_context
 from dadaia_workspace.core.invocation import resolve as _resolve_invocation
 from dadaia_workspace.core.invocation import resolve_context_specs_dir as _resolve_context_specs_dir
-from dadaia_workspace.core.protocols.git_history_reader import GitHistoryReader
-from dadaia_workspace.core.protocols.git_object_reader import GitObjectReader
 from dadaia_workspace.core.protocols.process_ancestry import ProcessAncestry
 from dadaia_workspace.core.protocols.record_store import RecordStore
 from dadaia_workspace.features.academy.service import AcademyService
@@ -69,6 +67,7 @@ from dadaia_workspace.features.spec_context.service import SpecContextService
 from dadaia_workspace.features.telemetry.aggregator.runtimes import ADAPTER_REGISTRY
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.excel_reader import OpenpyxlExcelReader
+from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.json_course_store import JsonCourseStore
@@ -160,48 +159,18 @@ def build_repos_service() -> ReposService:
     return ReposService(excel_reader=OpenpyxlExcelReader())
 
 
-def build_git_object_reader() -> GitObjectReader:
-    """Composition-root seam for the ``GitObjectReader`` adapter (v0.9.0 FR1/FR7).
-
-    The CLI layer must not import infrastructure directly (import-linter contract);
-    ``push-gate-check`` composes the subprocess-backed reader here, the same way
-    :func:`build_spec_context_service` and :func:`build_doctor_service` compose the
-    read-only git probe directly. A single concrete adapter today (subprocess-backed,
-    cross-platform via the ``git`` executable on PATH) — no platform branching
-    needed, unlike :func:`build_process_ancestry`.
+def build_git_object_reader() -> GitSubprocessObjectReader:
+    """Composition-root seam for the push-range object reader (v0.9.0 FR1/FR7; ADR-0001:
+    the sole adapter, shared by two CLI verbs — ``ci.push_gate_check`` and
+    ``specs.doctor``'s ``head_sha``/``parent_sha`` resolution — so it stays a container
+    seam rather than each verb constructing its own instance.
 
     As of v0.4.3 T-043-15/FR11, the adapter this seam returns yields commit-object
     message bodies and (for a tag-ref push) annotated tag bodies IN ADDITION to blob
-    content — see ``GitObjectReader.new_objects``'s own docstring for the full
-    contract. This seam's own return type/wiring is unchanged; only the adapter's
-    internal yield widened.
+    content — see ``GitSubprocessObjectReader.new_objects``'s own docstring for the full
+    contract.
     """
-    from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
-
     return GitSubprocessObjectReader()
-
-
-def build_git_history_reader() -> GitHistoryReader:
-    """Composition-root seam for the ``GitHistoryReader`` adapter (v0.5.0 FR3/A3.10,
-    AR-1 ruling answer (c), ``specs/releases/0.5.0/reviews/S1-AR1-ruling.md`` §3).
-
-    The CLI layer must not import infrastructure directly (import-linter contract).
-    A single concrete adapter today — the SAME ``GitSubprocessClient`` class
-    :func:`build_spec_context_service` and :func:`build_doctor_service` already
-    construct directly, which is why this seam needs no new infrastructure module:
-    the ruling's whole point is one adapter class, one new narrow port, no sibling
-    adapter.
-
-    T-050-09 built this port against a one-shot migration runner
-    (``features.bugs.migrate_v5.run_migration``) that T-050-10 ran once, standalone,
-    never wiring a permanent CLI verb to it. **T-050-17 (FR8/AS-1) is the first
-    permanent, ongoing caller**: ``features.bugs.service.BugService.resolved_commit``
-    is the one resolver seam for a record's ``resolved_commit`` — the CLI composition
-    root threads this exact adapter into ``BugService(..., history_reader=...,
-    repo_root=...)`` wherever derive-on-read is needed (both parameters optional —
-    most construction sites never need a git walk).
-    """
-    return GitSubprocessClient()
 
 
 def build_bug_record_store(specs_dir: Path) -> "RecordStore[BugRecord]":

@@ -18,7 +18,7 @@ sample, at implementation time.
 every commit that ever touched ``specs/bugs/`` (~300 at this fold) with ~2 extra git
 subprocess calls each — a few seconds, genuinely NOT free, and NOT something to pay
 per parametrized case. The module-scoped ``_cached_history_reader`` fixture below runs
-the REAL adapter (``container.build_git_history_reader()``) exactly ONCE per test
+the REAL adapter (``GitSubprocessClient()``) exactly ONCE per test
 session and caches its result; every parametrized case reuses that cached commit list,
 so the marginal cost per case is one in-memory ``derive_commit_provenance`` pass, not a
 new git invocation.
@@ -35,8 +35,9 @@ import pytest
 
 from dadaia_workspace import container
 from dadaia_workspace.core.models.bugs import BugRecord
-from dadaia_workspace.core.protocols.git_history_reader import GitHistoryReader, HistoryCommit
+from dadaia_workspace.core.models.git_history import HistoryCommit
 from dadaia_workspace.features.bugs.service import BugService
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 
 pytestmark = [pytest.mark.slow]
 
@@ -93,11 +94,11 @@ _SAMPLE: list[BugRecord] = _resolved_sample(_MINIMUM_SAMPLE) if _LEDGER_PATH.is_
 
 
 class _CachedHistoryReader:
-    """Wraps the REAL ``GitHistoryReader`` adapter but performs the git walk exactly
+    """Wraps the REAL ``GitSubprocessClient`` adapter but performs the git walk exactly
     once and replays the cached result for every subsequent call — the module
     fixture's cost-sharing device this file's docstring promises."""
 
-    def __init__(self, real_reader: GitHistoryReader) -> None:
+    def __init__(self, real_reader: GitSubprocessClient) -> None:
         self._real_reader = real_reader
         self._cache: dict[tuple[Path, str], list[HistoryCommit]] = {}
 
@@ -110,7 +111,7 @@ class _CachedHistoryReader:
 
 @pytest.fixture(scope="module")
 def _service_with_cached_history() -> BugService:
-    cached_reader = _CachedHistoryReader(container.build_git_history_reader())
+    cached_reader = _CachedHistoryReader(GitSubprocessClient())
     store = container.build_bug_record_store(_SPECS_DIR)
     return BugService(store, history_reader=cached_reader, repo_root=_REPO_ROOT)
 

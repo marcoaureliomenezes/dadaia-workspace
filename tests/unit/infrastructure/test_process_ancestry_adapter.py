@@ -22,12 +22,12 @@ from dadaia_workspace.core.protocols.process_ancestry import (
     Ancestry,
     ProcessAncestry,
 )
-from dadaia_workspace.core.protocols.process_runner import ProcessResult
 from dadaia_workspace.infrastructure.process_ancestry_adapter import (
     LinuxProcAncestry,
     PsProcessAncestry,
     WindowsToolhelpAncestry,
 )
+from dadaia_workspace.infrastructure.subprocess_runner import ProcessResult
 
 # --------------------------------------------------------------------------- #
 # Fakes                                                                        #

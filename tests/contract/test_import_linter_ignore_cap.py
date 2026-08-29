@@ -131,15 +131,41 @@ _SETUP_CFG = _REPO_ROOT / "setup.cfg"
 # is ALSO removed in the same K7 commit: `pre_commit_check` no longer wires a
 # pid-liveness probe (the dead params it served are deleted). Cap lowered 15 -> 14
 # (-1 cli-no-infrastructure).
-_RECORDED_IGNORE_EDGE_CAP = 14
+#
+# ADR-0001 NOTE (protocol retirement — one adapter, no port): `features-no-infrastructure`
+# (6 edges) and `cli-no-infrastructure` (1 edge) contracts are DELETED outright — the port
+# requirement they enforced is retired; a feature/CLI verb now imports its sole concrete
+# infrastructure adapter directly (`tests/contract/test_protocols_have_two_adapters.py`
+# polices the remaining Protocol set instead). `features-no-subprocess` (P-02) stays and
+# gains 4 new documented edges for the same reason: GitClient/CertificationProcess had one
+# adapter each (`git_subprocess`/`certification_process`, both `subprocess`-backed) —
+# `spec_context.service`, `spec_context.doctor`, `export.service` -> `git_subprocess`, and
+# `certification.service` -> `certification_process`. Cap 14 -> 11
+# (-6 features-no-infrastructure, -1 cli-no-infrastructure, +4 features-no-subprocess).
+#
+# ADR-0001 NOTE 2 (same retirement, PublicAssetManager/PythonEnvironmentManager): both
+# single-adapter (`public_assets`/`python_env`, both `subprocess`-backed at install time) —
+# `public.service`/`workspace.service` -> `public_assets`, `workspace.service` ->
+# `python_env`. Cap 11 -> 14 (+3 features-no-subprocess).
+#
+# ADR-0001 NOTE 3 (same retirement, GitObjectReader/GitHistoryReader): GitObjectReader
+# stays a container.py seam (build_git_object_reader — genuinely shared by two CLI verbs,
+# ci.push_gate_check and specs.doctor's head/parent-sha resolution) so it adds no NEW
+# features->infrastructure edge; its pure data shapes (ScannedObject/GitObjectReadError/
+# ZERO_SHA) move to core/models/git_scan.py (zero I/O) so the security-sensitive
+# features.chokepoints.push_gate (which must NEVER import infrastructure/subprocess, even
+# transitively) can still type `object_source` structurally via a feature-local Protocol
+# (`ObjectSource`) instead. GitHistoryReader (single adapter, GitSubprocessClient — reused
+# from GitClient's own retirement) had no real production caller (only a test); its
+# `history_reader` consumer, bugs.service, imports the concrete class directly, +1 edge.
+# HistoryCommit/GitHistoryReadError move to core/models/git_history.py for the same
+# zero-I/O reason. Cap 14 -> 15 (+1 features-no-subprocess).
+_RECORDED_IGNORE_EDGE_CAP = 4
 
 # Per-family recorded breakdown, pinned per contract section so a wrong edge-count set
 # (or a silent shift between families) fails loudly, not just the grand total.
 _RECORDED_PER_FAMILY_CAP: dict[str, int] = {
-    "features-no-infrastructure": 6,
-    "features-no-subprocess": 3,
     "features-no-cross-feature": 4,
-    "cli-no-infrastructure": 1,
 }
 
 # A18.1 (V13): the total count of `[importlinter:contract:*]` sections in setup.cfg,
@@ -149,7 +175,8 @@ _RECORDED_PER_FAMILY_CAP: dict[str, int] = {
 # contract AND a bump of this constant, in the same commit, with the new principle
 # authored alongside it (FR18/A18.1) — not attempted in this task (T-050-29's
 # mechanical half writes zero new contracts).
-_RECORDED_CONTRACT_COUNT = 9
+# ADR-0001: features-no-infrastructure and cli-no-infrastructure DELETED. 9 -> 7.
+_RECORDED_CONTRACT_COUNT = 7
 
 
 def _ignore_edges_by_contract() -> dict[str, list[str]]:
@@ -212,30 +239,21 @@ def test_ignore_edge_cap_family_breakdown_and_sanctioned_sources() -> None:
 def _assert_every_ignored_edge_is_a_features_layering_exception(
     by_contract: dict[str, list[str]],
 ) -> None:
-    """Every ignored edge must originate in its family's sanctioned source layer.
+    """Every ignored edge must originate from ``dadaia_workspace.features``.
 
-    The layering law's sanctioned exceptions come in three kinds now:
-    (1) ``features -> infrastructure`` reach while container DI is incomplete
-    (``features-no-infrastructure`` / ``features-no-subprocess``), (2) v0.1.54 FR3:
-    ``features -> features`` cross-feature composition debt (``features-no-cross-feature``),
-    and (3) v0.1.61 FR5 (ADR-4): ``cli -> infrastructure`` capped debt
-    (``cli-no-infrastructure``) — the CLI reaching adapters instead of composing via the
-    container. The first two keep a ``dadaia_workspace.features`` **source**; the cli family
-    keeps a ``dadaia_workspace.cli`` source. An ignored edge whose source does not match its
-    family's sanctioned layer would be a new, unrelated suppression smuggled into the list —
+    ADR-0001 retired the ``cli-no-infrastructure`` family (the CLI now imports
+    infrastructure freely — no port, no container detour required), so the two
+    remaining families (``features-no-subprocess``, ``features-no-cross-feature``) both
+    keep a ``dadaia_workspace.features`` source. An ignored edge whose source is not a
+    ``features`` module would be a new, unrelated suppression smuggled into the list —
     fail loudly so it cannot hide among the documented layering debt.
     """
-    _SANCTIONED_SOURCE_BY_FAMILY = {
-        "cli-no-infrastructure": "dadaia_workspace.cli",
-    }
-    offenders: list[str] = []
-    for section, section_edges in by_contract.items():
-        family = section.split(":")[-1]
-        sanctioned = _SANCTIONED_SOURCE_BY_FAMILY.get(family, "dadaia_workspace.features")
-        for edge in section_edges:
-            source = edge.split("->", 1)[0].strip()
-            if not source.startswith(sanctioned):
-                offenders.append(f"[{section}] {edge}")
+    offenders = [
+        f"[{section}] {edge}"
+        for section, section_edges in by_contract.items()
+        for edge in section_edges
+        if not edge.split("->", 1)[0].strip().startswith("dadaia_workspace.features")
+    ]
     assert not offenders, (
         "ignored import edges that are not features-layering exceptions:\n" + "\n".join(offenders)
     )

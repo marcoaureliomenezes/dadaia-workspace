@@ -12,8 +12,8 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.models.import_ import ImportManifest, ImportOptions
-from dadaia_workspace.core.protocols.process_runner import ProcessResult
 from dadaia_workspace.features.import_.service import ImportService
+from dadaia_workspace.infrastructure.subprocess_runner import ProcessResult
 
 
 class _FakeProcessRunner:

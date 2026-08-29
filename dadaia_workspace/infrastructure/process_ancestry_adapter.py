@@ -19,7 +19,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from dadaia_workspace.core.protocols.process_ancestry import Ancestry
-from dadaia_workspace.core.protocols.process_runner import ProcessRunner
+from dadaia_workspace.infrastructure.subprocess_runner import SubprocessProcessRunner
 
 #: Upper bound on PPID hops walked before declaring the relationship indeterminate.
 #: Guards against a corrupt/cyclic ppid chain looping forever; a real ancestry
@@ -93,14 +93,15 @@ class LinuxProcAncestry:
 
 
 class PsProcessAncestry:
-    """macOS / POSIX-without-/proc adapter: ``ps -o ppid= -p <pid>`` via ProcessRunner.
+    """macOS / POSIX-without-/proc adapter: ``ps -o ppid= -p <pid>`` via SubprocessProcessRunner.
 
-    Uses the injected :class:`ProcessRunner` so the feature/composition layers never
-    touch ``subprocess`` directly. A non-zero exit, empty output, timeout, or a
-    non-integer body ⇒ ``None`` (indeterminate link).
+    Uses the injected :class:`SubprocessProcessRunner` (or a structurally duck-typed
+    test fake) so this constructor never touches ``subprocess`` directly itself. A
+    non-zero exit, empty output, timeout, or a non-integer body ⇒ ``None``
+    (indeterminate link).
     """
 
-    def __init__(self, runner: ProcessRunner) -> None:
+    def __init__(self, runner: SubprocessProcessRunner) -> None:
         self._runner = runner
 
     def _ppid_of(self, pid: int) -> int | None:

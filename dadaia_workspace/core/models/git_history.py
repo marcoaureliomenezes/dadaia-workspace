@@ -1,32 +1,15 @@
-"""GitHistoryReader Protocol — read-only commit-history port for FR3's derivation.
+"""Pure data types for the FR3 bug-provenance commit-history walk.
 
-Zero I/O (per the core ring rule): only the Protocol, the commit-tuple shape and the
-typed failure live here, mirroring ``core/protocols/git_object_reader.py``'s own
-split between a pure port and its subprocess-backed adapter. The concrete adapter
-(``GitSubprocessClient.log_added_lines``) lives in
-``infrastructure/git_subprocess.py``; the pure consumer
+Zero I/O (core ring rule): only the commit-tuple shape and the typed failure live
+here. The sole adapter (``GitSubprocessClient.log_added_lines``, ADR-0001: one
+adapter, no port) lives in ``infrastructure/git_subprocess.py``; the pure consumer
 (``core/bug_provenance.py``'s ``derive_commit_provenance``) imports only
-:class:`HistoryCommit` from here — never this module's own git-facing docstring
-concerns, never ``infrastructure``.
-
-**Why this port exists rather than widening ``GitObjectReader`` or ``GitClient``**
-(v0.5.0 SPEC A3.10, AR-1 ruling answer (c), ``specs/releases/0.5.0/reviews/S1-AR1-ruling.md``
-§3.2). ``GitObjectReader.new_objects`` answers "which blob/commit/tag OBJECTS does one
-PUSHED RANGE publish" — no commit order, no parents, no per-commit added-line diff. FR3
-needs a CHRONOLOGICAL, all-refs history walk with per-commit added lines and the whole
-commit's touched-path set — a different contract entirely. Widening either existing port
-would put two contracts on one seam (the push-gate scan) or grow the already-large
-``GitClient`` Protocol for a single migration-only caller (ISP violation). One new,
-narrow port; one new method on the *existing* ``GitSubprocessClient`` adapter class — no
-sibling adapter module is born.
+:class:`HistoryCommit` from here — never the adapter itself.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterable
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Protocol
 
 
 class GitHistoryReadError(Exception):
@@ -72,14 +55,4 @@ class HistoryCommit:
     added_lines: tuple[str, ...]
 
 
-class GitHistoryReader(Protocol):
-    """Read-only port over the whole, chronological commit history that ever touched
-    *pathspec* — FR3's "one pass, all refs, first-add wins" ref scope (SPEC step 1):
-    ``git log --all --no-merges --reverse --date-order -- <pathspec>``, oldest first.
-
-    Implementations raise :class:`GitHistoryReadError` on any git failure rather than
-    returning a partial/empty result — a policy-relevant history walk never silently
-    under-reports.
-    """
-
-    def log_added_lines(self, repo: Path, pathspec: str) -> Iterable[HistoryCommit]: ...
+__all__ = ["GitHistoryReadError", "HistoryCommit"]

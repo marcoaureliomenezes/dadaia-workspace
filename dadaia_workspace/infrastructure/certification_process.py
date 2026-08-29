@@ -1,12 +1,19 @@
-"""Subprocess implementation of the certification process-control port."""
+"""Subprocess-backed certification process control (ADR-0001: no
+``CertificationProcess``/``RunningCertificationProcess`` port — one adapter, no swap
+seam)."""
 
 from __future__ import annotations
 
 import subprocess
 from collections.abc import Mapping, Sequence
 from pathlib import Path
+from typing import NamedTuple
 
-from dadaia_workspace.core.protocols.certification_process import CertificationProcessResult
+
+class CertificationProcessResult(NamedTuple):
+    returncode: int
+    stdout: str
+    stderr: str
 
 
 class _RunningProcess:

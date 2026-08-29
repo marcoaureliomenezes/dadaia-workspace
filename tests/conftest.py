@@ -40,7 +40,7 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.protocols.process_runner import ProcessResult
+from dadaia_workspace.infrastructure.subprocess_runner import ProcessResult
 
 # Every subprocess a test spawns (`python -m dadaia_workspace...`: CLI verbs, hooks) must
 # import THIS checkout, whatever the venv's install mode or the worktree it runs in — bugs

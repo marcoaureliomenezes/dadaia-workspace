@@ -1,17 +1,16 @@
-"""GitSubprocessObjectReader — the ``GitObjectReader`` adapter for the push-range scan.
+"""GitSubprocessObjectReader — the sole adapter for the push-range object scan (ADR-0001:
+no ``GitObjectReader`` port — one adapter, no swap seam).
 
-Implements ``core.protocols.git_object_reader.GitObjectReader`` over ``git rev-list
---objects`` + ``git cat-file`` (SPEC v0.9.0 FR1). Kept in a sibling file to
-``git_subprocess.py`` rather than grown inside it — the two modules serve different
-concerns (workspace-management git operations vs. the push-range object reader) and
-``git_subprocess.py`` is already close to the size that would warrant a split
+Reads over ``git rev-list --objects`` + ``git cat-file`` (SPEC v0.9.0 FR1). Kept in a
+sibling file to ``git_subprocess.py`` rather than grown inside it — the two modules serve
+different concerns (workspace-management git operations vs. the push-range object reader)
+and ``git_subprocess.py`` is already close to the size that would warrant a split
 (PLAN v0.9.0 §2).
 
 Every subprocess invocation in this module — including the batch calls that need
 ``input=`` — is routed through :func:`_run` so a timeout or a missing ``git`` executable
-always surfaces as :class:`GitObjectReadError` (SPEC v0.9.0 FR6 row 2 / the port's own
-contract, ``core/protocols/git_object_reader.py``: "Any git failure raises
-GitObjectReadError rather than returning a partial/empty result") — never a raw,
+always surfaces as :class:`GitObjectReadError` (SPEC v0.9.0 FR6 row 2: "Any git failure
+raises GitObjectReadError rather than returning a partial/empty result") — never a raw,
 unhandled exception at the push boundary (code-reviewer MEDIUM finding).
 
 **One exclusion formula for every push (bug
@@ -40,11 +39,7 @@ import threading
 from collections.abc import Iterator
 from pathlib import Path
 
-from dadaia_workspace.core.protocols.git_object_reader import (
-    ZERO_SHA,
-    GitObjectReadError,
-    ScannedObject,
-)
+from dadaia_workspace.core.models.git_scan import ZERO_SHA, GitObjectReadError, ScannedObject
 
 _TIMEOUT_S = 30
 
@@ -888,7 +883,8 @@ def _read_blobs(
 
 
 class GitSubprocessObjectReader:
-    """Subprocess-backed ``GitObjectReader`` (SPEC v0.9.0 FR1/FR7 injected port)."""
+    """Subprocess-backed push-range object reader (SPEC v0.9.0 FR1/FR7; ADR-0001: the
+    sole adapter — no ``GitObjectReader`` port)."""
 
     def list_tree_paths(self, repo: Path, sha: str, prefix: str) -> list[str]:
         """``git ls-tree -r --name-only --full-tree <sha> -- <prefix>`` (v0.5.0
