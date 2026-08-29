@@ -31,11 +31,14 @@ Census (file:line, T-044-03):
    - ``dadaia_workspace/hooks/ctx_inject.py`` (SessionStart/UserPromptSubmit) — writes
      only sentinel/compact markers under ``.dadaia/tmp/`` (``ctx_inject.py:378,435``); it
      reads memory atoms, never writes release artifacts.
-2. ``dadaia_workspace/features/migrate/registry.py:44-73`` (``REGISTRY``) — every
-   migration step is scoped to ``specs/foundation``/``specs/SPEC.md`` (``tree_v2.py``),
-   ``specs/bugs/**`` (``bugs_jsonl.py``, ``bugs_single_file.py``), or
-   ``specs/memory/**`` frontmatter, byte-preserving the rest (``agent_tier_frontmatter.py``,
-   ``retired_frontmatter_keys.py``) — never ``specs/releases/**``.
+2. ``dadaia_workspace/features/migrate/registry.py`` (``check_upgradable``) — v0.5.1
+   T-051-16 (K10) retired the versioned migration chain this item used to census (six
+   step modules scoped to ``specs/foundation``/``specs/SPEC.md``, ``specs/bugs/**``, and
+   ``specs/memory/**`` frontmatter — never ``specs/releases/**``). The registry's one
+   surviving function performs NO filesystem I/O at all (it only raises or returns
+   ``None``), so it cannot touch ``specs/releases/**`` by construction — proven below by
+   assertion on the function's signature/behaviour rather than a before/after fixture
+   diff, since there is no longer a write to diff around.
 3. ``dadaia_workspace/features/specs/canon.py`` (``release_new``) is a no-clobber
    scaffold: ``FileExistsError`` on an existing release dir, never a touch of its
    content.
@@ -206,21 +209,24 @@ def test_ctx_inject_hook_never_mutates_tasks_md_content(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------------------
-# 2. The migration-step registry — explicit `specs upgrade`-invoked writers, never
-#    auto-fired, but a legitimate "product-owned SDD-markdown writer" per the task's
-#    census scope.
+# 2. The migration registry — v0.5.1 T-051-16 (K10) retired the versioned chain; the
+#    one surviving rule (`check_upgradable`) writes nothing, so it cannot touch
+#    `specs/releases/**` by construction. Filesystem-level "nothing was written" proof
+#    for `upgrade()`'s refuse path lives in
+#    `tests/unit/features/migrate/test_specs_evolution.py::
+#    test_upgrade_refuses_below_floor_without_any_write` — not duplicated here.
 # ---------------------------------------------------------------------------------------
 
 
-def test_migration_registry_chain_never_touches_release_artifacts(tmp_path: Path) -> None:
-    specs_dir = tmp_path / "specs"
-    target = _seed_release_tasks_md(specs_dir)
-    before = target.read_text(encoding="utf-8")
+def test_migration_registry_check_upgradable_performs_no_filesystem_io() -> None:
+    """`check_upgradable` is a pure predicate over two ints — it cannot mutate
+    `specs/releases/**` (or anything else) because it never opens a path at all."""
+    # Silent (no exception) at or above the floor: no write, nothing to assert against.
+    migrate_registry.check_upgradable(current=6, goal=6)
 
-    migrate_registry.run_chain(specs_dir, 0, migrate_registry.latest_version(), dry_run=False)
-
-    after = target.read_text(encoding="utf-8")
-    _assert_sdd_invariants_preserved(before, after)
+    # Below the floor: raises, still no write.
+    with pytest.raises(migrate_registry.UpgradeRefused):
+        migrate_registry.check_upgradable(current=0, goal=6)
 
 
 # ---------------------------------------------------------------------------------------

@@ -27,8 +27,9 @@ import sys
 from pathlib import Path
 from typing import Any, cast
 
-import yaml
-from jsonschema import ValidationError, validate
+from jsonschema import Draft202012Validator
+
+from dadaia_workspace.core import frontmatter as _fm
 
 __all__ = [
     "AtomResult",
@@ -71,7 +72,6 @@ def load_frontmatter_schema() -> dict[str, Any]:
 # Parsers
 # ---------------------------------------------------------------------------
 
-_FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
 _H2_RE = re.compile(r"^##\s+(.+)$", re.MULTILINE)
 _WIKILINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
 
@@ -87,22 +87,6 @@ _CANON_SINGLE_FILENAMES: dict[str, str] = {
     "tech-stack": "TECHSTACK.md",
     "quality-assurance": "QUALITY.md",
 }
-
-
-def _parse_frontmatter(content: str) -> tuple[dict[str, Any] | None, str]:
-    """Return (frontmatter_dict, body_text) or (None, full_content) if no frontmatter."""
-    m = _FRONTMATTER_RE.match(content)
-    if not m:
-        return None, content
-    raw_yaml = m.group(1)
-    body = content[m.end() :]
-    try:
-        fm = yaml.safe_load(raw_yaml)
-    except yaml.YAMLError:
-        return None, content
-    if not isinstance(fm, dict):
-        return None, content
-    return fm, body
 
 
 def _extract_h2_headings(body: str) -> list[str]:
@@ -158,16 +142,27 @@ def lint_atom(
         result.error(f"Cannot read file: {exc}")
         return result
 
-    fm, body = _parse_frontmatter(content)
+    parsed = _fm.parse(content)
 
-    if fm is None:
-        result.error("No valid YAML frontmatter found (expected --- delimited block).")
+    if isinstance(parsed, _fm.FrontmatterError):
+        # Bug memory-lint-blames-missing-delimiter-for-a-yaml-parse-error: name the
+        # ACTUAL cause instead of always blaming a missing delimiter. `parsed.kind`
+        # already distinguishes "no block" from "block present, YAML invalid at
+        # line N" from "block present, not a mapping" — the fix IS not collapsing
+        # them, so the message below is exactly `parsed.message`, unmodified.
+        result.error(parsed.message)
         return result
 
-    try:
-        validate(instance=fm, schema=schema)
-    except ValidationError as exc:
-        result.error(f"Frontmatter schema violation: {exc.message}")
+    fm, body = parsed.data, parsed.body
+
+    # Bug memory-trio-missing-required-frontmatter-fields (checker half):
+    # ``jsonschema.validate()`` stops at the FIRST error `iter_errors` yields, so
+    # a frontmatter block missing three required fields reports only one — an
+    # author fixing it never sees the next two until they re-run. Iterating every
+    # error reports each missing/violating field explicitly, in one pass.
+    validator = Draft202012Validator(schema)
+    for schema_error in sorted(validator.iter_errors(fm), key=str):
+        result.error(f"Frontmatter schema violation: {schema_error.message}")
         # Do not return early — continue with remaining checks.
 
     slug = fm.get("slug")

@@ -142,6 +142,54 @@ def test_missing_required_frontmatter_field_is_an_error(tmp_path: Path) -> None:
     assert any("title" in e for e in result.errors)
 
 
+def test_multiple_missing_required_fields_are_all_reported(tmp_path: Path) -> None:
+    """Checker half of bug memory-trio-missing-required-frontmatter-fields:
+    ``jsonschema.validate()`` (single-error) used to report only the FIRST missing
+    required field, so an author fixing one at a time never saw the next until a
+    re-run. ``lint_atom`` now iterates every schema error, so all missing fields
+    surface in one pass."""
+    schema = load_frontmatter_schema()
+    content = "---\nslug: test-atom\ncategory: core\n---\n\n## Purpose\n\nBody.\n"
+    path = tmp_path / "test-atom.md"
+    path.write_text(content, encoding="utf-8")
+
+    result = lint_atom(path, tmp_path, schema)
+
+    assert result.has_errors
+    for missing in ("title", "tldr", "summary", "tags"):
+        assert any(missing in e for e in result.errors), (
+            f"expected a distinct error naming {missing!r}, got: {result.errors}"
+        )
+
+
+def test_yaml_parse_error_is_diagnosed_as_a_parse_error_not_a_missing_delimiter(
+    tmp_path: Path,
+) -> None:
+    """Bug memory-lint-blames-missing-delimiter-for-a-yaml-parse-error: an
+    unquoted scalar containing ': ' inside a present --- delimited block used to be
+    reported as "No valid YAML frontmatter found (expected --- delimited block)" —
+    blaming a missing delimiter when the real cause is a YAML syntax error with its
+    own line/column. The block IS present here; the diagnostic must name the YAML
+    failure, never the delimiter."""
+    schema = load_frontmatter_schema()
+    content = (
+        "---\n"
+        "slug: test-atom\n"
+        "tldr: Two-tier memory: 17 measured principles\n"  # unquoted ": " breaks YAML
+        "---\n\n## Purpose\n\nBody.\n"
+    )
+    path = tmp_path / "test-atom.md"
+    path.write_text(content, encoding="utf-8")
+
+    result = lint_atom(path, tmp_path, schema)
+
+    assert result.has_errors
+    assert not any("delimited block" in e for e in result.errors), (
+        f"blamed a missing delimiter for a present block: {result.errors}"
+    )
+    assert any("YAML is invalid" in e for e in result.errors)
+
+
 def test_slug_mismatch_is_an_error(tmp_path: Path) -> None:
     schema = load_frontmatter_schema()
     path = _make_atom(tmp_path, slug="correct-slug", filename="wrong-stem.md")

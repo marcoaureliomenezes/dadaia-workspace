@@ -251,24 +251,6 @@ def doctor(
     sys.exit(1 if has_errors else 0)
 
 
-def _error_identities(issue: SpecsDoctorIssue) -> set[tuple[str, str]]:
-    """Stable identities for a doctor error — one per underlying violation.
-
-    An aggregating issue cannot be compared as a whole: LINT-1 joins one line per
-    violating memory atom into a single description, so repairing some atoms shrinks that
-    string and an untouched pre-existing violation reads as newly introduced. The operator
-    is then told to restore the backup, discarding a good version bump while leaving the
-    very error in place — precisely the harm the pre/post comparison exists to prevent
-    (bug specs-upgrade-blames-itself-for-a-preexisting-error-when-a-migration-legitimately
-    -skips-an-atom). Comparing line by line gives every violation its own identity, so a
-    genuinely new one is still caught.
-    """
-    lines = [line.strip() for line in (issue.description or "").splitlines() if line.strip()]
-    if len(lines) <= 1:
-        return {(issue.code, issue.description or "")}
-    return {(issue.code, line) for line in lines}
-
-
 @app.command("upgrade")
 def upgrade(
     specs_dir: str | None = typer.Option(
@@ -277,103 +259,36 @@ def upgrade(
     target: int | None = typer.Option(
         None, "--target", help="Target pattern version. Default: the canonical version."
     ),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Plan only — no backup, no writes."),
-    yes: bool = typer.Option(False, "--yes", "-y", help="Skip the interactive confirmation."),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Plan only — no writes."),
 ) -> None:
     """Upgrade a specs/ tree to the canonical pattern version.
 
-    Backup-first (``specs_bkp/<from>→<to>-<UTC>/``) → apply the migration chain →
-    re-stamp the constitution → re-run ``dadaia specs doctor``. Idempotent: already
-    at target ⇒ no-op. On a non-clean doctor after upgrade, the backup is the
-    recovery point.
+    v0.5.1 T-051-16 (K10) retired the versioned migration chain this command used to
+    walk (backup-first, apply steps, re-stamp, doctor pre/post-diff) — see
+    ``features/migrate/registry.py``'s docstring for why. A tree below the target
+    now refuses immediately, no filesystem write, naming the dadaia-workspace 0.4.x
+    prerequisite. A tree already at (or above) the target is idempotent: only the
+    unconditional template-artifact repair runs.
     """
     from dadaia_workspace.core import specs_version as _ver
     from dadaia_workspace.features.migrate import upgrade as _upgrade_feat
+    from dadaia_workspace.features.migrate.registry import UpgradeRefused
 
     resolved = _resolve_specs_dir(specs_dir)
     current = _ver.read_pattern_version(resolved)
     goal = _ver.CANONICAL_SPECS_VERSION if target is None else target
 
-    if current >= goal:
-        # Still run the template-artifact repair (bug
-        # scaffold-repair-cannot-remediate-invalid-placeholder-atom): a current-version
-        # tree may carry an unfilled placeholder atom from an old scaffold.
+    try:
         result = _upgrade_feat.upgrade(resolved, target=target, dry_run=dry_run)
-        verb = "would remove" if dry_run else "removed"
-        for path in result.placeholder_removed:
-            typer.echo(f"[placeholder-repair] {verb} {path}")
-        if result.no_op:
-            typer.echo(
-                f"[ok] {resolved} already at pattern version {current} (target {goal}) — no-op."
-            )
-        sys.exit(0)
-
-    if dry_run:
-        result = _upgrade_feat.upgrade(resolved, target=target, dry_run=True)
-        typer.echo(f"[dry-run] {current} → {result.to_version}")
-        typer.echo(f"  backup would be: {result.backup_path}")
-        for key, step_result in result.steps:
-            typer.echo(f"  step {key}: {len(step_result.moved)} move(s) planned")
-        sys.exit(0)
-
-    if not yes:
-        confirm = typer.confirm(
-            f"Upgrade {resolved} from pattern version {current} → {goal}? (a backup is taken first)"
-        )
-        if not confirm:
-            typer.echo("[abort] upgrade cancelled.")
-            sys.exit(1)
-
-    # Snapshot pre-existing doctor errors BEFORE the migration so we only fail on errors
-    # the migration NEWLY introduces — not on pre-existing, unrelated ones (bug:
-    # specs-upgrade-fails-on-preexisting-doctor-error). Restoring the backup for a
-    # pre-existing error is actively harmful: it discards a good version bump while
-    # leaving the very same error in place.
-    pre_doctor = SpecsDoctor(
-        resolved, public_dir=_resolve_public_dir(resolved), templates_dir=_TEMPLATES_DIR
-    )
-    pre_errors = {
-        identity
-        for i in pre_doctor.check()
-        if i.severity == Severity.ERROR
-        for identity in _error_identities(i)
-    }
-
-    result = _upgrade_feat.upgrade(resolved, target=target)
-    typer.echo(f"[upgrade] {result.from_version} → {result.to_version}")
-    typer.echo(f"  backup: {result.backup_path}")
-    for path in result.placeholder_removed:
-        typer.echo(f"[placeholder-repair] removed {path}")
-    for key, step_result in result.steps:
-        for src, dst in step_result.moved:
-            typer.echo(f"  [{key}] moved {src} → {dst}")
-
-    # Verify with doctor; only the migration's OWN regressions justify a restore.
-    doctor_svc = SpecsDoctor(
-        resolved, public_dir=_resolve_public_dir(resolved), templates_dir=_TEMPLATES_DIR
-    )
-    post_errors = [i for i in doctor_svc.check() if i.severity == Severity.ERROR]
-    new_errors = [i for i in post_errors if _error_identities(i) - pre_errors]
-    pre_existing = [i for i in post_errors if not (_error_identities(i) - pre_errors)]
-    if new_errors:
-        typer.echo(
-            f"[fail] upgrade introduced {len(new_errors)} new doctor error(s). "
-            f"Restore from: {result.backup_path}",
-            err=True,
-        )
-        for issue in new_errors:
-            typer.echo(f"  {issue.code}: {issue.description}", err=True)
+    except UpgradeRefused as exc:
+        typer.echo(f"[refused] {exc}", err=True)
         sys.exit(1)
-    if pre_existing:
-        typer.echo(
-            f"[warn] {resolved} upgraded to pattern version {result.to_version}; the migration "
-            f"is clean, but {len(pre_existing)} pre-existing doctor error(s) remain (not caused "
-            f"by the upgrade) — fix separately, do NOT restore:"
-        )
-        for issue in pre_existing:
-            typer.echo(f"  {issue.code}: {issue.description}")
-        sys.exit(0)
-    typer.echo(f"[ok] {resolved} upgraded to pattern version {result.to_version}; doctor clean.")
+
+    verb = "would remove" if dry_run else "removed"
+    for path in result.placeholder_removed:
+        typer.echo(f"[placeholder-repair] {verb} {path}")
+    if result.no_op:
+        typer.echo(f"[ok] {resolved} already at pattern version {current} (target {goal}) — no-op.")
     sys.exit(0)
 
 
