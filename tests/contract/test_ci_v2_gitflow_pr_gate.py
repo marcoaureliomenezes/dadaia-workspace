@@ -27,7 +27,9 @@ pytestmark = pytest.mark.contract
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _CI_YML = _REPO_ROOT / ".github" / "workflows" / "ci.yml"
 _SCRIPT = _REPO_ROOT / ".github" / "scripts" / "pr-verdict-check.sh"
-_CHOKEPOINTS_SERVICE = _REPO_ROOT / "dadaia_workspace" / "features" / "chokepoints" / "service.py"
+_CHOKEPOINTS_PUSH_GATE = (
+    _REPO_ROOT / "dadaia_workspace" / "features" / "chokepoints" / "push_gate.py"
+)
 
 
 def _load_workflow() -> dict[Any, Any]:
@@ -114,7 +116,7 @@ def test_security_verdict_gate_job_shape() -> None:
 
 
 def test_a4_5_push_gate_decision_never_calls_the_verdict_reader() -> None:
-    text = _CHOKEPOINTS_SERVICE.read_text(encoding="utf-8")
+    text = _CHOKEPOINTS_PUSH_GATE.read_text(encoding="utf-8")
     start = text.index("def push_gate_decision")
     rest = text[start + 1 :]
     end = start + 1 + rest.index("\ndef ") if "\ndef " in rest else len(text)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -13,12 +14,6 @@ import typer
 
 from dadaia_workspace.container import is_source_repo_root as _is_source_repo_root
 from dadaia_workspace.core.exceptions import CiPreflightScopeError
-from dadaia_workspace.features.chokepoints import (
-    GcOutcome,
-    gc_consumed_push_verdicts,
-    iter_security_approvals,
-)
-from dadaia_workspace.features.chokepoints.service import LEDGER_RELPATH
 from dadaia_workspace.features.ci_preflight import (
     all_passed,
     checks_for,
@@ -147,31 +142,23 @@ def pre_commit_check() -> None:
     `pre-commit-presence-gate.sh` wrapper additionally guarantees exit 0 unconditionally,
     regardless of what this command does.
     """
-    from dadaia_workspace.container import build_process_ancestry
     from dadaia_workspace.features.chokepoints import context_slug_for_path, pre_commit_decision
+    from dadaia_workspace.features.spec_context import presence
 
     repo_root = _repo_root()
     workspace = _resolve_workspace_root(repo_root)
     ctx = context_slug_for_path(workspace, _repo_identity_root(repo_root))
 
-    # Wire the read-only ancestry adapter and the pid-liveness probe from the composition root.
-    ancestry_adapter = build_process_ancestry()
-    pid_probe = None
-    try:
-        from dadaia_workspace.infrastructure.process_probe_adapter import OsProcessProbe
-
-        probe = OsProcessProbe()
-        pid_probe = probe.is_pid_alive
-    except Exception:  # noqa: BLE001 — no liveness seam ⇒ TTL-only (cross-platform safe).
-        pid_probe = None
-
+    # v0.5.1 K7: the presence read is injected — `presence.others_alive` is wired
+    # straight through, no adapter needed (its signature already matches). This is
+    # what drops `chokepoints -> spec_context.presence` out of the import-linter
+    # ignore list entirely; the retired ancestry/pid-probe wiring above it is DELETED
+    # with the dead `caller_pid`/`pid_probe`/`ancestry` parameters (never read).
     decision = pre_commit_decision(
         workspace,
         ctx,
-        caller_pid=os.getpid(),
         env_sid=os.environ.get("DADAIA_SESSION_ID"),
-        pid_probe=pid_probe,
-        ancestry=ancestry_adapter.is_ancestor,
+        others_alive=presence.others_alive,
     )
     if decision.warn:
         typer.echo(decision.warn, err=True)
@@ -258,7 +245,8 @@ def push_gate_check() -> None:
         load_registry_context_identities,
     )
     from dadaia_workspace.features.chokepoints import context_slug_for_path, push_gate_decision
-    from dadaia_workspace.features.chokepoints.service import parse_push_stdin
+    from dadaia_workspace.features.chokepoints.branch_policy import parse_push_stdin
+    from dadaia_workspace.features.specs.canon import canon_violations, verdict_violations
 
     repo_root = _repo_root()
     workspace = _resolve_workspace_root(repo_root)
@@ -290,6 +278,8 @@ def push_gate_check() -> None:
         refs,
         object_source=build_git_object_reader(),
         repo=repo_root,
+        canon_violations_fn=canon_violations,
+        verdict_violations_fn=verdict_violations,
         malformed_lines=malformed,
         denylist_terms=denylist_terms,
         baseline_patterns=baseline_patterns,
@@ -302,71 +292,95 @@ def push_gate_check() -> None:
         raise typer.Exit(1)
 
 
-_LEDGER_BASENAME = Path(*LEDGER_RELPATH).name
+_SHA40_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 
 
-@app.command("gc-push-verdicts")
-def gc_push_verdicts(
-    sha: list[str] = typer.Option(
-        ...,
-        "--sha",
-        help=(
-            "A merged PR head sha the caller has ALREADY confirmed landed (repeatable "
-            "— pass one --sha per newly-merged PR head). Never pass a sha before the "
-            "PR merge it names is confirmed."
-        ),
+def _first_parent_sha(repo_root: Path, sha: str) -> str | None:
+    """The first-parent sha of *sha* in *repo_root*, or ``None`` (root commit, or git
+    cannot resolve it — e.g. a shallow clone; the caller's CI job fetches full history).
+    """
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", f"{sha}^"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+    return out.stdout.strip() or None
+
+
+@app.command("verdict-check")
+def verdict_check(
+    head: str = typer.Option(
+        ..., "--head", help="The PR/push head sha to prove coverage for (40-hex)."
     ),
-    dry_run: bool = typer.Option(
-        False,
-        "--dry-run",
-        help="Report what would be consumed without touching the filesystem.",
+    release_id: str = typer.Option(
+        "",
+        "--release-id",
+        help="Optional release-id narrowing (default: search every release, live and archived).",
     ),
 ) -> None:
-    """FR24 (v0.4.3 T-043-39 / M-1 six-axis-review rider / v0.4.4 D5): delete the
-    APPROVED security-verdict handoff(s) a merged PR just consumed.
+    """Require an APPROVED security-reviewer verdict covering ``--head`` (v0.4.4 FR4;
+    v0.5.1 K7 — built over
+    :func:`~dadaia_workspace.features.chokepoints.verdict.covering_verdict`).
 
-    Cadence contract (v0.4.4 D5 — re-keyed from the pushed ``develop`` tip to the
-    merged PR head sha; the security verdict itself is now a PR gate, not a push gate,
-    per FR3/FR4 — see ``features/chokepoints/service.py``'s module docstring for the
-    two sanctioned observation points this verb realizes, observation point (b)): the
-    ship flow runs this verb IMMEDIATELY AFTER a PR merges into ``develop`` or
-    ``main`` — never before. Each ``--sha`` is a merged PR head sha the caller has
-    already confirmed landed.
-
-    Idempotent and best-effort by design: exits 0 even when nothing matches (no verdict
-    handoff covers the given sha(s)), even when the AG.1 lane guard refuses a candidate,
-    and even when the audit-ledger append fails for one handoff — a GC sweep run
-    strictly AFTER the merge it cleans up after has already landed can never change
-    that merge's outcome, so a non-zero exit here would be a failure signal a caller
-    could misread as a merge problem, and this verb never emits one.
+    Backend for ``.github/scripts/pr-verdict-check.sh``'s ``security-verdict-gate`` CI
+    job (a thin wrapper as of v0.5.1 K7): reads the COMMITTED verdict evidence under
+    ``specs/releases/<id>/verdicts/`` (live) and ``specs/releases/_archive/<id>/
+    verdicts/`` (archived) — never ``.dadaia/handoff/``, a workspace-local, gitignored
+    directory a CI checkout never sees. Exit 0 (PASS) when a qualifying handoff's
+    ``metrics.commit_sha`` is ``--head`` itself or ``--head``'s first parent; exit 1
+    (FAIL) otherwise, naming the expected evidence shape.
     """
-    repo_root = _repo_root()
-    workspace = _resolve_workspace_root(repo_root)
-    shas = {value for value in sha if value}
-
-    if dry_run:
-        handoff_root = workspace / ".dadaia" / "handoff"
-        matches = [a for a in iter_security_approvals(handoff_root) if a.commit_sha in shas]
-        typer.echo(
-            f"dadaia ci gc-push-verdicts (dry-run): would consume {len(matches)} "
-            f"verdict(s); ledger {_LEDGER_BASENAME}."
-        )
-        for approval in matches:
-            typer.echo(f"  would consume: {approval.source}")
-        return
-
-    outcome: GcOutcome = gc_consumed_push_verdicts(workspace, shas)
-    skipped = len(outcome.append_failed) + len(outcome.lane_guard_refused)
-    typer.echo(
-        f"dadaia ci gc-push-verdicts: consumed {len(outcome.deleted)} verdict(s), "
-        f"skipped {skipped}; ledger {_LEDGER_BASENAME}."
+    from dadaia_workspace.core.specs_version import RELEASE_SEMVER_RE
+    from dadaia_workspace.features.chokepoints.verdict import (
+        covering_verdict,
+        discover_verdict_candidates,
     )
-    for name in outcome.deleted:
-        typer.echo(f"  consumed: {name}")
-    for name in outcome.append_failed:
-        typer.echo(f"  skipped (ledger append failed): {name}")
-    for name in outcome.lane_guard_refused:
-        typer.echo(f"  skipped (lane guard refused): {name}")
+
+    if not _SHA40_RE.match(head):
+        typer.secho(
+            f"[verdict-check] BLOCKED: --head '{head}' is not a 40-hex sha — refusing "
+            "to use it as a git argument or coverage anchor.",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    if release_id and release_id != "none" and not RELEASE_SEMVER_RE.match(release_id):
+        typer.secho(
+            f"[verdict-check] BLOCKED: --release-id '{release_id}' does not match the "
+            "canon release-id pattern — refusing to use it to narrow the search.",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    repo_root = _repo_root()
+    parent = _first_parent_sha(repo_root, head)
+    release_glob = release_id if (release_id and release_id != "none") else "*"
+    candidates = discover_verdict_candidates(repo_root, release_glob)
+    verdict = covering_verdict(candidates, head, parent)
+
+    if verdict is None:
+        typer.secho(
+            f"[verdict-check] BLOCKED: no APPROVED security-reviewer verdict covers "
+            f"head {head} — expected one at "
+            "specs/releases/<id>/verdicts/<sha>.handoff.json or "
+            "specs/releases/_archive/<id>/verdicts/<sha>.handoff.json "
+            f"(sha = {head} or its first parent {parent or 'none'}).",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    typer.echo(
+        f"[verdict-check] PASS: {verdict.path} — security-reviewer APPROVED "
+        f"{verdict.commit_sha}, which covers head {head}."
+    )
 
 
 def _install_one(source: Path, target: Path, *, label: str, force: bool) -> None:

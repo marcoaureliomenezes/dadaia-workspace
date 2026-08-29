@@ -1,4 +1,10 @@
-"""Presence-only pre-commit advisory tests for the NO-LOCKS doctrine."""
+"""Presence-only pre-commit advisory tests for the NO-LOCKS doctrine.
+
+Intent: CONTRACT — v0.1.76 FR3 (NO-LOCKS WARN-only); v0.5.1 K7 (injected
+``others_alive`` — the real ``spec_context.presence.others_alive`` is wired straight
+through here, exactly as the CLI composition root wires it, proving the injection
+seam works with zero adapter).
+"""
 
 from __future__ import annotations
 
@@ -6,9 +12,11 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
-from dadaia_workspace.core.protocols.process_ancestry import Ancestry
+import pytest
+
 from dadaia_workspace.features.chokepoints import pre_commit_decision
-from dadaia_workspace.features.chokepoints.service import context_slug_for_path
+from dadaia_workspace.features.chokepoints.branch_policy import context_slug_for_path
+from dadaia_workspace.features.spec_context import presence
 
 _CTX = "demo-ctx"
 
@@ -31,20 +39,12 @@ def _presence(workspace: Path, session_id: str) -> None:
     )
 
 
-def _decision(workspace: Path, *, env_sid: str | None = "caller"):
-    def forbidden_probe(_pid: int) -> bool:
-        raise AssertionError("retired pid probe must not run")
-
-    def forbidden_ancestry(_ancestor: int, _descendant: int) -> Ancestry:
-        raise AssertionError("retired ancestry probe must not run")
-
+def _decision(workspace: Path, ctx: str | None = _CTX, *, env_sid: str | None = "caller"):
     return pre_commit_decision(
         workspace,
-        _CTX,
-        caller_pid=999,
+        ctx,
         env_sid=env_sid,
-        pid_probe=forbidden_probe,
-        ancestry=forbidden_ancestry,
+        others_alive=presence.others_alive,
     )
 
 
@@ -73,16 +73,34 @@ def test_foreign_presence_allows_with_one_advisory(tmp_path: Path) -> None:
 
 
 def test_non_context_path_always_allows(tmp_path: Path) -> None:
+    def forbidden_others_alive(_workspace: Path, _ctx: str, _sid: str) -> list[object]:
+        raise AssertionError("others_alive must never run for a non-context path")
+
     decision = pre_commit_decision(
         tmp_path,
         None,
-        caller_pid=999,
         env_sid=None,
-        pid_probe=None,
-        ancestry=lambda _a, _b: Ancestry.UNKNOWN,
+        others_alive=forbidden_others_alive,  # type: ignore[arg-type]
     )
     assert decision.allowed
     assert decision.warn is None
+
+
+@pytest.mark.parametrize("env_sid", [None, ""], ids=["none", "empty-string"])
+def test_missing_env_sid_falls_back_to_the_anonymous_own_sid(
+    tmp_path: Path, env_sid: str | None
+) -> None:
+    """The injected ``others_alive`` still receives a non-empty own-sid string even
+    when the caller supplies no ``DADAIA_SESSION_ID`` — mirrors the pre-K7 fallback."""
+    seen: list[str] = []
+
+    def _spy(_workspace: Path, _ctx: str, sid: str) -> list[object]:
+        seen.append(sid)
+        return []
+
+    decision = pre_commit_decision(tmp_path, _CTX, env_sid=env_sid, others_alive=_spy)
+    assert decision.allowed
+    assert seen == ["pre-commit-anonymous"]
 
 
 def test_context_slug_for_path(tmp_path: Path) -> None:
