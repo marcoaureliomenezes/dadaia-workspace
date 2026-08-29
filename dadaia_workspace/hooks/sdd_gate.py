@@ -6,14 +6,17 @@ it delegates classification + decision to :func:`gate_policy.classify_path` and
 :func:`gate_policy.evaluate`, which is the single source of truth (avoids a third
 drifting copy alongside the bash gate).
 
-1. **PATH-first context slug.** The context is derived via the single resolution
-   authority (:func:`dadaia_workspace.container.resolve_context`, ``DADAIA.md`` §3),
-   called with ``target_path=fpath`` so the write-target path (``repos/<slug>/...``)
-   wins ahead of every other rung — a write under ``repos/B/...`` therefore never
-   touches ``repos/A``'s presence, even while ``DADAIA_CONTEXT`` names a different
-   context (T-50-02, SPEC v0.5.0 FR1). A write under NO repo falls through to
-   ``DADAIA_CONTEXT``, then this session's own live record, then the repo containing
-   the current working directory, before resolving unattributed.
+1. **One Invocation per target.** Session, context, root, mode, release and phase are
+   resolved in ONE call to :func:`dadaia_workspace.core.invocation.resolve`, called
+   with ``target_path=fpath`` so the write-target path (``repos/<slug>/...``) wins
+   ahead of every other rung — a write under ``repos/B/...`` therefore never touches
+   ``repos/A``'s presence, even while ``DADAIA_CONTEXT`` names a different context.
+   Because the workspace root is ALSO derived from the target first (the K1 open-bug
+   fix), a write under NO repo still falls through the same Invocation's remaining
+   rungs — ``DADAIA_CONTEXT``, this session's own live record, the repo containing the
+   current working directory — before resolving unattributed, and the root every rung
+   agrees on is never a different one than the root the write target actually lives
+   under.
 2. **PROTECTED is the sole fail-CLOSED path.** ``.dadaia/sessions/`` writes are blocked
    unconditionally (SEC-01); every other class fails OPEN.
 3. **Fail-open posture.** No non-PROTECTED, non-self-READ write blocks because of
@@ -27,14 +30,16 @@ import os
 import re
 from pathlib import Path
 
-from dadaia_workspace.features.spec_context import gate_policy, session_identity
+from dadaia_workspace.core import invocation
+from dadaia_workspace.features.spec_context import gate_policy
 from dadaia_workspace.hooks import _common
 
 _SLUG_STRIP = re.compile(r"[^A-Za-z0-9_-]")
 
-#: Default mode when neither the env override nor a session record resolves one. Missing-mode
-#: sessions stay IMPLEMENTATION-capable — Decision D-3 / FR-R4-04.
-_DEFAULT_MODE = "IMPLEMENTATION"
+#: The gate's own anonymous-session sentinel (FR5): an unresolvable session id never
+#: creates a presence record — the write is still allowed, there is simply nothing to
+#: be advisory about. Matches ``gate_policy._ANON_SESSION_ID``.
+_ANON_SESSION_ID = "anon-session"
 
 
 def _resolve_holder_pid(payload: dict[str, object]) -> int:
@@ -68,124 +73,25 @@ def _resolve_holder_pid(payload: dict[str, object]) -> int:
     return os.getppid()
 
 
-def _resolve_workspace() -> Path:
-    """Resolve the workspace root: ``WORKSPACE_ROOT`` env wins, else walk up from cwd."""
-    env = os.environ.get("WORKSPACE_ROOT")
-    if env:
-        return Path(env)
-    from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
-
-    return resolve_workspace_root()
-
-
 def _context_slug(fpath: Path) -> str:
-    """Derive the context slug via the single resolution authority (T-50-02, SPEC v0.5.0
-    FR1 — re-points consumer "E").
+    """Derive the context slug for *fpath* via the single resolution authority.
 
-    Delegates to :func:`dadaia_workspace.container.resolve_context` with
-    ``target_path=fpath`` (``core.specs_resolver`` is a forbidden direct import for
-    ``hooks`` — ``bind-resolution-seam-is-a-single-home``, ZERO ``ignore_imports`` —
-    so the composition-root seam in ``container`` is the sanctioned path). ``target_path``
-    is what preserves this hook's PATH-FIRST semantics through the authority's rung 0: a
-    target under ``<ws>/repos/<slug>/...`` belongs to context ``<slug>`` regardless of
-    ``DADAIA_CONTEXT`` or which context is first-ALIVE in the registry — rung 0 is
-    consulted before rung 1 (the env var).
-
-    **Intended semantic widening (SPEC FR1, this task's acceptance criterion):** a write
-    under NO repo used to resolve via ``DADAIA_CONTEXT`` only (the old 2-rung ladder this
-    function used to implement). It now falls through the authority's remaining rungs —
-    this session's own LIVE record (rung 2), then the repo containing the current
-    working directory (rung 3) — before giving up unattributed. The result is sanitized
-    to ``[A-Za-z0-9_-]`` (CWE-22), matching the authority's own allowlist.
+    A convenience one-liner over :func:`dadaia_workspace.core.invocation.resolve`
+    (``target_path=fpath`` — rung 0 — wins ahead of every other rung); the result is
+    sanitized to ``[A-Za-z0-9_-]`` (CWE-22), matching the authority's own allowlist.
+    ``_evaluate_target`` below resolves its own Invocation directly (this function
+    exists for callers that only need the slug).
     """
-    # Direct core import (F-01, v0.5.0 code review): the container is the DI
-    # composition root and costs ~2s of import graph per one-shot hook process; the
-    # seam contract sanctions hooks as direct importers of the single authority.
-    from dadaia_workspace.core.specs_resolver import resolve_context
-
-    slug = resolve_context(target_path=fpath) or ""
-    return _SLUG_STRIP.sub("", slug)
+    inv = invocation.resolve(target_path=fpath, env=os.environ, cwd=Path.cwd())
+    return _SLUG_STRIP.sub("", inv.context_name or "")
 
 
 def _resolve_mode(workspace: Path, session_id: str, ctx: str = "") -> str:
-    """Resolve the session's bind mode. First hit wins:
-
-    1. ``DADAIA_MODE`` env fast-path override — an operator-shell escape (the harness never
-       sets this; it is honored only when the operator deliberately exports it).
-    2. The CLI-owned session record keyed by the **resolved harness session id**
-       (``session_identity.read_session``) — this session's OWN bind, if it bound itself.
-    3. Default ``IMPLEMENTATION``: no env and no self record.
-
-    A foreign session's bind can never change this result. ``ctx`` is accepted for
-    call-site compatibility but is not consulted.
-
-    Fail-soft: every lookup returns ``None`` on missing/malformed input, so mode
-    resolution never raises.
-    """
+    """Resolve the session's bind mode — a thin call onto the single mode-resolution
+    rule (:func:`dadaia_workspace.core.invocation.resolve_mode`). ``ctx`` is accepted
+    for call-site compatibility but is not consulted (mode is strictly self-scoped)."""
     del ctx
-    env_mode = os.environ.get("DADAIA_MODE")
-    if env_mode:
-        return env_mode
-    rec = session_identity.read_session(workspace, session_id)
-    if rec is not None:
-        raw = rec.get("mode")
-        if raw:
-            return str(raw)
-    return _DEFAULT_MODE
-
-
-def _resolve_active_release(specs_dir: Path) -> tuple[str, str]:
-    """Resolve ``(release_id, phase)`` straight from the live release's
-    ``RELEASE.json`` mutable state document (v0.5.x, successor to the RELEASE.jsonl
-    fold — operator ruling: the release record is "altamente mutavel", never
-    append-only) — ``ACTIVE.md`` is retired, no file replaces it.
-
-    Deliberately re-implements the tiny directory scan + tri-state disk read
-    ``features.specs.doctor_common`` already owns (``resolve_live_release_id`` +
-    ``resolve_active_release``) rather than importing it: this hook is a one-shot
-    process spawned on every gated write, and ``from dadaia_workspace.features.specs
-    import ...`` runs ``features/specs/__init__.py``, which imports ``doctor
-    .SpecsDoctor`` — the entire ``SpecsDoctor`` decomposition — the exact heavy
-    hot-path import cost ``core.specs_resolver`` (vs. the DI container) was already
-    chosen to avoid (module docstring, :func:`_context_slug`). ``core.release_state``
-    stays the ONE place the DOCUMENT SHAPE is validated (:func:`parse_release_state`);
-    only the disk read itself is re-implemented here, an authorized, documented
-    hook-only exception (checked against this hook's own import budget by
-    ``tests/contract/test_hook_import_surface.py``). There is no fold anymore — the
-    document already IS the current phase, one JSON object read straight off disk.
-
-    Returns ``("none", "")`` when no live release directory exists, more than one
-    does (ambiguous), or its ``RELEASE.json`` cannot be read or fails to parse — the
-    gate then treats the write the same as "no active release" (fail toward blocking a
-    MEMORY write rather than guessing a phase that grants one).
-    """
-    from dadaia_workspace.core.release_state import parse_release_state
-
-    releases_root = specs_dir / "releases"
-    if not releases_root.is_dir():
-        return "none", ""
-    try:
-        candidates = sorted(
-            d.name
-            for d in releases_root.iterdir()
-            if d.is_dir()
-            and d.name not in ("_archive", "_ideas")
-            and (d / "RELEASE.json").is_file()
-        )
-    except OSError:
-        return "none", ""
-    if len(candidates) != 1:
-        return "none", ""
-    release_id = candidates[0]
-    try:
-        text = (releases_root / release_id / "RELEASE.json").read_text(encoding="utf-8")
-    except OSError:
-        return release_id, ""
-    try:
-        state = parse_release_state(text)
-    except ValueError:
-        return release_id, ""
-    return release_id, state.phase
+    return invocation.resolve_mode(workspace, session_id, os.environ)
 
 
 def _evaluate_target(
@@ -193,18 +99,29 @@ def _evaluate_target(
 ) -> tuple[gate_policy.Decision, str]:
     """Evaluate ONE write-target path through the gate policy.
 
-    Returns ``(ALLOW, "")`` for any allow path and ``(BLOCK, reason)`` for a blocked one.
-    Fail-open: an unresolvable/unattributable MUTATING write yields ALLOW (matches shell).
-    The caller (``main``) iterates every ``apply_patch`` file header and lets the most
-    restrictive verdict win (FR-W4-04) — the first BLOCK short-circuits the whole patch.
+    Builds exactly ONE :class:`~dadaia_workspace.core.invocation.Invocation` for
+    *raw_path* (session, context, root, mode, release, phase — resolved once) and
+    reads every field the policy needs off it. Returns ``(ALLOW, "")`` for any allow
+    path and ``(BLOCK, reason)`` for a blocked one. Fail-open: an unresolvable/
+    unattributable MUTATING write yields ALLOW. The caller (``main``) iterates every
+    ``apply_patch`` file header and lets the most restrictive verdict win (FR-W4-04) —
+    the first BLOCK short-circuits the whole patch.
     """
     fpath = Path(raw_path)
     if not fpath.is_absolute():
         fpath = workspace / fpath
 
+    # The Invocation's OWN workspace root is target-path-first (the K1 open-bug fix:
+    # a cwd sitting inside a nested, independently sentinel-bearing sandbox must never
+    # shadow the real root that actually owns *fpath*) — it is the authority for THIS
+    # target, falling back to the outer cwd/env-resolved *workspace* only when the
+    # target itself resolves no root at all (an unparseable/relative-path edge case).
+    inv = invocation.resolve(target_path=fpath, payload=payload, env=os.environ, cwd=Path.cwd())
+    effective_workspace = inv.workspace_root or workspace
+
     # Workspace-relative path for the policy classifier (POSIX-style separators).
     try:
-        rel_path = fpath.resolve().relative_to(workspace.resolve()).as_posix()
+        rel_path = fpath.resolve().relative_to(effective_workspace.resolve()).as_posix()
     except (ValueError, OSError):
         rel_path = fpath.as_posix()
 
@@ -213,7 +130,7 @@ def _evaluate_target(
     # PROTECTED short-circuit (sole fail-CLOSED path): no context/lease work needed.
     if cls == gate_policy.PathClass.PROTECTED:
         return gate_policy.evaluate(
-            workspace,
+            effective_workspace,
             rel_path,
             ctx="",
             phase="",
@@ -222,26 +139,10 @@ def _evaluate_target(
             mode="",
         )
 
-    ctx = _context_slug(fpath)
-    # F-02 (v0.5.0 code review): the authority returns the context NAME; the on-disk
-    # directory is the registry's repo_slug, and the two legitimately differ
-    # (`context create <name> --repo <slug>`). Map before joining, like
-    # container._context_specs_dir does — otherwise the release tree is read from a
-    # non-existent dir and MEMORY writes are wrongly phase-blocked.
-    if ctx:
-        from dadaia_workspace.core.specs_resolver import repo_slug_for_context
-
-        specs_dir = workspace / "repos" / repo_slug_for_context(workspace, ctx) / "specs"
-    else:
-        specs_dir = workspace / "specs"
-    # The RELEASE.json state document is the gate's sole decision authority (v0.5.x,
-    # T-050-21A, A4.1) — ACTIVE.md is retired, no fallback branch survives.
-    release, phase = _resolve_active_release(specs_dir)
-    session_id = _common.resolve_session_id(payload, default="anon-session")
-    # Mode resolution order (v0.1.76 FR4, strictly self-scoped): DADAIA_MODE env
-    # override → self-keyed session record → default. No context-incumbent fallback —
-    # a foreign session's bind can never change what THIS session's write resolves to.
-    mode = _resolve_mode(workspace, session_id, ctx)
+    ctx = inv.context_name or ""
+    # FR5: an anonymous identity (no harness-native id, no payload session_id) never
+    # creates a presence record — degrades presence accuracy only, never the write.
+    session_id = inv.session_id or _ANON_SESSION_ID
 
     # MUTATING with no resolvable context → fail open (UNGATED, no presence target),
     # matching legacy shell behavior. NOTE: a READ-bound session that *does* resolve a
@@ -253,13 +154,13 @@ def _evaluate_target(
 
     runtime = os.environ.get("DADAIA_RUNTIME", "unknown")
     return gate_policy.evaluate(
-        workspace,
+        effective_workspace,
         rel_path,
         ctx=ctx,
-        phase=phase,
+        phase=inv.phase,
         session_id=session_id,
-        release=release,
-        mode=mode,
+        release=inv.release,
+        mode=inv.mode,
         runtime=runtime,
         # NF-1: record a LONG-LIVED pid (the harness, via getppid / payload), never this
         # ephemeral hook child's own — a presence record naming a dead pid is misleading.
@@ -300,7 +201,9 @@ def evaluate_payload_with_advisory(payload: dict[str, object]) -> tuple[str | No
         return None, None
 
     try:
-        workspace = _resolve_workspace()
+        workspace = invocation.resolve(env=os.environ, cwd=Path.cwd()).workspace_root
+        if workspace is None:
+            raise RuntimeError("workspace not resolved")
     except Exception:  # noqa: BLE001 — fail-open: unresolved workspace must not block
         return None, None
 

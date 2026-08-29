@@ -34,7 +34,7 @@ import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 
-from dadaia_workspace.features.spec_context import session_identity
+from dadaia_workspace.core import session_store as session_identity
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
 #: The context's main repo slug AND registered name (kept equal, deliberately — a

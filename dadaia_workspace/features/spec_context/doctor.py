@@ -9,13 +9,13 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from dadaia_workspace.core import kernel_tunables, workspace_layout
+from dadaia_workspace.core import kernel_tunables, session_store, workspace_layout
 from dadaia_workspace.core.models.spec_context import ContextState
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.core.protocols.context_store import ContextStore
 from dadaia_workspace.core.protocols.git_client import GitClient
 from dadaia_workspace.core.record_liveness import is_stale
-from dadaia_workspace.features.spec_context import presence, session_identity
+from dadaia_workspace.features.spec_context import presence
 
 # Note: INV-1, INV-2, INV-3, INV-6 have been removed in v2. INV-4 and INV-5
 # are renamed for the ALIVE/DEAD semantics.
@@ -73,10 +73,10 @@ _ROOT_TOOL_CONFIGS: frozenset[str] = frozenset({".mcp.json"})
 _DADAIA_ALLOWED_SUBDIRS: frozenset[str] = workspace_layout.DADAIA_ALLOWED_SUBDIRS
 
 # Sessions expired beyond this age are graveyard entries eligible for GC. The field names
-# are owned by ``session_identity`` (the single owner of the session-record schema); the
-# GC liveness clock is resolved via ``session_identity.liveness_timestamp`` (last_seen_at,
+# are owned by ``session_store`` (the single owner of the session-record schema); the
+# GC liveness clock is resolved via ``session_store.liveness_timestamp`` (last_seen_at,
 # with TTL-from-creation fallback for pre-heartbeat records — T-011-04 / FR-W1-04 / ADR-8).
-_SESSION_GC_TTL_FIELD = session_identity.SESSION_GC_TTL_FIELD
+_SESSION_GC_TTL_FIELD = session_store.SESSION_GC_TTL_FIELD
 
 
 @dataclass(frozen=True)
@@ -107,7 +107,7 @@ class DoctorService:
     def _sessions_dir(self) -> Path:
         # Session-store path via the single owner (T-011-05 / FR-W1-05, ADR-12) — the
         # doctor no longer constructs ``.dadaia/sessions`` itself.
-        return session_identity.sessions_dir(self._workspace_root)
+        return session_store.sessions_dir(self._workspace_root)
 
     def _ctx_locks_dir(self) -> Path:
         return self._workspace_root / ".dadaia" / "states" / "ctx_locks"
@@ -551,7 +551,7 @@ class DoctorService:
                     continue
                 # Read the session record through its single owner (FR-R3-01).
                 sess_id = sess_file.name[: -len(".json")]
-                sess_data = session_identity.read_session(self._workspace_root, sess_id)
+                sess_data = session_store.read_session(self._workspace_root, sess_id)
                 if sess_data is None:
                     continue
                 # Build a TTL-check-compatible dict. The liveness clock is the
@@ -560,7 +560,7 @@ class DoctorService:
                 # the single owner. The session-record pid is NOT passed (no pid_probe): the
                 # bind-CLI pid is dead by construction, so bind GC is pure last_seen_at TTL.
                 gc_check: dict[str, object] = {
-                    "heartbeat": session_identity.liveness_timestamp(sess_data),
+                    "heartbeat": session_store.liveness_timestamp(sess_data),
                     "ttl": sess_data.get(
                         _SESSION_GC_TTL_FIELD, kernel_tunables.SESSION_GC_TTL_SECONDS
                     ),

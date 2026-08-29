@@ -1,4 +1,12 @@
-"""Caller-scoped session identity tests."""
+"""Caller-scoped session-record storage tests (``core.session_store``).
+
+Intent: CONTRACT — release K1 ("One Invocation"). Replaces
+``tests/unit/features/spec_context/test_session_identity.py`` at the new interface:
+the module moved from ``features.spec_context.session_identity`` into
+``core.session_store`` (core cannot import features; :mod:`core.invocation` needs to
+read a session record directly). Behavior is unchanged — this file is the deepened
+module's test surface, ported byte-for-byte onto the new import path.
+"""
 
 from __future__ import annotations
 
@@ -7,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.features.spec_context import session_identity as si
+from dadaia_workspace.core import session_store as si
 
 CTX = "myctx"
 SID = "my-session-id"

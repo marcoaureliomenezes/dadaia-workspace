@@ -29,7 +29,8 @@ from typing import Any
 
 import pytest
 
-from dadaia_workspace.features.spec_context import gate_policy, presence, session_identity
+from dadaia_workspace.core import session_store
+from dadaia_workspace.features.spec_context import gate_policy, presence
 from dadaia_workspace.hooks import sdd_gate
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
@@ -92,7 +93,7 @@ def _run(
 
 def _write_session_record(ws: Path, session_id: str, mode: str) -> None:
     """Persist a minimal session record (id + mode) the way the bind CLI does."""
-    session_identity.write_session(ws, session_id, {"session_id": session_id, "mode": mode})
+    session_store.write_session(ws, session_id, {"session_id": session_id, "mode": mode})
 
 
 # --------------------------------------------------------------------------- #
@@ -290,7 +291,7 @@ def test_path_first_context_slug_parity_no_context_fails_open_never_blocks(
 
 def _write_live_harness_record(ws: Path, harness_id: str, context: str) -> None:
     """Seed a fresh, LIVE ``sessions/<harness_id>.json`` bind (rung 2 fixture)."""
-    session_identity.write_session(
+    session_store.write_session(
         ws,
         harness_id,
         {

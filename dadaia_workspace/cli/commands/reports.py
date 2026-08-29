@@ -706,10 +706,9 @@ def next_(
       0  Resolved (an agent is pending, or all agents have emitted handoffs)
       3  No active release / no agent sequence in PLAN.md / workspace not initialized
     """
-    ctx = context or os.environ.get("DADAIA_CONTEXT")
     try:
         workspace_root = resolve_workspace_root()
-        service = container.build_reports_next_service(workspace_root, context=ctx)
+        service = container.build_reports_next_service(workspace_root, context=context)
         result = service.resolve_next()
     except WorkspaceNotInitializedError:
         err_console.print(
