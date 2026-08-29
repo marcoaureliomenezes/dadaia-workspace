@@ -383,26 +383,6 @@ class FileSystemPublicAssetManager:
         )
         return agent_name, toml_content
 
-    def _render_codex_pack_agent(
-        self,
-        md_path: Path,
-        workspace_root: Path,
-        overwrite: OverwritePolicy,
-        installed: list[str],
-        resolved: ResolvedAgentModel | None = None,
-    ) -> None:
-        """Render a pack agent's ``.codex/agents/<name>.toml`` from its body."""
-        rendered = self._codex_toml_from_md(md_path, resolved=resolved)
-        if rendered is None:
-            return
-        agent_name, toml_content = rendered
-        write_generated(
-            workspace_root / ".codex" / "agents" / f"{agent_name}.toml",
-            toml_content,
-            overwrite.force,
-            installed,
-        )
-
     @staticmethod
     def _prune_empty_dirs(start: Path, stop: Path) -> None:
         """Remove now-empty directories from *start* up to (exclusive) *stop*."""

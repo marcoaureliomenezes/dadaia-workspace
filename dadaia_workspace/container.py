@@ -8,8 +8,6 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from dadaia_workspace.core.models.backlog import BacklogHistoRecord, ConsumedBacklogHistoRecord
     from dadaia_workspace.core.models.bugs import BugRecord
-    from dadaia_workspace.core.models.findings import FindingRecord
-    from dadaia_workspace.core.protocols.git_client import GitClient
     from dadaia_workspace.features.agents.model_policy import AgentModelPolicyService
     from dadaia_workspace.features.certification import CertificationResult
 
@@ -80,33 +78,6 @@ from dadaia_workspace.infrastructure.process_probe_adapter import OsProcessProbe
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 from dadaia_workspace.infrastructure.stdlib_handoff_validator import StdlibHandoffValidator
-
-
-def _build_permission_setter() -> Any:
-    """Return the appropriate FilePermissionSetter for the current platform.
-
-    Reads ``PLATFORM.has_posix_chmod`` (the sole authorized platform capability
-    flag) and returns the POSIX adapter on platforms with effective chmod, or the
-    Windows ``icacls`` adapter otherwise.  The import is lazy so that importing
-    ``container`` never triggers the Windows module's guard on Linux/macOS.
-
-    Returns:
-        ``PosixFilePermissionSetter`` when ``PLATFORM.has_posix_chmod`` is ``True``,
-        or ``WindowsFilePermissionSetter`` when ``False``.
-    """
-    from dadaia_workspace.core.platform import PLATFORM
-
-    if PLATFORM.has_posix_chmod:
-        from dadaia_workspace.infrastructure.file_permission_posix import (
-            PosixFilePermissionSetter,
-        )
-
-        return PosixFilePermissionSetter()
-    from dadaia_workspace.infrastructure.file_permission_windows import (
-        WindowsFilePermissionSetter,
-    )
-
-    return WindowsFilePermissionSetter()
 
 
 def build_shutdown_handler() -> Any:
@@ -183,24 +154,15 @@ def build_repos_service() -> ReposService:
     return ReposService(excel_reader=OpenpyxlExcelReader())
 
 
-def build_git_client() -> "GitClient":
-    """Composition-root seam for the subprocess-backed ``GitClient`` (v0.1.72 FR4).
-
-    The CLI layer must not import infrastructure directly (import-linter contract);
-    commands that need a read-only git probe (e.g. ``context show``'s live
-    ``current_branch``) compose it here.
-    """
-    return GitSubprocessClient()
-
-
 def build_git_object_reader() -> GitObjectReader:
     """Composition-root seam for the ``GitObjectReader`` adapter (v0.9.0 FR1/FR7).
 
     The CLI layer must not import infrastructure directly (import-linter contract);
-    ``push-gate-check`` composes the subprocess-backed reader here, exactly as
-    :func:`build_git_client` does for the read-only git probe. A single concrete
-    adapter today (subprocess-backed, cross-platform via the ``git`` executable on
-    PATH) — no platform branching needed, unlike :func:`build_process_ancestry`.
+    ``push-gate-check`` composes the subprocess-backed reader here, the same way
+    :func:`build_spec_context_service` and :func:`build_doctor_service` compose the
+    read-only git probe directly. A single concrete adapter today (subprocess-backed,
+    cross-platform via the ``git`` executable on PATH) — no platform branching
+    needed, unlike :func:`build_process_ancestry`.
 
     As of v0.4.3 T-043-15/FR11, the adapter this seam returns yields commit-object
     message bodies and (for a tag-ref push) annotated tag bodies IN ADDITION to blob
@@ -219,9 +181,10 @@ def build_git_history_reader() -> GitHistoryReader:
 
     The CLI layer must not import infrastructure directly (import-linter contract).
     A single concrete adapter today — the SAME ``GitSubprocessClient`` class
-    :func:`build_git_client` already returns, which is why this seam needs no new
-    infrastructure module: the ruling's whole point is one adapter class, one new
-    narrow port, no sibling adapter.
+    :func:`build_spec_context_service` and :func:`build_doctor_service` already
+    construct directly, which is why this seam needs no new infrastructure module:
+    the ruling's whole point is one adapter class, one new narrow port, no sibling
+    adapter.
 
     T-050-09 built this port against a one-shot migration runner
     (``features.bugs.migrate_v5.run_migration``) that T-050-10 ran once, standalone,
@@ -328,26 +291,6 @@ def build_consumed_backlog_histo_store(
         Path(specs_dir) / "backlog" / "_archive" / "consumed_backlog_histo.jsonl",
         to_dict=ConsumedBacklogHistoRecord.to_dict,
         from_dict=ConsumedBacklogHistoRecord.from_dict,
-    )
-
-
-def build_findings_store(findings_path: Path) -> "RecordStore[FindingRecord]":
-    """Composition-root seam for the audit-finding JSONL store (v0.5.0 FR13/FR15, A13.4
-    — deferred there until a real caller existed; T-050-25A adds one). Takes
-    *findings_path* directly, never a ``specs_dir``: the caller
-    (``doctor_closure_audit.ClosureAuditValidator``, SPEC-DOC-036/038) resolves one
-    ``FINDINGS.jsonl`` per audit dir itself, over an unbounded discovered set. Accepted
-    as its ``findings_store_factory`` DI seam (mirrors ``features.agents.reader``'s
-    ``store_factory``) so that leaf module never gains a ``features -> infrastructure``
-    edge; unwired, it falls back to a zero-dependency reader of the SAME model.
-    """
-    from dadaia_workspace.core.models.findings import FindingRecord
-    from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
-
-    return JsonlRecordStore(
-        findings_path,
-        to_dict=FindingRecord.to_dict,
-        from_dict=FindingRecord.from_dict,
     )
 
 
@@ -643,188 +586,6 @@ def resolve_context_specs_dir(workspace_root: Path, context: str) -> Path:
     uses internally, without duplicating the resolution logic.
     """
     return _context_specs_dir(workspace_root, context)
-
-
-def _workspace_python_bin(workspace_root: Path) -> str | None:
-    """The workspace venv interpreter, when provisioned — the runtime the bootstrap
-    guarantees carries pytest (bug implementation-review-uses-parent-venv-without-
-    pytest: the CLI may itself run from a foreign venv with no test toolchain).
-    """
-    from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
-
-    candidate = VenvPythonEnvironmentManager().python_executable(str(workspace_root))
-    return candidate if Path(candidate).is_file() else None
-
-
-#: Cache/artifact dirs that must never survive inside a context repo
-#: (tmp-file-guardrail zero-tolerance list).
-_REPO_CACHE_DIR_NAMES = (
-    "__pycache__",
-    ".pytest_cache",
-    ".mypy_cache",
-    ".ruff_cache",
-    ".hypothesis",
-)
-
-
-def _repo_hygiene_sweeper(repo_root: Path) -> "Callable[[], None]":
-    """Build the closure-time cache sweep for one context repo."""
-
-    def _sweep() -> None:
-        import shutil
-
-        for name in _REPO_CACHE_DIR_NAMES:
-            for path in repo_root.rglob(name):
-                if path.is_dir() and ".git" not in path.parts:
-                    shutil.rmtree(path, ignore_errors=True)
-
-    return _sweep
-
-
-def _definition_committer(repo_root: Path, release_id: str) -> "Callable[[], None] | None":
-    """Build the definition-time commit of the context repo (Python-owned, post-success).
-
-    Bug fake-release-definition-leaves-dirty-worktree: a completed release-definition
-    leaves SPEC/PLAN/TASKS/backlog/RELEASE.json uncommitted, and implementation-reviews
-    then blocks at preflight on the dirty tree. Mirror of :func:`_closure_committer`
-    — commits everything the definition produced with a conventional message and
-    per-invocation identity fallbacks; ``None`` when the repo is not a git checkout
-    (self-hosting fixtures). Push stays out of scope here (the baseline owns it).
-    """
-    if not (repo_root / ".git").exists():
-        return None
-
-    def _commit() -> None:
-        import subprocess
-
-        subprocess.run(  # noqa: S603 — fixed argv
-            ["git", "-C", str(repo_root), "add", "-A"],
-            capture_output=True,
-            text=True,
-            timeout=60,
-            check=False,
-        )
-        subprocess.run(  # noqa: S603 — fixed argv
-            [
-                "git",
-                "-C",
-                str(repo_root),
-                "-c",
-                "user.email=definition@dadaia.invalid",
-                "-c",
-                "user.name=dadaia-definition",
-                "commit",
-                "-m",
-                f"definition({release_id}): approved release definition artifacts",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=60,
-            check=False,
-        )
-
-    return _commit
-
-
-def _closure_committer(repo_root: Path, release_id: str) -> "Callable[[], None] | None":
-    """Build the closure-time commit of the context repo (Python-owned, post-success).
-
-    Commits everything the cycle produced (implementation, specs artifacts, memory)
-    with a conventional message. Uses per-invocation identity fallbacks so a repo
-    without user config still commits deterministically. ``None`` when the repo is not
-    a git checkout (self-hosting fixtures).
-    """
-    if not (repo_root / ".git").exists():
-        return None
-
-    def _commit() -> None:
-        import subprocess
-
-        subprocess.run(  # noqa: S603 — fixed argv
-            ["git", "-C", str(repo_root), "add", "-A"],
-            capture_output=True,
-            text=True,
-            timeout=60,
-            check=False,
-        )
-        subprocess.run(  # noqa: S603 — fixed argv
-            [
-                "git",
-                "-C",
-                str(repo_root),
-                "-c",
-                "user.email=closure@dadaia.invalid",
-                "-c",
-                "user.name=dadaia-closure",
-                "commit",
-                "-m",
-                f"closure({release_id}): finalize release artifacts",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=60,
-            check=False,
-        )
-
-    return _commit
-
-
-def _memory_lint_gate(specs_dir: Path) -> "Callable[[], tuple[bool, str]] | None":
-    """Build the closure-time memory-atom lint gate for one context specs dir.
-
-    Runs the packaged ``lint-memory-atoms.py`` (the same script doctor LINT-1 shells
-    out to); the gate passes only on exit 0 with no ``WARN:`` findings. ``None`` when
-    the context has no memory dir or the script is not packaged (nothing to lint —
-    never a silent fake-green: the doctor still covers drift after the fact).
-    """
-    memory_dir = specs_dir / "memory"
-    script = Path(__file__).resolve().parent / "public" / "scripts" / "lint-memory-atoms.py"
-    if not memory_dir.is_dir() or not script.is_file():
-        return None
-
-    def _gate() -> tuple[bool, str]:
-        import subprocess
-        import sys as _sys
-
-        try:
-            proc = subprocess.run(  # noqa: S603 — fixed argv, read-only lint run
-                [_sys.executable, "-B", str(script), "--memory-dir", str(memory_dir)],
-                capture_output=True,
-                text=True,
-                timeout=60,
-                check=False,
-            )
-        except (OSError, subprocess.TimeoutExpired) as exc:
-            return True, f"memory lint could not run ({exc}); doctor covers it after the fact"
-        merged = (proc.stdout + "\n" + proc.stderr).strip()
-        ok = proc.returncode == 0 and "WARN:" not in merged
-        # SPEC-DOC-002 leg (bug closure-generates-memory-atom-without-heading): the
-        # lint script validates the headings PRESENT; a body with no markdown heading
-        # at all sails through it — but doctor flags it post-closure. Enforce the
-        # has-a-heading contract here so a heading-less atom never rides a green close.
-        import re as _re
-
-        heading_re = _re.compile(r"^#{1,6}\s+\S", _re.MULTILINE)
-        fm_re = _re.compile(r"^---\n.*?\n---\n", _re.DOTALL)
-        headingless: list[str] = []
-        for md in sorted(memory_dir.rglob("*.md")):
-            if md.name == "index.md":
-                continue
-            try:
-                body = fm_re.sub("", md.read_text(encoding="utf-8"), count=1)
-            except OSError:
-                continue
-            if heading_re.search(body) is None:
-                headingless.append(str(md.relative_to(memory_dir)))
-        if headingless:
-            ok = False
-            merged += "\nERROR: memory atom(s) with no markdown heading (doctor " + (
-                "SPEC-DOC-002): " + ", ".join(headingless)
-            )
-        tail = "\n".join(merged.splitlines()[-30:])
-        return ok, tail
-
-    return _gate
 
 
 def build_panel_views(

@@ -60,8 +60,9 @@ class SpecsDoctor:
             When *not* provided the TREE checks still run but TREE-3 fix and TREE-5
             hash comparison are skipped (issue is still emitted, fix is no-op).
         findings_store_factory: Optional DI seam for SPEC-DOC-036/038's
-            ``FINDINGS.jsonl`` fold (v0.5.0 T-050-25A, A13.4) — a composition root
-            wires ``container.build_findings_store``; ``None`` keeps
+            ``FINDINGS.jsonl`` fold (v0.5.0 T-050-25A, A13.4) — no composition root
+            wires this today (release 0.5.1 K9 deleted the never-called
+            ``container.build_findings_store`` seam as dead code); ``None`` keeps
             ``ClosureAuditValidator``'s zero-dependency fallback reader (same model).
         head_sha: Optional branch HEAD sha, resolved ONCE by the CLI composition
             root (through the ``GitObjectReader`` port) and passed in as plain data

@@ -2,15 +2,26 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "decision-record-v1",
   "title": "ADR Decision Record v1",
-  "description": "One record per architecture decision, appended once to specs/ADRs/decisions.jsonl (v0.5.0 specs-canon closure, operator ruling 2026-08-28). A decision moves — the whole record relocates, never copies — to specs/ADRs/_superseded/superseded.jsonl the moment it is superseded; its id is never reused. `id` is monotonic and gap-free across BOTH files together. Any agent may append a `status: proposed` record; ONLY the operator flips `status` to `accepted` (specs/ADRs/AGENTS.md's operator-only acceptance law) — `accepted` requires a non-null `measured_by` (a decision nobody can measure is not a principle, it is prose).",
+  "description": "One record per architecture decision, appended once to specs/ADRs/decisions.jsonl (v0.5.0 specs-canon closure, operator ruling 2026-08-28). A decision moves \u2014 the whole record relocates, never copies \u2014 to specs/ADRs/_superseded/superseded.jsonl the moment it is superseded; its id is never reused. `id` is monotonic and gap-free across BOTH files together. Any agent may append a `status: proposed` record; ONLY the operator flips `status` to `accepted` (specs/ADRs/AGENTS.md's operator-only acceptance law) \u2014 `accepted` requires a non-null `measured_by` (a decision nobody can measure is not a principle, it is prose).",
   "type": "object",
   "additionalProperties": false,
-  "required": ["id", "ts", "title", "status", "context", "decision", "consequences", "measured_by", "supersedes", "amends"],
+  "required": [
+    "id",
+    "ts",
+    "title",
+    "status",
+    "context",
+    "decision",
+    "consequences",
+    "measured_by",
+    "supersedes",
+    "amends"
+  ],
   "properties": {
     "id": {
       "type": "string",
       "pattern": "^\\d{4}$",
-      "description": "Zero-padded 4-digit sequence number, monotonic and gap-free across decisions.jsonl + _superseded/superseded.jsonl together — never reused, never re-numbered."
+      "description": "Zero-padded 4-digit sequence number, monotonic and gap-free across decisions.jsonl + _superseded/superseded.jsonl together \u2014 never reused, never re-numbered."
     },
     "ts": {
       "type": "string",
@@ -24,18 +35,23 @@
     },
     "status": {
       "type": "string",
-      "enum": ["proposed", "accepted", "rejected", "superseded"],
+      "enum": [
+        "proposed",
+        "accepted",
+        "rejected",
+        "superseded"
+      ],
       "description": "proposed: any agent may author. accepted: operator-only, requires measured_by. rejected: operator decision, no consequence elsewhere. superseded: the record has moved to _superseded/superseded.jsonl."
     },
     "context": {
       "type": "string",
       "minLength": 1,
-      "description": "What forces make this decision necessary — the problem, not the solution."
+      "description": "What forces make this decision necessary \u2014 the problem, not the solution."
     },
     "decision": {
       "type": "string",
       "minLength": 1,
-      "description": "\"We will …\" — the choice, stated as a commitment, not a discussion."
+      "description": "\"We will \u2026\" \u2014 the choice, stated as a commitment, not a discussion."
     },
     "consequences": {
       "type": "string",
@@ -43,16 +59,27 @@
       "description": "Benefits and costs/trade-offs accepted."
     },
     "measured_by": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "description": "The existing mechanical check that proves this decision holds (an import-linter contract, a contract test node id, a doctor check code, a ratchet script). Required (non-null) when status is accepted."
     },
     "supersedes": {
-      "type": ["string", "null"],
-      "description": "The 4-digit id of an earlier decision this one supersedes, or null."
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^\\d{4}$",
+      "description": "Id (NNNN) of the record this one supersedes, or null."
     },
     "amends": {
-      "type": ["string", "null"],
-      "description": "The 4-digit id of an earlier decision this one amends (narrows/extends without fully superseding it), or null."
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^\\d{4}$",
+      "description": "Id (NNNN) of the record this one amends, or null."
     }
   },
   "examples": [
@@ -62,7 +89,7 @@
       "title": "Features depend on ports, not adapters",
       "status": "proposed",
       "context": "Features need I/O (git, filesystem, subprocess) but must stay unit-testable without real I/O.",
-      "decision": "We will define a Protocol in core/protocols/ for every I/O boundary a feature needs, and inject a concrete infrastructure/ adapter at the composition root (container.py) — a feature module never imports infrastructure directly.",
+      "decision": "We will define a Protocol in core/protocols/ for every I/O boundary a feature needs, and inject a concrete infrastructure/ adapter at the composition root (container.py) \u2014 a feature module never imports infrastructure directly.",
       "consequences": "+ features are testable with fakes, no real I/O in unit tests\n- one extra indirection layer per I/O boundary",
       "measured_by": "tests/contract/test_import_linter_ignore_cap.py (features-no-infrastructure contract)",
       "supersedes": null,

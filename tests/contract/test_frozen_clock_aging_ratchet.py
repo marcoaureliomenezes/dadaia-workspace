@@ -97,6 +97,7 @@ from pathlib import Path
 import pytest
 
 from tests.helpers.scan_population import assert_populated
+from tests.helpers.suite_files import tracked_test_files
 
 pytestmark = pytest.mark.contract
 
@@ -109,16 +110,9 @@ _ISO_DATE_PREFIX_RE = re.compile(r"^\d{4}-\d{2}-\d{2}")
 
 
 def _test_files() -> list[Path]:
-    """Every ``*.py`` under ``tests/`` (recursively), excluding cache artifacts and the
-    ``tests/tmp/`` scratch directory (``pyproject.toml``'s ``norecursedirs`` — transient
-    probe files other tests write/delete there at run time are not permanent ratchet
-    subjects and race with concurrent xdist workers mid-scan; see
-    ``test_test_files_excludes_tests_tmp_scratch_directory`` below)."""
-    return sorted(
-        p
-        for p in _TESTS_DIR.rglob("*.py")
-        if "__pycache__" not in p.parts and p.relative_to(_TESTS_DIR).parts[0] != "tmp"
-    )
+    """The tracked suite — one enumeration shared by every ratchet
+    (``tests.helpers.suite_files``); ``tests/tmp/`` probes are outside it by construction."""
+    return tracked_test_files(_REPO_ROOT)
 
 
 def _trailing_name(node: ast.expr) -> str | None:

@@ -112,21 +112,24 @@ _RELEASE_SPEC_STUB = """\
 # ── public API ────────────────────────────────────────────────────────────────
 
 
+_RELEASE_ARTIFACTS = ("SPEC.md", "PLAN.md", "TASKS.md", "RELEASE.json")
+
+
 def release_new(specs_dir: Path, release_id: str) -> NewArtifactResult:
     """Create ``specs/releases/<release_id>/SPEC.md`` with a canonical stub.
 
     Args:
         specs_dir:  Absolute path to the ``specs/`` directory.
-        release_id: New release identifier. Must be the SemVer canon ``vX.Y.Z``
-            (preferred — what ``specs doctor`` SPEC-DOC-027 requires for a live dir) OR
-            the legacy slug ``^[a-z][a-z0-9-]+$``.
+        release_id: New release identifier — bare SemVer ``X.Y.Z`` (the canon; a
+            ``v`` prefix is refused) or the legacy slug ``^[a-z][a-z0-9-]+$``.
 
     Returns:
         :class:`NewArtifactResult` with the path to the created ``SPEC.md``.
 
     Raises:
         ValueError:    If ``release_id`` is neither the SemVer canon nor the legacy slug.
-        FileExistsError: If the release directory already exists (no-clobber).
+        FileExistsError: If ``SPEC.md`` already exists there (no-clobber); a directory
+            holding only ``verdicts/`` (the bug lane's PR evidence) is not a release yet.
     """
     if not _is_valid_release_id(release_id):
         raise ValueError(
@@ -138,13 +141,18 @@ def release_new(specs_dir: Path, release_id: str) -> NewArtifactResult:
         )
 
     release_dir = specs_dir / "releases" / release_id
-    if release_dir.exists():
+    if release_dir.is_symlink():
         raise FileExistsError(
-            f"Release directory already exists: {release_dir}. "
+            f"Release directory is a symlink, refusing to mint through it: {release_dir}"
+        )
+    minted = [n for n in _RELEASE_ARTIFACTS if (release_dir / n).exists()]
+    if minted:
+        raise FileExistsError(
+            f"Release already minted: {release_dir / minted[0]}. "
             "Use a different release ID or remove the existing directory first."
         )
 
-    release_dir.mkdir(parents=True, exist_ok=False)
+    release_dir.mkdir(parents=True, exist_ok=True)
     spec_path = release_dir / "SPEC.md"
     spec_path.write_text(
         _RELEASE_SPEC_STUB.format(release_id=release_id, today=_today()),

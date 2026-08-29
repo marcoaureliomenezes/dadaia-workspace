@@ -441,6 +441,12 @@ class GitSubprocessClient:
         Raises :class:`GitHistoryReadError` on any non-zero git exit — a policy-relevant
         history walk never silently under-reports.
         """
+        shallow = _run_bytes(["git", "rev-parse", "--is-shallow-repository"], cwd=repo)
+        if shallow.returncode == 0 and shallow.stdout.strip() == b"true":
+            raise GitHistoryReadError(
+                f"{repo} is a shallow repository: a history walk over {pathspec!r} would "
+                "silently under-report (every line derives to HEAD); fetch full history first"
+            )
         header = _run_bytes(
             [
                 "git",
