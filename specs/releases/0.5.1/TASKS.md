@@ -204,7 +204,7 @@
   - a measured overshoot is recorded as a drift, never renegotiated
   - parallelism: none
 
-- [ ] **T-051-22** — Trio review on one commit, thawed tree · owner: code-reviewer + security-reviewer + qa-engineer · write set: `specs/releases/0.5.1/verdicts/<40-hex-sha>.handoff.json` (security), handoffs for the other two · acceptance: A-0.6 — all three APPROVE the **same** commit; each states the bug-surface delta with bug-history evidence
+- [x] **T-051-22** — Trio review on one commit, thawed tree · owner: code-reviewer + security-reviewer + qa-engineer · write set: `specs/releases/0.5.1/verdicts/<40-hex-sha>.handoff.json` (security), handoffs for the other two · acceptance: A-0.6 — all three APPROVE the **same** commit; each states the bug-surface delta with bug-history evidence
   - the security verdict carries `agent: "security-reviewer"`, `verdict: "APPROVED"` and a **40-hex** `metrics.commit_sha`; a short sha or branch name is silently skipped by the CI gate
   - parallelism: none
 
@@ -212,7 +212,7 @@
 
 ## `rc` lane
 
-- [ ] **T-051-23** — `rc-1`: PR `feature/0.5.1` → `develop` · owner: dispatcher (+ security-reviewer) · write set: `specs/releases/0.5.1/RELEASE.json` (`rc: 1`), git refs · acceptance: merged with **every** CI job green, verdict covering the PR head sha
+- [-] **T-051-23** — `rc-1`: PR `feature/0.5.1` → `develop` · owner: dispatcher (+ security-reviewer) · write set: `specs/releases/0.5.1/RELEASE.json` (`rc: 1`), git refs · acceptance: merged with **every** CI job green, verdict covering the PR head sha
   - watch CI on a loop until all jobs are green; a red job is fixed at its root cause and the watch resumes
   - parallelism: none
 

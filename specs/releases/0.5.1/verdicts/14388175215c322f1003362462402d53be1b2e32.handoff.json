@@ -1,0 +1,87 @@
+{
+  "schema_version": "handoff-v1.1",
+  "agent": "security-reviewer",
+  "context": "dadaia-workspace",
+  "produced_at": "2026-08-29T20:30:00Z",
+  "release_id": "0.5.1",
+  "scope": "PR-gate security verdict (re-key + delta review), rc-1 feature/0.5.1 -> develop, head 14388175215c322f1003362462402d53be1b2e32; full range origin/develop..head plus the 4ff8dcb259412df3a4a258cb1071997510b28f12..head delta (3 commits, 14 files, +441/-111)",
+  "verdict": "APPROVED",
+  "verdict_reason": "SCAN SUMMARY: PR-gate security verdict for rc-1 (feature/0.5.1 -> develop), head 4ff8dcb259412df3a4a258cb1071997510b28f12, diff-based over origin/develop..head (270 files, +11998/-23768). Six lanes run: secrets/privacy over every added line (zero credential assignments, zero PEM/private-key headers, zero live e-mail/IP/host leakage; the pushed range passes `dadaia ci push-gate-check` with operator+baseline denylist, exit 0); OWASP/injection review of the new production modules (core.invocation, core.session_store, core.handoff_index, features.specs.canon, infrastructure.projection, features.chokepoints.push_gate/verdict, features.telemetry.store, features.panel.handler, core.redaction.first_privacy_hit + BugService threading, hooks.sdd_post_gate, features.spec_context.presence); dependency lane (pyproject.toml/poetry.lock untouched in the range, openpyxl retained, no new third-party surface); workflow lane (only ci.yml security-verdict-gate and secret-scan.yml changed since 349e2dcd; release.yml byte-identical); schema/records lane (3 ADRs all `proposed`, RELEASE.json IMPLEMENTATION/segment null, specs doctor 0 errors, backlog doctor clean); targeted regression lane (917 passed). One MEDIUM finding: the deletion-lane symlink guard (AG.1 / FR17) was deleted with the post-gate reaper and not re-implemented in its new owner presence.gc — reproduced deterministically. Not in the mandatory REQUEST_CHANGES set and pre-existing at develop in the sibling doctor --fix lane, so it is scheduled, not blocking.\n\nVERDICT REASON: The range REDUCES the bug surface materially and no blocking security or privacy finding exists on the reviewed commit. Bug-ledger evidence in the range (specs/bugs/BUGS.jsonl, +12 records touched): 30 status transitions to `resolved` land against 11 records left `open`, and the resolutions are structural deletions rather than puxadinhos — 8 context deciders/3 session-id ladders/4 staleness rules collapse into one core.invocation (T-051-03, 957080a8); 4 verdict readers over 2 stores collapse into the one committed-evidence verdict store (T-051-08, 73e9eae0, closing the 7-record Cluster D lineage where a fix in one reader never reached the next); the 1042-line chokepoints.service, migrate_v5, bugs_jsonl, specs_canon, reports.validation, telemetry store package and the post-gate reaper are deleted outright (-23768 lines against +11998). Security-relevant controls are preserved or strengthened at the new seams: session ids and context names are fullmatch-validated against [A-Za-z0-9_-]+ before any path join (CWE-22/59); handoff artifact and self_pull refs resolve through _within_root (resolve()+relative_to) against workspace_root or reviewed_root; the verdict gate shape-checks a 40-hex sha and a canon release id before any git argv and refuses `_ideas` as a verdict root; telemetry SQL stays fully parameterized with 0o700/0o600 hardening intact; panel routes are anchored ^...$ with the DNS-rebinding Host guard and no auth regression against the no-auth loopback contract; privacy refusals return only a pattern reason, never the offending value (CWE-532); secret-scan now also runs on develop PRs. The single regression (SEC-0.5.1-01) removes an implemented guard rather than adding an exploitable path, crosses no privilege boundary, and already exists unguarded at develop in presence.stale_records/sweep — blocking rc-1 would not remove the exposure, so it is recorded as must-fix in rc-2 with a deterministic reproduction.\n\nRE-KEY + DELTA REVIEW (4ff8dcb259412df3a4a258cb1071997510b28f12 -> 14388175215c322f1003362462402d53be1b2e32, 3 commits: 7f70fefe fix, 8f08721f bug record, 14388175 MEM-DRIFT-1; 14 files, +441/-111). (a) SEC-0.5.1-01 is FIXED and the fix is verified, not asserted: features/spec_context/presence.py:124-134 adds ONE `_within_dadaia(path, workspace)` guard (resolve() + relative_to inside try/except, never a string-prefix compare), shared by BOTH reap lanes — `_reap_presence_records` now filters context dirs with `p.is_dir() and not p.is_symlink()` (the symlinked-directory clause) AND re-checks every unlink candidate through `_within_dadaia` (the symlinked-entry clause), while `_reap_markers` re-checks each marker the same way. The contract test deleted at K2 is ported to its new owner as tests/unit/features/spec_context/test_presence_gc.py::test_symlinked_context_dir_to_outside_dadaia_never_followed. My original reproduction, re-run unchanged against head, now reports `victim.json still exists after gc: True` with an empty presence lane — where it previously reported deletion and `presence=('linked-ctx/victim',)`. The fix is structural (one guard, one home, +33 lines in the module that owns the lane), adds no flag, branch or second code path, and re-homes an invariant rather than bolting one on. (b) The remaining delta is refactor-shaped and security-neutral: hooks/sdd_post_gate.py builds the Invocation once, cli/commands/ci.py resolves the repo root through cli/_specs_resolution.resolve_workspace_root_for_cli (the verdict-check sha/release-id shape checks before any git argv are untouched — re-read at head), canon.release_new now renders through scaffold_entry with its symlink refusal and three-layer no-clobber intact, features/handoff.py (48 lines) is deleted into core.handoff_index. (c) The new MEM-DRIFT-1 memory-drift check in features/specs/doctor_memory.py is safe: it reads specs/memory/ARCHITECTURE.md read-only via read_text, and resolves live package names with `importlib.import_module('dadaia_workspace.features')` + `pkgutil.iter_modules(pkg.__path__)` — iter_modules ENUMERATES without importing, and dadaia_workspace/features/__init__.py is 0 bytes, so no sibling feature code is imported or executed; the ImportError fallback is a plain filesystem walk, never a subprocess. Severity is WARNING-only and never blocks push/CI. DELTA LANES: added-line secrets/privacy scan over the delta — zero credential assignments, zero PEM headers, zero home paths, e-mails, IPs or operator names; `dadaia ci push-gate-check` on the NEW head exit 0; targeted regression (spec_context + hooks + doctor_memory + handoff + chokepoints) 563 passed / 0 failed; `dadaia specs doctor` 0 errors, 3 warnings (the pre-existing SPECS-VERSION and SPEC-DOC-030 plus the newly introduced, by-design MEM-DRIFT-1 WARNING).",
+  "findings": [
+    {
+      "severity": "INFO",
+      "message": "SEC-0.5.1-01 (RESOLVED at head) — deletion-lane symlink guard re-homed in presence.gc",
+      "detail_md": "**Status at head 14388175215c322f1003362462402d53be1b2e32: RESOLVED — retained as the audit trail of the finding and its verification.**\n\n**Description.** Commit af27c9f8 (T-051-07, 'presence owns liveness and GC end-to-end; post-gate reaper deleted') removed hooks/sdd_post_gate.py's guarded reaper together with its guard implementation (_resolved_within(path, dadaia_root), os.walk(..., followlinks=False)) and its two contract tests (tests/unit/hooks/test_post_gate_reap.py::test_lane_guard_never_follows_a_symlinked_directory and ::test_lane_guard_refuses_a_target_resolving_outside_dadaia). The surviving owner, dadaia_workspace/features/spec_context/presence.py:_reap_presence_records (line 409: `sorted(p for p in root.iterdir() if p.is_dir())`, line 434: `entry.unlink(missing_ok=True)`), treats a symlink-to-directory as a presence context dir, descends into it and unlinks the *.json entries it finds; features/spec_context/presence.py:_reap_markers (line 447-465) likewise unlinks by name prefix under .dadaia/tmp/ without resolving. The new test file tests/unit/features/spec_context/test_presence_gc.py has no symlink or boundary-escape coverage (it does retain the traversal-shaped marker-name test). Reproduced deterministically in a scratch tmp tree: with `<ws>/.dadaia/states/presence/linked-ctx -> <ws>/../OUTSIDE-dadaia` and a stale-shaped record inside it, `presence.gc(ws, now=..., own_session_id='me')` returned presence=('linked-ctx/victim',) and the file outside .dadaia/ no longer existed. Trust domain: local only — planting the symlink requires write access under .dadaia/states/presence/ (a MUTATING path any concurrent session can write), so the realistic shape is a confused-deputy amplification where one session's PostToolUse throttle cadence or `dadaia doctor --fix` deletes *.json files outside .dadaia/ on another actor's behalf. No credential, PII or authentication boundary is involved. Pre-existing at develop in the sibling lane (presence.stale_records/sweep iterate `p.is_dir()` identically), so the range widens the unguarded lane's cadence and removes the only guarded implementation rather than introducing a new class.\n\n**Evidence.** presence.py:400-445 (reap lanes); presence.py:447-465 (marker lane); git show origin/develop:tests/unit/hooks/test_post_gate_reap.py:314-380 (the deleted AG.1 contract tests); git diff origin/develop..4ff8dcb2 -- dadaia_workspace/hooks/sdd_post_gate.py (deleted lines 176, 211-225, 268, 326, 344, 375, 405, 438); reproduction script kept out-of-repo under the session scratchpad\n\n**Fix verified.** presence.py:124-134 (`_within_dadaia`), :420-451 (`is_symlink()` skip + per-entry containment re-check), :468-485 (marker lane re-check); regression test tests/unit/features/spec_context/test_presence_gc.py::test_symlinked_context_dir_to_outside_dadaia_never_followed. Original reproduction re-run unchanged against head: the file outside .dadaia/ survives and the presence lane reports nothing, where it previously deleted it. Note for the fixing agent: the same class still exists at develop in presence.stale_records/sweep (`p.is_dir()` without the symlink clause) and is now closed on this branch only — confirm it stays closed after the rc-1 merge.",
+      "fix_recommendation": "None outstanding on this head. Post-merge, re-confirm the guard is the only path both reap lanes take."
+    },
+    {
+      "severity": "INFO",
+      "message": "SEC-0.5.1-02 — Verdict candidate discovery does not refuse a symlinked verdicts/ directory",
+      "detail_md": "**Description.** features/chokepoints/verdict.py:discover_verdict_candidates globs the two committed evidence roots and validates the release-id segment against RELEASE_SEMVER_RE (correctly refusing specs/releases/_ideas/**), but a committed symlink at specs/releases/<id>/verdicts pointing outside the repo would still be traversed by pathlib glob. Not reachable in CI (the runner checks out the PR head, where such a link's target does not exist) and no regression — the retired bash implementation globbed the same way. Recorded as defence-in-depth only.\n\n**Evidence.** dadaia_workspace/features/chokepoints/verdict.py:60-92",
+      "fix_recommendation": "Optional: assert `not path.is_symlink()` and containment under repo_root for each candidate before accepting it."
+    },
+    {
+      "severity": "INFO",
+      "message": "SEC-0.5.1-03 — Privacy-pattern threading defaults to an empty sequence on the BugRecord transitions",
+      "detail_md": "**Description.** core/models/bugs.py's resolve/supersede/defer/reject take `privacy_patterns: Sequence[PatternLike] = ()`, so a caller that forgets to thread the operator baseline performs no privacy check at all (fail-open default). The only production caller is correct today: cli/commands/bugs.py:107 passes container.load_denylist_baseline_patterns() into BugService, and features/bugs/service.py:212 threads self._baseline_patterns through the single `transition` seam for all four methods. Refusal messages carry only the pattern's `reason`, never the offending value (CWE-532 respected).\n\n**Evidence.** dadaia_workspace/core/models/bugs.py:333, 383, 412, 427, 440; dadaia_workspace/features/bugs/service.py:96-110, 195-215; dadaia_workspace/cli/commands/bugs.py:107",
+      "fix_recommendation": "Optional hardening: make privacy_patterns a required keyword so a future second caller cannot silently opt out of the check."
+    },
+    {
+      "severity": "INFO",
+      "message": "SEC-0.5.1-04 — Privacy-shaped test literal is built at runtime; one at-rest literal is pre-existing and out of range",
+      "detail_md": "**Description.** The range's added lines contain exactly one privacy-shaped path, deliberately split so the at-rest scan stays clean: tests/unit/core/models/test_bug_record.py:359 builds it as a runtime concatenation. The range also DELETES an at-rest leak (a home path plus a private IPv4 in the removed tests/unit/features/migrate/test_bugs_jsonl.py fixture) — a net privacy improvement. One at-rest literal at tests/unit/test_backlog_models.py:66 exists unchanged at develop (it is the negative fixture proving an absolute operator path is refused as a code ref) and is therefore outside this diff's scope and already covered by the push-scan amnesty for published prior text.\n\n**Evidence.** git diff origin/develop..4ff8dcb2 added-line scan (11998 lines); `dadaia ci push-gate-check` exit 0 with 'denylist scan mode: operator denylist + baseline'",
+      "fix_recommendation": "No action for this PR. If the operator wants the pre-existing literal gone, route it as its own backlog item, not as rc-1 rework."
+    },
+    {
+      "severity": "INFO",
+      "message": "SEC-0.5.1-05 — security-verdict-gate now installs the package (pip install -e .) from the PR head before running the gate",
+      "detail_md": "**Description.** ci.yml's security-verdict-gate gains a setup-python + `pip install -e .` step so the gate can run `dadaia ci verdict-check` instead of a 336-line bash re-implementation. This executes PR-head packaging metadata inside the gate job. The job keeps workflow-level `permissions: contents: read`, is a `pull_request` (never `pull_request_target`) trigger, holds no secrets, and every other CI job already executes PR-head code, so no new trust boundary is crossed. The replacement is a net security improvement: the sha is shape-checked as 40-hex and the release id against the canon pattern before either reaches a git argv, and the release-id segment check refuses the freely-writable specs/releases/_ideas/ tree as a verdict root.\n\n**Evidence.** .github/workflows/ci.yml:530-552; .github/scripts/pr-verdict-check.sh (336 -> 27 lines); dadaia_workspace/cli/commands/ci.py:315-383",
+      "fix_recommendation": "None. Note for the operator: this gate is advisory on rc-1's own PR (the PR that introduces the job) and must be made required from rc-2 by re-supplying the whole required-status-checks list."
+    }
+  ],
+  "metrics": {
+    "commit_sha": "14388175215c322f1003362462402d53be1b2e32",
+    "reviewed_range": "0f6bb0fd2584f380a74bbc4555f1560fafff6ba9..14388175215c322f1003362462402d53be1b2e32",
+    "reviewed_base_sha": "0f6bb0fd2584f380a74bbc4555f1560fafff6ba9",
+    "push_gate_exit_code": 0,
+    "bug_surface_axis": "reduced",
+    "files_changed": 274,
+    "lines_added": 11998,
+    "lines_removed": 23768,
+    "commits_in_range": 25,
+    "added_lines_scanned": 11998,
+    "secrets_found": 0,
+    "pem_blocks_found": 0,
+    "dependency_files_changed": 0,
+    "cve_findings": 0,
+    "findings_total": 5,
+    "findings_medium": 0,
+    "findings_info": 5,
+    "findings_blocking": 0,
+    "tests_selected_passed": 563,
+    "tests_selected_failed": 0,
+    "specs_doctor_errors": 0,
+    "specs_doctor_warnings": 3,
+    "backlog_doctor_clean": 1,
+    "adrs_proposed": 3,
+    "adrs_accepted": 0,
+    "ledger_records_touched": 12,
+    "ledger_resolved_transitions": 30,
+    "ledger_open_after_range": 11,
+    "re_keyed_from": "4ff8dcb259412df3a4a258cb1071997510b28f12",
+    "delta_range": "4ff8dcb259412df3a4a258cb1071997510b28f12..14388175215c322f1003362462402d53be1b2e32",
+    "delta_commits": 3,
+    "delta_files_changed": 14,
+    "delta_lines_added": 441,
+    "delta_lines_removed": 111,
+    "sec_0_5_1_01_status": "resolved-verified"
+  },
+  "artifact": {
+    "type": "report"
+  },
+  "next_handoff": {
+    "agent": "project-manager",
+    "context": "dadaia-workspace",
+    "expected_artifact_type": "report"
+  }
+}
