@@ -62,6 +62,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
+from dadaia_workspace.core import kernel_tunables
 from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
 from dadaia_workspace.core.record_liveness import is_stale
 from dadaia_workspace.core.release_state import parse_release_state
@@ -302,7 +303,7 @@ def _live_session_context(workspace_root: Path, session_id: str | None) -> str |
         return None
     gc_check: dict[str, object] = {
         "heartbeat": liveness_timestamp(record),
-        "ttl": record.get(SESSION_GC_TTL_FIELD),
+        "ttl": record.get(SESSION_GC_TTL_FIELD, kernel_tunables.SESSION_GC_TTL_SECONDS),
     }
     if is_stale(gc_check):
         return None

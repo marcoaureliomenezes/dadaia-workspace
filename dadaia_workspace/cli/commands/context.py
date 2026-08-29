@@ -23,7 +23,7 @@ from dadaia_workspace.cli._specs_resolution import (
     resolve_context_for_cli as _resolve_context_for_cli,
 )
 from dadaia_workspace.cli.redact import ContextRedactor
-from dadaia_workspace.core import session_store
+from dadaia_workspace.core import kernel_tunables, session_store
 from dadaia_workspace.core.exceptions import (
     ContextAlreadyExistsError,
     ContextNotFoundError,
@@ -152,7 +152,9 @@ def _live_session(workspace_root: Path, session_id: str) -> dict[str, Any] | Non
         return None
     gc_check: dict[str, object] = {
         "heartbeat": session_store.liveness_timestamp(record),
-        "ttl": record.get(session_store.SESSION_GC_TTL_FIELD, 300),
+        "ttl": record.get(
+            session_store.SESSION_GC_TTL_FIELD, kernel_tunables.SESSION_GC_TTL_SECONDS
+        ),
     }
     return None if is_stale(gc_check) else record
 
@@ -713,7 +715,7 @@ def bind(
         "pid": pid,
         "bound_at": now,
         "last_seen_at": now,
-        "ttl_seconds": 300,
+        "ttl_seconds": kernel_tunables.SESSION_GC_TTL_SECONDS,
         "is_stale": False,
     }
 

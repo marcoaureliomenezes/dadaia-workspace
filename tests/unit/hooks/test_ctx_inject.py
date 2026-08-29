@@ -225,7 +225,11 @@ def test_session_record_binds_context_over_first_alive(tmp_path: Path) -> None:
     _add_context(tmp_path, "alpha")  # alpha second; its memory says "Node 20"
     sid = "bound-sid"
     # The hook session id (stdin session_id field) carries its OWN bound record → alpha.
-    session_store.write_session(tmp_path, sid, {"id": sid, "context": "alpha"})
+    session_store.write_session(
+        tmp_path,
+        sid,
+        {"id": sid, "context": "alpha", "bound_at": datetime.now(tz=UTC).isoformat()},
+    )
     out = _run(tmp_path, sid)
     assert "[alpha]" in out
     assert "end memory bootstrap" in out
