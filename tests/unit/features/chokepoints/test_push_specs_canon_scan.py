@@ -18,7 +18,8 @@ from pathlib import Path
 
 from dadaia_workspace.core.protocols.git_object_reader import GitObjectReadError, ScannedObject
 from dadaia_workspace.features.chokepoints import push_gate_decision
-from dadaia_workspace.features.chokepoints.service import PushRef, parse_push_refs
+from dadaia_workspace.features.chokepoints.branch_policy import PushRef, parse_push_refs
+from dadaia_workspace.features.specs.canon import canon_violations, verdict_violations
 
 _SHA_A = "a" * 40
 _SHA_B = "b" * 40
@@ -70,6 +71,8 @@ def test_a_fully_canon_conformant_tree_passes(tmp_path: Path) -> None:
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         object_source=source,
         repo=tmp_path,
+        canon_violations_fn=canon_violations,
+        verdict_violations_fn=verdict_violations,
     )
     assert decision.allowed, decision.message
     assert (_SHA_A, "specs") in source.tree_calls
@@ -83,6 +86,8 @@ def test_a_non_canon_path_refuses_naming_the_fix_hint(tmp_path: Path) -> None:
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         object_source=source,
         repo=tmp_path,
+        canon_violations_fn=canon_violations,
+        verdict_violations_fn=verdict_violations,
     )
     assert not decision.allowed
     assert "specs/backlog/loose-entry.md" in decision.message
@@ -95,6 +100,8 @@ def test_a_stray_dotfile_refuses(tmp_path: Path) -> None:
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         object_source=source,
         repo=tmp_path,
+        canon_violations_fn=canon_violations,
+        verdict_violations_fn=verdict_violations,
     )
     assert not decision.allowed
     assert "specs/.gitkeep" in decision.message
@@ -107,6 +114,8 @@ def test_a_verdict_matching_head_passes(tmp_path: Path) -> None:
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         object_source=source,
         repo=tmp_path,
+        canon_violations_fn=canon_violations,
+        verdict_violations_fn=verdict_violations,
     )
     assert decision.allowed, decision.message
 
@@ -121,6 +130,8 @@ def test_a_verdict_matching_first_parent_passes(tmp_path: Path) -> None:
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         object_source=source,
         repo=tmp_path,
+        canon_violations_fn=canon_violations,
+        verdict_violations_fn=verdict_violations,
     )
     assert decision.allowed, decision.message
     assert _SHA_A in source.parent_calls
@@ -137,6 +148,8 @@ def test_a_stale_verdict_refuses(tmp_path: Path) -> None:
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         object_source=source,
         repo=tmp_path,
+        canon_violations_fn=canon_violations,
+        verdict_violations_fn=verdict_violations,
     )
     assert not decision.allowed
     assert verdict_path in decision.message
@@ -148,6 +161,8 @@ def test_a_deletion_ref_is_never_scanned(tmp_path: Path) -> None:
         _refs(f"refs/heads/feature/0.0.1 {_ZERO} refs/heads/feature/0.0.1 {_SHA_A}"),
         object_source=source,
         repo=tmp_path,
+        canon_violations_fn=canon_violations,
+        verdict_violations_fn=verdict_violations,
     )
     assert decision.allowed, decision.message
     assert source.tree_calls == []
@@ -159,6 +174,8 @@ def test_a_tag_push_is_scanned_too(tmp_path: Path) -> None:
         _refs(f"refs/tags/v9.9.9 {_SHA_A} refs/tags/v9.9.9 {_ZERO}"),
         object_source=source,
         repo=tmp_path,
+        canon_violations_fn=canon_violations,
+        verdict_violations_fn=verdict_violations,
     )
     assert not decision.allowed
     assert "specs/backlog/loose.md" in decision.message
@@ -169,6 +186,8 @@ def test_a_git_read_failure_on_list_tree_paths_refuses_fail_closed(tmp_path: Pat
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         object_source=_FailingTreeObjectSource(),
         repo=tmp_path,
+        canon_violations_fn=canon_violations,
+        verdict_violations_fn=verdict_violations,
     )
     assert not decision.allowed
     assert "reading the pushed specs/ tree failed" in decision.message
@@ -182,6 +201,8 @@ def test_canon_scan_runs_before_the_denylist_scan(tmp_path: Path) -> None:
         _refs(f"refs/heads/feature/0.0.1 {_SHA_A} refs/heads/feature/0.0.1 {_ZERO}"),
         object_source=source,
         repo=tmp_path,
+        canon_violations_fn=canon_violations,
+        verdict_violations_fn=verdict_violations,
         denylist_terms=(),
     )
     assert not decision.allowed

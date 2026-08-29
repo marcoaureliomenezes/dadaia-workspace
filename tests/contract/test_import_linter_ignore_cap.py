@@ -112,15 +112,34 @@ _SETUP_CFG = _REPO_ROOT / "setup.cfg"
 # documented `ignore_imports` edge with its own reason comment (collapsing them is a
 # `reconcile` feature rewrite, routed to intake — not attempted here). Cap raised
 # 14 -> 17 (+3 features-no-cross-feature) in the same commit as `setup.cfg`.
-_RECORDED_IGNORE_EDGE_CAP = 18
+#
+# v0.5.1 K7 NOTE ("split chokepoints.service into its four modules; one verdict
+# store"): three `chokepoints.service ->` edges REMOVED. `-> infrastructure.
+# jsonl_log_rotation` (features-no-infrastructure): the push-verdict GC lane it served
+# (`gc_consumed_push_verdicts`, `dadaia ci gc-push-verdicts`) is deleted outright — it
+# read a `.dadaia/handoff/` store no verdict reader consults any more (the committed
+# `specs/releases/**/verdicts/` tree is the ONE verdict store,
+# `features.chokepoints.verdict.covering_verdict`). `-> spec_context.presence` and
+# `-> specs.canon` (both features-no-cross-feature): the split `pre_commit.py`/
+# `push_gate.py` modules now receive `others_alive`/`canon_violations_fn`/
+# `verdict_violations_fn` as INJECTED callables instead of importing them at module
+# scope — the CLI composition root wires the real functions straight through, no
+# adapter needed (mirroring `push_gate_decision`'s pre-existing `object_source`
+# injection, FR7/A7.2). Cap lowered 18 -> 15 (-1 features-no-infrastructure, -2
+# features-no-cross-feature) in the same commit as `setup.cfg`. A fourth edge,
+# `cli.commands.ci -> infrastructure.process_probe_adapter` (cli-no-infrastructure),
+# is ALSO removed in the same K7 commit: `pre_commit_check` no longer wires a
+# pid-liveness probe (the dead params it served are deleted). Cap lowered 15 -> 14
+# (-1 cli-no-infrastructure).
+_RECORDED_IGNORE_EDGE_CAP = 14
 
-# Per-family recorded breakdown, pinned per contract section so a wrong 13-edge cross-feature
-# set (or a silent shift between families) fails loudly, not just the grand total.
+# Per-family recorded breakdown, pinned per contract section so a wrong edge-count set
+# (or a silent shift between families) fails loudly, not just the grand total.
 _RECORDED_PER_FAMILY_CAP: dict[str, int] = {
-    "features-no-infrastructure": 7,
+    "features-no-infrastructure": 6,
     "features-no-subprocess": 3,
-    "features-no-cross-feature": 6,
-    "cli-no-infrastructure": 2,
+    "features-no-cross-feature": 4,
+    "cli-no-infrastructure": 1,
 }
 
 # A18.1 (V13): the total count of `[importlinter:contract:*]` sections in setup.cfg,

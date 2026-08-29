@@ -2,52 +2,61 @@
 
 The SDD gate (``hooks/sdd_gate``) fires for *file-write tools* inside a harness that
 supports PreToolUse hooks. Chokepoints provide a separate boundary for any invocation
-where hooks are absent, disabled, bypassed, or changed by a future harness release:
+where hooks are absent, disabled, bypassed, or changed by a future harness release.
 
-* **pre-commit presence check** (:func:`pre_commit_decision`) — warns when another live
-  session is present and always allows the commit on concurrency grounds.
-* **push-gate branch + denylist check** (:func:`push_gate_decision`, v0.4.4 FR3 — the
-  gitflow v2 inversion / v0.9.0 FR1-FR6) — a push is blocked unless it is a
-  ``feature/{M.m.p}`` branch pushed to its own name (``develop``/``main`` advance by PR
-  only), AND the range-scoped denylist scan (v0.9.0) finds no new object carrying a
-  denylisted term across every non-deletion ref (tags included). The former
-  security-reviewer-verdict check is DELETED from this path (v0.4.4 A3.4) — it
-  relocates to a PR gate (FR4).
-* **push-verdict GC** (:func:`gc_consumed_push_verdicts`, FR24 / v0.4.3 T-043-39 /
-  v0.4.4 D5) — the POST-merge half of the verdict lifecycle: once a caller has
-  independently confirmed a PR merge actually landed (never inside
-  ``push_gate_decision`` itself — see that function's neighboring module docstring),
-  the APPROVED verdict(s) it consumed are deleted, with an append-only audit-ledger
-  line recorded first (A24.4) and the AG.1 symlink/boundary lane guard applied to
-  every deletion.
+v0.5.1 K7 ("split chokepoints.service into its four modules; one verdict store") split
+the former single ``service.py`` (~1,042 LOC gluing four concerns) into:
 
-All three are pure decision/action functions: every I/O and process seam is injected, so
-the CLI wires the real container adapters and the tests drive synthetic facts. Zero
-subprocess, zero ``os.kill`` — the ancestry probe is the injected read-only
-``ProcessAncestry`` port, and the push-gate's git object reads arrive via the injected
-:class:`~dadaia_workspace.core.protocols.git_object_reader.GitObjectReader` port.
+* :mod:`~dadaia_workspace.features.chokepoints.branch_policy` — the gitflow v2 branch
+  contract, :class:`Decision` (shared outcome shape) and :class:`PushRef`.
+* :mod:`~dadaia_workspace.features.chokepoints.pre_commit` — the NO-LOCKS presence
+  advisory (:func:`pre_commit_decision`).
+* :mod:`~dadaia_workspace.features.chokepoints.push_gate` — branch policy + specs-canon
+  scan + range-scoped denylist scan (:func:`push_gate_decision`).
+* :mod:`~dadaia_workspace.features.chokepoints.verdict` — the ONE verdict store
+  (:func:`covering_verdict`), reading the COMMITTED ``specs/releases/**/verdicts/``
+  evidence — never ``.dadaia/handoff/``, which is no longer a verdict source at all.
+
+The former push-verdict GC lifecycle (``iter_security_approvals``,
+``gc_consumed_push_verdicts``, ``dadaia ci gc-push-verdicts``) is DELETED outright: it
+served the ``.dadaia/handoff/`` store, which no verdict reader consults any more.
+
+All decision/action functions are pure: every I/O and process seam is injected, so the
+CLI wires the real container adapters and the tests drive synthetic facts. Zero
+subprocess, zero ``os.kill`` — the push-gate's git object reads arrive via the injected
+:class:`~dadaia_workspace.core.protocols.git_object_reader.GitObjectReader` port, the
+pre-commit presence read arrives via the injected ``others_alive`` callable, and the
+push-gate's specs-canon predicates arrive via the injected
+``canon_violations_fn``/``verdict_violations_fn`` callables — none of which this
+package imports at module scope any more (v0.5.1 K7 drops the
+``chokepoints -> spec_context.presence`` and ``chokepoints -> specs.canon``
+import-linter suppressions entirely, alongside ``chokepoints ->
+infrastructure.jsonl_log_rotation``, deleted with the GC lane).
 """
 
 from __future__ import annotations
 
-from dadaia_workspace.features.chokepoints.service import (
+from dadaia_workspace.features.chokepoints.branch_policy import (
     Decision,
-    GcOutcome,
     PushRef,
+    branch_name_is_permitted,
     context_slug_for_path,
-    gc_consumed_push_verdicts,
-    iter_security_approvals,
-    pre_commit_decision,
-    push_gate_decision,
+    parse_push_refs,
+    parse_push_stdin,
 )
+from dadaia_workspace.features.chokepoints.pre_commit import pre_commit_decision
+from dadaia_workspace.features.chokepoints.push_gate import push_gate_decision
+from dadaia_workspace.features.chokepoints.verdict import Verdict, covering_verdict
 
 __all__ = [
     "Decision",
-    "GcOutcome",
     "PushRef",
+    "Verdict",
+    "branch_name_is_permitted",
     "context_slug_for_path",
-    "gc_consumed_push_verdicts",
-    "iter_security_approvals",
+    "covering_verdict",
+    "parse_push_refs",
+    "parse_push_stdin",
     "pre_commit_decision",
     "push_gate_decision",
 ]

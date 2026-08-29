@@ -109,7 +109,7 @@
   - preconditions: T-051-06 `[x]` (needs `Invocation`'s sid)
   - parallelism: parallel with T-051-08, T-051-09 — disjoint write sets
 
-- [ ] **T-051-08** — K7: split `chokepoints.service`; one verdict store · owner: software-engineer · write set: `dadaia_workspace/features/chokepoints/{branch_policy,pre_commit,push_gate,verdict}.py` (new), `dadaia_workspace/features/chokepoints/service.py` (deleted), `dadaia_workspace/features/specs/doctor_release.py`, `dadaia_workspace/cli/commands/ci.py`, `.github/scripts/pr-verdict-check.sh`, `setup.cfg`, `tests/contract/test_import_linter_ignore_cap.py`, the chokepoints test files · acceptance: A-7.1 … A-7.4, A-0.3
+- [x] **T-051-08** — K7: split `chokepoints.service`; one verdict store · owner: software-engineer · write set: `dadaia_workspace/features/chokepoints/{branch_policy,pre_commit,push_gate,verdict}.py` (new), `dadaia_workspace/features/chokepoints/service.py` (deleted), `dadaia_workspace/features/specs/doctor_release.py`, `dadaia_workspace/cli/commands/ci.py`, `.github/scripts/pr-verdict-check.sh`, `setup.cfg`, `tests/contract/test_import_linter_ignore_cap.py`, the chokepoints test files · acceptance: A-7.1 … A-7.4, A-0.3
   - deletes: `iter_security_approvals` · `gc_consumed_push_verdicts` (hand-reachable only) · `LEDGER_RELPATH` · `_Approval` · `GcOutcome` · the `gc-push-verdicts` CLI verb · legacy `caller_pid`/`pid_probe`/`ancestry` params · the second `_PathMasker` predicate · 2–3 import-linter suppressions — ~300 LOC; cap **18 → 15** in the same commit
   - tests: one test per new module + one `covering_verdict(paths, head_sha)` table test
   - preconditions: T-051-06 `[x]`
