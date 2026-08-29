@@ -83,9 +83,10 @@ else
 fi
 
 rm -rf "$STAGE_ABS"
-mkdir -p "$STAGE_ABS/dadaia_workspace/core" "$STAGE_ABS/tests/unit/core"
-cp -r "$REPO/dadaia_workspace/core/models" "$STAGE_ABS/dadaia_workspace/core/models"
-cp -r "$REPO/tests/unit/core/models"       "$STAGE_ABS/tests/unit/core/models"
+mkdir -p "$STAGE_ABS/dadaia_workspace/core" "$STAGE_ABS/dadaia_workspace/public" "$STAGE_ABS/tests/unit/core"
+cp -r "$REPO/dadaia_workspace/core/models"    "$STAGE_ABS/dadaia_workspace/core/models"
+cp -r "$REPO/dadaia_workspace/public/schemas" "$STAGE_ABS/dadaia_workspace/public/schemas"
+cp -r "$REPO/tests/unit/core/models"          "$STAGE_ABS/tests/unit/core/models"
 touch "$STAGE_ABS/dadaia_workspace/__init__.py" "$STAGE_ABS/dadaia_workspace/core/__init__.py" \
       "$STAGE_ABS/tests/__init__.py" "$STAGE_ABS/tests/unit/__init__.py" \
       "$STAGE_ABS/tests/unit/core/__init__.py"
@@ -110,8 +111,11 @@ cd "$STAGE_ABS"
 .mutmut-venv/bin/python --version
 # mutmut + pytest (the tool). `dadaia_workspace/core/models/` + `tests/unit/core/
 # models/` import nothing beyond stdlib + pytest (verified: no third-party top-level
-# import across either tree) and nothing outside `core/` (constitution layering) —
-# this staged subset needs no more than the tool itself.
+# import across either tree) — this staged subset needs no more than the tool itself.
+# The tests also do plain file I/O against the packaged `public/schemas/` fixture
+# directory (tests are exempt from the `core` file-I/O purity ratchet; `core/models/`
+# itself never does), which is why it is staged alongside `core/models/` above — one
+# rule, not a per-fixture hand-kept list.
 .mutmut-venv/bin/pip install --quiet mutmut==3.7.0 pytest
 .mutmut-venv/bin/mutmut run
 .mutmut-venv/bin/mutmut export-cicd-stats

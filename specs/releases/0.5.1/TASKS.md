@@ -181,12 +181,12 @@
   - preconditions: T-051-14 `[x]`
   - parallelism: parallel with T-051-15, 16, 18, 19
 
-- [ ] **T-051-18** — bug: mutation baseline `core/models` scope omits the public-schemas fixture directory · owner: software-engineer · write set: `tests/scripts/run_mutation_baseline.sh`, the mutation-baseline config/fixture paths, `specs/bugs/BUGS.jsonl` · acceptance: A-12.1, A-12.2 — RED reproduction first, `resolved` with red-loop command, regression seam and diff direction
+- [x] **T-051-18** — bug: mutation baseline `core/models` scope omits the public-schemas fixture directory · owner: software-engineer · write set: `tests/scripts/run_mutation_baseline.sh`, the mutation-baseline config/fixture paths, `specs/bugs/BUGS.jsonl` · acceptance: A-12.1, A-12.2 — RED reproduction first, `resolved` with red-loop command, regression seam and diff direction
   - deletes: the scope duplication that caused the omission — the scope list has one home after the fix
   - preconditions: T-051-14 `[x]`
   - parallelism: parallel with T-051-15, 16, 17, 19
 
-- [ ] **T-051-19** — bug: secret-scan workflow never runs on develop PRs, so its required context blocks every merge · owner: software-engineer · write set: `.github/workflows/*.yml`, `specs/bugs/BUGS.jsonl` · acceptance: A-12.1, A-12.2 — the required context is produced on a `develop`-targeted PR, evidenced by a real run
+- [x] **T-051-19** — bug: secret-scan workflow never runs on develop PRs, so its required context blocks every merge · owner: software-engineer · write set: `.github/workflows/*.yml`, `specs/bugs/BUGS.jsonl` · acceptance: A-12.1, A-12.2 — the required context is produced on a `develop`-targeted PR, evidenced by a real run
   - deletes: the trigger duplication; one trigger definition covers both edges after the fix
   - preconditions: T-051-14 `[x]`
   - parallelism: parallel with T-051-15, 16, 17, 18
