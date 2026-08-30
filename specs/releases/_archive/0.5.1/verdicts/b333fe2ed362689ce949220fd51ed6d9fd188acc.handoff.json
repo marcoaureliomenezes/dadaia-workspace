@@ -60,7 +60,7 @@
     }
   ],
   "metrics": {
-    "commit_sha": "de1ede9c37b4921da080f259d101efacbef93d1e",
+    "commit_sha": "b333fe2ed362689ce949220fd51ed6d9fd188acc",
     "reviewed_branch": "feature/0.5.2",
     "review_mode": "diff-based",
     "diff_range": "8c4459d6..e37c066a",
