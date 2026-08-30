@@ -27,7 +27,7 @@ from typing import Any
 
 import pytest
 
-from dadaia_workspace.core.protocols.git_object_reader import ScannedObject
+from dadaia_workspace.core.models.git_scan import ScannedObject
 from dadaia_workspace.features.chokepoints import Decision, push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import PushRef, parse_push_refs
 from dadaia_workspace.features.specs.canon import canon_violations, verdict_violations

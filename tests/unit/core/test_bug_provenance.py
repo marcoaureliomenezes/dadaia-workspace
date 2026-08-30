@@ -25,7 +25,7 @@ from dadaia_workspace.core.bug_provenance import (
     LedgerLineKind,
     derive_commit_provenance,
 )
-from dadaia_workspace.core.protocols.git_history_reader import HistoryCommit
+from dadaia_workspace.core.models.git_history import HistoryCommit
 
 
 def _classify(line: str) -> ClassifiedLedgerLine | None:

@@ -9,14 +9,14 @@ tags: [architecture, layers, dependency-rules, agents, sdd]
 
 ## Part 1 — Principles
 
-### P-01 · We keep features on ports: a feature never imports `infrastructure` directly; the container injects the adapter.
-Measured by: `lint-imports --config setup.cfg --no-cache` — contract `features-no-infrastructure`.
-ADR: none
-Rationale: an adapter reached directly cannot be substituted or faked.
+### P-01 · We keep the dependency ring: core imports nothing internal, infrastructure imports only core, no layer imports upward; a feature imports the concrete infrastructure class it alone consumes.
+Measured by: `lint-imports --config setup.cfg --no-cache` — contracts `core-no-upper-layers` and `infrastructure-no-upper-layers` (zero ignored imports).
+ADR: 0001 (accepted)
+Rationale: the ledger shows zero adapter substitutions ever fixed a bug; the port requirement only grew the container funnel.
 
-### P-02 · We never spawn a subprocess from a feature; process execution goes through `ProcessRunner`.
-Measured by: `lint-imports --config setup.cfg --no-cache` — contract `features-no-subprocess`.
-ADR: none
+### P-02 · We never spawn a subprocess from a feature; process execution goes through the one infrastructure adapter, `infrastructure/subprocess_runner.py`.
+Measured by: `lint-imports --config setup.cfg --no-cache` — contract `features-no-subprocess` (direct imports only, zero ignored edges).
+ADR: 0001 (accepted)
 Rationale: one process seam keeps execution observable, fakeable and bounded.
 
 ### P-03 · We keep `core` free of OS primitives (`fcntl`, `signal`, `subprocess`, `msvcrt`); `core/platform.py` is the sole platform seam.
@@ -44,14 +44,14 @@ Measured by: `lint-imports --config setup.cfg --no-cache` — contract `features
 ADR: none
 Rationale: a hand-kept `modules =` list hid three real sibling edges from the check.
 
-### P-08 · We compose the CLI through the container: a verb never imports an infrastructure adapter directly.
-Measured by: `lint-imports --config setup.cfg --no-cache` — contract `cli-no-infrastructure`.
-ADR: none
-Rationale: a verb that builds its own adapter is a second composition root.
+### P-08 · We keep a Protocol in `core/protocols` only where two production adapters exist; `container.py` composes platform seams and shared collaborators, nothing single-consumer.
+Measured by: `pytest tests/contract/test_protocols_have_two_adapters.py`.
+ADR: 0001 (accepted)
+Rationale: a Protocol with one implementer is interface text that hides a direct dependency.
 
-### P-09 · We resolve a Spec Context in exactly one place, `core.specs_resolver.resolve_context`, imported directly only by `cli._specs_resolution`, `container` and `hooks`.
-Measured by: `lint-imports --config setup.cfg --no-cache` — contract `bind-resolution-seam-is-a-single-home` (zero ignored imports, none ever accepted).
-ADR: none
+### P-09 · We resolve the whole Invocation — workspace root, session, context, specs dir, mode, release, phase — once per process in `core.invocation.resolve`, imported directly only by `cli._specs_resolution`, `container` and `hooks`.
+Measured by: `lint-imports --config setup.cfg --no-cache` — contract `bind-resolution-seam-is-a-single-home` (zero ignored imports, none ever accepted); `pytest tests/unit/core/test_invocation.py`.
+ADR: 0003 (accepted)
 Rationale: every context bug came from a second resolution path answering differently.
 
 ### P-10 · We cap every suppressed layering edge and ratchet the cap only downward; an edge is added with its reason and the cap moved in the same commit.
@@ -74,14 +74,14 @@ Measured by: `dadaia specs doctor` — rule `MEM-DRIFT-1` (`features/specs/docto
 ADR: none
 Rationale: a diagram nobody checks is the first artifact to lie.
 
-### P-14 · We keep the release-event fold read-only: `core/release_events.py` contains no write call and no file I/O at all.
-Measured by: `pytest tests/contract/test_release_events_read_only.py`.
-ADR: none
+### P-14 · We keep the release-state reader pure: `core/release_state.py` parses and serializes already-read text and performs no file I/O.
+Measured by: `pytest tests/contract/test_release_state_read_only.py`.
+ADR: 0004 (proposed)
 Rationale: a reader that can write is a reader that can rewrite history.
 
-### P-15 · We close the release-record envelope: exactly seven event kinds, `additionalProperties: false`, and no harness `session_id` in a governance record.
-Measured by: `pytest tests/contract/test_release_event_schema.py`.
-ADR: none
+### P-15 · We close the release-state envelope: `release-state-v1` carries `additionalProperties: false` at every level, a closed log-entry shape, and no harness `session_id`.
+Measured by: `pytest tests/contract/test_release_state_schema.py`.
+ADR: 0004 (proposed)
 Rationale: an open envelope accumulates fields until no consumer can fold it.
 
 ### P-16 · We store no provenance a resolver cannot re-derive: a stored `resolved_commit` equals the value derived from git history.
@@ -106,13 +106,15 @@ Rationale: law that no asset owns is law nobody applies.
 | what a `specs/` tree may contain | `features/specs/canon.py`'s `CANON` table — scaffold renders it, doctor checks it |
 | whether a projection is current | `infrastructure/projection.py`'s `ProjectionRule` plus `projection_rules()`; install writes and doctor compares the same table |
 | which harness a projection targets | `HarnessProjection` in `infrastructure/projection_rules.py`, with three production adapters — Claude Code, Codex, Kimi Code |
-| a bug record's status | `core/models/bugs.py` transition methods; `RecordStore.scan()` is the one ledger parser, yielding `MalformedLine` for a bad row |
+| a bug record's status | `core/models/bugs.py` transition methods; `infrastructure/jsonl_record_store.py::JsonlRecordStore.scan()` is the one ledger parser, yielding `MalformedLine` for a bad row |
 | a handoff's version, artifact and validity | `core/handoff_index.py` — `HandoffIndex`/`Handoff`, the stdlib schema walker internal to it |
 | the git publication boundary | `features/chokepoints/{branch_policy,pre_commit,push_gate,verdict}.py`; `covering_verdict()` is the single verdict reader |
 | the telemetry database connection | `features/telemetry/store.py`'s `TelemetryStore`, owning open/migrate/`integrity_check`/`quarantine` |
 | a YAML frontmatter block | `core/frontmatter.py` |
 
-- `container.py` is composition wiring only; `build_telemetry_service` and `build_panel_views` are its panel-side entry points.
+- `container.py` is composition wiring only; `build_telemetry_service` and `build_panel_views` are its panel-side entry points; a single-consumer adapter is imported directly by its feature and never passes through it (ADR 0001).
+- `core/protocols/` holds seven Protocols: four two-adapter OS seams (`FilePermissionSetter`, `ProcessAncestry`, `ShutdownHandler`, `TelemetryRefreshLock`) and three panel cross-feature seams whose implementer lives under `features/` (`AgentsProvider`, `ContextProjectProvider`, `ServerRegistryProvider`); every other adapter is imported by its one consumer.
+- `setup.cfg` carries seven import-linter contracts; `features-no-infrastructure` and `cli-no-infrastructure` were deleted by ADR 0001, `features-no-subprocess` is direct-imports-only with no suppressed edge, and the four surviving suppressed edges all sit under `features-no-cross-feature`.
 - `features/migrate` stamps `specs_pattern_version: 6` or refuses, instructing a tree below v6 to upgrade to 0.4.x first — no in-wheel pre-v6 lineage.
 - Hooks import `core.invocation` directly and build the `Invocation` once per process; they never import `container` (P-12).
 
@@ -133,7 +135,7 @@ classDiagram
     SpecsDoctor --> ClosureAuditValidator : owns ORDER
     SpecsDoctor --> GovernanceValidator : owns ORDER
     SpecsDoctor --> CoherenceValidator : owns ORDER
-    note for MemoryValidator "receives a ProcessRunner port; owns CAT-1, LINT-1 and MEM-DRIFT-1"
+    note for MemoryValidator "takes the specs dir; runs the memory lint in-process; owns CAT-1, LINT-1 and MEM-DRIFT-1"
     note for GovernanceValidator "sole features.backlog.document import; reads BUGS.jsonl only through the injected bug store"
     note for SpecsDoctor "takes bug_store_factory; imports neither spec_context nor infrastructure"
 ```

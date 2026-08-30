@@ -316,20 +316,25 @@ def test_active_entry_not_an_object_yields_located_error_and_continues(
     assert "fine-item" in slugs
 
 
-# ── A1.6 — the module imports nothing from cli, infrastructure or hooks ─────────────
+# ── A1.6 — the module imports nothing from cli or hooks ─────────────────────────────
+#
+# The former third leg ("...or infrastructure") is RETIRED by ADR-0001 (accepted):
+# the features-no-infrastructure import-linter contract this per-module substring
+# check hand-duplicated is deleted from setup.cfg — this module now legitimately
+# imports its sole concrete infrastructure adapter directly
+# (infrastructure.jsonl_record_store.JsonlRecordStore, backlog_exit's histo_store
+# type). cli/hooks independence is untouched by that ADR and still has no global
+# import-linter contract behind it, so this narrowed probe stays the one thing that
+# catches a features -> cli/hooks edge here.
 
 
-def test_module_imports_nothing_from_cli_infrastructure_or_hooks() -> None:
+def test_module_imports_nothing_from_cli_or_hooks() -> None:
     import inspect
 
     import dadaia_workspace.features.backlog.document as document_module
 
     source = inspect.getsource(document_module)
-    for forbidden in (
-        "dadaia_workspace.cli",
-        "dadaia_workspace.infrastructure",
-        "dadaia_workspace.hooks",
-    ):
+    for forbidden in ("dadaia_workspace.cli", "dadaia_workspace.hooks"):
         assert forbidden not in source, f"document.py must not import {forbidden}"
 
 

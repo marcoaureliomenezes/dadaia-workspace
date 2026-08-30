@@ -20,7 +20,6 @@ from pathlib import Path
 
 import typer
 
-from dadaia_workspace import container
 from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
 from dadaia_workspace.core.atomic_write import ConcurrentModificationError
 from dadaia_workspace.core.models.backlog import SubjectKind
@@ -40,9 +39,10 @@ def _resolve_backlog_roots(
     ``.dadaia/states/backlog_subject_aliases.txt`` resolved up from ``specs_dir``.
 
     No longer returns an ``archive_root`` (v0.5.0 T-050-13A): the doctor's BL-STALE
-    condition (a) reads the relocated ``consumed_backlog_histo.jsonl`` store via
-    ``container.build_consumed_backlog_histo_store``, wired at the call site below —
-    the pre-relocation directory-glob root has no reader left to inject it into.
+    condition (a) reads the relocated ``consumed_backlog_histo.jsonl`` store through a
+    ``JsonlRecordStore`` this module builds directly (ADR-0001: single consumer, no
+    container seam), wired at the call site below — the pre-relocation directory-glob
+    root has no reader left to inject it into.
     """
     src = Path(source_root).resolve() if source_root else specs_dir.parent.resolve()
     catalog_path = specs_dir / "memory" / "product" / "catalog.json"
@@ -259,7 +259,9 @@ def backlog_doctor_cmd(
     each item's subjects resolved.
     """
     from dadaia_workspace.cli.anchors import derive_cli_anchors
+    from dadaia_workspace.core.models.backlog import BacklogHistoRecord, ConsumedBacklogHistoRecord
     from dadaia_workspace.features.backlog.doctor import Severity, run_backlog_doctor
+    from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
 
     target = _resolve_specs_dir(specs_dir)
     if not target.is_dir():
@@ -270,17 +272,25 @@ def backlog_doctor_cmd(
     if explain:
         _explain_backlog(target, src, catalog_path, alias_map_path)
 
+    # ADR-0001: both stores had exactly one production consumer (this command) — the
+    # single consumer builds each JsonlRecordStore directly instead of a container
+    # seam, so BL-STALE's histo conditions stay live from the real CLI callsite.
     findings = run_backlog_doctor(
         specs_dir=target,
         source_root=src,
         catalog_path=catalog_path,
         alias_map_path=alias_map_path,
         cli_anchors=derive_cli_anchors(),
-        # v0.5.0 T-050-13's documented residual, closed by T-050-13A: both generic
-        # backlog-histo stores are wired through the container so BL-STALE's histo
-        # conditions are live from the real CLI callsite, not a permanent no-op.
-        histo_store=container.build_backlog_histo_store(target),
-        consumed_histo_store=container.build_consumed_backlog_histo_store(target),
+        histo_store=JsonlRecordStore(
+            target / "backlog" / "_archive" / "backlog_histo.jsonl",
+            to_dict=BacklogHistoRecord.to_dict,
+            from_dict=BacklogHistoRecord.from_dict,
+        ),
+        consumed_histo_store=JsonlRecordStore(
+            target / "backlog" / "_archive" / "consumed_backlog_histo.jsonl",
+            to_dict=ConsumedBacklogHistoRecord.to_dict,
+            from_dict=ConsumedBacklogHistoRecord.from_dict,
+        ),
     )
 
     errors = [f for f in findings if f.severity is Severity.ERROR]

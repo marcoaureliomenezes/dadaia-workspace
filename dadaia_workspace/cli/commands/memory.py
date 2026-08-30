@@ -40,6 +40,17 @@ def product_add(
         ...,
         help="Feature slug in lowercase kebab-case: start with a letter, then a-z0-9 or hyphens (e.g. payments).",
     ),
+    area: str = typer.Option(
+        ...,
+        "--area",
+        help=(
+            "Canon area directory (e.g. platform): lowercase letters/digits/"
+            "hyphens/underscores, starting with a letter. The written path is "
+            "memory/product/<area>/<slug>.md — the ONE decider "
+            "(features.specs.canon.is_canon_path) also used by doctor/the "
+            "pre-push gate; a value that fails it is refused."
+        ),
+    ),
     specs_dir: str | None = typer.Option(
         None,
         "--specs-dir",
@@ -54,8 +65,8 @@ def product_add(
     """Create a product feature Markdown atom.
 
     \b
-    1. Creates specs/memory/product/<slug>.md from the born-markdown scaffold template
-       (skipped if the file already exists).
+    1. Creates specs/memory/product/<area>/<slug>.md from the born-markdown scaffold
+       template (skipped if the file already exists).
     2. To regenerate the product catalog JSON, run: dadaia memory catalog generate
     """
     target = _resolve_specs_dir(specs_dir)
@@ -68,6 +79,7 @@ def product_add(
         result = memory_product_add(
             target,
             slug,
+            area=area,
             project_name=project_name,
         )
     except ValueError as exc:

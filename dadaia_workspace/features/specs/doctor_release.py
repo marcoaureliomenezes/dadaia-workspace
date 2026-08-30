@@ -18,6 +18,7 @@ active release", the same as the old scaffold default did.
 from __future__ import annotations
 
 import re
+import tomllib
 from datetime import date
 from pathlib import Path
 
@@ -665,3 +666,30 @@ class ReleaseValidator:
         assert issue.code == "SPEC-DOC-044"
         target = Path(issue.path)  # type: ignore[arg-type]
         target.unlink(missing_ok=True)
+
+    def check_pyproject_version_matches_release(
+        self, repo_root: Path | None
+    ) -> list[SpecsDoctorIssue]:
+        """SPEC-DOC-045 (bug release-shipped-without-a-pyproject-version-bump):
+        pyproject.toml's [tool.poetry].version must equal the release id once the
+        active release reaches CLOSURE/ARCHIVED — read directly off disk, never
+        installed-package metadata. Silent absent repo_root/pyproject.toml/release.
+        """
+        if repo_root is None or not (pyproject_path := repo_root / "pyproject.toml").is_file():
+            return []
+        release, _segment, phase, err = resolve_active_release(self.specs_dir)
+        if err or not release or release == "none" or phase not in {"CLOSURE", "ARCHIVED"}:
+            return []
+        try:
+            data = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
+        except (tomllib.TOMLDecodeError, OSError):
+            return []
+        version = data.get("tool", {}).get("poetry", {}).get("version", "")
+        if not version or version == release:
+            return []
+        description = (
+            f"Active release '{release}' is phase '{phase}' but pyproject.toml mints "
+            f"'{version}' — bump [tool.poetry].version to the release id (SPEC-DOC-045)."
+        )
+        issue = SpecsDoctorIssue("SPEC-DOC-045", Severity.ERROR, description, str(pyproject_path))
+        return [issue]

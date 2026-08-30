@@ -118,7 +118,7 @@ def test_backup_label_location_copy_and_doctor_visibility(tmp_path: Path) -> Non
     version_warns = [i for i in below if i.code == "SPECS-VERSION"]
     assert len(version_warns) == 1
     assert version_warns[0].severity == Severity.WARNING
-    assert "dadaia specs upgrade" in version_warns[0].description
+    assert "re-stamp constitution.md" in version_warns[0].description
 
     canonical_specs = tmp_path / "specs_canonical"
     stamp = _version.CANONICAL_SPECS_VERSION

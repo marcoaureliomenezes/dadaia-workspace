@@ -113,23 +113,3 @@ def test_lint1_empty_memory_dir_is_a_noop(tmp_path: Path) -> None:
     issues = MemoryValidator(specs).check_lint1_memory_atoms()
 
     assert issues == []
-
-
-def test_lint1_process_runner_constructor_arg_is_accepted_but_unused(tmp_path: Path) -> None:
-    """v0.4.3 T-043-20/FR16: the constructor still accepts ``process_runner`` (kept for
-    SpecsDoctor.__init__'s call-site compatibility), but LINT-1 no longer touches it —
-    passing a runner that would explode if ever called proves it is never invoked."""
-
-    class _ExplodingRunner:
-        def run(self, argv: object, **kwargs: object) -> object:
-            raise AssertionError("LINT-1 must never invoke a ProcessRunner (A16.1)")
-
-    specs = _make_specs_with_memory(tmp_path)
-    (specs / "memory" / "architecture.md").write_text(
-        _VALID_FRONTMATTER.format(slug="architecture") + "\n## Purpose\n\nclean\n",
-        encoding="utf-8",
-    )
-
-    issues = MemoryValidator(specs, process_runner=_ExplodingRunner()).check_lint1_memory_atoms()  # type: ignore[arg-type]
-
-    assert issues == []

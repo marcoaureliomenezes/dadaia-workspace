@@ -25,6 +25,7 @@ tags: [context, lifecycle, session, no-locks, privacy]
 - The workspace root is walked from an explicit `target_path` when one is given and only from the cwd otherwise, so every rung in a call shares one root.
 - Rungs 0 and 3 resolve a slug and recover the context name through the registry, falling back to the slug when unregistered.
 - Every rung fails soft, and when all are exhausted `resolve_specs_dir` raises rather than guessing.
+- One harness session runs per checked-out tree; a parallel session gets its own linked worktree before launch (ADR 0002, `DADAIA.md` §3.3).
 - `core.session_store` is the sole reader, writer and toucher of `.dadaia/sessions/`; `core.record_liveness.is_stale` is the one staleness predicate.
 - `DADAIA_CONTEXT` is the only environment variable in resolution; `DADAIA_MODE` carries mode and the other `DADAIA_*` variables are hook transport.
 

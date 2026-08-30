@@ -33,9 +33,13 @@ from dadaia_workspace.cli._specs_resolution import (
 )
 from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
 from dadaia_workspace.core.models.bugs import BUG_ARCHIVE_THRESHOLD_DAYS, BugRecord
-from dadaia_workspace.core.protocols.record_store import RecordNotFoundError, StaleRecordWriteError
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.bugs.service import BugService
+from dadaia_workspace.infrastructure.jsonl_record_store import (
+    JsonlRecordStore,
+    RecordNotFoundError,
+    StaleRecordWriteError,
+)
 
 __all__ = ["bugs_app"]
 
@@ -100,9 +104,20 @@ def _now_iso() -> str:
 
 
 def _service(target: Path, *, with_archive: bool = False) -> BugService:
+    # ADR-0001: build_bug_archive_store had exactly one consumer (this module's
+    # `dadaia bugs archive`) — the single consumer builds it directly instead of a
+    # container seam. build_bug_record_store stays a container seam because
+    # `cli.commands.specs` shares it (bug_store_factory -> GovernanceValidator).
+    archive_store: JsonlRecordStore[BugRecord] | None = None
+    if with_archive:
+        archive_store = JsonlRecordStore(
+            target / "bugs" / "_archive" / "bugs_histo.jsonl",
+            to_dict=BugRecord.to_dict,
+            from_dict=BugRecord.from_dict,
+        )
     return BugService(
         container.build_bug_record_store(target),
-        archive_store=container.build_bug_archive_store(target) if with_archive else None,
+        archive_store=archive_store,
         denylist_terms=container.load_denylist_terms(),
         baseline_patterns=container.load_denylist_baseline_patterns(),
         validate=container.build_bug_record_validator(),

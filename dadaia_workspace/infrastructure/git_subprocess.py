@@ -6,10 +6,7 @@ from collections.abc import Iterable, Sequence
 from pathlib import Path
 
 from dadaia_workspace.core.exceptions import GitCloneError, GitSyncError
-from dadaia_workspace.core.protocols.git_history_reader import (
-    GitHistoryReadError,
-    HistoryCommit,
-)
+from dadaia_workspace.core.models.git_history import GitHistoryReadError, HistoryCommit
 
 logger = logging.getLogger(__name__)
 
@@ -412,7 +409,7 @@ class GitSubprocessClient:
         return result.stdout.strip()
 
     def log_added_lines(self, repo: Path, pathspec: str) -> Iterable[HistoryCommit]:
-        """``core.protocols.git_history_reader.GitHistoryReader`` implementation
+        """The sole commit-history-walk adapter (ADR-0001: no port)
         (v0.5.0 FR3/A3.10, AR-1 ruling §3 — no sibling adapter module, this EXISTING
         client gains the one new method).
 

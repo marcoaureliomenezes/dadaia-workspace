@@ -71,6 +71,7 @@ from pathlib import Path
 from typing import Literal
 
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION, is_release_semver
+from dadaia_workspace.core.workspace_layout import AUDIT_DIR_NAME_PATTERN
 
 __all__ = [
     "CANON",
@@ -89,7 +90,9 @@ __all__ = [
 
 _SEMVER = r"\d+\.\d+\.\d+"
 _SHA40 = r"[0-9a-f]{40}"
-_YYYYMMDD_SLUG = r"\d{8}-[a-z0-9][a-z0-9-]*"
+#: One fact, one place (core.workspace_layout, SPEC-DOC-030's own single home) — never
+#: a second, independently hand-kept copy of the audit-dir date-slug shape.
+_YYYYMMDD_SLUG = AUDIT_DIR_NAME_PATTERN
 #: A release segment name (ADR-1/ADR-5, mirrors ``scaffolder._SEGMENT_RE``): an
 #: ``alpha-N``/``rc-N`` sub-phase directory under a release, e.g.
 #: ``releases/0.6.0/alpha-1/``.

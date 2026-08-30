@@ -2,11 +2,11 @@
 
 from pathlib import Path
 
-from dadaia_workspace.core.protocols.storage import ExcelReader
+from dadaia_workspace.infrastructure.excel_reader import OpenpyxlExcelReader
 
 
 class ReposService:
-    def __init__(self, excel_reader: ExcelReader) -> None:
+    def __init__(self, excel_reader: OpenpyxlExcelReader) -> None:
         self._reader = excel_reader
 
     def list_known(self, workspace_root: Path) -> list[dict[str, str]]:

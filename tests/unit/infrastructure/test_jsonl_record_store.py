@@ -27,8 +27,10 @@ import pytest
 from dadaia_workspace import container
 from dadaia_workspace.core.atomic_write import atomic_write as real_atomic_write
 from dadaia_workspace.core.models.bugs import BugRecord
-from dadaia_workspace.core.protocols.record_store import StaleRecordWriteError
-from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
+from dadaia_workspace.infrastructure.jsonl_record_store import (
+    JsonlRecordStore,
+    StaleRecordWriteError,
+)
 
 
 def _redactable_property_names(schema: Mapping[str, object]) -> tuple[str, ...]:

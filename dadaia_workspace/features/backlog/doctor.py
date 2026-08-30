@@ -16,7 +16,7 @@ fan-out): each check is a ``BacklogCheck`` (a code + a callable over the shared
   consumed/dispositioned: its slug is recorded in the relocated consumed-backlog histo
   ledger (``ledger.read_consumed``, T-050-13A/A5.5 — reads
   ``consumed_backlog_histo.jsonl`` through an injected
-  ``RecordStore[ConsumedBacklogHistoRecord]``, the relocation target for the 18
+  ``JsonlRecordStore[ConsumedBacklogHistoRecord]``, the relocation target for the 18
   per-release ``consumed_backlog.json`` sidecars FR6 deletes), OR it already has an
   exit record in ``backlog_histo.jsonl`` (the retired in-document ``## LEDGER``
   condition's replacement — v0.5.0 FR5), OR its own ``Status`` is one of the six
@@ -36,9 +36,12 @@ dual-section document's duplicate-closure failure mode this task's SPEC (FR5) na
 its bug-history evidence, not an independent invariant.
 
 Pure module: all roots are **injected** (SPEC §3.8 #6); no I/O outside the supplied paths and
-no subprocess (``histo_store``/``consumed_histo_store``, when supplied, are each an
-already-built :class:`~dadaia_workspace.core.protocols.record_store.RecordStore` — DI
-via ``core.protocols``, never a direct ``infrastructure`` import). The CLI
+no subprocess — ``histo_store``/``consumed_histo_store``, when supplied, are each an
+already-built
+:class:`~dadaia_workspace.infrastructure.jsonl_record_store.JsonlRecordStore` (DI: the
+CLI composition boundary builds it, this module only ever calls the instance it is
+handed, never constructs one itself — ADR-0001 retired the single-adapter
+``RecordStore`` Protocol this used to type against). The CLI
 (``cli/commands/newartifacts.py``) and the pre-commit/CI chokepoint
 (``cli/commands/ci.py`` + ``public/scripts/``) are thin wirings over :func:`run_backlog_doctor`,
 which reads the single source ``specs/backlog/BACKLOG.json`` through
@@ -60,12 +63,12 @@ from dadaia_workspace.core.models.backlog import (
     is_intents_exempt,
     is_terminal_disposition,
 )
-from dadaia_workspace.core.protocols.record_store import RecordStore
 from dadaia_workspace.features.backlog.classifier import BoundItem, Verdict, classify
 from dadaia_workspace.features.backlog.document import ActiveItem, DocumentError, load_document
 from dadaia_workspace.features.backlog.ledger import read_consumed
 from dadaia_workspace.features.backlog.preview import bound_anchor_changes
 from dadaia_workspace.features.backlog.subject_registry import Registry, build_registry
+from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
 
 __all__ = [
     "BacklogDoctorCode",
@@ -329,8 +332,8 @@ def run_backlog_doctor(
     catalog_path: Path,
     alias_map_path: Path,
     cli_anchors: frozenset[str],
-    histo_store: RecordStore[BacklogHistoRecord] | None = None,
-    consumed_histo_store: RecordStore[ConsumedBacklogHistoRecord] | None = None,
+    histo_store: JsonlRecordStore[BacklogHistoRecord] | None = None,
+    consumed_histo_store: JsonlRecordStore[ConsumedBacklogHistoRecord] | None = None,
 ) -> list[Finding]:
     """Run BL-SCHEMA/CONFLICT/STALE over the single-source ``BACKLOG.json`` and return
     all findings.
@@ -341,13 +344,13 @@ def run_backlog_doctor(
 
     ``histo_store`` (v0.5.0 FR5/A13.4) and ``consumed_histo_store`` (v0.5.0 T-050-13A/
     A5.5) are each an already-built
-    :class:`~dadaia_workspace.core.protocols.record_store.RecordStore` — DI via
-    ``core.protocols`` (composed at ``container.build_backlog_histo_store`` and
-    ``container.build_consumed_backlog_histo_store`` respectively), never a direct
-    ``infrastructure`` import from this pure module. ``None`` (the default for both) is
-    a no-op for the corresponding BL-STALE condition, never a false ERROR — this is the
-    seam :func:`run_backlog_doctor` resolves the generic backlog-histo stores through:
-    ``histo_store``'s second real caller is
+    :class:`~dadaia_workspace.infrastructure.jsonl_record_store.JsonlRecordStore` — DI
+    (built directly by the one real CLI callsite, ``cli.commands.newartifacts``'s
+    ``backlog_doctor_cmd``, per ADR-0001: a single-consumer store builder has no reason
+    to be a container seam), never constructed by this pure module. ``None`` (the
+    default for both) is a no-op for the corresponding BL-STALE condition, never a
+    false ERROR — this is the seam :func:`run_backlog_doctor` resolves the generic
+    backlog-histo stores through: ``histo_store``'s second real caller is
     :func:`~dadaia_workspace.features.backlog.document.backlog_exit`;
     ``consumed_histo_store`` replaces the pre-relocation ``archive_root``
     directory-glob parameter (T-050-13A relocated the 18 per-release

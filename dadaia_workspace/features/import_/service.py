@@ -7,24 +7,22 @@ from pathlib import Path
 
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.models.import_ import ImportManifest, ImportOptions, ImportResult
-from dadaia_workspace.core.protocols.process_runner import ProcessRunner
+from dadaia_workspace.infrastructure.subprocess_runner import SubprocessProcessRunner
 
 
 class ImportService:
     def __init__(
         self,
         workspace_root: Path,
-        process_runner: ProcessRunner | None = None,
+        process_runner: SubprocessProcessRunner | None = None,
     ) -> None:
         self._workspace_root = workspace_root
-        # ProcessRunner: injected for tests/DI; lazily resolved to the infra adapter in
-        # production when not provided.
-        self._process_runner: ProcessRunner | None = process_runner
+        # Injected for tests/DI (a structurally duck-typed fake is fine — ADR-0001: no
+        # ProcessRunner port, one production adapter); defaults to the real adapter.
+        self._process_runner: SubprocessProcessRunner | None = process_runner
 
-    def _get_runner(self) -> ProcessRunner:
+    def _get_runner(self) -> SubprocessProcessRunner:
         if self._process_runner is None:
-            from dadaia_workspace.infrastructure.subprocess_runner import SubprocessProcessRunner
-
             self._process_runner = SubprocessProcessRunner()
         return self._process_runner
 

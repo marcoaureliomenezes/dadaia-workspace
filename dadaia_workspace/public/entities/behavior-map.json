@@ -69,14 +69,14 @@
         "dadaia_workspace/public/data/states-AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:d5b42e7261d343cde252ba5be762b1397446ab72e5d204f8f4bf041d93c2db9b",
+        "section": "sha256:342d5b2a79b73fbc4fde6bd059e5fdba2d4addd4d9036ee28397b6e21e3fca5c",
         "skill": "sha256:b0cf3f3df192ebc725faf888064a5b4009a481813d7ff02f865cc417eaf1db39",
         "scoped": [
           "sha256:fe801a2cc3e30d99c18bfa81692f442ab865ace134155cbd6362b6923d3d6e8e"
         ]
       },
       "recorded_by": "ai-engineer",
-      "recorded_at": "2026-08-28"
+      "recorded_at": "2026-08-30"
     },
     {
       "section": "§4 Gitflow — the branch contract",
@@ -84,12 +84,12 @@
       "skill": "dd-gitflow-default",
       "scoped_agents_md": [],
       "hash_tuple": {
-        "section": "sha256:7820280d6fe0ab06f1182ae6219eb9f5cd2d50d740991da236fcf73660aff77c",
-        "skill": "sha256:6322aca01bcadfb2d804c761f9f0cd9121c33c2f00c7555de03eb5b60f86aec5",
+        "section": "sha256:67782f98a9ddc188d379dd94213875efefb397bbc5c97aec183fadf03cfd1adb",
+        "skill": "sha256:cd293e5ce384bb904d5796d8a06e14ae93821591b688cbfe4251fbde649bda52",
         "scoped": []
       },
       "recorded_by": "ai-engineer",
-      "recorded_at": "2026-08-28"
+      "recorded_at": "2026-08-30"
     },
     {
       "section": "§5 Where things are written",

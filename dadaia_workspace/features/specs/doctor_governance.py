@@ -14,8 +14,8 @@ parser.** ``check_bugs_jsonl_invariant``/``check_bug_archive_overdue`` call
 ``container.build_bug_record_store`` the CLI composition root wires everywhere else a
 bug record is read or written (``cli/commands/specs.py``'s ``doctor`` command, mirroring
 ``cli/commands/bugs.py``). ``scan()``/``iter_records()`` are the store's own two read
-methods (``core.protocols.record_store.RecordStore``); the record-level parsing is
-``BugRecord.from_dict``, never a second, hand-rolled field check.
+methods (``infrastructure.jsonl_record_store.JsonlRecordStore``); the record-level
+parsing is ``BugRecord.from_dict``, never a second, hand-rolled field check.
 
 **Governance completeness is not diagnosed here.** Completeness is enforced
 prospectively, at the WRITE seam (``core.models.bugs.BugRecord.resolve``/``supersede``/
@@ -42,10 +42,10 @@ from dadaia_workspace.core.models.bugs import (
     TERMINAL_EVENTS,
     BugRecord,
 )
-from dadaia_workspace.core.protocols.record_store import MalformedLine, RecordStore
 from dadaia_workspace.features.backlog.document import load_document
 from dadaia_workspace.features.specs.doctor_common import iter_archive_release_dirs
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
+from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore, MalformedLine
 
 # ADR-11 single-source status-token vocabulary.
 #
@@ -126,7 +126,7 @@ class GovernanceValidator:
         self,
         specs_dir: Path,
         public_dir: Path | None = None,
-        bug_store_factory: Callable[[Path], RecordStore[BugRecord]] | None = None,
+        bug_store_factory: Callable[[Path], JsonlRecordStore[BugRecord]] | None = None,
     ) -> None:
         self.specs_dir = specs_dir
         self.public_dir = public_dir
@@ -137,7 +137,7 @@ class GovernanceValidator:
         # one (most non-bugs doctor tests) never needs it.
         self._bug_store_factory = bug_store_factory
 
-    def _bug_store(self) -> RecordStore[BugRecord]:
+    def _bug_store(self) -> JsonlRecordStore[BugRecord]:
         if self._bug_store_factory is None:
             raise ValueError(
                 "GovernanceValidator requires bug_store_factory to read "
@@ -247,9 +247,9 @@ class GovernanceValidator:
         :class:`~dadaia_workspace.core.models.bugs.BugRecord` through
         :meth:`~dadaia_workspace.core.models.bugs.BugRecord.from_dict`, the model's
         OWN parser — never a hand-rolled field check. Every line
-        :meth:`~dadaia_workspace.core.protocols.record_store.RecordStore.scan` cannot
-        parse surfaces as exactly ONE :class:`~dadaia_workspace.core.protocols
-        .record_store.MalformedLine` -> ONE ERROR here.
+        :meth:`~dadaia_workspace.infrastructure.jsonl_record_store.JsonlRecordStore.scan` cannot
+        parse surfaces as exactly ONE
+        :class:`~dadaia_workspace.infrastructure.jsonl_record_store.MalformedLine` -> ONE ERROR here.
 
         **Governance completeness is not diagnosed here.** A well-formed record —
         however incomplete for its own status — is not re-checked: completeness is

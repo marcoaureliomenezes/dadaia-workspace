@@ -12,7 +12,11 @@
     "rc": 1,
     "ts": "2026-08-29T20:32:20Z"
   },
-  "shipped": null,
+  "shipped": {
+    "sha": "0fee8cdd",
+    "pr": 228,
+    "ts": "2026-08-29T21:17:58Z"
+  },
   "audited": null,
   "log": [
     {
@@ -110,6 +114,12 @@
       "agent": "project-manager",
       "kind": "phase",
       "text": "ARCHIVED: rc-1 PR #226 merged into develop 46a2145e (no rc-2 round needed); consumed verdict deleted; T-051-23..27 closed; directory moves to specs/releases/_archive/0.5.1/ in this commit; T-051-28 (ship) follows on develop -> main."
+    },
+    {
+      "ts": "2026-08-29T21:17:58Z",
+      "agent": "project-manager",
+      "kind": "shipped",
+      "text": "Squash-merged develop a3111dab into main 0fee8cdd by PR #228 (tree identity develop==main). Publication withheld: no tag, PyPI stays 0.4.4, release approve untouched. Consumed verdicts (46a2145e, 748524c5) deleted in this commit."
     }
   ],
   "segment": null

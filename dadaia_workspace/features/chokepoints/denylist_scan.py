@@ -29,7 +29,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Protocol
 
-from dadaia_workspace.core.protocols.git_object_reader import ScannedObject
+from dadaia_workspace.core.models.git_scan import ScannedObject
 
 __all__ = [
     "BaselinePatternLike",

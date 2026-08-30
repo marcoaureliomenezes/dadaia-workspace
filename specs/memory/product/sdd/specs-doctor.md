@@ -22,7 +22,10 @@ tags: [specs, doctor, validation, sdd]
 - `SPEC-DOC-031` flags an active backlog item left non-terminal while an archived release asserts it was consumed, counting only an archived SPEC's `**Consumes:**` declaration with candidate slugs isolated as whole tokens.
 - `SPEC-DOC-035` is the single-source invariant: any item file loose directly under `specs/backlog/`, other than `BACKLOG.json` and its scoped rule file, is drift; the entry schema belongs to `backlog doctor`'s BL-* codes.
 - `SPEC-DOC-036` and `SPEC-DOC-038` fold `FINDINGS.jsonl`, never audit prose: an `open` finding in an archived audit is an ERROR, and a live audit whose findings are all terminal is an archive-due WARNING.
-- `SPEC-DOC-030` checks the collision-safe audit directory shape, and constitution checks cover required invariant references and `specs_pattern_version` 6.
+- `SPEC-DOC-030` checks the audit directory shape `<YYYYMMDD>-<slug>` (`core/workspace_layout.py::AUDIT_DIR_NAME_RE`, the fragment `canon.py` imports), and constitution checks cover required invariant references and `specs_pattern_version` 6.
+- `SPEC-DOC-045` requires `pyproject.toml`'s `[tool.poetry].version` to equal the release id once the release is in `CLOSURE` or later; it is silent without a repo root, a pyproject or a live release.
+- `SPECS-VERSION` names the fix for a pre-v6 stamp — migrate the tree and re-stamp `constitution.md`; `dadaia specs upgrade` refuses pre-v6 trees.
+- `dadaia memory product add <slug> --area <area>` writes `product/<area>/<slug>.md`, validated by `canon.is_canon_path`, the same decider the doctor and the pre-push gate use.
 - The split across doctors is by subject — `public doctor` carries the privacy-baseline carve-out rationale check, `dadaia doctor` owns workspace-state invariants ([[workspace-doctor]]), `backlog doctor` owns the backlog document model.
 - `--recipe` renders ordered, copy-pasteable steps over the same finding objects `--json` emits, every step tracing to a finding id in that run.
 - `--fix` regenerates deterministic catalog/tree artifacts and normalizes supported archive layout, inventing no approval, task completion, evidence, disposition or operator decision.

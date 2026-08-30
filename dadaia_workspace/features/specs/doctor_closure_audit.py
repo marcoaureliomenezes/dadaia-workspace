@@ -34,10 +34,10 @@ from collections.abc import Callable, Iterator
 from pathlib import Path
 
 from dadaia_workspace.core.models.findings import FindingRecord
-from dadaia_workspace.core.protocols.record_store import RecordStore
 from dadaia_workspace.core.workspace_layout import AUDIT_DIR_NAME_RE
 from dadaia_workspace.features.specs.canon import REQUIRED_ROOT_DIRS
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
+from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
 
 # Four audit dirs from the v0.1.9/v0.1.10 audit cycles predate the doctor WARN and are
 # grandfathered in place by the constitution §8 amendment (2026-06-10) — their session ids
@@ -52,7 +52,7 @@ _AUDIT_DIR_GRANDFATHER: frozenset[str] = frozenset(
 )
 
 # SPEC-DOC-034 (v0.1.46 AC-4): the per-artifact ``_archive`` dirs that must PRE-EXIST
-# (the FROZEN landing zone for disposed artifacts). Anchored to the canon table's
+# (the histo landing zone for disposed artifacts, ADDITIVE). Anchored to the canon table's
 # REQUIRED_ROOT_DIRS (v0.5.1 K4) rather than an independent hand-kept tuple, then
 # narrowed to the two areas that dispose routinely — backlog/bugs' histo ledgers grow
 # constantly, so a missing `_archive/` there is meaningful drift worth a standing
@@ -110,7 +110,7 @@ class ClosureAuditValidator:
     def __init__(
         self,
         specs_dir: Path,
-        findings_store_factory: Callable[[Path], RecordStore[FindingRecord]] | None = None,
+        findings_store_factory: Callable[[Path], JsonlRecordStore[FindingRecord]] | None = None,
     ) -> None:
         self.specs_dir = specs_dir
         # DI seam (A13.4): a composition root could wire a JsonlRecordStore-backed
@@ -149,15 +149,19 @@ class ClosureAuditValidator:
         return issues
 
     def check_audits_naming_canon(self) -> list[SpecsDoctorIssue]:
-        """SPEC-DOC-030 (constitution §8): WARN on any non-conforming ``specs/audits/`` dir.
+        """SPEC-DOC-030 (DADAIA.md §6.8, v6 canon): WARN on any non-conforming
+        ``specs/audits/`` dir.
 
-        Forward enforcement of the collision-safe naming law: every audit directory must
-        be named ``<YYYYMMDDTHHMMSSZ>-<session_id_8chars>`` (:data:`AUDIT_DIR_NAME_RE`,
-        the single home in ``core.workspace_layout``) so two concurrent additive sessions
-        never collide on a path. WARN-only (legacy names are preserved, never
-        auto-renamed), mirroring the SPEC-DOC-027 legacy policy.
+        Forward enforcement of the naming law: every audit directory must be named
+        ``<YYYYMMDD>-<slug>`` (:data:`AUDIT_DIR_NAME_RE`, the single home in
+        ``core.workspace_layout`` — the SAME shape ``features.specs.canon``'s own
+        audits ``CanonEntry`` pattern uses, never a second, independently hand-kept
+        regex; bug spec-doc-030-audit-dir-rule-contradicts-dadaia-6-8-canon fixed a
+        stale ``<YYYYMMDDTHHMMSSZ>-<session_id_8chars>`` shape that predated the v6
+        canon). WARN-only (legacy names are preserved, never auto-renamed), mirroring
+        the SPEC-DOC-027 legacy policy.
 
-        Exempt: the four grandfathered dirs from the §8 amendment
+        Exempt: the four grandfathered dirs from the old pre-canon amendment
         (:data:`_AUDIT_DIR_GRANDFATHER`) and ``specs/audits/_archive/``. Silent when the
         ``audits/`` dir is absent.
         """
@@ -178,9 +182,9 @@ class ClosureAuditValidator:
                     code="SPEC-DOC-030",
                     severity=Severity.WARNING,
                     description=(
-                        f"Audit dir 'audits/{name}' does not follow the collision-safe "
-                        "naming law <YYYYMMDDTHHMMSSZ>-<session_id_8chars> (constitution §8) "
-                        "— rename it (SPEC-DOC-030, WARNING)."
+                        f"Audit dir 'audits/{name}' does not follow the naming law "
+                        "<YYYYMMDD>-<slug> (DADAIA.md §6.8) — rename it (SPEC-DOC-030, "
+                        "WARNING)."
                     ),
                     path=str(child),
                 )
@@ -190,7 +194,7 @@ class ClosureAuditValidator:
     def check_archive_dirs_exist(self) -> list[SpecsDoctorIssue]:
         """SPEC-DOC-034 (v0.1.46 AC-4): the three per-artifact ``_archive`` dirs must exist.
 
-        ``specs/{backlog,audits,bugs}/_archive/`` are the FROZEN landing zones for disposed
+        ``specs/{backlog,audits,bugs}/_archive/`` are the ADDITIVE histo landing zones for disposed
         artifacts. A missing dir is a WARNING with an auto-fix (``doctor --fix`` mkdirs
         it — a directory is kept by its own future content, no ``.gitkeep``
         placeholder). A parent dir that does not itself exist is skipped — its
@@ -209,7 +213,7 @@ class ClosureAuditValidator:
                     code="SPEC-DOC-034",
                     severity=Severity.WARNING,
                     description=(
-                        f"specs/{parent}/_archive/ is missing — the FROZEN landing zone for "
+                        f"specs/{parent}/_archive/ is missing — the histo landing zone for "
                         "disposed artifacts (SPEC-DOC-034, WARNING). Auto-fix available "
                         "(run doctor --fix)."
                     ),

@@ -92,6 +92,30 @@ def test_head_match_wins_even_with_an_unrelated_parent_match(tmp_path: Path) -> 
     assert result == Verdict(commit_sha=_SHA_HEAD, path=head_verdict)
 
 
+def test_ship_pr_shape_a_verdict_naming_develops_pre_merge_tip_covers_the_merge_commit_head(
+    tmp_path: Path,
+) -> None:
+    """Bug verdict-check-head-or-first-parent-cannot-be-satisfied-by-a-develop-to-
+    main-pr, resolved by ruling + protocol (no code change): a develop -> main PR's
+    head is develop's tip AFTER the final `feature -> develop` merge — a merge
+    commit whose first parent IS develop's PRE-merge tip. The protocol
+    (dd-gitflow-default) commits the security verdict naming that pre-merge tip ON
+    THE FEATURE BRANCH before the merge, so it rides along into develop and covers
+    the post-merge head via the SAME first-parent branch `covering_verdict` already
+    has — never a second code path. This is the exact ship-PR shape from the bug's
+    repro: `head_sha` = the develop->main PR head (a merge commit minted at the last
+    feature->develop merge), `parent_sha` = develop's tip immediately before that
+    merge (the sha the pre-staged verdict names).
+    """
+    develop_pre_merge_tip = _SHA_PARENT
+    ship_pr_head = _SHA_HEAD  # the merge commit; its first parent is develop_pre_merge_tip
+    verdict_path = _write_verdict(tmp_path / "v.handoff.json", develop_pre_merge_tip)
+
+    result = covering_verdict([verdict_path], ship_pr_head, develop_pre_merge_tip)
+
+    assert result == Verdict(commit_sha=develop_pre_merge_tip, path=verdict_path)
+
+
 @pytest.mark.parametrize(
     ("agent", "verdict"),
     [

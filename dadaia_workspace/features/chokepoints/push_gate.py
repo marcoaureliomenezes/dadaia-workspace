@@ -17,7 +17,7 @@ this is what drops ``chokepoints -> specs.canon`` out of the import-linter
 ``ignore_imports`` list entirely — the CLI composition root
 (``cli/commands/ci.py``) wires ``features.specs.canon.canon_violations``/
 ``verdict_violations`` straight through, no adapter needed, mirroring how
-*object_source* (the injected :class:`GitObjectReader`) already works (FR7/A7.2: the
+*object_source* (the injected :class:`ObjectSource`) already works (FR7/A7.2: the
 decision function always takes it as a parameter; an unwired production call site is a
 CLI defect, never a bypass).
 """
@@ -26,12 +26,9 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from pathlib import Path
+from typing import Protocol
 
-from dadaia_workspace.core.protocols.git_object_reader import (
-    GitObjectReader,
-    GitObjectReadError,
-    ScannedObject,
-)
+from dadaia_workspace.core.models.git_scan import GitObjectReadError, ScannedObject
 from dadaia_workspace.features.chokepoints.branch_policy import (
     Decision,
     PushRef,
@@ -56,6 +53,23 @@ _MAX_LISTED_HITS = 10
 #: The fix hint every specs-canon refusal line carries (operator, 2026-08-28) — a
 #: canon or verdict violation has exactly one remediation: remove the offending path.
 _SPECS_CANON_FIX_HINT = "delete the path; canon: DADAIA.md §6"
+
+
+class ObjectSource(Protocol):
+    """Feature-local structural port over the push-range object reader (ADR-0001: no
+    ``core/protocols`` port — the concrete adapter, ``GitSubprocessObjectReader``, is
+    the only implementer; this module still never imports ``infrastructure`` or
+    spawns a subprocess itself — the CLI composition root (``cli/commands/ci.py``)
+    constructs the real adapter and injects it here, exactly as before).
+    """
+
+    def new_objects(
+        self, repo: Path, local_sha: str, remote_sha: str
+    ) -> Iterable[ScannedObject]: ...
+
+    def list_tree_paths(self, repo: Path, sha: str, prefix: str) -> list[str]: ...
+
+    def first_parent(self, repo: Path, sha: str) -> str | None: ...
 
 
 def _annotate_skip(
@@ -144,7 +158,7 @@ def _render_git_read_error(exc: GitObjectReadError, path_masker: PathMasker) -> 
 
 
 def _dedup_new_objects(
-    object_source: GitObjectReader,
+    object_source: ObjectSource,
     repo: Path,
     ref: PushRef,
     seen_shas: set[str],
@@ -168,7 +182,7 @@ def _dedup_new_objects(
 
 def _run_denylist_scan(
     scan_refs: list[PushRef],
-    object_source: GitObjectReader,
+    object_source: ObjectSource,
     repo: Path,
     terms: Iterable[tuple[str, str]],
     patterns: Iterable[BaselinePatternLike],
@@ -264,7 +278,7 @@ def _compose_specs_canon_refusal(violations: list[tuple[PushRef, str]]) -> str:
 
 def _run_specs_canon_scan(
     scan_refs: list[PushRef],
-    object_source: GitObjectReader,
+    object_source: ObjectSource,
     repo: Path,
     canon_violations_fn: Callable[[Sequence[str]], Sequence[str]],
     verdict_violations_fn: Callable[[Sequence[str], str, str | None], Sequence[str]],
@@ -313,7 +327,7 @@ def _run_specs_canon_scan(
 def push_gate_decision(
     refs: list[PushRef],
     *,
-    object_source: GitObjectReader,
+    object_source: ObjectSource,
     repo: Path,
     canon_violations_fn: Callable[[Sequence[str]], Sequence[str]],
     verdict_violations_fn: Callable[[Sequence[str], str, str | None], Sequence[str]],
