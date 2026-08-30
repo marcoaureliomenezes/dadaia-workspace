@@ -60,13 +60,10 @@ _CROSS_FEATURE_COMPOSITION_EXCEPTIONS: dict[str, str] = {
 }
 
 # Single-adapter protocols NOT yet retired this pass — visible debt, not silent debt.
-_PENDING_RETIREMENT_EXCEPTIONS: dict[str, str] = {
-    "RecordStore": (
-        "single adapter (infrastructure.jsonl_record_store.JsonlRecordStore); "
-        "operator/coordinator directive stopped further ADR-0001 retirement "
-        "mid-release — scoped to a follow-up pass"
-    ),
-}
+# Empty since the RecordStore follow-up pass (ADR-0001): its single adapter
+# (infrastructure.jsonl_record_store.JsonlRecordStore) is now the type every consumer
+# names directly — core/protocols/record_store.py is deleted.
+_PENDING_RETIREMENT_EXCEPTIONS: dict[str, str] = {}
 
 _ALL_EXCEPTIONS = {**_CROSS_FEATURE_COMPOSITION_EXCEPTIONS, **_PENDING_RETIREMENT_EXCEPTIONS}
 

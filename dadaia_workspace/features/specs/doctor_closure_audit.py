@@ -34,10 +34,10 @@ from collections.abc import Callable, Iterator
 from pathlib import Path
 
 from dadaia_workspace.core.models.findings import FindingRecord
-from dadaia_workspace.core.protocols.record_store import RecordStore
 from dadaia_workspace.core.workspace_layout import AUDIT_DIR_NAME_RE
 from dadaia_workspace.features.specs.canon import REQUIRED_ROOT_DIRS
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
+from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
 
 # Four audit dirs from the v0.1.9/v0.1.10 audit cycles predate the doctor WARN and are
 # grandfathered in place by the constitution §8 amendment (2026-06-10) — their session ids
@@ -110,7 +110,7 @@ class ClosureAuditValidator:
     def __init__(
         self,
         specs_dir: Path,
-        findings_store_factory: Callable[[Path], RecordStore[FindingRecord]] | None = None,
+        findings_store_factory: Callable[[Path], JsonlRecordStore[FindingRecord]] | None = None,
     ) -> None:
         self.specs_dir = specs_dir
         # DI seam (A13.4): a composition root could wire a JsonlRecordStore-backed

@@ -9,10 +9,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from dadaia_workspace.core.models.backlog import BacklogHistoRecord, ConsumedBacklogHistoRecord
     from dadaia_workspace.core.models.bugs import BugRecord
     from dadaia_workspace.features.agents.model_policy import AgentModelPolicyService
     from dadaia_workspace.features.certification import CertificationResult
+    from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
 
 from dadaia_workspace.core.exceptions import (
     NoActiveReleaseError,
@@ -23,7 +23,6 @@ from dadaia_workspace.core.invocation import repo_slug_for_context
 from dadaia_workspace.core.invocation import resolve as _resolve_invocation
 from dadaia_workspace.core.invocation import resolve_context_specs_dir as _resolve_context_specs_dir
 from dadaia_workspace.core.protocols.process_ancestry import ProcessAncestry
-from dadaia_workspace.core.protocols.record_store import RecordStore
 from dadaia_workspace.features.academy.service import AcademyService
 from dadaia_workspace.features.agents.reader import FileSystemAgentsProvider
 from dadaia_workspace.features.chokepoints.denylist_scan import BaselinePatternLike
@@ -173,16 +172,14 @@ def build_git_object_reader() -> GitSubprocessObjectReader:
     return GitSubprocessObjectReader()
 
 
-def build_bug_record_store(specs_dir: Path) -> "RecordStore[BugRecord]":
+def build_bug_record_store(specs_dir: Path) -> "JsonlRecordStore[BugRecord]":
     """Composition-root seam for the generic bug-record JSONL store (v0.5.0 FR2, AR-1
     ruling answer (b), ``specs/releases/0.5.0/reviews/S1-AR1-ruling.md`` §2).
 
-    T-050-08 switches ``features/bugs/service.py`` and the CLI onto this seam and
-    deletes ``infrastructure/jsonl_bug_store.py`` + ``core/protocols/bug_store.py``
-    (AR-1 §1.4/§2.1); this seam's ``cli -> infrastructure.jsonl_record_store``
-    composition replaces the direct ``cli.commands.bugs -> infrastructure.jsonl_bug_store``
-    import-linter ignore edge the CLI layer must not otherwise reach infrastructure
-    through (cap 15 -> 14, same commit).
+    Stays a container seam (ADR-0001: a store builder collapses into its single
+    consumer UNLESS two features share it) because two do: ``cli.commands.bugs``
+    (``_service`` -> ``features.bugs.service.BugService``) and ``cli.commands.specs``
+    (``bug_store_factory`` -> ``features.specs.doctor_governance.GovernanceValidator``).
 
     Takes *specs_dir* directly — the SAME resolved directory every ``dadaia bugs``
     verb's ``--specs-dir``/bind-resolution seam already produces (never a
@@ -223,73 +220,6 @@ def build_bug_record_validator() -> Callable[[Mapping[str, object]], None]:
         validator.validate(payload)
 
     return _validate
-
-
-def build_bug_archive_store(specs_dir: Path) -> "RecordStore[BugRecord]":
-    """Composition-root seam for ``dadaia bugs archive``'s destination store (A2.8) —
-    ``specs/bugs/_archive/bugs_histo.jsonl``, through the SAME generic
-    ``JsonlRecordStore`` mechanism :func:`build_bug_record_store` uses, one record per
-    line."""
-    from dadaia_workspace.core.models.bugs import BugRecord
-    from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
-
-    return JsonlRecordStore(
-        Path(specs_dir) / "bugs" / "_archive" / "bugs_histo.jsonl",
-        to_dict=BugRecord.to_dict,
-        from_dict=BugRecord.from_dict,
-    )
-
-
-def build_backlog_histo_store(specs_dir: Path) -> "RecordStore[BacklogHistoRecord]":
-    """Composition-root seam for the generic backlog-exit JSONL store (v0.5.0 FR5,
-    A5.1/A13.4 — the third of the three ``JsonlRecordStore`` instances A13.4 names, the
-    one whose container registration this task adds).
-
-    ``specs/backlog/_archive/backlog_histo.jsonl``, one record per backlog slug that
-    ever exited ``## ACTIVE`` (:class:`~dadaia_workspace.core.models.backlog.
-    BacklogHistoRecord`). Two real callers resolve it (A13.4's "a store instance
-    exists only where a writer exists" + this task's own done criterion, "the backlog
-    doctor's BL-STALE/consumption reads must resolve it"):
-    :func:`~dadaia_workspace.features.backlog.document.backlog_exit` (writer, A5.3) and
-    :func:`~dadaia_workspace.features.backlog.doctor.run_backlog_doctor` (reader, the
-    BL-STALE condition that replaces the retired in-document ``## LEDGER`` check).
-    Takes *specs_dir* directly, the same resolved directory every other
-    ``build_*_store`` seam takes (never a bare ``workspace_root``).
-    """
-    from dadaia_workspace.core.models.backlog import BacklogHistoRecord
-    from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
-
-    return JsonlRecordStore(
-        Path(specs_dir) / "backlog" / "_archive" / "backlog_histo.jsonl",
-        to_dict=BacklogHistoRecord.to_dict,
-        from_dict=BacklogHistoRecord.from_dict,
-    )
-
-
-def build_consumed_backlog_histo_store(
-    specs_dir: Path,
-) -> "RecordStore[ConsumedBacklogHistoRecord]":
-    """Composition-root seam for the relocated consumed-backlog ledger (v0.5.0
-    T-050-13A, SPEC A5.5) — ``specs/backlog/_archive/consumed_backlog_histo.jsonl``,
-    one record per archived release, through the SAME generic ``JsonlRecordStore``
-    mechanism :func:`build_backlog_histo_store` uses.
-
-    Relocates the 18 per-release ``specs/_archive/<release-id>/consumed_backlog.json``
-    sidecars FR6 (T-050-14) deletes out from under BL-STALE's condition (a) data feed
-    — the sidecars documented an absent-ledger no-op, but never a *permanently* absent
-    one (FR13's "documented convention with no data behind it" shape). The one real
-    caller is
-    :func:`~dadaia_workspace.features.backlog.ledger.read_consumed`, itself resolved
-    by :func:`~dadaia_workspace.features.backlog.doctor.run_backlog_doctor`.
-    """
-    from dadaia_workspace.core.models.backlog import ConsumedBacklogHistoRecord
-    from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
-
-    return JsonlRecordStore(
-        Path(specs_dir) / "backlog" / "_archive" / "consumed_backlog_histo.jsonl",
-        to_dict=ConsumedBacklogHistoRecord.to_dict,
-        from_dict=ConsumedBacklogHistoRecord.from_dict,
-    )
 
 
 def load_denylist_terms() -> tuple[tuple[str, str], ...]:

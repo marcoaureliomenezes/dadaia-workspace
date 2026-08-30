@@ -3,9 +3,11 @@
 Every consumer (``dadaia bugs status``/``stats``/``update``/``resolve|supersede|defer|
 reject``/``archive``, the CLI composition root) reads and writes through
 :class:`BugService`, which holds the generic
-:class:`~dadaia_workspace.core.protocols.record_store.RecordStore` (DI seam — the
-concrete ``JsonlRecordStore`` is injected at the CLI composition root, so ``features``
-never imports ``infrastructure``). :meth:`register` appends exactly one
+:class:`~dadaia_workspace.infrastructure.jsonl_record_store.JsonlRecordStore` (DI seam
+— the concrete store is built at the CLI composition root and injected here, so this
+service never resolves a path itself; ADR-0001 retired the single-adapter
+``RecordStore`` Protocol this used to type against — the concrete class IS the port
+now, there being no second adapter to abstract over). :meth:`register` appends exactly one
 :class:`~dadaia_workspace.core.models.bugs.BugRecord` line; :meth:`apply_update`
 rewrites an existing record's governance fields (never ``status`` — refused by
 :meth:`~dadaia_workspace.core.models.bugs.BugRecord.apply_governance_update` itself);
@@ -35,9 +37,9 @@ from dadaia_workspace.core.models.bugs import (
     TERMINAL_EVENTS,
     BugRecord,
 )
-from dadaia_workspace.core.protocols.record_store import RecordStore
 from dadaia_workspace.core.redaction import PatternLike
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
 
 __all__ = [
     "BugArchiveResult",
@@ -89,9 +91,9 @@ class BugService:
 
     def __init__(
         self,
-        record_store: RecordStore[BugRecord],
+        record_store: JsonlRecordStore[BugRecord],
         *,
-        archive_store: RecordStore[BugRecord] | None = None,
+        archive_store: JsonlRecordStore[BugRecord] | None = None,
         denylist_terms: Sequence[tuple[str, str]] = (),
         baseline_patterns: Sequence[PatternLike] = (),
         history_reader: GitSubprocessClient | None = None,
@@ -204,8 +206,8 @@ class BugService:
         governance-field change, so a refused transition
         (:class:`~dadaia_workspace.core.models.bugs.IncompleteTransitionError`) never
         reaches the file: ``mutate()`` runs BEFORE
-        :meth:`~dadaia_workspace.core.protocols.record_store.RecordStore.update` ever
-        touches disk, leaving the record byte-identical on refusal.
+        :meth:`~dadaia_workspace.infrastructure.jsonl_record_store.JsonlRecordStore.update`
+        ever touches disk, leaving the record byte-identical on refusal.
         """
 
         def _mutate(record: BugRecord) -> BugRecord:
@@ -218,11 +220,12 @@ class BugService:
         self, *, now: datetime | None = None, threshold_days: int = BUG_ARCHIVE_THRESHOLD_DAYS
     ) -> BugArchiveResult:
         """A2.8 — move every terminal record older than *threshold_days* from the live
-        ledger to the archive store, through :meth:`~dadaia_workspace.core.protocols
-        .record_store.RecordStore.remove` (v0.5.0 S1 FR23 firing, A1) — the SAME
-        refuse-stale seam :meth:`apply_update` already uses, never a second, unsealed
-        raw-file rewrite. Idempotent: a second run with nothing newly eligible never
-        touches either file (proven byte-identical by a fixture).
+        ledger to the archive store, through
+        :meth:`~dadaia_workspace.infrastructure.jsonl_record_store.JsonlRecordStore.remove`
+        (v0.5.0 S1 FR23 firing, A1) — the SAME refuse-stale seam :meth:`apply_update`
+        already uses, never a second, unsealed raw-file rewrite. Idempotent: a second
+        run with nothing newly eligible never touches either file (proven
+        byte-identical by a fixture).
         """
         if self._archive_store is None:
             raise ValueError("BugService.archive() requires an archive_store")

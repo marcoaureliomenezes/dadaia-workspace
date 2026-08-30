@@ -33,7 +33,6 @@ from pathlib import Path
 
 from dadaia_workspace.core.models.bugs import BugRecord
 from dadaia_workspace.core.models.findings import FindingRecord
-from dadaia_workspace.core.protocols.record_store import RecordStore
 from dadaia_workspace.features.specs.doctor_closure_audit import ClosureAuditValidator
 from dadaia_workspace.features.specs.doctor_coherence import CoherenceValidator
 from dadaia_workspace.features.specs.doctor_governance import GovernanceValidator
@@ -41,6 +40,7 @@ from dadaia_workspace.features.specs.doctor_memory import MemoryValidator
 from dadaia_workspace.features.specs.doctor_release import ReleaseValidator
 from dadaia_workspace.features.specs.doctor_structural import StructuralValidator
 from dadaia_workspace.features.specs.doctor_types import SpecsDoctorIssue
+from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
 
 
 class SpecsDoctor:
@@ -85,8 +85,8 @@ class SpecsDoctor:
         public_dir: Path | None = None,
         templates_dir: Path | None = None,
         repo_root: Path | None = None,
-        findings_store_factory: Callable[[Path], RecordStore[FindingRecord]] | None = None,
-        bug_store_factory: Callable[[Path], RecordStore[BugRecord]] | None = None,
+        findings_store_factory: Callable[[Path], JsonlRecordStore[FindingRecord]] | None = None,
+        bug_store_factory: Callable[[Path], JsonlRecordStore[BugRecord]] | None = None,
         head_sha: str | None = None,
         parent_sha: str | None = None,
     ) -> None:
@@ -198,7 +198,7 @@ class SpecsDoctor:
         # dead code behind a dead artifact, see doctor_governance.py's module
         # docstring.
         # v0.1.46 / T-46-04 (AC-1) — bug-ledger invariant, reads through the ONE
-        # RecordStore (v0.5.1 K5)
+        # JsonlRecordStore (v0.5.1 K5)
         issues.extend(self._governance.check_bugs_jsonl_invariant())  # SPEC-DOC-033
         # v0.1.46 / T-46-13 (AC-4) — taxonomy + disposition invariants
         issues.extend(self._closure_audit.check_archive_dirs_exist())  # SPEC-DOC-034
