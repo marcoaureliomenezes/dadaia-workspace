@@ -52,7 +52,7 @@ class CoherenceValidator:
 
     def check_specs_pattern_version(self) -> list[SpecsDoctorIssue]:
         """WARN-only: the tree's ``specs_pattern_version`` is below the canonical
-        version the library ships. Recommends ``dadaia specs upgrade`` (FR-S05)."""
+        version the library ships. Names the fix: migrate, then re-stamp (``specs upgrade`` refuses pre-v6 trees since K10)."""
         from dadaia_workspace.core import specs_version as _ver
 
         current = _ver.read_pattern_version(self.specs_dir)
@@ -64,7 +64,8 @@ class CoherenceValidator:
                 severity=Severity.WARNING,
                 description=(
                     f"specs_pattern_version is {current}, below the canonical "
-                    f"{_ver.CANONICAL_SPECS_VERSION}. Run: dadaia specs upgrade"
+                    f"{_ver.CANONICAL_SPECS_VERSION}. Migrate the tree to canon v{_ver.CANONICAL_SPECS_VERSION} "
+                    "(dadaia-workspace 0.4.x, or by hand) and re-stamp constitution.md"
                 ),
                 path=str(self.specs_dir / "constitution.md"),
             )

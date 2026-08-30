@@ -41,9 +41,10 @@ writing, the writer re-parses its own output and raises if the fresh slug is abs
 (write-then-verify). :func:`remove_active_subsection`/:func:`backlog_exit` (v0.5.0 FR5,
 A5.3, unchanged over the new storage) are the writer's mirror image: they remove exactly
 one ``active[]`` entry and, for :func:`backlog_exit`, append its histo record through an
-injected :class:`~dadaia_workspace.core.protocols.record_store.RecordStore` (DI via
-``core.protocols`` — this module never imports ``infrastructure`` directly, per the
-``features-no-infrastructure`` import-linter contract). ``entry_md`` (the histo record's
+injected
+:class:`~dadaia_workspace.infrastructure.jsonl_record_store.JsonlRecordStore` (DI — the
+caller builds the store; this module only ever calls the instance it is handed).
+``entry_md`` (the histo record's
 removed-entry snapshot field, name unchanged — ``core/models/backlog.py`` is out of this
 module's write set) now holds a pretty-printed JSON snapshot of the removed ``active[]``
 object instead of Markdown subsection source text.
@@ -60,7 +61,7 @@ from typing import Any
 
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.models.backlog import BacklogHistoRecord, Intent, parse_intents
-from dadaia_workspace.core.protocols.record_store import RecordStore
+from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
 
 __all__ = [
     "ActiveItem",
@@ -487,7 +488,7 @@ def backlog_exit(
     specs_dir: Path,
     slug: str,
     *,
-    histo_store: RecordStore[BacklogHistoRecord],
+    histo_store: JsonlRecordStore[BacklogHistoRecord],
     disposition: str,
     reason: str | None,
     release: str | None,
@@ -498,9 +499,9 @@ def backlog_exit(
     """Retire *slug* out of ``active[]`` and append its one histo record (v0.5.0 FR5,
     A5.3) — the atomic pair :func:`remove_active_subsection` (the removal) and
     ``histo_store.append`` (the record) — through an INJECTED
-    :class:`~dadaia_workspace.core.protocols.record_store.RecordStore` (DI via
-    ``core.protocols`` — this module never imports ``infrastructure`` directly; the
-    concrete store is composed at ``container.build_backlog_histo_store``).
+    :class:`~dadaia_workspace.infrastructure.jsonl_record_store.JsonlRecordStore` (DI —
+    the caller builds the store; this module only ever calls the instance it is
+    handed).
 
     ``entry_md`` is the exact removed entry's pretty-printed JSON text; there is
     nothing to "recover" for a live exit (only the historical migration reaches for an

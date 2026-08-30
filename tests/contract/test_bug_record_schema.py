@@ -23,6 +23,8 @@ from typing import Any
 import pytest
 from jsonschema import Draft202012Validator
 
+from dadaia_workspace.core.models import bugs as _bugs_module
+
 pytestmark = pytest.mark.contract
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -112,6 +114,24 @@ def test_bug_record_schema_example_validates_as_appended_and_after_resolution() 
     }
     for name in immutable_names:
         assert _AS_APPENDED[name] == after_resolution[name], name
+
+
+def test_bug_record_module_constants_are_pinned_to_the_schema() -> None:
+    """K5 residual D9: core/models/bugs.py restates the schema's evidence_diff
+    pattern, diff_direction enum, and status enum as its own zero-I/O runtime
+    mirror (the model may never read the schema file itself — it is not in
+    architecture.md's Core file-I/O authorized set, and BugRecord.resolve()'s
+    format checks are directly unit-tested as a PURE function with no DI'd
+    validator — see tests/unit/core/models/test_bug_record.py). This is the
+    ONE decider that keeps the restatement from silently drifting: it fails
+    the moment the model's constants stop matching the schema's declared
+    values, byte for byte, rather than the docstring's claim going unchecked."""
+    schema = _schema()
+    props = schema["properties"]
+
+    assert _bugs_module._EVIDENCE_DIFF_PATTERN_RE.pattern == props["evidence_diff"]["pattern"]
+    assert frozenset(props["diff_direction"]["enum"]) == _bugs_module._DIFF_DIRECTIONS
+    assert frozenset(props["status"]["enum"]) == _bugs_module._STATUS_VALUES
 
 
 def test_bug_record_schema_rejects_an_unknown_property_and_a_bad_status() -> None:

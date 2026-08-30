@@ -18,7 +18,6 @@ tags: [sdd, gate, hooks, enforcement, no-locks, privacy]
 | LAW | Projected law files — fail-closed, human-only |
 | ADDITIVE | `specs/{bugs,backlog,audits}`, workspace reports/handoffs/tmp — any mode |
 | MEMORY | Writable only in `DEFINITION` or `CLOSURE` |
-| FROZEN | `specs/{backlog,bugs,audits}/_archive/` and legacy `specs/_archive/`, matched before ADDITIVE |
 | PROTECTED | Session identity records, fail-closed |
 | MUTATING | Everything else, unless this session resolves READ; `specs/releases/**` throughout |
 

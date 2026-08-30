@@ -82,7 +82,7 @@ def target_paths(payload: dict[str, Any]) -> list[str]:
     open).
 
     FR-W4-04 (T-014-02): a multi-file ``apply_patch`` must surface every file header so
-    the gate can classify each path and let the most-restrictive verdict win (one FROZEN
+    the gate can classify each path and let the most-restrictive verdict win (one
     or PROTECTED header blocks the whole patch). Closes
     ``sdd-gate-apply-patch-multi-file-first-header-only``.
     """

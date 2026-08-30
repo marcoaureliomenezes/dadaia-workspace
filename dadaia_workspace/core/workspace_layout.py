@@ -16,6 +16,7 @@ from __future__ import annotations
 import re
 
 __all__ = [
+    "AUDIT_DIR_NAME_PATTERN",
     "AUDIT_DIR_NAME_RE",
     "DADAIA_ADDITIVE_PREFIXES",
     "DADAIA_ALLOWED_SUBDIRS",
@@ -26,11 +27,16 @@ __all__ = [
     "ROOT_ALLOWED_FILES",
 ]
 
-#: SPEC-DOC-030 (constitution §8): every new ``specs/audits/`` directory must be named
-#: ``<YYYYMMDDTHHMMSSZ>-<session_id_8chars>`` so concurrent additive sessions never
-#: collide. v0.5.0 T-050-25A: single home for this shape — ``doctor_closure_audit.py``
-#: and ``gate_policy.py`` both repeated it in prose; one fact, one place (module docstring).
-AUDIT_DIR_NAME_RE: re.Pattern[str] = re.compile(r"^\d{8}T\d{6}Z-[A-Za-z0-9]{8}$")
+#: SPEC-DOC-030 (DADAIA.md §6.8, v6 canon): every new ``specs/audits/`` directory must
+#: be named ``<YYYYMMDD>-<slug>`` — the SAME shape ``features.specs.canon``'s own
+#: audits ``CanonEntry`` pattern uses (bug
+#: spec-doc-030-audit-dir-rule-contradicts-dadaia-6-8-canon: this constant used to
+#: state an older, stale ``<YYYYMMDDTHHMMSSZ>-<session_id_8chars>`` shape that
+#: contradicted the law). One fact, one place: ``core`` may not import ``features``, so
+#: the fragment lives here and ``canon.py`` imports it — never a second, independently
+#: hand-kept regex.
+AUDIT_DIR_NAME_PATTERN: str = r"\d{8}-[a-z0-9][a-z0-9-]*"
+AUDIT_DIR_NAME_RE: re.Pattern[str] = re.compile(f"^{AUDIT_DIR_NAME_PATTERN}$")
 
 #: Directories the workspace root may contain (the Workspace Root Law).
 ROOT_ALLOWED_DIRS: frozenset[str] = frozenset(

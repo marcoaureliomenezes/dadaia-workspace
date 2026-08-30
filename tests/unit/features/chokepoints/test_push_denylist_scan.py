@@ -14,7 +14,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from dadaia_workspace.core.protocols.git_object_reader import GitObjectReadError, ScannedObject
+from dadaia_workspace.core.models.git_scan import GitObjectReadError, ScannedObject
 from dadaia_workspace.features.chokepoints import push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import PushRef, parse_push_refs
 from dadaia_workspace.features.specs.canon import canon_violations, verdict_violations

@@ -385,9 +385,10 @@ def test_silent_matrix(tmp_path: Path) -> None:
     )
     assert "SPEC-DOC-028" not in _codes(SpecsDoctor(specs_f2).check())  # no repo_root
 
-    # DOC-030: canonical/grandfathered dirs + absent audits/ -> silent.
+    # DOC-030: canonical (DADAIA.md §6.8 <YYYYMMDD>-<slug>)/grandfathered dirs + absent
+    # audits/ -> silent.
     specs_g1 = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-030ok"))
-    (specs_g1 / "audits" / "20260701T000000Z-abcd1234").mkdir(parents=True)
+    (specs_g1 / "audits" / "20260701-my-audit-slug").mkdir(parents=True)
     assert "SPEC-DOC-030" not in _codes(SpecsDoctor(specs_g1).check())
     specs_g2 = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-030gf"))
     for name in (
@@ -402,6 +403,17 @@ def test_silent_matrix(tmp_path: Path) -> None:
     specs_g3 = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-030absent"))
     assert not (specs_g3 / "audits").exists()
     assert "SPEC-DOC-030" not in _codes(SpecsDoctor(specs_g3).check())
+
+
+def test_doc030_accepts_the_dadaia_md_6_8_canon_shape_yyyymmdd_dash_slug(tmp_path: Path) -> None:
+    """Bug spec-doc-030-audit-dir-rule-contradicts-dadaia-6-8-canon: DADAIA.md section
+    6.8 (the current law) and features.specs.canon's own audits CanonEntry both declare
+    an audit dir as ``<YYYYMMDD>-<slug>`` — the SAME shape a real audit dir on this repo
+    carries (``20260827-canon-v6-first-audit``). SPEC-DOC-030 must accept it silently,
+    never WARN against a stale session-timestamp shape the law no longer states."""
+    specs = _make_clean_specs_tree(tmp_path)
+    (specs / "audits" / "20260827-canon-v6-first-audit").mkdir(parents=True)
+    assert "SPEC-DOC-030" not in _codes(SpecsDoctor(specs).check())
 
     # DOC-031: terminal-and-referenced, never-referenced-open, and aggregate files
     # skipped -> all silent. The "## Backlog returns" vs "## Dispositions" heading

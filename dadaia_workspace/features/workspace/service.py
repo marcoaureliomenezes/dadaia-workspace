@@ -6,8 +6,8 @@ from pathlib import Path
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.models.harness_profile import HarnessProfile
 from dadaia_workspace.core.models.workspace import Workspace
-from dadaia_workspace.core.protocols.runtime_env import PythonEnvironmentManager
-from dadaia_workspace.core.protocols.storage import PublicAssetManager
+from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 
 # Durable directories — must not be cleared by maintenance routines
 _DADAIA_DURABLE_DIRS = [
@@ -38,8 +38,8 @@ _EMPTY_SERVER_REGISTRY = {
 class WorkspaceService:
     def __init__(
         self,
-        public_assets: PublicAssetManager,
-        python_env: PythonEnvironmentManager,
+        public_assets: FileSystemPublicAssetManager,
+        python_env: VenvPythonEnvironmentManager,
     ) -> None:
         self._public_assets = public_assets
         self._python_env = python_env

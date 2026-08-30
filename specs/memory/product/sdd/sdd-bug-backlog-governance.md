@@ -10,11 +10,11 @@ tags: [sdd, governance, release-lifecycle, backlog, bugs, gitflow]
 ## Bugs
 
 - `specs/bugs/BUGS.jsonl` is the single canonical ledger: one record per bug, appended once, keyed by `id`, git history being that line's change log.
-- `bug-record-v1.schema.json` names every field and marks it immutable core, write-once or mutable governance.
+- `bug-record-v1.schema.json` names every field and marks it immutable core, write-once or mutable governance; `core/models/bugs.py` mirrors its `status` and `diff_direction` enums and `evidence_diff` pattern zero-I/O, pinned by `tests/contract/test_bug_record_schema.py`.
 - `status` is `open | resolved | superseded | deferred | rejected`; `resolved` requires a regression seam, a sweep closure is `superseded_by`, and a reopen is a new record declaring `caused_by`.
 - `surface` is a closed enum whose feature arm equals the import-linter independence contract's `modules =` list; `component` is free-text `path#symbol`.
 - `features/bugs`'s record store is the only code path that writes a governance field, sanitizing then masking each write once through the push scan's denylist loader, and rewriting compare-then-swap with refuse-stale plus retry ([[sdd-gate-v3]]).
-- `RecordStore.scan()` is the ledger's one parser, yielding a `MalformedLine` for a row it cannot read, so every reader — the CLI, the doctor, the audit — diagnoses a bad line identically.
+- `JsonlRecordStore.scan()` is the ledger's one parser, yielding a `MalformedLine` for a row it cannot read, so every reader — the CLI, the doctor, the audit — diagnoses a bad line identically.
 - A terminal status is reachable only through a transition that carries its evidence: `BugRecord.resolve/supersede/defer/reject` raise `IncompleteTransitionError` on missing input, and the model itself refuses a bare `status` key.
 - Nine verbs sit over that seam — `append`, `status`, `stats`, `update` (refusing an immutable core field, a second write to a write-once field, and `status` outright), `resolve`, `supersede`, `defer`, `reject` and `archive`; no `--event` flag exists.
 - Legacy v5-fold records carry `migration_note="v5-fold-incomplete"` and warn no further.

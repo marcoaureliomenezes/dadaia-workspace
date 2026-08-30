@@ -98,7 +98,7 @@
     },
     {
       "code": "SPECS-VERSION",
-      "description": "specs_pattern_version is 0, below the canonical 6. Run: dadaia specs upgrade",
+      "description": "specs_pattern_version is 0, below the canonical 6. Migrate the tree to canon v6 (dadaia-workspace 0.4.x, or by hand) and re-stamp constitution.md",
       "path": "<SPECS>/constitution.md",
       "severity": "warning"
     },
@@ -110,13 +110,13 @@
     },
     {
       "code": "SPEC-DOC-030",
-      "description": "Audit dir 'audits/bad-audit-name' does not follow the collision-safe naming law <YYYYMMDDTHHMMSSZ>-<session_id_8chars> (constitution §8) — rename it (SPEC-DOC-030, WARNING).",
+      "description": "Audit dir 'audits/bad-audit-name' does not follow the naming law <YYYYMMDD>-<slug> (DADAIA.md §6.8) — rename it (SPEC-DOC-030, WARNING).",
       "path": "<SPECS>/audits/bad-audit-name",
       "severity": "warning"
     },
     {
       "code": "SPEC-DOC-034",
-      "description": "specs/backlog/_archive/ is missing — the FROZEN landing zone for disposed artifacts (SPEC-DOC-034, WARNING). Auto-fix available (run doctor --fix).",
+      "description": "specs/backlog/_archive/ is missing — the histo landing zone for disposed artifacts (SPEC-DOC-034, WARNING). Auto-fix available (run doctor --fix).",
       "path": "<SPECS>/backlog/_archive",
       "severity": "warning"
     },

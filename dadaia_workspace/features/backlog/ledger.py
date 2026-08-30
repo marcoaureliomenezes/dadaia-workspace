@@ -14,10 +14,10 @@ convention with no data behind it" shape FR13 condemns. T-050-13A relocated all 
 one append-only file, ``specs/backlog/_archive/consumed_backlog_histo.jsonl`` (one
 :class:`~dadaia_workspace.core.models.backlog.ConsumedBacklogHistoRecord` per release),
 through the SAME generic
-:class:`~dadaia_workspace.core.protocols.record_store.RecordStore` seam FR5 (T-050-13)
-already uses for ``backlog_histo.jsonl`` — DI via ``core.protocols`` (the concrete store
-is composed at ``container.build_consumed_backlog_histo_store``); this module never
-imports ``infrastructure`` directly (``features-no-infrastructure`` lint contract).
+:class:`~dadaia_workspace.infrastructure.jsonl_record_store.JsonlRecordStore` FR5
+(T-050-13) already uses for ``backlog_histo.jsonl`` — DI: the CLI callsite
+(``cli.commands.newartifacts``) builds the store, this module only ever reads the
+instance it is handed (ADR-0001).
 
 R1 obligations: **read** the ledger mechanically, tolerating absence (no store injected,
 or its ledger holds no records → ``{}`` → BL-STALE is a no-op, never a false ERROR —
@@ -27,12 +27,14 @@ acceptance §3.7.6). R1 does NOT write it; the writer is R2's release-definition
 from __future__ import annotations
 
 from dadaia_workspace.core.models.backlog import ConsumedBacklogHistoRecord
-from dadaia_workspace.core.protocols.record_store import RecordStore
+from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
 
 __all__ = ["read_consumed"]
 
 
-def read_consumed(store: RecordStore[ConsumedBacklogHistoRecord] | None) -> dict[str, set[str]]:
+def read_consumed(
+    store: JsonlRecordStore[ConsumedBacklogHistoRecord] | None,
+) -> dict[str, set[str]]:
     """Iterate the relocated consumed-backlog histo store → ``{slug: shipped_anchors}``.
 
     Returns ``{}`` when *store* is ``None`` (no ledger injected) or its ledger holds no

@@ -5,8 +5,8 @@ from datetime import UTC, datetime, timedelta
 
 from dadaia_workspace.core.exceptions import PortConflictError, PortNotRegisteredError
 from dadaia_workspace.core.models.server_registry import PortEntry, PortStatus
-from dadaia_workspace.core.protocols.process_probe import ProcessProbe
-from dadaia_workspace.core.protocols.server_registry_store import ServerRegistryStore
+from dadaia_workspace.infrastructure.json_server_registry_store import JsonServerRegistryStore
+from dadaia_workspace.infrastructure.process_probe_adapter import OsProcessProbe
 
 _DEFAULT_TTL_HOURS = 8
 _DEFAULT_MIN_PORT = 3000
@@ -31,7 +31,7 @@ def _base_port(project: str, min_port: int, max_port: int) -> int:
     return min_port + offset
 
 
-def _is_stale(entry: PortEntry, probe: ProcessProbe) -> bool:
+def _is_stale(entry: PortEntry, probe: OsProcessProbe) -> bool:
     try:
         if _parse_dt(entry.expires_at) < _now_utc():
             return True
@@ -41,7 +41,7 @@ def _is_stale(entry: PortEntry, probe: ProcessProbe) -> bool:
 
 
 class ServerRegistryService:
-    def __init__(self, store: ServerRegistryStore, probe: ProcessProbe) -> None:
+    def __init__(self, store: JsonServerRegistryStore, probe: OsProcessProbe) -> None:
         self._store = store
         self._probe = probe
 

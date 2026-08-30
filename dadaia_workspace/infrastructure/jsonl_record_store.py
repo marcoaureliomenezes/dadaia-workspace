@@ -1,27 +1,37 @@
 """Generic JSONL "one record per id" store (v0.5.0 FR2, AR-1 ruling answer (b)).
 
+ADR-0001 (accepted, "the ring rule stays but the PORT requirement is dropped"):
+:class:`JsonlRecordStore` was the ONLY production adapter behind the retired
+``core/protocols/record_store.py`` Protocol — a single-adapter port is pure interface
+tax (measured: 23 Protocol classes workspace-wide, only 4 with >= 2 adapters), so every
+consumer now types against this concrete class directly
+(``tests/contract/test_protocols_have_two_adapters.py`` polices the Protocol set that
+remains). :class:`MalformedLine`, :class:`RecordNotFoundError` and
+:class:`StaleRecordWriteError` move here with it — they are this store's own
+diagnostics/exceptions, never shared by a second adapter, so they have no reason to
+live in a separate ``core/protocols`` module either.
+
 Model-agnostic: it knows the ledger's file mechanics only — append, iterate, atomic
-in-place rewrite, refuse-stale — and imports no model (`core/protocols/record_store.py`
-docstring, AR-1 (b)(iv)). Takes a file ``Path`` directly, never a directory plus a
-filename constant — the ledger's actual name (``BUGS.jsonl`` today) is the
-feature/container's concern, this module knows no ledger (AR-1 (b)(i)). Reads split on
-``"\\n"`` only, never ``str.splitlines()`` — carrying forward the T-045-20 root-cause fix
-at the one reader this release leaves standing (AR-1 (b)(ii); bug
-``bug-event-field-with-unicode-line-separator-silently-drops-the-event``).
+in-place rewrite, refuse-stale — and imports no model (AR-1 (b)(iv)). Takes a file
+``Path`` directly, never a directory plus a filename constant — the ledger's actual name
+(``BUGS.jsonl`` today) is the feature/CLI caller's concern, this module knows no ledger
+(AR-1 (b)(i)). Reads split on ``"\\n"`` only, never ``str.splitlines()`` — carrying
+forward the T-045-20 root-cause fix at the one reader this release leaves standing
+(AR-1 (b)(ii); bug ``bug-event-field-with-unicode-line-separator-silently-drops-the-event``).
 
 ``update``/``remove`` refuse a stale rewrite by comparing the ledger's LIVE bytes,
 re-read as ``atomic_write``'s very last step before ``os.replace`` (``expected_previous``,
 bug ``bugs-record-store-append-clobbers-concurrent-update-batch``), to the snapshot read
 at the top of the call — never mtime (sub-second granularity, Windows; AR-1 (b)(iii)) —
-raising :class:`~dadaia_workspace.core.protocols.record_store.StaleRecordWriteError` the
-caller retries (A2.9, one race semantics: refuse-stale, never last-write-wins). A
-staleness check performed by the CALLER before invoking a separate, unconditional write
-call leaves a gap for exactly this: a concurrent write landing while that write call is
-still serializing content is invisible to the caller's own check and gets silently
-discarded by the swap that follows — the symptom the bug above reports (a concurrent
-``append`` erasing an in-flight ``update`` batch, every command exiting 0). Every line
-OTHER than the one being updated is copied through verbatim (never re-serialized), so a
-governance update leaves every other byte of the file identical (A2.2c).
+raising :class:`StaleRecordWriteError` the caller retries (A2.9, one race semantics:
+refuse-stale, never last-write-wins). A staleness check performed by the CALLER before
+invoking a separate, unconditional write call leaves a gap for exactly this: a
+concurrent write landing while that write call is still serializing content is
+invisible to the caller's own check and gets silently discarded by the swap that
+follows — the symptom the bug above reports (a concurrent ``append`` erasing an
+in-flight ``update`` batch, every command exiting 0). Every line OTHER than the one
+being updated is copied through verbatim (never re-serialized), so a governance update
+leaves every other byte of the file identical (A2.2c).
 """
 
 from __future__ import annotations
@@ -29,18 +39,55 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import Callable, Iterable, Iterator, Mapping
+from dataclasses import dataclass
 from pathlib import Path
 
 from dadaia_workspace.core.atomic_write import ConcurrentModificationError, atomic_write
-from dadaia_workspace.core.protocols.record_store import (
-    MalformedLine,
-    RecordNotFoundError,
-    StaleRecordWriteError,
-)
 
-__all__ = ["JsonlRecordStore"]
+__all__ = ["JsonlRecordStore", "MalformedLine", "RecordNotFoundError", "StaleRecordWriteError"]
 
 _LOG = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class MalformedLine:
+    """One ledger line a :class:`JsonlRecordStore` could not parse as its record type —
+    the ONE malformed-line diagnosis :meth:`JsonlRecordStore.scan` yields, covering
+    every way a line can fail: not valid JSON, not a JSON object, or refused by the
+    model's own ``from_dict`` (a missing required field, an invalid closed-enum value,
+    or — historically — a v5-shaped event line that never carried the v6 required field
+    set). ``lineno`` is 1-based, counted over a literal ``"\\n"`` split (never
+    ``str.splitlines()``, which corrupts the count on a line carrying a
+    U+2028/U+2029/U+0085 unicode line separator)."""
+
+    lineno: int
+    raw: str
+    reason: str
+
+
+class RecordNotFoundError(Exception):
+    """Raised by :meth:`JsonlRecordStore.update` when no record with the given id exists."""
+
+    def __init__(self, record_id: str) -> None:
+        super().__init__(f"no record with id {record_id!r}")
+        self.record_id = record_id
+
+
+class StaleRecordWriteError(Exception):
+    """Raised by :meth:`JsonlRecordStore.update`/:meth:`JsonlRecordStore.remove` when the
+    file changed since it was read.
+
+    The ONE race semantics FR2 states: refuse-stale, never last-write-wins (A2.9). The
+    caller re-reads and retries — nothing blocks and nothing is silently lost; the file
+    is never left corrupt, because the rewrite is refused before it is ever attempted.
+    """
+
+    def __init__(self, record_id: str) -> None:
+        super().__init__(
+            f"record store changed since it was read while updating {record_id!r} — "
+            "re-read and retry"
+        )
+        self.record_id = record_id
 
 
 class JsonlRecordStore[T]:
@@ -48,8 +95,9 @@ class JsonlRecordStore[T]:
 
     *to_dict* / *from_dict* are plain callables (never a hand-imported model type —
     this module stays generic across bugs/findings/backlog) that serialize a record to
-    its JSONL object shape and parse one back. Structurally satisfies
-    :class:`~dadaia_workspace.core.protocols.record_store.RecordStore`.
+    its JSONL object shape and parse one back — the sole production adapter
+    (ADR-0001; the port it used to satisfy, ``core/protocols/record_store.py``, is
+    retired).
     """
 
     def __init__(
@@ -67,11 +115,9 @@ class JsonlRecordStore[T]:
     def path(self) -> Path:
         """The ledger file this concrete store instance is rooted at.
 
-        NOT part of the :class:`~dadaia_workspace.core.protocols.record_store.RecordStore`
-        Protocol (v0.5.0 S1 FR23 firing, A1) — a caller typed to the Protocol can never
-        reach through it to the raw file; this remains a plain implementation-detail
-        attribute of the concrete adapter, for a test that builds one directly (never
-        for a feature-layer consumer holding the Protocol type).
+        Never surfaced through a typed seam a caller could reach through to rewrite the
+        ledger's raw bytes directly (v0.5.0 S1 FR23 firing, A1) — this remains a plain
+        implementation-detail attribute, for a test that builds one directly.
         """
         return self._path
 

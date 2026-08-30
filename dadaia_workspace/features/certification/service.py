@@ -16,8 +16,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from dadaia_workspace.core.protocols.certification_process import CertificationProcess
 from dadaia_workspace.core.redaction import Redactor
+from dadaia_workspace.infrastructure.certification_process import SubprocessCertificationProcess
 
 
 @dataclass(frozen=True)
@@ -38,7 +38,7 @@ class CertificationResult:
         return asdict(self)
 
 
-def _git(process: CertificationProcess, cwd: Path, *args: str) -> None:
+def _git(process: SubprocessCertificationProcess, cwd: Path, *args: str) -> None:
     proc = process.run(
         ["git", "-c", "user.email=certify@dadaia.invalid", "-c", "user.name=dadaia-certify", *args],
         cwd=cwd,
@@ -125,7 +125,7 @@ def _codex_probe_outcome(output: str, cwd: Path) -> tuple[bool, str]:
     )
 
 
-def _codex_live_probe_detail(process: CertificationProcess, cwd: Path) -> str:
+def _codex_live_probe_detail(process: SubprocessCertificationProcess, cwd: Path) -> str:
     """A22.4: prove the installed Codex CLI actually answers, not just that its files exist.
 
     Runs ``codex --version`` then a bounded, read-only, non-interactive ``codex exec``
@@ -194,7 +194,7 @@ def _all_checks_ok(checks: Iterable[CertificationCheck]) -> bool:
 
 
 def certify(
-    workspace_root: Path, process: CertificationProcess, *, keep: bool = False
+    workspace_root: Path, process: SubprocessCertificationProcess, *, keep: bool = False
 ) -> CertificationResult:
     """Run the deterministic public-feature journey in a disposable workspace."""
     run_root = workspace_root / ".dadaia" / "tmp" / "certification" / uuid.uuid4().hex

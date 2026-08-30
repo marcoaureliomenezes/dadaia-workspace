@@ -16,11 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.protocols.git_object_reader import (
-    ZERO_SHA,
-    GitObjectReadError,
-    ScannedObject,
-)
+from dadaia_workspace.core.models.git_scan import ZERO_SHA, GitObjectReadError, ScannedObject
 from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
 
 pytestmark = [pytest.mark.integration, pytest.mark.slow]

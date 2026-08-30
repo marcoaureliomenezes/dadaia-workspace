@@ -230,6 +230,11 @@ def doctor(
         target,
         public_dir=resolved_public,
         templates_dir=_TEMPLATES_DIR,
+        # repo_root: the same specs_dir.parent convention _resolve_head_and_parent_sha
+        # already documents (specs/ sits directly at the repo root) — feeds
+        # SPEC-DOC-028 (constitution file-refs) and SPEC-DOC-045 (pyproject version
+        # vs release id at closure), both otherwise permanent no-ops.
+        repo_root=target.parent,
         head_sha=head_sha,
         parent_sha=parent_sha,
         bug_store_factory=container.build_bug_record_store,

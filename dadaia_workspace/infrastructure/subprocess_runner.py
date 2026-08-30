@@ -1,8 +1,10 @@
-"""SubprocessProcessRunner — production implementation of ``ProcessRunner``.
+"""SubprocessProcessRunner — the sole subprocess-execution adapter (ADR-0001: no
+``ProcessRunner`` port — one adapter, no swap seam).
 
 This is the ONLY module in ``dadaia_workspace`` that may import ``subprocess``
-for feature-layer use.  All features/ modules must consume the ``ProcessRunner``
-protocol and receive this adapter (or a test fake) via injection.
+for feature-layer use.  Every feature that runs an external command constructs
+this adapter (or a test fake, structurally duck-typed — never a second production
+implementation) directly.
 """
 
 from __future__ import annotations
@@ -10,8 +12,15 @@ from __future__ import annotations
 import subprocess
 from collections.abc import Callable, Sequence
 from pathlib import Path
+from typing import NamedTuple
 
-from dadaia_workspace.core.protocols.process_runner import ProcessResult
+
+class ProcessResult(NamedTuple):
+    """Outcome of running an external command."""
+
+    returncode: int
+    stdout: str
+    stderr: str
 
 
 class SubprocessProcessRunner:
