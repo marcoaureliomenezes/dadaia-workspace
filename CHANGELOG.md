@@ -54,20 +54,65 @@ for this task, so none is touched here):
 
 Left exactly as written; a future task can pick this up.
 
-## [0.5.1] — 2026-08-30
+## [0.5.0] — 2026-08-30
 
-Internal spec-release id: `0.5.1` ("deepening simplification K1–K11"). Shipped to `main` at
-`0fee8cdd` (PR #228); publication withheld — no tag, PyPI stays `0.4.4`.
-
-Post-ship work carried on `feature/0.5.2` and still unpublished is folded into this section:
-ADR 0001 executed, two `specs doctor` rules, one CLI signature change, four bugs fixed.
+One published version for everything since `0.4.4`: the internal spec-release ids `0.4.5`, `0.5.0` and `0.5.1` (canon v6, deepening simplification K1–K11, ADR 0001 executed) ship together as PyPI `0.5.0` — a candidate never mints a version; the version axis is the PyPI lineage.
 
 ### Added
+- **One atomic-write primitive** (`core/atomic_write.py`) replacing eleven per-feature
+  writers; derived call-site census; injected-failure battery on the single seam.
+- **Write-time bug-event redaction and sanitation**: the bug ledger masks denylisted
+  terms through the push gate's own loader and strips raw control/format characters
+  (TAB/LF/CR preserved) at the service seam.
+- `specs init` refuses a symlinked target on the explicit `--specs-dir` branch.
+- Workspace doctor **INV-6**: registry-wide slug-ownership collision detection
+  (report-only); `.dadaia/references/` sanctioned as an operator-owned subtree.
+
+- **One record per bug** (`specs/bugs/BUGS.jsonl`, `bug-record-v1`): immutable core,
+  write-once root cause/solution/FR23 evidence, mutable governance fields (`status`,
+  `cause`, `caused_by`, `resolved_commit`, `resolved_release`, `audited`); provenance
+  (`registration_commit`, `resolved_commit`, granularity markers) derived from a
+  `--full-history` walk of the ledger; one write seam — `dadaia bugs update` /
+  `dadaia bugs archive`.
+- **`RELEASE.jsonl`** milestones (`defined`, `implemented`, `shipped`, `audited`, `rc`,
+  `phase`, `note`) replace `ACTIVE.md` and `CLOSURE.md`; archived releases back-filled into
+  `specs/releases/_archive/releases_histo.jsonl`.
+- **Audits as committed artifacts** (`specs/audits/<YYYYMMDD>-<slug>/AUDIT.md` +
+  `FINDINGS.jsonl`, `finding-record-v1`), three pillars run together (bug history,
+  spec compliance, memory drift); `dd-audit-project` rewritten; first audit shipped.
+- **`specs/ADRs/`** canon (Nygard + MADR, operator-only acceptance) with the first
+  28 proposed ADRs; memory trio split into Part 1 Principles (each with `Measured by:`)
+  and Part 2 Implementation; constitution references principles by id.
+- `dd-diagnose` skill (lineage as phase 0); `behavior-map.json` — every skill and scoped
+  `AGENTS.md` maps to one `DADAIA.md` section, enforced by contract tests.
+- `core/atomic_write` compare-and-swap (`expected_previous`) — the one primitive refuses
+  a stale rewrite.
+
 - `specs doctor` gains `SPEC-DOC-045` (ERROR): `pyproject.toml`'s `[tool.poetry].version` must equal
   the active release id once that release reaches `CLOSURE`/`ARCHIVED` — read off disk, never from
   installed-package metadata; silent without a `repo_root`, a `pyproject.toml` or a live release.
 
 ### Changed
+- **LAW path class classified by origin** (workspace-root law family + manifest-tracked
+  projections) — a repo's own domain-scoped `AGENTS.md` is MUTATING.
+- Foreign-slug push-scan layer matches **whole tokens** only (hyphen/dot-glued
+  identifiers are other identifiers).
+- Byte goldens pin policy only; asset rosters and the skill-inventory oracle are derived
+  by scanning `public/**` — three hand-kept inventories deleted.
+- Always-on surface diet: `DADAIA.md` negations 58 → 28, bound-session prefix
+  1 506 → 878 tokens, persona bodies −92 lines with coverage tables; Intent vocabulary
+  fixed at four tokens.
+
+- Specs pattern **v6**: canon tree, `TREE-8`, `specs doctor --recipe`; memory files
+  `ARCHITECTURE.md` / `QUALITY.md` / `TECHSTACK.md`; backlog is a live photo with
+  `backlog_histo.jsonl` (LEDGER section and BL-DUP retired).
+- Hooks validate only at the publication boundary: pre-commit is advisory (always exit 0);
+  pre-push keeps branch policy + denylist scan; the CI preflight is an always-on rule.
+- `.gitignore` inversion tracks every canon governance path; the PR verdict gate derives
+  its evidence roots from the canon and refuses `_ideas/`.
+- `dd-bug-fix` renamed `dd-bug-resolution`; `dd-release-implement` rebuilt around
+  `RELEASE.jsonl` records.
+
 - **One decider per fact.** `core.invocation.resolve` resolves workspace, session, context, mode,
   release and phase once per process (K1); `core.session_store` is the sole owner of
   `.dadaia/sessions/`; `presence.gc` is the only reaper (K2); a declarative `ProjectionRule` table
@@ -102,6 +147,10 @@ ADR 0001 executed, two `specs doctor` rules, one CLI signature change, four bugs
   (ADR 0002), a parallel session's worktree created before launch, staging discipline in §7.3.
 
 ### Removed
+- Bug event fold and state machine, `jsonl_bug_store`, `ACTIVE.md`, `CLOSURE.md`
+  parsers, `rules-skills-map.json`, `specs release open` / `specs segment open`,
+  pre-commit `backlog doctor` block, root `specs/assets/`.
+
 - `core/specs_resolver.py`, `core/session_env.py`, `features/spec_context/session_identity.py`,
   the post-gate reaper, `features/spec_artifacts/`, `features/chokepoints/service.py`,
   `features/bugs/migrate_v5.py`, the pre-v6 migration steps, the duplicate memory-catalog script,
@@ -121,79 +170,6 @@ ADR 0001 executed, two `specs doctor` rules, one CLI signature change, four bugs
   `spec-doc-030-audit-dir-rule-contradicts-dadaia-6-8-canon`,
   `release-shipped-without-a-pyproject-version-bump`,
   `verdict-check-head-or-first-parent-cannot-be-satisfied-by-a-develop-to-main-pr`.
-
-## [0.5.0] — 2026-08-27
-
-Internal spec-release id: `0.5.0` ("governance, lineage and audits"). Bare-semver release ids
-begin here (specs pattern v6); `v`-prefixed ids are read-only archive history.
-The older `[0.5.0] — Unreleased` heading further below is the retired internal spec id
-`v0.3.0` (see the versioning note) — kept as written, never renamed; this section is the
-package version.
-
-### Added
-- **One record per bug** (`specs/bugs/BUGS.jsonl`, `bug-record-v1`): immutable core,
-  write-once root cause/solution/FR23 evidence, mutable governance fields (`status`,
-  `cause`, `caused_by`, `resolved_commit`, `resolved_release`, `audited`); provenance
-  (`registration_commit`, `resolved_commit`, granularity markers) derived from a
-  `--full-history` walk of the ledger; one write seam — `dadaia bugs update` /
-  `dadaia bugs archive`.
-- **`RELEASE.jsonl`** milestones (`defined`, `implemented`, `shipped`, `audited`, `rc`,
-  `phase`, `note`) replace `ACTIVE.md` and `CLOSURE.md`; archived releases back-filled into
-  `specs/releases/_archive/releases_histo.jsonl`.
-- **Audits as committed artifacts** (`specs/audits/<YYYYMMDD>-<slug>/AUDIT.md` +
-  `FINDINGS.jsonl`, `finding-record-v1`), three pillars run together (bug history,
-  spec compliance, memory drift); `dd-audit-project` rewritten; first audit shipped.
-- **`specs/ADRs/`** canon (Nygard + MADR, operator-only acceptance) with the first
-  28 proposed ADRs; memory trio split into Part 1 Principles (each with `Measured by:`)
-  and Part 2 Implementation; constitution references principles by id.
-- `dd-diagnose` skill (lineage as phase 0); `behavior-map.json` — every skill and scoped
-  `AGENTS.md` maps to one `DADAIA.md` section, enforced by contract tests.
-- `core/atomic_write` compare-and-swap (`expected_previous`) — the one primitive refuses
-  a stale rewrite.
-
-### Changed
-- Specs pattern **v6**: canon tree, `TREE-8`, `specs doctor --recipe`; memory files
-  `ARCHITECTURE.md` / `QUALITY.md` / `TECHSTACK.md`; backlog is a live photo with
-  `backlog_histo.jsonl` (LEDGER section and BL-DUP retired).
-- Hooks validate only at the publication boundary: pre-commit is advisory (always exit 0);
-  pre-push keeps branch policy + denylist scan; the CI preflight is an always-on rule.
-- `.gitignore` inversion tracks every canon governance path; the PR verdict gate derives
-  its evidence roots from the canon and refuses `_ideas/`.
-- `dd-bug-fix` renamed `dd-bug-resolution`; `dd-release-implement` rebuilt around
-  `RELEASE.jsonl` records.
-
-### Removed
-- Bug event fold and state machine, `jsonl_bug_store`, `ACTIVE.md`, `CLOSURE.md`
-  parsers, `rules-skills-map.json`, `specs release open` / `specs segment open`,
-  pre-commit `backlog doctor` block, root `specs/assets/`.
-
-## [0.4.5] — 2026-08-27
-
-Internal spec-release id: `v0.4.5` ("hardening and consolidation"). This version is
-**minted locally and deliberately unpublished** by operator order (O5): the published
-PyPI lineage stays `0.4.2 → 0.4.4` while `main` reads `0.4.5`; the release-gate approval
-is withheld and no `v0.4.5` tag is created.
-
-### Added
-- **One atomic-write primitive** (`core/atomic_write.py`) replacing eleven per-feature
-  writers; derived call-site census; injected-failure battery on the single seam.
-- **Write-time bug-event redaction and sanitation**: the bug ledger masks denylisted
-  terms through the push gate's own loader and strips raw control/format characters
-  (TAB/LF/CR preserved) at the service seam.
-- `specs init` refuses a symlinked target on the explicit `--specs-dir` branch.
-- Workspace doctor **INV-6**: registry-wide slug-ownership collision detection
-  (report-only); `.dadaia/references/` sanctioned as an operator-owned subtree.
-
-### Changed
-- **LAW path class classified by origin** (workspace-root law family + manifest-tracked
-  projections) — a repo's own domain-scoped `AGENTS.md` is MUTATING.
-- Foreign-slug push-scan layer matches **whole tokens** only (hyphen/dot-glued
-  identifiers are other identifiers).
-- Byte goldens pin policy only; asset rosters and the skill-inventory oracle are derived
-  by scanning `public/**` — three hand-kept inventories deleted.
-- Always-on surface diet: `DADAIA.md` negations 58 → 28, bound-session prefix
-  1 506 → 878 tokens, persona bodies −92 lines with coverage tables; Intent vocabulary
-  fixed at four tokens.
 
 ## [0.4.4] — 2026-08-24
 
