@@ -20,7 +20,6 @@ skills:
   - dadaia-workspace-spec-navigator
   - dadaia-step0-memory-bootstrap
   - dd-ai-eng-knowhow
-  - dev-server-registry
   - dd-release-implement
   - dd-bug-resolution
   - dd-bug-registration

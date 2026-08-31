@@ -58,3 +58,18 @@ Cache of expensive lookups, not a transcription of the live command tree — whe
 - Command groups (continued): `bugs`, `backlog`/`release`, `reports`, `server`, `ci`, `public`, `doctor`/`migrate`, `init`/`export`/`import`/`clean`.
 - `DADAIA.md` §2 — SDD stages are agent-dispatched, not a CLI verb group.
 - `dd-bug-registration` — classify-first, redaction, `dadaia bugs append` reference.
+
+## 5. Workspace-management idioms (absorbed from dadaia-workspace-manager, T-053-25)
+
+- State is CLI-owned: never edit `.dadaia/states/*.json`, never `git clone` into `repos/`, never `rm -rf repos/<slug>/`, never `tar xzf` an import — `dadaia context alive|dead`, `dadaia import|export` own those.
+- Bind is the context choice: `dadaia context bind <name> [--mode read|implementation|review] [--release <id>]`; a plain shell exports `DADAIA_CONTEXT=<ctx>` instead.
+- Lifecycle: `create (dead) -> alive -> bind -> dead -> delete`; `context dead` removes the repo from disk — never run it casually mid-switch.
+- Import flow: export on source, move the archive, `dadaia import <archive>`, then verify `dadaia context list` + `dadaia doctor`.
+- NO-LOCKS: binds acquire nothing; MUTATING writes leave advisory presence; a live foreign presence is one throttled warning, never a block.
+
+## 6. Dev-server law (absorbed from dev-server-registry, T-053-25)
+
+- Never open a port without the registry: `dadaia server list` -> `dadaia server next --project <name> --json` -> start -> `dadaia server register --port N --project <name> [--pid ...]`.
+- Use the returned port even when `is_base_port: false`; release on stop (`dadaia server release --port N | --project <name>`).
+- On `PortConflictError`: `server list`, `server clean` if stale, `server next` again.
+- Every discovery detail: `dadaia server --help`.

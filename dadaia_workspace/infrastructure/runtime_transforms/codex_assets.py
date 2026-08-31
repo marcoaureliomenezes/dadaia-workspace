@@ -54,9 +54,7 @@ _CODEX_SKILL_REF_PREFIXES = (
     "dadaia-task-manager",
     "dadaia-test-stewardship",
     "dadaia-workspace-spec-navigator",
-    "dadaia-workspace-spec-reviewer",
     "dd-",
-    "dev-server-registry",
     "memory-ctx",
 )
 

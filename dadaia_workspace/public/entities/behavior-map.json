@@ -62,23 +62,6 @@
    "recorded_at": "2026-08-28"
   },
   {
-   "section": "§3 What is enforced deterministically",
-   "anchor": null,
-   "skill": "dadaia-workspace-manager",
-   "scoped_agents_md": [
-    "dadaia_workspace/public/data/states-AGENTS.md"
-   ],
-   "hash_tuple": {
-    "section": "sha256:342d5b2a79b73fbc4fde6bd059e5fdba2d4addd4d9036ee28397b6e21e3fca5c",
-    "skill": "sha256:b0cf3f3df192ebc725faf888064a5b4009a481813d7ff02f865cc417eaf1db39",
-    "scoped": [
-     "sha256:fe801a2cc3e30d99c18bfa81692f442ab865ace134155cbd6362b6923d3d6e8e"
-    ]
-   },
-   "recorded_by": "ai-engineer",
-   "recorded_at": "2026-08-30"
-  },
-  {
    "section": "§4 Gitflow — the branch contract",
    "anchor": null,
    "skill": "dd-gitflow-default",
@@ -228,13 +211,13 @@
    ],
    "hash_tuple": {
     "section": "sha256:709ba9f35227e8d3c31520eb9375ff2a856845db234e18c7f90102f11b809d97",
-    "skill": "sha256:e15e9d3e79dd9b8490829c6e6737b980df0533032a43b01870f44da97242156c",
+    "skill": "sha256:34393376010ed7eec71fb23b0e0f3da34ccdd4950962c2a659b4765e60ccc6cf",
     "scoped": [
      "sha256:fe16b7e516152b0a6b314025f1edf1486e0bf8248a04210b982b08d4faa645f4"
     ]
    },
    "recorded_by": "ai-engineer",
-   "recorded_at": "2026-08-28"
+   "recorded_at": "2026-08-31"
   },
   {
    "section": "§6 Specs, tasks and memory",
@@ -275,26 +258,13 @@
    ],
    "hash_tuple": {
     "section": "sha256:709ba9f35227e8d3c31520eb9375ff2a856845db234e18c7f90102f11b809d97",
-    "skill": "sha256:cda1b43c4fcfafdd4cefb2d6b5dd98df11fae408eb898988f42043afa8015bb5",
+    "skill": "sha256:ca997fc44f283fc2bb44aba764be4b446cac1d83ebf57b4284041e5238b70e8a",
     "scoped": [
      "sha256:bf746753497fcf6220aaa804797e7f4059d22b40934232ee641d90242be51ad6"
     ]
    },
    "recorded_by": "ai-engineer",
-   "recorded_at": "2026-08-28"
-  },
-  {
-   "section": "§6 Specs, tasks and memory",
-   "anchor": null,
-   "skill": "dadaia-workspace-spec-reviewer",
-   "scoped_agents_md": [],
-   "hash_tuple": {
-    "section": "sha256:709ba9f35227e8d3c31520eb9375ff2a856845db234e18c7f90102f11b809d97",
-    "skill": "sha256:ecf9d7261abcdc8adc81d0d286fba7b8da845115a381afd708a35fc3c54d40ca",
-    "scoped": []
-   },
-   "recorded_by": "ai-engineer",
-   "recorded_at": "2026-08-28"
+   "recorded_at": "2026-08-31"
   },
   {
    "section": "§6 Specs, tasks and memory",
@@ -306,14 +276,14 @@
    ],
    "hash_tuple": {
     "section": "sha256:709ba9f35227e8d3c31520eb9375ff2a856845db234e18c7f90102f11b809d97",
-    "skill": "sha256:1623143aa2dee6e652e10b455beb9a412495617a3ae5b6e3b479ad91e7df53a8",
+    "skill": "sha256:75b24b7f1cb021043a7030284bdf45ce9451d9e25097d5884d8fd318257a062e",
     "scoped": [
      "sha256:2257841d588f3cf5dc96fae6baabcf11fcd494333c368b3665b954aea1e2d20c",
      "sha256:2257841d588f3cf5dc96fae6baabcf11fcd494333c368b3665b954aea1e2d20c"
     ]
    },
    "recorded_by": "ai-engineer",
-   "recorded_at": "2026-08-28"
+   "recorded_at": "2026-08-31"
   },
   {
    "section": "§7 Quality",
@@ -376,17 +346,21 @@
    "recorded_at": "2026-08-28"
   },
   {
-   "section": "§8 The library surface",
+   "section": "§3 What is enforced deterministically",
    "anchor": null,
    "skill": "dd-workspace-doctor",
-   "scoped_agents_md": [],
+   "scoped_agents_md": [
+    "dadaia_workspace/public/data/states-AGENTS.md"
+   ],
    "hash_tuple": {
-    "section": "sha256:376297a9ab263f842bccf31c92b825593aa8dc49d28f201358e0023658af584c",
+    "section": "sha256:342d5b2a79b73fbc4fde6bd059e5fdba2d4addd4d9036ee28397b6e21e3fca5c",
     "skill": "sha256:501b68ebc6fca9a68d83117e271677019c27bc27cfbbcc0c31988538926088d1",
-    "scoped": []
+    "scoped": [
+     "sha256:fe801a2cc3e30d99c18bfa81692f442ab865ace134155cbd6362b6923d3d6e8e"
+    ]
    },
    "recorded_by": "ai-engineer",
-   "recorded_at": "2026-08-28"
+   "recorded_at": "2026-08-31"
   },
   {
    "section": "§8 The library surface",
@@ -395,24 +369,11 @@
    "scoped_agents_md": [],
    "hash_tuple": {
     "section": "sha256:376297a9ab263f842bccf31c92b825593aa8dc49d28f201358e0023658af584c",
-    "skill": "sha256:fe1e8d03155d19a66efba43817687154e92deddf669091254fed6833edeac1a2",
+    "skill": "sha256:7508f5c3236bf5212a173051f2c3e4d1e8a6575a5cb3a3c362e7f12739262448",
     "scoped": []
    },
    "recorded_by": "ai-engineer",
-   "recorded_at": "2026-08-28"
-  },
-  {
-   "section": "§8 The library surface",
-   "anchor": null,
-   "skill": "dev-server-registry",
-   "scoped_agents_md": [],
-   "hash_tuple": {
-    "section": "sha256:376297a9ab263f842bccf31c92b825593aa8dc49d28f201358e0023658af584c",
-    "skill": "sha256:4758508e4f36afa9cafcda88ca3f11fa1407dfeb2f22f242ec986ea925bbc5f6",
-    "scoped": []
-   },
-   "recorded_by": "ai-engineer",
-   "recorded_at": "2026-08-28"
+   "recorded_at": "2026-08-31"
   },
   {
    "section": "§9 Credentials",
