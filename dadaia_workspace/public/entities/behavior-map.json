@@ -165,7 +165,7 @@
         "section": "sha256:ab59448f37391a5442a7dc46013dcc3645474faaac7c6d33d6c1dbf73945fce1",
         "skill": "sha256:5ecf13f2c9f52f7ec2f6b27ee6c043a72043e328b41cf8185e2b39cd2512ae06",
         "scoped": [
-          "sha256:00b84847d83e22f3b3fe6ba6556822c4b3c362dfb864bd792acd5e3e82745b88"
+          "sha256:4e0b67a3c7affffe2dbde34ee2e265dd480c36366de04fd977a667eb56e8b405"
         ]
       },
       "recorded_by": "claude-code",

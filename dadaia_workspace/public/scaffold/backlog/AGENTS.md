@@ -68,5 +68,5 @@ dadaia backlog subjects --resolve <ref> --kind <kind>   # preview how one subjec
 ## 5. Relationship to releases
 
 - A release SPEC names a picked entry's slug under `**Consumes:**`.
-- The entry stays in `active[]` (typically flipped to `status: picked`) until the release closes.
-- At closure, the disposition sweep exits it: `active[]` entry removed, terminal histo record appended or rewritten in place.
+- Purge-on-pick (`DADAIA.md` §6.6): the entry exits `active[]` in the same commit that creates the release SPEC, leaving a provisional `CONSUMED` histo record.
+- At closure, the disposition sweep rewrites that record in place to its terminal token.
