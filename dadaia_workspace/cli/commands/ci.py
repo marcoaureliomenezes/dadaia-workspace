@@ -304,18 +304,15 @@ _SHA40_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 def _first_parent_sha(repo_root: Path, sha: str) -> str | None:
     """The first-parent sha of *sha* in *repo_root*, or ``None`` (root commit, or git
     cannot resolve it — e.g. a shallow clone; the caller's CI job fetches full history).
+
+    Delegates to the ONE first-parent implementation (F015, 20260830 audit) —
+    ``git_objects.GitSubprocessObjectReader.first_parent`` — never a second raw
+    subprocess with its own error modes.
     """
-    try:
-        out = subprocess.run(
-            ["git", "rev-parse", f"{sha}^"],
-            cwd=repo_root,
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return None
-    return out.stdout.strip() or None
+    from dadaia_workspace.container import build_git_object_reader
+
+    parent: str | None = build_git_object_reader().first_parent(repo_root, sha)
+    return parent
 
 
 @app.command("verdict-check")

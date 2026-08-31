@@ -91,8 +91,10 @@ _LAW_MESSAGE = (
 _MEMORY_WRITE_PHASES: frozenset[str] = release_state.MEMORY_WRITE_PHASES
 
 #: READ-resolved mode tokens. READ is opt-in self-protection; all other modes permit
+#: (BOUND_READ retired at 0.5.3/F016: no writer ever minted it — the bind CLI persists
+#: READ bare and BOUND_<mode> only for mutating modes.)
 #: mutating writes and record advisory presence.
-_READ_MODES: frozenset[str] = frozenset({"READ", "BOUND_READ"})
+_READ_MODES: frozenset[str] = frozenset({"READ"})
 
 #: BLOCK message for a READ-resolved session attempting a MUTATING write. It names the
 #: documented path to write rights (``bind --mode implementation``) WITHOUT any banned
@@ -265,7 +267,7 @@ def evaluate(
     remains fail-safe regardless of the presence subsystem's health.
 
     ``mode`` (WS-R4 FR-R4-03) selects the MUTATING sub-policy. A READ-resolved mode
-    (``READ``/``BOUND_READ``, case-insensitive) is **non-acquiring**: a MUTATING write is
+    (``READ``, case-insensitive) is **non-acquiring**: a MUTATING write is
     BLOCKed with the documented-path message — this is the ONLY MUTATING block that
     survives the doctrine, and it is strictly self-scoped (Decision D-3 / v0.1.76 FR4):
     it fires only when THIS session's own mode resolved READ, never a foreign session's.
