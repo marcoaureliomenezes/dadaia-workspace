@@ -40,7 +40,7 @@
   .agents/skills/codebase-design/ (delete), .claude/skills/** (delete).
   Blocked by: T-046-08. Delivers: the survey carries the full reference
   method dadaia-ized; zero unmanaged reference copies remain.
-- [ ] T-046-11 — FR4 Merge C: `dd-bug-resolution` absorbs `dd-diagnose`
+- [-] T-046-11 — FR4 Merge C: `dd-bug-resolution` absorbs `dd-diagnose`
   (7-phase method inline, LINEAGE.md kept as sibling); `dd-diagnose` deleted;
   `DADAIA.md` §7.3 law source updated; behavior-map row removed, overlap
   triple updated, hashes.
