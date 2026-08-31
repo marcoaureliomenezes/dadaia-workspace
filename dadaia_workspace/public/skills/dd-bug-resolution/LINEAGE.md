@@ -1,6 +1,6 @@
 # LINEAGE.md — Phase 0 in Full
 
-Sibling of `SKILL.md` (`dd-diagnose`). The one canonical statement of the lineage window, the filter, and the diff-trust rule (D8, A7.2/A7.3).
+Sibling of `SKILL.md` (`dd-bug-resolution`, Phase 0). The one canonical statement of the lineage window, the filter, and the diff-trust rule (D8, A7.2/A7.3).
 FR14's audit pillar 1 cites this section, never restates it — if the two disagree, this file is stale, fix it here.
 
 ## The window (stated once)

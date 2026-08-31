@@ -12,8 +12,7 @@
     ],
     [
       "dd-bug-registration",
-      "dd-bug-resolution",
-      "dd-diagnose"
+      "dd-bug-resolution"
     ],
     [
       "dadaia-handoff-emitter",
@@ -211,7 +210,7 @@
       ],
       "hash_tuple": {
         "section": "sha256:ab59448f37391a5442a7dc46013dcc3645474faaac7c6d33d6c1dbf73945fce1",
-        "skill": "sha256:8a6954c2f78cd5e74fe1ee650975dfe6726326451a1a5a983930091253617de8",
+        "skill": "sha256:be49d0753978b71948f4f717560193b69299b523b6c32f0229efaa58ac816e59",
         "scoped": [
           "sha256:8d496146c5a9efdd2a4829d8a489e9365dcb0d8bc8752700897e4e7bbc60b8ea"
         ]
@@ -291,21 +290,8 @@
       "skill": "dd-bug-resolution",
       "scoped_agents_md": [],
       "hash_tuple": {
-        "section": "sha256:f4ec3aa97bf457e84daf530f77a2355ec8347a73fe3428cca65cbeeb2eec356b",
-        "skill": "sha256:926da9032a16d329a95a082d99df5909cdc17da110b1b8b8d7eeec6f047929a0",
-        "scoped": []
-      },
-      "recorded_by": "claude-code",
-      "recorded_at": "2026-08-31"
-    },
-    {
-      "section": "§7 Quality",
-      "anchor": "bugs",
-      "skill": "dd-diagnose",
-      "scoped_agents_md": [],
-      "hash_tuple": {
-        "section": "sha256:f4ec3aa97bf457e84daf530f77a2355ec8347a73fe3428cca65cbeeb2eec356b",
-        "skill": "sha256:e60733035aa3382f0233f9c87326f221e22f8a9bc800cf06e51e0495a3f035c8",
+        "section": "sha256:4b0bf3bfc1e2f783e621637866d029dd16612c2e8a973202d42bae3860516248",
+        "skill": "sha256:f84740044a353590eb67db2dbfec6ede26e281bb39e4ef451d0731858f4b5526",
         "scoped": []
       },
       "recorded_by": "claude-code",
@@ -319,10 +305,10 @@
         "dadaia_workspace/public/scaffold/bugs/AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:f4ec3aa97bf457e84daf530f77a2355ec8347a73fe3428cca65cbeeb2eec356b",
+        "section": "sha256:4b0bf3bfc1e2f783e621637866d029dd16612c2e8a973202d42bae3860516248",
         "skill": "sha256:4958f1623d872065b5dd212fae9c43f2fcf8298fe7e1aa5b8ef2bed1b4eac4c1",
         "scoped": [
-          "sha256:68ea6c90043af03d5d377f0d8f6279d8d3084958c506f663779f0d5eb3104269"
+          "sha256:c7535992c4dfdfe6d54e5bc9fa543f41d4146f3ebc17c93ebb185b82a00520bd"
         ]
       },
       "recorded_by": "claude-code",
@@ -336,7 +322,7 @@
         "dadaia_workspace/public/templates/tests-AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:f4ec3aa97bf457e84daf530f77a2355ec8347a73fe3428cca65cbeeb2eec356b",
+        "section": "sha256:4b0bf3bfc1e2f783e621637866d029dd16612c2e8a973202d42bae3860516248",
         "skill": "sha256:16af39900ea719de77a186498d69b10fc440ad6cf5d4c5169776274453a5f257",
         "scoped": [
           "sha256:c4261e173662ef6109f442aa9c590849a74b58c78589d6ec40a5c25d8fe8add3"

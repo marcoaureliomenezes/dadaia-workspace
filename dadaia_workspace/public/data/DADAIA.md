@@ -262,7 +262,7 @@
 - Redact local paths, IPs, hostnames, private names, secrets from every field. Protocol: `dd-bug-registration`.
 - Close in the same session as the fix: append `resolved` with the red-loop command, the regression-test seam, the diff direction.
 - Commit exactly what the fix touched, never a blanket `-A`; a net-positive diff routes to `software-architect` first.
-- Check prior resolutions on the same component first; declare `caused_by: <bug_id>|none` — protocol: `dd-diagnose`.
+- Check prior resolutions on the same component first; declare `caused_by: <bug_id>|none` — protocol: `dd-bug-resolution`.
 - Commit shapes: `dd-gitflow-default` §3a — measured by audits via `git log`, never a hook.
 
 ### 7.4 Push green

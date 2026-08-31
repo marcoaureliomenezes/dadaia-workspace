@@ -4,7 +4,7 @@ Disclosed sibling of `SKILL.md`, pillar 1. Input: every `BUGS.jsonl` record whos
 Window definition: `SKILL.md`'s window section.
 
 - Only shas carrying `resolution_granularity == "exact"` are diff-able lineage — never `commit_granularity`, which is not a field.
-- A `release-squash`/`ledger-only`/`null` sha is counted, never diffed (`dd-diagnose`'s `LINEAGE.md` table applies identically here).
+- A `release-squash`/`ledger-only`/`null` sha is counted, never diffed (`dd-bug-resolution`'s `LINEAGE.md` table applies identically here).
 
 ## Recurrence and fix-induced bugs — operational, not adjectival (A14.3)
 

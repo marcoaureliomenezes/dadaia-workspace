@@ -19,7 +19,7 @@ applyTo: "specs/audits/**"
 
 ## 2. Steps
 
-1. Compute the window once per audit: `dd-diagnose`'s `LINEAGE.md` "The window (stated once)" section (A14.2).
+1. Compute the window once per audit: `dd-bug-resolution`'s `LINEAGE.md` "The window (stated once)" section (A14.2).
 2. Read the live release's `_RELEASE.json` `audited` field plus every archived release's `audited` fact in `releases_histo.jsonl`.
 3. Set the window to `[newest audited sha, HEAD]`, or the whole history when no `audited` milestone exists yet.
 4. Never scan `specs/releases/_ideas/**` (D10/AS-7).
@@ -43,7 +43,7 @@ applyTo: "specs/audits/**"
 
 ## 4. References
 
-- `dd-diagnose` (`LINEAGE.md`) — the window computation, cited not restated.
+- `dd-bug-resolution` (`LINEAGE.md`) — the window computation, cited not restated.
 - `PILLAR-BUGS.md`, `PILLAR-SPECS.md`, `PILLAR-MEMORY.md` — the three pillar protocols.
 - `FINDINGS-FORMAT.md` — one-record-per-finding shape, evidence rule, disposition vocabulary.
 - `DADAIA.md` §6 (Audits) — full lifecycle: one audit binds to one remediation release, archives once dispositioned.
