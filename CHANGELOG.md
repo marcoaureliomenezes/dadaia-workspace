@@ -54,6 +54,23 @@ for this task, so none is touched here):
 
 Left exactly as written; a future task can pick this up.
 
+## [0.4.6] — em progresso
+
+Open-scope release under the release-candidates model it implements (ADRs
+0005–0009): the version is minted at birth from the PyPI lineage (latest
+published `0.4.5` + 1 patch) and each closed-scope candidate appends here.
+
+### Candidate 1 — release-candidates system
+- **Release-candidates model**: one live open-scope release, closed-scope
+  candidates archived to `rc-N/` by `dadaia release rc-archive`; version
+  increment and next branch only at operator-approved deploy.
+- `_RELEASE.json` is the canonical state filename (one decider in
+  `core.release_state`; legacy `RELEASE.json` read-side + SPEC-DOC-046 fixable
+  rename); archived releases migrated.
+- `release new` refuses a second live release (exactly one, ever).
+- Scaffolded segment lane (`alpha-N`, `**Segment:**` docs) retired; `rc-N` has
+  one meaning: archived candidate.
+
 ## [0.4.5] — 2026-08-31
 
 One published version for everything since `0.4.4`: the internal spec-release ids

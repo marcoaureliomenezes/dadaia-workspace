@@ -116,9 +116,12 @@ def test_release_new_creation_content(tmp_path: Path) -> None:
     for field in ("Status", "Release ID", "Owner", "Opened"):
         assert field in content, f"Missing frontmatter field: {field}"
 
-    # Other valid slug shapes also create successfully.
+    # Other valid slug shapes also create successfully — each in its OWN tree: the
+    # release-candidates model (0.4.6, ADR 0005) allows exactly one live release.
     for slug in ("hyphenated-release-v1", "release2026"):
-        other_path = release_new(specs, slug)
+        other_specs = tmp_path / f"specs-{slug}"
+        other_specs.mkdir()
+        other_path = release_new(other_specs, slug)
         assert other_path.is_file()
 
 

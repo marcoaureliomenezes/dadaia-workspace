@@ -27,9 +27,9 @@ dadaia specs doctor --context <ctx> --recipe
 5. Treat an absent `specs/releases/**/verdicts/**` file on a merged PR as expected — the gate deletes a verdict once consumed.
 6. Treat an archived release carrying no directory (only its `releases_histo.jsonl` summary) as the canon shape, not drift.
 
-## `RELEASE.json` milestone completeness
+## `_RELEASE.json` milestone completeness
 
-1. For every release whose `RELEASE.json` the window's commits touch, confirm the three canonical milestones.
+1. For every release whose `_RELEASE.json` the window's commits touch, confirm the three canonical milestones.
 2. Milestones: `defined` (SPEC `Aprovado`), `implemented` (final-rc QA close), `shipped` (merge to `main`).
 3. Confirm each carries a `sha` (and, where applicable, a `pr`).
 4. Flag a release with a `shipped` milestone but no `defined`/`implemented` milestone — the chain has a gap.

@@ -53,5 +53,5 @@ applyTo: "specs/**/TASKS.md"
 - `DADAIA.md` §3 — gate stages, mode resolution, path classes, block reasons.
 - `DADAIA.md` §4 (Gitflow) / `dd-gitflow-default` — which branch a reservation lands on.
 - `dd-release-implement` (`RC-FLOW.md`) — the review/QA gate-cadence table.
-- TASKS.md primary: `<specs_dir>/releases/<release-id>/TASKS.md` (segmented: `.../<segment>/TASKS.md`).
+- TASKS.md primary: `<specs_dir>/releases/<release-id>/TASKS.md` — always flat; `rc-N/` holds archived candidates only.
 - TASKS.md legacy: `specs/features/*/TASKS.md` under `SDD_LEGACY_FEATURES=1`; root `<specs_dir>/TASKS.md` is migration-only.

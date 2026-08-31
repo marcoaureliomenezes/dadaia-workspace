@@ -4,7 +4,7 @@ Scope: this file governs only the `specs/memory/**` tree of one Spec Context Pro
 Broader SDD rules are in the sibling `specs/AGENTS.md`.
 
 Memory is product truth: it describes the product as it is now, never how it got there.
-History lives in each release's `RELEASE.json` `log` entries and under `_archive/`.
+History lives in each release's `_RELEASE.json` `log` entries and under `_archive/`.
 
 ## 1. Write ownership
 

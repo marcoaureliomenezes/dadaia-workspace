@@ -2,7 +2,7 @@
 slug: specs-doctor
 title: specs-doctor
 category: product
-tldr: Validates the v6 canon tree, memory drift and catalog integrity, RELEASE.json, bug and backlog governance, and audit findings folded from JSONL.
+tldr: Validates the v6 canon tree, memory drift and catalog integrity, _RELEASE.json, bug and backlog governance, and audit findings folded from JSONL.
 summary: dadaia specs doctor coordinates structural, memory, release, closure/audit, governance and coherence validators over the v6 canon; it reports, never blocks, and fixes only deterministic state.
 tags: [specs, doctor, validation, sdd]
 ---
@@ -17,7 +17,7 @@ tags: [specs, doctor, validation, sdd]
 - `TREE-8` is the v6 canon-root check over top-level membership under `specs/` — WARN-only, ignoring dotfiles.
 - `TREE-5` covers the root `specs/AGENTS.md` AND every scoped scaffold law file (releases, releases/_ideas, backlog, bugs, audits, ADRs; memory excluded by single-ownership): a projection byte-identical to a shipped version (`shipped-hashes.json`, every historical scaffold version recorded) is refreshed losslessly by `--fix`; anything else stays warn-only.
 - `SPEC-DOC-*` release checks cover the active release and phase, artifact presence and `**Status:** Aprovado`, task-marker coherence, naming (`SPEC-DOC-027`, the one naming rule — `SPEC-DOC-016` and `TREE-6` retired at 0.5.3: one rule, one implementation), unique ids, archive-shape and partial-archive-residue invariants, and release references.
-- The active release, its optional segment and its phase are read from `RELEASE.json` through one reader with no fallback; zero live release directories resolves cleanly to no active release, and a missing segment directory is an ERROR.
+- The live release and its phase are read from `_RELEASE.json` through one reader (legacy `RELEASE.json` read-side accepted; SPEC-DOC-046 offers the fixable rename); zero live release directories resolves cleanly to no active release; the segment lane is retired (0.4.6, ADR 0006).
 - Memory checks cover Markdown, frontmatter and atomicity, forbidden history sections, Mermaid and image references, catalog/index agreement, and unfilled `<PLACEHOLDER>` tokens in atoms (ERROR) or an installed `tests/AGENTS.md` (WARN).
 - `CAT-1` reconciles catalog entries against atom files by slug set, so which optional fields the persisted catalog carries is outside what it asserts ([[context-management]]).
 - `MEM-DRIFT-1` compares `ARCHITECTURE.md`'s features package-map diagram against the live `dadaia_workspace/features` tree, one WARNING per stale or missing package and silence when the heading or its Mermaid block is absent.

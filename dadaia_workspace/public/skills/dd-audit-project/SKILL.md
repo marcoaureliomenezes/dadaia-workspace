@@ -20,14 +20,14 @@ applyTo: "specs/audits/**"
 ## 2. Steps
 
 1. Compute the window once per audit: `dd-diagnose`'s `LINEAGE.md` "The window (stated once)" section (A14.2).
-2. Read the live release's `RELEASE.json` `audited` field plus every archived release's `audited` fact in `releases_histo.jsonl`.
+2. Read the live release's `_RELEASE.json` `audited` field plus every archived release's `audited` fact in `releases_histo.jsonl`.
 3. Set the window to `[newest audited sha, HEAD]`, or the whole history when no `audited` milestone exists yet.
 4. Never scan `specs/releases/_ideas/**` (D10/AS-7).
 5. Record the resulting `[from-sha, HEAD]` in `AUDIT.md`'s scope.
 6. Run pillar 1 (`PILLAR-BUGS.md`): compute all eight forensic metrics on every `BUGS.jsonl` record in the window.
 7. Write `audited` plus the four provenance fields in one atomic rewrite per reviewed bug record (A14.6).
 8. Run pillar 2 (`PILLAR-SPECS.md`): check FR8 commit-shape conformance and canon-v6 pattern compliance over the window.
-9. Run pillar 2 (continued): check `RELEASE.json` milestone completeness.
+9. Run pillar 2 (continued): check `_RELEASE.json` milestone completeness.
 10. Run pillar 3 (`PILLAR-MEMORY.md`): execute every Part-1 principle's named `Measured by:` check.
 11. Run pillar 3 (continued): match every Part-1 hunk in the window to an `accepted` ADR in the same commit, or flag HIGH.
 12. Refuse to write `AUDIT.md` until all three pillar sections are present (A14.1) — fewer than three is not an audit.

@@ -1,10 +1,11 @@
 ---
 name: dd-release-definition
 description: >
-  Use when: turning bugs and/or backlog items into a release. product-engineer (dispatched
-  by project-manager) picks a pre-sanitized set and refines it into a SPEC. Enforces bug-
-  always-solved (unless subsumed) and a MANDATORY dd-grill-me session before the SPEC is
-  written. Invoke at the start of release definition.
+  Use when: turning bugs and/or backlog items into a release CANDIDATE. product-engineer
+  (dispatched by project-manager) picks a pre-sanitized set and refines it into the live
+  release's next closed-scope candidate trio. Enforces bug-always-solved (unless subsumed)
+  and a MANDATORY dd-grill-me session before the SPEC is written. Invoke at the start of
+  each candidate's definition — a release has open scope; each candidate does not.
 tldr: "Pick set -> bug-always-solved -> mandatory dd-grill-me -> author SPEC -> declare **Consumes:**."
 applyTo: "specs/releases/*/SPEC.md"
 ---
@@ -33,9 +34,9 @@ applyTo: "specs/releases/*/SPEC.md"
 9. Never silently drop a bug — leave it `open` if neither fixed nor subsumed (`dd-backlog-definition` sanitizes it later).
 10. Call the Skill tool with `dd-grill-me` on the picked set — mandatory, never skipped even when scope "looks obvious".
 11. Author the release SPEC (Draft) only after the grill: the picked bug+backlog set, their acceptance, every `superseded_by` link.
-12. Run definition on `feature/{M.m.p}`; open the definition PR once SPEC+PLAN+TASKS are all `Aprovado`.
-13. Append the `defined` milestone in `RELEASE.json` at the promotion commit (`RELEASE-EVENTS.md`'s recipe).
-14. Continue the normal SDD flow (PLAN -> TASKS -> implementation) with reviews per the segment/release cadence (`RC-FLOW.md`).
+12. Run definition on `feature/{M.m.p}`; the trio is authored at the RELEASE ROOT (`specs/releases/<v>/`) — after a prior candidate, `dadaia release rc-archive` has already cleared it.
+13. Append the `defined` milestone in `_RELEASE.json` at the promotion commit (`RELEASE-EVENTS.md`'s recipe).
+14. Continue the normal SDD flow (PLAN -> TASKS -> implementation -> memory -> CLOSURE); after the develop merge comes the promote-or-continue gate (`dd-gitflow-default` §2).
 15. Declare fully-consumed backlog items in the SPEC: `**Consumes:** slug-a, slug-b`.
 16. Treat `**Consumes:**` as SPEC provenance only — no library/CLI verb reads this line.
 17. Let `project-manager`'s purge-on-pick (same commit as the SPEC) execute consumption at definition.

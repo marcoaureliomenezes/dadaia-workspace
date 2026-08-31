@@ -34,7 +34,8 @@ import pytest
 from dadaia_workspace.features.backlog.document import backlog_new
 from dadaia_workspace.features.specs import SpecsDoctor
 from dadaia_workspace.features.specs import canon as canon_mod
-from dadaia_workspace.features.specs.scaffolder import scaffold, scaffold_release_segment
+from dadaia_workspace.features.specs.canon import release_new
+from dadaia_workspace.features.specs.scaffolder import scaffold
 
 pytestmark = pytest.mark.unit
 
@@ -85,13 +86,12 @@ def _fresh_release(tmp_path: Path) -> Path:
     return specs_dir
 
 
-def _fresh_release_segment(tmp_path: Path) -> Path:
-    """Fresh root specs/ plus one freshly-opened release SEGMENT
-    (``scaffold_release_segment``) — the exact shape bug
-    ``fresh-release-scaffold-emits-spec-doctor-warnings-042`` regressed on."""
+def _fresh_release(tmp_path: Path) -> Path:
+    """Fresh root specs/ plus one freshly-opened release (``release_new`` — the flat
+    trio shape; the segment lane is retired at 0.4.6, ADR 0006). Successor of the
+    shape bug ``fresh-release-scaffold-emits-spec-doctor-warnings-042`` regressed on."""
     specs_dir = _fresh_root_specs(tmp_path)
-    result = scaffold_release_segment(specs_dir, "0.6.0", "alpha-1")
-    assert result.errors == [], result.errors
+    release_new(specs_dir, "0.6.0")
     return specs_dir
 
 
@@ -110,7 +110,7 @@ def _fresh_backlog_entry(tmp_path: Path) -> Path:
         pytest.param(_fresh_root_specs, id="fresh-root-specs"),
         pytest.param(_fresh_repo_specs, id="fresh-repo-specs"),
         pytest.param(_fresh_release, id="fresh-release"),
-        pytest.param(_fresh_release_segment, id="fresh-release-segment"),
+        pytest.param(_fresh_release, id="fresh-release"),
         pytest.param(_fresh_backlog_entry, id="fresh-backlog-entry"),
     ],
 )

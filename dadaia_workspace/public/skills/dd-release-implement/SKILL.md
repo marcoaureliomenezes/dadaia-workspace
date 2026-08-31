@@ -1,13 +1,12 @@
 ---
 name: dd-release-implement
 description: >
-  Use when: implementing a release from the first task reservation through the
-  final-rc ship — the whole implement-to-close arc under the v2/rc segment model.
-  Short SKILL-plus-disclosed-siblings shape (T-050-21, FR12): RC-FLOW.md (state
-  ladder + gate cadence), RELEASE-EVENTS.md (RELEASE.json state+log contract),
-  MEMORY-UPDATE.md (closure memory protocol). CLOSURE.md/CLOSURE-TEMPLATE.md
-  retired — the closure narrative now lives in RELEASE.json's log.
-tldr: "Reserve -> TDD -> segment close -> rc rounds -> final-rc trio -> memory -> closure narrative -> archive -> ship."
+  Use when: implementing a release candidate from the first task reservation through
+  the promote-or-continue gate — the whole implement-to-close arc under the
+  release-candidates model (0.4.6, ADRs 0005-0009). Short SKILL-plus-disclosed-siblings
+  shape: RC-FLOW.md (candidate arc + gate cadence), RELEASE-EVENTS.md (_RELEASE.json
+  state+log contract), MEMORY-UPDATE.md (closure memory protocol).
+tldr: "Reserve -> TDD -> trio review -> memory -> closure -> develop merge -> promote-or-continue (rc-archive | ship+archive+cut)."
 applyTo: "specs/releases/*/TASKS.md"
 ---
 
@@ -17,34 +16,33 @@ applyTo: "specs/releases/*/TASKS.md"
 
 ## 1. When
 
-- Any implementer (`software-engineer`, `ai-engineer`, `qa-engineer`) working a task inside an `Aprovado` release.
-- `product-engineer` at the final-rc closure.
-- From the first reservation through the ship PR and the post-deploy branch cut.
+- Any implementer (`software-engineer`, `ai-engineer`, `qa-engineer`) working a task inside an `Aprovado` candidate.
+- `product-engineer` at each candidate's closure.
+- From the first reservation through the promote-or-continue gate (and, on promote, the ship + branch cut).
 
 ## 2. Steps
 
-1. Resolve the active release by reading `RELEASE.json`'s `phase` field directly — no fold, no `ACTIVE.md`.
-2. Locate `TASKS.md` at `releases/<release-id>/<segment>/TASKS.md` when `segment` is present.
-3. Locate `TASKS.md` at `releases/<release-id>/TASKS.md` otherwise.
-4. Full navigation protocol: `dadaia-workspace-spec-navigator`.
-5. Read `RC-FLOW.md` for the state ladder, gate cadence, and 14-step arc before acting past reservation.
-6. Update `RELEASE.json` per `RELEASE-EVENTS.md`'s shape and `log` conventions.
-7. At final-rc step 8, run `MEMORY-UPDATE.md`'s full protocol before touching any memory atom.
-8. Declare test intent at birth; pass the admission filter (`dadaia-test-stewardship` §A/§B) before a test enters the suite.
-9. Handle demotion and quarantine/SCAFFOLD expiry at closure time only (`RC-FLOW.md` step 9).
+1. Resolve the live release by reading `_RELEASE.json`'s `phase` field directly.
+2. The live candidate's `TASKS.md` sits at `releases/<v>/TASKS.md` — always flat; `rc-N/` folders are archives, never routed to.
+3. Full navigation protocol: `dadaia-workspace-spec-navigator`.
+4. Read `RC-FLOW.md` for the candidate arc and gate cadence before acting past reservation.
+5. Update `_RELEASE.json` per `RELEASE-EVENTS.md`'s shape and `log` conventions.
+6. At candidate step 5, run `MEMORY-UPDATE.md`'s full protocol before touching any memory atom.
+7. Declare test intent at birth; pass the admission filter (`dadaia-test-stewardship` §A/§B) before a test enters the suite.
+8. Handle demotion and quarantine/SCAFFOLD expiry at closure time only (`RC-FLOW.md` step 6).
 
 ## 3. Done when
 
-- Release + segment resolved by reading `RELEASE.json` directly.
+- Live release resolved by reading `_RELEASE.json` directly.
 - Task reserved (`[-]`) with an isolated `chore(tasks): start <id>` commit.
 - Current step (`RC-FLOW.md`) identified before attempting its unlock action.
-- CI green before any push; trio `APPROVE`d before any final-rc unlock action.
-- At final rc: memory update -> closure narrative -> disposition sweep -> artifact GC -> archive, one commit, in that order.
+- CI green before any push; trio `APPROVE`d before the candidate's develop PR.
+- At candidate closure: memory update -> closure narrative -> disposition sweep -> artifact GC -> merge -> the promote-or-continue gate.
 
 ## 4. References
 
-- `RC-FLOW.md` — gate cadence table, 14-step arc, out-of-scope list, segments rule.
-- `RELEASE-EVENTS.md` — `RELEASE.json` shape, milestone ownership, `log` conventions.
+- `RC-FLOW.md` — gate cadence table, the candidate arc, out-of-scope list.
+- `RELEASE-EVENTS.md` — `_RELEASE.json` shape, milestone ownership, `log` conventions.
 - `MEMORY-UPDATE.md` — closure memory protocol.
 - `dadaia-task-manager` — reservation/marker discipline.
 - `dadaia-test-stewardship` §A/§B — test admission filter.

@@ -115,6 +115,12 @@ RULES: tuple[Rule, ...] = (
         ("SPEC-DOC-045",),
         lambda d, t: d._release.check_pyproject_version_matches_release(d.repo_root),
     ),
+    Rule(
+        ("SPEC-DOC-046",),
+        lambda d, t: d._release.check_release_state_filename(),
+        fix=lambda d, i: d._release.fix_release_state_filename(i),
+        fix_help="rename a legacy RELEASE.json to the canonical _RELEASE.json",
+    ),
 )
 
 #: code -> Rule, for every rule that carries a fix — the ONE fix dispatch table.

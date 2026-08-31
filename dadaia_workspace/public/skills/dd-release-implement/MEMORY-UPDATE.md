@@ -6,16 +6,16 @@ Carries forward `CLOSURE-CHECKS.md` §1 (T-050-21 rename; content unchanged in s
 ## Protocol
 
 1. Verify gate phase: confirm the live release is in `CLOSURE` phase before writing `specs/memory/**` (also writable in `DEFINITION`).
-2. Set `phase` in `RELEASE.json` (`ACTIVE.md` retired at T-050-21A, no mirror to keep in sync — `RELEASE-EVENTS.md`).
+2. Set `phase` in `_RELEASE.json` (`ACTIVE.md` retired at T-050-21A, no mirror to keep in sync — `RELEASE-EVENTS.md`).
 3. Otherwise the gate blocks the write.
 4. Do not author legacy HTML memory — if it exists, treat it as read-only migration input; new memory writes are Markdown.
 5. Update Markdown atoms: apply the release's deltas to the corresponding `specs/memory/*.md` / `specs/memory/product/*.md` files.
-6. Memory describes the product as it is now, not what changed — change history lives in this release's `RELEASE.json` `log` and git.
+6. Memory describes the product as it is now, not what changed — change history lives in this release's `_RELEASE.json` `log` and git.
 7. Diagrams: use fenced Mermaid blocks; memory Markdown carries no external image references (FR1, T-050-06).
 8. `ARCHITECTURE.md`'s own `## Architecture Diagrams` section is the pattern to follow.
 9. Forbidden in memory Markdown: `<h2>Changelog</h2>`, `<h2>History</h2>`, `<h2>Histórico</h2>`, `<h2>Versions</h2>`.
 10. Forbidden (continued): `<section class="changelog">` and similar; narrative of past versions ("we used to use X, now Y").
-11. Point the operator to this release's `RELEASE.json` `log` or git if they ask for history.
+11. Point the operator to this release's `_RELEASE.json` `log` or git if they ask for history.
 12. Validate with `dadaia specs doctor` before moving to archive — it checks atomicity and Mermaid script presence.
 
 ## Product memory is a folder catalog
@@ -34,4 +34,4 @@ Carries forward `CLOSURE-CHECKS.md` §1 (T-050-21 rename; content unchanged in s
 - A deprecated feature's link and its atom are deleted outright — memory carries no archive of its own (history lives in git).
 
 *Done when:* every affected atom reflects current product truth, and `dadaia specs doctor` reports the memory atoms clean.
-*Done when* (continued): `RELEASE.json`'s `phase` field reads `CLOSURE`.
+*Done when* (continued): `_RELEASE.json`'s `phase` field reads `CLOSURE`.

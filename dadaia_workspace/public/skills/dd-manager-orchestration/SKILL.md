@@ -54,7 +54,7 @@ Stays generic: no operator-private project names, hostnames, IPs, customer names
 |---|---|---|---|---|
 | `project-manager` | 1-2, MUTATING | Intake, bug intake, dispatch, mediation | any core agent (top-level only) | A single specialist suffices |
 | `project-auditor` | 4 (audit) | Memory/implementation drift, dead-code, compliance | project-manager | A release is still mid-implementation |
-| `product-engineer` | 5+8 (defn, closure) | SPEC, PLAN, TASKS, RELEASE.json, memory | architect, PM | Task is code-only, already approved |
+| `product-engineer` | 5+8 (defn, closure) | SPEC, PLAN, TASKS, _RELEASE.json, memory | architect, PM | Task is code-only, already approved |
 | `software-architect` | feeds 4/5 | Architecture decisions, ADRs, dependency contracts | software-engineer | No architectural trade-off exists |
 | `software-engineer` | 6 (implementation) | Production code + tests for the bound context | qa-engineer | Task is spec, AI-entity, or pure review |
 | `ai-engineer` | surface owner | Agents, skills, rules, commands, hooks | security-reviewer, code-reviewer | Task is product code or spec |
@@ -92,7 +92,7 @@ Stays generic: no operator-private project names, hostnames, IPs, customer names
 
 ### Escalation triggers — stop and surface to the operator when
 
-1. Required `SPEC.md`/`PLAN.md`/`TASKS.md` or a resolvable `RELEASE.json` `phase` field are missing or not approved.
+1. Required `SPEC.md`/`PLAN.md`/`TASKS.md` or a resolvable `_RELEASE.json` `phase` field are missing or not approved.
 2. A CRITICAL security issue is reported.
 3. A dispatched agent returns `[SCOPE ERROR]`.
 4. Three or more unresolved conflicts are open.

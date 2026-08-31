@@ -107,7 +107,7 @@ Browser frontend and CI YAML -> software-engineer (generic implementer).
 
 ## 3. Procedure
 
-1. Resolve context: `dadaia context show --json`; read the live release's `RELEASE.json` `phase` field directly, no fold.
+1. Resolve context: `dadaia context show --json`; read the live release's `_RELEASE.json` `phase` field directly, no fold.
 2. Grill: run `dd-grill-me` to resolve ambiguity before any dispatch.
 3. Classify + dispatch: map the resolved demand to a playbook (router table below).
 4. Auto-reserve task_ids in TASKS.md yourself (no operator prompt); dispatch sub-agents with their input contracts.

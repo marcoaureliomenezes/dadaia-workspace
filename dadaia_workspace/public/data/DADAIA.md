@@ -38,7 +38,7 @@
 | SPEC / PLAN / TASKS / CLOSURE, and `specs/memory/**` | `product-engineer` |
 | Architecture: DRAFT, REVIEW, ONBOARD; root-cause and fidelity gates | `software-architect` |
 | Production code and its tests, in any language | `software-engineer` |
-| E2E, test pyramid, deploy validation; closes each `rc-N` | `qa-engineer` |
+| E2E, test pyramid, deploy validation; closes each candidate | `qa-engineer` |
 | Three-axis review (`dd-code-review`: standards, spec, bug-surface) before a PR | `code-reviewer` |
 | Vulnerabilities, secrets, CVEs; the push verdict (§4.2) | `security-reviewer` |
 | Agents, skills, rules, workflows, commands, hooks — the AI surface | `ai-engineer` |
@@ -112,9 +112,10 @@
 ### 4.2 Rules
 
 - No `v` prefix, no suffix, no fifth pattern; `hotfix/*` retired (operator-request only, no cadence).
-- Exactly one live `feature/{M.m.p}`; at deploy, delete it and cut `feature/{next}` in the same step; bugs fix on it in any phase, no ceremony.
-- `rc-N` is a specs state (`RELEASE.json`'s `phase` field + `TASKS.md`), never a branch name.
-- Each `rc` burns one `feature -> develop` merge; scope is fixes only, never new backlog.
+- Exactly one live `feature/{M.m.p}`, named for the live release; at deploy, delete it and cut `feature/{next}` in the same step; bugs fix on it in any phase, no ceremony.
+- The release version = last published PyPI + 1 patch, minted at birth; it increments ONLY at operator-approved deploy (ADR 0005).
+- `rc-N/` is an archived candidate folder under the live release (`dadaia release rc-archive`), never a branch name and never a scaffolded sub-phase.
+- Each candidate closure burns one `feature -> develop` merge; after it the agent asks the operator: promote (deploy) or continue (archive the trio to `rc-N/`, stack more backlog/bugs/findings).
 - Both PRs require an APPROVED `security-reviewer` verdict on the PR head sha, consumed once by the merge and deleted after — a survivor is slop.
 - Ship-PR verdict names develop's tip, staged on the feature branch before the final `rc` merge.
 - Every flow stage runs on `feature/{M.m.p}`; `develop`/`main` are PR targets only, never a working branch.
@@ -168,7 +169,7 @@
 |---|---|
 | root | `AGENTS.md constitution.md memory/ releases/ backlog/ bugs/ audits/ ADRs/` |
 | `releases/` | `AGENTS.md`, `_ideas/` (own `AGENTS.md`), `_archive/<release-id>/` |
-| `releases/<M.m.p>/` | `RELEASE.json SPEC.md PLAN.md TASKS.md verdicts/` |
+| `releases/<M.m.p>/` | `_RELEASE.json SPEC.md PLAN.md TASKS.md rc-N/ verdicts/` |
 | `backlog/` | `AGENTS.md BACKLOG.json`, `_archive/backlog_histo.jsonl` |
 | `bugs/` | `AGENTS.md BUGS.jsonl`, `_archive/bugs_histo.jsonl` |
 | `audits/` | `AGENTS.md`, `_archive/audits_histo.jsonl`, `<YYYYMMDD-slug>/` |
@@ -190,7 +191,7 @@
 
 - Current product truth, not history — read it before changing production behavior.
 - `product-engineer` writes `specs/memory/**` only in `DEFINITION`/`CLOSURE` phases; every other agent reads it.
-- Changelog and history live in each release's `RELEASE.json` `log` and in git.
+- Changelog and history live in each release's `_RELEASE.json` `log` and in git.
 - Atom frontmatter carries exactly 6 fields: `slug title category tldr summary tags`.
 - `ARCHITECTURE.md QUALITY.md TECHSTACK.md` split into ADR-gated Part 1 Principles (each `Measured by:`) and Part 2 Implementation.
 
@@ -218,10 +219,12 @@
 
 <!-- behavior: releases -->
 
-- A release is `major.minor.patch`, matures through the `rc-N` lane (branch mechanics: §4).
-- A `dd-grill-me` session on the picked set precedes the SPEC.
+- A release is `major.minor.patch` with OPEN scope: it grows by stacked closed-scope candidates, one live release ever (ADR 0005).
+- A candidate is one full SDD cycle: grill -> SPEC/PLAN/TASKS `Aprovado` at the release root -> implementation -> memory -> CLOSURE -> `feature -> develop` merge.
+- A `dd-grill-me` session on the picked set precedes each candidate's SPEC.
 - At pick time, open bugs and undispositioned audits outrank fresh backlog.
-- Finalization order: memory update -> CLOSURE -> archive; a completed task group is one commit.
+- After each merge, the promote-or-continue gate (§4.2): continue = `dadaia release rc-archive` moves the trio to `rc-N/` and a fresh trio is born at root; promote = the ship lane, then archive the whole release folder (final trio stays at root, ADR 0009).
+- Candidate finalization order: memory update -> CLOSURE -> gate; a completed task group is one commit.
 
 ### 6.8 Audits
 
@@ -331,9 +334,9 @@
 - **library** — this source repo, `dadaia_workspace/`, that scaffolds instances.
 - **context** — the active Spec Context Project resolved for this session (§3.3).
 - **spec context** — a `specs/` tree (root or `repos/<slug>/`) governed by this law.
-- **release** — a `major.minor.patch` unit maturing through the `rc-N` lane.
-- **rc** — a release-candidate round: fixes/adjustments only, never new backlog.
-- **segment** — a named sub-phase of a release's `TASKS.md` (e.g. `alpha-N`/`rc-N`).
+- **release** — the open-scope publication unit, named last-published-PyPI + 1 patch; exactly one live.
+- **candidate** — one closed-scope SDD cycle inside the live release; its trio lives at the release root.
+- **rc-N** — the archive folder of the N-th completed-but-not-shipped candidate's trio.
 - **task marker** — the `[ ] [-] [x]` open/in-progress/done trace in `TASKS.md`.
 - **handoff** — the machine-readable JSON completion record an agent emits (§5.4).
 - **verdict** — a PR-head-scoped approval record, consumed once, deleted after merge.

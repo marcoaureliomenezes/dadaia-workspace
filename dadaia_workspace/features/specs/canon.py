@@ -41,7 +41,7 @@ The canon (operator, 2026-08-28) — the ONLY members permitted under ``specs/``
 
     releases/{AGENTS.md, _ideas/{AGENTS.md, <M.m.p>/SPEC.md},
               _archive/{releases_histo.jsonl, <M.m.p>/**},
-              <M.m.p>/{RELEASE.json, SPEC.md, PLAN.md, TASKS.md,
+              <M.m.p>/{_RELEASE.json, SPEC.md, PLAN.md, TASKS.md, rc-N/{SPEC,PLAN,TASKS}.md,
                        verdicts/<40hex>.handoff.json,
                        <alpha|rc>-N/{SPEC.md, PLAN.md, TASKS.md}}}
     backlog/{AGENTS.md, BACKLOG.json,
@@ -98,10 +98,11 @@ _SHA40 = r"[0-9a-f]{40}"
 #: One fact, one place (core.workspace_layout, SPEC-DOC-030's own single home) — never
 #: a second, independently hand-kept copy of the audit-dir date-slug shape.
 _YYYYMMDD_SLUG = AUDIT_DIR_NAME_PATTERN
-#: A release segment name (ADR-1/ADR-5, mirrors ``scaffolder._SEGMENT_RE``): an
-#: ``alpha-N``/``rc-N`` sub-phase directory under a release, e.g.
-#: ``releases/0.6.0/alpha-1/``.
-_SEGMENT = r"(?:alpha|rc)-\d+"
+#: An archived-candidate folder under the live release (release 0.4.6 FR2, ADR 0006):
+#: ``rc-N`` holds the SPEC/PLAN/TASKS trio of the N-th completed-but-not-shipped
+#: candidate, moved there by ``dadaia release rc-archive``. The scaffolded segment
+#: lane (``alpha-N``, docs planned ahead) is retired — rc-N is ONLY an archive.
+_RC = r"rc-\d+"
 _AREA = r"[a-z][a-z0-9_-]*"
 _SLUG = r"[a-z][a-z0-9_-]*"
 
@@ -316,6 +317,11 @@ CANON: tuple[CanonEntry, ...] = (
     ),
     CanonEntry(re.compile(rf"^releases/_archive/{_SEMVER}/.+$"), "static", False, None, "releases"),
     CanonEntry(
+        re.compile(rf"^releases/{_SEMVER}/_RELEASE\.json$"), "static", False, None, "releases"
+    ),
+    # Legacy state-file name (pre-0.4.6) — admitted ONLY as the rename-lane input:
+    # SPEC-DOC-046 offers the doctor-fixable rename to _RELEASE.json (ADR 0007).
+    CanonEntry(
         re.compile(rf"^releases/{_SEMVER}/RELEASE\.json$"), "static", False, None, "releases"
     ),
     CanonEntry(
@@ -339,13 +345,13 @@ CANON: tuple[CanonEntry, ...] = (
     # ``scaffolder.scaffold_release_segment``, ``dd-release-implement`` §2/§4). Never
     # required_at_birth: a segment is opened on demand, well after the release itself.
     CanonEntry(
-        re.compile(rf"^releases/{_SEMVER}/{_SEGMENT}/SPEC\.md$"), "static", False, None, "releases"
+        re.compile(rf"^releases/{_SEMVER}/{_RC}/SPEC\.md$"), "static", False, None, "releases"
     ),
     CanonEntry(
-        re.compile(rf"^releases/{_SEMVER}/{_SEGMENT}/PLAN\.md$"), "static", False, None, "releases"
+        re.compile(rf"^releases/{_SEMVER}/{_RC}/PLAN\.md$"), "static", False, None, "releases"
     ),
     CanonEntry(
-        re.compile(rf"^releases/{_SEMVER}/{_SEGMENT}/TASKS\.md$"), "static", False, None, "releases"
+        re.compile(rf"^releases/{_SEMVER}/{_RC}/TASKS\.md$"), "static", False, None, "releases"
     ),
     # -- backlog/ ------------------------------------------------------------------
     CanonEntry(
@@ -669,7 +675,13 @@ def scaffold_entry(specs_dir: Path, rel_path: str, /, **context: str) -> Path:
 #: directory a caller can already write RELEASE.json/PLAN.md/TASKS.md into ahead of
 #: ``release new`` (e.g. `dadaia release new` racing a segment scaffold) must never
 #: have any of its four canonical artifacts silently overwritten.
-_RELEASE_ARTIFACT_NAMES: tuple[str, ...] = ("SPEC.md", "PLAN.md", "TASKS.md", "RELEASE.json")
+_RELEASE_ARTIFACT_NAMES: tuple[str, ...] = (
+    "SPEC.md",
+    "PLAN.md",
+    "TASKS.md",
+    "_RELEASE.json",
+    "RELEASE.json",
+)
 
 
 def release_new(specs_dir: Path, release_id: str) -> Path:
@@ -713,6 +725,21 @@ def release_new(specs_dir: Path, release_id: str) -> Path:
 
     releases_root = specs_dir / "releases"
     release_dir = releases_root / release_id
+    # Exactly one live release, ever (release 0.4.6 FR4, ADR 0005): scope grows by
+    # candidates inside the live release, never by minting a sibling. _archive/_ideas
+    # are not live; the target id itself is caught by the no-clobber checks below.
+    if releases_root.is_dir():
+        others = sorted(
+            d.name
+            for d in releases_root.iterdir()
+            if d.is_dir() and d.name not in ("_archive", "_ideas") and d.name != release_id
+        )
+        if others:
+            raise FileExistsError(
+                f"a live release already exists ({', '.join(others)}) — the "
+                "release-candidates model allows exactly one; stack the work as a new "
+                "candidate (dadaia release rc-archive) or ship first."
+            )
     if releases_root.is_symlink() or release_dir.is_symlink():
         raise FileExistsError(
             f"{release_dir} resolves through a symlink — refusing to mint a release "

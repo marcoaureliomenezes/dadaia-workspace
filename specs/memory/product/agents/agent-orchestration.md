@@ -26,7 +26,7 @@ The public core roster is nine Layer-1 agents (`public/agents/*.md`). Only `proj
 ## Behavior
 
 - The entry harness reads `DADAIA.md`, classifies the demand and dispatches the owning agent per artifact class; no runtime drives agents through steps.
-- Sequencing evidence is the artifacts themselves — `RELEASE.json`, `**Status:** Aprovado` markers, task markers, handoffs.
+- Sequencing evidence is the artifacts themselves — `_RELEASE.json`, `**Status:** Aprovado` markers, task markers, handoffs.
 - Each stage has exactly one owning skill: `dd-backlog-definition`, `dd-release-definition`, `dd-release-implement`, `dd-audit-project`, `dd-bug-registration`, `dd-bug-resolution`, with `dd-diagnose` carrying the seven-phase method.
 - An agent resolves or binds its context, reads the constitution, [[architecture]], [[tech-stack]], the catalog, the relevant atoms and the release artifacts, reserves tasks `[ ] -> [-]`, validates, marks `[x]`, and emits a handoff ([[agentic-entities]]).
 - Concurrent sessions are allowed and presence is advisory: no agent acquires, holds, hands off, releases or steals a lock.

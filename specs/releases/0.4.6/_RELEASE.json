@@ -1,0 +1,27 @@
+{
+  "schema": "release-state-v1",
+  "release": "0.4.6",
+  "phase": "CLOSURE",
+  "rc": null,
+  "defined": {
+    "sha": null,
+    "ts": "2026-08-31T18:16:56Z"
+  },
+  "implemented": null,
+  "shipped": null,
+  "audited": null,
+  "log": [
+    {
+      "ts": "2026-08-31T18:16:56Z",
+      "agent": "project-manager",
+      "kind": "note",
+      "text": "Release 0.4.6 born under the release-candidates model it implements (self-hosting): open scope, candidate 1 = the rc-system redesign (ADRs 0005-0009, grill 20260831T181256Z). Version = last published PyPI (0.4.5) + 1 patch; feature/0.4.6 is the one live branch. Definition grill held pre-SPEC; trio Aprovado by operator demand order."
+    },
+    {
+      "ts": "2026-08-31T18:43:56Z",
+      "agent": "product-engineer",
+      "kind": "summary",
+      "text": "Candidate 1 (release-candidates system) complete: _RELEASE.json one-filename decider (core.release_state, legacy read-side + SPEC-DOC-046 fixable rename); canon rc-N archive entries; segment lane deleted (scaffolder/state/routing/tests); release new refuses a second live release; dadaia release rc-archive verb (features/specs/candidate.py, 7 TDD tests); 4 archived releases migrated; version 0.4.6 minted at birth (pyproject + CHANGELOG [0.4.6]) — the mint-at-ship step is deleted; law rewritten (DADAIA §4.2/§6.2/§6.7/glossary: candidate, rc-N, promote-or-continue gate), skills dd-gitflow-default/dd-release-definition/dd-release-implement(RC-FLOW candidate arc)/navigator/task-manager updated; behavior-map re-recorded; CONTEXT.md glossary sharpened; memory atoms updated; projections refreshed via shipped-history TREE-5 fix. Net deletion-shaped: segment lane and mint-at-ship removed; one new deep verb."
+    }
+  ]
+}

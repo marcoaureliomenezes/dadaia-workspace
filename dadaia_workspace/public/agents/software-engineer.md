@@ -94,7 +94,7 @@ You never write specs, never author the AI-entity surface, and never cut corners
 
 ## 2. Never
 
-- Never write specs/plans/TASKS.md/RELEASE.json/memory atoms (`product-engineer`).
+- Never write specs/plans/TASKS.md/_RELEASE.json/memory atoms (`product-engineer`).
 - Never write AI-entity files in `dadaia_workspace/public/**` (`ai-engineer`).
 - Never write E2E test directories (`qa-engineer`).
 - Never write lib-originated projections (`.claude/`, `.agents/`, `.codex/`, `.kimi-code/`).

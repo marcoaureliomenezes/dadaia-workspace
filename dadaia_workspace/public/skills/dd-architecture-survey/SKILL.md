@@ -3,7 +3,7 @@ name: dd-architecture-survey
 description: >
   Operationalizes the operator's standing order "permanent architecture review oriented
   by bug history" as a procedure with defined input and output. User-invoked by the
-  operator or project-manager, or at the close of each alpha-N/release. Input: the bug
+  operator or project-manager, or at the close of each candidate/release. Input: the bug
   ledger aggregated per surface/component joined with git churn. Output: architecture
   cards plus exactly ONE top candidate, which goes to dd-grill-me before any pick.
   ADDITIVE only — never edits code, never materializes backlog.

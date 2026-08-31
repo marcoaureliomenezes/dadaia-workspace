@@ -35,7 +35,7 @@ tldr: "Declare intent, pass admission, size-tier, demote/delete with evidence, q
 8. Justify any tier heavier than the cheapest detecting one, written inline in the test.
 9. Fix the tier, never raise the timeout default, when a test needs more time than its tier allows.
 10. At closure (never mid-task), yield file:line of the replacement SMALL/MEDIUM coverage for every demoted LARGE.
-11. Keep a demoted LARGE only as the seam's single SENTINEL, otherwise record the demotion map in `RELEASE.json`'s `log`.
+11. Keep a demoted LARGE only as the seam's single SENTINEL, otherwise record the demotion map in `_RELEASE.json`'s `log`.
 12. Delete only when a decision-table criterion is true (§4), citing the evidence in the commit.
 13. Never delete a tombstone test's target without deleting the test itself — it validates a historical event, not live behavior.
 14. Never let the implementer prune to go green — pruning is a `qa-engineer` verdict; `software-engineer` executes the commit.
@@ -51,7 +51,7 @@ tldr: "Declare intent, pass admission, size-tier, demote/delete with evidence, q
 ## 3. Done when
 
 - Every new test carries an intent docstring and passed the admission filter.
-- Every demoted LARGE has a replacement file:line or is the seam's sole SENTINEL, recorded in `RELEASE.json`'s `log`.
+- Every demoted LARGE has a replacement file:line or is the seam's sole SENTINEL, recorded in `_RELEASE.json`'s `log`.
 - Every deleted test cites its decision-table criterion and evidence.
 - Every quarantined test carries a registered bug id.
 
