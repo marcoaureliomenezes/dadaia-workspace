@@ -32,9 +32,9 @@ from dadaia_workspace.features.specs.doctor_common import (
     RELEASE_ARTIFACTS,
     _read_and_parse_release_json,
     iter_all_release_dirs,
-    resolve_active_release,
 )
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
+from dadaia_workspace.features.specs.specs_tree import SpecsTree
 
 # Vocabulary + parser live in core.spec_status (single definition); re-exported here
 # because doctor_release has been the documented import site for both.
@@ -135,6 +135,9 @@ class ReleaseValidator:
 
     def __init__(self, specs_dir: Path) -> None:
         self.specs_dir = specs_dir
+        #: Fresh per check() run (assigned by the coordinator, F010) — the parsed
+        #: snapshot every active-release read goes through; never survives a fix pass.
+        self.tree: SpecsTree = SpecsTree(specs_dir)
 
     def check_active_md(self) -> list[SpecsDoctorIssue]:
         """SPEC-DOC-003/009 (v0.5.x, successor to the RELEASE.jsonl fold; v0.5.0
@@ -148,7 +151,13 @@ class ReleaseValidator:
         """
         issues: list[SpecsDoctorIssue] = []
         path = self.specs_dir / "releases"
-        release, segment, phase, err = resolve_active_release(self.specs_dir)
+        active = self.tree.active_release
+        release, segment, phase, err = (
+            active.release,
+            active.segment,
+            active.phase,
+            active.error,
+        )
         del segment
         if err:
             issues.append(
@@ -189,7 +198,13 @@ class ReleaseValidator:
 
     def check_active_release_artifacts(self) -> list[SpecsDoctorIssue]:
         issues: list[SpecsDoctorIssue] = []
-        release, segment, phase, err = resolve_active_release(self.specs_dir)
+        active = self.tree.active_release
+        release, segment, phase, err = (
+            active.release,
+            active.segment,
+            active.phase,
+            active.error,
+        )
         if err or not release or release == "none":
             return issues
         # Dir-based segment (ADR-1/ADR-5): when the active phase record carries a
@@ -331,7 +346,13 @@ class ReleaseValidator:
         """
         issues: list[SpecsDoctorIssue] = []
         active_path = self.specs_dir / "releases"
-        release, segment, phase, err = resolve_active_release(self.specs_dir)
+        active = self.tree.active_release
+        release, segment, phase, err = (
+            active.release,
+            active.segment,
+            active.phase,
+            active.error,
+        )
         if err or not release or release == "none" or phase is None:
             return issues
         rdir = self.specs_dir / "releases" / release
@@ -606,7 +627,8 @@ class ReleaseValidator:
         """
         if repo_root is None or not (pyproject_path := repo_root / "pyproject.toml").is_file():
             return []
-        release, _segment, phase, err = resolve_active_release(self.specs_dir)
+        active = self.tree.active_release
+        release, phase, err = active.release, active.phase, active.error
         if err or not release or release == "none" or phase not in {"CLOSURE", "ARCHIVED"}:
             return []
         try:

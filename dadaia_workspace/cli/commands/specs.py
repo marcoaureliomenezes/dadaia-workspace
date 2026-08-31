@@ -16,6 +16,7 @@ from dadaia_workspace.cli._specs_resolution import (
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.specs import Severity, SpecsDoctor
 from dadaia_workspace.features.specs.doctor_types import SpecsDoctorIssue
+from dadaia_workspace.features.specs.rules import render_fix_help
 from dadaia_workspace.features.specs.scaffolder import scaffold
 
 app = typer.Typer(help="SDD release-lifecycle structural checks and helpers.")
@@ -199,14 +200,7 @@ def doctor(
     fix: bool = typer.Option(
         False,
         "--fix",
-        help=(
-            "Apply auto-fixes for fixable issues (TREE-3: render missing memory HTML; "
-            "TREE-4: create missing dirs with AGENTS.md; TREE-8: remove a stray "
-            "non-canon root entry or dotfile; MEM-PLACEHOLDER-1: remove unfilled "
-            "placeholder atoms from old scaffolds). "
-            "Warn-only invariants (TREE-1, TREE-2, TREE-5) are never "
-            "auto-fixed. After fixing, re-checks and reports residual issues."
-        ),
+        help=render_fix_help(),
     ),
 ) -> None:
     """Run structural checks on the SDD specs tree.

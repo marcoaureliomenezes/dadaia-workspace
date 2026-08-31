@@ -40,6 +40,8 @@ from dadaia_workspace.features.specs.doctor_memory import MemoryValidator
 from dadaia_workspace.features.specs.doctor_release import ReleaseValidator
 from dadaia_workspace.features.specs.doctor_structural import StructuralValidator
 from dadaia_workspace.features.specs.doctor_types import SpecsDoctorIssue
+from dadaia_workspace.features.specs.rules import FIX_BY_CODE, RULES
+from dadaia_workspace.features.specs.specs_tree import SpecsTree
 from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
 
 
@@ -121,135 +123,42 @@ class SpecsDoctor:
 
         # Build the six validators (each independently testable). The coordinator owns the
         # config resolution; validators own their family LOGIC and family-local helpers.
-        self._structural = StructuralValidator(
+        self._structural: StructuralValidator = StructuralValidator(
             self.specs_dir, self._scaffold_dir, self._templates_dir
         )
-        self._memory = MemoryValidator(self.specs_dir)
-        self._release = ReleaseValidator(self.specs_dir)
-        self._closure_audit = ClosureAuditValidator(self.specs_dir, findings_store_factory)
-        self._governance = GovernanceValidator(
+        self._memory: MemoryValidator = MemoryValidator(self.specs_dir)
+        self._release: ReleaseValidator = ReleaseValidator(self.specs_dir)
+        self._closure_audit: ClosureAuditValidator = ClosureAuditValidator(
+            self.specs_dir, findings_store_factory
+        )
+        self._governance: GovernanceValidator = GovernanceValidator(
             self.specs_dir,
             self.public_dir,
             bug_store_factory,
         )
-        self._coherence = CoherenceValidator(
+        self._coherence: CoherenceValidator = CoherenceValidator(
             self.specs_dir,
             self.public_dir,
             self.repo_root,
         )
 
     def check(self) -> list[SpecsDoctorIssue]:
-        """Run every structural check in the EXACT original interleaved order.
-
-        The coordinator owns ORDER; each validator owns its family LOGIC. This sequence is the
-        pre-decomposition l.566-615 order 1:1 — the golden lock pins it byte-identically.
-        """
+        """Run every rule in the ONE ordered registry (F012) over a FRESH SpecsTree
+        snapshot (F010) — shared facts are parsed once per run, the registry owns
+        order, and the golden lock pins the rendered output byte-identically."""
+        tree = SpecsTree(self.specs_dir)
+        self._release.tree = tree
         issues: list[SpecsDoctorIssue] = []
-        issues.extend(self._coherence.check_constitution())
-        issues.extend(self._memory.check_memory_files())
-        issues.extend(self._memory.check_placeholder_atoms())  # MEM-PLACEHOLDER-1
-        issues.extend(self._memory.check_tests_agents_placeholder())  # AGENTS-PLACEHOLDER-1
-        issues.extend(self._release.check_active_md())
-        issues.extend(self._release.check_active_release_artifacts())
-        issues.extend(self._release.check_plan_line_limit())
-        # SPEC-DOC-006 (CLOSURE.md-before-archive completeness) RETIRED (v0.5.0
-        # T-050-25A, A4.4): FR4/T-050-21A retired CLOSURE.md as a going-forward
-        # artifact; a checker that parses a file which no longer exists is dead code
-        # behind a dead artifact.
-        issues.extend(self._closure_audit.check_no_orphan_specs())
-        issues.extend(self._memory.check_memory_atomicity())
-        # 9: covered inside check_active_md (release id ↔ dir)
-        # checks 10 and 11 (HTML image-links / mermaid-script) retired with HTML atoms
-        # SPEC-DOC-012/022/023 RETIRED (v0.12.0 T-120-08, ADR D10) — the candidates.md
-        # bullet-schema validator retired with candidates.md itself, archived by the
-        # same cutover; see doctor_governance.py's module docstring.
-        # SPEC-DOC-016 RETIRED (0.5.3 T-053-04, F005) — one naming rule, one
-        # implementation: SPEC-DOC-027 (check_release_naming_canon) below.
-        # TREE invariants (spec-context-tree-v2)
-        issues.extend(self._structural.check_tree1_foundation())
-        issues.extend(self._structural.check_repo_dadaia1())
-        issues.extend(self._structural.check_tree2_root_spec_md())
-        issues.extend(self._structural.check_tree3_memory_md())
-        issues.extend(self._structural.check_tree4_required_dirs())
-        issues.extend(self._structural.check_tree5_agents_md())
-        issues.extend(self._structural.check_memory_agents_md())
-        # TREE-6 RETIRED (0.5.3 T-053-04, F005) — one artifact rule, one
-        # implementation: SPEC-DOC-004 (check_active_release_artifacts) above.
-        issues.extend(self._structural.check_tree7_bug_session_id())
-        issues.extend(self._structural.check_tree8_canon_root())  # v6 canon, FR1
-        # CAT-1 (memory-context-enforcement-v1) — now based on .md files
-        issues.extend(self._memory.check_cat1_catalog_sync())
-        # LINT-1 (memory-markdown-source-v1) — invoke lint-memory-atoms.py
-        issues.extend(self._memory.check_lint1_memory_atoms())
-        # MEM-DRIFT-1 (v0.5.1 T-051-22 rework) — features package-map diagram vs live tree
-        issues.extend(self._memory.check_mem_drift1_features_package_map())
-        # SPECS-VERSION (specs-evolution / FR-S05) — pattern-version staleness
-        issues.extend(self._coherence.check_specs_pattern_version())
-        # v0.1.10 / T-010-14 (R6b) — ledger invariants + identity-coherence backstop
-        issues.extend(self._release.check_phase_markers_coherence())  # SPEC-DOC-024
-        issues.extend(self._release.check_unique_release_ids())  # SPEC-DOC-026
-        issues.extend(self._release.check_release_naming_canon())  # SPEC-DOC-027
-        issues.extend(self._coherence.check_constitution_file_refs())  # SPEC-DOC-028
-        # SPEC-DOC-029 RETIRED (v0.1.76 T-4, FR7, NO-LOCKS DOCTRINE) — see doctor_coherence.py.
-        issues.extend(self._closure_audit.check_audits_naming_canon())  # SPEC-DOC-030
-        # v0.1.11 / T-011-10 (bug B1) — closure-disposition canon
-        issues.extend(self._governance.check_consumed_backlog_disposition())  # SPEC-DOC-031
-        # SPEC-DOC-032 RETIRED (v0.5.1 K5 deepening) — regex-matched a per-bug
-        # specs/bugs/<slug>.md frontmatter status: line, a shape retired two
-        # migrations before this one (v0.5.0 FR2's single-JSONL-ledger cutover);
-        # dead code behind a dead artifact, see doctor_governance.py's module
-        # docstring.
-        # v0.1.46 / T-46-04 (AC-1) — bug-ledger invariant, reads through the ONE
-        # JsonlRecordStore (v0.5.1 K5)
-        issues.extend(self._governance.check_bugs_jsonl_invariant())  # SPEC-DOC-033
-        # v0.1.46 / T-46-13 (AC-4) — taxonomy + disposition invariants
-        issues.extend(self._closure_audit.check_archive_dirs_exist())  # SPEC-DOC-034
-        issues.extend(self._governance.check_unarchived_terminal_backlog())  # SPEC-DOC-035
-        issues.extend(self._closure_audit.check_audit_disposition())  # SPEC-DOC-036
-        # v0.1.47 / W1-9 — recurrence guards (constitution runtime enum + loose audits)
-        issues.extend(self._coherence.check_constitution_no_runtime_enum())  # SPEC-DOC-037
-        issues.extend(self._closure_audit.check_loose_undisposed_audits())  # SPEC-DOC-038
-        # v0.1.81 / FR2 (audit G-23) — partial (artifact-empty) archived release dirs
-        issues.extend(self._release.check_partial_archived_release_dirs())  # SPEC-DOC-039
-        # SPEC-DOC-042 RETIRED (v0.5.0 T-050-21A, FR4) — it existed only to watch
-        # RELEASE.jsonl and ACTIVE.md agree during the expand window; ACTIVE.md is gone.
-        # SPEC-DOC-043 RETIRED (v0.5.x, RELEASE.json migration) — it existed only to
-        # detect a duplicate defined/implemented/shipped record in the append-only
-        # RELEASE.jsonl event stream; RELEASE.json is ONE mutable document with one
-        # `defined`/`implemented`/`shipped` field each, so a "duplicate milestone" is
-        # now structurally impossible (criterion (a) feature removed —
-        # check_release_jsonl_milestone_immutability and its whole test file,
-        # tests/unit/features/specs/test_doctor_release_jsonl.py, are deleted with it;
-        # pruning verdict owed to qa-engineer per dadaia-test-stewardship §E).
-        # v0.5.0 T-050-08 (FR2/A2.8) — archive-overdue signal (WARN, never a block)
-        issues.extend(self._governance.check_bug_archive_overdue())  # SPEC-DOC-041
-        # v0.5.0 specs-canon closure (operator ruling 2026-08-28) — stale verdicts
-        issues.extend(
-            self._release.check_stale_verdicts(head_sha=self.head_sha, parent_sha=self.parent_sha)
-        )  # SPEC-DOC-044
-        # bug release-shipped-without-a-pyproject-version-bump — pyproject.toml
-        # version must equal the release id at/after CLOSURE.
-        issues.extend(
-            self._release.check_pyproject_version_matches_release(self.repo_root)
-        )  # SPEC-DOC-045
+        for rule in RULES:
+            issues.extend(rule.run(self, tree))
         return issues
 
     def fix(self, issues: list[SpecsDoctorIssue] | None = None) -> list[SpecsDoctorIssue]:
         """Apply auto-fixes for all fixable issues.
 
-        Resolves TREE-4 (structural) and SPEC-DOC-034 (closure_audit) only — the coordinator
-        dispatches by issue code to the owning validator's public fix method; warn-only and
-        no-fix invariants are never touched.
-
-        Args:
-            issues: Pre-computed issue list (avoids a second ``check()`` call).
-                    If None, ``check()`` is called internally.
-
-        Returns:
-            List of issues that were fixed (i.e. ``fixable=True`` issues that
-            were acted upon).  Issues that could not be fixed due to missing
-            templates are omitted and left as residual issues on the next
-            ``check()`` call.
+        Dispatch derives from the registry (:data:`~dadaia_workspace.features.specs
+        .rules.FIX_BY_CODE`) — never a hand-kept branch list. Warn-only invariants are
+        never touched; a failed fix is left as a residual issue for the next check().
         """
         if issues is None:
             issues = self.check()
@@ -257,29 +166,12 @@ class SpecsDoctor:
         for issue in issues:
             if not issue.fixable:
                 continue
+            rule = FIX_BY_CODE.get(issue.code)
+            if rule is None or rule.fix is None:
+                continue
             try:
-                if issue.code == "TREE-4":
-                    self._structural.fix_tree4(issue)
-                    fixed.append(issue)
-                elif issue.code == "TREE-5":
-                    self._structural.fix_tree5(issue)
-                    fixed.append(issue)
-                elif issue.code == "REPO-DADAIA-1":
-                    self._structural.fix_repo_dadaia1(issue)
-                    fixed.append(issue)
-                elif issue.code == "TREE-8":
-                    self._structural.fix_tree8(issue)
-                    fixed.append(issue)
-                elif issue.code == "SPEC-DOC-034":
-                    self._closure_audit.fix_archive_dir(issue)
-                    fixed.append(issue)
-                elif issue.code == "SPEC-DOC-044":
-                    self._release.fix_stale_verdict(issue)
-                    fixed.append(issue)
-                elif issue.code == "MEM-PLACEHOLDER-1":
-                    self._memory.fix_placeholder_atom(issue)
-                    fixed.append(issue)
-            except Exception:
-                # Leave as residual — will re-appear on next check()
-                pass
+                rule.fix(self, issue)
+            except Exception:  # noqa: BLE001 — leave as residual for the next check()
+                continue
+            fixed.append(issue)
         return fixed
