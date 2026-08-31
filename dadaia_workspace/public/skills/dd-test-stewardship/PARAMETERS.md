@@ -1,6 +1,6 @@
 # PARAMETERS — dd-test-stewardship declared defaults
 
-Disclosed reference reached from `SKILL.md`'s references to "PARAMETERS.md" (§C/§H and the module intro).
+Disclosed reference of `SKILL.md` — the numeric defaults its sections cite.
 Every value below is this workspace's declared default, not a universal constant.
 A consumer workspace re-parameterizes without forking the doctrine in `SKILL.md`.
 

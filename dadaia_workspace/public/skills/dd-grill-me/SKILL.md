@@ -15,7 +15,7 @@ Reach shared understanding by mapping every open branch of the demand as a desig
 ## 1. When
 
 - The operator's demand is ambiguous and needs intake refinement (`project-manager`).
-- A release is being defined and needs its mandatory pre-SPEC session (`product-engineer`, `dd-release-definition` §3).
+- A release is being defined and needs its mandatory pre-SPEC session (`product-engineer`, `dd-release-definition` §2).
 - A single spec or feature question needs a focused leaf answer.
 - The operator says "grill", "refine specs", or "review backlog".
 
@@ -54,5 +54,5 @@ Reach shared understanding by mapping every open branch of the demand as a desig
 
 - `PROBLEM-TAXONOMY.md` — the problem-shape reference used at step 3.
 - `EMISSION-FORMAT.md` — the optional report's shape, report mode only.
-- `dd-release-definition` §3 — the mandatory pre-SPEC session rule.
+- `dd-release-definition` §2 — the mandatory pre-SPEC session rule.
 - `DADAIA.md` §5 — handoff-first emission law.

@@ -193,7 +193,7 @@
       ],
       "hash_tuple": {
         "section": "sha256:ab59448f37391a5442a7dc46013dcc3645474faaac7c6d33d6c1dbf73945fce1",
-        "skill": "sha256:ee44ae5c7596e8abf49cd9d34681f2440dee246fab504bbcc6d368ffb58fb06b",
+        "skill": "sha256:f5cb4848dbf2c819ce9e812caa31ae455fc933c7883678c020f0dbcc1d13902a",
         "scoped": [
           "sha256:595d9e81de4fcfa9837e6332a5ba5c3b87dd53dcd89308545109b48d21b025b9"
         ]
@@ -242,7 +242,7 @@
       "scoped_agents_md": [],
       "hash_tuple": {
         "section": "sha256:ab59448f37391a5442a7dc46013dcc3645474faaac7c6d33d6c1dbf73945fce1",
-        "skill": "sha256:eced5779ab108bbb9ef482f87275b0aae7e85ecf4bca3b4034a90028c54997ed",
+        "skill": "sha256:555d4b8fff0353ae0660bda4e639e98e7dbf4d789cef440edb019b0a24a5d7cf",
         "scoped": []
       },
       "recorded_by": "claude-code",
@@ -417,7 +417,7 @@
       "scoped_agents_md": [],
       "hash_tuple": {
         "section": "sha256:4ff73734813e198c0717caf61020c9c81de1fedf182240a22bdce7b32ffe17fe",
-        "skill": "sha256:11029f5c654e4e29cbfccdb5081f33369a7b3a825f181d9f72aafce5f56078eb",
+        "skill": "sha256:f0ea24e06e09e36bebb590d860b2d582263eb03703e63ae3fd0bbaf94c47548e",
         "scoped": []
       },
       "recorded_by": "claude-code",

@@ -134,8 +134,8 @@ _PATH_MARKERS: tuple[tuple[str, str], ...] = (
     ("tests/tmp/", "tmp"),
 )
 
-# T-070-05 (v0.7.0 FR5): tier -> enforced timeout seconds (dd-test-stewardship
-# S-08/S-09). A test that trips its tier ceiling is MIS-TIERED — fix the tier or
+# Tier -> enforced timeout seconds (dd-test-stewardship, size tiers; values in its
+# PARAMETERS.md). A test that trips its tier ceiling is MIS-TIERED — fix the tier or
 # declare an explicit justified @pytest.mark.timeout; never raise these defaults.
 _TIER_TIMEOUTS: dict[str, int] = {"unit": 10, "contract": 30, "integration": 60, "e2e": 120}
 
@@ -188,7 +188,7 @@ def _validate_quarantine_markers(items: list[pytest.Item]) -> None:
             message = (
                 f"{item.nodeid}: @pytest.mark.quarantine requires a registered bug id — "
                 "use @pytest.mark.quarantine(bug='<bug-slug>') and register the bug via "
-                "`dadaia bugs append` first (dd-test-stewardship, group F)."
+                "`dadaia bugs append` first (dd-test-stewardship, flakes and quarantine)."
             )
             # Under xdist the UsageError kills the worker and surfaces as an opaque
             # INTERNALERROR on the controller (T-070-09 finding 2) — print the

@@ -1,4 +1,4 @@
-# Spec-set review dimension (absorbed from dadaia-workspace-spec-reviewer, T-053-25)
+# Spec-set review dimension
 
 Run when reviewing/refining a spec set before implementation or before declaring a
 refinement pass complete. Doctor codes enforce most of this mechanically — this
