@@ -15,7 +15,7 @@
   dadaia_workspace/public/entities/behavior-map.json.
   Blocked by: none. Delivers: every later task applies a written, binding
   standard the operator ratified.
-- [ ] T-046-09 — FR2 Merge A: `dd-domain-modeling` born from `dadaia-glossary`
+- [-] T-046-09 — FR2 Merge A: `dd-domain-modeling` born from `dadaia-glossary`
   + local `domain-modeling` (CONTEXT-FORMAT.md sibling; ADR criteria adapted
   to `specs/ADRs/decisions.jsonl`); `dadaia-glossary` dir deleted; local
   `domain-modeling` instance dirs deleted; grants swapped
