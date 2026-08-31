@@ -1,0 +1,18 @@
+{
+ "schema": "release-state-v1",
+ "release": "0.5.3",
+ "phase": "DEFINITION",
+ "rc": null,
+ "defined": null,
+ "implemented": null,
+ "shipped": null,
+ "audited": null,
+ "log": [
+  {
+   "ts": "2026-08-31T00:00:00Z",
+   "agent": "claude-code",
+   "kind": "note",
+   "text": "Remediation release for 20260830-design-bug-surface-audit (17 findings; 15 in-release, F010+F012 deferred to specs-tree-model-rule-registry per the audit's own sequencing). Operator order 2026-08-31; grill satisfied by the audit evidence + direct order."
+  }
+ ]
+}
