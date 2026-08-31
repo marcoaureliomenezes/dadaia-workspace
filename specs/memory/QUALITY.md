@@ -25,7 +25,7 @@ ADR: none
 Rationale: these two surfaces absorbed every migration this product shipped.
 
 ### P-21 · We give every test a size tier with an enforced timeout applied at collection, and an explicit `@pytest.mark.timeout` is never overridden.
-Measured by: `pytest tests/contract/test_stewardship_mechanics.py -k timeout` (executed path: the marker on the test's own item).
+Measured by: `pytest tests/contract/test_stewardship_mechanics.py -k "test_contract_tier_carries_30s_timeout or test_explicit_timeout_marker_is_never_overridden or test_tier_timeout_table_covers_all_four_layers"` (executed path: the marker on the test's own item; F041 — the bare `-k timeout` also matched the tier marker every contract item carries, collecting all 8 with 0 deselected).
 ADR: none
 Rationale: a test needing more time than its tier is mis-tiered.
 
