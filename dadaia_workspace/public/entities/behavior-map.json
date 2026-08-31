@@ -41,7 +41,7 @@
    "skill": "dadaia-codebase-design",
    "scoped_agents_md": [],
    "hash_tuple": {
-    "section": "sha256:4ef2e4f224b298b0d0d53fc53bb9e6744f77ac72400227634c0e4d7eb2743106",
+    "section": "sha256:9cb1f8b6a82863d2aee474162c82a7e525dbdcd44406589875b525623a38e940",
     "skill": "sha256:5c1e532e057c11b9c55302d6b5425e5d00a62b3d192a709e3f3cc592853a3a91",
     "scoped": []
    },
@@ -54,7 +54,7 @@
    "skill": "dd-ai-eng-knowhow",
    "scoped_agents_md": [],
    "hash_tuple": {
-    "section": "sha256:4ef2e4f224b298b0d0d53fc53bb9e6744f77ac72400227634c0e4d7eb2743106",
+    "section": "sha256:9cb1f8b6a82863d2aee474162c82a7e525dbdcd44406589875b525623a38e940",
     "skill": "sha256:677a573790cb8cc8e5f079587ffcfeaddb47a4896e462a2e4e8179d3a371ac83",
     "scoped": []
    },
@@ -473,6 +473,19 @@
    "hash_tuple": {
     "section": "sha256:709ba9f35227e8d3c31520eb9375ff2a856845db234e18c7f90102f11b809d97",
     "skill": "sha256:6c854309f49c35be6eb9bf0f3d4c58c93ad0c089306f78585d921be6bcd7eb0a",
+    "scoped": []
+   },
+   "recorded_by": "ai-engineer",
+   "recorded_at": "2026-08-31"
+  },
+  {
+   "section": "§2 Who does what",
+   "anchor": null,
+   "skill": "dd-code-review",
+   "scoped_agents_md": [],
+   "hash_tuple": {
+    "section": "sha256:9cb1f8b6a82863d2aee474162c82a7e525dbdcd44406589875b525623a38e940",
+    "skill": "sha256:2c39512baa42f5d5351324cc9cc4bc3f3c8200a303971b90e4adb1df18c7e1d2",
     "scoped": []
    },
    "recorded_by": "ai-engineer",
