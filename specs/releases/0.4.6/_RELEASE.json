@@ -1,8 +1,8 @@
 {
   "schema": "release-state-v1",
   "release": "0.4.6",
-  "phase": "CLOSURE",
-  "rc": 1,
+  "phase": "DISCOVERY",
+  "rc": 2,
   "defined": {
     "sha": null,
     "ts": "2026-08-31T18:16:56Z"
@@ -70,6 +70,18 @@
       "agent": "claude-code",
       "kind": "note",
       "text": "Architecture-survey note at candidate close (RC-FLOW step 3): bugs ledger 0 open (545 total); churn concentrated in public/skills (this candidate). Cards: (1) Strong — behavior-map hash re-record is a repeated manual seam (session-local script); a 'dadaia behavior-map rehash' CLI verb would give it one owner; (2) Worth exploring — doctor_release.py carries the candidate-phase predicate in three places (DISCOVERY guard at :208, :248, :327+, flagged by code-review as Repeated Switches); one phase->required-artifacts decider would delete two branches; (3) Speculative — dd-audit-project PILLAR-* siblings still carry heavy prose vs the 15-rule bar. Top candidate: (1). Next hop: operator intake via grill — no backlog write from this note."
+    },
+    {
+      "ts": "2026-08-31T22:18:36Z",
+      "agent": "release-candidates",
+      "kind": "note",
+      "text": "Candidate 2 archived to rc-2/ (operator ruled continue at the promote-or-continue gate); root is ready for the next candidate's trio."
+    },
+    {
+      "ts": "2026-08-31T22:18:47Z",
+      "agent": "release-candidates",
+      "kind": "note",
+      "text": "Candidate 2 archived to rc-2/ (operator ruled continue at the promote-or-continue gate); root is ready for the next candidate's trio."
     }
   ]
 }
