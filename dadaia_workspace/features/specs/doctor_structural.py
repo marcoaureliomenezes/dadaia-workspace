@@ -28,6 +28,19 @@ from dadaia_workspace.features.specs.template_history import was_shipped
 # TECHSTACK.md, QUALITY.md — case-only for the first, word-shortened for the other two.
 _TREE3_MEMORY_FILES: tuple[str, ...] = memory_canon.MEMORY_REQUIRED_FILES
 
+# TREE-5 scoped-law coverage (T-053-15, bug
+# releases-agents-projection-stale-vs-scaffold-source): the scaffold AGENTS.md files a
+# projection freezes at scaffold time. memory/ is EXCLUDED — single-ownership law
+# (install never updates specs/memory/AGENTS.md; TREE-5M owns its presence).
+_TREE5_SCOPED_LAW_AREAS: tuple[str, ...] = (
+    "releases",
+    "releases/_ideas",
+    "backlog",
+    "bugs",
+    "audits",
+    "ADRs",
+)
+
 # TREE-4: directories that must exist — folded over the canon table (v0.5.1 K4): every
 # area whose ``_archive/<area>_histo.jsonl`` is required_at_birth also needs its own
 # directory to exist (:data:`~dadaia_workspace.features.specs.canon.REQUIRED_ROOT_DIRS`,
@@ -246,16 +259,23 @@ class StructuralValidator:
             agents_md.write_text(agents_content, encoding="utf-8")
 
     def check_tree5_agents_md(self) -> list[SpecsDoctorIssue]:
-        """TREE-5: specs/AGENTS.md must exist and its content must match the canonical template.
+        """TREE-5: projected law files must match their canonical source.
 
-        Absent file → WARNING (fixable=False; cannot auto-create because the file
-        is intended for operator customisation).
-        Hash drift → WARNING (fixable=False; silent overwrite would destroy
-        operator customisation — user must merge manually).
+        Root: ``specs/AGENTS.md`` vs ``templates/specs-AGENTS.md``. Scoped (T-053-15):
+        ``specs/<area>/AGENTS.md`` vs ``public/scaffold/<area>/AGENTS.md`` for every
+        area in :data:`_TREE5_SCOPED_LAW_AREAS` (memory excluded — single-ownership).
 
-        When no templates_dir is available, hash comparison is skipped and
-        only presence is checked.
+        Absent root file → WARNING (fixable=False; intended for operator
+        customisation). Hash drift → WARNING; auto-fixable ONLY when the on-disk
+        bytes equal a version this project shipped (``was_shipped``) and the file is
+        not a symlink — anything else may hold operator content and stays warn-only.
         """
+        issues: list[SpecsDoctorIssue] = []
+        issues.extend(self._tree5_root_issues())
+        issues.extend(self._tree5_scoped_issues())
+        return issues
+
+    def _tree5_root_issues(self) -> list[SpecsDoctorIssue]:
         agents_md = self.specs_dir / "AGENTS.md"
         if not agents_md.exists():
             return [
@@ -272,15 +292,45 @@ class StructuralValidator:
                     fixable=False,
                 )
             ]
-
-        # Hash comparison against canonical template
         if self._templates_dir is None:
             return []
         canonical_path = self._templates_dir / "specs-AGENTS.md"
         if not canonical_path.exists():
             return []
+        return self._tree5_compare(
+            dst=agents_md,
+            canonical_path=canonical_path,
+            asset_name="specs-AGENTS.md",
+            label="specs/AGENTS.md",
+        )
+
+    def _tree5_scoped_issues(self) -> list[SpecsDoctorIssue]:
+        """Scoped scaffold law files (T-053-15) — same shipped-history discipline."""
+        if self._templates_dir is None or self._scaffold_dir is None:
+            return []
+        issues: list[SpecsDoctorIssue] = []
+        for area in _TREE5_SCOPED_LAW_AREAS:
+            dst = self.specs_dir / area / "AGENTS.md"
+            canonical_path = self._scaffold_dir / area / "AGENTS.md"
+            if not dst.exists() or not canonical_path.exists():
+                continue  # presence is the scaffold/TREE-8 lane's business
+            issues.extend(
+                self._tree5_compare(
+                    dst=dst,
+                    canonical_path=canonical_path,
+                    asset_name=f"scaffold/{area}/AGENTS.md",
+                    label=f"specs/{area}/AGENTS.md",
+                )
+            )
+        return issues
+
+    def _tree5_compare(
+        self, *, dst: Path, canonical_path: Path, asset_name: str, label: str
+    ) -> list[SpecsDoctorIssue]:
+        """ONE comparison rule for every TREE-5 target (root and scoped alike)."""
+        assert self._templates_dir is not None
         canonical_text = canonical_path.read_text(encoding="utf-8")
-        current_text = agents_md.read_text(encoding="utf-8")
+        current_text = dst.read_text(encoding="utf-8")
         canonical_hash = hashlib.sha256(canonical_text.encode("utf-8")).hexdigest()
         current_hash = hashlib.sha256(current_text.encode("utf-8")).hexdigest()
         if canonical_hash == current_hash:
@@ -288,25 +338,22 @@ class StructuralValidator:
         # A file whose bytes we published earlier carries no operator customisation, so
         # refreshing it is lossless (bug
         # upgrade-never-refreshes-uncustomised-scoped-law-projection). Anything else may
-        # hold operator content and stays warn-only.
-        # A symlinked projection is never repaired (the write would land outside the
-        # tree), so it must not be advertised as fixable either — reporting a fix that
-        # never happens is its own defect (CWE-393).
-        if was_shipped(current_text, "specs-AGENTS.md", self._templates_dir) and not (
-            agents_md.is_symlink()
-        ):
+        # hold operator content and stays warn-only. A symlinked projection is never
+        # repaired (the write would land outside the tree), so it must not be
+        # advertised as fixable either (CWE-393).
+        if was_shipped(current_text, asset_name, self._templates_dir) and not dst.is_symlink():
             return [
                 SpecsDoctorIssue(
                     code="TREE-5",
                     severity=Severity.WARNING,
                     description=(
-                        f"specs/AGENTS.md is a superseded version of the canonical "
+                        f"{label} is a superseded version of the canonical "
                         f"template (current sha256:{current_hash[:12]}… is a previously "
                         f"shipped release; canonical sha256:{canonical_hash[:12]}…). "
                         "It carries no operator customisation, so it can be refreshed "
                         "losslessly — run `dadaia specs doctor --fix`."
                     ),
-                    path=str(agents_md),
+                    path=str(dst),
                     fixable=True,
                 )
             ]
@@ -315,41 +362,56 @@ class StructuralValidator:
                 code="TREE-5",
                 severity=Severity.WARNING,
                 description=(
-                    f"specs/AGENTS.md has drifted from canonical template "
+                    f"{label} has drifted from its canonical source "
                     f"(current sha256:{current_hash[:12]}… vs "
                     f"canonical sha256:{canonical_hash[:12]}…). "
                     "Review the diff and merge any upstream changes manually — "
                     "auto-overwrite is disabled to protect operator customisations. "
-                    "Canonical template: dadaia_workspace/public/templates/specs-AGENTS.md"
+                    f"Canonical source: {canonical_path}"
                 ),
-                path=str(agents_md),
+                path=str(dst),
                 fixable=False,
             )
         ]
 
     def fix_tree5(self, issue: SpecsDoctorIssue) -> None:
-        """Refresh a superseded projection from the canonical template.
+        """Refresh a superseded projection from its canonical source (root or scoped).
 
-        Only ever reached for issues this validator marked ``fixable`` — i.e. the on-disk
-        bytes are a version we shipped ourselves. Re-verified here so a future caller
-        cannot turn the repair into an overwrite of operator content.
+        Only ever reached for issues this validator marked ``fixable``. The repair
+        target is resolved against a CLOSED set of known law files — the issue's path
+        selects WHICH member, never an arbitrary destination (CWE-73); a symlink is
+        refused so the write cannot land outside the tree (CWE-59); ``was_shipped`` is
+        re-verified so the repair can never overwrite operator content.
         """
         if self._templates_dir is None:
             return
-        # The repair target is derived, never taken from the issue: an externally supplied
-        # path would let a caller aim the write anywhere (CWE-73). A link is refused
-        # outright so the canonical text cannot be written through it to a file outside
-        # the tree (CWE-59).
-        agents_md = self.specs_dir / "AGENTS.md"
-        if agents_md.is_symlink():
+        targets: list[tuple[Path, Path, str]] = [
+            (
+                self.specs_dir / "AGENTS.md",
+                self._templates_dir / "specs-AGENTS.md",
+                "specs-AGENTS.md",
+            )
+        ]
+        if self._scaffold_dir is not None:
+            targets.extend(
+                (
+                    self.specs_dir / area / "AGENTS.md",
+                    self._scaffold_dir / area / "AGENTS.md",
+                    f"scaffold/{area}/AGENTS.md",
+                )
+                for area in _TREE5_SCOPED_LAW_AREAS
+            )
+        issue_path = Path(issue.path).resolve() if issue.path else None
+        for dst, canonical_path, asset_name in targets:
+            if issue_path is not None and dst.resolve() != issue_path:
+                continue
+            if dst.is_symlink() or not dst.exists() or not canonical_path.exists():
+                continue
+            current_text = dst.read_text(encoding="utf-8")
+            if not was_shipped(current_text, asset_name, self._templates_dir):
+                continue
+            atomic_write(dst, canonical_path.read_text(encoding="utf-8"), preserve_mode=True)
             return
-        canonical_path = self._templates_dir / "specs-AGENTS.md"
-        if not canonical_path.exists() or not agents_md.exists():
-            return
-        current_text = agents_md.read_text(encoding="utf-8")
-        if not was_shipped(current_text, "specs-AGENTS.md", self._templates_dir):
-            return
-        atomic_write(agents_md, canonical_path.read_text(encoding="utf-8"), preserve_mode=True)
 
     def check_memory_agents_md(self) -> list[SpecsDoctorIssue]:
         """Check: specs/memory/AGENTS.md must exist (WARNING only).

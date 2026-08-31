@@ -111,3 +111,89 @@ def test_shipped_history_records_the_current_canonical_template() -> None:
     """Anti-rot: every template edit must append its new hash, or the next stale
     projection stops being recognisable as ours."""
     assert was_shipped(_CANONICAL_TEXT, "specs-AGENTS.md", _REAL_TEMPLATES_DIR)
+
+
+# ---------------------------------------------------------------------------
+# T-053-15 (bug releases-agents-projection-stale-vs-scaffold-source, F006 lane):
+# the shipped-history mechanism covers every SCOPED scaffold law file too —
+# specs/<area>/AGENTS.md vs public/scaffold/<area>/AGENTS.md. memory/AGENTS.md is
+# excluded by the single-ownership law (install never updates it; TREE-5M owns it).
+# ---------------------------------------------------------------------------
+
+_SCOPED_STALE = "# specs/releases/ — old era\n\nRELEASE.jsonl append-only event log.\n"
+_SCOPED_CANONICAL = "# specs/releases/ — Release Rules\n\nRELEASE.json is one mutable doc.\n"
+
+
+def _public_dir_with_scoped(root: Path, *shipped: str) -> Path:
+    public = root / "public"
+    templates = public / "templates"
+    templates.mkdir(parents=True)
+    (templates / "specs-AGENTS.md").write_text(_CANONICAL_TEXT, encoding="utf-8")
+    scaffold = public / "scaffold" / "releases"
+    scaffold.mkdir(parents=True)
+    (scaffold / "AGENTS.md").write_text(_SCOPED_CANONICAL, encoding="utf-8")
+    (templates / SHIPPED_HASHES_FILENAME).write_text(
+        json.dumps(
+            {
+                "specs-AGENTS.md": [_sha(_CANONICAL_TEXT)],
+                "scaffold/releases/AGENTS.md": [_sha(t) for t in (_SCOPED_CANONICAL, *shipped)],
+            }
+        ),
+        encoding="utf-8",
+    )
+    return public
+
+
+def test_stale_shipped_scoped_law_is_refreshed(tmp_path: Path) -> None:
+    public = _public_dir_with_scoped(tmp_path, _SCOPED_STALE)
+    specs = _specs_tree(tmp_path / "scoped-stale", _CANONICAL_TEXT)
+    (specs / "releases").mkdir(parents=True, exist_ok=True)
+    (specs / "releases" / "AGENTS.md").write_text(_SCOPED_STALE, encoding="utf-8")
+
+    doctor = SpecsDoctor(specs, public_dir=public)
+    issues = [i for i in doctor.check() if i.code == "TREE-5"]
+    scoped = [i for i in issues if "releases/AGENTS.md" in (i.path or "")]
+    assert scoped and scoped[0].fixable, "a stale shipped scoped projection must be fixable"
+
+    doctor.fix(issues)
+    assert (specs / "releases" / "AGENTS.md").read_text(encoding="utf-8") == _SCOPED_CANONICAL
+
+
+def test_customised_scoped_law_is_never_overwritten(tmp_path: Path) -> None:
+    customised = "# Our releases law\n\nHand-written by the operator.\n"
+    public = _public_dir_with_scoped(tmp_path, _SCOPED_STALE)
+    specs = _specs_tree(tmp_path / "scoped-custom", _CANONICAL_TEXT)
+    (specs / "releases").mkdir(parents=True, exist_ok=True)
+    (specs / "releases" / "AGENTS.md").write_text(customised, encoding="utf-8")
+
+    doctor = SpecsDoctor(specs, public_dir=public)
+    issues = [i for i in doctor.check() if i.code == "TREE-5"]
+    scoped = [i for i in issues if "releases/AGENTS.md" in (i.path or "")]
+    assert scoped and not scoped[0].fixable
+
+    doctor.fix(doctor.check())
+    assert (specs / "releases" / "AGENTS.md").read_text(encoding="utf-8") == customised
+
+
+def test_memory_agents_is_excluded_from_scoped_law_refresh(tmp_path: Path) -> None:
+    """specs/memory/AGENTS.md is single-ownership (install never updates it) — the
+    scoped TREE-5 loop must not touch it even when its bytes match shipped history."""
+    public = _public_dir_with_scoped(tmp_path)
+    scaffold_mem = public / "scaffold" / "memory"
+    scaffold_mem.mkdir(parents=True)
+    (scaffold_mem / "AGENTS.md").write_text("# Memory law v2\n", encoding="utf-8")
+    specs = _specs_tree(tmp_path / "scoped-mem", _CANONICAL_TEXT)
+    (specs / "memory" / "AGENTS.md").write_text("# Memory law v1\n", encoding="utf-8")
+
+    doctor = SpecsDoctor(specs, public_dir=public)
+    issues = [i for i in doctor.check() if i.code == "TREE-5"]
+    assert not [i for i in issues if "memory" in (i.path or "")]
+
+
+def test_shipped_history_records_every_current_scaffold_law() -> None:
+    """Anti-rot, scoped half: every scaffold AGENTS.md edit must append its new hash
+    (memory excluded — single-ownership, never refreshed by TREE-5)."""
+    scaffold_root = _REPO_ROOT / "dadaia_workspace" / "public" / "scaffold"
+    for area in ("releases", "releases/_ideas", "backlog", "bugs", "audits", "ADRs"):
+        text = (scaffold_root / area / "AGENTS.md").read_text(encoding="utf-8")
+        assert was_shipped(text, f"scaffold/{area}/AGENTS.md", _REAL_TEMPLATES_DIR), area
