@@ -4,7 +4,7 @@ Scope: the `specs/memory/**` tree of one Spec Context Project. Broader SDD rules
 `specs/AGENTS.md`.
 
 Memory is **product truth**: it describes the product as it is now, never how it got there. History
-lives in each release's `RELEASE.json` closure log and under `_archive/`.
+lives in each release's `_RELEASE.json` closure log and under `_archive/`.
 
 ## Write ownership
 

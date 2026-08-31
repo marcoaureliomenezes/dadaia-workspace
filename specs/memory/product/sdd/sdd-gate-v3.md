@@ -2,7 +2,7 @@
 slug: sdd-gate-v3
 title: sdd-gate-v3
 category: product
-tldr: No-lock enforcement — origin-classified LAW, path/phase/mode gates, phase read from RELEASE.json, git hooks pared to the publication boundary.
+tldr: No-lock enforcement — origin-classified LAW, path/phase/mode gates, phase read from _RELEASE.json, git hooks pared to the publication boundary.
 summary: The merged PreToolUse gate enforces root whitelist, venv and cache posture, path class, phase and caller mode; the git chokepoints enforce the publication boundary and the denylist scan.
 tags: [sdd, gate, hooks, enforcement, no-locks, privacy]
 ---
@@ -23,7 +23,7 @@ tags: [sdd, gate, hooks, enforcement, no-locks, privacy]
 
 - LAW is origin-decided with zero I/O: basename `DADAIA.md`, `AGENTS.md` or `CLAUDE.md` plus a root or harness-projection location, both sets from `core/workspace_layout.py`.
 - A path under `repos/<slug>/` matches neither origin, so a repo's scoped `AGENTS.md` is MUTATING; MEMORY matches the bare prefix `specs/memory/` with no dotfile carve-out.
-- Phase comes from `RELEASE.json` alone — the single directory under `specs/releases/` carrying one — fail-closed: zero or several live releases, an unreadable file or a missing `phase` denies the write.
+- Phase comes from `_RELEASE.json` alone — the single directory under `specs/releases/` carrying one — fail-closed: zero or several live releases, an unreadable file or a missing `phase` denies the write.
 - Mode resolves from the environment, then this session's record, then `IMPLEMENTATION`; a READ session blocks only its own mutating writes.
 - The gate builds one `core.invocation.Invocation` per payload and reads context, mode, release and phase off it; it re-derives no fact and never imports the container ([[context-management]]).
 - It best-effort upserts a presence record, another live record warning once without changing the verdict.

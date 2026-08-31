@@ -27,6 +27,6 @@
 - [x] T-046-06 — law + skills: DADAIA.md §4.2/§6.7/glossary; dd-gitflow-default;
   dd-release-definition; behavior-map hashes; CONTEXT.md glossary. Write set:
   dadaia_workspace/public/**, CONTEXT.md, tests/**.
-- [-] T-046-07 — closure: memory atoms, reprojection (stage/install/doctor),
+- [x] T-046-07 — closure: memory atoms, reprojection (stage/install/doctor),
   full preflight, candidate CLOSURE. Write set: specs/memory/**, CHANGELOG.md,
   specs/releases/0.4.6/**.

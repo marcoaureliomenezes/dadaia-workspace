@@ -61,7 +61,7 @@
 | slug | title | tldr |
 |------|-------|------|
 | `audits-canon` | audits-canon | Audits are committed spec artifacts — three pillars over a sha window, findings as JSONL records, dispositioned by exactly one remediation release. |
-| `sdd-bug-backlog-governance` | sdd-bug-backlog-governance | One record per bug through one write seam, a live-photo backlog with histo exits, and the RELEASE.json state document. |
-| `sdd-gate-v3` | sdd-gate-v3 | No-lock enforcement — origin-classified LAW, path/phase/mode gates, phase read from RELEASE.json, git hooks pared to the publication boundary. |
-| `specs-doctor` | specs-doctor | Validates the v6 canon tree, memory drift and catalog integrity, RELEASE.json, bug and backlog governance, and audit findings folded from JSONL. |
+| `sdd-bug-backlog-governance` | sdd-bug-backlog-governance | One record per bug through one write seam, a live-photo backlog with histo exits, and the _RELEASE.json state document. |
+| `sdd-gate-v3` | sdd-gate-v3 | No-lock enforcement — origin-classified LAW, path/phase/mode gates, phase read from _RELEASE.json, git hooks pared to the publication boundary. |
+| `specs-doctor` | specs-doctor | Validates the v6 canon tree, memory drift and catalog integrity, _RELEASE.json, bug and backlog governance, and audit findings folded from JSONL. |
 

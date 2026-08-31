@@ -21,7 +21,7 @@ tags: [sdd, audits, findings, governance, evidence]
 
 ## Lifecycle
 
-- The window is `[from-sha, HEAD]`, `from-sha` being the newest `audited` milestone found across the live `RELEASE.json`, `specs/releases/_archive/**` and `releases_histo.jsonl`; `_ideas/` is not scanned.
+- The window is `[from-sha, HEAD]`, `from-sha` being the newest `audited` milestone found across the live `_RELEASE.json`, `specs/releases/_archive/**` and `releases_histo.jsonl`; `_ideas/` is not scanned.
 - The audit sets its own `audited` milestone at the end, so the chain never gaps, and all three pillars run together — a run reporting one of them is incomplete.
 - Pillar 1, bug history, covers every record whose registration or resolution sha falls in the window, measuring recurrence, fix-induced bugs, resolutions with no cause or regression seam, unrouted net-positive diffs, commit-shape conformance, a hunk changing an immutable core field (HIGH), and a stored provenance sha disagreeing with derivation.
 - Pillar 1 is the single writer of the derived cache, writing `audited` and the four provenance fields in one atomic rewrite.
