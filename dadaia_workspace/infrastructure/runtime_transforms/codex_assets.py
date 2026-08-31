@@ -48,7 +48,7 @@ _CODEX_DEFAULT_EFFORT = "medium"
 # family it was meant to cover (A22.6; a test derives this whole tuple from the
 # on-disk inventory — ``tests/contract/test_codex_skill_ref_prefixes.py``).
 _CODEX_SKILL_REF_PREFIXES = (
-    "architect-core-workflow",
+    "dadaia-codebase-design",
     "dadaia-handoff-emitter",
     "dadaia-step0-memory-bootstrap",
     "dadaia-task-manager",
