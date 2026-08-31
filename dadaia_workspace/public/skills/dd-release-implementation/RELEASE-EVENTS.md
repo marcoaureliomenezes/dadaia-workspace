@@ -30,7 +30,7 @@ Disclosed reference reached from `SKILL.md`/`RC-FLOW.md` wherever the arc says "
 - Every closure-narrative class (summary, size accounting, drifts, artifact-GC, test dispositions) lands as one `log` entry.
 - The entry's `kind` field names the class.
 - Already-native classes need no entry: dispositions (`backlog_histo.jsonl`/`BUGS.jsonl`'s `resolved_release`).
-- Already-native classes (continued): tasks completed (`TASKS.md` `[x]` + sha), validations (trio `APPROVE` handoffs), memory updates (atom diffs).
+- Already-native classes (continued): tasks completed (`TASKS.md` `[x]` + sha), validations (trio `APPROVED` handoffs), memory updates (atom diffs).
 
 ## Write seam
 

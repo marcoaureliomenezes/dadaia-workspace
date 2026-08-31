@@ -33,7 +33,7 @@ description: >
 - Live release resolved by reading `_RELEASE.json` directly.
 - Task reserved (`[-]`) with an isolated `chore(tasks): start <id>` commit.
 - Current step (`RC-FLOW.md`) identified before attempting its unlock action.
-- CI green before any push; trio `APPROVE`d before the candidate's develop PR.
+- CI green before any push; trio `APPROVED` before the candidate's develop PR.
 - At candidate closure: memory update -> closure narrative -> disposition sweep -> artifact GC -> merge -> the promote-or-continue gate.
 
 ## 4. References

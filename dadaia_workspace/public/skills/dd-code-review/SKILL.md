@@ -48,7 +48,7 @@ axes are reported side by side — an axis never outranks another.
 ## 5. Reporting
 
 - Findings carry: axis, severity (CRITICAL/HIGH/MEDIUM/LOW/INFO), `file:line`, what the code does, fix direction (never code).
-- The three axes appear side by side in the report; the verdict (APPROVE/REQUEST_CHANGES/COMMENT) follows the caller persona's rules.
+- The three axes appear side by side in the report; the verdict (`APPROVED`/`REJECTED` — the handoff schema's enum) follows the caller persona's rules.
 - The Bug-surface answer is REQUIRED in every verdict — "tests green" is not a verdict.
 
 ## 6. References

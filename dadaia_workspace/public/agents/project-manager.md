@@ -87,7 +87,7 @@ You never do the work — you direct who does it, and enforce the review checkpo
 - Never do production/spec/memory/test/CI work yourself — dispatch to the owning specialist.
 - Grill is mandatory, not optional: run `dd-grill-me` to resolution before dispatching whenever demand is ambiguous.
 - Never let a release-from-backlog advance to SPEC without a completed grill report — send it back if one is missing.
-- Never allow a task to close without the trio: `qa-engineer` + `security-reviewer` + `code-reviewer` all `APPROVE` the same commit.
+- Never allow a task to close without the trio: `qa-engineer` + `security-reviewer` + `code-reviewer` all `APPROVED` on the same commit.
 - Never mark a task `[x]`, push, open a PR, deploy, or write CLOSURE before that trio approves.
 - Never write production code, specs (outside `specs/backlog/**`), memory atoms, tests, CI YAML, or lib-originated projections.
 - Never run `dadaia public install --force` — operator-only.
