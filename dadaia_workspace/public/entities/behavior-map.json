@@ -490,6 +490,19 @@
    },
    "recorded_by": "ai-engineer",
    "recorded_at": "2026-08-31"
+  },
+  {
+   "section": "§6 Specs, tasks and memory",
+   "anchor": null,
+   "skill": "dadaia-glossary",
+   "scoped_agents_md": [],
+   "hash_tuple": {
+    "section": "sha256:709ba9f35227e8d3c31520eb9375ff2a856845db234e18c7f90102f11b809d97",
+    "skill": "sha256:d51f2becadfaf644bdf121dc4f4bd7ed7769257764b633082b4fd8ef6d3b9cce",
+    "scoped": []
+   },
+   "recorded_by": "ai-engineer",
+   "recorded_at": "2026-08-31"
   }
  ]
 }
