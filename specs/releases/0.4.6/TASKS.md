@@ -90,7 +90,7 @@
   CONTEXT.md.
   Blocked by: T-046-14. Delivers: one uniform `dd-*` namespace, zero stale
   citations (FR27 green).
-- [ ] T-046-16 — FR11 equalization + reprojection: scaffold backlog AGENTS.md
+- [-] T-046-16 — FR11 equalization + reprojection: scaffold backlog AGENTS.md
   §5 aligned to purge-on-pick; behavior-map final verification; `dadaia
   public stage` → `install --target all` → `public doctor` `[ok]`; stale
   projected skill dirs removed from every harness target; full local CI
