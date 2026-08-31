@@ -1,0 +1,21 @@
+{
+  "schema": "release-state-v1",
+  "release": "0.4.6",
+  "phase": "IMPLEMENTATION",
+  "rc": null,
+  "defined": {
+    "sha": null,
+    "ts": "2026-08-31T18:16:56Z"
+  },
+  "implemented": null,
+  "shipped": null,
+  "audited": null,
+  "log": [
+    {
+      "ts": "2026-08-31T18:16:56Z",
+      "agent": "project-manager",
+      "kind": "note",
+      "text": "Release 0.4.6 born under the release-candidates model it implements (self-hosting): open scope, candidate 1 = the rc-system redesign (ADRs 0005-0009, grill 20260831T181256Z). Version = last published PyPI (0.4.5) + 1 patch; feature/0.4.6 is the one live branch. Definition grill held pre-SPEC; trio Aprovado by operator demand order."
+    }
+  ]
+}
