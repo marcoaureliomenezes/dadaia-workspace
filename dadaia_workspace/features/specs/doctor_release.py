@@ -201,6 +201,12 @@ class ReleaseValidator:
         release, phase, err = (active.release, active.phase, active.error)
         if err or not release or release == "none":
             return issues
+        # Between candidates (bug rc-archive-discovery-state-rejected-by-doctor):
+        # DISCOVERY is the state `release rc-archive` legally produces — trio archived
+        # to rc-N/, root empty until the next candidate's definition. The trio
+        # requirement applies only to phases where a candidate exists.
+        if phase == "DISCOVERY":
+            return issues
         # Segment routing retired (release 0.4.6, ADR 0006): the live candidate trio
         # always sits flat at the release root; rc-N/ subfolders are archives owned by
         # `release rc-archive`, never routed to.
