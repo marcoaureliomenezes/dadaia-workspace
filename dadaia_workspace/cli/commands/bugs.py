@@ -121,6 +121,9 @@ def _service(target: Path, *, with_archive: bool = False) -> BugService:
         denylist_terms=container.load_denylist_terms(),
         baseline_patterns=container.load_denylist_baseline_patterns(),
         validate=container.build_bug_record_validator(),
+        # F017: the component normalizer probes the containing repo for the on-disk
+        # spelling; specs/ always sits at the repo root.
+        repo_root=target.parent,
     )
 
 
@@ -139,7 +142,11 @@ def bugs_append_cmd(
         help="Closed enum — a feature package name, a non-feature layer "
         "(core/infrastructure/cli/hooks/tests/public-assets), or 'unknown'.",
     ),
-    component: str = typer.Option("", "--component", help="Free text: path#symbol precision."),
+    component: str = typer.Option(
+        "",
+        "--component",
+        help="Repo-relative path#symbol (normalized at the seam; free text tolerated).",
+    ),
     context: str = typer.Option("", "--context", help="The spec-context the bug was found in."),
     symptom: str | None = typer.Option(None, "--symptom", help="What happened."),
     repro: str | None = typer.Option(None, "--repro", help="How to reproduce."),
