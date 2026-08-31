@@ -42,8 +42,8 @@ a fuzzy term in the demand becomes a canonical term before it reaches the SPEC.
    has already cleared it.
 3. Commit shape 5 (`dd-gitflow-default` §3a): SPEC + PLAN + TASKS + purge-on-pick +
    picked bugs, one commit; append the `defined` note in `_RELEASE.json`
-   (`dd-release-implement`'s `RELEASE-EVENTS.md`).
-4. PLAN names the seams the work will cut — speak `dadaia-codebase-design`
+   (`dd-release-implementation`'s `RELEASE-EVENTS.md`).
+4. PLAN names the seams the work will cut — speak `dd-codebase-design`
    (module, seam, deletion test) when declaring what each FR grows or deletes.
 
 ## 4. TASKS as tracer bullets
@@ -67,7 +67,7 @@ a fuzzy term in the demand becomes a canonical term before it reaches the SPEC.
 - Declare a slug only when fully consumed (all its bound anchors shipped); abort on
   an unknown slug — fix it before it lands in the SPEC.
 - Purge-on-pick executes consumption at definition (same commit as the SPEC);
-  `dd-release-implement`'s disposition sweep rewrites the histo record to its
+  `dd-release-implementation`'s disposition sweep rewrites the histo record to its
   terminal token at closure.
 - Mechanical backstops for a fallen-through slug: `backlog doctor`'s BL-STALE and
   `specs doctor`'s SPEC-DOC-031.
@@ -84,6 +84,6 @@ a fuzzy term in the demand becomes a canonical term before it reaches the SPEC.
 - `dd-backlog-definition` — the sanitized-set source and the histo contract.
 - `dd-grill-me` — the mandatory pre-SPEC session.
 - `dd-gitflow-default` §3a shape 5 — the definition commit shape.
-- `dd-release-implement` (`RELEASE-EVENTS.md`, `RC-FLOW.md`) — state recipe, gate
+- `dd-release-implementation` (`RELEASE-EVENTS.md`, `RC-FLOW.md`) — state recipe, gate
   cadence, disposition sweep.
 - `specs/releases/AGENTS.md` — release-id format, `_ideas/`'s pre-approval role.

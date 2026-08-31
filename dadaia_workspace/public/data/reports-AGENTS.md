@@ -77,7 +77,7 @@ Each finding must include:
 - The machine-readable handoff is written under `.dadaia/handoff/<context>/`.
 - It is consumed by downstream agents and validation tooling.
 - It must identify: producing agent, context, status/result, report path, key findings/outputs, next recommended agent/action.
-- Use the `dadaia-handoff-emitter` skill immediately after writing the HTML.
+- Use the `dd-handoff-emitter` skill immediately after writing the HTML.
 
 ## 6. Panel compatibility
 

@@ -24,7 +24,7 @@ line here and `--help` disagree, `--help` wins.
    env var IS the binding there. ADDITIVE work (bugs/backlog/audits/reports) needs
    no bind.
 5. Before implementing: `dadaia specs doctor --context <ctx> --json` clean, then
-   reserve the task (`dadaia-task-manager`).
+   reserve the task (`dd-task-manager`).
 6. Pass explicit `--context`/`--release-id` on every command.
 7. Converge a runtime: resolve `provider.distribution_version` from
    `dadaia capabilities --json`, then `dadaia reconcile --expect-version "$v"
@@ -49,11 +49,12 @@ line here and `--help` disagree, `--help` wins.
 
 ## Dev-server law
 
-- Never open a port without the registry: `dadaia server list` → `dadaia server
-  next --project <name> --json` → start → `dadaia server register --port N
-  --project <name>`.
-- Use the returned port even when `is_base_port: false`; release on stop; on
-  `PortConflictError`: `server list`, `server clean` if stale, `server next` again.
+- Never open a port without the registry: `dadaia server list` →
+  `dadaia server next --project <name> --json` → start →
+  `dadaia server register --port N --project <name>`.
+- Use the returned port even when `is_base_port: false`; release on stop
+  (`dadaia server release --port N`); on `PortConflictError`: `server list`,
+  `server clean` if stale, `server next` again.
 
 ## Reachability
 
@@ -71,5 +72,5 @@ dispatch. The table is derived at projection time by
 ## References
 
 - `dd-bug-registration` — classify-first, redaction, `dadaia bugs append`.
-- `dadaia-handoff-emitter` — emit/validate the final handoff.
+- `dd-handoff-emitter` — emit/validate the final handoff.
 - `DADAIA.md` §2 — SDD stages are agent-dispatched, not a CLI verb group.

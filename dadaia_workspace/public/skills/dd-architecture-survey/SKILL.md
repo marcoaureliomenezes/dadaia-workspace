@@ -9,13 +9,13 @@ disable-model-invocation: true
 # dd-architecture-survey
 
 The permanent architecture review as a procedure, not an exhortation. Speaks the
-`dadaia-codebase-design` vocabulary (seam, deep module, deletion test). A survey, not
+`dd-codebase-design` vocabulary (seam, deep module, deletion test). A survey, not
 a rescue: it finds and argues candidates; it never edits code.
 
 ## 1. When
 
 - The operator or `project-manager` invokes it explicitly.
-- At the close of each candidate or release (the `dd-release-implement` cadence).
+- At the close of each candidate or release (the `dd-release-implementation` cadence).
 
 ## 2. Scope before you scan — YAGNI
 
@@ -63,7 +63,7 @@ Then exactly **ONE top candidate**, argued from the cards. When a candidate cont
 an accepted ADR, surface it only if the friction justifies reopening the decision, and
 mark the conflict on the card.
 
-Emission is handoff-first (`dadaia-handoff-emitter`): cards travel in the handoff; the
+Emission is handoff-first (`dd-handoff-emitter`): cards travel in the handoff; the
 visual HTML report is added only when the operator asks or the next hop is human —
 then follow [`HTML-REPORT.md`](HTML-REPORT.md).
 
@@ -76,7 +76,7 @@ survey never decides. During that session, keep the domain model current via
 - A deepened module named after a concept missing from `CONTEXT.md` → add the term.
 - The operator rejects a candidate with a load-bearing reason → offer an ADR so future
   surveys don't re-suggest it (skip ephemeral or self-evident reasons).
-- Alternative interfaces worth exploring → `dadaia-codebase-design`'s design-it-twice
+- Alternative interfaces worth exploring → `dd-codebase-design`'s design-it-twice
   pattern.
 
 ## 6. Boundaries (ADDITIVE)
@@ -91,7 +91,7 @@ survey never decides. During that session, keep the domain model current via
 
 ## 8. References
 
-- `dadaia-codebase-design` — the vocabulary, the deletion test, design-it-twice.
+- `dd-codebase-design` — the vocabulary, the deletion test, design-it-twice.
 - `dd-domain-modeling` — glossary/ADR side effects during the grilling loop.
 - `dd-grill-me` — the mandatory next hop for the top candidate.
 - `dd-audit-project` — the three-pillar audit this survey feeds and complements.

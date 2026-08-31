@@ -86,7 +86,7 @@ specs_pattern_version: 5
 - Teste-lápide e SCAFFOLD expirado são lixo (slop), não histórico da suíte.
 - Artefatos de teste são capturados só em falha.
 
-Protocolo operacional completo: skill `dadaia-test-stewardship`. Os parâmetros numéricos
+Protocolo operacional completo: skill `dd-test-stewardship`. Os parâmetros numéricos
 (timeouts, tetos, prazos) são padrões ajustáveis por projeto, não regras fixas.
 
 ---

@@ -1,4 +1,4 @@
-# MEMORY-UPDATE — dd-release-implement (final-rc step 8 detail)
+# MEMORY-UPDATE — dd-release-implementation (final-rc step 8 detail)
 
 Disclosed reference reached at `SKILL.md` step 8 — `product-engineer` reads this before touching any `specs/memory/**` atom at closure.
 The closure memory protocol.

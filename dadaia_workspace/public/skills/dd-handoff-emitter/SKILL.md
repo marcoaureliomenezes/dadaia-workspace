@@ -1,5 +1,5 @@
 ---
-name: dadaia-handoff-emitter
+name: dd-handoff-emitter
 description: >
   Emit the machine-readable handoff JSON at the end of any agent task (handoff-only by
   default; HTML report added only when the operator asks or the next hop is human), and
@@ -7,7 +7,7 @@ description: >
   after acting on a handoff addressed to you.
 ---
 
-# dadaia-handoff-emitter
+# dd-handoff-emitter
 
 Handoff-first emission (`DADAIA.md` §5): the JSON handoff is the default output of a
 completed agent task; the HTML report is the exception, not the rule.

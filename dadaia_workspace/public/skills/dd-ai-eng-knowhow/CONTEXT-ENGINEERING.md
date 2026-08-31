@@ -92,7 +92,7 @@ Five invariants MUST hold across all personas. Inconsistencies are bugs — file
 | I2 | Body section order | The canonical 10-section spine of §2 |
 | I3 | `[SCOPE ERROR]` block format | Opener, one-line identity, explicit redirect per foreign domain |
 | I4 | TDD / task-manager reservation flow | Identical `[ ]`->`[-]`->`[x]` flow, referenced (not restated) |
-| I5 | Handoff JSON contract | All agents emit via `dadaia-handoff-emitter` against the same schema version |
+| I5 | Handoff JSON contract | All agents emit via `dd-handoff-emitter` against the same schema version |
 
 - I1 reference key list (on-disk today): `name`, `description`, `dispatch_band`, `activity_class`, `concurrency_relationship`.
 - I1 reference key list (continued): `gate_role`, `tools`, `skills`, `maxTurns`, `input_contract`, `paths.write_allowlist`.
@@ -104,7 +104,7 @@ Detection method:
 2. I2: run the §2 audit protocol.
 3. I3: `grep -A12 '\[SCOPE ERROR\]' <persona>.md`; verify opener, one-line identity, and a correct redirect per domain.
 4. I4: confirm the persona references the task-manager flow rather than restating it.
-5. I5: confirm `dadaia-handoff-emitter` is in the skills list and the report section cites the current schema.
+5. I5: confirm `dd-handoff-emitter` is in the skills list and the report section cites the current schema.
 
 Fix protocol:
 

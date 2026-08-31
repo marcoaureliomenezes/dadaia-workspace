@@ -1,5 +1,5 @@
 ---
-name: dadaia-codebase-design
+name: dd-codebase-design
 description: >
   The shared design vocabulary — seam, deep module, deletion test, adapter,
   locality, replace-don't-layer — plus the understand-the-problem discipline run
@@ -8,7 +8,7 @@ description: >
   shrinks a feature, or naming a structural problem.
 ---
 
-# dadaia-codebase-design
+# dd-codebase-design
 
 Reviews, fixes and architecture findings speak ONE language. This vocabulary is the
 anti-bug-loop law in words: the measured bug history showed additive fixes (branches,

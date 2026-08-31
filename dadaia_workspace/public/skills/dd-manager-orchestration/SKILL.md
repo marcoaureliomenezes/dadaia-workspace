@@ -108,21 +108,21 @@ The flow every demand travels, and the skill that owns each moment:
 **Arm A (feature):**
 `dd-grill-me` (ambiguous intake) → `dd-backlog-definition` (curation; the
 operator-gated intake) → `dd-release-definition` (candidate trio, mandatory grill)
-→ `dd-release-implement` (task arc through the promote-or-continue gate).
+→ `dd-release-implementation` (task arc through the promote-or-continue gate).
 
 **Arm B (bug):** `dd-bug-registration` (classify, redact, append — any agent, the
 moment a contract breaks) → `dd-bug-resolution` (seven-phase method + resolve).
 
 **Running underneath, on every lane:**
-- `dadaia-workspace-spec-navigator` — session grounding (context → memory → trio).
-- `dadaia-task-manager` — marker discipline before any production write.
+- `dd-spec-navigator` — session grounding (context → memory → trio).
+- `dd-task-manager` — marker discipline before any production write.
 - `dd-gitflow-default` — branches, commit shapes, PRs, the push gate.
-- `dadaia-test-stewardship` — every test's lifecycle.
+- `dd-test-stewardship` — every test's lifecycle.
 - `dd-code-review` — the three-axis review at the pre-PR checkpoint.
-- `dadaia-handoff-emitter` — emission at every task end.
+- `dd-handoff-emitter` — emission at every task end.
 
 **Vocabulary layers (reach for them when the words are the problem):**
-- `dadaia-codebase-design` — module/seam/depth; the deletion test on any growing diff.
+- `dd-codebase-design` — module/seam/depth; the deletion test on any growing diff.
 - `dd-domain-modeling` — the domain glossary; sharpening terms and offering ADRs.
 
 **Health and upkeep:**

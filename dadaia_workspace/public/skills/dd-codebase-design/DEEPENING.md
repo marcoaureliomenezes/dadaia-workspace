@@ -17,6 +17,6 @@ vocabulary in `SKILL.md`: module, interface, seam, adapter.
 
 ## Testing: replace, don't layer
 
-- Old unit tests on the shallow modules become waste once interface-level tests exist — delete them (a `qa-engineer` pruning verdict, per `dadaia-test-stewardship`).
+- Old unit tests on the shallow modules become waste once interface-level tests exist — delete them (a `qa-engineer` pruning verdict, per `dd-test-stewardship`).
 - New tests live at the deepened module's interface and assert observable outcomes, never internal state.
 - A test that must change when the implementation changes was testing past the interface.

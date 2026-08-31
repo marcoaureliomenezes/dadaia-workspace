@@ -53,7 +53,7 @@ Implementation is allowed only when:
 | Path | Writer |
 |---|---|
 | `constitution.md` | operator or `product-engineer` during approved governance work |
-| `releases/<id>/_RELEASE.json` | agents with file tools, per field (`dd-release-implement`'s `RELEASE-EVENTS.md`) |
+| `releases/<id>/_RELEASE.json` | agents with file tools, per field (`dd-release-implementation`'s `RELEASE-EVENTS.md`) |
 | `releases/<id>/SPEC.md` | `product-engineer` |
 | `releases/<id>/PLAN.md` | `product-engineer` |
 | `releases/<id>/TASKS.md` | `product-engineer`; implementers may change only their task marker |

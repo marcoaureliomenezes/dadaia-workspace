@@ -65,5 +65,5 @@ Any missing leg: skip the record and keep the reasoning in the session's artifac
 ## References
 
 - [`CONTEXT-FORMAT.md`](CONTEXT-FORMAT.md) — the glossary file's structure and rules.
-- `dadaia-codebase-design` — the design vocabulary (module, seam, depth) the glossary
+- `dd-codebase-design` — the design vocabulary (module, seam, depth) the glossary
   builds on; domain terms name the seams.

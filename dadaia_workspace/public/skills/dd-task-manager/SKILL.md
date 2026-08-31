@@ -1,12 +1,12 @@
 ---
-name: dadaia-task-manager
+name: dd-task-manager
 description: >
   Reserve, execute and complete TASKS.md tasks with the three canonical markers
   ([ ] open, [-] in progress, [x] done). Use before writing any production file inside
   a Spec Context Project, and when recovering a stale or conflicting marker.
 ---
 
-# dadaia-task-manager — Task State Protocol
+# dd-task-manager — Task State Protocol
 
 > Discipline, not a hook check — no engine reads `TASKS.md` or any marker. The marker
 > trail is the human-auditable trace of "who took what"; the SDD gate enforces
@@ -31,7 +31,7 @@ description: >
 4. Flip `[-]` → `[x]` in the task's completing commit —
    `conventional-commit(task-id): description` — once the task's own bar is met
    (suite green; the candidate-close review trio validates the candidate, cadence in
-   `dd-release-implement`'s `RC-FLOW.md`).
+   `dd-release-implementation`'s `RC-FLOW.md`).
 5. To abandon: flip `[-]` → `[ ]`, commit `chore(tasks): abandon <task-id>` naming
    the reason.
 6. Dispatching a shell-less sub-agent: commit its `[ ]`→`[-]` flip before relaying

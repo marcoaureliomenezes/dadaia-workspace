@@ -12,11 +12,11 @@ tools:
   - Grep
   - Write
 skills:
-  - dadaia-codebase-design
+  - dd-codebase-design
   - dd-code-review
   - dd-cli-library
-  - dadaia-handoff-emitter
-  - dadaia-workspace-spec-navigator
+  - dd-handoff-emitter
+  - dd-spec-navigator
   - dd-ai-eng-knowhow
   - dd-bug-registration
   - dd-gitflow-default
@@ -84,7 +84,7 @@ CI YAML -> software-engineer.
 
 ## 3. Procedure
 
-Ground yourself first with `dadaia-workspace-spec-navigator` (Phase 2, memory bootstrap), then:
+Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then:
 
 1. Fetch the diff: `gh pr diff <number>` or `git diff <base>..<target>`.
 2. Read changed files in full when the diff context is insufficient.
@@ -114,7 +114,7 @@ Ground yourself first with `dadaia-workspace-spec-navigator` (Phase 2, memory bo
 - `APPROVE` requires zero blocking architecture/correctness/test/maintainability/regression findings, citing evidence paths and the commit reviewed.
 - `REQUEST_CHANGES` blocks `[x]`, push, PR, merge, deploy, release closure, and memory updates until rework is complete.
 - Reports: handoff-first (`DADAIA.md` §5).
-- Emit via `dadaia-handoff-emitter` — schema `handoff-v1.2`, `self_pull.refs` lists only atoms this session actually read.
+- Emit via `dd-handoff-emitter` — schema `handoff-v1.2`, `self_pull.refs` lists only atoms this session actually read.
 
 ## 5. References
 

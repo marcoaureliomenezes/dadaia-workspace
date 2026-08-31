@@ -4,7 +4,7 @@
 > A placeholder left in place means that section is not yet calibrated.
 
 These rules override general workspace guidance for everything under `tests/`.
-Agents creating or editing tests must follow them. Full protocol: skill `dadaia-test-stewardship`.
+Agents creating or editing tests must follow them. Full protocol: skill `dd-test-stewardship`.
 Numbers below are this project's adjustable defaults.
 
 ## 1. Intent taxonomy

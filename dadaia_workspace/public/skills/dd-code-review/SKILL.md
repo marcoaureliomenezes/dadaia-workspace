@@ -28,7 +28,7 @@ axes are reported side by side — an axis never outranks another.
   Mysterious Name · Duplicated Code · Feature Envy · Data Clumps · Primitive Obsession ·
   Repeated Switches · Shotgun Surgery · Divergent Change · Speculative Generality ·
   Message Chains · Middle Man · Refused Bequest.
-- Speak `dadaia-codebase-design`: a smell is usually a shallow module or a misplaced seam.
+- Speak `dd-codebase-design`: a smell is usually a shallow module or a misplaced seam.
 
 ## 3. Axis 2 — Spec
 
@@ -53,6 +53,6 @@ axes are reported side by side — an axis never outranks another.
 
 ## 6. References
 
-- `dadaia-codebase-design` — the vocabulary the Standards and Bug-surface axes speak.
-- `dadaia-test-stewardship` — test findings' lifecycle rules.
+- `dd-codebase-design` — the vocabulary the Standards and Bug-surface axes speak.
+- `dd-test-stewardship` — test findings' lifecycle rules.
 - Security depth / CVE / OWASP: `security-reviewer`'s lane, never re-run here.

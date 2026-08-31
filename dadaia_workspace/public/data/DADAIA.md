@@ -250,7 +250,7 @@
 - Every test declares its intent and size at birth; an undeclared test is SCAFFOLD and expires.
 - Demotion (LARGE test -> equivalent cheaper coverage) is planned release-closure work.
 - Pruning to go green is exclusively a `qa-engineer` verdict; deletion/skip/disable carries evidence, executed by `software-engineer`.
-- Tombstones and expired SCAFFOLD are slop; artifact capture is failure-gated (§5.2). Protocol: `dadaia-test-stewardship`.
+- Tombstones and expired SCAFFOLD are slop; artifact capture is failure-gated (§5.2). Protocol: `dd-test-stewardship`.
 
 ### 7.3 Bugs
 
@@ -270,7 +270,7 @@
 - Every `feature/{M.m.p}` push runs the local CI preflight first — always-on, not hook-forced.
 - Preflight: `ruff format --check`, `ruff check`, `mypy --strict`, `pytest`.
 - A full scan lives only in the audit lane; the PR-gate review is diff-based; only pushes are review-blocked, commits flow freely.
-- Watch every push/PR to green (`dd-release-implement`).
+- Watch every push/PR to green (`dd-release-implementation`).
 - A `quarantine`-marked test sits outside the gating selectors, bug-gated; unregistered pass-on-retry is a failure.
 
 ### 7.5 Approval

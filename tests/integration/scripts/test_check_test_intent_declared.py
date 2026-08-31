@@ -146,6 +146,6 @@ def test_real_repo_e2e_tier_is_fully_declared() -> None:
     )
     assert result.returncode == 0, (
         f"undeclared e2e test file(s) found: {result.stderr!r}. Add a module-docstring/"
-        "header `Intent: <KIND> — <ref>` line (dadaia-test-stewardship §A, tests/AGENTS.md)."
+        "header `Intent: <KIND> — <ref>` line (dd-test-stewardship §A, tests/AGENTS.md)."
     )
     assert result.stderr.strip() == ""

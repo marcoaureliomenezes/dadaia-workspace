@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Refuse an e2e (LARGE) test file with no declared `Intent:` line. Exit 0=ok, 1=undeclared.
 
-FR19 (v0.4.3 T-043-27): dadaia-test-stewardship §A / tests/AGENTS.md require every test to
+FR19 (v0.4.3 T-043-27): dd-test-stewardship §A / tests/AGENTS.md require every test to
 declare intent in its module docstring (Python) or header comment (TypeScript) —
 `Intent: <KIND> — <AC id | bug-id | task-id>`. Scoped to `tests/e2e/**` (the LARGE tier
 T-043-24..26 fully backfilled): the wider suite carries no such mechanical gate yet.

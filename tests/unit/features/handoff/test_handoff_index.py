@@ -3,7 +3,7 @@
 Intent: CONTRACT — release 0.5.1 K6 ("features/handoff: one module owns discovery,
 version routing and artifact resolution").
 
-Replaces (per ``dadaia-test-stewardship``'s replace-don't-layer discipline): the 12
+Replaces (per ``dd-test-stewardship``'s replace-don't-layer discipline): the 12
 report/handoff test files this candidate's card names for collapse —
 ``tests/unit/test_handoff_models.py``, ``tests/unit/test_stdlib_handoff_validator.py``,
 ``tests/unit/test_reports_validation_service.py``,

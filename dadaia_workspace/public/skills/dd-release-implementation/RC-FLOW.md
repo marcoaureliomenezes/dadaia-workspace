@@ -1,4 +1,4 @@
-# RC-FLOW — the candidate arc (dd-release-implement)
+# RC-FLOW — the candidate arc (dd-release-implementation)
 
 Disclosed reference reached from `SKILL.md` §3. Release-candidates model (0.4.6,
 ADRs 0005–0009): the release has OPEN scope; each CANDIDATE is one closed-scope
@@ -22,7 +22,7 @@ cycle below. The version and the branch never change between candidates.
 Each step ends on a checkable criterion. Steps 5–8 are candidate-closure work.
 
 **Step 1 — Reserve.**
-- Flip `[ ]`->`[-]` in the release root's `TASKS.md`, commit `chore(tasks): start <id>` (`dadaia-task-manager`).
+- Flip `[ ]`->`[-]` in the release root's `TASKS.md`, commit `chore(tasks): start <id>` (`dd-task-manager`).
 - Done when: the reservation commit exists and no other task on the branch is `[-]`.
 
 **Step 2 — TDD loop.**
@@ -77,7 +77,7 @@ Each step ends on a checkable criterion. Steps 5–8 are candidate-closure work.
 
 ## Test-stewardship touchpoints (reference)
 
-- Declare test intent at birth; pass the admission filter (`dadaia-test-stewardship`, intent and admission) before a test enters the suite.
+- Declare test intent at birth; pass the admission filter (`dd-test-stewardship`, intent and admission) before a test enters the suite.
 - Demotion and quarantine/SCAFFOLD expiry are candidate-closure work (step 6's `closure-test-dispositions` log entry).
 
 ## Out of scope for closure

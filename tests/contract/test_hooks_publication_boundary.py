@@ -7,7 +7,7 @@ would fail) and its LARGE-tier e2e companion
 ``tests/e2e/features/test_backlog_precommit.py`` (its entire premise — pre-commit
 *blocking* a bad stage — is deleted by this FR; rewriting either would be a
 change-detector test of the new advisory behaviour, the class
-``dadaia-test-stewardship`` §B prohibits). Verdict: `qa-engineer`, SPEC FR9 "Tests:"
+``dd-test-stewardship`` §B prohibits). Verdict: `qa-engineer`, SPEC FR9 "Tests:"
 line / A9.3 — both files DELETE, replaced here.
 
 Each test below drives the REAL shipped shell script through ``bash`` (never asserts

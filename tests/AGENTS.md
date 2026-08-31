@@ -2,7 +2,7 @@
 
 These rules override general workspace guidance for everything under `tests/`.
 Agents creating or editing tests must follow them. Full protocol: skill
-`dadaia-test-stewardship`.
+`dd-test-stewardship`.
 
 ## Architecture
 
@@ -68,7 +68,7 @@ Agents creating or editing tests must follow them. Full protocol: skill
 A test that needs more time than its tier's default is **mis-tiered** — fix the
 tier, never raise the default (mechanical enforcement: T-070-05). The LARGE-tier
 census cap for this repo lives in exactly one place —
-`dadaia-test-stewardship/PARAMETERS.md`'s "LARGE (E2E) cap" row — declared and
+`dd-test-stewardship/PARAMETERS.md`'s "LARGE (E2E) cap" row — declared and
 measured as a WARN, never a hard failure in this release; this file does not
 restate the number (V29, `tests/contract/test_test_suite_ratchets.py`).
 

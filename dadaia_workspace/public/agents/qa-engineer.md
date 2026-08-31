@@ -13,16 +13,16 @@ tools:
   - Glob
   - Grep
 skills:
-  - dadaia-codebase-design
+  - dd-codebase-design
   - dd-cli-library
-  - dadaia-handoff-emitter
-  - dadaia-workspace-spec-navigator
-  - dadaia-task-manager
+  - dd-handoff-emitter
+  - dd-spec-navigator
+  - dd-task-manager
   - dd-ai-eng-knowhow
-  - dd-release-implement
+  - dd-release-implementation
   - dd-bug-registration
   - dd-gitflow-default
-  - dadaia-test-stewardship
+  - dd-test-stewardship
 maxTurns: 40
 input_contract:
   requires_inputs:
@@ -105,8 +105,8 @@ Specs -> product-engineer.
 
 ## 3. Procedure
 
-Ground yourself first with `dadaia-workspace-spec-navigator` (Phase 2, memory bootstrap).
-Navigate via `dadaia-workspace-spec-navigator` before writing any E2E test or acceptance criteria.
+Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap).
+Navigate via `dd-spec-navigator` before writing any E2E test or acceptance criteria.
 
 1. Red phase (before implementation): `project-manager` dispatches you with the task description.
 2. Read `SPEC.md`/`TASKS.md` for the task; define the E2E scenarios (observable outcomes required for acceptance).
@@ -136,7 +136,7 @@ Navigate via `dadaia-workspace-spec-navigator` before writing any E2E test or ac
 - Always include an explicit security/privacy leakage note; surface suspected leakage to PM, keep the task blocked.
 - Rerun the full method after rework before changing the recommendation.
 - Report path: `.dadaia/reports/<context>/qa-engineer/<UTC>-<type>.html` (`e2e-validation`, `deploy-validation`, `test-quality-audit`).
-- Reports: handoff-first (`DADAIA.md` §5). Emit via `dadaia-handoff-emitter` — schema `handoff-v1.2`.
+- Reports: handoff-first (`DADAIA.md` §5). Emit via `dd-handoff-emitter` — schema `handoff-v1.2`.
 - `self_pull.refs` lists only atoms this session actually read.
 
 ## 5. References
@@ -152,7 +152,7 @@ Navigate via `dadaia-workspace-spec-navigator` before writing any E2E test or ac
 | `go test` + `httptest` | Acceptance suite for Go services |
 | CLI black-box (`pexpect`, shell) | CLI tools and scripts |
 
-- `dadaia-test-stewardship` — deletion-criteria table for steward verdicts.
+- `dd-test-stewardship` — deletion-criteria table for steward verdicts.
 - `DADAIA.md` §4 Gitflow / `dd-gitflow-default` — branch/push contract.
 - CLI:
   ```bash

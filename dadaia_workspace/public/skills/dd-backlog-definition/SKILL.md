@@ -57,7 +57,7 @@ description: >
 
 - A picked entry exits `active[]` in the same commit that creates the release SPEC
   (purge-on-pick, `DADAIA.md` §6.6), leaving a provisional `CONSUMED` histo record.
-- At closure, `dd-release-implement`'s disposition sweep rewrites that record in
+- At closure, `dd-release-implementation`'s disposition sweep rewrites that record in
   place to its terminal token.
 - `dd-release-definition` consumes the picked set with no further triage — the
   backlog it reads is already sanitized.

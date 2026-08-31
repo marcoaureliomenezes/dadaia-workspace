@@ -48,11 +48,6 @@ _CODEX_DEFAULT_EFFORT = "medium"
 # family it was meant to cover (A22.6; a test derives this whole tuple from the
 # on-disk inventory — ``tests/contract/test_codex_skill_ref_prefixes.py``).
 _CODEX_SKILL_REF_PREFIXES = (
-    "dadaia-codebase-design",
-    "dadaia-handoff-emitter",
-    "dadaia-task-manager",
-    "dadaia-test-stewardship",
-    "dadaia-workspace-spec-navigator",
     "dd-",
     "memory-ctx",
 )
@@ -88,8 +83,8 @@ _AGENT_FM_BLOCK_SCALAR_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*): [>|]$", re.M
 # own context, unprompted by any tool call). Before this compaction, every
 # persona body ALSO restated fragments of that same law inline — the generic
 # H1 report/protocol pointer blockquotes, the Step-0 memory-bootstrap
-# pointer, the `dadaia-handoff-emitter` artifact-emission paragraph, the
-# `dadaia-task-manager` review-gate paragraph, and the generic `dadaia CLI`
+# pointer, the `dd-handoff-emitter` artifact-emission paragraph, the
+# `dd-task-manager` review-gate paragraph, and the generic `dadaia CLI`
 # command list — so the law effectively loaded TWICE per Codex context: once
 # via `AGENTS.md` natively, once again verbatim inside
 # ``developer_instructions``. Each pattern below strips exactly one of those
@@ -113,13 +108,13 @@ _CODEX_COMPACT_H1_PROTOCOL_POINTER_RE = re.compile(
 # "### Artifact emission" / "## Artifact emission" — the generic
 # invoke-the-handoff-emitter-skill paragraph (English and the two personas
 # that carry the Portuguese variant), fully covered by the
-# `dadaia-handoff-emitter` skill's own Step 4.
+# `dd-handoff-emitter` skill's own Step 4.
 _CODEX_COMPACT_ARTIFACT_EMISSION_RE = re.compile(
     r"(?:---\n\n)?###? Artifact emission\n\n"
     r"(?:After finalizing any HTML report under `\.dadaia/reports/`, invoke the\n"
-    r"`dadaia-handoff-emitter` skill to emit handoff JSON under `\.dadaia/handoff/<context>/`\.|"
+    r"`dd-handoff-emitter` skill to emit handoff JSON under `\.dadaia/handoff/<context>/`\.|"
     r"Após finalizar qualquer report HTML em `\.dadaia/reports/`, invocar a skill "
-    r"`dadaia-handoff-emitter`\npara emitir o handoff JSON em `\.dadaia/handoff/<context>/`\.)"
+    r"`dd-handoff-emitter`\npara emitir o handoff JSON em `\.dadaia/handoff/<context>/`\.)"
     r"\n\n?"
 )
 
@@ -131,7 +126,7 @@ _CODEX_COMPACT_HANDOFF_POINTER_RE = re.compile(
     r"\n?> Report/handoff emission follows the `DADAIA\.md`[^\n]*\n\n?"
 )
 
-# "## Implementation review gate" — restates the `dadaia-task-manager`
+# "## Implementation review gate" — restates the `dd-task-manager`
 # skill's "Implementation complete is not DONE" review-gate paragraph
 # near-verbatim in each implementer persona that carries the skill.
 _CODEX_COMPACT_REVIEW_GATE_SECTION_RE = re.compile(

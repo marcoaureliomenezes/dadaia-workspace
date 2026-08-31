@@ -1,5 +1,5 @@
 ---
-name: dadaia-test-stewardship
+name: dd-test-stewardship
 description: >
   The test lifecycle: intent declaration and admission for a new test, size tiers,
   demotion at closure, evidence-gated deletion, flake quarantine, artifact hygiene.
@@ -7,7 +7,7 @@ description: >
   test, or judging a deletion candidate.
 ---
 
-# dadaia-test-stewardship
+# dd-test-stewardship
 
 > The law (`DADAIA.md` §7) states five points once; this skill is where they operate.
 > Numeric values live in [`PARAMETERS.md`](PARAMETERS.md) — this workspace's declared
@@ -39,7 +39,7 @@ description: >
 - For every demoted LARGE, yield the `file:line` of the replacement SMALL/MEDIUM
   coverage, or keep it as the seam's single SENTINEL.
 - Record the demotion map in `_RELEASE.json`'s `log`
-  (`dd-release-implement`).
+  (`dd-release-implementation`).
 
 ## Deletion — a qa-engineer verdict, executed by software-engineer
 
@@ -81,6 +81,6 @@ description: >
 
 - [`PARAMETERS.md`](PARAMETERS.md) — LARGE cap, flake ceiling, quarantine
   cap/escalation, timeouts, wall-clock budget, mutation cadence.
-- `dadaia-task-manager` — reservation discipline for a curation-verdict commit.
+- `dd-task-manager` — reservation discipline for a curation-verdict commit.
 - `dd-audit-project` — detection-quality scoring for drift audits.
 - `DADAIA.md` §5 — artifact retention and repo cleanliness; §7 — the five-point law.

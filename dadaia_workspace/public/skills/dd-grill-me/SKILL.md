@@ -41,7 +41,7 @@ Reach shared understanding by mapping every open branch of the demand as a desig
 12. State the resulting shared understanding back to the operator in one summary.
 13. Record every inspection-resolved item as "answered via inspection: <value>".
 14. Record every operator decision as an ADR line (`<decision> — reason: <justification>`).
-15. Emit the session as a handoff via `dadaia-handoff-emitter` — handoff-only by default.
+15. Emit the session as a handoff via `dd-handoff-emitter` — handoff-only by default.
 16. Write the HTML report (`EMISSION-FORMAT.md`) only when the operator asked for one or the next hop is human.
 
 ## 3. Done when

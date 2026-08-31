@@ -1,5 +1,5 @@
 ---
-name: dadaia-workspace-spec-navigator
+name: dd-spec-navigator
 description: >
   Ground a session and load the specs in canonical order: resolve the context,
   bootstrap memory (tech digest, catalog, 1-3 feature atoms, ARCHITECTURE.md when the
@@ -8,7 +8,7 @@ description: >
   review, planning or closure task.
 ---
 
-# dadaia-workspace-spec-navigator
+# dd-spec-navigator
 
 The one session-grounding protocol: three phases, in order, before any source file is
 read or any output written.
@@ -60,5 +60,5 @@ read or any output written.
 ## References
 
 - `DADAIA.md` §3 — context resolution order; §6 — status tokens, memory ownership.
-- `dd-release-implement` (`RELEASE-EVENTS.md`) — `_RELEASE.json` shape.
+- `dd-release-implementation` (`RELEASE-EVENTS.md`) — `_RELEASE.json` shape.
 - `_archive/` and `backlog/` are read-only history — never a source of approval.

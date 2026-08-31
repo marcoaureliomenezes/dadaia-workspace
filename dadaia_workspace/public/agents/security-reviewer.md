@@ -13,8 +13,8 @@ tools:
   - Write
 skills:
   - dd-cli-library
-  - dadaia-handoff-emitter
-  - dadaia-workspace-spec-navigator
+  - dd-handoff-emitter
+  - dd-spec-navigator
   - dd-ai-eng-knowhow
   - dd-bug-registration
   - dd-gitflow-default
@@ -87,7 +87,7 @@ CI YAML -> software-engineer.
 
 ## 3. Procedure
 
-Ground yourself first with `dadaia-workspace-spec-navigator` (Phase 2, memory bootstrap), then:
+Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then:
 
 1. OWASP Top 10 scan across the codebase or diff: access control, crypto failures, injection, insecure design.
 2. OWASP scan (continued): misconfiguration, vulnerable components, auth failures, software-integrity gaps, logging/monitoring failures, SSRF.
@@ -96,7 +96,7 @@ Ground yourself first with `dadaia-workspace-spec-navigator` (Phase 2, memory bo
 5. Dependency CVE scan: `pip-audit`/`npm audit --json`/`go list -m -json all` per stack; record package, version, CVE id, CVSS, fix version.
 6. IaC review: Dockerfile/compose/Terraform/Pulumi — `no-new-privileges: true`, secrets never in `ENV`, intentional published ports.
 7. IaC review (continued): volumes never expose sensitive host paths.
-8. Emit: write the report; invoke `dadaia-handoff-emitter`.
+8. Emit: write the report; invoke `dd-handoff-emitter`.
 9. Cite `file:line` or a CVE id for every finding; treat security as continuous — a report is a snapshot, never "fully secure".
 10. Escalate a CRITICAL finding only with evidence reproducible from the report itself.
 11. On a PR-cycle `APPROVE`: set `metrics.commit_sha` to the exact 40-hex commit reviewed, never a branch name.
@@ -120,7 +120,7 @@ Ground yourself first with `dadaia-workspace-spec-navigator` (Phase 2, memory bo
 - Always redact raw secret values; include `file:line` evidence, command output references, the commit reviewed.
 - Rerun after rework before changing the recommendation.
 - Outputs flow to `project-manager`, `project-auditor`, or directly to the operator — you are not involved in the fix.
-- Reports: handoff-first (`DADAIA.md` §5). Emit via `dadaia-handoff-emitter` — schema `handoff-v1.2`.
+- Reports: handoff-first (`DADAIA.md` §5). Emit via `dd-handoff-emitter` — schema `handoff-v1.2`.
 - `self_pull.refs` lists only atoms this session actually read.
 
 ## 5. References

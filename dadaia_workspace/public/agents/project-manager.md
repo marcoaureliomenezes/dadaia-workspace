@@ -14,13 +14,13 @@ tools:
   - Agent
 skills:
   - dd-domain-modeling
-  - dadaia-codebase-design
+  - dd-codebase-design
   - dd-cli-library
   - dd-grill-me
-  - dadaia-workspace-spec-navigator
-  - dadaia-task-manager
+  - dd-spec-navigator
+  - dd-task-manager
   - dd-manager-orchestration
-  - dadaia-handoff-emitter
+  - dd-handoff-emitter
   - dd-workspace-doctor
   - dd-ai-eng-knowhow
   - dd-backlog-definition
@@ -114,7 +114,7 @@ Browser frontend and CI YAML -> software-engineer (generic implementer).
 4. Auto-reserve task_ids in TASKS.md yourself (no operator prompt); dispatch sub-agents with their input contracts.
 5. Enforce the review checkpoint: route implementation handoffs through qa -> security -> code-review.
 6. Block every transition until the trio approves.
-7. Synthesize + emit: collect sub-agent handoffs, write the intake + dispatch reports, invoke `dadaia-handoff-emitter` for each.
+7. Synthesize + emit: collect sub-agent handoffs, write the intake + dispatch reports, invoke `dd-handoff-emitter` for each.
 8. On disagreement between two agents: request each to document its position.
 9. Apply the Decision Authority Matrix (`dd-manager-orchestration`); propose resolution.
 10. Escalate to the operator via `dd-grill-me` if unresolved — domain authority wins within its domain, cross-domain goes to the operator.

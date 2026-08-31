@@ -11,8 +11,8 @@ tools:
   - Edit
   - Bash
 skills:
-  - dadaia-handoff-emitter
-  - dadaia-task-manager
+  - dd-handoff-emitter
+  - dd-task-manager
 maxTurns: 60
 input_contract:
   requires_inputs:

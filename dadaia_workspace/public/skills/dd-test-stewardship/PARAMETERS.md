@@ -1,4 +1,4 @@
-# PARAMETERS — dadaia-test-stewardship declared defaults
+# PARAMETERS — dd-test-stewardship declared defaults
 
 Disclosed reference reached from `SKILL.md`'s references to "PARAMETERS.md" (§C/§H and the module intro).
 Every value below is this workspace's declared default, not a universal constant.

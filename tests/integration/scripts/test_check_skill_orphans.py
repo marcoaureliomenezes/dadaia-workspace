@@ -30,7 +30,7 @@ _REPO_ROOT = _SCRIPT.parent.parent.parent
 
 # Pre-existing orphans, cited by the registered bug (T-043-25/FR18b discovery), now
 # WIRED by ai-engineer (Arm-B rider on bug skill-orphans-unwired-agent-frontmatter):
-# dadaia-gitflow, dadaia-test-stewardship, and harness-primitives are all referenced
+# dadaia-gitflow, dd-test-stewardship, and harness-primitives are all referenced
 # from agent frontmatter `skills:` lists. The exemption set is empty — any orphan
 # found now is a genuinely NEW, unregistered drift, never a silent hole (mirroring the
 # `_BESPOKE_EXEMPT` pattern in tests/unit/helpers/test_no_local_helper_copies.py).

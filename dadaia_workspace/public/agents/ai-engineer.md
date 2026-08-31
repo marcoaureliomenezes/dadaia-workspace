@@ -14,11 +14,11 @@ tools:
   - Grep
 skills:
   - dd-cli-library
-  - dadaia-handoff-emitter
-  - dadaia-task-manager
-  - dadaia-workspace-spec-navigator
+  - dd-handoff-emitter
+  - dd-task-manager
+  - dd-spec-navigator
   - dd-ai-eng-knowhow
-  - dd-release-implement
+  - dd-release-implementation
   - dd-bug-resolution
   - dd-bug-registration
   - dd-gitflow-default
@@ -116,11 +116,11 @@ Browser frontend and CI YAML -> software-engineer.
 
 ## 3. Procedure
 
-Ground yourself first with `dadaia-workspace-spec-navigator` (Phase 2, memory bootstrap), then:
+Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then:
 
 1. Resolve the active release by reading `_RELEASE.json`'s `phase` field directly (no fold, no `ACTIVE.md`).
 2. Read the resolved release's `SPEC/PLAN/TASKS.md` — the SDD gate blocks AI-entity authoring without an approved task.
-3. Reserve the task via `dadaia-task-manager`: `[ ]` -> `[-]` + commit before editing.
+3. Reserve the task via `dd-task-manager`: `[ ]` -> `[-]` + commit before editing.
 4. Read the persona brief (`product-engineer`, or the release's SPEC.md/TASKS.md).
 5. Apply the instruction-hierarchy ordering and persona-consistency invariants (`CONTEXT-ENGINEERING.md`).
 6. Validate frontmatter via the workspace parser (`tests/unit/features/agents/test_reader.py`).
@@ -137,8 +137,8 @@ Ground yourself first with `dadaia-workspace-spec-navigator` (Phase 2, memory bo
 - Write an HTML report to `.dadaia/reports/<context>/ai-engineer/<UTC>-<task-slug>.html` only on operator request or a human-facing next hop.
 - Required sections: Summary, Files authored/refactored (path + diff summary), Instruction-hierarchy compliance.
 - Required sections (continued): Persona-consistency invariants, Cost-impact estimate (when relevant), Topology-guard run, Operator-facing rationale.
-- Emit the handoff via `dadaia-handoff-emitter` — schema `handoff-v1.2`, `self_pull.refs` lists only atoms this session actually read.
-- Treat a completed AI-entity implementation as a handoff, not task completion — hold `[x]`/push/PR/merge/deploy/close per `dd-release-implement`.
+- Emit the handoff via `dd-handoff-emitter` — schema `handoff-v1.2`, `self_pull.refs` lists only atoms this session actually read.
+- Treat a completed AI-entity implementation as a handoff, not task completion — hold `[x]`/push/PR/merge/deploy/close per `dd-release-implementation`.
 - Include evidence paths for changed public assets, projection/doctor commands run, and privacy/security checks performed.
 
 ## 5. References
@@ -147,7 +147,7 @@ Ground yourself first with `dadaia-workspace-spec-navigator` (Phase 2, memory bo
 - `dadaia_workspace/hooks/` production code is `software-engineer`'s; `specs/` is `product-engineer`'s; `tests/**` is not yours.
 - `.claude/`, `.agents/`, `.codex/`, `.kimi-code/` (lib-originated projections) are never yours to hand-edit.
 - `DADAIA.md` §4 Gitflow / `dd-gitflow-default` — branch and push contract.
-- `dd-release-implement` — the review/QA gate cadence and closure hold.
+- `dd-release-implementation` — the review/QA gate cadence and closure hold.
 - CLI:
   ```bash
   dadaia context show --json    # discover active context and specs_dir
