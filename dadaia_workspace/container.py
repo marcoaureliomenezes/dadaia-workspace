@@ -19,7 +19,6 @@ from dadaia_workspace.core.exceptions import (
     WorkspaceNotInitializedError,
 )
 from dadaia_workspace.core.handoff_index import HandoffIndex
-from dadaia_workspace.core.invocation import repo_slug_for_context
 from dadaia_workspace.core.invocation import resolve as _resolve_invocation
 from dadaia_workspace.core.invocation import resolve_context_specs_dir as _resolve_context_specs_dir
 from dadaia_workspace.core.protocols.process_ancestry import ProcessAncestry
@@ -507,9 +506,7 @@ def build_reports_next_service(
             "No bound context. Run `eval $(dadaia context bind <name> --mode read)` "
             "or pass --context <name>."
         )
-    specs_dir = (
-        workspace_root / "repos" / repo_slug_for_context(workspace_root, context_name) / "specs"
-    )
+    specs_dir = _resolve_context_specs_dir(workspace_root, context_name)
     return ReportsNextService(
         specs_dir=specs_dir, reports_root=reports_root, context_name=context_name
     )
@@ -541,16 +538,6 @@ def build_agent_model_policy_service(workspace_root: Path) -> "AgentModelPolicyS
 
     store = JsonAgentModelPolicyStore(workspace_root)
     return AgentModelPolicyService(store=store, rerender=_rerender_agents)
-
-
-def resolve_context_specs_dir(workspace_root: Path, context: str) -> Path:
-    """Public seam (FR3, v0.1.68) for a context's ``specs/`` tree.
-
-    Thin pass-through to :func:`dadaia_workspace.core.invocation.resolve_context_specs_dir`
-    (release K1, the "One Invocation" deepening) — the container no longer holds its own
-    copy of the name-resolution + self-hosting-root-fallback logic.
-    """
-    return _resolve_context_specs_dir(workspace_root, context)
 
 
 def build_panel_views(

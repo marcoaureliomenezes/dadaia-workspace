@@ -1,6 +1,6 @@
 """Code-review remediation (v0.1.69 FR2.2, HIGH): ``specs doctor --context`` must reuse
 the SAME context->specs resolver the FR3 preflight-input probe already uses
-(``container._context_specs_dir`` / its public seam ``resolve_context_specs_dir``),
+(historically ``container._context_specs_dir`` / its public seam),
 not a hand-rolled ``repos/<context>/specs`` path.
 
 On current code, ``dadaia_workspace/cli/commands/specs.py``'s ``doctor --context``
@@ -12,7 +12,7 @@ then reports a FABRICATED ``SPEC-DOC-001: specs/constitution.md is missing`` —
 because the context's specs are actually broken, but because the CLI looked in the
 wrong place entirely.
 
-The fix reuses ``container.resolve_context_specs_dir`` (the v0.1.68 public seam over
+The fix reuses ``core.invocation.resolve_context_specs_dir`` (the one resolver over
 ``_context_specs_dir``), which falls back to the workspace-root ``specs/`` tree when
 ``repos/<ctx>/specs`` is absent — the exact resolution ``lifecycle pipeline`` already
 relies on for the implement step's write-scope derivation.

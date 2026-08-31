@@ -316,7 +316,7 @@ def _emit_bootstrap(workspace: Path, context: str) -> None:
     agent already carries as law, not per-prompt state.
     """
     sections = [f"[{context}]"]
-    memory = _build_memory(workspace / "repos" / context / "specs")
+    memory = _build_memory(invocation.resolve_context_specs_dir(workspace, context))
     if memory:
         sections.append(memory)
     _emit("\n".join(sections) + "\n")
@@ -365,7 +365,7 @@ def main() -> int:
         context = _resolve_context(payload)
         if not context:
             context = recorded_slug
-        if context and (workspace / "repos" / context / "specs").is_dir():
+        if context and invocation.resolve_context_specs_dir(workspace, context).is_dir():
             _emit_bootstrap(workspace, context)
         else:
             _emit(_generic_preflight(workspace))
@@ -389,7 +389,7 @@ def main() -> int:
         context = _resolve_context(payload)
         if not context:
             context = recorded_slug
-        if context and (workspace / "repos" / context / "specs").is_dir():
+        if context and invocation.resolve_context_specs_dir(workspace, context).is_dir():
             _emit_bootstrap(workspace, context)
             _stamp_sentinel(tmp_dir, sentinel, context)
         else:
@@ -439,7 +439,7 @@ def main() -> int:
         _stamp_sentinel(tmp_dir, sentinel, "")
         return 0
 
-    specs_dir = workspace / "repos" / context / "specs"
+    specs_dir = invocation.resolve_context_specs_dir(workspace, context)
     if not specs_dir.is_dir():
         # Resolved a context with no specs tree — degrade to generic preflight once.
         if sentinel_exists and not compacted:

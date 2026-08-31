@@ -417,3 +417,29 @@ def test_env_context_beats_own_session_record(tmp_path: Path) -> None:
     result = run_hook_subprocess("ctx_inject", {"session_id": "ordersid"}, env)
     assert result.returncode == 0, result.stderr
     assert "[ctx]" in result.stdout, "rung 1 env must win over the bound record"
+
+
+def test_bound_context_name_maps_to_registry_repo_slug(tmp_path: Path) -> None:
+    """F003 (20260830-design-bug-surface-audit): the hook derives the specs dir through
+    the ONE resolver (``invocation.resolve_context_specs_dir``), so a context whose
+    registry NAME differs from its ``repos/<slug>`` directory still injects its memory —
+    the 0.4.2 name-vs-slug defect class must not re-seed in the hook."""
+    states = tmp_path / ".dadaia" / "states"
+    states.mkdir(parents=True)
+    (states / "spec_contexts.json").write_text(
+        json.dumps(
+            {"contexts": [{"name": "pretty-name", "repo_slug": "actual-dir", "state": "alive"}]}
+        ),
+        encoding="utf-8",
+    )
+    specs = tmp_path / "repos" / "actual-dir" / "specs"
+    (specs / "memory").mkdir(parents=True)
+    (specs / "memory" / "TECHSTACK.md").write_text("# tech\nPython 3.12\n", encoding="utf-8")
+    (specs / "memory" / "product").mkdir()
+    (specs / "memory" / "product" / "catalog.json").write_text('{"features": []}', encoding="utf-8")
+
+    _run(tmp_path, "sess-slugmap")  # establish the sentinel (generic preflight)
+    _bind_session(tmp_path, "sess-slugmap", "pretty-name")
+    out = _run(tmp_path, "sess-slugmap")
+    assert "[pretty-name]" in out
+    assert "Python 3.12" in out

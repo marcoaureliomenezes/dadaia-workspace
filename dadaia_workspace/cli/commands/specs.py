@@ -10,6 +10,9 @@ import typer
 
 from dadaia_workspace import container
 from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
+from dadaia_workspace.core.invocation import (
+    resolve_context_specs_dir as _core_resolve_context_specs_dir,
+)
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.specs import Severity, SpecsDoctor
 from dadaia_workspace.features.specs.doctor_types import SpecsDoctorIssue
@@ -209,7 +212,8 @@ def doctor(
     """Run structural checks on the SDD specs tree.
 
     ``--context`` resolves the context's ``specs/`` tree via the same
-    ``container.resolve_context_specs_dir`` seam used by the four lifecycle workflows,
+    one resolver (``dadaia_workspace.core.invocation.resolve_context_specs_dir``)
+    used by hooks and lifecycle workflows alike,
     and is mutually exclusive with ``--specs-dir``. The resolver falls back to the
     workspace-root ``specs/`` tree
     when ``repos/<context>/specs`` does not exist (self-hosting workspaces), instead
@@ -218,7 +222,7 @@ def doctor(
     if specs_dir is not None and context is not None:
         raise typer.BadParameter("Pass either --context or --specs-dir, not both.")
     if context is not None:
-        target = container.resolve_context_specs_dir(resolve_workspace_root(), context)
+        target = _core_resolve_context_specs_dir(resolve_workspace_root(), context)
     else:
         target = _resolve_specs_dir(specs_dir)
     if public_dir is not None:

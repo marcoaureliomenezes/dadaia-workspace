@@ -508,11 +508,7 @@ def resolve_context_specs_dir(workspace_root: Path, context: str) -> Path:
     workspace-root ``specs/`` tree, exactly like this very repo) falls back to
     ``workspace_root/specs``. Both roots derive from ``workspace_root`` — never cwd.
     """
-    inv = resolve(explicit=context, env=os.environ, cwd=workspace_root)
-    context_name = inv.context_name or context
-    specs_dir = (
-        workspace_root / "repos" / repo_slug_for_context(workspace_root, context_name) / "specs"
-    )
+    specs_dir = workspace_root / "repos" / repo_slug_for_context(workspace_root, context) / "specs"
     if not specs_dir.is_dir():
         specs_dir = workspace_root / "specs"
     return specs_dir
