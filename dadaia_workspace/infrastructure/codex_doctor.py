@@ -63,38 +63,32 @@ ATTESTING_CHECK_IDS: tuple[str, ...] = (
 
 
 def dcx6_codex_runtime_adapters(workspace_root: Path, public_dir: Path) -> list[DoctorLine]:
-    """D-CX-6: public/runtime/codex/ adapters — leak, missing, drift checks."""
+    """D-CX-6: public/runtime/codex/ adapters — LEAK check only (F006, 20260830 audit).
+
+    Missing/drift of ``.codex/skills/<slug>/SKILL.md`` belongs to the ProjectionRule
+    table (``projection_rules._codex_runtime_adapter_rules`` byte-compares it) — a
+    second decider re-deriving that fact was the install/doctor-disagreement class K3
+    retired. What stays here is the one check no fixed-destination rule can express:
+    a Codex-only adapter must not leak into the Claude skills tree.
+    """
     src_root = public_dir / "runtime" / "codex"
     out: list[DoctorLine] = []
     if not src_root.exists():
         return out
-    codex_skills = workspace_root / ".codex" / "skills"
     claude_skills = workspace_root / ".claude" / "skills"
     for slug_dir in sorted(src_root.iterdir()):
-        if not slug_dir.is_dir():
-            continue
-        skill_src = slug_dir / "SKILL.md"
-        if not skill_src.exists():
+        if not slug_dir.is_dir() or not (slug_dir / "SKILL.md").exists():
             continue
         slug = slug_dir.name
-        src_text = skill_src.read_text(encoding="utf-8")
-        # Leak checks
-        for leak_root, label in [(claude_skills, "claude")]:
-            leak_path = leak_root / slug / "SKILL.md"
-            if leak_path.exists():
-                out.append(
-                    DoctorLine(
-                        DoctorStatus.LEAK,
-                        f"{label}:skills/{slug}/SKILL.md"
-                        " — Codex-only adapter must not appear here (D-CX-6)",
-                    )
+        leak_path = claude_skills / slug / "SKILL.md"
+        if leak_path.exists():
+            out.append(
+                DoctorLine(
+                    DoctorStatus.LEAK,
+                    f"claude:skills/{slug}/SKILL.md"
+                    " — Codex-only adapter must not appear here (D-CX-6)",
                 )
-        # Missing / drift
-        installed = codex_skills / slug / "SKILL.md"
-        if not installed.exists():
-            out.append(DoctorLine(DoctorStatus.MISSING, f"codex:skills/{slug}/SKILL.md (D-CX-6)"))
-        elif installed.read_text(encoding="utf-8") != src_text:
-            out.append(DoctorLine(DoctorStatus.DRIFT, f"codex:skills/{slug}/SKILL.md (D-CX-6)"))
+            )
     return out
 
 

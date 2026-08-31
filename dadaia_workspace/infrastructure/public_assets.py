@@ -200,7 +200,6 @@ class FileSystemPublicAssetManager:
         harnesses = build_harnesses(self._public_dir)
         rules = projection_rules(plan, harnesses)
         transcript = install_rules(rules, force=plan.overwrite.force)
-        transcript_start = len(installed)
         installed.extend(transcript.render())
 
         # Codex per-agent TOML pruning is independent of the rule table (a rule
@@ -221,10 +220,11 @@ class FileSystemPublicAssetManager:
 
         # Consumer-repo guardrail fan-out (bespoke: N-target discovery + provenance
         # gating, never a fixed-destination rule).
+        guardrail_managed: list[Path] = []
         if "repos" in plan.guardrail_targets:
             data_agents_md = agentic_dir / "data" / "AGENTS.md"
             if data_agents_md.is_file():
-                _install_guardrail_pair(
+                guardrail_managed = _install_guardrail_pair(
                     data_agents_md,
                     workspace_root,
                     plan.overwrite.force,
@@ -240,7 +240,7 @@ class FileSystemPublicAssetManager:
         self._reconcile_install_ledger(
             workspace_root,
             transcript,
-            transcript_start,
+            guardrail_managed,
             installed,
             full=(plan.target == "all" and plan.scope == "all"),
         )
@@ -369,7 +369,7 @@ class FileSystemPublicAssetManager:
         self,
         workspace_root: Path,
         transcript: Transcript,
-        transcript_start: int,
+        extra_managed: list[Path],
         installed: list[str],
         *,
         full: bool,
@@ -383,12 +383,11 @@ class FileSystemPublicAssetManager:
         surfaced with a ``[warn]``; a missing/corrupt previous ledger bootstraps —
         record everything, prune nothing.
 
-        The rule-table portion of *installed* is read directly off *transcript* (typed
-        ``TranscriptLine.path`` — K3 retires the ``"[ok]   "``/``"[skip] "`` string-
-        parsing protocol every prior consumer had to re-derive). The remaining bespoke
-        writers (consumer-repo guardrail fan-out) still emit plain strings in *installed*
-        with the SAME two prefixes, so their paths are recovered the historical way —
-        a small, bounded surface, not the whole transcript.
+        Paths arrive TYPED only: the rule table via ``transcript.paths()``, the bespoke
+        consumer-repo guardrail fan-out via *extra_managed* (its return value). The
+        historical two-prefix string re-parse of *installed* is deleted (F006): it
+        silently dropped ``[updated]`` restores — a restored consumer AGENTS.md never
+        reached the ledger.
         """
         states_dir = workspace_root / ".dadaia" / "states"
         ws = workspace_root.resolve()
@@ -413,16 +412,8 @@ class FileSystemPublicAssetManager:
         for path in transcript.paths():
             _record(path)
 
-        transcript_end = transcript_start + len(transcript.lines)
-        remaining = installed[:transcript_start] + installed[transcript_end:]
-        for line in remaining:
-            if line.startswith("[ok]   "):
-                raw = line[len("[ok]   ") :]
-            elif line.startswith("[skip] "):
-                raw = line[len("[skip] ") :]
-            else:
-                continue
-            _record(Path(raw.split(" — ")[0].split(" (")[0].strip()))
+        for path in extra_managed:
+            _record(path)
 
         previous = self._install_ledger_store.read(states_dir)
         merged: dict[str, LedgerEntry] = {}

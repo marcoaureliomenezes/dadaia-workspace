@@ -218,13 +218,43 @@ def _is_source_repo_root(path: Path) -> bool:
     return poetry_name == "dadaia-workspace" or project_name == "dadaia-workspace"
 
 
+def _classify_consumer_agents(dst: Path, source_sha: str) -> str:
+    """ONE provenance decider for a consumer AGENTS.md (F006): install actions and
+    doctor lines are both projections of this classification, never parallel
+    re-derivations. States: symlink | absent | canonical | stale | foreign."""
+    if dst.is_symlink():
+        return "symlink"  # FR6 (ADR-7): dangling included — never written through.
+    if not dst.exists():
+        return "absent"
+    if not _carries_canonical_banner(dst):
+        # Banner-FIRST (v0.1.60 FR9 amendment): a bannerless file is repo-owned even
+        # when byte-identical to a bannerless source. The retired install half checked
+        # sha first and disagreed with the doctor on exactly this case — the
+        # disagreement F006 predicted; the doctor's ruling-pinned order wins.
+        return "foreign"  # hand-authored / repo-owned — never overwritten (FR9)
+    if hashlib.sha256(dst.read_bytes()).hexdigest() == source_sha:
+        return "canonical"
+    return "stale"  # stale canonical projection (banner-bearing, divergent)
+
+
+def _classify_consumer_claude(dst: Path) -> str:
+    """ONE decider for the CLAUDE.md bridge: symlink | absent | stub | foreign."""
+    if dst.is_symlink():
+        return "symlink"
+    if not dst.exists():
+        return "absent"
+    if dst.read_text(encoding="utf-8") == _CLAUDE_MD_STUB:
+        return "stub"
+    return "foreign"
+
+
 def _install_guardrail_pair(
     source: Path,
     workspace_root: Path,
     force: bool,
     installed: list[str] | None = None,
     targets: set[Literal["workspace", "repos"]] | None = None,
-) -> None:
+) -> list[Path]:
     """Write the AGENTS.md + CLAUDE.md guardrail pair to the requested targets.
 
     This is the single implementation for all three scope variants:
@@ -256,13 +286,20 @@ def _install_guardrail_pair(
         workspace_root: Workspace root directory.
         force: When True, overwrite existing files; when False, skip if identical.
         installed: Optional list mutated with ``"[ok]   <path>"`` / ``"[skip] ..."``
-            / ``"[updated] ..."`` strings.
+            / ``"[updated] ..."`` strings (display only).
         targets: Which targets to write. Defaults to ``{"workspace", "repos"}``.
+
+    Returns:
+        The TYPED list of managed destination paths (written, restored, or confirmed
+        canonical) — the ledger reconciler consumes this instead of re-parsing the
+        display strings (F006: the two-prefix protocol silently dropped ``[updated]``
+        restores from the ledger).
     """
     if installed is None:
         installed = []
     if targets is None:
         targets = {"workspace", "repos"}
+    managed: list[Path] = []
 
     src_sha = hashlib.sha256(source.read_bytes()).hexdigest()
     stub_sha = hashlib.sha256(_CLAUDE_MD_STUB.encode()).hexdigest()
@@ -274,6 +311,7 @@ def _install_guardrail_pair(
         is_consumer: bool,
     ) -> None:
         dst.parent.mkdir(parents=True, exist_ok=True)
+        managed.append(dst)
         if dst.exists():
             if hashlib.sha256(dst.read_bytes()).hexdigest() == expected_sha:
                 # Already canonical: force rewrites (byte-identical) else no-op.
@@ -301,29 +339,33 @@ def _install_guardrail_pair(
         foreign (hand-authored) and left untouched.
         """
         dst.parent.mkdir(parents=True, exist_ok=True)
-        if dst.is_symlink():
-            # FR6 (ADR-7): NEVER write through a destination-file symlink — checked
-            # BEFORE exists() so a DANGLING link is refused too (never "absent → create").
+        state = _classify_consumer_agents(dst, src_sha)
+        if state == "symlink":
+            # FR6 (ADR-7): NEVER write through a destination-file symlink — a DANGLING
+            # link is refused too (never "absent → create").
             installed.append(f"[foreign] {dst} — left untouched (symlink)")
             return False
-        if not dst.exists():
-            # Case 3 (absent): create — an empty slot has nothing to clobber.
+        if state == "absent":
+            # An empty slot has nothing to clobber.
             shutil.copy2(source, dst)
             installed.append(f"[ok]   {dst}")
+            managed.append(dst)
             return True
-        if hashlib.sha256(dst.read_bytes()).hexdigest() == src_sha:
+        if state == "canonical":
             if force:
                 shutil.copy2(source, dst)
                 installed.append(f"[ok]   {dst}")
             else:
                 installed.append(f"[skip] {dst}")
+            managed.append(dst)
             return True
-        if _carries_canonical_banner(dst):
-            # Case 1 (banner match): stale canonical projection → restore + DISTINCT line.
+        if state == "stale":
+            # Stale canonical projection (banner match) → restore + DISTINCT line.
             shutil.copy2(source, dst)
             installed.append(f"[updated] {dst} (overwrote divergent workspace-law copy)")
+            managed.append(dst)
             return True
-        # Case 2 (no banner): FOREIGN / repo-owned → NEVER overwrite (the bug fix).
+        # FOREIGN / repo-owned → NEVER overwrite (the bug fix).
         installed.append(f"[foreign] {dst} — left untouched")
         return False
 
@@ -334,24 +376,27 @@ def _install_guardrail_pair(
         foreign, no CLAUDE.md is dropped (the orphan-drop the bug flags). A foreign
         (non-stub) existing CLAUDE.md is always left untouched.
         """
-        if dst.is_symlink():
+        state = _classify_consumer_claude(dst)
+        if state == "symlink":
             # FR6 (ADR-7): a symlinked CLAUDE.md (incl. dangling) is never written through.
             installed.append(f"[foreign] {dst} — left untouched (symlink)")
             return
         if sibling_written:
             dst.parent.mkdir(parents=True, exist_ok=True)
-            if not dst.exists():
+            if state == "absent":
                 atomic_write(dst, _CLAUDE_MD_STUB)
                 installed.append(f"[ok]   {dst}")
-            elif dst.read_text(encoding="utf-8") == _CLAUDE_MD_STUB:
+                managed.append(dst)
+            elif state == "stub":
                 if force:
                     atomic_write(dst, _CLAUDE_MD_STUB)
                     installed.append(f"[ok]   {dst}")
                 else:
                     installed.append(f"[skip] {dst}")
+                managed.append(dst)
             else:
                 installed.append(f"[foreign] {dst} — left untouched")
-        elif dst.exists() and dst.read_text(encoding="utf-8") != _CLAUDE_MD_STUB:
+        elif state == "foreign":
             installed.append(f"[foreign] {dst} — left untouched")
 
     def _write_pair(target_dir: Path, is_consumer: bool) -> None:
@@ -374,7 +419,10 @@ def _install_guardrail_pair(
     if "workspace" in targets:
         _write_pair(workspace_root, is_consumer=False)
 
-    if "repos" in targets:
+    if "repos" not in targets:
+        return managed
+
+    if True:
         repos_dir = workspace_root / "repos"
         for consumer in _consumer_repos_for_root(workspace_root):
             if consumer.parent != repos_dir:
@@ -390,6 +438,8 @@ def _install_guardrail_pair(
                 )
                 continue
             _write_pair(consumer, is_consumer=True)
+
+    return managed
 
 
 # ---------------------------------------------------------------------------
@@ -454,28 +504,32 @@ def _doctor_consumer_pair_lines(
         slug = consumer.name
         agents_dst = consumer / "AGENTS.md"
         a_label = f"repos/{slug}:AGENTS.md"
-        if agents_dst.is_symlink():
-            # FR6: symlink-aware doctor — a symlinked pair FILE is [foreign] (never
-            # [ok]/[drift]/[missing]) so doctor exits 0 and never prescribes an
-            # install that would be refused. Symlinked consumer DIRS remain legit.
-            agents_line = DoctorLine(DoctorStatus.FOREIGN, a_label)
-        elif not agents_dst.exists():
-            agents_line = DoctorLine(DoctorStatus.MISSING, a_label)
-        elif not _carries_canonical_banner(agents_dst):
-            agents_line = DoctorLine(DoctorStatus.FOREIGN, a_label)
-        elif hashlib.sha256(agents_dst.read_bytes()).hexdigest() != source_sha:
-            agents_line = DoctorLine(DoctorStatus.DRIFT, a_label)
-        else:
-            agents_line = DoctorLine(DoctorStatus.OK, a_label)
+        # ONE decider (F006): the doctor line is a projection of the same
+        # classification the install path acts on — never a parallel re-derivation.
+        # FR6: a symlinked pair FILE is [foreign] (never [ok]/[drift]/[missing]) so
+        # doctor exits 0 and never prescribes an install that would be refused;
+        # symlinked consumer DIRS remain legit.
+        a_state = _classify_consumer_agents(agents_dst, source_sha)
+        agents_line = DoctorLine(
+            {
+                "symlink": DoctorStatus.FOREIGN,
+                "absent": DoctorStatus.MISSING,
+                "canonical": DoctorStatus.OK,
+                "stale": DoctorStatus.DRIFT,
+                "foreign": DoctorStatus.FOREIGN,
+            }[a_state],
+            a_label,
+        )
         lines.append(_emit(agents_line))
 
         claude_dst = consumer / "CLAUDE.md"
         c_label = f"repos/{slug}:CLAUDE.md"
-        if agents_line.status is DoctorStatus.FOREIGN or claude_dst.is_symlink():
+        c_state = _classify_consumer_claude(claude_dst)
+        if agents_line.status is DoctorStatus.FOREIGN or c_state == "symlink":
             claude_line = DoctorLine(DoctorStatus.FOREIGN, c_label)
-        elif not claude_dst.exists():
+        elif c_state == "absent":
             claude_line = DoctorLine(DoctorStatus.MISSING, c_label)
-        elif claude_dst.read_text(encoding="utf-8") != _CLAUDE_MD_STUB:
+        elif c_state == "foreign":
             claude_line = DoctorLine(DoctorStatus.DRIFT, c_label)
         else:
             claude_line = DoctorLine(DoctorStatus.OK, c_label)
