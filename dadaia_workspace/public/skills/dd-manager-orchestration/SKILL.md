@@ -9,72 +9,62 @@ description: >
 
 # dd-manager-orchestration
 
-> Not an enforcement mechanism. No engine runs the SDD flow — each stage is agent-dispatched (`DADAIA.md` §1).
-> This skill is reference/dispatcher guidance, never a substitute for the SDD documents.
+> No engine runs the SDD flow — each stage is agent-dispatched (`DADAIA.md` §1).
+> This skill is reference for the dispatcher, never a substitute for the SDD
+> documents. It stays generic: no operator-private names, hosts, or repo slugs.
 
-Stays generic: no operator-private project names, hostnames, IPs, customer names, private repo slugs, or optional domain-pack assumptions.
+## 1. Dispatch protocol
 
-## 1. When
+1. Resolve the target agent from the inventory table (§3) by phase, mission, and
+   "do not call when" clause.
+2. Only the top-level dispatcher calls other agents — a leaf specialist cannot chain
+   further dispatch; route a leaf's returned handoff to its `next_handoff.agent`.
+3. Open every dispatch prompt with the Input Contract block: context, specs_dir,
+   release_id, task_id, report_dir, handoff_dir, allowed_write_paths.
+4. Reports land in `.dadaia/reports/<context>/<agent>/<UTC>-<slug>.html`; every
+   report feeding another agent gets a handoff under `.dadaia/handoff/<context>/`.
+5. The review/QA sequence holds by discipline (dispatcher, implementer, reviewer
+   each uphold their half); git chokepoints are the only mechanical backstop.
 
-- `project-manager`/`project-auditor` dispatching work to any core agent.
-- Resolving a mediation conflict, an escalation trigger, or a decision-authority question.
+## 2. Conflict resolution
 
-## 2. Steps
+1. Resolve a decision by domain with the Decision Authority table (§3); evidence
+   means `file:line`, spec citation, command output, or handoff field.
+2. On a two-agent deadlock: each agent writes a `Conflict Position` section in its
+   report; the dispatcher writes a synthesis naming the exact decision point.
+3. Still unresolved: call `dd-grill-me`, ask the operator one concrete question,
+   and reflect the answer in SPEC, PLAN, TASKS, ADR, or memory per the phase.
+4. Stop and surface to the operator on any Escalation trigger (§3); never perform a
+   Forbidden action (§3).
 
-1. Resolve the target agent from the inventory table (§4) by phase, mission, and "do not call when" clause.
-2. Confirm only the top-level dispatcher calls other agents — a leaf specialist cannot chain further dispatch in either harness.
-3. Route a leaf's returned handoff to its `next_handoff.agent` — this is handoff routing, not executable dispatch.
-4. Build the sub-agent prompt with `subagent_type`, `description`, `prompt` fields.
-5. Open every dispatch prompt with the Input Contract block (context, specs_dir, release_id, task_id, report_dir, handoff_dir, allowed_write_paths).
-6. Write reports to `.dadaia/reports/<context-name>/<agent-name>/<UTC>-<task-slug>.html`.
-7. Emit a handoff JSON for every HTML report that feeds another agent, under `.dadaia/handoff/<context-name>/`.
-8. Never treat the review/QA sequence as mechanically enforced — it holds only because dispatcher/implementer/reviewer each uphold their half.
-9. Rely on git chokepoints (pre-commit warns and allows; pre-push requires an APPROVED security handoff) as the only mechanical backstop.
-10. Resolve a decision by domain using the Decision Authority table (§4).
-11. Evidence means file:line, spec citation, command output, or handoff field.
-11. On a two-agent deadlock: have each agent write a `Conflict Position` section in its report.
-12. Write a synthesis report naming the exact decision point.
-13. If still unresolved, call `dd-grill-me` and ask the operator one concrete question.
-14. Reflect the operator's answer in SPEC, PLAN, TASKS, ADR, or memory as appropriate for the current phase.
-15. Stop and escalate to the operator on any trigger in §4's Escalation table.
-16. Never perform any action in §4's Forbidden table.
+## 3. Reference tables
 
-## 3. Done when
+### Agent inventory (9 core agents)
 
-- Every dispatch prompt carries the Input Contract block and a handoff on completion.
-- Every conflict either resolved via evidence-based decision authority or escalated per §4.
-- No forbidden action occurred.
+| Agent | Phase | Primary mission | Do not call when |
+|---|---|---|---|
+| `project-manager` | intake+dispatch | Intake, grill, backlog curation, dispatch, mediation | A single specialist suffices |
+| `project-auditor` | audit | Drift, dead code, compliance scoring | A release is mid-implementation |
+| `product-engineer` | definition+closure | SPEC/PLAN/TASKS, `_RELEASE.json`, memory | Task is code-only, already approved |
+| `software-architect` | feeds definition | Architecture decisions, ADRs, dependency contracts | No architectural trade-off exists |
+| `software-engineer` | implementation | Production code + tests | Task is spec, AI-entity, or pure review |
+| `ai-engineer` | AI surface | Agents, skills, rules, commands, hooks | Task is product code or spec |
+| `qa-engineer` | gate → commit | E2E strategy, acceptance validation | Only unit/integration tests are needed |
+| `security-reviewer` | gate → push | Security audit, secrets, CVEs, the push verdict | No security-relevant surface |
+| `code-reviewer` | gate → PR | Diff/PR review, verdict-only | There is no diff, PR, or staged set |
 
-## 4. References
+### SDD stages (Arm A — exactly four, no engine)
 
-### Agent inventory (9 core agents; roles/phases normative in constitution §7/§14)
-
-| Agent | Phase | Primary mission | Routes next to (via PM) | Do not call when |
-|---|---|---|---|---|
-| `project-manager` | 1-2, MUTATING | Intake, bug intake, dispatch, mediation | any core agent (top-level only) | A single specialist suffices |
-| `project-auditor` | 4 (audit) | Memory/implementation drift, dead-code, compliance | project-manager | A release is still mid-implementation |
-| `product-engineer` | 5+8 (defn, closure) | SPEC, PLAN, TASKS, _RELEASE.json, memory | architect, PM | Task is code-only, already approved |
-| `software-architect` | feeds 4/5 | Architecture decisions, ADRs, dependency contracts | software-engineer | No architectural trade-off exists |
-| `software-engineer` | 6 (implementation) | Production code + tests for the bound context | qa-engineer | Task is spec, AI-entity, or pure review |
-| `ai-engineer` | surface owner | Agents, skills, rules, commands, hooks | security-reviewer, code-reviewer | Task is product code or spec |
-| `qa-engineer` | 7 gate -> commit | E2E strategy, acceptance validation, smoke evidence | none | Only unit/integration tests are needed |
-| `security-reviewer` | 7 gate -> push | Security audit, threat modeling, secret/leak review | implementer | No security-relevant surface |
-| `code-reviewer` | 7 gate -> PR | Diff/PR review, no authoring | none | There is no diff, PR, or staged set |
-
-### SDD stage inventory (Arm A, `DADAIA.md` §1 — exactly four stages, no engine)
-
-| Stage | Entry agent | Governing document(s) |
+| Stage | Entry agent | Governing documents |
 |---|---|---|
-| Backlog definition | `project-manager` (intake+curate), `product-engineer` (reads to author) | `specs/backlog/**` |
+| Backlog definition | `project-manager` | `specs/backlog/**` |
 | Release definition | `product-engineer` | SPEC, PLAN, TASKS |
 | Implementation + reviews | surface implementer, then the review trio | TASKS, review handoffs |
 | Audit | `project-auditor` | `specs/audits/**` |
 
-### Pre-Implementation Agreement
-
-- Settled at TASKS approval, not at implementation time.
-- The owning implementer set, `qa-engineer`, `code-reviewer`, `security-reviewer` must agree the task definition.
-- Missing agreement blocks TASKS approval.
+Pre-implementation agreement: the owning implementer, `qa-engineer`,
+`code-reviewer` and `security-reviewer` agree the task definition at TASKS
+approval — missing agreement blocks it.
 
 ### Decision authority
 
@@ -89,36 +79,63 @@ Stays generic: no operator-private project names, hostnames, IPs, customer names
 | Drift scoring | project-auditor | product-engineer | product-engineer |
 | Orchestration | project-manager | any agent | operator |
 
-### Escalation triggers — stop and surface to the operator when
+### Escalation triggers — stop and surface to the operator
 
-1. Required `SPEC.md`/`PLAN.md`/`TASKS.md` or a resolvable `_RELEASE.json` `phase` field are missing or not approved.
-2. A CRITICAL security issue is reported.
+1. Required SPEC/PLAN/TASKS or a resolvable `_RELEASE.json` `phase` missing or not
+   approved.
+2. A CRITICAL security issue.
 3. A dispatched agent returns `[SCOPE ERROR]`.
-4. Three or more unresolved conflicts are open.
-5. The requested work requires an optional domain pack that is not installed.
-6. The requested workflow is unknown and cannot be decomposed into default workflows without changing the spec.
+4. Three or more unresolved conflicts open.
+5. The work needs an optional domain pack that is not installed.
+6. The workflow is unknown and cannot decompose without changing the spec.
 
 ### Forbidden actions
 
-| Action | Why forbidden |
+| Action | Why |
 |---|---|
-| Dispatchers editing outside `.dadaia/reports/` and `.dadaia/handoff/` | They are report/handoff-only roles |
+| Dispatchers editing outside `.dadaia/reports/` and `.dadaia/handoff/` | Report/handoff-only roles |
 | Recursive agent chains without operator approval | Breaks traceability |
 | Marking tasks DONE without validation evidence | Skips acceptance |
 | Push, PR, merge, deploy, closure, or `[x]` before QA/code/security approval | Bypasses the quality gate |
 | Editing `specs/` outside product-engineer authority | Breaks SDD ownership |
-| Editing production files without a `[-]` task reservation | Breaks task traceability |
-| Shipping private/project-specific details in public assets | Security and portability risk |
+| Editing production files without a `[-]` reservation | Breaks task traceability |
+| Private/project-specific details in public assets | Security and portability |
 
-### Generic playbooks
+## 4. The router — which skill, when
 
-| Playbook | Entry | Use for |
-|---|---|---|
-| architecture-review | software-architect | ADRs, dependency boundaries, cross-cutting migrations, pattern selection |
-| tdd-cycle | surface implementer | Non-trivial logic: failing test, smallest passing change, refactor, QA request |
-| bug-fix-fastlane | surface implementer | Reproducible defect, narrow blast radius |
-| release-definition | product-engineer (dispatched by PM) | Building a release from bugs+backlog — see `dd-release-definition` |
-| security-patch | security-reviewer | Reviewer triages, PM dispatches engineer, then security verification |
-| deploy-validation-only | qa-engineer | Deployment already happened, only smoke/evidence needed |
-| ai-entity-refinement | ai-engineer | Public agents/skills/rules/commands/hooks; must pass `dadaia public doctor` |
-| ai-engineer-recursive-bootstrap | ai-engineer | First restricted-scope self-edit of public AI entities only |
+The flow every demand travels, and the skill that owns each moment:
+
+**Arm A (feature):**
+`dd-grill-me` (ambiguous intake) → `dd-backlog-definition` (curation; the
+operator-gated intake) → `dd-release-definition` (candidate trio, mandatory grill)
+→ `dd-release-implement` (task arc through the promote-or-continue gate).
+
+**Arm B (bug):** `dd-bug-registration` (classify, redact, append — any agent, the
+moment a contract breaks) → `dd-bug-resolution` (seven-phase method + resolve).
+
+**Running underneath, on every lane:**
+- `dadaia-workspace-spec-navigator` — session grounding (context → memory → trio).
+- `dadaia-task-manager` — marker discipline before any production write.
+- `dd-gitflow-default` — branches, commit shapes, PRs, the push gate.
+- `dadaia-test-stewardship` — every test's lifecycle.
+- `dd-code-review` — the three-axis review at the pre-PR checkpoint.
+- `dadaia-handoff-emitter` — emission at every task end.
+
+**Vocabulary layers (reach for them when the words are the problem):**
+- `dadaia-codebase-design` — module/seam/depth; the deletion test on any growing diff.
+- `dd-domain-modeling` — the domain glossary; sharpening terms and offering ADRs.
+
+**Health and upkeep:**
+- `dd-architecture-survey` — deepening candidates at each candidate/release close.
+- `dd-audit-project` — the three-pillar drift audit, suggested every 5 releases.
+- `dd-workspace-doctor` — lib-vs-projection drift, state schema migration.
+
+**Harness:** `dd-ai-eng-knowhow` (primitives literacy; `ai-engineer` depth),
+`dd-cli-library` (CLI idioms for every Bash-capable agent).
+
+## 5. Done when
+
+- Every dispatch prompt carries the Input Contract block and a handoff on
+  completion.
+- Every conflict either resolved via evidence-based authority or escalated.
+- No forbidden action occurred.

@@ -8,61 +8,82 @@ description: >
 
 # dd-release-definition
 
-> Not hook-enforced. `product-engineer` (dispatched by `project-manager`) drives every step directly.
-> From picking the set through SPEC -> PLAN -> TASKS.
+> `product-engineer` (dispatched by `project-manager`) drives every step directly,
+> from picking the set through SPEC → PLAN → TASKS. A release has open scope; each
+> candidate does not.
 
-## 1. When
-
-- The operator asks for a new release built from bugs and/or backlog.
-- `product-engineer` runs this after `project-manager` dispatches it.
-- Never start authoring SPEC/PLAN/TASKS until steps 1-3 (below) are complete.
-
-## 2. Steps
+## 1. Pick the set
 
 1. Inspect `specs/bugs/BUGS.jsonl` via `dadaia bugs status`/`stats`.
-2. Read `specs/backlog/BACKLOG.json`'s `active[]` — already sanitized/deduplicated by `dd-backlog-definition`.
-3. Pick the set: open bugs and undispositioned audits outrank fresh backlog (`DADAIA.md` §6).
-4. Keep picking scoped to `specs/bugs/`+`specs/backlog/` discovery — not wide-codebase discovery.
-5. Record the picked set; it becomes the SPEC's scope.
-6. Solve every picked bug in the release, with exactly one exception: subsumption by a picked backlog item.
-7. On subsumption, run `dadaia bugs supersede <slug> --by <backlog-slug>` — never `update --set status=`.
-8. Note the subsumption in the release SPEC; ensure the backlog item's TASKS cover the bug's acceptance criteria.
-9. Never silently drop a bug — leave it `open` if neither fixed nor subsumed (`dd-backlog-definition` sanitizes it later).
-10. Call the Skill tool with `dd-grill-me` on the picked set — mandatory, never skipped even when scope "looks obvious".
-11. Author the release SPEC (Draft) only after the grill: the picked bug+backlog set, their acceptance, every `superseded_by` link.
-12. Run definition on `feature/{M.m.p}`; the trio is authored at the RELEASE ROOT (`specs/releases/<v>/`) — after a prior candidate, `dadaia release rc-archive` has already cleared it.
-13. Append the `defined` milestone in `_RELEASE.json` at the promotion commit (`RELEASE-EVENTS.md`'s recipe).
-14. Continue the normal SDD flow (PLAN -> TASKS -> implementation -> memory -> CLOSURE); after the develop merge comes the promote-or-continue gate (`dd-gitflow-default` §2).
-15. Declare fully-consumed backlog items in the SPEC: `**Consumes:** slug-a, slug-b`.
-16. Treat `**Consumes:**` as SPEC provenance only — no library/CLI verb reads this line.
-17. Let `project-manager`'s purge-on-pick (same commit as the SPEC) execute consumption at definition.
-18. Let `dd-release-implement`'s disposition sweep (closure) rewrite that slug's histo record to its terminal token, in place.
-19. Declare a slug only when fully consumed (all its bound anchors shipped) — never a partially-shipped item.
-20. Abort on an unknown slug (fail-loud) — fix the slug before it lands in the SPEC.
-21. Omit the `**Consumes:**` line entirely when the release consumes no backlog item.
+2. Read `specs/backlog/BACKLOG.json`'s `active[]` — already sanitized by
+   `dd-backlog-definition`, consumed with no further triage.
+3. Open bugs and undispositioned audits outrank fresh backlog (`DADAIA.md` §6);
+   keep picking scoped to `specs/bugs/` + `specs/backlog/` discovery.
+4. Solve every picked bug in the candidate, with exactly one exception —
+   subsumption by a picked backlog item: run
+   `dadaia bugs supersede <slug> --by <backlog-slug>`, note it in the SPEC, and
+   ensure the backlog item's TASKS cover the bug's acceptance criteria. A bug
+   neither fixed nor subsumed stays `open` — never silently dropped.
 
-## 3. TASKS as tracer bullets
+**Done when** the picked set is recorded; it becomes the SPEC's scope.
 
-- Every task carries two keys beside its write set: `blocked by:` (explicit dependency edge, may be `none`) and `delivers:` (the observable end-to-end slice — "after this task the operator can …").
-- Order the group so the FIRST tasks cut a thin end-to-end path; a group that is internally consistent but delivers no verifiable slice until the last task is misordered.
-- A demolition (deleting a subsystem — this repo's dominant release shape) is authored expand–contract: (1) add the new path, (2) switch consumers, (3) contract by deleting the old path — three tasks, each independently green, never one big-bang commit.
-- A task whose `delivers:` cannot be stated is either not a task (fold it) or not understood yet (back to the SPEC).
+## 2. The mandatory grill
 
-## 3. Done when
+Call the Skill tool with `dd-grill-me` on the picked set — never skipped, even when
+scope "looks obvious". Sharpen terminology as it surfaces (`dd-domain-modeling`):
+a fuzzy term in the demand becomes a canonical term before it reaches the SPEC.
 
-- Picked set recorded (from `dd-backlog-definition`'s already-sanitized `ACTIVE`).
-- Every picked bug fixed-in-release OR `superseded_by` a picked backlog item.
-- `dd-grill-me` session completed (report emitted).
-- SPEC authored from the refined, picked set.
-- `**Consumes:**` declared for any fully-consumed backlog item, or omitted if none.
+## 3. Author the trio
 
-## 4. References
+1. Author the SPEC (Draft) only after the grill: the picked bug+backlog set, their
+   acceptance, every `superseded_by` link.
+2. Definition runs on `feature/{M.m.p}`; the trio lives at the RELEASE ROOT
+   (`specs/releases/<v>/`) — after a prior candidate, `dadaia release rc-archive`
+   has already cleared it.
+3. Commit shape 5 (`dd-gitflow-default` §3a): SPEC + PLAN + TASKS + purge-on-pick +
+   picked bugs, one commit; append the `defined` note in `_RELEASE.json`
+   (`dd-release-implement`'s `RELEASE-EVENTS.md`).
+4. PLAN names the seams the work will cut — speak `dadaia-codebase-design`
+   (module, seam, deletion test) when declaring what each FR grows or deletes.
 
-- `dd-backlog-definition` — the sanitized-set source this skill consumes without re-triage.
+## 4. TASKS as tracer bullets
+
+- Every task carries two keys beside its write set: `blocked by:` (explicit
+  dependency edge, may be `none`) and `delivers:` (the observable end-to-end slice —
+  "after this task the operator can …").
+- Order the group so the FIRST tasks cut a thin end-to-end path; a group that
+  delivers no verifiable slice until the last task is misordered.
+- A demolition (deleting a subsystem) is authored expand–contract: add the new
+  path, switch consumers, contract by deleting the old — three tasks, each
+  independently green.
+- A task whose `delivers:` cannot be stated is either not a task (fold it) or not
+  understood yet (back to the SPEC).
+
+## 5. Declaring consumption
+
+- Declare fully-consumed backlog items in the SPEC: `**Consumes:** slug-a, slug-b`;
+  omit the line when the candidate consumes none.
+- `**Consumes:**` is SPEC provenance only — no library/CLI verb reads it.
+- Declare a slug only when fully consumed (all its bound anchors shipped); abort on
+  an unknown slug — fix it before it lands in the SPEC.
+- Purge-on-pick executes consumption at definition (same commit as the SPEC);
+  `dd-release-implement`'s disposition sweep rewrites the histo record to its
+  terminal token at closure.
+- Mechanical backstops for a fallen-through slug: `backlog doctor`'s BL-STALE and
+  `specs doctor`'s SPEC-DOC-031.
+
+## 6. Done when
+
+- Picked set recorded; every picked bug fixed-in-candidate OR `superseded_by` a
+  picked backlog item.
+- The `dd-grill-me` session completed and emitted.
+- SPEC authored from the refined set; `**Consumes:**` declared or omitted.
+
+## 7. References
+
+- `dd-backlog-definition` — the sanitized-set source and the histo contract.
 - `dd-grill-me` — the mandatory pre-SPEC session.
-- `dd-gitflow-default` §3a shape 5 — the release-definition commit shape.
-- `dd-release-implement` (`RELEASE-EVENTS.md`, `RC-FLOW.md`) — milestone recipe, review cadence, disposition sweep.
+- `dd-gitflow-default` §3a shape 5 — the definition commit shape.
+- `dd-release-implement` (`RELEASE-EVENTS.md`, `RC-FLOW.md`) — state recipe, gate
+  cadence, disposition sweep.
 - `specs/releases/AGENTS.md` — release-id format, `_ideas/`'s pre-approval role.
-- Two mechanical backstops for a fallen-through slug: `backlog doctor`'s BL-STALE, `specs doctor`'s SPEC-DOC-031.
-- `DADAIA.md` §4 Gitflow, §6 (Releases) — branch contract, pick-time priority.
-- `entities/behavior-map.json` `declared_overlaps` — activation precedence for the fleet.

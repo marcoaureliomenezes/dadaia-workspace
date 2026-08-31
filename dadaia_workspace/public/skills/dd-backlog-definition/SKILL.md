@@ -35,7 +35,8 @@ description: >
 - Re-read the whole document on every new entry — it is small enough that partial
   review is a discipline failure.
 - Dedup: compare a new entry's title+description against every ACTIVE item for the
-  same subject; merge a near-duplicate into the existing entry.
+  same subject — by domain concept (`dd-domain-modeling`), not by the request's
+  wording; merge a near-duplicate into the existing entry.
 - Staleness: an ACTIVE item with no reads/updates past a reasonable window is a
   sanitize candidate; disposition a confirmed-stale/invalid item to
   `DEFERRED`/`REJECTED` with a one-line reason.

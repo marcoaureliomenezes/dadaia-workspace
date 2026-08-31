@@ -12,6 +12,7 @@ tools:
   - Write
   - Edit
 skills:
+  - dadaia-codebase-design
   - dd-domain-modeling
   - dadaia-handoff-emitter
   - dd-release-implement

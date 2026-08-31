@@ -25,6 +25,7 @@ description: >
 5. Update `_RELEASE.json` per `RELEASE-EVENTS.md`'s shape and `log` conventions.
 6. At candidate step 5, run `MEMORY-UPDATE.md`'s full protocol before touching any memory atom.
 7. Declare test intent at birth; pass the admission filter (`dadaia-test-stewardship`, intent and admission) before a test enters the suite.
+8. Before growing any module, run the deletion test and speak the seam vocabulary (`dadaia-codebase-design`) — a diff that only adds justifies itself against replace-don't-layer.
 8. Handle demotion and quarantine/SCAFFOLD expiry at closure time only (`RC-FLOW.md` step 6).
 
 ## 3. Done when

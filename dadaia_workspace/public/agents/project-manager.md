@@ -13,6 +13,8 @@ tools:
   - Write
   - Agent
 skills:
+  - dd-domain-modeling
+  - dadaia-codebase-design
   - dd-cli-library
   - dd-grill-me
   - dadaia-workspace-spec-navigator
@@ -142,7 +144,7 @@ Playbook routers (entry agent in the demand cell):
 - Compliance audit / drift routes to `project-auditor` (peer, operator-triggered).
 - Browser frontend, UX/UI design, and CI/CD demands route to `software-engineer` (the generic implementer).
 - Read-only exploration dispatches inline as a scoped read — no dedicated research persona exists.
-- `dd-manager-orchestration` — full playbook protocol, canonical index, do not restate.
+- `dd-manager-orchestration` — dispatch protocol, decision authority, escalation, and the which-skill-when router.
 - `DADAIA.md` §4 Gitflow / `dd-gitflow-default` — branch contract and push operations.
 - CLI:
   ```bash

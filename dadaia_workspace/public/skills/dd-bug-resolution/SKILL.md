@@ -59,7 +59,8 @@ regressions: measure a baseline, then bisect — logs mislead.
 **Phase 5 — Seam test.** Write the regression test at the correct seam BEFORE the
 fix, intent and size declared at birth (`dadaia-test-stewardship`, intent and admission); watch it fail,
 fix the cause, watch it pass, re-run the Phase 1 loop on the original scenario. A
-correct seam exercises the real bug pattern at its call site; when none exists, that
+correct seam exercises the real bug pattern at its call site (`dadaia-codebase-design`
+owns the seam vocabulary and the deletion test the fix must pass); when none exists, that
 is itself the finding — register an architecture finding and dispatch
 `software-architect` before fixing.
 *Done when the test fails for the real reason and passes with the fix (or the seam
