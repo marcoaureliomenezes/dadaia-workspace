@@ -8,7 +8,7 @@
 
 ## Candidate 2 — skills quality consolidation
 
-- [-] T-046-08 — FR1: codify the 15-rule authoring standard into
+- [x] T-046-08 — FR1: codify the 15-rule authoring standard into
   `dd-ai-eng-knowhow`'s `AUTHORING.md` (merged with its existing content, one
   standard, no duplication); re-record that row's behavior-map hash.
   Write set: dadaia_workspace/public/skills/dd-ai-eng-knowhow/**,
