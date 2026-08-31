@@ -54,6 +54,35 @@ for this task, so none is touched here):
 
 Left exactly as written; a future task can pick this up.
 
+## [0.5.2] — 2026-08-31
+
+Audit-remediation release: all 32 open findings of `20260827-canon-v6-first-audit`
+dispositioned (spec release `0.5.2`; audit archived to `audits_histo.jsonl`).
+
+### Added
+- Pre-commit bundled-ledger advisory (WARN-only, NO-LOCKS): staging `specs/bugs/BUGS.jsonl`
+  together with other `specs/**` paths gets one FR8-isolation warn line (F015/F036).
+- `dd-gitflow-default` §4 commit shape 6 — the ordinary task commit,
+  `conventional-commit(task-id)` (F016).
+
+### Changed
+- `core/bug_provenance.py`: a single-registration commit derives `exact` registration
+  granularity unconditionally — `ledger-only` remains a resolution-side marker (F010).
+- `specs/memory/QUALITY.md` P-21 Measured-by names its three timeout assertions
+  explicitly (F041).
+- Bug-ledger lineage corrected in place: `certify-skip-detail-leaks-full-codex-output`
+  and `frozen-clock-ratchet-scans-tests-tmp-scratch-dir` now name their true parent
+  bugs (F001/F003).
+
+### Removed
+- `dadaia reports validate --strict`: dead flag (declared, documented, never read) —
+  INVALID already exits 1 unconditionally (bug `reports-validate-strict-flag-dead`).
+
+### Fixed
+- `dadaia backlog new` reports the action performed — `created:` only when it created
+  `BACKLOG.json`, `appended <slug>` otherwise (bug
+  `backlog-new-append-reported-as-created`).
+
 ## [0.5.0] — 2026-08-30
 
 One published version for everything since `0.4.4`: the internal spec-release ids `0.4.5`, `0.5.0` and `0.5.1` (canon v6, deepening simplification K1–K11, ADR 0001 executed) ship together as PyPI `0.5.0` — a candidate never mints a version; the version axis is the PyPI lineage.
