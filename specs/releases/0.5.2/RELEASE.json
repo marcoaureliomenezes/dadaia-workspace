@@ -1,0 +1,18 @@
+{
+ "schema": "release-state-v1",
+ "release": "0.5.2",
+ "phase": "DEFINITION",
+ "rc": null,
+ "defined": null,
+ "implemented": null,
+ "shipped": null,
+ "audited": null,
+ "log": [
+  {
+   "kind": "note",
+   "ts": "2026-08-31T00:00:00Z",
+   "text": "Audit-remediation release for 20260827-canon-v6-first-audit (32 open findings). Scope authorized by operator /goal order 2026-08-31; grill satisfied by direct order (recorded deviation).",
+   "agent": "claude-code"
+  }
+ ]
+}
