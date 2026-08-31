@@ -16,11 +16,10 @@ P-07 mutual-independence contract. A features/* home would need a new suppressed
 ``features-no-cross-feature`` ignore edge per consumer (the cap must never rise). ``core`` is
 outside that contract and already hosts the same shape of cross-cutting filesystem resolver
 (``core/specs_resolver.py``, ``core/workspace_resolver.py``) — this module joins that
-precedent rather than inventing a new one. ``features/handoff.py`` (this candidate's
-namesake — a flat module, not a package; see its own docstring for why) is a thin
-public-facing re-export of this module — the CLI's and tests' entrypoint — while every
-feature-internal reader imports ``core.handoff_index`` directly, so the total count of
-import-linter ``ignore_imports`` edges is unchanged by this release (P-10).
+precedent rather than inventing a new one. The K6 candidate also sketched a thin
+``features/handoff.py`` facade; it was never created (F016, 20260830 audit) — every
+consumer, CLI and tests included, imports ``core.handoff_index`` directly, and the
+import-linter ``ignore_imports`` edge count is unchanged either way (P-10).
 
 File I/O here is intentionally authorized (P-11: ``core`` file I/O is pure outside a named
 set) — ``Handoff.load``/``HandoffIndex.scan`` walk the filesystem exactly like

@@ -70,8 +70,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
-from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION, is_release_semver
+from dadaia_workspace.core.specs_version import (
+    CANONICAL_SPECS_VERSION,
+    RELEASE_ID_FRAGMENT,
+    is_release_semver,
+)
 from dadaia_workspace.core.workspace_layout import AUDIT_DIR_NAME_PATTERN
+from dadaia_workspace.features.specs.memory_canon import MEMORY_TOPLEVEL_FILES
 
 __all__ = [
     "CANON",
@@ -88,7 +93,7 @@ __all__ = [
     "verdict_violations",
 ]
 
-_SEMVER = r"\d+\.\d+\.\d+"
+_SEMVER = RELEASE_ID_FRAGMENT
 _SHA40 = r"[0-9a-f]{40}"
 #: One fact, one place (core.workspace_layout, SPEC-DOC-030's own single home) — never
 #: a second, independently hand-kept copy of the audit-dir date-slug shape.
@@ -245,29 +250,18 @@ CANON: tuple[CanonEntry, ...] = (
         "memory",
         "memory/AGENTS.md",
     ),
-    CanonEntry(
-        re.compile(r"^memory/ARCHITECTURE\.md$"),
-        "copy",
-        True,
-        _copy("scaffold/memory/ARCHITECTURE.md"),
-        "memory",
-        "memory/ARCHITECTURE.md",
-    ),
-    CanonEntry(
-        re.compile(r"^memory/QUALITY\.md$"),
-        "copy",
-        True,
-        _copy("scaffold/memory/QUALITY.md"),
-        "memory",
-        "memory/QUALITY.md",
-    ),
-    CanonEntry(
-        re.compile(r"^memory/TECHSTACK\.md$"),
-        "copy",
-        True,
-        _copy("scaffold/memory/TECHSTACK.md"),
-        "memory",
-        "memory/TECHSTACK.md",
+    # The top-level memory trio — folded over the ONE memory-canon table (F011):
+    # never a second, hand-kept row per file.
+    *(
+        CanonEntry(
+            re.compile(rf"^memory/{re.escape(name)}$"),
+            "copy",
+            True,
+            _copy(f"scaffold/memory/{name}"),
+            "memory",
+            f"memory/{name}",
+        )
+        for name in MEMORY_TOPLEVEL_FILES
     ),
     CanonEntry(
         re.compile(r"^memory/product/index\.md$"),

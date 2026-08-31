@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.infrastructure.codex_doctor import check_agent_skill_refs
+from dadaia_workspace.infrastructure.entity_doctor import check_agent_skill_refs
 
 
 def _rendered(result: object) -> list[str]:

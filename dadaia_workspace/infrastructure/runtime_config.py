@@ -279,8 +279,8 @@ def claude_settings(workspace_root: Path) -> dict[str, object]:
             # Bug claude-compact-reinjection-missing: a compact erases the injected
             # bootstrap and /clear wipes the context; ctx_inject re-emits it at the event
             # (Claude Code adds SessionStart stdout back to context) and restamps the
-            # sentinel. Matchers are the exact documented source names — startup/resume/
-            # fork stay on the bind-driven UserPromptSubmit path (FR-W2). Parity with the
+            # sentinel. Matchers are the exact documented source names; fork stays on
+            # the bind-driven UserPromptSubmit path (FR-W2). Parity with the
             # kimi-code PostCompact shim (v0.2.8) and the codex SessionStart wrapper.
             "SessionStart": [
                 {
@@ -304,6 +304,33 @@ def claude_settings(workspace_root: Path) -> dict[str, object]:
                         }
                     ],
                     "matcher": "clear",
+                },
+                # Backlog cli-help-architecture: a NEW session received zero context
+                # until its first prompt — startup/resume now inject at the event
+                # itself (parity with the codex SessionStart wrapper). They flow the
+                # normal prompt path in the policy: fresh session -> bootstrap or
+                # preflight + sentinel stamp; the next prompt stays silent.
+                {
+                    "hooks": [
+                        {
+                            "command": _hook_cmd(
+                                workspace_root, "dadaia_workspace.hooks.ctx_inject"
+                            ),
+                            "type": "command",
+                        }
+                    ],
+                    "matcher": "startup",
+                },
+                {
+                    "hooks": [
+                        {
+                            "command": _hook_cmd(
+                                workspace_root, "dadaia_workspace.hooks.ctx_inject"
+                            ),
+                            "type": "command",
+                        }
+                    ],
+                    "matcher": "resume",
                 },
             ],
         }

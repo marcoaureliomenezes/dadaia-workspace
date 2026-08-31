@@ -51,5 +51,4 @@ tldr: "Resolve context, read constitution+memory, resolve release via RELEASE.js
 - `DADAIA.md` §6 — status-token lifecycle (`Draft` → `Em revisão` → `Aprovado`).
 - `dd-release-implement` (`RELEASE-EVENTS.md`) — `RELEASE.json` shape.
 - `_archive/` and `backlog/` are read-only history/informal sources — never a source of approval.
-- Never reference `standby`, `context_dir`, `select`, `is_selected` — retired in v3.0.
 - Memory Markdown is write-locked except `product-engineer` in DEFINITION/CLOSURE phase.

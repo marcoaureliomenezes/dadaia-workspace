@@ -101,7 +101,7 @@ Rationale: law that no asset owns is law nobody applies.
 | Fact | The module that decides it |
 |---|---|
 | workspace root, session, context, mode, release, phase | `core/invocation.py` — `resolve() -> Invocation`, over rungs 0 (explicit/`target_path`) … 3 (repo of the cwd) |
-| session record read, bind and touch | `core/session_store.py`, the sole owner; `core/record_liveness.py` holds the one staleness predicate |
+| session record schema, read, liveness and reaping | `core/session_store.py` — `new_binding_record`/`is_live`/`live_session`/`reap_stale`; `core/record_liveness.py` holds the raw TTL predicate |
 | presence liveness and reaping | `features/spec_context/presence.py` — `gc()` is the only reaper of records, markers, sentinels and emptied directories |
 | what a `specs/` tree may contain | `features/specs/canon.py`'s `CANON` table — scaffold renders it, doctor checks it |
 | whether a projection is current | `infrastructure/projection.py`'s `ProjectionRule` plus `projection_rules()`; install writes and doctor compares the same table |
@@ -111,9 +111,17 @@ Rationale: law that no asset owns is law nobody applies.
 | the git publication boundary | `features/chokepoints/{branch_policy,pre_commit,push_gate,verdict}.py`; `covering_verdict()` is the single verdict reader |
 | the telemetry database connection | `features/telemetry/store.py`'s `TelemetryStore`, owning open/migrate/`integrity_check`/`quarantine` |
 | a YAML frontmatter block | `core/frontmatter.py` |
+| the release phase vocabulary | `core/release_state.py` — `PHASES` + `MEMORY_WRITE_PHASES`; doctor and gate import, never re-type |
+| the release-id shape | `core/specs_version.py` — `RELEASE_SEMVER_RE` with `RELEASE_ID_FRAGMENT` derived for path regexes; `is_release_semver` is the mint predicate |
+| memory-canon shape facts | `features/specs/memory_canon.py` — slug→file table, forbidden-heading matcher, wikilink grammar |
+| fail-soft registry reads | `core/invocation.py` — `alive_context_slugs` + the name↔slug maps; `JsonContextStore` stays the schema-gated CRUD |
+| first parent of a sha | `infrastructure/git_objects.py::GitSubprocessObjectReader.first_parent` |
+| the ctx-inject decision | `features/spec_context/injection_policy.py::decide_injection` — pure over plain values; the hook is transport |
+| doctor order, fix dispatch, --fix help | `features/specs/rules.py::RULES` — one ordered registry, three derived projections |
+| shared specs facts per doctor run | `features/specs/specs_tree.py::SpecsTree` — fresh per check(), active release parsed once |
 
-- `container.py` is composition wiring only; `build_telemetry_service` and `build_panel_views` are its panel-side entry points; a single-consumer adapter is imported directly by its feature and never passes through it (ADR 0001).
-- `core/protocols/` holds seven Protocols: four two-adapter OS seams (`FilePermissionSetter`, `ProcessAncestry`, `ShutdownHandler`, `TelemetryRefreshLock`) and three panel cross-feature seams whose implementer lives under `features/` (`AgentsProvider`, `ContextProjectProvider`, `ServerRegistryProvider`); every other adapter is imported by its one consumer.
+- `container.py` is composition wiring only, contract-tested so every definition keeps a production consumer (no orphaned factories); the panel's 20-route composition lives with its single consumer in `cli/commands/panel_composition.py`; a single-consumer adapter is imported directly by its feature and never passes through the container (ADR 0001).
+- `core/protocols/` holds six Protocols: three two-adapter OS seams (`FilePermissionSetter`, `ShutdownHandler`, `TelemetryRefreshLock`) and three panel cross-feature seams whose implementer lives under `features/` (`AgentsProvider`, `ContextProjectProvider`, `ServerRegistryProvider`); every other adapter is imported by its one consumer (the consumer-less `ProcessAncestry` chain was deleted at 0.5.3).
 - `setup.cfg` carries seven import-linter contracts; `features-no-infrastructure` and `cli-no-infrastructure` were deleted by ADR 0001, `features-no-subprocess` is direct-imports-only with no suppressed edge, and the four surviving suppressed edges all sit under `features-no-cross-feature`.
 - `features/migrate` stamps `specs_pattern_version: 6` or refuses, instructing a tree below v6 to upgrade to 0.4.x first — no in-wheel pre-v6 lineage.
 - Hooks import `core.invocation` directly and build the `Invocation` once per process; they never import `container` (P-12).
@@ -137,7 +145,7 @@ classDiagram
     SpecsDoctor --> CoherenceValidator : owns ORDER
     note for MemoryValidator "takes the specs dir; runs the memory lint in-process; owns CAT-1, LINT-1 and MEM-DRIFT-1"
     note for GovernanceValidator "sole features.backlog.document import; reads BUGS.jsonl only through the injected bug store"
-    note for SpecsDoctor "takes bug_store_factory; imports neither spec_context nor infrastructure"
+    note for SpecsDoctor "iterates rules.RULES over a fresh SpecsTree per check(); fix dispatch and --fix help derive from the same registry; takes bug_store_factory; imports neither spec_context nor infrastructure"
 ```
 
 ### `dadaia_workspace/features` — package map (23 packages)

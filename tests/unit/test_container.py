@@ -43,7 +43,6 @@ def _init_states_v2(tmp_path: Path) -> Path:
         container.build_doctor_service,
         container.build_academy_service,
         container.build_export_service,
-        container.build_panel_service,
     ],
 )
 def test_build_service_raises_when_not_initialized(tmp_path: Path, builder: object) -> None:
@@ -74,9 +73,7 @@ def test_build_service_succeeds_table(tmp_path: Path) -> None:
     assert isinstance(container.build_export_service(tmp_path), ExportService)
     assert isinstance(container.build_doctor_service(tmp_path), DoctorService)
 
-    from dadaia_workspace.features.panel.service import PanelService
-
-    assert isinstance(container.build_panel_service(tmp_path), PanelService)
+    # build_panel_service moved to cli.commands.panel_composition (F001, T-053-14).
 
 
 # ---------------------------------------------------------------------------

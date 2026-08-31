@@ -2,7 +2,6 @@
 
 import logging
 import os
-import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -10,7 +9,6 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from dadaia_workspace.core.models.bugs import BugRecord
-    from dadaia_workspace.features.agents.model_policy import AgentModelPolicyService
     from dadaia_workspace.features.certification import CertificationResult
     from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
 
@@ -19,43 +17,11 @@ from dadaia_workspace.core.exceptions import (
     WorkspaceNotInitializedError,
 )
 from dadaia_workspace.core.handoff_index import HandoffIndex
-from dadaia_workspace.core.invocation import repo_slug_for_context
 from dadaia_workspace.core.invocation import resolve as _resolve_invocation
 from dadaia_workspace.core.invocation import resolve_context_specs_dir as _resolve_context_specs_dir
-from dadaia_workspace.core.protocols.process_ancestry import ProcessAncestry
 from dadaia_workspace.features.academy.service import AcademyService
-from dadaia_workspace.features.agents.reader import FileSystemAgentsProvider
 from dadaia_workspace.features.chokepoints.denylist_scan import BaselinePatternLike
 from dadaia_workspace.features.export.service import ExportService
-from dadaia_workspace.features.panel.service import PanelService
-from dadaia_workspace.features.panel.views.academy import render_academy_lesson
-from dadaia_workspace.features.panel.views.agent_policy import (
-    render_api_agent_model_policy,
-    render_api_agent_model_templates,
-    render_post_agent_model_policy_validate,
-    render_put_agent_model_policy,
-)
-from dadaia_workspace.features.panel.views.api_academy import render_api_academy
-from dadaia_workspace.features.panel.views.api_agents import (
-    render_api_agent_prompt,
-    render_api_agent_sessions,
-    render_api_agents_canonical,
-)
-from dadaia_workspace.features.panel.views.api_contexts import render_api_contexts
-from dadaia_workspace.features.panel.views.api_health import render_health
-from dadaia_workspace.features.panel.views.api_reports import (
-    delete_report_file,
-    mark_report_important,
-    render_api_reports,
-    serve_report_file,
-    unmark_report_important,
-)
-from dadaia_workspace.features.panel.views.api_servers import render_api_servers
-from dadaia_workspace.features.panel.views.api_sessions import render_api_sessions
-from dadaia_workspace.features.panel.views.index import render_index
-from dadaia_workspace.features.panel.views.memory import render_memory
-from dadaia_workspace.features.panel.views.static import render_static
-from dadaia_workspace.features.panel.views.wrapper import render_memory_wrapper
 from dadaia_workspace.features.public.service import PublicAssetService
 from dadaia_workspace.features.reports.next import ReportsNextService
 from dadaia_workspace.features.reports.retention import ReportRetentionService
@@ -63,7 +29,6 @@ from dadaia_workspace.features.repos.service import ReposService
 from dadaia_workspace.features.server_registry.service import ServerRegistryService
 from dadaia_workspace.features.spec_context.doctor import DoctorService
 from dadaia_workspace.features.spec_context.service import SpecContextService
-from dadaia_workspace.features.telemetry.aggregator.runtimes import ADAPTER_REGISTRY
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.excel_reader import OpenpyxlExcelReader
 from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
@@ -71,12 +36,6 @@ from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.json_course_store import JsonCourseStore
 from dadaia_workspace.infrastructure.json_server_registry_store import JsonServerRegistryStore
-from dadaia_workspace.infrastructure.markdown_agent_store import MarkdownAgentStore
-from dadaia_workspace.infrastructure.process_ancestry_adapter import (
-    LinuxProcAncestry,
-    PsProcessAncestry,
-    WindowsToolhelpAncestry,
-)
 from dadaia_workspace.infrastructure.process_probe_adapter import OsProcessProbe, build_pid_probe
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
@@ -295,30 +254,6 @@ def load_registry_context_identities(workspace_root: Path) -> RegistryContextIde
     )
 
 
-def build_process_ancestry() -> ProcessAncestry:
-    """Composition-root selection of the read-only ``ProcessAncestry`` adapter (T-014-06).
-
-    Platform is decided here via the ``PLATFORM`` seam — never by an in-adapter
-    ``sys.platform`` branch:
-
-    * ``has_proc_fs`` (Linux) → ``LinuxProcAncestry`` (``/proc`` PPID walk).
-    * else ``has_os_kill_liveness`` (other POSIX, incl. macOS) → ``PsProcessAncestry``
-      (``ps -o ppid=`` via the injected ``SubprocessProcessRunner``).
-    * else (Windows) → ``WindowsToolhelpAncestry`` (read-only Toolhelp32 snapshot).
-
-    Every adapter is non-destructive and returns ``Ancestry.UNKNOWN`` for any
-    indeterminate case; the ALLOW+WARN policy decision lives in the chokepoint caller.
-    """
-    from dadaia_workspace.core.platform import PLATFORM
-    from dadaia_workspace.infrastructure.subprocess_runner import SubprocessProcessRunner
-
-    if PLATFORM.has_proc_fs:
-        return LinuxProcAncestry()
-    if PLATFORM.has_os_kill_liveness:
-        return PsProcessAncestry(SubprocessProcessRunner())
-    return WindowsToolhelpAncestry()
-
-
 def is_source_repo_root(path: Path) -> bool:
     """Composition-root seam for the source-repo test (``cli`` may not import ``infrastructure``).
 
@@ -381,93 +316,6 @@ def run_certification(workspace_root: Path, *, keep: bool = False) -> "Certifica
     return certify(workspace_root, SubprocessCertificationProcess(), keep=keep)
 
 
-def build_telemetry_service(workspace_root: Path) -> object | None:
-    """Best-effort ``TelemetryService`` construction for the panel boot (K8).
-
-    Plain wiring — no nested class, no factory-of-factories. Returns ``None``
-    (never raises) when telemetry cannot be wired (root uid, permission/OS/
-    SQLite error) so the panel starts regardless; telemetry endpoints degrade
-    to 503 when this returns ``None``.
-    """
-    import sqlite3
-    from pathlib import Path as _Path
-
-    from dadaia_workspace.core.exceptions import PlatformSecurityError
-    from dadaia_workspace.features.telemetry import pricing as _pricing
-    from dadaia_workspace.features.telemetry.aggregator.queries import TelemetryAggregator
-    from dadaia_workspace.features.telemetry.reader.adapters import DEFAULT_READERS
-    from dadaia_workspace.features.telemetry.service import TelemetryService
-    from dadaia_workspace.features.telemetry.store import TelemetryStore
-
-    state_dir = _Path("~/.dadaia/state/telemetry").expanduser()
-    db_path = state_dir / "telemetry.sqlite"
-    store = TelemetryStore(db_path)
-
-    try:
-        state_dir.mkdir(parents=True, exist_ok=True)
-        # Materialise + migrate the store once at boot so the per-request
-        # read-only factory always has a database to open (mode=ro cannot
-        # create a file); this store instance is also what the service ingests
-        # into on each refresh.
-        store.open_write().migrate()
-        store.close()
-
-        spec_context = build_spec_context_service(workspace_root)
-        aggregator = TelemetryAggregator(
-            connection_factory=store.open_read,
-            spec_context_service=spec_context,
-            pricing_module=_pricing,
-            workspace_root=workspace_root,
-        )
-
-        return TelemetryService(
-            store,
-            DEFAULT_READERS,
-            time.monotonic,
-            aggregator=aggregator,
-            pricing_module=_pricing,
-            workspace_root=workspace_root,
-            state_dir=state_dir,
-            spec_context_service=spec_context,
-        )
-    except ImportError as exc:
-        logger.warning("Telemetry unavailable (missing dependency): %s", exc)
-        return None
-    except PermissionError as exc:
-        logger.warning("Telemetry unavailable (permission denied on telemetry state dir): %s", exc)
-        return None
-    except PlatformSecurityError as exc:
-        # Tier-2: telemetry dir permission restriction failed on this platform.
-        # The panel continues without telemetry (503 on telemetry endpoints).
-        logger.warning(
-            "Telemetry unavailable (platform security error restricting state dir): %s", exc
-        )
-        return None
-    except OSError as exc:
-        logger.warning("Telemetry unavailable (OS error initialising telemetry state): %s", exc)
-        return None
-    except sqlite3.OperationalError as exc:
-        logger.warning("Telemetry unavailable (SQLite database error): %s", exc)
-        return None
-
-
-def build_panel_service(
-    workspace_root: Path,
-    telemetry: object | None = None,
-    academy: object | None = None,
-) -> PanelService:
-    return PanelService(
-        registry=build_server_registry_service(workspace_root),
-        spec_context=build_spec_context_service(workspace_root),
-        workspace_root=workspace_root,
-        telemetry=telemetry,
-        academy=academy,
-        report_retention=ReportRetentionService(workspace_root),
-        adapter_registry=dict(ADAPTER_REGISTRY),
-        agents_provider=FileSystemAgentsProvider(store_factory=MarkdownAgentStore),
-    )
-
-
 def build_handoff_index(workspace_root: Path) -> HandoffIndex:
     """Compose the workspace-rooted :class:`HandoffIndex` (release 0.5.1 K6).
 
@@ -507,9 +355,7 @@ def build_reports_next_service(
             "No bound context. Run `eval $(dadaia context bind <name> --mode read)` "
             "or pass --context <name>."
         )
-    specs_dir = (
-        workspace_root / "repos" / repo_slug_for_context(workspace_root, context_name) / "specs"
-    )
+    specs_dir = _resolve_context_specs_dir(workspace_root, context_name)
     return ReportsNextService(
         specs_dir=specs_dir, reports_root=reports_root, context_name=context_name
     )
@@ -519,89 +365,3 @@ def build_reports_retention_service(workspace_root: Path) -> ReportRetentionServ
     """Compose ``ReportRetentionService`` for workspace runtime report state."""
     _guard_initialized(workspace_root)
     return ReportRetentionService(workspace_root)
-
-
-def build_agent_model_policy_service(workspace_root: Path) -> "AgentModelPolicyService":
-    """Compose the panel-facing L1 agent-model-policy service (v0.1.65 FR8 / T-65-10).
-
-    Injects (D-4 — the features module carries no infrastructure import):
-
-    - the concrete :class:`JsonAgentModelPolicyStore` (typed to the feature's store
-      port), whose valid override targets are the 9 core agents;
-    - the **re-render callable** — the agents-only ``public install`` path over both
-      L1 projections (G-2 Apply semantics; profile-scoped like every install).
-    """
-    from dadaia_workspace.features.agents.model_policy import AgentModelPolicyService
-    from dadaia_workspace.infrastructure.json_agent_model_policy_store import (
-        JsonAgentModelPolicyStore,
-    )
-
-    def _rerender_agents() -> list[str]:
-        return build_public_service().install(workspace_root, target="all", only="agents")
-
-    store = JsonAgentModelPolicyStore(workspace_root)
-    return AgentModelPolicyService(store=store, rerender=_rerender_agents)
-
-
-def resolve_context_specs_dir(workspace_root: Path, context: str) -> Path:
-    """Public seam (FR3, v0.1.68) for a context's ``specs/`` tree.
-
-    Thin pass-through to :func:`dadaia_workspace.core.invocation.resolve_context_specs_dir`
-    (release K1, the "One Invocation" deepening) — the container no longer holds its own
-    copy of the name-resolution + self-hosting-root-fallback logic.
-    """
-    return _resolve_context_specs_dir(workspace_root, context)
-
-
-def build_panel_views(
-    workspace_root: Path,
-    telemetry: object | None = None,
-) -> dict[str, Callable[..., tuple[int, str, bytes]]]:
-    """Compose all panel view callables for injection into make_handler_class().
-
-    Returns a dict mapping route names to view callables as required by
-    ``features/panel/handler.py::make_handler_class(views)``.
-
-    Parameters
-    ----------
-    workspace_root:
-        Absolute path to the workspace root directory.
-    telemetry:
-        Optional TelemetryService instance.  When provided, it is injected
-        into PanelService so that ``render_api_agents_canonical`` can overlay
-        telemetry data on the canonical agent catalog (PR3-08).
-    """
-    academy = build_academy_service(workspace_root)
-    service = build_panel_service(workspace_root, telemetry=telemetry, academy=academy)
-
-    # L1 agent model-governance (v0.1.65 FR8): store + re-render injected via the
-    # dedicated factory (D-4 — the feature service never imports infrastructure).
-    agent_policy_service = build_agent_model_policy_service(workspace_root)
-
-    return {
-        "index": render_index(service),
-        "api_panel_status": render_api_servers(service),
-        "health": render_health(),
-        "api_contexts": render_api_contexts(service),
-        "api_academy": render_api_academy(service),
-        "academy_lesson": render_academy_lesson(academy),
-        "api_reports": render_api_reports(service),
-        "reports_serve": serve_report_file(service),
-        "api_report_delete": delete_report_file(service),
-        "api_report_mark_important": mark_report_important(service),
-        "api_report_unmark_important": unmark_report_important(service),
-        "api_agents": render_api_agents_canonical(service),
-        "api_agent_prompt": render_api_agent_prompt(service),
-        "api_agent_sessions": render_api_agent_sessions(service),
-        # L1 agent model-governance control plane (v0.1.65 FR8 — T-65-11).
-        "api_agent_model_policy": render_api_agent_model_policy(agent_policy_service),
-        "api_agent_model_templates": render_api_agent_model_templates(agent_policy_service),
-        "api_agent_model_policy_validate": render_post_agent_model_policy_validate(
-            agent_policy_service
-        ),
-        "api_agent_model_policy_put": render_put_agent_model_policy(agent_policy_service),
-        "api_sessions": render_api_sessions(service),
-        "memory": render_memory(workspace_root),
-        "memory_view": render_memory_wrapper(workspace_root),
-        "static": render_static(),
-    }

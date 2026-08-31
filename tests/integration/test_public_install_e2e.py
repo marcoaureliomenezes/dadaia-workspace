@@ -21,7 +21,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from dadaia_workspace.infrastructure.public_assets import (
+from dadaia_workspace.infrastructure.workspace_guardrail import (
     _CLAUDE_MD_STUB,
     _install_workspace_guardrail_pair,
 )

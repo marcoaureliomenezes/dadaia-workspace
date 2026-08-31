@@ -54,9 +54,126 @@ for this task, so none is touched here):
 
 Left exactly as written; a future task can pick this up.
 
+## [0.4.5] — 2026-08-31
+
+One published version for everything since `0.4.4`: the internal spec-release ids
+`0.5.2` (canon-v6 first-audit remediation, 41 findings dispositioned) and `0.5.3`
+(design/bug-surface remediation, 17 findings fixed, plus the AI-surface backlog
+extension) ship together as PyPI `0.4.5` — a candidate never mints a version; the
+version axis is the PyPI lineage, and its latest published version is `0.4.4`
+(measured at ship time, 2026-08-31). The `[0.5.3]`, `[0.5.2]` and `[0.5.0]`
+headings below are internal spec-release ids that were never published; their full
+content is this release's content.
+
+## [0.5.3] — 2026-08-31
+
+Design/bug-surface remediation: all 17 findings of `20260830-design-bug-surface-audit`
+fixed (spec release `0.5.3`; audit archived to `audits_histo.jsonl`). Oriented by the
+539-bug ledger's measured thesis — deletion-shaped fixes end bug families — every fix
+folds a duplicated decider, extracts policy from transport, or deletes a dead surface.
+
+### Added
+- `features/specs/specs_tree.py` — `SpecsTree`, the per-run parsed snapshot (active
+  release read once per doctor run; fix/check freshness contract) (F010).
+- `features/specs/rules.py` — the ONE ordered rule registry; check order, fix dispatch
+  and the `--fix` CLI help are derived projections (the hand-written help was wrong at
+  HEAD: claimed TREE-3 fixable, omitted six real fixables) (F012).
+- `features/spec_context/injection_policy.py` — the ctx-inject decision as one pure
+  function, unit-tested as a decision table encoding the four historical bug fixes (F009).
+- `features/specs/memory_canon.py` — one home for the memory slug→file table, the
+  forbidden-heading matcher and the wikilink grammar (F011).
+- `core/session_store.py` owns the whole binding-record lifecycle: `new_binding_record`
+  (one schema author), `is_live`/`live_session` (one predicate), `reap_stale` (one
+  reaper); the three hand-assembled `gc_check` dicts are gone (F002).
+- `core/release_state.py::PHASES`/`MEMORY_WRITE_PHASES` — the phase vocabulary's one
+  home (F007); `core/specs_version.py::RELEASE_ID_FRAGMENT` — the release-id fragment
+  derived from the ONE compiled pattern (F004).
+- Bug `component` normalizer at the registration seam — path/module spellings converge
+  to the on-disk `path#symbol` form; free text tolerated, never blocking (F017).
+- Shipped-history coverage for every scoped scaffold law file + TREE-5 scoped repair;
+  5 stale uncustomised projections refreshed on this instance (bug
+  `releases-agents-projection-stale-vs-scaffold-source` resolved).
+- Contract tests: no orphaned container factories; `gc_check` has one home; the gate
+  import-surface test drives the real `evaluate_payload` path.
+
+### Changed
+- Hooks, container and CLI derive context specs paths through the one resolver
+  (`core.invocation.resolve_context_specs_dir`), CLI via the sanctioned seam (F003).
+- The consumer guardrail pair has ONE provenance classifier consumed by install and
+  doctor alike — folding exposed a live disagreement (sha-first vs banner-first),
+  resolved to the ruling-pinned banner-first order; the ledger reconciler consumes the
+  guardrail's typed managed paths instead of re-parsing `[ok]/[skip]` strings that
+  silently dropped `[updated]` restores (F006).
+- The panel's 20-route composition moved to its single consumer
+  (`cli/commands/panel_composition.py`, ADR 0001); the secret-scan engine to the
+  privacy module; scoped-law placement to `scoped_law.py`; the harness-independent
+  asset checks to `infrastructure/entity_doctor.py` (F001/F013/F014).
+- `SPEC-DOC-016`/`SPEC-DOC-027` remedies name the bare, mintable release id; suffixed
+  ids (`0.6.0-rc1`) are canon-conformant end to end (F004).
+- `python_env` narrates a failed repack-install honestly with its own stderr (F016).
+
+### Removed
+- `TREE-6` and `SPEC-DOC-016` — each was a second implementation of an existing rule;
+  `SPEC-DOC-004` and `SPEC-DOC-027` are the survivors, and one defect now yields one
+  code; the `date.today()` gating (mocked-clock time-bomb class) died with 016 (F005).
+- The dead process-ancestry chain (protocol + 3-adapter module + factory, zero
+  production consumers) — third occurrence of the orphaned-factory class (F001).
+- `public_assets`' ~25-name underscore re-export shim, the dead `_compare_content`,
+  gate_policy's never-minted `BOUND_READ` token, ci.py's hand-rolled first-parent,
+  sdd_gate's dead `_context_slug`, the binding record's dead `is_stale` field
+  (F014/F015/F016).
+
+### Extension — AI-surface backlog consumption (same release, operator order)
+
+- **Skills**: `dadaia-codebase-design` (the shared design vocabulary; fuses and retires
+  `architect-core-workflow`), `dd-architecture-survey` (the permanent architecture
+  review as a procedure), `dd-code-review` (three axes side by side; the reviewer
+  persona thins 7→3 inline axes), `dadaia-glossary` (+ five homonyms in CONTEXT.md);
+  TASKS-as-tracer-bullets lands as a `dd-release-definition` section.
+- **CLI**: docker-style help (Common/Management panels, epilog examples, one-line-help
+  ratchet at 42); `dadaia help tree --digest` derives a ~1.8k-token stamped digest from
+  the live command tree (regenerated by install/reconcile, never at hook fire);
+  ctx-inject attaches it to every emission; Claude gains SessionStart `startup|resume`
+  matchers (a new session no longer starts context-blind).
+- **Nine-skill study executed**: Update×5 (two edits, three already landed by
+  evolution), Merge×3 (`dadaia-workspace-spec-reviewer`→`dd-audit-project/SPEC-REVIEW.md`;
+  `dadaia-workspace-manager` and `dev-server-registry`→the CLI-help surface).
+- **Rejected with recorded reasons**: `dadaia-router` (superseded by
+  DADAIA.md-in-statements + behavior-map), `dadaia-wizard` (speculative until a
+  concrete human-only runbook exists). Backlog: 0 active entries.
+
+## [0.5.2] — 2026-08-31
+
+Audit-remediation release: all 32 open findings of `20260827-canon-v6-first-audit`
+dispositioned (spec release `0.5.2`; audit archived to `audits_histo.jsonl`).
+
+### Added
+- Pre-commit bundled-ledger advisory (WARN-only, NO-LOCKS): staging `specs/bugs/BUGS.jsonl`
+  together with other `specs/**` paths gets one FR8-isolation warn line (F015/F036).
+- `dd-gitflow-default` §4 commit shape 6 — the ordinary task commit,
+  `conventional-commit(task-id)` (F016).
+
+### Changed
+- `core/bug_provenance.py`: a single-registration commit derives `exact` registration
+  granularity unconditionally — `ledger-only` remains a resolution-side marker (F010).
+- `specs/memory/QUALITY.md` P-21 Measured-by names its three timeout assertions
+  explicitly (F041).
+- Bug-ledger lineage corrected in place: `certify-skip-detail-leaks-full-codex-output`
+  and `frozen-clock-ratchet-scans-tests-tmp-scratch-dir` now name their true parent
+  bugs (F001/F003).
+
+### Removed
+- `dadaia reports validate --strict`: dead flag (declared, documented, never read) —
+  INVALID already exits 1 unconditionally (bug `reports-validate-strict-flag-dead`).
+
+### Fixed
+- `dadaia backlog new` reports the action performed — `created:` only when it created
+  `BACKLOG.json`, `appended <slug>` otherwise (bug
+  `backlog-new-append-reported-as-created`).
+
 ## [0.5.0] — 2026-08-30
 
-One published version for everything since `0.4.4`: the internal spec-release ids `0.4.5`, `0.5.0` and `0.5.1` (canon v6, deepening simplification K1–K11, ADR 0001 executed) ship together as PyPI `0.5.0` — a candidate never mints a version; the version axis is the PyPI lineage.
+One published version for everything since `0.4.4`: the internal spec-release ids `0.4.5`, `0.5.0` and `0.5.1` (canon v6, deepening simplification K1–K11, ADR 0001 executed) were staged to ship as PyPI `0.5.0` but the publication was retained (never approved at the release gate) — they publish in `[0.4.5]` above; a candidate never mints a version; the version axis is the PyPI lineage.
 
 ### Added
 - **One atomic-write primitive** (`core/atomic_write.py`) replacing eleven per-feature

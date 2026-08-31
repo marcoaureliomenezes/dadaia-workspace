@@ -237,8 +237,7 @@ class TestContentConsistency:
         absent — FR1), staged agent skill references all resolve to a real skill,
         installed Claude agents retain `tools:`, and every staged skill dir has a
         SKILL.md. Also folds the retired `us7_skill_file_exists` content asserts
-        (`dadaia server list/next/register/release` mentioned in the dev-server-registry
-        skill) since skill presence is already pinned by the one derived skill-inventory
+        (`dadaia server list/next/register/release`, now carried by dd-cli-library §6) since skill presence is already pinned by the one derived skill-inventory
         oracle (`tests.helpers.skill_inventory_oracle.skill_names`)."""
         workspace = tmp_path / "ws"
         _staged_install(workspace)
@@ -292,17 +291,17 @@ class TestContentConsistency:
                 assert (skill_dir / "SKILL.md").exists(), (
                     f"Skill directory '{skill_dir.name}' has no SKILL.md"
                 )
-        dev_server_skill = (skills_dir / "dev-server-registry" / "SKILL.md").read_text(
-            encoding="utf-8"
-        )
+        # T-053-25: dev-server-registry merged into the CLI-help surface — the law's
+        # non-derivable half lives in dd-cli-library §6 now.
+        cli_library_skill = (skills_dir / "dd-cli-library" / "SKILL.md").read_text(encoding="utf-8")
         for cmd in (
             "dadaia server list",
             "dadaia server next",
             "dadaia server register",
             "dadaia server release",
         ):
-            assert cmd in dev_server_skill, (
-                f"dev-server-registry SKILL.md missing content assert for {cmd!r}"
+            assert cmd in cli_library_skill, (
+                f"dd-cli-library SKILL.md missing dev-server law mention for {cmd!r}"
             )
 
 

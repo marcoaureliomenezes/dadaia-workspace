@@ -133,10 +133,10 @@ def _porcelain_paths(repo_root: Path) -> list[str] | None:
     return paths
 
 
-def _has_dirty_mutating_path(ctx: str, paths: list[str]) -> bool:
-    """True iff any dirty path classifies MUTATING under ``ctx`` (context-relative)."""
+def _has_dirty_mutating_path(slug: str, paths: list[str]) -> bool:
+    """True iff any dirty path classifies MUTATING under repo *slug* (context-relative)."""
     for p in paths:
-        rel = f"repos/{ctx}/{p}"
+        rel = f"repos/{slug}/{p}"
         if gate_policy.classify_path(rel) is PathClass.MUTATING:
             return True
     return False
@@ -223,18 +223,21 @@ def _reconcile_working_tree(workspace: Path, sess_id: str) -> None:
     if ctx is None:
         return
 
-    repo_root = workspace / "repos" / ctx
+    # F003 (20260830 audit): path derivation goes through the registry slug — never
+    # the bare context NAME (the 0.4.2 name-vs-slug defect class).
+    slug = invocation.repo_slug_for_context(workspace, ctx)
+    repo_root = workspace / "repos" / slug
     if not repo_root.is_dir():
         return
 
     paths = _porcelain_paths(repo_root)
     if not paths:
         return
-    if not _has_dirty_mutating_path(ctx, paths):
+    if not _has_dirty_mutating_path(slug, paths):
         return
 
     count = sum(
-        1 for p in paths if gate_policy.classify_path(f"repos/{ctx}/{p}") is PathClass.MUTATING
+        1 for p in paths if gate_policy.classify_path(f"repos/{slug}/{p}") is PathClass.MUTATING
     )
     _append_reconciler_flag(workspace, sess_id, ctx, count)
 

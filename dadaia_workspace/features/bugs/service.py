@@ -23,6 +23,7 @@ optional — most construction sites never need a git walk and the seam degrades
 from __future__ import annotations
 
 import logging
+import re
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -46,9 +47,45 @@ __all__ = [
     "BugDuplicateIdError",
     "BugService",
     "BugStats",
+    "normalize_component",
 ]
 
 _LOG = logging.getLogger(__name__)
+
+
+_DOTTED_MODULE_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)+$")
+
+
+def normalize_component(value: str, *, repo_root: Path | None = None) -> str:
+    """Canonicalize a bug record's ``component`` toward ``path#symbol`` (F017).
+
+    Conservative and NEVER raising (the bugs lane is ADDITIVE — registration must
+    never block): a path-shaped or dotted-module value is normalized to the on-disk
+    repo-relative form (backslashes -> ``/``, dots -> ``/``, ``.py`` and the
+    ``dadaia_workspace/`` prefix added when that file actually exists under
+    *repo_root*); anything else (free text) passes through stripped. The 539-record
+    ledger held 3+ spellings of the same file — this seam is where spellings converge.
+    """
+    text = value.strip()
+    if not text:
+        return ""
+    path_part, sep, symbol = text.partition("#")
+    path_part = path_part.strip().replace("\\", "/")
+    if any(ch in path_part for ch in " |()"):
+        return text  # free text — tolerated untouched (beyond the strip)
+    if "/" not in path_part and _DOTTED_MODULE_RE.match(path_part):
+        path_part = path_part.replace(".", "/")
+    if repo_root is not None:
+        for candidate in (
+            path_part,
+            f"{path_part}.py",
+            f"dadaia_workspace/{path_part}",
+            f"dadaia_workspace/{path_part}.py",
+        ):
+            if (repo_root / candidate).is_file():
+                path_part = candidate
+                break
+    return f"{path_part}#{symbol}" if sep else path_part
 
 
 class BugDuplicateIdError(ValueError):
@@ -156,7 +193,7 @@ class BugService:
             "title": title,
             "severity": severity,
             "surface": surface,
-            "component": component,
+            "component": normalize_component(component, repo_root=self._repo_root),
             "context": context,
             "symptom": symptom,
             "repro": repro,

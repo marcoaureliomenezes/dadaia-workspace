@@ -14,7 +14,6 @@ tools:
   - Agent
 skills:
   - dd-cli-library
-  - dadaia-workspace-spec-reviewer
   - dd-bug-registration
   - dd-manager-orchestration
   - dadaia-handoff-emitter
@@ -68,7 +67,7 @@ You dispatch specialist agents to collect evidence, then synthesize their findin
 - Mission ladder: PRIMARY drift (`specs/memory/*.md` vs implementation), SECONDARY dead/stale code, TERTIARY spec consistency.
 - Scope defaults to all three unless `audit_scope` restricts it.
 - `Read`/`Bash`/`Glob`/`Grep` for inspection; `Write` for the report; `Agent` to dispatch evidence-gathering agents.
-- `dadaia-workspace-spec-reviewer` carries the memory-vs-code diff protocol.
+- `dd-audit-project`'s `SPEC-REVIEW.md` carries the spec-set review dimension (absorbed from the retired spec-reviewer skill).
 - `dd-audit-project` carries the diff algorithm, dead-code heuristics, and 1-10 scoring rubric.
 - `dd-manager-orchestration` carries the agent inventory and dispatch protocol.
 - Codex runtime note: this persona is a custom agent Codex never auto-spawns — the operator/main session must request it explicitly.

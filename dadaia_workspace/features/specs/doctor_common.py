@@ -1,7 +1,7 @@
 """Shared leaf helpers for the SpecsDoctor decomposition (v0.1.55 FR1).
 
 Cross-validator free functions used by THREE validator families (release, closure_audit,
-governance) plus ``doctor_structural`` (a fourth, TREE-6). Holds no sibling-VALIDATOR
+governance) plus ``doctor_structural`` (a fourth). Holds no sibling-VALIDATOR
 import (no ``ReleaseValidator``/``StructuralValidator`` class ever imported here or from
 here) — the release-dir discovery helpers were instance methods on ``SpecsDoctor``; they
 are re-homed here as free functions taking ``specs_dir`` explicitly so no family owns

@@ -20,17 +20,16 @@ from dadaia_workspace.core.specs_repair import (  # noqa: F401
     is_placeholder_atom,
     remove_placeholder_atoms,
 )
-from dadaia_workspace.features.specs import memory_lint
+from dadaia_workspace.features.specs import memory_canon, memory_lint
 from dadaia_workspace.features.specs.doctor_types import (
     Severity,
     SpecsDoctorIssue,
     _MemoryMdSummary,
 )
 
-FORBIDDEN_MEMORY_H2_RE = re.compile(r"^(Changelog|History|Hist[óo]rico|Versions?)\b", re.IGNORECASE)
-# Top-level memory files (.md canonical source). v6 canon (FR1/A1.5/A1.6, T-050-06):
-# renamed from the lowercase trio (architecture.md, tech-stack.md, quality-assurance.md).
-TOPLEVEL_MEMORY_FILES = ("ARCHITECTURE.md", "TECHSTACK.md", "QUALITY.md")
+# ONE home for memory-canon facts (F011): features.specs.memory_canon.
+FORBIDDEN_MEMORY_H2_RE = memory_canon.FORBIDDEN_MEMORY_HEADING_RE
+TOPLEVEL_MEMORY_FILES = memory_canon.MEMORY_TOPLEVEL_FILES
 # Product memory is a folder catalog: index.md is required + 0..N feature .md atoms.
 PRODUCT_INDEX_REL = "product/index.md"
 
@@ -42,7 +41,7 @@ PRODUCT_INDEX_REL = "product/index.md"
 _MD_HEADING_RE = re.compile(r"^#{1,6}\s+\S", re.MULTILINE)
 _MD_H1_RE = re.compile(r"^#\s+(.+)$", re.MULTILINE)
 _MD_H2_RE = re.compile(r"^##\s+(.+)$", re.MULTILINE)
-_WIKILINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
+_WIKILINK_RE = memory_canon.WIKILINK_RE
 
 
 def _parse_memory_md(path: Path) -> _MemoryMdSummary:

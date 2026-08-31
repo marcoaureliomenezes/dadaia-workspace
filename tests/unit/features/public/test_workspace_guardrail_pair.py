@@ -23,11 +23,11 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
-from dadaia_workspace.infrastructure.public_assets import (  # type: ignore[attr-defined]
+from dadaia_workspace.infrastructure.public_assets_common import _package_version
+from dadaia_workspace.infrastructure.workspace_guardrail import (
     _CLAUDE_MD_STUB,
     _doctor_consumer_pair_lines,
     _install_workspace_guardrail_pair,
-    _package_version,
 )
 
 

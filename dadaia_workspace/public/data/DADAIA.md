@@ -39,7 +39,7 @@
 | Architecture: DRAFT, REVIEW, ONBOARD; root-cause and fidelity gates | `software-architect` |
 | Production code and its tests, in any language | `software-engineer` |
 | E2E, test pyramid, deploy validation; closes each `rc-N` | `qa-engineer` |
-| Six-axis review before a PR | `code-reviewer` |
+| Three-axis review (`dd-code-review`: standards, spec, bug-surface) before a PR | `code-reviewer` |
 | Vulnerabilities, secrets, CVEs; the push verdict (§4.2) | `security-reviewer` |
 | Agents, skills, rules, workflows, commands, hooks — the AI surface | `ai-engineer` |
 | Drift audits; dispatches evidence agents; scores compliance | `project-auditor` |

@@ -1,0 +1,69 @@
+{
+ "schema": "release-state-v1",
+ "release": "0.5.2",
+ "phase": "ARCHIVED",
+ "rc": null,
+ "defined": {
+  "sha": "56d37c0ad6f2df0fdaceddeaf9b8cd5a7ddcb518",
+  "ts": "2026-08-31T03:45:51Z"
+ },
+ "implemented": null,
+ "shipped": null,
+ "audited": null,
+ "log": [
+  {
+   "kind": "note",
+   "ts": "2026-08-31T00:00:00Z",
+   "text": "Audit-remediation release for 20260827-canon-v6-first-audit (32 open findings). Scope authorized by operator /goal order 2026-08-31; grill satisfied by direct order (recorded deviation).",
+   "agent": "claude-code"
+  },
+  {
+   "ts": "2026-08-31T03:56:23Z",
+   "agent": "claude-code",
+   "kind": "summary",
+   "text": "Audit-remediation release: all 32 open findings of 20260827-canon-v6-first-audit dispositioned (18 fixed in/by this release + 9 already-fixed evidenced, 6 superseded, 8 rejected with recorded reasons). Implemented: F001/F003 ledger lineage (T-052-01), F010 registration-granularity rule (T-052-02), F015/F036 pre-commit bundled-ledger advisory (T-052-03), F016 gitflow commit shape 6 (T-052-04), F033 vulture measurement (T-052-05), F041 P-21 selector (T-052-07). Audit archived: histo summary + directory removed (proof of uncustomized stale scoped law recorded in the histo record)."
+  },
+  {
+   "ts": "2026-08-31T03:56:23Z",
+   "agent": "claude-code",
+   "kind": "size",
+   "text": "Code diff net-negative-to-neutral: bug_provenance rule simplified in place; one dead CLI flag deleted (--strict); one pure advisory function + CLI wiring added; one skill line added (shape 6); no new subsystem, no new dependency."
+  },
+  {
+   "ts": "2026-08-31T03:56:23Z",
+   "agent": "claude-code",
+   "kind": "dispositions",
+   "text": "Bugs in-window: reports-validate-strict-flag-dead resolved (net-negative); audits-agents-contradiction superseded by releases-agents-projection-stale-vs-scaffold-source (OPEN, structural cause recorded: shipped-hashes covers only root specs-AGENTS.md \u2014 routed to the projection lane); backlog-new-append-reported-as-created remains open (picked-set rider NOT fixed in 0.5.2 \u2014 deferred to avoid an unrelated-surface commit inside closure; stays open per \u00a76.6 sanitization). No backlog item consumed."
+  },
+  {
+   "ts": "2026-08-31T03:56:23Z",
+   "agent": "claude-code",
+   "kind": "drifts",
+   "text": "specs/releases/AGENTS.md and specs/audits/AGENTS.md are stale lib-published projections (byte-identical to historical source versions d33786cb/10540961) \u2014 refresh path is the open projection bug; instance follows current SOURCE law where the two disagree, with proof recorded."
+  },
+  {
+   "ts": "2026-08-31T03:56:23Z",
+   "agent": "claude-code",
+   "kind": "artifact-gc",
+   "text": "Scratch vulture venv under session scratchpad (outside .dadaia) \u2014 no .dadaia release artifacts to GC; handoffs from the 20260830 design audit left in place (not this release's)."
+  },
+  {
+   "ts": "2026-08-31T03:56:23Z",
+   "agent": "claude-code",
+   "kind": "note",
+   "text": "rc-1 PR, trio verdicts, implemented/shipped milestones and publication are operator-gated and intentionally NOT executed: the /goal scope was define + implement the 32 findings. pyproject bumped to 0.5.2 per SPEC-DOC-045 at closure; publish gate untouched."
+  },
+  {
+   "ts": "2026-08-31T03:57:44Z",
+   "agent": "claude-code",
+   "kind": "note",
+   "text": "Correction to the dispositions entry: backlog-new-append-reported-as-created WAS fixed in-release after all (shape-3 commit; created vs appended echoed from the writer's own fact) \u2014 the picked set closes 2 resolved + 1 superseded, leaving only the routed projection-staleness bug open."
+  },
+  {
+   "ts": "2026-08-31T13:50:42Z",
+   "agent": "claude-code",
+   "kind": "note",
+   "text": "Archived pre-ship per D8/FR5 order (review -> closure -> archive -> ship): implementation and closure complete on feature/0.5.2, preflight green; rc PR / trio verdicts / ship remain operator-gated and will back-fill milestones, as 0.5.0/0.5.1 precedent did."
+  }
+ ]
+}

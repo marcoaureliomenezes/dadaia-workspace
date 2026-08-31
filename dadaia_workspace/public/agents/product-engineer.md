@@ -12,6 +12,7 @@ tools:
   - Write
   - Edit
 skills:
+  - dadaia-glossary
   - dadaia-handoff-emitter
   - dd-release-implement
   - dd-release-definition

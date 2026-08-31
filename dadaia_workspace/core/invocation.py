@@ -62,15 +62,9 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from dadaia_workspace.core import kernel_tunables
 from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
-from dadaia_workspace.core.record_liveness import is_stale
 from dadaia_workspace.core.release_state import parse_release_state
-from dadaia_workspace.core.session_store import (
-    SESSION_GC_TTL_FIELD,
-    liveness_timestamp,
-    read_session,
-)
+from dadaia_workspace.core.session_store import live_session, read_session
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 
 __all__ = [
@@ -191,6 +185,20 @@ def _registry_contexts(workspace_root: Path) -> list[dict[str, object]]:
     return [e for e in contexts if isinstance(e, dict)] if isinstance(contexts, list) else []
 
 
+def alive_context_slugs(workspace_root: Path) -> list[str]:
+    """The ``repos/<slug>`` dir of every ALIVE context, fail-soft to ``[]`` (F008:
+    the ONE fail-soft registry read family lives here — hooks import it, never a
+    private re-parse; ``JsonContextStore`` stays the schema-gated CRUD authority)."""
+    slugs: list[str] = []
+    for entry in _registry_contexts(workspace_root):
+        if str(entry.get("state", "")).lower() != "alive":
+            continue
+        slug = str(entry.get("repo_slug") or entry.get("name") or "")
+        if slug:
+            slugs.append(slug)
+    return slugs
+
+
 def _context_registered(workspace_root: Path, name: str) -> bool:
     """True while *name* is registered (missing registry -> ``False``; unreadable fails
     OPEN -> ``True``, so a transient FS hiccup never invalidates every live bind)."""
@@ -298,14 +306,8 @@ def _live_session_context(workspace_root: Path, session_id: str | None) -> str |
     missing/stale/deleted-context."""
     if not session_id:
         return None
-    record = read_session(workspace_root, session_id)
+    record = live_session(workspace_root, session_id)
     if record is None:
-        return None
-    gc_check: dict[str, object] = {
-        "heartbeat": liveness_timestamp(record),
-        "ttl": record.get(SESSION_GC_TTL_FIELD, kernel_tunables.SESSION_GC_TTL_SECONDS),
-    }
-    if is_stale(gc_check):
         return None
     context = record.get("context")
     context = str(context) if context else None
@@ -508,11 +510,7 @@ def resolve_context_specs_dir(workspace_root: Path, context: str) -> Path:
     workspace-root ``specs/`` tree, exactly like this very repo) falls back to
     ``workspace_root/specs``. Both roots derive from ``workspace_root`` — never cwd.
     """
-    inv = resolve(explicit=context, env=os.environ, cwd=workspace_root)
-    context_name = inv.context_name or context
-    specs_dir = (
-        workspace_root / "repos" / repo_slug_for_context(workspace_root, context_name) / "specs"
-    )
+    specs_dir = workspace_root / "repos" / repo_slug_for_context(workspace_root, context) / "specs"
     if not specs_dir.is_dir():
         specs_dir = workspace_root / "specs"
     return specs_dir

@@ -76,7 +76,6 @@ _FAMILY_OF_CODE: dict[str, str] = {
     "SPEC-DOC-004": "release",
     "SPEC-DOC-005": "release",
     "SPEC-DOC-009": "release",
-    "SPEC-DOC-016": "release",
     "SPEC-DOC-024": "release",
     "SPEC-DOC-026": "release",
     "SPEC-DOC-027": "release",
@@ -97,7 +96,6 @@ _FAMILY_OF_CODE: dict[str, str] = {
     "TREE-4": "structural",
     "TREE-5": "structural",
     "TREE-5M": "structural",
-    "TREE-6": "structural",
     "TREE-7": "structural",
     "TREE-8": "structural",
 }
@@ -163,7 +161,7 @@ def _capture() -> tuple[list[SpecsDoctorIssue], str]:
         # Free-text messages may embed the fixture path RELATIVE tail with os.sep (Windows
         # renders "at <SPECS>\releases\v9.9.9"). Canonicalize ONLY <SPECS>-anchored tails —
         # a blanket backslash replace would corrupt legit regex content in other messages
-        # (e.g. the SPEC-DOC-016 SemVer pattern's \d): "\d" and "\dir" are byte-identical
+        # (e.g. a regex pattern's \d): "\d" and "\dir" are byte-identical
         # shapes at this level, so anchoring is the only safe disambiguation.
         value = value.replace(str(_FIXTURE), "<SPECS>").replace(_FIXTURE.as_posix(), "<SPECS>")
         return re.sub(

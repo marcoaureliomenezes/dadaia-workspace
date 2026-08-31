@@ -8,7 +8,7 @@ visible:
 |---|---|
 | coherence | missing `constitution.md` → `SPEC-DOC-001`; unstamped pattern → `SPECS-VERSION` |
 | memory | missing `memory/` atoms → `SPEC-DOC-002` |
-| release | `ACTIVE.md` → missing `v9.9.9` dir → `SPEC-DOC-009`; non-SemVer `badname-release` (Created 2026-07-10) → `SPEC-DOC-016`/`SPEC-DOC-027` (date-gated) |
+| release | `ACTIVE.md` → missing `v9.9.9` dir → `SPEC-DOC-009`; non-SemVer `badname-release` (Created 2026-07-10) → `SPEC-DOC-027` (016/TREE-6 retired at 0.5.3 T-053-04 — one rule, one implementation) |
 | closure_audit | loose `audits/bad-audit-name/` → `SPEC-DOC-030`/`SPEC-DOC-038`; missing `_archive/` → `SPEC-DOC-034` |
 | governance | loose `backlog/candidates.md` (not `BACKLOG.md`/`README.md`) → `SPEC-DOC-035` (single-source invariant, SPEC v0.12.0 FR5) |
 | structural | missing dirs/atoms → `TREE-3`/`TREE-4`/`TREE-5`/`TREE-5M` |

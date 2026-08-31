@@ -6,7 +6,7 @@ The feature seam between the panel views and the agent-model governance stack:
   is injected through the :class:`AgentModelPolicyStorePort` protocol — this module
   never imports infrastructure (D-4, ``features-no-infrastructure``);
 - the **re-render callable** (the agents-only ``public install`` path — G-2 Apply
-  semantics) is injected by the composition root (``container.build_panel_views``).
+  semantics) is injected by the panel composition (``cli.commands.panel_composition.build_panel_views``).
 
 All precedence goes through the single resolver
 (:func:`~dadaia_workspace.core.agent_model_templates.resolve_agent_model` — FR4); this

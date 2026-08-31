@@ -375,7 +375,7 @@ class FileSystemAgentsProvider(AgentsProvider):
     Thin adapter over the module-level reader functions so the panel can depend
     on the `core/protocols/agents_provider.AgentsProvider` protocol instead of
     importing these functions concretely (NEW-02 boundary). Wired in
-    `container.build_panel_service`.
+    `cli.commands.panel_composition.build_panel_service`.
 
     Holds the injected ``store_factory`` (the concrete ``MarkdownAgentStore`` class,
     supplied by the composition root) and threads it into ``read_canonical_agents`` so

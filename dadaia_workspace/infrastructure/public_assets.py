@@ -29,9 +29,9 @@ from dadaia_workspace.core.models.agent_model_policy import (
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus, attest
 from dadaia_workspace.core.models.install_ledger import InstallLedger, LedgerEntry
 from dadaia_workspace.core.workspace_layout import DADAIA_ADDITIVE_PREFIXES
-from dadaia_workspace.infrastructure.codex_doctor import (
+from dadaia_workspace.infrastructure.codex_doctor import check_codex_rule_corpus_reachable
+from dadaia_workspace.infrastructure.entity_doctor import (
     check_agent_skill_refs,
-    check_codex_rule_corpus_reachable,
     check_entities_derivation,
     check_memory_phase_single_source,
 )
@@ -46,12 +46,6 @@ from dadaia_workspace.infrastructure.json_agent_model_policy_store import (
 )
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
 from dadaia_workspace.infrastructure.json_install_ledger_store import JsonInstallLedgerStore
-from dadaia_workspace.infrastructure.privacy_check import (  # noqa: F401
-    _PRIVACY_DENYLIST_ENV,
-    _PUBLIC_ASSET_IGNORED_DIRS,
-    _PUBLIC_ASSET_IGNORED_SUFFIXES,
-    _load_privacy_denylist,
-)
 from dadaia_workspace.infrastructure.privacy_check import (
     check_public_privacy as _check_public_privacy_fn,
 )
@@ -61,36 +55,21 @@ from dadaia_workspace.infrastructure.projection_rules import (
     projection_rules,
     prune_stale_codex_tomls,
 )
-from dadaia_workspace.infrastructure.public_assets_common import (  # noqa: F401
-    _CLAUDE_DIRS,
+from dadaia_workspace.infrastructure.public_assets_common import (
     _COPY_DIRS,
-    _SCHEMA_VERSION,
     _VALID_TARGETS,
     OverwritePolicy,
     _json_dump,
-    _log_cleanup_error,
-    _package_version,
     _sha256,
-    _toml_escape,
     is_ignored_public_asset,
     iter_public_files,
 )
 from dadaia_workspace.infrastructure.runtime_config import codex_config as _build_codex_config
-from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (  # noqa: F401
-    _parse_agent_frontmatter,
-    _parse_write_allowlist,
-)
-from dadaia_workspace.infrastructure.workspace_guardrail import (  # noqa: F401
-    _CANONICAL_AGENTS_BANNER,
-    _CLAUDE_MD_STUB,
+from dadaia_workspace.infrastructure.workspace_guardrail import (
     _agents_md_source,
-    _carries_canonical_banner,
     _consumer_repos_for_root,
     _doctor_consumer_pair_lines,
-    _install_consumer_repos_guardrail_pair,
     _install_guardrail_pair,
-    _install_workspace_guardrail_pair,
-    _install_workspace_root_guardrail_pair,
     _is_self_repo,
     _is_source_repo_root,
 )
@@ -200,7 +179,6 @@ class FileSystemPublicAssetManager:
         harnesses = build_harnesses(self._public_dir)
         rules = projection_rules(plan, harnesses)
         transcript = install_rules(rules, force=plan.overwrite.force)
-        transcript_start = len(installed)
         installed.extend(transcript.render())
 
         # Codex per-agent TOML pruning is independent of the rule table (a rule
@@ -221,10 +199,11 @@ class FileSystemPublicAssetManager:
 
         # Consumer-repo guardrail fan-out (bespoke: N-target discovery + provenance
         # gating, never a fixed-destination rule).
+        guardrail_managed: list[Path] = []
         if "repos" in plan.guardrail_targets:
             data_agents_md = agentic_dir / "data" / "AGENTS.md"
             if data_agents_md.is_file():
-                _install_guardrail_pair(
+                guardrail_managed = _install_guardrail_pair(
                     data_agents_md,
                     workspace_root,
                     plan.overwrite.force,
@@ -240,7 +219,7 @@ class FileSystemPublicAssetManager:
         self._reconcile_install_ledger(
             workspace_root,
             transcript,
-            transcript_start,
+            guardrail_managed,
             installed,
             full=(plan.target == "all" and plan.scope == "all"),
         )
@@ -369,7 +348,7 @@ class FileSystemPublicAssetManager:
         self,
         workspace_root: Path,
         transcript: Transcript,
-        transcript_start: int,
+        extra_managed: list[Path],
         installed: list[str],
         *,
         full: bool,
@@ -383,12 +362,11 @@ class FileSystemPublicAssetManager:
         surfaced with a ``[warn]``; a missing/corrupt previous ledger bootstraps —
         record everything, prune nothing.
 
-        The rule-table portion of *installed* is read directly off *transcript* (typed
-        ``TranscriptLine.path`` — K3 retires the ``"[ok]   "``/``"[skip] "`` string-
-        parsing protocol every prior consumer had to re-derive). The remaining bespoke
-        writers (consumer-repo guardrail fan-out) still emit plain strings in *installed*
-        with the SAME two prefixes, so their paths are recovered the historical way —
-        a small, bounded surface, not the whole transcript.
+        Paths arrive TYPED only: the rule table via ``transcript.paths()``, the bespoke
+        consumer-repo guardrail fan-out via *extra_managed* (its return value). The
+        historical two-prefix string re-parse of *installed* is deleted (F006): it
+        silently dropped ``[updated]`` restores — a restored consumer AGENTS.md never
+        reached the ledger.
         """
         states_dir = workspace_root / ".dadaia" / "states"
         ws = workspace_root.resolve()
@@ -413,16 +391,8 @@ class FileSystemPublicAssetManager:
         for path in transcript.paths():
             _record(path)
 
-        transcript_end = transcript_start + len(transcript.lines)
-        remaining = installed[:transcript_start] + installed[transcript_end:]
-        for line in remaining:
-            if line.startswith("[ok]   "):
-                raw = line[len("[ok]   ") :]
-            elif line.startswith("[skip] "):
-                raw = line[len("[skip] ") :]
-            else:
-                continue
-            _record(Path(raw.split(" — ")[0].split(" (")[0].strip()))
+        for path in extra_managed:
+            _record(path)
 
         previous = self._install_ledger_store.read(states_dir)
         merged: dict[str, LedgerEntry] = {}
@@ -616,13 +586,6 @@ class FileSystemPublicAssetManager:
         if not dst.exists():
             return DoctorLine(DoctorStatus.MISSING, f"{label}")
         if _sha256(src) != _sha256(dst):
-            return DoctorLine(DoctorStatus.DRIFT, f"{label}")
-        return DoctorLine(DoctorStatus.OK, f"{label}")
-
-    def _compare_content(self, expected: str, dst: Path, label: str) -> DoctorLine:
-        if not dst.exists():
-            return DoctorLine(DoctorStatus.MISSING, f"{label}")
-        if dst.read_text(encoding="utf-8") != expected:
             return DoctorLine(DoctorStatus.DRIFT, f"{label}")
         return DoctorLine(DoctorStatus.OK, f"{label}")
 

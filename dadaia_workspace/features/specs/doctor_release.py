@@ -2,7 +2,7 @@
 invariants.
 
 Single-responsibility sibling of the SpecsDoctor coordinator. Owns the active-release lifecycle
-checks (SPEC-DOC-003/004/005/009), SemVer naming (SPEC-DOC-016), the release ledger
+checks (SPEC-DOC-003/004/005/009), the release ledger
 invariants (phase↔markers SPEC-DOC-024, unique ids SPEC-DOC-026, naming canon SPEC-DOC-027),
 and the partial-archive residue invariant (SPEC-DOC-039, v0.1.81 FR2), plus the family-local
 status/created-date extractors. Leaf-only: imports the shared leaves + core, never a sibling
@@ -23,6 +23,7 @@ from datetime import date
 from pathlib import Path
 
 from dadaia_workspace.core.handoff_index import discover_handoff_paths
+from dadaia_workspace.core.release_state import PHASES as _PHASES
 from dadaia_workspace.core.spec_status import APPROVED, extract_status
 from dadaia_workspace.core.spec_status import CANONICAL_STATUS as _CANONICAL_STATUS
 from dadaia_workspace.core.specs_version import RELEASE_SEMVER_RE
@@ -31,28 +32,19 @@ from dadaia_workspace.features.specs.doctor_common import (
     RELEASE_ARTIFACTS,
     _read_and_parse_release_json,
     iter_all_release_dirs,
-    resolve_active_release,
 )
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
+from dadaia_workspace.features.specs.specs_tree import SpecsTree
 
 # Vocabulary + parser live in core.spec_status (single definition); re-exported here
 # because doctor_release has been the documented import site for both.
 CANONICAL_STATUS = _CANONICAL_STATUS
-CANONICAL_PHASES = {
-    "DISCOVERY",
-    "DEFINITION",  # v0.1.7: release-definition phase; product-engineer authors memory here
-    "SPEC",
-    "PLAN",
-    "TASKS",
-    "IMPLEMENTATION",
-    "CLOSURE",
-    "ARCHIVED",
-    "none",  # scaffold default: no active release
-}
+CANONICAL_PHASES = _PHASES
 HARD_LIMIT_PLAN_CUTOFF = date(2026, 5, 17)
 PLAN_MAX_LINES = 300
 
-# SPEC-DOC-016: SemVer folder naming for releases created on/after this date (D3).
+# Release-id canon cutoff (D3): a live release whose SPEC.md Created: is on/after
+# this date must carry a canon-conformant directory name (SPEC-DOC-027).
 # Vintage releases (Created: <= 2026-06-04) are excluded — this grandfathers the frozen
 # pre-June-5 _archive sub-patch releases (v0.1.4.1..v0.1.4.6, ctx-inject-v2-drift-fix-v1)
 # that predate the SemVer-folder mandate's rollout; the rule keeps hard-enforcing for
@@ -61,8 +53,6 @@ PLAN_MAX_LINES = 300
 # RELEASE_SEMVER_RE is the shared canon (core.specs_version), imported above — v0.1.53 FR3
 # centralised the pattern; the module-level name is preserved for the call sites below.
 RELEASE_SEMVER_CUTOFF = date(2026, 6, 1)  # WARNING starts here
-RELEASE_SEMVER_HARD = date(2026, 7, 1)  # ERROR starts here
-RELEASE_VINTAGE_CUTOFF = date(2026, 6, 4)  # releases on/before this are excluded
 
 # SPEC-DOC-027 (ADR-9, v0.1.11): permanent documented allowlist of legacy ``_archive``
 # release-dir names that predate the SemVer naming canon. These are FROZEN HISTORY:
@@ -145,6 +135,9 @@ class ReleaseValidator:
 
     def __init__(self, specs_dir: Path) -> None:
         self.specs_dir = specs_dir
+        #: Fresh per check() run (assigned by the coordinator, F010) — the parsed
+        #: snapshot every active-release read goes through; never survives a fix pass.
+        self.tree: SpecsTree = SpecsTree(specs_dir)
 
     def check_active_md(self) -> list[SpecsDoctorIssue]:
         """SPEC-DOC-003/009 (v0.5.x, successor to the RELEASE.jsonl fold; v0.5.0
@@ -158,7 +151,13 @@ class ReleaseValidator:
         """
         issues: list[SpecsDoctorIssue] = []
         path = self.specs_dir / "releases"
-        release, segment, phase, err = resolve_active_release(self.specs_dir)
+        active = self.tree.active_release
+        release, segment, phase, err = (
+            active.release,
+            active.segment,
+            active.phase,
+            active.error,
+        )
         del segment
         if err:
             issues.append(
@@ -199,7 +198,13 @@ class ReleaseValidator:
 
     def check_active_release_artifacts(self) -> list[SpecsDoctorIssue]:
         issues: list[SpecsDoctorIssue] = []
-        release, segment, phase, err = resolve_active_release(self.specs_dir)
+        active = self.tree.active_release
+        release, segment, phase, err = (
+            active.release,
+            active.segment,
+            active.phase,
+            active.error,
+        )
         if err or not release or release == "none":
             return issues
         # Dir-based segment (ADR-1/ADR-5): when the active phase record carries a
@@ -314,68 +319,6 @@ class ReleaseValidator:
             )
         return issues
 
-    def check_release_semver_naming(self) -> list[SpecsDoctorIssue]:
-        """SPEC-DOC-016: release folder names must follow SemVer (v<M>.<m>.<p>) for releases
-        whose SPEC.md has Created: >= RELEASE_SEMVER_CUTOFF.
-
-        Vintage releases (Created: <= RELEASE_VINTAGE_CUTOFF) are excluded.
-        Severity: WARNING until RELEASE_SEMVER_HARD, ERROR on/after that date;
-        an ARCHIVED legacy dir is always at most WARNING — SPEC-DOC-027 explicitly
-        preserves archived legacy names until renamed, and a hard 016 ERROR on the
-        same path contradicted it and left preflight permanently red with no
-        non-destructive remediation (bug
-        doctor-016-errors-archived-legacy-release-027-tolerates).
-
-        Applies to specs/releases/ — root specs/_archive/releases/ retired (v6 canon,
-        not a canon root member; T-050-14 deleted its last content).
-        """
-        issues: list[SpecsDoctorIssue] = []
-        today = date.today()
-
-        # Only run this check if we are at or past the cutoff
-        if today < RELEASE_SEMVER_CUTOFF:
-            return issues
-
-        severity = Severity.ERROR if today >= RELEASE_SEMVER_HARD else Severity.WARNING
-
-        releases_root = self.specs_dir / "releases"
-        if releases_root.exists():
-            for entry in releases_root.iterdir():
-                if not entry.is_dir():
-                    continue
-                folder_name = entry.name
-                # Resolve Created: date from SPEC.md
-                spec_path = entry / "SPEC.md"
-                created = _extract_created_date(spec_path) if spec_path.exists() else None
-
-                # Skip vintage releases (Created: <= RELEASE_VINTAGE_CUTOFF)
-                if created is not None and created <= RELEASE_VINTAGE_CUTOFF:
-                    continue
-
-                # Skip releases without a determinable Created: date
-                # (they could be legacy — give benefit of the doubt)
-                if created is None:
-                    continue
-
-                # Skip releases created before the cutoff
-                if created < RELEASE_SEMVER_CUTOFF:
-                    continue
-
-                if not RELEASE_SEMVER_RE.match(folder_name):
-                    issues.append(
-                        SpecsDoctorIssue(
-                            code="SPEC-DOC-016",
-                            severity=severity,
-                            description=(
-                                f"Release folder '{folder_name}' does not follow SemVer "
-                                f"naming (^v\\d+\\.\\d+\\.\\d+$). Created: {created}. "
-                                "Rename to v<MAJOR>.<MINOR>.<PATCH> (D3, SPEC-DOC-016)."
-                            ),
-                            path=str(entry),
-                        )
-                    )
-        return issues
-
     def _active_tasks_markers(self, release: str, segment: str | None) -> list[str] | None:
         """Return the list of task marker chars (' ', '-', 'x') for the active release's
         TASKS.md, or None when TASKS.md is absent/unreadable."""
@@ -403,7 +346,13 @@ class ReleaseValidator:
         """
         issues: list[SpecsDoctorIssue] = []
         active_path = self.specs_dir / "releases"
-        release, segment, phase, err = resolve_active_release(self.specs_dir)
+        active = self.tree.active_release
+        release, segment, phase, err = (
+            active.release,
+            active.segment,
+            active.phase,
+            active.error,
+        )
         if err or not release or release == "none" or phase is None:
             return issues
         rdir = self.specs_dir / "releases" / release
@@ -518,16 +467,17 @@ class ReleaseValidator:
         return issues
 
     def check_release_naming_canon(self) -> list[SpecsDoctorIssue]:
-        """SPEC-DOC-027: release dir names should match ``^v\\d+\\.\\d+\\.\\d+$``.
+        """SPEC-DOC-027: release dir names should match the release-id canon
+        (``RELEASE_SEMVER_RE``; mintable ids are bare ``MAJOR.MINOR.PATCH``).
 
-        Severity follows the same legacy policy as SPEC-DOC-016 so the two checks
-        never disagree:
+        The ONE naming rule (F005, 20260830 audit — SPEC-DOC-016 retired as a second
+        implementation of this same rule; no ``date.today()`` gating survives):
         - A non-conforming dir in the live ``releases/`` tree whose SPEC.md
           ``Created:`` date is on/after the canon cutoff (``RELEASE_SEMVER_CUTOFF``)
           is an ERROR — a release born after the canon must be SemVer-clean.
-        - Every other non-conforming dir (archive, vintage ``Created:`` ≤
-          ``RELEASE_VINTAGE_CUTOFF``, pre-cutoff, or undeterminable date) is a
-          WARNING — legacy names predate the canon and are preserved until renamed.
+        - Every other non-conforming dir (archive, pre-cutoff ``Created:``, or an
+          undeterminable date) is a WARNING — legacy names predate the canon and are
+          preserved until renamed.
 
         ADR-9 (v0.1.11): archived dirs whose name is in the permanent documented
         ``RELEASE_NAMING_LEGACY_ALLOWLIST`` are silenced entirely — they are frozen
@@ -554,7 +504,7 @@ class ReleaseValidator:
                     severity=severity,
                     description=(
                         f"Release dir '{d.relative_to(self.specs_dir).as_posix()}' does "
-                        "not follow the naming canon ^v<MAJOR>.<MINOR>.<PATCH>$ "
+                        "not follow the release-id canon (bare <MAJOR>.<MINOR>.<PATCH>) "
                         + (
                             "— rename it (SPEC-DOC-027)."
                             if severity == Severity.ERROR
@@ -677,7 +627,8 @@ class ReleaseValidator:
         """
         if repo_root is None or not (pyproject_path := repo_root / "pyproject.toml").is_file():
             return []
-        release, _segment, phase, err = resolve_active_release(self.specs_dir)
+        active = self.tree.active_release
+        release, phase, err = active.release, active.phase, active.error
         if err or not release or release == "none" or phase not in {"CLOSURE", "ARCHIVED"}:
             return []
         try:

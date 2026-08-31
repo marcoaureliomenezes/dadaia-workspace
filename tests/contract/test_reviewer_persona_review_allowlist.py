@@ -20,7 +20,9 @@ from pathlib import Path
 import pytest
 
 import dadaia_workspace
-from dadaia_workspace.infrastructure.public_assets import _parse_write_allowlist
+from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
+    _parse_write_allowlist,
+)
 
 pytestmark = pytest.mark.contract
 

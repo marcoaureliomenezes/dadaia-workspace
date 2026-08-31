@@ -15,7 +15,6 @@ tools:
 skills:
   - dd-cli-library
   - dd-grill-me
-  - dadaia-workspace-manager
   - dadaia-workspace-spec-navigator
   - dadaia-task-manager
   - dd-manager-orchestration

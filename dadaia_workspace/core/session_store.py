@@ -39,9 +39,13 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Callable
+from datetime import datetime
 from pathlib import Path
 
+from dadaia_workspace.core import kernel_tunables
 from dadaia_workspace.core.atomic_write import atomic_write
+from dadaia_workspace.core.record_liveness import is_stale
 
 __all__ = [
     "SESSION_CREATION_FIELDS",
@@ -132,8 +136,10 @@ def write_session(
 ) -> None:
     """Write the session record atomically. Raises on validation/OS error.
 
-    The caller owns the record schema (id, mode, pid, context, release, created_at,
-    last_seen_at, …); this module owns only where and how it is persisted.
+    This module owns the record schema (:func:`new_binding_record`), the liveness
+    predicate (:func:`is_live`/:func:`live_session`), the reaper (:func:`reap_stale`)
+    and where/how records persist (F002, 20260830 audit — the record finally has an
+    owning module; callers stop hand-assembling schema dicts and TTL checks).
     """
     _validate(session_id, field="session_id")
     path = session_record_path(workspace, session_id, create=True)
@@ -188,3 +194,77 @@ def liveness_timestamp(record: dict[str, object]) -> str:
         if isinstance(candidate, str) and candidate:
             return candidate
     return ""
+
+
+def new_binding_record(
+    *,
+    session_id: str,
+    context: str,
+    mode: str,
+    release: str | None,
+    runtime: str,
+    pid: int,
+    now: str,
+) -> dict[str, object]:
+    """Author one session-binding record — the ONE schema author (F002).
+
+    ``mode`` is the PERSISTED token (the bind CLI maps its aliases before calling).
+    The old inline author's dead ``is_stale: False`` field (read by nothing) is gone.
+    """
+    return {
+        "session_id": session_id,
+        "context": context,
+        "mode": mode,
+        "release": release,
+        "runtime": runtime,
+        "pid": pid,
+        "bound_at": now,
+        SESSION_HEARTBEAT_FIELD: now,
+        SESSION_GC_TTL_FIELD: kernel_tunables.SESSION_GC_TTL_SECONDS,
+    }
+
+
+def is_live(
+    record: dict[str, object],
+    *,
+    clock: Callable[[], datetime] | None = None,
+) -> bool:
+    """The ONE session-record liveness predicate: heartbeat (creation-fallback) + TTL,
+    through :func:`core.record_liveness.is_stale`. The ``pid`` field is never consulted
+    (ADR-8 amended: the bind-CLI pid is dead by construction)."""
+    check: dict[str, object] = {
+        "heartbeat": liveness_timestamp(record),
+        "ttl": record.get(SESSION_GC_TTL_FIELD, kernel_tunables.SESSION_GC_TTL_SECONDS),
+    }
+    return not (is_stale(check, clock=clock) if clock is not None else is_stale(check))
+
+
+def live_session(workspace: Path, session_id: str) -> dict[str, object] | None:
+    """This session's record when present AND live, else ``None`` (fail-soft)."""
+    record = read_session(workspace, session_id)
+    if record is None or not is_live(record):
+        return None
+    return record
+
+
+def reap_stale(workspace: Path) -> list[str]:
+    """Delete every TTL-expired session record; return the reaped session ids.
+
+    Non-``.json`` entries and subdirectories are untouched. Fail-soft per file: an
+    unreadable record is skipped (never deleted on a read error).
+    """
+    directory = _sessions_dir(workspace)
+    if not directory.is_dir():
+        return []
+    reaped: list[str] = []
+    for entry in sorted(directory.iterdir()):
+        if not entry.is_file() or not entry.name.endswith(".json"):
+            continue
+        sess_id = entry.name[: -len(".json")]
+        record = read_session(workspace, sess_id)
+        if record is None:
+            continue
+        if not is_live(record):
+            entry.unlink(missing_ok=True)
+            reaped.append(sess_id)
+    return reaped

@@ -123,3 +123,47 @@ _Avoid_: ledger, reader, dao
 **Registry**:
 A name-to-identity map (contexts, servers, harnesses); it holds no behaviour.
 _Avoid_: service, store, catalog (except the memory catalog)
+
+## Doctor internals (0.5.3)
+
+**SpecsTree**:
+The parsed snapshot of shared specs facts, built fresh at the start of every doctor `check()` run; the active release is parsed once per run. Checks read the tree; fixes take paths; a snapshot never survives a mutation pass.
+_Avoid_: cached doctor, tree model (bare)
+
+**Rule registry**:
+`features/specs/rules.py::RULES` — the one ordered table check order, fix dispatch and the `--fix` help derive from.
+_Avoid_: check list, fix branch table
+
+**Injection decision**:
+The pure outcome `decide_injection` returns for one ctx-inject invocation (what to emit, which slug to stamp); the hook is transport.
+_Avoid_: injection state machine, hook branch
+
+**Shipped history**:
+`shipped-hashes.json` — the sha256 set of every published version of a projected law file; bytes found there are provably uncustomised, so refreshing them is lossless.
+_Avoid_: template hashes, drift allowlist
+
+**Scoped law**:
+A per-area `AGENTS.md` projected from `public/scaffold/<area>/` (or the repo/tests pair placed by `scoped_law.install_scoped_law`); governed by TREE-5's shipped-history discipline.
+_Avoid_: sub-AGENTS, area rules file
+
+## Homonyms — one canonical sense
+
+**Scaffold**:
+The specs-tree renderer (`features/specs/canon.py` scaffold half) and its output under `public/scaffold/`. The test tier is always written SCAFFOLD (an undeclared test's expiring intent) — qualify on collision.
+_Avoid_: scaffold (bare) for the test tier
+
+**Sentinel**:
+The ctx-inject exactly-once file (`.dadaia/tmp/ctx-inject-fired-<session>`), carrying the last injected slug. Any other marker file is a marker, not a sentinel.
+_Avoid_: marker (for this file), sentinel (for presence records or workspace detection files — say "workspace sentinel" explicitly for spec_contexts.json)
+
+**Quarantine**:
+The pytest mark that parks a flaky test outside the gating selectors, always bug-gated. A bug is never "quarantined" — it is open, or it carries a terminal disposition.
+_Avoid_: quarantine for any bug state
+
+**Context**:
+The Spec Context (a registered `specs/` tree) — the workspace sense, always. The harness's context window is written "context window", ctx-inject's payload is "the injected bootstrap".
+_Avoid_: context (bare) for the model's window
+
+**Workflow**:
+A GitHub Actions workflow file — the only live sense. The in-repo workflow engine is retired (v0.3.0); the SDD sequence is "the flow" (DADAIA.md §1), never "the workflow".
+_Avoid_: workflow for the flow or for the retired engine

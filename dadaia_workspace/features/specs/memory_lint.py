@@ -30,6 +30,7 @@ from typing import Any, cast
 from jsonschema import Draft202012Validator
 
 from dadaia_workspace.core import frontmatter as _fm
+from dadaia_workspace.features.specs import memory_canon
 
 __all__ = [
     "AtomResult",
@@ -39,12 +40,6 @@ __all__ = [
     "main",
 ]
 
-# Forbidden headings — the one heading-shaped check that survives the retired
-# vocabulary allowlist: changelog/history sections violate the atomicity contract
-# regardless of prose policy. Case-insensitive match (strip/lower comparison).
-_FORBIDDEN_HEADING_LOWER: frozenset[str] = frozenset(
-    ["changelog", "histórico", "history", "versions"]
-)
 
 # ---------------------------------------------------------------------------
 # Frontmatter schema resolution — packaged data, same technique as
@@ -73,7 +68,7 @@ def load_frontmatter_schema() -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 _H2_RE = re.compile(r"^##\s+(.+)$", re.MULTILINE)
-_WIKILINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
+_WIKILINK_RE = memory_canon.WIKILINK_RE
 
 # v6 canon top-level singles (FR1/A1.5/A1.6, T-050-06): these three atoms' on-disk
 # filenames were renamed (ARCHITECTURE.md, TECHSTACK.md, QUALITY.md) while their
@@ -82,11 +77,7 @@ _WIKILINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
 # quality-assurance). This is the ONE named exception to "slug == filename stem" and
 # to "wikilink target == <slug>.md": both checks below consult it instead of adding a
 # second slug-resolution mechanism.
-_CANON_SINGLE_FILENAMES: dict[str, str] = {
-    "architecture": "ARCHITECTURE.md",
-    "tech-stack": "TECHSTACK.md",
-    "quality-assurance": "QUALITY.md",
-}
+_CANON_SINGLE_FILENAMES: dict[str, str] = memory_canon.MEMORY_SINGLE_FILE_SLUGS
 
 
 def _extract_h2_headings(body: str) -> list[str]:
@@ -177,9 +168,7 @@ def lint_atom(
     seen: set[str] = set()
 
     for heading in headings:
-        heading_lower = heading.strip().lower()
-
-        if heading_lower in _FORBIDDEN_HEADING_LOWER:
+        if memory_canon.is_forbidden_memory_heading(heading):
             result.error(
                 f"Forbidden heading '## {heading}' — changelog/history sections "
                 "violate the atomicity contract (specs/memory/AGENTS.md §3)."
