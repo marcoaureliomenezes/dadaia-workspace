@@ -32,5 +32,5 @@
 
 ## closure
 
-- [-] T-053-17 — Disposition sweep + audit archive (write set: specs/audits/**)
-- [ ] T-053-18 — Memory update + CONTEXT.md + closure + CHANGELOG + pyproject (write set: specs/memory/, CONTEXT.md, specs/releases/0.5.3/RELEASE.json, CHANGELOG.md, pyproject.toml)
+- [x] T-053-17 — Disposition sweep + audit archive (write set: specs/audits/**)
+- [-] T-053-18 — Memory update + CONTEXT.md + closure + CHANGELOG + pyproject (write set: specs/memory/, CONTEXT.md, specs/releases/0.5.3/RELEASE.json, CHANGELOG.md, pyproject.toml)
