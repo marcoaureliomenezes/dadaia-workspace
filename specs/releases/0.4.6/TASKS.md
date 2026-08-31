@@ -71,7 +71,7 @@
   dadaia_workspace/public/entities/behavior-map.json.
   Blocked by: T-046-09, T-046-10, T-046-11, T-046-12. Delivers: every kept
   skill audits clean against the 15 rules.
-- [ ] T-046-14 — FR7+FR8+FR9: gitflow commit-shapes promoted to a citable
+- [-] T-046-14 — FR7+FR8+FR9: gitflow commit-shapes promoted to a citable
   `§3a` section; release-definition duplicate `## 3` fixed and `**Consumes:**`
   sectioned; manager-orchestration duplicate step fixed + which-skill-when
   router section; grill round format into the body; core design-skill wiring
