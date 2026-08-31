@@ -26,7 +26,7 @@ from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 
-from dadaia_workspace.core import workspace_layout
+from dadaia_workspace.core import release_state, workspace_layout
 from dadaia_workspace.features.spec_context import presence
 
 __all__ = ["Decision", "PathClass", "classify_path", "evaluate"]
@@ -88,7 +88,7 @@ _LAW_MESSAGE = (
 )
 
 #: Phases in which product-engineer may write memory atoms (FR-P1-13).
-_MEMORY_WRITE_PHASES: frozenset[str] = frozenset({"DEFINITION", "CLOSURE"})
+_MEMORY_WRITE_PHASES: frozenset[str] = release_state.MEMORY_WRITE_PHASES
 
 #: READ-resolved mode tokens. READ is opt-in self-protection; all other modes permit
 #: mutating writes and record advisory presence.

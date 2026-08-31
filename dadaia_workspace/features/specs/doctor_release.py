@@ -23,6 +23,7 @@ from datetime import date
 from pathlib import Path
 
 from dadaia_workspace.core.handoff_index import discover_handoff_paths
+from dadaia_workspace.core.release_state import PHASES as _PHASES
 from dadaia_workspace.core.spec_status import APPROVED, extract_status
 from dadaia_workspace.core.spec_status import CANONICAL_STATUS as _CANONICAL_STATUS
 from dadaia_workspace.core.specs_version import RELEASE_SEMVER_RE
@@ -38,17 +39,7 @@ from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIs
 # Vocabulary + parser live in core.spec_status (single definition); re-exported here
 # because doctor_release has been the documented import site for both.
 CANONICAL_STATUS = _CANONICAL_STATUS
-CANONICAL_PHASES = {
-    "DISCOVERY",
-    "DEFINITION",  # v0.1.7: release-definition phase; product-engineer authors memory here
-    "SPEC",
-    "PLAN",
-    "TASKS",
-    "IMPLEMENTATION",
-    "CLOSURE",
-    "ARCHIVED",
-    "none",  # scaffold default: no active release
-}
+CANONICAL_PHASES = _PHASES
 HARD_LIMIT_PLAN_CUTOFF = date(2026, 5, 17)
 PLAN_MAX_LINES = 300
 
