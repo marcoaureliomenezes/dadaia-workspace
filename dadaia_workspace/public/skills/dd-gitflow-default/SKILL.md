@@ -51,6 +51,7 @@ tldr: "feature/{M.m.p} -> develop -> main, PR-only past feature; 5 isolated comm
 - Commit shape 3 — bug fix: code + regression test + `BUGS.jsonl` line together, one commit.
 - Commit shape 4 — resolve commits only; a push happens when asked, `dadaia ci preflight` first.
 - Commit shape 5 — release definition: SPEC + PLAN + TASKS + purge-on-pick + picked bugs, one commit.
+- Commit shape 6 — task implementation: the task's declared write set — `conventional-commit(task-id): description` (the §3 trace; F016, 20260827 audit: the largest commit class, now classified).
 - Mechanical enforcement (pre-push hook / CI job): branch-name pattern, push refusal, denylist scan, CI trigger.
 - Mechanical enforcement (continued): `pr-source-guard`, verdict-gate job requiring an APPROVED security handoff.
 - Discipline (this skill + reviewers, unenforced by any hook): start-of-work protocol, one-live-branch, delete+cut-on-deploy.
