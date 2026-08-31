@@ -10,6 +10,7 @@ import webbrowser
 import typer
 
 from dadaia_workspace import container
+from dadaia_workspace.cli.commands import panel_composition
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.panel.handler import make_handler_class
 from dadaia_workspace.features.panel.server import build_panel_http_server
@@ -45,10 +46,10 @@ def panel(
     # Telemetry composition is plain wiring in the container (K8 — the
     # composition root, not a nested-class factory) so it can be injected
     # into the panel service, enabling the canonical agent overlay (PR3-08).
-    telemetry = container.build_telemetry_service(workspace_root)
+    telemetry = panel_composition.build_telemetry_service(workspace_root)
 
     try:
-        views = container.build_panel_views(workspace_root, telemetry=telemetry)
+        views = panel_composition.build_panel_views(workspace_root, telemetry=telemetry)
     except Exception as exc:  # noqa: BLE001
         typer.echo(f"Failed to initialise panel: {exc}", err=True)
         raise typer.Exit(1) from None
