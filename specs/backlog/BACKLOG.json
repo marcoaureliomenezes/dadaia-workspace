@@ -1,4 +1,43 @@
 {
   "schema": "backlog-v1",
-  "active": []
+  "active": [
+    {
+      "id": "release-candidates-system",
+      "title": "Release-candidates system: open-scope release, closed-scope candidates",
+      "opened": "2026-08-31",
+      "status": "candidate",
+      "description": "Redesign of release governance to end version/branch slop: exactly one live release named last-published-PyPI+1-patch with ONE live feature branch until deploy; the release has OPEN scope and grows by stacking candidates; each candidate is a full closed-scope SDD cycle (grill -> SPEC/PLAN/TASKS Aprovado -> implementation -> memory -> closure -> feature->develop PR merge); after each merge the agent asks promote-or-continue; continue archives the root trio into specs/releases/<v>/rc-N/ via a new `dadaia release rc-archive` verb and a fresh trio is born at root; promote runs the ship lane and only then the version increments and the next branch is cut. RELEASE.json renamed _RELEASE.json everywhere (including _archive); the scaffolded segment lane (alpha-N) is retired; at deploy the final trio stays at root and the whole folder archives. Rulings: ADRs 0005-0009.",
+      "provenance": "operator request (2026-08-31, grill 20260831T181256Z-project-manager-rc-system-grill)",
+      "intents": [
+        {
+          "subject": {
+            "kind": "code",
+            "ref": "dadaia_workspace/core/release_state.py#PHASES"
+          },
+          "change": "one filename decider _RELEASE.json; per-candidate phase cycle; rc counter as archived-candidate count"
+        },
+        {
+          "subject": {
+            "kind": "code",
+            "ref": "dadaia_workspace/features/specs/canon.py#CANON"
+          },
+          "change": "releases/<v>/rc-N/{SPEC,PLAN,TASKS}.md admitted as archive entries; segment lane entries retired; _RELEASE.json replaces RELEASE.json"
+        },
+        {
+          "subject": {
+            "kind": "code",
+            "ref": "dadaia_workspace/features/specs/scaffolder.py#scaffold_release_segment"
+          },
+          "change": "segment scaffolding lane deleted; rc-N is only an archive, never scaffolded ahead"
+        },
+        {
+          "subject": {
+            "kind": "cli",
+            "ref": "release new"
+          },
+          "change": "new rc-archive verb (deterministic candidate archival); release new creates the new shape and refuses a second live release"
+        }
+      ]
+    }
+  ]
 }
