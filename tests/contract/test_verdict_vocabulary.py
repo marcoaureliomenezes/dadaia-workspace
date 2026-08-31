@@ -1,4 +1,4 @@
-"""One verdict vocabulary across the public surface.
+"""One verdict vocabulary across the public surface (Markdown and JSON assets).
 
 Intent: CONTRACT — bug verdict-vocabulary-persona-schema-mismatch. Size: SMALL
 (pure text reads over the real package tree).
@@ -19,7 +19,7 @@ from pathlib import Path
 _PUBLIC = Path(__file__).resolve().parent.parent.parent / "dadaia_workspace" / "public"
 
 #: Retired verdict tokens a public asset must never instruct.
-_RETIRED = re.compile(r"REQUEST_CHANGES|`APPROVE`(?!D)")
+_RETIRED = re.compile(r"REQUEST_CHANGES|\bAPPROVE\b")
 
 
 def test_handoff_schema_verdict_enum_is_the_two_tokens() -> None:
@@ -32,7 +32,7 @@ def test_handoff_schema_verdict_enum_is_the_two_tokens() -> None:
 
 def test_no_public_asset_names_a_retired_verdict_token() -> None:
     offenders: list[str] = []
-    for path in sorted(_PUBLIC.rglob("*.md")):
+    for path in sorted([*_PUBLIC.rglob("*.md"), *_PUBLIC.rglob("*.json")]):
         text = path.read_text(encoding="utf-8")
         for match in _RETIRED.finditer(text):
             line = text.count("\n", 0, match.start()) + 1
