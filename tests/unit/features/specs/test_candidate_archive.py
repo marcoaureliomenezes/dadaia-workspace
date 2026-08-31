@@ -97,3 +97,19 @@ def test_archive_refuses_without_live_release(tmp_path: Path) -> None:
     (tmp_path / "releases").mkdir()
     with pytest.raises(CandidateArchiveError, match="live release"):
         archive_candidate(tmp_path)
+
+
+def test_doctor_accepts_the_between_candidates_discovery_state(tmp_path: Path) -> None:
+    """Bug rc-archive-discovery-state-rejected-by-doctor: the state ``rc-archive``
+    legally produces (trio in ``rc-N/``, root empty, phase DISCOVERY) must be
+    doctor-clean — the verb and the doctor may never disagree about it."""
+    from dadaia_workspace.features.specs.doctor import SpecsDoctor
+
+    specs = tmp_path
+    (specs / "memory" / "product").mkdir(parents=True)
+    (specs / "AGENTS.md").write_text("# AGENTS\n", encoding="utf-8")
+    _live_release(specs)
+    archive_candidate(specs)
+
+    issues = [i for i in SpecsDoctor(specs).check() if i.code == "SPEC-DOC-004"]
+    assert issues == [], [i.description for i in issues]

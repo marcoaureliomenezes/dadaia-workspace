@@ -857,7 +857,7 @@ def test_mutation_fixture_8_flagged_skill_still_granted_turns_red() -> None:
     """Direction 7b mutation fixture: flag a real, currently-granted skill as
     disable-model-invocation without removing it from any allowlist — the finder must
     catch the contradiction."""
-    target = "dadaia-test-stewardship"  # dev-server-registry retired at T-053-25
+    target = "dd-test-stewardship"  # dev-server-registry retired at T-053-25
     granted = _granted_to_any_model(_AGENTS_DIR, _SKILLS_DIR)
     assert target in granted, "fixture precondition: target must start out granted"
     mutated_flagged = {target}

@@ -1,18 +1,14 @@
 ---
-name: dadaia-codebase-design
+name: dd-codebase-design
 description: >
-  The shared design vocabulary for every agent that touches code — seam, deep module,
-  deletion test, adapter, locality, replace-don't-layer — plus the understand-the-problem
-  discipline run BEFORE any recommendation, fix or verdict. Use when designing or
-  reviewing a module's interface, deciding where a seam goes, judging whether a diff
-  grows or shrinks a feature, or naming a structural problem. PRIMARY CALLERS:
-  software-architect (every DRAFT/REVIEW/ONBOARD verdict), software-engineer,
-  code-reviewer, qa-engineer. Replaces architect-core-workflow.
-tldr: "One design language (seam, deep module, deletion test, replace-don't-layer); understand the problem, then apply the deletion test to the module you are about to grow."
-applyTo: "**"
+  The shared design vocabulary — seam, deep module, deletion test, adapter,
+  locality, replace-don't-layer — plus the understand-the-problem discipline run
+  before any recommendation, fix or verdict. Use when designing or reviewing a
+  module's interface, deciding where a seam goes, judging whether a diff grows or
+  shrinks a feature, or naming a structural problem.
 ---
 
-# dadaia-codebase-design
+# dd-codebase-design
 
 Reviews, fixes and architecture findings speak ONE language. This vocabulary is the
 anti-bug-loop law in words: the measured bug history showed additive fixes (branches,
@@ -43,6 +39,18 @@ flags, wrappers) breeding chains, and deletion-shaped fixes ending families.
 - **One adapter = a hypothetical seam; two = a real one** — never introduce a port with a single adapter; that is indirection, not design.
 - **Replace, don't layer** — a fix that wraps the old path instead of replacing it is a layer, and layers are how the bug loop grows. The correct fix usually deletes a branch, collapses two paths, or moves logic back inside its owner.
 
+When designing an interface, ask: can I reduce the number of methods? simplify the
+parameters? hide more complexity inside?
+
+Design for testability — good interfaces make testing natural:
+
+1. **Accept dependencies, don't create them** — a module that constructs its own
+   collaborators can only be tested whole.
+2. **Return results, don't produce side effects** — a value can be asserted; a
+   mutation must be observed.
+3. **Small surface area** — fewer methods mean fewer tests; fewer parameters mean
+   simpler test setup.
+
 ## 4. Steps — understand the problem, then test the growth
 
 1. Extract the core problem: one sentence describing what must actually be solved.
@@ -65,4 +73,4 @@ flags, wrappers) breeding chains, and deletion-shaped fixes ending families.
 - Deepening a cluster given its dependencies: `DEEPENING.md` (dependency categories, seam discipline, replace-don't-layer testing).
 - Exploring alternative interfaces: `DESIGN-IT-TWICE.md` (parallel designs compared on depth, locality, seam placement).
 - Portfolio-level candidates from bug history: the `dd-architecture-survey` skill.
-- Domain terms: the repo's `CONTEXT.md` (see `dadaia-glossary`).
+- Domain terms: the repo's `CONTEXT.md` (see `dd-domain-modeling`).

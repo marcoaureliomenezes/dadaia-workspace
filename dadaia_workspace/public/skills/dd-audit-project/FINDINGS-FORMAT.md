@@ -18,7 +18,7 @@ Disclosed sibling of `SKILL.md`. Every claim any pillar makes becomes exactly on
 | `release` | mutable-governance | `null` until dispositioned |
 | `reason` | mutable-governance | `null` until dispositioned |
 
-- There is no CLI writer for `specs/audits/**` (D15/A14.5) — the auditor appends and later rewrites with file tools.
+- There is no CLI writer for `specs/audits/**` — the auditor appends and later rewrites with file tools.
 - That absence of a write-time seam is why the evidence rule below is a hand discipline, not a mechanical guarantee.
 
 ## The evidence rule (A13.5) — reproducible command, never a path

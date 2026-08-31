@@ -84,7 +84,7 @@ def _write_valid_handoff(base_dir: Path, stem: str = "report") -> Path:
 def test_full_handoff_emit_and_validate(tmp_path: Path) -> None:
     """Bootstrap workspace, write valid handoff, validate → exit 0, '1 valid'.
 
-    Explicit timeout (dadaia-test-stewardship S-09/S-10): measured 71 s solo — a full
+    Explicit timeout (dd-test-stewardship S-09/S-10): measured 71 s solo — a full
     bootstrap + emit + validate pipeline over real subprocesses, above the 120 s e2e
     ceiling under xdist load. The still-pending structural split is now tracked under
     v0.4.3 FR18/T-043-25 (re-aimed from the now-archived

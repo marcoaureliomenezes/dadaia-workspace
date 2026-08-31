@@ -86,7 +86,7 @@ specs_pattern_version: 5
 - Teste-lápide e SCAFFOLD expirado são lixo (slop), não histórico da suíte.
 - Artefatos de teste são capturados só em falha.
 
-Protocolo operacional completo: skill `dadaia-test-stewardship`. Os parâmetros numéricos
+Protocolo operacional completo: skill `dd-test-stewardship`. Os parâmetros numéricos
 (timeouts, tetos, prazos) são padrões ajustáveis por projeto, não regras fixas.
 
 ---
@@ -105,9 +105,9 @@ detalhamento operacional do modelo de coordenação vive na lei da workspace
 ## 11. Checkpoints de Revisão
 
 Revisão de código, QA e segurança são checkpoints — disciplina mediada por handoff
-`APPROVE`/`REQUEST_CHANGES`, nunca um bloqueio mecânico por si só (o bloqueio mecânico
+`APPROVED`/`REJECTED`, nunca um bloqueio mecânico por si só (o bloqueio mecânico
 real é o gate de push descrito na `DADAIA.md` §3). Uma tarefa só é marcada `[x]` após
-os revisores aplicáveis aprovarem o mesmo commit; qualquer `REQUEST_CHANGES` reabre a
+os revisores aplicáveis aprovarem o mesmo commit; qualquer `REJECTED` reabre a
 tarefa (`[-]` → volta ao trabalho). A cadência exata (qual revisor, em qual etapa do
 release) segue a `DADAIA.md` §6.
 

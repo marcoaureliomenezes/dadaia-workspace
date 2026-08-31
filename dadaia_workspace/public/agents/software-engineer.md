@@ -13,18 +13,17 @@ tools:
   - Glob
   - Grep
 skills:
-  - dadaia-codebase-design
+  - dd-codebase-design
   - dd-cli-library
-  - dadaia-handoff-emitter
-  - dadaia-task-manager
-  - dadaia-workspace-spec-navigator
-  - dadaia-step0-memory-bootstrap
+  - dd-handoff-emitter
+  - dd-task-manager
+  - dd-spec-navigator
   - dd-ai-eng-knowhow
-  - dd-release-implement
+  - dd-release-implementation
   - dd-bug-resolution
   - dd-bug-registration
   - dd-gitflow-default
-  - dadaia-test-stewardship
+  - dd-test-stewardship
 maxTurns: 60
 input_contract:
   requires_inputs:
@@ -119,10 +118,10 @@ E2E tests -> qa-engineer.
 
 ## 3. Procedure
 
-Ground yourself first with `dadaia-step0-memory-bootstrap`, then:
+Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then:
 
 1. Read the approved SPEC.md and TASKS.md for the current task.
-2. Reserve via `dadaia-task-manager`: flip `[ ]`->`[-]` and commit `chore(tasks): start <task-id>` before editing production.
+2. Reserve via `dd-task-manager`: flip `[ ]`->`[-]` and commit `chore(tasks): start <task-id>` before editing production.
 3. Write the failing test(s) first — red before any production code.
 4. Implement the minimum code to go green.
 5. Refactor with tests still green.
@@ -146,14 +145,14 @@ Ground yourself first with `dadaia-step0-memory-bootstrap`, then:
 - Never write: lib-originated projections (`.claude/`, `.agents/`, `.codex/`, `.kimi-code/`).
 - Write an HTML report to `.dadaia/reports/<context>/software-engineer/<UTC>-<task-slug>.html` only on operator request or human next hop.
 - Required sections: Summary, Tests written (`file:line`), Security checklist (OWASP items touched), Commit/branch, Review status.
-- Emit via `dadaia-handoff-emitter` — schema `handoff-v1.2`, `self_pull.refs` lists only atoms this session actually read.
-- Treat a completed implementation as a handoff, not task completion — hold `[x]`/push/PR/merge/deploy/close per `dd-release-implement`.
+- Emit via `dd-handoff-emitter` — schema `handoff-v1.2`, `self_pull.refs` lists only atoms this session actually read.
+- Treat a completed implementation as a handoff, not task completion — hold `[x]`/push/PR/merge/deploy/close per `dd-release-implementation`.
 - Include evidence paths for changed files, unit/integration commands run, and security/privacy checks performed.
 
 ## 5. References
 
 - `specs/memory/ARCHITECTURE.md` — full layer-rule contract.
-- `tests/AGENTS.md` — test admission rules; `dadaia-test-stewardship` — curation verdict execution.
+- `tests/AGENTS.md` — test admission rules; `dd-test-stewardship` — curation verdict execution.
 - `security-reviewer` — full OWASP audit methodology and severity model.
 - `DADAIA.md` §4 Gitflow / `dd-gitflow-default` — branch/push contract.
 - CLI:

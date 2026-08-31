@@ -1,59 +1,77 @@
 ---
 name: dd-backlog-definition
 description: >
-  Use when: curating specs/backlog/**, sanitizing for staleness, adjudicating an intake
-  report, or checking the terminal disposition-token vocabulary. Owns the BACKLOG.json
-  single-source active[] schema plus backlog_histo.jsonl, and the operator-gated intake
-  gate — the only path to a new backlog entry. project-manager runs this continuously.
-tldr: "Curate BACKLOG.json continuously; sanitize/dedup; only operator-gated intake creates a new entry; never delete."
-applyTo: "specs/backlog/**"
+  Curate specs/backlog: the BACKLOG.json active[] document, staleness/dedup
+  sanitizing, the operator-gated intake report (the only path to a new entry), and
+  the terminal disposition vocabulary. Use when touching a backlog file, compiling an
+  intake report, or handing release-definition its picked set.
 ---
 
 # dd-backlog-definition
 
-> Not hook-enforced. `project-manager` runs this protocol continuously; this skill is its authoritative source.
+> `project-manager` runs this continuously — not a release-boundary event.
 
-## 1. When
+## The document
 
-- `project-manager`, continuously — not a release-boundary event.
-- Any time a backlog file is touched, an intake report is compiled, or release-definition needs the picked set.
+- `specs/backlog/BACKLOG.json` is the single source: `{schema: "backlog-v1",
+  active: [...]}` — no per-entry files; schema:
+  `dadaia_workspace/public/schemas/backlog/backlog-v1.schema.json`.
+- Append via `dadaia backlog new <slug>`; validate via `dadaia backlog doctor`
+  (BL-SCHEMA/CONFLICT/STALE).
+- Required fields per entry: `id`, `title`, `opened`, `status`, `description`,
+  `provenance`.
+- **Status:** idea | candidate | picked — live (non-terminal) tokens only; a
+  terminal disposition token belongs to a `backlog_histo.jsonl` record instead.
+- `intents[]` is optional at `idea`, required from `candidate` on — every subject
+  bound to a canonical anchor (`dadaia backlog subjects`).
+- A closed item exits `active[]` into one append-only
+  `specs/backlog/_archive/backlog_histo.jsonl` record — never deleted, never two
+  records for one slug. Terminal tokens: `DELIVERED`, `SUPERSEDED`, `RESOLVED`,
+  `CONSUMED`, `DEFERRED`, `REJECTED` (a live status token never appears in the
+  histo, a terminal token never in `active[]`).
 
-## 2. Steps
+## Continuous curation
 
-1. Treat `specs/backlog/BACKLOG.json` as the single source: `{schema: "backlog-v1", active: [...]}` — no per-entry files.
-2. Write a closed item's history to `specs/backlog/_archive/backlog_histo.jsonl` — one append-only record per exit.
-3. Add an `active[]` entry with the required fields: `id`, `title`, `opened`, `status` (idea|candidate), `description`, `provenance`.
-- **Status:** idea | candidate — a live (non-terminal) token; a terminal disposition token belongs to a `backlog_histo.jsonl` record instead.
-4. Never write a terminal disposition token into `active[]` — that belongs to a `backlog_histo.jsonl` record.
-5. Leave `intents[]` optional at `status: idea`; require it at `candidate`+ (a missing one is BL-SCHEMA, not a warning).
-6. Append via `dadaia backlog new <slug>`; validate the document via `dadaia backlog doctor` (BL-SCHEMA/CONFLICT/STALE).
-7. Scan for staleness: an `ACTIVE` item with no reads/updates past a reasonable window is a sanitize candidate.
-8. Scan for dedup: compare a new entry's title+description against every `ACTIVE` item for the same subject before adding.
-9. Merge a near-duplicate into the existing entry — never file it twice.
-10. Disposition a confirmed-stale/invalid item to `DEFERRED`/`REJECTED` with a one-line reason, exited to the histo file.
-11. Re-read the whole document on every new entry — `BACKLOG.json` is small enough that partial review is a discipline failure.
-12. Never delete a backlog file or bug — move `active[]` -> `backlog_histo.jsonl`; the histo file itself is append-only.
-13. Never write a technical residual (review finding, closure return, audit observation) directly into `BACKLOG.json`.
-14. Compile every actionable defect into an operator-facing intake report at each release close and review round.
-15. Skip re-adjudication for an operator-ratified deferral already recorded at approval time (pre-approved intake).
-16. Terminate a record-only observation (INFO-grade, awareness-only) in the reviewer's own findings — never into an intake report.
-17. Emit the intake report as the existing handoff-first shape: JSON handoff with `next_handoff.agent: "human"` plus its HTML report.
-18. Purge on pick: exit a picked entry from `ACTIVE` in the same commit that creates the release SPEC.
-19. Update a provisional `CONSUMED` in place at closure — never a second histo record for the same slug.
+- Re-read the whole document on every new entry — it is small enough that partial
+  review is a discipline failure.
+- Dedup: compare a new entry's title+description against every ACTIVE item for the
+  same subject — by domain concept (`dd-domain-modeling`), not by the request's
+  wording; merge a near-duplicate into the existing entry.
+- Staleness: an ACTIVE item with no reads/updates past a reasonable window is a
+  sanitize candidate; disposition a confirmed-stale/invalid item to
+  `DEFERRED`/`REJECTED` with a one-line reason.
 
-## 3. Done when
+## The intake gate — the only path to a new entry
 
-- Every live candidate is in `active[]` with a live status token, every closed one has exactly one histo record.
-- No backlog entry was created outside the operator-gated intake path (or a pre-approved deferral).
-- A picked entry's SPEC exists in the same commit its `active[]` entry is purged.
+- Only the operator creates demand. An entry materializes via the PM's
+  operator-facing intake report (handoff with `next_handoff.agent: "human"` plus its
+  HTML report), or via an operator-ratified in-release deferral (already counts as
+  intake).
+- Compile every actionable defect (review findings, closure returns, audit
+  observations) into that report at each release close and review round — never
+  write a technical residual directly into `BACKLOG.json`.
+- A record-only observation (INFO-grade, awareness-only) terminates in the
+  reviewer's own findings, not in an intake report.
 
-## 4. References
+## Pick and dispositions
 
-- Schema: `dadaia_workspace/public/schemas/backlog/backlog-v1.schema.json`.
-- Terminal tokens — backlog (`backlog_histo.jsonl` `disposition`): `DELIVERED`, `SUPERSEDED`, `RESOLVED`, `CONSUMED`, `DEFERRED`, `REJECTED`.
-- Terminal tokens — bug (`BUGS.jsonl` `status`): `resolved`, `superseded`, `deferred`, `rejected` (`open` is the only non-terminal value).
-- `dd-release-implement` (`RC-FLOW.md` step 10) — the disposition-sweep executor at closure.
-- `dd-release-definition` — the picked-set consumer, reads `active[]` with no further triage.
-- `DADAIA.md` §6 (Backlog) — never-delete law, operator-gated intake doctrine.
-- CLI: `dadaia backlog new <slug>`, `dadaia backlog doctor`, `dadaia backlog subjects`, `dadaia bugs status`, `dadaia bugs stats`.
-- Exiting an item has no CLI verb yet — do it with file tools directly (ADDITIVE path, `DADAIA.md` §3).
+- A picked entry exits `active[]` in the same commit that creates the release SPEC
+  (purge-on-pick, `DADAIA.md` §6.6), leaving a provisional `CONSUMED` histo record.
+- At closure, `dd-release-implementation`'s disposition sweep rewrites that record in
+  place to its terminal token.
+- `dd-release-definition` consumes the picked set with no further triage — the
+  backlog it reads is already sanitized.
+
+## Done when
+
+- Every live candidate is in `active[]` with a live token; every closed one has
+  exactly one histo record.
+- No entry was created outside the operator-gated intake path.
+- A picked entry's SPEC exists in the same commit its `active[]` entry was purged.
+
+## References
+
+- `DADAIA.md` §6.6 — the backlog law this skill operates.
+- `dd-release-definition` — the picked-set consumer.
+- CLI: `dadaia backlog new`, `dadaia backlog doctor`, `dadaia backlog subjects`;
+  exiting an item has no CLI verb — use file tools directly (ADDITIVE path).

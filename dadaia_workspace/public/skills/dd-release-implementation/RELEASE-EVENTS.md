@@ -21,7 +21,7 @@ Disclosed reference reached from `SKILL.md`/`RC-FLOW.md` wherever the arc says "
 |---|---|---|
 | `phase` | whoever drives the transition (`product-engineer` at DEFINITION/CLOSURE, first implementer at IMPLEMENTATION) | phase string |
 | `defined` | `product-engineer`, at the definition promotion commit | `{sha, ts}` |
-| `implemented` | `qa-engineer`, at final-`rc` QA close, on the closed commit's sha, not the merge commit (D3) | `{sha, rc, ts}` |
+| `implemented` | `qa-engineer`, at final-`rc` QA close, on the closed commit's sha, not the merge commit | `{sha, rc, ts}` |
 | `shipped` | `project-manager` (or whoever merges the ship PR) | `{sha, pr, ts}` |
 | `audited` | `project-auditor`, the same atomic rewrite that sets a bug's `resolved_commit`/`audited` | `{sha, ts, audit}` |
 
@@ -30,7 +30,7 @@ Disclosed reference reached from `SKILL.md`/`RC-FLOW.md` wherever the arc says "
 - Every closure-narrative class (summary, size accounting, drifts, artifact-GC, test dispositions) lands as one `log` entry.
 - The entry's `kind` field names the class.
 - Already-native classes need no entry: dispositions (`backlog_histo.jsonl`/`BUGS.jsonl`'s `resolved_release`).
-- Already-native classes (continued): tasks completed (`TASKS.md` `[x]` + sha), validations (trio `APPROVE` handoffs), memory updates (atom diffs).
+- Already-native classes (continued): tasks completed (`TASKS.md` `[x]` + sha), validations (trio `APPROVED` handoffs), memory updates (atom diffs).
 
 ## Write seam
 

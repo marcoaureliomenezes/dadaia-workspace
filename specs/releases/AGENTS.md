@@ -26,14 +26,14 @@ Scope: this file governs only `specs/releases/`. Replaces the retired `releases/
 
 - SDD lifecycle order PER CANDIDATE: grill -> `SPEC.md` (Draft) -> operator approval -> `PLAN.md` -> `TASKS.md` -> implementation -> closure -> develop merge -> promote-or-continue gate.
 - Candidate closure order: memory update -> closure narrative in `_RELEASE.json`'s `log` -> disposition sweep -> artifact GC -> merge -> gate (continue = `rc-archive`; promote = ship, then archive the whole folder — final trio at root, ADR 0009).
-- Full arc, gate cadence, the step-by-step ladder: `dd-release-implement`'s `RC-FLOW.md`.
+- Full arc, gate cadence, the step-by-step ladder: `dd-release-implementation`'s `RC-FLOW.md`.
 - A `v`-prefixed id is minted nowhere — the bare axis (`^\d+\.\d+\.\d+$`) is the only current one.
 - A legacy `v`-prefixed id still resolves inside `_archive/` (read-only lookup) — pre-canon-v6 history.
 
 ## 3. _RELEASE.json (D3/D7/D11)
 
 - The active release's phase is its `phase` field — read directly, no fold, no event-stream replay.
-- Who sets which milestone, and the exact shape per field: `dd-release-implement`'s `RELEASE-EVENTS.md`.
+- Who sets which milestone, and the exact shape per field: `dd-release-implementation`'s `RELEASE-EVENTS.md`.
 - No dual-write, no mirror file (v0.5.0 FR4/T-050-21A, A4.1).
 - The SDD gate resolves the active release directly: the ONE non-archived, non-`_ideas` directory with a `_RELEASE.json`.
 - No such directory: no active release — honest absence, no placeholder file.

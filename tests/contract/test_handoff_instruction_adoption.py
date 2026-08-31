@@ -1,7 +1,7 @@
 """AC-6 handoff-v1.2 + self_pull instruction adoption — repinned to the FR26 pointer
 contract (v0.4.4 SPEC Amendment 1, T-044-55, commit f4ab1779).
 
-FR26 moved ``dadaia-handoff-emitter``'s field tables and its TWO full JSON examples out
+FR26 moved ``dd-handoff-emitter``'s field tables and its TWO full JSON examples out
 of ``SKILL.md``: the skill now POINTS at
 ``.dadaia/agentic/schemas/handoff-v1.schema.json`` as the single source of field
 semantics and never restates it (A26.1/A26.5). The v0.1.62 contract this file used to
@@ -60,7 +60,7 @@ _CORE_AGENT_BODIES: tuple[str, ...] = (
 
 _DOC_SURFACES: tuple[str, ...] = ("data/handoff-AGENTS.md",)
 
-_EMITTER_SKILL = "skills/dadaia-handoff-emitter/SKILL.md"
+_EMITTER_SKILL = "skills/dd-handoff-emitter/SKILL.md"
 
 #: The 10 whole-file surfaces FR26 left untouched.
 _FILE_SURFACES: tuple[str, ...] = (

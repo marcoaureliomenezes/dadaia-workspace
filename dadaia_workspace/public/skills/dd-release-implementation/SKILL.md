@@ -1,16 +1,12 @@
 ---
-name: dd-release-implement
+name: dd-release-implementation
 description: >
-  Use when: implementing a release candidate from the first task reservation through
-  the promote-or-continue gate — the whole implement-to-close arc under the
-  release-candidates model (0.4.6, ADRs 0005-0009). Short SKILL-plus-disclosed-siblings
-  shape: RC-FLOW.md (candidate arc + gate cadence), RELEASE-EVENTS.md (_RELEASE.json
-  state+log contract), MEMORY-UPDATE.md (closure memory protocol).
-tldr: "Reserve -> TDD -> trio review -> memory -> closure -> develop merge -> promote-or-continue (rc-archive | ship+archive+cut)."
-applyTo: "specs/releases/*/TASKS.md"
+  Implement a release candidate from the first task reservation through the
+  promote-or-continue gate. Use when working a task inside an Aprovado candidate, at
+  candidate closure, and at the gate (rc-archive or ship + archive + branch cut).
 ---
 
-# dd-release-implement
+# dd-release-implementation
 
 > Not hook-enforced. No engine advances gates, drives closure, or reads `TASKS.md` — implementers, reviewers, `product-engineer` uphold it directly.
 
@@ -24,11 +20,12 @@ applyTo: "specs/releases/*/TASKS.md"
 
 1. Resolve the live release by reading `_RELEASE.json`'s `phase` field directly.
 2. The live candidate's `TASKS.md` sits at `releases/<v>/TASKS.md` — always flat; `rc-N/` folders are archives, never routed to.
-3. Full navigation protocol: `dadaia-workspace-spec-navigator`.
+3. Full navigation protocol: `dd-spec-navigator`.
 4. Read `RC-FLOW.md` for the candidate arc and gate cadence before acting past reservation.
 5. Update `_RELEASE.json` per `RELEASE-EVENTS.md`'s shape and `log` conventions.
 6. At candidate step 5, run `MEMORY-UPDATE.md`'s full protocol before touching any memory atom.
-7. Declare test intent at birth; pass the admission filter (`dadaia-test-stewardship` §A/§B) before a test enters the suite.
+7. Declare test intent at birth; pass the admission filter (`dd-test-stewardship`, intent and admission) before a test enters the suite.
+8. Before growing any module, run the deletion test and speak the seam vocabulary (`dd-codebase-design`) — a diff that only adds justifies itself against replace-don't-layer.
 8. Handle demotion and quarantine/SCAFFOLD expiry at closure time only (`RC-FLOW.md` step 6).
 
 ## 3. Done when
@@ -36,7 +33,7 @@ applyTo: "specs/releases/*/TASKS.md"
 - Live release resolved by reading `_RELEASE.json` directly.
 - Task reserved (`[-]`) with an isolated `chore(tasks): start <id>` commit.
 - Current step (`RC-FLOW.md`) identified before attempting its unlock action.
-- CI green before any push; trio `APPROVE`d before the candidate's develop PR.
+- CI green before any push; trio `APPROVED` before the candidate's develop PR.
 - At candidate closure: memory update -> closure narrative -> disposition sweep -> artifact GC -> merge -> the promote-or-continue gate.
 
 ## 4. References
@@ -44,6 +41,6 @@ applyTo: "specs/releases/*/TASKS.md"
 - `RC-FLOW.md` — gate cadence table, the candidate arc, out-of-scope list.
 - `RELEASE-EVENTS.md` — `_RELEASE.json` shape, milestone ownership, `log` conventions.
 - `MEMORY-UPDATE.md` — closure memory protocol.
-- `dadaia-task-manager` — reservation/marker discipline.
-- `dadaia-test-stewardship` §A/§B — test admission filter.
+- `dd-task-manager` — reservation/marker discipline.
+- `dd-test-stewardship` (intent and admission) — the test admission filter.
 - `DADAIA.md` §3 — git chokepoints, the only mechanical backstop.

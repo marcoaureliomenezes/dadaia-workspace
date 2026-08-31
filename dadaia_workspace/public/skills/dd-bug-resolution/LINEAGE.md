@@ -1,15 +1,15 @@
 # LINEAGE.md — Phase 0 in Full
 
-Sibling of `SKILL.md` (`dd-diagnose`). The one canonical statement of the lineage window, the filter, and the diff-trust rule (D8, A7.2/A7.3).
-FR14's audit pillar 1 cites this section, never restates it — if the two disagree, this file is stale, fix it here.
+Sibling of `SKILL.md` (`dd-bug-resolution`, Phase 0). The one canonical statement of the lineage window, the filter, and the diff-trust rule.
+The audit's pillar 1 cites this section, never restates it — if the two disagree, this file is stale, fix it here.
 
 ## The window (stated once)
 
 - The window runs from the last `audited` milestone to `HEAD`.
 - Read the live release's `_RELEASE.json` `audited` field, plus every archived release's own `audited` fact.
-- Archived facts live in `releases/_archive/releases_histo.jsonl` (no per-release `_RELEASE.json` survives archiving, FR5).
+- Archived facts live in `releases/_archive/releases_histo.jsonl` (no per-release `_RELEASE.json` survives archiving).
 - The window is `[newest audited milestone's sha, HEAD]`; the whole file when no `audited` milestone exists yet.
-- Never scan `specs/releases/_ideas/**` — a Draft carries no `_RELEASE.json` (D10/AS-7), so it carries no milestone.
+- Never scan `specs/releases/_ideas/**` — a Draft carries no `_RELEASE.json`, so it carries no milestone.
 
 ## The filter
 
@@ -17,7 +17,7 @@ FR14's audit pillar 1 cites this section, never restates it — if the two disag
 - A prior record matches when `component` is a match — free text, judgement, not a string-equality check.
 - Cap: read at most the 20 most recent matching records in the window, ordered by resolution date (newest first).
 - Approximate the date via `resolved_commit`'s commit date when filled, else the last commit touching that record's line.
-- Twenty is the number; a fixer wanting a wider read runs the audit (FR14) instead of widening phase 0.
+- Twenty is the number; a fixer wanting a wider read runs the audit (`dd-audit-project`) instead of widening phase 0.
 - At 3.2 bugs/day over a five-release window, an uncapped filter is 100-300 records per fix — a ritual nobody performs.
 
 ## What to read — and what to distrust
@@ -37,7 +37,7 @@ FR14's audit pillar 1 cites this section, never restates it — if the two disag
 1. After reading the matching records, write to this bug's own record (never a prior one).
 2. Run `dadaia bugs update <this-bug-id> --set caused_by=<prior-bug-id-or-none> --set lineage_source=declared`.
 3. `caused_by: none` carries the same evidentiary weight as naming a bug — it means the window was read, no link found.
-4. This mirrors the migration's own distinction: `null` = never assessed, `"none"` = assessed and cleared (AS-2).
+4. This mirrors the migration's own distinction: `null` = never assessed, `"none"` = assessed and cleared.
 5. Echo the same declaration in the fix commit body, e.g.:
 
 ```text
@@ -53,11 +53,11 @@ prior diffs read: codex-live-probe-... (exact), certify-cannot-install-installed
 
 - At most 20 records read, at most 20 `git show` calls, per fix.
 - This is a reading discipline, not a mechanized scan — no CLI verb enforces the cap, no hook blocks a wider read.
-- The audit (FR14 pillar 1) measures how well the discipline is followed, over time, across the fleet.
+- The audit (pillar 1) measures how well the discipline is followed, over time, across the fleet.
 
-## Why this is not a hook or a CLI verb (D8/D15)
+## Why this is not a hook or a CLI verb
 
 - Phase 0 is a skill-carried procedure the fixer runs, not a gate anyone can be blocked by.
-- `dadaia bugs update` (AS-16) is a plain governance-field writer — validates nothing about lineage correctness.
+- `dadaia bugs update` is a plain governance-field writer — validates nothing about lineage correctness.
 - It only rejects a stale write or an attempt to touch an immutable-core field.
 - Whether a fixer actually ran phase 0 and declared an honest `caused_by` is measured after the fact, by the audit.

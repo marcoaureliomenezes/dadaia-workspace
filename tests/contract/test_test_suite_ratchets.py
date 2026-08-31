@@ -31,7 +31,7 @@ code):
 * **V27** — `Intent:` header coverage. Every `tests/**/test_*.py`'s *module*
   docstring (not just any matching line in the file body) should carry an
   `Intent: <KIND> — <ref>` header (`tests/AGENTS.md` "Intent taxonomy",
-  `dadaia-test-stewardship` §A). Ratchet: UP ONLY. Target: every file.
+  `dd-test-stewardship` §A). Ratchet: UP ONLY. Target: every file.
 * **V28** — SCAFFOLD expiry. Every `Intent: SCAFFOLD` header must carry an
   `expires: <M.m.p>` field, and the named release must not already be archived.
   The archive-membership check is an **exact** directory-name match against
@@ -40,7 +40,7 @@ code):
   under the JSONL-only archive canon, so this check's real-repo self-scan is
   permanently quiet going forward; its `tmp_path`-driven unit fixtures below still
   exercise the pure predicate directly) — no `v`-prefix normalization.
-* **V29** — one number per parameter. `dadaia-test-stewardship/PARAMETERS.md` is
+* **V29** — one number per parameter. `dd-test-stewardship/PARAMETERS.md` is
   the LARGE-cap's one canonical, literal home; every other scanned doctrine file
   either references it or carries no numeric statement of its own. Baseline (fold
   3, `qa-engineer` amendment 7): three homes, `PARAMETERS.md` = 30,
@@ -293,12 +293,7 @@ def test_v28_scaffold_expiry_goes_red_against_an_archived_release(tmp_path: Path
 # ---------------------------------------------------------------------------
 
 _V29_PARAMETERS_MD = (
-    _REPO_ROOT
-    / "dadaia_workspace"
-    / "public"
-    / "skills"
-    / "dadaia-test-stewardship"
-    / "PARAMETERS.md"
+    _REPO_ROOT / "dadaia_workspace" / "public" / "skills" / "dd-test-stewardship" / "PARAMETERS.md"
 )
 _V29_TESTS_AGENTS_MD = _REPO_ROOT / "tests" / "AGENTS.md"
 _V29_QUALITY_MD = _REPO_ROOT / "specs" / "memory" / "QUALITY.md"

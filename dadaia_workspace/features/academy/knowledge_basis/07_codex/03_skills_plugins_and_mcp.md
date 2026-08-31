@@ -28,8 +28,8 @@ duplicate an entire docs site. They teach a repeatable procedure.
 
 dadaia uses skills for protocols that multiple agents need:
 
-- `dadaia-workspace-spec-navigator` loads active release context.
-- `dadaia-task-manager` defines task marker discipline.
+- `dd-spec-navigator` loads active release context.
+- `dd-task-manager` defines task marker discipline.
 - `dd-ai-eng-knowhow` gives every agent shared harness literacy (Part 1) and gives
   `ai-engineer` alone the authoring/auditing depth (Part 2), including Codex-specific
   AI-surface decisions.

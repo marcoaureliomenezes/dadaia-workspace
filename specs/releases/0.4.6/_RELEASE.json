@@ -2,7 +2,7 @@
   "schema": "release-state-v1",
   "release": "0.4.6",
   "phase": "CLOSURE",
-  "rc": null,
+  "rc": 1,
   "defined": {
     "sha": null,
     "ts": "2026-08-31T18:16:56Z"
@@ -22,6 +22,54 @@
       "agent": "product-engineer",
       "kind": "summary",
       "text": "Candidate 1 (release-candidates system) complete: _RELEASE.json one-filename decider (core.release_state, legacy read-side + SPEC-DOC-046 fixable rename); canon rc-N archive entries; segment lane deleted (scaffolder/state/routing/tests); release new refuses a second live release; dadaia release rc-archive verb (features/specs/candidate.py, 7 TDD tests); 4 archived releases migrated; version 0.4.6 minted at birth (pyproject + CHANGELOG [0.4.6]) — the mint-at-ship step is deleted; law rewritten (DADAIA §4.2/§6.2/§6.7/glossary: candidate, rc-N, promote-or-continue gate), skills dd-gitflow-default/dd-release-definition/dd-release-implement(RC-FLOW candidate arc)/navigator/task-manager updated; behavior-map re-recorded; CONTEXT.md glossary sharpened; memory atoms updated; projections refreshed via shipped-history TREE-5 fix. Net deletion-shaped: segment lane and mint-at-ship removed; one new deep verb."
+    },
+    {
+      "ts": "2026-08-31T19:12:49Z",
+      "agent": "release-candidates",
+      "kind": "note",
+      "text": "Candidate 1 archived to rc-1/ (operator ruled continue at the promote-or-continue gate); root is ready for the next candidate's trio."
+    },
+    {
+      "ts": "2026-08-31T19:54:05Z",
+      "agent": "product-engineer",
+      "kind": "note",
+      "text": "Candidate 2 defined: skills-quality-consolidation (operator audit session 2026-08-31, 15-rule reference standard extracted from .dadaia/references/skills-examples; 5 recommendations ratified verbatim as the grill record — merges A-D, dd-domain-modeling name, router as a dd-manager-orchestration section, tldr/applyTo removal, dd-* rename last). Trio authored at release root, Aprovado by operator demand order; backlog entry purged on pick with provisional CONSUMED."
+    },
+    {
+      "ts": "2026-08-31T20:46:54Z",
+      "agent": "product-engineer",
+      "kind": "summary",
+      "text": "Candidate 2 (skills-quality-consolidation) complete: 15-rule authoring standard codified in dd-ai-eng-knowhow/AUTHORING.md; four merges (dd-domain-modeling born from glossary+reference domain-modeling; dd-architecture-survey absorbed the reference survey method with a self-contained HTML-REPORT sibling; dd-bug-resolution absorbed dd-diagnose with LINEAGE + new RED-LOOP siblings; dd-spec-navigator absorbed the step0 memory bootstrap); two unmanaged reference copies deleted after diff-fold; systemic conformance pass over every kept skill (tldr/applyTo frontmatter removed, descriptions as trigger pointers, sediment purged, form-follows-content restructures); structural fixes (citable gitflow §3a/§3b, duplicate headings/steps resolved); which-skill-when router in dd-manager-orchestration; design/domain skills wired into the lifecycle skills and PE/PM grants; rename sweep to one dd-* namespace (20 skills); ecosystem equalized (behavior-map 27 rows/20 skills/17 scoped re-recorded, shipped-hashes, codex prefix tuple collapsed, projections reinstalled). Net deletion-shaped on the AI surface: 25 skill dirs -> 20; 570 ungoverned reference-copy lines retired; library+copies 3258 -> 3109 lines."
+    },
+    {
+      "ts": "2026-08-31T20:46:54Z",
+      "agent": "product-engineer",
+      "kind": "size",
+      "text": "Skill corpus: 25 instance dirs -> 20 library skills (all dd-*); public/skills 2688 -> ~3078 lines (absorbed content), library+ungoverned copies net -149; behavior-map 27 rows / 20 skills / 17 scoped sources; zero tldr/applyTo frontmatter; codex_assets -18 lines; one bug registered+resolved in-arc (verdict-vocabulary-persona-schema-mismatch, net-negative)."
+    },
+    {
+      "ts": "2026-08-31T20:46:54Z",
+      "agent": "product-engineer",
+      "kind": "closure-review",
+      "text": "Trio review round 1: three REJECTED verdicts on 92283f67 (QA: 2 stale dd-diagnose memory citations; code-review: stale instance scoped laws + citation/anchor residue; security: CDN+mermaid securityLevel:loose in HTML-REPORT.md contradicting the self-contained reports law). All findings reworked in 9dbd8488 + the closure memory commit: HTML-REPORT rewritten self-contained (deletion-shaped), instance laws synced via specs doctor --fix, memory citations repointed, anchors made resolvable. Re-review requested on the new head."
+    },
+    {
+      "ts": "2026-08-31T20:46:54Z",
+      "agent": "product-engineer",
+      "kind": "closure-test-dispositions",
+      "text": "One test added (tests/contract/test_verdict_vocabulary.py, Intent: CONTRACT, SMALL, RED-proven pre-fix). No demotions due, no quarantine, no SCAFFOLD expiry: the candidate touched no LARGE tests."
+    },
+    {
+      "ts": "2026-08-31T20:46:54Z",
+      "agent": "product-engineer",
+      "kind": "closure-artifact-gc",
+      "text": "Working artifacts: 0 files under .dadaia/tmp for this candidate (all scratch lived in the harness scratchpad outside the workspace); 3 review handoffs under .dadaia/handoff/dadaia-workspace/ kept as trio evidence; kept 3 / deleted 0."
+    },
+    {
+      "ts": "2026-08-31T20:46:54Z",
+      "agent": "claude-code",
+      "kind": "note",
+      "text": "Architecture-survey note at candidate close (RC-FLOW step 3): bugs ledger 0 open (545 total); churn concentrated in public/skills (this candidate). Cards: (1) Strong — behavior-map hash re-record is a repeated manual seam (session-local script); a 'dadaia behavior-map rehash' CLI verb would give it one owner; (2) Worth exploring — doctor_release.py carries the candidate-phase predicate in three places (DISCOVERY guard at :208, :248, :327+, flagged by code-review as Repeated Switches); one phase->required-artifacts decider would delete two branches; (3) Speculative — dd-audit-project PILLAR-* siblings still carry heavy prose vs the 15-rule bar. Top candidate: (1). Next hop: operator intake via grill — no backlog write from this note."
     }
   ]
 }

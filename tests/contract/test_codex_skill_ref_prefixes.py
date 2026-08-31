@@ -91,9 +91,9 @@ def test_dcx7_does_not_report_a_real_dd_family_skill_reference(tmp_path: Path) -
     _make_codex_agent(
         tmp_path,
         "software-engineer",
-        "Follow the `dd-release-implement` skill for this stage.",
+        "Follow the `dd-release-implementation` skill for this stage.",
     )
-    _make_skill(tmp_path, "dd-release-implement")
+    _make_skill(tmp_path, "dd-release-implementation")
 
     assert dcx7_codex_skill_refs(tmp_path) == []
 

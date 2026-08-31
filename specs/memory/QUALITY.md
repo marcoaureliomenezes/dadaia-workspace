@@ -49,7 +49,7 @@ Measured by: `pytest tests/contract/test_test_suite_ratchets.py -k v28`.
 ADR: none
 Rationale: a temporary test that never expires is a permanent cost.
 
-### P-26 · We keep one number per parameter: `dadaia-test-stewardship`'s `PARAMETERS.md` is the LARGE cap's only literal home; every other doctrine file references it.
+### P-26 · We keep one number per parameter: `dd-test-stewardship`'s `PARAMETERS.md` is the LARGE cap's only literal home; every other doctrine file references it.
 Measured by: `pytest tests/contract/test_test_suite_ratchets.py -k v29` (competing-home ceiling, ratchet down only).
 ADR: none
 Rationale: two homes for one parameter guarantee two different values.
@@ -73,7 +73,7 @@ Rationale: a reported number promoted as if it gated is fabricated detection.
 ### Flake, quarantine and health
 
 - `flaky` marks a pass-and-fail on identical code; `quarantine` leaves every gating selector, is bug-gated by P-22, and the lane is empty.
-- Quarantine cap, escalation clock, diagnostic reruns, flake-rate target and the LARGE cap have one home each in `dadaia-test-stewardship`'s `PARAMETERS.md`.
+- Quarantine cap, escalation clock, diagnostic reruns, flake-rate target and the LARGE cap have one home each in `dd-test-stewardship`'s `PARAMETERS.md`.
 - A fail-closed step on the retrying panel E2E job turns an unregistered pass-on-retry red.
 - The structural audit fires on a trigger: wall-clock growth over 25 %, flake rate above ceiling, LARGE count above cap, or quarantine at cap.
 - Every `tests/e2e/**` file names an owner; every LARGE test carries a demotion, supersession or keep-justification, and the tree misses the LARGE cap.

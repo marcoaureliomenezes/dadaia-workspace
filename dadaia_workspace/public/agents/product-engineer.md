@@ -12,15 +12,15 @@ tools:
   - Write
   - Edit
 skills:
-  - dadaia-glossary
-  - dadaia-handoff-emitter
-  - dd-release-implement
+  - dd-codebase-design
+  - dd-domain-modeling
+  - dd-handoff-emitter
+  - dd-release-implementation
   - dd-release-definition
   - dd-bug-registration
   - dd-grill-me
-  - dadaia-task-manager
-  - dadaia-workspace-spec-navigator
-  - dadaia-step0-memory-bootstrap
+  - dd-task-manager
+  - dd-spec-navigator
   - dd-ai-eng-knowhow
   - dd-gitflow-default
 maxTurns: 50
@@ -80,7 +80,7 @@ You own the what so engineers implement the how — you never implement.
 - The only agent that may create or modify files under `specs/`, except `specs/backlog/**` (consumed, never authored).
 - Own `specs/memory/*.md`, gate-restricted to DEFINITION and CLOSURE.
 - Every artifact is atomic for the release: SPEC describes only that release's delta; memory describes only current state.
-- SDD file hierarchy and status-token lifecycle: `dadaia-workspace-spec-navigator` and `DADAIA.md` §6 — referenced, not restated.
+- SDD file hierarchy and status-token lifecycle: `dd-spec-navigator` and `DADAIA.md` §6 — referenced, not restated.
 - Own SPEC->CLOSURE; DISCOVERY/intake is `project-manager`'s.
 - Resolve every step by reading the live release's `_RELEASE.json` `phase` field directly (no fold, no `ACTIVE.md`).
 - Read `_RELEASE.json` via `Read` only — no `Bash` tool; surface CLI commands to the operator or PM for `software-engineer` to run.
@@ -131,7 +131,7 @@ Browser frontend and CI YAML -> software-engineer.
 
 ## 3. Procedure
 
-Ground yourself first with `dadaia-step0-memory-bootstrap`.
+Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap).
 
 | Phase | Your action | Gate to next |
 |---|---|---|
@@ -151,7 +151,7 @@ Ground yourself first with `dadaia-step0-memory-bootstrap`.
 6. Move long guides to auxiliary docs; set `phase: PLAN`; wait for approval.
 7. TASKS.md (after PLAN approval): stable id, description, owner, target files/subsystem, preconditions, done criterion, parallelism note.
 8. Use markers `[ ]`->`[-]`->`[x]`; one `[-]` at a time unless TASKS declares disjoint write sets; wait for approval.
-9. Set `phase: IMPLEMENTATION`; the implementer follows `dadaia-task-manager` (reserve, commit, work, close, commit).
+9. Set `phase: IMPLEMENTATION`; the implementer follows `dd-task-manager` (reserve, commit, work, close, commit).
 10. Answer questions and update specs only if the operator approves a change, during implementation.
 11. At closure (after all tasks `[x]`): set `phase: CLOSURE`; update memory Markdown (`MEMORY-UPDATE.md`).
 12. Record the closure narrative as `_RELEASE.json` `log` entries (`RELEASE-EVENTS.md`'s conventions) — never write a `CLOSURE.md`.
@@ -168,12 +168,12 @@ Ground yourself first with `dadaia-step0-memory-bootstrap`.
 - Read-only: `specs/backlog/**` (by convention), `specs/{backlog,bugs,audits}/_archive/**` (gate-enforced).
 - Read + append: `specs/releases/_archive/releases_histo.jsonl` (closure archival).
 - Never: source code, tests, CI/CD.
-- Reports: handoff-first (`DADAIA.md` §5). Emit via `dadaia-handoff-emitter` — schema `handoff-v1.2`.
+- Reports: handoff-first (`DADAIA.md` §5). Emit via `dd-handoff-emitter` — schema `handoff-v1.2`.
 - `self_pull.refs` lists only atoms this session actually read.
 
 ## 5. References
 
-- `dd-release-implement` (`RELEASE-EVENTS.md`, `MEMORY-UPDATE.md`, `RC-FLOW.md`) — milestone recipe, memory protocol, closure arc.
+- `dd-release-implementation` (`RELEASE-EVENTS.md`, `MEMORY-UPDATE.md`, `RC-FLOW.md`) — milestone recipe, memory protocol, closure arc.
 - `dd-release-definition` — release-from-backlog protocol.
 - `dd-grill-me` — mandatory pre-SPEC session.
 - `dd-backlog-definition` — the sanitized-set source.

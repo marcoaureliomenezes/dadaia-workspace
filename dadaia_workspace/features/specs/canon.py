@@ -342,7 +342,7 @@ CANON: tuple[CanonEntry, ...] = (
     ),
     # A segmented release's SPEC/PLAN/TASKS live one directory deeper
     # (``releases/<M.m.p>/<alpha|rc>-N/{SPEC,PLAN,TASKS}.md`` —
-    # ``scaffolder.scaffold_release_segment``, ``dd-release-implement`` §2/§4). Never
+    # ``scaffolder.scaffold_release_segment``, ``dd-release-implementation`` §2/§4). Never
     # required_at_birth: a segment is opened on demand, well after the release itself.
     CanonEntry(
         re.compile(rf"^releases/{_SEMVER}/{_RC}/SPEC\.md$"), "static", False, None, "releases"

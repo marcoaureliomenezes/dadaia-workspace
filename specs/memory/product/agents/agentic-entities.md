@@ -20,7 +20,7 @@ tags: [agents, entities, derivation, governance]
 
 - `public/entities/behavior-map.json` is the single declaration of which skill and which scoped rule file operate which section of the law.
 - A row is `{section, behavior, skill, scoped_agents_md[], hash_tuple, recorded_by, recorded_at}`, keyed by the law's section heading.
-- Every skill and every scoped `AGENTS.md` source on disk has exactly one row, every law section has at least one owner, and several skills may own one section; today 28 rows over 22 skills and 16 scoped sources.
+- Every skill and every scoped `AGENTS.md` source on disk has exactly one row, every law section has at least one owner, and several skills may own one section; today 27 rows over 20 skills and 17 scoped sources.
 - The map also carries `declared_overlaps`, the canonical home of an intended skill-activation overlap, and the `SKILL.md` line ceiling; no CLI verb and no hook reads it.
 - `tests/contract/test_agentic_entities_derivation.py` pins the bijection, wired-hook coverage, harness coverage and the universal surface at source.
 - `public doctor`'s `entities-derivation` check (`ENT-DERIVE-1`, blocking) attests the installed package at behavioral-fidelity depth, a stub body, an identity swap and a broken reference each its own drift class.

@@ -1,4 +1,4 @@
-# RC-FLOW — the candidate arc (dd-release-implement)
+# RC-FLOW — the candidate arc (dd-release-implementation)
 
 Disclosed reference reached from `SKILL.md` §3. Release-candidates model (0.4.6,
 ADRs 0005–0009): the release has OPEN scope; each CANDIDATE is one closed-scope
@@ -9,12 +9,12 @@ cycle below. The version and the branch never change between candidates.
 | Boundary | Who validates | What unlocks |
 |---|---|---|
 | Per task | implementer discipline only (TDD, tests, local CI preflight, handoff); marker stays `[-]` | nothing; no per-task reviewer gate |
-| Candidate close | `qa-engineer` + `code-reviewer` + `security-reviewer`, all `APPROVE` the same commit | `[x]`; the candidate's `feature -> develop` PR |
+| Candidate close | `qa-engineer` + `code-reviewer` + `security-reviewer`, all `APPROVED` on the same commit | `[x]`; the candidate's `feature -> develop` PR |
 | Promote (ship) | pre-staged security verdict naming develop's tip | the `develop -> main` PR |
 
-- Any `REQUEST_CHANGES`, CRITICAL/HIGH finding, failed E2E, or missing evidence sends the work back to implementation.
+- Any `REJECTED`, CRITICAL/HIGH finding, failed E2E, or missing evidence sends the work back to implementation.
 - Rework continues until every required validator approves the same commit, or the operator stops the candidate.
-- Order per candidate (D8/FR5): review -> closure -> merge -> gate.
+- Order per candidate: review -> closure -> merge -> gate.
 - The pre-PR three-axis code review (`dd-code-review`) runs before the merge, never after.
 
 ## The candidate arc, step by step
@@ -22,7 +22,7 @@ cycle below. The version and the branch never change between candidates.
 Each step ends on a checkable criterion. Steps 5–8 are candidate-closure work.
 
 **Step 1 — Reserve.**
-- Flip `[ ]`->`[-]` in the release root's `TASKS.md`, commit `chore(tasks): start <id>` (`dadaia-task-manager`).
+- Flip `[ ]`->`[-]` in the release root's `TASKS.md`, commit `chore(tasks): start <id>` (`dd-task-manager`).
 - Done when: the reservation commit exists and no other task on the branch is `[-]`.
 
 **Step 2 — TDD loop.**
@@ -34,8 +34,8 @@ Each step ends on a checkable criterion. Steps 5–8 are candidate-closure work.
 - Done when: `TASKS.md` carries zero `[ ]`/`[-]` rows.
 
 **Step 4 — Candidate trio review.**
-- `qa-engineer` + `code-reviewer` + `security-reviewer` all `APPROVE` the same commit.
-- Done when: all three verdicts are `APPROVE` on that sha.
+- `qa-engineer` + `code-reviewer` + `security-reviewer` all `APPROVED` on the same commit.
+- Done when: all three verdicts are `APPROVED` on that sha.
 
 **Step 5 — Memory update (`product-engineer`).**
 - Set `phase: CLOSURE` in `_RELEASE.json`.
@@ -77,7 +77,7 @@ Each step ends on a checkable criterion. Steps 5–8 are candidate-closure work.
 
 ## Test-stewardship touchpoints (reference)
 
-- Declare test intent at birth; pass the admission filter (`dadaia-test-stewardship` §A/§B) before a test enters the suite.
+- Declare test intent at birth; pass the admission filter (`dd-test-stewardship`, intent and admission) before a test enters the suite.
 - Demotion and quarantine/SCAFFOLD expiry are candidate-closure work (step 6's `closure-test-dispositions` log entry).
 
 ## Out of scope for closure

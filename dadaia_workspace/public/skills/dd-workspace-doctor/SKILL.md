@@ -1,12 +1,9 @@
 ---
 name: dd-workspace-doctor
 description: >
-  Diagnose and repair the dadaia workspace runtime. Checks lib vs .claude/ asset drift
-  and assists with JSON schema migration when .dadaia/states/*.json becomes stale after
-  a dadaia-workspace library update. Use when the operator mentions "doctor", "drift",
-  "schema stale", "fix workspace", or "/dd-workspace-doctor".
-tldr: "Diagnose lib-vs-.claude drift and stale state-JSON schema; repair via dadaia public stage/install, never hand-edit."
-applyTo: ".dadaia/**"
+  Diagnose and repair the workspace runtime: lib vs projection drift, and
+  .dadaia/states/*.json schema migration after a library update. Use when the
+  operator mentions "doctor", "drift", "schema stale", or "fix workspace".
 ---
 
 # dd-workspace-doctor — Workspace Diagnosis & Repair

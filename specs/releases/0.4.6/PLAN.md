@@ -6,31 +6,42 @@
 
 ---
 
-## Design (codebase-design vocabulary)
+## Candidate 2 — skills quality consolidation
 
-The seam already exists: `core/release_state.py` is the one home of release-state
-facts. Candidate 1 deepens that module (filename decider, candidate counter,
-per-candidate phase cycle) instead of adding a sibling — callers keep a small
-interface (`read`, `PHASES`, filename constant) over more behaviour. The segment
-lane fails the deletion test (its behaviour concentrates into the rc-archive
-verb) and is deleted, not layered over. `release rc-archive` is one deep CLI
-verb: zero options, all validation and mechanics behind it.
+### Method
 
-## Order of work
+1. **Standard first.** The 15-rule authoring contract lands in
+   `dd-ai-eng-knowhow/AUTHORING.md` before any skill is edited, so every later
+   task is applied *against* a written standard, not a session memory.
+2. **Content merges before cosmetic passes.** The four merges (FR2–FR5) and the
+   two reference-copy deletions run one task each, every task leaving the tree
+   green: the merged skill is born/enriched, the retired directory deleted,
+   persona grants, behavior-map row and cross-citations updated in the same
+   commit (the behavior-map enforcer, orphan checker and FR27 citation test
+   make a half-done merge RED — they are this candidate's safety net).
+3. **Conformance pass over the 16 kept skills** (FR6), then the structural
+   fixes/router/wiring (FR7–FR9) — content settles before names change.
+4. **Rename sweep last** (FR10), exactly as the operator ordered: directory
+   renames plus a whole-tree citation sweep (`public/**`, tests, memory
+   atoms, `CONTEXT.md`), relying on FR27/behavior-map to catch residue.
+5. **Equalize and reproject** (FR11): behavior-map hashes re-recorded as the
+   deliberate final act, scaffold backlog AGENTS.md §5 aligned to the
+   purge-on-pick law, `stage → install --target all → public doctor`, stale
+   projected directories for renamed/deleted skills removed from every
+   harness projection target, full local CI preflight.
 
-1. TDD core: filename decider + legacy fallback (RED on legacy-only tree).
-2. TDD canon/doctor: new entries, rename rule, one-live-release rule; retire
-   segment entries/rules and their tests (staged deletions).
-3. TDD scaffolder + CLI: new-shape `release new`, `rc-archive` verb; delete the
-   segment scaffolding lane.
-4. Migration commit: `_archive` renames + this release flips to `_RELEASE.json`
-   + pyproject/CHANGELOG mint at birth.
-5. Law/skills/behavior-map/CONTEXT.md rewrite.
-6. Memory update, full preflight, candidate closure.
+### Risks and controls
 
-## Verification
-
-- Full preflight (ruff, mypy --strict, import-linter, pytest) green.
-- `dadaia specs doctor` 0 errors on this repo with the new shape live.
-- `rc-archive` exercised on a fixture tree (unit) — the real first use happens
-  at this candidate's own gate if the operator rules "continue".
+- **Hash-tuple discipline**: every skill edit invalidates its behavior-map
+  hash; each task re-records only the rows it touched (a deliberate act per
+  A10.4), and T-046-16 does the final full verification.
+- **Citation residue after renames**: FR27 (path-shaped citation check) and
+  the behavior-map member-exists check are the mechanical backstop; the sweep
+  greps for the old names before committing.
+- **Stale projections**: `public install` overwrites but does not delete;
+  renamed/deleted skill directories must be explicitly removed from
+  `.claude/skills/`, `.agents/skills/`, and any other harness projection
+  target, then `public doctor` must report `[ok] public-privacy`.
+- **Bug-surface verdict**: this candidate is deletion-shaped (5 fewer skills,
+  dead frontmatter and sediment removed); any diff that grows a skill must be
+  justified against the replace-don't-layer principle in its task evidence.

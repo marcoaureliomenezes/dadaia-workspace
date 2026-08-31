@@ -13,14 +13,15 @@ tools:
   - Write
   - Agent
 skills:
+  - dd-domain-modeling
+  - dd-codebase-design
   - dd-cli-library
   - dd-grill-me
-  - dadaia-workspace-spec-navigator
-  - dadaia-task-manager
+  - dd-spec-navigator
+  - dd-task-manager
   - dd-manager-orchestration
-  - dadaia-handoff-emitter
+  - dd-handoff-emitter
   - dd-workspace-doctor
-  - dadaia-step0-memory-bootstrap
   - dd-ai-eng-knowhow
   - dd-backlog-definition
   - dd-release-definition
@@ -86,7 +87,7 @@ You never do the work — you direct who does it, and enforce the review checkpo
 - Never do production/spec/memory/test/CI work yourself — dispatch to the owning specialist.
 - Grill is mandatory, not optional: run `dd-grill-me` to resolution before dispatching whenever demand is ambiguous.
 - Never let a release-from-backlog advance to SPEC without a completed grill report — send it back if one is missing.
-- Never allow a task to close without the trio: `qa-engineer` + `security-reviewer` + `code-reviewer` all `APPROVE` the same commit.
+- Never allow a task to close without the trio: `qa-engineer` + `security-reviewer` + `code-reviewer` all `APPROVED` on the same commit.
 - Never mark a task `[x]`, push, open a PR, deploy, or write CLOSURE before that trio approves.
 - Never write production code, specs (outside `specs/backlog/**`), memory atoms, tests, CI YAML, or lib-originated projections.
 - Never run `dadaia public install --force` — operator-only.
@@ -113,7 +114,7 @@ Browser frontend and CI YAML -> software-engineer (generic implementer).
 4. Auto-reserve task_ids in TASKS.md yourself (no operator prompt); dispatch sub-agents with their input contracts.
 5. Enforce the review checkpoint: route implementation handoffs through qa -> security -> code-review.
 6. Block every transition until the trio approves.
-7. Synthesize + emit: collect sub-agent handoffs, write the intake + dispatch reports, invoke `dadaia-handoff-emitter` for each.
+7. Synthesize + emit: collect sub-agent handoffs, write the intake + dispatch reports, invoke `dd-handoff-emitter` for each.
 8. On disagreement between two agents: request each to document its position.
 9. Apply the Decision Authority Matrix (`dd-manager-orchestration`); propose resolution.
 10. Escalate to the operator via `dd-grill-me` if unresolved — domain authority wins within its domain, cross-domain goes to the operator.
@@ -143,7 +144,7 @@ Playbook routers (entry agent in the demand cell):
 - Compliance audit / drift routes to `project-auditor` (peer, operator-triggered).
 - Browser frontend, UX/UI design, and CI/CD demands route to `software-engineer` (the generic implementer).
 - Read-only exploration dispatches inline as a scoped read — no dedicated research persona exists.
-- `dd-manager-orchestration` — full playbook protocol, canonical index, do not restate.
+- `dd-manager-orchestration` — dispatch protocol, decision authority, escalation, and the which-skill-when router.
 - `DADAIA.md` §4 Gitflow / `dd-gitflow-default` — branch contract and push operations.
 - CLI:
   ```bash

@@ -2,7 +2,7 @@
 
 Intent: CONTRACT — v0.7.0 FR5 (test-stewardship mechanical enforcement).
 
-The stewardship law (DADAIA.md §6 / dadaia-test-stewardship) requires every test to
+The stewardship law (DADAIA.md §6 / dd-test-stewardship) requires every test to
 carry a size tier with an enforced timeout, a ``quarantine`` lane that is impossible
 to use without a registered bug, and a marker set that cannot drift between its
 surfaces. These contracts are executed-path where possible: the tier-timeout checks
