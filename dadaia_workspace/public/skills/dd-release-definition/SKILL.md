@@ -44,6 +44,13 @@ applyTo: "specs/releases/*/SPEC.md"
 20. Abort on an unknown slug (fail-loud) — fix the slug before it lands in the SPEC.
 21. Omit the `**Consumes:**` line entirely when the release consumes no backlog item.
 
+## 3. TASKS as tracer bullets
+
+- Every task carries two keys beside its write set: `blocked by:` (explicit dependency edge, may be `none`) and `delivers:` (the observable end-to-end slice — "after this task the operator can …").
+- Order the group so the FIRST tasks cut a thin end-to-end path; a group that is internally consistent but delivers no verifiable slice until the last task is misordered.
+- A demolition (deleting a subsystem — this repo's dominant release shape) is authored expand–contract: (1) add the new path, (2) switch consumers, (3) contract by deleting the old path — three tasks, each independently green, never one big-bang commit.
+- A task whose `delivers:` cannot be stated is either not a task (fold it) or not understood yet (back to the SPEC).
+
 ## 3. Done when
 
 - Picked set recorded (from `dd-backlog-definition`'s already-sanitized `ACTIVE`).

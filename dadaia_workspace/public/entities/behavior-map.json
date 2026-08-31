@@ -196,11 +196,11 @@
    "scoped_agents_md": [],
    "hash_tuple": {
     "section": "sha256:709ba9f35227e8d3c31520eb9375ff2a856845db234e18c7f90102f11b809d97",
-    "skill": "sha256:f62335bd7b10aaa68aab750c2cea10921170c9ff3626ec1126af13a57acdfca9",
+    "skill": "sha256:478c3509344be19378ad12dbc1b28879bc94a733943216829254b5bf8cd6271d",
     "scoped": []
    },
    "recorded_by": "ai-engineer",
-   "recorded_at": "2026-08-29"
+   "recorded_at": "2026-08-31"
   },
   {
    "section": "§6 Specs, tasks and memory",
