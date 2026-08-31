@@ -464,6 +464,19 @@
    },
    "recorded_by": "ai-engineer",
    "recorded_at": "2026-08-28"
+  },
+  {
+   "section": "§6 Specs, tasks and memory",
+   "anchor": null,
+   "skill": "dd-architecture-survey",
+   "scoped_agents_md": [],
+   "hash_tuple": {
+    "section": "sha256:709ba9f35227e8d3c31520eb9375ff2a856845db234e18c7f90102f11b809d97",
+    "skill": "sha256:6c854309f49c35be6eb9bf0f3d4c58c93ad0c089306f78585d921be6bcd7eb0a",
+    "scoped": []
+   },
+   "recorded_by": "ai-engineer",
+   "recorded_at": "2026-08-31"
   }
  ]
 }
