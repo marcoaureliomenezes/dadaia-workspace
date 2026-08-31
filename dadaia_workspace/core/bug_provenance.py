@@ -59,12 +59,14 @@ __all__ = [
 ]
 
 #: The closed granularity vocabulary (FR3 step 4, D-A — one marker name everywhere).
-#: ``exact`` — the commit adds exactly one bug's line of this kind AND touches at least
-#: one file outside ``specs/``. ``release-squash`` — the commit adds more than one bug's
-#: line of this kind (a release-level squash). ``ledger-only`` — the commit adds exactly
-#: one bug's line of this kind AND touches no file outside ``specs/`` (the code change,
-#: if any, is elsewhere or unknown). These are STRUCTURAL definitions computed from the
-#: diff alone — never a narrative/measured category.
+#: ``release-squash`` — the commit adds more than one bug's line of this kind.
+#: For REGISTRATION lines: a single-registration commit is ``exact`` unconditionally —
+#: a conformant shape-1 registration stages the ledger alone, which is the most precise
+#: registration provenance possible (F010, 20260827-canon-v6-first-audit).
+#: For TERMINAL lines: ``exact`` — the commit also touches at least one file outside
+#: ``specs/`` (the fix is diffable here); ``ledger-only`` — it touches nothing outside
+#: ``specs/`` (the code change, if any, is elsewhere or unknown — the sweep smell).
+#: These are STRUCTURAL definitions computed from the diff alone.
 Granularity = Literal["exact", "release-squash", "ledger-only"]
 
 
@@ -121,9 +123,9 @@ class DerivedBugProvenance:
 
 
 def _granularity(bug_line_count: int, *, touches_outside_specs: bool) -> Granularity:
-    """FR3 step 4's structural marker for one commit, one line kind. Never called with
-    ``bug_line_count == 0`` (the caller only computes a marker when at least one bug id
-    of that kind was classified in the commit)."""
+    """FR3 step 4's structural marker for one commit's TERMINAL lines (registration
+    lines use the unconditional single-line-is-exact rule at the call site — F010).
+    Never called with ``bug_line_count == 0``."""
     if bug_line_count > 1:
         return "release-squash"
     return "exact" if touches_outside_specs else "ledger-only"
@@ -174,8 +176,12 @@ def derive_commit_provenance(
         touches_outside_specs = any(not path.startswith("specs/") for path in commit.touched_paths)
 
         if registration_bug_ids:
-            marker = _granularity(
-                len(registration_bug_ids), touches_outside_specs=touches_outside_specs
+            # F010 (20260827 audit): a shape-1 registration stages the ledger alone by
+            # design, so a single-registration commit is ALWAYS `exact` — the
+            # outside-specs condition is a resolution-side fact (code fixed here vs
+            # elsewhere) and never applied to registrations.
+            marker: Granularity = (
+                "release-squash" if len(registration_bug_ids) > 1 else "exact"
             )
             for bug_id in registration_bug_ids:
                 if bug_id in registration_commit_of:

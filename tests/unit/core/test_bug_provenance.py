@@ -165,3 +165,26 @@ def test_a_bug_whose_registration_line_is_never_added_carries_a_migration_note()
     assert provenance.migration_note is not None
     assert provenance.resolved_commit == "c1"
     assert provenance.resolution_granularity == "exact"
+
+
+def test_shape1_registration_staging_the_ledger_alone_is_exact() -> None:
+    """F010 (20260827-canon-v6-first-audit): a conformant dd-gitflow-default §4 shape-1
+    registration commit stages ``specs/bugs/BUGS.jsonl`` alone — one bug, one line, no
+    path outside ``specs/``. That is the MOST precise registration provenance possible,
+    so it derives ``exact``, never ``ledger-only`` (which remains the resolution-side
+    sweep smell: code change elsewhere or unknown)."""
+    commits = [
+        HistoryCommit(
+            sha="c1",
+            parents=(),
+            date="2026-01-01T00:00:00+00:00",
+            touched_paths=("specs/bugs/bugs.jsonl",),
+            added_lines=("REG bug-alpha",),
+        ),
+    ]
+
+    result = derive_commit_provenance(commits, _classify)
+
+    provenance = result["bug-alpha"]
+    assert provenance.registration_commit == "c1"
+    assert provenance.registration_granularity == "exact"
