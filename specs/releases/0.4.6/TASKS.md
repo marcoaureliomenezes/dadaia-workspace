@@ -82,7 +82,7 @@
   dadaia_workspace/public/entities/behavior-map.json.
   Blocked by: T-046-13. Delivers: broken anchors gone; a dispatcher can route
   any demand to the right skill from one map.
-- [ ] T-046-15 — FR10 rename sweep (last content act): seven `dadaia-*` dirs
+- [-] T-046-15 — FR10 rename sweep (last content act): seven `dadaia-*` dirs
   → `dd-*`, `dd-release-implement` → `dd-release-implementation`; whole-tree
   citation sweep (public/**, tests, memory atoms, CONTEXT.md, scoped
   AGENTS.md sources); behavior-map rows renamed.
