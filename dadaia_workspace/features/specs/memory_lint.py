@@ -168,8 +168,6 @@ def lint_atom(
     seen: set[str] = set()
 
     for heading in headings:
-        heading_lower = heading.strip().lower()
-
         if memory_canon.is_forbidden_memory_heading(heading):
             result.error(
                 f"Forbidden heading '## {heading}' — changelog/history sections "

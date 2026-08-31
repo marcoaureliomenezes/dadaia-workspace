@@ -92,22 +92,6 @@ _SENTINEL_PREFIX = "ctx-inject-fired-"
 _COMPACT_PREFIX = "ctx-compact-"
 
 
-def _alive_context_names(workspace: Path) -> list[str]:
-    """Return the slugs of every ALIVE context in the registry (empty on any error)."""
-    registry = workspace / ".dadaia" / "states" / "spec_contexts.json"
-    try:
-        data = json.loads(registry.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError, ValueError):
-        return []
-    names: list[str] = []
-    for c in data.get("contexts", []):
-        if str(c.get("state", "")).lower() == "alive":
-            slug = str(c.get("repo_slug") or c.get("name") or "")
-            if slug:
-                names.append(slug)
-    return names
-
-
 def _session_bound_at(workspace: Path, session_id: str) -> float | None:
     """This session's own record ``bound_at``, as an epoch float, else ``None``.
 
@@ -300,7 +284,7 @@ def _generic_preflight(workspace: Path) -> str:
     ``DADAIA.md`` §1/§2 is deleted from every emission path, bound or not).
     """
     sections = ["[no bound context]"]
-    alive = _alive_context_names(workspace)
+    alive = invocation.alive_context_slugs(workspace)
     if alive:
         sections.append("")
         sections.append("=== ALIVE contexts (bind one to inject its memory) ===")

@@ -191,6 +191,20 @@ def _registry_contexts(workspace_root: Path) -> list[dict[str, object]]:
     return [e for e in contexts if isinstance(e, dict)] if isinstance(contexts, list) else []
 
 
+def alive_context_slugs(workspace_root: Path) -> list[str]:
+    """The ``repos/<slug>`` dir of every ALIVE context, fail-soft to ``[]`` (F008:
+    the ONE fail-soft registry read family lives here — hooks import it, never a
+    private re-parse; ``JsonContextStore`` stays the schema-gated CRUD authority)."""
+    slugs: list[str] = []
+    for entry in _registry_contexts(workspace_root):
+        if str(entry.get("state", "")).lower() != "alive":
+            continue
+        slug = str(entry.get("repo_slug") or entry.get("name") or "")
+        if slug:
+            slugs.append(slug)
+    return slugs
+
+
 def _context_registered(workspace_root: Path, name: str) -> bool:
     """True while *name* is registered (missing registry -> ``False``; unreadable fails
     OPEN -> ``True``, so a transient FS hiccup never invalidates every live bind)."""
