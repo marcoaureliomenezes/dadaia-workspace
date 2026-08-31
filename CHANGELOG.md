@@ -54,6 +54,17 @@ for this task, so none is touched here):
 
 Left exactly as written; a future task can pick this up.
 
+## [0.4.5] — 2026-08-31
+
+One published version for everything since `0.4.4`: the internal spec-release ids
+`0.5.2` (canon-v6 first-audit remediation, 41 findings dispositioned) and `0.5.3`
+(design/bug-surface remediation, 17 findings fixed, plus the AI-surface backlog
+extension) ship together as PyPI `0.4.5` — a candidate never mints a version; the
+version axis is the PyPI lineage, and its latest published version is `0.4.4`
+(measured at ship time, 2026-08-31). The `[0.5.3]`, `[0.5.2]` and `[0.5.0]`
+headings below are internal spec-release ids that were never published; their full
+content is this release's content.
+
 ## [0.5.3] — 2026-08-31
 
 Design/bug-surface remediation: all 17 findings of `20260830-design-bug-surface-audit`
@@ -162,7 +173,7 @@ dispositioned (spec release `0.5.2`; audit archived to `audits_histo.jsonl`).
 
 ## [0.5.0] — 2026-08-30
 
-One published version for everything since `0.4.4`: the internal spec-release ids `0.4.5`, `0.5.0` and `0.5.1` (canon v6, deepening simplification K1–K11, ADR 0001 executed) ship together as PyPI `0.5.0` — a candidate never mints a version; the version axis is the PyPI lineage.
+One published version for everything since `0.4.4`: the internal spec-release ids `0.4.5`, `0.5.0` and `0.5.1` (canon v6, deepening simplification K1–K11, ADR 0001 executed) were staged to ship as PyPI `0.5.0` but the publication was retained (never approved at the release gate) — they publish in `[0.4.5]` above; a candidate never mints a version; the version axis is the PyPI lineage.
 
 ### Added
 - **One atomic-write primitive** (`core/atomic_write.py`) replacing eleven per-feature
