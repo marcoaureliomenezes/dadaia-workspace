@@ -1,5 +1,5 @@
-"""Unit tests for container.build_telemetry_service() (K8 — the composition root
-moved out of cli/commands/panel.py's _try_build_telemetry into plain container
+"""Unit tests for panel_composition.build_telemetry_service() (K8; moved to the
+panel CLI's own composition at T-053-14/F001 — its single production consumer
 wiring, no nested class).
 
 Verifies that each expected exception type is caught, a warning is logged,
@@ -15,13 +15,13 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace import container
+from dadaia_workspace.cli.commands import panel_composition
 
 
 def _patch_imports_ok(monkeypatch: pytest.MonkeyPatch, raise_exc: Exception) -> None:
     """Patch the interior of build_telemetry_service to raise *raise_exc* after imports."""
     monkeypatch.setattr(
-        "dadaia_workspace.container.build_spec_context_service",
+        "dadaia_workspace.cli.commands.panel_composition.build_spec_context_service",
         lambda *_: (_ for _ in ()).throw(raise_exc),
     )
 
@@ -56,8 +56,8 @@ def test_build_telemetry_service_returns_none_on_expected_exceptions(
     """Each expected exception type yields None + a warning log."""
     _patch_imports_ok(monkeypatch, exc)
 
-    with caplog.at_level(logging.WARNING, logger="dadaia_workspace.container"):
-        result = container.build_telemetry_service(tmp_path)
+    with caplog.at_level(logging.WARNING, logger="dadaia_workspace.cli.commands.panel_composition"):
+        result = panel_composition.build_telemetry_service(tmp_path)
 
     assert result is None
     assert any(fragment in record.message for record in caplog.records), (
