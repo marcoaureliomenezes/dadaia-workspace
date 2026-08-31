@@ -12,13 +12,13 @@
   readers (doctor_release, specs_tree, reports/next, invocation) import it.
   Write set: dadaia_workspace/core/release_state.py, dadaia_workspace/features/specs/**,
   dadaia_workspace/features/reports/next.py, dadaia_workspace/core/invocation.py, tests/**.
-- [-] T-046-02 — canon: `_RELEASE.json` entry, `rc-N/` trio entries, legacy
+- [x] T-046-02 — canon: `_RELEASE.json` entry, `rc-N/` trio entries, legacy
   rename-lane entry; segment entries retired. Write set:
   dadaia_workspace/features/specs/canon.py, tests/**.
-- [ ] T-046-03 — doctor: fixable rename rule, one-live-release rule, segment
+- [x] T-046-03 — doctor: fixable rename rule, one-live-release rule, segment
   rules retired, phase cycle per candidate. Write set:
   dadaia_workspace/features/specs/*.py, tests/**.
-- [ ] T-046-04 — scaffolder + CLI: segment lane deleted; `release new` new shape
+- [x] T-046-04 — scaffolder + CLI: segment lane deleted; `release new` new shape
   + single-live refusal; `release rc-archive` verb. Write set:
   dadaia_workspace/features/specs/scaffolder.py, dadaia_workspace/cli/**, tests/**.
 - [ ] T-046-05 — migration: `_archive/*/RELEASE.json` → `_RELEASE.json`; this

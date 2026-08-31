@@ -102,9 +102,7 @@ def _skip_memory_lint_subprocess(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(MemoryValidator, "check_lint1_memory_atoms", lambda self: [])
 
 
-def _write_release_jsonl(
-    specs: Path, release_id: str, phase: str, segment: str | None = None
-) -> None:
+def _write_release_jsonl(specs: Path, release_id: str, phase: str) -> None:
     """Write (overwrite) ``specs/releases/<release_id>/RELEASE.json`` with a minimal
     release-state-v1 document (v0.5.x, successor to the RELEASE.jsonl fold; v0.5.0
     FR4/T-050-21A) -- the fixture-side replacement for the retired ``ACTIVE.md``."""
@@ -123,8 +121,6 @@ def _write_release_jsonl(
         "audited": None,
         "log": [],
     }
-    if segment:
-        state["segment"] = segment
     (rdir / "RELEASE.json").write_text(_json.dumps(state) + "\n", encoding="utf-8")
 
 
@@ -216,17 +212,6 @@ token_estimate: 100
     (product_dir / f"{slug}.md").write_text(content, encoding="utf-8")
 
 
-def _segment_active(specs: Path, release_id: str, segment: str) -> None:
-    """Convert a flat clean tree into a segmented one (move SPEC/PLAN/TASKS)."""
-    rel = specs / "releases" / release_id
-    seg = rel / segment
-    seg.mkdir(parents=True, exist_ok=True)
-    for fname in ("SPEC.md", "PLAN.md", "TASKS.md"):
-        (seg / fname).write_text((rel / fname).read_text(encoding="utf-8"), encoding="utf-8")
-        (rel / fname).unlink()
-    _write_release_jsonl(specs, release_id, "IMPLEMENTATION", segment=segment)
-
-
 # ---------------------------------------------------------------------------
 # The two negative anchors — kept named, they are the only proof the WHOLE
 # checker set stays silent on a genuinely valid tree.
@@ -240,23 +225,14 @@ def test_clean_tree_has_no_errors(tmp_path: Path) -> None:
     assert errors == [], errors
 
 
-def test_release_segment_phase_flip_still_warns_on_draft_in_implementation(tmp_path: Path) -> None:
-    """The "fresh scaffold is doctor-clean" half of the former bug-042 regression
-    (Draft SPEC/PLAN/TASKS at SPEC phase -> 0 errors) is now
-    ``tests/unit/features/specs/test_canon_property.py`` (the "fresh-release-segment"
-    case, asserting the FULL doctor is clean — a strictly stronger bar than this test's
-    original SPEC-DOC-004-only check). What survives here is the property that test
-    does NOT cover: the warning is not lost where it matters — a Draft artifact
-    is unmistakably no longer freshly-scaffolded once the release's phase moves to
-    IMPLEMENTATION, and SPEC-DOC-004 must still fire then."""
-    from dadaia_workspace.features.specs.scaffolder import scaffold_release_segment
-
+def test_release_phase_flip_still_warns_on_draft_in_implementation(tmp_path: Path) -> None:
+    """A Draft artifact is unmistakably no longer freshly-scaffolded once the release's
+    phase moves to IMPLEMENTATION — SPEC-DOC-004 must still fire then (segment lane
+    retired at 0.4.6, ADR 0006: the trio always sits flat at the release root)."""
     specs = _make_clean_specs_tree(tmp_path, "v0.1.0")
-    for fname in ("SPEC.md", "PLAN.md", "TASKS.md"):
-        (specs / "releases" / "v0.1.0" / fname).unlink()
-    result = scaffold_release_segment(specs, "v0.1.0", "alpha-1")
-    assert not result.errors, result.errors
-    _write_release_jsonl(specs, "v0.1.0", "IMPLEMENTATION", segment="alpha-1")
+    spec = specs / "releases" / "v0.1.0" / "SPEC.md"
+    spec.write_text(spec.read_text(encoding="utf-8").replace("Aprovado", "Draft"), encoding="utf-8")
+    _write_release_jsonl(specs, "v0.1.0", "IMPLEMENTATION")
 
     issues = SpecsDoctor(specs).check()
     assert any(i.code == "SPEC-DOC-004" for i in issues)
@@ -733,80 +709,9 @@ def test_doc027_release_naming_boundary(
 # ---------------------------------------------------------------------------
 
 
-def test_segmented_active_release_artifacts_matrix(tmp_path: Path) -> None:
-    specs_ok = _make_clean_specs_tree(tmp_path, "v0.1.6")
-    _segment_active(specs_ok, "v0.1.6", "alpha-1")
-    issues_ok = SpecsDoctor(specs_ok).check()
-    assert "SPEC-DOC-004" not in _codes(issues_ok)
-
-    specs_bad = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-seg-bad"), "v0.1.6")
-    _segment_active(specs_bad, "v0.1.6", "alpha-1")
-    (specs_bad / "releases" / "v0.1.6" / "alpha-1" / "TASKS.md").unlink()
-    issues_bad = SpecsDoctor(specs_bad).check()
-    assert "SPEC-DOC-004" in _codes(issues_bad)
-
-
 # ---------------------------------------------------------------------------
-# v0.4.3 T-043-22 [Arm-B rider] bug specs-doctor-segment-router-silent-skip —
-# AB.1-AB.4. Intent: CONTRACT — a live segment pointer at a MISSING directory must
-# produce an explicit SPEC-DOC-004 ERROR, never a silent early return (TREE-6
-# retired at 0.5.3 T-053-04/F005: one rule, one implementation). The stale "already reported by check 9" comment was wrong:
-# check 9 (SPEC-DOC-009) validates only the RELEASE directory
-# (releases/<release>/), never the SEGMENT subdirectory
-# (releases/<release>/<segment>/) — so a live segment pointer at a missing
-# segment dir was invisible to every downstream check.
-# ---------------------------------------------------------------------------
-
-
-def test_missing_segment_directory_is_an_explicit_error_not_a_silent_skip(
-    tmp_path: Path,
-) -> None:
-    """AB.1: an active release whose phase record's segment: names a non-existent directory produces an
-    explicit SPEC-DOC-004 ERROR naming the missing segment directory — never a
-    silent pass. Pre-fix, this fixture produced ZERO findings."""
-    specs = _make_clean_specs_tree(tmp_path, "v0.1.6")
-    _segment_active(specs, "v0.1.6", "alpha-1")
-    # The segment directory existed after _segment_active; now remove it entirely —
-    # the EXACT repro: a live segment pointer at a directory that does not exist.
-    import shutil as _shutil
-
-    _shutil.rmtree(specs / "releases" / "v0.1.6" / "alpha-1")
-
-    issues = SpecsDoctor(specs).check()
-
-    doc004 = [i for i in issues if i.code == "SPEC-DOC-004"]
-    assert doc004, "SPEC-DOC-004 must report the missing segment directory, never stay silent"
-    missing_segment_dir = str(specs / "releases" / "v0.1.6" / "alpha-1")
-    assert any(
-        missing_segment_dir in i.description or missing_segment_dir in (i.path or "")
-        for i in doc004
-    )
-
-
-def test_healthy_segmented_release_is_unaffected_by_the_missing_segment_check(
-    tmp_path: Path,
-) -> None:
-    """AB.2: a segmented release WITH its directory keeps validating exactly as
-    today — no behaviour change on the healthy path."""
-    specs = _make_clean_specs_tree(tmp_path, "v0.1.6")
-    _segment_active(specs, "v0.1.6", "alpha-1")
-
-    issues = SpecsDoctor(specs).check()
-
-    assert "SPEC-DOC-004" not in _codes(issues)
-
-
-def test_flat_release_is_unaffected_by_the_missing_segment_check(tmp_path: Path) -> None:
-    """AB.3: a flat release (segment: none / no segment line) is unaffected — the
-    missing-segment-directory check only ever activates when the active phase
-    record actually carries a live segment value."""
-    specs = _make_clean_specs_tree(tmp_path, "v0.1.6")
-
-    issues = SpecsDoctor(specs).check()
-
-    assert "SPEC-DOC-004" not in _codes(issues)
-
-
+# Segment lane retired at 0.4.6 (ADR 0006) — the AB.1-AB.3 segment-router tests
+# died with the routing they pinned; AB.4 survives as a comment-honesty pin.
 def test_stale_check_9_comment_no_longer_claims_coverage_it_does_not_provide() -> None:
     """AB.4: the stale 'already reported by check 9' comment (SPEC-DOC-009 only
     validates the RELEASE directory, never the segment subdirectory) is corrected

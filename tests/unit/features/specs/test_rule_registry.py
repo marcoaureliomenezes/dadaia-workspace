@@ -55,6 +55,7 @@ def test_fix_dispatch_and_help_derive_from_the_registry() -> None:
         "TREE-8",
         "SPEC-DOC-034",
         "SPEC-DOC-044",
+        "SPEC-DOC-046",
         "MEM-PLACEHOLDER-1",
     }
     help_text = rules_mod.render_fix_help()
