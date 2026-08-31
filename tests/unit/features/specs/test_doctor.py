@@ -917,3 +917,22 @@ def test_cat1_sync_matrix(tmp_path: Path) -> None:
     _make_catalog_json(product_dir_g, ["feature-a", "product-vision"])
     cat1_g = [i for i in SpecsDoctor(specs_g).check() if i.code == "CAT-1"]
     assert cat1_g == []
+
+
+def test_doc016_and_doc027_remedies_name_the_mintable_bare_axis(tmp_path: Path) -> None:
+    """F004 (20260830 audit, bug release-new-rejects-semver-but-doctor-requires-it):
+    SPEC-DOC-016/027 used to instruct a ``v<MAJOR>.<MINOR>.<PATCH>`` rename that
+    ``dadaia release new`` refuses (the v axis is retired, read-only). The remedy must
+    name the bare, mintable form. Intent: regression; size: unit."""
+    specs = _make_clean_specs_tree(tmp_path, release_id="not-semver")
+    (specs / "releases" / "not-semver" / "SPEC.md").write_text(
+        "# Spec\n\n> **Status:** Aprovado\n> **Created:** 2026-08-01\n\nContent.\n",
+        encoding="utf-8",
+    )
+    issues = SpecsDoctor(specs).check()
+    naming = [i for i in issues if i.code in ("SPEC-DOC-016", "SPEC-DOC-027")]
+    assert naming, "Expected naming issues for a non-SemVer release dir"
+    for issue in naming:
+        assert "v<MAJOR" not in issue.description, issue.description
+        assert "^v\\d" not in issue.description, issue.description
+    assert any("<MAJOR>.<MINOR>.<PATCH>" in i.description for i in naming)

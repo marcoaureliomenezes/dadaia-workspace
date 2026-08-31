@@ -70,7 +70,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
-from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION, is_release_semver
+from dadaia_workspace.core.specs_version import (
+    CANONICAL_SPECS_VERSION,
+    RELEASE_ID_FRAGMENT,
+    is_release_semver,
+)
 from dadaia_workspace.core.workspace_layout import AUDIT_DIR_NAME_PATTERN
 
 __all__ = [
@@ -88,7 +92,7 @@ __all__ = [
     "verdict_violations",
 ]
 
-_SEMVER = r"\d+\.\d+\.\d+"
+_SEMVER = RELEASE_ID_FRAGMENT
 _SHA40 = r"[0-9a-f]{40}"
 #: One fact, one place (core.workspace_layout, SPEC-DOC-030's own single home) — never
 #: a second, independently hand-kept copy of the audit-dir date-slug shape.

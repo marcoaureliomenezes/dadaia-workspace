@@ -94,7 +94,17 @@ _RESOLUTION_PARAM_NAMES = frozenset({"context", "specs_dir"})
 #: (by keyword or positional name-match) to count as consuming the canonical seam. T-1 is
 #: RED on ``resolve_context_for_cli`` (T-2 introduces it); ``resolve_specs_dir_for_cli`` and
 #: the ``container.build_*``/``container.resolve_*`` families already exist at HEAD.
-_SEAM_FUNCTION_NAMES = frozenset({"resolve_specs_dir_for_cli", "resolve_context_for_cli"})
+_SEAM_FUNCTION_NAMES = frozenset(
+    {
+        "resolve_specs_dir_for_cli",
+        "resolve_context_for_cli",
+        # T-053-01 (F003, 20260830 audit): core.invocation.resolve_context_specs_dir IS
+        # the one context->specs resolver; the container pass-through wrapper is deleted.
+        # CLI callers import it under the private alias below (dadaia.specs.doctor).
+        "resolve_context_specs_dir",
+        "_core_resolve_context_specs_dir",
+    }
+)
 
 #: ``container.build_*``/``container.resolve_*`` factories whose ``context`` kwarg is a
 #: documented FILTER (equality-narrows an already-resolved list, e.g.

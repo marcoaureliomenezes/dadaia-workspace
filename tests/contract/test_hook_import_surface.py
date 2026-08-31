@@ -49,12 +49,18 @@ def test_gate_resolution_path_never_imports_the_container(tmp_path) -> None:  # 
         json.dumps({"schema_version": "2", "contexts": []}), encoding="utf-8"
     )
     (ws / "repos" / "demo").mkdir(parents=True)
+    # Drive the gate's REAL entry (evaluate_payload → invocation.resolve → gate_policy),
+    # not a private helper: T-053-01 (F003) deleted the dead ``_context_slug`` this test
+    # previously used as its vehicle.
+    payload = {
+        "tool_name": "Write",
+        "tool_input": {"file_path": str(ws / "repos" / "demo" / "f.py")},
+    }
     code = (
-        "import sys\n"
-        "from pathlib import Path\n"
+        "import json, sys\n"
         "from dadaia_workspace.hooks import sdd_gate\n"
-        f"slug = sdd_gate._context_slug(Path({str(ws / 'repos' / 'demo' / 'f.py')!r}))\n"
-        "assert slug == 'demo', slug\n"
+        f"block = sdd_gate.evaluate_payload(json.loads({json.dumps(payload)!r}))\n"
+        "assert block is None, block\n"
         "assert 'dadaia_workspace.container' not in sys.modules, 'container imported'\n"
     )
     result = subprocess.run(
@@ -62,6 +68,7 @@ def test_gate_resolution_path_never_imports_the_container(tmp_path) -> None:  # 
         capture_output=True,
         text=True,
         timeout=120,
+        cwd=ws,
         env={"WORKSPACE_ROOT": str(ws), "PATH": "/usr/bin:/bin"},
     )
     assert result.returncode == 0, result.stderr

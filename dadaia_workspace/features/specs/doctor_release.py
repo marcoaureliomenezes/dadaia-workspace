@@ -306,7 +306,8 @@ class ReleaseValidator:
         return issues
 
     def check_release_semver_naming(self) -> list[SpecsDoctorIssue]:
-        """SPEC-DOC-016: release folder names must follow SemVer (v<M>.<m>.<p>) for releases
+        """SPEC-DOC-016: release folder names must follow the release-id canon (bare
+        ``<M>.<m>.<p>``, optional ``-suffix``; the retired ``v`` axis only resolves) for releases
         whose SPEC.md has Created: >= RELEASE_SEMVER_CUTOFF.
 
         Vintage releases (Created: <= RELEASE_VINTAGE_CUTOFF) are excluded.
@@ -358,9 +359,11 @@ class ReleaseValidator:
                             code="SPEC-DOC-016",
                             severity=severity,
                             description=(
-                                f"Release folder '{folder_name}' does not follow SemVer "
-                                f"naming (^v\\d+\\.\\d+\\.\\d+$). Created: {created}. "
-                                "Rename to v<MAJOR>.<MINOR>.<PATCH> (D3, SPEC-DOC-016)."
+                                f"Release folder '{folder_name}' does not follow the "
+                                f"release-id canon ({RELEASE_SEMVER_RE.pattern}). "
+                                f"Created: {created}. Rename to <MAJOR>.<MINOR>.<PATCH> "
+                                "— bare id, no v prefix; `dadaia release new` mints "
+                                "only the bare axis (D3, SPEC-DOC-016)."
                             ),
                             path=str(entry),
                         )
@@ -509,7 +512,8 @@ class ReleaseValidator:
         return issues
 
     def check_release_naming_canon(self) -> list[SpecsDoctorIssue]:
-        """SPEC-DOC-027: release dir names should match ``^v\\d+\\.\\d+\\.\\d+$``.
+        """SPEC-DOC-027: release dir names should match the release-id canon
+        (``RELEASE_SEMVER_RE``; mintable ids are bare ``MAJOR.MINOR.PATCH``).
 
         Severity follows the same legacy policy as SPEC-DOC-016 so the two checks
         never disagree:
@@ -545,7 +549,7 @@ class ReleaseValidator:
                     severity=severity,
                     description=(
                         f"Release dir '{d.relative_to(self.specs_dir).as_posix()}' does "
-                        "not follow the naming canon ^v<MAJOR>.<MINOR>.<PATCH>$ "
+                        "not follow the release-id canon (bare <MAJOR>.<MINOR>.<PATCH>) "
                         + (
                             "— rename it (SPEC-DOC-027)."
                             if severity == Severity.ERROR
