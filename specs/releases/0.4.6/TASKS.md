@@ -28,7 +28,7 @@
   CONTEXT.md.
   Blocked by: T-046-08. Delivers: one skill owns the domain language, active
   and passive, reachable by every prose-writing agent.
-- [ ] T-046-10 — FR3 Merge B: `dd-architecture-survey` absorbs
+- [-] T-046-10 — FR3 Merge B: `dd-architecture-survey` absorbs
   `improve-codebase-architecture` (friction prompts, YAGNI scoping,
   HTML-REPORT.md report-mode sibling); `dadaia-codebase-design` diff-folded
   against the reference `codebase-design`; both local instance copies
