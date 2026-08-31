@@ -12,7 +12,7 @@ tools:
   - Write
   - Edit
 skills:
-  - dadaia-glossary
+  - dd-domain-modeling
   - dadaia-handoff-emitter
   - dd-release-implement
   - dd-release-definition

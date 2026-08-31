@@ -12,7 +12,7 @@ tools:
   - Write
   - WebSearch
 skills:
-  - dadaia-glossary
+  - dd-domain-modeling
   - dadaia-codebase-design
   - dd-grill-me
   - dadaia-handoff-emitter

@@ -65,4 +65,4 @@ flags, wrappers) breeding chains, and deletion-shaped fixes ending families.
 - Deepening a cluster given its dependencies: `DEEPENING.md` (dependency categories, seam discipline, replace-don't-layer testing).
 - Exploring alternative interfaces: `DESIGN-IT-TWICE.md` (parallel designs compared on depth, locality, seam placement).
 - Portfolio-level candidates from bug history: the `dd-architecture-survey` skill.
-- Domain terms: the repo's `CONTEXT.md` (see `dadaia-glossary`).
+- Domain terms: the repo's `CONTEXT.md` (see `dd-domain-modeling`).

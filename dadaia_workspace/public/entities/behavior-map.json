@@ -42,7 +42,7 @@
       "scoped_agents_md": [],
       "hash_tuple": {
         "section": "sha256:4ff73734813e198c0717caf61020c9c81de1fedf182240a22bdce7b32ffe17fe",
-        "skill": "sha256:5c1e532e057c11b9c55302d6b5425e5d00a62b3d192a709e3f3cc592853a3a91",
+        "skill": "sha256:f317da36d555e887f6237905d27a241caa9d6c7a906ac677c9f1530f36ef6ec6",
         "scoped": []
       },
       "recorded_by": "claude-code",
@@ -455,11 +455,11 @@
     {
       "section": "§6 Specs, tasks and memory",
       "anchor": null,
-      "skill": "dadaia-glossary",
+      "skill": "dd-domain-modeling",
       "scoped_agents_md": [],
       "hash_tuple": {
         "section": "sha256:ab59448f37391a5442a7dc46013dcc3645474faaac7c6d33d6c1dbf73945fce1",
-        "skill": "sha256:d51f2becadfaf644bdf121dc4f4bd7ed7769257764b633082b4fd8ef6d3b9cce",
+        "skill": "sha256:9fff21e0eacb570080181d97ac380877518c0f2df4150a35b4849de3da3c491a",
         "scoped": []
       },
       "recorded_by": "claude-code",
