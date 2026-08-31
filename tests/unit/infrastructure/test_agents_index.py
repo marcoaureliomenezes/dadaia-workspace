@@ -7,7 +7,9 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.infrastructure.install_helpers import build_agents_index
-from dadaia_workspace.infrastructure.public_assets import _parse_write_allowlist
+from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
+    _parse_write_allowlist,
+)
 
 _AGENT_WITH_WL = """---
 name: my-agent

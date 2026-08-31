@@ -54,7 +54,7 @@ def stage() -> None:
     # Defence-in-depth (rc-4 / T-017-36, bug agent-skill-surface-slop): fail staging on broken
     # agent→skill references so a stage with dangling skills never silently succeeds (doctor
     # also catches these post-hoc; this blocks them at the source).
-    from dadaia_workspace.infrastructure.codex_doctor import check_agent_skill_refs
+    from dadaia_workspace.infrastructure.entity_doctor import check_agent_skill_refs
 
     public_dir = Path(__file__).resolve().parent.parent.parent / "public"
     ref_drift = [r for r in check_agent_skill_refs(public_dir) if r.status is DoctorStatus.DRIFT]

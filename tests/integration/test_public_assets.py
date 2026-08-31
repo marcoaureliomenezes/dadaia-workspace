@@ -30,10 +30,8 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.core.exceptions import PublicAssetError
-from dadaia_workspace.infrastructure.public_assets import (
-    _PRIVACY_DENYLIST_ENV,
-    FileSystemPublicAssetManager,
-)
+from dadaia_workspace.infrastructure.privacy_check import _PRIVACY_DENYLIST_ENV
+from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from tests.helpers import public_asset_roster
 from tests.helpers.scan_population import assert_populated
 from tests.helpers.skill_inventory_oracle import skill_names

@@ -26,7 +26,7 @@ import json
 from pathlib import Path
 
 from dadaia_workspace.core.models.doctor_report import DoctorStatus
-from dadaia_workspace.infrastructure.codex_doctor import check_entities_derivation
+from dadaia_workspace.infrastructure.entity_doctor import check_entities_derivation
 
 # ---------------------------------------------------------------------------
 # Scratch-render builder
