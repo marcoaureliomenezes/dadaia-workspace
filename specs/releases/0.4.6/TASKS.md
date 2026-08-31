@@ -21,7 +21,7 @@
 - [x] T-046-04 — scaffolder + CLI: segment lane deleted; `release new` new shape
   + single-live refusal; `release rc-archive` verb. Write set:
   dadaia_workspace/features/specs/scaffolder.py, dadaia_workspace/cli/**, tests/**.
-- [ ] T-046-05 — migration: `_archive/*/RELEASE.json` → `_RELEASE.json`; this
+- [-] T-046-05 — migration: `_archive/*/RELEASE.json` → `_RELEASE.json`; this
   release flips to `_RELEASE.json`; pyproject 0.4.6; CHANGELOG `[0.4.6]`.
   Write set: specs/releases/**, pyproject.toml, CHANGELOG.md.
 - [ ] T-046-06 — law + skills: DADAIA.md §4.2/§6.7/glossary; dd-gitflow-default;
