@@ -19,7 +19,6 @@ from dadaia_workspace.features.specs.canon import (
     REQUIRED_ROOT_DIRS,
     is_canon_path,
 )
-from dadaia_workspace.features.specs.doctor_common import resolve_active_release
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
 from dadaia_workspace.features.specs.template_history import was_shipped
 
@@ -56,9 +55,6 @@ _TREE8_CANON_ROOT: frozenset[str] = CANON_ROOT_MEMBERS
 #: pending operator consent). TREE-8 must never additionally flag-and-auto-remove
 #: either — that would silently destroy exactly the content TREE-1/TREE-2 protect.
 _TREE8_DEFERRED_TO_SIBLING_CHECKS: frozenset[str] = frozenset({"foundation", "SPEC.md"})
-
-# TREE-6: mandatory artifacts per phase bucket.
-_TREE6_IMPL_ARTIFACTS = ("SPEC.md", "PLAN.md", "TASKS.md")
 
 # Migration hint printed loudly for TREE-1 and TREE-2 (regardless of --fix).
 _TREE_MIGRATION_HINT = (
@@ -391,79 +387,6 @@ class StructuralValidator:
                 fixable=False,
             )
         ]
-
-    def check_tree6_release_artifacts(self) -> list[SpecsDoctorIssue]:
-        """TREE-6: for the ACTIVE release, mandatory SDD artifacts must exist for its phase.
-
-        Rule: if the active release exists and its phase is IMPLEMENTATION or CLOSURE,
-        then SPEC.md, PLAN.md, and TASKS.md must all be present in the release directory.
-        Any missing file is an ERROR (no auto-fix — creating an empty PLAN.md would
-        constitute an unapproved artifact; human review is required).
-
-        Inactive / non-active releases are not checked here (SPEC-DOC-004 already
-        checks the active release's artifact statuses; we only add the TREE-6
-        structural check for the IMPLEMENTATION/CLOSURE gates).
-
-        Note: this invariant applies to the ACTIVE release only.  The broader
-        per-release artifact check (SPEC-DOC-004) covers Status: field validation.
-        """
-        issues: list[SpecsDoctorIssue] = []
-        release, segment, phase, err = resolve_active_release(self.specs_dir)
-        if err or not release or release == "none":
-            return issues
-        if phase not in ("IMPLEMENTATION", "CLOSURE"):
-            return issues
-        rdir = self.specs_dir / "releases" / release
-        if segment:  # dir-based segment (ADR-1/ADR-5): artifacts live in the segment dir
-            rdir = rdir / segment
-        if not rdir.exists():
-            # v0.4.3 T-043-22 [Arm-B rider] bug specs-doctor-segment-router-silent-skip:
-            # a live segment pointer at a missing segment directory used to `return
-            # issues` here silently, UNCONDITIONALLY. SPEC-DOC-009 (check_active_md,
-            # doctor_release.py) only validates the RELEASE directory
-            # (releases/<release>/) — it NEVER checks the segment SUBdirectory
-            # (releases/<release>/<segment>/), so a segmented active-release pointer
-            # at a missing segment dir was invisible to every downstream check (this
-            # one AND SPEC-DOC-004 in doctor_release.py). Scoped to `segment` truthy
-            # only: the
-            # FLAT-release case (no segment:) is genuinely, correctly covered already
-            # by check 9's own release-dir check (rdir IS the release dir there) —
-            # firing here too would duplicate that finding.
-            if segment:
-                issues.append(
-                    SpecsDoctorIssue(
-                        code="TREE-6",
-                        severity=Severity.ERROR,
-                        description=(
-                            f"Active release '{release}' (phase={phase}) segment="
-                            f"'{segment}' but no directory at {rdir} — the segment "
-                            "directory itself is missing; SPEC-DOC-009 validates "
-                            "only the release directory, never the segment "
-                            "subdirectory."
-                        ),
-                        path=str(rdir),
-                        fixable=False,
-                    )
-                )
-            return issues
-        for fname in _TREE6_IMPL_ARTIFACTS:
-            fpath = rdir / fname
-            if not fpath.exists():
-                issues.append(
-                    SpecsDoctorIssue(
-                        code="TREE-6",
-                        severity=Severity.ERROR,
-                        description=(
-                            f"Active release '{release}' (phase={phase}) is missing "
-                            f"mandatory SDD artifact: {fname}. "
-                            "Create the artifact via the SDD lifecycle (product-engineer) — "
-                            "do NOT create an empty placeholder."
-                        ),
-                        path=str(fpath),
-                        fixable=False,
-                    )
-                )
-        return issues
 
     def check_tree7_bug_session_id(self) -> list[SpecsDoctorIssue]:
         """TREE-7: every bugs/<slug>.md must have a session_id frontmatter field.

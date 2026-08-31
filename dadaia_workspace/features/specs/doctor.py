@@ -163,7 +163,8 @@ class SpecsDoctor:
         # SPEC-DOC-012/022/023 RETIRED (v0.12.0 T-120-08, ADR D10) — the candidates.md
         # bullet-schema validator retired with candidates.md itself, archived by the
         # same cutover; see doctor_governance.py's module docstring.
-        issues.extend(self._release.check_release_semver_naming())
+        # SPEC-DOC-016 RETIRED (0.5.3 T-053-04, F005) — one naming rule, one
+        # implementation: SPEC-DOC-027 (check_release_naming_canon) below.
         # TREE invariants (spec-context-tree-v2)
         issues.extend(self._structural.check_tree1_foundation())
         issues.extend(self._structural.check_repo_dadaia1())
@@ -172,7 +173,8 @@ class SpecsDoctor:
         issues.extend(self._structural.check_tree4_required_dirs())
         issues.extend(self._structural.check_tree5_agents_md())
         issues.extend(self._structural.check_memory_agents_md())
-        issues.extend(self._structural.check_tree6_release_artifacts())
+        # TREE-6 RETIRED (0.5.3 T-053-04, F005) — one artifact rule, one
+        # implementation: SPEC-DOC-004 (check_active_release_artifacts) above.
         issues.extend(self._structural.check_tree7_bug_session_id())
         issues.extend(self._structural.check_tree8_canon_root())  # v6 canon, FR1
         # CAT-1 (memory-context-enforcement-v1) — now based on .md files

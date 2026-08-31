@@ -2,7 +2,7 @@
 invariants.
 
 Single-responsibility sibling of the SpecsDoctor coordinator. Owns the active-release lifecycle
-checks (SPEC-DOC-003/004/005/009), SemVer naming (SPEC-DOC-016), the release ledger
+checks (SPEC-DOC-003/004/005/009), the release ledger
 invariants (phase↔markers SPEC-DOC-024, unique ids SPEC-DOC-026, naming canon SPEC-DOC-027),
 and the partial-archive residue invariant (SPEC-DOC-039, v0.1.81 FR2), plus the family-local
 status/created-date extractors. Leaf-only: imports the shared leaves + core, never a sibling
@@ -43,7 +43,8 @@ CANONICAL_PHASES = _PHASES
 HARD_LIMIT_PLAN_CUTOFF = date(2026, 5, 17)
 PLAN_MAX_LINES = 300
 
-# SPEC-DOC-016: SemVer folder naming for releases created on/after this date (D3).
+# Release-id canon cutoff (D3): a live release whose SPEC.md Created: is on/after
+# this date must carry a canon-conformant directory name (SPEC-DOC-027).
 # Vintage releases (Created: <= 2026-06-04) are excluded — this grandfathers the frozen
 # pre-June-5 _archive sub-patch releases (v0.1.4.1..v0.1.4.6, ctx-inject-v2-drift-fix-v1)
 # that predate the SemVer-folder mandate's rollout; the rule keeps hard-enforcing for
@@ -52,8 +53,6 @@ PLAN_MAX_LINES = 300
 # RELEASE_SEMVER_RE is the shared canon (core.specs_version), imported above — v0.1.53 FR3
 # centralised the pattern; the module-level name is preserved for the call sites below.
 RELEASE_SEMVER_CUTOFF = date(2026, 6, 1)  # WARNING starts here
-RELEASE_SEMVER_HARD = date(2026, 7, 1)  # ERROR starts here
-RELEASE_VINTAGE_CUTOFF = date(2026, 6, 4)  # releases on/before this are excluded
 
 # SPEC-DOC-027 (ADR-9, v0.1.11): permanent documented allowlist of legacy ``_archive``
 # release-dir names that predate the SemVer naming canon. These are FROZEN HISTORY:
@@ -305,71 +304,6 @@ class ReleaseValidator:
             )
         return issues
 
-    def check_release_semver_naming(self) -> list[SpecsDoctorIssue]:
-        """SPEC-DOC-016: release folder names must follow the release-id canon (bare
-        ``<M>.<m>.<p>``, optional ``-suffix``; the retired ``v`` axis only resolves) for releases
-        whose SPEC.md has Created: >= RELEASE_SEMVER_CUTOFF.
-
-        Vintage releases (Created: <= RELEASE_VINTAGE_CUTOFF) are excluded.
-        Severity: WARNING until RELEASE_SEMVER_HARD, ERROR on/after that date;
-        an ARCHIVED legacy dir is always at most WARNING — SPEC-DOC-027 explicitly
-        preserves archived legacy names until renamed, and a hard 016 ERROR on the
-        same path contradicted it and left preflight permanently red with no
-        non-destructive remediation (bug
-        doctor-016-errors-archived-legacy-release-027-tolerates).
-
-        Applies to specs/releases/ — root specs/_archive/releases/ retired (v6 canon,
-        not a canon root member; T-050-14 deleted its last content).
-        """
-        issues: list[SpecsDoctorIssue] = []
-        today = date.today()
-
-        # Only run this check if we are at or past the cutoff
-        if today < RELEASE_SEMVER_CUTOFF:
-            return issues
-
-        severity = Severity.ERROR if today >= RELEASE_SEMVER_HARD else Severity.WARNING
-
-        releases_root = self.specs_dir / "releases"
-        if releases_root.exists():
-            for entry in releases_root.iterdir():
-                if not entry.is_dir():
-                    continue
-                folder_name = entry.name
-                # Resolve Created: date from SPEC.md
-                spec_path = entry / "SPEC.md"
-                created = _extract_created_date(spec_path) if spec_path.exists() else None
-
-                # Skip vintage releases (Created: <= RELEASE_VINTAGE_CUTOFF)
-                if created is not None and created <= RELEASE_VINTAGE_CUTOFF:
-                    continue
-
-                # Skip releases without a determinable Created: date
-                # (they could be legacy — give benefit of the doubt)
-                if created is None:
-                    continue
-
-                # Skip releases created before the cutoff
-                if created < RELEASE_SEMVER_CUTOFF:
-                    continue
-
-                if not RELEASE_SEMVER_RE.match(folder_name):
-                    issues.append(
-                        SpecsDoctorIssue(
-                            code="SPEC-DOC-016",
-                            severity=severity,
-                            description=(
-                                f"Release folder '{folder_name}' does not follow the "
-                                f"release-id canon ({RELEASE_SEMVER_RE.pattern}). "
-                                f"Created: {created}. Rename to <MAJOR>.<MINOR>.<PATCH> "
-                                "— bare id, no v prefix; `dadaia release new` mints "
-                                "only the bare axis (D3, SPEC-DOC-016)."
-                            ),
-                            path=str(entry),
-                        )
-                    )
-        return issues
-
     def _active_tasks_markers(self, release: str, segment: str | None) -> list[str] | None:
         """Return the list of task marker chars (' ', '-', 'x') for the active release's
         TASKS.md, or None when TASKS.md is absent/unreadable."""
@@ -515,14 +449,14 @@ class ReleaseValidator:
         """SPEC-DOC-027: release dir names should match the release-id canon
         (``RELEASE_SEMVER_RE``; mintable ids are bare ``MAJOR.MINOR.PATCH``).
 
-        Severity follows the same legacy policy as SPEC-DOC-016 so the two checks
-        never disagree:
+        The ONE naming rule (F005, 20260830 audit — SPEC-DOC-016 retired as a second
+        implementation of this same rule; no ``date.today()`` gating survives):
         - A non-conforming dir in the live ``releases/`` tree whose SPEC.md
           ``Created:`` date is on/after the canon cutoff (``RELEASE_SEMVER_CUTOFF``)
           is an ERROR — a release born after the canon must be SemVer-clean.
-        - Every other non-conforming dir (archive, vintage ``Created:`` ≤
-          ``RELEASE_VINTAGE_CUTOFF``, pre-cutoff, or undeterminable date) is a
-          WARNING — legacy names predate the canon and are preserved until renamed.
+        - Every other non-conforming dir (archive, pre-cutoff ``Created:``, or an
+          undeterminable date) is a WARNING — legacy names predate the canon and are
+          preserved until renamed.
 
         ADR-9 (v0.1.11): archived dirs whose name is in the permanent documented
         ``RELEASE_NAMING_LEGACY_ALLOWLIST`` are silenced entirely — they are frozen

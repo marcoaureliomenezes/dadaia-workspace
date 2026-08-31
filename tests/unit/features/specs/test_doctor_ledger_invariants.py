@@ -7,7 +7,7 @@ following the SPEC-DOC-NNN convention:
 - SPEC-DOC-006 (extended) — CLOSURE-before-archive, recursive into nested archive dirs.
 - SPEC-DOC-026 — unique release ids across releases/ u _archive/releases/ (recursive),
   WARN for documented legacy nested dirs.
-- SPEC-DOC-027 — naming canon ``^v\\d+\\.\\d+\\.\\d+$`` for release dirs, legacy WARN
+- SPEC-DOC-027 — the ONE release-dir naming canon (bare MAJOR.MINOR.PATCH), legacy WARN
   (ADR-9 permanent allowlist, forward-enforced).
 - SPEC-DOC-028 — constitution file-ref resolution (WARN on a missing repo file).
 - SPEC-DOC-029 — RETIRED (v0.1.76 T-4, FR7, NO-LOCKS DOCTRINE). Formerly the
