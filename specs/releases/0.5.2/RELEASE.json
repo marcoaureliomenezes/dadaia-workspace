@@ -52,6 +52,12 @@
    "agent": "claude-code",
    "kind": "note",
    "text": "rc-1 PR, trio verdicts, implemented/shipped milestones and publication are operator-gated and intentionally NOT executed: the /goal scope was define + implement the 32 findings. pyproject bumped to 0.5.2 per SPEC-DOC-045 at closure; publish gate untouched."
+  },
+  {
+   "ts": "2026-08-31T03:57:44Z",
+   "agent": "claude-code",
+   "kind": "note",
+   "text": "Correction to the dispositions entry: backlog-new-append-reported-as-created WAS fixed in-release after all (shape-3 commit; created vs appended echoed from the writer's own fact) \u2014 the picked set closes 2 resolved + 1 superseded, leaving only the routed projection-staleness bug open."
   }
  ]
 }
