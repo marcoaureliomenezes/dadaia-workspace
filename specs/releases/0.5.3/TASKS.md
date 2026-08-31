@@ -37,7 +37,7 @@
 
 ## alpha-5 (AI-surface backlog consumption — extension, operator order 2026-08-31)
 
-- [-] T-053-19 — dadaia-codebase-design skill + architect-core-workflow fuse (write set: dadaia_workspace/public/skills/dadaia-codebase-design/, dadaia_workspace/public/skills/architect-core-workflow/ (delete), dadaia_workspace/public/agents/software-architect.md, dadaia_workspace/public/entities/behavior-map.json)
+- [-] T-053-19 — dadaia-codebase-design skill + architect-core-workflow fuse (write set: dadaia_workspace/public/skills/dadaia-codebase-design/, dadaia_workspace/public/skills/architect-core-workflow/ (delete), dadaia_workspace/public/agents/, dadaia_workspace/public/entities/behavior-map.json)
 - [ ] T-053-20 — dd-architecture-survey skill (write set: dadaia_workspace/public/skills/dd-architecture-survey/, dadaia_workspace/public/entities/behavior-map.json)
 - [ ] T-053-21 — dd-code-review skill + persona thinning (write set: dadaia_workspace/public/skills/dd-code-review/, dadaia_workspace/public/agents/code-reviewer.md, dadaia_workspace/public/entities/behavior-map.json)
 - [ ] T-053-22 — dadaia-glossary skill + CONTEXT.md homonyms (write set: dadaia_workspace/public/skills/dadaia-glossary/, CONTEXT.md, dadaia_workspace/public/entities/behavior-map.json)
