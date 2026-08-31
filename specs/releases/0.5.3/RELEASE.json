@@ -1,7 +1,7 @@
 {
  "schema": "release-state-v1",
  "release": "0.5.3",
- "phase": "IMPLEMENTATION",
+ "phase": "CLOSURE",
  "rc": null,
  "defined": {
   "sha": "510423de4f924f3a9e60b167e5c0a9af8fee81ff",
@@ -16,6 +16,30 @@
    "agent": "claude-code",
    "kind": "note",
    "text": "Remediation release for 20260830-design-bug-surface-audit (17 findings; 15 in-release, F010+F012 deferred to specs-tree-model-rule-registry per the audit's own sequencing). Operator order 2026-08-31; grill satisfied by the audit evidence + direct order."
+  },
+  {
+   "ts": "2026-08-31T15:25:41Z",
+   "agent": "claude-code",
+   "kind": "note",
+   "text": "Scope correction over the definition note: the operator's mid-definition order required ALL 17 findings in-release — the F010+F012 deferral was reversed; specs-tree-model-rule-registry was consumed by this release (T-053-16), not deferred."
+  },
+  {
+   "ts": "2026-08-31T15:25:41Z",
+   "agent": "claude-code",
+   "kind": "summary",
+   "text": "Design/bug-surface remediation: all 17 findings of 20260830-design-bug-surface-audit fixed in-release across T-053-01..16; audit dispositioned and archived (T-053-17). Structural folds: one context->specs resolver reaches hooks+CLI via the sanctioned seam; phase vocabulary, release-id fragment, memory-canon facts, registry accessor, session-record schema/liveness/reaper, first-parent — each ONE home. Extractions: injection policy pure (decision-table tested), secret scan to the privacy module, scoped-law placement, panel composition to its single consumer, entity_doctor honest home. Deletions: TREE-6 + SPEC-DOC-016 (one rule one implementation), dead process-ancestry chain (-443), dead BOUND_READ/_compare_content/is_stale-field, container 594->~360. New deep modules: SpecsTree snapshot (active release parsed once per run) + RULES registry driving check/fix/--fix-help. Picked bug resolved: shipped-history covers every scoped scaffold law file; 5 stale projections refreshed on this instance."
+  },
+  {
+   "ts": "2026-08-31T15:25:41Z",
+   "agent": "claude-code",
+   "kind": "size",
+   "text": "Net-negative production diff: two rule implementations, a dead adapter chain, a re-export shim, string-protocol parsing and four duplicated deciders deleted; additions are small owning modules (memory_canon, injection_policy, scoped_law, specs_tree, rules, entity_doctor relocation, panel_composition move) each replacing 2+ scattered copies. Full suite 2866 tests green; import-linter 7/7 contracts kept (one CI-only violation caught and fixed locally)."
+  },
+  {
+   "ts": "2026-08-31T15:25:41Z",
+   "agent": "claude-code",
+   "kind": "dispositions",
+   "text": "Backlog: 6 entries CONSUMED by 0.5.3 (terminal, release recorded). Bugs: releases-agents-projection-stale-vs-scaffold-source RESOLVED in-release (T-053-15); 0 open bugs at closure. Audit 20260830-design-bug-surface-audit: 17/17 fixed, archived to audits_histo.jsonl, directory removed per source law."
   }
  ]
 }
