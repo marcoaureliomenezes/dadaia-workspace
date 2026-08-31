@@ -293,9 +293,7 @@ class TestContentConsistency:
                 )
         # T-053-25: dev-server-registry merged into the CLI-help surface — the law's
         # non-derivable half lives in dd-cli-library §6 now.
-        cli_library_skill = (skills_dir / "dd-cli-library" / "SKILL.md").read_text(
-            encoding="utf-8"
-        )
+        cli_library_skill = (skills_dir / "dd-cli-library" / "SKILL.md").read_text(encoding="utf-8")
         for cmd in (
             "dadaia server list",
             "dadaia server next",
