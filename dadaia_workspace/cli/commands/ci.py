@@ -293,18 +293,6 @@ def push_gate_check() -> None:
     if decision.warn:
         typer.echo(decision.warn, err=True)
 
-    # F015/F036 (20260827 audit): bundled-ledger advisory — WARN-only, never blocks.
-    staged = subprocess.run(  # noqa: S603 — fixed argv, repo-root cwd
-        ["git", "diff", "--cached", "--name-only"],
-        capture_output=True,
-        text=True,
-        cwd=repo_root,
-        check=False,
-    ).stdout.splitlines()
-    bundling_warn = bundled_ledger_advisory(staged)
-    if bundling_warn:
-        typer.echo(bundling_warn, err=True)
-
     if not decision.allowed:
         typer.secho(decision.message, fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
