@@ -98,11 +98,10 @@ _SEAM_FUNCTION_NAMES = frozenset(
     {
         "resolve_specs_dir_for_cli",
         "resolve_context_for_cli",
-        # T-053-01 (F003, 20260830 audit): core.invocation.resolve_context_specs_dir IS
-        # the one context->specs resolver; the container pass-through wrapper is deleted.
-        # CLI callers import it under the private alias below (dadaia.specs.doctor).
-        "resolve_context_specs_dir",
-        "_core_resolve_context_specs_dir",
+        # T-053-01 (F003, 20260830 audit): the one context->specs resolver
+        # (core.invocation.resolve_context_specs_dir) reaches CLI verbs through the
+        # sanctioned seam wrapper below (bind-resolution-seam-is-a-single-home).
+        "resolve_context_specs_dir_for_cli",
     }
 )
 

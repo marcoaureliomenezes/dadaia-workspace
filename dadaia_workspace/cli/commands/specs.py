@@ -9,9 +9,9 @@ from pathlib import Path
 import typer
 
 from dadaia_workspace import container
-from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
-from dadaia_workspace.core.invocation import (
-    resolve_context_specs_dir as _core_resolve_context_specs_dir,
+from dadaia_workspace.cli._specs_resolution import (
+    resolve_context_specs_dir_for_cli,
+    resolve_specs_dir_for_cli,
 )
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.specs import Severity, SpecsDoctor
@@ -222,7 +222,7 @@ def doctor(
     if specs_dir is not None and context is not None:
         raise typer.BadParameter("Pass either --context or --specs-dir, not both.")
     if context is not None:
-        target = _core_resolve_context_specs_dir(resolve_workspace_root(), context)
+        target = resolve_context_specs_dir_for_cli(resolve_workspace_root(), context)
     else:
         target = _resolve_specs_dir(specs_dir)
     if public_dir is not None:
