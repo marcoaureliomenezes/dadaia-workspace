@@ -164,7 +164,10 @@ def _print_recipe(issues: list[SpecsDoctorIssue]) -> None:
         typer.echo(step)
 
 
-@app.command("doctor")
+@app.command(
+    "doctor",
+    epilog="Examples: dadaia specs doctor --context my-ctx | dadaia specs doctor --specs-dir specs --fix",
+)
 def doctor(
     specs_dir: str | None = typer.Option(
         None,

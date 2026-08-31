@@ -276,6 +276,15 @@ def _stamp_sentinel(tmp_dir: Path, sentinel: Path, slug: str) -> None:
         )
 
 
+def _read_help_digest(workspace: Path) -> str:
+    """The derived CLI help digest, or ``""`` (fail-soft). Built by install/reconcile
+    (`dadaia help tree --digest`) — NEVER here: the hook only reads the file."""
+    try:
+        return (workspace / ".dadaia" / "agentic" / "help-digest.md").read_text(encoding="utf-8")
+    except OSError:
+        return ""
+
+
 def _generic_preflight(workspace: Path) -> str:
     """Generic preflight payload: ``[no bound context]`` + the ALIVE-context list.
 
@@ -291,6 +300,10 @@ def _generic_preflight(workspace: Path) -> str:
         sections.append("=== ALIVE contexts (bind one to inject its memory) ===")
         sections.extend(f"- {name}" for name in alive)
         sections.append("=== end ALIVE contexts ===")
+    digest = _read_help_digest(workspace)
+    if digest:
+        sections.append("")
+        sections.append(digest.rstrip("\n"))
     return "\n".join(sections) + "\n"
 
 
@@ -304,6 +317,9 @@ def _emit_bootstrap(workspace: Path, context: str) -> None:
     memory = _build_memory(invocation.resolve_context_specs_dir(workspace, context))
     if memory:
         sections.append(memory)
+    digest = _read_help_digest(workspace)
+    if digest:
+        sections.append(digest.rstrip("\n"))
     _emit("\n".join(sections) + "\n")
 
 

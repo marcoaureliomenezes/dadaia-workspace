@@ -608,7 +608,9 @@ _BIND_MODE_ALIASES: dict[str, str] = {
 _MUTATING_MODES = ("IMPLEMENTATION", "REVIEW")
 
 
-@app.command()
+@app.command(
+    epilog="Examples: eval $(dadaia context bind my-ctx --mode implementation --release 1.2.3 --print-env) | dadaia context bind my-ctx --mode read"
+)
 def bind(
     name: str = typer.Argument(..., help="Context name to bind to"),
     mode: str = typer.Option(

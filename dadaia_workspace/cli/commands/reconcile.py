@@ -29,6 +29,9 @@ def reconcile(
     if json_output:
         typer.echo(json.dumps(payload, sort_keys=True))
     elif result.ok:
+        from dadaia_workspace.cli.help_digest import write_digest
+
+        write_digest(workspace_root)  # derived help digest rider; fail-soft
         typer.echo(f"[ok] reconciled dadaia-workspace {result.actual_version}")
         for step in result.steps:
             typer.echo(f"  [ok] {step}")

@@ -127,7 +127,10 @@ def _service(target: Path, *, with_archive: bool = False) -> BugService:
     )
 
 
-@bugs_app.command("append")
+@bugs_app.command(
+    "append",
+    epilog="Example: dadaia bugs append --bug-id my-bug --title '...' --severity MEDIUM --surface cli --component dadaia_workspace/cli/commands/bugs.py --symptom '...' --repro '...' --expected '...'",
+)
 def bugs_append_cmd(
     bug_id: str = typer.Option(..., "--bug-id", help="Stable kebab-case bug identifier."),
     reported_by: str = typer.Option(

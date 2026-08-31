@@ -443,3 +443,18 @@ def test_bound_context_name_maps_to_registry_repo_slug(tmp_path: Path) -> None:
     out = _run(tmp_path, "sess-slugmap")
     assert "[pretty-name]" in out
     assert "Python 3.12" in out
+
+
+def test_emissions_attach_the_derived_help_digest(tmp_path: Path) -> None:
+    """T-053-24 (backlog cli-help-architecture): the digest rides EVERY emission,
+    bind-independent — read from .dadaia/agentic/help-digest.md, never built here."""
+    (tmp_path / ".dadaia" / "agentic").mkdir(parents=True)
+    (tmp_path / ".dadaia" / "agentic" / "help-digest.md").write_text(
+        "# dadaia CLI digest (vX)\n\n## dadaia context — ...\n", encoding="utf-8"
+    )
+    (tmp_path / ".dadaia" / "states").mkdir(parents=True)
+    (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text(
+        '{"schema_version": "2", "contexts": []}', encoding="utf-8"
+    )
+    out = _run(tmp_path, "sess-digest")
+    assert "# dadaia CLI digest" in out
