@@ -38,8 +38,8 @@
 ## alpha-5 (AI-surface backlog consumption — extension, operator order 2026-08-31)
 
 - [x] T-053-19 — dadaia-codebase-design skill + architect-core-workflow fuse (write set: dadaia_workspace/public/skills/dadaia-codebase-design/, dadaia_workspace/public/skills/architect-core-workflow/ (delete), dadaia_workspace/public/agents/, dadaia_workspace/public/entities/behavior-map.json)
-- [-] T-053-20 — dd-architecture-survey skill (write set: dadaia_workspace/public/skills/dd-architecture-survey/, dadaia_workspace/public/entities/behavior-map.json)
-- [ ] T-053-21 — dd-code-review skill + persona thinning (write set: dadaia_workspace/public/skills/dd-code-review/, dadaia_workspace/public/agents/code-reviewer.md, dadaia_workspace/public/entities/behavior-map.json)
+- [x] T-053-20 — dd-architecture-survey skill (write set: dadaia_workspace/public/skills/dd-architecture-survey/, dadaia_workspace/public/entities/behavior-map.json)
+- [-] T-053-21 — dd-code-review skill + persona thinning (write set: dadaia_workspace/public/skills/dd-code-review/, dadaia_workspace/public/agents/code-reviewer.md, dadaia_workspace/public/entities/behavior-map.json)
 - [ ] T-053-22 — dadaia-glossary skill + CONTEXT.md homonyms (write set: dadaia_workspace/public/skills/dadaia-glossary/, CONTEXT.md, dadaia_workspace/public/entities/behavior-map.json)
 - [ ] T-053-23 — tracer-bullets section in dd-release-definition (write set: dadaia_workspace/public/skills/dd-release-definition/SKILL.md, dadaia_workspace/public/entities/behavior-map.json)
 - [ ] T-053-24 — CLI help architecture + derived digest + session injection (write set: dadaia_workspace/cli/, dadaia_workspace/hooks/ctx_inject.py, dadaia_workspace/features/spec_context/injection_policy.py, dadaia_workspace/infrastructure/runtime_config.py, dadaia_workspace/features/, tests)
