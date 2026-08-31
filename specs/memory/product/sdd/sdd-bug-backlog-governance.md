@@ -20,7 +20,7 @@ tags: [sdd, governance, release-lifecycle, backlog, bugs, gitflow]
 - Legacy v5-fold records carry `migration_note="v5-fold-incomplete"` and warn no further.
 - `bugs archive` idempotently moves terminal records older than 90 days to `_archive/bugs_histo.jsonl`.
 - A bug is fixed on the spot on the live feature branch — register, root-cause, RED test, fix, GREEN, `resolved` with evidence, commit — with no SPEC, PLAN, TASKS or release directory.
-- Diagnosis is seven ordered phases, phase 0 being the lineage duty over the 20 most recent records sharing this bug's `surface` or `component` in the audit window, ending in `caused_by: <bug-id> | none` with evidence (`dd-diagnose`).
+- Diagnosis is seven ordered phases, phase 0 being the lineage duty over the 20 most recent records sharing this bug's `surface` or `component` in the audit window, ending in `caused_by: <bug-id> | none` with evidence (`dd-bug-resolution`).
 - `registration_commit` and `resolved_commit` are a git-derived cache (`core/bug_provenance.py`, all-refs first-add-wins over `specs/bugs/`, additions only) at granularity `exact`, `release-squash` or `ledger-only`, only `exact` being diffable lineage; the audit's first pillar is its only writer ([[audits-canon]]).
 
 ## Backlog
