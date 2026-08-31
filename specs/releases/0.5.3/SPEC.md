@@ -11,7 +11,7 @@
 > direct order (recorded deviation). Rides `feature/0.5.2` (0.5.2 archived pre-ship;
 > one live branch, precedent 0.4.5/0.5.0/0.5.1).
 
-**Consumes:** dissolve-container-feature-composition, session-binding-deep-module, specs-single-decider-folds, projection-finish-k3, specs-tree-model-rule-registry, design-audit-residue-hygiene
+**Consumes:** dissolve-container-feature-composition, session-binding-deep-module, specs-single-decider-folds, projection-finish-k3, specs-tree-model-rule-registry, design-audit-residue-hygiene, dadaia-codebase-design, dd-architecture-survey, dd-code-review, dadaia-glossary, dd-tasks-as-tracer-bullets, cli-help-architecture-and-session-injection, nine-skill-study-execution
 
 ---
 
@@ -67,3 +67,25 @@ modules are named.
 - Every task: TDD, targeted tests per task, full preflight at closure; each diff justified
   net-negative/neutral or explicitly argued against the permanent-architecture-review rule.
 - Refactors touch high-fan-in core files — full suite is the integration gate.
+
+---
+
+## Extension — AI-surface backlog consumption (operator order 2026-08-31)
+
+Conclusion criterion: **0 bugs, 0 active backlog, 0 audit findings.** The 9 remaining
+candidates were reviewed against current reality; 7 picked, 2 rejected (grill with the
+operator, 4 rulings recorded in RELEASE.json).
+
+| Task | Entry | Work (obsolescence review folded in) |
+|---|---|---|
+| T-053-19 | dadaia-codebase-design (+ nine-skill Fuse×1) | New public reference skill: the design vocabulary (seam, deep module, deletion test, adapter, locality, replace-don't-layer) + DEEPENING + DESIGN-IT-TWICE companions; retire `architect-core-workflow` (fuse); repoint software-architect persona; behavior-map row |
+| T-053-20 | dd-architecture-survey | New user-invoked skill (disable-model-invocation): bugs stats × git churn → architecture cards + ONE top candidate → grill; ADDITIVE-only; behavior-map row |
+| T-053-21 | dd-code-review | New skill, three axes (Standards+12-Fowler baseline, Spec, Bug-surface); code-reviewer persona invokes it and thins; behavior-map row |
+| T-053-22 | dadaia-glossary | Small skill: sharpen-inline over the repo CONTEXT.md; seed the five homonyms (scaffold, sentinel, quarantine, context, workflow) into CONTEXT.md. ADR-format half SUPERSEDED by the specs/ADRs JSONL canon (recorded in histo) |
+| T-053-23 | dd-tasks-as-tracer-bullets | As a SECTION of dd-release-definition (grill lean honored): every task carries `blocked by:` + `delivers:`; demolitions follow expand–contract |
+| T-053-24 | cli-help-architecture-and-session-injection (A/B/C) | (A) docker-style help: rich_markup_mode, no_args_is_help, Common/Management panels at root, epilogs on high-traffic leaves, help-quality contract test; (B) derived digest verb (`dadaia help tree --digest`, ≤4k tokens, version-stamped under .dadaia/agentic/, regenerated at install/reconcile — never at hook fire); (C) ctx_inject attaches the digest bind-independent; Claude gains SessionStart `startup|resume` matchers. Item (D) decommission: ALREADY DELIVERED by evolution (`dadaia-cli` → `dd-cli-library`, cache-not-transcription); residual sweep rides T-053-25's merges |
+| T-053-26 | (closure) | Extension closure: disposition rewrite of the 7 histo records to terminal, memory/CHANGELOG addenda, re-close |
+
+T-053-25 | nine-skill-study-execution | Execute the ratified dispositions (handoff 2026-08-24T015304Z): Update×5 (dadaia-task-manager, dadaia-handoff-emitter, dadaia-step0-memory-bootstrap, dadaia-test-stewardship, dadaia-workspace-spec-navigator — staleness/sediment fixes), Merge dadaia-workspace-spec-reviewer→dd-audit-project, Merge dadaia-workspace-manager→CLI-help surface, Merge dev-server-registry→CLI-help surface, Fuse architect-core-workflow→dadaia-codebase-design (rides T-053-19); behavior-map + persona allowlists updated.
+
+Rejected with recorded reasons (histo): **dadaia-router** (superseded — DADAIA.md-in-statements + behavior-map already answer "where am I, which skill next"), **dadaia-wizard** (speculative — no concrete human-only runbook in hand; re-enter on value).
