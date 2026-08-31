@@ -123,3 +123,25 @@ _Avoid_: ledger, reader, dao
 **Registry**:
 A name-to-identity map (contexts, servers, harnesses); it holds no behaviour.
 _Avoid_: service, store, catalog (except the memory catalog)
+
+## Doctor internals (0.5.3)
+
+**SpecsTree**:
+The parsed snapshot of shared specs facts, built fresh at the start of every doctor `check()` run; the active release is parsed once per run. Checks read the tree; fixes take paths; a snapshot never survives a mutation pass.
+_Avoid_: cached doctor, tree model (bare)
+
+**Rule registry**:
+`features/specs/rules.py::RULES` — the one ordered table check order, fix dispatch and the `--fix` help derive from.
+_Avoid_: check list, fix branch table
+
+**Injection decision**:
+The pure outcome `decide_injection` returns for one ctx-inject invocation (what to emit, which slug to stamp); the hook is transport.
+_Avoid_: injection state machine, hook branch
+
+**Shipped history**:
+`shipped-hashes.json` — the sha256 set of every published version of a projected law file; bytes found there are provably uncustomised, so refreshing them is lossless.
+_Avoid_: template hashes, drift allowlist
+
+**Scoped law**:
+A per-area `AGENTS.md` projected from `public/scaffold/<area>/` (or the repo/tests pair placed by `scoped_law.install_scoped_law`); governed by TREE-5's shipped-history discipline.
+_Avoid_: sub-AGENTS, area rules file
