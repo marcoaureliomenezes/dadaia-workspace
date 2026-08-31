@@ -62,15 +62,9 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from dadaia_workspace.core import kernel_tunables
 from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
-from dadaia_workspace.core.record_liveness import is_stale
 from dadaia_workspace.core.release_state import parse_release_state
-from dadaia_workspace.core.session_store import (
-    SESSION_GC_TTL_FIELD,
-    liveness_timestamp,
-    read_session,
-)
+from dadaia_workspace.core.session_store import live_session, read_session
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 
 __all__ = [
@@ -312,14 +306,8 @@ def _live_session_context(workspace_root: Path, session_id: str | None) -> str |
     missing/stale/deleted-context."""
     if not session_id:
         return None
-    record = read_session(workspace_root, session_id)
+    record = live_session(workspace_root, session_id)
     if record is None:
-        return None
-    gc_check: dict[str, object] = {
-        "heartbeat": liveness_timestamp(record),
-        "ttl": record.get(SESSION_GC_TTL_FIELD, kernel_tunables.SESSION_GC_TTL_SECONDS),
-    }
-    if is_stale(gc_check):
         return None
     context = record.get("context")
     context = str(context) if context else None
