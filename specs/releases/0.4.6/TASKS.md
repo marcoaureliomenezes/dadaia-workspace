@@ -8,11 +8,11 @@
 
 ## Candidate 1 — release-candidates system
 
-- [ ] T-046-01 — core/release_state: `_RELEASE.json` decider + legacy constant;
+- [x] T-046-01 — core/release_state: `_RELEASE.json` decider + legacy constant;
   readers (doctor_release, specs_tree, reports/next, invocation) import it.
   Write set: dadaia_workspace/core/release_state.py, dadaia_workspace/features/specs/**,
   dadaia_workspace/features/reports/next.py, dadaia_workspace/core/invocation.py, tests/**.
-- [ ] T-046-02 — canon: `_RELEASE.json` entry, `rc-N/` trio entries, legacy
+- [-] T-046-02 — canon: `_RELEASE.json` entry, `rc-N/` trio entries, legacy
   rename-lane entry; segment entries retired. Write set:
   dadaia_workspace/features/specs/canon.py, tests/**.
 - [ ] T-046-03 — doctor: fixable rename rule, one-live-release rule, segment

@@ -24,7 +24,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from dadaia_workspace.core.release_state import ReleaseState, parse_release_state
+from dadaia_workspace.core.release_state import ReleaseState, parse_release_state, release_state_file
 
 # A dir counts as a "release dir" iff it carries at least one SDD release artifact.
 # Public name (v0.1.81 FR2): reused by doctor_release's partial-archive invariant
@@ -66,7 +66,7 @@ def resolve_live_release_id(specs_dir: Path) -> tuple[str | None, str | None]:
     candidates = sorted(
         d.name
         for d in releases_root.iterdir()
-        if d.is_dir() and d.name not in ("_archive", "_ideas") and (d / "RELEASE.json").is_file()
+        if d.is_dir() and d.name not in ("_archive", "_ideas") and release_state_file(d) is not None
     )
     if not candidates:
         return None, None
@@ -98,8 +98,8 @@ def _read_and_parse_release_json(
     "absent" and "present but unreadable" into the same ``False``, silently
     contradicting ``read_release_phase``'s own docstring contract.)
     """
-    path = specs_dir / "releases" / release_id / "RELEASE.json"
-    if not path.is_file():
+    path = release_state_file(specs_dir / "releases" / release_id)
+    if path is None:
         return None, False
     try:
         text = path.read_text(encoding="utf-8")

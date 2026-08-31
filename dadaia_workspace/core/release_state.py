@@ -25,6 +25,8 @@ into a future ADR rather than invented as a workaround here.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import json
 from dataclasses import dataclass, field
 from typing import Any
@@ -40,6 +42,30 @@ __all__ = [
 
 #: The schema identifier every ``RELEASE.json`` document's ``schema`` field must carry.
 SCHEMA = "release-state-v1"
+
+#: The canonical release-state document filename (release 0.4.6 FR1, ADR 0007): the
+#: underscore prefix groups it with ``_archive``/``_ideas`` and sorts it apart from the
+#: working SPEC/PLAN/TASKS trio. ONE decider — no reader hand-builds this name.
+RELEASE_STATE_FILENAME = "_RELEASE.json"
+
+#: The pre-0.4.6 filename, recognised READ-side only so a consumer instance keeps
+#: working until ``specs doctor --fix`` renames it. Writers always use
+#: :data:`RELEASE_STATE_FILENAME`.
+LEGACY_RELEASE_STATE_FILENAME = "RELEASE.json"
+
+
+def release_state_file(release_dir: "Path") -> "Path | None":
+    """The release-state document inside ``release_dir``: the canonical
+    :data:`RELEASE_STATE_FILENAME` when present, else the legacy name, else ``None``.
+    The ONE existence-and-name rule every live-release discovery goes through."""
+    canonical = release_dir / RELEASE_STATE_FILENAME
+    if canonical.is_file():
+        return canonical
+    legacy = release_dir / LEGACY_RELEASE_STATE_FILENAME
+    if legacy.is_file():
+        return legacy
+    return None
+
 
 #: Canonical release lifecycle phase vocabulary (constitution §7; the ``phase`` field
 #: of release-state-v1). ONE home (F007, 20260830 audit) — every consumer imports this

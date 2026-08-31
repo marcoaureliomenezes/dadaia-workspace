@@ -20,7 +20,7 @@ from pathlib import Path
 
 from dadaia_workspace.core.exceptions import NoActiveReleaseError, NoAgentSequenceError
 from dadaia_workspace.core.handoff_index import scan_handoffs
-from dadaia_workspace.core.release_state import parse_release_state
+from dadaia_workspace.core.release_state import parse_release_state, release_state_file
 
 #: Canonical 9-agent core topology. Owner names parsed from
 #: PLAN.md are filtered to this set so prose like ``owner: TBD`` never enters a sequence.
@@ -120,7 +120,7 @@ class ReportsNextService:
                 for d in releases_root.iterdir()
                 if d.is_dir()
                 and d.name not in ("_archive", "_ideas")
-                and (d / "RELEASE.json").is_file()
+                and release_state_file(d) is not None
             )
         if not candidates:
             raise NoActiveReleaseError(
@@ -134,7 +134,8 @@ class ReportsNextService:
                 f"RELEASE.json ({', '.join(candidates)}) — ambiguous, refusing to guess."
             )
         release_id = candidates[0]
-        json_path = releases_root / release_id / "RELEASE.json"
+        json_path = release_state_file(releases_root / release_id)
+        assert json_path is not None  # discovery above guarantees presence
         try:
             state = parse_release_state(json_path.read_text(encoding="utf-8"))
         except ValueError as exc:
