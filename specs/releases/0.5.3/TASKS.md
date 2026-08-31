@@ -9,11 +9,11 @@
 - [x] T-053-03 — Release-identity fold (F004) (write set: dadaia_workspace/core/specs_version.py, dadaia_workspace/features/specs/canon.py, doctor_release.py, scaffolder.py, doctor_common.py, tests)
 - [x] T-053-04 — Collapse doctor rule pairs (F005) (write set: dadaia_workspace/features/specs/doctor_structural.py, doctor_release.py, tests)
 - [x] T-053-05 — Memory-canon fact folds (F011) (write set: dadaia_workspace/features/specs/doctor_memory.py, memory_lint.py, canon.py, catalog.py, tests)
-- [-] T-053-06 — One registry accessor (F008) (write set: dadaia_workspace/core/, dadaia_workspace/hooks/ctx_inject.py, tests)
+- [x] T-053-06 — One registry accessor (F008) (write set: dadaia_workspace/core/, dadaia_workspace/hooks/ctx_inject.py, tests)
 
 ## alpha-2 (extractions + projection)
 
-- [ ] T-053-07 — decide_injection extraction (F009) (write set: dadaia_workspace/hooks/ctx_inject.py, dadaia_workspace/features/spec_context/, tests)
+- [-] T-053-07 — decide_injection extraction (F009) (write set: dadaia_workspace/hooks/ctx_inject.py, dadaia_workspace/features/spec_context/, tests)
 - [ ] T-053-08 — SessionBinding deep module (F002) (write set: dadaia_workspace/core/session_store.py or new core module, dadaia_workspace/cli/commands/context.py, dadaia_workspace/features/spec_context/doctor.py, gate_policy.py, tests)
 - [ ] T-053-09 — service.py scope extraction (F013) (write set: dadaia_workspace/features/spec_context/service.py, dadaia_workspace/infrastructure/privacy_check.py, tests)
 - [ ] T-053-10 — Projection single decider (F006) (write set: dadaia_workspace/infrastructure/projection_rules.py, codex_doctor.py, workspace_guardrail.py, public_assets.py, tests)
