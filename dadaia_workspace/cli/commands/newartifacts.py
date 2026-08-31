@@ -165,7 +165,11 @@ def backlog_new_cmd(
         sys.exit(1)
 
     verb = "created" if result.created else "appended"
-    typer.echo(f"[ok] {verb} {slug!r} -> {result.path}" if not result.created else f"[ok] created: {result.path}")
+    typer.echo(
+        f"[ok] {verb} {slug!r} -> {result.path}"
+        if not result.created
+        else f"[ok] created: {result.path}"
+    )
 
 
 # ── dadaia backlog subjects (read-only resolve/preview surface — v0.1.25 R1) ────

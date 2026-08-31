@@ -180,9 +180,7 @@ def derive_commit_provenance(
             # design, so a single-registration commit is ALWAYS `exact` — the
             # outside-specs condition is a resolution-side fact (code fixed here vs
             # elsewhere) and never applied to registrations.
-            marker: Granularity = (
-                "release-squash" if len(registration_bug_ids) > 1 else "exact"
-            )
+            marker: Granularity = "release-squash" if len(registration_bug_ids) > 1 else "exact"
             for bug_id in registration_bug_ids:
                 if bug_id in registration_commit_of:
                     continue  # first-add wins — a later re-add never overrides.
