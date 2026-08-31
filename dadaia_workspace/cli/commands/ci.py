@@ -130,7 +130,11 @@ def pre_commit_check() -> None:
     `pre-commit-presence-gate.sh` wrapper additionally guarantees exit 0 unconditionally,
     regardless of what this command does.
     """
-    from dadaia_workspace.features.chokepoints import context_slug_for_path, pre_commit_decision
+    from dadaia_workspace.features.chokepoints import (
+        bundled_ledger_advisory,
+        context_slug_for_path,
+        pre_commit_decision,
+    )
     from dadaia_workspace.features.spec_context import presence
 
     repo_root = _repo_root()
@@ -150,6 +154,19 @@ def pre_commit_check() -> None:
     )
     if decision.warn:
         typer.echo(decision.warn, err=True)
+
+    # F015/F036 (20260827 audit): bundled-ledger advisory — WARN-only, never blocks.
+    staged = subprocess.run(  # noqa: S603 — fixed argv, repo-root cwd
+        ["git", "diff", "--cached", "--name-only"],
+        capture_output=True,
+        text=True,
+        cwd=repo_root,
+        check=False,
+    ).stdout.splitlines()
+    bundling_warn = bundled_ledger_advisory(staged)
+    if bundling_warn:
+        typer.echo(bundling_warn, err=True)
+
     if not decision.allowed:
         typer.secho(decision.message, fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
@@ -275,6 +292,19 @@ def push_gate_check() -> None:
     )
     if decision.warn:
         typer.echo(decision.warn, err=True)
+
+    # F015/F036 (20260827 audit): bundled-ledger advisory — WARN-only, never blocks.
+    staged = subprocess.run(  # noqa: S603 — fixed argv, repo-root cwd
+        ["git", "diff", "--cached", "--name-only"],
+        capture_output=True,
+        text=True,
+        cwd=repo_root,
+        check=False,
+    ).stdout.splitlines()
+    bundling_warn = bundled_ledger_advisory(staged)
+    if bundling_warn:
+        typer.echo(bundling_warn, err=True)
+
     if not decision.allowed:
         typer.secho(decision.message, fg=typer.colors.RED, err=True)
         raise typer.Exit(1)

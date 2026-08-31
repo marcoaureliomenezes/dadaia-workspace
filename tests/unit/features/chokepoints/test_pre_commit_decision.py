@@ -111,3 +111,47 @@ def test_context_slug_for_path(tmp_path: Path) -> None:
     nested = repo / "src"
     nested.mkdir()
     assert context_slug_for_path(tmp_path, nested) is None
+
+
+# ── bundled-ledger advisory (F015/F036, 20260827-canon-v6-first-audit) ──────────────
+
+
+def test_bundled_ledger_advisory_warns_when_ledger_staged_with_other_specs_paths() -> None:
+    from dadaia_workspace.features.chokepoints import bundled_ledger_advisory
+
+    warn = bundled_ledger_advisory(
+        ["specs/bugs/BUGS.jsonl", "specs/releases/0.5.2/TASKS.md", "dadaia_workspace/x.py"]
+    )
+    assert warn is not None
+    assert "BUGS.jsonl" in warn
+    assert "allowed" in warn  # NO-LOCKS: advisory only, the commit proceeds.
+
+
+def test_bundled_ledger_advisory_silent_for_shape1_ledger_alone() -> None:
+    from dadaia_workspace.features.chokepoints import bundled_ledger_advisory
+
+    assert bundled_ledger_advisory(["specs/bugs/BUGS.jsonl"]) is None
+
+
+def test_bundled_ledger_advisory_silent_for_shape3_code_plus_ledger() -> None:
+    from dadaia_workspace.features.chokepoints import bundled_ledger_advisory
+
+    staged = [
+        "specs/bugs/BUGS.jsonl",
+        "dadaia_workspace/core/x.py",
+        "tests/unit/core/test_x.py",
+    ]
+    assert bundled_ledger_advisory(staged) is None
+
+
+def test_bundled_ledger_advisory_silent_without_the_ledger() -> None:
+    from dadaia_workspace.features.chokepoints import bundled_ledger_advisory
+
+    assert bundled_ledger_advisory(["specs/releases/0.5.2/TASKS.md"]) is None
+
+
+def test_bundled_ledger_advisory_tolerates_backslash_paths() -> None:
+    from dadaia_workspace.features.chokepoints import bundled_ledger_advisory
+
+    warn = bundled_ledger_advisory(["specs\\bugs\\BUGS.jsonl", "specs\\memory\\QUALITY.md"])
+    assert warn is not None
