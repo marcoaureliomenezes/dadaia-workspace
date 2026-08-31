@@ -391,7 +391,7 @@ never exercised the live backlog path was false confidence).
 ### R-13 — Producers pass their own validators (scaffold / backlog / baseline)
 
 - Hand-write a release scaffold — `mkdir -p specs/releases/v0.1.0`, a Draft `SPEC.md`
-  stub, and a `RELEASE.json` with `phase: "SPEC"` (shape: `release-state-v1`,
+  stub, and a `_RELEASE.json` with `phase: "SPEC"` (shape: `release-state-v1`,
   `dd-release-implement`'s `RELEASE-EVENTS.md` — `specs release open`/`specs segment
   open` retired at T-050-21A, no CLI verb replaces them) — then `specs doctor`; add a
   dir-based segment the same way (a top-level `segment: "alpha-2"` field, plus

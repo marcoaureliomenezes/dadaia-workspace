@@ -12,7 +12,7 @@ constitution.md
 memory/ARCHITECTURE.md
 memory/TECHSTACK.md
 memory/product/index.md
-releases/<release-id>/RELEASE.json    (phase field read directly, no fold)
+releases/<release-id>/_RELEASE.json    (phase field read directly, no fold)
 releases/<release-id>/SPEC.md
 releases/<release-id>/PLAN.md
 releases/<release-id>/TASKS.md
@@ -27,7 +27,7 @@ A specs root carries exactly these members — nothing else:
 | `AGENTS.md` | this file |
 | `constitution.md` | absolute product laws |
 | `memory/` | current product truth (`memory/AGENTS.md`) |
-| `releases/` | release SPEC/PLAN/TASKS/RELEASE.json, `_ideas/` drafts, `_archive/releases_histo.jsonl` |
+| `releases/` | release SPEC/PLAN/TASKS/_RELEASE.json, `_ideas/` drafts, `_archive/releases_histo.jsonl` |
 | `backlog/` | the live demand queue, `_archive/` history |
 | `bugs/` | the bug ledger, `_archive/` history |
 | `audits/` | audit records, `_archive/` history |
@@ -42,7 +42,7 @@ A specs root carries exactly these members — nothing else:
 
 Implementation is allowed only when:
 
-- The live release's `RELEASE.json` `phase` field reads `IMPLEMENTATION`.
+- The live release's `_RELEASE.json` `phase` field reads `IMPLEMENTATION`.
 - `SPEC.md`, `PLAN.md`, and `TASKS.md` contain `**Status:** Aprovado`.
 - The active task is changed from `[ ]` to `[-]` before production edits.
 - The task's declared write set contains every production file to be edited.
@@ -53,7 +53,7 @@ Implementation is allowed only when:
 | Path | Writer |
 |---|---|
 | `constitution.md` | operator or `product-engineer` during approved governance work |
-| `releases/<id>/RELEASE.json` | agents with file tools, per field (`dd-release-implement`'s `RELEASE-EVENTS.md`) |
+| `releases/<id>/_RELEASE.json` | agents with file tools, per field (`dd-release-implement`'s `RELEASE-EVENTS.md`) |
 | `releases/<id>/SPEC.md` | `product-engineer` |
 | `releases/<id>/PLAN.md` | `product-engineer` |
 | `releases/<id>/TASKS.md` | `product-engineer`; implementers may change only their task marker |

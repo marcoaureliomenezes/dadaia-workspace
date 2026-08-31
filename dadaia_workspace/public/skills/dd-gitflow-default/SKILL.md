@@ -5,7 +5,7 @@ description: >
   or minting a version. The one operational home of the three-branch model: when to start
   work, which branch to cut, how a release rides it, and what actually gates a push.
   `DADAIA.md` §4 states the law once; this skill is where it operates.
-tldr: "feature/{M.m.p} -> develop -> main, PR-only past feature; 5 isolated commit shapes; delete+cut on deploy."
+tldr: "One live release, one branch; candidates close-scope and merge to develop; promote-or-continue gate; version increments only at deploy."
 ---
 
 # dd-gitflow-default — The Branch Contract, v2
@@ -25,12 +25,12 @@ tldr: "feature/{M.m.p} -> develop -> main, PR-only past feature; 5 isolated comm
 5. Refuse to create a second `feature/*` branch while one is already live.
 6. Cut `feature/{next-version}` from `main` only, once `{version}` is deployed on `main`.
 7. Name the new branch exactly `M.m.p` — no `v` prefix, no suffix.
-8. Definition stage: author SPEC/PLAN/TASKS on `feature/{M.m.p}`.
-9. Open the PR to `develop` the moment the trio is `Aprovado`.
-10. Implementation stage: one commit per completed task group.
-11. Each `rc`: one `feature/{M.m.p}` → `develop` PR merge; scope is fixes/adjustments only, never new backlog.
+8. Definition stage: author the candidate's SPEC/PLAN/TASKS at the release root on `feature/{M.m.p}`.
+9. Implementation stage: one commit per completed task group.
+10. Candidate closure (memory -> CLOSURE): open one `feature/{M.m.p}` → `develop` PR and merge it green.
+11. After the merge, ask the operator: **promote or continue?** Continue = `dadaia release rc-archive` (trio → `rc-N/`, fresh trio at root, same version, same branch); promote = step 12.
 12. Stage every write per its isolated shape — table in §4.
-13. At the final `rc`, open the PR `develop` → `main`.
+13. Promote: open the PR `develop` → `main` (ship verdict pre-staged naming develop's tip).
 14. The moment it merges, delete `feature/{M.m.p}` and cut `feature/{next}` (step 6) in the same step.
 15. Tag `archive/<name>` then delete a branch the moment its work lands elsewhere.
 
@@ -38,7 +38,7 @@ tldr: "feature/{M.m.p} -> develop -> main, PR-only past feature; 5 isolated comm
 
 - Exactly one live `feature/*` branch exists at all times.
 - That branch is named for the next version immediately after each deploy.
-- Every commit for a release traces to definition, implementation, `rc` merge, or bug fix.
+- Every commit for a release traces to a candidate's definition, implementation, closure merge, or a bug fix.
 - A `git log` scan finds each write in §4 alone in its own commit, matching its message pattern.
 - Only `feature/*` is pushable directly; `develop`/`main` advance by PR only.
 

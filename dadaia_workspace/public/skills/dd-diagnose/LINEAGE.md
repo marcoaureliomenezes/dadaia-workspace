@@ -6,10 +6,10 @@ FR14's audit pillar 1 cites this section, never restates it — if the two disag
 ## The window (stated once)
 
 - The window runs from the last `audited` milestone to `HEAD`.
-- Read the live release's `RELEASE.json` `audited` field, plus every archived release's own `audited` fact.
-- Archived facts live in `releases/_archive/releases_histo.jsonl` (no per-release `RELEASE.json` survives archiving, FR5).
+- Read the live release's `_RELEASE.json` `audited` field, plus every archived release's own `audited` fact.
+- Archived facts live in `releases/_archive/releases_histo.jsonl` (no per-release `_RELEASE.json` survives archiving, FR5).
 - The window is `[newest audited milestone's sha, HEAD]`; the whole file when no `audited` milestone exists yet.
-- Never scan `specs/releases/_ideas/**` — a Draft carries no `RELEASE.json` (D10/AS-7), so it carries no milestone.
+- Never scan `specs/releases/_ideas/**` — a Draft carries no `_RELEASE.json` (D10/AS-7), so it carries no milestone.
 
 ## The filter
 

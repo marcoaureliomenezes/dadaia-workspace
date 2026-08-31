@@ -119,7 +119,7 @@ Browser frontend and CI YAML -> software-engineer.
 
 Ground yourself first with `dadaia-step0-memory-bootstrap`, then:
 
-1. Resolve the active release by reading `RELEASE.json`'s `phase` field directly (no fold, no `ACTIVE.md`).
+1. Resolve the active release by reading `_RELEASE.json`'s `phase` field directly (no fold, no `ACTIVE.md`).
 2. Read the resolved release's `SPEC/PLAN/TASKS.md` — the SDD gate blocks AI-entity authoring without an approved task.
 3. Reserve the task via `dadaia-task-manager`: `[ ]` -> `[-]` + commit before editing.
 4. Read the persona brief (`product-engineer`, or the release's SPEC.md/TASKS.md).
@@ -128,7 +128,7 @@ Ground yourself first with `dadaia-step0-memory-bootstrap`, then:
 7. Run `dadaia public stage && dadaia public install --target all` if the change touches a projected file.
 8. Confirm projection-install ownership in the active TASKS.md — normally `software-engineer`'s pipeline step.
 9. Flip `[-]` -> `[x]` and commit, referencing the task id.
-10. `product-engineer` files the brief; you implement and return a report; PE records the change in `RELEASE.json` `log` entries.
+10. `product-engineer` files the brief; you implement and return a report; PE records the change in `_RELEASE.json` `log` entries.
 11. `software-architect` audits persona topology/dispatch graphs/skill sharing on request; you implement their findings.
 12. Pair with `security-reviewer` on any new hook or any persona gaining a powerful tool.
 13. When you refactor a persona `software-engineer` depends on, send a report on the behavioral delta.

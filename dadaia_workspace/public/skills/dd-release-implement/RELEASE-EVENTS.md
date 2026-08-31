@@ -1,15 +1,15 @@
-# RELEASE-EVENTS — the `RELEASE.json` state+log contract
+# RELEASE-EVENTS — the `_RELEASE.json` state+log contract
 
 Disclosed reference reached from `SKILL.md`/`RC-FLOW.md` wherever the arc says "update the release state" or "append a log entry".
 
-- `specs/releases/<release-id>/RELEASE.json` is ONE mutable JSON object — the release's current state, never an append-only event stream.
-- Retires `RELEASE.jsonl`, `release-event-v1.schema.json`, `core/release_events.py`.
+- `specs/releases/<release-id>/_RELEASE.json` is ONE mutable JSON object — the release's current state, never an append-only event stream.
+- Retires `_RELEASE.jsonl`, `release-event-v1.schema.json`, `core/release_events.py`.
 - Schema: `dadaia_workspace/public/schemas/releases/release-state-v1.schema.json`.
 
 ## Shape
 
-- Fields: `{schema, release, phase, rc, defined, implemented, shipped, audited, segment?, log[]}`.
-- `phase`, `rc`, `segment` are rewritten in place on every transition — no history of prior values survives in the field.
+- Fields: `{schema, release, phase, rc, defined, implemented, shipped, audited, log[]}` (`segment` retired at 0.4.6, ADR 0006; `rc` = archived-candidate count).
+- `phase` and `rc` are rewritten in place on every transition — no history of prior values survives in the field.
 - A transition worth remembering becomes a `log` entry.
 - `defined`/`implemented`/`shipped`/`audited` are the four sha-bearing milestone facts.
 - Each milestone is set at most once meaningfully (a later legitimate rewrite is a correction, not a duplicate), or `null` before that point.

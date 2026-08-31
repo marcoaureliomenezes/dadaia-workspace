@@ -17,6 +17,6 @@ This directory contains audit records for this Spec Context Project.
 
 ## 2. Relationship to releases
 
-- An audit may be referenced by a release SPEC or `RELEASE.json`'s `log` entries, by its directory name.
+- An audit may be referenced by a release SPEC or `_RELEASE.json`'s `log` entries, by its directory name.
 - Audit directories are created by `project-auditor` or `project-manager` during the DISCOVERY phase.
 - One audit generates exactly one remediation release, which must disposition every finding before the audit archives.
