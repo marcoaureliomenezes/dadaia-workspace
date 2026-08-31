@@ -1,13 +1,9 @@
 ---
 name: dd-release-implement
 description: >
-  Use when: implementing a release candidate from the first task reservation through
-  the promote-or-continue gate — the whole implement-to-close arc under the
-  release-candidates model (0.4.6, ADRs 0005-0009). Short SKILL-plus-disclosed-siblings
-  shape: RC-FLOW.md (candidate arc + gate cadence), RELEASE-EVENTS.md (_RELEASE.json
-  state+log contract), MEMORY-UPDATE.md (closure memory protocol).
-tldr: "Reserve -> TDD -> trio review -> memory -> closure -> develop merge -> promote-or-continue (rc-archive | ship+archive+cut)."
-applyTo: "specs/releases/*/TASKS.md"
+  Implement a release candidate from the first task reservation through the
+  promote-or-continue gate. Use when working a task inside an Aprovado candidate, at
+  candidate closure, and at the gate (rc-archive or ship + archive + branch cut).
 ---
 
 # dd-release-implement
@@ -28,7 +24,7 @@ applyTo: "specs/releases/*/TASKS.md"
 4. Read `RC-FLOW.md` for the candidate arc and gate cadence before acting past reservation.
 5. Update `_RELEASE.json` per `RELEASE-EVENTS.md`'s shape and `log` conventions.
 6. At candidate step 5, run `MEMORY-UPDATE.md`'s full protocol before touching any memory atom.
-7. Declare test intent at birth; pass the admission filter (`dadaia-test-stewardship` §A/§B) before a test enters the suite.
+7. Declare test intent at birth; pass the admission filter (`dadaia-test-stewardship`, intent and admission) before a test enters the suite.
 8. Handle demotion and quarantine/SCAFFOLD expiry at closure time only (`RC-FLOW.md` step 6).
 
 ## 3. Done when
@@ -45,5 +41,5 @@ applyTo: "specs/releases/*/TASKS.md"
 - `RELEASE-EVENTS.md` — `_RELEASE.json` shape, milestone ownership, `log` conventions.
 - `MEMORY-UPDATE.md` — closure memory protocol.
 - `dadaia-task-manager` — reservation/marker discipline.
-- `dadaia-test-stewardship` §A/§B — test admission filter.
+- `dadaia-test-stewardship` (intent and admission) — the test admission filter.
 - `DADAIA.md` §3 — git chokepoints, the only mechanical backstop.

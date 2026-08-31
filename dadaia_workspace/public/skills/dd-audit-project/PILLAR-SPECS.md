@@ -3,7 +3,7 @@
 Disclosed sibling of `SKILL.md`, pillar 2. Input: `git log` over every commit in the audit window.
 Also input: `dadaia specs doctor` against every release the window touches.
 
-## Commit-shape conformance (FR8)
+## Commit-shape conformance
 
 1. Walk every commit in the window with `git log --format='%H%x09%s' --stat`.
 2. Classify each by its subject-line pattern and staged-path set against the five canonical shapes.

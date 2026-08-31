@@ -14,7 +14,7 @@ cycle below. The version and the branch never change between candidates.
 
 - Any `REQUEST_CHANGES`, CRITICAL/HIGH finding, failed E2E, or missing evidence sends the work back to implementation.
 - Rework continues until every required validator approves the same commit, or the operator stops the candidate.
-- Order per candidate (D8/FR5): review -> closure -> merge -> gate.
+- Order per candidate: review -> closure -> merge -> gate.
 - The pre-PR three-axis code review (`dd-code-review`) runs before the merge, never after.
 
 ## The candidate arc, step by step
@@ -77,7 +77,7 @@ Each step ends on a checkable criterion. Steps 5–8 are candidate-closure work.
 
 ## Test-stewardship touchpoints (reference)
 
-- Declare test intent at birth; pass the admission filter (`dadaia-test-stewardship` §A/§B) before a test enters the suite.
+- Declare test intent at birth; pass the admission filter (`dadaia-test-stewardship`, intent and admission) before a test enters the suite.
 - Demotion and quarantine/SCAFFOLD expiry are candidate-closure work (step 6's `closure-test-dispositions` log entry).
 
 ## Out of scope for closure

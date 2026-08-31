@@ -1,11 +1,10 @@
 ---
 name: dd-manager-orchestration
 description: >
-  Generic dispatch reference for project-manager and project-auditor agents.
-  Defines the default public agent inventory, SDD stage inventory, dispatch
-  protocol, mediation rules, escalation triggers, and forbidden actions.
-tldr: "Dispatch reference: 9-agent inventory, SDD stage table, dispatch protocol, decision authority, escalation, forbidden actions."
-applyTo: ".dadaia/handoff/**"
+  Dispatch reference for project-manager and project-auditor: the agent inventory,
+  SDD stage table, dispatch protocol, decision authority, escalation triggers,
+  forbidden actions, and the which-skill-when router. Use when dispatching work,
+  resolving a conflict, or routing a demand to the right skill.
 ---
 
 # dd-manager-orchestration

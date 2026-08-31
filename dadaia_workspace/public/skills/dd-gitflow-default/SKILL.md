@@ -1,11 +1,10 @@
 ---
 name: dd-gitflow-default
 description: >
-  Use whenever git is touched — branching, committing, opening a PR, starting a new task,
-  or minting a version. The one operational home of the three-branch model: when to start
-  work, which branch to cut, how a release rides it, and what actually gates a push.
-  `DADAIA.md` §4 states the law once; this skill is where it operates.
-tldr: "One live release, one branch; candidates close-scope and merge to develop; promote-or-continue gate; version increments only at deploy."
+  The three-branch contract whenever git is touched: when to start work, which
+  branch to cut, how a release rides it, the isolated commit shapes, and what gates
+  a push. Use when branching, committing, opening a PR, starting a task, or minting
+  a version.
 ---
 
 # dd-gitflow-default — The Branch Contract, v2
@@ -51,7 +50,7 @@ tldr: "One live release, one branch; candidates close-scope and merge to develop
 - Commit shape 3 — bug fix: code + regression test + `BUGS.jsonl` line together, one commit.
 - Commit shape 4 — resolve commits only; a push happens when asked, `dadaia ci preflight` first.
 - Commit shape 5 — release definition: SPEC + PLAN + TASKS + purge-on-pick + picked bugs, one commit.
-- Commit shape 6 — task implementation: the task's declared write set — `conventional-commit(task-id): description` (the §3 trace; F016, 20260827 audit: the largest commit class, now classified).
+- Commit shape 6 — task implementation: the task's declared write set — `conventional-commit(task-id): description` — the auditable trace.
 - Mechanical enforcement (pre-push hook / CI job): branch-name pattern, push refusal, denylist scan, CI trigger.
 - Mechanical enforcement (continued): `pr-source-guard`, verdict-gate job requiring an APPROVED security handoff.
 - Discipline (this skill + reviewers, unenforced by any hook): start-of-work protocol, one-live-branch, delete+cut-on-deploy.

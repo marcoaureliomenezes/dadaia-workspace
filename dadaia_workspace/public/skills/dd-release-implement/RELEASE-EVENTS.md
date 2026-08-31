@@ -21,7 +21,7 @@ Disclosed reference reached from `SKILL.md`/`RC-FLOW.md` wherever the arc says "
 |---|---|---|
 | `phase` | whoever drives the transition (`product-engineer` at DEFINITION/CLOSURE, first implementer at IMPLEMENTATION) | phase string |
 | `defined` | `product-engineer`, at the definition promotion commit | `{sha, ts}` |
-| `implemented` | `qa-engineer`, at final-`rc` QA close, on the closed commit's sha, not the merge commit (D3) | `{sha, rc, ts}` |
+| `implemented` | `qa-engineer`, at final-`rc` QA close, on the closed commit's sha, not the merge commit | `{sha, rc, ts}` |
 | `shipped` | `project-manager` (or whoever merges the ship PR) | `{sha, pr, ts}` |
 | `audited` | `project-auditor`, the same atomic rewrite that sets a bug's `resolved_commit`/`audited` | `{sha, ts, audit}` |
 

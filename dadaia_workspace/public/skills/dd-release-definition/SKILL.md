@@ -1,13 +1,9 @@
 ---
 name: dd-release-definition
 description: >
-  Use when: turning bugs and/or backlog items into a release CANDIDATE. product-engineer
-  (dispatched by project-manager) picks a pre-sanitized set and refines it into the live
-  release's next closed-scope candidate trio. Enforces bug-always-solved (unless subsumed)
-  and a MANDATORY dd-grill-me session before the SPEC is written. Invoke at the start of
-  each candidate's definition — a release has open scope; each candidate does not.
-tldr: "Pick set -> bug-always-solved -> mandatory dd-grill-me -> author SPEC -> declare **Consumes:**."
-applyTo: "specs/releases/*/SPEC.md"
+  Turn bugs and backlog items into the live release's next closed-scope candidate:
+  pick the set, enforce bug-always-solved, run the mandatory grill, author the trio.
+  Use at the start of each candidate's definition.
 ---
 
 # dd-release-definition
@@ -62,7 +58,7 @@ applyTo: "specs/releases/*/SPEC.md"
 
 ## 4. References
 
-- `dd-backlog-definition` §2 — the sanitized-set source this skill consumes without re-triage.
+- `dd-backlog-definition` — the sanitized-set source this skill consumes without re-triage.
 - `dd-grill-me` — the mandatory pre-SPEC session.
 - `dd-gitflow-default` §3a shape 5 — the release-definition commit shape.
 - `dd-release-implement` (`RELEASE-EVENTS.md`, `RC-FLOW.md`) — milestone recipe, review cadence, disposition sweep.

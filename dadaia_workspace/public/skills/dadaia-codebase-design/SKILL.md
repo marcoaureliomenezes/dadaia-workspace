@@ -1,15 +1,11 @@
 ---
 name: dadaia-codebase-design
 description: >
-  The shared design vocabulary for every agent that touches code — seam, deep module,
-  deletion test, adapter, locality, replace-don't-layer — plus the understand-the-problem
-  discipline run BEFORE any recommendation, fix or verdict. Use when designing or
-  reviewing a module's interface, deciding where a seam goes, judging whether a diff
-  grows or shrinks a feature, or naming a structural problem. PRIMARY CALLERS:
-  software-architect (every DRAFT/REVIEW/ONBOARD verdict), software-engineer,
-  code-reviewer, qa-engineer. Replaces architect-core-workflow.
-tldr: "One design language (seam, deep module, deletion test, replace-don't-layer); understand the problem, then apply the deletion test to the module you are about to grow."
-applyTo: "**"
+  The shared design vocabulary — seam, deep module, deletion test, adapter,
+  locality, replace-don't-layer — plus the understand-the-problem discipline run
+  before any recommendation, fix or verdict. Use when designing or reviewing a
+  module's interface, deciding where a seam goes, judging whether a diff grows or
+  shrinks a feature, or naming a structural problem.
 ---
 
 # dadaia-codebase-design

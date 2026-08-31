@@ -1,48 +1,50 @@
 ---
 name: dadaia-handoff-emitter
 description: >
-  Emit a machine-readable handoff JSON under .dadaia/handoff/<context>/ at the end of
-  any agent task. Handoff-first: the default emission is handoff-only — the HTML report
-  is added only when the operator asks or the next handoff target is human, and then the
-  handoff also carries artifact.path + content_hash. Conforms to
-  .dadaia/agentic/schemas/handoff-v1.schema.json; validated via `dadaia reports validate`.
-  Also the single canonical location for the consumer-side rule: a consuming skill
-  deletes the coordination handoff it consumed (ack-on-consume).
-tldr: "Emit JSON handoff at task end (handoff-only default); add HTML report only if asked or next hop is human."
-applyTo: ".dadaia/handoff/**/*.handoff.json"
+  Emit the machine-readable handoff JSON at the end of any agent task (handoff-only by
+  default; HTML report added only when the operator asks or the next hop is human), and
+  delete a consumed coordination handoff (ack-on-consume). Use at task completion and
+  after acting on a handoff addressed to you.
 ---
 
 # dadaia-handoff-emitter
 
-## 1. When
+Handoff-first emission (`DADAIA.md` §5): the JSON handoff is the default output of a
+completed agent task; the HTML report is the exception, not the rule.
 
-- End of every completed agent task.
-- A consuming skill has read and acted on a coordination handoff (ack-on-consume).
+## Emitting
 
-## 2. Steps
+1. Resolve the workspace root: walk up from cwd to the nearest ancestor already
+   containing `.dadaia/` — never create a new one.
+2. Default to handoff-only; switch to report mode only when the operator asked or
+   `next_handoff.agent == "human"`.
+3. Report mode first writes the HTML to
+   `.dadaia/reports/<context>/<agent>/<UTC>-<slug>.html`, then captures
+   `sha256sum <report>` as `artifact.content_hash`.
+4. Assemble the handoff field-by-field against
+   `.dadaia/agentic/schemas/handoff-v1.schema.json`; set `artifact.path` only for a
+   file already on disk.
+5. Write `.dadaia/handoff/<context>/<YYYY-MM-DDTHHMMSSZ>-<agent>-<slug>.handoff.json`
+   (2-space indent) and run `dadaia reports validate <path>` — fix any non-zero exit
+   before moving on.
 
-1. Resolve workspace root: walk up from cwd to the nearest ancestor already containing `.dadaia/`; never create a new one.
-2. Default to handoff-only mode; switch to report mode only if asked, or `next_handoff.agent == "human"`.
-3. Report mode: write the HTML report first, to `.dadaia/reports/<context>/<agent>/<UTC>-<slug>.html`.
-4. Report mode: run `sha256sum <path-to-report.html>`; capture the hex digest as `artifact.content_hash`.
-5. Assemble the handoff JSON field-by-field against `.dadaia/agentic/schemas/handoff-v1.schema.json`.
-6. Never set `artifact.path` for a file that does not yet exist on disk.
-7. Write via the Write tool: `.dadaia/handoff/<context>/<YYYY-MM-DDTHHMMSSZ>-<agent>-<slug>.handoff.json`, 2-space indent.
-8. Run `dadaia reports validate <path>.handoff.json`; fix any non-zero exit before moving on.
-9. Consuming a coordination handoff: after acting on it, resolve its real target path.
-10. Refuse deletion if the resolved target falls outside `.dadaia/`; never follow a symlinked directory.
-11. Delete only the one consumed coordination handoff file — never a directory sweep.
-12. Never delete a handoff carrying `artifact.path` — it follows its report's own retention instead.
+**Done when** the handoff file exists at that exact path shape, `dadaia reports
+validate` exits 0, and (report mode) `artifact.content_hash` matches the file on disk.
 
-## 3. Done when
+## Consuming (ack-on-consume)
 
-- The handoff file exists at the exact directory/filename/extension above.
-- `dadaia reports validate` exits 0.
-- Report mode: `artifact.content_hash` matches the file on disk.
-- A consumed coordination handoff (no `artifact.path`) is gone; every other handoff still validates.
+After reading and acting on a coordination handoff addressed to you:
 
-## 4. References
+1. Resolve its real target path; act only on a path inside `.dadaia/`, and never
+   follow a symlinked directory.
+2. Delete only that one consumed handoff file — a handoff carrying `artifact.path`
+   stays and follows its report's retention instead.
 
-- `.dadaia/agentic/schemas/handoff-v1.schema.json` — field list, types, enums, patterns, `schema_version` posture.
-- `DADAIA.md` §5 — emission-first law, output paths.
-- FR17 / A17.1 — symlink doctrine the deletion lane guard inherits.
+**Done when** the consumed coordination handoff is gone and every other handoff still
+validates.
+
+## References
+
+- `.dadaia/agentic/schemas/handoff-v1.schema.json` — field list, types, enums,
+  patterns, `schema_version` posture.
+- `DADAIA.md` §5 — emission law, output paths, the 30 KB report split rule.

@@ -6,7 +6,7 @@ House authoring contract for every AI-entity file `ai-engineer` writes: personas
 - Derived from, and provenance-anchored to, the read-only clone at
   `.dadaia/references/skills-examples/` (`mattpocock/skills` — `writing-for-agents`,
   `SKILL-MECHANICS.md`, and the promoted corpus itself as worked examples).
-- Consult that clone for the full worked prose; this file states house rules in our own vocabulary, never a copy (A11.5).
+- Consult that clone for the full worked prose; this file states house rules in our own vocabulary, never a copy.
 
 ## The 15-rule checklist (audit 2026-08-31, operator-ratified)
 
@@ -55,7 +55,7 @@ Every library skill must satisfy all fifteen; each rule's detail lives in the se
 | Cognitive load | The operator/reviewer | Zero context tax, but the human must remember the document exists |
 
 - This is `dd-ai-eng-knowhow`'s own shape in miniature: Part 1 is context-loaded for every agent, every session.
-- Siblings are reached only by pointer — free until `ai-engineer` needs them (the FR11 fleet-scale trade).
+- Siblings are reached only by pointer — free until `ai-engineer` needs them.
 
 ---
 
@@ -144,10 +144,10 @@ decision-rich part.
 
 A skill never moves alone. Any authoring act (create, merge, rename, delete, restructure) carries in the same change:
 
-1. `entities/behavior-map.json` — the row (exactly one per skill), `declared_overlaps`, and the re-recorded hash tuple (a deliberate act, A10.4).
+1. `entities/behavior-map.json` — the row (exactly one per skill), `declared_overlaps`, and the re-recorded hash tuple (a deliberate, reviewed act).
 2. Persona `skills:` grants — the orphan checker requires every model-invoked skill granted somewhere; a `disable-model-invocation` skill is exempt.
 3. Law citations — `DADAIA.md` and every scoped `AGENTS.md` SOURCE under `public/` that names the skill.
-4. Cross-citations in sibling skills (FR27 checks every path-shaped token in `public/**`).
+4. Cross-citations in sibling skills (the citation contract test checks every path-shaped token in `public/**`).
 5. Reprojection — `dadaia public stage` → `install --target all` → `public doctor` `[ok]`; stale projected directories removed from every harness target.
 
 ---

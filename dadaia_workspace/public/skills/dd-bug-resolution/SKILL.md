@@ -57,7 +57,7 @@ regressions: measure a baseline, then bisect — logs mislead.
 *Done when one hypothesis survives by observation, not by reading code.*
 
 **Phase 5 — Seam test.** Write the regression test at the correct seam BEFORE the
-fix, intent and size declared at birth (`dadaia-test-stewardship` §A); watch it fail,
+fix, intent and size declared at birth (`dadaia-test-stewardship`, intent and admission); watch it fail,
 fix the cause, watch it pass, re-run the Phase 1 loop on the original scenario. A
 correct seam exercises the real bug pattern at its call site; when none exists, that
 is itself the finding — register an architecture finding and dispatch
@@ -98,5 +98,5 @@ dadaia bugs resolve <bug-id> --cause … --caused-by … --resolved-release …
 - [`RED-LOOP.md`](RED-LOOP.md) — loop construction menu, tightening, non-deterministic bugs.
 - `dd-bug-registration` — classify-first registration; the record this skill requires.
 - `dd-gitflow-default` §3a — the exact commit shape.
-- `dadaia-test-stewardship` §A — test intent/size declaration.
+- `dadaia-test-stewardship` (intent and admission) — test intent/size declaration.
 - `DADAIA.md` §4 (Gitflow), §7 (Quality) — branch contract, root-cause law, net-positive routing.

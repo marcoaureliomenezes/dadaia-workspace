@@ -1,15 +1,11 @@
 ---
 name: dd-grill-me
 description: >
-  Interview the operator to reach shared understanding on a demand, spec, or backlog
-  item, resolving every question the repo/CLI/a subagent can already answer before it
-  reaches the operator. Use when: the operator's demand is ambiguous and needs intake
-  refinement (project-manager); a release is being defined and needs its mandatory
-  pre-SPEC session (product-engineer, `dd-release-definition` §3); a single spec or
-  feature question needs a focused leaf answer; or the operator says "grill", "refine
-  specs", or "review backlog".
-tldr: "Map open questions as a design tree; resolve by inspection first; ask the frontier in rounds until it is empty."
-applyTo: "specs/**"
+  Interview the operator to shared understanding on a demand, spec, or backlog item,
+  resolving by inspection everything the repo/CLI/a subagent can answer first. Use
+  for ambiguous intake, the mandatory pre-SPEC session of a release candidate, a
+  focused spec question, or when the operator says "grill", "refine specs", or
+  "review backlog".
 ---
 
 # dd-grill-me — SDD Spec Refinement

@@ -1,15 +1,12 @@
 ---
 name: dd-code-review
 description: >
-  The reviewer's method: three independent axes reported side by side, never reranked
-  against each other — Standards (the repo's own conventions plus a fixed baseline of
-  twelve Fowler smells), Spec (does the diff do what the approved SPEC/TASKS say —
-  nothing more, nothing less), and Bug-surface (did this diff reduce or increase the
-  touched feature's bug surface, evidenced from the ledger). PRIMARY CALLER:
-  code-reviewer; qa-engineer and software-architect verdicts reuse the Bug-surface axis.
-  Security/perf depth stays with security-reviewer and the gates.
-tldr: "Three axes side by side — Standards (+12 Fowler smells), Spec conformance, Bug-surface delta — never reranked."
-applyTo: "**"
+  The reviewer's method: three independent axes reported side by side, never
+  reranked — Standards (repo conventions + twelve Fowler smells), Spec (the diff does
+  what the approved SPEC/TASKS say, nothing more), Bug-surface (the diff reduced or
+  grew the touched feature's bug surface, evidenced from the ledger). Use when
+  reviewing a PR, branch or commit range, or when a verdict needs the Bug-surface
+  axis.
 ---
 
 # dd-code-review

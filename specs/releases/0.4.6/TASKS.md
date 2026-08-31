@@ -60,7 +60,7 @@
   dadaia_workspace/public/entities/behavior-map.json, cross-citations.
   Blocked by: T-046-08. Delivers: one session-grounding protocol (context →
   memory → release trio), no duplicated catalog/atom steps.
-- [-] T-046-13 — FR6 systemic conformance pass over the 16 kept skills:
+- [x] T-046-13 — FR6 systemic conformance pass over the 16 kept skills:
   `tldr`/`applyTo` removed, descriptions rewritten as trigger pointers,
   sediment and dead negations purged, form-follows-content restructures
   (test-stewardship by branch, backlog-definition sections,
