@@ -58,6 +58,7 @@ from pathlib import Path
 from typing import Any
 
 from dadaia_workspace.core import frontmatter as _fm
+from dadaia_workspace.features.specs import memory_canon
 from dadaia_workspace.features.specs.canon import is_canon_path
 
 logger = logging.getLogger(__name__)
@@ -66,7 +67,7 @@ logger = logging.getLogger(__name__)
 # Regexes
 # ---------------------------------------------------------------------------
 
-_WIKILINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
+_WIKILINK_RE = memory_canon.WIKILINK_RE
 
 # Required frontmatter fields for catalog generation.
 # ``agent_tier`` was removed here in v0.1.53 (FR3): it has zero runtime consumers, so the

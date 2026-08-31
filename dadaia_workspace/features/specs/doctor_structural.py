@@ -14,6 +14,7 @@ import shutil
 from pathlib import Path
 
 from dadaia_workspace.core.atomic_write import atomic_write
+from dadaia_workspace.features.specs import memory_canon
 from dadaia_workspace.features.specs.canon import (
     CANON_ROOT_MEMBERS,
     REQUIRED_ROOT_DIRS,
@@ -25,12 +26,7 @@ from dadaia_workspace.features.specs.template_history import was_shipped
 # TREE-3: memory .md files that must exist.  No Jinja templates — .md is canonical source.
 # v6 canon (FR1/A1.5/A1.6, T-050-06): the top-level trio renamed to ARCHITECTURE.md,
 # TECHSTACK.md, QUALITY.md — case-only for the first, word-shortened for the other two.
-_TREE3_MEMORY_FILES: tuple[str, ...] = (
-    "ARCHITECTURE.md",
-    "TECHSTACK.md",
-    "QUALITY.md",
-    "product/index.md",
-)
+_TREE3_MEMORY_FILES: tuple[str, ...] = memory_canon.MEMORY_REQUIRED_FILES
 
 # TREE-4: directories that must exist — folded over the canon table (v0.5.1 K4): every
 # area whose ``_archive/<area>_histo.jsonl`` is required_at_birth also needs its own
