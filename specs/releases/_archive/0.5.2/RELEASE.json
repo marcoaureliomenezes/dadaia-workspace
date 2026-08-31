@@ -1,7 +1,7 @@
 {
  "schema": "release-state-v1",
  "release": "0.5.2",
- "phase": "CLOSURE",
+ "phase": "ARCHIVED",
  "rc": null,
  "defined": {
   "sha": "56d37c0ad6f2df0fdaceddeaf9b8cd5a7ddcb518",
@@ -58,6 +58,12 @@
    "agent": "claude-code",
    "kind": "note",
    "text": "Correction to the dispositions entry: backlog-new-append-reported-as-created WAS fixed in-release after all (shape-3 commit; created vs appended echoed from the writer's own fact) \u2014 the picked set closes 2 resolved + 1 superseded, leaving only the routed projection-staleness bug open."
+  },
+  {
+   "ts": "2026-08-31T13:50:42Z",
+   "agent": "claude-code",
+   "kind": "note",
+   "text": "Archived pre-ship per D8/FR5 order (review -> closure -> archive -> ship): implementation and closure complete on feature/0.5.2, preflight green; rc PR / trio verdicts / ship remain operator-gated and will back-fill milestones, as 0.5.0/0.5.1 precedent did."
   }
  ]
 }
