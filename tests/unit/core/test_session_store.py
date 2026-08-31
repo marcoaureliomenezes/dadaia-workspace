@@ -11,10 +11,12 @@ module's test surface, ported byte-for-byte onto the new import path.
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core import kernel_tunables, session_store
 from dadaia_workspace.core import session_store as si
 
 CTX = "myctx"
@@ -108,3 +110,100 @@ def test_last_seen_at_and_liveness_timestamp_matrix(tmp_path: Path) -> None:
         == "2019-01-01T00:00:00+00:00"
     )
     assert si.liveness_timestamp({"mode": "READ"}) == ""
+
+
+# ---------------------------------------------------------------------------
+# F002 (20260830-design-bug-surface-audit): the session-binding record gets an OWNING
+# module. session_store authors the schema (new_binding_record), owns the liveness
+# predicate (is_live/live_session) and the reaper (reap_stale) — the CLI, invocation
+# and the spec-context doctor stop hand-assembling gc_check dicts.
+# ---------------------------------------------------------------------------
+
+
+def test_new_binding_record_authors_the_schema() -> None:
+    record = session_store.new_binding_record(
+        session_id="sess-1",
+        context="alpha",
+        mode="BOUND_IMPLEMENTATION",
+        release="0.5.3",
+        runtime="claude-code",
+        pid=1234,
+        now="2026-08-31T12:00:00+00:00",
+    )
+    assert record == {
+        "session_id": "sess-1",
+        "context": "alpha",
+        "mode": "BOUND_IMPLEMENTATION",
+        "release": "0.5.3",
+        "runtime": "claude-code",
+        "pid": 1234,
+        "bound_at": "2026-08-31T12:00:00+00:00",
+        "last_seen_at": "2026-08-31T12:00:00+00:00",
+        "ttl_seconds": kernel_tunables.SESSION_GC_TTL_SECONDS,
+    }
+    # The dead `is_stale: False` field (written by the old inline author, read by
+    # nothing) does not survive the fold.
+    assert "is_stale" not in record
+
+
+def test_is_live_and_live_session(tmp_path: Path) -> None:
+    now = datetime.now(tz=UTC)
+    fresh = session_store.new_binding_record(
+        session_id="sess-2",
+        context="alpha",
+        mode="READ",
+        release=None,
+        runtime="unknown",
+        pid=1,
+        now=now.isoformat(),
+    )
+    assert session_store.is_live(fresh)
+    session_store.write_session(tmp_path, "sess-2", fresh)
+    assert session_store.live_session(tmp_path, "sess-2") == fresh
+
+    stale = dict(fresh)
+    stale["last_seen_at"] = "2000-01-01T00:00:00+00:00"
+    stale["bound_at"] = "2000-01-01T00:00:00+00:00"
+    assert not session_store.is_live(stale)
+    session_store.write_session(tmp_path, "sess-3", stale)
+    assert session_store.live_session(tmp_path, "sess-3") is None
+    assert session_store.live_session(tmp_path, "sess-absent") is None
+
+
+def test_reap_stale_deletes_only_expired_records(tmp_path: Path) -> None:
+    now = datetime.now(tz=UTC)
+    live = session_store.new_binding_record(
+        session_id="live-1",
+        context="a",
+        mode="READ",
+        release=None,
+        runtime="unknown",
+        pid=1,
+        now=now.isoformat(),
+    )
+    dead = dict(live)
+    dead["last_seen_at"] = "2000-01-01T00:00:00+00:00"
+    dead["bound_at"] = "2000-01-01T00:00:00+00:00"
+    session_store.write_session(tmp_path, "live-1", live)
+    session_store.write_session(tmp_path, "dead-1", dead)
+    (session_store.sessions_dir(tmp_path) / "not-a-record.txt").write_text("", encoding="utf-8")
+
+    reaped = session_store.reap_stale(tmp_path)
+
+    assert reaped == ["dead-1"]
+    assert session_store.read_session(tmp_path, "live-1") is not None
+    assert session_store.read_session(tmp_path, "dead-1") is None
+
+
+def test_gc_check_assembly_has_one_home() -> None:
+    """The hand-built ``gc_check`` dict must not exist outside session_store: the
+    liveness-predicate INPUT is owned by the record's owner (F002)."""
+    import dadaia_workspace
+
+    pkg_root = Path(dadaia_workspace.__file__).parent
+    offenders = [
+        str(p.relative_to(pkg_root))
+        for p in sorted(pkg_root.rglob("*.py"))
+        if "gc_check" in p.read_text(encoding="utf-8")
+    ]
+    assert offenders == [], offenders

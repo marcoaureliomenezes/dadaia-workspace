@@ -50,6 +50,17 @@ UNSTAMPED_VERSION = 0
 #: release identities on either axis).
 RELEASE_SEMVER_RE = re.compile(r"^v?\d+\.\d+\.\d+(-[0-9A-Za-z][0-9A-Za-z.]*)?$")
 
+#: The bare release-id pattern FRAGMENT (no anchors, no ``v`` prefix), mechanically
+#: derived from :data:`RELEASE_SEMVER_RE` — never a second hand-typed copy (F004,
+#: 20260830 audit). The one composable source for path regexes embedding a release id
+#: (``features/specs/canon.py``'s TREE-8 canon entries).
+#: The suffix group stays CAPTURING in the compiled pattern (bash's POSIX ERE, which
+#: ``release_semver_ere_pattern()`` feeds, has no ``(?:``) but is neutralized here so
+#: embedding the fragment never shifts a consumer regex's group indices.
+RELEASE_ID_FRAGMENT: str = (
+    RELEASE_SEMVER_RE.pattern.removeprefix("^v?").removesuffix("$").replace("(-", "(?:-")
+)
+
 #: The exactly-two verdict-evidence root templates the CI security-verdict gate
 #: (``.github/scripts/pr-verdict-check.sh``) resolves against (SPEC AS-15, T-050-06A
 #: boundary 2). Each string carries ONE ``{glob}`` placeholder the caller substitutes

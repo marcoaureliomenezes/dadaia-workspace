@@ -27,14 +27,11 @@ drifting copy alongside the bash gate).
 from __future__ import annotations
 
 import os
-import re
 from pathlib import Path
 
 from dadaia_workspace.core import invocation
 from dadaia_workspace.features.spec_context import gate_policy
 from dadaia_workspace.hooks import _common
-
-_SLUG_STRIP = re.compile(r"[^A-Za-z0-9_-]")
 
 #: The gate's own anonymous-session sentinel (FR5): an unresolvable session id never
 #: creates a presence record — the write is still allowed, there is simply nothing to
@@ -71,19 +68,6 @@ def _resolve_holder_pid(payload: dict[str, object]) -> int:
             if value > 0:
                 return value
     return os.getppid()
-
-
-def _context_slug(fpath: Path) -> str:
-    """Derive the context slug for *fpath* via the single resolution authority.
-
-    A convenience one-liner over :func:`dadaia_workspace.core.invocation.resolve`
-    (``target_path=fpath`` — rung 0 — wins ahead of every other rung); the result is
-    sanitized to ``[A-Za-z0-9_-]`` (CWE-22), matching the authority's own allowlist.
-    ``_evaluate_target`` below resolves its own Invocation directly (this function
-    exists for callers that only need the slug).
-    """
-    inv = invocation.resolve(target_path=fpath, env=os.environ, cwd=Path.cwd())
-    return _SLUG_STRIP.sub("", inv.context_name or "")
 
 
 def _resolve_mode(workspace: Path, session_id: str, ctx: str = "") -> str:

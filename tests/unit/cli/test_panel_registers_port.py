@@ -48,7 +48,8 @@ def test_panel_registers_and_releases_port(workspace: Path, monkeypatch) -> None
         lambda views, telemetry=None: object,
     )
     monkeypatch.setattr(
-        "dadaia_workspace.container.build_panel_views", lambda root, telemetry=None: object()
+        "dadaia_workspace.cli.commands.panel_composition.build_panel_views",
+        lambda root, telemetry=None: object(),
     )
 
     registered: dict[str, object] = {}

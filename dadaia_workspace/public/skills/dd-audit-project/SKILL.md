@@ -49,3 +49,7 @@ applyTo: "specs/audits/**"
 - `DADAIA.md` §6 (Audits) — full lifecycle: one audit binds to one remediation release, archives once dispositioned.
 - `dadaia specs doctor --json`/`--recipe`; `dadaia bugs update <id> --set field=value` (the FR2 seam, pillar 1's only write).
 - `dd-cli-library` — command syntax reference.
+
+## Spec-set review
+
+- Pre-implementation/refinement spec review runs the absorbed dimension: `SPEC-REVIEW.md` (from the retired dadaia-workspace-spec-reviewer).

@@ -9,9 +9,8 @@ a genuinely valid tree, a property no single-code row can prove.
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
@@ -616,16 +615,8 @@ def test_tree4_creates_missing_dirs_others_have_no_autofix(tmp_path: Path) -> No
     tree5m_present = [i for i in SpecsDoctor(specs_5m_present).check() if i.code == "TREE-5M"]
     assert tree5m_present == []
 
-    # TREE-6: missing PLAN.md in IMPLEMENTATION phase never auto-created.
-    specs6 = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-tree6"))
-    plan = specs6 / "releases" / "1.2.3" / "PLAN.md"
-    plan.unlink()
-    doctor6 = SpecsDoctor(specs6, templates_dir=_TEMPLATES_DIR)
-    issues6 = doctor6.check()
-    tree6 = [i for i in issues6 if i.code == "TREE-6"]
-    assert tree6 and tree6[0].severity == Severity.ERROR and not tree6[0].fixable
-    doctor6.fix(issues6)
-    assert not plan.exists()
+    # TREE-6 retired (0.5.3 T-053-04, F005): missing-artifact coverage lives in
+    # SPEC-DOC-004 — see test_one_defect_one_code_missing_active_artifact.
 
     # TREE-7: bug missing session_id is never auto-repaired; session_id: null passes.
     specs7 = _make_clean_specs_tree(tmp_path.parent / (tmp_path.name + "-tree7"))
@@ -704,45 +695,37 @@ def test_doc012_retired_never_fires_on_a_planted_candidates_md(tmp_path: Path) -
 
 
 @pytest.mark.parametrize(
-    ("release_id", "created", "today", "expect_doc016"),
+    ("release_id", "created", "expect"),
     [
-        pytest.param("v1.2.3", "2026-06-01", (2026, 6, 15), False, id="semver-name-ok"),
-        pytest.param(
-            "sdd-release-lifecycle-v1",
-            "2026-05-01",
-            (2026, 6, 15),
-            False,
-            id="vintage-grandfathered",
-        ),
-        pytest.param(
-            "bad-name", "2026-06-01", (2026, 5, 20), False, id="before-cutoff-not-checked"
-        ),
-        pytest.param(
-            "my-feature-v1", "2026-06-10", (2026, 6, 15), True, id="non-semver-new-release-warns"
-        ),
+        # Conforming names are silent (the retired v axis still resolves read-only).
+        pytest.param("v1.2.3", "2026-06-01", None, id="semver-name-ok"),
+        # Live legacy name born BEFORE the canon cutoff: preserved, WARNING only.
+        pytest.param("sdd-release-lifecycle-v1", "2026-05-01", Severity.WARNING, id="legacy-warns"),
+        # Born ON the canon cutoff day: the canon applies — ERROR.
+        pytest.param("bad-name", "2026-06-01", Severity.ERROR, id="on-cutoff-errors"),
+        # Born after the cutoff: ERROR. No date.today() gating (F005: the mocked-clock
+        # time-bomb class died with SPEC-DOC-016).
+        pytest.param("my-feature-v1", "2026-06-10", Severity.ERROR, id="post-cutoff-errors"),
     ],
 )
-def test_doc016_semver_folder_naming_boundary(
+def test_doc027_release_naming_boundary(
     tmp_path: Path,
     release_id: str,
     created: str,
-    today: tuple[int, int, int],
-    expect_doc016: bool,
+    expect: Severity | None,
 ) -> None:
     specs = _make_clean_specs_tree(tmp_path, release_id=release_id)
     (specs / "releases" / release_id / "SPEC.md").write_text(
         f"# Spec\n\n> **Status:** Aprovado\n> **Created:** {created}\n\nContent.\n",
         encoding="utf-8",
     )
-    with patch("dadaia_workspace.features.specs.doctor_release.date") as mock_date:
-        mock_date.today.return_value = date(*today)
-        mock_date.side_effect = lambda *a, **kw: date(*a, **kw)
-        issues = SpecsDoctor(specs).check()
-    doc16 = [i for i in issues if i.code == "SPEC-DOC-016"]
-    if expect_doc016:
-        assert doc16, "Expected SPEC-DOC-016 for non-SemVer folder name"
+    issues = SpecsDoctor(specs).check()
+    doc27 = [i for i in issues if i.code == "SPEC-DOC-027"]
+    if expect is None:
+        assert doc27 == [], [i.to_dict() for i in doc27]
     else:
-        assert doc16 == [], [i.to_dict() for i in doc16]
+        assert doc27, "Expected SPEC-DOC-027 for non-conforming folder name"
+        assert doc27[0].severity == expect
 
 
 # ---------------------------------------------------------------------------
@@ -766,8 +749,8 @@ def test_segmented_active_release_artifacts_matrix(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 # v0.4.3 T-043-22 [Arm-B rider] bug specs-doctor-segment-router-silent-skip —
 # AB.1-AB.4. Intent: CONTRACT — a live segment pointer at a MISSING directory must
-# produce an explicit ERROR from BOTH SPEC-DOC-004 and TREE-6, never a silent
-# early return. The stale "already reported by check 9" comment was wrong:
+# produce an explicit SPEC-DOC-004 ERROR, never a silent early return (TREE-6
+# retired at 0.5.3 T-053-04/F005: one rule, one implementation). The stale "already reported by check 9" comment was wrong:
 # check 9 (SPEC-DOC-009) validates only the RELEASE directory
 # (releases/<release>/), never the SEGMENT subdirectory
 # (releases/<release>/<segment>/) — so a live segment pointer at a missing
@@ -779,9 +762,8 @@ def test_missing_segment_directory_is_an_explicit_error_not_a_silent_skip(
     tmp_path: Path,
 ) -> None:
     """AB.1: an active release whose phase record's segment: names a non-existent directory produces an
-    explicit ERROR (from BOTH SPEC-DOC-004 and TREE-6) naming the missing segment
-    directory — never a silent pass. Pre-fix, this fixture produced ZERO findings
-    from either check."""
+    explicit SPEC-DOC-004 ERROR naming the missing segment directory — never a
+    silent pass. Pre-fix, this fixture produced ZERO findings."""
     specs = _make_clean_specs_tree(tmp_path, "v0.1.6")
     _segment_active(specs, "v0.1.6", "alpha-1")
     # The segment directory existed after _segment_active; now remove it entirely —
@@ -793,16 +775,11 @@ def test_missing_segment_directory_is_an_explicit_error_not_a_silent_skip(
     issues = SpecsDoctor(specs).check()
 
     doc004 = [i for i in issues if i.code == "SPEC-DOC-004"]
-    tree6 = [i for i in issues if i.code == "TREE-6"]
     assert doc004, "SPEC-DOC-004 must report the missing segment directory, never stay silent"
-    assert tree6, "TREE-6 must report the missing segment directory, never stay silent"
     missing_segment_dir = str(specs / "releases" / "v0.1.6" / "alpha-1")
     assert any(
         missing_segment_dir in i.description or missing_segment_dir in (i.path or "")
         for i in doc004
-    )
-    assert any(
-        missing_segment_dir in i.description or missing_segment_dir in (i.path or "") for i in tree6
     )
 
 
@@ -817,7 +794,6 @@ def test_healthy_segmented_release_is_unaffected_by_the_missing_segment_check(
     issues = SpecsDoctor(specs).check()
 
     assert "SPEC-DOC-004" not in _codes(issues)
-    assert "TREE-6" not in _codes(issues)
 
 
 def test_flat_release_is_unaffected_by_the_missing_segment_check(tmp_path: Path) -> None:
@@ -829,7 +805,6 @@ def test_flat_release_is_unaffected_by_the_missing_segment_check(tmp_path: Path)
     issues = SpecsDoctor(specs).check()
 
     assert "SPEC-DOC-004" not in _codes(issues)
-    assert "TREE-6" not in _codes(issues)
 
 
 def test_stale_check_9_comment_no_longer_claims_coverage_it_does_not_provide() -> None:
@@ -917,3 +892,56 @@ def test_cat1_sync_matrix(tmp_path: Path) -> None:
     _make_catalog_json(product_dir_g, ["feature-a", "product-vision"])
     cat1_g = [i for i in SpecsDoctor(specs_g).check() if i.code == "CAT-1"]
     assert cat1_g == []
+
+
+def test_doc016_and_doc027_remedies_name_the_mintable_bare_axis(tmp_path: Path) -> None:
+    """F004 (20260830 audit, bug release-new-rejects-semver-but-doctor-requires-it):
+    SPEC-DOC-016/027 used to instruct a ``v<MAJOR>.<MINOR>.<PATCH>`` rename that
+    ``dadaia release new`` refuses (the v axis is retired, read-only). The remedy must
+    name the bare, mintable form. Intent: regression; size: unit."""
+    specs = _make_clean_specs_tree(tmp_path, release_id="not-semver")
+    (specs / "releases" / "not-semver" / "SPEC.md").write_text(
+        "# Spec\n\n> **Status:** Aprovado\n> **Created:** 2026-08-01\n\nContent.\n",
+        encoding="utf-8",
+    )
+    issues = SpecsDoctor(specs).check()
+    naming = [i for i in issues if i.code in ("SPEC-DOC-016", "SPEC-DOC-027")]
+    assert naming, "Expected naming issues for a non-SemVer release dir"
+    for issue in naming:
+        assert "v<MAJOR" not in issue.description, issue.description
+        assert "^v\\d" not in issue.description, issue.description
+    assert any("<MAJOR>.<MINOR>.<PATCH>" in i.description for i in naming)
+
+
+def test_one_defect_one_code_missing_active_artifact(tmp_path: Path) -> None:
+    """F005 (20260830 audit): TREE-6 and SPEC-DOC-004 were ONE rule kept as two
+    implementations (the segment-router-silent-skip bug had to be fixed twice, one
+    ~20-line block per file). One defect now yields ONE code: SPEC-DOC-004.
+    Intent: contract; size: unit."""
+    specs = _make_clean_specs_tree(tmp_path)
+    plan = specs / "releases" / "1.2.3" / "PLAN.md"
+    plan.unlink()
+    doctor = SpecsDoctor(specs, templates_dir=_TEMPLATES_DIR)
+    issues = doctor.check()
+    doc004 = [i for i in issues if i.code == "SPEC-DOC-004" and "PLAN.md" in i.description]
+    assert doc004 and doc004[0].severity == Severity.ERROR
+    assert "TREE-6" not in _codes(issues)
+    doctor.fix(issues)
+    assert not plan.exists(), "a missing SDD artifact must never be auto-created"
+
+
+def test_one_defect_one_code_nonconforming_release_name(tmp_path: Path) -> None:
+    """F005: SPEC-DOC-016 and SPEC-DOC-027 were one naming rule as two implementations
+    that stayed coherent only by docstring promise (bug
+    doctor-016-errors-archived-legacy-release-027-tolerates). One defect, ONE code:
+    SPEC-DOC-027 — and no ``date.today()`` gating (the mocked-clock time-bomb class).
+    Intent: contract; size: unit."""
+    specs = _make_clean_specs_tree(tmp_path, release_id="badname-release")
+    (specs / "releases" / "badname-release" / "SPEC.md").write_text(
+        "# Spec\n\n> **Status:** Aprovado\n> **Created:** 2026-08-01\n\nContent.\n",
+        encoding="utf-8",
+    )
+    issues = SpecsDoctor(specs).check()
+    doc027 = [i for i in issues if i.code == "SPEC-DOC-027"]
+    assert doc027 and doc027[0].severity == Severity.ERROR
+    assert "SPEC-DOC-016" not in _codes(issues)

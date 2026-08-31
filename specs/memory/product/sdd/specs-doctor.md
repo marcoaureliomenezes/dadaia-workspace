@@ -10,10 +10,13 @@ tags: [specs, doctor, validation, sdd]
 ## Validator families
 
 - Specs doctor verifies that SDD artifacts are structurally and semantically coherent before release advancement or closure; it reports, and the enforcement lane is the gate ([[sdd-gate-v3]]).
+- `features/specs/rules.py::RULES` is the one ordered registry: check order, fix dispatch and the `--fix` CLI help are three projections of the same table, never hand-kept copies.
+- Each `check()` run builds a fresh `SpecsTree` snapshot (`features/specs/specs_tree.py`): the active release is parsed once per run; fixes mutate paths and the next run re-parses.
 - `features/specs/canon.py`'s `CANON` table is the one definition of what a `specs/` tree may hold: `scaffold` renders it, `check_tree` checks it, and a scaffolded tree passes its own doctor by construction.
 - `TREE-*` covers the canonical tree, required rule files and the absence of repo-local runtime or cache state.
 - `TREE-8` is the v6 canon-root check over top-level membership under `specs/` — WARN-only, ignoring dotfiles.
-- `SPEC-DOC-*` release checks cover the active release and phase, artifact presence and `**Status:** Aprovado`, task-marker coherence, SemVer naming, unique ids, archive-shape and partial-archive-residue invariants, and release references.
+- `TREE-5` covers the root `specs/AGENTS.md` AND every scoped scaffold law file (releases, releases/_ideas, backlog, bugs, audits, ADRs; memory excluded by single-ownership): a projection byte-identical to a shipped version (`shipped-hashes.json`, every historical scaffold version recorded) is refreshed losslessly by `--fix`; anything else stays warn-only.
+- `SPEC-DOC-*` release checks cover the active release and phase, artifact presence and `**Status:** Aprovado`, task-marker coherence, naming (`SPEC-DOC-027`, the one naming rule — `SPEC-DOC-016` and `TREE-6` retired at 0.5.3: one rule, one implementation), unique ids, archive-shape and partial-archive-residue invariants, and release references.
 - The active release, its optional segment and its phase are read from `RELEASE.json` through one reader with no fallback; zero live release directories resolves cleanly to no active release, and a missing segment directory is an ERROR.
 - Memory checks cover Markdown, frontmatter and atomicity, forbidden history sections, Mermaid and image references, catalog/index agreement, and unfilled `<PLACEHOLDER>` tokens in atoms (ERROR) or an installed `tests/AGENTS.md` (WARN).
 - `CAT-1` reconciles catalog entries against atom files by slug set, so which optional fields the persisted catalog carries is outside what it asserts ([[context-management]]).

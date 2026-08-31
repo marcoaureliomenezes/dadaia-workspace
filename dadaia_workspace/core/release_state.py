@@ -30,6 +30,8 @@ from dataclasses import dataclass, field
 from typing import Any
 
 __all__ = [
+    "MEMORY_WRITE_PHASES",
+    "PHASES",
     "SCHEMA",
     "ReleaseState",
     "parse_release_state",
@@ -38,6 +40,26 @@ __all__ = [
 
 #: The schema identifier every ``RELEASE.json`` document's ``schema`` field must carry.
 SCHEMA = "release-state-v1"
+
+#: Canonical release lifecycle phase vocabulary (constitution §7; the ``phase`` field
+#: of release-state-v1). ONE home (F007, 20260830 audit) — every consumer imports this
+#: set; ``"none"`` is the scaffold default meaning "no active release".
+PHASES: frozenset[str] = frozenset(
+    {
+        "DISCOVERY",
+        "DEFINITION",
+        "SPEC",
+        "PLAN",
+        "TASKS",
+        "IMPLEMENTATION",
+        "CLOSURE",
+        "ARCHIVED",
+        "none",
+    }
+)
+
+#: Phases in which product-engineer may write memory atoms (constitution §13 / FR-P1-13).
+MEMORY_WRITE_PHASES: frozenset[str] = frozenset({"DEFINITION", "CLOSURE"})
 
 #: Per-milestone-kind required inner keys (light structural validation only -- the
 #: schema file is the shape authority; this is a parse-time sanity check, not a second

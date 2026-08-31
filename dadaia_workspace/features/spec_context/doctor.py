@@ -9,10 +9,9 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from dadaia_workspace.core import kernel_tunables, session_store, workspace_layout
+from dadaia_workspace.core import session_store, workspace_layout
 from dadaia_workspace.core.models.spec_context import ContextState
 from dadaia_workspace.core.platform import PLATFORM
-from dadaia_workspace.core.record_liveness import is_stale
 from dadaia_workspace.features.spec_context import presence
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
@@ -542,33 +541,10 @@ class DoctorService:
         for name in gc_report.empty_context_dirs:
             actions.append(f"PRESENCE-GC: removed empty presence context dir '{name}'")
 
-        # Graveyard GC: delete TTL-expired session files from .dadaia/sessions/
-        sessions_dir = self._sessions_dir()
-        if sessions_dir.exists():
-            for sess_file in sorted(sessions_dir.iterdir()):
-                if not sess_file.name.endswith(".json"):
-                    continue
-                if sess_file.parent.name == "runtime":
-                    continue
-                # Read the session record through its single owner (FR-R3-01).
-                sess_id = sess_file.name[: -len(".json")]
-                sess_data = session_store.read_session(self._workspace_root, sess_id)
-                if sess_data is None:
-                    continue
-                # Build a TTL-check-compatible dict. The liveness clock is the
-                # heartbeat-renewed ``last_seen_at`` (T-011-04 / FR-W1-04, ADR-8 amended),
-                # with TTL-from-creation fallback for pre-heartbeat records — resolved by
-                # the single owner. The session-record pid is NOT passed (no pid_probe): the
-                # bind-CLI pid is dead by construction, so bind GC is pure last_seen_at TTL.
-                gc_check: dict[str, object] = {
-                    "heartbeat": session_store.liveness_timestamp(sess_data),
-                    "ttl": sess_data.get(
-                        _SESSION_GC_TTL_FIELD, kernel_tunables.SESSION_GC_TTL_SECONDS
-                    ),
-                }
-                if is_stale(gc_check):
-                    sess_file.unlink(missing_ok=True)
-                    actions.append(f"GRAVEYARD-GC: deleted expired session file '{sess_file.name}'")
+        # Graveyard GC: delete TTL-expired session files from .dadaia/sessions/ —
+        # through the record owner's ONE reaper (core.session_store.reap_stale, F002).
+        for sess_id in session_store.reap_stale(self._workspace_root):
+            actions.append(f"GRAVEYARD-GC: deleted expired session file '{sess_id}.json'")
 
         # ROOT-2: delete forbidden caches/outputs at workspace root (safe to delete)
         for cache_name in sorted(_ROOT_FORBIDDEN_CACHES):

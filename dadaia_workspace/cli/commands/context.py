@@ -23,7 +23,7 @@ from dadaia_workspace.cli._specs_resolution import (
     resolve_context_for_cli as _resolve_context_for_cli,
 )
 from dadaia_workspace.cli.redact import ContextRedactor
-from dadaia_workspace.core import kernel_tunables, session_store
+from dadaia_workspace.core import session_store
 from dadaia_workspace.core.exceptions import (
     ContextAlreadyExistsError,
     ContextNotFoundError,
@@ -34,7 +34,6 @@ from dadaia_workspace.core.exceptions import (
     WorkspaceNotInitializedError,
 )
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
-from dadaia_workspace.core.record_liveness import is_stale
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.spec_context import presence
 from dadaia_workspace.features.spec_context.service import (
@@ -141,22 +140,10 @@ def _sessions_dir(workspace_root: Path) -> Path:
 
 
 def _live_session(workspace_root: Path, session_id: str) -> dict[str, Any] | None:
-    """This caller's own session record, or ``None`` when absent/stale.
-
-    Thin call onto the single session-record owner (:mod:`core.session_store`) and the
-    ONE staleness rule (:func:`core.record_liveness.is_stale`) — replaces the CLI's own
-    ``_load_session``/``_session_is_stale`` pair (release K1).
-    """
-    record = session_store.read_session(workspace_root, session_id)
-    if record is None:
-        return None
-    gc_check: dict[str, object] = {
-        "heartbeat": session_store.liveness_timestamp(record),
-        "ttl": record.get(
-            session_store.SESSION_GC_TTL_FIELD, kernel_tunables.SESSION_GC_TTL_SECONDS
-        ),
-    }
-    return None if is_stale(gc_check) else record
+    """This caller's own session record, or ``None`` when absent/stale — the single
+    owner's predicate (:func:`core.session_store.live_session`, F002)."""
+    record = session_store.live_session(workspace_root, session_id)
+    return None if record is None else dict(record)
 
 
 def _harness_session_id() -> str | None:
@@ -621,7 +608,9 @@ _BIND_MODE_ALIASES: dict[str, str] = {
 _MUTATING_MODES = ("IMPLEMENTATION", "REVIEW")
 
 
-@app.command()
+@app.command(
+    epilog="Examples: eval $(dadaia context bind my-ctx --mode implementation --release 1.2.3 --print-env) | dadaia context bind my-ctx --mode read"
+)
 def bind(
     name: str = typer.Argument(..., help="Context name to bind to"),
     mode: str = typer.Option(
@@ -706,18 +695,15 @@ def bind(
     # The persisted mode the gate reads: mutating modes carry BOUND_; READ stays bare.
     persisted_mode = f"BOUND_{resolved_mode}" if resolved_mode in _MUTATING_MODES else resolved_mode
 
-    session_data: dict = {  # type: ignore[type-arg]
-        "session_id": session_id,
-        "context": name,
-        "mode": persisted_mode,
-        "release": release,
-        "runtime": runtime,
-        "pid": pid,
-        "bound_at": now,
-        "last_seen_at": now,
-        "ttl_seconds": kernel_tunables.SESSION_GC_TTL_SECONDS,
-        "is_stale": False,
-    }
+    session_data = session_store.new_binding_record(
+        session_id=session_id,
+        context=name,
+        mode=persisted_mode,
+        release=release,
+        runtime=runtime,
+        pid=pid,
+        now=now,
+    )
 
     # Persist the CLI session and, when available, the harness-native session record. There
     # is deliberately no context-global "incumbent" pointer: binding is caller-scoped.

@@ -349,6 +349,9 @@ class BacklogNewResult:
     created."""
 
     path: Path
+    #: True only when this call created BACKLOG.json itself; False for an append to an
+    #: existing document (bug backlog-new-append-reported-as-created: the CLI printed
+    #: "[ok] created:" for every append because this was hardcoded True).
     created: bool = True
 
 
@@ -410,6 +413,7 @@ def backlog_new(specs_dir: Path, slug: str) -> BacklogNewResult:
     backlog_dir = specs_dir / "backlog"
     backlog_dir.mkdir(parents=True, exist_ok=True)
     target = backlog_dir / "BACKLOG.json"
+    document_existed = target.is_file()
 
     existing_doc = load_document(backlog_dir)
     if any(item.slug == slug for item in existing_doc.active):
@@ -443,7 +447,7 @@ def backlog_new(specs_dir: Path, slug: str) -> BacklogNewResult:
             f"show slug {slug!r} in active — refusing to report success"
         )
 
-    return BacklogNewResult(path=target, created=True)
+    return BacklogNewResult(path=target, created=not document_existed)
 
 
 # ═════════════════════════════════════════════════════════════════════════════════

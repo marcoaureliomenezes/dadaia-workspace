@@ -24,7 +24,12 @@ from typing import Protocol
 
 from dadaia_workspace.features.chokepoints.branch_policy import Decision, context_slug_for_path
 
-__all__ = ["PresenceRecordLike", "context_slug_for_path", "pre_commit_decision"]
+__all__ = [
+    "PresenceRecordLike",
+    "bundled_ledger_advisory",
+    "context_slug_for_path",
+    "pre_commit_decision",
+]
 
 
 class PresenceRecordLike(Protocol):
@@ -108,4 +113,30 @@ def pre_commit_decision(
         allowed=True,
         message="[pre-commit] commit allowed.",
         warn=_advisory_message(ctx, other.session_id, age),
+    )
+
+
+_LEDGER_REL = "specs/bugs/BUGS.jsonl"
+
+
+def bundled_ledger_advisory(staged_paths: Sequence[str]) -> str | None:
+    """FR8-isolation advisory (F015/F036, 20260827-canon-v6-first-audit) — WARN-only.
+
+    A `dd-gitflow-default` §4 shape-1 registration stages the ledger ALONE; a shape-3
+    fix stages the ledger with code + its regression test. Staging the ledger together
+    with OTHER ``specs/**`` paths is the bundling that produced release-squash
+    provenance and swept unrelated staged content into ledger commits. Pure and
+    NO-LOCKS: returns one warn line (never a block) when ``specs/bugs/BUGS.jsonl`` is
+    staged alongside another ``specs/`` path outside ``specs/bugs/``, else ``None``.
+    """
+    posix = [p.replace("\\", "/") for p in staged_paths]
+    if _LEDGER_REL not in posix:
+        return None
+    bundled = [p for p in posix if p.startswith("specs/") and not p.startswith("specs/bugs/")]
+    if not bundled:
+        return None
+    return (
+        f"[pre-commit] WARN: {_LEDGER_REL} is staged together with {len(bundled)} other "
+        f"specs/ path(s) (e.g. {bundled[0]}) — commit allowed (NO-LOCKS); FR8 isolation "
+        "prefers the ledger line in its own commit (dd-gitflow-default §4, shapes 1/3)."
     )

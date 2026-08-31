@@ -19,7 +19,7 @@
     },
     "phase": {
       "type": "string",
-      "description": "The release's current lifecycle phase (DISCOVERY/DEFINITION/SPEC/PLAN/TASKS/IMPLEMENTATION/CLOSURE/ARCHIVED — the canonical vocabulary lives in features/specs/doctor_release.py, not duplicated here). Overwritten in place on every phase transition — no history of prior phases survives in this field; a transition worth remembering is recorded as a `log` entry."
+      "description": "The release's current lifecycle phase (DISCOVERY/DEFINITION/SPEC/PLAN/TASKS/IMPLEMENTATION/CLOSURE/ARCHIVED — the canonical vocabulary lives in core/release_state.py (PHASES), not duplicated here). Overwritten in place on every phase transition — no history of prior phases survives in this field; a transition worth remembering is recorded as a `log` entry."
     },
     "rc": {
       "type": ["integer", "null"],

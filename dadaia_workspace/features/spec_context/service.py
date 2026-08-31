@@ -3,7 +3,6 @@
 import contextlib
 import logging
 import os
-import re
 import shutil
 import sys
 from datetime import UTC, datetime
@@ -23,8 +22,12 @@ from dadaia_workspace.core.models.spec_context import (
     RepoLiveStatus,
     SpecContextProject,
 )
+from dadaia_workspace.features.spec_context import scoped_law
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+from dadaia_workspace.infrastructure.privacy_check import (
+    scan_file_for_secrets as _scan_file_for_secrets,
+)
 
 # Canonical scaffold source — lives inside the installed package
 _PUBLIC_DIR = Path(__file__).parent.parent.parent / "public"
@@ -100,7 +103,6 @@ def _rmtree_chmod_retry(func: object, path: str, _exc: BaseException) -> None:
     grant owner write on the failing path (and its parent dir, where the unlink
     permission actually lives) and retry the failed operation once.
     """
-    import os
     import stat
 
     target = Path(path)
@@ -113,121 +115,6 @@ def _rmtree_chmod_retry(func: object, path: str, _exc: BaseException) -> None:
 
 def _now() -> str:
     return datetime.now(tz=UTC).isoformat()
-
-
-# --------------------------------------------------------------------- secret scan
-#
-# Structural secret/identifier patterns reused as the privacy/secret engine for the
-# dead() --commit review gate (F-5 / AC-R7-01). These are content-shape rules — no
-# operator-specific terms are hardcoded here (dev-guardrail #4). The operator denylist
-# baseline (R7b / T-010-20) lives in infrastructure/privacy_check.py and is orthogonal;
-# this scan is the structural layer that blocks pushing newly-committed files that look
-# like they carry a secret, private IP, or internal hostname.
-_SECRET_SCAN_TEXT_SUFFIXES = {
-    ".cfg",
-    ".conf",
-    ".css",
-    ".env",
-    ".html",
-    ".ini",
-    ".j2",
-    ".js",
-    ".json",
-    ".md",
-    ".py",
-    ".sh",
-    ".toml",
-    ".ts",
-    ".txt",
-    ".yaml",
-    ".yml",
-    "",
-}
-
-# R-2 (v0.1.10 rc-2 sec audit LOW): cryptographic key / certificate material is
-# commonly stored in binary-suffix files (.pem can be text, .key/.p12/.pfx are
-# typically binary) that the text-suffix scan above skips. A private-key file in
-# an untracked dead()-push set is a finding *by its suffix alone* — regardless of
-# whether the bytes happen to be UTF-8 decodable. PEM files are also content-scanned
-# (they overlap with the text path) so a real key block is caught both ways.
-_SECRET_SCAN_KEY_SUFFIXES = {
-    ".pem",
-    ".key",
-    ".p12",
-    ".pfx",
-    ".crt",
-    ".cer",
-    ".der",
-    ".keystore",
-    ".jks",
-}
-
-# (rule-name, compiled-pattern). Names are surfaced in the error; values never are.
-_SECRET_SCAN_RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
-    ("private-key-block", re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")),
-    ("aws-access-key-id", re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b")),
-    ("github-token", re.compile(r"\bgh[pousr]_[A-Za-z0-9]{20,}\b")),
-    ("slack-token", re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}\b")),
-    (
-        "generic-secret-assignment",
-        re.compile(
-            r"(?i)(?:password|passwd|secret|api[_-]?key|access[_-]?token|"
-            r"private[_-]?key)\s*[:=]\s*['\"]?[A-Za-z0-9/+_\-]{8,}",
-        ),
-    ),
-    (
-        "private-ipv4",
-        re.compile(
-            r"\b(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3}"
-            r"|192\.168\.\d{1,3}\.\d{1,3}"
-            r"|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})\b",
-        ),
-    ),
-    (
-        "internal-hostname",
-        re.compile(r"(?i)\b[a-z0-9][a-z0-9-]*\.(?:internal|local|lan|corp|intranet)\b"),
-    ),
-)
-
-
-def _scan_file_for_secrets(path: Path) -> list[str]:
-    """Return rule names that match *path* (empty list ⇒ clean).
-
-    Two layers (R-2):
-
-    1. **Suffix presence** — a cryptographic key / certificate suffix
-       (``.pem``/``.key``/``.p12``/``.pfx``/...) is itself a finding
-       (``cert-key-file-suffix``), because such a file does not belong in an
-       untracked dead()-push set regardless of its byte content. This catches
-       binary key material the text scan below skips.
-    2. **Content rules** — for text-decodable files (the text-suffix allowlist,
-       plus PEM/key files that happen to be ASCII), the structural secret rules
-       run over the decoded content.
-
-    Binary / unreadable / unsupported-suffix files that are not key material are
-    skipped. Never returns the matched secret value — only the rule name, so
-    callers can build a redacted report.
-    """
-    suffix = path.suffix.lower()
-    hits: list[str] = []
-
-    is_key_file = suffix in _SECRET_SCAN_KEY_SUFFIXES
-    if is_key_file:
-        # Presence of cert/key material is a finding by itself.
-        hits.append("cert-key-file-suffix")
-
-    # Content-scan only files we can decode: the text allowlist, plus key files
-    # (PEM is frequently ASCII — a decodable .pem also triggers private-key-block).
-    if suffix not in _SECRET_SCAN_TEXT_SUFFIXES and not is_key_file:
-        return hits
-    try:
-        text = path.read_text(encoding="utf-8")
-    except (UnicodeDecodeError, OSError):
-        return hits
-    for rule_name, pattern in _SECRET_SCAN_RULES:
-        if pattern.search(text):
-            hits.append(rule_name)
-    return hits
 
 
 def _merge_scaffold_into(
@@ -629,53 +516,9 @@ class SpecContextService:
                 shutil.rmtree(preserved, ignore_errors=True)
                 _log.info("scaffold merge into pre-existing specs/: no missing files found")
 
-        # v0.4.3 T-043-21/FR17: mirror the tests/AGENTS.md sibling seam's hardened
-        # posture (below) onto this write too — it previously carried ZERO symlink
-        # refusals. The containing repo DIRECTORY must not itself be a symlink (it
-        # would escape the repos/ tree, same posture as `workspace_guardrail`'s
-        # consumer-repo containment).
-        #
-        # v0.4.3 T-043-23 security-review rework (FR17 LOW, CWE-367 TOCTOU/CWE-59 link
-        # following, handoff 2026-08-17T173112Z-security-reviewer-v0.4.3-alpha-2-delta):
-        # the destination-file check used to be a SEPARATE `is_symlink()`/`.exists()`
-        # probe followed by a DISTINCT `shutil.copy2` call — two syscalls with a window
-        # between them where a same-user process could swap the destination for a
-        # symlink and have the template written straight through it. Replaced with a
-        # SINGLE atomic `os.open()` carrying `O_CREAT|O_EXCL|O_NOFOLLOW`: "already
-        # exists", "is a symlink" (dangling or not) and "was swapped mid-window" are now
-        # ONE indivisible refusal, never three separately-timed checks.
-        repo_agents_dst = repo_path / "AGENTS.md"
-        repo_agents_src = _PUBLIC_DIR / "templates" / "repo-AGENTS.md"
-        if not repo_path.is_symlink() and repo_agents_src.exists():
-            open_flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY | getattr(os, "O_NOFOLLOW", 0)
-            try:
-                fd = os.open(repo_agents_dst, open_flags, 0o644)
-            except OSError:
-                pass  # exists, is a symlink, or was raced mid-window — refused, no-op.
-            else:
-                with os.fdopen(fd, "wb") as fh:
-                    fh.write(repo_agents_src.read_bytes())
-                touched.append("AGENTS.md")
-
-        # v0.7.0 FR3 (T-070-07): the scoped test law lands ONLY where a tests/ tree
-        # already exists — alive() never invents the directory (a stray tests/ would
-        # be planted in every non-Python consumer), and never overwrites a repo's own
-        # scoped law. Plain copy, byte-identical: no rendering at this seam.
-        tests_agents_dst = repo_path / "tests" / "AGENTS.md"
-        tests_agents_src = _PUBLIC_DIR / "templates" / "tests-AGENTS.md"
-        tests_dir = repo_path / "tests"
-        if (
-            tests_dir.is_dir()
-            and not tests_dir.is_symlink()  # a symlinked tests/ escapes the repo tree
-            and not tests_agents_dst.exists()
-            # A DANGLING destination symlink reports not-exists yet copy2 would write
-            # through it (workspace_guardrail refuses destination-file symlinks — the
-            # same posture holds at this seam).
-            and not tests_agents_dst.is_symlink()
-            and tests_agents_src.exists()
-        ):
-            shutil.copy2(tests_agents_src, tests_agents_dst)
-            touched.append(Path("tests", "AGENTS.md").as_posix())
+        # Scoped-law placement (repo AGENTS.md + tests/AGENTS.md) — one home (F013):
+        # features.spec_context.scoped_law owns the hardened install-if-absent writes.
+        touched.extend(scoped_law.install_scoped_law(repo_path, _PUBLIC_DIR))
 
         # Commit the scaffold alive() itself just wrote (bug alive-scaffold-blocks-dead,
         # validation-027 F-06): leaving tool-created files untracked made an immediate

@@ -63,6 +63,17 @@ def test_release_new_and_backlog_new(specs: Path) -> None:
     assert backlog_result.exit_code == 0, backlog_result.output
     assert "[ok] created:" in backlog_result.output
 
+    # bug backlog-new-append-reported-as-created: an append to the EXISTING document
+    # reports the action performed (appended), never a second "created".
+    append_result = _runner.invoke(
+        app,
+        ["backlog", "new", "second-idea", "--specs-dir", str(specs)],
+    )
+    assert append_result.exit_code == 0, append_result.output
+    assert "created" not in append_result.output
+    assert "appended" in append_result.output
+    assert "second-idea" in append_result.output
+
     target = specs / "backlog" / "BACKLOG.json"
     assert target.is_file()
     backlog_doc = json.loads(target.read_text(encoding="utf-8"))

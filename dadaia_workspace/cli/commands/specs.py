@@ -9,10 +9,14 @@ from pathlib import Path
 import typer
 
 from dadaia_workspace import container
-from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
+from dadaia_workspace.cli._specs_resolution import (
+    resolve_context_specs_dir_for_cli,
+    resolve_specs_dir_for_cli,
+)
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.specs import Severity, SpecsDoctor
 from dadaia_workspace.features.specs.doctor_types import SpecsDoctorIssue
+from dadaia_workspace.features.specs.rules import render_fix_help
 from dadaia_workspace.features.specs.scaffolder import scaffold
 
 app = typer.Typer(help="SDD release-lifecycle structural checks and helpers.")
@@ -160,7 +164,10 @@ def _print_recipe(issues: list[SpecsDoctorIssue]) -> None:
         typer.echo(step)
 
 
-@app.command("doctor")
+@app.command(
+    "doctor",
+    epilog="Examples: dadaia specs doctor --context my-ctx | dadaia specs doctor --specs-dir specs --fix",
+)
 def doctor(
     specs_dir: str | None = typer.Option(
         None,
@@ -196,20 +203,14 @@ def doctor(
     fix: bool = typer.Option(
         False,
         "--fix",
-        help=(
-            "Apply auto-fixes for fixable issues (TREE-3: render missing memory HTML; "
-            "TREE-4: create missing dirs with AGENTS.md; TREE-8: remove a stray "
-            "non-canon root entry or dotfile; MEM-PLACEHOLDER-1: remove unfilled "
-            "placeholder atoms from old scaffolds). "
-            "Warn-only invariants (TREE-1, TREE-2, TREE-5) are never "
-            "auto-fixed. After fixing, re-checks and reports residual issues."
-        ),
+        help=render_fix_help(),
     ),
 ) -> None:
     """Run structural checks on the SDD specs tree.
 
     ``--context`` resolves the context's ``specs/`` tree via the same
-    ``container.resolve_context_specs_dir`` seam used by the four lifecycle workflows,
+    one resolver (``dadaia_workspace.core.invocation.resolve_context_specs_dir``)
+    used by hooks and lifecycle workflows alike,
     and is mutually exclusive with ``--specs-dir``. The resolver falls back to the
     workspace-root ``specs/`` tree
     when ``repos/<context>/specs`` does not exist (self-hosting workspaces), instead
@@ -218,7 +219,7 @@ def doctor(
     if specs_dir is not None and context is not None:
         raise typer.BadParameter("Pass either --context or --specs-dir, not both.")
     if context is not None:
-        target = container.resolve_context_specs_dir(resolve_workspace_root(), context)
+        target = resolve_context_specs_dir_for_cli(resolve_workspace_root(), context)
     else:
         target = _resolve_specs_dir(specs_dir)
     if public_dir is not None:

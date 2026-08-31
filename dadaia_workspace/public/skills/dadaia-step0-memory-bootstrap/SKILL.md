@@ -2,12 +2,11 @@
 name: dadaia-step0-memory-bootstrap
 description: >
   Mandatory memory bootstrap protocol for every agent, executed before any
-  implementation, review, or report. Loads the tech-stack + feature catalog
-  (injected by the ctx-inject hook or self-pulled) and ensures the agent reads the
-  1-3 most relevant feature atoms and the architecture atom before starting work.
-  Updated for the markdown source world: atoms are .md files, read as plain text;
-  catalog.json is generated from frontmatter; [[slug]]
-  wikilinks in atom bodies resolve to specs/memory/<slug>.md.
+  implementation, review, or report. Grounds the session in the tech-stack digest and
+  feature catalog (injected by the ctx-inject hook, or self-pulled), then reads the
+  1-3 most relevant feature atoms — plain-Markdown files under
+  specs/memory/product/<area>/ whose [[slug]] wikilinks resolve to sibling atoms —
+  and ARCHITECTURE.md whenever the work is structural.
 tldr: "Ground in tech-stack + catalog (hook-injected), self-pull 1-3 relevant feature atoms, self-pull ARCHITECTURE.md when structural."
 applyTo: "**"
 ---

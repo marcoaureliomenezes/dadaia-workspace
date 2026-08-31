@@ -424,8 +424,18 @@ class VenvPythonEnvironmentManager:
                         self._ensure_ci_toolchain(pip)
                         self._verify_venv_provider(workspace_root, expected=self._running_version())
                         return str(venv_dir)
-                    except subprocess.CalledProcessError:
-                        pass
+                    except subprocess.CalledProcessError as repack_exc:
+                        # F016 (20260830 audit): narrate THIS failure as what it is —
+                        # the repack SUCCEEDED and installing the re-packed wheel
+                        # failed — with its own stderr, never re-narrated below as
+                        # "could not be re-packed" with the wrong error's output.
+                        repack_tail = (repack_exc.stderr or repack_exc.output or "").strip()[-400:]
+                        raise WorkspaceVenvBootstrapError(
+                            f"workspace venv bootstrap failed installing '{spec}': the "
+                            "index could not resolve it, and installing the re-packed "
+                            f"running distribution ({repacked.name}) also failed. "
+                            f"Installer output: {repack_tail}"
+                        ) from repack_exc
                 # Name the escape hatch that exists for exactly this case (a raw
                 # CalledProcessError traceback pointed nowhere — validation-028 cascade).
                 pip_tail = ((exc.stderr or exc.output or "") if exc else "").strip()[-400:]

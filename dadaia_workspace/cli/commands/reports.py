@@ -253,11 +253,6 @@ def validate(
         "--release",
         help="Filter to a specific release ID (matches against handoff release_id field).",
     ),
-    strict: bool = typer.Option(
-        False,
-        "--strict/--no-strict",
-        help="Exit 1 on any validation violation. Default: non-strict (warnings only).",
-    ),
     json_output: bool = typer.Option(
         False, "--json", help="Emit machine-readable JSON output instead of human-readable text."
     ),
@@ -289,8 +284,8 @@ def validate(
 
     \b
     Exit codes:
-      0  All files valid (or violations found in non-strict mode)
-      1  One or more violations in strict mode
+      0  All files valid
+      1  One or more INVALID files
       2  One or more file paths not found
       3  Bad invocation (no paths and not --all) or workspace not initialized
 
@@ -298,7 +293,7 @@ def validate(
     Examples:
       dadaia reports validate path/to/report.handoff.json
       dadaia reports validate --all
-      dadaia reports validate --all --strict
+      dadaia reports validate --all
       dadaia reports validate --all --json
       dadaia reports validate path/to/report.handoff.json --workspace /path/to/other/ws
       dadaia reports validate path/to/verdict.handoff.json --reviewed-root /path/to/worktree
@@ -394,7 +389,7 @@ def validate(
 
     # Exit-code truthfulness (validation-029 F-12): an INVALID file is a hard failure
     # — printing INVALID while exiting 0 masked tampered/malformed handoffs from every
-    # consuming script. --strict remains the elevation for soft warnings only.
+    # consuming script.
     if n_invalid > 0:
         raise typer.Exit(1)
 

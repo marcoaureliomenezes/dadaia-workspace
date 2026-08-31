@@ -24,6 +24,9 @@ from dadaia_workspace.cli.commands import (
     specs,
     tmp,
 )
+from dadaia_workspace.cli.commands import (
+    help as help_cmd,
+)
 from dadaia_workspace.cli.commands.bugs import bugs_app
 from dadaia_workspace.cli.commands.export import export
 from dadaia_workspace.cli.commands.import_ import import_workspace
@@ -78,31 +81,32 @@ def _root(
 
 
 # Top-level commands
-app.command(name="init")(init.init)
-app.command(name="export")(export)
-app.command(name="import")(import_workspace)
-app.command(name="capabilities")(capabilities.capabilities)
-app.command(name="certify")(certify.certify)
-app.command(name="reconcile")(reconcile.reconcile)
-app.add_typer(clean.app, name="clean")
+app.command(name="init", rich_help_panel="Management")(init.init)
+app.command(name="export", rich_help_panel="Management")(export)
+app.command(name="import", rich_help_panel="Management")(import_workspace)
+app.command(name="capabilities", rich_help_panel="Management")(capabilities.capabilities)
+app.command(name="certify", rich_help_panel="Management")(certify.certify)
+app.command(name="reconcile", rich_help_panel="Management")(reconcile.reconcile)
+app.add_typer(clean.app, name="clean", rich_help_panel="Management")
 
 # Sub-command groups
-app.add_typer(context.app, name="context")
-app.add_typer(ci.app, name="ci")
-app.add_typer(repos.app, name="repos")
-app.add_typer(public.app, name="public")
-app.add_typer(doctor.app, name="doctor")
-app.add_typer(academy.app, name="academy")
-app.add_typer(reports.app, name="reports")
-app.add_typer(specs.app, name="specs")
-app.add_typer(server.app, name="server")
-app.add_typer(tmp.app, name="tmp")
-app.add_typer(migrate.app, name="migrate")
-app.add_typer(panel.app, name="panel")
-app.add_typer(memory_app, name="memory")
-app.add_typer(release_app, name="release")
-app.add_typer(backlog_app, name="backlog")
-app.add_typer(bugs_app, name="bugs")
+app.add_typer(context.app, name="context", rich_help_panel="Common")
+app.add_typer(ci.app, name="ci", rich_help_panel="Management")
+app.add_typer(repos.app, name="repos", rich_help_panel="Management")
+app.add_typer(public.app, name="public", rich_help_panel="Common")
+app.add_typer(doctor.app, name="doctor", rich_help_panel="Common")
+app.add_typer(academy.app, name="academy", rich_help_panel="Management")
+app.add_typer(reports.app, name="reports", rich_help_panel="Management")
+app.add_typer(specs.app, name="specs", rich_help_panel="Common")
+app.add_typer(server.app, name="server", rich_help_panel="Management")
+app.add_typer(tmp.app, name="tmp", rich_help_panel="Management")
+app.add_typer(migrate.app, name="migrate", rich_help_panel="Management")
+app.add_typer(panel.app, name="panel", rich_help_panel="Common")
+app.add_typer(memory_app, name="memory", rich_help_panel="Management")
+app.add_typer(release_app, name="release", rich_help_panel="Common")
+app.add_typer(backlog_app, name="backlog", rich_help_panel="Common")
+app.add_typer(bugs_app, name="bugs", rich_help_panel="Common")
+app.add_typer(help_cmd.app, name="help", rich_help_panel="Common")
 
 
 #: Values of ``DADAIA_TRACEBACK`` that do NOT enable the traceback opt-in, so an

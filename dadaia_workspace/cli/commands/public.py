@@ -54,7 +54,7 @@ def stage() -> None:
     # Defence-in-depth (rc-4 / T-017-36, bug agent-skill-surface-slop): fail staging on broken
     # agent→skill references so a stage with dangling skills never silently succeeds (doctor
     # also catches these post-hoc; this blocks them at the source).
-    from dadaia_workspace.infrastructure.codex_doctor import check_agent_skill_refs
+    from dadaia_workspace.infrastructure.entity_doctor import check_agent_skill_refs
 
     public_dir = Path(__file__).resolve().parent.parent.parent / "public"
     ref_drift = [r for r in check_agent_skill_refs(public_dir) if r.status is DoctorStatus.DRIFT]
@@ -72,7 +72,9 @@ def stage() -> None:
         console.print("[dim]No assets to stage.[/dim]")
 
 
-@app.command()
+@app.command(
+    epilog="Recipe: dadaia public stage && dadaia public install --target all && dadaia public doctor"
+)
 def install(
     target: TargetOption = "all",
     force: bool = typer.Option(False, "--force", help="Overwrite existing files"),
@@ -121,6 +123,12 @@ def install(
             console.print(f"  {item}", markup=False)
     else:
         console.print("[dim]No assets to install.[/dim]")
+
+    # Derived help digest rider (backlog cli-help-architecture): regenerate the
+    # version-stamped digest at install time — never at hook fire. Fail-soft.
+    from dadaia_workspace.cli.help_digest import write_digest
+
+    write_digest(workspace_root)
 
 
 @app.command(name="list")

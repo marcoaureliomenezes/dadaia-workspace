@@ -128,3 +128,22 @@ def test_release_state_is_a_frozen_dataclass_value_object() -> None:
     )
     with pytest.raises(AttributeError):
         state.phase = "SPEC"  # type: ignore[misc]
+
+
+def test_phase_vocabulary_single_home() -> None:
+    """F007 (20260830-design-bug-surface-audit): the release phase vocabulary has ONE
+    home — ``core.release_state.PHASES`` — and every consumer imports it. Intent:
+    contract; size: unit.
+
+    ``doctor_release.CANONICAL_PHASES`` (the documented import site) and
+    ``gate_policy``'s memory-write subset must be the same objects, not re-typed
+    literals — a re-typed literal is exactly the duplicated-decider class the
+    demolished lifecycle cluster died of.
+    """
+    from dadaia_workspace.core import release_state
+    from dadaia_workspace.features.spec_context import gate_policy
+    from dadaia_workspace.features.specs import doctor_release
+
+    assert doctor_release.CANONICAL_PHASES is release_state.PHASES
+    assert gate_policy._MEMORY_WRITE_PHASES is release_state.MEMORY_WRITE_PHASES
+    assert release_state.MEMORY_WRITE_PHASES < release_state.PHASES
