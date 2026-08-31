@@ -51,7 +51,7 @@
   public/skills/**.
   Blocked by: T-046-08. Delivers: Arm B post-registration is one skill —
   lifecycle and method, no forced hop.
-- [ ] T-046-12 — FR5 Merge D: `dadaia-workspace-spec-navigator` absorbs
+- [-] T-046-12 — FR5 Merge D: `dadaia-workspace-spec-navigator` absorbs
   `dadaia-step0-memory-bootstrap` as its first phase; step0 deleted; persona
   grants deduped; behavior-map row folded, hashes.
   Write set: dadaia_workspace/public/skills/dadaia-workspace-spec-navigator/**,
