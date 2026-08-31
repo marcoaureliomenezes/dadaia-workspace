@@ -5,8 +5,8 @@
 ## alpha-1
 
 - [x] T-052-01 — Ledger lineage corrections F001/F003 (write set: specs/bugs/BUGS.jsonl via `dadaia bugs update`)
-- [-] T-052-02 — bug_provenance registration granularity F010 (write set: dadaia_workspace/core/bug_provenance.py, tests/unit/core/)
-- [ ] T-052-03 — pre-commit bundled-ledger advisory F015/F036 (write set: dadaia_workspace/features/chokepoints/pre_commit.py, dadaia_workspace/cli/commands/ci.py, tests/unit/features/chokepoints/)
+- [x] T-052-02 — bug_provenance registration granularity F010 (write set: dadaia_workspace/core/bug_provenance.py, tests/unit/core/)
+- [-] T-052-03 — pre-commit bundled-ledger advisory F015/F036 (write set: dadaia_workspace/features/chokepoints/pre_commit.py, dadaia_workspace/cli/commands/ci.py, tests/unit/features/chokepoints/)
 - [ ] T-052-04 — gitflow shape 6 F016 (write set: dadaia_workspace/public/skills/dd-gitflow-default/SKILL.md, projections, entities/behavior-map)
 - [ ] T-052-05 — vulture one-shot measurement F033 (write set: none in-repo; scratch venv)
 - [ ] T-052-06 — Disposition sweep: 32 findings + audit archive (write set: specs/audits/**)
