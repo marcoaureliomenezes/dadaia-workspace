@@ -126,14 +126,15 @@ def test_schema_violation_always_exits_nonzero(tmp_path: Path, monkeypatch) -> N
 
     handoff_path = _make_invalid_handoff(tmp_path)
 
-    strict = _runner.invoke(app, ["reports", "validate", str(handoff_path), "--strict"])
-    assert strict.exit_code == 1, strict.output
-    assert "agent" in strict.output
+    result = _runner.invoke(app, ["reports", "validate", str(handoff_path)])
+    assert result.exit_code == 1, result.output
+    assert "INVALID" in result.output
+    assert "agent" in result.output
 
-    non_strict = _runner.invoke(app, ["reports", "validate", str(handoff_path)])
-    assert non_strict.exit_code == 1, non_strict.output
-    assert "INVALID" in non_strict.output
-    assert "agent" in non_strict.output
+    # The dead --strict flag is DELETED (bug reports-validate-strict-flag-dead):
+    # a declared-but-never-read option is a contract lie, not a mode.
+    gone = _runner.invoke(app, ["reports", "validate", str(handoff_path), "--strict"])
+    assert gone.exit_code == 2, gone.output
 
 
 def test_exit_code_matrix_not_found_and_uninitialized_workspace(
