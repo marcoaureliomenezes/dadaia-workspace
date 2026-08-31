@@ -42,7 +42,7 @@
       "scoped_agents_md": [],
       "hash_tuple": {
         "section": "sha256:4ff73734813e198c0717caf61020c9c81de1fedf182240a22bdce7b32ffe17fe",
-        "skill": "sha256:f317da36d555e887f6237905d27a241caa9d6c7a906ac677c9f1530f36ef6ec6",
+        "skill": "sha256:2b3db078e9c8938fbaae45d5eb4468145976bfac1a67ff794c75b339c5ceff3e",
         "scoped": []
       },
       "recorded_by": "claude-code",
@@ -433,7 +433,7 @@
       "scoped_agents_md": [],
       "hash_tuple": {
         "section": "sha256:ab59448f37391a5442a7dc46013dcc3645474faaac7c6d33d6c1dbf73945fce1",
-        "skill": "sha256:e84bdd6962f3030b190847301e9bd531d564f2252db1dd721a0a1a1f7d0290c8",
+        "skill": "sha256:a7ed9916793bd390484cd11d4d36aa1d6e9605fd1a34296eab69bea235b97512",
         "scoped": []
       },
       "recorded_by": "claude-code",

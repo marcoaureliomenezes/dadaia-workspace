@@ -43,6 +43,18 @@ flags, wrappers) breeding chains, and deletion-shaped fixes ending families.
 - **One adapter = a hypothetical seam; two = a real one** — never introduce a port with a single adapter; that is indirection, not design.
 - **Replace, don't layer** — a fix that wraps the old path instead of replacing it is a layer, and layers are how the bug loop grows. The correct fix usually deletes a branch, collapses two paths, or moves logic back inside its owner.
 
+When designing an interface, ask: can I reduce the number of methods? simplify the
+parameters? hide more complexity inside?
+
+Design for testability — good interfaces make testing natural:
+
+1. **Accept dependencies, don't create them** — a module that constructs its own
+   collaborators can only be tested whole.
+2. **Return results, don't produce side effects** — a value can be asserted; a
+   mutation must be observed.
+3. **Small surface area** — fewer methods mean fewer tests; fewer parameters mean
+   simpler test setup.
+
 ## 4. Steps — understand the problem, then test the growth
 
 1. Extract the core problem: one sentence describing what must actually be solved.
