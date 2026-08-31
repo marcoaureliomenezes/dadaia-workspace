@@ -72,6 +72,7 @@ from datetime import datetime
 from pathlib import Path
 
 from dadaia_workspace.core import invocation, session_store
+from dadaia_workspace.features.spec_context import injection_policy
 from dadaia_workspace.hooks import _common
 
 #: Lean fields kept in the INJECTED catalog digest. The heavy ``summary`` is dropped from
@@ -307,7 +308,9 @@ def _emit_bootstrap(workspace: Path, context: str) -> None:
 
 
 def main() -> int:
-    """Run the context-injection hook. Returns 0 always."""
+    """Run the context-injection hook. Transport only (F009): resolve the inputs,
+    call :func:`injection_policy.decide_injection`, execute the decision. Returns 0
+    always."""
     payload = _common.read_stdin_json()
     try:
         workspace = invocation.resolve(
@@ -322,71 +325,30 @@ def main() -> int:
     session_id = _common.resolve_session_id(payload, default="workspace")
 
     # Sentinel — path BYTE-IDENTICAL to the shell sentinel: .dadaia/tmp/ctx-inject-fired-<id>.
-    # Its content now records the last injected slug so a re-bind is detectable. Sentinel
-    # GC (release 0.5.1 K2) is no longer inject-time: it is owned by presence.gc(), called
-    # by the PostToolUse reconciler on its own throttle cadence and by doctor --fix.
+    # Its content records the last injected slug so a re-bind is detectable. Sentinel
+    # GC (release 0.5.1 K2) is owned by presence.gc(), never inject-time.
     tmp_dir = workspace / ".dadaia" / "tmp"
+    sentinel = tmp_dir / f"{_SENTINEL_PREFIX}{session_id}"
+    sentinel_mtime, recorded_slug = _read_sentinel(sentinel)
 
-    # PostCompact (v0.2.8, kimi-code): stamp the compact-epoch marker, then RE-EMIT the
-    # bootstrap on stdout. Kimi's PostCompact is observation-only (the harness discards
-    # stdout), so this never double-injects — the deterministic re-injection still
-    # happens at the next UserPromptSubmit via the single authority. The emission follows
-    # the observable-contract doctrine (projected-pre-gate-silent-allow: a silent hook is
-    # unverifiable — external automation must SEE the re-injection happen). The sentinel
-    # is deliberately NOT restamped here, so the next prompt still re-injects.
+    event: injection_policy.Event = "prompt"
     if os.environ.get("DADAIA_HOOK_EVENT") == "PostCompact":
+        # Kimi PostCompact (v0.2.8): stamp the compact-epoch marker (transport side
+        # effect — the next UserPromptSubmit re-injects deterministically), then emit
+        # per the policy. Kimi discards this stdout (observation-only), so the
+        # emission is the observable contract, never a double-inject.
+        event = "postcompact"
         with contextlib.suppress(OSError):
             tmp_dir.mkdir(parents=True, exist_ok=True)
             (tmp_dir / f"{_COMPACT_PREFIX}{session_id}").write_text("", encoding="utf-8")
-        sentinel = tmp_dir / f"{_SENTINEL_PREFIX}{session_id}"
-        _, recorded_slug = _read_sentinel(sentinel)
-        # The emission resolves through the SAME single authority as a normal prompt
-        # (T-50-03: self-keyed session record → DADAIA_CONTEXT → this session's own live
-        # harness-native record → cwd's repo), falling back to the sentinel's recorded
-        # slug: a bind with NO prior prompt leaves no sentinel file, but its session
-        # record still names the bound context (consumer round-3 bug
-        # kimi-postcompact-omits-bound-context-bootstrap).
-        context = _resolve_context(payload)
-        if not context:
-            context = recorded_slug
-        if context and invocation.resolve_context_specs_dir(workspace, context).is_dir():
-            _emit_bootstrap(workspace, context)
-        else:
-            _emit(_generic_preflight(workspace))
-        return 0
-
-    # Claude Code SessionStart re-injection (bug claude-compact-reinjection-missing):
-    # a compact erased the injected bootstrap; a /clear wiped the whole context. Claude
-    # Code ADDS SessionStart stdout back to context (unlike Kimi's discard-stdout
-    # PostCompact), so the bootstrap re-emits at the event ITSELF and the sentinel is
-    # restamped immediately — the next prompt stays silent (exactly-once discipline) and
-    # no compact marker is stamped (it would double-inject at the next prompt). Detection
-    # is payload-driven (hook_event_name + source), never an env prefix — the settings
-    # command stays a plain, Windows-safe module invocation. Sources outside
-    # {compact, clear} (startup/resume/fork) fall through to the normal bind-driven flow.
-    if str(payload.get("hook_event_name") or "") == "SessionStart" and str(
+    elif str(payload.get("hook_event_name") or "") == "SessionStart" and str(
         payload.get("source") or ""
     ) in ("compact", "clear"):
-        sentinel = tmp_dir / f"{_SENTINEL_PREFIX}{session_id}"
-        _, recorded_slug = _read_sentinel(sentinel)
-        # Same single-authority resolution + recorded-slug fallback as PostCompact above.
-        context = _resolve_context(payload)
-        if not context:
-            context = recorded_slug
-        if context and invocation.resolve_context_specs_dir(workspace, context).is_dir():
-            _emit_bootstrap(workspace, context)
-            _stamp_sentinel(tmp_dir, sentinel, context)
-        else:
-            _emit(_generic_preflight(workspace))
-            _stamp_sentinel(tmp_dir, sentinel, "")
-        return 0
+        # Claude Code SessionStart re-injection (bug claude-compact-reinjection-missing):
+        # detection is payload-driven (hook_event_name + source), never an env prefix.
+        # Sources outside {compact, clear} (startup/resume/fork) stay normal prompts.
+        event = "session_restart"
 
-    sentinel = tmp_dir / f"{_SENTINEL_PREFIX}{session_id}"
-    sentinel_mtime, recorded_slug = _read_sentinel(sentinel)
-    sentinel_exists = sentinel_mtime is not None
-
-    # Compact trigger: a compact marker newer than the sentinel forces re-injection on
-    # this prompt (the sentinel restamp below makes the following prompt silent again).
     compact_marker = tmp_dir / f"{_COMPACT_PREFIX}{session_id}"
     compact_mtime: float | None = None
     with contextlib.suppress(OSError):
@@ -395,57 +357,28 @@ def main() -> int:
         sentinel_mtime is not None and compact_mtime is not None and compact_mtime > sentinel_mtime
     )
 
-    context = _resolve_context(payload)
-
-    # T-50-03 injection trigger (SPEC v0.5.0 FR1 coupling 1): this session's OWN bind
-    # (``bound_at``, self-keyed session record) newer than the sentinel forces
-    # re-injection even when the resolved context NAME is unchanged — a same-context
-    # re-bind is how a mode/release change reaches a live session (new pin: today a
-    # same-context re-bind does NOT re-inject; under this trigger it MUST).
+    # T-50-03 injection trigger: this session's OWN bind (bound_at, self-keyed session
+    # record) newer than the sentinel — a same-context re-bind is how a mode/release
+    # change reaches a live session.
     bound_at = _session_bound_at(workspace, session_id)
     rebound = sentinel_mtime is not None and bound_at is not None and bound_at > sentinel_mtime
 
-    if not context and compacted and recorded_slug:
-        # Post-compact re-injection source: the single authority no longer resolves a
-        # context on this prompt (e.g. the self-keyed session record was cleared/expired),
-        # but a compaction just occurred. The sentinel's recorded slug is the last
-        # injected context — the session's bound truth — and is what gets re-injected
-        # after a compaction.
-        context = recorded_slug
+    decision = injection_policy.decide_injection(
+        event=event,
+        context=_resolve_context(payload),
+        recorded_slug=recorded_slug,
+        sentinel_exists=sentinel_mtime is not None,
+        compacted=compacted,
+        rebound=rebound,
+        has_specs=lambda name: invocation.resolve_context_specs_dir(workspace, name).is_dir(),
+    )
 
-    # Unbound: generic preflight (NO memory). Emit once per session — a fresh session (no
-    # sentinel) gets it and stamps the sentinel; a repeat prompt is silent, unless a
-    # compaction just wiped the context (compacted ⇒ re-emit the preflight once).
-    if not context:
-        if sentinel_exists and not compacted:
-            return 0
+    if decision.emit == "bootstrap":
+        _emit_bootstrap(workspace, decision.context)
+    elif decision.emit == "preflight":
         _emit(_generic_preflight(workspace))
-        _stamp_sentinel(tmp_dir, sentinel, "")
-        return 0
-
-    specs_dir = invocation.resolve_context_specs_dir(workspace, context)
-    if not specs_dir.is_dir():
-        # Resolved a context with no specs tree — degrade to generic preflight once.
-        if sentinel_exists and not compacted:
-            return 0
-        _emit(_generic_preflight(workspace))
-        _stamp_sentinel(tmp_dir, sentinel, "")
-        return 0
-
-    # Re-injection guard: a repeat prompt for the SAME already-injected slug is silent. A
-    # re-bind to a different context (recorded_slug != context), a compaction newer than
-    # the sentinel, THIS session's own rebind (bound_at newer than the sentinel, T-50-03 —
-    # covers a SAME-CONTEXT re-bind too), or a fresh session always (re-)injects that
-    # context's memory and restamps the sentinel with the new slug.
-    if sentinel_exists and recorded_slug == context and not compacted and not rebound:
-        return 0
-
-    sections = [f"[{context}]"]
-    memory = _build_memory(specs_dir)
-    if memory:
-        sections.append(memory)
-    _emit("\n".join(sections) + "\n")
-    _stamp_sentinel(tmp_dir, sentinel, context)
+    if decision.stamp_slug is not None:
+        _stamp_sentinel(tmp_dir, sentinel, decision.stamp_slug)
     return 0
 
 
