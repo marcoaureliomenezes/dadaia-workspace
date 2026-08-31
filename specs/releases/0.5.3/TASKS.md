@@ -23,8 +23,8 @@
 
 - [x] T-053-12 — Honesty residue (F015/F016) (write set: dadaia_workspace/cli/commands/ci.py, dadaia_workspace/infrastructure/python_env.py, dadaia_workspace/core/handoff_index.py, tests)
 - [x] T-053-13 — Bug component vocabulary (F017) (write set: dadaia_workspace/features/bugs/, dadaia_workspace/cli/commands/bugs.py, tests)
-- [-] T-053-14 — Container dissolution (F001) (write set: dadaia_workspace/container.py, dadaia_workspace/features/panel/, dadaia_workspace/cli/, dadaia_workspace/core/protocols/, dadaia_workspace/infrastructure/process_ancestry_adapter.py, tests)
-- [ ] T-053-15 — Scoped-law shipped-hashes coverage + repair (picked bug) (write set: dadaia_workspace/features/specs/template_history.py, doctor_structural.py, features/migrate/upgrade.py, public/templates/shipped-hashes.json, specs/releases/AGENTS.md, specs/audits/AGENTS.md, tests)
+- [x] T-053-14 — Container dissolution (F001) (write set: dadaia_workspace/container.py, dadaia_workspace/features/panel/, dadaia_workspace/cli/, dadaia_workspace/core/protocols/, dadaia_workspace/infrastructure/process_ancestry_adapter.py, tests)
+- [-] T-053-15 — Scoped-law shipped-hashes coverage + repair (picked bug) (write set: dadaia_workspace/features/specs/template_history.py, doctor_structural.py, features/migrate/upgrade.py, public/templates/shipped-hashes.json, specs/releases/AGENTS.md, specs/audits/AGENTS.md, tests)
 
 ## alpha-4 (the deep model)
 
