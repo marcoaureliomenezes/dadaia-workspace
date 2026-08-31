@@ -4,7 +4,7 @@
 
 ## alpha-1 (folds)
 
-- [ ] T-053-01 — Invocation adoption in hooks/container (F003) (write set: dadaia_workspace/hooks/, dadaia_workspace/container.py, dadaia_workspace/core/invocation.py, tests)
+- [-] T-053-01 — Invocation adoption in hooks/container (F003) (write set: dadaia_workspace/hooks/, dadaia_workspace/container.py, dadaia_workspace/core/invocation.py, tests)
 - [ ] T-053-02 — Phase vocabulary one home (F007) (write set: dadaia_workspace/core/, dadaia_workspace/features/specs/doctor_release.py, dadaia_workspace/features/spec_context/gate_policy.py, tests)
 - [ ] T-053-03 — Release-identity fold (F004) (write set: dadaia_workspace/core/specs_version.py, dadaia_workspace/features/specs/canon.py, doctor_release.py, scaffolder.py, doctor_common.py, tests)
 - [ ] T-053-04 — Collapse doctor rule pairs (F005) (write set: dadaia_workspace/features/specs/doctor_structural.py, doctor_release.py, tests)
