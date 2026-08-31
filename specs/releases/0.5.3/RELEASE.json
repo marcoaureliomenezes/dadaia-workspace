@@ -1,9 +1,12 @@
 {
  "schema": "release-state-v1",
  "release": "0.5.3",
- "phase": "DEFINITION",
+ "phase": "IMPLEMENTATION",
  "rc": null,
- "defined": null,
+ "defined": {
+  "sha": "510423de4f924f3a9e60b167e5c0a9af8fee81ff",
+  "ts": "2026-08-31T13:53:35Z"
+ },
  "implemented": null,
  "shipped": null,
  "audited": null,
