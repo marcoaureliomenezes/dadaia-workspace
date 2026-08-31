@@ -34,6 +34,7 @@ tags: [context, lifecycle, session, no-locks, privacy]
 - `dadaia context bind <context> --mode …` writes one artifact — the caller-owned `.dadaia/sessions/<session-id>.json` carrying context, mode and `bound_at` — acquiring nothing.
 - That record is reachable at rung 2 only when keyed by the session's own harness-native id; lacking one, `bind` warns that the `DADAIA_CONTEXT` export is the binding.
 - The injection carries state, never law: the tech-stack digest plus the product catalog digest, the ALIVE-context list going only to an unbound session.
+- Every emission also attaches the derived CLI help digest (`.dadaia/agentic/help-digest.md`, built by `public install`/`reconcile`/`dadaia help tree --digest`) bind-independent; the hook only reads the file, never builds it.
 - The catalog generator persists `tldr` only for atoms in the injected tier, selected by `category`; `slug`, `title` and `path` survive on every entry.
 - Specs, bind, memory, releases and backlog resolve only from the main repo, so each doctor and the gate see exactly one `specs/` tree per context.
 - READ mode is opt-in self-protection: it blocks this session's mutating writes, leaves additive paths writable, and is never imposed on another session.

@@ -1,7 +1,7 @@
 {
  "schema": "release-state-v1",
  "release": "0.5.3",
- "phase": "IMPLEMENTATION",
+ "phase": "CLOSURE",
  "rc": null,
  "defined": {
   "sha": "510423de4f924f3a9e60b167e5c0a9af8fee81ff",
@@ -46,6 +46,12 @@
    "agent": "claude-code",
    "kind": "note",
    "text": "EXTENSION (operator order 2026-08-31): the release concludes only at 0 bugs / 0 active backlog / 0 findings. The 9 remaining backlog candidates were reviewed one by one against post-0.5.1/0.5.2/0.5.3 reality; grill held with the operator (4 rulings): (1) extend THIS release rather than cut 0.5.4; (2) dadaia-router REJECTED as superseded (DADAIA.md-in-statements + behavior-map already answer it); (3) dadaia-wizard REJECTED as speculative (no concrete runbook in hand; re-enter on value); (4) dd-code-review lands as a new skill with the persona thinned. Phase back to IMPLEMENTATION; T-053-19..26 added; 7 entries picked (CONSUMED), 2 rejected."
+  },
+  {
+   "ts": "2026-08-31T15:59:56Z",
+   "agent": "claude-code",
+   "kind": "summary",
+   "text": "EXTENSION CLOSED: the 9 remaining backlog candidates reviewed against post-0.5.x reality and consumed — 7 implemented (T-053-19..25: dadaia-codebase-design + fuse, dd-architecture-survey, dd-code-review + persona thinning + DADAIA §2 three-axis row, dadaia-glossary + CONTEXT.md homonyms, tracer-bullets section, docker-style CLI help + derived digest + SessionStart startup|resume injection, nine-skill Update×5/Merge×3), 2 REJECTED with recorded reasons (dadaia-router superseded, dadaia-wizard speculative). Conclusion criterion met: 0 open bugs, 0 active backlog entries, 0 audit findings. Skill surface 22→21 with three hand-transcribed CLI-map skills replaced by one derived digest."
   }
  ]
 }
