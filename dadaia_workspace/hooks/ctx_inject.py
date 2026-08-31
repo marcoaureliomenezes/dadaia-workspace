@@ -218,7 +218,7 @@ def _build_memory(specs_dir: Path) -> str:
     WS-C (v0.1.30 / T-30-E-05): this is a session-orientation bootstrap for an interactive
     agent session — a lightweight orientation aid, not the full memory tree. The agent
     self-pulls deeper atoms (e.g. ``ARCHITECTURE.md``, a specific product atom) directly when
-    a decision needs them, per the ``dadaia-step0-memory-bootstrap`` skill. So the bootstrap
+    a decision needs them, per the ``dadaia-workspace-spec-navigator`` skill (memory-bootstrap phase). So the bootstrap
     stays lean — a bounded tech-stack digest + the lean catalog tldr-digest, never the full
     memory tree.
     """

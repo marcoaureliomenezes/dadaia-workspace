@@ -253,32 +253,17 @@
       "anchor": null,
       "skill": "dadaia-workspace-spec-navigator",
       "scoped_agents_md": [
+        "dadaia_workspace/public/data/memory-AGENTS.md",
+        "dadaia_workspace/public/scaffold/memory/AGENTS.md",
         "dadaia_workspace/public/templates/specs-AGENTS.md"
       ],
       "hash_tuple": {
         "section": "sha256:ab59448f37391a5442a7dc46013dcc3645474faaac7c6d33d6c1dbf73945fce1",
-        "skill": "sha256:74e1bf0874e632dc0f55396ea4057212061d8e3369394408b02e04fb870ca41a",
-        "scoped": [
-          "sha256:3c495710196cf94a0bd8ea06bc3feca6d66a47b47b1737c7283ac295d4eda46f"
-        ]
-      },
-      "recorded_by": "claude-code",
-      "recorded_at": "2026-08-31"
-    },
-    {
-      "section": "§6 Specs, tasks and memory",
-      "anchor": "memory",
-      "skill": "dadaia-step0-memory-bootstrap",
-      "scoped_agents_md": [
-        "dadaia_workspace/public/data/memory-AGENTS.md",
-        "dadaia_workspace/public/scaffold/memory/AGENTS.md"
-      ],
-      "hash_tuple": {
-        "section": "sha256:ab59448f37391a5442a7dc46013dcc3645474faaac7c6d33d6c1dbf73945fce1",
-        "skill": "sha256:75b24b7f1cb021043a7030284bdf45ce9451d9e25097d5884d8fd318257a062e",
+        "skill": "sha256:bb25885f55e007587fbbf01edcd5422b0db29467c9747be33fb58bf143778cab",
         "scoped": [
           "sha256:4b7b2c92af03f3f5f2f92b7bccf8916f50abdf68b6cf26ed3e7750aff05f73a7",
-          "sha256:4b7b2c92af03f3f5f2f92b7bccf8916f50abdf68b6cf26ed3e7750aff05f73a7"
+          "sha256:4b7b2c92af03f3f5f2f92b7bccf8916f50abdf68b6cf26ed3e7750aff05f73a7",
+          "sha256:3c495710196cf94a0bd8ea06bc3feca6d66a47b47b1737c7283ac295d4eda46f"
         ]
       },
       "recorded_by": "claude-code",

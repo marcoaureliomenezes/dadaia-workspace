@@ -50,7 +50,6 @@ _CODEX_DEFAULT_EFFORT = "medium"
 _CODEX_SKILL_REF_PREFIXES = (
     "dadaia-codebase-design",
     "dadaia-handoff-emitter",
-    "dadaia-step0-memory-bootstrap",
     "dadaia-task-manager",
     "dadaia-test-stewardship",
     "dadaia-workspace-spec-navigator",
@@ -111,16 +110,6 @@ _CODEX_COMPACT_H1_PROTOCOL_POINTER_RE = re.compile(
     r"projected workspace protocol\.\n\n?"
 )
 
-# "## Step 0 — Memory bootstrap" — a byte-identical (modulo one trailing
-# clause) heading + one-line pointer to the `dadaia-step0-memory-bootstrap`
-# skill, repeated in every implementer/reviewer persona. The skill itself
-# (already in the agent's `skills:` list) carries the full protocol.
-_CODEX_COMPACT_STEP0_SECTION_RE = re.compile(
-    r"## Step 0 — Memory bootstrap \(mandatory, before any work\)\n\n"
-    r"Execute the `dadaia-step0-memory-bootstrap` skill before any[^\n]*\.\n\n"
-    r"---\n\n"
-)
-
 # "### Artifact emission" / "## Artifact emission" — the generic
 # invoke-the-handoff-emitter-skill paragraph (English and the two personas
 # that carry the Portuguese variant), fully covered by the
@@ -163,7 +152,6 @@ _CODEX_COMPACT_CLI_SECTION_RE = re.compile(r"(\n---\n)?## dadaia CLI\n.*?(?=\n##
 _CODEX_COMPACT_PATTERNS: tuple[re.Pattern[str], ...] = (
     _CODEX_COMPACT_H1_REPORTS_POINTER_RE,
     _CODEX_COMPACT_H1_PROTOCOL_POINTER_RE,
-    _CODEX_COMPACT_STEP0_SECTION_RE,
     _CODEX_COMPACT_ARTIFACT_EMISSION_RE,
     _CODEX_COMPACT_HANDOFF_POINTER_RE,
     _CODEX_COMPACT_REVIEW_GATE_SECTION_RE,

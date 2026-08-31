@@ -15,7 +15,6 @@ skills:
   - dd-cli-library
   - dadaia-handoff-emitter
   - dadaia-workspace-spec-navigator
-  - dadaia-step0-memory-bootstrap
   - dd-ai-eng-knowhow
   - dd-bug-registration
   - dd-gitflow-default
@@ -88,7 +87,7 @@ CI YAML -> software-engineer.
 
 ## 3. Procedure
 
-Ground yourself first with `dadaia-step0-memory-bootstrap`, then:
+Ground yourself first with `dadaia-workspace-spec-navigator` (Phase 2, memory bootstrap), then:
 
 1. OWASP Top 10 scan across the codebase or diff: access control, crypto failures, injection, insecure design.
 2. OWASP scan (continued): misconfiguration, vulnerable components, auth failures, software-integrity gaps, logging/monitoring failures, SSRF.

@@ -18,7 +18,6 @@ skills:
   - dadaia-handoff-emitter
   - dadaia-task-manager
   - dadaia-workspace-spec-navigator
-  - dadaia-step0-memory-bootstrap
   - dd-ai-eng-knowhow
   - dd-bug-registration
 maxTurns: 50
@@ -88,7 +87,7 @@ For E2E validation: use qa-engineer.
 
 ## 3. Procedure
 
-Ground yourself first with `dadaia-step0-memory-bootstrap`.
+Ground yourself first with `dadaia-workspace-spec-navigator` (Phase 2, memory bootstrap).
 
 | Mode | Trigger phrase | Output |
 |---|---|---|

@@ -18,7 +18,6 @@ skills:
   - dadaia-handoff-emitter
   - dadaia-workspace-spec-navigator
   - dadaia-task-manager
-  - dadaia-step0-memory-bootstrap
   - dd-ai-eng-knowhow
   - dd-release-implement
   - dd-bug-registration
@@ -106,7 +105,7 @@ Specs -> product-engineer.
 
 ## 3. Procedure
 
-Ground yourself first with `dadaia-step0-memory-bootstrap`.
+Ground yourself first with `dadaia-workspace-spec-navigator` (Phase 2, memory bootstrap).
 Navigate via `dadaia-workspace-spec-navigator` before writing any E2E test or acceptance criteria.
 
 1. Red phase (before implementation): `project-manager` dispatches you with the task description.

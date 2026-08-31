@@ -17,7 +17,6 @@ skills:
   - dadaia-handoff-emitter
   - dadaia-task-manager
   - dadaia-workspace-spec-navigator
-  - dadaia-step0-memory-bootstrap
   - dd-ai-eng-knowhow
   - dd-release-implement
   - dd-bug-resolution
@@ -117,7 +116,7 @@ Browser frontend and CI YAML -> software-engineer.
 
 ## 3. Procedure
 
-Ground yourself first with `dadaia-step0-memory-bootstrap`, then:
+Ground yourself first with `dadaia-workspace-spec-navigator` (Phase 2, memory bootstrap), then:
 
 1. Resolve the active release by reading `_RELEASE.json`'s `phase` field directly (no fold, no `ACTIVE.md`).
 2. Read the resolved release's `SPEC/PLAN/TASKS.md` — the SDD gate blocks AI-entity authoring without an approved task.

@@ -18,7 +18,6 @@ skills:
   - dadaia-handoff-emitter
   - dadaia-task-manager
   - dadaia-workspace-spec-navigator
-  - dadaia-step0-memory-bootstrap
   - dd-ai-eng-knowhow
   - dd-release-implement
   - dd-bug-resolution
@@ -119,7 +118,7 @@ E2E tests -> qa-engineer.
 
 ## 3. Procedure
 
-Ground yourself first with `dadaia-step0-memory-bootstrap`, then:
+Ground yourself first with `dadaia-workspace-spec-navigator` (Phase 2, memory bootstrap), then:
 
 1. Read the approved SPEC.md and TASKS.md for the current task.
 2. Reserve via `dadaia-task-manager`: flip `[ ]`->`[-]` and commit `chore(tasks): start <task-id>` before editing production.

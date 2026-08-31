@@ -20,7 +20,6 @@ skills:
   - dd-manager-orchestration
   - dadaia-handoff-emitter
   - dd-workspace-doctor
-  - dadaia-step0-memory-bootstrap
   - dd-ai-eng-knowhow
   - dd-backlog-definition
   - dd-release-definition

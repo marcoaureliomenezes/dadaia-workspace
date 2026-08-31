@@ -20,7 +20,6 @@ skills:
   - dd-grill-me
   - dadaia-task-manager
   - dadaia-workspace-spec-navigator
-  - dadaia-step0-memory-bootstrap
   - dd-ai-eng-knowhow
   - dd-gitflow-default
 maxTurns: 50
@@ -131,7 +130,7 @@ Browser frontend and CI YAML -> software-engineer.
 
 ## 3. Procedure
 
-Ground yourself first with `dadaia-step0-memory-bootstrap`.
+Ground yourself first with `dadaia-workspace-spec-navigator` (Phase 2, memory bootstrap).
 
 | Phase | Your action | Gate to next |
 |---|---|---|

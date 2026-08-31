@@ -18,7 +18,6 @@ skills:
   - dd-manager-orchestration
   - dadaia-handoff-emitter
   - dadaia-workspace-spec-navigator
-  - dadaia-step0-memory-bootstrap
   - dd-ai-eng-knowhow
   - dd-audit-project
 maxTurns: 60
@@ -95,7 +94,7 @@ Remediation dispatch is project-manager's; I only recommend actions in my report
 
 ## 3. Procedure
 
-Ground yourself first with `dadaia-step0-memory-bootstrap`, anchored on `specs/constitution.md` and the memory catalog.
+Ground yourself first with `dadaia-workspace-spec-navigator` (Phase 2, memory bootstrap), anchored on `specs/constitution.md` and the memory catalog.
 
 1. Scope: pick dimensions from `audit_scope` (default: all six — architecture, product, tech-stack, security, tests, agent-surface).
 2. Dispatch evidence agents (parallel where the runtime supports it; Codex treats this as manual/reference handoffs, never claimed as spawned).
