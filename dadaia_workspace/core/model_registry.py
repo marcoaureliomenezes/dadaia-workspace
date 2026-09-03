@@ -111,6 +111,12 @@ REGISTRY: tuple[ModelEntry, ...] = (
         tier="deep",
     ),
     ModelEntry(
+        claude_id="claude-fable-5-1",
+        codex_id="gpt-5.6-sol",
+        pricing=(ModelPricing(10.00, 50.00, 12.50, 1.00, date(2026, 6, 1)),),
+        tier="deep",
+    ),
+    ModelEntry(
         claude_id="claude-opus-4-7",
         codex_id="gpt-5.6-sol",
         pricing=(ModelPricing(15.00, 75.00, 18.75, 1.50, date(2025, 1, 1)),),
