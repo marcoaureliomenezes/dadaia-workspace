@@ -1,11 +1,11 @@
 {
   "schema": "release-state-v1",
   "release": "0.4.6",
-  "phase": "DISCOVERY",
+  "phase": "DEFINITION",
   "rc": 2,
   "defined": {
     "sha": null,
-    "ts": "2026-08-31T18:16:56Z"
+    "ts": "2026-09-03T03:53:29Z"
   },
   "implemented": null,
   "shipped": null,
@@ -82,6 +82,12 @@
       "agent": "release-candidates",
       "kind": "note",
       "text": "Candidate 2 archived to rc-2/ (operator ruled continue at the promote-or-continue gate); root is ready for the next candidate's trio."
+    },
+    {
+      "ts": "2026-09-03T03:53:29Z",
+      "agent": "product-engineer",
+      "kind": "note",
+      "text": "Candidate 3 (slop law) defined: trio at the release root, Aprovado under the operator's 2026-09-03 order to define and implement (rc to be evaluated by the operator before any merge or deploy). Consumes backlog slop-law-one-definition-one-home (purge-on-pick, CONSUMED). Architect RETURN 2026-09-03T052000Z folded in; ADR 0010 to be proposed by T-046-17 and awaits operator acceptance (ruling 10); ruling 13 closed by the dispatcher (bullet 15 lives in DADAIA.md §7.6 only)."
     }
   ]
 }
