@@ -35,7 +35,14 @@ def test_fragment_is_a_heading_plus_short_bullets(rel: str, section_id: str) -> 
         assert len(bullet) <= _MAX_BULLET_CHARS, f"{len(bullet)} chars: {bullet}"
 
 
-@pytest.mark.parametrize("rel, section_id", FIXED_SECTIONS, ids=[s for _, s in FIXED_SECTIONS])
+#: `constitution.md` has no template file: the CANON renders it from its stub and appends
+#: the fixed block; only the two memory documents ship as scaffold templates.
+_TEMPLATED_SECTIONS = [(rel, sid) for rel, sid in FIXED_SECTIONS if rel != "constitution.md"]
+
+
+@pytest.mark.parametrize(
+    "rel, section_id", _TEMPLATED_SECTIONS, ids=[s for _, s in _TEMPLATED_SECTIONS]
+)
 def test_scaffold_template_ends_with_its_empty_marker_pair(rel: str, section_id: str) -> None:
     template = (_PUBLIC_DIR / "scaffold" / rel).read_text(encoding="utf-8")
     assert extract_fixed_section(template, section_id) == ""

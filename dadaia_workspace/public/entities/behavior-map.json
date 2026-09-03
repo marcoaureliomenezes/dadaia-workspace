@@ -254,16 +254,14 @@
       "skill": "dd-spec-navigator",
       "scoped_agents_md": [
         "dadaia_workspace/public/data/memory-AGENTS.md",
-        "dadaia_workspace/public/scaffold/memory/AGENTS.md",
-        "dadaia_workspace/public/templates/specs-AGENTS.md"
+        "dadaia_workspace/public/scaffold/memory/AGENTS.md"
       ],
       "hash_tuple": {
         "section": "sha256:941b80ce5cb01c7a6223fae2ec34124ec96118797e2b15b4b42d8cc679863314",
         "skill": "sha256:b723649f7d392c87353f6c947ff3918952b10caf934d6a8946ac5f1999b9fcd7",
         "scoped": [
           "sha256:4b7b2c92af03f3f5f2f92b7bccf8916f50abdf68b6cf26ed3e7750aff05f73a7",
-          "sha256:4b7b2c92af03f3f5f2f92b7bccf8916f50abdf68b6cf26ed3e7750aff05f73a7",
-          "sha256:91576585aa8de972e7c3560acc88cf6f9be8f25442a701c75d7af35c6639900a"
+          "sha256:4b7b2c92af03f3f5f2f92b7bccf8916f50abdf68b6cf26ed3e7750aff05f73a7"
         ]
       },
       "recorded_by": "claude-code",
@@ -368,13 +366,13 @@
       "anchor": null,
       "skill": null,
       "scoped_agents_md": [
-        "dadaia_workspace/public/scaffold/AGENTS.md"
+        "dadaia_workspace/public/templates/specs-AGENTS.md"
       ],
       "hash_tuple": {
         "section": "sha256:e94e6f374624810d774184f773c805aa6ecefcf5e9504fc7f6472cec419d5df5",
         "skill": null,
         "scoped": [
-          "sha256:24be49a73428c3fc4d076a153503bf9592fb1bd0ad0391d467cb783f7d2fed11"
+          "sha256:91576585aa8de972e7c3560acc88cf6f9be8f25442a701c75d7af35c6639900a"
         ]
       },
       "recorded_by": "claude-code",
