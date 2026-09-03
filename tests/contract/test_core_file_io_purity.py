@@ -1,4 +1,6 @@
-"""Core file-I/O purity AST ratchet (release v0.1.54, FR7 / T-54-12).
+"""Intent: CONTRACT — P-11 core file-I/O purity (authorized set)
+
+Core file-I/O purity AST ratchet (release v0.1.54, FR7 / T-54-12).
 
 `architecture.md` names the `core/` modules that are *authorized* file-I/O exceptions —
 ``specs_backup``, ``specs_version``, ``workspace_resolver``, ``atomic_write``,

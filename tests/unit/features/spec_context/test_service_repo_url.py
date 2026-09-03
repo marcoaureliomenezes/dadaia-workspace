@@ -26,6 +26,7 @@ from dadaia_workspace.core.models.spec_context import (  # noqa: E402
     SpecContextProject,
 )
 from dadaia_workspace.features.spec_context.service import SpecContextService  # noqa: E402
+from dadaia_workspace.features.specs.canon import scaffold as canon_scaffold  # noqa: E402
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient  # noqa: E402
 from tests.fakes import FakeContextStore, FakeGitClient  # noqa: E402
 
@@ -60,6 +61,7 @@ def fake_service(store: FakeContextStore, workspace_root: Path) -> SpecContextSe
         context_store=store,
         git_client=FakeGitClient(),
         workspace_root=workspace_root,
+        scaffold_specs=canon_scaffold,
     )
 
 
@@ -152,6 +154,7 @@ def test_alive_backfills_repo_url_from_origin_remote(
         context_store=store,
         git_client=GitSubprocessClient(),
         workspace_root=workspace_root,
+        scaffold_specs=canon_scaffold,
     )
     service.create("foo", "foo", "")
 
@@ -195,6 +198,7 @@ def test_dead_backfills_repo_url_before_rmtree(
         context_store=store,
         git_client=GitSubprocessClient(),
         workspace_root=workspace_root,
+        scaffold_specs=canon_scaffold,
     )
 
     _make_writable(repo_path)

@@ -1,4 +1,7 @@
-"""Public handoff sidecar schema contracts."""
+"""Intent: CONTRACT — handoff-v1.schema.json (DADAIA §5.4 validation)
+
+Public handoff sidecar schema contracts.
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,6 @@
-"""Contract test: a rule's projected bytes are LF-exact and idempotent (FR-RC2-2).
+"""Intent: CONTRACT — infrastructure/projection.install_rules LF-exact bytes and skip-on-identical (FR-RC2-2)
+
+Contract test: a rule's projected bytes are LF-exact and idempotent (FR-RC2-2).
 
 K3 (v0.5.1): the retired ``write_generated`` free function is superseded by the ONE
 ``ProjectionRule``/``install_rules`` seam (``infrastructure/projection.py``) — every

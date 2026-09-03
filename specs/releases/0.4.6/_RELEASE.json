@@ -2,12 +2,16 @@
   "schema": "release-state-v1",
   "release": "0.4.6",
   "phase": "CLOSURE",
-  "rc": 1,
+  "rc": 2,
   "defined": {
     "sha": null,
-    "ts": "2026-08-31T18:16:56Z"
+    "ts": "2026-09-03T03:53:29Z"
   },
-  "implemented": null,
+  "implemented": {
+    "sha": "c3f5cb80",
+    "rc": 3,
+    "ts": "2026-09-03T12:40:41Z"
+  },
   "shipped": null,
   "audited": null,
   "log": [
@@ -70,6 +74,72 @@
       "agent": "claude-code",
       "kind": "note",
       "text": "Architecture-survey note at candidate close (RC-FLOW step 3): bugs ledger 0 open (545 total); churn concentrated in public/skills (this candidate). Cards: (1) Strong — behavior-map hash re-record is a repeated manual seam (session-local script); a 'dadaia behavior-map rehash' CLI verb would give it one owner; (2) Worth exploring — doctor_release.py carries the candidate-phase predicate in three places (DISCOVERY guard at :208, :248, :327+, flagged by code-review as Repeated Switches); one phase->required-artifacts decider would delete two branches; (3) Speculative — dd-audit-project PILLAR-* siblings still carry heavy prose vs the 15-rule bar. Top candidate: (1). Next hop: operator intake via grill — no backlog write from this note."
+    },
+    {
+      "ts": "2026-08-31T22:18:36Z",
+      "agent": "release-candidates",
+      "kind": "note",
+      "text": "Candidate 2 archived to rc-2/ (operator ruled continue at the promote-or-continue gate); root is ready for the next candidate's trio."
+    },
+    {
+      "ts": "2026-08-31T22:18:47Z",
+      "agent": "release-candidates",
+      "kind": "note",
+      "text": "Candidate 2 archived to rc-2/ (operator ruled continue at the promote-or-continue gate); root is ready for the next candidate's trio."
+    },
+    {
+      "ts": "2026-09-03T03:53:29Z",
+      "agent": "product-engineer",
+      "kind": "note",
+      "text": "Candidate 3 (slop law) defined: trio at the release root, Aprovado under the operator's 2026-09-03 order to define and implement (rc to be evaluated by the operator before any merge or deploy). Consumes backlog slop-law-one-definition-one-home (purge-on-pick, CONSUMED). Architect RETURN 2026-09-03T052000Z folded in; ADR 0010 to be proposed by T-046-17 and awaits operator acceptance (ruling 10); ruling 13 closed by the dispatcher (bullet 15 lives in DADAIA.md §7.6 only)."
+    },
+    {
+      "ts": "2026-09-03T12:40:41Z",
+      "agent": "product-engineer",
+      "kind": "summary",
+      "text": "Candidate 3 (slop law) implemented at c3f5cb80: one definition (DADAIA.md §7.6, 7 bullets) and two distribution classes — agentic entities (§7.6, dd-code-review/SLOP.md S1-S10, six personas, tests/AGENTS.md 116->58 lines) and scaffolded specs (fixed sections slop-law/slop-code/slop-tests projected from public/data/fixed/, validated and healed by specs doctor FIXED-1/2, injected by the memory bootstrap). Ratchets: V31 replaces V27 (per tier 160/51/0/0), V32=912, V33=51 (FR/AC/T- exempt), V34 24/12 KB. Bridges <repo>/CLAUDE.md and tests/CLAUDE.md via scoped_law. Constitution 5.1.0; ADR 0010 proposed (operator acceptance pending; P-24 amendment and P-29 ride the accept commit)."
+    },
+    {
+      "ts": "2026-09-03T12:40:41Z",
+      "agent": "product-engineer",
+      "kind": "size",
+      "text": "Range 83af41b0..c3f5cb80: 25 commits. Production net: reports/retention -102, spec_context/service -27 (copytree+merge deleted), fixed sections +202; public/ -163 net (nine dead scaffold image files deleted, 3 fragments + SLOP.md added); tests: script pair -120, two contract tests deleted by verdict, 38 Intent lines added; trio SPEC 22.2 KB / PLAN 7.5 KB / TASKS 10.6 KB under V34."
+    },
+    {
+      "ts": "2026-09-03T12:40:41Z",
+      "agent": "product-engineer",
+      "kind": "drifts",
+      "text": "Part-1 drift left for the ADR-0010 acceptance commit (operator): P-24 reworded to the downward per-tier form (V31), P-29 added (V32-V34), P-11 says six authorized core file-I/O modules while test_core_file_io_purity authorizes eight (specs_backup, specs_repair, specs_version, workspace_resolver, atomic_write, invocation, session_store, handoff_index). Memory Part 2 updated this pass: QUALITY 'CI gates' + 'Slop measurement', both fixed blocks, context-management atom (alive folds over the canon)."
+    },
+    {
+      "ts": "2026-09-03T12:40:41Z",
+      "agent": "project-manager",
+      "kind": "ratifications",
+      "text": "Dispatcher ratifications under 'slop dies in the change that finds it' (operator implementation order 2026-09-03): fragments live under public/data/fixed (context alive copied the scaffold image — bug fixed 42e94c04); T-046-20 also touched .gitignore:/CLAUDE.md and .github/scripts/check_no_repo_local_claude.sh (the bridge is now law, ruling 9), tests/helpers/suite_files.py tree= kwarg, test_context_alive_scaffold_commit.py; SPEC §8 baselines re-measured by the ratchet modules (V31 160/52/40 -> pinned, V32 422->912 counting docstring lines, V33 105->51 with the ratified families exempt); law cleanups ac3167df (reviews/** retired from four personas) and 4bd29279 (memory rules line, qa-engineer ALPHA-*-QA glob, recipe R-13); f77c711d registered claude-fable-5-1 in the model registry so the instance overlay could select the frontier model for all nine sub-agents (operator order; no task record — code-reviewer F1)."
+    },
+    {
+      "ts": "2026-09-03T12:40:41Z",
+      "agent": "project-manager",
+      "kind": "reviews",
+      "text": "Trio review on c3f5cb80: code-reviewer APPROVED (handoff 2026-09-03T053138Z; 2 MEDIUM recorded here, 8 LOW routed to this closure and the next candidate); qa-engineer APPROVED (report 2026-09-03T053522Z; V31 integration re-pinned 51 this pass; instance behavior-map reprojected); security-reviewer verdict NOT obtained — the agent session hit the API session limit; it is redone on the PR head before the feature->develop PR (DADAIA.md §4.2)."
+    },
+    {
+      "ts": "2026-09-03T12:40:41Z",
+      "agent": "qa-engineer",
+      "kind": "test-dispositions",
+      "text": "T-046-22 batch 1 tests/contract: 38 DECLARE (37 CONTRACT, 1 SENTINEL), 2 DELETE (test_consumer_validation_recipe.py, test_handoff_instruction_adoption.py — tombstone/change-detector, replacements cited in the verdict 2026-09-03T044615Z). V31 contract tier = 0."
+    },
+    {
+      "ts": "2026-09-03T12:40:41Z",
+      "agent": "project-manager",
+      "kind": "closure-artifact-gc",
+      "text": "Instance sweep (runtime): reports cleanup --older-than 30d deleted 12 paths then, after bug reports-cleanup-skips-handoffs-without-artifact-path (b4ac0207), 670 handoff-first handoffs; handoffs 912 -> 239, handoffs older than 30 d = 0; tmp gc: .dadaia/tmp 8.9 GB -> 408 MB; 37 reports kept, 0 important. Every 2026-09-03 handoff kept."
+    },
+    {
+      "ts": "2026-09-03T12:40:41Z",
+      "agent": "project-manager",
+      "kind": "dispositions",
+      "text": "Backlog slop-law-one-definition-one-home stays CONSUMED until the feature->develop merge (operator evaluates the rc first; rewritten to DELIVERED at the merge). Bugs fixed in-candidate: context-alive-copies-scaffold-image-bypassing-canon-fold, reports-cleanup-skips-handoffs-without-artifact-path, pre-commit-presence-advisory-names-the-committing-session-itself (all resolved, net-negative or neutral). Deferred to the PM intake report (operator-gated): Intent backfill tests/unit (160) and tests/integration (51); @AGENTS.md stub in two homes (workspace_guardrail vs templates); dadaia clean as a second cleanup engine beside reports cleanup; cli/commands/context.py third session-id ladder; venv-guard cache scope ($V/mypy bypass); e2e test_pre_commit_presence_gate ancestry test and test_doctor copytree test (qa curation); consumer repos' legacy lowercase memory names (specs upgrade); SLOP.md/slop-code wording (S4 scope to core/protocols, S6 regex by reference, two rows >150 chars); code-reviewer LOW S1/S2 hits in container.py, spec_context/service.py, chokepoints/pre_commit.py, cli/_specs_resolution.py."
     }
   ]
 }

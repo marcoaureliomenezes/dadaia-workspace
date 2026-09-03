@@ -28,6 +28,7 @@ from dadaia_workspace.features.spec_context.service import (  # noqa: E402
     _PUBLIC_DIR,
     SpecContextService,
 )
+from dadaia_workspace.features.specs.canon import scaffold as canon_scaffold  # noqa: E402
 from tests.fakes import FakeContextStore, FakeGitClient  # noqa: E402
 
 _TEMPLATE = _PUBLIC_DIR / "templates" / "repo-AGENTS.md"
@@ -47,6 +48,7 @@ def service(workspace_root: Path) -> SpecContextService:
         context_store=FakeContextStore(),
         git_client=FakeGitClient(),
         workspace_root=workspace_root,
+        scaffold_specs=canon_scaffold,
     )
 
 

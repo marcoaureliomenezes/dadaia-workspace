@@ -14,10 +14,12 @@ import subprocess
 from pathlib import Path
 
 
-def tracked_test_files(repo_root: Path, pattern: str = "*.py") -> list[Path]:
-    """Every git-tracked file under ``tests/`` whose basename matches *pattern*, sorted."""
+def tracked_test_files(
+    repo_root: Path, pattern: str = "*.py", *, tree: str = "tests"
+) -> list[Path]:
+    """Every git-tracked file under *tree* whose basename matches *pattern*, sorted."""
     result = subprocess.run(
-        ["git", "ls-files", "-z", "--", "tests"],
+        ["git", "ls-files", "-z", "--", tree],
         cwd=repo_root,
         capture_output=True,
         check=True,

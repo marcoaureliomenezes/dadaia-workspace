@@ -119,6 +119,7 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), anch
 - `## Compliance Scorecard` — Architecture/Product/Tech stack/Security/Tests/Agent-surface/Overall, each with score, drift-item count, notes.
 - `## Drift inventory` — per item: dimension, claim, actual, severity, evidence source.
 - `## Dead code` — files/modules flagged unreachable or unused, with evidence.
+- `## Slop readout` — the five ratchets, trend over the window (`dd-audit-project` pillar 2; sampled diffs against `dd-code-review`'s `SLOP.md`).
 - `## Spec consistency` — orphaned tasks, missing criteria, stale references.
 - `## Recommended actions` — ordered by severity; always names the agent who should act, never "fix X yourself".
 - `## Evidence sources` — agent reports consumed.

@@ -1,4 +1,6 @@
-"""Preflight-wiring contract: `dadaia ci preflight` enforces the import-linter contracts (FR4).
+"""Intent: CONTRACT — DADAIA §7.4 push green (ci_preflight.checks_for carries lint-imports, fail-closed)
+
+Preflight-wiring contract: `dadaia ci preflight` enforces the import-linter contracts (FR4).
 
 The pre-push hook runs `dadaia ci preflight`, so adding the import-linter contracts to
 `checks_for()` makes every push enforce the setup.cfg import boundaries alongside

@@ -1,4 +1,6 @@
-"""No-silent-optional-wiring guard — v0.3.0 successor.
+"""Intent: CONTRACT — panel_composition.build_panel_service wires every silently degrading collaborator
+
+No-silent-optional-wiring guard — v0.3.0 successor.
 
 The original guard pinned the lifecycle-engine builders (every optional collaborator of
 the four workflow bodies had to be wired by the container or the body silently degraded).

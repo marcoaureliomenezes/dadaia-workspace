@@ -1,4 +1,6 @@
-"""Contract tests for ``dadaia memory catalog generate`` CLI command.
+"""Intent: CONTRACT — dadaia memory catalog generate (memory-markdown-source-v1, DADAIA §6.4)
+
+Contract tests for ``dadaia memory catalog generate`` CLI command.
 
 memory-markdown-source-v1: catalog generation now reads YAML frontmatter
 from *.md feature atom files, not index.html scraping.

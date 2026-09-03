@@ -49,7 +49,15 @@ Fill these in during onboarding:
 
 - Agents should prefer these commands over guessing toolchains.
 
-## 5. Validation evidence
+## 5. Source hygiene
+
+- A comment explains a non-obvious why only; the what and the history live in git and the ledgers.
+- A docstring states the contract in at most 3 lines.
+- Code is born with a real caller in the same change.
+- A fix replaces the old path, never wraps it.
+- Full statements: `specs/memory/ARCHITECTURE.md`, fixed section Slop — code.
+
+## 6. Validation evidence
 
 Every implementation report must include:
 
@@ -60,7 +68,7 @@ Every implementation report must include:
 
 Write reports under `.dadaia/reports/<context>/<agent>/` and follow `.dadaia/reports/AGENTS.md`.
 
-## 6. Stop conditions
+## 7. Stop conditions
 
 Stop before editing when:
 

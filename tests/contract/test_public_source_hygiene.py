@@ -1,4 +1,6 @@
-"""Public-source hygiene contract (FR-W5-01 / AC-W5-01, release v0.1.11).
+"""Intent: CONTRACT — DADAIA §8.3 public asset hygiene (no bytecode under public/, build excludes)
+
+Public-source hygiene contract (FR-W5-01 / AC-W5-01, release v0.1.11).
 
 Residual R7: ``dadaia_workspace/public/scripts/__pycache__/`` had been committed —
 compiled bytecode leaking into the canonical public asset tree, which is source-of-truth

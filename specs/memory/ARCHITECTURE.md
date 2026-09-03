@@ -182,3 +182,13 @@ classDiagram
     api_health : render_health()
     note "no api.py barrel — container named-imports each render_api_* from its own module; each view imports only features.panel.service and core.models; handler._ROUTES is the one (method, pattern, view_name) table and a route absent from it cannot exist"
 ```
+
+<!-- dadaia:fixed slop-code -->
+### Slop — code (fixed)
+- A comment explains a non-obvious why; the what, the history and any spec, task, ADR or version id live in git and the ledgers.
+- A docstring states the contract in at most 3 lines; bug history lives in `BUGS.jsonl`.
+- Code is born with a real caller in the same change; without a caller it does not exist.
+- A fix replaces the old path; it never wraps it and never opens a second path.
+- A `core/protocols` port exists only with two production adapters; a parameter exists only when it is read.
+- Detection: `dd-code-review` SLOP.md S1, S2, S4, S5; measured by ratchet V32 and `test_protocols_have_two_adapters`.
+<!-- /dadaia:fixed slop-code -->

@@ -57,6 +57,8 @@ def test_fix_dispatch_and_help_derive_from_the_registry() -> None:
         "SPEC-DOC-044",
         "SPEC-DOC-046",
         "MEM-PLACEHOLDER-1",
+        "FIXED-1",
+        "FIXED-2",
     }
     help_text = rules_mod.render_fix_help()
     for code in fixable:

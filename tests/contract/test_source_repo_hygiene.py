@@ -1,4 +1,7 @@
-"""Source-repo hygiene contracts for files that must be visible to review/CI."""
+"""Intent: CONTRACT — bug gitignore-verdict-evidence-untrackable-fourth-recurrence (.gitignore inversion)
+
+Source-repo hygiene contracts for files that must be visible to review/CI.
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,6 @@
-"""Every CI/release pytest --cov step must redirect COVERAGE_FILE out of the checkout.
+"""Intent: CONTRACT — bug release-workflow-coverage-file-in-checkout (DADAIA §5.3 repos stay clean)
+
+Every CI/release pytest --cov step must redirect COVERAGE_FILE out of the checkout.
 
 Bug release-workflow-coverage-file-in-checkout: pyproject's coverage ``data_file`` was
 removed in T-018-07 with the contract that WORKFLOWS redirect the data file to the

@@ -24,6 +24,7 @@ from dadaia_workspace.core.models.spec_context import (  # noqa: E402
     SpecContextProject,
 )
 from dadaia_workspace.features.spec_context.service import SpecContextService  # noqa: E402
+from dadaia_workspace.features.specs.canon import scaffold as canon_scaffold  # noqa: E402
 from tests.fakes import FakeContextStore, FakeGitClient  # noqa: E402
 
 
@@ -49,7 +50,12 @@ def git() -> FakeGitClient:
 def service(
     store: FakeContextStore, git: FakeGitClient, workspace_root: Path
 ) -> SpecContextService:
-    return SpecContextService(context_store=store, git_client=git, workspace_root=workspace_root)
+    return SpecContextService(
+        context_store=store,
+        git_client=git,
+        workspace_root=workspace_root,
+        scaffold_specs=canon_scaffold,
+    )
 
 
 def _seed_ctx_with_associated(store: FakeContextStore, workspace_root: Path) -> None:

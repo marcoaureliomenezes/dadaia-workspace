@@ -1,12 +1,12 @@
 """Intent: CONTRACT — 0.5.0 A22.10
 
-The five test-suite ratchets (**V26**–**V30**), pinned in **one** file per T-050-18A
+The five test-suite ratchets (**V26**, **V28**–**V31**), pinned in **one** file per T-050-18A
 (release 0.5.0, `specs/releases/0.5.0/SPEC.md` A22.10 / FR22; measurement baselines:
 `specs/releases/0.5.0/reviews/test-minimization-literature.md` Part 3, T-050-03's
 capture at `.dadaia/tmp/software-engineer/20260827/T-050-03-baselines.md`). Same
 measure-then-pin-then-ratchet law `test_module_size_ceiling.py` and
 `test_import_linter_ignore_cap.py` already use: pin the number measured *now*,
-lowering (or, for V27, raising) a pin in a later commit is welcome, growing one
+lowering a pin in a later commit is welcome, growing one
 past its ratchet direction without a same-commit justification is not.
 
 **The A18.3 boundary, stated once so nobody re-litigates it.** These five properties
@@ -28,10 +28,10 @@ code):
   ``# allow-private-import: <reason>`` marker — a documented-contract exception,
   one entry per import statement, never a blanket file-level exemption. Ratchet:
   DOWN ONLY. Target: 0.
-* **V27** — `Intent:` header coverage. Every `tests/**/test_*.py`'s *module*
-  docstring (not just any matching line in the file body) should carry an
-  `Intent: <KIND> — <ref>` header (`tests/AGENTS.md` "Intent taxonomy",
-  `dd-test-stewardship` §A). Ratchet: UP ONLY. Target: every file.
+* **V31** — files without an `Intent:` header, per tier. Every `tests/**/test_*.py`'s
+  *module* docstring (not just any matching line in the file body) carries an
+  `Intent: <KIND> — <ref>` header (`dd-test-stewardship`, intent and admission); the
+  files lacking one are counted per `tests/<tier>/`. Ratchet: DOWN ONLY; e2e = 0.
 * **V28** — SCAFFOLD expiry. Every `Intent: SCAFFOLD` header must carry an
   `expires: <M.m.p>` field, and the named release must not already be archived.
   The archive-membership check is an **exact** directory-name match against
@@ -66,6 +66,7 @@ from __future__ import annotations
 
 import ast
 import re
+from collections.abc import Iterable
 from pathlib import Path
 
 import pytest
@@ -171,53 +172,70 @@ def test_v26_private_symbol_import_ratchet_pins_the_hyrums_law_liability() -> No
 
 
 # ---------------------------------------------------------------------------
-# V27 — `Intent:` header coverage
+# V31 — files without an `Intent:` header, per tier
 # ---------------------------------------------------------------------------
 
 _INTENT_HEADER_RE = re.compile(r"(?m)^\s*Intent:\s*\S")
 
-# RECORDED FLOOR (ratchet UP ONLY) — measured 2026-08-27 on this HEAD: 108 of
-# tests/**/test_*.py declare an `Intent:` header in their module docstring.
-# Raising this after a curation sweep declares more headers is the point; a drop
-# below the floor means a previously-declared file lost its header.
-_V27_INTENT_DECLARED_FLOOR = 108
+# RECORDED CEILINGS (ratchet DOWN ONLY) — measured 2026-09-03 on this HEAD; e2e is fully
+# declared and stays at 0. Lower a tier's ceiling in the same commit that declares or
+# deletes its undeclared files; raising one is never a ratchet move.
+_V31_UNDECLARED_CEILINGS: dict[str, int] = {
+    "unit": 160,
+    "integration": 51,
+    "contract": 0,
+    "e2e": 0,
+}
 
 
 def _declares_intent(source: str, *, filename: str = "<fixture>") -> bool:
-    """True if *source*'s module docstring carries an `Intent: <KIND> — <ref>`
-    header line (`tests/AGENTS.md` "Intent taxonomy")."""
+    """True if *source*'s module docstring carries an `Intent: <KIND> — <ref>` line."""
     tree = ast.parse(source, filename=filename)
     docstring = ast.get_docstring(tree) or ""
     return bool(_INTENT_HEADER_RE.search(docstring))
 
 
-def test_v27_intent_header_coverage_ratchet() -> None:
-    """V27 (A22.10) — pins `Intent:` module-docstring coverage at **>= 108**
-    declared files out of `tests/**/test_*.py` (T-050-03 baseline 94/396; this
-    re-measure on the current HEAD is higher — later tasks already declared more).
-    Ratchet UP ONLY; target is every collected test file."""
-    test_files = tracked_test_files(_REPO_ROOT, "test_*.py")
-    declared_count = sum(
-        1
-        for path in test_files
-        if _declares_intent(path.read_text(encoding="utf-8"), filename=str(path))
+def _undeclared_by_tier(test_files: Iterable[Path], tests_dir: Path) -> dict[str, int]:
+    """Files whose module docstring declares no `Intent:`, counted per `tests/<tier>/`."""
+    counts = dict.fromkeys(_V31_UNDECLARED_CEILINGS, 0)
+    for path in test_files:
+        if not _declares_intent(path.read_text(encoding="utf-8"), filename=str(path)):
+            tier = path.relative_to(tests_dir).parts[0]
+            counts[tier] = counts.get(tier, 0) + 1
+    return counts
+
+
+def _v31_violations(counts: dict[str, int], ceilings: dict[str, int]) -> list[str]:
+    return [
+        f"{tier}: {count} undeclared (ceiling {ceilings.get(tier, 0)})"
+        for tier, count in sorted(counts.items())
+        if count > ceilings.get(tier, 0)
+    ]
+
+
+def test_v31_undeclared_intent_ceiling_per_tier(tmp_path: Path) -> None:
+    """V31 — test files without an `Intent:` header, pinned per tier (unit 160 /
+    integration 52 / contract 0 / e2e 0). Ratchet DOWN ONLY; target 0 everywhere."""
+    counts = _undeclared_by_tier(tracked_test_files(_REPO_ROOT, "test_*.py"), _TESTS_DIR)
+    violations = _v31_violations(counts, _V31_UNDECLARED_CEILINGS)
+    assert not violations, (
+        "test files without an `Intent:` header grew past the pinned ceiling — an "
+        "undeclared test is SCAFFOLD by default (DADAIA.md §7): declare it or delete it "
+        f"under a qa-engineer verdict, never raise the ceiling. {violations}"
     )
 
-    assert declared_count >= _V27_INTENT_DECLARED_FLOOR, (
-        f"declared `Intent:` headers dropped to {declared_count} "
-        f"(floor {_V27_INTENT_DECLARED_FLOOR} of {len(test_files)} test files). "
-        "An undeclared test is SCAFFOLD by the taxonomy's own default (DADAIA.md "
-        "§7) — a drop below the floor means a previously-declared header was "
-        "lost, not merely that the sweep has not reached a new file yet."
-    )
-
-    # Mutation fixture — proves the checker distinguishes a declared header from
-    # an undeclared docstring.
-    declared = '"""Intent: CONTRACT — T-000\n\nBody text.\n"""\nX = 1\n'
-    assert _declares_intent(declared) is True
-
-    undeclared = '"""Just a docstring, no header."""\nX = 1\n'
-    assert _declares_intent(undeclared) is False
+    # Mutation fixture — one more undeclared file in a tier pinned at 0 goes red.
+    tests_dir = tmp_path / "tests"
+    undeclared = tests_dir / "unit" / "test_undeclared.py"
+    undeclared.parent.mkdir(parents=True)
+    undeclared.write_text('"""Just a docstring, no header."""\nX = 1\n', encoding="utf-8")
+    declared = tests_dir / "unit" / "test_declared.py"
+    declared.write_text('"""Intent: CONTRACT — T-000\n\nBody text.\n"""\nX = 1\n', encoding="utf-8")
+    fixture_counts = _undeclared_by_tier([undeclared, declared], tests_dir)
+    assert fixture_counts == {"unit": 1, "integration": 0, "contract": 0, "e2e": 0}
+    assert _v31_violations(fixture_counts, dict.fromkeys(fixture_counts, 0)) == [
+        "unit: 1 undeclared (ceiling 0)"
+    ]
 
 
 # ---------------------------------------------------------------------------

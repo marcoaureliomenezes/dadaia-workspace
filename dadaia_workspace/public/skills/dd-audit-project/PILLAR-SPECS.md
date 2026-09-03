@@ -42,6 +42,18 @@ dadaia specs doctor --context <ctx> --recipe
 3. Confirm the removal happened in the same commit as the SPEC.
 4. Flag a SPEC that consumes an entry still present in `active` after the definition commit — purge-on-pick unmet.
 
+## Slop readout
+
+Input: the ratchet modules and the window `from-sha..HEAD`. Output: the "Slop readout" table in `AUDIT.md`
+(ratchet, baseline, HEAD, trend, verdict). Definition and signals: `DADAIA.md` §7.6, `dd-code-review`'s `SLOP.md`.
+
+1. Run `pytest tests/contract/test_slop_ratchets.py tests/contract/test_test_suite_ratchets.py`; record each count beside its pinned ceiling.
+2. Trend each ratchet over the window: the count at the from-sha against HEAD, via a temporary worktree under `.dadaia/tmp/` — never a stash.
+3. Read the density of every SPEC in the window: bytes, words, codes per 1,000 words, numbered families outside FR/AC/T-.
+4. Read the GC: handoffs older than 30 days, `.dadaia/tmp/` files older than the window, `archive/` tags whose branch survives.
+5. Sample the ten commits with the most additions; apply `SLOP.md` S1-S5 to each diff — the audit proves the review worked, it never redoes it.
+6. One `FINDINGS-FORMAT.md` record per ratchet that rose or signal hit; ratchet rose HIGH, density over the ceiling MEDIUM, S4/S5 in a sample HIGH.
+
 ## Findings
 
 - Every check above emits `pillar: "specs"` records via `FINDINGS-FORMAT.md`'s shape — never a bespoke report format.

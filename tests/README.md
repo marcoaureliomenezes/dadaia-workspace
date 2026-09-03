@@ -1,7 +1,7 @@
 # Tests
 
-Rules for architecture, intent, admission, deletion and cost live in `tests/AGENTS.md` —
-read it before adding or editing a test.
+Architecture, size tiers and cost: `tests/AGENTS.md`; intent, admission and deletion: skill
+`dd-test-stewardship` — read both before adding or editing a test.
 
 ## Commands
 

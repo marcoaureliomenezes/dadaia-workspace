@@ -1,4 +1,6 @@
-"""Contract: every ``sqlite3.connect`` in production is factory-routed or exempt.
+"""Intent: CONTRACT — telemetry store connection factory (sqlite3.connect allowlist, read-only foreign readers)
+
+Contract: every ``sqlite3.connect`` in production is factory-routed or exempt.
 
 v0.1.52 FR3 routes every *writable* telemetry-store connection through the
 pragma'd factory ``telemetry/store/schema.open_connection`` (WAL + busy_timeout),

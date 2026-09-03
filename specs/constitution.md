@@ -1,6 +1,6 @@
 ---
 specs_pattern_version: 6
-constitution_version: 5.0.0
+constitution_version: 5.1.0
 ---
 
 # Constitution — dadaia-workspace
@@ -8,8 +8,7 @@ constitution_version: 5.0.0
 Permanent product law, stated **once** and by reference. Every article names where its rule
 is measured or described; no article restates a mechanism that the memory trio
 (`specs/memory/ARCHITECTURE.md`, `specs/memory/QUALITY.md`, `specs/memory/TECHSTACK.md`),
-`specs/memory/product/**` or `DADAIA.md` already carries. A rule stated twice is slop (§12.3)
-and is deleted from here, never mirrored.
+`specs/memory/product/**` or `DADAIA.md` already carries.
 
 **How to read a reference.** `P-01…P-17` are the Part-1 principles of `ARCHITECTURE.md`,
 `P-18…P-27` of `QUALITY.md`, `P-28` of `TECHSTACK.md`; each names the mechanical check that
@@ -150,25 +149,10 @@ has exactly one path. The channels and their paths: `DADAIA.md` §5 and §6 (**C
 
 ## 12. Anti-Slop Law
 
-1. Every agent, skill, rule and hook owns or gates a phase of §7; a phase-less artifact is
-   removed. Measured by `ARCHITECTURE.md` P-17 (ADR 0017 proposed) — every asset maps to a
-   law section, and every section has at least one owner.
-2. No store without a GC mechanism: every state file, session record and cache has a defined
-   expiry and a cleanup path (**C-13**).
-3. No fact in two sources, no fact in two channels. The constitution states law once, memory
-   states mechanism once, skills and personas cite and never duplicate; injected context that
-   does not change an agent's action is slop and is deleted. The parameter case is measured
-   by `QUALITY.md` P-26 (ADR 0026 proposed); the general case is **C-14**.
-4. A fix that only adds code carries an explicit justification of why removal was impossible,
-   and reviewers reject additive-by-default; the bug-surface axis every verdict must state is
-   `DADAIA.md` §7 (**C-15**).
-5. **Derivation law.** The workspace defines its method abstractly and only then implements
-   it per harness: no scaffolded core sub-agent without its Persona, no core hook without its
-   Deterministic Behavior, no core rule file without its Abstract Rule — all in the agentic
-   entity registry (§0). Operator-created agents, skills and rules are exempt: this law
-   governs only what the library scaffolds. Measured today by `dadaia public doctor`'s
-   `entities-derivation` check and `tests/contract/test_agentic_entities_derivation.py`
-   (**C-16**).
+1. Slop is defined once, in `DADAIA.md` §7.6, and stated for the specs class in the fixed section "Slop — workspace law" below; this constitution never restates it (**C-14**).
+2. Every agent, skill, rule and hook owns or gates a phase of §7; a phase-less artifact is removed. Measured by `ARCHITECTURE.md` P-17 (ADR 0017 proposed).
+3. A fix that only adds carries the reason removal was impossible; the bug-surface axis of every verdict answers "reduced" or "increased" per `DADAIA.md` §7 (**C-15**).
+4. Derivation law: no scaffolded core sub-agent, hook or rule file without its Persona, Deterministic Behavior or Abstract Rule in the agentic entity registry (§0); operator-created assets are exempt. Measured by `dadaia public doctor` `entities-derivation` and `tests/contract/test_agentic_entities_derivation.py` (**C-16**).
 
 ## 13. Memory Canon
 
@@ -203,5 +187,14 @@ Every always-on rule of this workspace is a section of `DADAIA.md`; every core s
 scoped `AGENTS.md` maps to exactly one such section, and every section has at least one owner.
 That relation is declared in exactly one controlled source,
 `dadaia_workspace/public/entities/behavior-map.json`, and is measured by `ARCHITECTURE.md`
-P-17 (ADR 0017 proposed). A second declaration of the same relation, anywhere, is slop
-(§12.3) and is deleted.
+P-17 (ADR 0017 proposed). A second declaration of the same relation is deleted (§12).
+
+<!-- dadaia:fixed slop-law -->
+## Slop — workspace law (fixed)
+- Slop is what passes the deletion test without loss: removed, no behavior changes and no decision loses its record (`DADAIA.md` §7.6).
+- A SPEC declares scope, observable criteria and decisions in domain names; it fits the byte ceiling of `DADAIA.md` §6.7.
+- A concept takes a glossary name; a numbered code exists only where a mechanical index reads it (FR, AC, T-).
+- Every file has a canonical home and a GC path; summaries, backups, notes and scratch live in `.dadaia/tmp/` or do not exist.
+- A branch dies at merge; a candidate exists only with scope that changes behavior.
+- Measured by `dadaia specs doctor` (FIXED-1/2) and the slop ratchets; detection signals: `dd-code-review` SLOP.md.
+<!-- /dadaia:fixed slop-law -->

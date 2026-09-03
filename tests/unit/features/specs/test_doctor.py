@@ -15,6 +15,11 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.features.specs import Severity, SpecsDoctor, SpecsDoctorIssue
+from dadaia_workspace.features.specs.memory_canon import (
+    FIXED_SECTIONS,
+    read_fixed_fragment,
+    render_fixed_section,
+)
 
 _REPO_ROOT = Path(__file__).parent.parent.parent.parent.parent
 _TEMPLATES_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "templates"
@@ -158,6 +163,11 @@ def _make_clean_specs_tree(root: Path, release_id: str = "1.2.3") -> Path:
     (specs / "releases" / release_id / "SPEC.md").write_text(spec_md, encoding="utf-8")
     (specs / "releases" / release_id / "PLAN.md").write_text(plan_md, encoding="utf-8")
     (specs / "releases" / release_id / "TASKS.md").write_text(tasks_md, encoding="utf-8")
+    for rel, section_id in FIXED_SECTIONS:
+        path = specs / rel
+        fragment = read_fixed_fragment(_PUBLIC_DIR, section_id)
+        rendered = render_fixed_section(path.read_text(encoding="utf-8"), section_id, fragment)
+        path.write_text(rendered, encoding="utf-8")
     return specs
 
 

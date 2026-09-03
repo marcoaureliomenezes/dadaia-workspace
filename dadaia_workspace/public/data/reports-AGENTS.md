@@ -44,6 +44,7 @@ Every report must be valid standalone HTML:
 
 - Inline CSS is allowed when useful.
 - External assets are allowed only when committed under `.dadaia/reports/<context>/<agent>/`, or referenced as evidence with stable relative paths.
+- Prose carries no opening, hedging or session narrative; a sentence that fits a bullet is a bullet; a term outside the glossary does not enter.
 
 ## 3. Required sections
 

@@ -27,6 +27,7 @@ Scope: this file governs only `specs/releases/`. Replaces the retired `releases/
 - SDD lifecycle order PER CANDIDATE: grill -> `SPEC.md` (Draft) -> operator approval -> `PLAN.md` -> `TASKS.md` -> implementation -> closure -> develop merge -> promote-or-continue gate.
 - Candidate closure order: memory update -> closure narrative in `_RELEASE.json`'s `log` -> disposition sweep -> artifact GC -> merge -> gate (continue = `rc-archive`; promote = ship, then archive the whole folder — final trio at root, ADR 0009).
 - Full arc, gate cadence, the step-by-step ladder: `dd-release-implementation`'s `RC-FLOW.md`.
+- A candidate's SPEC.md fits 24 KB and TASKS.md 12 KB (`DADAIA.md` §6.7); measure with `wc -c` before the definition commit.
 - A `v`-prefixed id is minted nowhere — the bare axis (`^\d+\.\d+\.\d+$`) is the only current one.
 - A legacy `v`-prefixed id still resolves inside `_archive/` (read-only lookup) — pre-canon-v6 history.
 

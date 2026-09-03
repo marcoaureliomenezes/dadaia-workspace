@@ -1,4 +1,7 @@
-"""Public CLI contracts for `dadaia context`."""
+"""Intent: CONTRACT — dadaia context CLI (P-09 one Invocation; DADAIA §3.3 context resolution)
+
+Public CLI contracts for `dadaia context`.
+"""
 
 import json
 import os

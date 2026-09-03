@@ -1,4 +1,6 @@
-"""Anti-erosion module-size ratchet (v0.1.55 FR1 / AC-1).
+"""Intent: CONTRACT — P-18 module line-count ceiling (doctor*, panel api*)
+
+Anti-erosion module-size ratchet (v0.1.55 FR1 / AC-1).
 
 The 2,830-line ``features/specs/doctor.py`` god module and the 1,279-line
 ``features/panel/views/api.py`` module were the erosion this release decomposes. Once split,

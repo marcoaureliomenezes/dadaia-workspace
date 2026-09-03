@@ -1,4 +1,6 @@
-"""CI workflow hygiene contract (v0.1.61 FR6 CI-1/CI-2; amended T-65-14 CI-fix).
+"""Intent: CONTRACT — one panel-e2e bootstrap home (tests/e2e/panel/run-panel-e2e-server.sh, CI-2)
+
+CI workflow hygiene contract (v0.1.61 FR6 CI-1/CI-2; amended T-65-14 CI-fix).
 
 Pins three invariants over the GitHub Actions workflow YAMLs:
 

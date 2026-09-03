@@ -1,4 +1,7 @@
-"""`dadaia --version` top-level flag (bug cli-missing-version-flag, F-01)."""
+"""Intent: CONTRACT — bug cli-missing-version-flag (dadaia --version / -V)
+
+`dadaia --version` top-level flag (bug cli-missing-version-flag, F-01).
+"""
 
 from __future__ import annotations
 

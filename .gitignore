@@ -52,7 +52,6 @@ test-results/
 
 # Root-level runtime projections / local harness files.
 # dadaia-workspace is the source library, not a generated consumer workspace.
-/CLAUDE.md
 /opencode.json
 /Makefile
 /playwright.config.ts

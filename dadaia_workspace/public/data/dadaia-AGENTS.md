@@ -6,7 +6,7 @@ Treat it as operational state, not product source.
 ## 1. Canonical folder law
 
 - `.dadaia/` may contain only the canonical subdirectories below, plus dotfiles (e.g. `.gitignore`).
-- Every other directory is slop and is forbidden — the ROOT-4 doctor invariant blocks unknown subdirs.
+- Every other directory is forbidden (`DADAIA.md` §7.6) — the ROOT-4 doctor invariant blocks unknown subdirs.
 - `dadaia reconcile` quarantines known-legacy dirs into `.dadaia/tmp/legacy-quarantine/` (moved, never deleted).
 - Never create a new top-level `.dadaia/` directory — route into the canonical zone that owns that concern.
 - Each canonical folder has ONE architectural purpose; a misfit file does not belong in `.dadaia/` at all.
@@ -58,7 +58,7 @@ dadaia public doctor
 
 ## 4. Hygiene
 
-- Never park a loose file or a new directory at the `.dadaia/` root — a non-canonical location is slop.
+- A loose file or a new directory at the `.dadaia/` root has no canonical home (`DADAIA.md` §7.6) — route it into the zone that owns it.
 - `tmp/`, `logs/`, `runs/`, `dev-report/` are disposable, safe to clear anytime.
 - Everything else is either regenerable (projections) or CLI-owned state.
 - Stale builds in `dist/` and expired `sessions/` are GC targets — doctor and `dadaia clean` reclaim them.

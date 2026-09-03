@@ -3,33 +3,38 @@
 The service treats reports and handoffs as workspace runtime state. It never
 writes into repo working trees and every filesystem mutation is constrained to
 ``.dadaia/reports/``, ``.dadaia/handoff/``, or ``.dadaia/states/``.
+
+One index (:meth:`ReportRetentionService._nodes`): every ``*.html`` under
+``.dadaia/reports/`` and every ``*.handoff.json`` under either root is a retention
+node. A handoff pairs with the report its ``artifact.path`` names under
+``.dadaia/reports/`` (or, for a legacy sidecar inside ``.dadaia/reports/``, the
+same-stem report); every other handoff — the handoff-first emission (DADAIA §5.4),
+a ``repos/…``/``specs/…`` artifact, an unreadable document — is a node of its own,
+keyed by its own workspace ref. There is no second class of handoff.
 """
 
 from __future__ import annotations
 
 import datetime as dt
 import json
-import re
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
-from dadaia_workspace.core.handoff_index import Handoff, scan_handoffs
+from dadaia_workspace.core.handoff_index import Handoff, path_timestamp, scan_handoffs
 from dadaia_workspace.core.models.hygiene import SlopPolicy
 
 _DEFAULT_TTL = dt.timedelta(seconds=SlopPolicy().reports_ttl_seconds)
-_TIMESTAMP_RE = re.compile(r"^(\d{4}-\d{2}-\d{2}T\d{6}Z)")
 
 
 @dataclass(frozen=True)
 class ReportRecord:
-    """One logical report artifact plus handoffs that reference it."""
+    """One retention node: a report with its paired handoffs, or an unpaired handoff group."""
 
     artifact_path: str
     report_path: Path | None
     handoff_paths: tuple[Path, ...]
     effective_timestamp: dt.datetime
     important: bool = False
-    malformed_handoffs: tuple[Path, ...] = field(default_factory=tuple)
 
 
 @dataclass(frozen=True)
@@ -69,111 +74,25 @@ class ReportRetentionService:
         return self._state_path
 
     def list_reports(self) -> list[ReportRecord]:
-        """Return discovered report records sorted newest first."""
-        important = self._important_paths()
-        handoffs_by_artifact, malformed = self._handoffs_by_artifact()
-        records: dict[str, ReportRecord] = {}
-
-        if self._reports_root.exists():
-            for report in sorted(self._reports_root.rglob("*.html")):
-                if not report.is_file() or not self._is_under(report, self._reports_root):
-                    continue
-                artifact = self._workspace_ref(report)
-                handoffs = handoffs_by_artifact.get(artifact, [])
-                records[artifact] = ReportRecord(
-                    artifact_path=artifact,
-                    report_path=report,
-                    handoff_paths=tuple(handoffs),
-                    effective_timestamp=self._effective_timestamp(report, handoffs),
-                    important=self._node_is_important(artifact, [report, *handoffs], important),
-                    malformed_handoffs=tuple(malformed),
-                )
-
-        for artifact, handoffs in handoffs_by_artifact.items():
-            if artifact in records:
-                continue
-            report_path = self._artifact_to_report_path(artifact)
-            if (
-                report_path is None
-                or not report_path.is_file()
-                or report_path.suffix.lower() != ".html"
-            ):
-                continue
-            records[artifact] = ReportRecord(
-                artifact_path=artifact,
-                report_path=report_path,
-                handoff_paths=tuple(handoffs),
-                effective_timestamp=self._effective_timestamp(report_path, handoffs),
-                important=self._node_is_important(artifact, [report_path, *handoffs], important),
-                malformed_handoffs=tuple(malformed),
-            )
-
-        return sorted(records.values(), key=lambda item: item.effective_timestamp, reverse=True)
+        """Return report-backed records sorted newest first."""
+        return [node for node in self._nodes() if node.report_path is not None]
 
     def cleanup_candidates(
         self,
         *,
         older_than: dt.timedelta = _DEFAULT_TTL,
     ) -> list[CleanupCandidate]:
-        """Return non-important reports/handoffs older than ``older_than``."""
-        cutoff = self._clock() - older_than
-        candidates: list[CleanupCandidate] = []
-        important = self._important_paths()
-        seen_handoffs: set[Path] = set()
-
-        for record in self.list_reports():
-            seen_handoffs.update(record.handoff_paths)
-            if record.important or record.effective_timestamp > cutoff:
-                continue
-            paths = tuple(
-                p
-                for p in ((record.report_path,) if record.report_path else ())
-                + record.handoff_paths
-                if p is not None
+        """Return every non-important node older than ``older_than``."""
+        reason = f"older than {int(older_than.total_seconds() // 3600)}h"
+        return [
+            CleanupCandidate(
+                artifact_path=node.artifact_path,
+                reason=reason,
+                paths=tuple(p for p in (node.report_path, *node.handoff_paths) if p is not None),
+                effective_timestamp=node.effective_timestamp,
             )
-            candidates.append(
-                CleanupCandidate(
-                    artifact_path=record.artifact_path,
-                    reason=f"older than {int(older_than.total_seconds() // 3600)}h",
-                    paths=paths,
-                    effective_timestamp=record.effective_timestamp,
-                    important=False,
-                )
-            )
-
-        handoffs_by_artifact, malformed = self._handoffs_by_artifact()
-        for artifact, handoffs in handoffs_by_artifact.items():
-            if artifact in important or any(self._workspace_ref(p) in important for p in handoffs):
-                continue
-            orphan_paths = tuple(p for p in handoffs if p not in seen_handoffs)
-            if not orphan_paths:
-                continue
-            timestamp = self._effective_timestamp(None, list(orphan_paths))
-            if timestamp <= cutoff:
-                candidates.append(
-                    CleanupCandidate(
-                        artifact_path=artifact,
-                        reason="orphan handoff older than retention window",
-                        paths=orphan_paths,
-                        effective_timestamp=timestamp,
-                    )
-                )
-
-        for handoff in malformed:
-            if handoff in seen_handoffs or self._workspace_ref(handoff) in important:
-                continue
-            timestamp = self._timestamp_from_path(handoff)
-            if timestamp <= cutoff:
-                candidates.append(
-                    CleanupCandidate(
-                        artifact_path=self._workspace_ref(handoff),
-                        reason="malformed handoff older than retention window",
-                        paths=(handoff,),
-                        effective_timestamp=timestamp,
-                    )
-                )
-
-        return candidates
+            for node in self._expired(self._nodes(), older_than)
+        ]
 
     def cleanup(
         self,
@@ -241,96 +160,77 @@ class ReportRetentionService:
         return result
 
     def status(self, *, older_than: dt.timedelta = _DEFAULT_TTL) -> dict[str, int | bool]:
-        """Return retention counters for doctor/status surfaces."""
-        reports = self.list_reports()
-        candidates = self.cleanup_candidates(older_than=older_than)
-        stale_handoffs = sum(
-            1 for c in candidates for p in c.paths if p.name.endswith(".handoff.json")
-        )
-        stale_reports = sum(1 for c in candidates for p in c.paths if p.suffix.lower() == ".html")
-        live_handoffs = {handoff for report in reports for handoff in report.handoff_paths}
-        handoffs_by_artifact, _malformed = self._handoffs_by_artifact()
-        orphan_handoffs = sum(
-            1
-            for handoffs in handoffs_by_artifact.values()
-            for handoff in handoffs
-            if handoff not in live_handoffs
-        )
+        """Return retention counters for doctor/status surfaces.
+
+        ``orphan_handoff_count`` counts every handoff not paired with a report.
+        """
+        nodes = self._nodes()
+        expired = self._expired(nodes, older_than)
         return {
-            "report_count": len(reports),
-            "stale_report_count": stale_reports,
-            "stale_handoff_count": stale_handoffs,
-            "orphan_handoff_count": orphan_handoffs,
+            "report_count": sum(1 for node in nodes if node.report_path is not None),
+            "stale_report_count": sum(1 for node in expired if node.report_path is not None),
+            "stale_handoff_count": sum(len(node.handoff_paths) for node in expired),
+            "orphan_handoff_count": sum(
+                len(node.handoff_paths) for node in nodes if node.report_path is None
+            ),
             "important_report_count": len(self.important_reports()),
             "malformed_state": self._state_malformed(),
         }
 
-    def _handoffs_by_artifact(self) -> tuple[dict[str, list[Path]], list[Path]]:
-        result: dict[str, list[Path]] = {}
-        malformed: list[Path] = []
-        for root in (self._handoff_root, self._reports_root):
-            for handoff_doc in scan_handoffs(root):
-                handoff = handoff_doc.path
-                if not self._is_under(handoff, root):
-                    continue
-                if handoff_doc.malformed_error is not None:
-                    malformed.append(handoff)
-                    stem_artifact = self._legacy_same_stem_artifact(handoff)
-                    if stem_artifact is not None:
-                        result.setdefault(stem_artifact, []).append(handoff)
-                    continue
-                path = handoff_doc.artifact_path_raw
-                if isinstance(path, str) and path.startswith(".dadaia/reports/"):
-                    result.setdefault(path, []).append(handoff)
-                    continue
-                stem_artifact = self._legacy_same_stem_artifact(handoff)
-                if stem_artifact is not None:
-                    result.setdefault(stem_artifact, []).append(handoff)
-        return result, malformed
+    def _nodes(self) -> list[ReportRecord]:
+        """The one index: every report under ``reports/``, every handoff under either root."""
+        important = self._important_paths()
+        groups = self._handoffs_by_ref()
+        nodes: list[ReportRecord] = []
+        if self._reports_root.exists():
+            for report in sorted(self._reports_root.rglob("*.html")):
+                if report.is_file() and self._is_under(report, self._reports_root):
+                    ref = self._workspace_ref(report)
+                    nodes.append(self._node(ref, report, groups.pop(ref, []), important))
+        nodes.extend(self._node(ref, None, group, important) for ref, group in groups.items())
+        return sorted(nodes, key=lambda node: node.effective_timestamp, reverse=True)
 
-    def _effective_timestamp(self, report: Path | None, handoffs: list[Path]) -> dt.datetime:
-        timestamp_handoffs = (
-            [handoff for handoff in handoffs if self._is_under(handoff, self._handoff_root)]
-            if report is not None
-            else handoffs
+    def _node(
+        self, ref: str, report: Path | None, handoffs: list[Handoff], important: set[str]
+    ) -> ReportRecord:
+        paths = tuple(handoff.path for handoff in handoffs)
+        members = [p for p in (report, *paths) if p is not None]
+        return ReportRecord(
+            artifact_path=ref,
+            report_path=report,
+            handoff_paths=paths,
+            effective_timestamp=self._effective_timestamp(report, handoffs),
+            important=ref in important or any(self._workspace_ref(p) in important for p in members),
         )
-        for handoff in timestamp_handoffs:
-            handoff_doc = Handoff.load(handoff)
-            produced_at = handoff_doc.produced_at
-            parsed = self._parse_datetime(produced_at) if produced_at is not None else None
-            if parsed is not None:
-                return parsed
-        if report is not None:
-            parsed = self._parse_datetime_from_name(report.name)
-            if parsed is not None:
-                return parsed
-            return dt.datetime.fromtimestamp(report.stat().st_mtime, tz=dt.UTC)
-        if handoffs:
-            return self._timestamp_from_path(handoffs[0])
-        return self._clock()
 
-    def _timestamp_from_path(self, path: Path) -> dt.datetime:
-        parsed = self._parse_datetime_from_name(path.name)
-        if parsed is not None:
-            return parsed
-        return dt.datetime.fromtimestamp(path.stat().st_mtime, tz=dt.UTC)
+    def _expired(self, nodes: list[ReportRecord], older_than: dt.timedelta) -> list[ReportRecord]:
+        cutoff = self._clock() - older_than
+        return [n for n in nodes if not n.important and n.effective_timestamp <= cutoff]
 
-    def _parse_datetime_from_name(self, name: str) -> dt.datetime | None:
-        match = _TIMESTAMP_RE.match(name)
-        if not match:
-            return None
-        raw = match.group(1)
-        return self._parse_datetime(f"{raw[:13]}:{raw[13:15]}:{raw[15:]}")
+    def _handoffs_by_ref(self) -> dict[str, list[Handoff]]:
+        """Every handoff under either root, grouped by the ref it pairs with (or its own)."""
+        groups: dict[str, list[Handoff]] = {}
+        for root in (self._handoff_root, self._reports_root):
+            for handoff in scan_handoffs(root):
+                if self._is_under(handoff.path, root):
+                    groups.setdefault(self._pairing_ref(handoff), []).append(handoff)
+        return groups
 
-    def _parse_datetime(self, value: str) -> dt.datetime | None:
-        normalized = value.replace("Z", "+00:00")
-        try:
-            parsed = dt.datetime.fromisoformat(normalized)
-        except ValueError:
-            return None
-        if parsed.tzinfo is None:
-            parsed = parsed.replace(tzinfo=dt.UTC)
-        return parsed.astimezone(dt.UTC)
+    def _pairing_ref(self, handoff: Handoff) -> str:
+        declared = handoff.artifact_path_raw
+        report = self._artifact_to_report_path(declared) if declared is not None else None
+        if report is None:
+            report = self._legacy_same_stem_report(handoff.path)
+        return self._workspace_ref(handoff.path if report is None else report)
+
+    def _effective_timestamp(self, report: Path | None, handoffs: list[Handoff]) -> dt.datetime:
+        """A node ages by its newest canonical handoff; a report with none ages by itself."""
+        if report is None:
+            return max(handoff.effective_timestamp() for handoff in handoffs)
+        canonical = [h for h in handoffs if self._is_under(h.path, self._handoff_root)]
+        if canonical:
+            return max(handoff.effective_timestamp() for handoff in canonical)
+        return path_timestamp(report)
 
     def _normalize_to_artifact_ref(self, path: str | Path) -> str:
         raw = Path(path)
@@ -351,20 +251,13 @@ class ReportRetentionService:
                 handoff, self._reports_root
             ):
                 raise ValueError("handoff path must be under .dadaia/handoff or .dadaia/reports")
-            handoff_doc = Handoff.load(handoff)
-            if handoff_doc.malformed_error is not None:
-                return self._workspace_ref(handoff)
-            artifact_path = handoff_doc.artifact_path_raw
-            if isinstance(artifact_path, str):
-                ref = artifact_path
-            else:
-                return self._workspace_ref(handoff)
-        elif not ref.startswith(".dadaia/reports/"):
+            return self._pairing_ref(Handoff.load(handoff))
+        if not ref.startswith(".dadaia/reports/"):
             ref = f".dadaia/reports/{ref}"
         report = self._artifact_to_report_path(ref)
         if report is None:
             raise ValueError("report path must stay under .dadaia/reports")
-        return ref
+        return self._workspace_ref(report)
 
     def _artifact_to_report_path(self, artifact: str) -> Path | None:
         if not artifact.startswith(".dadaia/reports/"):
@@ -380,20 +273,15 @@ class ReportRetentionService:
     def _workspace_ref(self, path: Path) -> str:
         return path.resolve().relative_to(self._workspace_root).as_posix()
 
-    def _legacy_same_stem_artifact(self, handoff: Path) -> str | None:
+    def _legacy_same_stem_report(self, handoff: Path) -> Path | None:
         if not self._is_under(handoff, self._reports_root) or not handoff.name.endswith(
             ".handoff.json"
         ):
             return None
         report = handoff.with_name(handoff.name.removesuffix(".handoff.json") + ".html")
         if report.is_file() and self._is_under(report, self._reports_root):
-            return self._workspace_ref(report)
+            return report
         return None
-
-    def _node_is_important(self, artifact: str, paths: list[Path], important: set[str]) -> bool:
-        if artifact in important:
-            return True
-        return any(self._workspace_ref(path) in important for path in paths)
 
     def _is_mutable_runtime_path(self, path: Path) -> bool:
         resolved = path.resolve()

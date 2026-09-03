@@ -1,4 +1,6 @@
-"""Contract — one authority per filesystem-layout invariant (2026-08-06 analysis).
+"""Intent: CONTRACT — core.workspace_layout single authority (bug dadaia-reconcile-quarantines-sanctioned-references-clone)
+
+Contract — one authority per filesystem-layout invariant (2026-08-06 analysis).
 
 The root whitelist diverged the day DADAIA.md was added to the hook's copy and not the
 doctor's. These tests pin that every consumer DERIVES from ``core/workspace_layout.py``

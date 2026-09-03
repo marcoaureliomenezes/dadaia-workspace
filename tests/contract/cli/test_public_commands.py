@@ -1,4 +1,7 @@
-"""Contract tests for dadaia public CLI commands."""
+"""Intent: CONTRACT — dadaia public list / install --only (DADAIA §8.1 reprojection)
+
+Contract tests for dadaia public CLI commands.
+"""
 
 from __future__ import annotations
 

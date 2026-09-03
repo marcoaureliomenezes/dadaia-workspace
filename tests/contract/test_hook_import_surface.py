@@ -1,4 +1,6 @@
-"""Hooks never import the DI composition root (F-01, v0.5.0 six-axis review).
+"""Intent: CONTRACT — P-12 hooks never import the composition root
+
+Hooks never import the DI composition root (F-01, v0.5.0 six-axis review).
 
 Hooks are one-shot processes on the write hot path: every gated tool call spawns a fresh
 interpreter, so module-import cost is paid per write. The container is the composition

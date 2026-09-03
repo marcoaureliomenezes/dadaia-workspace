@@ -1,4 +1,6 @@
-"""Public CLI contracts for `dadaia ci` (pre-push gate, T-GATE-01).
+"""Intent: CONTRACT — DADAIA §3.4 git chokepoints (dadaia ci preflight / install-hook)
+
+Public CLI contracts for `dadaia ci` (pre-push gate, T-GATE-01).
 
 Pre-commit allow/block and push-gate block/pass are covered at the STRONGER
 real-boundary e2e (``tests/e2e/test_pre_commit_lease_gate.py`` / real git hook,

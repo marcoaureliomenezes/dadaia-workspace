@@ -34,7 +34,7 @@ flags, wrappers) breeding chains, and deletion-shaped fixes ending families.
 ## 3. Principles
 
 - **Depth is a property of the interface, not the implementation** — internal seams (private, used by the module's own tests) never surface through the interface.
-- **The deletion test** — imagine deleting the module: if complexity vanishes it was a pass-through; if it reappears across N callers it earned its keep. Apply it to the module you are about to GROW before growing it.
+- **The deletion test** — imagine deleting the module: if complexity vanishes it was a pass-through; if it reappears across N callers it earned its keep. Apply it to the module you are about to GROW before growing it — the same test defines slop (`DADAIA.md` §7.6).
 - **The interface is the test surface** — a test that reaches past the interface says the module is the wrong shape.
 - **One adapter = a hypothetical seam; two = a real one** — never introduce a port with a single adapter; that is indirection, not design.
 - **Replace, don't layer** — a fix that wraps the old path instead of replacing it is a layer, and layers are how the bug loop grows. The correct fix usually deletes a branch, collapses two paths, or moves logic back inside its owner.

@@ -8,7 +8,7 @@ scaffold commit ``chore(scaffold): dadaia context alive specs baseline`` via
 folded in EVERY pre-existing unrelated modified tracked file (e.g. a docker-compose.yml
 and a supervisord.conf the operator was mid-edit on) into a tool-authored commit, with no
 operator consent. The scaffold commit must stage exactly the specs/ baseline (+
-AGENTS.md / tests/AGENTS.md) it authors; pre-existing unrelated worktree modifications
+the scoped-law rows) it authors; pre-existing unrelated worktree modifications
 must stay untouched and uncommitted (workspace rule: a commit stages exactly what its
 change touched, never -A over a shared tree).
 
@@ -30,6 +30,7 @@ from dadaia_workspace.core.models.spec_context import (  # noqa: E402
     SpecContextProject,
 )
 from dadaia_workspace.features.spec_context.service import SpecContextService  # noqa: E402
+from dadaia_workspace.features.specs.canon import scaffold as canon_scaffold  # noqa: E402
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient  # noqa: E402
 from tests.fakes import FakeContextStore  # noqa: E402
 
@@ -82,11 +83,12 @@ def test_alive_scaffold_commit_never_sweeps_preexisting_dirty_tracked_files(
         context_store=store,
         git_client=GitSubprocessClient(),
         workspace_root=workspace_root,
+        scaffold_specs=canon_scaffold,
     )
 
     service.alive("proj")
 
-    # The scaffold commit stages ONLY the specs/ baseline (+ AGENTS.md) it authored.
+    # The scaffold commit stages ONLY the specs/ baseline (+ the scoped-law rows) it authored.
     stat = subprocess.run(
         ["git", "show", "--stat", "--format=", "HEAD"],
         cwd=repo,
@@ -96,7 +98,8 @@ def test_alive_scaffold_commit_never_sweeps_preexisting_dirty_tracked_files(
     ).stdout
     committed_paths = [line.split("|")[0].strip() for line in stat.splitlines() if "|" in line]
     assert committed_paths, "scaffold commit must have touched files"
-    assert all(p == "AGENTS.md" or p.startswith("specs/") for p in committed_paths), (
+    scoped_law_rows = {"AGENTS.md", "CLAUDE.md", "tests/AGENTS.md", "tests/CLAUDE.md"}
+    assert all(p in scoped_law_rows or p.startswith("specs/") for p in committed_paths), (
         f"scaffold commit swept non-scaffold paths: {committed_paths}"
     )
     assert "docker-compose.yml" not in committed_paths

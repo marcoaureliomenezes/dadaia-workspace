@@ -1,4 +1,6 @@
-"""Agreement contract — the release-SemVer regex has ONE canonical home (v0.1.53 W3).
+"""Intent: CONTRACT — core.specs_version RELEASE_SEMVER_RE single canon (DADAIA §4.2 no v prefix)
+
+Agreement contract — the release-SemVer regex has ONE canonical home (v0.1.53 W3).
 
 Before this release the literal ``re.compile(r"^v\\d+\\.\\d+\\.\\d+$")`` was triplicated
 in three unrelated modules (``features/specs/scaffolder.py``,

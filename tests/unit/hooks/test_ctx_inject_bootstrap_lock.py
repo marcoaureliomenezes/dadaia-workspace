@@ -1,37 +1,11 @@
-"""AC-7 (v0.1.57 FR4 / Ruling A) — Layer-1 self-pull bootstrap byte-identical lock.
+"""Intent: CONTRACT — 0.4.6 AC11 (Layer-1 bootstrap byte-identical lock).
 
-FR4 RATIFIES self-pull: constitution / architecture / quality-assurance stay
-self-pull-only at Layer-1, and ``ctx_inject._build_memory`` remains **byte-identical**
-to pre-release — a bounded ``tech-stack.md`` digest + the lean ``catalog.json`` digest,
-never the full memory tree. This module is the enforcement of that ruling: a
-byte-identical golden on ``_build_memory``'s output for a fixed fixture specs tree. Any
-future Layer-1 expansion (appending an atom to the bootstrap — architecture, QA, the
-constitution, or anything else) breaks :data:`_EXPECTED_BOOTSTRAP` and this test goes
-RED. That is exactly the AC-10(f) mutation-sanity check: append any atom to
-``_build_memory``'s L1 bootstrap ⇒ this assert FAILS.
-
-Why a golden and not a hard gate — Layer-2 grounding is the verifiable surface.
-This wave adds **no** new gate. The mechanical proof that role grounding actually fired
-lives on **Layer-2**: FR2 records each resolved role→atom ref in the run record's
-``InjectedContext.refs``, and FR3's **FRAG-COH-4** doctor check asserts every
-model-driven step's role-mapped atom appears in its injected refs. Layer-1 memory
-grounding is deliberately kept as self-pull **discipline** (the deferred
-``layer1-selfpull-handoff-audit-line`` backlog return would add a schema-level "prove
-the atoms were read" field); this golden only *locks* that the L1 bootstrap does not
-silently grow, it does not attempt to verify the atoms were read.
-
-Platform-invariance (v0.1.55 law).
-``_build_memory`` emits only the CONTENT of the fixture's ``tech-stack.md`` and
-``catalog.json`` — never the host ``specs_dir`` path itself. The catalog ``path`` fields
-in the golden are forward-slash, workspace-relative (``specs/memory/...``), so the
-expected bytes carry no host path and no OS-specific separator; no normalization is
-required and the golden is identical on every platform. A dedicated assertion pins that
-the host ``tmp_path`` never leaks into the output.
-
-``_build_memory`` is a pure function of ``specs_dir`` (no stdin, no subprocess), so it is
-exercised in-process here — the harness-real subprocess contract applies to ``main()``
-(which the sibling ``test_ctx_inject.py`` / ``test_ctx_inject_digest.py`` cover and which
-stay green, unchanged in behaviour, under this ratification).
+Size: SMALL. ``_build_memory`` emits exactly: the tech-stack digest, the fixed law
+blocks of ``memory/ARCHITECTURE.md`` and ``memory/QUALITY.md`` (the marked body only,
+never the rest of the atom), and the lean catalog digest. The constitution and every
+unmarked memory body stay self-pull. The golden is the mutation check: any growth, a
+header change or a join change fails the byte equality. The output carries no host
+path, so the golden is identical on every platform.
 """
 
 from __future__ import annotations
@@ -91,14 +65,27 @@ _CATALOG: dict[str, object] = {
 # A small tech-stack atom (≤ the 24 non-empty-line cap) is emitted verbatim (stripped).
 _TECH_STACK = "# Tech Stack\n\nPython 3.12 + poetry\npytest + mypy --strict + ruff\n"
 
-# Sentinel content for the three atoms that MUST NOT reach the L1 bootstrap under
-# Ruling A. They exist in the fixture memory tree — proving the bootstrap deliberately
-# ignores them (self-pull-only), not that the tree merely lacks them.
-_FORBIDDEN_ATOMS: dict[str, str] = {
-    "constitution.md": "# Constitution\nSENTINEL_CONSTITUTION_BODY\n",
-    "architecture.md": "# Architecture\nSENTINEL_ARCHITECTURE_BODY\n",
-    "quality-assurance.md": "# Quality Assurance\nSENTINEL_QA_BODY\n",
-}
+# The constitution never reaches the bootstrap; of ARCHITECTURE.md and QUALITY.md only
+# the marked fixed block does — the sentinel bodies outside the markers prove it.
+_CONSTITUTION = "# Constitution\nSENTINEL_CONSTITUTION_BODY\n"
+_ARCHITECTURE = (
+    "# Architecture\n"
+    "SENTINEL_ARCHITECTURE_BODY\n"
+    "\n"
+    "<!-- dadaia:fixed slop-code -->\n"
+    "### Slop — code (fixed)\n"
+    "- LAW_CODE_BULLET\n"
+    "<!-- /dadaia:fixed slop-code -->\n"
+)
+_QUALITY = (
+    "# Quality\n"
+    "SENTINEL_QA_BODY\n"
+    "\n"
+    "<!-- dadaia:fixed slop-tests -->\n"
+    "### Slop — tests (fixed)\n"
+    "- LAW_TESTS_BULLET\n"
+    "<!-- /dadaia:fixed slop-tests -->\n"
+)
 
 # The frozen golden. Captured from ``_build_memory`` under the fixture below; any Layer-1
 # expansion (a new section, an appended atom, a header change, a join change) diverges
@@ -112,6 +99,11 @@ _EXPECTED_BOOTSTRAP = (
     "\n"
     "Python 3.12 + poetry\n"
     "pytest + mypy --strict + ruff\n"
+    "=== workspace law (fixed) ===\n"
+    "### Slop — code (fixed)\n"
+    "- LAW_CODE_BULLET\n"
+    "### Slop — tests (fixed)\n"
+    "- LAW_TESTS_BULLET\n"
     "{\n"
     '  "features": [\n'
     "    {\n"
@@ -134,12 +126,7 @@ _EXPECTED_BOOTSTRAP = (
 
 
 def _build_fixture_specs(tmp_path: Path) -> Path:
-    """Plant the fixed fixture specs tree and return its ``specs`` dir.
-
-    Writes ``tech-stack.md`` + ``product/catalog.json`` (the two atoms the L1 bootstrap
-    digests) **and** the three forbidden atoms (constitution / architecture /
-    quality-assurance) so the golden proves the bootstrap ignores them.
-    """
+    """Plant the fixture specs tree (tech digest, catalog, constitution, two marked atoms)."""
     specs = tmp_path / "specs"
     mem = specs / "memory"
     (mem / "product").mkdir(parents=True)
@@ -147,26 +134,20 @@ def _build_fixture_specs(tmp_path: Path) -> Path:
     (mem / "product" / "catalog.json").write_text(
         json.dumps(_CATALOG, ensure_ascii=False, indent=2), encoding="utf-8"
     )
-    for name, body in _FORBIDDEN_ATOMS.items():
-        (mem / name).write_text(body, encoding="utf-8")
+    (specs / "constitution.md").write_text(_CONSTITUTION, encoding="utf-8")
+    (mem / "ARCHITECTURE.md").write_text(_ARCHITECTURE, encoding="utf-8")
+    (mem / "QUALITY.md").write_text(_QUALITY, encoding="utf-8")
     return specs
 
 
 def test_build_memory_bootstrap_is_byte_identical_golden(tmp_path: Path) -> None:
-    """AC-7 core lock: ``_build_memory`` output equals the frozen golden byte-for-byte.
-
-    The golden IS the mutation-sanity check: appending any atom (constitution /
-    architecture / quality-assurance), leaking ``summary``/``rank``/``tags``, or
-    changing a header/join fails this byte-equality directly. The following asserts
-    are folded in as redundant, human-readable guards alongside the byte lock — their
-    intent stays explicit in source even though the golden alone already proves it.
-    """
+    """``_build_memory`` output equals the frozen golden byte-for-byte; the asserts
+    after it are human-readable guards the golden already proves."""
     specs = _build_fixture_specs(tmp_path)
     built = ctx_inject._build_memory(specs)
     assert built == _EXPECTED_BOOTSTRAP
 
-    # Ruling A: constitution / architecture / quality-assurance never reach the L1
-    # bootstrap (self-pull-only).
+    # The constitution and the unmarked memory bodies stay self-pull.
     for sentinel in (
         "SENTINEL_CONSTITUTION_BODY",
         "SENTINEL_ARCHITECTURE_BODY",
@@ -190,7 +171,7 @@ def test_build_memory_bootstrap_is_byte_identical_golden(tmp_path: Path) -> None
     assert str(tmp_path) not in built
     assert str(specs) not in built
 
-    # No `memory/` dir ⇒ empty bootstrap (the guard clause), unchanged under FR4.
+    # No `memory/` dir ⇒ empty bootstrap (the guard clause).
     empty_specs = tmp_path / "empty-specs"
     empty_specs.mkdir()
     assert ctx_inject._build_memory(empty_specs) == ""
