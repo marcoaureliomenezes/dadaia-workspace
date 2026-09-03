@@ -140,6 +140,12 @@
       "agent": "project-manager",
       "kind": "dispositions",
       "text": "Backlog slop-law-one-definition-one-home stays CONSUMED until the feature->develop merge (operator evaluates the rc first; rewritten to DELIVERED at the merge). Bugs fixed in-candidate: context-alive-copies-scaffold-image-bypassing-canon-fold, reports-cleanup-skips-handoffs-without-artifact-path, pre-commit-presence-advisory-names-the-committing-session-itself (all resolved, net-negative or neutral). Deferred to the PM intake report (operator-gated): Intent backfill tests/unit (160) and tests/integration (51); @AGENTS.md stub in two homes (workspace_guardrail vs templates); dadaia clean as a second cleanup engine beside reports cleanup; cli/commands/context.py third session-id ladder; venv-guard cache scope ($V/mypy bypass); e2e test_pre_commit_presence_gate ancestry test and test_doctor copytree test (qa curation); consumer repos' legacy lowercase memory names (specs upgrade); SLOP.md/slop-code wording (S4 scope to core/protocols, S6 regex by reference, two rows >150 chars); code-reviewer LOW S1/S2 hits in container.py, spec_context/service.py, chokepoints/pre_commit.py, cli/_specs_resolution.py."
+    },
+    {
+      "ts": "2026-09-03T13:17:55Z",
+      "agent": "project-manager",
+      "kind": "merge",
+      "text": "Candidate 3 merged: PR #244 feature/0.4.6 -> develop, merge commit 1463790031f223c1922454b376e13ce45f944ee9 (head 7c421ead = verdict commit whose first parent f50e6e9b is the sha the security-reviewer approved; 37 checks pass). Verdict consumed and deleted; backlog slop-law-one-definition-one-home rewritten to DELIVERED. Release stays live at the promote-or-continue gate: the operator rules promote (deploy) or continue (rc-archive to rc-3/); nothing deployed."
     }
   ]
 }
