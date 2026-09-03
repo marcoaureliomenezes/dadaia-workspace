@@ -62,7 +62,7 @@ of report §4.2 is the ratified source. Enters §7 Quality after §7.5.
 - Detection and ratchets: `dd-code-review` SLOP.md; measured by `tests/contract/test_slop_ratchets.py` and audit pillar 2.
 ```
 
-Fragment `public/scaffold/fixed/slop-law.md` → `constitution.md` (H2 section):
+Fragment `public/data/fixed/slop-law.md` → `constitution.md` (H2 section):
 
 ```
 ## Slop — workspace law (fixed)
@@ -161,7 +161,7 @@ Fragment `slop-tests.md` → `memory/QUALITY.md` (last `###` of Part 2):
   `file:line`), `software-engineer` executes; V31's contract pin drops to 0 in the same
   commit. Unit (143) and integration (51) re-enter via the closure deferral record
   (`DADAIA.md` §6.6) under new task ids.
-- FR10 — Fixed law sections. One home: `public/scaffold/fixed/<id>.md`, the three fragments
+- FR10 — Fixed law sections. One home: `public/data/fixed/<id>.md`, the three fragments
   of §3.1. `FIXED_SECTIONS` in `features/specs/memory_canon.py` maps `constitution.md` ->
   `slop-law`, `memory/ARCHITECTURE.md` -> `slop-code`, `memory/QUALITY.md` -> `slop-tests`.
   Marker grammar `<!-- dadaia:fixed <id> -->` … `<!-- /dadaia:fixed <id> -->`; the text
@@ -185,7 +185,7 @@ Fragment `slop-tests.md` → `memory/QUALITY.md` (last `###` of Part 2):
 | `specs/memory/QUALITY.md` (CLOSURE; P-24/P-29 at ADR-0010 acceptance) | CI gates; Slop measurement; block; tldr | +16 |
 | `specs/memory/ARCHITECTURE.md` (CLOSURE) | block | +8 |
 | `specs/ADRs/decisions.jsonl` | ADR 0010 `proposed` | +1 |
-| `public/scaffold/fixed/{slop-law,slop-code,slop-tests}.md` | new fragments | +22 |
+| `public/data/fixed/{slop-law,slop-code,slop-tests}.md` | new fragments | +22 |
 | `public/scaffold/{constitution,memory/ARCHITECTURE,memory/QUALITY}.md` | slop lines out; marker pairs in | +1 |
 | `tests/AGENTS.md` + `public/templates/tests-AGENTS.md` | 3 sections out; pointer bullet | -52 |
 | `tests/README.md` · `public/data/dadaia-AGENTS.md` | citation / "is slop" -> "(§7.6)" | 0 |
@@ -290,15 +290,16 @@ Measured 2026-09-03 on `feature/0.4.6`; the modules re-measure and pin at birth.
 
 | Ratchet | Home | Counts | Baseline | Direction |
 |---|---|---|---|---|
-| V31 | `test_test_suite_ratchets.py` (replaces V27) | test files without `Intent:`, per tier | unit 143, integration 51, contract 37, e2e 0 | down only, e2e = 0 |
-| V32 | `test_slop_ratchets.py` | governance ids in production comments + docstrings | 264 + 158 = 422 | down only |
-| V33 | `test_slop_ratchets.py` | `PREFIX-NN` families without a mechanical reader | 105 | down only |
+| V31 | `test_test_suite_ratchets.py` (replaces V27) | test files without a line-anchored docstring `Intent:`, per tier | unit 160, integration 52, contract 40, e2e 0 | down only, e2e = 0 |
+| V32 | `test_slop_ratchets.py` | governance ids in production comment tokens + docstring lines | 912 (265 + 647, measured at birth) | down only |
+| V33 | `test_slop_ratchets.py` | `PREFIX-NN` families without a mechanical reader | 51 (measured at birth; FR, AC, T- exempt) | down only |
 | V34 | `test_slop_ratchets.py` | SPEC.md + TASKS.md bytes of the live candidate | ceiling 24 KB / 12 KB | fixed ceiling |
 
 - V33: a family is a distinct prefix of tokens matching `\b[A-Z]{1,4}-?[0-9]{2,3}\b` over
   `specs/**` (minus `_archive/`), `dadaia_workspace/**`, `tests/**` (SLOP.md included); a
   family has a reader when a regex or string constant in `dadaia_workspace/**` or `tests/**`,
-  outside the counting test, matches its prefix. S1-S10 count as one orphan family — ratified.
+  outside the counting test, matches its prefix; FR, AC and T- are the ratified families (ruling 5)
+  and are exempt. S1-S10 count as one orphan family — ratified.
 - V35 (handoffs older than 30 days: 678 of 902 pre-GC) is not a ratchet — it reads
   `.dadaia/handoff` outside the repo by wall clock; home: the `closure-artifact-gc` log entry
   (target 0) and the audit pillar-2 readout.
@@ -309,6 +310,6 @@ Measured 2026-09-03 on `feature/0.4.6`; the modules re-measure and pin at birth.
 - Between T-046-23 and the closure pass, `dadaia specs doctor` on the lib reports FIXED-1 ×2
   on the memory files by construction (MEMORY class, `DADAIA.md` §3.2): accepted transient,
   named in AC2, cleared by AC11; no rule downgrade to avoid it.
-- `public/scaffold/fixed/` is not a canon entry (`canon.scaffold` copies only CANON entries);
+- `public/data/fixed/` is not a canon entry (`canon.scaffold` copies only CANON entries);
   the privacy scan must still cover it — T-046-23 verifies both.
 - Reprojection is the proof of every `public/` edit; a hand-edited projection is itself the bug.
