@@ -42,7 +42,7 @@
   Blocked by: T-046-17. Delivers: `dadaia specs init` in a fresh dir yields three blocks and
   `dadaia specs doctor` reports no FIXED-*; a bind's bootstrap prefix carries the two memory
   blocks — AC11 (its lib-memory clause completes at closure).
-- [ ] T-046-18 — FR1+FR2+FR4, the law in one act: `DADAIA.md` §7.6 (7 bullets), §7.2
+- [-] T-046-18 — FR1+FR2+FR4, the law in one act: `DADAIA.md` §7.6 (7 bullets), §7.2
   tombstone line, §6.7 byte ceiling, §10.2 glossary (`slop`, `ratchet`, `fixed section`);
   `constitution.md` §12 -> 3 bullets + pointer, `:11` deleted, §16 reduced, 5.1.0, then
   `dadaia specs doctor --fix` appends the `slop-law` block; `tests/AGENTS.md` and
