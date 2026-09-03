@@ -1,6 +1,8 @@
-"""Help-quality ratchet (backlog cli-help-architecture, T-053-24): a leaf command must
+"""Intent: CONTRACT — backlog cli-help-architecture (T-053-24) one-line-help ratchet
+
+Help-quality ratchet (backlog cli-help-architecture, T-053-24): a leaf command must
 not be born with a one-line docstring — the help IS the documentation surface now.
-Ratchet: the offender count only goes down. Intent: contract; size: unit."""
+Ratchet: the offender count only goes down. Size: unit."""
 
 from __future__ import annotations
 

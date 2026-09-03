@@ -1,3 +1,5 @@
+"""Intent: CONTRACT — features/reports/retention cleanup (symlink safety, malformed sidecar, important preservation)"""
+
 from __future__ import annotations
 
 import datetime as dt

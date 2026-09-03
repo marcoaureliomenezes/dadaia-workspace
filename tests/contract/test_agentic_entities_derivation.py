@@ -1,4 +1,6 @@
-"""Contract — the agentic-entity derivation law (constitution §12.5).
+"""Intent: CONTRACT — constitution §12.4 derivation law (C-16)
+
+Contract — the agentic-entity derivation law (constitution §12.5).
 
 dadaia-workspace defines its scaffolded surface as ABSTRACT, harness-agnostic
 entities first (``dadaia_workspace/public/entities/registry.json``) and only then

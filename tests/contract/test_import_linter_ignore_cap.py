@@ -1,4 +1,6 @@
-"""Import-linter ignore-edge **cap** contract (WS-R8 / AC-R8-04, release v0.1.10).
+"""Intent: CONTRACT — P-10 suppressed layering-edge cap (setup.cfg ignore_imports)
+
+Import-linter ignore-edge **cap** contract (WS-R8 / AC-R8-04, release v0.1.10).
 
 Architect finding F10: the ``ignore_imports`` lists in ``setup.cfg`` are documented,
 transitional exceptions to the ``features -> infrastructure`` / ``features -> subprocess``

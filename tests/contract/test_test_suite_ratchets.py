@@ -183,7 +183,7 @@ _INTENT_HEADER_RE = re.compile(r"(?m)^\s*Intent:\s*\S")
 _V31_UNDECLARED_CEILINGS: dict[str, int] = {
     "unit": 160,
     "integration": 52,
-    "contract": 40,
+    "contract": 0,
     "e2e": 0,
 }
 
@@ -215,7 +215,7 @@ def _v31_violations(counts: dict[str, int], ceilings: dict[str, int]) -> list[st
 
 def test_v31_undeclared_intent_ceiling_per_tier(tmp_path: Path) -> None:
     """V31 — test files without an `Intent:` header, pinned per tier (unit 160 /
-    integration 52 / contract 40 / e2e 0). Ratchet DOWN ONLY; target 0 everywhere."""
+    integration 52 / contract 0 / e2e 0). Ratchet DOWN ONLY; target 0 everywhere."""
     counts = _undeclared_by_tier(tracked_test_files(_REPO_ROOT, "test_*.py"), _TESTS_DIR)
     violations = _v31_violations(counts, _V31_UNDECLARED_CEILINGS)
     assert not violations, (

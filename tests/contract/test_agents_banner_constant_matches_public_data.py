@@ -1,4 +1,6 @@
-"""FR9 contract (v0.1.60 / Ruling 15) — the banner constant is byte-equal to public/data.
+"""Intent: CONTRACT — workspace_guardrail provenance discriminator equals the public/data/AGENTS.md banner
+
+FR9 contract (v0.1.60 / Ruling 15) — the banner constant is byte-equal to public/data.
 
 ``workspace_guardrail._CANONICAL_AGENTS_BANNER`` is the provenance discriminator for the
 consumer-repo AGENTS.md fan-out. It is a FIXED LITERAL (never a runtime read of

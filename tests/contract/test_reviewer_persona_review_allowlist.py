@@ -1,4 +1,6 @@
-"""Contract — the four reviewer personas' `specs/releases/**/reviews/**` grant (T-050-03A).
+"""Intent: CONTRACT — DADAIA §4.2 verdict ownership (security-reviewer alone declares specs/releases/**/verdicts/**)
+
+Contract — the four reviewer personas' `specs/releases/**/reviews/**` grant (T-050-03A).
 
 `software-architect`, `qa-engineer`, `code-reviewer` and `security-reviewer` write review
 artifacts under a release's `reviews/` subtree; `security-reviewer` additionally writes the

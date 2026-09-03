@@ -1,3 +1,5 @@
+"""Intent: CONTRACT — dadaia reports status / cleanup / mark-important (DADAIA §5.4 retention)"""
+
 from __future__ import annotations
 
 import datetime as dt

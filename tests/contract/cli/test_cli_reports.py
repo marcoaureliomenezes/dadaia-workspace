@@ -1,4 +1,7 @@
-"""Public CLI contracts for `dadaia reports validate`."""
+"""Intent: CONTRACT — dadaia reports validate (DADAIA §5.4 handoff validation)
+
+Public CLI contracts for `dadaia reports validate`.
+"""
 
 from __future__ import annotations
 

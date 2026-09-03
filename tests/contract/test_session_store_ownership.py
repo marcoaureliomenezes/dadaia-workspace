@@ -1,4 +1,6 @@
-"""Session-store ownership residue contract (T-010-07, WS-R3 / FR-R3-01).
+"""Intent: CONTRACT — core.session_store single owner of session-record paths
+
+Session-store ownership residue contract (T-010-07, WS-R3 / FR-R3-01).
 
 `core.session_store` (release K1: moved here from ``features.spec_context.session_identity``
 — core cannot import features, and :mod:`core.invocation` needs to read a session

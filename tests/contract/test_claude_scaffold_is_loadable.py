@@ -1,4 +1,6 @@
-"""The projected ``.claude/`` scaffold must be LOADABLE by Claude Code — not merely written.
+"""Intent: SENTINEL — Claude Code harness vocabulary seam (.claude/ projection loadability)
+
+The projected ``.claude/`` scaffold must be LOADABLE by Claude Code — not merely written.
 
 Every existing assertion over this surface compares dadaia's output to dadaia's own
 generator constants: install wrote what the generator produced, and doctor agrees. That is
