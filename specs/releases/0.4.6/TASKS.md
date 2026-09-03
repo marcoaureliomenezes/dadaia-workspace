@@ -106,7 +106,7 @@
   Blocked by: none. Delivers: a push that grows any of the four counts goes red in
   preflight, and `repos/dadaia-workspace/{AGENTS.md,tests/AGENTS.md}` load in Claude Code
   through their `CLAUDE.md` bridges — AC7, AC4's Intent-taxonomy line.
-- [-] T-046-21 — FR8, GC at closure: `dd-release-implementation/RC-FLOW.md` step 8 gains
+- [x] T-046-21 — FR8, GC at closure: `dd-release-implementation/RC-FLOW.md` step 8 gains
   `dadaia reports cleanup --older-than 30d` and `dadaia tmp gc`, scope line "this
   candidate's own artifacts, plus the 30-day sweep"; run both once on the instance now
   (runtime, not committed); `behavior-map.json` dd-release-implementation hash re-recorded;
@@ -118,7 +118,10 @@
   copies; runtime, uncommitted: .dadaia/handoff/**, .dadaia/tmp/**.
   Blocked by: none. Delivers: `find .dadaia/handoff -name '*.handoff.json' -mtime +30 | wc
   -l` = 0, and every future closure repeats it — AC8.
-- [-] T-046-22 — FR9, test curation batch 1 = `tests/contract` (37 files without
+  Ratified at completion: the write set also carried the nine dead `public/scaffold/` image
+  files (deleted), behavior-map rows 10/22 and `test_fixed_sections_canon.py`; AC8 reached
+  after bug `reports-cleanup-skips-handoffs-without-artifact-path` (Arm B).
+- [x] T-046-22 — FR9, test curation batch 1 = `tests/contract` (37 files without
   `Intent:`): `qa-engineer` issues the curation verdict per file (declare `Intent:`, or
   delete with the criterion and the `file:line` of the coverage that replaces it);
   `software-engineer` executes; V31's contract pin drops to 0 in the same commit. Unit and
