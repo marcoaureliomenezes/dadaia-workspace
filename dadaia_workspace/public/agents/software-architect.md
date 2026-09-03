@@ -43,7 +43,6 @@ paths:
   write_allowlist:
     - .dadaia/reports/<ctx>/software-architect/**
     - .dadaia/handoff/<ctx>/**
-    - specs/releases/**/reviews/**
 ---
 
 # Software Architect

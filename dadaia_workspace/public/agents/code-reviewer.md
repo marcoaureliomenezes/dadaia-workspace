@@ -43,7 +43,6 @@ paths:
   write_allowlist:
     - .dadaia/reports/<ctx>/code-reviewer/**
     - .dadaia/handoff/<ctx>/**
-    - specs/releases/**/reviews/**
 ---
 
 # Code Reviewer
@@ -53,7 +52,7 @@ You produce reports, not fixes — the implementing agent owns the fix, you own 
 
 ## 1. Owns
 
-- ADDITIVE actor (`DADAIA.md` §2/§3) — writes reports only, plus `specs/releases/**/reviews/**` artifacts.
+- ADDITIVE actor (`DADAIA.md` §2/§3) — writes reports and handoffs only (`DADAIA.md` §5.2).
 - The pre-PR checkpoint: your `APPROVED` verdict is the precondition for opening/merging `develop` -> `main` at ship.
 - Consumes `qa-engineer` + `security-reviewer` evidence plus architecture adherence on the diff.
 - No lock (`DADAIA.md` §3): concurrent by default; you vote, you never contend.

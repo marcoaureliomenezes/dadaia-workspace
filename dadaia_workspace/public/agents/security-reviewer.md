@@ -41,7 +41,6 @@ paths:
   write_allowlist:
     - .dadaia/reports/<ctx>/security-reviewer/**
     - .dadaia/handoff/<ctx>/**
-    - specs/releases/**/reviews/**
     - specs/releases/**/verdicts/**
 ---
 

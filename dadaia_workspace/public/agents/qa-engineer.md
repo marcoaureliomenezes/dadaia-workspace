@@ -55,7 +55,6 @@ paths:
   write_allowlist:
     - tests/e2e/**
     - specs/releases/**/ALPHA-*-QA.md
-    - specs/releases/**/reviews/**
     - .dadaia/reports/<ctx>/qa-engineer/**
     - .dadaia/handoff/<ctx>/**
 ---
