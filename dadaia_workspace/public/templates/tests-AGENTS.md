@@ -4,68 +4,57 @@
 > A placeholder left in place means that section is not yet calibrated.
 
 These rules override general workspace guidance for everything under `tests/`.
-Agents creating or editing tests must follow them. Full protocol: skill `dd-test-stewardship`.
-Numbers below are this project's adjustable defaults.
+Agents creating or editing tests must follow them. Full protocol: skill
+`dd-test-stewardship`.
 
-## 1. Intent taxonomy
+- Intent, admission, deletion, tombstone: `dd-test-stewardship`; slop: `DADAIA.md` §7.6 and `specs/memory/QUALITY.md` fixed section.
 
-- Every test declares intent in its module docstring: `Intent: <KIND> — <AC id | bug-id | task-id>`.
-- Never as a pytest marker.
-- CONTRACT (permanent, asserts an AC or a bug).
-- SENTINEL (permanent, the single integration test of one seam).
-- SCAFFOLD (temporary, expires at its task/release closure).
-- QUARANTINE (flaky, carries a registered bug id).
-- An undeclared test is SCAFFOLD — the default is to die, not to stay.
+## Architecture
 
-## 2. Architecture (size tiers)
+- `tests/unit/**`: pure or near-pure tests only. No real subprocess execution,
+  server threads, CLI runners, full workspace init, network, sleeps, or real git
+  remotes. Process-boundary units may patch the runner; they must not spawn a
+  process.
+- `tests/contract/**`: public CLI/API/schema/security/projection/gate contracts.
+- `tests/integration/**`: multi-component tests using tmp filesystem, service
+  wiring, or CLI runner.
+- `tests/e2e/**`: named end-to-end journeys only. Every file names an owner.
+- `tests/tmp/**`: temporary debugging reproductions only; excluded from default
+  collection and deleted or promoted before closure.
 
-- `tests/unit/**` (SMALL): pure or near-pure tests only.
-- No real subprocess execution, server threads, network, sleeps, or real external services in unit tests.
-- `tests/contract/**` (SMALL): public API/CLI/schema/security contracts.
-- `tests/integration/**` (MEDIUM): multi-component tests using a tmp filesystem or local service wiring.
-- `tests/e2e/**` (LARGE): named end-to-end journeys only; every file names an owner in a comment or docstring.
-- `tests/tmp/**`: SCAFFOLD only — excluded from default collection, deleted or promoted before closure.
+## Size tiers and cost
 
-## 3. Admission filter
+| Tier (marker) | Directory | Timeout default | Owner rule |
+|---|---|---|---|
+| `unit` | `tests/unit/**` | `<UNIT_TIMEOUT_S>` s | — |
+| `contract` | `tests/contract/**` | `<CONTRACT_TIMEOUT_S>` s | — |
+| `integration` | `tests/integration/**` | `<INTEGRATION_TIMEOUT_S>` s | — |
+| `e2e` (LARGE) | `tests/e2e/**` | `<E2E_TIMEOUT_S>` s | every file names an owner |
 
-- A new test enters the permanent suite only if it compiles and runs, is deterministic, adds real detection.
-- Real detection: covers previously-uncovered behavior, or kills a mutant no current test kills.
-- Prohibited: change-detector tests (mirror the implementation).
-- Prohibited: tautologies (expected value re-derived from the code under test).
-- Prohibited: reflex-regenerated snapshots.
+A test that needs more time than its tier's default is **mis-tiered** — fix the
+tier, never raise the default. The LARGE-tier census cap is `<LARGE_CAP>` per
+module (abstract default in `dd-test-stewardship/PARAMETERS.md`'s "LARGE (E2E)
+cap" row), reported as a warning until achievable.
 
-## 4. Deletion criteria and the tombstone ban
+`flaky` and `quarantine` markers are registered in `pyproject.toml`; a
+`quarantine` marker without `bug="<bug-slug>"` refuses collection, and every
+gating selector (CI jobs, release jobs, the pre-push preflight) excludes the
+quarantine lane. Diagnosis runs use `-m quarantine` explicitly.
 
-Delete, with `file:line` evidence in the commit, a test that meets any of:
+## Markers and cost
 
-| Criterion | Evidence |
-|---|---|
-| Feature removed | link to the removal |
-| Duplicate coverage exists | `file:line` of the equivalent test |
-| Tautology / no-op | shows the assertion never consults the product |
-| Reflex-regenerated snapshot, no review | diff history |
-| Failure-to-defect ratio ~= 0 | flake/failure history, zero real defects |
-| Expired quarantine/skip, no plan | see Markers, cost and flake policy (§5) |
+- Layer markers are applied automatically by directory via `tests/conftest.py`.
+- Add `@pytest.mark.slow(reason="...")` to any test over 1 second or any test
+  that starts a subprocess/server.
+- The local loop is:
 
-- Tombstone ban: a test whose central assertion is the absence of something removed validates a historical event.
-- That test is SCAFFOLD of the release that removed the thing, and dies at that release's closure.
-- The memory of the removal belongs to CLOSURE/changelog, never the suite.
-- Separation of powers: the implementer never prunes to go green.
-- Pruning is a quality-steward verdict carrying this table's evidence; the implementer executes the commit, quoting the verdict.
+```bash
+pytest -q -m "unit and not slow" tests/unit
+```
 
-## 5. Markers, cost and flake policy
+Coverage is not the default loop. Use explicit coverage only for curated
+unit/contract runs:
 
-- Layer markers are applied automatically by directory.
-- Per-test timeout defaults by tier (adjustable): unit `<UNIT_TIMEOUT_S>`s / contract `<CONTRACT_TIMEOUT_S>`s.
-- Timeout defaults (continued): integration `<INTEGRATION_TIMEOUT_S>`s / e2e `<E2E_TIMEOUT_S>`s.
-- A test needing more time than its tier allows is mis-tiered — fix the tier, never the default.
-- `flaky` and `quarantine` markers exist; `quarantine` without a registered bug id is refused at collection.
-- Every gating selector excludes `quarantine`.
-- LARGE cap (declared, reported as a warning until achievable): `<LARGE_CAP>` per module (abstract default 12-15).
-- Wall-clock budget is frozen at `<WALL_CLOCK_BASELINE>` per job; raising it requires a justification recorded at closure.
-
-## 6. Good test standard
-
-- A test is allowed only if it can fail for a meaningful regression: product behavior, public contract, security boundary.
-- Also: data integrity, or a real user journey.
-- If it mainly records implementation history, delete it — it does not belong in release notes either.
+```bash
+pytest -q -m "unit or contract" --cov=<PACKAGE> --cov-report=term-missing --cov-fail-under=<COVERAGE_FLOOR>
+```

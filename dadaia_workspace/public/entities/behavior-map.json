@@ -66,12 +66,12 @@
       "skill": "dd-gitflow-default",
       "scoped_agents_md": [],
       "hash_tuple": {
-        "section": "sha256:8a57032e397e698b37fcd9d72cdeb474f7ebd0bef4ba98814c6e63ae2a887347",
+        "section": "sha256:2d6cce9dac243698d8ca78cbf02dbcc4dec577e71312426fbb910534027ac4ab",
         "skill": "sha256:9cb14b1bcb1f39f703dcdcf0e9fc0c778b140c11a65a682f6ca0a643e81d4b60",
         "scoped": []
       },
       "recorded_by": "claude-code",
-      "recorded_at": "2026-08-31"
+      "recorded_at": "2026-09-03"
     },
     {
       "section": "§5 Where things are written",
@@ -101,11 +101,11 @@
         "section": "sha256:11a021b5885f086458c9a4c1e6f2fe5bfd3baca60fa26519e9a8233823ba3eee",
         "skill": null,
         "scoped": [
-          "sha256:416608dc4944394ec027ace5ed3ef3f1b6dd718958a663c691a6cf72c91298b3"
+          "sha256:36ebfba3bd9897ee4a6dea3fa864daa1d70c881c15bd31d306c45ea9dc770dbc"
         ]
       },
       "recorded_by": "claude-code",
-      "recorded_at": "2026-08-31"
+      "recorded_at": "2026-09-03"
     },
     {
       "section": "§5 Where things are written",
@@ -118,11 +118,11 @@
         "section": "sha256:11a021b5885f086458c9a4c1e6f2fe5bfd3baca60fa26519e9a8233823ba3eee",
         "skill": null,
         "scoped": [
-          "sha256:bb469a0364e91d9e4af5c2278a708f1c89cd6be9952dd650462062ccb4df2903"
+          "sha256:4c8d052866196eeb0f5505b8fdee0e02b7e9f8f2a9fa108ef0d1c75e33d10e3b"
         ]
       },
       "recorded_by": "claude-code",
-      "recorded_at": "2026-08-31"
+      "recorded_at": "2026-09-03"
     },
     {
       "section": "§5 Where things are written",
@@ -147,12 +147,12 @@
       "skill": "dd-task-manager",
       "scoped_agents_md": [],
       "hash_tuple": {
-        "section": "sha256:ab59448f37391a5442a7dc46013dcc3645474faaac7c6d33d6c1dbf73945fce1",
+        "section": "sha256:941b80ce5cb01c7a6223fae2ec34124ec96118797e2b15b4b42d8cc679863314",
         "skill": "sha256:c1eb56a5344104cc544e79d2275e2cafa3d0a0599f17286ddc7fe37b543feed8",
         "scoped": []
       },
       "recorded_by": "claude-code",
-      "recorded_at": "2026-08-31"
+      "recorded_at": "2026-09-03"
     },
     {
       "section": "§6 Specs, tasks and memory",
@@ -162,14 +162,14 @@
         "dadaia_workspace/public/scaffold/backlog/AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:ab59448f37391a5442a7dc46013dcc3645474faaac7c6d33d6c1dbf73945fce1",
+        "section": "sha256:941b80ce5cb01c7a6223fae2ec34124ec96118797e2b15b4b42d8cc679863314",
         "skill": "sha256:5ecf13f2c9f52f7ec2f6b27ee6c043a72043e328b41cf8185e2b39cd2512ae06",
         "scoped": [
           "sha256:4e0b67a3c7affffe2dbde34ee2e265dd480c36366de04fd977a667eb56e8b405"
         ]
       },
       "recorded_by": "claude-code",
-      "recorded_at": "2026-08-31"
+      "recorded_at": "2026-09-03"
     },
     {
       "section": "§6 Specs, tasks and memory",
@@ -177,12 +177,12 @@
       "skill": "dd-release-definition",
       "scoped_agents_md": [],
       "hash_tuple": {
-        "section": "sha256:ab59448f37391a5442a7dc46013dcc3645474faaac7c6d33d6c1dbf73945fce1",
+        "section": "sha256:941b80ce5cb01c7a6223fae2ec34124ec96118797e2b15b4b42d8cc679863314",
         "skill": "sha256:d5a1c8d8dced5d5465e7d5bdd3b24ecf4f4cbf714515e199d37b14c67d9063fc",
         "scoped": []
       },
       "recorded_by": "claude-code",
-      "recorded_at": "2026-08-31"
+      "recorded_at": "2026-09-03"
     },
     {
       "section": "§6 Specs, tasks and memory",
@@ -192,14 +192,14 @@
         "dadaia_workspace/public/scaffold/releases/AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:ab59448f37391a5442a7dc46013dcc3645474faaac7c6d33d6c1dbf73945fce1",
+        "section": "sha256:941b80ce5cb01c7a6223fae2ec34124ec96118797e2b15b4b42d8cc679863314",
         "skill": "sha256:f5cb4848dbf2c819ce9e812caa31ae455fc933c7883678c020f0dbcc1d13902a",
         "scoped": [
-          "sha256:595d9e81de4fcfa9837e6332a5ba5c3b87dd53dcd89308545109b48d21b025b9"
+          "sha256:1cc9b81a086fdcfd13a7d0005192c2ed5ab9d21adf390a0b00b4da16c8ddc026"
         ]
       },
       "recorded_by": "claude-code",
-      "recorded_at": "2026-08-31"
+      "recorded_at": "2026-09-03"
     },
     {
       "section": "§6 Specs, tasks and memory",
@@ -209,14 +209,14 @@
         "dadaia_workspace/public/scaffold/audits/AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:ab59448f37391a5442a7dc46013dcc3645474faaac7c6d33d6c1dbf73945fce1",
+        "section": "sha256:941b80ce5cb01c7a6223fae2ec34124ec96118797e2b15b4b42d8cc679863314",
         "skill": "sha256:3a66547699b5ffb8d38a2dd081140499f95768202dbc31f03baaeccb8501f353",
         "scoped": [
           "sha256:8d496146c5a9efdd2a4829d8a489e9365dcb0d8bc8752700897e4e7bbc60b8ea"
         ]
       },
       "recorded_by": "claude-code",
-      "recorded_at": "2026-08-31"
+      "recorded_at": "2026-09-03"
     },
     {
       "section": "§6 Specs, tasks and memory",
@@ -226,14 +226,14 @@
         "dadaia_workspace/public/scaffold/ADRs/AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:ab59448f37391a5442a7dc46013dcc3645474faaac7c6d33d6c1dbf73945fce1",
+        "section": "sha256:941b80ce5cb01c7a6223fae2ec34124ec96118797e2b15b4b42d8cc679863314",
         "skill": null,
         "scoped": [
           "sha256:17919aa759d9bef6524385d57ddd200de00ffb0146c0052550141860cc655ef6"
         ]
       },
       "recorded_by": "claude-code",
-      "recorded_at": "2026-08-31"
+      "recorded_at": "2026-09-03"
     },
     {
       "section": "§6 Specs, tasks and memory",
@@ -241,12 +241,12 @@
       "skill": "dd-grill-me",
       "scoped_agents_md": [],
       "hash_tuple": {
-        "section": "sha256:ab59448f37391a5442a7dc46013dcc3645474faaac7c6d33d6c1dbf73945fce1",
+        "section": "sha256:941b80ce5cb01c7a6223fae2ec34124ec96118797e2b15b4b42d8cc679863314",
         "skill": "sha256:555d4b8fff0353ae0660bda4e639e98e7dbf4d789cef440edb019b0a24a5d7cf",
         "scoped": []
       },
       "recorded_by": "claude-code",
-      "recorded_at": "2026-08-31"
+      "recorded_at": "2026-09-03"
     },
     {
       "section": "§6 Specs, tasks and memory",
@@ -258,7 +258,7 @@
         "dadaia_workspace/public/templates/specs-AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:ab59448f37391a5442a7dc46013dcc3645474faaac7c6d33d6c1dbf73945fce1",
+        "section": "sha256:941b80ce5cb01c7a6223fae2ec34124ec96118797e2b15b4b42d8cc679863314",
         "skill": "sha256:b723649f7d392c87353f6c947ff3918952b10caf934d6a8946ac5f1999b9fcd7",
         "scoped": [
           "sha256:4b7b2c92af03f3f5f2f92b7bccf8916f50abdf68b6cf26ed3e7750aff05f73a7",
@@ -267,7 +267,7 @@
         ]
       },
       "recorded_by": "claude-code",
-      "recorded_at": "2026-08-31"
+      "recorded_at": "2026-09-03"
     },
     {
       "section": "§7 Quality",
@@ -275,12 +275,12 @@
       "skill": "dd-bug-resolution",
       "scoped_agents_md": [],
       "hash_tuple": {
-        "section": "sha256:0578e09ed5b1a3c7a84a84d549e418b6004f72893cc8cf6535cffe9357c3aa99",
+        "section": "sha256:97a73434b788824c557c31bc30dfffa2a58033969a812746ce525974407eddb6",
         "skill": "sha256:797404a4415ae8d1a0f854bc0c108325795e43497d0d070813ab5035c0f7c5fc",
         "scoped": []
       },
       "recorded_by": "claude-code",
-      "recorded_at": "2026-08-31"
+      "recorded_at": "2026-09-03"
     },
     {
       "section": "§7 Quality",
@@ -290,14 +290,14 @@
         "dadaia_workspace/public/scaffold/bugs/AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:0578e09ed5b1a3c7a84a84d549e418b6004f72893cc8cf6535cffe9357c3aa99",
+        "section": "sha256:97a73434b788824c557c31bc30dfffa2a58033969a812746ce525974407eddb6",
         "skill": "sha256:be8fa0c376069fbdfaaa3fdc16c7797b8b3d355af0595ccc863ba1b73e6f89a9",
         "scoped": [
           "sha256:c7535992c4dfdfe6d54e5bc9fa543f41d4146f3ebc17c93ebb185b82a00520bd"
         ]
       },
       "recorded_by": "claude-code",
-      "recorded_at": "2026-08-31"
+      "recorded_at": "2026-09-03"
     },
     {
       "section": "§7 Quality",
@@ -307,14 +307,14 @@
         "dadaia_workspace/public/templates/tests-AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:0578e09ed5b1a3c7a84a84d549e418b6004f72893cc8cf6535cffe9357c3aa99",
+        "section": "sha256:97a73434b788824c557c31bc30dfffa2a58033969a812746ce525974407eddb6",
         "skill": "sha256:a452cb6d3a50241cc638b2d752e3c01c6e210b2e54b88fcbd6ef77bc917d9b9c",
         "scoped": [
-          "sha256:3ad62c3462a51330bad99f45aef9734f038a401b7f4274ba699ec91847b903a7"
+          "sha256:7acc3f692324f37471b27eb97d5d8405c905700c979601c620d64ff385fe0bd3"
         ]
       },
       "recorded_by": "claude-code",
-      "recorded_at": "2026-08-31"
+      "recorded_at": "2026-09-03"
     },
     {
       "section": "§3 What is enforced deterministically",
@@ -357,11 +357,11 @@
         "section": "sha256:41cfbf4ace302f8c8453146c15b18450bd1fc768a4cbd7b205c45c893106954f",
         "skill": null,
         "scoped": [
-          "sha256:4ef6043e9549abf110536ebadd23b3abef0aec0f603fb1c05020815f2da4643f"
+          "sha256:ad46c5c50c829230ed96cf3f9a71afe7b5a4857e9504f24065e38461bb25fe1a"
         ]
       },
       "recorded_by": "claude-code",
-      "recorded_at": "2026-08-31"
+      "recorded_at": "2026-09-03"
     },
     {
       "section": "§10 Where to look next",
@@ -371,14 +371,14 @@
         "dadaia_workspace/public/scaffold/AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:3a6064ce849f519efaf7d6bb795ab0be75745656fa653205d08edff273f12f5f",
+        "section": "sha256:e94e6f374624810d774184f773c805aa6ecefcf5e9504fc7f6472cec419d5df5",
         "skill": null,
         "scoped": [
           "sha256:24be49a73428c3fc4d076a153503bf9592fb1bd0ad0391d467cb783f7d2fed11"
         ]
       },
       "recorded_by": "claude-code",
-      "recorded_at": "2026-08-31"
+      "recorded_at": "2026-09-03"
     },
     {
       "section": "§6 Specs, tasks and memory",
@@ -388,14 +388,14 @@
         "dadaia_workspace/public/scaffold/releases/_ideas/AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:ab59448f37391a5442a7dc46013dcc3645474faaac7c6d33d6c1dbf73945fce1",
+        "section": "sha256:941b80ce5cb01c7a6223fae2ec34124ec96118797e2b15b4b42d8cc679863314",
         "skill": null,
         "scoped": [
           "sha256:0517671f6ae5f0de8f37322dc4b5be56f96e8615431c451749c3ccfee22558b0"
         ]
       },
       "recorded_by": "claude-code",
-      "recorded_at": "2026-08-31"
+      "recorded_at": "2026-09-03"
     },
     {
       "section": "§6 Specs, tasks and memory",
@@ -403,12 +403,12 @@
       "skill": "dd-architecture-survey",
       "scoped_agents_md": [],
       "hash_tuple": {
-        "section": "sha256:ab59448f37391a5442a7dc46013dcc3645474faaac7c6d33d6c1dbf73945fce1",
+        "section": "sha256:941b80ce5cb01c7a6223fae2ec34124ec96118797e2b15b4b42d8cc679863314",
         "skill": "sha256:1d041054d00fcf74652edf36eb922dc5a13328e499b6bdc506071e9fe2a762b7",
         "scoped": []
       },
       "recorded_by": "claude-code",
-      "recorded_at": "2026-08-31"
+      "recorded_at": "2026-09-03"
     },
     {
       "section": "§2 Who does what",
@@ -429,12 +429,12 @@
       "skill": "dd-domain-modeling",
       "scoped_agents_md": [],
       "hash_tuple": {
-        "section": "sha256:ab59448f37391a5442a7dc46013dcc3645474faaac7c6d33d6c1dbf73945fce1",
+        "section": "sha256:941b80ce5cb01c7a6223fae2ec34124ec96118797e2b15b4b42d8cc679863314",
         "skill": "sha256:1da471ae4df6ed1704f36db42ffab5876a0ee3bd607eedef9464540a97c2a5aa",
         "scoped": []
       },
       "recorded_by": "claude-code",
-      "recorded_at": "2026-08-31"
+      "recorded_at": "2026-09-03"
     }
   ]
 }

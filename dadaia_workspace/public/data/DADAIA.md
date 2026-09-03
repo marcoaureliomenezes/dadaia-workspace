@@ -116,7 +116,7 @@
 - The release version = last published PyPI + 1 patch, minted at birth; it increments ONLY at operator-approved deploy (ADR 0005).
 - `rc-N/` is an archived candidate folder under the live release (`dadaia release rc-archive`), never a branch name and never a scaffolded sub-phase.
 - Each candidate closure burns one `feature -> develop` merge; after it the agent asks the operator: promote (deploy) or continue (archive the trio to `rc-N/`, stack more backlog/bugs/findings).
-- Both PRs require an APPROVED `security-reviewer` verdict on the PR head sha, consumed once by the merge and deleted after — a survivor is slop.
+- Both PRs require an APPROVED `security-reviewer` verdict on the PR head sha, consumed once by the merge and deleted after — a survivor counts as slop (§7.6).
 - Ship-PR verdict names develop's tip, staged on the feature branch before the final `rc` merge.
 - Every flow stage runs on `feature/{M.m.p}`; `develop`/`main` are PR targets only, never a working branch.
 - Suggest CI/CD automation of this contract to the operator; mechanics: `dd-gitflow-default`.
@@ -225,6 +225,7 @@
 - At pick time, open bugs and undispositioned audits outrank fresh backlog.
 - After each merge, the promote-or-continue gate (§4.2): continue = `dadaia release rc-archive` moves the trio to `rc-N/` and a fresh trio is born at root; promote = the ship lane, then archive the whole release folder (final trio stays at root, ADR 0009).
 - Candidate finalization order: memory update -> CLOSURE -> gate; a completed task group is one commit.
+- A candidate's SPEC.md fits 24 KB and TASKS.md 12 KB — measured by V34 (`tests/contract/test_slop_ratchets.py`).
 
 ### 6.8 Audits
 
@@ -250,7 +251,7 @@
 - Every test declares its intent and size at birth; an undeclared test is SCAFFOLD and expires.
 - Demotion (LARGE test -> equivalent cheaper coverage) is planned release-closure work.
 - Pruning to go green is exclusively a `qa-engineer` verdict; deletion/skip/disable carries evidence, executed by `software-engineer`.
-- Tombstones and expired SCAFFOLD are slop; artifact capture is failure-gated (§5.2). Protocol: `dd-test-stewardship`.
+- Tombstones and expired SCAFFOLD die at closure (§7.6); artifact capture is failure-gated (§5.2). Protocol: `dd-test-stewardship`.
 
 ### 7.3 Bugs
 
@@ -277,6 +278,16 @@
 
 - Approved when the operator and the consumer-side validation agent agree, after validating a real workspace.
 - A green internal gate that diverges from real consumer behavior is itself a bug.
+
+### 7.6 Slop
+
+- Slop is what passes the deletion test without loss: removed, no behavior changes and no decision loses its record.
+- The test applies to a file, line, comment, test, spec sentence, acronym, branch, release, rule or handoff.
+- Slop dies in the change that finds it; it is never commented out, marked, archived or deferred.
+- The writer proves the artifact fails the deletion test; the reviewer applies the test; the auditor measures the balance.
+- A rule lives in one home; the second copy is deleted; a consumed handoff is deleted in the same turn.
+- Artifact rules live by class: constitution `Slop`, memory `ARCHITECTURE`/`QUALITY` fixed sections; `specs doctor` keeps them byte-exact.
+- Detection and ratchets: `dd-code-review` SLOP.md; measured by `tests/contract/test_slop_ratchets.py` and audit pillar 2.
 
 ---
 
@@ -357,3 +368,6 @@
 - **projection** — a lib-originated copy of a `public/` asset installed into a runtime tree.
 - **operator** — the human who owns the workspace and approves ADRs, deferrals, releases.
 - **dispatcher** — an agent authorized to invoke another agent via subagent dispatch.
+- **slop** — what passes the deletion test without loss (§7.6).
+- **ratchet** — a contract test pinning a measured count that moves down only (§7.6).
+- **fixed section** — a marker-bounded law block in a scaffolded spec, kept byte-equal to its fragment by `specs doctor` (§7.6).
