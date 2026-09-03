@@ -8,7 +8,7 @@
 
 ## Candidate 3 — slop law
 
-- [-] T-046-17 — Propose ADR 0010: slop is defined once by the deletion test, distributed
+- [x] T-046-17 — Propose ADR 0010: slop is defined once by the deletion test, distributed
   over two classes (agentic entities; fixed sections in scaffolded specs) and measured by
   downward-only ratchets (`status: proposed`; `context` cites report
   `2026-09-03T023255Z-slop-governance-map` and the 2026-09-03 ruling; `decision` names §7.6,
