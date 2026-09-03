@@ -41,3 +41,6 @@ são registrados aqui no CLOSURE.
 ## Estado runtime
 
 Nenhum estado runtime registrado.
+
+<!-- dadaia:fixed slop-code -->
+<!-- /dadaia:fixed slop-code -->

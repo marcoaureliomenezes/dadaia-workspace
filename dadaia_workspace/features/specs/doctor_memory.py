@@ -15,12 +15,14 @@ import re
 from pathlib import Path
 
 from dadaia_workspace.core import frontmatter as _fm
+from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.specs_repair import (  # noqa: F401
     has_unfilled_angle_placeholders,
     is_placeholder_atom,
     remove_placeholder_atoms,
 )
 from dadaia_workspace.features.specs import memory_canon, memory_lint
+from dadaia_workspace.features.specs.canon import default_public_dir
 from dadaia_workspace.features.specs.doctor_types import (
     Severity,
     SpecsDoctorIssue,
@@ -244,6 +246,49 @@ class MemoryValidator:
         path = Path(issue.path)
         if is_placeholder_atom(path):
             path.unlink()
+
+    def check_fixed_sections(self, public_dir: Path | None) -> list[SpecsDoctorIssue]:
+        """FIXED-1: a fixed law block is missing; FIXED-2: its body is not the fragment."""
+        fragments_dir = public_dir if public_dir is not None else default_public_dir()
+        issues: list[SpecsDoctorIssue] = []
+        for rel, section_id in memory_canon.FIXED_SECTIONS:
+            path = self.specs_dir / rel
+            if not path.is_file():
+                continue
+            try:
+                fragment = memory_canon.read_fixed_fragment(fragments_dir, section_id)
+            except FileNotFoundError:
+                continue
+            body = memory_canon.extract_fixed_section(path.read_text(encoding="utf-8"), section_id)
+            if body == fragment:
+                continue
+            state = "is missing" if body is None else "differs from the library fragment"
+            issues.append(
+                SpecsDoctorIssue(
+                    code="FIXED-1" if body is None else "FIXED-2",
+                    severity=Severity.ERROR,
+                    description=(
+                        f"{rel}: fixed law section `{section_id}` {state} — "
+                        "`dadaia specs doctor --fix` inserts or refreshes it"
+                    ),
+                    path=str(path),
+                    fixable=True,
+                )
+            )
+        return issues
+
+    def fix_fixed_section(self, issue: SpecsDoctorIssue, public_dir: Path | None) -> None:
+        """Insert or refresh the fixed law block of the file named by *issue*."""
+        if not issue.path:
+            return
+        fragments_dir = public_dir if public_dir is not None else default_public_dir()
+        path = Path(issue.path)
+        section_id = memory_canon.FIXED_SECTION_BY_PATH[path.relative_to(self.specs_dir).as_posix()]
+        fragment = memory_canon.read_fixed_fragment(fragments_dir, section_id)
+        rendered = memory_canon.render_fixed_section(
+            path.read_text(encoding="utf-8"), section_id, fragment
+        )
+        atomic_write(path, rendered)
 
     def check_memory_files(self) -> list[SpecsDoctorIssue]:
         """Check #2: required memory .md atoms exist with non-empty heading.

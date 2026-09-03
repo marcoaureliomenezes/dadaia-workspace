@@ -83,7 +83,6 @@ specs_pattern_version: 5
   obrigatória do fechamento de release, nunca uma decisão avulsa.
 - Poda (deletar, pular ou desabilitar um teste) é veredito do steward de qualidade, nunca
   iniciativa de quem implementou o teste.
-- Teste-lápide e SCAFFOLD expirado são lixo (slop), não histórico da suíte.
 - Artefatos de teste são capturados só em falha.
 
 Protocolo operacional completo: skill `dd-test-stewardship`. Os parâmetros numéricos
@@ -143,7 +142,7 @@ domínio descrito em sua própria persona.
   hash_tuple, recorded_by, recorded_at}`, uma linha por membro (uma skill OU um
   conjunto `scoped_agents_md`), chaveadas pela seção da lei que cada linha possui.
   Nenhuma skill, persona, arquivo de regra, hook ou doctor pode declarar essa relação em
-  outro lugar; uma segunda declaração é lixo (slop, §8) e deve ser removida.
+  outro lugar; uma segunda declaração é removida.
 - Um teste determinístico lê o mapa, a fonte da lei e o inventário de skills em disco, e
   bloqueia todo deploy sem um mapa válido — o enforcer é sempre esse teste, nunca uma
   checagem manual.
@@ -154,3 +153,8 @@ domínio descrito em sua própria persona.
   do mapa.
 - Uma skill sem tópico é fundida ou aposentada por padrão; a lei só ganha um tópico novo
   para comportamento genuinamente sempre-ativo.
+
+---
+
+<!-- dadaia:fixed slop-law -->
+<!-- /dadaia:fixed slop-law -->

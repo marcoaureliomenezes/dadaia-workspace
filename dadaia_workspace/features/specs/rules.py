@@ -85,6 +85,12 @@ RULES: tuple[Rule, ...] = (
     Rule(("CAT-1",), lambda d, t: d._memory.check_cat1_catalog_sync()),
     Rule(("LINT-1",), lambda d, t: d._memory.check_lint1_memory_atoms()),
     Rule(("MEM-DRIFT-1",), lambda d, t: d._memory.check_mem_drift1_features_package_map()),
+    Rule(
+        ("FIXED-1", "FIXED-2"),
+        lambda d, t: d._memory.check_fixed_sections(d.public_dir),
+        fix=lambda d, i: d._memory.fix_fixed_section(i, d.public_dir),
+        fix_help="insert or refresh the workspace's fixed law sections",
+    ),
     Rule(("SPECS-VERSION",), lambda d, t: d._coherence.check_specs_pattern_version()),
     Rule(("SPEC-DOC-024",), lambda d, t: d._release.check_phase_markers_coherence()),
     Rule(("SPEC-DOC-026",), lambda d, t: d._release.check_unique_release_ids()),
