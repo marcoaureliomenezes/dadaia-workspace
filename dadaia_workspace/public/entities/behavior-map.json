@@ -260,8 +260,8 @@
         "section": "sha256:941b80ce5cb01c7a6223fae2ec34124ec96118797e2b15b4b42d8cc679863314",
         "skill": "sha256:b723649f7d392c87353f6c947ff3918952b10caf934d6a8946ac5f1999b9fcd7",
         "scoped": [
-          "sha256:4b7b2c92af03f3f5f2f92b7bccf8916f50abdf68b6cf26ed3e7750aff05f73a7",
-          "sha256:4b7b2c92af03f3f5f2f92b7bccf8916f50abdf68b6cf26ed3e7750aff05f73a7"
+          "sha256:913e3525b59eaf739fbeaa6984c451795366f38f019261572e60648331f4600f",
+          "sha256:913e3525b59eaf739fbeaa6984c451795366f38f019261572e60648331f4600f"
         ]
       },
       "recorded_by": "claude-code",

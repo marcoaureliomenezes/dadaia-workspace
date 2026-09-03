@@ -54,7 +54,6 @@ input_contract:
 paths:
   write_allowlist:
     - tests/e2e/**
-    - specs/releases/**/ALPHA-*-QA.md
     - .dadaia/reports/<ctx>/qa-engineer/**
     - .dadaia/handoff/<ctx>/**
 ---
@@ -126,8 +125,8 @@ Navigate via `dd-spec-navigator` before writing any E2E test or acceptance crite
 
 ## 4. Outputs
 
-- Write permissions: `tests/e2e/**` of the active context repo, `specs/releases/**/ALPHA-*-QA.md` (segment review), reports/handoffs.
-- Never write: application source, unit/integration tests (implementer's), `specs/`/TASKS/PLAN/SPEC outside segment review, CI YAML.
+- Write permissions: `tests/e2e/**` of the active context repo, `.dadaia/reports/<ctx>/qa-engineer/**` and its handoff (`DADAIA.md` §5.2).
+- Never write: application source, unit/integration tests (implementer's), `specs/**`, CI YAML.
 - Emit exactly one recommendation: `APPROVED` or `REJECTED`.
 - `APPROVED` requires all planned E2E/acceptance scenarios to pass, with evidence paths (commands, screenshots, logs, endpoint probes).
 - `APPROVED` alone never closes the task — `project-manager` still waits for code/security approvals.
