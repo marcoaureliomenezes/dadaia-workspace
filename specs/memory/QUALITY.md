@@ -2,8 +2,8 @@
 slug: quality-assurance
 title: quality-assurance
 category: core
-tldr: 10 measured quality principles, then test layers, intent taxonomy, flake and quarantine policy, CI gates and anti-slop rules.
-summary: Part 1 carries the ADR-gated quality principles and the check measuring each; Part 2 records test layers, intent taxonomy, flake handling, the CI gate set and the anti-slop rules.
+tldr: 10 measured quality principles, then test layers, intent taxonomy, flake and quarantine policy, CI gates and slop measurement.
+summary: Part 1 carries the ADR-gated quality principles and the check measuring each; Part 2 records test layers, intent taxonomy, flake handling, the CI gate set and how slop is measured.
 tags: [testing, pytest, ci, quality, test-architecture, flake, quarantine, privacy]
 ---
 
@@ -80,7 +80,7 @@ Rationale: a reported number promoted as if it gated is fabricated detection.
 - Curation is a `qa-engineer` verdict; `software-engineer` executes.
 - Mutation testing runs once per release off the push path (`mutmut==3.7.0`); its score is evidence, never a gate, and `core/` ratchets upward only.
 
-### CI and anti-slop
+### CI gates
 
 - CI runs the preflight ladder plus cross-OS subsets, integration, Python and panel E2E, repo hygiene, backlog doctor, PR governance, the security-verdict gate and gitleaks.
 - Push triggers are `main`, `develop` and `feature/**`; PRs to `develop` or `main` run the same matrix as the local preflight.
@@ -90,6 +90,21 @@ Rationale: a reported number promoted as if it gated is fabricated detection.
 - Caches and artifacts are redirected outside the repository, and the forbidden repo-local set is measured by `tests/contract/test_source_repo_hygiene.py`.
 - Memory-vs-code drift is a `specs doctor` WARNING, never a push-gated test: a package added mid-implementation is drift to fix at the next closure, not a red build ([[specs-doctor]]).
 
+### Slop measurement
+
+- Four repo-pure ratchets pin slop counts and move only downward: V31 (Intent-less test files per tier) in `tests/contract/test_test_suite_ratchets.py`; V32 (governance ids in production comments and docstrings), V33 (`PREFIX-NN` families without a mechanical reader) and V34 (live SPEC/TASKS byte ceiling) in `tests/contract/test_slop_ratchets.py`.
+- Stale handoffs are a closure readout, never a ratchet: `dd-release-implementation` RC-FLOW step 8 runs `dadaia reports cleanup --older-than 30d` and `dadaia tmp gc`, and the `closure-artifact-gc` log entry records the counts.
+- `dd-audit-project` pillar 2 re-measures the ratchets over the audit window and applies `dd-code-review` SLOP.md S1–S10 to a commit sample; the fixed law sections are kept byte-exact by `specs doctor` FIXED-1/2.
+
 ### Dependencies
 
 [[tech-stack]], [[architecture]], [[panel]], [[consumer-agent-support]], [[sdd-gate-v3]].
+
+<!-- dadaia:fixed slop-tests -->
+### Slop — tests (fixed)
+- A test is born with `Intent:`, fails for a real regression and asserts a value that comes from outside the code under test.
+- A mock exists only at the system boundary (network, clock, randomness); an own module is tested through its interface.
+- A test name states current behavior; a tombstone (a test of an absence) and an expired SCAFFOLD die at closure.
+- Pruning is a `qa-engineer` verdict executed by `software-engineer`; a deletion cites its criterion and its replacement `file:line`.
+- Detection: `dd-code-review` SLOP.md S3; measured by ratchet V31 and `test_test_suite_ratchets.py`.
+<!-- /dadaia:fixed slop-tests -->

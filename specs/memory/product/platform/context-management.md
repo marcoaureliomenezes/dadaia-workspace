@@ -12,7 +12,7 @@ tags: [context, lifecycle, session, no-locks, privacy]
 - The registry stores per context its name, main repo slug and URL, the ordered associated repos, state, branch and lifecycle timestamps.
 - The main repo is unique and the only specs, bind, memory, release and backlog target; associated repos are working checkouts, reached after it through the one repos accessor.
 - `context create` registers a DEAD context, back-filling `repo_url` from the repos catalog.
-- `context alive` clones or keeps every repo under `repos/`, restores the branch and merges missing scaffold without overwriting; an associated repo is cloned clean and unbound.
+- `context alive` clones or keeps every repo under `repos/`, restores the branch and folds the canon scaffold over `specs/` without overwriting an existing file; an associated repo is cloned clean and unbound.
 - `context dead` requires a clean, pushed state across the set, naming the offender otherwise, scans committed material with `--commit`, records the branch and removes the local repos.
 - `context repo add|remove|list` is idempotent, and `context update --url` repairs the remote URL.
 - A repo slug is owned by exactly one context: `create` and `repo add` refuse a slug another context owns through one ownership predicate, because `dead` destroys every entry it walks.

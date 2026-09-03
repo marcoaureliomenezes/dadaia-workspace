@@ -182,7 +182,7 @@ _INTENT_HEADER_RE = re.compile(r"(?m)^\s*Intent:\s*\S")
 # deletes its undeclared files; raising one is never a ratchet move.
 _V31_UNDECLARED_CEILINGS: dict[str, int] = {
     "unit": 160,
-    "integration": 52,
+    "integration": 51,
     "contract": 0,
     "e2e": 0,
 }
