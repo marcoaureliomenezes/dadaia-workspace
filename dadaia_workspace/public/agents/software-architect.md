@@ -139,8 +139,7 @@ REVIEW + ONBOARD checklist:
 - Layer compliance — dependency rules obeyed (CLI -> Features -> Core <- Infrastructure)? Any feature importing another feature?
 - Encapsulation/coupling — internals exposed where they should not be; concrete dependencies instead of abstractions.
 - Cohesion — single clear responsibility per module; modules doing unrelated things.
-- Stale and dead code — unreferenced modules/classes/functions/files, commented-out blocks, `_old`/`_v2`/`_legacy` names.
-- Build-on-stale-layers — code wrapping/extending a deprecated implementation instead of replacing it (primary incident source).
+- Slop signals S4/S5 (stubs, one-adapter ports, layers over the old path): `dd-code-review`'s `SLOP.md`.
 - State management — mutable state scoped appropriately; writes atomic; state reconstructable from its persistent store.
 - OOP/SOLID — evaluate SRP/OCP/LSP/ISP/DIP explicitly; flag inheritance used for behavior variation instead of composition.
 

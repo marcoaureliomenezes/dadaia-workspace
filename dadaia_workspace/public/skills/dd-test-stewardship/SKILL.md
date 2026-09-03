@@ -25,6 +25,14 @@ description: >
   (new coverage or kills a new mutant). Change-detector tests, tautologies and
   reflex-regenerated snapshots fail admission; a brittle test is fixed or deleted,
   never appeased.
+- A mock exists only at the system boundary — network, clock, randomness; a
+  collaborator inside the module under test runs for real.
+- The expected value comes from an independent source (the SPEC, a worked example),
+  never from the code under test:
+  ```
+  GOOD: assert total([2, 3]) == 5
+  BAD:  assert total(xs) == sum(xs)
+  ```
 
 ## Size tiers
 

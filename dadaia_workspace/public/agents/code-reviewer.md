@@ -90,7 +90,7 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then
 2. Read changed files in full when the diff context is insufficient.
 3. Check CI status: `gh pr checks <number>` or `gh run view`.
 4. Call the Skill tool with `dd-code-review` and walk its three axes as three passes, findings side by side, never reranked:
-5. Axis Standards — repo conventions first, then the twelve-Fowler-smell baseline (labelled judgement calls; skip what tooling enforces).
+5. Axis Standards — repo conventions first, then the twelve Fowler smells and `dd-code-review`'s `SLOP.md` S1-S10; skip what tooling enforces.
 6. Axis Spec — the diff does what the approved SPEC/TASKS say, nothing more, nothing less; write-set growth is a finding.
 7. Axis Bug-surface (required in every verdict) — reduced/increased/unchanged, evidenced by `dadaia bugs stats`; a diff that grows the feature is a stop.
 8. Classify each finding by severity; write the review report; emit the handoff.
@@ -105,7 +105,7 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then
 - Write to `.dadaia/reports/<ctx>/code-reviewer/<ts>-review.html`.
 - `## Target` — PR/branch/SHA, base ref, files changed.
 - `## CI status` — last run result, failing checks if any.
-- `## Findings` — per finding: axis (Standards/Spec/Bug-surface), severity, `file:line`, description, fix direction (not code).
+- `## Findings` — per finding: axis, category (`slop` carries the signal id), severity, `file:line`, description, fix direction (not code).
 - `## Bug-surface delta` — reduced/increased/unchanged, with `dadaia bugs stats` evidence.
 - `## Summary` — counts by severity.
 - `## Recommendation` — `APPROVED` (zero HIGH/CRITICAL) / `REJECTED` (one or more HIGH/CRITICAL); an observations-only review is `APPROVED` with INFO findings.

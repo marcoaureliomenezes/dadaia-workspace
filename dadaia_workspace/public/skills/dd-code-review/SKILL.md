@@ -29,6 +29,7 @@ axes are reported side by side — an axis never outranks another.
   Repeated Switches · Shotgun Surgery · Divergent Change · Speculative Generality ·
   Message Chains · Middle Man · Refused Bequest.
 - Speak `dd-codebase-design`: a smell is usually a shallow module or a misplaced seam.
+- Slop signals S1-S10, each with its diff check: [`SLOP.md`](SLOP.md) — reported inside this axis, never a fourth.
 
 ## 3. Axis 2 — Spec
 
@@ -44,6 +45,7 @@ axes are reported side by side — an axis never outranks another.
 - The operator's rule applied as a review axis: a diff that GROWS the feature is a stop —
   a branch, flag, special case, second code path or cross-feature reach-in added by a fix
   is a puxadinho; name it and recommend the replace-don't-layer shape instead.
+- An S4, S5 or S8 finding (`SLOP.md`) answers this axis "increased" until the finding is gone.
 
 ## 5. Reporting
 

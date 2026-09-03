@@ -109,7 +109,7 @@ Six checks, applied at authoring time and at review time:
 4. Relevance sweep — does each line still bear on what the document does?
 5. A line that never bears on the task, or went stale, is sediment — the default fate of an unpruned document.
    Governance provenance (FR ids, task ids, "renamed/absorbed from") is sediment by definition: git owns history.
-6. No-op hunt — does removing the sentence change what the model does? If not, delete the whole sentence.
+6. No-op hunt — does removing the sentence change what the model does? If not, delete it; the deletion test (`DADAIA.md` §7.6) is the general form.
 
 Altitude belongs here too: state intent, not mechanics that go stale (file paths, code snippets). The one exception:
 a snippet that encodes a decision more precisely than prose (a schema, a state shape) may be inlined, trimmed to the

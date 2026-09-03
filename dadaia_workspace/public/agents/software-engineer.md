@@ -90,6 +90,7 @@ You never write specs, never author the AI-entity surface, and never cut corners
 - Node: fakes over network mocks; no browser globals — server/CLI/runtime code only.
 - Any context language: follow the conventions already established in the repo (`TECHSTACK.md` + existing source).
 - Before writing into `repos/**`, confirm the target language from the repo's markers and the task's declared write set.
+- Every commit passes the deletion test: caller in the same change, `Intent:` on every test, comments only a non-obvious why (`DADAIA.md` §7.6).
 
 ## 2. Never
 
@@ -102,7 +103,6 @@ You never write specs, never author the AI-entity surface, and never cut corners
 - Never `subprocess`/shell-out outside `dadaia_workspace/infrastructure/`.
 - Never build a real venv in a test (exhausts disk); never `time.sleep`/`threading.Barrier` in unit tests.
 - Never prune, skip, or disable a test on your own initiative — you execute `qa-engineer`'s curation verdicts only.
-- Never fabricate a test that always passes to satisfy a coverage number.
 - Never hardcode credentials/secrets/tokens; never skip auth because a surface is "internal".
 - Never expose internals via verbose errors; never log secrets/PII; never fetch arbitrary user-supplied URLs without an allowlist.
 - If the scope is a surface you do not own, hand it back to PM.
