@@ -23,8 +23,8 @@ labelled judgement call with the command that makes it verifiable in the diff.
 
 - S3a — no `Intent:`: `git diff --name-only -- tests | xargs grep -L 'Intent:'`; HIGH; declare, or refuse admission.
 - S3b — tautology: expected computed by the code's own expression, `assert f(x) == f(x)`, a constant vs itself; HIGH; an independent literal.
-- S3c — own-module mock: `patch\(.dadaia_workspace\.|MagicMock\(\)` in the diff, `assert_called` on an own collaborator; MEDIUM; mock at the frontier.
-- S3d — tombstone/change-detector: a `removed|retired|no_longer|legacy` name, an absence assertion, a grep over source text; MEDIUM; dies at closure.
+- S3c — own-module mock: `patch\(.dadaia_workspace\.|MagicMock\(\)` in the diff, `assert_called` on own code; MEDIUM; mock at the frontier.
+- S3d — tombstone/change-detector: a `removed|retired|no_longer|legacy` name, an absence assertion, a grep over source; MEDIUM; dies at closure.
 
 ## Verdict rule
 

@@ -93,9 +93,8 @@ def build_workspace_service(workspace_root: Path) -> WorkspaceService:
 def build_spec_context_service(workspace_root: Path) -> SpecContextService:
     _guard_initialized(workspace_root)
     states = _states_dir(workspace_root)
-    # The specs/ canon fold is injected here (P-07: spec_context never imports its
-    # sibling feature); imported lazily because `features.specs` pulls the doctor's
-    # jsonschema stack, which every other CLI command does without.
+    # Injected so spec_context never imports its sibling feature; lazy because
+    # `features.specs` pulls the doctor's jsonschema stack every other command skips.
     from dadaia_workspace.features.specs.canon import scaffold as scaffold_specs
 
     return SpecContextService(

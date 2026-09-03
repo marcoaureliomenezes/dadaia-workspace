@@ -30,7 +30,7 @@ from dadaia_workspace.infrastructure.privacy_check import (
     scan_file_for_secrets as _scan_file_for_secrets,
 )
 
-# Scoped-law source (repo AGENTS.md, tests/AGENTS.md) — lives inside the installed package
+# Scoped-law templates (`scoped_law.py`'s table) live inside the installed package
 _PUBLIC_DIR = Path(__file__).parent.parent.parent / "public"
 
 _log = logging.getLogger(__name__)
@@ -466,12 +466,9 @@ class SpecContextService:
         # docker-compose.yml). `touched` accumulates only those repo-relative paths.
         touched: list[str] = []
 
-        # specs/ is the canon fold, rendered in place (bug context-alive-copies-scaffold-
-        # image-bypassing-canon-fold): the same fold `dadaia specs init` runs, so an
-        # alive-born tree is doctor-clean at birth. The fold never overwrites an existing
-        # entry; a pre-existing tree is snapshotted first anyway (FR-S06 safe-preserve)
-        # and the snapshot dropped when nothing was added. Only the files the fold wrote
-        # are staged — a pre-existing specs/ may carry its own unrelated dirty files.
+        # The same canon fold `dadaia specs init` runs, so an alive-born tree is
+        # doctor-clean at birth; it never overwrites an existing entry, and only the
+        # files it wrote are staged — a pre-existing specs/ may carry unrelated dirt.
         specs_dir = self._specs_dir(repo_slug)
         preserved = _backup.preserve_specs(specs_dir) if specs_dir.exists() else None
         created = self._scaffold_specs(specs_dir, project_name=repo_slug)

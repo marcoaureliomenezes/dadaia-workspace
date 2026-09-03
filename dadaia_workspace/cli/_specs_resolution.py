@@ -117,13 +117,8 @@ def resolve_specs_dir_for_cli(specs_dir: str | None) -> Path:
 
 
 def resolve_session_id_for_cli() -> str:
-    """This process's own session identity through the ONE session-id rule
-    (:func:`dadaia_workspace.core.invocation.resolve_session_id` over ``os.environ``; no
-    hook payload — a CLI entrypoint). ``""`` when no channel resolves. A git-hook-spawned
-    ``dadaia ci`` child sees only the environment the harness exported into the shell
-    that ran ``git commit`` (its native id, never ``DADAIA_SESSION_ID``), so this seam is
-    the only way it recognises its own presence record
-    (``pre-commit-presence-advisory-names-the-committing-session-itself``)."""
+    """This process's own session id through the one rule over ``os.environ``
+    (no hook payload: a CLI entrypoint); ``""`` when no channel resolves."""
     return _core_resolve_session_id(None, os.environ)
 
 

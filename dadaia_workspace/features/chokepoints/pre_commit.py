@@ -14,15 +14,9 @@ drop out of the import-linter ``ignore_imports`` list entirely (v0.5.1 K7): the 
 composition root (``cli/commands/ci.py``) passes ``presence.others_alive`` directly —
 zero adapter needed, since the injected callable's signature already matches it.
 
-*own_sid* is the committing session's identity as the composition root resolved it
-through the ONE session-id rule (``core.invocation.resolve_session_id``, reached via the
-CLI seam ``cli._specs_resolution.resolve_session_id_for_cli`` — the write gate resolves
-presence self-exclusion with the same rule). A git hook is a harness-FREE child: no hook
-payload, only the environment the harness exported into the shell that ran
-``git commit`` (its native id, never ``DADAIA_SESSION_ID``), so a narrower read left the
-session's own presence record indistinguishable from a foreign one (bug
-``pre-commit-presence-advisory-names-the-committing-session-itself``). An empty
-*own_sid* excludes nothing — an unidentified committer sees every live record as foreign.
+*own_sid* is the committing session's identity as the composition root resolved it;
+an empty value excludes nothing, so an unidentified committer sees every live record as
+foreign.
 """
 
 from __future__ import annotations
