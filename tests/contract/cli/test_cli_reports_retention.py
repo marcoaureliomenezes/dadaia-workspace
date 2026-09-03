@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — dadaia reports status / cleanup / mark-important (DADAIA §5.4 retention)"""
+"""Intent: CONTRACT — dadaia reports status / cleanup / mark-important (DADAIA §5.4 retention); reports-cleanup-skips-handoffs-without-artifact-path"""
 
 from __future__ import annotations
 
@@ -117,3 +117,64 @@ def test_reports_cleanup_rejects_invalid_or_non_positive_duration(
     assert "greater than zero" in zero.output
     assert negative.exit_code == 2
     assert "greater than zero" in negative.output
+
+
+def _handoff_first(workspace: Path, slug: str, produced_at: dt.datetime) -> Path:
+    stamp = produced_at.strftime("%Y-%m-%dT%H%M%SZ")
+    handoff = (
+        workspace / ".dadaia" / "handoff" / "ctx" / f"{stamp}-software-engineer-{slug}.handoff.json"
+    )
+    handoff.parent.mkdir(parents=True, exist_ok=True)
+    handoff.write_text(
+        json.dumps(
+            {
+                "schema_version": "handoff-v1.2",
+                "agent": "software-engineer",
+                "context": "ctx",
+                "produced_at": produced_at.isoformat().replace("+00:00", "Z"),
+                "scope": slug,
+                "metrics": {},
+                "artifact": {"type": "other"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    return handoff
+
+
+def test_reports_cleanup_sweeps_and_status_counts_handoff_first_handoffs(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Intent: CONTRACT — reports-cleanup-skips-handoffs-without-artifact-path.
+
+    A handoff-first handoff (no ``artifact.path`` — the default emission, DADAIA §5.4)
+    older than ``--older-than`` is a cleanup candidate and a stale handoff in ``status``;
+    a younger one is counted and survives the real sweep.
+    """
+    _init_workspace(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    expired = _handoff_first(tmp_path, "expired", dt.datetime(2026, 6, 1, tzinfo=dt.UTC))
+    fresh = _handoff_first(tmp_path, "fresh", dt.datetime.now(tz=dt.UTC))
+
+    status = _runner.invoke(app, ["reports", "status", "--older-than", "30d", "--json"])
+    assert status.exit_code == 0, status.output
+    counters = json.loads(status.output)
+    assert counters["report_count"] == 0
+    assert counters["stale_handoff_count"] == 1
+    assert counters["orphan_handoff_count"] == 2
+
+    dry_run = _runner.invoke(
+        app, ["reports", "cleanup", "--older-than", "30d", "--dry-run", "--json"]
+    )
+    assert dry_run.exit_code == 0, dry_run.output
+    dry_payload = json.loads(dry_run.output)
+    assert [[Path(p) for p in c["paths"]] for c in dry_payload["candidates"]] == [
+        [expired.resolve()]
+    ]
+    assert expired.exists()
+
+    result = _runner.invoke(app, ["reports", "cleanup", "--older-than", "30d", "--json"])
+    assert result.exit_code == 0, result.output
+    assert [Path(p) for p in json.loads(result.output)["deleted_paths"]] == [expired.resolve()]
+    assert not expired.exists()
+    assert fresh.exists()

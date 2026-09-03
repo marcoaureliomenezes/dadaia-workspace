@@ -1,4 +1,4 @@
-"""Intent: CONTRACT — features/reports/retention cleanup (symlink safety, malformed sidecar, important preservation)"""
+"""Intent: CONTRACT — features/reports/retention cleanup (symlink safety, malformed sidecar, important preservation); reports-cleanup-skips-handoffs-without-artifact-path"""
 
 from __future__ import annotations
 
@@ -80,3 +80,45 @@ def test_cleanup_contract_preserves_important_orphan_and_malformed_handoffs(
     assert result.deleted_paths == ()
     assert orphan.exists()
     assert malformed.exists()
+
+
+def _handoff(tmp_path: Path, slug: str, doc: dict[str, object]) -> Path:
+    handoff = tmp_path / ".dadaia" / "handoff" / "ctx" / f"{slug}.handoff.json"
+    handoff.parent.mkdir(parents=True, exist_ok=True)
+    handoff.write_text(json.dumps(doc), encoding="utf-8")
+    return handoff
+
+
+def test_cleanup_contract_every_handoff_is_a_retention_node_paired_or_not(
+    tmp_path: Path,
+) -> None:
+    """Intent: CONTRACT — reports-cleanup-skips-handoffs-without-artifact-path.
+
+    One index over every handoff: a handoff without ``artifact.path`` and a handoff whose
+    artifact lives outside ``.dadaia/reports/`` age, count and expire exactly like an
+    artifact-bearing one; ``mark_important`` on either keys the protection by the
+    handoff's own ref; a younger handoff is counted and survives.
+    """
+    old = "2026-06-01T00:00:00Z"
+    audit = {"path": "repos/ctx/specs/audits/20260601-x/AUDIT.md"}
+    expired = _handoff(tmp_path, "expired", {"produced_at": old})
+    audited = _handoff(tmp_path, "audited", {"produced_at": old, "artifact": audit})
+    kept = _handoff(tmp_path, "kept", {"produced_at": old, "artifact": audit})
+    fresh = _handoff(tmp_path, "fresh", {"produced_at": "2026-06-04T11:00:00Z"})
+    service = _service(tmp_path)
+
+    kept_ref = service.mark_important(".dadaia/handoff/ctx/kept.handoff.json")
+
+    assert kept_ref == ".dadaia/handoff/ctx/kept.handoff.json"
+    candidates = service.cleanup_candidates()
+    assert sorted(p for c in candidates for p in c.paths) == sorted([expired, audited])
+    status = service.status()
+    assert status["report_count"] == 0
+    assert status["stale_handoff_count"] == 2
+    assert status["orphan_handoff_count"] == 4
+
+    result = service.cleanup()
+
+    assert sorted(result.deleted_paths) == sorted([expired, audited])
+    assert kept.exists()
+    assert fresh.exists()

@@ -48,6 +48,7 @@ __all__ = [
     "ValidationResult",
     "discover_handoff_paths",
     "load_schema",
+    "path_timestamp",
     "scan_handoffs",
     "validate_schema_shape",
 ]
@@ -415,19 +416,13 @@ class Handoff:
         return None
 
     def effective_timestamp(self) -> datetime:
-        """``produced_at`` if parseable, else the filename's leading UTC timestamp, else mtime."""
+        """``produced_at`` if parseable, else :func:`path_timestamp` of the file itself."""
         produced_at = self.produced_at
         if produced_at:
             parsed = _parse_datetime(produced_at)
             if parsed is not None:
                 return parsed
-        parsed = _parse_datetime_from_name(self.path.name)
-        if parsed is not None:
-            return parsed
-        try:
-            return datetime.fromtimestamp(self.path.stat().st_mtime, tz=UTC)
-        except OSError:
-            return datetime.now(tz=UTC)
+        return path_timestamp(self.path)
 
     def expires_at(self, ttl: timedelta) -> datetime:
         """``effective_timestamp() + ttl`` — the one TTL-expiry rule."""
@@ -625,6 +620,21 @@ def _parse_datetime_from_name(name: str) -> datetime | None:
         return None
     raw = match.group(1)
     return _parse_datetime(f"{raw[:13]}:{raw[13:15]}:{raw[15:]}")
+
+
+def path_timestamp(path: Path) -> datetime:
+    """The filename's leading UTC stamp (``<YYYY-MM-DDTHHMMSSZ>-…``), else mtime, else now.
+
+    The one age rule for a runtime artifact that carries no ``produced_at`` of its own —
+    a report under ``.dadaia/reports/`` or a handoff whose document is unreadable.
+    """
+    parsed = _parse_datetime_from_name(path.name)
+    if parsed is not None:
+        return parsed
+    try:
+        return datetime.fromtimestamp(path.stat().st_mtime, tz=UTC)
+    except OSError:
+        return datetime.now(tz=UTC)
 
 
 # ---------------------------------------------------------------------------
