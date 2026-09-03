@@ -42,7 +42,7 @@
   Blocked by: T-046-17. Delivers: `dadaia specs init` in a fresh dir yields three blocks and
   `dadaia specs doctor` reports no FIXED-*; a bind's bootstrap prefix carries the two memory
   blocks — AC11 (its lib-memory clause completes at closure).
-- [-] T-046-18 — FR1+FR2+FR4, the law in one act: `DADAIA.md` §7.6 (7 bullets), §7.2
+- [x] T-046-18 — FR1+FR2+FR4, the law in one act: `DADAIA.md` §7.6 (7 bullets), §7.2
   tombstone line, §6.7 byte ceiling, §10.2 glossary (`slop`, `ratchet`, `fixed section`);
   `constitution.md` §12 -> 3 bullets + pointer, `:11` deleted, §16 reduced, 5.1.0, then
   `dadaia specs doctor --fix` appends the `slop-law` block; `tests/AGENTS.md` and
@@ -63,7 +63,7 @@
   pointers, and the constitution carries its fixed block — AC1, AC2, AC4 (its Intent-taxonomy
   line completes at T-046-20); `public doctor` `[ok]`, `pytest -k "behavior_map or
   memory_two_tier_shape"` green.
-- [ ] T-046-19 — FR5+FR6, detection and its readers: new sibling `dd-code-review/SLOP.md`
+- [x] T-046-19 — FR5+FR6, detection and its readers: new sibling `dd-code-review/SLOP.md`
   (S1-S10: signal, diff check, severity, fix direction; the verdict rule that S4/S5/S8
   findings answer Axis 3 "increased"; the reader list); `dd-code-review/SKILL.md` §2 pointer
   + §4 verdict line; pointer/bullet edits in `dd-test-stewardship` (mock only at the
@@ -106,7 +106,7 @@
   Blocked by: none. Delivers: a push that grows any of the four counts goes red in
   preflight, and `repos/dadaia-workspace/{AGENTS.md,tests/AGENTS.md}` load in Claude Code
   through their `CLAUDE.md` bridges — AC7, AC4's Intent-taxonomy line.
-- [ ] T-046-21 — FR8, GC at closure: `dd-release-implementation/RC-FLOW.md` step 8 gains
+- [-] T-046-21 — FR8, GC at closure: `dd-release-implementation/RC-FLOW.md` step 8 gains
   `dadaia reports cleanup --older-than 30d` and `dadaia tmp gc`, scope line "this
   candidate's own artifacts, plus the 30-day sweep"; run both once on the instance now
   (runtime, not committed); `behavior-map.json` dd-release-implementation hash re-recorded;
@@ -118,7 +118,7 @@
   copies; runtime, uncommitted: .dadaia/handoff/**, .dadaia/tmp/**.
   Blocked by: none. Delivers: `find .dadaia/handoff -name '*.handoff.json' -mtime +30 | wc
   -l` = 0, and every future closure repeats it — AC8.
-- [ ] T-046-22 — FR9, test curation batch 1 = `tests/contract` (37 files without
+- [-] T-046-22 — FR9, test curation batch 1 = `tests/contract` (37 files without
   `Intent:`): `qa-engineer` issues the curation verdict per file (declare `Intent:`, or
   delete with the criterion and the `file:line` of the coverage that replaces it);
   `software-engineer` executes; V31's contract pin drops to 0 in the same commit. Unit and
