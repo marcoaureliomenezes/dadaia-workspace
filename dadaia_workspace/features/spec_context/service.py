@@ -7,6 +7,7 @@ import shutil
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Protocol
 
 from dadaia_workspace.core import specs_backup as _backup
 from dadaia_workspace.core.exceptions import (
@@ -29,11 +30,20 @@ from dadaia_workspace.infrastructure.privacy_check import (
     scan_file_for_secrets as _scan_file_for_secrets,
 )
 
-# Canonical scaffold source — lives inside the installed package
+# Scoped-law source (repo AGENTS.md, tests/AGENTS.md) — lives inside the installed package
 _PUBLIC_DIR = Path(__file__).parent.parent.parent / "public"
-_SCAFFOLD_SRC = _PUBLIC_DIR / "scaffold"
 
 _log = logging.getLogger(__name__)
+
+
+class ScaffoldSpecs(Protocol):
+    """The ONE canon fold ``alive()`` scaffolds ``specs/`` through — the shape of
+    ``features.specs.canon.scaffold``, injected by the composition root (P-07: features
+    compose through the container, never a sibling import). It writes every canon entry
+    missing from *specs_dir*, never overwrites one, and returns the paths it wrote.
+    """
+
+    def __call__(self, specs_dir: Path, *, project_name: str) -> list[Path]: ...
 
 
 class DeadReviewRequiredError(DadaiaError):
@@ -117,50 +127,18 @@ def _now() -> str:
     return datetime.now(tz=UTC).isoformat()
 
 
-def _merge_scaffold_into(
-    scaffold_src: Path,
-    target_dir: Path,
-    *,
-    timestamp: str | None = None,
-) -> list[str]:
-    """Walk *scaffold_src* and copy only files/dirs that are MISSING in *target_dir*.
-
-    Never overwrites any existing file.  Returns the list of relative paths that were
-    added (empty list when nothing was missing).
-
-    If *timestamp* is None the current UTC time is used.  Callers may inject a fixed
-    timestamp for deterministic testing.
-    """
-    if timestamp is None:
-        timestamp = datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%SZ")
-
-    added: list[str] = []
-    for src_path in scaffold_src.rglob("*"):
-        rel = src_path.relative_to(scaffold_src)
-        dst_path = target_dir / rel
-        if src_path.is_dir():
-            if not dst_path.exists():
-                dst_path.mkdir(parents=True, exist_ok=True)
-                _log.info("scaffold merge: created directory %s", rel)
-        else:
-            if not dst_path.exists():
-                dst_path.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(str(src_path), str(dst_path))
-                added.append(str(rel))
-                _log.info("scaffold merge: added missing file %s", rel)
-    return added
-
-
 class SpecContextService:
     def __init__(
         self,
         context_store: JsonContextStore,
         git_client: GitSubprocessClient,
         workspace_root: Path,
+        scaffold_specs: ScaffoldSpecs,
     ) -> None:
         self._store = context_store
         self._git = git_client
         self._workspace_root = workspace_root
+        self._scaffold_specs = scaffold_specs
 
     def _repos_dir(self) -> Path:
         return self._workspace_root / "repos"
@@ -488,33 +466,22 @@ class SpecContextService:
         # docker-compose.yml). `touched` accumulates only those repo-relative paths.
         touched: list[str] = []
 
+        # specs/ is the canon fold, rendered in place (bug context-alive-copies-scaffold-
+        # image-bypassing-canon-fold): the same fold `dadaia specs init` runs, so an
+        # alive-born tree is doctor-clean at birth. The fold never overwrites an existing
+        # entry; a pre-existing tree is snapshotted first anyway (FR-S06 safe-preserve)
+        # and the snapshot dropped when nothing was added. Only the files the fold wrote
+        # are staged — a pre-existing specs/ may carry its own unrelated dirty files.
         specs_dir = self._specs_dir(repo_slug)
-        if not specs_dir.exists():
-            if _SCAFFOLD_SRC.exists():
-                shutil.copytree(_SCAFFOLD_SRC, specs_dir)
-            else:
-                for subdir in ("", "memory", "features"):
-                    (specs_dir / subdir).mkdir(parents=True, exist_ok=True)
-            # Entirely new tree — every path under it is scaffold-authored.
-            touched.append("specs")
-        elif _SCAFFOLD_SRC.exists():
-            preserved = _backup.preserve_specs(specs_dir)
-            added = _merge_scaffold_into(_SCAFFOLD_SRC, specs_dir)
-            if added:
-                _log.info(
-                    "scaffold merge into pre-existing specs/: %d file(s) added: %s "
-                    "(pre-existing tree preserved at %s)",
-                    len(added),
-                    added,
-                    preserved,
-                )
-                # Pre-existing specs/ may carry its own unrelated dirty files — stage
-                # only the individual files the merge actually added, never the whole
-                # directory.
-                touched.extend(Path("specs", rel).as_posix() for rel in added)
-            else:
-                shutil.rmtree(preserved, ignore_errors=True)
-                _log.info("scaffold merge into pre-existing specs/: no missing files found")
+        preserved = _backup.preserve_specs(specs_dir) if specs_dir.exists() else None
+        created = self._scaffold_specs(specs_dir, project_name=repo_slug)
+        touched.extend(path.relative_to(repo_path).as_posix() for path in created)
+        if preserved is not None and not created:
+            shutil.rmtree(preserved, ignore_errors=True)
+            preserved = None
+        _log.info(
+            "scaffold: %d canon file(s) added to specs/; snapshot: %s", len(created), preserved
+        )
 
         # Scoped-law placement (repo AGENTS.md + tests/AGENTS.md) — one home (F013):
         # features.spec_context.scoped_law owns the hardened install-if-absent writes.

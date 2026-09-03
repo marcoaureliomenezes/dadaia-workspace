@@ -33,6 +33,7 @@ from dadaia_workspace.features.spec_context.service import (  # noqa: E402
     DeadSecretFoundError,
     SpecContextService,
 )
+from dadaia_workspace.features.specs.canon import scaffold as canon_scaffold  # noqa: E402
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient  # noqa: E402
 from tests.fakes import FakeContextStore  # noqa: E402
 
@@ -80,6 +81,7 @@ def _make_service(workspace_root: Path) -> tuple[SpecContextService, FakeContext
         context_store=store,
         git_client=_WritableObjectsGitClient(),
         workspace_root=workspace_root,
+        scaffold_specs=canon_scaffold,
     )
     return service, store
 
@@ -215,6 +217,7 @@ def test_dead_proceeds_gitignored_clean_tree_and_readonly_objects_real_git(
         context_store=store2,
         git_client=_WritableObjectsGitClient(),
         workspace_root=workspace_root,
+        scaffold_specs=canon_scaffold,
     )
     _alive_ctx(store2, "proj-repo-clean")
     _make_tree_writable(repo2)
@@ -235,6 +238,7 @@ def test_dead_proceeds_gitignored_clean_tree_and_readonly_objects_real_git(
         context_store=store3,
         git_client=GitSubprocessClient(),
         workspace_root=workspace_root,
+        scaffold_specs=canon_scaffold,
     )
     _alive_ctx(store3, "proj-readonly")
 
