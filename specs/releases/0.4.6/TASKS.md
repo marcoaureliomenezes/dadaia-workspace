@@ -19,7 +19,7 @@
   Write set: specs/ADRs/decisions.jsonl.
   Blocked by: none. Delivers: the operator has one decision to accept or refuse; every later
   task cites an existing id — `pytest -k adr_canon` green.
-- [ ] T-046-23 — FR10, fixed law sections: fragments `public/scaffold/fixed/{slop-law,
+- [-] T-046-23 — FR10, fixed law sections: fragments `public/scaffold/fixed/{slop-law,
   slop-code,slop-tests}.md` (SPEC §3.1, byte-exact); marker pairs in the scaffold
   `constitution.md` (new last section, replacing `:86` and the `:146` phrase) and
   `memory/{ARCHITECTURE,QUALITY}.md` (last subsection, replacing QUALITY `:21-23`);
@@ -80,7 +80,7 @@
   Blocked by: T-046-18. Delivers: a reviewer opens one file and names a slop finding with
   `file:line`, signal id and fix direction — AC5, AC6; `pytest -k "behavior_map or
   reviewer_persona_review_allowlist"` green.
-- [ ] T-046-20 — FR7, the numbers and the bridges: V31 replaces V27 in place in
+- [-] T-046-20 — FR7, the numbers and the bridges: V31 replaces V27 in place in
   `tests/contract/test_test_suite_ratchets.py` (same `tracked_test_files()` enumeration,
   ceiling on undeclared files per tier, `e2e = 0`, down only, mutation fixture);
   `tests/scripts/check_test_intent_declared.py` and
