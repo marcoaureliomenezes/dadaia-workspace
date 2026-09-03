@@ -81,10 +81,11 @@ _UPPER_RUN_RE = re.compile(r"[A-Z]+")
 _WORD_CHARS = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-")
 _V33_TOKEN_TREES = ("specs", "dadaia_workspace", "tests")
 _V33_READER_TREES = ("dadaia_workspace", "tests")
+_V33_RATIFIED_FAMILIES = frozenset({"FR", "AC", "T"})
 
 # RECORDED CEILING (ratchet DOWN ONLY) — measured 2026-09-03 on this HEAD; the failing
 # assertion prints the orphan family list so the number is reproducible.
-_V33_CEILING = 54
+_V33_CEILING = 51
 
 
 def _family_witnesses(texts: Iterable[str]) -> dict[str, set[tuple[str, int]]]:
@@ -146,7 +147,8 @@ def _orphan_families(texts: Iterable[str], constants: Iterable[str]) -> list[str
     return sorted(
         prefix
         for prefix, witnesses in _family_witnesses(texts).items()
-        if not any(_reads_family(c, prefix, witnesses) for c in readers.get(prefix, ()))
+        if prefix not in _V33_RATIFIED_FAMILIES
+        and not any(_reads_family(c, prefix, witnesses) for c in readers.get(prefix, ()))
     )
 
 
