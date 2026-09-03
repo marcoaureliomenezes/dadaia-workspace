@@ -85,7 +85,9 @@ def test_check_reports_a_missing_library_fragment_as_a_non_fixable_error(tmp_pat
     (public / "data" / "fixed").mkdir(parents=True)
     specs = _specs(tmp_path, constitution="# C\n", architecture="# A\n", quality="# Q\n")
     issues = MemoryValidator(specs).check_fixed_sections(public)
-    assert [(i.code, i.severity, i.fixable) for i in issues] == [("FIXED-1", Severity.ERROR, False)] * 3
+    assert [(i.code, i.severity, i.fixable) for i in issues] == [
+        ("FIXED-1", Severity.ERROR, False)
+    ] * 3
     assert all("library fragment" in i.description for i in issues)
 
 
