@@ -38,6 +38,7 @@ from dadaia_workspace.core.invocation import resolve as _resolve_invocation
 from dadaia_workspace.core.invocation import (
     resolve_context_specs_dir as _core_resolve_context_specs_dir,
 )
+from dadaia_workspace.core.invocation import resolve_session_id as _core_resolve_session_id
 from dadaia_workspace.core.invocation import resolve_specs_dir as _core_resolve_specs_dir
 from dadaia_workspace.core.invocation import sanitize_session_id as _sanitize_session_id
 
@@ -113,6 +114,17 @@ def resolve_context_specs_dir_for_cli(workspace_root: Path, context: str) -> Pat
 def resolve_specs_dir_for_cli(specs_dir: str | None) -> Path:
     """Resolve the target specs/ dir (explicit flag, else the resolution authority)."""
     return _core_resolve_specs_dir(specs_dir)
+
+
+def resolve_session_id_for_cli() -> str:
+    """This process's own session identity through the ONE session-id rule
+    (:func:`dadaia_workspace.core.invocation.resolve_session_id` over ``os.environ``; no
+    hook payload — a CLI entrypoint). ``""`` when no channel resolves. A git-hook-spawned
+    ``dadaia ci`` child sees only the environment the harness exported into the shell
+    that ran ``git commit`` (its native id, never ``DADAIA_SESSION_ID``), so this seam is
+    the only way it recognises its own presence record
+    (``pre-commit-presence-advisory-names-the-committing-session-itself``)."""
+    return _core_resolve_session_id(None, os.environ)
 
 
 def resolve_workspace_root_for_cli(target_path: Path) -> Path:
