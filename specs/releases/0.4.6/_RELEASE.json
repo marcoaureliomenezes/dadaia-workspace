@@ -1,7 +1,7 @@
 {
   "schema": "release-state-v1",
   "release": "0.4.6",
-  "phase": "DEFINITION",
+  "phase": "IMPLEMENTATION",
   "rc": 2,
   "defined": {
     "sha": null,
