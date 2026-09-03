@@ -116,7 +116,7 @@
 - The release version = last published PyPI + 1 patch, minted at birth; it increments ONLY at operator-approved deploy (ADR 0005).
 - `rc-N/` is an archived candidate folder under the live release (`dadaia release rc-archive`), never a branch name and never a scaffolded sub-phase.
 - Each candidate closure burns one `feature -> develop` merge; after it the agent asks the operator: promote (deploy) or continue (archive the trio to `rc-N/`, stack more backlog/bugs/findings).
-- Both PRs require an APPROVED `security-reviewer` verdict on the PR head sha, consumed once by the merge and deleted after — a survivor counts as slop (§7.6).
+- Both PRs need an APPROVED `security-reviewer` verdict on the PR head sha, consumed once by the merge, then deleted; a survivor is slop (§7.6).
 - Ship-PR verdict names develop's tip, staged on the feature branch before the final `rc` merge.
 - Every flow stage runs on `feature/{M.m.p}`; `develop`/`main` are PR targets only, never a working branch.
 - Suggest CI/CD automation of this contract to the operator; mechanics: `dd-gitflow-default`.

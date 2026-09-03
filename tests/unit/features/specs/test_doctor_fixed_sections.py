@@ -80,11 +80,13 @@ def test_check_is_a_no_op_for_an_absent_file(tmp_path: Path) -> None:
     assert [(i.code, Path(i.path or "").name) for i in issues] == [("FIXED-1", "constitution.md")]
 
 
-def test_check_skips_a_section_whose_fragment_the_public_dir_lacks(tmp_path: Path) -> None:
+def test_check_reports_a_missing_library_fragment_as_a_non_fixable_error(tmp_path: Path) -> None:
     public = tmp_path / "public"
     (public / "data" / "fixed").mkdir(parents=True)
     specs = _specs(tmp_path, constitution="# C\n", architecture="# A\n", quality="# Q\n")
-    assert MemoryValidator(specs).check_fixed_sections(public) == []
+    issues = MemoryValidator(specs).check_fixed_sections(public)
+    assert [(i.code, i.severity, i.fixable) for i in issues] == [("FIXED-1", Severity.ERROR, False)] * 3
+    assert all("library fragment" in i.description for i in issues)
 
 
 def test_fix_inserts_a_missing_block_and_refreshes_a_drifted_one(tmp_path: Path) -> None:

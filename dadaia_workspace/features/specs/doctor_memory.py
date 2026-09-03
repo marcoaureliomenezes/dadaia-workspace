@@ -258,6 +258,18 @@ class MemoryValidator:
             try:
                 fragment = memory_canon.read_fixed_fragment(fragments_dir, section_id)
             except FileNotFoundError:
+                issues.append(
+                    SpecsDoctorIssue(
+                        code="FIXED-1",
+                        severity=Severity.ERROR,
+                        description=(
+                            f"{rel}: library fragment `{section_id}` is missing under "
+                            f"{fragments_dir} — reinstall the library"
+                        ),
+                        path=str(path),
+                        fixable=False,
+                    )
+                )
                 continue
             body = memory_canon.extract_fixed_section(path.read_text(encoding="utf-8"), section_id)
             if body == fragment:
