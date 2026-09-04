@@ -128,3 +128,22 @@ def test_public_source_names_no_retired_surface() -> None:
                     hits.append(f"{rel}:{lineno}: {needle!r}")
     assert_populated(scanned, "dadaia_workspace/public/data/DADAIA.md")
     assert hits == []
+
+
+def test_dadaia_5_1_root_list_equals_root_allowed_registry() -> None:
+    """Intent: CONTRACT — 0.4.6 c4 (software-architect fidelity finding, T-046-34): the
+    `DADAIA.md` §5.1 "Root holds only" bullet names exactly
+    `ROOT_ALLOWED_DIRS | ROOT_ALLOWED_FILES` — no missing name, no extra name.
+
+    Documented != allowed was the class of bug this candidate ends (bug
+    doctor-root1-flags-env-that-dadaia-md-9-declares-canonical: the registry admitted
+    `.env`/`.gitignore`, the law did not name them). The law is hand-written today; this
+    test is the ratchet until a renderer derives the bullet from the registry.
+    """
+    from dadaia_workspace.core.workspace_layout import ROOT_ALLOWED_DIRS, ROOT_ALLOWED_FILES
+
+    law = (_PUBLIC_ROOT / "data" / "DADAIA.md").read_text(encoding="utf-8")
+    bullets = [ln for ln in law.splitlines() if ln.startswith("- Root holds only: `")]
+    assert len(bullets) == 1, bullets
+    listed = bullets[0].split("`")[1].split()
+    assert set(listed) == {f"{d}/" for d in ROOT_ALLOWED_DIRS} | set(ROOT_ALLOWED_FILES)

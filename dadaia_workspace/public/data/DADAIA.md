@@ -127,7 +127,7 @@
 
 ### 5.1 Workspace root
 
-- Root holds only: `.agents/ .claude/ .codex/ .dadaia/ .kimi-code/ repos/ AGENTS.md CLAUDE.md DADAIA.md prompt.md`.
+- Root holds only: `.agents/ .claude/ .codex/ .dadaia/ .kimi-code/ repos/ .env .gitignore AGENTS.md CLAUDE.md DADAIA.md prompt.md`.
 - Anything the operator created by hand stays, permanently.
 - A tool needing another root or harness-dir entry gets a documented glob in `.dadaia/states/instance_exceptions.txt`.
 
