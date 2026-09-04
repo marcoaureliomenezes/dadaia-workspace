@@ -5,6 +5,7 @@ CLI receives `--workspace` explicitly so the resolver never walks up from cwd.
 """
 
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -86,3 +87,38 @@ def test_import_refuses_a_file_outside_the_contract(tmp_path: Path) -> None:
 
     assert result.exit_code == 1
     assert "Error" in result.output
+
+
+def _real_checkout(repo: Path, branch: str) -> None:
+    for args in (
+        ["init", "-q", "-b", "main"],
+        ["config", "user.email", "test@test"],
+        ["config", "user.name", "test"],
+        ["commit", "-q", "--allow-empty", "-m", "init"],
+        ["checkout", "-q", "-b", branch],
+    ):
+        subprocess.run(["git", *args], cwd=repo, capture_output=True, text=True, check=True)
+
+
+def test_export_refreshes_an_alive_context_branch_from_its_real_checkout(tmp_path: Path) -> None:
+    """Intent: CONTRACT — AC11 (FR13): an ALIVE context's `branch` is re-read from the repo's
+    real checked-out HEAD at export time, superseding the stale store value, in both the
+    store and the exported record.
+
+    Size: MEDIUM — a real `git init`/`checkout` under `repos/<slug>` drives the real
+    `GitSubprocessClient` through the CLI; ported from the retired tar-era e2e
+    (tests/e2e/features/test_branch_tracking.py) when T-046-31 removed the archive."""
+    source = _workspace(tmp_path / "source")
+    source.save(_ctx("alpha", ContextState.ALIVE))  # the store still says "develop"
+    repo = tmp_path / "source" / "repos" / "alpha"
+    repo.mkdir(parents=True)
+    _real_checkout(repo, "feature/test")
+
+    exported = _runner.invoke(app, ["export", "--workspace", str(tmp_path / "source")])
+    assert exported.exit_code == 0, exported.output
+
+    file = tmp_path / "source" / ".dadaia" / "dist" / "spec-contexts.json"
+    payload = json.loads(file.read_text("utf-8"))
+    assert [(c["name"], c["branch"]) for c in payload["contexts"]] == [("alpha", "feature/test")]
+    alpha = source.get("alpha")
+    assert alpha is not None and alpha.current_branch == "feature/test"
