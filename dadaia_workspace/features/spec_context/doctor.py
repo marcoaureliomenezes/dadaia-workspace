@@ -20,6 +20,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
+from functools import partial
 from pathlib import Path, PurePosixPath
 
 from dadaia_workspace.core import session_store, workspace_layout
@@ -427,7 +428,8 @@ class DoctorService:
         assert zone.ttl_seconds is not None
         entries = self._entries(directory)
         if not entries:
-            return not is_zone_root and self._older_than(directory, now, zone.ttl_seconds)
+            mtime = self._mtime(directory)
+            return not is_zone_root and mtime is not None and now - mtime > zone.ttl_seconds
         all_expired = True
         for entry in entries:
             if entry.is_dir() and not entry.is_symlink():
@@ -444,7 +446,10 @@ class DoctorService:
                 else:
                     all_expired = False
                 continue
-            age = now - entry.lstat().st_mtime
+            mtime = self._mtime(entry)
+            if mtime is None:
+                continue
+            age = now - mtime
             if is_zone_root and entry.name == "AGENTS.md":
                 # The zone's own law file is canon by projection, never a TTL candidate
                 # (bug public-install-restores-expired-zone-agents).
@@ -460,16 +465,23 @@ class DoctorService:
         return all_expired
 
     @staticmethod
-    def _older_than(path: Path, now: float, ttl_seconds: int) -> bool:
-        return now - path.lstat().st_mtime > ttl_seconds
+    def _mtime(path: Path) -> float | None:
+        """``lstat`` mtime, or ``None`` for an entry that vanished between ``iterdir`` and
+        ``lstat`` — absent, never an exception (bug
+        doctor-scan-raises-when-a-ttl-entry-vanishes-mid-walk)."""
+        try:
+            return path.lstat().st_mtime
+        except OSError:
+            return None
 
     # ------------------------------------------------------------------
     # fix() — the one reaper, in the fixed FR4 order
     # ------------------------------------------------------------------
 
     def fix(self, *, expired_only: bool = False) -> list[str]:
-        """presence.gc -> session reap -> seed missing -> delete expired -> [stop] ->
-        delete slop -> remove dead contexts' repos (INV-5)."""
+        """presence.gc -> session reap -> migrate -> seed missing -> delete expired -> [stop]
+        -> delete slop -> remove dead contexts' repos (INV-5). Every step on an entry runs
+        through ``_guarded``: it reports what it did or that it skipped, never aborts."""
         actions: list[str] = []
 
         # presence.gc() is the ONE reaper of stale presence records, throttle/sentinel
@@ -491,8 +503,9 @@ class DoctorService:
         findings = self.scan()
         for finding in findings:
             if finding.verdict is FindingVerdict.MISSING and finding.fixable:
-                self._seed(finding)
-                actions.append(f"{finding.code}: created '{finding.path}'")
+                actions.extend(
+                    self._guarded(finding.code, finding.path, partial(self._seed, finding))
+                )
         actions.extend(self._delete(findings, FindingVerdict.EXPIRED))
         if expired_only:
             return actions
@@ -511,6 +524,17 @@ class DoctorService:
             actions.append(f"Removed stale repo '{ctx.repo_slug}' for dead context '{ctx.name}'")
         return actions
 
+    @staticmethod
+    def _guarded(code: str, path: str, step: Callable[[], str | None]) -> list[str]:
+        """One action line per step — what the step reports, or ``skipped`` with the errno
+        when the process cannot perform it; the pass never aborts (bug
+        doctor-fix-aborts-whole-pass-on-first-undeletable-entry, every fix step alike)."""
+        try:
+            done = step()
+        except OSError as exc:
+            return [f"{code}: skipped '{path}' (errno {exc.errno}: {exc.strerror})"]
+        return [] if done is None else [f"{code}: {done}"]
+
     def _migrate_exceptions(self) -> list[str]:
         """FR6: ``root_exceptions.txt`` -> ``INSTANCE_EXCEPTIONS`` through the one parser;
         deleted in the release after every consumer has run it."""
@@ -518,14 +542,16 @@ class DoctorService:
         new = self._workspace_root / workspace_layout.INSTANCE_EXCEPTIONS
         if not old.is_file() or new.exists():
             return []
-        globs = workspace_layout.parse_exception_globs(old.read_text(encoding="utf-8"))
-        new.write_text("".join(f"{g}\n" for g in globs), encoding="utf-8")
-        old.unlink()
-        return [
-            f"WS-{self._states.name}-slop: migrated '{old.name}' -> '{new.name}' ({len(globs)} globs)"
-        ]
 
-    def _seed(self, finding: Finding) -> None:
+        def migrate() -> str:
+            globs = workspace_layout.parse_exception_globs(old.read_text(encoding="utf-8"))
+            new.write_text("".join(f"{g}\n" for g in globs), encoding="utf-8")
+            old.unlink()
+            return f"migrated '{old.name}' -> '{new.name}' ({len(globs)} globs)"
+
+        return self._guarded(f"WS-{self._states.name}-slop", old.name, migrate)
+
+    def _seed(self, finding: Finding) -> str:
         """A missing zone is a directory; the missing profile is written by the one store
         writer from the L1 harnesses whose projection dir exists at the root (FR8)."""
         if finding.target == JsonHarnessProfileStore.path(self._states):
@@ -535,36 +561,31 @@ class DoctorService:
             JsonHarnessProfileStore().write(self._states, HarnessProfile.of(present))
         else:
             finding.target.mkdir(parents=True, exist_ok=True)
+        return f"created '{finding.path}'"
 
     def _delete(self, findings: tuple[Finding, ...], verdict: FindingVerdict) -> list[str]:
-        """One action per entry — ``deleted``, or ``skipped`` with the errno when the process
-        cannot remove it; the pass never aborts, so the list names exactly what happened."""
         actions: list[str] = []
         for finding in findings:
-            if finding.verdict is not verdict:
-                continue
-            try:
-                removed = self._remove(finding.target)
-            except OSError as exc:
-                reason = f"errno {exc.errno}: {exc.strerror}"
-                actions.append(f"{finding.code}: skipped '{finding.path}' ({reason})")
-                continue
-            if removed:
-                actions.append(f"{finding.code}: deleted '{finding.path}'")
+            if finding.verdict is verdict:
+                actions.extend(
+                    self._guarded(finding.code, finding.path, partial(self._remove, finding))
+                )
         return actions
 
-    def _remove(self, target: Path) -> bool:
-        """Delete *target* iff its own location (never a symlink's destination) resolves
-        inside the workspace; a symlink is unlinked, never followed."""
+    def _remove(self, finding: Finding) -> str | None:
+        """Delete the entry iff its own location (never a symlink's destination) resolves
+        inside the workspace; a symlink is unlinked, never followed; an entry already gone
+        is nothing to report."""
+        target = finding.target
         location = target.parent.resolve() / target.name
         try:
             location.relative_to(self._workspace_root.resolve())
         except ValueError:
-            return False
+            return f"skipped '{finding.path}' (outside the workspace)"
         if target.is_symlink() or target.is_file():
             target.unlink()
         elif target.is_dir():
             shutil.rmtree(target)
         else:
-            return False
-        return True
+            return None
+        return f"deleted '{finding.path}'"

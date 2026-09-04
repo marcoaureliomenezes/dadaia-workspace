@@ -39,6 +39,7 @@ from dadaia_workspace.features.spec_context.doctor import (
     FindingVerdict,
     compliance,
 )
+from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
 from tests.fakes import FakeContextStore, FakeGitClient
 
 _TTL_ZONE = zones_with_ttl()[0]
@@ -467,6 +468,40 @@ def test_symlinks_are_never_followed_and_only_the_link_is_deleted(tmp_path: Path
     assert victim.read_text(encoding="utf-8") == "keep"
 
 
+def test_ttl_walk_treats_an_entry_that_vanishes_mid_walk_as_absent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Bug doctor-scan-raises-when-a-ttl-entry-vanishes-mid-walk: an entry a parallel reaper
+    removes between ``iterdir`` and ``lstat`` — a file, or an empty directory the walk has
+    already descended into — is simply absent: no finding, no exception, and every other
+    entry is still classified."""
+    _init_workspace(tmp_path)
+    zone_dir = tmp_path / ".dadaia" / _TTL_ZONE.name
+    zone_dir.mkdir(exist_ok=True)
+    gone_file = zone_dir / "gone.txt"
+    gone_file.write_text("", encoding="utf-8")
+    gone_dir = zone_dir / "gone_dir"
+    gone_dir.mkdir()
+    (zone_dir / "kept.txt").write_text("", encoding="utf-8")
+    real_entries = DoctorService._entries
+
+    def racing_entries(directory: Path) -> list[Path]:
+        entries = real_entries(directory)
+        if directory == zone_dir:
+            gone_file.unlink()
+        elif directory == gone_dir:
+            gone_dir.rmdir()
+        return entries
+
+    monkeypatch.setattr(DoctorService, "_entries", staticmethod(racing_entries))
+
+    found = _by_path(_make_doctor(tmp_path).scan())
+
+    assert found[f"{_TTL_ZONE.name}/kept.txt"].verdict is FindingVerdict.CANON
+    assert f"{_TTL_ZONE.name}/gone.txt" not in found
+    assert f"{_TTL_ZONE.name}/gone_dir" not in found
+
+
 def test_operator_and_managed_zones_are_never_walked(tmp_path: Path) -> None:
     _init_workspace(tmp_path)
     clone = tmp_path / ".dadaia" / _OPERATOR_ZONE.name / "clone"
@@ -570,6 +605,72 @@ def test_fix_skips_and_reports_an_undeletable_entry_and_finishes_the_pass(
     assert not any("a.js" in a for a in deleted)
     assert any(f"'{_TTL_ZONE.name}/x/deps/a.js' (errno 13" in a for a in skipped), actions
     assert remaining[f"{_TTL_ZONE.name}/x/deps/a.js"].verdict is FindingVerdict.EXPIRED
+
+
+def test_fix_skips_and_reports_a_failing_migration_or_seed_and_still_deletes_expired(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Bug doctor-scan-raises-when-a-ttl-entry-vanishes-mid-walk (finding 2, same
+    skip-and-report family as doctor-fix-aborts-whole-pass-on-first-undeletable-entry): a
+    migration or seed the process cannot write is skipped and reported with its errno in the
+    same ``<code>: skipped '<path>' (errno N: …)`` shape as a deletion, and the pass still
+    reaches 'delete expired'."""
+    _init_workspace(tmp_path)
+    legacy = tmp_path / ".dadaia" / _STATE_ZONE.name / "root_exceptions.txt"
+    legacy.write_text("*.png\n", encoding="utf-8")
+    _profile(tmp_path).unlink()
+    zone_dir = tmp_path / ".dadaia" / _TTL_ZONE.name
+    zone_dir.mkdir(exist_ok=True)
+    stale = zone_dir / "stale"
+    stale.write_text("", encoding="utf-8")
+    _age(stale)
+
+    def denied(*_: object, **__: object) -> None:
+        raise PermissionError(13, "Permission denied")
+
+    monkeypatch.setattr(Path, "write_text", denied)
+    monkeypatch.setattr(JsonHarnessProfileStore, "write", denied)
+
+    actions = _make_doctor(tmp_path).fix(expired_only=True)
+
+    assert legacy.exists()
+    assert not (tmp_path / INSTANCE_EXCEPTIONS).exists()
+    assert not _profile(tmp_path).exists()
+    assert not stale.exists()
+    assert [a.split(": ", 1)[1].split(" (")[0] for a in actions] == [
+        "skipped 'root_exceptions.txt'",
+        f"skipped '{_STATE_ZONE.name}/harness_profile.json'",
+        f"deleted '{_TTL_ZONE.name}/stale'",
+    ]
+    assert all("(errno 13: Permission denied)" in a for a in actions[:2]), actions
+    assert actions[1].startswith(f"WS-{_STATE_ZONE.name}-missing: ")
+    assert actions[2] == f"WS-{_TTL_ZONE.name}-expired: deleted '{_TTL_ZONE.name}/stale'"
+
+
+def test_fix_reports_a_refusal_to_delete_outside_the_workspace(tmp_path: Path) -> None:
+    """Bug doctor-scan-raises-when-a-ttl-entry-vanishes-mid-walk (finding 6): when a zone
+    root is itself a symlink out of the workspace, the containment guard refuses the delete
+    AND says so — ``skipped '<path>' (outside the workspace)`` — instead of leaving a
+    persistent finding with no action line; the outside file is never touched."""
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    _init_workspace(ws)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    victim = outside / "old.txt"
+    victim.write_text("keep", encoding="utf-8")
+    _age(victim)
+    zone_dir = ws / ".dadaia" / _TTL_ZONE.name
+    if zone_dir.exists():
+        zone_dir.rmdir()
+    zone_dir.symlink_to(outside, target_is_directory=True)
+
+    actions = _make_doctor(ws).fix(expired_only=True)
+
+    assert victim.read_text(encoding="utf-8") == "keep"
+    assert actions == [
+        f"WS-{_TTL_ZONE.name}-expired: skipped '{_TTL_ZONE.name}/old.txt' (outside the workspace)"
+    ]
 
 
 def test_fix_removes_state_and_session_slop_recursively(tmp_path: Path) -> None:
