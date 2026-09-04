@@ -43,7 +43,7 @@ Write-set paths are relative to `dadaia_workspace/` unless they start with `test
   test_cli_help_quality,test_frozen_clock_aging_ratchet}.py, the 7 deleted tests,
   tests/unit/features/reconcile/**, tests/unit/test_container.py.
   Blocked by: T-046-25. Delivers: one engine exists — AC4, AC10 (engines), AC15 (cap).
-- [ ] T-046-27 — FR9, retire `reports/`: panel views/api/css/js, routes, static, `core.js`,
+- [-] T-046-27 — FR9, retire `reports/`: panel views/api/css/js, routes, static, `core.js`,
   tab; `public/data/reports-AGENTS.md`, its projection row and behavior-map row. RED: panel
   goldens + `test_api_contract.py` (no `/reports`), `test_behavior_map`, e2e `tab-navigation`.
   Owner: software-engineer. Commit: `refactor(T-046-27): retire the reports zone and panel tab`.
