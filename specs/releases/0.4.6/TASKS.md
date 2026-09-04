@@ -59,7 +59,7 @@ Write-set paths are relative to `dadaia_workspace/` unless they start with `test
   infrastructure/json_course_store.py, container.py, features/panel/**, features/workspace/
   service.py (academy lines), features/export/service.py (one line), their tests.
   Blocked by: T-046-27. Delivers: `dadaia --help` and the panel carry no academy — AC4, AC10.
-- [ ] T-046-29 — FR11, retire logs: `pre_gate._append_latency` + tail, `sdd_post_gate`
+- [-] T-046-29 — FR11, retire logs: `pre_gate._append_latency` + tail, `sdd_post_gate`
   writers, `jsonl_log_rotation.py`, `LOG_ROTATION_MAX_BYTES`; 2 tests deleted. RED:
   `test_pre_gate.py` / `test_post_gate_reconciler.py` assert no `.dadaia/logs` after a gated
   write; `test_hook_import_surface.py`. Owner: software-engineer.
