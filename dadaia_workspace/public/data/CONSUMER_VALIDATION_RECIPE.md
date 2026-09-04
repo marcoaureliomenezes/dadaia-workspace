@@ -230,13 +230,13 @@ an initialized workspace, create it:
   FAIL: the tool's own template must not violate its own linter.
 
 ### F-16 — Portability
-- Run: `$D export --output /tmp/f16/` (note: `--output/-o`, not positional); then import
-  the archive into a NEW destination — the archive is positional and the destination is
-  `--workspace/-w` (default cwd), so either `$D import <archive> --workspace /tmp/f16b`
-  or `cd /tmp/f16b && $D import <archive>`. (There is no `--into`; confirm the real flags
-  with `$D import --help`.)
-- **PASS if:** export produces an archive exit 0 and import reconstructs a workspace at the
-  destination that passes `$D doctor`.
+- Run: `$D export` (writes `.dadaia/dist/spec-contexts.json`, overwritten each run); in a
+  NEW initialized workspace `$D import <path-to-spec-contexts.json>` (the file is
+  positional, the destination is `--workspace/-w`, default cwd), then `$D context list`
+  and `$D context alive <slug>` for one context.
+- **PASS if:** export exits 0 and writes exactly that one file; import exits 0, registers
+  every unknown context DEAD and prints the `context alive` step; `context alive` clones
+  it; the destination passes `$D doctor`.
 
 ### F-17 — Migrations
 - Setup: seed an older specs tree (lower pattern version) in a throwaway dir.

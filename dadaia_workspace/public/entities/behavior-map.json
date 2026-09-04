@@ -321,7 +321,7 @@
       "scoped_agents_md": [],
       "hash_tuple": {
         "section": "sha256:35f1476c4c8e010fee0455ee3dc4a55496fbfcdf3b8a1eb36456a178ef822fb3",
-        "skill": "sha256:0a869a52069d84bdcc0f221dbaef4e3a07a9d0f74bbd65cbdb92e63d66c0a79d",
+        "skill": "sha256:8ebd32d580a48dcf8667add58071757e03432795b7667c198a96f0dd8bc81fc0",
         "scoped": []
       },
       "recorded_by": "claude-code",
