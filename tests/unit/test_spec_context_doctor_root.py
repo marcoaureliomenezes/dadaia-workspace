@@ -75,7 +75,13 @@ def _profile(root: Path) -> Path:
 
 
 def _age(path: Path, epoch: float = _TWO_DAYS_AGO) -> None:
-    os.utime(path, (epoch, epoch), follow_symlinks=False)
+    # Windows implements neither ``follow_symlinks=False`` nor lstat-side utime (bug
+    # doctor-root-tests-age-with-utime-follow-symlinks-false-unsupported-on-windows); the
+    # one test that must age a link itself skips there.
+    if os.utime in os.supports_follow_symlinks:
+        os.utime(path, (epoch, epoch), follow_symlinks=False)
+    else:
+        os.utime(path, (epoch, epoch))
 
 
 def _by_path(findings: tuple[Finding, ...]) -> dict[str, Finding]:
@@ -440,6 +446,10 @@ def test_zone_agents_md_is_never_a_ttl_candidate(tmp_path: Path) -> None:
     assert law.exists()
 
 
+@pytest.mark.skipif(
+    os.utime not in os.supports_follow_symlinks,
+    reason="ageing a symlink itself needs utime(follow_symlinks=False), absent on Windows",
+)
 def test_symlinks_are_never_followed_and_only_the_link_is_deleted(tmp_path: Path) -> None:
     ws = tmp_path / "ws"
     ws.mkdir()
