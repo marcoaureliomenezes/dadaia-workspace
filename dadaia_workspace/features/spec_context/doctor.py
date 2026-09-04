@@ -303,6 +303,11 @@ class DoctorService:
 
     @staticmethod
     def _entries(directory: Path) -> list[Path]:
+        """A root that is itself a symlink is never walked — the read side of ``_remove``'s
+        "a symlink is unlinked, never followed"; ``iterdir`` would follow it and every entry of
+        the target would pass the per-entry guard, its parent being inside the workspace."""
+        if directory.is_symlink():
+            return []
         try:
             return sorted(directory.iterdir())
         except OSError:

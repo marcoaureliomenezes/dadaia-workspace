@@ -646,30 +646,38 @@ def test_fix_skips_and_reports_a_failing_migration_or_seed_and_still_deletes_exp
     assert actions[2] == f"WS-{_TTL_ZONE.name}-expired: deleted '{_TTL_ZONE.name}/stale'"
 
 
-def test_fix_reports_a_refusal_to_delete_outside_the_workspace(tmp_path: Path) -> None:
-    """Bug doctor-scan-raises-when-a-ttl-entry-vanishes-mid-walk (finding 6): when a zone
-    root is itself a symlink out of the workspace, the containment guard refuses the delete
-    AND says so — ``skipped '<path>' (outside the workspace)`` — instead of leaving a
-    persistent finding with no action line; the outside file is never touched."""
+@pytest.mark.parametrize("target_inside_workspace", [True, False])
+def test_a_symlinked_zone_root_is_never_walked(
+    tmp_path: Path, target_inside_workspace: bool
+) -> None:
+    """Bug doctor-walks-symlinked-zone-root-into-a-repo-tree (CWE-59): a zone root that is
+    itself a symlink used to be walked — ``iterdir`` follows the link — and every entry of the
+    target passed the per-entry containment guard because its parent resolves inside the
+    workspace (``.dadaia/handoff -> ../repos/<victim>`` yielded ``WS-handoff-expired`` on a
+    repo file the SessionStart ``--fix --expired-only`` lane then unlinked). ``_entries`` now
+    refuses to walk a symlinked root: no per-entry finding, nothing under the target touched.
+    Supersedes the finding-6 pin of doctor-scan-raises-when-a-ttl-entry-vanishes-mid-walk,
+    whose per-entry refusal only covered a target OUTSIDE the workspace."""
     ws = tmp_path / "ws"
     ws.mkdir()
     _init_workspace(ws)
-    outside = tmp_path / "outside"
-    outside.mkdir()
-    victim = outside / "old.txt"
+    target = (ws / "repos" / "victim") if target_inside_workspace else (tmp_path / "outside")
+    target.mkdir(parents=True)
+    victim = target / "old.txt"
     victim.write_text("keep", encoding="utf-8")
     _age(victim)
     zone_dir = ws / ".dadaia" / _TTL_ZONE.name
     if zone_dir.exists():
         zone_dir.rmdir()
-    zone_dir.symlink_to(outside, target_is_directory=True)
+    zone_dir.symlink_to(target, target_is_directory=True)
 
+    findings = _make_doctor(ws).scan()
     actions = _make_doctor(ws).fix(expired_only=True)
 
+    assert not any("old.txt" in f.path for f in findings), [f.path for f in findings]
     assert victim.read_text(encoding="utf-8") == "keep"
-    assert actions == [
-        f"WS-{_TTL_ZONE.name}-expired: skipped '{_TTL_ZONE.name}/old.txt' (outside the workspace)"
-    ]
+    assert zone_dir.is_symlink()
+    assert actions == []
 
 
 def test_fix_removes_state_and_session_slop_recursively(tmp_path: Path) -> None:
