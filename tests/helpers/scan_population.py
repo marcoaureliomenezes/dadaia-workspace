@@ -64,10 +64,6 @@ Tree-/package-walking population scans (the convention applies at the call site 
   adds the sentinel half)
 * ``tests/contract/test_public_source_hygiene.py`` ::
   test_pre_push_ci_gate_ships_pyproject_excludes_bytecode_and_scripts_leave_no_pycache
-* ``tests/unit/infrastructure/test_install_target_goldens.py`` ::
-  test_doctor_stage_lines_match_the_public_asset_roster
-* ``tests/unit/infrastructure/test_public_assets_profile.py`` ::
-  test_absent_profile_doctor_stage_lines_match_the_public_asset_roster
 * ``tests/e2e/features/test_public_pipeline.py`` :: ``TestStage`` +
   ``TestInstallAll`` (two call sites, one per staged/installed skill-set comparison)
 * ``tests/integration/test_public_assets.py`` ::

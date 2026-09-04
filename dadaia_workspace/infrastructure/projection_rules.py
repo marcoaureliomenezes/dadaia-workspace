@@ -9,7 +9,7 @@ contributes for a given
 lines fall outside a byte-compare (a structural/semantic claim a single rendered file
 cannot express, e.g. "does this TOML's cited skill exist"). :func:`projection_rules`
 assembles the harness-independent rules (the guardrail pair, the law file, the shared
-skills/scripts trees, the ``.dadaia/**`` ``AGENTS.md`` family) alongside each active
+skills tree, the ``.dadaia/**`` ``AGENTS.md`` family) alongside each active
 harness's own — one call builds the exact same table ``install()`` writes and
 ``doctor()`` compares.
 """
@@ -250,16 +250,6 @@ def _skills_tree_rules(plan: InstallPlan) -> tuple[ProjectionRule, ...]:
         plan.workspace_root / ".agents" / "skills",
         harness="agents",
         label_prefix="agents:skills/",
-    )
-
-
-def _scripts_tree_rules(plan: InstallPlan) -> tuple[ProjectionRule, ...]:
-    return _tree_bytes_rules(
-        plan.agentic_dir / "scripts",
-        plan.workspace_root / ".dadaia" / "scripts",
-        harness="agents",
-        label_prefix="dadaia:scripts/",
-        mode=0o755,
     )
 
 
@@ -679,7 +669,5 @@ def projection_rules(
     for name in L1_ENTRY_HARNESSES:
         if name in plan.harness_targets:
             rules.extend(harnesses[name].rules(plan))
-    if plan.target in {"all", *L1_ENTRY_HARNESSES}:
-        rules.extend(_scripts_tree_rules(plan))
     rules.extend(_law_projection_rules(plan))
     return tuple(rules)

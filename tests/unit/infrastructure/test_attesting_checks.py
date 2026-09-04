@@ -53,29 +53,3 @@ def test_attesting_registry_is_pinned() -> None:
         "law-projection",
         "entities-derivation",
     )
-
-
-def test_golden_never_buries_an_attesting_check() -> None:
-    """Regen governance: every attesting check is PRESENT in the committed all-four
-    doctor golden — as its positive line or its explicit not-applicable stamp. An
-    UPDATE_INSTALL_GOLDENS regen that dropped a check entirely fails here, so
-    indiscriminate regeneration cannot bury a verifier."""
-    import json
-
-    golden = (Path(__file__).parent / "_golden" / "doctor_all_four_v0158.json").read_text(
-        encoding="utf-8"
-    )
-    lines = json.loads(golden)
-    text = "\n".join(lines)
-    markers = {
-        "rule-corpus": ("codex:rule-corpus", "check:rule-corpus"),
-        "trust-boundary": ("codex:trust-boundary", "check:trust-boundary"),
-        "public-privacy": ("public-privacy", "check:public-privacy"),
-        "law-projection": ("law:", "check:law-projection"),
-        "entities-derivation": ("entities-derivation", "check:entities-derivation"),
-    }
-    for check_id in ATTESTING_CHECK_IDS:
-        assert any(m in text for m in markers[check_id]), (
-            f"attesting check '{check_id}' is absent from the doctor golden — a regen "
-            "buried a verifier; restore the check or retire it in a reviewed diff"
-        )

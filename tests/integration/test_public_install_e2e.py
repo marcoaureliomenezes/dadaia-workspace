@@ -1,7 +1,8 @@
 """End-to-end integration tests for guardrail-pair nested non-interference — AGT-r2-28 —
 and the rendered ``.dadaia/**`` law fragments — 0.4.6 AC12.
 
-Intent: CONTRACT — AGT-r2-28 FR10 (guardrail pair) + 0.4.6 AC12 (FR14); size: MEDIUM.
+Intent: CONTRACT — AGT-r2-28 FR10 (guardrail pair) + 0.4.6 AC12 (FR14) + 0.4.6 AC10
+(FR12, no ``.dadaia/scripts`` projection); size: MEDIUM.
 
 Verifies that `_install_workspace_guardrail_pair` (the Option C installer):
 
@@ -221,3 +222,17 @@ def test_installed_dadaia_agents_md_carries_the_rendered_zone_table(tmp_path: Pa
     states = (ws / ".dadaia" / "states" / "AGENTS.md").read_text(encoding="utf-8")
     assert "<!-- canon -->" not in states
     assert {row.strip("| `") for row in _table_rows(states)} == STATES_CANON
+
+
+def test_install_all_projects_no_dadaia_scripts(tmp_path: Path) -> None:
+    """0.4.6 AC10 (FR12): ``install(target="all")`` creates no ``.dadaia/scripts`` and the
+    staged manifest names no such path. Git hooks and CI execute the package copy under
+    ``dadaia_workspace/public/scripts/``; only the ``agentic/scripts`` staging survives."""
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    FileSystemPublicAssetManager().install(ws, target="all")
+
+    assert not (ws / ".dadaia" / "scripts").exists()
+    assert (ws / ".dadaia" / "agentic" / "scripts").is_dir()
+    manifest = (ws / ".dadaia" / "agentic" / "manifest.json").read_text(encoding="utf-8")
+    assert ".dadaia/scripts" not in manifest
