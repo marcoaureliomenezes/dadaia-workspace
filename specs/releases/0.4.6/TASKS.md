@@ -74,7 +74,7 @@ Write-set paths are relative to `dadaia_workspace/` unless they start with `test
   Write set: infrastructure/projection_rules.py, tests/helpers/public_asset_roster.py,
   tests/unit/infrastructure/test_install_target_goldens*.
   Blocked by: T-046-27. Delivers: `public install` creates no `.dadaia/scripts` — AC10.
-- [-] T-046-31 — FR13, export/import JSON: `ExportService.run` -> `_refresh_branches` +
+- [x] T-046-31 — FR13, export/import JSON: `ExportService.run` -> `_refresh_branches` +
   `atomic_write` of `spec-contexts.json`; `ImportService(store)` reads, saves DEAD, skips
   known, prints the alive step; models and CLIs shrunk; tar, `patch_state`, runner use gone.
   RED: `test_cli_export.py` round trip through the store; export-shape test. Owner:

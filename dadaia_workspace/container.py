@@ -17,6 +17,7 @@ from dadaia_workspace.core.exceptions import (
 from dadaia_workspace.core.handoff_index import HandoffIndex
 from dadaia_workspace.features.chokepoints.denylist_scan import BaselinePatternLike
 from dadaia_workspace.features.export.service import ExportService
+from dadaia_workspace.features.import_.service import ImportService
 from dadaia_workspace.features.public.service import PublicAssetService
 from dadaia_workspace.features.repos.service import ReposService
 from dadaia_workspace.features.server_registry.service import ServerRegistryService
@@ -283,6 +284,11 @@ def build_export_service(workspace_root: Path) -> ExportService:
         git_client=GitSubprocessClient(),
         workspace_root=workspace_root,
     )
+
+
+def build_import_service(workspace_root: Path) -> ImportService:
+    _guard_initialized(workspace_root)
+    return ImportService(JsonContextStore(_states_dir(workspace_root)))
 
 
 def build_server_registry_service(workspace_root: Path) -> ServerRegistryService:

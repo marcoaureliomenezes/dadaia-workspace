@@ -46,13 +46,6 @@ _RETIRED_ZONES: frozenset[str] = frozenset(
     {"reports", "academy", "logs", "runs", "scripts", "dev-report", "runtime"}
 )
 
-#: Files outside T-046-24's write set that still hold a second zone list or a retired-zone
-#: path literal, keyed to the task whose write set deletes them. Each entry must still
-#: violate: once its task lands, the entry is stale and must go (ratchet moves down only).
-_PENDING_DEMOLITION: dict[str, str] = {
-    "dadaia_workspace/features/export/service.py": "T-046-31",
-}
-
 #: The module that creates each ``Creator``'s zones. ``None`` = no single package module
 #: (a runtime writer is any feature; the operator's hands are outside the package).
 _CREATOR_HOME: dict[Creator, str | None] = {
@@ -165,13 +158,10 @@ def test_zone_registry_is_the_only_dadaia_name_list() -> None:
         if hits:
             violations[path.relative_to(_REPO_ROOT).as_posix()] = hits
 
-    unexpected = {p: h for p, h in violations.items() if p not in _PENDING_DEMOLITION}
-    assert not unexpected, (
+    assert not violations, (
         "a second .dadaia zone list was born outside core.workspace_layout — derive a view "
-        f"from DADAIA_ZONES instead: {unexpected}"
+        f"from DADAIA_ZONES instead: {violations}"
     )
-    stale = sorted(p for p in _PENDING_DEMOLITION if p not in violations)
-    assert not stale, f"pending-demolition entries no longer violate — delete them: {stale}"
 
 
 def test_every_zone_creator_exists() -> None:
