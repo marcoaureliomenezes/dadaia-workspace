@@ -32,7 +32,7 @@ Write-set paths are relative to `dadaia_workspace/` unless they start with `test
   doctor_root.py, tests/unit/features/{spec_context,public_assets}/**, doctor goldens.
   Blocked by: T-046-24. Delivers: `dadaia doctor` on this instance lists every finding and a
   score line; `--fix --expired-only` deletes only expired — AC2, AC4, AC6.
-- [ ] T-046-26 — FR4 (contract half), delete the engines: `features/{workspace_clean,tmp_gc}/`,
+- [-] T-046-26 — FR4 (contract half), delete the engines: `features/{workspace_clean,tmp_gc}/`,
   `features/reports/{retention,next}.py`, `features/migrate/legacy_dadaia_dirs.py` + reconcile
   call + setup.cfg edge, `core/models/hygiene.py`, `cli/commands/{clean,tmp}.py`, eight `reports`
   verbs, container builders, their 7 tests; cap 4 -> 3, `modules =`, `_RATCHET`, frozen-clock
