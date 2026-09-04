@@ -2,22 +2,21 @@
 
 v0.1.55 FR2 splits the 1,279-line ``features/panel/views/api.py`` (24 functions / 8 domains)
 into per-domain view modules (``api_servers`` / ``api_contexts`` / ``api_agents`` /
-``api_sessions`` / ``api_academy`` / ``api_reports`` / ``api_health``) and
+``api_sessions`` / ``api_health``) and
 DELETES ``api.py`` (no facade, no re-export barrel). The refactor MUST be behavior-preserving:
 every panel route's ``(status, content_type, body)`` has to be byte-identical to the pre-split
 tree.
 
 This lock captures the ``(status, content_type, body)`` triple for a representative route from
-EACH of the eight domains (every ``render_api_*`` / report-view render function's happy path plus
+EACH panel domain (every ``render_api_*`` render function's happy path plus
 the key 400/403/404/503 error paths) on a single deterministic fixture panel state → a committed
 golden. Post-split the SAME golden is reproduced from the per-domain modules (only the import
 source moves; the captured bytes do not).
 
 Determinism (AC-2 / R-4 analogue):
 
-* **Fixed fake services** — servers/contexts/agents/sessions/academy are driven by
-  hand-built fakes with fixed data; reports use a real ``ReportRetentionService`` over a
-  ``tmp_path`` reports tree whose route-relative paths never leak an absolute path.
+* **Fixed fake services** — servers/contexts/agents/sessions are driven by
+  hand-built fakes with fixed data.
 * **Timestamp + version normalization** — every ISO-8601 timestamp in a captured body is replaced
   with the token ``<TS>`` and the ``render_health`` package version with ``<VER>`` so the golden is
   machine- and clock-independent. Agent ``status`` is pinned to ``inactive`` via
@@ -50,23 +49,14 @@ from dadaia_workspace.core.models.telemetry import AgentSummary, TokenTotals
 from dadaia_workspace.features.panel.service import PanelService
 
 # --- render functions under lock (per-domain modules post-FR2-split; the bytes do not move) ---
-from dadaia_workspace.features.panel.views.api_academy import render_api_academy
 from dadaia_workspace.features.panel.views.api_agents import (
     render_api_agent_prompt,
     render_api_agents_canonical,
 )
 from dadaia_workspace.features.panel.views.api_contexts import render_api_contexts
 from dadaia_workspace.features.panel.views.api_health import render_health
-from dadaia_workspace.features.panel.views.api_reports import (
-    delete_report_file,
-    mark_report_important,
-    render_api_reports,
-    serve_report_file,
-    unmark_report_important,
-)
 from dadaia_workspace.features.panel.views.api_servers import render_api_servers
 from dadaia_workspace.features.panel.views.api_sessions import render_api_sessions
-from dadaia_workspace.features.reports.retention import ReportRetentionService
 
 pytestmark = pytest.mark.unit
 
@@ -85,8 +75,6 @@ _ALL_DOMAINS = {
     "contexts",
     "agents",
     "sessions",
-    "academy",
-    "reports",
     "health",
 }
 
@@ -112,19 +100,6 @@ class _FakeSpecContext:
 
     def list_all(self) -> list[SpecContextProject]:
         return list(self._contexts)
-
-
-class _FakeAcademy:
-    def list_module_catalog(self) -> list[dict[str, object]]:
-        return [
-            {
-                "module": "07_codex",
-                "module_number": 7,
-                "title": "Codex for dadaia-workspace",
-                "lesson_count": 1,
-                "lessons": [{"lesson": "01_codex_mental_model.md", "title": "01. Codex Mental"}],
-            }
-        ]
 
 
 class _FakeTelemetry:
@@ -233,23 +208,10 @@ def _build_service(tmp_path: Path, *, telemetry: Any) -> PanelService:
         spec_context=_FakeSpecContext([_make_context()]),
         workspace_root=tmp_path,
         telemetry=telemetry,
-        academy=_FakeAcademy(),
-        report_retention=ReportRetentionService(tmp_path),
         agents_provider=_FakeAgentsProvider(),
     )
     svc._canonical_agents_override = [_make_dto()]  # type: ignore[attr-defined]
     return svc
-
-
-def _seed_report_tree(tmp_path: Path) -> None:
-    # A FRESH report (mtime = now) survives ``retention.cleanup()`` deterministically: its
-    # effective timestamp is always within the 48h TTL window, so no clock-relative flakiness
-    # and no self-deletion mid-capture. No handoff is seeded (the enrichment path is covered by
-    # tests/unit/features/panel/test_api_contract.py); created_at falls to the mtime and is
-    # normalized to ``<TS>``.
-    report = tmp_path / ".dadaia" / "reports" / "ctx" / "qa-engineer" / "report.html"
-    report.parent.mkdir(parents=True, exist_ok=True)
-    report.write_text("<html><head><title>t</title></head><body>ok</body></html>", encoding="utf-8")
 
 
 def _normalize(body: bytes, workspace_root: Path) -> str:
@@ -280,17 +242,10 @@ def _normalize(body: bytes, workspace_root: Path) -> str:
 
 
 def _capture(tmp_path: Path) -> dict[str, dict[str, object]]:
-    """Invoke a representative route per domain and record normalized responses.
-
-    The capture ORDER matters for the reports domain: the read routes
-    (``api_reports``, ``reports_serve``) run before the mutating ones
-    (``mark`` -> ``unmark`` -> ``delete``, which removes the report file last).
-    """
-    _seed_report_tree(tmp_path)
+    """Invoke a representative route per domain and record normalized responses."""
     service = _build_service(tmp_path, telemetry=_FakeTelemetry())
     service_no_tel = _build_service(tmp_path, telemetry=None)
 
-    rpath = "ctx/qa-engineer/report.html"
     plan: list[tuple[str, str, Any, dict[str, object]]] = [
         ("servers", "api_servers", render_api_servers(service), {}),
         ("contexts", "api_contexts", render_api_contexts(service), {}),
@@ -321,16 +276,6 @@ def _capture(tmp_path: Path) -> dict[str, dict[str, object]]:
         ),
         ("sessions", "api_sessions", render_api_sessions(service), {"qs": {"runtime": ["claude"]}}),
         ("sessions", "api_sessions_503", render_api_sessions(service_no_tel), {"qs": {}}),
-        ("academy", "api_academy", render_api_academy(service), {}),
-        # Reports: READS first (api_reports runs retention.cleanup(); the fresh report survives),
-        # then the mutating routes; delete removes the file LAST.
-        ("reports", "api_reports", render_api_reports(service), {}),
-        ("reports", "reports_serve", serve_report_file(service), {"path": rpath}),
-        ("reports", "reports_serve_403", serve_report_file(service), {"path": "../../etc/passwd"}),
-        ("reports", "reports_serve_404", serve_report_file(service), {"path": "ctx/missing.html"}),
-        ("reports", "mark_report", mark_report_important(service), {"path": rpath}),
-        ("reports", "unmark_report", unmark_report_important(service), {"path": rpath}),
-        ("reports", "delete_report", delete_report_file(service), {"path": rpath}),
         ("health", "health", render_health(), {}),
     ]
 
@@ -360,11 +305,12 @@ def test_api_routes_are_byte_identical_to_golden(tmp_path: Path) -> None:
     )
 
 
-def test_golden_spans_all_eight_domains(tmp_path: Path) -> None:
-    """Sanity: the capture covers >=1 route from EACH of the eight panel domains (AC-2)."""
+def test_golden_spans_all_domains(tmp_path: Path) -> None:
+    """Intent: CONTRACT — 0.4.6 T-046-27/T-046-28 (AC-2: the capture covers >=1 route from
+    EACH surviving panel domain after the reports/academy retirements); size: SMALL."""
     captured = _capture(tmp_path)
     domains = {str(entry["domain"]) for entry in captured.values()}
     assert domains == _ALL_DOMAINS, (
-        f"golden capture must span all eight domains; got {sorted(domains)}, "
+        f"golden capture must span every panel domain; got {sorted(domains)}, "
         f"missing {sorted(_ALL_DOMAINS - domains)}"
     )

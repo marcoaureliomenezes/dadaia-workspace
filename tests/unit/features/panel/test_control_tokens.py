@@ -1,8 +1,7 @@
 """Control token-anchor discipline for the panel (FR2 / AC-3, v0.1.59).
 
 Proves the **restyled interactive controls** (nav tabs, theme button, runtime
-switcher, report/academy CTAs and the report trash
-button) consume the design-token vocabulary rather than ad-hoc literals. Also
+switcher) consume the design-token vocabulary rather than ad-hoc literals. Also
 absorbs the former ``test_palette.py`` PANEL_CSS-grep prior art: the brand-color
 token *contract* (definition + consumption) holds across the concatenated
 stylesheet.
@@ -10,8 +9,7 @@ stylesheet.
 Mechanism (Q3, grep-falsifiable):
   * an explicit **selector allowlist** of the controls the W2 restyle touches;
   * for each allowlisted selector, the matching rule bodies are extracted from the
-    **served control-surface** stylesheet strings — ``structure.py``
-    / ``reports.py`` / ``academy.py``;
+    **served control-surface** stylesheet string — ``structure.py``;
   * the token-DEFINITION file ``tokens.py`` is **excluded** from the control-anchor
     scan — that is where ``--color-accent: #9cddc8`` etc. legitimately define the
     tokens (scanning it would false-positive on the definitions). The ``.runtime-btn``
@@ -32,8 +30,6 @@ import re
 
 import pytest
 
-from dadaia_workspace.features.panel.views.assets.css.academy import ACADEMY_CSS
-from dadaia_workspace.features.panel.views.assets.css.reports import REPORTS_CSS
 from dadaia_workspace.features.panel.views.assets.css.sessions import SESSIONS_CSS
 from dadaia_workspace.features.panel.views.assets.css.structure import STRUCTURE_CSS
 from dadaia_workspace.features.panel.views.assets.css.tokens import TOKENS_CSS
@@ -54,8 +50,6 @@ _REQUIRED_COLOR_TOKENS = {
 # deliberately EXCLUDED — see the module docstring.
 CONTROL_SURFACES: dict[str, str] = {
     "structure.py": STRUCTURE_CSS,
-    "reports.py": REPORTS_CSS,
-    "academy.py": ACADEMY_CSS,
 }
 
 # Explicit, literal selector allowlist — the controls restyled in W2 (FR2).
@@ -63,12 +57,6 @@ CONTROL_SELECTORS: tuple[str, ...] = (
     ".nav-tab",
     ".theme-btn",
     ".runtime-btn",
-    ".academy-card__cta",
-    ".academy-back-btn",
-    ".reports-row__trash",
-    ".reports-back-btn",
-    ".reports-confirm-delete",
-    ".reports-confirm-cancel",
 )
 
 # Button controls that must carry the full interaction-state set (one button language).

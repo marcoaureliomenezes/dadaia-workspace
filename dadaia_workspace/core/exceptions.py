@@ -23,6 +23,28 @@ class ContextStateError(DadaiaError):
     """Raised when an operation is invalid for the context's current state."""
 
 
+class InvalidContextNameError(DadaiaError, ValueError):
+    """A context name or repo slug fails the ``CONTEXT_NAME_RE`` allowlist.
+
+    Raised at ``SpecContextService.register``/``add_repo`` — the one place every registry
+    insert passes — so ``context create``, ``context repo add`` and ``dadaia import`` refuse
+    the same names (bug import-registers-unvalidated-slugs-that-doctor-fix-inv5-rmtrees).
+    """
+
+
+class AssociatedRepoConflictError(DadaiaError):
+    """The registry already has an opinion about this slug that the write will not override.
+
+    The slug is the context's own main repo slug, is already an associated repo registered
+    with a *different* URL, or is owned by ANOTHER context (its main repo or one of its
+    associated repos — ``repos/<slug>`` is a namespace every context shares).
+    """
+
+
+class AssociatedRepoNotFoundError(DadaiaError):
+    """``remove_repo``: the slug is not a registered associated repo of the context."""
+
+
 class PublicAssetError(DadaiaError):
     """Raised when installing public assets fails."""
 

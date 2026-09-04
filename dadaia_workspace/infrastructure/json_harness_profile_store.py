@@ -9,9 +9,9 @@ scaffolded for to ``.dadaia/states/harness_profile.json``:
     {"schema_version": "1", "harnesses": ["claude"]}
 
 Consumed same-layer by ``public_assets`` install/doctor (v0.1.58 W3) to scope which
-runtime projections a single-harness workspace expects; the init-time write path in
-``features/workspace/service.py`` inlines an identical payload (the allowed
-``_init_json_file``-style bootstrap), so the two writers never fork on shape.
+runtime projections a single-harness workspace expects. :meth:`JsonHarnessProfileStore.write`
+is the ONE writer (0.4.6 FR8): ``WorkspaceService.init`` and ``DoctorService.fix`` both call
+it — the init-time inline copy that used to mirror this payload is gone.
 
 The adapter is stateless — the ``states_dir`` is supplied per call, matching the per-call
 workspace-root style ``WorkspaceService`` already uses for its ``PublicAssetManager``.
@@ -50,6 +50,11 @@ def _from_dict(data: dict[str, object]) -> HarnessProfile:
 
 
 class JsonHarnessProfileStore:
+    @staticmethod
+    def path(states_dir: Path) -> Path:
+        """Where the profile lives under *states_dir* — the doctor's ``missing`` target."""
+        return _profile_path(states_dir)
+
     def read(self, states_dir: Path) -> HarnessProfile | None:
         """Return the persisted profile, or ``None`` when the file is absent."""
         path = _profile_path(states_dir)

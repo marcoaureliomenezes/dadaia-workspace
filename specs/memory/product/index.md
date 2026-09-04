@@ -11,7 +11,7 @@
 | slug | title | tldr |
 |------|-------|------|
 | `agent-comms` | agent-comms | The handoff-v1 JSON contract agents emit, its stdlib validator behind `dadaia reports`, and ack-on-consume deletion. |
-| `agent-monitoring` | agent-monitoring | Stdlib-only local agent telemetry behind an allowlist gate, plus the event-driven lifecycle of every runtime artifact under .dadaia/. |
+| `agent-monitoring` | agent-monitoring | Stdlib-only local agent telemetry behind an allowlist gate, plus where each runtime artifact under .dadaia/ lives and expires. |
 | `agent-orchestration` | agent-orchestration | Nine core Layer-1 roles, two dispatchers, document-governed ordered work, and advisory-only concurrency. |
 | `agentic-entities` | agentic-entities | Abstract-entity registry — Personas, Behaviors, Rules — plus the behavior map binding every skill and scoped rule file to one law section. |
 
@@ -19,7 +19,6 @@
 
 | slug | title | tldr |
 |------|-------|------|
-| `academy` | academy | Packaged knowledge-base modules browsable in the panel's Academy tab, with a copy-from-template CLI for derived courses. |
 | `public-asset-distribution` | public-asset-distribution | Canonical public assets staged to .dadaia/agentic and projected to the Claude Code, Codex, Kimi Code and .agents roots, hash-compared by doctor. |
 | `pypi-distribution` | pypi-distribution | The published PyPI package on one version axis, the OIDC publish pipeline, and the wheel content contract. |
 
@@ -36,7 +35,7 @@
 | slug | title | tldr |
 |------|-------|------|
 | `brand-identity` | brand-identity | The panel's canonical five-colour palette and its CSS token mapping, sourced only from `views/assets/css/tokens.py`. |
-| `panel` | panel | Local loopback-only six-tab workspace UI — Projects, Agents, Agentic Entities, Reports, Academy, Servers. |
+| `panel` | panel | Local loopback-only four-tab workspace UI — Projects, Agents, Agentic Entities, Servers. |
 
 ### philosophy
 
@@ -53,7 +52,7 @@
 | `context-management` | context-management | ALIVE/DEAD registry of one main repo plus N associated repos, one Invocation resolved per process, bind-driven injection, advisory presence, redactable output. |
 | `cross-platform-portability` | cross-platform-portability | Linux, macOS and Windows through one platform capability seam, injected adapters, Python hooks and hard-gated cross-OS CI legs. |
 | `server-registry` | server-registry | Port registry with TTL and PID tracking so parallel agents' dev servers never collide; the 3000-3999 range binds only `next_port`. |
-| `workspace-doctor` | workspace-doctor | Diagnoses root hygiene, venv health, context coherence, slug-ownership collisions, stale presence and lock residue; repairs deterministic state only. |
+| `workspace-doctor` | workspace-doctor | The one scan and reaper of the workspace instance — WS-<zone>-<verdict> findings against the zone registry, a compliance score, --fix deleting expired and slop. |
 | `workspace-init` | workspace-init | Idempotent bootstrap of workspace state, the Python venv, the selected harness projections and the governance hooks. |
 
 ### sdd

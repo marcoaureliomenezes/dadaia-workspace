@@ -43,16 +43,16 @@ input_contract:
   produces_outputs:
     - name: intake_report
       kind: report
-      path: .dadaia/reports/{context}/project-manager/{ts}-intake.html
+      path: repos/{context}/reports/project-manager/{ts}-intake.html
       schema_ref: handoff-schema-v1
     - name: dispatch_report
       kind: report
-      path: .dadaia/reports/{context}/project-manager/{ts}-dispatch.html
+      path: repos/{context}/reports/project-manager/{ts}-dispatch.html
       schema_ref: handoff-schema-v1
   stop_if_missing: true
 paths:
   write_allowlist:
-    - .dadaia/reports/<ctx>/project-manager/**
+    - repos/<ctx>/reports/project-manager/**
     - .dadaia/handoff/<ctx>/**
     - specs/backlog/**
 ---
@@ -124,7 +124,7 @@ Browser frontend and CI YAML -> software-engineer (generic implementer).
 
 - Reports: handoff-first (`DADAIA.md` §5); HTML only on `--with-report` or `next_handoff.agent == "human"`.
 - Schema `handoff-v1.2`; `self_pull.refs` lists only memory atoms this session actually self-pulled/read (`specs/`-prefixed, context-relative).
-- Reports land in `.dadaia/reports/<ctx>/project-manager/`.
+- Reports land in `repos/<ctx>/reports/project-manager/`.
 
 ## 5. References
 

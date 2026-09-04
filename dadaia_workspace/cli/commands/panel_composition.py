@@ -1,6 +1,6 @@
 """Panel composition — the panel CLI's own wiring (F001, 20260830 audit).
 
-Moved out of ``container.py``: the 20-route views dict, the panel service, the
+Moved out of ``container.py``: the views dict, the panel service, the
 telemetry boot and the agent-model-policy service have exactly ONE production
 consumer (``dadaia panel``), so the single consumer composes them directly
 (ADR-0001). Cross-feature composition is legal here — a cli-side composition
@@ -16,21 +16,18 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from dadaia_workspace.container import (
-    build_academy_service,
     build_public_service,
     build_server_registry_service,
     build_spec_context_service,
 )
 from dadaia_workspace.features.agents.reader import FileSystemAgentsProvider
 from dadaia_workspace.features.panel.service import PanelService
-from dadaia_workspace.features.panel.views.academy import render_academy_lesson
 from dadaia_workspace.features.panel.views.agent_policy import (
     render_api_agent_model_policy,
     render_api_agent_model_templates,
     render_post_agent_model_policy_validate,
     render_put_agent_model_policy,
 )
-from dadaia_workspace.features.panel.views.api_academy import render_api_academy
 from dadaia_workspace.features.panel.views.api_agents import (
     render_api_agent_prompt,
     render_api_agent_sessions,
@@ -38,20 +35,12 @@ from dadaia_workspace.features.panel.views.api_agents import (
 )
 from dadaia_workspace.features.panel.views.api_contexts import render_api_contexts
 from dadaia_workspace.features.panel.views.api_health import render_health
-from dadaia_workspace.features.panel.views.api_reports import (
-    delete_report_file,
-    mark_report_important,
-    render_api_reports,
-    serve_report_file,
-    unmark_report_important,
-)
 from dadaia_workspace.features.panel.views.api_servers import render_api_servers
 from dadaia_workspace.features.panel.views.api_sessions import render_api_sessions
 from dadaia_workspace.features.panel.views.index import render_index
 from dadaia_workspace.features.panel.views.memory import render_memory
 from dadaia_workspace.features.panel.views.static import render_static
 from dadaia_workspace.features.panel.views.wrapper import render_memory_wrapper
-from dadaia_workspace.features.reports.retention import ReportRetentionService
 from dadaia_workspace.features.telemetry.aggregator.runtimes import ADAPTER_REGISTRY
 from dadaia_workspace.infrastructure.markdown_agent_store import MarkdownAgentStore
 
@@ -134,15 +123,12 @@ def build_telemetry_service(workspace_root: Path) -> object | None:
 def build_panel_service(
     workspace_root: Path,
     telemetry: object | None = None,
-    academy: object | None = None,
 ) -> PanelService:
     return PanelService(
         registry=build_server_registry_service(workspace_root),
         spec_context=build_spec_context_service(workspace_root),
         workspace_root=workspace_root,
         telemetry=telemetry,
-        academy=academy,
-        report_retention=ReportRetentionService(workspace_root),
         adapter_registry=dict(ADAPTER_REGISTRY),
         agents_provider=FileSystemAgentsProvider(store_factory=MarkdownAgentStore),
     )
@@ -188,8 +174,7 @@ def build_panel_views(
         into PanelService so that ``render_api_agents_canonical`` can overlay
         telemetry data on the canonical agent catalog (PR3-08).
     """
-    academy = build_academy_service(workspace_root)
-    service = build_panel_service(workspace_root, telemetry=telemetry, academy=academy)
+    service = build_panel_service(workspace_root, telemetry=telemetry)
 
     # L1 agent model-governance (v0.1.65 FR8): store + re-render injected via the
     # dedicated factory (D-4 — the feature service never imports infrastructure).
@@ -200,13 +185,6 @@ def build_panel_views(
         "api_panel_status": render_api_servers(service),
         "health": render_health(),
         "api_contexts": render_api_contexts(service),
-        "api_academy": render_api_academy(service),
-        "academy_lesson": render_academy_lesson(academy),
-        "api_reports": render_api_reports(service),
-        "reports_serve": serve_report_file(service),
-        "api_report_delete": delete_report_file(service),
-        "api_report_mark_important": mark_report_important(service),
-        "api_report_unmark_important": unmark_report_important(service),
         "api_agents": render_api_agents_canonical(service),
         "api_agent_prompt": render_api_agent_prompt(service),
         "api_agent_sessions": render_api_agent_sessions(service),

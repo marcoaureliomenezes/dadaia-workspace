@@ -4,312 +4,287 @@
 **Release ID:** 0.4.6
 **Owner:** product-engineer
 **Opened:** 2026-09-03
-**Consumes:** slop-law-one-definition-one-home
 
 ---
 
+## Candidate 4 — workspace instance compliance: one zone registry, one doctor
+
 ## 1. Problem and context
 
-- `slop` is law on 14 surfaces and defined on none — governance map
-  `.dadaia/reports/dadaia-workspace/claude/2026-09-03T023255Z-slop-governance-map/`,
-  ratified 2026-09-03, measured on `feature/0.4.6 @ 83af41b0`.
-- Four implicit meanings; one rule in up to five homes; zero rules for comments (264 carry
-  a governance id) and docstrings (158); constitution §12 held since v0.1.46 and did not hold.
-- 231 test files without `Intent:` (unit 143/232, integration 51/78, contract 37/69,
-  e2e 0/14); 105 `PREFIX-NN` families; 678 of 902 handoffs older than 30 days.
-- `tests/AGENTS.md` and `repos/<slug>/AGENTS.md` never load in Claude Code: only
-  `CLAUDE.md -> @AGENTS.md -> @DADAIA.md` loads; no `repos/dadaia-workspace/CLAUDE.md` exists.
-- Folded in: architect RETURN `2026-09-03T052000Z` (F1-F12); operator ruling 2026-09-03 (§7).
+- The `.dadaia/` canon is a bare name list declared three times (`core/workspace_layout.
+  DADAIA_ALLOWED_SUBDIRS`, `features/workspace/service._DADAIA_DURABLE_DIRS`, `core/models/
+  hygiene.SlopPolicy.durable_top_level_dirs`) — no creator, class or TTL per name.
+- Six ledger bugs edited that list in eight weeks, none changed its shape:
+  workspace-doctor-root4-false-positive-dadaia-hooks (b8c40708), reconcile-legacy-dadaia-dirs-
+  unmigrated (c0f4656f: a SECOND list + a quarantine mover), doctor-whitelist-legitimizes-slop-dirs
+  (0f6d6e03), doctor-misses-root4-nonsense-directory + doctor-flags-product-created-dadaia-dirs-
+  as-unknown (2ffc7d57: too wide and too narrow at once), dadaia-reconcile-quarantines-sanctioned-
+  references-clone (92b8b3d6: list 2 derived from list 1, still two lists).
+- Cleanup is split over four engines (`dadaia clean`, `dadaia tmp gc`, `dadaia reports cleanup`,
+  `dadaia doctor --fix`) with three TTL authorities; only `tmp gc` ever ran unattended.
+- Measured on this instance 2026-09-03: `tmp/` 5,599 of 5,706 files past TTL (402 MB); handoffs
+  224 of 244 past TTL; 105 files in `.dadaia/reports/`; `states/` 74 files, 13 canonical; 8 wheels
+  in `dist/`; `.dadaia/{runs,scripts,logs,academy}` and `states/lifecycle` have zero readers.
+- `dadaia doctor` ROOT-1 flags the root `.env` that `DADAIA.md` §9 declares the credential home:
+  bug doctor-root1-flags-env-that-dadaia-md-9-declares-canonical (open, picked, fixed by FR7);
+  `states/harness_profile.json` is absent; `root_exceptions.txt` carries `.mcp.json` three times.
+- Sources: grill `2026-09-03T140000Z-claude-workspace-compliance-grill` (16 decisions, §7);
+  architect DRAFT `2026-09-03T153000Z-software-architect-workspace-compliance-draft` (A-G).
+  Every decision is settled: this SPEC records, it does not reopen.
 
-## 2. Objective and distribution classes
+## 2. Objective
 
-One definition (the deletion test, `DADAIA.md` §7.6); one home per statement in one of two
-classes, both enforced by the workspace; detection in one disclosed sibling; four repo-pure
-ratchets; net law surface shrinks.
+Measure compliance of the instantiated workspace the way `specs doctor` measures `specs/`: one
+registry in `core` names every `.dadaia/` zone with class, creator, TTL and closed file canon;
+`dadaia doctor` is the one scan and the one reaper over root, harness dirs, `.dadaia/` and
+`states/`; four zones and four cleanup engines retire; export is one JSON file; the
+`.dadaia/AGENTS.md` table is rendered from the registry. Net production diff about -8,100 lines.
 
-| Class | Homes | Enforced by |
-|---|---|---|
-| Agentic entities | `DADAIA.md` §7.6, skills, personas, scoped `AGENTS.md` | reprojection, `behavior-map` hashes, `public doctor` |
-| Scaffolded specs | fixed sections in `constitution.md`, `memory/ARCHITECTURE.md`, `memory/QUALITY.md` | `specs doctor` FIXED-1/2 (`--fix` heals), memory bootstrap |
+## 3. Vocabulary
 
-The 16 ratified bullets (report §4.2) land one each:
+- **Zone** — one top-level `.dadaia/` directory with a `Zone(name, cls, creator, ttl_seconds,
+  canon, purpose)` record in `core/workspace_layout.DADAIA_ZONES`. Classes: `projection state
+  protected operator output ephemeral managed`; creators: `init install runtime operator`.
+- **Finding verdict** — the classification of one scanned entry: `canon | operator | slop |
+  expired | missing`; always qualified "finding verdict" — the bare `verdict` stays the PR
+  approval record (`CONTEXT.md`). `canon` + `operator` count as canonical.
+- **Finding code** — `WS-<zone>-<verdict>`; `<zone>` is `root`, a harness dir (`claude codex
+  kimi-code agents`), `dadaia` (the `.dadaia/` top level) or a zone name with its leading dot
+  stripped (`cache`). Examples: `WS-root-slop`, `WS-states-missing`, `WS-tmp-expired`.
+- **Finding line** `WS-tmp-expired  tmp/claude/20260801/x.png  (mtime 33d > ttl 1d)`; **score
+  line**, last of every run: `compliance: N/M entries canonical (P%)`, M = every entry
+  classified in the walk, N = canon + operator.
+- **Instance exceptions** — `states/instance_exceptions.txt`: one glob per line, `#` comments,
+  deduplicated, order kept; matches at root and inside the harness dirs; outside the projection
+  manifest and outside the exceptions = slop. Replaces `root_exceptions.txt`.
+- The four terms enter `CONTEXT.md` in FR1's commit.
 
-| Ratified bullet | Class | Home |
-|---|---|---|
-| 1 definition · 2 scope · 3 dies in the change · 4 writer/reviewer/auditor · 15 one home · 16 pointer | agentic | `DADAIA.md` §7.6 |
-| 11 SPEC · 12 glossary name · 13 file home + GC · 14 branch, candidate | scaffolded | constitution, fragment `slop-law` |
-| 5 comment · 6 docstring · 9 born called · 10 fix replaces | scaffolded | `ARCHITECTURE.md`, fragment `slop-code` |
-| 7 test `Intent:` · 8 mock at the frontier | scaffolded | `QUALITY.md`, fragment `slop-tests` |
+## 4. Functional requirements
 
-- `slop-law` bullet 1 cites §7.6 (a pointer); bullet 15 lives in §7.6 only (ruling 13).
+Each FR cites the decision (D-n, §7) or architect section (A-G) it traces to.
 
-## 3. Scope (candidate 3)
+- **FR1 — Zone registry** (D14, D16, A; finding 1). `core/workspace_layout.py` gains `ZoneClass`,
+  `Creator`, `Zone`, `DADAIA_ZONES` (11 rows: `agentic hooks states sessions handoff tmp mcps
+  .cache dist references .venv`), `STATES_CANON`, `DADAIA_ROOT_FILES = {AGENTS.md, .gitignore}`,
+  `INSTANCE_EXCEPTIONS`, pure `parse_exception_globs(text)` and one pure derived view per
+  consumer (init creates; doctor allows / expires / closed canon / never walks; gate ADDITIVE
+  prefixes; table rows). `DADAIA_ALLOWED_SUBDIRS`, `DADAIA_ADDITIVE_PREFIXES`,
+  `_DADAIA_DURABLE_DIRS`, `_DADAIA_EPHEMERAL_DIRS`, `_EMPTY_ACADEMY` and `core/models/hygiene.py`
+  are deleted. No new leaf: `workspace_layout` is already the I/O-free single authority.
+- **FR2 — Ratchets born with the registry** (D14, F). `tests/contract/test_zone_registry.py`:
+  (1) the rendered `dadaia-AGENTS.md` table rows equal `DADAIA_ZONES` and the `states-AGENTS.md`
+  canon table equals `STATES_CANON`; (2) no set/tuple/list literal outside `workspace_layout.py`
+  holds 3+ zone names and no string literal equals `.dadaia/<retired>` for `reports academy logs
+  runs scripts dev-report runtime`; (3) every `creator` maps to a live module. Same commit as FR1.
+- **FR3 — One scan** (D9, D10, D11, B). `DoctorService._scan_zones()` walks in fixed order:
+  root (ROOT_ALLOWED -> canon; exception glob -> operator; else `WS-root-slop`); harness dirs
+  (an entry the install ledger names, read inside the one walk via `JsonInstallLedgerStore`, or
+  an exception glob -> canon/operator; else `WS-<harness>-slop`; an unreadable ledger yields one
+  non-fixable `WS-states-missing states/install_ledger.json` and classifies nothing under the
+  harness dirs, bug doctor-unreadable-install-ledger-classifies-projections-as-slop 50de406b;
+  `public doctor` keeps hash drift only); `.dadaia/` top level (`DADAIA_ROOT_FILES` / zone name
+  -> canon; else `WS-dadaia-slop`; INIT/INSTALL zone absent -> `WS-<zone>-missing`); closed-canon
+  zones `states dist sessions` (non-canon -> slop; seedable absent -> missing); TTL zones
+  `handoff tmp mcps .cache` (file older than `ttl_seconds` by mtime -> expired; a directory
+  emptied by expiry -> expired). `operator` and `managed` zones are never walked; symlinks never
+  followed; every deletion target `resolve().relative_to(dadaia)`-guarded once. Deleted:
+  `ROOT-1..4`, `RETIRED-LOCK-STATE`, `EFF-1`, `_root_exception_globs`, `_ROOT_FORBIDDEN_CACHES`,
+  `_ROOT_TOOL_CONFIGS`. Unchanged: `INV-4/5/6`, `CTX-URL-1`, `VENV-1`, `PRESENCE-GC`. Output:
+  one finding line each + the score line; exit 1 on any slop, expired or missing; `--json` ->
+  `{"issues":[...],"findings":[{code,path,verdict,fixable,detail}],"compliance":{canonical,
+  total,percent},"fixed":[...]}` (`issues` = the surviving INV/VENV/PRESENCE checks).
+- **FR4 — The one reaper** (D8, D9, D13, B, E). `dadaia doctor --fix` runs in order:
+  `presence.gc` -> `session_store.reap_stale` -> migrate the exceptions file (FR6) -> seed
+  missing -> delete expired -> delete slop. `--fix --expired-only` stops after "delete expired"
+  and is the SessionStart lane: one command entry per harness runtime config, `<venv>/dadaia
+  doctor --fix --expired-only --quiet` (Claude `matcher: startup|resume`; Codex via the hook
+  wrapper command); `--quiet` prints only when something was deleted. A CLI process, never a
+  hook module (P-12). Deleted: `dadaia clean`, `dadaia tmp gc`, `dadaia reports cleanup|status|
+  mark-important|unmark-important|important|mark-efficiency-audit|lint|next`,
+  `features/workspace_clean/`, `features/tmp_gc/`, `features/reports/{retention,next}.py`,
+  `features/migrate/legacy_dadaia_dirs.py` (+ its reconcile call and setup.cfg ignore edge).
+  Skip-and-report: an undeletable entry is a skipped action with its errno, stays a finding,
+  exit 1, never raises (bug doctor-fix-aborts-whole-pass-on-first-undeletable-entry, b2b302f9).
+  INV-5 dead-repo removal is the last step, after the `--expired-only` return.
+- **FR5 — TTLs** (D5, D7). `handoff tmp mcps .cache`: 86,400 s by mtime; no importance ledger,
+  no report pairing; a zone's own `AGENTS.md` is canon by projection, never a TTL candidate (bug
+  public-install-restores-expired-zone-agents). Every other zone: `ttl_seconds = None`.
+- **FR6 — Instance exceptions** (D11, E.1). Readers: hook `_operator_exception` and the doctor
+  scan, both via `INSTANCE_EXCEPTIONS` (the third reader dies with `workspace_clean`). Migration
+  lives in `fix()`: `root_exceptions.txt` present and `instance_exceptions.txt` absent ->
+  `parse_exception_globs(old)` written new, old unlinked; 12 lines, deleted in the release after
+  every consumer has run it.
+- **FR7 — Root whitelist** (finding 4, E.6; the picked bug). `.env` and `.gitignore` join
+  `ROOT_ALLOWED_FILES`; the `.gitignore` inline special case is deleted. Commit shape 3
+  (`fix(bugs): …`) with the `BUGS.jsonl` resolved line.
+- **FR8 — states/ closed canon** (D16, E.2). `STATES_CANON = {spec_contexts.json,
+  server_registry.json, install_ledger.json, agent_model_policy.json,
+  agent_model_policy.json.last-good.json, privacy_denylist.json, instance_exceptions.txt,
+  backlog_subject_aliases.txt, harness_profile.json, presence/, AGENTS.md}`. A missing
+  `harness_profile.json` is `WS-states-missing`, fixed by `HarnessProfile.of(present)`, `present`
+  = L1 harnesses whose projection dir exists at root; the one writer is
+  `infrastructure/json_harness_profile_store.write`, called by init and by fix; init's inline
+  `_write_harness_profile` / `_persisted_profile_harnesses` are deleted.
+- **FR9 — reports/ retired** (D2, C). Zone, `public/data/reports-AGENTS.md`, its projection row
+  and behavior-map entry, panel views/api/css/js, routes, static entries, `core.js` and wrapper
+  tab: deleted. `dadaia reports validate|doctor` survive on `core/handoff_index.py` (unchanged).
+  HTML reports live in `repos/<slug>/reports/<agent>/<UTC>-<slug>.html`, stated once (FR16).
+- **FR10 — academy retired** (D3, C). `features/academy/**` (44 course files), its CLI, model,
+  store, container builder, panel views/api/css/js, routes, static, `core.js`, wrapper tab,
+  init's academy dir and the export line: deleted.
+- **FR11 — logs retired** (D4, C). `hooks/pre_gate.py::_append_latency` + main tail,
+  `hooks/sdd_post_gate.py`'s three writers, `infrastructure/jsonl_log_rotation.py`,
+  `core/kernel_tunables.LOG_ROTATION_MAX_BYTES`: deleted; no replacement writer.
+- **FR12 — scripts projection stopped** (D6, C). `projection_rules._scripts_tree_rules` + call
+  deleted; staging into `agentic/scripts` stays; git hooks and CI execute the package copy.
+- **FR13 — Export/import** (D12, D15, D). `dadaia export` writes exactly
+  `.dadaia/dist/spec-contexts.json` (overwritten via `core.atomic_write`, shape below);
+  `dadaia import <file>` validates `schema_version`, `store.save`s each unknown name as `DEAD`
+  (`dead_since = now`, `current_branch`, `associated_repos`), reports known names `skipped
+  (exists)`, prints `dadaia context alive <name>` as the restore step. No tar, no `patch_state`,
+  no `SubprocessProcessRunner` in import; `ImportService` takes the injected `JsonContextStore`.
+  Anything else in `dist/` is `WS-dist-slop`.
 
-### 3.1 The deliverable text
-
-`DADAIA.md` §7.6 — agentic class, 7 bullets, English, each ≤150 chars; the Portuguese text
-of report §4.2 is the ratified source. Enters §7 Quality after §7.5.
-
+```json
+{"schema_version": "spec-contexts-export-v1", "exported_at": "<UTC>", "dadaia_version": "0.4.6",
+ "contexts": [{"slug": "…", "name": "…", "state": "ALIVE|DEAD", "repo_url": "…",
+   "branch": "…", "associated_repos": [{"slug": "…", "url": "…"}], "last_sync_at": "<UTC>"}]}
 ```
-### 7.6 Slop
 
-- Slop is what passes the deletion test without loss: removed, no behavior changes and no decision loses its record.
-- The test applies to a file, line, comment, test, spec sentence, acronym, branch, release, rule or handoff.
-- Slop dies in the change that finds it; it is never commented out, marked, archived or deferred.
-- The writer proves the artifact fails the deletion test; the reviewer applies the test; the auditor measures the balance.
-- A rule lives in one home; the second copy is deleted; a consumed handoff is deleted in the same turn.
-- Artifact rules live by class: constitution `Slop`, memory `ARCHITECTURE`/`QUALITY` fixed sections; `specs doctor` keeps them byte-exact.
-- Detection and ratchets: `dd-code-review` SLOP.md; measured by `tests/contract/test_slop_ratchets.py` and audit pillar 2.
-```
-
-Fragment `public/data/fixed/slop-law.md` → `constitution.md` (H2 section):
-
-```
-## Slop — workspace law (fixed)
-- Slop is what passes the deletion test without loss: removed, no behavior changes and no decision loses its record (`DADAIA.md` §7.6).
-- A SPEC declares scope, observable criteria and decisions in domain names; it fits the byte ceiling of `DADAIA.md` §6.7.
-- A concept takes a glossary name; a numbered code exists only where a mechanical index reads it (FR, AC, T-).
-- Every file has a canonical home and a GC path; summaries, backups, notes and scratch live in `.dadaia/tmp/` or do not exist.
-- A branch dies at merge; a candidate exists only with scope that changes behavior.
-- Measured by `dadaia specs doctor` (FIXED-1/2) and the slop ratchets; detection signals: `dd-code-review` SLOP.md.
-```
-
-Fragment `slop-code.md` → `memory/ARCHITECTURE.md` (last `###` of Part 2):
-
-```
-### Slop — code (fixed)
-- A comment explains a non-obvious why; the what, the history and any spec, task, ADR or version id live in git and the ledgers.
-- A docstring states the contract in at most 3 lines; bug history lives in `BUGS.jsonl`.
-- Code is born with a real caller in the same change; without a caller it does not exist.
-- A fix replaces the old path; it never wraps it and never opens a second path.
-- A port exists only with two production adapters; a parameter exists only when it is read.
-- Detection: `dd-code-review` SLOP.md S1, S2, S4, S5; measured by ratchet V32 and `test_protocols_have_two_adapters`.
-```
-
-Fragment `slop-tests.md` → `memory/QUALITY.md` (last `###` of Part 2):
-
-```
-### Slop — tests (fixed)
-- A test is born with `Intent:`, fails for a real regression and asserts a value that comes from outside the code under test.
-- A mock exists only at the system boundary (network, clock, randomness); an own module is tested through its interface.
-- A test name states current behavior; a tombstone (a test of an absence) and an expired SCAFFOLD die at closure.
-- Pruning is a `qa-engineer` verdict executed by `software-engineer`; a deletion cites its criterion and its replacement `file:line`.
-- Detection: `dd-code-review` SLOP.md S3; measured by ratchet V31 and `test_test_suite_ratchets.py`.
-```
-
-- Heading level is the one edit to the ruling's fragments: memory fragments carry `###`
-  because `test_each_memory_file_has_exactly_two_parts_in_order` admits exactly two `## `
-  parts per memory file; the constitution fragment stays `##`.
-
-### 3.2 Functional requirements
-
-- FR1 — Law (agentic): `DADAIA.md` gains §7.6 (7 bullets); §7.2 tombstone line becomes
-  "Tombstones and expired SCAFFOLD die at closure (§7.6)"; §6.7 gains the SPEC/TASKS byte
-  ceiling; §10.2 gains `slop`, `ratchet`, `fixed section`.
-- FR2 — Constitution: §12 shrinks to the three bullets the fixed block does not carry
-  (memory-write phase ownership; an add-only fix carries its justification; the derivation
-  law) plus a pointer to the fixed section; `:11` "A rule stated twice…" deleted; §16's
-  closing sentence reduced to "(§12)"; the `slop-law` block appended by `specs doctor --fix`
-  (MUTATING, IMPLEMENTATION); `constitution_version` 5.0.0 -> 5.1.0; ADR 0010 proposed —
-  its `decision` names §7.6, the three fixed sections, P-24's amendment and P-29.
-- FR3 — Memory, closure pass only (`product-engineer`, CLOSURE, MEMORY class): `QUALITY.md`
-  Part 2 "CI and anti-slop" -> "CI gates"; new "Slop measurement" (V31-V34 by module; the
-  closure GC step; the audit readout); the `slop-tests` block; `tldr`/`summary` drop
-  "anti-slop rules". `ARCHITECTURE.md` gains the `slop-code` block. Part 1 — P-24 amended to
-  the downward form (V31 per tier) and P-29 added (`Measured by: pytest
-  tests/contract/test_slop_ratchets.py`, `ADR: 0010`) — lands in the operator's ADR-0010
-  acceptance commit (§6.5), never in a task.
-- FR4 — One home per rule (scoped law): `tests/AGENTS.md` + `templates/tests-AGENTS.md` keep
-  Architecture, Size tiers and cost, Markers and cost + one pointer bullet; Intent/admission/
-  deletion, No Slop, Good Test Standard deleted (homes: `dd-test-stewardship`, §7.6,
-  `slop-tests`). `dadaia-AGENTS.md` `:9`/`:61` "is slop" -> "(§7.6)". `repo-AGENTS.md` gains
-  "## 5. Source hygiene" (four write-point lines + pointer to `ARCHITECTURE.md`'s block — the
-  report's permitted second touch). `releases/AGENTS.md` byte-ceiling bullet;
-  `reports-AGENTS.md` §2 prose bullet; `tests/README.md` drops its "Intent taxonomy" citation.
-  Scaffold slop lines (constitution `:86`, `:146`; QUALITY `:21-23`) are replaced by FR10's blocks.
-- FR5 — Detection: new sibling `dd-code-review/SLOP.md`, S1-S10 (signal, diff check,
-  severity, fix direction) as report §4.6; `SKILL.md` §2 pointer + §4 verdict rule; pointer
-  lines in `dd-test-stewardship` (mock only at the frontier; expected value from an
-  independent source), `dd-release-definition` §3, `dd-codebase-design` §3, `AUTHORING.md` §6.
-- FR6 — Audit and personas: `dd-audit-project/PILLAR-SPECS.md` gains "Slop readout" (six
-  steps, report §4.7); `project-auditor` §4 the readout line. Personas lose duplicates and
-  carry the proof they leave: `software-engineer` "Never fabricate a test…" (`:105`) deleted,
-  §1 Owns gains the deletion-test proof line; `qa-engineer` "Never accept: magic-mock
-  inflation…" (`:95`) -> SLOP.md §Tests pointer; `software-architect` §5 -> S4/S5 pointer;
-  `code-reviewer` §3 step 5 + `slop` finding category; `product-engineer` §1 Owns SPEC line.
-  `behavior-map.json` tuples re-recorded; no new row.
-- FR7 — Ratchets and bridges. (a) V31 replaces V27 in place in
-  `tests/contract/test_test_suite_ratchets.py`: same enumeration (`tracked_test_files()`),
-  assertion inverted to a ceiling on undeclared files per tier (unit, integration, contract,
-  e2e), `e2e = 0`, down only; `tests/scripts/check_test_intent_declared.py` and
-  `tests/integration/scripts/test_check_test_intent_declared.py` deleted in the same commit.
-  (b) New `tests/contract/test_slop_ratchets.py` carries V32-V34 only — measure, pin at
-  birth, down only, one mutation fixture each, tree walks through the shared helper.
-  (c) Two harness bridges via `features/spec_context/scoped_law.py::install_scoped_law`:
-  `<repo>/CLAUDE.md` <- `templates/repo-CLAUDE.md`, `<repo>/tests/CLAUDE.md` <-
-  `templates/tests-CLAUDE.md`, both exactly `@AGENTS.md`, install-if-absent, called from
-  `dadaia context alive`; the two hand-written blocks collapse into one loop over a four-row
-  `(template, dest)` table; the templates enter the manifest at `public stage`
-  (`build_manifest` walks `templates/`). `public install` never writes under `repos/`.
-- FR8 — Closure GC: `dd-release-implementation/RC-FLOW.md` step 8 gains
-  `dadaia reports cleanup --older-than 30d` and `dadaia tmp gc`; its scope line becomes "this
-  candidate's own artifacts, plus the 30-day sweep"; both run once now on the instance
-  (runtime, no commit); the `closure-artifact-gc` log entry reports handoffs >30 d = 0. V35 is
-  that readout plus the audit pillar-2 re-measure — never a `pytest` ratchet.
-- FR9 — Test curation, batch 1 = `tests/contract` (37 of 69 files without `Intent:`):
-  `qa-engineer` verdict per file (declare, or delete with the criterion and the replacement
-  `file:line`), `software-engineer` executes; V31's contract pin drops to 0 in the same
-  commit. Unit (143) and integration (51) re-enter via the closure deferral record
-  (`DADAIA.md` §6.6) under new task ids.
-- FR10 — Fixed law sections. One home: `public/data/fixed/<id>.md`, the three fragments
-  of §3.1. `FIXED_SECTIONS` in `features/specs/memory_canon.py` maps `constitution.md` ->
-  `slop-law`, `memory/ARCHITECTURE.md` -> `slop-code`, `memory/QUALITY.md` -> `slop-tests`.
-  Marker grammar `<!-- dadaia:fixed <id> -->` … `<!-- /dadaia:fixed <id> -->`; the text
-  between equals the fragment byte-for-byte; scaffold templates carry the pair at the
-  canonical position (constitution: last section; memory: last subsection). Two pure functions:
-  `render_fixed_section(text, id, fragment)` (append when absent, replace the body when
-  present) used by `canon.scaffold` and the doctor fix; `extract_fixed_section(text, id)`
-  used by the doctor check and the injection hook — a leaf the hook imports without the
-  container. Rule family FIXED-1 (block missing) / FIXED-2 (body drifted), ERROR,
-  `fixable=True`, after the memory checks. `hooks/ctx_inject.py::_build_memory` appends
-  `=== workspace law (fixed) ===` + the ARCHITECTURE and QUALITY blocks (bounded by fragment
-  size, no digest). No new CLI verb, no new hook. The lib's `specs/constitution.md` receives
-  its block in T-046-18 via `specs doctor --fix`; the lib's memory files in the CLOSURE pass.
-
-## 4. Change ledger (one line per file)
-
-| File (library source) | Action | Delta |
-|---|---|---|
-| `public/data/DADAIA.md` | §7.6 (7); §7.2, §6.7, §10.2 | +11 |
-| `specs/constitution.md` | §12 -> 3 bullets + pointer; `:11`; §16; 5.1.0; block via `--fix` | -17/+9 |
-| `specs/memory/QUALITY.md` (CLOSURE; P-24/P-29 at ADR-0010 acceptance) | CI gates; Slop measurement; block; tldr | +16 |
-| `specs/memory/ARCHITECTURE.md` (CLOSURE) | block | +8 |
-| `specs/ADRs/decisions.jsonl` | ADR 0010 `proposed` | +1 |
-| `public/data/fixed/{slop-law,slop-code,slop-tests}.md` | new fragments | +22 |
-| `public/scaffold/{constitution,memory/ARCHITECTURE,memory/QUALITY}.md` | slop lines out; marker pairs in | +1 |
-| `tests/AGENTS.md` + `public/templates/tests-AGENTS.md` | 3 sections out; pointer bullet | -52 |
-| `tests/README.md` · `public/data/dadaia-AGENTS.md` | citation / "is slop" -> "(§7.6)" | 0 |
-| `public/templates/repo-AGENTS.md` · `{repo,tests}-CLAUDE.md` · `shipped-hashes.json` | §5; bridges; re-record | +8 |
-| `public/scaffold/releases/AGENTS.md` · `public/data/reports-AGENTS.md` | ceiling bullet; prose bullet | +2 |
-| `public/skills/dd-code-review/SLOP.md` + `SKILL.md` | S1-S10; §2 + §4 | +47 |
-| `dd-test-stewardship` · `dd-audit-project/PILLAR-SPECS.md` · 3 pointer skills · `RC-FLOW.md` | bullets; readout; step 8 | +16 |
-| six personas · `public/entities/behavior-map.json` | proof lines; tuples re-recorded | 0 |
-| `features/specs/{memory_canon,canon,rules,doctor_memory}.py` · `hooks/ctx_inject.py` | `FIXED_SECTIONS`; render/extract; FIXED-1/2; bootstrap | +80 |
-| `features/spec_context/scoped_law.py` + its unit test | two blocks -> one 4-row loop | -10/+8 |
-| `tests/contract/test_test_suite_ratchets.py` | V31 replaces V27 | 0 |
-| `tests/scripts/check_test_intent_declared.py` + its integration test | deleted | -120 |
-| `tests/contract/test_slop_ratchets.py` | V32-V34 | +80 |
-| `tests/contract/test_fixed_sections_canon.py` · `tests/unit/features/specs/**` · doctor golden | new | +90 |
-
-Net: always-on law +11; six duplicate homes deleted; projected law -45; +47 on invocation
-only; one Intent counter instead of three (-120); mechanism +80 production, +170 tests.
+- **FR14 — Rendered zone table** (D14, A). `public/data/dadaia-AGENTS.md` carries a
+  `<!-- zones -->` placeholder; `infrastructure/public_assets.stage` renders one row per `Zone`
+  (name, purpose, class, ttl or `never`, creator); `states-AGENTS.md` renders the closed canon
+  from `STATES_CANON` the same way. The 18 hand rows and three stale prose lines are deleted.
+- **FR15 — Migration on this instance is `--fix` itself** (D8, E). Dry list -> the operator
+  moves any wanted `.dadaia/reports/` file under `repos/<slug>/reports/` by hand -> `dadaia
+  doctor --fix` -> reprojection. Retired zones, `states/` residue (`lifecycle/ audit/
+  workflow_model_policy.json* .ws_lock report_retention.json last_efficiency_audit.json
+  ctx_locks/`), `sessions/runtime/`, 8 wheels, kaykit packs and 5,599 expired tmp files are
+  deleted, never quarantined.
+- **FR16 — Law and skill text** (D2, D9, D13, F risk d; owner `ai-engineer`, `public/` source,
+  reprojected). `DADAIA.md`: §3.2 ADDITIVE row -> `.dadaia/{handoff,tmp,mcps,.cache}/`; §5.2 HTML
+  row -> `repos/<slug>/reports/<agent>/<UTC>-<slug>.html`; §5.4 states reports live in the repo
+  and are never TTL-reaped, handoffs expire after one day; §8 gains three bullets (zones and the
+  table derive from the registry; `dadaia doctor` is the one scan and reaper with the finding
+  vocabulary; SessionStart runs `--fix --expired-only`); §10.1 State row gains `dadaia doctor`,
+  Scoped-law row drops `.dadaia/reports/AGENTS.md`; §10.2 gains `zone`, `finding verdict`,
+  `instance exceptions`. `dadaia-AGENTS.md`: §1 -> placeholder + registry law (no quarantine
+  line, no ROOT-4); §2/§4/§5 lose `reports/ academy/ logs/ runs/ dev-report/`, `dadaia clean`.
+  Every other `public/` mention of `.dadaia/reports` (four fragments, the scaffold twin, the
+  repo template, nine personas, `dd-handoff-emitter` step 3, three more skills) -> the repo
+  reports path; `handoff-AGENTS.md` states the 1-day TTL. `RC-FLOW.md` step 8 -> `dadaia
+  doctor` dry, `dadaia doctor --fix --expired-only`, remaining slop listed for the operator, done
+  when the score line reads 100%. `dd-workspace-doctor` rewritten around the one scan (course/
+  academy steps and the report step deleted). `behavior-map.json` hashes re-recorded.
+- **FR17 — Memory** (CLOSURE, `product-engineer`). `workspace-doctor` atom: finding codes and
+  finding verdicts replace `ROOT-1..4`, `RETIRED-LOCK-STATE`, `EFF-1`; `ARCHITECTURE.md` Part 2
+  decider table gains "what `.dadaia/` may contain -> `core/workspace_layout.DADAIA_ZONES`" and
+  drops the retired packages from the feature diagram; P-11 wording "six" -> "eight" (matches
+  `test_core_file_io_purity._AUTHORIZED_STEMS`; principle unchanged, `ADR: none` kept);
+  `workspace-init`, `context-management`, `catalog.json` lose academy, clean, tmp gc, tarballs.
 
 ## 5. Out of scope
 
-- No new hook, gate stage or CLI verb; no fourth review axis or audit pillar; no
-  `.claude/rules/*.md` with `paths:` (a third rule-file kind).
-- No rewrite of the 15-rule authoring standard, `dd-test-stewardship`'s lifecycle, or V26/V28-V30.
-- Intent backfill of unit (143) and integration (51) — deferred at closure, new task ids.
-- Consumer repos keep legacy lowercase memory names (`architecture.md`,
-  `quality-assurance.md`): a `specs upgrade` matter; the constitution block applies there.
-- Existing consumers' `tests/AGENTS.md` (ruling 8) is not re-projected.
-- Operator-private instance rules; the reference corpus under `.dadaia/references/`.
+- No new hook module, gate stage, path class or zone; no repo-tree scan (`repos/<slug>/` hygiene
+  stays `DADAIA.md` §5.3 discipline).
+- `core/handoff_index.py`, `reports validate|doctor`, presence and session reapers: unchanged.
+- `.dadaia/references/` and `.venv/`: never walked. Structural slop at SessionStart (D13).
+- Consumer workspaces migrate on their next `dadaia doctor --fix`; no `specs upgrade` step.
+- `hooks/ctx_inject.py` and the memory bootstrap.
 
 ## 6. Acceptance
 
-- AC1 (FR1) — `grep -c '^- '` over the §7.6 block in `dadaia_workspace/public/data/DADAIA.md`
-  = 7; `grep -rIn -i slop` on that file returns only §4.2's verdict line, §6.7, §7.2, §7.6, §10.2.
-- AC2 (FR2) — `constitution_version` = `5.1.0`; `grep -c 'is slop' specs/constitution.md` = 0;
-  §12 ≤ 4 bullets; the `dadaia:fixed slop-law` pair present, body byte-equal to the fragment;
-  `grep -c '"id":"0010"' specs/ADRs/decisions.jsonl` = 1; `dadaia specs doctor` reports no
-  error other than FIXED-1 on `memory/{ARCHITECTURE,QUALITY}.md` (cleared by AC11).
-- AC3 (FR3, closure / ADR-0010 acceptance) — `grep -c 'CI and anti-slop'
-  specs/memory/QUALITY.md` = 0; both memory blocks byte-equal to their fragments; P-24 in the
-  downward form and P-29 with `Measured by:` once ADR 0010 is accepted;
-  `pytest -k "memory_two_tier_shape or quality_principles"` green.
-- AC4 (FR4) — `grep -c '^## ' tests/AGENTS.md` = 3; `wc -l tests/AGENTS.md` ≤ 70;
-  `grep -c 'dd-test-stewardship' tests/AGENTS.md` ≥ 1; `grep -rc 'is slop'
-  dadaia_workspace/public/scaffold dadaia_workspace/public/data` = 0;
-  `grep -rn 'Intent taxonomy' tests dadaia_workspace | wc -l` = 0 (completes at T-046-20).
-- AC5 (FR5) — `dd-code-review/SLOP.md` exists, `grep -cE '^\| S[0-9]'` = 10;
-  `grep -rl 'SLOP.md' dadaia_workspace/public` lists `dd-code-review`, `dd-audit-project` and
-  the four personas of FR6 that point at it.
-- AC6 (FR6) — `pytest -k "behavior_map or reviewer_persona_review_allowlist"` green;
-  `dadaia public stage && dadaia public install --target all && dadaia public doctor` reports
-  `[ok] public-privacy`.
-- AC7 (FR7) — `pytest tests/contract/test_test_suite_ratchets.py -k v31` green, four
-  per-tier pins, e2e = 0, `grep -c V27` = 0 in that file; `pytest
-  tests/contract/test_slop_ratchets.py -q` green, three pins, each mutation fixture RED on
-  growth; `tests/scripts/check_test_intent_declared.py` absent; after `dadaia context alive
-  dadaia-workspace`, `repos/dadaia-workspace/CLAUDE.md` and `…/tests/CLAUDE.md` exist with
-  exactly `@AGENTS.md`; `test_scoped_law.py` proves the four rows; both templates are in
-  `.dadaia/agentic/manifest.json`.
-- AC8 (FR8) — `RC-FLOW.md` step 8 names both commands with `--older-than 30d`;
-  `find .dadaia/handoff -name '*.handoff.json' -mtime +30 | wc -l` = 0 after the run.
-- AC9 (FR9) — `grep -rL 'Intent:' tests/contract` empty; V31's contract pin = 0, same commit.
-- AC10 (all) — local CI preflight green (`ruff format --check`, `ruff check`, `mypy --strict`,
-  `pytest`); the trio's own bytes obey V34.
-- AC11 (FR10) — `dadaia specs init` in a fresh dir, then `dadaia specs doctor`: no FIXED-*;
-  on the lib's `specs/` after the closure pass the three blocks are byte-equal to the
-  fragments and `dadaia specs doctor` reports 0 errors; `pytest
-  tests/contract/test_fixed_sections_canon.py` green; the bootstrap prefix of `dadaia context
-  bind dadaia-workspace` contains `=== workspace law (fixed) ===` with both memory blocks;
-  `test_doctor_golden` updated in T-046-23's commit.
+- AC1 (FR1, FR2) — `pytest tests/contract/test_zone_registry.py tests/contract/
+  test_workspace_layout_single_authority.py` green; `grep -rn 'DADAIA_ALLOWED_SUBDIRS\|
+  DADAIA_ADDITIVE_PREFIXES\|_DADAIA_DURABLE_DIRS\|SlopPolicy' dadaia_workspace | wc -l` = 0;
+  `core/models/hygiene.py` absent; `CONTEXT.md` carries the four §3 terms.
+- AC2 (FR3) — on this instance before `--fix`: `dadaia doctor` exits 1, every finding line
+  matches `^WS-[a-z.-]+-(slop|expired|missing) `, the last line matches `^compliance: [0-9]+/
+  [0-9]+ entries canonical \([0-9]+%\)$`; `dadaia doctor --json | python -m json.tool` succeeds
+  with keys at least `findings compliance fixed`; `dadaia public doctor` prints no `[foreign]`
+  line for a runtime directory (consumer-repo `repos/<slug>/AGENTS.md|CLAUDE.md` provenance
+  lines are pre-existing, grill ruling 16 of the skills-consolidation candidate, out of scope).
+- AC3 (FR4, FR15) — `dadaia doctor --fix` then `dadaia doctor`: exit 0, `compliance: N/N entries
+  canonical (100%)`; `ls -A .dadaia` is a subset of `{agentic hooks states sessions handoff tmp
+  mcps .cache dist references .venv AGENTS.md .gitignore}`; `ls -A .dadaia/states` a subset of
+  `STATES_CANON`; `find .dadaia/tmp .dadaia/handoff .dadaia/mcps -type f -mtime +1 | wc -l` = 0;
+  `.dadaia/sessions/runtime` absent.
+- AC4 (FR4) — `dadaia --help` lists no `clean tmp academy`; `dadaia reports --help` lists exactly
+  `validate doctor`; `dadaia doctor --help` shows `--fix --expired-only --json --quiet`; `dadaia
+  doctor --fix --expired-only --quiet` on a compliant instance prints nothing.
+- AC5 (FR4) — each harness runtime config projected by `public install` carries one SessionStart
+  entry ending in `doctor --fix --expired-only --quiet`; `pytest tests/contract/
+  test_hook_import_surface.py` green (P-12).
+- AC6 (FR5) — a file under `handoff/` or `tmp/` with mtime 2 days old is reported
+  `WS-<zone>-expired` and deleted by `--fix --expired-only`; a zone `AGENTS.md` never is.
+- AC7 (FR6) — after `--fix`: `states/root_exceptions.txt` absent; `instance_exceptions.txt` has
+  `grep -c '^\.mcp\.json$'` = 1 and no duplicate line; a file matching one of its globs is
+  reported nowhere, at root or inside `.claude/`.
+- AC8 (FR7) — root `.env` and `.gitignore` produce no finding; `dadaia bugs status` shows
+  doctor-root1-flags-env-that-dadaia-md-9-declares-canonical resolved, RED test named.
+- AC9 (FR8) — `.dadaia/states/harness_profile.json` exists after `--fix` and lists only harnesses
+  whose projection dir exists at root; `grep -c '_write_harness_profile' dadaia_workspace/
+  features/workspace/service.py` = 0.
+- AC10 (FR9-FR12) — `ls dadaia_workspace/features` has no `academy tmp_gc workspace_clean`;
+  `reports/{retention,next}.py`, `jsonl_log_rotation.py`, `legacy_dadaia_dirs.py` absent; panel
+  goldens green with no `/reports` or `/academy` route; a gated write creates no `.dadaia/logs`;
+  `public install --target all` creates no `.dadaia/scripts` and the manifest names none.
+- AC11 (FR13) — `dadaia export` writes only `.dadaia/dist/spec-contexts.json` in the FR13 shape;
+  on a scratch workspace under `.dadaia/tmp/qa-engineer/<date>/`, `dadaia import <file>`
+  registers every unknown name `DEAD` and skips known names; `dadaia doctor` there reports
+  `WS-dist-slop` for any other `dist/` entry.
+- AC12 (FR14) — after `public stage && public install --target all`, `.dadaia/AGENTS.md` has a
+  table of exactly 11 zone rows and `.dadaia/states/AGENTS.md` a canon table of 11 entries;
+  hand-editing one row makes `test_zone_registry` red.
+- AC13 (FR16) — `grep -rn '\.dadaia/reports\|academy\|dadaia clean\|tmp gc\|reports cleanup\|
+  ROOT-4\|legacy-quarantine' dadaia_workspace/public | wc -l` = 0; `grep -c 'repos/<slug>/
+  reports/' dadaia_workspace/public/data/DADAIA.md` = 1; `pytest -k behavior_map` green;
+  `dadaia public doctor` `[ok] public-privacy`.
+- AC14 (FR17) — `dadaia specs doctor` 0 errors after the closure pass; `grep -c 'set of eight'
+  specs/memory/ARCHITECTURE.md` = 1; `grep -rn 'ROOT-4\|RETIRED-LOCK-STATE\|EFF-1' specs/memory |
+  wc -l` = 0.
+- AC15 (all) — local CI preflight green; `test_import_linter_ignore_cap` cap = 3; `lint-imports`
+  zero new ignored edges; V32/V33 re-pinned downward; V34 holds for this trio; `git diff
+  --shortstat origin/develop..HEAD -- dadaia_workspace` net at most -7,400 lines (base 14637900,
+  head 6043bf2b: 145 files, +1,278/-9,391, net -8,113; the DRAFT's -8,000 was a net-new estimate;
+  nothing landed was reverted).
 
-## 7. Operator rulings (grill record)
+## 7. Operator decisions (grill record, ADR lines)
 
-The Part-4 ratification (2026-09-03) is the grill outcome; 10-13 come from the architect's
-RETURN and the operator's 2026-09-03 ruling.
+1. **D1** Continue at the gate: candidate 3 -> `rc-3/`, candidate 4 trio at root, version 0.4.6.
+2. **D2** `.dadaia/reports/` retired; only `reports validate|doctor` survive; panel routes, tab
+   and the cleanup/status/importance verbs deleted; HTML reports in `repos/<slug>/reports/`,
+   stated once in `DADAIA.md` §5.2.
+3. **D3** academy retired (CLI group, panel tab, zone, courses).
+4. **D4** `.dadaia/logs` retired with both hook writers and `jsonl_log_rotation`.
+5. **D5** `.dadaia/mcps` kept, ephemeral, TTL 1 day.
+6. **D6** `.dadaia/scripts` projection stopped, zone removed.
+7. **D7** `.dadaia/handoff` TTL 1 day by mtime; no importance ledger; no report pairing.
+8. **D8** `doctor --fix` on this instance deletes everything slop or expired, kaykit included.
+9. **D9** `dadaia doctor` is THE scan and THE reaper; `dadaia clean` and `dadaia tmp gc` deleted.
+10. **D10** One finding per line, `WS-<zone>-<class>` code, final `compliance:` line, `--json`
+    mirror, exit 1 on any slop or expired.
+11. **D11** `states/instance_exceptions.txt` (globs) replaces `root_exceptions.txt`, covers root
+    and harness dirs; outside manifest and outside exceptions = slop.
+12. **D12** `dadaia export` writes one fixed `.dadaia/dist/spec-contexts.json`, overwritten.
+13. **D13** SessionStart runs `doctor --fix --expired-only`; structural slop only by explicit
+    operator `--fix`.
+14. **D14** The `.dadaia/AGENTS.md` table is rendered from the registry at `public stage`,
+    pinned by a contract test.
+15. **D15** `dadaia import` reads `spec-contexts.json`, registers contexts DEAD; `context alive`
+    clones.
+16. **D16** `states/` closed canon (FR8); anything else slop; a missing `harness_profile.json` is
+    a fixable finding.
 
-1. **Definition** — the deletion test; the three parallel formulations collapse into it.
-2. **Always-on home** — agentic statements live in `DADAIA.md` §7.6, not only in a skill.
-3. **Governance ids in code** — only `Intent: CONTRACT — <ref>` on a test docstring's first
-   line; zero in production (V32 excludes `tests/`).
-4. **Byte ceiling** — SPEC ≤ 24 KB, TASKS ≤ 12 KB per candidate (V34).
-5. **Numbered families** — only FR, AC, T- are mechanical; every other concept takes a name.
-6. **Intent backfill** — by directory, one commit each; undefended tests die.
-7. **`tests/AGENTS.md`** — Architecture + Size tiers + Markers, with pointers.
-8. **Consumers** — `tests-AGENTS.md` is installed once by `context alive`, then
-   operator-owned; never added to TREE-5 (an overwrite path re-opens bug 108's class).
-9. **Bridges** — `<repo>/CLAUDE.md` and `<repo>/tests/CLAUDE.md` (`@AGENTS.md`) via
-   `scoped_law.py`, the root's adapter; `.claude/rules` with `paths:` rejected.
-10. **Accept ADR 0010** — operator step: `status: accepted` with `measured_by`, at trio
-    approval or at closure; carries the P-24/P-29 hunk (§6.5). Not accepted: the Part-1 hunk
-    waits; Part 2 and the fixed blocks land regardless.
-11. **Two distribution classes** (ruled 2026-09-03) — agentic entities and scaffolded specs;
-    fixed sections projected by the scaffold, validated and healed by `specs doctor`,
-    reinforced by the memory bootstrap.
-12. **Batch 1 = `tests/contract`** (37 files) — architect-recommended, decided here.
-13. **Bullet 15 has one home** — §7.6 bullet 5; `slop-law` carries no copy (rules and
-    handoffs are agentic artifacts). Ruled at definition by the dispatcher under the
-    operator's 2026-09-03 implementation order.
+## 8. Dependencies and risks
 
-## 8. Ratchet baselines (V31-V34)
-
-Measured 2026-09-03 on `feature/0.4.6`; the modules re-measure and pin at birth.
-
-| Ratchet | Home | Counts | Baseline | Direction |
-|---|---|---|---|---|
-| V31 | `test_test_suite_ratchets.py` (replaces V27) | test files without a line-anchored docstring `Intent:`, per tier | unit 160, integration 52, contract 40, e2e 0 | down only, e2e = 0 |
-| V32 | `test_slop_ratchets.py` | governance ids in production comment tokens + docstring lines | 912 (265 + 647, measured at birth) | down only |
-| V33 | `test_slop_ratchets.py` | `PREFIX-NN` families without a mechanical reader | 51 (measured at birth; FR, AC, T- exempt) | down only |
-| V34 | `test_slop_ratchets.py` | SPEC.md + TASKS.md bytes of the live candidate | ceiling 24 KB / 12 KB | fixed ceiling |
-
-- V33: a family is a distinct prefix of tokens matching `\b[A-Z]{1,4}-?[0-9]{2,3}\b` over
-  `specs/**` (minus `_archive/`), `dadaia_workspace/**`, `tests/**` (SLOP.md included); a
-  family has a reader when a regex or string constant in `dadaia_workspace/**` or `tests/**`,
-  outside the counting test, matches its prefix; FR, AC and T- are the ratified families (ruling 5)
-  and are exempt. S1-S10 count as one orphan family — ratified.
-- V35 (handoffs older than 30 days: 678 of 902 pre-GC) is not a ratchet — it reads
-  `.dadaia/handoff` outside the repo by wall clock; home: the `closure-artifact-gc` log entry
-  (target 0) and the audit pillar-2 readout.
-
-## 9. Dependencies and risks
-
-- ADR 0010 gates the Part-1 memory hunk only (ruling 10); Part 2 and the fixed blocks are not.
-- Between T-046-23 and the closure pass, `dadaia specs doctor` on the lib reports FIXED-1 ×2
-  on the memory files by construction (MEMORY class, `DADAIA.md` §3.2): accepted transient,
-  named in AC2, cleared by AC11; no rule downgrade to avoid it.
-- `public/data/fixed/` is not a canon entry (`canon.scaffold` copies only CANON entries);
-  the privacy scan must still cover it — T-046-23 verifies both.
+- FR1+FR2 land first and alone; every later FR only deletes or derives. Between FR1 and FR9-FR12
+  the instance doctor lists the retired zones as `WS-dadaia-slop`; the dry default is the safety
+  step, nothing is deleted without `--fix`.
+- `--fix` on this instance deletes 105 HTML reports and 402 MB of expired tmp: the dry list runs
+  first and the operator moves what is wanted (D8).
+- SessionStart adds one CLI process per session start (~100 ms over 5k files, tens after the
+  first fix); `--quiet` keeps the model context clean.
+- Suppressed-edge cap 4 -> 3 (`reconcile -> migrate.legacy_dadaia_dirs` gone); `modules =` loses
+  three packages; `_RATCHET` in `test_cli_help_quality` and V32 re-measure downward.
 - Reprojection is the proof of every `public/` edit; a hand-edited projection is itself the bug.

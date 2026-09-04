@@ -1,43 +1,49 @@
 ---
 name: dd-workspace-doctor
 description: >
-  Diagnose and repair the workspace runtime: lib vs projection drift, and
-  .dadaia/states/*.json schema migration after a library update. Use when the
-  operator mentions "doctor", "drift", "schema stale", or "fix workspace".
+  Run the one workspace compliance scan and reaper: `.dadaia/` zones, root and
+  harness-dir slop, TTL-expired entries, states canon, projection drift. Use when
+  the operator mentions "doctor", "drift", "slop", "compliance", or "fix workspace".
 ---
 
-# dd-workspace-doctor — Workspace Diagnosis & Repair
+# dd-workspace-doctor — The One Scan
 
 ## 1. When
 
-- The operator mentions "doctor", "drift", "schema stale", "fix workspace", or "/dd-workspace-doctor".
-- Operational state only: lib-vs-`.claude/` drift, and `.dadaia/states/*.json` schema migration.
-- Spec-vs-code drift (feature behavior vs approved SPEC.md) belongs to `project-auditor` instead.
+- The operator mentions "doctor", "drift", "slop", "compliance", "fix workspace", or `/dd-workspace-doctor`.
+- Instance state only: what `.dadaia/`, the root and the harness dirs contain (`DADAIA.md` §8.5).
+- Spec-vs-code drift belongs to `project-auditor`; lib-vs-projection drift to `dadaia public doctor`.
 
-## 2. Steps
+## 2. Vocabulary — use these terms exactly
 
-1. Locate the workspace: `ls .dadaia/` (confirm root); locate the library: `dadaia --version` or `pip show dadaia-workspace`.
-2. List canonical files in `dadaia_workspace/public/<type>/` for each asset type (`rules/`, `skills/`, `commands/`, `agents/`).
-3. List the corresponding files in `.claude/<type>/`.
-4. Compare content; flag any file that differs or is missing in `.claude/`.
-5. Run `dadaia doctor` as the CLI shortcut for the drift check.
-6. Auto-repair with `dadaia doctor --fix`, or `dadaia public stage` then `dadaia public install --target all --force`.
-7. For schema migration, read the current frozen dataclasses from the installed library (`core/models/spec_context.py`, `core/models/course.py`).
-8. Read the current JSON content: `spec_contexts.json` under `.dadaia/states/`, `academy.json` under `.dadaia/academy/`.
-9. Map old fields to new: drop disappeared fields, ask the operator for a default on new required fields, infer or ask on renames.
-10. Rewrite the JSON file atomically: write `.tmp` then `os.replace()`.
-11. Report every field change made.
-12. Never guess a required field value silently — always confirm with the operator.
-13. Write a summary report to `.dadaia/reports/<context>/dd-workspace-doctor/<UTC>.html`: issues found, actions taken, operator decisions needed.
-14. Never edit `.agents/`, `.claude/`, `.codex/`, `.kimi-code/` directly for drift repair — always `dadaia public stage`/`install --force`.
+- **Zone**: one top-level `.dadaia/` directory; the registry is `core/workspace_layout.DADAIA_ZONES`, rendered into `.dadaia/AGENTS.md`.
+- **Finding verdict**: `canon | operator | slop | expired | missing`; `canon` + `operator` are canonical.
+- **Finding code**: `WS-<zone>-<verdict>`; `<zone>` = `root`, a harness dir (`claude codex kimi-code agents`), `dadaia`, or a zone name without its leading dot.
+- **Score line**, last line of every run: `compliance: N/M entries canonical (P%)`.
+- Avoid: `ROOT-n`, "quarantine", "gc", "cleanup" — retired names, no longer verbs.
 
-## 3. Done when
+## 3. Steps
 
-- `dadaia doctor` (or `--fix`) reports drift resolved, or every remaining item is named for operator decision.
-- Every JSON schema migration change is reported field-by-field.
-- No lib-originated file was hand-edited to fake a fix.
+1. Dry run from the workspace root: `dadaia doctor` (`--json` for the machine mirror). Done when every finding line and the score line are read; exit 1 means slop or expired entries exist.
+2. Classify each finding: `expired` = TTL by mtime; `slop` = outside the projection manifest, the zone registry and `.dadaia/states/instance_exceptions.txt`; `missing` = a states-canon file absent.
+3. Reap expired entries: `dadaia doctor --fix --expired-only` — what SessionStart already runs. Done when a rerun shows zero `*-expired` lines.
+4. Slop: name each `WS-*-slop` line to the operator with its cause (stray root entry, unknown zone, harness-dir file outside the manifest). Only an explicit operator `dadaia doctor --fix` deletes it; never delete by hand.
+5. An operator-owned entry that must stay: add one glob per line to `.dadaia/states/instance_exceptions.txt` (`#` comments), then rerun. Done when the entry reads `operator`.
+6. `missing` or projection drift: `dadaia public stage && dadaia public install --target all && dadaia public doctor`; `--fix` recreates a missing `harness_profile.json`. Never hand-edit a projection.
+7. Report the final score line verbatim; 100% is the bar for a candidate's artifact GC (`dd-release-implementation`, `RC-FLOW.md` step 8).
 
-## 4. References
+## 4. What `--fix` touches
 
-- `dadaia public stage` / `dadaia public install --target all --force` — the only drift-repair path.
-- `project-auditor` — spec-vs-code drift, out of this skill's scope.
+- Deletes: every `expired` entry, and with a plain `--fix` every `slop` entry — nothing the dry run did not list.
+- Never touches: `canon` and `operator` entries, `.venv/`, `references/`, `sessions/` (own reaper), anything outside the workspace.
+
+## 5. Done when
+
+- The score line reads 100%, or every remaining finding is named to the operator with its cause.
+- No lib-originated file and no runtime JSON was hand-edited to fake a fix.
+
+## 6. References
+
+- `DADAIA.md` §5.1 (root, exceptions), §8.1 (reprojection), §8.5 (the scan).
+- `.dadaia/AGENTS.md` — the rendered zone table; `.dadaia/states/AGENTS.md` — the states canon.
+- `dadaia doctor --help` wins over any flag remembered here.

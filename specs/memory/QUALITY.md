@@ -93,7 +93,7 @@ Rationale: a reported number promoted as if it gated is fabricated detection.
 ### Slop measurement
 
 - Four repo-pure ratchets pin slop counts and move only downward: V31 (Intent-less test files per tier) in `tests/contract/test_test_suite_ratchets.py`; V32 (governance ids in production comments and docstrings), V33 (`PREFIX-NN` families without a mechanical reader) and V34 (live SPEC/TASKS byte ceiling) in `tests/contract/test_slop_ratchets.py`.
-- Stale handoffs are a closure readout, never a ratchet: `dd-release-implementation` RC-FLOW step 8 runs `dadaia reports cleanup --older-than 30d` and `dadaia tmp gc`, and the `closure-artifact-gc` log entry records the counts.
+- Stale handoffs and scratch are a closure readout, never a ratchet: `dd-release-implementation` RC-FLOW step 8 runs `dadaia doctor` dry, then `dadaia doctor --fix --expired-only`, and the `closure-artifact-gc` log entry records the counts ([[workspace-doctor]]).
 - `dd-audit-project` pillar 2 re-measures the ratchets over the audit window and applies `dd-code-review` SLOP.md S1–S10 to a commit sample; the fixed law sections are kept byte-exact by `specs doctor` FIXED-1/2.
 
 ### Dependencies

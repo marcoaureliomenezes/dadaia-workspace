@@ -12,7 +12,7 @@ Two layers:
   ``subprocess.Popen``/``run`` and ``os.exec*`` are monkeypatched to raise. These in-process
   tests fault-inject ``_common.read_stdin_json`` (a production internal) to supply the
   payload — they never simulate ``sys.stdin``, so they stay on the contract's white-box
-  carve-out. The harness-real latency-log behavior tests flow through
+  carve-out. The harness-real no-``.dadaia/logs`` test (AC10, T-046-29) flows through
   ``run_hook_subprocess`` (the sanctioned subprocess channel).
 """
 
@@ -202,86 +202,30 @@ def test_evaluate_payload_first_block_wins_and_faulty_policy_fails_open(
 
 
 # --------------------------------------------------------------------------- #
-# Hook-latency telemetry (FR-W4-06, T-014-04).
+# FR11 / AC10 (T-046-29): the gate writes no telemetry — a gated write leaves no
+# `.dadaia/logs/` behind, whatever the verdict.
 # --------------------------------------------------------------------------- #
 
 
 @pytest.mark.parametrize(
-    ("extra_env", "tool_name", "tool_input", "expected_event"),
+    ("path_fn", "expect_block"),
     [
-        # Harness-real path: no DADAIA_HOOK_EVENT override → the latency record falls back
-        # to "PreToolUse".
-        (None, "Read", {"file_path": "x"}, "PreToolUse"),
-        # DADAIA_HOOK_EVENT is a harness-control var (HARNESS_CONTROL_DADAIA_ENV): passed
-        # through the SUBPROCESS env via ``extra`` — the harness-real channel — never via
-        # an in-process setenv (which the env contract forbids).
-        ({"DADAIA_HOOK_EVENT": "Bash"}, "Bash", {"command": "ls"}, "Bash"),
+        (lambda ws: ws / "repos" / "a" / "src" / "thing.py", False),
+        (lambda ws: ws / ".dadaia" / "sessions" / "runtime" / "a.ptr", True),
     ],
+    ids=["allowed-mutating-write", "blocked-protected-write"],
 )
-def test_main_appends_one_latency_record(
-    tmp_path: Path,
-    extra_env: dict[str, str] | None,
-    tool_name: str,
-    tool_input: dict[str, str],
-    expected_event: str,
-) -> None:
-    env = claude_hook_env(tmp_path, extra=extra_env)
-    result = run_hook_subprocess(
-        "pre_gate", {"tool_name": tool_name, "tool_input": tool_input}, env
-    )
-    assert result.returncode == 0, result.stderr
-    log = tmp_path / ".dadaia" / "logs" / "hook-latency.jsonl"
-    lines = log.read_text(encoding="utf-8").strip().splitlines()
-    assert len(lines) == 1
-    rec = json.loads(lines[0])
-    assert rec["hook"] == "pre_gate"
-    assert rec["event"] == expected_event
-    assert isinstance(rec["duration_ms"], (int, float)) and rec["duration_ms"] >= 0
-    assert "ts" in rec
+def test_gated_write_leaves_no_logs_dir(tmp_path: Path, path_fn: Any, expect_block: bool) -> None:
+    """Intent: CONTRACT — AC10 (logs), T-046-29. Size: SMALL (one hook subprocess).
 
-
-def test_latency_log_rotates_at_the_shared_cap(tmp_path: Path) -> None:
-    """FR27/A27.1 — ``_append_latency`` funnels through the shared rotation helper, so
-    ``hook-latency.jsonl`` rotates exactly like every other ``.dadaia/logs/*.jsonl``
-    writer once it crosses the cap. Driven in-process (no subprocess) against the
-    production function directly — the shared helper's own cap-crossing/retention
-    behavior is proven once in ``tests/unit/infrastructure/test_jsonl_log_rotation.py``;
-    this test only proves THIS writer is actually wired through it.
+    Harness-real spawn of ``pre_gate`` on a hermetic workspace: the verdict is emitted
+    and the hook creates no ``.dadaia/logs`` directory — the ``hook-latency.jsonl``
+    writer is retired with no replacement (FR11).
     """
-    log = tmp_path / ".dadaia" / "logs" / "hook-latency.jsonl"
-    log.parent.mkdir(parents=True)
-    log.write_text('{"seed": true}\n', encoding="utf-8")
-
-    import dadaia_workspace.infrastructure.jsonl_log_rotation as rotation
-
-    original_cap = rotation.LOG_ROTATION_MAX_BYTES
-    rotation.LOG_ROTATION_MAX_BYTES = 8
-    try:
-        pre_gate._append_latency(tmp_path, "PreToolUse", 1.5)  # noqa: SLF001
-    finally:
-        rotation.LOG_ROTATION_MAX_BYTES = original_cap
-
-    rotated = log.with_name(log.name + ".1")
-    assert rotated.exists()
-    assert json.loads(rotated.read_text(encoding="utf-8").strip()) == {"seed": True}
-    new_rec = json.loads(log.read_text(encoding="utf-8").strip())
-    assert new_rec["hook"] == "pre_gate"
-    assert new_rec["event"] == "PreToolUse"
-
-
-def test_telemetry_failure_does_not_change_verdict(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    # An unwritable logs path must not alter the gate verdict or the exit code (fail-open).
-    # Fault-inject the production stdin reader (NOT sys.stdin) to stay in-process per the
-    # contract carve-out.
-    def boom(*_a: object, **_k: object) -> None:
-        raise OSError("logs dir unwritable")
-
-    monkeypatch.setattr(Path, "mkdir", boom)
-    monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
-    monkeypatch.setattr(_common, "read_stdin_json", lambda: {"tool_name": "Read"})
-    assert pre_gate.main() == 0  # no crash, verdict unaffected
+    ws = _mk_workspace(tmp_path, "a")
+    block = _run(tmp_path, {"tool_name": "Write", "tool_input": {"file_path": str(path_fn(ws))}})
+    assert (block is not None) is expect_block
+    assert not (ws / ".dadaia" / "logs").exists()
 
 
 # --------------------------------------------------------------------------- #

@@ -1,12 +1,20 @@
-"""dadaia export CLI — happy path + flag combinations."""
+"""Intent: CONTRACT — AC11 (FR13, T-046-31): `dadaia export` -> `dadaia import` round trip.
 
+Size: MEDIUM — two real initialized workspaces and the real `JsonContextStore`; the
+CLI receives `--workspace` explicitly so the resolver never walks up from cwd.
+"""
+
+import json
+import subprocess
 from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.features.workspace.service import WorkspaceService
+from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 
@@ -15,77 +23,102 @@ _runner = CliRunner()
 pytestmark = pytest.mark.slow
 
 
-@pytest.fixture
-def workspace(tmp_path: Path, monkeypatch) -> Path:
+def _workspace(root: Path) -> JsonContextStore:
     WorkspaceService(
         public_assets=FileSystemPublicAssetManager(),
         python_env=VenvPythonEnvironmentManager(),
-    ).init(tmp_path)
-    monkeypatch.chdir(tmp_path)
-    return tmp_path
+    ).init(root)
+    return JsonContextStore(root / ".dadaia" / "states")
 
 
-def test_export_list_create_archive_excluding_mnt_and_import_round_trip(
-    workspace: Path, tmp_path: Path
+def _ctx(name: str, state: ContextState) -> SpecContextProject:
+    return SpecContextProject(
+        name=name,
+        state=state,
+        repo_slug=name,
+        repo_url=f"https://example.com/{name}.git",
+        created_at="2026-01-01T00:00:00+00:00",
+        dead_since=None if state is ContextState.ALIVE else "2026-08-01T00:00:00+00:00",
+        current_branch="develop",
+    )
+
+
+def test_export_then_import_restores_unknown_contexts_dead_and_skips_known(
+    tmp_path: Path,
 ) -> None:
-    """--list alone creates no archive; a real export creates exactly one tar.gz; and
-    --exclude-mnt skips the mnt/ subtree inside it.
+    source = _workspace(tmp_path / "source")
+    source.save(_ctx("alpha", ContextState.ALIVE))
+    source.save(_ctx("beta", ContextState.DEAD))
 
-    Plus: the real generated archive round-trips through ``dadaia import`` — extracting
-    workspace state into a fresh destination without activation side effects (stronger
-    than a hand-crafted synthetic fixture, since it exercises the actual export shape).
-    """
-    list_result = _runner.invoke(app, ["export", "--list", "--exclude-mnt"])
-    assert list_result.exit_code == 0, list_result.output
-    archives = (
-        list((workspace / ".dadaia" / "dist").glob("*.tar.gz"))
-        if (workspace / ".dadaia" / "dist").exists()
-        else []
+    exported = _runner.invoke(app, ["export", "--workspace", str(tmp_path / "source")])
+    assert exported.exit_code == 0, exported.output
+    dist = tmp_path / "source" / ".dadaia" / "dist"
+    assert sorted(p.name for p in dist.iterdir()) == ["spec-contexts.json"]
+    file = dist / "spec-contexts.json"
+    assert str(file) in exported.output
+    payload = json.loads(file.read_text("utf-8"))
+    assert [c["name"] for c in payload["contexts"]] == ["alpha", "beta"]
+
+    target = _workspace(tmp_path / "target")
+    target.save(_ctx("alpha", ContextState.ALIVE))
+
+    imported = _runner.invoke(app, ["import", str(file), "--workspace", str(tmp_path / "target")])
+    assert imported.exit_code == 0, imported.output
+    assert "skipped (exists)" in imported.output and "alpha" in imported.output
+    assert "dadaia context alive beta" in imported.output
+
+    beta = target.get("beta")
+    assert beta is not None
+    assert (beta.state, beta.repo_url, beta.current_branch) == (
+        ContextState.DEAD,
+        "https://example.com/beta.git",
+        "develop",
     )
-    assert archives == []
+    assert beta.dead_since is not None
+    assert target.get("alpha") == _ctx("alpha", ContextState.ALIVE)
 
-    (workspace / "mnt" / "my-tool").mkdir(parents=True)
-    (workspace / "mnt" / "my-tool" / "marker.txt").write_text("hi")
 
-    out = tmp_path / "out"
-    out.mkdir()
-    result = _runner.invoke(app, ["export", "--output", str(out), "--exclude-mnt"])
-    assert result.exit_code == 0, result.output
-    created = list(out.glob("workspace-*.tar.gz"))
-    assert len(created) == 1
+def test_import_refuses_a_file_outside_the_contract(tmp_path: Path) -> None:
+    _workspace(tmp_path / "target")
+    bogus = tmp_path / "workspace-2026.tar.gz"
+    bogus.write_bytes(b"not json")
 
-    import tarfile
+    result = _runner.invoke(app, ["import", str(bogus), "--workspace", str(tmp_path / "target")])
 
-    with tarfile.open(created[0], "r:gz") as tar:
-        names = tar.getnames()
-    assert not any("mnt/" in n for n in names)
+    assert result.exit_code == 1
+    assert "Error" in result.output
 
-    # Import round-trip: the real generated archive extracts cleanly, no activation.
-    import_dest = tmp_path / "imported"
-    import_result = _runner.invoke(
-        app,
-        [
-            "import",
-            str(created[0]),
-            "--workspace",
-            str(import_dest),
-            "--skip-mnt",
-            "--skip-activate",
-        ],
-    )
-    assert import_result.exit_code == 0, import_result.output
-    assert (import_dest / ".dadaia" / "states").exists()
 
-    # Bug test-suite-real-venv-and-ci-longpole: import's bootstrap phase shells out to
-    # `dadaia init`, which escapes the in-process no-real-venv backstop and built a REAL
-    # venv + pip install in the destination (~19 s unloaded, 242 s on a loaded host).
-    # The conftest backstop now intercepts that subprocess and runs init in-process
-    # (against the source under test, venv stubbed) — a real venv materialising here
-    # means the interception regressed.
-    imported_venv = import_dest / ".dadaia" / ".venv"
-    real_venv_files = (
-        sorted(p.name for p in imported_venv.iterdir()) if imported_venv.exists() else []
-    )
-    assert real_venv_files == [], (
-        f"import bootstrap built a REAL venv in the destination (found {real_venv_files})"
-    )
+def _real_checkout(repo: Path, branch: str) -> None:
+    for args in (
+        ["init", "-q", "-b", "main"],
+        ["config", "user.email", "test@test"],
+        ["config", "user.name", "test"],
+        ["commit", "-q", "--allow-empty", "-m", "init"],
+        ["checkout", "-q", "-b", branch],
+    ):
+        subprocess.run(["git", *args], cwd=repo, capture_output=True, text=True, check=True)
+
+
+def test_export_refreshes_an_alive_context_branch_from_its_real_checkout(tmp_path: Path) -> None:
+    """Intent: CONTRACT — AC11 (FR13): an ALIVE context's `branch` is re-read from the repo's
+    real checked-out HEAD at export time, superseding the stale store value, in both the
+    store and the exported record.
+
+    Size: MEDIUM — a real `git init`/`checkout` under `repos/<slug>` drives the real
+    `GitSubprocessClient` through the CLI; ported from the retired tar-era e2e
+    (tests/e2e/features/test_branch_tracking.py) when T-046-31 removed the archive."""
+    source = _workspace(tmp_path / "source")
+    source.save(_ctx("alpha", ContextState.ALIVE))  # the store still says "develop"
+    repo = tmp_path / "source" / "repos" / "alpha"
+    repo.mkdir(parents=True)
+    _real_checkout(repo, "feature/test")
+
+    exported = _runner.invoke(app, ["export", "--workspace", str(tmp_path / "source")])
+    assert exported.exit_code == 0, exported.output
+
+    file = tmp_path / "source" / ".dadaia" / "dist" / "spec-contexts.json"
+    payload = json.loads(file.read_text("utf-8"))
+    assert [(c["name"], c["branch"]) for c in payload["contexts"]] == [("alpha", "feature/test")]
+    alpha = source.get("alpha")
+    assert alpha is not None and alpha.current_branch == "feature/test"

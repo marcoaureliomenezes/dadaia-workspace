@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.workspace_layout import Creator, zones_created_by
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from tests.fakes import FakePublicAssetManager, FakePythonEnvironmentManager
 
@@ -22,33 +23,30 @@ def service() -> WorkspaceService:
     )
 
 
-def test_init_creates_dirs_state_files_and_is_idempotent(
+def test_init_creates_only_registry_init_zones_and_canon_seeds(
     service: WorkspaceService, workspace_root: Path
 ) -> None:
+    """Intent: CONTRACT — 0.4.6 AC10 (FR1/FR10).
+
+    ``init`` materialises exactly the ``Creator.INIT`` rows of ``DADAIA_ZONES`` — the
+    registry view, never a second list — so a retired zone (``academy``, ``reports``,
+    ``scripts``, an eager ``tmp``) cannot reappear, and no ``academy.json`` is seeded.
+    """
     service.init(workspace_root, skip_assets=True)
 
-    assert (workspace_root / ".dadaia" / "states").is_dir()
-    assert (workspace_root / ".dadaia" / "agentic").is_dir()
-    assert (workspace_root / ".dadaia" / "reports").is_dir()
-    assert (workspace_root / ".dadaia" / "scripts").is_dir()
-    assert not (workspace_root / ".dadaia" / "src").exists()
-    assert (workspace_root / ".dadaia" / "tmp" / "python").is_dir()
-    assert (workspace_root / ".dadaia" / "tmp" / "json").is_dir()
+    dadaia = workspace_root / ".dadaia"
+    assert {p.name for p in dadaia.iterdir()} == {z.name for z in zones_created_by(Creator.INIT)}
+    assert (dadaia / "states").is_dir()
+    for retired in ("academy", "reports", "scripts", "tmp", "src"):
+        assert not (dadaia / retired).exists(), retired
     assert (workspace_root / ".agents" / "skills").is_dir()
     assert (workspace_root / ".claude").is_dir()
     assert (workspace_root / ".codex").is_dir()
 
-    spec_contexts_path = workspace_root / ".dadaia" / "states" / "spec_contexts.json"
-    assert spec_contexts_path.exists()
+    spec_contexts_path = dadaia / "states" / "spec_contexts.json"
     assert json.loads(spec_contexts_path.read_text()) == {"schema_version": "2", "contexts": []}
 
-    academy_path = workspace_root / ".dadaia" / "academy" / "academy.json"
-    assert academy_path.exists()
-    assert json.loads(academy_path.read_text()) == {"version": "1", "courses": []}
-
-    server_registry_path = workspace_root / ".dadaia" / "states" / "server_registry.json"
-    assert server_registry_path.exists()
-    registry_data = json.loads(server_registry_path.read_text())
+    registry_data = json.loads((dadaia / "states" / "server_registry.json").read_text())
     assert registry_data["version"] == "1"
     assert registry_data["entries"] == []
 

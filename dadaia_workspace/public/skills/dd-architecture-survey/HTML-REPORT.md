@@ -10,7 +10,7 @@ beside the report). Split any report over 30 KB behind an `index.html`
 
 ## Scaffold
 
-One HTML file under `.dadaia/reports/<context>/<agent>/`, everything inline:
+One HTML file in the repo's reports home (`DADAIA.md` §5.2), everything inline:
 
 ```html
 <!doctype html>

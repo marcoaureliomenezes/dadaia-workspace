@@ -44,12 +44,12 @@ tags: [context, lifecycle, session, no-locks, privacy]
 - Mutating file-tool activity best-effort records advisory presence; a live peer warns, never denies, and records expire by heartbeat age.
 - `presence.gc()` is the only reaper — presence records, throttle and sentinel markers, and the directories they empty — called by `doctor --fix` and the PostToolUse reconciler on one throttle; a live session's own record is never touched.
 - `context list`, `context show` and `dadaia doctor` accept `--redact`, presence block included, turning every foreign context name and repo slug into a stable `[REDACTED-CONTEXT-<n>]` placeholder at the render boundary.
-- `dadaia export` tars durable workspace state under `.dadaia/dist/`, excluding `.env`, caches and cloned `repos/`.
-- `dadaia import <archive>` restores contexts as they were, re-cloning through `context alive`.
+- `dadaia export` refreshes each ALIVE repo's checked-out branch, then writes one file, `.dadaia/dist/spec-contexts.json` (`spec-contexts-export-v1`: per context slug, name, state, repo URL, branch, associated repos, last sync); anything else in `dist/` is `WS-dist-slop` ([[workspace-doctor]]).
+- `dadaia import <file>` accepts only that schema version, registers each unknown name DEAD with its branch and associated repos, prints `skipped (exists)` for a known name and names `dadaia context alive <name>` as the restore step.
 
 ## Runtime state
 
-`.dadaia/states/spec_contexts.json` and `spec_contexts.v2.bak.json` (pre-migration, byte verbatim); `.dadaia/sessions/`; `.dadaia/states/presence/`; `repos/<slug>/`, where only the main repo carries canonical specs.
+`.dadaia/states/spec_contexts.json`; `.dadaia/sessions/`; `.dadaia/states/presence/`; `.dadaia/dist/spec-contexts.json`; `repos/<slug>/`, where only the main repo carries canonical specs.
 
 ## Dependencies
 

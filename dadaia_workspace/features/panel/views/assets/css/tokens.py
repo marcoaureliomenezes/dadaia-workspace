@@ -62,7 +62,7 @@ TOKENS_CSS: str = """
   --color-card-hover:    #f8feff;
   --color-chip-memory-bg: #f0fbf7;  /* memory pill chip background — Phase C */
   --color-session-bg:    #f5f5f5;   /* session binding zone background — Phase C */
-  --color-academy-chip-bg: #fef9ec; /* academy type chip background — T-P5-28 */
+  --color-chip-bg: #fef9ec; /* entity badge background */
   --color-report-tag-bg:   #f0f4f7; /* report agent tag chip background — T-P5-34 */
   --color-delete-icon:     #666666; /* trash button icon color — T-P5-34 */
   --color-delete-icon-hover: #c0392b; /* trash button hover color — T-P5-34 */
@@ -180,7 +180,7 @@ html:not([data-theme]) {
   --color-card-hover:       #f8feff;
   --color-chip-memory-bg:   #f0fbf7; /* memory pill chip background — Phase C */
   --color-session-bg:       #f0fbf7; /* session binding zone — Phase C */
-  --color-academy-chip-bg:  #fef9ec; /* academy type chip background — T-P5-28 */
+  --color-chip-bg:  #fef9ec; /* entity badge background */
   --color-report-tag-bg:    #f0f4f7; /* report agent tag chip background — T-P5-34 */
   --color-delete-icon:      #666666; /* trash button icon color — T-P5-34 */
   --color-delete-icon-hover: #c0392b; /* trash button hover color — T-P5-34 */
@@ -221,7 +221,7 @@ html[data-theme="sage"] {
   --color-card-hover:       #f6faf3;
   --color-chip-memory-bg:   #f5fbf0; /* memory pill chip background — Phase C (sage) */
   --color-session-bg:       #f4faf0; /* session binding zone — Phase C (sage) */
-  --color-academy-chip-bg:  #fef9ec; /* academy type chip background — T-P5-28 */
+  --color-chip-bg:  #fef9ec; /* entity badge background */
   --color-report-tag-bg:    #f0f4f7; /* report agent tag chip background — T-P5-34 */
   --color-delete-icon:      #666666; /* trash button icon color — T-P5-34 */
   --color-delete-icon-hover: #c0392b; /* trash button hover color — T-P5-34 */
@@ -264,7 +264,7 @@ html[data-theme="warm"] {
   --color-card-hover:       #fffaf2;
   --color-chip-memory-bg:   #fffbf4; /* memory pill chip background — Phase C (warm) */
   --color-session-bg:       #fff8ee; /* session binding zone — Phase C (warm) */
-  --color-academy-chip-bg:  #fff8e6; /* academy type chip background — T-P5-28 (warmer) */
+  --color-chip-bg:  #fff8e6; /* entity badge background */
   --color-report-tag-bg:    #f7f3ee; /* report agent tag chip background — T-P5-34 (warm cream) */
   --color-delete-icon:      #666666; /* trash button icon color — T-P5-34 */
   --color-delete-icon-hover: #c0392b; /* trash button hover color — T-P5-34 */

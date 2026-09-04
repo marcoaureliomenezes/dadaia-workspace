@@ -110,7 +110,6 @@
     "agents_md": [
       "AGENTS.md (workspace root guardrail)",
       "specs/AGENTS.md (spec-context rules)",
-      ".dadaia/reports/AGENTS.md",
       ".dadaia/handoff/AGENTS.md",
       "repos/<slug>/AGENTS.md (repo guardrail pair)"
     ]

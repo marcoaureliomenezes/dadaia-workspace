@@ -58,22 +58,22 @@ def _write_architecture_md(specs: Path, pkgs: tuple[str, ...]) -> None:
     [
         (
             "stale_node",
-            ("academy", "spec_artifacts"),
-            frozenset({"academy"}),
+            ("panel", "spec_artifacts"),
+            frozenset({"panel"}),
             ["MEM-DRIFT-1"],
             "spec_artifacts",
         ),
         (
             "missing_live_package",
-            ("academy",),
-            frozenset({"academy", "repos"}),
+            ("panel",),
+            frozenset({"panel", "repos"}),
             ["MEM-DRIFT-1"],
             "repos",
         ),
         (
             "matching",
-            ("academy", "repos"),
-            frozenset({"academy", "repos"}),
+            ("panel", "repos"),
+            frozenset({"panel", "repos"}),
             [],
             None,
         ),
@@ -108,7 +108,7 @@ def test_mem_drift1_no_architecture_md_produces_nothing(
 ) -> None:
     specs = tmp_path / "specs"
     (specs / "memory").mkdir(parents=True)
-    monkeypatch.setattr(doctor_memory, "_live_feature_package_names", lambda: {"academy"})
+    monkeypatch.setattr(doctor_memory, "_live_feature_package_names", lambda: {"panel"})
 
     issues = MemoryValidator(specs).check_mem_drift1_features_package_map()
 
@@ -120,7 +120,7 @@ def test_mem_drift1_no_memory_dir_produces_nothing(
 ) -> None:
     specs = tmp_path / "specs"
     specs.mkdir(parents=True)
-    monkeypatch.setattr(doctor_memory, "_live_feature_package_names", lambda: {"academy"})
+    monkeypatch.setattr(doctor_memory, "_live_feature_package_names", lambda: {"panel"})
 
     issues = MemoryValidator(specs).check_mem_drift1_features_package_map()
 
@@ -137,7 +137,7 @@ def test_mem_drift1_missing_heading_produces_nothing(
     mem_dir = specs / "memory"
     mem_dir.mkdir(parents=True)
     (mem_dir / "ARCHITECTURE.md").write_text("# Architecture\n\nnothing relevant here.\n")
-    monkeypatch.setattr(doctor_memory, "_live_feature_package_names", lambda: {"academy"})
+    monkeypatch.setattr(doctor_memory, "_live_feature_package_names", lambda: {"panel"})
 
     issues = MemoryValidator(specs).check_mem_drift1_features_package_map()
 

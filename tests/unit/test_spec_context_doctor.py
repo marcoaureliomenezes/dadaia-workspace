@@ -197,3 +197,40 @@ def test_inv6_main_vs_associated_slug_collision_reported(tmp_path: Path) -> None
     assert len(inv6) == 1
     assert inv6[0].fixable is False
     assert "a" in inv6[0].description and "b" in inv6[0].description
+
+
+def test_inv5_fix_refuses_a_dead_slug_that_resolves_outside_repos(tmp_path: Path) -> None:
+    """Intent: CONTRACT — bug import-registers-unvalidated-slugs-that-doctor-fix-inv5-rmtrees.
+    A DEAD record whose slug resolves outside ``<workspace>/repos/`` (``..`` is the workspace
+    root itself) is never rmtree'd: the step reports a skipped action and every entry of
+    the workspace survives."""
+    (tmp_path / "repos" / "victim").mkdir(parents=True)
+    (tmp_path / "repos" / "victim" / "keep.txt").write_text("keep", encoding="utf-8")
+    (tmp_path / ".dadaia" / "states").mkdir(parents=True)
+    svc, _ = _make_doctor(tmp_path, [_ctx("escape", repo_slug=".."), _ctx("dot", repo_slug=".")])
+
+    actions = svc.fix()
+
+    assert (tmp_path / "repos" / "victim" / "keep.txt").read_text(encoding="utf-8") == "keep"
+    assert (tmp_path / ".dadaia" / "states").is_dir()
+    inv5 = [a for a in actions if a.startswith("INV-5:")]
+    assert len(inv5) == 2 and all("skipped" in a and "outside" in a for a in inv5), actions
+
+
+def test_inv5_fix_never_follows_a_symlinked_repo_dir(tmp_path: Path) -> None:
+    """Intent: CONTRACT — same bug, the CWE-59 shape: ``repos/<slug>`` is a symlink out of
+    ``repos/``; the target is neither removed nor emptied."""
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "keep.txt").write_text("keep", encoding="utf-8")
+    ws = tmp_path / "ws"
+    (ws / "repos").mkdir(parents=True)
+    (ws / "repos" / "stale").symlink_to(outside, target_is_directory=True)
+    svc, _ = _make_doctor(ws, [_ctx("stale")])
+
+    actions = svc.fix()
+
+    assert (outside / "keep.txt").read_text(encoding="utf-8") == "keep"
+    assert [a for a in actions if a.startswith("INV-5:")] == [
+        "INV-5: skipped 'repos/stale' (outside repos/)"
+    ]

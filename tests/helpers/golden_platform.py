@@ -82,9 +82,8 @@ _DCX9_WRAPPER_RE = re.compile(
 # PATH varies host to host, e.g. a dev sandbox with Codex installed vs a CI runner
 # without it). Canonicalize the whole line to one fixed marker regardless of which of
 # the three branches (absent / certified-version-match / uncertified-version) the
-# capturing host produced — the doctor golden's job is to prove a trust-boundary line
-# still appears at all (test_golden_never_buries_an_attesting_check), not to pin its
-# host-dependent wording; the exact per-branch wording is unit-tested directly against
+# capturing host produced — a doctor golden's job is to prove a trust-boundary line
+# still appears at all, not to pin its host-dependent wording; the exact per-branch wording is unit-tested directly against
 # an injected fake probe in test_codex_rule_corpus_reachable.py.
 _CODEX_TRUST_BOUNDARY_RE = re.compile(r"^\[info\] codex:trust-boundary — .*\(WS-CDX-HYGIENE\)$")
 

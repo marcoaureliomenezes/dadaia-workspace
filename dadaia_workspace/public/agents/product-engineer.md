@@ -39,7 +39,7 @@ input_contract:
   produces_outputs:
     - name: discovery_report
       kind: report
-      path: .dadaia/reports/{context}/product-engineer/{ts}-discovery.html
+      path: repos/{context}/reports/product-engineer/{ts}-discovery.html
       schema_ref: handoff-schema-v1
     - name: release_spec
       kind: spec
@@ -61,7 +61,7 @@ input_contract:
 paths:
   write_allowlist:
     - specs/**
-    - .dadaia/reports/<ctx>/product-engineer/**
+    - repos/<ctx>/reports/product-engineer/**
     - .dadaia/handoff/<ctx>/**
 ---
 
@@ -101,7 +101,7 @@ You own the what so engineers implement the how — you never implement.
 - Never write source code, tests, or CI/CD.
 - Never write `specs/backlog/**` — by-convention read-only, PM curates (`DADAIA.md` §6 Backlog).
 - Never write to `specs/{backlog,bugs,audits}/_archive/**` — the gate blocks it.
-- Never treat a report in `.dadaia/reports/<context>/` as a source of truth — memory is; resolve a conflict in the release SPEC.
+- Never treat an HTML report as a source of truth — memory is; resolve a conflict in the release SPEC.
 - Never create PLAN/TASKS without an approved SPEC, or skip closure before archiving.
 
 If asked to create PLAN/TASKS without an approved SPEC, or to skip closure before archiving:

@@ -128,7 +128,7 @@ def _live_feature_package_names() -> set[str]:
     itself lives under — never a hardcoded name list (the deleted contract test's own
     technique, preserved). ``dadaia_workspace.features`` is the package NAMESPACE, not a
     sibling feature: the `features-no-cross-feature` independence contract's ``modules =``
-    list names only the sub-packages (``features.academy``, …, never bare ``features``
+    list names only the sub-packages (``features.panel``, …, never bare ``features``
     itself), and this module's own empty ``__init__.py`` means importing it loads no
     sibling code — so this import carries no cross-feature edge (verified live by
     `lint-imports --config setup.cfg --no-cache`, which this module's own contract gates).

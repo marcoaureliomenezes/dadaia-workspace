@@ -3,7 +3,7 @@
 Contract — the four reviewer personas' declared evidence home.
 
 `software-architect`, `qa-engineer`, `code-reviewer` and `security-reviewer` write their
-evidence to the canonical home `DADAIA.md` §5.2 names — `.dadaia/reports/<ctx>/<agent>/**`
+evidence to the canonical home `DADAIA.md` §5.2 names — `repos/<ctx>/reports/<agent>/**`
 plus the handoff under `.dadaia/handoff/<ctx>/**`; `security-reviewer` alone additionally
 writes `specs/releases/**/verdicts/**`, the PR-head verdict store the required gate reads
 (`DADAIA.md` §4.2). `specs/releases/AGENTS.md` retired the `reviews/` directory, so no
@@ -63,14 +63,14 @@ def test_no_persona_declares_the_retired_reviews_glob(persona: str) -> None:
     allowlist = _allowlist(persona)
     assert _RETIRED_REVIEWS_GLOB not in allowlist, (
         f"{persona} declares {_RETIRED_REVIEWS_GLOB}; specs/releases/AGENTS.md retired "
-        "the reviews/ directory — evidence lives in .dadaia/reports + the handoff (§5.2)"
+        "the reviews/ directory — evidence lives in repos/<ctx>/reports + the handoff (§5.2)"
     )
 
 
 @pytest.mark.parametrize("persona", _REVIEWER_PERSONAS)
 def test_reviewer_persona_declares_the_canonical_evidence_home(persona: str) -> None:
     allowlist = _allowlist(persona)
-    reports_home = f".dadaia/reports/<ctx>/{persona}/**"
+    reports_home = f"repos/<ctx>/reports/{persona}/**"
     assert reports_home in allowlist, (
         f"{persona} must declare {reports_home} in paths.write_allowlist (DADAIA.md §5.2)"
     )

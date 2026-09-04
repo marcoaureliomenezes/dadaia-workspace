@@ -156,7 +156,7 @@ code {
    trailing edge (margin-left:auto, in projects.py); a long title ellipsises
    before the badge shrinks. Token-anchored; no colour/type/radius literals.
    Scoped via :has(.projects-count-badge) so the plain title/description headers
-   (Servers, Reports, Academy) keep their stacked title+description flow. */
+   (Servers) keep their stacked title+description flow. */
 .section-header:has(.projects-count-badge) {
   display: flex;
   align-items: center;

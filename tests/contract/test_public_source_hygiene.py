@@ -89,3 +89,61 @@ def test_pre_push_ci_gate_ships_pyproject_excludes_bytecode_and_scripts_leave_no
 
     after = _bytecode_artifacts_under_public()
     assert after == [], f"script left bytecode under public/: {after}"
+
+
+_RETIRED_SURFACES: tuple[str, ...] = (
+    ".dadaia/reports",
+    "academy",
+    "dadaia clean",
+    "tmp gc",
+    "reports cleanup",
+    "ROOT-4",
+    "legacy-quarantine",
+)
+
+
+def test_public_source_names_no_retired_surface() -> None:
+    """Intent: CONTRACT — 0.4.6 c4 AC13 (FR16, D2/D3/D9): no `public/` text names a retired surface.
+
+    The reports zone, academy, `dadaia clean`, `dadaia tmp gc`, `dadaia reports cleanup`,
+    the `ROOT-4` invariant and the legacy quarantine were retired; the law, skills,
+    personas, templates and entities that are staged verbatim to every consumer must not
+    keep teaching them. Mirrors the SPEC's own grep exactly, so the verdict is the same
+    one the operator runs by hand.
+    """
+    hits: list[str] = []
+    scanned: list[str] = []
+    for path in sorted(_PUBLIC_ROOT.rglob("*")):
+        if not path.is_file():
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            continue
+        rel = path.relative_to(_REPO_ROOT).as_posix()
+        scanned.append(rel)
+        for lineno, line in enumerate(text.splitlines(), start=1):
+            for needle in _RETIRED_SURFACES:
+                if needle in line:
+                    hits.append(f"{rel}:{lineno}: {needle!r}")
+    assert_populated(scanned, "dadaia_workspace/public/data/DADAIA.md")
+    assert hits == []
+
+
+def test_dadaia_5_1_root_list_equals_root_allowed_registry() -> None:
+    """Intent: CONTRACT — 0.4.6 c4 (software-architect fidelity finding, T-046-34): the
+    `DADAIA.md` §5.1 "Root holds only" bullet names exactly
+    `ROOT_ALLOWED_DIRS | ROOT_ALLOWED_FILES` — no missing name, no extra name.
+
+    Documented != allowed was the class of bug this candidate ends (bug
+    doctor-root1-flags-env-that-dadaia-md-9-declares-canonical: the registry admitted
+    `.env`/`.gitignore`, the law did not name them). The law is hand-written today; this
+    test is the ratchet until a renderer derives the bullet from the registry.
+    """
+    from dadaia_workspace.core.workspace_layout import ROOT_ALLOWED_DIRS, ROOT_ALLOWED_FILES
+
+    law = (_PUBLIC_ROOT / "data" / "DADAIA.md").read_text(encoding="utf-8")
+    bullets = [ln for ln in law.splitlines() if ln.startswith("- Root holds only: `")]
+    assert len(bullets) == 1, bullets
+    listed = bullets[0].split("`")[1].split()
+    assert set(listed) == {f"{d}/" for d in ROOT_ALLOWED_DIRS} | set(ROOT_ALLOWED_FILES)

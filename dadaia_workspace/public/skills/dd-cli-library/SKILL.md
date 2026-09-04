@@ -38,12 +38,13 @@ line here and `--help` disagree, `--help` wins.
 ## Workspace state is CLI-owned
 
 - Never edit `.dadaia/states/*.json`, never `git clone` into `repos/`, never
-  `rm -rf repos/<slug>/`, never `tar xzf` an import — `dadaia context alive|dead`
-  and `dadaia import|export` own those.
+  `rm -rf repos/<slug>/`, never hand-write `.dadaia/dist/` — `dadaia context
+  alive|dead` and `dadaia import|export` own those.
 - Lifecycle: `create (dead) → alive → bind → dead → delete`; `context dead` removes
   the repo from disk — never run it casually mid-switch.
-- Import flow: export on source, move the archive, `dadaia import <archive>`, verify
-  with `dadaia context list` + `dadaia doctor`.
+- Portability: `dadaia export` writes `.dadaia/dist/spec-contexts.json` (overwritten
+  each run); on the destination `dadaia import <file>` registers each unknown context
+  DEAD, then `dadaia context alive <slug>` clones it; verify with `dadaia context list`.
 - NO-LOCKS: binds acquire nothing; MUTATING writes leave advisory presence; a live
   foreign presence is one throttled warning, never a block.
 

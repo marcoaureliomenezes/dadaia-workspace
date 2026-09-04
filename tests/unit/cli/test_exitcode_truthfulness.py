@@ -27,6 +27,9 @@ class _StubDoctor:
     def check(self):
         return [_Issue()]
 
+    def scan(self):
+        return ()
+
 
 def test_doctor_exits_nonzero_when_issues_found(tmp_path: Path, monkeypatch) -> None:
     (tmp_path / ".dadaia" / "states").mkdir(parents=True)

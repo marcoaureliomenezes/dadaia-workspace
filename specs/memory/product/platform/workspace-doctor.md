@@ -2,31 +2,29 @@
 slug: workspace-doctor
 title: workspace-doctor
 category: product
-tldr: Diagnoses root hygiene, venv health, context coherence, slug-ownership collisions, stale presence and lock residue; repairs deterministic state only.
-summary: dadaia doctor is the after-the-fact backstop for workspace-state invariants — root law, caches, state layout, venv health, repo coherence, slug ownership and stale presence.
-tags: [workspace, doctor, health, repair, privacy]
+tldr: The one scan and reaper of the workspace instance — WS-<zone>-<verdict> findings against the zone registry, a compliance score, --fix deleting expired and slop.
+summary: dadaia doctor classifies every entry of the root, the harness dirs, .dadaia/ and states/ with one finding verdict derived from the zone registry, reports the context invariants, and is the only cleanup engine.
+tags: [workspace, doctor, health, repair, zones, privacy]
 ---
 
-## Checks
+## The scan
 
-- Workspace doctor is the after-the-fact backstop for state and hygiene invariants, alongside `specs doctor`, `backlog doctor` and `public doctor`.
-- Each reports: a non-zero exit informs an agent or the operator and never stops work mid-flow.
+- `dadaia doctor` walks the instance in one fixed order — root, the harness dirs (`agents` plus the profile's `claude codex kimi-code`), the `.dadaia/` top level, the closed-canon zones `states dist sessions`, the TTL zones `handoff tmp mcps .cache`; `references/` and `.venv/` are never walked, symlinks never followed.
+- Every entry gets one finding verdict: `canon`, `operator` (matches an instance exception), `slop`, `expired` (a file older than the zone's one-day TTL by mtime, or a directory emptied by expiry) or `missing` (an init/install zone or `states/harness_profile.json` absent); `canon` + `operator` count as canonical.
+- Canon per level: root — the root law's directories and files (`.env` and `.gitignore` included); harness dirs — an entry the install ledger names, a directory holding one being descended, not judged; `.dadaia/` — the zone names plus `AGENTS.md` and `.gitignore`; `states/` — `spec_contexts.json server_registry.json install_ledger.json agent_model_policy.json agent_model_policy.json.last-good.json privacy_denylist.json instance_exceptions.txt backlog_subject_aliases.txt harness_profile.json presence/ AGENTS.md`; `dist/` — `spec-contexts.json`; `sessions/` — `*.json`; a TTL zone's own `AGENTS.md` — canon by projection, never a TTL candidate.
+- Instance exceptions are `.dadaia/states/instance_exceptions.txt`: one glob per line, `#` comments, deduplicated, order kept, matched against the entry name and its root-relative path at root and inside the harness dirs; the root-whitelist hook reads the same file ([[sdd-gate-v3]]).
+- Output is one line per non-canonical entry, `WS-<zone>-<verdict>  <path>  (<detail>)` — `<zone>` is `root`, the harness dir, `dadaia`, or the zone name without its leading dot — then the score line `compliance: N/M entries canonical (P%)`, M every entry classified.
+- The context invariants ride the same run: `INV-4`/`INV-5`/`CTX-URL-1` (ALIVE/DEAD repo and URL coherence), `INV-6` (a repo slug owned by two contexts, report-only, [[context-management]]), `PRESENCE-GC` (stale advisory presence), `VENV-1` (venv entrypoint health, manual).
+- Exit 1 on any slop, expired or missing finding or any invariant issue; `--json` mirrors the run as `{"issues", "findings": [{code, path, verdict, fixable, detail}], "compliance": {canonical, total, percent}, "fixed"}`; `--expired-only` narrows the listing to expired entries; `--redact` masks every foreign context name and repo slug at the render boundary.
 
-| Code | Subject |
-|---|---|
-| `ROOT-1..4` | root whitelist, forbidden repo caches/state, required directories, tool-config placement |
-| `VENV-1` | `.dadaia/.venv` Python, pip and dadaia import/entrypoint health |
-| `INV-4`, `INV-5`, `CTX-URL-1` | ALIVE/DEAD repository and URL coherence |
-| `INV-6` | registry-wide repo-slug ownership uniqueness |
-| `PRESENCE-GC` | expired advisory presence records |
-| `RETIRED-LOCK-STATE` | legacy `ctx_locks/` or `sessions/runtime/` residue |
-| `EFF-1` | overdue efficiency-audit signal |
+## The reaper
 
-- `INV-6` folds the registry and reports every `repos/<slug>` owned by more than one context, naming both owners, report-only because choosing the loser is an operator decision ([[context-management]]).
-- ROOT-4's allowed-subdirectory set includes the operator-owned `references`, so a reference clone is never flagged.
-- `--redact` replaces each foreign Spec Context name and repo slug with a stable `[REDACTED-CONTEXT-<n>]` placeholder at the render boundary.
-- `--fix` removes stale presence and retired lock-state trees and repairs deterministic scaffold/state issues, leaving ambiguous or operator-authored material untouched.
+- `--fix` runs in order: `presence.gc` -> stale session records -> migrate `states/root_exceptions.txt` into `instance_exceptions.txt` (parsed once, old file unlinked) -> seed missing (a zone directory; the harness profile from the L1 harnesses whose projection dir exists at root, through the profile store's one writer) -> delete expired -> delete slop -> remove a DEAD context's leftover repo.
+- `--fix --expired-only` stops after "delete expired" and is the SessionStart lane: every projected harness runtime config runs `<venv>/dadaia doctor --fix --expired-only --quiet` at startup and resume, a CLI process rather than a hook module; `--quiet` prints only what changed, nothing on a compliant instance.
+- Structural slop dies only by an explicit `dadaia doctor --fix`; nothing is quarantined or moved, and a deletion target is removed only when its own location resolves inside the workspace, a symlink unlinked and never followed.
+- Never touched: `references/` and `.venv/`, entries the install ledger names and the contents of `agentic/` and `hooks/` (hash drift belongs to `public doctor`, [[public-asset-distribution]]), a zone's `AGENTS.md`, entries matching an instance exception, unexpired files, a live session's own presence record.
+- `dadaia doctor` is the only cleanup engine; `specs doctor`, `backlog doctor`, `public doctor` and `reports doctor` diagnose their own trees and delete no instance file.
 
 ## Dependencies
 
-[[context-management]], [[sdd-gate-v3]], [[workspace-init]], [[quality-assurance]].
+[[context-management]], [[sdd-gate-v3]], [[workspace-init]], [[public-asset-distribution]].

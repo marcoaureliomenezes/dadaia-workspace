@@ -44,17 +44,17 @@ input_contract:
   produces_outputs:
     - name: red_test_report
       kind: report
-      path: .dadaia/reports/{context}/qa-engineer/{ts}-{task_id}-red.html
+      path: repos/{context}/reports/qa-engineer/{ts}-{task_id}-red.html
       schema_ref: handoff-schema-v1
     - name: qa_audit_report
       kind: report
-      path: .dadaia/reports/{context}/qa-engineer/{ts}-qa.html
+      path: repos/{context}/reports/qa-engineer/{ts}-qa.html
       schema_ref: handoff-schema-v1
   stop_if_missing: true
 paths:
   write_allowlist:
     - tests/e2e/**
-    - .dadaia/reports/<ctx>/qa-engineer/**
+    - repos/<ctx>/reports/qa-engineer/**
     - .dadaia/handoff/<ctx>/**
 ---
 
@@ -125,7 +125,7 @@ Navigate via `dd-spec-navigator` before writing any E2E test or acceptance crite
 
 ## 4. Outputs
 
-- Write permissions: `tests/e2e/**` of the active context repo, `.dadaia/reports/<ctx>/qa-engineer/**` and its handoff (`DADAIA.md` §5.2).
+- Write permissions: `tests/e2e/**` of the active context repo, `repos/<ctx>/reports/qa-engineer/**` and its handoff (`DADAIA.md` §5.2).
 - Never write: application source, unit/integration tests (implementer's), `specs/**`, CI YAML.
 - Emit exactly one recommendation: `APPROVED` or `REJECTED`.
 - `APPROVED` requires all planned E2E/acceptance scenarios to pass, with evidence paths (commands, screenshots, logs, endpoint probes).
@@ -133,7 +133,7 @@ Navigate via `dd-spec-navigator` before writing any E2E test or acceptance crite
 - `REJECTED` includes repro steps, expected/actual behavior, evidence paths, the commit tested.
 - Always include an explicit security/privacy leakage note; surface suspected leakage to PM, keep the task blocked.
 - Rerun the full method after rework before changing the recommendation.
-- Report path: `.dadaia/reports/<context>/qa-engineer/<UTC>-<type>.html` (`e2e-validation`, `deploy-validation`, `test-quality-audit`).
+- Report path: `repos/<context>/reports/qa-engineer/<UTC>-<type>.html` (`e2e-validation`, `deploy-validation`, `test-quality-audit`).
 - Reports: handoff-first (`DADAIA.md` §5). Emit via `dd-handoff-emitter` — schema `handoff-v1.2`.
 - `self_pull.refs` lists only atoms this session actually read.
 

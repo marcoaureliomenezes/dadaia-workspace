@@ -136,26 +136,6 @@ class FakeGitClient:
         return self._unpushed_commit_counts.get(path, 0)
 
 
-class FakeCourseStore:
-    def __init__(self) -> None:
-        self._store: dict[str, object] = {}
-
-    def save(self, course: object) -> None:
-        self._store[course.slug] = course  # type: ignore[call-overload]
-
-    def update(self, course: object) -> None:
-        self._store[course.slug] = course  # type: ignore[call-overload]
-
-    def get(self, slug: str) -> object | None:
-        return self._store.get(slug)
-
-    def list_all(self) -> list[object]:
-        return list(self._store.values())
-
-    def delete(self, slug: str) -> None:
-        self._store.pop(slug, None)
-
-
 class FakePublicAssetManager:
     def __init__(self) -> None:
         self.staged: list[Path] = []

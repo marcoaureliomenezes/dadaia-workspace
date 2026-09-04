@@ -6,115 +6,184 @@
 
 ---
 
-## Candidate 3 — slop law
+## Candidate 4 — workspace instance compliance: one zone registry, one doctor
 
 ### Method
 
-1. **Decision before law.** ADR 0010 lands first and alone; later edits cite an existing id.
-2. **Mechanism before law.** T-046-23 lands the fixed-section seam before T-046-18 heals the
-   constitution with `specs doctor --fix`.
-3. **Law before pointers.** §7.6 exists before any file points at it.
-4. **Pointers replace copies in the same commit.** No deprecation window; two homes never
-   coexist across a task boundary.
-5. **Detection after law, ratchets independent.** `SLOP.md` cites §7.6; the ratchets read
-   the tree, not the law, and run in parallel.
-6. **Memory in its phase.** Part 2 and the fixed blocks land in the CLOSURE pass; the Part-1
-   hunk (P-24, P-29) rides the operator's ADR-0010 acceptance commit (`DADAIA.md` §6.5).
-7. **Curation last, closed-scope.** Batch 1 = `tests/contract`; the rest re-enters via the
-   closure deferral, never under a reopened task id.
+1. **Record before views.** The registry and its three ratchets land first and alone (FR1+FR2);
+   every later task derives a view from it or deletes a hand copy of it.
+2. **Expand, switch, contract.** The doctor absorbs the four engines (FR3+FR4) before any engine
+   is deleted; consumers switch to the registry before the lists die; each demolition is one
+   green commit.
+3. **Delete, never quarantine.** The dry `dadaia doctor` listing is the safety step; `--fix` is
+   the deletion; no mover, no legacy set, no manifest of moved files.
+4. **One writer per record.** `harness_profile.json` gets one store writer; `spec-contexts.json`
+   one export writer; the exceptions file one migration inside `fix()`.
+5. **Law after mechanism.** `ai-engineer` rewrites `DADAIA.md`, the zone fragments and the skills
+   only once the code they describe exists (FR16 blocked by FR9-FR14).
+6. **Memory in its phase.** The atom, the decider row, the P-11 wording and the catalog land in
+   the CLOSURE pass (FR17).
+7. **Validate on this instance.** The candidate is done when `dadaia doctor` on the live
+   workspace reads 100% after `--fix`, then projection, `public doctor` and `specs doctor` agree.
 
-### Seams
+### Module map (architect A-B)
 
-| FR | Seam it cuts | Grows / deletes |
+| Module | Role after the candidate | Grows / deletes |
 |---|---|---|
-| FR1 | `DADAIA.md` §7 — always-on law; §7.6 a new sibling section | +11 lines; makes 6 homes deletable |
-| FR2 | constitution §12 + the `slop-law` marker pair | -17; §12 becomes an interface; the block is rendered, not written |
-| FR3 | memory Part 1/Part 2 seam, CLOSURE only | +24; `Measured by:` moves numbers into test modules |
-| FR4 | scoped-`AGENTS.md` seam — the write point | -52 -3 scaffold; `tests/AGENTS.md` stops being a second law file |
-| FR5 | skill sibling `dd-code-review/SLOP.md`, loaded on invocation | +47 off the always-on budget; persona smell lists deleted |
-| FR6 | persona `§1 Owns` — proof, not rule | net 0 across 6 personas; hashes re-recorded, no new row |
-| FR7a | `test_test_suite_ratchets.py` — the one Intent counter | V31 replaces V27 (±0); e2e script pair deleted (-120) |
-| FR7b | `tests/contract/` — repo-pure V32-V34 | +80; every walk through the shared helper |
-| FR7c | `scoped_law.py::install_scoped_law` — the only repo-tree write seam | two blocks -> one 4-row loop; no new seam |
-| FR8 | `RC-FLOW.md` step 8 — closure GC | +2; 678 handoffs deleted from the instance |
-| FR9 | `tests/contract` — the suite itself | undefended tests deleted; the rest declared |
-| FR10 | `memory_canon.py` — the one home of memory-tree shape facts | +1 leaf table, +2 pure functions, +1 rule family; -3 scaffold slop lines |
+| `core/workspace_layout.py` | the one home of root law + `.dadaia` layout: `ZoneClass`, `Creator`, `Zone`, `DADAIA_ZONES`, `STATES_CANON`, `DADAIA_ROOT_FILES`, `INSTANCE_EXCEPTIONS`, `parse_exception_globs`, derived views | +60; -39 (two tuples) |
+| `features/spec_context/doctor.py` | `_scan_zones()` -> `Finding(code, path, verdict, fixable, detail)`; `fix()` consumes the same list in the fixed order | +140; -240 (ROOT-1..4, RETIRED-LOCK, EFF-1, globs) |
+| `cli/commands/doctor.py` | `--fix`, `--expired-only`, `--json`, `--quiet`, the score line, exit code | +30 |
+| `infrastructure/public_assets.py` | `stage` renders the zone table and the states canon table into the two fragments | +25; -21 hand rows |
+| `infrastructure/projection_rules.py` | harness-dir predicate `foreign_entries(workspace_root, profile)` (moved from `public doctor`); `_scripts_tree_rules` gone | +0 net; -9 |
+| `infrastructure/json_harness_profile_store.py` | `write` — the one profile writer (init + fix) | +15; -46 in `workspace/service.py` |
+| `features/workspace/service.py` | init creates `creator is INIT` zones + canon seeds through the store | -15 lists, -40 writer, -4 academy |
+| `features/export/service.py`, `features/import_/service.py` | JSON out via `atomic_write`; JSON in via the injected `JsonContextStore.save` | 193->60, 295->60; models 32->12, 32->10; cli 60->25, 89->35 |
+| `hooks/pre_gate.py`, `hooks/sdd_post_gate.py` | latency and post-gate telemetry writers removed | -80 |
+| harness runtime configs (Claude, Codex) | one SessionStart entry: `dadaia doctor --fix --expired-only --quiet` | +24 |
+| `public/data/{dadaia,states}-AGENTS.md` | `<!-- zones -->` / canon placeholders, rendered at stage | -21 |
 
-### Deletion ledger — what leaves, and from where
+- Seam placement: the registry is data plus pure parse — `core` stays I/O-free (P-11 set
+  unchanged at eight); `doctor` consumes `core` + `infrastructure` only (P-07); hooks import
+  nothing new and SessionStart is a CLI process (P-12); `infrastructure` imports `core` only for
+  the table render (P-05).
+- Deletion test on a new `core/zones.py`: a second home for the same fact family, imported next
+  to `workspace_layout` by every consumer — pass-through; rejected. Extend the existing leaf.
 
-- `tests/AGENTS.md` -52: "Intent taxonomy, admission, deletion" (37), "No Slop" (11), "Good
-  Test Standard" (6) — homes: `dd-test-stewardship`, §7.6, `slop-tests`.
-- `specs/constitution.md` -17: §12's paragraphs -> 3 bullets + pointer; `:11` "A rule stated
-  twice…"; §16's closing sentence -> "(§12)".
-- `public/scaffold/` -3: constitution `:86`, the `:146` "(slop, §8)" phrase, `memory/QUALITY.md`
-  `:21-23` — replaced by rendered marker blocks, not by pointers.
-- `tests/scripts/check_test_intent_declared.py` + `tests/integration/scripts/
-  test_check_test_intent_declared.py` -120, and `V27` (`_V27_INTENT_DECLARED_FLOOR`) — V31
-  is V27 with the assertion inverted and per-tier; three Intent counters become one.
-- V35 leaves the ratchet table: a wall-clock count of a directory outside the repo is not a
-  property of the tree.
-- `scoped_law.py`: two hand-written install blocks -> one loop over a table.
-- Personas: "Never fabricate a test…" (software-engineer); §5 smells -> one S4/S5 pointer
-  (software-architect); "Never accept: magic-mock inflation…" -> SLOP.md pointer (qa-engineer).
-- `.dadaia/handoff/**` — 678 handoffs older than 30 days, deleted at T-046-21.
-- `tests/contract` — every undefended test in batch 1, each deletion citing its criterion and
-  the replacement `file:line`.
+### Deletion ledger (architect C) — net -8,165 lines (-4,755 Python)
 
-### Bug-surface answer: reduced, on all three touched features
+| Block | What leaves | Lines |
+|---|---|---|
+| workspace_clean | `features/workspace_clean/**`, `cli/commands/clean.py`, `main.py` wiring | 241 |
+| tmp_gc | `features/tmp_gc/**`, `cli/commands/tmp.py`, `main.py` wiring | 339 |
+| reports retention + verbs | `features/reports/{retention,next}.py`, `__init__` exports, eight `cli/commands/reports.py` verbs, container builders | 913 |
+| academy | `features/academy/**` (44 course files), CLI, `core/models/course.py`, `json_course_store.py`, container, panel views/api/css/js, routes, static, `core.js`, tab, init dir, export line | 4,397 |
+| panel reports | `views/{reports,api_reports}.py`, `css/{reports,reports_doc}.py`, `js/reports.js`, routes, static, `core.js`, tab, `reports-AGENTS.md`, projection row, behavior-map entry | 1,188 |
+| logs | `pre_gate._append_latency` + tail, `sdd_post_gate` three writers, `jsonl_log_rotation.py`, `LOG_ROTATION_MAX_BYTES` | 263 |
+| legacy quarantine | `migrate/legacy_dadaia_dirs.py`, reconcile call, setup.cfg ignore edge | 89 |
+| hygiene | `core/models/hygiene.py` | 148 |
+| scripts projection | `_scripts_tree_rules` + call | 9 |
+| export/import tar | service, model and CLI shrink; `patch_state`, `extract`, runner use | 496 |
+| canon lists | `DADAIA_ALLOWED_SUBDIRS`, `DADAIA_ADDITIVE_PREFIXES`, `_DADAIA_*_DIRS` | 54 |
+| doctor ROOT/EFF/RETIRED | `_check_root_1..4`, `_check_retired_lock_state`, `_check_efficiency_audit`, globs | 240 |
+| init profile writer | `_write_harness_profile`, `_persisted_profile_harnesses` -> 6 store-call lines | 40 |
+| `dadaia-AGENTS.md` table | 18 hand rows + 3 stale prose lines | 21 |
+| **removed** | | **8,438** |
+| **added** | registry +60, walk +140, cli +30, store write +15, export/import bodies, table render +25, migration +12, SessionStart +24 | **~345** |
 
-- **Law surface** — six homes -> one; -52/-17/-3 lines. Ledger:
-  `scoped-agents-md-stale-active-md-dual-write-text-past-t-050-21a`,
-  `releases-agents-projection-stale-vs-scaffold-source`,
-  `audits-agents-contradicts-dadaia-6-8-on-directory-disposal` — duplicated rule text drifted
-  three times in one week, each fix a text re-sync (symptom). Deleting the copies is the
-  first structural fix; the fixed sections make the surviving copies doctor-validated.
-- **Ratchets** — one Intent counter instead of three; four repo-pure ratchets; no wall-clock,
-  no out-of-repo read, no private walk. Ledger:
-  `tmp-gc-tests-age-files-by-the-real-clock-against-a-frozen-now`,
-  `frozen-clock-ratchet-scans-tests-tmp-scratch-dir`,
-  `v26-ratchet-scans-tests-tmp-scratch-dir-xdist-race` — the family V35-as-pytest would have
-  rejoined.
-- **Projection** — the bridges land in the one seam that already writes repo trees,
-  install-if-absent. Ledger: `public-install-clobbers-consumer-repo-agents-md` (HIGH),
-  `public-doctor-flags-hand-authored-consumer-agents-md`,
-  `repo-agents-md-law-gate-contradicts-template`, `sdd-gate-blocks-fresh-repo-root-agents-md`
-  — a scoped-law row inherits their classification; a manifest projection would not.
-- Additions against replace-don't-layer: §7.6 replaces six copies; `SLOP.md` replaces persona
-  lists; V32-V34 force numbers down; the fixed-section seam replaces three hand-copied
-  scaffold lines and makes `specs doctor` validate content it only counted before. No branch,
-  flag, hook, CLI verb or second code path.
+- Net-positive sub-parts, justified: table render +25 vs -21 (buys the ratchet that makes
+  "documented but not allowed" unrepresentable — two of the six bugs); SessionStart +24 vs 0
+  (nothing was wired; without it 98% of tmp keeps violating its TTL); store `write` +15 paired
+  with -46 (one writer instead of an inline copy).
+- `legacy_dadaia_dirs.py` does not survive: its set is "not in the registry" = `WS-dadaia-slop`;
+  its quarantine produced bug dadaia-reconcile-quarantines-sanctioned-references-clone; its edge
+  drops the suppressed-edge cap 4 -> 3.
+- Survives unchanged: `core/handoff_index.py`, `reports validate|doctor`, presence and session
+  reapers, `public/data/{tmp,handoff,states}-AGENTS.md` bodies (states gains the rendered canon).
 
-### Execution order
+### Migration on the live instance (architect E) — `dadaia doctor --fix` is the migration
 
-1. T-046-17 — ADR 0010 (no dependency).
-2. T-046-23 — fixed-section mechanism + fragments. Depends on T-046-17.
-3. T-046-18 — the law: DADAIA, constitution (§12 + `--fix`), scoped/scaffold/template
-   files, section + scoped hashes. Depends on T-046-23.
-4. T-046-19 — SLOP.md, skill pointers, personas, skill/agent hashes. Depends on T-046-18.
-5. T-046-20 — V31 in place, V32-V34, scoped-law bridges. Independent; parallel to 2-4.
-6. T-046-21 — RC-FLOW step 8 + one GC run. Independent; serial with T-046-19 only.
-7. T-046-22 — curation of `tests/contract`. Depends on T-046-20 and T-046-23.
-8. Closure — memory pass (Part 2 + fixed blocks), P-24/P-29 with the acceptance commit,
-   deferral record for unit/integration batches, GC sweep, trio review.
-   Disjointness is declared per pair in `TASKS.md` §Parallelism.
+1. `dadaia doctor` (dry): the operator reads the `WS-dadaia-slop` lines for `reports/ academy/
+   logs/ runs/ scripts/` and moves any wanted HTML under `repos/<slug>/reports/` by hand.
+2. `dadaia doctor --fix`: presence gc -> session reap -> `root_exceptions.txt` ->
+   `instance_exceptions.txt` (deduplicated: `.mcp.json` x3 -> 1, `z_img/`+`z_img` -> `z_img`)
+   -> `harness_profile.json` regenerated from the projection dirs present -> expired deleted
+   (5,599 tmp files, 224 handoffs, old mcps captures) -> slop deleted (retired zones, `states/`
+   residue, `sessions/runtime/`, 8 wheels, kaykit packs).
+3. `dadaia public stage && dadaia public install --target all && dadaia public doctor`:
+   `.dadaia/AGENTS.md` rendered from the registry, no `.dadaia/scripts`, no `[foreign]` line.
+4. `dadaia doctor` again: `compliance: N/N entries canonical (100%)`, exit 0.
+5. Consumer workspaces: the same four steps on their next `dadaia doctor --fix`; the exceptions
+   migration (12 lines) is deleted in the release after every consumer has run it.
+
+### Test plan (architect F)
+
+- **Deleted with their feature (16 files):** `test_clean_service.py`, `test_tmp_gc_service.py`,
+  `test_tmp_gc_cmd.py`, `test_retention_service.py`, `test_reports_retention_cleanup.py`,
+  `test_hygiene_models.py`, `test_jsonl_log_rotation.py`,
+  `test_jsonl_log_rotation_concurrency.py`, `test_legacy_dadaia_dirs.py`,
+  `test_academy_service.py`, `test_service_read_lesson.py`, `test_json_course_store.py`,
+  `test_cli_academy.py`, `test_academy_route.py`, `test_api_academy.py`, `test_views_reports.py`.
+- **Rewritten:** `test_spec_context_doctor_root.py` (WS codes, finding-verdict enum, score line,
+  `--json`), `test_workspace_layout_single_authority.py` (registry object identity in doctor,
+  gate_policy, public_assets), `test_root_whitelist.py` (exceptions file name),
+  `test_pre_gate.py` + `test_post_gate_reconciler.py` (no logs assertions),
+  `test_workspace_service.py` (INIT zones + canon seeds, no academy), `test_container.py`,
+  `test_cli_export.py` (+ import round trip through the store), `test_reconcile_service.py` (no
+  quarantine step), `test_dadaia_references_lifecycle_sanction.py` (OPERATOR never walked),
+  `test_doctor_projected_drift.py` (no `[foreign]`).
+- **Goldens:** panel `api_golden_v0155.json` + `test_api_golden.py`, `test_control_tokens.py`,
+  `test_no_auth_contract.py`, `test_api_contract.py`; e2e `tab-navigation`, `response-guard`,
+  `helpers.ts`; `test_install_target_goldens` + `public_asset_roster.py` (no `.dadaia/scripts`);
+  `doctor_all_four_v0158.json`, `test_public_install_e2e.py`, `test_public_install_scope_flags.py`
+  (no `[foreign]`; rendered `.dadaia/AGENTS.md` bytes).
+- **Ratchets that move:** `test_import_linter_ignore_cap.py` cap 4 -> 3 and `modules =` minus
+  three packages; `test_cli_help_quality._RATCHET` re-measured (13 leaves gone); V32 ceiling
+  re-measured down; `test_frozen_clock_aging_ratchet` enumeration (tmp/clean tests gone);
+  `test_behavior_map` (reports source removed); `test_doctor_memory` MEM-DRIFT-1 package map.
+- **New ratchets** (`tests/contract/test_zone_registry.py`, `Intent: CONTRACT`): table equals
+  registry; registry is the only `.dadaia` name list (AST walk, no `.dadaia/<retired>` literal);
+  every creator exists.
+- **RED tests per task** are named in `TASKS.md`; every new test declares `Intent:` and size at
+  birth; no LARGE test is added, none demoted; no quarantine.
+
+### Execution order and parallelism
+
+1. T-046-24 registry + ratchets -> 2. T-046-25 doctor one scan (serial: the foundation).
+3. Lane A (`software-engineer`, shared `container.py`/`cli/main.py`/panel files, serial):
+   T-046-26 engines -> T-046-27 reports -> T-046-28 academy -> T-046-30 scripts ->
+   T-046-31 export/import -> T-046-32 exceptions + profile + `.env`.
+4. Lane B (parallel to lane A after T-046-25): T-046-29 logs (hooks + infrastructure only);
+   T-046-33 table render + SessionStart (`public_assets.stage`, two fragments, runtime configs).
+5. T-046-34 law + skills (`ai-engineer`) after T-046-27 and T-046-33.
+6. T-046-35 memory + CLOSURE (`product-engineer`); T-046-36 live-instance QA run + reviews.
+   Disjointness per pair is declared in `TASKS.md` §Parallelism.
+
+### Bug-surface answer: reduced (architect G)
+
+- Same file, same symptom family, six times in eight weeks; every resolution edited membership,
+  none changed shape. A zone now enters only as `Zone(name, cls, creator, ttl, canon, purpose)`;
+  init, doctor, gate, export and the table are views of one record; the table is rendered and
+  pinned; a second name list fails an AST ratchet; a row without a live creator fails the build.
+- Counts: engines 4 -> 1; canon lists 3 -> 1; TTL authorities 3 -> 1; exception readers 3 -> 2;
+  suppressed edges 4 -> 3; zones 18 -> 11; CLI leaves -13; production net -8,165.
+- Root-cause gate PASS (the bare list is what is replaced; no branch, flag or wrapper added to an
+  existing path). Architecture-fidelity gate PASS (P-01/05/07/11/12 hold; one suppressed edge
+  removed).
+
+### Review gates
+
+- **`software-architect` fidelity review** on the candidate head: module map above vs the diff;
+  the deletion test on every added line; P-07/P-11/P-12 unchanged; verdict names whether any
+  block deviated from sections A-E.
+- **`code-reviewer` three-axis review** (`dd-code-review`): standards; spec (FR1-FR16 vs diff);
+  bug surface citing the six ledger bugs by id and stating "reduced" with the counts above, or
+  "increased" with the line that grew a feature.
+- **`security-reviewer` push verdict** on the PR head sha (`DADAIA.md` §4.2): deletion lanes
+  guarded by `resolve().relative_to(dadaia)`, symlinks never followed, `--quiet` leaks nothing
+  into the model context, no secret material in `spec-contexts.json`, denylist scan green.
+- **`qa-engineer`** closes the candidate on this instance: AC2-AC13 executed live, evidence
+  captured under `.dadaia/tmp/qa-engineer/<date>/`, then the handoff.
 
 ### Technical risks and controls
 
-- **Pointer to a not-yet-existing section.** T-046-18 lands §7.6 before any pointer;
-  `grep -n '§7.6'` across `public/` resolves after each task.
-- **Marker block outside its phase.** The lib's memory blocks are MEMORY class: FIXED-1 ×2
-  is red on the lib between T-046-23 and closure by construction — accepted, named in AC2,
-  never downgraded to WARNING.
-- **Behavior-map red mid-arc.** Each task re-records the rows it changes (T-046-18 sections +
-  scoped; T-046-19 skills/agents; T-046-21 RC-FLOW) — never deferred to the next task.
-- **Ratchet false positives.** V32 excludes `tests/`; V33 is defined in SPEC §8; one
-  mutation fixture per ratchet.
-- **Curation used to go green.** Deleting a test is a `qa-engineer` verdict (`DADAIA.md`
-  §7.2); `software-engineer` executes, never decides.
+- **Destructive `--fix` on the live instance.** Dry list first (step 1 of the migration); the
+  operator ruled the deletion (D8); AG.1 lane guard kept once in the doctor.
+- **Transient red between FR1 and the demolitions.** The instance doctor lists retired zones as
+  slop while their code still exists; the dry default deletes nothing; CI runs the unit suite,
+  not the live instance.
+- **Behavior-map red mid-arc.** T-046-27 re-records its own row; T-046-33 and T-046-34 re-record
+  the fragments they touch — never deferred.
+- **SessionStart cost.** ~100 ms over 5k files, tens of files after the first fix; `--quiet`.
+- **Consumer `[foreign]` readers.** None found outside the goldens; the harness-dir scan moves,
+  its coverage does not shrink.
+- **Exceptions migration lifetime.** 12 lines inside `fix()`, deleted next release; tracked in
+  the closure `drifts` entry.
 
 ### Validation plan
 
-- Per task: the ACs in its `Delivers:` line plus the local CI preflight.
-- Candidate close: `dadaia specs doctor` 0 errors (after the memory pass), `dadaia public
-  doctor` `[ok]`, `pytest` green including V31-V34 and the fixed-sections contract, trio
-  review with the bug-surface axis answering "reduced" against this ledger.
+- Per task: the ACs in its `Delivers:` line plus the local CI preflight (`ruff format --check`,
+  `ruff check`, `mypy --strict`, `pytest`).
+- Candidate close: AC3 on this instance (100%), `dadaia public doctor` `[ok]`, `dadaia specs
+  doctor` 0 errors after the memory pass, `pytest` green with the zone-registry ratchets and
+  the moved ratchets re-pinned, trio review answering "reduced" against the six-bug ledger,
+  security verdict on the PR head.

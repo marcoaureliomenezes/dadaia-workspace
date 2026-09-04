@@ -1,9 +1,6 @@
-// Hash navigation grammar. The initial-load router (below) maps three hash routes to a
-// bare tab activation on page load: #reports | #academy (prefix match, so a
-// trailing ?key=val is tolerated but not parsed). The Sessions tab is click-activated,
-// not an initial-load hash route. No other hash routes exist (the former
-// #memories/#agents/#servers routes and the #agents?filter= params
-// were never wired — v0.1.48 F-truth fix).
+// Hash navigation grammar: none. The Sessions tab is click-activated, not a hash
+// route; the former #memories/#agents/#servers routes and the #agents?filter= params
+// were never wired (v0.1.48 F-truth fix).
 
 (function () {
   'use strict';
@@ -218,10 +215,8 @@
   setInterval(fetchServers, 5000);
   setInterval(updateStatusLabel, 5000);
 
-  // ── Tab activation hook — lazy fetch for sessions/academy/reports ──
+  // ── Tab activation hook — lazy fetch for sessions ──
   // Sessions module: window.Sessions (sessions.js, loaded after this script).
-  // Academy module: window.Academy (academy.js, loaded after this script).
-  // Reports module: window.Reports (reports.js, loaded after this script).
   tabs.forEach(function (tab) {
     tab.addEventListener('click', function () {
       var target = tab.getAttribute('data-section');
@@ -231,35 +226,14 @@
       if (target === 'sessions') {
         window.Panel.activate('sessions');
       }
-      if (target === 'academy') {
-        window.Panel.activate('academy');
-      }
-      if (target === 'reports') {
-        window.Panel.activate('reports');
-      }
     });
   });
-
-  // ── Hash-fragment routing on initial load ─────────────────────────────
-  (function () {
-    var hash = location.hash;
-    if (!hash) { return; }
-    if (hash.startsWith('#reports')) {
-      var reportsTab = document.getElementById('tab-reports');
-      if (reportsTab) { reportsTab.click(); }
-    } else if (hash.startsWith('#academy')) {
-      var academyTab = document.getElementById('tab-academy');
-      if (academyTab) { academyTab.click(); }
-    }
-  })();
 
   // ── Register modules into window.Panel ───────────────────────────────
   // Runs after all synchronous <script> tags have executed (DOMContentLoaded
   // fires after the parser has processed every script in the document head/body).
   document.addEventListener('DOMContentLoaded', function () {
     if (window.Sessions) { window.Panel.register('sessions', window.Sessions); }
-    if (window.Academy) { window.Panel.register('academy', window.Academy); }
-    if (window.Reports) { window.Panel.register('reports', window.Reports); }
   });
 
 })();

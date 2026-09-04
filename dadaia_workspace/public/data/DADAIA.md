@@ -64,7 +64,7 @@
 
 | Class | Paths | Verdict |
 |---|---|---|
-| ADDITIVE | `specs/bugs\|backlog\|audits/`, each area's `_archive/*_histo.jsonl`, `.dadaia/reports\|handoff\|tmp/` | Always writable |
+| ADDITIVE | `specs/bugs\|backlog\|audits/`, each area's `_archive/*_histo.jsonl`, `.dadaia/{handoff,tmp,mcps,.cache}/` | Always writable |
 | MEMORY | `specs/memory/` | Writable in `DEFINITION` and `CLOSURE` phase |
 | MUTATING | everything else in-repo | Writable; records advisory presence |
 | PROTECTED | `.dadaia/sessions/`, projected law files (§8.2) | Blocked |
@@ -127,9 +127,9 @@
 
 ### 5.1 Workspace root
 
-- Root holds only: `.agents/ .claude/ .codex/ .dadaia/ .kimi-code/ repos/ AGENTS.md CLAUDE.md DADAIA.md prompt.md`.
+- Root holds only: `.agents/ .claude/ .codex/ .dadaia/ .git/ .kimi-code/ repos/ .env .gitignore AGENTS.md CLAUDE.md DADAIA.md prompt.md`.
 - Anything the operator created by hand stays, permanently.
-- A tool needing another root entry gets a documented glob in `.dadaia/states/root_exceptions.txt`.
+- A tool needing another root or harness-dir entry gets a documented glob in `.dadaia/states/instance_exceptions.txt`.
 
 ### 5.2 Output paths
 
@@ -137,8 +137,8 @@
 |---|---|
 | Temp files, scripts, screenshots, captures | `.dadaia/tmp/<agent>/<YYYYMMDD>/` |
 | Machine-readable handoffs (default emission) | `.dadaia/handoff/<context>/<UTC>-<agent>-<slug>.handoff.json` |
-| HTML reports | `.dadaia/reports/<context>/<agent>/<UTC>-<slug>.html` |
-| Tool caches, MCP working dirs | `.dadaia/` (`.dadaia/mcps/<server>/`) |
+| HTML reports | `repos/<slug>/reports/<agent>/<UTC>-<slug>.html` |
+| Tool caches, MCP working dirs | `.dadaia/.cache/`, `.dadaia/mcps/<server>/` |
 
 ### 5.3 Repos stay clean
 
@@ -153,6 +153,7 @@
 
 - Handoff-first: JSON handoff by default; HTML report only on operator request or when the next hop is human.
 - Split a report over 30 KB into multiple files behind an `index.html`.
+- A report lives in its repo and is never TTL-reaped; a handoff, scratch file, MCP dir or cache expires one day after its mtime (§8.5).
 - Validate with `dadaia reports validate <path>.handoff.json`; HTML integrity rides on `content_hash`.
 
 ---
@@ -315,6 +316,12 @@
 - Invoke `.dadaia/.venv/bin/dadaia` and `.dadaia/.venv/bin/pip` directly, with absolute paths.
 - Register every dev server you start with `dadaia server register`; check the registry before opening a port.
 
+### 8.5 Instance compliance
+
+- `dadaia doctor` is the one workspace scan and reaper: one `WS-<zone>-<verdict>` finding per line, a final `compliance: N/M entries canonical (P%)` line, `--json` mirror, exit 1 on any slop or expired entry.
+- `.dadaia/` zones and the `states/` canon are one registry (`core/workspace_layout.DADAIA_ZONES`), rendered into `.dadaia/AGENTS.md` at `public stage`; outside manifest, registry and exceptions (§5.1) = slop.
+- SessionStart runs `dadaia doctor --fix --expired-only`; slop dies only by an explicit operator `dadaia doctor --fix`.
+
 ---
 
 ## 9. Credentials
@@ -332,9 +339,9 @@
 
 | Surface | Where |
 |---|---|
-| Scoped law | `specs/AGENTS.md`, `.dadaia/reports/AGENTS.md`, `.dadaia/handoff/AGENTS.md`, `repos/<slug>/AGENTS.md`, any nested `AGENTS.md` |
+| Scoped law | `specs/AGENTS.md`, `.dadaia/AGENTS.md`, `.dadaia/handoff/AGENTS.md`, `repos/<slug>/AGENTS.md`, any nested `AGENTS.md` |
 | Skills | `.claude/skills/`, `.agents/skills/` — skill-to-rule mapping declared once in `public/entities/behavior-map.json` |
-| State | `dadaia context show --json`, `dadaia specs doctor`, `dadaia public doctor`, `dadaia server list`, `dadaia bugs status`, `dadaia panel` |
+| State | `dadaia context show --json`, `dadaia doctor`, `dadaia specs doctor`, `dadaia public doctor`, `dadaia server list`, `dadaia bugs status`, `dadaia panel` |
 
 - Language: operator preference, default English. Tone: direct, concise, operational.
 
@@ -366,6 +373,10 @@
 - **finding** — one recorded audit observation in `FINDINGS.jsonl`.
 - **denylist** — the pattern list the pre-push scan refuses to let through.
 - **projection** — a lib-originated copy of a `public/` asset installed into a runtime tree.
+- **zone** — one top-level `.dadaia/` directory with a registry record: class, creator, TTL, canon, purpose (§8.5).
+- **finding verdict** — `dadaia doctor`'s class for one scanned entry: `canon | operator | slop | expired | missing`; `canon` + `operator` count as canonical.
+- **finding code** — `WS-<zone>-<verdict>`, `<zone>` = `root`, a harness dir, `dadaia`, or a zone name without its leading dot.
+- **instance exceptions** — `.dadaia/states/instance_exceptions.txt`, one glob per line, honoured at the root and inside the harness dirs (§5.1).
 - **operator** — the human who owns the workspace and approves ADRs, deferrals, releases.
 - **dispatcher** — an agent authorized to invoke another agent via subagent dispatch.
 - **slop** — what passes the deletion test without loss (§7.6).

@@ -53,11 +53,9 @@ Each step ends on a checkable criterion. Steps 5–8 are candidate-closure work.
 - Done when: `dadaia bugs stats` and `dadaia backlog doctor` show zero non-terminal picked items.
 
 **Step 8 — Artifact GC sweep.**
-- Scope: this candidate's own artifacts under `.dadaia/`, plus the 30-day sweep.
-- `dadaia reports cleanup --older-than 30d` — expired reports and their handoffs; `--dry-run` first, record the counts.
-- `dadaia tmp gc` — dated scratch older than 3 days and `*cache*` directories under `.dadaia/tmp/`.
-- KEEP anything a surviving `note`/handoff evidence pointer references; lane guard (AG.1): never leave `.dadaia/`, never follow a symlinked directory.
-- Done when: the `closure-artifact-gc` log entry states kept/deleted counts per class and handoffs older than 30 days = 0.
+- `dadaia doctor` dry: read every `WS-<zone>-<verdict>` line and the `compliance:` score line.
+- `dadaia doctor --fix --expired-only` reaps the TTL-expired entries; list the remaining slop for the operator — structural slop dies only by an explicit operator `--fix`.
+- Done when: the `closure-artifact-gc` log entry records the score line and it reads 100%, or names the slop the operator holds.
 
 **Step 9 — Candidate PR.**
 - Open the `feature/{M.m.p}` -> `develop` PR (security verdict covering the head, `DADAIA.md` §4.2); watch CI to green; merge.

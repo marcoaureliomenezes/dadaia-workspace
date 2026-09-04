@@ -62,11 +62,11 @@ def build_capabilities() -> dict[str, Any]:
             "layer_1": ["claude-code", "codex", "kimi-code"],
         },
         "surfaces": {
-            "workspace": ["init", "export", "import", "doctor", "clean"],
+            "workspace": ["init", "export", "import", "doctor"],
             "public_projections": ["stage", "install", "doctor", "list"],
             "panel": ["panel", "server registry"],
             "evidence": ["reports", "handoff validation"],
-            "knowledge": ["memory", "academy", "projected skills", "rules"],
+            "knowledge": ["memory", "projected skills", "rules"],
             "governance": ["bugs", "backlog", "releases", "ci preflight"],
             "extensions": ["repository catalog"],
         },

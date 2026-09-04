@@ -34,12 +34,12 @@ input_contract:
   produces_outputs:
     - name: security_report
       kind: report
-      path: .dadaia/reports/{context}/security-reviewer/{ts}-security.html
+      path: repos/{context}/reports/security-reviewer/{ts}-security.html
       schema_ref: handoff-schema-v1
   stop_if_missing: true
 paths:
   write_allowlist:
-    - .dadaia/reports/<ctx>/security-reviewer/**
+    - repos/<ctx>/reports/security-reviewer/**
     - .dadaia/handoff/<ctx>/**
     - specs/releases/**/verdicts/**
 ---
@@ -104,7 +104,7 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then
 
 ## 4. Outputs
 
-- Write to `.dadaia/reports/<ctx>/security-reviewer/<ts>-security.html`.
+- Write to `repos/<ctx>/reports/security-reviewer/<ts>-security.html`.
 - `## Scan summary` — date, target, tools run, totals by severity.
 - `## OWASP findings` — CWE id, category, severity, `file:line`, redacted description, fix.
 - `## Secrets detected` — `file:line`, pattern, value `[REDACTED]`, action.
