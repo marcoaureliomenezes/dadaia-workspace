@@ -122,7 +122,7 @@ def test_build_doctor_service_wires_pid_probe_live_holder_never_reclaimed(tmp_pa
 
     doctor = container.build_doctor_service(tmp_path)
 
-    retired = [i for i in doctor.check() if i.code == "RETIRED-LOCK-STATE"]
+    retired = [f for f in doctor.scan() if f.code == "WS-states-slop"]
     assert retired
 
     doctor.fix()
@@ -146,12 +146,12 @@ def test_build_doctor_service_wires_pid_probe_dead_holder_reclaimed(tmp_path: Pa
     path = _seed_stale_lock(tmp_path, pid=dead_pid)
     doctor = container.build_doctor_service(tmp_path)
 
-    retired = [i for i in doctor.check() if i.code == "RETIRED-LOCK-STATE"]
+    retired = [f for f in doctor.scan() if f.code == "WS-states-slop"]
     assert retired
 
     actions = doctor.fix()
     assert not path.exists(), "TTL-expired dead-holder lease should be reclaimed by --fix"
-    assert any("RETIRED-LOCK-STATE" in a for a in actions)
+    assert any("WS-states-slop" in a for a in actions)
 
 
 # ---------------------------------------------------------------------------

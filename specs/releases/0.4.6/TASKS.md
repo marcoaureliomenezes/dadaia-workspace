@@ -20,7 +20,7 @@ Write-set paths are relative to `dadaia_workspace/` unless they start with `test
   Write set: core/workspace_layout.py, features/spec_context/gate_policy.py, CONTEXT.md,
   tests/contract/{test_zone_registry,test_workspace_layout_single_authority}.py, tests/unit/core/**.
   Blocked by: none. Delivers: one record answers "what may live in `.dadaia/`" — AC1.
-- [-] T-046-25 — FR3+FR4 (scan half), the one doctor: `_scan_zones()`, `Finding`, the
+- [x] T-046-25 — FR3+FR4 (scan half), the one doctor: `_scan_zones()`, `Finding`, the
   finding-verdict enum (inline in `doctor.py`), `fix()` order, `--fix --expired-only --json
   --quiet`, score line, exit code; `foreign_entries()` moved into infrastructure, `public
   doctor` keeps hash drift; ROOT-1..4 / RETIRED-LOCK-STATE / EFF-1 / globs deleted. RED:

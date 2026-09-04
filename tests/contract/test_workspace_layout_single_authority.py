@@ -11,6 +11,8 @@ package-wide ratchet that no second list can be born.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 pytestmark = pytest.mark.contract
@@ -26,12 +28,23 @@ def test_hook_whitelist_derives_from_core() -> None:
     assert root_whitelist._ROOT_FILES is workspace_layout.ROOT_ALLOWED_FILES
 
 
-def test_doctor_whitelist_is_the_same_object() -> None:
+def test_doctor_root_walk_derives_from_core(tmp_path: Path) -> None:
+    """The doctor holds no root list of its own (T-046-25): every name the law allows
+    reads canon straight off ``workspace_layout``, and the module re-exports nothing."""
     from dadaia_workspace.core import workspace_layout
     from dadaia_workspace.features.spec_context import doctor
+    from tests.fakes import FakeContextStore, FakeGitClient
 
-    assert doctor._ROOT_ALLOWED_DIRS is workspace_layout.ROOT_ALLOWED_DIRS
-    assert doctor._ROOT_ALLOWED_FILES is workspace_layout.ROOT_ALLOWED_FILES
+    assert not hasattr(doctor, "_ROOT_ALLOWED_DIRS")
+    (tmp_path / ".dadaia" / "states").mkdir(parents=True)
+    for name in workspace_layout.ROOT_ALLOWED_DIRS:
+        (tmp_path / name).mkdir(exist_ok=True)
+    for name in workspace_layout.ROOT_ALLOWED_FILES:
+        (tmp_path / name).write_text("", encoding="utf-8")
+    findings = doctor.DoctorService(FakeContextStore(), FakeGitClient(), tmp_path).scan()
+    root = {f.path: f.verdict.value for f in findings if f.code.startswith("WS-root-")}
+    assert set(root.values()) == {"canon"}
+    assert set(root) == workspace_layout.ROOT_ALLOWED_DIRS | workspace_layout.ROOT_ALLOWED_FILES
 
 
 def test_gate_law_sets_are_the_same_objects() -> None:
@@ -61,25 +74,6 @@ def test_gate_additive_prefixes_are_the_registry_view() -> None:
     from dadaia_workspace.features.spec_context import gate_policy
 
     assert workspace_layout.additive_prefixes() == gate_policy._DADAIA_ADDITIVE_PREFIXES
-
-
-def test_public_doctor_foreign_scan_skips_the_registry_additive_view() -> None:
-    """Compatibility reader (dies in T-046-25 when the foreign scan moves into the doctor
-    walk): the public doctor skips exactly the registry's ADDITIVE zones."""
-    from dadaia_workspace.core import workspace_layout
-    from dadaia_workspace.infrastructure import public_assets
-
-    assert workspace_layout.additive_prefixes() == public_assets.DADAIA_ADDITIVE_PREFIXES
-
-
-def test_doctor_dadaia_allow_set_is_the_registry_view() -> None:
-    """Bug dadaia-reconcile-quarantines-sanctioned-references-clone: the doctor's
-    ``.dadaia/`` allow set is ``zone_names()`` — compatibility name until T-046-25 switches
-    the doctor to the registry walk."""
-    from dadaia_workspace.core import workspace_layout
-    from dadaia_workspace.features.spec_context import doctor
-
-    assert workspace_layout.zone_names() == doctor._DADAIA_ALLOWED_SUBDIRS
 
 
 def test_migrate_legacy_quarantine_set_never_contains_a_zone() -> None:

@@ -1,81 +1,83 @@
-"""DoctorService — diagnose and repair workspace state invariants (v2 model: ALIVE/DEAD)."""
+"""DoctorService — the one scan and reaper of the workspace instance (0.4.6 FR3/FR4).
+
+``check()`` reports the context invariants (INV-4/5/6, CTX-URL-1, VENV-1, PRESENCE-GC).
+``scan()`` is the ONE walk over the instance, driven by the zone registry
+(``core.workspace_layout.DADAIA_ZONES``): root, harness dirs, the ``.dadaia/`` top level,
+the closed-canon zones, the TTL zones — every entry gets one finding verdict and one
+``WS-<zone>-<verdict>`` code. ``fix()`` consumes the same findings in the fixed order.
+
+Bug class (the six-bug ``.dadaia/`` ledger, workspace-doctor-root4-false-positive-dadaia-hooks
+.. dadaia-reconcile-quarantines-sanctioned-references-clone): the doctor kept its own name
+lists and disagreed with what init/install create. Nothing here spells a zone name — every
+allow set, TTL and canon is a view of the registry.
+"""
 
 import fnmatch
-import json
 import os
 import shutil
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
-from pathlib import Path
+from datetime import UTC, datetime
+from enum import StrEnum
+from pathlib import Path, PurePosixPath
 
 from dadaia_workspace.core import session_store, workspace_layout
+from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES, PROJECTION_TARGETS
 from dadaia_workspace.core.models.spec_context import ContextState
 from dadaia_workspace.core.platform import PLATFORM
+from dadaia_workspace.core.workspace_layout import Creator, Zone
 from dadaia_workspace.features.spec_context import presence
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
+from dadaia_workspace.infrastructure.json_install_ledger_store import JsonInstallLedgerStore
 
-# Note: INV-1, INV-2, INV-3, INV-6 have been removed in v2. INV-4 and INV-5
-# are renamed for the ALIVE/DEAD semantics.
+_DAY = 86_400
 
-# ---------------------------------------------------------------------------
-# EFF-1 — recurring efficiency-audit staleness marker (v0.1.60 FR7)
-# ---------------------------------------------------------------------------
 
-#: Days after which the recorded efficiency audit is considered stale (EFF-1 fires).
-EFFICIENCY_AUDIT_STALE_DAYS = 30
+class FindingVerdict(StrEnum):
+    """The classification of one scanned entry; ``canon`` + ``operator`` count as canonical."""
 
-#: The marker file the ``dadaia reports mark-efficiency-audit`` writer produces and this
-#: check reads. Kept in sync with ``cli/commands/reports.py`` by the writer→doctor
-#: round-trip test (``AC-8``); a divergence there would break the production clear path.
-_EFFICIENCY_AUDIT_MARKER = "last_efficiency_audit.json"
+    CANON = "canon"
+    OPERATOR = "operator"
+    SLOP = "slop"
+    EXPIRED = "expired"
+    MISSING = "missing"
 
-# ---------------------------------------------------------------------------
-# ROOT-* invariant constants
-# ---------------------------------------------------------------------------
 
-#: Directories allowed at workspace root — DERIVED from the single authority
-#: ``core/workspace_layout.py`` (one fact, one place; see the hook's twin note).
-_ROOT_ALLOWED_DIRS: frozenset[str] = workspace_layout.ROOT_ALLOWED_DIRS
+_CANONICAL = frozenset({FindingVerdict.CANON, FindingVerdict.OPERATOR})
 
-#: Files allowed at workspace root (exact names, no wildcards). Mirrors the Workspace
-#: Root Law and ``hooks/root_whitelist.py``: ``DADAIA.md`` is the workspace system prompt
-#: (the single always-on law file), ``CLAUDE.md`` the required Claude Code bridge,
-#: ``prompt.md`` the optional operator long-prompt file (bug
-#: doctor-root-whitelist-contradicts-root-law).
-_ROOT_ALLOWED_FILES: frozenset[str] = workspace_layout.ROOT_ALLOWED_FILES
 
-#: Caches and tool outputs that are forbidden at workspace root (ROOT-2).
-#: These are safe to delete — they regenerate.
-_ROOT_FORBIDDEN_CACHES: frozenset[str] = frozenset(
-    {
-        ".ruff_cache",
-        ".pytest_cache",
-        ".mypy_cache",
-        ".hypothesis",
-        ".coverage",
-        ".playwright-mcp",
-        "test-results",
-    }
-)
+@dataclass(frozen=True)
+class Finding:
+    """One scanned entry. ``path`` is root-relative at the root and inside the harness dirs,
+    ``.dadaia``-relative inside a zone; ``target`` is the absolute path ``fix()`` acts on."""
 
-#: Tool config files that have canonical homes elsewhere but are currently
-#: tolerated at root with a WARN (ROOT-3, lenient). ``CLAUDE.md`` is NOT here — it is
-#: root-law-allowed (see ``_ROOT_ALLOWED_FILES``).
-_ROOT_TOOL_CONFIGS: frozenset[str] = frozenset({".mcp.json"})
+    code: str
+    path: str
+    verdict: FindingVerdict
+    fixable: bool
+    detail: str
+    target: Path
 
-#: Canonical top-level subdirectories allowed inside `.dadaia/` (ROOT-4) — DERIVED from
-#: the single authority ``core/workspace_layout.py`` (one fact, one place; see the hook's
-#: twin note). Never hand-copy a literal set here — that produced bug
-#: dadaia-reconcile-quarantines-sanctioned-references-clone.
-_DADAIA_ALLOWED_SUBDIRS: frozenset[str] = workspace_layout.DADAIA_ALLOWED_SUBDIRS
+    @property
+    def canonical(self) -> bool:
+        return self.verdict in _CANONICAL
 
-# Sessions expired beyond this age are graveyard entries eligible for GC. The field names
-# are owned by ``session_store`` (the single owner of the session-record schema); the
-# GC liveness clock is resolved via ``session_store.liveness_timestamp`` (last_seen_at,
-# with TTL-from-creation fallback for pre-heartbeat records — T-011-04 / FR-W1-04 / ADR-8).
-_SESSION_GC_TTL_FIELD = session_store.SESSION_GC_TTL_FIELD
+
+@dataclass(frozen=True)
+class Compliance:
+    canonical: int
+    total: int
+    percent: int
+
+
+def compliance(findings: tuple[Finding, ...]) -> Compliance:
+    """The score line's numbers: canon + operator over every classified entry."""
+    total = len(findings)
+    canonical = sum(1 for f in findings if f.canonical)
+    return Compliance(canonical, total, round(100 * canonical / total) if total else 100)
 
 
 @dataclass(frozen=True)
@@ -96,6 +98,8 @@ class DoctorService:
         self._store = context_store
         self._git = git_client
         self._workspace_root = workspace_root
+        self._dadaia = workspace_root / ".dadaia"
+        self._states = self._dadaia / "states"
         # Kept as a compatibility constructor seam. Session/presence expiry is TTL-only;
         # process liveness never grants blocking authority.
         self._pid_probe = pid_probe
@@ -103,184 +107,14 @@ class DoctorService:
     def _repos_dir(self) -> Path:
         return self._workspace_root / "repos"
 
-    def _sessions_dir(self) -> Path:
-        # Session-store path via the single owner (T-011-05 / FR-W1-05, ADR-12) — the
-        # doctor no longer constructs ``.dadaia/sessions`` itself.
-        return session_store.sessions_dir(self._workspace_root)
-
-    def _ctx_locks_dir(self) -> Path:
-        return self._workspace_root / ".dadaia" / "states" / "ctx_locks"
-
     # ------------------------------------------------------------------
-    # Helper: load operator exception allowlist from .dadaia/states/root_exceptions.txt
-    # Returns a list of fnmatch glob patterns (one per non-empty line).
-    # File is optional — returns empty list when absent.
-    # ------------------------------------------------------------------
-
-    def _root_exception_globs(self) -> list[str]:
-        exc_path = self._workspace_root / ".dadaia" / "states" / "root_exceptions.txt"
-        if not exc_path.exists():
-            return []
-        lines = exc_path.read_text(encoding="utf-8").splitlines()
-        return [ln.strip() for ln in lines if ln.strip() and not ln.strip().startswith("#")]
-
-    @staticmethod
-    def _matches_any_glob(name: str, globs: list[str]) -> bool:
-        return any(fnmatch.fnmatch(name, g) for g in globs)
-
-    # ------------------------------------------------------------------
-    # ROOT-* check helpers
-    # ------------------------------------------------------------------
-
-    def _check_root_1(self, exc_globs: list[str]) -> list[DoctorIssue]:
-        """ROOT-1 — workspace root contains only whitelisted entries."""
-        issues: list[DoctorIssue] = []
-        offenders: list[str] = []
-        try:
-            entries = list(self._workspace_root.iterdir())
-        except OSError:
-            return issues
-        for entry in sorted(entries):
-            name = entry.name
-            # Skip git internals
-            if name == ".git":
-                continue
-            if entry.is_dir():
-                if name in _ROOT_ALLOWED_DIRS:
-                    continue
-            else:
-                if name in _ROOT_ALLOWED_FILES:
-                    continue
-                # gitignore is operator-owned; always allow it
-                if name == ".gitignore":
-                    continue
-            # Check operator exception allowlist
-            if self._matches_any_glob(name, exc_globs):
-                continue
-            offenders.append(name)
-        if offenders:
-            listed = ", ".join(repr(o) for o in offenders)
-            issues.append(
-                DoctorIssue(
-                    code="ROOT-1",
-                    description=(
-                        f"Workspace root contains non-whitelisted entries: {listed}. "
-                        "Relocate under .dadaia/<subdir> or add to "
-                        ".dadaia/states/root_exceptions.txt"
-                    ),
-                    fixable=False,
-                )
-            )
-        return issues
-
-    def _check_root_2(self) -> list[DoctorIssue]:
-        """ROOT-2 — no forbidden caches/outputs at workspace root."""
-        issues: list[DoctorIssue] = []
-        found: list[str] = []
-        for name in _ROOT_FORBIDDEN_CACHES:
-            if (self._workspace_root / name).exists():
-                found.append(name)
-        if found:
-            listed = ", ".join(repr(n) for n in sorted(found))
-            issues.append(
-                DoctorIssue(
-                    code="ROOT-2",
-                    description=(
-                        f"Forbidden cache/output dirs at workspace root: {listed}. "
-                        "Run 'dadaia doctor --fix' to delete them (they regenerate under .dadaia/)."
-                    ),
-                    fixable=True,
-                )
-            )
-        return issues
-
-    def _check_root_3(self, exc_globs: list[str]) -> list[DoctorIssue]:
-        """ROOT-3 — tool configs in canonical homes or documented exception list (WARN)."""
-        issues: list[DoctorIssue] = []
-        found: list[str] = []
-        for name in _ROOT_TOOL_CONFIGS:
-            entry = self._workspace_root / name
-            if entry.exists() and not self._matches_any_glob(name, exc_globs):
-                found.append(name)
-        if found:
-            listed = ", ".join(repr(n) for n in sorted(found))
-            issues.append(
-                DoctorIssue(
-                    code="ROOT-3",
-                    description=(
-                        f"Tool config file(s) at workspace root not in exception list: {listed}. "
-                        "Add to .dadaia/states/root_exceptions.txt or relocate under .dadaia/. "
-                        "(T-SANI-02 will resolve canonical placement.)"
-                    ),
-                    fixable=False,
-                )
-            )
-        return issues
-
-    def _check_root_4(self) -> list[DoctorIssue]:
-        """ROOT-4 — .dadaia/ contains only canonical top-level subdirs."""
-        issues: list[DoctorIssue] = []
-        dadaia_dir = self._workspace_root / ".dadaia"
-        if not dadaia_dir.exists():
-            return issues
-        unknown: list[str] = []
-        try:
-            entries = list(dadaia_dir.iterdir())
-        except OSError:
-            return issues
-        for entry in sorted(entries):
-            name = entry.name
-            # Allow dotfiles at the .dadaia level (e.g. .DS_Store)
-            if name.startswith(".") and not entry.is_dir():
-                continue
-            if entry.is_dir() and name not in _DADAIA_ALLOWED_SUBDIRS:
-                unknown.append(name)
-        if unknown:
-            listed = ", ".join(repr(u) for u in sorted(unknown))
-            issues.append(
-                DoctorIssue(
-                    code="ROOT-4",
-                    description=(
-                        f"Unknown top-level subdirectory/ies inside .dadaia/: {listed}. "
-                        "Relocate or register in the canonical .dadaia/ layout."
-                    ),
-                    fixable=False,
-                )
-            )
-        return issues
-
-    # ------------------------------------------------------------------
-    # RETIRED-LOCK-STATE: pre-doctrine cleanup
-    # ------------------------------------------------------------------
-
-    def _check_retired_lock_state(self) -> list[DoctorIssue]:
-        """Report pre-doctrine context-lock/pointer directories as removable stale state."""
-        ctx_locks_dir = self._ctx_locks_dir()
-        pointer_dir = self._sessions_dir() / "runtime"
-        stale = [path for path in (ctx_locks_dir, pointer_dir) if path.exists()]
-        if not stale:
-            return []
-        return [
-            DoctorIssue(
-                code="RETIRED-LOCK-STATE",
-                description=(
-                    "Retired context-global concurrency state exists: "
-                    f"{', '.join(str(path) for path in stale)}. Run 'dadaia doctor --fix' "
-                    "to remove it; its contents have no authority."
-                ),
-                fixable=True,
-            )
-        ]
-
-    # ------------------------------------------------------------------
-    # PRESENCE-GC: stale/corrupt advisory presence-record REPORT (v0.1.76 T-4, FR7).
-    # Read-only — the ONLY reclamation authority is presence.gc() (release 0.5.1 K2),
-    # called by fix() below. check() reuses the SAME read-only predicate
-    # (presence.stale_records()) so it can never disagree with what --fix reclaims.
+    # check() — the context invariants (unchanged by the zone walk)
     # ------------------------------------------------------------------
 
     def _check_presence_gc(self) -> list[DoctorIssue]:
-        """PRESENCE-GC: report stale/corrupt advisory presence records (FR7)."""
+        """PRESENCE-GC: report stale/corrupt advisory presence records (FR7). Read-only —
+        the ONLY reclamation authority is presence.gc(), called by fix(); the same
+        read-only predicate keeps check and fix from ever disagreeing."""
         issues: list[DoctorIssue] = []
         for ref in presence.stale_records(self._workspace_root):
             issues.append(
@@ -299,16 +133,11 @@ class DoctorService:
     def _check_venv_health(self) -> list[DoctorIssue]:
         """VENV-1 — the workspace venv exists with an executable ``dadaia`` entrypoint.
 
-        FR-W3-02 (ADR-G4). The workspace law requires ``dadaia`` / ``pip`` / ``python -m
-        dadaia_workspace`` to run from ``<ws>/.dadaia/.venv/bin/`` (the W3 Bash gate
-        enforces this for agents). This invariant surfaces a broken venv before an agent
-        hits the gate: the venv dir is absent, or its ``dadaia`` entrypoint is missing or
-        non-executable. Windows-safe — the scripts dir / exe suffix come from ``PLATFORM``
-        and the exec check uses ``os.access`` (the platform-correct probe). Not fixable:
-        rebuilding a venv is an operator action (``dadaia init`` / re-bootstrap), never an
-        auto-repair.
+        FR-W3-02 (ADR-G4). Windows-safe — the scripts dir / exe suffix come from ``PLATFORM``
+        and the exec check uses ``os.access``. Not fixable: rebuilding a venv is an operator
+        action (``dadaia init`` / re-bootstrap), never an auto-repair.
         """
-        venv_bin = self._workspace_root / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir
+        venv_bin = self._dadaia / ".venv" / PLATFORM.venv_scripts_dir
         if not venv_bin.is_dir():
             return [
                 DoctorIssue(
@@ -347,62 +176,6 @@ class DoctorService:
             ]
         return []
 
-    def _check_efficiency_audit(self) -> list[DoctorIssue]:
-        """EFF-1 (FR7) — flag a stale or malformed efficiency-audit marker.
-
-        Reads ``.dadaia/states/last_efficiency_audit.json`` (schema
-        ``{schema_version, last_efficiency_audit, by, report}``) and emits a
-        ``DoctorIssue(code="EFF-1", fixable=False, ...)`` — NOT a ``[warn]`` token, and the
-        bare ``dadaia doctor`` exit stays 0 (the service never raises on issues). 4-case
-        matrix: *absent* ⇒ no issue (fresh-workspace happy path unchanged); *fresh* (≤
-        :data:`EFFICIENCY_AUDIT_STALE_DAYS`) ⇒ no issue; *stale* (> threshold) ⇒ EFF-1;
-        *malformed* (invalid JSON / missing ``last_efficiency_audit`` / unparseable
-        timestamp) ⇒ EFF-1 "malformed marker" — **never a crash**.
-        """
-        clear = "run: dadaia reports mark-efficiency-audit --report <report-path>"
-        marker = self._workspace_root / ".dadaia" / "states" / _EFFICIENCY_AUDIT_MARKER
-        if not marker.exists():
-            return []
-
-        def _malformed(reason: str) -> list[DoctorIssue]:
-            return [
-                DoctorIssue(
-                    code="EFF-1",
-                    description=f"efficiency-audit marker is malformed ({reason}) — {clear}",
-                    fixable=False,
-                )
-            ]
-
-        try:
-            data = json.loads(marker.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            return _malformed("invalid JSON")
-        if not isinstance(data, dict):
-            return _malformed("not a JSON object")
-        raw = data.get("last_efficiency_audit")
-        if not isinstance(raw, str) or not raw.strip():
-            return _malformed("missing 'last_efficiency_audit'")
-        try:
-            recorded = datetime.fromisoformat(raw)
-        except ValueError:
-            return _malformed("unparseable 'last_efficiency_audit' timestamp")
-        if recorded.tzinfo is None:
-            recorded = recorded.replace(tzinfo=UTC)
-
-        age = datetime.now(tz=UTC) - recorded
-        if age <= timedelta(days=EFFICIENCY_AUDIT_STALE_DAYS):
-            return []
-        return [
-            DoctorIssue(
-                code="EFF-1",
-                description=(
-                    f"efficiency audit is {age.days} day(s) old "
-                    f"(threshold {EFFICIENCY_AUDIT_STALE_DAYS}d) — {clear}"
-                ),
-                fixable=False,
-            )
-        ]
-
     def check(self) -> list[DoctorIssue]:
         issues: list[DoctorIssue] = []
         contexts = self._store.list_all()
@@ -422,9 +195,7 @@ class DoctorService:
 
         # CTX-URL-1 (T-011-08 / FR-W2-03 d): an ALIVE context with an empty repo_url is
         # un-portable — an export/import + ``context alive`` on another machine would
-        # ``git clone ""`` and fail. Surface it so the operator can repair via
-        # ``dadaia context update <name> --url <url>`` (or re-run ``alive`` while the
-        # on-disk origin remote is present, which back-fills automatically).
+        # ``git clone ""`` and fail.
         for ctx in contexts:
             if ctx.state == ContextState.ALIVE and not ctx.repo_url:
                 issues.append(
@@ -480,34 +251,239 @@ class DoctorService:
                     )
                 )
 
-        # ---- ROOT invariants (T-SANI-05) ----
-        exc_globs = self._root_exception_globs()
-        issues.extend(self._check_root_1(exc_globs))
-        issues.extend(self._check_root_2())
-        issues.extend(self._check_root_3(exc_globs))
-        issues.extend(self._check_root_4())
-
-        issues.extend(self._check_retired_lock_state())
-
-        # ---- Stale/corrupt advisory presence-record REPORT (v0.1.76 T-4, FR7) ----
         issues.extend(self._check_presence_gc())
-
-        # ---- Venv health (FR-W3-02, T-014-13) ----
         issues.extend(self._check_venv_health())
-
-        # ---- Efficiency-audit staleness (EFF-1, v0.1.60 FR7) ----
-        issues.extend(self._check_efficiency_audit())
-
         return issues
 
-    def fix(self) -> list[str]:
-        """Fix detected issues.
+    # ------------------------------------------------------------------
+    # scan() — the one walk
+    # ------------------------------------------------------------------
 
-        INV-5: remove stale repos for DEAD contexts.
-        RETIRED-LOCK-STATE: remove the entire pre-doctrine context-lock directory.
-        Graveyard GC: delete TTL-expired .dadaia/sessions/*.json files.
-        """
+    def scan(self) -> tuple[Finding, ...]:
+        """Every entry of the instance, classified, in the fixed FR3 order."""
+        globs = self._exception_globs()
+        findings: list[Finding] = []
+        findings.extend(self._scan_root(globs))
+        findings.extend(self._scan_harness_dirs(globs))
+        findings.extend(self._scan_dadaia_top())
+        for zone in workspace_layout.zones_with_canon():
+            findings.extend(self._scan_canon_zone(zone))
+        now = time.time()
+        for zone in workspace_layout.zones_with_ttl():
+            findings.extend(self._scan_ttl_zone(zone, now))
+        return tuple(findings)
+
+    def _exception_globs(self) -> tuple[str, ...]:
+        """``INSTANCE_EXCEPTIONS``; the legacy ``root_exceptions.txt`` through the same
+        parser until T-046-32 migrates it inside ``fix()``."""
+        for candidate in (
+            self._workspace_root / workspace_layout.INSTANCE_EXCEPTIONS,
+            self._states / "root_exceptions.txt",
+        ):
+            if candidate.is_file():
+                return workspace_layout.parse_exception_globs(candidate.read_text(encoding="utf-8"))
+        return ()
+
+    def _excepted(self, entry: Path, globs: tuple[str, ...]) -> bool:
+        rel = entry.relative_to(self._workspace_root).as_posix()
+        return any(fnmatch.fnmatch(entry.name, g) or fnmatch.fnmatch(rel, g) for g in globs)
+
+    @staticmethod
+    def _finding(
+        zone: str, base: Path, target: Path, verdict: FindingVerdict, detail: str
+    ) -> Finding:
+        return Finding(
+            code=f"WS-{zone.lstrip('.')}-{verdict.value}",
+            path=target.relative_to(base).as_posix(),
+            verdict=verdict,
+            fixable=verdict not in _CANONICAL,
+            detail=detail,
+            target=target,
+        )
+
+    @staticmethod
+    def _entries(directory: Path) -> list[Path]:
+        try:
+            return sorted(directory.iterdir())
+        except OSError:
+            return []
+
+    def _scan_root(self, globs: tuple[str, ...]) -> list[Finding]:
+        out: list[Finding] = []
+        for entry in self._entries(self._workspace_root):
+            if entry.name == ".git":
+                continue
+            allowed = (
+                workspace_layout.ROOT_ALLOWED_DIRS
+                if entry.is_dir()
+                else workspace_layout.ROOT_ALLOWED_FILES
+            )
+            if entry.name in allowed:
+                verdict, detail = FindingVerdict.CANON, ""
+            elif self._excepted(entry, globs):
+                verdict, detail = FindingVerdict.OPERATOR, "(instance exception)"
+            else:
+                verdict, detail = FindingVerdict.SLOP, "(not in the root law or the exceptions)"
+            out.append(self._finding("root", self._workspace_root, entry, verdict, detail))
+        return out
+
+    def _active_harnesses(self) -> tuple[str, ...]:
+        """``agents`` always; the L1 harnesses of the persisted profile (absent ⇒ all)."""
+        profile = JsonHarnessProfileStore().read(self._states)
+        active = L1_ENTRY_HARNESSES if profile is None else profile.harnesses
+        return tuple(t for t in PROJECTION_TARGETS if t not in L1_ENTRY_HARNESSES or t in active)
+
+    def _scan_harness_dirs(self, globs: tuple[str, ...]) -> list[Finding]:
+        """An entry is canon iff it is a projection target (the install ledger — what
+        ``public install`` actually wrote); a directory holding a target is a path, not an
+        entry; anything else is operator (exception glob) or slop."""
+        ledger = JsonInstallLedgerStore().read(self._states)
+        targets = frozenset(ledger.by_relpath()) if ledger is not None else frozenset()
+        owned_dirs = frozenset(
+            parent.as_posix() for rel in targets for parent in PurePosixPath(rel).parents
+        )
+        out: list[Finding] = []
+        for harness in self._active_harnesses():
+            root = self._workspace_root / f".{harness}"
+            if not root.is_dir():
+                continue
+            pending = [root]
+            while pending:
+                directory = pending.pop()
+                for entry in self._entries(directory):
+                    rel = entry.relative_to(self._workspace_root).as_posix()
+                    if rel in targets:
+                        verdict, detail = FindingVerdict.CANON, ""
+                    elif rel in owned_dirs and entry.is_dir() and not entry.is_symlink():
+                        pending.append(entry)
+                        continue
+                    elif self._excepted(entry, globs):
+                        verdict, detail = FindingVerdict.OPERATOR, "(instance exception)"
+                    else:
+                        verdict = FindingVerdict.SLOP
+                        detail = "(not a projection target or an exception)"
+                    out.append(self._finding(harness, self._workspace_root, entry, verdict, detail))
+        return out
+
+    def _scan_dadaia_top(self) -> list[Finding]:
+        out: list[Finding] = []
+        present: set[str] = set()
+        for entry in self._entries(self._dadaia):
+            if entry.is_dir() and entry.name in workspace_layout.zone_names():
+                present.add(entry.name)
+                verdict, detail = FindingVerdict.CANON, ""
+            elif not entry.is_dir() and entry.name in workspace_layout.DADAIA_ROOT_FILES:
+                verdict, detail = FindingVerdict.CANON, ""
+            else:
+                verdict, detail = FindingVerdict.SLOP, "(not a zone)"
+            out.append(self._finding("dadaia", self._dadaia, entry, verdict, detail))
+        for zone in workspace_layout.walked_zones():
+            if zone.creator in (Creator.INIT, Creator.INSTALL) and zone.name not in present:
+                out.append(
+                    self._finding(
+                        zone.name,
+                        self._dadaia,
+                        self._dadaia / zone.name,
+                        FindingVerdict.MISSING,
+                        "(created by --fix)",
+                    )
+                )
+        return out
+
+    def _scan_canon_zone(self, zone: Zone) -> list[Finding]:
+        assert zone.canon is not None
+        out: list[Finding] = []
+        for entry in self._entries(self._dadaia / zone.name):
+            if any(fnmatch.fnmatch(entry.name, g) for g in zone.canon):
+                verdict, detail = FindingVerdict.CANON, ""
+            else:
+                verdict, detail = FindingVerdict.SLOP, "(outside the closed canon)"
+            out.append(self._finding(zone.name, self._dadaia, entry, verdict, detail))
+        return out
+
+    def _scan_ttl_zone(self, zone: Zone, now: float) -> list[Finding]:
+        out: list[Finding] = []
+        self._walk_ttl(zone, self._dadaia / zone.name, now, out, is_zone_root=True)
+        return out
+
+    def _walk_ttl(
+        self, zone: Zone, directory: Path, now: float, out: list[Finding], *, is_zone_root: bool
+    ) -> bool:
+        """Append one finding per file (by lstat mtime, symlinks never followed) and per
+        directory emptied by expiry; return whether *directory* is entirely expired."""
+        assert zone.ttl_seconds is not None
+        entries = self._entries(directory)
+        if not entries:
+            return not is_zone_root and self._older_than(directory, now, zone.ttl_seconds)
+        all_expired = True
+        for entry in entries:
+            if entry.is_dir() and not entry.is_symlink():
+                if self._walk_ttl(zone, entry, now, out, is_zone_root=False):
+                    out.append(
+                        self._finding(
+                            zone.name,
+                            self._dadaia,
+                            entry,
+                            FindingVerdict.EXPIRED,
+                            "(emptied by expiry)",
+                        )
+                    )
+                else:
+                    all_expired = False
+                continue
+            age = now - entry.lstat().st_mtime
+            if is_zone_root and entry.name == "AGENTS.md":
+                # The zone's own law file is canon by projection, never a TTL candidate
+                # (bug public-install-restores-expired-zone-agents).
+                verdict, detail = FindingVerdict.CANON, ""
+            elif age > zone.ttl_seconds:
+                verdict = FindingVerdict.EXPIRED
+                detail = f"(mtime {int(age // _DAY)}d > ttl {zone.ttl_seconds // _DAY}d)"
+            else:
+                verdict, detail = FindingVerdict.CANON, ""
+            if verdict is not FindingVerdict.EXPIRED:
+                all_expired = False
+            out.append(self._finding(zone.name, self._dadaia, entry, verdict, detail))
+        return all_expired
+
+    @staticmethod
+    def _older_than(path: Path, now: float, ttl_seconds: int) -> bool:
+        return now - path.lstat().st_mtime > ttl_seconds
+
+    # ------------------------------------------------------------------
+    # fix() — the one reaper, in the fixed FR4 order
+    # ------------------------------------------------------------------
+
+    def fix(self, *, expired_only: bool = False) -> list[str]:
+        """presence.gc -> session reap -> seed missing -> delete expired -> [stop] ->
+        delete slop -> remove dead contexts' repos (INV-5)."""
         actions: list[str] = []
+
+        # presence.gc() is the ONE reaper of stale presence records, throttle/sentinel
+        # markers and now-empty presence context dirs (release 0.5.1 K2).
+        gc_report = presence.gc(self._workspace_root, now=datetime.now(tz=UTC), own_session_id="")
+        for key in gc_report.presence:
+            actions.append(f"PRESENCE-GC: deleted stale presence record '{key}'")
+        for name in gc_report.markers:
+            actions.append(f"PRESENCE-GC: deleted stale marker '{name}'")
+        for name in gc_report.empty_context_dirs:
+            actions.append(f"PRESENCE-GC: removed empty presence context dir '{name}'")
+
+        # The session-record owner's ONE reaper (core.session_store.reap_stale, F002).
+        for sess_id in session_store.reap_stale(self._workspace_root):
+            actions.append(f"GRAVEYARD-GC: deleted expired session file '{sess_id}.json'")
+
+        # T-046-32: the exceptions-file migration (FR6) is called here, before the walk.
+
+        findings = self.scan()
+        for finding in findings:
+            if finding.verdict is FindingVerdict.MISSING:
+                finding.target.mkdir(parents=True, exist_ok=True)
+                actions.append(f"{finding.code}: created '{finding.path}'")
+        actions.extend(self._delete(findings, FindingVerdict.EXPIRED))
+        if expired_only:
+            return actions
+        actions.extend(self._delete(findings, FindingVerdict.SLOP))
 
         for ctx in self._store.list_all():
             if ctx.state != ContextState.DEAD:
@@ -520,45 +496,27 @@ class DoctorService:
                 continue
             shutil.rmtree(repo_path)
             actions.append(f"Removed stale repo '{ctx.repo_slug}' for dead context '{ctx.name}'")
-
-        ctx_locks_dir = self._ctx_locks_dir()
-        if ctx_locks_dir.exists():
-            shutil.rmtree(ctx_locks_dir)
-            actions.append("RETIRED-LOCK-STATE: removed .dadaia/states/ctx_locks")
-        pointer_dir = self._sessions_dir() / "runtime"
-        if pointer_dir.exists():
-            shutil.rmtree(pointer_dir)
-            actions.append("RETIRED-LOCK-STATE: removed .dadaia/sessions/runtime")
-
-        # PRESENCE-GC (release 0.5.1 K2): presence.gc() is the ONE reaper of stale
-        # presence records, throttle/sentinel markers, and now-empty presence context
-        # dirs. Doctor has no "own" session to exclude, so nothing is exempted.
-        gc_report = presence.gc(self._workspace_root, now=datetime.now(tz=UTC), own_session_id="")
-        for key in gc_report.presence:
-            actions.append(f"PRESENCE-GC: deleted stale presence record '{key}'")
-        for name in gc_report.markers:
-            actions.append(f"PRESENCE-GC: deleted stale marker '{name}'")
-        for name in gc_report.empty_context_dirs:
-            actions.append(f"PRESENCE-GC: removed empty presence context dir '{name}'")
-
-        # Graveyard GC: delete TTL-expired session files from .dadaia/sessions/ —
-        # through the record owner's ONE reaper (core.session_store.reap_stale, F002).
-        for sess_id in session_store.reap_stale(self._workspace_root):
-            actions.append(f"GRAVEYARD-GC: deleted expired session file '{sess_id}.json'")
-
-        # ROOT-2: delete forbidden caches/outputs at workspace root (safe to delete)
-        for cache_name in sorted(_ROOT_FORBIDDEN_CACHES):
-            target = self._workspace_root / cache_name
-            if target.exists():
-                try:
-                    if target.is_dir():
-                        shutil.rmtree(target)
-                    else:
-                        target.unlink()
-                    actions.append(
-                        f"ROOT-2: deleted forbidden cache/output '{cache_name}' from workspace root"
-                    )
-                except OSError as exc:
-                    actions.append(f"ROOT-2: failed to delete '{cache_name}': {exc}")
-
         return actions
+
+    def _delete(self, findings: tuple[Finding, ...], verdict: FindingVerdict) -> list[str]:
+        actions: list[str] = []
+        for finding in findings:
+            if finding.verdict is verdict and self._remove(finding.target):
+                actions.append(f"{finding.code}: deleted '{finding.path}'")
+        return actions
+
+    def _remove(self, target: Path) -> bool:
+        """Delete *target* iff its own location (never a symlink's destination) resolves
+        inside the workspace; a symlink is unlinked, never followed."""
+        location = target.parent.resolve() / target.name
+        try:
+            location.relative_to(self._workspace_root.resolve())
+        except ValueError:
+            return False
+        if target.is_symlink() or target.is_file():
+            target.unlink()
+        elif target.is_dir():
+            shutil.rmtree(target)
+        else:
+            return False
+        return True
