@@ -83,7 +83,7 @@ Write-set paths are relative to `dadaia_workspace/` unless they start with `test
   cli/commands/{export,import_}.py, container.py (import builder), tests/integration/
   test_cli_export.py, tests/unit/features/{export,import_}/**.
   Blocked by: T-046-28. Delivers: export writes one file, import restores DEAD contexts — AC11.
-- [ ] T-046-32 — FR6+FR7+FR8: exceptions migration inside `fix()`; hook `_operator_exception`
+- [-] T-046-32 — FR6+FR7+FR8: exceptions migration inside `fix()`; hook `_operator_exception`
   reads `INSTANCE_EXCEPTIONS`; `json_harness_profile_store.write` (init + fix), inline init
   writer deleted; `.env` and `.gitignore` in `ROOT_ALLOWED_FILES`, inline case deleted; bug
   doctor-root1-flags-env-that-dadaia-md-9-declares-canonical resolved (`caused_by: none`).
