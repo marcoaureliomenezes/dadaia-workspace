@@ -59,7 +59,7 @@ Measured by: `pytest tests/contract/test_import_linter_ignore_cap.py` — the te
 ADR: none
 Rationale: a pinned exception list turns every new suppression into a reviewable diff.
 
-### P-11 · We keep `core` file-I/O pure outside an authorized set of six modules; new file I/O enters `core` only by joining that set on purpose.
+### P-11 · We keep `core` file-I/O pure outside an authorized set of eight modules; new file I/O enters `core` only by joining that set on purpose.
 Measured by: `pytest tests/contract/test_core_file_io_purity.py` (AST walk; every authorized stem must exist).
 ADR: none
 Rationale: joining the set is legal; arriving there unnoticed is not.
@@ -103,6 +103,7 @@ Rationale: law that no asset owns is law nobody applies.
 | workspace root, session, context, mode, release, phase | `core/invocation.py` — `resolve() -> Invocation`, over rungs 0 (explicit/`target_path`) … 3 (repo of the cwd) |
 | session record schema, read, liveness and reaping | `core/session_store.py` — `new_binding_record`/`is_live`/`live_session`/`reap_stale`; `core/record_liveness.py` holds the raw TTL predicate |
 | presence liveness and reaping | `features/spec_context/presence.py` — `gc()` is the only reaper of records, markers, sentinels and emptied directories |
+| what `.dadaia/` may contain — zones with class, creator, TTL and canon, the `states/` canon, the root law sets, the exceptions file | `core/workspace_layout.py` — `DADAIA_ZONES`, `STATES_CANON`, `ROOT_ALLOWED_DIRS`/`ROOT_ALLOWED_FILES`, `INSTANCE_EXCEPTIONS`; init, `dadaia doctor`, the gate's ADDITIVE prefixes, the root-whitelist hook, the stage renderer and export are derived views, pinned by `tests/contract/test_zone_registry.py` |
 | what a `specs/` tree may contain | `features/specs/canon.py`'s `CANON` table — scaffold renders it, doctor checks it |
 | whether a projection is current | `infrastructure/projection.py`'s `ProjectionRule` plus `projection_rules()`; install writes and doctor compares the same table |
 | which harness a projection targets | `HarnessProjection` in `infrastructure/projection_rules.py`, with three production adapters — Claude Code, Codex, Kimi Code |
@@ -120,11 +121,11 @@ Rationale: law that no asset owns is law nobody applies.
 | doctor order, fix dispatch, --fix help | `features/specs/rules.py::RULES` — one ordered registry, three derived projections |
 | shared specs facts per doctor run | `features/specs/specs_tree.py::SpecsTree` — fresh per check(), active release parsed once |
 
-- `container.py` is composition wiring only, contract-tested so every definition keeps a production consumer (no orphaned factories); the panel's 20-route composition lives with its single consumer in `cli/commands/panel_composition.py`; a single-consumer adapter is imported directly by its feature and never passes through the container (ADR 0001).
+- `container.py` is composition wiring only, contract-tested so every definition keeps a production consumer (no orphaned factories); the panel's 15-route composition lives with its single consumer in `cli/commands/panel_composition.py`; a single-consumer adapter is imported directly by its feature and never passes through the container (ADR 0001).
 - `core/protocols/` holds six Protocols: three two-adapter OS seams (`FilePermissionSetter`, `ShutdownHandler`, `TelemetryRefreshLock`) and three panel cross-feature seams whose implementer lives under `features/` (`AgentsProvider`, `ContextProjectProvider`, `ServerRegistryProvider`); every other adapter is imported by its one consumer (the consumer-less `ProcessAncestry` chain was deleted at 0.5.3).
-- `setup.cfg` carries seven import-linter contracts; `features-no-infrastructure` and `cli-no-infrastructure` were deleted by ADR 0001, `features-no-subprocess` is direct-imports-only with no suppressed edge, and the four surviving suppressed edges all sit under `features-no-cross-feature`.
+- `setup.cfg` carries seven import-linter contracts; `features-no-infrastructure` and `cli-no-infrastructure` were deleted by ADR 0001, `features-no-subprocess` is direct-imports-only with no suppressed edge, and the three surviving suppressed edges all sit under `features-no-cross-feature`.
 - `features/migrate` stamps `specs_pattern_version: 6` or refuses, instructing a tree below v6 to upgrade to 0.4.x first — no in-wheel pre-v6 lineage.
-- Hooks import `core.invocation` directly and build the `Invocation` once per process; they never import `container` (P-12).
+- Hooks import `core.invocation` directly and build the `Invocation` once per process; they never import `container` (P-12); the PostToolUse hook `sdd_post_gate` renews presence, touches `last_seen_at` and runs `presence.gc` on one throttle — it writes nothing else.
 
 ### `features/specs/doctor` — SpecsDoctor coordinator + validator siblings
 
@@ -148,13 +149,12 @@ classDiagram
     note for SpecsDoctor "iterates rules.RULES over a fresh SpecsTree per check(); fix dispatch and --fix help derive from the same registry; takes bug_store_factory; imports neither spec_context nor infrastructure"
 ```
 
-### `dadaia_workspace/features` — package map (23 packages)
+### `dadaia_workspace/features` — package map (20 packages)
 
 ```mermaid
 flowchart TB
     subgraph features["dadaia_workspace/features"]
-      pkgs["academy · agents · backlog · bugs · capabilities · certification · chokepoints · ci_preflight · export · import_ · migrate · panel · public · reconcile · reports · repos · server_registry · spec_context · specs · telemetry · tmp_gc · workspace · workspace_clean"]
-      subs["reports submodules — next · retention"]
+      pkgs["agents · backlog · bugs · capabilities · certification · chokepoints · ci_preflight · export · import_ · migrate · panel · public · reconcile · reports · repos · server_registry · spec_context · specs · telemetry · workspace"]
     end
     container["container.py"] --> features
     features --> core["core"]
@@ -173,12 +173,6 @@ classDiagram
     agent_policy : render_api_agent_model_policy()
     agent_policy : render_api_agent_model_templates()
     api_sessions : render_api_sessions()
-    api_academy : render_api_academy()
-    api_reports : render_api_reports()
-    api_reports : serve_report_file()
-    api_reports : mark_report_important()
-    api_reports : unmark_report_important()
-    api_reports : delete_report_file()
     api_health : render_health()
     note "no api.py barrel — container named-imports each render_api_* from its own module; each view imports only features.panel.service and core.models; handler._ROUTES is the one (method, pattern, view_name) table and a route absent from it cannot exist"
 ```

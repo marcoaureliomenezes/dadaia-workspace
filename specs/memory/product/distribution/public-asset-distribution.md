@@ -19,7 +19,7 @@ tags: [public, assets, distribution, projection, privacy]
 - The nine `agents/*.md` bodies stage generic and render at install as `render(staged body + resolved (model, effort))`, precedence override > template > `balanced` over `.dadaia/states/agent_model_policy.json`.
 - Codex render fails closed without a model, and the manifest keeps hashing the policy-free staged bytes.
 - A skill is a folder and every file in it is projected, to `.agents/skills/<name>/` plus `.claude/skills/<name>/`; Codex and Kimi Code read the shared root natively, with no per-harness copy ([[agentic-entities]]).
-- A projected script is a thin wrapper forwarding the package's exit code; the memory-atom lint lives in `features/specs/memory_lint.py`.
+- `stage` fills the `<!-- zones -->` and `<!-- canon -->` placeholders of the `.dadaia/AGENTS.md` and `.dadaia/states/AGENTS.md` fragments from the zone registry, so the projected tables are the registry ([[workspace-doctor]]); scripts are staged under `agentic/scripts` and never projected — git hooks and CI execute the package copy, and the memory-atom lint lives in `features/specs/memory_lint.py`.
 
 ## Doctor
 
@@ -27,7 +27,7 @@ tags: [public, assets, distribution, projection, privacy]
 - A core `claude:agents/*.md` label compares against `render(staged + resolved policy)`, so an applied policy reads `[ok]` and a hand-edit `[drift]`; a Codex TOML is byte-compared to its render exactly as a Claude agent is.
 - The privacy gate runs over source and staged assets, reporting `[ok] public-privacy` only on a clean surface, which CI treats as a release gate.
 - With `.dadaia/states/harness_profile.json` present, `install` without `--target` covers the profile's harnesses plus the shared `agents` tree; an absent profile means all four ([[workspace-init]]).
-- Doctor builds its rule table for the profile's harnesses only and warns on a runtime directory outside it.
+- Doctor builds its rule table for the profile's harnesses only; an entry inside a harness dir that the install ledger does not name is `dadaia doctor`'s `WS-<harness>-slop`, never a `public doctor` line ([[workspace-doctor]]).
 
 ## Scaffold and consumer fan-out
 

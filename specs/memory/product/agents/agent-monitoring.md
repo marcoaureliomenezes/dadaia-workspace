@@ -2,8 +2,8 @@
 slug: agent-monitoring
 title: agent-monitoring
 category: product
-tldr: Stdlib-only local agent telemetry behind an allowlist gate, plus the event-driven lifecycle of every runtime artifact under .dadaia/.
-summary: Telemetry ingests Claude Code, Codex and Kimi Code session metadata into a local SQLite store behind an allowlist gate; the same atom owns artifact GC, reconciler reaping and log rotation.
+tldr: Stdlib-only local agent telemetry behind an allowlist gate, plus where each runtime artifact under .dadaia/ lives and expires.
+summary: Telemetry ingests Claude Code, Codex and Kimi Code session metadata into a local SQLite store behind an allowlist gate; runtime artifacts live in registry zones and expire through dadaia doctor.
 tags: [monitoring, telemetry, sessions, lifecycle]
 ---
 
@@ -23,14 +23,10 @@ tags: [monitoring, telemetry, sessions, lifecycle]
 
 ## Artifact lifecycle
 
-- Runtime artifacts under `.dadaia/` die when the thing they exist for dies; each capability is fail-open where it rides a hook, refuses a target outside `.dadaia/`, and never follows a symlinked directory.
-- Release closure sweeps that release's reports, handoffs, captures and run records after its evidence pointers are final and before the archive move, keeping whatever a surviving pointer references.
-- `presence.gc()` is the one reaper of presence records, throttle and sentinel markers and the directories they empty; a live session's own record is never touched, and it runs from `doctor --fix` and the PostToolUse pass behind one throttle ([[context-management]]).
-- Each `.dadaia/logs/*.jsonl` writer rotates its own file at a 1 MB cap, keeping current + 1 generation, locking only at or over the cap and appending without rotating on a contended timeout.
+- Every runtime artifact under `.dadaia/` lives in a registry zone; `handoff tmp mcps .cache` expire one day after mtime and `dadaia doctor --fix --expired-only` reaps them at every SessionStart as a CLI process, never a hook module ([[workspace-doctor]]).
+- `presence.gc()` is the one reaper of presence records, throttle and sentinel markers and the directories they empty; a live session's own record is never touched, and it runs from `doctor --fix` and the PostToolUse hook behind one throttle ([[context-management]]).
 - A cache is refused, not deleted: the venv guard blocks the invocation that would write one into a repo tree ([[sdd-gate-v3]]).
-- `dadaia tmp gc` is the only calendar-based backstop, covering dated scratch older than 3 days, `*cache*` directories under `.dadaia/` outside the venv, and orphaned session markers.
-- It offers a dry run, is idempotent, never removes a live session's markers or a non-dated path, and is safe at `SessionStart`.
 
 ## Dependencies
 
-[[panel]], [[context-management]], [[brand-identity]].
+[[panel]], [[context-management]], [[brand-identity]], [[workspace-doctor]].

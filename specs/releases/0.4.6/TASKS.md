@@ -117,7 +117,7 @@ Write-set paths are relative to `dadaia_workspace/` unless they start with `test
   public/templates/repo-AGENTS.md, public/scaffold/memory/AGENTS.md,
   public/entities/behavior-map.json, the reprojected instance law files.
   Blocked by: T-046-27, T-046-33. Delivers: the law names one reports home, one doctor — AC13.
-- [ ] T-046-35 — FR17 + CLOSURE: `workspace-doctor` atom (finding codes and verdicts),
+- [x] T-046-35 — FR17 + CLOSURE: `workspace-doctor` atom (finding codes and verdicts),
   `ARCHITECTURE.md` decider row + diagram, P-11 "six" -> "eight", `workspace-init`,
   `context-management`, `catalog.json` (MEMORY-UPDATE.md protocol); the closure narrative
   (`_RELEASE.json` log: summary, size, drifts, test-dispositions, artifact-gc via `dadaia
