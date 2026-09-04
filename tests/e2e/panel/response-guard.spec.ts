@@ -10,7 +10,7 @@
  * If these fail, other tests are unreliable.
  *
  * E2E-GUARD-01: Register a response listener BEFORE navigation. Fail on ANY
- *   response status >= 400 during a full tab tour (sessions, academy,
+ *   response status >= 400 during a full tab tour (agents, entities,
  *   servers, memories) PLUS clicking the first memory chip and
  *   waiting for networkidle. Include the failing URL+status list in the
  *   assertion message.
@@ -45,11 +45,11 @@ import { test, expect } from '@playwright/test';
 import { gotoPanel, PANEL_TOKEN, BASE_URL } from './helpers';
 
 // ---------------------------------------------------------------------------
-// Tab tour definition — primary tabs in display order (v0.3.0 nav set)
+// Tab tour definition — the four primary tabs (v0.4.6 nav set)
 // ---------------------------------------------------------------------------
 const ALL_TABS = [
   { tabId: '#tab-subagents', sectionId: 'subagents', label: 'Agents' },
-  { tabId: '#tab-academy', sectionId: 'academy', label: 'Academy' },
+  { tabId: '#tab-entities', sectionId: 'entities', label: 'Agentic Entities' },
   { tabId: '#tab-servers', sectionId: 'servers', label: 'Servers' },
   { tabId: '#tab-memories', sectionId: 'memories', label: 'Spec Context Projects' },
 ] as const;

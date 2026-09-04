@@ -34,7 +34,6 @@ test('E2E-TAB-01 — Tab bar contains the current tabs in correct order', async 
     'Projects',
     'Agents',
     'Agentic Entities',
-    'Academy',
     'Servers',
   ]);
 });
@@ -74,7 +73,7 @@ test('E2E-TAB-03 — Clicking each tab activates the correct section', async ({ 
 
   const tabs: Array<{ tabId: string; sectionId: string }> = [
     { tabId: '#tab-subagents', sectionId: 'subagents' },
-    { tabId: '#tab-academy', sectionId: 'academy' },
+    { tabId: '#tab-entities', sectionId: 'entities' },
     { tabId: '#tab-servers', sectionId: 'servers' },
     { tabId: '#tab-memories', sectionId: 'memories' },
   ];
@@ -147,7 +146,7 @@ test('E2E-TAB-04 — No CSP violations on load and all tab activations', async (
   await page.waitForSelector('[role="tab"]');
 
   // Navigate across the surviving tabs (Agentic/agents/kanban removed in v0.1.45).
-  for (const sectionId of ['subagents', 'servers', 'memories'] as const) {
+  for (const sectionId of ['subagents', 'entities', 'servers', 'memories'] as const) {
     await activateTab(page, sectionId);
   }
 
