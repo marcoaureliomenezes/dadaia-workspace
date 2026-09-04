@@ -1,6 +1,6 @@
 # SPEC — Release: 0.4.6
 
-**Status:** Em revisão
+**Status:** Aprovado
 **Release ID:** 0.4.6
 **Owner:** product-engineer
 **Opened:** 2026-09-03
