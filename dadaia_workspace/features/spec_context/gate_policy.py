@@ -51,9 +51,8 @@ _SPECS_ADDITIVE_PREFIXES: tuple[str, ...] = (
     "specs/bugs/",
     "specs/audits/",
 )
-# Single authority in core (also consumed by the public doctor's foreign scan) —
-# the local name is kept for the module's existing readers.
-_DADAIA_ADDITIVE_PREFIXES: tuple[str, ...] = workspace_layout.DADAIA_ADDITIVE_PREFIXES
+# Derived from the zone registry (OUTPUT + EPHEMERAL zones) — never a second literal.
+_DADAIA_ADDITIVE_PREFIXES: tuple[str, ...] = workspace_layout.additive_prefixes()
 #: v0.4.3 FR13 (ratified): bare-prefix match — dotfiles included, by decision; no
 #: carve-out; no SPEC override of the phase rule (see the module docstring above).
 _MEMORY_PREFIX = "specs/memory/"

@@ -152,6 +152,24 @@ _Avoid_: template hashes, drift allowlist
 A per-area `AGENTS.md` projected from `public/scaffold/<area>/` (or the repo/tests pair placed by `scoped_law.install_scoped_law`); governed by TREE-5's shipped-history discipline.
 _Avoid_: sub-AGENTS, area rules file
 
+## Workspace zones (0.4.6)
+
+**Zone**:
+One top-level `.dadaia/` directory with a `Zone(name, cls, creator, ttl_seconds, canon, purpose)` record in `core/workspace_layout.DADAIA_ZONES`; classes `projection state protected operator output ephemeral managed`, creators `init install runtime operator`. Every other list of zone names is a view of the registry.
+_Avoid_: folder, lane, path class (the gate's category — a zone is a directory record)
+
+**Finding verdict**:
+The doctor's classification of one scanned entry — `canon | operator | slop | expired | missing`; `canon` + `operator` count as canonical. Always written qualified.
+_Avoid_: verdict (bare — the PR approval record above), status, class
+
+**Finding code**:
+`WS-<zone>-<verdict>` — `<zone>` is `root`, a harness dir (`claude codex kimi-code agents`), `dadaia` (the `.dadaia/` top level) or a zone name with its leading dot stripped (`cache`); one finding line each, then the score line `compliance: N/M entries canonical (P%)`.
+_Avoid_: ROOT-n, EFF-n, issue code
+
+**Instance exceptions**:
+`states/instance_exceptions.txt` — one glob per line, `#` comments, deduplicated, order kept; matches at the root and inside the harness dirs. Outside the projection manifest and outside the exceptions = slop. Replaces `root_exceptions.txt`.
+_Avoid_: root exceptions, allowlist, whitelist (the root whitelist is the gate's law, not the operator's globs)
+
 ## Homonyms — one canonical sense
 
 **Scaffold**:

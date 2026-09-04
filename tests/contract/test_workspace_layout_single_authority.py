@@ -1,10 +1,12 @@
-"""Intent: CONTRACT — core.workspace_layout single authority (bug dadaia-reconcile-quarantines-sanctioned-references-clone)
+"""Intent: CONTRACT — core.workspace_layout single authority (bug dadaia-reconcile-quarantines-sanctioned-references-clone; 0.4.6 AC1); size: SMALL.
 
-Contract — one authority per filesystem-layout invariant (2026-08-06 analysis).
-
-The root whitelist diverged the day DADAIA.md was added to the hook's copy and not the
-doctor's. These tests pin that every consumer DERIVES from ``core/workspace_layout.py``
-— identity, not equality, where possible — so divergence is unrepresentable.
+One authority per filesystem-layout invariant (2026-08-06 analysis). The root whitelist
+diverged the day DADAIA.md was added to the hook's copy and not the doctor's; the
+``.dadaia/`` layout diverged six times as bare name lists (architect G, 0.4.6). These
+tests pin that every consumer DERIVES from ``core/workspace_layout.py`` — identity where a
+constant is re-exported, equality against the registry view where a consumer derives —
+so divergence is unrepresentable. ``tests/contract/test_zone_registry.py`` adds the
+package-wide ratchet that no second list can be born.
 """
 
 from __future__ import annotations
@@ -51,26 +53,40 @@ def test_installer_targets_are_the_same_object() -> None:
     assert projection_rules.DADAIA_MD_HARNESS_TARGETS is workspace_layout.DADAIA_MD_HARNESS_TARGETS
 
 
-def test_doctor_dadaia_allowlist_is_the_same_object() -> None:
-    """Bug dadaia-reconcile-quarantines-sanctioned-references-clone: doctor's ROOT-4
-    ``.dadaia/`` allowlist must be the SAME object as the core authority, never a
-    hand-copied literal that can silently diverge (as it did the moment T-045-23
-    sanctioned "references" in one copy but not the other)."""
+def test_gate_additive_prefixes_are_the_registry_view() -> None:
+    """The gate's ``.dadaia/`` ADDITIVE class is the OUTPUT + EPHEMERAL rows of the
+    registry (SPEC 0.4.6 FR1, architect A) — ``reports/`` left the class the moment its
+    row left the registry, with no gate edit."""
+    from dadaia_workspace.core import workspace_layout
+    from dadaia_workspace.features.spec_context import gate_policy
+
+    assert workspace_layout.additive_prefixes() == gate_policy._DADAIA_ADDITIVE_PREFIXES
+
+
+def test_public_doctor_foreign_scan_skips_the_registry_additive_view() -> None:
+    """Compatibility reader (dies in T-046-25 when the foreign scan moves into the doctor
+    walk): the public doctor skips exactly the registry's ADDITIVE zones."""
+    from dadaia_workspace.core import workspace_layout
+    from dadaia_workspace.infrastructure import public_assets
+
+    assert workspace_layout.additive_prefixes() == public_assets.DADAIA_ADDITIVE_PREFIXES
+
+
+def test_doctor_dadaia_allow_set_is_the_registry_view() -> None:
+    """Bug dadaia-reconcile-quarantines-sanctioned-references-clone: the doctor's
+    ``.dadaia/`` allow set is ``zone_names()`` — compatibility name until T-046-25 switches
+    the doctor to the registry walk."""
     from dadaia_workspace.core import workspace_layout
     from dadaia_workspace.features.spec_context import doctor
 
-    assert doctor._DADAIA_ALLOWED_SUBDIRS is workspace_layout.DADAIA_ALLOWED_SUBDIRS
+    assert workspace_layout.zone_names() == doctor._DADAIA_ALLOWED_SUBDIRS
 
 
-def test_migrate_legacy_quarantine_set_never_contains_a_canonical_dadaia_dir() -> None:
-    """Bug dadaia-reconcile-quarantines-sanctioned-references-clone: migrate's legacy-
-    quarantine set is DERIVED from the same core authority doctor's ROOT-4 allowlist
-    uses, so a name cannot be canonical (never quarantined) and legacy (always
-    quarantined) at once — the structural cause of the bug is unrepresentable, not
-    merely absent from today's values."""
+def test_migrate_legacy_quarantine_set_never_contains_a_zone() -> None:
+    """Bug dadaia-reconcile-quarantines-sanctioned-references-clone: a name cannot be a
+    registry zone (never quarantined) and legacy (always quarantined) at once. Dies with
+    ``legacy_dadaia_dirs`` in T-046-26."""
     from dadaia_workspace.core import workspace_layout
     from dadaia_workspace.features.migrate import legacy_dadaia_dirs
 
-    assert legacy_dadaia_dirs.LEGACY_DADAIA_SUBDIRS.isdisjoint(
-        workspace_layout.DADAIA_ALLOWED_SUBDIRS
-    )
+    assert legacy_dadaia_dirs.LEGACY_DADAIA_SUBDIRS.isdisjoint(workspace_layout.zone_names())

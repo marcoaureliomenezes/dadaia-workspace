@@ -85,9 +85,9 @@ _IN_REPO_PRODUCTION_CASES: tuple[tuple[str, str], ...] = (
         # Workspace-root .dadaia/ ADDITIVE prefixes preserved (FR-R1-05).
         pytest.param(
             "root-path",
-            ".dadaia/reports/ctx/agent/r.html",
+            ".dadaia/mcps/server/s.json",
             PathClass.ADDITIVE,
-            id="root-dadaia-reports",
+            id="root-dadaia-mcps",
         ),
         pytest.param(
             "root-path", ".dadaia/handoff/ctx/h.json", PathClass.ADDITIVE, id="root-dadaia-handoff"
