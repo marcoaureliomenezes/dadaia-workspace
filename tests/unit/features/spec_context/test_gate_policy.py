@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.workspace_layout import LAW_BASENAMES
+from dadaia_workspace.core.workspace_layout import LAW_BASENAMES, additive_prefixes
 from dadaia_workspace.features.spec_context.gate_policy import (
     Decision,
     PathClass,
@@ -521,3 +522,28 @@ def test_manifest_removal_never_demotes_a_statically_floored_law_path(tmp_path: 
     assert not manifest_path.exists()
     for floor_path in floor_paths:
         assert classify_path(floor_path) == PathClass.LAW, floor_path
+
+
+# ---------------------------------------------------------------------------
+# The READ-mode block message advertises exactly the ADDITIVE set the gate honours.
+# ---------------------------------------------------------------------------
+
+
+def test_read_block_message_names_only_the_live_additive_set(tmp_path: Path) -> None:
+    """A retired ``.dadaia/`` zone (``reports`` after 0.4.6 candidate 4) must never be
+    offered as writable: the message is derived from the same prefixes ``classify_path``
+    honours, so the two cannot drift apart again."""
+    decision, message = evaluate(
+        tmp_path,
+        "repos/dadaia-workspace/specs/releases/v0.1.46/TASKS.md",
+        ctx="dadaia-workspace",
+        phase="IMPLEMENTATION",
+        session_id="sess-1",
+        release="v0.1.46",
+        mode="READ",
+    )
+    assert decision is Decision.BLOCK
+    advertised = re.search(r"Additive paths \(([^)]*)\) remain writable", message)
+    assert advertised is not None
+    live = ("specs/backlog/", "specs/bugs/", "specs/audits/", *additive_prefixes())
+    assert set(advertised.group(1).split(", ")) == {prefix.rstrip("/") for prefix in live}

@@ -20,6 +20,8 @@ import os
 import time
 from pathlib import Path
 
+import pytest
+
 from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.workspace_layout import (
@@ -58,6 +60,7 @@ def _init_workspace(root: Path) -> None:
     (dadaia / _STATE_ZONE.name / "spec_contexts.json").write_text(
         '{"schema_version": "2", "contexts": []}', encoding="utf-8"
     )
+    _write_ledger(root)
     _profile(root).write_text(
         json.dumps({"schema_version": "1", "harnesses": list(L1_ENTRY_HARNESSES)}),
         encoding="utf-8",
@@ -220,6 +223,46 @@ def test_harness_dirs_are_scoped_by_the_persisted_profile(tmp_path: Path) -> Non
     codes = _codes(_make_doctor(tmp_path).scan())
     assert "WS-codex-slop" in codes
     assert "WS-kimi-code-slop" not in codes
+
+
+@pytest.mark.parametrize("ledger_state", ["absent", "corrupt"])
+def test_unreadable_install_ledger_reports_itself_and_never_reclassifies_projections(
+    tmp_path: Path, ledger_state: str
+) -> None:
+    """Bug doctor-unreadable-install-ledger-classifies-projections-as-slop: the store's
+    contract (a missing or corrupt record degrades to inaction, never deletion) holds
+    downstream — ONE non-fixable ``WS-states-missing`` finding, no harness-dir entry
+    classified, and ``fix()`` deletes nothing under the harness dirs."""
+    _init_workspace(tmp_path)
+    projected = tmp_path / ".claude" / "agents" / "pm.md"
+    projected.parent.mkdir(parents=True)
+    projected.write_text("projected", encoding="utf-8")
+    ledger = tmp_path / ".dadaia" / _STATE_ZONE.name / "install_ledger.json"
+    if ledger_state == "corrupt":
+        ledger.write_text("{not json", encoding="utf-8")
+    else:
+        ledger.unlink()
+
+    doctor = _make_doctor(tmp_path)
+    findings = doctor.scan()
+
+    ledger_path = f"{_STATE_ZONE.name}/install_ledger.json"
+    reported = [f for f in findings if f.path == ledger_path and not f.canonical]
+    assert [(f.code, f.verdict, f.fixable, f.detail) for f in reported] == [
+        (
+            f"WS-{_STATE_ZONE.name}-missing",
+            FindingVerdict.MISSING,
+            False,
+            "(run dadaia public install)",
+        )
+    ]
+    assert not any(f.path.startswith(".claude/") for f in findings)
+
+    actions = doctor.fix()
+
+    assert projected.read_text(encoding="utf-8") == "projected"
+    assert not any("install_ledger.json" in action for action in actions)
+    assert not (tmp_path / ".dadaia" / _STATE_ZONE.name / "install_ledger.json").is_dir()
 
 
 def test_exception_globs_match_workspace_relative_paths_inside_harness_dirs(

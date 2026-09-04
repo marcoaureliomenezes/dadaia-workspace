@@ -101,10 +101,10 @@ _READ_MODES: frozenset[str] = frozenset({"READ"})
 #: operator action that grants write rights, never instructing a mid-flow relaunch.
 _READ_BLOCK_MESSAGE = (
     "[RULE READ] '{rel_path}' is a MUTATING write, but this session is bound in read "
-    "(observe) mode. "
-    "Additive paths (specs/backlog, specs/bugs, specs/audits, .dadaia/reports, "
-    ".dadaia/handoff, .dadaia/tmp) remain writable. To gain write rights, the operator "
-    "binds implementation mode once: `dadaia context bind {ctx} --mode implementation`."
+    "(observe) mode. Additive paths ("
+    + ", ".join(p.rstrip("/") for p in (*_SPECS_ADDITIVE_PREFIXES, *_DADAIA_ADDITIVE_PREFIXES))
+    + ") remain writable. To gain write rights, the operator binds implementation mode "
+    "once: `dadaia context bind {ctx} --mode implementation`."
 )
 
 #: The default session id when no harness-native id resolves (``hooks/sdd_gate.py``'s

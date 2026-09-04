@@ -48,6 +48,10 @@ def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         json.dumps({"schema_version": "1", "harnesses": list(L1_ENTRY_HARNESSES)}),
         encoding="utf-8",
     )
+    # ... and the install ledger: absent, the harness dirs are never classified.
+    (dadaia / "states" / "install_ledger.json").write_text(
+        json.dumps({"schema_version": "1", "entries": []}), encoding="utf-8"
+    )
     (tmp_path / "repos").mkdir()
     (tmp_path / "AGENTS.md").write_text("# agents", encoding="utf-8")
     venv_bin = dadaia / ".venv" / PLATFORM.venv_scripts_dir

@@ -30,6 +30,11 @@ def _ledger_path(states_dir: Path) -> Path:
 
 
 class JsonInstallLedgerStore:
+    @staticmethod
+    def path(states_dir: Path) -> Path:
+        """Where the ledger lives under *states_dir* — the doctor's ``missing`` target."""
+        return _ledger_path(states_dir)
+
     def read(self, states_dir: Path) -> InstallLedger | None:
         """The persisted ledger, or ``None`` when absent OR unreadable (fail to inaction)."""
         path = _ledger_path(states_dir)

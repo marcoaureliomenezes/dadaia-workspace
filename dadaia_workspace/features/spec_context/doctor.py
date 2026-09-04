@@ -335,9 +335,17 @@ class DoctorService:
     def _scan_harness_dirs(self, globs: tuple[str, ...]) -> list[Finding]:
         """An entry is canon iff it is a projection target (the install ledger — what
         ``public install`` actually wrote); a directory holding a target is a path, not an
-        entry; anything else is operator (exception glob) or slop."""
+        entry; anything else is operator (exception glob) or slop. No readable ledger ⇒ the
+        store's contract (degrade to inaction, never deletion) holds here too: ONE
+        non-fixable ``missing`` finding, and no harness-dir entry is classified."""
         ledger = JsonInstallLedgerStore().read(self._states)
-        targets = frozenset(ledger.by_relpath()) if ledger is not None else frozenset()
+        if ledger is None:
+            path = JsonInstallLedgerStore.path(self._states)
+            code = f"WS-{self._states.name}-{FindingVerdict.MISSING.value}"
+            rel = path.relative_to(self._dadaia).as_posix()
+            detail = "(run dadaia public install)"
+            return [Finding(code, rel, FindingVerdict.MISSING, False, detail, path)]
+        targets = frozenset(ledger.by_relpath())
         owned_dirs = frozenset(
             parent.as_posix() for rel in targets for parent in PurePosixPath(rel).parents
         )
@@ -482,7 +490,7 @@ class DoctorService:
 
         findings = self.scan()
         for finding in findings:
-            if finding.verdict is FindingVerdict.MISSING:
+            if finding.verdict is FindingVerdict.MISSING and finding.fixable:
                 self._seed(finding)
                 actions.append(f"{finding.code}: created '{finding.path}'")
         actions.extend(self._delete(findings, FindingVerdict.EXPIRED))
