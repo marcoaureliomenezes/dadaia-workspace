@@ -23,7 +23,6 @@ PANEL_PRIMARY_TABS: list[tuple[str, str]] = [
     ("memories", "Projects"),
     ("subagents", "Agents"),
     ("entities", "Agentic Entities"),
-    ("reports", "Reports"),
     ("academy", "Academy"),
     ("servers", "Servers"),
 ]

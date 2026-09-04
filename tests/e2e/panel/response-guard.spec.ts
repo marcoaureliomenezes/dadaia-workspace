@@ -3,15 +3,15 @@
  *
  * Tests: 2
  * Surface: Global guard — any status >= 400 or console error during a full
- *          tab tour (all 6 tabs) plus clicking the first memory chip and
+ *          tab tour (every primary tab) plus clicking the first memory chip and
  *          waiting for networkidle.
  *
  * Priority: P0 — these guards must run before any other panel tests.
  * If these fail, other tests are unreliable.
  *
  * E2E-GUARD-01: Register a response listener BEFORE navigation. Fail on ANY
- *   response status >= 400 during a full tab tour (sessions, reports,
- *   academy, servers, memories) PLUS clicking the first memory chip and
+ *   response status >= 400 during a full tab tour (sessions, academy,
+ *   servers, memories) PLUS clicking the first memory chip and
  *   waiting for networkidle. Include the failing URL+status list in the
  *   assertion message.
  *
@@ -49,7 +49,6 @@ import { gotoPanel, PANEL_TOKEN, BASE_URL } from './helpers';
 // ---------------------------------------------------------------------------
 const ALL_TABS = [
   { tabId: '#tab-subagents', sectionId: 'subagents', label: 'Agents' },
-  { tabId: '#tab-reports', sectionId: 'reports', label: 'Reports' },
   { tabId: '#tab-academy', sectionId: 'academy', label: 'Academy' },
   { tabId: '#tab-servers', sectionId: 'servers', label: 'Servers' },
   { tabId: '#tab-memories', sectionId: 'memories', label: 'Spec Context Projects' },

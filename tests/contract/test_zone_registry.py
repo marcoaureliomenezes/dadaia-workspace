@@ -50,10 +50,7 @@ _RETIRED_ZONES: frozenset[str] = frozenset(
 #: path literal, keyed to the task whose write set deletes them. Each entry must still
 #: violate: once its task lands, the entry is stale and must go (ratchet moves down only).
 _PENDING_DEMOLITION: dict[str, str] = {
-    "dadaia_workspace/cli/commands/reports.py": "T-046-27",
-    "dadaia_workspace/features/reports/retention.py": "T-046-27",
     "dadaia_workspace/features/export/service.py": "T-046-31",
-    "dadaia_workspace/features/panel/views/api_reports.py": "T-046-27",
 }
 
 #: The module that creates each ``Creator``'s zones. ``None`` = no single package module

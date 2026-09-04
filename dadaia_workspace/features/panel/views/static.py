@@ -27,11 +27,6 @@ from dadaia_workspace.features.panel.views.assets.css.entities import ENTITIES_C
 from dadaia_workspace.features.panel.views.assets.css.memory import MEMORY_CSS
 from dadaia_workspace.features.panel.views.assets.css.memory_doc import MEMORY_DOC_CSS
 from dadaia_workspace.features.panel.views.assets.css.projects import PROJECTS_CSS
-from dadaia_workspace.features.panel.views.assets.css.reports import REPORTS_CSS
-from dadaia_workspace.features.panel.views.assets.css.reports_doc import (
-    REPORTS_DOC_BASE_CSS,
-    REPORTS_DOC_OVERRIDE_CSS,
-)
 from dadaia_workspace.features.panel.views.assets.css.sessions import SESSIONS_CSS
 from dadaia_workspace.features.panel.views.assets.css.structure import STRUCTURE_CSS
 from dadaia_workspace.features.panel.views.assets.css.tokens import TOKENS_CSS
@@ -58,17 +53,12 @@ _ASSETS: dict[str, tuple[str, bytes]] = {
     "tokens.css": ("text/css; charset=utf-8", TOKENS_CSS.encode("utf-8")),
     "memory.css": ("text/css; charset=utf-8", MEMORY_CSS.encode("utf-8")),
     "memory-doc.css": ("text/css; charset=utf-8", MEMORY_DOC_CSS.encode("utf-8")),
-    "reports-doc.css": (
-        "text/css; charset=utf-8",
-        (REPORTS_DOC_BASE_CSS + REPORTS_DOC_OVERRIDE_CSS).encode("utf-8"),
-    ),
     "structure.css": ("text/css; charset=utf-8", STRUCTURE_CSS.encode("utf-8")),
     "projects.css": ("text/css; charset=utf-8", PROJECTS_CSS.encode("utf-8")),
     "agent-policy.css": ("text/css; charset=utf-8", AGENT_POLICY_CSS.encode("utf-8")),
     "sessions.css": ("text/css; charset=utf-8", SESSIONS_CSS.encode("utf-8")),
     "academy.css": ("text/css; charset=utf-8", ACADEMY_CSS.encode("utf-8")),
     "entities.css": ("text/css; charset=utf-8", ENTITIES_CSS.encode("utf-8")),
-    "reports.css": ("text/css; charset=utf-8", REPORTS_CSS.encode("utf-8")),
     "core.js": (
         "application/javascript; charset=utf-8",
         (_JS_DIR / "core.js").read_bytes(),
@@ -96,10 +86,6 @@ _ASSETS: dict[str, tuple[str, bytes]] = {
     "academy.js": (
         "application/javascript; charset=utf-8",
         (_JS_DIR / "academy.js").read_bytes(),
-    ),
-    "reports.js": (
-        "application/javascript; charset=utf-8",
-        (_JS_DIR / "reports.js").read_bytes(),
     ),
     "logo-rhino-24.svg": (
         "image/svg+xml; charset=utf-8",

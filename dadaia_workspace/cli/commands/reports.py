@@ -188,11 +188,11 @@ def doctor(
         False, "--json", help="Emit machine-readable JSON instead of human-readable text."
     ),
 ) -> None:
-    """Diagnose structural invariants in .dadaia/reports/ and .dadaia/handoff/.
+    """Diagnose structural invariants in .dadaia/handoff/.
 
     \b
     Invariants checked:
-      RPT-1: handoff artifact.path must point to an existing .html under .dadaia/reports/.
+      RPT-1: a declared handoff artifact.path must resolve to an existing .html file.
 
     \b
     Flags emitted:
@@ -210,7 +210,6 @@ def doctor(
     """
     workspace_root = resolve_workspace_root()
     handoff_root = workspace_root / ".dadaia" / "handoff"
-    _RPT1_PREFIX = ".dadaia/reports/"
     issues: list[dict[str, str | None]] = []
     for handoff in scan_handoffs(handoff_root):
         artifact_path_str = handoff.artifact_path_raw
@@ -218,16 +217,13 @@ def doctor(
             # No artifact.path declared — sidecar is valid (handoff-first emission).
             continue
         reason: str | None = None
-        if not artifact_path_str.startswith(_RPT1_PREFIX):
-            reason = f"artifact.path must start with '{_RPT1_PREFIX}'"
-        else:
-            resolved = handoff.artifact_path(workspace_root)
-            if resolved is None:
-                reason = "path traversal or boundary escape detected"
-            elif not resolved.exists():
-                reason = "file does not exist"
-            elif resolved.suffix.lower() != ".html":
-                reason = f"not an .html file — got {resolved.suffix!r}"
+        resolved = handoff.artifact_path(workspace_root)
+        if resolved is None:
+            reason = "path traversal or boundary escape detected"
+        elif not resolved.exists():
+            reason = "file does not exist"
+        elif resolved.suffix.lower() != ".html":
+            reason = f"not an .html file — got {resolved.suffix!r}"
         if reason is not None:
             issues.append(
                 {

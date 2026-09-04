@@ -61,9 +61,6 @@ tests).** Every ``tests/**`` file that performs fixture ageing via ``os.utime`` 
 ``grep -rln "os.utime(" tests/``; this scan is authoritative for the rule as coded, and in
 any case the rule below runs over the ENTIRE ``tests/**`` tree, not merely this list):
 
-* ``tests/contract/test_reports_retention_cleanup.py`` and
-  ``tests/unit/features/reports/test_retention_service.py`` — frozen ``NOW``; every
-  ``os.utime`` mtime derives from ``NOW - timedelta(...)`` — no real-clock call.
 * ``tests/unit/features/telemetry/test_runtime_adapters.py``,
   ``tests/unit/hooks/test_ctx_inject_digest.py``,
   ``tests/unit/hooks/test_post_gate_reap.py`` — every mtime derives from a real-clock call
@@ -73,13 +70,6 @@ any case the rule below runs over the ENTIRE ``tests/**`` tree, not merely this 
   epoch (``stale_mtime = 0.0``, a LOCAL variable inside a function, never a module-level
   constant) — the bug report's "epoch 0.0" self-healing relative: as real wall-clock time
   advances the gap only GROWS, never erodes, so no ratchet is needed even in spirit.
-
-The bug report's other self-healing relative — a fixed date compared against the real clock —
-is the retention fixtures above (``produced_at="2026-06-01T00:00:00Z"`` /
-``"2026-06-04T00:00:00Z"``): both resolve against the frozen ``NOW`` constant, never the real
-clock, so they are not actually "compared against the real clock" in THIS file — the
-comparison happens inside production code, out of this scan's scope by design (this rule
-guards test-authored fixtures, not the module under test).
 """
 
 from __future__ import annotations

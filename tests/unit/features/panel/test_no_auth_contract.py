@@ -75,11 +75,7 @@ _ALL_VIEW_NAMES = [
     "api_contexts",
     "memory",
     "memory_view",
-    "reports_serve",
     "api_academy",
-    "api_reports",
-    "api_report_delete",
-    "api_report_mark_important",
     "api_agent_prompt",
     "api_workflow_run",
 ]
@@ -119,9 +115,7 @@ _VIEW_ROUTE_CASES = [
     ("/api/contexts", "api_contexts"),
     ("/memory/foo/bar.md", "memory"),
     ("/memory-view/foo/bar.md", "memory_view"),
-    ("/reports/sub/report.html", "reports_serve"),
     ("/api/academy", "api_academy"),
-    ("/api/reports", "api_reports"),
     ("/api/agents/software-engineer/prompt", "api_agent_prompt"),
 ]
 
@@ -174,7 +168,7 @@ _ALL_ROUTE_CLASS_PATHS = [
     "/",  # PUBLIC
     "/health",  # PUBLIC
     "/api/panel-status",  # BEARER_SECOND_LOOP
-    "/api/reports",  # BEARER
+    "/api/agents/software-engineer/prompt",  # BEARER
     "/api/agents",  # BEARER_TELEMETRY
 ]
 
@@ -189,7 +183,7 @@ def test_foreign_host_is_403_on_every_route_class(path: str) -> None:
 
     assert status == 403, f"{path} with foreign Host must 403, got {status}"
     assert b"forbidden host" in body
-    if path in {"/", "/health", "/api/panel-status", "/api/reports"}:
+    if path in {"/", "/health", "/api/panel-status", "/api/agents/software-engineer/prompt"}:
         for stub in stubs.values():
             assert stub.call_count == 0
 

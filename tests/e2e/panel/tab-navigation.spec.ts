@@ -34,7 +34,6 @@ test('E2E-TAB-01 — Tab bar contains the current tabs in correct order', async 
     'Projects',
     'Agents',
     'Agentic Entities',
-    'Reports',
     'Academy',
     'Servers',
   ]);
@@ -75,7 +74,6 @@ test('E2E-TAB-03 — Clicking each tab activates the correct section', async ({ 
 
   const tabs: Array<{ tabId: string; sectionId: string }> = [
     { tabId: '#tab-subagents', sectionId: 'subagents' },
-    { tabId: '#tab-reports', sectionId: 'reports' },
     { tabId: '#tab-academy', sectionId: 'academy' },
     { tabId: '#tab-servers', sectionId: 'servers' },
     { tabId: '#tab-memories', sectionId: 'memories' },

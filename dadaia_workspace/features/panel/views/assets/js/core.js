@@ -1,5 +1,5 @@
-// Hash navigation grammar. The initial-load router (below) maps three hash routes to a
-// bare tab activation on page load: #reports | #academy (prefix match, so a
+// Hash navigation grammar. The initial-load router (below) maps one hash route to a
+// bare tab activation on page load: #academy (prefix match, so a
 // trailing ?key=val is tolerated but not parsed). The Sessions tab is click-activated,
 // not an initial-load hash route. No other hash routes exist (the former
 // #memories/#agents/#servers routes and the #agents?filter= params
@@ -218,10 +218,9 @@
   setInterval(fetchServers, 5000);
   setInterval(updateStatusLabel, 5000);
 
-  // ── Tab activation hook — lazy fetch for sessions/academy/reports ──
+  // ── Tab activation hook — lazy fetch for sessions/academy ──
   // Sessions module: window.Sessions (sessions.js, loaded after this script).
   // Academy module: window.Academy (academy.js, loaded after this script).
-  // Reports module: window.Reports (reports.js, loaded after this script).
   tabs.forEach(function (tab) {
     tab.addEventListener('click', function () {
       var target = tab.getAttribute('data-section');
@@ -234,9 +233,6 @@
       if (target === 'academy') {
         window.Panel.activate('academy');
       }
-      if (target === 'reports') {
-        window.Panel.activate('reports');
-      }
     });
   });
 
@@ -244,10 +240,7 @@
   (function () {
     var hash = location.hash;
     if (!hash) { return; }
-    if (hash.startsWith('#reports')) {
-      var reportsTab = document.getElementById('tab-reports');
-      if (reportsTab) { reportsTab.click(); }
-    } else if (hash.startsWith('#academy')) {
+    if (hash.startsWith('#academy')) {
       var academyTab = document.getElementById('tab-academy');
       if (academyTab) { academyTab.click(); }
     }
@@ -259,7 +252,6 @@
   document.addEventListener('DOMContentLoaded', function () {
     if (window.Sessions) { window.Panel.register('sessions', window.Sessions); }
     if (window.Academy) { window.Panel.register('academy', window.Academy); }
-    if (window.Reports) { window.Panel.register('reports', window.Reports); }
   });
 
 })();

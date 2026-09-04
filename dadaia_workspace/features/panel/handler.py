@@ -141,8 +141,7 @@ _MAX_MUTATION_BODY_BYTES = 256 * 1024
 
 # ---------------------------------------------------------------------------
 # The route table — the single source of truth for every method/pattern/view.
-# Order matters within a method — more-specific patterns first, first match
-# wins (e.g. the `/important` suffix before the `/api/reports/<path>` catch-all).
+# Order matters within a method — more-specific patterns first, first match wins.
 # ---------------------------------------------------------------------------
 
 
@@ -168,13 +167,8 @@ _ROUTES: tuple[_Route, ...] = (
     _Route("GET", _r(r"^/api/contexts$"), "api_contexts"),
     _Route("GET", _r(r"^/memory/(?P<slug>[^/]+)/(?P<path>.+)$"), "memory"),
     _Route("GET", _r(r"^/memory-view/(?P<slug>[^/]+)/(?P<path>.+)$"), "memory_view"),
-    _Route("GET", _r(r"^/reports/(?P<path>.+)$"), "reports_serve"),
     _Route("GET", _r(r"^/academy/(?P<module>[^/]+)/(?P<lesson>[^/]+)$"), "academy_lesson"),
     _Route("GET", _r(r"^/api/academy$"), "api_academy"),
-    _Route("GET", _r(r"^/api/reports$"), "api_reports"),
-    # /api/reports/<path>/important must come before /api/reports/<path> (more specific first).
-    _Route("GET", _r(r"^/api/reports/(?P<path>.+)/important$"), "api_report_mark_important"),
-    _Route("GET", _r(r"^/api/reports/(?P<path>.+)$"), "api_report_delete"),
     _Route("GET", _r(r"^/api/agents/(?P<agent_id>[^/]+)/prompt$"), "api_agent_prompt"),
     # L1 agent model-governance control plane (v0.1.65 FR8 — T-65-11).
     _Route("GET", _r(r"^/api/agent-model-policy$"), "api_agent_model_policy"),
@@ -188,11 +182,7 @@ _ROUTES: tuple[_Route, ...] = (
     ),
     _Route("GET", _r(r"^/api/agents$"), "api_agents", requires_telemetry=True),
     _Route("GET", _r(r"^/api/sessions$"), "api_sessions", requires_telemetry=True),
-    # --- DELETE --- (ordered separately: /important before the catch-all)
-    _Route("DELETE", _r(r"^/api/reports/(?P<path>.+)/important$"), "api_report_unmark_important"),
-    _Route("DELETE", _r(r"^/api/reports/(?P<path>.+)$"), "api_report_delete"),
-    # --- POST --- (non-body: mark-important toggle; body: mutation validate)
-    _Route("POST", _r(r"^/api/reports/(?P<path>.+)/important$"), "api_report_mark_important"),
+    # --- POST --- (body: mutation validate)
     _Route(
         "POST",
         _r(r"^/api/agent-model-policy/validate$"),
@@ -304,12 +294,6 @@ class PanelHandler(BaseHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         qs = urllib.parse.parse_qs(parsed.query)
         self._dispatch("GET", parsed.path, qs)
-
-    def do_DELETE(self) -> None:  # noqa: N802
-        if self._host_rejected():
-            return
-        parsed = urllib.parse.urlparse(self.path)
-        self._dispatch("DELETE", parsed.path, {})
 
     def do_POST(self) -> None:  # noqa: N802
         if self._host_rejected():

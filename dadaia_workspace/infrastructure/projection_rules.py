@@ -222,7 +222,6 @@ def _law_projection_rules(plan: InstallPlan) -> tuple[ProjectionRule, ...]:
 #: (staged source name, destination relpath, doctor label) for the ``.dadaia/**``
 #: ``AGENTS.md`` family — unconditional, harness-independent.
 _DADAIA_FAMILY_AGENTS_MD: tuple[tuple[str, str, str], ...] = (
-    ("reports-AGENTS.md", ".dadaia/reports/AGENTS.md", "reports:AGENTS.md"),
     ("handoff-AGENTS.md", ".dadaia/handoff/AGENTS.md", "handoff:AGENTS.md"),
     ("dadaia-AGENTS.md", ".dadaia/AGENTS.md", "dadaia:AGENTS.md"),
     ("tmp-AGENTS.md", ".dadaia/tmp/AGENTS.md", "dadaia:tmp/AGENTS.md"),

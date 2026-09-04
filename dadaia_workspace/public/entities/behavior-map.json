@@ -112,23 +112,6 @@
       "anchor": null,
       "skill": null,
       "scoped_agents_md": [
-        "dadaia_workspace/public/data/reports-AGENTS.md"
-      ],
-      "hash_tuple": {
-        "section": "sha256:11a021b5885f086458c9a4c1e6f2fe5bfd3baca60fa26519e9a8233823ba3eee",
-        "skill": null,
-        "scoped": [
-          "sha256:4c8d052866196eeb0f5505b8fdee0e02b7e9f8f2a9fa108ef0d1c75e33d10e3b"
-        ]
-      },
-      "recorded_by": "claude-code",
-      "recorded_at": "2026-09-03"
-    },
-    {
-      "section": "§5 Where things are written",
-      "anchor": null,
-      "skill": null,
-      "scoped_agents_md": [
         "dadaia_workspace/public/data/tmp-AGENTS.md"
       ],
       "hash_tuple": {

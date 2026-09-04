@@ -41,12 +41,6 @@
     "domain": "contexts",
     "status": 200
   },
-  "api_reports": {
-    "body": "{\"reports\": [{\"title\": \"report\", \"agent\": \"qa-engineer\", \"context\": \"ctx\", \"created_at\": \"<TS>\", \"path\": \"ctx/qa-engineer/report.html\", \"findings_summary\": {\"CRITICAL\": 0, \"HIGH\": 0, \"MEDIUM\": 0, \"LOW\": 0}, \"important\": false, \"expires_at\": \"<TS>\", \"is_expired\": false, \"retention_status\": \"expires\", \"retention_reason\": \"Expires after 48h\"}]}",
-    "content_type": "application/json; charset=utf-8",
-    "domain": "reports",
-    "status": 200
-  },
   "api_servers": {
     "body": "{\"groups\": [{\"group_label\": \"dadaia-workspace\", \"context_name\": \"dadaia-workspace\", \"rows\": [{\"port\": 3000, \"project\": \"dadaia-workspace\", \"url\": \"http://localhost:3000\", \"status\": \"active\", \"pid\": 1234, \"expires_at\": \"<TS>\", \"description\": \"dev server\"}]}]}",
     "content_type": "application/json; charset=utf-8",
@@ -65,46 +59,10 @@
     "domain": "sessions",
     "status": 503
   },
-  "delete_report": {
-    "body": "{\"deleted\": true}",
-    "content_type": "application/json; charset=utf-8",
-    "domain": "reports",
-    "status": 200
-  },
   "health": {
     "body": "{\"status\": \"ok\", \"version\": \"<VER>\"}",
     "content_type": "application/json",
     "domain": "health",
-    "status": 200
-  },
-  "mark_report": {
-    "body": "{\"important\": true, \"artifact_path\": \".dadaia/reports/ctx/qa-engineer/report.html\"}",
-    "content_type": "application/json; charset=utf-8",
-    "domain": "reports",
-    "status": 200
-  },
-  "reports_serve": {
-    "body": "<html><head><script>(function(){var t=localStorage.getItem('dadaia-panel-theme');if(t&&(t==='mint'||t==='sage'||t==='warm')){document.documentElement.dataset.theme=t;}})();</script><link rel=\"stylesheet\" href=\"/static/tokens.css\"><link rel=\"stylesheet\" href=\"/static/reports-doc.css\"><title>t</title></head><body>ok</body></html>",
-    "content_type": "text/html; charset=utf-8",
-    "domain": "reports",
-    "status": 200
-  },
-  "reports_serve_403": {
-    "body": "403 Forbidden",
-    "content_type": "text/plain; charset=utf-8",
-    "domain": "reports",
-    "status": 403
-  },
-  "reports_serve_404": {
-    "body": "404 Not Found",
-    "content_type": "text/plain; charset=utf-8",
-    "domain": "reports",
-    "status": 404
-  },
-  "unmark_report": {
-    "body": "{\"important\": false, \"artifact_path\": \".dadaia/reports/ctx/qa-engineer/report.html\"}",
-    "content_type": "application/json; charset=utf-8",
-    "domain": "reports",
     "status": 200
   }
 }
