@@ -38,7 +38,7 @@ Measure compliance of the instantiated workspace the way `specs doctor` measures
 registry in `core` names every `.dadaia/` zone with class, creator, TTL and closed file canon;
 `dadaia doctor` is the one scan and the one reaper over root, harness dirs, `.dadaia/` and
 `states/`; four zones and four cleanup engines retire; export is one JSON file; the
-`.dadaia/AGENTS.md` table is rendered from the registry. Net production diff about -7,460 lines.
+`.dadaia/AGENTS.md` table is rendered from the registry. Net production diff about -8,100 lines.
 
 ## 3. Vocabulary
 
@@ -245,9 +245,9 @@ Each FR cites the decision (D-n, §7) or architect section (A-G) it traces to.
   wc -l` = 0.
 - AC15 (all) — local CI preflight green; `test_import_linter_ignore_cap` cap = 3; `lint-imports`
   zero new ignored edges; V32/V33 re-pinned downward; V34 holds for this trio; `git diff
-  --shortstat develop..HEAD -- dadaia_workspace` net at most -7,400 lines (08736ddb: 260 files,
-  +6,004/-13,466, net -7,462; shortstat counts rewritten lines, -8,000 was the DRAFT's net-new
-  estimate; nothing landed was reverted).
+  --shortstat origin/develop..HEAD -- dadaia_workspace` net at most -7,400 lines (base 14637900,
+  head 6043bf2b: 145 files, +1,278/-9,391, net -8,113; the DRAFT's -8,000 was a net-new estimate;
+  nothing landed was reverted).
 
 ## 7. Operator decisions (grill record, ADR lines)
 
