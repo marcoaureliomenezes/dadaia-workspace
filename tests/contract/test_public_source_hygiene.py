@@ -89,3 +89,42 @@ def test_pre_push_ci_gate_ships_pyproject_excludes_bytecode_and_scripts_leave_no
 
     after = _bytecode_artifacts_under_public()
     assert after == [], f"script left bytecode under public/: {after}"
+
+
+_RETIRED_SURFACES: tuple[str, ...] = (
+    ".dadaia/reports",
+    "academy",
+    "dadaia clean",
+    "tmp gc",
+    "reports cleanup",
+    "ROOT-4",
+    "legacy-quarantine",
+)
+
+
+def test_public_source_names_no_retired_surface() -> None:
+    """Intent: CONTRACT — 0.4.6 c4 AC13 (FR16, D2/D3/D9): no `public/` text names a retired surface.
+
+    The reports zone, academy, `dadaia clean`, `dadaia tmp gc`, `dadaia reports cleanup`,
+    the `ROOT-4` invariant and the legacy quarantine were retired; the law, skills,
+    personas, templates and entities that are staged verbatim to every consumer must not
+    keep teaching them. Mirrors the SPEC's own grep exactly, so the verdict is the same
+    one the operator runs by hand.
+    """
+    hits: list[str] = []
+    scanned: list[str] = []
+    for path in sorted(_PUBLIC_ROOT.rglob("*")):
+        if not path.is_file():
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            continue
+        rel = path.relative_to(_REPO_ROOT).as_posix()
+        scanned.append(rel)
+        for lineno, line in enumerate(text.splitlines(), start=1):
+            for needle in _RETIRED_SURFACES:
+                if needle in line:
+                    hits.append(f"{rel}:{lineno}: {needle!r}")
+    assert_populated(scanned, "dadaia_workspace/public/data/DADAIA.md")
+    assert hits == []

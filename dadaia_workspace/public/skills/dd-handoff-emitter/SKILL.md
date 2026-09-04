@@ -19,7 +19,7 @@ completed agent task; the HTML report is the exception, not the rule.
 2. Default to handoff-only; switch to report mode only when the operator asked or
    `next_handoff.agent == "human"`.
 3. Report mode first writes the HTML to
-   `.dadaia/reports/<context>/<agent>/<UTC>-<slug>.html`, then captures
+   `repos/<slug>/reports/<agent>/<UTC>-<slug>.html`, then captures
    `sha256sum <report>` as `artifact.content_hash`.
 4. Assemble the handoff field-by-field against
    `.dadaia/agentic/schemas/handoff-v1.schema.json`; set `artifact.path` only for a
@@ -37,8 +37,8 @@ After reading and acting on a coordination handoff addressed to you:
 
 1. Resolve its real target path; act only on a path inside `.dadaia/`, and never
    follow a symlinked directory.
-2. Delete only that one consumed handoff file — a handoff carrying `artifact.path`
-   stays and follows its report's retention instead.
+2. Delete only that one consumed handoff file; every other handoff expires one day
+   after its mtime and `dadaia doctor` reaps it, `artifact.path` or not.
 
 **Done when** the consumed coordination handoff is gone and every other handoff still
 validates.

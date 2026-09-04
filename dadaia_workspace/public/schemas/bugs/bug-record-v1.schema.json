@@ -65,7 +65,6 @@
     "surface": {
       "type": "string",
       "enum": [
-        "academy",
         "agents",
         "backlog",
         "bugs",

@@ -43,11 +43,11 @@ input_contract:
   produces_outputs:
     - name: persona_report
       kind: report
-      path: .dadaia/reports/{context}/ai-engineer/{ts}-{task_id}-persona.html
+      path: repos/{context}/reports/ai-engineer/{ts}-{task_id}-persona.html
       schema_ref: handoff-schema-v1
     - name: efficiency_report
       kind: report
-      path: .dadaia/reports/{context}/ai-engineer/{ts}-{task_id}-efficiency.html
+      path: repos/{context}/reports/ai-engineer/{ts}-{task_id}-efficiency.html
       schema_ref: handoff-schema-v1
   stop_if_missing: true
 paths:
@@ -58,7 +58,7 @@ paths:
     - dadaia_workspace/public/templates/*-AGENTS.md
     - dadaia_workspace/public/agents/**
     - dadaia_workspace/public/scripts/**
-    - .dadaia/reports/<ctx>/ai-engineer/**
+    - repos/<ctx>/reports/ai-engineer/**
     - .dadaia/handoff/<ctx>/**
 ---
 
@@ -78,7 +78,7 @@ Covers agent personas, skills, rules, commands, hook-facing instructions.
 - Write: skill files (`public/skills/<name>/SKILL.md` + assets).
 - Write: the law source `public/data/*.md` (`DADAIA.md`, `AGENTS.md`) and scoped `*-AGENTS.md` under `public/scaffold/**`/`public/templates/`.
 - Write: shell + memory-tooling scripts under `public/scripts/` — verify the live count with `ls`, never hardcode it.
-- Write: efficiency/cost/context-engineering audit reports under `.dadaia/reports/<ctx>/ai-engineer/`.
+- Write: efficiency/cost/context-engineering audit reports under `repos/<ctx>/reports/ai-engineer/`.
 - Review only, never author: runtime hooks (`dadaia_workspace/hooks/*.py`, production Python, owned by `software-engineer`).
 - Author the AI-entity surface for all three entry harnesses: Claude Code, Codex, Kimi Code.
 - `dd-ai-eng-knowhow`'s top layer is shared literacy every agent reads; its four disclosed siblings are yours alone.
@@ -134,7 +134,7 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then
 
 ## 4. Outputs
 
-- Write an HTML report to `.dadaia/reports/<context>/ai-engineer/<UTC>-<task-slug>.html` only on operator request or a human-facing next hop.
+- Write an HTML report to `repos/<context>/reports/ai-engineer/<UTC>-<task-slug>.html` only on operator request or a human-facing next hop.
 - Required sections: Summary, Files authored/refactored (path + diff summary), Instruction-hierarchy compliance.
 - Required sections (continued): Persona-consistency invariants, Cost-impact estimate (when relevant), Topology-guard run, Operator-facing rationale.
 - Emit the handoff via `dd-handoff-emitter` — schema `handoff-v1.2`, `self_pull.refs` lists only atoms this session actually read.

@@ -45,11 +45,11 @@ input_contract:
   produces_outputs:
     - name: green_report
       kind: report
-      path: .dadaia/reports/{context}/software-engineer/{ts}-{task_id}-green.html
+      path: repos/{context}/reports/software-engineer/{ts}-{task_id}-green.html
       schema_ref: handoff-schema-v1
     - name: refactor_report
       kind: report
-      path: .dadaia/reports/{context}/software-engineer/{ts}-{task_id}-refactor.html
+      path: repos/{context}/reports/software-engineer/{ts}-{task_id}-refactor.html
       schema_ref: handoff-schema-v1
   stop_if_missing: true
 paths:
@@ -64,7 +64,7 @@ paths:
     - tests/**
     - .github/workflows/**
     - repos/**
-    - .dadaia/reports/<ctx>/software-engineer/**
+    - repos/<ctx>/reports/software-engineer/**
     - .dadaia/handoff/<ctx>/**
 ---
 
@@ -143,7 +143,7 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then
 - Write permissions (continued): `scripts/**`, `tests/**` (unit + integration, not E2E), `repos/**` (in-scope), browser frontend, CI YAML.
 - Never write: `dadaia_workspace/public/**` (ai-engineer), `specs/**` (product-engineer), E2E test directories (qa-engineer).
 - Never write: lib-originated projections (`.claude/`, `.agents/`, `.codex/`, `.kimi-code/`).
-- Write an HTML report to `.dadaia/reports/<context>/software-engineer/<UTC>-<task-slug>.html` only on operator request or human next hop.
+- Write an HTML report to `repos/<context>/reports/software-engineer/<UTC>-<task-slug>.html` only on operator request or human next hop.
 - Required sections: Summary, Tests written (`file:line`), Security checklist (OWASP items touched), Commit/branch, Review status.
 - Emit via `dd-handoff-emitter` — schema `handoff-v1.2`, `self_pull.refs` lists only atoms this session actually read.
 - Treat a completed implementation as a handoff, not task completion — hold `[x]`/push/PR/merge/deploy/close per `dd-release-implementation`.

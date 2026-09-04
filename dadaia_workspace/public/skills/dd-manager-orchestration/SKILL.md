@@ -21,8 +21,8 @@ description: >
    further dispatch; route a leaf's returned handoff to its `next_handoff.agent`.
 3. Open every dispatch prompt with the Input Contract block: context, specs_dir,
    release_id, task_id, report_dir, handoff_dir, allowed_write_paths.
-4. Reports land in `.dadaia/reports/<context>/<agent>/<UTC>-<slug>.html`; every
-   report feeding another agent gets a handoff under `.dadaia/handoff/<context>/`.
+4. Reports land in the repo's reports home (`DADAIA.md` §5.2); every report
+   feeding another agent gets a handoff under `.dadaia/handoff/<context>/`.
 5. The review/QA sequence holds by discipline (dispatcher, implementer, reviewer
    each uphold their half); git chokepoints are the only mechanical backstop.
 
@@ -93,7 +93,7 @@ approval — missing agreement blocks it.
 
 | Action | Why |
 |---|---|
-| Dispatchers editing outside `.dadaia/reports/` and `.dadaia/handoff/` | Report/handoff-only roles |
+| Dispatchers editing outside `repos/<slug>/reports/` and `.dadaia/handoff/` | Report/handoff-only roles |
 | Recursive agent chains without operator approval | Breaks traceability |
 | Marking tasks DONE without validation evidence | Skips acceptance |
 | Push, PR, merge, deploy, closure, or `[x]` before QA/code/security approval | Bypasses the quality gate |

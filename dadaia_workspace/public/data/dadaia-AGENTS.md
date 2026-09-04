@@ -5,19 +5,13 @@ Treat it as operational state, not product source.
 
 ## 1. Canonical folder law
 
-- `.dadaia/` may contain only the zones below, plus `AGENTS.md` and `.gitignore`.
-- Every other directory is forbidden (`DADAIA.md` §7.6) — the ROOT-4 doctor invariant blocks unknown subdirs.
-- `dadaia reconcile` quarantines known-legacy dirs into `.dadaia/tmp/legacy-quarantine/` (moved, never deleted).
-- Never create a new top-level `.dadaia/` directory — route into the canonical zone that owns that concern.
-- Each canonical folder has ONE architectural purpose; a misfit file does not belong in `.dadaia/` at all.
-
-The table is rendered from `core/workspace_layout.py` at `dadaia public stage`. TTL is
-seconds by mtime before `dadaia doctor` expires an entry; `never` = not clock-expired.
+- `.dadaia/` may contain only the zones below, plus `AGENTS.md` and `.gitignore`; anything else is slop (`DADAIA.md` §8.5).
+- The table is rendered from `core/workspace_layout.DADAIA_ZONES` at `dadaia public stage`; TTL is seconds by mtime before `dadaia doctor` expires an entry, `never` = not clock-expired.
+- Never create a new top-level `.dadaia/` directory — route into the zone that owns that concern; a misfit file does not belong in `.dadaia/` at all.
 
 <!-- zones -->
 
-- There is no "misc", "assets", "imgs", or "bridge" folder — those are junk drawers.
-- Put images/evidence under `tmp/<agent>/<date>/`, MCP working state under `mcps/<server>/`.
+- Evidence goes under `tmp/<agent>/<date>/`, MCP working state under `mcps/<server>/`; HTML reports live in the repo (`DADAIA.md` §5.2).
 
 ## 2. Scoped subtree rules — follow the nearest first
 
@@ -41,15 +35,16 @@ dadaia public doctor
 
 ## 4. Hygiene
 
-- A loose file or a new directory at the `.dadaia/` root has no canonical home (`DADAIA.md` §7.6) — route it into the zone that owns it.
-- Everything else is either regenerable (projections) or CLI-owned state.
+- `dadaia doctor` is the one scan and reaper: a loose file or unknown directory at the `.dadaia/` root is a `WS-dadaia-slop` finding — route it into the zone that owns it.
+- SessionStart reaps only expired entries; slop dies only by an explicit operator `dadaia doctor --fix`.
 
 ## 5. Validation
 
 ```bash
+dadaia doctor
 dadaia public doctor
 dadaia specs doctor
 ```
 
-- On drift or a ROOT-4 unknown subdir: fix the public source or the state owner, quarantine the stray dir.
+- On drift or a `WS-*-slop` finding: fix the public source or the state owner; `dadaia doctor --fix` deletes only what its dry run listed.
 - Never patch the projection in place; never rubber-stamp a new folder into the canonical set to silence the check.

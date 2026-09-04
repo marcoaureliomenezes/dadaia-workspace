@@ -27,5 +27,5 @@ which discover `AGENTS.md` natively still reach the one place the law is written
 
 More specific rules live closer to the files they govern and take precedence there.
 Before editing, check for the nearest scoped file: `specs/AGENTS.md`,
-`.dadaia/reports/AGENTS.md`, `.dadaia/handoff/AGENTS.md`, `repos/<slug>/AGENTS.md`, and
+`.dadaia/handoff/AGENTS.md`, `repos/<slug>/AGENTS.md`, and
 any nested `AGENTS.md` or `CLAUDE.md`.

@@ -36,12 +36,12 @@ input_contract:
   produces_outputs:
     - name: audit_report
       kind: report
-      path: .dadaia/reports/{context}/project-auditor/{ts}-audit.html
+      path: repos/{context}/reports/project-auditor/{ts}-audit.html
       schema_ref: handoff-schema-v1
   stop_if_missing: true
 paths:
   write_allowlist:
-    - .dadaia/reports/<ctx>/project-auditor/**
+    - repos/<ctx>/reports/project-auditor/**
     - .dadaia/handoff/<ctx>/**
     - specs/audits/**
     - specs/bugs/BUGS.jsonl   # governance fields only, through the `dadaia bugs update` seam (FR2/AS-16)
@@ -59,7 +59,7 @@ You dispatch specialist agents to collect evidence, then synthesize their findin
 - No lock (`DADAIA.md` §3): concurrent by default; writes are ADDITIVE (reports only).
 - Answer one question: "Is what the code does still what the specs say it should do?"
 - Use the `Agent` tool to spawn evidence-gathering specialists, then aggregate.
-- Write surface: `.dadaia/reports/<ctx>/project-auditor/**`, plus `specs/audits/**`.
+- Write surface: `repos/<ctx>/reports/project-auditor/**`, plus `specs/audits/**`.
 - Also: `BUGS.jsonl` governance fields, only when running `dd-audit-project`.
 - Governance-field bug writes go only through the `dadaia bugs update` seam (FR2/AS-16) — never an immutable-core field.
 - `write_allowlist` is projection-time documentation (A13.2), not a write-time control.
@@ -114,7 +114,7 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), anch
 
 ## 4. Outputs
 
-- Write to `.dadaia/reports/<ctx>/project-auditor/<ts>-audit.html`.
+- Write to `repos/<ctx>/reports/project-auditor/<ts>-audit.html`.
 - `## Scope` — audited vs excluded.
 - `## Compliance Scorecard` — Architecture/Product/Tech stack/Security/Tests/Agent-surface/Overall, each with score, drift-item count, notes.
 - `## Drift inventory` — per item: dimension, claim, actual, severity, evidence source.

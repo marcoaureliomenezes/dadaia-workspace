@@ -66,7 +66,7 @@ Every implementation report must include:
 - changed production paths
 - known risk or `none`
 
-Write reports under `.dadaia/reports/<context>/<agent>/` and follow `.dadaia/reports/AGENTS.md`.
+Write reports under this repo's `reports/<agent>/` (`DADAIA.md` §5.2).
 
 ## 7. Stop conditions
 

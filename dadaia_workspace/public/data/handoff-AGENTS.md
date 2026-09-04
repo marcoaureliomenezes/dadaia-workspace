@@ -3,7 +3,7 @@
 Scope: this file governs only `.dadaia/handoff/**`.
 
 Handoffs are machine-readable coordination records between agents.
-Reports stay in `.dadaia/reports/`; handoff JSON stays here.
+HTML reports live in the repo (`DADAIA.md` §5.2); handoff JSON stays here.
 
 ## 1. File contract
 
@@ -19,11 +19,7 @@ Use the canonical schema:
 .dadaia/agentic/schemas/handoff-v1.schema.json
 ```
 
-Set `artifact.path` to the report or artifact being handed off, usually:
-
-```text
-.dadaia/reports/<context>/<agent>/<YYYY-MM-DDTHHMMSSZ>-<slug>.html
-```
+Set `artifact.path` to the report or artifact being handed off (report home: `DADAIA.md` §5.2).
 
 Validate before handing work to another agent:
 
@@ -41,7 +37,7 @@ dadaia reports validate <handoff-json-path>
 - Use stable workspace-relative paths.
 - Include only information needed by the next agent.
 - Do not store HTML, screenshots, logs, or temporary notes here.
-- Do not write handoff JSON under `.dadaia/reports/`.
+- A handoff expires one day after its mtime and `dadaia doctor` reaps it — no importance marker, no pairing with a report.
 
 ## 3. Read rules
 

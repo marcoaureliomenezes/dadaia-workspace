@@ -1,9 +1,9 @@
 # EMISSION-FORMAT — dd-grill-me (report mode only)
 
 Disclosed reference reached only when Step 5 writes the optional HTML report (operator asked for one, or the next handoff target is human).
-Follows the canonical template in `.dadaia/reports/AGENTS.md` — this file adds only what that template leaves to the caller.
+Report home: `DADAIA.md` §5.2; the sections below, in this order, are the report.
 
-| Section (`.dadaia/reports/AGENTS.md`) | Fill with |
+| Section | Fill with |
 |---|---|
 | `Summary` | Session scope (entire backlog / one feature-id) and the problem count |
 | `Question resolved` | Every frontier question settled, its answer, "answered via inspection" vs operator decision (ADR line) |

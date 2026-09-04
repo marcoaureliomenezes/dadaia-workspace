@@ -36,12 +36,12 @@ input_contract:
   produces_outputs:
     - name: review_report
       kind: report
-      path: .dadaia/reports/{context}/code-reviewer/{ts}-review.html
+      path: repos/{context}/reports/code-reviewer/{ts}-review.html
       schema_ref: handoff-schema-v1
   stop_if_missing: true
 paths:
   write_allowlist:
-    - .dadaia/reports/<ctx>/code-reviewer/**
+    - repos/<ctx>/reports/code-reviewer/**
     - .dadaia/handoff/<ctx>/**
 ---
 
@@ -101,7 +101,7 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then
 
 ## 4. Outputs
 
-- Write to `.dadaia/reports/<ctx>/code-reviewer/<ts>-review.html`.
+- Write to `repos/<ctx>/reports/code-reviewer/<ts>-review.html`.
 - `## Target` — PR/branch/SHA, base ref, files changed.
 - `## CI status` — last run result, failing checks if any.
 - `## Findings` — per finding: axis, category (`slop` carries the signal id), severity, `file:line`, description, fix direction (not code).

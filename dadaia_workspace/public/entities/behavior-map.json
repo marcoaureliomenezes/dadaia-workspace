@@ -28,11 +28,11 @@
       "scoped_agents_md": [],
       "hash_tuple": {
         "section": "sha256:6b73fe234171bca96b842a11500e70307c480db89a8d0c191e424c73f4935ce5",
-        "skill": "sha256:5a6c4756c8be95567303139a5927f2a4bd943c32f81b202c06d0776f76e9840f",
+        "skill": "sha256:ff93afb4e1fdc317d4a695f027b965824bf3c667499323b0a91777540b290eef",
         "scoped": []
       },
       "recorded_by": "claude-code",
-      "recorded_at": "2026-08-31"
+      "recorded_at": "2026-09-03"
     },
     {
       "section": "§2 Who does what",
@@ -81,14 +81,14 @@
         "dadaia_workspace/public/data/handoff-AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:11a021b5885f086458c9a4c1e6f2fe5bfd3baca60fa26519e9a8233823ba3eee",
-        "skill": "sha256:de2778ce427a03d3033ce0910ec0d1049685ec7801c0751e8daab3d5dafd3824",
+        "section": "sha256:f1b8e424afa46756ee0ec3f4c36d08b1088b3abd2c56486fd90021b79d673cc5",
+        "skill": "sha256:721f63f154573d93b4f2eb45e1788dc6905bc3ef6afd98b822d38b13b1fed652",
         "scoped": [
-          "sha256:737ab2032b8f2abe77c1cce6b7cf70df29416add8b153fbcca2258e4454daf1f"
+          "sha256:1b00807565d4934626195cb2e05983dbe3eb5890ba3ee95ee60774d98e75e70f"
         ]
       },
       "recorded_by": "claude-code",
-      "recorded_at": "2026-08-31"
+      "recorded_at": "2026-09-03"
     },
     {
       "section": "§5 Where things are written",
@@ -98,10 +98,10 @@
         "dadaia_workspace/public/data/dadaia-AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:11a021b5885f086458c9a4c1e6f2fe5bfd3baca60fa26519e9a8233823ba3eee",
+        "section": "sha256:f1b8e424afa46756ee0ec3f4c36d08b1088b3abd2c56486fd90021b79d673cc5",
         "skill": null,
         "scoped": [
-          "sha256:362589582cb256ea1b9c2bcdca5d8d6636591dfa1676e65eeddebca9984721a5"
+          "sha256:596b84ae24ea67395d34afd050941b37e11c31e1441c44103e030d7e6fb25456"
         ]
       },
       "recorded_by": "claude-code",
@@ -115,14 +115,14 @@
         "dadaia_workspace/public/data/tmp-AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:11a021b5885f086458c9a4c1e6f2fe5bfd3baca60fa26519e9a8233823ba3eee",
+        "section": "sha256:f1b8e424afa46756ee0ec3f4c36d08b1088b3abd2c56486fd90021b79d673cc5",
         "skill": null,
         "scoped": [
-          "sha256:ecfeb283267e9adab3946b6c53c9cecbdfa990c6912acdfa8615a2bfc6ad55cb"
+          "sha256:f26363f7086defe1337610925040a2f4477d26f34fdae6ee2bc5a84ac0b129d3"
         ]
       },
       "recorded_by": "claude-code",
-      "recorded_at": "2026-08-31"
+      "recorded_at": "2026-09-03"
     },
     {
       "section": "§6 Specs, tasks and memory",
@@ -243,8 +243,8 @@
         "section": "sha256:941b80ce5cb01c7a6223fae2ec34124ec96118797e2b15b4b42d8cc679863314",
         "skill": "sha256:b723649f7d392c87353f6c947ff3918952b10caf934d6a8946ac5f1999b9fcd7",
         "scoped": [
-          "sha256:913e3525b59eaf739fbeaa6984c451795366f38f019261572e60648331f4600f",
-          "sha256:913e3525b59eaf739fbeaa6984c451795366f38f019261572e60648331f4600f"
+          "sha256:7bb5178387b97e21093334df304c35a6f26b02de960bdde4c554e3ea10157dbb",
+          "sha256:7bb5178387b97e21093334df304c35a6f26b02de960bdde4c554e3ea10157dbb"
         ]
       },
       "recorded_by": "claude-code",
@@ -305,14 +305,14 @@
         "dadaia_workspace/public/data/states-AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:342d5b2a79b73fbc4fde6bd059e5fdba2d4addd4d9036ee28397b6e21e3fca5c",
-        "skill": "sha256:9e99a8b55a3f94f270a7493d37aea63decee9e8c19ab7c462887202467a19dd3",
+        "section": "sha256:a33ad4a7f1a281aa351f7b354e3536bad30df9c202ff3eddbae4ebccfb9bab5f",
+        "skill": "sha256:3b32d25f56db1c42757324aae6e5e81cc70c87385265b30698b3a8f86dee3424",
         "scoped": [
           "sha256:3b624dcf425012cd3711b7d30e4425b0ab65a3697ffd2c7dea6a27c7e2b5b7c1"
         ]
       },
       "recorded_by": "claude-code",
-      "recorded_at": "2026-08-31"
+      "recorded_at": "2026-09-03"
     },
     {
       "section": "§8 The library surface",
@@ -320,12 +320,12 @@
       "skill": "dd-cli-library",
       "scoped_agents_md": [],
       "hash_tuple": {
-        "section": "sha256:376297a9ab263f842bccf31c92b825593aa8dc49d28f201358e0023658af584c",
+        "section": "sha256:35f1476c4c8e010fee0455ee3dc4a55496fbfcdf3b8a1eb36456a178ef822fb3",
         "skill": "sha256:0a869a52069d84bdcc0f221dbaef4e3a07a9d0f74bbd65cbdb92e63d66c0a79d",
         "scoped": []
       },
       "recorded_by": "claude-code",
-      "recorded_at": "2026-08-31"
+      "recorded_at": "2026-09-03"
     },
     {
       "section": "§9 Credentials",
@@ -338,7 +338,7 @@
         "section": "sha256:41cfbf4ace302f8c8453146c15b18450bd1fc768a4cbd7b205c45c893106954f",
         "skill": null,
         "scoped": [
-          "sha256:ad46c5c50c829230ed96cf3f9a71afe7b5a4857e9504f24065e38461bb25fe1a"
+          "sha256:af2bd3ffbeb24938532924ba6a0833111b9ed5bed90eabf3956885f2b8dd8ad5"
         ]
       },
       "recorded_by": "claude-code",
@@ -352,7 +352,7 @@
         "dadaia_workspace/public/templates/specs-AGENTS.md"
       ],
       "hash_tuple": {
-        "section": "sha256:e94e6f374624810d774184f773c805aa6ecefcf5e9504fc7f6472cec419d5df5",
+        "section": "sha256:c59a4b5044b85a396e3f68485d24b2fca696c7ffaf4f005d64c2dc0fc7de0dea",
         "skill": null,
         "scoped": [
           "sha256:91576585aa8de972e7c3560acc88cf6f9be8f25442a701c75d7af35c6639900a"
@@ -385,7 +385,7 @@
       "scoped_agents_md": [],
       "hash_tuple": {
         "section": "sha256:941b80ce5cb01c7a6223fae2ec34124ec96118797e2b15b4b42d8cc679863314",
-        "skill": "sha256:1d041054d00fcf74652edf36eb922dc5a13328e499b6bdc506071e9fe2a762b7",
+        "skill": "sha256:a6d8b1c1602fd5e32fa87b0e78f67c0853c2634f0297a7b858d287d8ff0775a6",
         "scoped": []
       },
       "recorded_by": "claude-code",
