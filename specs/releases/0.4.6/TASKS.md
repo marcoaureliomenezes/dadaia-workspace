@@ -68,7 +68,7 @@ Write-set paths are relative to `dadaia_workspace/` unless they start with `test
   core/kernel_tunables.py, tests/unit/hooks/**, tests/unit/infrastructure/
   test_jsonl_log_rotation.py, tests/integration/infrastructure/**.
   Blocked by: T-046-25. Delivers: a gated write leaves no `logs/` — AC10 (logs).
-- [ ] T-046-30 — FR12, stop the scripts projection: `_scripts_tree_rules` + call deleted;
+- [-] T-046-30 — FR12, stop the scripts projection: `_scripts_tree_rules` + call deleted;
   roster and install goldens without `.dadaia/scripts`. RED: `test_install_target_goldens`.
   Owner: software-engineer. Commit: `refactor(T-046-30): stop projecting .dadaia/scripts`.
   Write set: infrastructure/projection_rules.py, tests/helpers/public_asset_roster.py,
