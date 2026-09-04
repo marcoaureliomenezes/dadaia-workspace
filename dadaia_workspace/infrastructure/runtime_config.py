@@ -470,12 +470,15 @@ _KIMI_WRITE_MATCHER = "^(Edit|Write|Bash)$"
 #: PostCompact fires for both manual (``/compact``) and automatic compaction.
 _KIMI_COMPACT_MATCHER = "manual|auto"
 
-#: The four kimi hook rules: (shim filename, event, matcher-or-None, timeout seconds).
+#: The five kimi hook rules: (shim filename, event, matcher-or-None, timeout seconds).
+#: SessionStart carries no matcher: Kimi's ``source`` vocabulary is undocumented, and the
+#: reaper is idempotent and silent on a compliant workspace.
 _KIMI_HOOK_RULES: tuple[tuple[str, str, str | None, int], ...] = (
     ("dadaia-kimi-pre-gate.sh", "PreToolUse", _KIMI_WRITE_MATCHER, 10),
     ("dadaia-kimi-post-gate.sh", "PostToolUse", None, 10),
     ("dadaia-kimi-ctx-inject.sh", "UserPromptSubmit", None, 10),
     ("dadaia-kimi-post-compact.sh", "PostCompact", _KIMI_COMPACT_MATCHER, 10),
+    ("dadaia-kimi-doctor-expired.sh", "SessionStart", None, 10),
 )
 
 #: Shared shim prologue: resolve the nearest dadaia workspace venv python by walking up
@@ -519,7 +522,7 @@ def kimi_code_home(env: Mapping[str, str] | None = None) -> Path:
 
 
 def kimi_hook_shims() -> dict[str, str]:
-    """Return the four kimi hook shim bodies as ``{filename: POSIX sh content}``.
+    """Return the five kimi hook shim bodies as ``{filename: POSIX sh content}``.
 
     - pre-gate: forwards the payload to ``hooks.pre_gate`` and translates the dadaia
       envelope to the Kimi protocol — ``"decision": "block"`` ⇒ reason on stderr +
@@ -531,6 +534,8 @@ def kimi_hook_shims() -> dict[str, str]:
       the compact-epoch marker consumed by the next ``UserPromptSubmit`` AND re-emits
       the bootstrap on stdout (observable-contract posture; Kimi discards PostCompact
       stdout, so the deterministic re-injection still lands at the next prompt).
+    - doctor-expired: the SessionStart reaper (0.4.6 FR4/D13) as a CLI process — the same
+      ``_REAPER_ARGS`` the Claude and Codex entries run.
     """
     pre_gate = (
         _KIMI_SHIM_PROLOGUE
@@ -573,11 +578,19 @@ printf '%s' "$payload" | "$PYTHON_BIN" -B -m dadaia_workspace.hooks.ctx_inject 2
 exit 0
 """
     )
+    doctor_expired = (
+        _KIMI_SHIM_PROLOGUE
+        + f"""
+"$PYTHON_BIN" -B -m dadaia_workspace {_REAPER_ARGS} 2>/dev/null || true
+exit 0
+"""
+    )
     return {
         "dadaia-kimi-pre-gate.sh": pre_gate,
         "dadaia-kimi-post-gate.sh": post_gate,
         "dadaia-kimi-ctx-inject.sh": ctx_inject,
         "dadaia-kimi-post-compact.sh": post_compact,
+        "dadaia-kimi-doctor-expired.sh": doctor_expired,
     }
 
 

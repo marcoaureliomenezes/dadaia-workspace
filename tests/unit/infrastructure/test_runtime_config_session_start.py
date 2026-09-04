@@ -9,6 +9,7 @@ reaper beside it (the shape that made ``tmp gc`` at SessionStart a rumour and ne
 
 from __future__ import annotations
 
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -18,6 +19,8 @@ from dadaia_workspace.infrastructure.runtime_config import (
     codex_hook_wrapper_contents,
     codex_hooks,
     dadaia_owned_claude_settings,
+    kimi_hook_shims,
+    kimi_hooks_block,
     merge_claude_settings,
 )
 
@@ -68,6 +71,23 @@ def test_codex_session_start_runs_the_reaper_once(tmp_path: Path) -> None:
     for command, body in bodies.items():
         if command != reapers[0]:
             assert "dadaia_workspace.hooks.ctx_inject" in body
+
+
+def test_kimi_session_start_runs_the_reaper_once(tmp_path: Path) -> None:
+    """Kimi Code exposes ``SessionStart`` in the same hook-event enum as the ``PostCompact``
+    the compact shim already consumes; its rule runs the reaper shim and nothing else."""
+    rules = tomllib.loads(kimi_hooks_block(tmp_path))["hooks"]
+    session_start = [r for r in rules if r["event"] == "SessionStart"]
+    assert len(session_start) == 1, rules
+    shims = kimi_hook_shims()
+    reaper_body = shims[Path(session_start[0]["command"]).name]
+    assert f" -m dadaia_workspace {_REAPER_TAIL}" in reaper_body
+    assert "dadaia_workspace.hooks." not in reaper_body
+    assert reaper_body.rstrip().endswith("exit 0")
+    others = [
+        body for name, body in shims.items() if name != Path(session_start[0]["command"]).name
+    ]
+    assert others and all("--fix" not in body for body in others)
 
 
 def test_reaper_entry_is_dadaia_owned_so_merge_is_idempotent(tmp_path: Path) -> None:
