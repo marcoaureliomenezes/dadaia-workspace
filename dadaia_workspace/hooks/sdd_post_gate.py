@@ -1,8 +1,8 @@
-"""PostToolUse advisory presence, session heartbeat, and reconciler hook.
+"""PostToolUse advisory presence, session heartbeat, and throttled-GC hook.
 
 Runs after every tool call. It renews this session's advisory presence record(s),
-best-effort refreshes ``last_seen_at`` in the CLI session record, and flags dirty
-mutating paths. It always returns zero and never blocks a tool call.
+best-effort refreshes ``last_seen_at`` in the CLI session record, and, on a throttle
+cadence, runs the one GC reaper. It always returns zero and never blocks a tool call.
 
 Session id resolution (unchanged, FR-R2-01): via :func:`_common.resolve_session_id` — the
 harness-native id var (``CLAUDE_CODE_SESSION_ID`` / ``CODEX_SESSION_ID``) or the stdin
@@ -15,8 +15,8 @@ sits first in ``resolve_session_id``'s order).
 - Fail-open: any exception ⇒ exit 0. The hook must never break the harness.
 
 GC (release 0.5.1 K2): this hook no longer reaps anything itself. On its own throttle
-cadence (the SAME throttle that gates the git-status reconciler below — never on every
-single tool call) it calls the ONE reaper, :func:`presence.gc`, for presence records,
+cadence (never on every single tool call) it calls the ONE reaper, :func:`presence.gc`,
+for presence records,
 throttle/sentinel markers and now-empty presence context dirs. Session-record graveyard
 GC stays exclusively owned by ``DoctorService.fix()`` — this hook used to duplicate it at
 a different TTL multiplier via its own ``sid`` guard, which is exactly how it could reap
@@ -28,7 +28,6 @@ a session's own bind record (bug family ``doctor-ptr-gc-deletes-valid-lock-free-
 from __future__ import annotations
 
 import os
-import subprocess  # noqa: S404 — see _reconcile_working_tree (documented FR-W1-03 exemption).
 import sys
 import time
 from datetime import UTC, datetime
@@ -36,8 +35,7 @@ from pathlib import Path
 
 from dadaia_workspace.core import invocation, session_store
 from dadaia_workspace.core.kernel_tunables import RECONCILER_THROTTLE_TTL_SECONDS
-from dadaia_workspace.features.spec_context import gate_policy, presence
-from dadaia_workspace.features.spec_context.gate_policy import PathClass
+from dadaia_workspace.features.spec_context import presence
 from dadaia_workspace.hooks import _common
 
 
@@ -60,127 +58,30 @@ def _refresh_session_record(workspace: Path, sess_id: str) -> dict[str, object] 
 
 
 # ---------------------------------------------------------------------------------------
-# Advisory working-tree reconciler (FR-W1-03, T-014-16) — NEVER blocks, always exit 0.
+# Throttled GC cadence (FR-W1-03 throttle, release 0.5.1 K2 reaper) — NEVER blocks.
 #
-# Classifies the bound context repo's dirty paths (for example, a Bash write the file-tool
-# gate cannot see). It writes nothing (the reconciler event log is retired), never changes
-# session state, never raises, and never changes the hook's exit code.
-#
-# Throttle marker: ``.dadaia/tmp/reconciler-last-<sid>``, via :func:`presence.throttled`/
-# :func:`presence.stamp_throttle` — the ONE mtime-throttle-marker idiom (release 0.5.1
-# K2). Checked BEFORE any git child is spawned (acceptance: a throttled invocation spawns
-# no git process).
+# Throttle marker: ``.dadaia/tmp/reconciler-last-<sid>``, via :func:`presence.throttled` /
+# :func:`presence.stamp_throttle` — the ONE mtime-throttle-marker idiom. A second
+# PostToolUse invocation inside the window does nothing; outside it, the hook calls the
+# ONE reaper, :func:`presence.gc`. The git-status reconciler that used to share this
+# cadence died with the log line that was its only output (FR11).
 # ---------------------------------------------------------------------------------------
 
 
-def _reconciler_marker(sess_id: str) -> str:
-    return f"reconciler-last-{sess_id}"
+def _throttled_gc(workspace: Path, sess_id: str) -> None:
+    """On the throttle cadence, run :func:`presence.gc`; inside the window, do nothing.
 
-
-def _bound_context(sess_id: str) -> str | None:
-    """The context this session resolves to, for the advisory reconciler's own read side.
-
-    ONE call into the single resolution authority
-    (:func:`dadaia_workspace.core.invocation.resolve` — hooks are sanctioned DIRECT
-    importers per the seam contract; the container never loads on a hook path, F-01).
-    *sess_id* is the caller's already-resolved identity (``_common.resolve_session_id``
-    on the hook payload); threading it through as the ``payload`` mapping's
-    ``session_id`` field makes rung 2 (this session's own live record) resolve the SAME
-    identity, never a second re-derivation of it. ``resolve`` itself applies the
-    ``DADAIA.md`` §3 law order: rung 1 ``DADAIA_CONTEXT``, rung 2 the session binding,
-    rung 3 the repo containing the current working directory.
+    The marker is stamped BEFORE the reaper runs so even a slow or erroring pass throttles
+    the next invocation. Any exception is swallowed by the caller's ``main`` try/except
+    (fail-open).
     """
-    return invocation.resolve(
-        payload={"session_id": sess_id}, env=os.environ, cwd=Path.cwd()
-    ).context_name
-
-
-def _porcelain_paths(repo_root: Path) -> list[str] | None:
-    """Return ``git status --porcelain`` path entries for ``repo_root``, or ``None`` on error.
-
-    DOCUMENTED EXEMPTION (FR-W1-03): the advisory reconciler is a hook (not a ``features``
-    module), and reads the working-tree status via a direct, read-only
-    ``git status --porcelain`` with a hard timeout. Any failure (no git, not a repo, timeout)
-    returns ``None`` → the caller emits nothing and exits 0 (fail-open).
-    """
-    try:
-        proc = subprocess.run(  # noqa: S603 — fixed read-only argv, no shell, hard timeout.
-            ["git", "status", "--porcelain"],
-            cwd=str(repo_root),
-            capture_output=True,
-            text=True,
-            timeout=10,
-            check=False,
-        )
-    except (OSError, subprocess.SubprocessError):
-        return None
-    if proc.returncode != 0:
-        return None
-    paths: list[str] = []
-    for line in proc.stdout.splitlines():
-        if len(line) < 4:
-            continue
-        # Porcelain v1: 2 status chars + space + path (rename uses "orig -> new").
-        entry = line[3:].strip()
-        if " -> " in entry:
-            entry = entry.split(" -> ", 1)[1]
-        if entry:
-            paths.append(entry)
-    return paths
-
-
-def _has_dirty_mutating_path(slug: str, paths: list[str]) -> bool:
-    """True iff any dirty path classifies MUTATING under repo *slug* (context-relative)."""
-    for p in paths:
-        rel = f"repos/{slug}/{p}"
-        if gate_policy.classify_path(rel) is PathClass.MUTATING:
-            return True
-    return False
-
-
-def _reconcile_working_tree(workspace: Path, sess_id: str) -> None:
-    """Advisory reconciler pass — flags dirty MUTATING paths in the bound repo. NEVER blocks.
-
-    Order (throttle FIRST, before any git child):
-      1. throttled within the window ⇒ return (no git spawned).
-      2. K2 (release 0.5.1): on the SAME throttle cadence — never on every single tool
-         call — call the ONE reaper, :func:`presence.gc`, for stale presence records,
-         throttle/sentinel markers, and now-empty presence context dirs.
-      3. no bound context ⇒ nothing to reconcile.
-      4. ``git status --porcelain`` of the context repo fails ⇒ no event (fail-open).
-      5. dirty paths are classified MUTATING-or-not — nothing is written; the event log
-         this classification fed is retired with no replacement.
-
-    Every branch stamps the throttle marker on exit so the next call inside the window is a
-    no-op. Any exception is swallowed by the caller's ``main`` try/except (fail-open).
-    """
-    now = time.time()
-    marker = _reconciler_marker(sess_id)
+    marker = f"reconciler-last-{sess_id}"
     if presence.throttled(
-        workspace, marker, window_seconds=RECONCILER_THROTTLE_TTL_SECONDS, now=now
+        workspace, marker, window_seconds=RECONCILER_THROTTLE_TTL_SECONDS, now=time.time()
     ):
         return
-    # Stamp immediately so even a slow/erroring pass throttles the next invocation.
     presence.stamp_throttle(workspace, marker)
-
     presence.gc(workspace, now=datetime.now(tz=UTC), own_session_id=sess_id)
-
-    ctx = _bound_context(sess_id)
-    if ctx is None:
-        return
-
-    # F003 (20260830 audit): path derivation goes through the registry slug — never
-    # the bare context NAME (the 0.4.2 name-vs-slug defect class).
-    slug = invocation.repo_slug_for_context(workspace, ctx)
-    repo_root = workspace / "repos" / slug
-    if not repo_root.is_dir():
-        return
-
-    paths = _porcelain_paths(repo_root)
-    if not paths:
-        return
-    if not _has_dirty_mutating_path(slug, paths):
-        return
 
 
 def main() -> int:
@@ -203,10 +104,10 @@ def main() -> int:
     except Exception:  # noqa: BLE001 — fail-open: any error ⇒ exit 0, never break harness
         return 0
 
-    # Advisory working-tree reconciler (FR-W1-03) — strictly advisory, isolated in its own
-    # try/except so a reconciler bug can never affect the heartbeat or the exit code.
+    # Throttled GC cadence — isolated in its own try/except so a reaper bug can never
+    # affect the heartbeat or the exit code.
     try:
-        _reconcile_working_tree(workspace, sess_id)
+        _throttled_gc(workspace, sess_id)
     except Exception:  # noqa: BLE001 — never blocks; any error ⇒ still exit 0.
         return 0
 
