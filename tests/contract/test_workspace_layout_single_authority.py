@@ -73,4 +73,4 @@ def test_gate_additive_prefixes_are_the_registry_view() -> None:
     from dadaia_workspace.core import workspace_layout
     from dadaia_workspace.features.spec_context import gate_policy
 
-    assert workspace_layout.additive_prefixes() == gate_policy._DADAIA_ADDITIVE_PREFIXES
+    assert workspace_layout.additive_prefixes() == gate_policy._ADDITIVE_DADAIA_PREFIXES
