@@ -11,7 +11,7 @@
 Write-set paths are relative to `dadaia_workspace/` unless they start with `tests/`,
 `specs/` or `CONTEXT.md`; every new test declares `Intent:` and size at birth.
 
-- [-] T-046-24 — FR1+FR2, the registry and its ratchets: `ZoneClass`, `Creator`, `Zone`,
+- [x] T-046-24 — FR1+FR2, the registry and its ratchets: `ZoneClass`, `Creator`, `Zone`,
   `DADAIA_ZONES` (11 rows), `STATES_CANON`, `DADAIA_ROOT_FILES`, `INSTANCE_EXCEPTIONS`,
   `parse_exception_globs`, derived views; the two tuples deleted; `gate_policy` derives its
   ADDITIVE prefixes; `CONTEXT.md` gains the four SPEC §3 terms. RED: `tests/contract/
