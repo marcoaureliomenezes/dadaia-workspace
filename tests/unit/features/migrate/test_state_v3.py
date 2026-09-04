@@ -1,10 +1,11 @@
 """Unit tests for state_v3 migration (spec_contexts.json v2 -> v3, FR15).
 
 Intent: CONTRACT — A15.1, A15.2, V8 (registry v2->v3 migration round-trip on a real v2
-registry)
+registry); bug migrate-v3-backup-lands-in-closed-states-canon (the hop writes nothing
+outside ``STATES_CANON``).
 
-Covers the schema-drop law's migration: backup-first (the v2 file is preserved
-byte-for-byte before any mutation), idempotent (a second run makes zero writes), and
+Covers the schema-drop law's migration: canon-clean (the only file the hop touches is
+``spec_contexts.json`` itself), idempotent (a second run makes zero writes), and
 behaviourally-identical-with-zero-associated-repos (A15.2), proven through the real
 JsonContextStore, not just by inspecting JSON keys.
 """
@@ -17,6 +18,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.models.spec_context import AssociatedRepo
+from dadaia_workspace.core.workspace_layout import STATES_CANON
 from dadaia_workspace.features.migrate.state_v3 import execute_migration, plan_migration
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 
@@ -104,29 +106,25 @@ def test_plan_migration_detection_matrix(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# A15.1: backup-first — the v2 snapshot exists, byte-identical, before mutation.
+# A15.1 + bug migrate-v3-backup-lands-in-closed-states-canon: the hop rewrites
+# spec_contexts.json and leaves states/ holding canon entries only.
 # ---------------------------------------------------------------------------
 
 
-def test_execute_migration_writes_backup_before_mutating(tmp_path: Path) -> None:
+def test_execute_migration_writes_nothing_outside_the_states_canon(tmp_path: Path) -> None:
     states = _states(tmp_path)
     _write_v2(states)
     ctx_file = states / "spec_contexts.json"
-    original_bytes = ctx_file.read_bytes()
 
     execute_migration(states)
 
-    backup_file = states / "spec_contexts.v2.bak.json"
-    assert backup_file.exists()
-    assert backup_file.read_bytes() == original_bytes
+    entries = {p.name for p in states.iterdir()}
+    assert entries == {"spec_contexts.json"}
+    assert entries <= STATES_CANON
 
     migrated = json.loads(ctx_file.read_text())
     assert migrated["schema_version"] == "3"
     assert migrated["contexts"][0]["associated_repos"] == []
-    # The original v2 shape is fully recoverable from the backup alone.
-    restored = json.loads(backup_file.read_text())
-    assert restored["schema_version"] == "2"
-    assert "associated_repos" not in restored["contexts"][0]
 
 
 def test_execute_migration_preserves_existing_fields(tmp_path: Path) -> None:
@@ -165,18 +163,13 @@ def test_execute_migration_rerun_is_a_noop(tmp_path: Path) -> None:
     execute_migration(states)
 
     ctx_file = states / "spec_contexts.json"
-    backup_file = states / "spec_contexts.v2.bak.json"
     after_first = ctx_file.read_bytes()
-    backup_after_first = backup_file.read_bytes()
     ctx_mtime = ctx_file.stat().st_mtime_ns
-    backup_mtime = backup_file.stat().st_mtime_ns
 
     execute_migration(states)
 
     assert ctx_file.read_bytes() == after_first
-    assert backup_file.read_bytes() == backup_after_first
     assert ctx_file.stat().st_mtime_ns == ctx_mtime
-    assert backup_file.stat().st_mtime_ns == backup_mtime
 
 
 def test_execute_migration_on_already_v3_is_a_noop(tmp_path: Path) -> None:
@@ -187,7 +180,7 @@ def test_execute_migration_on_already_v3_is_a_noop(tmp_path: Path) -> None:
     execute_migration(states)
 
     assert (states / "spec_contexts.json").read_text() == before
-    assert not (states / "spec_contexts.v2.bak.json").exists()
+    assert {p.name for p in states.iterdir()} == {"spec_contexts.json"}
 
 
 def test_execute_migration_missing_file_is_a_noop(tmp_path: Path) -> None:
