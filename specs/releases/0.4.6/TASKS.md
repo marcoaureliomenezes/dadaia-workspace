@@ -126,7 +126,7 @@ Write-set paths are relative to `dadaia_workspace/` unless they start with `test
   Write set: specs/memory/**, specs/releases/0.4.6/_RELEASE.json (phase only).
   Blocked by: T-046-32, T-046-34. Delivers: memory is current truth, `dadaia specs doctor` 0
   errors — AC14.
-- [-] T-046-36 — QA on this live instance, then reviews: `dadaia doctor` (dry, counts
+- [x] T-046-36 — QA on this live instance, then reviews: `dadaia doctor` (dry, counts
   recorded) -> operator moves wanted reports -> `dadaia doctor --fix` -> reprojection ->
   `dadaia public doctor` -> `dadaia doctor` = 100% -> `dadaia specs doctor`; AC2-AC13 executed,
   evidence under `.dadaia/tmp/qa-engineer/<date>/`; then `software-architect` fidelity review,
