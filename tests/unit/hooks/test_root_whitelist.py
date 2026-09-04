@@ -1,4 +1,7 @@
-"""Harness-real behavior tests for dadaia_workspace.hooks.root_whitelist.
+"""Intent: CONTRACT — 0.4.6 AC8 (FR7, bug doctor-root1-flags-env-that-dadaia-md-9-declares-canonical)
+and AC7 (FR6, the ``INSTANCE_EXCEPTIONS`` reader); size: SMALL.
+
+Harness-real behavior tests for dadaia_workspace.hooks.root_whitelist.
 
 These drive ``root_whitelist`` as a real Claude Code harness does: a subprocess spawned with
 :func:`claude_hook_env` and a ``PreToolUse`` payload piped to stdin. The gate signals ALLOW
@@ -22,6 +25,7 @@ from typing import Any
 
 import pytest
 
+from dadaia_workspace.core.workspace_layout import INSTANCE_EXCEPTIONS
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
 
@@ -42,7 +46,8 @@ def test_block_message_lists_every_whitelisted_entry(tmp_path: Path) -> None:
     """The block reason is DERIVED from the policy — it can never lag the whitelist.
 
     Consumer-gate bug class (v0.2.8): the message literal omitted `.kimi-code/` while the
-    policy already allowed it. Assert the reason names EVERY whitelisted basename.
+    policy already allowed it. Assert the reason names EVERY whitelisted basename and the
+    one exceptions file the policy reads.
     """
     from dadaia_workspace.hooks.root_whitelist import _WHITELIST
 
@@ -53,6 +58,30 @@ def test_block_message_lists_every_whitelisted_entry(tmp_path: Path) -> None:
     reason = block["reason"]
     for entry in _WHITELIST:
         assert entry in reason, f"{entry} missing from the block message: {reason}"
+    assert INSTANCE_EXCEPTIONS in reason
+    assert "root_exceptions" not in reason
+
+
+@pytest.mark.parametrize("name", [".env", ".gitignore"])
+def test_law_declared_root_files_are_canon_for_the_hook_and_the_doctor(
+    tmp_path: Path, name: str
+) -> None:
+    """Bug doctor-root1-flags-env-that-dadaia-md-9-declares-canonical: ``DADAIA.md`` §9
+    names the root ``.env`` as the one credential home and §5.3 presumes a root
+    ``.gitignore``, yet ``ROOT_ALLOWED_FILES`` listed neither — the hook blocked the write
+    and the doctor flagged the file. Both derive from that one set, so one row fixes both."""
+    from dadaia_workspace.features.spec_context.doctor import DoctorService, FindingVerdict
+    from tests.fakes import FakeContextStore, FakeGitClient
+
+    ws = _ws(tmp_path)
+    out, block = _run(tmp_path, {"tool_name": "Write", "tool_input": {"file_path": str(ws / name)}})
+    assert (out, block) == ("", None)
+
+    (ws / name).write_text("", encoding="utf-8")
+    findings = DoctorService(FakeContextStore(), FakeGitClient(), ws).scan()
+    assert {f.path: f.verdict for f in findings if f.code.startswith("WS-root-")}[name] is (
+        FindingVerdict.CANON
+    )
 
 
 @pytest.mark.parametrize(
@@ -161,15 +190,20 @@ def test_allow_table(
             ".opencode\n",
             lambda ws: ws / ".opencode" / "agents" / "foo.md",
         ),
+        (
+            # A directory glob written gitignore-style (trailing slash) names the
+            # directory — the one parser drops the slash for every reader.
+            "directory_glob_with_trailing_slash",
+            ".playwright-mcp/\n",
+            lambda ws: ws / ".playwright-mcp" / "console.log",
+        ),
     ],
 )
 def test_exception_glob_table(
     tmp_path: Path, name: str, exceptions_content: str, target_fn: Callable[[Path], Path]
 ) -> None:
     ws = _ws(tmp_path)
-    (ws / ".dadaia" / "states" / "root_exceptions.txt").write_text(
-        exceptions_content, encoding="utf-8"
-    )
+    (ws / INSTANCE_EXCEPTIONS).write_text(exceptions_content, encoding="utf-8")
     target = target_fn(ws)
     out, block = _run(
         tmp_path,
@@ -177,3 +211,15 @@ def test_exception_glob_table(
     )
     assert out == ""
     assert block is None
+
+
+def test_legacy_root_exceptions_file_is_not_a_reader_anymore(tmp_path: Path) -> None:
+    """FR6: ``INSTANCE_EXCEPTIONS`` is the one exceptions file the hook reads; the retired
+    ``root_exceptions.txt`` grants nothing until ``dadaia doctor --fix`` migrates it."""
+    ws = _ws(tmp_path)
+    (ws / ".dadaia" / "states" / "root_exceptions.txt").write_text("*.png\n", encoding="utf-8")
+    _out, block = _run(
+        tmp_path, {"tool_name": "Write", "tool_input": {"file_path": str(ws / "shot.png")}}
+    )
+    assert block is not None
+    assert block["decision"] == "block"

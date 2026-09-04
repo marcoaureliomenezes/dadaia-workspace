@@ -132,6 +132,13 @@ def test_root_files_and_exceptions_path() -> None:
         pytest.param(
             ".idea\n# note\n.idea\n*.iml\n.idea", (".idea", "*.iml"), id="dedupe-keeps-first"
         ),
+        pytest.param(
+            # A directory glob written gitignore-style names the directory: ``fnmatch``
+            # never matches a trailing slash, so the parser drops it (and dedupes across).
+            "z_img/\n.playwright-mcp/\nz_img\n",
+            ("z_img", ".playwright-mcp"),
+            id="directory-slash-dropped",
+        ),
     ],
 )
 def test_parse_exception_globs(text: str, expected: tuple[str, ...]) -> None:

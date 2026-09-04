@@ -21,6 +21,7 @@ from typer.testing import CliRunner
 
 from dadaia_workspace import container
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.core.workspace_layout import Creator, zones_created_by, zones_with_ttl
 from dadaia_workspace.features.spec_context.doctor import DoctorService
@@ -41,6 +42,11 @@ def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         (dadaia / zone.name).mkdir(parents=True, exist_ok=True)
     (dadaia / "states" / "spec_contexts.json").write_text(
         '{"schema_version": "2", "contexts": []}', encoding="utf-8"
+    )
+    # FR8: a healthy states/ carries the profile; absent it is WS-states-missing.
+    (dadaia / "states" / "harness_profile.json").write_text(
+        json.dumps({"schema_version": "1", "harnesses": list(L1_ENTRY_HARNESSES)}),
+        encoding="utf-8",
     )
     (tmp_path / "repos").mkdir()
     (tmp_path / "AGENTS.md").write_text("# agents", encoding="utf-8")

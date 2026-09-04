@@ -1,12 +1,10 @@
-"""AC-4 (v0.1.58 FR2) — ``WorkspaceService.init`` persists the harness profile.
+"""Intent: CONTRACT — v0.1.58 AC-4 and 0.4.6 AC9 (FR8, one profile writer); size: SMALL.
 
-The init-time write lands ``.dadaia/states/harness_profile.json`` with the chosen L1
-harness set (schema v1). The write is inline (like the ``_init_json_file`` state
-bootstraps) but produces exactly the shape the ``infrastructure`` adapter reads back, so
-this suite cross-checks the two writers via ``JsonHarnessProfileStore.read``. Re-running
-``init`` with the same set is a no-op (no spurious rewrite, no second hook entry). An
-absent profile file (a pre-v0.1.58 workspace) reads as ``None`` — the "treated as all-four"
-back-compat convention every consumer honours.
+``WorkspaceService.init`` persists the harness profile through the ONE writer,
+``JsonHarnessProfileStore.write`` — the service never spells the file (the inline
+``_write_harness_profile`` copy is gone). Re-running ``init`` with the same set is a no-op
+(no spurious rewrite, no second hook entry). An absent profile file (a pre-v0.1.58 workspace)
+reads as ``None`` — the "treated as all-four" back-compat convention every consumer honours.
 
 These are unit-level assertions over the real service with fake asset/venv managers; the
 harness-gated *scaffold* behaviour (which dirs/hooks appear) is pinned end-to-end by the
@@ -15,6 +13,7 @@ CLI suite ``tests/unit/cli/test_init_harness.py``.
 
 from __future__ import annotations
 
+import inspect
 import json
 from pathlib import Path
 
@@ -22,6 +21,7 @@ import pytest
 
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.models.harness_profile import HarnessProfile
+from dadaia_workspace.features.workspace import service as service_module
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
 from tests.fakes import FakePublicAssetManager, FakePythonEnvironmentManager
@@ -47,7 +47,7 @@ def test_persists_selected_set_roundtrips_and_defaults_to_all_four(
     data = json.loads(_profile_path(tmp_path).read_text(encoding="utf-8"))
     assert data == {"schema_version": "1", "harnesses": ["codex"]}
 
-    # the inline init write and the infra adapter agree on shape (no fork).
+    # init's write is the store's write — the adapter reads back exactly what init wrote.
     service.init(
         tmp_path.parent / (tmp_path.name + "-roundtrip"),
         skip_assets=True,
@@ -117,3 +117,13 @@ def test_reinit_same_set_does_not_duplicate_ctx_inject_hook(
     service.init(tmp_path, skip_assets=True, harnesses=("claude",))
 
     assert not (tmp_path / ".claude" / "settings.json").exists()
+
+
+def test_init_writes_the_profile_through_the_store_and_never_spells_the_file() -> None:
+    """AC9 (FR8): one writer. The service holds no copy of the profile's file name or
+    payload shape — both live only in ``infrastructure/json_harness_profile_store``."""
+    source = inspect.getsource(service_module)
+
+    assert "_write_harness_profile" not in source
+    assert "_persisted_profile_harnesses" not in source
+    assert "harness_profile.json" not in source

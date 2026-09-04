@@ -24,6 +24,7 @@ from pathlib import Path, PurePosixPath
 
 from dadaia_workspace.core import session_store, workspace_layout
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES, PROJECTION_TARGETS
+from dadaia_workspace.core.models.harness_profile import HarnessProfile
 from dadaia_workspace.core.models.spec_context import ContextState
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.core.workspace_layout import Creator, Zone
@@ -274,15 +275,13 @@ class DoctorService:
         return tuple(findings)
 
     def _exception_globs(self) -> tuple[str, ...]:
-        """``INSTANCE_EXCEPTIONS``; the legacy ``root_exceptions.txt`` through the same
-        parser until T-046-32 migrates it inside ``fix()``."""
-        for candidate in (
-            self._workspace_root / workspace_layout.INSTANCE_EXCEPTIONS,
-            self._states / "root_exceptions.txt",
-        ):
-            if candidate.is_file():
-                return workspace_layout.parse_exception_globs(candidate.read_text(encoding="utf-8"))
-        return ()
+        try:
+            text = (self._workspace_root / workspace_layout.INSTANCE_EXCEPTIONS).read_text(
+                encoding="utf-8"
+            )
+        except OSError:
+            return ()
+        return workspace_layout.parse_exception_globs(text)
 
     def _excepted(self, entry: Path, globs: tuple[str, ...]) -> bool:
         rel = entry.relative_to(self._workspace_root).as_posix()
@@ -399,6 +398,12 @@ class DoctorService:
             else:
                 verdict, detail = FindingVerdict.SLOP, "(outside the closed canon)"
             out.append(self._finding(zone.name, self._dadaia, entry, verdict, detail))
+        profile = JsonHarnessProfileStore.path(self._states)
+        if profile.parent == self._dadaia / zone.name and not profile.exists():
+            detail = "(seeded by --fix from the projection dirs present)"
+            out.append(
+                self._finding(zone.name, self._dadaia, profile, FindingVerdict.MISSING, detail)
+            )
         return out
 
     def _scan_ttl_zone(self, zone: Zone, now: float) -> list[Finding]:
@@ -473,12 +478,12 @@ class DoctorService:
         for sess_id in session_store.reap_stale(self._workspace_root):
             actions.append(f"GRAVEYARD-GC: deleted expired session file '{sess_id}.json'")
 
-        # T-046-32: the exceptions-file migration (FR6) is called here, before the walk.
+        actions.extend(self._migrate_exceptions())
 
         findings = self.scan()
         for finding in findings:
             if finding.verdict is FindingVerdict.MISSING:
-                finding.target.mkdir(parents=True, exist_ok=True)
+                self._seed(finding)
                 actions.append(f"{finding.code}: created '{finding.path}'")
         actions.extend(self._delete(findings, FindingVerdict.EXPIRED))
         if expired_only:
@@ -497,6 +502,31 @@ class DoctorService:
             shutil.rmtree(repo_path)
             actions.append(f"Removed stale repo '{ctx.repo_slug}' for dead context '{ctx.name}'")
         return actions
+
+    def _migrate_exceptions(self) -> list[str]:
+        """FR6: ``root_exceptions.txt`` -> ``INSTANCE_EXCEPTIONS`` through the one parser;
+        deleted in the release after every consumer has run it."""
+        old = self._states / "root_exceptions.txt"
+        new = self._workspace_root / workspace_layout.INSTANCE_EXCEPTIONS
+        if not old.is_file() or new.exists():
+            return []
+        globs = workspace_layout.parse_exception_globs(old.read_text(encoding="utf-8"))
+        new.write_text("".join(f"{g}\n" for g in globs), encoding="utf-8")
+        old.unlink()
+        return [
+            f"WS-{self._states.name}-slop: migrated '{old.name}' -> '{new.name}' ({len(globs)} globs)"
+        ]
+
+    def _seed(self, finding: Finding) -> None:
+        """A missing zone is a directory; the missing profile is written by the one store
+        writer from the L1 harnesses whose projection dir exists at the root (FR8)."""
+        if finding.target == JsonHarnessProfileStore.path(self._states):
+            present = tuple(
+                h for h in L1_ENTRY_HARNESSES if (self._workspace_root / f".{h}").is_dir()
+            )
+            JsonHarnessProfileStore().write(self._states, HarnessProfile.of(present))
+        else:
+            finding.target.mkdir(parents=True, exist_ok=True)
 
     def _delete(self, findings: tuple[Finding, ...], verdict: FindingVerdict) -> list[str]:
         actions: list[str] = []

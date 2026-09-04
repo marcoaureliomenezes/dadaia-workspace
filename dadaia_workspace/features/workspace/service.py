@@ -7,6 +7,7 @@ from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.models.harness_profile import HarnessProfile
 from dadaia_workspace.core.models.workspace import Workspace
 from dadaia_workspace.core.workspace_layout import Creator, zones_created_by
+from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 
@@ -39,8 +40,12 @@ class WorkspaceService:
         ``.codex``/``.kimi-code`` projections plus per-harness hook registration).
         ``None`` ⇒ the full harness set (back-compat with pre-v0.1.58 init). Only the
         chosen harnesses' directories, hooks, and asset projections are created; the
-        selected set is persisted to ``.dadaia/states/harness_profile.json`` (the source
-        of truth for profile-aware install/doctor scoping, v0.1.58 FR3).
+        selected set is persisted through the profile store (the source of truth for
+        profile-aware install/doctor scoping, v0.1.58 FR3).
+
+        Bug init-harness-profile-silent-narrowing: init deletes no projection, so it must
+        never un-manage one — a re-init with a harness subset MERGES into the persisted
+        profile (canonical L1 order, unknown names appended sorted).
         """
         workspace = Workspace.from_root(workspace_root)
         chosen = tuple(harnesses) if harnesses is not None else L1_ENTRY_HARNESSES
@@ -65,8 +70,13 @@ class WorkspaceService:
         self._init_json_file(workspace.states_dir / "spec_contexts.json", _EMPTY_CONTEXTS)
         self._init_json_file(workspace.states_dir / "server_registry.json", _EMPTY_SERVER_REGISTRY)
 
-        # Persist the harness profile (schema v1) — inline like the state bootstraps above.
-        self._write_harness_profile(workspace, chosen)
+        store = JsonHarnessProfileStore()
+        persisted = store.read(workspace.states_dir)
+        merged = chosen_set | (set(persisted.harnesses) if persisted is not None else set())
+        ordered = tuple(h for h in L1_ENTRY_HARNESSES if h in merged) + tuple(
+            sorted(merged - set(L1_ENTRY_HARNESSES))
+        )
+        store.write(workspace.states_dir, HarnessProfile.of(ordered))
 
         # Install public assets — only the chosen harness projections. Every hook wiring
         # (.claude/settings.json, .codex/hooks.json, kimi user hooks) is install's output:
@@ -77,11 +87,8 @@ class WorkspaceService:
         installed: list[str] = []
         if not skip_assets:
             installed.extend(self._public_assets.stage(workspace_root))
-            # `target="all"` resolves the chosen-harness SUBSET on its own: the harness
-            # profile was already persisted above (`_write_harness_profile`), and
-            # `install(target="all")` reads that persisted profile to scope its harness
-            # targets (v0.1.58 FR3). The old per-target loop with manual line-dedup was
-            # a redundant workaround predating that profile-scoped install path.
+            # `target="all"` resolves the chosen-harness SUBSET on its own: it reads the
+            # profile persisted above to scope its harness targets (v0.1.58 FR3).
             installed.extend(self._public_assets.install(workspace_root, target="all"))
         else:
             installed.append(
@@ -90,53 +97,6 @@ class WorkspaceService:
             )
 
         return workspace, installed
-
-    def _write_harness_profile(self, workspace: Workspace, harnesses: tuple[str, ...]) -> None:
-        """Write .dadaia/states/harness_profile.json inline (like ``_init_json_file``).
-
-        Uses the pure ``HarnessProfile`` core model to shape the payload; the identical
-        shape is produced by ``infrastructure/json_harness_profile_store.py`` (the W3 read
-        side), so the two writers never fork. Idempotent — no spurious rewrite when the
-        on-disk bytes already match (satisfies AC-4's re-run-is-a-no-op).
-
-        Bug init-harness-profile-silent-narrowing: init deletes no projection, so it must
-        never un-manage one — a re-init with a harness subset MERGES into the persisted
-        profile (canonical L1 order, unknown names appended sorted). Narrowing the
-        managed set is a deliberate operator state edit, never an init side effect;
-        before this, adding one harness silently dropped the others out of
-        install/doctor scope ([warn] out-of-profile) and their projections rotted.
-        """
-        merged = set(harnesses) | self._persisted_profile_harnesses(workspace)
-        ordered = tuple(h for h in L1_ENTRY_HARNESSES if h in merged) + tuple(
-            sorted(merged - set(L1_ENTRY_HARNESSES))
-        )
-        profile = HarnessProfile.of(ordered)
-        payload = {
-            "schema_version": profile.schema_version,
-            "harnesses": list(profile.harnesses),
-        }
-        path = workspace.states_dir / "harness_profile.json"
-        new_text = json.dumps(payload, indent=2)
-        if path.exists() and path.read_text(encoding="utf-8") == new_text:
-            return
-        path.write_text(new_text, encoding="utf-8")
-
-    def _persisted_profile_harnesses(self, workspace: Workspace) -> set[str]:
-        """Read the harness set already persisted in the profile (empty on absence/corruption).
-
-        Inline read mirroring the inline write above (the infrastructure store stays the
-        W3 read side for install/doctor). A corrupt or unreadable profile contributes
-        nothing — init then persists exactly the requested set, the pre-merge behavior.
-        """
-        path = workspace.states_dir / "harness_profile.json"
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError, ValueError):
-            return set()
-        raw = data.get("harnesses", []) if isinstance(data, dict) else []
-        if not isinstance(raw, list):
-            return set()
-        return {str(h) for h in raw}
 
     def is_initialized(self, workspace_root: Path) -> bool:
         return (workspace_root / ".dadaia" / "states" / "spec_contexts.json").exists()

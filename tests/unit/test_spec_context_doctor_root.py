@@ -1,4 +1,5 @@
-"""Intent: CONTRACT — 0.4.6 AC2, AC4, AC6 (FR3 one scan, FR4 the reaper, FR5 TTLs); size: SMALL.
+"""Intent: CONTRACT — 0.4.6 AC2, AC4, AC6, AC7, AC9 (FR3 one scan, FR4 the reaper, FR5 TTLs,
+FR6 exceptions migration, FR8 the profile seed); size: SMALL.
 
 ``DoctorService.scan()`` is the ONE walk over the workspace instance, driven by the zone
 registry (``core.workspace_layout.DADAIA_ZONES``): root, harness dirs, the ``.dadaia/`` top
@@ -20,6 +21,7 @@ import time
 from pathlib import Path
 
 from dadaia_workspace.core import workspace_layout
+from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.workspace_layout import (
     DADAIA_ROOT_FILES,
     INSTANCE_EXCEPTIONS,
@@ -56,8 +58,16 @@ def _init_workspace(root: Path) -> None:
     (dadaia / _STATE_ZONE.name / "spec_contexts.json").write_text(
         '{"schema_version": "2", "contexts": []}', encoding="utf-8"
     )
+    _profile(root).write_text(
+        json.dumps({"schema_version": "1", "harnesses": list(L1_ENTRY_HARNESSES)}),
+        encoding="utf-8",
+    )
     (root / "repos").mkdir()
     (root / "AGENTS.md").write_text("# agents", encoding="utf-8")
+
+
+def _profile(root: Path) -> Path:
+    return root / ".dadaia" / _STATE_ZONE.name / "harness_profile.json"
 
 
 def _age(path: Path, epoch: float = _TWO_DAYS_AGO) -> None:
@@ -110,18 +120,50 @@ def test_root_walk_classifies_every_entry(tmp_path: Path) -> None:
     assert "# comment" not in {f.detail for f in found.values()}
 
 
-def test_exceptions_fall_back_to_root_exceptions_until_migrated(tmp_path: Path) -> None:
-    """T-046-32 migrates the file inside ``fix()``; until then the legacy name is read
-    through the same parser — never a third one."""
+def test_fix_migrates_root_exceptions_into_instance_exceptions(tmp_path: Path) -> None:
+    """FR6 / AC7: ``root_exceptions.txt`` present and ``INSTANCE_EXCEPTIONS`` absent ⇒ ``fix()``
+    writes the parsed globs (comments dropped, deduplicated, directory slash dropped, order
+    kept) to the new file and unlinks the old one. Before the migration the legacy file is
+    read by nobody: it is plain closed-canon slop and its globs suppress nothing."""
     _init_workspace(tmp_path)
     (tmp_path / "shot.png").write_bytes(b"PNG")
+    (tmp_path / "z_img").mkdir()
+    legacy = tmp_path / ".dadaia" / _STATE_ZONE.name / "root_exceptions.txt"
+    legacy.write_text(
+        "# operator files\n*.png\n\n.mcp.json\n# infra\n.mcp.json\nz_img/\n.mcp.json\nz_img\n",
+        encoding="utf-8",
+    )
+    new = tmp_path / INSTANCE_EXCEPTIONS
+
+    before = _by_path(_make_doctor(tmp_path).scan())
+    assert before["shot.png"].verdict is FindingVerdict.SLOP
+    assert before[f"{_STATE_ZONE.name}/root_exceptions.txt"].code == f"WS-{_STATE_ZONE.name}-slop"
+
+    actions = _make_doctor(tmp_path).fix(expired_only=True)
+
+    assert not legacy.exists()
+    assert new.read_text(encoding="utf-8") == "*.png\n.mcp.json\nz_img\n"
+    assert [a for a in actions if "root_exceptions.txt" in a] == [
+        f"WS-{_STATE_ZONE.name}-slop: migrated 'root_exceptions.txt' -> "
+        f"'instance_exceptions.txt' (3 globs)"
+    ]
+    after = _by_path(_make_doctor(tmp_path).scan())
+    assert after["shot.png"].verdict is FindingVerdict.OPERATOR
+    assert after["z_img"].verdict is FindingVerdict.OPERATOR
+    assert after[f"{_STATE_ZONE.name}/instance_exceptions.txt"].verdict is FindingVerdict.CANON
+
+
+def test_fix_never_overwrites_an_existing_instance_exceptions_file(tmp_path: Path) -> None:
+    _init_workspace(tmp_path)
     legacy = tmp_path / ".dadaia" / _STATE_ZONE.name / "root_exceptions.txt"
     legacy.write_text("*.png\n", encoding="utf-8")
+    new = tmp_path / INSTANCE_EXCEPTIONS
+    new.write_text("*.jpg\n", encoding="utf-8")
 
-    assert _by_path(_make_doctor(tmp_path).scan())["shot.png"].verdict is FindingVerdict.OPERATOR
+    _make_doctor(tmp_path).fix()
 
-    (tmp_path / INSTANCE_EXCEPTIONS).write_text("# nothing here\n", encoding="utf-8")
-    assert _by_path(_make_doctor(tmp_path).scan())["shot.png"].verdict is FindingVerdict.SLOP
+    assert new.read_text(encoding="utf-8") == "*.jpg\n"
+    assert not legacy.exists()
 
 
 # ---------------------------------------------------------------------------
@@ -178,6 +220,29 @@ def test_harness_dirs_are_scoped_by_the_persisted_profile(tmp_path: Path) -> Non
     codes = _codes(_make_doctor(tmp_path).scan())
     assert "WS-codex-slop" in codes
     assert "WS-kimi-code-slop" not in codes
+
+
+def test_exception_globs_match_workspace_relative_paths_inside_harness_dirs(
+    tmp_path: Path,
+) -> None:
+    """FR6: a glob matches on the entry basename OR its workspace-relative path, at the root
+    and inside the harness dirs — ``.claude/settings.local.json`` and
+    ``.codex/skills/godot-*`` both suppress the slop finding."""
+    _init_workspace(tmp_path)
+    _write_ledger(tmp_path, ".claude/agents/pm.md", ".codex/skills/dd-x/SKILL.md")
+    (tmp_path / ".claude" / "settings.local.json").write_text("{}", encoding="utf-8")
+    godot = tmp_path / ".codex" / "skills" / "godot-mcp"
+    godot.mkdir(parents=True)
+    (godot / "SKILL.md").write_text("x", encoding="utf-8")
+    (tmp_path / INSTANCE_EXCEPTIONS).write_text(
+        ".claude/settings.local.json\n.codex/skills/godot-*\n", encoding="utf-8"
+    )
+
+    found = _by_path(_make_doctor(tmp_path).scan())
+
+    assert found[".claude/settings.local.json"].code == "WS-claude-operator"
+    assert found[".codex/skills/godot-mcp"].code == "WS-codex-operator"
+    assert not [f for f in found.values() if f.verdict is FindingVerdict.SLOP]
 
 
 # ---------------------------------------------------------------------------
@@ -243,6 +308,35 @@ def test_closed_canon_zones_flag_every_non_canon_entry(tmp_path: Path) -> None:
         assert found[f"{zone.name}/stray.bin"].code == f"WS-{zone.name}-slop"
         sample = sorted(zone.canon)[0].replace("*", "sample")
         assert found[f"{zone.name}/{sample}"].verdict is FindingVerdict.CANON
+
+
+def test_absent_harness_profile_is_missing_and_fix_seeds_it_from_present_dirs(
+    tmp_path: Path,
+) -> None:
+    """FR8 / AC9: a missing ``harness_profile.json`` is ``WS-states-missing`` (fixable);
+    ``fix()`` seeds it through the one store writer with exactly the L1 harnesses whose
+    projection dir exists at the root — regenerated from disk, never widened."""
+    _init_workspace(tmp_path)
+    _profile(tmp_path).unlink()
+    (tmp_path / ".claude").mkdir()
+    (tmp_path / ".codex").mkdir()
+
+    findings = _make_doctor(tmp_path).scan()
+    missing = [f for f in findings if f.verdict is FindingVerdict.MISSING]
+    assert [(f.code, f.path, f.fixable) for f in missing] == [
+        (f"WS-{_STATE_ZONE.name}-missing", f"{_STATE_ZONE.name}/harness_profile.json", True)
+    ]
+
+    actions = _make_doctor(tmp_path).fix(expired_only=True)
+
+    assert actions == [
+        f"WS-{_STATE_ZONE.name}-missing: created '{_STATE_ZONE.name}/harness_profile.json'"
+    ]
+    assert json.loads(_profile(tmp_path).read_text(encoding="utf-8")) == {
+        "schema_version": "1",
+        "harnesses": ["claude", "codex"],
+    }
+    assert not [f for f in _make_doctor(tmp_path).scan() if f.verdict is FindingVerdict.MISSING]
 
 
 # ---------------------------------------------------------------------------

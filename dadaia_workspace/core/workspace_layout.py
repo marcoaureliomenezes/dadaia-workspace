@@ -66,8 +66,13 @@ ROOT_ALLOWED_DIRS: frozenset[str] = frozenset(
 #: Files the workspace root may contain. ``DADAIA.md`` is the workspace system prompt
 #: (the single always-on law file); ``AGENTS.md`` its harness-discovery bridge;
 #: ``CLAUDE.md`` the Claude Code import bridge; ``prompt.md`` the optional operator
-#: long-prompt file.
-ROOT_ALLOWED_FILES: frozenset[str] = frozenset({"AGENTS.md", "CLAUDE.md", "DADAIA.md", "prompt.md"})
+#: long-prompt file; ``.env`` the one credential home (DADAIA.md §9); ``.gitignore`` the
+#: defence-in-depth exclusion list (§5.3) — bug
+#: doctor-root1-flags-env-that-dadaia-md-9-declares-canonical: the law named both, this
+#: set named neither, and hook + doctor (both derived from here) contradicted the law.
+ROOT_ALLOWED_FILES: frozenset[str] = frozenset(
+    {"AGENTS.md", "CLAUDE.md", "DADAIA.md", "prompt.md", ".env", ".gitignore"}
+)
 
 
 class ZoneClass(StrEnum):
@@ -192,8 +197,9 @@ INSTANCE_EXCEPTIONS: str = ".dadaia/states/instance_exceptions.txt"
 
 
 def parse_exception_globs(text: str) -> tuple[str, ...]:
-    """One glob per line; ``#`` lines and blanks dropped; deduplicated, first kept, order kept."""
-    lines = (line.strip() for line in text.splitlines())
+    """One glob per line; ``#`` lines and blanks dropped; a directory glob's trailing ``/``
+    dropped (``fnmatch`` never matches it); deduplicated, first kept, order kept."""
+    lines = (line.strip().rstrip("/") for line in text.splitlines())
     return tuple(dict.fromkeys(line for line in lines if line and not line.startswith("#")))
 
 
