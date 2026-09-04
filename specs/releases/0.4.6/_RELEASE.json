@@ -1,8 +1,8 @@
 {
   "schema": "release-state-v1",
   "release": "0.4.6",
-  "phase": "CLOSURE",
-  "rc": 2,
+  "phase": "DISCOVERY",
+  "rc": 3,
   "defined": {
     "sha": null,
     "ts": "2026-09-03T03:53:29Z"
@@ -146,6 +146,12 @@
       "agent": "project-manager",
       "kind": "merge",
       "text": "Candidate 3 merged: PR #244 feature/0.4.6 -> develop, merge commit 1463790031f223c1922454b376e13ce45f944ee9 (head 7c421ead = verdict commit whose first parent f50e6e9b is the sha the security-reviewer approved; 37 checks pass). Verdict consumed and deleted; backlog slop-law-one-definition-one-home rewritten to DELIVERED. Release stays live at the promote-or-continue gate: the operator rules promote (deploy) or continue (rc-archive to rc-3/); nothing deployed."
+    },
+    {
+      "ts": "2026-09-04T00:02:03Z",
+      "agent": "release-candidates",
+      "kind": "note",
+      "text": "Candidate 3 archived to rc-3/ (operator ruled continue at the promote-or-continue gate); root is ready for the next candidate's trio."
     }
   ]
 }
