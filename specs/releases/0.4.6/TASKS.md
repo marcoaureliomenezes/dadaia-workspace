@@ -32,7 +32,7 @@ Write-set paths are relative to `dadaia_workspace/` unless they start with `test
   doctor_root.py, tests/unit/features/{spec_context,public_assets}/**, doctor goldens.
   Blocked by: T-046-24. Delivers: `dadaia doctor` on this instance lists every finding and a
   score line; `--fix --expired-only` deletes only expired — AC2, AC4, AC6.
-- [-] T-046-26 — FR4 (contract half), delete the engines: `features/{workspace_clean,tmp_gc}/`,
+- [x] T-046-26 — FR4 (contract half), delete the engines: `features/{workspace_clean,tmp_gc}/`,
   `features/reports/{retention,next}.py`, `features/migrate/legacy_dadaia_dirs.py` + reconcile
   call + setup.cfg edge, `core/models/hygiene.py`, `cli/commands/{clean,tmp}.py`, eight `reports`
   verbs, container builders, their 7 tests; cap 4 -> 3, `modules =`, `_RATCHET`, frozen-clock
@@ -59,7 +59,7 @@ Write-set paths are relative to `dadaia_workspace/` unless they start with `test
   infrastructure/json_course_store.py, container.py, features/panel/**, features/workspace/
   service.py (academy lines), features/export/service.py (one line), their tests.
   Blocked by: T-046-27. Delivers: `dadaia --help` and the panel carry no academy — AC4, AC10.
-- [-] T-046-29 — FR11, retire logs: `pre_gate._append_latency` + tail, `sdd_post_gate`
+- [x] T-046-29 — FR11, retire logs: `pre_gate._append_latency` + tail, `sdd_post_gate`
   writers, `jsonl_log_rotation.py`, `LOG_ROTATION_MAX_BYTES`; 2 tests deleted. RED:
   `test_pre_gate.py` / `test_post_gate_reconciler.py` assert no `.dadaia/logs` after a gated
   write; `test_hook_import_surface.py`. Owner: software-engineer.

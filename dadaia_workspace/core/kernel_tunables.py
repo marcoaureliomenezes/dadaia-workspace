@@ -13,7 +13,6 @@ presence only; no tunable in this module can make a workspace operation wait or 
 from __future__ import annotations
 
 __all__ = [
-    "LOG_ROTATION_MAX_BYTES",
     "PRESENCE_TTL_SECONDS",
     "RECONCILER_THROTTLE_TTL_SECONDS",
     "SENTINEL_GC_TTL_SECONDS",
@@ -40,12 +39,3 @@ SESSION_GC_TTL_SECONDS: int = 300
 #: the same cadence, gates the ONE GC reaper's call (release 0.5.1 K2:
 #: ``features.spec_context.presence.gc``).
 RECONCILER_THROTTLE_TTL_SECONDS: int = 30
-
-#: FR27 (T-043-42): the "~1 MB" cap every ``.dadaia/logs/*.jsonl`` appender rotates at
-#: (decimal MB, matching the SPEC's own wording). Not a timing constant like its
-#: siblings above, but co-located here anyway — it is the same kind of thing (a single
-#: kernel-owned tunable hooks/features/cli all hold a legal ``core`` edge to), and the
-#: mechanism that reads it (``infrastructure/jsonl_log_rotation.py``) is I/O, so it
-#: cannot live there itself (this module is the zero-I/O leaf; see the module
-#: docstring).
-LOG_ROTATION_MAX_BYTES: int = 1_000_000

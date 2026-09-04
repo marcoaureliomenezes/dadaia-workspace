@@ -11,8 +11,9 @@ every dirty MUTATING path in a bound repo is now unconditionally flagged (see
 ``sdd_post_gate._reconcile_working_tree``'s updated docstring). Criterion4 (byte-identical
 lease record) drops out with it — there is no lease record for the reconciler to touch.
 
-CRIT (NEVER-BLOCKS): the flag test below folds in criterion2 (advisory-only: the ONLY
-side effect is the RECONCILER_FLAG event).
+FR11 (T-046-29): the reconciler writes no event log any more — a dirty MUTATING pass
+leaves no ``.dadaia/logs`` behind; its only side effects are the throttle marker and
+the reaper's own work under ``.dadaia/tmp/``.
 """
 
 from __future__ import annotations
@@ -21,7 +22,6 @@ import json
 import time
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
 
 import pytest
 
@@ -70,20 +70,16 @@ def _bind_session(workspace: Path, ctx: str = _CTX) -> None:
     )
 
 
-def _events(workspace: Path) -> list[dict[str, Any]]:
-    log = workspace / ".dadaia" / "logs" / "reconciler-events.jsonl"
-    if not log.exists():
-        return []
-    return [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines() if line]
-
-
-def _flags(workspace: Path) -> list[dict[str, Any]]:
-    return [e for e in _events(workspace) if e.get("event") == "RECONCILER_FLAG"]
-
-
-def test_dirty_mutating_emits_flag_advisory_only(
+def test_dirty_mutating_path_leaves_no_logs_dir(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    """Intent: CONTRACT — AC10 (logs), T-046-29. Size: SMALL (git child faked).
+
+    The dirty-MUTATING pass — the branch that used to append ``RECONCILER_FLAG`` to
+    ``.dadaia/logs/reconciler-events.jsonl`` — creates no ``.dadaia/logs`` directory,
+    neither through ``_reconcile_working_tree`` nor through the full PostToolUse
+    ``main()``, which still exits 0 on this path (never-blocks, criterion1).
+    """
     # This suite runs inside the dadaia-workspace SOURCE checkout, itself nested under a
     # REAL registered "dadaia-workspace" context; an ambient DADAIA_CONTEXT (rung 1, the
     # normal way an agent binds a plain shell) would otherwise outrank this test's own
@@ -94,78 +90,18 @@ def test_dirty_mutating_emits_flag_advisory_only(
     ws = _make_workspace(tmp_path)
     monkeypatch.setenv("WORKSPACE_ROOT", str(ws))
     _bind_session(ws)
-
-    # A dirty production file (MUTATING) in the bound context repo ⇒ the flagging branch
-    # (unconditional now — there is no lease to be "in" anymore).
     monkeypatch.setattr(sdd_post_gate, "_porcelain_paths", lambda repo: ["dadaia_workspace/x.py"])
 
     sdd_post_gate._reconcile_working_tree(ws, _SID)
+    assert not (ws / ".dadaia" / "logs").exists()
 
-    flags = _flags(ws)
-    assert len(flags) == 1
-    assert flags[0]["context"] == _CTX
-    assert flags[0]["dirty_mutating_paths"] >= 1
-
-    # criterion2: the ONLY side effect is the advisory event — nothing else logged.
-    events = _events(ws)
-    assert len(events) == 1
-    assert events[0]["event"] == "RECONCILER_FLAG"
-    assert "no action taken" in events[0]["note"]
-
-    # Companion: the full PostToolUse main() returns 0 even on this exact dirty MUTATING
-    # flagging path (criterion1) — proving never-blocks holds end-to-end, not just at the
-    # pure _reconcile_working_tree layer.
     ws2 = _make_workspace(tmp_path.parent / (tmp_path.name + "-main"))
     _bind_session(ws2)
     monkeypatch.setenv("WORKSPACE_ROOT", str(ws2))
-    monkeypatch.setattr(sdd_post_gate, "_porcelain_paths", lambda repo: ["dadaia_workspace/x.py"])
     monkeypatch.setattr(_common, "read_stdin_json", lambda: {"session_id": _SID})
     monkeypatch.setattr(_common, "resolve_session_id", lambda payload: _SID)
     assert sdd_post_gate.main() == 0
-    assert len(_flags(ws2)) == 1
-
-
-@pytest.mark.parametrize(
-    ("name", "setup_fn"),
-    [
-        (
-            "clean_tree",
-            lambda ws, mp: mp.setattr(sdd_post_gate, "_porcelain_paths", lambda repo: []),
-        ),
-        (
-            # specs/bugs is ADDITIVE — dirt there must NOT raise a flag.
-            "additive_only_dirt",
-            lambda ws, mp: mp.setattr(
-                sdd_post_gate, "_porcelain_paths", lambda repo: ["specs/bugs/some-bug.md"]
-            ),
-        ),
-        (
-            # No session record written ⇒ no bound context ⇒ no flag, even with dirt.
-            "no_bound_context",
-            lambda ws, mp: mp.setattr(
-                sdd_post_gate, "_porcelain_paths", lambda repo: ["dadaia_workspace/x.py"]
-            ),
-        ),
-    ],
-)
-def test_no_flag_table(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, name: str, setup_fn: object
-) -> None:
-    # T-50-02 (SPEC v0.5.0 FR1): "no_bound_context" now falls through
-    # _bound_context's leg 2 (the single resolution authority, rungs 1-3) instead of
-    # stopping at the direct record read. This suite runs inside the dadaia-workspace
-    # SOURCE checkout, itself nested under a REAL registered "dadaia-workspace" context
-    # — chdir + a scrubbed DADAIA_CONTEXT keep rung 3 (cwd) and rung 1 (env) from
-    # leaking that real context into this "isolated" tmp_path fixture.
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.delenv("DADAIA_CONTEXT", raising=False)
-    ws = _make_workspace(tmp_path)
-    monkeypatch.setenv("WORKSPACE_ROOT", str(ws))
-    if name != "no_bound_context":
-        _bind_session(ws)
-    setup_fn(ws, monkeypatch)  # type: ignore[operator]
-    sdd_post_gate._reconcile_working_tree(ws, _SID)
-    assert _flags(ws) == []
+    assert not (ws2 / ".dadaia" / "logs").exists()
 
 
 def test_bound_context_leg2_falls_through_to_authority_via_dadaia_context_env(
@@ -230,9 +166,9 @@ def test_fail_open_table(
         monkeypatch.setattr(_common, "resolve_session_id", lambda payload: _SID)
         assert sdd_post_gate.main() == 0
     else:
-        # Must not raise and must emit nothing.
+        # Must not raise, and the failed pass leaves no log behind either.
         sdd_post_gate._reconcile_working_tree(ws, _SID)
-        assert _flags(ws) == []
+        assert not (ws / ".dadaia" / "logs").exists()
 
 
 def test_throttle_skip_and_expiry(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -256,7 +192,6 @@ def test_throttle_skip_and_expiry(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
     sdd_post_gate._reconcile_working_tree(ws, _SID)  # second: throttled BEFORE any git spawn
 
     assert spawn_count["n"] == 1, "throttled invocation must not spawn the git child"
-    assert len(_flags(ws)) == 1
 
     # Advance the throttle clock past the window for the third check. sdd_post_gate
     # imports the stdlib `time` module directly (`import time`), so patching the SAME
@@ -265,30 +200,4 @@ def test_throttle_skip_and_expiry(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
     monkeypatch.setattr(time, "time", lambda: base + RECONCILER_THROTTLE_TTL_SECONDS + 1)
     sdd_post_gate._reconcile_working_tree(ws, _SID)
 
-    assert len(_flags(ws)) == 2, "after the window the reconciler runs again"
-
-
-# ---------------------------------------------------------------------------
-# FR27/A27.1 (T-043-42): reconciler-events.jsonl rotates like every other
-# .dadaia/logs/*.jsonl writer, funneled through the shared rotation helper.
-# ---------------------------------------------------------------------------
-
-
-def test_reconciler_flag_rotates_the_shared_events_log(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    import dadaia_workspace.infrastructure.jsonl_log_rotation as rotation
-
-    log = tmp_path / ".dadaia" / "logs" / "reconciler-events.jsonl"
-    log.parent.mkdir(parents=True)
-    log.write_text('{"seed": true}\n', encoding="utf-8")
-    monkeypatch.setattr(rotation, "LOG_ROTATION_MAX_BYTES", 8)
-
-    sdd_post_gate._append_reconciler_flag(tmp_path, _SID, _CTX, 1)  # noqa: SLF001
-
-    rotated = log.with_name(log.name + ".1")
-    assert rotated.exists()
-    assert json.loads(rotated.read_text(encoding="utf-8").strip()) == {"seed": True}
-    new_events = _events(tmp_path)
-    assert len(new_events) == 1
-    assert new_events[0]["event"] == "RECONCILER_FLAG"
+    assert spawn_count["n"] == 2, "after the window the reconciler runs again"

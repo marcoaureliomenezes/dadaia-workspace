@@ -27,7 +27,6 @@ a session's own bind record (bug family ``doctor-ptr-gc-deletes-valid-lock-free-
 
 from __future__ import annotations
 
-import json
 import os
 import subprocess  # noqa: S404 — see _reconcile_working_tree (documented FR-W1-03 exemption).
 import sys
@@ -40,7 +39,6 @@ from dadaia_workspace.core.kernel_tunables import RECONCILER_THROTTLE_TTL_SECOND
 from dadaia_workspace.features.spec_context import gate_policy, presence
 from dadaia_workspace.features.spec_context.gate_policy import PathClass
 from dadaia_workspace.hooks import _common
-from dadaia_workspace.infrastructure.jsonl_log_rotation import append_rotating_jsonl
 
 
 def _refresh_session_record(workspace: Path, sess_id: str) -> dict[str, object] | None:
@@ -64,11 +62,9 @@ def _refresh_session_record(workspace: Path, sess_id: str) -> dict[str, object] 
 # ---------------------------------------------------------------------------------------
 # Advisory working-tree reconciler (FR-W1-03, T-014-16) — NEVER blocks, always exit 0.
 #
-# Flags the case where the bound context's repo has dirty MUTATING paths while this session
-# has dirty mutating paths (for example, a Bash write the file-tool gate cannot see). It
-# only ever appends a
-# ``RECONCILER_FLAG`` event to the reconciler log — it never changes session state, never raises,
-# and never changes the hook's exit code.
+# Classifies the bound context repo's dirty paths (for example, a Bash write the file-tool
+# gate cannot see). It writes nothing (the reconciler event log is retired), never changes
+# session state, never raises, and never changes the hook's exit code.
 #
 # Throttle marker: ``.dadaia/tmp/reconciler-last-<sid>``, via :func:`presence.throttled`/
 # :func:`presence.stamp_throttle` — the ONE mtime-throttle-marker idiom (release 0.5.1
@@ -142,52 +138,6 @@ def _has_dirty_mutating_path(slug: str, paths: list[str]) -> bool:
     return False
 
 
-def _append_reconciler_event(workspace: Path, event: dict[str, object]) -> None:
-    """Append one JSON *event* to the shared ``.dadaia/logs/reconciler-events.jsonl``.
-
-    FR27 (T-043-42): funneled through the single shared rotation helper
-    (``infrastructure/jsonl_log_rotation.append_rotating_jsonl``) so this file caps at
-    ~1 MB and keeps current+1 like every other ``.dadaia/logs/*.jsonl`` writer. Both
-    reconciler-events writers (``_append_reconciler_flag``, ``_append_reap_event``)
-    share this ONE call site instead of each duplicating the write.
-    """
-    audit_path = workspace / ".dadaia" / "logs" / "reconciler-events.jsonl"
-    append_rotating_jsonl(audit_path, json.dumps(event))
-
-
-def _append_reconciler_flag(workspace: Path, sess_id: str, ctx: str, count: int) -> None:
-    """Append a ``RECONCILER_FLAG`` advisory event (best-effort)."""
-    _append_reconciler_event(
-        workspace,
-        {
-            "ts": datetime.now(tz=UTC).isoformat(),
-            "event": "RECONCILER_FLAG",
-            "context": ctx,
-            "session_id": sess_id,
-            "dirty_mutating_paths": count,
-            "note": "dirty MUTATING path(s); advisory only, no action taken",
-        },
-    )
-
-
-def _append_reap_event(workspace: Path, sess_id: str, report: presence.GcReport) -> None:
-    """Append a ``RECONCILER_REAP`` advisory event (best-effort) — only ever called when
-    :func:`presence.gc` actually reaped something, so an ordinary no-op pass adds no log
-    noise."""
-    _append_reconciler_event(
-        workspace,
-        {
-            "ts": datetime.now(tz=UTC).isoformat(),
-            "event": "RECONCILER_REAP",
-            "session_id": sess_id,
-            "presence_reaped": len(report.presence),
-            "markers_reaped": len(report.markers),
-            "empty_context_dirs_removed": len(report.empty_context_dirs),
-            "note": "presence.gc reap; best-effort, fail-open",
-        },
-    )
-
-
 def _reconcile_working_tree(workspace: Path, sess_id: str) -> None:
     """Advisory reconciler pass — flags dirty MUTATING paths in the bound repo. NEVER blocks.
 
@@ -198,7 +148,8 @@ def _reconcile_working_tree(workspace: Path, sess_id: str) -> None:
          throttle/sentinel markers, and now-empty presence context dirs.
       3. no bound context ⇒ nothing to reconcile.
       4. ``git status --porcelain`` of the context repo fails ⇒ no event (fail-open).
-      5. any dirty path classifies MUTATING ⇒ append RECONCILER_FLAG.
+      5. dirty paths are classified MUTATING-or-not — nothing is written; the event log
+         this classification fed is retired with no replacement.
 
     Every branch stamps the throttle marker on exit so the next call inside the window is a
     no-op. Any exception is swallowed by the caller's ``main`` try/except (fail-open).
@@ -212,12 +163,7 @@ def _reconcile_working_tree(workspace: Path, sess_id: str) -> None:
     # Stamp immediately so even a slow/erroring pass throttles the next invocation.
     presence.stamp_throttle(workspace, marker)
 
-    try:
-        report = presence.gc(workspace, now=datetime.now(tz=UTC), own_session_id=sess_id)
-        if report.total:
-            _append_reap_event(workspace, sess_id, report)
-    except Exception:  # noqa: BLE001 — fail-open: a GC bug must never break the reconciler.
-        pass
+    presence.gc(workspace, now=datetime.now(tz=UTC), own_session_id=sess_id)
 
     ctx = _bound_context(sess_id)
     if ctx is None:
@@ -235,11 +181,6 @@ def _reconcile_working_tree(workspace: Path, sess_id: str) -> None:
         return
     if not _has_dirty_mutating_path(slug, paths):
         return
-
-    count = sum(
-        1 for p in paths if gate_policy.classify_path(f"repos/{slug}/{p}") is PathClass.MUTATING
-    )
-    _append_reconciler_flag(workspace, sess_id, ctx, count)
 
 
 def main() -> int:
