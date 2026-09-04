@@ -149,12 +149,12 @@ classDiagram
     note for SpecsDoctor "iterates rules.RULES over a fresh SpecsTree per check(); fix dispatch and --fix help derive from the same registry; takes bug_store_factory; imports neither spec_context nor infrastructure"
 ```
 
-### `dadaia_workspace/features` — package map (20 packages)
+### `dadaia_workspace/features` — package map (19 packages)
 
 ```mermaid
 flowchart TB
     subgraph features["dadaia_workspace/features"]
-      pkgs["agents · backlog · bugs · capabilities · certification · chokepoints · ci_preflight · export · import_ · migrate · panel · public · reconcile · reports · repos · server_registry · spec_context · specs · telemetry · workspace"]
+      pkgs["agents · backlog · bugs · capabilities · certification · chokepoints · ci_preflight · export · import_ · migrate · panel · public · reconcile · repos · server_registry · spec_context · specs · telemetry · workspace"]
     end
     container["container.py"] --> features
     features --> core["core"]
