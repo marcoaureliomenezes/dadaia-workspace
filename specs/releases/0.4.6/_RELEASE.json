@@ -212,6 +212,12 @@
       "agent": "project-manager",
       "kind": "reviews",
       "text": "PR #245 first CI run: windows-latest unit + contract jobs red on tests/unit/test_spec_context_doctor_root.py::_age (utime follow_symlinks=False unsupported on Windows), every other job green. Fixed as bug doctor-root-tests-age-with-utime-follow-symlinks-false-unsupported-on-windows (13be6784, tests only, same class as retention-sweep-test-uses-windows-unsupported-utime-followsymlinks). Delta security verdict APPROVED at efd58d33 (verdict file committed here; the 637059d2 verdict deleted as superseded — a verdict never transfers to a sha it did not examine). Security INFO for a later candidate: 12 os.utime call sites across 6 test files with no shared helper."
+    },
+    {
+      "ts": "2026-09-04T06:07:44Z",
+      "agent": "project-manager",
+      "kind": "merge",
+      "text": "Candidate 4 merged: PR #245 feature/0.4.6 -> develop, merge commit 9c3fc0f8a05825d462b6197468fb1719ef726307 (head 8dc5b7ff = verdict commit whose first parent efd58d33 is the sha the security-reviewer approved; 37 checks pass after one Windows-only red fixed as doctor-root-tests-age-with-utime-follow-symlinks-false-unsupported-on-windows). Verdict consumed and deleted. Release stays live at the promote-or-continue gate: the operator rules promote (deploy 0.4.6) or continue (rc-archive to rc-4/); nothing deployed. Live instance 99% pending the operator sudo removal of one root-owned June directory."
     }
   ]
 }
