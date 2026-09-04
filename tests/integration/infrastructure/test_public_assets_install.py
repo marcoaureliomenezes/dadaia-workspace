@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import pytest
 
 from dadaia_workspace.core.exceptions import PublicAssetError
+from dadaia_workspace.infrastructure.json_install_ledger_store import JsonInstallLedgerStore
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 
 pytestmark = [
@@ -104,3 +105,32 @@ def test_invalid_target_raises_and_only_rules_agents_filters(tmp_path: Path) -> 
     manager2.install(ws_agents, target="claude", force=True, only="agents")
     rules_dir = ws_agents / ".claude" / "rules"
     assert not rules_dir.exists() or list(rules_dir.iterdir()) == []
+
+
+def test_install_leaves_only_ledger_owned_entries_under_claude(tmp_path: Path) -> None:
+    """Intent: SENTINEL — install seam: every entry a real ``install`` leaves under
+    ``.claude/`` is a ledger target or a directory holding one — the canon predicate the
+    workspace doctor applies (``spec_context/doctor.py#_scan_harness_dirs``); size: MEDIUM
+    (drives the real ``public/`` tree, no fake agentic dir).
+
+    A category named in ``_CLAUDE_DIRS`` with no staged source (``commands`` retired at
+    v0.1.1) must not materialise as an empty directory the doctor then flags as slop.
+    """
+    workspace_root = tmp_path / "workspace"
+    states_dir = workspace_root / ".dadaia" / "states"
+    states_dir.mkdir(parents=True)
+
+    FileSystemPublicAssetManager().install(workspace_root, target="claude")
+
+    ledger = JsonInstallLedgerStore().read(states_dir)
+    assert ledger is not None
+    targets = frozenset(ledger.by_relpath())
+    owned_dirs = frozenset(
+        parent.as_posix() for rel in targets for parent in PurePosixPath(rel).parents
+    )
+    entries = sorted(
+        p.relative_to(workspace_root).as_posix() for p in (workspace_root / ".claude").iterdir()
+    )
+    assert entries, "install must project into .claude/"
+    assert [e for e in entries if e not in targets and e not in owned_dirs] == []
+    assert ".claude/commands" not in entries
