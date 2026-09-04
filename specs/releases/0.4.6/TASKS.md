@@ -51,7 +51,7 @@ Write-set paths are relative to `dadaia_workspace/` unless they start with `test
   projection_rules.py (that row), public/entities/behavior-map.json (that row),
   tests/unit/features/panel/**, tests/e2e/panel/**.
   Blocked by: T-046-26. Delivers: no reports route, no reports zone in the manifest — AC10.
-- [ ] T-046-28 — FR10, retire academy: feature + courses, CLI, model, store, container, panel
+- [-] T-046-28 — FR10, retire academy: feature + courses, CLI, model, store, container, panel
   views/api/css/js, routes, static, `core.js`, tab, init dir, export line; 6 tests deleted.
   RED: panel goldens (no `/academy`), `test_workspace_service.py`, `test_doctor_memory` map.
   Owner: software-engineer. Commit: `refactor(T-046-28): retire academy`.
