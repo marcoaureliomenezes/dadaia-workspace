@@ -8,7 +8,7 @@
     "ts": "2026-09-04T01:02:22Z"
   },
   "implemented": {
-    "sha": "6043bf2b",
+    "sha": "637059d2",
     "rc": 4,
     "ts": "2026-09-04T04:16:27Z"
   },
@@ -200,6 +200,12 @@
       "agent": "project-manager",
       "kind": "reviews",
       "text": "Candidate 4 reviews: software-architect fidelity APPROVED (root-cause PASS, fidelity PASS, bug surface REDUCED; handoff 2026-09-04T034000Z). qa-engineer live run REJECTED then APPROVED on rerun (handoffs 034752Z, 041454Z): scratch proof 100%, live 99% with the root-owned June dir pending operator sudo. code-reviewer three-axis APPROVE WITH FIXES (handoff 042313Z): 1 MEDIUM + 10 LOW, all applied in 6112831e (bug doctor-scan-raises-when-a-ttl-entry-vanishes-mid-walk, lineage doctor-fix-aborts-whole-pass-on-first-undeletable-entry) and 6043bf2b (.git in the root law, one finding format, features/reports package deleted, pid_probe deleted, intents added); finding 9 (self-projected repo AGENTS.md cannot be regenerated) registered as a bug for the next candidate. AC15 evidence re-recorded against the merge-base: -8,113 at 6043bf2b. Security verdict follows on the PR head."
+    },
+    {
+      "ts": "2026-09-04T05:36:36Z",
+      "agent": "project-manager",
+      "kind": "reviews",
+      "text": "Security: first verdict REJECTED at 0bf7a759 (HIGH import wrote unvalidated names/slugs to the registry and INV-5 rmtree had no containment; LOW symlinked zone root walked). Fixed as bugs import-registers-unvalidated-slugs-that-doctor-fix-inv5-rmtrees (6dabc9f6: one guarded registration seam SpecContextService.register serves create, add_repo and import; CLI allowlist loops deleted; INV-5 removes only a direct child of repos/) and doctor-walks-symlinked-zone-root-into-a-repo-tree (b1ee9272). Re-verdict APPROVED at 637059d2 (verdict file committed here, consumed by the merge): 0 CRITICAL/HIGH/MEDIUM, 2 LOW (import/export --workspace ancestor-walk re-resolution registered as import-export-workspace-flag-re-resolves-through-ancestor-walk; symlinked zone root classified canon by the top-level scan, pre-existing), 6 INFO. Bug surface reduced. MEM-DRIFT-1 cleared (cca0e068)."
     }
   ]
 }
