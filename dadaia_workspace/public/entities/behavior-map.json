@@ -101,7 +101,7 @@
         "section": "sha256:11a021b5885f086458c9a4c1e6f2fe5bfd3baca60fa26519e9a8233823ba3eee",
         "skill": null,
         "scoped": [
-          "sha256:36ebfba3bd9897ee4a6dea3fa864daa1d70c881c15bd31d306c45ea9dc770dbc"
+          "sha256:362589582cb256ea1b9c2bcdca5d8d6636591dfa1676e65eeddebca9984721a5"
         ]
       },
       "recorded_by": "claude-code",
@@ -325,7 +325,7 @@
         "section": "sha256:342d5b2a79b73fbc4fde6bd059e5fdba2d4addd4d9036ee28397b6e21e3fca5c",
         "skill": "sha256:9e99a8b55a3f94f270a7493d37aea63decee9e8c19ab7c462887202467a19dd3",
         "scoped": [
-          "sha256:fe801a2cc3e30d99c18bfa81692f442ab865ace134155cbd6362b6923d3d6e8e"
+          "sha256:3b624dcf425012cd3711b7d30e4425b0ab65a3697ffd2c7dea6a27c7e2b5b7c1"
         ]
       },
       "recorded_by": "claude-code",

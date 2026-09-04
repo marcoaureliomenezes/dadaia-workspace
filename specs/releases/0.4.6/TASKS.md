@@ -96,7 +96,7 @@ Write-set paths are relative to `dadaia_workspace/` unless they start with `test
   tests/unit/hooks/test_root_whitelist.py, tests/unit/test_spec_context_doctor_root.py.
   Blocked by: T-046-29, T-046-31. Delivers: `--fix` migrates the exceptions file and seeds the
   profile; `.env` is canon — AC7, AC8, AC9.
-- [-] T-046-33 — FR14 + SessionStart: `<!-- zones -->` and canon placeholders in
+- [x] T-046-33 — FR14 + SessionStart: `<!-- zones -->` and canon placeholders in
   `dadaia-AGENTS.md` / `states-AGENTS.md`, 18 hand rows deleted; `public_assets.stage` renders
   both tables; one SessionStart entry per harness in `runtime_config.py` running `dadaia doctor
   --fix --expired-only --quiet`. RED: `test_zone_registry` ratchet 1 on the rendered bytes;

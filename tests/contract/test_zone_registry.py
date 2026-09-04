@@ -31,13 +31,13 @@ from dadaia_workspace.core.workspace_layout import (
     Creator,
     zone_names,
 )
+from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from tests.helpers.scan_population import assert_populated
 
 pytestmark = pytest.mark.contract
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _PACKAGE = _REPO_ROOT / "dadaia_workspace"
-_PUBLIC_DATA = _PACKAGE / "public" / "data"
 
 #: Zone names retired by 0.4.6 candidate 4 (SPEC FR1/FR9, architect C). A string literal
 #: ``.dadaia/<retired>`` anywhere in the package is a path into a directory no record
@@ -116,18 +116,21 @@ def _bare(cell: str) -> str:
     return cell.strip("`").rstrip("/")
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="T-046-33 renders the zone and canon tables from the registry at `public stage`; "
-    "the hand-kept 18-row table cannot equal DADAIA_ZONES before that. T-046-33 removes "
-    "this marker in the commit that renders — an xfail surviving T-046-33 is a parser bug.",
-)
-def test_dadaia_agents_table_equals_zone_registry() -> None:
-    """The projected ``.dadaia/AGENTS.md`` table rows are the registry, row for row, and the
+@pytest.fixture(scope="module")
+def staged_data(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """The bytes ``public stage`` writes — the same bytes ``install`` projects to
+    ``.dadaia/AGENTS.md``; the source fragment carries only the placeholder."""
+    workspace = tmp_path_factory.mktemp("stage")
+    FileSystemPublicAssetManager().stage(workspace)
+    return workspace / ".dadaia" / "agentic" / "data"
+
+
+def test_dadaia_agents_table_equals_zone_registry(staged_data: Path) -> None:
+    """The staged ``.dadaia/AGENTS.md`` table rows are the registry, row for row, and the
     ``states/AGENTS.md`` canon table is ``STATES_CANON`` — documented == allowed."""
     zone_tables = [
         t
-        for t in _markdown_tables((_PUBLIC_DATA / "dadaia-AGENTS.md").read_text("utf-8"))
+        for t in _markdown_tables((staged_data / "dadaia-AGENTS.md").read_text("utf-8"))
         if t and {"class", "ttl", "creator"} <= set(t[0])
     ]
     assert len(zone_tables) == 1, "exactly one rendered zone table"
@@ -148,7 +151,7 @@ def test_dadaia_agents_table_equals_zone_registry() -> None:
 
     canon_tables = [
         {_bare(next(iter(row.values()))) for row in t}
-        for t in _markdown_tables((_PUBLIC_DATA / "states-AGENTS.md").read_text("utf-8"))
+        for t in _markdown_tables((staged_data / "states-AGENTS.md").read_text("utf-8"))
         if t
     ]
     assert STATES_CANON in canon_tables, "states-AGENTS.md carries the closed canon table"

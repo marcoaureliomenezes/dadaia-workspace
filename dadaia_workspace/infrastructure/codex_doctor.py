@@ -17,6 +17,10 @@ from collections.abc import Callable
 from pathlib import Path
 
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
+from dadaia_workspace.infrastructure.runtime_config import (
+    codex_hook_wrapper_command,
+    codex_hook_wrapper_contents,
+)
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
     _CODEX_SKILL_REF_PREFIXES,
 )
@@ -166,11 +170,14 @@ def dcx9_codex_hook_shape(workspace_root: Path) -> list[DoctorLine]:
     except (OSError, json.JSONDecodeError):
         return [DoctorLine(DoctorStatus.ERROR, "codex:hooks.json missing or invalid (D-CX-9)")]
 
-    expected = {
-        ".dadaia/hooks/codex-pre-gate",
-        ".dadaia/hooks/codex-post-gate",
-        ".dadaia/hooks/codex-ctx-inject",
-        ".dadaia/hooks/codex-ctx-inject-session-start",
+    wrappers = codex_hook_wrapper_contents()
+    expected = {codex_hook_wrapper_command(name) for name in wrappers}
+    # The exec probe feeds a fake hook payload on stdin: a no-op for a ``hooks.*`` module,
+    # a real run for the CLI reaper wrapper — a doctor never mutates, so it is not probed.
+    probeable = {
+        command
+        for command in expected
+        if "-m dadaia_workspace.hooks." in wrappers[Path(command).name]
     }
     commands = set(_codex_hook_commands(hooks))
     missing = expected - commands
@@ -198,6 +205,8 @@ def dcx9_codex_hook_shape(workspace_root: Path) -> list[DoctorLine]:
                     DoctorStatus.ERROR, f"codex hook wrapper not executable {command} (D-CX-9)"
                 )
             )
+            continue
+        if command not in probeable:
             continue
         try:
             proc = subprocess.run(

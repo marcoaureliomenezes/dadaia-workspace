@@ -1,4 +1,7 @@
-"""End-to-end integration tests for guardrail-pair nested non-interference — AGT-r2-28.
+"""End-to-end integration tests for guardrail-pair nested non-interference — AGT-r2-28 —
+and the rendered ``.dadaia/**`` law fragments — 0.4.6 AC12.
+
+Intent: CONTRACT — AGT-r2-28 FR10 (guardrail pair) + 0.4.6 AC12 (FR14); size: MEDIUM.
 
 Verifies that `_install_workspace_guardrail_pair` (the Option C installer):
 
@@ -21,6 +24,8 @@ import hashlib
 import json
 from pathlib import Path
 
+from dadaia_workspace.core.workspace_layout import DADAIA_ZONES, STATES_CANON
+from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.workspace_guardrail import (
     _CLAUDE_MD_STUB,
     _install_workspace_guardrail_pair,
@@ -192,3 +197,27 @@ def test_nested_operator_pair_untouched_and_all_projections_share_single_sha(
     assert _sha256(no_consumer_ws / "CLAUDE.md") == stub_sha, (
         "workspace-root/CLAUDE.md must be the T-41 stub after install."
     )
+
+
+def _table_rows(text: str) -> list[str]:
+    return [line for line in text.splitlines() if line.startswith("| `")]
+
+
+def test_installed_dadaia_agents_md_carries_the_rendered_zone_table(tmp_path: Path) -> None:
+    """After ``install(target="all")`` the projected ``.dadaia/AGENTS.md`` carries exactly one
+    row per registry zone and no placeholder; ``states/AGENTS.md`` carries the closed canon."""
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    FileSystemPublicAssetManager().install(ws, target="all")
+
+    zones = (ws / ".dadaia" / "AGENTS.md").read_text(encoding="utf-8")
+    assert "<!-- zones -->" not in zones
+    rows = _table_rows(zones)
+    assert len(rows) == len(DADAIA_ZONES) == 11
+    assert [row.split("|")[1].strip().strip("`").rstrip("/") for row in rows] == [
+        zone.name for zone in DADAIA_ZONES
+    ]
+
+    states = (ws / ".dadaia" / "states" / "AGENTS.md").read_text(encoding="utf-8")
+    assert "<!-- canon -->" not in states
+    assert {row.strip("| `") for row in _table_rows(states)} == STATES_CANON
