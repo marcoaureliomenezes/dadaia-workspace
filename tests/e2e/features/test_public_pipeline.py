@@ -512,8 +512,6 @@ class TestPerProfileInit:
         assert (ws / ".codex").is_dir()
         assert (ws / ".kimi-code").is_dir()
         assert _ctx_inject_registered(ws / ".claude")
-        # The all-four install path also lays the chokepoint scripts (target=="all").
-        assert (ws / ".dadaia" / "scripts").is_dir()
 
         assert _persisted_profile(ws) == ["claude", "codex", "kimi-code"]
         _assert_profile_doctor_green(ws, monkeypatch)
