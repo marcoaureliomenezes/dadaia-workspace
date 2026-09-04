@@ -2,7 +2,7 @@
 
 v0.1.55 FR2 splits the 1,279-line ``features/panel/views/api.py`` (24 functions / 8 domains)
 into per-domain view modules (``api_servers`` / ``api_contexts`` / ``api_agents`` /
-``api_sessions`` / ``api_academy`` / ``api_health``) and
+``api_sessions`` / ``api_health``) and
 DELETES ``api.py`` (no facade, no re-export barrel). The refactor MUST be behavior-preserving:
 every panel route's ``(status, content_type, body)`` has to be byte-identical to the pre-split
 tree.
@@ -15,7 +15,7 @@ source moves; the captured bytes do not).
 
 Determinism (AC-2 / R-4 analogue):
 
-* **Fixed fake services** — servers/contexts/agents/sessions/academy are driven by
+* **Fixed fake services** — servers/contexts/agents/sessions are driven by
   hand-built fakes with fixed data.
 * **Timestamp + version normalization** — every ISO-8601 timestamp in a captured body is replaced
   with the token ``<TS>`` and the ``render_health`` package version with ``<VER>`` so the golden is
@@ -49,7 +49,6 @@ from dadaia_workspace.core.models.telemetry import AgentSummary, TokenTotals
 from dadaia_workspace.features.panel.service import PanelService
 
 # --- render functions under lock (per-domain modules post-FR2-split; the bytes do not move) ---
-from dadaia_workspace.features.panel.views.api_academy import render_api_academy
 from dadaia_workspace.features.panel.views.api_agents import (
     render_api_agent_prompt,
     render_api_agents_canonical,
@@ -76,7 +75,6 @@ _ALL_DOMAINS = {
     "contexts",
     "agents",
     "sessions",
-    "academy",
     "health",
 }
 
@@ -102,19 +100,6 @@ class _FakeSpecContext:
 
     def list_all(self) -> list[SpecContextProject]:
         return list(self._contexts)
-
-
-class _FakeAcademy:
-    def list_module_catalog(self) -> list[dict[str, object]]:
-        return [
-            {
-                "module": "07_codex",
-                "module_number": 7,
-                "title": "Codex for dadaia-workspace",
-                "lesson_count": 1,
-                "lessons": [{"lesson": "01_codex_mental_model.md", "title": "01. Codex Mental"}],
-            }
-        ]
 
 
 class _FakeTelemetry:
@@ -223,7 +208,6 @@ def _build_service(tmp_path: Path, *, telemetry: Any) -> PanelService:
         spec_context=_FakeSpecContext([_make_context()]),
         workspace_root=tmp_path,
         telemetry=telemetry,
-        academy=_FakeAcademy(),
         agents_provider=_FakeAgentsProvider(),
     )
     svc._canonical_agents_override = [_make_dto()]  # type: ignore[attr-defined]
@@ -292,7 +276,6 @@ def _capture(tmp_path: Path) -> dict[str, dict[str, object]]:
         ),
         ("sessions", "api_sessions", render_api_sessions(service), {"qs": {"runtime": ["claude"]}}),
         ("sessions", "api_sessions_503", render_api_sessions(service_no_tel), {"qs": {}}),
-        ("academy", "api_academy", render_api_academy(service), {}),
         ("health", "health", render_health(), {}),
     ]
 

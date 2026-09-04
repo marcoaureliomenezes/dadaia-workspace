@@ -167,8 +167,6 @@ _ROUTES: tuple[_Route, ...] = (
     _Route("GET", _r(r"^/api/contexts$"), "api_contexts"),
     _Route("GET", _r(r"^/memory/(?P<slug>[^/]+)/(?P<path>.+)$"), "memory"),
     _Route("GET", _r(r"^/memory-view/(?P<slug>[^/]+)/(?P<path>.+)$"), "memory_view"),
-    _Route("GET", _r(r"^/academy/(?P<module>[^/]+)/(?P<lesson>[^/]+)$"), "academy_lesson"),
-    _Route("GET", _r(r"^/api/academy$"), "api_academy"),
     _Route("GET", _r(r"^/api/agents/(?P<agent_id>[^/]+)/prompt$"), "api_agent_prompt"),
     # L1 agent model-governance control plane (v0.1.65 FR8 — T-65-11).
     _Route("GET", _r(r"^/api/agent-model-policy$"), "api_agent_model_policy"),

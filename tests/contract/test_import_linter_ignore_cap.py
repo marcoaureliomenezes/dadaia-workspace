@@ -291,7 +291,7 @@ def test_cross_feature_contract_modules_equals_disk_and_contract_count_is_pinned
         for p in features_dir.iterdir()
         if p.is_dir() and p.name != "__pycache__" and (p / "__init__.py").is_file()
     }
-    assert len(on_disk_packages) == 21  # 0.4.6 T-046-26: tmp_gc, workspace_clean deleted (23 -> 21)
+    assert len(on_disk_packages) == 20  # 0.4.6 T-046-26 (23 -> 21), T-046-28 academy (21 -> 20)
 
     parser = configparser.ConfigParser()
     read = parser.read(_SETUP_CFG, encoding="utf-8")

@@ -16,21 +16,18 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from dadaia_workspace.container import (
-    build_academy_service,
     build_public_service,
     build_server_registry_service,
     build_spec_context_service,
 )
 from dadaia_workspace.features.agents.reader import FileSystemAgentsProvider
 from dadaia_workspace.features.panel.service import PanelService
-from dadaia_workspace.features.panel.views.academy import render_academy_lesson
 from dadaia_workspace.features.panel.views.agent_policy import (
     render_api_agent_model_policy,
     render_api_agent_model_templates,
     render_post_agent_model_policy_validate,
     render_put_agent_model_policy,
 )
-from dadaia_workspace.features.panel.views.api_academy import render_api_academy
 from dadaia_workspace.features.panel.views.api_agents import (
     render_api_agent_prompt,
     render_api_agent_sessions,
@@ -126,14 +123,12 @@ def build_telemetry_service(workspace_root: Path) -> object | None:
 def build_panel_service(
     workspace_root: Path,
     telemetry: object | None = None,
-    academy: object | None = None,
 ) -> PanelService:
     return PanelService(
         registry=build_server_registry_service(workspace_root),
         spec_context=build_spec_context_service(workspace_root),
         workspace_root=workspace_root,
         telemetry=telemetry,
-        academy=academy,
         adapter_registry=dict(ADAPTER_REGISTRY),
         agents_provider=FileSystemAgentsProvider(store_factory=MarkdownAgentStore),
     )
@@ -179,8 +174,7 @@ def build_panel_views(
         into PanelService so that ``render_api_agents_canonical`` can overlay
         telemetry data on the canonical agent catalog (PR3-08).
     """
-    academy = build_academy_service(workspace_root)
-    service = build_panel_service(workspace_root, telemetry=telemetry, academy=academy)
+    service = build_panel_service(workspace_root, telemetry=telemetry)
 
     # L1 agent model-governance (v0.1.65 FR8): store + re-render injected via the
     # dedicated factory (D-4 — the feature service never imports infrastructure).
@@ -191,8 +185,6 @@ def build_panel_views(
         "api_panel_status": render_api_servers(service),
         "health": render_health(),
         "api_contexts": render_api_contexts(service),
-        "api_academy": render_api_academy(service),
-        "academy_lesson": render_academy_lesson(academy),
         "api_agents": render_api_agents_canonical(service),
         "api_agent_prompt": render_api_agent_prompt(service),
         "api_agent_sessions": render_api_agent_sessions(service),

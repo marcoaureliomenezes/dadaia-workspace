@@ -254,7 +254,7 @@ def test_surface_enum_equals_on_disk_feature_packages() -> None:
         for p in features_dir.iterdir()
         if p.is_dir() and p.name != "__pycache__" and (p / "__init__.py").is_file()
     }
-    assert len(on_disk_packages) == 21  # 0.4.6 T-046-26: tmp_gc, workspace_clean deleted
+    assert len(on_disk_packages) == 20  # 0.4.6 T-046-26 (23 -> 21), T-046-28 academy (21 -> 20)
 
     non_feature_members = {
         "core",
@@ -266,7 +266,7 @@ def test_surface_enum_equals_on_disk_feature_packages() -> None:
         "unknown",
     }
     assert enum_values == on_disk_packages | non_feature_members
-    assert len(enum_values) == 28
+    assert len(enum_values) == 27  # 0.4.6 T-046-28: academy left with its package
 
 
 # --- v0.5.1 K5 — status transitions are the interface -------------------------------

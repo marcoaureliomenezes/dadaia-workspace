@@ -6,28 +6,11 @@ from pathlib import Path
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.models.harness_profile import HarnessProfile
 from dadaia_workspace.core.models.workspace import Workspace
+from dadaia_workspace.core.workspace_layout import Creator, zones_created_by
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 
-# Durable directories — must not be cleared by maintenance routines
-_DADAIA_DURABLE_DIRS = [
-    "academy",
-    "agentic",
-    "reports",
-    "scripts",
-    "states",
-]
-
-# Ephemeral directories — can be recreated or cleared at any time
-_DADAIA_EPHEMERAL_DIRS = [
-    "tmp/python",
-    "tmp/json",
-]
-
-_DADAIA_DIRS = _DADAIA_DURABLE_DIRS + _DADAIA_EPHEMERAL_DIRS
-
 _EMPTY_CONTEXTS = {"schema_version": "2", "contexts": []}
-_EMPTY_ACADEMY = {"version": "1", "courses": []}
 _EMPTY_SERVER_REGISTRY = {
     "version": "1",
     "range": {"min_port": 3000, "max_port": 3999},
@@ -63,9 +46,11 @@ class WorkspaceService:
         chosen = tuple(harnesses) if harnesses is not None else L1_ENTRY_HARNESSES
         chosen_set = set(chosen)
 
-        # Create .dadaia/ directory structure (harness-independent).
-        for subdir in _DADAIA_DIRS:
-            (workspace.dadaia_dir / subdir).mkdir(parents=True, exist_ok=True)
+        # The venv manager owns `.dadaia/.venv` and runs before the zone pass: an empty
+        # pre-made `.venv` would read to it as an already-built venv.
+        self._python_env.ensure_workspace_venv(str(workspace_root))
+        for zone in zones_created_by(Creator.INIT):
+            (workspace.dadaia_dir / zone.name).mkdir(parents=True, exist_ok=True)
         # The shared skills root is harness-independent — always created.
         (workspace.root / ".agents" / "skills").mkdir(parents=True, exist_ok=True)
         # Per-harness projection directories — only for the chosen set.
@@ -78,14 +63,10 @@ class WorkspaceService:
 
         # Initialize JSON state files (idempotent — never overwrite existing data)
         self._init_json_file(workspace.states_dir / "spec_contexts.json", _EMPTY_CONTEXTS)
-        self._init_json_file(workspace.dadaia_dir / "academy" / "academy.json", _EMPTY_ACADEMY)
         self._init_json_file(workspace.states_dir / "server_registry.json", _EMPTY_SERVER_REGISTRY)
 
         # Persist the harness profile (schema v1) — inline like the state bootstraps above.
         self._write_harness_profile(workspace, chosen)
-
-        # Create .venv (idempotent)
-        self._python_env.ensure_workspace_venv(str(workspace_root))
 
         # Install public assets — only the chosen harness projections. Every hook wiring
         # (.claude/settings.json, .codex/hooks.json, kimi user hooks) is install's output:

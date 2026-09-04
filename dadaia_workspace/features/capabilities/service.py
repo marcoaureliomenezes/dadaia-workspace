@@ -66,7 +66,7 @@ def build_capabilities() -> dict[str, Any]:
             "public_projections": ["stage", "install", "doctor", "list"],
             "panel": ["panel", "server registry"],
             "evidence": ["reports", "handoff validation"],
-            "knowledge": ["memory", "academy", "projected skills", "rules"],
+            "knowledge": ["memory", "projected skills", "rules"],
             "governance": ["bugs", "backlog", "releases", "ci preflight"],
             "extensions": ["repository catalog"],
         },

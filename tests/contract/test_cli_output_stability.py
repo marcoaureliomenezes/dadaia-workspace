@@ -123,21 +123,11 @@ def _register_dead_ctx_with_repo_on_disk(workspace: Path, name: str = "stale-ctx
 # ---------------------------------------------------------------------------
 
 
-# The three ``WS-dadaia-slop`` lines are the zones ``init`` still creates that left the
-# registry in T-046-24 (FR1); they vanish from these goldens as T-046-26/27/30 stop
-# creating them — regenerated from real output, never hand-edited (0.4.6 PLAN, risks).
-
-
 def test_doctor_default_output_healthy_workspace_unchanged(workspace: Path) -> None:
     result = _runner.invoke(app, ["doctor"])
-    assert result.exit_code == 1, result.output
+    assert result.exit_code == 0, result.output
     assert result.output == (
-        "WS-dadaia-slop  academy  (not a zone)\n"
-        "WS-dadaia-slop  reports  (not a zone)\n"
-        "WS-dadaia-slop  scripts  (not a zone)\n"
-        "\n"
-        "Run 'dadaia doctor --fix' to apply automatic repairs.\n"
-        "compliance: 134/137 entries canonical (98%)\n"
+        "All invariants OK — workspace is healthy.\ncompliance: 134/134 entries canonical (100%)\n"
     )
 
 
@@ -148,12 +138,9 @@ def test_doctor_default_output_with_issue_unchanged(workspace: Path) -> None:
     assert result.output == (
         "Found 1 issue(s):\n"
         "  INV-5 [fixable] — Context 'stale-ctx' is dead but repo 'stale-ctx' is on disk\n"
-        "WS-dadaia-slop  academy  (not a zone)\n"
-        "WS-dadaia-slop  reports  (not a zone)\n"
-        "WS-dadaia-slop  scripts  (not a zone)\n"
         "\n"
         "Run 'dadaia doctor --fix' to apply automatic repairs.\n"
-        "compliance: 135/138 entries canonical (98%)\n"
+        "compliance: 135/135 entries canonical (100%)\n"
     )
 
 
@@ -164,14 +151,8 @@ def test_doctor_default_fix_output_unchanged(workspace: Path) -> None:
     assert result.output == (
         "Found 1 issue(s):\n"
         "  INV-5 [fixable] — Context 'stale-ctx' is dead but repo 'stale-ctx' is on disk\n"
-        "WS-dadaia-slop  academy  (not a zone)\n"
-        "WS-dadaia-slop  reports  (not a zone)\n"
-        "WS-dadaia-slop  scripts  (not a zone)\n"
         "\n"
-        "Applied 4 repair(s):\n"
-        "  - WS-dadaia-slop: deleted 'academy'\n"
-        "  - WS-dadaia-slop: deleted 'reports'\n"
-        "  - WS-dadaia-slop: deleted 'scripts'\n"
+        "Applied 1 repair(s):\n"
         "  - Removed stale repo 'stale-ctx' for dead context 'stale-ctx'\n"
         "compliance: 135/135 entries canonical (100%)\n"
     )

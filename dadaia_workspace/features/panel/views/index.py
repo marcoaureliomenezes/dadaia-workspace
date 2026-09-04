@@ -11,7 +11,6 @@ SSR-vs-client-side policy
 SSR (data inlined into the initial HTML response, no auth required):
   - Contexts (active Spec Context Projects) — small payload, public
   - Servers (server registry grouped by context) — small payload, public
-  - Academy initial scaffold — public empty shell; content fetched client-side
 
 Client-side (fetched via XHR/fetch after Bearer auth):
   - Agents    — auth-gated; telemetry-enriched; dynamic
@@ -19,9 +18,9 @@ Client-side (fetched via XHR/fetch after Bearer auth):
                 sub-section INSIDE the Agents (subagents) tabpanel
                 (v0.1.79 — the standalone Sessions tab was removed)
 
-Primary tabs (0.4.6 — 5 tabs):
+Primary tabs (0.4.6 — 4 tabs):
   Projects | Agents (id ``tab-subagents``) | Agentic Entities (id
-  ``tab-entities``) | Academy | Servers. The Agents tab opens with the
+  ``tab-entities``) | Servers. The Agents tab opens with the
   abstract Persona definition cards (``render_personas_section``), governs
   sub-agent model+effort (v0.1.65 L1 governance) and hosts the Sessions
   cost/telemetry dashboard as a sub-section (``render_sessions_section``,
@@ -38,7 +37,6 @@ from collections.abc import Callable, Sequence
 
 from dadaia_workspace.features.panel.service import PanelContext, PanelService, ServerGroup
 from dadaia_workspace.features.panel.views._md_render import memory_view_url
-from dadaia_workspace.features.panel.views.academy import render_academy_section
 from dadaia_workspace.features.panel.views.entities import (
     render_entities_section,
     render_personas_section,
@@ -62,7 +60,6 @@ def render_index(
         memories_html = "".join(_render_context_card(c) for c in sorted_contexts)
         context_count = len(contexts)
 
-        academy_section = render_academy_section()
         entities_section = render_entities_section()
 
         body = f"""<!DOCTYPE html>
@@ -78,7 +75,6 @@ def render_index(
   <link rel="stylesheet" href="/static/projects.css">
   <link rel="stylesheet" href="/static/agent-policy.css">
   <link rel="stylesheet" href="/static/sessions.css">
-  <link rel="stylesheet" href="/static/academy.css">
   <link rel="stylesheet" href="/static/entities.css">
 </head>
 <body>
@@ -117,7 +113,6 @@ def render_index(
     <button class="nav-tab active tab-memories-btn" data-section="memories" aria-selected="true" role="tab" id="tab-memories" aria-label="Projects">Projects</button>
     <button class="nav-tab" data-section="subagents" aria-selected="false" role="tab" id="tab-subagents" aria-label="Agents">Agents</button>
     <button class="nav-tab" data-section="entities" aria-selected="false" role="tab" id="tab-entities" aria-label="Agentic Entities">Agentic Entities</button>
-    <button class="nav-tab" data-section="academy" aria-selected="false" role="tab" id="tab-academy">Academy</button>
     <button class="nav-tab" data-section="servers" aria-selected="false" role="tab" id="tab-servers">Servers</button>
   </nav>
   <main class="main" role="main">
@@ -152,15 +147,12 @@ def render_index(
 
     {entities_section}
 
-    {academy_section}
-
   </main>
   <script src="/static/runtime.js"></script>
   <script src="/static/themes.js"></script>
   <script src="/static/core.js"></script>
   <script src="/static/agent-policy.js"></script>
   <script src="/static/sessions.js" defer></script>
-  <script src="/static/academy.js"></script>
 </body>
 </html>"""
         return (200, "text/html; charset=utf-8", body.encode("utf-8"))

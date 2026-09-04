@@ -41,7 +41,6 @@ def _init_states_v2(tmp_path: Path) -> Path:
     [
         container.build_spec_context_service,
         container.build_doctor_service,
-        container.build_academy_service,
         container.build_export_service,
     ],
 )
@@ -69,7 +68,6 @@ def test_build_service_succeeds_table(tmp_path: Path) -> None:
 
     _init_states(tmp_path)
     assert container.build_spec_context_service(tmp_path) is not None
-    assert container.build_academy_service(tmp_path) is not None
     assert isinstance(container.build_export_service(tmp_path), ExportService)
     assert isinstance(container.build_doctor_service(tmp_path), DoctorService)
 

@@ -15,7 +15,6 @@ from dadaia_workspace.core.exceptions import (
     WorkspaceNotInitializedError,
 )
 from dadaia_workspace.core.handoff_index import HandoffIndex
-from dadaia_workspace.features.academy.service import AcademyService
 from dadaia_workspace.features.chokepoints.denylist_scan import BaselinePatternLike
 from dadaia_workspace.features.export.service import ExportService
 from dadaia_workspace.features.public.service import PublicAssetService
@@ -28,7 +27,6 @@ from dadaia_workspace.infrastructure.excel_reader import OpenpyxlExcelReader
 from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
-from dadaia_workspace.infrastructure.json_course_store import JsonCourseStore
 from dadaia_workspace.infrastructure.json_server_registry_store import JsonServerRegistryStore
 from dadaia_workspace.infrastructure.process_probe_adapter import OsProcessProbe, build_pid_probe
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
@@ -274,15 +272,6 @@ def build_doctor_service(workspace_root: Path) -> DoctorService:
         git_client=GitSubprocessClient(),
         workspace_root=workspace_root,
         pid_probe=build_pid_probe(),
-    )
-
-
-def build_academy_service(workspace_root: Path) -> AcademyService:
-    _guard_initialized(workspace_root)
-    academy_dir = workspace_root / ".dadaia" / "academy"
-    return AcademyService(
-        course_store=JsonCourseStore(academy_dir),
-        workspace_root=workspace_root,
     )
 
 

@@ -120,7 +120,6 @@ class PanelService:
         spec_context: ContextProjectProvider,
         workspace_root: Path,
         telemetry: Any = None,
-        academy: Any = None,
         adapter_registry: dict[str, Any] | None = None,
         agents_provider: AgentsProvider | None = None,
     ) -> None:
@@ -141,9 +140,6 @@ class PanelService:
             boot layer (``dadaia_workspace/cli/commands/panel.py``).
             Passing None is safe: telemetry endpoints will return 503
             until a real TelemetryService is injected.
-        academy:
-            Optional AcademyService instance (injected).  When None,
-            the Academy tab returns an empty course list.
         adapter_registry:
             Mapping of runtime name to RuntimeAdapter (injected, T-017-08).
             When None, get_session_adapter() always returns None (no enrichment).
@@ -152,7 +148,6 @@ class PanelService:
         self._spec_context = spec_context
         self._workspace_root = workspace_root
         self.telemetry = telemetry
-        self.academy = academy
         # AR-03: the adapter registry is injected, never imported by a view.
         self._adapter_registry: dict[str, Any] = (
             adapter_registry if adapter_registry is not None else {}

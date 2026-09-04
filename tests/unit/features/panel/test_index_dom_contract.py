@@ -147,7 +147,7 @@ def test_exactly_five_primary_tabs_in_order(index_html: str) -> None:
     """0.4.6 FR9: exactly 5 primary tabs render (the Reports tab died with the
     ``.dadaia/reports/`` zone; v0.3.0 had already retired the workflow tab), in the
     exact PANEL_PRIMARY_TABS order, with the operator's exact label strings."""
-    assert len(PANEL_PRIMARY_TABS) == 5
+    assert len(PANEL_PRIMARY_TABS) == 4
 
     positions = []
     for slug, label in PANEL_PRIMARY_TABS:

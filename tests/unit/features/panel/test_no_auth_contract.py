@@ -75,7 +75,6 @@ _ALL_VIEW_NAMES = [
     "api_contexts",
     "memory",
     "memory_view",
-    "api_academy",
     "api_agent_prompt",
     "api_workflow_run",
 ]
@@ -115,7 +114,6 @@ _VIEW_ROUTE_CASES = [
     ("/api/contexts", "api_contexts"),
     ("/memory/foo/bar.md", "memory"),
     ("/memory-view/foo/bar.md", "memory_view"),
-    ("/api/academy", "api_academy"),
     ("/api/agents/software-engineer/prompt", "api_agent_prompt"),
 ]
 

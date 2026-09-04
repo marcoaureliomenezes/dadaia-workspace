@@ -21,7 +21,6 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
-from dadaia_workspace.features.panel.views.assets.css.academy import ACADEMY_CSS
 from dadaia_workspace.features.panel.views.assets.css.agent_policy import AGENT_POLICY_CSS
 from dadaia_workspace.features.panel.views.assets.css.entities import ENTITIES_CSS
 from dadaia_workspace.features.panel.views.assets.css.memory import MEMORY_CSS
@@ -57,7 +56,6 @@ _ASSETS: dict[str, tuple[str, bytes]] = {
     "projects.css": ("text/css; charset=utf-8", PROJECTS_CSS.encode("utf-8")),
     "agent-policy.css": ("text/css; charset=utf-8", AGENT_POLICY_CSS.encode("utf-8")),
     "sessions.css": ("text/css; charset=utf-8", SESSIONS_CSS.encode("utf-8")),
-    "academy.css": ("text/css; charset=utf-8", ACADEMY_CSS.encode("utf-8")),
     "entities.css": ("text/css; charset=utf-8", ENTITIES_CSS.encode("utf-8")),
     "core.js": (
         "application/javascript; charset=utf-8",
@@ -82,10 +80,6 @@ _ASSETS: dict[str, tuple[str, bytes]] = {
     "sessions.js": (
         "application/javascript; charset=utf-8",
         (_JS_DIR / "sessions.js").read_bytes(),
-    ),
-    "academy.js": (
-        "application/javascript; charset=utf-8",
-        (_JS_DIR / "academy.js").read_bytes(),
     ),
     "logo-rhino-24.svg": (
         "image/svg+xml; charset=utf-8",

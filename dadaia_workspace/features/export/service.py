@@ -58,7 +58,6 @@ class ExportService:
                 includes.append((src, arc))
 
         _add_if_exists(dadaia / "states", ".dadaia/states")
-        _add_if_exists(dadaia / "academy", ".dadaia/academy")
 
         if options.include_reports:
             _add_if_exists(dadaia / "reports", ".dadaia/reports")

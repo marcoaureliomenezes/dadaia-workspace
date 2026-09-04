@@ -1,10 +1,4 @@
 {
-  "api_academy": {
-    "body": "{\"modules\": [{\"module\": \"07_codex\", \"module_number\": 7, \"title\": \"Codex for dadaia-workspace\", \"lesson_count\": 1, \"lessons\": [{\"lesson\": \"01_codex_mental_model.md\", \"title\": \"01. Codex Mental\"}]}]}",
-    "content_type": "application/json; charset=utf-8",
-    "domain": "academy",
-    "status": 200
-  },
   "api_agent_prompt": {
     "body": "{\"agent_id\": \"software-engineer\", \"system_prompt\": \"# software-engineer\\n\\nSystem prompt body.\\n\", \"source_path\": \".claude/agents/software-engineer.md\"}",
     "content_type": "application/json; charset=utf-8",
