@@ -10,7 +10,6 @@ from dadaia_workspace.cli.commands import (
     capabilities,
     certify,
     ci,
-    clean,
     context,
     doctor,
     init,
@@ -22,7 +21,6 @@ from dadaia_workspace.cli.commands import (
     repos,
     server,
     specs,
-    tmp,
 )
 from dadaia_workspace.cli.commands import (
     help as help_cmd,
@@ -87,7 +85,6 @@ app.command(name="import", rich_help_panel="Management")(import_workspace)
 app.command(name="capabilities", rich_help_panel="Management")(capabilities.capabilities)
 app.command(name="certify", rich_help_panel="Management")(certify.certify)
 app.command(name="reconcile", rich_help_panel="Management")(reconcile.reconcile)
-app.add_typer(clean.app, name="clean", rich_help_panel="Management")
 
 # Sub-command groups
 app.add_typer(context.app, name="context", rich_help_panel="Common")
@@ -99,7 +96,6 @@ app.add_typer(academy.app, name="academy", rich_help_panel="Management")
 app.add_typer(reports.app, name="reports", rich_help_panel="Management")
 app.add_typer(specs.app, name="specs", rich_help_panel="Common")
 app.add_typer(server.app, name="server", rich_help_panel="Management")
-app.add_typer(tmp.app, name="tmp", rich_help_panel="Management")
 app.add_typer(migrate.app, name="migrate", rich_help_panel="Management")
 app.add_typer(panel.app, name="panel", rich_help_panel="Common")
 app.add_typer(memory_app, name="memory", rich_help_panel="Management")

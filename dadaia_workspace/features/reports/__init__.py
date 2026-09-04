@@ -1,7 +1,5 @@
 """Reports feature: agent-comms report/handoff behaviors as flat submodules.
 
-* :mod:`~dadaia_workspace.features.reports.next` — discover the next expected
-  agent handoff for the active release.
 * :mod:`~dadaia_workspace.features.reports.retention` — TTL cleanup of workspace
   report/handoff runtime state.
 

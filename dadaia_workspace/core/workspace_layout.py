@@ -25,7 +25,6 @@ from enum import StrEnum
 __all__ = [
     "AUDIT_DIR_NAME_PATTERN",
     "AUDIT_DIR_NAME_RE",
-    "DADAIA_ALLOWED_SUBDIRS",
     "DADAIA_MD_HARNESS_TARGETS",
     "DADAIA_ROOT_FILES",
     "DADAIA_ZONES",
@@ -250,9 +249,6 @@ def zone_table_rows() -> tuple[tuple[str, str, str, str, str], ...]:
         for zone in DADAIA_ZONES
     )
 
-
-#: Compatibility view, deleted with its last reader (``legacy_dadaia_dirs``, T-046-26).
-DADAIA_ALLOWED_SUBDIRS: frozenset[str] = zone_names()
 
 #: Basenames of the projected LAW files — human-only in an instantiated workspace.
 LAW_BASENAMES: frozenset[str] = frozenset({"DADAIA.md", "AGENTS.md", "CLAUDE.md"})

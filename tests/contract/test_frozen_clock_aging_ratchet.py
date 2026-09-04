@@ -55,22 +55,16 @@ only real ``ast.Call`` nodes (the same distinction ``tests/contract/test_core_fi
 draws, and for the identical reason) means a docstring or a ``#`` comment mentioning the
 pattern in prose never trips it — only an actual call site does.
 
-**Verified GREEN at HEAD (v0.4.4 audit).** Every ``tests/**`` file that performs fixture
-ageing via ``os.utime`` at the time this ratchet was authored (10 files, found via
-``grep -rln "os.utime(" tests/`` — the bug report's own prose cites an audit that counted 9;
-this scan is authoritative for the rule as coded, not a re-derivation of that count, and in
+**Verified GREEN at HEAD (v0.4.4 audit; re-enumerated at 0.4.6 T-046-26 when the
+``tmp_gc``/``workspace_clean`` features and the ``reports`` retention verbs died with their
+tests).** Every ``tests/**`` file that performs fixture ageing via ``os.utime`` (found via
+``grep -rln "os.utime(" tests/``; this scan is authoritative for the rule as coded, and in
 any case the rule below runs over the ENTIRE ``tests/**`` tree, not merely this list):
 
-* ``tests/unit/features/tmp_gc/test_tmp_gc_service.py`` — frozen ``_NOW``; every ``os.utime``
-  mtime derives from ``_NOW.timestamp()`` (the fix already landed) — no real-clock call
-  remains in the file.
 * ``tests/contract/test_reports_retention_cleanup.py`` and
   ``tests/unit/features/reports/test_retention_service.py`` — frozen ``NOW``; every
   ``os.utime`` mtime derives from ``NOW - timedelta(...)`` — no real-clock call.
-* ``tests/contract/cli/test_cli_reports_retention.py``,
-  ``tests/unit/cli/commands/test_tmp_gc_cmd.py``,
-  ``tests/unit/features/telemetry/test_runtime_adapters.py``,
-  ``tests/unit/features/workspace_clean/test_clean_service.py``,
+* ``tests/unit/features/telemetry/test_runtime_adapters.py``,
   ``tests/unit/hooks/test_ctx_inject_digest.py``,
   ``tests/unit/hooks/test_post_gate_reap.py`` — every mtime derives from a real-clock call
   with NO frozen constant anywhere in the same file, so the injected reference and the aged

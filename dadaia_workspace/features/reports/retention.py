@@ -21,9 +21,8 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
 from dadaia_workspace.core.handoff_index import Handoff, path_timestamp, scan_handoffs
-from dadaia_workspace.core.models.hygiene import SlopPolicy
 
-_DEFAULT_TTL = dt.timedelta(seconds=SlopPolicy().reports_ttl_seconds)
+_DEFAULT_TTL = dt.timedelta(hours=48)
 
 
 @dataclass(frozen=True)

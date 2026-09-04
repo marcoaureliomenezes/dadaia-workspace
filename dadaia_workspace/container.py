@@ -1,7 +1,6 @@
 """Composition root — builds services with concrete infrastructure."""
 
 import logging
-import os
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -13,18 +12,13 @@ if TYPE_CHECKING:
     from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
 
 from dadaia_workspace.core.exceptions import (
-    NoActiveReleaseError,
     WorkspaceNotInitializedError,
 )
 from dadaia_workspace.core.handoff_index import HandoffIndex
-from dadaia_workspace.core.invocation import resolve as _resolve_invocation
-from dadaia_workspace.core.invocation import resolve_context_specs_dir as _resolve_context_specs_dir
 from dadaia_workspace.features.academy.service import AcademyService
 from dadaia_workspace.features.chokepoints.denylist_scan import BaselinePatternLike
 from dadaia_workspace.features.export.service import ExportService
 from dadaia_workspace.features.public.service import PublicAssetService
-from dadaia_workspace.features.reports.next import ReportsNextService
-from dadaia_workspace.features.reports.retention import ReportRetentionService
 from dadaia_workspace.features.repos.service import ReposService
 from dadaia_workspace.features.server_registry.service import ServerRegistryService
 from dadaia_workspace.features.spec_context.doctor import DoctorService
@@ -332,41 +326,3 @@ def build_handoff_index(workspace_root: Path) -> HandoffIndex:
         workspace_root: Root directory of the initialized dadaia workspace.
     """
     return HandoffIndex(workspace_root)
-
-
-def build_reports_next_service(
-    workspace_root: Path, context: str | None = None
-) -> ReportsNextService:
-    """Compose ``ReportsNextService`` for the active (or explicitly named) context.
-
-    Context resolution (FR-RN-1): when *context* is given, specs live at
-    ``repos/<context>/specs``; otherwise the bound context session is used. The
-    reports tree is keyed by the context name under ``<workspace>/.dadaia/reports``.
-
-    Args:
-        workspace_root: Root directory of the initialized dadaia workspace.
-        context: Optional explicit context name (overrides primary-context resolution).
-
-    Raises:
-        NoActiveReleaseError: No explicit context and no primary context is set.
-    """
-    _guard_initialized(workspace_root)
-    reports_root = workspace_root / ".dadaia" / "handoff"
-    context_name = _resolve_invocation(
-        explicit=context, env=os.environ, cwd=Path.cwd()
-    ).context_name
-    if not context_name:
-        raise NoActiveReleaseError(
-            "No bound context. Run `eval $(dadaia context bind <name> --mode read)` "
-            "or pass --context <name>."
-        )
-    specs_dir = _resolve_context_specs_dir(workspace_root, context_name)
-    return ReportsNextService(
-        specs_dir=specs_dir, reports_root=reports_root, context_name=context_name
-    )
-
-
-def build_reports_retention_service(workspace_root: Path) -> ReportRetentionService:
-    """Compose ``ReportRetentionService`` for workspace runtime report state."""
-    _guard_initialized(workspace_root)
-    return ReportRetentionService(workspace_root)

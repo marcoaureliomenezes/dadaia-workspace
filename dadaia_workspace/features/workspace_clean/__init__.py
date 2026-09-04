@@ -1,1 +1,0 @@
-"""``workspace_clean`` STANDS ALONE — ``WorkspaceCleanService`` TTL-reclaims stale files from ephemeral ``.dadaia/`` zones behind ``dadaia clean``, the opposite lifecycle end from ``workspace``'s ``WorkspaceService`` (bootstrap/init): reclaim vs create."""

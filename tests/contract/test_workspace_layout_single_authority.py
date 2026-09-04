@@ -74,13 +74,3 @@ def test_gate_additive_prefixes_are_the_registry_view() -> None:
     from dadaia_workspace.features.spec_context import gate_policy
 
     assert workspace_layout.additive_prefixes() == gate_policy._DADAIA_ADDITIVE_PREFIXES
-
-
-def test_migrate_legacy_quarantine_set_never_contains_a_zone() -> None:
-    """Bug dadaia-reconcile-quarantines-sanctioned-references-clone: a name cannot be a
-    registry zone (never quarantined) and legacy (always quarantined) at once. Dies with
-    ``legacy_dadaia_dirs`` in T-046-26."""
-    from dadaia_workspace.core import workspace_layout
-    from dadaia_workspace.features.migrate import legacy_dadaia_dirs
-
-    assert legacy_dadaia_dirs.LEGACY_DADAIA_SUBDIRS.isdisjoint(workspace_layout.zone_names())
