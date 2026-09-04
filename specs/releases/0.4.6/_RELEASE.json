@@ -1,16 +1,16 @@
 {
   "schema": "release-state-v1",
   "release": "0.4.6",
-  "phase": "IMPLEMENTATION",
+  "phase": "CLOSURE",
   "rc": 3,
   "defined": {
     "sha": "bcd02b21",
     "ts": "2026-09-04T01:02:22Z"
   },
   "implemented": {
-    "sha": "c3f5cb80",
-    "rc": 3,
-    "ts": "2026-09-03T12:40:41Z"
+    "sha": "cdcbadc1",
+    "rc": 4,
+    "ts": "2026-09-04T04:16:27Z"
   },
   "shipped": null,
   "audited": null,
@@ -164,6 +164,36 @@
       "agent": "project-manager",
       "kind": "drifts",
       "text": "Candidate 4 drifts, recorded in SPEC.md with evidence: (1) FR3 harness-dir predicate is the install ledger read inside the one walk, not a foreign_entries() seam; an unreadable ledger reports itself and classifies nothing (bug doctor-unreadable-install-ledger-classifies-projections-as-slop, 50de406b); --json carries issues findings compliance fixed. (2) FR4 fix() is skip-and-report — an undeletable entry is a skipped action with its errno, stays a finding, exit 1 (bug doctor-fix-aborts-whole-pass-on-first-undeletable-entry, b2b302f9); INV-5 dead-repo removal is last. (3) AC15 re-pinned -8,000 -> -7,400 on the measured -7,462 at 08736ddb (shortstat counts rewritten lines; the DRAFT estimate counted net-new). (4) AC2 [foreign] clause scoped to runtime dirs; consumer-repo AGENTS.md/CLAUDE.md provenance lines pre-exist (grill ruling 16, skills-consolidation). Kimi SessionStart reaper added (08736ddb) so AC5 holds for three harnesses. Architect fidelity verdict APPROVED (handoff 2026-09-04T034000Z); QA first live run REJECTED on the reaper abort, rerun in progress."
+    },
+    {
+      "ts": "2026-09-04T04:16:27Z",
+      "agent": "project-manager",
+      "kind": "summary",
+      "text": "Candidate 4 — workspace instance compliance: one zone registry (core/workspace_layout.DADAIA_ZONES, 11 zones, STATES_CANON closed), one doctor scan and reaper (WS-<zone>-<verdict> findings, compliance score line, --fix / --expired-only / --json / --quiet), TTL 1 day on handoff/tmp/mcps/.cache, SessionStart reaper on Claude/Codex/Kimi, .dadaia/AGENTS.md zone table rendered from the registry at stage, export/import as one spec-contexts.json. Retired: dadaia clean, tmp gc, reports retention + 8 reports verbs, panel Reports and Academy tabs, academy feature, hook telemetry writers + log rotation, legacy quarantine mover, hygiene model, .dadaia/scripts projection, reconciler dirty-path chain. Tasks T-046-24..36 all [x]."
+    },
+    {
+      "ts": "2026-09-04T04:16:27Z",
+      "agent": "project-manager",
+      "kind": "size",
+      "text": "git diff --shortstat develop..cdcbadc1 -- dadaia_workspace: 260 files, +6,004 / -13,466 (net -7,462); AC15 re-pinned to -7,400. Import-linter ignore cap 4 -> 3; help-quality ratchet 42 -> 30; feature packages 23 -> 20; dadaia --help groups 20; dadaia reports = validate doctor; panel 15 routes, 4 tabs."
+    },
+    {
+      "ts": "2026-09-04T04:16:27Z",
+      "agent": "project-manager",
+      "kind": "test-dispositions",
+      "text": "Preflight green at cdcbadc1 (ruff format, ruff check, mypy --strict, lint-imports 7/7, pytest 2,529 passed / 2 skipped in contract+unit; collect-only 2,805, 0 errors). New ratchets: test_zone_registry (table == registry; no second zone-name list; every creator is a live module), DADAIA.md 5.1 root list == ROOT_ALLOWED_*, public source names no retired surface. Deleted with their subjects (criterion feature removed, evidence in each commit): tests for workspace_clean, tmp_gc, retention, next, legacy_dadaia_dirs, hygiene models, academy (6), reports panel (4 + contract), jsonl_log_rotation (2), doctor EFF-1/foreign-projections, tar-era e2e test_branch_tracking (one assertion ported to test_cli_export), two orphan _v0158 goldens and a tombstone attesting test. Panel e2e specs aligned to four tabs (not executed locally: no browsers; CI is the proof)."
+    },
+    {
+      "ts": "2026-09-04T04:16:27Z",
+      "agent": "project-manager",
+      "kind": "closure-artifact-gc",
+      "text": "Live instance: dadaia doctor before 4741/11900 (40%), 7,159 findings; --fix applied 7,178 repairs (7,121 deleted, 64 skipped errno 13), reports/ academy/ logs/ runs/ zones gone, states/ within canon (lifecycle/ audit/ .ws_lock workflow_model_policy* root_exceptions.txt removed, instance_exceptions.txt migrated deduplicated, harness_profile.json seeded), dist/ holds spec-contexts.json only, 402 MB of expired tmp reclaimed; after 4874/4931 (99%) — the 57 remaining findings are one root-owned June directory the operator removes with sudo. Evidence .dadaia/tmp/qa-engineer/20260904/."
+    },
+    {
+      "ts": "2026-09-04T04:16:27Z",
+      "agent": "project-manager",
+      "kind": "dispositions",
+      "text": "Bugs: doctor-root1-flags-env-that-dadaia-md-9-declares-canonical resolved (f733c2b8); migrate-v3-backup-lands-in-closed-states-canon resolved (ff354a3e); doctor-unreadable-install-ledger-classifies-projections-as-slop resolved (50de406b); doctor-fix-aborts-whole-pass-on-first-undeletable-entry resolved (b2b302f9); memory-gate-requires-closure-phase-that-spec-doc-024-forbids-before-last-task open, deferred to the next candidate. Architect recommendations for the next candidate: delete the Claude-sense `rules` category (dead since the core rules folded into DADAIA.md); delete features/migrate/state_v3.py (no caller, store already stamps v3); render DADAIA.md 5.1 from the registry; widen zone ratchet 2 to dict keys and substrings; make ratchet 3 behavioral."
     }
   ]
 }
