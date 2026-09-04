@@ -107,7 +107,7 @@ Write-set paths are relative to `dadaia_workspace/` unless they start with `test
   test_public_install_e2e.py, tests/unit/infrastructure/**, doctor_all_four golden.
   Blocked by: T-046-25. Delivers: `.dadaia/AGENTS.md` carries 11 rendered rows and every new
   session reaps expired files — AC5, AC12.
-- [ ] T-046-34 — FR16, law and skills: `DADAIA.md` §3.2/§5.2/§5.4/§8/§10; `dadaia-AGENTS.md`
+- [-] T-046-34 — FR16, law and skills: `DADAIA.md` §3.2/§5.2/§5.4/§8/§10; `dadaia-AGENTS.md`
   prose; every `public/` reports path -> `repos/<slug>/reports/`; `handoff-AGENTS.md` TTL;
   `RC-FLOW.md` step 8; `dd-workspace-doctor` rewritten; personas; `behavior-map.json` hashes;
   reprojection (`public stage && public install --target all && public doctor`). RED:
