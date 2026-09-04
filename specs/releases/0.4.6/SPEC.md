@@ -38,7 +38,7 @@ Measure compliance of the instantiated workspace the way `specs doctor` measures
 registry in `core` names every `.dadaia/` zone with class, creator, TTL and closed file canon;
 `dadaia doctor` is the one scan and the one reaper over root, harness dirs, `.dadaia/` and
 `states/`; four zones and four cleanup engines retire; export is one JSON file; the
-`.dadaia/AGENTS.md` table is rendered from the registry. Net production diff about -8,100 lines.
+`.dadaia/AGENTS.md` table is rendered from the registry. Net production diff about -7,460 lines.
 
 ## 3. Vocabulary
 
@@ -78,8 +78,10 @@ Each FR cites the decision (D-n, §7) or architect section (A-G) it traces to.
   runs scripts dev-report runtime`; (3) every `creator` maps to a live module. Same commit as FR1.
 - **FR3 — One scan** (D9, D10, D11, B). `DoctorService._scan_zones()` walks in fixed order:
   root (ROOT_ALLOWED -> canon; exception glob -> operator; else `WS-root-slop`); harness dirs
-  (projection target or exception glob -> canon/operator; else `WS-<harness>-slop`; the predicate
-  `foreign_entries(workspace_root, profile)` moves from `public doctor` into infrastructure and
+  (an entry the install ledger names, read inside the one walk via `JsonInstallLedgerStore`, or
+  an exception glob -> canon/operator; else `WS-<harness>-slop`; an unreadable ledger yields one
+  non-fixable `WS-states-missing states/install_ledger.json` and classifies nothing under the
+  harness dirs, bug doctor-unreadable-install-ledger-classifies-projections-as-slop 50de406b;
   `public doctor` keeps hash drift only); `.dadaia/` top level (`DADAIA_ROOT_FILES` / zone name
   -> canon; else `WS-dadaia-slop`; INIT/INSTALL zone absent -> `WS-<zone>-missing`); closed-canon
   zones `states dist sessions` (non-canon -> slop; seedable absent -> missing); TTL zones
@@ -89,8 +91,8 @@ Each FR cites the decision (D-n, §7) or architect section (A-G) it traces to.
   `ROOT-1..4`, `RETIRED-LOCK-STATE`, `EFF-1`, `_root_exception_globs`, `_ROOT_FORBIDDEN_CACHES`,
   `_ROOT_TOOL_CONFIGS`. Unchanged: `INV-4/5/6`, `CTX-URL-1`, `VENV-1`, `PRESENCE-GC`. Output:
   one finding line each + the score line; exit 1 on any slop, expired or missing; `--json` ->
-  `{"findings":[{code,path,verdict,fixable,detail}],"compliance":{canonical,total,percent},
-  "fixed":[...]}`.
+  `{"issues":[...],"findings":[{code,path,verdict,fixable,detail}],"compliance":{canonical,
+  total,percent},"fixed":[...]}` (`issues` = the surviving INV/VENV/PRESENCE checks).
 - **FR4 — The one reaper** (D8, D9, D13, B, E). `dadaia doctor --fix` runs in order:
   `presence.gc` -> `session_store.reap_stale` -> migrate the exceptions file (FR6) -> seed
   missing -> delete expired -> delete slop. `--fix --expired-only` stops after "delete expired"
@@ -101,6 +103,9 @@ Each FR cites the decision (D-n, §7) or architect section (A-G) it traces to.
   mark-important|unmark-important|important|mark-efficiency-audit|lint|next`,
   `features/workspace_clean/`, `features/tmp_gc/`, `features/reports/{retention,next}.py`,
   `features/migrate/legacy_dadaia_dirs.py` (+ its reconcile call and setup.cfg ignore edge).
+  Skip-and-report: an undeletable entry is a skipped action with its errno, stays a finding,
+  exit 1, never raises (bug doctor-fix-aborts-whole-pass-on-first-undeletable-entry, b2b302f9).
+  INV-5 dead-repo removal is the last step, after the `--expired-only` return.
 - **FR5 — TTLs** (D5, D7). `handoff tmp mcps .cache`: 86,400 s by mtime; no importance ledger,
   no report pairing; a zone's own `AGENTS.md` is canon by projection, never a TTL candidate (bug
   public-install-restores-expired-zone-agents). Every other zone: `ttl_seconds = None`.
@@ -196,7 +201,9 @@ Each FR cites the decision (D-n, §7) or architect section (A-G) it traces to.
 - AC2 (FR3) — on this instance before `--fix`: `dadaia doctor` exits 1, every finding line
   matches `^WS-[a-z.-]+-(slop|expired|missing) `, the last line matches `^compliance: [0-9]+/
   [0-9]+ entries canonical \([0-9]+%\)$`; `dadaia doctor --json | python -m json.tool` succeeds
-  with keys `findings compliance fixed`; `dadaia public doctor` prints no `[foreign]` line.
+  with keys at least `findings compliance fixed`; `dadaia public doctor` prints no `[foreign]`
+  line for a runtime directory (consumer-repo `repos/<slug>/AGENTS.md|CLAUDE.md` provenance
+  lines are pre-existing, grill ruling 16 of the skills-consolidation candidate, out of scope).
 - AC3 (FR4, FR15) — `dadaia doctor --fix` then `dadaia doctor`: exit 0, `compliance: N/N entries
   canonical (100%)`; `ls -A .dadaia` is a subset of `{agentic hooks states sessions handoff tmp
   mcps .cache dist references .venv AGENTS.md .gitignore}`; `ls -A .dadaia/states` a subset of
@@ -237,8 +244,10 @@ Each FR cites the decision (D-n, §7) or architect section (A-G) it traces to.
   specs/memory/ARCHITECTURE.md` = 1; `grep -rn 'ROOT-4\|RETIRED-LOCK-STATE\|EFF-1' specs/memory |
   wc -l` = 0.
 - AC15 (all) — local CI preflight green; `test_import_linter_ignore_cap` cap = 3; `lint-imports`
-  zero new ignored edges; V32/V33 re-pinned downward; V34 holds for this trio; `git diff --stat
-  develop..HEAD -- dadaia_workspace` net at most -8,000 lines.
+  zero new ignored edges; V32/V33 re-pinned downward; V34 holds for this trio; `git diff
+  --shortstat develop..HEAD -- dadaia_workspace` net at most -7,400 lines (08736ddb: 260 files,
+  +6,004/-13,466, net -7,462; shortstat counts rewritten lines, -8,000 was the DRAFT's net-new
+  estimate; nothing landed was reverted).
 
 ## 7. Operator decisions (grill record, ADR lines)
 

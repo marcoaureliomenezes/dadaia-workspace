@@ -158,6 +158,12 @@
       "agent": "project-manager",
       "kind": "ratifications",
       "text": "Candidate 4 (workspace instance compliance: one zone registry, one doctor) SPEC/PLAN/TASKS ratified Aprovado by the operator after a 16-question dd-grill-me (handoff 2026-09-03T140000Z-claude-workspace-compliance-grill) and the software-architect DRAFT (handoff 2026-09-03T153000Z). Trio committed at bcd02b21; 13 tasks T-046-24..36; phase IMPLEMENTATION on feature/0.4.6, version 0.4.6 kept."
+    },
+    {
+      "ts": "2026-09-04T04:11:48Z",
+      "agent": "project-manager",
+      "kind": "drifts",
+      "text": "Candidate 4 drifts, recorded in SPEC.md with evidence: (1) FR3 harness-dir predicate is the install ledger read inside the one walk, not a foreign_entries() seam; an unreadable ledger reports itself and classifies nothing (bug doctor-unreadable-install-ledger-classifies-projections-as-slop, 50de406b); --json carries issues findings compliance fixed. (2) FR4 fix() is skip-and-report — an undeletable entry is a skipped action with its errno, stays a finding, exit 1 (bug doctor-fix-aborts-whole-pass-on-first-undeletable-entry, b2b302f9); INV-5 dead-repo removal is last. (3) AC15 re-pinned -8,000 -> -7,400 on the measured -7,462 at 08736ddb (shortstat counts rewritten lines; the DRAFT estimate counted net-new). (4) AC2 [foreign] clause scoped to runtime dirs; consumer-repo AGENTS.md/CLAUDE.md provenance lines pre-exist (grill ruling 16, skills-consolidation). Kimi SessionStart reaper added (08736ddb) so AC5 holds for three harnesses. Architect fidelity verdict APPROVED (handoff 2026-09-04T034000Z); QA first live run REJECTED on the reaper abort, rerun in progress."
     }
   ]
 }
