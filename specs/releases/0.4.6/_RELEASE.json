@@ -8,7 +8,7 @@
     "ts": "2026-09-04T01:02:22Z"
   },
   "implemented": {
-    "sha": "637059d2",
+    "sha": "efd58d33",
     "rc": 4,
     "ts": "2026-09-04T04:16:27Z"
   },
@@ -206,6 +206,12 @@
       "agent": "project-manager",
       "kind": "reviews",
       "text": "Security: first verdict REJECTED at 0bf7a759 (HIGH import wrote unvalidated names/slugs to the registry and INV-5 rmtree had no containment; LOW symlinked zone root walked). Fixed as bugs import-registers-unvalidated-slugs-that-doctor-fix-inv5-rmtrees (6dabc9f6: one guarded registration seam SpecContextService.register serves create, add_repo and import; CLI allowlist loops deleted; INV-5 removes only a direct child of repos/) and doctor-walks-symlinked-zone-root-into-a-repo-tree (b1ee9272). Re-verdict APPROVED at 637059d2 (verdict file committed here, consumed by the merge): 0 CRITICAL/HIGH/MEDIUM, 2 LOW (import/export --workspace ancestor-walk re-resolution registered as import-export-workspace-flag-re-resolves-through-ancestor-walk; symlinked zone root classified canon by the top-level scan, pre-existing), 6 INFO. Bug surface reduced. MEM-DRIFT-1 cleared (cca0e068)."
+    },
+    {
+      "ts": "2026-09-04T05:54:39Z",
+      "agent": "project-manager",
+      "kind": "reviews",
+      "text": "PR #245 first CI run: windows-latest unit + contract jobs red on tests/unit/test_spec_context_doctor_root.py::_age (utime follow_symlinks=False unsupported on Windows), every other job green. Fixed as bug doctor-root-tests-age-with-utime-follow-symlinks-false-unsupported-on-windows (13be6784, tests only, same class as retention-sweep-test-uses-windows-unsupported-utime-followsymlinks). Delta security verdict APPROVED at efd58d33 (verdict file committed here; the 637059d2 verdict deleted as superseded — a verdict never transfers to a sha it did not examine). Security INFO for a later candidate: 12 os.utime call sites across 6 test files with no shared helper."
     }
   ]
 }
