@@ -8,7 +8,7 @@
     "ts": "2026-09-04T01:02:22Z"
   },
   "implemented": {
-    "sha": "cdcbadc1",
+    "sha": "6043bf2b",
     "rc": 4,
     "ts": "2026-09-04T04:16:27Z"
   },
@@ -194,6 +194,12 @@
       "agent": "project-manager",
       "kind": "dispositions",
       "text": "Bugs: doctor-root1-flags-env-that-dadaia-md-9-declares-canonical resolved (f733c2b8); migrate-v3-backup-lands-in-closed-states-canon resolved (ff354a3e); doctor-unreadable-install-ledger-classifies-projections-as-slop resolved (50de406b); doctor-fix-aborts-whole-pass-on-first-undeletable-entry resolved (b2b302f9); memory-gate-requires-closure-phase-that-spec-doc-024-forbids-before-last-task open, deferred to the next candidate. Architect recommendations for the next candidate: delete the Claude-sense `rules` category (dead since the core rules folded into DADAIA.md); delete features/migrate/state_v3.py (no caller, store already stamps v3); render DADAIA.md 5.1 from the registry; widen zone ratchet 2 to dict keys and substrings; make ratchet 3 behavioral."
+    },
+    {
+      "ts": "2026-09-04T04:46:15Z",
+      "agent": "project-manager",
+      "kind": "reviews",
+      "text": "Candidate 4 reviews: software-architect fidelity APPROVED (root-cause PASS, fidelity PASS, bug surface REDUCED; handoff 2026-09-04T034000Z). qa-engineer live run REJECTED then APPROVED on rerun (handoffs 034752Z, 041454Z): scratch proof 100%, live 99% with the root-owned June dir pending operator sudo. code-reviewer three-axis APPROVE WITH FIXES (handoff 042313Z): 1 MEDIUM + 10 LOW, all applied in 6112831e (bug doctor-scan-raises-when-a-ttl-entry-vanishes-mid-walk, lineage doctor-fix-aborts-whole-pass-on-first-undeletable-entry) and 6043bf2b (.git in the root law, one finding format, features/reports package deleted, pid_probe deleted, intents added); finding 9 (self-projected repo AGENTS.md cannot be regenerated) registered as a bug for the next candidate. AC15 evidence re-recorded against the merge-base: -8,113 at 6043bf2b. Security verdict follows on the PR head."
     }
   ]
 }
