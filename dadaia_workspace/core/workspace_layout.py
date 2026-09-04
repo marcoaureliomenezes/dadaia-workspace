@@ -60,7 +60,7 @@ AUDIT_DIR_NAME_RE: re.Pattern[str] = re.compile(f"^{AUDIT_DIR_NAME_PATTERN}$")
 
 #: Directories the workspace root may contain (the Workspace Root Law).
 ROOT_ALLOWED_DIRS: frozenset[str] = frozenset(
-    {".agents", ".claude", ".codex", ".dadaia", ".kimi-code", "repos"}
+    {".agents", ".claude", ".codex", ".dadaia", ".git", ".kimi-code", "repos"}
 )
 
 #: Files the workspace root may contain. ``DADAIA.md`` is the workspace system prompt

@@ -1,7 +1,8 @@
 """Unit tests for container.py builder functions.
 
-CRIT: the two container pid-probe tests are the only production-wiring proof of
-FR-W1-02 no-steal for LOCK-GC — kept verbatim, never merged away.
+The two ``build_doctor_service`` tests go through PRODUCTION wiring — no injected
+collaborator — and pin that the retired lock state (``states/ctx_locks``) is reaped whether
+or not its recorded holder pid is alive: liveness is never consulted (NO-LOCKS).
 """
 
 import json
@@ -75,15 +76,9 @@ def test_build_service_succeeds_table(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# rc-1 code-review HIGH fix (T-011-02 follow-up): build_doctor_service must wire
-# the PID-liveness probe so LOCK-GC honours the no-steal invariant (FR-W1-02).
-#
-# These tests go through PRODUCTION container wiring — NO injected probe lambda —
-# so they pin the seam end-to-end. Against the UNFIXED container (DoctorService
-# constructed without pid_probe -> None -> TTL-only LOCK-GC), the live-pid case
-# below would FAIL: a TTL-expired record whose holder is os.getpid() (this very
-# test process, demonstrably alive) would be reported reclaimable and deleted by
-# --fix. The fix wires build_pid_probe() into the DoctorService.
+# build_doctor_service through PRODUCTION wiring: residual lock state under
+# states/ctx_locks is closed-canon slop, reaped whether the recorded holder pid is
+# alive (this very test process) or dead — liveness is never consulted.
 # ---------------------------------------------------------------------------
 
 _GC_CTX = "containergcctx"
@@ -112,7 +107,7 @@ def _seed_stale_lock(tmp_path: Path, *, pid: int | None) -> Path:
     return path
 
 
-def test_build_doctor_service_wires_pid_probe_live_holder_never_reclaimed(tmp_path: Path) -> None:
+def test_build_doctor_service_reaps_retired_lock_state_with_a_live_holder(tmp_path: Path) -> None:
     """Residual lock state has no authority even when its recorded pid is live."""
     pytest.importorskip("fcntl")  # ctx-lock GC is POSIX-seamed like the gate.
     _init_states_v2(tmp_path)
@@ -127,7 +122,7 @@ def test_build_doctor_service_wires_pid_probe_live_holder_never_reclaimed(tmp_pa
     assert not path.exists()
 
 
-def test_build_doctor_service_wires_pid_probe_dead_holder_reclaimed(tmp_path: Path) -> None:
+def test_build_doctor_service_reaps_retired_lock_state_with_a_dead_holder(tmp_path: Path) -> None:
     """Residual lock state is removed without consulting holder liveness."""
     pytest.importorskip("fcntl")
     _init_states_v2(tmp_path)

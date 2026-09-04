@@ -2,8 +2,8 @@
 
 release 0.5.1 candidate K6. Before this module, ten independent readers each re-decided
 how to find a ``*.handoff.json`` file, which schema version it carried, and where its
-``artifact.path`` pointed on disk — ``cli/commands/reports.py``, three ``features/reports/``
-services, ``features/panel/{reports_doctor.py,views/api_reports.py}``,
+``artifact.path`` pointed on disk — ``cli/commands/reports.py``, the three services of the
+since-deleted ``features/reports/`` package, ``features/panel/{reports_doctor.py,views/api_reports.py}``,
 ``features/chokepoints/service.py``, ``features/specs/doctor_release.py``, plus the stdlib
 schema validator itself. A fix landing in one reader did not reach the next (7 bug-ledger
 records, one open — see the module-level docstring on :meth:`Handoff.validate` for the fix
@@ -11,7 +11,7 @@ this module carries).
 
 Placement (core, not a features/* package): resolving "which handoff, what version, which
 artifact" needs the SAME answer in ``features.chokepoints``, ``features.specs``,
-``features.panel`` and ``features.reports`` — four *different* feature packages under the
+``features.panel`` — three *different* feature packages under the
 P-07 mutual-independence contract. A features/* home would need a new suppressed
 ``features-no-cross-feature`` ignore edge per consumer (the cap must never rise). ``core`` is
 outside that contract and already hosts the same shape of cross-cutting filesystem resolver

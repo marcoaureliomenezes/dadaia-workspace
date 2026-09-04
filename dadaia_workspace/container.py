@@ -29,7 +29,7 @@ from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReade
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.json_server_registry_store import JsonServerRegistryStore
-from dadaia_workspace.infrastructure.process_probe_adapter import OsProcessProbe, build_pid_probe
+from dadaia_workspace.infrastructure.process_probe_adapter import OsProcessProbe
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 
@@ -272,7 +272,6 @@ def build_doctor_service(workspace_root: Path) -> DoctorService:
         context_store=JsonContextStore(states),
         git_client=GitSubprocessClient(),
         workspace_root=workspace_root,
-        pid_probe=build_pid_probe(),
     )
 
 

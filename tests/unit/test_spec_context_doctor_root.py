@@ -120,7 +120,7 @@ def test_root_walk_classifies_every_entry(tmp_path: Path) -> None:
     assert found["random_junk.txt"].code == "WS-root-slop"
     assert found["random_junk.txt"].fixable is True
     assert found[".ruff_cache"].code == "WS-root-slop"
-    assert ".git" not in found
+    assert found[".git"].verdict is FindingVerdict.CANON
     assert "# comment" not in {f.detail for f in found.values()}
 
 
@@ -148,8 +148,7 @@ def test_fix_migrates_root_exceptions_into_instance_exceptions(tmp_path: Path) -
     assert not legacy.exists()
     assert new.read_text(encoding="utf-8") == "*.png\n.mcp.json\nz_img\n"
     assert [a for a in actions if "root_exceptions.txt" in a] == [
-        f"WS-{_STATE_ZONE.name}-slop: migrated 'root_exceptions.txt' -> "
-        f"'instance_exceptions.txt' (3 globs)"
+        "EXCEPTIONS-MIGRATION: migrated 'root_exceptions.txt' -> 'instance_exceptions.txt' (3 globs)"
     ]
     after = _by_path(_make_doctor(tmp_path).scan())
     assert after["shot.png"].verdict is FindingVerdict.OPERATOR
@@ -425,7 +424,7 @@ def test_every_ttl_zone_uses_its_own_code_and_ttl(tmp_path: Path) -> None:
 
 
 def test_zone_agents_md_is_never_a_ttl_candidate(tmp_path: Path) -> None:
-    """Bug public-install-restores-expired-zone-agents: the projected ``AGENTS.md`` inside
+    """Bug public-install-restores-expired-zone-agents-reblocks-preflight: the projected ``AGENTS.md`` inside
     a TTL zone is canon by projection, whatever its mtime."""
     _init_workspace(tmp_path)
     zone_dir = tmp_path / ".dadaia" / _TTL_ZONE.name

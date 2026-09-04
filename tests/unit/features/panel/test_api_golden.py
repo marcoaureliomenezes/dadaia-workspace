@@ -306,7 +306,8 @@ def test_api_routes_are_byte_identical_to_golden(tmp_path: Path) -> None:
 
 
 def test_golden_spans_all_domains(tmp_path: Path) -> None:
-    """Sanity: the capture covers >=1 route from EACH panel domain (AC-2)."""
+    """Intent: CONTRACT — 0.4.6 T-046-27/T-046-28 (AC-2: the capture covers >=1 route from
+    EACH surviving panel domain after the reports/academy retirements); size: SMALL."""
     captured = _capture(tmp_path)
     domains = {str(entry["domain"]) for entry in captured.values()}
     assert domains == _ALL_DOMAINS, (

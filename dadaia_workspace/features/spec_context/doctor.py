@@ -18,7 +18,7 @@ import shutil
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from functools import partial
 from pathlib import Path, PurePosixPath
@@ -34,8 +34,6 @@ from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
 from dadaia_workspace.infrastructure.json_install_ledger_store import JsonInstallLedgerStore
-
-_DAY = 86_400
 
 
 class FindingVerdict(StrEnum):
@@ -95,16 +93,12 @@ class DoctorService:
         context_store: JsonContextStore,
         git_client: GitSubprocessClient,
         workspace_root: Path,
-        pid_probe: Callable[[int], bool] | None = None,
     ) -> None:
         self._store = context_store
         self._git = git_client
         self._workspace_root = workspace_root
         self._dadaia = workspace_root / ".dadaia"
         self._states = self._dadaia / "states"
-        # Kept as a compatibility constructor seam. Session/presence expiry is TTL-only;
-        # process liveness never grants blocking authority.
-        self._pid_probe = pid_probe
 
     def _repos_dir(self) -> Path:
         return self._workspace_root / "repos"
@@ -290,13 +284,19 @@ class DoctorService:
 
     @staticmethod
     def _finding(
-        zone: str, base: Path, target: Path, verdict: FindingVerdict, detail: str
+        zone: str,
+        base: Path,
+        target: Path,
+        verdict: FindingVerdict,
+        detail: str,
+        *,
+        fixable: bool | None = None,
     ) -> Finding:
         return Finding(
             code=f"WS-{zone.lstrip('.')}-{verdict.value}",
             path=target.relative_to(base).as_posix(),
             verdict=verdict,
-            fixable=verdict not in _CANONICAL,
+            fixable=(verdict not in _CANONICAL) if fixable is None else fixable,
             detail=detail,
             target=target,
         )
@@ -311,8 +311,6 @@ class DoctorService:
     def _scan_root(self, globs: tuple[str, ...]) -> list[Finding]:
         out: list[Finding] = []
         for entry in self._entries(self._workspace_root):
-            if entry.name == ".git":
-                continue
             allowed = (
                 workspace_layout.ROOT_ALLOWED_DIRS
                 if entry.is_dir()
@@ -342,10 +340,17 @@ class DoctorService:
         ledger = JsonInstallLedgerStore().read(self._states)
         if ledger is None:
             path = JsonInstallLedgerStore.path(self._states)
-            code = f"WS-{self._states.name}-{FindingVerdict.MISSING.value}"
-            rel = path.relative_to(self._dadaia).as_posix()
             detail = "(run dadaia public install)"
-            return [Finding(code, rel, FindingVerdict.MISSING, False, detail, path)]
+            return [
+                self._finding(
+                    self._states.name,
+                    self._dadaia,
+                    path,
+                    FindingVerdict.MISSING,
+                    detail,
+                    fixable=False,
+                )
+            ]
         targets = frozenset(ledger.by_relpath())
         owned_dirs = frozenset(
             parent.as_posix() for rel in targets for parent in PurePosixPath(rel).parents
@@ -452,11 +457,12 @@ class DoctorService:
             age = now - mtime
             if is_zone_root and entry.name == "AGENTS.md":
                 # The zone's own law file is canon by projection, never a TTL candidate
-                # (bug public-install-restores-expired-zone-agents).
+                # (bug public-install-restores-expired-zone-agents-reblocks-preflight).
                 verdict, detail = FindingVerdict.CANON, ""
             elif age > zone.ttl_seconds:
                 verdict = FindingVerdict.EXPIRED
-                detail = f"(mtime {int(age // _DAY)}d > ttl {zone.ttl_seconds // _DAY}d)"
+                days = timedelta(seconds=age).days
+                detail = f"(mtime {days}d > ttl {timedelta(seconds=zone.ttl_seconds).days}d)"
             else:
                 verdict, detail = FindingVerdict.CANON, ""
             if verdict is not FindingVerdict.EXPIRED:
@@ -549,7 +555,7 @@ class DoctorService:
             old.unlink()
             return f"migrated '{old.name}' -> '{new.name}' ({len(globs)} globs)"
 
-        return self._guarded(f"WS-{self._states.name}-slop", old.name, migrate)
+        return self._guarded("EXCEPTIONS-MIGRATION", old.name, migrate)
 
     def _seed(self, finding: Finding) -> str:
         """A missing zone is a directory; the missing profile is written by the one store

@@ -143,8 +143,10 @@ def test_tab_and_section_present(index_html: str, section: str) -> None:
     assert 'class="nav-tab' in index_html
 
 
-def test_exactly_five_primary_tabs_in_order(index_html: str) -> None:
-    """0.4.6 FR9: exactly 5 primary tabs render (the Reports tab died with the
+def test_exactly_four_primary_tabs_in_order(index_html: str) -> None:
+    """Intent: CONTRACT — 0.4.6 FR9 (T-046-27); size: SMALL.
+
+    Exactly 4 primary tabs render (the Reports tab died with the
     ``.dadaia/reports/`` zone; v0.3.0 had already retired the workflow tab), in the
     exact PANEL_PRIMARY_TABS order, with the operator's exact label strings."""
     assert len(PANEL_PRIMARY_TABS) == 4
@@ -180,7 +182,7 @@ def test_no_sessions_tab_or_section_remnants(index_html: str) -> None:
 
 
 def test_no_reports_tab_or_section_remnants(index_html: str) -> None:
-    """0.4.6 FR9 (T-046-27): the Reports tab died with the ``.dadaia/reports/`` zone —
+    """Intent: CONTRACT — 0.4.6 FR9 (T-046-27); size: SMALL. The Reports tab died with the ``.dadaia/reports/`` zone —
     no #tab-reports button, no #section-reports tabpanel, no reports stylesheet/script."""
     assert 'id="tab-reports"' not in index_html
     assert 'data-section="reports"' not in index_html
