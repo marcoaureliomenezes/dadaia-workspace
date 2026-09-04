@@ -43,6 +43,7 @@ def _init_states_v2(tmp_path: Path) -> Path:
         container.build_spec_context_service,
         container.build_doctor_service,
         container.build_export_service,
+        container.build_import_service,
     ],
 )
 def test_build_service_raises_when_not_initialized(tmp_path: Path, builder: object) -> None:
@@ -57,6 +58,7 @@ def test_build_service_raises_when_not_initialized(tmp_path: Path, builder: obje
 
 def test_build_service_succeeds_table(tmp_path: Path) -> None:
     from dadaia_workspace.features.export.service import ExportService
+    from dadaia_workspace.features.import_.service import ImportService
     from dadaia_workspace.features.public.service import PublicAssetService
     from dadaia_workspace.features.repos.service import ReposService
     from dadaia_workspace.features.spec_context.doctor import DoctorService
@@ -70,6 +72,7 @@ def test_build_service_succeeds_table(tmp_path: Path) -> None:
     _init_states(tmp_path)
     assert container.build_spec_context_service(tmp_path) is not None
     assert isinstance(container.build_export_service(tmp_path), ExportService)
+    assert isinstance(container.build_import_service(tmp_path), ImportService)
     assert isinstance(container.build_doctor_service(tmp_path), DoctorService)
 
     # build_panel_service moved to cli.commands.panel_composition (F001, T-053-14).

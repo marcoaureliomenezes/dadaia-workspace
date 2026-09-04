@@ -1,7 +1,13 @@
 """Spec Context Project domain models."""
 
+import re
 from dataclasses import dataclass
 from enum import StrEnum
+
+#: Path-traversal allowlist (CWE-22/CWE-59) for a context name or repo slug used as a
+#: filename or path component. ONE regex: every registry insert enforces it at
+#: ``SpecContextService.register``; every resolver reads it through ``core.invocation``.
+CONTEXT_NAME_RE = re.compile(r"[A-Za-z0-9_-]+")
 
 
 class ContextState(StrEnum):

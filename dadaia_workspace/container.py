@@ -286,8 +286,7 @@ def build_export_service(workspace_root: Path) -> ExportService:
 
 
 def build_import_service(workspace_root: Path) -> ImportService:
-    _guard_initialized(workspace_root)
-    return ImportService(JsonContextStore(_states_dir(workspace_root)))
+    return ImportService(build_spec_context_service(workspace_root))
 
 
 def build_server_registry_service(workspace_root: Path) -> ServerRegistryService:

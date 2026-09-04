@@ -153,7 +153,7 @@ def test_doctor_default_fix_output_unchanged(workspace: Path) -> None:
         "  INV-5 [fixable] — Context 'stale-ctx' is dead but repo 'stale-ctx' is on disk\n"
         "\n"
         "Applied 1 repair(s):\n"
-        "  - Removed stale repo 'stale-ctx' for dead context 'stale-ctx'\n"
+        "  - INV-5: removed stale repo 'stale-ctx' for dead context 'stale-ctx'\n"
         "compliance: 135/135 entries canonical (100%)\n"
     )
 

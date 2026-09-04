@@ -6,4 +6,5 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class ImportResult:
     registered: tuple[str, ...]
-    skipped: tuple[str, ...]
+    #: ``(name, reason)`` — ``"exists"`` for a known name, else the registry guard's refusal.
+    skipped: tuple[tuple[str, str], ...]

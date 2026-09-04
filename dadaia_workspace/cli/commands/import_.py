@@ -5,6 +5,7 @@ from typing import Annotated
 
 import typer
 from rich.console import Console
+from rich.markup import escape
 
 from dadaia_workspace import container
 from dadaia_workspace.core.exceptions import DadaiaError
@@ -30,8 +31,8 @@ def import_workspace(
     except (DadaiaError, ValueError) as exc:
         err_console.print(f"[red]Error:[/red] {exc}")
         raise typer.Exit(1) from None
-    for name in result.skipped:
-        console.print(f"  [dim]skipped (exists)[/dim]   {name}")
+    for name, reason in result.skipped:
+        console.print(f"  [dim]skipped ({escape(reason)})[/dim]   {escape(name)}")
     for name in result.registered:
         console.print(f"  [green]registered (dead)[/green]  {name}")
     if result.registered:

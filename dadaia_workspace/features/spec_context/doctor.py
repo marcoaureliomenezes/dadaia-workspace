@@ -26,7 +26,7 @@ from pathlib import Path, PurePosixPath
 from dadaia_workspace.core import session_store, workspace_layout
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES, PROJECTION_TARGETS
 from dadaia_workspace.core.models.harness_profile import HarnessProfile
-from dadaia_workspace.core.models.spec_context import ContextState
+from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.core.workspace_layout import Creator, Zone
 from dadaia_workspace.features.spec_context import presence
@@ -518,17 +518,24 @@ class DoctorService:
         actions.extend(self._delete(findings, FindingVerdict.SLOP))
 
         for ctx in self._store.list_all():
-            if ctx.state != ContextState.DEAD:
-                continue
             repo_path = self._repos_dir() / ctx.repo_slug
-            if not repo_path.exists():
-                continue
-            ctx_recheck = self._store.get(ctx.name)
-            if ctx_recheck is None or ctx_recheck.state != ContextState.DEAD:
-                continue
-            shutil.rmtree(repo_path)
-            actions.append(f"Removed stale repo '{ctx.repo_slug}' for dead context '{ctx.name}'")
+            if ctx.state is ContextState.DEAD and repo_path.exists():
+                step = partial(self._remove_dead_repo, ctx, repo_path)
+                actions.extend(self._guarded("INV-5", f"repos/{ctx.repo_slug}", step))
         return actions
+
+    def _remove_dead_repo(self, ctx: SpecContextProject, repo_path: Path) -> str | None:
+        """INV-5: rmtree ``repos/<slug>`` only when it resolves to a direct child of ``repos/``
+        — a slug like ``..`` or a symlinked checkout resolves elsewhere and is refused (bug
+        import-registers-unvalidated-slugs-that-doctor-fix-inv5-rmtrees) — and the context
+        is still DEAD at the moment of deletion."""
+        if repo_path.resolve().parent != self._repos_dir().resolve():
+            return f"skipped 'repos/{ctx.repo_slug}' (outside repos/)"
+        current = self._store.get(ctx.name)
+        if current is None or current.state is not ContextState.DEAD:
+            return None
+        shutil.rmtree(repo_path)
+        return f"removed stale repo '{ctx.repo_slug}' for dead context '{ctx.name}'"
 
     @staticmethod
     def _guarded(code: str, path: str, step: Callable[[], str | None]) -> list[str]:

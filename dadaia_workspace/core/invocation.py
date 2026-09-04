@@ -63,6 +63,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
+from dadaia_workspace.core.models.spec_context import CONTEXT_NAME_RE
 from dadaia_workspace.core.release_state import parse_release_state, release_state_file
 from dadaia_workspace.core.session_store import live_session, read_session
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
@@ -81,10 +82,6 @@ __all__ = [
     "resolve_session_id",
     "sanitize_session_id",
 ]
-
-#: Path-traversal allowlist (CWE-22/CWE-59) for a context NAME / repo SLUG / session id
-#: used as a filename or path component. ONE regex — replaces five identical copies.
-CONTEXT_NAME_RE = re.compile(r"[A-Za-z0-9_-]+")
 
 #: Harness-native session-id env vars, in resolution order — Claude before Codex.
 #: ``CODEX_THREAD_ID`` is ordered AFTER ``CODEX_SESSION_ID`` deliberately: a modern

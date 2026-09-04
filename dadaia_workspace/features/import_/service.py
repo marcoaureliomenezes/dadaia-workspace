@@ -3,7 +3,13 @@
 import json
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Protocol
 
+from dadaia_workspace.core.exceptions import (
+    AssociatedRepoConflictError,
+    ContextAlreadyExistsError,
+    InvalidContextNameError,
+)
 from dadaia_workspace.core.models.export import SCHEMA_VERSION
 from dadaia_workspace.core.models.import_ import ImportResult
 from dadaia_workspace.core.models.spec_context import (
@@ -11,7 +17,14 @@ from dadaia_workspace.core.models.spec_context import (
     ContextState,
     SpecContextProject,
 )
-from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+
+
+class ContextRegistry(Protocol):
+    """The guarded registry insert — ``SpecContextService.register``, wired by the container
+    (features compose there, never by sibling import). Import never writes the store itself,
+    so an imported record is refused exactly as ``context create`` refuses it."""
+
+    def register(self, ctx: SpecContextProject) -> SpecContextProject: ...
 
 
 def _read(file: Path) -> list[dict[str, object]]:
@@ -51,18 +64,21 @@ def _dead_context(record: dict[str, object], now: str) -> SpecContextProject:
 
 
 class ImportService:
-    def __init__(self, store: JsonContextStore) -> None:
-        self._store = store
+    def __init__(self, registry: ContextRegistry) -> None:
+        self._registry = registry
 
     def run(self, file: Path) -> ImportResult:
         now = datetime.now(tz=UTC).isoformat()
         registered: list[str] = []
-        skipped: list[str] = []
+        skipped: list[tuple[str, str]] = []
         for record in _read(file):
             ctx = _dead_context(record, now)
-            if self._store.get(ctx.name) is None:
-                self._store.save(ctx)
-                registered.append(ctx.name)
+            try:
+                self._registry.register(ctx)
+            except ContextAlreadyExistsError:
+                skipped.append((ctx.name, "exists"))
+            except (InvalidContextNameError, AssociatedRepoConflictError) as exc:
+                skipped.append((ctx.name, str(exc)))
             else:
-                skipped.append(ctx.name)
+                registered.append(ctx.name)
         return ImportResult(registered=tuple(registered), skipped=tuple(skipped))
