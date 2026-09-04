@@ -122,6 +122,35 @@ def test_json_carries_findings_compliance_and_fixed(workspace: Path) -> None:
     assert payload["fixed"] == []
 
 
+@pytest.mark.skipif(
+    os.name != "posix" or os.geteuid() == 0,
+    reason="chmod 0o555 denies unlink only for a non-root POSIX user",
+)
+def test_fix_reports_an_undeletable_entry_exits_1_and_never_raises(workspace: Path) -> None:
+    """Bug doctor-fix-aborts-whole-pass-on-first-undeletable-entry: the live symptom was
+    ``Error: unexpected PermissionError`` with 0 repairs reported although earlier repairs
+    had been applied — the pass must finish, report the skip, and exit 1 for what remains."""
+    stale = _plant_expired(workspace)
+    locked = workspace / ".dadaia" / _TTL_ZONE.name / "locked"
+    locked.mkdir()
+    undeletable = locked / "a.js"
+    undeletable.write_text("", encoding="utf-8")
+    two_days_ago = time.time() - 2 * 86_400
+    os.utime(undeletable, (two_days_ago, two_days_ago))
+    locked.chmod(0o555)
+    try:
+        result = CliRunner().invoke(app, ["doctor", "--fix"])
+    finally:
+        locked.chmod(0o755)
+
+    assert not isinstance(result.exception, OSError), repr(result.exception)
+    assert result.exit_code == 1, result.output
+    assert not stale.exists()
+    assert undeletable.exists()
+    assert f"{_EXPIRED_CODE}: deleted '{_TTL_ZONE.name}/stale'" in result.output
+    assert f"{_EXPIRED_CODE}: skipped '{_TTL_ZONE.name}/locked/a.js' (errno 13" in result.output
+
+
 def test_fix_expired_only_quiet_prints_only_what_it_deleted(workspace: Path) -> None:
     (workspace / "junk.txt").write_text("", encoding="utf-8")
     stale = _plant_expired(workspace)

@@ -533,6 +533,45 @@ def test_fix_expired_only_stops_before_slop(tmp_path: Path) -> None:
     assert actions == ["WS-root-slop: deleted 'junk.txt'"]
 
 
+@pytest.mark.skipif(
+    os.name != "posix" or os.geteuid() == 0,
+    reason="chmod 0o555 denies unlink only for a non-root POSIX user",
+)
+def test_fix_skips_and_reports_an_undeletable_entry_and_finishes_the_pass(
+    tmp_path: Path,
+) -> None:
+    """Bug doctor-fix-aborts-whole-pass-on-first-undeletable-entry (same class as
+    retention-sweep-crashes-on-permission-denied, 903f8b89): an entry the process cannot
+    delete is skipped and reported with its errno, the pass reaches every other entry, the
+    returned actions name only what was actually deleted, and the entry stays a finding."""
+    _init_workspace(tmp_path)
+    zone = tmp_path / ".dadaia" / _TTL_ZONE.name
+    locked = zone / "x" / "deps"
+    locked.mkdir(parents=True)
+    undeletable = locked / "a.js"
+    undeletable.write_text("", encoding="utf-8")
+    other = zone / "x" / "other.txt"
+    other.write_text("", encoding="utf-8")
+    for path in (undeletable, other, locked, locked.parent):
+        _age(path)
+    locked.chmod(0o555)
+    try:
+        doctor = _make_doctor(tmp_path)
+        actions = doctor.fix()
+        remaining = _by_path(doctor.scan())
+    finally:
+        locked.chmod(0o755)
+
+    assert not other.exists()
+    assert undeletable.exists()
+    deleted = [a for a in actions if ": deleted '" in a]
+    skipped = [a for a in actions if ": skipped '" in a]
+    assert f"WS-{_TTL_ZONE.name}-expired: deleted '{_TTL_ZONE.name}/x/other.txt'" in deleted
+    assert not any("a.js" in a for a in deleted)
+    assert any(f"'{_TTL_ZONE.name}/x/deps/a.js' (errno 13" in a for a in skipped), actions
+    assert remaining[f"{_TTL_ZONE.name}/x/deps/a.js"].verdict is FindingVerdict.EXPIRED
+
+
 def test_fix_removes_state_and_session_slop_recursively(tmp_path: Path) -> None:
     """The retired lock/pointer state (``states/ctx_locks``, ``sessions/runtime``) is plain
     closed-canon slop now — no code of its own."""

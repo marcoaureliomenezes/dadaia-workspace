@@ -537,9 +537,19 @@ class DoctorService:
             finding.target.mkdir(parents=True, exist_ok=True)
 
     def _delete(self, findings: tuple[Finding, ...], verdict: FindingVerdict) -> list[str]:
+        """One action per entry — ``deleted``, or ``skipped`` with the errno when the process
+        cannot remove it; the pass never aborts, so the list names exactly what happened."""
         actions: list[str] = []
         for finding in findings:
-            if finding.verdict is verdict and self._remove(finding.target):
+            if finding.verdict is not verdict:
+                continue
+            try:
+                removed = self._remove(finding.target)
+            except OSError as exc:
+                reason = f"errno {exc.errno}: {exc.strerror}"
+                actions.append(f"{finding.code}: skipped '{finding.path}' ({reason})")
+                continue
+            if removed:
                 actions.append(f"{finding.code}: deleted '{finding.path}'")
         return actions
 
