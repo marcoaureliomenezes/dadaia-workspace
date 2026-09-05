@@ -1,7 +1,7 @@
 {
   "schema": "release-state-v1",
   "release": "0.4.6",
-  "phase": "CLOSURE",
+  "phase": "ARCHIVED",
   "rc": 3,
   "defined": {
     "sha": "bcd02b21",
@@ -12,7 +12,10 @@
     "rc": 4,
     "ts": "2026-09-04T04:16:27Z"
   },
-  "shipped": null,
+  "shipped": {
+    "sha": "570af64270368ac43d156bf58bd278c4433bde2f",
+    "ts": "2026-09-05T20:44:37Z"
+  },
   "audited": null,
   "log": [
     {
@@ -224,6 +227,12 @@
       "agent": "project-manager",
       "kind": "reviews",
       "text": "Promote ruled by the operator (2026-09-05): PyPI latest 0.4.5, pyproject 0.4.6 = +1 patch, no v0.4.6 tag. Ship lane: CHANGELOG [0.4.6] (e8ddf085); security ship verdict APPROVED naming develop tip 9c3fc0f8 (range origin/main..origin/develop, 469 files +10,570/-18,749, 0 CRITICAL/HIGH/MEDIUM, 4 LOW record-only, pip-audit clean, release.yml OIDC sha-pinned); staging it hit bug verdict-staleness-rule-refuses-the-ship-verdict-the-gitflow-law-mandates (SPEC-DOC-044 + pre-push scan refused the 3b shape) — fixed in-lane as Arm B (f705bbef: one liveness set head/first parent/origin-develop tip in chokepoints/verdict.py::live_verdict_shas, raw subprocess resolver deleted; software-architect APPROVED WITH FIXES applied, bug surface REDUCED; preflight green 2,849 passed). PR-gate delta verdict APPROVED at f705bbef (supersedes e8ddf085). Both verdicts staged in this commit; the develop merge consumes f705bbef's, the main merge consumes 9c3fc0f8's."
+    },
+    {
+      "ts": "2026-09-05T20:44:37Z",
+      "agent": "project-manager",
+      "kind": "merge",
+      "text": "Shipped: PR #246 feature/0.4.6 -> develop merged 7a8c0e01 (40 checks green); PR #247 develop -> main squash-merged 570af642 (36 checks green, verdict gate resolved the ship verdict through the head's first parent 9c3fc0f8). Release run 33990917232 awaits the operator's release-gate approval to publish PyPI 0.4.6 + tag v0.4.6. feature/0.4.6 deleted; feature/0.4.7 cut from main; both verdicts consumed. Whole release folder archived (final trio at root, rc-1..rc-3 inside, ADR 0009)."
     }
   ]
 }
