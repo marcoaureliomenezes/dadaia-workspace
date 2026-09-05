@@ -54,6 +54,11 @@ for this task, so none is touched here):
 
 Left exactly as written; a future task can pick this up.
 
+## [0.4.7] — em progresso
+
+Open-scope release (ADRs 0005–0009): version minted at birth from the PyPI lineage
+(latest published `0.4.6` + 1 patch); each closed-scope candidate appends here.
+
 ## [0.4.6] — 2026-09-04
 
 Open-scope release under the release-candidates model it implements (ADRs
