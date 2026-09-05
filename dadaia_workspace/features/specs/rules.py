@@ -113,9 +113,9 @@ RULES: tuple[Rule, ...] = (
     Rule(("SPEC-DOC-041",), lambda d, t: d._governance.check_bug_archive_overdue()),
     Rule(
         ("SPEC-DOC-044",),
-        lambda d, t: d._release.check_stale_verdicts(head_sha=d.head_sha, parent_sha=d.parent_sha),
+        lambda d, t: d._release.check_stale_verdicts(live_shas=d.live_shas),
         fix=lambda d, i: d._release.fix_stale_verdict(i),
-        fix_help="delete a stale (non-head, non-parent) security verdict",
+        fix_help="delete a stale security verdict (names no live sha: head, first parent, develop tip)",
     ),
     Rule(
         ("SPEC-DOC-045",),

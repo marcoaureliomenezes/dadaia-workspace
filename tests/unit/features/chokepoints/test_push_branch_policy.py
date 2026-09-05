@@ -52,6 +52,9 @@ class _EmptyObjectSource:
     def first_parent(self, repo: Path, sha: str) -> str | None:
         return None
 
+    def resolve_ref(self, repo: Path, ref: str) -> str | None:
+        return None
+
 
 def _decide(refs: list[PushRef], root: Path, **kwargs: Any) -> Decision:
     """``push_gate_decision`` with a no-op object source unless a test overrides it —

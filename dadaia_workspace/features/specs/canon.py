@@ -64,7 +64,7 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Iterable
+from collections.abc import Collection, Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -506,31 +506,28 @@ def canon_violations(paths: Iterable[str]) -> list[str]:
     return [path for path in paths if not is_canon_path(path)]
 
 
-def verdict_violations(paths: Iterable[str], head_sha: str, parent_sha: str | None) -> list[str]:
-    """The verdict business rule (operator, 2026-08-28): ``verdicts/`` may hold at most
-    ONE file whose 40-hex name equals *head_sha* or *head_sha*'s first parent
-    (*parent_sha*).
+def verdict_violations(paths: Iterable[str], live_shas: Collection[str]) -> list[str]:
+    """The verdict business rule (operator, 2026-08-28; ship shape 2026-09-05):
+    ``verdicts/`` may hold at most ONE file per LIVE sha.
 
-    Every verdict-shaped path in *paths* whose sha is NEITHER *head_sha* nor
-    *parent_sha* is a violation (stale — SPEC-DOC-044). When more than one verdict
-    file's sha DOES match (an unusual double-verdict state), every match past the
-    first is ALSO a violation — "at most one", not "any number matching". Paths that
-    are not verdict-shaped at all (already covered by :func:`canon_violations`) are
-    ignored here, never double-reported.
+    *live_shas* is ``features.chokepoints.verdict.live_verdict_shas`` — head, head's
+    first parent, integration branch tip — resolved once by the composition root and
+    passed in as plain data. Every verdict-shaped path in *paths* naming a sha outside
+    that set is a violation (stale — SPEC-DOC-044); a second file naming the SAME live
+    sha is also a violation (the excess, never the first). Paths that are not
+    verdict-shaped at all (already covered by :func:`canon_violations`) are ignored
+    here, never double-reported.
     """
-    allowed = {sha for sha in (head_sha, parent_sha) if sha}
-    matches: list[str] = []
+    seen: set[str] = set()
     violations: list[str] = []
     for path in paths:
         match = _VERDICT_RE.match(path)
         if match is None:
             continue
         sha = match.group(1)
-        if sha in allowed:
-            matches.append(path)
-        else:
+        if sha not in live_shas or sha in seen:
             violations.append(path)
-    violations.extend(sorted(matches[1:]))
+        seen.add(sha)
     return violations
 
 

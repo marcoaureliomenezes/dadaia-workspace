@@ -118,7 +118,7 @@ def build_repos_service() -> ReposService:
 def build_git_object_reader() -> GitSubprocessObjectReader:
     """Composition-root seam for the push-range object reader (v0.9.0 FR1/FR7; ADR-0001:
     the sole adapter, shared by two CLI verbs — ``ci.push_gate_check`` and
-    ``specs.doctor``'s ``head_sha``/``parent_sha`` resolution — so it stays a container
+    ``specs.doctor``'s live verdict-sha resolution — so it stays a container
     seam rather than each verb constructing its own instance.
 
     As of v0.4.3 T-043-15/FR11, the adapter this seam returns yields commit-object

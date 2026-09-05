@@ -28,7 +28,7 @@ Pure module — no I/O outside the supplied specs_dir / public_dir. No external 
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from pathlib import Path
 
 from dadaia_workspace.core.models.bugs import BugRecord
@@ -73,12 +73,11 @@ class SpecsDoctor:
             ``container.build_bug_record_store`` (the SAME factory ``cli.commands
             .bugs`` already calls); ``None`` keeps ``GovernanceValidator``'s
             zero-dependency fallback reader (same model).
-        head_sha: Optional branch HEAD sha, resolved ONCE by the CLI composition
-            root (through the ``GitObjectReader`` port) and passed in as plain data
-            (v0.5.0 specs-canon closure) — feeds SPEC-DOC-044 (stale verdicts).
-            ``None`` (default) keeps that check a silent no-op; this coordinator
-            never resolves git state itself.
-        parent_sha: Optional first-parent sha of *head_sha*, resolved the same way.
+        live_shas: Optional live verdict-sha set (head, first parent, develop tip —
+            ``features.chokepoints.verdict.live_verdict_shas``), resolved ONCE by the
+            CLI composition root and passed in as plain data — feeds SPEC-DOC-044
+            (stale verdicts). ``None`` (default) keeps that check a silent no-op; this
+            coordinator never resolves git state itself.
     """
 
     def __init__(
@@ -89,8 +88,7 @@ class SpecsDoctor:
         repo_root: Path | None = None,
         findings_store_factory: Callable[[Path], JsonlRecordStore[FindingRecord]] | None = None,
         bug_store_factory: Callable[[Path], JsonlRecordStore[BugRecord]] | None = None,
-        head_sha: str | None = None,
-        parent_sha: str | None = None,
+        live_shas: Collection[str] | None = None,
     ) -> None:
         self.specs_dir = Path(specs_dir)
         self.public_dir: Path | None = Path(public_dir) if public_dir is not None else None
@@ -99,10 +97,9 @@ class SpecsDoctor:
         # release-id invariant (SPEC-DOC-045) reads pyproject.toml from it. None ->
         # both checks are a no-op.
         self.repo_root: Path | None = Path(repo_root) if repo_root is not None else None
-        # head_sha/parent_sha (v0.5.0 specs-canon closure): SPEC-DOC-044's plain-data
-        # inputs, resolved once by the CLI. None -> that check is a no-op.
-        self.head_sha: str | None = head_sha
-        self.parent_sha: str | None = parent_sha
+        # live_shas (v0.5.0 specs-canon closure): SPEC-DOC-044's plain-data input,
+        # resolved once by the CLI. None -> that check is a no-op.
+        self.live_shas: Collection[str] | None = live_shas
         # templates_dir is resolved from public_dir if not explicitly supplied.
         if templates_dir is not None:
             self._templates_dir: Path | None = Path(templates_dir)

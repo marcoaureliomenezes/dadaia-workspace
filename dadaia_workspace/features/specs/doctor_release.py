@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import re
 import tomllib
+from collections.abc import Collection
 from datetime import date
 from pathlib import Path
 
@@ -527,42 +528,40 @@ class ReleaseValidator:
             )
         return issues
 
-    def check_stale_verdicts(
-        self, *, head_sha: str | None, parent_sha: str | None
-    ) -> list[SpecsDoctorIssue]:
+    def check_stale_verdicts(self, *, live_shas: Collection[str] | None) -> list[SpecsDoctorIssue]:
         """SPEC-DOC-044 (v0.5.0 specs-canon closure, operator ruling 2026-08-28): a
-        verdict under ``releases/<id>/verdicts/`` whose 40-hex sha is neither the
-        branch HEAD nor HEAD's first parent is stale — ERROR, ``--fix`` deletes.
+        verdict under ``releases/<id>/verdicts/`` naming a sha outside the LIVE set —
+        branch HEAD, HEAD's first parent, the integration branch tip (the ship shape,
+        DADAIA.md §4.2) — is stale — ERROR, ``--fix`` deletes.
 
-        Uses :func:`~dadaia_workspace.features.specs.canon.verdict_violations`
-        — the SAME predicate the pre-push gate uses
-        (``features.chokepoints.service.push_gate_decision``) — never a second,
-        hand-kept rule. *head_sha*/*parent_sha* are resolved ONCE by the CLI
-        composition root (through the ``GitObjectReader`` port) and passed in as
-        plain data; this validator stays zero-I/O (it never resolves git state
-        itself). A ``None`` *head_sha* (no repo_root/git context available) is a
-        silent no-op — this check genuinely cannot evaluate without a resolved head,
-        so it stays silent rather than guessing (mirrors the constitution file-ref
-        check's own optional-``repo_root`` shape).
+        Uses :func:`~dadaia_workspace.features.specs.canon.verdict_violations` over
+        *live_shas* — the SAME predicate and the SAME set
+        (``features.chokepoints.verdict.live_verdict_shas``) the pre-push gate uses —
+        never a second, hand-kept rule. *live_shas* is resolved ONCE by the CLI
+        composition root and passed in as plain data; this validator stays zero-I/O.
+        ``None`` (no git context available) is a silent no-op — this check genuinely
+        cannot evaluate without a resolved head, so it stays silent rather than
+        guessing (mirrors the constitution file-ref check's own optional-``repo_root``
+        shape).
         """
-        if head_sha is None:
+        if live_shas is None:
             return []
         verdict_paths = discover_handoff_paths(self.specs_dir, "releases/*/verdicts/*.handoff.json")
         if not verdict_paths:
             return []
         rel_paths = [p.relative_to(self.specs_dir).as_posix() for p in verdict_paths]
-        stale_rels = verdict_violations(rel_paths, head_sha, parent_sha)
+        stale_rels = verdict_violations(rel_paths, live_shas)
+        live_display = ", ".join(sha[:12] for sha in live_shas)
         issues: list[SpecsDoctorIssue] = []
         for rel in stale_rels:
-            parent_display = parent_sha[:12] if parent_sha else "none"
             issues.append(
                 SpecsDoctorIssue(
                     code="SPEC-DOC-044",
                     severity=Severity.ERROR,
                     description=(
-                        f"specs/{rel} is a stale verdict — its sha is neither the "
-                        f"branch head ({head_sha[:12]}) nor its first parent "
-                        f"({parent_display}). A consumed-or-stale verdict never "
+                        f"specs/{rel} is a stale verdict — its sha is none of the live "
+                        f"shas (head, first parent, develop tip: {live_display}), or a "
+                        "second file for one of them. A consumed-or-stale verdict never "
                         "stays on disk (SPEC-DOC-044). Auto-fix available (run "
                         "doctor --fix) to delete it."
                     ),
