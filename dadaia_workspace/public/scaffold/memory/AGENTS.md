@@ -4,7 +4,7 @@ Scope: this file governs only the `specs/memory/**` tree of one Spec Context Pro
 Broader SDD rules are in the sibling `specs/AGENTS.md`.
 
 Memory is product truth: it describes the product as it is now, never how it got there.
-History lives in each release's `RELEASE.json` `log` entries and under `_archive/`.
+History lives in each release's `_RELEASE.json` `log` entries and under `_archive/`.
 
 ## 1. Write ownership
 
@@ -54,7 +54,7 @@ Rationale: <one line — why this rule exists>
 ### 2.3 Never silently
 
 - Moving a block between parts, or deleting one, is recorded row by row in the release's coverage table.
-- Table lives under `specs/releases/<id>/reviews/`: old section -> new home, or `deleted: <reason>`.
+- Table lives in the reviewer's report (`DADAIA.md` §5.2) + its handoff: old section -> new home, or `deleted: <reason>`.
 
 ### 2.4 `product/` atoms are functional descriptions only
 

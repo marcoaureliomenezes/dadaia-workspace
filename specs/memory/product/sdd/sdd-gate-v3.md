@@ -2,7 +2,7 @@
 slug: sdd-gate-v3
 title: sdd-gate-v3
 category: product
-tldr: No-lock enforcement — origin-classified LAW, path/phase/mode gates, phase read from RELEASE.json, git hooks pared to the publication boundary.
+tldr: No-lock enforcement — origin-classified LAW, path/phase/mode gates, phase read from _RELEASE.json, git hooks pared to the publication boundary.
 summary: The merged PreToolUse gate enforces root whitelist, venv and cache posture, path class, phase and caller mode; the git chokepoints enforce the publication boundary and the denylist scan.
 tags: [sdd, gate, hooks, enforcement, no-locks, privacy]
 ---
@@ -10,24 +10,24 @@ tags: [sdd, gate, hooks, enforcement, no-locks, privacy]
 ## PreToolUse
 
 - No lease, mutex, lock file, acquisition or wait path exists.
-- `hooks/pre_gate.py` reads each payload once and evaluates three policies in order — root whitelist, venv + cache guard, SDD gate — first block wins, each block message carrying the corrected command.
+- `hooks/pre_gate.py` reads each payload once and evaluates three policies in order — root whitelist (the root law sets plus the instance exception globs, both from `core/workspace_layout.py`, [[workspace-doctor]]), venv + cache guard, SDD gate — first block wins, each block message carrying the corrected command.
 - The venv + cache guard is Bash-only on fixed leading tokens: `dadaia`, `python -m dadaia_workspace` or `pip` outside `.dadaia/.venv/bin/`, and a `pytest`/`ruff`/`mypy` run writing a cache in-tree.
 
 | Class | Behavior |
 |---|---|
 | LAW | Projected law files — fail-closed, human-only |
-| ADDITIVE | `specs/{bugs,backlog,audits}`, workspace reports/handoffs/tmp — any mode |
+| ADDITIVE | `specs/{bugs,backlog,audits}`, `.dadaia/{handoff,tmp,mcps,.cache}` — the registry's output and ephemeral zones — any mode |
 | MEMORY | Writable only in `DEFINITION` or `CLOSURE` |
 | PROTECTED | Session identity records, fail-closed |
 | MUTATING | Everything else, unless this session resolves READ; `specs/releases/**` throughout |
 
 - LAW is origin-decided with zero I/O: basename `DADAIA.md`, `AGENTS.md` or `CLAUDE.md` plus a root or harness-projection location, both sets from `core/workspace_layout.py`.
 - A path under `repos/<slug>/` matches neither origin, so a repo's scoped `AGENTS.md` is MUTATING; MEMORY matches the bare prefix `specs/memory/` with no dotfile carve-out.
-- Phase comes from `RELEASE.json` alone — the single directory under `specs/releases/` carrying one — fail-closed: zero or several live releases, an unreadable file or a missing `phase` denies the write.
+- Phase comes from `_RELEASE.json` alone — the single directory under `specs/releases/` carrying one — fail-closed: zero or several live releases, an unreadable file or a missing `phase` denies the write.
 - Mode resolves from the environment, then this session's record, then `IMPLEMENTATION`; a READ session blocks only its own mutating writes.
 - The gate builds one `core.invocation.Invocation` per payload and reads context, mode, release and phase off it; it re-derives no fact and never imports the container ([[context-management]]).
 - It best-effort upserts a presence record, another live record warning once without changing the verdict.
-- The PostToolUse reconciler reports out-of-scope dirty paths, refreshes presence and never blocks; `bound_at` against the injection sentinel is the only injection trigger ([[context-management]]).
+- The PostToolUse hook renews this session's presence and `last_seen_at`, runs `presence.gc` on one throttle and never blocks; `bound_at` against the injection sentinel is the only injection trigger ([[context-management]]).
 
 ## Git chokepoints
 

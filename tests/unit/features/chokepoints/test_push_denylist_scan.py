@@ -42,6 +42,9 @@ class _FakeObjectSource:
     def first_parent(self, repo: Path, sha: str) -> str | None:
         return None
 
+    def resolve_ref(self, repo: Path, ref: str) -> str | None:
+        return None
+
 
 class _FailingObjectSource:
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
@@ -51,6 +54,9 @@ class _FailingObjectSource:
         return []
 
     def first_parent(self, repo: Path, sha: str) -> str | None:
+        return None
+
+    def resolve_ref(self, repo: Path, ref: str) -> str | None:
         return None
 
 
@@ -597,6 +603,9 @@ class _FailingObjectSourceWithPath:
         return []
 
     def first_parent(self, repo: Path, sha: str) -> str | None:
+        return None
+
+    def resolve_ref(self, repo: Path, ref: str) -> str | None:
         return None
 
 

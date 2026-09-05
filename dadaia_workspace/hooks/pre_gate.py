@@ -25,17 +25,10 @@ Parity invariants preserved verbatim from the standalone gates:
 
 from __future__ import annotations
 
-import json
-import os
 import sys
-import time
 from collections.abc import Callable
-from datetime import UTC, datetime
-from pathlib import Path
 
-from dadaia_workspace.core import invocation
 from dadaia_workspace.hooks import _common, root_whitelist, sdd_gate, venv_guard
-from dadaia_workspace.infrastructure.jsonl_log_rotation import append_rotating_jsonl
 
 
 def _venv_guard_reason(payload: dict[str, object]) -> str | None:
@@ -95,53 +88,14 @@ def evaluate_payload_with_advisory(payload: dict[str, object]) -> tuple[str | No
     return None, advisory
 
 
-def _append_latency(workspace: Path | None, event: str, duration_ms: float) -> None:
-    """Append one hook-latency record to ``.dadaia/logs/hook-latency.jsonl`` (best-effort).
-
-    FR-W4-06 (T-014-04). Fail-OPEN: an unresolvable workspace, an unwritable/absent logs
-    dir, or any OS error is swallowed — telemetry must NEVER change the gate verdict or the
-    exit code. ``duration_ms`` is clamped to ``>= 0`` (a monotonic clock never goes backward,
-    but the clamp makes the contract explicit for consumers).
-
-    FR27 (T-043-42): the append is funneled through the single shared rotation helper
-    (``infrastructure/jsonl_log_rotation.append_rotating_jsonl``) so this file caps at
-    ~1 MB and keeps current+1 like every other ``.dadaia/logs/*.jsonl`` writer — this
-    function stays the OWNER (it decides what/when to write), the helper only owns the
-    write-and-rotate mechanics.
-    """
-    if workspace is None:
-        return
-    record = {
-        "ts": datetime.now(tz=UTC).isoformat(),
-        "hook": "pre_gate",
-        "event": event,
-        "duration_ms": round(max(0.0, duration_ms), 3),
-    }
-    path = workspace / ".dadaia" / "logs" / "hook-latency.jsonl"
-    append_rotating_jsonl(path, json.dumps(record))
-
-
 def main() -> int:
-    """Run the merged PreToolUse gate. Returns 0 always (block via the stdout envelope).
-
-    The whole invocation is timed (FR-W4-06): after the verdict is emitted, one best-effort
-    latency record is appended to ``.dadaia/logs/hook-latency.jsonl``. The telemetry is
-    fail-open and never alters the gate decision or the exit code.
-    """
-    start = time.monotonic()
+    """Run the merged PreToolUse gate. Returns 0 always (block via the stdout envelope)."""
     payload = _common.read_stdin_json()
     reason, advisory = evaluate_payload_with_advisory(payload)
     if reason is not None:
         _common.emit_block(reason)
     else:
         _common.emit_allow(system_message=advisory)
-    duration_ms = (time.monotonic() - start) * 1000.0
-    try:
-        workspace: Path | None = invocation.resolve(env=os.environ, cwd=Path.cwd()).workspace_root
-    except Exception:  # noqa: BLE001 — telemetry workspace resolution must never block
-        workspace = None
-    event = os.environ.get("DADAIA_HOOK_EVENT", "PreToolUse")
-    _append_latency(workspace, event, duration_ms)
     return 0
 
 

@@ -54,17 +54,30 @@ def _hook_cmd(workspace_root: Path, module: str) -> str:
     return f"{_python_bin(workspace_root)} -B -m {module}"
 
 
+#: The SessionStart lane (0.4.6 FR4/D13): the one reaper, run as a CLI process at every
+#: session start — never a hook module (P-12). ``--quiet`` prints only what it deleted, so
+#: a compliant workspace adds nothing to the model context.
+_REAPER_ARGS = "doctor --fix --expired-only --quiet"
+
+
+def _reaper_cmd(workspace_root: Path) -> str:
+    return f"{_hook_cmd(workspace_root, 'dadaia_workspace')} {_REAPER_ARGS}"
+
+
+#: ``{wrapper name: (argv after ``-m``, exported env)}`` — hook modules forward the
+#: harness payload (``"$@"``); the reaper is a fixed CLI invocation.
 _CODEX_HOOK_WRAPPERS: dict[str, tuple[str, dict[str, str]]] = {
-    "codex-pre-gate": ("dadaia_workspace.hooks.pre_gate", {}),
-    "codex-post-gate": ("dadaia_workspace.hooks.sdd_post_gate", {}),
+    "codex-pre-gate": ('dadaia_workspace.hooks.pre_gate "$@"', {}),
+    "codex-post-gate": ('dadaia_workspace.hooks.sdd_post_gate "$@"', {}),
     "codex-ctx-inject": (
-        "dadaia_workspace.hooks.ctx_inject",
+        'dadaia_workspace.hooks.ctx_inject "$@"',
         {"DADAIA_HOOK_OUTPUT": "codex-json"},
     ),
     "codex-ctx-inject-session-start": (
-        "dadaia_workspace.hooks.ctx_inject",
+        'dadaia_workspace.hooks.ctx_inject "$@"',
         {"DADAIA_HOOK_OUTPUT": "codex-json", "DADAIA_HOOK_EVENT": "SessionStart"},
     ),
+    "codex-doctor-expired": (f"dadaia_workspace {_REAPER_ARGS}", {}),
 }
 
 
@@ -78,7 +91,7 @@ def codex_hook_wrapper_contents() -> dict[str, str]:
     location, so moving/importing a workspace does not leave stale absolute Python paths.
     """
     wrappers: dict[str, str] = {}
-    for name, (module, env) in _CODEX_HOOK_WRAPPERS.items():
+    for name, (argv, env) in _CODEX_HOOK_WRAPPERS.items():
         exports = "".join(f'{key}="{value}"\nexport {key}\n' for key, value in env.items())
         wrappers[name] = (
             "#!/usr/bin/env sh\n"
@@ -91,12 +104,12 @@ def codex_hook_wrapper_contents() -> dict[str, str]:
             "  exit 127\n"
             "fi\n"
             f"{exports}"
-            f'exec "$PYTHON_BIN" -B -m {module} "$@"\n'
+            f'exec "$PYTHON_BIN" -B -m {argv}\n'
         )
     return wrappers
 
 
-def _codex_hook_wrapper_command(name: str) -> str:
+def codex_hook_wrapper_command(name: str) -> str:
     """Return a direct-exec-safe hook command path for a generated wrapper."""
     return f".dadaia/hooks/{name}"
 
@@ -114,10 +127,11 @@ _CLAUDE_MATCH_ALL = "*"
 
 
 #: The marker that identifies a hook entry as dadaia-owned. Every command this module
-#: generates invokes a ``dadaia_workspace.hooks.*`` module, so ownership is decidable from
-#: the emitted content alone — no side-car state, and an operator's own entry in the SAME
-#: event is never mistaken for ours.
-_DADAIA_HOOK_MARKER = "dadaia_workspace.hooks."
+#: generates runs the venv interpreter as ``-m dadaia_workspace...`` (a ``hooks.*`` module
+#: or the ``doctor`` reaper), so ownership is decidable from the emitted content alone —
+#: no side-car state, and an operator's own entry in the SAME event is never mistaken for
+#: ours.
+_DADAIA_HOOK_MARKER = "-m dadaia_workspace"
 
 
 def _is_dadaia_hook_entry(entry: object) -> bool:
@@ -141,7 +155,7 @@ def merge_claude_settings(
     ``permissions``, ``model``, ``env``, ``statusLine`` and custom hooks — it is NOT a
     dadaia-owned artifact. Writing it wholesale erased all of that silently, printing
     ``[ok]`` (bug ``claude-install-destroys-operator-settings``). dadaia owns exactly the
-    hook entries whose command invokes ``dadaia_workspace.hooks.*``:
+    hook entries whose command runs ``-m dadaia_workspace...`` (:data:`_DADAIA_HOOK_MARKER`):
 
     * top-level keys other than ``hooks`` are preserved untouched;
     * hook EVENTS dadaia does not wire are preserved untouched;
@@ -332,6 +346,10 @@ def claude_settings(workspace_root: Path) -> dict[str, object]:
                     ],
                     "matcher": "resume",
                 },
+                {
+                    "hooks": [{"command": _reaper_cmd(workspace_root), "type": "command"}],
+                    "matcher": "startup|resume",
+                },
             ],
         }
     }
@@ -372,7 +390,7 @@ def codex_hooks(workspace_root: Path) -> dict[str, object]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": _codex_hook_wrapper_command("codex-pre-gate"),
+                            "command": codex_hook_wrapper_command("codex-pre-gate"),
                             "statusMessage": "Checking dadaia PreToolUse gate",
                         }
                     ],
@@ -385,7 +403,7 @@ def codex_hooks(workspace_root: Path) -> dict[str, object]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": _codex_hook_wrapper_command("codex-post-gate"),
+                            "command": codex_hook_wrapper_command("codex-post-gate"),
                             "statusMessage": "Refreshing SDD session heartbeat",
                         }
                     ],
@@ -401,11 +419,14 @@ def codex_hooks(workspace_root: Path) -> dict[str, object]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": _codex_hook_wrapper_command(
-                                "codex-ctx-inject-session-start"
-                            ),
+                            "command": codex_hook_wrapper_command("codex-ctx-inject-session-start"),
                             "statusMessage": "Loading dadaia context",
-                        }
+                        },
+                        {
+                            "type": "command",
+                            "command": codex_hook_wrapper_command("codex-doctor-expired"),
+                            "statusMessage": "Reaping expired workspace files",
+                        },
                     ],
                 }
             ],
@@ -414,7 +435,7 @@ def codex_hooks(workspace_root: Path) -> dict[str, object]:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": _codex_hook_wrapper_command("codex-ctx-inject"),
+                            "command": codex_hook_wrapper_command("codex-ctx-inject"),
                             "statusMessage": "Loading dadaia context",
                         }
                     ],
@@ -449,12 +470,15 @@ _KIMI_WRITE_MATCHER = "^(Edit|Write|Bash)$"
 #: PostCompact fires for both manual (``/compact``) and automatic compaction.
 _KIMI_COMPACT_MATCHER = "manual|auto"
 
-#: The four kimi hook rules: (shim filename, event, matcher-or-None, timeout seconds).
+#: The five kimi hook rules: (shim filename, event, matcher-or-None, timeout seconds).
+#: SessionStart carries no matcher: Kimi's ``source`` vocabulary is undocumented, and the
+#: reaper is idempotent and silent on a compliant workspace.
 _KIMI_HOOK_RULES: tuple[tuple[str, str, str | None, int], ...] = (
     ("dadaia-kimi-pre-gate.sh", "PreToolUse", _KIMI_WRITE_MATCHER, 10),
     ("dadaia-kimi-post-gate.sh", "PostToolUse", None, 10),
     ("dadaia-kimi-ctx-inject.sh", "UserPromptSubmit", None, 10),
     ("dadaia-kimi-post-compact.sh", "PostCompact", _KIMI_COMPACT_MATCHER, 10),
+    ("dadaia-kimi-doctor-expired.sh", "SessionStart", None, 10),
 )
 
 #: Shared shim prologue: resolve the nearest dadaia workspace venv python by walking up
@@ -498,7 +522,7 @@ def kimi_code_home(env: Mapping[str, str] | None = None) -> Path:
 
 
 def kimi_hook_shims() -> dict[str, str]:
-    """Return the four kimi hook shim bodies as ``{filename: POSIX sh content}``.
+    """Return the five kimi hook shim bodies as ``{filename: POSIX sh content}``.
 
     - pre-gate: forwards the payload to ``hooks.pre_gate`` and translates the dadaia
       envelope to the Kimi protocol — ``"decision": "block"`` ⇒ reason on stderr +
@@ -510,6 +534,8 @@ def kimi_hook_shims() -> dict[str, str]:
       the compact-epoch marker consumed by the next ``UserPromptSubmit`` AND re-emits
       the bootstrap on stdout (observable-contract posture; Kimi discards PostCompact
       stdout, so the deterministic re-injection still lands at the next prompt).
+    - doctor-expired: the SessionStart reaper (0.4.6 FR4/D13) as a CLI process — the same
+      ``_REAPER_ARGS`` the Claude and Codex entries run.
     """
     pre_gate = (
         _KIMI_SHIM_PROLOGUE
@@ -552,11 +578,19 @@ printf '%s' "$payload" | "$PYTHON_BIN" -B -m dadaia_workspace.hooks.ctx_inject 2
 exit 0
 """
     )
+    doctor_expired = (
+        _KIMI_SHIM_PROLOGUE
+        + f"""
+"$PYTHON_BIN" -B -m dadaia_workspace {_REAPER_ARGS} 2>/dev/null || true
+exit 0
+"""
+    )
     return {
         "dadaia-kimi-pre-gate.sh": pre_gate,
         "dadaia-kimi-post-gate.sh": post_gate,
         "dadaia-kimi-ctx-inject.sh": ctx_inject,
         "dadaia-kimi-post-compact.sh": post_compact,
+        "dadaia-kimi-doctor-expired.sh": doctor_expired,
     }
 
 

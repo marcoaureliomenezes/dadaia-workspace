@@ -54,6 +54,68 @@ for this task, so none is touched here):
 
 Left exactly as written; a future task can pick this up.
 
+## [0.4.6] — 2026-09-04
+
+Open-scope release under the release-candidates model it implements (ADRs
+0005–0009): the version is minted at birth from the PyPI lineage (latest
+published `0.4.5` + 1 patch) and each closed-scope candidate appends here.
+
+### Candidate 1 — release-candidates system
+- **Release-candidates model**: one live open-scope release, closed-scope
+  candidates archived to `rc-N/` by `dadaia release rc-archive`; version
+  increment and next branch only at operator-approved deploy.
+- `_RELEASE.json` is the canonical state filename (one decider in
+  `core.release_state`; legacy `RELEASE.json` read-side + SPEC-DOC-046 fixable
+  rename); archived releases migrated.
+- `release new` refuses a second live release (exactly one, ever).
+- Scaffolded segment lane (`alpha-N`, `**Segment:**` docs) retired; `rc-N` has
+  one meaning: archived candidate.
+
+### Candidate 2 — skills quality consolidation
+- 15-rule skill authoring standard (`dd-ai-eng-knowhow/AUTHORING.md`); corpus
+  25 → 20 `dd-*` skills: `dd-domain-modeling`, `dd-architecture-survey`,
+  `dd-bug-resolution` (LINEAGE + RED-LOOP) and `dd-spec-navigator` absorb their
+  reference siblings; unmanaged reference copies deleted after diff-fold.
+- Systemic conformance pass over every kept skill (trigger-pointer
+  descriptions, sediment purged, form-follows-content restructures).
+
+### Candidate 3 — slop law
+- One definition (`DADAIA.md` §7.6: slop = what passes the deletion test without
+  loss) distributed as agentic entities (`dd-code-review/SLOP.md` S1–S10, six
+  personas, `tests/AGENTS.md` halved) and as scaffolded fixed sections
+  (`slop-law` / `slop-code` / `slop-tests` from `public/data/fixed/`, validated
+  and healed by `specs doctor` FIXED-1/2).
+- Ratchets down only: V31 (Intent-less tests per tier) replaces V27, V32, V33,
+  V34 (SPEC 24 KB / TASKS 12 KB). Constitution 5.1.0; ADR 0010 proposed.
+
+### Candidate 4 — workspace instance compliance
+- One zone registry (`core/workspace_layout.DADAIA_ZONES`: 11 zones with class,
+  creator, TTL and closed canon; `STATES_CANON`; root law gains `.env`,
+  `.gitignore`, `.git`) from which init, the doctor, the gate, the root hook, the
+  rendered `.dadaia/AGENTS.md` table and export derive; three hand-kept name
+  lists deleted; ratchets pin table == registry and no second list.
+- `dadaia doctor` is the one workspace scan and reaper: `WS-<zone>-<verdict>`
+  findings, `compliance: N/M entries canonical (P%)`, `--json`, `--fix`,
+  `--fix --expired-only` (SessionStart lane on Claude Code, Codex and Kimi Code),
+  `--quiet`; skip-and-report on every step; TTL 1 day on `handoff/`, `tmp/`,
+  `mcps/`, `.cache/`; `states/instance_exceptions.txt` replaces
+  `root_exceptions.txt`.
+- `dadaia export` writes one `.dadaia/dist/spec-contexts.json`; `dadaia import`
+  registers unknown contexts DEAD through the one guarded registration seam
+  (`SpecContextService.register`, shared with `context create` and `add_repo`).
+- Retired: `dadaia clean`, `dadaia tmp gc`, reports retention and eight `reports`
+  verbs (`validate`, `doctor` stay), the panel Reports and Academy tabs, the
+  academy feature, hook telemetry writers and JSONL rotation, the reconciler's
+  dirty-path chain, the legacy quarantine mover, the hygiene model, the
+  `.dadaia/scripts` projection, the dead `commands` asset category.
+- HTML reports live in `repos/<slug>/reports/`; law text in `DADAIA.md` §3.2,
+  §5.1, §5.2, §5.4, §8.5, §10.
+- Bugs fixed with RED tests: root `.env` flagged by the doctor; v3 migration
+  backup outside the states canon; unreadable install ledger reclassifying
+  projections; reaper aborting on an undeletable entry; TTL walk raising on a
+  vanished entry; unvalidated slugs accepted by `import` (security HIGH);
+  symlinked zone root walked; Windows-unsupported `utime` in the doctor tests.
+
 ## [0.4.5] — 2026-08-31
 
 One published version for everything since `0.4.4`: the internal spec-release ids

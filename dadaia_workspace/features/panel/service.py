@@ -108,10 +108,6 @@ class PanelService:
         Absolute path to the workspace root directory.  Used to construct
         repo_path in PanelContext without reaching into SpecContextService
         private attributes.
-    report_retention:
-        Optional ReportRetentionService instance (injected, T-017-08).
-        When None, a RuntimeError is raised on first use.  The container always
-        injects one; pass a fake for tests.
     adapter_registry:
         Optional mapping of runtime name -> RuntimeAdapter (injected, T-017-08).
         When None defaults to an empty dict (no enrichment).  The container
@@ -124,8 +120,6 @@ class PanelService:
         spec_context: ContextProjectProvider,
         workspace_root: Path,
         telemetry: Any = None,
-        academy: Any = None,
-        report_retention: Any = None,
         adapter_registry: dict[str, Any] | None = None,
         agents_provider: AgentsProvider | None = None,
     ) -> None:
@@ -146,12 +140,6 @@ class PanelService:
             boot layer (``dadaia_workspace/cli/commands/panel.py``).
             Passing None is safe: telemetry endpoints will return 503
             until a real TelemetryService is injected.
-        academy:
-            Optional AcademyService instance (injected).  When None,
-            the Academy tab returns an empty course list.
-        report_retention:
-            ReportRetentionService instance (injected, T-017-08).
-            When None, calling get_report_retention() raises RuntimeError.
         adapter_registry:
             Mapping of runtime name to RuntimeAdapter (injected, T-017-08).
             When None, get_session_adapter() always returns None (no enrichment).
@@ -160,9 +148,7 @@ class PanelService:
         self._spec_context = spec_context
         self._workspace_root = workspace_root
         self.telemetry = telemetry
-        self.academy = academy
-        # AR-03: injected dependencies for report retention and adapter registry.
-        self._report_retention = report_retention
+        # AR-03: the adapter registry is injected, never imported by a view.
         self._adapter_registry: dict[str, Any] = (
             adapter_registry if adapter_registry is not None else {}
         )
@@ -299,25 +285,6 @@ class PanelService:
         ``core.models.agent`` on bad input / missing agent.
         """
         return self._agents().get_prompt(agent_id, self._workspace_root)
-
-    def get_report_retention(self) -> Any:
-        """Return the injected ReportRetentionService.
-
-        AR-03: views must not construct ReportRetentionService per-request.
-        The container always injects one; tests pass a fake.
-
-        Raises
-        ------
-        RuntimeError
-            When no ReportRetentionService was injected.
-        """
-        if self._report_retention is None:
-            raise RuntimeError(
-                "PanelService requires a ReportRetentionService to be injected via "
-                "'report_retention'. The composition root (container.py) always "
-                "provides one; pass a fake for tests."
-            )
-        return self._report_retention
 
     def get_session_adapter(self, runtime: str) -> Any:
         """Return the RuntimeAdapter for *runtime*, or None if not found.

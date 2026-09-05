@@ -5,9 +5,9 @@ next to the unique main repo. Unlike the v1 -> v2 hop (a breaking state-string r
 ``state_v2.py``), this hop changes no existing semantics — a v2 file with zero
 associated repos already behaves identically to a v3 file with zero associated repos
 (``JsonContextStore`` tolerates both on read; see its module docstring). This module is
-the formal, backup-first, idempotent upgrade that stamps a v2 file explicitly to v3.
+the formal, idempotent upgrade that stamps a v2 file explicitly to v3.
 
-Migration is idempotent once ``schema_version == "3"`` (no-op, no write, no new backup).
+Migration is idempotent once ``schema_version == "3"`` (no-op, no write).
 On unknown schema versions it raises ValueError.
 """
 
@@ -19,8 +19,6 @@ from pathlib import Path
 
 from dadaia_workspace.core.atomic_write import atomic_write
 
-_BACKUP_NAME = "spec_contexts.v2.bak.json"
-
 
 @dataclass
 class MigrationPlan:
@@ -29,7 +27,6 @@ class MigrationPlan:
     schema_version_before: str
     contexts_to_migrate: list[dict] = field(default_factory=list)  # type: ignore[type-arg]
     already_v3: bool = False
-    backup_path: str | None = None
 
 
 def _detect_schema_version(data: dict) -> str:  # type: ignore[type-arg]
@@ -73,24 +70,19 @@ def plan_migration(states_dir: Path) -> MigrationPlan:
         schema_version_before="2",
         contexts_to_migrate=contexts_to_migrate,
         already_v3=False,
-        backup_path=str(states_dir / _BACKUP_NAME),
     )
 
 
 def execute_migration(states_dir: Path) -> None:
-    """Execute the v2 -> v3 migration atomically, backup-first.
+    """Execute the v2 -> v3 migration atomically.
 
     Actions (in spec order):
     1.  Detect schema_version. No file -> nothing to do.
-    2.  Already "3" -> idempotent no-op: no write, no backup.
+    2.  Already "3" -> idempotent no-op: no write.
     3.  Unknown version (not "2"/"3"/missing) -> raise ValueError.
-    4.  Backup: copy the v2 file's text contents to ``spec_contexts.v2.bak.json``
-        *before* any mutation (A15.1) — a UTF-8 text copy via ``read_text``/
-        ``write_text``, not a byte-for-byte copy (universal-newline translation
-        applies).
-    5.  Add ``associated_repos: []`` to every context row that lacks it.
-    6.  Set ``schema_version = "3"``.
-    7.  Write atomically via ``core.atomic_write.atomic_write`` (T-045-14).
+    4.  Add ``associated_repos: []`` to every context row that lacks it.
+    5.  Set ``schema_version = "3"``.
+    6.  Write atomically via ``core.atomic_write.atomic_write`` (T-045-14).
     """
     ctx_file = states_dir / "spec_contexts.json"
 
@@ -108,12 +100,6 @@ def execute_migration(states_dir: Path) -> None:
             f"Unknown schema_version '{schema_ver}' in spec_contexts.json for the v3 "
             "migration. Manual intervention required."
         )
-
-    # Backup-first: preserve the pre-migration v2 file's text contents before any
-    # write (UTF-8 text copy via read_text/write_text — universal-newline
-    # translation applies, not byte-for-byte).
-    backup_file = states_dir / _BACKUP_NAME
-    backup_file.write_text(ctx_file.read_text(encoding="utf-8"), encoding="utf-8")
 
     new_contexts = []
     for ctx in raw.get("contexts", []):

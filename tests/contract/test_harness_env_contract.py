@@ -1,4 +1,6 @@
-"""Harness-env contract tests (WS-R5 / FR-R5-01 / AC-R5-01, release v0.1.10).
+"""Intent: CONTRACT — tests/fixtures/harness_env discipline (no DADAIA_* fiction, no in-process hook stdin)
+
+Harness-env contract tests (WS-R5 / FR-R5-01 / AC-R5-01, release v0.1.10).
 
 Two HARD-FAIL contracts protect the harness-env fixture discipline introduced in
 ``tests/fixtures/harness_env.py``. Both formerly carried per-file *baselines* of pre-existing

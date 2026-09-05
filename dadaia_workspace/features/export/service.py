@@ -1,40 +1,35 @@
-"""Workspace export feature — packages durable state into a portable .tar.gz."""
+"""`dadaia export` — one record per spec context, written to `.dadaia/dist/spec-contexts.json`."""
 
-import io
 import json
-import sys
-import tarfile
-from dataclasses import asdict, replace
+from dataclasses import replace
 from datetime import UTC, datetime
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
-from dadaia_workspace.core import workspace_layout
-from dadaia_workspace.core.models.export import ExportManifest, ExportOptions, ExportResult
-from dadaia_workspace.core.models.spec_context import ContextState
+from dadaia_workspace.core.atomic_write import atomic_write
+from dadaia_workspace.core.models.export import SCHEMA_VERSION, ExportResult
+from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
-
-_EXCLUDED_DIR_NAMES: frozenset[str] = frozenset(
-    {".npm", ".npm-global", ".cache", ".local", "linuxbrew", ".venv", "tmp", "contexts"}
-)
-
-
-def _exclude_filter(tarinfo: tarfile.TarInfo) -> tarfile.TarInfo | None:
-    parts = Path(tarinfo.name).parts
-    if any(p in _EXCLUDED_DIR_NAMES for p in parts):
-        return None
-    if tarinfo.name.endswith(".env"):
-        return None
-    return tarinfo
 
 
 def _dadaia_version() -> str:
     try:
-        from importlib.metadata import version
-
         return version("dadaia-workspace")
-    except Exception:
-        return "unknown"
+    except PackageNotFoundError:
+        return "editable"
+
+
+def _record(ctx: SpecContextProject, last_sync_at: str | None) -> dict[str, object]:
+    return {
+        "slug": ctx.repo_slug,
+        "name": ctx.name,
+        "state": ctx.state.name,
+        "repo_url": ctx.repo_url,
+        "branch": ctx.current_branch,
+        "associated_repos": [{"slug": r.slug, "url": r.url} for r in ctx.associated_repos],
+        "last_sync_at": last_sync_at,
+    }
 
 
 class ExportService:
@@ -45,149 +40,31 @@ class ExportService:
         self._git = git_client
         self._workspace_root = workspace_root
 
-    def resolve_includes(self, options: ExportOptions) -> list[tuple[Path, str]]:
-        root = self._workspace_root
-        dadaia = root / ".dadaia"
-        includes: list[tuple[Path, str]] = []
-
-        def _add_if_exists(src: Path, arc: str) -> None:
-            if src.exists():
-                if src.is_file() and src.name.endswith(".env"):
-                    print(f"WARNING: skipping .env file: {src}", file=sys.stderr)
-                    return
-                includes.append((src, arc))
-
-        _add_if_exists(dadaia / "states", ".dadaia/states")
-        _add_if_exists(dadaia / "academy", ".dadaia/academy")
-
-        if options.include_reports:
-            _add_if_exists(dadaia / "reports", ".dadaia/reports")
-
-        for name in sorted(workspace_layout.LAW_BASENAMES):
-            _add_if_exists(root / name, name)
-
-        _add_if_exists(root / ".agents" / "skills", ".agents/skills")
-
-        claude = root / ".claude"
-        _add_if_exists(claude / "settings.json", ".claude/settings.json")
-        _add_if_exists(claude / "settings.local.json", ".claude/settings.local.json")
-        _add_if_exists(claude / "rules", ".claude/rules")
-
-        codex = root / ".codex"
-        _add_if_exists(codex / "config.toml", ".codex/config.toml")
-        _add_if_exists(codex / "hooks.json", ".codex/hooks.json")
-        _add_if_exists(codex / "rules", ".codex/rules")
-
-        mnt = root / "mnt"
-        if not options.exclude_mnt and mnt.exists():
-            includes.append((mnt, "mnt"))
-
-        return includes
-
-    def _refresh_branches(self) -> None:
-        """Refresh the stored `current_branch` snapshot for every ALIVE context
-        before an export runs.
-
-        Uses ``dataclasses.replace`` (never a hand-copied field-by-field
-        reconstruction) so this write-through can NEVER silently drop a field it
-        does not know about — the root cause of a real data-loss bug (T-044-29,
-        FR18): the prior manual ``SpecContextProject(...)`` call omitted
-        ``associated_repos``, so every ``dadaia export`` on an ALIVE context with
-        associated repos wiped that context's associated-repo registry in the LIVE
-        ``spec_contexts.json`` store, not merely in the export archive.
-        """
+    def _refresh_branches(self, now: str) -> list[tuple[SpecContextProject, str | None]]:
+        """Re-read the checked-out branch of every ALIVE repo on disk and write it through
+        the store with ``dataclasses.replace`` — a field-by-field rebuild once dropped
+        ``associated_repos`` from the live store (T-044-29). Returns each context with the
+        instant it was synced: ``now`` when refreshed, else its ``dead_since``."""
+        rows: list[tuple[SpecContextProject, str | None]] = []
         for ctx in self._store.list_all():
-            if ctx.state != ContextState.ALIVE:
-                continue
-            repo_path = self._workspace_root / "repos" / ctx.repo_slug
-            if not repo_path.exists():
-                continue
-            try:
-                branch = self._git.current_branch(repo_path)
-                self._store.update(replace(ctx, current_branch=branch))
-            except Exception:
-                pass
+            repo = self._workspace_root / "repos" / ctx.repo_slug
+            if ctx.state is ContextState.ALIVE and repo.is_dir():
+                ctx = replace(ctx, current_branch=self._git.current_branch(repo))
+                self._store.update(ctx)
+                rows.append((ctx, now))
+            else:
+                rows.append((ctx, ctx.dead_since))
+        return rows
 
-    def build_manifest(
-        self, includes: list[tuple[Path, str]], options: ExportOptions
-    ) -> ExportManifest:
-        try:
-            contexts: tuple[dict[str, object], ...] = tuple(
-                {
-                    "name": ctx.name,
-                    "repo_url": ctx.repo_url,
-                    "state": ctx.state,
-                    "current_branch": ctx.current_branch,
-                    # FR18/A18.4: the manifest surfaces associated repos too (url per
-                    # repo; branch is tracked on the main repo only, per the model) —
-                    # the actual round-trip authority is the `.dadaia/states` archive
-                    # member (patched wholesale on import), this is the visible record.
-                    "associated_repos": [
-                        {"slug": r.slug, "url": r.url} for r in ctx.associated_repos
-                    ],
-                }
-                for ctx in self._store.list_all()
-            )
-        except Exception:
-            print(
-                "WARNING: could not read spec_contexts.json — contexts list will be empty",
-                file=sys.stderr,
-            )
-            contexts = ()
-
-        arc_names = tuple(arc for _, arc in includes)
-        mnt_included = any(arc == "mnt" or arc.startswith("mnt/") for arc in arc_names)
-
-        return ExportManifest(
-            version="1",
-            exported_at=datetime.now(tz=UTC).isoformat(),
-            workspace_root=str(self._workspace_root),
-            dadaia_version=_dadaia_version(),
-            contexts=contexts,
-            includes=arc_names,
-            mnt_included=mnt_included,
-            reports_included=options.include_reports,
-            total_size_bytes=0,
-        )
-
-    def create_archive(
-        self,
-        includes: list[tuple[Path, str]],
-        manifest: ExportManifest,
-        output_dir: Path,
-    ) -> Path:
-        timestamp = datetime.now().strftime("%Y-%m-%d-%H%M%S")
-        archive_path = output_dir / f"workspace-{timestamp}.tar.gz"
-
-        manifest_bytes = json.dumps(asdict(manifest), indent=2).encode()
-
-        with tarfile.open(archive_path, "w:gz") as tar:
-            manifest_info = tarfile.TarInfo(name="export-manifest.json")
-            manifest_info.size = len(manifest_bytes)
-            tar.addfile(manifest_info, io.BytesIO(manifest_bytes))
-
-            for src, arc_name in includes:
-                tar.add(src, arcname=arc_name, recursive=True, filter=_exclude_filter)
-
-        return archive_path
-
-    def run(self, options: ExportOptions) -> ExportResult:
-        output_dir = (
-            options.output
-            if options.output is not None
-            else self._workspace_root / ".dadaia" / "dist"
-        )
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-        self._refresh_branches()
-        includes = self.resolve_includes(options)
-        manifest = self.build_manifest(includes, options)
-
-        if options.list_only:
-            print(json.dumps(asdict(manifest), indent=2))
-            return ExportResult(path=None, size=0, manifest=manifest)
-
-        archive_path = self.create_archive(includes, manifest, output_dir)
-        final_size = archive_path.stat().st_size
-        manifest = replace(manifest, total_size_bytes=final_size)
-        return ExportResult(path=archive_path, size=final_size, manifest=manifest)
+    def run(self) -> ExportResult:
+        now = datetime.now(tz=UTC).isoformat()
+        rows = self._refresh_branches(now)
+        payload = {
+            "schema_version": SCHEMA_VERSION,
+            "exported_at": now,
+            "dadaia_version": _dadaia_version(),
+            "contexts": [_record(ctx, synced_at) for ctx, synced_at in rows],
+        }
+        path = self._workspace_root / ".dadaia" / "dist" / "spec-contexts.json"
+        atomic_write(path, json.dumps(payload, indent=2) + "\n", ensure_parent=True)
+        return ExportResult(path=path, contexts=len(rows))

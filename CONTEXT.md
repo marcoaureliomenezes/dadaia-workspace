@@ -95,7 +95,13 @@ The one way a record changes status; refuses incomplete input.
 _Avoid_: update --set status, flip
 
 **Release**:
-One `major.minor.patch` unit maturing through `rc-N`; its state is `RELEASE.json`, its narrative is that file's `log`.
+The open-scope publication unit, named last-published-PyPI + 1 patch — exactly one live, growing by stacked Candidates; its state is `_RELEASE.json`, its narrative is that file's `log`. The version increments only at operator-approved deploy (ADR 0005). _Avoid_: "release" for one closed scope — that is a Candidate.
+
+**Candidate**:
+One closed-scope SDD cycle inside the live Release (grill → SPEC/PLAN/TASKS `Aprovado` → implementation → memory → closure → develop merge → promote-or-continue gate). The live Candidate's trio sits at the release root.
+
+**rc-N**:
+The archive folder of the N-th completed-but-not-shipped Candidate's trio, created by `dadaia release rc-archive`. _Avoid_: "rc" as a branch name, a fixes-only round, or a scaffolded sub-phase — the segment lane (`alpha-N`) is retired (ADR 0006).
 _Avoid_: version (for the unit), sprint
 
 **Memory**:
@@ -145,6 +151,24 @@ _Avoid_: template hashes, drift allowlist
 **Scoped law**:
 A per-area `AGENTS.md` projected from `public/scaffold/<area>/` (or the repo/tests pair placed by `scoped_law.install_scoped_law`); governed by TREE-5's shipped-history discipline.
 _Avoid_: sub-AGENTS, area rules file
+
+## Workspace zones (0.4.6)
+
+**Zone**:
+One top-level `.dadaia/` directory with a `Zone(name, cls, creator, ttl_seconds, canon, purpose)` record in `core/workspace_layout.DADAIA_ZONES`; classes `projection state protected operator output ephemeral managed`, creators `init install runtime operator`. Every other list of zone names is a view of the registry.
+_Avoid_: folder, lane, path class (the gate's category — a zone is a directory record)
+
+**Finding verdict**:
+The doctor's classification of one scanned entry — `canon | operator | slop | expired | missing`; `canon` + `operator` count as canonical. Always written qualified.
+_Avoid_: verdict (bare — the PR approval record above), status, class
+
+**Finding code**:
+`WS-<zone>-<verdict>` — `<zone>` is `root`, a harness dir (`claude codex kimi-code agents`), `dadaia` (the `.dadaia/` top level) or a zone name with its leading dot stripped (`cache`); one finding line each, then the score line `compliance: N/M entries canonical (P%)`.
+_Avoid_: ROOT-n, EFF-n, issue code
+
+**Instance exceptions**:
+`states/instance_exceptions.txt` — one glob per line, `#` comments, deduplicated, order kept; matches at the root and inside the harness dirs. Outside the projection manifest and outside the exceptions = slop. Replaces `root_exceptions.txt`.
+_Avoid_: root exceptions, allowlist, whitelist (the root whitelist is the gate's law, not the operator's globs)
 
 ## Homonyms — one canonical sense
 

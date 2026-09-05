@@ -41,7 +41,7 @@ The canon (operator, 2026-08-28) — the ONLY members permitted under ``specs/``
 
     releases/{AGENTS.md, _ideas/{AGENTS.md, <M.m.p>/SPEC.md},
               _archive/{releases_histo.jsonl, <M.m.p>/**},
-              <M.m.p>/{RELEASE.json, SPEC.md, PLAN.md, TASKS.md,
+              <M.m.p>/{_RELEASE.json, SPEC.md, PLAN.md, TASKS.md, rc-N/{SPEC,PLAN,TASKS}.md,
                        verdicts/<40hex>.handoff.json,
                        <alpha|rc>-N/{SPEC.md, PLAN.md, TASKS.md}}}
     backlog/{AGENTS.md, BACKLOG.json,
@@ -64,7 +64,7 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Iterable
+from collections.abc import Collection, Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -76,7 +76,12 @@ from dadaia_workspace.core.specs_version import (
     is_release_semver,
 )
 from dadaia_workspace.core.workspace_layout import AUDIT_DIR_NAME_PATTERN
-from dadaia_workspace.features.specs.memory_canon import MEMORY_TOPLEVEL_FILES
+from dadaia_workspace.features.specs.memory_canon import (
+    FIXED_SECTION_BY_PATH,
+    MEMORY_TOPLEVEL_FILES,
+    read_fixed_fragment,
+    render_fixed_section,
+)
 
 __all__ = [
     "CANON",
@@ -98,10 +103,11 @@ _SHA40 = r"[0-9a-f]{40}"
 #: One fact, one place (core.workspace_layout, SPEC-DOC-030's own single home) — never
 #: a second, independently hand-kept copy of the audit-dir date-slug shape.
 _YYYYMMDD_SLUG = AUDIT_DIR_NAME_PATTERN
-#: A release segment name (ADR-1/ADR-5, mirrors ``scaffolder._SEGMENT_RE``): an
-#: ``alpha-N``/``rc-N`` sub-phase directory under a release, e.g.
-#: ``releases/0.6.0/alpha-1/``.
-_SEGMENT = r"(?:alpha|rc)-\d+"
+#: An archived-candidate folder under the live release (release 0.4.6 FR2, ADR 0006):
+#: ``rc-N`` holds the SPEC/PLAN/TASKS trio of the N-th completed-but-not-shipped
+#: candidate, moved there by ``dadaia release rc-archive``. The scaffolded segment
+#: lane (``alpha-N``, docs planned ahead) is retired — rc-N is ONLY an archive.
+_RC = r"rc-\d+"
 _AREA = r"[a-z][a-z0-9_-]*"
 _SLUG = r"[a-z][a-z0-9_-]*"
 
@@ -316,6 +322,11 @@ CANON: tuple[CanonEntry, ...] = (
     ),
     CanonEntry(re.compile(rf"^releases/_archive/{_SEMVER}/.+$"), "static", False, None, "releases"),
     CanonEntry(
+        re.compile(rf"^releases/{_SEMVER}/_RELEASE\.json$"), "static", False, None, "releases"
+    ),
+    # Legacy state-file name (pre-0.4.6) — admitted ONLY as the rename-lane input:
+    # SPEC-DOC-046 offers the doctor-fixable rename to _RELEASE.json (ADR 0007).
+    CanonEntry(
         re.compile(rf"^releases/{_SEMVER}/RELEASE\.json$"), "static", False, None, "releases"
     ),
     CanonEntry(
@@ -336,16 +347,16 @@ CANON: tuple[CanonEntry, ...] = (
     ),
     # A segmented release's SPEC/PLAN/TASKS live one directory deeper
     # (``releases/<M.m.p>/<alpha|rc>-N/{SPEC,PLAN,TASKS}.md`` —
-    # ``scaffolder.scaffold_release_segment``, ``dd-release-implement`` §2/§4). Never
+    # ``scaffolder.scaffold_release_segment``, ``dd-release-implementation`` §2/§4). Never
     # required_at_birth: a segment is opened on demand, well after the release itself.
     CanonEntry(
-        re.compile(rf"^releases/{_SEMVER}/{_SEGMENT}/SPEC\.md$"), "static", False, None, "releases"
+        re.compile(rf"^releases/{_SEMVER}/{_RC}/SPEC\.md$"), "static", False, None, "releases"
     ),
     CanonEntry(
-        re.compile(rf"^releases/{_SEMVER}/{_SEGMENT}/PLAN\.md$"), "static", False, None, "releases"
+        re.compile(rf"^releases/{_SEMVER}/{_RC}/PLAN\.md$"), "static", False, None, "releases"
     ),
     CanonEntry(
-        re.compile(rf"^releases/{_SEMVER}/{_SEGMENT}/TASKS\.md$"), "static", False, None, "releases"
+        re.compile(rf"^releases/{_SEMVER}/{_RC}/TASKS\.md$"), "static", False, None, "releases"
     ),
     # -- backlog/ ------------------------------------------------------------------
     CanonEntry(
@@ -495,31 +506,28 @@ def canon_violations(paths: Iterable[str]) -> list[str]:
     return [path for path in paths if not is_canon_path(path)]
 
 
-def verdict_violations(paths: Iterable[str], head_sha: str, parent_sha: str | None) -> list[str]:
-    """The verdict business rule (operator, 2026-08-28): ``verdicts/`` may hold at most
-    ONE file whose 40-hex name equals *head_sha* or *head_sha*'s first parent
-    (*parent_sha*).
+def verdict_violations(paths: Iterable[str], live_shas: Collection[str]) -> list[str]:
+    """The verdict business rule (operator, 2026-08-28; ship shape 2026-09-05):
+    ``verdicts/`` may hold at most ONE file per LIVE sha.
 
-    Every verdict-shaped path in *paths* whose sha is NEITHER *head_sha* nor
-    *parent_sha* is a violation (stale — SPEC-DOC-044). When more than one verdict
-    file's sha DOES match (an unusual double-verdict state), every match past the
-    first is ALSO a violation — "at most one", not "any number matching". Paths that
-    are not verdict-shaped at all (already covered by :func:`canon_violations`) are
-    ignored here, never double-reported.
+    *live_shas* is ``features.chokepoints.verdict.live_verdict_shas`` — head, head's
+    first parent, integration branch tip — resolved once by the composition root and
+    passed in as plain data. Every verdict-shaped path in *paths* naming a sha outside
+    that set is a violation (stale — SPEC-DOC-044); a second file naming the SAME live
+    sha is also a violation (the excess, never the first). Paths that are not
+    verdict-shaped at all (already covered by :func:`canon_violations`) are ignored
+    here, never double-reported.
     """
-    allowed = {sha for sha in (head_sha, parent_sha) if sha}
-    matches: list[str] = []
+    seen: set[str] = set()
     violations: list[str] = []
     for path in paths:
         match = _VERDICT_RE.match(path)
         if match is None:
             continue
         sha = match.group(1)
-        if sha in allowed:
-            matches.append(path)
-        else:
+        if sha not in live_shas or sha in seen:
             violations.append(path)
-    violations.extend(sorted(matches[1:]))
+        seen.add(sha)
     return violations
 
 
@@ -558,7 +566,7 @@ def check_tree(specs_dir: Path) -> list[Violation]:
     return violations
 
 
-def _default_public_dir() -> Path:
+def default_public_dir() -> Path:
     """``dadaia_workspace/public/`` resolved relative to this installed module — the
     same module-relative idiom already used by ``features.spec_artifacts.memory``
     (retired by this task) and ``features.specs.doctor``'s CLI composition root."""
@@ -572,15 +580,15 @@ def _today() -> str:
 def _render(entry: CanonEntry, *, public_dir: Path, context: dict[str, str]) -> str:
     if entry.kind == "copy":
         assert entry.template is not None
-        return (public_dir / entry.template).read_text(encoding="utf-8")
-    if entry.kind == "static":
+        text = (public_dir / entry.template).read_text(encoding="utf-8")
+    elif entry.kind == "static":
         assert entry.template is not None
-        return entry.template
-    if entry.kind == "format":
+        text = entry.template
+    elif entry.kind == "format":
         assert entry.template is not None
-        return entry.template.format(**context)
-    if entry.kind == "json_catalog":
-        return (
+        text = entry.template.format(**context)
+    elif entry.kind == "json_catalog":
+        text = (
             json.dumps(
                 {
                     "generated_at": f"{context['today']}T00:00:00Z",
@@ -591,7 +599,12 @@ def _render(entry: CanonEntry, *, public_dir: Path, context: dict[str, str]) -> 
             )
             + "\n"
         )
-    raise AssertionError(f"unknown CanonEntry.kind: {entry.kind!r}")  # pragma: no cover
+    else:
+        raise AssertionError(f"unknown CanonEntry.kind: {entry.kind!r}")  # pragma: no cover
+    section_id = FIXED_SECTION_BY_PATH.get(entry.dest or "")
+    if section_id is None:
+        return text
+    return render_fixed_section(text, section_id, read_fixed_fragment(public_dir, section_id))
 
 
 def scaffold(
@@ -609,7 +622,7 @@ def scaffold(
     ``features.specs.scaffolder.scaffold`` (the CLI-facing wrapper, which pre-checks
     existence to report ``ScaffoldResult.skipped`` without changing this fold).
     """
-    resolved_public = public_dir if public_dir is not None else _default_public_dir()
+    resolved_public = public_dir if public_dir is not None else default_public_dir()
     context = {
         "today": _today(),
         "project_name": project_name,
@@ -656,7 +669,7 @@ def scaffold_entry(specs_dir: Path, rel_path: str, /, **context: str) -> Path:
         raise FileExistsError(f"{target} already exists — refusing to overwrite (no-clobber).")
     rendered = _render(
         entry,
-        public_dir=_default_public_dir(),
+        public_dir=default_public_dir(),
         context={"today": _today(), **context},
     )
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -669,7 +682,13 @@ def scaffold_entry(specs_dir: Path, rel_path: str, /, **context: str) -> Path:
 #: directory a caller can already write RELEASE.json/PLAN.md/TASKS.md into ahead of
 #: ``release new`` (e.g. `dadaia release new` racing a segment scaffold) must never
 #: have any of its four canonical artifacts silently overwritten.
-_RELEASE_ARTIFACT_NAMES: tuple[str, ...] = ("SPEC.md", "PLAN.md", "TASKS.md", "RELEASE.json")
+_RELEASE_ARTIFACT_NAMES: tuple[str, ...] = (
+    "SPEC.md",
+    "PLAN.md",
+    "TASKS.md",
+    "_RELEASE.json",
+    "RELEASE.json",
+)
 
 
 def release_new(specs_dir: Path, release_id: str) -> Path:
@@ -713,6 +732,21 @@ def release_new(specs_dir: Path, release_id: str) -> Path:
 
     releases_root = specs_dir / "releases"
     release_dir = releases_root / release_id
+    # Exactly one live release, ever (release 0.4.6 FR4, ADR 0005): scope grows by
+    # candidates inside the live release, never by minting a sibling. _archive/_ideas
+    # are not live; the target id itself is caught by the no-clobber checks below.
+    if releases_root.is_dir():
+        others = sorted(
+            d.name
+            for d in releases_root.iterdir()
+            if d.is_dir() and d.name not in ("_archive", "_ideas") and d.name != release_id
+        )
+        if others:
+            raise FileExistsError(
+                f"a live release already exists ({', '.join(others)}) — the "
+                "release-candidates model allows exactly one; stack the work as a new "
+                "candidate (dadaia release rc-archive) or ship first."
+            )
     if releases_root.is_symlink() or release_dir.is_symlink():
         raise FileExistsError(
             f"{release_dir} resolves through a symlink — refusing to mint a release "

@@ -24,7 +24,7 @@ CLI defect, never a bypass).
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Iterator, Sequence
+from collections.abc import Callable, Collection, Iterable, Iterator, Sequence
 from pathlib import Path
 from typing import Protocol
 
@@ -41,6 +41,7 @@ from dadaia_workspace.features.chokepoints.denylist_scan import (
     PathMasker,
     scan_objects,
 )
+from dadaia_workspace.features.chokepoints.verdict import live_verdict_shas
 
 __all__ = ["push_gate_decision"]
 
@@ -70,6 +71,8 @@ class ObjectSource(Protocol):
     def list_tree_paths(self, repo: Path, sha: str, prefix: str) -> list[str]: ...
 
     def first_parent(self, repo: Path, sha: str) -> str | None: ...
+
+    def resolve_ref(self, repo: Path, ref: str) -> str | None: ...
 
 
 def _annotate_skip(
@@ -281,7 +284,7 @@ def _run_specs_canon_scan(
     object_source: ObjectSource,
     repo: Path,
     canon_violations_fn: Callable[[Sequence[str]], Sequence[str]],
-    verdict_violations_fn: Callable[[Sequence[str], str, str | None], Sequence[str]],
+    verdict_violations_fn: Callable[[Sequence[str], Collection[str]], Sequence[str]],
 ) -> Decision | None:
     """SPEC v0.5.0 specs-canon closure (operator ruling 2026-08-28): every pushed
     non-deletion ref's tree is checked for a ``specs/`` path violating the v6 canon
@@ -311,8 +314,9 @@ def _run_specs_canon_scan(
             )
         specs_rel = [p[len("specs/") :] for p in raw_paths if p.startswith("specs/")]
         bad = set(canon_violations_fn(specs_rel))
-        parent_sha = object_source.first_parent(repo, ref.local_sha)
-        bad.update(verdict_violations_fn(specs_rel, ref.local_sha, parent_sha))
+        bad.update(
+            verdict_violations_fn(specs_rel, live_verdict_shas(object_source, repo, ref.local_sha))
+        )
         for path in sorted(bad):
             key = (ref.local_sha, path)
             if key in seen:
@@ -330,7 +334,7 @@ def push_gate_decision(
     object_source: ObjectSource,
     repo: Path,
     canon_violations_fn: Callable[[Sequence[str]], Sequence[str]],
-    verdict_violations_fn: Callable[[Sequence[str], str, str | None], Sequence[str]],
+    verdict_violations_fn: Callable[[Sequence[str], Collection[str]], Sequence[str]],
     malformed_lines: int = 0,
     denylist_terms: Iterable[tuple[str, str]] = (),
     baseline_patterns: Iterable[BaselinePatternLike] = (),

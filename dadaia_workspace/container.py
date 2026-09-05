@@ -1,7 +1,6 @@
 """Composition root — builds services with concrete infrastructure."""
 
 import logging
-import os
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -13,18 +12,13 @@ if TYPE_CHECKING:
     from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
 
 from dadaia_workspace.core.exceptions import (
-    NoActiveReleaseError,
     WorkspaceNotInitializedError,
 )
 from dadaia_workspace.core.handoff_index import HandoffIndex
-from dadaia_workspace.core.invocation import resolve as _resolve_invocation
-from dadaia_workspace.core.invocation import resolve_context_specs_dir as _resolve_context_specs_dir
-from dadaia_workspace.features.academy.service import AcademyService
 from dadaia_workspace.features.chokepoints.denylist_scan import BaselinePatternLike
 from dadaia_workspace.features.export.service import ExportService
+from dadaia_workspace.features.import_.service import ImportService
 from dadaia_workspace.features.public.service import PublicAssetService
-from dadaia_workspace.features.reports.next import ReportsNextService
-from dadaia_workspace.features.reports.retention import ReportRetentionService
 from dadaia_workspace.features.repos.service import ReposService
 from dadaia_workspace.features.server_registry.service import ServerRegistryService
 from dadaia_workspace.features.spec_context.doctor import DoctorService
@@ -34,9 +28,8 @@ from dadaia_workspace.infrastructure.excel_reader import OpenpyxlExcelReader
 from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
-from dadaia_workspace.infrastructure.json_course_store import JsonCourseStore
 from dadaia_workspace.infrastructure.json_server_registry_store import JsonServerRegistryStore
-from dadaia_workspace.infrastructure.process_probe_adapter import OsProcessProbe, build_pid_probe
+from dadaia_workspace.infrastructure.process_probe_adapter import OsProcessProbe
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 
@@ -93,10 +86,15 @@ def build_workspace_service(workspace_root: Path) -> WorkspaceService:
 def build_spec_context_service(workspace_root: Path) -> SpecContextService:
     _guard_initialized(workspace_root)
     states = _states_dir(workspace_root)
+    # Injected so spec_context never imports its sibling feature; lazy because
+    # `features.specs` pulls the doctor's jsonschema stack every other command skips.
+    from dadaia_workspace.features.specs.canon import scaffold as scaffold_specs
+
     return SpecContextService(
         context_store=JsonContextStore(states),
         git_client=GitSubprocessClient(),
         workspace_root=workspace_root,
+        scaffold_specs=scaffold_specs,
     )
 
 
@@ -120,7 +118,7 @@ def build_repos_service() -> ReposService:
 def build_git_object_reader() -> GitSubprocessObjectReader:
     """Composition-root seam for the push-range object reader (v0.9.0 FR1/FR7; ADR-0001:
     the sole adapter, shared by two CLI verbs — ``ci.push_gate_check`` and
-    ``specs.doctor``'s ``head_sha``/``parent_sha`` resolution — so it stays a container
+    ``specs.doctor``'s live verdict-sha resolution — so it stays a container
     seam rather than each verb constructing its own instance.
 
     As of v0.4.3 T-043-15/FR11, the adapter this seam returns yields commit-object
@@ -274,16 +272,6 @@ def build_doctor_service(workspace_root: Path) -> DoctorService:
         context_store=JsonContextStore(states),
         git_client=GitSubprocessClient(),
         workspace_root=workspace_root,
-        pid_probe=build_pid_probe(),
-    )
-
-
-def build_academy_service(workspace_root: Path) -> AcademyService:
-    _guard_initialized(workspace_root)
-    academy_dir = workspace_root / ".dadaia" / "academy"
-    return AcademyService(
-        course_store=JsonCourseStore(academy_dir),
-        workspace_root=workspace_root,
     )
 
 
@@ -295,6 +283,10 @@ def build_export_service(workspace_root: Path) -> ExportService:
         git_client=GitSubprocessClient(),
         workspace_root=workspace_root,
     )
+
+
+def build_import_service(workspace_root: Path) -> ImportService:
+    return ImportService(build_spec_context_service(workspace_root))
 
 
 def build_server_registry_service(workspace_root: Path) -> ServerRegistryService:
@@ -327,41 +319,3 @@ def build_handoff_index(workspace_root: Path) -> HandoffIndex:
         workspace_root: Root directory of the initialized dadaia workspace.
     """
     return HandoffIndex(workspace_root)
-
-
-def build_reports_next_service(
-    workspace_root: Path, context: str | None = None
-) -> ReportsNextService:
-    """Compose ``ReportsNextService`` for the active (or explicitly named) context.
-
-    Context resolution (FR-RN-1): when *context* is given, specs live at
-    ``repos/<context>/specs``; otherwise the bound context session is used. The
-    reports tree is keyed by the context name under ``<workspace>/.dadaia/reports``.
-
-    Args:
-        workspace_root: Root directory of the initialized dadaia workspace.
-        context: Optional explicit context name (overrides primary-context resolution).
-
-    Raises:
-        NoActiveReleaseError: No explicit context and no primary context is set.
-    """
-    _guard_initialized(workspace_root)
-    reports_root = workspace_root / ".dadaia" / "handoff"
-    context_name = _resolve_invocation(
-        explicit=context, env=os.environ, cwd=Path.cwd()
-    ).context_name
-    if not context_name:
-        raise NoActiveReleaseError(
-            "No bound context. Run `eval $(dadaia context bind <name> --mode read)` "
-            "or pass --context <name>."
-        )
-    specs_dir = _resolve_context_specs_dir(workspace_root, context_name)
-    return ReportsNextService(
-        specs_dir=specs_dir, reports_root=reports_root, context_name=context_name
-    )
-
-
-def build_reports_retention_service(workspace_root: Path) -> ReportRetentionService:
-    """Compose ``ReportRetentionService`` for workspace runtime report state."""
-    _guard_initialized(workspace_root)
-    return ReportRetentionService(workspace_root)

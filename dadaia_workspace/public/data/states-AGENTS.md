@@ -5,13 +5,12 @@ Scope: this file governs `.dadaia/states/**`.
 State files are machine-owned JSON records used by dadaia services, hooks, and the panel.
 They are not documentation and not an implementation workspace.
 
-## 1. State ownership
+## 1. Canon
 
-| File | Owner |
-|---|---|
-| `spec_contexts.json` | context lifecycle commands (`dadaia context bind/show/list`) |
-| `server_registry.json` | `dadaia server register/list/unregister` |
-| other `*.json` | owning feature/service code |
+The closed canon of `.dadaia/states/`, rendered from `core/workspace_layout.py`
+(`STATES_CANON`) at `dadaia public stage`; any other entry is slop `dadaia doctor` reports.
+
+<!-- canon -->
 
 ## 2. Rules
 

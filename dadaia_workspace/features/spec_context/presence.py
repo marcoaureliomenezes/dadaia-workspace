@@ -49,13 +49,13 @@ from __future__ import annotations
 
 import contextlib
 import json
-import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
 from dadaia_workspace.core import kernel_tunables
 from dadaia_workspace.core.atomic_write import atomic_write
+from dadaia_workspace.core.models.spec_context import CONTEXT_NAME_RE
 from dadaia_workspace.core.record_liveness import is_stale
 
 __all__ = [
@@ -88,11 +88,6 @@ _MARKER_PREFIXES: tuple[str, ...] = (
 #: (24h) for all four throttle/sentinel idioms; see the module docstring.
 _MARKER_GC_TTL_SECONDS = kernel_tunables.SENTINEL_GC_TTL_SECONDS
 
-#: Path-traversal allowlist (CWE-22/CWE-59), matching
-#: ``session_store._validate``. Context names and session ids are filename
-#: components and must never escape their directory.
-_NAME_RE = re.compile(r"[A-Za-z0-9_-]+")
-
 
 @dataclass(frozen=True)
 class PresenceRecord:
@@ -114,7 +109,7 @@ class StaleRecordRef:
 
 
 def _valid_name(name: str) -> bool:
-    return bool(_NAME_RE.fullmatch(name))
+    return bool(CONTEXT_NAME_RE.fullmatch(name))
 
 
 def _presence_root(workspace: Path) -> Path:

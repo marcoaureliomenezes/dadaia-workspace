@@ -1,4 +1,6 @@
-"""v0.1.77 T-1 (RED) — dynamic bind-visibility contract + seam-boundary assertion.
+"""Intent: CONTRACT — P-09 one Invocation (bind-resolution seam, recurrence family F2)
+
+v0.1.77 T-1 (RED) — dynamic bind-visibility contract + seam-boundary assertion.
 
 SPEC FR1/FR2/FR3/FR4 (backlog ``central-bind-resolution-seam``, recurrence family F2: 8
 reports, 5 partial per-command fixes v0.1.47->v0.1.71, still recurring). The contract "a

@@ -110,7 +110,7 @@ def test_gc_deletion_matrix(tmp_path: Path) -> None:
 
     assert not lock_file.exists()
     assert not ctx_locks_dir.exists()
-    assert any("RETIRED-LOCK-STATE" in a for a in actions), actions
+    assert any("WS-states-slop" in a for a in actions), actions
     assert not sess_file.exists()
     assert any("GRAVEYARD-GC" in a and "old-sess-001.json" in a for a in actions), actions
     assert not sentinel.exists()

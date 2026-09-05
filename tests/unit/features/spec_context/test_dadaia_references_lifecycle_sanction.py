@@ -4,8 +4,9 @@
 (``.dadaia/references/<clone>/``). Two independent guarantees, proven at the seam every
 consumer actually shares — never a rule bolted onto each verb (A10.3):
 
-1. A10.1 — the ROOT-4 doctor invariant never flags a reference clone: it is a legitimate,
-   documented top-level ``.dadaia/`` subdir now (``DoctorService._DADAIA_ALLOWED_SUBDIRS``).
+1. A10.1 — the doctor's zone walk never flags a reference clone: ``references`` is an
+   OPERATOR-class row of ``core.workspace_layout.DADAIA_ZONES`` (0.4.6 FR3) — canon at the
+   ``.dadaia/`` top level and never walked, whatever it contains.
 2. A10.2 — a reference clone sits OUTSIDE the context lifecycle: no lifecycle verb can ever
    resolve, bind, alive, dead or GC it. This is proven twice: once at the ONE shared
    enumeration seam every lifecycle verb funnels context resolution through
@@ -82,15 +83,15 @@ def _make_doctor(root: Path, store: FakeContextStore | None = None) -> DoctorSer
 
 
 def test_reference_clone_reports_doctor_clean(tmp_path: Path) -> None:
-    """RED before the fix: ROOT-4 flags ``.dadaia/references/<clone>/`` today. GREEN after:
-    the ROOT-4 allowlist sanctions ``references`` (operator ruling O4) and the workspace
-    reports zero issues for it."""
+    """``references`` reads canon at the ``.dadaia/`` top level and nothing beneath it is
+    ever an entry of the walk (operator ruling O4; OPERATOR zones are never walked)."""
     _init_workspace(tmp_path)
     _plant_reference_clone(tmp_path)
 
-    issues = _make_doctor(tmp_path).check()
+    findings = _make_doctor(tmp_path).scan()
 
-    assert "ROOT-4" not in {i.code for i in issues}, issues
+    assert [f.verdict.value for f in findings if f.path == "references"] == ["canon"]
+    assert not any("references/" in f.path for f in findings), findings
 
 
 # ---------------------------------------------------------------------------
@@ -141,7 +142,8 @@ def test_doctor_fix_gc_sweep_never_touches_a_reference_clone(tmp_path: Path) -> 
     clone_dir = _plant_reference_clone(tmp_path)
     before = (clone_dir / "README.md").read_text(encoding="utf-8")
 
-    # Plant genuinely GC-eligible state alongside it, so fix() has real work to do.
+    # Plant genuinely reapable state alongside it (``WS-states-slop``), so fix() has
+    # real work to do.
     (tmp_path / ".dadaia" / "states" / "ctx_locks").mkdir(parents=True)
     (tmp_path / ".dadaia" / "states" / "ctx_locks" / "stale.lock.json").write_text(
         "{}", encoding="utf-8"

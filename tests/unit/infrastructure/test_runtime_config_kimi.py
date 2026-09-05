@@ -1,7 +1,7 @@
 """v0.2.8 T2 — Kimi Code runtime-config generators (managed hook block + shims).
 
 Pins the managed ``[[hooks]]`` TOML block shape (events, matchers, markers, absolute
-commands), the replace-or-append upsert semantics, and the four workspace-agnostic shim
+commands), the replace-or-append upsert semantics, and the five workspace-agnostic shim
 bodies — including a live ``sh`` replay of the pre-gate block/allow/fail-open contract
 against a fake workspace venv.
 """
@@ -59,8 +59,10 @@ def test_kimi_hooks_block_parses_as_toml_and_pins_rules() -> None:
         "PostToolUse",
         "UserPromptSubmit",
         "PostCompact",
+        "SessionStart",
     ]
     by_event = {h["event"]: h for h in hooks}
+    assert "matcher" not in by_event["SessionStart"]
     assert by_event["PreToolUse"]["matcher"] == "^(Edit|Write|Bash)$"
     assert by_event["PostCompact"]["matcher"] == "manual|auto"
     assert "matcher" not in by_event["PostToolUse"]
@@ -117,7 +119,7 @@ def test_upsert_full_result_stays_valid_toml() -> None:
     out = upsert_kimi_hooks_block(foreign, kimi_hooks_block(_HOME))
     parsed = tomllib.loads(out)
     assert parsed["default_model"] == "kimi-code/k3"
-    assert len(parsed["hooks"]) == 4
+    assert len(parsed["hooks"]) == 5
 
 
 # ---------------------------------------------------------------------------
@@ -132,6 +134,7 @@ def test_kimi_hook_shims_keys_and_prologue() -> None:
         "dadaia-kimi-post-gate.sh",
         "dadaia-kimi-ctx-inject.sh",
         "dadaia-kimi-post-compact.sh",
+        "dadaia-kimi-doctor-expired.sh",
     }
     for body in shims.values():
         assert body.startswith("#!/usr/bin/env sh\n")
@@ -246,7 +249,7 @@ def test_upsert_adopts_legacy_unmarked_rules_instead_of_duplicating() -> None:
     existing = 'default_model = "k3"\n\n' + _LEGACY_UNMARKED_RULES
     out = upsert_kimi_hooks_block(existing, kimi_hooks_block(_HOME))
     parsed = tomllib.loads(out)
-    assert len(parsed["hooks"]) == 4, "legacy rules must be replaced, not duplicated"
+    assert len(parsed["hooks"]) == 5, "legacy rules must be replaced, not duplicated"
     assert out.count(KIMI_BLOCK_BEGIN) == 1
     assert parsed["default_model"] == "k3"
     events = [h["event"] for h in parsed["hooks"]]
@@ -261,7 +264,7 @@ def test_upsert_preserves_operator_rules_while_stripping_legacy() -> None:
     existing = 'default_model = "k3"\n\n' + _LEGACY_UNMARKED_RULES + "\n" + operator_rule
     out = upsert_kimi_hooks_block(existing, kimi_hooks_block(_HOME))
     parsed = tomllib.loads(out)
-    assert len(parsed["hooks"]) == 5  # managed 4 + the operator's Notification rule
+    assert len(parsed["hooks"]) == 6  # managed 5 + the operator's Notification rule
     assert 'command = "terminal-notifier"' in out
 
 
@@ -277,4 +280,4 @@ def test_upsert_repairs_stray_duplicates_outside_existing_markers() -> None:
     assert out.count("dadaia-kimi-pre-gate.sh") == 1
     assert out.count(KIMI_BLOCK_BEGIN) == 1
     parsed = tomllib.loads(out)
-    assert len(parsed["hooks"]) == 4
+    assert len(parsed["hooks"]) == 5

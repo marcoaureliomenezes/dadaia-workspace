@@ -7,16 +7,21 @@ import shutil
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Protocol
 
 from dadaia_workspace.core import specs_backup as _backup
 from dadaia_workspace.core.exceptions import (
+    AssociatedRepoConflictError,
+    AssociatedRepoNotFoundError,
     ContextAlreadyExistsError,
     ContextNotFoundError,
     ContextStateError,
     DadaiaError,
     GitSyncError,
+    InvalidContextNameError,
 )
 from dadaia_workspace.core.models.spec_context import (
+    CONTEXT_NAME_RE,
     AssociatedRepo,
     ContextState,
     RepoLiveStatus,
@@ -29,11 +34,20 @@ from dadaia_workspace.infrastructure.privacy_check import (
     scan_file_for_secrets as _scan_file_for_secrets,
 )
 
-# Canonical scaffold source — lives inside the installed package
+# Scoped-law templates (`scoped_law.py`'s table) live inside the installed package
 _PUBLIC_DIR = Path(__file__).parent.parent.parent / "public"
-_SCAFFOLD_SRC = _PUBLIC_DIR / "scaffold"
 
 _log = logging.getLogger(__name__)
+
+
+class ScaffoldSpecs(Protocol):
+    """The ONE canon fold ``alive()`` scaffolds ``specs/`` through — the shape of
+    ``features.specs.canon.scaffold``, injected by the composition root (P-07: features
+    compose through the container, never a sibling import). It writes every canon entry
+    missing from *specs_dir*, never overwrites one, and returns the paths it wrote.
+    """
+
+    def __call__(self, specs_dir: Path, *, project_name: str) -> list[Path]: ...
 
 
 class DeadReviewRequiredError(DadaiaError):
@@ -54,23 +68,6 @@ class DeadSecretFoundError(DadaiaError):
     ``--commit`` would newly commit. Any match blocks the push (repo left on disk,
     nothing committed or pushed). The message is redacted: it names the file and
     the rule that fired, never the secret value itself.
-    """
-
-
-class AssociatedRepoConflictError(DadaiaError):
-    """Raised by ``add_repo`` when the slug cannot be registered as given (A17.3).
-
-    Two distinct causes share this one error type (both are "the registry already
-    has an opinion about this slug that `add` will not silently override"):
-    the slug IS the context's own main repo slug, or the slug is already an
-    associated repo registered with a *different* URL. Same-slug-same-url is NOT
-    an error — see ``add_repo``'s idempotent no-op.
-    """
-
-
-class AssociatedRepoNotFoundError(DadaiaError):
-    """Raised by ``remove_repo`` when the slug is not a registered associated repo
-    of the context (A17.1: fails loudly on an unknown slug, never a silent no-op).
     """
 
 
@@ -117,38 +114,12 @@ def _now() -> str:
     return datetime.now(tz=UTC).isoformat()
 
 
-def _merge_scaffold_into(
-    scaffold_src: Path,
-    target_dir: Path,
-    *,
-    timestamp: str | None = None,
-) -> list[str]:
-    """Walk *scaffold_src* and copy only files/dirs that are MISSING in *target_dir*.
-
-    Never overwrites any existing file.  Returns the list of relative paths that were
-    added (empty list when nothing was missing).
-
-    If *timestamp* is None the current UTC time is used.  Callers may inject a fixed
-    timestamp for deterministic testing.
-    """
-    if timestamp is None:
-        timestamp = datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%SZ")
-
-    added: list[str] = []
-    for src_path in scaffold_src.rglob("*"):
-        rel = src_path.relative_to(scaffold_src)
-        dst_path = target_dir / rel
-        if src_path.is_dir():
-            if not dst_path.exists():
-                dst_path.mkdir(parents=True, exist_ok=True)
-                _log.info("scaffold merge: created directory %s", rel)
-        else:
-            if not dst_path.exists():
-                dst_path.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(str(src_path), str(dst_path))
-                added.append(str(rel))
-                _log.info("scaffold merge: added missing file %s", rel)
-    return added
+def _require_allowlisted(label: str, value: str) -> None:
+    if not CONTEXT_NAME_RE.fullmatch(value):
+        raise InvalidContextNameError(
+            f"invalid {label} {value!r}: use only letters, digits, '-' and '_' — the one "
+            "allowlist every verb enforces, so a context that is registered is always usable."
+        )
 
 
 class SpecContextService:
@@ -157,10 +128,12 @@ class SpecContextService:
         context_store: JsonContextStore,
         git_client: GitSubprocessClient,
         workspace_root: Path,
+        scaffold_specs: ScaffoldSpecs,
     ) -> None:
         self._store = context_store
         self._git = git_client
         self._workspace_root = workspace_root
+        self._scaffold_specs = scaffold_specs
 
     def _repos_dir(self) -> Path:
         return self._workspace_root / "repos"
@@ -173,42 +146,54 @@ class SpecContextService:
 
     # ------------------------------------------------------------------ create
 
-    def create(self, name: str, repo_slug: str, repo_url: str) -> SpecContextProject:
-        """Register a new Spec Context Project in state ``DEAD``.
-
-        Refuses a *name* already registered (``ContextAlreadyExistsError``) and a
-        *repo_slug* already owned by ANOTHER context — as its own main repo or one
-        of its associated repos (``AssociatedRepoConflictError``,
-        context-create-accepts-slug-owned-by-another-context): the second registry
-        seam that writes into the shared ``repos/<slug>`` namespace, mirroring
-        ``add_repo``'s F-1 guard (see ``_foreign_slug_owner``). Without it, two
-        contexts could register the same ``repos/<slug>`` checkout and arm
-        ``dead()`` of either one to commit, push and delete the other's working
-        tree.
-        """
-        if self._store.get(name) is not None:
-            raise ContextAlreadyExistsError(
-                f"Context '{name}' already exists. Use a different name."
+    def create(
+        self,
+        name: str,
+        repo_slug: str,
+        repo_url: str,
+        *,
+        associated_repos: tuple[AssociatedRepo, ...] = (),
+    ) -> SpecContextProject:
+        """Register a new Spec Context Project in state ``DEAD`` — see ``register``."""
+        return self.register(
+            SpecContextProject(
+                name=name,
+                state=ContextState.DEAD,
+                repo_slug=repo_slug,
+                repo_url=repo_url,
+                created_at=_now(),
+                alive_since=None,
+                dead_since=None,
+                associated_repos=associated_repos,
             )
-        owner = self._foreign_slug_owner(name, repo_slug)
-        if owner is not None:
-            raise AssociatedRepoConflictError(
-                f"'{repo_slug}' is already registered by context '{owner}' (as its "
-                "own main repo or one of its associated repos). 'repos/<slug>' "
-                "is a namespace every context shares — creating context "
-                f"'{name}' with it too would let 'dadaia context dead {name}' "
-                f"commit, push and delete '{owner}''s working tree. Choose a "
-                "different slug, or coordinate with the owning context first."
-            )
-        ctx = SpecContextProject(
-            name=name,
-            state=ContextState.DEAD,
-            repo_slug=repo_slug,
-            repo_url=repo_url,
-            created_at=_now(),
-            alive_since=None,
-            dead_since=None,
         )
+
+    def register(self, ctx: SpecContextProject) -> SpecContextProject:
+        """The ONE seam that inserts a context into the registry — ``create`` (CLI) and
+        ``dadaia import`` both pass here, so a record is refused the same way whoever built
+        it: name and every slug allowlisted (``InvalidContextNameError``), name new
+        (``ContextAlreadyExistsError``), every slug free — not the main slug repeated, not
+        given twice, not owned by another context (``AssociatedRepoConflictError``). Nothing
+        is written unless every check passes."""
+        _require_allowlisted("context name", ctx.name)
+        if self._store.get(ctx.name) is not None:
+            raise ContextAlreadyExistsError(
+                f"Context '{ctx.name}' already exists. Use a different name."
+            )
+        self._refuse_slug(ctx.name, ctx.repo_slug)
+        seen: set[str] = set()
+        for repo in ctx.associated_repos:
+            if repo.slug == ctx.repo_slug:
+                raise AssociatedRepoConflictError(
+                    f"'{repo.slug}' is context '{ctx.name}''s own main repo slug — it is "
+                    "always included via all_repos() and can never also be an associated repo."
+                )
+            if repo.slug in seen:
+                raise AssociatedRepoConflictError(
+                    f"associated repo slug '{repo.slug}' given more than once."
+                )
+            seen.add(repo.slug)
+            self._refuse_slug(ctx.name, repo.slug)
         self._store.save(ctx)
         return ctx
 
@@ -241,29 +226,23 @@ class SpecContextService:
 
     # ------------------------------------------------------------------ associated repos (FR17)
 
-    def _foreign_slug_owner(self, name: str, slug: str) -> str | None:
-        """Return the name of another context that already owns *slug*, or ``None``.
-
-        "Owns" means *slug* is that other context's own main repo slug, or one of
-        its registered associated repos. Every context's ``repos/<slug>`` checkout
-        lives in the ONE namespace every context shares (A15.3/FR17) — the same
-        assumption ``dead()`` makes when it walks ``all_repos()`` and
-        commit_all()s/push()es/rmtree()s every entry it finds. ``create`` (the
-        main ``--repo`` slug) and ``add_repo`` (associated slugs) are the TWO
-        seams that write into that shared namespace, so both consult this
-        predicate to keep the assumption true (T-044-45 F-1 / bug
-        context-repo-add-accepts-foreign-context-slug at ``add_repo``, mirrored
-        at ``create`` by bug context-create-accepts-slug-owned-by-another-context)
-        — never a second guard added inside ``dead()`` itself, which would be
-        checking the destructive side of a boundary that should never have been
-        crossable in the first place.
-        """
+    def _refuse_slug(self, name: str, slug: str) -> None:
+        """Refuse *slug* for *name* unless allowlisted and unowned by any other context (its
+        main repo or an associated repo): every ``repos/<slug>`` checkout lives in the ONE
+        namespace ``dead()`` walks and destroys, so the two writers into it — ``register``
+        and ``add_repo`` — guard here, never ``dead()`` itself."""
+        _require_allowlisted("repo slug", slug)
         for other in self._store.list_all():
             if other.name == name:
                 continue
             if other.repo_slug == slug or any(r.slug == slug for r in other.associated_repos):
-                return other.name
-        return None
+                raise AssociatedRepoConflictError(
+                    f"'{slug}' is already owned by context '{other.name}' (as its own main "
+                    "repo or one of its associated repos). 'repos/<slug>' is a namespace every "
+                    f"context shares — registering it on '{name}' too would let 'dadaia "
+                    f"context dead {name}' commit, push and delete '{other.name}''s working "
+                    "tree. Choose a different slug, or coordinate with the owning context first."
+                )
 
     def add_repo(self, name: str, slug: str, repo_url: str = "") -> tuple[SpecContextProject, bool]:
         """Register an associated repo on a context (A17.1/A17.3).
@@ -295,16 +274,7 @@ class SpecContextService:
                 "create time) — it is always included via all_repos() and can "
                 "never also be registered as an associated repo."
             )
-        owner = self._foreign_slug_owner(name, slug)
-        if owner is not None:
-            raise AssociatedRepoConflictError(
-                f"'{slug}' is already registered by context '{owner}' (as its "
-                "own main repo or one of its associated repos). 'repos/<slug>' "
-                "is a namespace every context shares — registering it on "
-                f"'{name}' too would let 'dadaia context dead {name}' commit, "
-                f"push and delete '{owner}''s working tree. Choose a different "
-                "slug, or coordinate with the owning context first."
-            )
+        self._refuse_slug(name, slug)
         existing = next((r for r in ctx.associated_repos if r.slug == slug), None)
         if existing is not None:
             if existing.url == repo_url:
@@ -488,33 +458,19 @@ class SpecContextService:
         # docker-compose.yml). `touched` accumulates only those repo-relative paths.
         touched: list[str] = []
 
+        # The same canon fold `dadaia specs init` runs, so an alive-born tree is
+        # doctor-clean at birth; it never overwrites an existing entry, and only the
+        # files it wrote are staged — a pre-existing specs/ may carry unrelated dirt.
         specs_dir = self._specs_dir(repo_slug)
-        if not specs_dir.exists():
-            if _SCAFFOLD_SRC.exists():
-                shutil.copytree(_SCAFFOLD_SRC, specs_dir)
-            else:
-                for subdir in ("", "memory", "features"):
-                    (specs_dir / subdir).mkdir(parents=True, exist_ok=True)
-            # Entirely new tree — every path under it is scaffold-authored.
-            touched.append("specs")
-        elif _SCAFFOLD_SRC.exists():
-            preserved = _backup.preserve_specs(specs_dir)
-            added = _merge_scaffold_into(_SCAFFOLD_SRC, specs_dir)
-            if added:
-                _log.info(
-                    "scaffold merge into pre-existing specs/: %d file(s) added: %s "
-                    "(pre-existing tree preserved at %s)",
-                    len(added),
-                    added,
-                    preserved,
-                )
-                # Pre-existing specs/ may carry its own unrelated dirty files — stage
-                # only the individual files the merge actually added, never the whole
-                # directory.
-                touched.extend(Path("specs", rel).as_posix() for rel in added)
-            else:
-                shutil.rmtree(preserved, ignore_errors=True)
-                _log.info("scaffold merge into pre-existing specs/: no missing files found")
+        preserved = _backup.preserve_specs(specs_dir) if specs_dir.exists() else None
+        created = self._scaffold_specs(specs_dir, project_name=repo_slug)
+        touched.extend(path.relative_to(repo_path).as_posix() for path in created)
+        if preserved is not None and not created:
+            shutil.rmtree(preserved, ignore_errors=True)
+            preserved = None
+        _log.info(
+            "scaffold: %d canon file(s) added to specs/; snapshot: %s", len(created), preserved
+        )
 
         # Scoped-law placement (repo AGENTS.md + tests/AGENTS.md) — one home (F013):
         # features.spec_context.scoped_law owns the hardened install-if-absent writes.

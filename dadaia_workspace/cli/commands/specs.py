@@ -14,6 +14,7 @@ from dadaia_workspace.cli._specs_resolution import (
     resolve_specs_dir_for_cli,
 )
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
+from dadaia_workspace.features.chokepoints.verdict import INTEGRATION_TIP_REF, live_verdict_shas
 from dadaia_workspace.features.specs import Severity, SpecsDoctor
 from dadaia_workspace.features.specs.doctor_types import SpecsDoctorIssue
 from dadaia_workspace.features.specs.rules import render_fix_help
@@ -33,41 +34,28 @@ def _resolve_specs_dir(specs_dir: str | None) -> Path:
     return resolve_specs_dir_for_cli(specs_dir)
 
 
-def _resolve_head_and_parent_sha(specs_dir: Path) -> tuple[str | None, str | None]:
-    """Resolve the branch HEAD sha and its first parent (v0.5.0 specs-canon closure)
-    — plain data fed into SPEC-DOC-044's stale-verdict check. The repo root is
-    ``specs_dir.parent`` (the SAME convention :func:`_resolve_public_dir` already
-    uses: ``specs/`` sits directly at the repo root). Returns ``(None, None)`` when
-    *specs_dir*'s repo root is not a git repository, or the resolution otherwise
-    fails — a doctor invocation with no git context stays silent on that one check
-    rather than guessing (never raises; this is a read-only convenience, not a
-    policy gate).
+def _resolve_live_shas(specs_dir: Path) -> tuple[str, ...] | None:
+    """Resolve the live verdict-sha set (head, first parent, develop tip) — plain data
+    fed into SPEC-DOC-044's stale-verdict check, through the ONE
+    ``features.chokepoints.verdict.live_verdict_shas`` rule the pre-push gate also
+    uses. The repo root is ``specs_dir.parent`` (the SAME convention
+    :func:`_resolve_public_dir` already uses: ``specs/`` sits directly at the repo
+    root). Returns ``None`` when the repo root is not a git repository, or HEAD or the
+    integration tip (``origin/develop``, environment state — an unfetched clone) cannot
+    be resolved: the doctor cannot tell a live ship verdict from a stale one without
+    the full set, so it stays silent rather than letting ``--fix`` delete staged ship
+    evidence (never raises; a read-only convenience, not a gate — the pre-push gate
+    keeps failing closed on the same shortfall).
     """
-    import subprocess
-
     repo_root = specs_dir.parent
+    reader = container.build_git_object_reader()
     try:
-        result = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=repo_root,
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return None, None
-    if result.returncode != 0:
-        return None, None
-    head_sha = result.stdout.strip()
-    if not head_sha:
-        return None, None
-
-    parent_sha: str | None
-    try:
-        parent_sha = container.build_git_object_reader().first_parent(repo_root, head_sha)
-    except Exception:  # noqa: BLE001 — a failed parent lookup degrades to None, never a crash
-        parent_sha = None
-    return head_sha, parent_sha
+        head_sha = reader.resolve_ref(repo_root, "HEAD")
+        if head_sha is None or reader.resolve_ref(repo_root, INTEGRATION_TIP_REF) is None:
+            return None
+        return live_verdict_shas(reader, repo_root, head_sha)
+    except Exception:  # noqa: BLE001 — a failed git read degrades to None, never a crash
+        return None
 
 
 def _resolve_public_dir(specs_dir: Path) -> Path | None:
@@ -226,18 +214,16 @@ def doctor(
         resolved_public: Path | None = Path(public_dir).resolve()
     else:
         resolved_public = _resolve_public_dir(target)
-    head_sha, parent_sha = _resolve_head_and_parent_sha(target)
     doctor_svc = SpecsDoctor(
         target,
         public_dir=resolved_public,
         templates_dir=_TEMPLATES_DIR,
-        # repo_root: the same specs_dir.parent convention _resolve_head_and_parent_sha
+        # repo_root: the same specs_dir.parent convention _resolve_live_shas
         # already documents (specs/ sits directly at the repo root) — feeds
         # SPEC-DOC-028 (constitution file-refs) and SPEC-DOC-045 (pyproject version
         # vs release id at closure), both otherwise permanent no-ops.
         repo_root=target.parent,
-        head_sha=head_sha,
-        parent_sha=parent_sha,
+        live_shas=_resolve_live_shas(target),
         bug_store_factory=container.build_bug_record_store,
     )
     issues = doctor_svc.check()

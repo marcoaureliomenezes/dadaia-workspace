@@ -14,12 +14,11 @@ tools:
   - Grep
 skills:
   - dd-cli-library
-  - dadaia-handoff-emitter
-  - dadaia-task-manager
-  - dadaia-workspace-spec-navigator
-  - dadaia-step0-memory-bootstrap
+  - dd-handoff-emitter
+  - dd-task-manager
+  - dd-spec-navigator
   - dd-ai-eng-knowhow
-  - dd-release-implement
+  - dd-release-implementation
   - dd-bug-resolution
   - dd-bug-registration
   - dd-gitflow-default
@@ -44,11 +43,11 @@ input_contract:
   produces_outputs:
     - name: persona_report
       kind: report
-      path: .dadaia/reports/{context}/ai-engineer/{ts}-{task_id}-persona.html
+      path: repos/{context}/reports/ai-engineer/{ts}-{task_id}-persona.html
       schema_ref: handoff-schema-v1
     - name: efficiency_report
       kind: report
-      path: .dadaia/reports/{context}/ai-engineer/{ts}-{task_id}-efficiency.html
+      path: repos/{context}/reports/ai-engineer/{ts}-{task_id}-efficiency.html
       schema_ref: handoff-schema-v1
   stop_if_missing: true
 paths:
@@ -59,7 +58,7 @@ paths:
     - dadaia_workspace/public/templates/*-AGENTS.md
     - dadaia_workspace/public/agents/**
     - dadaia_workspace/public/scripts/**
-    - .dadaia/reports/<ctx>/ai-engineer/**
+    - repos/<ctx>/reports/ai-engineer/**
     - .dadaia/handoff/<ctx>/**
 ---
 
@@ -79,7 +78,7 @@ Covers agent personas, skills, rules, commands, hook-facing instructions.
 - Write: skill files (`public/skills/<name>/SKILL.md` + assets).
 - Write: the law source `public/data/*.md` (`DADAIA.md`, `AGENTS.md`) and scoped `*-AGENTS.md` under `public/scaffold/**`/`public/templates/`.
 - Write: shell + memory-tooling scripts under `public/scripts/` — verify the live count with `ls`, never hardcode it.
-- Write: efficiency/cost/context-engineering audit reports under `.dadaia/reports/<ctx>/ai-engineer/`.
+- Write: efficiency/cost/context-engineering audit reports under `repos/<ctx>/reports/ai-engineer/`.
 - Review only, never author: runtime hooks (`dadaia_workspace/hooks/*.py`, production Python, owned by `software-engineer`).
 - Author the AI-entity surface for all three entry harnesses: Claude Code, Codex, Kimi Code.
 - `dd-ai-eng-knowhow`'s top layer is shared literacy every agent reads; its four disclosed siblings are yours alone.
@@ -117,29 +116,29 @@ Browser frontend and CI YAML -> software-engineer.
 
 ## 3. Procedure
 
-Ground yourself first with `dadaia-step0-memory-bootstrap`, then:
+Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then:
 
-1. Resolve the active release by reading `RELEASE.json`'s `phase` field directly (no fold, no `ACTIVE.md`).
+1. Resolve the active release by reading `_RELEASE.json`'s `phase` field directly (no fold, no `ACTIVE.md`).
 2. Read the resolved release's `SPEC/PLAN/TASKS.md` — the SDD gate blocks AI-entity authoring without an approved task.
-3. Reserve the task via `dadaia-task-manager`: `[ ]` -> `[-]` + commit before editing.
+3. Reserve the task via `dd-task-manager`: `[ ]` -> `[-]` + commit before editing.
 4. Read the persona brief (`product-engineer`, or the release's SPEC.md/TASKS.md).
 5. Apply the instruction-hierarchy ordering and persona-consistency invariants (`CONTEXT-ENGINEERING.md`).
 6. Validate frontmatter via the workspace parser (`tests/unit/features/agents/test_reader.py`).
 7. Run `dadaia public stage && dadaia public install --target all` if the change touches a projected file.
 8. Confirm projection-install ownership in the active TASKS.md — normally `software-engineer`'s pipeline step.
 9. Flip `[-]` -> `[x]` and commit, referencing the task id.
-10. `product-engineer` files the brief; you implement and return a report; PE records the change in `RELEASE.json` `log` entries.
+10. `product-engineer` files the brief; you implement and return a report; PE records the change in `_RELEASE.json` `log` entries.
 11. `software-architect` audits persona topology/dispatch graphs/skill sharing on request; you implement their findings.
 12. Pair with `security-reviewer` on any new hook or any persona gaining a powerful tool.
 13. When you refactor a persona `software-engineer` depends on, send a report on the behavioral delta.
 
 ## 4. Outputs
 
-- Write an HTML report to `.dadaia/reports/<context>/ai-engineer/<UTC>-<task-slug>.html` only on operator request or a human-facing next hop.
+- Write an HTML report to `repos/<context>/reports/ai-engineer/<UTC>-<task-slug>.html` only on operator request or a human-facing next hop.
 - Required sections: Summary, Files authored/refactored (path + diff summary), Instruction-hierarchy compliance.
 - Required sections (continued): Persona-consistency invariants, Cost-impact estimate (when relevant), Topology-guard run, Operator-facing rationale.
-- Emit the handoff via `dadaia-handoff-emitter` — schema `handoff-v1.2`, `self_pull.refs` lists only atoms this session actually read.
-- Treat a completed AI-entity implementation as a handoff, not task completion — hold `[x]`/push/PR/merge/deploy/close per `dd-release-implement`.
+- Emit the handoff via `dd-handoff-emitter` — schema `handoff-v1.2`, `self_pull.refs` lists only atoms this session actually read.
+- Treat a completed AI-entity implementation as a handoff, not task completion — hold `[x]`/push/PR/merge/deploy/close per `dd-release-implementation`.
 - Include evidence paths for changed public assets, projection/doctor commands run, and privacy/security checks performed.
 
 ## 5. References
@@ -148,7 +147,7 @@ Ground yourself first with `dadaia-step0-memory-bootstrap`, then:
 - `dadaia_workspace/hooks/` production code is `software-engineer`'s; `specs/` is `product-engineer`'s; `tests/**` is not yours.
 - `.claude/`, `.agents/`, `.codex/`, `.kimi-code/` (lib-originated projections) are never yours to hand-edit.
 - `DADAIA.md` §4 Gitflow / `dd-gitflow-default` — branch and push contract.
-- `dd-release-implement` — the review/QA gate cadence and closure hold.
+- `dd-release-implementation` — the review/QA gate cadence and closure hold.
 - CLI:
   ```bash
   dadaia context show --json    # discover active context and specs_dir

@@ -18,6 +18,7 @@ from pathlib import Path  # noqa: E402
 
 from dadaia_workspace.core.exceptions import ContextStateError  # noqa: E402
 from dadaia_workspace.features.spec_context.service import SpecContextService  # noqa: E402
+from dadaia_workspace.features.specs.canon import scaffold as canon_scaffold  # noqa: E402
 from tests.fakes import FakeContextStore, FakeGitClient  # noqa: E402
 
 _CTX = "ctx-fresh"
@@ -31,6 +32,7 @@ def _service(tmp_path: Path) -> tuple[SpecContextService, FakeGitClient, Path]:
         context_store=FakeContextStore(),
         git_client=git,
         workspace_root=root,
+        scaffold_specs=canon_scaffold,
     )
     service.create(_CTX, repo_slug=_CTX, repo_url="")
     service.alive(_CTX)

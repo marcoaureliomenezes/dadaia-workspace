@@ -53,10 +53,6 @@ def _make_stubs() -> dict[str, _StubView]:
         "memory",
         "memory_view",
         "static",
-        "api_report_delete",
-        "api_report_mark_important",
-        "api_report_unmark_important",
-        "api_reports",
     ]
     stubs = {n: _StubView(name=n) for n in names}
     stubs["health"].content_type = "application/json"
@@ -150,35 +146,6 @@ def _dispatch(
             id="get-query-string-stripped-before-matching",
         ),
         pytest.param("GET", "/unknown", None, None, id="get-unknown-404"),
-        pytest.param(
-            "DELETE",
-            "/api/reports/foo.html",
-            "api_report_delete",
-            {"path": "foo.html"},
-            id="delete-report-dispatches-delete-view",
-        ),
-        pytest.param(
-            "DELETE",
-            "/api/reports/ctx/agent/file.html",
-            "api_report_delete",
-            {"path": "ctx/agent/file.html"},
-            id="delete-report-nested-path-full-capture",
-        ),
-        pytest.param("DELETE", "/unknown/path", None, None, id="delete-unknown-404"),
-        pytest.param(
-            "POST",
-            "/api/reports/ctx/agent/file.html/important",
-            "api_report_mark_important",
-            {"path": "ctx/agent/file.html"},
-            id="post-important-before-catchall-marks",
-        ),
-        pytest.param(
-            "DELETE",
-            "/api/reports/ctx/agent/file.html/important",
-            "api_report_unmark_important",
-            {"path": "ctx/agent/file.html"},
-            id="delete-important-before-catchall-unmarks-not-plain-delete",
-        ),
         pytest.param("GET", "/health", "health", {}, id="get-health-200-json-no-credential"),
     ],
 )

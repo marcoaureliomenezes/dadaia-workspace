@@ -8,7 +8,7 @@ Also input: `specs/memory/product/**` atoms and `specs/constitution.md`, over th
 1. For each `P-NN` entry across the three Part-1 sections, execute exactly the check its own `Measured by:` line names.
 2. Record the result: pass, fail, or "check does not run" — the last is itself a finding against whoever authored the principle.
 3. Flag a principle carrying no `Measured by:` line, or accepted with no `Accepted by: ADR NNNN`, as a finding on its own.
-4. Report the finding only — fixing it is memory FR17/FR18 territory, not this pillar's.
+4. Report the finding only — fixing it belongs to `product-engineer`'s memory lane, not this pillar.
 
 ## 2 — "Part 1 principle changed without an accepted ADR"
 
@@ -17,7 +17,7 @@ git log -p --since="<window start>" -- specs/memory/ARCHITECTURE.md specs/memory
 ```
 
 1. For every hunk touching a `## Part 1 — Principles` section, find the `accepted` ADR it should pair with.
-2. The same commit (or the immediately preceding one, per FR19) must add/update a `docs(adr): accept NNNN-<slug>`.
+2. The same commit (or the immediately preceding one) must add/update a `docs(adr): accept NNNN-<slug>`.
 3. That ADR's own text must name the changed principle.
 4. An unmatched hunk is a HIGH finding — Part 1 is ADR-gated by law, and this is the only mechanical check for it.
 5. Exception: the first-inventory case — read `specs/ADRs/AGENTS.md`'s "Relationship to memory and audits" section before scoring a CREATING commit.

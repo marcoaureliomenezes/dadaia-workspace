@@ -21,17 +21,19 @@ import pytest
 
 pytest.importorskip("fcntl")
 
-from dadaia_workspace.core.exceptions import ContextNotFoundError  # noqa: E402
+from dadaia_workspace.core.exceptions import (  # noqa: E402
+    AssociatedRepoConflictError,
+    AssociatedRepoNotFoundError,
+    ContextNotFoundError,
+    InvalidContextNameError,
+)
 from dadaia_workspace.core.models.spec_context import (  # noqa: E402
     AssociatedRepo,
     ContextState,
     SpecContextProject,
 )
-from dadaia_workspace.features.spec_context.service import (  # noqa: E402
-    AssociatedRepoConflictError,
-    AssociatedRepoNotFoundError,
-    SpecContextService,
-)
+from dadaia_workspace.features.spec_context.service import SpecContextService  # noqa: E402
+from dadaia_workspace.features.specs.canon import scaffold as canon_scaffold  # noqa: E402
 from tests.fakes import FakeContextStore, FakeGitClient  # noqa: E402
 
 
@@ -57,7 +59,12 @@ def git() -> FakeGitClient:
 def service(
     store: FakeContextStore, git: FakeGitClient, workspace_root: Path
 ) -> SpecContextService:
-    return SpecContextService(context_store=store, git_client=git, workspace_root=workspace_root)
+    return SpecContextService(
+        context_store=store,
+        git_client=git,
+        workspace_root=workspace_root,
+        scaffold_specs=canon_scaffold,
+    )
 
 
 def _seed(store: FakeContextStore) -> None:
@@ -342,3 +349,61 @@ def test_remove_repo_second_call_on_same_slug_fails_loudly(
     service.remove_repo("proj", "assoc-repo")
     with pytest.raises(AssociatedRepoNotFoundError):
         service.remove_repo("proj", "assoc-repo")
+
+
+# --------------------------------------------------------------------- allowlist at the seam
+
+
+@pytest.mark.parametrize(
+    ("name", "slug"),
+    [("meu projeto", "ok"), ("ok", "../escape"), ("projeto-café", "ok"), ("ok", "a/b")],
+)
+def test_create_refuses_a_name_or_slug_outside_the_allowlist(
+    service: SpecContextService, store: FakeContextStore, name: str, slug: str
+) -> None:
+    """Bug import-registers-unvalidated-slugs-that-doctor-fix-inv5-rmtrees: the
+    `CONTEXT_NAME_RE` allowlist lived only in the CLI, so the CLI was the one guarded
+    writer and `dadaia import` the unguarded one. The allowlist now lives at
+    `SpecContextService.register`, the ONE seam every registry insert goes through."""
+    with pytest.raises(InvalidContextNameError, match="letters, digits"):
+        service.create(name, slug, "https://github.com/org/x")
+
+    assert store.list_all() == []
+
+
+def test_create_refuses_an_associated_slug_that_collides_or_repeats(
+    service: SpecContextService, store: FakeContextStore
+) -> None:
+    """A17.3 at the seam, not the CLI: an associated slug equal to the main slug, or
+    given twice, is refused before anything is written."""
+    own = AssociatedRepo(slug="main-repo", url="")
+    with pytest.raises(AssociatedRepoConflictError, match="own main repo"):
+        service.create("proj", "main-repo", "", associated_repos=(own,))
+    twice = (AssociatedRepo(slug="infra", url=""), AssociatedRepo(slug="infra", url="u"))
+    with pytest.raises(AssociatedRepoConflictError, match="more than once"):
+        service.create("proj", "main-repo", "", associated_repos=twice)
+
+    assert store.list_all() == []
+
+
+def test_create_registers_associated_repos_in_the_same_guarded_write(
+    service: SpecContextService, store: FakeContextStore
+) -> None:
+    assoc = (AssociatedRepo(slug="infra", url="https://github.com/org/infra"),)
+
+    ctx = service.create("proj", "main-repo", "https://github.com/org/main", associated_repos=assoc)
+
+    assert ctx.associated_repos == assoc
+    assert store.get("proj") == ctx
+
+
+def test_add_repo_refuses_a_slug_outside_the_allowlist(
+    service: SpecContextService, store: FakeContextStore
+) -> None:
+    _seed(store)
+
+    with pytest.raises(InvalidContextNameError, match="letters, digits"):
+        service.add_repo("proj", "../escape", "")
+
+    ctx = store.get("proj")
+    assert ctx is not None and all(r.slug != "../escape" for r in ctx.associated_repos)

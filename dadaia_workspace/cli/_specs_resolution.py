@@ -38,14 +38,14 @@ from dadaia_workspace.core.invocation import resolve as _resolve_invocation
 from dadaia_workspace.core.invocation import (
     resolve_context_specs_dir as _core_resolve_context_specs_dir,
 )
+from dadaia_workspace.core.invocation import resolve_session_id as _core_resolve_session_id
 from dadaia_workspace.core.invocation import resolve_specs_dir as _core_resolve_specs_dir
 from dadaia_workspace.core.invocation import sanitize_session_id as _sanitize_session_id
 
 #: Re-exports so a verb never reaches ``core.invocation`` directly (FR3,
 #: ``bind-resolution-seam-is-a-single-home``). The contract takes ZERO ignore_imports,
-#: so every consumer of the context-name allowlist, the harness-session-id env-var
-#: list, the sid sanitizer, or the name->repo-slug mapping routes through this seam.
-CONTEXT_NAME_RE = _CONTEXT_NAME_RE
+#: so every consumer of the harness-session-id env-var list, the sid sanitizer, or the
+#: name->repo-slug mapping routes through this seam.
 HARNESS_SESSION_ID_ENV_VARS = _HARNESS_SESSION_ID_ENV_VARS
 sanitize_session_id = _sanitize_session_id
 
@@ -113,6 +113,12 @@ def resolve_context_specs_dir_for_cli(workspace_root: Path, context: str) -> Pat
 def resolve_specs_dir_for_cli(specs_dir: str | None) -> Path:
     """Resolve the target specs/ dir (explicit flag, else the resolution authority)."""
     return _core_resolve_specs_dir(specs_dir)
+
+
+def resolve_session_id_for_cli() -> str:
+    """This process's own session id through the one rule over ``os.environ``
+    (no hook payload: a CLI entrypoint); ``""`` when no channel resolves."""
+    return _core_resolve_session_id(None, os.environ)
 
 
 def resolve_workspace_root_for_cli(target_path: Path) -> Path:

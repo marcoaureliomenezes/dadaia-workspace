@@ -1,4 +1,6 @@
-"""Source-scan contract — no bare os.chmod in telemetry/service.py (v0.1.53 FR4, AC-4).
+"""Intent: CONTRACT — telemetry/service.py os.chmod always PLATFORM.has_posix_chmod-guarded (CWE-732)
+
+Source-scan contract — no bare os.chmod in telemetry/service.py (v0.1.53 FR4, AC-4).
 
 The Windows-silent-no-op chmod defect (CWE-732, accepted Tier-2) is prevented structurally,
 not just by a runtime test: EVERY ``os.chmod(`` call in ``features/telemetry/service.py``

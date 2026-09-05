@@ -14,7 +14,7 @@ import json
 import os
 import subprocess
 from collections.abc import Iterable
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from typing import Literal
 
 from dadaia_workspace.core.agent_model_templates import CORE_AGENTS, resolve_agent_model
@@ -28,7 +28,7 @@ from dadaia_workspace.core.models.agent_model_policy import (
 )
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus, attest
 from dadaia_workspace.core.models.install_ledger import InstallLedger, LedgerEntry
-from dadaia_workspace.core.workspace_layout import DADAIA_ADDITIVE_PREFIXES
+from dadaia_workspace.core.workspace_layout import STATES_CANON, zone_table_rows
 from dadaia_workspace.infrastructure.codex_doctor import check_codex_rule_corpus_reachable
 from dadaia_workspace.infrastructure.entity_doctor import (
     check_agent_skill_refs,
@@ -74,7 +74,44 @@ from dadaia_workspace.infrastructure.workspace_guardrail import (
     _is_source_repo_root,
 )
 
-__all__ = ["FileSystemPublicAssetManager", "InstallPlan", "OverwritePolicy"]
+__all__ = [
+    "FileSystemPublicAssetManager",
+    "InstallPlan",
+    "OverwritePolicy",
+    "render_registry_tables",
+]
+
+
+def _zone_table() -> str:
+    rows = ["| Zone | Purpose | Class | TTL | Creator |", "|---|---|---|---|---|"]
+    rows += [
+        f"| `{name}/` | {purpose} | {cls} | {ttl} | {creator} |"
+        for name, purpose, cls, ttl, creator in zone_table_rows()
+    ]
+    return "\n".join(rows)
+
+
+def _states_canon_table() -> str:
+    return "\n".join(["| Entry |", "|---|", *(f"| `{entry}` |" for entry in sorted(STATES_CANON))])
+
+
+def render_registry_tables(text: str) -> str:
+    """Fill a law fragment's ``<!-- zones -->`` / ``<!-- canon -->`` placeholders from
+    ``core.workspace_layout`` — the projected ``.dadaia/AGENTS.md`` table IS the registry
+    (0.4.6 FR14/D14), never a hand-kept copy of it."""
+    return text.replace("<!-- zones -->", _zone_table()).replace(
+        "<!-- canon -->", _states_canon_table()
+    )
+
+
+def _staged_bytes(src: Path, public_dir: Path) -> bytes:
+    """What ``stage`` writes for the public asset *src* and what ``doctor`` compares the
+    staged copy against: a ``data/*.md`` law fragment with its registry tables rendered,
+    every other asset byte for byte."""
+    raw = src.read_bytes()
+    if src.suffix == ".md" and src.parent == public_dir / "data":
+        return render_registry_tables(raw.decode("utf-8")).encode("utf-8")
+    return raw
 
 
 #: Non-silent doctor line for a runtime whose directory physically exists on disk but is
@@ -125,6 +162,13 @@ class FileSystemPublicAssetManager:
             else:
                 shutil.copy2(src, dst)
             staged.append(f"[stage] {dst}")
+
+        for src in self._iter_files(self._public_dir / "data"):
+            expected = _staged_bytes(src, self._public_dir)
+            if expected != src.read_bytes():
+                dst = agentic_dir / src.relative_to(self._public_dir)
+                atomic_write(dst, expected)
+                staged.append(f"[render] {dst}")
 
         # LF-exact, atomic writes: staged JSON is hash-compared by doctor, so it must
         # not pick up Windows CRLF translation (FR-RC2-2).
@@ -522,9 +566,6 @@ class FileSystemPublicAssetManager:
         reports.extend(check_memory_phase_single_source(self._public_dir))
         reports.extend(attest("public-privacy", self._check_public_privacy()))
         reports.extend(attest("entities-derivation", check_entities_derivation(self._public_dir)))
-        reports.extend(
-            attest("foreign-projections", self._check_foreign_projections(workspace_root))
-        )
 
         try:
             git_result = subprocess.run(
@@ -585,7 +626,7 @@ class FileSystemPublicAssetManager:
     def _compare(self, src: Path, dst: Path, label: str) -> DoctorLine:
         if not dst.exists():
             return DoctorLine(DoctorStatus.MISSING, f"{label}")
-        if _sha256(src) != _sha256(dst):
+        if _staged_bytes(src, self._public_dir) != dst.read_bytes():
             return DoctorLine(DoctorStatus.DRIFT, f"{label}")
         return DoctorLine(DoctorStatus.OK, f"{label}")
 
@@ -594,47 +635,3 @@ class FileSystemPublicAssetManager:
         return _check_public_privacy_fn(
             self._public_dir, self._iter_files, self._is_ignored_public_asset
         )
-
-    def _check_foreign_projections(self, workspace_root: Path) -> list[DoctorLine]:
-        """Surface unmanaged files inside lib-managed projection dirs (read-only).
-
-        Bug ``claude-doctor-blind-to-unmanaged-projection-files``: an extra file in
-        ``.claude/rules/`` produced zero doctor lines. This is the install-ledger
-        reconciliation run READ-ONLY — no second scanner, no allowlist: a managed dir is
-        exactly a directory the ledger owns a file in (so an operator-created skill dir
-        is naturally out of scope), and a file there the ledger does not own reads
-        ``[foreign]`` — visible but non-blocking (Ruling 16: operator authorship is
-        legitimate). No ledger ⇒ no authority to scan against ⇒ empty universe (``attest``
-        stamps ``[not-applicable]``).
-        """
-        states_dir = workspace_root / ".dadaia" / "states"
-        ledger = self._install_ledger_store.read(states_dir)
-        if ledger is None:
-            return []
-        owned = ledger.by_relpath()
-        managed_dirs = sorted(
-            {
-                parent
-                for rel in owned
-                if (parent := PurePosixPath(rel).parent.as_posix()) != "."
-                and not any(f"{parent}/".startswith(p) for p in DADAIA_ADDITIVE_PREFIXES)
-            }
-        )
-        lines: list[DoctorLine] = []
-        for rel_dir in managed_dirs:
-            dir_path = workspace_root / rel_dir
-            if not dir_path.is_dir():
-                continue
-            for child in sorted(dir_path.iterdir()):
-                if not child.is_file():
-                    continue
-                rel = f"{rel_dir}/{child.name}"
-                if rel not in owned:
-                    lines.append(
-                        DoctorLine(
-                            DoctorStatus.FOREIGN, f"{rel} — not lib-managed (operator file kept)"
-                        )
-                    )
-        if not lines:
-            lines.append(DoctorLine(DoctorStatus.OK, "ledger:foreign-scan (managed dirs clean)"))
-        return lines

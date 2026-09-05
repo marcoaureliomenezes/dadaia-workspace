@@ -24,6 +24,10 @@ from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
 from dadaia_workspace.core.atomic_write import ConcurrentModificationError
 from dadaia_workspace.core.models.backlog import SubjectKind
 from dadaia_workspace.features.backlog.document import backlog_new
+from dadaia_workspace.features.specs.candidate import (
+    CandidateArchiveError,
+    archive_candidate,
+)
 from dadaia_workspace.features.specs.canon import release_new
 
 
@@ -114,6 +118,41 @@ def release_new_cmd(
         sys.exit(1)
 
     typer.echo(f"[ok] created: {spec_path}")
+
+
+# ── dadaia release rc-archive ─────────────────────────────────────────────────
+
+
+@release_app.command("rc-archive")
+def release_rc_archive_cmd(
+    specs_dir: str | None = typer.Option(
+        None,
+        "--specs-dir",
+        help="Path to specs/ directory. Default: resolve from bound context session.",
+    ),
+) -> None:
+    """Archive the live release's completed candidate trio into the next rc-N/.
+
+    The "continue" mechanics of the promote-or-continue gate (release-candidates
+    model, ADR 0008): validates candidate closure (trio at root, every task [x],
+    phase CLOSURE), moves SPEC/PLAN/TASKS into rc-N/, bumps the candidate counter
+    and resets phase to DISCOVERY so the next candidate's trio can be born at root.
+    The version never increments here — that happens only at operator-approved
+    deploy.
+    """
+    target = _resolve_specs_dir(specs_dir)
+    if not target.is_dir():
+        typer.echo(f"[error] specs_dir not found: {target}", err=True)
+        sys.exit(1)
+    try:
+        result = archive_candidate(target)
+    except CandidateArchiveError as exc:
+        typer.echo(f"[error] {exc}", err=True)
+        sys.exit(1)
+    typer.echo(
+        f"[ok] candidate {result.rc} of release {result.release} archived -> "
+        f"{result.rc_dir} — root is ready for the next candidate's SPEC/PLAN/TASKS."
+    )
 
 
 # ── dadaia backlog new ────────────────────────────────────────────────────────

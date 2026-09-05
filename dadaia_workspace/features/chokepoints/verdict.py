@@ -34,11 +34,25 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol
 
 from dadaia_workspace.core.handoff_index import Handoff, discover_handoff_paths
 from dadaia_workspace.core.specs_version import RELEASE_SEMVER_RE, VERDICT_EVIDENCE_ROOT_TEMPLATES
 
-__all__ = ["Verdict", "covering_verdict", "discover_verdict_candidates"]
+__all__ = [
+    "INTEGRATION_TIP_REF",
+    "ShaSource",
+    "Verdict",
+    "covering_verdict",
+    "discover_verdict_candidates",
+    "live_verdict_shas",
+]
+
+#: The integration branch's remote-tracking ref (DADAIA.md §4: every feature merges into
+#: ``develop`` — the same branch name ``branch_policy.py`` refuses a direct push to). Its
+#: tip is the sha the ship-PR verdict names (§4.2 / dd-gitflow-default §3b) while that
+#: verdict sits on the feature branch, so it is one of the LIVE shas.
+INTEGRATION_TIP_REF = "refs/remotes/origin/develop"
 
 #: The ``"verdict"`` value a security-reviewer handoff must carry to authorize a push/PR.
 _APPROVED = "APPROVED"
@@ -53,6 +67,37 @@ class Verdict:
 
     commit_sha: str
     path: Path
+
+
+class ShaSource(Protocol):
+    """The two git reads :func:`live_verdict_shas` needs — a structural port the
+    push gate's ``ObjectSource`` and the concrete ``GitSubprocessObjectReader`` both
+    satisfy; this module still never imports ``infrastructure``."""
+
+    def first_parent(self, repo: Path, sha: str) -> str | None: ...
+
+    def resolve_ref(self, repo: Path, ref: str) -> str | None: ...
+
+
+def live_verdict_shas(source: ShaSource, repo: Path, head_sha: str) -> tuple[str, ...]:
+    """The ONE on-disk liveness set: the shas a committed verdict under
+    ``specs/releases/<id>/verdicts/`` may name and not be stale.
+
+    ``head_sha`` itself; its first parent (the committed-verdict shape — the verdict
+    file lands in the commit right after the reviewed sha); and the integration branch
+    tip (:data:`INTEGRATION_TIP_REF` — the ship-PR verdict DADAIA.md §4.2 stages on the
+    feature branch names develop's tip, which becomes the merge commit's first parent
+    only after the merge). Anything unresolvable is simply absent; duplicates collapse;
+    order is head, parent, tip. ``features.specs.canon.verdict_violations`` (the doctor's
+    SPEC-DOC-044 and the pre-push specs-canon scan) consumes exactly this set — the rule
+    has one home, so the shape the law mandates is never refused by one gate and
+    accepted by another.
+    """
+    shas: list[str] = [head_sha]
+    for sha in (source.first_parent(repo, head_sha), source.resolve_ref(repo, INTEGRATION_TIP_REF)):
+        if sha and sha not in shas:
+            shas.append(sha)
+    return tuple(shas)
 
 
 def discover_verdict_candidates(repo_root: Path, release_glob: str = "*") -> list[Path]:

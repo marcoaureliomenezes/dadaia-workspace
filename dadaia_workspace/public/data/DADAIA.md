@@ -38,7 +38,7 @@
 | SPEC / PLAN / TASKS / CLOSURE, and `specs/memory/**` | `product-engineer` |
 | Architecture: DRAFT, REVIEW, ONBOARD; root-cause and fidelity gates | `software-architect` |
 | Production code and its tests, in any language | `software-engineer` |
-| E2E, test pyramid, deploy validation; closes each `rc-N` | `qa-engineer` |
+| E2E, test pyramid, deploy validation; closes each candidate | `qa-engineer` |
 | Three-axis review (`dd-code-review`: standards, spec, bug-surface) before a PR | `code-reviewer` |
 | Vulnerabilities, secrets, CVEs; the push verdict (§4.2) | `security-reviewer` |
 | Agents, skills, rules, workflows, commands, hooks — the AI surface | `ai-engineer` |
@@ -64,7 +64,7 @@
 
 | Class | Paths | Verdict |
 |---|---|---|
-| ADDITIVE | `specs/bugs\|backlog\|audits/`, each area's `_archive/*_histo.jsonl`, `.dadaia/reports\|handoff\|tmp/` | Always writable |
+| ADDITIVE | `specs/bugs\|backlog\|audits/`, each area's `_archive/*_histo.jsonl`, `.dadaia/{handoff,tmp,mcps,.cache}/` | Always writable |
 | MEMORY | `specs/memory/` | Writable in `DEFINITION` and `CLOSURE` phase |
 | MUTATING | everything else in-repo | Writable; records advisory presence |
 | PROTECTED | `.dadaia/sessions/`, projected law files (§8.2) | Blocked |
@@ -112,10 +112,11 @@
 ### 4.2 Rules
 
 - No `v` prefix, no suffix, no fifth pattern; `hotfix/*` retired (operator-request only, no cadence).
-- Exactly one live `feature/{M.m.p}`; at deploy, delete it and cut `feature/{next}` in the same step; bugs fix on it in any phase, no ceremony.
-- `rc-N` is a specs state (`RELEASE.json`'s `phase` field + `TASKS.md`), never a branch name.
-- Each `rc` burns one `feature -> develop` merge; scope is fixes only, never new backlog.
-- Both PRs require an APPROVED `security-reviewer` verdict on the PR head sha, consumed once by the merge and deleted after — a survivor is slop.
+- Exactly one live `feature/{M.m.p}`, named for the live release; at deploy, delete it and cut `feature/{next}` in the same step; bugs fix on it in any phase, no ceremony.
+- The release version = last published PyPI + 1 patch, minted at birth; it increments ONLY at operator-approved deploy (ADR 0005).
+- `rc-N/` is an archived candidate folder under the live release (`dadaia release rc-archive`), never a branch name and never a scaffolded sub-phase.
+- Each candidate closure burns one `feature -> develop` merge; after it the agent asks the operator: promote (deploy) or continue (archive the trio to `rc-N/`, stack more backlog/bugs/findings).
+- Both PRs need an APPROVED `security-reviewer` verdict on the PR head sha, consumed once by the merge, then deleted; a survivor is slop (§7.6).
 - Ship-PR verdict names develop's tip, staged on the feature branch before the final `rc` merge.
 - Every flow stage runs on `feature/{M.m.p}`; `develop`/`main` are PR targets only, never a working branch.
 - Suggest CI/CD automation of this contract to the operator; mechanics: `dd-gitflow-default`.
@@ -126,9 +127,9 @@
 
 ### 5.1 Workspace root
 
-- Root holds only: `.agents/ .claude/ .codex/ .dadaia/ .kimi-code/ repos/ AGENTS.md CLAUDE.md DADAIA.md prompt.md`.
+- Root holds only: `.agents/ .claude/ .codex/ .dadaia/ .git/ .kimi-code/ repos/ .env .gitignore AGENTS.md CLAUDE.md DADAIA.md prompt.md`.
 - Anything the operator created by hand stays, permanently.
-- A tool needing another root entry gets a documented glob in `.dadaia/states/root_exceptions.txt`.
+- A tool needing another root or harness-dir entry gets a documented glob in `.dadaia/states/instance_exceptions.txt`.
 
 ### 5.2 Output paths
 
@@ -136,8 +137,8 @@
 |---|---|
 | Temp files, scripts, screenshots, captures | `.dadaia/tmp/<agent>/<YYYYMMDD>/` |
 | Machine-readable handoffs (default emission) | `.dadaia/handoff/<context>/<UTC>-<agent>-<slug>.handoff.json` |
-| HTML reports | `.dadaia/reports/<context>/<agent>/<UTC>-<slug>.html` |
-| Tool caches, MCP working dirs | `.dadaia/` (`.dadaia/mcps/<server>/`) |
+| HTML reports | `repos/<slug>/reports/<agent>/<UTC>-<slug>.html` |
+| Tool caches, MCP working dirs | `.dadaia/.cache/`, `.dadaia/mcps/<server>/` |
 
 ### 5.3 Repos stay clean
 
@@ -152,6 +153,7 @@
 
 - Handoff-first: JSON handoff by default; HTML report only on operator request or when the next hop is human.
 - Split a report over 30 KB into multiple files behind an `index.html`.
+- A report lives in its repo and is never TTL-reaped; a handoff, scratch file, MCP dir or cache expires one day after its mtime (§8.5).
 - Validate with `dadaia reports validate <path>.handoff.json`; HTML integrity rides on `content_hash`.
 
 ---
@@ -168,7 +170,7 @@
 |---|---|
 | root | `AGENTS.md constitution.md memory/ releases/ backlog/ bugs/ audits/ ADRs/` |
 | `releases/` | `AGENTS.md`, `_ideas/` (own `AGENTS.md`), `_archive/<release-id>/` |
-| `releases/<M.m.p>/` | `RELEASE.json SPEC.md PLAN.md TASKS.md verdicts/` |
+| `releases/<M.m.p>/` | `_RELEASE.json SPEC.md PLAN.md TASKS.md rc-N/ verdicts/` |
 | `backlog/` | `AGENTS.md BACKLOG.json`, `_archive/backlog_histo.jsonl` |
 | `bugs/` | `AGENTS.md BUGS.jsonl`, `_archive/bugs_histo.jsonl` |
 | `audits/` | `AGENTS.md`, `_archive/audits_histo.jsonl`, `<YYYYMMDD-slug>/` |
@@ -190,7 +192,7 @@
 
 - Current product truth, not history — read it before changing production behavior.
 - `product-engineer` writes `specs/memory/**` only in `DEFINITION`/`CLOSURE` phases; every other agent reads it.
-- Changelog and history live in each release's `RELEASE.json` `log` and in git.
+- Changelog and history live in each release's `_RELEASE.json` `log` and in git.
 - Atom frontmatter carries exactly 6 fields: `slug title category tldr summary tags`.
 - `ARCHITECTURE.md QUALITY.md TECHSTACK.md` split into ADR-gated Part 1 Principles (each `Measured by:`) and Part 2 Implementation.
 
@@ -218,10 +220,13 @@
 
 <!-- behavior: releases -->
 
-- A release is `major.minor.patch`, matures through the `rc-N` lane (branch mechanics: §4).
-- A `dd-grill-me` session on the picked set precedes the SPEC.
+- A release is `major.minor.patch` with OPEN scope: it grows by stacked closed-scope candidates, one live release ever (ADR 0005).
+- A candidate is one full SDD cycle: grill -> SPEC/PLAN/TASKS `Aprovado` at the release root -> implementation -> memory -> CLOSURE -> `feature -> develop` merge.
+- A `dd-grill-me` session on the picked set precedes each candidate's SPEC.
 - At pick time, open bugs and undispositioned audits outrank fresh backlog.
-- Finalization order: memory update -> CLOSURE -> archive; a completed task group is one commit.
+- After each merge, the promote-or-continue gate (§4.2): continue = `dadaia release rc-archive` moves the trio to `rc-N/` and a fresh trio is born at root; promote = the ship lane, then archive the whole release folder (final trio stays at root, ADR 0009).
+- Candidate finalization order: memory update -> CLOSURE -> gate; a completed task group is one commit.
+- A candidate's SPEC.md fits 24 KB and TASKS.md 12 KB — measured by V34 (`tests/contract/test_slop_ratchets.py`).
 
 ### 6.8 Audits
 
@@ -247,7 +252,7 @@
 - Every test declares its intent and size at birth; an undeclared test is SCAFFOLD and expires.
 - Demotion (LARGE test -> equivalent cheaper coverage) is planned release-closure work.
 - Pruning to go green is exclusively a `qa-engineer` verdict; deletion/skip/disable carries evidence, executed by `software-engineer`.
-- Tombstones and expired SCAFFOLD are slop; artifact capture is failure-gated (§5.2). Protocol: `dadaia-test-stewardship`.
+- Tombstones and expired SCAFFOLD die at closure (§7.6); artifact capture is failure-gated (§5.2). Protocol: `dd-test-stewardship`.
 
 ### 7.3 Bugs
 
@@ -259,7 +264,7 @@
 - Redact local paths, IPs, hostnames, private names, secrets from every field. Protocol: `dd-bug-registration`.
 - Close in the same session as the fix: append `resolved` with the red-loop command, the regression-test seam, the diff direction.
 - Commit exactly what the fix touched, never a blanket `-A`; a net-positive diff routes to `software-architect` first.
-- Check prior resolutions on the same component first; declare `caused_by: <bug_id>|none` — protocol: `dd-diagnose`.
+- Check prior resolutions on the same component first; declare `caused_by: <bug_id>|none` — protocol: `dd-bug-resolution`.
 - Commit shapes: `dd-gitflow-default` §3a — measured by audits via `git log`, never a hook.
 
 ### 7.4 Push green
@@ -267,13 +272,23 @@
 - Every `feature/{M.m.p}` push runs the local CI preflight first — always-on, not hook-forced.
 - Preflight: `ruff format --check`, `ruff check`, `mypy --strict`, `pytest`.
 - A full scan lives only in the audit lane; the PR-gate review is diff-based; only pushes are review-blocked, commits flow freely.
-- Watch every push/PR to green (`dd-release-implement`).
+- Watch every push/PR to green (`dd-release-implementation`).
 - A `quarantine`-marked test sits outside the gating selectors, bug-gated; unregistered pass-on-retry is a failure.
 
 ### 7.5 Approval
 
 - Approved when the operator and the consumer-side validation agent agree, after validating a real workspace.
 - A green internal gate that diverges from real consumer behavior is itself a bug.
+
+### 7.6 Slop
+
+- Slop is what passes the deletion test without loss: removed, no behavior changes and no decision loses its record.
+- The test applies to a file, line, comment, test, spec sentence, acronym, branch, release, rule or handoff.
+- Slop dies in the change that finds it; it is never commented out, marked, archived or deferred.
+- The writer proves the artifact fails the deletion test; the reviewer applies the test; the auditor measures the balance.
+- A rule lives in one home; the second copy is deleted; a consumed handoff is deleted in the same turn.
+- Artifact rules live by class: constitution `Slop`, memory `ARCHITECTURE`/`QUALITY` fixed sections; `specs doctor` keeps them byte-exact.
+- Detection and ratchets: `dd-code-review` SLOP.md; measured by `tests/contract/test_slop_ratchets.py` and audit pillar 2.
 
 ---
 
@@ -301,6 +316,12 @@
 - Invoke `.dadaia/.venv/bin/dadaia` and `.dadaia/.venv/bin/pip` directly, with absolute paths.
 - Register every dev server you start with `dadaia server register`; check the registry before opening a port.
 
+### 8.5 Instance compliance
+
+- `dadaia doctor` is the one workspace scan and reaper: one `WS-<zone>-<verdict>` finding per line, a final `compliance: N/M entries canonical (P%)` line, `--json` mirror, exit 1 on any slop or expired entry.
+- `.dadaia/` zones and the `states/` canon are one registry (`core/workspace_layout.DADAIA_ZONES`), rendered into `.dadaia/AGENTS.md` at `public stage`; outside manifest, registry and exceptions (§5.1) = slop.
+- SessionStart runs `dadaia doctor --fix --expired-only`; slop dies only by an explicit operator `dadaia doctor --fix`.
+
 ---
 
 ## 9. Credentials
@@ -318,9 +339,9 @@
 
 | Surface | Where |
 |---|---|
-| Scoped law | `specs/AGENTS.md`, `.dadaia/reports/AGENTS.md`, `.dadaia/handoff/AGENTS.md`, `repos/<slug>/AGENTS.md`, any nested `AGENTS.md` |
+| Scoped law | `specs/AGENTS.md`, `.dadaia/AGENTS.md`, `.dadaia/handoff/AGENTS.md`, `repos/<slug>/AGENTS.md`, any nested `AGENTS.md` |
 | Skills | `.claude/skills/`, `.agents/skills/` — skill-to-rule mapping declared once in `public/entities/behavior-map.json` |
-| State | `dadaia context show --json`, `dadaia specs doctor`, `dadaia public doctor`, `dadaia server list`, `dadaia bugs status`, `dadaia panel` |
+| State | `dadaia context show --json`, `dadaia doctor`, `dadaia specs doctor`, `dadaia public doctor`, `dadaia server list`, `dadaia bugs status`, `dadaia panel` |
 
 - Language: operator preference, default English. Tone: direct, concise, operational.
 
@@ -331,9 +352,9 @@
 - **library** — this source repo, `dadaia_workspace/`, that scaffolds instances.
 - **context** — the active Spec Context Project resolved for this session (§3.3).
 - **spec context** — a `specs/` tree (root or `repos/<slug>/`) governed by this law.
-- **release** — a `major.minor.patch` unit maturing through the `rc-N` lane.
-- **rc** — a release-candidate round: fixes/adjustments only, never new backlog.
-- **segment** — a named sub-phase of a release's `TASKS.md` (e.g. `alpha-N`/`rc-N`).
+- **release** — the open-scope publication unit, named last-published-PyPI + 1 patch; exactly one live.
+- **candidate** — one closed-scope SDD cycle inside the live release; its trio lives at the release root.
+- **rc-N** — the archive folder of the N-th completed-but-not-shipped candidate's trio.
 - **task marker** — the `[ ] [-] [x]` open/in-progress/done trace in `TASKS.md`.
 - **handoff** — the machine-readable JSON completion record an agent emits (§5.4).
 - **verdict** — a PR-head-scoped approval record, consumed once, deleted after merge.
@@ -352,5 +373,12 @@
 - **finding** — one recorded audit observation in `FINDINGS.jsonl`.
 - **denylist** — the pattern list the pre-push scan refuses to let through.
 - **projection** — a lib-originated copy of a `public/` asset installed into a runtime tree.
+- **zone** — one top-level `.dadaia/` directory with a registry record: class, creator, TTL, canon, purpose (§8.5).
+- **finding verdict** — `dadaia doctor`'s class for one scanned entry: `canon | operator | slop | expired | missing`; `canon` + `operator` count as canonical.
+- **finding code** — `WS-<zone>-<verdict>`, `<zone>` = `root`, a harness dir, `dadaia`, or a zone name without its leading dot.
+- **instance exceptions** — `.dadaia/states/instance_exceptions.txt`, one glob per line, honoured at the root and inside the harness dirs (§5.1).
 - **operator** — the human who owns the workspace and approves ADRs, deferrals, releases.
 - **dispatcher** — an agent authorized to invoke another agent via subagent dispatch.
+- **slop** — what passes the deletion test without loss (§7.6).
+- **ratchet** — a contract test pinning a measured count that moves down only (§7.6).
+- **fixed section** — a marker-bounded law block in a scaffolded spec, kept byte-equal to its fragment by `specs doctor` (§7.6).

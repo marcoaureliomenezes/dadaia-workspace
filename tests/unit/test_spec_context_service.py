@@ -18,6 +18,7 @@ from dadaia_workspace.core.exceptions import (
 )
 from dadaia_workspace.core.models.spec_context import ContextState
 from dadaia_workspace.features.spec_context.service import SpecContextService
+from dadaia_workspace.features.specs.canon import scaffold as canon_scaffold
 from tests.fakes import FakeContextStore, FakeGitClient
 
 
@@ -49,6 +50,7 @@ def service(
         context_store=store,
         git_client=git,
         workspace_root=workspace_root,
+        scaffold_specs=canon_scaffold,
     )
 
 

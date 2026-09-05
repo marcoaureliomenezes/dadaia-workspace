@@ -1,4 +1,6 @@
-"""Contract test: pyproject.toml declares the correct OS classifiers (T-018-08 / T-018-30).
+"""Intent: CONTRACT — pyproject OS classifiers match the hard-gated CI matrix (T-018-30)
+
+Contract test: pyproject.toml declares the correct OS classifiers (T-018-08 / T-018-30).
 
 After the 0.1.8 rc-2 Windows graduation (the cross-platform unit + contract CI legs
 are green and hard-gated on Linux, macOS, and Windows), pyproject.toml advertises all

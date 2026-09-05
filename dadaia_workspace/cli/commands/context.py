@@ -14,7 +14,6 @@ from rich.console import Console
 from rich.table import Table
 
 from dadaia_workspace import container
-from dadaia_workspace.cli._specs_resolution import CONTEXT_NAME_RE as _CONTEXT_NAME_RE
 from dadaia_workspace.cli._specs_resolution import (
     HARNESS_SESSION_ID_ENV_VARS,
     sanitize_session_id,
@@ -25,20 +24,25 @@ from dadaia_workspace.cli._specs_resolution import (
 from dadaia_workspace.cli.redact import ContextRedactor
 from dadaia_workspace.core import session_store
 from dadaia_workspace.core.exceptions import (
+    AssociatedRepoConflictError,
+    AssociatedRepoNotFoundError,
     ContextAlreadyExistsError,
     ContextNotFoundError,
     ContextStateError,
     GitSyncError,
+    InvalidContextNameError,
     RepoCatalogError,
     SchemaVersionError,
     WorkspaceNotInitializedError,
 )
-from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
+from dadaia_workspace.core.models.spec_context import (
+    AssociatedRepo,
+    ContextState,
+    SpecContextProject,
+)
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.spec_context import presence
 from dadaia_workspace.features.spec_context.service import (
-    AssociatedRepoConflictError,
-    AssociatedRepoNotFoundError,
     DeadReviewRequiredError,
     DeadSecretFoundError,
     SpecContextService,
@@ -207,51 +211,13 @@ def create(
     ),
 ) -> None:
     """Create a new Spec Context Project in state 'dead'."""
-    # Refuse at CREATE what every downstream verb refuses. `create` accepted names with
-    # spaces or Unicode, and then `bind`, `bugs append` and every workflow rejected that
-    # same context — so the operator ended up with a context they could create and never
-    # use, which is a trap with no way out except deleting it
-    # (bug a3-context-create-accepts-unusable-name). The rule is the ONE allowlist the
-    # resolver already enforces; it is not a second, stricter opinion.
-    for label, value in (("context name", name), ("repo slug", repo)):
-        if not _CONTEXT_NAME_RE.fullmatch(value):
-            err_console.print(
-                f"[red]Error:[/red] invalid {label} {value!r}. Use only letters, digits, "
-                "'-' and '_' — the same allowlist every other verb enforces, so a context "
-                "that is created is always usable."
-            )
-            raise typer.Exit(1) from None
-
-    # Parse + validate every --associated entry BEFORE creating anything (A17.3 and
-    # slug-format checks apply here too — a refused --associated must never leave a
-    # half-created context behind). `repo add` (below) is reused verbatim for the
-    # actual registration — this is not a second repo-registration path.
-    parsed_associated: list[tuple[str, str]] = []
-    seen_associated_slugs: set[str] = set()
-    for raw in associated:
-        assoc_slug, _, assoc_url = raw.partition("=")
-        assoc_slug = assoc_slug.strip()
-        assoc_url = assoc_url.strip()
-        if not _CONTEXT_NAME_RE.fullmatch(assoc_slug):
-            err_console.print(
-                f"[red]Error:[/red] invalid --associated repo slug {assoc_slug!r} in "
-                f"{raw!r}. Use only letters, digits, '-' and '_'."
-            )
-            raise typer.Exit(1) from None
-        if assoc_slug == repo:
-            err_console.print(
-                f"[red]Error:[/red] --associated {raw!r}: '{assoc_slug}' is this "
-                "context's own main repo slug (--repo) — it cannot also be an "
-                "associated repo."
-            )
-            raise typer.Exit(1) from None
-        if assoc_slug in seen_associated_slugs:
-            err_console.print(
-                f"[red]Error:[/red] --associated repo slug {assoc_slug!r} given more than once."
-            )
-            raise typer.Exit(1) from None
-        seen_associated_slugs.add(assoc_slug)
-        parsed_associated.append((assoc_slug, assoc_url))
+    # Every check — allowlist, own-slug, duplicates, foreign owner — runs at
+    # SpecContextService.register before anything is written, so a refused --associated
+    # never leaves a half-created context behind.
+    associated_repos = tuple(
+        AssociatedRepo(slug=slug.strip(), url=assoc_url.strip())
+        for slug, _, assoc_url in (raw.partition("=") for raw in associated)
+    )
 
     workspace_root = resolve_workspace_root()
     # An explicit --url overrides the catalog lookup (FR-W2-03 a / T-011-08); otherwise
@@ -271,16 +237,13 @@ def create(
             pass
 
     try:
-        svc = _ctx_service()
-        ctx = svc.create(name, repo, repo_url)
-        for assoc_slug, assoc_url in parsed_associated:
-            ctx, _ = svc.add_repo(name, assoc_slug, assoc_url)
-        suffix = f", {len(parsed_associated)} associated repo(s)" if parsed_associated else ""
+        ctx = _ctx_service().create(name, repo, repo_url, associated_repos=associated_repos)
+        suffix = f", {len(associated_repos)} associated repo(s)" if associated_repos else ""
         console.print(
             f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' created "
             f"(repo: {ctx.repo_slug}, state: {ctx.state}{suffix})"
         )
-    except (ContextAlreadyExistsError, ContextNotFoundError, AssociatedRepoConflictError) as e:
+    except (ContextAlreadyExistsError, InvalidContextNameError, AssociatedRepoConflictError) as e:
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
 
@@ -888,19 +851,9 @@ def repo_add(
     (compare 'context update --url', which repairs the MAIN repo's URL only).
     Adding the context's own main repo slug is refused (it is already covered).
     """
-    for label, value in (("context name", ctx_name), ("repo slug", slug)):
-        if not _CONTEXT_NAME_RE.fullmatch(value):
-            err_console.print(
-                f"[red]Error:[/red] invalid {label} {value!r}. Use only letters, digits, "
-                "'-' and '_'."
-            )
-            raise typer.Exit(1) from None
     try:
         ctx, was_added = _ctx_service().add_repo(ctx_name, slug, url)
-    except ContextNotFoundError as e:
-        err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1) from None
-    except AssociatedRepoConflictError as e:
+    except (ContextNotFoundError, InvalidContextNameError, AssociatedRepoConflictError) as e:
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
 

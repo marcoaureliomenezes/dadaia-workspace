@@ -4,7 +4,7 @@ Scope: this file governs only `specs/backlog/`. Replaces the retired `backlog/RE
 
 - The backlog is a single JSON document: `specs/backlog/BACKLOG.json`, `{schema: "backlog-v1", active: [...]}`.
 - No per-entry file per backlog item — every live candidate/idea is one `active[]` object (ADR #14).
-- Full schema: `dd-backlog-definition` §2, `schemas/backlog/backlog-v1.schema.json`.
+- Full schema: `dd-backlog-definition` (The document), `schemas/backlog/backlog-v1.schema.json`.
 - A closed item's history lives beside the document, in `specs/backlog/_archive/backlog_histo.jsonl`.
 
 ## 1. The document, plus its histo
@@ -28,7 +28,7 @@ Scope: this file governs only `specs/backlog/`. Replaces the retired `backlog/RE
 
 ## 3. Terminal disposition tokens
 
-- Canonical home: `dd-backlog-definition` §2 — six tokens: `DELIVERED`, `SUPERSEDED`, `RESOLVED`, `CONSUMED`, `DEFERRED`, `REJECTED`.
+- Canonical home: `dd-backlog-definition` (The document) — six tokens: `DELIVERED`, `SUPERSEDED`, `RESOLVED`, `CONSUMED`, `DEFERRED`, `REJECTED`.
 - `DELIVERED`/`SUPERSEDED`/`RESOLVED`/`CONSUMED` carry the release id in `release`.
 - `DEFERRED`/`REJECTED` carry a one-line reason in `reason` instead.
 - A provisional `CONSUMED` is rewritten in place to its terminal token at closure — never a second record for the same slug.
@@ -68,5 +68,5 @@ dadaia backlog subjects --resolve <ref> --kind <kind>   # preview how one subjec
 ## 5. Relationship to releases
 
 - A release SPEC names a picked entry's slug under `**Consumes:**`.
-- The entry stays in `active[]` (typically flipped to `status: picked`) until the release closes.
-- At closure, the disposition sweep exits it: `active[]` entry removed, terminal histo record appended or rewritten in place.
+- Purge-on-pick (`DADAIA.md` §6.6): the entry exits `active[]` in the same commit that creates the release SPEC, leaving a provisional `CONSUMED` histo record.
+- At closure, the disposition sweep rewrites that record in place to its terminal token.

@@ -1,4 +1,7 @@
-"""Contract tests for dadaia public CLI commands."""
+"""Intent: CONTRACT — dadaia public list / install --only (DADAIA §8.1 reprojection)
+
+Contract tests for dadaia public CLI commands.
+"""
 
 from __future__ import annotations
 
@@ -24,7 +27,7 @@ def mock_svc() -> MagicMock:
     svc = MagicMock()
     svc.list_all.return_value = {
         "agents": ["code-reviewer.md", "researcher.md"],
-        "skills": ["dadaia-handoff-emitter"],
+        "skills": ["dd-handoff-emitter"],
         "rules": ["workspace-protocol.md"],
     }
     svc.install.return_value = ["[ok] .claude/rules/workspace-protocol.md"]

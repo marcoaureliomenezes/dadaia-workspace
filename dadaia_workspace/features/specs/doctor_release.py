@@ -9,7 +9,7 @@ status/created-date extractors. Leaf-only: imports the shared leaves + core, nev
 validator.
 
 v0.5.x (successor to the RELEASE.jsonl fold; v0.5.0 FR4/T-050-21A): ``ACTIVE.md`` is
-retired — the active release, its optional segment, and its phase are read directly
+retired — the active release and its phase are read directly
 off ``RELEASE.json`` (see :func:`resolve_active_release`). No fallback branch
 survives; a workspace with zero live release directories resolves cleanly to "no
 active release", the same as the old scaffold default did.
@@ -19,10 +19,15 @@ from __future__ import annotations
 
 import re
 import tomllib
+from collections.abc import Collection
 from datetime import date
 from pathlib import Path
 
 from dadaia_workspace.core.handoff_index import discover_handoff_paths
+from dadaia_workspace.core.release_state import (
+    LEGACY_RELEASE_STATE_FILENAME,
+    RELEASE_STATE_FILENAME,
+)
 from dadaia_workspace.core.release_state import PHASES as _PHASES
 from dadaia_workspace.core.spec_status import APPROVED, extract_status
 from dadaia_workspace.core.spec_status import CANONICAL_STATUS as _CANONICAL_STATUS
@@ -32,6 +37,7 @@ from dadaia_workspace.features.specs.doctor_common import (
     RELEASE_ARTIFACTS,
     _read_and_parse_release_json,
     iter_all_release_dirs,
+    resolve_live_release_id,
 )
 from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
 from dadaia_workspace.features.specs.specs_tree import SpecsTree
@@ -152,13 +158,7 @@ class ReleaseValidator:
         issues: list[SpecsDoctorIssue] = []
         path = self.specs_dir / "releases"
         active = self.tree.active_release
-        release, segment, phase, err = (
-            active.release,
-            active.segment,
-            active.phase,
-            active.error,
-        )
-        del segment
+        release, phase, err = (active.release, active.phase, active.error)
         if err:
             issues.append(
                 SpecsDoctorIssue(
@@ -199,47 +199,19 @@ class ReleaseValidator:
     def check_active_release_artifacts(self) -> list[SpecsDoctorIssue]:
         issues: list[SpecsDoctorIssue] = []
         active = self.tree.active_release
-        release, segment, phase, err = (
-            active.release,
-            active.segment,
-            active.phase,
-            active.error,
-        )
+        release, phase, err = (active.release, active.phase, active.error)
         if err or not release or release == "none":
             return issues
-        # Dir-based segment (ADR-1/ADR-5): when the active phase record carries a
-        # segment, the active SPEC/PLAN/TASKS live in releases/<release>/<segment>/;
-        # else flat. D-E: this release's own phase records carry none.
-        rdir = self.specs_dir / "releases" / release
-        if segment:
-            rdir = rdir / segment
-        if not rdir.exists():
-            # v0.4.3 T-043-22 [Arm-B rider] bug specs-doctor-segment-router-silent-skip:
-            # a live segment pointer at a missing segment directory used to `return
-            # issues` here silently, UNCONDITIONALLY. Check 9 (SPEC-DOC-009,
-            # check_active_md above) only validates the RELEASE directory
-            # (releases/<release>/) — it NEVER checks the segment SUBdirectory
-            # (releases/<release>/<segment>/), so a segmented active-release pointer at
-            # a missing segment dir was invisible to every downstream check (this one
-            # AND TREE-6 in doctor_structural.py). Scoped to `segment` truthy only: the
-            # FLAT-release case (no segment) is genuinely, correctly covered already
-            # by check 9's own release-dir check (rdir IS the release dir there) —
-            # firing here too would duplicate that finding.
-            if segment:
-                issues.append(
-                    SpecsDoctorIssue(
-                        code="SPEC-DOC-004",
-                        severity=Severity.ERROR,
-                        description=(
-                            f"Active release segment='{segment}' but no directory at "
-                            f"{rdir} (release='{release}') — the segment directory "
-                            "itself is missing; SPEC-DOC-009 validates only the "
-                            "release directory, never the segment subdirectory."
-                        ),
-                        path=str(rdir),
-                    )
-                )
+        # Between candidates (bug rc-archive-discovery-state-rejected-by-doctor):
+        # DISCOVERY is the state `release rc-archive` legally produces — trio archived
+        # to rc-N/, root empty until the next candidate's definition. The trio
+        # requirement applies only to phases where a candidate exists.
+        if phase == "DISCOVERY":
             return issues
+        # Segment routing retired (release 0.4.6, ADR 0006): the live candidate trio
+        # always sits flat at the release root; rc-N/ subfolders are archives owned by
+        # `release rc-archive`, never routed to.
+        rdir = self.specs_dir / "releases" / release
         for fname in ("SPEC.md", "PLAN.md", "TASKS.md"):
             fpath = rdir / fname
             if not fpath.exists():
@@ -319,13 +291,10 @@ class ReleaseValidator:
             )
         return issues
 
-    def _active_tasks_markers(self, release: str, segment: str | None) -> list[str] | None:
+    def _active_tasks_markers(self, release: str) -> list[str] | None:
         """Return the list of task marker chars (' ', '-', 'x') for the active release's
         TASKS.md, or None when TASKS.md is absent/unreadable."""
-        rdir = self.specs_dir / "releases" / release
-        if segment:
-            rdir = rdir / segment
-        tasks = rdir / "TASKS.md"
+        tasks = self.specs_dir / "releases" / release / "TASKS.md"
         if not tasks.exists():
             return None
         text = tasks.read_text(encoding="utf-8")
@@ -347,21 +316,14 @@ class ReleaseValidator:
         issues: list[SpecsDoctorIssue] = []
         active_path = self.specs_dir / "releases"
         active = self.tree.active_release
-        release, segment, phase, err = (
-            active.release,
-            active.segment,
-            active.phase,
-            active.error,
-        )
+        release, phase, err = (active.release, active.phase, active.error)
         if err or not release or release == "none" or phase is None:
             return issues
         rdir = self.specs_dir / "releases" / release
-        if segment:
-            rdir = rdir / segment
         if not rdir.exists():
             return issues  # release dir issues already reported by SPEC-DOC-009/004
 
-        markers = self._active_tasks_markers(release, segment)
+        markers = self._active_tasks_markers(release)
 
         if phase in ("SPEC", "DEFINITION"):
             if markers:
@@ -566,42 +528,40 @@ class ReleaseValidator:
             )
         return issues
 
-    def check_stale_verdicts(
-        self, *, head_sha: str | None, parent_sha: str | None
-    ) -> list[SpecsDoctorIssue]:
+    def check_stale_verdicts(self, *, live_shas: Collection[str] | None) -> list[SpecsDoctorIssue]:
         """SPEC-DOC-044 (v0.5.0 specs-canon closure, operator ruling 2026-08-28): a
-        verdict under ``releases/<id>/verdicts/`` whose 40-hex sha is neither the
-        branch HEAD nor HEAD's first parent is stale — ERROR, ``--fix`` deletes.
+        verdict under ``releases/<id>/verdicts/`` naming a sha outside the LIVE set —
+        branch HEAD, HEAD's first parent, the integration branch tip (the ship shape,
+        DADAIA.md §4.2) — is stale — ERROR, ``--fix`` deletes.
 
-        Uses :func:`~dadaia_workspace.features.specs.canon.verdict_violations`
-        — the SAME predicate the pre-push gate uses
-        (``features.chokepoints.service.push_gate_decision``) — never a second,
-        hand-kept rule. *head_sha*/*parent_sha* are resolved ONCE by the CLI
-        composition root (through the ``GitObjectReader`` port) and passed in as
-        plain data; this validator stays zero-I/O (it never resolves git state
-        itself). A ``None`` *head_sha* (no repo_root/git context available) is a
-        silent no-op — this check genuinely cannot evaluate without a resolved head,
-        so it stays silent rather than guessing (mirrors the constitution file-ref
-        check's own optional-``repo_root`` shape).
+        Uses :func:`~dadaia_workspace.features.specs.canon.verdict_violations` over
+        *live_shas* — the SAME predicate and the SAME set
+        (``features.chokepoints.verdict.live_verdict_shas``) the pre-push gate uses —
+        never a second, hand-kept rule. *live_shas* is resolved ONCE by the CLI
+        composition root and passed in as plain data; this validator stays zero-I/O.
+        ``None`` (no git context available) is a silent no-op — this check genuinely
+        cannot evaluate without a resolved head, so it stays silent rather than
+        guessing (mirrors the constitution file-ref check's own optional-``repo_root``
+        shape).
         """
-        if head_sha is None:
+        if live_shas is None:
             return []
         verdict_paths = discover_handoff_paths(self.specs_dir, "releases/*/verdicts/*.handoff.json")
         if not verdict_paths:
             return []
         rel_paths = [p.relative_to(self.specs_dir).as_posix() for p in verdict_paths]
-        stale_rels = verdict_violations(rel_paths, head_sha, parent_sha)
+        stale_rels = verdict_violations(rel_paths, live_shas)
+        live_display = ", ".join(sha[:12] for sha in live_shas)
         issues: list[SpecsDoctorIssue] = []
         for rel in stale_rels:
-            parent_display = parent_sha[:12] if parent_sha else "none"
             issues.append(
                 SpecsDoctorIssue(
                     code="SPEC-DOC-044",
                     severity=Severity.ERROR,
                     description=(
-                        f"specs/{rel} is a stale verdict — its sha is neither the "
-                        f"branch head ({head_sha[:12]}) nor its first parent "
-                        f"({parent_display}). A consumed-or-stale verdict never "
+                        f"specs/{rel} is a stale verdict — its sha is none of the live "
+                        f"shas (head, first parent, develop tip: {live_display}), or a "
+                        "second file for one of them. A consumed-or-stale verdict never "
                         "stays on disk (SPEC-DOC-044). Auto-fix available (run "
                         "doctor --fix) to delete it."
                     ),
@@ -616,6 +576,41 @@ class ReleaseValidator:
         assert issue.code == "SPEC-DOC-044"
         target = Path(issue.path)  # type: ignore[arg-type]
         target.unlink(missing_ok=True)
+
+    def check_release_state_filename(self) -> list[SpecsDoctorIssue]:
+        """SPEC-DOC-046 (release 0.4.6 FR3, ADR 0007): the live release's state
+        document carries the legacy ``RELEASE.json`` name — WARNING with a doctor
+        ``--fix`` rename to the canonical ``_RELEASE.json``. Read-side both names
+        already work (``core.release_state.release_state_file``); this rule is the
+        migration lane that retires the legacy name from a consumer instance."""
+        release_id, err = resolve_live_release_id(self.specs_dir)
+        if err or release_id is None:
+            return []
+        release_dir = self.specs_dir / "releases" / release_id
+        legacy = release_dir / LEGACY_RELEASE_STATE_FILENAME
+        if not legacy.is_file() or (release_dir / RELEASE_STATE_FILENAME).is_file():
+            return []
+        return [
+            SpecsDoctorIssue(
+                code="SPEC-DOC-046",
+                severity=Severity.WARNING,
+                description=(
+                    f"releases/{release_id}/{LEGACY_RELEASE_STATE_FILENAME} carries the "
+                    f"legacy state-file name — canonical is {RELEASE_STATE_FILENAME} "
+                    "(release-candidates model, ADR 0007). Auto-fix available (run "
+                    "doctor --fix) to rename it."
+                ),
+                path=str(legacy),
+                fixable=True,
+            )
+        ]
+
+    def fix_release_state_filename(self, issue: SpecsDoctorIssue) -> None:
+        """Rename the legacy state file to the canonical name (SPEC-DOC-046 auto-fix)."""
+        assert issue.code == "SPEC-DOC-046"
+        legacy = Path(issue.path)  # type: ignore[arg-type]
+        if legacy.is_file():
+            legacy.rename(legacy.with_name(RELEASE_STATE_FILENAME))
 
     def check_pyproject_version_matches_release(
         self, repo_root: Path | None

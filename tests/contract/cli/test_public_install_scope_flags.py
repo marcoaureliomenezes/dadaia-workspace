@@ -1,4 +1,7 @@
-"""Contract tests for public install scope flags."""
+"""Intent: CONTRACT — dadaia public install --repos-only / --workspace-only (DADAIA §8.1)
+
+Contract tests for public install scope flags.
+"""
 
 from __future__ import annotations
 

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dadaia-workspace"
-version = "0.4.5"
+version = "0.4.6"
 description = "AI-native workspace management CLI for multi-agent development with Claude Code, Codex and Kimi Code"
 authors = ["Marco Menezes <marcoaureliomenezes@users.noreply.github.com>"]
 readme = "README.md"
@@ -236,8 +236,8 @@ markers = [
     "e2e: full user journeys and browser-backed flows",
     "slow: tests over 1s or tests that start a server/subprocess",
     "tmp: temporary debugging tests excluded from default runs",
-    "flaky: observed pass+fail on identical code; being diagnosed (dadaia-test-stewardship F)",
-    "quarantine: out of gating selectors; requires bug= id and expires (dadaia-test-stewardship F)",
+    "flaky: observed pass+fail on identical code; being diagnosed (dd-test-stewardship, flakes and quarantine)",
+    "quarantine: out of gating selectors; requires bug= id and expires (dd-test-stewardship, flakes and quarantine)",
 ]
 norecursedirs = [
     ".*",

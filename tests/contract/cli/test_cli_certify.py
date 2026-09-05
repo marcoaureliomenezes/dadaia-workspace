@@ -1,4 +1,7 @@
-"""Full-capability certification result contract."""
+"""Intent: CONTRACT — dadaia-certification-v1 result shape (CertificationResult.to_dict)
+
+Full-capability certification result contract.
+"""
 
 from __future__ import annotations
 

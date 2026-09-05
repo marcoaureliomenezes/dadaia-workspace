@@ -46,8 +46,8 @@ PROJECTS_CSS: str = """
 }
 
 /* ── Context card — uniform treatment (no primary special casing) ──────────── */
-/* v0.1.59 / FR4 density pass: aligned to the one card-elevation language shared by
-   the Workflows + Academy cards — a calm resting shadow (--shadow-card-rest) that
+/* v0.1.59 / FR4 density pass: the one card-elevation language — a calm resting
+   shadow (--shadow-card-rest) that
    lifts on hover (--shadow-card-hover + --lift-hover translate) with the softer
    --radius-lg corner, so every card surface reads as one designed system. The
    4px accent left-border + --space-md padding are preserved. Motion-guarded. */

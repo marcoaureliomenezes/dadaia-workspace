@@ -1,0 +1,161 @@
+{
+  "schema_version": "handoff-v1.2",
+  "agent": "security-reviewer",
+  "context": "dadaia-workspace",
+  "release_id": "0.4.6",
+  "produced_at": "2026-09-05T20:24:33Z",
+  "scope": "DELTA re-verdict for the feature/0.4.6 -> develop PR, re-headed at f705bbef49fb3c24a629d3c1f0e099c6e13b2e72. Supersedes the PR-gate verdict at e8ddf08519af276a3f55655a8ece840481d4e457 (same PR, two commits older); that file was deleted from disk in this turn so exactly one PR-gate verdict exists. Delta reviewed: e8ddf08519af276a3f55655a8ece840481d4e457..f705bbef49fb3c24a629d3c1f0e099c6e13b2e72 \u2014 2 commits (13131a7b bug registration, BUGS.jsonl alone; f705bbef the fix) = 20 files: production dadaia_workspace/ 8 modules +146/-97 raw added lines of which ~122 are docstring/comment (cli/commands/specs.py, container.py, features/chokepoints/push_gate.py, features/chokepoints/verdict.py, features/specs/canon.py, features/specs/doctor.py, features/specs/doctor_release.py, features/specs/rules.py, infrastructure/git_objects.py), 8 test files, public/skills/dd-gitflow-default/SKILL.md (one 4-line bullet in 3b), public/entities/behavior-map.json (that skill's hash re-record), specs/bugs/BUGS.jsonl (+1 resolve line). FULL PR range 9c3fc0f8a05825d462b6197468fb1719ef726307..f705bbef49fb3c24a629d3c1f0e099c6e13b2e72 = 4 commits (6057c6e0 candidate-4 merge record + consumed-verdict deletion, e8ddf085 CHANGELOG 0.4.6, 13131a7b bug report, f705bbef the fix). The predecessor verdicts carry the unchanged surface forward: efd58d33 (APPROVED, consumed by the 9c3fc0f8 merge) covered the full candidate-4 production, dependency, IaC and hook surface, and e8ddf08519af276a3f55655a8ece840481d4e457 (APPROVED) covered the docs/specs-only 9c3fc0f8..e8ddf085 span; neither is re-litigated here. This delta is the FIRST production-code movement in the PR range, so every gate a code change can move was rerun on it: line-by-line read of all 8 production modules, argv-injection testing of the new subprocess seam, trust-boundary analysis of the widened liveness set, secret/token/privacy grep over all 389 added lines, pytest over the 5 delta-touched test files, dadaia public doctor, dadaia ci push-gate-check (committed HEAD and simulated consuming commit), dadaia ci verdict-check, dadaia specs doctor. Diff-based scope only (DADAIA.md \u00a77.4) \u2014 a whole-tree scan lives in the audit lane and, for what ships, in the sibling ship verdict at 9c3fc0f8a05825d462b6197468fb1719ef726307.",
+  "verdict": "APPROVED",
+  "verdict_reason": "No CRITICAL, HIGH, MEDIUM or LOW finding is open against this delta, and the ONE LOW the superseded verdict's sibling raised (CWE-841, the SPEC-DOC-044 staleness rule refusing the very ship-verdict shape DADAIA.md \u00a74.2 / dd-gitflow-default \u00a73b mandates) is closed by this delta with live proof, not by assertion.\n\n1. NEW SUBPROCESS SEAM \u2014 infrastructure/git_objects.py::GitSubprocessObjectReader.resolve_ref builds a git argv from a ref string, so it was treated as an injection surface (CWE-88/CWE-78). It is safe by construction and by measurement. Construction: _run() calls subprocess.run(args, cwd=..., capture_output=True, timeout=30) with a list argv and no shell=True anywhere in the module, so no shell metacharacter is ever interpreted; the ONE interpolated token is gated by _REF_SHAPE_RE = ^[A-Za-z0-9_][A-Za-z0-9_./-]*$, whose FIRST character class excludes '-' and '.', making an option-shaped argument unrepresentable, and whose body excludes whitespace, newline, ';', '|', '&', '$', '`', '*', quotes and NUL. Measurement (20 adversarial refs driven through the real reader against this repo, read-only, no ref moved): '--upload-pack=touch /tmp/pwn', '-n', '--output=/tmp/x', '-HEAD', '--end-of-options', 'HEAD --output=/tmp/x', 'HEAD\\nrefs/heads/main', 'HEAD;id', '$(id)', '`id`', '  HEAD', 'refs/heads/*', '.hidden', '' \u2014 ALL rejected by the regex before argv construction, returning None. The two shapes the regex does admit are neutralised by git itself: 'e8ddf085..HEAD' (a range) and 'a/../../etc/passwd' (traversal-shaped) both return None, because 'git rev-parse --verify' refuses a range and git's own refname rules refuse a '..' component \u2014 the '^{commit}' peel and '--verify --quiet' together admit exactly one existing commit-ish and nothing else. Both real call sites pass module constants ('HEAD', INTEGRATION_TIP_REF), so no caller-controlled string reaches this function today; the guard is second-layer defence, the same posture _SHA_SHAPE_RE already holds for first_parent. --end-of-options is NOT required here (a leading '-' cannot pass the regex) and is recorded as an INFO hardening suggestion only, for parity with the trailing '--' this module already uses in its multi-path argv.\n\n2. WIDENED LIVENESS SET \u2014 the security question this delta really turns on is whether adding origin/develop's tip to the live-verdict sha set lets an unreviewed verdict be smuggled past a gate. It does not, because the widened rule is NOT the authorization rule. The authoritative gate is CI's security-verdict-gate, which runs features/chokepoints/verdict.py::covering_verdict \u2014 and covering_verdict is BYTE-UNCHANGED by this delta (the diff touches its name only inside the re-sorted __all__ literal). It still resolves two-hop, PR head or head's first parent ONLY, never origin/develop; it still parses the document and demands agent == 'security-reviewer', verdict == 'APPROVED' and a non-empty metrics.commit_sha; and it still fails closed on ambiguity (two qualifying candidates for one sha resolve to None). What changed is the ON-DISK HYGIENE rule (features/specs/canon.py::verdict_violations, consumed by the pre-push specs-canon scan and by SPEC-DOC-044), which matches a 40-hex FILENAME and reads no content at all \u2014 it can authorize nothing. Its input, refs/remotes/origin/develop, is local remote-tracking state that anyone with write access to the working copy could set to an arbitrary sha; that is not a new exposure, because the same actor can already bypass the entire client-side hook with 'git push --no-verify'. A pre-push hook is hygiene, never a trust boundary (DADAIA.md \u00a73.4 chokepoint vs \u00a73.5 'hooks validate at the publication boundary'), and the trust boundary that does matter \u2014 CI, on the server, over the PR head \u2014 was not moved by one line of this delta.\n\n3. FAIL DIRECTION \u2014 the two consumers of the new set degrade in OPPOSITE and individually correct directions, which is the property that makes the silence in cli/commands/specs.py::_resolve_live_shas safe. The doctor degrades OPEN: when HEAD or origin/develop cannot be resolved (unfetched clone, no git context) _resolve_live_shas returns None, check_stale_verdicts returns [] and 'doctor --fix' therefore DELETES NOTHING \u2014 the fail-safe direction for a destructive auto-fix, and a direct defence against the recorded failure mode of this bug family (the tool deleting the operator's staged ship evidence). The pre-push gate degrades CLOSED: push_gate.py::_run_specs_canon_scan has no such early return; it calls live_verdict_shas directly, so an unresolvable tip merely SHRINKS the set to (head, first parent) \u2014 exactly the pre-fix strictness \u2014 and the scan keeps refusing. Silence never opens a gate; it only withholds a deletion. Read line by line, confirmed in code.\n\n4. RULE CONSOLIDATION \u2014 'one file per live sha' replaces 'one file total, head or parent'. The predicate is now order-independent in outcome for the doctor (discover_handoff_paths returns sorted(root.glob(...)), so duplicate reporting is deterministic) and strictly narrower per sha than the old global 'at most one': a second file naming the SAME live sha is still a violation, so a duplicate-verdict smuggle is refused exactly as before. No path that was refused for being non-live becomes accepted unless it names one of the three live shas, each of which is a sha the PR itself is built on.\n\n5. SECRETS AND PRIVACY \u2014 every one of the 389 added lines in this delta was scanned: 0 secret-assignment hits ((password|passwd|secret|token|api_key|apikey|private_key) followed by an assignment and a 6+ char quoted literal), 0 'BEGIN ... PRIVATE KEY' headers, 0 AWS/GitHub/Slack/OpenAI/JWT token shapes, 0 absolute local paths, 0 private IPs, 0 .local hostnames, 0 operator identifiers. The two new BUGS.jsonl lines were read in full and are correctly redacted: they name only repo-relative module paths and symbols, CLI verbs, bug slugs and law section numbers. 'dadaia public doctor' reports [ok] public-privacy \u2014 material, because this delta edits two files under dadaia_workspace/public/ (the dd-gitflow-default skill bullet and its behavior-map hash record), and both carry only public asset paths and symbol names, no consumer name, host, IP or operator-local path.\n\n6. BUG SURFACE (operator standing order) \u2014 REDUCED, with ledger evidence. specs/bugs/BUGS.jsonl declares caused_by: verdict-check-head-or-first-parent-cannot-be-satisfied-by-a-develop-to-main-pr, and the ledger shows that predecessor closed as resolved/MEDIUM with caused_by 'none'. That is a two-step recurrence, and the ledger explains it exactly: the earlier fix taught the CI half (covering_verdict) the ship shape and left the on-disk half (verdict_violations) on the 2026-08-28 head-or-parent predicate \u2014 one law, two homes, so the shape the law mandates was accepted by one gate and refused by the other. The correct response to a split-brain rule is to collapse it, and this diff does: liveness now has ONE home (verdict.py::live_verdict_shas) consumed by all three call sites; the duplicate resolver dies (cli/commands/specs.py loses its own raw 'import subprocess' + subprocess.run block, -26 lines, and now goes through the same container-built reader); push_gate loses its separate first_parent call; the two-argument (head_sha, parent_sha) signature collapses to one Collection across canon.py, doctor.py, doctor_release.py and rules.py. The raw stat is +142/-97 in production, which the fix's own record honestly declares 'net-positive'; against DADAIA.md \u00a77.1 and the standing order that number must be read correctly, so it was measured: of 146 added production lines ~122 are docstring/comment (the new rule's provenance and the operator ruling), leaving roughly 24 added executable lines \u2014 one 6-line function, one 12-line adapter method, two Protocol member declarations, one constant, and import/signature changes \u2014 against 97 deletions including a whole hand-rolled subprocess resolver. Branches were removed, not added; no flag, no special case, no second code path, no cross-feature reach-in. features/chokepoints stays free of any infrastructure import (the new ShaSource Protocol is structural, satisfied by both the push gate's ObjectSource and the concrete reader), so the layering that the architecture rules defend is intact. software-architect reviewed the same diff today: APPROVED WITH FIXES (all applied), root-cause PASS, fidelity PASS, bug surface REDUCED \u2014 this review reaches the same conclusion on independent, security-side evidence.\n\n7. GATES, MEASURED \u2014 pytest over the 5 delta-touched test files: 217 passed, 0 failed, 3.06s, including the new coverage for resolve_ref, live_verdict_shas, the per-sha verdict predicate and the push-gate wiring. 'dadaia ci push-gate-check' on the committed HEAD exits 0 \u2014 stated precisely, because it is weak evidence on its own: at HEAD the tree carries ZERO verdict files ('git ls-tree -r HEAD -- specs/releases/0.4.6/verdicts/' is empty; both verdict files are untracked working-tree state), so the specs-canon step has nothing to judge. The load-bearing proof is the simulation of the consuming commit: a DANGLING 'git commit-tree' whose parent is HEAD and whose tree is HEAD's tree plus this verdict file plus the 9c3fc0f8 ship verdict minus the superseded e8ddf085 file \u2014 no ref moved, nothing committed, no --fix run anywhere in this review. On that dangling sha 'dadaia ci push-gate-check' exits 0 and 'dadaia ci verdict-check --head <dangling> --release-id 0.4.6' passes: this file is live as the head's first parent, the ship verdict is live as origin/develop's tip, one file per sha. Under the pre-fix rule that identical tree was REFUSED \u2014 that refusal is the LOW CWE-841 the predecessor recorded, and its disappearance on an otherwise identical tree is the executed-path evidence that the fix is real. 'dadaia specs doctor', with both live verdict files on disk and the superseded one deleted, reports 0 SPEC-DOC-044 and 0 errors; the only warnings are 19 SPEC-DOC-041 (bug records past the 90-day archive threshold, warning-only by design, oldest 2026-06-04, entirely outside this range). Exact exit codes and counts are in metrics.\n\n8. CARRIED FORWARD \u2014 the 2 LOW findings from the efd58d33 verdict (CWE-706, the '--workspace' ancestor walk, registered and open; CWE-59/61, a symlinked zone root classified canon) are untouched by this delta: it modifies no file under core/workspace_resolver.py or the workspace-doctor zone scan. They remain stated with fresh code evidence in the sibling ship verdict at 9c3fc0f8 and are not re-opened here. No dependency manifest, lockfile, Dockerfile, compose, Terraform, CI workflow or hook script is touched by this delta, so the dependency-CVE and IaC surfaces are unmoved since efd58d33 and are carried forward unchanged.",
+  "artifact": {
+    "type": "other"
+  },
+  "metrics": {
+    "commit_sha": "f705bbef49fb3c24a629d3c1f0e099c6e13b2e72",
+    "supersedes_verdict": "e8ddf08519af276a3f55655a8ece840481d4e457",
+    "delta_range": "e8ddf08519af276a3f55655a8ece840481d4e457..f705bbef49fb3c24a629d3c1f0e099c6e13b2e72",
+    "delta_commits": 2,
+    "pr_range": "9c3fc0f8a05825d462b6197468fb1719ef726307..f705bbef49fb3c24a629d3c1f0e099c6e13b2e72",
+    "pr_range_commits": 4,
+    "pr_range_commit_list": "6057c6e0 (candidate-4 merge record + consumed-verdict deletion), e8ddf085 (CHANGELOG 0.4.6), 13131a7b (bug report, BUGS.jsonl alone), f705bbef (the fix)",
+    "delta_files": {
+      "production_modules": 8,
+      "production_lines": "+142/-97 net (146 raw added lines, of which ~122 are docstring/comment; ~24 added executable lines against 97 deletions)",
+      "paths_production": "cli/commands/specs.py, container.py, features/chokepoints/push_gate.py, features/chokepoints/verdict.py, features/specs/canon.py, features/specs/doctor.py, features/specs/doctor_release.py, features/specs/rules.py, infrastructure/git_objects.py",
+      "test_files": 8,
+      "public_asset_files": "dadaia_workspace/public/skills/dd-gitflow-default/SKILL.md (+4 lines, one 3b bullet), dadaia_workspace/public/entities/behavior-map.json (that skill's sha256 hash re-record)",
+      "record_files": "specs/bugs/BUGS.jsonl (+1 resolve line)",
+      "dependency_manifests": 0,
+      "lockfiles": 0,
+      "ci_workflow_files": 0,
+      "iac_files": 0,
+      "hook_scripts": 0
+    },
+    "delta_added_lines_scanned": 389,
+    "secret_pattern_hits_delta": 0,
+    "private_key_headers_delta": 0,
+    "token_shape_hits_delta": 0,
+    "local_path_ip_hostname_operator_id_hits_delta": 0,
+    "ref_shape_probe": {
+      "surface": "infrastructure/git_objects.py::GitSubprocessObjectReader.resolve_ref (CWE-88/CWE-78)",
+      "adversarial_refs_driven": 20,
+      "rejected_before_argv_construction": 18,
+      "admitted_by_regex_then_neutralised_by_git": "2 \u2014 'e8ddf085..HEAD' (rev-parse --verify refuses a range) and 'a/../../etc/passwd' (git refname rules refuse a '..' component); both return None",
+      "shapes_rejected": "leading '-' / '--opt=value' / '--end-of-options' / embedded space / embedded newline / ';' / '$(...)' / backtick / '*' / leading whitespace / leading '.' / empty",
+      "shell": "never \u2014 list argv, no shell=True in the module; 30s timeout; FileNotFoundError and TimeoutExpired typed into GitObjectReadError",
+      "end_of_options_marker": "absent; NOT required (the regex's first character class excludes '-'), recorded as an INFO hardening suggestion only"
+    },
+    "authorization_boundary_unchanged": "features/chokepoints/verdict.py::covering_verdict is byte-unchanged \u2014 the diff touches its name only inside the re-sorted __all__ literal. CI's security-verdict-gate still resolves two-hop (PR head or head's first parent ONLY, never origin/develop), still parses the document (agent == security-reviewer, verdict == APPROVED, non-empty metrics.commit_sha) and still fails closed on a duplicate-sha ambiguity.",
+    "rule_counterfactual": {
+      "method": "pure predicate evaluation over the SAME simulated tree; no git write, no ref moved, no exploit",
+      "pre_fix_rule_head_or_parent_one_file_total": "REFUSES the 9c3fc0f8 ship verdict \u2014 this is the LOW CWE-841 the superseded verdict recorded",
+      "post_fix_rule_one_file_per_live_sha": "no violation \u2014 both files live (this one as first parent, the ship verdict as origin/develop's tip)",
+      "post_fix_duplicate_smuggle_two_files_one_live_sha": "still REFUSED (the excess file is a violation)",
+      "post_fix_unreviewed_sha": "still REFUSED (any sha outside the 3-element live set is stale)"
+    },
+    "fail_direction": {
+      "specs_doctor_when_head_or_origin_develop_unresolvable": "degrades OPEN \u2014 _resolve_live_shas returns None, check_stale_verdicts returns [], 'doctor --fix' deletes NOTHING (fail-safe for a destructive auto-fix; protects staged ship evidence)",
+      "pre_push_gate_when_origin_develop_unresolvable": "degrades CLOSED \u2014 _run_specs_canon_scan has no early return; live_verdict_shas simply shrinks to (head, first parent), i.e. the pre-fix strictness, and the scan keeps refusing",
+      "assessment": "silence never opens a gate; it only withholds a deletion"
+    },
+    "pytest_delta": {
+      "command": "python -m pytest -p no:cacheprovider -q tests/unit/features/chokepoints tests/unit/features/specs/test_canon.py tests/unit/features/specs/test_doctor_stale_verdicts.py tests/unit/infrastructure/test_git_object_reader.py tests/contract/test_push_gate_wiring.py",
+      "passed": 217,
+      "failed": 0,
+      "duration_s": 3.06
+    },
+    "push_gate_check_exit": {
+      "at_committed_head_f705bbef": 0,
+      "at_committed_head_caveat": "vacuous on its own \u2014 'git ls-tree -r HEAD -- specs/releases/0.4.6/verdicts/' is EMPTY; both verdict files are untracked working-tree state at HEAD, so the specs-canon step has no verdict path to judge",
+      "at_simulated_consuming_commit": 0,
+      "ref_line": "refs/heads/feature/0.4.6 <sha> refs/heads/feature/0.4.6 6057c6e03d1ce4fdfa9b978452b584b2965bc10b",
+      "simulation_recipe": "dangling 'git commit-tree' with parent HEAD and tree = HEAD's tree + this verdict file + the 9c3fc0f8 ship verdict (the superseded e8ddf085 file is absent from HEAD's tree, so it is subtracted by construction); built through a throwaway GIT_INDEX_FILE \u2014 no ref moved, nothing committed, no --fix run anywhere in this review",
+      "simulation_sha_note": "the dangling sha is self-referential (it hashes this very file's bytes), so the RECIPE above, not a fixed sha, is the reproducible artifact"
+    },
+    "verdict_check": "PASS \u2014 'dadaia ci verdict-check --head <simulated consuming commit> --release-id 0.4.6' exits 0, resolving THIS file through the head's first parent; the CI security-verdict-gate for the feature/0.4.6 -> develop PR is satisfied at this head",
+    "specs_doctor": {
+      "errors": 0,
+      "SPEC-DOC-044_findings": 0,
+      "warnings": 19,
+      "warning_code": "SPEC-DOC-041 (bug records past the 90-day archive threshold; warning-only by design D15; oldest 2026-06-07, outside this range)",
+      "state_measured": "both live verdict files on disk (this one = HEAD, the ship verdict = origin/develop tip), superseded e8ddf085 file deleted"
+    },
+    "public_doctor_privacy": "ok \u2014 [ok] public-privacy, plus [ok] entities-derivation and [ok] model-resolution (material: this delta edits two files under dadaia_workspace/public/)",
+    "bug_lineage": {
+      "this_bug": "verdict-staleness-rule-refuses-the-ship-verdict-the-gitflow-law-mandates (MEDIUM, resolved)",
+      "caused_by": "verdict-check-head-or-first-parent-cannot-be-satisfied-by-a-develop-to-main-pr (MEDIUM, resolved, caused_by: none)",
+      "pattern": "two-step recurrence in ONE law with TWO homes \u2014 the earlier fix taught the CI half, leaving the on-disk half on the old predicate",
+      "structural_response": "liveness collapsed into ONE home (verdict.py::live_verdict_shas) consumed by all three call sites; the duplicate raw-subprocess resolver in cli/commands/specs.py deleted; push_gate's separate first_parent call deleted; the (head_sha, parent_sha) two-argument signature collapsed to one Collection across 4 modules",
+      "bug_surface": "REDUCED"
+    },
+    "carried_forward_findings": "2 LOW + the dependency/IaC surface from the efd58d33 verdict (CWE-706 '--workspace' ancestor walk, registered and open; CWE-59/61 symlinked zone root classified canon) \u2014 untouched by this delta (no file under core/workspace_resolver.py or the workspace-doctor zone scan is modified) and re-stated with fresh code evidence in the sibling ship verdict at 9c3fc0f8",
+    "findings": {
+      "CRITICAL": 0,
+      "HIGH": 0,
+      "MEDIUM": 0,
+      "LOW": 0,
+      "INFO": 7
+    },
+    "superseded_verdict_file_state": "read as the template and delta baseline this session, then DELETED from disk in this same turn so exactly one PR-gate verdict exists (it is untracked, so nothing is committed by that removal); it is therefore absent from self_pull.refs, which the validator requires to resolve on disk"
+  },
+  "findings": [
+    {
+      "severity": "INFO",
+      "message": "New subprocess seam `GitSubprocessObjectReader.resolve_ref` is not argv-injectable (CWE-88/CWE-78) \u2014 20 adversarial refs driven through the real reader, 18 rejected before argv construction, the 2 the regex admits neutralised by git itself.",
+      "detail_md": "`_REF_SHAPE_RE = ^[A-Za-z0-9_][A-Za-z0-9_./-]*$`. The FIRST character class excludes `-` and `.`, so an option-shaped argument is unrepresentable; the body excludes whitespace, newline, `;`, `|`, `&`, `$`, backtick, `*`, quotes and NUL.\n\nRejected before argv: `--upload-pack=touch /tmp/pwn`, `-n`, `--output=/tmp/x`, `-HEAD`, `--end-of-options`, `HEAD --output=/tmp/x`, `HEAD\\nrefs/heads/main`, `HEAD;id`, `$(id)`, `` `id` ``, `  HEAD`, `refs/heads/*`, `.hidden`, `` (empty), `HEAD^{commit}`, `refs/remotes/origin/develop^{tree}`.\n\nAdmitted by the regex, then refused by git: `e8ddf085..HEAD` (a range \u2014 `rev-parse --verify` refuses it) and `a/../../etc/passwd` (git's own refname rules refuse a `..` component). Both return `None`.\n\n`_run` uses a list argv with no `shell=True` anywhere in the module, a 30 s timeout, and types `FileNotFoundError`/`TimeoutExpired` into `GitObjectReadError`. `--verify --quiet` + `^{commit}` admit exactly one existing commit-ish. Both real call sites pass module constants (`\"HEAD\"`, `INTEGRATION_TIP_REF`), so no caller-controlled string reaches this function today \u2014 the guard is second-layer defence, the same posture `_SHA_SHAPE_RE` already holds for `first_parent`.",
+      "fix_recommendation": "None required \u2014 the guard holds as written. Keep `_REF_SHAPE_RE` anchored and keep its first character class free of `-` and `.`; any future loosening of that class must re-add an explicit end-of-options marker before merge."
+    },
+    {
+      "severity": "INFO",
+      "message": "`--end-of-options` is not required on the new argv, and is recorded only as an optional defence-in-depth parity suggestion \u2014 NOT a finding to fix before merge.",
+      "detail_md": "A leading `-` cannot pass `_REF_SHAPE_RE`, so the marker would be unreachable hardening. It is noted because this module already uses a trailing `--` end-of-options marker in its multi-path argv (v0.11.0 FR7/A7.4), and a future caller that loosens the regex would lose the only layer. Operator/PM decision, backlog-shaped at most; adding it now would be a change with no behavioural difference.",
+      "fix_recommendation": "Optional, non-blocking: append `--end-of-options` (or a trailing `--`) to the `resolve_ref` argv for parity with this module's multi-path calls. Do not treat as a merge condition."
+    },
+    {
+      "severity": "INFO",
+      "message": "Widening the on-disk liveness set to `origin/develop`'s tip does NOT widen any authorization boundary \u2014 the authoritative CI rule `covering_verdict` is byte-unchanged.",
+      "detail_md": "The pre-push specs-canon scan matches a 40-hex FILENAME and reads no handoff content at all, so it can authorize nothing; it is a hygiene rule (DADAIA.md \u00a77.6 slop) enforced at a client-side chokepoint that is already bypassable with `git push --no-verify`. Its new input, `refs/remotes/origin/develop`, is local remote-tracking state that any actor with write access to the working copy could set arbitrarily \u2014 the same actor who can skip the hook entirely, so no new capability is granted.\n\nAuthorization stays where it was: CI's `security-verdict-gate` runs `covering_verdict`, which this diff touches only inside the re-sorted `__all__` literal. It still resolves PR head or head's first parent ONLY, still requires `agent == \"security-reviewer\"`, `verdict == \"APPROVED\"` and a non-empty `metrics.commit_sha`, and still returns `None` (fails closed) when two qualifying candidates name the same sha.",
+      "fix_recommendation": "None required. Keep `covering_verdict` as the single authorization rule and keep the on-disk predicate content-free; if the on-disk rule ever gains content checks, it must not become an authorization path \u2014 CI over the PR head stays the trust boundary."
+    },
+    {
+      "severity": "INFO",
+      "message": "The new `one file per live sha` predicate was tested against smuggling: a duplicate verdict for a live sha and a verdict for an unreviewed sha are BOTH still refused; the widening is exactly three shas and nothing more.",
+      "detail_md": "Pure predicate evaluation over the simulated tree (no git write, no exploit):\n\n- pre-fix rule (head or first parent, one file total) -> REFUSES the ship verdict `9c3fc0f8...` \u2014 the LOW CWE-841 the superseded verdict recorded;\n- post-fix rule over `(head, first parent, origin/develop tip)` -> no violation;\n- post-fix + a second file naming the SAME live sha -> the excess file is REFUSED;\n- post-fix + a verdict naming an unreviewed sha (`dddd\u2026`) -> REFUSED.\n\nThe doctor's input is `discover_handoff_paths`, which returns `sorted(root.glob(...))`, so duplicate reporting is deterministic rather than filesystem-order dependent.",
+      "fix_recommendation": "None required. Preserve the two refusal cases in the regression suite (`tests/unit/features/specs/test_canon.py`) so a future widening cannot silently drop the duplicate-sha or unreviewed-sha refusal."
+    },
+    {
+      "severity": "INFO",
+      "message": "Fail directions are opposite and each is correct: `specs doctor` degrades OPEN (deletes nothing), the pre-push gate degrades CLOSED (keeps refusing). The silence in `_resolve_live_shas` is therefore safe.",
+      "detail_md": "`cli/commands/specs.py::_resolve_live_shas` returns `None` when HEAD or `origin/develop` is unresolvable (an unfetched clone, no git context); `check_stale_verdicts` then returns `[]`, so SPEC-DOC-044 is a silent no-op and `--fix` DELETES NOTHING. For a destructive auto-fix that is the fail-safe direction, and it directly defends against this bug family's recorded failure mode \u2014 the tool deleting the operator's staged ship evidence.\n\n`features/chokepoints/push_gate.py::_run_specs_canon_scan` has no equivalent early return: it calls `live_verdict_shas` directly, so an unresolvable tip merely shrinks the set to `(head, first parent)` \u2014 exactly the pre-fix strictness \u2014 and the scan keeps refusing. Operator-visible consequence worth knowing, not a vulnerability: on a clone without `origin/develop` fetched, a correctly staged ship verdict is refused at push while the doctor stays silent about why.",
+      "fix_recommendation": "None required \u2014 the asymmetry is correct as implemented. If the operator wants the unfetched-clone case to be self-explaining, the cheapest non-gating improvement is a doctor NOTE when `_resolve_live_shas` returns `None`; backlog-shaped, never a blocker."
+    },
+    {
+      "severity": "INFO",
+      "message": "Secrets, privacy and public-asset integrity gates on the delta: 0 secret-assignment hits, 0 private-key headers, 0 provider-token shapes, 0 absolute-local-path / private-IP / hostname / operator-identifier hits across all 389 added lines; `dadaia public doctor` reports `[ok] public-privacy`.",
+      "detail_md": "Patterns applied to `git diff e8ddf085..HEAD | grep '^+'`:\n\n- `(password|passwd|secret|token|api_key|apikey|private_key)\\s*[=:]\\s*['\\\"][^'\\\"]{6,}` \u2014 0 hits;\n- `BEGIN [A-Z ]*PRIVATE KEY` \u2014 0 hits;\n- `AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{20,}|xox[baprs]-|sk-[A-Za-z0-9]{20,}|eyJ[A-Za-z0-9_-]{10,}\\.` \u2014 0 hits;\n- `/home/<user>|/Users/|192.168.|10.x.x.x|\\.local\\b|<operator id>|<user>@` \u2014 0 hits.\n\nThe two new `BUGS.jsonl` lines were read in full and are correctly redacted: they name only repo-relative module paths and symbols, CLI verbs, bug slugs and law section numbers. Software-integrity note (OWASP A08): this delta edits an agent-instruction asset (`public/skills/dd-gitflow-default/SKILL.md`) and re-records its sha256 in `public/entities/behavior-map.json`; `public doctor` returns `[ok] entities-derivation`, so the instruction change is accounted for by the integrity record rather than drifting silently.",
+      "fix_recommendation": "None required. Keep the `public doctor` privacy and entities-derivation checks in the push preflight so any future edit to an agent-instruction asset stays hash-accounted."
+    },
+    {
+      "severity": "INFO",
+      "message": "Dependency-CVE and IaC surfaces are unmoved by this delta and are carried forward from the efd58d33 verdict; the 2 LOW findings recorded there are untouched.",
+      "detail_md": "`git diff --name-status e8ddf085..HEAD` lists no `pyproject.toml`, no lockfile, no `Dockerfile`/compose, no Terraform/Pulumi, no `.github/` workflow and no hook script \u2014 so no dependency, container, IaC or CI-permission surface changed since the APPROVED at `efd58d33`. Carried forward unchanged and NOT re-opened here: CWE-706 (the `--workspace` ancestor walk, registered and open) and CWE-59/61 (a symlinked zone root classified `canon`); this delta modifies no file under `core/workspace_resolver.py` or the workspace-doctor zone scan. Both are re-stated with fresh code evidence in the sibling ship verdict at `9c3fc0f8`.",
+      "fix_recommendation": "None required in this delta. The two carried-forward LOW findings remain tracked in the bug ledger and in the sibling ship verdict at 9c3fc0f8; they are dispositioned there, not here."
+    }
+  ],
+  "decisions_required": [
+    "The merge that consumes this verdict must delete this file in the same turn (DADAIA.md \u00a74.2/\u00a77.6) \u2014 a surviving PR-cycle verdict is slop. The sibling ship verdict at 9c3fc0f8 stays until the develop -> main merge consumes it.",
+    "Optional, non-blocking (INFO 2): add an `--end-of-options` marker to the `resolve_ref` argv as parity with this module's existing trailing `--`. It changes no behaviour today (the ref regex already makes a leading `-` unrepresentable) and is backlog-shaped at most \u2014 it is NOT a condition of this APPROVED."
+  ],
+  "self_pull": {
+    "refs": [
+      "DADAIA.md",
+      "specs/bugs/BUGS.jsonl",
+      "dadaia_workspace/public/skills/dd-gitflow-default/SKILL.md"
+    ]
+  },
+  "next_handoff": {
+    "agent": "project-manager",
+    "context": "dadaia-workspace",
+    "expected_artifact_type": "other"
+  }
+}

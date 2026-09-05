@@ -15,7 +15,7 @@
 # The CI-equivalent preflight (ruff format --check, ruff check, mypy --strict,
 # lint-imports, pytest) NO LONGER runs from this hook (v0.5.0 FR9/D9 — it moved OFF
 # the hook and became the always-on rule "run `dadaia ci preflight` before you push",
-# `DADAIA.md` §7 + `dd-gitflow-default` + `dd-release-implement`). A failing local
+# `DADAIA.md` §7 + `dd-gitflow-default` + `dd-release-implementation`). A failing local
 # preflight therefore no longer blocks a push through THIS hook — run `dadaia ci
 # preflight` yourself before pushing; CI still gates on the same checks independently,
 # on every push.

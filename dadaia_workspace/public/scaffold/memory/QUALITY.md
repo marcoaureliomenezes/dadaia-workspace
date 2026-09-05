@@ -18,9 +18,6 @@ tags:
   reproduz o defeito em teste antes do fix.
 - Testes rodam com `pytest -p no:cacheprovider` (nenhum cache dentro do repo) e devem
   passar verdes antes de qualquer commit de fechamento de task.
-- Anti-slop: nenhum teste fabricado que não asserta comportamento real; nenhum
-  requisito sem critério de aceitação observável (entrada, saída ou falha verificável
-  de fora).
 - Revisões julgam o artefato apresentado pelos critérios acima; num contexto novo, a
   ausência de histórico não é motivo de rejeição — o SPEC vigente define a base.
 
@@ -28,5 +25,8 @@ tags:
 
 Tamanho por diretório: SMALL = `tests/unit` + `tests/contract`; MEDIUM =
 `tests/integration`; LARGE = `tests/e2e`. Protocolo completo (intenção, admissão,
-rebaixamento, poda, flaky/quarentena): skill `dadaia-test-stewardship`. Lei de nível de
+rebaixamento, poda, flaky/quarentena): skill `dd-test-stewardship`. Lei de nível de
 projeto: constitution, seção "Disciplina de Testes".
+
+<!-- dadaia:fixed slop-tests -->
+<!-- /dadaia:fixed slop-tests -->

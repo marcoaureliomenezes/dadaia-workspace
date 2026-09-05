@@ -61,12 +61,13 @@ def test_parse_release_state_reads_every_field() -> None:
     assert state.audited is None
     assert len(state.log) == 1
     assert state.log[0]["kind"] == "note"
-    assert state.segment is None
 
 
-def test_parse_release_state_reads_optional_segment() -> None:
+def test_parse_release_state_ignores_legacy_segment_key() -> None:
+    """The segment lane is retired (0.4.6, ADR 0006) — a legacy document still
+    carrying the key parses fine and the key is simply dropped."""
     state = parse_release_state(json.dumps(_doc(segment="rc-1")))
-    assert state.segment == "rc-1"
+    assert not hasattr(state, "segment")
 
 
 @pytest.mark.parametrize(
@@ -103,7 +104,7 @@ def test_parse_release_state_rejects_non_object_top_level() -> None:
 
 
 def test_serialize_release_state_round_trips() -> None:
-    original = parse_release_state(json.dumps(_doc(segment="alpha-2")))
+    original = parse_release_state(json.dumps(_doc()))
 
     text = serialize_release_state(original)
     reparsed = parse_release_state(text)

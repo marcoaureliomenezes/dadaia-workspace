@@ -1,4 +1,6 @@
-"""The projected ``.claude/`` scaffold must be LOADABLE by Claude Code — not merely written.
+"""Intent: SENTINEL — Claude Code harness vocabulary seam (.claude/ projection loadability)
+
+The projected ``.claude/`` scaffold must be LOADABLE by Claude Code — not merely written.
 
 Every existing assertion over this surface compares dadaia's output to dadaia's own
 generator constants: install wrote what the generator produced, and doctor agrees. That is
@@ -160,8 +162,9 @@ def test_settings_hook_events_and_matchers_are_claude_code_valid(projected: Path
     assert not unknown_events, f"settings.json declares unknown hook event(s): {unknown_events}"
     for entry in hooks.get("SessionStart", []):
         source = entry.get("matcher", "")
-        assert source in _SESSION_START_SOURCES, (
-            f"SessionStart matcher {source!r} is not an accepted source "
+        unknown_sources = sorted(set(source.split("|")) - _SESSION_START_SOURCES)
+        assert not unknown_sources, (
+            f"SessionStart matcher {source!r} names unaccepted source(s) {unknown_sources} "
             f"({sorted(_SESSION_START_SOURCES)}) — the hook would never fire"
         )
     for event in ("PreToolUse", "PostToolUse"):

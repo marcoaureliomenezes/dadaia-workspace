@@ -9,7 +9,7 @@
 > HOP-0.1 was executed at v0.1.1 closure (SPEC DEC-1) and is NOT a task here.
 > Parallelism: tasks in the same phase with disjoint write sets may run in parallel; at most
 > one `[-]` per owner otherwise. Reserve `[ ]` → `[-]` before writing, `[-]` → `[x]` after
-> review approval (`dadaia-task-manager` discipline).
+> review approval (`dd-task-manager` discipline).
 > Dispatch law: implementation and review work MUST be driven by dispatching the owning
 > agent for each SDD stage, with explicit `--context sample-consumer --release-id v0.2.0`
 > on every command. Any failure, wrong result, invalid handoff, context/bind

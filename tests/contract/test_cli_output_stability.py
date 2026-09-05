@@ -126,7 +126,9 @@ def _register_dead_ctx_with_repo_on_disk(workspace: Path, name: str = "stale-ctx
 def test_doctor_default_output_healthy_workspace_unchanged(workspace: Path) -> None:
     result = _runner.invoke(app, ["doctor"])
     assert result.exit_code == 0, result.output
-    assert result.output == "All invariants OK — workspace is healthy.\n"
+    assert result.output == (
+        "All invariants OK — workspace is healthy.\ncompliance: 134/134 entries canonical (100%)\n"
+    )
 
 
 def test_doctor_default_output_with_issue_unchanged(workspace: Path) -> None:
@@ -138,6 +140,7 @@ def test_doctor_default_output_with_issue_unchanged(workspace: Path) -> None:
         "  INV-5 [fixable] — Context 'stale-ctx' is dead but repo 'stale-ctx' is on disk\n"
         "\n"
         "Run 'dadaia doctor --fix' to apply automatic repairs.\n"
+        "compliance: 135/135 entries canonical (100%)\n"
     )
 
 
@@ -150,7 +153,8 @@ def test_doctor_default_fix_output_unchanged(workspace: Path) -> None:
         "  INV-5 [fixable] — Context 'stale-ctx' is dead but repo 'stale-ctx' is on disk\n"
         "\n"
         "Applied 1 repair(s):\n"
-        "  - Removed stale repo 'stale-ctx' for dead context 'stale-ctx'\n"
+        "  - INV-5: removed stale repo 'stale-ctx' for dead context 'stale-ctx'\n"
+        "compliance: 135/135 entries canonical (100%)\n"
     )
 
 

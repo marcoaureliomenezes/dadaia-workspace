@@ -1,4 +1,6 @@
-"""Import-linter ignore-edge **cap** contract (WS-R8 / AC-R8-04, release v0.1.10).
+"""Intent: CONTRACT — P-10 suppressed layering-edge cap (setup.cfg ignore_imports)
+
+Import-linter ignore-edge **cap** contract (WS-R8 / AC-R8-04, release v0.1.10).
 
 Architect finding F10: the ``ignore_imports`` lists in ``setup.cfg`` are documented,
 transitional exceptions to the ``features -> infrastructure`` / ``features -> subprocess``
@@ -160,12 +162,17 @@ _SETUP_CFG = _REPO_ROOT / "setup.cfg"
 # `history_reader` consumer, bugs.service, imports the concrete class directly, +1 edge.
 # HistoryCommit/GitHistoryReadError move to core/models/git_history.py for the same
 # zero-I/O reason. Cap 14 -> 15 (+1 features-no-subprocess).
-_RECORDED_IGNORE_EDGE_CAP = 4
+#
+# 0.4.6 T-046-26 NOTE (FR4/AC15): `reconcile.service -> migrate.legacy_dadaia_dirs`
+# REMOVED — the legacy-dir quarantine module is deleted (its set is "not in the
+# registry", which `dadaia doctor` now reports as WS-dadaia-slop), so the reconcile
+# step and its ignored edge die together. Cap lowered 4 -> 3 (-1 features-no-cross-feature).
+_RECORDED_IGNORE_EDGE_CAP = 3
 
 # Per-family recorded breakdown, pinned per contract section so a wrong edge-count set
 # (or a silent shift between families) fails loudly, not just the grand total.
 _RECORDED_PER_FAMILY_CAP: dict[str, int] = {
-    "features-no-cross-feature": 4,
+    "features-no-cross-feature": 3,
 }
 
 # A18.1 (V13): the total count of `[importlinter:contract:*]` sections in setup.cfg,
@@ -284,7 +291,9 @@ def test_cross_feature_contract_modules_equals_disk_and_contract_count_is_pinned
         for p in features_dir.iterdir()
         if p.is_dir() and p.name != "__pycache__" and (p / "__init__.py").is_file()
     }
-    assert len(on_disk_packages) == 23  # v0.5.1 K4: spec_artifacts deleted (24 -> 23)
+    assert (
+        len(on_disk_packages) == 19
+    )  # 0.4.6 T-046-26 (23 -> 21), T-046-28 (21 -> 20), T-046-25 reports pkg (20 -> 19)
 
     parser = configparser.ConfigParser()
     read = parser.read(_SETUP_CFG, encoding="utf-8")

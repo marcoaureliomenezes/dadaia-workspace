@@ -65,7 +65,6 @@
     "surface": {
       "type": "string",
       "enum": [
-        "academy",
         "agents",
         "backlog",
         "bugs",
@@ -84,17 +83,14 @@
         "public",
         "public-assets",
         "reconcile",
-        "reports",
         "repos",
         "server_registry",
         "spec_context",
         "specs",
         "telemetry",
         "tests",
-        "tmp_gc",
         "unknown",
-        "workspace",
-        "workspace_clean"
+        "workspace"
       ],
       "x-mutability": "immutable-core",
       "description": "Closed enum, one source (v0.5.0 FR2/A2.12): the 24 `dadaia_workspace/features/<name>/` packages on disk, plus the non-feature layers `core`/`infrastructure`/`cli`/`hooks`/`tests`/`public-assets`, plus the `unknown` sentinel for an unmappable legacy value. A contract test asserts the feature arm of this enum equals the on-disk package list; setup.cfg's `[importlinter:contract:features-no-cross-feature]` `modules =` list is completed to the same 24 by T-050-29 and is not yet the comparison target at this fold."

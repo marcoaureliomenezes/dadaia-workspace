@@ -1,0 +1,17 @@
+# PARAMETERS — dd-test-stewardship declared defaults
+
+Disclosed reference of `SKILL.md` — the numeric defaults its sections cite.
+Every value below is this workspace's declared default, not a universal constant.
+A consumer workspace re-parameterizes without forking the doctrine in `SKILL.md`.
+
+| Parameter | This repo's value | Abstract default |
+|---|---|---|
+| LARGE (E2E) cap | 30 (current ~84 — companion-release remediation target) | 12-15 per module |
+| Flake rate | target < 0.5% of runs | hard ceiling 1% |
+| Quarantine cap | max 8 tests | — |
+| Quarantine escalation | 30d unresolved -> `disabled`; 30 clean days -> restored | — |
+| Deletion after disable | `disabled` + 1 release with no plan -> deleted | — |
+| Per-test timeout | unit 10s / contract 30s / integration 60s / e2e 120s | tier ratio holds |
+| Wall-clock budget | frozen at the current baseline per job | freeze-then-ratchet |
+| Mutation cadence | 1x/release, off the push path | same |
+| Skip/disabled expiry | > 1 release, no registered plan -> deleted | same |

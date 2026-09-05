@@ -517,8 +517,7 @@ def test_a_single_skill_rename_is_green_everywhere_after_one_place(
     ``skills_dir.iterdir()`` roster. All three are gone (A4.1); each now reads
     :func:`tests.helpers.skill_inventory_oracle.skill_names`.
 
-    A mirror tree (the T-045-15 pattern in
-    ``tests/unit/infrastructure/test_install_target_goldens.py``) is built — the real
+    A mirror tree (the T-045-15 pattern) is built — the real
     ``dadaia_workspace/public/`` tree is never mutated — and ONE skill directory is
     renamed inside it, plus the same skill's references in the three agent frontmatter
     files that list it (the edit a real rename requires; the ORACLE ITSELF needs no

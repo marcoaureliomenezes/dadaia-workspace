@@ -34,6 +34,15 @@ def test_wikilink_regex_is_compiled_once() -> None:
     assert catalog._WIKILINK_RE is memory_canon.WIKILINK_RE
 
 
+def test_fixed_section_facts_are_the_core_leaf_re_exported() -> None:
+    from dadaia_workspace.core import fixed_sections
+
+    assert memory_canon.FIXED_SECTIONS is fixed_sections.FIXED_SECTIONS
+    assert memory_canon.render_fixed_section is fixed_sections.render_fixed_section
+    assert memory_canon.extract_fixed_section is fixed_sections.extract_fixed_section
+    assert dict(fixed_sections.FIXED_SECTIONS) == memory_canon.FIXED_SECTION_BY_PATH
+
+
 def test_forbidden_heading_vocabulary_is_one_matcher() -> None:
     assert doctor_memory.FORBIDDEN_MEMORY_H2_RE is memory_canon.FORBIDDEN_MEMORY_HEADING_RE
     for heading in ("Changelog", "History", "Histórico", "Historico", "Version", "Versions"):

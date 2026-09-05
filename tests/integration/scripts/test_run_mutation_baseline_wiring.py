@@ -5,7 +5,7 @@ claim ("once per release, off the push path") once mutmut is selected and pinned
 (qa-engineer verdict, .dadaia/tmp/qa-engineer/20260817/
 v0.4.3-T-043-28-mutation-tool-verdict.md). Because a real invocation spins a throwaway
 venv and installs a package over the network, this suite never runs the script for
-real (dadaia-test-stewardship / DADAIA.md "Slop-test discipline": "No real venvs built
+real (dd-test-stewardship / DADAIA.md "Slop-test discipline": "No real venvs built
 in tests — they exhaust disk"). Instead it proves the three things a gating test CAN
 prove cheaply and deterministically:
 

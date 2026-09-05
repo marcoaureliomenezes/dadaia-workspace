@@ -1,4 +1,6 @@
-"""MANDATORY tier-taxonomy contract (v0.1.60 FR6 / Ruling 17 — reworked v0.1.65 FR9).
+"""Intent: CONTRACT — core.agent_model_templates FR2 table and ruling G-1 (Fable never on security-reviewer)
+
+MANDATORY tier-taxonomy contract (v0.1.60 FR6 / Ruling 17 — reworked v0.1.65 FR9).
 
 The word "tier" names two distinct axes and this contract machine-enforces the split:
 

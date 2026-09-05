@@ -51,9 +51,8 @@ _SPECS_ADDITIVE_PREFIXES: tuple[str, ...] = (
     "specs/bugs/",
     "specs/audits/",
 )
-# Single authority in core (also consumed by the public doctor's foreign scan) —
-# the local name is kept for the module's existing readers.
-_DADAIA_ADDITIVE_PREFIXES: tuple[str, ...] = workspace_layout.DADAIA_ADDITIVE_PREFIXES
+# Derived from the zone registry (OUTPUT + EPHEMERAL zones) — never a second literal.
+_ADDITIVE_DADAIA_PREFIXES: tuple[str, ...] = workspace_layout.additive_prefixes()
 #: v0.4.3 FR13 (ratified): bare-prefix match — dotfiles included, by decision; no
 #: carve-out; no SPEC override of the phase rule (see the module docstring above).
 _MEMORY_PREFIX = "specs/memory/"
@@ -102,10 +101,10 @@ _READ_MODES: frozenset[str] = frozenset({"READ"})
 #: operator action that grants write rights, never instructing a mid-flow relaunch.
 _READ_BLOCK_MESSAGE = (
     "[RULE READ] '{rel_path}' is a MUTATING write, but this session is bound in read "
-    "(observe) mode. "
-    "Additive paths (specs/backlog, specs/bugs, specs/audits, .dadaia/reports, "
-    ".dadaia/handoff, .dadaia/tmp) remain writable. To gain write rights, the operator "
-    "binds implementation mode once: `dadaia context bind {ctx} --mode implementation`."
+    "(observe) mode. Additive paths ("
+    + ", ".join(p.rstrip("/") for p in (*_SPECS_ADDITIVE_PREFIXES, *_ADDITIVE_DADAIA_PREFIXES))
+    + ") remain writable. To gain write rights, the operator binds implementation mode "
+    "once: `dadaia context bind {ctx} --mode implementation`."
 )
 
 #: The default session id when no harness-native id resolves (``hooks/sdd_gate.py``'s
@@ -231,7 +230,7 @@ def classify_path(rel_path: str) -> PathClass:
     specs_class = _classify_specs_relative(p)
     if specs_class is not None:
         return specs_class
-    for prefix in _DADAIA_ADDITIVE_PREFIXES:
+    for prefix in _ADDITIVE_DADAIA_PREFIXES:
         if p.startswith(prefix):
             return PathClass.ADDITIVE
     if p.startswith("specs/releases/"):

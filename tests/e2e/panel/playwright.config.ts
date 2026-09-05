@@ -1,5 +1,4 @@
 import { defineConfig, devices } from '@playwright/test';
-import * as os from 'os';
 import * as path from 'path';
 
 const REPO_ROOT = path.resolve(__dirname, '../../..');
@@ -18,12 +17,14 @@ const RUN_SERVER_SCRIPT = path.join(__dirname, 'run-panel-e2e-server.sh');
 const PANEL_WEB_SERVER_COMMAND =
   process.env.PANEL_WEB_SERVER_COMMAND || `bash "${RUN_SERVER_SCRIPT}"`;
 
-// Keep test-results and playwright-report OUTSIDE the repo to avoid polluting
-// the working tree.  Use env override (PLAYWRIGHT_OUTPUT_DIR /
-// PLAYWRIGHT_REPORT_DIR) so CI can redirect to a known artifacts path; fall
-// back to the OS temp directory for local runs.
-const OUTPUT_DIR = process.env.PLAYWRIGHT_OUTPUT_DIR || path.join(os.tmpdir(), 'dadaia-pw-test-results');
-const REPORT_DIR = process.env.PLAYWRIGHT_REPORT_DIR || path.join(os.tmpdir(), 'dadaia-pw-report');
+// Keep test-results and playwright-report OUTSIDE the repo (DADAIA.md §5.3: Playwright's
+// outputDir is redirected into the workspace `.dadaia/tmp/`). The repo lives at
+// `<workspace>/repos/dadaia-workspace`, so five levels up from this directory is the
+// workspace root. Env overrides (PLAYWRIGHT_OUTPUT_DIR / PLAYWRIGHT_REPORT_DIR) let CI
+// redirect to its own artifacts path.
+const WORKSPACE_TMP = path.resolve(__dirname, '../../../../../.dadaia/tmp/playwright');
+const OUTPUT_DIR = process.env.PLAYWRIGHT_OUTPUT_DIR || path.join(WORKSPACE_TMP, 'results');
+const REPORT_DIR = process.env.PLAYWRIGHT_REPORT_DIR || path.join(WORKSPACE_TMP, 'report');
 
 export default defineConfig({
   testDir: '.',

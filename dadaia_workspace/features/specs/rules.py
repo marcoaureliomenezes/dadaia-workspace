@@ -85,6 +85,12 @@ RULES: tuple[Rule, ...] = (
     Rule(("CAT-1",), lambda d, t: d._memory.check_cat1_catalog_sync()),
     Rule(("LINT-1",), lambda d, t: d._memory.check_lint1_memory_atoms()),
     Rule(("MEM-DRIFT-1",), lambda d, t: d._memory.check_mem_drift1_features_package_map()),
+    Rule(
+        ("FIXED-1", "FIXED-2"),
+        lambda d, t: d._memory.check_fixed_sections(d.public_dir),
+        fix=lambda d, i: d._memory.fix_fixed_section(i, d.public_dir),
+        fix_help="insert or refresh the workspace's fixed law sections",
+    ),
     Rule(("SPECS-VERSION",), lambda d, t: d._coherence.check_specs_pattern_version()),
     Rule(("SPEC-DOC-024",), lambda d, t: d._release.check_phase_markers_coherence()),
     Rule(("SPEC-DOC-026",), lambda d, t: d._release.check_unique_release_ids()),
@@ -107,13 +113,19 @@ RULES: tuple[Rule, ...] = (
     Rule(("SPEC-DOC-041",), lambda d, t: d._governance.check_bug_archive_overdue()),
     Rule(
         ("SPEC-DOC-044",),
-        lambda d, t: d._release.check_stale_verdicts(head_sha=d.head_sha, parent_sha=d.parent_sha),
+        lambda d, t: d._release.check_stale_verdicts(live_shas=d.live_shas),
         fix=lambda d, i: d._release.fix_stale_verdict(i),
-        fix_help="delete a stale (non-head, non-parent) security verdict",
+        fix_help="delete a stale security verdict (names no live sha: head, first parent, develop tip)",
     ),
     Rule(
         ("SPEC-DOC-045",),
         lambda d, t: d._release.check_pyproject_version_matches_release(d.repo_root),
+    ),
+    Rule(
+        ("SPEC-DOC-046",),
+        lambda d, t: d._release.check_release_state_filename(),
+        fix=lambda d, i: d._release.fix_release_state_filename(i),
+        fix_help="rename a legacy RELEASE.json to the canonical _RELEASE.json",
     ),
 )
 

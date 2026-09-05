@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import re
 import shutil
 import subprocess
@@ -12,7 +11,10 @@ from pathlib import Path
 
 import typer
 
-from dadaia_workspace.cli._specs_resolution import resolve_workspace_root_for_cli
+from dadaia_workspace.cli._specs_resolution import (
+    resolve_session_id_for_cli,
+    resolve_workspace_root_for_cli,
+)
 from dadaia_workspace.container import is_source_repo_root as _is_source_repo_root
 from dadaia_workspace.core.exceptions import CiPreflightScopeError
 from dadaia_workspace.features.ci_preflight import (
@@ -149,7 +151,7 @@ def pre_commit_check() -> None:
     decision = pre_commit_decision(
         workspace,
         ctx,
-        env_sid=os.environ.get("DADAIA_SESSION_ID"),
+        own_sid=resolve_session_id_for_cli(),
         others_alive=presence.others_alive,
     )
     if decision.warn:

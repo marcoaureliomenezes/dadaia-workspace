@@ -21,10 +21,8 @@ import stat  # noqa: E402
 from pathlib import Path  # noqa: E402
 
 from dadaia_workspace.core.models.spec_context import ContextState  # noqa: E402
-from dadaia_workspace.features.spec_context.service import (  # noqa: E402
-    _SCAFFOLD_SRC,
-    SpecContextService,
-)
+from dadaia_workspace.features.spec_context.service import SpecContextService  # noqa: E402
+from dadaia_workspace.features.specs.canon import scaffold as canon_scaffold  # noqa: E402
 from tests.fakes import FakeContextStore, FakeGitClient  # noqa: E402
 
 
@@ -56,6 +54,7 @@ def service(
         context_store=store,
         git_client=git,
         workspace_root=workspace_root,
+        scaffold_specs=canon_scaffold,
     )
 
 
@@ -101,6 +100,7 @@ def test_alive_with_preexisting_specs_adds_missing_files_without_overwriting(
         context_store=store,
         git_client=git,
         workspace_root=workspace_root,
+        scaffold_specs=canon_scaffold,
     )
     svc.create("proj", "my-repo", "https://github.com/org/my-repo")
 
@@ -123,10 +123,10 @@ def test_alive_with_preexisting_specs_adds_missing_files_without_overwriting(
         "alive() must NOT overwrite pre-existing operator files in specs/"
     )
 
-    # At least one canonical scaffold file was merged in (scaffold src must exist)
-    if _SCAFFOLD_SRC.exists():
-        # The scaffold has a memory/ dir; it should be present after merge
-        assert specs_dir.exists(), "specs/ must still exist after merge"
+    # The missing canon entries were rendered in beside it.
+    assert (specs_dir / "memory" / "ARCHITECTURE.md").exists(), (
+        "alive() must add the canon entries missing from a pre-existing specs/"
+    )
 
 
 def test_dead_writable_alive_safe_preserve_and_merge_not_skipped(
@@ -141,6 +141,7 @@ def test_dead_writable_alive_safe_preserve_and_merge_not_skipped(
         context_store=store,
         git_client=git,
         workspace_root=workspace_root,
+        scaffold_specs=canon_scaffold,
     )
 
     # Baseline: dead() succeeds when all files are writable.
@@ -150,9 +151,6 @@ def test_dead_writable_alive_safe_preserve_and_merge_not_skipped(
     (repo / "writable.txt").write_text("data")
     svc.dead("proj")
     assert not repo.exists()
-
-    if not _SCAFFOLD_SRC.exists():
-        return  # merge/backup only run when the scaffold source exists
 
     # Safe-preserve: a pre-existing tree is snapshotted to specs_bkp/preserve-<UTC>/.
     svc.create("projbk", "repobk", "https://github.com/org/repobk")
@@ -175,13 +173,10 @@ def test_dead_writable_alive_safe_preserve_and_merge_not_skipped(
     specs_dir2.mkdir(parents=True, exist_ok=True)
     svc.alive("proj2")
 
-    scaffold_files = list(_SCAFFOLD_SRC.rglob("*"))
-    non_dir_scaffold = [f for f in scaffold_files if f.is_file()]
-    specs_files2 = [f for f in specs_dir2.rglob("*") if f.is_file()]
-    assert len(specs_files2) >= len(non_dir_scaffold), (
-        f"alive() did not merge scaffold files into empty specs/; "
-        f"expected >={len(non_dir_scaffold)} files, got {len(specs_files2)}"
-    )
+    for rel in ("constitution.md", "memory/ARCHITECTURE.md", "backlog/BACKLOG.json"):
+        assert (specs_dir2 / rel).is_file(), (
+            f"alive() did not render the canon into an empty pre-existing specs/: {rel} missing"
+        )
 
 
 def test_alive_commits_its_own_scaffold(

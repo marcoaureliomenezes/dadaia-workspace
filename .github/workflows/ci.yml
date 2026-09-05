@@ -397,7 +397,7 @@ jobs:
           esac
           if [ "$FLAKY" -gt 0 ]; then
             jq -r '.. | objects | select(.tests? != null) | select([.tests[].status] | index("flaky")) | .title // empty' "$REPORT" | head -10
-            echo "::error::$FLAKY test(s) passed only on retry (flaky). A pass-on-retry is not a pass: register the flake (quarantine + bug via dadaia bugs append) or fix it (dadaia-test-stewardship, group F)."
+            echo "::error::$FLAKY test(s) passed only on retry (flaky). A pass-on-retry is not a pass: register the flake (quarantine + bug via dadaia bugs append) or fix it (dd-test-stewardship, flakes and quarantine)."
             exit 1
           fi
           echo "no unregistered pass-on-retry."

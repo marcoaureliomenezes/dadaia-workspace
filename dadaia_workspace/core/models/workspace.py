@@ -17,16 +17,8 @@ class Workspace:
         return self.dadaia_dir / "reports"
 
     @property
-    def scripts_dir(self) -> Path:
-        return self.dadaia_dir / "scripts"
-
-    @property
     def states_dir(self) -> Path:
         return self.dadaia_dir / "states"
-
-    @property
-    def academy_dir(self) -> Path:
-        return self.dadaia_dir / "academy"
 
     # Ephemeral subdirs
     @property

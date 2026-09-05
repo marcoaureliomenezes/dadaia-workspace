@@ -3,7 +3,11 @@
 Intent: CONTRACT — v0.1.76 FR3 (NO-LOCKS WARN-only); v0.5.1 K7 (injected
 ``others_alive`` — the real ``spec_context.presence.others_alive`` is wired straight
 through here, exactly as the CLI composition root wires it, proving the injection
-seam works with zero adapter).
+seam works with zero adapter); bug
+pre-commit-presence-advisory-names-the-committing-session-itself (``own_sid`` is the
+identity the composition root resolved through the ONE session-id rule; an empty one
+excludes nothing — the executed-path contract lives in
+``tests/integration/cli/test_ci_pre_commit_check_self_identity.py``).
 """
 
 from __future__ import annotations
@@ -11,8 +15,6 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from pathlib import Path
-
-import pytest
 
 from dadaia_workspace.features.chokepoints import pre_commit_decision
 from dadaia_workspace.features.chokepoints.branch_policy import context_slug_for_path
@@ -39,11 +41,11 @@ def _presence(workspace: Path, session_id: str) -> None:
     )
 
 
-def _decision(workspace: Path, ctx: str | None = _CTX, *, env_sid: str | None = "caller"):
+def _decision(workspace: Path, ctx: str | None = _CTX, *, own_sid: str = "caller"):
     return pre_commit_decision(
         workspace,
         ctx,
-        env_sid=env_sid,
+        own_sid=own_sid,
         others_alive=presence.others_alive,
     )
 
@@ -79,28 +81,22 @@ def test_non_context_path_always_allows(tmp_path: Path) -> None:
     decision = pre_commit_decision(
         tmp_path,
         None,
-        env_sid=None,
+        own_sid="",
         others_alive=forbidden_others_alive,  # type: ignore[arg-type]
     )
     assert decision.allowed
     assert decision.warn is None
 
 
-@pytest.mark.parametrize("env_sid", [None, ""], ids=["none", "empty-string"])
-def test_missing_env_sid_falls_back_to_the_anonymous_own_sid(
-    tmp_path: Path, env_sid: str | None
-) -> None:
-    """The injected ``others_alive`` still receives a non-empty own-sid string even
-    when the caller supplies no ``DADAIA_SESSION_ID`` — mirrors the pre-K7 fallback."""
-    seen: list[str] = []
-
-    def _spy(_workspace: Path, _ctx: str, sid: str) -> list[object]:
-        seen.append(sid)
-        return []
-
-    decision = pre_commit_decision(tmp_path, _CTX, env_sid=env_sid, others_alive=_spy)
+def test_empty_own_sid_excludes_nothing(tmp_path: Path) -> None:
+    """An unidentified committer (no channel of the ONE session-id rule resolved, so the
+    composition root passed ``""``) sees every live record as foreign — the lock-era
+    ``pre-commit-anonymous`` label is gone; nothing needs a name to be excluded."""
+    _presence(tmp_path, "some-session")
+    decision = _decision(tmp_path, own_sid="")
     assert decision.allowed
-    assert seen == ["pre-commit-anonymous"]
+    assert decision.warn is not None
+    assert "some-session" in decision.warn
 
 
 def test_context_slug_for_path(tmp_path: Path) -> None:

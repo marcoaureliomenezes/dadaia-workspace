@@ -12,7 +12,7 @@ dependency), or installed but unusable — a signed-in account the upstream API 
 with an entitlement/plan 4xx (checked dynamically in the test body, via the same
 ``_CertificationSkip`` classification ``certify()`` itself relies on; see
 codex-live-probe-gate-checks-presence-not-usability). This is the env-gated,
-plan-referenced skip dadaia-test-stewardship §I requires ("give every env-gated skip a
+plan-referenced skip dd-test-stewardship §I requires ("give every env-gated skip a
 plan ref or delete it") — the plan ref is T-043-34/A22.4 above.
 """
 
@@ -43,7 +43,7 @@ pytestmark = pytest.mark.skipif(
 def test_codex_live_probe_exercises_the_real_installed_codex(tmp_path: Path) -> None:
     """A22.4: certification's live probe genuinely talks to the installed Codex CLI.
 
-    Explicit 90s timeout override (justified, dadaia-test-stewardship §C): the probe's
+    Explicit 90s timeout override (justified, dd-test-stewardship §C): the probe's
     own internal bound is 15s (``codex --version``) + 60s (``codex exec``) = up to 75s
     worst case; the default integration-tier ceiling (60s) would truncate a
     legitimately slow-but-successful run before the function's own bounded-timeout

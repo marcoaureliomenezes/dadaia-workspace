@@ -2,8 +2,8 @@
 slug: sdd-bug-backlog-governance
 title: sdd-bug-backlog-governance
 category: product
-tldr: One record per bug through one write seam, a live-photo backlog with histo exits, and the RELEASE.json state document.
-summary: The bug ledger, the backlog live photo and the release state document — one record per bug, one write seam, one exit record per backlog slug, one mutable RELEASE.json per release.
+tldr: One record per bug through one write seam, a live-photo backlog with histo exits, and the _RELEASE.json state document.
+summary: The bug ledger, the backlog live photo and the release state document — one record per bug, one write seam, one exit record per backlog slug, one mutable _RELEASE.json per release.
 tags: [sdd, governance, release-lifecycle, backlog, bugs, gitflow]
 ---
 
@@ -20,7 +20,7 @@ tags: [sdd, governance, release-lifecycle, backlog, bugs, gitflow]
 - Legacy v5-fold records carry `migration_note="v5-fold-incomplete"` and warn no further.
 - `bugs archive` idempotently moves terminal records older than 90 days to `_archive/bugs_histo.jsonl`.
 - A bug is fixed on the spot on the live feature branch — register, root-cause, RED test, fix, GREEN, `resolved` with evidence, commit — with no SPEC, PLAN, TASKS or release directory.
-- Diagnosis is seven ordered phases, phase 0 being the lineage duty over the 20 most recent records sharing this bug's `surface` or `component` in the audit window, ending in `caused_by: <bug-id> | none` with evidence (`dd-diagnose`).
+- Diagnosis is seven ordered phases, phase 0 being the lineage duty over the 20 most recent records sharing this bug's `surface` or `component` in the audit window, ending in `caused_by: <bug-id> | none` with evidence (`dd-bug-resolution`).
 - `registration_commit` and `resolved_commit` are a git-derived cache (`core/bug_provenance.py`, all-refs first-add-wins over `specs/bugs/`, additions only) at granularity `exact`, `release-squash` or `ledger-only`, only `exact` being diffable lineage; the audit's first pillar is its only writer ([[audits-canon]]).
 
 ## Backlog
@@ -36,7 +36,8 @@ tags: [sdd, governance, release-lifecycle, backlog, bugs, gitflow]
 
 ## The release state document
 
-- Each release directory carries `RELEASE.json`, a mutable `release-state-v1` document parsed by `core/release_state.py` and updated with file tools.
+- Each release directory carries `_RELEASE.json`, a mutable `release-state-v1` document parsed by `core/release_state.py` and updated with file tools; the filename is the one decider `core.release_state.RELEASE_STATE_FILENAME`.
+- The release model is release-candidates (0.4.6, ADRs 0005-0009): exactly one live release named last-published-PyPI + 1 patch, OPEN scope; each candidate is a closed-scope SDD cycle whose trio sits at the release root; `dadaia release rc-archive` archives a completed candidate's trio to `rc-N/` and `rc` counts those archives; the version increments only at operator-approved deploy.
 - `phase` is a plain top-level field — no stream, no fold — beside `release`, `rc`, the milestones `defined`, `implemented`, `shipped`, `audited`, and a `log` array.
 - Milestones are immutable once set, each carrying its sha: `defined` at the definition promotion commit, `implemented` at the final-`rc` QA close, `shipped` at the ship merge, `audited` at the audit.
 - `rc-N` is a state of the specs living in `rc`/`segment` and in TASKS, never a branch name; an internal segment closed by a committed QA review burns no `rc`.
@@ -44,7 +45,7 @@ tags: [sdd, governance, release-lifecycle, backlog, bugs, gitflow]
 - Everything else has a native home: dispositions in the histo and `BUGS.jsonl`, tasks in `TASKS.md` markers, validations in handoffs and verdicts, memory updates in atom diffs, archival in `phase: ARCHIVED`.
 - Inside closure the order is memory update, closure log entries, disposition sweep, artifact GC, archive, with the pre-PR six-axis review running on the thawed tree.
 - Release ids are bare semver; a `v` prefix resolves only for a read-only lookup of an archived directory.
-- `specs/releases/_ideas/<id>/` holds a SPEC only — no `RELEASE.json`, never an audit-window source or evidence root.
+- `specs/releases/_ideas/<id>/` holds a SPEC only — no `_RELEASE.json`, never an audit-window source or evidence root.
 
 ## Dependencies
 

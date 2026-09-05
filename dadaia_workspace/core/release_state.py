@@ -10,23 +10,22 @@ state IS the document, no event stream to fold. This module retires
 left to export under those names. Schema:
 ``dadaia_workspace/public/schemas/releases/release-state-v1.schema.json``.
 
-**This module never performs file I/O** (``core/`` file-I/O purity ratchet,
-``tests/contract/test_core_file_io_purity.py``, architect A9) -- it parses/serializes
-already-read text. The ONE tri-state disk read of a release's ``RELEASE.json`` stays a
+**This module never reads or writes file content** (``core/`` file-I/O purity
+ratchet, ``tests/contract/test_core_file_io_purity.py``, architect A9) -- it
+parses/serializes already-read text; :func:`release_state_file` performs presence
+probes only (``is_file``), the same class of check ``core/platform`` carries. The ONE tri-state disk read of a release's ``RELEASE.json`` stays a
 ``features``-layer concern (``features.specs.doctor_common``), same precedent this
 module's predecessor set.
 
-``segment`` is carried as an OPTIONAL top-level field, outside the operator's literal
-five-milestone shape, because the ADR-1/ADR-5 dir-based segment mechanism
-(``releases/<id>/<segment>/TASKS.md`` routing) is live, orthogonal state that the
-migration must not silently drop -- flagged for the operator/product-engineer to fold
-into a future ADR rather than invented as a workaround here.
+The pre-0.4.6 ``segment`` field is retired with the scaffolded segment lane
+(ADR 0006) — a legacy document still carrying it parses fine; the key is ignored.
 """
 
 from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 __all__ = [
@@ -40,6 +39,30 @@ __all__ = [
 
 #: The schema identifier every ``RELEASE.json`` document's ``schema`` field must carry.
 SCHEMA = "release-state-v1"
+
+#: The canonical release-state document filename (release 0.4.6 FR1, ADR 0007): the
+#: underscore prefix groups it with ``_archive``/``_ideas`` and sorts it apart from the
+#: working SPEC/PLAN/TASKS trio. ONE decider — no reader hand-builds this name.
+RELEASE_STATE_FILENAME = "_RELEASE.json"
+
+#: The pre-0.4.6 filename, recognised READ-side only so a consumer instance keeps
+#: working until ``specs doctor --fix`` renames it. Writers always use
+#: :data:`RELEASE_STATE_FILENAME`.
+LEGACY_RELEASE_STATE_FILENAME = "RELEASE.json"
+
+
+def release_state_file(release_dir: Path) -> Path | None:
+    """The release-state document inside ``release_dir``: the canonical
+    :data:`RELEASE_STATE_FILENAME` when present, else the legacy name, else ``None``.
+    The ONE existence-and-name rule every live-release discovery goes through."""
+    canonical = release_dir / RELEASE_STATE_FILENAME
+    if canonical.is_file():
+        return canonical
+    legacy = release_dir / LEGACY_RELEASE_STATE_FILENAME
+    if legacy.is_file():
+        return legacy
+    return None
+
 
 #: Canonical release lifecycle phase vocabulary (constitution §7; the ``phase`` field
 #: of release-state-v1). ONE home (F007, 20260830 audit) — every consumer imports this
@@ -100,7 +123,6 @@ class ReleaseState:
     shipped: dict[str, Any] | None
     audited: dict[str, Any] | None
     log: tuple[dict[str, Any], ...] = field(default_factory=tuple)
-    segment: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """The canonical field order this module always serializes -- schema first,
@@ -115,8 +137,6 @@ class ReleaseState:
             "shipped": self.shipped,
             "audited": self.audited,
         }
-        if self.segment is not None:
-            out["segment"] = self.segment
         out["log"] = [dict(n) for n in self.log]
         return out
 
@@ -176,9 +196,6 @@ def parse_release_state(text: str) -> ReleaseState:
     rc = obj["rc"]
     if rc is not None and not isinstance(rc, int):
         raise ValueError(f"'rc' must be an integer or null, got {type(rc).__name__}")
-    segment = obj.get("segment")
-    if segment is not None and not isinstance(segment, str):
-        raise ValueError(f"'segment' must be a string or null, got {type(segment).__name__}")
     return ReleaseState(
         schema=obj["schema"],
         release=obj["release"],
@@ -189,7 +206,6 @@ def parse_release_state(text: str) -> ReleaseState:
         shipped=_validate_milestone("shipped", obj["shipped"]),
         audited=_validate_milestone("audited", obj["audited"]),
         log=_validate_notes(obj["log"]),
-        segment=segment,
     )
 
 

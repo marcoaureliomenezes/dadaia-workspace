@@ -94,7 +94,7 @@ ENTITIES_CSS: str = """
   font-weight: 500;
   padding: 0.1rem 0.55rem;
   border-radius: var(--radius-pill, 999px);
-  background: var(--color-academy-chip-bg, #eef2ec);
+  background: var(--color-chip-bg, #eef2ec);
   color: var(--color-text-muted, #666666);
 }
 

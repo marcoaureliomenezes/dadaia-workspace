@@ -1,0 +1,229 @@
+{
+  "schema": "release-state-v1",
+  "release": "0.4.6",
+  "phase": "CLOSURE",
+  "rc": 3,
+  "defined": {
+    "sha": "bcd02b21",
+    "ts": "2026-09-04T01:02:22Z"
+  },
+  "implemented": {
+    "sha": "efd58d33",
+    "rc": 4,
+    "ts": "2026-09-04T04:16:27Z"
+  },
+  "shipped": null,
+  "audited": null,
+  "log": [
+    {
+      "ts": "2026-08-31T18:16:56Z",
+      "agent": "project-manager",
+      "kind": "note",
+      "text": "Release 0.4.6 born under the release-candidates model it implements (self-hosting): open scope, candidate 1 = the rc-system redesign (ADRs 0005-0009, grill 20260831T181256Z). Version = last published PyPI (0.4.5) + 1 patch; feature/0.4.6 is the one live branch. Definition grill held pre-SPEC; trio Aprovado by operator demand order."
+    },
+    {
+      "ts": "2026-08-31T18:43:56Z",
+      "agent": "product-engineer",
+      "kind": "summary",
+      "text": "Candidate 1 (release-candidates system) complete: _RELEASE.json one-filename decider (core.release_state, legacy read-side + SPEC-DOC-046 fixable rename); canon rc-N archive entries; segment lane deleted (scaffolder/state/routing/tests); release new refuses a second live release; dadaia release rc-archive verb (features/specs/candidate.py, 7 TDD tests); 4 archived releases migrated; version 0.4.6 minted at birth (pyproject + CHANGELOG [0.4.6]) — the mint-at-ship step is deleted; law rewritten (DADAIA §4.2/§6.2/§6.7/glossary: candidate, rc-N, promote-or-continue gate), skills dd-gitflow-default/dd-release-definition/dd-release-implement(RC-FLOW candidate arc)/navigator/task-manager updated; behavior-map re-recorded; CONTEXT.md glossary sharpened; memory atoms updated; projections refreshed via shipped-history TREE-5 fix. Net deletion-shaped: segment lane and mint-at-ship removed; one new deep verb."
+    },
+    {
+      "ts": "2026-08-31T19:12:49Z",
+      "agent": "release-candidates",
+      "kind": "note",
+      "text": "Candidate 1 archived to rc-1/ (operator ruled continue at the promote-or-continue gate); root is ready for the next candidate's trio."
+    },
+    {
+      "ts": "2026-08-31T19:54:05Z",
+      "agent": "product-engineer",
+      "kind": "note",
+      "text": "Candidate 2 defined: skills-quality-consolidation (operator audit session 2026-08-31, 15-rule reference standard extracted from .dadaia/references/skills-examples; 5 recommendations ratified verbatim as the grill record — merges A-D, dd-domain-modeling name, router as a dd-manager-orchestration section, tldr/applyTo removal, dd-* rename last). Trio authored at release root, Aprovado by operator demand order; backlog entry purged on pick with provisional CONSUMED."
+    },
+    {
+      "ts": "2026-08-31T20:46:54Z",
+      "agent": "product-engineer",
+      "kind": "summary",
+      "text": "Candidate 2 (skills-quality-consolidation) complete: 15-rule authoring standard codified in dd-ai-eng-knowhow/AUTHORING.md; four merges (dd-domain-modeling born from glossary+reference domain-modeling; dd-architecture-survey absorbed the reference survey method with a self-contained HTML-REPORT sibling; dd-bug-resolution absorbed dd-diagnose with LINEAGE + new RED-LOOP siblings; dd-spec-navigator absorbed the step0 memory bootstrap); two unmanaged reference copies deleted after diff-fold; systemic conformance pass over every kept skill (tldr/applyTo frontmatter removed, descriptions as trigger pointers, sediment purged, form-follows-content restructures); structural fixes (citable gitflow §3a/§3b, duplicate headings/steps resolved); which-skill-when router in dd-manager-orchestration; design/domain skills wired into the lifecycle skills and PE/PM grants; rename sweep to one dd-* namespace (20 skills); ecosystem equalized (behavior-map 27 rows/20 skills/17 scoped re-recorded, shipped-hashes, codex prefix tuple collapsed, projections reinstalled). Net deletion-shaped on the AI surface: 25 skill dirs -> 20; 570 ungoverned reference-copy lines retired; library+copies 3258 -> 3109 lines."
+    },
+    {
+      "ts": "2026-08-31T20:46:54Z",
+      "agent": "product-engineer",
+      "kind": "size",
+      "text": "Skill corpus: 25 instance dirs -> 20 library skills (all dd-*); public/skills 2688 -> ~3078 lines (absorbed content), library+ungoverned copies net -149; behavior-map 27 rows / 20 skills / 17 scoped sources; zero tldr/applyTo frontmatter; codex_assets -18 lines; one bug registered+resolved in-arc (verdict-vocabulary-persona-schema-mismatch, net-negative)."
+    },
+    {
+      "ts": "2026-08-31T20:46:54Z",
+      "agent": "product-engineer",
+      "kind": "closure-review",
+      "text": "Trio review round 1: three REJECTED verdicts on 92283f67 (QA: 2 stale dd-diagnose memory citations; code-review: stale instance scoped laws + citation/anchor residue; security: CDN+mermaid securityLevel:loose in HTML-REPORT.md contradicting the self-contained reports law). All findings reworked in 9dbd8488 + the closure memory commit: HTML-REPORT rewritten self-contained (deletion-shaped), instance laws synced via specs doctor --fix, memory citations repointed, anchors made resolvable. Re-review requested on the new head."
+    },
+    {
+      "ts": "2026-08-31T20:46:54Z",
+      "agent": "product-engineer",
+      "kind": "closure-test-dispositions",
+      "text": "One test added (tests/contract/test_verdict_vocabulary.py, Intent: CONTRACT, SMALL, RED-proven pre-fix). No demotions due, no quarantine, no SCAFFOLD expiry: the candidate touched no LARGE tests."
+    },
+    {
+      "ts": "2026-08-31T20:46:54Z",
+      "agent": "product-engineer",
+      "kind": "closure-artifact-gc",
+      "text": "Working artifacts: 0 files under .dadaia/tmp for this candidate (all scratch lived in the harness scratchpad outside the workspace); 3 review handoffs under .dadaia/handoff/dadaia-workspace/ kept as trio evidence; kept 3 / deleted 0."
+    },
+    {
+      "ts": "2026-08-31T20:46:54Z",
+      "agent": "claude-code",
+      "kind": "note",
+      "text": "Architecture-survey note at candidate close (RC-FLOW step 3): bugs ledger 0 open (545 total); churn concentrated in public/skills (this candidate). Cards: (1) Strong — behavior-map hash re-record is a repeated manual seam (session-local script); a 'dadaia behavior-map rehash' CLI verb would give it one owner; (2) Worth exploring — doctor_release.py carries the candidate-phase predicate in three places (DISCOVERY guard at :208, :248, :327+, flagged by code-review as Repeated Switches); one phase->required-artifacts decider would delete two branches; (3) Speculative — dd-audit-project PILLAR-* siblings still carry heavy prose vs the 15-rule bar. Top candidate: (1). Next hop: operator intake via grill — no backlog write from this note."
+    },
+    {
+      "ts": "2026-08-31T22:18:36Z",
+      "agent": "release-candidates",
+      "kind": "note",
+      "text": "Candidate 2 archived to rc-2/ (operator ruled continue at the promote-or-continue gate); root is ready for the next candidate's trio."
+    },
+    {
+      "ts": "2026-08-31T22:18:47Z",
+      "agent": "release-candidates",
+      "kind": "note",
+      "text": "Candidate 2 archived to rc-2/ (operator ruled continue at the promote-or-continue gate); root is ready for the next candidate's trio."
+    },
+    {
+      "ts": "2026-09-03T03:53:29Z",
+      "agent": "product-engineer",
+      "kind": "note",
+      "text": "Candidate 3 (slop law) defined: trio at the release root, Aprovado under the operator's 2026-09-03 order to define and implement (rc to be evaluated by the operator before any merge or deploy). Consumes backlog slop-law-one-definition-one-home (purge-on-pick, CONSUMED). Architect RETURN 2026-09-03T052000Z folded in; ADR 0010 to be proposed by T-046-17 and awaits operator acceptance (ruling 10); ruling 13 closed by the dispatcher (bullet 15 lives in DADAIA.md §7.6 only)."
+    },
+    {
+      "ts": "2026-09-03T12:40:41Z",
+      "agent": "product-engineer",
+      "kind": "summary",
+      "text": "Candidate 3 (slop law) implemented at c3f5cb80: one definition (DADAIA.md §7.6, 7 bullets) and two distribution classes — agentic entities (§7.6, dd-code-review/SLOP.md S1-S10, six personas, tests/AGENTS.md 116->58 lines) and scaffolded specs (fixed sections slop-law/slop-code/slop-tests projected from public/data/fixed/, validated and healed by specs doctor FIXED-1/2, injected by the memory bootstrap). Ratchets: V31 replaces V27 (per tier 160/51/0/0), V32=912, V33=51 (FR/AC/T- exempt), V34 24/12 KB. Bridges <repo>/CLAUDE.md and tests/CLAUDE.md via scoped_law. Constitution 5.1.0; ADR 0010 proposed (operator acceptance pending; P-24 amendment and P-29 ride the accept commit)."
+    },
+    {
+      "ts": "2026-09-03T12:40:41Z",
+      "agent": "product-engineer",
+      "kind": "size",
+      "text": "Range 83af41b0..c3f5cb80: 25 commits. Production net: reports/retention -102, spec_context/service -27 (copytree+merge deleted), fixed sections +202; public/ -163 net (nine dead scaffold image files deleted, 3 fragments + SLOP.md added); tests: script pair -120, two contract tests deleted by verdict, 38 Intent lines added; trio SPEC 22.2 KB / PLAN 7.5 KB / TASKS 10.6 KB under V34."
+    },
+    {
+      "ts": "2026-09-03T12:40:41Z",
+      "agent": "product-engineer",
+      "kind": "drifts",
+      "text": "Part-1 drift left for the ADR-0010 acceptance commit (operator): P-24 reworded to the downward per-tier form (V31), P-29 added (V32-V34), P-11 says six authorized core file-I/O modules while test_core_file_io_purity authorizes eight (specs_backup, specs_repair, specs_version, workspace_resolver, atomic_write, invocation, session_store, handoff_index). Memory Part 2 updated this pass: QUALITY 'CI gates' + 'Slop measurement', both fixed blocks, context-management atom (alive folds over the canon)."
+    },
+    {
+      "ts": "2026-09-03T12:40:41Z",
+      "agent": "project-manager",
+      "kind": "ratifications",
+      "text": "Dispatcher ratifications under 'slop dies in the change that finds it' (operator implementation order 2026-09-03): fragments live under public/data/fixed (context alive copied the scaffold image — bug fixed 42e94c04); T-046-20 also touched .gitignore:/CLAUDE.md and .github/scripts/check_no_repo_local_claude.sh (the bridge is now law, ruling 9), tests/helpers/suite_files.py tree= kwarg, test_context_alive_scaffold_commit.py; SPEC §8 baselines re-measured by the ratchet modules (V31 160/52/40 -> pinned, V32 422->912 counting docstring lines, V33 105->51 with the ratified families exempt); law cleanups ac3167df (reviews/** retired from four personas) and 4bd29279 (memory rules line, qa-engineer ALPHA-*-QA glob, recipe R-13); f77c711d registered claude-fable-5-1 in the model registry so the instance overlay could select the frontier model for all nine sub-agents (operator order; no task record — code-reviewer F1)."
+    },
+    {
+      "ts": "2026-09-03T12:40:41Z",
+      "agent": "project-manager",
+      "kind": "reviews",
+      "text": "Trio review on c3f5cb80: code-reviewer APPROVED (handoff 2026-09-03T053138Z; 2 MEDIUM recorded here, 8 LOW routed to this closure and the next candidate); qa-engineer APPROVED (report 2026-09-03T053522Z; V31 integration re-pinned 51 this pass; instance behavior-map reprojected); security-reviewer verdict NOT obtained — the agent session hit the API session limit; it is redone on the PR head before the feature->develop PR (DADAIA.md §4.2)."
+    },
+    {
+      "ts": "2026-09-03T12:40:41Z",
+      "agent": "qa-engineer",
+      "kind": "test-dispositions",
+      "text": "T-046-22 batch 1 tests/contract: 38 DECLARE (37 CONTRACT, 1 SENTINEL), 2 DELETE (test_consumer_validation_recipe.py, test_handoff_instruction_adoption.py — tombstone/change-detector, replacements cited in the verdict 2026-09-03T044615Z). V31 contract tier = 0."
+    },
+    {
+      "ts": "2026-09-03T12:40:41Z",
+      "agent": "project-manager",
+      "kind": "closure-artifact-gc",
+      "text": "Instance sweep (runtime): reports cleanup --older-than 30d deleted 12 paths then, after bug reports-cleanup-skips-handoffs-without-artifact-path (b4ac0207), 670 handoff-first handoffs; handoffs 912 -> 239, handoffs older than 30 d = 0; tmp gc: .dadaia/tmp 8.9 GB -> 408 MB; 37 reports kept, 0 important. Every 2026-09-03 handoff kept."
+    },
+    {
+      "ts": "2026-09-03T12:40:41Z",
+      "agent": "project-manager",
+      "kind": "dispositions",
+      "text": "Backlog slop-law-one-definition-one-home stays CONSUMED until the feature->develop merge (operator evaluates the rc first; rewritten to DELIVERED at the merge). Bugs fixed in-candidate: context-alive-copies-scaffold-image-bypassing-canon-fold, reports-cleanup-skips-handoffs-without-artifact-path, pre-commit-presence-advisory-names-the-committing-session-itself (all resolved, net-negative or neutral). Deferred to the PM intake report (operator-gated): Intent backfill tests/unit (160) and tests/integration (51); @AGENTS.md stub in two homes (workspace_guardrail vs templates); dadaia clean as a second cleanup engine beside reports cleanup; cli/commands/context.py third session-id ladder; venv-guard cache scope ($V/mypy bypass); e2e test_pre_commit_presence_gate ancestry test and test_doctor copytree test (qa curation); consumer repos' legacy lowercase memory names (specs upgrade); SLOP.md/slop-code wording (S4 scope to core/protocols, S6 regex by reference, two rows >150 chars); code-reviewer LOW S1/S2 hits in container.py, spec_context/service.py, chokepoints/pre_commit.py, cli/_specs_resolution.py."
+    },
+    {
+      "ts": "2026-09-03T13:17:55Z",
+      "agent": "project-manager",
+      "kind": "merge",
+      "text": "Candidate 3 merged: PR #244 feature/0.4.6 -> develop, merge commit 1463790031f223c1922454b376e13ce45f944ee9 (head 7c421ead = verdict commit whose first parent f50e6e9b is the sha the security-reviewer approved; 37 checks pass). Verdict consumed and deleted; backlog slop-law-one-definition-one-home rewritten to DELIVERED. Release stays live at the promote-or-continue gate: the operator rules promote (deploy) or continue (rc-archive to rc-3/); nothing deployed."
+    },
+    {
+      "ts": "2026-09-04T00:02:03Z",
+      "agent": "release-candidates",
+      "kind": "note",
+      "text": "Candidate 3 archived to rc-3/ (operator ruled continue at the promote-or-continue gate); root is ready for the next candidate's trio."
+    },
+    {
+      "ts": "2026-09-04T01:02:22Z",
+      "agent": "project-manager",
+      "kind": "ratifications",
+      "text": "Candidate 4 (workspace instance compliance: one zone registry, one doctor) SPEC/PLAN/TASKS ratified Aprovado by the operator after a 16-question dd-grill-me (handoff 2026-09-03T140000Z-claude-workspace-compliance-grill) and the software-architect DRAFT (handoff 2026-09-03T153000Z). Trio committed at bcd02b21; 13 tasks T-046-24..36; phase IMPLEMENTATION on feature/0.4.6, version 0.4.6 kept."
+    },
+    {
+      "ts": "2026-09-04T04:11:48Z",
+      "agent": "project-manager",
+      "kind": "drifts",
+      "text": "Candidate 4 drifts, recorded in SPEC.md with evidence: (1) FR3 harness-dir predicate is the install ledger read inside the one walk, not a foreign_entries() seam; an unreadable ledger reports itself and classifies nothing (bug doctor-unreadable-install-ledger-classifies-projections-as-slop, 50de406b); --json carries issues findings compliance fixed. (2) FR4 fix() is skip-and-report — an undeletable entry is a skipped action with its errno, stays a finding, exit 1 (bug doctor-fix-aborts-whole-pass-on-first-undeletable-entry, b2b302f9); INV-5 dead-repo removal is last. (3) AC15 re-pinned -8,000 -> -7,400 on the measured -7,462 at 08736ddb (shortstat counts rewritten lines; the DRAFT estimate counted net-new). (4) AC2 [foreign] clause scoped to runtime dirs; consumer-repo AGENTS.md/CLAUDE.md provenance lines pre-exist (grill ruling 16, skills-consolidation). Kimi SessionStart reaper added (08736ddb) so AC5 holds for three harnesses. Architect fidelity verdict APPROVED (handoff 2026-09-04T034000Z); QA first live run REJECTED on the reaper abort, rerun in progress."
+    },
+    {
+      "ts": "2026-09-04T04:16:27Z",
+      "agent": "project-manager",
+      "kind": "summary",
+      "text": "Candidate 4 — workspace instance compliance: one zone registry (core/workspace_layout.DADAIA_ZONES, 11 zones, STATES_CANON closed), one doctor scan and reaper (WS-<zone>-<verdict> findings, compliance score line, --fix / --expired-only / --json / --quiet), TTL 1 day on handoff/tmp/mcps/.cache, SessionStart reaper on Claude/Codex/Kimi, .dadaia/AGENTS.md zone table rendered from the registry at stage, export/import as one spec-contexts.json. Retired: dadaia clean, tmp gc, reports retention + 8 reports verbs, panel Reports and Academy tabs, academy feature, hook telemetry writers + log rotation, legacy quarantine mover, hygiene model, .dadaia/scripts projection, reconciler dirty-path chain. Tasks T-046-24..36 all [x]."
+    },
+    {
+      "ts": "2026-09-04T04:16:27Z",
+      "agent": "project-manager",
+      "kind": "size",
+      "text": "git diff --shortstat develop..cdcbadc1 -- dadaia_workspace: 260 files, +6,004 / -13,466 (net -7,462); AC15 re-pinned to -7,400. Import-linter ignore cap 4 -> 3; help-quality ratchet 42 -> 30; feature packages 23 -> 20; dadaia --help groups 20; dadaia reports = validate doctor; panel 15 routes, 4 tabs."
+    },
+    {
+      "ts": "2026-09-04T04:16:27Z",
+      "agent": "project-manager",
+      "kind": "test-dispositions",
+      "text": "Preflight green at cdcbadc1 (ruff format, ruff check, mypy --strict, lint-imports 7/7, pytest 2,529 passed / 2 skipped in contract+unit; collect-only 2,805, 0 errors). New ratchets: test_zone_registry (table == registry; no second zone-name list; every creator is a live module), DADAIA.md 5.1 root list == ROOT_ALLOWED_*, public source names no retired surface. Deleted with their subjects (criterion feature removed, evidence in each commit): tests for workspace_clean, tmp_gc, retention, next, legacy_dadaia_dirs, hygiene models, academy (6), reports panel (4 + contract), jsonl_log_rotation (2), doctor EFF-1/foreign-projections, tar-era e2e test_branch_tracking (one assertion ported to test_cli_export), two orphan _v0158 goldens and a tombstone attesting test. Panel e2e specs aligned to four tabs (not executed locally: no browsers; CI is the proof)."
+    },
+    {
+      "ts": "2026-09-04T04:16:27Z",
+      "agent": "project-manager",
+      "kind": "closure-artifact-gc",
+      "text": "Live instance: dadaia doctor before 4741/11900 (40%), 7,159 findings; --fix applied 7,178 repairs (7,121 deleted, 64 skipped errno 13), reports/ academy/ logs/ runs/ zones gone, states/ within canon (lifecycle/ audit/ .ws_lock workflow_model_policy* root_exceptions.txt removed, instance_exceptions.txt migrated deduplicated, harness_profile.json seeded), dist/ holds spec-contexts.json only, 402 MB of expired tmp reclaimed; after 4874/4931 (99%) — the 57 remaining findings are one root-owned June directory the operator removes with sudo. Evidence .dadaia/tmp/qa-engineer/20260904/."
+    },
+    {
+      "ts": "2026-09-04T04:16:27Z",
+      "agent": "project-manager",
+      "kind": "dispositions",
+      "text": "Bugs: doctor-root1-flags-env-that-dadaia-md-9-declares-canonical resolved (f733c2b8); migrate-v3-backup-lands-in-closed-states-canon resolved (ff354a3e); doctor-unreadable-install-ledger-classifies-projections-as-slop resolved (50de406b); doctor-fix-aborts-whole-pass-on-first-undeletable-entry resolved (b2b302f9); memory-gate-requires-closure-phase-that-spec-doc-024-forbids-before-last-task open, deferred to the next candidate. Architect recommendations for the next candidate: delete the Claude-sense `rules` category (dead since the core rules folded into DADAIA.md); delete features/migrate/state_v3.py (no caller, store already stamps v3); render DADAIA.md 5.1 from the registry; widen zone ratchet 2 to dict keys and substrings; make ratchet 3 behavioral."
+    },
+    {
+      "ts": "2026-09-04T04:46:15Z",
+      "agent": "project-manager",
+      "kind": "reviews",
+      "text": "Candidate 4 reviews: software-architect fidelity APPROVED (root-cause PASS, fidelity PASS, bug surface REDUCED; handoff 2026-09-04T034000Z). qa-engineer live run REJECTED then APPROVED on rerun (handoffs 034752Z, 041454Z): scratch proof 100%, live 99% with the root-owned June dir pending operator sudo. code-reviewer three-axis APPROVE WITH FIXES (handoff 042313Z): 1 MEDIUM + 10 LOW, all applied in 6112831e (bug doctor-scan-raises-when-a-ttl-entry-vanishes-mid-walk, lineage doctor-fix-aborts-whole-pass-on-first-undeletable-entry) and 6043bf2b (.git in the root law, one finding format, features/reports package deleted, pid_probe deleted, intents added); finding 9 (self-projected repo AGENTS.md cannot be regenerated) registered as a bug for the next candidate. AC15 evidence re-recorded against the merge-base: -8,113 at 6043bf2b. Security verdict follows on the PR head."
+    },
+    {
+      "ts": "2026-09-04T05:36:36Z",
+      "agent": "project-manager",
+      "kind": "reviews",
+      "text": "Security: first verdict REJECTED at 0bf7a759 (HIGH import wrote unvalidated names/slugs to the registry and INV-5 rmtree had no containment; LOW symlinked zone root walked). Fixed as bugs import-registers-unvalidated-slugs-that-doctor-fix-inv5-rmtrees (6dabc9f6: one guarded registration seam SpecContextService.register serves create, add_repo and import; CLI allowlist loops deleted; INV-5 removes only a direct child of repos/) and doctor-walks-symlinked-zone-root-into-a-repo-tree (b1ee9272). Re-verdict APPROVED at 637059d2 (verdict file committed here, consumed by the merge): 0 CRITICAL/HIGH/MEDIUM, 2 LOW (import/export --workspace ancestor-walk re-resolution registered as import-export-workspace-flag-re-resolves-through-ancestor-walk; symlinked zone root classified canon by the top-level scan, pre-existing), 6 INFO. Bug surface reduced. MEM-DRIFT-1 cleared (cca0e068)."
+    },
+    {
+      "ts": "2026-09-04T05:54:39Z",
+      "agent": "project-manager",
+      "kind": "reviews",
+      "text": "PR #245 first CI run: windows-latest unit + contract jobs red on tests/unit/test_spec_context_doctor_root.py::_age (utime follow_symlinks=False unsupported on Windows), every other job green. Fixed as bug doctor-root-tests-age-with-utime-follow-symlinks-false-unsupported-on-windows (13be6784, tests only, same class as retention-sweep-test-uses-windows-unsupported-utime-followsymlinks). Delta security verdict APPROVED at efd58d33 (verdict file committed here; the 637059d2 verdict deleted as superseded — a verdict never transfers to a sha it did not examine). Security INFO for a later candidate: 12 os.utime call sites across 6 test files with no shared helper."
+    },
+    {
+      "ts": "2026-09-04T06:07:44Z",
+      "agent": "project-manager",
+      "kind": "merge",
+      "text": "Candidate 4 merged: PR #245 feature/0.4.6 -> develop, merge commit 9c3fc0f8a05825d462b6197468fb1719ef726307 (head 8dc5b7ff = verdict commit whose first parent efd58d33 is the sha the security-reviewer approved; 37 checks pass after one Windows-only red fixed as doctor-root-tests-age-with-utime-follow-symlinks-false-unsupported-on-windows). Verdict consumed and deleted. Release stays live at the promote-or-continue gate: the operator rules promote (deploy 0.4.6) or continue (rc-archive to rc-4/); nothing deployed. Live instance 99% pending the operator sudo removal of one root-owned June directory."
+    },
+    {
+      "ts": "2026-09-05T20:30:27Z",
+      "agent": "project-manager",
+      "kind": "reviews",
+      "text": "Promote ruled by the operator (2026-09-05): PyPI latest 0.4.5, pyproject 0.4.6 = +1 patch, no v0.4.6 tag. Ship lane: CHANGELOG [0.4.6] (e8ddf085); security ship verdict APPROVED naming develop tip 9c3fc0f8 (range origin/main..origin/develop, 469 files +10,570/-18,749, 0 CRITICAL/HIGH/MEDIUM, 4 LOW record-only, pip-audit clean, release.yml OIDC sha-pinned); staging it hit bug verdict-staleness-rule-refuses-the-ship-verdict-the-gitflow-law-mandates (SPEC-DOC-044 + pre-push scan refused the 3b shape) — fixed in-lane as Arm B (f705bbef: one liveness set head/first parent/origin-develop tip in chokepoints/verdict.py::live_verdict_shas, raw subprocess resolver deleted; software-architect APPROVED WITH FIXES applied, bug surface REDUCED; preflight green 2,849 passed). PR-gate delta verdict APPROVED at f705bbef (supersedes e8ddf085). Both verdicts staged in this commit; the develop merge consumes f705bbef's, the main merge consumes 9c3fc0f8's."
+    }
+  ]
+}

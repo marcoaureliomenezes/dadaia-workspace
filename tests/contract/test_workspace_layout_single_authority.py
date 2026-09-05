@@ -1,11 +1,17 @@
-"""Contract — one authority per filesystem-layout invariant (2026-08-06 analysis).
+"""Intent: CONTRACT — core.workspace_layout single authority (bug dadaia-reconcile-quarantines-sanctioned-references-clone; 0.4.6 AC1); size: SMALL.
 
-The root whitelist diverged the day DADAIA.md was added to the hook's copy and not the
-doctor's. These tests pin that every consumer DERIVES from ``core/workspace_layout.py``
-— identity, not equality, where possible — so divergence is unrepresentable.
+One authority per filesystem-layout invariant (2026-08-06 analysis). The root whitelist
+diverged the day DADAIA.md was added to the hook's copy and not the doctor's; the
+``.dadaia/`` layout diverged six times as bare name lists (architect G, 0.4.6). These
+tests pin that every consumer DERIVES from ``core/workspace_layout.py`` — identity where a
+constant is re-exported, equality against the registry view where a consumer derives —
+so divergence is unrepresentable. ``tests/contract/test_zone_registry.py`` adds the
+package-wide ratchet that no second list can be born.
 """
 
 from __future__ import annotations
+
+from pathlib import Path
 
 import pytest
 
@@ -22,12 +28,23 @@ def test_hook_whitelist_derives_from_core() -> None:
     assert root_whitelist._ROOT_FILES is workspace_layout.ROOT_ALLOWED_FILES
 
 
-def test_doctor_whitelist_is_the_same_object() -> None:
+def test_doctor_root_walk_derives_from_core(tmp_path: Path) -> None:
+    """The doctor holds no root list of its own (T-046-25): every name the law allows
+    reads canon straight off ``workspace_layout``, and the module re-exports nothing."""
     from dadaia_workspace.core import workspace_layout
     from dadaia_workspace.features.spec_context import doctor
+    from tests.fakes import FakeContextStore, FakeGitClient
 
-    assert doctor._ROOT_ALLOWED_DIRS is workspace_layout.ROOT_ALLOWED_DIRS
-    assert doctor._ROOT_ALLOWED_FILES is workspace_layout.ROOT_ALLOWED_FILES
+    assert not hasattr(doctor, "_ROOT_ALLOWED_DIRS")
+    (tmp_path / ".dadaia" / "states").mkdir(parents=True)
+    for name in workspace_layout.ROOT_ALLOWED_DIRS:
+        (tmp_path / name).mkdir(exist_ok=True)
+    for name in workspace_layout.ROOT_ALLOWED_FILES:
+        (tmp_path / name).write_text("", encoding="utf-8")
+    findings = doctor.DoctorService(FakeContextStore(), FakeGitClient(), tmp_path).scan()
+    root = {f.path: f.verdict.value for f in findings if f.code.startswith("WS-root-")}
+    assert set(root.values()) == {"canon"}
+    assert set(root) == workspace_layout.ROOT_ALLOWED_DIRS | workspace_layout.ROOT_ALLOWED_FILES
 
 
 def test_gate_law_sets_are_the_same_objects() -> None:
@@ -49,26 +66,11 @@ def test_installer_targets_are_the_same_object() -> None:
     assert projection_rules.DADAIA_MD_HARNESS_TARGETS is workspace_layout.DADAIA_MD_HARNESS_TARGETS
 
 
-def test_doctor_dadaia_allowlist_is_the_same_object() -> None:
-    """Bug dadaia-reconcile-quarantines-sanctioned-references-clone: doctor's ROOT-4
-    ``.dadaia/`` allowlist must be the SAME object as the core authority, never a
-    hand-copied literal that can silently diverge (as it did the moment T-045-23
-    sanctioned "references" in one copy but not the other)."""
+def test_gate_additive_prefixes_are_the_registry_view() -> None:
+    """The gate's ``.dadaia/`` ADDITIVE class is the OUTPUT + EPHEMERAL rows of the
+    registry (SPEC 0.4.6 FR1, architect A) — ``reports/`` left the class the moment its
+    row left the registry, with no gate edit."""
     from dadaia_workspace.core import workspace_layout
-    from dadaia_workspace.features.spec_context import doctor
+    from dadaia_workspace.features.spec_context import gate_policy
 
-    assert doctor._DADAIA_ALLOWED_SUBDIRS is workspace_layout.DADAIA_ALLOWED_SUBDIRS
-
-
-def test_migrate_legacy_quarantine_set_never_contains_a_canonical_dadaia_dir() -> None:
-    """Bug dadaia-reconcile-quarantines-sanctioned-references-clone: migrate's legacy-
-    quarantine set is DERIVED from the same core authority doctor's ROOT-4 allowlist
-    uses, so a name cannot be canonical (never quarantined) and legacy (always
-    quarantined) at once — the structural cause of the bug is unrepresentable, not
-    merely absent from today's values."""
-    from dadaia_workspace.core import workspace_layout
-    from dadaia_workspace.features.migrate import legacy_dadaia_dirs
-
-    assert legacy_dadaia_dirs.LEGACY_DADAIA_SUBDIRS.isdisjoint(
-        workspace_layout.DADAIA_ALLOWED_SUBDIRS
-    )
+    assert workspace_layout.additive_prefixes() == gate_policy._ADDITIVE_DADAIA_PREFIXES

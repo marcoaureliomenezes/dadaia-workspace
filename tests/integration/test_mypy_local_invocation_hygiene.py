@@ -2,7 +2,7 @@
 
 Intent: CONTRACT -- bug mypy-strict-cache-dir-created-without-cache-dir-env-override.
 
-INTEGRATION / SLOW (dadaia-test-stewardship declaration: this is the one test in the
+INTEGRATION / SLOW (dd-test-stewardship declaration: this is the one test in the
 suite that actually EXECUTES mypy against the real, checked-in ``[tool.mypy]`` config,
 rather than asserting on argv shape -- ``tests/unit/features/ci_preflight/
 test_no_pollution.py`` already pins the ``dadaia ci preflight`` mypy check's argv

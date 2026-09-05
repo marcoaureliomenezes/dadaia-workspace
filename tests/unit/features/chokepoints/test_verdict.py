@@ -18,9 +18,11 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.features.chokepoints.verdict import (
+    INTEGRATION_TIP_REF,
     Verdict,
     covering_verdict,
     discover_verdict_candidates,
+    live_verdict_shas,
 )
 
 _SHA_HEAD = "a" * 40
@@ -189,3 +191,42 @@ def test_ideas_directory_is_never_a_candidate_root(tmp_path: Path) -> None:
 
 def test_no_specs_tree_yields_no_candidates(tmp_path: Path) -> None:
     assert discover_verdict_candidates(tmp_path) == []
+
+
+# ---------------------------------------------------------------------------------------
+# live_verdict_shas — the ONE on-disk liveness set (bug
+# verdict-staleness-rule-refuses-the-ship-verdict-the-gitflow-law-mandates): a committed
+# verdict stays live while it names the head, the head's first parent, or the integration
+# branch tip (the ship shape DADAIA.md §4.2 / dd-gitflow-default §3b mandate).
+# ---------------------------------------------------------------------------------------
+
+
+class _FakeShaSource:
+    def __init__(self, parent: str | None = None, refs: dict[str, str] | None = None) -> None:
+        self._parent = parent
+        self._refs = refs or {}
+        self.ref_calls: list[str] = []
+
+    def first_parent(self, repo: Path, sha: str) -> str | None:
+        return self._parent if sha == _SHA_HEAD else None
+
+    def resolve_ref(self, repo: Path, ref: str) -> str | None:
+        self.ref_calls.append(ref)
+        return self._refs.get(ref)
+
+
+def test_live_shas_are_head_first_parent_and_the_integration_tip(tmp_path: Path) -> None:
+    source = _FakeShaSource(parent=_SHA_PARENT, refs={INTEGRATION_TIP_REF: _SHA_OTHER})
+    assert live_verdict_shas(source, tmp_path, _SHA_HEAD) == (_SHA_HEAD, _SHA_PARENT, _SHA_OTHER)
+    assert source.ref_calls == [INTEGRATION_TIP_REF]
+
+
+def test_live_shas_drop_what_cannot_be_resolved(tmp_path: Path) -> None:
+    """A root commit with no remote-tracking develop (a fresh clone, CI's shallow
+    checkout): the set shrinks to the head — never a None, never a raise."""
+    assert live_verdict_shas(_FakeShaSource(), tmp_path, _SHA_HEAD) == (_SHA_HEAD,)
+
+
+def test_live_shas_dedupe_when_the_integration_tip_is_the_parent(tmp_path: Path) -> None:
+    source = _FakeShaSource(parent=_SHA_PARENT, refs={INTEGRATION_TIP_REF: _SHA_PARENT})
+    assert live_verdict_shas(source, tmp_path, _SHA_HEAD) == (_SHA_HEAD, _SHA_PARENT)

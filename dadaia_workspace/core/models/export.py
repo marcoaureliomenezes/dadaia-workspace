@@ -1,32 +1,12 @@
-"""Domain models for the workspace export feature."""
+"""Domain model for `dadaia export` — the one JSON artifact in the `dist` zone (FR13)."""
 
 from dataclasses import dataclass
 from pathlib import Path
 
-
-@dataclass(frozen=True)
-class ExportOptions:
-    output: Path | None = None
-    include_reports: bool = False
-    exclude_mnt: bool = False
-    list_only: bool = False
-
-
-@dataclass(frozen=True)
-class ExportManifest:
-    version: str
-    exported_at: str
-    workspace_root: str
-    dadaia_version: str
-    contexts: tuple[dict[str, object], ...]
-    includes: tuple[str, ...]
-    mnt_included: bool
-    reports_included: bool
-    total_size_bytes: int
+SCHEMA_VERSION = "spec-contexts-export-v1"
 
 
 @dataclass(frozen=True)
 class ExportResult:
-    path: Path | None  # None when list_only=True
-    size: int
-    manifest: ExportManifest
+    path: Path
+    contexts: int

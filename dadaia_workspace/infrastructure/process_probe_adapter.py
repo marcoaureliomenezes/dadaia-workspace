@@ -36,7 +36,6 @@ Windows therefore probes liveness with a read-only ``OpenProcess`` existence che
 
 import logging
 import os
-from collections.abc import Callable
 
 from dadaia_workspace.core.platform import PLATFORM
 
@@ -123,18 +122,3 @@ class OsProcessProbe:
             return bool(int(exit_code.value) == still_active)
         finally:
             kernel32.CloseHandle(handle)
-
-
-def build_pid_probe() -> Callable[[int], bool] | None:
-    """Return the platform-seamed PID-liveness probe used by presence/state cleanup.
-
-    ``OsProcessProbe`` is itself platform-seamed (``PLATFORM.has_os_kill_liveness`` selects
-    ``os.kill`` vs the Windows ``OpenProcess`` existence check), so a single probe instance
-    is correct on every host. The concrete probe is wired lazily here so any construction
-    failure fails open: ``None`` lets callers use timestamp-only liveness.
-    """
-    try:
-        probe = OsProcessProbe()
-        return lambda pid: probe.is_pid_alive(pid)
-    except Exception:  # noqa: BLE001 — never let probe wiring break a caller.
-        return None

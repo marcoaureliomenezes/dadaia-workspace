@@ -72,6 +72,8 @@ _FAMILY_OF_CODE: dict[str, str] = {
     "SPEC-DOC-008": "memory",
     "CAT-1": "memory",
     "LINT-1": "memory",
+    "FIXED-1": "memory",
+    "FIXED-2": "memory",
     "SPEC-DOC-003": "release",
     "SPEC-DOC-004": "release",
     "SPEC-DOC-005": "release",

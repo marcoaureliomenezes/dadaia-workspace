@@ -1,5 +1,6 @@
-"""CLI command: dadaia doctor [--fix] [--redact]."""
+"""CLI command: dadaia doctor [--fix] [--expired-only] [--json] [--quiet] [--redact]."""
 
+import json
 from pathlib import Path
 
 import typer
@@ -9,6 +10,7 @@ from dadaia_workspace.cli._specs_resolution import resolve_context_for_cli
 from dadaia_workspace.cli.redact import ContextRedactor
 from dadaia_workspace.core.exceptions import SchemaVersionError, WorkspaceNotInitializedError
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
+from dadaia_workspace.features.spec_context.doctor import Finding, FindingVerdict, compliance
 
 app = typer.Typer(help="Diagnose and repair workspace state.")
 
@@ -56,9 +58,30 @@ def _build_redactor(workspace_root: Path) -> ContextRedactor:
     return ContextRedactor(candidates, exclude=(caller_name, caller_slug))
 
 
+def _finding_dict(finding: Finding) -> dict[str, object]:
+    return {
+        "code": finding.code,
+        "path": finding.path,
+        "verdict": finding.verdict.value,
+        "fixable": finding.fixable,
+        "detail": finding.detail,
+    }
+
+
 @app.callback(invoke_without_command=True)
 def doctor(
     fix: bool = typer.Option(False, "--fix", help="Apply automatic repairs."),
+    expired_only: bool = typer.Option(
+        False,
+        "--expired-only",
+        help="Scope the run to TTL-expired entries: --fix stops after deleting them.",
+    ),
+    json_out: bool = typer.Option(
+        False, "--json", help="Machine-readable output: issues, findings, compliance, fixed."
+    ),
+    quiet: bool = typer.Option(
+        False, "--quiet", help="Print only what --fix deleted (nothing on a compliant run)."
+    ),
     redact: bool = typer.Option(
         False,
         "--redact",
@@ -76,7 +99,23 @@ def doctor(
         typer.echo("Error: Workspace not initialized. Run 'dadaia init' first.", err=True)
         raise typer.Exit(1) from None
 
+    lane = (
+        {FindingVerdict.EXPIRED}
+        if expired_only
+        else set(FindingVerdict)
+        - {
+            FindingVerdict.CANON,
+            FindingVerdict.OPERATOR,
+        }
+    )
     issues = dr.check()
+    findings = [f for f in dr.scan() if f.verdict in lane]
+    fixed = dr.fix(expired_only=expired_only) if fix else []
+    remaining_issues = dr.check() if fix else issues
+    post = dr.scan()
+    remaining = [f for f in post if f.verdict in lane]
+    score = compliance(post)
+    healthy = not remaining_issues and not remaining
 
     # Render boundary ONLY: `dr` (DoctorService) never sees `redactor` and its issue
     # descriptions/fix actions keep carrying true names — nothing here mutates them.
@@ -85,26 +124,57 @@ def doctor(
     def _render(text: str) -> str:
         return redactor.text(text) if redactor is not None else text
 
-    if not issues:
-        typer.echo("All invariants OK — workspace is healthy.")
-        return
-
-    typer.echo(f"Found {len(issues)} issue(s):")
-    for issue in issues:
-        fixable = "[fixable]" if issue.fixable else "[manual]"
-        typer.echo(f"  {issue.code} {fixable} — {_render(issue.description)}")
-
-    if fix:
-        actions = dr.fix()
-        typer.echo(f"\nApplied {len(actions)} repair(s):")
-        for action in actions:
-            typer.echo(f"  - {_render(action)}")
-        remaining = dr.check()
-        if remaining:
-            typer.echo(f"\n{len(remaining)} issue(s) remain after repairs.")
-            raise typer.Exit(1)
+    if json_out:
+        typer.echo(
+            json.dumps(
+                {
+                    "issues": [
+                        {
+                            "code": i.code,
+                            "description": _render(i.description),
+                            "fixable": i.fixable,
+                        }
+                        for i in remaining_issues
+                    ],
+                    "findings": [_finding_dict(f) for f in remaining],
+                    "compliance": {
+                        "canonical": score.canonical,
+                        "total": score.total,
+                        "percent": score.percent,
+                    },
+                    "fixed": [_render(a) for a in fixed],
+                },
+                indent=2,
+            )
+        )
+    elif quiet:
+        for action in fixed:
+            typer.echo(_render(action))
     else:
-        typer.echo("\nRun 'dadaia doctor --fix' to apply automatic repairs.")
-        # Exit-code truthfulness (validation-029 F-04): issues found => non-zero, so
-        # scripts and agents consuming doctor never mistake a sick tree for healthy.
+        if issues:
+            typer.echo(f"Found {len(issues)} issue(s):")
+            for issue in issues:
+                fixable = "[fixable]" if issue.fixable else "[manual]"
+                typer.echo(f"  {issue.code} {fixable} — {_render(issue.description)}")
+        for finding in findings:
+            typer.echo(_render(f"{finding.code}  {finding.path}  {finding.detail}"))
+        if fix:
+            typer.echo(f"\nApplied {len(fixed)} repair(s):")
+            for action in fixed:
+                typer.echo(f"  - {_render(action)}")
+            if not healthy:
+                typer.echo(
+                    f"\n{len(remaining_issues) + len(remaining)} issue(s) remain after repairs."
+                )
+        elif healthy:
+            typer.echo("All invariants OK — workspace is healthy.")
+        else:
+            # Exit-code truthfulness (validation-029 F-04): issues found => non-zero, so
+            # scripts and agents consuming doctor never mistake a sick tree for healthy.
+            typer.echo("\nRun 'dadaia doctor --fix' to apply automatic repairs.")
+        typer.echo(
+            f"compliance: {score.canonical}/{score.total} entries canonical ({score.percent}%)"
+        )
+
+    if not healthy:
         raise typer.Exit(1)

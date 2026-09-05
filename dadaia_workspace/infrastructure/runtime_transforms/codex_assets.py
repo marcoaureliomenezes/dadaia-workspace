@@ -48,12 +48,6 @@ _CODEX_DEFAULT_EFFORT = "medium"
 # family it was meant to cover (A22.6; a test derives this whole tuple from the
 # on-disk inventory — ``tests/contract/test_codex_skill_ref_prefixes.py``).
 _CODEX_SKILL_REF_PREFIXES = (
-    "dadaia-codebase-design",
-    "dadaia-handoff-emitter",
-    "dadaia-step0-memory-bootstrap",
-    "dadaia-task-manager",
-    "dadaia-test-stewardship",
-    "dadaia-workspace-spec-navigator",
     "dd-",
     "memory-ctx",
 )
@@ -89,8 +83,8 @@ _AGENT_FM_BLOCK_SCALAR_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*): [>|]$", re.M
 # own context, unprompted by any tool call). Before this compaction, every
 # persona body ALSO restated fragments of that same law inline — the generic
 # H1 report/protocol pointer blockquotes, the Step-0 memory-bootstrap
-# pointer, the `dadaia-handoff-emitter` artifact-emission paragraph, the
-# `dadaia-task-manager` review-gate paragraph, and the generic `dadaia CLI`
+# pointer, the `dd-handoff-emitter` artifact-emission paragraph, the
+# `dd-task-manager` review-gate paragraph, and the generic `dadaia CLI`
 # command list — so the law effectively loaded TWICE per Codex context: once
 # via `AGENTS.md` natively, once again verbatim inside
 # ``developer_instructions``. Each pattern below strips exactly one of those
@@ -111,26 +105,16 @@ _CODEX_COMPACT_H1_PROTOCOL_POINTER_RE = re.compile(
     r"projected workspace protocol\.\n\n?"
 )
 
-# "## Step 0 — Memory bootstrap" — a byte-identical (modulo one trailing
-# clause) heading + one-line pointer to the `dadaia-step0-memory-bootstrap`
-# skill, repeated in every implementer/reviewer persona. The skill itself
-# (already in the agent's `skills:` list) carries the full protocol.
-_CODEX_COMPACT_STEP0_SECTION_RE = re.compile(
-    r"## Step 0 — Memory bootstrap \(mandatory, before any work\)\n\n"
-    r"Execute the `dadaia-step0-memory-bootstrap` skill before any[^\n]*\.\n\n"
-    r"---\n\n"
-)
-
 # "### Artifact emission" / "## Artifact emission" — the generic
 # invoke-the-handoff-emitter-skill paragraph (English and the two personas
 # that carry the Portuguese variant), fully covered by the
-# `dadaia-handoff-emitter` skill's own Step 4.
+# `dd-handoff-emitter` skill's own Step 4.
 _CODEX_COMPACT_ARTIFACT_EMISSION_RE = re.compile(
     r"(?:---\n\n)?###? Artifact emission\n\n"
     r"(?:After finalizing any HTML report under `\.dadaia/reports/`, invoke the\n"
-    r"`dadaia-handoff-emitter` skill to emit handoff JSON under `\.dadaia/handoff/<context>/`\.|"
+    r"`dd-handoff-emitter` skill to emit handoff JSON under `\.dadaia/handoff/<context>/`\.|"
     r"Após finalizar qualquer report HTML em `\.dadaia/reports/`, invocar a skill "
-    r"`dadaia-handoff-emitter`\npara emitir o handoff JSON em `\.dadaia/handoff/<context>/`\.)"
+    r"`dd-handoff-emitter`\npara emitir o handoff JSON em `\.dadaia/handoff/<context>/`\.)"
     r"\n\n?"
 )
 
@@ -142,7 +126,7 @@ _CODEX_COMPACT_HANDOFF_POINTER_RE = re.compile(
     r"\n?> Report/handoff emission follows the `DADAIA\.md`[^\n]*\n\n?"
 )
 
-# "## Implementation review gate" — restates the `dadaia-task-manager`
+# "## Implementation review gate" — restates the `dd-task-manager`
 # skill's "Implementation complete is not DONE" review-gate paragraph
 # near-verbatim in each implementer persona that carries the skill.
 _CODEX_COMPACT_REVIEW_GATE_SECTION_RE = re.compile(
@@ -163,7 +147,6 @@ _CODEX_COMPACT_CLI_SECTION_RE = re.compile(r"(\n---\n)?## dadaia CLI\n.*?(?=\n##
 _CODEX_COMPACT_PATTERNS: tuple[re.Pattern[str], ...] = (
     _CODEX_COMPACT_H1_REPORTS_POINTER_RE,
     _CODEX_COMPACT_H1_PROTOCOL_POINTER_RE,
-    _CODEX_COMPACT_STEP0_SECTION_RE,
     _CODEX_COMPACT_ARTIFACT_EMISSION_RE,
     _CODEX_COMPACT_HANDOFF_POINTER_RE,
     _CODEX_COMPACT_REVIEW_GATE_SECTION_RE,

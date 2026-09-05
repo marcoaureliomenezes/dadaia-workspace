@@ -117,7 +117,7 @@ def test_bugs_append_resolves_the_slug_and_closure_lands_in_scope(workspace: Pat
 def test_create_refuses_a_name_no_other_verb_can_use(workspace: Path) -> None:
     """`create` must refuse exactly what the rest of the CLI refuses.
 
-    Explicit timeout (dadaia-test-stewardship S-09/S-10): this test builds several real
+    Explicit timeout (dd-test-stewardship S-09/S-10): this test builds several real
     workspaces through the CliRunner and measured ~20 s solo / >60 s under full-suite
     xdist load — above the 60 s integration ceiling. The justified bound stays; the
     structural fix (splitting the workspace builds) was queued and curated under the

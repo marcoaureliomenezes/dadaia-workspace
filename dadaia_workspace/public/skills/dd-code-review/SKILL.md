@@ -1,15 +1,12 @@
 ---
 name: dd-code-review
 description: >
-  The reviewer's method: three independent axes reported side by side, never reranked
-  against each other — Standards (the repo's own conventions plus a fixed baseline of
-  twelve Fowler smells), Spec (does the diff do what the approved SPEC/TASKS say —
-  nothing more, nothing less), and Bug-surface (did this diff reduce or increase the
-  touched feature's bug surface, evidenced from the ledger). PRIMARY CALLER:
-  code-reviewer; qa-engineer and software-architect verdicts reuse the Bug-surface axis.
-  Security/perf depth stays with security-reviewer and the gates.
-tldr: "Three axes side by side — Standards (+12 Fowler smells), Spec conformance, Bug-surface delta — never reranked."
-applyTo: "**"
+  The reviewer's method: three independent axes reported side by side, never
+  reranked — Standards (repo conventions + twelve Fowler smells), Spec (the diff does
+  what the approved SPEC/TASKS say, nothing more), Bug-surface (the diff reduced or
+  grew the touched feature's bug surface, evidenced from the ledger). Use when
+  reviewing a PR, branch or commit range, or when a verdict needs the Bug-surface
+  axis.
 ---
 
 # dd-code-review
@@ -31,7 +28,8 @@ axes are reported side by side — an axis never outranks another.
   Mysterious Name · Duplicated Code · Feature Envy · Data Clumps · Primitive Obsession ·
   Repeated Switches · Shotgun Surgery · Divergent Change · Speculative Generality ·
   Message Chains · Middle Man · Refused Bequest.
-- Speak `dadaia-codebase-design`: a smell is usually a shallow module or a misplaced seam.
+- Speak `dd-codebase-design`: a smell is usually a shallow module or a misplaced seam.
+- Slop signals S1-S10, each with its diff check: [`SLOP.md`](SLOP.md) — reported inside this axis, never a fourth.
 
 ## 3. Axis 2 — Spec
 
@@ -47,15 +45,16 @@ axes are reported side by side — an axis never outranks another.
 - The operator's rule applied as a review axis: a diff that GROWS the feature is a stop —
   a branch, flag, special case, second code path or cross-feature reach-in added by a fix
   is a puxadinho; name it and recommend the replace-don't-layer shape instead.
+- An S4, S5 or S8 finding (`SLOP.md`) answers this axis "increased" until the finding is gone.
 
 ## 5. Reporting
 
 - Findings carry: axis, severity (CRITICAL/HIGH/MEDIUM/LOW/INFO), `file:line`, what the code does, fix direction (never code).
-- The three axes appear side by side in the report; the verdict (APPROVE/REQUEST_CHANGES/COMMENT) follows the caller persona's rules.
+- The three axes appear side by side in the report; the verdict (`APPROVED`/`REJECTED` — the handoff schema's enum) follows the caller persona's rules.
 - The Bug-surface answer is REQUIRED in every verdict — "tests green" is not a verdict.
 
 ## 6. References
 
-- `dadaia-codebase-design` — the vocabulary the Standards and Bug-surface axes speak.
-- `dadaia-test-stewardship` — test findings' lifecycle rules.
+- `dd-codebase-design` — the vocabulary the Standards and Bug-surface axes speak.
+- `dd-test-stewardship` — test findings' lifecycle rules.
 - Security depth / CVE / OWASP: `security-reviewer`'s lane, never re-run here.

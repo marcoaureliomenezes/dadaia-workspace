@@ -1,4 +1,7 @@
-"""Public machine-readable capability contract."""
+"""Intent: CONTRACT — dadaia-capabilities-v2.schema.json (dadaia capabilities --json)
+
+Public machine-readable capability contract.
+"""
 
 from __future__ import annotations
 

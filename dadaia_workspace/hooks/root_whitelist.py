@@ -1,13 +1,9 @@
 """PreToolUse workspace-root whitelist gate (the canonical, cross-platform gate surface).
 
-The Law: the workspace root may contain ONLY these entries::
-
-    .agents/ .claude/ .codex/ .dadaia/ .kimi-code/ repos/  (directories)
-    AGENTS.md CLAUDE.md DADAIA.md prompt.md                     (files)
-
-Any other top-level entry is blocked. An operator exception list at
-``.dadaia/states/root_exceptions.txt`` (one fnmatch glob per line) documents deliberate
-exceptions. The gate classifies the **first path component** of the target relative to the
+The Law: the workspace root may contain ONLY ``core.workspace_layout.ROOT_ALLOWED_DIRS``
+and ``ROOT_ALLOWED_FILES``. Any other top-level entry is blocked. The operator's instance
+exceptions (``workspace_layout.INSTANCE_EXCEPTIONS``, one fnmatch glob per line) document
+deliberate exceptions. The gate classifies the **first path component** of the target relative to the
 workspace root (T-47-15): a write blocks when that first component would create a NEW
 top-level entry outside the whitelist/exceptions — so a nested write like
 ``<root>/.opencode/agents/foo.md`` is blocked, while a write into an existing (operator-
@@ -45,17 +41,14 @@ def _render_whitelist() -> str:
 
 
 def _operator_exception(workspace: Path, basename: str) -> bool:
-    """Return True if *basename* matches a glob in the operator exception list."""
-    efile = workspace / ".dadaia" / "states" / "root_exceptions.txt"
+    """Return True if *basename* matches a glob in the operator's instance exceptions."""
     try:
-        text = efile.read_text(encoding="utf-8")
+        text = (workspace / workspace_layout.INSTANCE_EXCEPTIONS).read_text(encoding="utf-8")
     except OSError:
         return False
-    for raw in text.splitlines():
-        pat = raw.strip()
-        if pat and not pat.startswith("#") and fnmatch.fnmatch(basename, pat):
-            return True
-    return False
+    return any(
+        fnmatch.fnmatch(basename, pat) for pat in workspace_layout.parse_exception_globs(text)
+    )
 
 
 def evaluate_payload(payload: dict[str, object]) -> str | None:
@@ -140,6 +133,6 @@ def _root_violation(workspace: Path, raw_path: str) -> str | None:
         f"The workspace root may only contain: {_render_whitelist()}. Redirect output to "
         ".dadaia/<subdir> (temp files: .dadaia/tmp/<agent>/<date>/; tool caches: "
         ".dadaia/; MCP output: .dadaia/mcps/<server>/). If this entry is genuinely "
-        "required at root, add a glob pattern to .dadaia/states/root_exceptions.txt and "
-        "retry. Operator-created files are exempt — add them to root_exceptions.txt."
+        f"required at root, add a glob pattern to {workspace_layout.INSTANCE_EXCEPTIONS} "
+        "and retry. Operator-created files are exempt — add them there."
     )

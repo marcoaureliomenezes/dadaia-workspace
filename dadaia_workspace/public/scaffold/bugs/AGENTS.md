@@ -32,7 +32,7 @@ Scope: this file governs only `specs/bugs/`. Replaces the retired `bugs/README.m
 
 ## 3. Duties this ledger carries, and where each lives
 
-- Diagnosing method, lineage first: `dd-diagnose` — window, cap, diff-trust rule, stated once there.
+- Diagnosing method, lineage first: `dd-bug-resolution` — window, cap, diff-trust rule, stated once there.
 - Commit shapes for a registration and a resolution: `dd-gitflow-default`.
 - Redaction, classification, CLI reference for filing: `dd-bug-registration`.
 - The rest of Arm B (branch, concurrency, the `resolved` write, evidence triple): `dd-bug-resolution`.

@@ -13,6 +13,10 @@ requires *object_source* the same way). This is what lets ``chokepoints -> spec_
 drop out of the import-linter ``ignore_imports`` list entirely (v0.5.1 K7): the CLI
 composition root (``cli/commands/ci.py``) passes ``presence.others_alive`` directly —
 zero adapter needed, since the injected callable's signature already matches it.
+
+*own_sid* is the committing session's identity as the composition root resolved it;
+an empty value excludes nothing, so an unidentified committer sees every live record as
+foreign.
 """
 
 from __future__ import annotations
@@ -78,7 +82,7 @@ def pre_commit_decision(
     workspace: Path,
     ctx: str | None,
     *,
-    env_sid: str | None,
+    own_sid: str,
     others_alive: Callable[[Path, str, str], Sequence[PresenceRecordLike]],
     now: datetime | None = None,
 ) -> Decision:
@@ -87,7 +91,9 @@ def pre_commit_decision(
     NO-LOCKS DOCTRINE: this ALWAYS returns ``allowed=True``. Advisory detection reads the
     same fail-soft presence records as the write gate, via the injected *others_alive*
     (matches ``spec_context.presence.others_alive``'s own signature — the CLI passes it
-    straight through, no adapter needed).
+    straight through, no adapter needed). *own_sid* is the committing session's identity
+    resolved by the composition root through the ONE session-id rule, so the advisory
+    names a COLLIDING session only (DADAIA.md §3.3); ``""`` excludes nothing.
 
     v0.5.1 K7: the legacy ``caller_pid``/``pid_probe``/``ancestry`` parameters are
     DELETED — dead since the liveness-probe path they served was retired (their bodies
@@ -99,7 +105,6 @@ def pre_commit_decision(
     if ctx is None:
         return Decision(allowed=True, message="[pre-commit] not a Spec Context repo; allow.")
 
-    own_sid = env_sid or "pre-commit-anonymous"
     others = others_alive(workspace, ctx, own_sid)
     if not others:
         return Decision(

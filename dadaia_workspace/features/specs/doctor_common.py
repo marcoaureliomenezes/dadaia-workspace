@@ -24,7 +24,11 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from dadaia_workspace.core.release_state import ReleaseState, parse_release_state
+from dadaia_workspace.core.release_state import (
+    ReleaseState,
+    parse_release_state,
+    release_state_file,
+)
 
 # A dir counts as a "release dir" iff it carries at least one SDD release artifact.
 # Public name (v0.1.81 FR2): reused by doctor_release's partial-archive invariant
@@ -66,7 +70,7 @@ def resolve_live_release_id(specs_dir: Path) -> tuple[str | None, str | None]:
     candidates = sorted(
         d.name
         for d in releases_root.iterdir()
-        if d.is_dir() and d.name not in ("_archive", "_ideas") and (d / "RELEASE.json").is_file()
+        if d.is_dir() and d.name not in ("_archive", "_ideas") and release_state_file(d) is not None
     )
     if not candidates:
         return None, None
@@ -98,8 +102,8 @@ def _read_and_parse_release_json(
     "absent" and "present but unreadable" into the same ``False``, silently
     contradicting ``read_release_phase``'s own docstring contract.)
     """
-    path = specs_dir / "releases" / release_id / "RELEASE.json"
-    if not path.is_file():
+    path = release_state_file(specs_dir / "releases" / release_id)
+    if path is None:
         return None, False
     try:
         text = path.read_text(encoding="utf-8")
@@ -111,13 +115,11 @@ def _read_and_parse_release_json(
         return None, True
 
 
-def resolve_active_release(specs_dir: Path) -> tuple[str, str | None, str | None, str | None]:
-    """Resolve ``(release_id, segment, phase, error)`` straight from the live
-    ``RELEASE.json`` — the full replacement for ``read_active_md``/``ACTIVE.md``
-    (v0.5.x, successor to the RELEASE.jsonl fold; v0.5.0 FR4/T-050-21A, A4.1). Same
-    4-tuple shape the retired reader returned, so every downstream consumer
-    (``doctor_release``, ``doctor_structural``) keeps its existing branching
-    (``if err: ...``, ``if release and release != "none": ...``).
+def resolve_active_release(specs_dir: Path) -> tuple[str, str | None, str | None]:
+    """Resolve ``(release_id, phase, error)`` straight from the live state document
+    (v0.5.x reader; segment dropped at release 0.4.6 with the scaffolded segment
+    lane, ADR 0006). Downstream consumers (``doctor_release``, ``doctor_structural``)
+    keep their existing branching (``if err: ...``, ``if release != "none": ...``).
 
     :func:`resolve_live_release_id` (above) answers "which directory" (pure stdlib);
     this function answers the content question — phase and the optional dir-based
@@ -128,7 +130,7 @@ def resolve_active_release(specs_dir: Path) -> tuple[str, str | None, str | None
     — the document already IS the current phase/segment, read straight off disk by
     :func:`_read_and_parse_release_json`.
 
-    No live release directory: ``("none", None, "none", None)`` — success, not an
+    No live release directory: ``("none", "none", None)`` — success, not an
     error; the honest successor of ``ACTIVE.md``'s scaffold default ``release: none``.
     Ambiguous (two+ live release dirs) or an unreadable/malformed/phase-less
     ``RELEASE.json``: ``error`` carries the reason and ``phase`` is ``None`` — the
@@ -136,20 +138,19 @@ def resolve_active_release(specs_dir: Path) -> tuple[str, str | None, str | None
     """
     release_id, disc_err = resolve_live_release_id(specs_dir)
     if disc_err:
-        return "none", None, None, disc_err
+        return "none", None, disc_err
     if release_id is None:
-        return "none", None, "none", None
+        return "none", "none", None
     state, exists = _read_and_parse_release_json(specs_dir, release_id)
     if not exists or state is None:
-        return release_id, None, None, f"RELEASE.json for {release_id!r} could not be read"
+        return release_id, None, f"state document for {release_id!r} could not be read"
     if not state.phase:
         return (
             release_id,
             None,
-            None,
-            f"RELEASE.json for {release_id!r} carries no 'phase' value",
+            f"state document for {release_id!r} carries no 'phase' value",
         )
-    return release_id, state.segment, state.phase, None
+    return release_id, state.phase, None
 
 
 def is_release_dir(d: Path) -> bool:

@@ -56,13 +56,16 @@ an initialized workspace, create it:
 - **PASS if:** `$D --version` exits 0 and prints the candidate version; and
   `capabilities` JSON `.provider.distribution_version` equals that same version.
 
-### F-02 — Reconcile with legacy quarantine
-- Setup: an initialized workspace that also contains legacy `.dadaia/bugs/` and
-  `.dadaia/src/` dirs (create them with a file inside).
-- Run: `$D reconcile --expect-version <candidate> --json`.
-- **PASS if:** exit 0, result `.ok == true`, `.steps` contains `legacy-dir-quarantine`,
-  and `.dadaia/tmp/legacy-quarantine/<run>/manifest.json` exists while `.dadaia/bugs`
-  and `.dadaia/src` are gone (moved, not deleted — content present under quarantine).
+### F-02 — Doctor is the one scan and reaper
+- Setup: an initialized workspace; seed `mkdir .dadaia/nonsense` and one file under
+  `.dadaia/tmp/` with an mtime older than one day (`touch -d '2 days ago'`).
+- Run: `$D doctor` (exit code asserted directly, never through a pipe), then
+  `$D doctor --fix --expired-only`, then `$D doctor --fix`, then `$D doctor`.
+- **PASS if:** the dry run exits non-zero with one `WS-dadaia-slop` line for `nonsense`,
+  one `WS-tmp-expired` line and a final `compliance: N/M entries canonical (P%)` line;
+  `--expired-only` deletes only the tmp file; the plain `--fix` deletes `nonsense`; the
+  last run exits 0 at 100%. Run the seed and the doctor from the SAME cwd — a doctor run
+  from another cwd resolves a different workspace and proves nothing.
 
 ### F-03 — Certify agrees with reconcile
 - Run: `$D certify --json`.
@@ -81,13 +84,8 @@ an initialized workspace, create it:
 - Also assert coherence: bare `$D specs init` AT the workspace root must REFUSE
   (Root Law — init must not create what doctor refuses), exit non-zero, no `specs/`
   created.
-- **PASS if:** doctor/public-doctor/specs-doctor exit 0 on the clean tree, the root
-  `specs init` refusal holds, and seeding one violation (`mkdir .dadaia/nonsense`)
-  makes `$D doctor` exit non-zero naming ROOT-4. Evidence discipline for the ROOT-4
-  probe: capture the `mkdir`, the `pwd`, and the doctor invocation in the SAME log —
-  the seeded dir and the doctor run must share the workspace root (a doctor run from
-  another cwd resolves a different workspace and proves nothing), and assert the exit
-  code directly, never through a pipe.
+- **PASS if:** doctor/public-doctor/specs-doctor exit 0 on the clean tree and the root
+  `specs init` refusal holds (the slop probe is F-02).
 
 ### F-05 — Projections
 - Run: `$D public stage`; `$D public install --target all`; `$D public doctor`.
@@ -232,13 +230,13 @@ an initialized workspace, create it:
   FAIL: the tool's own template must not violate its own linter.
 
 ### F-16 — Portability
-- Run: `$D export --output /tmp/f16/` (note: `--output/-o`, not positional); then import
-  the archive into a NEW destination — the archive is positional and the destination is
-  `--workspace/-w` (default cwd), so either `$D import <archive> --workspace /tmp/f16b`
-  or `cd /tmp/f16b && $D import <archive>`. (There is no `--into`; confirm the real flags
-  with `$D import --help`.)
-- **PASS if:** export produces an archive exit 0 and import reconstructs a workspace at the
-  destination that passes `$D doctor`.
+- Run: `$D export` (writes `.dadaia/dist/spec-contexts.json`, overwritten each run); in a
+  NEW initialized workspace `$D import <path-to-spec-contexts.json>` (the file is
+  positional, the destination is `--workspace/-w`, default cwd), then `$D context list`
+  and `$D context alive <slug>` for one context.
+- **PASS if:** export exits 0 and writes exactly that one file; import exits 0, registers
+  every unknown context DEAD and prints the `context alive` step; `context alive` clones
+  it; the destination passes `$D doctor`.
 
 ### F-17 — Migrations
 - Setup: seed an older specs tree (lower pattern version) in a throwaway dir.
@@ -270,10 +268,6 @@ an initialized workspace, create it:
      class: a bootstrap that only works through inherited runtime paths is broken).
   (Init may reach an index — if egress is fully blocked AND the fallback cannot apply,
   mark EXCEPTION with the network cause, else FAIL.)
-
-### F-20 — Academy
-- Run: `$D academy --help` and a read verb.
-- **PASS if:** the academy verbs exist and read without touching governed paths.
 
 ### F-21 — CI preflight (scope-aware)
 - Run `$D ci preflight` from a git repo that is NOT the dadaia-workspace source tree
@@ -391,12 +385,10 @@ never exercised the live backlog path was false confidence).
 ### R-13 — Producers pass their own validators (scaffold / backlog / baseline)
 
 - Hand-write a release scaffold — `mkdir -p specs/releases/v0.1.0`, a Draft `SPEC.md`
-  stub, and a `RELEASE.json` with `phase: "SPEC"` (shape: `release-state-v1`,
-  `dd-release-implement`'s `RELEASE-EVENTS.md` — `specs release open`/`specs segment
-  open` retired at T-050-21A, no CLI verb replaces them) — then `specs doctor`; add a
-  dir-based segment the same way (a top-level `segment: "alpha-2"` field, plus
-  `specs/releases/<release-id>/alpha-2/TASKS.md`) then doctor again; `backlog new
-  <slug>` then `backlog doctor`; fresh context: `context create` → `alive` → `specs
+  stub, and a `_RELEASE.json` with `phase: "SPEC"` (shape: `release-state-v1`,
+  `dd-release-implementation`'s `RELEASE-EVENTS.md` — `specs release open`/`specs segment
+  open` retired at T-050-21A, no CLI verb replaces them) — then `specs doctor`;
+  `backlog new <slug>` then `backlog doctor`; fresh context: `context create` → `alive` → `specs
   init` → `context baseline`.
 - **PASS if ALL of:** both doctors report 0 errors AND 0 warnings on the fresh
   scaffold (Draft + phase SPEC is the legitimate authoring state — bug

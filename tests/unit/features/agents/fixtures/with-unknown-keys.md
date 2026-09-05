@@ -9,7 +9,7 @@ tools:
   - Read
   - Write
 skills:
-  - dadaia-workspace-spec-navigator
+  - dd-spec-navigator
 maxTurns: 30
 ---
 
