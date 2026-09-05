@@ -99,44 +99,51 @@ def test_canon_violations_over_a_fully_nonconformant_set_is_everything() -> None
 def test_verdict_matching_head_is_not_a_violation() -> None:
     head = "b" * 40
     paths = [f"releases/0.5.0/verdicts/{head}.handoff.json"]
-    assert verdict_violations(paths, head_sha=head, parent_sha=None) == []
+    assert verdict_violations(paths, live_shas=(head,)) == []
 
 
 def test_verdict_matching_parent_is_not_a_violation() -> None:
     head = "b" * 40
     parent = "c" * 40
     paths = [f"releases/0.5.0/verdicts/{parent}.handoff.json"]
-    assert verdict_violations(paths, head_sha=head, parent_sha=parent) == []
+    assert verdict_violations(paths, live_shas=(head, parent)) == []
 
 
-def test_verdict_matching_neither_head_nor_parent_is_stale() -> None:
+def test_verdict_matching_no_live_sha_is_stale() -> None:
     head = "b" * 40
     parent = "c" * 40
     stale = "d" * 40
     path = f"releases/0.5.0/verdicts/{stale}.handoff.json"
-    assert verdict_violations([path], head_sha=head, parent_sha=parent) == [path]
+    assert verdict_violations([path], live_shas=(head, parent)) == [path]
 
 
-def test_at_most_one_matching_verdict_extras_are_violations() -> None:
+def test_the_ship_shape_one_verdict_per_live_sha_is_clean() -> None:
+    """DADAIA.md §4.2 / dd-gitflow-default §3b: the ship verdict names develop's tip and
+    is staged on the feature branch NEXT TO the PR-head verdict — two files, two live
+    shas, zero violations (bug
+    verdict-staleness-rule-refuses-the-ship-verdict-the-gitflow-law-mandates)."""
     head = "b" * 40
     parent = "c" * 40
-    head_path = f"releases/0.5.0/verdicts/{head}.handoff.json"
-    parent_path = f"releases/0.5.0/verdicts/{parent}.handoff.json"
-    result = verdict_violations([head_path, parent_path], head_sha=head, parent_sha=parent)
-    # exactly one of the two matching verdicts survives as clean; the other is flagged.
-    assert len(result) == 1
-    assert result[0] in (head_path, parent_path)
+    develop_tip = "e" * 40
+    paths = [
+        f"releases/0.5.0/verdicts/{parent}.handoff.json",
+        f"releases/0.5.0/verdicts/{develop_tip}.handoff.json",
+    ]
+    assert verdict_violations(paths, live_shas=(head, parent, develop_tip)) == []
+
+
+def test_a_second_file_naming_the_same_live_sha_is_the_excess() -> None:
+    head = "b" * 40
+    first = f"releases/0.5.0/verdicts/{head}.handoff.json"
+    second = f"releases/0.5.1/verdicts/{head}.handoff.json"
+    assert verdict_violations([first, second], live_shas=(head,)) == [second]
 
 
 def test_verdict_violations_ignores_non_verdict_shaped_paths() -> None:
-    assert (
-        verdict_violations(["AGENTS.md", "backlog/BACKLOG.json"], head_sha="x", parent_sha=None)
-        == []
-    )
+    assert verdict_violations(["AGENTS.md", "backlog/BACKLOG.json"], live_shas=("x",)) == []
 
 
-def test_verdict_violations_with_no_parent_only_checks_head() -> None:
-    head = "e" * 40
+def test_verdict_violations_with_an_empty_live_set_flags_every_verdict() -> None:
     other = "f" * 40
     path = f"releases/0.5.0/verdicts/{other}.handoff.json"
-    assert verdict_violations([path], head_sha=head, parent_sha=None) == [path]
+    assert verdict_violations([path], live_shas=()) == [path]

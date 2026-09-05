@@ -53,6 +53,10 @@ description: >
 - Nothing else lands on `develop` between that staged verdict commit and the merge.
 - The verdict store is two-hop: PR head, or the head's first parent
   (`features/chokepoints/verdict.py::covering_verdict`).
+- On disk a verdict is live while it names the head, the head's first parent, or
+  `origin/develop`'s tip — one file per sha; anything else is stale, refused by the
+  pre-push gate and deleted by `specs doctor --fix` (SPEC-DOC-044, one rule:
+  `features/chokepoints/verdict.py::live_verdict_shas`).
 - The ship PR's verdict is consumed and deleted after the `main` merge, like any
   other.
 

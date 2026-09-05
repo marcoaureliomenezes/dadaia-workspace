@@ -47,6 +47,9 @@ class _SpyObjectSource:
     def first_parent(self, repo: Path, sha: str) -> str | None:
         return None
 
+    def resolve_ref(self, repo: Path, ref: str) -> str | None:
+        return None
+
 
 def _init_repo(path: Path) -> str:
     """A real, minimal git repo with one commit — returns the commit sha."""
