@@ -218,6 +218,12 @@
       "agent": "project-manager",
       "kind": "merge",
       "text": "Candidate 4 merged: PR #245 feature/0.4.6 -> develop, merge commit 9c3fc0f8a05825d462b6197468fb1719ef726307 (head 8dc5b7ff = verdict commit whose first parent efd58d33 is the sha the security-reviewer approved; 37 checks pass after one Windows-only red fixed as doctor-root-tests-age-with-utime-follow-symlinks-false-unsupported-on-windows). Verdict consumed and deleted. Release stays live at the promote-or-continue gate: the operator rules promote (deploy 0.4.6) or continue (rc-archive to rc-4/); nothing deployed. Live instance 99% pending the operator sudo removal of one root-owned June directory."
+    },
+    {
+      "ts": "2026-09-05T20:30:27Z",
+      "agent": "project-manager",
+      "kind": "reviews",
+      "text": "Promote ruled by the operator (2026-09-05): PyPI latest 0.4.5, pyproject 0.4.6 = +1 patch, no v0.4.6 tag. Ship lane: CHANGELOG [0.4.6] (e8ddf085); security ship verdict APPROVED naming develop tip 9c3fc0f8 (range origin/main..origin/develop, 469 files +10,570/-18,749, 0 CRITICAL/HIGH/MEDIUM, 4 LOW record-only, pip-audit clean, release.yml OIDC sha-pinned); staging it hit bug verdict-staleness-rule-refuses-the-ship-verdict-the-gitflow-law-mandates (SPEC-DOC-044 + pre-push scan refused the 3b shape) — fixed in-lane as Arm B (f705bbef: one liveness set head/first parent/origin-develop tip in chokepoints/verdict.py::live_verdict_shas, raw subprocess resolver deleted; software-architect APPROVED WITH FIXES applied, bug surface REDUCED; preflight green 2,849 passed). PR-gate delta verdict APPROVED at f705bbef (supersedes e8ddf085). Both verdicts staged in this commit; the develop merge consumes f705bbef's, the main merge consumes 9c3fc0f8's."
     }
   ]
 }
