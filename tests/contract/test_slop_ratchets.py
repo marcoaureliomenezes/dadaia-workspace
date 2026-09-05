@@ -193,16 +193,18 @@ def test_v33_prefix_families_without_a_mechanical_reader() -> None:
 _V34_CEILINGS = {"SPEC.md": 24 * 1024, "TASKS.md": 12 * 1024}
 
 
-def _live_release_dir() -> Path:
-    """The one non-archived `specs/releases/<id>/` carrying a `_RELEASE.json`."""
+def _live_release_dir() -> Path | None:
+    """The one non-archived `specs/releases/<id>/` carrying a `_RELEASE.json`, or
+    ``None`` in the post-ship window (folder archived, next release not yet defined) —
+    at most one live release ever (ADR 0005), never necessarily one."""
     releases = _REPO_ROOT / "specs" / "releases"
     live = [
         path.parent
         for path in tracked_test_files(_REPO_ROOT, "_RELEASE.json", tree="specs/releases")
         if path.parent.parent == releases
     ]
-    assert len(live) == 1, f"exactly one live release expected, found {live}"
-    return live[0]
+    assert len(live) <= 1, f"at most one live release expected, found {live}"
+    return live[0] if live else None
 
 
 def _byte_ceiling_violations(sizes: dict[str, int]) -> list[str]:
@@ -217,11 +219,12 @@ def test_v34_live_candidate_trio_bytes_under_the_fixed_ceiling() -> None:
     """V34 — the live candidate's SPEC.md is at most 24 KB and its TASKS.md at most 12 KB;
     a fixed ceiling, never a pin."""
     live = _live_release_dir()
-    sizes = {name: (live / name).stat().st_size for name in _V34_CEILINGS}
-    assert _byte_ceiling_violations(sizes) == [], (
-        f"{live.name} trio exceeds the byte ceiling — above it the scope is open enough "
-        "to be two candidates."
-    )
+    if live is not None:
+        sizes = {name: (live / name).stat().st_size for name in _V34_CEILINGS}
+        assert _byte_ceiling_violations(sizes) == [], (
+            f"{live.name} trio exceeds the byte ceiling — above it the scope is open "
+            "enough to be two candidates."
+        )
 
     # Mutation fixture — one byte over either ceiling is a violation.
     assert _byte_ceiling_violations({"SPEC.md": 24 * 1024 + 1, "TASKS.md": 12 * 1024}) == [
