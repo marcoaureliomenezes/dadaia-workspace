@@ -38,7 +38,9 @@ Each step ends on a checkable criterion. Steps 5–8 are candidate-closure work.
 - Done when: all three verdicts are `APPROVED` on that sha.
 
 **Step 5 — Memory update (`product-engineer`).**
-- Set `phase: CLOSURE` in `_RELEASE.json`.
+- Set `phase: CLOSURE` in `_RELEASE.json` — after the last task is `[x]`, never before.
+- Memory is closure procedure, never a task: a TASKS.md task whose write set names
+  `specs/memory` is refused by `specs doctor` (SPEC-DOC-047).
 - Update `specs/memory/**` atoms to the product's current state — protocol detail: `MEMORY-UPDATE.md`.
 - Done when: `dadaia specs doctor` reports the memory atoms clean.
 
