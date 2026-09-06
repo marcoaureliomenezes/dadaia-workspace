@@ -11,7 +11,10 @@ from rich.console import Console
 from dadaia_workspace import container
 from dadaia_workspace.core.exceptions import HandoffSchemaError, WorkspaceNotInitializedError
 from dadaia_workspace.core.handoff_index import Handoff, ValidationResult, scan_handoffs
-from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
+from dadaia_workspace.core.workspace_resolver import (
+    resolve_cli_workspace_root,
+    resolve_workspace_root,
+)
 
 app = typer.Typer(help="Validate and diagnose agent handoff reports.")
 console = Console()
@@ -87,7 +90,7 @@ def validate(
         raise typer.Exit(3)
 
     try:
-        workspace_root = workspace.resolve() if workspace is not None else resolve_workspace_root()
+        workspace_root = resolve_cli_workspace_root(workspace)
     except WorkspaceNotInitializedError:
         err_console.print(
             "[red]Error:[/red] Workspace not initialized. Run [bold]dadaia init[/bold] first."

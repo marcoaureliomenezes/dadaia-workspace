@@ -12,6 +12,10 @@ Covers:
   resolve_workspace_root_for_init (T-25) —
     7. sentinel present → returns sentinel's parent dir
     8. sentinel absent → returns cwd (no exception raised)
+
+  resolve_cli_workspace_root —
+    9. explicit --workspace is authoritative and must hold .dadaia/ (bug
+       import-export-workspace-flag-re-resolves-through-ancestor-walk)
 """
 
 from __future__ import annotations
@@ -22,6 +26,7 @@ import pytest
 
 from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
 from dadaia_workspace.core.workspace_resolver import (
+    resolve_cli_workspace_root,
     resolve_workspace_root,
     resolve_workspace_root_for_init,
 )
@@ -132,44 +137,39 @@ def test_resolve_workspace_root_for_init_sentinel_and_fallback(tmp_path: Path) -
 
 
 # ---------------------------------------------------------------------------
-# T-016-Z01: explicit --workspace flag is authoritative (bug: init-ignores-workspace-flag)
+# resolve_cli_workspace_root: an explicit --workspace is authoritative for EVERY verb
+# (bugs: init-ignores-workspace-flag, import-export-workspace-flag-re-resolves-through-ancestor-walk)
 # ---------------------------------------------------------------------------
 
 
-def test_explicit_workspace_is_authoritative(tmp_path: Path) -> None:
-    """T-016-Z01: init --workspace <dir> from inside an existing workspace must target <dir>.
+def test_explicit_workspace_is_authoritative_and_must_be_initialized(tmp_path: Path) -> None:
+    """Intent: CONTRACT — bug import-export-workspace-flag-re-resolves-through-ancestor-walk.
 
-    Bug: resolve_workspace_root_for_init used to walk UP to the ancestor
-    workspace when cwd was inside one, ignoring the explicit --workspace path.
-    Fix: an explicit path is returned directly — no ancestor-walk, regardless of
-    whether the target dir exists yet (init is allowed to initialize a directory
-    that doesn't exist yet).
-    """
-    # Set up an existing workspace at tmp_path/existing_ws.
+    Size: SMALL — filesystem only."""
     existing_ws = _make_full_workspace(tmp_path / "existing_ws")
-    # Simulate CWD inside the existing workspace (e.g. its .dadaia/tmp subdirectory).
-    cwd_inside_ws = existing_ws / ".dadaia" / "tmp" / "agent-session"
-    cwd_inside_ws.mkdir(parents=True)
 
-    # The explicit --workspace target (a fresh, uninitialized dir).
-    fresh_target = tmp_path / "freshws"
-    fresh_target.mkdir(parents=True)
-    result = resolve_workspace_root_for_init(fresh_target, explicit=True)
-    assert result == fresh_target.resolve()
-    # Sanity: the ancestor workspace is NOT what we got back.
-    assert result != existing_ws
+    # An uninitialized directory nested inside a live workspace is REFUSED, never
+    # silently re-resolved to the enclosing workspace.
+    nested = existing_ws / ".dadaia" / "tmp" / "x"
+    nested.mkdir(parents=True)
+    with pytest.raises(WorkspaceNotInitializedError) as exc:
+        resolve_cli_workspace_root(nested)
+    assert str(nested) in str(exc.value)
+    assert "brand_new" not in str(exc.value)
 
-    # A target path that does not yet exist is returned as-is.
-    nonexistent = tmp_path / "brand_new_workspace"
-    assert resolve_workspace_root_for_init(nonexistent, explicit=True) == nonexistent.resolve()
+    # An initialized explicit target is used as given.
+    other = _make_full_workspace(tmp_path / "other_ws")
+    assert resolve_cli_workspace_root(other) == other.resolve()
 
-    # Backward compat: without explicit=True, ancestor-walk is preserved — a nested
-    # sub-repo with partial .dadaia (no sentinel) still walks up to find the proper
-    # workspace.
+    # A partial .dadaia/ (sub-repo shape) counts as explicit-target-initialized:
+    # the flag names the root, no walk is performed.
     sub_repo = _make_partial_dadaia(existing_ws / "repos", "my-service")
+    assert resolve_cli_workspace_root(sub_repo) == sub_repo.resolve()
+
+    # None keeps the cwd ancestor walk.
     deep = sub_repo / "src"
     deep.mkdir(parents=True)
-    assert resolve_workspace_root_for_init(deep, explicit=False) == existing_ws
+    assert resolve_cli_workspace_root(None, deep) == existing_ws
 
 
 # ---------------------------------------------------------------------------
@@ -192,7 +192,7 @@ def test_bare_init_nested_inside_ancestor_dotdadaia_targets_cwd_not_ancestor(
     nested = existing_ws / ".dadaia" / "tmp" / "qa-engineer" / "20260818" / "throwaway-ws"
     nested.mkdir(parents=True)
 
-    result = resolve_workspace_root_for_init(nested, explicit=False)
+    result = resolve_workspace_root_for_init(nested)
 
     # MUST target the nested cwd itself — never the ancestor workspace found by
     # walking past the .dadaia/ boundary.
@@ -208,7 +208,7 @@ def test_bare_init_nested_one_level_inside_dotdadaia_targets_cwd(tmp_path: Path)
     nested = existing_ws / ".dadaia" / "scratch"
     nested.mkdir(parents=True)
 
-    result = resolve_workspace_root_for_init(nested, explicit=False)
+    result = resolve_workspace_root_for_init(nested)
     assert result == nested.resolve()
     assert result != existing_ws
 
@@ -222,4 +222,4 @@ def test_bare_init_sub_repo_not_inside_dotdadaia_still_walks_up(tmp_path: Path) 
     deep = sub_repo / "src"
     deep.mkdir(parents=True)
 
-    assert resolve_workspace_root_for_init(deep, explicit=False) == existing_ws
+    assert resolve_workspace_root_for_init(deep) == existing_ws

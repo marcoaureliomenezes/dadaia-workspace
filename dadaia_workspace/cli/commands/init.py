@@ -33,8 +33,9 @@ def init(
     except ValueError as exc:
         raise typer.BadParameter(str(exc), param_hint="--harness") from exc
 
+    # An explicit --workspace is authoritative (it may not exist yet: init creates it).
     explicit = workspace is not None
-    root = resolve_workspace_root_for_init(workspace, explicit=explicit)
+    root = workspace.resolve() if workspace is not None else resolve_workspace_root_for_init()
 
     # Bug ancestor-walk-workspace-root-silent-mistarget (T-043-47/A30.5): the
     # .dadaia/-nesting boundary in resolve_workspace_root_for_init already stops the

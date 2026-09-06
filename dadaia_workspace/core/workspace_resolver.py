@@ -80,6 +80,35 @@ def resolve_workspace_root(cwd: Path | None = None) -> Path:
     )
 
 
+def resolve_cli_workspace_root(workspace: Path | None, cwd: Path | None = None) -> Path:
+    """Resolve the workspace root for a CLI verb carrying ``--workspace``.
+
+    One home for the flag's semantics, shared by every such verb: an explicitly
+    given *workspace* is AUTHORITATIVE — it is used as given and must itself hold
+    ``.dadaia/``; it is never re-resolved through the ancestor walk, which would
+    silently target an enclosing workspace when the path is an uninitialized
+    directory nested inside one (bug
+    ``import-export-workspace-flag-re-resolves-through-ancestor-walk``).
+
+    ``None`` keeps the cwd ancestor walk of :func:`resolve_workspace_root`.
+
+    Raises
+    ------
+    WorkspaceNotInitializedError
+        When *workspace* is given but holds no ``.dadaia/``, or when the walk
+        finds no initialized workspace.
+    """
+    if workspace is None:
+        return resolve_workspace_root(cwd)
+    root = workspace.resolve()
+    if not (root / ".dadaia").is_dir():
+        raise WorkspaceNotInitializedError(
+            f"'{root}' is not an initialized workspace (no .dadaia/). "
+            f"Run 'dadaia init --workspace {root}' first."
+        )
+    return root
+
+
 def _is_nested_inside_dotdadaia(start: Path) -> bool:
     """``True`` when *start* sits inside some ancestor's own ``.dadaia/`` tree.
 
@@ -94,68 +123,34 @@ def _is_nested_inside_dotdadaia(start: Path) -> bool:
     return any(parent.name == ".dadaia" for parent in start.resolve().parents)
 
 
-def resolve_workspace_root_for_init(
-    cwd: Path | None = None,
-    *,
-    explicit: bool = False,
-) -> Path:
-    """Resolve the workspace root for ``dadaia init``.
+def resolve_workspace_root_for_init(cwd: Path | None = None) -> Path:
+    """Resolve the workspace root for a bare ``dadaia init`` (no ``--workspace``).
 
-    When *explicit* is ``True`` the supplied *cwd* is treated as the
-    authoritative target: it is returned directly (resolved to an absolute
-    path) without any ancestor-walk.  This is the correct behavior for
-    ``dadaia init --workspace <dir>`` — the caller has told us exactly where
-    to initialize, so we must not silently write into an ancestor workspace.
-
-    When *explicit* is ``False`` (the default) the old semantics are mostly
-    preserved: walk up from *cwd* looking for ``.dadaia/states/
-    spec_contexts.json``, and fall back to *cwd* when nothing is found. This
-    supports the no-argument invocation (``dadaia init`` with no
-    ``--workspace`` flag) re-projecting assets from anywhere inside an
-    existing workspace's own tree (including a sub-repo directory that has
-    not yet been sentinel-initialized).
+    Walk up from *cwd* looking for ``.dadaia/states/spec_contexts.json`` and fall
+    back to *cwd* when nothing is found, so a bare invocation anywhere inside an
+    existing workspace's tree re-projects that workspace's assets.
 
     **One boundary the walk never crosses (bug
     ``ancestor-walk-workspace-root-silent-mistarget``):** when *cwd* is itself
     nested inside an ANCESTOR workspace's own ``.dadaia/`` directory (the
-    R7-sanctioned pattern for a throwaway/nested workspace created under
-    ``.dadaia/tmp/<agent>/<date>/``), the ancestor-walk is skipped entirely and
-    *cwd* is returned directly — exactly like "no sentinel found anywhere".
-    Walking past that boundary is precisely how a naive nested-throwaway
-    invocation used to silently re-project an unrelated ancestor workspace's
-    harness assets instead of creating a new workspace at *cwd*.
+    R7-sanctioned throwaway workspace under ``.dadaia/tmp/<agent>/<date>/``), the
+    walk is skipped and *cwd* is returned — exactly like "no sentinel anywhere".
 
-    Parameters
-    ----------
-    cwd:
-        Starting directory (or explicit target when *explicit=True*).
-        Defaults to ``Path.cwd()`` when *None*.
-    explicit:
-        When ``True``, treat *cwd* as the authoritative workspace root and
-        return it immediately.  When ``False``, perform the ancestor-walk
-        with sentinel detection (subject to the ``.dadaia/``-nesting boundary
-        above).
+    An explicit ``--workspace`` never reaches here: it is authoritative at its own
+    call site (``dadaia init`` creates it) and, for every verb requiring an already
+    initialized target, in :func:`resolve_cli_workspace_root`.
 
     Returns
     -------
     Path
         Absolute path to the intended workspace root.  Never raises.
     """
-    if explicit:
-        # Authoritative path: resolve to absolute but do NOT walk up.
-        # The directory may not exist yet (init is allowed to create it).
-        target = cwd if cwd is not None else Path.cwd()
-        return target.resolve()
-
     start = cwd if cwd is not None else Path.cwd()
 
     if _is_nested_inside_dotdadaia(start):
-        # Workspace-internal scratch space of an ancestor workspace — never
-        # silently walk past this boundary to re-project the ancestor's assets.
         return start.resolve()
 
-    # Legacy / default behavior: ancestor-walk with safe fallback.
     try:
         return resolve_workspace_root(start)
     except WorkspaceNotInitializedError:
-        return cwd or Path.cwd()
+        return start.resolve()

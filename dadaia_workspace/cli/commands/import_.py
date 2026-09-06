@@ -9,7 +9,7 @@ from rich.markup import escape
 
 from dadaia_workspace import container
 from dadaia_workspace.core.exceptions import DadaiaError
-from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
+from dadaia_workspace.core.workspace_resolver import resolve_cli_workspace_root
 
 console = Console()
 err_console = Console(stderr=True)
@@ -27,7 +27,7 @@ def import_workspace(
     Known names are skipped; `dadaia context alive <name>` clones each registered context.
     """
     try:
-        result = container.build_import_service(resolve_workspace_root(workspace)).run(file)
+        result = container.build_import_service(resolve_cli_workspace_root(workspace)).run(file)
     except (DadaiaError, ValueError) as exc:
         err_console.print(f"[red]Error:[/red] {exc}")
         raise typer.Exit(1) from None
