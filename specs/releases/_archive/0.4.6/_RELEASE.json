@@ -1,7 +1,7 @@
 {
   "schema": "release-state-v1",
   "release": "0.4.6",
-  "phase": "CLOSURE",
+  "phase": "ARCHIVED",
   "rc": 3,
   "defined": {
     "sha": "bcd02b21",
@@ -12,7 +12,10 @@
     "rc": 4,
     "ts": "2026-09-04T04:16:27Z"
   },
-  "shipped": null,
+  "shipped": {
+    "sha": "6cef01f854ee4e3c1178791270c9813fa9947730",
+    "ts": "2026-09-06T15:05:36Z"
+  },
   "audited": null,
   "log": [
     {
@@ -236,6 +239,12 @@
       "agent": "project-manager",
       "kind": "reviews",
       "text": "Re-ship (operator order 2026-09-06: everything in one release, 0 bugs / 0 backlog at publication): 6 bugs resolved on feature/0.4.6 (v34-ratchet…, g1-fable-guard…, memory-gate… via SPEC-DOC-047, import-export-workspace-flag… via one resolver, public-install-skips-self-projection… via deletion, squash-to-main-leaves-develop-history-divergent… via RC-FLOW step 12 reconciliation), agent-model templates re-tabled, bugs status 0 open, backlog active 0, preflight green, CI green at fb98abd6. PR #248 was DIRTY (develop history-divergent after the #247 squash) -> reconciled with git merge -s ours origin/develop (fc266c6e, tree unchanged). Security: PR-gate verdict APPROVED at fb98abd6 then delta APPROVED at fc266c6e (supersedes), ship verdict APPROVED naming develop tip 7a8c0e01; 0 CRITICAL/HIGH/MEDIUM, 1 LOW record-only (absent-file residual of the deleted self-projection skip); bug surface REDUCED. Both verdicts staged in this commit."
+    },
+    {
+      "ts": "2026-09-06T15:05:36Z",
+      "agent": "project-manager",
+      "kind": "merge",
+      "text": "SHIPPED + PUBLISHED: PR #248 feature/0.4.6 -> develop merged e1b44248 (37 checks green); PR #249 develop -> main squash 6cef01f8 (36 checks green, verdict gate via first parent 7a8c0e01); Release run 34040877135 green end to end: release-gate approved on operator order, PyPI 0.4.6 published (OIDC), tag v0.4.6, install-from-PyPI smoke run green. First attempt run 33990917232 rejected. Ledger 0 open bugs, backlog 0 at publication. Whole release folder archived (final trio at root, rc-1..rc-3 inside, ADR 0009); feature/0.4.7 cut from main with the develop reconciliation as its first commit."
     }
   ]
 }
