@@ -75,6 +75,7 @@ Each step ends on a checkable criterion. Steps 5–8 are candidate-closure work.
 **Step 12 — Archive + branch cut (promote only).**
 - `git mv specs/releases/<v>/ specs/releases/_archive/<v>/` — whole directory: the final trio stays at root, `rc-N/` folders inside (ADR 0009); set `phase: ARCHIVED`; append the histo record, same commit.
 - Delete `feature/{v}`; cut `feature/{next patch}` from `main` in the same step; the new release is born with its version minted (pyproject + CHANGELOG top section).
+- Reconcile first: the new branch's first commit is `git merge -s ours origin/develop` — the squash kept `main`'s tree, not `develop`'s history, and without this every later `feature -> develop` PR is DIRTY (bug `squash-to-main-leaves-develop-history-divergent-…`).
 - Done when: exactly one `feature/*` branch exists, named for the next version.
 
 ## Test-stewardship touchpoints (reference)
