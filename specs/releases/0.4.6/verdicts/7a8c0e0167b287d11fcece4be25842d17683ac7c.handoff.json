@@ -1,0 +1,85 @@
+{
+  "schema_version": "handoff-v1.2",
+  "self_pull": {
+    "refs": [
+      "specs/releases/0.4.6/_RELEASE.json",
+      "specs/releases/0.4.6/TASKS.md",
+      "specs/bugs/BUGS.jsonl"
+    ]
+  },
+  "agent": "security-reviewer",
+  "context": "dadaia-workspace",
+  "produced_at": "2026-09-06T00:00:00Z",
+  "release_id": "0.4.6",
+  "artifact": {
+    "type": "other"
+  },
+  "scope": "SHIP security verdict: develop -> main, release 0.4.6 re-ship, naming develop's tip 7a8c0e0167b287d11fcece4be25842d17683ac7c (DADAIA.md §4.2). `git diff --stat origin/main origin/develop` is EMPTY — develop is tree-identical to main 570af642 — so the shipped content is exactly the feature range 570af642..fb98abd6 reviewed in the PR-gate verdict fb98abd6031aeaa778ae60e1be154e197ae2a238.handoff.json; that code review is incorporated here by reference and not repeated. This verdict adds the ship-lane checks: version lineage, tag absence, the publish workflow's authentication surface, dependency state.",
+  "verdict": "APPROVED",
+  "verdict_reason": "No CRITICAL, HIGH or MEDIUM finding in the shipped content (PR-gate verdict fb98abd6: 1 LOW + 4 INFO, all record-only). Ship checks all green: pyproject 0.4.6 = PyPI latest 0.4.5 + 1 patch; `git ls-remote --tags origin v0.4.6` empty, so the publish is a first publication and not an overwrite; `.github/workflows/release.yml` UNCHANGED in range and re-read — OIDC trusted publishing, zero static credentials; `poetry.lock` UNCHANGED in range, so the earlier 0.4.6 pip-audit result (no known vulnerabilities) stands unmodified; all 4 Dependabot alerts including #4 are state `fixed`, zero open. Snapshot, not a guarantee; the release-gate approval remains the operator's call.",
+  "findings": [
+    {
+      "severity": "INFO",
+      "message": "release.yml unchanged in range; publish job authenticates by OIDC trusted publishing with zero static credentials and fully sha-pinned actions",
+      "detail_md": "`git diff --name-only origin/main..HEAD -- .github/` -> **empty**. The workflow is byte-identical to the one already reviewed for the 570af642 ship attempt; re-read in full regardless.\n\n- **Least privilege at the top:** `.github/workflows/release.yml:7-8` — `permissions: contents: read`. Only the publish job widens it (`:221-223`: `contents: write`, `id-token: write`).\n- **OIDC trusted publishing:** `:231` — `pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b` (v1.14.0) with `id-token: write` and **no `password:` input**. A grep of the file for `secrets.`, `password`, `TWINE`, `PYPI` returns zero credential references — no long-lived API token exists to leak, rotate or exfiltrate (CWE-798 not present).\n- **Supply-chain integrity (CWE-829):** every `uses:` in the file is pinned to a full 40-hex commit sha with the version in a trailing comment — checkout, setup-python, setup-node, cache, upload-artifact, download-artifact, gh-action-pypi-publish. No floating tag, no branch ref, no unpinned third-party action.",
+      "fix_recommendation": "None."
+    },
+    {
+      "severity": "INFO",
+      "message": "Dependency state unchanged in range: poetry.lock untouched, prior 0.4.6 pip-audit stands, all 4 Dependabot alerts fixed",
+      "detail_md": "`git diff --name-only origin/main..HEAD -- poetry.lock` -> **empty**. No package was added, removed or bumped anywhere in the range, so the dependency attack surface is identical to the one already audited: the pip-audit run recorded in the earlier 0.4.6 verdict — **no known vulnerabilities** — carries over unchanged. No re-run is warranted by this diff (a CVE disclosed since would be caught by the Dependabot state below, not by re-auditing an unchanged lock).\n\nGitHub Dependabot alerts, all four, live state:\n\n| # | package | severity | state |\n|---|---|---|---|\n| 4 | mistune (DoS, RecursionError via excessive emphasis markers) | high | **fixed** |\n| 3 | cryptography (PKCS#7 Bleichenbacher oracle) | high | fixed |\n| 2 | mcp (WebSocket transport missing Host/Origin validation) | high | fixed |\n| 1 | pytest (vulnerable tmpdir handling) | medium | fixed |\n\n**Zero open alerts** — the operator's standing 'no open security alerts' rule is satisfied at ship time. Alert #4 specifically, called out for this verdict, is `fixed`.",
+      "fix_recommendation": "None."
+    },
+    {
+      "severity": "INFO",
+      "message": "Version lineage and tag state correct for a first publication of 0.4.6",
+      "detail_md": "- `pyproject.toml` -> `version = \"0.4.6\"`; PyPI latest is 0.4.5, so the release is last-published + 1 patch (DADAIA.md §4.2, ADR 0005). The range contains a mint to 0.4.7 (`924fa0ae`) and its un-mint back to 0.4.6 (`7c96a10d`); the net state on disk is 0.4.6 and `pyproject.toml` shows no diff against `origin/main`.\n- `git ls-remote --tags origin 'v0.4.6'` -> **empty**. No tag exists, so this publish creates the artifact rather than overwriting a published one; the withheld 570af642 attempt left nothing behind on PyPI or in the tag namespace.\n- The release-folder archive (`5da6c11e`) was reverted (`4c2e6c4f`), so release 0.4.6 is live at phase CLOSURE and this verdict's `release_id` resolves.",
+      "fix_recommendation": "None."
+    },
+    {
+      "severity": "LOW",
+      "message": "Carried from the PR-gate verdict: residual absent-state write path into the library source tree after the self-projection skip deletion",
+      "detail_md": "Full analysis and evidence in `specs/releases/0.4.6/verdicts/fb98abd6031aeaa778ae60e1be154e197ae2a238.handoff.json`. Summary: with `_is_self_repo` deleted, `repos/dadaia-workspace/AGENTS.md` is protected by the banner-first provenance decider (`workspace_guardrail.py:179-196` -> `foreign`, never overwritten, `--force` included) and its CLAUDE.md follows its sibling's fate — verified live by `dadaia public doctor` printing `[foreign]` on both. The residual is the `absent` state only: were that tracked file missing, `public install` would create a generated copy in the library source tree. Integrity-only, no confidentiality or authz impact, not a ship blocker.",
+      "fix_recommendation": "Record-only for 0.4.6; if raised later, guard the `absent` branch of `_classify_consumer_agents` rather than restoring a parallel self-skip."
+    },
+    {
+      "severity": "INFO",
+      "message": "Bug-surface statement for the shipped range (operator standing order)",
+      "detail_md": "**Bug-surface statement (operator standing order: permanent architecture review oriented by bug history).** Five bugs resolved on this branch, all `status: resolved`, all severity LOW, all carrying a `diff_direction` in `specs/bugs/BUGS.jsonl`; `dadaia bugs status` = 0 open. Production totals for the whole range: **+160 / -155, net +5 lines** across 14 files.\n\n1. `v34-ratchet-asserts-exactly-one-live-release-and-fails-in-the-post-ship-window` — component `tests/contract/test_slop_ratchets.py#_live_release_dir`, ledger `net-neutral`, `caused_by: none`. **Tests only, zero production paths.** The assertion was relaxed from 'exactly one' to 'at most one' — a weakened predicate, no new branch. No bug surface.\n2. `g1-fable-guard-matches-only-claude-fable-5...` — ledger `net-neutral`, `caused_by: none`. **Deleted two paths, added one.** Both `_FABLE_MODEL` literal constants deleted (`agent_model_templates.py`, `json_agent_model_policy_store.py`); one registry-derived predicate added (`model_registry.py`, +13). Three enforcement points that each carried their own literal now share one derivation — this is the collapse the standing order asks for, and it is why the 5.1 release did not go stale twice.\n3. `memory-gate-requires-closure-phase-that-spec-doc-024-forbids-before-last-task` — ledger `net-positive`, `caused_by: none`. **Added a path: +44 lines, one new check (`check_no_memory_task`) plus one `RULES` tuple entry.** Honest accounting: this is the one fix in the range that grows a feature. It is defensible — it does NOT add a branch to an existing code path, it refuses at DEFINITION a contradiction between two rules that already existed (§6.4 phase gate vs SPEC-DOC-024), so the contradiction is caught where it is born instead of being worked around by toggling the phase twice at closure. It removes an operator workaround rather than encoding one. No security consequence.\n4. `import-export-workspace-flag-re-resolves-through-ancestor-walk` — ledger `net-positive`, `caused_by: ancestor-walk-workspace-root-silent-mistarget`. **Net deletion in the resolver (+40/-45) and a deleted parameter.** The `explicit=` keyword of `resolve_workspace_root_for_init` and its whole branch are gone; four CLI verbs now share one `resolve_cli_workspace_root`. Note the declared lineage — this is the SECOND bug on the same surface, and per the standing order that is the signal the first fix was a symptom patch: it bolted an `explicit=` flag onto the init resolver instead of giving the flag one home. This fix removes that puxadinho. Security-positive: it is the finding above (unintended write into an unnamed enclosing workspace).\n5. `public-install-skips-self-projection-so-the-library-repo-agents-md-drifts` — ledger `net-negative`, `caused_by: none`. **Pure deletion: -61 lines in `workspace_guardrail.py`, -4 in `public_assets.py`.** `_is_self_repo` and its two call sites and its shim are gone; the surviving `_classify_consumer_agents` provenance decider — which already knew how to refuse a repo-owned file — carries the whole job. Two parallel deciders collapsed to one. This is the cleanest diff in the range; its only cost is the LOW residual recorded above.\n\n**Verdict on the surface:** four of five fixes deleted paths or were net-neutral; one added a definition-time refusal that removes a phase-toggling workaround. Two long-lived parallel deciders (self-skip vs provenance; explicit-flag vs walk) were collapsed into single homes. The range REDUCES the bug surface of every feature it touches. 'Tests green' is not the basis of this statement — the ledger lineage and the numstat are.",
+      "fix_recommendation": "None — recorded as the standing-order evidence for this verdict."
+    }
+  ],
+  "metrics": {
+    "secret_scan_added_lines": 471,
+    "secret_scan_matches": 0,
+    "private_path_matches": 0,
+    "public_doctor": "exit 0, [ok] public-privacy",
+    "prod_diff": "+160/-155 (net +5), 14 files",
+    "bugs_open": 0,
+    "bugs_resolved_in_range": 5,
+    "findings_critical": 0,
+    "findings_high": 0,
+    "findings_medium": 0,
+    "findings_low": 1,
+    "findings_info": 4,
+    "commit_sha": "7a8c0e0167b287d11fcece4be25842d17683ac7c",
+    "full_range": "570af64270368ac43d156bf58bd278c4433bde2f..fb98abd6031aeaa778ae60e1be154e197ae2a238",
+    "pr_edge": "develop -> main",
+    "develop_vs_main": "tree-identical (git diff --stat origin/main origin/develop empty)",
+    "pyproject_version": "0.4.6",
+    "pypi_latest": "0.4.5",
+    "tag_v046_exists": false,
+    "release_yml_changed_in_range": false,
+    "poetry_lock_changed_in_range": false,
+    "dependabot_open_alerts": 0,
+    "referenced_pr_gate_verdict": "fb98abd6031aeaa778ae60e1be154e197ae2a238"
+  },
+  "decisions_required": [
+    "Operator: approve the release-gate run to publish 0.4.6 to PyPI — this verdict clears security only, the publish decision is yours."
+  ],
+  "next_handoff": {
+    "agent": "project-manager",
+    "context": "dadaia-workspace",
+    "expected_artifact_type": "other"
+  }
+}

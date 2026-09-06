@@ -16,7 +16,7 @@ Two load paths, deliberately distinct (NFR-4, "missing != invalid"):
   schema version, unknown ``applied_template`` id, unknown agent name (valid names =
   the 9 core agents), a model not in the registry, an
   effort outside the D-3 vocabulary, an empty override, and — D-7 — any combination
-  that resolves ``claude-fable-5`` onto ``security-reviewer``.
+  that resolves a Fable-family model onto ``security-reviewer``.
 
 :meth:`parse` is the shared no-I/O validation path (consumed by :meth:`load` and by the
 panel validate endpoint in Wave 4).
@@ -33,7 +33,7 @@ from dadaia_workspace.core.agent_model_templates import (
     template_by_id,
 )
 from dadaia_workspace.core.atomic_write import atomic_write
-from dadaia_workspace.core.model_registry import registry_by_claude_id
+from dadaia_workspace.core.model_registry import is_fable_model, registry_by_claude_id
 from dadaia_workspace.core.models.agent_model_policy import (
     _SCHEMA_VERSION,
     CLAUDE_EFFORTS,
@@ -50,9 +50,8 @@ _ALLOWED_TOP_LEVEL = frozenset({"schema_version", "applied_template", "overrides
 #: Allowed keys inside one per-agent override (per-field: model, effort, or both).
 _ALLOWED_OVERRIDE_KEYS = frozenset({"model", "effort"})
 
-#: The agent that must never resolve to claude-fable-5 (G-1/D-7).
+#: The agent that must never resolve to a Fable-family model (G-1/D-7).
 _FABLE_FORBIDDEN_AGENT = "security-reviewer"
-_FABLE_MODEL = "claude-fable-5"
 
 
 class JsonAgentModelPolicyStore:
@@ -227,9 +226,9 @@ class JsonAgentModelPolicyStore:
         (override model, template interplay), not just the literal override value.
         """
         resolved = resolve_agent_model(_FABLE_FORBIDDEN_AGENT, overlay)
-        if resolved.model == _FABLE_MODEL:
+        if is_fable_model(resolved.model):
             raise AgentModelPolicyStoreError(
-                f"policy resolves {_FABLE_MODEL!r} onto {_FABLE_FORBIDDEN_AGENT!r}; "
+                f"policy resolves {resolved.model!r} onto {_FABLE_FORBIDDEN_AGENT!r}; "
                 "Fable is never assigned to security-reviewer (operator ruling G-1)",
                 path,
             )

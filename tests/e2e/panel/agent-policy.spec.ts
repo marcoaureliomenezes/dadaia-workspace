@@ -143,11 +143,11 @@ test('Template select + Apply round-trips PUT/GET and shows the post-apply pop-u
   const body = await getPolicy(request);
   expect(body.exists).toBe(true);
   expect(body.policy.applied_template).toBe('subscription-saver');
-  // product-engineer distinguishes subscription-saver (sonnet-5/xhigh) from
-  // balanced (opus-4-8/high) — a copy of the old roster would fail here.
+  // product-engineer distinguishes subscription-saver (opus-5/high) from
+  // balanced (fable-5-1/high) — a copy of the old roster would fail here.
   expect(body.resolved['product-engineer']).toEqual({
-    model: 'claude-sonnet-5',
-    effort: 'xhigh',
+    model: 'claude-opus-5',
+    effort: 'high',
     source: 'template',
   });
   // G-1: security-reviewer is never Fable in any template.
@@ -184,10 +184,10 @@ test('Per-agent override round-trips through Apply with the AC-3 per-field merge
     model: 'claude-opus-4-8',
   });
   // …and the resolved roster applies the AC-3 per-field merge: model from the
-  // override, effort from the subscription-saver template (xhigh).
+  // override, effort from the subscription-saver template (low).
   expect(body.resolved['software-engineer']).toEqual({
     model: 'claude-opus-4-8',
-    effort: 'xhigh',
+    effort: 'low',
     source: 'override',
   });
 

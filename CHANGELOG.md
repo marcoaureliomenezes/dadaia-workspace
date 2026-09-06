@@ -116,6 +116,27 @@ published `0.4.5` + 1 patch) and each closed-scope candidate appends here.
   vanished entry; unvalidated slugs accepted by `import` (security HIGH);
   symlinked zone root walked; Windows-unsupported `utime` in the doctor tests.
 
+### Post-merge additions (2026-09-06) — same release, re-shipped
+- **Agent model templates re-tabled** (`core/agent_model_templates.py`): Fable 5.1 on
+  project-manager, software-architect, product-engineer and project-auditor
+  (balanced/max-quality; Opus 5 in subscription-saver); software-engineer Opus 5 · low
+  everywhere; ai-engineer Opus 5 · medium (Sonnet 5 · medium in saver); qa-engineer
+  Opus 5 · low (Sonnet 5 · low in saver); code-reviewer Opus 5 · high / Sonnet 5 · high
+  / Fable 5.1 · medium; security-reviewer Sonnet 5 except max-quality (Opus 5 · xhigh).
+- **G-1 guard is a Fable-family predicate** (`core/model_registry.fable_model_ids`):
+  template import, policy-store parse and the panel validate endpoint refuse every
+  registered `claude-fable-*` id on security-reviewer, not the literal `claude-fable-5`
+  (bug `g1-fable-guard-matches-only-claude-fable-5-so-fable-5-1-lands-on-security-reviewer`).
+- Ratchet V34 measures the live candidate when one exists and is vacuous in the
+  post-ship window (bug `v34-ratchet-asserts-exactly-one-live-release-…`).
+- **Zero open bugs at publication** (operator order): `import-export-workspace-flag-…`
+  (one explicit-path resolver `resolve_cli_workspace_root` for every verb, init-only flag
+  deleted); `public-install-skips-self-projection-…` (self-projection skip deleted, one
+  provenance decider, library `AGENTS.md` hand-authored); `memory-gate-requires-closure-
+  phase-…` (SPEC-DOC-047: memory is closure procedure, never a TASKS.md task).
+- First ship attempt (main 570af642) was never published; this is the re-ship with everything.
+
+
 ## [0.4.5] — 2026-08-31
 
 One published version for everything since `0.4.4`: the internal spec-release ids

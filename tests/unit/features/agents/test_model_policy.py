@@ -77,8 +77,8 @@ def test_policy_read_apply_roundtrip(tmp_path: Path) -> None:
     assert set(resolved) == set(CORE_AGENTS)
     assert all(entry["source"] == "default" for entry in resolved.values())
     assert resolved["software-engineer"] == {
-        "model": "claude-sonnet-5",
-        "effort": "xhigh",
+        "model": "claude-opus-5",
+        "effort": "low",
         "source": "default",
     }
 
@@ -94,7 +94,7 @@ def test_policy_read_apply_roundtrip(tmp_path: Path) -> None:
     roster = service.resolved_roster()
     assert roster["software-engineer"] == {
         "model": "claude-opus-4-8",
-        "effort": "xhigh",
+        "effort": "low",
         "source": "override",
     }
     assert roster["project-manager"]["source"] == "template"

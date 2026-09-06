@@ -209,3 +209,13 @@ def test_codex_tier_views_raises_on_collapse() -> None:
             codex_tier_views()
     finally:
         mr.REGISTRY = original
+
+
+def test_fable_family_is_derived_from_the_registry() -> None:
+    """G-1 is a family rule: every registered claude-fable-* id is Fable, nothing else
+    (bug g1-fable-guard-matches-only-claude-fable-5-so-fable-5-1-lands-on-security-reviewer)."""
+    from dadaia_workspace.core.model_registry import fable_model_ids, is_fable_model
+
+    assert {"claude-fable-5", "claude-fable-5-1"} <= fable_model_ids()
+    assert is_fable_model("claude-fable-5-1")
+    assert not is_fable_model("claude-opus-5")

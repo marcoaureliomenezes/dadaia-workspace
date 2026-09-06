@@ -21,8 +21,8 @@
 # minimal dadaia-workspace, register THIS checkout as its sole ALIVE
 # consumer repo (a `repos/dadaia-workspace` symlink — read-only consumption
 # of the checkout's real specs/memory so the Projects tab has genuine data;
-# `_is_self_repo` makes `install()` skip writing AGENTS.md/CLAUDE.md back
-# into the checkout, so it is never touched), stage + install a real
+# the checkout's hand-authored, bannerless AGENTS.md classifies `foreign`, so
+# `install()` never writes it), stage + install a real
 # projection INTO the temp workspace, and exec the panel there.
 #
 # Env overrides:
@@ -98,9 +98,8 @@ chmod +x "$TEMP_WS/.dadaia/.venv/bin/dadaia"
 
 # 2. Register THIS checkout as the sole ALIVE consumer repo. The panel's
 #    Projects/memory views read repos/<slug>/specs/** through this symlink;
-#    `_is_self_repo` (workspace_guardrail.py) makes install() SKIP writing
-#    AGENTS.md/CLAUDE.md back into it (self-projection) — the checkout is
-#    read, never written.
+#    its bannerless AGENTS.md/CLAUDE.md classify `foreign` (the one provenance
+#    decider, workspace_guardrail.py) — the checkout is read, never written.
 mkdir -p "$TEMP_WS/repos"
 ln -sfn "$REPO_ROOT" "$TEMP_WS/repos/dadaia-workspace"
 cat > "$TEMP_WS/.dadaia/states/spec_contexts.json" <<JSON

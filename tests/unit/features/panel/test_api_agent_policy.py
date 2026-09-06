@@ -82,8 +82,8 @@ def test_get_policy_shape_default_resolved_and_invalid_overlay(tmp_path: Path) -
     assert payload["exists"] is False
     assert payload["policy"]["schema_version"] == "agent-model-policy-v1"
     assert payload["resolved"]["software-engineer"] == {
-        "model": "claude-sonnet-5",
-        "effort": "xhigh",
+        "model": "claude-opus-5",
+        "effort": "low",
         "source": "default",
     }
 
@@ -319,7 +319,7 @@ def test_put_persists_rerenders_and_handler_routes_with_host_guard(tmp_path: Pat
     # AC-3 through the API: override model + template effort merge.
     assert payload["resolved"]["software-engineer"] == {
         "model": "claude-opus-4-8",
-        "effort": "xhigh",
+        "effort": "low",
         "source": "override",
     }
     assert rerender.calls == 1

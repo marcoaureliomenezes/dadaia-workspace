@@ -70,7 +70,6 @@ from dadaia_workspace.infrastructure.workspace_guardrail import (
     _consumer_repos_for_root,
     _doctor_consumer_pair_lines,
     _install_guardrail_pair,
-    _is_self_repo,
     _is_source_repo_root,
 )
 
@@ -613,9 +612,6 @@ class FileSystemPublicAssetManager:
 
     def _consumer_repos(self, workspace_root: Path) -> list[Path]:
         return _consumer_repos_for_root(workspace_root)
-
-    def _is_self_repo(self, consumer: Path) -> bool:
-        return _is_self_repo(consumer)
 
     def _iter_files(self, root: Path) -> Iterable[Path]:
         return iter_public_files(root)

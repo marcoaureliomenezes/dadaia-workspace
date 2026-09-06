@@ -30,6 +30,7 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.core.exceptions import PublicAssetError
+from dadaia_workspace.core.model_registry import is_fable_model
 from dadaia_workspace.infrastructure.privacy_check import _PRIVACY_DENYLIST_ENV
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from tests.helpers import public_asset_roster
@@ -365,19 +366,16 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
     # the SAME resolved config — this lockstep IS the codex-correctness assurance (no
     # codex doctor byte-compare exists).
     pm = _claude_frontmatter(ws, "project-manager")
-    assert (pm["model"], pm["effort"]) == ("claude-fable-5", "high")
+    assert (pm["model"], pm["effort"]) == ("claude-fable-5-1", "high")
     se = _claude_frontmatter(ws, "software-engineer")
-    assert (se["model"], se["effort"]) == ("claude-sonnet-5", "xhigh")
+    assert (se["model"], se["effort"]) == ("claude-opus-5", "low")
     sec = _claude_frontmatter(ws, "security-reviewer")
-    assert sec["model"] == "claude-opus-5", "never Fable on security-reviewer (G-1)"
+    assert not is_fable_model(sec["model"]), "never Fable on security-reviewer (G-1)"
 
     pm_toml = _codex_toml_fields(ws, "project-manager")
     assert (pm_toml["model"], pm_toml["model_reasoning_effort"]) == ("gpt-5.6-sol", "high")
     se_toml = _codex_toml_fields(ws, "software-engineer")
-    assert (se_toml["model"], se_toml["model_reasoning_effort"]) == (
-        "gpt-5.6-terra",
-        "high",  # xhigh clamps to high (D-3)
-    )
+    assert (se_toml["model"], se_toml["model_reasoning_effort"]) == ("gpt-5.6-sol", "low")
 
     # AC-3: an overlay change moves the .claude md AND .codex toml together at install.
     states = ws / ".dadaia" / "states"
@@ -395,12 +393,12 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
     manager.install(ws, target="all")
 
     se2 = _claude_frontmatter(ws, "software-engineer")
-    assert (se2["model"], se2["effort"]) == ("claude-opus-4-8", "xhigh")
+    assert (se2["model"], se2["effort"]) == ("claude-opus-4-8", "low")
     pm2 = _claude_frontmatter(ws, "project-manager")
     assert (pm2["model"], pm2["effort"]) == ("claude-opus-5", "high")
 
     se2_toml = _codex_toml_fields(ws, "software-engineer")
-    assert (se2_toml["model"], se2_toml["model_reasoning_effort"]) == ("gpt-5.6-sol", "high")
+    assert (se2_toml["model"], se2_toml["model_reasoning_effort"]) == ("gpt-5.6-sol", "low")
     pm2_toml = _codex_toml_fields(ws, "project-manager")
     assert (pm2_toml["model"], pm2_toml["model_reasoning_effort"]) == ("gpt-5.6-sol", "high")
 

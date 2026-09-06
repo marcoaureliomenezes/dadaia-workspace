@@ -19,7 +19,6 @@ from typing import Literal
 
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
-from dadaia_workspace.infrastructure.public_assets_common import _package_version
 
 # T-021-18: CLAUDE.md is the Claude Code bridge that imports @AGENTS.md — the single
 # source of workspace law. Claude Code reads CLAUDE.md natively and follows the @-import
@@ -103,8 +102,7 @@ def _consumer_repos_for_root(workspace_root: Path) -> list[Path]:
 
     Contexts listed in the registry but absent under ``repos/`` are skipped
     silently (no error, no stderr line). Duplicate ``repo_slug`` values collapse
-    to a single path. The ``_is_self_repo`` skip (the dadaia-workspace source
-    tree) is applied by the callers, not here.
+    to a single path.
 
     Never raises: a missing / unreadable / malformed / non-v2 registry yields an
     empty list — the fan-out and doctor degrade to workspace-root-only, never
@@ -143,53 +141,13 @@ def _consumer_repos_for_root(workspace_root: Path) -> list[Path]:
     return sorted(result)
 
 
-def _is_self_repo(consumer: Path) -> bool:
-    """Return True when *consumer* is the dadaia-workspace repo itself (R14).
-
-    Two independent checks, either of which is sufficient.
-
-    Primary (manifest-based): compares ``package_version`` in the consumer's
-    manifest against the currently installed package version.  A match means
-    the consumer IS the dadaia-workspace source tree.
-
-    Secondary (pyproject-based): if the consumer directory contains a
-    ``pyproject.toml`` whose ``[tool.poetry] name`` or ``[project] name``
-    equals ``"dadaia-workspace"``, treat it as self regardless of whether a
-    manifest exists.  This closes the gap where a fresh clone (no
-    ``.dadaia/agentic/manifest.json`` yet) could be mistakenly scaffolded into
-    the library source tree.
-    """
-    # Secondary check: pyproject.toml name detection (manifest-independent)
-    pyproject_path = consumer / "pyproject.toml"
-    if pyproject_path.exists():
-        try:
-            data = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
-            poetry_name = data.get("tool", {}).get("poetry", {}).get("name", "")
-            project_name = data.get("project", {}).get("name", "")
-            if poetry_name == "dadaia-workspace" or project_name == "dadaia-workspace":
-                return True
-        except (tomllib.TOMLDecodeError, OSError):
-            pass
-
-    # Primary check: manifest version match
-    manifest_path = consumer / ".dadaia" / "agentic" / "manifest.json"
-    if not manifest_path.exists():
-        return False
-    try:
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        consumer_version = manifest.get("package_version", "")
-        return bool(consumer_version and consumer_version == _package_version())
-    except (json.JSONDecodeError, OSError):
-        return False
-
-
 def _is_source_repo_root(path: Path) -> bool:
     """Return True only for the dadaia-workspace source tree root.
 
-    Unlike ``_is_self_repo()``, this intentionally ignores staged manifest
-    versions. A normal temporary consumer workspace becomes version-matching
-    after ``stage()``, and must still be installable. The source-root guard is
-    only for the library checkout that contains the package source itself.
+    This intentionally ignores staged manifest versions: a normal temporary
+    consumer workspace becomes version-matching after ``stage()`` and must still
+    be installable. The source-root guard is only for the library checkout that
+    contains the package source itself.
     """
     pyproject_path = path / "pyproject.toml"
     if not pyproject_path.exists():
@@ -264,10 +222,6 @@ def _install_guardrail_pair(
 
     Hash-compare logic (T-PROP-01): files are overwritten only when the source
     SHA-256 differs from the destination, even when ``force=False``.
-
-    Self-skip (R14): consumer repos whose manifest ``package_version`` matches
-    the installed package version (or whose ``pyproject.toml`` names
-    ``dadaia-workspace``) are skipped — they are the dadaia-workspace source tree.
 
     Consumer detection is registry-based (v0.1.58 FR4): the repos written are
     those registered in ``spec_contexts.json`` whose dir exists on disk. A
@@ -431,12 +385,6 @@ def _install_guardrail_pair(
                 # never raise (trivially true post-validation).
                 _reject_slug(consumer.name)
                 continue
-            if _is_self_repo(consumer):
-                v = _package_version()
-                sys.stderr.write(
-                    f"[skip] {consumer / 'AGENTS.md'} (self-projection — package_version={v})\n"
-                )
-                continue
             _write_pair(consumer, is_consumer=True)
 
     return managed
@@ -479,7 +427,7 @@ def _doctor_consumer_pair_lines(
     re-derived both root and consumer lines is retired). There is no parallel legacy
     consumer-doctor path.
 
-    Per registry-detected consumer repo (self-repo skipped):
+    Per registry-detected consumer repo:
       * **AGENTS.md** — absent → ``[missing]``; no canonical banner → ``[foreign]`` (repo-owned,
         NOT a drift); banner-bearing → ``[ok]``/``[drift]`` vs *source*.
       * **CLAUDE.md** — paired (Ruling 16, CRITICAL): when the AGENTS.md line is ``[foreign]``
@@ -488,7 +436,9 @@ def _doctor_consumer_pair_lines(
         ``public.py:161-172``) EXITS 0 for a hand-authored consumer repo. Otherwise the stub
         check applies (``[ok]``/``[drift]``/``[missing]``).
 
-    Never ``[skip]`` for a real consumer repo.
+    Never ``[skip]`` for a consumer repo — the library checkout included: its
+    hand-authored bannerless AGENTS.md classifies ``[foreign]`` like any repo-owned
+    file, so no generated file exists there without a live generator.
     """
     source_sha = hashlib.sha256(source.read_bytes()).hexdigest()
 
@@ -499,8 +449,6 @@ def _doctor_consumer_pair_lines(
 
     lines: list[DoctorLine] = []
     for consumer in _consumer_repos_for_root(workspace_root):
-        if _is_self_repo(consumer):
-            continue
         slug = consumer.name
         agents_dst = consumer / "AGENTS.md"
         a_label = f"repos/{slug}:AGENTS.md"
