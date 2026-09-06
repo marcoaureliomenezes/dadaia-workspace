@@ -129,6 +129,12 @@ published `0.4.5` + 1 patch) and each closed-scope candidate appends here.
   (bug `g1-fable-guard-matches-only-claude-fable-5-so-fable-5-1-lands-on-security-reviewer`).
 - Ratchet V34 measures the live candidate when one exists and is vacuous in the
   post-ship window (bug `v34-ratchet-asserts-exactly-one-live-release-…`).
+- **Zero open bugs at publication** (operator order): `import-export-workspace-flag-…`
+  (one explicit-path resolver `resolve_cli_workspace_root` for every verb, init-only flag
+  deleted); `public-install-skips-self-projection-…` (self-projection skip deleted, one
+  provenance decider, library `AGENTS.md` hand-authored); `memory-gate-requires-closure-
+  phase-…` (SPEC-DOC-047: memory is closure procedure, never a TASKS.md task).
+- First ship attempt (main 570af642) was never published; this is the re-ship with everything.
 
 
 ## [0.4.5] — 2026-08-31
