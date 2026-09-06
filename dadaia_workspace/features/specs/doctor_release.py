@@ -87,6 +87,12 @@ RELEASE_NAMING_LEGACY_ALLOWLIST: frozenset[str] = frozenset(
 
 # SPEC-DOC-024: phase ↔ markers coherence.
 _TASK_MARKER_RE = re.compile(r"^\s*[-*]?\s*\[([ \-xX])\]", re.MULTILINE)
+# SPEC-DOC-047: a task block runs from its marker line to the next marker line; a
+# ``Write set:`` naming ``specs/memory`` inside it schedules memory as implementation work.
+_TASK_BLOCK_RE = re.compile(
+    r"^\s*[-*]?\s*\[[ \-xX]\][^\n]*(?:\n(?![-*]?\s*\[[ \-xX]\])[^\n]*)*", re.MULTILINE
+)
+_MEMORY_WRITE_SET_RE = re.compile(r"Write set:[^\n]*specs/memory")
 
 
 def read_release_phase(specs_dir: Path, release_id: str) -> str | None:
@@ -299,6 +305,44 @@ class ReleaseValidator:
             return None
         text = tasks.read_text(encoding="utf-8")
         return [m.group(1).lower() for m in _TASK_MARKER_RE.finditer(text)]
+
+    def check_no_memory_task(self) -> list[SpecsDoctorIssue]:
+        """SPEC-DOC-047: memory is closure procedure, never a task. DADAIA.md §6.4 lets
+        ``specs/memory/**`` be written only in DEFINITION/CLOSURE (the gate's RULE A
+        reads no SDD artifact), and §6.7 orders memory update -> closure narrative ->
+        gate AFTER the last task; SPEC-DOC-024 refuses CLOSURE with an open task. A
+        TASKS.md task whose ``Write set:`` names ``specs/memory`` therefore cannot be
+        executed in any phase without toggling the phase twice (bug
+        memory-gate-requires-closure-phase-that-spec-doc-024-forbids-before-last-task):
+        the contradiction is refused at definition, where it is born.
+        """
+        active = self.tree.active_release
+        if active.error or not active.release or active.release == "none":
+            return []
+        tasks = self.specs_dir / "releases" / active.release / "TASKS.md"
+        if not tasks.exists():
+            return []
+        text = tasks.read_text(encoding="utf-8")
+        issues: list[SpecsDoctorIssue] = []
+        for block in _TASK_BLOCK_RE.finditer(text):
+            if _MEMORY_WRITE_SET_RE.search(block.group(0)) is None:
+                continue
+            task_line = block.group(0).splitlines()[0].strip()
+            issues.append(
+                SpecsDoctorIssue(
+                    code="SPEC-DOC-047",
+                    severity=Severity.ERROR,
+                    description=(
+                        f"TASKS.md of release '{active.release}' schedules memory as a "
+                        f"task ({task_line[:80]}): its write set names specs/memory. "
+                        "Memory update is closure procedure (RC-FLOW step 5, DADAIA.md "
+                        "§6.7) run in CLOSURE after the last task — drop the task and "
+                        "keep the memory work in the closure steps."
+                    ),
+                    path=str(tasks),
+                )
+            )
+        return issues
 
     def check_phase_markers_coherence(self) -> list[SpecsDoctorIssue]:
         """SPEC-DOC-024 (v0.5.x, successor to the RELEASE.jsonl fold; v0.5.0

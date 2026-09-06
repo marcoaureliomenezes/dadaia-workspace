@@ -80,8 +80,8 @@ def _add_marker_consumer(workspace_root: Path, slug: str) -> Path:
     """Register a consumer repo under `workspace_root/repos/` (v0.1.58 FR4).
 
     Detection is registry-based (Ruling G): the slug is registered in
-    ``spec_contexts.json``. The manifest is kept for the retained
-    ``_is_self_repo`` self-skip check, not for detection.
+    ``spec_contexts.json``. The manifest only records the consumer's package
+    version; it plays no part in detection.
     """
     consumer = workspace_root / "repos" / slug
     (consumer / ".dadaia" / "agentic").mkdir(parents=True)

@@ -38,7 +38,7 @@ from dadaia_workspace.core.agent_model_templates import (
     default_template,
     list_templates,
 )
-from dadaia_workspace.core.model_registry import registry_by_claude_id
+from dadaia_workspace.core.model_registry import is_fable_model, registry_by_claude_id
 
 pytestmark = pytest.mark.contract
 
@@ -72,43 +72,44 @@ def _core_agents() -> list[Path]:
 #: The FR2 table, pinned verbatim: template id -> agent -> (model, effort).
 _EXPECTED_TEMPLATES: dict[str, dict[str, tuple[str, str]]] = {
     "balanced": {
-        "project-manager": ("claude-fable-5", "high"),
-        "software-architect": ("claude-fable-5", "high"),
-        "product-engineer": ("claude-opus-5", "high"),
-        "project-auditor": ("claude-opus-5", "xhigh"),
-        "security-reviewer": ("claude-opus-5", "xhigh"),
+        "project-manager": ("claude-fable-5-1", "high"),
+        "software-architect": ("claude-fable-5-1", "high"),
+        "product-engineer": ("claude-fable-5-1", "high"),
+        "project-auditor": ("claude-fable-5-1", "high"),
+        "security-reviewer": ("claude-sonnet-5", "xhigh"),
         "code-reviewer": ("claude-opus-5", "high"),
-        "ai-engineer": ("claude-sonnet-5", "high"),
-        "software-engineer": ("claude-sonnet-5", "xhigh"),
-        "qa-engineer": ("claude-sonnet-5", "high"),
+        "ai-engineer": ("claude-opus-5", "medium"),
+        "software-engineer": ("claude-opus-5", "low"),
+        "qa-engineer": ("claude-opus-5", "low"),
     },
     "subscription-saver": {
         "project-manager": ("claude-opus-5", "high"),
         "software-architect": ("claude-opus-5", "high"),
-        "product-engineer": ("claude-sonnet-5", "xhigh"),
-        "project-auditor": ("claude-sonnet-5", "xhigh"),
-        "security-reviewer": ("claude-opus-5", "high"),
-        "code-reviewer": ("claude-sonnet-5", "xhigh"),
-        "ai-engineer": ("claude-sonnet-5", "high"),
-        "software-engineer": ("claude-sonnet-5", "xhigh"),
-        "qa-engineer": ("claude-sonnet-5", "high"),
+        "product-engineer": ("claude-opus-5", "high"),
+        "project-auditor": ("claude-opus-5", "high"),
+        "security-reviewer": ("claude-sonnet-5", "high"),
+        "code-reviewer": ("claude-sonnet-5", "high"),
+        "ai-engineer": ("claude-sonnet-5", "medium"),
+        "software-engineer": ("claude-opus-5", "low"),
+        "qa-engineer": ("claude-sonnet-5", "low"),
     },
     "max-quality": {
-        "project-manager": ("claude-fable-5", "high"),
-        "software-architect": ("claude-fable-5", "high"),
-        "product-engineer": ("claude-fable-5", "high"),
-        "project-auditor": ("claude-fable-5", "high"),
+        "project-manager": ("claude-fable-5-1", "high"),
+        "software-architect": ("claude-fable-5-1", "high"),
+        "product-engineer": ("claude-fable-5-1", "high"),
+        "project-auditor": ("claude-fable-5-1", "high"),
         "security-reviewer": ("claude-opus-5", "xhigh"),
-        "code-reviewer": ("claude-opus-5", "xhigh"),
+        "code-reviewer": ("claude-fable-5-1", "medium"),
         "ai-engineer": ("claude-opus-5", "medium"),
-        "software-engineer": ("claude-sonnet-5", "xhigh"),
-        "qa-engineer": ("claude-opus-5", "high"),
+        "software-engineer": ("claude-opus-5", "low"),
+        "qa-engineer": ("claude-opus-5", "low"),
     },
 }
 
 #: (d) the registry tier each template model must resolve to.
 _MODEL_TIER: dict[str, str] = {
     "claude-fable-5": "deep",
+    "claude-fable-5-1": "deep",
     "claude-opus-5": "dispatch",
     "claude-sonnet-5": "standard",
 }
@@ -147,7 +148,7 @@ def test_builtin_templates_pin_fr2_table_default_and_registry_tiers() -> None:
 def test_no_template_assigns_fable_to_security_reviewer() -> None:
     """(c): G-1 — Fable is NEVER assigned to security-reviewer, in any template."""
     for template in list_templates():
-        assert template.assignments["security-reviewer"].model != "claude-fable-5", (
+        assert not is_fable_model(template.assignments["security-reviewer"].model), (
             f"template {template.id!r} assigns Fable to security-reviewer (G-1 violation)"
         )
 

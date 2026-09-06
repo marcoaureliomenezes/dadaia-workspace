@@ -123,7 +123,8 @@ Write-set paths are relative to `dadaia_workspace/` unless they start with `test
   (`_RELEASE.json` log: summary, size, drifts, test-dispositions, artifact-gc via `dadaia
   doctor`, dispositions) follows T-046-36 as closure procedure, not a task.
   Owner: product-engineer. Commit: `docs(T-046-35): memory — candidate 4`.
-  Write set: specs/memory/**, specs/releases/0.4.6/_RELEASE.json (phase only).
+  Write set: specs/releases/0.4.6/_RELEASE.json (phase only); the memory atoms were
+  written as closure procedure (RC-FLOW step 5), not inside this task (SPEC-DOC-047).
   Blocked by: T-046-32, T-046-34. Delivers: memory is current truth, `dadaia specs doctor` 0
   errors — AC14.
 - [x] T-046-36 — QA on this live instance, then reviews: `dadaia doctor` (dry, counts

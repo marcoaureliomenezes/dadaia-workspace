@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "agent-model-policy-v1",
   "title": "Agent Model Policy Overlay v1",
-  "description": "Operator-editable, validated JSON overlay that selects the Layer-1 agent roster's models: an applied built-in template plus per-agent, per-field overrides. Missing file = library defaults (the 'balanced' template); an invalid file is a loud typed error, never a silent fallback (missing != invalid). One policy governs BOTH L1 projections (.claude/agents/*.md and .codex/agents/*.toml). Hard constraint (G-1/D-7): no combination may resolve claude-fable-5 onto security-reviewer — enforced at template import, store parse, and the panel validate endpoint (semantic checks like registry-known models and known agent names are enforced by the store, beyond this structural schema).",
+  "description": "Operator-editable, validated JSON overlay that selects the Layer-1 agent roster's models: an applied built-in template plus per-agent, per-field overrides. Missing file = library defaults (the 'balanced' template); an invalid file is a loud typed error, never a silent fallback (missing != invalid). One policy governs BOTH L1 projections (.claude/agents/*.md and .codex/agents/*.toml). Hard constraint (G-1/D-7): no combination may resolve a Fable-family model (any registered claude-fable-* id) onto security-reviewer — enforced at template import, store parse, and the panel validate endpoint (semantic checks like registry-known models and known agent names are enforced by the store, beyond this structural schema).",
   "type": "object",
   "required": ["schema_version"],
   "additionalProperties": false,
@@ -34,7 +34,7 @@
         "model": {
           "type": "string",
           "minLength": 1,
-          "description": "Claude model id from core/model_registry (e.g. 'claude-sonnet-5'). Never claude-fable-5 when the agent is security-reviewer (G-1/D-7)."
+          "description": "Claude model id from core/model_registry (e.g. 'claude-sonnet-5'). Never a Fable-family model when the agent is security-reviewer (G-1/D-7)."
         },
         "effort": {
           "$ref": "#/$defs/claudeEffort",

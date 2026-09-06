@@ -121,6 +121,7 @@ RULES: tuple[Rule, ...] = (
         ("SPEC-DOC-045",),
         lambda d, t: d._release.check_pyproject_version_matches_release(d.repo_root),
     ),
+    Rule(("SPEC-DOC-047",), lambda d, t: d._release.check_no_memory_task()),
     Rule(
         ("SPEC-DOC-046",),
         lambda d, t: d._release.check_release_state_filename(),

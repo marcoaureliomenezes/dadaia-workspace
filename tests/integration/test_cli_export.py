@@ -122,3 +122,32 @@ def test_export_refreshes_an_alive_context_branch_from_its_real_checkout(tmp_pat
     assert [(c["name"], c["branch"]) for c in payload["contexts"]] == [("alpha", "feature/test")]
     alpha = source.get("alpha")
     assert alpha is not None and alpha.current_branch == "feature/test"
+
+
+@pytest.mark.parametrize("verb", ["import", "export"])
+def test_explicit_workspace_pointing_at_an_uninitialized_dir_is_refused(
+    tmp_path: Path, verb: str
+) -> None:
+    """Intent: CONTRACT — bug import-export-workspace-flag-re-resolves-through-ancestor-walk:
+    an explicit --workspace is authoritative; a path without its own `.dadaia/` is refused
+    instead of silently resolving to the enclosing live workspace.
+
+    Size: MEDIUM — a real filesystem workspace sentinel driven through the CLI."""
+    live = tmp_path / "live"
+    _workspace(live)
+    registry = live / ".dadaia" / "states" / "spec_contexts.json"
+    before = registry.read_text("utf-8")
+    nested = live / ".dadaia" / "tmp" / "x"
+    nested.mkdir(parents=True)
+
+    source = _workspace(tmp_path / "source")
+    source.save(_ctx("gamma", ContextState.DEAD))
+    assert _runner.invoke(app, ["export", "--workspace", str(tmp_path / "source")]).exit_code == 0
+    payload = tmp_path / "source" / ".dadaia" / "dist" / "spec-contexts.json"
+
+    argv = ["import", str(payload)] if verb == "import" else ["export"]
+    result = _runner.invoke(app, [*argv, "--workspace", str(nested)])
+
+    assert result.exit_code != 0, result.output
+    assert registry.read_text("utf-8") == before
+    assert not (live / ".dadaia" / "dist").exists()
