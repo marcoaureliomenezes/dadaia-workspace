@@ -179,6 +179,19 @@ def registry_by_claude_id() -> dict[str, ModelEntry]:
     return index
 
 
+def fable_model_ids() -> frozenset[str]:
+    """The Fable family — every registered ``claude-fable-*`` id. The G-1 ruling
+    ("Fable is never assigned to security-reviewer") is a FAMILY rule; both guards
+    (template import, policy-store parse) derive it from here, never from one literal
+    id that goes stale at the next Fable release (bug
+    g1-fable-guard-matches-only-claude-fable-5-so-fable-5-1-lands-on-security-reviewer)."""
+    return frozenset(e.claude_id for e in REGISTRY if e.claude_id.startswith("claude-fable-"))
+
+
+def is_fable_model(claude_id: str) -> bool:
+    return claude_id in fable_model_ids()
+
+
 #: The Kimi Code model id (the only model the Kimi CLI runs agents on today).
 #: Single source — the panel per-harness model view and any Kimi projection
 #: derive from this constant, never a scattered literal.

@@ -79,6 +79,7 @@ _CLAUDE_MODEL_IDS = frozenset(
         "claude-opus-4-7",
         "claude-opus-4-6",
         "claude-fable-5",
+        "claude-fable-5-1",
         "claude-sonnet-5",
         "claude-sonnet-4-6",
         "claude-haiku-4-5",

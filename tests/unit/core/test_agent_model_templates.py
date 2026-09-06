@@ -21,7 +21,7 @@ from dadaia_workspace.core.agent_model_templates import (
     list_templates,
     resolve_agent_model,
 )
-from dadaia_workspace.core.model_registry import registry_by_claude_id
+from dadaia_workspace.core.model_registry import is_fable_model, registry_by_claude_id
 from dadaia_workspace.core.models.agent_model_policy import (
     CLAUDE_EFFORTS,
     AgentModelAssignment,
@@ -39,7 +39,7 @@ from dadaia_workspace.core.models.agent_model_policy import (
 
 def test_no_template_assigns_fable_to_security_reviewer() -> None:
     for template in list_templates():
-        assert template.assignments["security-reviewer"].model != "claude-fable-5", template.id
+        assert not is_fable_model(template.assignments["security-reviewer"].model), template.id
 
 
 # ---------------------------------------------------------------------------
@@ -59,15 +59,15 @@ def test_template_ids_default_and_balanced_roster_golden() -> None:
 
     balanced = default_template()
     expected = {
-        "project-manager": ("claude-fable-5", "high"),
-        "software-architect": ("claude-fable-5", "high"),
-        "product-engineer": ("claude-opus-5", "high"),
-        "project-auditor": ("claude-opus-5", "xhigh"),
-        "security-reviewer": ("claude-opus-5", "xhigh"),
+        "project-manager": ("claude-fable-5-1", "high"),
+        "software-architect": ("claude-fable-5-1", "high"),
+        "product-engineer": ("claude-fable-5-1", "high"),
+        "project-auditor": ("claude-fable-5-1", "high"),
+        "security-reviewer": ("claude-sonnet-5", "xhigh"),
         "code-reviewer": ("claude-opus-5", "high"),
-        "ai-engineer": ("claude-sonnet-5", "high"),
-        "software-engineer": ("claude-sonnet-5", "xhigh"),
-        "qa-engineer": ("claude-sonnet-5", "high"),
+        "ai-engineer": ("claude-opus-5", "medium"),
+        "software-engineer": ("claude-opus-5", "low"),
+        "qa-engineer": ("claude-opus-5", "low"),
     }
     assert {a: (v.model, v.effort) for a, v in balanced.assignments.items()} == expected
 
@@ -117,6 +117,13 @@ def _template_with(agent: str, model: str, effort: str, **kwargs: object) -> Age
             # standalone live-registry sweep above).
             "fable_on_security_reviewer",
             lambda: (_template_with("security-reviewer", "claude-fable-5", "high"),),
+            "security-reviewer",
+        ),
+        (
+            # G-1 is a FAMILY rule: the next Fable id is refused too (bug
+            # g1-fable-guard-matches-only-claude-fable-5-so-fable-5-1-lands-on-security-reviewer).
+            "fable_5_1_on_security_reviewer",
+            lambda: (_template_with("security-reviewer", "claude-fable-5-1", "high"),),
             "security-reviewer",
         ),
         (
@@ -187,7 +194,7 @@ def test_codex_effort_clamp_map(claude_effort: str, codex_effort: str) -> None:
             "no_overlay_resolves_balanced_default",
             "software-engineer",
             lambda: None,
-            ("claude-sonnet-5", "xhigh", "default"),
+            ("claude-opus-5", "low", "default"),
         ),
         (
             "applied_template_resolves_source_template",
@@ -197,14 +204,14 @@ def test_codex_effort_clamp_map(claude_effort: str, codex_effort: str) -> None:
         ),
         (
             # AC-3: template subscription-saver + override {SE: model=opus-4-8} →
-            # SE = opus-4-8 (override model) / xhigh (template effort), source=override.
+            # SE = opus-4-8 (override model) / low (template effort), source=override.
             "per_field_override_merges_with_applied_template",
             "software-engineer",
             lambda: AgentModelPolicyOverlay(
                 applied_template="subscription-saver",
                 overrides={"software-engineer": AgentModelOverride(model="claude-opus-4-8")},
             ),
-            ("claude-opus-4-8", "xhigh", "override"),
+            ("claude-opus-4-8", "low", "override"),
         ),
         (
             "effort_only_override_keeps_template_model",
@@ -213,7 +220,7 @@ def test_codex_effort_clamp_map(claude_effort: str, codex_effort: str) -> None:
                 applied_template=None,
                 overrides={"qa-engineer": AgentModelOverride(effort="max")},
             ),
-            ("claude-sonnet-5", "max", "override"),
+            ("claude-opus-5", "max", "override"),
         ),
         (
             "full_override_beats_template",
@@ -237,7 +244,7 @@ def test_codex_effort_clamp_map(claude_effort: str, codex_effort: str) -> None:
                 applied_template="subscription-saver",
                 overrides={"software-engineer": AgentModelOverride(model="claude-opus-4-8")},
             ),
-            ("claude-sonnet-5", "high", "template"),
+            ("claude-sonnet-5", "low", "template"),
         ),
     ],
 )

@@ -59,6 +59,20 @@ Left exactly as written; a future task can pick this up.
 Open-scope release (ADRs 0005–0009): version minted at birth from the PyPI lineage
 (latest published `0.4.6` + 1 patch); each closed-scope candidate appends here.
 
+### Operator changes (2026-09-06, pre-candidate)
+- **Agent model templates re-tabled** (`core/agent_model_templates.py`): Fable 5.1 on
+  project-manager, software-architect, product-engineer and project-auditor
+  (balanced/max-quality; Opus 5 in subscription-saver); software-engineer Opus 5 · low
+  everywhere; ai-engineer Opus 5 · medium (Sonnet 5 · medium in saver); qa-engineer
+  Opus 5 · low (Sonnet 5 · low in saver); code-reviewer Opus 5 · high / Sonnet 5 · high
+  / Fable 5.1 · medium; security-reviewer Sonnet 5 except max-quality (Opus 5 · xhigh).
+- **G-1 guard is a Fable-family predicate** (`core/model_registry.fable_model_ids`):
+  template import, policy-store parse and the panel validate endpoint refuse every
+  registered `claude-fable-*` id on security-reviewer, not the literal `claude-fable-5`
+  (bug `g1-fable-guard-matches-only-claude-fable-5-so-fable-5-1-lands-on-security-reviewer`).
+- Ratchet V34 measures the live candidate when one exists and is vacuous in the
+  post-ship window (bug `v34-ratchet-asserts-exactly-one-live-release-…`).
+
 ## [0.4.6] — 2026-09-04
 
 Open-scope release under the release-candidates model it implements (ADRs
