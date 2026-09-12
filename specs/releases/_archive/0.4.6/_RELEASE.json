@@ -17,7 +17,6 @@
     "ts": "2026-09-06T15:05:36Z",
     "pr": 249
   },
-  "audited": null,
   "log": [
     {
       "ts": "2026-08-31T18:16:56Z",
@@ -58,19 +57,19 @@
     {
       "ts": "2026-08-31T20:46:54Z",
       "agent": "product-engineer",
-      "kind": "closure-review",
+      "kind": "reviews",
       "text": "Trio review round 1: three REJECTED verdicts on 92283f67 (QA: 2 stale dd-diagnose memory citations; code-review: stale instance scoped laws + citation/anchor residue; security: CDN+mermaid securityLevel:loose in HTML-REPORT.md contradicting the self-contained reports law). All findings reworked in 9dbd8488 + the closure memory commit: HTML-REPORT rewritten self-contained (deletion-shaped), instance laws synced via specs doctor --fix, memory citations repointed, anchors made resolvable. Re-review requested on the new head."
     },
     {
       "ts": "2026-08-31T20:46:54Z",
       "agent": "product-engineer",
-      "kind": "closure-test-dispositions",
+      "kind": "test-dispositions",
       "text": "One test added (tests/contract/test_verdict_vocabulary.py, Intent: CONTRACT, SMALL, RED-proven pre-fix). No demotions due, no quarantine, no SCAFFOLD expiry: the candidate touched no LARGE tests."
     },
     {
       "ts": "2026-08-31T20:46:54Z",
       "agent": "product-engineer",
-      "kind": "closure-artifact-gc",
+      "kind": "artifact-gc",
       "text": "Working artifacts: 0 files under .dadaia/tmp for this candidate (all scratch lived in the harness scratchpad outside the workspace); 3 review handoffs under .dadaia/handoff/dadaia-workspace/ kept as trio evidence; kept 3 / deleted 0."
     },
     {
@@ -118,7 +117,7 @@
     {
       "ts": "2026-09-03T12:40:41Z",
       "agent": "project-manager",
-      "kind": "ratifications",
+      "kind": "note",
       "text": "Dispatcher ratifications under 'slop dies in the change that finds it' (operator implementation order 2026-09-03): fragments live under public/data/fixed (context alive copied the scaffold image — bug fixed 42e94c04); T-046-20 also touched .gitignore:/CLAUDE.md and .github/scripts/check_no_repo_local_claude.sh (the bridge is now law, ruling 9), tests/helpers/suite_files.py tree= kwarg, test_context_alive_scaffold_commit.py; SPEC §8 baselines re-measured by the ratchet modules (V31 160/52/40 -> pinned, V32 422->912 counting docstring lines, V33 105->51 with the ratified families exempt); law cleanups ac3167df (reviews/** retired from four personas) and 4bd29279 (memory rules line, qa-engineer ALPHA-*-QA glob, recipe R-13); f77c711d registered claude-fable-5-1 in the model registry so the instance overlay could select the frontier model for all nine sub-agents (operator order; no task record — code-reviewer F1)."
     },
     {
@@ -136,7 +135,7 @@
     {
       "ts": "2026-09-03T12:40:41Z",
       "agent": "project-manager",
-      "kind": "closure-artifact-gc",
+      "kind": "artifact-gc",
       "text": "Instance sweep (runtime): reports cleanup --older-than 30d deleted 12 paths then, after bug reports-cleanup-skips-handoffs-without-artifact-path (b4ac0207), 670 handoff-first handoffs; handoffs 912 -> 239, handoffs older than 30 d = 0; tmp gc: .dadaia/tmp 8.9 GB -> 408 MB; 37 reports kept, 0 important. Every 2026-09-03 handoff kept."
     },
     {
@@ -160,7 +159,7 @@
     {
       "ts": "2026-09-04T01:02:22Z",
       "agent": "project-manager",
-      "kind": "ratifications",
+      "kind": "note",
       "text": "Candidate 4 (workspace instance compliance: one zone registry, one doctor) SPEC/PLAN/TASKS ratified Aprovado by the operator after a 16-question dd-grill-me (handoff 2026-09-03T140000Z-claude-workspace-compliance-grill) and the software-architect DRAFT (handoff 2026-09-03T153000Z). Trio committed at bcd02b21; 13 tasks T-046-24..36; phase IMPLEMENTATION on feature/0.4.6, version 0.4.6 kept."
     },
     {
@@ -190,7 +189,7 @@
     {
       "ts": "2026-09-04T04:16:27Z",
       "agent": "project-manager",
-      "kind": "closure-artifact-gc",
+      "kind": "artifact-gc",
       "text": "Live instance: dadaia doctor before 4741/11900 (40%), 7,159 findings; --fix applied 7,178 repairs (7,121 deleted, 64 skipped errno 13), reports/ academy/ logs/ runs/ zones gone, states/ within canon (lifecycle/ audit/ .ws_lock workflow_model_policy* root_exceptions.txt removed, instance_exceptions.txt migrated deduplicated, harness_profile.json seeded), dist/ holds spec-contexts.json only, 402 MB of expired tmp reclaimed; after 4874/4931 (99%) — the 57 remaining findings are one root-owned June directory the operator removes with sudo. Evidence .dadaia/tmp/qa-engineer/20260904/."
     },
     {
