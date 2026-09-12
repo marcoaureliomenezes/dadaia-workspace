@@ -56,7 +56,7 @@
   `dadaia_workspace/core/release_state.py`, `dadaia_workspace/features/specs/
   candidate.py`, `specs/releases/**`, `tests/**`. Blocked by: T-047-06.
   Delivers: the validator refuses any phase or kind outside the enum.
-- [ ] T-047-08 — FR4 bugs: terminal verbs write `closed_at`; `bugs archive` and
+- [-] T-047-08 — FR4 bugs: terminal verbs write `closed_at`; `bugs archive` and
   SPEC-DOC-041 age by `closed_at`; one-time back-fill of the 507 live terminal
   records from the ledger's commit dates (own commit); validator refuses
   `closed_at < ts`. Write set: `dadaia_workspace/core/models/bugs.py`,
